@@ -7,26 +7,25 @@
 //!   Basic auth applies to every hostname of the Ingress. Its users are htpasswd lines with bcrypt
 //!   hashes in a Secret; the password itself is not stored. The Ingress owns the middlewares and
 //!   the Secret, so they go when it goes.
-//! - **On an `HTTPRoute`** a redirect is a `RequestRedirect` filter [gw-redirect]. The filter
-//!   applies to every hostname of the route, and Gateway API refuses it next to `backendRefs`. Thus
-//!   a hostname that shares its route first moves to a new route of its own, with the same parents
-//!   and rules, named as "Add domain" names one. Then its rules become one redirect rule. The rules
-//!   from before are kept in the annotation [`REDIRECT_RULES_ANNOTATION`], and stopping the
-//!   redirect writes them back; without it, the route gets one rule to the workload's first
-//!   Service. Gateway API has no basic auth filter, so basic auth on an `HTTPRoute` is refused.
+//! - **On an `HTTPRoute`** a redirect is a rule with a `RequestRedirect` filter [gw-redirect],
+//!   first in `spec.rules`. A filter applies to every hostname of the route, so a hostname that
+//!   shares its route first moves to a new route of its own, with the same parents and rules, named
+//!   as "Add domain" names one. Gateway API refuses the filter next to `backendRefs` in one rule,
+//!   so the redirect rule has none. It copies the `matches` of every other rule: of rules that
+//!   match a request equally, the first in list order wins [gw-precedence]. The other rules stay,
+//!   and stopping the redirect removes the redirect rule. Gateway API has no basic auth filter, so
+//!   basic auth on an `HTTPRoute` is refused.
 //!
 //! [traefik-mw]: https://doc.traefik.io/traefik/reference/routing-configuration/kubernetes/ingress/
 //! [gw-redirect]: https://gateway-api.sigs.k8s.io/reference/spec/#httprequestredirectfilter
+//! [gw-precedence]: https://gateway-api.sigs.k8s.io/reference/spec/#httprouterule
 
 use base64::Engine as _;
 use k8s_openapi::api::core::v1::Secret;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use serde_json::{Value, json};
 use sha2::{Digest as _, Sha256};
-use zeabur_adapters::error_pages::MAINTENANCE_ANNOTATION;
-use zeabur_adapters::gateway::{REDIRECT_RULES_ANNOTATION, redirect_rules};
 use zeabur_adapters::traefik::{self, MIDDLEWARES_ANNOTATION};
-use zeabur_model::WorkloadRef;
 
 use crate::change::{BasicAuthUser, Change, ObjectName, RouteKind, RouteRef, Target, Warning};
 use crate::checks::ResourceRef;
@@ -43,6 +42,11 @@ const TRAEFIK_GROUP: &str = "traefik.io";
 const MIDDLEWARE_VERSION: &str = "v1alpha1";
 /// Traefik checks the hash on each request, so a higher cost slows every page.
 const BCRYPT_COST: u32 = 10;
+/// The most rules, matches in one rule and matches in all rules of an `HTTPRoute` (Gateway API
+/// v1.6 CRD validation).
+const RULES_MAX: usize = 16;
+const RULE_MATCHES_MAX: usize = 64;
+const MATCHES_MAX: usize = 128;
 
 pub(crate) fn middleware_resource() -> ResourceRef {
     ResourceRef {
@@ -91,7 +95,6 @@ impl Planner<'_> {
     pub(crate) fn redirect(
         &mut self,
         route: &RouteRef,
-        workload: &WorkloadRef,
         hostname: &str,
         to: Option<&str>,
         permanent: bool,
@@ -127,7 +130,7 @@ impl Planner<'_> {
             }
             RouteKind::HttpRoute => {
                 let (name, object) = self.own_http_route(&route.name, object, hostname)?;
-                self.redirect_http_route(&name, &object, workload, to.as_deref(), permanent)?;
+                self.redirect_http_route(&name, &object, to.as_deref(), permanent)?;
             }
         }
         if to.is_some() && permanent {
@@ -221,7 +224,8 @@ impl Planner<'_> {
             .flat_map(|t| array(t, "/hosts"))
             .filter_map(|h| h.as_str().map(str::to_owned))
             .collect();
-        let plain: Vec<String> = hosts(&object, RouteKind::Ingress)
+        let plain: Vec<String> = RouteKind::Ingress
+            .hosts(&object)
             .into_iter()
             .filter(|h| !tls.contains(h))
             .collect();
@@ -252,12 +256,8 @@ impl Planner<'_> {
         hostname: &str,
     ) -> Result<Value, PlanError> {
         let (object, meta, services) = self.route(route)?;
-        let kind = match route.kind {
-            RouteKind::Ingress => "Ingress",
-            RouteKind::HttpRoute => "HTTPRoute",
-        };
-        Self::refuse_managed(&meta, kind, &route.name)?;
-        if !hostname.is_empty() && !hosts(&object, route.kind).iter().any(|h| h == hostname) {
+        Self::refuse_managed(&meta, route.kind.kind_name(), &route.name)?;
+        if !hostname.is_empty() && !route.kind.hosts(&object).iter().any(|h| h == hostname) {
             return Err(error(
                 ErrorKind::NotFound,
                 "unknown_host",
@@ -352,60 +352,75 @@ impl Planner<'_> {
         &mut self,
         name: &str,
         object: &Value,
-        workload: &WorkloadRef,
         to: Option<&str>,
         permanent: bool,
     ) -> Result<(), PlanError> {
-        let before = array(object, "/spec/rules");
-        let redirecting = before.iter().any(|rule| {
-            array(rule, "/filters")
-                .iter()
-                .any(|f| f.get("type").and_then(Value::as_str) == Some("RequestRedirect"))
-        });
-        let kept = redirect_rules(&meta_of(object));
-        // The rules to write, and the kept rules after: unchanged for `None`, removed for "".
-        let (rules, annotation) = if let Some(to) = to {
-            let rules = json!([{"filters": [{"type": "RequestRedirect", "requestRedirect": {
-                "scheme": "https",
-                "hostname": to,
-                "statusCode": if permanent { 301 } else { 302 },
-            }}]}]);
-            let keep = (!redirecting).then(|| Value::Array(before).to_string());
-            (rules, keep)
-        } else if !redirecting {
-            return Err(error(
-                ErrorKind::NotFound,
-                "not_redirected",
-                format!("HTTPRoute {name} does not redirect."),
-            ));
-        } else if let Some(kept) = kept.filter(|k| !k.is_empty()) {
-            (Value::Array(kept), Some(String::new()))
-        } else {
-            let route = RouteRef {
-                kind: RouteKind::HttpRoute,
-                name: name.to_owned(),
-            };
-            let (service, port) = self.first_endpoint(workload, &route)?;
-            let annotation = redirect_rules(&meta_of(object)).map(|_| String::new());
-            (
-                json!([{"backendRefs": [{"name": service, "port": port}]}]),
-                annotation,
-            )
-        };
+        let rules = array(object, "/spec/rules");
+        let found = redirect_rule(object);
         let index = self.working(http_route_target(name), object.clone());
         self.claim(index, &[Step::field("spec"), Step::field("rules")], "rules")?;
-        let operations = match object.pointer("/spec/rules") {
-            Some(before) => vec![
-                test("/spec/rules", before.clone()),
-                replace("/spec/rules", rules),
-            ],
-            None => vec![add("/spec/rules", rules)],
+        let Some(to) = to else {
+            let Some(at) = found else {
+                return Err(error(
+                    ErrorKind::NotFound,
+                    "not_redirected",
+                    format!("HTTPRoute {name} does not redirect."),
+                ));
+            };
+            let path = format!("/spec/rules/{at}");
+            let rule = rules.get(at).cloned().unwrap_or_default();
+            return self.patch(index, vec![test(&path, rule), remove(&path)]);
         };
-        self.patch(index, operations)?;
-        if let Some(annotation) = annotation {
-            self.set_annotation(index, REDIRECT_RULES_ANNOTATION, &annotation)?;
+        let filters = json!([{"type": "RequestRedirect", "requestRedirect": {
+            "scheme": "https",
+            "hostname": to,
+            "statusCode": if permanent { 301 } else { 302 },
+        }}]);
+        if let Some(at) = found {
+            let path = format!("/spec/rules/{at}/filters");
+            let before = rules
+                .get(at)
+                .and_then(|r| r.get("filters"))
+                .cloned()
+                .unwrap_or_default();
+            return self.patch(index, vec![test(&path, before), replace(&path, filters)]);
         }
-        Ok(())
+        // A rule without matches matches every path, as a `PathPrefix` of `/`.
+        let every = json!({"path": {"type": "PathPrefix", "value": "/"}});
+        let mut matches: Vec<Value> = Vec::new();
+        for rule in &rules {
+            let own = array(rule, "/matches");
+            for entry in if own.is_empty() {
+                vec![every.clone()]
+            } else {
+                own
+            } {
+                if !matches.contains(&entry) {
+                    matches.push(entry);
+                }
+            }
+        }
+        let total: usize = rules
+            .iter()
+            .map(|r| array(r, "/matches").len().max(1))
+            .sum::<usize>()
+            + matches.len();
+        if rules.len() >= RULES_MAX || matches.len() > RULE_MATCHES_MAX || total > MATCHES_MAX {
+            return Err(error(
+                ErrorKind::Invalid,
+                "too_many_rules",
+                format!(
+                    "HTTPRoute {name} has too many rules or matches for a redirect rule that copies them; add the redirect with kubectl."
+                ),
+            ));
+        }
+        let rule = json!({"matches": matches, "filters": filters});
+        let operation = if object.pointer("/spec/rules").is_some() {
+            add("/spec/rules/0", rule)
+        } else {
+            add("/spec/rules", json!([rule]))
+        };
+        self.patch(index, vec![operation])
     }
 
     /// `HTTPRoute` `name` as read, when `hostname` is its only hostname. Otherwise the hostname
@@ -428,13 +443,7 @@ impl Planner<'_> {
         let own = self.own_route_name(&services, name, hostname)?;
         let meta = meta_of(&object);
         let mut annotations = meta.annotations.clone().unwrap_or_default();
-        for key in [
-            LAST_APPLIED,
-            MAINTENANCE_ANNOTATION,
-            REDIRECT_RULES_ANNOTATION,
-        ] {
-            annotations.remove(key);
-        }
+        annotations.remove(LAST_APPLIED);
         let mut metadata = json!({"name": own, "namespace": self.input.snapshot.namespace});
         if let Some(map) = metadata.as_object_mut() {
             if let Some(labels) = &meta.labels {
@@ -466,35 +475,6 @@ impl Planner<'_> {
             to: ObjectName::of("HTTPRoute", &own),
         });
         Ok((own, body))
-    }
-
-    /// The first Service of `workload` and its first port, for `route` to send requests to.
-    pub(crate) fn first_endpoint(
-        &self,
-        workload: &WorkloadRef,
-        route: &RouteRef,
-    ) -> Result<(String, i32), PlanError> {
-        self.workload(workload)?;
-        self.project
-            .services
-            .iter()
-            .find(|s| s.workload.kind == workload.kind && s.workload.name == workload.name)
-            .and_then(|s| self.project.endpoints_of(s).next())
-            .map(|e| (e.name.clone(), e.ports.first().map_or(80, |p| p.port)))
-            .ok_or_else(|| {
-                let kind = match route.kind {
-                    RouteKind::Ingress => "Ingress",
-                    RouteKind::HttpRoute => "HTTPRoute",
-                };
-                error(
-                    ErrorKind::Invalid,
-                    "no_service",
-                    format!(
-                        "{} has no Kubernetes Service for {kind} {} to send requests to.",
-                        workload.name, route.name
-                    ),
-                )
-            })
     }
 
     pub(crate) fn fetched_middleware(&self, name: &str) -> Option<Value> {
@@ -652,18 +632,15 @@ fn htpasswd(user: &BasicAuthUser, salt: &[u8; 16]) -> Result<String, PlanError> 
     ))
 }
 
-fn hosts(object: &Value, kind: RouteKind) -> Vec<String> {
-    let values = match kind {
-        RouteKind::Ingress => array(object, "/spec/rules")
-            .iter()
-            .filter_map(|r| r.get("host").cloned())
-            .collect(),
-        RouteKind::HttpRoute => array(object, "/spec/hostnames"),
-    };
-    values
-        .iter()
-        .filter_map(|v| v.as_str().map(str::to_owned))
-        .collect()
+/// The index of the redirect rule of `HTTPRoute` `object`: a rule with a `RequestRedirect`
+/// filter and no `backendRefs`.
+pub(crate) fn redirect_rule(object: &Value) -> Option<usize> {
+    array(object, "/spec/rules").iter().position(|rule| {
+        array(rule, "/backendRefs").is_empty()
+            && array(rule, "/filters")
+                .iter()
+                .any(|f| f.get("type").and_then(Value::as_str) == Some("RequestRedirect"))
+    })
 }
 
 pub(crate) fn meta_of(object: &Value) -> ObjectMeta {

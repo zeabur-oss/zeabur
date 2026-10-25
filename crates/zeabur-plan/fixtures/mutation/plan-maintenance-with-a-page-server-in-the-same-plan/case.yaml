@@ -1,6 +1,9 @@
-description: "A page server created in the same plan serves maintenance: the hostname's paths go to its maintenance port, and the errors middleware names it."
+description: "A page server created in the same plan serves maintenance: the maintenance Ingress sends to its maintenance port."
 operation: mutation.plan
 params:
+  kinds:
+    - {group: traefik.io, kind: Middleware, plural: middlewares, namespaced: true}
+    - {group: "", kind: Service, plural: services, namespaced: true}
   request:
     changes:
       - op: maintenance

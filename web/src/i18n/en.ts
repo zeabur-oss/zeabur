@@ -1444,9 +1444,6 @@ export const en = {
     `${host} is HTTP only. An administrator can name a cert-manager issuer to make new domains HTTPS`,
   "warn.httpOnlyElsewhere": (host: string, route: string) =>
     `${host} is HTTP only: ${route}'s certificates don't come from cert-manager, so add ${host} where they're made`,
-  "warn.gatewayChosen": (gateway: string, of: number) =>
-    `Attaches the public domain to Gateway ${gateway} (${of} found)`,
-  "warn.gatewaysUnreadable": "Unable to read Gateways: the public domain won't attach to one",
   "warn.secretValuesUnknown": (name: string) =>
     `Unable to read ${name}'s values: the diff shows keys only`,
   "warn.configNotRolledBack": (workload: string) =>
@@ -1620,8 +1617,7 @@ export const en = {
     `Stop running ${name} on schedule. A run already going keeps going, and Run now still works.`,
   "confirm.resumeTask": (name: string) => `Run ${name} on schedule again.`,
   "confirm.redirect": (host: string, to: string) => `Send visitors of ${host} to ${to}.`,
-  "confirm.redirectOff": (host: string, service: string) =>
-    `Show ${service} on ${host} again, without the redirect.`,
+  "confirm.redirectOff": (host: string) => `Stop redirecting ${host}.`,
   "confirm.envImport": (kind: string, name: string, service: string) =>
     `${service} reads every key of ${kind} ${name} as variables. Its replicas restart.`,
   "confirm.publicPort": (port: number, name: string) =>
@@ -1868,6 +1864,11 @@ export const en = {
   "data.noChanges": "No changes.",
   "net.addDomain": "Add domain",
   "net.domain": "Domain",
+  "net.routeKind": "Route",
+  "net.viaIngress": "Ingress (default)",
+  "net.viaGateway": (gateway: string, listener: string) =>
+    `Gateway ${gateway}, listener ${listener}`,
+  "net.gatewayHttps": "HTTPS comes from the Gateway's listener.",
   "diagnosis.title": "What's wrong",
   "diagnosis.evidence": "Evidence",
   "diagnosis.replica": "Replica",
@@ -1899,8 +1900,6 @@ export const en = {
   "fix.readiness": (container: string) => `Add a traffic check to ${container}`,
   "fix.addVolume": (container: string, path: string) => `Keep ${path} of ${container} on a volume`,
   "fix.isolateProject": (project: string) => `Isolate the services of ${project}`,
-  "fix.httpRoute": (ingress: string) => `Route ${ingress} through the Gateway`,
-  "fix.httpRouteNote": "The Ingress stays. Delete it once the new route works.",
   "gap.unreadable": "Some checks need rights you don't have.",
   "install.title": "Install",
   "install.helm": "Run these commands where helm and kubectl can reach the cluster.",
@@ -3740,7 +3739,6 @@ export const en = {
   "domainAccess.protected": "Password protected",
   "domainAccess.kube.annotation": "Middleware list",
   "domainAccess.kube.redirect": "Redirect",
-  "domainAccess.kube.kept": "Rules from before",
   "domainAccess.kube.password": "Password",
   "domainAccess.kube.users": "Users",
   "domainAccess.kube.usersValue": (name: string) =>
@@ -3798,8 +3796,10 @@ export const en = {
     "Error pages template: Deployment, Service, ConfigMaps and NetworkPolicy error-pages, labelled zeabur.com/page-server",
   "domainPages.kube.errors": "Error pages",
   "domainPages.kube.maintenance": "Maintenance",
-  "domainPages.kube.maintenanceValue":
-    "The domain's backend becomes the maintenance port of the page server. Annotation zeabur.com/maintenance-backend keeps the one it had",
+  "domainPages.kube.maintenanceIngress": (route: string) =>
+    `A second Ingress sends every request for the domain to the maintenance page. Its router.priority is higher than ${route}'s, and it is deleted with ${route}`,
+  "domainPages.kube.maintenanceWeights": (route: string) =>
+    `HTTPRoute ${route} sends every request to the maintenance port of the page server; its other backends get weight 0`,
   "ports.title": "Public ports",
   "ports.about":
     "Clients outside the cluster connect straight to a port, without a domain. For services that don't speak HTTP, such as a database.",
@@ -3885,8 +3885,6 @@ export const en = {
     `${host} moves from ${from} to a route of its own, ${to}`,
   "warn.routeDeleted": (route: string, host: string) =>
     `${route} routes only ${host}, so it is deleted with it`,
-  "warn.maintenanceRestored": (host: string, service: string, port: number) =>
-    `The rules of ${host} changed during maintenance, so the paths that show the maintenance page go to ${service}:${port}, not to the backends they had before`,
   "warn.permanentRedirect": (host: string) =>
     `Browsers remember a permanent redirect: if you remove it later, earlier visitors of ${host} still go to the old target until they clear their cache`,
   "warn.publicDatabase": (name: string) =>

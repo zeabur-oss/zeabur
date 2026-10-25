@@ -27,6 +27,8 @@ description: 將網域接到服務，設定 HTTPS 憑證、轉址與訪客密碼
 
 叢集有多個簽發者時，表單會出現 **簽發者**，可以保留預設或改選另一個。如果這個網域拿不到憑證，檢查變更時會提示它只有 HTTP。
 
+叢集有 Gateway 接受這個專案的路由時，表單會多一個 **路由**，預設是 **Ingress（預設）**，也可以選某個 Gateway 的 listener，網域就會用 HTTPRoute 掛在那個 Gateway 上。選了 Gateway 就不會出現簽發者，HTTPS 憑證由 listener 提供。只有能讀取叢集 Gateway 的帳號看得到這個選項，看不到時請叢集管理員幫忙。
+
 </Step>
 <Step>
 
@@ -36,7 +38,7 @@ description: 將網域接到服務，設定 HTTPS 憑證、轉址與訪客密碼
 
 ![儲存前確認 web 的變更：app.example.com 會連到 web，並使用 HTTPS](https://oss.zeabur.com/shots/zeabur/zh-TW/light/domain-review.avif)
 
-表單沒有連接埠欄位，所以要在檢查時看 **轉送到** 的服務和連接埠。服務已經有路由時，新網域加在同一個 Ingress 上，沿用它的後端。沒有路由時，Zeabur 建立新的 Ingress，轉送到服務第一個 Kubernetes Service 的第一個連接埠。
+表單沒有連接埠欄位，所以要在檢查時看 **轉送到** 的服務和連接埠。服務已經有 Ingress 時，新網域加在同一個 Ingress 上，沿用它的後端。只有 HTTPRoute 時，新網域加在那條 HTTPRoute 上。都沒有時，Zeabur 建立新的 Ingress，轉送到服務第一個 Kubernetes Service 的第一個連接埠。選了 Gateway 時，新網域加在那個 Gateway 上轉送到這個服務的 HTTPRoute，沒有就建一條新的。
 
 </Step>
 <Step>
@@ -152,13 +154,13 @@ kubectl get clusterissuer letsencrypt-dns
 
 按 **加入變更**，從頁面下方檢查並套用，再開啟來源網域測試。轉址只對這個網域生效，同一個 Ingress 的其他網域照樣顯示原服務。萬用字元網域不能當轉址的來源或目標。
 
-HTTPRoute 的轉址作用在整條路由。同一條 HTTPRoute 還有其他網域時，這個網域會移到自己的路由，其他網域留在原處。
+HTTPRoute 的轉址作用在整條路由。同一條 HTTPRoute 還有其他網域時，這個網域會移到自己的路由，其他網域留在原處。Zeabur 在路由最前面加一條轉址規則，比對原本所有規則的路徑；原本的規則留著不動，取消轉址時只拿掉這一條。
 
 要取消轉址，在同一個面板改選 **顯示 web**（`web` 是服務名稱），再加入變更並套用。
 
 ## 讓訪客先輸入密碼
 
-在網域列按 **app.example.com 的轉址或密碼**，開啟 **要求輸入密碼**，填入 **使用者名稱** 與 **密碼**。使用者名稱不能有空格或冒號，密碼至少 8 個字元，最多 72 個位元組。密碼只能設在 Traefik 提供的 Ingress 上。Gateway API 沒有要求輸入密碼的 filter，所以 HTTPRoute 的網域無法設定密碼。
+在網域列按 **app.example.com 的轉址或密碼**，開啟 **要求輸入密碼**，填入 **使用者名稱** 與 **密碼**。使用者名稱不能有空格或冒號，密碼至少 8 個字元，最多 72 個位元組。密碼只能設在 Traefik 提供的 Ingress 上，HTTPRoute 的網域目前無法在這裡設定密碼。
 
 <Callout type="warn">
 先確認受保護的所有網域都有 HTTPS。HTTP 上的 Basic auth 會把登入資訊以明文傳送。

@@ -1,14 +1,54 @@
 {
   "objects": [
     {
-      "target": {"apiVersion": "gateway.networking.k8s.io/v1", "kind": "HTTPRoute", "plural": "httproutes", "name": "web-www"},
+      "target": {
+        "kind": "HTTPRoute",
+        "name": "web-www"
+      },
       "write": {
         "type": "patch",
         "operations": [
-          {"op": "test", "path": "/metadata/resourceVersion", "value": "5"},
-          {"op": "test", "path": "/spec/rules", "value": [{"backendRefs": [{"name": "web", "port": 8080}]}]},
-          {"op": "replace", "path": "/spec/rules", "value": [{"filters": [{"type": "RequestRedirect", "requestRedirect": {"scheme": "https", "hostname": "shop.example.test", "statusCode": 302}}]}]},
-          {"op": "add", "path": "/metadata/annotations", "value": {"zeabur.com/redirect-rules": "[{\"backendRefs\":[{\"name\":\"web\",\"port\":8080}]}]"}}
+          {
+            "op": "test",
+            "path": "/metadata/resourceVersion",
+            "value": "5"
+          },
+          {
+            "op": "add",
+            "path": "/spec/rules/0",
+            "value": {
+              "filters": [
+                {
+                  "requestRedirect": {
+                    "hostname": "shop.example.test",
+                    "scheme": "https",
+                    "statusCode": 302
+                  },
+                  "type": "RequestRedirect"
+                }
+              ],
+              "matches": [
+                {
+                  "headers": [
+                    {
+                      "name": "x-version",
+                      "value": "2"
+                    }
+                  ],
+                  "path": {
+                    "type": "PathPrefix",
+                    "value": "/api"
+                  }
+                },
+                {
+                  "path": {
+                    "type": "PathPrefix",
+                    "value": "/"
+                  }
+                }
+              ]
+            }
+          }
         ]
       }
     }

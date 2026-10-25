@@ -1,0 +1,10 @@
+description: "Another Ingress of the hostname that names its router.priority counts with that priority, so the maintenance Ingress gets one more."
+operation: mutation.plan
+params:
+  kinds: [{group: traefik.io, kind: Middleware, plural: middlewares, namespaced: true}]
+  request:
+    changes:
+      - op: maintenance
+        route: {kind: Ingress, name: shop}
+        hostname: www.shop.example.test
+        enabled: true

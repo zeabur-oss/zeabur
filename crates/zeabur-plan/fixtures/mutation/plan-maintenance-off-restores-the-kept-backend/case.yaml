@@ -1,9 +1,0 @@
-description: "Stopping maintenance writes back the backends from zeabur.com/maintenance-backend, removes the annotation, and leaves the errors middleware's query without hostnames; a middleware from before the query named them catches 503 again."
-operation: mutation.plan
-params:
-  request:
-    changes:
-      - op: maintenance
-        route: {kind: Ingress, name: shop}
-        hostname: www.shop.example.test
-        enabled: false

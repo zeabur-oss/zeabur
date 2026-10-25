@@ -1,0 +1,26 @@
+{
+  "objects": [
+    {
+      "target": {
+        "kind": "HTTPRoute",
+        "name": "web-a-example-test"
+      },
+      "write": {
+        "type": "patch",
+        "operations": [
+          {
+            "op": "test",
+            "path": "/metadata/resourceVersion",
+            "value": "3"
+          },
+          {
+            "op": "add",
+            "path": "/spec/hostnames/-",
+            "value": "b.example.test"
+          }
+        ]
+      }
+    }
+  ],
+  "warnings": []
+}

@@ -19,7 +19,7 @@ import PlusIcon from "~icons/ph/plus"
 import SlidersHorizontalIcon from "~icons/ph/sliders-horizontal"
 import TrashIcon from "~icons/ph/trash"
 
-import { clusterIssuersQuery, clusterQuery, traceQuery } from "@/api/queries"
+import { clusterIssuersQuery, clusterQuery, projectGatewaysQuery, traceQuery } from "@/api/queries"
 import { DnsHint, DomainSetup, DomainState } from "@/components/domain-setup"
 import { GateTip, useGate } from "@/components/gate"
 import { ReviewWord, useDraft } from "@/components/plan/draft"
@@ -50,6 +50,7 @@ import { domainsLead, filterRoutes, needsSetup, plainFirst } from "@/model/domai
 import { stagedDomains, stagedSettings } from "@/model/draft"
 import type { Gate } from "@/model/rights"
 import { canIssue } from "@/model/cluster-issuers"
+import { offered, parentOf } from "@/model/gateways"
 import { isLongList } from "@/model/lists"
 import {
   endpointsOf,
@@ -223,12 +224,12 @@ export function NetworkingTab({
               <HostForm
                 value={adding}
                 hint={hint}
-                chooseIssuer
+                choices={project}
                 onCancel={() => setAdding(undefined)}
-                onReview={(host, certificate) => {
+                onReview={(host, choice) => {
                   planner.plan({
                     title: t("title.addDomain", host),
-                    changes: [{ op: "addDomain", workload, hostname: host, ...certificate }],
+                    changes: [{ op: "addDomain", workload, hostname: host, ...choice }],
                   })
                   setAdding(undefined)
                 }}
@@ -860,29 +861,36 @@ function Managed({ tool, gate, children }: { tool?: string; gate: Gate; children
   )
 }
 
-type Certificate = Pick<Schemas["AddDomainChange"], "certificate">
+type Choice = Pick<Schemas["AddDomainChange"], "certificate" | "parent">
 
 function HostForm({
   value,
   hint,
-  chooseIssuer = false,
+  choices,
   onCancel,
   onReview,
 }: {
   value: string
   /** What the typed host will need, once it is a host name. */
   hint?: (host: string) => ReactNode
-  /** Offer the cluster's issuers besides the default one. */
-  chooseIssuer?: boolean
+  /** The project whose Gateways and the cluster's issuers to offer, for a new domain. */
+  choices?: string
   onCancel: () => void
-  onReview: (host: string, certificate: Certificate) => void
+  onReview: (host: string, choice: Choice) => void
 }) {
   const t = useT()
   const [issuer, setIssuer] = useState("")
+  const [gateway, setGateway] = useState("")
+  const gateways =
+    useQuery({ ...projectGatewaysQuery(choices ?? ""), enabled: choices !== undefined }).data
+      ?.gateways ?? []
   const form = useForm({
     defaultValues: { host: value },
     onSubmit: ({ value: { host } }) => {
-      if (isHost(host)) onReview(host.trim().toLowerCase(), issuerChoice(issuer))
+      if (!isHost(host)) return
+      const name = host.trim().toLowerCase()
+      const parent = offered(gateways, name).includes(gateway) ? parentOf(gateway) : undefined
+      onReview(name, parent ? { parent } : issuerChoice(issuer))
     },
   })
   return (
@@ -926,17 +934,59 @@ function HostForm({
           }
         </form.Subscribe>
       ) : null}
-      {chooseIssuer ? (
+      {choices ? (
         <form.Subscribe selector={(s) => s.values.host.trim().toLowerCase()}>
-          {(host) => <IssuerChoice host={host} value={issuer} onChange={setIssuer} />}
+          {(host) => {
+            const listeners = offered(gateways, host)
+            const chosen = listeners.includes(gateway) ? gateway : ""
+            return (
+              <>
+                <GatewayChoice listeners={listeners} value={chosen} onChange={setGateway} />
+                {chosen ? null : <IssuerChoice host={host} value={issuer} onChange={setIssuer} />}
+              </>
+            )
+          }}
         </form.Subscribe>
       ) : null}
     </form>
   )
 }
 
-const issuerChoice = (issuer: string): Certificate =>
+const issuerChoice = (issuer: string): Pick<Choice, "certificate"> =>
   issuer ? { certificate: { from: "issuer", name: issuer } } : {}
+
+/** Ingress, or one of `listeners`. Shown only when there is one. */
+function GatewayChoice({
+  listeners,
+  value,
+  onChange,
+}: {
+  listeners: string[]
+  value: string
+  onChange: (gateway: string) => void
+}) {
+  const t = useT()
+  if (listeners.length === 0) return null
+  const items = listeners.map((l) => {
+    const [namespace, name, listener] = l.split("/")
+    return { value: l, label: t("net.viaGateway", `${namespace}/${name}`, listener ?? "") }
+  })
+  return (
+    <div className="flex w-full flex-wrap items-center gap-2">
+      <span className="type-meta w-12 shrink-0 text-muted-foreground">{t("net.routeKind")}</span>
+      <Select
+        size="sm"
+        className="sm:w-72"
+        value={value}
+        onValueChange={(next) => onChange(String(next))}
+        items={[{ value: "", label: t("net.viaIngress") }, ...items]}
+      />
+      {value ? (
+        <span className="type-meta text-muted-foreground">{t("net.gatewayHttps")}</span>
+      ) : null}
+    </div>
+  )
+}
 
 /** The issuer of a new domain: the default one, or another the person may read. Shown only when
  * there is a choice; a wildcard host needs a DNS-01 issuer. */
@@ -957,10 +1007,12 @@ function IssuerChoice({
   const chosen = issuers.find((i) => i.name === (value || data?.default))
   return (
     <div className="flex w-full flex-wrap items-center gap-2">
-      <span className="type-meta text-muted-foreground">{t("domainCert.issuer")}</span>
+      <span className="type-meta w-12 shrink-0 text-muted-foreground">
+        {t("domainCert.issuer")}
+      </span>
       <Select
         size="sm"
-        className="sm:w-60"
+        className="sm:w-72"
         value={value}
         onValueChange={(next) => onChange(String(next))}
         items={[

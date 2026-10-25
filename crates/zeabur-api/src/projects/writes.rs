@@ -65,7 +65,7 @@ use zeabur_core::problem::{AppliedObject, Kind, MEDIA_TYPE as PROBLEM, Problem, 
 use zeabur_kube::k8s_openapi::api::storage::v1::StorageClass;
 use zeabur_kube::k8s_openapi::jiff::Timestamp;
 use zeabur_kube::{Cluster, ClusterExt as _, ObjectTarget, Preconditions, WriteBody, WriteRequest};
-use zeabur_plan::{Change, ErrorKind, GatewayRef, Input, Plan, PlanError, PlanRequest, Write};
+use zeabur_plan::{Change, ErrorKind, Input, Plan, PlanError, PlanRequest, Write};
 
 use crate::cluster::s3_destinations;
 use crate::error::{ApiError, project_read, read_problem};
@@ -168,11 +168,8 @@ async fn compute(
         .changes
         .iter()
         .any(|c| matches!(c, Change::AddDomain(_)));
-    let gateways: Option<Vec<GatewayRef>> = if wants_gateways {
-        cluster
-            .gateways()
-            .await
-            .map_err(|e| ApiError::from(e.into_problem("the Gateways")))?
+    let gateways = if wants_gateways {
+        super::gateways::attachable(cluster, project).await?
     } else {
         Some(Vec::new())
     };

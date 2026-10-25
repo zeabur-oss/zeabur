@@ -1,0 +1,54 @@
+{
+  "objects": [
+    {
+      "target": {
+        "kind": "HTTPRoute",
+        "name": "web-www"
+      },
+      "write": {
+        "type": "patch",
+        "operations": [
+          {
+            "op": "test",
+            "path": "/metadata/resourceVersion",
+            "value": "5"
+          },
+          {
+            "op": "test",
+            "path": "/spec/rules/0/backendRefs/0/weight",
+            "value": 1
+          },
+          {
+            "op": "replace",
+            "path": "/spec/rules/0/backendRefs/0/weight",
+            "value": 0
+          },
+          {
+            "op": "add",
+            "path": "/spec/rules/0/backendRefs/-",
+            "value": {
+              "name": "error-pages",
+              "port": 8081,
+              "weight": 1
+            }
+          },
+          {
+            "op": "add",
+            "path": "/spec/rules/1/backendRefs/0/weight",
+            "value": 0
+          },
+          {
+            "op": "add",
+            "path": "/spec/rules/1/backendRefs/-",
+            "value": {
+              "name": "error-pages",
+              "port": 8081,
+              "weight": 1
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "warnings": []
+}

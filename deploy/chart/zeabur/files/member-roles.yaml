@@ -72,6 +72,10 @@ zeabur-project-viewer:
   - apiGroups: [gateway.networking.k8s.io]
     resources: [httproutes]
     verbs: [get, list, watch]
+  # Traefik middlewares on an Ingress: redirects, passwords and error pages.
+  - apiGroups: [traefik.io]
+    resources: [middlewares]
+    verbs: [get, list, watch]
   - apiGroups: [metrics.k8s.io]
     resources: [pods]
     verbs: [get, list]
@@ -180,6 +184,11 @@ zeabur-project-developer:
     verbs: [get, list, watch]
   - apiGroups: [gateway.networking.k8s.io]
     resources: [httproutes]
+    verbs: [get, list, watch, create, update, patch, delete]
+  # Traefik reads a Middleware only from its own namespace (`allowCrossNamespace: false`), so it
+  # changes only this project's routers.
+  - apiGroups: [traefik.io]
+    resources: [middlewares]
     verbs: [get, list, watch, create, update, patch, delete]
   - apiGroups: [metrics.k8s.io]
     resources: [pods]

@@ -1,11 +1,10 @@
-description: "A redirect on an HTTPRoute that serves only its hostname replaces the rules with one RequestRedirect rule, as Gateway API refuses the filter next to backendRefs. The rules from before are kept in an annotation."
+description: "A redirect on an HTTPRoute that serves only its hostname inserts a RequestRedirect rule first, as Gateway API refuses the filter next to backendRefs. The rule copies the matches of every rule, a rule without matches as a PathPrefix of /, so it wins over each of them; the other rules stay."
 operation: mutation.plan
 params:
   request:
     changes:
       - op: redirect
         route: {kind: HTTPRoute, name: web-www}
-        workload: {kind: Deployment, name: web}
         hostname: www.shop.example.test
         to: shop.example.test
         permanent: false

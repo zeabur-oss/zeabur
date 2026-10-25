@@ -102,12 +102,11 @@ function resolved(form: RedirectForm, existing: Existing) {
 
 function redirectChanges(
   route: Schemas["RouteRef"],
-  workload: Schemas["WorkloadRef"],
   host: string,
   existing: Existing,
   next: { mode: Mode; to: string; permanent: boolean },
 ): Change[] {
-  const base = { op: "redirect", route, workload, hostname: host } as const
+  const base = { op: "redirect", route, hostname: host } as const
   if (next.mode === "serve") return existing ? [{ ...base, permanent: true }] : []
   const same = existing && next.to === existing.to && next.permanent === existing.permanent
   return same ? [] : [{ ...base, to: next.to, permanent: next.permanent }]
@@ -177,7 +176,7 @@ export default function DomainAccessDrawer({
   const password = gateway ? { ...passwordForm, on: false } : passwordForm
   const problems = problemsOf(t, host, target, password)
   const changes = [
-    ...redirectChanges(routeRef, workload, host, existing, target),
+    ...redirectChanges(routeRef, host, existing, target),
     ...passwordChanges(routeRef, password, protectedNow),
   ]
   const nothing = tried && changes.length === 0
@@ -240,8 +239,7 @@ function GatewayAccess({ route }: { route: string }) {
       <p className="type-meta text-muted-foreground">{t("domainAccess.gatewayNoPassword")}</p>
       <KubeDetails
         facts={[
-          [t("domainAccess.kube.redirect"), `HTTPRoute/${route} RequestRedirect`],
-          [t("domainAccess.kube.kept"), `HTTPRoute/${route} zeabur.com/redirect-rules`],
+          [t("domainAccess.kube.redirect"), `HTTPRoute/${route} spec.rules[0] RequestRedirect`],
         ]}
       />
     </>

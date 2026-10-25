@@ -1,0 +1,10 @@
+description: "Stopping maintenance deletes the maintenance Ingress of the hostname, and leaves the Ingress as it is."
+operation: mutation.plan
+params:
+  kinds: [{group: traefik.io, kind: Middleware, plural: middlewares, namespaced: true}]
+  request:
+    changes:
+      - op: maintenance
+        route: {kind: Ingress, name: shop}
+        hostname: www.shop.example.test
+        enabled: false

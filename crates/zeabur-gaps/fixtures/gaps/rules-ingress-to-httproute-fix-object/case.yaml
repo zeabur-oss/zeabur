@@ -1,8 +1,0 @@
-description: The fix of an Ingress that should become an HTTPRoute carries that HTTPRoute, for a plan to create - the Ingress's hosts, paths and backends, a named Service port as its number, attached to the first Gateway.
-operation: gaps.rules
-params:
-  rules: [ingress-to-httproute]
-  gatewayApi: true
-  gateways:
-    - namespace: kube-system
-      name: traefik

@@ -89,7 +89,7 @@ pub(crate) fn relations_of(snapshot: &Snapshot, all: &[Workload<'_>]) -> Vec<Rel
     }
     let mut routes = Vec::new();
     for ingress in &snapshot.ingresses {
-        route_relations(&selected, ingress, &mut routes);
+        route_relations(&selected, &snapshot.ingresses, ingress, &mut routes);
     }
     out.append(&mut routes);
     // Relations that compare equal are identical, so an unstable sort gives the same list.
@@ -404,26 +404,27 @@ fn selector_relations(
 }
 
 /// An Ingress belongs to the workloads its backend Services select (`selected`, by Service
-/// name).
+/// name). A maintenance Ingress belongs to the workloads of the Ingress that owns it.
 fn route_relations(
     selected: &BTreeMap<&str, Vec<&WorkloadRef>>,
+    ingresses: &[Ingress],
     ingress: &Ingress,
     out: &mut Vec<Relation>,
 ) {
     let name = name_of(&ingress.metadata);
-    let kept: Vec<String> = error_pages::maintenance(&ingress.metadata)
-        .unwrap_or_default()
-        .values()
-        .flat_map(error_pages::ingress_services)
-        .collect();
-    let kept_at = format!(
-        "metadata.annotations[{}]",
-        error_pages::MAINTENANCE_ANNOTATION
-    );
-    let backends = ingress_backends(ingress)
-        .into_iter()
-        .chain(kept.iter().map(|s| (s.as_str(), kept_at.clone())));
-    for (service, path) in backends {
+    let (routed, owned) = match error_pages::maintenance_of(ingress) {
+        Some((owner, _)) => match ingresses.iter().find(|i| name_of(&i.metadata) == owner) {
+            Some(owner) => (owner, true),
+            None => return,
+        },
+        None => (ingress, false),
+    };
+    for (service, path) in ingress_backends(routed) {
+        let path = if owned {
+            "metadata.ownerReferences".to_owned()
+        } else {
+            path
+        };
         for &workload in selected.get(service).into_iter().flatten() {
             out.push(relation(
                 workload,

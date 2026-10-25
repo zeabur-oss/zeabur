@@ -774,15 +774,24 @@ fn shop() -> NamespaceObjects {
                     "backend": {"service": {"name": "web", "port": {"name": "http"}}}}]}}],
                     "tls": [{"hosts": ["shop.example.com", "www.shop.example.com"], "secretName": "shop-tls"}]},
                 "status": {"loadBalancer": {"ingress": [{"ip": ENTRY}]}}})),
-            // The API shows the maintenance page.
+            // The API shows the maintenance page, through an Ingress of its own that outranks it.
             from::<Ingress>(json!({"metadata": {"name": "api", "namespace": "shop",
-                    "annotations": {"zeabur.com/maintenance-backend":
-                        r#"{"api.shop.example.com":[{"service":{"name":"api","port":{"name":"http"}}}]}"#,
-                        "cert-manager.io/cluster-issuer": "letsencrypt"}},
+                    "uid": "0e9b1c44-6a43-4c55-9d0b-7f3f2a1d0002",
+                    "annotations": {"cert-manager.io/cluster-issuer": "letsencrypt"}},
                 "spec": {"rules": [{"host": "api.shop.example.com", "http": {"paths": [{"path": "/", "pathType": "Prefix",
-                    "backend": {"service": {"name": "error-pages", "port": {"number": 8081}}}}]}}],
+                    "backend": {"service": {"name": "api", "port": {"name": "http"}}}}]}}],
                     "tls": [{"hosts": ["api.shop.example.com"], "secretName": "api-tls"}]},
                 "status": {"loadBalancer": {"ingress": [{"ip": ENTRY}]}}})),
+            from::<Ingress>(
+                json!({"metadata": {"name": "api-api-shop-example-com-maintenance", "namespace": "shop",
+                    "ownerReferences": [{"apiVersion": "networking.k8s.io/v1", "kind": "Ingress",
+                        "name": "api", "uid": "0e9b1c44-6a43-4c55-9d0b-7f3f2a1d0002"}],
+                    "annotations": {"traefik.ingress.kubernetes.io/router.priority": "48"}},
+                "spec": {"rules": [{"host": "api.shop.example.com", "http": {"paths": [{"path": "/", "pathType": "Prefix",
+                    "backend": {"service": {"name": "error-pages", "port": {"name": "maintenance"}}}}]}}],
+                    "tls": [{"hosts": ["api.shop.example.com"], "secretName": "api-tls"}]},
+                "status": {"loadBalancer": {"ingress": [{"ip": ENTRY}]}}}),
+            ),
         ],
         // A Gateway API route: redirects and maintenance work, a password and error pages don't.
         http_routes: vec![json!({
@@ -1970,6 +1979,13 @@ fn state() -> State {
                 "ClusterRoleBinding",
                 false,
             ),
+            ServedResource::readable(
+                "gateway.networking.k8s.io",
+                "v1",
+                "gateways",
+                "Gateway",
+                true,
+            ),
         ]
         .into_iter()
         .chain(velero_served())
@@ -1987,6 +2003,18 @@ fn state() -> State {
         }])
         .collect(),
         dynamic: [
+            // The Gateway of the shop's HTTPRoute, which accepts routes from every namespace.
+            from(json!({
+                "apiVersion": "gateway.networking.k8s.io/v1", "kind": "Gateway",
+                "metadata": {"name": "public", "namespace": "gateway", "resourceVersion": "1"},
+                "spec": {"gatewayClassName": "traefik", "listeners": [
+                    {"name": "web", "port": 8000, "protocol": "HTTP",
+                     "allowedRoutes": {"namespaces": {"from": "All"}}},
+                    {"name": "websecure", "port": 8443, "protocol": "HTTPS",
+                     "hostname": "*.shop.example.com",
+                     "allowedRoutes": {"namespaces": {"from": "All"}}}
+                ]}
+            })),
             from(json!({
                 "apiVersion": "traefik.io/v1alpha1", "kind": "Middleware",
                 "metadata": {"name": "web-error-pages", "namespace": "shop",

@@ -81,7 +81,6 @@ describe("draft", () => {
     const redirect = (to: string): Change => ({
       op: "redirect",
       route,
-      workload,
       hostname: "a.example.com",
       to,
     })

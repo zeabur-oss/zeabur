@@ -66,23 +66,26 @@ mod tests {
             }))
             .unwrap(),
         ];
-        let page = json!([{"name": "error-pages", "port": 8081}]);
         let routes = [
             json!({
-                "metadata": {"name": "down", "namespace": "demo", "annotations": {
-                    "zeabur.com/maintenance-backend":
-                        r#"{"down.example.test":[[{"name":"web","port":8080}]]}"#
-                }},
-                "spec": {"hostnames": ["down.example.test"], "rules": [{"backendRefs": page}]}
+                "metadata": {"name": "down", "namespace": "demo"},
+                "spec": {"hostnames": ["down.example.test"], "rules": [{"backendRefs": [
+                    {"name": "web", "port": 8080, "weight": 0},
+                    {"name": "error-pages", "port": 8081, "weight": 1}
+                ]}]}
             }),
             json!({
-                "metadata": {"name": "moved", "namespace": "demo", "annotations": {
-                    "zeabur.com/redirect-rules": r#"[{"backendRefs":[{"name":"web","port":8080}]}]"#
-                }},
-                "spec": {"hostnames": ["moved.example.test"], "rules": [{"filters": [{
-                    "type": "RequestRedirect",
-                    "requestRedirect": {"hostname": "example.test", "statusCode": 301}
-                }]}]}
+                "metadata": {"name": "moved", "namespace": "demo"},
+                "spec": {"hostnames": ["moved.example.test"], "rules": [
+                    {
+                        "matches": [{"path": {"type": "PathPrefix", "value": "/"}}],
+                        "filters": [{
+                            "type": "RequestRedirect",
+                            "requestRedirect": {"hostname": "example.test", "statusCode": 301}
+                        }]
+                    },
+                    {"backendRefs": [{"name": "web", "port": 8080}]}
+                ]}
             }),
         ];
         let mut project = project(&snapshot);
@@ -91,6 +94,7 @@ mod tests {
         let down = project.route("down").unwrap();
         assert_eq!(down.origin.kind, "HTTPRoute");
         assert_eq!(down.maintenance, ["down.example.test"]);
+        assert_eq!(down.rules.len(), 1);
         assert_eq!(down.rules[0].service, "web");
         let moved = project.route("moved").unwrap();
         assert_eq!(moved.rules[0].service, "web");

@@ -20,6 +20,7 @@ mod project;
 mod public_port;
 pub mod releases;
 mod reload;
+mod route;
 pub mod rules;
 mod settings;
 mod shared;
@@ -31,9 +32,9 @@ pub use certificates::{CheckedCertificate, IssuerRead, own_secret_name};
 pub use change::{
     AddDomainChange, BasicAuthUser, BuildOptionsChange, CertificateChange, CertificateSource,
     Change, ConnectionRef, CopyS3KeysChange, DataEdit, DataKind, EnvImportChange, ErrorPageHtml,
-    FieldOwners, HttpOnlyReason, KeptReason, LabelVolumeChange, ObjectName, Plan, PlanRequest,
-    PlannedObject, ProbeKind, PublicPortChange, RouteKind, RouteRef, Target, TemplateChange,
-    Warning, Write,
+    FieldOwners, GatewayParent, HttpOnlyReason, KeptReason, LabelVolumeChange, ObjectName, Plan,
+    PlanRequest, PlannedObject, ProbeKind, PublicPortChange, RouteKind, RouteRef, Target,
+    TemplateChange, Warning, Write,
 };
 pub use checks::{AccessMode, ProbeHandler, ProbeRequest, ResourceRef, VolumeRequest};
 pub use create::{ServedKind, created_object, resolve};
@@ -47,5 +48,6 @@ pub use project::project_namespace;
 pub use public_port::public_service_name;
 pub use releases::{Release, ReleasePods};
 pub use rules::{EnvEdit, EnvValueFrom, FieldChange};
-pub use zeabur_kernel::names::{Conventions, GatewayRef};
+pub use zeabur_adapters::gateway::{Attachable, Listener, attachable};
+pub use zeabur_kernel::names::Conventions;
 pub use zeabur_model::TaskConcurrency;

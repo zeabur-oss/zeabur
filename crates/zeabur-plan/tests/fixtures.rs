@@ -15,7 +15,7 @@ mod tests {
     };
     use zeabur_plan::rules::{EnvEdit, diff, route_name, validate_env, validate_hostname};
     use zeabur_plan::{
-        CheckedCertificate, Fetched, GatewayRef, Input, IssuerRead, PlanRequest, Release,
+        Attachable, CheckedCertificate, Fetched, Input, IssuerRead, PlanRequest, Release,
         ServedKind, StorageClassInfo, plan,
     };
 
@@ -157,18 +157,20 @@ mod tests {
         let params = &fixture.case.params;
         let (snapshot, routes) = snapshot(fixture);
         let request: PlanRequest = from_value(params["request"].clone()).unwrap();
-        let gateways: Option<Vec<GatewayRef>> = match params.get("gateways") {
+        // Gateway objects, of which the plan sees those that accept a route from the namespace
+        // (labelled `namespaceLabels`); `null` when they cannot be listed.
+        let gateways: Option<Vec<Attachable>> = match params.get("gateways") {
             Some(Value::Null) => None,
-            Some(list) => Some(
-                list.as_array()
-                    .unwrap()
-                    .iter()
-                    .map(|g| GatewayRef {
-                        namespace: g["namespace"].as_str().unwrap().to_owned(),
-                        name: g["name"].as_str().unwrap().to_owned(),
-                    })
-                    .collect(),
-            ),
+            Some(list) => {
+                let labels: BTreeMap<String, String> =
+                    from_value(params.get("namespaceLabels").cloned().unwrap_or_default())
+                        .unwrap_or_default();
+                Some(zeabur_plan::attachable(
+                    list.as_array().unwrap(),
+                    &snapshot.namespace,
+                    &labels,
+                ))
+            }
             None => Some(Vec::new()),
         };
         let secret_values: BTreeMap<String, BTreeMap<String, Vec<u8>>> = params

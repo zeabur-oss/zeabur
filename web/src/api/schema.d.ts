@@ -1312,6 +1312,23 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  "/api/v1/projects/{project}/gateways": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** The Gateways a new `HTTPRoute` of the project can attach to. */
+    get: operations["listProjectGateways"]
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   "/api/v1/projects/{project}/github-app": {
     parameters: {
       query?: never
@@ -2290,6 +2307,7 @@ export interface components {
       certificate?: components["schemas"]["CertificateSource"] | null
       /** @description The hostname. */
       hostname: string
+      parent?: components["schemas"]["GatewayParent"] | null
       /** @description The workload. */
       workload: components["schemas"]["WorkloadRef"]
     }
@@ -4775,6 +4793,24 @@ export interface components {
      * @enum {string}
      */
     GapSeverity: "warning" | "advice"
+    /** @description A Gateway, or one of its listeners, that a new `HTTPRoute` attaches to. */
+    GatewayParent: {
+      /** @description The Gateway's name. */
+      name: string
+      /** @description The Gateway's namespace. */
+      namespace: string
+      /** @description The listener; absent: every listener that accepts the route. */
+      sectionName?: string | null
+    }
+    /** @description A Gateway that accepts an `HTTPRoute` from the project. */
+    GatewayView: {
+      /** @description The listeners that accept the route. */
+      listeners: components["schemas"]["ListenerView"][]
+      /** @description The Gateway's name. */
+      name: string
+      /** @description The Gateway's namespace. */
+      namespace: string
+    }
     /** @description How to make a generated value: random bytes, then encoded. */
     Generated: {
       /**
@@ -5326,6 +5362,13 @@ export interface components {
       /** @description `GitHub` or `Google`. */
       provider: string
     }
+    /** @description A listener of a Gateway. */
+    ListenerView: {
+      /** @description The hostname it serves; absent when it serves every hostname. */
+      hostname?: string | null
+      /** @description The listener's name, a parent's `sectionName`. */
+      name: string
+    }
     /** @description A service's log lines over a range, every pod's, also those replaced since. */
     LogHistory: {
       /** @description `projects/{project}/services/{kind}/{name}/logs/history`. */
@@ -5387,7 +5430,6 @@ export interface components {
       hostname: string
       /** @description The route. */
       route: components["schemas"]["RouteRef"]
-      workload?: components["schemas"]["WorkloadRef"] | null
     }
     /** @description What a plan changes, and the token that applies it. */
     MaintenancePlan: {
@@ -6390,20 +6432,6 @@ export interface components {
         }
       | {
           /** @enum {string} */
-          code: "gatewayChosen"
-          /** @description Its name. */
-          name: string
-          /** @description Its namespace. */
-          namespace: string
-          /** @description How many Gateways there are. */
-          of: number
-        }
-      | {
-          /** @enum {string} */
-          code: "gatewaysUnreadable"
-        }
-      | {
-          /** @enum {string} */
           code: "secretValuesUnknown"
           /** @description The Secret. */
           name: string
@@ -6580,19 +6608,6 @@ export interface components {
           hostname: string
           /** @description The route. */
           route: components["schemas"]["ObjectName"]
-        }
-      | {
-          /** @enum {string} */
-          code: "maintenanceRestored"
-          /** @description The hostname. */
-          hostname: string
-          /**
-           * Format: int32
-           * @description Its port.
-           */
-          port: number
-          /** @description The Service. */
-          service: string
         }
       | {
           /** @enum {string} */
@@ -7044,6 +7059,13 @@ export interface components {
     ProjectExtensions: {
       networkPolicy?: components["schemas"]["NetworkPolicyReachability"] | null
     }
+    /** @description The Gateways a project's new `HTTPRoute` can attach to. */
+    ProjectGateways: {
+      /** @description The Gateways, by namespace and name. */
+      gateways: components["schemas"]["GatewayView"][]
+      /** @description Whether you may list the cluster's Gateways. When not, `gateways` is empty. */
+      readable: boolean
+    }
     /** @description The installations granted to a project. */
     ProjectGitHubApp: {
       /** @description The installations, by account. */
@@ -7388,11 +7410,6 @@ export interface components {
       route: components["schemas"]["RouteRef"]
       /** @description The hostname to redirect to; absent stops the redirect. */
       to?: string | null
-      /**
-       * @description The workload the route sends requests to. An `HTTPRoute` that stops redirecting sends
-       *     them to it again.
-       */
-      workload: components["schemas"]["WorkloadRef"]
     }
     /** @description How a variable points at a database service. */
     Refers: {
@@ -11789,6 +11806,36 @@ export interface operations {
         }
         content: {
           "application/json": components["schemas"]["GapList"]
+        }
+      }
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
+  listProjectGateways: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description The project's namespace */
+        project: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["ProjectGateways"]
         }
       }
       403: {

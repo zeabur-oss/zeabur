@@ -44,7 +44,7 @@ crate never depends on a module.
 | `resource-limits` | a container without CPU and memory requests or a memory limit | Kubernetes resource management, Pod quality of service classes |
 | `health-checks` | a long-running container behind a Service without a readiness probe | Kubernetes container probes |
 | `ephemeral-data` | an official database image (postgres, mysql, mariadb, mongo, redis, valkey, rabbitmq) whose data directory is on no persistent volume | Kubernetes volumes and persistent volumes, each image's Dockerfile |
-| `ingress-to-httproute` | an Ingress of a retired controller, or one that can move to Gateway API | Kubernetes Ingress, the ingress-nginx retirement notice, Gateway API's migration guide |
+| `ingress-to-httproute` | an Ingress of a retired controller | Kubernetes Ingress, the ingress-nginx retirement notice, Gateway API's migration guide |
 
 ## Words
 

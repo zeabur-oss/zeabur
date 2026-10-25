@@ -1349,9 +1349,6 @@ export const zhCN: Messages = {
     `${host} 只有 HTTP。管理员指定 cert-manager 的签发者后，新域名会使用 HTTPS`,
   "warn.httpOnlyElsewhere": (host: string, route: string) =>
     `${host} 只有 HTTP：${route} 的证书不是由 cert-manager 签发的，请到生成证书的地方加入 ${host}`,
-  "warn.gatewayChosen": (gateway: string, of: number) =>
-    `公开域名会连接到 Gateway ${gateway}（共找到 ${of} 个）`,
-  "warn.gatewaysUnreadable": "无法读取 Gateway：公开域名不会连接到 Gateway",
   "warn.secretValuesUnknown": (name: string) => `无法读取 ${name} 的值：差异只列出键名`,
   "warn.configNotRolledBack": (workload: string) =>
     `${workload} 读取 ConfigMap 或 Secret：回滚不会改动它们的内容`,
@@ -1492,7 +1489,7 @@ export const zhCN: Messages = {
     `${name} 不再定时运行。正在运行的那次会继续，“立即运行”也仍可使用。`,
   "confirm.resumeTask": (name) => `${name} 恢复定时运行。`,
   "confirm.redirect": (host, to) => `把 ${host} 的访客转到 ${to}。`,
-  "confirm.redirectOff": (host, service) => `取消重定向，${host} 重新显示 ${service}。`,
+  "confirm.redirectOff": (host) => `取消 ${host} 的重定向。`,
   "confirm.envImport": (kind, name, service) =>
     `${service} 把 ${kind} ${name} 的每个键都当作变量读取。它的副本会重启。`,
   "confirm.publicPort": (port, name) => `把 ${name} 的端口 ${port} 开放到互联网。`,
@@ -1731,6 +1728,10 @@ export const zhCN: Messages = {
   "data.noChanges": "没有变更。",
   "net.addDomain": "添加域名",
   "net.domain": "域名",
+  "net.routeKind": "路由",
+  "net.viaIngress": "Ingress（默认）",
+  "net.viaGateway": (gateway, listener) => `Gateway ${gateway} 的 ${listener} listener`,
+  "net.gatewayHttps": "HTTPS 证书由 Gateway 的 listener 提供。",
   "diagnosis.title": "出了什么问题",
   "diagnosis.evidence": "依据",
   "diagnosis.replica": "副本",
@@ -1761,8 +1762,6 @@ export const zhCN: Messages = {
   "fix.readiness": (container: string) => `为 ${container} 添加就绪检查`,
   "fix.addVolume": (container, path) => `把 ${container} 的 ${path} 存到卷上`,
   "fix.isolateProject": (project: string) => `隔离 ${project} 的服务`,
-  "fix.httpRoute": (ingress) => `改由 Gateway 转发 ${ingress}`,
-  "fix.httpRouteNote": "原来的 Ingress 会保留，新路由正常后再删掉它。",
   "gap.unreadable": "部分检查需要你没有的权限。",
   "install.title": "安装",
   "install.helm": "在能用 helm 和 kubectl 连到集群的电脑上运行这些命令。",
@@ -3426,7 +3425,6 @@ export const zhCN: Messages = {
   "domainAccess.protected": "密码保护",
   "domainAccess.kube.annotation": "Middleware 列表",
   "domainAccess.kube.redirect": "重定向",
-  "domainAccess.kube.kept": "原来的规则",
   "domainAccess.kube.password": "密码",
   "domainAccess.kube.users": "用户",
   "domainAccess.kube.usersValue": (name) =>
@@ -3481,8 +3479,10 @@ export const zhCN: Messages = {
     "Error pages 模板：名为 error-pages 的 Deployment、Service、ConfigMap 和 NetworkPolicy，带标签 zeabur.com/page-server",
   "domainPages.kube.errors": "错误页面",
   "domainPages.kube.maintenance": "维护",
-  "domainPages.kube.maintenanceValue":
-    "域名的后端改为页面服务器的维护端口，原来的后端记在注解 zeabur.com/maintenance-backend",
+  "domainPages.kube.maintenanceIngress": (route) =>
+    `另建一份 Ingress，这个域名的请求都发到维护页。它的 router.priority 比 ${route} 高，删除 ${route} 时会一起删除`,
+  "domainPages.kube.maintenanceWeights": (route) =>
+    `HTTPRoute ${route} 把其他后端的权重改为 0，所有请求都发到页面服务器的维护端口`,
   "ports.title": "对外端口",
   "ports.about": "集群外的客户端不经域名，直接连到端口。适合不走 HTTP 的服务，例如数据库。",
   "ports.open": "开放端口",
@@ -3560,8 +3560,6 @@ export const zhCN: Messages = {
     `任务使用 ${service} 当前的镜像 ${image}。之后 ${service} 换镜像，任务不会跟着换`,
   "warn.domainMoved": (host, from, to) => `${host} 从 ${from} 移到自己的路由 ${to}`,
   "warn.routeDeleted": (route, host) => `${route} 只用于 ${host}，所以会一起删除`,
-  "warn.maintenanceRestored": (host, service, port) =>
-    `维护期间 ${host} 的规则改过，原来的后端对不上，显示维护页的路径会改发到 ${service}:${port}`,
   "warn.permanentRedirect": (host) =>
     `浏览器会记住永久重定向：之后即使取消，来过的访客清除缓存前，打开 ${host} 仍会转到旧的域名`,
   "warn.publicDatabase": (name) => `${name} 是数据库：面对互联网，只剩它自己的密码保护数据`,

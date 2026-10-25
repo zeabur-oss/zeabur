@@ -1,0 +1,67 @@
+{
+  "objects": [
+    {
+      "target": {
+        "kind": "Ingress",
+        "name": "web-www-shop-example-test-maintenance"
+      },
+      "write": {
+        "type": "create",
+        "body": {
+          "apiVersion": "networking.k8s.io/v1",
+          "kind": "Ingress",
+          "metadata": {
+            "annotations": {
+              "traefik.ingress.kubernetes.io/router.entrypoints": "websecure",
+              "traefik.ingress.kubernetes.io/router.priority": "52",
+              "traefik.ingress.kubernetes.io/router.tls": "true"
+            },
+            "name": "web-www-shop-example-test-maintenance",
+            "namespace": "demo",
+            "ownerReferences": [
+              {
+                "apiVersion": "networking.k8s.io/v1",
+                "kind": "Ingress",
+                "name": "shop",
+                "uid": "7d1f5c2a-0000-4000-8000-000000000001"
+              }
+            ]
+          },
+          "spec": {
+            "ingressClassName": "traefik",
+            "rules": [
+              {
+                "host": "www.shop.example.test",
+                "http": {
+                  "paths": [
+                    {
+                      "backend": {
+                        "service": {
+                          "name": "error-pages",
+                          "port": {
+                            "name": "maintenance"
+                          }
+                        }
+                      },
+                      "path": "/",
+                      "pathType": "Prefix"
+                    }
+                  ]
+                }
+              }
+            ],
+            "tls": [
+              {
+                "hosts": [
+                  "www.shop.example.test"
+                ],
+                "secretName": "shop-tls"
+              }
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "warnings": []
+}

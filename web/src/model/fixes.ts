@@ -1,4 +1,4 @@
-// The plans a gap's fix names (`compute.resources`, `probes.readiness`, `domains.httpRoute`), and
+// The plans a gap's fix names (`compute.resources`, `probes.readiness`), and
 // the forms that end in a plan when a fix needs input or a template declines its case. Every
 // template only proposes: the plan dialog shows the change and the person applies it or not.
 import type { Schemas } from "@/api/client"
@@ -83,18 +83,6 @@ export const fixTemplates: Record<string, FixTemplate> = {
   // and one that lets the sender's pods connect out. Each is created as a new object.
   "networkPolicy.allowFrom": (gap, project, t) => policyFix(gap, project, t, "to"),
   "networkPolicy.allowEgress": (gap, project, t) => policyFix(gap, project, t, "from"),
-  // The HTTPRoute the server built from the Ingress. The Ingress stays until the person deletes
-  // it, so traffic does not stop while the route is new.
-  "domains.httpRoute": (gap, _project, t) => {
-    const object = gap.fix.params?.object
-    const ingress = gap.fix.params?.ingress
-    if (!object || !ingress) return undefined
-    return {
-      title: t("fix.httpRoute", ingress),
-      changes: [{ op: "create", object: JSON.parse(object) as Record<string, never> }],
-      notes: [t("fix.httpRouteNote")],
-    }
-  },
   // The ready-made policies that isolate a project's unprotected services, and let the ingress
   // controller reach those it routes to: one plan, each policy created as a new object.
   "networkPolicy.isolateProject": (gap, project, t) => {

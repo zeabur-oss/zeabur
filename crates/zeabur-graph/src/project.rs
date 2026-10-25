@@ -9,7 +9,7 @@ use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use k8s_openapi::apimachinery::pkg::util::intstr::IntOrString;
 use serde_json::Value;
 use zeabur_adapters::provenance::{detect_tool, managed_by};
-use zeabur_adapters::{Conventions, LABEL_SHARED_VARIABLES, error_pages, gateway, traefik};
+use zeabur_adapters::{Conventions, LABEL_SHARED_VARIABLES, error_pages, traefik};
 use zeabur_model::{
     Attribution, Container, ContainerResources, Endpoint, NamespaceAttribution, Origin, PageServer,
     ProbeHandler, ProbeSummary, Probes, Project, Provenance, Quantities, Resource, ResourceKind,
@@ -68,11 +68,23 @@ pub fn project_with(snapshot: &Snapshot, conventions: &Conventions) -> Project {
         .iter()
         .filter(|o| owned(attribution.services.get(name_of(&o.metadata))))
         .map(endpoint);
+    let mut maintained: BTreeMap<&str, Vec<String>> = BTreeMap::new();
+    for (owner, hosts) in snapshot
+        .ingresses
+        .iter()
+        .filter_map(error_pages::maintenance_of)
+    {
+        maintained.entry(owner).or_default().extend(hosts);
+    }
     let routes = snapshot
         .ingresses
         .iter()
+        .filter(|o| error_pages::maintenance_of(o).is_none())
         .filter(|o| owned(attribution.ingresses.get(name_of(&o.metadata))))
-        .map(route);
+        .map(|o| {
+            let hosts = maintained.remove(name_of(&o.metadata));
+            route(o, hosts.unwrap_or_default())
+        });
     Project {
         namespace: snapshot.namespace.clone(),
         connections: connections(&snapshot.namespace, &services),
@@ -195,8 +207,9 @@ pub fn endpoint(object: &KubeService) -> Endpoint {
 }
 
 /// An Ingress as a route, with every one of its rules. It reads the Ingress alone, so one route
-/// serves every workload it reaches.
-fn route(object: &Ingress) -> Route {
+/// serves every workload it reaches. `maintenance` is the hostnames its maintenance Ingresses
+/// serve.
+fn route(object: &Ingress, mut maintenance: Vec<String>) -> Route {
     let name = name_of(&object.metadata);
     let mut backends: Vec<String> = ingress_backends(object)
         .into_iter()
@@ -275,10 +288,11 @@ fn route(object: &Ingress) -> Route {
         redirects,
         basic_auth,
         error_pages,
-        maintenance: error_pages::maintenance(&object.metadata)
-            .unwrap_or_default()
-            .into_keys()
-            .collect(),
+        maintenance: {
+            maintenance.sort();
+            maintenance.dedup();
+            maintenance
+        },
         issuer,
         tls,
         provenance: provenance(&object.metadata),
@@ -291,7 +305,11 @@ fn route(object: &Ingress) -> Route {
 /// Each is named by the services whose Kubernetes Services it sends to. A route named as an Ingress
 /// is left out: the document names routes by name alone.
 pub fn with_http_routes(project: &mut Project, http_routes: &[Value]) {
-    for route in http_routes.iter().filter_map(http_route) {
+    let page = project.page_server.as_ref().map(|p| p.service.clone());
+    for route in http_routes
+        .iter()
+        .filter_map(|r| http_route(r, page.as_deref()))
+    {
         if project.route(&route.name).is_some() {
             continue;
         }
@@ -311,9 +329,9 @@ pub fn with_http_routes(project: &mut Project, http_routes: &[Value]) {
     }
 }
 
-/// An `HTTPRoute` as a route. While a hostname shows the maintenance page or redirects, its
-/// rules are the ones Zeabur kept, so the route still names the services it returns to.
-fn http_route(object: &Value) -> Option<Route> {
+/// An `HTTPRoute` as a route. While it shows the maintenance page of page server `page`, its
+/// other `backendRefs` have weight 0 and still name the services it returns to.
+fn http_route(object: &Value, page: Option<&str>) -> Option<Route> {
     let meta: ObjectMeta = serde_json::from_value(object.get("metadata")?.clone()).ok()?;
     let name = meta.name.clone()?;
     let strings = |at: &str| -> Vec<String> {
@@ -326,20 +344,27 @@ fn http_route(object: &Value) -> Option<Route> {
             .collect()
     };
     let hostnames = strings("/spec/hostnames");
-    let spec_rules: Vec<Value> = object
+    let rules: Vec<Value> = object
         .pointer("/spec/rules")
         .and_then(Value::as_array)
         .cloned()
         .unwrap_or_default();
-    let rules = gateway::redirect_rules(&meta).unwrap_or_else(|| spec_rules.clone());
-    let down = error_pages::maintenance(&meta).unwrap_or_default();
-    let kept = hostnames.iter().find_map(|h| down.get(h));
-    let route_rules = http_route_rules(&name, &hostnames, &rules, kept);
+    let page_refs: Vec<&Value> = rules
+        .iter()
+        .filter_map(|rule| rule.get("backendRefs").and_then(Value::as_array))
+        .flat_map(|refs| page_refs(refs, page))
+        .collect();
+    let route_rules = http_route_rules(&name, &hostnames, &rules, &|b| page_refs.contains(&b));
     let mut backends: Vec<String> = route_rules.iter().map(|r| r.service.clone()).collect();
     backends.sort();
     backends.dedup();
-    let redirects = http_route_redirects(&name, &hostnames, &spec_rules);
+    let redirects = http_route_redirects(&name, &hostnames, &rules);
     Some(Route {
+        maintenance: if page_refs.is_empty() {
+            Vec::new()
+        } else {
+            hostnames.clone()
+        },
         hostnames,
         backends,
         class: None,
@@ -348,7 +373,6 @@ fn http_route(object: &Value) -> Option<Route> {
         redirects,
         basic_auth: None,
         error_pages: None,
-        maintenance: down.into_keys().collect(),
         issuer: None,
         tls: Vec::new(),
         provenance: provenance(&meta),
@@ -357,13 +381,33 @@ fn http_route(object: &Value) -> Option<Route> {
     })
 }
 
+/// The `backendRefs` among `refs` that send to page server `page`. When the page server is not
+/// known, it is the one of weight 1 next to others of weight 0, as maintenance leaves them.
+fn page_refs<'v>(refs: &'v [Value], page: Option<&str>) -> Vec<&'v Value> {
+    let weight = |b: &Value| b.get("weight").and_then(Value::as_i64).unwrap_or(1);
+    page.map_or_else(
+        || {
+            let shown: Vec<&Value> = refs.iter().filter(|b| weight(b) != 0).collect();
+            match shown.as_slice() {
+                [one] if refs.len() > 1 && weight(one) == 1 => vec![*one],
+                _ => Vec::new(),
+            }
+        },
+        |page| {
+            refs.iter()
+                .filter(|b| b.get("name").and_then(Value::as_str) == Some(page))
+                .collect()
+        },
+    )
+}
+
 /// The rules of `HTTPRoute` `name` that send to a Service of its namespace, for each hostname and
-/// path. `kept` is the `backendRefs` of each rule from before maintenance.
+/// path, except the backends for which `skipped` is true.
 fn http_route_rules(
     name: &str,
     hostnames: &[String],
     rules: &[Value],
-    kept: Option<&Value>,
+    skipped: &dyn Fn(&Value) -> bool,
 ) -> Vec<RouteRule> {
     let hosts: Vec<Option<String>> = if hostnames.is_empty() {
         vec![None]
@@ -372,10 +416,7 @@ fn http_route_rules(
     };
     let mut route_rules = Vec::new();
     for (r, rule) in rules.iter().enumerate() {
-        let refs = kept
-            .and_then(|k| k.get(r))
-            .filter(|k| !k.is_null())
-            .or_else(|| rule.get("backendRefs"));
+        let refs = rule.get("backendRefs");
         let paths: Vec<(String, String)> = rule
             .get("matches")
             .and_then(Value::as_array)
@@ -402,7 +443,8 @@ fn http_route_rules(
             .flatten()
             .enumerate()
         {
-            let local = backend.get("namespace").is_none()
+            let local = !skipped(backend)
+                && backend.get("namespace").is_none()
                 && backend
                     .get("group")
                     .and_then(Value::as_str)

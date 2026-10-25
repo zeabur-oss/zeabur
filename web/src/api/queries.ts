@@ -348,6 +348,21 @@ export const clusterIssuersQuery = queryOptions({
   retryOnMount: false,
 })
 
+/** The Gateways a project's new HTTPRoute can attach to; `readable` is false when the person may
+ * not list the cluster's Gateways. */
+export const projectGatewaysQuery = (project: string) =>
+  queryOptions({
+    queryKey: ["project", project, "gateways"],
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.GET("/api/v1/projects/{project}/gateways", {
+          params: { path: { project } },
+          signal,
+        }),
+      ),
+    retry: false,
+  })
+
 /** The dates of the certificate in a project's `kubernetes.io/tls` Secret; never its key. */
 export const certificateDatesQuery = (project: string, secret: string) =>
   queryOptions({

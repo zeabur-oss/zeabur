@@ -1,26 +1,87 @@
 {
   "objects": [
     {
-      "target": {"kind": "HTTPRoute", "name": "web-www"},
-      "write": {"type": "patch", "operations": [
-        {"op": "test", "path": "/metadata/resourceVersion", "value": "5"},
-        {"op": "test", "path": "/spec/hostnames/0", "value": "www.shop.example.test"},
-        {"op": "remove", "path": "/spec/hostnames/0"}
-      ]}
+      "target": {
+        "kind": "HTTPRoute",
+        "name": "web-www"
+      },
+      "write": {
+        "type": "patch",
+        "operations": [
+          {
+            "op": "test",
+            "path": "/metadata/resourceVersion",
+            "value": "5"
+          },
+          {
+            "op": "test",
+            "path": "/spec/hostnames/0",
+            "value": "www.shop.example.test"
+          },
+          {
+            "op": "remove",
+            "path": "/spec/hostnames/0"
+          }
+        ]
+      }
     },
     {
-      "target": {"kind": "HTTPRoute", "name": "web-www-www-shop-example-test"},
-      "write": {"type": "create", "body": {
-        "metadata": {"name": "web-www-www-shop-example-test", "annotations": {"zeabur.com/maintenance-backend": "{\"www.shop.example.test\":[[{\"name\":\"web\",\"port\":8080}]]}"}},
-        "spec": {
-          "parentRefs": [{"name": "public", "namespace": "gateway"}],
-          "hostnames": ["www.shop.example.test"],
-          "rules": [{"backendRefs": [{"name": "error-pages", "port": 8081}]}]
+      "target": {
+        "kind": "HTTPRoute",
+        "name": "web-www-www-shop-example-test"
+      },
+      "write": {
+        "type": "create",
+        "body": {
+          "apiVersion": "gateway.networking.k8s.io/v1",
+          "kind": "HTTPRoute",
+          "metadata": {
+            "name": "web-www-www-shop-example-test",
+            "namespace": "demo"
+          },
+          "spec": {
+            "hostnames": [
+              "www.shop.example.test"
+            ],
+            "parentRefs": [
+              {
+                "name": "public",
+                "namespace": "gateway"
+              }
+            ],
+            "rules": [
+              {
+                "backendRefs": [
+                  {
+                    "name": "web",
+                    "port": 8080,
+                    "weight": 0
+                  },
+                  {
+                    "name": "error-pages",
+                    "port": 8081,
+                    "weight": 1
+                  }
+                ]
+              }
+            ]
+          }
         }
-      }}
+      }
     }
   ],
   "warnings": [
-    {"code": "domainMoved", "hostname": "www.shop.example.test", "from": {"kind": "HTTPRoute", "name": "web-www"}, "to": {"kind": "HTTPRoute", "name": "web-www-www-shop-example-test"}}
+    {
+      "code": "domainMoved",
+      "from": {
+        "kind": "HTTPRoute",
+        "name": "web-www"
+      },
+      "hostname": "www.shop.example.test",
+      "to": {
+        "kind": "HTTPRoute",
+        "name": "web-www-www-shop-example-test"
+      }
+    }
   ]
 }

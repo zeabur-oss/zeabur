@@ -26,7 +26,6 @@
 use base64::Engine as _;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use serde_json::{Map, Value, json};
-use zeabur_adapters::error_pages::{MAINTENANCE_ANNOTATION, maintenance};
 use zeabur_adapters::traefik;
 
 use crate::access::{meta_of, owner_of};
@@ -174,13 +173,18 @@ fn issuing_others(object: &Value, hostname: &str) -> bool {
 
 /// Refuses to move `hostname` off Ingress `ingress` while the Ingress asks for a password, or
 /// the hostname redirects or is in maintenance: the middlewares for these belong to the Ingress.
-fn refuse_move(meta: &ObjectMeta, ingress: &str, hostname: &str) -> Result<(), PlanError> {
+fn refuse_move(
+    meta: &ObjectMeta,
+    ingress: &str,
+    hostname: &str,
+    in_maintenance: bool,
+) -> Result<(), PlanError> {
     let listed = traefik::middlewares(meta);
     let first = if listed.contains(&traefik::basic_auth_name(ingress)) {
         format!("Stop asking for a password on {ingress}")
     } else if listed.contains(&traefik::redirect_name(ingress, hostname)) {
         format!("Stop redirecting {hostname}")
-    } else if maintenance(meta).is_some_and(|down| down.contains_key(hostname)) {
+    } else if in_maintenance {
         format!("End maintenance on {hostname}")
     } else {
         return Ok(());
@@ -196,7 +200,7 @@ fn refuse_move(meta: &ObjectMeta, ingress: &str, hostname: &str) -> Result<(), P
 }
 
 /// Ingress `name` for `hostname` alone, from Ingress `from`: its rules for the hostname, its
-/// class, labels and annotations, without the issuer, the maintenance backends and the
+/// class, labels and annotations, without the issuer and the
 /// middlewares Zeabur made for `from`. `pages` is the new Ingress's own errors middleware.
 fn moved_ingress(
     from: &Value,
@@ -221,7 +225,7 @@ fn moved_ingress(
         .map(str::to_owned)
         .collect();
     middlewares.extend(pages.map(|p| traefik::reference(namespace, p)));
-    for key in [CLUSTER_ISSUER, ISSUER, LAST_APPLIED, MAINTENANCE_ANNOTATION] {
+    for key in [CLUSTER_ISSUER, ISSUER, LAST_APPLIED] {
         annotations.remove(key);
     }
     annotations.remove(traefik::MIDDLEWARES_ANNOTATION);
@@ -390,7 +394,8 @@ impl Planner<'_> {
         let current = self.current(index);
         let meta = meta_of(&current);
         let ingress = route.name.as_str();
-        refuse_move(&meta, ingress, hostname)?;
+        let in_maintenance = self.maintenance_ingress(ingress, hostname).is_some();
+        refuse_move(&meta, ingress, hostname, in_maintenance)?;
         let services = array(&current, "/spec/rules")
             .iter()
             .filter(|r| r.get("host").and_then(Value::as_str) == Some(hostname))
@@ -406,7 +411,7 @@ impl Planner<'_> {
             .contains(&traefik::error_pages_name(ingress))
             .then(|| traefik::error_pages_name(&name));
         if let Some(pages) = &pages {
-            let spec = errors_spec(&self.page_server()?, []);
+            let spec = errors_spec(&self.page_server()?);
             self.created_middleware(pages, None, &spec);
         }
         let namespace = self.input.snapshot.namespace.clone();

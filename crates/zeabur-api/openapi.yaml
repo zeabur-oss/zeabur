@@ -2013,6 +2013,30 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/Problem"
+  "/api/v1/projects/{project}/gateways":
+    get:
+      tags:
+      - projects
+      summary: The Gateways a new `HTTPRoute` of the project can attach to.
+      operationId: listProjectGateways
+      parameters:
+      - name: project
+        in: path
+        description: The project's namespace
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectGateways"
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
   "/api/v1/projects/{project}/github-app":
     get:
       tags:
@@ -4127,6 +4151,14 @@ components:
         hostname:
           type: string
           description: The hostname.
+        parent:
+          oneOf:
+          - $ref: "#/components/schemas/GatewayParent"
+            description: |-
+              The Gateway the hostname attaches to through an `HTTPRoute`. Absent: the hostname joins
+              the workload's route, else a new Ingress. Not together with `certificate`: the Gateway's
+              listener holds the certificate.
+          - type: "null"
         workload:
           $ref: "#/components/schemas/WorkloadRef"
           description: The workload.
@@ -9060,6 +9092,43 @@ components:
       enum:
       - warning
       - advice
+    GatewayParent:
+      type: object
+      description: A Gateway, or one of its listeners, that a new `HTTPRoute` attaches to.
+      required:
+      - namespace
+      - name
+      properties:
+        name:
+          type: string
+          description: The Gateway's name.
+        namespace:
+          type: string
+          description: The Gateway's namespace.
+        sectionName:
+          type:
+          - string
+          - "null"
+          description: "The listener; absent: every listener that accepts the route."
+    GatewayView:
+      type: object
+      description: A Gateway that accepts an `HTTPRoute` from the project.
+      required:
+      - namespace
+      - name
+      - listeners
+      properties:
+        listeners:
+          type: array
+          items:
+            $ref: "#/components/schemas/ListenerView"
+          description: The listeners that accept the route.
+        name:
+          type: string
+          description: The Gateway's name.
+        namespace:
+          type: string
+          description: The Gateway's namespace.
     Generated:
       type: object
       description: "How to make a generated value: random bytes, then encoded."
@@ -10089,6 +10158,20 @@ components:
         provider:
           type: string
           description: "`GitHub` or `Google`."
+    ListenerView:
+      type: object
+      description: A listener of a Gateway.
+      required:
+      - name
+      properties:
+        hostname:
+          type:
+          - string
+          - "null"
+          description: The hostname it serves; absent when it serves every hostname.
+        name:
+          type: string
+          description: The listener's name, a parent's `sectionName`.
     LogHistory:
       type: object
       description: A service's log lines over a range, every pod's, also those replaced since.
@@ -10208,13 +10291,6 @@ components:
         route:
           $ref: "#/components/schemas/RouteRef"
           description: The route.
-        workload:
-          oneOf:
-          - $ref: "#/components/schemas/WorkloadRef"
-            description: |-
-              When stopping: the workload whose first Service gets the hostname when the rules changed
-              after maintenance started, so the backends kept then no longer fit.
-          - type: "null"
     MaintenancePlan:
       type: object
       description: What a plan changes, and the token that applies it.
@@ -12189,37 +12265,6 @@ components:
             - "null"
             description: The Ingress whose certificates come from elsewhere, for `certificatesElsewhere`.
       - type: object
-        description: The new `HTTPRoute` attaches to this Gateway, the first of several.
-        required:
-        - namespace
-        - name
-        - of
-        - code
-        properties:
-          code:
-            type: string
-            enum:
-            - gatewayChosen
-          name:
-            type: string
-            description: Its name.
-          namespace:
-            type: string
-            description: Its namespace.
-          of:
-            type: integer
-            description: How many Gateways there are.
-            minimum: 0
-      - type: object
-        description: Gateways could not be listed, so the new route is an Ingress.
-        required:
-        - code
-        properties:
-          code:
-            type: string
-            enum:
-            - gatewaysUnreadable
-      - type: object
         description: The Secret's values could not be read, so its diff shows only which keys change.
         required:
         - name
@@ -12645,30 +12690,6 @@ components:
           route:
             $ref: "#/components/schemas/ObjectName"
             description: The route.
-      - type: object
-        description: |-
-          The rules changed after maintenance started, so the hostname goes to this Service port
-          instead of the backends kept then.
-        required:
-        - hostname
-        - service
-        - port
-        - code
-        properties:
-          code:
-            type: string
-            enum:
-            - maintenanceRestored
-          hostname:
-            type: string
-            description: The hostname.
-          port:
-            type: integer
-            format: int32
-            description: Its port.
-          service:
-            type: string
-            description: The Service.
       - type: object
         description: |-
           Browsers keep a permanent redirect: after it stops, visitors who saw it still go to the
@@ -13620,6 +13641,21 @@ components:
               Who may reach each service, from the project's NetworkPolicy objects. Whether the
               cluster's network plugin enforces them is not known.
           - type: "null"
+    ProjectGateways:
+      type: object
+      description: The Gateways a project's new `HTTPRoute` can attach to.
+      required:
+      - readable
+      - gateways
+      properties:
+        gateways:
+          type: array
+          items:
+            $ref: "#/components/schemas/GatewayView"
+          description: The Gateways, by namespace and name.
+        readable:
+          type: boolean
+          description: Whether you may list the cluster's Gateways. When not, `gateways` is empty.
     ProjectGitHubApp:
       type: object
       description: The installations granted to a project.
@@ -14243,7 +14279,6 @@ components:
       description: A [`Change::Redirect`].
       required:
       - route
-      - workload
       - hostname
       properties:
         hostname:
@@ -14260,11 +14295,6 @@ components:
           - string
           - "null"
           description: The hostname to redirect to; absent stops the redirect.
-        workload:
-          $ref: "#/components/schemas/WorkloadRef"
-          description: |-
-            The workload the route sends requests to. An `HTTPRoute` that stops redirecting sends
-            them to it again.
     Refers:
       type: object
       description: How a variable points at a database service.

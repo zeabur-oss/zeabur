@@ -1,10 +1,26 @@
-description: "An HTTPRoute whose backend is a same-named Service in another namespace does not route to the workload, so a new hostname gets a route of its own."
+description: "An HTTPRoute whose backend is a same-named Service in another namespace does not route to the workload, so a new hostname on a Gateway gets a route of its own."
 operation: mutation.plan
 params:
+  gateways:
+    - apiVersion: gateway.networking.k8s.io/v1
+      kind: Gateway
+      metadata: {namespace: gateway, name: public}
+      spec:
+        listeners:
+          - name: https
+            port: 443
+            protocol: HTTPS
+            hostname: "*.example.test"
+            allowedRoutes: {namespaces: {from: All}}
+    - apiVersion: gateway.networking.k8s.io/v1
+      kind: Gateway
+      metadata: {namespace: gateway, name: internal}
+      spec:
+        listeners:
+          - {name: http, port: 80, protocol: HTTP}
   request:
     changes:
       - op: addDomain
         workload: {kind: Deployment, name: web}
         hostname: web.example.test
-  gateways:
-    - {namespace: gateway, name: public}
+        parent: {namespace: gateway, name: public}

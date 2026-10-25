@@ -102,7 +102,6 @@ mod tests {
                     .collect();
                 assert_eq!(rules.len(), wanted.len(), "{}: unknown rule", fixture.name);
                 let cluster = ClusterTraits {
-                    gateway_api: params["gatewayApi"].as_bool().unwrap_or(false),
                     retired_ingress_classes: params["retiredIngressClasses"]
                         .as_array()
                         .map_or_else(Default::default, |a| {

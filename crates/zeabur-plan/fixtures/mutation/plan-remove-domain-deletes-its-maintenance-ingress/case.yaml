@@ -1,0 +1,8 @@
+description: "Removing a hostname that shows the maintenance page also deletes its maintenance Ingress."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - op: removeDomain
+        route: {kind: Ingress, name: shop}
+        hostname: www.shop.example.test

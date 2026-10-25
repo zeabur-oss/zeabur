@@ -1,15 +1,13 @@
-//! The page server a project runs for its error pages and maintenance page, and the annotation
-//! that keeps the backends of a hostname in maintenance.
+//! The page server a project runs for its error pages and maintenance page, and the Ingress that
+//! shows the maintenance page for a hostname.
 //!
 //! The page server is what Zeabur Catalog's `error-pages` template deploys. Zeabur finds it by
 //! [`PAGE_SERVER_LABEL`], not by name: its Service has the ports [`PAGES_PORT`] and
 //! [`MAINTENANCE_PORT`], and its ConfigMap holds the pages by file name, such as `502.html`.
 
-use std::collections::BTreeMap;
-
 use k8s_openapi::api::core::v1::Service;
+use k8s_openapi::api::networking::v1::Ingress;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
-use serde_json::Value;
 
 /// The label, set to `"true"`, on the Service and the ConfigMap of the page server.
 pub const PAGE_SERVER_LABEL: &str = "zeabur.com/page-server";
@@ -20,13 +18,6 @@ pub const PAGES_PORT: &str = "pages";
 /// The name of the Service port that answers every request with `maintenance.html` and status
 /// 503.
 pub const MAINTENANCE_PORT: &str = "maintenance";
-
-/// Annotation on an Ingress or `HTTPRoute`: a JSON object from each hostname in maintenance to
-/// the backends it had.
-///
-/// On an Ingress the value is the `backend` of each path of the hostname's rules, in order. On an
-/// `HTTPRoute` it is the `backendRefs` of each rule, in order, or `null` for a rule without them.
-pub const MAINTENANCE_ANNOTATION: &str = "zeabur.com/maintenance-backend";
 
 /// A page server's Service: its name and the numbers of its two ports.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -68,29 +59,35 @@ pub fn page_server(service: &Service) -> Option<PageServer> {
     })
 }
 
-/// The hostnames in maintenance, each with the backends it had. Empty without the annotation;
-/// `None` when its value is not a JSON object.
+/// The Ingress that shows the maintenance page for some hostnames of another Ingress: the name of
+/// that Ingress and the hostnames. `None` for any other Ingress.
+///
+/// Such an Ingress has an owner reference to the other Ingress, and every path sends to the Service
+/// port named [`MAINTENANCE_PORT`].
 #[must_use]
-pub fn maintenance(meta: &ObjectMeta) -> Option<BTreeMap<String, Value>> {
-    let Some(text) = meta
-        .annotations
-        .as_ref()
-        .and_then(|a| a.get(MAINTENANCE_ANNOTATION))
-    else {
-        return Some(BTreeMap::new());
-    };
-    let parsed: serde_json::Map<String, Value> = serde_json::from_str(text).ok()?;
-    Some(parsed.into_iter().collect())
-}
-
-/// The names of the Services an Ingress hostname in maintenance sent its requests to.
-#[must_use]
-pub fn ingress_services(backends: &Value) -> Vec<String> {
-    backends
-        .as_array()
-        .into_iter()
+pub fn maintenance_of(ingress: &Ingress) -> Option<(&str, Vec<String>)> {
+    let owner = ingress
+        .metadata
+        .owner_references
+        .iter()
         .flatten()
-        .filter_map(|b| b.pointer("/service/name").and_then(Value::as_str))
-        .map(str::to_owned)
-        .collect()
+        .find(|o| o.kind == "Ingress" && o.api_version == "networking.k8s.io/v1")?;
+    let rules = ingress.spec.as_ref()?.rules.as_deref()?;
+    let paths: Vec<_> = rules
+        .iter()
+        .flat_map(|r| r.http.iter().flat_map(|h| &h.paths))
+        .collect();
+    let shows_page = !paths.is_empty()
+        && paths.iter().all(|p| {
+            p.backend
+                .service
+                .as_ref()
+                .and_then(|s| s.port.as_ref())
+                .and_then(|port| port.name.as_deref())
+                == Some(MAINTENANCE_PORT)
+        });
+    shows_page.then(|| {
+        let hosts = rules.iter().filter_map(|r| r.host.clone()).collect();
+        (owner.name.as_str(), hosts)
+    })
 }

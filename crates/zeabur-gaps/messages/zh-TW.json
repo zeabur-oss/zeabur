@@ -123,7 +123,6 @@
     "gap.healthChecks.none": "${container} 沒有就緒檢查，還沒準備好就可能收到流量。",
     "gap.healthChecks.livenessOnly": "${container} 有存活檢查，但沒有就緒檢查。",
     "gap.ingressToHttpRoute.retired": "Ingress ${ingress} 使用 ${class}，它的 controller 已停止維護。",
-    "gap.ingressToHttpRoute.available": "叢集已有 Gateway API，Ingress ${ingress} 可以改用 HTTPRoute。",
     "gap.retiredIngressController": "IngressClass ${class} 的 controller ${controller} 已停止維護。",
     "gap.danglingRoute.noService": "${kind} ${route} 指定的 Service ${services, list} 不在這個專案裡。",
     "gap.danglingRoute.noGateway": "HTTPRoute ${route} 指定的 Gateway ${gateways, list} 不存在。",

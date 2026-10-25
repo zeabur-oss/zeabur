@@ -1,0 +1,14 @@
+{
+  "objects": [
+    {
+      "target": {
+        "kind": "Ingress",
+        "name": "web-www-shop-example-test-maintenance"
+      },
+      "write": {
+        "type": "delete"
+      }
+    }
+  ],
+  "warnings": []
+}

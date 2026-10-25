@@ -1283,15 +1283,6 @@
   "zh-CN": "Ingress ingress1 使用 class1，它的 controller 已停止维护。"
  },
  {
-  "key": "gap.ingressToHttpRoute.available",
-  "params": {
-   "ingress": "ingress1"
-  },
-  "en": "Gateway API is available, so Ingress ingress1 can move to an HTTPRoute.",
-  "zh-TW": "叢集已有 Gateway API，Ingress ingress1 可以改用 HTTPRoute。",
-  "zh-CN": "集群已有 Gateway API，Ingress ingress1 可以改用 HTTPRoute。"
- },
- {
   "key": "gap.retiredIngressController",
   "params": {
    "class": "class1",

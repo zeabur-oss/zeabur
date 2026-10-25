@@ -274,7 +274,7 @@ function accessSentence(t: Translate, change: AccessChange | ServiceChange): str
     case "redirect":
       return change.to
         ? t("confirm.redirect", change.hostname, change.to)
-        : t("confirm.redirectOff", change.hostname, change.workload.name)
+        : t("confirm.redirectOff", change.hostname)
     case "basicAuth":
       return change.user
         ? t("confirm.basicAuth", change.route.name)

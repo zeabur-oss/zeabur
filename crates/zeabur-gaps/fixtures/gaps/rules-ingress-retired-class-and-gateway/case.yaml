@@ -1,6 +1,5 @@
-description: An Ingress of a retired controller's class is a warning; with Gateway API served, another Ingress is advice to move to HTTPRoute; an Ingress shared by two services is one finding.
+description: An Ingress of a retired controller's class is a warning, and an Ingress shared by two services is one finding. Another Ingress gets no finding, also when Gateway API is served.
 operation: gaps.rules
 params:
   rules: [ingress-to-httproute]
-  gatewayApi: true
   retiredIngressClasses: [nginx]

@@ -1,0 +1,51 @@
+{
+  "objects": [
+    {
+      "target": {
+        "kind": "Ingress",
+        "name": "web-web-other-test"
+      },
+      "write": {
+        "type": "create",
+        "body": {
+          "apiVersion": "networking.k8s.io/v1",
+          "kind": "Ingress",
+          "metadata": {
+            "name": "web-web-other-test",
+            "namespace": "demo"
+          },
+          "spec": {
+            "rules": [
+              {
+                "host": "web.other.test",
+                "http": {
+                  "paths": [
+                    {
+                      "backend": {
+                        "service": {
+                          "name": "web",
+                          "port": {
+                            "number": 8080
+                          }
+                        }
+                      },
+                      "path": "/",
+                      "pathType": "Prefix"
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "warnings": [
+    {
+      "code": "httpOnly",
+      "hostname": "web.other.test",
+      "reason": "noIssuer"
+    }
+  ]
+}

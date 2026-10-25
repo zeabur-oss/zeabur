@@ -11,56 +11,58 @@
 //!   502 to 504 that asks the pages port for `/{status}.html`. The Ingress lists it last and owns
 //!   it. Traefik finds the Service in the middleware's namespace, so the page server is in the
 //!   project. Gateway API has no standard filter for error pages, so an `HTTPRoute` refuses them.
-//! - **Maintenance** sends the hostname's requests to the maintenance port, and the workload keeps
-//!   running. [`MAINTENANCE_ANNOTATION`] keeps the backends the hostname had, and stopping writes
-//!   them back. On an Ingress these are the backends of the hostname's paths. On an `HTTPRoute`
-//!   they are the `backendRefs` of its rules. A filter applies to every hostname of the route, so a
-//!   hostname that shares one moves to a route of its own first, as for a redirect. When the rules
-//!   changed since, the kept backends no longer fit, and stopping sends the hostname to the
-//!   workload's first Service instead.
-//! - The `errors` middleware catches the maintenance port's 503 too, and asks for `503.html` with
-//!   the original `Host` header [traefik-errors-source]. Its query lists the hostnames in
-//!   maintenance (`?down=a.example.com,*.example.org`), and for those hosts the pages port answers
-//!   `503.html` with `maintenance.html`. The other hostnames of the Ingress keep their 503 page.
+//! - **Maintenance on an Ingress** is a second Ingress for the hostname, with path `/` to the
+//!   maintenance port. Its Traefik `router.priority` is one more than the highest of the hostname's
+//!   routers, so it wins over every path [traefik-priority]. It copies the `router.*` annotations
+//!   of the Ingress (TLS, entry points) but not its middlewares, and the same `tls` entry. The
+//!   original Ingress owns it, so the garbage collector deletes it with the Ingress. Stopping
+//!   deletes it. The workload keeps running.
+//! - **Maintenance on an `HTTPRoute`** sets the weight of each `backendRef` to 0 and adds the
+//!   maintenance port with weight 1, so every request goes to the maintenance port [gw-weight].
+//!   Stopping removes the maintenance port and sets the weights back to 1. A route that already
+//!   splits by weight is refused. A filter or a weight applies to every hostname of the route, so a
+//!   hostname that shares one moves to a route of its own first, as for a redirect.
 //!
 //! [k8s-configmap]: https://kubernetes.io/docs/concepts/configuration/configmap/#mounted-configmaps-are-updated-automatically
 //! [traefik-errors]: https://doc.traefik.io/traefik/reference/routing-configuration/http/middlewares/errorpages/
-//! [traefik-errors-source]: https://github.com/traefik/traefik/blob/v3.5.0/pkg/middlewares/customerrors/custom_errors.go
+//! [traefik-priority]: https://doc.traefik.io/traefik/reference/routing-configuration/kubernetes/ingress/#annotations
+//! [gw-weight]: https://gateway-api.sigs.k8s.io/reference/spec/#httpbackendref
 
 use k8s_openapi::api::core::v1::{ConfigMap, Service};
-use serde_json::{Value, json};
+use serde_json::{Map, Value, json};
 use zeabur_adapters::error_pages::{
-    MAINTENANCE_ANNOTATION, MAINTENANCE_PORT, PAGE_SERVER_LABEL, PAGES_PORT, PageServer,
-    ingress_services, is_page_server, maintenance, page_server,
+    MAINTENANCE_PORT, PAGE_SERVER_LABEL, PAGES_PORT, PageServer, is_page_server, maintenance_of,
+    page_server,
 };
 use zeabur_adapters::traefik;
-use zeabur_model::WorkloadRef;
 
-use crate::access::{meta_of, middleware_resource, middleware_target, owner_of};
-use crate::change::{Change, ErrorPageHtml, RouteKind, RouteRef, Target, Warning};
+use crate::access::{meta_of, middleware_resource, owner_of, redirect_rule};
+use crate::change::{Change, ErrorPageHtml, RouteKind, RouteRef, Target};
 use crate::checks::ResourceRef;
 use crate::fields::Step;
-use crate::json::{add, pointer, replace, test};
+use crate::json::{add, pointer, remove, replace, test};
 use crate::plan::{
     ErrorKind, PlanError, Planner, array, error, http_route_target, ingress_target, to_json,
 };
+use crate::rules::route_name;
+
+/// The prefix of the Traefik annotations on an Ingress that set up its router.
+const ROUTER_PREFIX: &str = "traefik.ingress.kubernetes.io/router.";
+const PRIORITY: &str = "traefik.ingress.kubernetes.io/router.priority";
+const NAME_MAX: usize = 253;
 
 /// The largest page, so that the ConfigMap stays far below its limit of 1 MiB.
 const PAGE_MAX: usize = 64 * 1024;
 
 /// The Traefik `Middleware` a change reads first, if any: the plan updates or deletes it.
 pub(crate) fn middleware_read(change: &Change) -> Option<(ResourceRef, String)> {
-    let route = if let Change::ErrorPages(pages) = change {
-        &pages.route
-    } else if let Change::Maintenance(maintenance) = change {
-        &maintenance.route
-    } else {
+    let Change::ErrorPages(pages) = change else {
         return None;
     };
-    (route.kind == RouteKind::Ingress).then(|| {
+    (pages.route.kind == RouteKind::Ingress).then(|| {
         (
             middleware_resource(),
-            traefik::error_pages_name(&route.name),
+            traefik::error_pages_name(&pages.route.name),
         )
     })
 }
@@ -93,25 +95,12 @@ fn given(pages: &ErrorPageHtml) -> Result<Vec<(&'static str, &str)>, PlanError> 
     Ok(given)
 }
 
-/// The errors middleware's query, naming the hostnames in maintenance.
-fn query<'h>(down: impl IntoIterator<Item = &'h String>) -> String {
-    let down: Vec<&str> = down.into_iter().map(String::as_str).collect();
-    if down.is_empty() {
-        "/{status}.html".to_owned()
-    } else {
-        format!("/{{status}}.html?down={}", down.join(","))
-    }
-}
-
-/// The `errors` middleware spec of an Ingress whose hostnames `down` are in maintenance.
-pub(crate) fn errors_spec<'h>(
-    server: &PageServer,
-    down: impl IntoIterator<Item = &'h String>,
-) -> Value {
+/// The `errors` middleware spec of an Ingress.
+pub(crate) fn errors_spec(server: &PageServer) -> Value {
     json!({"errors": {
         "status": ["502-504"],
         "service": {"name": server.name, "port": server.pages},
-        "query": query(down),
+        "query": "/{status}.html",
     }})
 }
 
@@ -134,14 +123,6 @@ fn several_page_servers(kind: &str, names: &[String]) -> PlanError {
             "Several {kind}s are labelled {PAGE_SERVER_LABEL}=true ({}); keep the label on one.",
             names.join(", ")
         ),
-    )
-}
-
-fn bad_annotation(name: &str) -> PlanError {
-    error(
-        ErrorKind::Invalid,
-        "bad_maintenance_annotation",
-        format!("The {MAINTENANCE_ANNOTATION} annotation of {name} is not a JSON object."),
     )
 }
 
@@ -281,9 +262,7 @@ impl Planner<'_> {
         }
         let server = self.page_server()?;
         if middleware.is_none() {
-            let down = maintenance(&meta).ok_or_else(|| bad_annotation(ingress))?;
-            let spec = errors_spec(&server, down.keys());
-            self.created_middleware(&name, owner_of(&meta).as_ref(), &spec);
+            self.created_middleware(&name, owner_of(&meta).as_ref(), &errors_spec(&server));
         }
         if !listed {
             self.list(index, &name, false)?;
@@ -296,30 +275,13 @@ impl Planner<'_> {
         route: &RouteRef,
         hostname: &str,
         enabled: bool,
-        workload: Option<&WorkloadRef>,
     ) -> Result<(), PlanError> {
         let object = self.checked_route(route, hostname)?;
-        let (route, object) = match route.kind {
-            RouteKind::Ingress => (route.clone(), object),
-            RouteKind::HttpRoute => {
-                let (name, object) = self.own_http_route(&route.name, object, hostname)?;
-                let route = RouteRef {
-                    kind: RouteKind::HttpRoute,
-                    name,
-                };
-                (route, object)
-            }
+        let shown = match route.kind {
+            RouteKind::Ingress => self.maintenance_ingress(&route.name, hostname).is_some(),
+            RouteKind::HttpRoute => shows_maintenance(&object, self.page_server().ok().as_ref()),
         };
-        let route = &route;
-        let target = match route.kind {
-            RouteKind::Ingress => ingress_target(&route.name),
-            RouteKind::HttpRoute => http_route_target(&route.name),
-        };
-        let index = self.working(target, object);
-        let current = self.current(index);
-        let mut kept =
-            maintenance(&meta_of(&current)).ok_or_else(|| bad_annotation(&route.name))?;
-        match (enabled, kept.contains_key(hostname)) {
+        match (enabled, shown) {
             (true, true) => {
                 return Err(error(
                     ErrorKind::Conflict,
@@ -336,247 +298,317 @@ impl Planner<'_> {
             }
             _ => {}
         }
-        let server = if enabled {
-            Some(self.page_server()?)
-        } else {
-            self.page_server().ok()
-        };
-        self.claim(index, &[Step::field("spec"), Step::field("rules")], "rules")?;
-        let rules = array(&current, "/spec/rules");
-        let swapped = match route.kind {
-            RouteKind::Ingress => {
-                ingress_swap(&rules, hostname, kept.get(hostname), server.as_ref())
+        match (route.kind, enabled) {
+            (RouteKind::Ingress, true) => {
+                let server = self.page_server()?;
+                self.refuse_without_traefik(&object, &route.name)?;
+                self.start_ingress_maintenance(&route.name, &object, hostname, &server)
             }
-            RouteKind::HttpRoute => http_route_swap(&rules, kept.get(hostname), server.as_ref()),
-        };
-        let (operations, had) = match (swapped, workload) {
-            (Err(e), Some(workload)) if !enabled && e.code == "maintenance_changed" => {
-                let page = server.as_ref().ok_or_else(no_page_server)?.name.clone();
-                let (service, port) = self.first_endpoint(workload, route)?;
-                self.impact.insert(workload.clone());
-                self.warnings.push(Warning::MaintenanceRestored {
-                    hostname: hostname.to_owned(),
-                    service: service.clone(),
-                    port,
-                });
-                let operations = match route.kind {
-                    RouteKind::Ingress => ingress_back(&rules, hostname, &page, &service, port),
-                    RouteKind::HttpRoute => http_route_back(&rules, &page, &service, port),
-                };
-                (operations, Value::Null)
+            (RouteKind::Ingress, false) => self.end_maintenance_ingress(route, hostname),
+            (RouteKind::HttpRoute, true) => {
+                if redirect_rule(&object).is_some() {
+                    return Err(error(
+                        ErrorKind::Conflict,
+                        "redirecting",
+                        format!(
+                            "{hostname} redirects, so nobody would see the maintenance page; stop the redirect first."
+                        ),
+                    ));
+                }
+                let server = self.page_server()?;
+                let (name, object) = self.own_http_route(&route.name, object, hostname)?;
+                self.weigh_backends(&name, &object, &server)
             }
-            (swapped, _) => swapped?,
-        };
-        self.patch(index, operations)?;
-        if enabled {
-            kept.insert(hostname.to_owned(), had);
-        } else if let Some(back) = kept.remove(hostname) {
-            let services = match route.kind {
-                RouteKind::Ingress => ingress_services(&back),
-                RouteKind::HttpRoute => elements(&back)
+            (RouteKind::HttpRoute, false) => {
+                let server = self.page_server().ok();
+                self.restore_backends(&route.name, &object, server.as_ref())
+            }
+        }
+    }
+
+    /// The maintenance Ingress of Ingress `owner` for `hostname`, by name.
+    pub(crate) fn maintenance_ingress(&self, owner: &str, hostname: &str) -> Option<String> {
+        self.input.snapshot.ingresses.iter().find_map(|i| {
+            let (of, hosts) = maintenance_of(i)?;
+            (of == owner && hosts.iter().any(|h| h == hostname))
+                .then(|| i.metadata.name.clone())
+                .flatten()
+        })
+    }
+
+    /// Deletes the maintenance Ingress of `route` for `hostname`, when it has one.
+    pub(crate) fn end_maintenance_ingress(
+        &mut self,
+        route: &RouteRef,
+        hostname: &str,
+    ) -> Result<(), PlanError> {
+        if route.kind != RouteKind::Ingress {
+            return Ok(());
+        }
+        self.maintenance_ingress(&route.name, hostname)
+            .map_or(Ok(()), |name| {
+                self.delete(&RouteKind::Ingress.resource(), &name, None)
+            })
+    }
+
+    fn start_ingress_maintenance(
+        &mut self,
+        ingress: &str,
+        object: &Value,
+        hostname: &str,
+        server: &PageServer,
+    ) -> Result<(), PlanError> {
+        let meta = meta_of(object);
+        let owner = owner_of(&meta).ok_or_else(|| {
+            error(
+                ErrorKind::Invalid,
+                "unreadable_object",
+                format!("Ingress {ingress} has no uid to own its maintenance Ingress."),
+            )
+        })?;
+        let services = RouteKind::Ingress.services(object);
+        let workload = self.behind(&services).into_iter().next();
+        let mut name = route_name(workload.as_ref().map_or(ingress, |w| &w.name), hostname);
+        name.truncate(NAME_MAX - SUFFIX.len());
+        name.push_str(SUFFIX);
+        if self
+            .input
+            .snapshot
+            .ingresses
+            .iter()
+            .any(|i| i.metadata.name.as_deref() == Some(name.as_str()))
+        {
+            return Err(error(
+                ErrorKind::Conflict,
+                "route_name_taken",
+                format!("A route named {name} already exists."),
+            ));
+        }
+        let mut annotations: Map<String, Value> = meta
+            .annotations
+            .iter()
+            .flatten()
+            .filter(|(key, _)| {
+                key.starts_with(ROUTER_PREFIX)
+                    && key.as_str() != traefik::MIDDLEWARES_ANNOTATION
+                    && key.as_str() != PRIORITY
+            })
+            .map(|(key, value)| (key.clone(), json!(value)))
+            .collect();
+        annotations.insert(
+            PRIORITY.to_owned(),
+            json!((self.host_priority(hostname) + 1).to_string()),
+        );
+        let mut spec = json!({"rules": [{"host": hostname, "http": {"paths": [{
+            "path": "/",
+            "pathType": "Prefix",
+            "backend": {"service": {"name": server.name, "port": {"name": MAINTENANCE_PORT}}},
+        }]}}]});
+        if let Some(map) = spec.as_object_mut() {
+            if let Some(class) = object.pointer("/spec/ingressClassName") {
+                map.insert("ingressClassName".to_owned(), class.clone());
+            }
+            let tls = array(object, "/spec/tls").into_iter().find(|t| {
+                array(t, "/hosts")
                     .iter()
-                    .flat_map(elements)
-                    .filter_map(|r| r.get("name").and_then(Value::as_str).map(str::to_owned))
-                    .collect(),
-            };
-            let behind = self.behind(&services.into_iter().collect());
-            self.impact.extend(behind);
+                    .any(|h| h.as_str() == Some(hostname))
+            });
+            if let Some(tls) = tls {
+                let mut entry = json!({"hosts": [hostname]});
+                if let (Some(secret), Some(entry)) = (tls.get("secretName"), entry.as_object_mut())
+                {
+                    entry.insert("secretName".to_owned(), secret.clone());
+                }
+                map.insert("tls".to_owned(), json!([entry]));
+            }
         }
-        let after = if kept.is_empty() {
-            String::new()
-        } else {
-            serde_json::to_string(&kept)
-                .map_err(|e| error(ErrorKind::Invalid, "encode", e.to_string()))?
-        };
-        self.set_annotation(index, MAINTENANCE_ANNOTATION, &after)?;
-        if route.kind == RouteKind::Ingress {
-            self.retune_errors(&route.name, &query(kept.keys()))?;
+        let mut metadata = self.owned_metadata(&name, Some(&owner));
+        if let Some(map) = metadata.as_object_mut() {
+            map.insert("annotations".to_owned(), Value::Object(annotations));
         }
+        self.created(
+            ingress_target(&name),
+            json!({
+                "apiVersion": "networking.k8s.io/v1",
+                "kind": "Ingress",
+                "metadata": metadata,
+                "spec": spec,
+            }),
+        );
         Ok(())
     }
 
-    /// Sets the query of the errors middleware of Ingress `ingress`, where it exists.
-    fn retune_errors(&mut self, ingress: &str, query: &str) -> Result<(), PlanError> {
-        let name = traefik::error_pages_name(ingress);
-        let target = middleware_target(&name);
-        let index = match self.objects.iter().position(|w| w.target == target) {
-            Some(index) if self.objects.get(index).is_some_and(|w| w.deleted) => return Ok(()),
-            Some(index) => index,
-            None => match self.fetched_middleware(&name) {
-                Some(found) => self.working(target, found),
-                None => return Ok(()),
-            },
-        };
-        let current = self.current(index);
-        let mut operations = Vec::new();
-        for (path, after) in [
-            ("/spec/errors/status", json!(["502-504"])),
-            ("/spec/errors/query", json!(query)),
-        ] {
-            match current.pointer(path) {
-                Some(before) if *before == after => {}
-                Some(before) => {
-                    operations.extend([test(path, before.clone()), replace(path, after)]);
+    /// The highest Traefik priority of the project's Ingress routers that match `hostname`.
+    ///
+    /// A router has the priority its Ingress names in `router.priority`. Else Traefik uses the
+    /// length of the rule it builds, such as ``Host(`a.example.com`) && PathPrefix(`/`)``.
+    fn host_priority(&self, hostname: &str) -> u64 {
+        let mut highest = 0;
+        for ingress in &self.input.snapshot.ingresses {
+            let named = ingress
+                .metadata
+                .annotations
+                .as_ref()
+                .and_then(|a| a.get(PRIORITY))
+                .and_then(|p| p.parse::<u64>().ok())
+                .filter(|p| *p > 0);
+            for rule in ingress.spec.iter().flat_map(|s| s.rules.iter().flatten()) {
+                let host = rule.host.as_deref().unwrap_or_default();
+                if !host.is_empty() && !zeabur_adapters::gateway::intersects(host, hostname) {
+                    continue;
                 }
-                None => operations.push(add(path, after)),
+                for path in rule.http.iter().flat_map(|h| &h.paths) {
+                    let length = rule_length(host, path.path.as_deref(), &path.path_type);
+                    highest = highest.max(named.unwrap_or(length));
+                }
             }
         }
+        highest
+    }
+
+    /// Sets the `backendRefs` of `HTTPRoute` `name` to weight 0 and adds the maintenance port of
+    /// `server` with weight 1.
+    fn weigh_backends(
+        &mut self,
+        name: &str,
+        object: &Value,
+        server: &PageServer,
+    ) -> Result<(), PlanError> {
+        let mut operations = Vec::new();
+        for (r, rule) in array(object, "/spec/rules").iter().enumerate() {
+            let refs = array(rule, "/backendRefs");
+            if refs.is_empty() {
+                continue;
+            }
+            if refs
+                .iter()
+                .any(|b| b.get("weight").is_some_and(|w| *w != json!(1)))
+            {
+                return Err(error(
+                    ErrorKind::Conflict,
+                    "weighted_backends",
+                    format!(
+                        "HTTPRoute {name} splits its requests by weight; show the maintenance page with kubectl."
+                    ),
+                ));
+            }
+            for (b, backend) in refs.iter().enumerate() {
+                let path = format!("/spec/rules/{r}/backendRefs/{b}/weight");
+                match backend.get("weight") {
+                    Some(weight) => {
+                        operations.extend([test(&path, weight.clone()), replace(&path, json!(0))]);
+                    }
+                    None => operations.push(add(&path, json!(0))),
+                }
+            }
+            operations.push(add(
+                &format!("/spec/rules/{r}/backendRefs/-"),
+                json!({"name": server.name, "port": server.maintenance, "weight": 1}),
+            ));
+        }
+        if operations.is_empty() {
+            return Err(error(
+                ErrorKind::Invalid,
+                "no_backend",
+                "The hostname sends its requests to no Service.",
+            ));
+        }
+        let index = self.working(http_route_target(name), object.clone());
+        self.claim(index, &[Step::field("spec"), Step::field("rules")], "rules")?;
+        self.patch(index, operations)
+    }
+
+    /// Removes the page server's `backendRefs` from `HTTPRoute` `name` and sets the others back to
+    /// weight 1.
+    fn restore_backends(
+        &mut self,
+        name: &str,
+        object: &Value,
+        server: Option<&PageServer>,
+    ) -> Result<(), PlanError> {
+        let mut operations = Vec::new();
+        let mut removals = Vec::new();
+        for (r, rule) in array(object, "/spec/rules").iter().enumerate() {
+            let refs = array(rule, "/backendRefs");
+            let page = page_refs(&refs, server);
+            for (b, backend) in refs.iter().enumerate() {
+                let path = format!("/spec/rules/{r}/backendRefs/{b}");
+                if page.contains(&b) {
+                    removals.push((path, backend.clone()));
+                } else if !page.is_empty() && backend.get("weight") == Some(&json!(0)) {
+                    let path = format!("{path}/weight");
+                    operations.extend([test(&path, json!(0)), replace(&path, json!(1))]);
+                }
+            }
+        }
+        // Remove from the end, so the paths of the next removals stay valid.
+        for (path, backend) in removals.into_iter().rev() {
+            operations.extend([test(&path, backend), remove(&path)]);
+        }
+        let index = self.working(http_route_target(name), object.clone());
+        self.claim(index, &[Step::field("spec"), Step::field("rules")], "rules")?;
         self.patch(index, operations)
     }
 }
 
-/// The patch that sends the paths of `hostname` to the maintenance port, or back to `kept`, and
-/// the backends they had.
-///
-/// `server` is needed when the hostname starts maintenance, so when nothing is kept.
-fn ingress_swap(
-    rules: &[Value],
-    hostname: &str,
-    kept: Option<&Value>,
-    server: Option<&PageServer>,
-) -> Result<(Vec<Value>, Value), PlanError> {
-    let page =
-        server.map(|s| json!({"service": {"name": s.name, "port": {"number": s.maintenance}}}));
-    let back = kept.map(elements);
-    let mut operations = Vec::new();
-    let mut had = Vec::new();
-    for (r, rule) in rules.iter().enumerate() {
-        if rule.get("host").and_then(Value::as_str) != Some(hostname) {
-            continue;
-        }
-        for (p, path) in array(rule, "/http/paths").iter().enumerate() {
-            let Some(backend) = path.get("backend") else {
-                continue;
-            };
-            let at = format!("/spec/rules/{r}/http/paths/{p}/backend");
-            let next = match (&back, &page) {
-                (Some(back), _) => back.get(had.len()).cloned().ok_or_else(changed)?,
-                (None, Some(page)) => page.clone(),
-                (None, None) => return Err(no_page_server()),
-            };
-            operations.push(test(&at, backend.clone()));
-            operations.push(replace(&at, next));
-            had.push(backend.clone());
-        }
-    }
-    finish_swap(operations, had, back.as_ref())
-}
+/// What a maintenance Ingress adds to its name.
+const SUFFIX: &str = "-maintenance";
 
-/// As [`ingress_swap`], for the `backendRefs` of each rule of an `HTTPRoute`.
-fn http_route_swap(
-    rules: &[Value],
-    kept: Option<&Value>,
-    server: Option<&PageServer>,
-) -> Result<(Vec<Value>, Value), PlanError> {
-    let back = kept.map(elements);
-    let page = match (&back, server) {
-        (Some(_), _) => Value::Null,
-        (None, Some(s)) => json!([{"name": s.name, "port": s.maintenance}]),
-        (None, None) => return Err(no_page_server()),
-    };
-    if back.as_ref().is_some_and(|b| b.len() != rules.len()) {
-        return Err(changed());
-    }
-    let mut operations = Vec::new();
-    let mut had = Vec::new();
-    for (r, rule) in rules.iter().enumerate() {
-        let refs = rule
-            .get("backendRefs")
-            .filter(|refs| !elements(refs).is_empty());
-        let next = back.as_ref().map_or_else(
-            || refs.map(|_| page.clone()),
-            |back| back.get(r).filter(|b| !b.is_null()).cloned(),
-        );
-        had.push(refs.cloned().unwrap_or(Value::Null));
-        let (Some(refs), Some(next)) = (refs, next) else {
-            continue;
-        };
-        let at = format!("/spec/rules/{r}/backendRefs");
-        operations.push(test(&at, refs.clone()));
-        operations.push(replace(&at, next));
-    }
-    finish_swap(operations, had, back.as_ref())
-}
-
-/// The patch that sends the paths of `hostname` that show page server `page`'s maintenance page
-/// to `service`.
-fn ingress_back(
-    rules: &[Value],
-    hostname: &str,
-    page: &str,
-    service: &str,
-    port: i32,
-) -> Vec<Value> {
-    let back = json!({"service": {"name": service, "port": {"number": port}}});
-    let mut operations = Vec::new();
-    for (r, rule) in rules.iter().enumerate() {
-        if rule.get("host").and_then(Value::as_str) != Some(hostname) {
-            continue;
-        }
-        for (p, path) in array(rule, "/http/paths").iter().enumerate() {
-            let Some(backend) = path
-                .get("backend")
-                .filter(|b| shows_page(b, "/service/name", page))
-            else {
-                continue;
-            };
-            let at = format!("/spec/rules/{r}/http/paths/{p}/backend");
-            operations.extend([test(&at, backend.clone()), replace(&at, back.clone())]);
-        }
-    }
-    operations
-}
-
-/// As [`ingress_back`], for the `backendRefs` of each rule of an `HTTPRoute`.
-fn http_route_back(rules: &[Value], page: &str, service: &str, port: i32) -> Vec<Value> {
-    let back = json!([{"name": service, "port": port}]);
-    let mut operations = Vec::new();
-    for (r, rule) in rules.iter().enumerate() {
-        let Some(refs) = rule
-            .get("backendRefs")
-            .filter(|refs| elements(refs).iter().any(|b| shows_page(b, "/name", page)))
-        else {
-            continue;
-        };
-        let at = format!("/spec/rules/{r}/backendRefs");
-        operations.extend([test(&at, refs.clone()), replace(&at, back.clone())]);
-    }
-    operations
-}
-
-fn shows_page(backend: &Value, name: &str, page: &str) -> bool {
-    backend.pointer(name).and_then(Value::as_str) == Some(page)
-}
-
-fn finish_swap(
-    operations: Vec<Value>,
-    had: Vec<Value>,
-    back: Option<&Vec<Value>>,
-) -> Result<(Vec<Value>, Value), PlanError> {
-    if operations.is_empty() {
-        return Err(error(
-            ErrorKind::Invalid,
-            "no_backend",
-            "The hostname sends its requests to no Service.",
-        ));
-    }
-    if back.is_some_and(|b| b.len() != had.len()) {
-        return Err(changed());
-    }
-    Ok((operations, Value::Array(had)))
-}
-
-fn elements(value: &Value) -> Vec<Value> {
-    value.as_array().cloned().unwrap_or_default()
-}
-
-fn changed() -> PlanError {
-    error(
-        ErrorKind::Conflict,
-        "maintenance_changed",
+/// The length of the rule Traefik builds for an Ingress path of `host`.
+fn rule_length(host: &str, path: Option<&str>, path_type: &str) -> u64 {
+    let host_rule = if host.is_empty() {
+        String::new()
+    } else if let Some(suffix) = host.strip_prefix("*.") {
+        // Traefik escapes the suffix in a regular expression: a generous upper bound.
         format!(
-            "The rules changed after maintenance started, so {MAINTENANCE_ANNOTATION} no longer \
-             fits them. Name the workload to send the hostname to its first Service."
-        ),
-    )
+            "HostRegexp(`^[a-z0-9-\\.]+\\.{}$`)",
+            suffix.replace('.', "\\\\.")
+        )
+    } else {
+        format!("Host(`{host}`)")
+    };
+    let path_rule = path.map(|p| match path_type {
+        "Exact" => format!("Path(`{p}`)"),
+        _ => format!("PathPrefix(`{p}`)"),
+    });
+    let rule = match (host_rule.is_empty(), path_rule) {
+        (false, Some(path)) => format!("{host_rule} && {path}"),
+        (true, Some(path)) => path,
+        (_, None) => host_rule,
+    };
+    u64::try_from(rule.len()).unwrap_or(u64::MAX)
+}
+
+/// Whether a rule of `HTTPRoute` `object` sends to the maintenance port of `server`.
+pub(crate) fn shows_maintenance(object: &Value, server: Option<&PageServer>) -> bool {
+    array(object, "/spec/rules")
+        .iter()
+        .any(|rule| !page_refs(&array(rule, "/backendRefs"), server).is_empty())
+}
+
+/// The indexes of the `backendRefs` among `refs` that send to the maintenance port of `server`.
+/// Without a page server, it is the one of weight 1 next to others of weight 0.
+fn page_refs(refs: &[Value], server: Option<&PageServer>) -> Vec<usize> {
+    let weight = |b: &Value| b.get("weight").and_then(Value::as_i64).unwrap_or(1);
+    refs.iter()
+        .enumerate()
+        .filter(|(b, backend)| {
+            server.map_or_else(
+                || {
+                    refs.len() > 1
+                        && weight(backend) == 1
+                        && refs
+                            .iter()
+                            .enumerate()
+                            .all(|(o, other)| o == *b || weight(other) == 0)
+                },
+                |server| {
+                    backend.get("name").and_then(Value::as_str) == Some(server.name.as_str())
+                        && backend.get("port").and_then(Value::as_i64)
+                            == Some(i64::from(server.maintenance))
+                },
+            )
+        })
+        .map(|(b, _)| b)
+        .collect()
 }

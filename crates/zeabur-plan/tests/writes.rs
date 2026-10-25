@@ -449,6 +449,7 @@ mod tests {
                     workload: w.reference(),
                     hostname: "new-domain.example.test".to_owned(),
                     certificate: None,
+                    parent: None,
                 }),
                 "route",
                 vec![field("spec"), route_field],

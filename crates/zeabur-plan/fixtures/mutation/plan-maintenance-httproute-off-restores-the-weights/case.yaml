@@ -1,0 +1,9 @@
+description: "Stopping maintenance on an HTTPRoute removes the maintenance port's backendRefs and sets the others back to weight 1."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - op: maintenance
+        route: {kind: HTTPRoute, name: web-www}
+        hostname: www.shop.example.test
+        enabled: false

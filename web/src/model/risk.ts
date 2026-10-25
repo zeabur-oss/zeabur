@@ -359,8 +359,8 @@ function accessTab(change: Change, service?: WorkloadRef): [WorkloadRef | undefi
     case "errorPages":
     case "maintenance":
     case "certificate":
-      return [service, "networking"]
     case "redirect":
+      return [service, "networking"]
     case "publicPort":
       return [change.workload, "networking"]
     default:

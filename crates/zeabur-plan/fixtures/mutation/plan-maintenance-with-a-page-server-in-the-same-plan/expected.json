@@ -1,17 +1,91 @@
 {
   "objects": [
     {
-      "target": {"apiVersion": "networking.k8s.io/v1", "kind": "Ingress", "plural": "ingresses", "name": "shop"},
-      "write": {"type": "patch", "operations": [
-        {"op": "test", "path": "/metadata/resourceVersion", "value": "9"},
-        {"op": "test", "path": "/spec/rules/1/http/paths/0/backend", "value": {"service": {"name": "web", "port": {"number": 8080}}}},
-        {"op": "replace", "path": "/spec/rules/1/http/paths/0/backend", "value": {"service": {"name": "error-pages", "port": {"number": 8081}}}},
-        {"op": "add", "path": "/metadata/annotations", "value": {"zeabur.com/maintenance-backend": "{\"www.shop.example.test\":[{\"service\":{\"name\":\"web\",\"port\":{\"number\":8080}}}]}"}}
-      ]}
+      "target": {
+        "kind": "Ingress",
+        "name": "shop-www-shop-example-test-maintenance"
+      },
+      "write": {
+        "type": "create",
+        "body": {
+          "apiVersion": "networking.k8s.io/v1",
+          "kind": "Ingress",
+          "metadata": {
+            "annotations": {
+              "traefik.ingress.kubernetes.io/router.priority": "49"
+            },
+            "name": "shop-www-shop-example-test-maintenance",
+            "namespace": "demo",
+            "ownerReferences": [
+              {
+                "apiVersion": "networking.k8s.io/v1",
+                "kind": "Ingress",
+                "name": "shop",
+                "uid": "7d1f5c2a-0000-4000-8000-000000000001"
+              }
+            ]
+          },
+          "spec": {
+            "ingressClassName": "traefik",
+            "rules": [
+              {
+                "host": "www.shop.example.test",
+                "http": {
+                  "paths": [
+                    {
+                      "backend": {
+                        "service": {
+                          "name": "error-pages",
+                          "port": {
+                            "name": "maintenance"
+                          }
+                        }
+                      },
+                      "path": "/",
+                      "pathType": "Prefix"
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        }
+      }
     },
     {
-      "target": {"apiVersion": "v1", "kind": "Service", "plural": "services", "name": "error-pages"},
-      "write": {"type": "create"}
+      "target": {
+        "kind": "Service",
+        "name": "error-pages"
+      },
+      "write": {
+        "type": "create",
+        "body": {
+          "apiVersion": "v1",
+          "kind": "Service",
+          "metadata": {
+            "labels": {
+              "zeabur.com/page-server": "true"
+            },
+            "name": "error-pages",
+            "namespace": "demo"
+          },
+          "spec": {
+            "ports": [
+              {
+                "name": "pages",
+                "port": 8080
+              },
+              {
+                "name": "maintenance",
+                "port": 8081
+              }
+            ],
+            "selector": {
+              "app.kubernetes.io/name": "error-pages"
+            }
+          }
+        }
+      }
     }
   ],
   "warnings": []

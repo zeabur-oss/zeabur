@@ -7,7 +7,6 @@
 
 use std::collections::BTreeSet;
 
-use serde_json::{Value, json};
 use zeabur_graph::{Snapshot, ingress_backends};
 use zeabur_kernel::names::GatewayRef;
 use zeabur_model::{
@@ -36,8 +35,6 @@ pub struct Input<'a> {
 /// Facts about the cluster that rules depend on, found by whoever builds the [`Input`].
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ClusterTraits {
-    /// Gateway API (`gateway.networking.k8s.io` `HTTPRoute`) is served and a Gateway exists.
-    pub gateway_api: bool,
     /// Ingress classes whose controller is retired, such as ingress-nginx's `nginx`.
     pub retired_ingress_classes: BTreeSet<String>,
     /// The Gateways of every namespace; `None` when they could not be listed, and then no rule
@@ -247,12 +244,11 @@ impl Rule for HealthChecks {
 
 // ── Ingress to HTTPRoute ────────────────────────────────────────────────────────────────────────
 
-/// An Ingress that should become an HTTPRoute.
+/// An Ingress whose class belongs to a retired controller.
 ///
-/// The Ingress API is frozen; new routing features go to Gateway API [k8s-ingress]. An Ingress
-/// whose class belongs to a retired controller is a warning: ingress-nginx stopped receiving
-/// releases and security fixes in March 2026 [ingress-nginx-retirement]. Otherwise, when the
-/// cluster serves Gateway API, moving is advice [gateway-migrating].
+/// The Ingress API is frozen; new routing features go to Gateway API [k8s-ingress]. ingress-nginx
+/// stopped receiving releases and security fixes in March 2026 [ingress-nginx-retirement], so its
+/// Ingresses are a warning that links to Gateway API's migration guide [gateway-migrating].
 ///
 /// [k8s-ingress]: https://kubernetes.io/docs/concepts/services-networking/ingress/
 /// [ingress-nginx-retirement]: https://kubernetes.io/blog/2025/11/11/ingress-nginx-retirement/
@@ -291,105 +287,28 @@ impl Rule for IngressToHttpRoute {
                 if !seen.insert(route.name.clone()) {
                     continue;
                 }
-                let retired = route
+                let Some(class) = route
                     .class
                     .as_ref()
-                    .filter(|class| input.cluster.retired_ingress_classes.contains(*class));
-                let (severity, message) = match retired {
-                    Some(class) => (
-                        Severity::Warning,
-                        Message::new("gap.ingressToHttpRoute.retired")
-                            .with("ingress", &route.name)
-                            .with("class", class),
-                    ),
-                    None if input.cluster.gateway_api => (
-                        Severity::Advice,
-                        Message::new("gap.ingressToHttpRoute.available")
-                            .with("ingress", &route.name),
-                    ),
-                    None => continue,
+                    .filter(|class| input.cluster.retired_ingress_classes.contains(*class))
+                else {
+                    continue;
                 };
                 gaps.push(Gap {
                     rule: self.id().to_owned(),
-                    severity,
+                    severity: Severity::Warning,
                     subject: Origin::object("Ingress", &route.name),
                     service: None,
-                    message,
-                    fix: http_route(input.project, &route.name, input.cluster).map_or_else(
-                        || plan("domains.httpRoute", &[("ingress", &route.name)]),
-                        |object| {
-                            plan(
-                                "domains.httpRoute",
-                                &[("ingress", &route.name), ("object", &object.to_string())],
-                            )
-                        },
-                    ),
+                    message: Message::new("gap.ingressToHttpRoute.retired")
+                        .with("ingress", &route.name)
+                        .with("class", class),
+                    fix: plan("domains.httpRoute", &[("ingress", &route.name)]),
                     citations: self.citations(),
                 });
             }
         }
         gaps
     }
-}
-
-/// An `HTTPRoute` that routes what Ingress `ingress` routes: its hosts, paths and backends,
-/// attached to the first Gateway.
-///
-/// It follows the Gateway API's migration guide [gw-migrate]: `Prefix` paths become
-/// `PathPrefix`, `Exact` stays `Exact`, and an implementation-specific path becomes a prefix.
-/// `None` when no Gateway is known, or when a backend names a Service port that the Service does
-/// not have: `HTTPRoute` takes a port number.
-///
-/// [gw-migrate]: https://gateway-api.sigs.k8s.io/guides/getting-started/migrating-from-ingress/
-fn http_route(project: &Project, ingress: &str, cluster: &ClusterTraits) -> Option<Value> {
-    let gateway = cluster.gateways.as_deref()?.first()?;
-    let route = project.route(ingress)?;
-    let mut hosts: Vec<&str> = route
-        .rules
-        .iter()
-        .filter_map(|r| r.host.as_deref())
-        .collect();
-    hosts.sort_unstable();
-    hosts.dedup();
-    let mut rules = Vec::new();
-    for rule in &route.rules {
-        let kind = match rule.path_type.as_deref() {
-            Some("Exact") => "Exact",
-            _ => "PathPrefix",
-        };
-        let mut backend = serde_json::Map::from_iter([("name".to_owned(), json!(rule.service))]);
-        if let Some(port) = rule.port.as_deref() {
-            let number = port.parse::<u16>().ok().or_else(|| {
-                project
-                    .endpoint(&rule.service)
-                    .into_iter()
-                    .flat_map(|e| &e.ports)
-                    .find(|p| p.name.as_deref() == Some(port))
-                    .and_then(|p| u16::try_from(p.port).ok())
-            })?;
-            backend.insert("port".to_owned(), json!(number));
-        }
-        rules.push(json!({
-            "matches": [{"path": {"type": kind, "value": rule.path.as_deref().unwrap_or("/")}}],
-            "backendRefs": [backend],
-        }));
-    }
-    let mut spec = serde_json::Map::from_iter([
-        (
-            "parentRefs".to_owned(),
-            json!([{"name": gateway.name, "namespace": gateway.namespace}]),
-        ),
-        ("rules".to_owned(), json!(rules)),
-    ]);
-    if !hosts.is_empty() {
-        spec.insert("hostnames".to_owned(), json!(hosts));
-    }
-    Some(json!({
-        "apiVersion": "gateway.networking.k8s.io/v1",
-        "kind": "HTTPRoute",
-        "metadata": {"name": ingress},
-        "spec": spec,
-    }))
 }
 
 // ── Routes that lead nowhere ────────────────────────────────────────────────────────────────────

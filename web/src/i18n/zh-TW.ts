@@ -1351,9 +1351,6 @@ export const zhTW: Messages = {
     `${host} 只有 HTTP。管理員指定 cert-manager 的簽發者後，新網域會使用 HTTPS`,
   "warn.httpOnlyElsewhere": (host: string, route: string) =>
     `${host} 只有 HTTP：${route} 的憑證不是 cert-manager 簽發的，請到產生憑證的地方加入 ${host}`,
-  "warn.gatewayChosen": (gateway: string, of: number) =>
-    `公開網域會掛接到 Gateway ${gateway}（共找到 ${of} 個）`,
-  "warn.gatewaysUnreadable": "無法讀取 Gateway：公開網域不會掛接到 Gateway",
   "warn.secretValuesUnknown": (name: string) => `無法讀取 ${name} 的值：差異只列出鍵名`,
   "warn.configNotRolledBack": (workload: string) =>
     `${workload} 讀取 ConfigMap 或 Secret：回滾不會改動它們的內容`,
@@ -1494,7 +1491,7 @@ export const zhTW: Messages = {
     `${name} 不再依排程執行。正在執行的那次會繼續，「立即執行」也仍可使用。`,
   "confirm.resumeTask": (name) => `${name} 恢復依排程執行。`,
   "confirm.redirect": (host, to) => `把 ${host} 的訪客轉到 ${to}。`,
-  "confirm.redirectOff": (host, service) => `取消轉址，${host} 重新顯示 ${service}。`,
+  "confirm.redirectOff": (host) => `取消 ${host} 的轉址。`,
   "confirm.envImport": (kind, name, service) =>
     `${service} 把 ${kind} ${name} 的每個鍵都當成變數讀取。它的副本會重新啟動。`,
   "confirm.publicPort": (port, name) => `把 ${name} 的連接埠 ${port} 開放到網際網路。`,
@@ -1734,6 +1731,10 @@ export const zhTW: Messages = {
   "data.noChanges": "沒有變更。",
   "net.addDomain": "新增網域",
   "net.domain": "網域",
+  "net.routeKind": "路由",
+  "net.viaIngress": "Ingress（預設）",
+  "net.viaGateway": (gateway, listener) => `Gateway ${gateway} 的 ${listener} listener`,
+  "net.gatewayHttps": "HTTPS 憑證由 Gateway 的 listener 提供。",
   "diagnosis.title": "出了什麼問題",
   "diagnosis.evidence": "依據",
   "diagnosis.replica": "副本",
@@ -1764,8 +1765,6 @@ export const zhTW: Messages = {
   "fix.readiness": (container: string) => `為 ${container} 加上就緒檢查`,
   "fix.addVolume": (container, path) => `把 ${container} 的 ${path} 存到磁碟區`,
   "fix.isolateProject": (project: string) => `隔離 ${project} 的服務`,
-  "fix.httpRoute": (ingress) => `改由 Gateway 轉送 ${ingress}`,
-  "fix.httpRouteNote": "原本的 Ingress 會保留，新路由正常後再刪掉它。",
   "gap.unreadable": "部分檢查需要你沒有的權限。",
   "install.title": "安裝",
   "install.helm": "在能用 helm 和 kubectl 連到叢集的電腦上執行這些指令。",
@@ -3433,7 +3432,6 @@ export const zhTW: Messages = {
   "domainAccess.protected": "密碼保護",
   "domainAccess.kube.annotation": "Middleware 清單",
   "domainAccess.kube.redirect": "轉址",
-  "domainAccess.kube.kept": "原本的規則",
   "domainAccess.kube.password": "密碼",
   "domainAccess.kube.users": "使用者",
   "domainAccess.kube.usersValue": (name) =>
@@ -3488,8 +3486,10 @@ export const zhTW: Messages = {
     "Error pages 範本：名為 error-pages 的 Deployment、Service、ConfigMap 和 NetworkPolicy，帶標籤 zeabur.com/page-server",
   "domainPages.kube.errors": "錯誤頁面",
   "domainPages.kube.maintenance": "維護",
-  "domainPages.kube.maintenanceValue":
-    "網域後端改成頁面伺服器的維護連接埠，原本的後端記在註解 zeabur.com/maintenance-backend",
+  "domainPages.kube.maintenanceIngress": (route) =>
+    `另建一份 Ingress，這個網域的請求都送到維護頁。它的 router.priority 比 ${route} 高，刪掉 ${route} 時會一起刪除`,
+  "domainPages.kube.maintenanceWeights": (route) =>
+    `HTTPRoute ${route} 把其他後端的權重改成 0，所有請求都送到頁面伺服器的維護連接埠`,
   "ports.title": "對外連接埠",
   "ports.about": "叢集外的用戶端不經網域，直接連到連接埠。適合不走 HTTP 的服務，例如資料庫。",
   "ports.open": "開放連接埠",
@@ -3567,8 +3567,6 @@ export const zhTW: Messages = {
     `排程工作使用 ${service} 目前的映像檔 ${image}。之後 ${service} 換映像檔，排程工作不會跟著換`,
   "warn.domainMoved": (host, from, to) => `${host} 從 ${from} 移到自己的路由 ${to}`,
   "warn.routeDeleted": (route, host) => `${route} 只用於 ${host}，所以會一起刪除`,
-  "warn.maintenanceRestored": (host, service, port) =>
-    `維護期間 ${host} 的規則改過，原本的後端對不上，顯示維護頁的路徑會改送到 ${service}:${port}`,
   "warn.permanentRedirect": (host) =>
     `瀏覽器會記住永久轉址：之後就算取消，來過的訪客清除快取前，開啟 ${host} 仍會轉到舊的網域`,
   "warn.publicDatabase": (name) => `${name} 是資料庫：面對網際網路，只剩它自己的密碼保護資料`,

@@ -1,0 +1,9 @@
+description: "An HTTPRoute that splits its requests by weight is refused: setting the weights back after maintenance would lose the split."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - op: maintenance
+        route: {kind: HTTPRoute, name: web-www}
+        hostname: www.shop.example.test
+        enabled: true

@@ -32,9 +32,9 @@ kind: Ingress
 metadata:
   name: shop
   namespace: demo
+  uid: 7d1f5c2a-0000-4000-8000-000000000001
   annotations:
     traefik.ingress.kubernetes.io/router.middlewares: demo-shop-error-pages@kubernetescrd
-    zeabur.com/maintenance-backend: '{"www.shop.example.test":[{"service":{"name":"web","port":{"number":8080}}}]}'
 spec:
   rules:
     - host: shop.example.test
@@ -50,4 +50,36 @@ spec:
           - path: /
             pathType: Prefix
             backend:
-              service: {name: error-pages, port: {number: 8081}}
+              service: {name: web, port: {number: 8080}}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: web-www-shop-example-test-maintenance
+  namespace: demo
+  ownerReferences:
+    - {apiVersion: networking.k8s.io/v1, kind: Ingress, name: shop, uid: 7d1f5c2a-0000-4000-8000-000000000001}
+  annotations:
+    traefik.ingress.kubernetes.io/router.priority: "49"
+spec:
+  rules:
+    - host: www.shop.example.test
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service: {name: error-pages, port: {name: maintenance}}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: error-pages
+  namespace: demo
+  labels: {zeabur.com/page-server: "true"}
+spec:
+  selector:
+    app: error-pages
+  ports:
+    - {name: pages, port: 8080}
+    - {name: maintenance, port: 8081}

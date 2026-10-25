@@ -1,0 +1,43 @@
+{
+  "objects": [
+    {
+      "target": {
+        "kind": "Ingress",
+        "name": "shop"
+      },
+      "write": {
+        "type": "patch",
+        "operations": [
+          {
+            "op": "test",
+            "path": "/metadata/resourceVersion",
+            "value": "9"
+          },
+          {
+            "op": "test",
+            "path": "/spec/rules/1/host",
+            "value": "www.shop.example.test"
+          },
+          {
+            "op": "remove",
+            "path": "/spec/rules/1"
+          },
+          {
+            "op": "remove",
+            "path": "/spec/tls/0/hosts/1"
+          }
+        ]
+      }
+    },
+    {
+      "target": {
+        "kind": "Ingress",
+        "name": "web-www-shop-example-test-maintenance"
+      },
+      "write": {
+        "type": "delete"
+      }
+    }
+  ],
+  "warnings": []
+}

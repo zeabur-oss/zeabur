@@ -136,7 +136,6 @@ pub(crate) async fn project(
         .filter_map(|route| serde_json::from_value(route.clone()).ok())
         .collect();
     let traits = ClusterTraits {
-        gateway_api: facts.gateways.as_ref().is_some_and(|g| !g.is_empty()),
         retired_ingress_classes: retired_classes(&facts.classes),
         gateways: facts.gateways,
     };

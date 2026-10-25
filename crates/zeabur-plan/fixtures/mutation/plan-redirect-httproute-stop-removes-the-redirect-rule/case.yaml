@@ -1,0 +1,9 @@
+description: "Stopping the redirect of an HTTPRoute removes the RequestRedirect rule, so the rules after it serve again."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - op: redirect
+        route: {kind: HTTPRoute, name: web-www}
+        hostname: www.shop.example.test
+        permanent: true

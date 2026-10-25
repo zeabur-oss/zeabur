@@ -126,7 +126,6 @@ export default sentences({
     "gap.healthChecks.none": "${container} has no traffic check; traffic can reach it before it's ready.",
     "gap.healthChecks.livenessOnly": "${container} has a restart check but no traffic check.",
     "gap.ingressToHttpRoute.retired": "Ingress ${ingress} uses ${class}, whose controller is no longer maintained.",
-    "gap.ingressToHttpRoute.available": "Gateway API is available, so Ingress ${ingress} can move to an HTTPRoute.",
     "gap.retiredIngressController": "IngressClass ${class} is served by ${controller}, which is no longer maintained.",
     "gap.danglingRoute.noService": "${kind} ${route} sends traffic to ${services, items, one {Service} other {Services}} ${services, list}, which ${services, items, one {doesn't} other {don't}} exist in this project.",
     "gap.danglingRoute.noGateway": "HTTPRoute ${route} attaches to ${gateways, items, one {Gateway} other {Gateways}} ${gateways, list}, which ${gateways, items, one {doesn't} other {don't}} exist.",

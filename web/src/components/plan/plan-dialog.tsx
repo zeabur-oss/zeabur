@@ -756,10 +756,6 @@ function warningSentence(
       return t("warn.httpsCertificate", warning.hostname, warning.issuer)
     case "httpOnly":
       return httpOnlySentence(t, warning)
-    case "gatewayChosen":
-      return t("warn.gatewayChosen", `${warning.namespace}/${warning.name}`, warning.of)
-    case "gatewaysUnreadable":
-      return t("warn.gatewaysUnreadable")
     case "secretValuesUnknown":
       return t("warn.secretValuesUnknown", warning.name)
     case "configNotRolledBack":
@@ -823,12 +819,7 @@ function routeWarning(
   warning: Extract<
     Schemas["PlanWarning"],
     {
-      code:
-        | "ownCertificate"
-        | "issuerShared"
-        | "maintenanceRestored"
-        | "routeDeleted"
-        | "domainMoved"
+      code: "ownCertificate" | "issuerShared" | "routeDeleted" | "domainMoved"
     }
   >,
 ): string {
@@ -842,8 +833,6 @@ function routeWarning(
         warning.issuer,
         t("common.list", warning.hostnames),
       )
-    case "maintenanceRestored":
-      return t("warn.maintenanceRestored", warning.hostname, warning.service, warning.port)
     case "domainMoved":
       return t(
         "warn.domainMoved",
@@ -869,7 +858,6 @@ function accessWarning(
         | "publicPortBlocked"
         | "ownCertificate"
         | "issuerShared"
-        | "maintenanceRestored"
         | "routeDeleted"
         | "domainMoved"
     }

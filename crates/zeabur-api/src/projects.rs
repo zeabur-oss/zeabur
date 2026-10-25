@@ -43,6 +43,7 @@ pub mod database_export;
 pub mod databases;
 pub mod deploy_keys;
 pub(crate) mod events;
+pub mod gateways;
 pub mod namespace;
 pub mod network_policy;
 pub mod object_storage;

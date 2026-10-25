@@ -1,9 +1,0 @@
-description: "Maintenance on an HTTPRoute that serves only its hostname replaces the backendRefs of each rule with the maintenance port and keeps them in the annotation."
-operation: mutation.plan
-params:
-  request:
-    changes:
-      - op: maintenance
-        route: {kind: HTTPRoute, name: web-www}
-        hostname: www.shop.example.test
-        enabled: true

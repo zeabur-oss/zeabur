@@ -9,11 +9,5 @@
       "params": {"ingress": "legacy", "class": "nginx"}
     },
     "fix": {"kind": "plan", "id": "domains.httpRoute", "params": {"ingress": "legacy"}}
-  },
-  {
-    "rule": "ingress-to-httproute",
-    "severity": "advice",
-    "subject": {"kind": "Ingress", "name": "shop"},
-    "message": {"key": "gap.ingressToHttpRoute.available", "params": {"ingress": "shop"}}
   }
 ]

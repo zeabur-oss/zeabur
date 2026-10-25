@@ -68,12 +68,7 @@ function useCurrentPages(project: string) {
 }
 
 /** The form, and the changes it asks for once the pages are known. */
-function usePagesForm(
-  project: string,
-  route: Schemas["Route"],
-  host: string,
-  workload: Schemas["WorkloadRef"],
-) {
+function usePagesForm(project: string, route: Schemas["Route"], host: string) {
   const current = useCurrentPages(project)
   const was = {
     maintenance: route.maintenance?.includes(host) ?? false,
@@ -92,7 +87,6 @@ function usePagesForm(
           defaults: current.defaults,
         },
         form,
-        workload,
       )
     : []
   return {
@@ -124,10 +118,7 @@ export default function DomainPagesDrawer({
   onClose: () => void
 }) {
   const t = useT()
-  const { current, form, setForm, changes, large } = usePagesForm(project, route, host, {
-    kind: service.kind,
-    name: service.name,
-  })
+  const { current, form, setForm, changes, large } = usePagesForm(project, route, host)
   const [tried, setTried] = useState(false)
   const review = () => {
     setTried(true)
@@ -223,7 +214,9 @@ function pagesFacts(t: Translate, route: Schemas["Route"], name?: string): [stri
   ]
   const maintenance: [string, string] = [
     t("domainPages.kube.maintenance"),
-    t("domainPages.kube.maintenanceValue"),
+    route.origin.kind === "HTTPRoute"
+      ? t("domainPages.kube.maintenanceWeights", route.name)
+      : t("domainPages.kube.maintenanceIngress", route.name),
   ]
   if (route.origin.kind === "HTTPRoute") return [server, maintenance]
   const errors: [string, string] = [

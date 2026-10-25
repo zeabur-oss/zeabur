@@ -16,6 +16,21 @@ minor or patch release may break the API.
   ([docs/reference/releases.md](docs/reference/releases.md)). The chart's new `image.digest` value pins any image
   by content.
 
+### Changed
+
+- A new domain uses an Ingress unless "Add domain" names a Gateway listener. Before, any Gateway in
+  the cluster turned new domains into HTTPRoutes on the first Gateway found.
+- Maintenance on an Ingress adds a second Ingress (`<name>-maintenance`) that Traefik ranks first;
+  on an HTTPRoute it sets the backends to weight 0 next to the page server. An HTTPRoute redirect
+  adds one rule at the top. The annotations `zeabur.com/maintenance-backend` and
+  `zeabur.com/redirect-rules` are no longer read: stop every redirect and maintenance before you
+  upgrade, and see the backup docs for restored objects that still have them.
+- The Developer role can manage Traefik Middlewares in its projects.
+
+### Removed
+
+- The suggestion to move an Ingress to an HTTPRoute.
+
 ## [0.0.1] - 2026-10-18
 
 The first public release, pre-alpha.

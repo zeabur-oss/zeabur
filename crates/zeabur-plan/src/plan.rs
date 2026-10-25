@@ -36,20 +36,25 @@ use k8s_openapi::api::apps::v1::ReplicaSet;
 use k8s_openapi::api::networking::v1::Ingress;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use serde_json::{Value, json};
+use zeabur_adapters::error_pages::maintenance_of;
+use zeabur_adapters::gateway::Attachable;
 use zeabur_adapters::provenance::{Tool, detect_tool};
 use zeabur_graph::{Snapshot, Workload, workloads};
-use zeabur_kernel::names::{Conventions, GatewayRef};
+use zeabur_kernel::names::Conventions;
 use zeabur_model::{HttpRoute, Project, SourceKind, WorkloadKind, WorkloadRef};
 
+use crate::access::redirect_rule;
 use crate::certificates::{
     CLUSTER_ISSUER, CheckedCertificate, ISSUER, IssuerRead, issued_secret_name,
 };
 use crate::change::{
-    CertificateSource, Change, DataEdit, DataKind, FieldOwners, HttpOnlyReason, ObjectName, Plan,
-    PlanRequest, PlannedObject, RouteKind, RouteRef, Target, Warning, Write,
+    AddDomainChange, CertificateSource, Change, DataEdit, DataKind, FieldOwners, GatewayParent,
+    HttpOnlyReason, ObjectName, Plan, PlanRequest, PlannedObject, RouteKind, RouteRef, Target,
+    Warning, Write,
 };
 use crate::checks::ResourceRef;
 use crate::create::ServedKind;
+use crate::error_pages::shows_maintenance;
 use crate::fields::{Step, owners, reapplying_tool};
 use crate::json::{add, apply_patch, pointer, remove, replace, test};
 use crate::releases::Release;
@@ -156,8 +161,9 @@ pub struct Input<'a> {
     pub snapshot: &'a Snapshot,
     /// The project's `HTTPRoute` objects, as JSON.
     pub http_routes: &'a [Value],
-    /// The cluster's Gateways; `None` when they could not be listed.
-    pub gateways: Option<&'a [GatewayRef]>,
+    /// The Gateways with listeners that accept an `HTTPRoute` from the project's namespace;
+    /// `None` when they could not be read.
+    pub gateways: Option<&'a [Attachable]>,
     /// The values of the Secrets the request edits, by name, where the person could read them.
     pub secret_values: &'a BTreeMap<String, BTreeMap<String, Vec<u8>>>,
     /// The time the plan is made, RFC 3339; the restart annotation's value.
@@ -416,9 +422,7 @@ impl<'a> Planner<'a> {
                 name,
                 changes,
             } => self.data(*kind, name, changes),
-            Change::AddDomain(add) => {
-                self.add_domain(&add.workload, &add.hostname, add.certificate.as_ref())
-            }
+            Change::AddDomain(add) => self.add_domain(add),
             Change::Certificate(change) => {
                 self.certificate(&change.route, &change.hostname, &change.certificate)
             }
@@ -426,7 +430,6 @@ impl<'a> Planner<'a> {
             Change::RemoveDomain { route, hostname } => self.remove_domain(route, hostname),
             Change::Redirect(redirect) => self.redirect(
                 &redirect.route,
-                &redirect.workload,
                 &redirect.hostname,
                 redirect.to.as_deref(),
                 redirect.permanent,
@@ -434,12 +437,9 @@ impl<'a> Planner<'a> {
             Change::BasicAuth(auth) => self.basic_auth(&auth.route, auth.user.as_ref()),
             Change::ErrorPageHtml(pages) => self.error_page_html(pages),
             Change::ErrorPages(pages) => self.error_pages(&pages.route, pages.enabled),
-            Change::Maintenance(change) => self.maintenance(
-                &change.route,
-                &change.hostname,
-                change.enabled,
-                change.workload.as_ref(),
-            ),
+            Change::Maintenance(change) => {
+                self.maintenance(&change.route, &change.hostname, change.enabled)
+            }
             Change::EnvImport(import) => self.env_import(import),
             Change::PublicPort(public) => self.public_port(public),
             Change::Create { .. } => self.create(change, index),
@@ -1111,13 +1111,10 @@ impl<'a> Planner<'a> {
     }
 
     #[expect(clippy::too_many_lines, reason = "one change kind, read top to bottom")]
-    fn add_domain(
-        &mut self,
-        reference: &WorkloadRef,
-        hostname: &str,
-        certificate: Option<&CertificateSource>,
-    ) -> Result<(), PlanError> {
-        let hostname = hostname.to_ascii_lowercase();
+    fn add_domain(&mut self, change: &AddDomainChange) -> Result<(), PlanError> {
+        let reference = &change.workload;
+        let certificate = change.certificate.as_ref();
+        let hostname = change.hostname.to_ascii_lowercase();
         validate_hostname(&hostname).map_err(|r| {
             error(
                 ErrorKind::BadRequest,
@@ -1125,6 +1122,14 @@ impl<'a> Planner<'a> {
                 format!("{hostname:?} is not a hostname."),
             )
         })?;
+        if change.parent.is_some() && certificate.is_some() {
+            return Err(error(
+                ErrorKind::BadRequest,
+                "parent_with_certificate",
+                "A domain on a Gateway gets its certificate from the Gateway's listener; choose a \
+                 certificate only for a domain on an Ingress.",
+            ));
+        }
         self.workload(reference)?;
         let endpoints: Vec<(String, Option<i32>)> = self
             .project
@@ -1154,6 +1159,10 @@ impl<'a> Planner<'a> {
                 format!("{hostname} already routes somewhere in this project."),
             ));
         }
+        let parent = Self::new_route_parent(change);
+        if let Some(parent) = parent {
+            self.check_parent(parent, &hostname)?;
+        }
         match certificate {
             Some(CertificateSource::Issuer { name }) => {
                 self.check_chosen_issuer(name, &hostname)?;
@@ -1165,6 +1174,13 @@ impl<'a> Planner<'a> {
         }
         self.impact.insert(reference.clone());
         let names: BTreeSet<String> = endpoints.iter().map(|(n, _)| n.clone()).collect();
+        let port = port.unwrap_or(80);
+        if let Some(parent) = parent {
+            if let Some(object) = self.joinable_http_route(&names, &hostname, Some(parent)) {
+                return self.join_http_route(&object, &hostname);
+            }
+            return self.new_route(reference, &hostname, (&service, port), Some(parent), None);
+        }
         let joins = |i: &Ingress| match certificate {
             None => true,
             Some(CertificateSource::Issuer { name }) => {
@@ -1182,7 +1198,7 @@ impl<'a> Planner<'a> {
             .snapshot
             .ingresses
             .iter()
-            .filter(|i| joins(i))
+            .filter(|i| joins(i) && maintenance_of(i).is_none())
             .find_map(|i| {
                 let backend = i
                     .spec
@@ -1220,32 +1236,140 @@ impl<'a> Planner<'a> {
         }
         // An HTTPRoute that already routes to the workload; a chosen certificate needs an
         // Ingress.
-        let route = self
-            .http_routes()
-            .filter(|_| certificate.is_none())
-            .find(|(_, route)| route.routes_to(|name| names.contains(name)));
-        if let Some((object, route)) = route {
-            let name = route.name().to_owned();
-            Self::refuse_managed(&metadata(object), "HTTPRoute", &name)?;
-            if route.spec.hostnames.is_empty() {
-                return Err(error(
-                    ErrorKind::Invalid,
-                    "route_matches_every_host",
-                    format!(
-                        "HTTPRoute {name} lists no hostnames, so it already answers every host; adding one would narrow it."
-                    ),
-                ));
-            }
-            let index = self.working(http_route_target(&name), object.clone());
-            self.claim(
-                index,
-                &[Step::field("spec"), Step::field("hostnames")],
-                "hostnames",
-            )?;
-            return self.patch(index, vec![add("/spec/hostnames/-", json!(hostname))]);
+        if certificate.is_none()
+            && let Some(object) = self.joinable_http_route(&names, &hostname, None)
+        {
+            return self.join_http_route(&object, &hostname);
         }
-        // A new route.
-        let name = route_name(&reference.name, &hostname);
+        self.new_route(reference, &hostname, (&service, port), None, certificate)
+    }
+
+    /// The Gateway of a new domain's `HTTPRoute`; without one the domain joins or gets an Ingress.
+    /// This is the one place that picks the kind of a new route: to prefer `HTTPRoute`, return a
+    /// default Gateway here.
+    const fn new_route_parent(change: &AddDomainChange) -> Option<&GatewayParent> {
+        change.parent.as_ref()
+    }
+
+    /// Refuses `parent` when the Gateways could be read and none of its listeners accepts a
+    /// route from the project for `hostname`.
+    fn check_parent(&self, parent: &GatewayParent, hostname: &str) -> Result<(), PlanError> {
+        let Some(gateways) = self.input.gateways else {
+            return Ok(());
+        };
+        let shown = format!("{}/{}", parent.namespace, parent.name);
+        let Some(gateway) = gateways
+            .iter()
+            .find(|g| g.namespace == parent.namespace && g.name == parent.name)
+            .filter(|g| {
+                parent
+                    .section_name
+                    .as_ref()
+                    .is_none_or(|s| g.listeners.iter().any(|l| l.name == *s))
+            })
+        else {
+            return Err(error(
+                ErrorKind::Invalid,
+                "gateway_refuses_route",
+                format!("Gateway {shown} does not accept routes from this project."),
+            ));
+        };
+        if !gateway.serves(parent.section_name.as_deref(), hostname) {
+            return Err(error(
+                ErrorKind::Invalid,
+                "listener_hostname_mismatch",
+                format!("No listener of Gateway {shown} serves {hostname}."),
+            ));
+        }
+        Ok(())
+    }
+
+    /// An `HTTPRoute` that sends to Services `names` and can take `hostname`: attached to
+    /// `parent` when given, and not showing the maintenance page or redirecting, as the new
+    /// hostname would do the same. A route whose Gateway listeners cannot serve the hostname is
+    /// left out, as Gateway API ignores such a hostname.
+    fn joinable_http_route(
+        &self,
+        names: &BTreeSet<String>,
+        hostname: &str,
+        parent: Option<&GatewayParent>,
+    ) -> Option<Value> {
+        let namespace = self.input.snapshot.namespace.as_str();
+        let server = self.page_server().ok();
+        self.http_routes()
+            .filter(|(_, route)| route.routes_to(|name| names.contains(name)))
+            .filter(|(object, _)| {
+                redirect_rule(object).is_none() && !shows_maintenance(object, server.as_ref())
+            })
+            .filter(|(_, route)| {
+                parent.is_none_or(|p| {
+                    route.spec.parent_refs.iter().any(|r| {
+                        r.gateway(namespace) == Some((p.namespace.as_str(), p.name.as_str()))
+                            && r.section_name == p.section_name
+                    })
+                })
+            })
+            .find(|(_, route)| self.listeners_serve(route, hostname))
+            .map(|(object, _)| object.clone())
+    }
+
+    /// Whether a Gateway listener of `route` may serve `hostname`: false only when every Gateway
+    /// parent is known and none of its listeners serves it.
+    fn listeners_serve(&self, route: &HttpRoute, hostname: &str) -> bool {
+        let Some(gateways) = self.input.gateways else {
+            return true;
+        };
+        let namespace = self.input.snapshot.namespace.as_str();
+        let mut parents = route
+            .spec
+            .parent_refs
+            .iter()
+            .filter_map(|r| r.gateway(namespace).map(|g| (g, r.section_name.as_deref())))
+            .peekable();
+        if parents.peek().is_none() {
+            return true;
+        }
+        parents.any(|((ns, name), section)| {
+            gateways
+                .iter()
+                .find(|g| g.namespace == ns && g.name == name)
+                .is_none_or(|g| g.serves(section, hostname))
+        })
+    }
+
+    fn join_http_route(&mut self, object: &Value, hostname: &str) -> Result<(), PlanError> {
+        let meta = metadata(object);
+        let name = meta.name.clone().unwrap_or_default();
+        Self::refuse_managed(&meta, "HTTPRoute", &name)?;
+        if array(object, "/spec/hostnames").is_empty() {
+            return Err(error(
+                ErrorKind::Invalid,
+                "route_matches_every_host",
+                format!(
+                    "HTTPRoute {name} lists no hostnames, so it already answers every host; adding one would narrow it."
+                ),
+            ));
+        }
+        let index = self.working(http_route_target(&name), object.clone());
+        self.claim(
+            index,
+            &[Step::field("spec"), Step::field("hostnames")],
+            "hostnames",
+        )?;
+        self.patch(index, vec![add("/spec/hostnames/-", json!(hostname))])
+    }
+
+    /// A new route for `hostname` to `backend` (a Service and its port): an `HTTPRoute` on
+    /// `parent` when given, else an Ingress with the certificate chosen.
+    fn new_route(
+        &mut self,
+        reference: &WorkloadRef,
+        hostname: &str,
+        (service, port): (&str, i32),
+        parent: Option<&GatewayParent>,
+        certificate: Option<&CertificateSource>,
+    ) -> Result<(), PlanError> {
+        let name = route_name(&reference.name, hostname);
         let taken = self
             .input
             .snapshot
@@ -1261,64 +1385,48 @@ impl<'a> Planner<'a> {
             ));
         }
         let namespace = self.input.snapshot.namespace.clone();
-        let port = port.unwrap_or(80);
-        let gateway = if certificate.is_some() {
-            None
-        } else if let Some(gateways) = self.input.gateways {
-            gateways.first().map(|g| (g.clone(), gateways.len()))
-        } else {
-            self.warnings.push(Warning::GatewaysUnreadable);
-            None
-        };
-        let (target, body) = if let Some((gateway, of)) = gateway {
-            if of > 1 {
-                self.warnings.push(Warning::GatewayChosen {
-                    namespace: gateway.namespace.clone(),
-                    name: gateway.name.clone(),
-                    of,
-                });
+        if let Some(parent) = parent {
+            let mut reference = json!({"name": parent.name, "namespace": parent.namespace});
+            if let (Some(section), Some(map)) = (&parent.section_name, reference.as_object_mut()) {
+                map.insert("sectionName".to_owned(), json!(section));
             }
-            (
-                http_route_target(&name),
-                json!({
+            self.objects.push(Working {
+                target: http_route_target(&name),
+                original: None,
+                current: json!({
                     "apiVersion": "gateway.networking.k8s.io/v1",
                     "kind": "HTTPRoute",
                     "metadata": {"name": name, "namespace": namespace},
                     "spec": {
-                        "parentRefs": [{"name": gateway.name, "namespace": gateway.namespace}],
+                        "parentRefs": [reference],
                         "hostnames": [hostname],
                         "rules": [{"backendRefs": [{"name": service, "port": port}]}]
                     }
                 }),
-            )
-        } else {
-            (
-                ingress_target(&name),
-                json!({
-                    "apiVersion": "networking.k8s.io/v1",
-                    "kind": "Ingress",
-                    "metadata": {"name": name, "namespace": namespace},
-                    "spec": {"rules": [{"host": hostname, "http": {"paths": [{
-                        "path": "/", "pathType": "Prefix",
-                        "backend": {"service": {"name": service, "port": {"number": port}}}
-                    }]}}]}
-                }),
-            )
-        };
-        let is_ingress = target.kind == "Ingress";
+                operations: Vec::new(),
+                owners: Vec::new(),
+                deleted: false,
+            });
+            return Ok(());
+        }
         self.objects.push(Working {
-            target,
+            target: ingress_target(&name),
             original: None,
-            current: body,
+            current: json!({
+                "apiVersion": "networking.k8s.io/v1",
+                "kind": "Ingress",
+                "metadata": {"name": name, "namespace": namespace},
+                "spec": {"rules": [{"host": hostname, "http": {"paths": [{
+                    "path": "/", "pathType": "Prefix",
+                    "backend": {"service": {"name": service, "port": {"number": port}}}
+                }]}}]}
+            }),
             operations: Vec::new(),
             owners: Vec::new(),
             deleted: false,
         });
-        if is_ingress {
-            let index = self.objects.len() - 1;
-            return self.secure(index, &name, &hostname, certificate);
-        }
-        Ok(())
+        let index = self.objects.len() - 1;
+        self.secure(index, &name, hostname, certificate)
     }
 
     /// Lists `hostname` for HTTPS on Ingress `index`, with the certificate the person chose.
@@ -1433,70 +1541,42 @@ impl<'a> Planner<'a> {
         &self,
         route: &RouteRef,
     ) -> Result<(Value, ObjectMeta, BTreeSet<String>), PlanError> {
-        let missing = || {
+        let named = |meta: &ObjectMeta| meta.name.as_deref() == Some(route.name.as_str());
+        let object = match route.kind {
+            RouteKind::Ingress => self
+                .input
+                .snapshot
+                .ingresses
+                .iter()
+                .find(|i| named(&i.metadata))
+                .map(to_json)
+                .transpose()?,
+            RouteKind::HttpRoute => self
+                .input
+                .http_routes
+                .iter()
+                .find(|o| named(&metadata(o)))
+                .cloned(),
+        }
+        .ok_or_else(|| {
             error(
                 ErrorKind::NotFound,
                 "unknown_route",
                 format!("There is no route named {}.", route.name),
             )
-        };
-        match route.kind {
-            RouteKind::Ingress => {
-                let object = self
-                    .input
-                    .snapshot
-                    .ingresses
-                    .iter()
-                    .find(|i| i.metadata.name.as_deref() == Some(route.name.as_str()))
-                    .ok_or_else(missing)?;
-                let services = object
-                    .spec
-                    .iter()
-                    .flat_map(|s| {
-                        s.rules
-                            .iter()
-                            .flatten()
-                            .flat_map(|r| r.http.iter().flat_map(|h| h.paths.iter()))
-                            .filter_map(|p| p.backend.service.as_ref().map(|b| b.name.clone()))
-                    })
-                    .collect();
-                Ok((to_json(object)?, object.metadata.clone(), services))
-            }
-            RouteKind::HttpRoute => {
-                let (object, typed) = self
-                    .http_routes()
-                    .find(|(_, r)| r.name() == route.name)
-                    .ok_or_else(missing)?;
-                let services = typed
-                    .spec
-                    .rules
-                    .iter()
-                    .flat_map(|r| &r.backend_refs)
-                    .map(|b| b.name.clone())
-                    .collect();
-                Ok((object.clone(), metadata(object), services))
-            }
-        }
+        })?;
+        let services = route.kind.services(&object);
+        let meta = metadata(&object);
+        Ok((object, meta, services))
     }
 
     fn route_index(&mut self, route: &RouteRef) -> Result<usize, PlanError> {
         let (object, meta, services) = self.route(route)?;
-        let kind = match route.kind {
-            RouteKind::Ingress => "Ingress",
-            RouteKind::HttpRoute => "HTTPRoute",
-        };
-        Self::refuse_managed(&meta, kind, &route.name)?;
+        Self::refuse_managed(&meta, route.kind.kind_name(), &route.name)?;
         let behind = self.behind(&services);
         self.impact.extend(behind);
-        let target = match route.kind {
-            RouteKind::Ingress => ingress_target(&route.name),
-            RouteKind::HttpRoute => http_route_target(&route.name),
-        };
-        let index = self.working(target, object);
-        let field = match route.kind {
-            RouteKind::Ingress => "rules",
-            RouteKind::HttpRoute => "hostnames",
-        };
+        let index = self.working(route.kind.target(&route.name), object);
+        let field = route.kind.hosts_field();
         self.claim(index, &[Step::field("spec"), Step::field(field)], field)?;
         Ok(index)
     }
@@ -1518,44 +1598,7 @@ impl<'a> Planner<'a> {
             ));
         }
         let index = self.route_index(route)?;
-        let current = self.current(index);
-        let mut operations = Vec::new();
-        match route.kind {
-            RouteKind::Ingress => {
-                for (at, rule) in array(&current, "/spec/rules").iter().enumerate() {
-                    if rule.get("host").and_then(Value::as_str) == Some(from) {
-                        operations.push(test(&format!("/spec/rules/{at}/host"), json!(from)));
-                        operations.push(replace(&format!("/spec/rules/{at}/host"), json!(to)));
-                    }
-                }
-                for (at, tls) in array(&current, "/spec/tls").iter().enumerate() {
-                    for (h, host) in tls
-                        .get("hosts")
-                        .and_then(Value::as_array)
-                        .into_iter()
-                        .flatten()
-                        .enumerate()
-                    {
-                        if host.as_str() == Some(from) {
-                            operations
-                                .push(replace(&format!("/spec/tls/{at}/hosts/{h}"), json!(to)));
-                            self.warnings.push(Warning::TlsHostChanged {
-                                route: route.name.clone(),
-                                hostname: to.clone(),
-                            });
-                        }
-                    }
-                }
-            }
-            RouteKind::HttpRoute => {
-                for (at, host) in array(&current, "/spec/hostnames").iter().enumerate() {
-                    if host.as_str() == Some(from) {
-                        operations.push(test(&format!("/spec/hostnames/{at}"), json!(from)));
-                        operations.push(replace(&format!("/spec/hostnames/{at}"), json!(to)));
-                    }
-                }
-            }
-        }
+        let (operations, tls_changed) = route.kind.rename_host(&self.current(index), from, &to);
         if operations.is_empty() {
             return Err(error(
                 ErrorKind::NotFound,
@@ -1563,7 +1606,14 @@ impl<'a> Planner<'a> {
                 format!("{} does not route {from}.", route.name),
             ));
         }
-        self.patch(index, operations)
+        if tls_changed {
+            self.warnings.push(Warning::TlsHostChanged {
+                route: route.name.clone(),
+                hostname: to,
+            });
+        }
+        self.patch(index, operations)?;
+        self.end_maintenance_ingress(route, from)
     }
 
     pub(crate) fn remove_domain(
@@ -1575,122 +1625,41 @@ impl<'a> Planner<'a> {
             return self.delete_route(route, hostname);
         }
         let index = self.route_index(route)?;
-        let current = self.current(index);
-        let mut operations = Vec::new();
-        match route.kind {
-            RouteKind::Ingress => {
-                let rules = array(&current, "/spec/rules");
-                let matching: Vec<usize> = rules
-                    .iter()
-                    .enumerate()
-                    .filter(|(_, r)| r.get("host").and_then(Value::as_str) == Some(hostname))
-                    .map(|(i, _)| i)
-                    .collect();
-                if matching.is_empty() {
-                    return Err(error(
-                        ErrorKind::NotFound,
-                        "unknown_host",
-                        format!("{} does not route {hostname}.", route.name),
-                    ));
-                }
-                for at in matching.iter().rev() {
-                    operations.push(test(&format!("/spec/rules/{at}/host"), json!(hostname)));
-                    operations.push(remove(&format!("/spec/rules/{at}")));
-                }
-                for (at, tls) in array(&current, "/spec/tls").iter().enumerate().rev() {
-                    let hosts = tls
-                        .get("hosts")
-                        .and_then(Value::as_array)
-                        .cloned()
-                        .unwrap_or_default();
-                    if let Some(h) = hosts.iter().position(|v| v.as_str() == Some(hostname)) {
-                        if hosts.len() == 1 {
-                            operations.push(remove(&format!("/spec/tls/{at}")));
-                        } else {
-                            operations.push(remove(&format!("/spec/tls/{at}/hosts/{h}")));
-                        }
-                    }
-                }
-            }
-            RouteKind::HttpRoute => {
-                let hostnames = array(&current, "/spec/hostnames");
-                let Some(at) = hostnames.iter().position(|v| v.as_str() == Some(hostname)) else {
-                    return Err(error(
-                        ErrorKind::NotFound,
-                        "unknown_host",
-                        format!("{} does not route {hostname}.", route.name),
-                    ));
-                };
-                operations.push(test(&format!("/spec/hostnames/{at}"), json!(hostname)));
-                operations.push(remove(&format!("/spec/hostnames/{at}")));
-            }
+        let operations = route.kind.remove_host(&self.current(index), hostname);
+        if operations.is_empty() {
+            return Err(error(
+                ErrorKind::NotFound,
+                "unknown_host",
+                format!("{} does not route {hostname}.", route.name),
+            ));
         }
-        self.patch(index, operations)
+        self.patch(index, operations)?;
+        self.end_maintenance_ingress(route, hostname)
     }
 
-    /// Whether `hostname` is all that `route` routes: an Ingress whose every rule is for it and
-    /// that has no default backend, or an HTTPRoute with only this hostname. Without it the
-    /// Ingress would be invalid and the HTTPRoute would answer every host.
+    /// Whether `hostname` is all that `route` routes, after the edits so far.
     fn last_host(&self, route: &RouteRef, hostname: &str) -> Result<bool, PlanError> {
-        let target = match route.kind {
-            RouteKind::Ingress => ingress_target(&route.name),
-            RouteKind::HttpRoute => http_route_target(&route.name),
-        };
+        let target = route.kind.target(&route.name);
         let current = match self.objects.iter().find(|w| w.target == target) {
             Some(working) => working.current.clone(),
             None => self.route(route)?.0,
         };
-        let host = Some(hostname);
-        Ok(match route.kind {
-            RouteKind::Ingress => {
-                let rules = array(&current, "/spec/rules");
-                !rules.is_empty()
-                    && rules
-                        .iter()
-                        .all(|r| r.get("host").and_then(Value::as_str) == host)
-                    && current.pointer("/spec/defaultBackend").is_none()
-            }
-            RouteKind::HttpRoute => {
-                let hostnames = array(&current, "/spec/hostnames");
-                matches!(hostnames.as_slice(), [only] if only.as_str() == host)
-            }
-        })
+        Ok(route.kind.is_last_host(&current, hostname))
     }
 
-    /// Deletes `route`, whose last hostname is `hostname`.
+    /// Deletes `route`, whose last hostname is `hostname`. The garbage collector deletes the
+    /// maintenance Ingress it owns.
     fn delete_route(&mut self, route: &RouteRef, hostname: &str) -> Result<(), PlanError> {
         let (_, _, services) = self.route(route)?;
-        let (kind, resource) = match route.kind {
-            RouteKind::Ingress => (
-                "Ingress",
-                ResourceRef {
-                    group: "networking.k8s.io".to_owned(),
-                    version: "v1".to_owned(),
-                    resource: "ingresses".to_owned(),
-                },
-            ),
-            RouteKind::HttpRoute => (
-                "HTTPRoute",
-                ResourceRef {
-                    group: "gateway.networking.k8s.io".to_owned(),
-                    version: "v1".to_owned(),
-                    resource: "httproutes".to_owned(),
-                },
-            ),
-        };
-        self.delete(&resource, &route.name, None)?;
+        self.delete(&route.kind.resource(), &route.name, None)?;
         let behind = self.behind(&services);
         self.impact.extend(behind);
         self.warnings.push(Warning::RouteDeleted {
-            route: ObjectName {
-                kind: kind.to_owned(),
-                name: route.name.clone(),
-            },
+            route: ObjectName::of(route.kind.kind_name(), &route.name),
             hostname: hostname.to_owned(),
         });
         Ok(())
     }
-
     // ── Restarts and the result ──────────────────────────────────────────────────────────────
 
     fn restart(&mut self, reference: &WorkloadRef) -> Result<(), PlanError> {

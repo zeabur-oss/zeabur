@@ -263,6 +263,7 @@ fn remaining_routes(router: OpenApiRouter<AppState>) -> OpenApiRouter<AppState> 
         .routes(routes!(projects::list))
         .routes(routes!(projects::get))
         .routes(routes!(projects::namespace::get))
+        .routes(routes!(projects::gateways::list))
         .routes(routes!(services::service))
         .routes(routes!(gaps::project))
         .routes(routes!(incidents::project))

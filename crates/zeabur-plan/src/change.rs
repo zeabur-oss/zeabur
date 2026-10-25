@@ -510,9 +510,6 @@ pub struct LabelVolumeChange {
 pub struct RedirectChange {
     /// The route.
     pub route: RouteRef,
-    /// The workload the route sends requests to. An `HTTPRoute` that stops redirecting sends
-    /// them to it again.
-    pub workload: WorkloadRef,
     /// The hostname that redirects.
     pub hostname: String,
     /// The hostname to redirect to; absent stops the redirect.
@@ -666,10 +663,6 @@ pub struct MaintenanceChange {
     pub hostname: String,
     /// Show the maintenance page when true; send requests to the workload again when false.
     pub enabled: bool,
-    /// When stopping: the workload whose first Service gets the hostname when the rules changed
-    /// after maintenance started, so the backends kept then no longer fit.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub workload: Option<WorkloadRef>,
 }
 
 /// The probes of a container [k8s-probes].
@@ -737,6 +730,25 @@ pub struct AddDomainChange {
     /// module).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub certificate: Option<CertificateSource>,
+    /// The Gateway the hostname attaches to through an `HTTPRoute`. Absent: the hostname joins
+    /// the workload's route, else a new Ingress. Not together with `certificate`: the Gateway's
+    /// listener holds the certificate.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parent: Option<GatewayParent>,
+}
+
+/// A Gateway, or one of its listeners, that a new `HTTPRoute` attaches to.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[serde(rename_all = "camelCase")]
+pub struct GatewayParent {
+    /// The Gateway's namespace.
+    pub namespace: String,
+    /// The Gateway's name.
+    pub name: String,
+    /// The listener; absent: every listener that accepts the route.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub section_name: Option<String>,
 }
 
 /// A [`Change::Certificate`].
@@ -1019,18 +1031,6 @@ pub enum Warning {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         route: Option<String>,
     },
-    /// The new `HTTPRoute` attaches to this Gateway, the first of several.
-    #[serde(rename_all = "camelCase")]
-    GatewayChosen {
-        /// Its namespace.
-        namespace: String,
-        /// Its name.
-        name: String,
-        /// How many Gateways there are.
-        of: usize,
-    },
-    /// Gateways could not be listed, so the new route is an Ingress.
-    GatewaysUnreadable,
     /// The Secret's values could not be read, so its diff shows only which keys change.
     #[serde(rename_all = "camelCase")]
     SecretValuesUnknown {
@@ -1231,17 +1231,6 @@ pub enum Warning {
         route: ObjectName,
         /// The hostname.
         hostname: String,
-    },
-    /// The rules changed after maintenance started, so the hostname goes to this Service port
-    /// instead of the backends kept then.
-    #[serde(rename_all = "camelCase")]
-    MaintenanceRestored {
-        /// The hostname.
-        hostname: String,
-        /// The Service.
-        service: String,
-        /// Its port.
-        port: i32,
     },
     /// Browsers keep a permanent redirect: after it stops, visitors who saw it still go to the
     /// other hostname until their browser forgets it.

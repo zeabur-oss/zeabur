@@ -1,0 +1,25 @@
+description: "Without a route to the workload, a new hostname gets an Ingress also when the cluster has Gateways that accept the project's routes: an HTTPRoute is made only when the Gateway is named."
+operation: mutation.plan
+params:
+  gateways:
+    - apiVersion: gateway.networking.k8s.io/v1
+      kind: Gateway
+      metadata: {namespace: gateway, name: public}
+      spec:
+        listeners:
+          - name: https
+            port: 443
+            protocol: HTTPS
+            hostname: "*.example.test"
+            allowedRoutes: {namespaces: {from: All}}
+    - apiVersion: gateway.networking.k8s.io/v1
+      kind: Gateway
+      metadata: {namespace: gateway, name: internal}
+      spec:
+        listeners:
+          - {name: http, port: 80, protocol: HTTP}
+  request:
+    changes:
+      - op: addDomain
+        workload: {kind: Deployment, name: web}
+        hostname: web.example.test

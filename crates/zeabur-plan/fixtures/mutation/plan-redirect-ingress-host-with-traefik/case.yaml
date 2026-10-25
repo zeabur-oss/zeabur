@@ -6,6 +6,5 @@ params:
     changes:
       - op: redirect
         route: {kind: Ingress, name: shop}
-        workload: {kind: Deployment, name: web}
         hostname: www.shop.example.test
         to: shop.example.test

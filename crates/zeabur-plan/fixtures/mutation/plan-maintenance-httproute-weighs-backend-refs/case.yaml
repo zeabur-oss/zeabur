@@ -1,0 +1,9 @@
+description: "Maintenance on an HTTPRoute that serves only its hostname sets each backendRef of each rule to weight 0 and adds the maintenance port with weight 1. A weight of 1 that is written is tested first."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - op: maintenance
+        route: {kind: HTTPRoute, name: web-www}
+        hostname: www.shop.example.test
+        enabled: true

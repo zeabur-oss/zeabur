@@ -1,0 +1,86 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: shop
+  namespace: demo
+  uid: 7d1f5c2a-0000-4000-8000-000000000001
+  resourceVersion: "9"
+  annotations:
+    traefik.ingress.kubernetes.io/router.middlewares: demo-shop-error-pages@kubernetescrd
+    traefik.ingress.kubernetes.io/router.tls: "true"
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts: [shop.example.test, www.shop.example.test]
+      secretName: shop-tls
+  rules:
+    - host: shop.example.test
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service: {name: web, port: {number: 8080}}
+    - host: www.shop.example.test
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service: {name: web, port: {number: 8080}}
+          - path: /api
+            pathType: Prefix
+            backend:
+              service: {name: web, port: {number: 8080}}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: web, namespace: demo, resourceVersion: "2"}
+spec:
+  selector: {matchLabels: {app: web}}
+  template:
+    metadata: {labels: {app: web}}
+    spec:
+      containers: [{name: app, image: example/web:1.0}]
+---
+apiVersion: v1
+kind: Service
+metadata: {name: web, namespace: demo, resourceVersion: "3"}
+spec:
+  selector: {app: web}
+  ports: [{name: http, port: 8080}]
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: error-pages
+  labels: {zeabur.com/page-server: "true"}
+  namespace: demo
+  resourceVersion: "4"
+data:
+  502.html: "<p>502</p>"
+  503.html: "<p>503</p>"
+  504.html: "<p>504</p>"
+  maintenance.html: "<p>Back soon</p>"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: error-pages, namespace: demo, resourceVersion: "5"}
+spec:
+  selector: {matchLabels: {app.kubernetes.io/name: error-pages}}
+  template:
+    metadata: {labels: {app.kubernetes.io/name: error-pages}}
+    spec:
+      containers: [{name: nginx, image: nginx}]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: error-pages
+  labels: {zeabur.com/page-server: "true"}
+  namespace: demo
+  resourceVersion: "6"
+spec:
+  selector: {app.kubernetes.io/name: error-pages}
+  ports: [{name: pages, port: 8080}, {name: maintenance, port: 8081}]

@@ -1,0 +1,27 @@
+description: "A Gateway parent with a chosen certificate is refused: the listener holds the certificate of an HTTPRoute."
+operation: mutation.plan
+params:
+  gateways:
+    - apiVersion: gateway.networking.k8s.io/v1
+      kind: Gateway
+      metadata: {namespace: gateway, name: public}
+      spec:
+        listeners:
+          - name: https
+            port: 443
+            protocol: HTTPS
+            hostname: "*.example.test"
+            allowedRoutes: {namespaces: {from: All}}
+    - apiVersion: gateway.networking.k8s.io/v1
+      kind: Gateway
+      metadata: {namespace: gateway, name: internal}
+      spec:
+        listeners:
+          - {name: http, port: 80, protocol: HTTP}
+  request:
+    changes:
+      - op: addDomain
+        workload: {kind: Deployment, name: web}
+        hostname: web.example.test
+        parent: {namespace: gateway, name: public, sectionName: https}
+        certificate: {from: issuer, name: letsencrypt}

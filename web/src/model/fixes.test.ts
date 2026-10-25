@@ -125,16 +125,6 @@ describe("ready-made objects", () => {
     expect(ask?.service).toStrictEqual({ kind: "Deployment", name: "api" })
     expect(fix(gap({ ...params, to: "Deployment/gone" }), two, t)).toBe(undefined)
   })
-
-  test("a route for an Ingress is created and the Ingress is left to the person", () => {
-    const fix = fixTemplates["domains.httpRoute"]!
-    const route = { kind: "HTTPRoute", metadata: { name: "shop" } }
-    const ask = fix(gap({ ingress: "shop", object: JSON.stringify(route) }), two, t)
-    expect<unknown>(ask?.changes).toStrictEqual([{ op: "create", object: route }])
-    expect(ask?.notes?.length).toBeGreaterThan(0)
-    // No Gateway to attach to: the server sends no object.
-    expect(fix(gap({ ingress: "shop" }), two, t)).toBe(undefined)
-  })
 })
 
 describe("fixLink", () => {

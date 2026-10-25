@@ -1,0 +1,10 @@
+description: "Maintenance on an Ingress hostname adds an Ingress for the hostname alone that sends / to the maintenance port. Its router.priority is one more than the longest rule of the hostname (the /api path), it copies the router TLS and entry points but not the middlewares, takes the hostname's tls entry, and the Ingress owns it. The Ingress itself does not change."
+operation: mutation.plan
+params:
+  kinds: [{group: traefik.io, kind: Middleware, plural: middlewares, namespaced: true}]
+  request:
+    changes:
+      - op: maintenance
+        route: {kind: Ingress, name: shop}
+        hostname: www.shop.example.test
+        enabled: true
