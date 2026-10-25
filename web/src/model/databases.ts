@@ -135,14 +135,6 @@ export interface NewDatabase {
   size: SizePreset
 }
 
-/** Linux 6.19 or later. Ubuntu's `7.0.0-38-generic` is 7.0. */
-export function kernel619OrLater(kernel: string): boolean {
-  const match = /^\D*(\d+)\.(\d+)/.exec(kernel)
-  if (!match) return false
-  const [major, minor] = [Number(match[1]), Number(match[2])]
-  return major > 6 || (major === 6 && minor >= 19)
-}
-
 /** MongoDB 8 or later, from a version label (`8.0`), a version (`8.0.32-14`) or an image. */
 function mongo8OrLater(version: string | null | undefined): boolean {
   const match = /(?:^|:)(\d+)\./.exec(version ?? "")
@@ -181,16 +173,9 @@ export function perThreadCaches(spec: Manifest, version?: string | null) {
   )
 }
 
-/** Whether a new database of `form` gets the note: MongoDB 8 where a node runs Linux 6.19+. */
-export const kernelNoteForNew = (
-  form: Pick<NewDatabase, "engine" | "version">,
-  kernels: string[],
-) => form.engine === "mongodb" && mongo8OrLater(form.version) && kernels.some(kernel619OrLater)
-
-/** The note a MongoDB 8 gets where a node runs Linux 6.19+: the setting is there, or missing. */
-export function kernelNote(database: Database, kernels: string[]): "set" | "missing" | undefined {
+/** The note a MongoDB 8 gets: the setting is there, or missing. */
+export function rseqNote(database: Database): "set" | "missing" | undefined {
   if (database.engine !== "mongodb" || !mongo8OrLater(database.version ?? database.image)) return
-  if (!kernels.some(kernel619OrLater)) return
   const spec = (database.object as Manifest & { spec?: Manifest }).spec ?? {}
   const replsets = (spec.replsets as Manifest[] | undefined) ?? []
   return replsets.every(hasPerThreadCaches) ? "set" : "missing"

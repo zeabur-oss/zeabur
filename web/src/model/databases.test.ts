@@ -17,9 +17,6 @@ import {
   addPerThreadCaches,
   eventsOf,
   enableBackups,
-  kernel619OrLater,
-  kernelNote,
-  kernelNoteForNew,
   nameProblem,
   newBackupTarget,
   newDatabase,
@@ -27,6 +24,7 @@ import {
   presetOf,
   presetResources,
   reshapeDatabase,
+  rseqNote,
   shellCommand,
   storageProblem,
   targetProblems,
@@ -186,43 +184,22 @@ const mongodEnv = (changes: unknown[]) =>
   (changes[0] as { object: { spec: { replsets: { env?: unknown }[] } } }).object.spec.replsets[0]
     ?.env
 
-describe("MongoDB 8 on Linux 6.19 and later", () => {
-  test("kernels from 6.19 on count, whatever the distribution appends", () => {
-    expect(kernel619OrLater("6.19.2")).toBe(true)
-    expect(kernel619OrLater("7.0.0-38-generic")).toBe(true)
-    expect(kernel619OrLater("10.1")).toBe(true)
-    expect(kernel619OrLater("6.18.9-arch1-1")).toBe(false)
-    expect(kernel619OrLater("6.8.0-45-generic")).toBe(false)
-    expect(kernel619OrLater("6.12.48+deb13-arm64")).toBe(false)
-    expect(kernel619OrLater("")).toBe(false)
-  })
-
-  test("a new MongoDB 8 keeps rseq in glibc on every kernel; MongoDB 7 is left alone", () => {
+describe("MongoDB 8 memory setting", () => {
+  test("a new MongoDB 8 keeps rseq in glibc; MongoDB 7 is left alone", () => {
     const eight = createDatabase({ ...newDatabase("mongodb", 1), version: "8.0" })
     expect(mongodEnv(eight)).toEqual([{ name: "GLIBC_TUNABLES", value: "glibc.pthread.rseq=1" }])
     const seven = createDatabase({ ...newDatabase("mongodb", 1), version: "7.0" })
     expect(mongodEnv(seven)).toBeUndefined()
   })
 
-  test("the form notes it only for MongoDB 8 with a node on Linux 6.19 or later", () => {
-    const form = { engine: "mongodb" as const, version: "8.0" }
-    expect(kernelNoteForNew(form, ["6.12.48+deb13-arm64", "7.0.0-38-generic"])).toBe(true)
-    expect(kernelNoteForNew(form, ["6.12.48+deb13-arm64"])).toBe(false)
-    expect(kernelNoteForNew({ ...form, version: "7.0" }, ["7.0.0-38-generic"])).toBe(false)
-    expect(kernelNoteForNew({ engine: "postgresql", version: "18" }, ["7.0.0-38-generic"])).toBe(
-      false,
-    )
-  })
-
   const eight = { ...mongo, version: "8.0.32-14" }
 
   test("an existing MongoDB 8 without the setting gets a fix that adds it", () => {
-    expect(kernelNote(eight, ["6.12.48+deb13-arm64"])).toBeUndefined()
-    expect(kernelNote(eight, ["7.0.0-38-generic"])).toBe("missing")
-    expect(kernelNote({ ...mongo, version: "7.0.43-23" }, ["7.0.0-38-generic"])).toBeUndefined()
+    expect(rseqNote(eight)).toBe("missing")
+    expect(rseqNote({ ...mongo, version: "7.0.43-23" })).toBeUndefined()
     const [change] = addPerThreadCaches(eight) as { yaml: string }[]
     const fixed = { ...eight, object: JSON.parse(change?.yaml ?? "{}") as Database["object"] }
-    expect(kernelNote(fixed, ["7.0.0-38-generic"])).toBe("set")
+    expect(rseqNote(fixed)).toBe("set")
   })
 
   test("the fix keeps other glibc tunables", () => {

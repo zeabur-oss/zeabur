@@ -28,8 +28,6 @@
 //! K8up backs up shop's Redis volume nightly to R2; the newest run failed. `ZEABUR_DEMO_K8UP=none`
 //! leaves it uninstalled. The cluster lists one S3 destination, `r2-backups`.
 //!
-//! `ZEABUR_DEMO_KERNEL=7.0.0-38-generic` gives vps-3 that kernel, for the MongoDB 8 notes.
-//!
 //! Alerting sends shop's deploy failures to Slack and the cluster's node alerts to Telegram; a
 //! second shop channel was rejected by Alertmanager. `ZEABUR_DEMO_ALERTING=none` leaves it
 //! uninstalled.
@@ -3053,10 +3051,6 @@ fn nodes() -> Vec<Node> {
             .checked_sub(SignedDuration::from_hours(24 * age_days))
             .unwrap_or_else(|_| Timestamp::now())
             .to_string();
-        let kernel = std::env::var("ZEABUR_DEMO_KERNEL")
-            .ok()
-            .filter(|_| name == "vps-3")
-            .unwrap_or_else(|| "6.12.48+deb13-arm64".to_owned());
         let taints = if cordoned {
             json!([{"key": "node.kubernetes.io/unschedulable", "effect": "NoSchedule"}])
         } else {
@@ -3076,7 +3070,7 @@ fn nodes() -> Vec<Node> {
                 ],
                 "nodeInfo": {
                     "kubeletVersion": kubelet, "kubeProxyVersion": "",
-                    "osImage": "Debian GNU/Linux 13 (trixie)", "kernelVersion": kernel,
+                    "osImage": "Debian GNU/Linux 13 (trixie)", "kernelVersion": "6.12.48+deb13-arm64",
                     "architecture": "arm64", "operatingSystem": "linux",
                     "containerRuntimeVersion": "containerd://2.1.4-k3s1",
                     "machineID": "", "systemUUID": "", "bootID": ""

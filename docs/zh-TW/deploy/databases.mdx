@@ -22,7 +22,7 @@ description: 建立五種受支援的資料庫、接到服務，並完成備份�
 | MariaDB | mariadb-operator | 12.3、11.8 | 10 GiB |
 | Dragonfly（相容 Redis） | Dragonfly Operator | 1.34 | 2 GiB |
 
-表單預設選最新版本。MongoDB 8.0 在 Linux 6.19 以上的核心要改一項記憶體設定才能啟動，Zeabur 建立的 MongoDB 8 都會加上 `GLIBC_TUNABLES=glibc.pthread.rseq=1`，效能可能會稍微低一點。叢集裡有這類節點時，表單和資料庫頁面會提醒；之前建立、還沒有這項設定的 MongoDB 8，可以在資料庫頁面按「修改設定」補上。
+表單預設選最新版本。MongoDB 8.0 在部分 Linux 版本上要改一項記憶體設定才能啟動，Zeabur 建立和還原的 MongoDB 8 都會加上 `GLIBC_TUNABLES=glibc.pthread.rseq=1`，效能可能會稍微低一點。之前建立、還沒有這項設定的 MongoDB 8，資料庫頁面會提醒，按「修改設定」就能補上。
 
 Dragonfly 的授權為 `Apache-2.0 AND BUSL-1.1`。選用前閱讀表單顯示的授權限制，尤其是向他人提供託管資料庫服務的情境。
 

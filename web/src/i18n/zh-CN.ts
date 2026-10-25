@@ -2532,12 +2532,9 @@ export const zhCN: Messages = {
   "db.noRedundancy": (backedUp: boolean) =>
     `只有一个实例：它故障时没有其他实例接手，数据也只在一个卷上。${backedUp ? "" : "请设置备份。"}`,
   "db.replicaSetHint": "副本集有三个实例时，坏掉一个也能继续运行。",
-  "db.rseq.new":
-    "这个集群有节点使用 Linux 6.19 及以上的内核，MongoDB 8 要改一项内存设置才能在上面启动。Zeabur 会帮你改好，性能可能会稍微低一点。",
-  "db.rseq.set":
-    "这个集群有节点使用 Linux 6.19 及以上的内核，MongoDB 8 要改一项内存设置才能在上面启动。Zeabur 已经帮你改好，这个 MongoDB 的性能可能会稍微低一点。",
+  "db.rseq.set": "Zeabur 已经改好一项内存设置，让这个 MongoDB 8 能启动，性能可能会稍微低一点。",
   "db.rseq.missing":
-    "这个集群有节点使用 Linux 6.19 及以上的内核，MongoDB 8 要改一项内存设置才能在上面启动。这个 MongoDB 还没改，在这些节点上无法启动。改了之后，性能可能会稍微低一点。",
+    "MongoDB 8 在部分 Linux 版本上要改一项内存设置才能启动，这个 MongoDB 还没改。改了之后，性能可能会稍微低一点。",
   "db.rseq.fix": "修改设置",
   "db.rseq.plan": (name) => `修改 ${name} 的内存设置`,
   "db.rseq.said": (name) =>

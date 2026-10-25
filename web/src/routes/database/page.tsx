@@ -14,7 +14,7 @@ import TextAlignLeftIcon from "~icons/ph/text-align-left"
 import WarningIcon from "~icons/ph/warning"
 
 import type { Schemas } from "@/api/client"
-import { databasesQuery, nodesQuery, projectQuery } from "@/api/queries"
+import { databasesQuery, projectQuery } from "@/api/queries"
 import { Ago } from "@/components/bits"
 import { ConnectServices } from "@/components/connect"
 import { CopyText } from "@/components/copy-text"
@@ -59,7 +59,7 @@ import {
   exportUrl,
   fixedFolder,
   keepsEverything,
-  kernelNote,
+  rseqNote,
   lastRun,
   newBackupTarget,
   presetOf,
@@ -464,7 +464,7 @@ function Cautions({ project, database }: { project: string; database: Database }
       {troubled ? (
         <Diagnoses diagnoses={troubled.diagnoses} service={troubled} project={project} />
       ) : null}
-      <KernelNote project={project} database={database} />
+      <RseqNote project={project} database={database} />
       {database.engine === "dragonfly" && !database.app ? (
         <Alert variant="warn">
           <WarningIcon aria-hidden="true" />
@@ -475,16 +475,12 @@ function Cautions({ project, database }: { project: string; database: Database }
   )
 }
 
-/** MongoDB 8 on a cluster with a node on Linux 6.19 or later, which needs per-thread caches. */
-function KernelNote({ project, database }: { project: string; database: Database }) {
+/** MongoDB 8, which needs per-thread caches to start on some kernels. */
+function RseqNote({ project, database }: { project: string; database: Database }) {
   const t = useT()
-  const nodes = useQuery(nodesQuery).data?.items ?? []
   const gate = useGate(project, "changeDatabases")
   const planner = usePlanner(project)
-  const note = kernelNote(
-    database,
-    nodes.map((n) => n.kernelVersion),
-  )
+  const note = rseqNote(database)
   if (!note) return null
   if (note === "set")
     return (

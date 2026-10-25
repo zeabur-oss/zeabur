@@ -25,7 +25,6 @@ import {
   engineLicence,
   engineName,
   engines,
-  kernelNoteForNew,
   lastRun,
   memberChoices,
   nameProblem,
@@ -192,7 +191,6 @@ export function NewDatabaseDrawer({
   const t = useT()
   const nodeList = useQuery(nodesQuery).data?.items ?? []
   const nodes = nodeList.length || 1
-  const kernels = nodeList.map((n) => n.kernelVersion)
   const first =
     engine && available.includes(engine)
       ? engine
@@ -324,12 +322,6 @@ export function NewDatabaseDrawer({
           <Alert variant="warn">
             <WarningIcon aria-hidden="true" />
             <AlertDescription>{t("db.noRedundancy", false)}</AlertDescription>
-          </Alert>
-        ) : null}
-        {kernelNoteForNew(form, kernels) ? (
-          <Alert variant="warn">
-            <WarningIcon aria-hidden="true" />
-            <AlertDescription>{t("db.rseq.new")}</AlertDescription>
           </Alert>
         ) : null}
         <ConnectFields {...connections.fieldProps} optional tried={tried} />
