@@ -519,12 +519,24 @@ stringData:
         assert_eq!(status, StatusCode::OK, "{guide}");
         assert_eq!(formats(&guide), ["helm"]);
 
-        serve(&cluster, "helm.toolkit.fluxcd.io", "helmreleases", "HelmRelease", "flux-system");
+        serve(
+            &cluster,
+            "helm.toolkit.fluxcd.io",
+            "helmreleases",
+            "HelmRelease",
+            "flux-system",
+        );
         let (_, guide) = send(&app, "GET", path, None).await;
         assert_eq!(formats(&guide), ["helm", "flux"]);
         let flux = &guide["formats"][1];
         assert_eq!(flux["namespace"], "flux-system");
-        serve(&cluster, "source.toolkit.fluxcd.io", "helmrepositories", "HelmRepository", "flux-system");
+        serve(
+            &cluster,
+            "source.toolkit.fluxcd.io",
+            "helmrepositories",
+            "HelmRepository",
+            "flux-system",
+        );
         let creates: Vec<Value> = flux["objects"]
             .as_array()
             .unwrap()
@@ -541,7 +553,13 @@ stringData:
     #[tokio::test]
     async fn a_component_is_installed_as_helm_charts_in_kube_system() {
         let cluster = cluster();
-        serve(&cluster, "helm.cattle.io", "helmcharts", "HelmChart", "kube-system");
+        serve(
+            &cluster,
+            "helm.cattle.io",
+            "helmcharts",
+            "HelmChart",
+            "kube-system",
+        );
         let app = app(&cluster);
         let path = "/api/v1/cluster/components/databases/cloudnative-pg/install";
         let (_, guide) = send(&app, "GET", path, None).await;

@@ -15,8 +15,8 @@ use serde::Serialize;
 use utoipa::ToSchema;
 use zeabur_catalog::install::{InstallError, InstallFormat, InstallGuide, PROFILES, guide};
 use zeabur_core::problem::{Kind, MEDIA_TYPE as PROBLEM, Problem};
-use zeabur_kube::k8s_openapi::api::core::v1::Node;
 use zeabur_kube::ClusterExt as _;
+use zeabur_kube::k8s_openapi::api::core::v1::Node;
 
 use crate::error::ApiError;
 use crate::handlers::Person;
