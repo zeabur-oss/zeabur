@@ -18,6 +18,10 @@ kubectl -n crowdsec create secret generic crowdsec-lapi \
 
 # crowdsec
 cat > crowdsec-values.yaml <<'ZEABUR_VALUES'
+# Pinned by digest; a tag alone can move.
+image:
+  repository: crowdsecurity/crowdsec
+  tag: v1.8.1@sha256:0f2523fa61ef507f15d953045cface490cc880670c62f2755ced17524107f71a
 # The runtime on k3s and mainstream distributions.
 container_runtime: containerd
 secrets:

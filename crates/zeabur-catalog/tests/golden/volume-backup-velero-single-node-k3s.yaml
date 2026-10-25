@@ -68,8 +68,12 @@ spec:
       existingSecret: velero-credentials
       useSecret: true
     deployNodeAgent: true
+    image:
+      repository: docker.io/velero/velero
+      tag: v1.18.2@sha256:37396519f399536e5f01427d723565ae69294ec3fb5625cf1c87c09eaa9de16b
     initContainers:
-    - image: velero/velero-plugin-for-aws:v1.14.4
+    - image: >-
+        velero/velero-plugin-for-aws:v1.14.4@sha256:c85a7fa803569e3128c33e4f5766f84ab156c8d171c9f1dd2715581d45ce98fa
       name: velero-plugin-for-aws
       volumeMounts:
       - mountPath: /target

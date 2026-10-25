@@ -73,6 +73,9 @@ spec:
               cpu: 20m
               memory: 48Mi
         container_runtime: containerd
+        image:
+          repository: crowdsecurity/crowdsec
+          tag: v1.8.1@sha256:0f2523fa61ef507f15d953045cface490cc880670c62f2755ced17524107f71a
         lapi:
           env:
           - name: DISABLE_ONLINE_API

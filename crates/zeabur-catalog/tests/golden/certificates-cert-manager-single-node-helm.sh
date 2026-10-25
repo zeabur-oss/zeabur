@@ -2,6 +2,25 @@
 
 # cert-manager
 cat > cert-manager-values.yaml <<'ZEABUR_VALUES'
+# Pinned by digest; a tag alone can move.
+image:
+  repository: quay.io/jetstack/cert-manager-controller
+  tag: v1.21.3@sha256:9f4f96a33c7774cef24466fcd85031997531a03a8d117f151126baa8d1290dcc
+webhook:
+  # Pinned by digest; a tag alone can move.
+  image:
+    repository: quay.io/jetstack/cert-manager-webhook
+    tag: v1.21.3@sha256:055ac8e9de6a0ba6763794838fe38944acc650f68ebe1b01dd8be079e580f458
+cainjector:
+  # Pinned by digest; a tag alone can move.
+  image:
+    repository: quay.io/jetstack/cert-manager-cainjector
+    tag: v1.21.3@sha256:083d0e906f8eb44e255fe4ff817ae54e49f9ed82e22f1011bb4e9e4f4b8a641f
+startupapicheck:
+  # Pinned by digest; a tag alone can move.
+  image:
+    repository: quay.io/jetstack/cert-manager-startupapicheck
+    tag: v1.21.3@sha256:1c519d4afca1413d1e4ccd78bdc756184418ab55a34569a3b3de39d32f9974e1
 crds:
   # Upgrade CRDs with the chart, whatever the installer.
   enabled: true

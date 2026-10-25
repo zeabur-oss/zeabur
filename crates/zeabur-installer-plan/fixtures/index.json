@@ -164,13 +164,14 @@
       "releases": [
         {
           "chart": "oci://quay.io/jetstack/charts/cert-manager",
+          "chartDigest": "sha256:e482675aec32862d323a9218293ff7de81192337998615e4378c56498473f240",
           "name": "cert-manager",
           "namespace": "cert-manager",
           "profiles": {
             "multi-node": "# Two replicas; leader election keeps one active.\nreplicaCount: 2\npodDisruptionBudget:\n  # Keep a controller during drains.\n  enabled: true\nwebhook:\n  # Gates every cert-manager write; stay available during drains.\n  replicaCount: 2\n  podDisruptionBudget:\n    enabled: true\ncainjector:\n  # Same reason as the controller.\n  replicaCount: 2\n  podDisruptionBudget:\n    enabled: true\n",
             "single-node": "prometheus:\n  # Metrics on the pod port; no Prometheus operator assumed.\n  enabled: true\n  servicemonitor:\n    enabled: false\n# Idles at 20-40Mi; small requests fit a 2 GB node.\nresources:\n  requests: {cpu: 10m, memory: 32Mi}\n  limits: {memory: 128Mi}\nwebhook:\n  # Same sizing as the controller.\n  resources:\n    requests: {cpu: 10m, memory: 24Mi}\n    limits: {memory: 64Mi}\ncainjector:\n  # Caches watched Secrets; the limit bounds it.\n  resources:\n    requests: {cpu: 10m, memory: 32Mi}\n    limits: {memory: 128Mi}\nstartupapicheck:\n  # Short-lived post-install Job.\n  resources:\n    requests: {cpu: 10m, memory: 16Mi}\n    limits: {memory: 64Mi}\n"
           },
-          "values": "crds:\n  # Upgrade CRDs with the chart, whatever the installer.\n  enabled: true\n  # Keep CRDs on uninstall; deleting them deletes every Certificate.\n  keep: true\nenableCertificateOwnerRef: true # Delete the TLS Secret with its Certificate.\nconfig:\n  # Typed controller config for the setting below.\n  apiVersion: controller.config.cert-manager.io/v1alpha1\n  kind: ControllerConfiguration\n  # Issue certificates for Gateway listeners.\n  enableGatewayAPI: true\n",
+          "values": "# Pinned by digest; a tag alone can move.\nimage:\n  repository: quay.io/jetstack/cert-manager-controller\n  tag: v1.21.3@sha256:9f4f96a33c7774cef24466fcd85031997531a03a8d117f151126baa8d1290dcc\nwebhook:\n  # Pinned by digest; a tag alone can move.\n  image:\n    repository: quay.io/jetstack/cert-manager-webhook\n    tag: v1.21.3@sha256:055ac8e9de6a0ba6763794838fe38944acc650f68ebe1b01dd8be079e580f458\ncainjector:\n  # Pinned by digest; a tag alone can move.\n  image:\n    repository: quay.io/jetstack/cert-manager-cainjector\n    tag: v1.21.3@sha256:083d0e906f8eb44e255fe4ff817ae54e49f9ed82e22f1011bb4e9e4f4b8a641f\nstartupapicheck:\n  # Pinned by digest; a tag alone can move.\n  image:\n    repository: quay.io/jetstack/cert-manager-startupapicheck\n    tag: v1.21.3@sha256:1c519d4afca1413d1e4ccd78bdc756184418ab55a34569a3b3de39d32f9974e1\ncrds:\n  # Upgrade CRDs with the chart, whatever the installer.\n  enabled: true\n  # Keep CRDs on uninstall; deleting them deletes every Certificate.\n  keep: true\nenableCertificateOwnerRef: true # Delete the TLS Secret with its Certificate.\nconfig:\n  # Typed controller config for the setting below.\n  apiVersion: controller.config.cert-manager.io/v1alpha1\n  kind: ControllerConfiguration\n  # Issue certificates for Gateway listeners.\n  enableGatewayAPI: true\n",
           "version": "v1.21.3"
         },
         {
@@ -267,6 +268,7 @@
       "releases": [
         {
           "chart": "reloader",
+          "chartDigest": "sha256:5eb4576ba75a0e165897e8a98a6ffef15d68939430da6eb8fe80796bba75cb17",
           "name": "reloader",
           "namespace": "reloader",
           "profiles": {
@@ -274,7 +276,7 @@
             "single-node": "reloader:\n  deployment:\n    resources:\n      # Caches every ConfigMap and Secret; grows with their count.\n      requests: {cpu: 10m, memory: 64Mi}\n      limits: {memory: 256Mi}\n"
           },
           "repo": "https://stakater.github.io/stakater-charts",
-          "values": "reloader:\n  # Only workloads annotated reloader.stakater.com/auto or */reload restart.\n  autoReloadAll: false\n  # Marks the pod template with an annotation instead of adding an\n  # environment variable, which the upstream README prefers for Flux and Argo CD.\n  reloadStrategy: annotations\n  # Leave Jobs alone and never create Jobs from CronJobs; this also drops\n  # the chart's batch RBAC rules.\n  ignoreJobs: true\n  ignoreCronJobs: true\n  # Tenants opt in per workload; a namespace list would differ per cluster.\n  watchGlobally: true\n",
+          "values": "# Pinned by digest; a tag alone can move.\nimage:\n  repository: ghcr.io/stakater/reloader\n  tag: v1.4.22@sha256:def2480040adc164b3a57340e77674eadfd88fb7f0593df25e93297f29c7fd7c\nreloader:\n  # Only workloads annotated reloader.stakater.com/auto or */reload restart.\n  autoReloadAll: false\n  # Marks the pod template with an annotation instead of adding an\n  # environment variable, which the upstream README prefers for Flux and Argo CD.\n  reloadStrategy: annotations\n  # Leave Jobs alone and never create Jobs from CronJobs; this also drops\n  # the chart's batch RBAC rules.\n  ignoreJobs: true\n  ignoreCronJobs: true\n  # Tenants opt in per workload; a namespace list would differ per cluster.\n  watchGlobally: true\n",
           "version": "2.2.18"
         }
       ],
@@ -395,6 +397,7 @@
       "releases": [
         {
           "chart": "keda",
+          "chartDigest": "sha256:a7da56bf41a33dad9d2fc82a6fdecee552fff947d80bf1e1dbcf4db0f9e26dee",
           "name": "keda",
           "namespace": "keda",
           "profiles": {
@@ -402,6 +405,7 @@
             "single-node": "resources:\n  # Chart defaults (100Mi/1000Mi) far exceed idle use.\n  operator:\n    requests: {cpu: 20m, memory: 64Mi}\n    limits: {memory: 256Mi}\n  metricServer:\n    requests: {cpu: 20m, memory: 48Mi}\n    limits: {memory: 256Mi}\n  webhooks:\n    requests: {cpu: 10m, memory: 32Mi}\n    limits: {memory: 128Mi}\n"
           },
           "repo": "https://kedacore.github.io/charts",
+          "values": "# Pinned by digest; a tag alone can move. An empty registry lets\n# repository hold the full name, which Renovate looks up.\nimage:\n  keda:\n    registry: \"\"\n    repository: ghcr.io/kedacore/keda\n    tag: 2.21.0@sha256:81fe6547ce8d1cc29273f887b76507e9b853e5bc1f875ec23fe60061a38ed809\n  metricsApiServer:\n    registry: \"\"\n    repository: ghcr.io/kedacore/keda-metrics-apiserver\n    tag: 2.21.0@sha256:255375037fe592732eeb554743aae360c2da88cf0b9b1258d0a987ef885f0881\n  webhooks:\n    registry: \"\"\n    repository: ghcr.io/kedacore/keda-admission-webhooks\n    tag: 2.21.0@sha256:e1969628cca6123e32eea13c47c75817091af2657fa68d9d0d58a8620d1b75b1\n",
           "version": "2.21.0"
         }
       ],
@@ -511,6 +515,7 @@
       "releases": [
         {
           "chart": "keda-add-ons-http",
+          "chartDigest": "sha256:363f7250851f948661f7301c7e3bcb33c2cf19f4e26e2247f71ae61d339abe82",
           "name": "http-add-on",
           "namespace": "keda",
           "profiles": {
@@ -519,6 +524,11 @@
           },
           "releaseName": "keda-add-ons-http",
           "repo": "https://kedacore.github.io/charts",
+          "unpinnedImages": [
+            "ghcr.io/kedacore/http-add-on-operator",
+            "ghcr.io/kedacore/http-add-on-scaler",
+            "ghcr.io/kedacore/http-add-on-interceptor"
+          ],
           "version": "0.16.0"
         }
       ],
@@ -655,6 +665,9 @@
           "skipIfPresent": [
             "httproutes.gateway.networking.k8s.io"
           ],
+          "urlDigests": [
+            "sha256:356c2b8e286a964dc20995435659ad1095386329974793af10bbfe3eff977fe5"
+          ],
           "urls": [
             "https://github.com/kubernetes-sigs/gateway-api/releases/download/{version}/standard-install.yaml"
           ],
@@ -662,13 +675,14 @@
         },
         {
           "chart": "oci://ghcr.io/traefik/helm/traefik",
+          "chartDigest": "sha256:49458ccd9673cd828ee0b091030f5747f5d95f205bbd0cf0b6c3bf757398cae1",
           "name": "traefik",
           "namespace": "traefik",
           "profiles": {
             "multi-node": "deployment:\n  # One pod per node, so every node keeps client addresses under the\n  # Local traffic policy; k3s ServiceLB source-NATs on nodes without one.\n  # From a Deployment, annotate it helm.sh/resource-policy=keep before the\n  # upgrade and delete it after, or ingress drops for a few seconds.\n  kind: DaemonSet\ntolerations:\n  # The taints k3s ServiceLB tolerates, so Traefik runs wherever it listens.\n  - key: node-role.kubernetes.io/control-plane\n    operator: Exists\n    effect: NoSchedule\n  - key: CriticalAddonsOnly\n    operator: Exists\nmetrics:\n  prometheus:\n    # Request rate and latency metrics.\n    service:\n      enabled: true\nresources:\n  # Headroom for higher request rates.\n  requests: {cpu: 100m, memory: 128Mi}\n  limits: {memory: 512Mi}\n",
             "single-node": "deployment:\n  # A second copy gains nothing on one node.\n  replicas: 1\nresources:\n  # Idles near 40Mi; the limit contains leaks.\n  requests: {cpu: 50m, memory: 64Mi}\n  limits: {memory: 256Mi}\n"
           },
-          "values": "providers:\n  kubernetesGateway:\n    # Route web services with HTTPRoute.\n    enabled: true\n  kubernetesIngress:\n    # Many charts still ship Ingress objects.\n    enabled: true\n  kubernetesCRD:\n    # Middleware objects, such as the CrowdSec bouncer.\n    enabled: true\n    # No references to other namespaces.\n    allowCrossNamespace: false\n    # Only the traefik namespace can set the default TLS store.\n    defaultTLSResourcesNamespace: traefik\ngatewayClass:\n  # Gateways reference GatewayClass \"traefik\".\n  enabled: true\n  name: traefik\ngateway:\n  # Gateways and listeners are created per domain, not by the chart.\n  enabled: false\napi:\n  # Unauthenticated surface; not needed.\n  dashboard: false\nservice:\n  spec:\n    # Skip source NAT so Traefik sees client addresses (CrowdSec, rate\n    # limits, logs); only nodes running Traefik serve traffic.\n    externalTrafficPolicy: Local\naccessLog:\n  # JSON access logs for metrics, log search and CrowdSec.\n  enabled: true\n  format: json\n  fields:\n    # Keep only the fields below; secrets live in headers and queries.\n    defaultMode: drop\n    names:\n      RequestHost: keep\n      RequestMethod: keep\n      RequestPath: keep\n      RequestProtocol: keep\n      DownstreamStatus: keep\n      DownstreamContentSize: keep\n      RequestContentSize: keep\n      Duration: keep\n      RouterName: keep\n      StartUTC: keep\n    headers:\n      # Headers carry cookies and bearer tokens.\n      defaultMode: drop\n    queryParameters:\n      # Query strings carry OAuth codes and signed-URL secrets.\n      defaultMode: drop\n",
+          "values": "# Pinned by digest; a tag alone can move.\nimage:\n  repository: traefik\n  tag: v3.7.16@sha256:c8a121e4bb1347e8fd52657fab12f2cb70b68f8a018895e2068f92c9e519b9c2\nproviders:\n  kubernetesGateway:\n    # Route web services with HTTPRoute.\n    enabled: true\n  kubernetesIngress:\n    # Many charts still ship Ingress objects.\n    enabled: true\n  kubernetesCRD:\n    # Middleware objects, such as the CrowdSec bouncer.\n    enabled: true\n    # No references to other namespaces.\n    allowCrossNamespace: false\n    # Only the traefik namespace can set the default TLS store.\n    defaultTLSResourcesNamespace: traefik\ngatewayClass:\n  # Gateways reference GatewayClass \"traefik\".\n  enabled: true\n  name: traefik\ngateway:\n  # Gateways and listeners are created per domain, not by the chart.\n  enabled: false\napi:\n  # Unauthenticated surface; not needed.\n  dashboard: false\nservice:\n  spec:\n    # Skip source NAT so Traefik sees client addresses (CrowdSec, rate\n    # limits, logs); only nodes running Traefik serve traffic.\n    externalTrafficPolicy: Local\naccessLog:\n  # JSON access logs for metrics, log search and CrowdSec.\n  enabled: true\n  format: json\n  fields:\n    # Keep only the fields below; secrets live in headers and queries.\n    defaultMode: drop\n    names:\n      RequestHost: keep\n      RequestMethod: keep\n      RequestPath: keep\n      RequestProtocol: keep\n      DownstreamStatus: keep\n      DownstreamContentSize: keep\n      RequestContentSize: keep\n      Duration: keep\n      RouterName: keep\n      StartUTC: keep\n    headers:\n      # Headers carry cookies and bearer tokens.\n      defaultMode: drop\n    queryParameters:\n      # Query strings carry OAuth codes and signed-URL secrets.\n      defaultMode: drop\n",
           "version": "42.1.3"
         }
       ],
@@ -821,13 +835,14 @@
       "releases": [
         {
           "chart": "oci://ghcr.io/crowdsecurity/helm-charts/crowdsec",
+          "chartDigest": "sha256:9078b83a6ba27a9a258cbdb4d8aefba6992a833041ba07317133fd61c5e6b446",
           "name": "crowdsec",
           "namespace": "crowdsec",
           "profiles": {
             "multi-node": "agent:\n  resources:\n    # One agent per node; busier logs than single-node.\n    requests: {cpu: 50m, memory: 64Mi}\n    limits: {memory: 256Mi}\nlapi:\n  resources:\n    # Headroom for more agents and decisions.\n    requests: {cpu: 50m, memory: 96Mi}\n    limits: {memory: 384Mi}\n",
             "single-node": "agent:\n  resources:\n    # Chart asks 250Mi; an idle agent uses under 100Mi.\n    requests: {cpu: 20m, memory: 48Mi}\n    limits: {memory: 192Mi}\nlapi:\n  resources:\n    # Chart asks 500Mi; LAPI on SQLite idles far below.\n    requests: {cpu: 20m, memory: 64Mi}\n    limits: {memory: 256Mi}\n"
           },
-          "values": "# The runtime on k3s and mainstream distributions.\ncontainer_runtime: containerd\nsecrets:\n  externalSecret:\n    # Inputs, not chart-generated, so every render is identical.\n    name: crowdsec-lapi\nagent:\n  acquisition:\n    # Traefik's JSON access log.\n    - namespace: traefik\n      podName: traefik-*\n      program: traefik\n  env:\n    # Parsers and scenarios for Traefik plus generic HTTP attacks.\n    - name: COLLECTIONS\n      value: crowdsecurity/traefik\nlapi:\n  env:\n    # No data leaves the cluster unless the user opts in.\n    - name: DISABLE_ONLINE_API\n      value: \"true\"\n    # Registers the Traefik bouncer (input bouncer-key).\n    - name: BOUNCER_KEY_traefik\n      valueFrom:\n        secretKeyRef: {name: crowdsec-bouncer-key, key: key}\n  persistentVolume:\n    data:\n      # SQLite decisions and bouncer registrations.\n      enabled: true\n    config:\n      # Keeps machine credentials stable across restarts.\n      enabled: true\n",
+          "values": "# Pinned by digest; a tag alone can move.\nimage:\n  repository: crowdsecurity/crowdsec\n  tag: v1.8.1@sha256:0f2523fa61ef507f15d953045cface490cc880670c62f2755ced17524107f71a\n# The runtime on k3s and mainstream distributions.\ncontainer_runtime: containerd\nsecrets:\n  externalSecret:\n    # Inputs, not chart-generated, so every render is identical.\n    name: crowdsec-lapi\nagent:\n  acquisition:\n    # Traefik's JSON access log.\n    - namespace: traefik\n      podName: traefik-*\n      program: traefik\n  env:\n    # Parsers and scenarios for Traefik plus generic HTTP attacks.\n    - name: COLLECTIONS\n      value: crowdsecurity/traefik\nlapi:\n  env:\n    # No data leaves the cluster unless the user opts in.\n    - name: DISABLE_ONLINE_API\n      value: \"true\"\n    # Registers the Traefik bouncer (input bouncer-key).\n    - name: BOUNCER_KEY_traefik\n      valueFrom:\n        secretKeyRef: {name: crowdsec-bouncer-key, key: key}\n  persistentVolume:\n    data:\n      # SQLite decisions and bouncer registrations.\n      enabled: true\n    config:\n      # Keeps machine credentials stable across restarts.\n      enabled: true\n",
           "version": "0.24.2"
         },
         {
@@ -1062,6 +1077,7 @@
       "releases": [
         {
           "chart": "metrics-server",
+          "chartDigest": "sha256:c2ca1185c01e6e7f53dd1b7d131f0c9b3fa50e003ed068b784563a1b5a3422a1",
           "name": "metrics-server",
           "namespace": "kube-system",
           "profiles": {
@@ -1069,7 +1085,7 @@
             "single-node": "resources:\n  # The chart's 200Mi request is sized for 100+ nodes.\n  requests: {cpu: 20m, memory: 48Mi}\n  limits: {memory: 128Mi}\n"
           },
           "repo": "https://kubernetes-sigs.github.io/metrics-server",
-          "values": "args:\n  # 15s is fresh enough for live views; the default is 60s.\n  - --metric-resolution=15s\n",
+          "values": "# Pinned by digest; a tag alone can move.\nimage:\n  repository: registry.k8s.io/metrics-server/metrics-server\n  tag: v0.9.0@sha256:d9862115e7c7881280d3d75ca26bda8ffc0fc213315979575bf23ce9826205c0\nargs:\n  # 15s is fresh enough for live views; the default is 60s.\n  - --metric-resolution=15s\n",
           "version": "3.14.0"
         }
       ],
@@ -1168,6 +1184,7 @@
       "releases": [
         {
           "chart": "oci://ghcr.io/victoriametrics/helm-charts/victoria-metrics-k8s-stack",
+          "chartDigest": "sha256:5f3e783289f25f6498a9f0f66a8d1b2aa54256df48452863f449bc36dae0ee39",
           "name": "k8s-stack",
           "namespace": "observability",
           "profiles": {
@@ -1175,7 +1192,7 @@
             "single-node": "prometheus-node-exporter:\n  # Node disk use (node_filesystem_*) has no other source; Zeabur reads it.\n  enabled: true\n  extraArgs:\n    # Only the collectors the default node-exporter, node and kubernetes rules query.\n    - --collector.disable-defaults\n    - --collector.filesystem\n    - --collector.cpu\n    - --collector.meminfo\n    - --collector.loadavg\n    - --collector.vmstat\n    - --collector.diskstats\n    - --collector.netdev\n    - --collector.netclass\n    - --collector.filefd\n    - --collector.conntrack\n    - --collector.timex\n    - --collector.mdadm\n    - --collector.bonding\n    - --collector.textfile\n    # The chart's excludes plus containerd's per-pod shm mounts (k3s keeps them under /run/k3s).\n    # /var/lib/kubelet itself stays visible; only mounts below it are dropped.\n    - --collector.filesystem.mount-points-exclude=^/(dev|proc|sys|run/containerd/.+|run/k3s/.+|var/lib/docker/.+|var/lib/kubelet/.+)($|/)\n    - --collector.filesystem.fs-types-exclude=^(autofs|binfmt_misc|bpf|cgroup2?|configfs|debugfs|devpts|devtmpfs|fusectl|hugetlbfs|iso9660|mqueue|nsfs|overlay|proc|procfs|pstore|rpc_pipefs|securityfs|selinuxfs|squashfs|erofs|sysfs|tracefs)$\n  resources:\n    # One small exporter per node.\n    requests: {cpu: 10m, memory: 16Mi}\n    limits: {memory: 64Mi}\nkube-state-metrics:\n  # Only the objects needed to map pods to workloads.\n  collectors: [pods, replicasets, deployments, statefulsets, daemonsets, jobs, cronjobs, nodes, persistentvolumeclaims, namespaces]\nkubeControllerManager:\n  # Embedded in k3s; nothing to scrape.\n  enabled: false\nkubeScheduler:\n  # Embedded in k3s; nothing to scrape.\n  enabled: false\nkubeEtcd:\n  # k3s single-node uses SQLite (kine), not etcd.\n  enabled: false\nkubeApiServer:\n  # Its histograms are ~half of all series; its alert rules go with it.\n  enabled: false\nkubelet:\n  vmScrape:\n    spec:\n      metricRelabelConfigs:\n        # Chart defaults: UIDs and cgroup ids only multiply series.\n        - action: labeldrop\n          regex: (uid)\n        - action: labeldrop\n          regex: (id|name)\n        # k3s kubelet also exports API server and kine histograms (~45% of series).\n        - action: drop\n          source_labels: [__name__]\n          regex: .+_bucket|(apiserver|etcd|kine|rest_client|workqueue|scheduler|authentication|authorization|aggregator|admission|watch_cache|storage)_.+\nvmsingle:\n  spec:\n    # A week of history fits 5Gi on one node.\n    retentionPeriod: 7d\n    storage:\n      resources:\n        requests: {storage: 5Gi}\n    resources:\n      requests: {cpu: 50m, memory: 128Mi}\n      limits: {memory: 512Mi}\nvmagent:\n  spec:\n    # Small scrape set on one node.\n    resources:\n      requests: {cpu: 20m, memory: 64Mi}\n      limits: {memory: 256Mi}\nvmalert:\n  spec:\n    # Evaluates the default alert rules.\n    resources:\n      requests: {cpu: 10m, memory: 32Mi}\n      limits: {memory: 128Mi}\nalertmanager:\n  spec:\n    # Routes alerts to configured receivers.\n    resources:\n      requests: {cpu: 10m, memory: 32Mi}\n      limits: {memory: 128Mi}\n"
           },
           "releaseName": "vm",
-          "values": "victoria-metrics-operator:\n  # The operator is its own component, shared with logs.\n  enabled: false\ngrafana:\n  # Grafana adds ~150Mi; install it separately if needed.\n  enabled: false\ndefaultDashboards:\n  # Dashboards only matter with Grafana.\n  enabled: false\nkube-state-metrics:\n  # Maps pods to workloads and exposes requests, limits and object state.\n  enabled: true\n  metricLabelsAllowlist:\n    # Pods: map pods to apps. Jobs: a notification test names its channel in\n    # this label. Namespaces: tell projects from the cluster's own namespaces.\n    - pods=[app.kubernetes.io/name,app.kubernetes.io/component]\n    - jobs=[zeabur.com/notification-test]\n    - namespaces=[zeabur.com/project]\n  rbac:\n    # Read the objects the custom resource metrics below come from.\n    extraRules:\n      - apiGroups: [builder.zeabur.com]\n        resources: [buildruns]\n        verbs: [list, watch]\n      - apiGroups: [postgresql.cnpg.io]\n        resources: [clusters, backups]\n        verbs: [list, watch]\n      - apiGroups: [psmdb.percona.com]\n        resources: [perconaservermongodbs, perconaservermongodbbackups]\n        verbs: [list, watch]\n      - apiGroups: [k8up.io]\n        resources: [backups]\n        verbs: [list, watch]\n      - apiGroups: [velero.io]\n        resources: [backups]\n        verbs: [list, watch]\n      - apiGroups: [cert-manager.io]\n        resources: [certificates]\n        verbs: [list, watch]\n  customResourceState:\n    # The status of builds, databases, backups and certificates as metrics,\n    # for the notification rules (release notifications). A kind that is not\n    # installed adds nothing. One series for each object: a Build keeps at\n    # most its historyLimit of BuildRuns, Velero and K8up delete old\n    # backups, but CloudNativePG and Percona keep every Backup object.\n    # The scrape below drops their successful backups.\n    enabled: true\n    config:\n      kind: CustomResourceStateMetrics\n      spec:\n        resources:\n          - groupVersionKind: {group: builder.zeabur.com, version: v1alpha1, kind: BuildRun}\n            metricNamePrefix: zeabur_builder_buildrun\n            labelsFromPath:\n              namespace: [metadata, namespace]\n              buildrun: [metadata, name]\n              build: [spec, buildRef]\n              phase: [status, phase]\n              reason: [status, reason]\n            metrics:\n              - name: completion_time\n                help: When the BuildRun finished; absent while it runs.\n                errorLogV: 5\n                each:\n                  type: Gauge\n                  gauge: {path: [status, completionTime]}\n          - groupVersionKind: {group: postgresql.cnpg.io, version: v1, kind: Cluster}\n            metricNamePrefix: zeabur_cnpg_cluster\n            labelsFromPath:\n              namespace: [metadata, namespace]\n              cluster: [metadata, name]\n            metrics:\n              - name: phase\n                help: The CloudNativePG cluster's phase.\n                each:\n                  type: Info\n                  info:\n                    labelsFromPath:\n                      phase: [status, phase]\n          - groupVersionKind: {group: postgresql.cnpg.io, version: v1, kind: Backup}\n            metricNamePrefix: zeabur_cnpg_backup\n            labelsFromPath:\n              namespace: [metadata, namespace]\n              backup: [metadata, name]\n              cluster: [spec, cluster, name]\n              phase: [status, phase]\n            metrics:\n              - name: created\n                help: When the Backup was created, by its phase.\n                each:\n                  type: Gauge\n                  gauge: {path: [metadata, creationTimestamp]}\n          - groupVersionKind: {group: psmdb.percona.com, version: v1, kind: PerconaServerMongoDB}\n            metricNamePrefix: zeabur_psmdb\n            labelsFromPath:\n              namespace: [metadata, namespace]\n              cluster: [metadata, name]\n            metrics:\n              - name: state\n                help: The MongoDB cluster's state.\n                each:\n                  type: Info\n                  info:\n                    labelsFromPath:\n                      state: [status, state]\n          - groupVersionKind: {group: psmdb.percona.com, version: v1, kind: PerconaServerMongoDBBackup}\n            metricNamePrefix: zeabur_psmdb_backup\n            labelsFromPath:\n              namespace: [metadata, namespace]\n              backup: [metadata, name]\n              cluster: [spec, clusterName]\n              state: [status, state]\n            metrics:\n              - name: created\n                help: When the backup was created, by its state.\n                each:\n                  type: Gauge\n                  gauge: {path: [metadata, creationTimestamp]}\n          - groupVersionKind: {group: k8up.io, version: v1, kind: Backup}\n            metricNamePrefix: zeabur_k8up_backup\n            labelsFromPath:\n              namespace: [metadata, namespace]\n              backup: [metadata, name]\n            metrics:\n              - name: condition_time\n                help: When each condition of the Backup last changed, by type and reason.\n                each:\n                  type: Gauge\n                  gauge:\n                    path: [status, conditions]\n                    labelsFromPath:\n                      type: [type]\n                      reason: [reason]\n                    valueFrom: [lastTransitionTime]\n          - groupVersionKind: {group: velero.io, version: v1, kind: Backup}\n            metricNamePrefix: zeabur_velero_backup\n            labelsFromPath:\n              namespace: [metadata, namespace]\n              backup: [metadata, name]\n              phase: [status, phase]\n            metrics:\n              - name: created\n                help: When the Velero backup was created, by its phase.\n                each:\n                  type: Gauge\n                  gauge: {path: [metadata, creationTimestamp]}\n          - groupVersionKind: {group: cert-manager.io, version: v1, kind: Certificate}\n            metricNamePrefix: zeabur_certmanager_certificate\n            labelsFromPath:\n              namespace: [metadata, namespace]\n              certificate: [metadata, name]\n            metrics:\n              - name: not_after\n                help: When the issued certificate expires.\n                errorLogV: 5\n                each:\n                  type: Gauge\n                  gauge: {path: [status, notAfter]}\n              - name: condition\n                help: The Certificate's conditions, 1 when true.\n                each:\n                  type: Gauge\n                  gauge:\n                    path: [status, conditions]\n                    labelsFromPath:\n                      type: [type]\n                    valueFrom: [status]\n  vmScrape:\n    spec:\n      endpoints:\n        # The chart's endpoint, plus two drops. The rules read failed\n        # backups only. Each successful backup adds one series.\n        - port: http\n          honorLabels: true\n          metricRelabelConfigs:\n            - action: labeldrop\n              regex: (uid|container_id|image_id)\n            - action: drop\n              if: '{__name__=\"zeabur_cnpg_backup_created\", phase=\"completed\"}'\n            - action: drop\n              if: '{__name__=\"zeabur_psmdb_backup_created\", state=\"ready\"}'\nalertmanager:\n  spec:\n    # Each project keeps its channels in VMAlertmanagerConfigs. The operator\n    # then routes a config only its own namespace's alerts, and refuses one\n    # that reads files from the Alertmanager pod.\n    disableNamespaceMatcher: false\n    arbitraryFSAccessThroughSMs:\n      deny: true\nvmagent:\n  spec:\n    # 30s cuts scrape cost by a third versus the chart's 20s.\n    scrapeInterval: 30s\n",
+          "values": "prometheus-node-exporter:\n  # Pinned by digest; a tag alone can move. The chart joins registry and\n  # repository. registry comes second, so Renovate reads both.\n  image:\n    repository: prometheus/node-exporter\n    registry: quay.io\n    tag: v1.12.1@sha256:1b4e4438faca4dd7e001dd445d161a4a2091b0fededa84093b3a8dfeae1f1be0\n  # The chart compares this version, not the tag above, with semver; any\n  # release from 1.4.0 on renders the same.\n  version: 1.12.1\nsyncJob:\n  # Pinned by digest; a tag alone can move.\n  image:\n    repository: ghcr.io/victoriametrics/sync-job\n    tag: v0.0.17@sha256:b6f233532a85cda65e645264d24f995e5ee97f88b60610643f01f170516f444b\nvictoria-metrics-operator:\n  # The operator is its own component, shared with logs.\n  enabled: false\ngrafana:\n  # Grafana adds ~150Mi; install it separately if needed.\n  enabled: false\ndefaultDashboards:\n  # Dashboards only matter with Grafana.\n  enabled: false\nkube-state-metrics:\n  # Maps pods to workloads and exposes requests, limits and object state.\n  enabled: true\n  # Pinned by digest; a tag alone can move. The chart joins registry and\n  # repository. registry comes second, so Renovate reads both.\n  image:\n    repository: kube-state-metrics/kube-state-metrics\n    registry: registry.k8s.io\n    tag: v2.20.0@sha256:42cfe3723a5f058171c627537fb57a3ea0f26e4380fa18555a95cb1a1b4cfc5b\n  metricLabelsAllowlist:\n    # Pods: map pods to apps. Jobs: a notification test names its channel in\n    # this label. Namespaces: tell projects from the cluster's own namespaces.\n    - pods=[app.kubernetes.io/name,app.kubernetes.io/component]\n    - jobs=[zeabur.com/notification-test]\n    - namespaces=[zeabur.com/project]\n  rbac:\n    # Read the objects the custom resource metrics below come from.\n    extraRules:\n      - apiGroups: [builder.zeabur.com]\n        resources: [buildruns]\n        verbs: [list, watch]\n      - apiGroups: [postgresql.cnpg.io]\n        resources: [clusters, backups]\n        verbs: [list, watch]\n      - apiGroups: [psmdb.percona.com]\n        resources: [perconaservermongodbs, perconaservermongodbbackups]\n        verbs: [list, watch]\n      - apiGroups: [k8up.io]\n        resources: [backups]\n        verbs: [list, watch]\n      - apiGroups: [velero.io]\n        resources: [backups]\n        verbs: [list, watch]\n      - apiGroups: [cert-manager.io]\n        resources: [certificates]\n        verbs: [list, watch]\n  customResourceState:\n    # The status of builds, databases, backups and certificates as metrics,\n    # for the notification rules (release notifications). A kind that is not\n    # installed adds nothing. One series for each object: a Build keeps at\n    # most its historyLimit of BuildRuns, Velero and K8up delete old\n    # backups, but CloudNativePG and Percona keep every Backup object.\n    # The scrape below drops their successful backups.\n    enabled: true\n    config:\n      kind: CustomResourceStateMetrics\n      spec:\n        resources:\n          - groupVersionKind: {group: builder.zeabur.com, version: v1alpha1, kind: BuildRun}\n            metricNamePrefix: zeabur_builder_buildrun\n            labelsFromPath:\n              namespace: [metadata, namespace]\n              buildrun: [metadata, name]\n              build: [spec, buildRef]\n              phase: [status, phase]\n              reason: [status, reason]\n            metrics:\n              - name: completion_time\n                help: When the BuildRun finished; absent while it runs.\n                errorLogV: 5\n                each:\n                  type: Gauge\n                  gauge: {path: [status, completionTime]}\n          - groupVersionKind: {group: postgresql.cnpg.io, version: v1, kind: Cluster}\n            metricNamePrefix: zeabur_cnpg_cluster\n            labelsFromPath:\n              namespace: [metadata, namespace]\n              cluster: [metadata, name]\n            metrics:\n              - name: phase\n                help: The CloudNativePG cluster's phase.\n                each:\n                  type: Info\n                  info:\n                    labelsFromPath:\n                      phase: [status, phase]\n          - groupVersionKind: {group: postgresql.cnpg.io, version: v1, kind: Backup}\n            metricNamePrefix: zeabur_cnpg_backup\n            labelsFromPath:\n              namespace: [metadata, namespace]\n              backup: [metadata, name]\n              cluster: [spec, cluster, name]\n              phase: [status, phase]\n            metrics:\n              - name: created\n                help: When the Backup was created, by its phase.\n                each:\n                  type: Gauge\n                  gauge: {path: [metadata, creationTimestamp]}\n          - groupVersionKind: {group: psmdb.percona.com, version: v1, kind: PerconaServerMongoDB}\n            metricNamePrefix: zeabur_psmdb\n            labelsFromPath:\n              namespace: [metadata, namespace]\n              cluster: [metadata, name]\n            metrics:\n              - name: state\n                help: The MongoDB cluster's state.\n                each:\n                  type: Info\n                  info:\n                    labelsFromPath:\n                      state: [status, state]\n          - groupVersionKind: {group: psmdb.percona.com, version: v1, kind: PerconaServerMongoDBBackup}\n            metricNamePrefix: zeabur_psmdb_backup\n            labelsFromPath:\n              namespace: [metadata, namespace]\n              backup: [metadata, name]\n              cluster: [spec, clusterName]\n              state: [status, state]\n            metrics:\n              - name: created\n                help: When the backup was created, by its state.\n                each:\n                  type: Gauge\n                  gauge: {path: [metadata, creationTimestamp]}\n          - groupVersionKind: {group: k8up.io, version: v1, kind: Backup}\n            metricNamePrefix: zeabur_k8up_backup\n            labelsFromPath:\n              namespace: [metadata, namespace]\n              backup: [metadata, name]\n            metrics:\n              - name: condition_time\n                help: When each condition of the Backup last changed, by type and reason.\n                each:\n                  type: Gauge\n                  gauge:\n                    path: [status, conditions]\n                    labelsFromPath:\n                      type: [type]\n                      reason: [reason]\n                    valueFrom: [lastTransitionTime]\n          - groupVersionKind: {group: velero.io, version: v1, kind: Backup}\n            metricNamePrefix: zeabur_velero_backup\n            labelsFromPath:\n              namespace: [metadata, namespace]\n              backup: [metadata, name]\n              phase: [status, phase]\n            metrics:\n              - name: created\n                help: When the Velero backup was created, by its phase.\n                each:\n                  type: Gauge\n                  gauge: {path: [metadata, creationTimestamp]}\n          - groupVersionKind: {group: cert-manager.io, version: v1, kind: Certificate}\n            metricNamePrefix: zeabur_certmanager_certificate\n            labelsFromPath:\n              namespace: [metadata, namespace]\n              certificate: [metadata, name]\n            metrics:\n              - name: not_after\n                help: When the issued certificate expires.\n                errorLogV: 5\n                each:\n                  type: Gauge\n                  gauge: {path: [status, notAfter]}\n              - name: condition\n                help: The Certificate's conditions, 1 when true.\n                each:\n                  type: Gauge\n                  gauge:\n                    path: [status, conditions]\n                    labelsFromPath:\n                      type: [type]\n                    valueFrom: [status]\n  vmScrape:\n    spec:\n      endpoints:\n        # The chart's endpoint, plus two drops. The rules read failed\n        # backups only. Each successful backup adds one series.\n        - port: http\n          honorLabels: true\n          metricRelabelConfigs:\n            - action: labeldrop\n              regex: (uid|container_id|image_id)\n            - action: drop\n              if: '{__name__=\"zeabur_cnpg_backup_created\", phase=\"completed\"}'\n            - action: drop\n              if: '{__name__=\"zeabur_psmdb_backup_created\", state=\"ready\"}'\nalertmanager:\n  spec:\n    # Each project keeps its channels in VMAlertmanagerConfigs. The operator\n    # then routes a config only its own namespace's alerts, and refuses one\n    # that reads files from the Alertmanager pod.\n    disableNamespaceMatcher: false\n    arbitraryFSAccessThroughSMs:\n      deny: true\nvmagent:\n  spec:\n    # 30s cuts scrape cost by a third versus the chart's 20s.\n    scrapeInterval: 30s\n",
           "version": "0.96.0"
         },
         {
@@ -1325,6 +1342,9 @@
         {
           "name": "crds",
           "namespace": "system-upgrade",
+          "urlDigests": [
+            "sha256:1fb061e0d8bf9534da0145e614a9e03ca376cd5d1adcca17d13cfa12e211c48c"
+          ],
           "urls": [
             "https://github.com/rancher/system-upgrade-controller/releases/download/{version}/crd.yaml"
           ],
@@ -1333,6 +1353,9 @@
         {
           "name": "controller",
           "namespace": "system-upgrade",
+          "urlDigests": [
+            "sha256:fd474b662d1f2b74ab150d95b6482869e1fd1f27ceee54b13e94b92292097969"
+          ],
           "urls": [
             "https://github.com/rancher/system-upgrade-controller/releases/download/{version}/system-upgrade-controller.yaml"
           ],
@@ -1442,13 +1465,14 @@
       "releases": [
         {
           "chart": "oci://ghcr.io/victoriametrics/helm-charts/victoria-metrics-operator",
+          "chartDigest": "sha256:1817be5446c975a306e404d6b605eafc45dbe6512a64d25b80d72f458fa4664a",
           "name": "operator",
           "namespace": "observability",
           "profiles": {
             "single-node": "resources:\n  # The operator idles near 40Mi.\n  requests: {cpu: 10m, memory: 48Mi}\n  limits: {memory: 256Mi}\n"
           },
           "releaseName": "victoria-metrics-operator",
-          "values": "admissionWebhooks:\n  certManager:\n    # cert-manager issues the webhook certificate, so every render is identical.\n    enabled: true\ncrds:\n  # Delete VM objects before uninstall so finalizers don't block the namespace.\n  cleanup:\n    enabled: true\n",
+          "values": "# Pinned by digest; a tag alone can move.\nimage:\n  repository: victoriametrics/operator\n  tag: v0.75.0@sha256:78da26b41a819093707be2ab6a65a5dc19f43d58ec52f30b49a545c2c6b7bd55\nadmissionWebhooks:\n  certManager:\n    # cert-manager issues the webhook certificate, so every render is identical.\n    enabled: true\ncrds:\n  # Delete VM objects before uninstall so finalizers don't block the namespace.\n  cleanup:\n    enabled: true\n    # Pinned by digest; a tag alone can move. The chart's default tag\n    # follows the cluster's Kubernetes version.\n    image:\n      repository: registry.k8s.io/kubectl\n      tag: v1.36.0@sha256:63e5e76b746bb8b891a94968d380736c035e768dab0d56ddad1f50c750a4be39\n",
           "version": "0.68.1"
         }
       ],
@@ -1457,7 +1481,7 @@
       ],
       "security": {
         "clusterWide": true,
-        "summary": "Manages VictoriaMetrics and VictoriaLogs objects and their workloads in all namespaces.",
+        "summary": "Manages VictoriaMetrics and VictoriaLogs objects and their workloads in all namespaces. It can read every Secret, create pods in any namespace, and create ClusterRoles and bindings, so its token equals cluster-admin.\n",
         "tenants": "admin-only"
       }
     },
@@ -1524,6 +1548,7 @@
       "releases": [
         {
           "chart": "tailscale-operator",
+          "chartDigest": "sha256:cf215d52f3a20fae4c77b14a191957ccb12e46b0f2ff2263c6f51c8a472cd505",
           "name": "tailscale-operator",
           "namespace": "tailscale",
           "profiles": {
@@ -1531,7 +1556,7 @@
             "single-node": "operatorConfig:\n  resources:\n    # Chart sets none; one controller and one tailnet node.\n    requests: {cpu: 20m, memory: 64Mi}\n    limits: {memory: 256Mi}\n"
           },
           "repo": "https://pkgs.tailscale.com/helmcharts",
-          "values": "oauth:\n  # Empty, so the chart renders no Secret; the operator mounts\n  # operator-oauth, created from the inputs before install.\n  clientId: \"\"\n  clientSecret: \"\"\noperatorConfig:\n  image:\n    # The tag is pinned to the chart's appVersion; Always pulls on every restart.\n    pullPolicy: IfNotPresent\napiServerProxyConfig:\n  # No Kubernetes API proxy and no impersonation ClusterRole.\n  mode: \"false\"\n  allowImpersonation: \"false\"\n",
+          "values": "oauth:\n  # Empty, so the chart renders no Secret; the operator mounts\n  # operator-oauth, created from the inputs before install.\n  clientId: \"\"\n  clientSecret: \"\"\noperatorConfig:\n  image:\n    # Pinned by digest; a tag alone can move. Always pulls on every restart.\n    repository: tailscale/k8s-operator\n    tag: v1.104.2@sha256:9cddfcbe75a7eab2b46d610966d519a28699a5e38235a2cb3aec960487c4aa48\n    pullPolicy: IfNotPresent\nproxyConfig:\n  # The proxies the operator creates, pinned by digest.\n  image:\n    repository: tailscale/tailscale\n    tag: v1.104.2@sha256:b11583ad2e93e4671128538c88cf11f460444a5d7e449311dd1933a400ab849d\napiServerProxyConfig:\n  # No Kubernetes API proxy and no impersonation ClusterRole.\n  mode: \"false\"\n  allowImpersonation: \"false\"\n",
           "version": "1.104.2"
         }
       ],
@@ -1624,6 +1649,7 @@
       "releases": [
         {
           "chart": "longhorn",
+          "chartDigest": "sha256:e57f010d2a8bcf0da5b8b03ffecf49c5bc35ddc2663588ce8f22b7567b6133ed",
           "name": "longhorn",
           "namespace": "longhorn-system",
           "profiles": {
@@ -1631,7 +1657,7 @@
             "single-node": "persistence:\n  # local-path stays the default: on one node it is faster, and\n  # Longhorn is for volumes that need to grow.\n  defaultClass: false\n  # One node: a second replica would sit on the same disk.\n  defaultClassReplicaCount: 1\ncsi:\n  # One node: the chart's three replicas of each sidecar gain nothing.\n  attacherReplicaCount: 1\n  provisionerReplicaCount: 1\n  resizerReplicaCount: 1\n  snapshotterReplicaCount: 1\nlonghornGlobalManager:\n  # One node: the chart's three warm standbys gain nothing.\n  replicas: 1\n"
           },
           "repo": "https://charts.longhorn.io",
-          "values": "persistence:\n  # One copy per node, up to three: losing a node leaves two while the\n  # third rebuilds. Two nodes give two copies; with one down, volumes\n  # run on a single copy until it is back.\n  defaultClassReplicaCount: 3\n  # Volumes outlive their claims only when a person asks for it, as with local-path.\n  reclaimPolicy: Delete\ndefaultSettings:\n  # With fewer nodes than replicas, volumes still attach (degraded) and gain\n  # their missing replicas as nodes join, so a class asking for 3 gives\n  # min(3, nodes) copies.\n  allowVolumeCreationWithDegradedAvailability: true\n  # Spread existing replicas onto nodes that join later.\n  replicaAutoBalance: best-effort\n  # No calls to Longhorn's upgrade server; versions change with the catalog.\n  upgradeChecker: false\n  allowCollectingLonghornUsageMetrics: false\n  # After a Longhorn upgrade, move attached volumes to the new engine one\n  # node at a time; otherwise they stay on the old one until done by hand.\n  concurrentAutomaticEngineUpgradePerNodeLimit: 1\nlonghornUI:\n  # No login: it acts as Longhorn's admin. ClusterIP only (the chart's\n  # default, no Ingress); reach it with kubectl port-forward.\n  replicas: 1\nlonghornManager:\n  resources:\n    # The chart sets none. No limit: killing the manager stalls attach\n    # and detach on its node.\n    requests: {cpu: 25m, memory: 128Mi}\n",
+          "values": "# Pinned by digest; a tag alone can move.\nimage:\n  longhorn:\n    manager:\n      repository: longhornio/longhorn-manager\n      tag: v1.13.0@sha256:7372f3c59239e9a67c0017b3af32fabdf08c4dcc0631140161da9a47e3b142f0\n    shareManager:\n      repository: longhornio/longhorn-share-manager\n      tag: v1.13.0@sha256:53950f78b7af38b8a943c298cd3020622191a4661a13036f69d83c154cc8690d\n    ui:\n      repository: longhornio/longhorn-ui\n      tag: v1.13.0@sha256:f22fb0254ae50195c1635ce428dfae26375956b3d7bd39640fae8fe33a236023\npersistence:\n  # One copy per node, up to three: losing a node leaves two while the\n  # third rebuilds. Two nodes give two copies; with one down, volumes\n  # run on a single copy until it is back.\n  defaultClassReplicaCount: 3\n  # Volumes outlive their claims only when a person asks for it, as with local-path.\n  reclaimPolicy: Delete\ndefaultSettings:\n  # With fewer nodes than replicas, volumes still attach (degraded) and gain\n  # their missing replicas as nodes join, so a class asking for 3 gives\n  # min(3, nodes) copies.\n  allowVolumeCreationWithDegradedAvailability: true\n  # Spread existing replicas onto nodes that join later.\n  replicaAutoBalance: best-effort\n  # No calls to Longhorn's upgrade server; versions change with the catalog.\n  upgradeChecker: false\n  allowCollectingLonghornUsageMetrics: false\n  # After a Longhorn upgrade, move attached volumes to the new engine one\n  # node at a time; otherwise they stay on the old one until done by hand.\n  concurrentAutomaticEngineUpgradePerNodeLimit: 1\nlonghornUI:\n  # No login: it acts as Longhorn's admin. ClusterIP only (the chart's\n  # default, no Ingress); reach it with kubectl port-forward.\n  replicas: 1\nlonghornManager:\n  resources:\n    # The chart sets none. No limit: killing the manager stalls attach\n    # and detach on its node.\n    requests: {cpu: 25m, memory: 128Mi}\n",
           "version": "1.13.0"
         },
         {
@@ -1660,7 +1686,7 @@
             "risk": "Uninstalling deletes every Longhorn volume and its data."
           }
         ],
-        "summary": "Privileged pods on every node: they mount /dev, /proc, /boot, /etc and /var/lib/longhorn from the host, run iscsiadm and mount in the host's namespaces, and manage pods, PVs and storage classes cluster-wide.\n",
+        "summary": "Privileged pods on every node: they mount /dev, /proc, /boot, /etc and /var/lib/longhorn from the host, run iscsiadm and mount in the host's namespaces, and manage pods, PVs and storage classes cluster-wide. The chart binds the longhorn-support-bundle ServiceAccount to cluster-admin; only support bundle pods mount its token.\n",
         "tenants": "admin-only"
       },
       "smoke": [
@@ -1769,10 +1795,11 @@
       "releases": [
         {
           "chart": "vertical-pod-autoscaler",
+          "chartDigest": "sha256:dc9682d3d41a92b535e01d0fc2726e9d595eacd22f676ccc3f5333b4c6425624",
           "name": "vpa",
           "namespace": "vpa-system",
           "repo": "https://kubernetes.github.io/autoscaler",
-          "values": "recommender:\n  # Produces suggestions from metrics.k8s.io.\n  enabled: true\nupdater:\n  # Evicts pods to apply suggestions; keep changes manual.\n  enabled: false\nadmissionController:\n  # Rewrites pod resources at admission; same reason.\n  enabled: false\n",
+          "values": "recommender:\n  # Produces suggestions from metrics.k8s.io.\n  enabled: true\n  # Pinned by digest; a tag alone can move.\n  image:\n    repository: registry.k8s.io/autoscaling/vpa-recommender\n    tag: 1.8.1@sha256:edf874b830984d1df9d60f839874eba42de3465051922b929754edc42ea0f69b\nupdater:\n  # Evicts pods to apply suggestions; keep changes manual.\n  enabled: false\nadmissionController:\n  # Rewrites pod resources at admission; same reason.\n  enabled: false\n",
           "version": "0.15.0"
         }
       ],
@@ -1875,6 +1902,10 @@
           "skipIfPresent": [
             "policyreports.wgpolicyk8s.io"
           ],
+          "urlDigests": [
+            "sha256:04cae1b4158ba59debed7c702e8dee4434d583cff9aa8ab00add54b6a63c56b5",
+            "sha256:8bb518a3f12e6cb199c8cc252970d9a8383f419e0b59e8312f4a2c1105710919"
+          ],
           "urls": [
             "https://raw.githubusercontent.com/kubernetes-retired/wg-policy-prototypes/{version}/policy-report/crd/wgpolicyk8s.io/v1alpha2/wgpolicyk8s.io_policyreports.yaml",
             "https://raw.githubusercontent.com/kubernetes-retired/wg-policy-prototypes/{version}/policy-report/crd/wgpolicyk8s.io/v1alpha2/wgpolicyk8s.io_clusterpolicyreports.yaml"
@@ -1888,13 +1919,14 @@
         },
         {
           "chart": "oci://ghcr.io/falcosecurity/charts/falco",
+          "chartDigest": "sha256:0e1fb8c9a069659f19427ee96695416dc4152bb43c8fd5234108dd05c34ef3b1",
           "name": "falco",
           "namespace": "falco",
           "profiles": {
             "multi-node": "resources:\n  # Busier nodes mean more syscalls to evaluate.\n  requests: {cpu: 100m, memory: 256Mi}\n  limits: {memory: 1Gi}\n",
             "single-node": "resources:\n  # The chart asks 512Mi; one node idles well below that.\n  requests: {cpu: 50m, memory: 128Mi}\n  limits: {memory: 768Mi}\n"
           },
-          "values": "driver:\n  # Built-in CO-RE eBPF probe: no kernel module or headers.\n  kind: modern_ebpf\nfalco:\n  # JSON alerts so the log store can index fields.\n  json_output: true\n  json_include_output_property: true\nfalcoctl:\n  artifact:\n    follow:\n      # Rules change only with chart upgrades; no background downloads.\n      enabled: false\nfalcosidekick:\n  # Forwards alerts to PolicyReports in the namespace they concern.\n  enabled: true\n  # One writer: reports are read, appended to and replaced whole, and a\n  # second replica's concurrent update would be refused and its alert lost.\n  replicaCount: 1\n  image:\n    # The chart's default repository. Renovate reads it to update the tag.\n    repository: falcosecurity/falcosidekick\n    # 2.35.0 writes the alert's time; earlier versions only its seconds\n    # within the minute.\n    tag: 2.35.0\n  resources:\n    # Idle most of the time; one report update per alert.\n    requests: {cpu: 10m, memory: 32Mi}\n    limits: {memory: 128Mi}\n  config:\n    policyreport:\n      enabled: true\n      # The newest 100 alerts per namespace. One alert is about 1.5 KiB and\n      # holds the command line twice. At the upstream 1000, a report passes\n      # the etcd limit of 1.5 MiB, and each later update fails.\n      maxevents: 100\n",
+          "values": "# Pinned by digest; a tag alone can move.\nimage:\n  repository: falcosecurity/falco\n  tag: 0.45.1@sha256:69e957f91b3a6beb5c82e2afae33ec3e4479dab2d4421475d288d0cd113cedf6\ndriver:\n  # Built-in CO-RE eBPF probe: no kernel module or headers.\n  kind: modern_ebpf\nfalco:\n  # JSON alerts so the log store can index fields.\n  json_output: true\n  json_include_output_property: true\nfalcoctl:\n  # Pinned by digest; a tag alone can move.\n  image:\n    repository: falcosecurity/falcoctl\n    tag: 0.14.2@sha256:90ba9627886e8f26b746fa52465d755b28ee49b76eb1d047a0fefd8cadb21907\n  artifact:\n    follow:\n      # Rules change only with chart upgrades; no background downloads.\n      enabled: false\nfalcosidekick:\n  # Forwards alerts to PolicyReports in the namespace they concern.\n  enabled: true\n  # One writer: reports are read, appended to and replaced whole, and a\n  # second replica's concurrent update would be refused and its alert lost.\n  replicaCount: 1\n  image:\n    # The chart's default repository. Renovate reads it to update the tag.\n    repository: falcosecurity/falcosidekick\n    # 2.35.0 writes the alert's time; earlier versions only its seconds\n    # within the minute. Pinned by digest; a tag alone can move.\n    tag: 2.35.0@sha256:216ddb75229dcbf78cf57b1cf2140bd1b9092fcd72e4fd20b4d3057395d6765b\n  resources:\n    # Idle most of the time; one report update per alert.\n    requests: {cpu: 10m, memory: 32Mi}\n    limits: {memory: 128Mi}\n  config:\n    policyreport:\n      enabled: true\n      # The newest 100 alerts per namespace. One alert is about 1.5 KiB and\n      # holds the command line twice. At the upstream 1000, a report passes\n      # the etcd limit of 1.5 MiB, and each later update fails.\n      maxevents: 100\n",
           "version": "9.2.1"
         }
       ],
@@ -1996,13 +2028,14 @@
       "releases": [
         {
           "chart": "oci://ghcr.io/prometheus-community/charts/prometheus-blackbox-exporter",
+          "chartDigest": "sha256:dff2a707004310c712745e884f548c4c63e6af43be14b831673b519b530c0fe8",
           "name": "blackbox-exporter",
           "namespace": "observability",
           "profiles": {
             "multi-node": "# Two replicas, so a failure means the target is down.\nreplicas: 2\nresources:\n  # More probes per interval.\n  requests: {cpu: 20m, memory: 32Mi}\n  limits: {memory: 128Mi}\n",
             "single-node": "resources:\n  # Idles around 15Mi.\n  requests: {cpu: 10m, memory: 16Mi}\n  limits: {memory: 64Mi}\n"
           },
-          "values": "config:\n  modules:\n    # Uptime: a 2xx after redirects, IPv6 then IPv4.\n    http_2xx:\n      prober: http\n      timeout: 5s\n      http:\n        valid_http_versions: [\"HTTP/1.1\", \"HTTP/2.0\"]\n        follow_redirects: true\n        preferred_ip_protocol: ip6\n        ip_protocol_fallback: true\n    # Port checks for TCP services.\n    tcp_connect:\n      prober: tcp\n      timeout: 5s\n",
+          "values": "# Pinned by digest; a tag alone can move. The chart joins registry and\n# repository. registry comes second, so Renovate reads both.\nimage:\n  repository: prometheus/blackbox-exporter\n  registry: quay.io\n  tag: v0.29.1@sha256:ea1c7aa3ef3f307cd03e85f34abb604478ccb90b567fc690da0cd9776da76b13\nconfig:\n  modules:\n    # Uptime: a 2xx after redirects, IPv6 then IPv4.\n    http_2xx:\n      prober: http\n      timeout: 5s\n      http:\n        valid_http_versions: [\"HTTP/1.1\", \"HTTP/2.0\"]\n        follow_redirects: true\n        preferred_ip_protocol: ip6\n        ip_protocol_fallback: true\n    # Port checks for TCP services.\n    tcp_connect:\n      prober: tcp\n      timeout: 5s\n",
           "version": "11.20.2"
         }
       ],
@@ -2107,6 +2140,7 @@
       "releases": [
         {
           "chart": "k8up",
+          "chartDigest": "sha256:6d8a2e69ea3b75e25de80b4d173b2858e337586edf603c485567c5bf1ec8697a",
           "name": "k8up",
           "namespace": "k8up-system",
           "profiles": {
@@ -2114,7 +2148,7 @@
             "single-node": "k8up:\n  # No leader election with a single replica.\n  enableLeaderElection: false\nresources:\n  # Idle between schedules; backup Jobs have their own requests.\n  requests: {cpu: 10m, memory: 32Mi}\n  limits: {memory: 256Mi}\n"
           },
           "repo": "https://k8up-io.github.io/k8up",
-          "values": "k8up:\n  # Back up only PVCs annotated for backup.\n  skipWithoutAnnotation: true\n",
+          "values": "# Pinned by digest; a tag alone can move. The chart joins registry and\n# repository. registry comes second, so Renovate reads both.\nimage:\n  repository: k8up-io/k8up\n  registry: ghcr.io\n  tag: v2.16.1@sha256:f59bfa37c51511d5ad67e53816fb55c62d0e6411890e59bb6b965923129f30b5\nk8up:\n  # Back up only PVCs annotated for backup.\n  skipWithoutAnnotation: true\n",
           "version": "4.10.1"
         }
       ],
@@ -2220,6 +2254,12 @@
             "name": "velero-backup-key",
             "namespace": "velero"
           }
+        },
+        {
+          "default": true,
+          "description": "Installs the node agent on every node, so Velero can copy volume files with Kopia. The agent runs as root and holds Velero's cluster-admin token. Set false only if every Backup and Schedule sets defaultVolumesToFsBackup to false. Zeabur's backup schedule sets it to true, so without the agent its backups fail partly.\n",
+          "name": "file-backup",
+          "path": "deployNodeAgent"
         }
       ],
       "installOrder": {
@@ -2278,6 +2318,7 @@
       "releases": [
         {
           "chart": "velero",
+          "chartDigest": "sha256:fe4acd70a0123c369e7af7064457b4ffdddebee413e2bb01976a4fe07c471773",
           "name": "velero",
           "namespace": "velero",
           "profiles": {
@@ -2285,7 +2326,7 @@
             "single-node": "resources:\n  # Idle between backups; chart sets none.\n  requests: {cpu: 20m, memory: 64Mi}\n  limits: {memory: 512Mi}\n"
           },
           "repo": "https://vmware-tanzu.github.io/helm-charts",
-          "values": "initContainers:\n  # AWS plugin covers any S3-compatible store; v1.14.x matches Velero 1.18.\n  - name: velero-plugin-for-aws\n    image: velero/velero-plugin-for-aws:v1.14.4\n    volumeMounts:\n      - mountPath: /target\n        name: plugins\ncredentials:\n  # Secret comes from the credentials input, not the chart.\n  useSecret: true\n  existingSecret: velero-credentials\nconfiguration:\n  backupStorageLocation:\n    # One S3 location; bucket and URL are inputs.\n    - name: default\n      provider: aws\n      default: true\n      config:\n        region: us-east-1\n        s3ForcePathStyle: \"true\"\n        # Velero writes Secrets into the backup as they are. The\n        # store encrypts them with the backup-key input (SSE-C).\n        customerKeyEncryptionSecret: velero-backup-key/key\n  # Kopia file-system backups work on any storage class, local-path included.\n  uploaderType: kopia\n  # Back up all volumes unless they opt out.\n  defaultVolumesToFsBackup: true\n# CSI snapshots need per-driver setup; use file-system backups instead.\nsnapshotsEnabled: false\n# Needed for file-system backups.\ndeployNodeAgent: true\n",
+          "values": "# Pinned by digest; a tag alone can move.\nimage:\n  repository: docker.io/velero/velero\n  tag: v1.18.2@sha256:37396519f399536e5f01427d723565ae69294ec3fb5625cf1c87c09eaa9de16b\ninitContainers:\n  # AWS plugin covers any S3-compatible store; v1.14.x matches Velero 1.18.\n  - name: velero-plugin-for-aws\n    image: velero/velero-plugin-for-aws:v1.14.4@sha256:c85a7fa803569e3128c33e4f5766f84ab156c8d171c9f1dd2715581d45ce98fa\n    volumeMounts:\n      - mountPath: /target\n        name: plugins\ncredentials:\n  # Secret comes from the credentials input, not the chart.\n  useSecret: true\n  existingSecret: velero-credentials\nconfiguration:\n  backupStorageLocation:\n    # One S3 location; bucket and URL are inputs.\n    - name: default\n      provider: aws\n      default: true\n      config:\n        region: us-east-1\n        s3ForcePathStyle: \"true\"\n        # Velero writes Secrets into the backup as they are. The\n        # store encrypts them with the backup-key input (SSE-C).\n        customerKeyEncryptionSecret: velero-backup-key/key\n  # Kopia file-system backups work on any storage class, local-path included.\n  uploaderType: kopia\n  # Back up all volumes unless they opt out. Needs the file-backup input.\n  defaultVolumesToFsBackup: true\n# CSI snapshots need per-driver setup; use file-system backups instead.\nsnapshotsEnabled: false\n",
           "version": "12.2.1"
         }
       ],
@@ -2308,7 +2349,7 @@
             "risk": "Without the velero-repo-credentials and velero-backup-key Secrets, nobody can read the backups. Both are also inside the backups that they encrypt.\n"
           }
         ],
-        "summary": "Bound to cluster-admin; reads and restores every object.",
+        "summary": "Bound to cluster-admin; reads and restores every object. With the file-backup input, a root node agent on every node holds the same token.\n",
         "tenants": "admin-only"
       },
       "upgradeNotes": [
@@ -2402,6 +2443,7 @@
       "releases": [
         {
           "chart": "trivy-operator",
+          "chartDigest": "sha256:6d23f16d950496d17253258ca2e52bd068959041298e66c0652bf0841ccedf69",
           "name": "trivy-operator",
           "namespace": "trivy-system",
           "profiles": {
@@ -2409,7 +2451,7 @@
             "single-node": "operator:\n  # One scan at a time; each job loads an image and the DB.\n  scanJobsConcurrentLimit: 1\n  # One report per (mostly system) role; RBAC review is an admin task.\n  rbacAssessmentScannerEnabled: false\ntrivy:\n  # Low severity is noise on a small cluster.\n  severity: MEDIUM,HIGH,CRITICAL\nresources:\n  # The operator idles under 100Mi; scan jobs set their own.\n  requests: {cpu: 20m, memory: 64Mi}\n  limits: {memory: 512Mi}\n"
           },
           "repo": "https://aquasecurity.github.io/helm-charts",
-          "values": "operator:\n  # Reading every Secret is too broad; list pull secrets explicitly.\n  accessGlobalSecretsAndServiceAccount: false\n  # Compliance scans run privileged collectors; opt in explicitly.\n  infraAssessmentScannerEnabled: false\n  clusterComplianceEnabled: false\n  # SBOMs duplicate vulnerability reports and inflate operator memory.\n  sbomGenerationEnabled: false\ntrivy:\n  # Only fixable findings are actionable.\n  ignoreUnfixed: true\n",
+          "values": "# Pinned by digest; a tag alone can move. The chart joins registry and\n# repository. registry comes second, so Renovate reads both.\nimage:\n  repository: aquasec/trivy-operator\n  registry: mirror.gcr.io\n  tag: 0.35.0@sha256:4cdb11af98ff409cfa7af980098203a841a5fe957cc6a0bbb0df7668065eb5fa\noperator:\n  # Reading every Secret is too broad; list pull secrets explicitly.\n  accessGlobalSecretsAndServiceAccount: false\n  # Compliance scans run privileged collectors; opt in explicitly.\n  infraAssessmentScannerEnabled: false\n  clusterComplianceEnabled: false\n  # SBOMs duplicate vulnerability reports and inflate operator memory.\n  sbomGenerationEnabled: false\ntrivy:\n  # Only fixable findings are actionable.\n  ignoreUnfixed: true\n",
           "version": "0.37.0"
         }
       ],

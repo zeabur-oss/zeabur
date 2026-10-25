@@ -20,10 +20,14 @@ kubectl -n velero create secret generic velero-backup-key \
 
 # velero
 cat > velero-values.yaml <<'ZEABUR_VALUES'
+# Pinned by digest; a tag alone can move.
+image:
+  repository: docker.io/velero/velero
+  tag: v1.18.2@sha256:37396519f399536e5f01427d723565ae69294ec3fb5625cf1c87c09eaa9de16b
 initContainers:
   # AWS plugin covers any S3-compatible store; v1.14.x matches Velero 1.18.
   - name: velero-plugin-for-aws
-    image: velero/velero-plugin-for-aws:v1.14.4
+    image: velero/velero-plugin-for-aws:v1.14.4@sha256:c85a7fa803569e3128c33e4f5766f84ab156c8d171c9f1dd2715581d45ce98fa
     volumeMounts:
       - mountPath: /target
         name: plugins
@@ -45,12 +49,10 @@ configuration:
         customerKeyEncryptionSecret: velero-backup-key/key
   # Kopia file-system backups work on any storage class, local-path included.
   uploaderType: kopia
-  # Back up all volumes unless they opt out.
+  # Back up all volumes unless they opt out. Needs the file-backup input.
   defaultVolumesToFsBackup: true
 # CSI snapshots need per-driver setup; use file-system backups instead.
 snapshotsEnabled: false
-# Needed for file-system backups.
-deployNodeAgent: true
 ZEABUR_VALUES
 cat > velero-single-node.yaml <<'ZEABUR_VALUES'
 resources:
@@ -65,4 +67,5 @@ helm upgrade --install velero velero \
   --values velero-values.yaml \
   --values velero-single-node.yaml \
   --set configuration.backupStorageLocation.0.bucket='<bucket>' \
-  --set configuration.backupStorageLocation.0.config.s3Url='<s3-url>'
+  --set configuration.backupStorageLocation.0.config.s3Url='<s3-url>' \
+  --set deployNodeAgent='<file-backup>'

@@ -15,6 +15,10 @@ fi
 
 # traefik
 cat > traefik-values.yaml <<'ZEABUR_VALUES'
+# Pinned by digest; a tag alone can move.
+image:
+  repository: traefik
+  tag: v3.7.16@sha256:c8a121e4bb1347e8fd52657fab12f2cb70b68f8a018895e2068f92c9e519b9c2
 providers:
   kubernetesGateway:
     # Route web services with HTTPRoute.

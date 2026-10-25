@@ -9,6 +9,10 @@
 
 # metrics-server
 cat > metrics-server-values.yaml <<'ZEABUR_VALUES'
+# Pinned by digest; a tag alone can move.
+image:
+  repository: registry.k8s.io/metrics-server/metrics-server
+  tag: v0.9.0@sha256:d9862115e7c7881280d3d75ca26bda8ffc0fc213315979575bf23ce9826205c0
 args:
   # 15s is fresh enough for live views; the default is 60s.
   - --metric-resolution=15s
