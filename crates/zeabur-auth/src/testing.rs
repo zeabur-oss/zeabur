@@ -67,6 +67,8 @@ pub struct Recorded {
     pub elevation_allowed: bool,
     /// Whether the token endpoint fails with `503`.
     pub down: bool,
+    /// Users whose ID tokens lack `can_elevate`, as for someone with no elevated groups.
+    pub cannot_elevate: HashSet<String>,
 }
 
 /// The issuer.
@@ -185,6 +187,20 @@ async fn metadata(State(shared): State<Shared>) -> Response {
     .into_response()
 }
 
+/// An unsigned ID token for `user`; Zeabur reads only its `can_elevate` claim.
+fn id_token(recorded: &Recorded, user: &str) -> String {
+    let claims = if recorded.cannot_elevate.contains(user) {
+        json!({"sub": user})
+    } else {
+        json!({"sub": user, "can_elevate": true})
+    };
+    format!(
+        "{}.{}.",
+        URL_SAFE_NO_PAD.encode(br#"{"alg":"none"}"#),
+        URL_SAFE_NO_PAD.encode(claims.to_string())
+    )
+}
+
 fn oauth_error(status: StatusCode, error: &str) -> Response {
     (status, axum::Json(json!({"error": error}))).into_response()
 }
@@ -232,6 +248,7 @@ async fn token(State(shared): State<Shared>, headers: HeaderMap, body: String) -
                     "access_token": format!("{}:elevated:{n}", code.user),
                     "token_type": "Bearer",
                     "expires_in": 300,
+                    "id_token": id_token(recorded, &code.user),
                 }))
                 .into_response();
             }
@@ -245,6 +262,7 @@ async fn token(State(shared): State<Shared>, headers: HeaderMap, body: String) -
                 "token_type": "Bearer",
                 "expires_in": expires_in,
                 "refresh_token": refresh,
+                "id_token": id_token(recorded, &code.user),
             }))
             .into_response()
         }
@@ -273,6 +291,7 @@ async fn token(State(shared): State<Shared>, headers: HeaderMap, body: String) -
                 "token_type": "Bearer",
                 "expires_in": expires_in,
                 "refresh_token": refresh,
+                "id_token": id_token(recorded, &user),
             }))
             .into_response()
         }

@@ -11,10 +11,15 @@
 //!   defence of [rfc9700] §4.4.2.1.
 //! - **Client authentication** is `client_secret_basic`: the identifier and the secret,
 //!   form-urlencoded, then Base64, in `Authorization` ([rfc6749] §2.3.1).
-//! - **Tokens are opaque here.** No ID token is requested for its claims or verified: who the
-//!   person is comes from kube-apiserver, which validates the access token itself, through a
-//!   `SelfSubjectReview`. The access token's lifetime comes from `expires_in` ([rfc6749] §5.1); an
-//!   answer without it is refused rather than guessed.
+//! - **Tokens are opaque here.** No ID token is verified: who the person is comes from
+//!   kube-apiserver, which validates the access token itself, through a `SelfSubjectReview`. The
+//!   access token's lifetime comes from `expires_in` ([rfc6749] §5.1); an answer without it is
+//!   refused rather than guessed.
+//! - **One claim of the ID token is read**: `can_elevate`, which Zeabur Identity sets when an
+//!   `elevate` request would succeed. Its signature is not checked: the token comes straight from
+//!   the token endpoint over TLS ([oidc-core] §3.1.3.7, item 6), and the claim only decides whether
+//!   admin rights are offered. It grants nothing; kube-apiserver checks the elevated token. Without
+//!   the claim, or without an ID token, admin rights are not offered.
 //! - **Refresh** sends the refresh token and keeps the one the answer returns; Zeabur Identity
 //!   rotates it on every use and revokes the whole family when a used one comes back ([rfc9700]
 //!   §4.14.2), so refreshes of one session never overlap ([`crate::session`]).
@@ -31,6 +36,8 @@
 //!   Identification," RFC 9207, IETF, Mar. 2022. <https://www.rfc-editor.org/rfc/rfc9207>
 //! - [rfc9700] T. Lodderstedt, J. Bradley, A. Labunets and D. Fett, "Best Current Practice for
 //!   OAuth 2.0 Security," RFC 9700, IETF, Jan. 2025. <https://www.rfc-editor.org/rfc/rfc9700>
+//! - [oidc-core] N. Sakimura, J. Bradley, M. Jones, B. de Medeiros and C. Mortimore, "OpenID
+//!   Connect Core 1.0," OpenID Foundation. <https://openid.net/specs/openid-connect-core-1_0.html>
 //! - [oidc-discovery] N. Sakimura, J. Bradley, M. Jones and E. Jay, "OpenID Connect Discovery 1.0,"
 //!   OpenID Foundation. <https://openid.net/specs/openid-connect-discovery-1_0.html>
 //!
@@ -38,12 +45,13 @@
 //! [rfc7009]: https://www.rfc-editor.org/rfc/rfc7009
 //! [rfc9207]: https://www.rfc-editor.org/rfc/rfc9207
 //! [rfc9700]: https://www.rfc-editor.org/rfc/rfc9700
+//! [oidc-core]: https://openid.net/specs/openid-connect-core-1_0.html#TokenResponseValidation
 //! [oidc-discovery]: https://openid.net/specs/openid-connect-discovery-1_0.html
 
 use std::fmt;
 
 use base64::Engine as _;
-use base64::engine::general_purpose::STANDARD;
+use base64::engine::general_purpose::{STANDARD, URL_SAFE_NO_PAD};
 use bytes::Bytes;
 use http::{Method, Request, StatusCode, header};
 use http_body_util::Full;
@@ -114,6 +122,8 @@ pub struct TokenSet {
     pub expires_in: i64,
     /// The refresh token, when one was issued (never with elevated tokens).
     pub refresh_token: Option<SecretString>,
+    /// Whether the ID token says an `elevate` request would succeed.
+    pub can_elevate: bool,
 }
 
 impl fmt::Debug for TokenSet {
@@ -121,6 +131,7 @@ impl fmt::Debug for TokenSet {
         f.debug_struct("TokenSet")
             .field("expires_in", &self.expires_in)
             .field("refresh_token", &self.refresh_token.is_some())
+            .field("can_elevate", &self.can_elevate)
             .finish_non_exhaustive()
     }
 }
@@ -155,6 +166,23 @@ struct TokenAnswer {
     expires_in: Option<i64>,
     #[serde(default)]
     refresh_token: Option<String>,
+    #[serde(default)]
+    id_token: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct IdTokenClaims {
+    #[serde(default)]
+    can_elevate: bool,
+}
+
+/// The `can_elevate` claim of a compact JWS ID token; `false` when it cannot be read.
+fn can_elevate(id_token: Option<&str>) -> bool {
+    id_token
+        .and_then(|token| token.split('.').nth(1))
+        .and_then(|payload| URL_SAFE_NO_PAD.decode(payload).ok())
+        .and_then(|json| serde_json::from_slice::<IdTokenClaims>(&json).ok())
+        .is_some_and(|claims| claims.can_elevate)
 }
 
 #[derive(Deserialize)]
@@ -402,6 +430,7 @@ impl OAuthClient {
             access_token: SecretString::from(answer.access_token),
             expires_in,
             refresh_token: answer.refresh_token.map(SecretString::from),
+            can_elevate: can_elevate(answer.id_token.as_deref()),
         })
     }
 

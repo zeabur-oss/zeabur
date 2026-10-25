@@ -4,7 +4,8 @@ import { expect, test } from "../fixtures.ts"
 import { invite, member, planAndApply, signInAsAdmin } from "./members.ts"
 
 // Roles per project: an admin invites a Developer of one project and a Viewer of another, and
-// each sees what their role allows. scripts/e2e-l2-browser.sh sets, besides ZEABUR_L2_URL:
+// each sees what their role allows. The Viewer, with no elevated groups, is not offered admin
+// rights. scripts/e2e-l2-browser.sh sets, besides ZEABUR_L2_URL:
 //
 //   ZEABUR_L2_ADMIN_LINK         an invitation `zeabur-identityctl invite` printed for `e2e-admin`,
 //                                in the groups admins and elevated admins
@@ -191,6 +192,25 @@ test("an admin invites a Developer and a Viewer, who each get what their role al
       ).state
     expect(await logHistory(second)).toBe("unreadable")
     expect(await logHistory(first)).toBe("unreadable")
+
+    // The Viewer has no elevated groups, so Zeabur Identity would refuse admin rights.
+    await viewer.goto("/cluster")
+    const warnings = viewer.getByRole("region", { name: "Warnings in the last hour" })
+    await expect(
+      warnings.getByText("Seeing the cluster's warnings needs more rights."),
+    ).toBeVisible({ timeout: 30_000 })
+    await expect(
+      viewer.getByRole("button", { name: "Use admin rights for a few minutes" }),
+    ).toHaveCount(0)
+    await viewer
+      .getByRole("button", { name: /^Cluster .*, signed in as / })
+      .first()
+      .click()
+    await expect(viewer.getByRole("menuitem", { name: "Sign out" })).toBeVisible()
+    await expect(
+      viewer.getByRole("menuitem", { name: "Use admin rights for a few minutes" }),
+    ).toHaveCount(0)
+    await viewer.keyboard.press("Escape")
     await viewer.context().close()
   })
 })

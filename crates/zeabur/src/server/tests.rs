@@ -706,6 +706,22 @@ async fn without_elevation_a_refusal_stays_forbidden() {
 }
 
 #[tokio::test]
+async fn someone_who_cannot_elevate_is_not_offered_it() {
+    let rig = Rig::new(true).await;
+    rig.issuer
+        .with(|r| r.cannot_elevate.insert("alice".to_owned()));
+    let session = rig.sign_in("alice").await;
+    let (status, problem) = rig.plan_and_apply(&session).await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+    assert_eq!(problem["type"], "/problems/forbidden");
+    let (status, problem) = rig.get_json("/api/v1/cluster/nodes", &session).await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+    assert_eq!(problem["type"], "/problems/forbidden");
+    let (_, view) = rig.get_json("/api/v1/session", &session).await;
+    assert_eq!(view["elevation"], "unavailable");
+}
+
+#[tokio::test]
 async fn signing_out_ends_the_session_and_revokes_its_refresh_token() {
     let rig = Rig::new(true).await;
     let session = rig.sign_in("alice").await;
@@ -788,6 +804,7 @@ fn every_request_goes_with_the_token_in_use_and_ends_with_it() {
             expires_at: NOW + 600,
         },
         elevated: None,
+        can_elevate: true,
     };
     parts.extensions.insert(Signed::In(credentials.clone()));
     assert_eq!(

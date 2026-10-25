@@ -81,7 +81,7 @@ zeabur.com/icon
 
 管理員按 **暫時使用管理員權限**，在 Zeabur Identity 的視窗用通行密鑰確認。畫面會顯示 **管理員權限至** 某個時間。在那之前，或按下 **放棄管理員權限** 之前，你的所有操作都使用管理員權限。操作被拒絕時，錯誤畫面也會提供 **暫時用管理員權限重試**。
 
-這項功能需要 chart 的 `elevation.enabled`（預設 `true`），以及在 Zeabur Identity 以 `--allow-elevation` 註冊的 OAuth client。否則畫面會顯示 **這個 Zeabur 不能要求管理員權限，請洽叢集管理員**。一般成員權限不足時，把畫面列出缺少的規則交給管理員。
+這項功能需要 chart 的 `elevation.enabled`（預設 `true`），以及在 Zeabur Identity 以 `--allow-elevation` 註冊的 OAuth client。否則畫面會顯示 **這個 Zeabur 不能要求管理員權限，請洽叢集管理員**。只有在 Zeabur Identity 拿得到管理員權限的人會看到這個選項；開發者和檢視者權限不足時，畫面只說需要更多權限，把畫面列出缺少的規則交給管理員。
 
 在 **檢查變更** 之後、套用之前取得或放棄管理員權限都沒關係。套用時用的是當下持有的權限，kube-apiserver 會再檢查一次。
 

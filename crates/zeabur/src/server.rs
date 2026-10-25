@@ -231,7 +231,8 @@ async fn session(State(auth): State<Arc<Auth>>, mut request: Request, next: Next
 }
 
 /// The API's view of sessions: every request with the elevated token while it lasts, otherwise
-/// with the base one.
+/// with the base one. Admin rights are offered only when elevation is on and the ID token says
+/// they can be had (`can_elevate`), so a refusal does not offer what Zeabur Identity would refuse.
 #[derive(Debug)]
 struct SessionAccess {
     elevation: bool,
@@ -271,7 +272,8 @@ fn timestamp(seconds: i64) -> Timestamp {
 impl ClusterAccess for SessionAccess {
     fn for_request(&self, parts: &Parts) -> Result<Access, Box<Problem>> {
         let credentials = credentials(parts)?;
-        Ok(match (&credentials.elevated, self.elevation) {
+        let offered = self.elevation && credentials.can_elevate;
+        Ok(match (&credentials.elevated, offered) {
             (Some(elevated), _) => Access {
                 cluster: Arc::clone(&elevated.value.cluster),
                 elevation: Elevation::Active {

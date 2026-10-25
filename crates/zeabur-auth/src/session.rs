@@ -97,6 +97,8 @@ pub struct Credentials<T> {
     pub base: Bound<T>,
     /// The administrator credential, while it lasts.
     pub elevated: Option<Bound<T>>,
+    /// Whether asking for administrator rights would succeed, by the last ID token.
+    pub can_elevate: bool,
 }
 
 /// The outcome of looking a session up.
@@ -130,6 +132,7 @@ struct State<T> {
     base: Bound<T>,
     refresh: Option<SecretString>,
     elevated: Option<Bound<T>>,
+    can_elevate: bool,
 }
 
 struct Entry<T> {
@@ -210,6 +213,7 @@ impl<T: Clone + Send + Sync + 'static> Sessions<T> {
                 base,
                 refresh: tokens.refresh_token,
                 elevated: None,
+                can_elevate: tokens.can_elevate,
             }),
             renewing: tokio::sync::Mutex::new(()),
         });
@@ -247,6 +251,7 @@ impl<T: Clone + Send + Sync + 'static> Sessions<T> {
             username: state.username.clone(),
             base: state.base.clone(),
             elevated: state.elevated.clone(),
+            can_elevate: state.can_elevate,
         }
     }
 
@@ -294,6 +299,7 @@ impl<T: Clone + Send + Sync + 'static> Sessions<T> {
                 Ok(base) => {
                     let mut state = entry.state();
                     state.base = base;
+                    state.can_elevate = tokens.can_elevate;
                     // RFC 6749 §6: the issuer may keep the refresh token; Zeabur Identity rotates
                     // it.
                     if let Some(next) = tokens.refresh_token {
@@ -537,6 +543,7 @@ mod tests {
             access_token: SecretString::from("alice:1".to_owned()),
             expires_in: 600,
             refresh_token: Some(refresh),
+            can_elevate: false,
         };
         let id = rig.sessions.start("alice".to_owned(), tokens).unwrap();
         assert!(rig.base(&id).await.is_some());
@@ -599,6 +606,34 @@ mod tests {
         rig.advance(15 * 60);
         assert_eq!(rig.sessions.sweep(), 1);
         assert!(rig.base(&second).await.is_some());
+    }
+
+    #[tokio::test]
+    async fn the_id_token_says_who_can_get_administrator_rights_at_each_renewal() {
+        let rig = Rig::new(Limits::default()).await;
+        rig.issuer
+            .with(|r| r.cannot_elevate.insert("carol".to_owned()));
+        let alice = rig.sign_in("alice").await;
+        let carol = rig.sign_in("carol").await;
+        let can_elevate = |id: String| {
+            let sessions = Arc::clone(&rig.sessions);
+            async move {
+                match sessions.current(&id).await {
+                    Lookup::Active(credentials) => credentials.can_elevate,
+                    Lookup::SignedOut | Lookup::IssuerUnavailable => panic!("signed out"),
+                }
+            }
+        };
+        assert!(can_elevate(alice.clone()).await);
+        assert!(!can_elevate(carol.clone()).await);
+
+        rig.issuer.with(|r| {
+            r.cannot_elevate.remove("carol");
+            r.cannot_elevate.insert("alice".to_owned())
+        });
+        rig.advance(590);
+        assert!(!can_elevate(alice).await);
+        assert!(can_elevate(carol).await);
     }
 
     #[tokio::test]

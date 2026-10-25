@@ -131,7 +131,7 @@ likely to set:
 | `issuer.clientSecret.existingSecret` | The Secret from step 2. The chart never takes the secret itself as a value, so it stays out of Helm's release records. |
 | `issuer.accountUrl` | Where people manage their passkeys and linked accounts; the Account page links there. Empty: the `manage` URL the issuer publishes at `/.well-known/passkey-endpoints`, else no link. |
 | `issuer.caBundle.configMap` | A ConfigMap with the CA that signed Zeabur Identity's certificate, when a private CA did (mkcert, an internal CA). |
-| `elevation.enabled` | Whether anything the cluster refuses to everyday rights (a change, a read, a terminal) offers "Retry as admin", which asks for the passkey again. While admin rights last, a few minutes, every request goes with them, as with `sudo`. |
+| `elevation.enabled` | Whether anything the cluster refuses to everyday rights (a change, a read, a terminal) offers "Retry as admin", which asks for the passkey again. Only people who have elevated groups in Zeabur Identity get the offer. While admin rights last, a few minutes, every request goes with them, as with `sudo`. |
 | `ingress.*`, `httpRoute.*` | An Ingress, or a Gateway API HTTPRoute (`httpRoute.parentRefs` names the Gateway), for the public URL's host name. |
 | `domains.suffixes`, `domains.clusterIssuer` | How a new service's public URL is made; see [Public URLs for services](#public-urls-for-services). |
 
