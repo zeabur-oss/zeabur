@@ -24,6 +24,7 @@
     dns: 設定 DNS 紀錄
     maintenance: 顯示維護與錯誤頁面
     volumes: 儲存檔案與備份磁碟區
+    delete-project: 刪除專案
 - group: cluster
   label: 管理叢集
   pages:

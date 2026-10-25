@@ -72,6 +72,18 @@ function ProjectTile({ project, small }: { project: ProjectItem; small?: boolean
   )
 }
 
+/** A project being deleted says so in place of its services' health. */
+function ServicesState({ project }: { project: ProjectItem }) {
+  const t = useT()
+  if (!project.deleting) return <ServicesHealth project={project} />
+  return (
+    <span className="flex items-center gap-1.5 text-xs text-secondary">
+      <StatusDot health="progress" />
+      {t("project.deleting")}
+    </span>
+  )
+}
+
 function ServicesHealth({ project }: { project: ProjectItem }) {
   const t = useT()
   const h = project.health
@@ -157,7 +169,7 @@ function ProjectCard({ project, document, documentPending }: CardProps) {
       <span className="min-h-2 flex-1" />
       <span className="flex flex-col gap-y-2.5">
         <InfoRow label={t("metric.services")}>
-          <ServicesHealth project={project} />
+          <ServicesState project={project} />
         </InfoRow>
         <InfoRow label={t("table.domain")}>
           <DomainValue document={document} documentPending={documentPending} />
@@ -195,7 +207,7 @@ function ProjectListRow({ project, document, documentPending }: CardProps) {
         ) : null}
       </span>
       <span className={columns.services}>
-        <ServicesHealth project={project} />
+        <ServicesState project={project} />
       </span>
       <span
         className={cn(

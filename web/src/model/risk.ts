@@ -16,7 +16,7 @@
 //   cannot shrink, a new or moved mount replaces the pods); a YAML edit (written as typed);
 //   removing a domain; a NetworkPolicy that isolates its pods (limits what they send, or lets
 //   nothing in); opening a port to the internet; deleting an object, which cannot be taken back
-//   and is confirmed by typing its name.
+//   and is confirmed by typing its name; deleting a project, confirmed by typing the project's.
 // - normal: everything else (variables, values set, domains added or renamed, resources, health
 //   checks, other created objects, letting a namespace go).
 // - low as well: adopting a namespace and a project's details, which touch only the Namespace's
@@ -91,6 +91,7 @@ const fixedWeight: Partial<Record<Change["op"], OneWeight>> = {
   edit: { risk: "high", reason: "yamlEdit" },
   removeDomain: { risk: "high", reason: "removesDomain" },
   delete: { risk: "high", reason: "deletes" },
+  deleteProject: { risk: "high", reason: "deletes" },
   image: { risk: "normal" },
   autoUpdate: { risk: "normal" },
   env: { risk: "normal" },
@@ -247,10 +248,11 @@ export function deletionOf(created: {
   }
 }
 
-/** The name a person types to confirm a plan that deletes something: the first
- * object it deletes; `undefined` when there is none. */
-export function typedName(changes: readonly Change[]): string | undefined {
+/** The name a person types to confirm a plan that deletes something: the project's when it
+ * deletes `project`, else the first object it deletes; `undefined` when there is none. */
+export function typedName(changes: readonly Change[], project?: string): string | undefined {
   for (const change of changes) {
+    if (change.op === "deleteProject" && project !== undefined) return project
     if (change.op === "delete") return change.name
   }
   return undefined
@@ -258,8 +260,8 @@ export function typedName(changes: readonly Change[]): string | undefined {
 
 /** Whether a plan still waits for its name to be typed: it deletes something, and `typed` is
  * not that name (surrounding spaces aside; case counts, as Kubernetes names are lower case). */
-export function awaitsName(changes: readonly Change[], typed: string): boolean {
-  const name = typedName(changes)
+export function awaitsName(changes: readonly Change[], typed: string, project?: string): boolean {
+  const name = typedName(changes, project)
   return name !== undefined && typed.trim() !== name
 }
 
@@ -299,6 +301,15 @@ const workloadTab: Partial<Record<Change["op"], Tab>> = {
 /** Where to look at what a plan changed, as a path and query: the service page tab for a
  * workload's change, the object on the Objects page for anything else. `service` is the service
  * the change was asked from, for changes that name only a route, a claim or an object. */
+/** Where a change to the project itself leads, by the project's encoded name. */
+const projectPlace: Partial<Record<Change["op"], (project: string) => string>> = {
+  adopt: (project) => `/projects/${project}`,
+  createProject: (project) => `/projects/${project}`,
+  unadopt: () => "/projects",
+  deleteProject: () => "/projects",
+  details: (project) => `/projects/${project}/settings`,
+}
+
 export function destinationOf(
   project: string,
   changes: readonly Change[],
@@ -322,6 +333,8 @@ export function destinationOf(
   }
   const own = workloadTab[change.op]
   if (own && "workload" in change) return tab(change.workload ?? undefined, own)
+  const place = projectPlace[change.op]
+  if (place) return place(encodeURIComponent(project))
   switch (change.op) {
     case "renameDomain":
     case "removeDomain":
@@ -338,13 +351,6 @@ export function destinationOf(
     case "delete":
       // The object is gone; a policy's effect shows on the service it was asked from.
       return change.resource.resource === "networkpolicies" ? tab(service, "networking") : undefined
-    case "adopt":
-    case "createProject":
-      return `/projects/${encodeURIComponent(project)}`
-    case "unadopt":
-      return "/projects"
-    case "details":
-      return `/projects/${encodeURIComponent(project)}/settings`
     default:
       return tab(...accessTab(change, service))
   }

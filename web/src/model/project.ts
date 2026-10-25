@@ -66,6 +66,7 @@ const MANAGE_VERB = "zeabur-manage"
 export const namespaceOps = new Set<Schemas["Change"]["op"]>([
   "adopt",
   "unadopt",
+  "deleteProject",
   "details",
   "createProject",
 ])

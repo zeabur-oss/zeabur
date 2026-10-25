@@ -1,4 +1,3 @@
-// Deleting the namespace is not offered: plans refuse it (`tenant_level`).
 import { useForm } from "@tanstack/react-form"
 import { useQuery } from "@tanstack/react-query"
 import { getRouteApi, Link } from "@tanstack/react-router"
@@ -15,6 +14,7 @@ import { Notifications } from "@/components/notifications"
 import { LoadingRows } from "@/components/page"
 import { GateTip, useGates } from "@/components/gate"
 import { usePlanner } from "@/components/plan/planner"
+import { ProjectDeleting } from "@/components/project-deleting"
 import { Problem } from "@/components/problem"
 import { projectGlyphs } from "@/components/project-icon"
 import { useI18n, useT } from "@/i18n"
@@ -48,6 +48,7 @@ export function ProjectSettingsPage() {
   return (
     <PageColumn width="content" gap="xl" className="mt-6 mb-20 md:mt-8">
       <PageHeader title={t("projectSettings.general")} />
+      <ProjectDeleting project={project} />
       {namespace.isPending ? (
         <LoadingRows label={t("common.loading")} rows={4} />
       ) : namespace.isError ? (
@@ -122,23 +123,7 @@ export function ProjectSettings({ namespace }: { namespace: Schemas["ProjectName
           <BatchActions project={namespace.name} />
         </>
       ) : null}
-      {namespace.adopted && !namespace.system ? (
-        <Group label={t("projectSettings.danger")}>
-          <Card variant="list">
-            <CardRow
-              label={t("projectSettings.remove")}
-              description={t("projectSettings.removeHint")}
-            >
-              <AdoptButton
-                namespace={namespace.name}
-                adopted
-                variant="destructive"
-                label={t("projectSettings.removeAction")}
-              />
-            </CardRow>
-          </Card>
-        </Group>
-      ) : null}
+      <DangerZone namespace={namespace} />
       {help ? (
         <AccessDialog
           namespace={namespace.name}
@@ -148,6 +133,50 @@ export function ProjectSettings({ namespace }: { namespace: Schemas["ProjectName
           onClose={() => setHelp(false)}
         />
       ) : null}
+    </>
+  )
+}
+
+function DangerZone({ namespace }: { namespace: Schemas["ProjectNamespace"] }) {
+  const t = useT()
+  if (!namespace.adopted || namespace.system || namespace.deleting) return null
+  return (
+    <Group label={t("projectSettings.danger")}>
+      <Card variant="list">
+        <CardRow label={t("projectSettings.remove")} description={t("projectSettings.removeHint")}>
+          <AdoptButton
+            namespace={namespace.name}
+            adopted
+            variant="destructive"
+            label={t("projectSettings.removeAction")}
+          />
+        </CardRow>
+        <CardRow label={t("projectSettings.delete")} description={t("projectSettings.deleteHint")}>
+          <DeleteProjectButton project={namespace.name} />
+        </CardRow>
+      </Card>
+    </Group>
+  )
+}
+
+function DeleteProjectButton({ project }: { project: string }) {
+  const t = useT()
+  const planner = usePlanner(project)
+  return (
+    <>
+      <Button
+        variant="destructive"
+        size="sm"
+        onClick={() =>
+          planner.plan({
+            title: t("title.deleteProject", project),
+            changes: [{ op: "deleteProject" }],
+          })
+        }
+      >
+        {t("projectSettings.deleteAction")}
+      </Button>
+      {planner.dialog}
     </>
   )
 }

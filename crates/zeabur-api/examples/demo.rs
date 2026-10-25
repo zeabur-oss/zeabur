@@ -25,6 +25,9 @@
 //! holds the projects as the demo starts and `wiki`, deleted since. A store on 127.0.0.1 answers
 //! the `DownloadRequest`s, so restore plans list what a backup holds.
 //!
+//! `ZEABUR_DEMO_DELETING=1` adds a project, `archive`, that a database's finalizer keeps from
+//! being deleted.
+//!
 //! K8up backs up shop's Redis volume nightly to R2; the newest run failed. `ZEABUR_DEMO_K8UP=none`
 //! leaves it uninstalled. The cluster lists one S3 destination, `r2-backups`.
 //!
@@ -2441,6 +2444,27 @@ fn alerting() -> Vec<DynamicObject> {
     ]
 }
 
+/// A project `archive` whose Namespace is being deleted, held by a database's finalizer.
+fn deleting(state: &mut State) {
+    let since = minutes_ago(12);
+    state.namespaces.push(from(json!({
+        "metadata": {"name": "archive", "labels": {"zeabur.com/project": "true"},
+            "deletionTimestamp": since},
+        "status": {"phase": "Terminating", "conditions": [
+            {"type": "NamespaceContentRemaining", "status": "True",
+             "message": "Some resources are remaining: clusters.postgresql.cnpg.io has 1 resource instances"},
+            {"type": "NamespaceFinalizersRemaining", "status": "True",
+             "message": "Some content in the namespace has finalizers remaining: cnpg.io/cleanup in 1 resource instances"}
+        ]}
+    })));
+    state.dynamic.push(from(json!({
+        "apiVersion": "postgresql.cnpg.io/v1", "kind": "Cluster",
+        "metadata": {"name": "ledger", "namespace": "archive", "finalizers": ["cnpg.io/cleanup"],
+            "deletionTimestamp": since},
+        "spec": {"instances": 1, "storage": {"size": "5Gi"}}
+    })));
+}
+
 /// K8up, unless `ZEABUR_DEMO_K8UP` is `none`.
 fn k8up_installed() -> bool {
     std::env::var("ZEABUR_DEMO_K8UP").unwrap_or_default() != "none"
@@ -4184,7 +4208,11 @@ fn github_app(s: &mut State, fake: &FakeGitHub) {
 
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
-    let cluster = MemoryCluster::new(state());
+    let mut state = state();
+    if std::env::var_os("ZEABUR_DEMO_DELETING").is_some() {
+        deleting(&mut state);
+    }
+    let cluster = MemoryCluster::new(state);
     if std::env::var("ZEABUR_DEMO_FORBID")
         .is_ok_and(|list| list.split(',').any(|r| r == "pods/exec"))
     {

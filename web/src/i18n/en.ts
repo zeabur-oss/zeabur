@@ -518,6 +518,39 @@ export const en = {
   "project.noServices": "No services yet",
   "project.seeObjects": "View all objects",
   "project.healthyOf": (healthy: number, total: number) => `${healthy}/${total} healthy`,
+  "project.deleting": "Deleting…",
+  "deletion.goes": "Goes with the project",
+  "deletion.services": (names: string) => `Services: ${names}`,
+  "deletion.database": (kind: string) => `Database (${kind})`,
+  "deletion.dataDeleted": "Its data is deleted with it",
+  "deletion.dataKept": (volume: string) => `Its data stays in PersistentVolume ${volume}`,
+  "deletion.dataKeptUnbound": "Its data stays: the StorageClass keeps volumes",
+  "deletion.dataUnknown": "Unable to tell whether its data stays",
+  "deletion.backUpFirst": "Back up first",
+  "deletion.backUpVolume": (claim: string) => `Back up ${claim} now`,
+  "deletion.toolsPods": "Your tools pods for this project are deleted too",
+  "deletion.operatorDown": (names: string) =>
+    `No operator is running for ${names}, so their cleanup can't run and the project may take a long time to go away`,
+  "deletion.stays": "Stays",
+  "deletion.staysBackups": "Backups in S3",
+  "deletion.resticPassword":
+    "Volume backups in S3 stay, but the restic password that restores them is in a Secret in this project and goes with it. Keep a copy first.",
+  "deletion.staysOutside":
+    "Everything outside the project, such as other projects and cluster settings",
+  "deletion.restore": (action: string) =>
+    `To get the project back later, use ${action} on the cluster's backups page.`,
+  "deletion.openBackups": "Open backups",
+  "deleting.title": "Deleting this project",
+  "deleting.gone": "This project is deleted",
+  "deleting.toProjects": "Back to projects",
+  "deleting.body":
+    "Kubernetes deletes what's in the namespace, then the namespace itself. This usually takes a minute or two.",
+  "deleting.since": (ago: string) => `Started ${ago}.`,
+  "deleting.count": (resource: string, count: number) => `${resource} (${count})`,
+  "deleting.left": (list: string) => `Left: ${list}.`,
+  "deleting.held":
+    "These objects wait for their finalizers. The controller that added each finalizer removes it after its cleanup; Zeabur doesn't remove finalizers.",
+  "deleting.commandsLabel": "Look with kubectl",
 
   // Overview
   "attention.title": "Needs attention",
@@ -1126,11 +1159,13 @@ export const en = {
   "project.entry.settings": "Settings",
   "action.adopt": "Use this namespace",
   "action.unadopt": "Stop showing as a project",
+  "action.deleteProject": "Delete project",
   "action.openDebugTerminal": "Open debug terminal",
   "action.openToolsTerminal": "Open kubectl terminal",
   "action.saveDetails": "Save details",
   "title.adopt": (ns: string) => `Use the existing namespace ${ns}`,
   "title.unadopt": (ns: string) => `Stop showing ${ns} as a project`,
+  "title.deleteProject": (ns: string) => `Delete project ${ns}`,
   "title.details": (ns: string) => `${ns} details`,
   "title.pauseAll": (ns: string) => `Pause every service in ${ns}`,
   "title.restartAll": (ns: string) => `Restart every service in ${ns}`,
@@ -1138,6 +1173,8 @@ export const en = {
     "Creates the namespace with the project label; services in it may run as root but can't reach the host (Pod Security baseline). Nothing else changes.",
   "confirm.adopt": "Adds the project label to the namespace. Nothing in it changes.",
   "confirm.unadopt": "The namespace stops showing as a project. Nothing in it is deleted.",
+  "confirm.deleteProject":
+    "Deletes the project's namespace and everything in it, as kubectl delete namespace does. This can't be undone.",
   "confirm.debugContainer": (pod: string) =>
     `Adds a debug container with a shell to replica ${pod}. It can see the app's processes.`,
   "confirm.debugStays":
@@ -1207,6 +1244,10 @@ export const en = {
   "projectSettings.removeHint":
     "Removes only Zeabur's project label. The namespace and everything in it stay.",
   "projectSettings.removeAction": "Remove",
+  "projectSettings.delete": "Delete project",
+  "projectSettings.deleteHint":
+    "Deletes the namespace and everything in it. You see what goes and what stays before you confirm.",
+  "projectSettings.deleteAction": "Delete",
   "icon.folder": "Folder",
   "icon.globe": "Globe",
   "icon.storefront": "Shop",
@@ -1403,6 +1444,8 @@ export const en = {
   "risk.opensPort": "Anyone on the internet can connect to it, without a password from Zeabur.",
   "risk.deletes": "Deleting can't be undone.",
   "warn.rightsMissing": (rights: string) => `The cluster may refuse this: you lack ${rights}.`,
+  "warn.recreated": (names: string, tool: string) =>
+    `${tool} manages ${names}: it may create them again after the deletion`,
   "warn.restartNeeded": (names: string) => `Takes effect after a restart: ${names}`,
   "warn.reloaderRestarts": (names: string) => `Reloader restarts ${names}`,
   "warn.reloaderMayRestart": (names: string) =>

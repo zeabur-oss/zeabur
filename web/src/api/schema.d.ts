@@ -3174,6 +3174,10 @@ export interface components {
           op: "unadopt"
         }
       | {
+          /** @enum {string} */
+          op: "deleteProject"
+        }
+      | {
           /** @description The name to show instead of the namespace's. */
           displayName?: string | null
           /** @enum {string} */
@@ -4000,6 +4004,15 @@ export interface components {
       username?: string | null
       /** @description The Secret's key holding the user name. */
       usernameKey?: string | null
+    }
+    /** @description A database that goes with the project. */
+    DatabaseDeletion: {
+      /** @description Its kind (`Cluster`). */
+      kind: string
+      /** @description Its name. */
+      name: string
+      /** @description Whether its operator runs. Only while it runs does the apply wait for the database to go. */
+      operator: components["schemas"]["OperatorState"]
     }
     /**
      * @description A database engine.
@@ -4963,6 +4976,19 @@ export interface components {
       host: string
       /** @description The project whose route serves it. */
       project: string
+    }
+    /** @description An object whose finalizers keep the Namespace. */
+    HeldObject: {
+      /** @description Its finalizers. */
+      finalizers: string[]
+      /** @description The API group; empty for the core group. */
+      group: string
+      /** @description The kind. */
+      kind: string
+      /** @description The name. */
+      name: string
+      /** @description The resource (plural). */
+      resource: string
     }
     /** @description The store a history came from. */
     HistorySource: {
@@ -6209,6 +6235,11 @@ export interface components {
       ownerKind?: string | null
     }
     /**
+     * @description Whether the operator of a database runs, as far as the person can see.
+     * @enum {string}
+     */
+    OperatorState: "ready" | "notReady" | "unknown"
+    /**
      * @description Where a value is *declared* or read from: the Kubernetes object and the field inside it.
      *
      *     Every value the API returns carries one, so a client can always show which object to open,
@@ -6660,6 +6691,18 @@ export interface components {
           /** @description The image. */
           image: string
         }
+      | (components["schemas"]["ProjectDeletion"] & {
+          /** @enum {string} */
+          code: "deletesProject"
+        })
+      | {
+          /** @enum {string} */
+          code: "recreated"
+          /** @description The objects. */
+          objects: components["schemas"]["ObjectName"][]
+          /** @description The tool. */
+          tool: components["schemas"]["Tool"]
+        }
     /** @description One object a plan writes. */
     PlannedObject: {
       /** @description The object as it will be, the same way; absent when the write deletes it. */
@@ -7034,6 +7077,32 @@ export interface components {
       /** @description What could not be read. */
       unreadable: components["schemas"]["UnreadableView"][]
     }
+    /** @description A project whose Namespace is being deleted. */
+    ProjectDeleting: {
+      /** @description The finalizers that hold objects back, as the namespace controller counts them. */
+      finalizers: components["schemas"]["RemainingFinalizer"][]
+      /** @description The objects with finalizers the person could read. */
+      held: components["schemas"]["HeldObject"][]
+      /** @description What is left, by resource, as the namespace controller counts it. */
+      remaining: components["schemas"]["RemainingContent"][]
+      /** @description When the deletion started, RFC 3339. */
+      since: string
+    }
+    /** @description What deleting the project takes with it ([`Warning::DeletesProject`]). */
+    ProjectDeletion: {
+      /** @description Its databases, deleted before the Namespace. */
+      databases: components["schemas"]["DatabaseDeletion"][]
+      /** @description The project's Namespace. */
+      namespace: string
+      /** @description Its services: workloads no other object controls. */
+      services: components["schemas"]["WorkloadRef"][]
+      /** @description The namespace of tools pods. */
+      toolsNamespace: string
+      /** @description The person's tools pods for the project, deleted after the Namespace. */
+      toolsPods: string[]
+      /** @description Its volumes. */
+      volumes: components["schemas"]["VolumeDeletion"][]
+    }
     /**
      * @description A project's details, as its namespace's annotations give them. Each is absent when its
      *     annotation is missing or blank (or, for the icon, names no built-in icon).
@@ -7158,6 +7227,7 @@ export interface components {
       canAdopt: components["schemas"]["Permission"]
       /** @description Whether the person may patch the Namespace: change its details. */
       canChange: components["schemas"]["Permission"]
+      deleting?: components["schemas"]["ProjectDeleting"] | null
       /**
        * @description The chart's admission policy is installed: patching the Namespace without `zeabur-manage`
        *     changes only its details.
@@ -7273,6 +7343,8 @@ export interface components {
        *     it only adds the label.
        */
       adopted: boolean
+      /** @description Its namespace is being deleted (`Terminating`). */
+      deleting?: boolean
       health?: components["schemas"]["ProjectHealth"] | null
       /** @description `projects/<name>`. */
       id: string
@@ -7463,6 +7535,28 @@ export interface components {
      * @enum {string}
      */
     ReloaderState: "running" | "stopped" | "notInstalled" | "unknown"
+    /** @description Objects of one resource that are left. */
+    RemainingContent: {
+      /**
+       * Format: int64
+       * @description How many.
+       */
+      count: number
+      /** @description The API group; empty for the core group. */
+      group: string
+      /** @description The resource (plural). */
+      resource: string
+    }
+    /** @description One finalizer that holds objects back. */
+    RemainingFinalizer: {
+      /**
+       * Format: int64
+       * @description On how many objects.
+       */
+      count: number
+      /** @description The finalizer (`cnpg.io/cleanup`). */
+      finalizer: string
+    }
     /** @description A field the plan removes. */
     Removal: {
       /** @description Its value now (redacted for a Secret). */
@@ -9011,6 +9105,21 @@ export interface components {
       validationErrors: string[]
       /** @description It is the schedule Zeabur sets up ([`SCHEDULE`]). */
       zeabur: boolean
+    }
+    /** @description A volume that goes with the project. */
+    VolumeDeletion: {
+      /** @description The PersistentVolumeClaim. */
+      claim: string
+      /**
+       * @description What happens to the data: the PersistentVolume's `persistentVolumeReclaimPolicy` when the
+       *     person could read it, else the `StorageClass`'s `reclaimPolicy` (`Delete` when it sets
+       *     none); absent when neither could be read.
+       */
+      reclaimPolicy?: string | null
+      /** @description Its `StorageClass`; absent when it names none and no default is known. */
+      storageClass?: string | null
+      /** @description Its PersistentVolume; absent while the claim is not bound. */
+      volume?: string | null
     }
     /** @description A new volume for a workload: a PersistentVolumeClaim and where it is mounted. */
     VolumeRequest: {

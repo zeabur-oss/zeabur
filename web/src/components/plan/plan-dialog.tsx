@@ -25,6 +25,7 @@ import { COUNTDOWN_FROM_SECONDS, clock, useSecondsLeft } from "@/components/plan
 import { carryOut } from "@/components/plan/outcome"
 import type { PlanAsk, PlanHooks } from "@/components/plan/planner"
 import { PlanPreview, useShortfall } from "@/components/plan/preview"
+import { ProjectDeletion } from "@/components/plan/project-deletion"
 import { changedSince, type Reviewed } from "@/components/plan/replan"
 import { Problem } from "@/components/problem"
 import { StatusDot } from "@/components/status"
@@ -124,10 +125,10 @@ function usePlan(
   const grouped = !!description?.facts
   const light = weight.risk === "low" && !grouped
   const short = useShortfall(plan.data?.preview)
-  const named = typedName(ask.changes)
+  const named = typedName(ask.changes, project)
   const [typed, setTyped] = useState("")
   const typedInput = useRef<HTMLInputElement>(null)
-  const unconfirmed = awaitsName(ask.changes, typed)
+  const unconfirmed = awaitsName(ask.changes, typed, project)
 
   const confirm = () => {
     if (!plan.data) return
@@ -194,16 +195,19 @@ function usePlan(
         />
       ) : null}
       {plan.data && !plan.isFetching ? (
-        <Readers
-          project={project}
-          ask={ask}
-          plan={plan.data}
-          reopen={reopen}
-          go={(href) => {
-            onClose()
-            void navigate({ href })
-          }}
-        />
+        <>
+          <Readers
+            project={project}
+            ask={ask}
+            plan={plan.data}
+            reopen={reopen}
+            go={(href) => {
+              onClose()
+              void navigate({ href })
+            }}
+          />
+          <ProjectDeletion project={project} plan={plan.data} reopen={reopen} />
+        </>
       ) : null}
       {named !== undefined && plan.data ? (
         <div className="mt-4 flex flex-col gap-2">
@@ -499,7 +503,7 @@ function PlanBody({
   const { lines, more } = description
   const [first, ...rest] = lines
   const warnings: Said[] = [
-    ...plan.warnings.filter((w) => !sentenced.has(w.code)).map((w) => warningText(t, w)),
+    ...warningsSaid(t, plan.warnings),
     ...(plan.gaps ?? []).flatMap((gap) => {
       const text = writeSentence(t, gap.message)
       return text ? [{ text }] : []
@@ -658,7 +662,26 @@ function names(t: Translate, workloads: Schemas["WorkloadRef"][]): string {
   ).text
 }
 
-function warningText(t: Translate, warning: Schemas["PlanWarning"]): Said {
+/** The warnings the plain sentences do not say; a project's deletion has its own section. */
+function warningsSaid(t: Translate, warnings: Schemas["PlanWarning"][]): Said[] {
+  return warnings.flatMap((w): Said[] => {
+    if (sentenced.has(w.code) || w.code === "deletesProject") return []
+    if (w.code === "recreated")
+      return [
+        namedText(
+          t,
+          w.objects.map((o) => `${o.kind} ${o.name}`),
+          (list) => t("warn.recreated", list, w.tool),
+        ),
+      ]
+    return [warningText(t, w)]
+  })
+}
+
+function warningText(
+  t: Translate,
+  warning: Exclude<Schemas["PlanWarning"], { code: "recreated" | "deletesProject" }>,
+): Said {
   switch (warning.code) {
     case "deletesDependents":
       return namedText(
@@ -739,7 +762,14 @@ function warningSentence(
   warning: Exclude<
     Schemas["PlanWarning"],
     {
-      code: "deletesDependents" | "deletesOwned" | "stays" | "rightsMissing" | "claimDataMayBeLost"
+      code:
+        | "deletesDependents"
+        | "deletesOwned"
+        | "stays"
+        | "rightsMissing"
+        | "claimDataMayBeLost"
+        | "recreated"
+        | "deletesProject"
     }
   >,
 ): string {

@@ -15,6 +15,7 @@ import { Segmented } from "@/components/bits"
 import { CopyText } from "@/components/copy-text"
 import { AddMenu, useAddChoices } from "@/components/add/menu"
 import { Freshness } from "@/components/freshness"
+import { ProjectDeleting } from "@/components/project-deleting"
 import { GapList } from "@/components/gaps"
 import { IncidentRow, isTakenDown, takenDown } from "@/components/incident"
 import { ProblemGroupRow } from "@/routes/project/problem-group"
@@ -124,11 +125,14 @@ function ProjectBody({
   const view = useView(project, data)
   const refused = refusedAmong(unreadable, refusedPlaces.services)
   const empty = data.services.length === 0 && refused.length === 0
+  const deleting = useProjectSummary(project)?.deleting ?? false
   return (
     <>
       <Header project={project} data={data} view={empty ? undefined : view} />
       {empty ? (
-        <NextStep project={project} />
+        deleting ? null : (
+          <NextStep project={project} />
+        )
       ) : view === "map" ? (
         <MapView project={project} data={data} unreadable={unreadable} />
       ) : (
@@ -209,6 +213,7 @@ function Header({ project, data, view }: { project: string; data: Project; view?
             </span>
           }
         />
+        <ProjectDeleting project={project} className="mt-4" />
       </PageColumn>
     </header>
   )

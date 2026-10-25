@@ -229,6 +229,14 @@ describe("typed confirmation", () => {
       }
     }
   })
+
+  test("deleting a project waits for the project's name, and leads to the projects list", () => {
+    const deletion = [{ op: "deleteProject" as const }]
+    expect(weigh(deletion, pods({})).risk).toBe("high")
+    expect(awaitsName(deletion, "", "shop")).toBe(true)
+    expect(awaitsName(deletion, "shop", "shop")).toBe(false)
+    expect(destinationOf("shop", deletion, undefined)).toBe("/projects")
+  })
 })
 
 describe("destinationOf", () => {

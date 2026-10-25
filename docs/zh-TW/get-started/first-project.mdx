@@ -73,13 +73,7 @@ Zeabur 讀出 `nginx-unprivileged` 以使用者 101 執行，會自動選 **嚴�
 
 在 `web` 服務右上角的**更多**選**刪除服務**。刪除也會先列出要刪的物件，這次是 Deployment、Service 和 Ingress，確認後套用。
 
-專案本身的 Namespace 要用 `kubectl` 刪：
-
-```sh
-kubectl delete namespace hello
-```
-
-專案**設定**裡的**不再顯示為專案**只會拿掉專案標籤，Namespace 和裡面的東西都會留著。
+要連專案一起清掉，到專案**設定**的**危險區域**按**刪除專案**，檢查要刪的東西後輸入 `hello` 確認，見[刪除專案](../configure/delete-project.mdx)。同一處的**從 Zeabur 移除**只會拿掉專案標籤，Namespace 和裡面的東西都會留著。
 
 ## 接下來
 
