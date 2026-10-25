@@ -1,4 +1,4 @@
-//! How to install a catalogue component, in four forms: Helm commands, a k3s `HelmChart`, Flux
+//! How to install a catalogue component, in four forms: Helm commands, a K3s/RKE2 `HelmChart`, Flux
 //! objects and an Argo CD `Application`.
 //!
 //! Each is a text to copy, or to commit to a Git repository a GitOps tool watches. The three
@@ -12,9 +12,9 @@
 //!   (`--values base --values profile`), so the reasons for each value stay readable. `helm upgrade
 //!   --install` installs or upgrades in one command [helm-upgrade]; a chart from an HTTP repository
 //!   is named with `--repo`.
-//! - **k3s** writes a `HelmChart` for k3s's Helm controller, which installs it; the file can go in
-//!   the server's auto-deploying manifests directory [k3s-helm]. Values are merged into
-//!   `valuesContent`.
+//! - **K3s/RKE2** writes a `HelmChart` for the Helm controller both run, which installs it; the
+//!   file can go in the server's auto-deploying manifests directory [k3s-helm] [rke2-helm]. Values
+//!   are merged into `valuesContent`.
 //! - **Flux** writes the chart's source (`OCIRepository` for an OCI chart, `HelmRepository` for an
 //!   HTTP repository) and a `HelmRelease` [flux-helmrelease] [flux-ocirepository].
 //! - **Argo CD** writes an `Application` with the values in `helm.valuesObject`; an OCI chart also
@@ -25,8 +25,10 @@
 //! `APIService`, and the k3s form's `HelmChart kube-system/<name>` would overwrite k3s's own, which
 //! k3s re-applies on its next restart. So every form, on k3s, begins with how to disable the
 //! packaged one first (`disable` in `/etc/rancher/k3s/config.yaml` on every server, then a
-//! restart), and what that removes [k3s-packaged]; the guide lists those add-ons for the interface
-//! to warn about.
+//! restart), and what that removes [k3s-packaged]. RKE2 names its copies `rke2-<name>` and
+//! chooses its ingress controller with `ingress-controller` in `/etc/rancher/rke2/config.yaml`
+//! [rke2-packaged] [rke2-ingress], so the comment gives that form too. The guide lists those
+//! add-ons for the interface to warn about.
 //!
 //! Releases that are manifests (by URL or inline) are applied with `kubectl apply
 //! --server-side` in the Helm form, and listed in the others for the person's own repository.
@@ -41,6 +43,9 @@
 //! [flux-ocirepository]: https://fluxcd.io/flux/components/source/ocirepositories/
 //! [argocd-helm]: https://argo-cd.readthedocs.io/en/stable/user-guide/helm/
 //! [k3s-packaged]: https://docs.k3s.io/installation/packaged-components
+//! [rke2-helm]: https://docs.rke2.io/helm
+//! [rke2-packaged]: https://docs.rke2.io/advanced
+//! [rke2-ingress]: https://docs.rke2.io/networking/networking_services
 
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
@@ -57,7 +62,7 @@ pub const PROFILES: [&str; 2] = ["single-node", "multi-node"];
 pub enum InstallFormat {
     /// Shell commands: `kubectl` and `helm upgrade --install`.
     Helm,
-    /// A k3s `HelmChart` object.
+    /// A K3s/RKE2 `HelmChart` object.
     K3s,
     /// Flux source and `HelmRelease` objects.
     Flux,
@@ -85,7 +90,7 @@ pub struct InstallText {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub enum InstallBlocked {
-    /// It replaces a component k3s packages, which is disabled on the servers first.
+    /// It replaces a component K3s and RKE2 package, which is turned off on the servers first.
     K3sPackaged,
     /// It asks for values (a token, a domain) or generates secrets.
     Inputs,
@@ -168,8 +173,9 @@ pub struct InstallGuide {
     /// Other components whose releases it adds values to (`<capability>/<id>`); those values
     /// are not in these texts.
     pub contributes_to: Vec<String>,
-    /// k3s packaged components of the same kind (`traefik`, `metrics-server`) that must be
-    /// disabled on k3s before installing this one; each text begins by saying how.
+    /// K3s packaged components of the same kind (`traefik`, `metrics-server`) that must be
+    /// turned off on K3s, or their `rke2-` copies on RKE2, before installing this one; each text
+    /// begins by saying how.
     pub replaces_k3s_packaged: Vec<String>,
     /// The texts, one per form.
     pub formats: Vec<InstallText>,
@@ -652,9 +658,19 @@ impl<'a> Rendered<'a> {
             push(
                 &mut out,
                 format!(
-                    "# On k3s, first disable the packaged {addon}: add it to `disable` in\n# /etc/rancher/k3s/config.yaml on every server, then restart k3s.\n"
+                    "# On K3s, first turn off the packaged {addon}: add it to `disable` in\n# /etc/rancher/k3s/config.yaml on every server, then restart k3s.\n"
                 ),
             );
+            if addon == "traefik" {
+                out.push_str("# On RKE2, set `ingress-controller: none` in /etc/rancher/rke2/config.yaml on\n# every server, then restart rke2-server.\n");
+            } else {
+                push(
+                    &mut out,
+                    format!(
+                        "# On RKE2, add rke2-{addon} to `disable` in /etc/rancher/rke2/config.yaml on\n# every server, then restart rke2-server.\n"
+                    ),
+                );
+            }
             out.push_str(match addon.as_str() {
                 "traefik" => {
                     "# That deletes the Traefik CRDs and any IngressRoute or Middleware objects;\n# Ingress traffic stops until this one runs.\n"
@@ -665,6 +681,7 @@ impl<'a> Rendered<'a> {
         }
         if !out.is_empty() {
             out.push_str("# https://docs.k3s.io/installation/packaged-components\n");
+            out.push_str("# https://docs.rke2.io/advanced\n");
         }
         out
     }
@@ -734,13 +751,13 @@ impl<'a> Rendered<'a> {
         }
     }
 
-    /// k3s `HelmChart` objects.
+    /// K3s/RKE2 `HelmChart` objects.
     fn k3s(&self) -> String {
         let mut out = self.k3s_packaged();
         push(
             &mut out,
             format!(
-                "# Profile: {}. Apply with kubectl, or save in /var/lib/rancher/k3s/server/manifests/.\n",
+                "# Profile: {}. Apply with kubectl, or save in /var/lib/rancher/k3s/server/manifests/\n# (K3s) or /var/lib/rancher/rke2/server/manifests/ (RKE2).\n",
                 self.profile
             ),
         );
@@ -1277,7 +1294,7 @@ mod tests {
             for text in &guide.formats {
                 assert_eq!(
                     text.text
-                        .starts_with("# On k3s, first disable the packaged "),
+                        .starts_with("# On K3s, first turn off the packaged "),
                     !expected.is_empty(),
                     "{component} {:?}",
                     text.format

@@ -1,9 +1,13 @@
-# On k3s, first disable the packaged traefik: add it to `disable` in
+# On K3s, first turn off the packaged traefik: add it to `disable` in
 # /etc/rancher/k3s/config.yaml on every server, then restart k3s.
+# On RKE2, set `ingress-controller: none` in /etc/rancher/rke2/config.yaml on
+# every server, then restart rke2-server.
 # That deletes the Traefik CRDs and any IngressRoute or Middleware objects;
 # Ingress traffic stops until this one runs.
 # https://docs.k3s.io/installation/packaged-components
-# Profile: multi-node. Apply with kubectl, or save in /var/lib/rancher/k3s/server/manifests/.
+# https://docs.rke2.io/advanced
+# Profile: multi-node. Apply with kubectl, or save in /var/lib/rancher/k3s/server/manifests/
+# (K3s) or /var/lib/rancher/rke2/server/manifests/ (RKE2).
 # gateway-api-crds: apply with `kubectl apply --server-side -f`, or vendor into your repository:
 #   https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.6.3/standard-install.yaml
 apiVersion: helm.cattle.io/v1

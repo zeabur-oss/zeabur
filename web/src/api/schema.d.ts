@@ -4966,8 +4966,9 @@ export interface components {
       /** @description Every profile the catalogue sizes it for. */
       profiles: string[]
       /**
-       * @description k3s packaged components of the same kind (`traefik`, `metrics-server`) that must be
-       *     disabled on k3s before installing this one; each text begins by saying how.
+       * @description K3s packaged components of the same kind (`traefik`, `metrics-server`) that must be
+       *     turned off on K3s, or their `rke2-` copies on RKE2, before installing this one; each text
+       *     begins by saying how.
        */
       replacesK3sPackaged: string[]
       /** @description What it needs installed first: `<capability>` (any provider) or `<capability>/<id>`. */

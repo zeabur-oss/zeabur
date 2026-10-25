@@ -3,7 +3,7 @@
 Reads Zeabur Catalog and tells, for each capability (ingress, certificates,
 backups, …), whether the cluster already has it; for a missing one it lists what could be
 installed, and writes the install as a `helm` command, a Flux `HelmRelease`, an Argo CD
-`Application` or a k3s `HelmChart` (`tests/golden/` holds each form for a few components), with
+`Application` or a K3s/RKE2 `HelmChart` (`tests/golden/` holds each form for a few components), with
 the objects of each form that a plan can create. It
 also says how long the cluster's Kubernetes version is supported and whether it should be upgraded
 (`versions`).
@@ -42,7 +42,7 @@ Level 3: may depend on `zeabur-core`, `zeabur-model` and `zeabur-kube` (for the 
   `single-node` for one node, `multi-node` otherwise; the distribution comes from kube-apiserver's
   version string.
 - **Evidence, not a verdict.** Every match is reported as a line of evidence (a CRD, an
-  IngressClass controller, a k3s add-on, …), so a person can see why Zeabur thinks something is
+  IngressClass controller, a K3s add-on, …), so a person can see why Zeabur thinks something is
   installed.
 - **Secrets stay closed.** Helm charts are recognised by release name or by the `helm.sh/chart`
   label on workloads; release Secrets are listed by metadata only, never decoded.
