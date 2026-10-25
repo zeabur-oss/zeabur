@@ -62,4 +62,10 @@ pub enum PlanError {
         .0.iter().map(|k| format!("sources.{k}")).collect::<Vec<_>>().join(", ")
     )]
     Unpublished(Vec<&'static str>),
+    /// A bootstrap token was given to a node that joins as a server.
+    #[error(
+        "configuration: join token: a bootstrap token (<id>.<secret>) joins workers only; a server \
+         needs the server token from `zeabur-installer node add --role server`"
+    )]
+    BootstrapTokenForServer,
 }

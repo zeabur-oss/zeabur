@@ -387,10 +387,7 @@ pub fn check_token(token: &str, role: Role) -> Result<TokenKind, PlanError> {
         TokenKind::Server
     };
     if kind == TokenKind::Bootstrap && role == Role::Server {
-        return Err(PlanError::Config(
-            "join token: a bootstrap token (<id>.<secret>) joins workers only; a server needs the              server token from `zeabur-installer node add --role server`"
-                .to_owned(),
-        ));
+        return Err(PlanError::BootstrapTokenForServer);
     }
     Ok(kind)
 }
@@ -610,7 +607,7 @@ mod tests {
         assert!(join("  tokenFile: /etc/zeabur-installer/join-token\n").is_err());
         // Bootstrap tokens cannot join servers.
         let err = join("  role: server\n  serverConfig: {identity: true}\n").unwrap_err();
-        assert!(err.to_string().contains("workers only"), "{err}");
+        assert!(matches!(err, PlanError::BootstrapTokenForServer), "{err}");
         let server = Document::parse(&format!(
             "join:\n  server: https://10.0.0.5:9345\n  role: server\n  token: K10{HASH}::server:s3cret\n  serverConfig: {{disable: [rke2-metrics-server], identity: true}}\n"
         ));
