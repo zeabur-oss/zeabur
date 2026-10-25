@@ -12,6 +12,7 @@ import {
   repositoryUrl,
   useGitHubSource,
 } from "@/components/add/repository-field"
+import { ImageSizeField } from "@/components/add/image-size"
 import { useTakenNames } from "@/components/add/taken"
 import { FormField } from "@/components/form-field"
 import { PlanDrawer } from "@/components/plan/plan-drawer"
@@ -38,13 +39,10 @@ import {
 } from "@/model/git-service"
 import {
   imageOptions,
-  imageResources,
-  imageSizes,
   nameFromImage,
   parseEnv,
   rightsOf,
   suggestedHost,
-  type ImageSize,
 } from "@/model/image-service"
 import type { Profile } from "@/model/pod-security"
 import { Alert, AlertDescription } from "@zeabur/design-system/components/alert"
@@ -438,55 +436,11 @@ function DeployKeyFields({
   return (
     <div className="flex flex-col gap-2 pt-2">
       {made ? (
-        <>
-          <FormField label={t("add.deployKeyPublic")}>
-            <CopyInput value={made.publicKey} copyLabel={t("common.copy")} />
-          </FormField>
-          <p className="flex flex-wrap items-baseline gap-x-2 type-meta text-muted-foreground">
-            {t("add.deployKeyAdd")}
-            {page ? (
-              <a
-                href={page}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1 text-foreground hover:underline"
-              >
-                {t("add.deployKeyOpen", host === "github.com" ? "GitHub" : "GitLab")}
-                <ArrowSquareOutIcon aria-hidden="true" className="size-3.5" />
-              </a>
-            ) : null}
-          </p>
-          {pinned ? null : (
-            <div className="flex flex-col gap-1">
-              <p className="text-sm font-medium">{t("add.hostKeys")}</p>
-              <ul className="flex flex-col gap-0.5 font-mono text-xs break-all">
-                {made.hostKeys.map((k) => (
-                  <li key={k.fingerprint}>
-                    {k.algorithm} {k.fingerprint}
-                  </li>
-                ))}
-              </ul>
-              <p className="type-meta text-muted-foreground">{t("add.hostKeysCheck")}</p>
-            </div>
-          )}
-        </>
+        <MadeDeployKey made={made} host={host} pinned={pinned} page={page} />
       ) : (
         <div className="flex flex-col gap-1.5">
           {pinned ? null : (
-            <>
-              <FormField label={t("add.keyscan")}>
-                <CopyInput value={keyscanCommand(host)} copyLabel={t("common.copy")} />
-              </FormField>
-              <FormField label={t("add.knownHosts")} hint={t("add.knownHostsHint")}>
-                <Textarea
-                  mono
-                  rows={3}
-                  value={knownHosts}
-                  spellCheck={false}
-                  onChange={(event) => setKnownHosts(event.target.value)}
-                />
-              </FormField>
-            </>
+            <KnownHostsFields host={host} value={knownHosts} onChange={setKnownHosts} />
           )}
           <Button
             type="button"
@@ -509,6 +463,84 @@ function DeployKeyFields({
         </Alert>
       ) : null}
     </div>
+  )
+}
+
+/** The command that prints the host's keys, and where its output goes. */
+function KnownHostsFields({
+  host,
+  value,
+  onChange,
+}: {
+  host: string
+  value: string
+  onChange: (value: string) => void
+}) {
+  const t = useT()
+  return (
+    <>
+      <FormField label={t("add.keyscan")}>
+        <CopyInput value={keyscanCommand(host)} copyLabel={t("common.copy")} />
+      </FormField>
+      <FormField label={t("add.knownHosts")} hint={t("add.knownHostsHint")}>
+        <Textarea
+          mono
+          rows={3}
+          value={value}
+          spellCheck={false}
+          onChange={(event) => onChange(event.target.value)}
+        />
+      </FormField>
+    </>
+  )
+}
+
+/** The public key to add on the host and, for a host Zeabur does not pin, the host keys to check. */
+function MadeDeployKey({
+  made,
+  host,
+  pinned,
+  page,
+}: {
+  made: DeployKey
+  host: string
+  pinned: boolean
+  page?: string
+}) {
+  const t = useT()
+  return (
+    <>
+      <FormField label={t("add.deployKeyPublic")}>
+        <CopyInput value={made.publicKey} copyLabel={t("common.copy")} />
+      </FormField>
+      <p className="flex flex-wrap items-baseline gap-x-2 type-meta text-muted-foreground">
+        {t("add.deployKeyAdd")}
+        {page ? (
+          <a
+            href={page}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1 text-foreground hover:underline"
+          >
+            {t("add.deployKeyOpen", host === "github.com" ? "GitHub" : "GitLab")}
+            <ArrowSquareOutIcon aria-hidden="true" className="size-3.5" />
+          </a>
+        ) : null}
+      </p>
+      {pinned ? null : (
+        <div className="flex flex-col gap-1">
+          <p className="text-sm font-medium">{t("add.hostKeys")}</p>
+          <ul className="flex flex-col gap-0.5 font-mono text-xs break-all">
+            {made.hostKeys.map((k) => (
+              <li key={k.fingerprint}>
+                {k.algorithm} {k.fingerprint}
+              </li>
+            ))}
+          </ul>
+          <p className="type-meta text-muted-foreground">{t("add.hostKeysCheck")}</p>
+        </div>
+      )}
+    </>
   )
 }
 
@@ -541,7 +573,6 @@ function MoreFields({
   shown: (problem: unknown, text: () => string) => string[]
 }) {
   const t = useT()
-  const resources = imageResources[form.size]
   return (
     <div className="flex flex-col gap-4 pt-4">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -613,22 +644,7 @@ function MoreFields({
           onChange={(event) => onBuildEnv(event.target.value)}
         />
       </FormField>
-      <FormField
-        label={t("db.field.size")}
-        hint={t(
-          "db.sizeDetail",
-          resources.requests.cpu,
-          resources.requests.memory,
-          resources.limits.memory,
-        )}
-      >
-        <Select
-          size="sm"
-          value={form.size}
-          onValueChange={(size) => set({ size: size as ImageSize })}
-          items={imageSizes.map((p) => ({ value: p, label: t(`db.size.${p}`) }))}
-        />
-      </FormField>
+      <ImageSizeField size={form.size} onSize={(size) => set({ size })} />
       <SecurityProfileField project={project} built value={security} onChange={onSecurity} />
     </div>
   )

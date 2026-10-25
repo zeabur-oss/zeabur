@@ -32,8 +32,7 @@ export function SecurityProfileField({
   const t = useT()
   const enforced = useQuery(namespaceQuery(project)).data?.podSecurity ?? undefined
   const shown = current === "privileged" ? "privileged" : value
-  const about =
-    built && shown === "restricted" ? t("security.aboutBuilt") : t(`security.about.${shown}`)
+  const about = useAbout(shown, built)
   return (
     <div className="flex flex-col gap-2">
       <FormField label={t("part.security")} hint={picked ? `${picked} ${about}` : about}>
@@ -53,16 +52,29 @@ export function SecurityProfileField({
       {shown === "baseline" && enforced === "restricted" ? (
         <p className="type-meta text-muted-foreground">{t("security.projectRestricted")}</p>
       ) : null}
-      <KubeDetails
-        facts={[
-          ...(current ? [[t("security.kube.service"), current] as [string, string]] : []),
-          [
-            t("security.kube.project"),
-            enforced ? `pod-security.kubernetes.io/enforce=${enforced}` : t("security.kube.unset"),
-          ],
-          [t("security.kube.strict"), RESTRICTED_FIELDS],
-        ]}
-      />
+      <SecurityKubeDetails current={current} enforced={enforced} />
     </div>
+  )
+}
+
+function useAbout(shown: Level, built: boolean | undefined): string {
+  const t = useT()
+  return built && shown === "restricted" ? t("security.aboutBuilt") : t(`security.about.${shown}`)
+}
+
+/** The levels behind the choice, as Kubernetes names them. */
+function SecurityKubeDetails({ current, enforced }: { current?: Level; enforced?: Level }) {
+  const t = useT()
+  const project = enforced
+    ? `pod-security.kubernetes.io/enforce=${enforced}`
+    : t("security.kube.unset")
+  return (
+    <KubeDetails
+      facts={[
+        ...(current ? [[t("security.kube.service"), current] as [string, string]] : []),
+        [t("security.kube.project"), project],
+        [t("security.kube.strict"), RESTRICTED_FIELDS],
+      ]}
+    />
   )
 }

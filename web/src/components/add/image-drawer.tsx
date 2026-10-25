@@ -8,6 +8,7 @@ import { useTakenNames } from "@/components/add/taken"
 import { FormField, quantity } from "@/components/form-field"
 import { PlanDrawer } from "@/components/plan/plan-drawer"
 import { PortNoteHint, useImageInspection } from "@/components/add/image-port"
+import { ImageSizeField } from "@/components/add/image-size"
 import { usePlanStep } from "@/components/plan/planner"
 import { SecurityProfileField } from "@/components/security-profile"
 import { growthWords, useStorage } from "@/components/storage-class"
@@ -23,8 +24,6 @@ import {
   imageObjects,
   imageOptions,
   imageProblem,
-  imageResources,
-  imageSizes,
   nameFromImage,
   newImageService,
   parseEnv,
@@ -33,7 +32,6 @@ import {
   serviceNameProblem,
   suggestedHost,
   type ImageService,
-  type ImageSize,
 } from "@/model/image-service"
 import { imageProfile, type Profile } from "@/model/pod-security"
 import { Button } from "@zeabur/design-system/components/button"
@@ -94,19 +92,12 @@ export function ImageDrawer({ project, onClose }: { project: string; onClose: ()
 
   const name = named ? form.name : form.image.trim() ? nameFromImage(form.image, taken) : ""
   const [typedPort, setTypedPort] = useState<string>()
-  const [chosenSecurity, setChosenSecurity] = useState<Profile>()
   const login = options.secrets && extras.registry ? registryLogin(extras) : undefined
   const inspection = useImageInspection(project, {
     image: form.image.trim(),
     registry: login,
   }).data
-  const security = chosenSecurity ?? imageProfile(inspection?.user)
-  const picked =
-    chosenSecurity === undefined && inspection?.user != null
-      ? security === "restricted"
-        ? t("security.picked.restricted", inspection.user)
-        : t("security.picked.baseline")
-      : undefined
+  const { security, picked, choose } = useImageSecurity(inspection)
   const portValue = shownPort(typedPort, inspection)
   const note = portNote(portValue, inspection)
   const port = options.port ? portValue.trim() : ""
@@ -166,7 +157,6 @@ export function ImageDrawer({ project, onClose }: { project: string; onClose: ()
     void navigate({ to: "/projects/$project/create", params: { project } })
   }
 
-  const resources = imageResources[form.size]
   const moreOpen = tried && (problems.env || problems.mountPath || problems.volumeSize)
 
   return (
@@ -385,22 +375,7 @@ export function ImageDrawer({ project, onClose }: { project: string; onClose: ()
                 <Note>{t("add.noVolume")}</Note>
               )}
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <FormField
-                  label={t("db.field.size")}
-                  hint={t(
-                    "db.sizeDetail",
-                    resources.requests.cpu,
-                    resources.requests.memory,
-                    resources.limits.memory,
-                  )}
-                >
-                  <Select
-                    size="sm"
-                    value={form.size}
-                    onValueChange={(size) => set({ size: size as ImageSize })}
-                    items={imageSizes.map((p) => ({ value: p, label: t(`db.size.${p}`) }))}
-                  />
-                </FormField>
+                <ImageSizeField size={form.size} onSize={(size) => set({ size })} />
                 <FormField
                   label={t("add.replicas")}
                   hint={volume ? t("add.replicasFixed") : undefined}
@@ -465,7 +440,7 @@ export function ImageDrawer({ project, onClose }: { project: string; onClose: ()
                 project={project}
                 value={security}
                 picked={picked}
-                onChange={setChosenSecurity}
+                onChange={choose}
               />
             </div>
           </CollapsibleContent>
@@ -479,6 +454,22 @@ const registryLogin = ({ server, username, password }: Extras) =>
   [server, username, password].every((v) => v.trim() !== "")
     ? { server: server.trim(), username, password }
     : undefined
+
+/** Strict when the image runs as a numeric user other than root, until the person chooses; and
+ * why, while Zeabur chose. */
+function useImageSecurity(inspection: { user?: string | null } | undefined) {
+  const t = useT()
+  const user = inspection?.user
+  const [chosen, choose] = useState<Profile>()
+  const security = chosen ?? imageProfile(user)
+  let picked: string | undefined
+  if (chosen === undefined && user != null)
+    picked =
+      security === "restricted"
+        ? t("security.picked.restricted", user)
+        : t("security.picked.baseline")
+  return { security, picked, choose }
+}
 
 function Toggle({
   id,
