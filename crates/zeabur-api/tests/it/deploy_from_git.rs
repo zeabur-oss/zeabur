@@ -228,9 +228,13 @@ mod tests {
         let writes = cluster.inspect(|s| s.writes.clone()).unwrap();
         let secret = writes
             .iter()
-            .find_map(|w| match &w.body {
-                WriteBody::Create(body) if w.target.kind == "Secret" => Some(body.clone()),
-                _ => None,
+            .filter(|w| w.target.kind == "Secret")
+            .find_map(|w| {
+                if let WriteBody::Create(body) = &w.body {
+                    Some(body.clone())
+                } else {
+                    None
+                }
             })
             .expect("the Secret is created");
         assert_eq!(

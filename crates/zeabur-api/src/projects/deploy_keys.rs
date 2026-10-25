@@ -169,7 +169,7 @@ fn trusted(host: &str, given: Option<&str>) -> Result<(String, Vec<TrustedHostKe
             }
         })
     })?;
-    let lines: String = keys.iter().map(|k| format!("{}\n", k.line)).collect();
+    let lines: String = keys.iter().flat_map(|k| [k.line.as_str(), "\n"]).collect();
     let shown = keys
         .into_iter()
         .map(|k| TrustedHostKey {
