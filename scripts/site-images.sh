@@ -6,6 +6,7 @@ set -euo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
 out="$root/target/site-shots"
+rm -rf "$out"
 ZEABUR_SHOTS_SCALE=2 ZEABUR_SHOTS_BUDGET_KB=150 "$root/scripts/docs-shots.sh" "$root/docs/site-shots.yaml" "$out"
 rm -rf "$root/docs/images/site"
 for locale in en zh-TW zh-CN; do

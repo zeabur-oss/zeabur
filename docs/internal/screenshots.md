@@ -22,6 +22,9 @@ that only one page uses can list fewer `locales`. It writes:
 <out>/docs-shots-<version>.tar    both, when a version is given
 ```
 
+Images already in `<out>` that the run does not take stay there, and `manifest.json` lists them
+too, so a run with a shorter manifest replaces only its own images.
+
 Each AVIF must be at most 150 KB; the script names the files above it and fails. When a shot
 fails, Playwright's trace is in `target/docs-shots-results`. The demo listens on port 18300;
 `ZEABUR_SHOTS_PORT` picks another, for example when two worktrees take shots at once.

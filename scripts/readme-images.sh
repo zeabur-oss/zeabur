@@ -5,6 +5,7 @@ set -euo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
 out="$root/target/readme-shots"
+rm -rf "$out"
 ZEABUR_SHOTS_SCALE=1 ZEABUR_SHOTS_BUDGET_KB=30 "$root/scripts/docs-shots.sh" "$root/docs/readme-shots.yaml" "$out"
 for theme in light dark; do
   for avif in "$out/en/$theme"/*.avif; do

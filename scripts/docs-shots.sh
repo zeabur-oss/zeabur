@@ -5,7 +5,7 @@
 # Run inside `nix develop`.
 #   scripts/docs-shots.sh [manifest] [out] [version]
 # <out> receives <locale>/<theme>/<id>.avif and manifest.json; with a version, also
-# docs-shots-<version>.tar, which holds both.
+# docs-shots-<version>.tar, which holds both. Images in <out> that this run does not take stay.
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
@@ -32,7 +32,6 @@ yq -o=json '.' "$manifest" >"$work/shots.json"
 servers="$(cd "$root/web" && bun e2e/shots/manifest.ts "$work/shots.json" "$manifest")"
 
 mkdir -p "$work/png"
-touch "$work/sizes.tsv"
 if grep -q '"app":"zeabur"' <<<"$servers"; then
   "$root/scripts/build-ui.sh"
   ZEABUR_UI_DIST="$root/web/dist" cargo build --locked -p zeabur-api --example demo
@@ -78,7 +77,6 @@ while IFS= read -r line; do
   server=""
 done <<<"$servers"
 
-rm -rf "$out"/{en,zh-TW,zh-CN} "$out/manifest.json" "$out"/docs-shots-*.tar
 mkdir -p "$out"/{en,zh-TW,zh-CN}
 over=()
 while IFS= read -r png; do
@@ -91,7 +89,6 @@ while IFS= read -r png; do
     size=$(wc -c <"$avif" | tr -d ' ')
     if ((size <= budget)); then break; fi
   done
-  printf '%s\t%s\n' "${name%.png}.avif" "$size" >>"$work/sizes.tsv"
   if ((size > budget)); then over+=("${name%.png}.avif ($size bytes)"); fi
 done < <(find "$work/png" -name '*.png' | sort)
 
@@ -101,6 +98,10 @@ if ((${#over[@]} > 0)); then
   exit 1
 fi
 
+# The manifest lists every image in <out>, also the ones that earlier runs took.
+(cd "$out" && find en zh-TW zh-CN -name '*.avif' | sort | while IFS= read -r avif; do
+  printf '%s\t%s\n' "$avif" "$(wc -c <"$avif" | tr -d ' ')"
+done) >"$work/sizes.tsv"
 jq -R -s 'split("\n") | map(select(. != "") | split("\t") | {path: .[0], bytes: (.[1] | tonumber)})
   | {files: .}' "$work/sizes.tsv" >"$out/manifest.json"
 jq -r '.files | map(.bytes) | sort | "\(length) files: min \(.[0]) bytes, median \(.[length / 2 | floor]) bytes, max \(.[-1]) bytes"' \
