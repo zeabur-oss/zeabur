@@ -1,8 +1,8 @@
-//! A kubectl terminal for the whole cluster: the plan that starts its pod (and the namespace when
-//! missing), reuse, the list, the terminal whose kubeconfig starts in `default`, and the refusals:
-//! someone who is not a cluster administrator, a binding that lets others into the pod's
-//! namespace, the person's own computer, a plan the cluster moved past. Project and cluster tools
-//! pods stay apart.
+//! A kubectl terminal for the whole cluster: the plan that starts its pod in the terminal
+//! namespace with Zeabur's own service account, reuse, the list, the terminal whose kubeconfig
+//! starts in `default`, and the refusals: someone who is not a cluster administrator, a binding
+//! that lets anyone but Zeabur into the pod's namespace, the person's own computer, a plan the
+//! cluster moved past. Project and cluster tools pods stay apart.
 
 #[cfg(test)]
 mod tests {
@@ -28,19 +28,33 @@ mod tests {
 
     use crate::common::{app, send};
 
-    const NAMESPACE: &str = "zeabur-cluster-tools";
+    const NAMESPACE: &str = "zeabur-terminals";
     const TOKEN: &str = "eyJhbGciOi.secret-token-of-alice.sig";
     const WAIT: Duration = Duration::from_secs(5);
 
+    fn namespace(name: &str) -> Namespace {
+        serde_json::from_value(json!({"metadata": {"name": name}})).unwrap()
+    }
+
     fn cluster() -> MemoryCluster {
-        let namespace: Namespace =
-            serde_json::from_value(json!({"metadata": {"name": "shop"}})).unwrap();
         MemoryCluster::new(State {
             identity: Identity {
                 username: "zeabur:alice@example.com".to_owned(),
                 groups: vec!["zeabur:admins".to_owned()],
             },
-            namespaces: vec![namespace],
+            namespaces: vec![namespace("shop")],
+            ..State::default()
+        })
+    }
+
+    /// Zeabur's own service account, which sees the terminal namespace only.
+    fn zeabur() -> MemoryCluster {
+        MemoryCluster::new(State {
+            identity: Identity {
+                username: "system:serviceaccount:zeabur:zeabur".to_owned(),
+                groups: Vec::new(),
+            },
+            namespaces: vec![namespace(NAMESPACE)],
             ..State::default()
         })
     }
@@ -69,11 +83,14 @@ mod tests {
         }
     }
 
-    fn signed(cluster: &MemoryCluster) -> Router {
+    fn signed(cluster: &MemoryCluster, zeabur: &MemoryCluster) -> Router {
         let mut settings = Settings::default();
         settings.terminal.tools_grace = Duration::ZERO;
-        settings.terminal.tools_namespace = Some("zeabur-tools".to_owned());
-        zeabur_api::router_with_settings(Arc::new(Signed(Arc::new(cluster.clone()))), settings)
+        zeabur_api::router_with_terminals(
+            Arc::new(Signed(Arc::new(cluster.clone()))),
+            settings,
+            Arc::new(zeabur.clone()),
+        )
     }
 
     async fn plan(app: &Router) -> (StatusCode, Value) {
@@ -104,21 +121,11 @@ mod tests {
             .unwrap_or_default()
     }
 
-    fn namespace_of(cluster: &MemoryCluster, name: &str) -> Option<Value> {
-        cluster
-            .inspect(|s| {
-                s.namespaces
-                    .iter()
-                    .find(|n| n.metadata.name.as_deref() == Some(name))
-                    .map(|n| serde_json::to_value(n).unwrap())
-            })
-            .flatten()
-    }
-
     #[tokio::test]
-    async fn an_administrator_starts_a_cluster_tools_pod_in_its_own_namespace() {
+    async fn zeabur_starts_an_administrators_cluster_tools_pod_in_the_terminal_namespace() {
         let cluster = cluster();
-        let app = signed(&cluster);
+        let zeabur = zeabur();
+        let app = signed(&cluster, &zeabur);
         let (status, planned) = plan(&app).await;
         assert_eq!(status, StatusCode::OK, "{planned}");
         assert!(!planned.to_string().contains("secret-token"));
@@ -129,21 +136,20 @@ mod tests {
             .iter()
             .map(|w| w["kind"].as_str().unwrap())
             .collect();
-        assert_eq!(kinds, ["Namespace", "Pod"]);
+        assert_eq!(kinds, ["Pod"]);
         assert_eq!(planned["warnings"][0]["code"], "toolsPod");
         assert_eq!(planned["warnings"][0]["namespace"], NAMESPACE);
-        assert_eq!(planned["warnings"][1]["code"], "toolsCredentialExposed");
         let name = planned["pod"].as_str().unwrap().to_owned();
 
         let (status, applied) = apply(&app, &planned).await;
         assert_eq!(status, StatusCode::OK, "{applied}");
         assert_eq!(applied, json!({"pod": name, "namespace": NAMESPACE}));
-        let created = namespace_of(&cluster, NAMESPACE).unwrap();
         assert_eq!(
-            created["metadata"]["labels"]["pod-security.kubernetes.io/enforce"],
-            "restricted"
+            cluster.inspect(|s| s.writes.len()),
+            Some(0),
+            "nothing as the person"
         );
-        let [pod] = stored(&cluster, NAMESPACE).try_into().unwrap();
+        let [pod] = stored(&zeabur, NAMESPACE).try_into().unwrap();
         assert_eq!(pod["metadata"]["name"], name.as_str());
         assert_eq!(pod["metadata"]["labels"]["zeabur.com/tools"], "cluster");
         assert!(pod["metadata"]["annotations"]["zeabur.com/project"].is_null());
@@ -167,12 +173,13 @@ mod tests {
     #[tokio::test]
     async fn the_terminal_starts_kubectl_in_the_default_namespace() {
         let cluster = cluster();
-        let app = signed(&cluster);
+        let zeabur = zeabur();
+        let app = signed(&cluster, &zeabur);
         let (_, planned) = plan(&app).await;
         let (status, applied) = apply(&app, &planned).await;
         assert_eq!(status, StatusCode::OK, "{applied}");
         let name = applied["pod"].as_str().unwrap().to_owned();
-        cluster.update(|state| {
+        zeabur.update(|state| {
             let pod = &mut state.objects.get_mut(NAMESPACE).unwrap().pods[0];
             pod.status = Some(
                 serde_json::from_value(json!({"phase": "Running",
@@ -188,7 +195,7 @@ mod tests {
             frame(&mut socket).await,
             json!({"type": "ready", "container": "tools"})
         );
-        let runs = cluster.inspect(|s| s.runs.clone()).unwrap();
+        let runs = zeabur.inspect(|s| s.runs.clone()).unwrap();
         let [setup] = runs.as_slice() else {
             panic!("one setup run: {runs:?}")
         };
@@ -202,7 +209,8 @@ mod tests {
     async fn someone_who_is_not_a_cluster_administrator_is_refused() {
         let cluster = cluster();
         cluster.update(|s| s.cluster_wide_denied = true);
-        let app = signed(&cluster);
+        let zeabur = zeabur();
+        let app = signed(&cluster, &zeabur);
         let (status, refused) = plan(&app).await;
         assert_eq!(status, StatusCode::FORBIDDEN, "{refused}");
         assert_eq!(
@@ -211,7 +219,7 @@ mod tests {
         );
         let (status, _) = send(&app, "GET", "/api/v1/cluster/tools", None).await;
         assert_eq!(status, StatusCode::FORBIDDEN);
-        assert!(namespace_of(&cluster, NAMESPACE).is_none());
+        assert_eq!(stored(&zeabur, NAMESPACE), Vec::<Value>::new());
     }
 
     #[tokio::test]
@@ -237,7 +245,8 @@ mod tests {
         serde_json::from_value(object).unwrap()
     }
 
-    /// RBAC served, the namespace there, and a Role in it and in `shop` that lets in `pods/exec`.
+    /// RBAC served, a Role in the terminal namespace and in `shop` that lets in `pods/exec`, and
+    /// Zeabur's own binding.
     fn with_exec_roles(cluster: &MemoryCluster) {
         cluster.update(|s| {
             for (plural, kind, namespaced) in [
@@ -254,11 +263,14 @@ mod tests {
                     namespaced,
                 ));
             }
-            s.namespaces.push(
-                serde_json::from_value(json!({"metadata": {"name": NAMESPACE,
-                    "resourceVersion": "1"}}))
-                .unwrap(),
-            );
+            s.dynamic.push(rbac(
+                "RoleBinding",
+                Some(NAMESPACE),
+                &json!({"metadata": {"name": "zeabur-terminals"},
+                    "roleRef": {"kind": "Role", "name": "exec"},
+                    "subjects": [{"kind": "ServiceAccount", "name": "zeabur",
+                                  "namespace": "zeabur"}]}),
+            ));
             for namespace in [NAMESPACE, "shop"] {
                 s.dynamic.push(rbac(
                     "Role",
@@ -281,7 +293,8 @@ mod tests {
     async fn a_binding_that_lets_others_into_its_namespace_blocks_the_plan() {
         let cluster = cluster();
         with_exec_roles(&cluster);
-        let app = signed(&cluster);
+        let zeabur = zeabur();
+        let app = signed(&cluster, &zeabur);
         let (status, planned) = plan(&app).await;
         assert_eq!(status, StatusCode::OK, "{planned}");
         assert_eq!(planned.get("token"), None);
@@ -318,20 +331,26 @@ mod tests {
         let (status, refused) = apply(&app, &planned).await;
         assert_eq!(status, StatusCode::CONFLICT, "{refused}");
         assert_eq!(refused["kind"], "conflict", "{refused}");
-        assert_eq!(stored(&cluster, NAMESPACE), Vec::<Value>::new());
+        assert_eq!(stored(&zeabur, NAMESPACE), Vec::<Value>::new());
     }
 
     #[tokio::test]
     async fn a_plan_the_cluster_moved_past_is_refused() {
         let cluster = cluster();
-        let app = signed(&cluster);
-        let (_, stale) = plan(&app).await;
+        let zeabur = zeabur();
+        let app = signed(&cluster, &zeabur);
         let (_, planned) = plan(&app).await;
         let (status, _) = apply(&app, &planned).await;
         assert_eq!(status, StatusCode::OK);
+        let (_, stale) = plan(&app).await;
+        assert_eq!(stale["warnings"][0]["code"], "toolsPodReused", "{stale}");
+        zeabur.update(|s| {
+            let pod = &mut s.objects.get_mut(NAMESPACE).unwrap().pods[0];
+            pod.metadata.name = Some("zeabur-tools-other".to_owned());
+        });
         let (status, refused) = apply(&app, &stale).await;
         assert_eq!(status, StatusCode::CONFLICT, "{refused}");
-        assert_eq!(stored(&cluster, NAMESPACE).len(), 1);
+        assert_eq!(stored(&zeabur, NAMESPACE).len(), 1);
     }
 
     type Socket = tokio_tungstenite::WebSocketStream<

@@ -1,5 +1,6 @@
 //! The plans a terminal needs first: a debug container (`debugContainer`) and a tools pod
-//! (`clusterTools`); see `zeabur_plan::terminal` and the `tools` module.
+//! (`clusterTools`); see `zeabur_plan::terminal` and the `tools` module. A tools pod's plan is
+//! read and applied with Zeabur's own service account, in the terminal namespace.
 
 use serde_json::Value;
 use zeabur_core::problem::{Denied, Kind, Problem};
@@ -20,23 +21,31 @@ pub(crate) struct Planner<'a> {
     pub(crate) person: &'a str,
     /// Their token, where Zeabur holds one.
     pub(crate) handoff: Option<&'a Handoff>,
+    /// Zeabur's own service account in the terminal namespace, where there is one.
+    pub(crate) zeabur: Option<&'a dyn Cluster>,
 }
 
-/// The namespace a terminal plan writes in: the tools namespace for a tools pod when the chart
-/// names one, the project otherwise.
-pub(crate) fn namespace<'a>(
-    settings: &'a TerminalSettings,
-    request: &PlanRequest,
-    project: &'a str,
-) -> &'a str {
-    if request
-        .changes
-        .iter()
-        .any(|c| matches!(c, Change::ClusterTools))
-    {
-        settings.tools_namespace.as_deref().unwrap_or(project)
-    } else {
-        project
+impl<'a> Planner<'a> {
+    /// The namespace and the cluster a plan for `request` writes with: the terminal namespace and
+    /// Zeabur's service account for a tools pod, the project and `person` otherwise.
+    pub(crate) fn writer(
+        &self,
+        request: &PlanRequest,
+        project: &'a str,
+        person: &'a dyn Cluster,
+    ) -> Result<(&'a str, &'a dyn Cluster), ApiError> {
+        if request
+            .changes
+            .iter()
+            .any(|c| matches!(c, Change::ClusterTools))
+        {
+            Ok((
+                &self.settings.namespace,
+                self.zeabur.ok_or_else(local_mode)?,
+            ))
+        } else {
+            Ok((project, person))
+        }
     }
 }
 
@@ -245,42 +254,30 @@ pub(crate) async fn list_pods(
         .collect())
 }
 
+/// The plan for the person's tools pod for `project`, once kube-apiserver says they may run
+/// commands in the project's pods; Zeabur's service account reads the terminal namespace.
 async fn tools(
     planner: &Planner<'_>,
     cluster: &dyn Cluster,
     project: &str,
     made_at: &str,
 ) -> Result<Plan, ApiError> {
-    let handoff = planner.handoff.ok_or_else(local_mode)?;
-    let namespace = planner
-        .settings
-        .tools_namespace
-        .as_deref()
-        .unwrap_or(project);
-    let pods = list_pods(cluster, namespace).await?;
-    let mut plan = tools_plan(
+    let (Some(handoff), Some(zeabur)) = (planner.handoff, planner.zeabur) else {
+        return Err(local_mode());
+    };
+    crate::tools::Scope::Project(project.to_owned())
+        .allowed(cluster)
+        .await?;
+    let namespace = planner.settings.namespace.as_str();
+    let pods = list_pods(zeabur, namespace).await?;
+    Ok(tools_plan(
         planner,
         handoff,
         namespace,
         ToolsScope::Project(project),
         &pods,
         made_at,
-    );
-    if plan.objects.is_empty() {
-        return Ok(plan);
-    }
-    plan.warnings.extend(
-        rights_missing(
-            cluster,
-            vec![
-                right("create", "pods", namespace, None),
-                right("get", "pods/exec", namespace, None),
-                right("delete", "pods", namespace, None),
-            ],
-        )
-        .await,
-    );
-    Ok(plan)
+    ))
 }
 
 /// The plan that starts the person's tools pod for `scope` in `namespace`, or uses the one among

@@ -71,6 +71,7 @@ Helm、Argo CD、Flux 管理的物件，Zeabur 只接受重新啟動，其他修
 - 叢集名稱和 metrics store 設定：Zeabur 所在 Namespace 的 `zeabur-settings` ConfigMap。
 - 成員權限：Kubernetes 的 RoleBinding 和 ClusterRoleBinding。
 - 已登錄的 S3 目的地：`zeabur-s3-destinations` Namespace 裡的 ConfigMap 和 Secret。
+- kubectl 終端機的 tools Pod：`zeabur-terminals` Namespace，只有 Zeabur 的 ServiceAccount 能在裡面建立和使用 Pod。
 - 登入工作階段：只在伺服器程序的記憶體裡。chart 用單一副本和 `Recreate` 策略，Zeabur 重新啟動後，每個人都要重新登入。
 
 終端機會用到短暫的 Pod 和記憶體裡的 kubeconfig，權限和存活時間見[安全性](./security.mdx#終端機)。

@@ -178,8 +178,9 @@ pub const DEBUG_IMAGE: &str = "docker.io/library/busybox:1.37.0@sha256:bdf57e528
 /// 1.36.5, `helm` and a busybox shell on Alpine.
 pub const TOOLS_IMAGE: &str = "docker.io/alpine/k8s:1.36.5@sha256:094adf64cdc4827377cdbe7ea5747472ce115f9fbc64a4e35970ec66777f9a00";
 
-/// The namespace of cluster tools pods, which only administrators use.
-pub const CLUSTER_TOOLS_NAMESPACE: &str = "zeabur-cluster-tools";
+/// The namespace of every tools pod, which only Zeabur's own service account and cluster
+/// administrators use.
+pub const TERMINAL_NAMESPACE: &str = "zeabur-terminals";
 
 /// What the debug container and the tools pod are made from (see `zeabur_plan::terminal` and the
 /// `tools` module), from the chart's `terminal` values.
@@ -189,12 +190,11 @@ pub struct TerminalSettings {
     pub debug_image: String,
     /// The tools pod's image; it needs `sh`, `sleep`, `kubectl` and `helm`.
     pub tools_image: String,
-    /// The namespace tools pods go in; `None`: the project's.
-    pub tools_namespace: Option<String>,
-    /// The namespace cluster tools pods go in: an administrator's credential is written into
-    /// them, so never `tools_namespace`, where people who use a project's tools pods may run
-    /// commands.
-    pub cluster_tools_namespace: String,
+    /// The namespace every tools pod goes in.
+    pub namespace: String,
+    /// Zeabur's own service account token, which may use pods in `namespace` only; `None`
+    /// (local mode, tests): no tools terminal.
+    pub token_file: Option<std::path::PathBuf>,
     /// How long a tools pod may run at most, in seconds (`activeDeadlineSeconds`).
     pub tools_deadline_seconds: i64,
     /// How long after its last terminal closes a tools pod is deleted, for a reconnect.
@@ -208,8 +208,8 @@ impl Default for TerminalSettings {
         Self {
             debug_image: DEBUG_IMAGE.to_owned(),
             tools_image: TOOLS_IMAGE.to_owned(),
-            tools_namespace: None,
-            cluster_tools_namespace: CLUSTER_TOOLS_NAMESPACE.to_owned(),
+            namespace: TERMINAL_NAMESPACE.to_owned(),
+            token_file: None,
             tools_deadline_seconds: 30 * 60,
             tools_grace: std::time::Duration::from_mins(1),
             tools_resources: zeabur_plan::terminal::ToolsResources::default(),

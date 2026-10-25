@@ -174,13 +174,7 @@
       "properties": {
         "debugImage": { "$ref": "#/definitions/image" },
         "toolsImage": { "$ref": "#/definitions/image" },
-        "toolsNamespace": {
-          "anyOf": [
-            { "const": "" },
-            { "type": "string", "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$", "maxLength": 63 }
-          ]
-        },
-        "clusterToolsNamespace": {
+        "namespace": {
           "type": "string",
           "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
           "maxLength": 63

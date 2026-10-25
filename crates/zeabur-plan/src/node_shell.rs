@@ -595,6 +595,27 @@ fn is_kubernetes_own(subject: &Value) -> bool {
     }
 }
 
+/// Whether `subject` is the user named `username`.
+fn is_user(subject: &Value, username: Option<&str>) -> bool {
+    let Some(username) = username else {
+        return false;
+    };
+    let name = subject
+        .get("name")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+    match subject.get("kind").and_then(Value::as_str) {
+        Some("User") => name == username,
+        Some("ServiceAccount") => subject
+            .get("namespace")
+            .and_then(Value::as_str)
+            .is_some_and(|namespace| {
+                username == format!("system:serviceaccount:{namespace}:{name}")
+            }),
+        _ => false,
+    }
+}
+
 fn find<'a>(
     objects: &'a [Value],
     kind: &str,
@@ -624,6 +645,18 @@ fn find<'a>(
 /// residual risk: such a subject (a provisioner, a CI runner) is as good as node root anyway.
 #[must_use]
 pub fn exposures(pods_in: &str, bindings: &[Value], roles: &[Value]) -> Vec<Exposure> {
+    exposures_except(pods_in, bindings, roles, None)
+}
+
+/// [`exposures`], leaving out the subject whose user name is `trusted`: Zeabur's own service
+/// account in the terminal namespace (`system:serviceaccount:<namespace>:<name>`).
+#[must_use]
+pub fn exposures_except(
+    pods_in: &str,
+    bindings: &[Value],
+    roles: &[Value],
+    trusted: Option<&str>,
+) -> Vec<Exposure> {
     let mut found = Vec::new();
     for binding in bindings {
         let kind = binding
@@ -668,7 +701,7 @@ pub fn exposures(pods_in: &str, bindings: &[Value], roles: &[Value]) -> Vec<Expo
             .and_then(Value::as_array)
             .into_iter()
             .flatten()
-            .filter(|s| !is_kubernetes_own(s))
+            .filter(|s| !is_kubernetes_own(s) && !is_user(s, trusted))
             .map(|s| Subject {
                 kind: text(s, "/kind").unwrap_or_default(),
                 name: text(s, "/name").unwrap_or_default(),
@@ -1114,6 +1147,53 @@ mod tests {
             ]
         );
         assert_eq!(exposures(NAMESPACE, bindings.get(..4).unwrap(), &roles), []);
+    }
+
+    #[test]
+    fn zeaburs_own_service_account_is_trusted_and_no_one_bound_beside_it_is() {
+        let roles = [rbac(
+            "Role",
+            Some("zeabur-terminals"),
+            "zeabur-terminals",
+            json!({"rules": [
+            {"apiGroups": [""], "resources": ["pods"], "verbs": ["create", "get", "list", "delete"]},
+            {"apiGroups": [""], "resources": ["pods/exec"], "verbs": ["create", "get"]}]}),
+        )];
+        let bound = |subjects: &Value| {
+            binding(
+                "RoleBinding",
+                Some("zeabur-terminals"),
+                "zeabur-terminals",
+                ("Role", "zeabur-terminals"),
+                subjects,
+            )
+        };
+        let zeabur = json!({"kind": "ServiceAccount", "name": "zeabur", "namespace": "zeabur"});
+        let trusted = Some("system:serviceaccount:zeabur:zeabur");
+        let alone = bound(&json!([zeabur]));
+        assert_eq!(
+            exposures_except(
+                "zeabur-terminals",
+                std::slice::from_ref(&alone),
+                &roles,
+                trusted
+            ),
+            []
+        );
+        let untrusted = exposures("zeabur-terminals", std::slice::from_ref(&alone), &roles);
+        assert_eq!(untrusted.len(), 1, "{untrusted:?}");
+        let other = json!({"kind": "ServiceAccount", "name": "zeabur", "namespace": "shop"});
+        let beside = bound(&json!([zeabur, other]));
+        let found = exposures_except("zeabur-terminals", &[beside], &roles, trusted);
+        let subjects: Vec<_> = found.iter().flat_map(|e| &e.subjects).collect();
+        assert_eq!(
+            subjects,
+            [&Subject {
+                kind: "ServiceAccount".to_owned(),
+                name: "zeabur".to_owned(),
+                namespace: Some("shop".to_owned()),
+            }]
+        );
     }
 
     #[test]

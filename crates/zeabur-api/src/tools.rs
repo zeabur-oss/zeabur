@@ -1,4 +1,4 @@
-//! A terminal with `kubectl` and `helm` that act as the person, in a short-lived pod of theirs.
+//! A terminal with `kubectl` and `helm` that act as the person, in a short-lived tools pod.
 //!
 //! A plan creates the pod (the `clusterTools` change for a project, see `zeabur_plan::terminal`;
 //! `cluster::tools` for the whole cluster); these endpoints use it.
@@ -10,6 +10,20 @@
 //! | `DELETE /api/v1/projects/{p}/tools/{name}` | deletes it |
 //!
 //! `cluster::tools` serves the same for an administrator's cluster tools pods (`Scope`).
+//!
+//! # Where tools pods run
+//!
+//! Every tools pod, a project's or the cluster's, goes in one namespace, the chart's
+//! `terminal.namespace` (`zeabur-terminals`). The chart lets Zeabur's own service account create,
+//! list, read and delete pods there and run commands in them, and nothing more; members get no
+//! rights there. Before Zeabur plans, lists, deletes or opens a tools pod, it asks kube-apiserver
+//! as the person (`SelfSubjectAccessReview`) whether they may `create` `pods/exec` in the
+//! project, and for the cluster's whether they may do everything everywhere. Only then does it
+//! use its service account. It tells the person's pods from others' by their labels and the
+//! person's own user name.
+//!
+//! On a person's own computer (`zeaburctl ui`), Zeabur has no token of the person's to hand over
+//! and no service account, so there is no tools terminal: the person runs `kubectl` there.
 //!
 //! # The credential
 //!
@@ -28,18 +42,16 @@
 //! # Lifetime
 //!
 //! When the last terminal of a pod closes, Zeabur deletes the kubeconfig at once, and the pod
-//! after a grace period (a minute by default, for a reconnect), with the person's credential of
-//! that terminal. If that fails, as it does once that token has expired, the next status request
-//! past the grace period deletes it with its own. If the server restarted meanwhile, the pod still
-//! stops at its `activeDeadlineSeconds`, and the next status request deletes it.
+//! after a grace period (a minute by default, for a reconnect). If the server restarted
+//! meanwhile, the pod still stops at its `activeDeadlineSeconds`, and the next status request
+//! deletes it. A pod outlives the project it was opened from until then.
 //!
 //! # Who else can use the token
 //!
-//! Anyone who may `create` or `get` `pods/exec` in the pod's namespace can run commands in it and
-//! read the kubeconfig while it is there, and a node's administrator can read its memory; they
-//! could act as the person until the token expires. The plan says so
-//! (`toolsCredentialExposed`), and the chart can put tools pods in a namespace of their own
-//! (`terminal.toolsNamespace`) where only administrators have those rights.
+//! Whoever may run commands in pods of the terminal namespace: Zeabur's service account and
+//! cluster administrators; and a node's administrator, who can read its memory. They could act as
+//! the person until the token expires. A plan for a cluster tools pod has no token while a
+//! binding lets anyone else into the namespace (see `cluster::tools`).
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -64,7 +76,7 @@ use crate::access::{Elevation, Handoff};
 use crate::error::{ApiError, offer_elevation, read_problem, review_refusal};
 use crate::handlers::{AppState, Person};
 use crate::pods::exec::{self, ServerFrame, Terminal};
-use crate::projects::writes::terminal::{list_pods, read_pod};
+use crate::projects::writes::terminal::{list_pods, local_mode, read_pod};
 use crate::settings::TerminalSettings;
 
 /// kube-apiserver's address inside the cluster, which its serving certificate names
@@ -97,14 +109,6 @@ impl Scope {
         }
     }
 
-    /// The namespace its tools pods go in.
-    pub(crate) fn namespace<'a>(&'a self, settings: &'a TerminalSettings) -> &'a str {
-        match self {
-            Self::Project(project) => settings.tools_namespace.as_deref().unwrap_or(project),
-            Self::Cluster => &settings.cluster_tools_namespace,
-        }
-    }
-
     /// Where `kubectl` acts, for the greeting.
     fn place(&self) -> String {
         match self {
@@ -116,10 +120,25 @@ impl Scope {
         }
     }
 
-    /// Refused unless it is the project's or the person is a cluster administrator.
-    async fn allowed(&self, cluster: &dyn Cluster) -> Result<(), ApiError> {
+    /// Refused unless kube-apiserver says the person may run commands in the project's pods, or,
+    /// for the cluster, do everything everywhere. `cluster` is the person's.
+    pub(crate) async fn allowed(&self, cluster: &dyn Cluster) -> Result<(), ApiError> {
         match self {
-            Self::Project(_) => Ok(()),
+            Self::Project(project) => {
+                let right = exec_in(project);
+                match cluster.review_access(&right).await {
+                    Ok(true) => Ok(()),
+                    Ok(false) => Err(exec::exec_refusal(review_refusal(
+                        &format!("a kubectl terminal for project {project}"),
+                        right,
+                    ))),
+                    Err(error) => Err(read_problem(
+                        error,
+                        "whether you may run commands in the project's pods",
+                        right,
+                    )),
+                }
+            }
             Self::Cluster => {
                 crate::cluster::node_shells::require_admin(
                     cluster,
@@ -130,6 +149,36 @@ impl Scope {
             }
         }
     }
+}
+
+/// `create` on `pods/exec` in `namespace`, for any pod.
+fn exec_in(namespace: &str) -> Denied {
+    Denied {
+        verb: "create".to_owned(),
+        group: String::new(),
+        resource: "pods/exec".to_owned(),
+        name: None,
+        namespace: Some(namespace.to_owned()),
+    }
+}
+
+/// Zeabur's own service account in the terminal namespace, from `settings.token_file`.
+pub(crate) fn connect(settings: &TerminalSettings) -> Option<Arc<dyn Cluster>> {
+    let path = settings.token_file.as_deref()?;
+    match zeabur_kube::ClusterEndpoint::in_cluster()
+        .and_then(|endpoint| zeabur_kube::UserClient::with_token_file(&endpoint, path))
+    {
+        Ok(client) => Some(Arc::new(client)),
+        Err(error) => {
+            tracing::warn!(%error, "no tools terminals: Zeabur cannot use its service account");
+            None
+        }
+    }
+}
+
+/// Zeabur's own service account in the terminal namespace.
+pub(crate) fn zeabur(state: &AppState) -> Result<Arc<dyn Cluster>, ApiError> {
+    state.terminals.clone().ok_or_else(local_mode)
 }
 
 /// The open terminals of each tools pod, by `namespace/name`.
@@ -241,7 +290,7 @@ pub struct ToolsStatus {
     /// The namespace these tools pods go in.
     pub namespace: String,
     /// Whether Zeabur can open a tools terminal here; `false` in local mode, which holds no
-    /// token to hand over.
+    /// token to hand over and no service account.
     pub available: bool,
     /// The person's tools pods there that have not stopped and are not being deleted, oldest
     /// first.
@@ -363,24 +412,34 @@ pub(crate) async fn status(
     .map(Json)
 }
 
-/// The person's tools pods for `scope`, deleting those that are done with.
+/// The person's tools pods for `scope`, deleting those that are done with. `cluster` is the
+/// person's.
 pub(crate) async fn status_in(
     state: &AppState,
     cluster: &dyn Cluster,
     available: bool,
     scope: &Scope,
 ) -> Result<ToolsStatus, ApiError> {
+    let namespace = state.settings.terminal.namespace.clone();
+    let mut pods = Vec::new();
+    let mut deleted = Vec::new();
+    if !available {
+        return Ok(ToolsStatus {
+            namespace,
+            available,
+            pods,
+            deleted,
+        });
+    }
     scope.allowed(cluster).await?;
-    let namespace = scope.namespace(&state.settings.terminal).to_owned();
+    let zeabur = zeabur(state)?;
     let identity = cluster
         .whoami()
         .await
         .map_err(|e| ApiError::from(e.into_problem("your identity")))?;
     let key = plans::person_key(&identity.username);
     let now = (state.clock)();
-    let mut pods = Vec::new();
-    let mut deleted = Vec::new();
-    for pod in list_pods(cluster, &namespace).await? {
+    for pod in list_pods(zeabur.as_ref(), &namespace).await? {
         if !plans::is_tools_pod_of(&pod, &key, scope.tools()) {
             continue;
         }
@@ -392,10 +451,9 @@ pub(crate) async fn status_in(
         let closed = state
             .tools
             .idle_past(&key, state.settings.terminal.tools_grace, now);
-        // One the person may not delete now (their admin rights ended) stays listed.
         if (closed || finished(&pod, now))
             && state.tools.terminals(&key) == 0
-            && cluster
+            && zeabur
                 .write(&delete_request(&namespace, &pod))
                 .await
                 .is_ok()
@@ -415,18 +473,20 @@ pub(crate) async fn status_in(
     })
 }
 
-/// The person's tools pod `name`, read as them; `404` for anyone else's.
+/// The person's tools pod `name`, read by Zeabur; `404` for anyone else's. `person` is the
+/// person's cluster.
 async fn own_pod(
-    cluster: &dyn Cluster,
+    person: &dyn Cluster,
+    zeabur: &dyn Cluster,
     namespace: &str,
     scope: &Scope,
     name: &str,
 ) -> Result<(Value, String), ApiError> {
-    let identity = cluster
+    let identity = person
         .whoami()
         .await
         .map_err(|e| ApiError::from(e.into_problem("your identity")))?;
-    let pod = read_pod(cluster, namespace, name).await?;
+    let pod = read_pod(zeabur, namespace, name).await?;
     if plans::is_tools_pod_of(&pod, &plans::person_key(&identity.username), scope.tools()) {
         Ok((pod, identity.username))
     } else {
@@ -454,30 +514,21 @@ pub(crate) async fn delete(
     delete_in(&state, cluster.as_ref(), &Scope::Project(project), &name).await
 }
 
-/// Deletes the person's tools pod `name` for `scope`.
+/// Deletes the person's tools pod `name` for `scope`. `cluster` is the person's.
 pub(crate) async fn delete_in(
     state: &AppState,
     cluster: &dyn Cluster,
     scope: &Scope,
     name: &str,
 ) -> Result<StatusCode, ApiError> {
+    let zeabur = zeabur(state)?;
     scope.allowed(cluster).await?;
-    let namespace = scope.namespace(&state.settings.terminal);
-    let (pod, _) = own_pod(cluster, namespace, scope, name).await?;
-    let request = delete_request(namespace, &pod);
-    cluster.write(&request).await.map_err(|error| {
-        let mut problem = error.into_problem(&format!("pod {name}"));
-        if problem.kind == Kind::Forbidden {
-            problem.deny(Denied {
-                verb: "delete".to_owned(),
-                group: String::new(),
-                resource: "pods".to_owned(),
-                name: Some(name.to_owned()),
-                namespace: Some(namespace.to_owned()),
-            });
-        }
-        ApiError::from(problem)
-    })?;
+    let namespace = &state.settings.terminal.namespace;
+    let (pod, _) = own_pod(cluster, zeabur.as_ref(), namespace, scope, name).await?;
+    zeabur
+        .write(&delete_request(namespace, &pod))
+        .await
+        .map_err(|error| ApiError::from(error.into_problem(&format!("pod {name}"))))?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -601,32 +652,22 @@ fn script(command: &str, args: &[String]) -> Vec<String> {
 }
 
 /// Opens a terminal in the tools pod: writes the person's current credential into it, then
-/// starts a login shell.
+/// starts a login shell. `zeabur` is Zeabur's own service account.
 async fn open(
     terminal: &Terminal,
+    zeabur: Option<&dyn Cluster>,
     settings: &TerminalSettings,
     scope: &Scope,
     name: &str,
 ) -> Result<(Value, zeabur_kube::ExecSession), ApiError> {
-    let Some(handoff) = terminal.handoff.as_ref() else {
-        return Err(ApiError::from(Problem::new(
-            Kind::BadRequest,
-            "A tools terminal needs Zeabur running in the cluster: on your own computer, Zeabur \
-             has no credential of yours to hand to a pod.",
-        )));
+    let (Some(handoff), Some(cluster)) = (terminal.handoff.as_ref(), zeabur) else {
+        return Err(local_mode());
     };
-    let cluster = terminal.cluster.as_ref();
-    scope.allowed(cluster).await?;
-    let namespace = scope.namespace(settings);
-    let (pod, person) = own_pod(cluster, namespace, scope, name).await?;
+    scope.allowed(terminal.cluster.as_ref()).await?;
+    let namespace = settings.namespace.as_str();
+    let (pod, person) = own_pod(terminal.cluster.as_ref(), cluster, namespace, scope, name).await?;
     exec::pick_container(&pod, name, Some(TOOLS_CONTAINER.to_owned()))?;
     let exec_right = || exec::exec_right(namespace, name);
-    if matches!(cluster.review_access(&exec_right()).await, Ok(false)) {
-        return Err(review_refusal(
-            &format!("a terminal in tools pod {name}"),
-            exec_right(),
-        ));
-    }
     let input = kubeconfig(handoff, &person, scope.tools().start());
     let args = [
         handoff.expires_at.as_second().to_string(),
@@ -720,8 +761,8 @@ fn after_close(
 /// and `4001`). Before the shell starts, Zeabur writes the person's current credential into the
 /// pod (see the module documentation); `ready` names the container `tools`. Failures arrive as an
 /// `error` frame: a pod that is not the person's (`404`), one not running yet (`409`), local mode
-/// (`400`), or `pods/exec` refused (`403`). The pod is deleted a minute (by default) after its
-/// last terminal closes.
+/// (`400`), or `create` on `pods/exec` in the project refused (`403`). The pod is deleted a minute
+/// (by default) after its last terminal closes.
 #[utoipa::path(get, path = "/api/v1/projects/{project}/tools/{name}/terminal", tag = "pods",
     operation_id = "toolsTerminal",
     params(("project" = String, Path), ("name" = String, Path)),
@@ -758,10 +799,11 @@ async fn run(
     name: String,
 ) {
     let settings = &state.settings.terminal;
-    let namespace = scope.namespace(settings).to_owned();
+    let namespace = settings.namespace.clone();
     let key = format!("{namespace}/{name}");
     state.tools.opened(&key);
-    match open(&terminal, settings, &scope, &name).await {
+    let zeabur = state.terminals.clone();
+    match open(&terminal, zeabur.as_deref(), settings, &scope, &name).await {
         Ok((pod, session)) => {
             let ready = ServerFrame::Ready {
                 container: TOOLS_CONTAINER.to_owned(),
@@ -769,10 +811,12 @@ async fn run(
             if exec::send_frame(&mut socket, &ready).await {
                 exec::relay(socket, session, terminal.expires_in, terminal.idle).await;
             }
-            if let Some(closing) = state.tools.closed(&key, (state.clock)()) {
+            if let (Some(closing), Some(zeabur)) =
+                (state.tools.closed(&key, (state.clock)()), zeabur)
+            {
                 after_close(
                     Arc::clone(&state.tools),
-                    Arc::clone(&terminal.cluster),
+                    zeabur,
                     namespace,
                     pod,
                     closing,

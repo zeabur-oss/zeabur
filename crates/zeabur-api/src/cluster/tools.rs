@@ -6,21 +6,19 @@
 //! | Route | What it does |
 //! |---|---|
 //! | `GET /api/v1/cluster/tools` | the person's cluster tools pods and how they are doing; deletes those that are done with |
-//! | `POST /api/v1/cluster/tools/plan` | what starting one writes (its namespace when missing, the pod), and a token; writes nothing |
+//! | `POST /api/v1/cluster/tools/plan` | what starting one writes (the pod), and a token; writes nothing |
 //! | `POST /api/v1/cluster/tools/apply` | carries out that plan by its token |
 //! | `GET /api/v1/cluster/tools/{name}/terminal` | a terminal in it, over a WebSocket |
 //! | `DELETE /api/v1/cluster/tools/{name}` | deletes it |
 //!
 //! Every route is refused unless kube-apiserver says the person may do everything everywhere,
-//! with admin rights offered where they are not in use. The pod goes in
-//! `terminal.clusterToolsNamespace`, never in `terminal.toolsNamespace`: the credential written
-//! into it at each terminal (see the `tools` module) is the administrator's, and people who use a
-//! project's tools pods may run commands in pods there. `kubectl` starts in namespace `default`.
-//! As for node shells, a plan has no token while a binding lets anyone but cluster administrators
-//! create pods in that namespace or run commands in its pods (`exposed`), and its apply is
-//! refused when one has appeared since; the plan also says who could use the credential
-//! (`toolsCredentialExposed`), as a project's does. Everything else (the credential, the pod's
-//! lifetime) is the project tools pod's.
+//! with admin rights offered where they are not in use. The pod goes in the terminal namespace
+//! with the projects' tools pods, and Zeabur's own service account creates it (see the `tools`
+//! module). `kubectl` starts in namespace `default`. As for node shells, a plan has no token while
+//! a binding lets anyone but cluster administrators and Zeabur's service account create pods in
+//! that namespace or run commands in its pods (`exposed`), and its apply is refused when one has
+//! appeared since. Everything else (the credential, the pod's lifetime) is the project tools
+//! pod's.
 
 use axum::Json;
 use axum::extract::{Path, State, WebSocketUpgrade};
@@ -31,16 +29,16 @@ use serde_json::Value;
 use utoipa::ToSchema;
 use zeabur_core::problem::{Denied, Kind, MEDIA_TYPE as PROBLEM, Problem};
 use zeabur_kube::k8s_openapi::jiff::Timestamp;
-use zeabur_kube::{Cluster, ClusterExt as _, DynamicObject, ObjectTarget, ResourceRef, WriteBody};
-use zeabur_plan::terminal::{self as plans, ToolsScope};
+use zeabur_kube::{Cluster, ObjectTarget, WriteBody};
+use zeabur_plan::terminal::ToolsScope;
 use zeabur_plan::{Plan, Warning, Write};
 
 use super::node_shells::{
-    ShellExposure, ShellWrite, ShellWriteAction, exposed, exposure_views, moved, plan_key,
+    ShellExposure, ShellWrite, ShellWriteAction, exposed_except, exposure_views, moved, plan_key,
     require_admin, seal, send, yaml,
 };
 use crate::access::Handoff;
-use crate::error::{ApiError, get_read};
+use crate::error::ApiError;
 use crate::handlers::{AppState, Credential, Everyday, Person};
 use crate::plan_token::{self as token, LIFETIME_SECONDS, TokenError};
 use crate::pods::exec::Terminal;
@@ -68,8 +66,7 @@ pub struct ClusterToolsPlan {
     pub pod: String,
     /// The writes, in order; none when it uses a running pod.
     pub writes: Vec<ShellWrite>,
-    /// Who `kubectl` acts as and until when, or that a running pod is used; who else could use
-    /// the credential.
+    /// Who `kubectl` acts as and until when, or that a running pod is used.
     pub warnings: Vec<Warning>,
     /// Bindings that let others into the pod, and so to the credential in it; the plan cannot be
     /// applied while there is one.
@@ -99,50 +96,24 @@ struct Claims {
     groups: Vec<String>,
     made_at: String,
     pod: String,
-    /// The namespace's `resourceVersion` when it existed.
-    namespace_version: Option<String>,
     expires_at: i64,
 }
 
 /// What a plan writes, worked out against the cluster as it is.
 struct Computed {
     namespace: String,
-    /// The namespace as it is, when it exists.
-    existing: Option<Value>,
     plan: Plan,
     pod: String,
     exposed: Vec<zeabur_plan::node_shell::Exposure>,
 }
 
 impl Computed {
-    fn namespace_version(&self) -> Option<String> {
-        self.existing.as_ref().map(|n| {
-            n.pointer("/metadata/resourceVersion")
-                .and_then(Value::as_str)
-                .unwrap_or_default()
-                .to_owned()
-        })
-    }
-
     /// Each write with what kube-apiserver would refuse it as; empty when a running pod is used.
     fn writes(&self) -> Vec<(ObjectTarget, Value, Denied)> {
         let mut writes = Vec::new();
         let Some(pod) = self.plan.objects.first() else {
             return writes;
         };
-        if self.existing.is_none() {
-            writes.push((
-                ObjectTarget {
-                    api_version: "v1".to_owned(),
-                    kind: "Namespace".to_owned(),
-                    plural: "namespaces".to_owned(),
-                    namespace: String::new(),
-                    name: self.namespace.clone(),
-                },
-                plans::cluster_tools_namespace_body(&self.namespace),
-                right("namespaces", None),
-            ));
-        }
         if let Write::Create { body } = &pod.write {
             writes.push((
                 ObjectTarget {
@@ -153,54 +124,46 @@ impl Computed {
                     name: self.pod.clone(),
                 },
                 body.clone(),
-                right("pods", Some(&self.namespace)),
+                right(&self.namespace),
             ));
         }
         writes
     }
 }
 
-fn right(resource: &str, namespace: Option<&str>) -> Denied {
+fn right(namespace: &str) -> Denied {
     Denied {
         verb: "create".to_owned(),
         group: String::new(),
-        resource: resource.to_owned(),
+        resource: "pods".to_owned(),
         name: None,
-        namespace: namespace.map(str::to_owned),
+        namespace: Some(namespace.to_owned()),
     }
 }
 
+/// `cluster` is the administrator's, which reads the bindings; `zeabur` is Zeabur's own service
+/// account, which reads the pods.
 async fn compute(
     state: &AppState,
     cluster: &dyn Cluster,
+    zeabur: &dyn Cluster,
     handoff: &Handoff,
     person: &str,
     made_at: &str,
 ) -> Result<Computed, ApiError> {
     let settings = &state.settings.terminal;
-    let namespace = settings.cluster_tools_namespace.clone();
-    let namespaces = ResourceRef::new("", "v1", "namespaces", "Namespace");
-    let existing = cluster
-        .find_object(&namespaces, None, &namespace)
+    let namespace = settings.namespace.clone();
+    let trusted = zeabur
+        .whoami()
         .await
-        .map_err(|e| {
-            crate::error::read_problem(
-                e,
-                &format!("namespace {namespace}"),
-                get_read("", "namespaces", None, &namespace),
-            )
-        })?
-        .map(|o: DynamicObject| serde_json::to_value(o).unwrap_or(Value::Null));
-    let exposed = exposed(cluster, &namespace, existing.is_some()).await?;
-    let pods = if existing.is_some() {
-        list_pods(cluster, &namespace).await?
-    } else {
-        Vec::new()
-    };
+        .map_err(|e| ApiError::from(e.into_problem("Zeabur's own identity")))?;
+    let exposed = exposed_except(cluster, &namespace, Some(&trusted.username)).await?;
+    let pods = list_pods(zeabur, &namespace).await?;
     let planner = Planner {
         settings,
         person,
         handoff: Some(handoff),
+        zeabur: Some(zeabur),
     };
     let plan = tools_plan(
         &planner,
@@ -226,7 +189,6 @@ async fn compute(
         .unwrap_or_default();
     Ok(Computed {
         namespace,
-        existing,
         plan,
         pod,
         exposed,
@@ -267,6 +229,7 @@ pub(crate) async fn plan(
     let sealing = plan_key(&state)?;
     require_admin(cluster.as_ref(), WHAT, CLUSTER_ADMIN).await?;
     let handoff = handoff.ok_or_else(local_mode)?;
+    let zeabur = crate::tools::zeabur(&state)?;
     let identity = everyday
         .whoami()
         .await
@@ -278,6 +241,7 @@ pub(crate) async fn plan(
     let computed = compute(
         &state,
         cluster.as_ref(),
+        zeabur.as_ref(),
         &handoff,
         &identity.username,
         &made_at,
@@ -289,7 +253,6 @@ pub(crate) async fn plan(
         groups: identity.groups,
         made_at,
         pod: computed.pod.clone(),
-        namespace_version: computed.namespace_version(),
         expires_at,
     };
     let writes = computed
@@ -356,11 +319,16 @@ pub(crate) async fn apply(
     }
     require_admin(cluster.as_ref(), WHAT, CLUSTER_ADMIN).await?;
     let handoff = handoff.ok_or_else(local_mode)?;
-    let cluster = cluster.as_ref();
-    let computed = compute(&state, cluster, &handoff, &claims.person, &claims.made_at).await?;
-    if computed.namespace_version() != claims.namespace_version {
-        return Err(moved(&format!("Namespace {}", computed.namespace)));
-    }
+    let zeabur = crate::tools::zeabur(&state)?;
+    let computed = compute(
+        &state,
+        cluster.as_ref(),
+        zeabur.as_ref(),
+        &handoff,
+        &claims.person,
+        &claims.made_at,
+    )
+    .await?;
     if computed.pod != claims.pod {
         return Err(moved("Your cluster tools pod"));
     }
@@ -378,11 +346,10 @@ pub(crate) async fn apply(
             ),
         )));
     }
-    // One at a time: a pod's dry run needs its namespace to exist.
     for (target, body, refused) in computed.writes() {
         for dry_run in [true, false] {
             send(
-                cluster,
+                zeabur.as_ref(),
                 target.clone(),
                 WriteBody::Create(body.clone()),
                 dry_run,

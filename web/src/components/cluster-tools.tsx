@@ -9,7 +9,6 @@ import {
   type ClusterToolsPlan,
 } from "@/api/cluster-tools"
 import { Exposed, PlanFrame, PlanWrites } from "@/components/cluster-plan"
-import { Consequence } from "@/components/members/frame"
 import { terminalLines } from "@/components/plan/describe"
 import { useT } from "@/i18n"
 
@@ -54,14 +53,10 @@ export function ClusterToolsDialog({
 
 function Planned({ plan }: { plan: ClusterToolsPlan }) {
   const t = useT()
-  const exposed = plan.warnings.find((w) => w.code === "toolsCredentialExposed")
   return (
     <>
       {plan.exposed.length > 0 ? (
         <Exposed namespace={plan.namespace} exposed={plan.exposed} />
-      ) : null}
-      {exposed ? (
-        <Consequence>{t("warn.toolsCredentialExposed", plan.namespace)}</Consequence>
       ) : null}
       {plan.writes.length > 0 ? <p>{t("clusterTools.starts", plan.namespace)}</p> : null}
       <ul className="flex list-disc flex-col gap-1 pl-5">

@@ -1,0 +1,45 @@
+{{- $namespace := .Values.terminal.namespace }}
+# The terminal namespace: every tools pod (kubectl and helm with one person's token) runs here.
+# Zeabur's service account may create, read, run commands in and delete pods here and nothing
+# else. It creates a pod only after kube-apiserver says the person may run commands in the
+# project's pods (or, for the whole cluster, is a cluster administrator). Members get no rights
+# here, so no one but Zeabur and cluster administrators can read a token in these pods.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ $namespace }}
+  labels:
+    {{- include "zeabur.labels" . | nindent 4 }}
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: latest
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "zeabur.fullname" . }}-terminals
+  namespace: {{ $namespace }}
+  labels:
+    {{- include "zeabur.labels" . | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["create", "get", "list", "delete"]
+  - apiGroups: [""]
+    resources: ["pods/exec"]
+    verbs: ["create", "get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "zeabur.fullname" . }}-terminals
+  namespace: {{ $namespace }}
+  labels:
+    {{- include "zeabur.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "zeabur.fullname" . }}-terminals
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "zeabur.fullname" . }}
+    namespace: {{ .Release.Namespace }}

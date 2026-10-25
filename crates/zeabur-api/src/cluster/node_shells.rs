@@ -412,19 +412,35 @@ async fn rbac(
         .collect())
 }
 
-/// The bindings that let others into the pods of `namespace`: node shells, or cluster tools pods.
+/// The bindings that let others into the pods of `namespace`: node shells.
 pub(crate) async fn exposed(
     cluster: &dyn Cluster,
     namespace: &str,
     namespace_exists: bool,
 ) -> Result<Vec<shell::Exposure>, ApiError> {
+    if namespace_exists {
+        exposed_except(cluster, namespace, None).await
+    } else {
+        let bindings = rbac(cluster, "clusterrolebindings", "ClusterRoleBinding", None).await?;
+        let roles = rbac(cluster, "clusterroles", "ClusterRole", None).await?;
+        Ok(shell::exposures(namespace, &bindings, &roles))
+    }
+}
+
+/// [`exposed`] in a namespace that exists, leaving out the user `trusted`: tools pods, with
+/// Zeabur's own service account.
+pub(crate) async fn exposed_except(
+    cluster: &dyn Cluster,
+    namespace: &str,
+    trusted: Option<&str>,
+) -> Result<Vec<shell::Exposure>, ApiError> {
     let mut bindings = rbac(cluster, "clusterrolebindings", "ClusterRoleBinding", None).await?;
     let mut roles = rbac(cluster, "clusterroles", "ClusterRole", None).await?;
-    if namespace_exists {
-        bindings.extend(rbac(cluster, "rolebindings", "RoleBinding", Some(namespace)).await?);
-        roles.extend(rbac(cluster, "roles", "Role", Some(namespace)).await?);
-    }
-    Ok(shell::exposures(namespace, &bindings, &roles))
+    bindings.extend(rbac(cluster, "rolebindings", "RoleBinding", Some(namespace)).await?);
+    roles.extend(rbac(cluster, "roles", "Role", Some(namespace)).await?);
+    Ok(shell::exposures_except(
+        namespace, &bindings, &roles, trusted,
+    ))
 }
 
 async fn opening(cluster: &dyn Cluster, node: &str) -> Result<Opening, ApiError> {

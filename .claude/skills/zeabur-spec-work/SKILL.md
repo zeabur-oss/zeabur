@@ -20,7 +20,8 @@ description: Implement or change a security- or protocol-relevant behaviour in Z
 4. **Test the attack, not just the happy path.** Tampered plan tokens, replays, concurrent
    applies (64 tasks behind a barrier, exactly one wins), cross-site requests, expired tokens,
    revoked permissions, privilege boundaries (Zeabur's own service account must never gain a
-   right its users lack; no `impersonate`). Use the real kube-apiserver for anything RBAC or
+   right its users lack, apart from pods in the terminal namespace after an access review of the
+   person; no `impersonate`). Use the real kube-apiserver for anything RBAC or
    admission related (`zeabur-cluster-tests`).
 5. **Never leak a Secret's value.** Values are read only on an explicit "show" request, never
    cached, never logged. Test it.

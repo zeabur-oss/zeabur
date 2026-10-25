@@ -790,8 +790,6 @@ function warningSentence(
             )
           : undefined,
       ])
-    case "toolsCredentialExposed":
-      return t("warn.toolsCredentialExposed", warning.namespace)
     case "debugContainerStays":
     case "debugContainerReused":
     case "toolsPod":

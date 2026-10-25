@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Checks the Helm chart without a cluster: `helm lint`, then what the chart promises in every
-# rendering (no rights for Zeabur itself, no service account token, one replica, a locked-down container),
+# rendering (no rights for Zeabur itself beyond pods in the terminal namespace, its token only at a
+# path of its own, one replica, a locked-down container),
 # and that values.schema.json refuses values that would install a broken Zeabur.
 # Run inside `nix develop`.
 #   scripts/check-chart.sh
@@ -34,10 +35,12 @@ for values in "$chart"/ci/*-values.yaml; do
   name=$(basename "$values" -values.yaml)
   helm lint --strict --quiet "$chart" -f "$values" >/dev/null || fail "$name: helm lint failed"
   out=$(render -f "$values")
+  terminals=$(yq '.terminal.namespace // "zeabur-terminals"' "$values")
 
-  # Zeabur has no rights of its own: no binding to a ServiceAccount, no ClusterRoleBinding, and no
-  # token in the pod. The Roles let people read Zeabur's settings (`get` on the ConfigMap
-  # zeabur-settings) and the S3 destinations (the ConfigMaps of their namespace). The ClusterRoles are the member roles, which
+  # Zeabur's own rights are pods in the terminal namespace only: one RoleBinding to its
+  # ServiceAccount, no ClusterRoleBinding, and its token only at a path of its own. The other Roles
+  # let people read Zeabur's settings (`get` on the ConfigMap zeabur-settings) and the S3
+  # destinations (the ConfigMaps of their namespace). The ClusterRoles are the member roles, which
   # Zeabur binds per member, the rule sets the project roles aggregate, and Zeabur Proxy's logs
   # reader.
   expect "$name" "$out" '[select(.kind == "ClusterRoleBinding")] | length' 0
@@ -80,17 +83,28 @@ for values in "$chart"/ci/*-values.yaml; do
   expect "$name" "$out" \
     '[select(.kind == "ClusterRole") | select(.rules | any_c(.resources | any_c(test("^(secrets|pods/(exec|attach|portforward|ephemeralcontainers))$")))) | .metadata.name] | join(",")' \
     zeabur-project-developer-rules
-  expect "$name" "$out" '[select(.kind == "RoleBinding") | .subjects[] | select(.kind == "ServiceAccount")] | length' 0
   expect "$name" "$out" \
-    '[select(.kind == "Role") | .metadata.namespace + "/" + .metadata.name + ":" + (.rules[] | [.apiGroups, .resources, .resourceNames // [], .verbs] | map(join(",")) | join("|"))] | sort | join(" ")' \
+    "[select(.kind == \"RoleBinding\") | (.metadata.namespace + \"/\" + .metadata.name + \">\" + .roleRef.name) as \$b | .subjects[] | select(.kind == \"ServiceAccount\") | \$b + \">\" + .namespace + \"/\" + .name] | join(\",\")" \
+    "$terminals/zeabur-terminals>zeabur-terminals>zeabur/zeabur"
+  expect "$name" "$out" \
+    "[select(.kind == \"Role\" and .metadata.namespace != \"$terminals\") | .metadata.namespace + \"/\" + .metadata.name + \":\" + (.rules[] | [.apiGroups, .resources, .resourceNames // [], .verbs] | map(join(\",\")) | join(\"|\"))] | sort | join(\" \")" \
     'zeabur-s3-destinations/zeabur-s3-destinations-reader:|configmaps||get,list zeabur/zeabur-settings-reader:|configmaps|zeabur-settings|get'
+  expect "$name" "$out" \
+    "[select(.kind == \"Role\" and .metadata.namespace == \"$terminals\") | .metadata.name + \":\" + (.rules[] | [.apiGroups, .resources, .resourceNames // [], .verbs] | map(join(\",\")) | join(\"|\"))] | join(\" \")" \
+    'zeabur-terminals:|pods||create,get,list,delete zeabur-terminals:|pods/exec||create,get'
+  expect "$name" "$out" \
+    "select(.kind == \"Namespace\" and .metadata.name == \"$terminals\") | .metadata.labels[\"pod-security.kubernetes.io/enforce\"]" \
+    restricted
   expect "$name" "$out" '[select(.kind == "ServiceAccount") | .automountServiceAccountToken == false] | all' true
   expect "$name" "$out" '[select(.kind == "Deployment") | .spec.template.spec.automountServiceAccountToken == false] | all' true
   dep='select(.kind == "Deployment" and .metadata.name == "zeabur")'
   pod="$dep | .spec.template.spec"
   container="$pod | .containers[0]"
   expect "$name" "$out" "$pod | .automountServiceAccountToken" false
-  expect "$name" "$out" "[$pod | .volumes[].projected.sources[]?.serviceAccountToken] | length" 0
+  expect "$name" "$out" "[$pod | .volumes[] | select(.projected.sources[]?.serviceAccountToken) | .name] | join(\",\")" terminal-token
+  expect "$name" "$out" "$container | .volumeMounts[] | select(.name == \"terminal-token\") | .mountPath" \
+    /var/run/zeabur/terminal-token
+  expect "$name" "$out" "$container | .env[] | select(.name == \"ZEABUR_TERMINAL_NAMESPACE\") | .value" "$terminals"
   # Sessions are in memory: exactly one replica, never two side by side.
   expect "$name" "$out" "$dep | .spec.replicas" 1
   expect "$name" "$out" "$dep | .spec.strategy.type" Recreate
@@ -151,7 +165,7 @@ terminal_env='select(.kind == "Deployment" and .metadata.name == "zeabur") | .sp
 expect minimal "$(render -f "$chart/ci/minimal-values.yaml")" "[$terminal_env] | join(\" \")" \
   "ZEABUR_TOOLS_DEADLINE_MINUTES=30 ZEABUR_TOOLS_GRACE_SECONDS=60 ZEABUR_TOOLS_REQUESTS=cpu=10m,memory=64Mi ZEABUR_TOOLS_LIMITS=cpu=1,memory=512Mi"
 expect full "$(render -f "$chart/ci/full-values.yaml")" "[$terminal_env] | join(\" \")" \
-  "ZEABUR_DEBUG_IMAGE=registry.example.test/busybox:1.37.0 ZEABUR_TOOLS_IMAGE=registry.example.test/k8s:1.36.5 ZEABUR_TOOLS_NAMESPACE=zeabur-tools ZEABUR_TOOLS_DEADLINE_MINUTES=15 ZEABUR_TOOLS_GRACE_SECONDS=30 ZEABUR_TOOLS_REQUESTS=cpu=20m,memory=96Mi ZEABUR_TOOLS_LIMITS=cpu=500m,memory=256Mi"
+  "ZEABUR_DEBUG_IMAGE=registry.example.test/busybox:1.37.0 ZEABUR_TOOLS_IMAGE=registry.example.test/k8s:1.36.5 ZEABUR_TOOLS_DEADLINE_MINUTES=15 ZEABUR_TOOLS_GRACE_SECONDS=30 ZEABUR_TOOLS_REQUESTS=cpu=20m,memory=96Mi ZEABUR_TOOLS_LIMITS=cpu=500m,memory=256Mi"
 
 # The cluster's name reaches Zeabur only when one is given.
 cluster_env='[select(.kind == "Deployment" and .metadata.name == "zeabur") | .spec.template.spec.containers[0].env[] | select(.name == "ZEABUR_CLUSTER_NAME") | .value] | join(",")'
@@ -220,7 +234,7 @@ refuse "a domain suffix that is not a domain" --set 'domains.suffixes={Apps_Exam
 refuse "a domain suffix with a wildcard" --set 'domains.suffixes={*.apps.example.test}'
 refuse "a ClusterIssuer that is not a name" --set 'domains.clusterIssuer=Lets Encrypt'
 refuse "a tools pod without a deadline" --set terminal.toolsDeadlineMinutes=0
-refuse "a tools namespace that is not a name" --set terminal.toolsNamespace=Tools
+refuse "a terminal namespace that is not a name" --set terminal.namespace=Tools
 refuse "a tools resource Zeabur does not set" --set terminal.toolsResources.limits.gpu=1
 refuse "an image digest without its algorithm" --set image.digest="$(printf '%064d' 0)"
 refuse "a logs URL with https or a path" --set proxy.logs.url=https://vl.example.test:9428/select

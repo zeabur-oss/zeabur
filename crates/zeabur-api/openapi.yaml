@@ -3729,8 +3729,8 @@ paths:
         and `4001`). Before the shell starts, Zeabur writes the person's current credential into the
         pod (see the module documentation); `ready` names the container `tools`. Failures arrive as an
         `error` frame: a pod that is not the person's (`404`), one not running yet (`409`), local mode
-        (`400`), or `pods/exec` refused (`403`). The pod is deleted a minute (by default) after its
-        last terminal closes.
+        (`400`), or `create` on `pods/exec` in the project refused (`403`). The pod is deleted a minute
+        (by default) after its last terminal closes.
       operationId: toolsTerminal
       parameters:
       - name: project
@@ -6567,9 +6567,7 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/PlanWarning"
-          description: |-
-            Who `kubectl` acts as and until when, or that a running pod is used; who else could use
-            the credential.
+          description: Who `kubectl` acts as and until when, or that a running pod is used.
         writes:
           type: array
           items:
@@ -12594,21 +12592,6 @@ components:
             type: string
             description: Its name.
       - type: object
-        description: |-
-          While the credential is valid, anyone who can run commands in the tools pod, or read its
-          memory, can use it as the person.
-        required:
-        - namespace
-        - code
-        properties:
-          code:
-            type: string
-            enum:
-            - toolsCredentialExposed
-          namespace:
-            type: string
-            description: The pod's namespace, whose `pods/exec` grants decide who that is.
-      - type: object
         description: The person's tools pod still runs; the terminal uses it, and nothing is written.
         required:
         - namespace
@@ -16693,7 +16676,7 @@ components:
           type: boolean
           description: |-
             Whether Zeabur can open a tools terminal here; `false` in local mode, which holds no
-            token to hand over.
+            token to hand over and no service account.
         deleted:
           type: array
           items:

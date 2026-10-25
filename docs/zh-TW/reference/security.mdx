@@ -86,8 +86,10 @@ Pod Security 不管網路。要限制跨專案的流量，另外設定 NetworkPo
 
 Zeabur 在短暫的 tools Pod 裡提供 `kubectl` 和 `helm`，使用登入者當下的權杖。專案的 kubectl 終端機從搜尋開啟，整個叢集的從 **叢集** 頁標題旁的 **開啟 kubectl 終端機** 開啟。kubeconfig 透過 exec 的標準輸入寫進記憶體型的 `emptyDir`，不會出現在 Pod spec、環境變數、ConfigMap 或 Secret 裡。
 
+所有 tools Pod 都放在 chart 建立的 `zeabur-terminals` Namespace（`terminal.namespace`），kubectl 預設在你開啟它的專案。成員在這個 Namespace 沒有任何權限，看不到也進不去別人的 tools Pod。Zeabur 先請 kube-apiserver 確認你能在專案的容器裡執行指令（整個叢集的則要是叢集管理員），再用 Zeabur 自己的 ServiceAccount 建立 Pod 並開啟終端機。這個 ServiceAccount 只能在 `zeabur-terminals` 建立、讀取、刪除 Pod 和執行指令，別的都不能做。
+
 <Callout type="warn">
-能在 tools Pod 所在 Namespace 執行 `pods/exec` 的人，以及那個節點的管理員，在權杖到期前都能讀到並使用這份 kubeconfig。管理員的叢集 tools Pod 放在獨立的 `zeabur-cluster-tools` Namespace。專案的 tools Pod 預設放在專案裡，可以用 chart 的 `terminal.toolsNamespace` 移到只有管理員能 exec 的 Namespace。
+在權杖到期前，能讀到這份 kubeconfig 的只有 Zeabur 本身、叢集管理員，以及 Pod 所在節點的管理員。不要把 `zeabur-terminals` 的權限給其他人。
 </Callout>
 
 tools Pod 預設最多執行 30 分鐘。最後一個終端機關閉時，Zeabur 立刻刪掉 kubeconfig，60 秒後刪除 Pod。Zeabur 中途重新啟動時，Pod 仍會在 `activeDeadlineSeconds` 到期時停止，之後查詢 tools Pod 狀態時再刪除。權杖寫進 tools Pod 後，Zeabur 無法撤銷，kube-apiserver 會接受它直到過期。

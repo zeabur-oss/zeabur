@@ -98,8 +98,10 @@ metricsStore:
   # read the ConfigMap gets the default store, and the page says why.
   everyoneReads: true
 
-# Terminals in containers without a shell, and the tools pod with kubectl and helm. Zeabur creates
-# both as the person who asks, after they apply the plan.
+# Terminals in containers without a shell, and the tools pod with kubectl and helm. Zeabur adds a
+# debug container as the person who asks. It creates tools pods with its own service account, in
+# the terminal namespace only, after kube-apiserver says the person may run commands in the
+# project's pods.
 terminal:
   # The debug container added to a pod for a terminal; it needs `sh`. Empty: busybox 1.37.0,
   # pinned by digest.
@@ -107,14 +109,10 @@ terminal:
   # The tools pod's image; it needs `sh`, `sleep`, `kubectl` and `helm`, for amd64 and arm64.
   # Empty: alpine/k8s 1.36.5 (kubectl 1.36.5, helm 4.3.0), pinned by digest.
   toolsImage: ""
-  # The namespace tools pods go in. Empty: the project's. A namespace of its own keeps the
-  # person's token away from whoever may exec into pods in the project.
-  toolsNamespace: ""
-  # The namespace administrators' cluster tools pods go in (the Components page's kubectl
-  # terminal); Zeabur creates it when they first open one. Their admin credential is written into
-  # those pods, so it must not be toolsNamespace, and only administrators should run commands in
-  # pods there.
-  clusterToolsNamespace: zeabur-cluster-tools
+  # The namespace all tools pods go in, for projects and for the whole cluster. The chart creates
+  # it and lets Zeabur's service account create, run commands in and delete pods there, and
+  # nothing else. Each pod holds its person's token, so give no one else rights in it.
+  namespace: zeabur-terminals
   # A tools pod stops after this many minutes in any case.
   toolsDeadlineMinutes: 30
   # A tools pod is deleted this many seconds after its last terminal closes.

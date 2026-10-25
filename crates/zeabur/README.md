@@ -2,7 +2,8 @@
 
 `zeabur`: the in-cluster server. It serves the API and the embedded web interface, and signs
 people in through Zeabur Identity. Every request to the cluster carries the token of the person who made
-it; Zeabur's own service account is never used for one.
+it. Zeabur's own service account is used only for tools pods in the terminal namespace, after
+kube-apiserver says the person may run commands in the project's pods (see `zeabur_api::tools`).
 
 ## Configuration
 
@@ -22,6 +23,8 @@ Flags, or the environment variable after each:
 | `--listen` | `ZEABUR_LISTEN` | default `[::]:8080`: IPv6 and, on Linux, IPv4 as well ([dual-stack](https://kubernetes.io/docs/concepts/services-networking/dual-stack/)); `0.0.0.0:8080` on a node without IPv6 |
 | `--metrics-service` | `ZEABUR_METRICS_SERVICE` | the metrics store history, node disk and volume use are read from, `namespace/name:port` (default: where Zeabur's VictoriaMetrics recommendation installs it) |
 | `--namespace` | `ZEABUR_NAMESPACE` | the namespace Zeabur runs in, whose ConfigMap `zeabur-settings` keeps the settings people choose; unset, they cannot be changed |
+| `--terminal-namespace` | `ZEABUR_TERMINAL_NAMESPACE` | the namespace all kubectl terminal (tools) pods go in (default `zeabur-terminals`); give members no rights there |
+| `--terminal-token-file` | `ZEABUR_TERMINAL_TOKEN_FILE` | a file with Zeabur's own service account token, which may use pods in the terminal namespace only; unset, there are no kubectl terminals |
 
 Register Zeabur in Zeabur Identity as a confidential client with the redirect URI
 `<public URL>/auth/callback` and the audience kube-apiserver accepts (`--audience kubernetes`),

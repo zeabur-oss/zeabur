@@ -4231,10 +4231,13 @@ async fn main() -> std::io::Result<()> {
     if !matches!(velero_mode().as_str(), "none" | "location") {
         backup_store(cluster.clone()).await?;
     }
+    let tools = std::env::var_os("ZEABUR_DEMO_TOOLS").is_some();
+    let cluster: Arc<dyn Cluster> = Arc::new(cluster);
+    let terminals = tools.then(|| Arc::clone(&cluster));
     let access = Demo {
-        cluster: Arc::new(cluster),
+        cluster,
         offered: std::env::var_os("ZEABUR_DEMO_ELEVATION").is_some(),
-        tools: std::env::var_os("ZEABUR_DEMO_TOOLS").is_some(),
+        tools,
     };
     // Settings are kept in an `zeabur` namespace, as on the in-cluster server.
     let settings = zeabur_api::Settings {
@@ -4268,6 +4271,7 @@ async fn main() -> std::io::Result<()> {
         Arc::new(dns()),
         Arc::new(images),
         template_idle,
+        terminals,
     )
     .fallback_service(zeabur_ui::router());
     // Another port when 8080 is taken: ZEABUR_DEMO_ADDR=127.0.0.1:8090.

@@ -1097,7 +1097,8 @@ export const zhCN: Messages = {
   "confirm.debugStays":
     "它会留在这个副本里，直到副本被替换为止，例如重启时。Kubernetes 无法提前移除它。",
   "confirm.debugReused": "这个副本里已有调试容器在运行，终端会在其中打开。",
-  "confirm.clusterTools": "在这个项目里为你启动一个临时容器，里面有 kubectl 和 helm。",
+  "confirm.clusterTools":
+    "为你启动一个临时容器，里面有 kubectl 和 helm，只有 Zeabur 和集群管理员能接触到。kubectl 默认在这个项目。",
   "confirm.toolsActsAs": (person: string, admin: boolean) =>
     admin
       ? `kubectl 和 helm 会以 ${person} 的身份运行，使用你当前持有的管理员权限。`
@@ -1337,8 +1338,6 @@ export const zhCN: Messages = {
   "risk.opensPort": "互联网上任何人都能连到它，Zeabur 不会要求密码。",
   "risk.deletes": "删除后无法撤销。",
   "warn.rightsMissing": (rights: string) => `集群可能会拒绝：你缺少 ${rights} 的权限。`,
-  "warn.toolsCredentialExposed": (namespace: string) =>
-    `在这个终端的容器运行期间，能在 ${namespace} 的容器里执行命令的人，都能使用你的凭证。`,
   "warn.restartNeeded": (names: string) => `重启后才会生效：${names}`,
   "warn.reloaderRestarts": (names: string) => `Reloader 会重启 ${names}`,
   "warn.reloaderMayRestart": (names: string) => `如果这个集群运行着 Reloader，会重启 ${names}`,

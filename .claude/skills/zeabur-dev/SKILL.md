@@ -15,7 +15,8 @@ description: Day-to-day development loop for the Zeabur repository — environme
   (in-cluster server), `zeaburctl` (CLI: `ui`, `doctor`) and `zeabur-installer` (runs as
   root on a Linux server; crates `zeabur-installer-*`, guide in `docs/get-started/quickstart.md` and `docs/reference/installer*.md`).
 - `zeabur-kube` is the only crate that talks to kube-apiserver, and only through clients bound to
-  a person's credential. Never build a client from Zeabur's service account token, and never
+  a person's credential. Never build a client from Zeabur's service account token (the one
+  exception is tools pods in the terminal namespace, `zeabur_api::tools`), and never
   impersonate.
 - Workspace dependency versions live in the root `Cargo.toml` `[workspace.dependencies]`;
   crates use `name.workspace = true`.

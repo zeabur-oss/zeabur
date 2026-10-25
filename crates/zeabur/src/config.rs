@@ -103,12 +103,13 @@ pub(crate) struct Args {
     /// `alpine/k8s`, pinned by digest.
     #[arg(long, env = "ZEABUR_TOOLS_IMAGE", default_value = "")]
     pub(crate) tools_image: String,
-    /// The namespace tools pods go in. Empty: the project's.
-    #[arg(long, env = "ZEABUR_TOOLS_NAMESPACE", default_value = "")]
-    pub(crate) tools_namespace: String,
-    /// The namespace administrators' cluster tools pods go in; not `--tools-namespace`.
-    #[arg(long, env = "ZEABUR_CLUSTER_TOOLS_NAMESPACE", default_value = zeabur_api::settings::CLUSTER_TOOLS_NAMESPACE)]
-    pub(crate) cluster_tools_namespace: String,
+    /// The namespace all tools pods go in. Only Zeabur's own service account uses it.
+    #[arg(long, env = "ZEABUR_TERMINAL_NAMESPACE", default_value = zeabur_api::settings::TERMINAL_NAMESPACE)]
+    pub(crate) terminal_namespace: String,
+    /// A file with Zeabur's own service account token, which may use pods in
+    /// `--terminal-namespace` only. Empty: no tools pods.
+    #[arg(long, env = "ZEABUR_TERMINAL_TOKEN_FILE", default_value = "")]
+    pub(crate) terminal_token_file: String,
     /// Minutes a tools pod may run at most.
     #[arg(long, env = "ZEABUR_TOOLS_DEADLINE_MINUTES", default_value_t = 30)]
     pub(crate) tools_deadline_minutes: u32,
@@ -333,25 +334,16 @@ fn terminal(
             image.clone_into(setting);
         }
     }
-    if !args.tools_namespace.is_empty() {
-        if !zeabur_plan::checks::is_dns_label(&args.tools_namespace) {
-            return Err(format!(
-                "--tools-namespace: {:?} is not a namespace's name",
-                args.tools_namespace
-            ));
-        }
-        terminal.tools_namespace = Some(args.tools_namespace.clone());
-    }
-    if !zeabur_plan::checks::is_dns_label(&args.cluster_tools_namespace)
-        || terminal.tools_namespace.as_deref() == Some(args.cluster_tools_namespace.as_str())
-    {
+    if !zeabur_plan::checks::is_dns_label(&args.terminal_namespace) {
         return Err(format!(
-            "--cluster-tools-namespace: {:?} is not a namespace's name of its own",
-            args.cluster_tools_namespace
+            "--terminal-namespace: {:?} is not a namespace's name",
+            args.terminal_namespace
         ));
     }
-    args.cluster_tools_namespace
-        .clone_into(&mut terminal.cluster_tools_namespace);
+    args.terminal_namespace.clone_into(&mut terminal.namespace);
+    if !args.terminal_token_file.is_empty() {
+        terminal.token_file = Some(args.terminal_token_file.clone().into());
+    }
     if args.tools_deadline_minutes == 0 {
         return Err("--tools-deadline-minutes must be at least 1".to_owned());
     }
@@ -517,8 +509,8 @@ mod tests {
         assert!(error.starts_with("--metrics-service:"), "{error}");
         let error = args(&files, &["--namespace", "Default"]).unwrap_err();
         assert!(error.starts_with("--namespace:"), "{error}");
-        let error = args(&files, &["--tools-namespace", "Tools"]).unwrap_err();
-        assert!(error.starts_with("--tools-namespace:"), "{error}");
+        let error = args(&files, &["--terminal-namespace", "Tools"]).unwrap_err();
+        assert!(error.starts_with("--terminal-namespace:"), "{error}");
         let error = args(&files, &["--tools-requests", "gpu=1"]).unwrap_err();
         assert!(error.starts_with("--tools-requests:"), "{error}");
         let error = args(&files, &["--tools-requests", "memory=1Gi"]).unwrap_err();
@@ -535,10 +527,10 @@ mod tests {
             &[
                 "--debug-image",
                 "registry.example.com/busybox:1",
-                "--tools-namespace",
-                "zeabur-tools",
-                "--cluster-tools-namespace",
-                "ops-tools",
+                "--terminal-namespace",
+                "ops-terminals",
+                "--terminal-token-file",
+                "/var/run/zeabur/terminal-token/token",
                 "--tools-deadline-minutes",
                 "10",
                 "--tools-grace-seconds",
@@ -551,8 +543,11 @@ mod tests {
         let terminal = &config.settings.terminal;
         assert_eq!(terminal.debug_image, "registry.example.com/busybox:1");
         assert_eq!(terminal.tools_image, zeabur_api::settings::TOOLS_IMAGE);
-        assert_eq!(terminal.tools_namespace.as_deref(), Some("zeabur-tools"));
-        assert_eq!(terminal.cluster_tools_namespace, "ops-tools");
+        assert_eq!(terminal.namespace, "ops-terminals");
+        assert_eq!(
+            terminal.token_file.as_deref(),
+            Some(Path::new("/var/run/zeabur/terminal-token/token"))
+        );
         assert_eq!(terminal.tools_deadline_seconds, 600);
         assert_eq!(terminal.tools_grace, std::time::Duration::from_secs(5));
         assert_eq!(terminal.tools_resources.limits["memory"], "256Mi");

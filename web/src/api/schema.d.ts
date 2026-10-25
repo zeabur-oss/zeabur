@@ -2058,8 +2058,8 @@ export interface paths {
      *     and `4001`). Before the shell starts, Zeabur writes the person's current credential into the
      *     pod (see the module documentation); `ready` names the container `tools`. Failures arrive as an
      *     `error` frame: a pod that is not the person's (`404`), one not running yet (`409`), local mode
-     *     (`400`), or `pods/exec` refused (`403`). The pod is deleted a minute (by default) after its
-     *     last terminal closes.
+     *     (`400`), or `create` on `pods/exec` in the project refused (`403`). The pod is deleted a minute
+     *     (by default) after its last terminal closes.
      */
     get: operations["toolsTerminal"]
     put?: never
@@ -3443,10 +3443,7 @@ export interface components {
        *     bindings.
        */
       token?: string | null
-      /**
-       * @description Who `kubectl` acts as and until when, or that a running pod is used; who else could use
-       *     the credential.
-       */
+      /** @description Who `kubectl` acts as and until when, or that a running pod is used. */
       warnings: components["schemas"]["PlanWarning"][]
       /** @description The writes, in order; none when it uses a running pod. */
       writes: components["schemas"]["ShellWrite"][]
@@ -6556,12 +6553,6 @@ export interface components {
         }
       | {
           /** @enum {string} */
-          code: "toolsCredentialExposed"
-          /** @description The pod's namespace, whose `pods/exec` grants decide who that is. */
-          namespace: string
-        }
-      | {
-          /** @enum {string} */
           code: "toolsPodReused"
           /** @description Its namespace. */
           namespace: string
@@ -8689,7 +8680,7 @@ export interface components {
     ToolsStatus: {
       /**
        * @description Whether Zeabur can open a tools terminal here; `false` in local mode, which holds no
-       *     token to hand over.
+       *     token to hand over and no service account.
        */
       available: boolean
       /** @description The tools pods that had stopped or outlived their deadline and were deleted now. */

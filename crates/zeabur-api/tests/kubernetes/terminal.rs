@@ -1,8 +1,9 @@
 //! A debug container and a tools pod on a real cluster, as the person: the debug container is
 //! added to a pod whose image has no shell and a terminal opens in it beside the target's
-//! processes; the tools pod starts locked down with no token in its spec, and kubectl in it acts
-//! as the person with the kubeconfig written through standard input; it is gone once its
-//! terminal closes.
+//! processes; the tools pod starts locked down with no token in its spec, in a terminal namespace
+//! the person cannot read, and kubectl in it acts as the person with the kubeconfig written
+//! through standard input; it is gone once its terminal closes. A second sandbox's person stands
+//! in for Zeabur's own service account, with the rights the chart gives it.
 
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -19,7 +20,7 @@ use tokio_tungstenite::tungstenite::Message;
 use tokio_tungstenite::tungstenite::client::IntoClientRequest as _;
 use zeabur_api::Settings;
 use zeabur_api::access::{Access, ClusterAccess, Elevation, Handoff};
-use zeabur_core::problem::Problem;
+use zeabur_core::problem::{Denied, Problem};
 use zeabur_kube::Cluster;
 use zeabur_kube::k8s_openapi::api::core::v1::Pod;
 use zeabur_kube::k8s_openapi::jiff::{SignedDuration, Timestamp};
@@ -66,6 +67,35 @@ fn app(sandbox: &Sandbox) -> Router {
         }),
         settings,
     )
+}
+
+fn with_terminals(sandbox: &Sandbox, terminals: &Sandbox) -> Router {
+    let mut settings = Settings::default();
+    settings.terminal.tools_grace = Duration::ZERO;
+    terminals
+        .namespace()
+        .clone_into(&mut settings.terminal.namespace);
+    zeabur_api::router_with_terminals(
+        Arc::new(Signed {
+            cluster: Arc::new(sandbox.user().clone()),
+            token: sandbox.token().to_owned(),
+        }),
+        settings,
+        Arc::new(terminals.user().clone()),
+    )
+}
+
+/// The terminal namespace, whose person has the Role the chart gives Zeabur there.
+async fn terminals() -> Sandbox {
+    Sandbox::new(
+        "zeabur-terminals",
+        json!([
+            {"apiGroups": [""], "resources": ["pods"],
+             "verbs": ["create", "get", "list", "delete"]},
+            {"apiGroups": [""], "resources": ["pods/exec"], "verbs": ["get", "create"]}
+        ]),
+    )
+    .await
 }
 
 async fn sandbox() -> Sandbox {
@@ -242,13 +272,33 @@ async fn a_debug_container_opens_a_shell_beside_a_container_without_one() {
 #[ignore = "needs a disposable cluster"]
 async fn kubectl_in_a_tools_pod_acts_as_the_person_and_the_pod_goes_after() {
     let sandbox = sandbox().await;
+    let terminals = terminals().await;
     let ns = sandbox.namespace().to_owned();
-    let app = app(&sandbox);
+    let app = with_terminals(&sandbox, &terminals);
     let planned = plan_and_apply(&app, &ns, json!({"op": "clusterTools"})).await;
     assert!(!planned.to_string().contains(sandbox.token()));
     let name = planned["warnings"][0]["pod"].as_str().unwrap().to_owned();
 
-    let pods = Api::<Pod>::namespaced(sandbox.admin().clone(), &ns);
+    let pods = terminals.admin_api::<Pod>();
+    let theirs = Api::<Pod>::namespaced(sandbox.user().kube().clone(), terminals.namespace());
+    assert!(
+        theirs
+            .list(&kube::api::ListParams::default())
+            .await
+            .is_err(),
+        "the person cannot list tools pods"
+    );
+    let exec = Denied {
+        verb: "create".to_owned(),
+        group: String::new(),
+        resource: "pods/exec".to_owned(),
+        name: Some(name.clone()),
+        namespace: Some(terminals.namespace().to_owned()),
+    };
+    assert!(
+        !sandbox.user().review_access(&exec).await.unwrap(),
+        "the person cannot run commands in it past Zeabur"
+    );
     let stored = serde_json::to_value(pods.get(&name).await.unwrap()).unwrap();
     assert!(!stored.to_string().contains(sandbox.token()));
     assert_eq!(stored["spec"]["automountServiceAccountToken"], false);

@@ -1,6 +1,7 @@
 //! A debug container and a tools pod against an in-memory cluster: the plans and what they say,
 //! the writes, reuse, refusals in plain words, the terminal in each, and the tools pod's
-//! credential reaching it only through a command's standard input.
+//! credential reaching it only through a command's standard input. Tools pods run in the
+//! terminal namespace, which only Zeabur's own service account uses; the person cannot see it.
 
 #[cfg(test)]
 mod tests {
@@ -29,6 +30,7 @@ mod tests {
 
     const TOKEN: &str = "eyJhbGciOi.secret-token-of-alice.sig";
     const WAIT: Duration = Duration::from_secs(5);
+    const TERMINALS: &str = "zeabur-terminals";
 
     fn pod(value: Value) -> Pod {
         serde_json::from_value(value).unwrap()
@@ -60,24 +62,36 @@ mod tests {
                 username: "alice@example.com".to_owned(),
                 groups: vec!["developers".to_owned()],
             },
-            namespaces: vec![namespace("shop"), namespace("zeabur-tools")],
-            objects: BTreeMap::from([
-                (
-                    "shop".to_owned(),
-                    NamespaceObjects {
-                        namespace: "shop".to_owned(),
-                        pods: vec![distroless()],
-                        ..NamespaceObjects::default()
-                    },
-                ),
-                (
-                    "zeabur-tools".to_owned(),
-                    NamespaceObjects {
-                        namespace: "zeabur-tools".to_owned(),
-                        ..NamespaceObjects::default()
-                    },
-                ),
-            ]),
+            namespaces: vec![namespace("shop")],
+            objects: BTreeMap::from([(
+                "shop".to_owned(),
+                NamespaceObjects {
+                    namespace: "shop".to_owned(),
+                    pods: vec![distroless()],
+                    ..NamespaceObjects::default()
+                },
+            )]),
+            forbidden_namespaces: [TERMINALS.to_owned()].into(),
+            ..State::default()
+        })
+    }
+
+    /// Zeabur's own service account, which sees the terminal namespace only.
+    fn zeabur() -> MemoryCluster {
+        MemoryCluster::new(State {
+            identity: Identity {
+                username: "system:serviceaccount:zeabur:zeabur".to_owned(),
+                groups: Vec::new(),
+            },
+            namespaces: vec![namespace(TERMINALS)],
+            objects: BTreeMap::from([(
+                TERMINALS.to_owned(),
+                NamespaceObjects {
+                    namespace: TERMINALS.to_owned(),
+                    ..NamespaceObjects::default()
+                },
+            )]),
+            forbidden_namespaces: ["shop".to_owned()].into(),
             ..State::default()
         })
     }
@@ -110,27 +124,27 @@ mod tests {
         }
     }
 
-    fn settings(tools_namespace: Option<&str>) -> Settings {
+    fn settings() -> Settings {
         let mut settings = Settings::default();
         settings.terminal.tools_grace = Duration::ZERO;
-        settings.terminal.tools_namespace = tools_namespace.map(str::to_owned);
         settings
     }
 
     fn local(cluster: &MemoryCluster) -> Router {
         zeabur_api::router_with_settings(
             Arc::new(SingleCluster(Arc::new(cluster.clone()))),
-            settings(None),
+            settings(),
         )
     }
 
-    fn signed(cluster: &MemoryCluster, tools_namespace: Option<&str>) -> Router {
-        zeabur_api::router_with_settings(
+    fn signed(cluster: &MemoryCluster, zeabur: &MemoryCluster, admin: bool) -> Router {
+        zeabur_api::router_with_terminals(
             Arc::new(Signed {
                 cluster: Arc::new(cluster.clone()),
-                admin: false,
+                admin,
             }),
-            settings(tools_namespace),
+            settings(),
+            Arc::new(zeabur.clone()),
         )
     }
 
@@ -355,23 +369,27 @@ mod tests {
     #[tokio::test]
     async fn the_token_reaches_the_tools_pod_only_through_standard_input() {
         let cluster = cluster();
-        let app = signed(&cluster, Some("zeabur-tools"));
+        let zeabur = zeabur();
+        let app = signed(&cluster, &zeabur, false);
         let (status, planned) = plan(&app, json!({"op": "clusterTools"})).await;
         assert_eq!(status, StatusCode::OK, "{planned}");
         assert!(!planned.to_string().contains("secret-token"));
         let tools = &planned["warnings"][0];
         assert_eq!(tools["code"], "toolsPod");
-        assert_eq!(tools["namespace"], "zeabur-tools");
+        assert_eq!(tools["namespace"], TERMINALS);
         assert_eq!(tools["person"], "alice@example.com");
         assert_eq!(tools["admin"], false);
         assert_eq!(tools["deadlineSeconds"], 1800);
         assert!(tools["credentialExpiresAt"].is_string());
-        assert_eq!(planned["warnings"][1]["code"], "toolsCredentialExposed");
         let name = tools["pod"].as_str().unwrap().to_owned();
 
         let (status, applied) = apply(&app, &planned).await;
         assert_eq!(status, StatusCode::OK, "{applied}");
-        let created = stored_pod(&cluster, "zeabur-tools", &name).unwrap();
+        let created = stored_pod(&zeabur, TERMINALS, &name).unwrap();
+        assert_eq!(
+            created["metadata"]["annotations"]["zeabur.com/tools-project"],
+            "shop"
+        );
         assert_eq!(created["spec"]["automountServiceAccountToken"], false);
         assert!(!created.to_string().contains("secret-token"));
 
@@ -385,8 +403,8 @@ mod tests {
         assert_eq!(listed["pods"][0]["ready"], false);
 
         set_pod_status(
-            &cluster,
-            "zeabur-tools",
+            &zeabur,
+            TERMINALS,
             &name,
             json!({"phase": "Running", "startTime": "2026-10-21T00:00:00Z",
                    "containerStatuses": [{"name": "tools", "image": "k8s", "imageID": "",
@@ -402,32 +420,37 @@ mod tests {
             frame(&mut socket).await,
             json!({"type": "ready", "container": "tools"})
         );
-        let runs = cluster.inspect(|s| s.runs.clone()).unwrap();
+        let runs = zeabur.inspect(|s| s.runs.clone()).unwrap();
         let [setup] = runs.as_slice() else {
             panic!("one setup run: {runs:?}")
         };
-        assert_eq!(setup.pod, format!("zeabur-tools/{name}"));
+        assert_eq!(setup.pod, format!("{TERMINALS}/{name}"));
         assert_eq!(setup.container, "tools");
         assert!(String::from_utf8_lossy(&setup.input).contains(TOKEN));
         assert!(!setup.command.iter().any(|a| a.contains("secret-token")));
         let config: Value = serde_json::from_slice(&setup.input).unwrap();
         assert_eq!(config["contexts"][0]["context"]["namespace"], "shop");
-        let writes = cluster.inspect(|s| format!("{:?}", s.writes)).unwrap();
+        let writes = zeabur.inspect(|s| format!("{:?}", s.writes)).unwrap();
         assert!(!writes.contains("secret-token"));
+        assert_eq!(
+            cluster.inspect(|s| s.writes.len()),
+            Some(0),
+            "nothing as the person"
+        );
 
         socket
             .send(Message::binary(b"exit\r".to_vec()))
             .await
             .unwrap();
         let deleted = async {
-            while stored_pod(&cluster, "zeabur-tools", &name).is_some() {
+            while stored_pod(&zeabur, TERMINALS, &name).is_some() {
                 tokio::time::sleep(Duration::from_millis(10)).await;
             }
         };
         tokio::time::timeout(WAIT, deleted)
             .await
             .expect("the pod is deleted after its last terminal");
-        let runs = cluster.inspect(|s| s.runs.clone()).unwrap();
+        let runs = zeabur.inspect(|s| s.runs.clone()).unwrap();
         let forget = runs.last().unwrap();
         assert!(
             forget.command.iter().any(|a| a.contains("rm -f")),
@@ -437,44 +460,76 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn only_the_persons_own_tools_pods_are_listed_deleted_and_swept() {
+    async fn an_administrators_project_terminal_works_the_same_way() {
         let cluster = cluster();
-        let tools_pod = |name: &str, person: &str, phase: &str| {
+        let zeabur = zeabur();
+        let app = signed(&cluster, &zeabur, true);
+        let (status, planned) = plan(&app, json!({"op": "clusterTools"})).await;
+        assert_eq!(status, StatusCode::OK, "{planned}");
+        assert_eq!(planned["warnings"][0]["admin"], true);
+        let (status, applied) = apply(&app, &planned).await;
+        assert_eq!(status, StatusCode::OK, "{applied}");
+        let name = planned["warnings"][0]["pod"].as_str().unwrap();
+        assert!(stored_pod(&zeabur, TERMINALS, name).is_some());
+    }
+
+    #[tokio::test]
+    async fn without_the_right_to_run_commands_in_the_project_there_is_no_tools_pod() {
+        let cluster = cluster();
+        cluster.update(|s| {
+            s.refused_rights.insert("create pods/exec".to_owned());
+        });
+        let zeabur = zeabur();
+        let app = signed(&cluster, &zeabur, false);
+        let (status, refused) = plan(&app, json!({"op": "clusterTools"})).await;
+        assert_eq!(status, StatusCode::FORBIDDEN, "{refused}");
+        assert_eq!(refused["denied"]["resource"], "pods/exec", "{refused}");
+        assert_eq!(refused["denied"]["namespace"], "shop", "{refused}");
+        let (status, _) = send(&app, "GET", "/api/v1/projects/shop/tools", None).await;
+        assert_eq!(status, StatusCode::FORBIDDEN);
+        assert_eq!(zeabur.inspect(|s| s.writes.len()), Some(0));
+    }
+
+    #[tokio::test]
+    async fn only_the_persons_own_tools_pods_of_the_project_are_listed_deleted_and_swept() {
+        let cluster = cluster();
+        let zeabur = zeabur();
+        let tools_pod = |name: &str, person: &str, project: &str, phase: &str| {
             let key = zeabur_plan::terminal::person_key(person);
             pod(json!({
-                "metadata": {"name": name, "namespace": "shop", "uid": format!("uid-{name}"),
+                "metadata": {"name": name, "namespace": TERMINALS, "uid": format!("uid-{name}"),
                     "resourceVersion": "3", "creationTimestamp": "2026-10-21T00:00:00Z",
-                    "labels": {"zeabur.com/tools": "true", "zeabur.com/tools-person": key}},
+                    "labels": {"zeabur.com/tools": "true", "zeabur.com/tools-person": key},
+                    "annotations": {"zeabur.com/tools-project": project}},
                 "spec": {"activeDeadlineSeconds": 1_000_000_000,
                          "containers": [{"name": "tools", "image": "k8s"}]},
                 "status": {"phase": phase}
             }))
         };
-        cluster.update(|state| {
-            let pods = &mut state.objects.get_mut("shop").unwrap().pods;
+        zeabur.update(|state| {
+            let pods = &mut state.objects.get_mut(TERMINALS).unwrap().pods;
+            let alice = "alice@example.com";
+            pods.push(tools_pod("zeabur-tools-mine", alice, "shop", "Running"));
+            pods.push(tools_pod("zeabur-tools-old", alice, "shop", "Failed"));
+            pods.push(tools_pod("zeabur-tools-blog", alice, "blog", "Running"));
             pods.push(tools_pod(
-                "zeabur-tools-mine",
-                "alice@example.com",
+                "zeabur-tools-bobs",
+                "bob@example.com",
+                "shop",
                 "Running",
             ));
-            pods.push(tools_pod("zeabur-tools-old", "alice@example.com", "Failed"));
-            pods.push(tools_pod("zeabur-tools-bobs", "bob@example.com", "Running"));
-            let mut going = tools_pod("zeabur-tools-going", "alice@example.com", "Running");
+            let mut going = tools_pod("zeabur-tools-going", alice, "shop", "Running");
             going.metadata.deletion_timestamp =
                 serde_json::from_value(json!("2026-10-21T00:10:00Z")).ok();
             pods.push(going);
-            pods.push(tools_pod(
-                "zeabur-tools-kept",
-                "alice@example.com",
-                "Failed",
-            ));
+            pods.push(tools_pod("zeabur-tools-kept", alice, "shop", "Failed"));
             state
                 .forbidden_writes
                 .insert("Pod/zeabur-tools-kept".to_owned());
         });
-        let app = signed(&cluster, None);
+        let app = signed(&cluster, &zeabur, false);
         let (_, listed) = send(&app, "GET", "/api/v1/projects/shop/tools", None).await;
-        assert_eq!(listed["namespace"], "shop");
+        assert_eq!(listed["namespace"], TERMINALS);
         assert_eq!(listed["deleted"], json!(["zeabur-tools-old"]));
         let names: Vec<&str> = listed["pods"]
             .as_array()
@@ -483,17 +538,41 @@ mod tests {
             .map(|p| p["name"].as_str().unwrap())
             .collect();
         assert_eq!(names, ["zeabur-tools-mine", "zeabur-tools-kept"]);
-        assert!(stored_pod(&cluster, "shop", "zeabur-tools-old").is_none());
+        assert!(stored_pod(&zeabur, TERMINALS, "zeabur-tools-old").is_none());
 
-        let (status, _) = send(
-            &app,
-            "DELETE",
-            "/api/v1/projects/shop/tools/zeabur-tools-bobs",
-            None,
+        for other in ["zeabur-tools-bobs", "zeabur-tools-blog"] {
+            let (status, _) = send(
+                &app,
+                "DELETE",
+                &format!("/api/v1/projects/shop/tools/{other}"),
+                None,
+            )
+            .await;
+            assert_eq!(status, StatusCode::NOT_FOUND, "{other}");
+            assert!(stored_pod(&zeabur, TERMINALS, other).is_some());
+        }
+
+        set_pod_status(
+            &zeabur,
+            TERMINALS,
+            "zeabur-tools-bobs",
+            json!({"phase": "Running", "containerStatuses": [{"name": "tools", "image": "k8s",
+                   "imageID": "", "ready": true, "restartCount": 0, "state": {"running": {}}}]}),
+        );
+        let address = serve(app.clone()).await;
+        let mut socket = connect(
+            address,
+            "/api/v1/projects/shop/tools/zeabur-tools-bobs/terminal",
         )
         .await;
-        assert_eq!(status, StatusCode::NOT_FOUND);
-        assert!(stored_pod(&cluster, "shop", "zeabur-tools-bobs").is_some());
+        let refused = frame(&mut socket).await;
+        assert_eq!(refused["type"], "error", "{refused}");
+        assert_eq!(
+            zeabur.inspect(|s| s.runs.len()),
+            Some(0),
+            "nothing ran in Bob's pod"
+        );
+
         let (status, _) = send(
             &app,
             "DELETE",
@@ -502,7 +581,7 @@ mod tests {
         )
         .await;
         assert_eq!(status, StatusCode::NO_CONTENT);
-        assert!(stored_pod(&cluster, "shop", "zeabur-tools-mine").is_none());
+        assert!(stored_pod(&zeabur, TERMINALS, "zeabur-tools-mine").is_none());
     }
 
     type Socket = tokio_tungstenite::WebSocketStream<

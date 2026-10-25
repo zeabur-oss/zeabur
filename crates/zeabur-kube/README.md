@@ -6,9 +6,10 @@ The only crate that talks to kube-apiserver.
 
 How a request reaches the cluster. The port it exports reads and writes *as a given user*: the
 caller hands over the user's credential (a bearer token issued by Zeabur Identity, or the local
-kubeconfig context) and gets back a client bound to it. No exported function returns a client
-built from Zeabur's own service account, so no layer above can act with more rights than the
-person using it; kube-apiserver makes every authorisation decision.
+kubeconfig context) and gets back a client bound to it, so no layer above can act with more
+rights than the person using it; kube-apiserver makes every authorisation decision. The one
+exception is `UserClient::with_token_file`, for Zeabur's own service account, which the chart
+lets create, run commands in and delete pods in the terminal namespace and nothing else.
 
 The port ([`Cluster`](crate::port::Cluster)) has two adapters: kube-rs against a real cluster
 ([`UserClient`]), and an in-memory store for tests (`memory::MemoryCluster`, behind the `memory`

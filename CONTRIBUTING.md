@@ -209,7 +209,7 @@ Each cluster test works in a namespace of its own with a person in it, from
 interface: `./scripts/build-ui.sh && ZEABUR_UI_DIST=$PWD/web/dist cargo build --release -p zeaburctl`.
 
 `scripts/e2e-l2.sh` (the `kubernetes-l2` job) is `up`, the browser tests, then checks from outside
-(Zeabur's service accounts have no extra rights, the idle pod's memory, removing Zeabur leaves the
+(Zeabur's service accounts have no extra rights beyond pods in `zeabur-terminals`, the idle pod's memory, removing Zeabur leaves the
 cluster as it was) and `down`. It takes `up`'s options; `ZEABUR_L2_KEEP=1` keeps the cluster and
 skips the removal check. On a cluster of `--profile full`, a browser test that would skip for want
 of a component fails instead.

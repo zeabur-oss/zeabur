@@ -108,12 +108,10 @@ spec:
             - name: ZEABUR_TOOLS_IMAGE
               value: {{ . | quote }}
             {{- end }}
-            {{- with .toolsNamespace }}
-            - name: ZEABUR_TOOLS_NAMESPACE
-              value: {{ . | quote }}
-            {{- end }}
-            - name: ZEABUR_CLUSTER_TOOLS_NAMESPACE
-              value: {{ .clusterToolsNamespace | quote }}
+            - name: ZEABUR_TERMINAL_NAMESPACE
+              value: {{ .namespace | quote }}
+            - name: ZEABUR_TERMINAL_TOKEN_FILE
+              value: /var/run/zeabur/terminal-token/token
             - name: ZEABUR_TOOLS_DEADLINE_MINUTES
               value: {{ .toolsDeadlineMinutes | int | quote }}
             - name: ZEABUR_TOOLS_GRACE_SECONDS
@@ -173,6 +171,9 @@ spec:
             - name: plan-key
               mountPath: /etc/zeabur/plan-key
               readOnly: true
+            - name: terminal-token
+              mountPath: /var/run/zeabur/terminal-token
+              readOnly: true
             {{- if $issuer.caBundle.configMap }}
             - name: issuer-ca
               mountPath: /etc/zeabur/issuer-ca
@@ -222,6 +223,16 @@ spec:
             items:
               - key: {{ .Values.planKey.key }}
                 path: {{ .Values.planKey.key }}
+        # Zeabur's own token, for tools pods in the terminal namespace only (templates/terminals.yaml).
+        # It is apart from the path in-cluster clients read, so nothing else uses it by default.
+        # https://kubernetes.io/docs/concepts/storage/projected-volumes/#serviceaccounttoken
+        - name: terminal-token
+          projected:
+            defaultMode: 0440
+            sources:
+              - serviceAccountToken:
+                  path: token
+                  expirationSeconds: 3600
         {{- if $issuer.caBundle.configMap }}
         - name: issuer-ca
           configMap:

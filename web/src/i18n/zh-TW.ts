@@ -1099,7 +1099,8 @@ export const zhTW: Messages = {
   "confirm.debugStays":
     "它會留在這個副本裡，直到副本被替換為止，例如重新啟動時。Kubernetes 無法提早移除它。",
   "confirm.debugReused": "這個副本裡已經有除錯容器在執行，終端機會在其中開啟。",
-  "confirm.clusterTools": "在這個專案裡替你啟動一個暫時的容器，裡面有 kubectl 和 helm。",
+  "confirm.clusterTools":
+    "替你啟動一個暫時的容器，裡面有 kubectl 和 helm，只有 Zeabur 和叢集管理員碰得到。kubectl 預設在這個專案。",
   "confirm.toolsActsAs": (person: string, admin: boolean) =>
     admin
       ? `kubectl 與 helm 會以 ${person} 的身分執行，使用你目前持有的管理員權限。`
@@ -1339,8 +1340,6 @@ export const zhTW: Messages = {
   "risk.opensPort": "網際網路上任何人都能連到它，Zeabur 不會要求密碼。",
   "risk.deletes": "刪除後無法復原。",
   "warn.rightsMissing": (rights: string) => `叢集可能會拒絕：你缺少 ${rights} 的權限。`,
-  "warn.toolsCredentialExposed": (namespace: string) =>
-    `這個終端機的容器執行期間，只要有權在 ${namespace} 的容器裡執行指令，就能使用你的認證資訊。`,
   "warn.restartNeeded": (names: string) => `重新啟動後才會生效：${names}`,
   "warn.reloaderRestarts": (names: string) => `Reloader 會重新啟動 ${names}`,
   "warn.reloaderMayRestart": (names: string) => `若這個叢集有執行 Reloader，會重新啟動 ${names}`,

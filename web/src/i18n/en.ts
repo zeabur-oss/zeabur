@@ -1171,7 +1171,7 @@ export const en = {
   "confirm.debugReused":
     "A debug container already runs in this replica; the terminal opens in it.",
   "confirm.clusterTools":
-    "Starts a temporary container with kubectl and helm for you, in this project.",
+    "Starts a temporary container with kubectl and helm for you, where only Zeabur and cluster administrators can reach it. kubectl starts in this project.",
   "confirm.toolsActsAs": (person: string, admin: boolean) =>
     admin
       ? `kubectl and helm act as ${person}, with the admin rights you hold now.`
@@ -1432,8 +1432,6 @@ export const en = {
   "risk.opensPort": "Anyone on the internet can connect to it, without a password from Zeabur.",
   "risk.deletes": "Deleting can't be undone.",
   "warn.rightsMissing": (rights: string) => `The cluster may refuse this: you lack ${rights}.`,
-  "warn.toolsCredentialExposed": (namespace: string) =>
-    `Anyone who can run commands in the containers of ${namespace} can use your credential while this terminal's container runs.`,
   "warn.restartNeeded": (names: string) => `Takes effect after a restart: ${names}`,
   "warn.reloaderRestarts": (names: string) => `Reloader restarts ${names}`,
   "warn.reloaderMayRestart": (names: string) =>

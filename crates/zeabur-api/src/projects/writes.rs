@@ -289,6 +289,7 @@ pub(crate) async fn plan(
         settings: &state.settings.terminal,
         person: &identity.username,
         handoff: handoff.as_ref(),
+        zeabur: state.terminals.as_deref(),
     };
     let opened = deploy_keys::open(&state, &identity.username, &project, &request)?;
     let opened = s3_destinations::open(cluster.as_ref(), opened).await?;
@@ -423,6 +424,7 @@ pub(crate) async fn apply(
         settings: &state.settings.terminal,
         person: &identity.username,
         handoff: handoff.as_ref(),
+        zeabur: state.terminals.as_deref(),
     };
     let opened = deploy_keys::open(&state, &identity.username, &project, &claims.request)?;
     let opened = s3_destinations::open(cluster.as_ref(), opened).await?;
@@ -440,7 +442,8 @@ pub(crate) async fn apply(
         state.settings.domains.cluster_issuer.as_deref(),
     )
     .await?;
-    let namespace = terminal::namespace(&state.settings.terminal, &claims.request, &project);
+    let (namespace, target_cluster) =
+        planner.writer(&claims.request, &project, cluster.as_ref())?;
     if zeabur_plan::versions(&plan) != claims.versions {
         return Err(ApiError::from(Problem::new(
             Kind::Conflict,
@@ -462,20 +465,20 @@ pub(crate) async fn apply(
             dry_run: true,
             ..write.clone()
         };
-        if let Err(error) = cluster.write(&dry).await {
-            let problem = refused(cluster.as_ref(), namespace, target, write, error).await;
+        if let Err(error) = target_cluster.write(&dry).await {
+            let problem = refused(target_cluster, namespace, target, write, error).await;
             return Err(ApiError::from(refusal(problem, &plan, target, &[])));
         }
     }
     let mut applied = Vec::new();
     for (target, write) in writes {
-        match cluster.write(&write).await {
+        match target_cluster.write(&write).await {
             Ok(written) => applied.push(Applied {
                 target,
                 resource_version: written.resource_version,
             }),
             Err(error) => {
-                let problem = refused(cluster.as_ref(), namespace, &target, &write, error).await;
+                let problem = refused(target_cluster, namespace, &target, &write, error).await;
                 return Err(ApiError::from(refusal(problem, &plan, &target, &applied)));
             }
         }

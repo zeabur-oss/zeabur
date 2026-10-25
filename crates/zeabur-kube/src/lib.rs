@@ -6,7 +6,9 @@
 //! type has no field for a credential, and [`ClusterEndpoint::in_cluster`] reads only the
 //! address and the CA bundle of the pod's service account, never its token. So the only identity
 //! a request from this crate can carry is the one the person brought, and kube-apiserver
-//! authorises it with that person's own RBAC rights [k8s-authn] [k8s-authz]. Zeabur does not
+//! authorises it with that person's own RBAC rights [k8s-authn] [k8s-authz]. The one exception
+//! is [`UserClient::with_token_file`]: Zeabur's own service account, which the chart lets into
+//! the terminal namespace only (see `zeabur_api::tools`). Zeabur does not
 //! impersonate: impersonation would need `impersonate` rights on Zeabur's service account, which
 //! would then be able to do anything any user can [k8s-impersonation].
 //!
@@ -215,6 +217,24 @@ impl UserClient {
         let authorization = token.authorization().clone();
         Ok(Self {
             client: client(endpoint.config(), endpoint.pool()?, Some(authorization))?,
+            name: None,
+        })
+    }
+
+    /// Acts as the holder of the token in `path`, which is read again as it rotates. Only for
+    /// Zeabur's own service account in the terminal namespace (see `zeabur_api::tools`).
+    ///
+    /// # Errors
+    ///
+    /// When the TLS or HTTP client cannot be built, or the file cannot be read.
+    pub fn with_token_file(
+        endpoint: &ClusterEndpoint,
+        path: &std::path::Path,
+    ) -> Result<Self, ConnectError> {
+        let mut config = endpoint.config();
+        config.auth_info.token_file = Some(path.to_string_lossy().into_owned());
+        Ok(Self {
+            client: client(config, endpoint.pool()?, None)?,
             name: None,
         })
     }

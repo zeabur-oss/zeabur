@@ -49,7 +49,8 @@ restarted=$(kubectl -n "$project" get deployment/talker \
   -o jsonpath='{.spec.template.metadata.annotations.kubectl\.kubernetes\.io/restartedAt}')
 [[ -n "$restarted" ]] || { echo "error: deployment/talker was not restarted" >&2; exit 1; }
 
-# --- Zeabur's and Zeabur Proxy's own rights: none beyond what any service account has --------------
+# --- Zeabur's and Zeabur Proxy's own rights: none beyond what any service account has, except -----
+# --- Zeabur's pods in the terminal namespace --------------------------------------------------------
 # kubectl adds no groups to --as; these are the ones a service account's token carries. A name
 # no object has stands for a fresh service account, to which only the cluster's defaults apply.
 groups=(--as-group=system:serviceaccounts "--as-group=system:serviceaccounts:$namespace"
@@ -71,6 +72,20 @@ for account in zeabur zeabur-proxy; do
   done
   echo "service account $account: no rights beyond the defaults"
 done
+as_zeabur=("--as=system:serviceaccount:$namespace:zeabur" "${groups[@]}")
+for right in "create pods" "create pods/exec" "delete pods"; do
+  if [[ "$(kubectl auth can-i "${right% *}" "${right#* }" -n zeabur-terminals "${as_zeabur[@]}" || true)" != yes ]]; then
+    echo "error: Zeabur may not $right in zeabur-terminals" >&2
+    exit 1
+  fi
+done
+for right in "create secrets" "create rolebindings" "patch pods"; do
+  if [[ "$(kubectl auth can-i "${right% *}" "${right#* }" -n zeabur-terminals "${as_zeabur[@]}" || true)" != no ]]; then
+    echo "error: Zeabur may $right in zeabur-terminals" >&2
+    exit 1
+  fi
+done
+echo "service account zeabur: pods in zeabur-terminals only"
 
 # --- Memory when idle -----------------------------------------------------------------------------
 # A fixed wait on purpose: the measure is the pod's working set after a minute of nothing, as
@@ -98,6 +113,7 @@ fi
 kubectl -n kube-system delete helmchart.helm.cattle.io zeabur --wait --timeout=180s
 kubectl -n kube-system delete helmchartconfig.helm.cattle.io zeabur --wait
 kubectl delete namespace "$namespace" --wait --timeout=180s
+kubectl wait --for=delete namespace/zeabur-terminals --timeout=180s
 kubectl delete rolebindings,clusterrolebindings -A -l app.kubernetes.io/managed-by=zeabur,zeabur.com/member --wait
 # The chart keeps the S3 destinations' namespace on purpose; the project's name is the person's.
 kubectl delete namespace zeabur-s3-destinations --wait --timeout=180s

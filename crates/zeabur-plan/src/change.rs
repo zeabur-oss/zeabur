@@ -1215,13 +1215,6 @@ pub enum Warning {
         /// It is deleted this long after its last terminal closes.
         grace_seconds: i64,
     },
-    /// While the credential is valid, anyone who can run commands in the tools pod, or read its
-    /// memory, can use it as the person.
-    #[serde(rename_all = "camelCase")]
-    ToolsCredentialExposed {
-        /// The pod's namespace, whose `pods/exec` grants decide who that is.
-        namespace: String,
-    },
     /// The person's tools pod still runs; the terminal uses it, and nothing is written.
     #[serde(rename_all = "camelCase")]
     ToolsPodReused {

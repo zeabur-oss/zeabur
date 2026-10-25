@@ -354,6 +354,7 @@ pub fn router_with_key(
     log_proxy: Option<Arc<dyn services::logs::LogProxy>>,
 ) -> Router {
     let images = inspector(images::https::Reach::Public, &settings);
+    let terminals = tools::connect(&settings.terminal);
     build_with(
         access,
         zeabur_kube::k8s_openapi::jiff::Timestamp::now,
@@ -366,6 +367,7 @@ pub fn router_with_key(
         images,
         zeabur_catalog::template_idle,
         images::https::Reach::Public,
+        terminals,
     )
 }
 
@@ -383,6 +385,7 @@ pub fn router_with_images(access: Arc<dyn ClusterAccess>, images: images::Inspec
         Arc::new(images),
         zeabur_catalog::template_idle,
         images::https::Reach::Any,
+        None,
     )
 }
 
@@ -411,6 +414,7 @@ pub fn router_with_log_proxy(
         inspector(images::https::Reach::Any, &Settings::default()),
         zeabur_catalog::template_idle,
         images::https::Reach::Any,
+        None,
     )
 }
 
@@ -422,6 +426,30 @@ pub fn router_with_settings(access: Arc<dyn ClusterAccess>, settings: Settings) 
         PlanKey::random().ok().map(Arc::new),
         pods::exec::IDLE,
         settings,
+    )
+}
+
+/// [`router_with_settings`], with `terminals` as Zeabur's own service account in the terminal
+/// namespace (see [`tools`]); for tests.
+pub fn router_with_terminals(
+    access: Arc<dyn ClusterAccess>,
+    settings: Settings,
+    terminals: Arc<dyn zeabur_kube::Cluster>,
+) -> Router {
+    let images = inspector(images::https::Reach::Any, &settings);
+    build_with(
+        access,
+        zeabur_kube::k8s_openapi::jiff::Timestamp::now,
+        PlanKey::random().ok().map(Arc::new),
+        pods::exec::IDLE,
+        settings,
+        Arc::new(resolve::System),
+        Arc::new(account::Fixed(None)),
+        None,
+        images,
+        zeabur_catalog::template_idle,
+        images::https::Reach::Any,
+        Some(terminals),
     )
 }
 
@@ -482,6 +510,7 @@ pub fn router_with_settings_and_resolver(
         images,
         zeabur_catalog::template_idle,
         images::https::Reach::Any,
+        None,
     )
 }
 
@@ -493,6 +522,7 @@ pub fn router_for_demo(
     resolver: Arc<dyn resolve::Resolve>,
     images: Arc<images::Inspector>,
     template_idle: fn(&str) -> Option<zeabur_catalog::IdleUse>,
+    terminals: Option<Arc<dyn zeabur_kube::Cluster>>,
 ) -> Router {
     build_with(
         access,
@@ -506,6 +536,7 @@ pub fn router_for_demo(
         images,
         template_idle,
         images::https::Reach::Any,
+        terminals,
     )
 }
 
@@ -529,6 +560,7 @@ fn build(
         images,
         zeabur_catalog::template_idle,
         images::https::Reach::Any,
+        None,
     )
 }
 
@@ -548,6 +580,7 @@ fn build_with(
     images: Arc<images::Inspector>,
     template_idle: fn(&str) -> Option<zeabur_catalog::IdleUse>,
     reach: images::https::Reach,
+    terminals: Option<Arc<dyn zeabur_kube::Cluster>>,
 ) -> Router {
     let catalogue = Arc::new(zeabur_catalog::catalogue().unwrap_or_default());
     let github = images::https::Https::new(reach, None).ok();
@@ -566,6 +599,7 @@ fn build_with(
         store: Arc::new(cluster::object_store::Fetcher::new(images.reach())),
         images,
         github,
+        terminals,
     };
     let (router, api) = routes().split_for_parts();
     let spec = Arc::new(serde_json::to_string(&api).unwrap_or_default());

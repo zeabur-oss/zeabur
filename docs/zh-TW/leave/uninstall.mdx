@@ -134,10 +134,10 @@ kubectl delete rolebindings,clusterrolebindings --all-namespaces \
 
 ### 終端機物件
 
-關閉終端機後，先列出仍留下的 tools Pod 與節點終端機 Pod：
+關閉終端機後，先列出仍留下的 tools Pod 與節點終端機 Pod。tools Pod 都在 `zeabur-terminals` Namespace，移除 chart 時會跟著 Namespace 一起刪除：
 
 ```sh
-kubectl get pods --all-namespaces -l zeabur.com/tools
+kubectl get pods --namespace zeabur-terminals -l zeabur.com/tools
 kubectl get pods --all-namespaces -l zeabur.com/node-shell=true
 ```
 

@@ -72,7 +72,7 @@ kubectl -n zeabur rollout status deployment/zeabur
 
 要把它固定列為專案，選擇**使用這個 Namespace**，檢查並套用。這只加上專案標籤，裡面的 Deployment、Service 與資料不會搬動。
 
-能登入卻看不到服務時，先確認該使用者的 Kubernetes 權限：Zeabur 用登入者自己的 token 讀取叢集，ServiceAccount 本身沒有任何權限。管理員可以在[成員](../cluster/members.mdx)授予專案角色。
+能登入卻看不到服務時，先確認該使用者的 Kubernetes 權限：Zeabur 用登入者自己的 token 讀取叢集，它的 ServiceAccount 只能在 `zeabur-terminals` 使用 kubectl 終端機的 Pod。管理員可以在[成員](../cluster/members.mdx)授予專案角色。
 
 ## 讓新服務有公開網址
 

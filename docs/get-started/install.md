@@ -178,14 +178,15 @@ touch.
 A terminal in a container without a shell adds a debug container to the pod (busybox, pinned
 by digest; `terminal.debugImage`). A tools terminal starts a short-lived pod with `kubectl` and
 `helm` (`alpine/k8s`, pinned by digest; `terminal.toolsImage`) that acts with the token of the
-person who opened it. Both are created as that person, so they need `patch` on
-`pods/ephemeralcontainers`, or `create` and `delete` on `pods`, plus `get` on `pods/exec`.
-With `terminal.toolsNamespace`, tools pods go in a namespace of their own instead of the
-project's; give people those rights there, and nobody else `pods/exec` in it.
-Administrators also open a tools terminal for the whole cluster, from the Components page; its
-pods go in `terminal.clusterToolsNamespace` (`zeabur-cluster-tools`, created by the first plan
-that needs it), never in `terminal.toolsNamespace`, since they hold an administrator's token.
-`terminal.toolsDeadlineMinutes` and `terminal.toolsResources` bound each tools pod.
+person who opened it. The debug container is created as that person, so it needs `patch` on
+`pods/ephemeralcontainers` plus `get` on `pods/exec`. Tools pods, for a project and for the
+whole cluster (administrators, from the Components page), all go in `terminal.namespace`
+(`zeabur-terminals`), which the chart creates. Zeabur asks kube-apiserver whether the person may
+`create` `pods/exec` in the project (for the cluster: whether they are a cluster administrator),
+then creates the pod and runs the terminal with its own ServiceAccount, which the chart lets
+create, read, delete and exec into pods in that namespace and nothing else. Give nobody else
+rights there: each pod holds its person's token, so only Zeabur and cluster administrators can
+read it. `terminal.toolsDeadlineMinutes` and `terminal.toolsResources` bound each tools pod.
 
 ### Use, disk and history
 
@@ -350,11 +351,13 @@ Delete that Secret to revoke the token.
 
 ## Check what Zeabur may do
 
-Zeabur's service account may do nothing a new service account cannot:
+Zeabur's service account may use pods in the terminal namespace and nothing else:
 
 ```sh
 kubectl auth can-i impersonate users --as=system:serviceaccount:zeabur:zeabur    # no
-kubectl get rolebindings,clusterrolebindings -A -o wide | grep -w zeabur/zeabur  # nothing
+kubectl auth can-i create pods -n default --as=system:serviceaccount:zeabur:zeabur  # no
+kubectl get rolebindings,clusterrolebindings -A -o wide | grep -w zeabur/zeabur
+# only zeabur-terminals/zeabur-terminals
 ```
 
 To see what a member may do, ask as them:

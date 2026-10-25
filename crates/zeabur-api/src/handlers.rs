@@ -44,6 +44,9 @@ pub struct AppState {
     pub github: Option<crate::images::https::Https>,
     /// Reads backups from their buckets (see [`crate::cluster::object_store`]).
     pub store: Arc<crate::cluster::object_store::Fetcher>,
+    /// Zeabur's own service account, which may use pods in the terminal namespace only (see
+    /// [`crate::tools`]); `None` where there is none (local mode).
+    pub terminals: Option<Arc<dyn Cluster>>,
 }
 
 impl std::fmt::Debug for AppState {

@@ -90,9 +90,13 @@ applied like any other plan and alone in it:
 The tools pod holds the person's Zeabur Identity token, which Zeabur otherwise never lets out of
 its process. So:
 
-- **Created as the person**, in the project's namespace or one the chart names, after a plan
-  that says what runs, where, as whom, with or without admin rights, until when, and that it is
-  deleted on close or at the deadline.
+- **In the terminal namespace** (`zeabur-terminals`), after a plan that says what runs, as
+  whom, with or without admin rights, until when, and that it is deleted on close or at the
+  deadline. Zeabur first asks kube-apiserver whether the person may `create` `pods/exec` in the
+  project (for the cluster scope: whether they are a cluster administrator), then creates, execs
+  into and deletes the pod with its own ServiceAccount. The chart binds that account to a Role
+  with exactly those rights in that one namespace. Members have no rights there, so no one can
+  list or exec into another person's tools pod. kubectl in it starts in the project.
 - **Nothing of Zeabur's in it**: `automountServiceAccountToken: false`, no service links.
 - **Locked down**: non-root, read-only root filesystem, no privilege escalation, every
   capability dropped, seccomp `RuntimeDefault`; small requests and limits;
@@ -110,9 +114,9 @@ its process. So:
   restarted, the token expired before the deletion) stop at their deadline, and the person's
   next tools request deletes them.
 
-What remains: until the token expires, anyone who may exec into pods in that namespace, or who
-administers its node, can use it. The plan says this in one sentence; a namespace of its own for
-tools pods narrows who that is.
+What remains: until the token expires, Zeabur itself, cluster administrators and whoever
+administers the pod's node can read it. Nobody else should get rights in the terminal
+namespace.
 
 ## Use and disk
 
