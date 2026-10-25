@@ -263,6 +263,14 @@ export function awaitsName(changes: readonly Change[], typed: string): boolean {
   return name !== undefined && typed.trim() !== name
 }
 
+const NAME_MARK = "\u0000"
+
+/** The text before and after the name in the sentence `say` makes around one. */
+export function aroundName(say: (name: string) => string): [string, string] {
+  const [before = "", after = ""] = say(NAME_MARK).split(NAME_MARK)
+  return [before, after]
+}
+
 /** The service page tab a change is seen on. */
 type Tab =
   | "variables"

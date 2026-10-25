@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
-import { useState, type ReactNode } from "react"
+import { useRef, useState, type ReactNode } from "react"
 import { createPortal } from "react-dom"
 import ArrowsClockwiseIcon from "~icons/ph/arrows-clockwise"
 import CaretLeftIcon from "~icons/ph/caret-left"
@@ -47,7 +47,15 @@ import { YamlDiff } from "@/components/yaml"
 import { useI18n, useT, writeSentence, type Translate } from "@/i18n"
 import { cn } from "@/lib/utils"
 import { toolNotes, type Skipped, type ToolNote } from "@/model/managed"
-import { awaitsName, destinationOf, typedName, undoOf, weigh, type PodsOf } from "@/model/risk"
+import {
+  aroundName,
+  awaitsName,
+  destinationOf,
+  typedName,
+  undoOf,
+  weigh,
+  type PodsOf,
+} from "@/model/risk"
 import type { Health } from "@/model/service"
 
 /** A sentence, and the full names behind its "and N more". */
@@ -118,6 +126,7 @@ function usePlan(
   const short = useShortfall(plan.data?.preview)
   const named = typedName(ask.changes)
   const [typed, setTyped] = useState("")
+  const typedInput = useRef<HTMLInputElement>(null)
   const unconfirmed = awaitsName(ask.changes, typed)
 
   const confirm = () => {
@@ -198,8 +207,15 @@ function usePlan(
       ) : null}
       {named !== undefined && plan.data ? (
         <div className="mt-4 flex flex-col gap-2">
-          <Label htmlFor="plan-typed-name">{t("plan.typeName", named)}</Label>
+          <TypeNameLabel
+            name={named}
+            onFill={() => {
+              setTyped(named)
+              typedInput.current?.focus()
+            }}
+          />
           <Input
+            ref={typedInput}
             id="plan-typed-name"
             value={typed}
             onChange={(event) => setTyped(event.target.value)}
@@ -560,6 +576,27 @@ function PlanBody({
         </CollapsibleContent>
       </Collapsible>
     </div>
+  )
+}
+
+/** "Type <name> to confirm", where the name is a button that types it. */
+function TypeNameLabel({ name, onFill }: { name: string; onFill: () => void }) {
+  const t = useT()
+  const [before, after] = aroundName((n) => t("plan.typeName", n))
+  return (
+    <Label htmlFor="plan-typed-name" className="block">
+      {before}
+      <button
+        type="button"
+        translate="no"
+        title={t("plan.fillName")}
+        className="cursor-pointer font-mono text-foreground underline decoration-dotted underline-offset-2 hover:decoration-solid"
+        onClick={onFill}
+      >
+        {name}
+      </button>
+      {after}
+    </Label>
   )
 }
 

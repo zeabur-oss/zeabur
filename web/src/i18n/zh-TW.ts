@@ -1270,6 +1270,7 @@ export const zhTW: Messages = {
   "plan.create": "新增",
   "plan.delete": "刪除",
   "plan.typeName": (name: string) => `輸入 ${name} 以確認`,
+  "plan.fillName": "填入名稱",
   "plan.added": "新增",
   "plan.removed": "移除",
   "plan.changed": "變更",

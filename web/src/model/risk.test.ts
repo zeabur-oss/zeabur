@@ -1,7 +1,11 @@
 import { describe, test, expect } from "bun:test"
 
 import type { Schemas } from "@/api/client"
+import { en } from "@/i18n/en"
+import { zhCN } from "@/i18n/zh-CN"
+import { zhTW } from "@/i18n/zh-TW"
 import {
+  aroundName,
   awaitsName,
   destinationOf,
   isolates,
@@ -215,6 +219,15 @@ describe("typed confirmation", () => {
     expect(awaitsName([remove], " zeabur-isolate-api ")).toBe(false)
     expect(awaitsName([{ op: "restart", workload: api }], "")).toBe(false)
     expect(typedName([{ op: "restart", workload: api }])).toBe(undefined)
+  })
+
+  test("each language's prompt has one place for the name, whatever the name is", () => {
+    for (const messages of [en, zhTW, zhCN]) {
+      for (const name of ["web", "to", "e", "輸入"]) {
+        const [before, after] = aroundName(messages["plan.typeName"])
+        expect(`${before}${name}${after}`).toBe(messages["plan.typeName"](name))
+      }
+    }
   })
 })
 

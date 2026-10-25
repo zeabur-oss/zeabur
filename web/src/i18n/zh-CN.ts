@@ -1268,6 +1268,7 @@ export const zhCN: Messages = {
   "plan.create": "新建",
   "plan.delete": "删除",
   "plan.typeName": (name: string) => `输入 ${name} 以确认`,
+  "plan.fillName": "填入名称",
   "plan.added": "新增",
   "plan.removed": "移除",
   "plan.changed": "更改",

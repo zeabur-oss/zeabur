@@ -1355,6 +1355,7 @@ export const en = {
   "plan.create": "New",
   "plan.delete": "Deleted",
   "plan.typeName": (name: string) => `Type ${name} to confirm`,
+  "plan.fillName": "Fill in the name",
   "plan.added": "added",
   "plan.removed": "removed",
   "plan.changed": "changed",
