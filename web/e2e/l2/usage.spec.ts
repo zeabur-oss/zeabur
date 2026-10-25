@@ -51,10 +51,11 @@ test("an admin sees what the test project uses; a Viewer is told it needs more r
     const link = await invite(page, "e2e-usage-viewer", [{ project, role: "viewer" }])
     const viewer = await member(browser, link, "e2e-usage-viewer", zeabur)
     await viewer.goto("/cluster")
+    const usage = viewer.getByRole("region", { name: "Resource usage" })
+    const refused = usage.getByText("Seeing what each namespace uses needs more rights.")
+    await expect(refused).toBeVisible({ timeout: 30_000 })
     await expect(
-      viewer
-        .getByRole("region", { name: "Resource usage" })
-        .getByText("Seeing what each namespace uses needs more rights."),
-    ).toBeVisible({ timeout: 30_000 })
+      viewer.getByRole("button", { name: "Use admin rights for a few minutes" }),
+    ).toHaveCount(0)
   })
 })
