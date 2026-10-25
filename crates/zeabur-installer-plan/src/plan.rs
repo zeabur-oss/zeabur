@@ -1121,6 +1121,32 @@ pub fn network_policy(namespace: &str, node_addresses: &[String]) -> Value {
     })
 }
 
+/// The `NetworkPolicy` that lets Zeabur Builder's buildkitd push to zot, which the baseline policy
+/// of zot's namespace would refuse. Only buildkitd's Pods in `builder-system`, to zot's port.
+#[must_use]
+pub fn zot_builder_policy() -> Value {
+    json!({
+        "apiVersion": "networking.k8s.io/v1",
+        "kind": "NetworkPolicy",
+        "metadata": {
+            "name": "zeabur-installer-zot-builder",
+            "namespace": "zot",
+            "labels": {"app.kubernetes.io/managed-by": MANAGER},
+        },
+        "spec": {
+            "podSelector": {"matchLabels": {"app.kubernetes.io/name": "zot"}},
+            "policyTypes": ["Ingress"],
+            "ingress": [{
+                "from": [{
+                    "namespaceSelector": {"matchLabels": {"kubernetes.io/metadata.name": "builder-system"}},
+                    "podSelector": {"matchLabels": {"app.kubernetes.io/name": "buildkitd"}},
+                }],
+                "ports": [{"port": 5000, "protocol": "TCP"}],
+            }],
+        },
+    })
+}
+
 /// The objects of `local` access: a self-signed root, a CA certificate kept in cert-manager's
 /// namespace, and the `ClusterIssuer` signing with it.
 #[must_use]
@@ -1680,6 +1706,22 @@ mod tests {
             with.zeabur.unwrap().values["builds"]["caBundle"]["configMap"],
             REGISTRY_CA_CONFIGMAP
         );
+    }
+
+    #[test]
+    fn zot_admits_only_buildkitd_of_the_builder_namespace() {
+        let policy = zot_builder_policy();
+        let rule = &policy["spec"]["ingress"][0];
+        assert_eq!(rule["from"].as_array().unwrap().len(), 1);
+        assert_eq!(
+            rule["from"][0]["namespaceSelector"]["matchLabels"]["kubernetes.io/metadata.name"],
+            "builder-system"
+        );
+        assert_eq!(
+            rule["from"][0]["podSelector"]["matchLabels"]["app.kubernetes.io/name"],
+            "buildkitd"
+        );
+        assert_eq!(rule["ports"], json!([{"port": 5000, "protocol": "TCP"}]));
     }
 
     #[test]

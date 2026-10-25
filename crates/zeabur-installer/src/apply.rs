@@ -88,6 +88,9 @@ pub(crate) fn run(config_path: &Path) -> Result<(), InstallError> {
             args.push("--timeout=5m");
             kubectl.wait(&args)?;
         }
+        if component.id == plan::ZOT {
+            kubectl.apply_object(&plan::zot_builder_policy())?;
+        }
         if component.id == plan::ZOT && plan.zot_cluster_ip.is_some() {
             zot_ca(&kubectl)?;
         }
