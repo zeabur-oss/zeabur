@@ -1137,6 +1137,34 @@ pub fn zot_builder_policy() -> Value {
     })
 }
 
+/// The namespace where RKE2 runs the `ServiceLB` pods.
+pub const SERVICELB_NAMESPACE: &str = "kube-system";
+
+/// The `NetworkPolicy` that lets outside traffic into the `ServiceLB` pods.
+///
+/// RKE2's `cis` profile adds `kube-system/default-network-policy`, which lets in only pods of
+/// `kube-system`. Without this policy, a `ServiceLB` pod on a worker gets no outside requests.
+/// RKE2 labels the pods `svccontroller.rke2.cattle.io/svcname`, not with the k3s prefix.
+#[must_use]
+pub fn servicelb_policy() -> Value {
+    json!({
+        "apiVersion": "networking.k8s.io/v1",
+        "kind": "NetworkPolicy",
+        "metadata": {
+            "name": "zeabur-installer-servicelb",
+            "namespace": SERVICELB_NAMESPACE,
+            "labels": {"app.kubernetes.io/managed-by": MANAGER},
+        },
+        "spec": {
+            "podSelector": {"matchExpressions": [
+                {"key": "svccontroller.rke2.cattle.io/svcname", "operator": "Exists"},
+            ]},
+            "policyTypes": ["Ingress"],
+            "ingress": [{}],
+        },
+    })
+}
+
 /// The objects of `local` access: a self-signed root, a CA certificate kept in cert-manager's
 /// namespace, and the `ClusterIssuer` signing with it.
 #[must_use]
@@ -1690,6 +1718,21 @@ mod tests {
             with.zeabur.unwrap().values["builds"]["caBundle"]["configMap"],
             REGISTRY_CA_CONFIGMAP
         );
+    }
+
+    #[test]
+    fn servicelb_pods_alone_take_outside_traffic() {
+        let policy = servicelb_policy();
+        assert_eq!(policy["metadata"]["namespace"], "kube-system");
+        assert_eq!(
+            policy["spec"]["podSelector"],
+            json!({"matchExpressions": [
+                {"key": "svccontroller.rke2.cattle.io/svcname", "operator": "Exists"},
+            ]}),
+            "only ServiceLB pods"
+        );
+        assert_eq!(policy["spec"]["policyTypes"], json!(["Ingress"]));
+        assert_eq!(policy["spec"]["ingress"], json!([{}]), "from any source");
     }
 
     #[test]

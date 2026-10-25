@@ -57,6 +57,12 @@ interrupted install or repairs drift.
    `installer.zeabur.com/baseline: "true"`, which the policies select, and the installer applies
    namespaces under their own field manager, so a component's own namespace labels (Zeabur
    Identity's `app.kubernetes.io/managed-by`, for one) are merged rather than replaced.
+   RKE2's CIS profile adds `kube-system/default-network-policy`, which lets in only pods of
+   `kube-system` and so drops outside traffic to ServiceLB's pods there. A node without a
+   Traefik pod sends ingress through its ServiceLB pod, so its requests never reached Traefik.
+   The installer adds `kube-system/zeabur-installer-servicelb`, which lets traffic from
+   anywhere into the pods labelled `svccontroller.rke2.cattle.io/svcname`, ServiceLB's pods,
+   and no others.
 6. **Storage.** RKE2, unlike k3s, ships no storage class. Unless the cluster already has a
    default one, the installer adds rancher's local-path-provisioner as the default class. Each
    volume is a directory under `/var/lib/zeabur/storage` on this server's disk, with no copy
@@ -198,4 +204,5 @@ are backed up.
 | Join planning: configuration, warnings, latency thresholds, `node add` output | Unit-tested |
 | A worker or server joining a real cluster, `node sync` with Canal | Verified on two Ubuntu 26.04 arm64 VMs, RKE2 v1.36.5 |
 | The baseline NetworkPolicies' node sources on two nodes: cert-manager's and CloudNativePG's webhooks on the worker, probes, ingress | Verified on two Ubuntu 26.04 arm64 VMs, RKE2 v1.36.5 |
+| Port 80 through a worker's ServiceLB pod to Traefik on the server, with `zeabur-installer-servicelb` | Verified on two Ubuntu 26.04 arm64 VMs, RKE2 v1.36.5 |
 | The CA hash from `kube-root-ca.crt` equals the server token's | Checked by `node add` each time; equal on the same VMs |

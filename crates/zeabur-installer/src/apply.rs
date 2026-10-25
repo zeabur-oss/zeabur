@@ -76,6 +76,7 @@ pub(crate) fn run(config_path: &Path) -> Result<(), InstallError> {
             kubectl.apply_object(&plan::network_policy(&namespace.name, &nodes))?;
         }
     }
+    kubectl.apply_object(&plan::servicelb_policy())?;
 
     storage(&kubectl, &plan.storage)?;
 
