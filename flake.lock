@@ -6,17 +6,17 @@
         "nixpkgs": "nixpkgs"
       },
       "locked": {
-        "lastModified": 1792904317,
-        "narHash": "sha256-u+WxG8b4VrHFyyLqvjjPvvii2rlJUCI2Z19zlc6GTxY=",
-        "owner": "zeabur-oss",
-        "repo": "catalog",
-        "rev": "719517fe9553810a2d5be9240c5981a17692147d",
-        "type": "github"
+        "lastModified": 1792905181,
+        "narHash": "sha256-clhiCO+0JZODrZ1ABcZ+QlKQCHU03y4/BS5M4uIvSP8=",
+        "ref": "refs/heads/main",
+        "rev": "535739fbbee4de7c01c4634f2377c463f04728e8",
+        "revCount": 102,
+        "type": "git",
+        "url": "ssh://git@github.com/zeabur-oss/catalog.git"
       },
       "original": {
-        "owner": "zeabur-oss",
-        "repo": "catalog",
-        "type": "github"
+        "type": "git",
+        "url": "ssh://git@github.com/zeabur-oss/catalog.git"
       }
     },
     "fenix": {
