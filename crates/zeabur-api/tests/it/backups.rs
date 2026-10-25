@@ -1,15 +1,19 @@
 //! The cluster's backups through Velero: not installed is an answer, setting the location keeps
 //! its keys out of every answer, the schedule is created, paused and backed up from, a finished
-//! backup is restored into the namespaces it holds, and the refusals: someone RBAC does not let
-//! write, a plan the cluster moved past.
+//! backup goes into a new project while the original runs and back under its own name once it is
+//! gone, domains move to the copy, and the refusals: someone RBAC does not let write, a plan the
+//! cluster moved past.
 
 #[cfg(test)]
 mod tests {
     use axum::Router;
     use axum::http::StatusCode;
     use serde_json::{Value, json};
+    use zeabur_kube::k8s_openapi::api::apps::v1::Deployment;
+    use zeabur_kube::k8s_openapi::api::core::v1::Namespace;
+    use zeabur_kube::k8s_openapi::api::networking::v1::Ingress;
     use zeabur_kube::memory::{MemoryCluster, State};
-    use zeabur_kube::{DynamicObject, ServedResource};
+    use zeabur_kube::{DynamicObject, NamespaceObjects, ServedResource};
 
     use crate::common::{app, send};
 
@@ -22,6 +26,7 @@ mod tests {
             ("backups", "Backup"),
             ("podvolumebackups", "PodVolumeBackup"),
             ("restores", "Restore"),
+            ("downloadrequests", "DownloadRequest"),
         ]
         .into_iter()
         .map(|(resource, kind)| ServedResource::readable("velero.io", "v1", resource, kind, true))
@@ -356,46 +361,334 @@ mod tests {
         assert_eq!(found["canRestore"], "denied");
     }
 
-    #[tokio::test]
-    async fn a_finished_backup_is_restored_into_namespaces_it_holds() {
-        let backup = |name: &str, phase: &str| {
-            object(json!({
-                "apiVersion": "velero.io/v1", "kind": "Backup",
-                "metadata": {"name": name, "namespace": "velero", "resourceVersion": "4"},
-                "spec": {"includedNamespaces": ["shop", "blog"]}, "status": {"phase": phase}
-            }))
-        };
+    fn backup(name: &str, phase: &str) -> DynamicObject {
+        object(json!({
+            "apiVersion": "velero.io/v1", "kind": "Backup",
+            "metadata": {"name": name, "namespace": "velero", "resourceVersion": "4"},
+            "spec": {"includedNamespaces": ["shop", "blog"]}, "status": {"phase": phase}
+        }))
+    }
+
+    fn namespace(name: &str, labels: &Value) -> Namespace {
+        serde_json::from_value(json!({
+            "metadata": {"name": name, "resourceVersion": "2", "labels": labels}
+        }))
+        .unwrap()
+    }
+
+    fn ingress(name: &str, namespace: &str, host: &str, labels: &Value) -> Ingress {
+        serde_json::from_value(json!({
+            "metadata": {"name": name, "namespace": namespace, "uid": format!("uid-{name}"),
+                         "resourceVersion": "5", "labels": labels},
+            "spec": {"rules": [{"host": host}]}
+        }))
+        .unwrap()
+    }
+
+    /// Velero, and the project `shop` with a route and a variable naming its own namespace.
+    fn with_shop() -> MemoryCluster {
         let cluster = velero(vec![
             location(),
             schedule(),
             backup("zeabur-1", "Completed"),
             backup("zeabur-2", "InProgress"),
         ]);
+        let deployment: Deployment = serde_json::from_value(json!({
+            "metadata": {"name": "web", "namespace": "shop"},
+            "spec": {"selector": {}, "template": {"spec": {"containers": [{"name": "web",
+                "env": [{"name": "DB_HOST", "value": "postgres.shop.svc.cluster.local"}]}]}}}
+        }))
+        .unwrap();
+        cluster.update(|s| {
+            s.namespaces = vec![
+                namespace(
+                    "shop",
+                    &json!({"zeabur.com/project": "true",
+                           "pod-security.kubernetes.io/enforce": "baseline"}),
+                ),
+                namespace("other", &json!({})),
+            ];
+            s.objects.insert(
+                "shop".to_owned(),
+                NamespaceObjects {
+                    namespace: "shop".to_owned(),
+                    deployments: vec![deployment],
+                    ingresses: vec![ingress("web", "shop", "shop.example.com", &json!({}))],
+                    ..NamespaceObjects::default()
+                },
+            );
+        });
+        cluster
+    }
+
+    #[tokio::test]
+    async fn a_backup_goes_into_a_new_project_while_the_original_runs() {
+        let cluster = with_shop();
+        let app = app(&cluster);
+        let request = json!({"op": "restore", "backup": "zeabur-1", "namespace": "shop", "into": "shop-copy"});
+        let (planned, done) = applied(&app, &request).await;
+        let copy = &planned["copy"];
+        assert_eq!(copy["sameName"], false);
+        assert_eq!(copy["into"], "shop-copy");
+        assert_eq!(copy["hosts"], json!(["shop.example.com"]));
+        assert_eq!(copy["references"][0]["key"], "DB_HOST");
+        assert_eq!(copy["references"][0]["kind"], "Deployment");
+
+        let made = stored(&cluster, "Restore", done["restore"].as_str().unwrap()).unwrap();
+        assert_eq!(
+            made["spec"]["namespaceMapping"],
+            json!({"shop": "shop-copy"})
+        );
+        assert_eq!(made["spec"]["includedNamespaces"], json!(["shop"]));
+        let held: Vec<&str> = made["spec"]["excludedResources"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter_map(Value::as_str)
+            .collect();
+        assert!(held.contains(&"ingresses.networking.k8s.io"), "{held:?}");
+
+        let labels = cluster
+            .inspect(|s| {
+                s.namespaces
+                    .iter()
+                    .find(|n| n.metadata.name.as_deref() == Some("shop-copy"))
+                    .and_then(|n| n.metadata.labels.clone())
+            })
+            .flatten()
+            .expect("the new project");
+        assert_eq!(labels["zeabur.com/project"], "true");
+        assert_eq!(labels["pod-security.kubernetes.io/enforce"], "baseline");
+        let (_, found) = send(&app, "GET", "/api/v1/cluster/backups", None).await;
+        assert_eq!(found["restores"][0]["into"], "shop-copy");
+
+        for (request, status) in [
+            (
+                json!({"op": "restore", "backup": "zeabur-1", "namespace": "shop"}),
+                StatusCode::UNPROCESSABLE_ENTITY,
+            ),
+            (
+                json!({"op": "restore", "backup": "zeabur-1", "namespace": "shop", "into": "shop"}),
+                StatusCode::UNPROCESSABLE_ENTITY,
+            ),
+            (
+                json!({"op": "restore", "backup": "zeabur-1", "namespace": "shop", "into": "other"}),
+                StatusCode::CONFLICT,
+            ),
+            (
+                json!({"op": "restore", "backup": "zeabur-2", "namespace": "shop", "into": "x"}),
+                StatusCode::UNPROCESSABLE_ENTITY,
+            ),
+            (
+                json!({"op": "restore", "backup": "zeabur-1", "namespace": "payments", "into": "x"}),
+                StatusCode::UNPROCESSABLE_ENTITY,
+            ),
+        ] {
+            let (got, problem) = plan(&app, &request).await;
+            assert_eq!(got, status, "{request} {problem}");
+        }
+    }
+
+    #[tokio::test]
+    async fn a_namespace_that_is_gone_comes_back_under_its_own_name_with_its_routes() {
+        let cluster = velero(vec![
+            location(),
+            schedule(),
+            backup("zeabur-1", "Completed"),
+        ]);
         let app = app(&cluster);
         let (planned, done) = applied(
             &app,
-            &json!({"op": "restore", "backup": "zeabur-1", "namespaces": ["shop"]}),
+            &json!({"op": "restore", "backup": "zeabur-1", "namespace": "blog",
+                    "into": "ignored"}),
         )
         .await;
-        let name = done["restore"].as_str().unwrap();
-        assert_eq!(planned["restore"], name);
-        assert!(name.starts_with("zeabur-1-"), "{name}");
-        let made = stored(&cluster, "Restore", name).unwrap();
+        assert_eq!(planned["copy"]["sameName"], true);
+        assert_eq!(planned["copy"]["into"], "blog");
+        let kinds: Vec<&str> = planned["writes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter_map(|w| w["kind"].as_str())
+            .collect();
+        assert_eq!(kinds, ["Restore"]);
+        let made = stored(&cluster, "Restore", done["restore"].as_str().unwrap()).unwrap();
         assert_eq!(
             made["spec"],
-            json!({"backupName": "zeabur-1", "includedNamespaces": ["shop"]})
+            json!({"backupName": "zeabur-1", "includedNamespaces": ["blog"]})
         );
-        let (_, found) = send(&app, "GET", "/api/v1/cluster/backups", None).await;
-        assert_eq!(found["restores"][0]["backup"], "zeabur-1");
+    }
 
-        for request in [
-            json!({"op": "restore", "backup": "zeabur-2", "namespaces": ["shop"]}),
-            json!({"op": "restore", "backup": "zeabur-1", "namespaces": ["payments"]}),
-            json!({"op": "restore", "backup": "zeabur-1", "namespaces": []}),
-        ] {
-            let (status, problem) = plan(&app, &request).await;
-            assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{problem}");
-        }
+    #[tokio::test]
+    async fn moving_domains_moves_each_route_and_leaves_one_a_tool_manages() {
+        let cluster = with_shop();
+        cluster.update(|s| {
+            s.namespaces.push(namespace("shop-copy", &json!({})));
+            let shop = s.objects.get_mut("shop").unwrap();
+            shop.ingresses.push(ingress(
+                "chart",
+                "shop",
+                "chart.example.com",
+                &json!({"app.kubernetes.io/managed-by": "Helm"}),
+            ));
+        });
+        let app = app(&cluster);
+        let (planned, _) = applied(
+            &app,
+            &json!({"op": "moveDomains", "from": "shop", "to": "shop-copy"}),
+        )
+        .await;
+        assert_eq!(planned["hosts"], json!(["shop.example.com"]));
+        assert_eq!(planned["managed"], json!(["Ingress/chart"]));
+        let routes = |namespace: &str| {
+            cluster
+                .inspect(|s| {
+                    s.objects.get(namespace).map(|o| {
+                        o.ingresses
+                            .iter()
+                            .filter_map(|i| i.metadata.name.clone())
+                            .collect::<Vec<_>>()
+                    })
+                })
+                .flatten()
+                .unwrap_or_default()
+        };
+        assert_eq!(routes("shop"), ["chart"]);
+        assert_eq!(routes("shop-copy"), ["web"]);
+
+        let (status, problem) = plan(
+            &app,
+            &json!({"op": "moveDomains", "from": "shop", "to": "missing"}),
+        )
+        .await;
+        assert_eq!(status, StatusCode::NOT_FOUND, "{problem}");
+    }
+
+    /// A store at 127.0.0.1 that answers `body` only with the customer key `key`, and the
+    /// location of it.
+    async fn store(key: &'static str, body: &'static [u8]) -> DynamicObject {
+        use axum::http::HeaderMap;
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let app = Router::new().route(
+            "/{*path}",
+            axum::routing::get(move |headers: HeaderMap| async move {
+                let sent = |name: &str| {
+                    headers
+                        .get(name)
+                        .and_then(|v| v.to_str().ok())
+                        .unwrap_or_default()
+                        .to_owned()
+                };
+                let encoded =
+                    base64::Engine::encode(&base64::engine::general_purpose::STANDARD, key);
+                if sent("x-amz-server-side-encryption-customer-key") == encoded
+                    && sent("x-amz-server-side-encryption-customer-algorithm") == "AES256"
+                    && !sent("x-amz-server-side-encryption-customer-key-md5").is_empty()
+                {
+                    (StatusCode::OK, body.to_vec())
+                } else {
+                    (StatusCode::BAD_REQUEST, Vec::new())
+                }
+            }),
+        );
+        tokio::spawn(async move { axum::serve(listener, app).await });
+        object(json!({
+            "apiVersion": "velero.io/v1", "kind": "BackupStorageLocation",
+            "metadata": {"name": "default", "namespace": "velero", "resourceVersion": "3"},
+            "spec": {"provider": "aws", "default": true,
+                     "objectStorage": {"bucket": "backups"},
+                     "config": {"region": "us-east-1",
+                                "s3Url": format!("http://127.0.0.1:{port}"),
+                                "customerKeyEncryptionSecret": "velero-backup-key/key"}}
+        }))
+    }
+
+    /// Plays Velero: signs a URL for every `DownloadRequest` at `base`.
+    fn sign_downloads(cluster: &MemoryCluster, base: String) -> tokio::task::JoinHandle<()> {
+        let cluster = cluster.clone();
+        tokio::spawn(async move {
+            loop {
+                cluster.update(|s| {
+                    for request in s.dynamic.iter_mut().filter(|o| {
+                        o.types.as_ref().is_some_and(|t| t.kind == "DownloadRequest")
+                    }) {
+                        let backup = request.data["spec"]["target"]["name"]
+                            .as_str()
+                            .unwrap_or_default()
+                            .to_owned();
+                        request.data["status"] = json!({
+                            "phase": "Processed",
+                            "downloadURL": format!("{base}/backups/backups/{backup}/{backup}.tar.gz?X-Amz-Signature=x"),
+                            "expiration": "2026-10-25T00:10:00Z"
+                        });
+                    }
+                });
+                tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+            }
+        })
+    }
+
+    #[tokio::test]
+    async fn a_backup_downloads_through_zeabur_with_its_key_and_no_url_reaches_the_page() {
+        let location = store("k".repeat(32).leak(), b"tarball").await;
+        let base = location.data["spec"]["config"]["s3Url"]
+            .as_str()
+            .unwrap()
+            .to_owned();
+        let cluster = velero(vec![location, schedule(), backup("zeabur-1", "Completed")]);
+        cluster.update(|s| {
+            s.secret_values.insert(
+                "velero/velero-backup-key".to_owned(),
+                [("key".to_owned(), "k".repeat(32).into_bytes())].into(),
+            );
+        });
+        let velero = sign_downloads(&cluster, base.clone());
+        let app = app(&cluster);
+        let request = axum::http::Request::get("/api/v1/cluster/backups/zeabur-1/download")
+            .body(axum::body::Body::empty())
+            .unwrap();
+        let response = tower::ServiceExt::oneshot(app.clone(), request)
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        assert!(
+            response.headers()["content-disposition"]
+                .to_str()
+                .unwrap()
+                .contains("zeabur-1.tar.gz")
+        );
+        let bytes = http_body_util::BodyExt::collect(response.into_body())
+            .await
+            .unwrap()
+            .to_bytes();
+        assert_eq!(&bytes[..], b"tarball");
+
+        // A second download in the same second makes its own request.
+        let request = axum::http::Request::get("/api/v1/cluster/backups/zeabur-1/download")
+            .body(axum::body::Body::empty())
+            .unwrap();
+        let again = tower::ServiceExt::oneshot(app.clone(), request)
+            .await
+            .unwrap();
+        assert_eq!(again.status(), StatusCode::OK);
+
+        // A URL to another host is not fetched.
+        velero.abort();
+        assert!(velero.await.is_err_and(|e| e.is_cancelled()));
+        let _other = sign_downloads(&cluster, "http://127.0.0.2:9".to_owned());
+        let (status, problem) = send(
+            &app,
+            "GET",
+            "/api/v1/cluster/backups/zeabur-1/download",
+            None,
+        )
+        .await;
+        assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE, "{problem}");
+        assert!(
+            !problem.to_string().contains("X-Amz-Signature"),
+            "{problem}"
+        );
     }
 
     #[tokio::test]

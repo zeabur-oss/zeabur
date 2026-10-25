@@ -1,0 +1,7 @@
+description: "A volume restored from a K8up snapshot makes a new claim and a K8up Restore into it."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - {"op":"create","object":{"apiVersion":"v1","kind":"PersistentVolumeClaim","metadata":{"name":"web-data-restored-1025"},"spec":{"accessModes":["ReadWriteOnce"],"resources":{"requests":{"storage":"1Gi"}}}}}
+      - {"op":"create","object":{"apiVersion":"k8up.io/v1","kind":"Restore","metadata":{"name":"web-data-restore-20261025","labels":{"zeabur.com/backup-volume":"web-data"}},"spec":{"snapshot":"00a2c7fb","backend":{"repoPasswordSecretRef":{"name":"web-data-backup","key":"RESTIC_PASSWORD"}},"restoreMethod":{"folder":{"claimName":"web-data-restored-1025"}}}}}

@@ -74,6 +74,8 @@ use crate::rules::{
 ///   restore from fields of the new database);
 /// - a volume's backups: K8up's `Schedule`, `Backup` and `PodConfig`, and the Secret with the
 ///   bucket's keys and the repository password;
+/// - a volume's restore: K8up's `Restore`, into a new claim, into the claim itself or out to the
+///   bucket;
 /// - a service from a container image: its Deployment, Service, Ingress, volume claim and Secrets;
 /// - a service from Git: the same, and Zeabur Builder's `Build`;
 /// - the page server of Zeabur Catalog's `error-pages` template: its ConfigMaps, Deployment,
@@ -132,6 +134,7 @@ pub const CREATABLE: &[(&str, &str, &str)] = &[
     ("k8up.io/v1", "Schedule", "schedules"),
     ("k8up.io/v1", "Backup", "backups"),
     ("k8up.io/v1", "PodConfig", "podconfigs"),
+    ("k8up.io/v1", "Restore", "restores"),
 ];
 
 /// The plural of a kind [`CREATABLE`] lists.
@@ -490,6 +493,7 @@ impl<'a> Planner<'a> {
                 container,
                 mount_path,
             } => self.remove_volume(workload, container.as_deref(), mount_path),
+            Change::SwapClaim { workload, from, to } => self.swap_claim(workload, from, to),
             Change::Probe {
                 workload,
                 container,

@@ -1,6 +1,10 @@
 import { describe, expect, test } from "bun:test"
 
 import {
+  exportSnapshot,
+  restoreInPlace,
+  restoreToNewVolume,
+  swapToVolume,
   backUpVolumeNow,
   backupUser,
   newVolumeTarget,
@@ -149,5 +153,79 @@ describe("volume backups", () => {
         } as unknown as Record<string, never>,
       },
     ])
+  })
+})
+
+describe("restoring a volume from a backup point", () => {
+  const template = {
+    apiVersion: "k8up.io/v1",
+    kind: "Restore",
+    metadata: { labels: { "zeabur.com/backup-volume": "data" } },
+    spec: {
+      backend: { s3: { bucket: "backups/shop/data" } },
+      podConfigRef: { name: "data-backup" },
+    },
+  }
+  const now = new Date("2026-10-25T04:05:06Z")
+  const objects = (changes: ReturnType<typeof restoreToNewVolume>) =>
+    changes.map((c) => (c.op === "create" ? (c.object as any) : c))
+
+  test("goes into a new claim of the same size and class, with the backup's backend and user", () => {
+    const [claim, restore] = objects(
+      restoreToNewVolume(
+        template,
+        "abc123",
+        "data",
+        "data-restored-1025",
+        {
+          size: "5Gi",
+          storageClass: "fast",
+          accessModes: ["ReadWriteOnce"],
+        },
+        now,
+      ),
+    )
+    expect(claim.kind).toBe("PersistentVolumeClaim")
+    expect(claim.metadata.name).toBe("data-restored-1025")
+    expect(claim.spec).toEqual({
+      accessModes: ["ReadWriteOnce"],
+      storageClassName: "fast",
+      resources: { requests: { storage: "5Gi" } },
+    })
+    expect(restore.metadata).toEqual({
+      labels: { "zeabur.com/backup-volume": "data" },
+      name: "data-restore-20261025-040506",
+    })
+    expect(restore.spec).toEqual({
+      backend: { s3: { bucket: "backups/shop/data" } },
+      podConfigRef: { name: "data-backup" },
+      snapshot: "abc123",
+      restoreMethod: { folder: { claimName: "data-restored-1025" } },
+    })
+  })
+
+  test("in place, stops the service first and deletes what the backup does not have", () => {
+    const workload = { kind: "StatefulSet" as const, name: "db" }
+    const [scale, restore] = objects(restoreInPlace(template, "abc123", "data", workload, 2, now))
+    expect(scale).toEqual({ op: "scale", workload, replicas: 0 })
+    expect(restore.spec.delete).toBe(true)
+    expect(restore.spec.restoreMethod).toEqual({ folder: { claimName: "data" } })
+    expect(restore.metadata.annotations).toEqual({ "zeabur.com/replicas": "2" })
+  })
+
+  test("exports to the bucket, and the service switches claims in one change", () => {
+    const method = { s3: { endpoint: "http://s3:8333", bucket: "backups" } }
+    const [restore] = objects(exportSnapshot(template, method, "abc123", "data", now))
+    expect(restore.spec.restoreMethod).toEqual(method)
+    expect(swapToVolume({ kind: "Deployment", name: "web" }, "data", "data-restored-1025")).toEqual(
+      [
+        {
+          op: "swapClaim",
+          workload: { kind: "Deployment", name: "web" },
+          from: "data",
+          to: "data-restored-1025",
+        },
+      ],
+    )
   })
 })

@@ -14,6 +14,10 @@
 //!   after creation [k8s-sts-limitations], so a StatefulSet gets no new volume here.
 //! - **A volume is removed** by unmounting it, and dropping it from the pod template once no
 //!   container mounts it; the claim and its data stay until deleted on their own.
+//! - **A claim is swapped** for another, such as one restored from a backup, in each pod template
+//!   volume that names it. A Deployment's strategy becomes `Recreate`, so the old pod lets go of a
+//!   `ReadWriteOnce` claim before the new one mounts its replacement [k8s-recreate]; a rolling
+//!   update could leave the new pod waiting for a node the old one holds.
 //! - **Probes** follow the container's declared ports [k8s-probes].
 //! - **Scaling** sets `spec.replicas` of a Deployment or StatefulSet.
 //! - **A YAML edit** becomes the patch between the object as read and as edited ([`crate::edit`]);
@@ -26,6 +30,7 @@
 //! [k8s-sts-limitations]: https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/#limitations
 //! [k8s-probes]: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/
 //! [k8s-secret-immutable]: https://kubernetes.io/docs/concepts/configuration/secret/#secret-immutable
+//! [k8s-recreate]: https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#recreate-deployment
 
 use std::collections::BTreeMap;
 
@@ -607,6 +612,87 @@ impl<'a> Planner<'a> {
         }
         if let Some(read_only) = read_only {
             operations.push(add(&format!("{entry}/readOnly"), json!(read_only)));
+        }
+        self.patch(index, operations)
+    }
+
+    /// Mounts claim `to` wherever the workload's pod template mounts claim `from`; a Deployment
+    /// is set to `Recreate`.
+    pub(crate) fn swap_claim(
+        &mut self,
+        reference: &WorkloadRef,
+        from: &str,
+        to: &str,
+    ) -> Result<(), PlanError> {
+        if from == to {
+            return Err(error(
+                ErrorKind::BadRequest,
+                "no_changes",
+                "The workload already mounts that claim.",
+            ));
+        }
+        if self.input.snapshot.persistent_volume_claim(to).is_none() {
+            return Err(error(
+                ErrorKind::NotFound,
+                "unknown_claim",
+                format!("There is no PersistentVolumeClaim named {to}."),
+            ));
+        }
+        let found = self.editable_workload(reference)?;
+        let object = workload_json(found)?;
+        let index = self.working(workload_target(found), object);
+        self.impact.insert(found.reference());
+        let tokens: Vec<&str> = found
+            .kind()
+            .pod_template_path()
+            .iter()
+            .copied()
+            .chain(["spec", "volumes"])
+            .collect();
+        let volumes_pointer = pointer(&tokens);
+        let current = self.current(index);
+        let volumes = array_at(&current, &volumes_pointer);
+        let mounting: Vec<(usize, String)> = volumes
+            .iter()
+            .enumerate()
+            .filter(|(_, v)| v.pointer("/persistentVolumeClaim/claimName") == Some(&json!(from)))
+            .map(|(i, v)| (i, v["name"].as_str().unwrap_or_default().to_owned()))
+            .collect();
+        if mounting.is_empty() {
+            return Err(error(
+                ErrorKind::NotFound,
+                "unknown_claim",
+                format!(
+                    "{} {} does not mount {from} from its pod template.",
+                    reference.kind.as_str(),
+                    reference.name
+                ),
+            ));
+        }
+        let mut operations = Vec::new();
+        for (at, name) in mounting {
+            let mut steps = pod_spec_steps(found.kind());
+            steps.extend([Step::field("volumes"), Step::named(&name)]);
+            self.claim(index, &steps, &format!("volume {name}"))?;
+            let entry = format!("{volumes_pointer}/{at}/persistentVolumeClaim/claimName");
+            operations.push(test(&entry, json!(from)));
+            operations.push(replace(&entry, json!(to)));
+        }
+        if found.kind() == WorkloadKind::Deployment
+            && current
+                .pointer("/spec/strategy/type")
+                .and_then(Value::as_str)
+                != Some("Recreate")
+        {
+            self.claim(
+                index,
+                &[Step::field("spec"), Step::field("strategy")],
+                "the update strategy",
+            )?;
+            if let Some(strategy) = current.pointer("/spec/strategy") {
+                operations.push(test("/spec/strategy", strategy.clone()));
+            }
+            operations.push(add("/spec/strategy", json!({"type": "Recreate"})));
         }
         self.patch(index, operations)
     }

@@ -50,6 +50,7 @@ pub mod rights;
 pub mod storage;
 pub(crate) mod templates;
 pub mod usage;
+pub mod volume_restores;
 pub mod writes;
 
 use std::sync::Arc;

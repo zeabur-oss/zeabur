@@ -156,6 +156,22 @@ pub struct Backups {
     /// A backup can start now: the database runs with its store. False between setting up
     /// backups and the operator restarting the members with them.
     pub ready: bool,
+    /// The times a new database can start from, for an engine that archives its write-ahead
+    /// log; absent when it does not, or archiving fails.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub recovery_window: Option<RecoveryWindow>,
+}
+
+/// The times a new database can recover to.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+#[schema(as = DatabaseRecoveryWindow)]
+pub struct RecoveryWindow {
+    /// The earliest time, RFC 3339: when the oldest backup in the store finished.
+    pub first: String,
+    /// The newest time is this many seconds before now: the archive may not hold the most
+    /// recent writes yet.
+    pub lag_seconds: u64,
 }
 
 /// The backup a database was made from, as Zeabur noted it on the object when it planned the

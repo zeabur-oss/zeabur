@@ -1772,6 +1772,8 @@ export const en = {
   "confirm.mount": (service: string) => `Change a mount of ${service}.`,
   "confirm.removeVolume": (service: string, path: string) =>
     `${service} stops mounting ${path}. The volume and the data on it stay; to free the space, delete its PersistentVolumeClaim under Objects.`,
+  "confirm.swapClaim": (service: string, from: string, to: string) =>
+    `${service} stops, then starts again with volume ${to} in place of ${from}. It is down for a short time.`,
   "confirm.probeSet.readiness": (check: string, period: number, _failures: number) =>
     `A replica gets no traffic until ${check} succeeds (checked every ${period} s).`,
   "confirm.probeSet.liveness": (check: string, period: number, failures: number) =>
@@ -1860,6 +1862,7 @@ export const en = {
   "action.saveMount": "Save mount",
   "action.removeVariable": "Remove variable",
   "action.removeVolume": "Remove volume",
+  "action.swapClaim": "Switch volume",
   "action.deleteVolume": "Delete volume",
   "action.saveVolumes": "Save volumes",
   "action.saveHealthChecks": "Save health checks",
@@ -2247,11 +2250,54 @@ export const en = {
   "backups.volume.keep.weekly": (n: number) => `${n} weekly`,
   "backups.volume.keep.monthly": (n: number) => `${n} monthly`,
   "backups.volume.keep.yearly": (n: number) => `${n} yearly`,
-  "backups.volume.restore":
-    "Zeabur doesn't restore volume backups. K8up's Restore object copies a backup into a volume you choose.",
-  "backups.volume.restoreGuide": "K8up: restore",
   "backups.volume.runs": "Backups of these volumes",
 
+  "backups.volume.liveFiles":
+    "Files a running database is writing may be copied in an unfinished state. Back a database up with its own backups, or have K8up back up its dump with",
+  "volumeRestore.points": (claim: string) => `${claim} can go back to how it was at a backup.`,
+  "volumeRestore.noPoints": (claim: string) =>
+    `${claim} has no backup point to restore yet. One shows here after the first backup.`,
+  "volumeRestore.new": "New volume from a backup point",
+  "volumeRestore.inPlace": "Stop the service, clear the volume, restore in place",
+  "volumeRestore.export": "Export as a file",
+  "volumeRestore.toFile": "Exported file",
+  "volumeRestore.toItself": (claim: string) => `Into ${claim} itself`,
+  "volumeRestore.toVolume": (into: string) => `Into new volume ${into}`,
+  "volumeRestore.check":
+    "K8up can report a restore as done even when it failed, so check the files before you use them.",
+  "volumeRestore.download": "Download",
+  "volumeRestore.swap": "Switch the service to the new volume",
+  "volumeRestore.swapTitle": (service: string, into: string) => `Switch ${service} to ${into}`,
+  "volumeRestore.swapDowntime": (service: string) =>
+    `${service} stops, then starts again, so it is down for a short time.`,
+  "volumeRestore.keep": (claim: string) =>
+    `The original volume ${claim} is kept. Delete it when you no longer need it.`,
+  "volumeRestore.start": "Start the service",
+  "volumeRestore.startTitle": (service: string) => `Start ${service}`,
+  "volumeRestore.exportTitle": (claim: string) => `Export a backup point of ${claim} as a file`,
+  "volumeRestore.inPlaceTitle": (claim: string) => `Restore ${claim} in place`,
+  "volumeRestore.newTitle": (claim: string) => `New volume from a backup point of ${claim}`,
+  "volumeRestore.newNote": (into: string, when: string) =>
+    `The new volume ${into} holds the files as they were at the backup of ${when}.`,
+  "volumeRestore.asUser": "The restore runs as the same user as the backups.",
+  "volumeRestore.cleared": (claim: string, when: string) =>
+    `${claim} gets the files of the backup of ${when}. Files added or changed after it are deleted.`,
+  "volumeRestore.clearedAll": (claim: string) =>
+    `Every file now in ${claim} is replaced by the backup point. Files added or changed after it are deleted.`,
+  "volumeRestore.stops": (service: string) =>
+    `${service} stops. You start it again once the restore is done.`,
+  "volumeRestore.noUndo": "This can't be undone.",
+  "volumeRestore.understood": (claim: string) =>
+    `I understand the files now in ${claim} are cleared`,
+  "volumeRestore.exportNote": (when: string) =>
+    `The backup point of ${when} is packed as a .tar.gz file in the bucket of the backups. You can download it once it is done.`,
+  "volumeRestore.onlyBackups": "Only the times of backups can be chosen, not any time.",
+  "volumeRestore.point": "Backup point",
+  "volumeRestore.zone": "In your time zone.",
+  "volumeRestore.name": "New volume name",
+  "volumeRestore.sameAs": (size: string, storageClass: string) =>
+    `Same size and storage class as the original: ${size}, ${storageClass}.`,
+  "volumeRestore.badName": "Lowercase letters, digits and hyphens, and not the original's name.",
   // Cluster → Backups (Velero)
   "cluster.backups": "Backups",
   "clusterBackups.what": "the cluster's backups",
@@ -2343,15 +2389,60 @@ export const en = {
     "Velero restarted while this backup ran. The next one runs on schedule.",
   "clusterBackups.failure.other": "The backup failed.",
   "clusterBackups.restoreAction": "Restore",
-  "clusterBackups.restoreInto": "Namespaces to restore",
-  "clusterBackups.restoreSkips":
-    "Velero skips objects that are already there, so a restore puts back what was deleted and leaves the rest as it is. Delete an object first to get the backed-up one back.",
   "clusterBackups.problem.restoreNone": "Choose at least one namespace.",
   "clusterBackups.restores": "Restores",
   "clusterBackups.restoredFrom": (backup: string) => `From ${backup}`,
-  "clusterBackups.plan.restore": (backup: string) => `Restore ${backup}`,
-  "clusterBackups.plan.restoreInto": (namespaces: string) =>
-    `It restores ${namespaces} and skips the objects already there.`,
+  "clusterBackups.copyAction": "New project from backup",
+  "clusterBackups.download": "Download backup",
+  "clusterBackups.restoreFrom": "Project to restore",
+  "clusterBackups.chooseProject": "Choose a project",
+  "clusterBackups.copyName": "New project name",
+  "clusterBackups.copyHint": (source: string) =>
+    `${source} keeps running; the backup goes into this new project.`,
+  "clusterBackups.goneBody": (source: string) =>
+    `${source} no longer exists, so it comes back under its own name, domains included.`,
+  "clusterBackups.problem.intoTaken": "Choose a name no project uses.",
+  "clusterBackups.restoredInto": (source: string, into: string) => `${source} → ${into}`,
+  "clusterBackups.openCopy": "Open project",
+  "clusterBackups.plan.copy": (source: string) => `Restore ${source} from backup`,
+  "clusterBackups.copy.sameName": (source: string) =>
+    `${source} no longer exists, so the backup goes back under its own name, domains included.`,
+  "clusterBackups.copy.into": (source: string, into: string) =>
+    `The backup goes into a new project, ${into}, with its own copy of every service, volume and database. ${source} is not touched.`,
+  "clusterBackups.copy.keep": (source: string) =>
+    `The original project ${source} is kept. Delete it when you no longer need it.`,
+  "clusterBackups.copy.hosts": (hosts: string, source: string) =>
+    `${hosts} stay with ${source} until you move them with "Move domains to the new project".`,
+  "clusterBackups.copy.references": (source: string, n: number) =>
+    `${plural(n, "value names", "values name")} addresses in ${source}, so the new project would call the original:`,
+  "clusterBackups.copy.rewriteLater":
+    'Once the restore is done, use "Rewrite addresses" on it to point them at the new project.',
+  "clusterBackups.copy.secrets": (names: string) =>
+    `The values of these Secrets aren't read here and may name it too: ${names}. Rewriting addresses reads them.`,
+  "clusterBackups.copy.unchecked": (kinds: string) => `Couldn't look in ${kinds}.`,
+  "clusterBackups.copy.amount": (cpu: string, memory: string) => `${cpu} CPU and ${memory}`,
+  "clusterBackups.copy.short": (need: string, free: string) =>
+    `Both projects run at once. The new one asks for ${need}, but the nodes have ${free} left, so some services may not start. Stop services you don't need, or add a node.`,
+  "clusterBackups.copy.fits": (need: string, free: string) =>
+    `Both projects run at once: the new one asks for ${need}, and the nodes have ${free} left.`,
+  "clusterBackups.copy.roomUnknown": (need: string) =>
+    `Both projects run at once, and the new one asks for ${need}. Zeabur couldn't read how much the nodes have left.`,
+  "clusterBackups.copy.webhooks": (source: string) =>
+    `Auto deploy and Git webhooks still go to ${source}.`,
+  "clusterBackups.move.action": "Move domains to the new project",
+  "clusterBackups.move.title": (into: string) => `Move domains to ${into}`,
+  "clusterBackups.move.hosts": (hosts: string, from: string, to: string) =>
+    `${hosts} move from ${from} to ${to}.`,
+  "clusterBackups.move.managed": (routes: string) =>
+    `A tool manages these routes, so they stay: ${routes}.`,
+  "clusterBackups.move.brief":
+    "Each domain is unreachable for a moment while it moves, and the new project gets its certificate again.",
+  "clusterBackups.rewrite.action": "Rewrite addresses",
+  "clusterBackups.rewrite.title": (into: string) => `Rewrite addresses in ${into}`,
+  "clusterBackups.rewrite.note": (source: string, into: string) =>
+    `Values that name ${source}.svc will name ${into}.svc.`,
+  "clusterBackups.rewrite.none": (source: string) =>
+    `No variable, ConfigMap or Secret in the new project names ${source}.`,
   "clusterBackups.thing.Restore": (name: string) => `restore ${name}, which starts now`,
   "clusterBackups.plan.location": "Set where backups go",
   "clusterBackups.plan.schedule": "Set the backup schedule",
@@ -2360,12 +2451,16 @@ export const en = {
   "clusterBackups.plan.now": "Back up now",
   "clusterBackups.plan.create": (what: string) => `Adds ${what}.`,
   "clusterBackups.plan.patch": (what: string) => `Changes ${what}.`,
+  "clusterBackups.plan.delete": (what: string) => `Removes ${what}.`,
   "clusterBackups.plan.nothing": "Nothing to change.",
   "clusterBackups.plan.keysHidden": "The keys go into a Secret and aren't shown here.",
   "clusterBackups.thing.Secret": "the storage keys",
   "clusterBackups.thing.BackupStorageLocation": "where backups go",
   "clusterBackups.thing.Schedule": "the schedule",
   "clusterBackups.thing.Backup": (name: string) => `backup ${name}, which starts now`,
+  "clusterBackups.thing.Namespace": (name: string) => `project ${name}`,
+  "clusterBackups.thing.route": (namespace: string, name: string) =>
+    `route ${name} in ${namespace}`,
   "clusterBackups.kube.namespace": "Velero's namespace",
   "clusterBackups.kube.location": "Backup location",
   "clusterBackups.kube.schedule": "Schedule",
@@ -2812,6 +2907,12 @@ export const en = {
   "db.membersReady": (ready: number, total: number) => `${ready}/${total} ready`,
   "db.tab.backups": "Backups",
   "db.delete": "Delete database",
+  "db.delete.made":
+    "Also deletes the passwords, backup settings and other objects Zeabur made for it. Backups already in the bucket stay.",
+  "db.delete.kept": (name: string, by: string) =>
+    `Keeps the Secret ${name}, which ${by} still uses.`,
+  "db.delete.unlisted": (label: string) =>
+    `Zeabur could not list everything it made for this database, so some objects may stay. Remove them with kubectl delete -l ${label}.`,
   "db.settings": "Settings of this database",
   "db.computeHint": "How many instances run, and the CPU and memory each one gets.",
   "db.customSize": "Set by hand in the object; picking a size replaces it.",
@@ -3070,28 +3171,45 @@ export const en = {
   "db.backup.retentionHours": (hours: string) => `${hours} of backups`,
   "db.backup.snapshots":
     "Dragonfly writes a snapshot there on its schedule and when it stops. Zeabur cannot list them.",
-  "db.restore.action": "Restore into a new database",
-  "db.restore.title": (name: string) => `Restore ${name} into a new database`,
+  "db.restore.action": "New database from a backup point",
+  "db.restore.title": (name: string) => `New database from a backup point of ${name}`,
   "db.restore.body":
     "Zeabur creates a new database with the same settings, starting from the backup. The original is not changed.",
   "db.restore.point": "Backup",
   "db.restore.latest": "Newest snapshot",
   "db.restore.name": "New database name",
-  "db.restore.none": "No finished backup to restore from yet.",
+  "db.restore.none": "No finished backup or point in time to restore from yet.",
+  "db.restore.fromBackup": "A finished backup",
+  "db.restore.fromTime": "A point in time",
+  "db.restore.window": (from: string, to: string) =>
+    `Any time from ${from} to ${to}, in your time zone.`,
+  "db.restore.time": "Time, in your time zone",
+  "db.restore.utc": (instant: string) => `That is ${instant} UTC.`,
+  "db.restore.outside": "This time is outside the range that can be restored.",
+  "db.restore.instant": (local: string, utc: string) =>
+    `The new database holds the data as of ${local}, which is ${utc} UTC, not what was written after it.`,
+  "db.restore.asOfTime":
+    "The new database holds the data as of the time you choose, not what was written after it.",
+  "db.restore.making": (name: string) =>
+    `Creating ${name}. Once it is ready, you can point services to it here.`,
+  "db.restore.ready": (name: string) =>
+    `${name} is ready. Next, point the services that read the original to it. You review each change first.`,
+  "db.restore.download": (name: string) =>
+    `To download the data of this point, export it from ${name}'s page. Backup files cannot be downloaded directly yet.`,
   "db.restore.plan": (from: string, name: string) => `Restore ${from} into ${name}`,
   "db.restore.unchanged": (from: string) =>
     `${from} is not changed, and services keep reading it until you point them to the new database.`,
   "db.restore.asOf":
     "The new database holds the data as of the backup, not what was written after it.",
-  "db.restore.sharedSecret": (secret: string) =>
-    `The new database uses the original's Secret ${secret}, as the backup holds the same users and passwords.`,
+  "db.restore.copiedSecret": (from: string, into: string) =>
+    `The backup holds the passwords in ${from}, so the new database gets its own Secret ${into} with the same values. It keeps working after the original is deleted.`,
   "db.restored.from": (name: string, time: string) => `Restored from ${name}'s backup of ${time}`,
   "db.restored.copy": (name: string, time: string) =>
     `${name} was restored from this database's backup of ${time}`,
   "db.restored.point": "Point services here",
   "db.restored.pointTitle": (name: string) => `Point services to ${name}`,
   "db.restored.keep": (name: string) =>
-    `${name} keeps running. Delete it from its page when you no longer need it.`,
+    `${name} keeps running and is kept. Delete it when you no longer need it.`,
   "db.restored.readers": (name: string, services: string) => `Reading ${name}: ${services}.`,
   "db.restored.noReaders": (name: string) => `No service reads ${name}.`,
   "db.restored.waiting": (name: string) => `You can point services to ${name} once it is ready.`,

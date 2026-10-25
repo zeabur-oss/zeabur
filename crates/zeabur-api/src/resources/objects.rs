@@ -19,6 +19,9 @@
 //!   kinds, generated ones included, so a client can open one kind for a single list;
 //! - with `?all=true`, every kind that controllers do not generate.
 //!
+//! `?label=<key>=<value>` keeps only the objects with that label, as `kubectl get -l` does: the
+//! objects a database made carry `zeabur.com/database: <name>`, so deleting it can find them.
+//!
 //! Other kinds come back with `listed: false` and no items, for a client to read on demand. A
 //! kind the hint says the person may not list is not read; one refused when read is named in
 //! `unreadable`. Resources that are not objects a person keeps (`metrics.k8s.io`'s measurements)
@@ -120,6 +123,28 @@ pub(crate) struct ObjectListParams {
     kinds: Option<String>,
     /// `true`: read every kind that controllers do not generate ("scan all kinds").
     all: Option<bool>,
+    /// Keep only the objects with this label, as `<key>=<value>`: `zeabur.com/database=pg`.
+    label: Option<String>,
+}
+
+/// What the objects list reads.
+#[derive(Debug, Default)]
+struct ListQuery {
+    kinds: BTreeSet<String>,
+    all: bool,
+    label: Option<(String, String)>,
+}
+
+impl ListQuery {
+    fn keeps(&self, metadata: &ObjectMeta) -> bool {
+        self.label.as_ref().is_none_or(|(key, value)| {
+            metadata
+                .labels
+                .as_ref()
+                .and_then(|l| l.get(key))
+                .is_some_and(|v| v == value)
+        })
+    }
 }
 
 /// One object in a listing.
@@ -240,10 +265,11 @@ fn key(group: &str, resource: &str) -> String {
     format!("{}/{resource}", segment(group))
 }
 
-/// Reads `?kinds=` and `?all=`.
-fn parse_query(query: Option<&str>) -> Result<(BTreeSet<String>, bool), ApiError> {
+/// Reads `?kinds=`, `?all=` and `?label=`.
+fn parse_query(query: Option<&str>) -> Result<ListQuery, ApiError> {
     let mut kinds = BTreeSet::new();
     let mut all = false;
+    let mut label = None;
     for (name, value) in form_urlencoded::parse(query.unwrap_or_default().as_bytes()) {
         match name.as_ref() {
             "kinds" => kinds.extend(
@@ -265,16 +291,28 @@ fn parse_query(query: Option<&str>) -> Result<(BTreeSet<String>, bool), ApiError
                     }
                 };
             }
+            "label" => {
+                let (key, value) = value
+                    .split_once('=')
+                    .filter(|(k, _)| !k.trim().is_empty())
+                    .ok_or_else(|| {
+                        ApiError::from(Problem::new(
+                            Kind::BadRequest,
+                            format!("`label` must be `<key>=<value>`, not {value:?}."),
+                        ))
+                    })?;
+                label = Some((key.trim().to_owned(), value.trim().to_owned()));
+            }
             _ => {}
         }
     }
-    Ok((kinds, all))
+    Ok(ListQuery { kinds, all, label })
 }
 
 /// Every listable namespaced kind of a project, kinds first: the usual kinds (or only those named
 /// in `kinds`) and, with `all`, every kind that controllers do not generate are read (names, ages
 /// and owners only); the rest come back unread. Each kind carries an access hint; kinds refused
-/// when read are named in `unreadable`.
+/// when read are named in `unreadable`. With `label`, only the objects with that label.
 #[utoipa::path(get, path = "/api/v1/projects/{project}/objects", tag = "resources", operation_id = "listObjects",
     params(("project" = String, Path), ObjectListParams),
     responses((status = 200, body = ObjectList), (status = 400, body = Problem, content_type = PROBLEM),
@@ -284,7 +322,8 @@ pub(crate) async fn list(
     Path(project): Path<String>,
     RawQuery(query): RawQuery,
 ) -> Result<Json<ObjectList>, ApiError> {
-    let (requested, all) = parse_query(query.as_deref())?;
+    let query = parse_query(query.as_deref())?;
+    let (requested, all) = (&query.kinds, query.all);
     let served = cluster
         .served_resources()
         .await
@@ -346,6 +385,7 @@ pub(crate) async fn list(
             Ok(Some(metadata)) => {
                 let mut objects: Vec<ObjectSummary> = metadata
                     .into_iter()
+                    .filter(|m| query.keeps(m))
                     .map(|m| summary(&project, &resource, m))
                     .collect();
                 objects.sort_by(|a, b| a.name.cmp(&b.name));

@@ -110,11 +110,33 @@ export interface paths {
     get?: never
     put?: never
     /**
-     * Works out what setting the backup location or Zeabur's schedule, pausing or resuming it, or
-     *     backing up now writes, and a token to apply it; writes nothing. The keys of a location never
+     * Works out what setting the backup location or Zeabur's schedule, pausing or resuming it,
+     *     backing up now, restoring a backup into a new project or moving domains to it writes, and a
+     *     token to apply it; writes nothing. The keys of a location never
      *     appear in the answer.
      */
     post: operations["planClusterBackups"]
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  "/api/v1/cluster/backups/{backup}/download": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * A Velero backup's contents, as a `.tar.gz` file. Read and written as the person: creating a
+     *     `DownloadRequest` in Velero's namespace and reading the location's customer key. No URL or
+     *     key reaches the answer.
+     */
+    get: operations["downloadClusterBackup"]
+    put?: never
+    post?: never
     delete?: never
     options?: never
     head?: never
@@ -1601,7 +1623,7 @@ export interface paths {
      * Every listable namespaced kind of a project, kinds first: the usual kinds (or only those named
      *     in `kinds`) and, with `all`, every kind that controllers do not generate are read (names, ages
      *     and owners only); the rest come back unread. Each kind carries an access hint; kinds refused
-     *     when read are named in `unreadable`.
+     *     when read are named in `unreadable`. With `label`, only the objects with that label.
      */
     get: operations["listObjects"]
     put?: never
@@ -2217,6 +2239,47 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  "/api/v1/projects/{project}/volumes/{claim}/restores": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * What `claim` can be restored from: the snapshots K8up lists for it, its restores, and the
+     *     parts of a `Restore`, read as the person.
+     */
+    get: operations["getVolumeRestores"]
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  "/api/v1/projects/{project}/volumes/{claim}/restores/{restore}/download": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * The file an export of `claim`'s backup wrote, as a `.tar.gz` file. Read as the person: the
+     *     `Restore`, the claim's backup schedule and the keys of its bucket. No URL or key reaches the
+     *     answer.
+     */
+    get: operations["downloadVolumeExport"]
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   "/api/v1/session": {
     parameters: {
       query?: never
@@ -2661,7 +2724,7 @@ export interface components {
      * @description What a write does.
      * @enum {string}
      */
-    BackupWriteAction: "create" | "patch"
+    BackupWriteAction: "create" | "patch" | "delete"
     /** @description What an apply wrote. */
     BackupsApplied: {
       /** @description The backup a `backupNow` plan created. */
@@ -2680,8 +2743,13 @@ export interface components {
     BackupsPlan: {
       /** @description The backup a `backupNow` plan creates. */
       backup?: string | null
+      copy?: components["schemas"]["RestoreCopy"] | null
       /** @description When the token stops working, RFC 3339. */
       expiresAt: string
+      /** @description The hostnames a `moveDomains` plan moves. */
+      hosts?: string[]
+      /** @description The routes a `moveDomains` plan leaves, because a tool manages them. */
+      managed?: string[]
       /** @description The restore a `restore` plan creates. */
       restore?: string | null
       /** @description Send this to `apply` to carry out exactly this plan. */
@@ -2738,10 +2806,20 @@ export interface components {
       | {
           /** @description The backup. */
           backup: string
-          /** @description The namespaces to restore. */
-          namespaces: string[]
+          /** @description The new namespace, needed while `namespace` exists. */
+          into?: string | null
+          /** @description The namespace to restore. */
+          namespace: string
           /** @enum {string} */
           op: "restore"
+        }
+      | {
+          /** @description The project the routes leave. */
+          from: string
+          /** @enum {string} */
+          op: "moveDomains"
+          /** @description The project they move to. */
+          to: string
         }
     /** @description A baseline policy and the node addresses it does not let in. */
     BaselinePolicy: {
@@ -3033,6 +3111,16 @@ export interface components {
           op: "editMount"
           /** @description Mount it read-only (or not). */
           readOnly?: boolean | null
+          /** @description The workload. */
+          workload: components["schemas"]["WorkloadRef"]
+        }
+      | {
+          /** @description The claim it mounts now. */
+          from: string
+          /** @enum {string} */
+          op: "swapClaim"
+          /** @description The claim to mount instead. */
+          to: string
           /** @description The workload. */
           workload: components["schemas"]["WorkloadRef"]
         }
@@ -4005,6 +4093,7 @@ export interface components {
        *     backups and the operator restarting the members with them.
        */
       ready: boolean
+      recoveryWindow?: components["schemas"]["DatabaseRecoveryWindow"] | null
       /** @description Its backups, newest first. */
       runs: components["schemas"]["BackupRun"][]
       /** @description The schedules that back it up. */
@@ -4051,6 +4140,17 @@ export interface components {
       module: string
       /** @description Whether its objects could be read. */
       state: components["schemas"]["ProviderState"]
+    }
+    /** @description The times a new database can recover to. */
+    DatabaseRecoveryWindow: {
+      /** @description The earliest time, RFC 3339: when the oldest backup in the store finished. */
+      first: string
+      /**
+       * Format: int64
+       * @description The newest time is this many seconds before now: the archive may not hold the most
+       *     recent writes yet.
+       */
+      lagSeconds: number
     }
     /**
      * @description The backup a database was made from, as Zeabur noted it on the object when it planned the
@@ -7533,6 +7633,11 @@ export interface components {
       readLogs: components["schemas"]["Permission"]
       /** @description Read Secret values: `get` on secrets. */
       readSecrets: components["schemas"]["Permission"]
+      /**
+       * @description Restore volumes from their backups: `create` on K8up's restores and on
+       *     persistentvolumeclaims.
+       */
+      restoreVolumes: components["schemas"]["Permission"]
       /** @description Change the number of replicas: `patch` on `deployments/scale` or `statefulsets/scale`. */
       scale: components["schemas"]["Permission"]
     }
@@ -7865,6 +7970,70 @@ export interface components {
        * @description Pods; only where a count of pods applies.
        */
       pods?: number | null
+    }
+    /** @description What a restore into a new project reports. */
+    RestoreCopy: {
+      /** @description The hostnames the original serves, which stay with it until they are moved. */
+      hosts: string[]
+      /** @description The namespace it is restored into. */
+      into: string
+      /** @description The values that name the original namespace; empty under the same name. */
+      references: components["schemas"]["RestoreReference"][]
+      room?: components["schemas"]["RestoreRoom"] | null
+      /**
+       * @description The original no longer exists, so the backup goes back under its own name, routes
+       *     included.
+       */
+      sameName: boolean
+      /** @description The Secrets whose values were not read, which may name it too. */
+      secrets: string[]
+      /** @description The namespace restored. */
+      source: string
+      /** @description The kinds that could not be read to look for them. */
+      unchecked: string[]
+    }
+    /**
+     * @description Whether the cluster has room for the copy.
+     * @enum {string}
+     */
+    RestoreFit: "fits" | "short" | "unknown"
+    /** @description A value of the original project that names the original namespace. */
+    RestoreReference: {
+      /** @description The container, for a variable. */
+      container?: string | null
+      /** @description The variable or key; the rule list (`ingress` or `egress`) of a NetworkPolicy. */
+      key: string
+      /** @description `Deployment`, `StatefulSet`, `DaemonSet`, `CronJob`, `ConfigMap` or `NetworkPolicy`. */
+      kind: string
+      /** @description The object. */
+      name: string
+      /** @description The value, for a variable or a ConfigMap key. */
+      value?: string | null
+    }
+    /** @description The room the copy needs and the room there is. */
+    RestoreRoom: {
+      /** @description The verdict. */
+      fit: components["schemas"]["RestoreFit"]
+      /**
+       * Format: int64
+       * @description What the nodes have left: millicores.
+       */
+      freeCpu: number
+      /**
+       * Format: int64
+       * @description Bytes.
+       */
+      freeMemory: number
+      /**
+       * Format: int64
+       * @description What the original's running pods request: millicores.
+       */
+      needCpu: number
+      /**
+       * Format: int64
+       * @description Bytes.
+       */
+      needMemory: number
     }
     /** @description A Secret's values, shown because the person asked. */
     RevealedSecret: {
@@ -9176,6 +9345,8 @@ export interface components {
       errors: number
       /** @description When it finished, RFC 3339. */
       finished?: string | null
+      /** @description The new namespace it restores into, when it maps one. */
+      into?: string | null
       /** @description Its name. */
       name: string
       /** @description The namespaces it restores; empty for every namespace of the backup. */
@@ -9237,6 +9408,55 @@ export interface components {
       size: string
       /** @description The `StorageClass`; absent for the cluster's default. */
       storageClass?: string | null
+    }
+    /** @description A `Restore` of a claim's backups. */
+    VolumeRestore: {
+      /** @description It deletes what the snapshot does not have. */
+      delete: boolean
+      /** @description When it finished, RFC 3339. */
+      finished?: string | null
+      /** @description The claim it restores into; absent for an export. */
+      into?: string | null
+      /** @description Why it failed. */
+      message?: string | null
+      /** @description Its name. */
+      name: string
+      /** @description How it went, as K8up reports it. */
+      outcome: components["schemas"]["BackupOutcome"]
+      /**
+       * Format: int32
+       * @description The replicas to start the workload again with, which Zeabur notes on a restore into the
+       *     claim itself ([`REPLICAS`]).
+       */
+      replicas?: number | null
+      /** @description The snapshot. */
+      snapshot: string
+      /** @description When it was created, RFC 3339. */
+      started?: string | null
+    }
+    /** @description What a claim can be restored from. */
+    VolumeRestores: {
+      /** @description The `restoreMethod` that exports a snapshot to the bucket of the backups. */
+      export?: unknown
+      /** @description The restores of the claim's backups, newest first. */
+      restores: components["schemas"]["VolumeRestore"][]
+      /** @description The schedule of the claim's backups. */
+      schedule?: string | null
+      /** @description The snapshots of the claim, newest first. Only these times can be restored. */
+      snapshots: components["schemas"]["VolumeSnapshot"][]
+      /** @description Whether K8up's objects could be read. */
+      state: components["schemas"]["ProviderState"]
+      /** @description A `Restore` with the backup's backend and Pod security, for a snapshot and a method. */
+      template?: unknown
+      /** @description What could not be read. */
+      unreadable: components["schemas"]["UnreadableView"][]
+    }
+    /** @description A snapshot of a claim that can be restored. */
+    VolumeSnapshot: {
+      /** @description When it was taken, RFC 3339. */
+      date: string
+      /** @description restic's ID. */
+      id: string
     }
     /** @description How full one claim's volume is. */
     VolumeUsage: {
@@ -9693,6 +9913,61 @@ export interface operations {
         }
       }
       422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
+  downloadClusterBackup: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description The backup */
+        backup: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description Velero's archive of the backup's objects */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/gzip": unknown
+        }
+      }
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      503: {
         headers: {
           [name: string]: unknown
         }
@@ -12537,6 +12812,8 @@ export interface operations {
         kinds?: string
         /** @description `true`: read every kind that controllers do not generate ("scan all kinds"). */
         all?: boolean
+        /** @description Keep only the objects with this label, as `<key>=<value>`: `zeabur.com/database=pg`. */
+        label?: string
       }
       header?: never
       path: {
@@ -13870,6 +14147,97 @@ export interface operations {
         }
       }
       400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
+  getVolumeRestores: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description The project's namespace */
+        project: string
+        /** @description The claim */
+        claim: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["VolumeRestores"]
+        }
+      }
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
+  downloadVolumeExport: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description The project's namespace */
+        project: string
+        /** @description The claim */
+        claim: string
+        /** @description The export's `Restore` */
+        restore: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description The snapshot's files */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/gzip": unknown
+        }
+      }
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      503: {
         headers: {
           [name: string]: unknown
         }

@@ -48,6 +48,8 @@ pub struct Inspector {
     /// Registries reached over plain HTTP: loopback, where every address may be reached.
     insecure: Vec<String>,
     kept: Mutex<HashMap<String, (Instant, Inspected)>>,
+    /// Which addresses the server may connect to.
+    reach: https::Reach,
 }
 
 impl std::fmt::Debug for Inspector {
@@ -66,7 +68,14 @@ impl Inspector {
             transport,
             insecure,
             kept: Mutex::new(HashMap::new()),
+            reach: https::Reach::Any,
         }
+    }
+
+    /// Which addresses the server may connect to.
+    #[must_use]
+    pub const fn reach(&self) -> https::Reach {
+        self.reach
     }
 
     /// Through [`https::Https`] reaching `reach`. The registry of Zeabur Builder is read over
@@ -81,7 +90,10 @@ impl Inspector {
         if reach == https::Reach::Any {
             insecure.extend(["localhost".to_owned(), "127.0.0.1".to_owned()]);
         }
-        Self::new(transport, insecure)
+        Self {
+            reach,
+            ..Self::new(transport, insecure)
+        }
     }
 
     fn base(&self, reference: &Reference) -> String {
@@ -475,11 +487,7 @@ mod tests {
     async fn answers_are_kept_and_each_credential_has_its_own() {
         let fake = Arc::new(nginx());
         let transport: Arc<dyn Transport> = Arc::<registry::fake::Registry>::clone(&fake);
-        let inspector = Inspector {
-            transport,
-            insecure: Vec::new(),
-            kept: Mutex::new(HashMap::new()),
-        };
+        let inspector = Inspector::new(transport, Vec::new());
         // The fake answers at registry.test.
         let reference = Reference::parse("registry.test/library/nginx").unwrap();
         let amd64 = vec!["amd64".to_owned()];

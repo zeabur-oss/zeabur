@@ -206,6 +206,7 @@ fn backups_of(
         schedules,
         runs,
         ready,
+        recovery_window: None,
     }
 }
 

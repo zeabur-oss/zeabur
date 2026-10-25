@@ -223,6 +223,7 @@ fn cluster_routes(router: OpenApiRouter<AppState>) -> OpenApiRouter<AppState> {
         .routes(routes!(cluster::backups::get))
         .routes(routes!(cluster::backups::plan))
         .routes(routes!(cluster::backups::apply))
+        .routes(routes!(cluster::backup_download::download))
         .routes(routes!(cluster::issuers::get))
         .routes(routes!(cluster::issuers::plan))
         .routes(routes!(cluster::issuers::apply))
@@ -313,6 +314,8 @@ fn remaining_routes(router: OpenApiRouter<AppState>) -> OpenApiRouter<AppState> 
         .routes(routes!(projects::databases::get))
         .routes(routes!(projects::object_storage::get))
         .routes(routes!(projects::database_export::export))
+        .routes(routes!(projects::volume_restores::get))
+        .routes(routes!(projects::volume_restores::download))
         .routes(routes!(projects::builds::get))
         .routes(routes!(projects::deploy_keys::create))
         .routes(routes!(cluster::github_app::project))
@@ -572,6 +575,7 @@ fn build_with(
         tools: Arc::new(tools::Sessions::default()),
         sign_in,
         log_proxy,
+        store: Arc::new(cluster::object_store::Fetcher::new(images.reach())),
         images,
         github,
     };

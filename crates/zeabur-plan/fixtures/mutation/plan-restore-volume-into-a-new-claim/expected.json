@@ -1,0 +1,6 @@
+{
+  "objects": [
+    {"target": {"apiVersion": "v1", "kind": "PersistentVolumeClaim", "plural": "persistentvolumeclaims", "name": "web-data-restored-1025"}},
+    {"target": {"apiVersion": "k8up.io/v1", "kind": "Restore", "plural": "restores", "name": "web-data-restore-20261025"}}
+  ]
+}

@@ -50,6 +50,7 @@
 //! `partial: true`), so a very large cluster gives a partial answer quickly rather than a slow
 //! one (see `zeabur_kube`'s cluster-wide reads).
 
+pub mod backup_download;
 pub mod backups;
 pub(crate) mod capacity;
 pub mod config_reload;
@@ -63,6 +64,8 @@ pub mod maintenance;
 pub mod modules;
 pub mod node_policies;
 pub mod node_shells;
+pub mod object_store;
+pub mod restore_copy;
 pub mod s3_destinations;
 pub mod templates;
 pub mod tools;

@@ -42,4 +42,5 @@ mod terminal;
 mod timeline;
 mod trace;
 mod usage;
+mod volume_restores;
 mod writes;

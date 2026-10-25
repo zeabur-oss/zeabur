@@ -1,5 +1,6 @@
 import type { Schemas } from "@/api/client"
 import type { Locale, Translate } from "@/i18n"
+import type { Messages } from "@/i18n/en"
 import {
   bounded,
   countRows,
@@ -96,6 +97,48 @@ const databases = new Set([
   "perconaservermongodbs.psmdb.percona.com",
 ])
 
+type PlainKey = { [K in keyof Messages]: Messages[K] extends string ? K : never }[keyof Messages]
+
+/** The sentence of a change that does not depend on its fields. */
+const plainSentence: Partial<Record<Change["op"], PlainKey>> = {
+  expandVolume: "confirm.noShrink",
+  edit: "confirm.yamlAsIs",
+  adopt: "confirm.adopt",
+  createProject: "confirm.createProject",
+  unadopt: "confirm.unadopt",
+  details: "confirm.details",
+  clusterTools: "confirm.clusterTools",
+}
+
+type VolumeChange = Extract<
+  Change,
+  { op: "addVolume" | "removeVolume" | "swapClaim" | "editMount" }
+>
+
+function volumeSentence(t: Translate, change: VolumeChange): string {
+  if (change.op === "addVolume") return addVolumeSentence(t, change)
+  if (change.op === "removeVolume")
+    return t("confirm.removeVolume", change.workload.name, change.mountPath)
+  if (change.op === "swapClaim")
+    return t("confirm.swapClaim", change.workload.name, change.from, change.to)
+  return mountSentence(t, change)
+}
+
+function mountSentence(t: Translate, change: Extract<Change, { op: "editMount" }>): string {
+  const path = change.newMountPath ?? change.mountPath
+  const moved =
+    change.newMountPath && change.newMountPath !== change.mountPath
+      ? t("confirm.moveMount", change.workload.name, change.mountPath, change.newMountPath)
+      : undefined
+  const mode =
+    change.readOnly === true
+      ? t("confirm.readOnly", path, change.workload.name)
+      : change.readOnly === false
+        ? t("confirm.writable", path, change.workload.name)
+        : undefined
+  return t("common.sentences", [moved, mode]) || t("confirm.mount", change.workload.name)
+}
+
 function sentenceOf(
   t: Translate,
   change: Change,
@@ -103,6 +146,8 @@ function sentenceOf(
   plan?: Pick<Plan, "objects">,
 ): string {
   const list = (items: string[]) => (items.length > 0 ? t("common.list", items) : "")
+  const plain = plainSentence[change.op]
+  if (plain) return t(plain)
   switch (change.op) {
     case "restart":
       return rolling(t, change.workload, podsOf, true)
@@ -133,25 +178,11 @@ function sentenceOf(
       return t("confirm.removeDomain", change.hostname)
     case "rollback":
       return t("confirm.rollback", change.revision)
-    case "expandVolume":
-      return t("confirm.noShrink")
     case "addVolume":
-      return addVolumeSentence(t, change)
     case "removeVolume":
-      return t("confirm.removeVolume", change.workload.name, change.mountPath)
-    case "editMount": {
-      const moved =
-        change.newMountPath && change.newMountPath !== change.mountPath
-          ? t("confirm.moveMount", change.workload.name, change.mountPath, change.newMountPath)
-          : undefined
-      const mode =
-        change.readOnly === true
-          ? t("confirm.readOnly", change.newMountPath ?? change.mountPath, change.workload.name)
-          : change.readOnly === false
-            ? t("confirm.writable", change.newMountPath ?? change.mountPath, change.workload.name)
-            : undefined
-      return t("common.sentences", [moved, mode]) || t("confirm.mount", change.workload.name)
-    }
+    case "swapClaim":
+    case "editMount":
+      return volumeSentence(t, change)
     case "probe":
       return probeSentence(t, change.probe, change.set ?? undefined)
     case "configReload":
@@ -189,8 +220,6 @@ function sentenceOf(
         change.limits ?? undefined,
         fieldsOf(plan, change.workload.kind, change.workload.name),
       )
-    case "edit":
-      return t("confirm.yamlAsIs")
     case "create": {
       const object = (change.object ?? {}) as { kind?: unknown; metadata?: { name?: unknown } }
       const kind = typeof object.kind === "string" ? object.kind : ""
@@ -201,22 +230,12 @@ function sentenceOf(
       return databases.has(`${change.resource.resource}.${change.resource.group}`)
         ? t("confirm.deleteDatabase", change.name)
         : t("confirm.delete", change.name)
-    case "adopt":
-      return t("confirm.adopt")
-    case "createProject":
-      return t("confirm.createProject")
     case "deployKey":
       return t("confirm.deployKey", change.name)
-    case "unadopt":
-      return t("confirm.unadopt")
-    case "details":
-      return t("confirm.details")
     case "debugContainer":
       return t("confirm.debugContainer", change.pod)
-    case "clusterTools":
-      return t("confirm.clusterTools")
     default:
-      return accessSentence(t, change)
+      return accessSentence(t, change as Parameters<typeof accessSentence>[1])
   }
 }
 
@@ -753,7 +772,13 @@ export function undoTitle(t: Translate, undo: readonly Change[], asked: readonly
   return t("undo.many", undo.length)
 }
 
-const storageOps = new Set<Change["op"]>(["addVolume", "expandVolume", "editMount", "removeVolume"])
+const storageOps = new Set<Change["op"]>([
+  "addVolume",
+  "expandVolume",
+  "editMount",
+  "removeVolume",
+  "swapClaim",
+])
 
 // A deploy key and copied S3 keys open into the create of a Secret: a form that sends one still
 // creates.
@@ -766,80 +791,87 @@ const secretName = (object: unknown): string => {
 }
 
 /** The confirm button, the same whether a form, YAML or a drawer asked (`docs/internal/wording.md`). */
+/** The button of a change that does not depend on its fields. */
+const plainAction: Partial<Record<Change["op"], PlainKey>> = {
+  env: "action.saveVariables",
+  data: "action.saveValues",
+  addDomain: "action.addDomain",
+  renameDomain: "action.renameDomain",
+  removeDomain: "action.removeDomain",
+  addVolume: "action.addVolume",
+  editMount: "action.saveMount",
+  removeVolume: "action.removeVolume",
+  swapClaim: "action.swapClaim",
+  probe: "action.saveHealthChecks",
+  image: "action.deploy",
+  rebuild: "action.rebuild",
+  resources: "action.saveResources",
+  edit: "action.saveYaml",
+  delete: "action.delete",
+  adopt: "action.adopt",
+  createProject: "action.create",
+  deployKey: "action.create",
+  unadopt: "action.unadopt",
+  details: "action.saveDetails",
+  debugContainer: "action.openDebugTerminal",
+  clusterTools: "action.openToolsTerminal",
+}
+
 export function actionOf(t: Translate, ask: Asked): string {
   const [change] = ask.changes
   if (!change) return t("plan.apply")
   if (ask.summary) return ask.summary.action
   const many = manyAction(t, ask.changes)
   if (many) return many
-  const count = ask.changes.length
+  const plain = plainAction[change.op]
+  if (plain) return t(plain)
+  return oneAction(t, change, ask.changes)
+}
+
+function scaleAction(t: Translate, replicas: number, changes: readonly Change[]): string {
+  const count = changes.length
+  if (changes.every((c) => c.op === "scale" && c.replicas === 0))
+    return count > 1 ? t("action.pauseMany", count) : t("action.pause")
+  return count > 1 ? t("action.scaleMany", count) : t("action.scale", replicas)
+}
+
+function createAction(t: Translate, object: unknown): string {
+  if ((object as { kind?: unknown } | null)?.kind !== "NetworkPolicy") return t("action.create")
+  return isolates(object) ? t("action.isolate") : t("action.allow")
+}
+
+/** The button of one kind of change whose words depend on it. */
+function oneAction(t: Translate, change: Change, changes: readonly Change[]): string {
+  const count = changes.length
   switch (change.op) {
     case "restart":
       return count > 1 ? t("action.restartMany", count) : t("action.restart")
-    case "env":
-      return t("action.saveVariables")
-    case "data":
-      return t("action.saveValues")
     case "configReload":
       return change.enabled ? t("action.turnOn") : t("action.turnOff")
-    case "addDomain":
-      return t("action.addDomain")
-    case "renameDomain":
-      return t("action.renameDomain")
-    case "removeDomain":
-      return t("action.removeDomain")
     case "rollback":
       return t("action.rollback", change.revision)
     case "expandVolume":
       return t("action.grow", change.size)
-    case "addVolume":
-      return t("action.addVolume")
-    case "editMount":
-      return t("action.saveMount")
-    case "removeVolume":
-      return t("action.removeVolume")
-    case "probe":
-      return t("action.saveHealthChecks")
     case "scale":
-      if (ask.changes.every((c) => c.op === "scale" && c.replicas === 0))
-        return count > 1 ? t("action.pauseMany", count) : t("action.pause")
-      return count > 1 ? t("action.scaleMany", count) : t("action.scale", change.replicas)
-    case "image":
-      return t("action.deploy")
-    case "rebuild":
-      return t("action.rebuild")
+      return scaleAction(t, change.replicas, changes)
+    case "create":
+      return createAction(t, change.object)
+    default:
+      return switchAction(t, change)
+  }
+}
+
+/** The button of a change that turns a setting on or off, or makes it strict. */
+function switchAction(t: Translate, change: Change): string {
+  switch (change.op) {
     case "autoUpdate":
       return t(change.enabled ? "action.autoUpdateOn" : "action.autoUpdateOff")
-    case "resources":
-      return t("action.saveResources")
-    case "edit":
-      return t("action.saveYaml")
-    case "create": {
-      const object = (change.object ?? {}) as { kind?: unknown }
-      if (object.kind !== "NetworkPolicy") return t("action.create")
-      return isolates(change.object) ? t("action.isolate") : t("action.allow")
-    }
-    case "delete":
-      return t("action.delete")
-    case "adopt":
-      return t("action.adopt")
-    case "createProject":
-    case "deployKey":
-      return t("action.create")
-    case "unadopt":
-      return t("action.unadopt")
-    case "details":
-      return t("action.saveDetails")
-    case "debugContainer":
-      return t("action.openDebugTerminal")
-    case "clusterTools":
-      return t("action.openToolsTerminal")
     case "securityProfile":
       return change.profile === "restricted" ? t("action.makeStrict") : t("action.makeCompatible")
     case "podSecurity":
       return change.level === "restricted" ? t("action.makeStrict") : t("action.save")
     default:
-      return accessAction(t, change)
+      return accessAction(t, change as Parameters<typeof accessAction>[1])
   }
 }
 

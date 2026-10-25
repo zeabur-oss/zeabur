@@ -27,7 +27,7 @@
 //! [k8s-psa-labels]: https://kubernetes.io/docs/concepts/security/pod-security-admission/#pod-security-admission-labels-for-namespaces
 
 use serde_json::{Value, json};
-use zeabur_kernel::names::{NODE_SHELL_NAMESPACE, is_system_namespace};
+use zeabur_kernel::names::{Conventions, NODE_SHELL_NAMESPACE, is_system_namespace};
 use zeabur_model::{DESCRIPTION_MAX, DISPLAY_NAME_MAX, PodSecurityLevel, ProjectIcon};
 
 use crate::change::Target;
@@ -49,6 +49,34 @@ fn node_shell_namespace(name: &str) -> PlanError {
 
 /// The value of the project label.
 const ADOPTED: &str = "true";
+
+/// A new project's Namespace: the project label, the Pod Security labels at `level`, and the
+/// display name when given.
+#[must_use]
+pub fn project_namespace(
+    conventions: &Conventions,
+    name: &str,
+    display_name: Option<&str>,
+    level: PodSecurityLevel,
+) -> Value {
+    let level = level.as_str();
+    let mut metadata = json!({
+        "name": name,
+        "labels": {
+            conventions.project_label.clone(): ADOPTED,
+            PodSecurityLevel::ENFORCE: level,
+            PodSecurityLevel::AUDIT: level,
+            PodSecurityLevel::WARN: level,
+        },
+    });
+    if let (Some(display_name), Some(map)) = (display_name, metadata.as_object_mut()) {
+        map.insert(
+            "annotations".to_owned(),
+            json!({ conventions.display_name_annotation.clone(): display_name }),
+        );
+    }
+    json!({"apiVersion": "v1", "kind": "Namespace", "metadata": metadata})
+}
 
 #[expect(
     clippy::multiple_inherent_impl,
@@ -124,25 +152,16 @@ impl Planner<'_> {
             "display_name",
             "display name",
         )?;
-        let annotations =
-            display_name.map(|d| json!({ conventions.display_name_annotation.clone(): d }));
-        let restricted = PodSecurityLevel::Restricted.as_str();
-        let mut metadata = json!({
-            "name": name,
-            "labels": {
-                conventions.project_label.clone(): ADOPTED,
-                PodSecurityLevel::ENFORCE: restricted,
-                PodSecurityLevel::AUDIT: restricted,
-                PodSecurityLevel::WARN: restricted,
-            },
-        });
-        if let (Some(annotations), Some(map)) = (annotations, metadata.as_object_mut()) {
-            map.insert("annotations".to_owned(), annotations);
-        }
+        let namespace = project_namespace(
+            conventions,
+            &name,
+            display_name,
+            PodSecurityLevel::Restricted,
+        );
         self.objects.push(Working {
             target: Target::namespace(&name),
             original: None,
-            current: json!({"apiVersion": "v1", "kind": "Namespace", "metadata": metadata}),
+            current: namespace,
             operations: Vec::new(),
             owners: Vec::new(),
             deleted: false,

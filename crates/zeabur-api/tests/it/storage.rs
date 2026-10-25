@@ -156,4 +156,58 @@ mod tests {
         assert!(claims.iter().all(|c| c.get("pinned").is_none()));
         assert_eq!(claims[0]["storageClass"], "longhorn");
     }
+
+    #[tokio::test]
+    async fn a_restored_claim_replaces_the_old_one_and_the_deployment_recreates() {
+        let cluster = cluster();
+        cluster.update(|s| {
+            let shop = s.objects.get_mut("shop").unwrap();
+            shop.persistent_volume_claims
+                .push(from_value(claim("web-data-restored", "local-path", "pvc-new")).unwrap());
+            shop.deployments.push(
+                from_value(json!({
+                    "metadata": {"name": "web", "namespace": "shop", "generation": 2},
+                    "spec": {"selector": {"matchLabels": {"app": "web"}},
+                        "strategy": {"type": "RollingUpdate",
+                                     "rollingUpdate": {"maxSurge": 1}},
+                        "template": {"metadata": {"labels": {"app": "web"}},
+                            "spec": {"containers": [{"name": "web", "image": "nginx",
+                                "volumeMounts": [{"name": "data", "mountPath": "/data"}]}],
+                            "volumes": [{"name": "data",
+                                "persistentVolumeClaim": {"claimName": "web-data"}}]}}}
+                }))
+                .unwrap(),
+            );
+        });
+        let app = app(&cluster);
+        crate::common::planned_and_applied(
+            &app,
+            "shop",
+            json!([{"op": "swapClaim", "workload": {"kind": "Deployment", "name": "web"},
+                    "from": "web-data", "to": "web-data-restored"}]),
+        )
+        .await;
+        let web = cluster
+            .inspect(|s| s.objects["shop"].deployments[0].clone())
+            .unwrap();
+        let web = serde_json::to_value(web).unwrap();
+        assert_eq!(
+            web["spec"]["template"]["spec"]["volumes"][0]["persistentVolumeClaim"]["claimName"],
+            "web-data-restored"
+        );
+        assert_eq!(web["spec"]["strategy"], json!({"type": "Recreate"}));
+        let claims = cluster
+            .inspect(|s| s.objects["shop"].persistent_volume_claims.len())
+            .unwrap();
+        assert_eq!(claims, 3, "the old claim stays");
+
+        let (status, _) = crate::common::plan_and_apply(
+            &app,
+            "shop",
+            json!([{"op": "swapClaim", "workload": {"kind": "Deployment", "name": "web"},
+                    "from": "web-data-restored", "to": "missing"}]),
+        )
+        .await;
+        assert_eq!(status, StatusCode::NOT_FOUND);
+    }
 }

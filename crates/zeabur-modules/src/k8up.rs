@@ -15,7 +15,32 @@
 //! From the `Backup`'s conditions [k8up-status]: `Completed` with reason `Succeeded` or `Failed`;
 //! `Progressing` while it runs. The finish time is the `Completed` condition's transition time.
 //!
+//! # Restoring a volume
+//!
+//! K8up lists the restic snapshots of each repository it backs up to as `Snapshot` objects in
+//! the namespace: the restic ID, the time, the paths and the repository [k8up-api]. A claim's
+//! files are at `/data/<claim>` [k8up-rwo], and only snapshots taken with the namespace as the
+//! restic host are listed [k8up-snapshots].
+//!
+//! A `Restore` runs one snapshot with the backup's backend [k8up-restore]:
+//!
+//! - into a claim (`restoreMethod.folder.claimName`). The snapshot's path is trimmed, so the files
+//!   land at the claim's root. restic keeps files the snapshot does not have unless the `Restore`
+//!   sets `delete: true`, which passes `--delete` [restic-restore]. K8up 2.16 does not check
+//!   restic's exit status here, so a restore that failed can still report `Completed`
+//!   [k8up-folder-restore]; the files must be checked.
+//! - to S3 (`restoreMethod.s3`) as `backup-<namespace>-<claim>-<snapshot time>.tar.gz` at the root
+//!   of `restoreMethod.s3.bucket`. The operator joins the endpoint and the bucket with a slash, so
+//!   a bucket in the endpoint's path with no `bucket` ends in a slash that S3 rejects
+//!   [k8up-s3-restore].
+//!
 //! [k8up-api]: https://docs.k8up.io/k8up/2.13/references/api-reference.html
+//! [k8up-snapshots]: https://github.com/k8up-io/k8up/blob/v2.16.1/restic/kubernetes/snapshots.go
+//! [k8up-restore]: https://docs.k8up.io/k8up/2.16/how-tos/restore.html
+//! [restic-restore]: https://restic.readthedocs.io/en/stable/050_restore.html
+//! [k8up-folder-restore]: https://github.com/k8up-io/k8up/blob/v2.16.1/restic/cli/restore.go#L196
+//! [k8up-s3-restore]: https://github.com/k8up-io/k8up/blob/v2.16.1/restic/cli/restore.go#L288
+//! [k8up-s3-client]: https://github.com/k8up-io/k8up/blob/v2.16.1/restic/s3/client.go#L93
 //! [k8up-rwo]: https://docs.k8up.io/k8up/2.13/explanations/rwo.html
 //! [k8up-annotations]: https://docs.k8up.io/k8up/2.13/references/annotations.html
 //! [k8up-status]: https://docs.k8up.io/k8up/2.13/references/status.html
@@ -53,6 +78,26 @@ pub const BACKUPS: Read = Read {
     resource: "backups",
     kind: "Backup",
 };
+
+/// `k8up.io/v1` `Snapshot`, in the project's namespace.
+pub const SNAPSHOTS: Read = Read {
+    group: "k8up.io",
+    version: "v1",
+    resource: "snapshots",
+    kind: "Snapshot",
+};
+
+/// `k8up.io/v1` `Restore`, in the project's namespace.
+pub const RESTORES: Read = Read {
+    group: "k8up.io",
+    version: "v1",
+    resource: "restores",
+    kind: "Restore",
+};
+
+/// The label a volume's `Schedule` selects its claim by, and that Zeabur puts on each `Restore`
+/// of the claim's backups.
+pub const VOLUME_LABEL: &str = "zeabur.com/backup-volume";
 
 /// The annotation that selects a claim (`"true"`).
 pub const BACKUP_ANNOTATION: &str = "k8up.io/backup";
@@ -195,6 +240,200 @@ pub fn findings(
     }
     newest(&mut out.runs, 10);
     out
+}
+
+/// A snapshot of a claim that can be restored.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, utoipa::ToSchema)]
+#[serde(rename_all = "camelCase")]
+#[schema(as = VolumeSnapshot)]
+pub struct SnapshotView {
+    /// restic's ID.
+    pub id: String,
+    /// When it was taken, RFC 3339.
+    pub date: String,
+}
+
+/// A `Restore` of a claim's backups.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, utoipa::ToSchema)]
+#[serde(rename_all = "camelCase")]
+#[schema(as = VolumeRestore)]
+pub struct RestoreView {
+    /// Its name.
+    pub name: String,
+    /// The snapshot.
+    pub snapshot: String,
+    /// The claim it restores into; absent for an export.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub into: Option<String>,
+    /// It deletes what the snapshot does not have.
+    pub delete: bool,
+    /// How it went, as K8up reports it.
+    pub outcome: Outcome,
+    /// When it was created, RFC 3339.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub started: Option<String>,
+    /// When it finished, RFC 3339.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub finished: Option<String>,
+    /// Why it failed.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub message: Option<String>,
+    /// The replicas to start the workload again with, which Zeabur notes on a restore into the
+    /// claim itself ([`REPLICAS`]).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub replicas: Option<i32>,
+}
+
+/// The annotation Zeabur puts on a restore into the claim itself: the replicas the workload had.
+pub const REPLICAS: &str = "zeabur.com/replicas";
+
+/// The `Schedule` made for `claim` alone, else one whose backups select the claim's label.
+#[must_use]
+pub fn schedule_of<'a>(schedules: &'a [DynamicObject], claim: &str) -> Option<&'a DynamicObject> {
+    let own = format!("{claim}-backup");
+    schedules
+        .iter()
+        .find(|s| s.metadata.name.as_deref() == Some(own.as_str()))
+        .or_else(|| {
+            schedules.iter().find(|s| {
+                s.data
+                    .pointer("/spec/backup/labelSelectors")
+                    .and_then(Value::as_array)
+                    .into_iter()
+                    .flatten()
+                    .any(|selector| {
+                        selector
+                            .get("matchLabels")
+                            .and_then(|l| l.get(VOLUME_LABEL))
+                            .and_then(Value::as_str)
+                            == Some(claim)
+                    })
+            })
+        })
+}
+
+/// The snapshots of `claim` in the repository of `schedule`, newest first.
+#[must_use]
+pub fn snapshots(
+    objects: &[DynamicObject],
+    schedule: &DynamicObject,
+    claim: &str,
+) -> Vec<SnapshotView> {
+    let Some(repository) = destination(schedule) else {
+        return Vec::new();
+    };
+    let path = format!("/data/{claim}");
+    let mut out: Vec<SnapshotView> = objects
+        .iter()
+        .filter(|o| text(o, "/spec/repository").as_deref() == Some(repository.as_str()))
+        .filter(|o| {
+            o.data
+                .pointer("/spec/paths")
+                .and_then(Value::as_array)
+                .is_some_and(|p| p.iter().any(|p| p == path.as_str()))
+        })
+        .filter_map(|o| {
+            Some(SnapshotView {
+                id: text(o, "/spec/id")?,
+                date: text(o, "/spec/date")?,
+            })
+        })
+        .collect();
+    out.sort_by(|a, b| b.date.cmp(&a.date));
+    out
+}
+
+/// The `Restore`s of `claim`'s backups, by [`VOLUME_LABEL`], newest first.
+#[must_use]
+pub fn restores(objects: &[DynamicObject], claim: &str) -> Vec<RestoreView> {
+    let mut out: Vec<RestoreView> = objects
+        .iter()
+        .filter(|o| {
+            o.metadata
+                .labels
+                .as_ref()
+                .and_then(|l| l.get(VOLUME_LABEL))
+                .map(String::as_str)
+                == Some(claim)
+        })
+        .map(|o| {
+            let completed = condition(o, "Completed");
+            let outcome = match completed.as_ref().and_then(|c| c.1.as_deref()) {
+                Some("Succeeded") => Outcome::Succeeded,
+                Some("Failed") => Outcome::Failed,
+                _ => Outcome::Running,
+            };
+            RestoreView {
+                name: o.metadata.name.clone().unwrap_or_default(),
+                snapshot: text(o, "/spec/snapshot").unwrap_or_default(),
+                into: text(o, "/spec/restoreMethod/folder/claimName"),
+                delete: o.data.pointer("/spec/delete").and_then(Value::as_bool) == Some(true),
+                outcome,
+                started: o
+                    .metadata
+                    .creation_timestamp
+                    .as_ref()
+                    .map(|t| t.0.to_string()),
+                finished: completed.as_ref().and_then(|c| c.0.clone()),
+                message: completed
+                    .filter(|_| outcome == Outcome::Failed)
+                    .and_then(|c| c.2),
+                replicas: o
+                    .metadata
+                    .annotations
+                    .as_ref()
+                    .and_then(|a| a.get(REPLICAS))
+                    .and_then(|r| r.parse().ok()),
+            }
+        })
+        .collect();
+    out.sort_by(|a, b| b.started.cmp(&a.started));
+    out
+}
+
+/// A `Restore` with `schedule`'s backend and Pod security, labelled for `claim`, for the
+/// snapshot and the method to be added.
+#[must_use]
+pub fn restore_template(schedule: &DynamicObject, claim: &str) -> Value {
+    let mut spec = serde_json::Map::new();
+    if let Some(backend) = backend(schedule) {
+        spec.insert("backend".to_owned(), backend.clone());
+    }
+    for field in ["podSecurityContext", "podConfigRef"] {
+        if let Some(value) = schedule
+            .data
+            .pointer(&format!("/spec/backup/{field}"))
+            .or_else(|| schedule.data.pointer(&format!("/spec/{field}")))
+        {
+            spec.insert(field.to_owned(), value.clone());
+        }
+    }
+    json!({
+        "apiVersion": "k8up.io/v1", "kind": "Restore",
+        "metadata": {"labels": {VOLUME_LABEL: claim}},
+        "spec": spec,
+    })
+}
+
+/// The S3 method that exports a snapshot to the root of the bucket of `schedule`'s backups, with
+/// the same keys.
+#[must_use]
+pub fn export_method(schedule: &DynamicObject) -> Option<Value> {
+    let s3 = backend(schedule)?.get("s3")?;
+    let endpoint = s3.get("endpoint")?.as_str()?.trim_end_matches('/');
+    let bucket = s3.get("bucket")?.as_str()?.split('/').next()?;
+    Some(json!({"s3": {
+        "endpoint": endpoint,
+        "bucket": bucket,
+        "accessKeyIDSecretRef": s3.get("accessKeyIDSecretRef")?,
+        "secretAccessKeySecretRef": s3.get("secretAccessKeySecretRef")?,
+    }}))
+}
+
+/// The name of the file a snapshot of `claim` exported in `namespace` starts with.
+#[must_use]
+pub fn export_prefix(namespace: &str, claim: &str) -> String {
+    format!("backup-{namespace}-{claim}-")
 }
 
 #[cfg(test)]

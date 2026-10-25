@@ -145,6 +145,19 @@ pub enum Change {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         read_only: Option<bool>,
     },
+    /// Mount another PersistentVolumeClaim where a workload mounts `from`, such as one restored
+    /// from a backup. A Deployment stops its old pod before it starts the new one (`Recreate`),
+    /// since a `ReadWriteOnce` claim is mounted by one node at a time. `from` stays, with its
+    /// data.
+    #[serde(rename_all = "camelCase")]
+    SwapClaim {
+        /// The workload.
+        workload: WorkloadRef,
+        /// The claim it mounts now.
+        from: String,
+        /// The claim to mount instead.
+        to: String,
+    },
     /// Stop mounting a volume in a container, and drop it from the pod template once nothing
     /// mounts it. A PersistentVolumeClaim it names stays, with its data.
     #[serde(rename_all = "camelCase")]

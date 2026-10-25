@@ -137,8 +137,9 @@ paths:
       tags:
       - cluster
       summary: |-
-        Works out what setting the backup location or Zeabur's schedule, pausing or resuming it, or
-        backing up now writes, and a token to apply it; writes nothing. The keys of a location never
+        Works out what setting the backup location or Zeabur's schedule, pausing or resuming it,
+        backing up now, restoring a backup into a new project or moving domains to it writes, and a
+        token to apply it; writes nothing. The keys of a location never
         appear in the answer.
       operationId: planClusterBackups
       requestBody:
@@ -164,6 +165,47 @@ paths:
               schema:
                 $ref: "#/components/schemas/Problem"
         "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  "/api/v1/cluster/backups/{backup}/download":
+    get:
+      tags:
+      - cluster
+      summary: |-
+        A Velero backup's contents, as a `.tar.gz` file. Read and written as the person: creating a
+        `DownloadRequest` in Velero's namespace and reading the location's customer key. No URL or
+        key reaches the answer.
+      operationId: downloadClusterBackup
+      parameters:
+      - name: backup
+        in: path
+        description: The backup
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: Velero's archive of the backup's objects
+          content:
+            application/gzip: {}
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "503":
           content:
             application/problem+json:
               schema:
@@ -2446,7 +2488,7 @@ paths:
         Every listable namespaced kind of a project, kinds first: the usual kinds (or only those named
         in `kinds`) and, with `all`, every kind that controllers do not generate are read (names, ages
         and owners only); the rest come back unread. Each kind carries an access hint; kinds refused
-        when read are named in `unreadable`.
+        when read are named in `unreadable`. With `label`, only the objects with that label.
       operationId: listObjects
       parameters:
       - name: project
@@ -2468,6 +2510,12 @@ paths:
         required: false
         schema:
           type: boolean
+      - name: label
+        in: query
+        description: "Keep only the objects with this label, as `<key>=<value>`: `zeabur.com/database=pg`."
+        required: false
+        schema:
+          type: string
       responses:
         "200":
           content:
@@ -3942,6 +3990,91 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/Problem"
+  "/api/v1/projects/{project}/volumes/{claim}/restores":
+    get:
+      tags:
+      - projects
+      summary: |-
+        What `claim` can be restored from: the snapshots K8up lists for it, its restores, and the
+        parts of a `Restore`, read as the person.
+      operationId: getVolumeRestores
+      parameters:
+      - name: project
+        in: path
+        description: The project's namespace
+        required: true
+        schema:
+          type: string
+      - name: claim
+        in: path
+        description: The claim
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VolumeRestores"
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  "/api/v1/projects/{project}/volumes/{claim}/restores/{restore}/download":
+    get:
+      tags:
+      - projects
+      summary: |-
+        The file an export of `claim`'s backup wrote, as a `.tar.gz` file. Read as the person: the
+        `Restore`, the claim's backup schedule and the keys of its bucket. No URL or key reaches the
+        answer.
+      operationId: downloadVolumeExport
+      parameters:
+      - name: project
+        in: path
+        description: The project's namespace
+        required: true
+        schema:
+          type: string
+      - name: claim
+        in: path
+        description: The claim
+        required: true
+        schema:
+          type: string
+      - name: restore
+        in: path
+        description: The export's `Restore`
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: The snapshot's files
+          content:
+            application/gzip: {}
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "503":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
   /api/v1/session:
     get:
       tags:
@@ -4750,6 +4883,7 @@ components:
       enum:
       - create
       - patch
+      - delete
     BackupsApplied:
       type: object
       description: What an apply wrote.
@@ -4793,9 +4927,24 @@ components:
           - string
           - "null"
           description: The backup a `backupNow` plan creates.
+        copy:
+          oneOf:
+          - $ref: "#/components/schemas/RestoreCopy"
+            description: What a `restore` plan copies, and what to check before it runs.
+          - type: "null"
         expiresAt:
           type: string
           description: When the token stops working, RFC 3339.
+        hosts:
+          type: array
+          items:
+            type: string
+          description: The hostnames a `moveDomains` plan moves.
+        managed:
+          type: array
+          items:
+            type: string
+          description: The routes a `moveDomains` plan leaves, because a tool manages them.
         restore:
           type:
           - string
@@ -4893,26 +5042,49 @@ components:
             enum:
             - backupNow
       - type: object
-        description: >-
-          Restore a backup into some of its namespaces. Velero skips objects that are
-          there.
+        description: |-
+          Restore one namespace of a backup into a new project. While the namespace exists, the
+          backup goes into the new namespace `into` without its routes; when it no longer exists,
+          back under its own name.
         required:
         - backup
-        - namespaces
+        - namespace
         - op
         properties:
           backup:
             type: string
             description: The backup.
-          namespaces:
-            type: array
-            items:
-              type: string
-            description: The namespaces to restore.
+          into:
+            type:
+            - string
+            - "null"
+            description: The new namespace, needed while `namespace` exists.
+          namespace:
+            type: string
+            description: The namespace to restore.
           op:
             type: string
             enum:
             - restore
+      - type: object
+        description: |-
+          Move every route of `from` to `to`: delete each from `from` and create it in `to`. A route
+          that Helm, Argo CD or Flux manages stays.
+        required:
+        - from
+        - to
+        - op
+        properties:
+          from:
+            type: string
+            description: The project the routes leave.
+          op:
+            type: string
+            enum:
+            - moveDomains
+          to:
+            type: string
+            description: The project they move to.
       description: What to plan.
     BaselinePolicy:
       type: object
@@ -5576,6 +5748,31 @@ components:
             - boolean
             - "null"
             description: Mount it read-only (or not).
+          workload:
+            $ref: "#/components/schemas/WorkloadRef"
+            description: The workload.
+      - type: object
+        description: |-
+          Mount another PersistentVolumeClaim where a workload mounts `from`, such as one restored
+          from a backup. A Deployment stops its old pod before it starts the new one (`Recreate`),
+          since a `ReadWriteOnce` claim is mounted by one node at a time. `from` stays, with its
+          data.
+        required:
+        - workload
+        - from
+        - to
+        - op
+        properties:
+          from:
+            type: string
+            description: The claim it mounts now.
+          op:
+            type: string
+            enum:
+            - swapClaim
+          to:
+            type: string
+            description: The claim to mount instead.
           workload:
             $ref: "#/components/schemas/WorkloadRef"
             description: The workload.
@@ -7578,6 +7775,13 @@ components:
           description: |-
             A backup can start now: the database runs with its store. False between setting up
             backups and the operator restarting the members with them.
+        recoveryWindow:
+          oneOf:
+          - $ref: "#/components/schemas/DatabaseRecoveryWindow"
+            description: |-
+              The times a new database can start from, for an engine that archives its write-ahead
+              log; absent when it does not, or archiving fails.
+          - type: "null"
         runs:
           type: array
           items:
@@ -7668,6 +7872,23 @@ components:
         state:
           $ref: "#/components/schemas/ProviderState"
           description: Whether its objects could be read.
+    DatabaseRecoveryWindow:
+      type: object
+      description: The times a new database can recover to.
+      required:
+      - first
+      - lagSeconds
+      properties:
+        first:
+          type: string
+          description: "The earliest time, RFC 3339: when the oldest backup in the store finished."
+        lagSeconds:
+          type: integer
+          format: int64
+          description: |-
+            The newest time is this many seconds before now: the archive may not hold the most
+            recent writes yet.
+          minimum: 0
     DatabaseRestored:
       type: object
       description: |-
@@ -14502,6 +14723,7 @@ components:
       - backUpDatabases
       - changeObjectStorage
       - backUpVolumes
+      - restoreVolumes
       - openTerminal
       - readLogs
       - build
@@ -14565,6 +14787,11 @@ components:
         readSecrets:
           $ref: "#/components/schemas/Permission"
           description: "Read Secret values: `get` on secrets."
+        restoreVolumes:
+          $ref: "#/components/schemas/Permission"
+          description: |-
+            Restore volumes from their backups: `create` on K8up's restores and on
+            persistentvolumeclaims.
         scale:
           $ref: "#/components/schemas/Permission"
           description: "Change the number of replicas: `patch` on `deployments/scale` or `statefulsets/scale`."
@@ -15161,6 +15388,121 @@ components:
           - "null"
           format: int64
           description: Pods; only where a count of pods applies.
+          minimum: 0
+    RestoreCopy:
+      type: object
+      description: What a restore into a new project reports.
+      required:
+      - source
+      - into
+      - sameName
+      - hosts
+      - references
+      - secrets
+      - unchecked
+      properties:
+        hosts:
+          type: array
+          items:
+            type: string
+          description: The hostnames the original serves, which stay with it until they are moved.
+        into:
+          type: string
+          description: The namespace it is restored into.
+        references:
+          type: array
+          items:
+            $ref: "#/components/schemas/RestoreReference"
+          description: The values that name the original namespace; empty under the same name.
+        room:
+          oneOf:
+          - $ref: "#/components/schemas/RestoreRoom"
+            description: Room for a second copy; absent under the same name.
+          - type: "null"
+        sameName:
+          type: boolean
+          description: |-
+            The original no longer exists, so the backup goes back under its own name, routes
+            included.
+        secrets:
+          type: array
+          items:
+            type: string
+          description: The Secrets whose values were not read, which may name it too.
+        source:
+          type: string
+          description: The namespace restored.
+        unchecked:
+          type: array
+          items:
+            type: string
+          description: The kinds that could not be read to look for them.
+    RestoreFit:
+      type: string
+      description: Whether the cluster has room for the copy.
+      enum:
+      - fits
+      - short
+      - unknown
+    RestoreReference:
+      type: object
+      description: A value of the original project that names the original namespace.
+      required:
+      - kind
+      - name
+      - key
+      properties:
+        container:
+          type:
+          - string
+          - "null"
+          description: The container, for a variable.
+        key:
+          type: string
+          description: The variable or key; the rule list (`ingress` or `egress`) of a NetworkPolicy.
+        kind:
+          type: string
+          description: "`Deployment`, `StatefulSet`, `DaemonSet`, `CronJob`, `ConfigMap` or `NetworkPolicy`."
+        name:
+          type: string
+          description: The object.
+        value:
+          type:
+          - string
+          - "null"
+          description: The value, for a variable or a ConfigMap key.
+    RestoreRoom:
+      type: object
+      description: The room the copy needs and the room there is.
+      required:
+      - fit
+      - needCpu
+      - needMemory
+      - freeCpu
+      - freeMemory
+      properties:
+        fit:
+          $ref: "#/components/schemas/RestoreFit"
+          description: The verdict.
+        freeCpu:
+          type: integer
+          format: int64
+          description: "What the nodes have left: millicores."
+          minimum: 0
+        freeMemory:
+          type: integer
+          format: int64
+          description: Bytes.
+          minimum: 0
+        needCpu:
+          type: integer
+          format: int64
+          description: "What the original's running pods request: millicores."
+          minimum: 0
+        needMemory:
+          type: integer
+          format: int64
+          description: Bytes.
           minimum: 0
     RevealedSecret:
       type: object
@@ -17609,6 +17951,11 @@ components:
           - string
           - "null"
           description: When it finished, RFC 3339.
+        into:
+          type:
+          - string
+          - "null"
+          description: The new namespace it restores into, when it maps one.
         name:
           type: string
           description: Its name.
@@ -17737,6 +18084,106 @@ components:
           - string
           - "null"
           description: The `StorageClass`; absent for the cluster's default.
+    VolumeRestore:
+      type: object
+      description: A `Restore` of a claim's backups.
+      required:
+      - name
+      - snapshot
+      - delete
+      - outcome
+      properties:
+        delete:
+          type: boolean
+          description: It deletes what the snapshot does not have.
+        finished:
+          type:
+          - string
+          - "null"
+          description: When it finished, RFC 3339.
+        into:
+          type:
+          - string
+          - "null"
+          description: The claim it restores into; absent for an export.
+        message:
+          type:
+          - string
+          - "null"
+          description: Why it failed.
+        name:
+          type: string
+          description: Its name.
+        outcome:
+          $ref: "#/components/schemas/BackupOutcome"
+          description: How it went, as K8up reports it.
+        replicas:
+          type:
+          - integer
+          - "null"
+          format: int32
+          description: |-
+            The replicas to start the workload again with, which Zeabur notes on a restore into the
+            claim itself ([`REPLICAS`]).
+        snapshot:
+          type: string
+          description: The snapshot.
+        started:
+          type:
+          - string
+          - "null"
+          description: When it was created, RFC 3339.
+    VolumeRestores:
+      type: object
+      description: What a claim can be restored from.
+      required:
+      - state
+      - snapshots
+      - restores
+      - unreadable
+      properties:
+        export:
+          description: The `restoreMethod` that exports a snapshot to the bucket of the backups.
+        restores:
+          type: array
+          items:
+            $ref: "#/components/schemas/VolumeRestore"
+          description: The restores of the claim's backups, newest first.
+        schedule:
+          type:
+          - string
+          - "null"
+          description: The schedule of the claim's backups.
+        snapshots:
+          type: array
+          items:
+            $ref: "#/components/schemas/VolumeSnapshot"
+          description: The snapshots of the claim, newest first. Only these times can be restored.
+        state:
+          $ref: "#/components/schemas/ProviderState"
+          description: Whether K8up's objects could be read.
+        template:
+          description: >-
+            A `Restore` with the backup's backend and Pod security, for a snapshot and a
+            method.
+        unreadable:
+          type: array
+          items:
+            $ref: "#/components/schemas/UnreadableView"
+          description: What could not be read.
+    VolumeSnapshot:
+      type: object
+      description: A snapshot of a claim that can be restored.
+      required:
+      - id
+      - date
+      properties:
+        date:
+          type: string
+          description: When it was taken, RFC 3339.
+        id:
+          type: string
+          description: restic's ID.
     VolumeUsage:
       type: object
       description: How full one claim's volume is.

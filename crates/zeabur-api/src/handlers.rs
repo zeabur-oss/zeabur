@@ -42,6 +42,8 @@ pub struct AppState {
     pub images: Arc<crate::images::Inspector>,
     /// The client of GitHub's API; `None` when TLS could not be set up.
     pub github: Option<crate::images::https::Https>,
+    /// Reads backups from their buckets (see [`crate::cluster::object_store`]).
+    pub store: Arc<crate::cluster::object_store::Fetcher>,
 }
 
 impl std::fmt::Debug for AppState {

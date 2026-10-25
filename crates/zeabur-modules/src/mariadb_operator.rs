@@ -138,6 +138,7 @@ fn backups_of(
         store,
         schedules,
         runs,
+        recovery_window: None,
     }
 }
 

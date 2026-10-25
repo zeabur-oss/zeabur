@@ -2427,14 +2427,20 @@ fn k8up_served() -> Vec<ServedResource> {
     if !k8up_installed() {
         return Vec::new();
     }
-    [("schedules", "Schedule"), ("backups", "Backup")]
-        .into_iter()
-        .map(|(resource, kind)| ServedResource::readable("k8up.io", "v1", resource, kind, true))
-        .collect()
+    [
+        ("schedules", "Schedule"),
+        ("backups", "Backup"),
+        ("snapshots", "Snapshot"),
+        ("restores", "Restore"),
+    ]
+    .into_iter()
+    .map(|(resource, kind)| ServedResource::readable("k8up.io", "v1", resource, kind, true))
+    .collect()
 }
 
 /// A nightly schedule of shop's Redis volume, kept 7 days and 4 weeks; last night's backup
-/// failed, the one before succeeded.
+/// failed, the one before succeeded. Its snapshots can be restored, and one was exported as a
+/// file.
 fn k8up() -> Vec<DynamicObject> {
     if !k8up_installed() {
         return Vec::new();
@@ -2446,6 +2452,15 @@ fn k8up() -> Vec<DynamicObject> {
             "secretAccessKeySecretRef": {"name": "data-redis-0-backup", "key": "AWS_SECRET_ACCESS_KEY"}}
     });
     let selector = json!([{"matchLabels": {"zeabur.com/backup-volume": "data-redis-0"}}]);
+    let repository = "s3:https://4f1c.r2.cloudflarestorage.com/acme-backups/shop/data-redis-0";
+    let snapshot = |id: &str, minutes: i64| {
+        from(json!({
+            "apiVersion": "k8up.io/v1", "kind": "Snapshot",
+            "metadata": {"name": id, "namespace": "shop", "resourceVersion": "31"},
+            "spec": {"id": id, "date": minutes_ago(minutes), "repository": repository,
+                "paths": ["/data/data-redis-0"]}
+        }))
+    };
     let backup = |name: &str, minutes: i64, reason: &str, message: &str| {
         from(json!({
             "apiVersion": "k8up.io/v1", "kind": "Backup",
@@ -2480,6 +2495,18 @@ fn k8up() -> Vec<DynamicObject> {
             "Succeeded",
             "the job succeeded",
         ),
+        snapshot("3f9a6c1e7b2d4a58", 1738),
+        snapshot("8c2e5d0a9f1b3c47", 3178),
+        from(json!({
+            "apiVersion": "k8up.io/v1", "kind": "Restore",
+            "metadata": {"name": "data-redis-0-export-1", "namespace": "shop",
+                "resourceVersion": "41", "creationTimestamp": minutes_ago(90),
+                "labels": {"zeabur.com/backup-volume": "data-redis-0"}},
+            "spec": {"backend": backend, "snapshot": "3f9a6c1e7b2d4a58",
+                "restoreMethod": {"s3": {"endpoint": "https://4f1c.r2.cloudflarestorage.com", "bucket": "acme-backups"}}},
+            "status": {"conditions": [{"type": "Completed", "status": "True",
+                "reason": "Succeeded", "lastTransitionTime": minutes_ago(88)}]}
+        })),
     ]
 }
 

@@ -3,6 +3,7 @@
 import { useMutation, useQuery, type UseQueryResult } from "@tanstack/react-query"
 import { Link } from "@tanstack/react-router"
 import { useId, useState, type ReactNode } from "react"
+import DownloadSimpleIcon from "~icons/ph/download-simple"
 import InfoIcon from "~icons/ph/info"
 import WarningIcon from "~icons/ph/warning"
 
@@ -38,6 +39,7 @@ import {
   locationRequest,
   mainLocation,
   mainSchedule,
+  backupDownloadUrl,
   outcomeHealth,
   scheduleForm,
   scheduleProblems,
@@ -52,6 +54,7 @@ import {
   type ScheduleProblem,
 } from "@/model/cluster-backups"
 import type { Gate } from "@/model/rights"
+import { CopyFacts, MoveFacts, RestoreForm, RestoreList } from "@/routes/cluster/backup-restore"
 import { ClusterFrame } from "@/routes/cluster/frame"
 import { Forbidden, type Role } from "@/routes/cluster/forbidden"
 import { S3DestinationsSection } from "@/routes/cluster/s3-destinations"
@@ -175,7 +178,7 @@ function Installed({ data }: { data: Data }) {
       <LocationSection data={data} gate={gate} onPlan={open} />
       <ScheduleSection data={data} gate={gate} onPlan={open} />
       <BackupList data={data} gate={restoreGate} onPlan={open} />
-      <RestoreList restores={data.restores} />
+      <RestoreList restores={data.restores} gate={restoreGate} onPlan={open} />
       <div className="flex flex-col gap-3">
         <KubeDetails
           facts={[
@@ -761,36 +764,39 @@ function BackupRow({
           iso={takenAt(backup)}
           className="shrink-0 text-right type-meta text-muted-foreground sm:w-24"
         />
-        {/* Kept when empty, so the times of every row line up. */}
-        <span className="flex w-12 shrink-0 justify-end">
-          {restorable ? (
-            <GateTip gate={gate}>
-              <Button
-                size="xs"
-                variant="ghost"
-                aria-expanded={restoring}
-                onClick={() => setRestoring((v) => !v)}
-              >
-                {t("clusterBackups.restoreAction")}
-              </Button>
-            </GateTip>
-          ) : null}
-        </span>
       </div>
       <span className="type-meta text-muted-foreground">{facts.join(t("common.sep"))}</span>
       <BackupFailure backup={backup} />
+      {restorable ? (
+        <div className="mt-1 flex flex-wrap items-center gap-2">
+          <GateTip gate={gate}>
+            <Button
+              size="xs"
+              variant="outline"
+              aria-expanded={restoring}
+              onClick={() => setRestoring((v) => !v)}
+            >
+              {t("clusterBackups.copyAction")}
+            </Button>
+          </GateTip>
+          <a
+            className={buttonVariants({ size: "xs", variant: "ghost" })}
+            href={backupDownloadUrl(backup.name)}
+            download
+          >
+            <DownloadSimpleIcon aria-hidden="true" data-icon="inline-start" />
+            {t("clusterBackups.download")}
+          </a>
+        </div>
+      ) : null}
       {restoring ? (
         <RestoreForm
           backup={backup}
           gate={gate}
           onCancel={() => setRestoring(false)}
-          onReview={(namespaces) => {
+          onPlan={(request, title, action) => {
             setRestoring(false)
-            onPlan(
-              { op: "restore", backup: backup.name, namespaces },
-              t("clusterBackups.plan.restore", backup.name),
-              t("clusterBackups.restoreAction"),
-            )
+            onPlan(request, title, action)
           }}
         />
       ) : null}
@@ -851,120 +857,6 @@ function BackupFailure({ backup }: { backup: Schemas["VeleroBackup"] }) {
   )
 }
 
-/** The namespaces to restore: those the backup holds, or the projects when it holds them all. */
-function RestoreForm({
-  backup,
-  gate,
-  onCancel,
-  onReview,
-}: {
-  backup: Schemas["VeleroBackup"]
-  gate: Gate
-  onCancel: () => void
-  onReview: (namespaces: string[]) => void
-}) {
-  const t = useT()
-  const id = useId()
-  const projects = useQuery(projectsQuery)
-  const choices =
-    backup.namespaces.length > 0
-      ? [...backup.namespaces].sort()
-      : (projects.data?.items ?? [])
-          .filter((p) => p.adopted && !p.system)
-          .map((p) => p.name)
-          .sort()
-  const [chosen, setChosen] = useState<string[]>(choices.length === 1 ? choices : [])
-  const [tried, setTried] = useState(false)
-  return (
-    <form
-      className={cn(formBox, "mt-2")}
-      onSubmit={(event) => {
-        event.preventDefault()
-        setTried(true)
-        if (chosen.length > 0) onReview(chosen)
-      }}
-    >
-      <fieldset className="flex flex-col gap-2">
-        <legend className="mb-2 type-body font-medium text-main">
-          {t("clusterBackups.restoreInto")}
-        </legend>
-        <ul className="max-h-56 divide-y divide-main overflow-y-auto rounded-lg border border-main">
-          {choices.map((name) => (
-            <li key={name} className="flex h-10 min-w-0 items-center gap-2.5 px-3">
-              <Checkbox
-                id={`${id}-${name}`}
-                checked={chosen.includes(name)}
-                onCheckedChange={(on) =>
-                  setChosen((c) => (on ? [...c, name] : c.filter((n) => n !== name)))
-                }
-              />
-              <Label htmlFor={`${id}-${name}`} className="min-w-0 flex-1">
-                <span className="truncate type-mono" translate="no">
-                  {name}
-                </span>
-              </Label>
-            </li>
-          ))}
-        </ul>
-        {tried && chosen.length === 0 ? (
-          <p className="type-meta text-destructive">{t("clusterBackups.problem.restoreNone")}</p>
-        ) : null}
-      </fieldset>
-      <p className="type-meta text-muted-foreground">{t("clusterBackups.restoreSkips")}</p>
-      <FormButtons gate={gate} onCancel={onCancel} />
-    </form>
-  )
-}
-
-function RestoreList({ restores }: { restores: Schemas["VeleroRestore"][] }) {
-  const t = useT()
-  const scope = useScope()
-  if (restores.length === 0) return null
-  return (
-    <Section id="restore-list" title={t("clusterBackups.restores")} count={restores.length}>
-      <ul className="flex flex-col">
-        {restores.map((r) => (
-          <li key={r.name} className="flex flex-col gap-0.5 border-t border-rule py-2.5">
-            <div className="flex min-w-0 items-center gap-2.5">
-              <span className="min-w-0 flex-1 truncate type-mono" translate="no">
-                {r.name}
-              </span>
-              <StatusPill health={outcomeHealth[r.outcome]} size="sm">
-                {t(`backups.${r.outcome}`)}
-              </StatusPill>
-              {r.started ? (
-                <Ago
-                  iso={r.started}
-                  className="shrink-0 text-right type-meta text-muted-foreground sm:w-24"
-                />
-              ) : (
-                <span className="shrink-0 sm:w-24" />
-              )}
-              {/* In line with the backups above, which have an action here. */}
-              <span className="w-12 shrink-0" />
-            </div>
-            <span className="type-meta text-muted-foreground">
-              {[
-                t("clusterBackups.restoredFrom", r.backup),
-                scope(r.namespaces),
-                r.errors > 0 ? t("clusterBackups.errors", r.errors) : "",
-                r.warnings > 0 ? t("clusterBackups.warnings", r.warnings) : "",
-              ]
-                .filter(Boolean)
-                .join(t("common.sep"))}
-            </span>
-            {r.reason ? (
-              <p className="type-meta text-fail-strong" translate="no">
-                {r.reason}
-              </p>
-            ) : null}
-          </li>
-        ))}
-      </ul>
-    </Section>
-  )
-}
-
 /** What a change writes, and applying it; planning writes nothing. */
 function PlanDialog({
   request,
@@ -1005,8 +897,9 @@ function PlanDialog({
       {(data) => (
         <>
           <Planned writes={data.writes} />
-          {request.op === "restore" ? (
-            <p>{t("clusterBackups.plan.restoreInto", t("common.list", request.namespaces))}</p>
+          {data.copy ? <CopyFacts copy={data.copy} /> : null}
+          {request.op === "moveDomains" ? (
+            <MoveFacts plan={data} from={request.from} to={request.to} />
           ) : null}
         </>
       )}
@@ -1017,17 +910,26 @@ function PlanDialog({
 function Planned({ writes }: { writes: Schemas["BackupWrite"][] }) {
   const t = useT()
   if (writes.length === 0) return <p>{t("clusterBackups.plan.nothing")}</p>
-  const thing = (write: Schemas["BackupWrite"]) =>
-    write.kind === "Backup"
-      ? t("clusterBackups.thing.Backup", write.name)
-      : write.kind === "Restore"
-        ? t("clusterBackups.thing.Restore", write.name)
-        : t(`clusterBackups.thing.${write.kind as "Secret"}`)
+  const thing = (write: Schemas["BackupWrite"]) => {
+    switch (write.kind) {
+      case "Backup":
+      case "Restore":
+      case "Namespace":
+        return t(`clusterBackups.thing.${write.kind}`, write.name)
+      case "Ingress":
+      case "HTTPRoute":
+        return t("clusterBackups.thing.route", write.namespace ?? "", write.name)
+      default:
+        return t(`clusterBackups.thing.${write.kind as "Secret"}`)
+    }
+  }
   return (
     <>
       <ul className="flex flex-col gap-1">
         {writes.map((w) => (
-          <li key={`${w.kind}/${w.name}`}>{t(`clusterBackups.plan.${w.action}`, thing(w))}</li>
+          <li key={`${w.action}/${w.kind}/${w.namespace ?? ""}/${w.name}`}>
+            {t(`clusterBackups.plan.${w.action}`, thing(w))}
+          </li>
         ))}
       </ul>
       {writes.some((w) => w.kind === "Secret") ? (

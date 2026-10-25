@@ -13,6 +13,7 @@ import { usePlanner, usePlanStep } from "@/components/plan/planner"
 import { FrequencyField, S3Fields } from "@/components/s3-fields"
 import { Schedule } from "@/components/schedule"
 import { useProjectSecurity } from "@/components/security-profile"
+import { VolumeRestore } from "@/components/volume-restore"
 import { type Translate, useT } from "@/i18n"
 import {
   backUpVolumeNow,
@@ -45,17 +46,20 @@ const userNote = (t: Translate, user: BackupUser) =>
 
 const K8UP_COMPONENT = "volume-backup/k8up"
 const RUNS_SHOWN = 5
-const RESTORE_GUIDE = "https://docs.k8up.io/k8up/2.16/how-tos/restore.html"
+const BACKUP_COMMAND = "https://docs.k8up.io/k8up/2.16/how-tos/application-aware-backups.html"
 
 /** The backups of a service's volumes, with K8up's schedule and on-demand backup per volume. */
 export function VolumeBackups({
   project,
   service,
   claims,
+  mounts,
 }: {
   project: string
   service: Service
   claims: string[]
+  /** Each claim's mount, for a new volume like it. */
+  mounts?: Record<string, Schemas["Mount"]>
 }) {
   const t = useT()
   const data = useBackups(project).data
@@ -67,7 +71,6 @@ export function VolumeBackups({
   const runs = data.runs
     .filter((r) => claims.some((c) => runsOf(data, c).includes(r)))
     .slice(0, RUNS_SHOWN)
-  const scheduled = claims.some((c) => scheduleOf(data, c))
   return (
     <section aria-labelledby="storage-backups" className="flex flex-col">
       <h2 id="storage-backups" className="mb-1 flex items-baseline gap-1.5 text-sm font-medium">
@@ -112,21 +115,17 @@ export function VolumeBackups({
           </ul>
         </>
       ) : null}
-      {scheduled ? (
-        <p className="border-t border-rule py-2.5 type-meta text-muted-foreground">
-          {t("backups.volume.restore")}
-          {t("common.gap")}
-          <a
-            href={RESTORE_GUIDE}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-1 text-foreground hover:underline"
-          >
-            {t("backups.volume.restoreGuide")}
-            <ArrowSquareOutIcon aria-hidden="true" className="size-3" />
-          </a>
-        </p>
-      ) : null}
+      {claims
+        .filter((c) => scheduleOf(data, c))
+        .map((c) => (
+          <VolumeRestore
+            key={c}
+            project={project}
+            service={service}
+            claim={c}
+            mount={mounts?.[c]}
+          />
+        ))}
       <BackupDetails data={data} />
     </section>
   )
@@ -360,6 +359,19 @@ function ScheduleDrawer({
         ) : (
           <p className="type-meta text-muted-foreground">{userNote(t, user)}</p>
         )}
+        <p className="type-meta text-muted-foreground">
+          {t("backups.volume.liveFiles")}
+          {t("common.gap")}
+          <a
+            href={BACKUP_COMMAND}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1 text-foreground hover:underline"
+          >
+            <span translate="no">k8up.io/backupcommand</span>
+            <ArrowSquareOutIcon aria-hidden="true" className="size-3" />
+          </a>
+        </p>
         <S3Fields
           target={target}
           set={set}

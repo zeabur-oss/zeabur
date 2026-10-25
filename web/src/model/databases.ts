@@ -247,6 +247,21 @@ const create = (object: Manifest): Change => ({
   object: object as Record<string, never>,
 })
 
+/** Every object Zeabur makes for a database carries this label with the database's name, so
+ * `kubectl delete -l zeabur.com/database=<name>` removes them, and so does deleting it here. */
+export const DATABASE_LABEL = "zeabur.com/database"
+
+/** `changes`, with each object they create labelled as made for `database`. */
+export function madeFor(database: string, changes: Change[]): Change[] {
+  return changes.map((change) => {
+    if (change.op !== "create" && change.op !== "copyS3Keys") return change
+    const object = change.object as Manifest & { metadata?: Manifest }
+    const metadata = object.metadata ?? {}
+    const labels = { ...(metadata.labels as Manifest | undefined), [DATABASE_LABEL]: database }
+    return { ...change, object: { ...object, metadata: { ...metadata, labels } } as never }
+  })
+}
+
 const imageOf = (engine: Engine, label: string) =>
   versions[engine].find((v) => v.label === label)?.image ?? versions[engine][0]?.image ?? ""
 
@@ -487,11 +502,12 @@ function appSetup(form: NewDatabase, image: string): Manifest {
   }
 }
 
-export const createDatabase = (form: NewDatabase, password = newPassword): Change[] => [
-  ...passwordSecrets(form, password),
-  create(databaseObject(form)),
-  ...(form.engine === "mysql" ? [create(appSetup(form, imageOf("mysql", form.version)))] : []),
-]
+export const createDatabase = (form: NewDatabase, password = newPassword): Change[] =>
+  madeFor(form.name, [
+    ...passwordSecrets(form, password),
+    create(databaseObject(form)),
+    ...(form.engine === "mysql" ? [create(appSetup(form, imageOf("mysql", form.version)))] : []),
+  ])
 
 export type Frequency = "daily" | "weekly"
 
@@ -668,7 +684,7 @@ export function enableBackups(database: Database, target: BackupTarget): Change[
           pluginConfiguration: { name: PLUGIN },
         },
       })
-      return [keys, store, edit(), schedule]
+      return madeFor(database.name, [keys, store, edit(), schedule])
     }
     case "mongodb": {
       const keys = keysSecret(names.secret, target, AWS_KEYS)
@@ -704,7 +720,7 @@ export function enableBackups(database: Database, target: BackupTarget): Change[
           },
         ],
       }
-      return [keys, edit()]
+      return madeFor(database.name, [keys, edit()])
     }
     case "mysql": {
       const keys = awsKeys(names.secret, target, region)
@@ -719,7 +735,7 @@ export function enableBackups(database: Database, target: BackupTarget): Change[
         },
       })
       spec.backupPolicyName = names.store
-      return [keys, policy, edit()]
+      return madeFor(database.name, [keys, policy, edit()])
     }
     case "mariadb": {
       const keys = awsKeys(names.secret, target, region)
@@ -743,7 +759,7 @@ export function enableBackups(database: Database, target: BackupTarget): Change[
           securityContext: restricted,
         },
       })
-      return [keys, backup]
+      return madeFor(database.name, [keys, backup])
     }
     case "dragonfly": {
       const keys = awsKeys(names.secret, target, region)
@@ -773,7 +789,7 @@ export function enableBackups(database: Database, target: BackupTarget): Change[
         dir: `s3://${bucket}/${folder(target, database.name)}`,
         cron: cron(target.frequency, false),
       }
-      return [keys, edit()]
+      return madeFor(database.name, [keys, edit()])
     }
   }
 }
@@ -838,7 +854,7 @@ export function backUpNow(database: Database, now: Date): Change[] {
   const name = backupName(database.name, now)
   const store = database.backups.store
   if (database.engine === "postgresql")
-    return [
+    return madeFor(database.name, [
       create({
         apiVersion: "postgresql.cnpg.io/v1",
         kind: "Backup",
@@ -849,10 +865,10 @@ export function backUpNow(database: Database, now: Date): Change[] {
           pluginConfiguration: { name: PLUGIN },
         },
       }),
-    ]
+    ])
   if (database.engine === "mariadb") {
     const { bucket, folder: prefix } = splitDestination(store?.destination)
-    return [
+    return madeFor(database.name, [
       create({
         apiVersion: "k8s.mariadb.com/v1alpha1",
         kind: "Backup",
@@ -871,9 +887,9 @@ export function backUpNow(database: Database, now: Date): Change[] {
           securityContext: restricted,
         },
       }),
-    ]
+    ])
   }
-  return [
+  return madeFor(database.name, [
     create({
       apiVersion: "psmdb.percona.com/v1",
       kind: "PerconaServerMongoDBBackup",
@@ -884,7 +900,7 @@ export function backUpNow(database: Database, now: Date): Change[] {
         type: "logical",
       },
     }),
-  ]
+  ])
 }
 
 export const stateHealth: Record<Schemas["DatabaseState"], Health> = {
@@ -1149,8 +1165,66 @@ function withStorage(claim: Manifest, storage: string): Manifest {
   }
 }
 
-/** Deleting the database: its object, which the operator deletes its members and volumes with. */
-export function deleteDatabase(database: Database): Change[] {
+/** The kinds of what Zeabur makes for a database besides its object: passwords and keys, MOCO's
+ * setup Job, where backups go, their schedules, runs and restores. */
+export const MADE_KINDS = [
+  "core/secrets",
+  "batch/jobs",
+  "barmancloud.cnpg.io/objectstores",
+  "postgresql.cnpg.io/scheduledbackups",
+  "postgresql.cnpg.io/backups",
+  "moco.cybozu.com/backuppolicies",
+  "k8s.mariadb.com/backups",
+  "k8s.mariadb.com/restores",
+  "psmdb.percona.com/perconaservermongodbbackups",
+  "psmdb.percona.com/perconaservermongodbrestores",
+]
+
+type ObjectKind = Schemas["ObjectKind"]
+type Made = { resource: { group: string; version: string; resource: string }; name: string }
+
+/** Whether `value` holds the string `name` anywhere. */
+function mentions(value: unknown, name: string): boolean {
+  if (value === name) return true
+  if (Array.isArray(value)) return value.some((v) => mentions(v, name))
+  if (value && typeof value === "object") return Object.values(value).some((v) => mentions(v, name))
+  return false
+}
+
+/** What deleting `database` also removes: the objects labelled as made for it (`made`), except
+ * those a controller owns, which go with their owner, and a Secret another database still names
+ * (a restored copy reading the original's backup keys), which stays. */
+export function madeObjects(database: Database, made: ObjectKind[], others: Database[]) {
+  const address = databaseAddress(database)
+  const own = (kind: ObjectKind) =>
+    !(kind.group === address.group && kind.resource === address.resource)
+  const readerOf = (kind: ObjectKind, name: string) =>
+    kind.resource === "secrets"
+      ? others.find((d) => d.name !== database.name && mentions(d.object, name))
+      : undefined
+  const gone: Made[] = []
+  const kept: { name: string; by: string }[] = []
+  for (const kind of made.filter(own))
+    for (const item of kind.items.filter((i) => !i.ownerKind)) {
+      const by = readerOf(kind, item.name)
+      if (by) kept.push({ name: item.name, by: by.name })
+      else gone.push({ resource: addressOf(kind), name: item.name })
+    }
+  return { gone, kept }
+}
+
+const addressOf = (kind: ObjectKind) => ({
+  group: kind.group,
+  version: kind.version,
+  resource: kind.resource,
+})
+
+/** Deleting the database: its object, which the operator deletes its members and volumes with,
+ * then what Zeabur made for it (`madeObjects`). Backups already in object storage stay. */
+export function deleteDatabase(database: Database, gone: Made[] = []): Change[] {
   const { group, version, resource } = databaseAddress(database)
-  return [{ op: "delete", resource: { group, version, resource }, name: database.name }]
+  return [
+    { op: "delete", resource: { group, version, resource }, name: database.name },
+    ...gone.map((m): Change => ({ op: "delete", resource: m.resource, name: m.name })),
+  ]
 }

@@ -24,17 +24,35 @@
 //! `method: plugin` [barman-cloud-usage]. The operator's in-tree `barmanObjectStore` is
 //! deprecated and removed in 1.32, so Zeabur only writes the plugin's form.
 //!
+//! # Recovery window
+//!
+//! A new database can start from any time between the end of the oldest backup in the store and
+//! the newest write-ahead log segment there [barman-cloud-api]. The plugin reports the first as
+//! the `ObjectStore`'s `status.serverRecoveryWindow.<server>.firstRecoverabilityPoint`, refreshed
+//! after each backup and each catalog check. It does not report the second, and the `Cluster`'s
+//! own recoverability fields are not set for backup plugins [cnpg-api]. While the `Cluster`'s
+//! `ContinuousArchiving` condition is true, PostgreSQL switches to a new segment at least every
+//! `archive_timeout` (5 minutes unless the `Cluster` sets it) [cnpg-config], so the archive holds
+//! every write older than that. Zeabur offers times up to that lag before now, and none when
+//! archiving fails. The new `Cluster` names the time as `recoveryTarget.targetTime` in RFC 3339,
+//! and CloudNativePG picks the newest backup that ended before it [cnpg-recovery].
+//!
 //! [cnpg-api]: https://cloudnative-pg.io/docs/devel/cloudnative-pg.v1
 //! [cnpg-phases]: https://github.com/cloudnative-pg/cloudnative-pg/blob/main/api/v1/backup_types.go
 //! [cnpg-cluster-phases]: https://github.com/cloudnative-pg/cloudnative-pg/blob/v1.30.1/api/v1/cluster_types.go
 //! [cnpg-app-secret]: https://cloudnative-pg.io/documentation/current/applications/#secrets
 //! [cnpg-services]: https://cloudnative-pg.io/documentation/current/service_management/
 //! [barman-cloud-usage]: https://cloudnative-pg.io/plugin-barman-cloud/docs/usage/
+//! [barman-cloud-api]: https://github.com/cloudnative-pg/plugin-barman-cloud/blob/v0.15.1/api/v1/objectstore_types.go
+//! [cnpg-config]: https://github.com/cloudnative-pg/cloudnative-pg/blob/v1.30.1/pkg/postgres/configuration.go
+//! [cnpg-recovery]: https://cloudnative-pg.io/documentation/current/recovery/
 
 use zeabur_kube::DynamicObject;
 
 use crate::backups::{Findings, Outcome, Run, Schedule, Target, TargetKind, newest};
-use crate::databases::{self, AppUser, Backups, Connection, Database, Engine, State, Store};
+use crate::databases::{
+    self, AppUser, Backups, Connection, Database, Engine, RecoveryWindow, State, Store,
+};
 use crate::{Module, Read, strings, text};
 
 /// The module.
@@ -131,17 +149,65 @@ fn state(phase: Option<&str>, members: i64, ready: i64) -> State {
     }
 }
 
-/// The `ObjectStore` this `Cluster` archives to through the Barman Cloud plugin.
-fn plugin_store(cluster: &DynamicObject) -> Option<String> {
+/// The Barman Cloud plugin's entry of this `Cluster`'s `spec.plugins`, when it is enabled.
+fn plugin(cluster: &DynamicObject) -> Option<&serde_json::Value> {
     cluster
         .data
         .pointer("/spec/plugins")?
         .as_array()?
         .iter()
         .find(|p| p["name"] == BARMAN_CLOUD_PLUGIN && p["enabled"] != false)
+}
+
+/// The `ObjectStore` this `Cluster` archives to through the Barman Cloud plugin.
+fn plugin_store(cluster: &DynamicObject) -> Option<String> {
+    plugin(cluster)
         .and_then(|p| p.pointer("/parameters/barmanObjectName"))
         .and_then(serde_json::Value::as_str)
         .map(str::to_owned)
+}
+
+/// A PostgreSQL time setting such as `5min` or `300` (seconds) in seconds.
+fn seconds(setting: &str) -> Option<u64> {
+    let setting = setting.trim();
+    let split = setting
+        .find(|c: char| !c.is_ascii_digit())
+        .unwrap_or(setting.len());
+    let (number, unit) = setting.split_at(split);
+    let number: u64 = number.parse().ok()?;
+    let factor = match unit.trim() {
+        "" | "s" => 1,
+        "min" => 60,
+        "h" => 3600,
+        "d" => 86_400,
+        "ms" => return Some(number.div_ceil(1000)),
+        _ => return None,
+    };
+    number.checked_mul(factor)
+}
+
+/// The times a new database can start from: see the module's "Recovery window".
+fn recovery_window(
+    cluster: &DynamicObject,
+    store: Option<&DynamicObject>,
+) -> Option<RecoveryWindow> {
+    true_since(cluster, "ContinuousArchiving")?;
+    let server = plugin(cluster)
+        .and_then(|p| p.pointer("/parameters/serverName"))
+        .and_then(serde_json::Value::as_str)
+        .map(str::to_owned)
+        .or_else(|| cluster.metadata.name.clone())?;
+    let first = store?
+        .data
+        .pointer("/status/serverRecoveryWindow")?
+        .get(&server)?
+        .get("firstRecoverabilityPoint")?
+        .as_str()?
+        .to_owned();
+    let lag_seconds = text(cluster, "/spec/postgresql/parameters/archive_timeout")
+        .map_or(Some(300), |t| seconds(&t))
+        .filter(|s| *s > 0)?;
+    Some(RecoveryWindow { first, lag_seconds })
 }
 
 /// When the condition `kind` last turned true, if it is true.
@@ -265,10 +331,11 @@ pub fn database(
     let backups: Vec<DynamicObject> = backups.iter().filter(mine).cloned().collect();
     let found = findings_limited(namespace, &scheduled, &backups, 20);
     let state = state(phase.as_deref(), members, ready);
-    let store_created = plugin_store(cluster)
-        .and_then(|wanted| named(&wanted))
+    let in_use = plugin_store(cluster).and_then(|wanted| named(&wanted));
+    let store_created = in_use
         .and_then(|s| s.metadata.creation_timestamp.as_ref())
         .map(|t| t.0.to_string());
+    let recovery_window = recovery_window(cluster, in_use);
     Database {
         origin: zeabur_model::Origin::complete(
             "postgresql.cnpg.io/v1",
@@ -311,6 +378,7 @@ pub fn database(
             store,
             schedules: found.schedules,
             runs: found.runs,
+            recovery_window,
         },
         created: cluster
             .metadata
@@ -537,6 +605,68 @@ mod tests {
                 .backups
                 .ready
         );
+    }
+
+    #[test]
+    fn the_recovery_window_starts_at_the_stores_first_point_and_needs_working_archiving() {
+        let cluster = |parameters: serde_json::Value, archiving: &str| {
+            object(serde_json::json!({
+                "apiVersion": "postgresql.cnpg.io/v1", "kind": "Cluster",
+                "metadata": {"name": "pg", "namespace": "shop"},
+                "spec": {"postgresql": {"parameters": parameters},
+                         "plugins": [{"name": "barman-cloud.cloudnative-pg.io", "isWALArchiver": true,
+                                      "parameters": {"barmanObjectName": "pg-backups",
+                                                     "serverName": "pg-v2"}}]},
+                "status": {"phase": "Cluster in healthy state", "readyInstances": 1,
+                           "conditions": [{"type": "ContinuousArchiving", "status": archiving,
+                                           "lastTransitionTime": "2026-10-22T16:02:32Z"}]}
+            }))
+        };
+        let store = object(serde_json::json!({
+            "apiVersion": "barmancloud.cnpg.io/v1", "kind": "ObjectStore",
+            "metadata": {"name": "pg-backups", "namespace": "shop"},
+            "status": {"serverRecoveryWindow": {
+                "pg": {"firstRecoverabilityPoint": "2026-10-01T03:00:00Z"},
+                "pg-v2": {"firstRecoverabilityPoint": "2026-10-20T03:05:00Z",
+                          "lastSuccessfulBackupTime": "2026-10-22T03:05:00Z"}}}
+        }));
+        let window = |pg: &DynamicObject| {
+            database("shop", pg, std::slice::from_ref(&store), &[], &[])
+                .backups
+                .recovery_window
+                .map(|w| (w.first, w.lag_seconds))
+        };
+        let first = "2026-10-20T03:05:00Z".to_owned();
+        let cases = [
+            (
+                "default archive_timeout",
+                serde_json::json!({}),
+                "True",
+                Some((first.clone(), 300)),
+            ),
+            (
+                "its own archive_timeout",
+                serde_json::json!({"archive_timeout": "1h"}),
+                "True",
+                Some((first.clone(), 3600)),
+            ),
+            (
+                "archive_timeout in seconds",
+                serde_json::json!({"archive_timeout": "90"}),
+                "True",
+                Some((first, 90)),
+            ),
+            (
+                "no archive_timeout",
+                serde_json::json!({"archive_timeout": "0"}),
+                "True",
+                None,
+            ),
+            ("archiving fails", serde_json::json!({}), "False", None),
+        ];
+        for (case, parameters, archiving, want) in cases {
+            assert_eq!(window(&cluster(parameters, archiving)), want, "{case}");
+        }
     }
 
     #[test]

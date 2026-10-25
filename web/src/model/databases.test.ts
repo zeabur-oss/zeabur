@@ -13,7 +13,9 @@ import {
   connectionUri,
   createDatabase,
   databaseAddress,
+  DATABASE_LABEL,
   deleteDatabase,
+  madeObjects,
   addPerThreadCaches,
   eventsOf,
   enableBackups,
@@ -111,7 +113,7 @@ describe("a new database", () => {
       object: {
         apiVersion: "postgresql.cnpg.io/v1",
         kind: "Cluster",
-        metadata: { name: "db" },
+        metadata: { name: "db", labels: { "zeabur.com/database": "db" } },
         spec: {
           instances: 1,
           imageName: "ghcr.io/cloudnative-pg/postgresql:17-standard-trixie",
@@ -160,6 +162,7 @@ describe("a new database", () => {
     expect(change.object.metadata).toEqual({
       name: "mongo",
       finalizers: ["percona.com/delete-psmdb-pvc"],
+      labels: { "zeabur.com/database": "mongo" },
     })
   })
 
@@ -314,7 +317,7 @@ describe("backups", () => {
         object: {
           apiVersion: "postgresql.cnpg.io/v1",
           kind: "Backup",
-          metadata: { name: "pg-20261022-080910" },
+          metadata: { name: "pg-20261022-080910", labels: { "zeabur.com/database": "pg" } },
           spec: {
             cluster: { name: "pg" },
             method: "plugin",
@@ -441,6 +444,57 @@ describe("reshaping", () => {
         resource: { group: "psmdb.percona.com", version: "v1", resource: "perconaservermongodbs" },
         name: "mongo",
       },
+    ])
+  })
+
+  test("everything Zeabur makes for a database carries its name as a label", () => {
+    const labels = (changes: ReturnType<typeof createDatabase>) =>
+      changes.map((c) =>
+        c.op === "create" || c.op === "copyS3Keys"
+          ? (c.object as unknown as { metadata: { labels?: Record<string, string> } }).metadata
+              .labels?.[DATABASE_LABEL]
+          : "edit",
+      )
+    const mysql = createDatabase({ ...newDatabase("mysql", 1), name: "shop" }, password)
+    expect(labels(mysql).every((l) => l === "shop")).toBe(true)
+    const target = {
+      ...newBackupTarget(),
+      endpoint: "https://s3.test",
+      bucket: "b",
+      accessKey: "a",
+      secretKey: "s",
+    }
+    for (const changes of [enableBackups(postgres, target), backUpNow(postgres, new Date())])
+      expect(
+        labels(changes)
+          .filter((l) => l !== "edit")
+          .every((l) => l === "pg"),
+      ).toBe(true)
+  })
+
+  test("deleting also removes what Zeabur made for it, but not what a controller owns or another database reads", () => {
+    const kind = (group: string, resource: string, items: { name: string; ownerKind?: string }[]) =>
+      ({ group, version: "v1", resource, kind: resource, items }) as never
+    const copy = {
+      ...postgres,
+      name: "pg-copy",
+      object: { spec: { env: [{ secretKeyRef: { name: "pg-backups-s3" } }] } },
+    } as unknown as Database
+    const { gone, kept } = madeObjects(
+      postgres,
+      [
+        kind("", "secrets", [{ name: "pg-backups-s3" }, { name: "pg-app-copy" }]),
+        kind("postgresql.cnpg.io", "clusters", [{ name: "pg" }]),
+        kind("postgresql.cnpg.io", "scheduledbackups", [{ name: "pg-daily" }]),
+        kind("postgresql.cnpg.io", "backups", [{ name: "pg-1", ownerKind: "ScheduledBackup" }]),
+      ],
+      [postgres, copy],
+    )
+    expect(kept).toEqual([{ name: "pg-backups-s3", by: "pg-copy" }])
+    expect(deleteDatabase(postgres, gone).map((c) => (c.op === "delete" ? c.name : c.op))).toEqual([
+      "pg",
+      "pg-app-copy",
+      "pg-daily",
     ])
   })
 })

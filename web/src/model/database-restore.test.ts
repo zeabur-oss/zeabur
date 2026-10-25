@@ -2,7 +2,11 @@ import { describe, expect, test } from "bun:test"
 
 import type { Target } from "@/model/connect"
 import {
+  keptSecret,
+  localInput,
+  pointInTime,
   pointServices,
+  recoveryRange,
   restoreChanges,
   restoredName,
   restoreKin,
@@ -11,7 +15,12 @@ import {
 import type { Database } from "@/model/databases"
 import type { Service } from "@/model/service"
 
-type Body = { kind: string; metadata: { name: string; annotations?: object }; spec: any }
+type Body = {
+  kind: string
+  metadata: { name: string; labels?: object; annotations?: object }
+  spec: any
+  stringData?: Record<string, string>
+}
 
 const bodies = (changes: ReturnType<typeof restoreChanges>) =>
   changes.map((c) => (c.op === "create" ? (c.object as unknown as Body) : undefined))
@@ -91,6 +100,7 @@ describe("restoring into a new database", () => {
     const [cluster] = bodies(restoreChanges(pg, point, "copy", "demo"))
     expect(cluster?.metadata).toEqual({
       name: "copy",
+      labels: { "zeabur.com/database": "copy" },
       annotations: {
         "zeabur.com/restored-from": "shop",
         "zeabur.com/restored-backup": "shop-1",
@@ -108,6 +118,73 @@ describe("restoring into a new database", () => {
     expect(cluster?.spec.externalClusters[0].plugin.parameters).toEqual({
       barmanObjectName: "shop-backups",
       serverName: "shop",
+    })
+  })
+
+  test("PostgreSQL reads the backups under the server name the original archives with", () => {
+    const pg = base({
+      engine: "postgresql",
+      apiVersion: "postgresql.cnpg.io/v1",
+      kind: "Cluster",
+      backups: {
+        schedules: [],
+        runs: [],
+        ready: true,
+        store: { name: "shop-backups", inUse: true },
+      },
+      object: {
+        spec: {
+          plugins: [
+            {
+              name: "barman-cloud.cloudnative-pg.io",
+              isWALArchiver: true,
+              parameters: { barmanObjectName: "shop-backups", serverName: "shop-2025" },
+            },
+          ],
+        },
+      } as unknown as Database["object"],
+    })
+    const [cluster] = bodies(restoreChanges(pg, point, "copy", "demo"))
+    expect(cluster?.spec.externalClusters[0].plugin.parameters).toEqual({
+      barmanObjectName: "shop-backups",
+      serverName: "shop-2025",
+    })
+  })
+
+  test("PostgreSQL recovers to a point in time inside the window, given in UTC", () => {
+    const window = { first: "2026-10-20T03:00:00Z", lagSeconds: 300 }
+    const pg = base({
+      engine: "postgresql",
+      apiVersion: "postgresql.cnpg.io/v1",
+      kind: "Cluster",
+      backups: {
+        schedules: [],
+        runs: [],
+        ready: true,
+        recoveryWindow: window,
+        store: { name: "shop-backups", inUse: true },
+      },
+      object: { spec: { instances: 1 } } as unknown as Database["object"],
+    })
+    const now = new Date("2026-10-25T12:00:00Z")
+    expect(recoveryRange(pg, now)).toEqual({
+      from: new Date("2026-10-20T03:00:00Z"),
+      to: new Date("2026-10-25T11:55:00Z"),
+    })
+    expect(recoveryRange({ ...pg, backups: { ...pg.backups, recoveryWindow: null } }, now)).toBe(
+      undefined,
+    )
+    // What the viewer types is in their own zone; the plan says the instant in UTC.
+    const typed = new Date(2026, 9, 24, 15, 30, 5)
+    expect(new Date(localInput(typed))).toEqual(typed)
+    const at = pointInTime(new Date("2026-10-24T07:30:05.123Z"))
+    expect(at.target).toBe("2026-10-24T07:30:05Z")
+    const [cluster] = bodies(restoreChanges(pg, at, "copy", "demo"))
+    expect(cluster?.spec.bootstrap.recovery.recoveryTarget).toEqual({
+      targetTime: "2026-10-24T07:30:05Z",
+    })
+    expect(cluster?.metadata.annotations).toMatchObject({
+      "zeabur.com/restored-time": "2026-10-24T07:30:05Z",
     })
   })
 
@@ -269,6 +346,76 @@ describe("restoring into a new database", () => {
       "AWS_ACCESS_KEY_ID",
     ])
     expect(copy.env[0].value).toBe("s3://b/shop")
+  })
+})
+
+describe("the copy's own Secrets", () => {
+  const values = { password: "from-backup" }
+
+  test("MongoDB's copy gets a users Secret of its own with the original's values", () => {
+    const mongo = base({
+      engine: "mongodb",
+      apiVersion: "psmdb.percona.com/v1",
+      kind: "PerconaServerMongoDB",
+      backups: { schedules: [], runs: [], ready: true, store: { name: "backups", inUse: true } },
+      object: {
+        spec: { secrets: { users: "shop-users" }, backup: { storages: { backups: { s3: {} } } } },
+      } as unknown as Database["object"],
+    })
+    expect(keptSecret(mongo)).toEqual({ name: "shop-users", suffix: "secrets" })
+    const changes = bodies(restoreChanges(mongo, point, "copy", "demo", undefined, values))
+    const secret = changes.find((b) => b?.kind === "Secret")
+    const cluster = changes.find((b) => b?.kind === "PerconaServerMongoDB")
+    expect(secret?.metadata.name).toBe("copy-secrets")
+    expect(secret?.stringData).toEqual(values)
+    expect(cluster?.spec.secrets.users).toBe("copy-secrets")
+  })
+
+  test("MySQL's copy names an app Secret of its own with the original's password", () => {
+    const mysql = base({
+      engine: "mysql",
+      apiVersion: "moco.cybozu.com/v1beta2",
+      kind: "MySQLCluster",
+      backups: { schedules: [], runs: [], ready: true, store: { name: "p", inUse: true } },
+      object: {
+        metadata: { annotations: { "zeabur.com/app-secret": "shop-app" } },
+        spec: {},
+      } as unknown as Database["object"],
+    })
+    expect(keptSecret(mysql)).toEqual({ name: "shop-app", suffix: "app" })
+    const changes = bodies(restoreChanges(mysql, point, "copy", "demo", undefined, values))
+    const secret = changes.find((b) => b?.kind === "Secret")
+    const cluster = changes.find((b) => b?.kind === "MySQLCluster")
+    expect(secret?.metadata.name).toBe("copy-app")
+    expect(secret?.stringData).toEqual(values)
+    expect(cluster?.metadata.annotations).toMatchObject({ "zeabur.com/app-secret": "copy-app" })
+  })
+
+  test("MariaDB's copy gets a root Secret of its own with the original's password", () => {
+    const maria = base({
+      engine: "mariadb",
+      apiVersion: "k8s.mariadb.com/v1alpha1",
+      kind: "MariaDB",
+      backups: { schedules: [], runs: [], ready: true, store: { name: "s", inUse: true } },
+      object: {
+        spec: { rootPasswordSecretKeyRef: { name: "shop-root", key: "password" } },
+      } as unknown as Database["object"],
+    })
+    expect(keptSecret(maria)).toEqual({ name: "shop-root", suffix: "root" })
+    const changes = bodies(restoreChanges(maria, point, "copy", "demo", undefined, values))
+    const secret = changes.find((b) => b?.kind === "Secret")
+    const server = changes.find((b) => b?.kind === "MariaDB")
+    expect(secret?.metadata.name).toBe("copy-root")
+    expect(server?.spec.rootPasswordSecretKeyRef).toEqual({
+      name: "copy-root",
+      key: "password",
+      generate: false,
+    })
+  })
+
+  test("PostgreSQL and Dragonfly keep no Secret of the original", () => {
+    expect(keptSecret(base({ engine: "postgresql" }))).toBeUndefined()
+    expect(keptSecret(base({ engine: "dragonfly" }))).toBeUndefined()
   })
 })
 

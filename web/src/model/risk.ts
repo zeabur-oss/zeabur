@@ -79,7 +79,42 @@ export function weigh(changes: readonly Change[], podsOf: PodsOf): Weight {
   return { risk, reasons }
 }
 
-function weighOne(change: Change, podsOf: PodsOf): { risk: Risk; reason?: Reason } {
+type OneWeight = { risk: Risk; reason?: Reason }
+
+/** The weight of a change that does not depend on its fields. */
+const fixedWeight: Partial<Record<Change["op"], OneWeight>> = {
+  rollback: { risk: "high", reason: "rollback" },
+  expandVolume: { risk: "high", reason: "storage" },
+  addVolume: { risk: "high", reason: "storage" },
+  editMount: { risk: "high", reason: "storage" },
+  removeVolume: { risk: "high", reason: "storage" },
+  swapClaim: { risk: "high", reason: "storage" },
+  edit: { risk: "high", reason: "yamlEdit" },
+  removeDomain: { risk: "high", reason: "removesDomain" },
+  delete: { risk: "high", reason: "deletes" },
+  image: { risk: "normal" },
+  autoUpdate: { risk: "normal" },
+  env: { risk: "normal" },
+  addDomain: { risk: "normal" },
+  renameDomain: { risk: "normal" },
+  probe: { risk: "normal" },
+  resources: { risk: "normal" },
+  configReload: { risk: "normal" },
+  unadopt: { risk: "normal" },
+  debugContainer: { risk: "normal" },
+  clusterTools: { risk: "normal" },
+  securityProfile: { risk: "normal" },
+  podSecurity: { risk: "normal" },
+  deployKey: { risk: "normal" },
+  adopt: { risk: "low" },
+  createProject: { risk: "low" },
+  details: { risk: "low" },
+  rebuild: { risk: "low" },
+}
+
+function weighOne(change: Change, podsOf: PodsOf): OneWeight {
+  const fixed = fixedWeight[change.op]
+  if (fixed) return fixed
   switch (change.op) {
     case "restart":
       return (podsOf(change.workload)?.ready ?? 0) >= 2
@@ -91,44 +126,10 @@ function weighOne(change: Change, podsOf: PodsOf): { risk: Risk; reason?: Reason
       return change.changes.some((edit) => edit.op === "remove")
         ? { risk: "high", reason: "deletesKeys" }
         : { risk: "normal" }
-    case "rollback":
-      return { risk: "high", reason: "rollback" }
-    case "expandVolume":
-    case "addVolume":
-    case "editMount":
-    case "removeVolume":
-      return { risk: "high", reason: "storage" }
-    case "edit":
-      return { risk: "high", reason: "yamlEdit" }
-    case "removeDomain":
-      return { risk: "high", reason: "removesDomain" }
     case "create":
       return isolates(change.object) ? { risk: "high", reason: "isolates" } : { risk: "normal" }
-    case "delete":
-      return { risk: "high", reason: "deletes" }
-    case "image":
-    case "autoUpdate":
-    case "env":
-    case "addDomain":
-    case "renameDomain":
-    case "probe":
-    case "resources":
-    case "configReload":
-    case "unadopt":
-    case "debugContainer":
-    case "clusterTools":
-    case "securityProfile":
-    case "podSecurity":
-      return { risk: "normal" }
-    case "adopt":
-    case "createProject":
-    case "details":
-    case "rebuild":
-      return { risk: "low" }
-    case "deployKey":
-      return { risk: "normal" }
     default:
-      return weighAccess(change)
+      return weighAccess(change as AccessChange | ServiceChange)
   }
 }
 
@@ -285,6 +286,22 @@ type Tab =
   | "settings#health-checks"
   | "settings#storage"
 
+/** The service tab of a change to one workload. */
+const workloadTab: Partial<Record<Change["op"], Tab>> = {
+  restart: "deployments",
+  rollback: "deployments",
+  env: "variables",
+  scale: "settings#compute",
+  resources: "settings#compute",
+  configReload: "settings#compute",
+  probe: "settings#health-checks",
+  addDomain: "networking",
+  addVolume: "settings#storage",
+  editMount: "settings#storage",
+  removeVolume: "settings#storage",
+  swapClaim: "settings#storage",
+}
+
 /** Where to look at what a plan changed, as a path and query: the service page tab for a
  * workload's change, the object on the Objects page for anything else. `service` is the service
  * the change was asked from, for changes that name only a route, a claim or an object. */
@@ -309,27 +326,12 @@ export function destinationOf(
     const key = [group, version, target.plural, target.name].join("/")
     return `/projects/${encodeURIComponent(project)}/objects?object=${encodeURIComponent(key)}`
   }
+  const own = workloadTab[change.op]
+  if (own && "workload" in change) return tab(change.workload ?? undefined, own)
   switch (change.op) {
-    case "restart":
-    case "rollback":
-      return tab(change.workload, "deployments")
-    case "env":
-      return tab(change.workload, "variables")
-    case "scale":
-    case "resources":
-    case "configReload":
-      return tab(change.workload, "settings#compute")
-    case "probe":
-      return tab(change.workload, "settings#health-checks")
-    case "addDomain":
-      return tab(change.workload, "networking")
     case "renameDomain":
     case "removeDomain":
       return tab(service, "networking")
-    case "addVolume":
-    case "editMount":
-    case "removeVolume":
-      return tab(change.workload, "settings#storage")
     case "expandVolume":
       return tab(service, "settings#storage") ?? object()
     case "create":

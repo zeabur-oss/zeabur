@@ -250,3 +250,8 @@ export function projectCoverage(data: Schemas["ProjectBackups"]): ProjectCoverag
     ? { as: "waiting" }
     : { as: "notCovered" }
 }
+
+/** Where a backup's contents download from: Zeabur fetches them from the location and streams
+ * them, so no signed URL or key reaches the page. */
+export const backupDownloadUrl = (backup: string) =>
+  `/api/v1/cluster/backups/${encodeURIComponent(backup)}/download`

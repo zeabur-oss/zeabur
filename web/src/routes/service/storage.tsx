@@ -318,6 +318,7 @@ export function StorageTab({ project, service }: { project: string; service: Ser
         project={project}
         service={service}
         claims={mounts.map(({ mount }) => claimOf(mount))}
+        mounts={Object.fromEntries(mounts.map(({ mount }) => [claimOf(mount), mount]))}
       />
       <KubeDetails
         facts={[

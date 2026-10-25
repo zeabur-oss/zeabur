@@ -15,9 +15,18 @@
 //! - A backup now: a `Backup` with the schedule's template and its `velero.io/schedule-name` label,
 //!   named `<schedule>-<UTC time>`, as `velero backup create --from-schedule` makes one
 //!   [velero-cli].
-//! - A restore: a `Restore` of one backup into the namespaces chosen, named `<backup>-<UTC time>`
-//!   as `velero restore create --from-backup` names one [velero-restore]. Velero skips an object
-//!   that is already there, so a restore puts back what was deleted and changes nothing else.
+//! - A restore: a `Restore` of one namespace of a backup, named `<backup>-<UTC time>` as `velero
+//!   restore create --from-backup` names one [velero-restore]. Velero skips an object that is
+//!   already there [velero-restore], so Zeabur restores into a new project and leaves the original
+//!   as it is:
+//!   - while the namespace exists, into a new namespace through `namespaceMapping`
+//!     [velero-restore]. Zeabur creates that namespace first as a project, so Velero keeps its
+//!     labels. Ingresses and HTTPRoutes stay out ([`HELD_BACK`]), so the copy claims no hostname
+//!     the original serves; moving them later deletes each from the original and creates it in the
+//!     copy ([`moved_route`]);
+//!   - when the namespace no longer exists, under its own name, with everything.
+//! - A download: a `DownloadRequest` for a backup's contents [velero-download]. Velero answers with
+//!   a signed URL to the location.
 //!
 //! # Sizes
 //!
@@ -32,6 +41,7 @@
 //! [velero-aws]: https://github.com/vmware-tanzu/velero-plugin-for-aws/blob/v1.13.0/backupstoragelocation.md
 //! [velero-cli]: https://velero.io/docs/v1.17/backup-reference/
 //! [velero-restore]: https://velero.io/docs/v1.17/restore-reference/
+//! [velero-download]: https://velero.io/docs/v1.17/api-types/downloadrequest/
 
 use std::collections::BTreeMap;
 
@@ -253,6 +263,9 @@ pub struct RestoreView {
     pub backup: String,
     /// The namespaces it restores; empty for every namespace of the backup.
     pub namespaces: Vec<String>,
+    /// The new namespace it restores into, when it maps one.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub into: Option<String>,
     /// Velero's phase.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub phase: Option<String>,
@@ -471,6 +484,12 @@ pub fn restore(object: &DynamicObject) -> RestoreView {
     RestoreView {
         name: name(object),
         backup: text(object, "/spec/backupName").unwrap_or_default(),
+        into: object
+            .data
+            .pointer("/spec/namespaceMapping")
+            .and_then(Value::as_object)
+            .and_then(|m| m.values().find_map(Value::as_str))
+            .map(str::to_owned),
         namespaces: covered(object, "/spec"),
         outcome,
         started: text(object, "/status/startTimestamp"),
@@ -766,35 +785,149 @@ pub fn backup_now(schedule: &Value, name: &str) -> Value {
     })
 }
 
-/// What is wrong with restoring `namespaces` from a backup of `covered` (empty for every
+/// What is wrong with restoring `namespace` from a backup of `covered` (empty for every
 /// namespace); `None` when nothing is.
 #[must_use]
-pub fn restore_problem(covered: &[String], namespaces: &[String]) -> Option<String> {
-    if namespaces.is_empty() {
-        return Some("Choose at least one namespace to restore.".to_owned());
+pub fn restore_problem(covered: &[String], namespace: &str) -> Option<String> {
+    if namespace.is_empty() {
+        return Some("Choose the namespace to restore.".to_owned());
     }
-    let missing: Vec<&str> = namespaces
-        .iter()
-        .filter(|n| !covered.is_empty() && !covered.contains(n))
-        .map(String::as_str)
-        .collect();
-    (!missing.is_empty()).then(|| {
+    (!covered.is_empty() && !covered.iter().any(|n| n == namespace))
+        .then(|| format!("The backup does not hold the namespace {namespace}."))
+}
+
+/// What is wrong with `into` as the name of a new namespace; `None` when nothing is.
+#[must_use]
+pub fn new_namespace_problem(source: &str, into: &str) -> Option<String> {
+    if into == source {
+        return Some(format!(
+            "{source} still exists; choose another name for the new project."
+        ));
+    }
+    if into.starts_with("kube-") {
+        return Some(format!(
+            "Names starting with kube- are kept for Kubernetes; {into} cannot be a project."
+        ));
+    }
+    (!namespace_ok(into)).then(|| {
         format!(
-            "The backup does not hold these namespaces: {}.",
-            missing.join(", ")
+            "{into:?} cannot name a namespace: use at most 63 lowercase letters, digits and \
+             hyphens, starting and ending with a letter or digit."
         )
     })
 }
 
-/// A restore of `backup` into `namespaces`, in Velero's namespace `namespace`.
+/// The kinds a restore into a new namespace leaves out, so the copy claims no hostname of the
+/// original.
+///
+/// These are its routes, and cert-manager's certificates and ACME challenges for those
+/// hostnames. cert-manager makes the certificates again for a route that moves. Velero names
+/// them as `resource.group` [velero-restore].
+pub const HELD_BACK: [&str; 6] = [
+    "ingresses.networking.k8s.io",
+    "httproutes.gateway.networking.k8s.io",
+    "certificates.cert-manager.io",
+    "certificaterequests.cert-manager.io",
+    "orders.acme.cert-manager.io",
+    "challenges.acme.cert-manager.io",
+];
+
+/// A restore of `source` from `backup`, in Velero's namespace `namespace`: into the new namespace
+/// `into` without the [`HELD_BACK`] kinds, or under its own name when `into` is `None`.
 #[must_use]
-pub fn restore_object(namespace: &str, name: &str, backup: &str, namespaces: &[String]) -> Value {
+pub fn restore_object(
+    namespace: &str,
+    name: &str,
+    backup: &str,
+    source: &str,
+    into: Option<&str>,
+) -> Value {
+    let mut spec = json!({"backupName": backup, "includedNamespaces": [source]});
+    if let (Some(into), Some(map)) = (into, spec.as_object_mut()) {
+        map.insert("namespaceMapping".to_owned(), json!({ source: into }));
+        map.insert("excludedResources".to_owned(), json!(HELD_BACK));
+    }
     json!({
         "apiVersion": API_VERSION,
         "kind": "Restore",
         "metadata": {"name": name, "namespace": namespace},
-        "spec": {"backupName": backup, "includedNamespaces": namespaces},
+        "spec": spec,
     })
+}
+
+/// The copy of the route `route` that `into` gets when its hostnames move there: the same spec,
+/// labels and annotations, without what the server or `kubectl` set.
+#[must_use]
+pub fn moved_route(route: &Value, into: &str) -> Value {
+    let keep = |pointer: &str| route.pointer(pointer).cloned();
+    let mut metadata = Map::new();
+    metadata.insert(
+        "name".to_owned(),
+        keep("/metadata/name").unwrap_or(Value::Null),
+    );
+    metadata.insert("namespace".to_owned(), json!(into));
+    if let Some(labels) = keep("/metadata/labels") {
+        metadata.insert("labels".to_owned(), labels);
+    }
+    if let Some(Value::Object(mut annotations)) = keep("/metadata/annotations") {
+        annotations.remove("kubectl.kubernetes.io/last-applied-configuration");
+        if !annotations.is_empty() {
+            metadata.insert("annotations".to_owned(), Value::Object(annotations));
+        }
+    }
+    let mut out = Map::new();
+    for field in ["apiVersion", "kind"] {
+        out.insert(
+            field.to_owned(),
+            route.get(field).cloned().unwrap_or(Value::Null),
+        );
+    }
+    out.insert("metadata".to_owned(), Value::Object(metadata));
+    if let Some(spec) = route.get("spec") {
+        out.insert("spec".to_owned(), spec.clone());
+    }
+    Value::Object(out)
+}
+
+/// The hostnames of an Ingress (`spec.rules[].host`) or an HTTPRoute (`spec.hostnames`).
+#[must_use]
+pub fn route_hosts(route: &Value) -> Vec<String> {
+    let rules = route
+        .pointer("/spec/rules")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(|r| r["host"].as_str());
+    let names = route
+        .pointer("/spec/hostnames")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(Value::as_str);
+    let mut out: Vec<String> = rules.chain(names).map(str::to_owned).collect();
+    out.sort();
+    out.dedup();
+    out
+}
+
+/// A `DownloadRequest` for the contents of `backup` [velero-download].
+#[must_use]
+pub fn download_request(namespace: &str, name: &str, backup: &str) -> Value {
+    json!({
+        "apiVersion": API_VERSION,
+        "kind": "DownloadRequest",
+        "metadata": {"name": name, "namespace": namespace},
+        "spec": {"target": {"kind": "BackupContents", "name": backup}},
+    })
+}
+
+/// The signed URL a `DownloadRequest` holds once Velero processed it, and when it expires.
+#[must_use]
+pub fn download_url(object: &DynamicObject) -> Option<(String, Option<String>)> {
+    (text(object, "/status/phase").as_deref() == Some("Processed"))
+        .then(|| text(object, "/status/downloadURL"))
+        .flatten()
+        .map(|url| (url, text(object, "/status/expiration")))
 }
 
 #[cfg(test)]
@@ -1012,21 +1145,63 @@ mod tests {
     }
 
     #[test]
-    fn a_restore_names_its_backup_and_namespaces_and_only_those_the_backup_holds() {
-        let made = restore_object("velero", "zeabur-1-2", "zeabur-1", &["shop".to_owned()]);
-        let mut read = object(made);
+    fn a_restore_copies_into_a_new_namespace_without_routes_or_keeps_the_name_of_a_missing_one() {
+        let copy = restore_object("velero", "zeabur-1-2", "zeabur-1", "shop", Some("shop-2"));
+        let mut read = object(copy.clone());
         read.data["status"] = json!({"phase": "PartiallyFailed", "warnings": 3, "errors": 1});
         let view = restore(&read);
         assert_eq!(view.backup, "zeabur-1");
         assert_eq!(view.namespaces, ["shop"]);
+        assert_eq!(view.into.as_deref(), Some("shop-2"));
         assert_eq!(view.outcome, Outcome::PartiallyFailed);
         assert_eq!((view.errors, view.warnings), (1, 3));
+        assert_eq!(copy["spec"]["excludedResources"], json!(HELD_BACK));
 
-        let shop = ["shop".to_owned()];
-        assert!(restore_problem(&[], &shop).is_none());
-        assert!(restore_problem(&shop, &shop).is_none());
-        assert!(restore_problem(&shop, &[]).is_some());
-        assert!(restore_problem(&shop, &["blog".to_owned()]).is_some());
+        let same = restore_object("velero", "zeabur-1-2", "zeabur-1", "shop", None);
+        assert_eq!(
+            same["spec"],
+            json!({"backupName": "zeabur-1", "includedNamespaces": ["shop"]})
+        );
+        assert_eq!(restore(&object(same)).into, None);
+
+        assert!(restore_problem(&[], "shop").is_none());
+        assert!(restore_problem(&["shop".to_owned()], "shop").is_none());
+        assert!(restore_problem(&["shop".to_owned()], "").is_some());
+        assert!(restore_problem(&["shop".to_owned()], "blog").is_some());
+        assert!(new_namespace_problem("shop", "shop-2").is_none());
+        for bad in ["shop", "Shop-2", "-x", ""] {
+            assert!(new_namespace_problem("shop", bad).is_some(), "{bad}");
+        }
+    }
+
+    #[test]
+    fn a_moved_route_keeps_its_spec_and_hosts_and_drops_what_the_server_set() {
+        let ingress = json!({
+            "apiVersion": "networking.k8s.io/v1", "kind": "Ingress",
+            "metadata": {"name": "web", "namespace": "shop", "uid": "u", "resourceVersion": "9",
+                         "labels": {"app": "web"},
+                         "annotations": {"cert-manager.io/cluster-issuer": "le",
+                                         "kubectl.kubernetes.io/last-applied-configuration": "{}"},
+                         "managedFields": []},
+            "spec": {"rules": [{"host": "shop.example.com"}, {"host": "www.example.com"}]},
+            "status": {"loadBalancer": {}}
+        });
+        let moved = moved_route(&ingress, "shop-2");
+        assert_eq!(
+            moved,
+            json!({
+                "apiVersion": "networking.k8s.io/v1", "kind": "Ingress",
+                "metadata": {"name": "web", "namespace": "shop-2", "labels": {"app": "web"},
+                             "annotations": {"cert-manager.io/cluster-issuer": "le"}},
+                "spec": {"rules": [{"host": "shop.example.com"}, {"host": "www.example.com"}]}
+            })
+        );
+        assert_eq!(
+            route_hosts(&ingress),
+            ["shop.example.com", "www.example.com"]
+        );
+        let route = json!({"spec": {"hostnames": ["b.example.com", "a.example.com"]}});
+        assert_eq!(route_hosts(&route), ["a.example.com", "b.example.com"]);
     }
 
     #[test]

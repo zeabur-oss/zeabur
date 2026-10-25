@@ -52,9 +52,10 @@ describe("closing an action by the person's rights", () => {
     })
   })
 
-  test("members, components and nodes need an admin; everything else in a project a developer", () => {
+  test("members, volume restores, components and nodes need an admin; everything else in a project a developer", () => {
+    const admin = new Set(["changeMembers", "restoreVolumes"])
     for (const right of Object.keys(unknownRights()) as (keyof ReturnType<typeof unknownRights>)[])
-      expect(neededRole(right)).toBe(right === "changeMembers" ? "admin" : "developer")
+      expect(neededRole(right)).toBe(admin.has(right) ? "admin" : "developer")
     expect(neededRole("installComponents")).toBe("admin")
     expect(neededRole("changeNodes")).toBe("admin")
     expect(ruleOf("readSecrets")).toBe("get secrets")

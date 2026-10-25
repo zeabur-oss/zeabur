@@ -41,7 +41,7 @@ pub enum Reach {
 /// A registry client.
 #[derive(Clone)]
 pub struct Https {
-    client: Client<HttpsConnector<HttpConnector<Guarded>>, Full<Bytes>>,
+    client: Client<Connector, Full<Bytes>>,
     reach: Reach,
 }
 
@@ -61,56 +61,16 @@ impl Https {
     ///
     /// When `extra_ca` is not a PEM certificate bundle, or TLS cannot be set up.
     pub fn new(reach: Reach, extra_ca: Option<&[u8]>) -> Result<Self, String> {
-        let provider = Arc::new(rustls::crypto::aws_lc_rs::default_provider());
-        let extra = match extra_ca {
-            Some(pem) => {
-                let roots = CertificateDer::pem_slice_iter(pem)
-                    .collect::<Result<Vec<_>, _>>()
-                    .map_err(|e| format!("not a PEM certificate bundle: {e}"))?;
-                if roots.is_empty() {
-                    return Err("not a PEM certificate bundle: no certificate in it".to_owned());
-                }
-                roots
-            }
-            None => Vec::new(),
-        };
-        let verifier =
-            rustls_platform_verifier::Verifier::new_with_extra_roots(extra, Arc::clone(&provider))
-                .map_err(|e| e.to_string())?;
-        let tls = rustls::ClientConfig::builder_with_provider(provider)
-            .with_safe_default_protocol_versions()
-            .map_err(|e| e.to_string())?
-            .dangerous()
-            .with_custom_certificate_verifier(Arc::new(verifier))
-            .with_no_client_auth();
-        let mut http = HttpConnector::new_with_resolver(Guarded {
-            inner: GaiResolver::new(),
-            reach,
-        });
-        http.enforce_http(false);
-        http.set_connect_timeout(Some(DEADLINE));
-        let connector = hyper_rustls::HttpsConnectorBuilder::new()
-            .with_tls_config(tls)
-            .https_or_http()
-            .enable_http1()
-            .wrap_connector(http);
         let client = Client::builder(TokioExecutor::new())
             .pool_idle_timeout(Duration::from_secs(30))
             .pool_max_idle_per_host(2)
-            .build(connector);
+            .build(connector(reach, extra_ca)?);
         Ok(Self { client, reach })
     }
 
     async fn send(&self, get: Get) -> Result<Answer, String> {
         let uri: http::Uri = get.url.parse().map_err(|e| format!("{e}"))?;
-        if let Some(ip) = uri
-            .host()
-            .map(|h| h.trim_start_matches('[').trim_end_matches(']'))
-            .and_then(|h| h.parse::<IpAddr>().ok())
-            && !allowed(self.reach, ip)
-        {
-            return Err(format!("Zeabur does not connect to {ip}"));
-        }
+        refuse_named(self.reach, &uri)?;
         let mut request = Request::get(uri).header(http::header::USER_AGENT, "zeabur");
         if let Some(accept) = &get.accept {
             request = request.header(http::header::ACCEPT, accept);
@@ -164,15 +124,7 @@ impl Https {
         request: Request<Full<Bytes>>,
         limit: usize,
     ) -> Result<(u16, Vec<u8>), String> {
-        if let Some(ip) = request
-            .uri()
-            .host()
-            .map(|h| h.trim_start_matches('[').trim_end_matches(']'))
-            .and_then(|h| h.parse::<IpAddr>().ok())
-            && !allowed(self.reach, ip)
-        {
-            return Err(format!("Zeabur does not connect to {ip}"));
-        }
+        refuse_named(self.reach, request.uri())?;
         let exchange = async {
             let response = self
                 .client
@@ -194,8 +146,64 @@ impl Https {
     }
 }
 
+/// The HTTPS connector, through the platform's trust roots, to the addresses `reach` allows.
+pub(crate) type Connector = HttpsConnector<HttpConnector<Guarded>>;
+
+/// A [`Connector`] that connects where `reach` allows and also trusts `extra_ca`, a PEM bundle.
+///
+/// # Errors
+///
+/// When `extra_ca` is not a PEM certificate bundle, or TLS cannot be set up.
+pub(crate) fn connector(reach: Reach, extra_ca: Option<&[u8]>) -> Result<Connector, String> {
+    let provider = Arc::new(rustls::crypto::aws_lc_rs::default_provider());
+    let extra = match extra_ca {
+        Some(pem) => {
+            let roots = CertificateDer::pem_slice_iter(pem)
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(|e| format!("not a PEM certificate bundle: {e}"))?;
+            if roots.is_empty() {
+                return Err("not a PEM certificate bundle: no certificate in it".to_owned());
+            }
+            roots
+        }
+        None => Vec::new(),
+    };
+    let verifier =
+        rustls_platform_verifier::Verifier::new_with_extra_roots(extra, Arc::clone(&provider))
+            .map_err(|e| e.to_string())?;
+    let tls = rustls::ClientConfig::builder_with_provider(provider)
+        .with_safe_default_protocol_versions()
+        .map_err(|e| e.to_string())?
+        .dangerous()
+        .with_custom_certificate_verifier(Arc::new(verifier))
+        .with_no_client_auth();
+    let mut http = HttpConnector::new_with_resolver(Guarded {
+        inner: GaiResolver::new(),
+        reach,
+    });
+    http.enforce_http(false);
+    http.set_connect_timeout(Some(DEADLINE));
+    Ok(hyper_rustls::HttpsConnectorBuilder::new()
+        .with_tls_config(tls)
+        .https_or_http()
+        .enable_http1()
+        .wrap_connector(http))
+}
+
+/// Refuses a URL that names an address `reach` does not allow.
+pub(crate) fn refuse_named(reach: Reach, uri: &http::Uri) -> Result<(), String> {
+    match uri
+        .host()
+        .map(|h| h.trim_start_matches('[').trim_end_matches(']'))
+        .and_then(|h| h.parse::<IpAddr>().ok())
+    {
+        Some(ip) if !allowed(reach, ip) => Err(format!("Zeabur does not connect to {ip}")),
+        _ => Ok(()),
+    }
+}
+
 /// The innermost cause, which names what failed (DNS, TLS, a refused address).
-fn describe(error: &(dyn std::error::Error + 'static)) -> String {
+pub(crate) fn describe(error: &(dyn std::error::Error + 'static)) -> String {
     let mut source = error;
     while let Some(next) = source.source() {
         source = next;
@@ -248,7 +256,7 @@ pub(crate) const fn allowed(reach: Reach, ip: IpAddr) -> bool {
 
 /// The system's resolver, keeping only the addresses `reach` allows.
 #[derive(Clone)]
-struct Guarded {
+pub(crate) struct Guarded {
     inner: GaiResolver,
     reach: Reach,
 }

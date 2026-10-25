@@ -108,6 +108,7 @@ fn backups_of(namespace: &str, store: &DynamicObject, name: &str) -> Backups {
         schedules,
         runs: Vec::new(),
         ready: false,
+        recovery_window: None,
     }
 }
 

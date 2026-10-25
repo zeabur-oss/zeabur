@@ -103,6 +103,20 @@ export const configMapsQuery = (project: string) =>
       ),
   })
 
+export const volumeRestoresQuery = (project: string, claim: string) =>
+  queryOptions({
+    queryKey: ["project", project, "volume-restores", claim],
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.GET("/api/v1/projects/{project}/volumes/{claim}/restores", {
+          params: { path: { project, claim } },
+          signal,
+        }),
+      ),
+    refetchInterval: POLL,
+    refetchIntervalInBackground: false,
+  })
+
 export const debugQuery = (project: string, pod: string, container: string | undefined) =>
   queryOptions({
     queryKey: ["project", project, "debug", pod, container],
@@ -446,16 +460,35 @@ export async function evictNodePods(node: string, body: Schemas["MaintenanceAppl
   )
 }
 
+/** A Secret's values, read as the person; never cached. */
+export async function revealSecret(project: string, name: string): Promise<Record<string, string>> {
+  const answer = unwrap(
+    await api.POST("/api/v1/projects/{project}/secrets/{name}/reveal", {
+      params: { path: { project, name } },
+      cache: "no-store",
+    }),
+  )
+  return Object.fromEntries(Object.entries(answer.values).map(([key, value]) => [key, value.value]))
+}
+
 /** `kinds` are `<group>/<resource>` (`core` for the core group); `all` reads every kind controllers
  * do not generate. */
 export interface ObjectsRead {
   kinds?: string[]
   all?: boolean
+  /** Only objects with this label, `<key>=<value>`. */
+  label?: string
 }
 
 export const objectsQuery = (project: string, read: ObjectsRead = {}) =>
   queryOptions({
-    queryKey: ["project", project, "objects", read.all ? "*" : (read.kinds ?? []).join(",")],
+    queryKey: [
+      "project",
+      project,
+      "objects",
+      read.all ? "*" : (read.kinds ?? []).join(","),
+      ...(read.label ? [read.label] : []),
+    ],
     queryFn: async ({ signal }) =>
       unwrap(
         await api.GET("/api/v1/projects/{project}/objects", {
@@ -464,6 +497,7 @@ export const objectsQuery = (project: string, read: ObjectsRead = {}) =>
             query: {
               kinds: read.kinds?.length ? read.kinds.join(",") : undefined,
               all: read.all ? true : undefined,
+              label: read.label,
             },
           },
           signal,

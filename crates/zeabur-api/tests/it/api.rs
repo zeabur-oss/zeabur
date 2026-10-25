@@ -784,6 +784,37 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn a_label_keeps_only_the_objects_that_carry_it() {
+        let cluster = cluster_with_a_certificate();
+        let list = get(
+            &cluster,
+            "/api/v1/projects/shop/objects?kinds=cert-manager.io/certificates&label=app.kubernetes.io/managed-by%3DHelm",
+        )
+        .await;
+        let certificates = kind_of(&list, "Certificate").unwrap();
+        assert_eq!(certificates["items"][0]["name"], "shop-tls");
+        let list = get(
+            &cluster,
+            "/api/v1/projects/shop/objects?kinds=cert-manager.io/certificates&label=zeabur.com/database%3Dpg",
+        )
+        .await;
+        let certificates = kind_of(&list, "Certificate").unwrap();
+        assert_eq!(certificates["listed"], true);
+        assert_eq!(
+            certificates["items"],
+            json!([]),
+            "objects without the label are left out"
+        );
+        let (status, ..) = call(
+            app(&cluster),
+            "GET",
+            "/api/v1/projects/shop/objects?label=nokey",
+        )
+        .await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
     async fn a_kind_refused_in_the_namespace_is_named_and_the_rest_is_served() {
         let cluster = cluster_with_a_certificate();
         cluster.update(|s| {

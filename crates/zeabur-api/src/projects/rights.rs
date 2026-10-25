@@ -42,6 +42,9 @@ pub struct ProjectRights {
     pub change_object_storage: Permission,
     /// Back up volumes: `create` on K8up's schedules, backups and pod configs.
     pub back_up_volumes: Permission,
+    /// Restore volumes from their backups: `create` on K8up's restores and on
+    /// persistentvolumeclaims.
+    pub restore_volumes: Permission,
     /// Open a terminal in a container: `create` on `pods/exec`.
     pub open_terminal: Permission,
     /// Read the pods' logs: `get` on `pods/log`.
@@ -135,6 +138,7 @@ impl ProjectRights {
             back_up_databases: u,
             change_object_storage: u,
             back_up_volumes: u,
+            restore_volumes: u,
             open_terminal: u,
             read_logs: u,
             build: u,
@@ -186,6 +190,10 @@ impl ProjectRights {
                 ask.can("create", K8UP, "schedules"),
                 ask.can("create", K8UP, "backups"),
                 ask.can("create", K8UP, "podconfigs"),
+            ]),
+            restore_volumes: all([
+                ask.can("create", K8UP, "restores"),
+                ask.can("create", "", "persistentvolumeclaims"),
             ]),
             open_terminal: ask.can("create", "", "pods/exec"),
             read_logs: ask.can("get", "", "pods/log"),
@@ -239,13 +247,15 @@ mod tests {
     }
 
     #[test]
-    fn a_developer_changes_everything_in_the_project_except_who_has_access() {
+    fn a_developer_changes_everything_in_the_project_except_who_has_access_and_restores_no_volume()
+    {
         let developer = rights(ProjectRole::Developer);
         let allowed = Permission::Allowed;
         assert_eq!(
             developer,
             ProjectRights {
                 change_members: Permission::Denied,
+                restore_volumes: Permission::Denied,
                 ..ProjectRights {
                     deploy: allowed,
                     change_services: allowed,
@@ -260,6 +270,7 @@ mod tests {
                     back_up_databases: allowed,
                     change_object_storage: allowed,
                     back_up_volumes: allowed,
+                    restore_volumes: allowed,
                     open_terminal: allowed,
                     read_logs: allowed,
                     build: allowed,

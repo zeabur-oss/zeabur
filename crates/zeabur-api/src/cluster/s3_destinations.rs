@@ -443,6 +443,7 @@ pub(crate) async fn open(
             | Change::AddVolume { .. }
             | Change::EditMount { .. }
             | Change::RemoveVolume { .. }
+            | Change::SwapClaim { .. }
             | Change::Probe { .. }
             | Change::ConfigReload { .. }
             | Change::Image { .. }

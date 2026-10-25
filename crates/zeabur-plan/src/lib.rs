@@ -43,6 +43,7 @@ pub use plan::{
     CREATABLE, ErrorKind, Fetched, Input, PlanError, RESTARTED_AT, StorageClassInfo, creatable,
     plan, plan_with, versions,
 };
+pub use project::project_namespace;
 pub use public_port::public_service_name;
 pub use releases::{Release, ReleasePods};
 pub use rules::{EnvEdit, EnvValueFrom, FieldChange};

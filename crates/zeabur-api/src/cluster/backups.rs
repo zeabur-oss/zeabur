@@ -6,6 +6,7 @@
 //! | `GET /api/v1/cluster/backups` | Velero's locations, schedules and backups, or that it is not installed |
 //! | `POST /api/v1/cluster/backups/plan` | what setting the location or the schedule, pausing it, backing up now or restoring a backup writes, and a token; writes nothing |
 //! | `POST /api/v1/cluster/backups/apply` | carries out that plan by its token |
+//! | `GET /api/v1/cluster/backups/{backup}/download` | the backup's contents as a file (see [`super::backup_download`]) |
 //!
 //! Everything is read and written as the person; RBAC on `velero.io` and on Secrets in Velero's
 //! namespace decides. Velero's API not being served is an answer (`not-installed`), not an error.
@@ -24,15 +25,18 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use utoipa::ToSchema;
 use zeabur_core::problem::{Denied, Kind, MEDIA_TYPE as PROBLEM, Problem};
+use zeabur_kube::k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use zeabur_kube::k8s_openapi::jiff::Timestamp;
 use zeabur_kube::{
     Cluster, ClusterError, ClusterExt as _, DynamicObject, ObjectTarget, ResourceRef, WriteBody,
     WriteRequest,
 };
+use zeabur_model::PodSecurityLevel;
 use zeabur_modules::Reading;
 use zeabur_modules::backups::Outcome;
 use zeabur_modules::velero::{self, cluster as v};
 
+use crate::cluster::restore_copy::{self, routes};
 use crate::cluster::s3_destinations;
 use crate::error::{ApiError, get_read, list_read, read_problem};
 use crate::handlers::{AppState, Everyday, Person};
@@ -44,7 +48,7 @@ use crate::views::UnreadableView;
 
 /// Sealed plans of this module start with this, so no other plan's token opens as one.
 const PREFIX: &str = "b1.";
-const GROUP: &str = "velero.io";
+pub(crate) const GROUP: &str = "velero.io";
 /// The most backups an answer lists, newest first.
 const SHOWN: usize = 100;
 /// What a plan's YAML shows for the keys.
@@ -125,12 +129,25 @@ pub enum BackupsPlanRequest {
     },
     /// Back up now with Zeabur's schedule's settings.
     BackupNow,
-    /// Restore a backup into some of its namespaces. Velero skips objects that are there.
+    /// Restore one namespace of a backup into a new project. While the namespace exists, the
+    /// backup goes into the new namespace `into` without its routes; when it no longer exists,
+    /// back under its own name.
     Restore {
         /// The backup.
         backup: String,
-        /// The namespaces to restore.
-        namespaces: Vec<String>,
+        /// The namespace to restore.
+        namespace: String,
+        /// The new namespace, needed while `namespace` exists.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        into: Option<String>,
+    },
+    /// Move every route of `from` to `to`: delete each from `from` and create it in `to`. A route
+    /// that Helm, Argo CD or Flux manages stays.
+    MoveDomains {
+        /// The project the routes leave.
+        from: String,
+        /// The project they move to.
+        to: String,
     },
 }
 
@@ -166,10 +183,20 @@ impl std::fmt::Debug for BackupsPlanRequest {
                 .finish(),
             Self::Pause { paused } => f.debug_struct("Pause").field("paused", paused).finish(),
             Self::BackupNow => f.write_str("BackupNow"),
-            Self::Restore { backup, namespaces } => f
+            Self::Restore {
+                backup,
+                namespace,
+                into,
+            } => f
                 .debug_struct("Restore")
                 .field("backup", backup)
-                .field("namespaces", namespaces)
+                .field("namespace", namespace)
+                .field("into", into)
+                .finish(),
+            Self::MoveDomains { from, to } => f
+                .debug_struct("MoveDomains")
+                .field("from", from)
+                .field("to", to)
                 .finish(),
         }
     }
@@ -183,6 +210,8 @@ pub enum BackupWriteAction {
     Create,
     /// Changes it.
     Patch,
+    /// Deletes it.
+    Delete,
 }
 
 /// One object a plan writes.
@@ -221,6 +250,15 @@ pub struct BackupsPlan {
     /// The restore a `restore` plan creates.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub restore: Option<String>,
+    /// What a `restore` plan copies, and what to check before it runs.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub copy: Option<restore_copy::Copy>,
+    /// The hostnames a `moveDomains` plan moves.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub hosts: Vec<String>,
+    /// The routes a `moveDomains` plan leaves, because a tool manages them.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub managed: Vec<String>,
 }
 
 /// The token of a plan to apply.
@@ -257,18 +295,18 @@ struct Claims {
 }
 
 /// What Velero's objects are, read as the person.
-struct Objects {
-    namespace: String,
-    locations: Vec<DynamicObject>,
+pub(crate) struct Objects {
+    pub(crate) namespace: String,
+    pub(crate) locations: Vec<DynamicObject>,
     schedules: Vec<DynamicObject>,
 }
 
-enum Found {
+pub(crate) enum Found {
     Read(Objects),
     NotInstalled,
 }
 
-fn not_installed() -> ApiError {
+pub(crate) fn not_installed() -> ApiError {
     ApiError::from(Problem::new(
         Kind::NotFound,
         "Velero is not installed in the cluster, so backups cannot be set up.",
@@ -293,7 +331,10 @@ async fn list(
 }
 
 /// The locations and schedules, from which Velero's namespace follows.
-async fn objects(cluster: &dyn Cluster, namespace: Option<&str>) -> Result<Found, ApiError> {
+pub(crate) async fn objects(
+    cluster: &dyn Cluster,
+    namespace: Option<&str>,
+) -> Result<Found, ApiError> {
     let Some(locations) = list(cluster, &v::LOCATIONS, namespace).await? else {
         return Ok(Found::NotInstalled);
     };
@@ -451,14 +492,24 @@ fn secrets() -> ResourceRef {
     ResourceRef::new("", "v1", "secrets", "Secret")
 }
 
-fn right(verb: &str, resource: &str, namespace: &str, name: Option<&str>) -> Denied {
+pub(crate) fn right(verb: &str, resource: &str, namespace: &str, name: Option<&str>) -> Denied {
     let group = if resource == "secrets" { "" } else { GROUP };
+    right_in(group, verb, resource, namespace, name)
+}
+
+fn right_in(
+    group: &str,
+    verb: &str,
+    resource: &str,
+    namespace: &str,
+    name: Option<&str>,
+) -> Denied {
     Denied {
         verb: verb.to_owned(),
         group: group.to_owned(),
         resource: resource.to_owned(),
         name: name.map(str::to_owned),
-        namespace: Some(namespace.to_owned()),
+        namespace: (!namespace.is_empty()).then(|| namespace.to_owned()),
     }
 }
 
@@ -475,14 +526,22 @@ struct Planned {
 struct Computed {
     versions: BTreeMap<String, String>,
     writes: Vec<Planned>,
+    /// What a restore copies, before the addresses and the room are read.
+    copy: Option<restore_copy::Copy>,
+    /// The hostnames a move moves, and the routes it leaves.
+    moved: (Vec<String>, Vec<String>),
 }
 
-fn target(kind: &str, namespace: &str, name: &str) -> ObjectTarget {
+pub(crate) fn target(kind: &str, namespace: &str, name: &str) -> ObjectTarget {
     let (api_version, plural) = match kind {
         "Secret" => ("v1", "secrets"),
         "BackupStorageLocation" => ("velero.io/v1", "backupstoragelocations"),
         "Schedule" => ("velero.io/v1", "schedules"),
         "Restore" => ("velero.io/v1", "restores"),
+        "DownloadRequest" => ("velero.io/v1", "downloadrequests"),
+        "Namespace" => ("v1", "namespaces"),
+        "Ingress" => ("networking.k8s.io/v1", "ingresses"),
+        "HTTPRoute" => ("gateway.networking.k8s.io/v1", "httproutes"),
         _ => ("velero.io/v1", "backups"),
     };
     ObjectTarget {
@@ -552,7 +611,7 @@ fn change(
 }
 
 /// The location Zeabur edits: the default one, else the one named `default`.
-fn chosen_location(locations: &[DynamicObject]) -> Option<&DynamicObject> {
+pub(crate) fn chosen_location(locations: &[DynamicObject]) -> Option<&DynamicObject> {
     locations
         .iter()
         .find(|l| l.data.pointer("/spec/default").and_then(Value::as_bool) == Some(true))
@@ -724,14 +783,104 @@ async fn backup_key_write(
     }))
 }
 
-/// The restore of `backup` into `namespaces`, named `made`; the backup must have finished.
+fn namespaces() -> ResourceRef {
+    ResourceRef::new("", "v1", "namespaces", "Namespace")
+}
+
+async fn namespace_object(cluster: &dyn Cluster, name: &str) -> Result<Option<Value>, ApiError> {
+    cluster
+        .find_object(&namespaces(), None, name)
+        .await
+        .map_err(|e| {
+            read_problem(
+                e,
+                &format!("namespace {name}"),
+                get_read("", "namespaces", None, name),
+            )
+        })?
+        .map(|n| value(&n))
+        .transpose()
+}
+
+/// The routes of `namespace` as JSON with their `apiVersion` and `kind`, read as the person.
+async fn routes_of(cluster: &dyn Cluster, namespace: &str) -> Result<Vec<Value>, ApiError> {
+    let mut out = Vec::new();
+    for resource in routes() {
+        let listed = cluster
+            .list_objects(&resource, Some(namespace))
+            .await
+            .map_err(|e| {
+                read_problem(
+                    e,
+                    &format!("{} in {namespace}", resource.resource),
+                    list_read(&resource.group, &resource.resource, Some(namespace)),
+                )
+            })?;
+        for route in listed.into_iter().flatten() {
+            let mut route = value(&route)?;
+            if let Some(map) = route.as_object_mut() {
+                map.insert("apiVersion".to_owned(), json!(resource.api_version()));
+                map.insert("kind".to_owned(), json!(resource.kind));
+            }
+            out.push(route);
+        }
+    }
+    Ok(out)
+}
+
+/// The namespace of a copy: a project like a new one, at the Pod Security level of the
+/// original, so its pods run there as they ran in the original.
+fn copy_namespace(into: &str, source: &Value) -> Value {
+    let mut namespace = zeabur_plan::project_namespace(
+        &zeabur_plan::Conventions::ZEABUR,
+        into,
+        None,
+        PodSecurityLevel::Restricted,
+    );
+    let enforce = source
+        .pointer(&format!(
+            "/metadata/labels/{}",
+            PodSecurityLevel::ENFORCE.replace('/', "~1")
+        ))
+        .and_then(Value::as_str)
+        .and_then(PodSecurityLevel::parse);
+    if let Some(labels) = namespace
+        .pointer_mut("/metadata/labels")
+        .and_then(Value::as_object_mut)
+    {
+        for key in [
+            PodSecurityLevel::ENFORCE,
+            PodSecurityLevel::AUDIT,
+            PodSecurityLevel::WARN,
+        ] {
+            match enforce {
+                Some(level) => {
+                    labels.insert(key.to_owned(), json!(level.as_str()));
+                }
+                None => {
+                    labels.remove(key);
+                }
+            }
+        }
+    }
+    namespace
+}
+
+/// The restore of `source` from `backup`, named `made`: into the new project `into` while
+/// `source` exists, else under its own name. The backup must have finished.
+#[expect(
+    clippy::too_many_arguments,
+    reason = "one per part of the request and of the plan"
+)]
 async fn restore_writes(
     cluster: &dyn Cluster,
     namespace: &str,
     backup: &str,
-    namespaces: &[String],
+    source: &str,
+    into: Option<&str>,
     made: Option<&str>,
     versions: &mut BTreeMap<String, String>,
+    copy: &mut Option<restore_copy::Copy>,
 ) -> Result<Vec<Planned>, ApiError> {
     let found = cluster
         .find_object(&velero::BACKUPS.resource(), Some(namespace), backup)
@@ -755,18 +904,149 @@ async fn restore_writes(
             "Backup {backup} has not finished, so it cannot be restored."
         )));
     }
-    if let Some(problem) = v::restore_problem(&view.namespaces, namespaces) {
+    if let Some(problem) = v::restore_problem(&view.namespaces, source) {
         return Err(invalid(problem));
     }
     versions.insert(format!("Backup/{backup}"), version(Some(&value(&found)?)));
+    let original = namespace_object(cluster, source).await?;
+    versions.insert(format!("Namespace/{source}"), version(original.as_ref()));
     let name = made.unwrap_or_default();
-    let object = v::restore_object(namespace, name, backup, namespaces);
-    Ok(change("Restore", namespace, name, None, object)
-        .into_iter()
-        .collect())
+    let mut writes = Vec::new();
+    let into = match &original {
+        None => None,
+        Some(original) => {
+            let into = into.map_or("", str::trim);
+            if let Some(problem) = v::new_namespace_problem(source, into) {
+                return Err(invalid(problem));
+            }
+            if namespace_object(cluster, into).await?.is_some() {
+                return Err(ApiError::from(Problem::new(
+                    Kind::Conflict,
+                    format!("A namespace named {into} already exists; choose another name."),
+                )));
+            }
+            versions.insert(format!("Namespace/{into}"), String::new());
+            writes.extend(change(
+                "Namespace",
+                "",
+                into,
+                None,
+                copy_namespace(into, original),
+            ));
+            Some(into)
+        }
+    };
+    let hosts = match into {
+        Some(_) => {
+            let mut hosts: Vec<String> = routes_of(cluster, source)
+                .await?
+                .iter()
+                .flat_map(v::route_hosts)
+                .collect();
+            hosts.sort();
+            hosts.dedup();
+            hosts
+        }
+        None => Vec::new(),
+    };
+    *copy = Some(restore_copy::Copy {
+        source: source.to_owned(),
+        into: into.unwrap_or(source).to_owned(),
+        same_name: into.is_none(),
+        hosts,
+        references: Vec::new(),
+        secrets: Vec::new(),
+        unchecked: Vec::new(),
+        room: None,
+    });
+    let object = v::restore_object(namespace, name, backup, source, into);
+    writes.extend(change("Restore", namespace, name, None, object));
+    Ok(writes)
+}
+
+/// The move of every route of `from` to `to`; each is deleted from `from`, then created in `to`.
+async fn move_writes(
+    cluster: &dyn Cluster,
+    from: &str,
+    to: &str,
+    versions: &mut BTreeMap<String, String>,
+) -> Result<(Vec<Planned>, Vec<String>, Vec<String>), ApiError> {
+    if from == to {
+        return Err(invalid(
+            "Choose another project to move the domains to.".to_owned(),
+        ));
+    }
+    for name in [from, to] {
+        if namespace_object(cluster, name).await?.is_none() {
+            return Err(ApiError::from(Problem::new(
+                Kind::NotFound,
+                format!("There is no namespace {name}."),
+            )));
+        }
+    }
+    let mut writes = Vec::new();
+    let mut hosts = Vec::new();
+    let mut managed = Vec::new();
+    for before in routes_of(cluster, from).await? {
+        let text = |pointer: &str| {
+            before
+                .pointer(pointer)
+                .and_then(Value::as_str)
+                .map(str::to_owned)
+        };
+        let kind = text("/kind").unwrap_or_default();
+        let name = text("/metadata/name").unwrap_or_default();
+        let metadata: ObjectMeta =
+            serde_json::from_value(before.get("metadata").cloned().unwrap_or_default())
+                .unwrap_or_default();
+        if zeabur_adapters::provenance::detect_tool(&metadata).is_some() {
+            managed.push(format!("{kind}/{name}"));
+            continue;
+        }
+        let taken = cluster
+            .find_object(&target(&kind, to, &name).resource(), Some(to), &name)
+            .await
+            .map_err(|e| {
+                read_problem(
+                    e,
+                    &format!("{kind} {name} in {to}"),
+                    get_read(
+                        target(&kind, to, &name).resource().group.as_str(),
+                        &target(&kind, to, &name).plural,
+                        Some(to),
+                        &name,
+                    ),
+                )
+            })?;
+        if taken.is_some() {
+            return Err(ApiError::from(Problem::new(
+                Kind::Conflict,
+                format!("{to} already has a {kind} named {name}; delete or rename it first."),
+            )));
+        }
+        versions.insert(format!("{kind}/{from}/{name}"), version(Some(&before)));
+        hosts.extend(v::route_hosts(&before));
+        writes.push(Planned {
+            target: target(&kind, from, &name),
+            body: WriteBody::Delete(zeabur_kube::Preconditions {
+                uid: metadata.uid.clone(),
+                resource_version: metadata.resource_version.clone(),
+                grace_period_seconds: None,
+            }),
+            action: BackupWriteAction::Delete,
+            before: Some(before.clone()),
+            shown: Value::Null,
+        });
+        let moved = v::moved_route(&before, to);
+        writes.extend(change(&kind, to, &name, None, moved));
+    }
+    hosts.sort();
+    hosts.dedup();
+    Ok((writes, hosts, managed))
 }
 
 /// The writes of `request`; `made` names the backup or restore the plan creates.
+#[expect(clippy::too_many_lines, reason = "one arm per request kind")]
 async fn compute(
     cluster: &dyn Cluster,
     objects: &Objects,
@@ -775,6 +1055,8 @@ async fn compute(
 ) -> Result<Computed, ApiError> {
     let namespace = objects.namespace.as_str();
     let mut versions = BTreeMap::new();
+    let mut copy = None;
+    let mut moved = (Vec::new(), Vec::new());
     let schedule = zeabur_schedule(&objects.schedules).map(value).transpose()?;
     let writes = match request {
         BackupsPlanRequest::Location {
@@ -857,11 +1139,35 @@ async fn compute(
                 .into_iter()
                 .collect()
         }
-        BackupsPlanRequest::Restore { backup, namespaces } => {
-            restore_writes(cluster, namespace, backup, namespaces, made, &mut versions).await?
+        BackupsPlanRequest::Restore {
+            backup,
+            namespace: source,
+            into,
+        } => {
+            restore_writes(
+                cluster,
+                namespace,
+                backup,
+                source,
+                into.as_deref(),
+                made,
+                &mut versions,
+                &mut copy,
+            )
+            .await?
+        }
+        BackupsPlanRequest::MoveDomains { from, to } => {
+            let (writes, hosts, managed) = move_writes(cluster, from, to, &mut versions).await?;
+            moved = (hosts, managed);
+            writes
         }
     };
-    Ok(Computed { versions, writes })
+    Ok(Computed {
+        versions,
+        writes,
+        copy,
+        moved,
+    })
 }
 
 fn yaml(object: &Value) -> Option<String> {
@@ -877,8 +1183,9 @@ fn plan_key(state: &AppState) -> Result<std::sync::Arc<token::PlanKey>, ApiError
     })
 }
 
-/// Works out what setting the backup location or Zeabur's schedule, pausing or resuming it, or
-/// backing up now writes, and a token to apply it; writes nothing. The keys of a location never
+/// Works out what setting the backup location or Zeabur's schedule, pausing or resuming it,
+/// backing up now, restoring a backup into a new project or moving domains to it writes, and a
+/// token to apply it; writes nothing. The keys of a location never
 /// appear in the answer.
 #[utoipa::path(post, path = "/api/v1/cluster/backups/plan", tag = "cluster",
     operation_id = "planClusterBackups", request_body = BackupsPlanRequest,
@@ -907,9 +1214,13 @@ pub(crate) async fn plan(
         BackupsPlanRequest::Restore { backup, .. } => Some(v::backup_name(backup, &at)),
         BackupsPlanRequest::Location { .. }
         | BackupsPlanRequest::Schedule { .. }
-        | BackupsPlanRequest::Pause { .. } => None,
+        | BackupsPlanRequest::Pause { .. }
+        | BackupsPlanRequest::MoveDomains { .. } => None,
     };
-    let computed = compute(cluster.as_ref(), &objects, &request, made.as_deref()).await?;
+    let mut computed = compute(cluster.as_ref(), &objects, &request, made.as_deref()).await?;
+    if let Some(copy) = computed.copy.as_mut().filter(|c| !c.same_name) {
+        restore_copy::read(cluster.as_ref(), copy).await;
+    }
     let restoring = matches!(request, BackupsPlanRequest::Restore { .. });
     let (backup, restore) = if restoring {
         (None, made.clone())
@@ -946,11 +1257,16 @@ pub(crate) async fn plan(
                 name: w.target.name.clone(),
                 namespace: w.target.namespace.clone(),
                 before_yaml: w.before.as_ref().and_then(yaml),
-                after_yaml: yaml(&w.shown),
+                after_yaml: (w.action != BackupWriteAction::Delete)
+                    .then(|| yaml(&w.shown))
+                    .flatten(),
             })
             .collect(),
         backup,
         restore,
+        copy: computed.copy,
+        hosts: computed.moved.0,
+        managed: computed.moved.1,
     }))
 }
 
@@ -963,6 +1279,7 @@ async fn send(cluster: &dyn Cluster, write: &Planned, dry_run: bool) -> Result<(
     let verb = match write.action {
         BackupWriteAction::Create => "create",
         BackupWriteAction::Patch => "patch",
+        BackupWriteAction::Delete => "delete",
     };
     let target = &write.target;
     cluster
@@ -973,11 +1290,15 @@ async fn send(cluster: &dyn Cluster, write: &Planned, dry_run: bool) -> Result<(
             read_problem(
                 error,
                 &format!("{} {} in {}", target.kind, target.name, target.namespace),
-                right(
+                right_in(
+                    target
+                        .api_version
+                        .split_once('/')
+                        .map_or("", |(group, _)| group),
                     verb,
                     &target.plural,
                     &target.namespace,
-                    (write.action == BackupWriteAction::Patch).then_some(target.name.as_str()),
+                    (write.action != BackupWriteAction::Create).then_some(target.name.as_str()),
                 ),
             )
         })
@@ -1022,7 +1343,8 @@ pub(crate) async fn apply(
     if computed.versions != claims.versions {
         return Err(ApiError::from(Problem::new(
             Kind::Conflict,
-            "Velero's location, schedule, keys or backup changed after the plan was made.",
+            "Velero's location, schedule, keys or backup, or a namespace or route of the plan, \
+             changed after the plan was made.",
         )));
     }
     let restoring = matches!(claims.request, BackupsPlanRequest::Restore { .. });

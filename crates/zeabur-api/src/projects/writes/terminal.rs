@@ -89,6 +89,7 @@ pub(crate) async fn compute(
         | Change::AddVolume { .. }
         | Change::EditMount { .. }
         | Change::RemoveVolume { .. }
+        | Change::SwapClaim { .. }
         | Change::Probe { .. }
         | Change::Image { .. }
         | Change::Rebuild { .. }

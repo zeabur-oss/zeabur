@@ -6,6 +6,7 @@ import { databaseOfEnv, type Target } from "@/model/connect"
 import {
   APP_DATABASE,
   APP_SECRET,
+  madeFor,
   newPassword,
   perThreadCaches,
   splitDestination,
@@ -24,6 +25,34 @@ export interface RestorePoint {
   time?: string
   /** What the operator restores: CloudNativePG's backup ID, Percona's destination, a time. */
   from?: string
+  /** A point in time to recover to, RFC 3339 in UTC, instead of a backup (CloudNativePG). */
+  target?: string
+}
+
+/** The times a PostgreSQL database can be recovered to: from its oldest backup to its archive's
+ * lag before `now`. None when the archive does not run or the window is empty. */
+export function recoveryRange(database: Database, now: Date): { from: Date; to: Date } | undefined {
+  const window = database.backups.recoveryWindow
+  if (database.engine !== "postgresql" || !window) return undefined
+  const from = new Date(window.first)
+  const to = new Date(now.getTime() - window.lagSeconds * 1000)
+  if (Number.isNaN(from.getTime()) || to <= from) return undefined
+  return { from, to }
+}
+
+/** A time as RFC 3339 in UTC, to the second. */
+export const utcInstant = (time: Date) => time.toISOString().replace(/\.\d{3}Z$/, "Z")
+
+/** `time` in the viewer's zone as an `<input type="datetime-local">` value, to the second. */
+export function localInput(time: Date): string {
+  const two = (n: number) => String(n).padStart(2, "0")
+  return `${time.getFullYear()}-${two(time.getMonth() + 1)}-${two(time.getDate())}T${two(time.getHours())}:${two(time.getMinutes())}:${two(time.getSeconds())}`
+}
+
+/** A point in time as a restore point. */
+export const pointInTime = (time: Date): RestorePoint => {
+  const target = utcInstant(time)
+  return { backup: target, time: target, target }
 }
 
 /** The backups a database can be restored from, newest first. Dragonfly keeps one snapshot set
@@ -42,10 +71,10 @@ export function restorePoints(database: Database): RestorePoint[] {
 
 const NAME_MAX = 30
 
-/** `<name>-restored-<MMDD>`, the original's name cut to fit. */
-export function restoredName(name: string, now: Date): string {
+/** `<name>-restored-<MMDD>`, the original's name cut to fit `max`. */
+export function restoredName(name: string, now: Date, max = NAME_MAX): string {
   const suffix = `-restored-${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`
-  return `${name.slice(0, NAME_MAX - suffix.length).replace(/-+$/, "")}${suffix}`
+  return `${name.slice(0, max - suffix.length).replace(/-+$/, "")}${suffix}`
 }
 
 const PLUGIN = "barman-cloud.cloudnative-pg.io"
@@ -77,40 +106,80 @@ interface Restoring {
   object: Manifest
   /** A new Secret with a password, key `password`. */
   secret: (name: string) => Change
+  /** The values of the original's Secret that `keptSecret` names, for the copy's own. */
+  copied?: Record<string, string>
 }
 
+const secretOf = (name: string, data: Record<string, string>): Change =>
+  create({ apiVersion: "v1", kind: "Secret", metadata: { name }, type: "Opaque", stringData: data })
+
+/** The original's Secret whose passwords the backup holds, and the suffix of the copy's own:
+ * MongoDB's system users, MySQL's app user, MariaDB's root. The copy gets a Secret of its own with
+ * the same values, so it still starts when the original and its Secrets are deleted. */
+export function keptSecret(source: Database): { name: string; suffix: string } | undefined {
+  const object = source.object as { metadata?: Manifest; spec?: Manifest } | undefined
+  const spec = object?.spec ?? {}
+  if (source.engine === "mongodb") {
+    const users = (spec.secrets as { users?: string } | undefined)?.users
+    return { name: users ?? `${source.name}-secrets`, suffix: "secrets" }
+  }
+  if (source.engine === "mysql") {
+    const app = (object?.metadata?.annotations as Record<string, string> | undefined)?.[APP_SECRET]
+    return app ? { name: app, suffix: "app" } : undefined
+  }
+  if (source.engine === "mariadb") {
+    const root = (spec.rootPasswordSecretKeyRef as { name?: string } | undefined)?.name
+    return root ? { name: root, suffix: "root" } : undefined
+  }
+  return undefined
+}
+
+/** Where the original archives: its object store and the server name its backups are under,
+ * its own name unless set. */
+function archiveOf(spec: Spec, source: Database, store?: Store) {
+  const plugins = (spec.plugins as Manifest[] | undefined) ?? []
+  const parameters = (plugins.find((p) => p.name === PLUGIN)?.parameters ?? {}) as Manifest
+  return {
+    barmanObjectName: parameters.barmanObjectName ?? store?.name,
+    serverName: parameters.serverName ?? source.name,
+  }
+}
+
+const recoveryTarget = (point: RestorePoint) =>
+  point.target ? { targetTime: point.target } : { backupID: point.from, targetImmediate: true }
+
 function restorePostgresql({ source, point, spec, store, object }: Restoring): Change[] {
+  const archive = archiveOf(spec, source, store)
   delete spec.plugins
   spec.bootstrap = {
     recovery: {
       source: source.name,
       database: source.app?.database ?? source.connection.database ?? "app",
       owner: source.app?.username ?? "app",
-      recoveryTarget: { backupID: point.from, targetImmediate: true },
+      recoveryTarget: recoveryTarget(point),
     },
   }
-  spec.externalClusters = [
-    {
-      name: source.name,
-      plugin: {
-        name: PLUGIN,
-        parameters: { barmanObjectName: store?.name, serverName: source.name },
-      },
-    },
-  ]
+  spec.externalClusters = [{ name: source.name, plugin: { name: PLUGIN, parameters: archive } }]
   return [create(object)]
 }
 
-// A logical dump holds the system users, so the copy keeps the original's users Secret.
-function restoreMongodb({ source, point, name, spec, store, object }: Restoring): Change[] {
-  const backup = (spec.backup as Manifest | undefined) ?? {}
+/** Where the original's backups go, as Percona's restore reads them. */
+function backupS3(backup: Manifest, store?: Store) {
   const storages = (backup.storages as Record<string, Manifest> | undefined) ?? {}
-  const s3 = storages[store?.name ?? "backups"]?.s3
-  const secrets = (spec.secrets as Manifest | undefined) ?? {}
+  return storages[store?.name ?? "backups"]?.s3
+}
+
+// A logical dump holds the system users, so the copy's users Secret has the original's values.
+function restoreMongodb({ source, point, name, spec, store, object, copied }: Restoring): Change[] {
+  const backup = (spec.backup as Manifest | undefined) ?? {}
+  const s3 = backupS3(backup, store)
   spec.backup = { ...backup, tasks: [] }
-  spec.secrets = { ...secrets, users: secrets.users ?? `${source.name}-secrets` }
+  const users = copied ? `${name}-secrets` : keptSecret(source)?.name
+  spec.secrets = { ...(spec.secrets as Manifest | undefined), users }
   perThreadCaches(spec, source.version)
+  const own = copied ? [secretOf(`${name}-secrets`, copied)] : []
   return [
+    ...own,
     create(object),
     create({
       apiVersion: "psmdb.percona.com/v1",
@@ -121,7 +190,7 @@ function restoreMongodb({ source, point, name, spec, store, object }: Restoring)
   ]
 }
 
-function restoreMysql({ source, point, project, spec, store, object }: Restoring): Change[] {
+function restoreMysql({ source, point, name, project, spec, store, object, copied }: Restoring) {
   delete spec.backupPolicyName
   delete spec.offline
   const { bucket } = splitDestination(store?.destination)
@@ -148,19 +217,25 @@ function restoreMysql({ source, point, project, spec, store, object }: Restoring
       },
     },
   }
-  return [create(object)]
+  if (!copied) return [create(object)]
+  const metadata = object.metadata as { annotations: Record<string, string> }
+  metadata.annotations[APP_SECRET] = `${name}-app`
+  return [secretOf(`${name}-app`, copied), create(object)]
 }
 
-// The copy keeps the original's root password, which the dump holds.
-function restoreMariadb({ point, name, spec, store, object, secret }: Restoring): Change[] {
+// The dump holds the original's root password: the copy's root Secret has the same values.
+function restoreMariadb({ point, name, spec, store, object, secret, copied }: Restoring) {
   delete spec.suspend
+  const root = (spec.rootPasswordSecretKeyRef as Manifest | undefined) ?? {}
+  const kept = copied ? [secretOf(`${name}-root`, copied)] : []
+  if (copied) spec.rootPasswordSecretKeyRef = { ...root, name: `${name}-root`, generate: false }
   spec.bootstrapFrom = {
     backupRef: { name: store?.name },
     ...(point.from ? { targetRecoveryTime: point.from } : {}),
   }
-  if (!spec.passwordSecretKeyRef) return [create(object)]
+  if (!spec.passwordSecretKeyRef) return [...kept, create(object)]
   spec.passwordSecretKeyRef = { name: `${name}-app`, key: "password", generate: false }
-  return [secret(`${name}-app`), create(object)]
+  return [...kept, secret(`${name}-app`), create(object)]
 }
 
 function restoreDragonfly({ name, spec, store, object, secret }: Restoring): Change[] {
@@ -203,7 +278,7 @@ const RESTORE = {
 }
 
 /** The copy's metadata: its name, the original's finalizers, and where it came from. MOCO's
- * app user is in the dump, so the copy reads the original's Secret. */
+ * app user is in the dump, so the copy names a Secret with the same password. */
 function copyMetadata(
   original: Manifest | undefined,
   source: string,
@@ -227,13 +302,15 @@ function copyMetadata(
 }
 
 /** The writes that make `name` from `point` of `source`: a copy of its object that starts from
- * the backup, Percona's restore, and a password of its own where Zeabur keeps one. */
+ * the backup, Percona's restore, a password of its own where Zeabur keeps one, and a copy of the
+ * Secret `keptSecret` names when its values (`copied`) are given. */
 export function restoreChanges(
   source: Database,
   point: RestorePoint,
   name: string,
   project: string,
   password = newPassword,
+  copied?: Record<string, string>,
 ): Change[] {
   const original = source.object as Manifest & { metadata?: Manifest; spec?: Manifest }
   const spec = structuredClone(original.spec ?? {})
@@ -243,24 +320,21 @@ export function restoreChanges(
     metadata: copyMetadata(original.metadata, source.name, point, name),
     spec,
   }
-  const secret = (secretName: string) =>
-    create({
-      apiVersion: "v1",
-      kind: "Secret",
-      metadata: { name: secretName },
-      type: "Opaque",
-      stringData: { password: password() },
-    })
-  return RESTORE[source.engine]({
-    source,
-    point,
+  const secret = (secretName: string) => secretOf(secretName, { password: password() })
+  return madeFor(
     name,
-    project,
-    spec,
-    store: source.backups.store ?? undefined,
-    object,
-    secret,
-  })
+    RESTORE[source.engine]({
+      source,
+      point,
+      name,
+      project,
+      spec,
+      store: source.backups.store ?? undefined,
+      object,
+      secret,
+      copied,
+    }),
+  )
 }
 
 /** The database `database` was restored from, and the ones restored from it. */

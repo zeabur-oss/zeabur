@@ -202,6 +202,7 @@ fn backups_of(
         store: Some(store),
         schedules,
         runs,
+        recovery_window: None,
     }
 }
 

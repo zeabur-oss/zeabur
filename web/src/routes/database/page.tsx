@@ -1,6 +1,6 @@
 // One database an operator runs, with a service's tabs: how it is and how to reach it, its
 // members' logs, backups, events, and its settings with the operator's object as YAML.
-import { useQuery } from "@tanstack/react-query"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { getRouteApi, Link } from "@tanstack/react-router"
 import { useState, type ReactNode } from "react"
 import ArchiveIcon from "~icons/ph/archive"
@@ -14,7 +14,7 @@ import TextAlignLeftIcon from "~icons/ph/text-align-left"
 import WarningIcon from "~icons/ph/warning"
 
 import type { Schemas } from "@/api/client"
-import { databasesQuery, projectQuery } from "@/api/queries"
+import { databasesQuery, objectsQuery, projectQuery } from "@/api/queries"
 import { Ago } from "@/components/bits"
 import { ConnectServices } from "@/components/connect"
 import { CopyText } from "@/components/copy-text"
@@ -48,6 +48,7 @@ import {
   backupsOn,
   canBackUpNow,
   connectionUri,
+  DATABASE_LABEL,
   deleteDatabase,
   backupsSummary,
   backUpNowSummary,
@@ -61,6 +62,8 @@ import {
   keepsEverything,
   rseqNote,
   lastRun,
+  MADE_KINDS,
+  madeObjects,
   newBackupTarget,
   presetOf,
   serverContainer,
@@ -143,6 +146,7 @@ export function DatabasePage() {
     <Body
       project={project}
       database={database}
+      others={query.data.items}
       backupsReadable={operator?.backups === "installed"}
       updatedAt={query.dataUpdatedAt}
       failed={query.isRefetchError}
@@ -161,12 +165,14 @@ function Column({ children }: { children: ReactNode }) {
 function Body({
   project,
   database,
+  others,
   backupsReadable,
   updatedAt,
   failed,
 }: {
   project: string
   database: Database
+  others: Database[]
   backupsReadable: boolean
   updatedAt: number
   failed: boolean
@@ -181,6 +187,26 @@ function Body({
   const events = eventsOf(useProjectEvents(project), database)
   const shell = (pod?: string) => openDatabaseShell(project, database, pod)
   const terminalGate = gates("openTerminal")
+  const queryClient = useQueryClient()
+  // What Zeabur made for the database goes with it, found by its label.
+  const planDelete = async () => {
+    const label = `${DATABASE_LABEL}=${database.name}`
+    const listed = await queryClient
+      .query(objectsQuery(project, { kinds: MADE_KINDS, label }))
+      .catch(() => undefined)
+    const { gone, kept } = listed
+      ? madeObjects(database, listed.items, others)
+      : { gone: [], kept: [] }
+    deleter.plan({
+      title: t("title.delete", database.kind, database.name),
+      changes: deleteDatabase(database, gone),
+      notes: [
+        ...(gone.length > 0 ? [t("db.delete.made")] : []),
+        ...kept.map((k) => t("db.delete.kept", k.name, k.by)),
+        ...(!listed || listed.unreadable.length > 0 ? [t("db.delete.unlisted", label)] : []),
+      ],
+    })
+  }
 
   return (
     <StoreShell
@@ -225,12 +251,7 @@ function Body({
             copy={`${database.resource}/${database.name}`}
             deleteGate={gates("changeDatabases")}
             deleteLabel={t("db.delete")}
-            onDelete={() =>
-              deleter.plan({
-                title: t("title.delete", database.kind, database.name),
-                changes: deleteDatabase(database),
-              })
-            }
+            onDelete={() => void planDelete()}
           >
             <ExportItem project={project} database={database} />
           </StoreMenu>

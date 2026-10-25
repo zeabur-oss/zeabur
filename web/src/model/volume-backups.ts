@@ -70,7 +70,7 @@ function restrictedPods(name: string, as: Extract<BackupUser, { root: false }>) 
 
 /** K8up backs up only annotated claims when installed from the catalogue. */
 const BACKUP_ANNOTATION = "k8up.io/backup"
-/** The label a volume's `Schedule` selects its claim by. */
+/** The label a volume's `Schedule` selects its claim by, and Zeabur's restores carry. */
 const VOLUME_LABEL = "zeabur.com/backup-volume"
 
 export interface VolumeTarget extends BackupTarget {
@@ -215,3 +215,123 @@ export const runsOf = (data: ProjectBackups, claim: string) =>
 
 export const k8upState = (data: ProjectBackups) =>
   data.providers.find((p) => p.module === "k8up")?.state ?? "not-installed"
+
+type Template = Record<string, unknown> & {
+  metadata?: Record<string, unknown>
+  spec?: Record<string, unknown>
+}
+type Mount = Pick<Schemas["Mount"], "accessModes" | "size" | "storageClass" | "volumeMode">
+type Workload = Schemas["WorkloadRef"]
+
+const LABEL_MAX = 63
+
+/** `<claim>-restore-<UTC time>`, cut to fit a name. */
+function restoreName(claim: string, now: Date): string {
+  const name = backupName(`${claim}-restore`, now)
+  return name.length <= LABEL_MAX
+    ? name
+    : `${claim.slice(0, LABEL_MAX - (name.length - claim.length)).replace(/-+$/, "")}${name.slice(claim.length)}`
+}
+
+/** A `Restore` of `snapshot` with `method`, from the server's template: the backup's backend and
+ * Pod security, labelled for the claim. */
+function restoreObject(
+  template: Template,
+  name: string,
+  snapshot: string,
+  method: Record<string, unknown>,
+  extra: Record<string, unknown> = {},
+  annotations: Record<string, string> = {},
+) {
+  return {
+    ...template,
+    metadata: {
+      ...template.metadata,
+      name,
+      ...(Object.keys(annotations).length ? { annotations } : {}),
+    },
+    spec: { ...template.spec, snapshot, restoreMethod: method, ...extra },
+  }
+}
+
+/** A new claim like `mount`'s, and the restore of `snapshot` into it. The original stays. */
+export function restoreToNewVolume(
+  template: Template,
+  snapshot: string,
+  claim: string,
+  into: string,
+  mount: Mount,
+  now: Date,
+): Change[] {
+  return [
+    create({
+      apiVersion: "v1",
+      kind: "PersistentVolumeClaim",
+      metadata: {
+        name: into,
+        annotations: {
+          "zeabur.com/restored-from": claim,
+          "zeabur.com/restored-snapshot": snapshot,
+        },
+      },
+      spec: {
+        accessModes: mount.accessModes?.length ? mount.accessModes : ["ReadWriteOnce"],
+        ...(mount.storageClass ? { storageClassName: mount.storageClass } : {}),
+        ...(mount.volumeMode ? { volumeMode: mount.volumeMode } : {}),
+        resources: { requests: { storage: mount.size ?? "1Gi" } },
+      },
+    }),
+    create(
+      restoreObject(template, restoreName(claim, now), snapshot, { folder: { claimName: into } }),
+    ),
+  ]
+}
+
+/** The workload mounts `to` in place of `from`, stopping before it starts again. */
+export const swapToVolume = (workload: Workload, from: string, to: string): Change[] => [
+  { op: "swapClaim", workload, from, to },
+]
+
+/** The annotation on an in-place restore with the replicas to start again with. */
+const REPLICAS = "zeabur.com/replicas"
+
+/** Stops `workload`, then restores `snapshot` into `claim` itself, deleting what the snapshot
+ * does not have. The restore notes `replicas` to start the workload again with. */
+export function restoreInPlace(
+  template: Template,
+  snapshot: string,
+  claim: string,
+  workload: Workload,
+  replicas: number,
+  now: Date,
+): Change[] {
+  return [
+    { op: "scale", workload, replicas: 0 },
+    create(
+      restoreObject(
+        template,
+        restoreName(claim, now),
+        snapshot,
+        { folder: { claimName: claim } },
+        { delete: true },
+        { [REPLICAS]: String(replicas) },
+      ),
+    ),
+  ]
+}
+
+/** Exports `snapshot` as a file to the bucket of the backups. */
+export function exportSnapshot(
+  template: Template,
+  method: Record<string, unknown>,
+  snapshot: string,
+  claim: string,
+  now: Date,
+): Change[] {
+  return [create(restoreObject(template, restoreName(claim, now), snapshot, method))]
+}
+
+/** Where an export downloads from: Zeabur signs the requests with the bucket's keys and streams
+ * the file, so no URL or key reaches the page. */
+export const volumeExportUrl = (project: string, claim: string, restore: string) =>
+  `/api/v1/projects/${encodeURIComponent(project)}/volumes/${encodeURIComponent(claim)}/restores/${encodeURIComponent(restore)}/download`
