@@ -8,7 +8,7 @@ use zeabur_core::problem::{Kind, MEDIA_TYPE as PROBLEM, Problem};
 use zeabur_kube::{Cluster, Preconditions, WriteBody, WriteRequest};
 
 use super::directory::{
-    CredentialSpec, Directory, IdentityKind, MembersView, Object, SetupLinks, can_manage, request,
+    CredentialObject, Directory, IdentityKind, MembersView, SetupLinks, can_manage, request,
     setup_links,
 };
 use super::writes::{
@@ -185,7 +185,7 @@ pub(crate) async fn setup_link(
 /// The rule for removing a credential of `username` as `you`: never your own last passkey.
 pub(crate) fn check_removal(
     directory: &Directory,
-    credential: &Object<CredentialSpec>,
+    credential: &CredentialObject,
     you: &str,
 ) -> Result<(), ApiError> {
     let owner = &credential.spec.user;
@@ -206,7 +206,7 @@ pub(crate) fn credential<'a>(
     directory: &'a Directory,
     username: &str,
     id: &str,
-) -> Result<&'a Object<CredentialSpec>, ApiError> {
+) -> Result<&'a CredentialObject, ApiError> {
     directory
         .credentials
         .iter()

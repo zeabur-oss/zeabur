@@ -123,9 +123,10 @@ fn identity_object(
     let metadata = json!({"name": name, "namespace": "zeabur-identity",
         "uid": format!("identity-{name}"), "creationTimestamp": created,
         "labels": labels, "annotations": annotations});
+    let status = extra.get("status").cloned().unwrap_or_else(|| json!({}));
     from(
         json!({"apiVersion": "identity.zeabur.com/v1alpha1", "kind": kind,
-        "metadata": metadata, "spec": spec}),
+        "metadata": metadata, "spec": spec, "status": status}),
     )
 }
 
@@ -133,7 +134,6 @@ fn identity_object(
 /// that adds another), Carol (GitHub and a passkey), and Dan, invited and not yet signed in.
 fn people() -> Vec<DynamicObject> {
     let now = Timestamp::now().as_second();
-    let last_used = Timestamp::from_second(now - 600).map_or_default(|t| t.to_string());
     let passkey = |name: &str, user: &str, created: &str, label: &str, extra: &Value| {
         identity_object(
             "Credential",
@@ -187,7 +187,7 @@ fn people() -> Vec<DynamicObject> {
             "alice",
             "2026-03-02T08:01:00Z",
             "MacBook Pro",
-            &json!({"annotations": {"identity.zeabur.com/last-used-at": last_used}}),
+            &json!({"status": {"lastUsedAt": now - 600}}),
         ),
         passkey(
             "cred-alice-phone",

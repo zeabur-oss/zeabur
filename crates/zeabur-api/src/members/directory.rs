@@ -10,10 +10,7 @@ use zeabur_kube::{Cluster, ClusterError, DynamicObject, ResourceRef};
 use zeabur_model::Origin;
 
 use super::access::ProjectGrant;
-use super::{
-    ADMIN_GROUP, API_VERSION, DEPLOYMENT, GROUP, LABEL_ANNOTATION, LAST_USED_ANNOTATION,
-    USER_PREFIX, VERSION,
-};
+use super::{ADMIN_GROUP, API_VERSION, DEPLOYMENT, GROUP, USER_PREFIX, VERSION};
 use crate::error::{ApiError, list_read, read_problem};
 use crate::projects::namespace::Permission;
 use crate::settings::IdentitySettings;
@@ -80,6 +77,17 @@ pub(crate) struct CredentialSpec {
     pub(crate) passkey: Option<PasskeySpec>,
 }
 
+/// What Zeabur Identity changes after enrolment.
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct CredentialStatus {
+    #[serde(default)]
+    pub(crate) label: Option<String>,
+    /// Unix seconds.
+    #[serde(default)]
+    pub(crate) last_used_at: Option<i64>,
+}
+
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct PasskeySpec {
@@ -105,24 +113,21 @@ pub(crate) struct GrantSpec {
     pub(crate) auth_time: i64,
 }
 
-/// An object with its typed `spec`.
+/// An object with its typed `spec` and, for kinds that need it, `status`.
 #[derive(Debug, Clone, Deserialize)]
-pub(crate) struct Object<S> {
+pub(crate) struct Object<S, T = serde::de::IgnoredAny> {
     pub(crate) metadata: ObjectMeta,
     pub(crate) spec: S,
+    #[serde(default)]
+    pub(crate) status: T,
 }
 
-impl<S> Object<S> {
+/// A `Credential`.
+pub(crate) type CredentialObject = Object<CredentialSpec, CredentialStatus>;
+
+impl<S, T> Object<S, T> {
     pub(crate) fn name(&self) -> &str {
         self.metadata.name.as_deref().unwrap_or_default()
-    }
-
-    pub(crate) fn annotation(&self, key: &str) -> Option<&str> {
-        self.metadata
-            .annotations
-            .as_ref()?
-            .get(key)
-            .map(String::as_str)
     }
 
     pub(crate) fn created(&self) -> Option<String> {
@@ -137,7 +142,7 @@ impl<S> Object<S> {
 #[derive(Debug, Clone, Default)]
 pub(crate) struct Directory {
     pub(crate) users: Vec<Object<UserSpec>>,
-    pub(crate) credentials: Vec<Object<CredentialSpec>>,
+    pub(crate) credentials: Vec<CredentialObject>,
     pub(crate) invitations: Vec<Object<InvitationSpec>>,
     pub(crate) grants: Vec<Object<GrantSpec>>,
     pub(crate) unreadable: Vec<UnreadableView>,
@@ -147,7 +152,7 @@ pub(crate) struct Directory {
 
 /// Objects that do not decode (made by hand, from another version) are left out: one bad object
 /// must not hide everyone else.
-fn decode<S: for<'de> Deserialize<'de>>(objects: Vec<DynamicObject>) -> Vec<Object<S>> {
+fn decode<O: for<'de> Deserialize<'de>>(objects: Vec<DynamicObject>) -> Vec<O> {
     objects
         .into_iter()
         .filter_map(|object| serde_json::to_value(object).ok())
@@ -157,16 +162,16 @@ fn decode<S: for<'de> Deserialize<'de>>(objects: Vec<DynamicObject>) -> Vec<Obje
 
 /// What reading one kind gave: its objects, nothing because the API is not installed, or a
 /// refusal.
-pub(crate) enum Read<S> {
-    Objects(Vec<Object<S>>),
+pub(crate) enum Read<O> {
+    Objects(Vec<O>),
     NotInstalled,
 }
 
-pub(crate) async fn read<S: for<'de> Deserialize<'de>>(
+pub(crate) async fn read<O: for<'de> Deserialize<'de>>(
     cluster: &dyn Cluster,
     namespace: &str,
     kind: IdentityKind,
-) -> Result<Read<S>, ClusterError> {
+) -> Result<Read<O>, ClusterError> {
     Ok(cluster
         .list_objects(&kind.resource(), Some(namespace))
         .await?
@@ -183,11 +188,11 @@ pub(crate) fn read_error(error: ClusterError, namespace: &str, kind: IdentityKin
 }
 
 /// The objects of a kind that only adds to the answer; a refusal is named in `unreadable`.
-fn optional<S>(
-    read: Result<Read<S>, ClusterError>,
+fn optional<O>(
+    read: Result<Read<O>, ClusterError>,
     kind: IdentityKind,
     unreadable: &mut Vec<UnreadableView>,
-) -> Vec<Object<S>> {
+) -> Vec<O> {
     match read {
         Ok(Read::Objects(objects)) => objects,
         Ok(Read::NotInstalled) => Vec::new(),
@@ -209,10 +214,10 @@ impl Directory {
         namespace: &str,
     ) -> Result<Option<Self>, ApiError> {
         let (users, credentials, invitations, grants) = futures_util::join!(
-            read::<UserSpec>(cluster, namespace, IdentityKind::User),
-            read::<CredentialSpec>(cluster, namespace, IdentityKind::Credential),
-            read::<InvitationSpec>(cluster, namespace, IdentityKind::Invitation),
-            read::<GrantSpec>(cluster, namespace, IdentityKind::Grant),
+            read::<Object<UserSpec>>(cluster, namespace, IdentityKind::User),
+            read::<CredentialObject>(cluster, namespace, IdentityKind::Credential),
+            read::<Object<InvitationSpec>>(cluster, namespace, IdentityKind::Invitation),
+            read::<Object<GrantSpec>>(cluster, namespace, IdentityKind::Grant),
         );
         let users = match users.map_err(|e| read_error(e, namespace, IdentityKind::User))? {
             Read::Objects(users) => users,
@@ -269,12 +274,16 @@ impl Directory {
                 credential.name(),
             );
             let last_used_at = credential
-                .annotation(LAST_USED_ANNOTATION)
-                .map(str::to_owned);
+                .status
+                .last_used_at
+                .and_then(|secs| Timestamp::from_second(secs).ok())
+                .map(|t| t.to_string());
             if credential.spec.kind == "Passkey" {
                 let passkey = credential.spec.passkey.clone().unwrap_or_default();
                 let label = credential
-                    .annotation(LABEL_ANNOTATION)
+                    .status
+                    .label
+                    .as_deref()
                     .map(str::trim)
                     .filter(|l| !l.is_empty())
                     .map(str::to_owned)
@@ -647,7 +656,7 @@ mod tests {
 
     use super::*;
 
-    fn object<S: for<'de> Deserialize<'de>>(value: Value) -> Object<S> {
+    fn object<O: for<'de> Deserialize<'de>>(value: Value) -> O {
         serde_json::from_value(value).unwrap()
     }
 
@@ -659,14 +668,10 @@ mod tests {
         }))
     }
 
-    fn passkey(
-        name: &str,
-        user: &str,
-        created: &str,
-        annotations: &Value,
-    ) -> Object<CredentialSpec> {
+    fn passkey(name: &str, user: &str, created: &str, status: &Value) -> CredentialObject {
         object(json!({
-            "metadata": {"name": name, "creationTimestamp": created, "annotations": annotations},
+            "metadata": {"name": name, "creationTimestamp": created},
+            "status": status,
             "spec": {"user": user, "type": "Passkey",
                      "passkey": {"credentialId": "abc", "record": "{}", "label": "MacBook"}}
         }))
@@ -681,7 +686,7 @@ mod tests {
                     "c-1",
                     "ada",
                     "2026-10-01T00:00:00Z",
-                    &json!({LABEL_ANNOTATION: "Phone", LAST_USED_ANNOTATION: "2026-10-20T08:00:00Z"}),
+                    &json!({"label": "Phone", "lastUsedAt": 1_792_483_200}),
                 ),
                 object(json!({
                     "metadata": {"name": "c-3", "creationTimestamp": "2026-10-03T00:00:00Z"},

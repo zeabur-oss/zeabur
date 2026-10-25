@@ -36,12 +36,10 @@
 //!
 //! # Labels and last use
 //!
-//! A `Credential`'s `spec` is immutable, so a passkey renamed after enrolment (at Zeabur
-//! Identity) keeps its new name in the annotation `identity.zeabur.com/label`, which wins over
-//! `spec.passkey.label`. When
-//! Zeabur Identity records a credential's last sign-in it is the annotation
-//! `identity.zeabur.com/last-used-at` (RFC 3339); a member's last sign-in is the latest of those
-//! and of their grants' `authTime`.
+//! A `Credential`'s `spec` is immutable. Zeabur Identity keeps the name given after enrolment in
+//! `status.label`, which takes the place of `spec.passkey.label`. It keeps the last passkey
+//! sign-in in `status.lastUsedAt` (Unix seconds). A member's last sign-in is the latest of
+//! those times and of their grants' `authTime`.
 //!
 //! [k8s-rbac-names]: https://kubernetes.io/docs/reference/access-authn-authz/rbac/#referring-to-resources
 
@@ -69,10 +67,6 @@ pub const API_VERSION: &str = "identity.zeabur.com/v1alpha1";
 pub const DEFAULT_NAMESPACE: &str = "zeabur-identity";
 /// Label naming the `User` an invitation, credential or grant belongs to.
 pub const USER_LABEL: &str = "identity.zeabur.com/user";
-/// Annotation holding a passkey's name chosen after enrolment.
-pub const LABEL_ANNOTATION: &str = "identity.zeabur.com/label";
-/// Annotation holding when a credential last signed in, RFC 3339.
-pub const LAST_USED_ANNOTATION: &str = "identity.zeabur.com/last-used-at";
 /// Annotation holding an invitation's expiry, Unix seconds.
 pub const EXPIRES_AT_ANNOTATION: &str = "identity.zeabur.com/expires-at";
 /// Label selecting expiring objects for Zeabur Identity's garbage collector: the expiry hour.

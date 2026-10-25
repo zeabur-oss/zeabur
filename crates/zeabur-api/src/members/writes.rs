@@ -115,11 +115,11 @@ async fn send(
 }
 
 /// Deletes one object that is still the one read (its `uid`); one already gone is fine.
-pub(crate) async fn delete<S: Sync>(
+pub(crate) async fn delete<S: Sync, T: Sync>(
     cluster: &dyn Cluster,
     kind: IdentityKind,
     namespace: &str,
-    object: &Object<S>,
+    object: &Object<S, T>,
 ) -> Result<(), ApiError> {
     let body = WriteBody::Delete(Preconditions {
         uid: object.metadata.uid.clone(),
