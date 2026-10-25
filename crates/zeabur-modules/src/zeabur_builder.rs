@@ -52,8 +52,19 @@ pub struct ZeaburBuilderBuild {
     /// The repository it pushes to, without tag or digest; unknown until the first image when
     /// the controller's default registry is used.
     pub repository: Option<String>,
-    /// The Git repository.
+    /// The Git repository; none for an uploaded folder.
     pub git_url: Option<String>,
+    /// Built from an uploaded folder (`spec.source.archive`) instead of a Git ref.
+    pub archive: bool,
+    /// The uploaded folder's manifest digest, once it is named.
+    pub archive_digest: Option<String>,
+    /// An uploaded folder not yet named: the `Build` waits for its upload.
+    pub awaiting_upload: bool,
+    /// The upload token request the controller last answered
+    /// (`status.uploadToken.request`).
+    pub upload_request: Option<String>,
+    /// When that upload token expires.
+    pub upload_expires: Option<String>,
     /// The branch or tag it follows; `HEAD` (or none) follows the repository's default branch.
     pub git_ref: Option<String>,
     /// The ref the newest commit came from, such as `refs/heads/master`, when the controller
@@ -61,7 +72,7 @@ pub struct ZeaburBuilderBuild {
     pub resolved_ref: Option<String>,
     /// The Secret it reads the repository's credentials from.
     pub credentials: Option<String>,
-    /// The build context inside the repository; none for its root.
+    /// The build context inside the repository or folder; none for its root.
     pub context_dir: Option<String>,
     /// The Dockerfile, relative to the context; none for `Dockerfile`.
     pub dockerfile: Option<String>,
@@ -143,11 +154,20 @@ pub struct ZeaburBuilderProblem {
 /// How long a `ResolveFailed` may last before it counts as a failure.
 pub const TRANSIENT: SignedDuration = SignedDuration::from_mins(5);
 
+/// The reason of `SourceReady` while an uploaded folder has no digest yet.
+const WAITING_FOR_UPLOAD: &str = "WaitingForUpload";
+
+fn awaiting_upload(object: &DynamicObject) -> bool {
+    object.data.pointer("/spec/source/archive").is_some()
+        && object.data.pointer("/spec/source/archive/digest").is_none()
+}
+
 fn problem(object: &DynamicObject, now: Option<Timestamp>) -> Option<ZeaburBuilderProblem> {
     ["SourceReady", "BuilderReady"]
         .into_iter()
         .find_map(|kind| {
-            let found = condition(object, kind).filter(|c| c["status"] == "False")?;
+            let found = condition(object, kind)
+                .filter(|c| c["status"] == "False" && c["reason"] != WAITING_FOR_UPLOAD)?;
             let reason = field(Some(found), "reason");
             let since = field(Some(found), "lastTransitionTime");
             let lasting = reason.as_deref() != Some("ResolveFailed")
@@ -242,8 +262,15 @@ pub fn builds(objects: &[DynamicObject], now: Option<Timestamp>) -> Vec<ZeaburBu
                 git_ref: text(b, "/spec/source/git/ref"),
                 resolved_ref: text(b, "/status/resolvedRef"),
                 credentials: text(b, "/spec/source/credentialsRef/name"),
-                context_dir: text(b, "/spec/source/git/contextDir"),
-                dockerfile: text(b, "/spec/source/git/dockerfile"),
+                archive: b.data.pointer("/spec/source/archive").is_some(),
+                archive_digest: text(b, "/spec/source/archive/digest"),
+                awaiting_upload: awaiting_upload(b),
+                upload_request: text(b, "/status/uploadToken/request"),
+                upload_expires: text(b, "/status/uploadToken/expiresAt"),
+                context_dir: text(b, "/spec/source/git/contextDir")
+                    .or_else(|| text(b, "/spec/source/archive/contextDir")),
+                dockerfile: text(b, "/spec/source/git/dockerfile")
+                    .or_else(|| text(b, "/spec/source/archive/dockerfile")),
                 env: env(b),
                 builder: text(b, "/spec/builderRef"),
                 suspended: b
@@ -323,6 +350,8 @@ pub const BUILD_FAILED: &str = "BuildFailed";
 /// [`ZeaburBuilderProblem`], such as a branch that does not exist or a deploy key the host
 /// refuses.
 ///
+/// A `Build` that waits for its folder to be uploaded has not failed.
+///
 /// Before the first image the service is building, not failing to pull an image that does not
 /// exist, or it has failed with [`BUILD_FAILED`]; its diagnoses go, since the missing image and
 /// the replicas it leaves unready both come from the build. After it, a failed build fails a
@@ -354,6 +383,7 @@ pub fn built_image(
     });
     let failed = newest.is_some_and(|run| run.phase.as_deref() == Some("Failed"))
         || (!running
+            && !build.awaiting_upload
             && (build.ready.as_deref() == Some("False")
                 || build.problem.as_ref().is_some_and(|p| p.lasting)));
     let build_failed = |word| zeabur_model::ServiceStatus {
@@ -436,6 +466,25 @@ mod tests {
                 .unwrap()
                 .contains("production")
         );
+    }
+
+    #[test]
+    fn a_build_waiting_for_its_folder_has_not_failed() {
+        let build = object(serde_json::json!({
+            "apiVersion": "builder.zeabur.com/v1alpha1", "kind": "Build",
+            "metadata": {"name": "site", "namespace": "demo"},
+            "spec": {"builderRef": "railpack", "source": {"archive": {}},
+                "output": {"image": "zot:5000/demo/site"}},
+            "status": {"uploadToken": {"request": "u1", "secretName": "site-upload",
+                    "expiresAt": "2026-10-23T08:15:00Z"},
+                "conditions": [
+                    {"type": "SourceReady", "status": "False", "reason": "WaitingForUpload"},
+                    {"type": "Ready", "status": "False", "reason": "SourceNotReady"}]}
+        }));
+        let found = builds(&[build], None);
+        assert!(found[0].archive && found[0].awaiting_upload);
+        assert_eq!(found[0].upload_request.as_deref(), Some("u1"));
+        assert!(found[0].problem.is_none());
     }
 
     #[test]

@@ -102,6 +102,8 @@ pub(crate) async fn compute(
         | Change::Probe { .. }
         | Change::Image { .. }
         | Change::Rebuild { .. }
+        | Change::UploadToken { .. }
+        | Change::ArchiveDigest { .. }
         | Change::BuildOptions(_)
         | Change::AutoUpdate { .. }
         | Change::Scale { .. }

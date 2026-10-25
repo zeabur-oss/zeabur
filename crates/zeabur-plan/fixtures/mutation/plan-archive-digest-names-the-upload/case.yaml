@@ -1,0 +1,6 @@
+description: "Naming a digest sets the archive's digest, which builds the upload; the second upload replaces the first."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - {op: archiveDigest, build: site, digest: "sha256:2222222222222222222222222222222222222222222222222222222222222222"}

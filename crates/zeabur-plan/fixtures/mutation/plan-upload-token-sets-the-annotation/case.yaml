@@ -1,0 +1,6 @@
+description: "Asking for an upload token sets the Build's upload-token-request annotation to the client's value."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - {op: uploadToken, build: site, request: u1}

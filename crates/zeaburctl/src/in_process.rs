@@ -54,10 +54,55 @@ impl InProcess {
 
     /// `GET` `path_and_query`: the JSON of a success, or the problem the API answered with.
     pub(crate) async fn get(&self, path_and_query: &str) -> Result<Value, Value> {
-        let request = Request::builder()
-            .method(Method::GET)
-            .uri(path_and_query)
-            .body(Body::empty())
+        self.send(Method::GET, path_and_query, None, Body::empty())
+            .await
+    }
+
+    /// `POST` `body` as JSON to `path_and_query`.
+    pub(crate) async fn post(&self, path_and_query: &str, body: &Value) -> Result<Value, Value> {
+        let bytes = serde_json::to_vec(body)
+            .map_err(|e| internal(&format!("The request is not JSON: {e}")))?;
+        self.send(
+            Method::POST,
+            path_and_query,
+            Some(("application/json", bytes.len())),
+            Body::from(bytes),
+        )
+        .await
+    }
+
+    /// `POST` `bytes` to `path_and_query` as `content_type`.
+    pub(crate) async fn post_bytes(
+        &self,
+        path_and_query: &str,
+        content_type: &str,
+        bytes: Vec<u8>,
+    ) -> Result<Value, Value> {
+        let length = bytes.len();
+        self.send(
+            Method::POST,
+            path_and_query,
+            Some((content_type, length)),
+            Body::from(bytes),
+        )
+        .await
+    }
+
+    async fn send(
+        &self,
+        method: Method,
+        path_and_query: &str,
+        content: Option<(&str, usize)>,
+        body: Body,
+    ) -> Result<Value, Value> {
+        let mut request = Request::builder().method(method).uri(path_and_query);
+        if let Some((content_type, length)) = content {
+            request = request
+                .header("content-type", content_type)
+                .header("content-length", length);
+        }
+        let request = request
+            .body(body)
             .map_err(|e| internal(&format!("{path_and_query} is not a request path: {e}")))?;
         let Ok(response) = self.router.clone().oneshot(request).await;
         let success = response.status().is_success();

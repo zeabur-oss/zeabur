@@ -211,6 +211,25 @@ pub enum Change {
         /// The `Build`.
         build: String,
     },
+    /// Ask a Zeabur Builder `Build` with an uploaded-folder source for a token that pushes the
+    /// folder (see the `builds` module).
+    #[serde(rename_all = "camelCase")]
+    UploadToken {
+        /// The `Build`.
+        build: String,
+        /// A value the `Build` has not been asked with before; the controller answers it in
+        /// `status.uploadToken.request`.
+        request: String,
+    },
+    /// Build the folder at `digest` for a `Build` with an uploaded-folder source (see the
+    /// `builds` module).
+    #[serde(rename_all = "camelCase")]
+    ArchiveDigest {
+        /// The `Build`.
+        build: String,
+        /// The manifest digest of the pushed folder, `sha256:` and 64 hexadecimal digits.
+        digest: String,
+    },
     /// Set what a Zeabur Builder `Build` builds: its directory, its Dockerfile and its build
     /// variables (see the `builds` module).
     BuildOptions(BuildOptionsChange),

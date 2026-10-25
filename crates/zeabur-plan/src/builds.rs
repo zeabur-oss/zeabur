@@ -5,6 +5,11 @@
 //!   template change.
 //! - **Building again** sets the `Build`'s `builder.zeabur.com/rebuild` annotation to the time of
 //!   the plan; the controller builds the ref's current commit when the value is new.
+//! - **Uploading a folder** to a `Build` with an `archive` source takes two plans. Asking for an
+//!   upload token sets the `builder.zeabur.com/upload-token-request` annotation to a value the
+//!   client chooses; the controller answers in `status.uploadToken` and writes the token to a
+//!   Secret. After the client has pushed the folder, naming its digest sets
+//!   `spec.source.archive.digest`, which builds it.
 //! - **Updating automatically** adds `keel.sh/policy: force` to the workload's own metadata, so
 //!   Keel moves it to whatever tag it is told of, and adds a `keel` target to the `Build`'s
 //!   `spec.notify`, so the controller tells Keel of each image it pushes. Turning it off removes
@@ -34,11 +39,23 @@ pub const BUILDER_GROUP: &str = "builder.zeabur.com";
 pub const BUILDER_VERSION: &str = "v1alpha1";
 /// The annotation whose new value builds a `Build` again.
 pub const REBUILD: &str = "builder.zeabur.com/rebuild";
+/// The annotation whose new value asks for a token to upload an archive.
+pub const UPLOAD_TOKEN_REQUEST: &str = "builder.zeabur.com/upload-token-request";
 /// The workload annotation that has Keel update it, and to which tags.
 pub const KEEL_POLICY: &str = "keel.sh/policy";
 /// The policy Zeabur sets: any new tag of the image, since the builder's tags are not
 /// versions.
 pub const KEEL_FORCE: &str = "force";
+
+/// Longest upload token request the controller answers.
+const MAX_UPLOAD_REQUEST: usize = 63;
+
+/// Whether `digest` is a SHA-256 digest in the form the `Build` takes.
+fn archive_digest_valid(digest: &str) -> bool {
+    digest.strip_prefix("sha256:").is_some_and(|hex| {
+        hex.len() == 64 && hex.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f'))
+    })
+}
 
 /// Most build variables a `Build` takes.
 const MAX_BUILD_ENV: usize = 128;
@@ -156,6 +173,94 @@ impl Planner<'_> {
         let operations = current.pointer(&path).cloned().map_or_else(
             || set_key(&current, "annotations", REBUILD, now),
             |before| vec![test(&path, before), replace(&path, json!(now))],
+        );
+        self.patch(index, operations)
+    }
+
+    /// The `Build` named `name` must take its source from an uploaded archive.
+    fn archive_build(&mut self, name: &str) -> Result<usize, PlanError> {
+        let index = self.build(name)?;
+        if self
+            .current(index)
+            .pointer("/spec/source/archive")
+            .is_none()
+        {
+            return Err(error(
+                ErrorKind::BadRequest,
+                "not_an_upload",
+                format!("Build {name} does not build an uploaded folder."),
+            ));
+        }
+        Ok(index)
+    }
+
+    pub(crate) fn upload_token(&mut self, name: &str, request: &str) -> Result<(), PlanError> {
+        if request.is_empty()
+            || request.len() > MAX_UPLOAD_REQUEST
+            || !request
+                .bytes()
+                .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'_' | b'-'))
+        {
+            return Err(error(
+                ErrorKind::BadRequest,
+                "invalid_request",
+                "The upload request must be 1 to 63 letters, digits, dots, dashes or underscores.",
+            ));
+        }
+        let index = self.archive_build(name)?;
+        let path = pointer(&["metadata", "annotations", UPLOAD_TOKEN_REQUEST]);
+        let current = self.current(index);
+        let before = current.pointer(&path).cloned();
+        if before.as_ref().and_then(Value::as_str) == Some(request) {
+            return Err(error(
+                ErrorKind::BadRequest,
+                "unchanged",
+                format!("Build {name} was already asked for this upload."),
+            ));
+        }
+        self.claim(
+            index,
+            &steps("annotations", UPLOAD_TOKEN_REQUEST),
+            &shown("annotations", UPLOAD_TOKEN_REQUEST),
+        )?;
+        let operations = before.map_or_else(
+            || set_key(&current, "annotations", UPLOAD_TOKEN_REQUEST, request),
+            |before| vec![test(&path, before), replace(&path, json!(request))],
+        );
+        self.patch(index, operations)
+    }
+
+    pub(crate) fn archive_digest(&mut self, name: &str, digest: &str) -> Result<(), PlanError> {
+        if !archive_digest_valid(digest) {
+            return Err(error(
+                ErrorKind::BadRequest,
+                "invalid_digest",
+                "The digest must be sha256: and 64 lower-case hexadecimal digits.",
+            ));
+        }
+        let index = self.archive_build(name)?;
+        let path = pointer(&["spec", "source", "archive", "digest"]);
+        let before = self.current(index).pointer(&path).cloned();
+        if before.as_ref().and_then(Value::as_str) == Some(digest) {
+            return Err(error(
+                ErrorKind::BadRequest,
+                "unchanged",
+                format!("Build {name} already builds this upload."),
+            ));
+        }
+        self.claim(
+            index,
+            &[
+                Step::field("spec"),
+                Step::field("source"),
+                Step::field("archive"),
+                Step::field("digest"),
+            ],
+            "spec.source.archive.digest",
+        )?;
+        let operations = before.map_or_else(
+            || vec![add(&path, json!(digest))],
+            |before| vec![test(&path, before), replace(&path, json!(digest))],
         );
         self.patch(index, operations)
     }
@@ -334,14 +439,24 @@ impl Planner<'_> {
         Ok(())
     }
 
-    /// Sets `spec.source.git.<field>` to `value`, or removes it when `value` is empty.
+    /// Sets `spec.source.git.<field>` (`archive` for an uploaded folder) to `value`, or removes it
+    /// when `value` is empty.
     fn build_path_field(
         &mut self,
         index: usize,
         field: &str,
         value: &str,
     ) -> Result<(), PlanError> {
-        let path = pointer(&["spec", "source", "git", field]);
+        let source = if self
+            .current(index)
+            .pointer("/spec/source/archive")
+            .is_some()
+        {
+            "archive"
+        } else {
+            "git"
+        };
+        let path = pointer(&["spec", "source", source, field]);
         let before = self.current(index).pointer(&path).cloned();
         let operations = match before {
             Some(before) if before.as_str() == Some(value) => return Ok(()),
@@ -355,10 +470,10 @@ impl Planner<'_> {
             &[
                 Step::field("spec"),
                 Step::field("source"),
-                Step::field("git"),
+                Step::field(source),
                 Step::field(field),
             ],
-            &format!("spec.source.git.{field}"),
+            &format!("spec.source.{source}.{field}"),
         )?;
         self.patch(index, operations)
     }

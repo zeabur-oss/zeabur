@@ -1665,6 +1665,75 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/Problem"
+  "/api/v1/projects/{project}/builds/{build}/source":
+    post:
+      tags:
+      - projects
+      summary: >-
+        Pushes the request's body, a gzip tar of the folder, as the `Build`'s next
+        source.
+      description: |-
+        `Content-Length` is the size, at most 256 MiB. `request` is the value of the `uploadToken`
+        change the controller has answered; the upload goes to the registry the token names.
+      operationId: uploadBuildSource
+      parameters:
+      - name: project
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: build
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: request
+        in: query
+        description: The upload token request the Build has answered
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/gzip:
+            schema:
+              type: array
+              items:
+                type: integer
+                format: int32
+                minimum: 0
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UploadedSource"
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "503":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
   "/api/v1/projects/{project}/certificates/{secret}":
     get:
       tags:
@@ -5729,6 +5798,46 @@ components:
             type: string
             enum:
             - rebuild
+      - type: object
+        description: |-
+          Ask a Zeabur Builder `Build` with an uploaded-folder source for a token that pushes the
+          folder (see the `builds` module).
+        required:
+        - build
+        - request
+        - op
+        properties:
+          build:
+            type: string
+            description: The `Build`.
+          op:
+            type: string
+            enum:
+            - uploadToken
+          request:
+            type: string
+            description: |-
+              A value the `Build` has not been asked with before; the controller answers it in
+              `status.uploadToken.request`.
+      - type: object
+        description: |-
+          Build the folder at `digest` for a `Build` with an uploaded-folder source (see the
+          `builds` module).
+        required:
+        - build
+        - digest
+        - op
+        properties:
+          build:
+            type: string
+            description: The `Build`.
+          digest:
+            type: string
+            description: The manifest digest of the pushed folder, `sha256:` and 64 hexadecimal digits.
+          op:
+            type: string
+            enum:
+            - archiveDigest
       - allOf:
         - $ref: "#/components/schemas/BuildOptionsChange"
           description: |-
@@ -17164,6 +17273,29 @@ components:
           items:
             type: string
           description: Nodes system-upgrade-controller is upgrading now.
+    UploadedSource:
+      type: object
+      description: The folder as pushed.
+      required:
+      - origin
+      - digest
+      - tag
+      - size
+      properties:
+        digest:
+          type: string
+          description: The artifact's manifest digest, for the `archiveDigest` change.
+        origin:
+          $ref: "#/components/schemas/Origin"
+          description: The `Build`.
+        size:
+          type: integer
+          format: int64
+          description: The compressed size.
+          minimum: 0
+        tag:
+          type: string
+          description: The tag it was pushed under.
     UsageTotals:
       type: object
       description: Every namespace together.
@@ -17960,10 +18092,23 @@ components:
       description: A `Build`.
       required:
       - name
+      - archive
+      - awaitingUpload
       - env
       - suspended
       - keelWebhooks
       properties:
+        archive:
+          type: boolean
+          description: Built from an uploaded folder (`spec.source.archive`) instead of a Git ref.
+        archiveDigest:
+          type:
+          - string
+          - "null"
+          description: The uploaded folder's manifest digest, once it is named.
+        awaitingUpload:
+          type: boolean
+          description: "An uploaded folder not yet named: the `Build` waits for its upload."
         builder:
           type:
           - string
@@ -17973,7 +18118,7 @@ components:
           type:
           - string
           - "null"
-          description: The build context inside the repository; none for its root.
+          description: The build context inside the repository or folder; none for its root.
         credentials:
           type:
           - string
@@ -18000,7 +18145,7 @@ components:
           type:
           - string
           - "null"
-          description: The Git repository.
+          description: The Git repository; none for an uploaded folder.
         keelWebhooks:
           type: array
           items:
@@ -18066,6 +18211,18 @@ components:
         suspended:
           type: boolean
           description: Whether builds are paused.
+        uploadExpires:
+          type:
+          - string
+          - "null"
+          description: When that upload token expires.
+        uploadRequest:
+          type:
+          - string
+          - "null"
+          description: |-
+            The upload token request the controller last answered
+            (`status.uploadToken.request`).
     ZeaburBuilderEnv:
       type: object
       description: A build variable of a `Build`.

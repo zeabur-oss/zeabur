@@ -39,7 +39,10 @@
 //! reading the storage classes (local-path, the default, and Longhorn) and the volumes behind
 //! claims.
 //!
-//! `ZEABUR_DEMO_KEEL=1` installs Keel, so a project offers Deploy from Git.
+//! `ZEABUR_DEMO_KEEL=1` installs Keel, so a project offers Deploy from Git and Upload a folder.
+//! A registry on 127.0.0.1 takes the uploaded folders, and a stand-in for Zeabur Builder's
+//! controller answers upload token requests and builds the digest named in a `Build` (a few
+//! seconds, then it is built).
 //!
 //! `ZEABUR_DEMO_GITHUB=1` starts a fake GitHub on 127.0.0.1, so Cluster → GitHub App goes through
 //! the manifest flow without leaving the demo. `ZEABUR_DEMO_GITHUB=installed` also makes the App
@@ -3908,6 +3911,213 @@ fn storage(s: &mut State) {
     s.dynamic.extend(volumes);
 }
 
+/// A registry that takes a folder pushed as an OCI artifact and keeps none of it.
+async fn fake_registry() -> std::io::Result<String> {
+    use axum::body::Body;
+    use axum::extract::Request;
+    use axum::http::{StatusCode, header};
+    use axum::response::{IntoResponse as _, Response};
+
+    let router = axum::Router::new().fallback(async |request: Request| {
+        let (parts, body) = request.into_parts();
+        let bytes = axum::body::to_bytes(body, usize::MAX)
+            .await
+            .unwrap_or_default();
+        let path = parts.uri.path();
+        match parts.method.as_str() {
+            "POST" | "PATCH" => Response::builder()
+                .status(StatusCode::ACCEPTED)
+                .header(
+                    header::LOCATION,
+                    format!(
+                        "{}/session",
+                        path.trim_end_matches("/session").trim_end_matches('/')
+                    ),
+                )
+                .body(Body::empty())
+                .unwrap_or_default(),
+            "PUT" => Response::builder()
+                .status(StatusCode::CREATED)
+                .header(
+                    "docker-content-digest",
+                    format!("sha256:{}", hex::encode(Sha256::digest(&bytes))),
+                )
+                .body(Body::empty())
+                .unwrap_or_default(),
+            _ => StatusCode::NOT_FOUND.into_response(),
+        }
+    });
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
+    let address = listener.local_addr()?.to_string();
+    tokio::spawn(async move { axum::serve(listener, router).await });
+    Ok(address)
+}
+
+const UPLOAD_TOKEN_REQUEST: &str = "builder.zeabur.com/upload-token-request";
+
+/// Zeabur Builder's controller as far as uploaded folders go: it answers a token request with the
+/// upload Secret, then runs a build for the digest the `Build` names.
+fn upload_controller(cluster: MemoryCluster, registry: String) {
+    tokio::spawn(async move {
+        loop {
+            tokio::time::sleep(std::time::Duration::from_millis(400)).await;
+            cluster.update(|s| answer_uploads(s, &registry));
+        }
+    });
+}
+
+/// Sets `status.<key>` of an object.
+fn set_status(object: &mut DynamicObject, key: &str, value: Value) {
+    if let Some(status) = object
+        .data
+        .as_object_mut()
+        .map(|data| data.entry("status").or_insert_with(|| json!({})))
+        .and_then(Value::as_object_mut)
+    {
+        status.insert(key.to_owned(), value);
+    }
+}
+
+/// The digest's first `len` hexadecimal digits, after `sha256:`.
+fn short_digest(digest: &str, len: usize) -> &str {
+    digest.get(7..7 + len).unwrap_or_default()
+}
+
+fn answer_uploads(s: &mut State, registry: &str) {
+    let now = Timestamp::now();
+    let mut secrets = Vec::new();
+    let mut runs = Vec::new();
+    for build in s
+        .dynamic
+        .iter_mut()
+        .filter(|o| o.types.as_ref().is_some_and(|t| t.kind == "Build"))
+    {
+        if build.data.pointer("/spec/source/archive").is_none() {
+            continue;
+        }
+        let name = build.metadata.name.clone().unwrap_or_default();
+        let namespace = build.metadata.namespace.clone().unwrap_or_default();
+        let asked = build
+            .metadata
+            .annotations
+            .as_ref()
+            .and_then(|a| a.get(UPLOAD_TOKEN_REQUEST))
+            .cloned();
+        let answered = build
+            .data
+            .pointer("/status/uploadToken/request")
+            .and_then(Value::as_str);
+        if let Some(request) = asked.filter(|r| Some(r.as_str()) != answered) {
+            let expires = now
+                .checked_add(SignedDuration::from_mins(15))
+                .unwrap_or(now)
+                .to_string();
+            set_status(
+                build,
+                "uploadToken",
+                json!({"request": request, "secretName": format!("{name}-upload"),
+                    "expiresAt": expires}),
+            );
+            let config = json!({"auths": {registry: {"registrytoken": "demo-token"}}});
+            secrets.push((
+                format!("{namespace}/{name}-upload"),
+                BTreeMap::from([
+                    ("token".to_owned(), b"demo-token".to_vec()),
+                    (
+                        ".dockerconfigjson".to_owned(),
+                        config.to_string().into_bytes(),
+                    ),
+                ]),
+            ));
+        }
+        let digest = build
+            .data
+            .pointer("/spec/source/archive/digest")
+            .and_then(Value::as_str);
+        if let Some(digest) = digest.filter(|d| {
+            build
+                .data
+                .pointer("/status/latestRevision")
+                .and_then(Value::as_str)
+                != Some(*d)
+        }) {
+            let digest = digest.to_owned();
+            set_status(build, "latestRevision", json!(digest));
+            runs.push(from::<DynamicObject>(json!({
+                "apiVersion": "builder.zeabur.com/v1alpha1", "kind": "BuildRun",
+                "metadata": {"name": format!("{name}-{}", short_digest(&digest, 5)), "namespace": namespace,
+                    "creationTimestamp": now.to_string()},
+                "spec": {"buildRef": name, "revision": digest, "trigger": "manual"},
+                "status": {"phase": "Building", "startTime": now.to_string()}
+            })));
+        }
+    }
+    s.secret_values.extend(secrets);
+    s.dynamic.extend(runs);
+    finish_builds(s, now);
+}
+
+/// A run that has been building for eight seconds succeeds, and its `Build` has an image.
+fn finish_builds(s: &mut State, now: Timestamp) {
+    let mut images = Vec::new();
+    for run in s
+        .dynamic
+        .iter_mut()
+        .filter(|o| o.types.as_ref().is_some_and(|t| t.kind == "BuildRun"))
+    {
+        let started = run
+            .data
+            .pointer("/status/startTime")
+            .and_then(Value::as_str)
+            .and_then(|t| t.parse::<Timestamp>().ok());
+        let building =
+            run.data.pointer("/status/phase").and_then(Value::as_str) == Some("Building");
+        let late = started.is_some_and(|t| now.duration_since(t) >= SignedDuration::from_secs(8));
+        if building && late {
+            let digest = run
+                .data
+                .pointer("/spec/revision")
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .to_owned();
+            set_status(run, "phase", json!("Succeeded"));
+            set_status(run, "completionTime", json!(now.to_string()));
+            set_status(run, "imageDigest", json!(digest));
+            images.push((
+                run.metadata.namespace.clone().unwrap_or_default(),
+                run.data
+                    .pointer("/spec/buildRef")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default()
+                    .to_owned(),
+                digest,
+            ));
+        }
+    }
+    for (namespace, name, digest) in images {
+        for build in s.dynamic.iter_mut().filter(|o| {
+            o.types.as_ref().is_some_and(|t| t.kind == "Build")
+                && o.metadata.name.as_deref() == Some(&name)
+                && o.metadata.namespace.as_deref() == Some(&namespace)
+        }) {
+            let repository = build
+                .data
+                .pointer("/spec/output/image")
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .to_owned();
+            let image = format!("{repository}:archive-{}@{digest}", short_digest(&digest, 7));
+            set_status(build, "latestImage", json!(image));
+            set_status(
+                build,
+                "conditions",
+                json!([{"type": "SourceReady", "status": "True", "reason": "Archive"},
+                    {"type": "Ready", "status": "True", "reason": "Succeeded"}]),
+            );
+        }
+    }
+}
+
 fn kubelet(cluster: MemoryCluster) {
     tokio::spawn(async move {
         loop {
@@ -4281,6 +4491,7 @@ async fn main() -> std::io::Result<()> {
         Err(_) => None,
     };
     kubelet(cluster.clone());
+    upload_controller(cluster.clone(), fake_registry().await?);
     if !matches!(velero_mode().as_str(), "none" | "location") {
         backup_store(cluster.clone()).await?;
     }

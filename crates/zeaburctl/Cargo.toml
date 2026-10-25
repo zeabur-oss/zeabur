@@ -24,8 +24,12 @@ clap.workspace = true
 serde.workspace = true
 serde-saphyr.workspace = true
 serde_json.workspace = true
+flate2.workspace = true
+regex.workspace = true
+tar.workspace = true
 tokio.workspace = true
 tower.workspace = true
 
 [dev-dependencies]
+tempfile.workspace = true
 zeabur-kube = { workspace = true, features = ["memory"] }

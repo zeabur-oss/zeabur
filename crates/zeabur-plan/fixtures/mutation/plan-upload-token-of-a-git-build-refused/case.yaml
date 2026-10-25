@@ -1,0 +1,6 @@
+description: "A Build that follows a Git ref has no upload; the plan refuses to ask for a token."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - {op: uploadToken, build: web, request: u1}

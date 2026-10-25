@@ -1,0 +1,12 @@
+apiVersion: builder.zeabur.com/v1alpha1
+kind: Build
+metadata:
+  name: site
+  namespace: demo
+  resourceVersion: "7"
+  generation: 1
+spec:
+  source:
+    archive:
+      digest: "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+  builderRef: railpack

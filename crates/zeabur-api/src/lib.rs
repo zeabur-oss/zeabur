@@ -42,6 +42,7 @@
 //! | `GET /api/v1/projects/{p}/usage` | what each pod uses now, from metrics-server |
 //! | `GET /api/v1/projects/{p}/volumes` | how full each claim's volume is, from the kubelets |
 //! | `GET /api/v1/projects/{p}/builds` | its Zeabur Builder builds and their runs, with each run's pod |
+//! | `POST /api/v1/projects/{p}/builds/{b}/source` | pushes an uploaded folder (a gzip tar, up to 256 MiB) to the registry for a Build that builds one, and answers the digest to name in it; the plan (`uploadToken`, then `archiveDigest`) is the write |
 //! | `GET /api/v1/projects/{p}/notifications` | where the project's alerts go: its channels and the events each receives, or that alerting is not installed |
 //! | `POST /api/v1/projects/{p}/notifications/plan` | what adding, changing, testing or removing a channel writes, and a token; writes nothing and never shows a secret |
 //! | `POST /api/v1/projects/{p}/notifications/apply` | carries out that plan by its token |
@@ -306,6 +307,7 @@ fn remaining_routes(router: OpenApiRouter<AppState>) -> OpenApiRouter<AppState> 
         .routes(routes!(projects::database_export::export))
         .routes(routes!(projects::volume_restores::get))
         .routes(routes!(projects::builds::get))
+        .routes(routes!(projects::source_upload::upload))
         .routes(routes!(projects::deploy_keys::create))
         .routes(routes!(cluster::github_app::project))
         .routes(routes!(images::inspect))
@@ -602,6 +604,10 @@ fn build_with(
         tools: Arc::new(tools::Sessions::default()),
         sign_in,
         log_proxy,
+        pusher: Arc::new(projects::oci_push::Pusher::new(
+            reach,
+            trusted_ca.as_deref(),
+        )),
         store: Arc::new(cluster::object_store::Fetcher::new(
             images.reach(),
             trusted_ca.as_deref(),

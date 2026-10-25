@@ -1,0 +1,10 @@
+{
+  "objects": [
+    {
+      "target": {"kind": "Build", "name": "site"},
+      "changes": [
+        {"after": "u1", "path": "metadata.annotations.builder.zeabur.com/upload-token-request"}
+      ]
+    }
+  ]
+}

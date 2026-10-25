@@ -1,0 +1,6 @@
+description: "A digest other than sha256 and 64 hexadecimal digits is refused before the Build is read."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - {op: archiveDigest, build: site, digest: "sha256:abc"}

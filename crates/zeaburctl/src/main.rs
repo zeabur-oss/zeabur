@@ -5,7 +5,9 @@
 mod doctor;
 mod in_process;
 mod output;
+mod pack;
 mod ui;
+mod up;
 
 use std::process::ExitCode;
 
@@ -30,6 +32,11 @@ enum Command {
     /// all is well, 1 for a warning, 2 for something critical, 3 when the cluster cannot be
     /// reached or a check cannot run. An invalid command line also exits 2.
     Doctor(doctor::DoctorArgs),
+    /// Upload a folder to a service that builds one, and build it.
+    ///
+    /// The files `.gitignore` and `.dockerignore` leave out are not sent. The service is made with
+    /// "Upload a folder" in the web interface.
+    Up(up::UpArgs),
 }
 
 fn main() -> ExitCode {
@@ -41,5 +48,6 @@ fn main() -> ExitCode {
     match args.command {
         Command::Ui(ui_args) => ui::run(&ui_args),
         Command::Doctor(doctor_args) => doctor::run(&doctor_args),
+        Command::Up(up_args) => up::run(&up_args),
     }
 }

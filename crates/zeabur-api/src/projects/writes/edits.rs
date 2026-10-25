@@ -22,6 +22,8 @@ pub(super) async fn edited_objects(
     for change in &request.changes {
         let (resource, name) =
             if let Change::Rebuild { build }
+            | Change::UploadToken { build, .. }
+            | Change::ArchiveDigest { build, .. }
             | Change::BuildOptions(zeabur_plan::BuildOptionsChange { build, .. })
             | Change::AutoUpdate {
                 build: Some(build),

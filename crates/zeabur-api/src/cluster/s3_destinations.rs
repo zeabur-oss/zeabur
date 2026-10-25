@@ -448,6 +448,8 @@ pub(crate) async fn open(
             | Change::ConfigReload { .. }
             | Change::Image { .. }
             | Change::Rebuild { .. }
+            | Change::UploadToken { .. }
+            | Change::ArchiveDigest { .. }
             | Change::BuildOptions(_)
             | Change::AutoUpdate { .. }
             | Change::Scale { .. }

@@ -27,6 +27,7 @@ bytes.workspace = true
 flate2.workspace = true
 form_urlencoded.workspace = true
 futures-util.workspace = true
+hex.workspace = true
 http-body-util.workspace = true
 # The registry client of `images`: the HTTPS stack kube-rs already ships.
 hyper-rustls.workspace = true
@@ -53,7 +54,6 @@ aws-lc-rs.workspace = true
 zeabur-kube = { workspace = true, features = ["memory"] }
 zeabur-test-support = { workspace = true, features = ["sandbox"] }
 zeabur-ui.workspace = true
-hex.workspace = true
 http-body-util.workspace = true
 tokio-tungstenite.workspace = true
 # YAML output of the OpenAPI document, for the committed copy only.

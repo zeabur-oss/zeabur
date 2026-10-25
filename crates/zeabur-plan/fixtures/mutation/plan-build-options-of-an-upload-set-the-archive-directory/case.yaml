@@ -1,0 +1,6 @@
+description: "An uploaded folder keeps its directory and Dockerfile under source.archive, not source.git."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - {op: buildOptions, build: site, contextDir: apps/site, dockerfile: Dockerfile.prod}

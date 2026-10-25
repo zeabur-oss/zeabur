@@ -1,0 +1,11 @@
+{
+  "objects": [
+    {
+      "target": {"kind": "Build", "name": "site"},
+      "changes": [
+        {"after": "apps/site", "path": "spec.source.archive.contextDir"},
+        {"after": "Dockerfile.prod", "path": "spec.source.archive.dockerfile"}
+      ]
+    }
+  ]
+}

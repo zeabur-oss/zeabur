@@ -35,6 +35,7 @@ mod releases;
 mod reloader;
 mod rollout;
 mod s3_destinations;
+mod source_upload;
 mod storage;
 mod templates;
 mod terminal;

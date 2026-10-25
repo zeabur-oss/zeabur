@@ -500,6 +500,8 @@ impl<'a> Planner<'a> {
                 image,
             } => self.image(workload, container.as_deref(), image),
             Change::Rebuild { build } => self.rebuild(build),
+            Change::UploadToken { build, request } => self.upload_token(build, request),
+            Change::ArchiveDigest { build, digest } => self.archive_digest(build, digest),
             Change::BuildOptions(change) => self.build_options(change),
             Change::AutoUpdate {
                 workload,
