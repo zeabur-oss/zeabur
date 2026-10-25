@@ -455,7 +455,8 @@ paths:
       - cluster
       summary: |-
         Starts GitHub's manifest flow: a `state` sealed for the person, valid for an hour, and the
-        page that sends the manifest to GitHub. Writes nothing.
+        page that sends the manifest to GitHub. Writes nothing. A person who may not write Builder's
+        Secret is refused here, before GitHub makes an App that Zeabur could not store.
       operationId: startGitHubAppManifest
       requestBody:
         content:
@@ -469,6 +470,11 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/GitHubManifest"
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
         "422":
           content:
             application/problem+json:

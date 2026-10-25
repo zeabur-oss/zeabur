@@ -40,7 +40,7 @@ pub struct AppState {
     pub log_proxy: Option<Arc<dyn crate::services::logs::LogProxy>>,
     /// Reads images' configurations from their registries (see [`crate::images`]).
     pub images: Arc<crate::images::Inspector>,
-    /// The client of GitHub's API (see [`crate::github`]); `None` when TLS could not be set up.
+    /// The client of GitHub's API; `None` when TLS could not be set up.
     pub github: Option<crate::images::https::Https>,
 }
 

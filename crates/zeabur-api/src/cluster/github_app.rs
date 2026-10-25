@@ -546,6 +546,15 @@ async fn listed(
         .collect())
 }
 
+/// The `state` GitHub sent back is expired, altered, or from another server.
+fn flow_problem() -> ApiError {
+    problem(
+        Kind::BadRequest,
+        "The link from GitHub expired, or it is not from this server. Start again from the \
+         cluster page.",
+    )
+}
+
 fn person_mismatch() -> ApiError {
     problem(
         Kind::Forbidden,
@@ -626,18 +635,33 @@ fn manifest_of(request: &GitHubManifestRequest) -> Value {
 }
 
 /// Starts GitHub's manifest flow: a `state` sealed for the person, valid for an hour, and the
-/// page that sends the manifest to GitHub. Writes nothing.
+/// page that sends the manifest to GitHub. Writes nothing. A person who may not write Builder's
+/// Secret is refused here, before GitHub makes an App that Zeabur could not store.
 #[utoipa::path(post, path = "/api/v1/cluster/github-app/manifest", tag = "cluster",
     operation_id = "startGitHubAppManifest", request_body = GitHubManifestRequest,
     responses((status = 200, body = GitHubManifest),
+              (status = 403, body = Problem, content_type = PROBLEM),
               (status = 422, body = Problem, content_type = PROBLEM)))]
 pub(crate) async fn manifest(
     State(state): State<AppState>,
+    Person(cluster): Person,
     Everyday(everyday): Everyday,
     Json(request): Json<GitHubManifestRequest>,
 ) -> Result<Json<GitHubManifest>, ApiError> {
     if let Some(why) = manifest_problem(&request, state.settings.public_host.as_deref()) {
         return Err(problem(Kind::Invalid, why));
+    }
+    let can_change = permission(cluster.as_ref(), "secrets")
+        .await
+        .and(permission(cluster.as_ref(), "configmaps").await);
+    if matches!(can_change, Permission::Denied) {
+        return Err(problem(
+            Kind::Forbidden,
+            format!(
+                "Only a cluster admin can set up the GitHub App: the cluster does not let you \
+                 create Secrets and ConfigMaps in {NAMESPACE}."
+            ),
+        ));
     }
     let identity = everyday
         .whoami()
@@ -767,10 +791,10 @@ pub(crate) async fn conversion(
     Everyday(everyday): Everyday,
     Json(request): Json<GitHubConversionRequest>,
 ) -> Result<Json<GitHubAppPlan>, ApiError> {
-    let opened: FlowState =
-        token::open_as(&*sealing(&state)?, STATE_PREFIX, &request.state).map_err(token_problem)?;
+    let opened: FlowState = token::open_as(&*sealing(&state)?, STATE_PREFIX, &request.state)
+        .map_err(|_error| flow_problem())?;
     if (state.clock)().as_second() >= opened.expires_at {
-        return Err(token_problem(TokenError::Expired));
+        return Err(flow_problem());
     }
     let identity = everyday
         .whoami()

@@ -331,6 +331,23 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn a_forged_state_does_not_spend_the_code() {
+        let (_cluster, app, fake) = setup().await;
+        let body = json!({"code": "good-code", "state": "ghs1.forged"});
+        let (status, refused) =
+            send(&app, "POST", &format!("{BASE}/conversion"), Some(&body)).await;
+        assert_eq!(status, StatusCode::BAD_REQUEST, "{refused}");
+        assert!(
+            refused["detail"].as_str().unwrap().contains("Start again"),
+            "{refused}"
+        );
+        assert!(
+            !fake.converted.load(Ordering::SeqCst),
+            "the code is not spent"
+        );
+    }
+
+    #[tokio::test]
     async fn a_grant_writes_builders_grants_and_what_each_project_may_build() {
         let (cluster, app, fake) = setup().await;
         made(&app, &fake).await;
@@ -391,6 +408,20 @@ mod tests {
             panic!("{grants:?}")
         };
         assert_eq!(ops[1]["value"], json!({"4242": "blog"}), "{ops}");
+    }
+
+    #[tokio::test]
+    async fn someone_who_may_not_write_builder_system_cannot_start_the_flow() {
+        let (cluster, app, _fake) = setup().await;
+        cluster.update(|s| {
+            s.forbidden_namespaces.insert("builder-system".to_owned());
+        });
+        let request = json!({"name": "Zeabur shop", "redirectUrl":
+            "https://zeabur.example.com/settings/github-app"});
+        let (status, refused) =
+            send(&app, "POST", &format!("{BASE}/manifest"), Some(&request)).await;
+        assert_eq!(status, StatusCode::FORBIDDEN, "{refused}");
+        assert!(refused.get("formUrl").is_none(), "{refused}");
     }
 
     #[tokio::test]

@@ -319,7 +319,8 @@ export interface paths {
     put?: never
     /**
      * Starts GitHub's manifest flow: a `state` sealed for the person, valid for an hour, and the
-     *     page that sends the manifest to GitHub. Writes nothing.
+     *     page that sends the manifest to GitHub. Writes nothing. A person who may not write Builder's
+     *     Secret is refused here, before GitHub makes an App that Zeabur could not store.
      */
     post: operations["startGitHubAppManifest"]
     delete?: never
@@ -10053,6 +10054,14 @@ export interface operations {
         }
         content: {
           "application/json": components["schemas"]["GitHubManifest"]
+        }
+      }
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
         }
       }
       422: {
