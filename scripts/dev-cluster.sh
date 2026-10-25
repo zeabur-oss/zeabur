@@ -461,13 +461,14 @@ EOF
   if helm -n builder-system status builder >/dev/null 2>&1; then
     kubectl apply --server-side -f "$builder_src/deploy/chart/crds/crds.yaml" >/dev/null
   fi
-  # No push credentials: zot takes anonymous pushes, and buildkitd trusts zot's CA, copied from
-  # zot-tls at install time.
+  # zot takes pushes only with a token that Builder signs with the key of zot-token-signer.
+  # buildkitd trusts zot's CA, copied from zot-tls at install time.
   helm upgrade --install builder "$builder_src/deploy/chart" -n builder-system --create-namespace \
     --set image.repository=zeabur-builder/builder --set image.tag="$tag" \
     --set jobImage.repository=zeabur-builder/builder-job --set jobImage.tag="$tag" \
     --set railpackImage.repository=zeabur-builder/builder-railpack --set railpackImage.tag="$tag" \
-    --set registry.host="$zot_host" --set registry.authPrefix= \
+    --set registry.host="$zot_host" \
+    --set registry.tokenKey.namespace=zot --set registry.tokenKey.secret=zot-token-signer \
     --set registry.caFrom.namespace=zot --set registry.caFrom.secret=zot-tls \
     --set registry.inCluster.namespace=zot \
     --set registry.inCluster.podLabels.app\\.kubernetes\\.io/name=zot \
