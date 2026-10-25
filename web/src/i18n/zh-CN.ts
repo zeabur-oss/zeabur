@@ -456,68 +456,6 @@ export const zhCN: Messages = {
   "clusterUsage.whatUsage": "Pod 的用量",
   "clusterUsage.whatPods": "每个 Namespace 的用量",
   "clusterUsage.whatProjects": "哪些 Namespace 是项目",
-  "join.add": "添加节点",
-  "join.title": "添加节点",
-  "join.body":
-    "新的 VM 会以工作节点加入这个集群。Zeabur 创建加入令牌，你再用它在 VM 上运行 Zeabur Installer。",
-  "join.unavailable.notRke2":
-    "只有用 Zeabur Installer（RKE2）安装的集群能在这里添加节点。请用安装这个集群的工具添加节点。",
-  "join.unavailable.noCaHash":
-    "Zeabur 读不到集群的 CA 证书（kube-system 中的 ConfigMap kube-root-ca.crt），加入令牌需要它。",
-  "join.before": "开始之前",
-  "join.role": "角色",
-  "join.worker": "工作节点",
-  "join.workerHint": "运行你的服务。控制平面留在现有的服务器上。",
-  "join.serverNote": (command) => `要添加服务器（控制平面），请在现有的服务器上运行 ${command}。`,
-  "join.lifetime": "令牌有效时间",
-  "join.hours": (n) => `${n} 小时`,
-  "join.minutes": (n) => `${n} 分钟`,
-  "join.lifetimeHint": "在此之前，可以让任意数量的 VM 加入。",
-  "join.server": "服务器地址",
-  "join.serverHint": "服务器的内网地址。新 VM 要用其他地址才能连到服务器时，改成那个地址。",
-  "join.serverProblem.empty": "请输入新的 VM 连到服务器的地址。",
-  "join.serverProblem.invalid": "请写成 https://<地址>:9345。",
-  "join.planTitle": "创建加入令牌",
-  "join.planNote": (until) =>
-    `令牌只会在创建后显示一次。在 ${until} 之前，任何拿到它的机器都能以工作节点加入这个集群。`,
-  "join.creating": "正在创建加入令牌…",
-  "join.created": (until) => `已创建加入令牌，有效到 ${until}。`,
-  "join.stepBinary": "把 zeabur-installer 可执行文件复制到新的 VM，用安装第一台服务器时的同一个。",
-  "join.stepRun": "在新的 VM 上以 root 运行：",
-  "join.stepRunHint":
-    "plan 会列出网络检查和警告，不会改动任何东西。apply 会把 RKE2 安装为工作节点，并等到节点就绪。",
-  "join.script": "新 VM 要运行的命令",
-  "join.shownOnce":
-    "令牌只会显示这一次。在过期之前，任何拿到它的人都能把机器加入这个集群。节点加入后，请撤销它。",
-  "join.waiting": "正在等新节点加入…",
-  "join.joining": (name) => `${name} 已加入，正在启动。`,
-  "join.joined": (name) => `${name} 已加入，并已就绪。`,
-  "join.cannotWatch": "Zeabur 无法列出节点，所以看不到新节点何时加入。",
-  "join.viewNode": "查看节点",
-  "join.revokeNow": "撤销令牌",
-  "join.revokedNow": "令牌已撤销",
-  "join.done": "完成",
-  "join.tokens": "加入令牌",
-  "join.expires": "到期",
-  "join.never": "不会过期",
-  "join.byZeabur": "在 Zeabur 中创建",
-  "join.byInstaller": "由 zeabur-installer 创建",
-  "join.revoke": "撤销",
-  "join.revokeTitle": (id) => `撤销加入令牌 ${id}`,
-  "join.revokeNote":
-    "已加入的节点会保留，重启后也会用自己的证书连回集群。撤销后不能再用这个令牌加入新机器，从集群删除的节点也要用新的令牌才能再加入。",
-  "join.next": "节点就绪后：",
-  "join.revokeStep": "撤销加入令牌。",
-  "join.planSays": "plan 停止或出现警告时",
-  "policies.step": "让网络策略放行它的流量。",
-  "policies.current": "网络策略已放行所有节点的流量。",
-  "policies.behind": (names) => `网络策略还没放行 ${listZh("zh-CN", names)}。`,
-  "policies.stale": "网络策略还在放行已移除节点的地址。",
-  "policies.unreadable": (command) => `Zeabur 读不到网络策略。请在服务器上运行 ${command}。`,
-  "policies.cannotUpdate": (command) => `你无法在这里更新网络策略。请在服务器上运行 ${command}。`,
-  "policies.planTitle": "更新网络策略",
-  "policies.planLine": (namespaces) =>
-    `让所有节点的流量进入 ${listZh("zh-CN", namespaces)}。每条策略只改节点地址，其他设置不变。`,
   "maint.actions": (node) => `${node} 的操作`,
   "maint.cordon": "停止调度",
   "maint.drain": "维护模式",
@@ -607,21 +545,6 @@ export const zhCN: Messages = {
     `在 ${node} 上运行这些命令，卸载 RKE2 和安装程序的文件。运行之前，RKE2 一重启，它就会再次加入集群。`,
   "maint.removed.commands": (node) => `要在 ${node} 上运行的命令`,
   "maint.removed.volumes": "/var/lib/zeabur/storage 下的卷会留在机器上，不再需要时请手动删除。",
-  "warning.join.sameRegion":
-    "所有节点都要在同一家云服务商的同一个区域。同一区域内的不同可用区没有问题。跨服务商或跨区域时，延迟会拖慢 etcd、Kubernetes API 和存储，甚至让集群不稳定。",
-  "warning.join.ports":
-    "节点之间需要放行：到服务器的 TCP 9345 和 6443；所有节点之间的 TCP 10250、9099 和 UDP 8472（Canal VXLAN）；服务器之间的 TCP 2379 到 2381。UDP 8472 不要对公网开放。",
-  "warning.join.storage.local":
-    "默认 local-path 存储类创建的卷只在创建它的节点上：使用它的 Pod 只能在那个节点运行，节点没了，数据也跟着没了。",
-  "warning.join.udp": "无法从这里检查 UDP 8472。如果它被拦截，不同节点上的 Pod 会互相连不上。",
-  "warning.join.servers.ha":
-    "控制平面要有三台以上的服务器，少一台时才能继续运行：etcd 需要过半数。只有两台时，任一台宕机整个集群就会停摆，请再加一台。",
-  "warning.join.server.unreachable": (server) =>
-    `连不上 ${server}。请检查地址，以及这台 VM 能否连到 TCP 9345。`,
-  "warning.join.port.closed": (ports, host) =>
-    `这台 VM 连不上 ${host} 的 TCP ${ports}，请检查防火墙或安全组。`,
-  "warning.join.token.unpinned":
-    "这个令牌没有 CA 哈希（K10<hash>::…），所以这台 VM 会信任在那个地址响应的任何服务器。请原样使用这里显示的令牌。",
 
   "projects.title": "项目",
   "projects.adopted": "项目",

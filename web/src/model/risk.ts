@@ -16,8 +16,7 @@
 //   cannot shrink, a new or moved mount replaces the pods); a YAML edit (written as typed);
 //   removing a domain; a NetworkPolicy that isolates its pods (limits what they send, or lets
 //   nothing in); opening a port to the internet; deleting an object, which cannot be taken back
-//   and is confirmed by typing its name. Revoking a join token (a bootstrap token Secret in kube-system) is not typed: it only
-//   takes away access, and a node that has joined keeps working.
+//   and is confirmed by typing its name.
 // - normal: everything else (variables, values set, domains added or renamed, resources, health
 //   checks, other created objects, letting a namespace go).
 // - low as well: adopting a namespace and a project's details, which touch only the Namespace's
@@ -249,31 +248,19 @@ export function deletionOf(created: {
   }
 }
 
-/** Whether a change revokes a join token: it deletes a `bootstrap-token-<id>` Secret in
- * kube-system. */
-export function revokesJoinToken(project: string, change: Change): boolean {
-  return (
-    project === "kube-system" &&
-    change.op === "delete" &&
-    change.resource.group === "" &&
-    change.resource.resource === "secrets" &&
-    /^bootstrap-token-[a-z0-9]{6}$/.test(change.name)
-  )
-}
-
-/** The name a person types to confirm a plan that deletes something in `project`: the first
- * object it deletes, join tokens left out; `undefined` when there is none. */
-export function typedName(changes: readonly Change[], project: string): string | undefined {
+/** The name a person types to confirm a plan that deletes something: the first
+ * object it deletes; `undefined` when there is none. */
+export function typedName(changes: readonly Change[]): string | undefined {
   for (const change of changes) {
-    if (change.op === "delete" && !revokesJoinToken(project, change)) return change.name
+    if (change.op === "delete") return change.name
   }
   return undefined
 }
 
 /** Whether a plan still waits for its name to be typed: it deletes something, and `typed` is
  * not that name (surrounding spaces aside; case counts, as Kubernetes names are lower case). */
-export function awaitsName(changes: readonly Change[], project: string, typed: string): boolean {
-  const name = typedName(changes, project)
+export function awaitsName(changes: readonly Change[], typed: string): boolean {
+  const name = typedName(changes)
   return name !== undefined && typed.trim() !== name
 }
 

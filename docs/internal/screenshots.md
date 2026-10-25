@@ -58,7 +58,7 @@ attribute, or a `data-testid` added to the component. A selector that matches se
 uses the first. After the steps the pointer moves to the corner of the page, unless the last step
 is `hover`.
 
-A shot whose steps change what the demo holds, such as creating a join token or sending an
+A shot whose steps change what the demo holds, such as sending an
 invitation, sets `fresh: true`: it gets its own demo server for each locale and theme, so every
 locale shows the same state. The demo's `ZEABUR_DEMO_*` variables are listed at the top of
 `crates/zeabur-api/examples/demo.rs`.

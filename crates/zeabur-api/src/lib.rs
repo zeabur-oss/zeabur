@@ -15,8 +15,6 @@
 //! | `GET /api/v1/cluster/events` | events of every namespace, newest first, `limit` of them |
 //! | `GET /api/v1/cluster/gaps` | what the cluster itself is missing, with fixes |
 //! | `GET /api/v1/cluster/incidents` | components down and nodes not ready, with the domains and projects they reach |
-//! | `GET /api/v1/cluster/join` | what a new node needs to join: supervisor, CA hash, location, join tokens (never their secrets) |
-//! | `GET /api/v1/cluster/node-policies` | whether the installer's baseline network policies let every node's traffic in |
 //! | `GET /api/v1/cluster/node-shells` | the node shell pods (cluster administrators only) |
 //! | `GET /api/v1/cluster/node-shells/{pod}/terminal` | a root shell on the node, over a WebSocket, for whoever opened it |
 //! | `GET /api/v1/cluster/tools` | your cluster tools pods, for administrators; deletes those that have stopped (see `cluster::tools`) |
@@ -71,8 +69,6 @@
 //! | `GET /api/v1/members` | everyone Zeabur Identity signs in, and pending setup links |
 //! | `POST /api/v1/members/plan` | the objects inviting someone, changing a member's access or removing a member writes, and a token; writes nothing |
 //! | `POST /api/v1/members/apply` | carries out a member plan by its token; an invitation's link is made then, shown once |
-//! | `POST /api/v1/cluster/node-policies/plan` | how the baseline network policies change to let every node in, and a token; writes nothing |
-//! | `POST /api/v1/cluster/node-policies/apply` | carries out that plan by its token |
 //! | `POST /api/v1/cluster/backups/plan` | what setting the backup location or schedule, pausing it or backing up now writes, and a token; writes nothing and never shows the keys |
 //! | `POST /api/v1/cluster/backups/apply` | carries out that plan by its token |
 //! | `GET /api/v1/cluster/notifications` | the cluster's notification channels and whether the alert rules are installed, or that alerting is not installed |
@@ -243,10 +239,6 @@ fn cluster_routes(router: OpenApiRouter<AppState>) -> OpenApiRouter<AppState> {
         .routes(routes!(cluster::install::guide_for))
         .routes(routes!(cluster::templates::list))
         .routes(routes!(cluster::templates::get))
-        .routes(routes!(cluster::join::get))
-        .routes(routes!(cluster::node_policies::get))
-        .routes(routes!(cluster::node_policies::plan))
-        .routes(routes!(cluster::node_policies::apply))
         .routes(routes!(cluster::node_shells::list))
         .routes(routes!(cluster::node_shells::plan))
         .routes(routes!(cluster::node_shells::apply))

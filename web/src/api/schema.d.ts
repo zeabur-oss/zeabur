@@ -470,84 +470,6 @@ export interface paths {
     patch?: never
     trace?: never
   }
-  "/api/v1/cluster/join": {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    /**
-     * What a new node needs to join the cluster: the supervisor's address, the CA hash for the
-     *     token, and the join tokens that have not expired (never their
-     *     secrets). Each read is the person's; one they may not make is listed in `unreadable`.
-     */
-    get: operations["getJoin"]
-    put?: never
-    post?: never
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  "/api/v1/cluster/node-policies": {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    /**
-     * Whether the installer's baseline network policies let every node's traffic in. Read as the
-     *     person; a read they may not make is listed in `unreadable`.
-     */
-    get: operations["getNodePolicies"]
-    put?: never
-    post?: never
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  "/api/v1/cluster/node-policies/apply": {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    get?: never
-    put?: never
-    /** Carries out a plan by its token: checks it, dry-runs every write, then writes. */
-    post: operations["applyNodePolicies"]
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  "/api/v1/cluster/node-policies/plan": {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    get?: never
-    put?: never
-    /**
-     * Works out how the baseline network policies change to let every node in, and a token to apply
-     *     it; writes nothing.
-     */
-    post: operations["planNodePolicies"]
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
   "/api/v1/cluster/node-shells": {
     parameters: {
       query?: never
@@ -2814,15 +2736,6 @@ export interface components {
           /** @description The project the routes go to. */
           to: string
         }
-    /** @description A baseline policy and the node addresses it does not let in. */
-    BaselinePolicy: {
-      /** @description Whether its blocks are exactly the nodes' addresses. */
-      current: boolean
-      /** @description Node addresses it has no block for, sorted. */
-      missing: string[]
-      /** @description Its namespace. */
-      namespace: string
-    }
     /** @description A [`Change::BasicAuth`]. */
     BasicAuthChange: {
       /** @description The Ingress. */
@@ -5528,40 +5441,6 @@ export interface components {
       /** @description The writes, in order; empty when nothing changes. */
       writes: components["schemas"]["IssuerWrite"][]
     }
-    /**
-     * @description Why this cluster cannot take a node from Zeabur.
-     * @enum {string}
-     */
-    JoinBlocked: "notRke2"
-    /** @description What a new node needs to join, as far as the person may read it. */
-    JoinInfo: {
-      blocked?: components["schemas"]["JoinBlocked"] | null
-      /** @description 64 hex characters of the cluster CA's SHA-256, for the `K10` token. */
-      caHash?: string | null
-      /** @description kube-apiserver's version (`v1.34.1+rke2r1`). */
-      kubernetesVersion: string
-      /** @description The supervisor a new node joins, `https://<address>:9345`. */
-      server?: string | null
-      /** @description Bootstrap tokens that have not expired, soonest to expire first. */
-      tokens: components["schemas"]["JoinToken"][]
-      /** @description The reads that were refused. */
-      unreadable: components["schemas"]["UnreadableView"][]
-    }
-    /** @description A bootstrap token that has not expired, without its secret. */
-    JoinToken: {
-      /** @description When the Secret was created. */
-      created?: string | null
-      /** @description Its `description`. */
-      description?: string | null
-      /** @description Its `expiration` (RFC 3339); absent when it never expires. */
-      expires?: string | null
-      /** @description The token id; the Secret is `bootstrap-token-<id>`. */
-      id: string
-      /** @description Its `app.kubernetes.io/managed-by` label (`zeabur`, `zeabur-installer`). */
-      managedBy?: string | null
-      /** @description The Secret's name. */
-      secret: string
-    }
     /** @description A workload's Keel policy. */
     KeelPolicy: {
       /** @description `Deployment`, `StatefulSet` or `DaemonSet`. */
@@ -6129,13 +6008,6 @@ export interface components {
      * @enum {string}
      */
     NodeAction: "cordon" | "uncordon" | "drain" | "remove"
-    /** @description A node some baseline policy drops traffic from. */
-    NodeBehind: {
-      /** @description Its addresses a policy does not let in. */
-      addresses: string[]
-      /** @description The node. */
-      name: string
-    }
     /**
      * @description A node condition that is not as it should be: `Ready` not `True`, or a pressure that is
      *     `True`.
@@ -6168,40 +6040,6 @@ export interface components {
       unreadable: components["schemas"]["UnreadableView"][]
       /** @description Pods not yet placed on a node. */
       unscheduledPods: number
-    }
-    /** @description The baseline policies against the nodes, as far as the person may read them. */
-    NodePolicies: {
-      /** @description The addresses every baseline policy should let in, sorted. */
-      addresses: string[]
-      /** @description Nodes whose traffic a policy drops, by name. */
-      behind: components["schemas"]["NodeBehind"][]
-      /** @description Whether the person may patch the policies that are not current. */
-      canUpdate: components["schemas"]["Permission"]
-      /** @description The baseline policies, by namespace; empty on a cluster the installer did not set up. */
-      policies: components["schemas"]["BaselinePolicy"][]
-      /** @description The reads that were refused (`nodes`, `networkpolicies.networking.k8s.io`). */
-      unreadable: components["schemas"]["UnreadableView"][]
-    }
-    /** @description What an apply wrote. */
-    NodePoliciesApplied: {
-      /** @description The namespaces whose policy was rewritten. */
-      namespaces: string[]
-    }
-    /** @description The token of a plan to apply. */
-    NodePoliciesApply: {
-      /** @description The token `plan` returned. */
-      token: string
-    }
-    /** @description A plan that brings the baseline policies up to date, and the token that applies it. */
-    NodePoliciesPlan: {
-      /** @description The addresses the policies will let in. */
-      addresses: string[]
-      /** @description When the token stops working, RFC 3339. */
-      expiresAt: string
-      /** @description Send this to `apply` to carry out exactly this plan. */
-      token: string
-      /** @description The policies it rewrites; empty when all are current. */
-      writes: components["schemas"]["PolicyWrite"][]
     }
     /** @description Whether a node can be removed. */
     NodeRemoval: {
@@ -7196,17 +7034,6 @@ export interface components {
       kind: string
       /** @description Its name. */
       name: string
-    }
-    /** @description One policy a plan rewrites. */
-    PolicyWrite: {
-      /** @description The policy as it will be, YAML. */
-      afterYaml?: string | null
-      /** @description The policy as it is, YAML. */
-      beforeYaml?: string | null
-      /** @description Its name. */
-      name: string
-      /** @description Its namespace. */
-      namespace: string
     }
     /** @description One port of a Kubernetes Service. */
     Port: components["schemas"]["ProtocolInference"] & {
@@ -10582,142 +10409,6 @@ export interface operations {
         }
       }
       422: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          "application/problem+json": components["schemas"]["Problem"]
-        }
-      }
-    }
-  }
-  getJoin: {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          "application/json": components["schemas"]["JoinInfo"]
-        }
-      }
-      401: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          "application/problem+json": components["schemas"]["Problem"]
-        }
-      }
-    }
-  }
-  getNodePolicies: {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          "application/json": components["schemas"]["NodePolicies"]
-        }
-      }
-      401: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          "application/problem+json": components["schemas"]["Problem"]
-        }
-      }
-    }
-  }
-  applyNodePolicies: {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["NodePoliciesApply"]
-      }
-    }
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          "application/json": components["schemas"]["NodePoliciesApplied"]
-        }
-      }
-      400: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          "application/problem+json": components["schemas"]["Problem"]
-        }
-      }
-      403: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          "application/problem+json": components["schemas"]["Problem"]
-        }
-      }
-      409: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          "application/problem+json": components["schemas"]["Problem"]
-        }
-      }
-      422: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          "application/problem+json": components["schemas"]["Problem"]
-        }
-      }
-    }
-  }
-  planNodePolicies: {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          "application/json": components["schemas"]["NodePoliciesPlan"]
-        }
-      }
-      403: {
         headers: {
           [name: string]: unknown
         }

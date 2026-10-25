@@ -128,49 +128,6 @@
   wait: '#cluster-installed'
   clip: main
   until: '[aria-labelledby="components-catalogue"] section:nth-of-type(2)'
-# Adding a worker node (docs/zh-TW/cluster/nodes.mdx, tokens.mdx). The join token's ID and
-# expiry differ from run to run. vps-4 joins a few seconds after a join token is created.
-- id: node-add
-  path: /cluster
-  wait: '#cluster-nodes'
-  steps:
-    - click: '[data-testid="add-node"]'
-    - wait: '[data-slot="dialog-content"] input'
-  clip: '[data-slot="dialog-content"]'
-  env:
-    ZEABUR_DEMO_RKE2: "1"
-- id: node-add-command
-  path: /cluster
-  wait: '#cluster-nodes'
-  steps:
-    - click: '[data-testid="add-node"]'
-    - click: '[data-slot="dialog-footer"] button:last-child'
-    - wait: '[data-slot="dialog-content"] [data-slot="collapsible-trigger"]'
-    - click: '[data-slot="dialog-footer"] button:last-child'
-    - wait: '[data-testid="join-ready"]'
-  clip: '[data-testid="join-ready"]'
-  fresh: true
-  env:
-    ZEABUR_DEMO_RKE2: "1"
-- id: node-add-joined
-  path: /cluster
-  wait: '#cluster-nodes'
-  steps:
-    - click: '[data-testid="add-node"]'
-    - click: '[data-slot="dialog-footer"] button:last-child'
-    - wait: '[data-slot="dialog-content"] [data-slot="collapsible-trigger"]'
-    - click: '[data-slot="dialog-footer"] button:last-child'
-    - wait: 'section[aria-labelledby="join-next"] li:nth-child(2)'
-  clip: '[data-testid="join-ready"]'
-  fresh: true
-  env:
-    ZEABUR_DEMO_RKE2: "1"
-- id: join-tokens
-  path: /cluster
-  wait: 'section[aria-labelledby="join-tokens"]'
-  clip: 'section[aria-labelledby="join-tokens"]'
-  env:
-    ZEABUR_DEMO_RKE2: "1"
 # Notification channels (docs/zh-TW/cluster/notifications.mdx).
 - id: notify-channel-add
   path: /cluster/notifications

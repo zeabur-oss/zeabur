@@ -456,68 +456,6 @@ export const zhTW: Messages = {
   "clusterUsage.whatUsage": "Pod 的用量",
   "clusterUsage.whatPods": "每個 Namespace 的用量",
   "clusterUsage.whatProjects": "哪些 Namespace 是專案",
-  "join.add": "新增節點",
-  "join.title": "新增節點",
-  "join.body":
-    "新的 VM 會以工作節點加入這個叢集。Zeabur 建立加入權杖，你再用它在 VM 上執行 Zeabur Installer。",
-  "join.unavailable.notRke2":
-    "只有用 Zeabur Installer（RKE2）安裝的叢集能在這裡新增節點。請用安裝這個叢集的工具新增節點。",
-  "join.unavailable.noCaHash":
-    "Zeabur 讀不到叢集的 CA 憑證（kube-system 裡的 ConfigMap kube-root-ca.crt），加入權杖需要它。",
-  "join.before": "開始之前",
-  "join.role": "角色",
-  "join.worker": "工作節點",
-  "join.workerHint": "執行你的服務。控制平面留在現有的伺服器上。",
-  "join.serverNote": (command) => `要新增伺服器（控制平面），請在現有的伺服器上執行 ${command}。`,
-  "join.lifetime": "權杖有效時間",
-  "join.hours": (n) => `${n} 小時`,
-  "join.minutes": (n) => `${n} 分鐘`,
-  "join.lifetimeHint": "在這之前，可以讓任意數量的 VM 加入。",
-  "join.server": "伺服器位址",
-  "join.serverHint": "伺服器的內網位址。新 VM 要用其他位址才連得到伺服器時，改成那個位址。",
-  "join.serverProblem.empty": "請輸入伺服器位址，新的 VM 會用它來連線。",
-  "join.serverProblem.invalid": "請寫成 https://<位址>:9345。",
-  "join.planTitle": "建立加入權杖",
-  "join.planNote": (until) =>
-    `權杖只會在建立後顯示一次。在 ${until} 之前，任何拿到它的機器都能以工作節點加入這個叢集。`,
-  "join.creating": "正在建立加入權杖…",
-  "join.created": (until) => `已建立加入權杖，有效到 ${until}。`,
-  "join.stepBinary": "把 zeabur-installer 執行檔複製到新的 VM，用安裝第一台伺服器時的同一個。",
-  "join.stepRun": "在新的 VM 上以 root 執行：",
-  "join.stepRunHint":
-    "plan 會列出網路檢查和警告，不會改動任何東西。apply 會把 RKE2 安裝成工作節點，並等到節點就緒。",
-  "join.script": "新 VM 要執行的指令",
-  "join.shownOnce":
-    "權杖只會顯示這一次。在過期之前，任何拿到它的人都能把機器加進這個叢集。節點加入後，請撤銷它。",
-  "join.waiting": "正在等新節點加入…",
-  "join.joining": (name) => `${name} 已加入，正在啟動。`,
-  "join.joined": (name) => `${name} 已加入，並已就緒。`,
-  "join.cannotWatch": "Zeabur 無法列出節點，所以看不到新節點何時加入。",
-  "join.viewNode": "檢視節點",
-  "join.revokeNow": "撤銷權杖",
-  "join.revokedNow": "權杖已撤銷",
-  "join.done": "完成",
-  "join.tokens": "加入權杖",
-  "join.expires": "到期",
-  "join.never": "不會過期",
-  "join.byZeabur": "在 Zeabur 建立",
-  "join.byInstaller": "由 zeabur-installer 建立",
-  "join.revoke": "撤銷",
-  "join.revokeTitle": (id) => `撤銷加入權杖 ${id}`,
-  "join.revokeNote":
-    "已加入的節點會留著，重新開機後也會用自己的憑證連回叢集。撤銷後不能再用這個權杖加入新機器，從叢集刪除的節點也要用新的權杖才能再加入。",
-  "join.next": "節點就緒後：",
-  "join.revokeStep": "撤銷加入權杖。",
-  "join.planSays": "plan 停下或出現警告時",
-  "policies.step": "讓網路政策放行它的流量。",
-  "policies.current": "網路政策已放行所有節點的流量。",
-  "policies.behind": (names) => `網路政策還沒放行 ${listZh("zh-TW", names)}。`,
-  "policies.stale": "網路政策還在放行已移除節點的位址。",
-  "policies.unreadable": (command) => `Zeabur 讀不到網路政策。請在伺服器上執行 ${command}。`,
-  "policies.cannotUpdate": (command) => `你無法在這裡更新網路政策。請在伺服器上執行 ${command}。`,
-  "policies.planTitle": "更新網路政策",
-  "policies.planLine": (namespaces) =>
-    `讓所有節點的流量進入 ${listZh("zh-TW", namespaces)}。每條政策只改節點位址，其他設定不變。`,
   "maint.actions": (node) => `${node} 的操作`,
   "maint.cordon": "停止排程",
   "maint.drain": "維護模式",
@@ -609,21 +547,6 @@ export const zhTW: Messages = {
   "maint.removed.commands": (node) => `要在 ${node} 上執行的指令`,
   "maint.removed.volumes":
     "/var/lib/zeabur/storage 底下的磁碟區會留在機器上，不再需要時請手動刪除。",
-  "warning.join.sameRegion":
-    "所有節點都要在同一家主機服務商的同一個區域。同一區域內的不同可用區域沒有問題。跨服務商或跨區域時，延遲會拖慢 etcd、Kubernetes API 和儲存，甚至讓叢集不穩定。",
-  "warning.join.ports":
-    "節點之間要開放：連到伺服器的 TCP 9345 和 6443；所有節點之間的 TCP 10250、9099 和 UDP 8472（Canal VXLAN）；伺服器之間的 TCP 2379 到 2381。UDP 8472 不要對網際網路開放。",
-  "warning.join.storage.local":
-    "預設的 local-path 儲存類別只把資料存在一個節點上。用到這些資料的 Pod 只能在那個節點執行，節點不在了，資料也就不在了。",
-  "warning.join.udp": "從這裡無法檢查 UDP 8472。如果它被擋住，不同節點上的 Pod 會連不到彼此。",
-  "warning.join.servers.ha":
-    "控制平面要有三台以上的伺服器，少一台時才能繼續運作：etcd 需要過半數。只有兩台時，任一台停機整個叢集就會停擺，請再加一台。",
-  "warning.join.server.unreachable": (server) =>
-    `連不到 ${server}。請檢查位址，以及這台 VM 能不能連到 TCP 9345。`,
-  "warning.join.port.closed": (ports, host) =>
-    `這台 VM 連不到 ${host} 的 TCP ${ports}，請檢查防火牆或安全群組。`,
-  "warning.join.token.unpinned":
-    "這個權杖沒有 CA 雜湊（K10<hash>::…），所以這台 VM 會信任在那個位址回應的任何伺服器。請照這裡顯示的權杖原樣使用。",
 
   "projects.title": "專案",
   "projects.adopted": "專案",

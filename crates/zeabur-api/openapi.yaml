@@ -684,102 +684,6 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/Problem"
-  /api/v1/cluster/join:
-    get:
-      tags:
-      - cluster
-      summary: |-
-        What a new node needs to join the cluster: the supervisor's address, the CA hash for the
-        token, and the join tokens that have not expired (never their
-        secrets). Each read is the person's; one they may not make is listed in `unreadable`.
-      operationId: getJoin
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/JoinInfo"
-        "401":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/Problem"
-  /api/v1/cluster/node-policies:
-    get:
-      tags:
-      - cluster
-      summary: |-
-        Whether the installer's baseline network policies let every node's traffic in. Read as the
-        person; a read they may not make is listed in `unreadable`.
-      operationId: getNodePolicies
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/NodePolicies"
-        "401":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/Problem"
-  /api/v1/cluster/node-policies/apply:
-    post:
-      tags:
-      - cluster
-      summary: "Carries out a plan by its token: checks it, dry-runs every write, then writes."
-      operationId: applyNodePolicies
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/NodePoliciesApply"
-        required: true
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/NodePoliciesApplied"
-        "400":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/Problem"
-        "403":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/Problem"
-        "409":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/Problem"
-        "422":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/Problem"
-  /api/v1/cluster/node-policies/plan:
-    post:
-      tags:
-      - cluster
-      summary: |-
-        Works out how the baseline network policies change to let every node in, and a token to apply
-        it; writes nothing.
-      operationId: planNodePolicies
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/NodePoliciesPlan"
-        "403":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/Problem"
   /api/v1/cluster/node-shells:
     get:
       tags:
@@ -5062,25 +4966,6 @@ components:
             type: string
             description: The project the routes go to.
       description: What to plan.
-    BaselinePolicy:
-      type: object
-      description: A baseline policy and the node addresses it does not let in.
-      required:
-      - namespace
-      - missing
-      - current
-      properties:
-        current:
-          type: boolean
-          description: Whether its blocks are exactly the nodes' addresses.
-        missing:
-          type: array
-          items:
-            type: string
-          description: Node addresses it has no block for, sorted.
-        namespace:
-          type: string
-          description: Its namespace.
     BasicAuthChange:
       type: object
       description: A [`Change::BasicAuth`].
@@ -10488,80 +10373,6 @@ components:
           items:
             $ref: "#/components/schemas/IssuerWrite"
           description: The writes, in order; empty when nothing changes.
-    JoinBlocked:
-      type: string
-      description: Why this cluster cannot take a node from Zeabur.
-      enum:
-      - notRke2
-    JoinInfo:
-      type: object
-      description: What a new node needs to join, as far as the person may read it.
-      required:
-      - kubernetesVersion
-      - tokens
-      - unreadable
-      properties:
-        blocked:
-          oneOf:
-          - $ref: "#/components/schemas/JoinBlocked"
-            description: Why nodes cannot be added; absent when they can.
-          - type: "null"
-        caHash:
-          type:
-          - string
-          - "null"
-          description: 64 hex characters of the cluster CA's SHA-256, for the `K10` token.
-        kubernetesVersion:
-          type: string
-          description: kube-apiserver's version (`v1.34.1+rke2r1`).
-        server:
-          type:
-          - string
-          - "null"
-          description: The supervisor a new node joins, `https://<address>:9345`.
-        tokens:
-          type: array
-          items:
-            $ref: "#/components/schemas/JoinToken"
-          description: Bootstrap tokens that have not expired, soonest to expire first.
-        unreadable:
-          type: array
-          items:
-            $ref: "#/components/schemas/UnreadableView"
-          description: The reads that were refused.
-    JoinToken:
-      type: object
-      description: A bootstrap token that has not expired, without its secret.
-      required:
-      - id
-      - secret
-      properties:
-        created:
-          type:
-          - string
-          - "null"
-          description: When the Secret was created.
-        description:
-          type:
-          - string
-          - "null"
-          description: Its `description`.
-        expires:
-          type:
-          - string
-          - "null"
-          description: Its `expiration` (RFC 3339); absent when it never expires.
-        id:
-          type: string
-          description: The token id; the Secret is `bootstrap-token-<id>`.
-        managedBy:
-          type:
-          - string
-          - "null"
-          description: Its `app.kubernetes.io/managed-by` label (`zeabur`, `zeabur-installer`).
-        secret:
-          type: string
-          description: The Secret's name.
     KeelPolicy:
       type: object
       description: A workload's Keel policy.
@@ -11645,21 +11456,6 @@ components:
       - uncordon
       - drain
       - remove
-    NodeBehind:
-      type: object
-      description: A node some baseline policy drops traffic from.
-      required:
-      - name
-      - addresses
-      properties:
-        addresses:
-          type: array
-          items:
-            type: string
-          description: Its addresses a policy does not let in.
-        name:
-          type: string
-          description: The node.
     NodeCondition:
       type: object
       description: |-
@@ -11728,88 +11524,6 @@ components:
           type: integer
           description: Pods not yet placed on a node.
           minimum: 0
-    NodePolicies:
-      type: object
-      description: The baseline policies against the nodes, as far as the person may read them.
-      required:
-      - addresses
-      - policies
-      - behind
-      - canUpdate
-      - unreadable
-      properties:
-        addresses:
-          type: array
-          items:
-            type: string
-          description: The addresses every baseline policy should let in, sorted.
-        behind:
-          type: array
-          items:
-            $ref: "#/components/schemas/NodeBehind"
-          description: Nodes whose traffic a policy drops, by name.
-        canUpdate:
-          $ref: "#/components/schemas/Permission"
-          description: Whether the person may patch the policies that are not current.
-        policies:
-          type: array
-          items:
-            $ref: "#/components/schemas/BaselinePolicy"
-          description: >-
-            The baseline policies, by namespace; empty on a cluster the installer did not
-            set up.
-        unreadable:
-          type: array
-          items:
-            $ref: "#/components/schemas/UnreadableView"
-          description: The reads that were refused (`nodes`, `networkpolicies.networking.k8s.io`).
-    NodePoliciesApplied:
-      type: object
-      description: What an apply wrote.
-      required:
-      - namespaces
-      properties:
-        namespaces:
-          type: array
-          items:
-            type: string
-          description: The namespaces whose policy was rewritten.
-    NodePoliciesApply:
-      type: object
-      description: The token of a plan to apply.
-      required:
-      - token
-      properties:
-        token:
-          type: string
-          description: The token `plan` returned.
-    NodePoliciesPlan:
-      type: object
-      description: >-
-        A plan that brings the baseline policies up to date, and the token that applies
-        it.
-      required:
-      - token
-      - expiresAt
-      - addresses
-      - writes
-      properties:
-        addresses:
-          type: array
-          items:
-            type: string
-          description: The addresses the policies will let in.
-        expiresAt:
-          type: string
-          description: When the token stops working, RFC 3339.
-        token:
-          type: string
-          description: Send this to `apply` to carry out exactly this plan.
-        writes:
-          type: array
-          items:
-            $ref: "#/components/schemas/PolicyWrite"
-          description: The policies it rewrites; empty when all are current.
     NodeRemoval:
       type: object
       description: Whether a node can be removed.
@@ -13883,29 +13597,6 @@ components:
         name:
           type: string
           description: Its name.
-    PolicyWrite:
-      type: object
-      description: One policy a plan rewrites.
-      required:
-      - namespace
-      - name
-      properties:
-        afterYaml:
-          type:
-          - string
-          - "null"
-          description: The policy as it will be, YAML.
-        beforeYaml:
-          type:
-          - string
-          - "null"
-          description: The policy as it is, YAML.
-        name:
-          type: string
-          description: Its name.
-        namespace:
-          type: string
-          description: Its namespace.
     Port:
       allOf:
       - $ref: "#/components/schemas/ProtocolInference"

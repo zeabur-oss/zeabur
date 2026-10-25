@@ -49,12 +49,8 @@
 //! under `apps.example.com` with HTTPS from the `ClusterIssuer` `letsencrypt`;
 //! `ZEABUR_DEMO_NO_DOMAINS=1` leaves both unset.
 //!
-//! `ZEABUR_DEMO_RKE2=1` makes the cluster an RKE2 one installed by Zeabur Installer, so Cluster →
-//! Nodes offers Add node: the nodes have addresses and a location, `kube-system` has the CA and
-//! one installer-made join token, and a node `vps-4` joins a few seconds after a join token is
-//! created, Ready a few seconds later. Three namespaces have the installer's baseline network
-//! policy, which lets in the first nodes only, so it is behind once `vps-4` joins;
-//! `networkpolicies/patch` in `ZEABUR_DEMO_FORBID` refuses rewriting it.
+//! `ZEABUR_DEMO_RKE2=1` makes the cluster an RKE2 one installed by Zeabur Installer: the nodes
+//! have addresses and a location, and the control plane runs as static pods.
 //!
 //! The `web` pods have no shell, so their terminal offers a debug container, which starts a moment
 //! after it is added, as do tools pods and node shells. With `ZEABUR_DEMO_RKE2=1`, `vps-2` also has
@@ -3333,19 +3329,6 @@ fn rke2(s: &mut State) {
             "fsn1-dc14".to_owned(),
         );
     }
-    let mut blocks: Vec<String> = (0..s.nodes.len())
-        .flat_map(|i| [format!("10.0.0.{}", i + 5), format!("10.42.{i}.0")])
-        .collect();
-    blocks.sort();
-    for namespace in ["observability", "zeabur", "zeabur-identity"] {
-        s.dynamic.push(from(baseline_policy(namespace, &blocks)));
-    }
-    if std::env::var("ZEABUR_DEMO_FORBID")
-        .is_ok_and(|list| list.split(',').any(|r| r == "networkpolicies/patch"))
-    {
-        s.forbidden_writes
-            .insert("NetworkPolicy/zeabur-installer-baseline".to_owned());
-    }
     let system = s
         .objects
         .entry("kube-system".to_owned())
@@ -3370,114 +3353,6 @@ fn rke2(s: &mut State) {
                 "state": {"running": {}}}]}
         })));
     }
-    system.config_maps.push(from(json!({
-        "metadata": {"name": "kube-root-ca.crt", "namespace": "kube-system"},
-        "data": {"ca.crt": include_str!("../tests/fixtures/join/root.pem")}
-    })));
-    let expires = Timestamp::now()
-        .checked_add(SignedDuration::from_hours(5))
-        .expect("in range")
-        .to_string();
-    let created = Timestamp::now()
-        .checked_sub(SignedDuration::from_hours(19))
-        .expect("in range")
-        .to_string();
-    system.secrets.push(SecretSummary {
-        secret: from(json!({
-            "metadata": {"name": "bootstrap-token-k7q2xm", "namespace": "kube-system",
-                         "creationTimestamp": created,
-                         "labels": {"app.kubernetes.io/managed-by": "zeabur-installer"}},
-            "type": "bootstrap.kubernetes.io/token"
-        })),
-        key_count: 7,
-    });
-    s.secret_values.insert(
-        "kube-system/bootstrap-token-k7q2xm".to_owned(),
-        [
-            ("token-id", "k7q2xm"),
-            ("token-secret", "demo0secret0demo"),
-            ("description", "zeabur-installer node add"),
-            ("expiration", expires.as_str()),
-        ]
-        .into_iter()
-        .map(|(k, v)| (k.to_owned(), v.as_bytes().to_vec()))
-        .collect(),
-    );
-}
-
-/// The policy `zeabur-installer apply` puts in a namespace it manages, letting in `addresses`.
-fn baseline_policy(namespace: &str, addresses: &[String]) -> Value {
-    let mut from = vec![
-        json!({"podSelector": {}}),
-        json!({"namespaceSelector": {"matchLabels":
-            {"app.kubernetes.io/managed-by": "zeabur-installer"}}}),
-    ];
-    from.extend(
-        addresses
-            .iter()
-            .map(|a| json!({"ipBlock": {"cidr": format!("{a}/32")}})),
-    );
-    json!({
-        "apiVersion": "networking.k8s.io/v1",
-        "kind": "NetworkPolicy",
-        "metadata": {"name": "zeabur-installer-baseline", "namespace": namespace,
-                     "resourceVersion": "1",
-                     "labels": {"app.kubernetes.io/managed-by": "zeabur-installer"}},
-        "spec": {"podSelector": {}, "policyTypes": ["Ingress"], "ingress": [{"from": from}]},
-    })
-}
-
-/// A VM that joins as `vps-4` once a join token has been created: listed after a few seconds,
-/// Ready a few seconds later.
-fn joining(cluster: MemoryCluster) {
-    tokio::spawn(async move {
-        let mut seen: Option<u32> = None;
-        loop {
-            tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-            let created = cluster
-                .inspect(|s| {
-                    s.writes.iter().any(|w| {
-                        w.target.kind == "Secret" && w.target.name.starts_with("bootstrap-token-")
-                    })
-                })
-                .unwrap_or(false);
-            if !created {
-                continue;
-            }
-            let ticks = seen.map_or(0, |t| t + 1);
-            seen = Some(ticks);
-            if ticks != 6 && ticks != 12 {
-                continue;
-            }
-            cluster.update(|s| {
-                let Some(mut node) = s.nodes.last().cloned() else {
-                    return;
-                };
-                node.metadata.name = Some("vps-4".to_owned());
-                node.metadata.uid = Some("node-vps-4".to_owned());
-                node.metadata.creation_timestamp = None;
-                if let Some(labels) = node.metadata.labels.as_mut() {
-                    labels.insert("kubernetes.io/hostname".to_owned(), "vps-4".to_owned());
-                }
-                if let Some(status) = node.status.as_mut() {
-                    status.addresses = Some(vec![from(
-                        json!({"type": "InternalIP", "address": "10.0.0.9"}),
-                    )]);
-                    node.spec.get_or_insert_with(Default::default).pod_cidrs =
-                        Some(vec!["10.42.9.0/24".to_owned()]);
-                    for condition in status.conditions.iter_mut().flatten() {
-                        if condition.type_ == "Ready" {
-                            if ticks == 6 { "False" } else { "True" }
-                                .clone_into(&mut condition.status);
-                        }
-                    }
-                }
-                s.nodes
-                    .retain(|n| n.metadata.name.as_deref() != Some("vps-4"));
-                s.nodes.push(node);
-            });
-        }
-    });
 }
 
 /// What node maintenance has to say something about: Deployment pods owned by their
@@ -4307,7 +4182,6 @@ async fn main() -> std::io::Result<()> {
     }
     if std::env::var_os("ZEABUR_DEMO_RKE2").is_some() {
         cluster.update(rke2);
-        joining(cluster.clone());
     }
     let github = match std::env::var("ZEABUR_DEMO_GITHUB") {
         Ok(mode) => {

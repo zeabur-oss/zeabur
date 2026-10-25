@@ -28,7 +28,6 @@
   label: 管理叢集
   pages:
     members: 邀請成員並分配專案權限
-    tokens: 建立與撤銷節點加入權杖
     notifications: 把叢集警示送到通知管道
     backups: 備份叢集並從備份還原
     nodes: 新增與維護節點

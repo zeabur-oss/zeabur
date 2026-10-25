@@ -1,9 +1,8 @@
 //! `node add` and `node sync`, run on a server of the cluster.
 //!
 //! `node add` prints what the new VM needs: the server's address and a join token, as a
-//! configuration to paste. A worker gets a bootstrap token that expires, made as Zeabur makes
-//! one through the API; a server gets the cluster's server token, which a bootstrap token cannot
-//! replace.
+//! configuration to paste. A worker gets a bootstrap token that expires; a server gets the
+//! cluster's server token, which a bootstrap token cannot replace.
 
 use std::fs;
 use std::path::Path;

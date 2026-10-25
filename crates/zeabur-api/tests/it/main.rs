@@ -23,7 +23,6 @@ mod github_app;
 mod images;
 mod incidents;
 mod issuers;
-mod join;
 mod log_history;
 mod maintenance;
 mod members;

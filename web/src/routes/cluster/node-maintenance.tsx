@@ -15,7 +15,6 @@ import type { Schemas } from "@/api/client"
 import {
   applyNodeMaintenance,
   evictNodePods,
-  nodePoliciesQuery,
   nodesQuery,
   planNodeMaintenance,
   queryClient,
@@ -516,7 +515,6 @@ export function Removed({ node, onClose }: { node?: string; onClose: () => void 
   useEffect(() => {
     if (!node) return
     refresh()
-    void queryClient.invalidateQueries({ queryKey: nodePoliciesQuery.queryKey })
   }, [node])
   return node ? <RemovedFrame node={node} onClose={onClose} /> : null
 }

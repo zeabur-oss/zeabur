@@ -307,30 +307,6 @@ export const installQuery = (capability: string, component: string, profile?: st
     staleTime: Infinity,
   })
 
-export const joinQuery = queryOptions({
-  queryKey: ["cluster", "join"],
-  queryFn: async ({ signal }) => unwrap(await api.GET("/api/v1/cluster/join", { signal })),
-  staleTime: 30_000,
-  retryOnMount: false,
-})
-
-export const nodePoliciesQuery = queryOptions({
-  queryKey: ["cluster", "node-policies"],
-  queryFn: async ({ signal }) => unwrap(await api.GET("/api/v1/cluster/node-policies", { signal })),
-  refetchInterval: CLUSTER_POLL,
-  refetchIntervalInBackground: false,
-  retryOnMount: false,
-})
-
-/** How the baseline network policies change to let every node in, and the token; writes nothing. */
-export async function planNodePolicies(signal?: AbortSignal) {
-  return unwrap(await api.POST("/api/v1/cluster/node-policies/plan", { signal }))
-}
-
-export async function applyNodePolicies(token: string) {
-  return unwrap(await api.POST("/api/v1/cluster/node-policies/apply", { body: { token } }))
-}
-
 export const clusterBackupsQuery = queryOptions({
   queryKey: ["cluster", "backups"],
   queryFn: async ({ signal }) => unwrap(await api.GET("/api/v1/cluster/backups", { signal })),
