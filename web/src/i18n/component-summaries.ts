@@ -20,7 +20,7 @@ export const summaries: Record<string, Summary> = {
     "zh-TW": "服務使用的 ConfigMap 或 Secret 變更時，自動重新啟動服務。",
     "zh-CN": "服务使用的 ConfigMap 或 Secret 变更时，自动重启服务。",
   },
-  "container-registry/zot#6396ba2c": {
+  "container-registry/zot#1e24c1ce": {
     en: "Stores the images Zeabur Builder builds, inside the cluster.",
     "zh-TW": "在叢集裡存放 Zeabur Builder 建置的映像檔。",
     "zh-CN": "在集群里存放 Zeabur Builder 构建的镜像。",
