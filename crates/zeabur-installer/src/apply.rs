@@ -157,7 +157,11 @@ pub(crate) fn show_checks(
             Status::Warn => "warn",
             Status::Fail => "FAIL",
         };
-        out::err(&format!("    {mark} {:<18} {}", check.name, check.detail));
+        out::err(&format!(
+            "    {mark} {:<18} {}",
+            check.name.label(),
+            check.detail
+        ));
     }
     checks.iter().any(|c| c.status == Status::Fail)
 }

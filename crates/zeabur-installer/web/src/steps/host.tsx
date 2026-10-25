@@ -16,6 +16,7 @@ import {
 
 const health: Record<string, Health> = { pass: "ok", warn: "warn", fail: "fail" }
 const order: Record<Check["status"], number> = { fail: 0, warn: 1, pass: 2 }
+const checkKey = (check: Check) => [check.name, check.code, ...check.values].join(" ")
 
 export function CheckRow({ check }: { check: Check }) {
   const t = useT()
@@ -100,7 +101,7 @@ export function HostStep({ wizard }: { wizard: Wizard }) {
         }
       >
         {exceptions.map((check) => (
-          <CheckRow key={check.name} check={check} />
+          <CheckRow key={checkKey(check)} check={check} />
         ))}
         {passed.length ? (
           <div className="px-5 py-3 text-sm">
@@ -112,7 +113,7 @@ export function HostStep({ wizard }: { wizard: Wizard }) {
               <CollapsibleContent>
                 <div className="-mx-5 mt-3 -mb-3 flex flex-col divide-y divide-v2-separator border-t border-v2-separator">
                   {passed.map((check) => (
-                    <CheckRow key={check.name} check={check} />
+                    <CheckRow key={checkKey(check)} check={check} />
                   ))}
                 </div>
               </CollapsibleContent>

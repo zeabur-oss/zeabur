@@ -365,7 +365,7 @@
     {
       "code": "others.none",
       "detail": "none found",
-      "name": "other Kubernetes",
+      "name": "otherKubernetes",
       "status": "pass",
       "values": []
     },
@@ -374,19 +374,19 @@
       "detail": "80, 443, 6443, 9345 and 10250 are free",
       "name": "ports",
       "status": "pass",
-      "values": []
+      "values": ["80", "443", "6443", "9345", "10250"]
     },
     {
       "code": "disk.ok",
       "detail": "152.3 GiB free under /var/lib",
-      "name": "disk space",
+      "name": "diskSpace",
       "status": "pass",
       "values": ["152.3", "/var/lib"]
     },
     {
       "code": "crypt.no",
       "detail": "/var/lib is not on an encrypted device; Secrets are encrypted in etcd, volumes are not",
-      "name": "disk encryption",
+      "name": "diskEncryption",
       "status": "warn",
       "values": ["/var/lib"]
     }

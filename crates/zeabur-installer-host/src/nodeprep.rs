@@ -10,7 +10,7 @@ use zeabur_installer_plan::storage::{
     MODULES_FILE, MULTIPATH_BLACKLIST, MULTIPATH_FILE, NodePrep, Package,
 };
 
-use crate::preflight::{Check, Status};
+use crate::preflight::{Check, Code, Status, Topic};
 use crate::{HostError, cmd, files, systemd};
 
 /// Directories programs such as `iscsiadm` and `mount.nfs` install into.
@@ -91,77 +91,99 @@ pub enum Stage {
 /// Checks the node against `prep`.
 #[must_use]
 pub fn check(prep: &NodePrep, stage: Stage) -> Vec<Check> {
-    let missing = match stage {
-        Stage::Before => Status::Warn,
-        Stage::After => Status::Fail,
+    let (missing, fix) = match stage {
+        Stage::Before => (Status::Warn, "apply installs it"),
+        Stage::After => (Status::Fail, "zeabur-installer apply installs it"),
     };
-    let fix = match stage {
-        Stage::Before => "apply installs it",
-        Stage::After => "zeabur-installer apply installs it",
-    };
+    let after = stage == Stage::After;
     let component = prep.component;
     let mut checks = Vec::new();
     for package in prep.packages {
-        checks.push(if has_binary(package.binary) {
+        let binary = package.binary;
+        checks.push(if has_binary(binary) {
             Check::new(
-                "node packages",
+                Topic::NodePackages,
                 Status::Pass,
-                format!("{} is installed ({})", package.binary, package.purpose),
+                format!("{binary} is installed ({})", package.purpose),
+                Code::PackageOk,
             )
-            .code("prep.package.ok", &[package.binary])
+            .values(&[binary])
         } else {
             Check::new(
-                "node packages",
+                Topic::NodePackages,
                 missing,
-                format!(
-                    "{component} needs {} ({}); {fix}",
-                    package.binary, package.purpose
-                ),
+                format!("{component} needs {binary} ({}); {fix}", package.purpose),
+                if after {
+                    Code::PackageMissing
+                } else {
+                    Code::PackageToInstall
+                },
             )
-            .code("prep.package.missing", &[package.binary, component])
+            .values(&[binary, component])
         });
     }
     for module in prep.modules {
         checks.push(if module_loaded(module) {
             Check::new(
-                "kernel modules",
+                Topic::KernelModules,
                 Status::Pass,
                 format!("{module} is loaded"),
+                Code::ModuleOk,
             )
-            .code("prep.module.ok", &[module])
+            .values(&[module])
         } else {
             Check::new(
-                "kernel modules",
+                Topic::KernelModules,
                 missing,
                 format!("{component} needs the {module} kernel module loaded; {fix}"),
+                if after {
+                    Code::ModuleMissing
+                } else {
+                    Code::ModuleToLoad
+                },
             )
-            .code("prep.module.missing", &[module, component])
+            .values(&[module, component])
         });
     }
     for service in prep.services {
         checks.push(if systemd::is_active(service) {
-            Check::new("services", Status::Pass, format!("{service} is running"))
-                .code("prep.service.ok", &[service])
+            Check::new(
+                Topic::Services,
+                Status::Pass,
+                format!("{service} is running"),
+                Code::ServiceOk,
+            )
+            .values(&[service])
         } else {
             Check::new(
-                "services",
+                Topic::Services,
                 missing,
                 format!("{component} needs {service} running; {fix}"),
+                if after {
+                    Code::ServiceStopped
+                } else {
+                    Code::ServiceToStart
+                },
             )
-            .code("prep.service.stopped", &[service, component])
+            .values(&[service, component])
         });
     }
     if multipathd_running() && !Path::new(MULTIPATH_FILE).exists() {
         checks.push(
             Check::new(
-                "multipathd",
+                Topic::Multipathd,
                 missing,
                 format!(
                     "multipathd is running and would claim {component}'s iSCSI disks; {fix} \
                      ({MULTIPATH_FILE})"
                 ),
+                if after {
+                    Code::MultipathOpen
+                } else {
+                    Code::MultipathToBlock
+                },
             )
-            .code("prep.multipath.open", &[MULTIPATH_FILE]),
+            .values(&[component, MULTIPATH_FILE]),
         );
     }
     checks

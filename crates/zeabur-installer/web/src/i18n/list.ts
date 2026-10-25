@@ -4,8 +4,8 @@ export function listZh(locale: "zh-TW" | "zh-CN", items: string[]): string {
   return parts
     .map((part, i) => {
       if (part.type !== "literal" || !/\p{Script=Han}/u.test(part.value)) return part.value
-      const before = /[A-Za-z0-9]$/.test(parts[i - 1]?.value ?? "") ? " " : ""
-      const after = /^[A-Za-z0-9]/.test(parts[i + 1]?.value ?? "") ? " " : ""
+      const before = /[!-~]$/.test(parts[i - 1]?.value ?? "") ? " " : ""
+      const after = /^[!-~]/.test(parts[i + 1]?.value ?? "") ? " " : ""
       return `${before}${part.value}${after}`
     })
     .join("")

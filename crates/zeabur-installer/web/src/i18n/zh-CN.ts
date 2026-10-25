@@ -53,10 +53,14 @@ export const zhCN: Messages = {
   "check.systemd": "systemd",
   "check.time": "时钟",
   "check.swap": "Swap",
-  "check.other Kubernetes": "其他 Kubernetes",
+  "check.otherKubernetes": "其他 Kubernetes",
   "check.ports": "端口",
-  "check.disk space": "磁盘空间",
-  "check.disk encryption": "磁盘加密",
+  "check.diskSpace": "磁盘空间",
+  "check.diskEncryption": "磁盘加密",
+  "check.nodePackages": "软件包",
+  "check.kernelModules": "内核模块",
+  "check.services": "系统服务",
+  "check.multipathd": "multipathd",
 
   "code.root.ok": () => "以 root 运行。",
   "code.root.no": () => "请用 sudo 启动安装程序。",
@@ -71,10 +75,11 @@ export const zhCN: Messages = {
     "Swap 已开启，kubelet 建议关闭。请运行 swapoff -a，并从 /etc/fstab 删除 swap 那一行。",
   "code.swap.unknown": () => "无法判断 Swap 是否开启。请运行 swapon --show 查看。",
   "code.others.none": () => "未发现。",
-  "code.others.found": (found) => `发现 ${found}。请先卸载：两个发行版会争抢同样的端口。`,
-  "code.ports.free": () => "80、443、6443、9345 和 10250 均未被占用。",
-  "code.ports.busy": (busy) =>
-    `端口 ${listZh("zh-CN", busy.split(", "))} 已被占用。运行 ss -ltnp 查看占用者。`,
+  "code.others.found": (...paths) =>
+    `发现其他 Kubernetes 发行版（${listZh("zh-CN", paths)}）。请先卸载：两个发行版会争抢同样的端口。`,
+  "code.ports.free": (...ports) => `${listZh("zh-CN", ports)} 均未被占用。`,
+  "code.ports.busy": (...ports) =>
+    `端口 ${listZh("zh-CN", ports)} 已被占用。运行 ss -ltnp 查看占用者。`,
   "code.disk.unknown": (path) => `无法读取 ${path} 的可用空间。请运行 df -h ${path} 查看。`,
   "code.disk.low": (gib, path, need) => `${path} 只剩 ${gib} GiB，需要 ${need} GiB。`,
   "code.disk.tight": (gib, path, need) =>
@@ -87,6 +92,25 @@ export const zhCN: Messages = {
     `${path} 不在加密设备上。集群中的 Secret 会加密，卷不会。测试机没关系，生产数据请装在加密磁盘上。`,
   "code.crypt.unknown": (path) =>
     `无法判断 ${path} 是否加密。请运行 lsblk，查看它下面有没有 crypt 设备。`,
+  "code.prep.package.ok": (binary) => `已安装 ${binary}。`,
+  "code.prep.package.toInstall": (binary, component) =>
+    `${component} 需要 ${binary}，安装时会一并装好。`,
+  "code.prep.package.missing": (binary, component) =>
+    `${component} 需要 ${binary}，但当前未安装。请运行 zeabur-installer apply 补上。`,
+  "code.prep.module.ok": (module) => `已加载 ${module} 内核模块。`,
+  "code.prep.module.toLoad": (module, component) =>
+    `${component} 需要 ${module} 内核模块，安装时会一并加载。`,
+  "code.prep.module.missing": (module, component) =>
+    `${component} 需要 ${module} 内核模块，但当前未加载。请运行 zeabur-installer apply 加载。`,
+  "code.prep.service.ok": (service) => `${service} 正在运行。`,
+  "code.prep.service.toStart": (service, component) =>
+    `${component} 需要 ${service} 保持运行，安装时会一并启动。`,
+  "code.prep.service.stopped": (service, component) =>
+    `${component} 需要 ${service} 保持运行，但它已停止。请运行 zeabur-installer apply 启动。`,
+  "code.prep.multipath.toBlock": (component, file) =>
+    `multipathd 会占用 ${component} 的磁盘，安装时会写入 ${file} 让它避开。`,
+  "code.prep.multipath.open": (component, file) =>
+    `缺少 ${file}，multipathd 可能占用 ${component} 的磁盘。请运行 zeabur-installer apply 补上。`,
 
   "access.title": "如何访问 Zeabur",
   "access.description": "Zeabur 和它的登录服务各需要一个指向这台服务器的域名。",

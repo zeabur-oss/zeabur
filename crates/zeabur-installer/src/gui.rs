@@ -448,3 +448,21 @@ fn asset(request: &Request, path: &str) -> Response {
         },
     )
 }
+
+#[cfg(test)]
+mod tests {
+    use zeabur_installer_host::preflight::{Code, Topic};
+
+    /// zh-TW and zh-CN are typed against English, so TypeScript rejects a key missing there.
+    #[test]
+    fn the_page_has_words_for_every_check() {
+        let en = include_str!("../web/src/i18n/en.ts");
+        let missing: Vec<String> = Topic::ALL
+            .iter()
+            .map(|topic| format!("check.{}", topic.key()))
+            .chain(Code::ALL.iter().map(|code| format!("code.{}", code.key())))
+            .filter(|key| !en.contains(&format!("\"{key}\":")))
+            .collect();
+        assert!(missing.is_empty(), "web/src/i18n/en.ts lacks {missing:?}");
+    }
+}

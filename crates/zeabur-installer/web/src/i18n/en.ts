@@ -5,6 +5,8 @@ const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one :
 
 const mib = (value: number | string) => `${Number(value).toLocaleString("en")} MiB`
 
+const list = (items: string[]) => new Intl.ListFormat("en").format(items)
+
 export const en = {
   "app.name": "Installer",
   "app.language": "Language",
@@ -57,10 +59,14 @@ export const en = {
   "check.systemd": "systemd",
   "check.time": "Clock",
   "check.swap": "Swap",
-  "check.other Kubernetes": "Other Kubernetes",
+  "check.otherKubernetes": "Other Kubernetes",
   "check.ports": "Ports",
-  "check.disk space": "Disk space",
-  "check.disk encryption": "Disk encryption",
+  "check.diskSpace": "Disk space",
+  "check.diskEncryption": "Disk encryption",
+  "check.nodePackages": "Packages",
+  "check.kernelModules": "Kernel modules",
+  "check.services": "Services",
+  "check.multipathd": "multipathd",
 
   "code.root.ok": () => "Running as root.",
   "code.root.no": () => "Start the installer with sudo.",
@@ -76,10 +82,11 @@ export const en = {
     "Swap is on; the kubelet expects it off. Run swapoff -a and remove the swap entry from /etc/fstab.",
   "code.swap.unknown": () => "Could not tell whether swap is on. Run swapon --show to see it.",
   "code.others.none": () => "None found.",
-  "code.others.found": (found: string) =>
-    `Found ${found}. Uninstall it first: two distributions fight over the same ports.`,
-  "code.ports.free": () => "80, 443, 6443, 9345 and 10250 are free.",
-  "code.ports.busy": (busy: string) => `In use: ${busy}. Run ss -ltnp to see what holds them.`,
+  "code.others.found": (...paths: string[]) =>
+    `Found another Kubernetes distribution (${list(paths)}). Uninstall it first: two distributions fight over the same ports.`,
+  "code.ports.free": (...ports: string[]) => `${list(ports)} are free.`,
+  "code.ports.busy": (...ports: string[]) =>
+    `In use: ${list(ports)}. Run ss -ltnp to see what holds them.`,
   "code.disk.unknown": (path: string) =>
     `Could not read the free space under ${path}. Run df -h ${path} to see it.`,
   "code.disk.low": (gib: string, path: string, need: string) =>
@@ -96,6 +103,25 @@ export const en = {
     `${path} is not on an encrypted device. Secrets are encrypted in the cluster; volumes are not. Fine for a test machine; for production data, install on an encrypted disk.`,
   "code.crypt.unknown": (path: string) =>
     `Could not tell whether ${path} is encrypted. Run lsblk to see whether a crypt device is under it.`,
+  "code.prep.package.ok": (binary: string) => `${binary} is installed.`,
+  "code.prep.package.toInstall": (binary: string, component: string) =>
+    `${component} needs ${binary}. The install adds it.`,
+  "code.prep.package.missing": (binary: string, component: string) =>
+    `${component} needs ${binary}, and it is not installed. Run zeabur-installer apply to add it.`,
+  "code.prep.module.ok": (module: string) => `The ${module} kernel module is loaded.`,
+  "code.prep.module.toLoad": (module: string, component: string) =>
+    `${component} needs the ${module} kernel module. The install loads it.`,
+  "code.prep.module.missing": (module: string, component: string) =>
+    `${component} needs the ${module} kernel module, and it is not loaded. Run zeabur-installer apply to load it.`,
+  "code.prep.service.ok": (service: string) => `${service} is running.`,
+  "code.prep.service.toStart": (service: string, component: string) =>
+    `${component} needs ${service} running. The install starts it.`,
+  "code.prep.service.stopped": (service: string, component: string) =>
+    `${component} needs ${service} running, and it is stopped. Run zeabur-installer apply to start it.`,
+  "code.prep.multipath.toBlock": (component: string, file: string) =>
+    `multipathd would take over ${component}'s disks. The install writes ${file} to keep it off them.`,
+  "code.prep.multipath.open": (component: string, file: string) =>
+    `multipathd can take over ${component}'s disks while ${file} is missing. Run zeabur-installer apply to write it.`,
 
   // Access
   "access.title": "How people reach Zeabur",

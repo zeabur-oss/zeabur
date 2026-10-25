@@ -53,10 +53,14 @@ export const zhTW: Messages = {
   "check.systemd": "systemd",
   "check.time": "時鐘",
   "check.swap": "Swap",
-  "check.other Kubernetes": "其他 Kubernetes",
+  "check.otherKubernetes": "其他 Kubernetes",
   "check.ports": "連接埠",
-  "check.disk space": "磁碟空間",
-  "check.disk encryption": "磁碟加密",
+  "check.diskSpace": "磁碟空間",
+  "check.diskEncryption": "磁碟加密",
+  "check.nodePackages": "套件",
+  "check.kernelModules": "核心模組",
+  "check.services": "系統服務",
+  "check.multipathd": "multipathd",
 
   "code.root.ok": () => "以 root 執行。",
   "code.root.no": () => "請用 sudo 啟動安裝程式。",
@@ -71,10 +75,11 @@ export const zhTW: Messages = {
     "Swap 已開啟，kubelet 建議關閉。請執行 swapoff -a，並從 /etc/fstab 移除 swap 那一行。",
   "code.swap.unknown": () => "無法判斷 Swap 是否開啟。請執行 swapon --show 確認。",
   "code.others.none": () => "沒有發現。",
-  "code.others.found": (found) => `發現 ${found}。請先解除安裝：兩套發行版會搶同樣的連接埠。`,
-  "code.ports.free": () => "80、443、6443、9345 和 10250 都沒有被占用。",
-  "code.ports.busy": (busy) =>
-    `連接埠 ${listZh("zh-TW", busy.split(", "))} 已被占用。執行 ss -ltnp 可看到是誰占用。`,
+  "code.others.found": (...paths) =>
+    `發現其他 Kubernetes 發行版（${listZh("zh-TW", paths)}）。請先解除安裝：兩套發行版會搶同樣的連接埠。`,
+  "code.ports.free": (...ports) => `${listZh("zh-TW", ports)} 都沒有被占用。`,
+  "code.ports.busy": (...ports) =>
+    `連接埠 ${listZh("zh-TW", ports)} 已被占用。執行 ss -ltnp 可看到是誰占用。`,
   "code.disk.unknown": (path) => `讀不到 ${path} 的可用空間。請執行 df -h ${path} 確認。`,
   "code.disk.low": (gib, path, need) => `${path} 只剩 ${gib} GiB，需要 ${need} GiB。`,
   "code.disk.tight": (gib, path, need) =>
@@ -87,6 +92,25 @@ export const zhTW: Messages = {
     `${path} 不在加密的裝置上。叢集裡的 Secret 會加密，磁碟區則不會。測試機無妨，正式環境的資料請裝在加密的磁碟上。`,
   "code.crypt.unknown": (path) =>
     `無法判斷 ${path} 是否加密。請執行 lsblk，看它底下有沒有 crypt 裝置。`,
+  "code.prep.package.ok": (binary) => `已安裝 ${binary}。`,
+  "code.prep.package.toInstall": (binary, component) =>
+    `${component} 需要 ${binary}，安裝時會一併裝好。`,
+  "code.prep.package.missing": (binary, component) =>
+    `${component} 需要 ${binary}，但目前沒有安裝。請執行 zeabur-installer apply 補上。`,
+  "code.prep.module.ok": (module) => `已載入 ${module} 核心模組。`,
+  "code.prep.module.toLoad": (module, component) =>
+    `${component} 需要 ${module} 核心模組，安裝時會一併載入。`,
+  "code.prep.module.missing": (module, component) =>
+    `${component} 需要 ${module} 核心模組，但目前沒有載入。請執行 zeabur-installer apply 載入。`,
+  "code.prep.service.ok": (service) => `${service} 正在執行。`,
+  "code.prep.service.toStart": (service, component) =>
+    `${component} 需要 ${service} 保持執行，安裝時會一併啟動。`,
+  "code.prep.service.stopped": (service, component) =>
+    `${component} 需要 ${service} 保持執行，但它已停止。請執行 zeabur-installer apply 啟動。`,
+  "code.prep.multipath.toBlock": (component, file) =>
+    `multipathd 會搶走 ${component} 的磁碟，安裝時會寫入 ${file} 讓它避開。`,
+  "code.prep.multipath.open": (component, file) =>
+    `少了 ${file}，multipathd 可能搶走 ${component} 的磁碟。請執行 zeabur-installer apply 補上。`,
 
   "access.title": "大家怎麼連到 Zeabur",
   "access.description": "Zeabur 和它的登入服務各需要一個指向這台伺服器的網域。",

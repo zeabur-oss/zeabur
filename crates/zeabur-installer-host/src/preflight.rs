@@ -21,18 +21,128 @@ pub enum Status {
     Fail,
 }
 
+/// Declares an enum whose variants each name a stable key, serialized as that key.
+macro_rules! keyed {
+    ($(#[$attr:meta])* pub enum $name:ident { $($variant:ident => $key:literal,)+ }) => {
+        $(#[$attr])*
+        #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+        pub enum $name {
+            $(#[doc = concat!("`", $key, "`.")] $variant,)+
+        }
+
+        impl $name {
+            /// Every value.
+            pub const ALL: &[Self] = &[$(Self::$variant),+];
+
+            /// The stable key.
+            #[must_use]
+            pub const fn key(self) -> &'static str {
+                match self {
+                    $(Self::$variant => $key,)+
+                }
+            }
+        }
+
+        impl Serialize for $name {
+            fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+                serializer.serialize_str(self.key())
+            }
+        }
+    };
+}
+
+keyed! {
+    /// What a check looks at. An interface words it as `check.<key>`.
+    pub enum Topic {
+        Root => "root",
+        Systemd => "systemd",
+        Time => "time",
+        Swap => "swap",
+        OtherKubernetes => "otherKubernetes",
+        Ports => "ports",
+        DiskSpace => "diskSpace",
+        DiskEncryption => "diskEncryption",
+        NodePackages => "nodePackages",
+        KernelModules => "kernelModules",
+        Services => "services",
+        Multipathd => "multipathd",
+    }
+}
+
+impl Topic {
+    /// The English name, for the command line.
+    #[must_use]
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::Root => "root",
+            Self::Systemd => "systemd",
+            Self::Time => "time",
+            Self::Swap => "swap",
+            Self::OtherKubernetes => "other Kubernetes",
+            Self::Ports => "ports",
+            Self::DiskSpace => "disk space",
+            Self::DiskEncryption => "disk encryption",
+            Self::NodePackages => "node packages",
+            Self::KernelModules => "kernel modules",
+            Self::Services => "services",
+            Self::Multipathd => "multipathd",
+        }
+    }
+}
+
+keyed! {
+    /// How a check came out, as a sentence an interface words as `code.<key>` with the check's
+    /// values.
+    pub enum Code {
+        RootOk => "root.ok",
+        RootNo => "root.no",
+        SystemdOk => "systemd.ok",
+        SystemdNo => "systemd.no",
+        TimeOk => "time.ok",
+        TimeDrift => "time.drift",
+        TimeUnknown => "time.unknown",
+        SwapOff => "swap.off",
+        SwapOn => "swap.on",
+        SwapUnknown => "swap.unknown",
+        OthersNone => "others.none",
+        OthersFound => "others.found",
+        PortsFree => "ports.free",
+        PortsBusy => "ports.busy",
+        DiskUnknown => "disk.unknown",
+        DiskLow => "disk.low",
+        DiskTight => "disk.tight",
+        DiskOk => "disk.ok",
+        CryptYes => "crypt.yes",
+        CryptRequiredPlain => "crypt.requiredPlain",
+        CryptRequiredUnknown => "crypt.requiredUnknown",
+        CryptNo => "crypt.no",
+        CryptUnknown => "crypt.unknown",
+        PackageOk => "prep.package.ok",
+        PackageToInstall => "prep.package.toInstall",
+        PackageMissing => "prep.package.missing",
+        ModuleOk => "prep.module.ok",
+        ModuleToLoad => "prep.module.toLoad",
+        ModuleMissing => "prep.module.missing",
+        ServiceOk => "prep.service.ok",
+        ServiceToStart => "prep.service.toStart",
+        ServiceStopped => "prep.service.stopped",
+        MultipathToBlock => "prep.multipath.toBlock",
+        MultipathOpen => "prep.multipath.open",
+    }
+}
+
 /// One check.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct Check {
     /// What was checked.
-    pub name: &'static str,
+    pub name: Topic,
     /// The outcome.
     pub status: Status,
-    /// What was found and what to do.
+    /// What was found and what to do, in English.
     pub detail: String,
-    /// The outcome as a stable key, such as `ports.busy`, for an interface that words it itself.
-    pub code: &'static str,
-    /// The values the detail names, in order: paths, sizes, ports.
+    /// The outcome as a key, for an interface that words it itself.
+    pub code: Code,
+    /// The values `code` names, in order: names, paths, numbers; never words.
     pub values: Vec<String>,
 }
 
@@ -89,23 +199,22 @@ pub fn run(options: Options) -> Vec<Check> {
     checks
 }
 
-fn check(name: &'static str, status: Status, detail: impl Into<String>) -> Check {
-    Check::new(name, status, detail)
+fn check(name: Topic, status: Status, detail: impl Into<String>, code: Code) -> Check {
+    Check::new(name, status, detail, code)
 }
 
 impl Check {
-    pub(crate) fn new(name: &'static str, status: Status, detail: impl Into<String>) -> Self {
+    pub(crate) fn new(name: Topic, status: Status, detail: impl Into<String>, code: Code) -> Self {
         Self {
             name,
             status,
             detail: detail.into(),
-            code: "",
+            code,
             values: Vec::new(),
         }
     }
 
-    pub(crate) fn code(mut self, code: &'static str, values: &[&str]) -> Self {
-        self.code = code;
+    pub(crate) fn values(mut self, values: &[&str]) -> Self {
         self.values = values.iter().map(|&v| v.to_owned()).collect();
         self
     }
@@ -119,9 +228,14 @@ pub fn is_root() -> bool {
 
 fn root() -> Check {
     if is_root() {
-        check("root", Status::Pass, "running as root").code("root.ok", &[])
+        check(Topic::Root, Status::Pass, "running as root", Code::RootOk)
     } else {
-        check("root", Status::Fail, "run apply as root (sudo)").code("root.no", &[])
+        check(
+            Topic::Root,
+            Status::Fail,
+            "run apply as root (sudo)",
+            Code::RootNo,
+        )
     }
 }
 
@@ -132,14 +246,19 @@ fn effective_uid(status: &str) -> Option<u32> {
 
 fn systemd() -> Check {
     if Path::new("/run/systemd/system").is_dir() {
-        check("systemd", Status::Pass, "systemd is the init system").code("systemd.ok", &[])
+        check(
+            Topic::Systemd,
+            Status::Pass,
+            "systemd is the init system",
+            Code::SystemdOk,
+        )
     } else {
         check(
-            "systemd",
+            Topic::Systemd,
             Status::Fail,
             "RKE2 runs as a systemd service; this host does not run systemd",
+            Code::SystemdNo,
         )
-        .code("systemd.no", &[])
     }
 }
 
@@ -149,55 +268,73 @@ fn time_sync() -> Check {
         &["show", "--property=NTPSynchronized", "--value"],
         None,
     ) {
-        Ok(out) if out.trim() == "yes" => check("time", Status::Pass, "the clock is synchronised").code("time.ok", &[]),
+        Ok(out) if out.trim() == "yes" => check(
+            Topic::Time,
+            Status::Pass,
+            "the clock is synchronised",
+            Code::TimeOk,
+        ),
         Ok(_) => check(
-            "time",
+            Topic::Time,
             Status::Warn,
             "the clock is not synchronised; certificates and tokens fail when it drifts (timedatectl set-ntp true)",
-        )
-        .code("time.drift", &[]),
+            Code::TimeDrift,
+        ),
         Err(_) => check(
-            "time",
+            Topic::Time,
             Status::Warn,
             "could not ask timedatectl whether the clock is synchronised",
-        )
-        .code("time.unknown", &[]),
+            Code::TimeUnknown,
+        ),
     }
 }
 
 fn swap() -> Check {
     match fs::read_to_string("/proc/swaps") {
         Ok(swaps) if swaps.lines().skip(1).any(|l| !l.trim().is_empty()) => check(
-            "swap",
+            Topic::Swap,
             Status::Warn,
             "swap is on; the kubelet expects it off (swapoff -a, and remove it from /etc/fstab)",
-        )
-        .code("swap.on", &[]),
-        Ok(_) => check("swap", Status::Pass, "swap is off").code("swap.off", &[]),
-        Err(_) => {
-            check("swap", Status::Warn, "could not read /proc/swaps").code("swap.unknown", &[])
-        }
+            Code::SwapOn,
+        ),
+        Ok(_) => check(Topic::Swap, Status::Pass, "swap is off", Code::SwapOff),
+        Err(_) => check(
+            Topic::Swap,
+            Status::Warn,
+            "could not read /proc/swaps",
+            Code::SwapUnknown,
+        ),
     }
 }
 
 fn other_distributions() -> Check {
-    let found: Vec<String> = OTHERS
+    let found: Vec<&(&str, &str)> = OTHERS
         .iter()
         .filter(|(path, _)| Path::new(path).exists())
-        .map(|(path, name)| format!("{name} ({path})"))
         .collect();
     if found.is_empty() {
-        check("other Kubernetes", Status::Pass, "none found").code("others.none", &[])
-    } else {
         check(
-            "other Kubernetes",
+            Topic::OtherKubernetes,
+            Status::Pass,
+            "none found",
+            Code::OthersNone,
+        )
+    } else {
+        let named: Vec<String> = found
+            .iter()
+            .map(|(path, name)| format!("{name} ({path})"))
+            .collect();
+        let paths: Vec<&str> = found.iter().map(|(path, _)| *path).collect();
+        check(
+            Topic::OtherKubernetes,
             Status::Fail,
             format!(
                 "found {}; uninstall it first, two distributions fight over the same ports and iptables",
-                found.join(", ")
+                named.join(", ")
             ),
+            Code::OthersFound,
         )
-        .code("others.found", &[&found.join(", ")])
+        .values(&paths)
     }
 }
 
@@ -210,11 +347,12 @@ fn ports(server: bool) -> Check {
     if busy.is_empty() {
         let numbers: Vec<String> = ports.iter().map(|(port, _)| port.to_string()).collect();
         check(
-            "ports",
+            Topic::Ports,
             Status::Pass,
             format!("{} are free", and_list(&numbers)),
+            Code::PortsFree,
         )
-        .code("ports.free", &[])
+        .values(&numbers.iter().map(String::as_str).collect::<Vec<_>>())
     } else {
         let named: Vec<String> = busy
             .iter()
@@ -222,11 +360,12 @@ fn ports(server: bool) -> Check {
             .collect();
         let numbers: Vec<String> = busy.iter().map(|(port, _)| port.to_string()).collect();
         check(
-            "ports",
+            Topic::Ports,
             Status::Fail,
             format!("in use: {}; `ss -ltnp` shows by what", named.join(", ")),
+            Code::PortsBusy,
         )
-        .code("ports.busy", &[&numbers.join(", ")])
+        .values(&numbers.iter().map(String::as_str).collect::<Vec<_>>())
     }
 }
 
@@ -250,36 +389,40 @@ fn disk_space() -> Check {
         .and_then(|out| available_kib(&out))
     else {
         return check(
-            "disk space",
+            Topic::DiskSpace,
             Status::Warn,
             format!("could not read the free space of {target}"),
+            Code::DiskUnknown,
         )
-        .code("disk.unknown", &[target]);
+        .values(&[target]);
     };
     let gib = gib(kib);
     if kib < DISK_NEEDED_GIB << 20 {
         check(
-            "disk space",
+            Topic::DiskSpace,
             Status::Fail,
             format!("{gib} GiB free under {target}; RKE2's images and data need at least {DISK_NEEDED_GIB} GiB"),
+            Code::DiskLow,
         )
-        .code("disk.low", &[&gib, target, &DISK_NEEDED_GIB.to_string()])
+        .values(&[&gib, target, &DISK_NEEDED_GIB.to_string()])
     } else if kib < DISK_ROOMY_GIB << 20 {
         check(
-            "disk space",
+            Topic::DiskSpace,
             Status::Warn,
             format!(
                 "{gib} GiB free under {target}; {DISK_ROOMY_GIB} GiB or more leaves room for logs, metrics and apps"
             ),
+            Code::DiskTight,
         )
-        .code("disk.tight", &[&gib, target, &DISK_ROOMY_GIB.to_string()])
+        .values(&[&gib, target, &DISK_ROOMY_GIB.to_string()])
     } else {
         check(
-            "disk space",
+            Topic::DiskSpace,
             Status::Pass,
             format!("{gib} GiB free under {target}"),
+            Code::DiskOk,
         )
-        .code("disk.ok", &[&gib, target])
+        .values(&[&gib, target])
     }
 }
 
@@ -300,42 +443,38 @@ fn encryption(required: bool) -> Check {
         "/var/lib"
     };
     let found = disk_encryption(target);
-    match (found, required) {
-        (Encryption::Encrypted, _) => check(
-            "disk encryption",
+    let (status, detail, code) = match (found, required) {
+        (Encryption::Encrypted, _) => (
             Status::Pass,
             format!("{target} is on a dm-crypt device"),
-        )
-        .code("crypt.yes", &[target]),
-        (Encryption::Plain, true) => check(
-            "disk encryption",
+            Code::CryptYes,
+        ),
+        (Encryption::Plain, true) => (
             Status::Fail,
             format!("{target} is not on an encrypted device, and host.requireEncryptedDisk is set"),
-        )
-        .code("crypt.requiredPlain", &[target]),
-        (Encryption::Unknown, true) => check(
-            "disk encryption",
+            Code::CryptRequiredPlain,
+        ),
+        (Encryption::Unknown, true) => (
             Status::Fail,
             format!(
                 "could not tell whether {target} is encrypted, and host.requireEncryptedDisk is set"
             ),
-        )
-        .code("crypt.requiredUnknown", &[target]),
-        (Encryption::Plain, false) => check(
-            "disk encryption",
+            Code::CryptRequiredUnknown,
+        ),
+        (Encryption::Plain, false) => (
             Status::Warn,
             format!(
                 "{target} is not on an encrypted device; Secrets are encrypted in etcd, volumes are not"
             ),
-        )
-        .code("crypt.no", &[target]),
-        (Encryption::Unknown, false) => check(
-            "disk encryption",
+            Code::CryptNo,
+        ),
+        (Encryption::Unknown, false) => (
             Status::Warn,
             format!("could not tell whether {target} is encrypted"),
-        )
-        .code("crypt.unknown", &[target]),
-    }
+            Code::CryptUnknown,
+        ),
+    };
+    check(Topic::DiskEncryption, status, detail, code).values(&[target])
 }
 
 /// Whether the device holding `path` has a dm-crypt device beneath it.
