@@ -80,13 +80,6 @@ export function VolumeRestore({
                 {stateful ? t("volumeRestore.inPlace") : t("volumeRestore.new")}
               </Button>
             </GateTip>
-            {data.export ? (
-              <GateTip gate={gate}>
-                <Button size="xs" variant="ghost" onClick={() => setMode("export")}>
-                  {t("volumeRestore.export")}
-                </Button>
-              </GateTip>
-            ) : null}
           </>
         ) : null}
       </div>
