@@ -12,7 +12,7 @@
 #   --profile bare          only the cluster, for the cluster tests of crates/*/tests and
 #                           zeaburctl in local mode
 #   --profile full          also CloudNativePG with the Barman Cloud plugin, the Percona Operator
-#                           for MongoDB, Keel, cert-manager, a test S3 and Zeabur Builder
+#                           for MongoDB, Keel, cert-manager, zot, a test S3 and Zeabur Builder
 #   --identity-src <dir>    build Zeabur Identity from this working tree, as it is
 #   --builder-src <dir>     build Zeabur Builder from this working tree, as it is (full profile)
 #   --zeabur-image <image>  run this Zeabur image (a local image is imported, any other is pulled)
@@ -41,10 +41,11 @@ state="$root/target/dev-cluster"
 tls="$state/tls"
 identity_host=identity.localhost
 zeabur_host=zeabur.localhost
-# The Builder's registry: a fixed ClusterIP in the static band of k3s's service range
-# (10.43.0.0/16), so that the node's containerd reaches the in-cluster name through a mirror.
-builder_registry=registry.builder-registry.svc.cluster.local:5000
-builder_registry_ip=10.43.0.50
+# The catalog's zot, as zeabur-installer sets it up: the node's containerd pulls zot.zot.svc:5000
+# through a mirror to zot's fixed ClusterIP, checked against zot's CA.
+zot_host=zot.zot.svc:5000
+zot_ip=10.43.0.50
+zot_ca=/etc/rancher/k3s/zot-ca.crt
 export KUBECONFIG="$state/kubeconfig"
 
 usage() { sed -n '2,/^set -euo/{/^set -euo/d;s/^# \{0,1\}//;p}' "$0" >&2; exit 2; }
@@ -128,16 +129,16 @@ import() {
 
 # Runs the Helm commands Zeabur Catalog gives for a component (Cluster → Components) and waits for
 # its deployments.
-catalog_install() { # $1 = <capability>/<id>, $@ = namespaces to wait for
-  local component="$1" work namespace
-  shift
+catalog_install() { # $1 = <capability>/<id>, $2 = namespace to wait for, $@ = <input>=<value>
+  local component="$1" namespace="$2" work
+  shift 2
   work=$(mktemp -d)
-  cargo run -q --locked -p zeabur-catalog --example install -- "$component" single-node >"$work/install.sh"
+  cargo run -q --locked -p zeabur-catalog --example install -- "$component" single-node "$@" >"$work/install.sh"
   (cd "$work" && bash -euo pipefail install.sh)
   rm -rf "$work"
-  for namespace in "$@"; do
+  if [[ -n "$(kubectl -n "$namespace" get deployment -o name)" ]]; then
     kubectl -n "$namespace" wait deployment --all --for=condition=Available --timeout=300s
-  done
+  fi
 }
 
 up() {
@@ -213,8 +214,9 @@ up() {
     printf 'apiVersion: apiserver.config.k8s.io/v1\nkind: AuthenticationConfiguration\nanonymous:\n  enabled: false\njwt: []\n' |
       docker run --rm -i -v "$authn_volume:/authn" busybox:1.37 sh -c 'cat >/authn/authn.yaml'
     {
+      printf 'configs:\n  "%s:5000":\n    tls:\n      ca_file: %s\n' "$zot_ip" "$zot_ca"
       echo "mirrors:"
-      printf '  "%s":\n    endpoint: ["http://%s:5000"]\n' "$builder_registry" "$builder_registry_ip"
+      printf '  "%s":\n    endpoint: ["https://%s:5000"]\n' "$zot_host" "$zot_ip"
       if [[ -n "${ZEABUR_REGISTRY_MIRRORS:-}" ]]; then
         IFS=, read -ra mirrors <<<"$ZEABUR_REGISTRY_MIRRORS"
         for mirror in "${mirrors[@]}"; do
@@ -354,15 +356,11 @@ EOF
   cargo build -q --locked -p zeabur-installer
   "$root/target/debug/zeabur-installer" --config "$state/install.yaml" manifests --cluster-name "$cluster" |
     kubectl apply --server-side --force-conflicts -f - >/dev/null
-  # What only this cluster sets: Zeabur Proxy when its image is built here, and the Builder's
-  # registry.
+  # What only this cluster sets: Zeabur Proxy when its image is built here.
   local values="{}"
   if [[ -n "$proxy_image" ]]; then
     values=$(jq -c --arg r "${proxy_image%:*}" --arg t "${proxy_image##*:}" \
       '.proxy = {enabled: true, image: {repository: $r, tag: $t}}' <<<"$values")
-  fi
-  if [[ "$profile" == full ]]; then
-    values=$(jq -c --arg r "$builder_registry" '.builds.registry = $r' <<<"$values")
   fi
   kubectl apply -f - >/dev/null <<EOF
 apiVersion: helm.cattle.io/v1
@@ -421,7 +419,15 @@ EOF
   }
   retry 120 "the test S3's bucket" bucket
 
-  # --- Zeabur Builder, from its repository's deploy files ---------------------------------------
+  # zot, with the fixed ClusterIP the node's mirror points at. Its CA goes where the mirror reads
+  # it, as zeabur-installer copies it; containerd reads it on each pull.
+  catalog_install container-registry/zot zot cluster-ip="$zot_ip"
+  kubectl -n zot wait certificate/zot-tls --for=condition=Ready --timeout=120s >/dev/null
+  kubectl -n zot rollout status statefulset/zot --timeout=180s
+  kubectl -n zot get secret zot-tls -o jsonpath='{.data.ca\.crt}' | base64 -d |
+    docker exec -i "$node" sh -c "cat >$zot_ca.tmp && mv $zot_ca.tmp $zot_ca"
+
+  # --- Zeabur Builder, from its chart -----------------------------------------------------------
   if [[ -z "$builder_src" ]]; then
     builder_src="$state/builder"
     checkout "$builder_src" "$(tr -d '[:space:]' <"$root/ZEABUR_BUILDER_PINNED")" \
@@ -439,27 +445,22 @@ EOF
     images+=("zeabur-builder/$image:$tag")
   done
   import "${images[@]}"
-  local examples="$builder_src/deploy/examples"
-  kubectl apply --server-side -f "$builder_src/deploy/crds.json" >/dev/null
-  kubectl wait --for condition=Established --timeout 60s crd/builds.builder.zeabur.com >/dev/null
-  for namespace in builder-system builder-registry; do
-    kubectl create namespace "$namespace" --dry-run=client -o yaml | kubectl apply -f - >/dev/null
-  done
-  # Zot without accounts takes anonymous pushes, and a controller without
-  # ZEABUR_BUILDER_REGISTRY_AUTH_PREFIX hands builds no credentials: any namespace can build.
-  kubectl -n builder-registry create configmap zot --dry-run=client -o yaml --from-literal=config.json='{
-    "storage": {"rootDirectory": "/var/lib/registry"},
-    "http": {"address": "0.0.0.0", "port": "5000"}, "log": {"level": "info"}}' | kubectl apply -f - >/dev/null
-  apply_secret builder-registry generic zot-htpasswd --from-literal=htpasswd=
-  kubectl apply -f "$examples/registry.yaml" --dry-run=client -o json |
-    jq --arg ip "$builder_registry_ip" '(.items[] | select(.kind == "Service") | .spec.clusterIP) = $ip' |
-    kubectl apply -f - >/dev/null
-  kubectl apply -f "$examples/buildkitd.yaml" >/dev/null
-  sed -e "s|__IMAGE_PREFIX__|zeabur-builder|g" -e "s|__TAG__|$tag|g" -e "s|__HOST_USERS__|false|g" \
-    -e "s|__IDLE__|600|g" -e '/ZEABUR_BUILDER_REGISTRY_AUTH_PREFIX/d' "$examples/controller.yaml" |
-    kubectl apply -f - >/dev/null
+  # Helm installs the CRDs only on the first install.
+  if helm -n builder-system status builder >/dev/null 2>&1; then
+    kubectl apply --server-side -f "$builder_src/deploy/chart/crds/crds.yaml" >/dev/null
+  fi
+  # No push credentials: zot takes anonymous pushes, and buildkitd trusts zot's CA, copied from
+  # zot-tls at install time.
+  helm upgrade --install builder "$builder_src/deploy/chart" -n builder-system --create-namespace \
+    --set image.repository=zeabur-builder/builder --set image.tag="$tag" \
+    --set jobImage.repository=zeabur-builder/builder-job --set jobImage.tag="$tag" \
+    --set railpackImage.repository=zeabur-builder/builder-railpack --set railpackImage.tag="$tag" \
+    --set registry.host="$zot_host" --set registry.authPrefix= \
+    --set registry.caFrom.namespace=zot --set registry.caFrom.secret=zot-tls \
+    --set registry.inCluster.namespace=zot \
+    --set registry.inCluster.podLabels.app\\.kubernetes\\.io/name=zot \
+    --set-json 'extraArgs=["--buildkitd-host-users=false"]' >/dev/null
   kubectl -n builder-system rollout status deployment/zeabur-builder --timeout=180s
-  kubectl -n builder-registry rollout status deployment/registry --timeout=180s
 }
 
 case "${1:-}" in

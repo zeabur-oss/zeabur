@@ -28,10 +28,11 @@ nix run .#dev-cluster -- down
 `e2e-l2.sh` and `release-smoke.sh` all use it. It installs Zeabur Identity (built from
 `ZEABUR_IDENTITY_PINNED`, fetched from `ZEABUR_IDENTITY_GIT`, or from `--identity-src`) and Zeabur
 from `zeabur-installer manifests` (the installer's own HelmChart and values; a `HelmChartConfig`
-adds Zeabur Proxy and, on the full profile, the Builder's registry), and imports busybox for the
-exec test. `--profile full` adds cert-manager, CloudNativePG with Barman Cloud, Percona MongoDB
-and Keel (each with the Helm commands Zeabur Catalog gives), the test S3, and Zeabur Builder from
-`ZEABUR_BUILDER_PINNED` with a Zot that takes anonymous pushes at a fixed ClusterIP.
+adds Zeabur Proxy), and imports busybox for the exec test. `--profile full` adds cert-manager,
+CloudNativePG with Barman Cloud, Percona MongoDB, Keel and zot (each with the Helm commands Zeabur
+Catalog gives), the test S3, and Zeabur Builder's chart from `ZEABUR_BUILDER_PINNED`, pushing
+anonymously to zot. The node pulls `zot.zot.svc:5000` as zeabur-installer sets it up: a mirror to
+zot's fixed ClusterIP 10.43.0.50, checked against zot's CA.
 `--profile bare` is the cluster alone: run `binary(kubernetes)` and `e2e-ui.sh` there (the
 `kubernetes` job does), since Zeabur's ValidatingAdmissionPolicy `zeabur-project-namespace` stops
 their non-admin people from changing namespace labels. To run a whole
