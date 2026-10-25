@@ -248,11 +248,12 @@ type ServiceChange =
           | "labelVolume"
           | "uploadToken"
           | "archiveDigest"
-          | "ipAllow"
-          | "egressLimit"
       }
     >
   | PagesChange
+  | LimitChange
+
+type LimitChange = Extract<Change, { op: "ipAllow" | "egressLimit" }>
 
 type PagesChange = Extract<
   Change,
@@ -321,12 +322,20 @@ function serviceSentence(t: Translate, change: ServiceChange): string {
       return t("confirm.archiveDigest", change.build)
     case "labelVolume":
       return t("confirm.labelVolume", change.claim)
-    case "ipAllow":
-    case "egressLimit":
-      return limitSentence(t, change)
     default:
-      return pagesSentence(t, change)
+      return limitOrPagesSentence(t, change)
   }
+}
+
+function limitOrPagesSentence(t: Translate, change: LimitChange | PagesChange): string {
+  return change.op === "ipAllow" || change.op === "egressLimit"
+    ? limitSentence(t, change)
+    : pagesSentence(t, change)
+}
+
+function limitOrPagesAction(t: Translate, change: LimitChange | PagesChange): string {
+  if (change.op !== "ipAllow" && change.op !== "egressLimit") return pagesAction(t, change)
+  return t(change.enabled ? "action.limitAddresses" : "action.removeLimit")
 }
 
 function pagesSentence(t: Translate, change: PagesChange): string {
@@ -934,11 +943,8 @@ function serviceAction(t: Translate, change: ServiceChange): string {
       return t("action.upload")
     case "labelVolume":
       return t("action.save")
-    case "ipAllow":
-    case "egressLimit":
-      return t(change.enabled ? "action.limitAddresses" : "action.removeLimit")
     default:
-      return pagesAction(t, change)
+      return limitOrPagesAction(t, change)
   }
 }
 

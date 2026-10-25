@@ -83,15 +83,19 @@ pub(crate) fn middleware_read(change: &Change) -> Option<(ResourceRef, String)> 
 
 /// The `NetworkPolicy` a change reads first, if any.
 pub(crate) fn policy_read(change: &Change) -> Option<(ResourceRef, String)> {
-    let name = match change {
-        Change::EgressLimit(limit) => &limit.workload.name,
-        Change::Delete {
-            resource,
-            name,
-            owned: true,
-            ..
-        } if crate::owned::workload_of(resource, name).is_some() => name,
-        _ => return None,
+    let name = if let Change::EgressLimit(limit) = change {
+        &limit.workload.name
+    } else if let Change::Delete {
+        resource,
+        name,
+        owned: true,
+        ..
+    } = change
+        && crate::owned::workload_of(resource, name).is_some()
+    {
+        name
+    } else {
+        return None;
     };
     Some((policy_resource(), egress_limit_name(name)))
 }
