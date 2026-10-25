@@ -226,7 +226,7 @@ up() {
       fi
     } >"$state/registries.yaml"
     # No k3d load balancer: port 443 maps straight onto the server node.
-    k3d cluster create "$cluster" --image "${K3S_IMAGE:-rancher/k3s:v1.36.5-k3s1}" --no-lb \
+    k3d cluster create "$cluster" --image "${K3S_IMAGE:-rancher/k3s:v1.37.1-k3s1}" --no-lb \
       --wait --timeout 300s --kubeconfig-update-default=false --kubeconfig-switch-context=false \
       --registry-config "$state/registries.yaml" \
       --volume "$authn_volume:/etc/rancher/k3s/zeabur-identity@server:0" \
