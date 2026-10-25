@@ -1,13 +1,16 @@
-// End-to-end tests of Zeabur in a cluster with Zeabur Identity (e2e/l2/), run by scripts/e2e-l2.sh:
+// End-to-end tests of Zeabur in a cluster with Zeabur Identity (e2e/l2/), run by
+// scripts/e2e-l2-browser.sh:
 //
 //   ZEABUR_L2_URL   Zeabur's public URL, https://zeabur.localhost
-//   ZEABUR_L2_SPKI  base64 SHA-256 of the test certificate's public key (SubjectPublicKeyInfo)
+//   ZEABUR_L2_SPKI  base64 SHA-256 of each served certificate's public key (SubjectPublicKeyInfo),
+//                   separated by commas
 //
 // Both host names end in `.localhost` and reach the cluster's ingress on this machine's port 443
-// (`--host-resolver-rules`). The certificate comes from a CA the script makes; naming its key in
-// `--ignore-certificate-errors-spki-list` makes Chromium accept it as valid, which WebAuthn needs:
-// Chromium refuses passkeys on a page with a certificate error, so `ignoreHTTPSErrors` would not
-// do. Chromium honours that switch only with `--user-data-dir`, which Playwright always passes.
+// (`--host-resolver-rules`). The certificates come from a CA scripts/dev-cluster.sh makes; naming
+// their keys in `--ignore-certificate-errors-spki-list` makes Chromium accept them as valid, which
+// WebAuthn needs: Chromium refuses passkeys on a page with a certificate error, so
+// `ignoreHTTPSErrors` would not do. Chromium honours that switch only with `--user-data-dir`,
+// which Playwright always passes.
 import { defineConfig, devices } from "@playwright/test"
 
 const url = process.env.ZEABUR_L2_URL

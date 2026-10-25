@@ -1,4 +1,4 @@
-# The browser tests' project, applied by scripts/e2e-ui.sh and scripts/e2e-l2.sh. Only `editor`
+# The browser tests' project, applied by scripts/e2e-ui.sh and scripts/dev-cluster.sh. Only `editor`
 # is changed by the write tests.
 apiVersion: v1
 kind: Namespace

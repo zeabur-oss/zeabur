@@ -1,280 +1,45 @@
 #!/usr/bin/env bash
-# Zeabur in a cluster, end to end: a k3d cluster whose kube-apiserver trusts Zeabur Identity, Zeabur Identity and
-# Zeabur installed from their images (Zeabur with its Helm chart, Zeabur Proxy enabled), both behind the cluster's
-# Traefik over HTTPS, and a browser (web/e2e/l2) that enrols a passkey, signs in, confirms a
-# terminal with the passkey again, runs a command, then reads and changes with admin rights; an
-# admin invites a Developer and a Viewer, who each see what their role allows. Then, from the
-# outside: Zeabur's service account can do nothing a fresh one cannot, the idle pod
-# stays within its memory budget, and `helm uninstall` leaves the cluster as it was.
+# Zeabur in a cluster, end to end, on the development cluster (scripts/dev-cluster.sh: Zeabur
+# Identity and Zeabur from zeabur-installer's objects, behind Traefik over HTTPS): a browser
+# (web/e2e/l2) enrols a passkey, signs in, confirms a terminal with the passkey again, runs a
+# command, then reads and changes with admin rights; an admin invites a Developer and a Viewer,
+# who each see what their role allows. Then, from the outside: Zeabur's service account can do
+# nothing a fresh one cannot, the idle pod stays within its memory budget, and removing Zeabur
+# leaves the cluster as it was.
 #
-# Run inside `nix develop` on Linux with Docker; it uses this machine's port 443. It creates the
-# k3d cluster `zeabur-l2` and deletes it at the end (ZEABUR_L2_KEEP=1 keeps it).
-#   ZEABUR_IDENTITY_SRC=../identity scripts/e2e-l2.sh
-#
-# Zeabur Identity is built from ZEABUR_IDENTITY_SRC (default: ../identity next to this checkout) at the commit in
-# ZEABUR_IDENTITY_PINNED; the script refuses a checkout whose HEAD is another commit. K3S_IMAGE picks the
-# k3s release (default as in CI). ZEABUR_REGISTRY_MIRRORS (`docker.io=http://mirror:5001,ghcr.io=...`)
-# makes the cluster pull through those mirrors.
+# Run on Linux with Docker and Nix; it uses this machine's port 443. Arguments go to
+# `dev-cluster.sh up` (`--profile full`, `--identity-src <dir>`). The cluster is deleted at the
+# end; ZEABUR_L2_KEEP=1 keeps it, with Zeabur, and skips the removal check.
+#   scripts/e2e-l2.sh
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
-zeabur_identity_src="$(cd "${ZEABUR_IDENTITY_SRC:-$root/../identity}" && pwd)"
-k3s_image="${K3S_IMAGE:-rancher/k3s:v1.36.5-k3s1}"
-cluster=zeabur-l2
-node="k3d-$cluster-server-0"
-authn_volume="$cluster-authn"
-out="$root/target/e2e-l2"
-zeabur_identity_host=identity.localhost
-zeabur_host=zeabur.localhost
+if [[ -z "${ZEABUR_CA_BUNDLE:-}" ]]; then
+  exec nix develop "$root" --command "$0" "$@"
+fi
+state="$root/target/dev-cluster"
 namespace=zeabur             # Zeabur's release
 project=zeabur-e2e           # the project the browser opens (web/e2e/manifests/talker.yaml)
-zeabur_identity_image=docker.io/library/zeabur-identity:e2e-l2
-zeabur_image=docker.io/library/zeabur:e2e-l2
-proxy_image=docker.io/library/zeabur-proxy:e2e-l2
 memory_budget=$((30 * 1024 * 1024))
+export KUBECONFIG="$state/kubeconfig"
 
-for tool in docker k3d kubectl helm openssl jq git bun curl nix; do
-  command -v "$tool" >/dev/null || { echo "error: $tool is not on PATH" >&2; exit 1; }
-done
-mkdir -p "$out"
-
-# --- Zeabur Identity, as pinned --------------------------------------------------------------------------
-pinned=$(tr -d '[:space:]' <"$root/ZEABUR_IDENTITY_PINNED")
-head=$(git -C "$zeabur_identity_src" rev-parse HEAD)
-if [[ "$head" != "$pinned" ]]; then
-  echo "error: $zeabur_identity_src is at $head; ZEABUR_IDENTITY_PINNED wants $pinned" >&2
-  echo "       check out that commit, or write the new one to ZEABUR_IDENTITY_PINNED" >&2
-  exit 1
-fi
-# Built from the pinned commit's tree, not the working copy, with that commit's own dev shell.
-# The build directory stays between runs so Cargo can reuse it.
-zeabur_identity_build="$out/zeabur-identity"
-mkdir -p "$zeabur_identity_build"
-find "$zeabur_identity_build" -mindepth 1 -maxdepth 1 ! -name target -exec rm -rf {} +
-git -C "$zeabur_identity_src" archive "$pinned" | tar -x -C "$zeabur_identity_build"
-zeabur_identity_shell=(nix develop "git+file://$zeabur_identity_src?rev=$pinned" --command)
-
-# --- Failure context and clean-up ---------------------------------------------------------------
-cluster_up=""
 finish() {
   local status=$?
-  if ((status != 0)) && [[ -n "$cluster_up" ]]; then
+  if ((status != 0)) && [[ -s "$KUBECONFIG" ]]; then
     echo "--- failure context" >&2
     kubectl get pods,events -A -o wide >&2 || true
     kubectl -n "$namespace" logs deploy/zeabur --tail=200 >&2 || true
     kubectl -n zeabur-identity logs deploy/zeabur-identity --tail=200 >&2 || true
-    for context in "$out"/results/*/error-context.md; do
+    for context in "$state"/results/*/error-context.md; do
       [[ -f "$context" ]] && cat "$context" >&2
     done
   fi
-  if [[ -z "${ZEABUR_L2_KEEP:-}" ]]; then
-    k3d cluster delete "$cluster" >/dev/null 2>&1 || true
-    docker volume rm -f "$authn_volume" >/dev/null 2>&1 || true
-  fi
+  [[ -n "${ZEABUR_L2_KEEP:-}" ]] || "$root/scripts/dev-cluster.sh" down
   exit "$status"
 }
 trap finish EXIT
 
-# Polls `$@` every two seconds until it succeeds or `$1` seconds pass.
-retry() { # $1 = seconds, $2 = what, $@ = command
-  local deadline=$((SECONDS + $1)) what="$2"
-  shift 2
-  until "$@" >/dev/null 2>&1; do
-    if ((SECONDS >= deadline)); then
-      echo "error: timed out waiting for $what" >&2
-      return 1
-    fi
-    sleep 2
-  done
-}
-
-# --- Images -------------------------------------------------------------------------------------
-# No attestation manifests: k3d's import of a multi-manifest index can fail on the node while
-# reporting success (see the kubernetes job in .github/workflows/ci.yml).
-export BUILDX_NO_DEFAULT_ATTESTATIONS=1
-(cd "$zeabur_identity_build" && "${zeabur_identity_shell[@]}" bash -c \
-  "./scripts/build-image.sh $zeabur_identity_image && cargo build --release --locked -p zeabur-identityctl")
-zeabur_identityctl="$zeabur_identity_build/target/release/zeabur-identityctl"
-"$root/scripts/build-image.sh" "$zeabur_image"
-"$root/scripts/build-image.sh" "$proxy_image" zeabur-proxy
-docker pull busybox:1.37
-printf 'FROM busybox:1.37\nLABEL com.zeabur.test=busybox\n' |
-  DOCKER_BUILDKIT=0 docker build -t busybox:1.37 -
-
-# --- Cluster ------------------------------------------------------------------------------------
-# kube-apiserver reads its AuthenticationConfiguration from a file it re-reads by path, starting
-# with no issuer (as Zeabur Identity's CI does). The file lives in a Docker volume rather than a host
-# directory so that this also works where the script itself runs in a container.
-k3d cluster delete "$cluster" >/dev/null 2>&1 || true
-docker volume rm -f "$authn_volume" >/dev/null
-docker volume create "$authn_volume" >/dev/null
-printf 'apiVersion: apiserver.config.k8s.io/v1\nkind: AuthenticationConfiguration\nanonymous:\n  enabled: false\njwt: []\n' |
-  docker run --rm -i -v "$authn_volume:/authn" busybox:1.37 sh -c 'cat >/authn/authn.yaml'
-registry_args=()
-if [[ -n "${ZEABUR_REGISTRY_MIRRORS:-}" ]]; then
-  IFS=, read -ra mirrors <<<"$ZEABUR_REGISTRY_MIRRORS"
-  {
-    echo "mirrors:"
-    for mirror in "${mirrors[@]}"; do
-      [[ "$mirror" == ?*=?* ]] || { echo "error: ZEABUR_REGISTRY_MIRRORS: want registry=endpoint, got $mirror" >&2; exit 1; }
-      printf '  "%s":\n    endpoint: ["%s"]\n' "${mirror%%=*}" "${mirror#*=}"
-    done
-  } >"$out/registries.yaml"
-  registry_args=(--registry-config "$out/registries.yaml")
-fi
-# No k3d load balancer, so the port maps straight onto the server node (`direct`, see
-# https://k3d.io/stable/usage/exposing_services/).
-k3d cluster create "$cluster" --image "$k3s_image" --no-lb --wait --timeout 300s \
-  --kubeconfig-update-default=false "${registry_args[@]}" \
-  --volume "$authn_volume:/etc/rancher/k3s/zeabur-identity@server:0" \
-  --k3s-arg "--kube-apiserver-arg=authentication-config=/etc/rancher/k3s/zeabur-identity/authn.yaml@server:0" \
-  --port "443:443@server:0:direct"
-export KUBECONFIG="$out/kubeconfig"
-cluster_up=1
-k3d kubeconfig get "$cluster" >"$KUBECONFIG"
-for image in "$zeabur_identity_image" "$zeabur_image" "$proxy_image" busybox:1.37; do
-  k3d image import "$image" --cluster "$cluster"
-  name="${image%:*}"
-  # Read the whole list before matching: `grep -q` exits at the first match, and under pipefail
-  # the SIGPIPE that crictl then gets would fail the check.
-  images=$(docker exec "$node" crictl images)
-  if ! grep -q "${name#docker.io/} *${image##*:}" <<<"$images"; then
-    echo "error: the node does not have $image after the import" >&2
-    exit 1
-  fi
-done
-
-# k3s installs Traefik (ports 80 and 443 on the node) from a bundled Helm chart, shortly after
-# the node is ready.
-retry 300 "Traefik to be installed" kubectl -n kube-system get deployment/traefik
-kubectl -n kube-system rollout status deployment/traefik --timeout=300s
-
-# Both host names resolve to Traefik inside the cluster too, so Zeabur reaches Zeabur Identity at its
-# public URL. k3s's CoreDNS imports `*.override` from the `coredns-custom` ConfigMap into its
-# main server block (https://docs.k3s.io/networking/networking-services#coredns);
-# `answer auto` names the answer as asked (https://coredns.io/plugins/rewrite/).
-kubectl apply -f - <<EOF
-apiVersion: v1
-kind: ConfigMap
-metadata: {name: coredns-custom, namespace: kube-system}
-data:
-  zeabur-l2.override: |
-    rewrite name exact $zeabur_identity_host traefik.kube-system.svc.cluster.local answer auto
-    rewrite name exact $zeabur_host traefik.kube-system.svc.cluster.local answer auto
-EOF
-kubectl -n kube-system rollout restart deployment/coredns
-kubectl -n kube-system rollout status deployment/coredns --timeout=120s
-# A pod per try, read through its log: `kubectl run --rm -i` may fail to attach to a pod that has
-# already ended and then leaves it behind, so the next try would find the name taken.
-resolves() {
-  kubectl delete pod dns-check --ignore-not-found --wait >/dev/null
-  kubectl run dns-check --restart=Never --image=busybox:1.37 --image-pull-policy=Never \
-    -- nslookup "$zeabur_identity_host" >/dev/null &&
-    kubectl wait pod/dns-check --for=jsonpath='{.status.phase}'=Succeeded --timeout=60s >/dev/null &&
-    kubectl logs dns-check | grep -q "^Name:.*$zeabur_identity_host"
-}
-retry 120 "$zeabur_identity_host to resolve in the cluster" resolves
-kubectl delete pod dns-check --wait >/dev/null
-
-# --- TLS: a CA of this run, one certificate for both host names ----------------------------------
-tls="$out/tls"
-rm -rf "$tls"
-mkdir -p "$tls"
-openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes -days 2 \
-  -subj "/CN=zeabur e2e CA" -keyout "$tls/ca.key" -out "$tls/ca.crt" \
-  -addext "basicConstraints=critical,CA:TRUE" -addext "keyUsage=critical,keyCertSign" 2>/dev/null
-openssl req -new -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes \
-  -subj "/CN=zeabur e2e" -keyout "$tls/tls.key" -out "$tls/tls.csr" 2>/dev/null
-printf 'subjectAltName=DNS:%s,DNS:%s\nextendedKeyUsage=serverAuth\nbasicConstraints=critical,CA:FALSE\n' \
-  "$zeabur_identity_host" "$zeabur_host" >"$tls/ext.cnf"
-openssl x509 -req -in "$tls/tls.csr" -CA "$tls/ca.crt" -CAkey "$tls/ca.key" -days 2 \
-  -set_serial "0x$(openssl rand -hex 16)" -extfile "$tls/ext.cnf" -out "$tls/tls.crt" 2>/dev/null
-
-# --- Zeabur Identity, installed as its get-started guide does ----------------------------------------------
-export ZEABUR_IDENTITY_ISSUER="https://$zeabur_identity_host"
-"$zeabur_identityctl" crds | kubectl apply --server-side -f -
-"$zeabur_identityctl" manifests --image "$zeabur_identity_image" --serve-arg=--invitations |
-  kubectl apply --server-side -f -
-kubectl -n zeabur-identity rollout status deployment/zeabur-identity --timeout=180s
-kubectl -n zeabur-identity create secret tls zeabur-identity-tls --cert="$tls/tls.crt" --key="$tls/tls.key"
-kubectl apply -f - <<EOF
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata: {name: zeabur-identity, namespace: zeabur-identity}
-spec:
-  ingressClassName: traefik
-  tls: [{hosts: [$zeabur_identity_host], secretName: zeabur-identity-tls}]
-  rules:
-    - host: $zeabur_identity_host
-      http:
-        paths:
-          - {path: /, pathType: Prefix, backend: {service: {name: zeabur-identity, port: {number: 80}}}}
-EOF
-zeabur_identity_up() {
-  curl -sf --cacert "$tls/ca.crt" --resolve "$zeabur_identity_host:443:127.0.0.1" \
-    "https://$zeabur_identity_host/.well-known/openid-configuration" | jq -e --arg i "$ZEABUR_IDENTITY_ISSUER" '.issuer == $i'
-}
-retry 120 "Zeabur Identity's discovery document over HTTPS" zeabur_identity_up
-
-# kube-apiserver trusts Zeabur Identity once it has re-read its configuration (about once a minute):
-# count its successful reloads before and after.
-reloads() {
-  kubectl get --raw /metrics | awk '/^apiserver_authentication_config_controller_automatic_reloads_total/ &&
-    /status="success"/ { n += $NF } END { print n + 0 }'
-}
-before=$(reloads)
-# (It also prints how to install the file on a k3s server; the next line does that here.)
-"$zeabur_identityctl" kube-config --distro k3s >"$out/authn.yaml"
-docker exec -i "$node" sh -c 'cat >/etc/rancher/k3s/zeabur-identity/.authn.yaml.tmp &&
-  mv /etc/rancher/k3s/zeabur-identity/.authn.yaml.tmp /etc/rancher/k3s/zeabur-identity/authn.yaml' <"$out/authn.yaml"
-reloaded() { (($(reloads) > before)); }
-retry 180 "kube-apiserver to load Zeabur Identity's configuration" reloaded
-
-# Zeabur's client: confidential, may ask for elevation, gets tokens kube-apiserver accepts.
-"$zeabur_identityctl" client create zeabur --type confidential --allow-elevation --audience kubernetes --display-name Zeabur \
-  --redirect-uri "https://$zeabur_host/auth/callback" --home-url "https://$zeabur_host/" 2>"$out/client.err" | kubectl apply -f -
-client_secret=$(tail -n 1 "$out/client.err")
-rm -f "$out/client.err"
-
-# The projects the browser opens, before the snapshot: their namespaces stay after the removal.
-kubectl apply -f "$root/web/e2e/manifests/talker.yaml" \
-  -f "$root/web/e2e/manifests/second-project.yaml" >/dev/null
-
-# --- What the cluster looks like before zeabur ----------------------------------------------------
-# Every cluster-scoped object by kind and name, and every namespace's labels and annotations.
-# Sorted within each kind: not every list comes in a fixed order (componentstatuses have come back
-# in another order between two reads).
-snapshot() {
-  local resource
-  for resource in $(kubectl api-resources --namespaced=false --verbs=list -o name 2>/dev/null | sort); do
-    kubectl get "$resource" -o name 2>/dev/null | sort | sed "s|^|$resource |"
-  done
-  kubectl get namespaces -o json |
-    jq -r '.items[] | [.metadata.name, (.metadata.labels // {} | tojson), (.metadata.annotations // {} | tojson)] | @tsv'
-}
-snapshot >"$out/before.txt"
-
-# --- Zeabur, from the chart ---------------------------------------------------------------------
-kubectl create namespace "$namespace"
-printf %s "$client_secret" |
-  kubectl -n "$namespace" create secret generic zeabur-oidc --from-file=client-secret=/dev/stdin
-unset client_secret
-kubectl -n "$namespace" create secret tls zeabur-tls --cert="$tls/tls.crt" --key="$tls/tls.key"
-kubectl -n "$namespace" create configmap zeabur-identity-ca --from-file=ca.crt="$tls/ca.crt"
-helm install zeabur "$root/deploy/chart/zeabur" --namespace "$namespace" --wait --timeout 3m \
-  --set image.repository="${zeabur_image%:*}" --set image.tag="${zeabur_image##*:}" \
-  --set publicUrl="https://$zeabur_host" --set clusterName="$cluster" \
-  --set issuer.url="$ZEABUR_IDENTITY_ISSUER" \
-  --set issuer.clientSecret.existingSecret=zeabur-oidc \
-  --set issuer.caBundle.configMap=zeabur-identity-ca \
-  --set ingress.enabled=true --set ingress.className=traefik \
-  --set ingress.tls.secretName=zeabur-tls \
-  --set proxy.enabled=true \
-  --set proxy.image.repository="${proxy_image%:*}" --set proxy.image.tag="${proxy_image##*:}"
-zeabur_up() {
-  curl -sf --cacert "$tls/ca.crt" --resolve "$zeabur_host:443:127.0.0.1" "https://$zeabur_host/api/healthz"
-}
-retry 120 "zeabur over HTTPS" zeabur_up
+"$root/scripts/dev-cluster.sh" up "$@"
 
 # --- The browser ----------------------------------------------------------------------------------
 # The e2e users, made from scratch, and web/e2e/l2.
@@ -320,7 +85,7 @@ if [[ ! "$working_set" =~ ^[0-9]+$ ]]; then
   echo "error: the kubelet reported no working set for pod $pod" >&2
   exit 1
 fi
-printf '{"pod_working_set_bytes": %s}\n' "$working_set" >"$out/measurements.json"
+printf '{"pod_working_set_bytes": %s}\n' "$working_set" >"$state/measurements.json"
 echo "idle working set: $working_set bytes ($((working_set / 1024)) KiB; budget $((memory_budget / 1024)) KiB)"
 if ((working_set > memory_budget)); then
   echo "error: idle working set $working_set bytes exceeds 30 MiB" >&2
@@ -328,14 +93,17 @@ if ((working_set > memory_budget)); then
 fi
 
 # --- Removal leaves the cluster as it was -----------------------------------------------------------
-helm uninstall zeabur --namespace "$namespace" --wait --timeout 3m
-kubectl delete rolebindings,clusterrolebindings -A -l zeabur.com/member --wait
+[[ -z "${ZEABUR_L2_KEEP:-}" ]] || exit 0
+# As `zeabur-installer uninstall` removes Zeabur, and the values only this cluster sets.
+kubectl -n kube-system delete helmchart.helm.cattle.io zeabur --wait --timeout=180s
+kubectl -n kube-system delete helmchartconfig.helm.cattle.io zeabur --wait
 kubectl delete namespace "$namespace" --wait --timeout=180s
+kubectl delete rolebindings,clusterrolebindings -A -l app.kubernetes.io/managed-by=zeabur,zeabur.com/member --wait
 # The chart keeps the S3 destinations' namespace on purpose; the project's name is the person's.
 kubectl delete namespace zeabur-s3-destinations --wait --timeout=180s
 kubectl annotate namespace "$project" zeabur.com/display-name-
-snapshot >"$out/after.txt"
-if ! diff -u "$out/before.txt" "$out/after.txt"; then
+"$root/scripts/dev-cluster.sh" snapshot >"$state/after.txt"
+if ! diff -u "$state/before.txt" "$state/after.txt"; then
   echo "error: the cluster differs from before the installation (above)" >&2
   exit 1
 fi

@@ -1,7 +1,7 @@
 import { expect, test } from "../fixtures.ts"
 import { authenticator, enrol, signInAtZeaburIdentity } from "./identity.ts"
 
-// Zeabur in a cluster with Zeabur Identity, first sign-in to admin rights. scripts/e2e-l2.sh sets:
+// Zeabur in a cluster with Zeabur Identity, first sign-in to admin rights. scripts/e2e-l2-browser.sh sets:
 //
 //   ZEABUR_L2_URL          Zeabur's public URL (https://zeabur.localhost)
 //   ZEABUR_L2_SETUP_LINK   the one-time link `zeabur-identityctl setup-link` printed for user `admin`

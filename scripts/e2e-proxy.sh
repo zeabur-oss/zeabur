@@ -8,7 +8,7 @@
 # Needs a cluster where the chart runs with `proxy.enabled` and the catalog's logs capability
 # (VictoriaLogs, vlagent, its NetworkPolicy) is installed; KUBECONFIG points at it. Run inside
 # `nix develop`. It removes what it made unless ZEABUR_PROXY_E2E_KEEP=1.
-#   KUBECONFIG=target/e2e-l2/kubeconfig scripts/e2e-proxy.sh
+#   KUBECONFIG=target/dev-cluster/kubeconfig scripts/e2e-proxy.sh
 set -euo pipefail
 
 release_namespace="${ZEABUR_NAMESPACE:-zeabur}"

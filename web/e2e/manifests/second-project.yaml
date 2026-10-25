@@ -1,5 +1,5 @@
 # A second project: the roles test (web/e2e/l2/roles.spec.ts) gives its Developer none here and
-# its Viewer only this one; ui.spec.ts switches to it. Applied by scripts/e2e-l2.sh and
+# its Viewer only this one; ui.spec.ts switches to it. Applied by scripts/dev-cluster.sh and
 # scripts/e2e-ui.sh.
 apiVersion: v1
 kind: Namespace

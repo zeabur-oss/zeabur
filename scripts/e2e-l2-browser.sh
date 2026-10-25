@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
-# The browser part of scripts/e2e-l2.sh, on the cluster it made (one kept with ZEABUR_L2_KEEP=1
-# too): makes the e2e users again from scratch, then runs web/e2e/l2 with Playwright. Arguments go
-# to Playwright:
+# The browser part of scripts/e2e-l2.sh, on the cluster `scripts/dev-cluster.sh up` made: makes the
+# e2e users again from scratch, then runs web/e2e/l2 with Playwright. Arguments go to Playwright:
 #   scripts/e2e-l2-browser.sh e2e/l2/roles.spec.ts
 #
 # Every e2e user is deleted with the RBAC bindings Zeabur made for them (label zeabur.com/member)
@@ -10,14 +9,15 @@
 # `zeabur-identityctl invite`, and the members the roles test invites through Zeabur. Users of an
 # older run would keep what the code of their day gave them.
 #
-# Run inside `nix develop`; uses target/e2e-l2 (kubeconfig, TLS, zeabur-identityctl), never the
-# default kubeconfig.
+# On a cluster of `--profile full`, a spec that would skip for want of Zeabur Builder, CloudNativePG
+# or the Percona Operator fails instead. Run inside `nix develop`; uses target/dev-cluster
+# (kubeconfig, CA, zeabur-identityctl), never the default kubeconfig.
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
-out="$root/target/e2e-l2"
+out="$root/target/dev-cluster"
 tls="$out/tls"
-zeabur_identityctl="$out/zeabur-identity/target/release/zeabur-identityctl"
+zeabur_identityctl="$out/identityctl"
 zeabur_host=zeabur.localhost
 first=zeabur-e2e           # web/e2e/manifests/talker.yaml
 second=zeabur-e2e-second   # web/e2e/manifests/second-project.yaml
@@ -25,11 +25,19 @@ users=(admin e2e-admin e2e-developer e2e-viewer e2e-member e2e-db-admin e2e-db-d
   e2e-git-admin e2e-git-developer e2e-git-private-admin e2e-git-private-developer
   e2e-image-admin e2e-image-developer e2e-usage-admin e2e-usage-viewer)
 
-for file in "$out/kubeconfig" "$tls/ca.crt" "$tls/tls.crt" "$zeabur_identityctl"; do
-  [[ -e "$file" ]] || { echo "error: $file is missing; run scripts/e2e-l2.sh first" >&2; exit 1; }
+for file in "$out/kubeconfig" "$out/profile" "$tls/ca.crt" "$zeabur_identityctl"; do
+  [[ -e "$file" ]] || { echo "error: $file is missing; run scripts/dev-cluster.sh up first" >&2; exit 1; }
 done
 export KUBECONFIG="$out/kubeconfig"
 export ZEABUR_IDENTITY_ISSUER="https://identity.localhost"
+full=""
+[[ "$(cat "$out/profile")" == full ]] && full=1
+# Whether the cluster has CRD `$1`; on the full profile, that it must.
+has_crd() {
+  kubectl get crd "$1" >/dev/null 2>&1 && return 0
+  [[ -z "$full" ]] || { echo "error: the full profile has no CRD $1" >&2; exit 1; }
+  return 1
+}
 
 # --- The e2e users, from scratch ------------------------------------------------------------------
 # A User owns its credentials, sessions and links: a foreground deletion waits for them too.
@@ -50,7 +58,7 @@ usage_admin_link=$("$zeabur_identityctl" invite --username e2e-usage-admin --gro
 # Deploy from Git, when Zeabur Builder runs here (e2e/l2/git.spec.ts skips otherwise), and from a
 # private repository when E2E_PRIVATE_GIT_REPO names one (e2e/l2/git-private.spec.ts).
 git_admin_link="" git_private_admin_link=""
-if kubectl get crd builds.builder.zeabur.com >/dev/null 2>&1; then
+if has_crd builds.builder.zeabur.com; then
   git_admin_link=$("$zeabur_identityctl" invite --username e2e-git-admin --group admins \
     --elevated-group admins)
   if [[ -n "${E2E_PRIVATE_GIT_REPO:-}" ]]; then
@@ -64,26 +72,26 @@ kubectl apply -f "$root/web/e2e/manifests/talker.yaml" -f "$root/web/e2e/manifes
 kubectl -n "$first" rollout status deployment/talker --timeout=180s
 kubectl -n "$second" rollout status deployment/talker --timeout=180s
 
-# --- Databases, when an operator runs here (e2e/l2/databases.spec.ts skips otherwise) ------------
+# --- Databases, when an operator and the test S3 run here (e2e/l2/databases.spec.ts skips otherwise)
 s3_endpoint="" mongodb=""
-if kubectl get crd clusters.postgresql.cnpg.io >/dev/null 2>&1; then
-  kubectl apply -f "$root/web/e2e/manifests/s3.yaml" >/dev/null
-  kubectl -n s3-test rollout status deployment/seaweedfs --timeout=180s
-  for _ in $(seq 1 30); do
-    kubectl -n s3-test exec deploy/seaweedfs -- sh -c \
-      'echo s3.bucket.create -name backups | weed shell -master=localhost:9333 -filer=localhost:8888' \
-      2>/dev/null | grep -q 'created bucket\|already exists' && break
-    sleep 2
-  done
-  s3_endpoint=http://s3.s3-test.svc:8333
-  kubectl get crd perconaservermongodbs.psmdb.percona.com >/dev/null 2>&1 && mongodb=1
+if has_crd clusters.postgresql.cnpg.io; then
+  if kubectl -n s3-test get deployment seaweedfs >/dev/null 2>&1; then
+    s3_endpoint=http://s3.s3-test.svc:8333
+  elif [[ -n "$full" ]]; then
+    echo "error: the full profile has no test S3 (namespace s3-test)" >&2
+    exit 1
+  fi
+  has_crd perconaservermongodbs.psmdb.percona.com && mongodb=1
 fi
 
 # --- The browser ----------------------------------------------------------------------------------
-# Chromium accepts the run's certificate by its key (ZEABUR_L2_SPKI); the test's own requests
-# (page.request) go through Node, which takes the run's CA from NODE_EXTRA_CA_CERTS.
-spki=$(openssl x509 -in "$tls/tls.crt" -pubkey -noout | openssl pkey -pubin -outform der |
-  openssl dgst -sha256 -binary | base64)
+# Chromium accepts the served certificates by their keys (ZEABUR_L2_SPKI): cert-manager, on the
+# full profile, issues its own. The test's own requests (page.request) go through Node, which
+# takes the cluster's CA from NODE_EXTRA_CA_CERTS.
+spki=$(for host in identity.localhost "$zeabur_host"; do
+  openssl s_client -connect 127.0.0.1:443 -servername "$host" </dev/null 2>/dev/null |
+    openssl x509 -pubkey -noout | openssl pkey -pubin -outform der | openssl dgst -sha256 -binary | base64
+done | paste -sd,)
 rm -rf "$out/results"
 cd "$root/web"
 NODE_EXTRA_CA_CERTS="$tls/ca.crt" \
