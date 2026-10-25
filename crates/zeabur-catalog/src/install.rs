@@ -455,14 +455,12 @@ impl<'a> Rendered<'a> {
         secrets
     }
 
-    /// Shell commands for `kubectl` and Helm.
-    fn helm(&self) -> String {
-        let mut out = self.k3s_packaged();
-        push(&mut out, format!("# Profile: {}\n", self.profile));
-        let secrets = self.secrets();
+    /// `kubectl` commands that make the namespaces the secrets and a privileged component need.
+    fn namespace_commands(&self, secrets: &[SecretInputs<'_>]) -> String {
+        let mut out = String::new();
         let privileged = self.privileged_namespaces();
         let mut namespaces: Vec<&str> = privileged.clone();
-        for ((ns, _), _) in &secrets {
+        for ((ns, _), _) in secrets {
             if !namespaces.contains(ns) {
                 namespaces.push(ns);
             }
@@ -488,6 +486,15 @@ impl<'a> Rendered<'a> {
                 );
             }
         }
+        out
+    }
+
+    /// Shell commands for `kubectl` and Helm.
+    fn helm(&self) -> String {
+        let mut out = self.k3s_packaged();
+        push(&mut out, format!("# Profile: {}\n", self.profile));
+        let secrets = self.secrets();
+        out.push_str(&self.namespace_commands(&secrets));
         for ((ns, name), inputs) in &secrets {
             for (input, _) in inputs {
                 push(&mut out, format!("# {}\n", input.description.trim()));
