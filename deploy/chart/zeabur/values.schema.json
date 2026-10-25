@@ -60,7 +60,7 @@
     },
     "publicUrl": { "$ref": "#/definitions/origin" },
     "clusterName": {
-      "description": "What the interface calls the cluster: one line of at most 63 characters, or empty to find one.",
+      "description": "What the interface calls the cluster: one line of at most 63 characters, or empty to use the public URL's host.",
       "type": "string",
       "maxLength": 63,
       "pattern": "^[^\\x00-\\x1f\\x7f]*$"

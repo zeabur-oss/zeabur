@@ -5,21 +5,16 @@
 //!
 //! 1. A name chosen in the settings (the ConfigMap `zeabur-settings`, key `cluster-name`).
 //! 2. The name the server was started with (`ZEABUR_CLUSTER_NAME`, the chart's `clusterName`).
-//! 3. In local mode, the kubeconfig's name for the context's cluster, without the `k3d-` or `kind-`
-//!    prefix, EKS' ARN or GKE's `gke_<project>_<location>_` around it.
-//! 4. What the person can read on the nodes: a provider's label or naming scheme, else the first
-//!    control plane node's name ([`zeabur_adapters::cluster_name::detect`]). Nothing is kept
-//!    between requests: someone who may not list nodes is not told what they say.
-//! 5. The host Zeabur is served at: the public URL's, else the request's `Host`.
+//! 3. In local mode, the kubeconfig's name for the context's cluster, as it is.
+//! 4. The host Zeabur is served at: the public URL's, else the request's `Host`.
 
 use axum::Json;
 use axum::extract::State;
 use axum::http::{HeaderMap, header};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
-use zeabur_adapters::cluster_name::{Provider, detect, from_kubeconfig, is_address};
 use zeabur_core::problem::{Kind, MEDIA_TYPE as PROBLEM, Problem};
-use zeabur_kube::{Cluster, ResourceRef};
+use zeabur_kube::Cluster;
 use zeabur_model::Origin;
 
 use super::{
@@ -40,59 +35,8 @@ pub enum NameSource {
     Install,
     /// The kubeconfig's name for the cluster (local mode).
     Kubeconfig,
-    /// Read on the cluster's nodes; `provider` says whose convention.
-    Nodes,
     /// The host Zeabur is served at.
     Address,
-}
-
-/// Whose convention a name follows. An open set.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
-#[serde(rename_all = "kebab-case")]
-pub enum NameProvider {
-    /// Amazon EKS.
-    Eks,
-    /// Google Kubernetes Engine.
-    Gke,
-    /// Azure Kubernetes Service.
-    Aks,
-    /// k3d.
-    K3d,
-    /// kind.
-    Kind,
-    /// minikube.
-    Minikube,
-    /// Docker Desktop.
-    DockerDesktop,
-    /// `OrbStack`.
-    Orbstack,
-    /// k3s: its first control plane node's name.
-    K3s,
-    /// k0s: its first control plane node's name.
-    K0s,
-    /// RKE2: its first control plane node's name.
-    Rke2,
-    /// Another distribution: its first control plane node's name.
-    Node,
-}
-
-impl From<Provider> for NameProvider {
-    fn from(provider: Provider) -> Self {
-        match provider {
-            Provider::Eks => Self::Eks,
-            Provider::Gke => Self::Gke,
-            Provider::Aks => Self::Aks,
-            Provider::K3d => Self::K3d,
-            Provider::Kind => Self::Kind,
-            Provider::Minikube => Self::Minikube,
-            Provider::DockerDesktop => Self::DockerDesktop,
-            Provider::OrbStack => Self::Orbstack,
-            Provider::K3s => Self::K3s,
-            Provider::K0s => Self::K0s,
-            Provider::Rke2 => Self::Rke2,
-            Provider::Node => Self::Node,
-        }
-    }
 }
 
 /// The cluster's name for one request.
@@ -100,16 +44,11 @@ impl From<Provider> for NameProvider {
 pub(crate) struct Named {
     pub(crate) name: String,
     pub(crate) source: NameSource,
-    pub(crate) provider: Option<NameProvider>,
 }
 
 impl Named {
-    const fn new(name: String, source: NameSource, provider: Option<NameProvider>) -> Self {
-        Self {
-            name,
-            source,
-            provider,
-        }
+    const fn new(name: String, source: NameSource) -> Self {
+        Self { name, source }
     }
 }
 
@@ -126,6 +65,20 @@ fn host_of(headers: &HeaderMap) -> Option<String> {
     (!host.is_empty()).then(|| host.to_owned())
 }
 
+/// Whether `host` is an address rather than a name: an IPv4 or IPv6 literal, or a name made of
+/// one (`ip-10-0-1-2.ec2.internal`).
+fn is_address(host: &str) -> bool {
+    let host = host.trim_start_matches('[').trim_end_matches(']');
+    if host.contains(':') || host.parse::<std::net::Ipv4Addr>().is_ok() {
+        return true;
+    }
+    let first = host.split('.').next().unwrap_or(host);
+    first.strip_prefix("ip-").is_some_and(|rest| {
+        let parts: Vec<&str> = rest.split('-').collect();
+        parts.len() == 4 && parts.iter().all(|p| p.parse::<u8>().is_ok())
+    })
+}
+
 /// The cluster's name for this person (see the module documentation).
 pub(crate) async fn resolve(
     cluster: &dyn Cluster,
@@ -137,20 +90,13 @@ pub(crate) async fn resolve(
         .get(CLUSTER_NAME_KEY)
         .and_then(|text| parse_cluster_name(text).ok())
     {
-        return Named::new(name, NameSource::Setting, None);
+        return Named::new(name, NameSource::Setting);
     }
     if let Some(name) = &settings.cluster_name {
-        return Named::new(name.clone(), NameSource::Install, None);
+        return Named::new(name.clone(), NameSource::Install);
     }
     if let Some(name) = cluster.kubeconfig_name() {
-        let (name, provider) = from_kubeconfig(&name);
-        return Named::new(name, NameSource::Kubeconfig, provider.map(Into::into));
-    }
-    let nodes = ResourceRef::new("", "v1", "nodes", "Node");
-    if let Ok(Some(metas)) = cluster.list_metadata(&nodes, None).await
-        && let Some(found) = detect(&metas)
-    {
-        return Named::new(found.name, NameSource::Nodes, Some(found.provider.into()));
+        return Named::new(name, NameSource::Kubeconfig);
     }
     let hosts: Vec<String> = settings
         .public_host
@@ -164,7 +110,7 @@ pub(crate) async fn resolve(
         .or_else(|| hosts.first())
         .cloned()
         .unwrap_or_else(|| "localhost".to_owned());
-    Named::new(host, NameSource::Address, None)
+    Named::new(host, NameSource::Address)
 }
 
 /// The cluster's name setting.
@@ -289,5 +235,20 @@ mod tests {
             assert_eq!(host_of(&headers).as_deref(), Some(host), "{value}");
         }
         assert_eq!(host_of(&HeaderMap::new()), None);
+    }
+
+    #[test]
+    fn addresses_are_told_from_names() {
+        for address in [
+            "10.43.0.1",
+            "[fd00::1]",
+            "fd00::1",
+            "ip-10-0-1-2.ec2.internal",
+        ] {
+            assert!(is_address(address), "{address}");
+        }
+        for name in ["zeabur.localhost", "vps-1", "ip-range", "k3d-dev-server-0"] {
+            assert!(!is_address(name), "{name}");
+        }
     }
 }

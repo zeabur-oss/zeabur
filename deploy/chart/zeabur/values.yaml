@@ -19,8 +19,7 @@ imagePullSecrets: []
 publicUrl: ""
 
 # What the interface calls this cluster, so people with several can tell them apart, such as
-# shop-prod. An administrator can rename it in Settings. Empty: a name read from the nodes (k3d,
-# kind, EKS, GKE, AKS and others, or the first control plane node), else publicUrl's host.
+# shop-prod. An administrator can rename it in Settings. Empty: publicUrl's host.
 clusterName: ""
 
 issuer:

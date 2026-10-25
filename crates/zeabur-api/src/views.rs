@@ -68,9 +68,6 @@ pub struct Cluster {
     pub name: String,
     /// Where `name` comes from.
     pub name_source: crate::settings::cluster_name::NameSource,
-    /// Whose convention `name` follows, when one does (`nodes`, `kubeconfig`).
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub name_provider: Option<crate::settings::cluster_name::NameProvider>,
     /// kube-apiserver's version (`gitVersion`, such as `v1.36.5+k3s1`).
     pub kubernetes_version: String,
     /// The distribution, when the version names one: `k3s` or `rke2`.

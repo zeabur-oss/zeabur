@@ -245,8 +245,7 @@ test("the account card's lines share one left edge, also with admin rights on", 
     route.fulfill({
       json: {
         name: "zeabur-l2",
-        nameSource: "nodes",
-        nameProvider: "k3d",
+        nameSource: "install",
         kubernetesVersion: "v1.36.5+k3s1",
       },
     }),
@@ -257,7 +256,7 @@ test("the account card's lines share one left edge, also with admin rights on", 
     .getByRole("navigation", { name: "Main" })
     .locator('button:has([data-slot="avatar"])')
   await expect(card).toContainText("zeabur-l2")
-  await expect(card.getByTitle(/Name from k3d/)).toContainText("zeabur-l2")
+  await expect(card.getByTitle(/Name from the installation/)).toContainText("zeabur-l2")
   await expect(card).toContainText("ada.lovelace")
   await expect(card).not.toContainText("zeabur:")
   await expect(card.locator('[data-slot="avatar"]')).toContainText("AD")

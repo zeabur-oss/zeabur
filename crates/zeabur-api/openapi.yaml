@@ -6060,11 +6060,6 @@ components:
           description: |-
             What to call the cluster, never kube-apiserver's address (see
             `crate::settings::cluster_name`).
-        nameProvider:
-          oneOf:
-          - $ref: "#/components/schemas/NameProvider"
-            description: Whose convention `name` follows, when one does (`nodes`, `kubeconfig`).
-          - type: "null"
         nameSource:
           $ref: "#/components/schemas/NameSource"
           description: Where `name` comes from.
@@ -10691,22 +10686,6 @@ components:
       - persistent
       - config
       - ephemeral
-    NameProvider:
-      type: string
-      description: Whose convention a name follows. An open set.
-      enum:
-      - eks
-      - gke
-      - aks
-      - k3d
-      - kind
-      - minikube
-      - docker-desktop
-      - orbstack
-      - k3s
-      - k0s
-      - rke2
-      - node
     NameSource:
       type: string
       description: Where the cluster's name comes from.
@@ -10714,7 +10693,6 @@ components:
       - setting
       - install
       - kubeconfig
-      - nodes
       - address
     NamespaceUsage:
       type: object

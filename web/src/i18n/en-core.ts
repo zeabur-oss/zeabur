@@ -10,10 +10,6 @@ export const core = {
   "shell.nameFrom.install": "Name from the installation",
   "shell.nameFrom.kubeconfig": "Name from kubeconfig",
   "shell.nameFrom.address": "Name from the URL",
-  "shell.nameFrom.node": "Name from the control plane node",
-  "shell.nameFrom.provider": (provider: string) => `Name from ${provider}`,
-  "shell.nameFrom.distributionNode": (distribution: string) =>
-    `Name from the ${distribution} control plane node`,
   "shell.renameCluster": "Rename in Settings",
   "shell.cluster": "Cluster",
   "shell.search": "Search",

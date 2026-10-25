@@ -95,20 +95,12 @@ options.
 
 ## 3. Install the chart
 
-Name the cluster as people know it, so those with several can tell which one they are in. The
-kubeconfig's name for the cluster, without what k3d, kind, EKS and GKE add around it:
-
-```sh
-cluster=$(kubectl config view --minify -o jsonpath='{.clusters[0].name}')
-cluster=${cluster#k3d-}; cluster=${cluster#kind-}             # k3d-shop, kind-shop
-cluster=${cluster##*:cluster/}; cluster=${cluster%%.*.eksctl.io} # EKS ARN, eksctl
-case $cluster in gke_*) cluster=${cluster##*_} ;; esac          # gke_<project>_<zone>_<name>
-echo "$cluster"
-```
+Name the cluster as people know it (`clusterName`), so those with several can tell which one
+they are in.
 
 ```sh
 helm install zeabur "oci://$chart" --namespace zeabur \
-  --set clusterName="$cluster" \
+  --set clusterName=shop-prod \
   --set publicUrl=https://zeabur.example.com \
   --set issuer.url=https://identity.example.com \
   --set issuer.clientSecret.existingSecret=zeabur-oidc \
@@ -126,7 +118,7 @@ likely to set:
 | Value | What it does |
 |---|---|
 | `publicUrl` | The address people open. Sign-in returns to `<publicUrl>/auth/callback`. |
-| `clusterName` | What the interface calls the cluster; an administrator can rename it in Settings. Empty: a name read from the nodes where the person may list them (k3d, kind, minikube, EKS with eksctl, GKE, AKS, or the first control plane node), else the public URL's host. |
+| `clusterName` | What the interface calls the cluster; an administrator can rename it in Settings. Empty: the public URL's host. |
 | `issuer.url`, `issuer.clientId` | Zeabur Identity's issuer URL and the client registered in step 2. |
 | `issuer.clientSecret.existingSecret` | The Secret from step 2. The chart never takes the secret itself as a value, so it stays out of Helm's release records. |
 | `issuer.accountUrl` | Where people manage their passkeys and linked accounts; the Account page links there. Empty: the `manage` URL the issuer publishes at `/.well-known/passkey-endpoints`, else no link. |

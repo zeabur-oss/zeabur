@@ -16,12 +16,6 @@ mod tests {
                 username: "alice".to_owned(),
                 groups: vec![],
             },
-            nodes: vec![
-                serde_json::from_value(json!({"metadata": {"name": "k3d-zeabur-l2-server-0",
-                    "labels": {"node.kubernetes.io/instance-type": "k3s",
-                               "node-role.kubernetes.io/control-plane": "true"}}}))
-                .unwrap(),
-            ],
             facts: zeabur_kube::ClusterFacts {
                 version: "v1.36.5+k3s1".to_owned(),
                 ..zeabur_kube::ClusterFacts::default()
@@ -51,37 +45,25 @@ mod tests {
         body
     }
 
-    async fn named(cluster: &MemoryCluster, settings: Settings) -> (Value, Value, Value) {
+    async fn named(cluster: &MemoryCluster, settings: Settings) -> (Value, Value) {
         let about = call(cluster, settings, "GET", "/api/v1/cluster", None).await;
-        (
-            about["name"].clone(),
-            about["nameSource"].clone(),
-            about.get("nameProvider").cloned().unwrap_or(Value::Null),
-        )
+        (about["name"].clone(), about["nameSource"].clone())
     }
 
     #[tokio::test]
-    async fn the_nodes_name_the_cluster_when_nothing_else_does_and_never_its_address() {
-        let cluster = cluster();
+    async fn the_public_url_names_the_cluster_when_nothing_else_does() {
         assert_eq!(
-            named(&cluster, in_cluster(None)).await,
-            (json!("zeabur-l2"), json!("nodes"), json!("k3d"))
-        );
-        cluster.update(|s| {
-            s.forbidden_resources.insert("nodes".to_owned());
-        });
-        assert_eq!(
-            named(&cluster, in_cluster(None)).await,
-            (json!("zeabur.localhost"), json!("address"), Value::Null)
+            named(&cluster(), in_cluster(None)).await,
+            (json!("zeabur.localhost"), json!("address"))
         );
     }
 
     #[tokio::test]
-    async fn the_installs_name_comes_before_the_nodes_and_a_chosen_one_before_both() {
+    async fn the_installs_name_comes_before_the_url_and_a_chosen_one_before_both() {
         let cluster = cluster();
         assert_eq!(
             named(&cluster, in_cluster(Some("shop-prod"))).await,
-            (json!("shop-prod"), json!("install"), Value::Null)
+            (json!("shop-prod"), json!("install"))
         );
 
         let setting = call(
@@ -99,7 +81,7 @@ mod tests {
         assert!(matches!(&writes[..], [w] if matches!(w.body, WriteBody::Create(_))));
         assert_eq!(
             named(&cluster, in_cluster(Some("shop-prod"))).await,
-            (json!("Shop EU"), json!("setting"), Value::Null)
+            (json!("Shop EU"), json!("setting"))
         );
 
         let setting = call(
@@ -113,7 +95,7 @@ mod tests {
         assert!(setting.get("name").is_none());
         assert_eq!(
             named(&cluster, in_cluster(None)).await,
-            (json!("zeabur-l2"), json!("nodes"), json!("k3d"))
+            (json!("zeabur.localhost"), json!("address"))
         );
     }
 
@@ -141,12 +123,12 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn local_mode_keeps_the_kubeconfigs_name_without_the_tools_prefix() {
+    async fn local_mode_keeps_the_kubeconfigs_name_as_it_is() {
         let cluster = cluster();
         cluster.update(|s| "k3d-dev".clone_into(&mut s.name));
         assert_eq!(
             named(&cluster, Settings::default()).await,
-            (json!("dev"), json!("kubeconfig"), json!("k3d"))
+            (json!("k3d-dev"), json!("kubeconfig"))
         );
     }
 

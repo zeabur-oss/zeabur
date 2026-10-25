@@ -3194,7 +3194,6 @@ export interface components {
        *     `crate::settings::cluster_name`).
        */
       name: string
-      nameProvider?: components["schemas"]["NameProvider"] | null
       /** @description Where `name` comes from. */
       nameSource: components["schemas"]["NameSource"]
     }
@@ -5600,27 +5599,10 @@ export interface components {
      */
     MountCategory: "persistent" | "config" | "ephemeral"
     /**
-     * @description Whose convention a name follows. An open set.
-     * @enum {string}
-     */
-    NameProvider:
-      | "eks"
-      | "gke"
-      | "aks"
-      | "k3d"
-      | "kind"
-      | "minikube"
-      | "docker-desktop"
-      | "orbstack"
-      | "k3s"
-      | "k0s"
-      | "rke2"
-      | "node"
-    /**
      * @description Where the cluster's name comes from.
      * @enum {string}
      */
-    NameSource: "setting" | "install" | "kubeconfig" | "nodes" | "address"
+    NameSource: "setting" | "install" | "kubeconfig" | "address"
     /** @description One namespace's pods together. */
     NamespaceUsage: {
       /**

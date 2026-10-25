@@ -162,7 +162,6 @@ pub(crate) async fn get(
     Ok(Json(Cluster {
         name: named.name,
         name_source: named.source,
-        name_provider: named.provider,
         distribution: distribution(&version),
         kubernetes_version: version,
         domains: crate::settings::DomainSettings {
