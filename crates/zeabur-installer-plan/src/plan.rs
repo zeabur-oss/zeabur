@@ -36,6 +36,8 @@ pub const ZEABUR_NAMESPACE: &str = "zeabur";
 pub const LOCAL_ISSUER: &str = "zeabur-local-ca";
 /// The catalog's in-cluster registry, which nodes pull through a mirror to its fixed address.
 pub const ZOT: &str = "container-registry/zot";
+/// The label Zeabur Builder puts on the Pods of a build's Job.
+const BUILD_RUN_LABEL: &str = "builder.zeabur.com/buildrun";
 /// The ConfigMap in Zeabur's namespace with zot's CA, which Zeabur trusts to read its images.
 pub const REGISTRY_CA_CONFIGMAP: &str = "zeabur-registry-ca";
 /// zot's input naming that address.
@@ -1105,7 +1107,9 @@ pub fn network_policy(namespace: &str, node_addresses: &[String]) -> Value {
 ///
 /// The baseline policy of zot's namespace would refuse them: buildkitd pushes, the controller
 /// deletes the repositories of deleted Builds, and a build's Job in a project namespace fetches its
-/// archive source. Only an admin can set the project label on a Namespace.
+/// archive source. Other pods in a project namespace cannot reach zot, so a compromised app cannot
+/// pull the images of other projects. Only an admin can set the project label on a Namespace. A
+/// person who can create Pods in a project namespace can set the build Job's label on a Pod.
 #[must_use]
 pub fn zot_builder_policy() -> Value {
     json!({
@@ -1129,7 +1133,10 @@ pub fn zot_builder_policy() -> Value {
                         "namespaceSelector": {"matchLabels": {"kubernetes.io/metadata.name": "builder-system"}},
                         "podSelector": {"matchLabels": {"app.kubernetes.io/name": "zeabur-builder"}},
                     },
-                    {"namespaceSelector": {"matchLabels": {"zeabur.com/project": "true"}}},
+                    {
+                        "namespaceSelector": {"matchLabels": {"zeabur.com/project": "true"}},
+                        "podSelector": {"matchExpressions": [{"key": BUILD_RUN_LABEL, "operator": "Exists"}]},
+                    },
                 ],
                 "ports": [{"port": 5000, "protocol": "TCP"}],
             }],
@@ -1736,7 +1743,7 @@ mod tests {
     }
 
     #[test]
-    fn zot_admits_builder_and_project_namespaces_on_its_port() {
+    fn zot_admits_builder_and_build_jobs_on_its_port() {
         let policy = zot_builder_policy();
         let rule = &policy["spec"]["ingress"][0];
         let builder = json!({"kubernetes.io/metadata.name": "builder-system"});
@@ -1751,13 +1758,14 @@ mod tests {
             );
         }
         assert!(from.contains(&json!({
-            "namespaceSelector": {"matchLabels": {"zeabur.com/project": "true"}}
+            "namespaceSelector": {"matchLabels": {"zeabur.com/project": "true"}},
+            "podSelector": {"matchExpressions": [{"key": BUILD_RUN_LABEL, "operator": "Exists"}]},
         })));
         assert!(
-            from.iter().all(
-                |peer| peer.get("ipBlock").is_none() && peer.get("namespaceSelector").is_some()
-            ),
-            "every peer names its namespaces"
+            from.iter().all(|peer| peer.get("ipBlock").is_none()
+                && peer.get("namespaceSelector").is_some()
+                && peer.get("podSelector").is_some()),
+            "every peer names its namespaces and its pods"
         );
         assert_eq!(rule["ports"], json!([{"port": 5000, "protocol": "TCP"}]));
     }

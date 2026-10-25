@@ -10,6 +10,7 @@ description: 連接 Git 儲存庫、完成第一次建置，並選擇新映像�
 - 已有專案，以及在專案建立服務、Kubernetes Service 和 Build 的權限。使用私有儲存庫或建置變數時，也需要建立機密的權限。
 - 叢集已安裝 Zeabur Builder 和 Keel。缺少元件時，新增選單會顯示原因，安裝方式見[管理叢集元件](../cluster/components.mdx)。
 - 建置好的映像檔推到 Zeabur chart 的 `builds.registry`，預設是元件目錄的 Zot（`zot.zot.svc:5000`）。改用 Harbor 或外部 registry 時，管理員在 chart 設定 `builds.registry`，並讓 Builder 與節點能存取它。
+- 用安裝程式裝的 Zot 只讓 Builder、建置用的 Pod 和節點連進來。專案裡其他的 Pod 連不到 Zot，所以被入侵的應用程式拉不到別的專案的映像檔。
 - 準備應用程式實際監聽的連接埠。要公開網站，另備可指向叢集入口的網域。
 
 ## 建立服務
