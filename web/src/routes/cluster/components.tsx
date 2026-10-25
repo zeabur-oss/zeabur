@@ -10,6 +10,7 @@ import ChartLineIcon from "~icons/ph/chart-line"
 import ClockCounterClockwiseIcon from "~icons/ph/clock-counter-clockwise"
 import CloudArrowUpIcon from "~icons/ph/cloud-arrow-up"
 import DatabaseIcon from "~icons/ph/database"
+import DownloadSimpleIcon from "~icons/ph/download-simple"
 import GaugeIcon from "~icons/ph/gauge"
 import GlobeIcon from "~icons/ph/globe"
 import HardDriveIcon from "~icons/ph/hard-drive"
@@ -21,7 +22,6 @@ import PackageIcon from "~icons/ph/package"
 import PulseIcon from "~icons/ph/pulse"
 import ShieldCheckIcon from "~icons/ph/shield-check"
 import SignpostIcon from "~icons/ph/signpost"
-import TerminalIcon from "~icons/ph/terminal"
 import TextAlignLeftIcon from "~icons/ph/text-align-left"
 
 import { isStatus, type Schemas } from "@/api/client"
@@ -316,7 +316,7 @@ function ComponentCard({
             })}
             className={cn(buttonVariants({ variant: "outline", size: "xs" }), "ml-auto")}
           >
-            <TerminalIcon aria-hidden="true" data-icon="inline-start" />
+            <DownloadSimpleIcon aria-hidden="true" data-icon="inline-start" />
             {t("settings.installCommand")}
           </Link>
         )}
