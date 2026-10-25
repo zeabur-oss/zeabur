@@ -1,24 +1,20 @@
 #!/usr/bin/env bash
-# Renders the chart corpus in fixtures/charts/ from Zeabur Catalog
-# (github.com/zeabur-oss/catalog): every component's single-node profile, rendered by
-# the catalogue's own `recs render` (helm template with the release values, the profile, CI
-# test inputs and contributions; `urls` releases downloaded, `manifests` releases as written),
-# for the newest Kubernetes version in its config/kubernetes.yaml. CustomResourceDefinitions
-# and empty documents are removed; everything else is kept verbatim.
+# Renders the chart corpus in fixtures/charts/ from Zeabur Catalog at the commit in flake.lock
+# (ZEABUR_CATALOG, set by the dev shell): every component's single-node profile, rendered by the
+# catalogue's own `catalog render` (helm template with the release values, the profile, CI test
+# inputs and contributions; `urls` releases downloaded, `manifests` releases as written), for the
+# newest Kubernetes version in its config/kubernetes.yaml. CustomResourceDefinitions and empty
+# documents are removed; everything else is kept verbatim.
 #
-# Needs Nix with flakes and network access to the chart registries.
+# Needs network access to the chart registries. OUT_DIR defaults to fixtures/charts next to this
+# script. The catalogue is rendered twice and the script fails if the two renders differ, so the
+# corpus contains no random values.
 #
-#   RECS_DIR=~/recs RECS_COMMIT=a0e1cb1d0f5e857459351133d7922cd057a2d19d \
-#     scripts/render-chart-corpus.sh [OUT_DIR]
-#
-# RECS_DIR is a git clone of the catalogue (the pinned commit is exported from it) or an
-# export of exactly RECS_COMMIT (`git archive RECS_COMMIT | tar -x -C RECS_DIR`). OUT_DIR
-# defaults to fixtures/charts next to this script. The catalogue is rendered twice and the
-# script fails if the two renders differ, so the corpus contains no random values.
+#   nix develop -c scripts/render-chart-corpus.sh [OUT_DIR]
 set -euo pipefail
 
-: "${RECS_DIR:?set RECS_DIR to a Zeabur Catalog checkout}"
-: "${RECS_COMMIT:?set RECS_COMMIT to the pinned commit}"
+: "${ZEABUR_CATALOG:?run inside nix develop}"
+: "${ZEABUR_CATALOG_COMMIT:?run inside nix develop}"
 PROFILE=single-node
 script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 out_dir=${1:-$script_dir/../fixtures/charts}
@@ -26,23 +22,17 @@ out_dir=${1:-$script_dir/../fixtures/charts}
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 
-# The catalogue at the pinned commit.
-src=$work/recs
-mkdir -p "$src"
-if git -C "$RECS_DIR" rev-parse --git-dir >/dev/null 2>&1; then
-  git -C "$RECS_DIR" archive "$RECS_COMMIT" | tar -x -C "$src"
-else
-  echo "note: $RECS_DIR is not a git repository; assuming it is an export of $RECS_COMMIT" >&2
-  cp -R "$RECS_DIR"/. "$src"
-fi
+src=$work/catalog
+cp -R "$ZEABUR_CATALOG" "$src"
+chmod -R u+w "$src"
 
-# recs render: every component, both profiles, every Kubernetes version, twice. Its exit
+# catalog render: every component, both profiles, every Kubernetes version, twice. Its exit
 # status also covers kubeconform, which is not this corpus's concern, so it is reported and
 # missing files are caught below instead.
 for run in 1 2; do
   if ! (cd "$src" && nix develop -c go run ./tools/cmd/catalog render -out "$work/render-$run") \
     >"$work/render-$run.log" 2>&1; then
-    echo "warning: recs render run $run exited non-zero; see the tail of its log:" >&2
+    echo "warning: catalog render run $run exited non-zero; see the tail of its log:" >&2
     tail -n 20 "$work/render-$run.log" >&2
   fi
 done
@@ -80,12 +70,12 @@ filter() {
 # is looked up before it joins the corpus. Releases written inline in the catalogue are the
 # catalogue's (Apache-2.0).
 licence() {
-  local gh=https://github.com recs="[Apache-2.0](https://github.com/zeabur-oss/catalog/blob/main/LICENSE) (catalogue)"
+  local gh=https://github.com catalog="[Apache-2.0](https://github.com/zeabur-oss/catalog/blob/main/LICENSE) (catalogue)"
   case $1 in
   certificates/cert-manager) echo "[Apache-2.0]($gh/cert-manager/cert-manager/blob/master/LICENSE)" ;;
   config-reload/reloader) echo "[Apache-2.0]($gh/stakater/Reloader/blob/master/LICENSE)" ;;
   container-registry/zot)
-    echo "tls: $recs; zot: [Apache-2.0]($gh/project-zot/helm-charts/blob/main/LICENSE)"
+    echo "tls: $catalog; zot: [Apache-2.0]($gh/project-zot/helm-charts/blob/main/LICENSE)"
     ;;
   databases/cloudnative-pg) echo "[Apache-2.0]($gh/cloudnative-pg/charts/blob/main/LICENSE)" ;;
   databases/dragonfly-operator)
@@ -100,15 +90,15 @@ licence() {
     echo "[Apache-2.0]($gh/kedacore/charts/blob/main/LICENSE)"
     ;;
   external-secrets/external-secrets) echo "[Apache-2.0]($gh/external-secrets/external-secrets/blob/main/LICENSE)" ;;
-  gotify-notifications/alertmanager-gotify-bridge) echo "$recs" ;;
+  gotify-notifications/alertmanager-gotify-bridge) echo "$catalog" ;;
   image-updates/keel) echo "[MPL-2.0]($gh/keel-hq/keel/blob/master/LICENSE)" ;;
   ingress/traefik)
     echo "gateway-api-crds: [Apache-2.0]($gh/kubernetes-sigs/gateway-api/blob/main/LICENSE); traefik: [Apache-2.0]($gh/traefik/traefik-helm-chart/blob/master/LICENSE)"
     ;;
   intrusion-prevention/crowdsec)
-    echo "crowdsec: [MIT]($gh/crowdsecurity/helm-charts/blob/main/LICENSE), notice in \`LICENSE-crowdsec-helm-charts.txt\`; bouncer-middleware: $recs"
+    echo "crowdsec: [MIT]($gh/crowdsecurity/helm-charts/blob/main/LICENSE), notice in \`LICENSE-crowdsec-helm-charts.txt\`; bouncer-middleware: $catalog"
     ;;
-  logs/victoria-logs) echo "$recs" ;;
+  logs/victoria-logs) echo "$catalog" ;;
   metrics/metrics-server) echo "[Apache-2.0]($gh/kubernetes-sigs/metrics-server/blob/master/LICENSE)" ;;
   metrics/victoria-metrics | observability-operator/victoria-metrics-operator)
     echo "[Apache-2.0]($gh/VictoriaMetrics/helm-charts/blob/master/LICENSE)"
@@ -121,7 +111,7 @@ licence() {
     ;;
   remote-access/tailscale-operator) echo "[BSD-3-Clause]($gh/tailscale/tailscale/blob/main/LICENSE)" ;;
   replicated-storage/longhorn)
-    echo "longhorn: [Apache-2.0]($gh/longhorn/charts/blob/v1.13.x/LICENSE); ui-policy: $recs"
+    echo "longhorn: [Apache-2.0]($gh/longhorn/charts/blob/v1.13.x/LICENSE); ui-policy: $catalog"
     ;;
   resource-recommendations/vertical-pod-autoscaler)
     echo "[Apache-2.0]($gh/kubernetes/autoscaler/blob/master/LICENSE)"
@@ -186,17 +176,17 @@ input the projection covers. One file per component of the
 \`<capability>__<component>.yaml\`, each holding every release of the component in install
 order as one multi-document YAML stream.
 
-- Source: \`zeabur-oss/catalog\` at commit \`$RECS_COMMIT\`.
+- Source: \`zeabur-oss/catalog\` at commit \`$ZEABUR_CATALOG_COMMIT\`.
 - Profile: \`$PROFILE\`, Kubernetes version \`$kube_version\` (the newest in its
   \`config/kubernetes.yaml\`).
-- Rendered by the catalogue's own \`recs render\`: \`helm template --include-crds\` with the
+- Rendered by the catalogue's own \`catalog render\`: \`helm template --include-crds\` with the
   release's values, the profile, the components' CI test inputs (\`testValue\`/\`default\`) and
   values contributed by other components (CrowdSec's Traefik middleware). \`urls\` releases are
   the downloaded upstream manifests; \`manifests\` releases are the inline objects.
 - CustomResourceDefinition documents and empty documents are removed. Everything else is
   verbatim, including Helm's \`# Source:\` comments.
 - Deterministic: the catalogue is rendered twice and the script fails if the renders differ.
-  The catalogue forbids generated secrets and certificates in charts (\`recs render\` checks
+  The catalogue forbids generated secrets and certificates in charts (\`catalog render\` checks
   it too), so no value had to be replaced.
 
 Each file keeps the licence of the chart or manifests it was rendered from, named in the table
@@ -205,11 +195,10 @@ operator are in \`LICENSE-crowdsec-helm-charts.txt\` and \`LICENSE-mariadb-opera
 Trivy Operator's NOTICE (Apache-2.0, section 4(d)) in \`LICENSE-trivy-operator-NOTICE.txt\`;
 the Apache-2.0 text is in the \`LICENSE\` at the root.
 
-Regenerate with Nix and network access to the chart registries:
+Regenerate with network access to the chart registries:
 
 \`\`\`sh
-git clone https://github.com/zeabur-oss/catalog ~/recs
-RECS_DIR=~/recs RECS_COMMIT=$RECS_COMMIT scripts/render-chart-corpus.sh
+nix develop -c scripts/render-chart-corpus.sh
 \`\`\`
 
 | Component | File | Releases (name@version) | Licence | Documents | Bytes |
