@@ -27,10 +27,11 @@ Level 3: may depend on `zeabur-core`, `zeabur-model` and `zeabur-kube` (for the 
 - **Templates are rendered here.** `build.rs` also embeds each `templates/<id>/` of the bundle,
   and `templates::render` fills its `manifests.yaml` for a namespace, a domain, the cluster's
   issuer and the inputs, as the catalogue's own Go renderer (`tools/internal/templates/render.go`)
-  does: the same checks and the same subset of `text/template`. Any other action is refused. The
+  does: the same checks. A manifest allows field substitution only, and any other action is
+  refused. A test renders every template with the values the catalogue recorded in
+  `crosscheck.json` and compares the objects. The
   generated inputs are not given to the renderer: the browser generates them and creates their
-  Secrets. A template needs a domain or an issuer when its manifests use `.Domain` or
-  `.ClusterIssuer`.
+  Secrets. A template needs a domain and an issuer when a service lists `domains`.
 - **Templates' idle use is measured.** `template_idle` reads the bundle's
   `measurements/templates/<id>.json`, which Zeabur Catalog's nightly run writes, and takes
   its newest single-node amd64 environment. A template without that file has no measurement, and

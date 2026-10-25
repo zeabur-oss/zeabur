@@ -1,21 +1,19 @@
 //! The templates of Zeabur Catalog: what each one asks for, and its objects for one namespace.
 //!
-//! A template's `manifests.yaml` is a Go `text/template` [go-template]. Zeabur Catalog renders it
-//! with the fields `.Namespace`, `.Domain`, `.ClusterIssuer` and `.Inputs.<name>`, and the function
-//! `dnsEgress` [catalog-render]. This module runs the part of the language that the catalogue
-//! uses: those fields and that function, `eq` of a field and a string, `if` / `else` / `end` on a
-//! field, and the `{{-` and `-}}` trim markers. It refuses every other action, so a template that
-//! needs more fails the tests of this crate. It does not render it differently.
+//! A template's `manifests.yaml` allows field substitution only. Zeabur Catalog renders it with
+//! the fields `.Namespace`, `.Domain`, `.ClusterIssuer` and `.Inputs.<name>` [catalog-render]. This
+//! module reads `{{ <field> }}` and refuses every other action, so a template that needs more
+//! fails the tests of this crate. The catalogue refuses them too.
 //!
 //! The checks before rendering are the catalogue's own: a namespace is a DNS label, a domain is a
 //! DNS name and not an IP address, a generated input is never given, a required input is given,
-//! each value matches its whole pattern, and an unknown input is refused. A template that uses
-//! `.Domain` or `.ClusterIssuer` needs that value.
+//! each value matches its whole pattern, and an unknown input is refused. An input that is not
+//! given takes its `default`, or is empty. A template with a `services[].domains` entry needs the
+//! domain and the issuer. The names of the inputs and the Secret keys are unique.
 //!
-//! [go-template]: https://pkg.go.dev/text/template
-//! [catalog-render]: https://github.com/zeabur-oss/catalog/blob/aa107befc1910473024d8f01d7e494fd9170b1ce/tools/internal/templates/render.go
+//! [catalog-render]: https://github.com/zeabur-oss/catalog/blob/main/tools/internal/templates/render.go
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::net::IpAddr;
 
 use regex::Regex;
@@ -30,10 +28,6 @@ use crate::install::Risk;
 const INSTANCE_LABEL: &str = "app.kubernetes.io/instance";
 const TEMPLATE_LABEL: &str = "templates.zeabur.com/template";
 const VERSION_LABEL: &str = "app.kubernetes.io/version";
-
-/// The NetworkPolicy egress rule to cluster DNS that `{{ dnsEgress }}` writes, as the catalogue
-/// defines it.
-const DNS_EGRESS: &str = "{to: [{namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: kube-system}}, podSelector: {matchLabels: {k8s-app: kube-dns}}}], ports: [{protocol: UDP, port: 53}, {protocol: TCP, port: 53}]}";
 
 /// A template of Zeabur Catalog.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
@@ -98,6 +92,9 @@ pub struct TemplateInput {
     pub locales: BTreeMap<String, InputLocale>,
     /// A deploy must give it.
     pub required: bool,
+    /// The value when a deploy does not give the input. Not part of the API.
+    #[serde(skip)]
+    pub default: Option<String>,
     /// The regular expression the whole value matches (RE2 syntax).
     pub pattern: String,
     /// For a generated input: how to make the value. The value goes into `secret`, and a deploy
@@ -195,7 +192,7 @@ pub enum RenderError {
     /// The template has no such input.
     #[error("The template has no input {0}.")]
     UnknownInput(String),
-    /// The template uses a part of Go templates that Zeabur does not run, or does not read.
+    /// The template has an action that is not field substitution, or does not read.
     #[error("The template {template} does not read: {detail}")]
     Broken {
         /// The template.
@@ -264,6 +261,8 @@ struct FileMetadata {
 struct FileService {
     name: String,
     #[serde(default)]
+    domains: Vec<String>,
+    #[serde(default)]
     resources: BTreeMap<String, BTreeMap<String, String>>,
 }
 
@@ -278,6 +277,8 @@ struct FileInput {
     locales: BTreeMap<String, InputLocale>,
     #[serde(default)]
     required: bool,
+    #[serde(default)]
+    default: Option<String>,
     #[serde(default)]
     generate: Option<String>,
     #[serde(default)]
@@ -330,7 +331,7 @@ fn read(id: &str, file: &str, manifests: &str) -> Result<Template, RenderError> 
         detail,
     };
     let file: File = serde_saphyr::from_str(file).map_err(|e| broken(e.to_string()))?;
-    let nodes = parse(manifests).map_err(broken)?;
+    parse(manifests).map_err(broken)?;
     let inputs = file
         .inputs
         .into_iter()
@@ -356,12 +357,29 @@ fn read(id: &str, file: &str, manifests: &str) -> Result<Template, RenderError> 
                     })
                     .collect(),
                 required: input.required,
+                default: input.default,
                 pattern: input.validation.pattern,
                 generate,
                 secret: input.secret,
             })
         })
         .collect::<Result<Vec<_>, _>>()?;
+    let mut names = BTreeSet::new();
+    let mut secrets = BTreeSet::new();
+    for input in &inputs {
+        if !names.insert(input.name.as_str()) {
+            return Err(broken(format!("duplicate input {}", input.name)));
+        }
+        if let Some(secret) = &input.secret
+            && !secrets.insert((secret.name.as_str(), secret.key.as_str()))
+        {
+            return Err(broken(format!(
+                "duplicate Secret key {}/{}",
+                secret.name, secret.key
+            )));
+        }
+    }
+    let routes_domain = file.services.iter().any(|s| !s.domains.is_empty());
     let labels = [
         (INSTANCE_LABEL, id),
         (TEMPLATE_LABEL, id),
@@ -397,8 +415,8 @@ fn read(id: &str, file: &str, manifests: &str) -> Result<Template, RenderError> 
                 mitigation: r.mitigation.trim().to_owned(),
             })
             .collect(),
-        needs_domain: uses(&nodes, &Field::Domain),
-        needs_cluster_issuer: uses(&nodes, &Field::ClusterIssuer),
+        needs_domain: routes_domain,
+        needs_cluster_issuer: routes_domain,
     })
 }
 
@@ -421,9 +439,12 @@ pub fn render(id: &str, options: &RenderOptions<'_>) -> Result<Vec<Value>, Rende
         .iter()
         .map(|(k, v)| (k.as_str(), v.as_str()))
         .collect();
-    // An input that is not generated and not given is empty, as the catalogue renders it.
+    // An input that is not generated and not given takes its default, or is empty, as the
+    // catalogue renders it.
     for input in template.inputs.iter().filter(|i| i.generate.is_none()) {
-        inputs.entry(input.name.as_str()).or_insert("");
+        inputs
+            .entry(input.name.as_str())
+            .or_insert_with(|| input.default.as_deref().unwrap_or_default());
     }
     let values = Values {
         namespace: options.namespace,
@@ -534,122 +555,30 @@ enum Field {
 enum Node {
     Text(String),
     Field(Field),
-    DnsEgress,
-    Eq(Field, String),
-    If {
-        condition: Field,
-        then: Vec<Self>,
-        otherwise: Vec<Self>,
-    },
-}
-
-fn uses(nodes: &[Node], wanted: &Field) -> bool {
-    nodes.iter().any(|node| match node {
-        Node::Field(f) | Node::Eq(f, _) => f == wanted,
-        Node::If {
-            condition,
-            then,
-            otherwise,
-        } => condition == wanted || uses(then, wanted) || uses(otherwise, wanted),
-        Node::Text(_) | Node::DnsEgress => false,
-    })
-}
-
-/// An action of the template, without its delimiters and trim markers.
-enum Action {
-    Node(Node),
-    If(Field),
-    Else,
-    End,
-}
-
-/// One level of `if` being read: the condition, the branch before `else`, and whether `else`
-/// came.
-struct Open {
-    condition: Field,
-    then: Vec<Node>,
-    in_else: bool,
 }
 
 fn parse(text: &str) -> Result<Vec<Node>, String> {
-    let mut stack: Vec<(Open, Vec<Node>)> = Vec::new();
-    let mut nodes: Vec<Node> = Vec::new();
+    let mut nodes = Vec::new();
     let mut rest = text;
-    let mut trim_next = false;
-    while let Some((mut before, after)) = rest.split_once("{{") {
-        let (trim_before, inner_start) = after
-            .strip_prefix("- ")
-            .map_or((false, after), |stripped| (true, stripped));
-        let (raw, next) = inner_start
+    while let Some((before, after)) = rest.split_once("{{") {
+        let (inner, next) = after
             .split_once("}}")
             .ok_or_else(|| "an action has no closing }}".to_owned())?;
-        let (inner, trim_after) = raw.strip_suffix(" -").map_or((raw, false), |i| (i, true));
-        if trim_next {
-            before = before.trim_start();
-        }
-        if trim_before {
-            before = before.trim_end();
-        }
         if !before.is_empty() {
             nodes.push(Node::Text(before.to_owned()));
         }
-        match action(inner.trim())? {
-            Action::Node(node) => nodes.push(node),
-            Action::If(condition) => {
-                let open = Open {
-                    condition,
-                    then: Vec::new(),
-                    in_else: false,
-                };
-                stack.push((open, std::mem::take(&mut nodes)));
-            }
-            Action::Else => {
-                let (open, _) = stack
-                    .last_mut()
-                    .filter(|(open, _)| !open.in_else)
-                    .ok_or_else(|| "else without if".to_owned())?;
-                open.then = std::mem::take(&mut nodes);
-                open.in_else = true;
-            }
-            Action::End => {
-                let (open, outer) = stack.pop().ok_or_else(|| "end without if".to_owned())?;
-                let branch = std::mem::replace(&mut nodes, outer);
-                let (then, otherwise) = if open.in_else {
-                    (open.then, branch)
-                } else {
-                    (branch, Vec::new())
-                };
-                nodes.push(Node::If {
-                    condition: open.condition,
-                    then,
-                    otherwise,
-                });
-            }
-        }
-        trim_next = trim_after;
+        nodes.push(Node::Field(field(inner.trim_matches(is_go_space))?));
         rest = next;
     }
-    if !stack.is_empty() {
-        return Err("if without end".to_owned());
-    }
-    let tail = if trim_next { rest.trim_start() } else { rest };
-    if !tail.is_empty() {
-        nodes.push(Node::Text(tail.to_owned()));
+    if !rest.is_empty() {
+        nodes.push(Node::Text(rest.to_owned()));
     }
     Ok(nodes)
 }
 
-fn action(inner: &str) -> Result<Action, String> {
-    let words: Vec<&str> = inner.split_whitespace().collect();
-    Ok(match words.as_slice() {
-        ["dnsEgress"] => Action::Node(Node::DnsEgress),
-        ["else"] => Action::Else,
-        ["end"] => Action::End,
-        ["if", name] => Action::If(field(name)?),
-        ["eq", name, literal] => Action::Node(Node::Eq(field(name)?, string(literal)?)),
-        [name] => Action::Node(Node::Field(field(name)?)),
-        _ => return Err(format!("Zeabur does not run the action {{{{ {inner} }}}}")),
-    })
+/// The white space that Go's `text/template` skips around an action.
+const fn is_go_space(c: char) -> bool {
+    matches!(c, ' ' | '\t' | '\r' | '\n')
 }
 
 fn field(name: &str) -> Result<Field, String> {
@@ -659,20 +588,17 @@ fn field(name: &str) -> Result<Field, String> {
         ".ClusterIssuer" => Ok(Field::ClusterIssuer),
         _ => name
             .strip_prefix(".Inputs.")
-            .filter(|n| !n.is_empty() && n.bytes().all(|b| b.is_ascii_alphanumeric()))
+            .filter(|n| is_input_name(n))
             .map(|n| Field::Input(n.to_owned()))
-            .ok_or_else(|| format!("Zeabur does not know the field {name}")),
+            .ok_or_else(|| format!("Zeabur does not run the action {{{{ {name} }}}}")),
     }
 }
 
-/// A Go string literal without escapes.
-fn string(literal: &str) -> Result<String, String> {
-    literal
-        .strip_prefix('"')
-        .and_then(|l| l.strip_suffix('"'))
-        .filter(|l| !l.contains(['"', '\\']))
-        .map(str::to_owned)
-        .ok_or_else(|| format!("Zeabur does not read the string {literal}"))
+/// An input name: `^[A-Za-z][A-Za-z0-9_]*$`, as the catalogue's schema defines it.
+fn is_input_name(name: &str) -> bool {
+    let mut bytes = name.bytes();
+    bytes.next().is_some_and(|b| b.is_ascii_alphabetic())
+        && bytes.all(|b| b.is_ascii_alphanumeric() || b == b'_')
 }
 
 struct Values<'a> {
@@ -703,26 +629,6 @@ fn execute(nodes: &[Node], values: &Values<'_>, out: &mut String) -> Result<(), 
         match node {
             Node::Text(text) => out.push_str(text),
             Node::Field(field) => out.push_str(values.get(field)?),
-            Node::DnsEgress => out.push_str(DNS_EGRESS),
-            Node::Eq(field, literal) => {
-                out.push_str(if values.get(field)? == literal {
-                    "true"
-                } else {
-                    "false"
-                });
-            }
-            Node::If {
-                condition,
-                then,
-                otherwise,
-            } => {
-                let branch = if values.get(condition)?.is_empty() {
-                    otherwise
-                } else {
-                    then
-                };
-                execute(branch, values, out)?;
-            }
         }
     }
     Ok(())
@@ -748,7 +654,7 @@ mod tests {
     type Case<'a> = (&'a str, &'a str, &'a [(&'a str, &'a str)], &'a str);
 
     #[test]
-    fn runs_the_part_of_go_templates_the_catalogue_uses() {
+    fn substitutes_fields() {
         let cases: &[Case<'_>] = &[
             (
                 "fields",
@@ -763,39 +669,16 @@ mod tests {
                 "port: '465'",
             ),
             (
-                "eq",
-                "a: {{ eq .Inputs.port \"465\" }} b: {{ eq .Inputs.port \"587\" }}",
-                &[("port", "465")],
-                "a: true b: false",
+                "input with an underscore",
+                "{{.Inputs.smtp_port}}",
+                &[("smtp_port", "587")],
+                "587",
             ),
-            (
-                "if with trim markers",
-                "a:\n  {{- if .Inputs.ca }}\n  ca: {{ .Inputs.ca }}\n  {{- end }}\nb: 1",
-                &[("ca", "x")],
-                "a:\n  ca: x\nb: 1",
-            ),
-            (
-                "if on an empty input",
-                "a:\n  {{- if .Inputs.ca }}\n  ca: {{ .Inputs.ca }}\n  {{- end }}\nb: 1",
-                &[("ca", "")],
-                "a:\nb: 1",
-            ),
-            (
-                "else",
-                "{{ if .Inputs.e }}{{ .Inputs.e }}{{ else }}default{{ end }}",
-                &[("e", "")],
-                "default",
-            ),
-            ("trim after", "a {{ .Namespace -}}   \n  b", &[], "a shopb"),
+            ("text", "a -}} b {x}", &[], "a -}} b {x}"),
         ];
         for (name, text, inputs, expected) in cases {
             assert_eq!(run(text, inputs).as_deref(), Ok(*expected), "{name}");
         }
-        assert!(
-            run("{{ dnsEgress }}", &[])
-                .unwrap()
-                .contains("k8s-app: kube-dns")
-        );
     }
 
     #[test]
@@ -804,9 +687,12 @@ mod tests {
             "{{ .Values.x }}",
             "{{ printf \"%s\" .Namespace }}",
             "{{ range .Inputs }}x{{ end }}",
-            "{{ if .Inputs.a }}x",
-            "x{{ end }}",
-            "{{ eq .Inputs.a \"a\\\"b\" }}",
+            "{{ if .Inputs.a }}x{{ end }}",
+            "{{ eq .Inputs.a \"a\" }}",
+            "{{ dnsEgress }}",
+            "{{- .Namespace }}",
+            "{{ .Namespace -}}",
+            "{{ .Namespace | printf }}",
             "{{ .Namespace",
             "{{ .Inputs.unset }}",
         ] {
@@ -814,53 +700,85 @@ mod tests {
         }
     }
 
-    /// The values the catalogue's own end-to-end run deploys each template with
-    /// (`config/e2e.yaml`), with fixed values for its S3 gateway.
-    fn e2e_inputs(template: &Template) -> BTreeMap<String, String> {
-        #[derive(Deserialize)]
-        #[serde(rename_all = "camelCase")]
-        struct E2e {
-            template_inputs: BTreeMap<String, String>,
-            templates: BTreeMap<String, PerTemplate>,
-        }
-        #[derive(Deserialize)]
-        struct PerTemplate {
-            #[serde(default)]
-            inputs: BTreeMap<String, String>,
-        }
-        let e2e: E2e = serde_saphyr::from_str(include_str!(concat!(
+    #[test]
+    fn refuses_duplicate_input_names_and_secret_keys() {
+        let file = |inputs: &str| {
+            format!(
+                "metadata: {{name: A, version: '1', description: d, license: MIT, homepage: h}}\ninputs:\n{inputs}"
+            )
+        };
+        let input = |name: &str, secret: &str| {
+            format!(
+                "  - {{name: {name}, description: d, generate: random, secret: {secret}, validation: {{pattern: x}}}}\n"
+            )
+        };
+        let secret = |name: &str, key: &str| format!("{{name: {name}, key: {key}}}");
+        let ok = file(&(input("a", &secret("s", "k")) + &input("b", &secret("s", "l"))));
+        assert!(read("t", &ok, "").is_ok());
+        let same_name = file(&(input("a", &secret("s", "k")) + &input("a", &secret("s", "l"))));
+        assert!(read("t", &same_name, "").is_err());
+        let same_key = file(&(input("a", &secret("s", "k")) + &input("b", &secret("s", "k"))));
+        assert!(read("t", &same_key, "").is_err());
+    }
+
+    #[test]
+    fn an_input_that_is_not_given_takes_its_default() {
+        let template = template("hermes-agent").unwrap();
+        assert!(
+            template
+                .inputs
+                .iter()
+                .any(|i| i.name == "providerEndpoint" && i.default.is_some())
+        );
+    }
+
+    /// What `catalog crosscheck` records for a template: the options of its end-to-end render
+    /// and the objects that the catalogue renders.
+    #[derive(Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct Recorded {
+        namespace: String,
+        domain: String,
+        cluster_issuer: String,
+        inputs: BTreeMap<String, String>,
+        objects: Vec<Value>,
+    }
+
+    fn recorded() -> BTreeMap<String, Recorded> {
+        serde_json::from_str(include_str!(concat!(
             env!("OUT_DIR"),
-            "/bundle/config/e2e.yaml"
+            "/bundle/crosscheck.json"
         )))
-        .unwrap();
-        let mut values = e2e.template_inputs;
-        if let Some(own) = e2e.templates.get(&template.id) {
-            values.extend(own.inputs.clone());
+        .unwrap()
+    }
+
+    #[test]
+    fn renders_what_the_catalogue_renders() {
+        let recorded = recorded();
+        for template in templates().unwrap() {
+            let id = &template.id;
+            let want = recorded
+                .get(id)
+                .unwrap_or_else(|| panic!("{id}: the catalogue recorded no render"));
+            let got = render(
+                id,
+                &RenderOptions {
+                    namespace: &want.namespace,
+                    domain: Some(&want.domain),
+                    cluster_issuer: Some(&want.cluster_issuer),
+                    inputs: &want.inputs,
+                },
+            )
+            .unwrap_or_else(|e| panic!("{id}: {e}"));
+            assert_eq!(got, want.objects, "{id}");
         }
-        values
-            .into_iter()
-            .filter(|(name, _)| {
-                template
-                    .inputs
-                    .iter()
-                    .any(|i| &i.name == name && i.generate.is_none())
-            })
-            .map(|(name, value)| {
-                let value = value
-                    .replace("{{ .S3.Endpoint }}", "https://s3.example.test")
-                    .replace("{{ .S3.Bucket }}", "e2e")
-                    .replace("{{ .S3.CIDR }}", "192.0.2.1/32");
-                (name, value)
-            })
-            .collect()
     }
 
     #[test]
     fn every_template_renders_into_its_namespace_with_its_labels_and_keeps_its_traffic_to_itself() {
-        let all = templates().unwrap();
-        assert!(all.iter().any(|t| t.id == "error-pages"));
-        for template in &all {
-            let inputs = e2e_inputs(template);
+        let recorded = recorded();
+        for template in &templates().unwrap() {
+            let inputs = recorded[&template.id].inputs.clone();
             let objects = render(
                 &template.id,
                 &RenderOptions {

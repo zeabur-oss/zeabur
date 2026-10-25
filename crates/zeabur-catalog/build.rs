@@ -3,7 +3,8 @@
 //! (`components/<capability>/<id>.yaml`), the templates (`templates/<id>/template.yaml` and
 //! `manifests.yaml`) and the template measurements (`measurements/templates/<id>.json`) become
 //! sorted tables of `include_str!` entries, so the binary carries the catalogue it was built with
-//! and reads nothing at run time. `config/e2e.yaml` is unpacked for the tests only.
+//! and reads nothing at run time. `crosscheck.json`, the catalogue's own render of each template,
+//! is unpacked for the tests only.
 
 use std::fmt::Write as _;
 use std::fs::{self, File};
@@ -95,7 +96,7 @@ fn unpack(archive: &Path, dir: &Path) -> io::Result<(Components, Templates, Meas
             ["templates", id, "template.yaml"] => {
                 templates.push(((*id).to_owned(), dir.join("templates").join(id)));
             }
-            ["templates", _, "manifests.yaml"] | ["config", "e2e.yaml"] => {}
+            ["templates", _, "manifests.yaml"] | ["crosscheck.json"] => {}
             _ => continue,
         }
         if let Some(parent) = dest.parent() {
