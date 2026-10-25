@@ -8,12 +8,7 @@
 //! start"), or the container runtime no longer has that run's container ("unable to retrieve
 //! container logs for containerd://…") [kuberuntime]. The kubelet keeps only the latest dead
 //! containers of a pod [kubelet-gc], so the run before a long crash loop's last restart is often
-//! gone.
-//!
-//! The kubelet's handler answers a refusal with `400` [kubelet-server], yet the last text has also
-//! been seen as the whole body of a `200` answer (k3s v1.36.5, right after a restart, and on a
-//! long crash loop); the cause is not known. Either way it is the kubelet speaking, not the
-//! program, so it is recognised in both forms and never shown as a log line.
+//! gone. The kubelet's handler answers a refusal with `400` [kubelet-server].
 //!
 //! [apiserver-checker]: https://github.com/kubernetes/kubernetes/blob/master/staging/src/k8s.io/apiserver/pkg/registry/generic/rest/response_checker.go
 //! [kubelet-pods]: https://github.com/kubernetes/kubernetes/blob/master/pkg/kubelet/kubelet_pods.go
@@ -23,16 +18,11 @@
 
 use zeabur_core::problem::UnavailableLog;
 
-/// Why the kubelet could not give a log, when `text` is one of its refusals.
-///
-/// `text` is kube-apiserver's message or a whole log body. Anything else is `None`, including
-/// any log of more than one line, which a program wrote.
+/// Why the kubelet could not give a log, when `text`, the message of a `400` answer, is one of
+/// its refusals. Anything else is `None`.
 #[must_use]
 pub fn unavailable_log(text: &str) -> Option<UnavailableLog> {
     let text = text.trim();
-    if text.contains('\n') {
-        return None;
-    }
     if text.starts_with("unable to retrieve container logs for ") && text.contains("://") {
         Some(UnavailableLog::Removed)
     } else if text.starts_with("previous terminated container ") && text.ends_with(" not found") {
@@ -81,11 +71,6 @@ mod tests {
             ),
             ("listening on :8080", None),
             ("container web started", None),
-            // A program that prints the phrase among its own lines.
-            (
-                "starting\nunable to retrieve container logs for containerd://4b1c0e9f",
-                None,
-            ),
         ];
         for (text, expected) in cases {
             assert_eq!(unavailable_log(text), expected, "{text}");

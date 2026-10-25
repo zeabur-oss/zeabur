@@ -973,28 +973,6 @@ mod tests {
             assert_eq!(problem["unavailableLog"], "no-previous-run", "{path}");
             assert_eq!(problem["kubernetes"]["code"], 400, "{path}");
         }
-
-        // The kubelet's refusal as the whole body of a 200.
-        cluster.update(|s| {
-            s.logs.insert(
-                "shop/web-1".to_owned(),
-                "unable to retrieve container logs for containerd://4b1c0e9f".to_owned(),
-            );
-        });
-        let (status, _, body) = call(
-            app(&cluster),
-            "GET",
-            "/api/v1/projects/shop/pods/web-1/logs",
-        )
-        .await;
-        assert_eq!(status, StatusCode::NOT_FOUND);
-        let problem = json(&body);
-        assert_eq!(problem["unavailableLog"], "removed");
-        assert!(problem.get("lines").is_none());
-        assert_eq!(
-            problem["kubernetes"]["message"],
-            "unable to retrieve container logs for containerd://4b1c0e9f"
-        );
     }
 
     #[tokio::test]

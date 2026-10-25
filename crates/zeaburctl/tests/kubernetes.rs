@@ -195,8 +195,8 @@ mod tests {
 
             // The run that printed `line` is the previous one while the container waits to restart,
             // and the current one while it stays terminated during a back-off; then the kubelet
-            // has already removed the run before it ("unable to retrieve container logs"). Either
-            // answer is a `log-unavailable` problem, never a log line; ask both until one has it.
+            // has already removed the run before it ("unable to retrieve container logs"), which
+            // kube-apiserver passes on as a `log-unavailable` problem; ask both until one has it.
             'found: loop {
                 for previous in [true, false] {
                     let result = session
@@ -210,15 +210,6 @@ mod tests {
                         assert_eq!(logs["kind"], "log-unavailable", "{era:?}: {result}");
                     } else if logs["lines"].as_array().unwrap().contains(&json!(line)) {
                         break 'found;
-                    } else {
-                        let first = &logs["lines"][0];
-                        assert!(
-                            !first
-                                .as_str()
-                                .unwrap_or_default()
-                                .starts_with("unable to retrieve"),
-                            "{era:?}: {logs}"
-                        );
                     }
                     assert!(Instant::now() < deadline, "{era:?}: {logs}");
                 }

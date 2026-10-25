@@ -12,7 +12,7 @@ use axum::extract::{Path, RawQuery};
 use axum::response::sse::{Event as SseEvent, KeepAlive, Sse};
 use futures_util::{Stream, StreamExt as _};
 use utoipa::IntoParams;
-use zeabur_core::problem::{Kind, KubernetesStatus, MEDIA_TYPE as PROBLEM, Problem};
+use zeabur_core::problem::{Kind, MEDIA_TYPE as PROBLEM, Problem};
 use zeabur_kube::{ClusterError, LogOptions, unavailable_log};
 use zeabur_model::Origin;
 
@@ -122,10 +122,6 @@ pub(crate) async fn logs(
         .pod_logs(&project, &pod, &query.options())
         .await
         .map_err(|e| log_problem(e, &what, &project, &pod))?;
-    if let Some(reason) = unavailable_log(&text) {
-        let answer = KubernetesStatus::new(200, "", text);
-        return Err(Problem::log_unavailable(reason, answer, &what).into());
-    }
     Ok(Json(LogSnapshot {
         origin: query.origin(&project, &pod),
         lines: text.lines().map(str::to_owned).collect(),
