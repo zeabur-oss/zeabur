@@ -134,6 +134,23 @@
         }
       }
     },
+    "extraTrustedCA": {
+      "description": "A ConfigMap or a Secret, not both, with PEM certificates Zeabur trusts for every HTTPS connection.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "configMap": { "anyOf": [{ "const": "" }, { "$ref": "#/definitions/name" }] },
+        "secret": { "anyOf": [{ "const": "" }, { "$ref": "#/definitions/name" }] },
+        "key": { "$ref": "#/definitions/key" }
+      },
+      "not": {
+        "properties": {
+          "configMap": { "$ref": "#/definitions/name" },
+          "secret": { "$ref": "#/definitions/name" }
+        },
+        "required": ["configMap", "secret"]
+      }
+    },
     "elevation": {
       "type": "object",
       "additionalProperties": false,

@@ -13,6 +13,8 @@ issuer:
   caBundle:
     configMap: zeabur-identity-ca
   accountUrl: https://identity.example.test:8443/account
+extraTrustedCA:
+  secret: corp-ca
 domains:
   suffixes: [apps.example.test, example.test]
   clusterIssuer: letsencrypt

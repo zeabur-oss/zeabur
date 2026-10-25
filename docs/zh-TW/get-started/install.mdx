@@ -90,6 +90,22 @@ helm upgrade zeabur oci://ghcr.io/zeabur-oss/charts/zeabur \
 
 這裡只指定服務使用的簽發者名稱。ClusterIssuer 與 DNS 要先備妥，Zeabur 不會從這兩個值建立它們。
 
+## 信任私有 CA
+
+Registry、物件儲存或 GitHub Enterprise 使用私有 CA 簽發的憑證，或叢集透過會檢查 TLS 的代理伺服器連外時，把 CA 憑證放進 Zeabur 所在 Namespace 的 ConfigMap，再設定 `extraTrustedCA.configMap`：
+
+```sh
+kubectl -n zeabur create configmap corp-ca --from-file=ca.crt=corp-ca.pem
+helm upgrade zeabur oci://ghcr.io/zeabur-oss/charts/zeabur \
+  --version <version> \
+  --namespace zeabur --reuse-values \
+  --set extraTrustedCA.configMap=corp-ca
+```
+
+憑證放在 Secret 時，改設定 `extraTrustedCA.secret`。兩者只能擇一。鍵名預設是 `ca.crt`，可用 `extraTrustedCA.key` 修改，一個檔案可以放多張憑證。
+
+Zeabur 讀取映像檔、讀取物件儲存裡的備份、連線 GitHub 時，除了內建的 Mozilla CA，也信任這些憑證。Zeabur 只在啟動時讀取這個檔案，修改 ConfigMap 後要執行 `kubectl -n zeabur rollout restart deployment/zeabur`。Identity 的 CA 另外用 `issuer.caBundle.configMap` 設定。
+
 ## 常見失敗
 
 | 情況 | 檢查位置 |

@@ -91,6 +91,10 @@ pub(crate) struct Args {
     /// top of the platform's roots. Needs `--build-registry`.
     #[arg(long, env = "ZEABUR_BUILD_REGISTRY_CA_FILE")]
     pub(crate) build_registry_ca_file: Option<PathBuf>,
+    /// A PEM file of certificate authorities Zeabur trusts, on top of the platform's roots, for
+    /// every HTTPS connection it makes: registries, object stores and GitHub.
+    #[arg(long, env = "ZEABUR_EXTRA_CA_FILE")]
+    pub(crate) extra_ca_file: Option<PathBuf>,
     /// The namespace Zeabur runs in, where the ConfigMap `zeabur-settings` keeps the settings
     /// people choose. Empty: settings cannot be changed.
     #[arg(long, env = "ZEABUR_NAMESPACE", default_value = "")]
@@ -200,7 +204,7 @@ impl Args {
             );
         }
         (settings.domains, settings.builds) = (domains(self)?, builds(self)?);
-        settings.build_registry_ca = self.build_registry_ca(&settings.builds)?;
+        settings.trusted_ca = self.trusted_ca(&settings.builds)?;
         let authority = public_url.authority();
         settings.public_host = Some(
             authority
@@ -253,21 +257,29 @@ impl Args {
         })
     }
 
-    /// The PEM bundle of the build registry's CA, checked.
-    fn build_registry_ca(
+    /// One PEM bundle of the extra CAs and the build registry's CA, each file checked.
+    fn trusted_ca(
         &self,
         builds: &zeabur_api::settings::BuildSettings,
     ) -> Result<Option<Vec<u8>>, String> {
-        let Some(path) = &self.build_registry_ca_file else {
-            return Ok(None);
-        };
-        if builds.registry.is_none() {
+        if self.build_registry_ca_file.is_some() && builds.registry.is_none() {
             return Err("--build-registry-ca-file needs --build-registry".to_owned());
         }
-        let pem = read(path, "--build-registry-ca-file")?;
-        ExtraRoots::from_pem(&pem)
-            .map_err(|e| format!("--build-registry-ca-file: {}: {e}", path.display()))?;
-        Ok(Some(pem.to_vec()))
+        let mut bundle: Option<Vec<u8>> = None;
+        for (path, flag) in [
+            (&self.extra_ca_file, "--extra-ca-file"),
+            (&self.build_registry_ca_file, "--build-registry-ca-file"),
+        ] {
+            let Some(path) = path else { continue };
+            let pem = read(path, flag)?;
+            ExtraRoots::from_pem(&pem).map_err(|e| format!("{flag}: {}: {e}", path.display()))?;
+            let bundle = bundle.get_or_insert_with(Vec::new);
+            if !bundle.is_empty() && !bundle.ends_with(b"\n") {
+                bundle.push(b'\n');
+            }
+            bundle.extend_from_slice(&pem);
+        }
+        Ok(bundle)
     }
 }
 
@@ -672,7 +684,7 @@ qkDcEXA7cf4S+NsEneg=
     #[test]
     fn a_build_registry_ca_file_is_checked_and_needs_a_registry() {
         let files = Files::new("registry-ca");
-        assert_eq!(args(&files, &[]).unwrap().settings.build_registry_ca, None);
+        assert_eq!(args(&files, &[]).unwrap().settings.trusted_ca, None);
         let ca = files.write("ca.crt", CA.as_bytes());
         let config = args(
             &files,
@@ -684,10 +696,7 @@ qkDcEXA7cf4S+NsEneg=
             ],
         )
         .unwrap();
-        assert_eq!(
-            config.settings.build_registry_ca.as_deref(),
-            Some(CA.as_bytes())
-        );
+        assert_eq!(config.settings.trusted_ca.as_deref(), Some(CA.as_bytes()));
         let error = args(&files, &["--build-registry-ca-file", &ca]).unwrap_err();
         assert!(
             error.starts_with("--build-registry-ca-file needs"),
@@ -705,6 +714,34 @@ qkDcEXA7cf4S+NsEneg=
         )
         .unwrap_err();
         assert!(error.starts_with("--build-registry-ca-file:"), "{error}");
+    }
+
+    #[test]
+    fn an_extra_ca_file_is_trusted_with_the_build_registry_ca() {
+        let files = Files::new("extra-ca");
+        let ca = files.write("ca.crt", CA.as_bytes());
+        let alone = args(&files, &["--extra-ca-file", &ca]).unwrap();
+        assert_eq!(alone.settings.trusted_ca.as_deref(), Some(CA.as_bytes()));
+        let both = args(
+            &files,
+            &[
+                "--extra-ca-file",
+                &ca,
+                "--build-registry",
+                "zot.zot.svc:5000",
+                "--build-registry-ca-file",
+                &ca,
+            ],
+        )
+        .unwrap();
+        let bundle = String::from_utf8(both.settings.trusted_ca.unwrap()).unwrap();
+        assert_eq!(
+            bundle.trim_end(),
+            format!("{}\n{}", CA.trim_end(), CA.trim_end())
+        );
+        let none = files.write("none.crt", b"not a certificate\n");
+        let error = args(&files, &["--extra-ca-file", &none]).unwrap_err();
+        assert!(error.starts_with("--extra-ca-file:"), "{error}");
     }
 
     #[test]

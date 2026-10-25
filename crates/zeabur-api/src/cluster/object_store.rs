@@ -44,10 +44,11 @@ impl std::fmt::Debug for Fetcher {
 }
 
 impl Fetcher {
-    /// A client that connects where `reach` allows.
+    /// A client that connects where `reach` allows and also trusts `extra_ca`, a PEM bundle.
     #[must_use]
-    pub fn new(reach: https::Reach) -> Self {
-        let client = connector(reach, None).map(|c| Client::builder(TokioExecutor::new()).build(c));
+    pub fn new(reach: https::Reach, extra_ca: Option<&[u8]>) -> Self {
+        let client =
+            connector(reach, extra_ca).map(|c| Client::builder(TokioExecutor::new()).build(c));
         Self { client, reach }
     }
 
@@ -232,6 +233,28 @@ mod tests {
         assert_eq!(
             authority("https://r2.example.com/b").as_deref(),
             Some("r2.example.com")
+        );
+    }
+
+    /// The extra CA reaches the store's client, and it does not open an address the reach
+    /// refuses.
+    #[tokio::test]
+    async fn the_store_trusts_the_extra_ca_and_still_refuses_link_local_addresses() {
+        let broken = Fetcher::new(https::Reach::Public, Some(b"not a certificate"));
+        let error = broken.get("https://s3.example.com/b/k", Vec::new()).await;
+        assert!(
+            error.as_ref().is_err_and(|e| e.contains("PEM")),
+            "{:?}",
+            error.map(|r| r.status())
+        );
+        let store = Fetcher::new(https::Reach::Public, None);
+        let refused = store.get("https://169.254.169.254/b/k", Vec::new()).await;
+        assert!(
+            refused
+                .as_ref()
+                .is_err_and(|e| e.contains("169.254.169.254")),
+            "{:?}",
+            refused.map(|r| r.status())
         );
     }
 }

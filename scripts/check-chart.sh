@@ -177,6 +177,13 @@ domain_env='[select(.kind == "Deployment" and .metadata.name == "zeabur") | .spe
 expect minimal "$(render -f "$chart/ci/minimal-values.yaml")" "$domain_env" ""
 expect full "$(render -f "$chart/ci/full-values.yaml")" "$domain_env" "apps.example.test,example.test,letsencrypt"
 
+# Extra CAs reach Zeabur only when given, from a ConfigMap or a Secret.
+extra_ca='select(.kind == "Deployment" and .metadata.name == "zeabur") | .spec.template.spec | [(.containers[0].env[] | select(.name == "ZEABUR_EXTRA_CA_FILE") | .value), (.volumes[] | select(.name == "extra-ca") | .secret.secretName // .configMap.name)] | join(",")'
+expect minimal "$(render -f "$chart/ci/minimal-values.yaml")" "$extra_ca" ""
+expect full "$(render -f "$chart/ci/full-values.yaml")" "$extra_ca" "/etc/zeabur/extra-ca/ca.crt,corp-ca"
+expect configMap "$(render -f "$chart/ci/minimal-values.yaml" --set extraTrustedCA.configMap=corp-ca)" \
+  "$extra_ca" "/etc/zeabur/extra-ca/ca.crt,corp-ca"
+
 # Zeabur Proxy: off unless asked for; on, a locked-down pod with no token that only Zeabur reaches,
 # over TLS whose CA (and only the CA) Zeabur trusts.
 expect minimal "$(render -f "$chart/ci/minimal-values.yaml")" \
@@ -228,6 +235,7 @@ refuse "no client secret" --set issuer.clientSecret.existingSecret=
 refuse "an HTTPRoute with no parent" --set httpRoute.enabled=true
 refuse "a metrics store without a port" --set metricsStore.service=observability/vm
 refuse "an unknown value" --set replicas=2
+refuse "an extra CA from both a ConfigMap and a Secret" --set extraTrustedCA.configMap=a --set extraTrustedCA.secret=b
 refuse "a cluster name longer than 63 characters" --set clusterName="$(printf 'x%.0s' {1..64})"
 refuse "a cluster name on two lines" --set-json 'clusterName="a\nb"'
 refuse "a domain suffix that is not a domain" --set 'domains.suffixes={Apps_Example}'

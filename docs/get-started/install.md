@@ -123,9 +123,25 @@ likely to set:
 | `issuer.clientSecret.existingSecret` | The Secret from step 2. The chart never takes the secret itself as a value, so it stays out of Helm's release records. |
 | `issuer.accountUrl` | Where people manage their passkeys and linked accounts; the Account page links there. Empty: the `manage` URL the issuer publishes at `/.well-known/passkey-endpoints`, else no link. |
 | `issuer.caBundle.configMap` | A ConfigMap with the CA that signed Zeabur Identity's certificate, when a private CA did (mkcert, an internal CA). |
+| `extraTrustedCA.configMap` or `extraTrustedCA.secret` | PEM certificates Zeabur trusts for every HTTPS connection it makes: registries, object stores and GitHub. Use it when one of them, or a proxy that inspects TLS, has a certificate a private CA signed. See [A private CA](#a-private-ca). |
 | `elevation.enabled` | Whether anything the cluster refuses to everyday rights (a change, a read, a terminal) offers "Retry as admin", which asks for the passkey again. Only people who have elevated groups in Zeabur Identity get the offer. While admin rights last, a few minutes, every request goes with them, as with `sudo`. |
 | `ingress.*`, `httpRoute.*` | An Ingress, or a Gateway API HTTPRoute (`httpRoute.parentRefs` names the Gateway), for the public URL's host name. |
 | `domains.suffixes`, `domains.clusterIssuer` | How a new service's public URL is made; see [Public URLs for services](#public-urls-for-services). |
+
+### A private CA
+
+Put the CA certificates in a ConfigMap (or a Secret) in Zeabur's namespace, then name it:
+
+```sh
+kubectl -n zeabur create configmap corp-ca --from-file=ca.crt=corp-ca.pem
+helm upgrade zeabur "oci://$chart" --version "$version" -n zeabur --reuse-values \
+  --set extraTrustedCA.configMap=corp-ca
+```
+
+`extraTrustedCA.key` names the key in it, `ca.crt` by default, and the file may hold several
+certificates. Zeabur reads the file when it starts, so after you change the ConfigMap, restart it
+with `kubectl -n zeabur rollout restart deployment/zeabur`. The certificates are added to the
+Mozilla CA bundle. Zeabur still refuses loopback and link-local addresses.
 
 ### The plan key
 

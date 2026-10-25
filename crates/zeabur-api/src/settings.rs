@@ -74,9 +74,10 @@ pub struct Settings {
     pub domains: DomainSettings,
     /// Where a service deployed from Git keeps its images.
     pub builds: BuildSettings,
-    /// A PEM bundle of the CA that signed the build registry's certificate, trusted when Zeabur
-    /// reads an image from it (`--build-registry-ca-file`); `None`: the platform's roots only.
-    pub build_registry_ca: Option<Vec<u8>>,
+    /// A PEM bundle trusted on top of the platform's roots by every HTTPS connection Zeabur
+    /// makes: to registries, object stores and GitHub (`--extra-ca-file` with
+    /// `--build-registry-ca-file`); `None`: the platform's roots only.
+    pub trusted_ca: Option<Vec<u8>>,
     /// The GitHub the cluster's GitHub App is made on (see [`crate::cluster::github_app`]).
     pub github: GitHubSettings,
 }
@@ -165,7 +166,7 @@ impl Default for Settings {
             account_url: None,
             domains: DomainSettings::default(),
             builds: BuildSettings::default(),
-            build_registry_ca: None,
+            trusted_ca: None,
             github: GitHubSettings::default(),
         }
     }

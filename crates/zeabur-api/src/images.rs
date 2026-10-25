@@ -78,11 +78,11 @@ impl Inspector {
         self.reach
     }
 
-    /// Through [`https::Https`] reaching `reach`. The registry of Zeabur Builder is read over
-    /// HTTPS like any other; `registry_ca`, a PEM bundle, is trusted for its certificate.
+    /// Through [`https::Https`] reaching `reach`, trusting `extra_ca`, a PEM bundle, on top of
+    /// the platform's roots; the registry of Zeabur Builder is read over HTTPS like any other.
     #[must_use]
-    pub fn connected(reach: https::Reach, registry_ca: Option<&[u8]>) -> Self {
-        let transport: Arc<dyn Transport> = match https::Https::new(reach, registry_ca) {
+    pub fn connected(reach: https::Reach, extra_ca: Option<&[u8]>) -> Self {
+        let transport: Arc<dyn Transport> = match https::Https::new(reach, extra_ca) {
             Ok(client) => Arc::new(client),
             Err(error) => Arc::new(Broken(error)),
         };

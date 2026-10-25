@@ -66,6 +66,16 @@ builds:
     configMap: ""
     key: ca.crt
 
+# Extra CA certificates (PEM) Zeabur trusts, on top of the image's Mozilla CA bundle, for every
+# HTTPS connection it makes: reading images from registries, reading backups from object stores,
+# and GitHub. Use it when one of them, or a proxy that inspects TLS, presents a certificate a
+# private CA signed. Name a ConfigMap or a Secret in this namespace, not both; Zeabur reads it when
+# it starts. builds.caBundle is trusted the same way. Empty: the Mozilla CA bundle only.
+extraTrustedCA:
+  configMap: ""
+  secret: ""
+  key: ca.crt
+
 # Anything the cluster refuses offers to ask for the passkey again (Zeabur Identity's `elevate` scope) and
 # retry with admin rights. Needs a client registered with `--allow-elevation`.
 elevation:
