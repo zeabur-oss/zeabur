@@ -319,19 +319,3 @@ export function restoreInPlace(
     ),
   ]
 }
-
-/** Exports `snapshot` as a file to the bucket of the backups. */
-export function exportSnapshot(
-  template: Template,
-  method: Record<string, unknown>,
-  snapshot: string,
-  claim: string,
-  now: Date,
-): Change[] {
-  return [create(restoreObject(template, restoreName(claim, now), snapshot, method))]
-}
-
-/** Where an export downloads from: Zeabur signs the requests with the bucket's keys and streams
- * the file, so no URL or key reaches the page. */
-export const volumeExportUrl = (project: string, claim: string, restore: string) =>
-  `/api/v1/projects/${encodeURIComponent(project)}/volumes/${encodeURIComponent(claim)}/restores/${encodeURIComponent(restore)}/download`

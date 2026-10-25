@@ -2439,8 +2439,8 @@ fn k8up_served() -> Vec<ServedResource> {
 }
 
 /// A nightly schedule of shop's Redis volume, kept 7 days and 4 weeks; last night's backup
-/// failed, the one before succeeded. Its snapshots can be restored, and one was exported as a
-/// file.
+/// failed, the one before succeeded. Its snapshots can be restored, and one was restored into a
+/// new volume.
 fn k8up() -> Vec<DynamicObject> {
     if !k8up_installed() {
         return Vec::new();
@@ -2499,11 +2499,11 @@ fn k8up() -> Vec<DynamicObject> {
         snapshot("8c2e5d0a9f1b3c47", 3178),
         from(json!({
             "apiVersion": "k8up.io/v1", "kind": "Restore",
-            "metadata": {"name": "data-redis-0-export-1", "namespace": "shop",
+            "metadata": {"name": "data-redis-0-restore-1", "namespace": "shop",
                 "resourceVersion": "41", "creationTimestamp": minutes_ago(90),
                 "labels": {"zeabur.com/backup-volume": "data-redis-0"}},
             "spec": {"backend": backend, "snapshot": "3f9a6c1e7b2d4a58",
-                "restoreMethod": {"s3": {"endpoint": "https://4f1c.r2.cloudflarestorage.com", "bucket": "acme-backups"}}},
+                "restoreMethod": {"folder": {"claimName": "data-redis-0-copy"}}},
             "status": {"conditions": [{"type": "Completed", "status": "True",
                 "reason": "Succeeded", "lastTransitionTime": minutes_ago(88)}]}
         })),

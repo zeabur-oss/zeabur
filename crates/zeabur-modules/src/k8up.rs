@@ -22,25 +22,18 @@
 //! files are at `/data/<claim>` [k8up-rwo], and only snapshots taken with the namespace as the
 //! restic host are listed [k8up-snapshots].
 //!
-//! A `Restore` runs one snapshot with the backup's backend [k8up-restore]:
-//!
-//! - into a claim (`restoreMethod.folder.claimName`). The snapshot's path is trimmed, so the files
-//!   land at the claim's root. restic keeps files the snapshot does not have unless the `Restore`
-//!   sets `delete: true`, which passes `--delete` [restic-restore]. K8up 2.16 does not check
-//!   restic's exit status here, so a restore that failed can still report `Completed`
-//!   [k8up-folder-restore]; the files must be checked.
-//! - to S3 (`restoreMethod.s3`) as `backup-<namespace>-<claim>-<snapshot time>.tar.gz` at the root
-//!   of `restoreMethod.s3.bucket`. The operator joins the endpoint and the bucket with a slash, so
-//!   a bucket in the endpoint's path with no `bucket` ends in a slash that S3 rejects
-//!   [k8up-s3-restore].
+//! A `Restore` runs one snapshot with the backup's backend [k8up-restore], into a claim
+//! (`restoreMethod.folder.claimName`). The snapshot's path is trimmed, so the files land at the
+//! claim's root. restic keeps files the snapshot does not have unless the `Restore` sets
+//! `delete: true`, which passes `--delete` [restic-restore]. K8up 2.16 does not check restic's exit
+//! status here, so a restore that failed can still report `Completed` [k8up-folder-restore]; the
+//! files must be checked.
 //!
 //! [k8up-api]: https://docs.k8up.io/k8up/2.13/references/api-reference.html
 //! [k8up-snapshots]: https://github.com/k8up-io/k8up/blob/v2.16.1/restic/kubernetes/snapshots.go
 //! [k8up-restore]: https://docs.k8up.io/k8up/2.16/how-tos/restore.html
 //! [restic-restore]: https://restic.readthedocs.io/en/stable/050_restore.html
 //! [k8up-folder-restore]: https://github.com/k8up-io/k8up/blob/v2.16.1/restic/cli/restore.go#L196
-//! [k8up-s3-restore]: https://github.com/k8up-io/k8up/blob/v2.16.1/restic/cli/restore.go#L288
-//! [k8up-s3-client]: https://github.com/k8up-io/k8up/blob/v2.16.1/restic/s3/client.go#L93
 //! [k8up-rwo]: https://docs.k8up.io/k8up/2.13/explanations/rwo.html
 //! [k8up-annotations]: https://docs.k8up.io/k8up/2.13/references/annotations.html
 //! [k8up-status]: https://docs.k8up.io/k8up/2.13/references/status.html
@@ -262,7 +255,7 @@ pub struct RestoreView {
     pub name: String,
     /// The snapshot.
     pub snapshot: String,
-    /// The claim it restores into; absent for an export.
+    /// The claim it restores into; absent for a restore to anywhere else.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub into: Option<String>,
     /// It deletes what the snapshot does not have.
@@ -413,27 +406,6 @@ pub fn restore_template(schedule: &DynamicObject, claim: &str) -> Value {
         "metadata": {"labels": {VOLUME_LABEL: claim}},
         "spec": spec,
     })
-}
-
-/// The S3 method that exports a snapshot to the root of the bucket of `schedule`'s backups, with
-/// the same keys.
-#[must_use]
-pub fn export_method(schedule: &DynamicObject) -> Option<Value> {
-    let s3 = backend(schedule)?.get("s3")?;
-    let endpoint = s3.get("endpoint")?.as_str()?.trim_end_matches('/');
-    let bucket = s3.get("bucket")?.as_str()?.split('/').next()?;
-    Some(json!({"s3": {
-        "endpoint": endpoint,
-        "bucket": bucket,
-        "accessKeyIDSecretRef": s3.get("accessKeyIDSecretRef")?,
-        "secretAccessKeySecretRef": s3.get("secretAccessKeySecretRef")?,
-    }}))
-}
-
-/// The name of the file a snapshot of `claim` exported in `namespace` starts with.
-#[must_use]
-pub fn export_prefix(namespace: &str, claim: &str) -> String {
-    format!("backup-{namespace}-{claim}-")
 }
 
 #[cfg(test)]

@@ -315,7 +315,6 @@ fn remaining_routes(router: OpenApiRouter<AppState>) -> OpenApiRouter<AppState> 
         .routes(routes!(projects::object_storage::get))
         .routes(routes!(projects::database_export::export))
         .routes(routes!(projects::volume_restores::get))
-        .routes(routes!(projects::volume_restores::download))
         .routes(routes!(projects::builds::get))
         .routes(routes!(projects::deploy_keys::create))
         .routes(routes!(cluster::github_app::project))

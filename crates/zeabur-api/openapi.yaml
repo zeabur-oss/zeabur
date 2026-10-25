@@ -4022,59 +4022,6 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/Problem"
-  "/api/v1/projects/{project}/volumes/{claim}/restores/{restore}/download":
-    get:
-      tags:
-      - projects
-      summary: |-
-        The file an export of `claim`'s backup wrote, as a `.tar.gz` file. Read as the person: the
-        `Restore`, the claim's backup schedule and the keys of its bucket. No URL or key reaches the
-        answer.
-      operationId: downloadVolumeExport
-      parameters:
-      - name: project
-        in: path
-        description: The project's namespace
-        required: true
-        schema:
-          type: string
-      - name: claim
-        in: path
-        description: The claim
-        required: true
-        schema:
-          type: string
-      - name: restore
-        in: path
-        description: The export's `Restore`
-        required: true
-        schema:
-          type: string
-      responses:
-        "200":
-          description: The snapshot's files
-          content:
-            application/gzip: {}
-        "403":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/Problem"
-        "404":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/Problem"
-        "422":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/Problem"
-        "503":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/Problem"
   /api/v1/session:
     get:
       tags:
@@ -18106,7 +18053,7 @@ components:
           type:
           - string
           - "null"
-          description: The claim it restores into; absent for an export.
+          description: The claim it restores into; absent for a restore to anywhere else.
         message:
           type:
           - string
@@ -18143,8 +18090,6 @@ components:
       - restores
       - unreadable
       properties:
-        export:
-          description: The `restoreMethod` that exports a snapshot to the bucket of the backups.
         restores:
           type: array
           items:

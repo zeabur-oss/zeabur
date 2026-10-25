@@ -1,7 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
 import {
-  exportSnapshot,
   restoreInPlace,
   restoreToNewVolume,
   swapToVolume,
@@ -213,10 +212,7 @@ describe("restoring a volume from a backup point", () => {
     expect(restore.metadata.annotations).toEqual({ "zeabur.com/replicas": "2" })
   })
 
-  test("exports to the bucket, and the service switches claims in one change", () => {
-    const method = { s3: { endpoint: "http://s3:8333", bucket: "backups" } }
-    const [restore] = objects(exportSnapshot(template, method, "abc123", "data", now))
-    expect(restore.spec.restoreMethod).toEqual(method)
+  test("the service switches claims in one change", () => {
     expect(swapToVolume({ kind: "Deployment", name: "web" }, "data", "data-restored-1025")).toEqual(
       [
         {

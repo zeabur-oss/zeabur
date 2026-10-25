@@ -2259,27 +2259,6 @@ export interface paths {
     patch?: never
     trace?: never
   }
-  "/api/v1/projects/{project}/volumes/{claim}/restores/{restore}/download": {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    /**
-     * The file an export of `claim`'s backup wrote, as a `.tar.gz` file. Read as the person: the
-     *     `Restore`, the claim's backup schedule and the keys of its bucket. No URL or key reaches the
-     *     answer.
-     */
-    get: operations["downloadVolumeExport"]
-    put?: never
-    post?: never
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
   "/api/v1/session": {
     parameters: {
       query?: never
@@ -9416,7 +9395,7 @@ export interface components {
       delete: boolean
       /** @description When it finished, RFC 3339. */
       finished?: string | null
-      /** @description The claim it restores into; absent for an export. */
+      /** @description The claim it restores into; absent for a restore to anywhere else. */
       into?: string | null
       /** @description Why it failed. */
       message?: string | null
@@ -9437,8 +9416,6 @@ export interface components {
     }
     /** @description What a claim can be restored from. */
     VolumeRestores: {
-      /** @description The `restoreMethod` that exports a snapshot to the bucket of the backups. */
-      export?: unknown
       /** @description The restores of the claim's backups, newest first. */
       restores: components["schemas"]["VolumeRestore"][]
       /** @description The schedule of the claim's backups. */
@@ -14180,65 +14157,6 @@ export interface operations {
         }
       }
       403: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          "application/problem+json": components["schemas"]["Problem"]
-        }
-      }
-    }
-  }
-  downloadVolumeExport: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        /** @description The project's namespace */
-        project: string
-        /** @description The claim */
-        claim: string
-        /** @description The export's `Restore` */
-        restore: string
-      }
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description The snapshot's files */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          "application/gzip": unknown
-        }
-      }
-      403: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          "application/problem+json": components["schemas"]["Problem"]
-        }
-      }
-      404: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          "application/problem+json": components["schemas"]["Problem"]
-        }
-      }
-      422: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          "application/problem+json": components["schemas"]["Problem"]
-        }
-      }
-      503: {
         headers: {
           [name: string]: unknown
         }

@@ -2259,13 +2259,10 @@ export const en = {
     `${claim} has no backup point to restore yet. One shows here after the first backup.`,
   "volumeRestore.new": "New volume from a backup point",
   "volumeRestore.inPlace": "Stop the service, clear the volume, restore in place",
-  "volumeRestore.export": "Export as a file",
-  "volumeRestore.toFile": "Exported file",
   "volumeRestore.toItself": (claim: string) => `Into ${claim} itself`,
   "volumeRestore.toVolume": (into: string) => `Into new volume ${into}`,
   "volumeRestore.check":
     "K8up can report a restore as done even when it failed, so check the files before you use them.",
-  "volumeRestore.download": "Download",
   "volumeRestore.swap": "Switch the service to the new volume",
   "volumeRestore.swapTitle": (service: string, into: string) => `Switch ${service} to ${into}`,
   "volumeRestore.swapDowntime": (service: string) =>
@@ -2274,7 +2271,6 @@ export const en = {
     `The original volume ${claim} is kept. Delete it when you no longer need it.`,
   "volumeRestore.start": "Start the service",
   "volumeRestore.startTitle": (service: string) => `Start ${service}`,
-  "volumeRestore.exportTitle": (claim: string) => `Export a backup point of ${claim} as a file`,
   "volumeRestore.inPlaceTitle": (claim: string) => `Restore ${claim} in place`,
   "volumeRestore.newTitle": (claim: string) => `New volume from a backup point of ${claim}`,
   "volumeRestore.newNote": (into: string, when: string) =>
@@ -2293,8 +2289,6 @@ export const en = {
     "Anyone who can restore can read every backup in this project's backup repository.",
   "volumeRestore.understood": (claim: string) =>
     `I understand the files now in ${claim} are cleared`,
-  "volumeRestore.exportNote": (when: string) =>
-    `The backup point of ${when} is packed as a .tar.gz file in the bucket of the backups. You can download it once it is done.`,
   "volumeRestore.onlyBackups": "Only the times of backups can be chosen, not any time.",
   "volumeRestore.point": "Backup point",
   "volumeRestore.zone": "In your time zone.",

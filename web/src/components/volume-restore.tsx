@@ -1,9 +1,8 @@
 // Restoring a volume from its K8up backups: into a new volume the service can switch to, in
-// place for a StatefulSet's volume, or out to a file to download.
+// place for a StatefulSet's volume.
 import { useQuery } from "@tanstack/react-query"
 import { useState } from "react"
 import ArrowCounterClockwiseIcon from "~icons/ph/arrow-counter-clockwise"
-import DownloadSimpleIcon from "~icons/ph/download-simple"
 import WarningIcon from "~icons/ph/warning"
 
 import { type Schemas } from "@/api/client"
@@ -19,15 +18,9 @@ import type { Messages } from "@/i18n/en"
 import { formatTime } from "@/lib/format"
 import { outcomeHealth } from "@/model/cluster-backups"
 import { restoredName } from "@/model/database-restore"
-import {
-  exportSnapshot,
-  volumeExportUrl,
-  restoreInPlace,
-  restoreToNewVolume,
-  swapToVolume,
-} from "@/model/volume-backups"
+import { restoreInPlace, restoreToNewVolume, swapToVolume } from "@/model/volume-backups"
 import { Alert, AlertDescription } from "@zeabur/design-system/components/alert"
-import { Button, buttonVariants } from "@zeabur/design-system/components/button"
+import { Button } from "@zeabur/design-system/components/button"
 import { Checkbox } from "@zeabur/design-system/components/checkbox"
 import { Label } from "@zeabur/design-system/components/label"
 import { Select } from "@zeabur/design-system/components/select"
@@ -36,7 +29,7 @@ type Service = Schemas["Service"]
 type Mount = Schemas["Mount"]
 type Restores = Schemas["VolumeRestores"]
 type Restore = Schemas["VolumeRestore"]
-type Mode = "new" | "inPlace" | "export"
+type Mode = "new" | "inPlace"
 type Template = Parameters<typeof restoreToNewVolume>[0]
 
 const NAME_MAX = 63
@@ -130,12 +123,11 @@ function RestoreRow({
 }) {
   const t = useT()
   const done = restore.outcome === "succeeded"
-  const into = restore.into
   return (
     <li className="flex flex-col gap-1 border-t border-rule py-2 first:border-t-0">
       <div className="flex min-w-0 flex-wrap items-center gap-2.5">
         <span className="min-w-0 flex-1 truncate type-meta" translate="no">
-          {restoreWords(t, claim, into)}
+          {restoreWords(t, claim, restore)}
         </span>
         <StatusPill health={outcomeHealth[restore.outcome]} size="sm">
           {t(`backups.${restore.outcome}`)}
@@ -154,13 +146,14 @@ function RestoreRow({
   )
 }
 
-function restoreWords(t: Translate, claim: string, into: string | null | undefined) {
-  if (!into) return t("volumeRestore.toFile")
+function restoreWords(t: Translate, claim: string, restore: Restore) {
+  const into = restore.into
+  if (!into) return restore.name
   return into === claim ? t("volumeRestore.toItself", claim) : t("volumeRestore.toVolume", into)
 }
 
-/** The next step after a restore finished: download the file, start the service again, or
- * switch it to the new volume. */
+/** The next step after a restore finished: start the service again, or switch it to the new
+ * volume. */
 function Done({
   project,
   service,
@@ -174,19 +167,7 @@ function Done({
 }) {
   const t = useT()
   const into = restore.into
-  if (!into)
-    return (
-      <div className="flex flex-wrap items-center gap-2">
-        <a
-          className={buttonVariants({ size: "xs", variant: "outline" })}
-          href={volumeExportUrl(project, claim, restore.name)}
-          download
-        >
-          <DownloadSimpleIcon aria-hidden="true" data-icon="inline-start" />
-          {t("volumeRestore.download")}
-        </a>
-      </div>
-    )
+  if (!into) return null
   return (
     <>
       <p className="type-meta text-muted-foreground">{t("volumeRestore.check")}</p>
@@ -304,7 +285,7 @@ function RestoreDrawer({
   const template = (data.template ?? {}) as Template
   const intoProblem = badName(into, claim)
   const title = t(TITLE[mode], claim)
-  const ready = { new: !intoProblem, inPlace: understood, export: !!data.export }[mode]
+  const ready = mode === "new" ? !intoProblem : understood
   const review = () => {
     setTried(true)
     if (!point || !ready) return
@@ -316,7 +297,6 @@ function RestoreDrawer({
       into,
       mount,
       service,
-      exportTo: data.export as Record<string, unknown>,
     }
     step.plan({ title, ...PLANS[mode](t, ask, new Date()) })
   }
@@ -337,24 +317,45 @@ function RestoreDrawer({
       <ReviewForm onReview={review}>
         <SnapshotField snapshots={data.snapshots} value={snapshot} onChange={setSnapshot} />
         {mode === "new" ? (
-          <NameField
-            label={t("volumeRestore.name")}
-            hint={sameAs(t, mount)}
-            error={tried && intoProblem ? t("volumeRestore.badName") : undefined}
-            value={into}
+          <NewVolumeField
+            mount={mount}
+            into={into}
             onChange={setInto}
+            error={tried && !!intoProblem}
           />
-        ) : null}
-        {mode === "inPlace" ? (
+        ) : (
           <InPlaceWarning
             service={service.name}
             claim={claim}
             understood={understood}
             onUnderstood={setUnderstood}
           />
-        ) : null}
+        )}
       </ReviewForm>
     </PlanDrawer>
+  )
+}
+
+function NewVolumeField({
+  mount,
+  into,
+  onChange,
+  error,
+}: {
+  mount?: Mount
+  into: string
+  onChange: (name: string) => void
+  error: boolean
+}) {
+  const t = useT()
+  return (
+    <NameField
+      label={t("volumeRestore.name")}
+      hint={sameAs(t, mount)}
+      error={error ? t("volumeRestore.badName") : undefined}
+      value={into}
+      onChange={onChange}
+    />
   )
 }
 
@@ -402,7 +403,6 @@ function SnapshotField({
 const TITLE = {
   new: "volumeRestore.newTitle",
   inPlace: "volumeRestore.inPlaceTitle",
-  export: "volumeRestore.exportTitle",
 } as const satisfies Record<Mode, keyof Messages>
 
 type Ask = {
@@ -413,7 +413,6 @@ type Ask = {
   into: string
   mount?: Mount
   service: Service
-  exportTo: Record<string, unknown>
 }
 
 const PLANS: Record<Mode, (t: Translate, ask: Ask, now: Date) => Omit<PlanAsk, "title">> = {
@@ -435,10 +434,6 @@ const PLANS: Record<Mode, (t: Translate, ask: Ask, now: Date) => Omit<PlanAsk, "
       now,
     ),
     notes: [t("volumeRestore.cleared", a.claim, a.when), t("volumeRestore.stops", a.service.name)],
-  }),
-  export: (t, a, now) => ({
-    changes: exportSnapshot(a.template, a.exportTo, a.point.id, a.claim, now),
-    notes: [t("volumeRestore.exportNote", a.when)],
   }),
 }
 
