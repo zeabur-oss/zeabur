@@ -36,8 +36,6 @@
 //! without NetworkPolicy support accepts the objects and enforces nothing [k8s-netpol]. k3s
 //! enforces them with its embedded controller unless it was started with
 //! `--disable-network-policy` [k3s-netpol]. Clients say so wherever they show reachability.
-//! [`enforcement`] reads what k3s records on its nodes, for the `no-network-policy` rule; on any
-//! other cluster it stays unknown.
 //!
 //! [k8s-netpol]: https://kubernetes.io/docs/concepts/services-networking/network-policies/
 //! [k8s-ns-label]: https://kubernetes.io/docs/reference/labels-annotations-taints/#kubernetes-io-metadata-name
@@ -787,88 +785,6 @@ pub fn gaps(namespace: &str, reachability: &Reachability, workloads: &[Workload]
         .collect()
 }
 
-/// Whether the cluster enforces NetworkPolicy, as far as Zeabur can tell.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Enforcement {
-    /// k3s, with its embedded network policy controller on every server.
-    Enforced,
-    /// k3s with Flannel, and the controller turned off on every server: Flannel enforces
-    /// nothing, so the policies are objects only.
-    NotEnforced,
-    /// Another distribution or network plugin, or the nodes could not be read.
-    Unknown,
-}
-
-impl Enforcement {
-    /// The word a gap's message carries.
-    const fn word(self) -> &'static str {
-        match self {
-            Self::Enforced => "enforced",
-            Self::NotEnforced => "notEnforced",
-            Self::Unknown => "unknown",
-        }
-    }
-}
-
-/// The node annotation in which k3s records the arguments it was started with, config file
-/// included, secrets masked [k3s-nodeconfig].
-///
-/// [k3s-nodeconfig]: https://github.com/k3s-io/k3s/blob/main/pkg/nodeconfig/nodeconfig.go
-pub const K3S_NODE_ARGS: &str = "k3s.io/node-args";
-
-/// Whether NetworkPolicy is enforced, from the [`K3S_NODE_ARGS`] annotation of every node that
-/// has one (`None` when the nodes could not be listed).
-///
-/// k3s embeds kube-router's network policy controller and runs it unless each server is started
-/// with `--disable-network-policy` [k3s-netpol]. With `--flannel-backend=none` another network
-/// plugin is installed [k3s-cni], which may enforce policies of its own: unknown. Servers that
-/// disagree, or no server annotation at all: unknown.
-///
-/// [k3s-netpol]: https://docs.k3s.io/networking/networking-services#network-policy-controller
-/// [k3s-cni]: https://docs.k3s.io/networking/basic-network-options#custom-cni
-#[must_use]
-pub fn enforcement(node_args: Option<&[String]>) -> Enforcement {
-    let Some(node_args) = node_args else {
-        return Enforcement::Unknown;
-    };
-    let mut seen = Vec::new();
-    for value in node_args {
-        let Ok(args) = serde_json::from_str::<Vec<String>>(value) else {
-            return Enforcement::Unknown;
-        };
-        if args.first().map(String::as_str) != Some("server") {
-            continue;
-        }
-        if flag(&args, "--flannel-backend").as_deref() == Some("none") {
-            return Enforcement::Unknown;
-        }
-        seen.push(flag(&args, "--disable-network-policy").is_some_and(|v| v != "false"));
-    }
-    match (seen.iter().all(|d| *d), seen.iter().any(|d| *d)) {
-        _ if seen.is_empty() => Enforcement::Unknown,
-        (true, _) => Enforcement::NotEnforced,
-        (false, false) => Enforcement::Enforced,
-        (false, true) => Enforcement::Unknown,
-    }
-}
-
-/// The value of `name` among k3s arguments: `--name=value`, `--name value`, or `--name` alone
-/// (a boolean, `"true"`). The last one wins, as on the command line.
-fn flag(args: &[String], name: &str) -> Option<String> {
-    let mut found = None;
-    for (i, arg) in args.iter().enumerate() {
-        if let Some(value) = arg.strip_prefix(name).and_then(|r| r.strip_prefix('=')) {
-            found = Some(value.to_owned());
-        } else if arg == name {
-            found = Some(match args.get(i + 1) {
-                Some(next) if !next.starts_with('-') => next.clone(),
-                _ => "true".to_owned(),
-            });
-        }
-    }
-    found
-}
-
 /// How traffic from outside the project reaches its services, by service id.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Exposed<'a> {
@@ -893,20 +809,12 @@ pub const NO_NETWORK_POLICY: &str = "no-network-policy";
 /// the plan is checked with [`reachability`] itself, and what it would cut off that is open today
 /// is named in the message as `cuts`: `otherNamespaces`, `outside`, `published`, `connections`.
 ///
-/// A warning where the cluster enforces policies; advice where that is unknown, said in the
-/// message; nothing where it is known not to, since a policy there changes nothing. No workloads,
-/// no finding.
+/// Always advice: whether the policies take effect depends on the cluster's network plugin, which
+/// the message says. No workloads, no finding.
 ///
 /// [k8s-isolation]: https://kubernetes.io/docs/concepts/services-networking/network-policies/#the-two-sorts-of-pod-isolation
 #[must_use]
-pub fn unprotected(
-    input: Input<'_>,
-    exposed: Exposed<'_>,
-    enforced: Enforcement,
-) -> Option<Finding> {
-    if enforced == Enforcement::NotEnforced {
-        return None;
-    }
+pub fn unprotected(input: Input<'_>, exposed: Exposed<'_>) -> Option<Finding> {
     let before = reachability(input);
     let open: Vec<&Workload> = input
         .workloads
@@ -946,16 +854,11 @@ pub fn unprotected(
     Some(Finding {
         gap: Gap {
             rule: NO_NETWORK_POLICY.to_owned(),
-            severity: if enforced == Enforcement::Enforced {
-                Severity::Warning
-            } else {
-                Severity::Advice
-            },
+            severity: Severity::Advice,
             subject: Origin::object("Namespace", input.namespace),
             service: None,
             message: Message::new("gap.noNetworkPolicy")
                 .with("services", names.join(","))
-                .with("enforcement", enforced.word())
                 .with("cuts", cuts(&before, &after, &open, exposed).join(",")),
             fix: Fix {
                 kind: FixKind::Plan,
@@ -1276,15 +1179,13 @@ mod tests {
                 routed: std::slice::from_ref(&workloads[0].id),
                 published: std::slice::from_ref(&workloads[1].id),
             },
-            Enforcement::Enforced,
         )
         .unwrap();
         let gap = &finding.gap;
         assert_eq!(gap.rule, NO_NETWORK_POLICY);
-        assert_eq!(gap.severity, Severity::Warning);
+        assert_eq!(gap.severity, Severity::Advice);
         assert_eq!(gap.subject, Origin::object("Namespace", "shop"));
         assert_eq!(gap.message.params["services"], "web,api");
-        assert_eq!(gap.message.params["enforcement"], "enforced");
         assert_eq!(
             gap.message.params["cuts"],
             "otherNamespaces,outside,published"
@@ -1312,8 +1213,7 @@ mod tests {
         assert!(
             unprotected(
                 input(&workloads, &applied, &connections),
-                Exposed::default(),
-                Enforcement::Enforced
+                Exposed::default()
             )
             .is_none()
         );
@@ -1323,26 +1223,14 @@ mod tests {
     fn a_policy_selecting_every_pod_leaves_nothing_to_report() {
         let workloads = [workload("web", "web"), workload("api", "api")];
         let policies = [deny("default-deny", &json!({}))];
-        assert!(
-            unprotected(
-                input(&workloads, &policies, &[]),
-                Exposed::default(),
-                Enforcement::Enforced
-            )
-            .is_none()
-        );
+        assert!(unprotected(input(&workloads, &policies, &[]), Exposed::default()).is_none());
     }
 
     #[test]
     fn a_policy_selecting_some_pods_names_only_the_others() {
         let workloads = [workload("web", "web"), workload("api", "api")];
         let policies = [deny("deny-web", &json!({"matchLabels": {"app": "web"}}))];
-        let finding = unprotected(
-            input(&workloads, &policies, &[]),
-            Exposed::default(),
-            Enforcement::Enforced,
-        )
-        .unwrap();
+        let finding = unprotected(input(&workloads, &policies, &[]), Exposed::default()).unwrap();
         assert_eq!(finding.gap.message.params["services"], "api");
         let objects: Vec<Value> = serde_json::from_str(&finding.gap.fix.params["objects"]).unwrap();
         assert_eq!(objects.len(), 1);
@@ -1357,98 +1245,13 @@ mod tests {
             "metadata": {"name": "egress", "namespace": "shop"},
             "spec": {"podSelector": {}, "policyTypes": ["Egress"]}
         }))];
-        let finding = unprotected(
-            input(&workloads, &policies, &[]),
-            Exposed::default(),
-            Enforcement::Enforced,
-        )
-        .unwrap();
+        let finding = unprotected(input(&workloads, &policies, &[]), Exposed::default()).unwrap();
         assert_eq!(finding.gap.message.params["services"], "api");
     }
 
     #[test]
     fn no_workloads_no_finding() {
-        assert!(
-            unprotected(
-                input(&[], &[], &[]),
-                Exposed::default(),
-                Enforcement::Enforced
-            )
-            .is_none()
-        );
-    }
-
-    #[test]
-    fn enforcement_decides_severity_or_silence() {
-        let workloads = [workload("api", "api")];
-        let unknown = unprotected(
-            input(&workloads, &[], &[]),
-            Exposed::default(),
-            Enforcement::Unknown,
-        )
-        .unwrap();
-        assert_eq!(unknown.gap.severity, Severity::Advice);
-        assert_eq!(unknown.gap.message.params["enforcement"], "unknown");
-        assert!(
-            unprotected(
-                input(&workloads, &[], &[]),
-                Exposed::default(),
-                Enforcement::NotEnforced
-            )
-            .is_none()
-        );
-    }
-
-    #[test]
-    fn enforcement_is_read_from_k3s_server_arguments() {
-        let of = |nodes: &[&[&str]]| {
-            let args: Vec<String> = nodes
-                .iter()
-                .map(|a| serde_json::to_string(a).unwrap())
-                .collect();
-            enforcement(Some(&args))
-        };
-        assert_eq!(enforcement(None), Enforcement::Unknown);
-        assert_eq!(of(&[]), Enforcement::Unknown);
-        assert_eq!(of(&[&["agent"]]), Enforcement::Unknown);
-        assert_eq!(
-            of(&[&["server", "--write-kubeconfig-mode", "644"], &["agent"]]),
-            Enforcement::Enforced
-        );
-        assert_eq!(
-            of(&[&["server", "--disable-network-policy"]]),
-            Enforcement::NotEnforced
-        );
-        // From a config file, k3s records `--flag=value` split in two.
-        assert_eq!(
-            of(&[&["server", "--disable-network-policy", "true"]]),
-            Enforcement::NotEnforced
-        );
-        assert_eq!(
-            of(&[&["server", "--disable-network-policy", "false"]]),
-            Enforcement::Enforced
-        );
-        assert_eq!(
-            of(&[&["server", "--disable-network-policy=true"]]),
-            Enforcement::NotEnforced
-        );
-        assert_eq!(
-            of(&[&["server", "--disable-network-policy"], &["server"]]),
-            Enforcement::Unknown
-        );
-        assert_eq!(
-            of(&[&[
-                "server",
-                "--flannel-backend",
-                "none",
-                "--disable-network-policy"
-            ]]),
-            Enforcement::Unknown
-        );
-        assert_eq!(
-            enforcement(Some(&["not json".to_owned()])),
-            Enforcement::Unknown
-        );
+        assert!(unprotected(input(&[], &[], &[]), Exposed::default()).is_none());
     }
 
     #[test]

@@ -134,7 +134,7 @@ export default sentences({
     "gap.danglingRoute.noParent": "HTTPRoute ${route} 没有指定 Gateway，所以它收不到任何流量。",
     "gap.danglingRoute.notAccepted": "没有任何 Gateway 接受 HTTPRoute ${route}${reason, select, none {} other {（${reason}）}}，所以它收不到任何流量。",
     "gap.blockedConnection": "${at, select, egress {${from} 的环境变量指向 ${to}，但 ${from} 的 NetworkPolicy 不允许连出。} both {${from} 的环境变量指向 ${to}，但两端的 NetworkPolicy 都拦截了这条连接。} other {${from} 的环境变量指向 ${to}，但 ${to} 的 NetworkPolicy 不允许 ${from} 连入。}}",
-    "gap.noNetworkPolicy": "没有 NetworkPolicy 保护 ${services, list}：集群里任何 Pod 都连得到。${enforcement, select, unknown {NetworkPolicy 要网络插件（CNI）支持才会生效。} other {}}${cuts, select, none {} other {隔离后也会拦截${cuts, first, published { } other {}}${cuts, list, and, otherNamespaces {来自其他 Namespace 的连接} outside {连到集群外的连接} published {NodePort 与 LoadBalancer 的流量} connections {服务之间的一条连接}}。}}",
+    "gap.noNetworkPolicy": "没有 NetworkPolicy 保护 ${services, list}：集群里任何 Pod 都连得到。NetworkPolicy 要集群的网络插件（CNI）支持才会生效。${cuts, select, none {} other {隔离后也会拦截${cuts, first, published { } other {}}${cuts, list, and, otherNamespaces {来自其他 Namespace 的连接} outside {连到集群外的连接} published {NodePort 与 LoadBalancer 的流量} connections {服务之间的一条连接}}。}}",
     "gap.volumeWithoutBackup": "卷 ${claim} 没有定时备份。",
     "gap.databaseWithoutBackup": "数据库 ${database} 没有定时备份。",
     "incident.componentDown.cause.ingressController": "Ingress 控制器 ${workload} 停摆了：它没有任何就绪的副本。",

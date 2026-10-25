@@ -1595,7 +1595,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn a_project_without_network_policy_is_one_gap_rated_by_enforcement() {
+    async fn a_project_without_network_policy_is_one_advice_gap() {
         let cluster = cluster();
         let find = |gaps: &Value| {
             gaps["items"]
@@ -1605,25 +1605,17 @@ mod tests {
                 .find(|g| g["rule"] == "no-network-policy")
                 .cloned()
         };
-        // No k3s node to read: whether policies are enforced is unknown.
-        let unknown = find(&get(&cluster, "/api/v1/projects/shop/gaps").await).unwrap();
-        assert_eq!(unknown["severity"], "advice");
-        assert_eq!(unknown["message"]["params"]["enforcement"], "unknown");
-        assert_eq!(unknown["fix"]["id"], "networkPolicy.isolateProject");
-        let k3s = |args: &str| -> Node {
-            serde_json::from_value(json!({"metadata": {"name": "vps-1",
-                "annotations": {"k3s.io/node-args": args}}}))
-            .unwrap()
-        };
+        let gap = find(&get(&cluster, "/api/v1/projects/shop/gaps").await).unwrap();
+        assert_eq!(gap["severity"], "advice");
+        assert_eq!(gap["fix"]["id"], "networkPolicy.isolateProject");
         assert!(
-            !unknown["fix"]["params"]["objects"]
+            !gap["fix"]["params"]["objects"]
                 .as_str()
                 .unwrap()
                 .contains("zeabur-allow-ingress-web")
         );
-        // A k3s server with its policy controller on, and an HTTPRoute sending traffic to web.
+        // An HTTPRoute sending traffic to web.
         cluster.update(|s| {
-            s.nodes = vec![k3s(r#"["server"]"#)];
             let shop = s.objects.get_mut("shop").unwrap();
             shop.services.push(
                 serde_json::from_value(json!({
@@ -1638,17 +1630,14 @@ mod tests {
                 "spec": {"rules": [{"backendRefs": [{"name": "web", "port": 80}]}]}
             }));
         });
-        let enforced = find(&get(&cluster, "/api/v1/projects/shop/gaps").await).unwrap();
-        assert_eq!(enforced["severity"], "warning");
-        assert_eq!(enforced["subject"]["name"], "shop");
-        assert_eq!(enforced["message"]["params"]["services"], "web");
+        let routed = find(&get(&cluster, "/api/v1/projects/shop/gaps").await).unwrap();
+        assert_eq!(routed["severity"], "advice");
+        assert_eq!(routed["subject"]["name"], "shop");
+        assert_eq!(routed["message"]["params"]["services"], "web");
         let objects: Value =
-            serde_json::from_str(enforced["fix"]["params"]["objects"].as_str().unwrap()).unwrap();
+            serde_json::from_str(routed["fix"]["params"]["objects"].as_str().unwrap()).unwrap();
         assert_eq!(objects[1]["metadata"]["name"], "zeabur-allow-ingress-web");
-        cluster.update(|s| s.nodes = vec![k3s(r#"["server","--disable-network-policy"]"#)]);
-        assert!(find(&get(&cluster, "/api/v1/projects/shop/gaps").await).is_none());
         cluster.update(|s| {
-            s.nodes = vec![k3s(r#"["server"]"#)];
             s.dynamic.push(
                 serde_json::from_value(json!({
                     "apiVersion": "networking.k8s.io/v1", "kind": "NetworkPolicy",

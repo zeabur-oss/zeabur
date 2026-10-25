@@ -1441,56 +1441,18 @@
  {
   "key": "gap.noNetworkPolicy",
   "params": {},
-  "en": "No NetworkPolicy protects : any pod in the cluster can reach it.",
-  "zh-TW": "沒有 NetworkPolicy 保護 ：叢集裡任何 Pod 都連得到。",
-  "zh-CN": "没有 NetworkPolicy 保护 ：集群里任何 Pod 都连得到。"
- },
- {
-  "key": "gap.noNetworkPolicy",
-  "params": {
-   "enforcement": "unknown"
-  },
-  "en": "No NetworkPolicy protects : any pod in the cluster can reach it. Policies only work if the network plugin enforces them.",
-  "zh-TW": "沒有 NetworkPolicy 保護 ：叢集裡任何 Pod 都連得到。NetworkPolicy 要網路外掛（CNI）支援才會生效。",
-  "zh-CN": "没有 NetworkPolicy 保护 ：集群里任何 Pod 都连得到。NetworkPolicy 要网络插件（CNI）支持才会生效。"
- },
- {
-  "key": "gap.noNetworkPolicy",
-  "params": {
-   "enforcement": "enforcement1"
-  },
-  "en": "No NetworkPolicy protects : any pod in the cluster can reach it.",
-  "zh-TW": "沒有 NetworkPolicy 保護 ：叢集裡任何 Pod 都連得到。",
-  "zh-CN": "没有 NetworkPolicy 保护 ：集群里任何 Pod 都连得到。"
+  "en": "No NetworkPolicy protects : any pod in the cluster can reach it. Policies only work if the cluster's network plugin enforces them.",
+  "zh-TW": "沒有 NetworkPolicy 保護 ：叢集裡任何 Pod 都連得到。NetworkPolicy 要叢集的網路外掛（CNI）支援才會生效。",
+  "zh-CN": "没有 NetworkPolicy 保护 ：集群里任何 Pod 都连得到。NetworkPolicy 要集群的网络插件（CNI）支持才会生效。"
  },
  {
   "key": "gap.noNetworkPolicy",
   "params": {
    "services": "one"
   },
-  "en": "No NetworkPolicy protects one: any pod in the cluster can reach it.",
-  "zh-TW": "沒有 NetworkPolicy 保護 one：叢集裡任何 Pod 都連得到。",
-  "zh-CN": "没有 NetworkPolicy 保护 one：集群里任何 Pod 都连得到。"
- },
- {
-  "key": "gap.noNetworkPolicy",
-  "params": {
-   "services": "one",
-   "enforcement": "unknown"
-  },
-  "en": "No NetworkPolicy protects one: any pod in the cluster can reach it. Policies only work if the network plugin enforces them.",
-  "zh-TW": "沒有 NetworkPolicy 保護 one：叢集裡任何 Pod 都連得到。NetworkPolicy 要網路外掛（CNI）支援才會生效。",
-  "zh-CN": "没有 NetworkPolicy 保护 one：集群里任何 Pod 都连得到。NetworkPolicy 要网络插件（CNI）支持才会生效。"
- },
- {
-  "key": "gap.noNetworkPolicy",
-  "params": {
-   "services": "one",
-   "enforcement": "enforcement1"
-  },
-  "en": "No NetworkPolicy protects one: any pod in the cluster can reach it.",
-  "zh-TW": "沒有 NetworkPolicy 保護 one：叢集裡任何 Pod 都連得到。",
-  "zh-CN": "没有 NetworkPolicy 保护 one：集群里任何 Pod 都连得到。"
+  "en": "No NetworkPolicy protects one: any pod in the cluster can reach it. Policies only work if the cluster's network plugin enforces them.",
+  "zh-TW": "沒有 NetworkPolicy 保護 one：叢集裡任何 Pod 都連得到。NetworkPolicy 要叢集的網路外掛（CNI）支援才會生效。",
+  "zh-CN": "没有 NetworkPolicy 保护 one：集群里任何 Pod 都连得到。NetworkPolicy 要集群的网络插件（CNI）支持才会生效。"
  },
  {
   "key": "gap.volumeWithoutBackup",

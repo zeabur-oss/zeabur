@@ -216,8 +216,7 @@ const MODULE_RULES: &[&str] = &[
 /// The gaps the modules find in `project`: NetworkPolicy blocking a connection the
 /// project's variables imply, services no NetworkPolicy protects, and claims or databases no
 /// backup schedule covers. Their reads are the person's; a refused read is named in `unreadable`
-/// and its rule has nothing to say. The nodes, read to learn whether NetworkPolicy is enforced,
-/// are the exception: refused, enforcement is unknown and the finding says so itself.
+/// and its rule has nothing to say.
 async fn module_findings(
     cluster: &dyn Cluster,
     project: &str,
@@ -238,14 +237,12 @@ async fn module_findings(
             &facts.workloads,
         ));
         let (routed, published) = crate::projects::network_policy::exposed(projection, http_routes);
-        let enforcement = crate::projects::network_policy::enforcement(cluster).await;
         found.extend(network_policy::unprotected(
             facts.input(),
             Exposed {
                 routed: &routed,
                 published: &published,
             },
-            enforcement,
         ));
     }
     {

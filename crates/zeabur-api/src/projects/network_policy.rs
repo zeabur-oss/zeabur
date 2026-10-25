@@ -4,9 +4,8 @@
 //! The project's `NetworkPolicy` objects are read as the person, in the project's namespace,
 //! with the rest of the document; the module evaluates them (see
 //! `zeabur_modules::network_policy`). A refused read joins the document's `unreadable`; it never
-//! makes the document fail. Whether the cluster's network plugin enforces the policies is known
-//! only on k3s, from its nodes (see `enforcement`); the document does not carry it, and clients
-//! say it depends on the plugin.
+//! makes the document fail. Whether the cluster's network plugin enforces the policies is not
+//! known; clients say it depends on the plugin.
 
 use axum::Json;
 use axum::extract::{Path, RawQuery};
@@ -14,11 +13,10 @@ use serde::Serialize;
 use utoipa::ToSchema;
 use zeabur_core::problem::{Kind, MEDIA_TYPE as PROBLEM, Problem};
 use zeabur_graph::{Snapshot, workloads};
-use zeabur_kube::k8s_openapi::api::core::v1::Node;
-use zeabur_kube::{Cluster, ClusterExt as _, DynamicObject};
+use zeabur_kube::{Cluster, DynamicObject};
 use zeabur_model::{HttpRoute, Project, WorkloadKind, id};
 use zeabur_modules::Reading;
-use zeabur_modules::network_policy::{self, Enforcement, Preset, Reachability, Workload};
+use zeabur_modules::network_policy::{self, Preset, Reachability, Workload};
 
 use crate::error::{ApiError, project_read, read_problem};
 use crate::handlers::Person;
@@ -119,22 +117,6 @@ pub(crate) async fn read(
         workloads,
         connections,
     }))
-}
-
-/// Whether the cluster enforces NetworkPolicy, from the nodes' k3s arguments. Nodes the person
-/// may not list, or any other failed read, leave it unknown: the finding says so.
-pub(crate) async fn enforcement(cluster: &dyn Cluster) -> Enforcement {
-    let args = cluster.list::<Node>(None).await.ok().map(|nodes| {
-        nodes
-            .into_iter()
-            .filter_map(|node| {
-                node.metadata
-                    .annotations?
-                    .remove(network_policy::K3S_NODE_ARGS)
-            })
-            .collect::<Vec<String>>()
-    });
-    network_policy::enforcement(args.as_deref())
 }
 
 /// Services traffic reaches from outside the project: those an Ingress routes to (from the
