@@ -631,14 +631,15 @@
             "risk": "A tenant HTTPRoute can claim another tenant's hostname on a shared listener."
           },
           {
-            "mitigation": "allowCrossNamespace is false and tenants get no Traefik CRDs.",
+            "mitigation": "allowCrossNamespace is false, so a Middleware works only in its own namespace.",
             "risk": "Traefik CRDs can reference other namespaces."
           }
         ],
         "summary": "Reads Services, Secrets and routes cluster-wide; writes route status.",
         "tenantCRDs": [
           "HTTPRoute",
-          "GRPCRoute"
+          "GRPCRoute",
+          "Middleware"
         ],
         "tenants": "namespaced"
       },

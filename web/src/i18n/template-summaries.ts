@@ -7,7 +7,7 @@ import { sourceHash } from "@/i18n/component-summaries"
 type Summary = { en: string } & Partial<Record<Exclude<Locale, "en">, string>>
 
 export const templateSummaries: Record<string, Summary> = {
-  "browserless#427d1a15": {
+  "browserless#6cec3184": {
     en: "A headless Chrome that your automation tools drive with a token.",
     "zh-TW": "讓自動化工具用權杖操作的無頭 Chrome 瀏覽器。",
     "zh-CN": "让自动化工具用令牌操作的无头 Chrome 浏览器。",
@@ -17,7 +17,7 @@ export const templateSummaries: Record<string, Summary> = {
     "zh-TW": "相容 OpenAI 與 Gemini 的 API 代理，附金鑰和管理頁面。",
     "zh-CN": "兼容 OpenAI 与 Gemini 的 API 代理，附密钥和管理页面。",
   },
-  "dify#e38042c6": {
+  "dify#23cbde4e": {
     en: "A platform for building LLM apps, with PostgreSQL, a queue, a code sandbox and S3 storage.",
     "zh-TW": "打造 LLM 應用程式的平台，內含 PostgreSQL、佇列、程式碼沙箱和 S3 儲存空間。",
     "zh-CN": "构建 LLM 应用的平台，内含 PostgreSQL、队列、代码沙箱和 S3 存储。",
@@ -47,17 +47,17 @@ export const templateSummaries: Record<string, Summary> = {
     "zh-TW": "Hermes AI 代理，附 API 和管理面板，可接 OpenRouter 或其他相容 OpenAI 的服務。",
     "zh-CN": "Hermes AI 智能体，附 API 和管理面板，可接 OpenRouter 或其他兼容 OpenAI 的服务。",
   },
-  "librechat#6f79ecab": {
+  "librechat#e3d2712a": {
     en: "An AI chat app with sign-in, MongoDB, PostgreSQL for document search and Meilisearch.",
     "zh-TW": "需要登入的 AI 聊天應用程式，搭配 MongoDB、用來搜尋文件的 PostgreSQL 和 Meilisearch。",
     "zh-CN": "需要登录的 AI 聊天应用，搭配 MongoDB、用于文档检索的 PostgreSQL 和 Meilisearch。",
   },
-  "litellm#f3bdf8cd": {
+  "litellm#0f697478": {
     en: "One proxy for many LLM providers, with keys, models and spend kept in PostgreSQL.",
     "zh-TW": "用一個代理串接多家 LLM 服務，金鑰、模型和花費存在 PostgreSQL。",
     "zh-CN": "用一个代理接入多家 LLM 服务，密钥、模型和花费存在 PostgreSQL。",
   },
-  "lobechat#413863ab": {
+  "lobechat#c3b12896": {
     en: "A chatbot interface that keeps chats in each browser, behind an access code.",
     "zh-TW": "聊天機器人介面，對話存在各自的瀏覽器裡，用存取碼保護。",
     "zh-CN": "聊天机器人界面，对话存在各自的浏览器里，用访问码保护。",
@@ -77,17 +77,17 @@ export const templateSummaries: Record<string, Summary> = {
     "zh-TW": "RSS 閱讀器，搭配 PostgreSQL。",
     "zh-CN": "RSS 阅读器，搭配 PostgreSQL。",
   },
-  "n8n#f512d144": {
+  "n8n#c5390f63": {
     en: "Workflow automation with PostgreSQL and separate code runners.",
     "zh-TW": "工作流程自動化，搭配 PostgreSQL 和獨立的程式碼執行器。",
     "zh-CN": "工作流自动化，搭配 PostgreSQL 和独立的代码执行器。",
   },
-  "n8n-ai-brain#c4c54a37": {
+  "n8n-ai-brain#c6346add": {
     en: "Workflow automation for AI, with PostgreSQL and isolated code runners.",
     "zh-TW": "為 AI 準備的工作流程自動化，搭配 PostgreSQL 和隔離的程式碼執行器。",
     "zh-CN": "面向 AI 的工作流自动化，搭配 PostgreSQL 和隔离的代码执行器。",
   },
-  "n8n-sqlite#d81c86f3": {
+  "n8n-sqlite#03a02ebc": {
     en: "Workflow automation with SQLite and separate code runners.",
     "zh-TW": "工作流程自動化，資料存在 SQLite，搭配獨立的程式碼執行器。",
     "zh-CN": "工作流自动化，数据存在 SQLite，搭配独立的代码执行器。",
@@ -112,7 +112,7 @@ export const templateSummaries: Record<string, Summary> = {
     "zh-TW": "在 CPU 上執行本機模型，API 只能從叢集內連線。",
     "zh-CN": "在 CPU 上运行本地模型，API 只能从集群内访问。",
   },
-  "open-webui#3faf4f0f": {
+  "open-webui#e4b0c18b": {
     en: "A chat interface for LLMs with sign-in; its licence asks you to keep its branding.",
     "zh-TW": "需要登入的 LLM 聊天介面，授權要求保留它的品牌標示。",
     "zh-CN": "需要登录的 LLM 聊天界面，许可要求保留其品牌标识。",
@@ -122,7 +122,7 @@ export const templateSummaries: Record<string, Summary> = {
     "zh-TW": "個人 AI 助理，可以串接 WhatsApp、Telegram、Slack、Discord 等通訊軟體。",
     "zh-CN": "个人 AI 助手，可以连接 WhatsApp、Telegram、Slack、Discord 等通讯软件。",
   },
-  "openclaw-browser-sandbox#8711c108": {
+  "openclaw-browser-sandbox#db663c08": {
     en: "A headless Chrome that OpenClaw or other services drive through the DevTools protocol.",
     "zh-TW": "無頭 Chrome 沙箱，讓 OpenClaw 或其他服務透過 DevTools 協定操作。",
     "zh-CN": "无头 Chrome 沙箱，供 OpenClaw 或其他服务通过 DevTools 协议操作。",

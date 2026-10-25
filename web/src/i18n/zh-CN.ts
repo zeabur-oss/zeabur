@@ -2369,8 +2369,6 @@ export const zhCN: Messages = {
   "add.templateLowCpu": (use, free) =>
     `集群 CPU 不够：它需要 ${use}，目前只剩 ${free}。先腾出空间或加一台节点。`,
   "add.templateGenerated": (secrets) => `密码和密钥会在你的浏览器生成，存进机密 ${secrets}。`,
-  "add.templateConsent": "我已阅读并同意",
-  "add.templateConsentNeeded": "同意后才能部署。",
   "add.templateInputEmpty": "这一栏必填。",
   "add.templateInputInvalid": (pattern) => `格式不符（${pattern}）。`,
   "add.templateOptional": "选填",
@@ -3538,7 +3536,7 @@ export const zhCN: Messages = {
   "domainPages.pagesHint": "项目的每个域名都显示同一组页面。",
   "domainPages.noServer": "这个项目还没有页面服务器",
   "domainPages.noServerHint":
-    "这些页面由 Error pages 模板提供。开启任一开关或编辑页面时，会一并把它部署到这个项目。它是只允许 Traefik 连接的小型 nginx。",
+    "这些页面由 Error pages 模板提供。开启任一开关或编辑页面时，会一并把它部署到这个项目。它是一个小型 nginx。",
   "domainPages.room": (use, free) =>
     `集群还有空间：它空闲时大约占用 ${use} 内存，目前还有 ${free} 可用。`,
   "domainPages.tightMemory": (use, free) =>

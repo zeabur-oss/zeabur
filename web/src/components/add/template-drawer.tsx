@@ -13,12 +13,10 @@ import { useI18n, useT, type Translate } from "@/i18n"
 import { templateSummary } from "@/i18n/template-summaries"
 import { useQuantityFormat } from "@/lib/quantity"
 import {
-  acceptedValue,
   deployProblems,
   filterTemplates,
   generateAll,
   generatedSecrets,
-  inputKind,
   listed,
   missing,
   shownInputs,
@@ -33,9 +31,7 @@ import { templateRoom } from "@/model/template-room"
 import { Alert, AlertDescription, AlertTitle } from "@zeabur/design-system/components/alert"
 import { Button } from "@zeabur/design-system/components/button"
 import { Card } from "@zeabur/design-system/components/card"
-import { Checkbox } from "@zeabur/design-system/components/checkbox"
 import { Input } from "@zeabur/design-system/components/input"
-import { Label } from "@zeabur/design-system/components/label"
 
 /** "App template": the catalogue's templates, then the form of the one picked, in one plan. */
 export function TemplateDrawer({ project, onClose }: { project: string; onClose: () => void }) {
@@ -419,30 +415,7 @@ function InputField({
 }) {
   const t = useT()
   const { locale } = useI18n()
-  const checkId = useId()
   const words = inputWords(input, locale)
-  if (inputKind(input) === "consent") {
-    const accepted = acceptedValue(input.pattern) ?? ""
-    return (
-      <div className="flex flex-col gap-2">
-        <p className="type-meta text-muted-foreground">{words.description}</p>
-        <div className="flex items-start gap-2">
-          <Checkbox
-            id={checkId}
-            checked={value === accepted}
-            onCheckedChange={(on) => onChange(on ? accepted : "")}
-            className="mt-0.5"
-          />
-          <Label htmlFor={checkId}>{t("add.templateConsent")}</Label>
-        </div>
-        {problem ? (
-          <p className="type-meta text-fail-strong" role="alert">
-            {t("add.templateConsentNeeded")}
-          </p>
-        ) : null}
-      </div>
-    )
-  }
   const label = (
     <span className="flex items-center gap-2">
       <span>{words.label}</span>

@@ -32,6 +32,10 @@ minor or patch release may break the API.
 
 ### Changed
 
+- Templates no longer carry consent inputs or default-deny NetworkPolicies, so the deploy form has no
+  consent checkbox and a template is no longer "missing Traefik" outside the namespace `traefik`.
+  The catalogue is at its latest main; the Traefik risk text says that a Middleware works only in
+  its own namespace.
 - A new domain uses an Ingress unless "Add domain" names a Gateway listener. Before, any Gateway in
   the cluster turned new domains into HTTPRoutes on the first Gateway found.
 - Maintenance on an Ingress adds a second Ingress (`<name>-maintenance`) that Traefik ranks first;

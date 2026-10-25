@@ -135,7 +135,6 @@ mod tests {
             ("Service", "miniflux"),
             ("Ingress", "miniflux"),
             ("Cluster", "miniflux-db"),
-            ("NetworkPolicy", "miniflux-default-deny"),
         ] {
             assert_eq!(
                 named(kind, name)["metadata"]["namespace"],
@@ -155,13 +154,6 @@ mod tests {
             ingress["metadata"]["annotations"]["cert-manager.io/cluster-issuer"],
             "letsencrypt"
         );
-        for policy in created.iter().filter(|o| o["kind"] == "NetworkPolicy") {
-            assert_eq!(
-                policy["spec"]["podSelector"]["matchLabels"]["templates.zeabur.com/template"],
-                "miniflux",
-                "{policy}"
-            );
-        }
     }
 
     #[tokio::test]

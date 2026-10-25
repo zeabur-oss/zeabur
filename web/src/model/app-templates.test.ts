@@ -3,12 +3,10 @@ import { readFileSync } from "node:fs"
 import { resolve } from "node:path"
 
 import {
-  acceptedValue,
   deployProblems,
   filterTemplates,
   generate,
   generateAll,
-  inputKind,
   inputProblem,
   inputWords,
   listed,
@@ -86,16 +84,6 @@ describe("app templates", () => {
   test("hex is two digits a byte and base64url has no padding", () => {
     expect(generate({ bytes: 16, encoding: "hex" })).toMatch(/^[0-9a-f]{32}$/)
     expect(generate({ bytes: 32, encoding: "base64url" })).toMatch(/^[A-Za-z0-9_-]{43}$/)
-  })
-
-  test("an input that accepts one literal is a consent, with that literal", () => {
-    expect(acceptedValue("^I-ACCEPT-DRAGONFLY-BUSL-1\\.1$")).toBe("I-ACCEPT-DRAGONFLY-BUSL-1.1")
-    expect(acceptedValue("^[A-Za-z0-9_-]{43}$")).toBeUndefined()
-    expect(inputKind(input({ name: "licenseOptIn", pattern: "^I-ACCEPT-MONGODB-SSPL$" }))).toBe(
-      "consent",
-    )
-    expect(inputKind(password("token", "s", "token"))).toBe("generated")
-    expect(inputKind(input({ name: "adminEmail" }))).toBe("text")
   })
 
   test("a value is checked against the whole pattern, and an empty one only when required", () => {

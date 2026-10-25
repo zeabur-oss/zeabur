@@ -880,13 +880,6 @@ mod tests {
                     );
                 }
             }
-            let deny = format!("{}-default-deny", template.id);
-            assert!(
-                objects.iter().any(|o| o["kind"] == "NetworkPolicy"
-                    && o.pointer("/metadata/name") == Some(&Value::from(deny.as_str()))),
-                "{} has no {deny}",
-                template.id
-            );
         }
     }
 

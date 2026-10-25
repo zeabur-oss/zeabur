@@ -110,8 +110,6 @@ HTML 存在 ConfigMap 裡，頁面伺服器每次請求都從掛載的檔案讀�
 
 一個專案只能有一個帶這個標籤的 Service。也可以自己用 `kubectl` 部署這個範本，或改用符合上表的其他伺服器，Zeabur 一樣認得。這些都是一般的 Kubernetes 物件，不用 Zeabur 也照常運作。
 
-範本附的 NetworkPolicy `error-pages` 只讓 `traefik` 命名空間的 Traefik 連到頁面伺服器。叢集用其他 Ingress controller 或 Gateway 時，要在這個 NetworkPolicy 加上它的來源。Zeabur 部署時不會建立範本裡擋下整個命名空間的 `default-deny`，專案裡其他服務的流量不受影響。
-
 ## 遇到問題
 
 | 畫面或結果 | 接著處理 |

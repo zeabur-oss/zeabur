@@ -26,22 +26,8 @@ export function filterTemplates(items: readonly AppTemplate[], query: string) {
 export const missing = (template: AppTemplate) =>
   template.requires.filter((r) => r.state === "missing")
 
-/** The value an input accepts when its pattern accepts one literal only (`^I-ACCEPT-X$`). */
-export function acceptedValue(pattern: string): string | undefined {
-  const literal = /^\^((?:[A-Za-z0-9-]|\\\.)+)\$$/.exec(pattern)?.[1]
-  return literal?.replaceAll("\\.", ".")
-}
-
-export type InputKind = "generated" | "consent" | "text"
-
-export function inputKind(input: TemplateInput): InputKind {
-  if (input.generate) return "generated"
-  return acceptedValue(input.pattern) === undefined ? "text" : "consent"
-}
-
 /** The inputs a person sees, in the catalogue's order. */
-export const shownInputs = (template: AppTemplate) =>
-  template.inputs.filter((i) => inputKind(i) !== "generated")
+export const shownInputs = (template: AppTemplate) => template.inputs.filter((i) => !i.generate)
 
 /** Values to start the form with: all empty. */
 export const startValues = (template: AppTemplate) =>

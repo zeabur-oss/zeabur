@@ -2574,8 +2574,6 @@ export const en = {
     `The cluster is low on CPU for it: it needs ${use}, and ${free} is free. Make room or add a node first.`,
   "add.templateGenerated": (secrets: string) =>
     `Passwords and keys are generated in your browser and kept in Secret ${secrets}.`,
-  "add.templateConsent": "I've read this and agree",
-  "add.templateConsentNeeded": "Agree to deploy this app.",
   "add.templateInputEmpty": "Fill this in.",
   "add.templateInputInvalid": (pattern: string) =>
     `Doesn't match the expected format (${pattern}).`,
@@ -3867,7 +3865,7 @@ export const en = {
   "domainPages.pagesHint": "Every domain of the project shows the same pages.",
   "domainPages.noServer": "This project has no page server yet",
   "domainPages.noServerHint":
-    "These pages come from the Error pages template. Turning either switch on or editing a page also deploys it here: a small nginx that only Traefik can reach.",
+    "These pages come from the Error pages template. Turning either switch on or editing a page also deploys it here: a small nginx.",
   "domainPages.room": (use: string, free: string) =>
     `The cluster has room for it: idle, it uses about ${use} of memory, and ${free} is free.`,
   "domainPages.tightMemory": (use: string, free: string) =>

@@ -190,11 +190,6 @@ mod tests {
                     && o.pointer("/metadata/name").and_then(Value::as_str) == Some(name)
             })
         };
-        let deny = named("NetworkPolicy", "error-pages-default-deny").unwrap();
-        assert_eq!(
-            deny.pointer("/spec/podSelector/matchLabels"),
-            Some(&json!({"templates.zeabur.com/template": "error-pages"}))
-        );
         let pages = named("ConfigMap", "error-pages").unwrap();
         assert_eq!(pages["data"]["maintenance.html"], "<p>Back soon</p>");
         assert!(

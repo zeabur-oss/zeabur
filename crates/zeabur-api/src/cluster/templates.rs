@@ -7,10 +7,6 @@
 //! catalogue detects it by, and *missing* when it serves none of them. Discovery is readable by
 //! every signed-in person, so a person who cannot read the whole cluster gets the same answer as
 //! an administrator. A component without such a rule, or a refused discovery, is *unknown*.
-//!
-//! Traefik is installed for templates only in the namespace `traefik`: their NetworkPolicies
-//! admit the ingress controller from there alone, so a Traefik elsewhere (k3s's own, in
-//! `kube-system`) answers `502` for them. Namespaces are readable by every signed-in person.
 
 use std::collections::BTreeMap;
 
@@ -21,7 +17,7 @@ use utoipa::ToSchema;
 use zeabur_catalog::templates::{TemplateInput, TemplateService};
 use zeabur_catalog::{Component, RenderError};
 use zeabur_core::problem::{Kind, MEDIA_TYPE as PROBLEM, Problem};
-use zeabur_kube::{Cluster, ClusterExt as _, ResourceRef, ServedResource};
+use zeabur_kube::ServedResource;
 
 use crate::cluster::capacity::Amount;
 use crate::error::ApiError;
@@ -92,8 +88,7 @@ pub struct Requirement {
 pub enum RequirementState {
     /// kube-apiserver serves its API.
     Installed,
-    /// kube-apiserver serves none of its API, or Traefik is not in the namespace `traefik`:
-    /// install it first.
+    /// kube-apiserver serves none of its API: install it first.
     Missing,
     /// Zeabur cannot tell.
     Unknown,
@@ -116,10 +111,10 @@ pub(crate) async fn list(
     Person(cluster): Person,
 ) -> Result<Json<TemplateList>, ApiError> {
     let templates = zeabur_catalog::templates().map_err(|e| render_problem(&e))?;
-    let seen = Seen::read(cluster.as_ref()).await;
+    let served = cluster.served_resources().await.ok();
     let items = templates
         .into_iter()
-        .map(|t| view(&state, t, &seen))
+        .map(|t| view(&state, t, served.as_deref()))
         .collect();
     Ok(Json(TemplateList { items }))
 }
@@ -135,8 +130,8 @@ pub(crate) async fn get(
     Path(template): Path<String>,
 ) -> Result<Json<TemplateView>, ApiError> {
     let template = zeabur_catalog::template(&template).map_err(|e| render_problem(&e))?;
-    let seen = Seen::read(cluster.as_ref()).await;
-    Ok(Json(view(&state, template, &seen)))
+    let served = cluster.served_resources().await.ok();
+    Ok(Json(view(&state, template, served.as_deref())))
 }
 
 fn render_problem(error: &RenderError) -> ApiError {
@@ -148,32 +143,11 @@ fn render_problem(error: &RenderError) -> ApiError {
     ApiError::from(Problem::new(kind, error.to_string()))
 }
 
-/// The namespace templates admit Traefik from.
-const TRAEFIK_NAMESPACE: &str = "traefik";
-
-/// What the person's reads tell of the components: the resources discovery names, and whether
-/// the namespace `traefik` exists. `None` where the read failed.
-#[derive(Default)]
-struct Seen {
-    served: Option<Vec<ServedResource>>,
-    traefik_namespace: Option<bool>,
-}
-
-impl Seen {
-    async fn read(cluster: &dyn Cluster) -> Self {
-        let namespaces = ResourceRef::new("", "v1", "namespaces", "Namespace");
-        let (served, namespace) = futures_util::join!(
-            cluster.served_resources(),
-            cluster.find_object(&namespaces, None, TRAEFIK_NAMESPACE),
-        );
-        Self {
-            served: served.ok(),
-            traefik_namespace: namespace.ok().map(|found| found.is_some()),
-        }
-    }
-}
-
-fn view(state: &AppState, template: zeabur_catalog::Template, seen: &Seen) -> TemplateView {
+fn view(
+    state: &AppState,
+    template: zeabur_catalog::Template,
+    served: Option<&[ServedResource]>,
+) -> TemplateView {
     let mut requests = Amount::default();
     for service in &template.services {
         requests.add(Amount::of(&service.requests));
@@ -182,7 +156,7 @@ fn view(state: &AppState, template: zeabur_catalog::Template, seen: &Seen) -> Te
         requires: template
             .requires
             .iter()
-            .map(|r| requirement(&state.catalogue, r, seen))
+            .map(|r| requirement(&state.catalogue, r, served))
             .collect(),
         requests: Requests {
             cpu_millicores: requests.cpu,
@@ -205,7 +179,11 @@ fn view(state: &AppState, template: zeabur_catalog::Template, seen: &Seen) -> Te
 
 /// `wanted` (`databases/cloudnative-pg`, or `databases`), and whether kube-apiserver serves the
 /// CustomResourceDefinitions its components are detected by.
-fn requirement(catalogue: &[Component], wanted: &str, seen: &Seen) -> Requirement {
+fn requirement(
+    catalogue: &[Component],
+    wanted: &str,
+    served: Option<&[ServedResource]>,
+) -> Requirement {
     let (capability, component) = match wanted.split_once('/') {
         Some((capability, component)) => (capability, Some(component)),
         None => (wanted, None),
@@ -215,18 +193,13 @@ fn requirement(catalogue: &[Component], wanted: &str, seen: &Seen) -> Requiremen
         .filter(|c| c.capability == capability && component.is_none_or(|id| c.id == id))
         .collect();
     let crds: Vec<&String> = components.iter().flat_map(|c| &c.detection.crds).collect();
-    let state = match seen.served.as_deref() {
+    let state = match served {
         _ if crds.is_empty() => RequirementState::Unknown,
         None => RequirementState::Unknown,
         Some(served) if crds.iter().any(|crd| is_served(served, crd)) => {
             RequirementState::Installed
         }
         Some(_) => RequirementState::Missing,
-    };
-    let state = match (state, wanted, seen.traefik_namespace) {
-        (RequirementState::Installed, "ingress/traefik", Some(false)) => RequirementState::Missing,
-        (RequirementState::Installed, "ingress/traefik", None) => RequirementState::Unknown,
-        (state, ..) => state,
     };
     Requirement {
         capability: capability.to_owned(),
@@ -251,20 +224,13 @@ fn is_served(served: &[ServedResource], crd: &str) -> bool {
 mod tests {
     use super::*;
 
-    fn seen(served: Option<&[ServedResource]>, traefik_namespace: Option<bool>) -> Seen {
-        Seen {
-            served: served.map(<[_]>::to_vec),
-            traefik_namespace,
-        }
-    }
-
     #[test]
     fn a_component_is_there_when_one_of_its_crds_is_served() {
         let catalogue = zeabur_catalog::catalogue().unwrap();
         let cnpg =
             ServedResource::readable("postgresql.cnpg.io", "v1", "clusters", "Cluster", true);
         let state = |wanted: &str, served: Option<&[ServedResource]>| {
-            requirement(&catalogue, wanted, &seen(served, Some(true))).state
+            requirement(&catalogue, wanted, served).state
         };
         let with = [cnpg];
         assert_eq!(
@@ -281,36 +247,8 @@ mod tests {
             RequirementState::Unknown
         );
         assert_eq!(
-            requirement(
-                &catalogue,
-                "databases/cloudnative-pg",
-                &seen(Some(&with), None)
-            )
-            .name,
+            requirement(&catalogue, "databases/cloudnative-pg", Some(&with)).name,
             "CloudNativePG"
         );
-    }
-
-    #[test]
-    fn traefik_is_there_only_in_its_own_namespace() {
-        let catalogue = zeabur_catalog::catalogue().unwrap();
-        let traefik = [ServedResource::readable(
-            "traefik.io",
-            "v1alpha1",
-            "middlewares",
-            "Middleware",
-            true,
-        )];
-        let state = |namespace| {
-            requirement(
-                &catalogue,
-                "ingress/traefik",
-                &seen(Some(&traefik), namespace),
-            )
-            .state
-        };
-        assert_eq!(state(Some(true)), RequirementState::Installed);
-        assert_eq!(state(Some(false)), RequirementState::Missing);
-        assert_eq!(state(None), RequirementState::Unknown);
     }
 }
