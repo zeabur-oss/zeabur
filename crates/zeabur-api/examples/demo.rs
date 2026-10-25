@@ -3231,7 +3231,8 @@ impl ClusterAccess for Demo {
 
     fn handoff(&self, _parts: &Parts) -> Option<Handoff> {
         self.tools.then(|| Handoff {
-            token: Arc::new(SecretString::from("demo-token")),
+            token: zeabur_kube::UserToken::new(SecretString::from("demo-token"))
+                .expect("a valid token"),
             expires_at: Timestamp::now()
                 .checked_add(SignedDuration::from_mins(30))
                 .expect("in range"),

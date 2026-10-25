@@ -18,9 +18,11 @@ use std::future::Future;
 use std::pin::Pin;
 
 use base64::Engine as _;
+use secrecy::zeroize::Zeroizing;
 use secrecy::{ExposeSecret as _, SecretString};
 use serde::Deserialize;
 use sha2::{Digest as _, Sha256};
+use zeabur_core::secret;
 
 use super::reference::Reference;
 
@@ -102,11 +104,14 @@ impl fmt::Debug for Credential {
 
 impl Credential {
     fn basic(&self) -> SecretString {
-        let pair = format!("{}:{}", self.username, self.password.expose_secret());
-        SecretString::from(format!(
-            "Basic {}",
-            base64::engine::general_purpose::STANDARD.encode(pair)
-        ))
+        let pair = Zeroizing::new(secret::join(&[
+            &self.username,
+            ":",
+            self.password.expose_secret(),
+        ]));
+        let encoded =
+            Zeroizing::new(base64::engine::general_purpose::STANDARD.encode(pair.as_bytes()));
+        SecretString::from(secret::join(&["Basic ", &encoded]))
     }
 
     /// A digest that tells credentials apart without holding them.
@@ -344,8 +349,8 @@ impl Session<'_> {
         token
             .token
             .or(token.access_token)
-            .filter(|t| !t.is_empty())
-            .map(|t| SecretString::from(format!("Bearer {t}")))
+            .filter(|t| !t.expose_secret().is_empty())
+            .map(|t| SecretString::from(secret::join(&["Bearer ", t.expose_secret()])))
             .ok_or_else(|| Unreadable::Unexpected("the token service gave no token".to_owned()))
     }
 }
@@ -544,8 +549,8 @@ struct RuntimeConfig {
 
 #[derive(Debug, Deserialize)]
 struct Token {
-    token: Option<String>,
-    access_token: Option<String>,
+    token: Option<SecretString>,
+    access_token: Option<SecretString>,
 }
 
 #[cfg(test)]

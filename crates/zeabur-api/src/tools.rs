@@ -50,7 +50,7 @@ use axum::extract::{Path, State, WebSocketUpgrade};
 use axum::http::StatusCode;
 use axum::response::Response;
 use secrecy::ExposeSecret as _;
-use secrecy::zeroize::Zeroize as _;
+use secrecy::zeroize::Zeroizing;
 use serde::Serialize;
 use serde_json::{Value, json};
 use utoipa::ToSchema;
@@ -481,23 +481,57 @@ pub(crate) async fn delete_in(
     Ok(StatusCode::NO_CONTENT)
 }
 
-fn kubeconfig(handoff: &Handoff, person: &str, start: &str) -> Vec<u8> {
-    let config = json!({
-        "apiVersion": "v1",
-        "kind": "Config",
-        "clusters": [{"name": "zeabur", "cluster": {
+/// The kubeconfig for the tools pod. It is cleared on drop.
+fn kubeconfig(handoff: &Handoff, person: &str, start: &str) -> Zeroizing<Vec<u8>> {
+    // Serialize the token from a borrowed `&str`. A `Value` would hold a copy of it.
+    #[derive(Serialize)]
+    #[serde(rename_all = "kebab-case")]
+    struct Kubeconfig<'a> {
+        api_version: &'static str,
+        kind: &'static str,
+        clusters: Value,
+        users: [User<'a>; 1],
+        contexts: Value,
+        current_context: &'static str,
+    }
+    #[derive(Serialize)]
+    struct User<'a> {
+        name: &'a str,
+        user: Token<'a>,
+    }
+    #[derive(Serialize)]
+    struct Token<'a> {
+        token: &'a str,
+    }
+    let config = |token| Kubeconfig {
+        api_version: "v1",
+        kind: "Config",
+        clusters: json!([{"name": "zeabur", "cluster": {
             "server": IN_CLUSTER_SERVER,
             "certificate-authority": plans::TOOLS_CA,
-        }}],
-        "users": [{"name": person, "user": {"token": handoff.token.expose_secret()}}],
-        "contexts": [{"name": "zeabur", "context": {
+        }}]),
+        users: [User {
+            name: person,
+            user: Token { token },
+        }],
+        contexts: json!([{"name": "zeabur", "context": {
             "cluster": "zeabur",
             "user": person,
             "namespace": start,
-        }}],
-        "current-context": "zeabur",
-    });
-    serde_json::to_vec(&config).unwrap_or_default()
+        }}]),
+        current_context: "zeabur",
+    };
+    let token = handoff.token.secret().expose_secret();
+    // JSON writes one byte as at most six (`\u00XX`). With this capacity the buffer never moves,
+    // so no copy of the token stays in freed memory.
+    let rest = serde_json::to_vec(&config("")).map_or(0, |empty| empty.len());
+    let mut out = Zeroizing::new(Vec::with_capacity(
+        token.len().saturating_mul(6).saturating_add(rest),
+    ));
+    if serde_json::to_writer(&mut *out, &config(token)).is_err() {
+        out.clear();
+    }
+    out
 }
 
 /// Writes standard input to the kubeconfig, then the wrappers that refuse an expired token and
@@ -593,7 +627,7 @@ async fn open(
             exec_right(),
         ));
     }
-    let mut input = kubeconfig(handoff, &person, scope.tools().start());
+    let input = kubeconfig(handoff, &person, scope.tools().start());
     let args = [
         handoff.expires_at.as_second().to_string(),
         EXPIRED.to_owned(),
@@ -614,7 +648,7 @@ async fn open(
             &input,
         )
         .await;
-    input.zeroize();
+    drop(input);
     match written.map_err(|e| read_problem(e, &format!("tools pod {name}"), exec_right()))? {
         ExitStatus::Exited(0) => {}
         status @ (ExitStatus::Exited(_) | ExitStatus::CommandNotFound | ExitStatus::Failed(_)) => {
@@ -810,7 +844,7 @@ mod tests {
     #[test]
     fn the_kubeconfig_names_the_in_cluster_server_the_ca_and_the_project() {
         let handoff = Handoff {
-            token: Arc::new("t0ken".into()),
+            token: zeabur_kube::UserToken::new("t0ken".into()).unwrap(),
             expires_at: Timestamp::UNIX_EPOCH,
             admin: false,
         };

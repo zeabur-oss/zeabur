@@ -49,7 +49,7 @@ pub use port::{
     Preconditions, Resize, SecretSummary, ServicePort, TerminalSize, Unreadable, WriteBody,
     WriteRequest, Written,
 };
-use secrecy::SecretString;
+use secrecy::{ExposeSecret as _, SecretString};
 
 /// Where kube-apiserver is and how to verify it. Holds no credential.
 ///
@@ -144,14 +144,45 @@ impl ClusterEndpoint {
 }
 
 /// A bearer token a person presented (in the cluster, an access token issued by Zeabur Identity).
+///
+/// It holds the token and one `Authorization` header value made from it. Clones share both, and
+/// every request that carries the token sends that header value.
 #[derive(Clone)]
-pub struct UserToken(SecretString);
+pub struct UserToken(Arc<Bearer>);
+
+struct Bearer {
+    token: SecretString,
+    authorization: http::HeaderValue,
+}
 
 impl UserToken {
     /// Wraps a token. It is never logged or printed.
+    ///
+    /// # Errors
+    ///
+    /// When the token cannot be part of an HTTP header.
+    pub fn new(token: SecretString) -> Result<Self, ConnectError> {
+        let value = zeabur_core::secret::join(&["Bearer ", token.expose_secret()]);
+        // The conversion moves the buffer into the header value. It does not copy it.
+        let mut authorization =
+            http::HeaderValue::try_from(value).map_err(|_invalid| ConnectError::Token)?;
+        authorization.set_sensitive(true);
+        Ok(Self(Arc::new(Bearer {
+            token,
+            authorization,
+        })))
+    }
+
+    /// The token.
     #[must_use]
-    pub fn new(token: impl Into<String>) -> Self {
-        Self(SecretString::from(token.into()))
+    pub fn secret(&self) -> &SecretString {
+        &self.0.token
+    }
+
+    /// `Bearer <token>`, marked sensitive.
+    #[must_use]
+    pub fn authorization(&self) -> &http::HeaderValue {
+        &self.0.authorization
     }
 }
 
@@ -181,10 +212,9 @@ impl UserClient {
     ///
     /// When the TLS or HTTP client cannot be built.
     pub fn with_token(endpoint: &ClusterEndpoint, token: &UserToken) -> Result<Self, ConnectError> {
-        let mut config = endpoint.config();
-        config.auth_info.token = Some(token.0.clone());
+        let authorization = token.authorization().clone();
         Ok(Self {
-            client: client(config, endpoint.pool()?)?,
+            client: client(endpoint.config(), endpoint.pool()?, Some(authorization))?,
             name: None,
         })
     }
@@ -210,7 +240,7 @@ impl UserClient {
     /// person, so this client keeps a pool of its own.
     fn from_kube_config(config: kube::Config, name: Option<String>) -> Result<Self, ConnectError> {
         let pool = pool(&config, POOL_IDLE)?;
-        client(config, pool).map(|client| Self { client, name })
+        client(config, pool, None).map(|client| Self { client, name })
     }
 
     /// The underlying kube-rs client, bound to this person.
@@ -292,7 +322,12 @@ impl<Res>
 }
 
 /// The layers of kube-rs's default client (retry, auth, extra headers, tracing) over `pool`.
-fn client(config: kube::Config, pool: Pool) -> Result<kube::Client, ConnectError> {
+/// Each request carries `authorization` if it is set, else the credential of `config`.
+fn client(
+    config: kube::Config,
+    pool: Pool,
+    authorization: Option<http::HeaderValue>,
+) -> Result<kube::Client, ConnectError> {
     use kube::client::ConfigExt as _;
     use kube::client::retry::RetryPolicy;
     use tower_http::classify::ServerErrorsFailureClass;
@@ -304,6 +339,14 @@ fn client(config: kube::Config, pool: Pool) -> Result<kube::Client, ConnectError
                 .then(|| tower::retry::RetryLayer::new(Retry(RetryPolicy::server_retry()))),
         )
         .option_layer(config.auth_layer().map_err(|e| refused(&e))?)
+        .option_layer(authorization.map(|value| {
+            tower::util::MapRequestLayer::new(move |mut request: http::Request<_>| {
+                request
+                    .headers_mut()
+                    .insert(http::header::AUTHORIZATION, value.clone());
+                request
+            })
+        }))
         .layer(config.extra_headers_layer().map_err(|e| refused(&e))?)
         // kube-rs's request tracing, with its span and fields (OpenTelemetry's HTTP client
         // conventions).
@@ -391,6 +434,9 @@ pub enum ConnectError {
     /// The HTTP client could not be built.
     #[error("cannot build the Kubernetes client: {0}")]
     Client(String),
+    /// The token has a character that an HTTP header cannot carry.
+    #[error("the token is not a valid bearer token")]
+    Token,
 }
 
 #[cfg(test)]
@@ -444,7 +490,7 @@ contexts:
     #[tokio::test]
     async fn in_the_cluster_the_api_servers_address_names_nothing() {
         let endpoint = ClusterEndpoint::new(http::Uri::from_static("https://10.43.0.1:443"), None);
-        let client = UserClient::with_token(&endpoint, &UserToken::new("t")).unwrap();
+        let client = UserClient::with_token(&endpoint, &token("t")).unwrap();
         assert_eq!(Cluster::kubeconfig_name(&client), None);
     }
 
@@ -487,7 +533,7 @@ contexts:
     fn own_pool(config: kube::Config, idle: std::time::Duration) -> UserClient {
         let pool = pool(&config, idle).unwrap();
         UserClient {
-            client: client(config, pool).unwrap(),
+            client: client(config, pool, None).unwrap(),
             name: None,
         }
     }
@@ -513,8 +559,8 @@ contexts:
             (requests, another)
         });
         let endpoint = ClusterEndpoint::new(url, None);
-        let alice = UserClient::with_token(&endpoint, &UserToken::new("alice-token")).unwrap();
-        let bob = UserClient::with_token(&endpoint.clone(), &UserToken::new("bob-token")).unwrap();
+        let alice = UserClient::with_token(&endpoint, &token("alice-token")).unwrap();
+        let bob = UserClient::with_token(&endpoint.clone(), &token("bob-token")).unwrap();
         assert_eq!(version(&alice).await.unwrap(), "{}");
         assert_eq!(version(&bob).await.unwrap(), "{}");
         let (requests, another) = tokio::time::timeout(PATIENCE, server)
@@ -633,9 +679,22 @@ contexts:
         server.abort();
     }
 
+    fn token(token: &str) -> UserToken {
+        UserToken::new(SecretString::from(token)).unwrap()
+    }
+
     #[test]
     fn tokens_do_not_leak_through_debug() {
-        let token = UserToken::new("eyJhbGciOi.secret");
+        let token = token("eyJhbGciOi.secret");
         assert!(!format!("{token:?}").contains("secret"));
+        assert!(!format!("{:?}", token.authorization()).contains("secret"));
+    }
+
+    #[test]
+    fn a_token_that_a_header_cannot_carry_is_refused() {
+        assert!(matches!(
+            UserToken::new(SecretString::from("a\nb")),
+            Err(ConnectError::Token)
+        ));
     }
 }

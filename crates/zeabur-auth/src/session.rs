@@ -45,14 +45,14 @@ use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use secrecy::SecretString;
 use zeabur_core::crypto::{RandomError, equal, random_token, sha256};
 
-use crate::client::{AuthError, OAuthClient, TokenSet};
+use crate::client::{AuthError, OAuthClient};
 
 /// The time now, in seconds since the epoch.
 pub type Clock = Arc<dyn Fn() -> i64 + Send + Sync>;
 
 /// Makes what a request needs from an access token (in the server, a client for kube-apiserver
 /// bound to it). The token is not kept otherwise.
-pub type Bind<T> = Arc<dyn Fn(&SecretString) -> Result<T, String> + Send + Sync>;
+pub type Bind<T> = Arc<dyn Fn(SecretString) -> Result<T, String> + Send + Sync>;
 
 /// How long sessions last, in seconds.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -187,20 +187,32 @@ impl<T: Clone + Send + Sync + 'static> Sessions<T> {
         (self.clock)()
     }
 
-    fn bound(&self, token: &SecretString, expires_in: i64) -> Result<Bound<T>, SessionError> {
+    fn bound(&self, token: SecretString, expires_in: i64) -> Result<Bound<T>, SessionError> {
         Ok(Bound {
             value: (self.bind)(token).map_err(SessionError::Bind)?,
             expires_at: self.now().saturating_add(expires_in),
         })
     }
 
-    /// Starts a session for `username` with `tokens`; returns the identifier for the cookie.
+    /// Starts a session for `username`; returns the identifier for the cookie. `value` is what
+    /// [`Bind`] made of the access token, which expires in `expires_in` seconds. The other
+    /// arguments come from the same [`TokenSet`](crate::client::TokenSet).
     ///
     /// # Errors
     ///
-    /// When the token cannot be bound or the random number generator fails.
-    pub fn start(&self, username: String, tokens: TokenSet) -> Result<String, SessionError> {
-        let base = self.bound(&tokens.access_token, tokens.expires_in)?;
+    /// When the random number generator fails.
+    pub fn start(
+        &self,
+        username: String,
+        value: T,
+        expires_in: i64,
+        refresh: Option<SecretString>,
+        can_elevate: bool,
+    ) -> Result<String, SessionError> {
+        let base = Bound {
+            value,
+            expires_at: self.now().saturating_add(expires_in),
+        };
         let id = random_token::<32>()?;
         let hash = sha256(id.as_bytes());
         let now = self.now();
@@ -211,9 +223,9 @@ impl<T: Clone + Send + Sync + 'static> Sessions<T> {
                 username,
                 last_seen: now,
                 base,
-                refresh: tokens.refresh_token,
+                refresh,
                 elevated: None,
-                can_elevate: tokens.can_elevate,
+                can_elevate,
             }),
             renewing: tokio::sync::Mutex::new(()),
         });
@@ -295,7 +307,7 @@ impl<T: Clone + Send + Sync + 'static> Sessions<T> {
             };
         };
         match self.oauth.refresh(&refresh).await {
-            Ok(tokens) => match self.bound(&tokens.access_token, tokens.expires_in) {
+            Ok(tokens) => match self.bound(tokens.access_token, tokens.expires_in) {
                 Ok(base) => {
                     let mut state = entry.state();
                     state.base = base;
@@ -330,14 +342,18 @@ impl<T: Clone + Send + Sync + 'static> Sessions<T> {
         }
     }
 
-    /// Adds administrator rights from `tokens` to the session `id`.
+    /// Adds administrator rights to the session `id`: `value`, what [`Bind`] made of the elevated
+    /// access token, which expires in `expires_in` seconds.
     ///
     /// # Errors
     ///
-    /// When the session is over or the token cannot be bound.
-    pub fn elevate(&self, id: &str, tokens: &TokenSet) -> Result<i64, SessionError> {
+    /// When the session is over.
+    pub fn elevate(&self, id: &str, value: T, expires_in: i64) -> Result<i64, SessionError> {
         let entry = self.find(id).ok_or(SessionError::SignedOut)?;
-        let elevated = self.bound(&tokens.access_token, tokens.expires_in)?;
+        let elevated = Bound {
+            value,
+            expires_at: self.now().saturating_add(expires_in),
+        };
         let until = elevated.expires_at;
         entry.state().elevated = Some(elevated);
         Ok(until)
@@ -373,7 +389,7 @@ mod tests {
     use secrecy::ExposeSecret as _;
 
     use super::*;
-    use crate::client::{ClientConfig, ExtraRoots};
+    use crate::client::{ClientConfig, ExtraRoots, TokenSet};
     use crate::flow::{Pending, Purpose};
     use crate::testing::{CLIENT_ID, CLIENT_SECRET, FakeIssuer};
     use crate::url::BaseUrl;
@@ -404,7 +420,7 @@ mod tests {
             let clock = Arc::clone(&now);
             let sessions = Arc::new(Sessions::new(
                 Arc::clone(&oauth),
-                Arc::new(|token: &SecretString| Ok(token.expose_secret().to_owned())),
+                Arc::new(|token: SecretString| Ok(token.expose_secret().to_owned())),
                 limits,
                 Arc::new(move || clock.load(Ordering::SeqCst)),
             ));
@@ -444,7 +460,20 @@ mod tests {
                     },
                 )
                 .await;
-            self.sessions.start(user.to_owned(), tokens).unwrap()
+            self.start(user, tokens)
+        }
+
+        fn start(&self, user: &str, tokens: TokenSet) -> String {
+            let value = tokens.access_token.expose_secret().to_owned();
+            self.sessions
+                .start(
+                    user.to_owned(),
+                    value,
+                    tokens.expires_in,
+                    tokens.refresh_token,
+                    tokens.can_elevate,
+                )
+                .unwrap()
         }
 
         async fn base(&self, id: &str) -> Option<String> {
@@ -545,7 +574,7 @@ mod tests {
             refresh_token: Some(refresh),
             can_elevate: false,
         };
-        let id = rig.sessions.start("alice".to_owned(), tokens).unwrap();
+        let id = rig.start("alice", tokens);
         assert!(rig.base(&id).await.is_some());
         rig.advance(590);
         assert!(matches!(rig.sessions.current(&id).await, Lookup::SignedOut));
@@ -641,7 +670,14 @@ mod tests {
         let rig = Rig::new(Limits::default()).await;
         let id = rig.sign_in("alice").await;
         let elevated = rig.tokens("alice", Purpose::Elevate).await;
-        let until = rig.sessions.elevate(&id, &elevated).unwrap();
+        let until = rig
+            .sessions
+            .elevate(
+                &id,
+                elevated.access_token.expose_secret().to_owned(),
+                elevated.expires_in,
+            )
+            .unwrap();
         assert_eq!(until, START + 300);
         let Lookup::Active(credentials) = rig.sessions.current(&id).await else {
             panic!("signed out")
@@ -658,14 +694,18 @@ mod tests {
         assert!(credentials.elevated.is_none());
 
         let elevated = rig.tokens("alice", Purpose::Elevate).await;
-        rig.sessions.elevate(&id, &elevated).unwrap();
+        let admin = elevated.access_token.expose_secret().to_owned();
+        rig.sessions
+            .elevate(&id, admin.clone(), elevated.expires_in)
+            .unwrap();
         rig.sessions.drop_elevation(&id);
         let Lookup::Active(credentials) = rig.sessions.current(&id).await else {
             panic!("signed out")
         };
         assert!(credentials.elevated.is_none());
         assert_eq!(
-            rig.sessions.elevate("no-such-session", &elevated),
+            rig.sessions
+                .elevate("no-such-session", admin, elevated.expires_in),
             Err(SessionError::SignedOut)
         );
     }

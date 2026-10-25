@@ -124,7 +124,9 @@ rmcp = { version = "3.5", default-features = false, features = ["server", "macro
 # The schemars rmcp re-exports, named directly so that zeabur-modules can derive the schema of a
 # tool argument it shares with the API. Keep the version rmcp uses.
 schemars = { version = "1.2", default-features = false, features = ["derive"] }
-secrecy = "0.10"
+# Process settings that keep a person's tokens out of core dumps (zeabur-core's `secret`).
+rustix = { version = "1", default-features = false, features = ["std", "process"] }
+secrecy = { version = "0.10", features = ["serde"] }
 serde = { version = "1", features = ["derive"] }
 serde-saphyr = { version = "0.0.29", default-features = false, features = ["deserialize"] }
 serde_json = "1"

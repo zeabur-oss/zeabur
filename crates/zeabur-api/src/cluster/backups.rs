@@ -80,7 +80,7 @@ pub struct ClusterBackups {
 }
 
 /// What to plan.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(tag = "op", rename_all = "camelCase")]
 pub enum BackupsPlanRequest {
     /// Set where backups go.
@@ -132,6 +132,47 @@ pub enum BackupsPlanRequest {
         /// The namespaces to restore.
         namespaces: Vec<String>,
     },
+}
+
+impl std::fmt::Debug for BackupsPlanRequest {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Location {
+                bucket,
+                prefix,
+                region,
+                endpoint,
+                access_key_id,
+                destination,
+                ..
+            } => f
+                .debug_struct("Location")
+                .field("bucket", bucket)
+                .field("prefix", prefix)
+                .field("region", region)
+                .field("endpoint", endpoint)
+                .field("access_key_id", access_key_id)
+                .field("destination", destination)
+                .finish_non_exhaustive(),
+            Self::Schedule {
+                cron,
+                keep_days,
+                namespaces,
+            } => f
+                .debug_struct("Schedule")
+                .field("cron", cron)
+                .field("keep_days", keep_days)
+                .field("namespaces", namespaces)
+                .finish(),
+            Self::Pause { paused } => f.debug_struct("Pause").field("paused", paused).finish(),
+            Self::BackupNow => f.write_str("BackupNow"),
+            Self::Restore { backup, namespaces } => f
+                .debug_struct("Restore")
+                .field("backup", backup)
+                .field("namespaces", namespaces)
+                .finish(),
+        }
+    }
 }
 
 /// What a write does.
@@ -1000,4 +1041,23 @@ pub(crate) async fn apply(
         backup: claims.made.clone().filter(|_| !restoring),
         restore: claims.made.filter(|_| restoring),
     }))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn debug_leaves_the_secret_access_key_out() {
+        let request = BackupsPlanRequest::Location {
+            bucket: "backups".to_owned(),
+            prefix: String::new(),
+            region: String::new(),
+            endpoint: String::new(),
+            access_key_id: "AKIA".to_owned(),
+            secret_access_key: "S3CR3T".to_owned(),
+            destination: None,
+        };
+        assert!(!format!("{request:?}").contains("S3CR3T"));
+    }
 }

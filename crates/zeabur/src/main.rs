@@ -20,7 +20,6 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use clap::Parser;
-use secrecy::{ExposeSecret as _, SecretString};
 use zeabur_auth::client::{ClientConfig, OAuthClient};
 use zeabur_auth::flow::FlowKey;
 use zeabur_auth::passkey::PasskeyEndpoints;
@@ -43,6 +42,9 @@ const DRAIN: Duration = Duration::from_secs(10);
 fn main() -> ExitCode {
     let args = Args::parse();
     tracing_subscriber::fmt().with_target(false).init();
+    if let Err(error) = zeabur_core::secret::forbid_core_dumps() {
+        tracing::warn!(event = "server.core_dumps", %error, "core dumps stay possible");
+    }
     let config = match args.check() {
         Ok(config) => config,
         Err(message) => {
@@ -78,10 +80,11 @@ fn clock() -> Clock {
 /// A client for kube-apiserver that acts as the holder of the token; never Zeabur's own.
 fn connect(endpoint: ClusterEndpoint) -> Bind<Connection> {
     Arc::new(move |token| {
-        UserClient::with_token(&endpoint, &UserToken::new(token.expose_secret()))
+        let token = UserToken::new(token).map_err(|e| e.to_string())?;
+        UserClient::with_token(&endpoint, &token)
             .map(|client| Connection {
                 cluster: Arc::new(client),
-                token: Arc::new(SecretString::from(token.expose_secret().to_owned())),
+                token,
             })
             .map_err(|e| e.to_string())
     })

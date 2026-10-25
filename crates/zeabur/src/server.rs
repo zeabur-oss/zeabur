@@ -39,7 +39,6 @@ use axum::http::{HeaderMap, HeaderValue, StatusCode, Uri, header};
 use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
 use axum::routing::{delete, get, post};
-use secrecy::SecretString;
 use zeabur_api::ApiError;
 use zeabur_api::access::{Access, ClusterAccess, Elevation, Handoff};
 use zeabur_api::account::SignInPage;
@@ -53,8 +52,8 @@ use zeabur_auth::session::{Bind, Clock, Credentials, Lookup, Sessions};
 use zeabur_auth::url::BaseUrl;
 use zeabur_core::guard::{self, Origins, Refusal};
 use zeabur_core::problem::{Kind, Problem};
-use zeabur_kube::Cluster;
 use zeabur_kube::k8s_openapi::jiff::Timestamp;
+use zeabur_kube::{Cluster, UserToken};
 
 use crate::pages::{self, Elevated, SignInProblem};
 
@@ -63,7 +62,7 @@ use crate::pages::{self, Elevated, SignInProblem};
 #[derive(Clone)]
 pub(crate) struct Connection {
     pub(crate) cluster: Arc<dyn Cluster>,
-    pub(crate) token: Arc<SecretString>,
+    pub(crate) token: UserToken,
 }
 
 impl std::fmt::Debug for Connection {
@@ -316,7 +315,7 @@ impl ClusterAccess for SessionAccess {
             .as_ref()
             .map_or((&credentials.base, false), |elevated| (elevated, true));
         Some(Handoff {
-            token: Arc::clone(&bound.value.token),
+            token: bound.value.token.clone(),
             expires_at: timestamp(bound.expires_at),
             admin,
         })
@@ -510,16 +509,17 @@ async fn sign_in(
         }
     };
     // Who the person is, as kube-apiserver sees the token: it validated the token itself.
-    let identity = match (auth.connect)(&tokens.access_token) {
-        Ok(connection) => connection.cluster.whoami().await.map_err(|e| e.to_string()),
-        Err(error) => Err(error),
+    let refused = |error: &dyn std::fmt::Display| {
+        tracing::warn!(event = "auth.sign_in", outcome = "failure", %error, "the cluster did not accept the token");
+        failed(SignInProblem::ClusterRefused)
     };
-    let identity = match identity {
+    let connection = match (auth.connect)(tokens.access_token) {
+        Ok(connection) => connection,
+        Err(error) => return refused(&error),
+    };
+    let identity = match connection.cluster.whoami().await {
         Ok(identity) => identity,
-        Err(error) => {
-            tracing::warn!(event = "auth.sign_in", outcome = "failure", %error, "the cluster did not accept the token");
-            return failed(SignInProblem::ClusterRefused);
-        }
+        Err(error) => return refused(&error),
     };
     let username = identity.username;
     // A session is never carried over a sign-in: the previous one ends (session fixation,
@@ -528,7 +528,13 @@ async fn sign_in(
     if let Some(old) = cookie::get(headers, cookie::SESSION) {
         auth.sessions.end_session(old);
     }
-    match auth.sessions.start(username.clone(), tokens) {
+    match auth.sessions.start(
+        username.clone(),
+        connection,
+        tokens.expires_in,
+        tokens.refresh_token,
+        tokens.can_elevate,
+    ) {
         Ok(id) => {
             tracing::info!(event = "auth.sign_in", outcome = "success", user = %username, "signed in");
             redirect(return_to, &[cookie::set(cookie::SESSION, &id, None)])
@@ -574,11 +580,14 @@ async fn elevation(
     // The elevated token must be the same person's: Zeabur Identity adds groups, never changes the
     // user. A passkey of someone else, used in this window, must not lend its rights to this
     // session; and the plan token's binding (the user name) stays true.
-    let identity = match (auth.connect)(&tokens.access_token) {
-        Ok(connection) => connection.cluster.whoami().await.map_err(|e| e.to_string()),
-        Err(error) => Err(error),
+    let connection = match (auth.connect)(tokens.access_token) {
+        Ok(connection) => connection,
+        Err(error) => {
+            tracing::warn!(event = "auth.elevate", outcome = "failure", %error, "the cluster did not accept the elevated token");
+            return Elevated::Failed;
+        }
     };
-    match identity {
+    match connection.cluster.whoami().await {
         Ok(identity) if identity.username == session.username => {}
         Ok(identity) => {
             tracing::warn!(
@@ -592,7 +601,7 @@ async fn elevation(
             return Elevated::Failed;
         }
     }
-    match auth.sessions.elevate(id, &tokens) {
+    match auth.sessions.elevate(id, connection, tokens.expires_in) {
         Ok(until) => {
             tracing::info!(event = "auth.elevate", outcome = "success", user = %session.username, "admin rights granted");
             Elevated::Done(timestamp(until).to_string())

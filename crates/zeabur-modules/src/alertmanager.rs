@@ -220,7 +220,7 @@ impl AlertmanagerChannelKind {
 
 /// A channel's settings, secrets included. They go into the channel's Secret and spec; Zeabur
 /// never shows them again.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(tag = "kind", rename_all = "kebab-case")]
 pub enum AlertmanagerChannelSettings {
     /// A Slack incoming webhook.
@@ -299,6 +299,14 @@ impl AlertmanagerChannelSettings {
             Self::Ntfy { .. } => AlertmanagerChannelKind::Ntfy,
             Self::Gotify { .. } => AlertmanagerChannelKind::Gotify,
         }
+    }
+}
+
+impl std::fmt::Debug for AlertmanagerChannelSettings {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("AlertmanagerChannelSettings")
+            .field("kind", &self.kind())
+            .finish_non_exhaustive()
     }
 }
 
@@ -1014,6 +1022,19 @@ fn hide_url(reason: String) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn debug_leaves_the_secrets_out() {
+        let settings = AlertmanagerChannelSettings::Webhook {
+            url: "https://hooks.example.com/T0K3N".to_owned(),
+            bearer_token: "TOKEN-SECRET".to_owned(),
+        };
+        let shown = format!("{settings:?}");
+        assert!(
+            !shown.contains("T0K3N") && !shown.contains("TOKEN-SECRET"),
+            "{shown}"
+        );
+    }
 
     fn object(value: Value) -> DynamicObject {
         serde_json::from_value(value).unwrap()

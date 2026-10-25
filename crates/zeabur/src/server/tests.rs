@@ -21,7 +21,7 @@ use zeabur_auth::testing::{CLIENT_ID, CLIENT_SECRET, FakeIssuer};
 use zeabur_auth::url::BaseUrl;
 use zeabur_kube::k8s_openapi::api::core::v1::Namespace;
 use zeabur_kube::memory::{MemoryCluster, State};
-use zeabur_kube::{Identity, NamespaceObjects};
+use zeabur_kube::{Identity, NamespaceObjects, UserToken};
 
 use super::{Auth, Connection, app};
 
@@ -98,15 +98,16 @@ impl Rig {
         let read = Arc::clone(&now);
         let clock: zeabur_auth::session::Clock = Arc::new(move || read.load(Ordering::SeqCst));
         // Tokens read `<user>:<n>` or `<user>:elevated:<n>`; kube-apiserver refuses `mallory`.
-        let connect: zeabur_auth::session::Bind<Connection> = Arc::new(|token: &SecretString| {
-            let token = token.expose_secret();
-            let user = token.split(':').next().unwrap_or("");
+        let connect: zeabur_auth::session::Bind<Connection> = Arc::new(|token: SecretString| {
+            let text = token.expose_secret();
+            let user = text.split(':').next().unwrap_or("");
             if user == "mallory" {
                 return Err("Unauthorized".to_owned());
             }
+            let cluster = Arc::new(cluster(user, text.contains(":elevated:")));
             Ok(Connection {
-                cluster: Arc::new(cluster(user, token.contains(":elevated:"))),
-                token: Arc::new(SecretString::from(token.to_owned())),
+                cluster,
+                token: UserToken::new(token).map_err(|e| e.to_string())?,
             })
         });
         let sessions = Arc::new(Sessions::new(
@@ -785,7 +786,7 @@ fn every_request_goes_with_the_token_in_use_and_ends_with_it() {
 
     let connection = |elevated: bool, token: &str| Connection {
         cluster: Arc::new(cluster("alice", elevated)),
-        token: Arc::new(SecretString::from(token.to_owned())),
+        token: UserToken::new(SecretString::from(token)).unwrap(),
     };
     let base = connection(false, "alice:1");
     let elevated = connection(true, "alice:elevated:1");
@@ -815,7 +816,7 @@ fn every_request_goes_with_the_token_in_use_and_ends_with_it() {
     assert!(Arc::ptr_eq(&now.cluster, &base.cluster));
     assert!(matches!(now.elevation, Elevation::Available));
     let handoff = access.handoff(&parts).unwrap();
-    assert_eq!(handoff.token.expose_secret(), "alice:1");
+    assert_eq!(handoff.token.secret().expose_secret(), "alice:1");
     assert_eq!(
         (handoff.expires_at.as_second(), handoff.admin),
         (NOW + 600, false)
@@ -841,7 +842,7 @@ fn every_request_goes_with_the_token_in_use_and_ends_with_it() {
         &base.cluster
     ));
     let handoff = access.handoff(&parts).unwrap();
-    assert_eq!(handoff.token.expose_secret(), "alice:elevated:1");
+    assert_eq!(handoff.token.secret().expose_secret(), "alice:elevated:1");
     assert_eq!(
         (handoff.expires_at.as_second(), handoff.admin),
         (NOW + 300, true)

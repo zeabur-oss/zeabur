@@ -75,6 +75,18 @@ reason = "Async runtime and OS I/O"
 approved = "2026-10-12"
 
 [[crate]]
+name = "rustix"
+kind = "unsafe"
+reason = "Async runtime and OS I/O: prctl(PR_SET_DUMPABLE) and setrlimit(RLIMIT_CORE) at startup (zeabur-core secret, zeabur-proxy); std has no safe call for either"
+approved = "2026-10-25"
+
+[[crate]]
+name = "linux-raw-sys"
+kind = "unsafe"
+reason = "Async runtime and OS I/O: the Linux system call numbers and types that rustix's raw backend uses"
+approved = "2026-10-25"
+
+[[crate]]
 name = "pin-project-lite"
 kind = "unsafe"
 reason = "Async runtime and OS I/O"

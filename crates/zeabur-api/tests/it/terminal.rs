@@ -103,7 +103,7 @@ mod tests {
 
         fn handoff(&self, _parts: &Parts) -> Option<Handoff> {
             Some(Handoff {
-                token: Arc::new(SecretString::from(TOKEN.to_owned())),
+                token: zeabur_kube::UserToken::new(SecretString::from(TOKEN)).unwrap(),
                 expires_at: Timestamp::now() + SignedDuration::from_mins(10),
                 admin: self.admin,
             })

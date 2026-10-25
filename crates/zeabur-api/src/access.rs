@@ -13,10 +13,9 @@
 use std::sync::Arc;
 
 use axum::http::request::Parts;
-use secrecy::SecretString;
 use zeabur_core::problem::Problem;
-use zeabur_kube::Cluster;
 use zeabur_kube::k8s_openapi::jiff::Timestamp;
+use zeabur_kube::{Cluster, UserToken};
 
 /// Whether the person can act as an administrator for a while (the in-cluster server with
 /// elevation turned on; see the `zeabur` binary).
@@ -54,7 +53,7 @@ impl std::fmt::Debug for Access {
 #[derive(Clone)]
 pub struct Handoff {
     /// The token.
-    pub token: Arc<SecretString>,
+    pub token: UserToken,
     /// When it expires.
     pub expires_at: Timestamp,
     /// Whether it is the administrator's.

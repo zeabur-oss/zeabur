@@ -15,10 +15,10 @@ use std::pin::Pin;
 
 use axum::Json;
 use axum::extract::{Path, RawQuery, State};
-use secrecy::SecretString;
 use serde::Serialize;
 use utoipa::ToSchema;
 use zeabur_core::problem::{Kind, MEDIA_TYPE as PROBLEM, Problem};
+use zeabur_kube::UserToken;
 use zeabur_kube::k8s_openapi::jiff::Timestamp;
 use zeabur_modules::prometheus_api::{PrometheusRange, pod_pattern};
 
@@ -33,7 +33,7 @@ pub trait LogProxy: Send + Sync {
     /// `GET path_and_query` with `token` as the bearer token.
     fn get<'a>(
         &'a self,
-        token: &'a SecretString,
+        token: &'a UserToken,
         path_and_query: String,
     ) -> Pin<Box<dyn Future<Output = Result<ProxyAnswer, String>> + Send + 'a>>;
 }

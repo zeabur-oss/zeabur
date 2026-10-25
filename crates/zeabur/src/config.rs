@@ -6,6 +6,7 @@ use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 
 use secrecy::SecretString;
+use secrecy::zeroize::Zeroizing;
 use zeabur_api::plan_token::PlanKey;
 use zeabur_auth::client::ExtraRoots;
 use zeabur_auth::session::Limits;
@@ -155,9 +156,9 @@ impl Args {
             return Err("--client-id: must not be empty".to_owned());
         }
         let secret = read(&self.client_secret_file, "--client-secret-file")?;
-        let secret = String::from_utf8(secret)
-            .map_err(|_utf8| "--client-secret-file: the secret is not text".to_owned())?;
-        let secret = secret.trim();
+        let secret = std::str::from_utf8(&secret)
+            .map_err(|_utf8| "--client-secret-file: the secret is not text".to_owned())?
+            .trim();
         if secret.is_empty() {
             return Err(format!(
                 "--client-secret-file: {} is empty",
@@ -232,7 +233,7 @@ impl Args {
             issuer,
             issuer_ca,
             client_id: self.client_id.clone(),
-            client_secret: SecretString::from(secret.to_owned()),
+            client_secret: SecretString::from(secret),
             plan_key,
             elevation: self.elevation,
             limits: Limits {
@@ -376,8 +377,11 @@ fn quantities(text: &str) -> Result<std::collections::BTreeMap<String, String>, 
         .collect()
 }
 
-fn read(path: &Path, flag: &str) -> Result<Vec<u8>, String> {
-    std::fs::read(path).map_err(|e| format!("{flag}: cannot read {}: {e}", path.display()))
+/// The file's bytes, cleared on drop: the client secret and the plan key are read this way.
+fn read(path: &Path, flag: &str) -> Result<Zeroizing<Vec<u8>>, String> {
+    std::fs::read(path)
+        .map(Zeroizing::new)
+        .map_err(|e| format!("{flag}: cannot read {}: {e}", path.display()))
 }
 
 /// The key in `bytes`: exactly 32 bytes (a Secret made with Helm's `randBytes 32`, mounted as a

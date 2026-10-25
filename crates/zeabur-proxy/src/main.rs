@@ -66,6 +66,9 @@ const REVIEW_TIMEOUT: Duration = Duration::from_secs(5);
 fn main() -> ExitCode {
     let args = Args::parse();
     tracing_subscriber::fmt().with_target(true).init();
+    if let Err(error) = forbid_core_dumps() {
+        tracing::warn!(%error, "core dumps stay possible");
+    }
     let runtime = match tokio::runtime::Builder::new_multi_thread()
         .worker_threads(2)
         .max_blocking_threads(2)
@@ -84,6 +87,36 @@ fn main() -> ExitCode {
             output::error(&message);
             ExitCode::FAILURE
         }
+    }
+}
+
+/// Stops this process from writing a core dump, which would hold the tokens of requests in
+/// progress. The proxy depends on `zeabur-kernel` only, so this is a copy of
+/// `zeabur_core::secret::forbid_core_dumps`.
+fn forbid_core_dumps() -> Result<(), String> {
+    let mut refused = Vec::new();
+    #[cfg(unix)]
+    {
+        use rustix::process::{Resource, Rlimit, setrlimit};
+        let none = Rlimit {
+            current: Some(0),
+            maximum: Some(0),
+        };
+        if let Err(error) = setrlimit(Resource::Core, none) {
+            refused.push(format!("cannot set RLIMIT_CORE to 0: {error}"));
+        }
+    }
+    #[cfg(target_os = "linux")]
+    {
+        use rustix::process::{DumpableBehavior, set_dumpable_behavior};
+        if let Err(error) = set_dumpable_behavior(DumpableBehavior::NotDumpable) {
+            refused.push(format!("cannot make the process non-dumpable: {error}"));
+        }
+    }
+    if refused.is_empty() {
+        Ok(())
+    } else {
+        Err(refused.join("; "))
     }
 }
 

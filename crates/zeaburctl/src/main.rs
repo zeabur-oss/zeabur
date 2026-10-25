@@ -37,6 +37,10 @@ enum Command {
 
 fn main() -> ExitCode {
     let args = Args::parse();
+    // Every command holds the kubeconfig's credential in memory.
+    if let Err(error) = zeabur_core::secret::forbid_core_dumps() {
+        output::error(&format!("core dumps stay possible: {error}"));
+    }
     match args.command {
         Command::Ui(ui_args) => ui::run(&ui_args),
         Command::Mcp(mcp_args) => mcp::run(&mcp_args),

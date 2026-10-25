@@ -37,13 +37,13 @@ mod tests {
     impl LogProxy for Fake {
         fn get<'a>(
             &'a self,
-            token: &'a SecretString,
+            token: &'a zeabur_kube::UserToken,
             path_and_query: String,
         ) -> Pin<Box<dyn Future<Output = Result<ProxyAnswer, String>> + Send + 'a>> {
             self.asked
                 .lock()
                 .unwrap()
-                .push((token.expose_secret().to_owned(), path_and_query));
+                .push((token.secret().expose_secret().to_owned(), path_and_query));
             Box::pin(std::future::ready(self.answer.clone()))
         }
     }
@@ -60,7 +60,7 @@ mod tests {
 
         fn handoff(&self, _parts: &Parts) -> Option<Handoff> {
             Some(Handoff {
-                token: Arc::new(SecretString::from(TOKEN.to_owned())),
+                token: zeabur_kube::UserToken::new(SecretString::from(TOKEN)).unwrap(),
                 expires_at: now() + SignedDuration::from_mins(10),
                 admin: false,
             })

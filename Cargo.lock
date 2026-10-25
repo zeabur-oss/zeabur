@@ -1738,6 +1738,7 @@ version = "0.10.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e891af845473308773346dc847b2c23ee78fe442e0472ac50e22a18a93d3ae5a"
 dependencies = [
+ "serde",
  "zeroize",
 ]
 
@@ -2785,6 +2786,7 @@ dependencies = [
  "aws-lc-rs",
  "base64 0.23.1",
  "http",
+ "rustix",
  "serde",
  "serde_json",
  "thiserror",
@@ -2981,6 +2983,7 @@ dependencies = [
  "k8s-openapi",
  "kube",
  "proptest",
+ "rustix",
  "rustls",
  "secrecy",
  "serde_json",

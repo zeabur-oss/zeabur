@@ -49,7 +49,7 @@ impl ClusterAccess for Signed {
 
     fn handoff(&self, _parts: &Parts) -> Option<Handoff> {
         Some(Handoff {
-            token: Arc::new(SecretString::from(self.token.clone())),
+            token: zeabur_kube::UserToken::new(SecretString::from(self.token.as_str())).unwrap(),
             expires_at: Timestamp::now() + SignedDuration::from_mins(10),
             admin: false,
         })

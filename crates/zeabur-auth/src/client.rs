@@ -53,11 +53,13 @@ use std::fmt;
 use base64::Engine as _;
 use base64::engine::general_purpose::{STANDARD, URL_SAFE_NO_PAD};
 use bytes::Bytes;
-use http::{Method, Request, StatusCode, header};
+use http::{HeaderValue, Method, Request, StatusCode, header};
 use http_body_util::Full;
-use secrecy::{ExposeSecret as _, SecretString};
+use secrecy::zeroize::Zeroizing;
+use secrecy::{ExposeSecret, SecretString};
 use serde::Deserialize;
 use tokio::sync::OnceCell;
+use zeabur_core::secret::join;
 
 use crate::flow::{Pending, Purpose};
 pub use crate::http::ExtraRoots;
@@ -160,14 +162,14 @@ struct Metadata {
 
 #[derive(Deserialize)]
 struct TokenAnswer {
-    access_token: String,
+    access_token: SecretString,
     token_type: String,
     #[serde(default)]
     expires_in: Option<i64>,
     #[serde(default)]
-    refresh_token: Option<String>,
+    refresh_token: Option<SecretString>,
     #[serde(default)]
-    id_token: Option<String>,
+    id_token: Option<SecretString>,
 }
 
 #[derive(Deserialize)]
@@ -194,7 +196,11 @@ struct ErrorAnswer {
 
 /// The OAuth client.
 pub struct OAuthClient {
-    config: ClientConfig,
+    issuer: BaseUrl,
+    client_id: String,
+    /// The `Authorization` header of `client_secret_basic`. The client secret is not kept
+    /// otherwise.
+    basic: HeaderValue,
     redirect_uri: String,
     http: Http,
     provider: OnceCell<Provider>,
@@ -203,7 +209,8 @@ pub struct OAuthClient {
 impl fmt::Debug for OAuthClient {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("OAuthClient")
-            .field("config", &self.config)
+            .field("issuer", &self.issuer)
+            .field("client_id", &self.client_id)
             .finish_non_exhaustive()
     }
 }
@@ -215,11 +222,12 @@ impl OAuthClient {
     ///
     /// When TLS cannot be set up.
     pub fn new(config: ClientConfig) -> Result<Self, AuthError> {
-        let http =
-            Http::new(config.issuer_ca.clone()).map_err(|e| AuthError::Invalid(e.to_string()))?;
+        let http = Http::new(config.issuer_ca).map_err(|e| AuthError::Invalid(e.to_string()))?;
         Ok(Self {
+            basic: basic(&config.client_id, &config.client_secret)?,
             redirect_uri: config.public_url.join(CALLBACK_PATH),
-            config,
+            issuer: config.issuer,
+            client_id: config.client_id,
             http,
             provider: OnceCell::new(),
         })
@@ -247,7 +255,7 @@ impl OAuthClient {
     }
 
     async fn fetch_provider(&self) -> Result<Provider, AuthError> {
-        let issuer = &self.config.issuer;
+        let issuer = &self.issuer;
         let url = issuer.join("/.well-known/openid-configuration");
         let request = Request::get(&url)
             .header(header::ACCEPT, "application/json")
@@ -302,7 +310,7 @@ impl OAuthClient {
         let mut query = form_urlencoded::Serializer::new(String::new());
         query
             .append_pair("response_type", "code")
-            .append_pair("client_id", &self.config.client_id)
+            .append_pair("client_id", &self.client_id)
             .append_pair("redirect_uri", &self.redirect_uri)
             .append_pair("scope", pending.purpose().scope())
             .append_pair("state", pending.state())
@@ -338,10 +346,10 @@ impl OAuthClient {
     pub async fn check_issuer(&self, iss: Option<&str>) -> Result<(), AuthError> {
         let provider = self.provider().await?;
         match iss {
-            Some(iss) if iss.trim_end_matches('/') == self.config.issuer.as_str() => Ok(()),
+            Some(iss) if iss.trim_end_matches('/') == self.issuer.as_str() => Ok(()),
             Some(other) => Err(AuthError::Invalid(format!(
                 "the answer comes from the issuer {other:?}, not {}",
-                self.config.issuer
+                self.issuer
             ))),
             None if provider.iss_parameter => Err(AuthError::Invalid(
                 "the answer does not name its issuer".to_owned(),
@@ -427,10 +435,10 @@ impl OAuthClient {
             .filter(|seconds| *seconds > 0)
             .ok_or_else(|| AuthError::Invalid(format!("{endpoint}: no expires_in")))?;
         Ok(TokenSet {
-            access_token: SecretString::from(answer.access_token),
+            access_token: answer.access_token,
             expires_in,
-            refresh_token: answer.refresh_token.map(SecretString::from),
-            can_elevate: can_elevate(answer.id_token.as_deref()),
+            refresh_token: answer.refresh_token,
+            can_elevate: can_elevate(answer.id_token.as_ref().map(ExposeSecret::expose_secret)),
         })
     }
 
@@ -445,25 +453,12 @@ impl OAuthClient {
         let request = Request::builder()
             .method(Method::POST)
             .uri(endpoint)
-            .header(header::AUTHORIZATION, self.basic())
+            .header(header::AUTHORIZATION, self.basic.clone())
             .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
             .header(header::ACCEPT, "application/json")
             .body(Full::new(Bytes::from(body)))
             .map_err(|e| AuthError::Invalid(e.to_string()))?;
         self.send(request).await
-    }
-
-    /// `client_secret_basic`: both parts form-urlencoded before Base64 ([rfc6749] §2.3.1).
-    ///
-    /// [rfc6749]: https://www.rfc-editor.org/rfc/rfc6749#section-2.3.1
-    fn basic(&self) -> String {
-        let encode = |s: &str| form_urlencoded::byte_serialize(s.as_bytes()).collect::<String>();
-        let pair = format!(
-            "{}:{}",
-            encode(&self.config.client_id),
-            encode(self.config.client_secret.expose_secret())
-        );
-        format!("Basic {}", STANDARD.encode(pair))
     }
 
     async fn send(&self, request: Request<Full<Bytes>>) -> Result<(StatusCode, Bytes), AuthError> {
@@ -472,6 +467,27 @@ impl OAuthClient {
             .await
             .map_err(|e| AuthError::Unreachable(e.to_string()))
     }
+}
+
+/// The `Authorization` header of `client_secret_basic`, marked sensitive: both parts
+/// form-urlencoded before Base64 ([rfc6749] §2.3.1).
+///
+/// [rfc6749]: https://www.rfc-editor.org/rfc/rfc6749#section-2.3.1
+fn basic(client_id: &str, secret: &SecretString) -> Result<HeaderValue, AuthError> {
+    let encode = |s: &str| {
+        let parts: Vec<&str> = form_urlencoded::byte_serialize(s.as_bytes()).collect();
+        Zeroizing::new(join(&parts))
+    };
+    let pair = Zeroizing::new(join(&[
+        &encode(client_id),
+        ":",
+        &encode(secret.expose_secret()),
+    ]));
+    let encoded = Zeroizing::new(STANDARD.encode(pair.as_bytes()));
+    let mut value = HeaderValue::try_from(join(&["Basic ", &encoded]))
+        .map_err(|e| AuthError::Invalid(e.to_string()))?;
+    value.set_sensitive(true);
+    Ok(value)
 }
 
 fn unexpected(status: StatusCode, url: &str) -> AuthError {

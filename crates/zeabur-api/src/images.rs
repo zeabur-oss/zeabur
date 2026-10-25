@@ -22,7 +22,8 @@ use axum::Json;
 use axum::extract::{Path, State};
 use reference::{Reference, registry_name};
 use registry::{Credential, Inspected, Transport, Unreadable};
-use secrecy::SecretString;
+use secrecy::zeroize::Zeroizing;
+use secrecy::{ExposeSecret as _, SecretString};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use zeabur_core::problem::{Kind, MEDIA_TYPE as PROBLEM, Problem};
@@ -161,7 +162,8 @@ pub struct RegistryLogin {
     /// The username.
     pub username: String,
     /// The password or access token.
-    pub password: String,
+    #[schema(value_type = String)]
+    pub password: SecretString,
 }
 
 impl std::fmt::Debug for RegistryLogin {
@@ -287,7 +289,7 @@ pub(crate) async fn inspect(
         (Some(login), _) => {
             (registry_name(&login.server) == reference.registry).then(|| Credential {
                 username: login.username.clone(),
-                password: SecretString::from(login.password.clone()),
+                password: login.password.clone(),
             })
         }
         (None, Some(secret)) => match cluster.reveal_secret(&project, secret).await {
@@ -398,8 +400,8 @@ fn from_pull_secret(values: &BTreeMap<String, Vec<u8>>, registry: &str) -> Optio
     #[derive(Deserialize)]
     struct Entry {
         username: Option<String>,
-        password: Option<String>,
-        auth: Option<String>,
+        password: Option<SecretString>,
+        auth: Option<SecretString>,
     }
     #[derive(Deserialize)]
     struct Config {
@@ -418,24 +420,20 @@ fn from_pull_secret(values: &BTreeMap<String, Vec<u8>>, registry: &str) -> Optio
     let (username, password) = match (entry.username, entry.password) {
         (Some(username), Some(password)) if !username.is_empty() => (username, password),
         _ => {
-            let decoded = base64::engine::general_purpose::STANDARD
-                .decode(entry.auth?.trim())
-                .ok()?;
-            let pair = String::from_utf8(decoded).ok()?;
-            let (username, password) = pair.split_once(':')?;
-            (username.to_owned(), password.to_owned())
+            let decoded = Zeroizing::new(
+                base64::engine::general_purpose::STANDARD
+                    .decode(entry.auth?.expose_secret().trim())
+                    .ok()?,
+            );
+            let (username, password) = std::str::from_utf8(&decoded).ok()?.split_once(':')?;
+            (username.to_owned(), SecretString::from(password))
         }
     };
-    Some(Credential {
-        username,
-        password: SecretString::from(password),
-    })
+    Some(Credential { username, password })
 }
 
 #[cfg(test)]
 mod tests {
-    use secrecy::ExposeSecret as _;
-
     use super::registry::fake::nginx;
     use super::*;
 

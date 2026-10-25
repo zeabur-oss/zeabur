@@ -16,8 +16,8 @@ use hyper_util::client::legacy::connect::HttpConnector;
 use hyper_util::rt::TokioExecutor;
 use rustls::pki_types::CertificateDer;
 use rustls::pki_types::pem::PemObject as _;
-use secrecy::{ExposeSecret as _, SecretString};
 use zeabur_api::services::logs::{LogProxy, ProxyAnswer};
+use zeabur_kube::UserToken;
 
 /// Longer than the proxy's own 30 s for its backend, so its answer arrives first.
 const DEADLINE: Duration = Duration::from_secs(35);
@@ -81,12 +81,9 @@ impl Proxy {
         })
     }
 
-    async fn send(&self, token: &SecretString, path: &str) -> Result<ProxyAnswer, String> {
+    async fn send(&self, token: &UserToken, path: &str) -> Result<ProxyAnswer, String> {
         let request = Request::get(format!("{}{path}", self.base))
-            .header(
-                header::AUTHORIZATION,
-                format!("Bearer {}", token.expose_secret()),
-            )
+            .header(header::AUTHORIZATION, token.authorization().clone())
             .body(Empty::new())
             .map_err(|e| e.to_string())?;
         let exchange = async {
@@ -115,7 +112,7 @@ impl Proxy {
 impl LogProxy for Proxy {
     fn get<'a>(
         &'a self,
-        token: &'a SecretString,
+        token: &'a UserToken,
         path_and_query: String,
     ) -> Pin<Box<dyn Future<Output = Result<ProxyAnswer, String>> + Send + 'a>> {
         Box::pin(async move { self.send(token, &path_and_query).await })

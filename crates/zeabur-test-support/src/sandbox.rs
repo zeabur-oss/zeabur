@@ -158,7 +158,9 @@ impl Sandbox {
             .status
             .expect("token")
             .token;
-        let user = UserClient::with_token(&endpoint, &UserToken::new(token.clone())).expect("user");
+        let user = UserToken::new(token.as_str().into())
+            .and_then(|token| UserClient::with_token(&endpoint, &token))
+            .expect("user");
         Self {
             admin,
             endpoint,

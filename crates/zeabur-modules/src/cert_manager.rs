@@ -42,7 +42,7 @@ const PRODUCTION: &str = "https://acme-v02.api.letsencrypt.org/directory";
 const STAGING: &str = "https://acme-staging-v02.api.letsencrypt.org/directory";
 
 /// A DNS provider's settings for a DNS-01 solver. A blank secret field keeps the Secret's value.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(tag = "provider", rename_all = "camelCase")]
 pub enum Dns01Provider {
     /// Cloudflare, with an API token that may edit the zone's DNS.
@@ -99,6 +99,21 @@ pub enum Dns01Provider {
         /// The zone.
         hosted_zone_name: String,
     },
+}
+
+impl std::fmt::Debug for Dns01Provider {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let provider = match self {
+            Self::Cloudflare { .. } => "Cloudflare",
+            Self::Route53 { .. } => "Route53",
+            Self::CloudDns { .. } => "CloudDns",
+            Self::Digitalocean { .. } => "Digitalocean",
+            Self::AzureDns { .. } => "AzureDns",
+        };
+        f.debug_struct("Dns01Provider")
+            .field("provider", &provider)
+            .finish_non_exhaustive()
+    }
 }
 
 impl Dns01Provider {
@@ -456,6 +471,14 @@ pub fn issuer(object: &DynamicObject) -> IssuerView {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn debug_leaves_the_secret_out() {
+        let provider = Dns01Provider::Cloudflare {
+            api_token: "cf-T0K3N".to_owned(),
+        };
+        assert!(!format!("{provider:?}").contains("T0K3N"));
+    }
 
     fn request(dns: Dns01Provider) -> IssuerRequest {
         IssuerRequest {
