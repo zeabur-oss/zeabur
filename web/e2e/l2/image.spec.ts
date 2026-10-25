@@ -5,7 +5,8 @@ import { invite, member, planAndApply, signInAdmin, toast } from "./members.ts"
 // Deploy an image, then delete it: the delete plan lists what the service made (its Kubernetes
 // Service, `-env` Secret, Ingress and volume claim) and, once applied, none of them is left. In a
 // project Zeabur creates (Pod Security baseline), a root image runs as Compatible and an image
-// with a numeric user is Strict, both chosen for the Developer.
+// with a numeric user is Strict, both chosen for the Developer. The admin then deletes that project,
+// so removing Zeabur leaves the cluster as it was.
 // scripts/e2e-l2-browser.sh sets, besides ZEABUR_L2_URL and ZEABUR_L2_NAMESPACE:
 //
 //   ZEABUR_L2_IMAGE_ADMIN_LINK  an invitation for `e2e-image-admin`, an admin account
@@ -109,5 +110,20 @@ test("a Developer deploys an image and deletes it with what it made", async ({ p
             `PersistentVolumeClaim ${name}-data`,
           ],
         }))
+    await test.step(`the admin deletes ${baselineProject}`, async () => {
+      const deleted = await planAndApply(page, baselineProject, [{ op: "deleteProject" }])
+      expect(deleted.status, JSON.stringify(deleted)).toBe(200)
+      await expect
+        .poll(
+          async () => {
+            const list = (await (await page.request.get("/api/v1/projects")).json()) as {
+              items: { name: string }[]
+            }
+            return list.items.some((p) => p.name === baselineProject)
+          },
+          { timeout: 180_000 },
+        )
+        .toBe(false)
+    })
   }
 })
