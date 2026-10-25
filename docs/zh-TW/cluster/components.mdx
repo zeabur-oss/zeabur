@@ -10,7 +10,7 @@ description: 查看叢集已偵測到的元件，檢查權限與相依項目，�
 ## 開始之前
 
 - 你能讀取整個叢集的 CRD、IngressClass 和各 Namespace 的工作負載，元件頁才偵測得到已安裝的元件。
-- 要由 Zeabur 安裝，叢集要有對應的控制器：K3s/RKE2 內建的 Helm 控制器、Flux 或 Argo CD。你也要能在它的 Namespace（`kube-system`、`flux-system` 或 `argocd`）建立物件。管理員可以先按 **暫時使用管理員權限**。
+- 要由 Zeabur 安裝，叢集要有對應的控制器：K3s/RKE2 內建的 Helm 控制器、Flux 或 Argo CD。你也要能在它的 Namespace（`kube-system`、`flux-system` 或 `argocd`）建立物件，管理員帳號就有這個權限。
 - 如果這個元件已經由 Helm、Flux 或 Argo CD 管理，先找到原本的設定，在那裡修改。
 
 ## 先確認叢集裡已有什麼

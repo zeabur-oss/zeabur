@@ -10,7 +10,7 @@ description: 登錄 S3 儲存位置供資料庫、K8up 與 Velero 備份選用�
 ## 開始之前
 
 - 已有 S3 相容的儲存貯體，以及它的端點、區域、存取金鑰 ID 和私密存取金鑰。
-- 登錄和編輯需要在 `zeabur-s3-destinations` Namespace 寫入 ConfigMap 和 Secret 的權限。管理員可以先按 **暫時使用管理員權限**。
+- 登錄和編輯需要在 `zeabur-s3-destinations` Namespace 寫入 ConfigMap 和 Secret 的權限，管理員帳號就有。
 - 在備份表單選用目的地，需要能讀取 `zeabur-s3-destinations` 的 Secret，並在備份所在的 Namespace 建立 Secret。
 
 每個登入的人都看得到目的地的名稱和位置，但 Zeabur Chart 沒有讓任何人讀取裡面的 Secret。沒有這項權限的成員在備份表單只能選 **手動輸入**，自己填金鑰。

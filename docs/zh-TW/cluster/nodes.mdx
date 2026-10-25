@@ -12,7 +12,7 @@ description: 用 zeabur-installer 加入新節點，停止排程，用 kubectl �
 - 只有用 Zeabur Installer（RKE2）安裝的叢集能用 `zeabur-installer node add` 加節點。其他叢集用原本的安裝工具。
 - 準備一台能用 root 操作的新 VM，以及安裝第一台伺服器時用的同一個 `zeabur-installer` 執行檔。
 - 所有節點放在同一家主機服務商的同一個區域，同區域內不同的可用區域沒有問題。跨服務商或跨區域時，延遲會拖慢 etcd、Kubernetes API 和儲存。
-- 停止排程和恢復排程需要修改 Node 的權限。`drain` 和 `delete node` 在 kubectl 終端機執行，用的是你自己的權限。節點終端機需要叢集管理員權限。
+- 停止排程和恢復排程需要修改 Node 的權限。`drain` 和 `delete node` 在 kubectl 終端機執行，用的是你自己的權限。節點終端機要用管理員帳號開啟。
 
 節點之間的防火牆要開放：
 
@@ -176,7 +176,7 @@ sudo zeabur-installer node sync
 
 ## 開啟節點終端機
 
-**節點終端機** 會在主機上開一個完整的 root shell。先取得管理員權限，在節點列按 **節點終端機**，看過要建立的終端機 Pod 和時限，再按 **開啟終端機**。
+**節點終端機** 會在主機上開一個完整的 root shell。用管理員帳號登入，在節點列按 **節點終端機**，看過要建立的終端機 Pod 和時限，再按 **開啟終端機**。
 
 <Callout type="warn">
 節點終端機能動主機上所有的檔案、程序和網路介面。在裡面做的事不經過 Zeabur 和 Kubernetes 的權限檢查，也無法復原。

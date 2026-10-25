@@ -11,7 +11,7 @@ description: 設定 Velero 的 S3 存放位置與排程，確認備份結果，�
 
 - 叢集裝了 Velero。畫面顯示 **備份需要 Velero** 時，按 **安裝 Velero**，照[安裝元件](./components.mdx)裝好。
 - 準備 S3 相容的儲存貯體、端點和金鑰，或先在同一頁上方的 **S3 目的地** 登錄，見 [S3 目的地](./s3-destinations.mdx)。
-- 你能在 Velero 的 Namespace 讀取和建立備份位置、排程、備份、還原和 Secret。Zeabur Chart 的成員角色沒有 Velero 的權限，通常要先按 **暫時使用管理員權限**。
+- 你能在 Velero 的 Namespace 讀取和建立備份位置、排程、備份、還原和 Secret。Zeabur Chart 的成員角色沒有 Velero 的權限，通常要用管理員帳號操作。
 
 <Callout type="warn">
 備份要存在叢集以外的儲存，例如 Cloudflare R2、Backblaze B2 或 AWS S3。存在同一個叢集裡的話，叢集遺失時備份也會一起消失。端點看起來在叢集裡時，表單會提醒。
@@ -257,7 +257,7 @@ kubectl -n velero get secret velero-repo-credentials velero-backup-key -o yaml >
 - **無法連線**：核對儲存貯體、端點、區域和金鑰，並看位置下方 Velero 的訊息。
 - 連線成功但備份失敗，儲存服務拒絕上傳：確認它支援 SSE-C，端點也用 HTTPS，見[備份的加密](#備份的加密)。
 - 沒有 **立即備份**：要先有 Zeabur 建立的排程，而排程要先有存放位置。
-- 還原按鈕（**從備份建立新專案**、**還原已刪除的專案** 或 **還原專案**）無法使用：你不能在 Velero 的 Namespace 建立 Restore。還原時 Velero 用自己的權限寫入物件，所以只有管理員能還原，見[權限](../reference/permissions.mdx)。管理員按 **暫時使用管理員權限** 再試一次。
+- 還原按鈕（**從備份建立新專案**、**還原已刪除的專案** 或 **還原專案**）無法使用：你不能在 Velero 的 Namespace 建立 Restore。還原時 Velero 用自己的權限寫入物件，所以只有管理員能還原，見[權限](../reference/permissions.mdx)。請管理員用管理員帳號還原。
 - **部分失敗**：有些物件或磁碟區檔案沒有複製到，其餘的已存好。用 `velero backup describe <backup> --details` 查看失敗的項目，處理後再備份一次。
 - 畫面說備份途中 Velero 重新啟動：下一次會照排程執行，也可以按 **立即備份** 補一次。
 - **磁碟區** 顯示 **只備份物件，不複製磁碟區裡的檔案**：這是在 Zeabur 以外建立的排程，要到原本的設定開啟 `defaultVolumesToFsBackup`。

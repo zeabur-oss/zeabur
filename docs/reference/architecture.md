@@ -38,7 +38,7 @@ holding any power of its own. It is a projection: Kubernetes objects are the onl
 |---|---|---|
 | L0 | read: projects, services, relations, logs, events | `zeaburctl ui` (local) |
 | L1 | write: plans, JSON Patch, create and delete with preconditions, releases and rollback | `zeaburctl ui` (local) |
-| L2 | the in-cluster server, sign-in through Zeabur Identity, elevation | `zeabur` |
+| L2 | the in-cluster server, sign-in through Zeabur Identity | `zeabur` |
 | L3, L4 | full sign-in, multi-tenancy | later |
 
 A layer depends only on the layers below it; turning one off leaves those below working.
@@ -92,12 +92,12 @@ The tools pod holds the person's Zeabur Identity token, which Zeabur otherwise n
 its process. So:
 
 - **In the terminal namespace** (`zeabur-terminals`), after a plan that says what runs, as
-  whom, with or without admin rights, until when, and that it is deleted on close or at the
-  deadline. Zeabur first asks kube-apiserver whether the person may `create` `pods/exec` in the
-  project (for the cluster scope: whether they are a cluster administrator), then creates, execs
-  into and deletes the pod with its own ServiceAccount. The chart binds that account to a Role
-  with exactly those rights in that one namespace. Members have no rights there, so no one can
-  list or exec into another person's tools pod. kubectl in it starts in the project.
+  whom, until when, and that it is deleted on close or at the deadline. Zeabur first asks
+  kube-apiserver whether the person may `create` `pods/exec` in the project (for the cluster
+  scope: whether they are a cluster administrator), then creates, execs into and deletes the pod
+  with its own ServiceAccount. The chart binds that account to a Role with exactly those rights
+  in that one namespace. Members have no rights there, so no one can list or exec into another
+  person's tools pod. kubectl in it starts in the project.
 - **Nothing of Zeabur's in it**: `automountServiceAccountToken: false`, no service links.
 - **Locked down**: non-root, read-only root filesystem, no privilege escalation, every
   capability dropped, seccomp `RuntimeDefault`; small requests and limits;
@@ -175,5 +175,15 @@ kube-apiserver says:
 
 Members (`/members`) is Zeabur Identity's admin view and still reads and changes its objects as
 the signed-in person.
+
+The sign-in settings on the Settings page are the ConfigMap `zeabur-identity-settings` in Zeabur
+Identity's namespace, read and written as the person; Zeabur Identity applies them at every
+sign-in and refresh ([Sign-in settings](../get-started/install.md#sign-in-settings)).
+
+A sign-in session (`crates/zeabur-auth/src/session.rs`) ends at the shorter of Zeabur's idle
+limit (1 hour) and the idle time Zeabur Identity gives the refresh token
+(`refresh_expires_in`), and 12 hours after sign-in at the latest. Requests the browser marks as
+background, sent after 60 seconds without input, renew the tokens but do not count as activity,
+so a page left open lets the session go idle.
 
 [W3C Passkey Endpoints]: https://www.w3.org/TR/passkey-endpoints-1/

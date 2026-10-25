@@ -67,11 +67,10 @@ Install the chart by `$chart`, its digest, as below: a tag can be moved, a diges
 ## 2. Register Zeabur at Zeabur Identity
 
 Zeabur is a confidential client: it has a server side that keeps a secret. It needs tokens that
-kube-apiserver accepts (`--audience kubernetes`), and it asks for admin rights when the cluster
-refuses something to the everyday ones (`--allow-elevation`):
+kube-apiserver accepts (`--audience kubernetes`):
 
 ```sh
-zeabur-identityctl client create zeabur --type confidential --allow-elevation --audience kubernetes --display-name Zeabur \
+zeabur-identityctl client create zeabur --type confidential --audience kubernetes --display-name Zeabur \
   --redirect-uri https://zeabur.example.com/auth/callback --home-url https://zeabur.example.com/ \
   | kubectl apply -f -
 ```
@@ -88,8 +87,7 @@ printf %s "$CLIENT_SECRET" | kubectl -n zeabur create secret generic zeabur-oidc
 unset CLIENT_SECRET
 ```
 
-Without `--allow-elevation`, set `elevation.enabled=false` below: people then see and change
-only what their everyday rights allow. See Zeabur Identity's
+See Zeabur Identity's
 [Registering clients](https://github.com/zeabur-oss/identity/blob/main/docs/clients.md) for the
 options.
 
@@ -123,7 +121,6 @@ likely to set:
 | `issuer.clientSecret.existingSecret` | The Secret from step 2. The chart never takes the secret itself as a value, so it stays out of Helm's release records. |
 | `issuer.accountUrl` | Where people manage their passkeys and linked accounts; the Account page links there. Empty: the `manage` URL the issuer publishes at `/.well-known/passkey-endpoints`, else no link. |
 | `extraTrustedCA.configMap` or `extraTrustedCA.secret` | PEM certificates Zeabur trusts for every HTTPS connection it makes: Zeabur Identity, registries, object stores and GitHub. Use it when one of them, or a proxy that inspects TLS, has a certificate a private CA signed. See [A private CA](#a-private-ca). |
-| `elevation.enabled` | Whether anything the cluster refuses to everyday rights (a change, a read, a terminal) offers "Retry as admin", which asks for the passkey again. Only people who have elevated groups in Zeabur Identity get the offer. While admin rights last, a few minutes, every request goes with them, as with `sudo`. |
 | `ingress.*`, `httpRoute.*` | An Ingress, or a Gateway API HTTPRoute (`httpRoute.parentRefs` names the Gateway), for the public URL's host name. |
 | `domains.suffixes`, `domains.clusterIssuer` | How a new service's public URL is made; see [Public URLs for services](#public-urls-for-services). |
 
@@ -262,7 +259,7 @@ projects:
 
 | Role | Where | Can | Cannot |
 |---|---|---|---|
-| Admin | The cluster | What Zeabur Identity's `admins` group may do, with admin rights when asked for | — |
+| Admin | The cluster | Everything: an admin account, whose tokens carry Zeabur Identity's `admins` group, bound to `cluster-admin` | — |
 | Developer | Chosen projects | Deploy, change variables, restart, read logs, open terminals, read Secret values, change the project's name, description and icon | Other projects, nodes, members, adopting or removing projects |
 | Viewer | Chosen projects | See status and events | Read logs, change anything, open a terminal, read Secret values |
 
@@ -360,6 +357,77 @@ someone who is still a member only gives them a setup link.
 only Admin or nothing, and RBAC you write yourself decides the rest. The ClusterRole names are fixed: install one Zeabur
 per cluster.
 
+## Admin accounts and sessions
+
+Zeabur Identity has two kinds of account. An **admin account** signs in with a passkey only,
+never GitHub or Google, and its tokens carry the `admins` group, which Zeabur Identity binds to
+`cluster-admin`: an admin acts with full rights at once, with no second confirmation. A
+**regular account** signs in any way the server offers and has the rights its roles give. The
+Admin role on the Members page is the admin account: giving it turns the person's account into
+an admin account (their GitHub or Google session ends at its next refresh), and taking it away
+makes the account regular again. A regular account that lacks a right sees which rule is missing
+and asks an admin.
+
+There is no sudo mode. The admin account plays that part, so admins keep a regular account for
+everyday work; teams that want more turn on AAL3 (below).
+
+The first admin comes from the setup link (`zeabur-identityctl setup-link`). On the command
+line, `zeabur-identityctl invite --username alice --admin` invites an admin and
+`zeabur-identityctl account-type alice admin` (or `regular`) changes an existing account; see
+Zeabur Identity's [Admin accounts](https://github.com/zeabur-oss/identity/blob/main/docs/managing-users.md#admin-accounts).
+
+| Account | Access token | Session ends when idle for | Session ends at the latest |
+|---|---|---|---|
+| Regular | 10 minutes | 1 hour | 12 hours after sign-in |
+| Admin, one team | 5 minutes | 1 hour | 12 hours after sign-in |
+| Admin, several teams or AAL3 | 5 minutes | 15 minutes | 12 hours after sign-in |
+
+Zeabur's own session ends at the shorter of its idle limit (1 hour) and the idle time Zeabur
+Identity gives the refresh token, and 12 hours after sign-in at the latest. A page left open
+does not keep it alive: after 60 seconds without input, the browser marks its automatic requests
+as background, and they do not count as activity. A terminal stays open while used and closes
+after 15 minutes idle.
+
+### Sign-in settings
+
+The Settings page has two sign-in settings. Both change admin accounts only. They live in the
+ConfigMap `zeabur-identity-settings` in Zeabur Identity's namespace, which Zeabur Identity reads
+at every sign-in and refresh. There is no Helm value for them, since Zeabur Identity is not part
+of this chart: use the Settings page, or kubectl on that ConfigMap.
+
+| Key | Values | Default | What it does |
+|---|---|---|---|
+| `teams` | `single`, `multiple` | `single` | With `multiple`, idle admin sessions end after 15 minutes. |
+| `admin-aal3` | `false`, `true` | `false` | With `true`, admin accounts accept only device-bound passkeys, and idle admin sessions end after 15 minutes. |
+
+```sh
+kubectl -n zeabur-identity patch configmap zeabur-identity-settings --type merge -p '{"data":{"teams":"multiple"}}'
+```
+
+A missing key gives the default; a value Zeabur Identity does not understand gives the stricter
+setting.
+
+With AAL3, a device-bound passkey is one whose authenticator reports it cannot be backed up
+(the WebAuthn backup eligibility flag, BE, unset), such as a security key or a passkey that
+stays on one device. Synced passkeys, such as those in iCloud Keychain or Google Password
+Manager, are refused at sign-in with a plain message. The authenticator reports BE itself and
+Zeabur Identity asks for no attestation, so nothing verifies it: AAL3 here keeps synced
+passkeys out, it does not prove what hardware holds the key. Zeabur refuses to turn AAL3 on
+unless the admin making the change has a device-bound passkey; other admins without one are
+locked out until `zeabur-identityctl setup-link --username <admin> --reset`. Regular accounts
+never change. See Zeabur Identity's
+[AAL3 for admins](https://github.com/zeabur-oss/identity/blob/main/docs/managing-users.md#aal3-for-admins).
+
+### kubectl
+
+An admin's kubeconfig context is a plain kubelogin (`oidc-login`) context with a refresh token,
+like a regular one: plain `kubectl` works, with the limits above, and nobody re-confirms with a
+passkey every few minutes. kubectl has no extra confirmation; an admin account's protection
+there is the passkey sign-in and the session limits. kubelogin keeps the refresh token in
+`~/.kube/cache/oidc-login`; add `--token-cache-storage=keyring` to the context's exec args to
+keep it in the OS keyring instead, or `--token-cache-storage=none` to keep nothing and sign in
+for each command.
+
 ## Tokens for scripts and CI
 
 Zeabur has no API tokens of its own. Its state is Kubernetes objects, so a script uses a
@@ -398,6 +466,23 @@ To see what a member may do, ask as them:
 kubectl auth can-i --list -n shop --as=zeabur:bob
 ```
 
+## Upgrade from a version with elevation
+
+Earlier versions gave admins everyday rights and a "Retry with admin rights" button. Admin
+accounts replace it. When upgrading:
+
+1. Upgrade Zeabur Identity first, following its
+   [From elevation to admin accounts](https://github.com/zeabur-oss/identity/blob/main/docs/operations.md#from-elevation-to-admin-accounts).
+2. Make everyone who had `admins` in `groups` or `elevatedGroups` an admin account, with
+   `zeabur-identityctl account-type <user> admin` or the Admin role on the Members page.
+   Zeabur Identity refuses `admins` in a user's `groups` from now on.
+3. Remove `allowElevation` from Zeabur's OAuthClient, including manifests kept in Git: Zeabur
+   Identity no longer knows it.
+4. Remove `elevation` from your Helm values. The chart's schema refuses it, so `helm upgrade`
+   fails until you do.
+
+`zeaburctl doctor` no longer checks whether the OAuthClient may ask for elevation.
+
 ## Uninstall
 
 ```sh
@@ -408,7 +493,9 @@ kubectl delete rolebindings,clusterrolebindings -A -l zeabur.com/member
 ```
 
 Zeabur keeps no state outside its namespace but the member bindings admins made: no custom
-resources, and only those bindings cluster-wide, which the last command removes. After these
+resources, and only those bindings cluster-wide, which the last command removes. The sign-in
+settings, if anyone changed them, stay in Zeabur Identity's ConfigMap `zeabur-identity-settings`,
+which Zeabur Identity keeps using. After these
 commands the cluster is as it was before step 2. `scripts/e2e-l2.sh` checks this after removing an installer-made install: it
 records every cluster-scoped object and every namespace's labels and annotations before the
 install and compares them after the removal.
