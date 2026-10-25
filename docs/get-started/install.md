@@ -215,7 +215,7 @@ there the cluster page says node disk use is not collected. Nobody needs `nodes/
 
 ### Log history
 
-With `proxy.enabled=true`, the Logs tab also shows lines from replicas that are gone, read from
+The installer sets `proxy.enabled=true` when it installs VictoriaLogs. With it, the Logs tab also shows lines from replicas that are gone, read from
 VictoriaLogs (Zeabur Catalog's logs capability; `proxy.logs`). VictoriaLogs holds every
 namespace's lines, so Zeabur never reads it. Zeabur Proxy does, as the person: it reads only
 the project's namespace, and only for people who may `get` `logs.proxy.zeabur.com` there.

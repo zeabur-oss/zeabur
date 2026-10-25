@@ -40,6 +40,8 @@ pub const ZOT: &str = "container-registry/zot";
 const BUILD_RUN_LABEL: &str = "builder.zeabur.com/buildrun";
 /// The ConfigMap in Zeabur's namespace with zot's CA, which Zeabur trusts to read its images.
 pub const REGISTRY_CA_CONFIGMAP: &str = "zeabur-registry-ca";
+/// The catalog's log store, whose history Zeabur reads through Zeabur Proxy.
+const VICTORIA_LOGS: &str = "logs/victoria-logs";
 /// zot's input naming that address.
 const ZOT_CLUSTER_IP_INPUT: &str = "cluster-ip";
 /// The `ClusterIssuer` of `domain` access, shipped by the catalog's cert-manager component.
@@ -620,6 +622,11 @@ fn products(
             "builds".to_owned(),
             json!({"caBundle": {"configMap": REGISTRY_CA_CONFIGMAP}}),
         );
+    }
+    if chosen.contains(VICTORIA_LOGS)
+        && let Some(map) = values.as_object_mut()
+    {
+        map.insert("proxy".to_owned(), json!({"enabled": true}));
     }
     Ok((
         Some(identity),
@@ -1690,9 +1697,9 @@ mod tests {
     #[test]
     fn products_only_are_what_the_plan_installs() {
         let index = Index::parse(INDEX.as_bytes()).unwrap();
-        let p = plan(&index, &config(""), &facts()).unwrap();
+        let p = plan(&index, &config("disable: [logs/victoria-logs]\n"), &facts()).unwrap();
         assert_eq!(
-            products_only(&config(""), &facts()).unwrap(),
+            products_only(&config("disable: [logs/victoria-logs]\n"), &facts()).unwrap(),
             p.identity.zip(p.zeabur)
         );
     }
@@ -1713,6 +1720,15 @@ mod tests {
         );
         assert_eq!(values["domains"]["clusterIssuer"], "letsencrypt");
         assert_eq!(values["domains"]["suffixes"], json!([]));
+    }
+
+    #[test]
+    fn zeabur_reads_log_history_through_its_proxy_only_with_victoria_logs() {
+        let index = Index::parse(INDEX.as_bytes()).unwrap();
+        let with = plan(&index, &config(""), &facts()).unwrap();
+        assert_eq!(with.zeabur.unwrap().values["proxy"]["enabled"], true);
+        let without = plan(&index, &config("disable: [logs/victoria-logs]\n"), &facts()).unwrap();
+        assert!(without.zeabur.unwrap().values.get("proxy").is_none());
     }
 
     #[test]

@@ -41,6 +41,8 @@ minor or patch release may break the API.
 
 ### Changed
 
+- The installer turns on Zeabur Proxy (`proxy.enabled`) when it installs VictoriaLogs, so the Logs
+  tab shows the history of replicas that are gone on a team install.
 - `ZEABUR_IDENTITY_PINNED` holds a release tag, Renovate moves it only to newer release tags,
   and `scripts/release-pins.sh` accepts a tag or a tagged commit, so a release no longer stops on
   a pin that Renovate pushed to an untagged commit.

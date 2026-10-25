@@ -192,7 +192,7 @@ tools Pod 預設最多執行 30 分鐘。最後一個終端機關閉時，Zeabur
 
 能透過 `services/proxy` 查詢 metrics store 的人，也查得到同一個 metrics store 裡其他專案的指標。
 
-Zeabur Proxy（chart 預設 `proxy.enabled: false`）啟用後，使用者要能在該 Namespace `get logs.proxy.zeabur.com`，才讀得到它的歷史日誌，查詢也只限於這個 Namespace。VictoriaLogs 本身如果能直接連線，就能繞過這層檢查，要另外限制。
+Zeabur Proxy 啟用後（chart 預設關閉，安裝器在裝了 VictoriaLogs 時會打開），使用者要能在該 Namespace `get logs.proxy.zeabur.com`，才讀得到它的歷史日誌，查詢也只限於這個 Namespace。VictoriaLogs 本身如果能直接連線，就能繞過這層檢查，要另外限制。
 
 ## 機密的加密與存取紀錄
 
