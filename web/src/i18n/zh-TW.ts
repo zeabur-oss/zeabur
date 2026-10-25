@@ -2443,6 +2443,8 @@ export const zhTW: Messages = {
   "add.deployKeyAdd": "把這把金鑰加到儲存庫的部署金鑰，不要給寫入權限。",
   "add.deployKeyOpen": (host) => `到 ${host} 新增部署金鑰`,
   "add.keyscan": "在你的電腦執行",
+  "add.keyscanHint":
+    "在你信任的網路上執行。建立後會列出每把金鑰的指紋，請和主機管理員公布的指紋對照。",
   "add.knownHosts": "主機金鑰（known_hosts）",
   "add.knownHostsHint": "貼上指令印出的內容。Zeabur Builder 只連線到持有這些金鑰的主機。",
   "add.hostKeys": "Zeabur Builder 信任的主機金鑰",

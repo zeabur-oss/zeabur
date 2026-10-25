@@ -2438,6 +2438,8 @@ export const zhCN: Messages = {
   "add.deployKeyAdd": "把这把密钥加到仓库的部署密钥，不要给写入权限。",
   "add.deployKeyOpen": (host) => `到 ${host} 添加部署密钥`,
   "add.keyscan": "在你的电脑上运行",
+  "add.keyscanHint":
+    "在你信任的网络上运行。创建后会列出每把密钥的指纹，请和主机管理员公布的指纹对照。",
   "add.knownHosts": "主机密钥（known_hosts）",
   "add.knownHostsHint": "粘贴命令输出的内容。Zeabur Builder 只连接持有这些密钥的主机。",
   "add.hostKeys": "Zeabur Builder 信任的主机密钥",

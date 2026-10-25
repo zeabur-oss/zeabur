@@ -2652,6 +2652,8 @@ export const en = {
   "add.deployKeyAdd": "Add this key to the repository's deploy keys, without write access.",
   "add.deployKeyOpen": (host: string) => `Open deploy keys on ${host}`,
   "add.keyscan": "Run on your computer",
+  "add.keyscanHint":
+    "Run it on a network you trust. Zeabur then lists each key's fingerprint for you to compare with the ones the host's admin publishes.",
   "add.knownHosts": "Host keys (known_hosts)",
   "add.knownHostsHint":
     "Paste what the command prints. Zeabur Builder connects only to a host that holds one of these keys.",

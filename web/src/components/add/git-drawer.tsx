@@ -478,8 +478,8 @@ function KnownHostsFields({
 }) {
   const t = useT()
   return (
-    <>
-      <FormField label={t("add.keyscan")}>
+    <div className="flex flex-col gap-4 pb-1.5">
+      <FormField label={t("add.keyscan")} hint={t("add.keyscanHint")}>
         <CopyInput value={keyscanCommand(host)} copyLabel={t("common.copy")} />
       </FormField>
       <FormField label={t("add.knownHosts")} hint={t("add.knownHostsHint")}>
@@ -491,7 +491,7 @@ function KnownHostsFields({
           onChange={(event) => onChange(event.target.value)}
         />
       </FormField>
-    </>
+    </div>
   )
 }
 
