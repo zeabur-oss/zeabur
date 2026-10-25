@@ -229,8 +229,9 @@ the port empty.
 ### An image of your own
 
 To run a build of your own instead, build the image on a Linux machine with Docker
-(`./scripts/build-image.sh zeabur:dev`), load it into the cluster's nodes (on k3s:
-`docker save zeabur:dev | sudo k3s ctr images import -`) and install the chart from this
+(`./scripts/build-image.sh zeabur:dev`), load it into the cluster's nodes (on K3s:
+`docker save zeabur:dev | sudo k3s ctr images import -`; on RKE2:
+`docker save zeabur:dev | sudo /var/lib/rancher/rke2/bin/ctr --address /run/k3s/containerd/containerd.sock -n k8s.io images import -`) and install the chart from this
 repository, `deploy/chart/zeabur`, with `--set image.repository=docker.io/library/zeabur
 --set image.tag=dev`.
 
