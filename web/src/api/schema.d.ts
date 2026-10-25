@@ -4715,11 +4715,11 @@ export interface components {
     FitStatus: "notNeeded" | "fits" | "blocked" | "unknown"
     /** @description The fix of a gap. */
     Fix: {
-      /** @description The plan template, component or snippet. */
+      /** @description The plan template or component. */
       id: string
       /** @description How it is closed. */
       kind: components["schemas"]["FixKind"]
-      /** @description What the template, component or snippet is filled in with. */
+      /** @description What the template or component is filled in with. */
       params?: {
         [key: string]: string
       }
@@ -4728,7 +4728,7 @@ export interface components {
      * @description How a gap is closed.
      * @enum {string}
      */
-    FixKind: "plan" | "install" | "snippet"
+    FixKind: "plan" | "install"
     /**
      * @description Who can remove the cause.
      * @enum {string}
@@ -4754,7 +4754,7 @@ export interface components {
     /** @description What a project or the cluster is missing. */
     GapList: {
       /** @description The findings: warnings first, then by rule and subject. */
-      items: components["schemas"]["GapView"][]
+      items: components["schemas"]["Gap"][]
       /** @description Reads the person was refused; rules that need them did not run on their facts. */
       unreadable: components["schemas"]["UnreadableView"][]
     }
@@ -4763,14 +4763,6 @@ export interface components {
      * @enum {string}
      */
     GapSeverity: "warning" | "advice"
-    /** @description One gap and, when its fix is a YAML fragment to copy, that fragment. */
-    GapView: components["schemas"]["Gap"] & {
-      /**
-       * @description YAML that fixes it, to copy into the object's manifest; absent when the fix is an install
-       *     or a plan Zeabur writes itself.
-       */
-      snippet?: string | null
-    }
     /**
      * @description A service's health, from worst to best: what a status dot shows.
      * @enum {string}

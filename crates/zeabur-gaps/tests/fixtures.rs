@@ -6,7 +6,7 @@ mod tests {
     use serde_json::{Value, from_value, to_value};
     use zeabur_fixtures::{Fixture, compare, load};
     use zeabur_gaps::{
-        BUILTIN, ClusterTraits, Event, GatewayRef, Input, Namespace, Rule, evaluate, snippet,
+        BUILTIN, ClusterTraits, Event, GatewayRef, Input, Namespace, Rule, evaluate,
     };
     use zeabur_graph::{Snapshot, project};
     use zeabur_model::HttpRoute;
@@ -122,37 +122,6 @@ mod tests {
                     },
                 ))
                 .unwrap()
-            }
-            "gaps.snippets" => {
-                let project = project(&snapshot);
-                let gateways = gateways(params).unwrap_or_default();
-                let cluster = ClusterTraits {
-                    gateway_api: true,
-                    retired_ingress_classes: std::collections::BTreeSet::new(),
-                    gateways: Some(gateways.clone()),
-                };
-                let routes = parse_routes(&http_routes);
-                let gaps = evaluate(
-                    &BUILTIN,
-                    &Input {
-                        project: &project,
-                        snapshot: &snapshot,
-                        http_routes: &routes,
-                        services_readable: true,
-                        cluster: &cluster,
-                    },
-                );
-                Value::Array(
-                    gaps.iter()
-                        .map(|gap| {
-                            serde_json::json!({
-                                "rule": gap.rule,
-                                "fix": gap.fix.id,
-                                "snippet": snippet(gap, &project, &gateways),
-                            })
-                        })
-                        .collect(),
-                )
             }
             other => panic!("{}: no runner for operation {other}", fixture.name),
         }

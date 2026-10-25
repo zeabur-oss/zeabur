@@ -710,9 +710,9 @@ pub const BLOCKED_CONNECTION: &str = "blocked-connection";
 ///
 /// A warning: the caller will fail at run time. When only the callee's ingress stops it, the fix
 /// is a plan creating the `allow-from-service` preset (see [`presets`]); when the caller's egress
-/// stops it, the fix is a policy to write by hand that lets the caller reach the callee, since
-/// egress rules are the caller's to decide. A connection blocked at both ends gets the egress
-/// policy; the ingress side is the same preset, offered on the callee's Networking tab.
+/// stops it, the fix is a plan creating a policy that lets the caller reach the callee. A
+/// connection blocked at both ends gets the egress policy; the ingress side is the same preset,
+/// offered on the callee's Networking tab.
 ///
 /// [k8s-netpol]: https://kubernetes.io/docs/concepts/services-networking/network-policies/
 #[must_use]
@@ -735,7 +735,7 @@ pub fn gaps(namespace: &str, reachability: &Reachability, workloads: &[Workload]
                 .with("from", from_name)
                 .with("to", to_name)
                 .with("at", at);
-            let (fix, object) = if egress {
+            let fix = if egress {
                 let object = policy(
                     namespace,
                     &policy_name(&format!("allow-to-{to_name}"), from),
@@ -745,20 +745,20 @@ pub fn gaps(namespace: &str, reachability: &Reachability, workloads: &[Workload]
                         "egress": [{"to": [{"podSelector": selector_value(&to.labels)}]}],
                     }),
                 );
-                let fix = Fix {
-                    kind: FixKind::Snippet,
+                Fix {
+                    kind: FixKind::Plan,
                     id: "networkPolicy.allowEgress".to_owned(),
                     params: BTreeMap::from([
                         ("from".to_owned(), from.id.clone()),
                         ("to".to_owned(), to.id.clone()),
+                        ("object".to_owned(), object.to_string()),
                     ]),
-                };
-                (fix, Some(object))
+                }
             } else {
                 let preset = presets(namespace, to, std::slice::from_ref(from))
                     .into_iter()
                     .find(|p| p.from.as_deref() == Some(from.id.as_str()))?;
-                let fix = Fix {
+                Fix {
                     kind: FixKind::Plan,
                     id: "networkPolicy.allowFrom".to_owned(),
                     params: BTreeMap::from([
@@ -766,8 +766,7 @@ pub fn gaps(namespace: &str, reachability: &Reachability, workloads: &[Workload]
                         ("to".to_owned(), to.id.clone()),
                         ("object".to_owned(), preset.object.to_string()),
                     ]),
-                };
-                (fix, None)
+                }
             };
             Some(Finding {
                 gap: Gap {
@@ -783,7 +782,6 @@ pub fn gaps(namespace: &str, reachability: &Reachability, workloads: &[Workload]
                             .to_owned(),
                     }],
                 },
-                object,
             })
         })
         .collect()
@@ -980,7 +978,6 @@ pub fn unprotected(
                 },
             ],
         },
-        object: None,
     })
 }
 

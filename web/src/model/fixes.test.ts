@@ -2,9 +2,9 @@ import { describe, test, expect } from "bun:test"
 
 import type { Schemas } from "@/api/client"
 import type { Translate } from "@/i18n"
-import { fixTemplates } from "@/model/fixes"
+import { fixLink, fixTemplates } from "@/model/fixes"
 
-type Gap = Schemas["GapView"]
+type Gap = Schemas["Gap"]
 type Project = Schemas["Project"]
 
 const t = ((key: string) => key) as unknown as Translate
@@ -104,5 +104,68 @@ describe("storage.addVolume", () => {
   test("leaves a temporary volume at that path to a person", () => {
     const mounted = project({ mounts: [{ mountPath: "/var/lib/postgresql", kind: "EmptyDir" }] })
     expect(fix(gap(params), mounted, t)).toBeUndefined()
+  })
+})
+
+describe("ready-made objects", () => {
+  const policy = { kind: "NetworkPolicy", metadata: { name: "zeabur-allow-egress-api" } }
+  const two = {
+    ...project({}),
+    services: [
+      { id: "Deployment/api", kind: "Deployment", name: "api", containers: [] },
+      { id: "Deployment/db", kind: "Deployment", name: "db", containers: [] },
+    ],
+  } as unknown as Project
+
+  test("an egress policy is created on the sender's side", () => {
+    const fix = fixTemplates["networkPolicy.allowEgress"]!
+    const params = { from: "Deployment/api", to: "Deployment/db", object: JSON.stringify(policy) }
+    const ask = fix(gap(params), two, t)
+    expect<unknown>(ask?.changes).toStrictEqual([{ op: "create", object: policy }])
+    expect(ask?.service).toStrictEqual({ kind: "Deployment", name: "api" })
+    expect(fix(gap({ ...params, to: "Deployment/gone" }), two, t)).toBe(undefined)
+  })
+
+  test("a route for an Ingress is created and the Ingress is left to the person", () => {
+    const fix = fixTemplates["domains.httpRoute"]!
+    const route = { kind: "HTTPRoute", metadata: { name: "shop" } }
+    const ask = fix(gap({ ingress: "shop", object: JSON.stringify(route) }), two, t)
+    expect<unknown>(ask?.changes).toStrictEqual([{ op: "create", object: route }])
+    expect(ask?.notes?.length).toBeGreaterThan(0)
+    // No Gateway to attach to: the server sends no object.
+    expect(fix(gap({ ingress: "shop" }), two, t)).toBe(undefined)
+  })
+})
+
+describe("fixLink", () => {
+  const withFix = (id: string, params: Record<string, string>, service?: string) =>
+    ({ fix: { id, params }, service }) as unknown as Gap
+  const shop = (mounts: { claimName: string }[], kind = "Deployment") =>
+    ({
+      namespace: "shop",
+      services: [{ id: `${kind}/api`, kind, name: "api", containers: [{ name: "app", mounts }] }],
+    }) as unknown as Project
+
+  test("a database without backups opens its backups", () => {
+    const form = fixLink(withFix("backups.scheduledBackup", { database: "main" }), shop([]))
+    expect(form?.link).toMatchObject({
+      params: { project: "shop", engine: "postgresql", name: "main" },
+      search: { tab: "backups" },
+    })
+  })
+
+  test("a volume without backups opens the storage of the service that mounts it", () => {
+    const form = fixLink(
+      withFix("backups.k8upSchedule", { claim: "data-api-0" }),
+      shop([{ claimName: "data" }], "StatefulSet"),
+    )
+    expect(form?.link).toMatchObject({ params: { name: "api" }, hash: "storage" })
+    const none = fixLink(withFix("backups.k8upSchedule", { claim: "other" }), shop([]))
+    expect(none).toBe(undefined)
+  })
+
+  test("a declined template opens the part of Settings that sets it by hand", () => {
+    const form = fixLink(withFix("probes.readiness", { service: "Deployment/api" }), shop([]))
+    expect(form).toMatchObject({ label: "gap.openSettings", link: { hash: "health-checks" } })
   })
 })

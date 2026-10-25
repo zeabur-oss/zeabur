@@ -1487,7 +1487,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn project_gaps_carry_citations_and_a_snippet_to_copy() {
+    async fn project_gaps_carry_citations_and_a_plan_fix() {
         let gaps = get(&cluster(), "/api/v1/projects/shop/gaps").await;
         let limits = gaps["items"]
             .as_array()
@@ -1502,9 +1502,8 @@ mod tests {
                 .unwrap()
                 .starts_with("https://")
         );
-        let snippet = limits["snippet"].as_str().unwrap();
-        assert!(snippet.starts_with("# Deployment/web\n"), "{snippet}");
-        assert!(snippet.contains("resources:"), "{snippet}");
+        assert_eq!(limits["fix"]["kind"], "plan");
+        assert_eq!(limits["fix"]["id"], "compute.resources");
         let cluster_gaps = get(&cluster(), "/api/v1/cluster/gaps").await;
         assert_eq!(cluster_gaps["items"], json!([]));
     }

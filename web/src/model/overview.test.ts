@@ -206,7 +206,7 @@ describe("a project's suggestions", () => {
       severity: "warning",
       subject: { kind, name },
       message: { key, params: { container } },
-    }) as unknown as Schemas["GapView"]
+    }) as unknown as Schemas["Gap"]
 
   test("services without a traffic check fold into one row after the others", () => {
     const backups = gap("gap.volumeWithoutBackup", "PersistentVolumeClaim", "data-db-0")

@@ -7,6 +7,7 @@
 
 use std::collections::BTreeSet;
 
+use serde_json::{Value, json};
 use zeabur_graph::{Snapshot, ingress_backends};
 use zeabur_kernel::names::GatewayRef;
 use zeabur_model::{
@@ -314,13 +315,76 @@ impl Rule for IngressToHttpRoute {
                     subject: Origin::object("Ingress", &route.name),
                     service: None,
                     message,
-                    fix: plan("domains.httpRoute", &[("ingress", &route.name)]),
+                    fix: match http_route(input.project, &route.name, input.cluster) {
+                        Some(object) => plan(
+                            "domains.httpRoute",
+                            &[("ingress", &route.name), ("object", &object.to_string())],
+                        ),
+                        None => plan("domains.httpRoute", &[("ingress", &route.name)]),
+                    },
                     citations: self.citations(),
                 });
             }
         }
         gaps
     }
+}
+
+/// An `HTTPRoute` that routes what Ingress `ingress` routes: its hosts, paths and backends,
+/// attached to the first Gateway.
+///
+/// It follows the Gateway API's migration guide [gw-migrate]: `Prefix` paths become
+/// `PathPrefix`, `Exact` stays `Exact`, and an implementation-specific path becomes a prefix.
+/// `None` when no Gateway is known, or when a backend names a Service port that the Service does
+/// not have: `HTTPRoute` takes a port number.
+///
+/// [gw-migrate]: https://gateway-api.sigs.k8s.io/guides/getting-started/migrating-from-ingress/
+fn http_route(project: &Project, ingress: &str, cluster: &ClusterTraits) -> Option<Value> {
+    let gateway = cluster.gateways.as_deref()?.first()?;
+    let route = project.route(ingress)?;
+    let mut hosts: Vec<&str> = route
+        .rules
+        .iter()
+        .filter_map(|r| r.host.as_deref())
+        .collect();
+    hosts.sort_unstable();
+    hosts.dedup();
+    let mut rules = Vec::new();
+    for rule in &route.rules {
+        let kind = match rule.path_type.as_deref() {
+            Some("Exact") => "Exact",
+            _ => "PathPrefix",
+        };
+        let mut backend = json!({"name": rule.service});
+        if let Some(port) = rule.port.as_deref() {
+            let number = port.parse::<u16>().ok().or_else(|| {
+                project
+                    .endpoint(&rule.service)
+                    .into_iter()
+                    .flat_map(|e| &e.ports)
+                    .find(|p| p.name.as_deref() == Some(port))
+                    .and_then(|p| u16::try_from(p.port).ok())
+            })?;
+            backend["port"] = json!(number);
+        }
+        rules.push(json!({
+            "matches": [{"path": {"type": kind, "value": rule.path.as_deref().unwrap_or("/")}}],
+            "backendRefs": [backend],
+        }));
+    }
+    let mut spec = json!({
+        "parentRefs": [{"name": gateway.name, "namespace": gateway.namespace}],
+        "rules": rules,
+    });
+    if !hosts.is_empty() {
+        spec["hostnames"] = json!(hosts);
+    }
+    Some(json!({
+        "apiVersion": "gateway.networking.k8s.io/v1",
+        "kind": "HTTPRoute",
+        "metadata": {"name": ingress},
+        "spec": spec,
+    }))
 }
 
 // ── Routes that lead nowhere ────────────────────────────────────────────────────────────────────

@@ -172,7 +172,7 @@ export const eventWord = (reason: string | undefined): EventWord | undefined =>
     ? eventWords[reason as keyof typeof eventWords]
     : undefined
 
-type Gap = Schemas["GapView"]
+type Gap = Schemas["Gap"]
 
 /** A project's suggestions: each gap on its own, and one row for every service without a traffic check. */
 export type Suggestion =

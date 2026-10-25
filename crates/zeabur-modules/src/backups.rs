@@ -13,7 +13,7 @@
 use std::collections::BTreeMap;
 
 use serde::Serialize;
-use serde_json::{Value, json};
+use serde_json::Value;
 use utoipa::ToSchema;
 use zeabur_model::{Citation, Fix, FixKind, Gap, Message, Origin, Severity};
 
@@ -229,15 +229,16 @@ pub const DATABASE_WITHOUT_BACKUP: &str = "database-without-backup";
 ///
 /// A database is a warning: it is the data a project cannot rebuild, and its operator backs it
 /// up natively (CloudNativePG's `ScheduledBackup` [cnpg-backup]). A claim is advice: many hold
-/// caches or data that can be rebuilt. A claim's fix is a K8up `Schedule` for the namespace when
-/// K8up is installed [k8up-schedule], else a Velero `Schedule` with file-system backup of its
-/// volumes when Velero is [velero-fs], else installing K8up.
+/// caches or data that can be rebuilt. Each fix names a form that asks for the bucket and ends in
+/// a plan: the database's backups (`backups.scheduledBackup`); for a claim, its volume's K8up
+/// backups when K8up is installed (`backups.k8upSchedule`) [k8up-schedule], else the cluster's
+/// Velero schedule when Velero is (`backups.veleroSchedule`) [velero-fs], else installing K8up.
 ///
 /// [cnpg-backup]: https://cloudnative-pg.io/documentation/current/backup/
 /// [k8up-schedule]: https://docs.k8up.io/k8up/references/schedule-specification.html
 /// [velero-fs]: https://velero.io/docs/main/file-system-backup/
 #[must_use]
-pub fn gaps(namespace: &str, coverage: &[Coverage], installed: Installed) -> Vec<crate::Finding> {
+pub fn gaps(coverage: &[Coverage], installed: Installed) -> Vec<crate::Finding> {
     unscheduled(coverage)
         .into_iter()
         .map(|c| {
@@ -250,16 +251,15 @@ pub fn gaps(namespace: &str, coverage: &[Coverage], installed: Installed) -> Vec
                         subject: Origin::object("Cluster", name),
                         service: None,
                         message: Message::new("gap.databaseWithoutBackup").with("database", name),
-                        fix: snippet_fix("backups.scheduledBackup", "database", name),
+                        fix: form_fix("backups.scheduledBackup", "database", name),
                         citations: vec![cite(
                             "CloudNativePG: Backup",
                             "https://cloudnative-pg.io/documentation/current/backup/",
                         )],
                     },
-                    object: Some(scheduled_backup(namespace, name)),
                 }
             } else {
-                let (fix, object) = volume_fix(namespace, name, installed);
+                let fix = volume_fix(name, installed);
                 crate::Finding {
                     gap: Gap {
                         rule: VOLUME_WITHOUT_BACKUP.to_owned(),
@@ -279,7 +279,6 @@ pub fn gaps(namespace: &str, coverage: &[Coverage], installed: Installed) -> Vec
                             ),
                         ],
                     },
-                    object,
                 }
             }
         })
@@ -293,84 +292,27 @@ fn cite(title: &str, url: &str) -> Citation {
     }
 }
 
-fn snippet_fix(id: &str, param: &str, value: &str) -> Fix {
+/// A fix that opens the form named `id`, which plans the change.
+fn form_fix(id: &str, param: &str, value: &str) -> Fix {
     Fix {
-        kind: FixKind::Snippet,
+        kind: FixKind::Plan,
         id: id.to_owned(),
         params: BTreeMap::from([(param.to_owned(), value.to_owned())]),
     }
 }
 
-/// A CloudNativePG `ScheduledBackup` of `database`, daily at 03:00 (six cron fields, seconds
-/// first), through the Barman Cloud plugin.
-fn scheduled_backup(namespace: &str, database: &str) -> Value {
-    json!({
-        "apiVersion": "postgresql.cnpg.io/v1",
-        "kind": "ScheduledBackup",
-        "metadata": {"name": format!("{database}-daily"), "namespace": namespace},
-        "spec": {
-            "schedule": "0 0 3 * * *",
-            "cluster": {"name": database},
-            "method": "plugin",
-            "pluginConfiguration": {"name": "barman-cloud.cloudnative-pg.io"},
-        },
-    })
-}
-
-/// A claim's fix: a K8up `Schedule` of the namespace, a Velero `Schedule` with file-system backup
-/// of its volumes, or installing K8up. The repository and bucket are placeholders to fill in.
-fn volume_fix(namespace: &str, claim: &str, installed: Installed) -> (Fix, Option<Value>) {
+/// A claim's fix: its volume's K8up backups, the cluster's Velero schedule, or installing K8up.
+fn volume_fix(claim: &str, installed: Installed) -> Fix {
     if installed.k8up {
-        let object = json!({
-            "apiVersion": "k8up.io/v1",
-            "kind": "Schedule",
-            "metadata": {"name": "backups", "namespace": namespace},
-            "spec": {
-                "backend": {
-                    "repoPasswordSecretRef": {"name": "backup-repo", "key": "password"},
-                    "s3": {
-                        "endpoint": "https://s3.example.test",
-                        "bucket": format!("{namespace}-backups"),
-                        "accessKeyIDSecretRef": {"name": "backup-s3", "key": "access-key-id"},
-                        "secretAccessKeySecretRef": {"name": "backup-s3", "key": "secret-access-key"},
-                    },
-                },
-                "backup": {"schedule": "@daily-random"},
-                "prune": {
-                    "schedule": "@weekly-random",
-                    "retention": {"keepDaily": 7, "keepWeekly": 4},
-                },
-            },
-        });
-        (
-            snippet_fix("backups.k8upSchedule", "claim", claim),
-            Some(object),
-        )
+        form_fix("backups.k8upSchedule", "claim", claim)
     } else if installed.velero {
-        let object = json!({
-            "apiVersion": "velero.io/v1",
-            "kind": "Schedule",
-            "metadata": {"name": format!("{namespace}-daily"), "namespace": "velero"},
-            "spec": {
-                "schedule": "0 3 * * *",
-                "template": {
-                    "includedNamespaces": [namespace],
-                    "defaultVolumesToFsBackup": true,
-                    "ttl": "168h0m0s",
-                },
-            },
-        });
-        (
-            snippet_fix("backups.veleroSchedule", "claim", claim),
-            Some(object),
-        )
+        form_fix("backups.veleroSchedule", "claim", claim)
     } else {
-        let fix = Fix {
+        Fix {
             kind: FixKind::Install,
             id: "volume-backup/k8up".to_owned(),
             params: BTreeMap::new(),
-        };
-        (fix, None)
+        }
     }
 }
 

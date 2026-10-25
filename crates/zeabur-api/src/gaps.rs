@@ -6,8 +6,8 @@
 //! Gaps are their own read, not part of the project document: the rules need two cluster-wide
 //! facts (whether Gateway API serves a Gateway, and which `IngressClasses` belong to a retired
 //! controller) that change rarely and that a polled document should not pay for every few
-//! seconds. Each gap carries its fix: a plan template id the web interface turns into a plan, an
-//! install from the catalogue, or a YAML `snippet` to copy when Zeabur cannot write the fix.
+//! seconds. Each gap carries its fix: a plan template id the web interface turns into a plan (or
+//! into the form that asks for what the plan needs), or an install from the catalogue.
 //!
 //! The cluster-wide facts are read as the person. Someone who may not list `IngressClasses` or
 //! Gateways gets the rules that do not need them, and the refused reads are named in
@@ -23,9 +23,8 @@ use utoipa::ToSchema;
 use zeabur_core::problem::{MEDIA_TYPE as PROBLEM, Problem};
 use zeabur_gaps::{
     BUILTIN, ClusterTraits, GatewayRef, IngressClassFact, Input, Rule, cluster_gaps, evaluate,
-    retired_classes, snippet,
+    retired_classes,
 };
-use zeabur_graph::manifest;
 use zeabur_kube::{Cluster, ClusterExt as _, ResourceRef};
 use zeabur_model::{Citation, Gap, HttpRoute};
 use zeabur_modules::Finding;
@@ -34,25 +33,12 @@ use crate::error::{ApiError, project_read, read_problem};
 use crate::handlers::Person;
 use crate::views::UnreadableView;
 
-/// One gap and, when its fix is a YAML fragment to copy, that fragment.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct GapView {
-    /// The finding.
-    #[serde(flatten)]
-    pub gap: Gap,
-    /// YAML that fixes it, to copy into the object's manifest; absent when the fix is an install
-    /// or a plan Zeabur writes itself.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub snippet: Option<String>,
-}
-
 /// What a project or the cluster is missing.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct GapList {
     /// The findings: warnings first, then by rule and subject.
-    pub items: Vec<GapView>,
+    pub items: Vec<Gap>,
     /// Reads the person was refused; rules that need them did not run on their facts.
     pub unreadable: Vec<UnreadableView>,
 }
@@ -169,24 +155,11 @@ pub(crate) async fn project(
             cluster: &traits,
         },
     );
-    let items = gaps
-        .into_iter()
-        .map(|gap| GapView {
-            snippet: found.iter().find(|f| f.gap == gap).map_or_else(
-                || {
-                    snippet(
-                        &gap,
-                        &projection,
-                        traits.gateways.as_deref().unwrap_or_default(),
-                    )
-                },
-                |f| f.object.as_ref().and_then(|o| manifest::to_yaml(o).ok()),
-            ),
-            gap,
-        })
-        .collect();
     unreadable.extend(facts.unreadable);
-    Ok(Json(GapList { items, unreadable }))
+    Ok(Json(GapList {
+        items: gaps,
+        unreadable,
+    }))
 }
 
 /// A module's findings, wrapped as a rule so they sort and show with the built-in ones. The
@@ -283,7 +256,6 @@ async fn module_findings(
             })
         };
         found.extend(zeabur_modules::backups::gaps(
-            project,
             &backups.coverage,
             zeabur_modules::backups::Installed {
                 k8up: installed("k8up"),
@@ -301,12 +273,8 @@ async fn module_findings(
     responses((status = 200, body = GapList), (status = 403, body = Problem, content_type = PROBLEM)))]
 pub(crate) async fn cluster(Person(cluster): Person) -> Result<Json<GapList>, ApiError> {
     let facts = facts(cluster.as_ref()).await?;
-    let items = cluster_gaps(&facts.classes)
-        .into_iter()
-        .map(|gap| GapView { gap, snippet: None })
-        .collect();
     Ok(Json(GapList {
-        items,
+        items: cluster_gaps(&facts.classes),
         unreadable: facts.unreadable,
     }))
 }

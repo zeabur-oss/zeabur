@@ -35,12 +35,11 @@ pub struct Citation {
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "camelCase")]
 pub enum FixKind {
-    /// A change Zeabur plans and applies (`id` names the plan template).
+    /// A change Zeabur plans and applies (`id` names the plan template, or the form that asks for
+    /// what the plan needs).
     Plan,
     /// A component to install (`id` names the catalogue component).
     Install,
-    /// A Kubernetes object to write by hand (`id` names the snippet).
-    Snippet,
 }
 
 /// The fix of a gap.
@@ -50,9 +49,9 @@ pub enum FixKind {
 pub struct Fix {
     /// How it is closed.
     pub kind: FixKind,
-    /// The plan template, component or snippet.
+    /// The plan template or component.
     pub id: String,
-    /// What the template, component or snippet is filled in with.
+    /// What the template or component is filled in with.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub params: BTreeMap<String, String>,
 }

@@ -6,7 +6,6 @@ mod event;
 mod incident;
 pub mod messages;
 mod rules;
-mod snippet;
 mod trace;
 
 pub use diagnose::{Namespace, RECENT, diagnose, missing_claim, shortage};
@@ -21,7 +20,6 @@ pub use rules::{
     Input, RETIRED_INGRESS_CONTROLLERS, ResourceLimits, Rule, cluster_gaps, evaluate,
     retired_classes,
 };
-pub use snippet::snippet;
 pub use trace::{
     Certificates, Resolved, TraceInput, diagnoses as trace_diagnoses, ingress_addresses,
     names_to_resolve, trace,

@@ -23,8 +23,7 @@ pub mod system_upgrade_controller;
 pub mod velero;
 pub mod zeabur_builder;
 
-/// One gap a module finds, with the object that closes it when Zeabur cannot write the fix
-/// itself.
+/// One gap a module finds.
 ///
 /// Modules cannot implement `zeabur-gaps`' rule trait (the core never depends on a module, and a
 /// module never on a crate above it), so a module's rule is a pure function returning these, and
@@ -34,10 +33,6 @@ pub mod zeabur_builder;
 pub struct Finding {
     /// The gap.
     pub gap: zeabur_model::Gap,
-    /// The object to write by hand, shown as YAML to copy; absent when the fix is a plan or an
-    /// install.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub object: Option<serde_json::Value>,
 }
 
 /// One integration: a provider of a capability, and what it reads.

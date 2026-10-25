@@ -8993,13 +8993,13 @@ components:
       properties:
         id:
           type: string
-          description: The plan template, component or snippet.
+          description: The plan template or component.
         kind:
           $ref: "#/components/schemas/FixKind"
           description: How it is closed.
         params:
           type: object
-          description: What the template, component or snippet is filled in with.
+          description: What the template or component is filled in with.
           additionalProperties:
             type: string
           propertyNames:
@@ -9010,7 +9010,6 @@ components:
       enum:
       - plan
       - install
-      - snippet
     Fixer:
       type: string
       description: Who can remove the cause.
@@ -9064,7 +9063,7 @@ components:
         items:
           type: array
           items:
-            $ref: "#/components/schemas/GapView"
+            $ref: "#/components/schemas/Gap"
           description: "The findings: warnings first, then by rule and subject."
         unreadable:
           type: array
@@ -9077,20 +9076,6 @@ components:
       enum:
       - warning
       - advice
-    GapView:
-      allOf:
-      - $ref: "#/components/schemas/Gap"
-        description: The finding.
-      - type: object
-        properties:
-          snippet:
-            type:
-            - string
-            - "null"
-            description: |-
-              YAML that fixes it, to copy into the object's manifest; absent when the fix is an install
-              or a plan Zeabur writes itself.
-      description: One gap and, when its fix is a YAML fragment to copy, that fragment.
     Health:
       type: string
       description: "A service's health, from worst to best: what a status dot shows."

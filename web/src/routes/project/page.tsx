@@ -258,7 +258,7 @@ function Suggestions({ project, data }: { project: string; data: Project }) {
         description={t("project.suggestionsBody")}
         closeLabel={t("common.close")}
       >
-        <GapList gaps={items} project={project} document={data} onTerminal={() => setOpen(false)} />
+        <GapList gaps={items} project={project} document={data} />
         {gaps.data && gaps.data.unreadable.length > 0 ? (
           <p className="type-meta text-muted-foreground">{t("gap.unreadable")}</p>
         ) : null}

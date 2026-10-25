@@ -4,7 +4,6 @@ import CaretRightIcon from "~icons/ph/caret-right"
 import WrenchIcon from "~icons/ph/wrench"
 
 import type { Schemas } from "@/api/client"
-import { OpenInTerminal } from "@/components/dock/open-in-terminal"
 import { usePlanner } from "@/components/plan/planner"
 import { StatusPill } from "@/components/status"
 import { Button, buttonVariants } from "@zeabur/design-system/components/button"
@@ -13,28 +12,23 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@zeabur/design-system/components/collapsible"
-import { YamlBlock } from "@/components/yaml"
 import { useSentence, useT } from "@/i18n"
 import { cn } from "@/lib/utils"
 import { serviceLink } from "@/lib/place"
-import { fixTemplates } from "@/model/fixes"
+import { fixLink, fixTemplates } from "@/model/fixes"
 import { suggestionsOf } from "@/model/overview"
-import { applyCommand, isManifest } from "@/model/terminal"
 
-type Gap = Schemas["GapView"]
+type Gap = Schemas["Gap"]
 
 export function GapList({
   gaps,
   project,
   document,
-  onTerminal,
 }: {
   gaps: Gap[]
   /** Absent for cluster gaps. */
   project?: string
   document?: Schemas["Project"]
-  /** A snippet opened in the kubectl terminal. */
-  onTerminal?: () => void
 }) {
   const t = useT()
   const planner = usePlanner(project ?? "")
@@ -47,15 +41,13 @@ export function GapList({
               <UncheckedRow key="unchecked" project={project} services={row.services} />
             ) : null
           const gap = row.gap
-          // A template can decline a case (no numeric port to check): the snippet stays the fix.
-          const ask = project && document ? fixTemplates[gap.fix.id]?.(gap, document, t) : undefined
+          const ask = document ? fixTemplates[gap.fix.id]?.(gap, document, t) : undefined
           return (
             <GapRow
               key={`${gap.rule}/${gap.subject.kind}/${gap.subject.name}/${gap.message.key}/${gap.message.params?.container ?? ""}`}
               gap={gap}
-              project={project}
               onPlan={ask ? () => planner.plan(ask) : undefined}
-              onTerminal={onTerminal}
+              form={ask || !document ? undefined : fixLink(gap, document)}
             />
           )
         })}
@@ -110,14 +102,12 @@ function UncheckedRow({
 
 function GapRow({
   gap,
-  project,
   onPlan,
-  onTerminal,
+  form,
 }: {
   gap: Gap
-  project?: string
   onPlan?: () => void
-  onTerminal?: () => void
+  form?: ReturnType<typeof fixLink>
 }) {
   const t = useT()
   const write = useSentence()
@@ -134,6 +124,11 @@ function GapRow({
             <WrenchIcon aria-hidden="true" data-icon="inline-start" />
             {t("gap.fix")}
           </Button>
+        ) : null}
+        {form ? (
+          <Link {...form.link} className={cn(buttonVariants({ variant: "outline", size: "sm" }))}>
+            {t(form.label)}
+          </Link>
         ) : null}
         {install && install.length === 2 ? (
           <Link
@@ -167,27 +162,6 @@ function GapRow({
           </a>
         ))}
       </div>
-      {gap.snippet && !onPlan ? (
-        <Collapsible>
-          <CollapsibleTrigger variant="disclosure">
-            <CaretRightIcon aria-hidden="true" />
-            {t("gap.snippet")}
-          </CollapsibleTrigger>
-          <CollapsibleContent>
-            <div className="flex flex-col items-start gap-1.5 pt-2">
-              <YamlBlock yaml={gap.snippet} label={t("gap.snippet")} className="self-stretch" />
-              {project && isManifest(gap.snippet) ? (
-                <OpenInTerminal
-                  project={project}
-                  command={applyCommand(gap.snippet)}
-                  variant="outline"
-                  onOpen={onTerminal}
-                />
-              ) : null}
-            </div>
-          </CollapsibleContent>
-        </Collapsible>
-      ) : null}
     </li>
   )
 }

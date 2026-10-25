@@ -76,13 +76,12 @@ mod tests {
     }
 
     fn backup_gaps(fixture: &Fixture) -> Value {
-        let namespace = fixture.case.params["namespace"].as_str().unwrap();
         let installed = &fixture.case.params["installed"];
         let installed = backups::Installed {
             k8up: installed["k8up"].as_bool().unwrap_or(false),
             velero: installed["velero"].as_bool().unwrap_or(false),
         };
-        to_value(backups::gaps(namespace, &covered(fixture), installed)).unwrap()
+        to_value(backups::gaps(&covered(fixture), installed)).unwrap()
     }
 
     fn covered(fixture: &Fixture) -> Vec<backups::Coverage> {

@@ -1,4 +1,4 @@
-description: With K8up installed, a claim no schedule covers gets a K8up Schedule to copy; a database without a ScheduledBackup is a warning with one to copy; the covered database is not a gap.
+description: With K8up installed, a claim no schedule covers is fixed through its volume's K8up backups form; a database without a ScheduledBackup is a warning fixed through its backups form; the covered database is not a gap.
 operation: modules.backupGaps
 params:
   namespace: "shop"

@@ -1,14 +1,13 @@
-// The plan templates a gap's fix names (`compute.resources`, `probes.readiness`,
-// `domains.httpRoute`) that this build can write through a plan. A gap whose template is missing
-// here shows the server's YAML snippet to copy instead, so a template can be added without the
-// rule or the server changing. Every template only proposes: the plan dialog shows the change
-// and the person applies it or not.
+// The plans a gap's fix names (`compute.resources`, `probes.readiness`, `domains.httpRoute`), and
+// the forms that end in a plan when a fix needs input or a template declines its case. Every
+// template only proposes: the plan dialog shows the change and the person applies it or not.
 import type { Schemas } from "@/api/client"
 import type { PlanAsk } from "@/components/plan/planner"
 import type { Translate } from "@/i18n"
+import { databaseLink, serviceLink } from "@/lib/place"
 import { endpointsOf } from "@/model/service"
 
-type Gap = Schemas["GapView"]
+type Gap = Schemas["Gap"]
 type Project = Schemas["Project"]
 type Service = Project["services"][number]
 
@@ -81,6 +80,30 @@ export const fixTemplates: Record<string, FixTemplate> = {
       service: workloadOf(to),
     }
   },
+  // The NetworkPolicy module's ready-made policy that lets the sender's pods connect out.
+  "networkPolicy.allowEgress": (gap, project, t) => {
+    const object = gap.fix.params?.object
+    const from = project.services.find((s) => s.id === gap.fix.params?.from)
+    const to = project.services.find((s) => s.id === gap.fix.params?.to)
+    if (!object || !from || !to) return undefined
+    return {
+      title: t("reach.planAllowFrom", from.name, to.name),
+      changes: [{ op: "create", object: JSON.parse(object) as Record<string, never> }],
+      service: workloadOf(from),
+    }
+  },
+  // The HTTPRoute the server built from the Ingress. The Ingress stays until the person deletes
+  // it, so traffic does not stop while the route is new.
+  "domains.httpRoute": (gap, _project, t) => {
+    const object = gap.fix.params?.object
+    const ingress = gap.fix.params?.ingress
+    if (!object || !ingress) return undefined
+    return {
+      title: t("fix.httpRoute", ingress),
+      changes: [{ op: "create", object: JSON.parse(object) as Record<string, never> }],
+      notes: [t("fix.httpRouteNote")],
+    }
+  },
   // The ready-made policies that isolate a project's unprotected services, and let the ingress
   // controller reach those it routes to: one plan, each policy created as a new object.
   "networkPolicy.isolateProject": (gap, project, t) => {
@@ -132,4 +155,68 @@ export const fixTemplates: Record<string, FixTemplate> = {
       service: workloadOf(found.service),
     }
   },
+}
+
+export type FixLink =
+  | ReturnType<typeof serviceLink>
+  | ReturnType<typeof databaseLink>
+  | { to: "/cluster/backups" }
+
+/** The form that asks for what a fix needs and ends in a plan. */
+export function fixLink(
+  gap: Gap,
+  project: Project,
+): { link: FixLink; label: "gap.setUpBackups" | "gap.openSettings" } | undefined {
+  const params = gap.fix.params ?? {}
+  const service = project.services.find((s) => s.id === (gap.service ?? params.service))
+  const settings = (tab: "compute" | "health-checks" | "storage" | "networking") =>
+    service
+      ? {
+          link: serviceLink(project.namespace, service, { tab }),
+          label: "gap.openSettings" as const,
+        }
+      : undefined
+  switch (gap.fix.id) {
+    case "backups.scheduledBackup":
+      return params.database
+        ? {
+            link: databaseLink(
+              project.namespace,
+              { engine: "postgresql", name: params.database },
+              "backups",
+            ),
+            label: "gap.setUpBackups",
+          }
+        : undefined
+    case "backups.k8upSchedule": {
+      // A StatefulSet's claim is `<template>-<statefulset>-<ordinal>`.
+      const owner = project.services.find((s) =>
+        s.containers.some((c) =>
+          c.mounts.some(
+            (m) =>
+              m.claimName === params.claim ||
+              (s.kind === "StatefulSet" && params.claim?.startsWith(`${m.claimName}-${s.name}-`)),
+          ),
+        ),
+      )
+      return owner
+        ? {
+            link: serviceLink(project.namespace, owner, { tab: "storage" }),
+            label: "gap.setUpBackups",
+          }
+        : undefined
+    }
+    case "backups.veleroSchedule":
+      return { link: { to: "/cluster/backups" }, label: "gap.setUpBackups" }
+    case "compute.resources":
+      return settings("compute")
+    case "probes.readiness":
+      return settings("health-checks")
+    case "storage.addVolume":
+      return settings("storage")
+    case "domains.httpRoute":
+      return settings("networking")
+    default:
+      return undefined
+  }
 }
