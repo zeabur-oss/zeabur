@@ -19,8 +19,8 @@ use crate::handlers::Person;
 use crate::projects::{document_of, not_found};
 use crate::views::ServiceDocument;
 
-/// One service (workload) of a project, cut from the project document: for deep links, scripts
-/// and the MCP server. The web interface reads the project document instead.
+/// One service (workload) of a project, cut from the project document: for deep links and scripts.
+/// The web interface reads the project document instead.
 #[utoipa::path(get, path = "/api/v1/projects/{project}/services/{kind}/{name}", tag = "services",
     params(("project" = String, Path),
            ("kind" = String, Path, description = "deployment, statefulset, daemonset, job or cronjob; any case"),

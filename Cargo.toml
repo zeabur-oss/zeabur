@@ -33,7 +33,6 @@ zeabur-gaps = 3
 zeabur-plan = 3
 zeabur-catalog = 3
 zeabur-api = 4
-zeabur-mcp = 4
 zeabur = 5
 zeaburctl = 5
 zeabur-test-support = 6
@@ -46,7 +45,7 @@ zeabur-installer = 5
 # never know which modules a build has.
 [workspace.metadata.modules]
 crates = ["zeabur-modules"]
-composers = ["zeabur-api", "zeabur-mcp", "zeabur", "zeaburctl"]
+composers = ["zeabur-api", "zeabur", "zeaburctl"]
 
 # Crates that run as their own component with a small trusted base, also checked by
 # scripts/check-levels.sh: each may depend only on the workspace crates listed for it.
@@ -79,7 +78,6 @@ zeabur-catalog = { path = "crates/zeabur-catalog" }
 zeabur-modules = { path = "crates/zeabur-modules" }
 zeabur-plan = { path = "crates/zeabur-plan", version = "0.0.1" }
 zeabur-api = { path = "crates/zeabur-api" }
-zeabur-mcp = { path = "crates/zeabur-mcp" }
 zeabur-ui = { path = "crates/zeabur-ui" }
 zeabur-auth = { path = "crates/zeabur-auth" }
 zeabur-test-support = { path = "crates/zeabur-test-support" }
@@ -118,15 +116,8 @@ tokio-rustls = { version = "0.26", default-features = false, features = ["tls12"
 k8s-openapi = { version = "0.28", default-features = false, features = ["v1_34"] }
 kube = { version = "4.2", default-features = false, features = ["client", "rustls-tls", "aws-lc-rs", "ws"] }
 proptest = { version = "1", default-features = false, features = ["std"] }
-# The official Model Context Protocol SDK (modelcontextprotocol/rust-sdk), for `zeaburctl mcp`:
-# the server, its tool macros and the stdio transport. Its JSON Schemas come from the schemars it
-# re-exports.
 # The input patterns of Zeabur Catalog templates (RE2 syntax), checked before a template renders.
 regex = { version = "1.13", default-features = false, features = ["std", "unicode-perl"] }
-rmcp = { version = "3.5", default-features = false, features = ["server", "macros", "transport-io"] }
-# The schemars rmcp re-exports, named directly so that zeabur-modules can derive the schema of a
-# tool argument it shares with the API. Keep the version rmcp uses.
-schemars = { version = "1.2", default-features = false, features = ["derive"] }
 # Process settings that keep a person's tokens out of core dumps (zeabur-core's `secret`).
 rustix = { version = "1", default-features = false, features = ["std", "process"] }
 secrecy = { version = "0.10", features = ["serde"] }

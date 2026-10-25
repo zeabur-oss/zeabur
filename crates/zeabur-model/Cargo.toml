@@ -1,6 +1,6 @@
 [package]
 name = "zeabur-model"
-description = "zeabur: the projected view (project, service, relation, source) shared by the API, MCP and UI"
+description = "zeabur: the projected view (project, service, relation, source) shared by the API and UI"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

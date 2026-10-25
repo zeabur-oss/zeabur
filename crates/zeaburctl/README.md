@@ -3,8 +3,6 @@
 `zeaburctl`: the command-line tool for people using a cluster.
 
 - `zeaburctl ui`: the web interface on this machine, with the current kubeconfig context.
-- `zeaburctl mcp [--context <name>]`: the read-only MCP server over stdio (see `zeabur-mcp`;
-  `claude mcp add zeabur -- zeaburctl mcp`).
 - `zeaburctl doctor`: checks the cluster version, the Zeabur Identity setup and recommended components.
 
 ## `zeaburctl doctor`

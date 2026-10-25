@@ -77,9 +77,6 @@ than you have, and keeps no state of its own: no database, no custom resources.
   [Zeabur Catalog](https://github.com/zeabur-oss/catalog).
 - **In a cluster**, with its Helm chart: sign-in through Zeabur Identity with a passkey, admin rights
   confirmed with the passkey again, and nothing left behind after uninstalling.
-- **`zeaburctl mcp`**: a read-only [Model Context Protocol](https://modelcontextprotocol.io)
-  server over stdio, so an AI assistant can ask what is failing and why, with your rights and
-  never a Secret's value.
 - **`zeaburctl doctor`**: checks the cluster version, the Zeabur Identity setup and the recommended
   components, as text or JSON, with an exit code for scripts.
 
@@ -102,7 +99,7 @@ ZEABUR_UI_DIST="$PWD/web/dist" cargo build --release --locked -p zeaburctl
 ```
 
 `zeaburctl ui` listens on a random loopback port, opens the browser, and makes every request
-with your current kubeconfig context. `zeaburctl doctor` and `zeaburctl mcp` use it the same way.
+with your current kubeconfig context. `zeaburctl doctor` uses it the same way.
 
 In a cluster, for everyone who signs in through Zeabur Identity: [Install on an existing cluster](docs/get-started/install.md).
 On a fresh Linux server, `zeabur-installer` installs RKE2, Zeabur Identity and Zeabur in one

@@ -1,11 +1,11 @@
 ---
 name: zeabur-spec-work
-description: Implement or change a security- or protocol-relevant behaviour in Zeabur (Kubernetes API semantics, server-side apply, RBAC, OAuth/OIDC with Zeabur Identity, MCP, HTTP caching) the way the codebase expects — from the specification text, with citations and adversarial tests. Use for any such feature or fix.
+description: Implement or change a security- or protocol-relevant behaviour in Zeabur (Kubernetes API semantics, server-side apply, RBAC, OAuth/OIDC with Zeabur Identity, HTTP caching) the way the codebase expects — from the specification text, with citations and adversarial tests. Use for any such feature or fix.
 ---
 
 # Specification-driven work
 
-1. **Read the source.** Find the exact section of the RFC, KEP, Kubernetes documentation, MCP
+1. **Read the source.** Find the exact section of the RFC, KEP, Kubernetes documentation
    revision or upstream source the behaviour depends on. Note MUST/SHOULD (RFC 2119, RFC 8174).
    For prior art, read the other project's code at a pinned tag or commit. Never cite something
    you have not read; if a fact cannot be verified, write "not verified" instead of inventing a
@@ -23,4 +23,4 @@ description: Implement or change a security- or protocol-relevant behaviour in Z
    right its users lack; no `impersonate`). Use the real kube-apiserver for anything RBAC or
    admission related (`zeabur-cluster-tests`).
 5. **Never leak a Secret's value.** Values are read only on an explicit "show" request, never
-   cached, never logged, never returned through MCP. Test it.
+   cached, never logged. Test it.

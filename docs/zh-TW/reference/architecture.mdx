@@ -12,7 +12,6 @@ Zeabur 顯示的內容讀自叢集裡的 Kubernetes 物件：用 kubectl 改了�
 | 使用方式 | 使用者開啟什麼 | Kubernetes API 使用的認證資訊 |
 |---|---|---|
 | `zeaburctl ui` | 本機 `127.0.0.1` 上的網頁 | 啟動時選的 kubeconfig context |
-| `zeaburctl mcp` | AI 用戶端透過 stdio 連線 | 選的 kubeconfig context，只有讀取工具 |
 | 叢集內的 `zeabur` | 透過 Ingress 或 HTTPRoute 公開的 Zeabur 網址 | Zeabur Identity 發給使用者的權杖，暫時使用管理員權限時，改用管理員權杖 |
 
 `zeabur` 同時提供 `/api` 下的 API 和網頁介面。Chart 建立的 ServiceAccount 沒有綁定任何 Role，Pod 也不掛載 ServiceAccount token，每一次讀寫都用登入者的權杖。

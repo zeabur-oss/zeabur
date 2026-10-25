@@ -6,7 +6,7 @@ its API path (`projects/shop/services/deployment/api`).
 
 ## Hides
 
-The shape of the projection as seen by clients. The HTTP API, the MCP server and the generated
+The shape of the projection as seen by clients. The HTTP API and the generated
 TypeScript client all serialise these types; nothing here knows how they are computed.
 
 ## Place in the workspace

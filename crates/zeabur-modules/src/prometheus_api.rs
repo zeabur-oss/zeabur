@@ -75,13 +75,11 @@ pub const QUERY_RANGE: &str = "/api/v1/query_range";
 /// The path of an instant query.
 pub const QUERY: &str = "/api/v1/query";
 
-// The API's `range` parameter and the `service_history` MCP tool's `range` argument, by their
-// serde names. The doc comments are the schemas' descriptions.
+// The API's `range` parameter, by its serde names. The doc comments are the schema's descriptions.
 /// How far back a history reaches.
 #[derive(
     Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, ToSchema,
 )]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub enum PrometheusRange {
     /// The last hour, a point every 15 s.
     #[default]

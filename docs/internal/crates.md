@@ -18,7 +18,7 @@ The code is split into small crates in one flat `crates/` directory:
   bound to a person's credential.
 - **Integrations with installed components are modules** (`zeabur-modules`, one module per
   provider): they declare the resources they read and turn the objects into their own views.
-  Only the composing crates (`zeabur-api`, `zeabur-mcp`, the binaries) may depend on a module
+  Only the composing crates (`zeabur-api`, the binaries) may depend on a module
   crate (`[workspace.metadata.modules]`, also checked by `scripts/check-levels.sh`), so the core
   never knows which integrations exist.
 - **The rules are pure crates**: `zeabur-kernel`, `zeabur-model`, `zeabur-adapters`,
@@ -41,9 +41,8 @@ flowchart BT
   plan[zeabur-plan] --> graph
   recommend[zeabur-catalog] --> kube
   api[zeabur-api] --> kube & gaps & plan & recommend & modules
-  mcp[zeabur-mcp] --> core & modules
   zeabur([zeabur]) --> api & ui & auth
-  zeaburctl([zeaburctl]) --> api & mcp & ui
+  zeaburctl([zeaburctl]) --> api & ui
 ```
 
 Arrows point from a crate to what it may depend on (transitive edges omitted).
@@ -63,7 +62,6 @@ Arrows point from a crate to what it may depend on (transitive edges omitted).
 | 3 | [`zeabur-plan`](../../crates/zeabur-plan) | change plans, minimal apply bodies, impact |
 | 3 | [`zeabur-catalog`](../../crates/zeabur-catalog) | the recommendations bundle and install suggestions |
 | 4 | [`zeabur-api`](../../crates/zeabur-api) | the HTTP API and its OpenAPI document |
-| 4 | [`zeabur-mcp`](../../crates/zeabur-mcp) | the read-only MCP server: its tools and the API reads behind them |
 | 5 | [`zeabur`](../../crates/zeabur), [`zeaburctl`](../../crates/zeaburctl) | **binaries** |
 | 0 | [`zeabur-fixtures`](../../crates/zeabur-fixtures) | loading the fixture cases (dev-dependency only) |
 | 6 | [`zeabur-test-support`](../../crates/zeabur-test-support) | test helpers |

@@ -10,17 +10,11 @@ publish.workspace = true
 [lints]
 workspace = true
 
-[features]
-# The JSON Schema of `PrometheusRange`, a tool argument of zeabur-mcp; the API describes it with
-# utoipa.
-schemars = ["dep:schemars"]
-
 [dependencies]
 zeabur-adapters.workspace = true
 zeabur-kube.workspace = true
 zeabur-model.workspace = true
 k8s-openapi.workspace = true
-schemars = { workspace = true, optional = true }
 serde.workspace = true
 serde_json.workspace = true
 utoipa.workspace = true

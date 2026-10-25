@@ -12,7 +12,7 @@ description: Day-to-day development loop for the Zeabur repository — environme
 - The workspace is a flat `crates/` directory; dependencies only point downwards. Each crate has
   a level in `Cargo.toml` `[workspace.metadata.levels]` (table in `docs/internal/crates.md`). Put new
   code in the lowest crate that can hold it; never add an upward dependency. Binaries: `zeabur`
-  (in-cluster server), `zeaburctl` (CLI: `ui`, `mcp`, `doctor`) and `zeabur-installer` (runs as
+  (in-cluster server), `zeaburctl` (CLI: `ui`, `doctor`) and `zeabur-installer` (runs as
   root on a Linux server; crates `zeabur-installer-*`, guide in `docs/get-started/quickstart.md` and `docs/reference/installer*.md`).
 - `zeabur-kube` is the only crate that talks to kube-apiserver, and only through clients bound to
   a person's credential. Never build a client from Zeabur's service account token, and never

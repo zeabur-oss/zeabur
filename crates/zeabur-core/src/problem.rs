@@ -11,7 +11,7 @@
 //! human-readable documentation the RFC asks a type URI to lead to.
 //!
 //! **The plain-language layers are keyed.** `title`, `detail` and `fix` stay English, as RFC 9457
-//! has them and as MCP clients read them. Beside them, `summary` (what happened, naming the
+//! has them. Beside them, `summary` (what happened, naming the
 //! object) and `why` (the rule, with this occurrence's numbers) are [`Message`]s a client words
 //! in its own language; `evidence` names the objects and fields the problem rests on, and
 //! `fields` the fields kube-apiserver found invalid (`details.causes` [api-conventions]), so a

@@ -47,8 +47,7 @@ A layer depends only on the layers below it; turning one off leaves those below 
 - **`zeabur`**: the in-cluster server. It serves the API under `/api` and the embedded web
   interface, and signs people in as a confidential client of Zeabur Identity.
 - **`zeaburctl`**: the command-line tool on a person's machine: `ui` (the interface with the
-  current kubeconfig context, on a random loopback port), `mcp` (a read-only MCP server over
-  stdio) and `doctor`.
+  current kubeconfig context, on a random loopback port) and `doctor`.
 
 The split follows Zeabur Identity (`zeabur-identity`/`zeabur-identityctl`): code only a person's machine runs never ships in
 the server image.

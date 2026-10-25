@@ -1790,8 +1790,8 @@ export interface paths {
       cookie?: never
     }
     /**
-     * One service (workload) of a project, cut from the project document: for deep links, scripts
-     *     and the MCP server. The web interface reads the project document instead.
+     * One service (workload) of a project, cut from the project document: for deep links and scripts.
+     *     The web interface reads the project document instead.
      */
     get: operations["service"]
     put?: never

@@ -4,7 +4,7 @@
 //!
 //! One read of a namespace (one LIST per kind, twelve in all) gives the whole projection, and
 //! `get` returns it as one document. The service and resource endpoints are cuts of that same
-//! read, for deep links, scripts and the MCP server; the web interface derives its service,
+//! read, for deep links and scripts; the web interface derives its service,
 //! variables and objects views from the cached document instead of reading the namespace again
 //! for each, so the parts of one screen cannot contradict each other.
 //!

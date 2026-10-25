@@ -1,6 +1,6 @@
 [package]
 name = "zeaburctl"
-description = "Kubernetes made simple and secure by default: the command-line tool (ui, mcp, doctor)"
+description = "Kubernetes made simple and secure by default: the command-line tool (ui, doctor)"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -18,11 +18,9 @@ ui = ["dep:zeabur-ui"]
 zeabur-api.workspace = true
 zeabur-core.workspace = true
 zeabur-kube.workspace = true
-zeabur-mcp.workspace = true
 zeabur-ui = { workspace = true, optional = true }
 axum.workspace = true
 clap.workspace = true
-rmcp.workspace = true
 serde.workspace = true
 serde-saphyr.workspace = true
 serde_json.workspace = true
@@ -31,10 +29,3 @@ tower.workspace = true
 
 [dev-dependencies]
 zeabur-kube = { workspace = true, features = ["memory"] }
-zeabur-test-support = { workspace = true, features = ["sandbox"] }
-# The client side, for the session tests.
-rmcp = { workspace = true, features = ["client"] }
-# The cluster test prepares its namespace and person as admin.
-kube.workspace = true
-# The cluster test runs the built binary and speaks to it with rmcp's client.
-tokio = { workspace = true, features = ["process"] }

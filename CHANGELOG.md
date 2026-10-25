@@ -42,9 +42,8 @@ The first public release, pre-alpha.
   [Zeabur Catalog](https://github.com/zeabur-oss/catalog), as a `helm`
   command, a Flux `HelmRelease`, an Argo CD `Application` or a k3s `HelmChart`.
 - The web interface in English and Traditional Chinese (zh-TW), embedded in the binaries.
-- `zeaburctl ui` (local mode with the kubeconfig), `zeaburctl mcp` (a read-only Model Context
-  Protocol server over stdio) and `zeaburctl doctor` (cluster, Zeabur Identity and component checks as
-  text or JSON).
+- `zeaburctl ui` (local mode with the kubeconfig) and `zeaburctl doctor` (cluster, Zeabur Identity
+  and component checks as text or JSON).
 - `zeabur`, the in-cluster server, with its Helm chart (`deploy/chart/zeabur`) and container
   image build: sign-in through Zeabur Identity as a confidential OAuth client, and admin rights on demand
   confirmed with the passkey again.
