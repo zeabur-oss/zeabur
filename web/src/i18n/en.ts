@@ -4331,7 +4331,8 @@ export const en = {
     resource === "pods"
       ? `No node has room for ${need} more replicas; the roomiest has room for ${left}.`
       : `No node has ${need} free; the roomiest has ${left}.`,
-  "preview.fitUnknown": "Zeabur could not check whether the new replicas fit.",
+  "preview.fitUnknown": (replicas: number, cpu: string, memory: string) =>
+    `It adds ${plural(replicas, "replica", "replicas")}, ${cpu} and ${memory} at its peak. Zeabur could not check whether they fit.`,
   "preview.dataLoss": "Data this loses",
   "preview.loss.claimDeleted": (claim: string, paths: string) =>
     `Deletes the volume ${claim}${paths ? ` and what is in ${paths}` : ""}.`,

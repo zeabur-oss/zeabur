@@ -3958,7 +3958,8 @@ export const zhCN: Messages = {
     resource === "pods"
       ? `没有节点放得下 ${need} 个新的副本，最空的节点只能再放 ${left} 个。`
       : `没有节点有 ${need} 的空间，最空的节点只有 ${left}。`,
-  "preview.fitUnknown": "Zeabur 无法确认新的副本是否放得下。",
+  "preview.fitUnknown": (pods, cpu, memory) =>
+    `峰值时会多出 ${pods} 个副本、${cpu} 和 ${memory}。Zeabur 无法确认是否放得下。`,
   "preview.dataLoss": "会丢失的数据",
   "preview.loss.claimDeleted": (claim, paths) =>
     `会删除卷 ${claim}${paths ? `，以及 ${paths} 里的数据` : ""}。`,

@@ -167,7 +167,14 @@ export function PlanPreview({
         </ul>
       ) : fit.status === "unknown" ? (
         <ul>
-          <Line health="idle">{t("preview.fitUnknown")}</Line>
+          <Line health="idle">
+            {t(
+              "preview.fitUnknown",
+              fit.pods,
+              t("preview.cores", cores(fit.cpuMillicores)),
+              memory(fit.memoryBytes),
+            )}
+          </Line>
         </ul>
       ) : null}
       {dataLoss.length > 0 ? (

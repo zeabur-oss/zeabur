@@ -3969,7 +3969,8 @@ export const zhTW: Messages = {
     resource === "pods"
       ? `沒有節點放得下 ${need} 個新的副本，最空的節點只能再放 ${left} 個。`
       : `沒有節點有 ${need} 的空間，最空的節點只有 ${left}。`,
-  "preview.fitUnknown": "Zeabur 無法確認新的副本是否放得下。",
+  "preview.fitUnknown": (pods, cpu, memory) =>
+    `尖峰時會多出 ${pods} 個副本、${cpu} 和 ${memory}。Zeabur 無法確認放不放得下。`,
   "preview.dataLoss": "會遺失的資料",
   "preview.loss.claimDeleted": (claim, paths) =>
     `會刪除磁碟區 ${claim}${paths ? `，以及 ${paths} 裡的資料` : ""}。`,
