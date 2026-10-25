@@ -74,6 +74,9 @@ pub struct Settings {
     pub domains: DomainSettings,
     /// Where a service deployed from Git keeps its images.
     pub builds: BuildSettings,
+    /// A PEM bundle of the CA that signed the build registry's certificate, trusted when Zeabur
+    /// reads an image from it (`--build-registry-ca-file`); `None`: the platform's roots only.
+    pub build_registry_ca: Option<Vec<u8>>,
 }
 
 /// How a new service's public URL is made, as an administrator installed Zeabur (the chart's
@@ -139,6 +142,7 @@ impl Default for Settings {
             account_url: None,
             domains: DomainSettings::default(),
             builds: BuildSettings::default(),
+            build_registry_ca: None,
         }
     }
 }

@@ -73,6 +73,10 @@ spec:
             {{- with .Values.builds.registry }}
             - name: ZEABUR_BUILD_REGISTRY
               value: {{ . | quote }}
+            {{- if $.Values.builds.caBundle.configMap }}
+            - name: ZEABUR_BUILD_REGISTRY_CA_FILE
+              value: /etc/zeabur/registry-ca/{{ $.Values.builds.caBundle.key }}
+            {{- end }}
             {{- end }}
             - name: ZEABUR_ISSUER_URL
               value: {{ required "issuer.url is required" $issuer.url | quote }}
@@ -174,6 +178,11 @@ spec:
               mountPath: /etc/zeabur/issuer-ca
               readOnly: true
             {{- end }}
+            {{- if and .Values.builds.registry .Values.builds.caBundle.configMap }}
+            - name: registry-ca
+              mountPath: /etc/zeabur/registry-ca
+              readOnly: true
+            {{- end }}
             {{- if .Values.proxy.enabled }}
             - name: proxy-ca
               mountPath: /etc/zeabur/proxy-ca
@@ -220,6 +229,14 @@ spec:
             items:
               - key: {{ $issuer.caBundle.key }}
                 path: {{ $issuer.caBundle.key }}
+        {{- end }}
+        {{- if and .Values.builds.registry .Values.builds.caBundle.configMap }}
+        - name: registry-ca
+          configMap:
+            name: {{ .Values.builds.caBundle.configMap }}
+            items:
+              - key: {{ .Values.builds.caBundle.key }}
+                path: {{ .Values.builds.caBundle.key }}
         {{- end }}
         {{- if .Values.proxy.enabled }}
         # Only the CA of Zeabur Proxy's certificate, not its key.

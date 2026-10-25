@@ -20,6 +20,8 @@ use hyper_util::client::legacy::Client;
 use hyper_util::client::legacy::connect::HttpConnector;
 use hyper_util::client::legacy::connect::dns::{GaiResolver, Name};
 use hyper_util::rt::TokioExecutor;
+use rustls::pki_types::CertificateDer;
+use rustls::pki_types::pem::PemObject as _;
 use secrecy::ExposeSecret as _;
 
 use super::registry::{Answer, Get, Transport};
@@ -52,15 +54,29 @@ impl std::fmt::Debug for Https {
 }
 
 impl Https {
-    /// A client that connects where `reach` allows.
+    /// A client that connects where `reach` allows, trusting the platform's roots and the
+    /// certificates of the PEM bundle `extra_ca`.
     ///
     /// # Errors
     ///
-    /// When TLS cannot be set up.
-    pub fn new(reach: Reach) -> Result<Self, String> {
+    /// When `extra_ca` is not a PEM certificate bundle, or TLS cannot be set up.
+    pub fn new(reach: Reach, extra_ca: Option<&[u8]>) -> Result<Self, String> {
         let provider = Arc::new(rustls::crypto::aws_lc_rs::default_provider());
-        let verifier = rustls_platform_verifier::Verifier::new(Arc::clone(&provider))
-            .map_err(|e| e.to_string())?;
+        let extra = match extra_ca {
+            Some(pem) => {
+                let roots = CertificateDer::pem_slice_iter(pem)
+                    .collect::<Result<Vec<_>, _>>()
+                    .map_err(|e| format!("not a PEM certificate bundle: {e}"))?;
+                if roots.is_empty() {
+                    return Err("not a PEM certificate bundle: no certificate in it".to_owned());
+                }
+                roots
+            }
+            None => Vec::new(),
+        };
+        let verifier =
+            rustls_platform_verifier::Verifier::new_with_extra_roots(extra, Arc::clone(&provider))
+                .map_err(|e| e.to_string())?;
         let tls = rustls::ClientConfig::builder_with_provider(provider)
             .with_safe_default_protocol_versions()
             .map_err(|e| e.to_string())?
@@ -254,9 +270,17 @@ mod tests {
         }
     }
 
+    #[test]
+    fn an_extra_ca_must_be_a_pem_certificate_bundle() {
+        let error = Https::new(Reach::Public, Some(b"not a certificate")).unwrap_err();
+        assert!(error.contains("not a PEM certificate bundle"), "{error}");
+        assert!(Https::new(Reach::Public, Some(b"")).is_err());
+        assert!(Https::new(Reach::Public, None).is_ok());
+    }
+
     #[tokio::test]
     async fn a_url_that_names_a_refused_address_is_not_sent() {
-        let client = Https::new(Reach::Public).unwrap();
+        let client = Https::new(Reach::Public, None).unwrap();
         let answer = client
             .get(Get {
                 url: "http://169.254.169.254/latest/meta-data/".to_owned(),

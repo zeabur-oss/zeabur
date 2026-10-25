@@ -36,6 +36,8 @@ pub const ZEABUR_NAMESPACE: &str = "zeabur";
 pub const LOCAL_ISSUER: &str = "zeabur-local-ca";
 /// The catalog's in-cluster registry, which nodes pull through a mirror to its fixed address.
 pub const ZOT: &str = "container-registry/zot";
+/// The ConfigMap in Zeabur's namespace with zot's CA, which Zeabur trusts to read its images.
+pub const REGISTRY_CA_CONFIGMAP: &str = "zeabur-registry-ca";
 /// zot's input naming that address.
 const ZOT_CLUSTER_IP_INPUT: &str = "cluster-ip";
 /// The `ClusterIssuer` of `domain` access, shipped by the catalog's cert-manager component.
@@ -608,7 +610,15 @@ fn products(
     }
     let suffixes = suffixes(config, facts);
     warn_no_suffixes(config, facts, &suffixes, warnings);
-    let values = zeabur_values(config, facts, tls_issuer, &zeabur_image, &suffixes);
+    let mut values = zeabur_values(config, facts, tls_issuer, &zeabur_image, &suffixes);
+    if chosen.contains(ZOT)
+        && let Some(map) = values.as_object_mut()
+    {
+        map.insert(
+            "builds".to_owned(),
+            json!({"caBundle": {"configMap": REGISTRY_CA_CONFIGMAP}}),
+        );
+    }
     Ok((
         Some(identity),
         Some(ZeaburPlan {
@@ -1653,6 +1663,23 @@ mod tests {
         );
         assert_eq!(values["domains"]["clusterIssuer"], "letsencrypt");
         assert_eq!(values["domains"]["suffixes"], json!([]));
+    }
+
+    #[test]
+    fn zeabur_trusts_zots_ca_only_when_zot_is_installed() {
+        let index = index_with_zot();
+        let without = plan(&index, &config(""), &facts()).unwrap();
+        assert!(without.zeabur.unwrap().values.get("builds").is_none());
+        let with = plan(
+            &index,
+            &config("enable: [container-registry/zot]\n"),
+            &facts(),
+        )
+        .unwrap();
+        assert_eq!(
+            with.zeabur.unwrap().values["builds"]["caBundle"]["configMap"],
+            REGISTRY_CA_CONFIGMAP
+        );
     }
 
     #[test]

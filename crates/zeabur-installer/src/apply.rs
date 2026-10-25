@@ -661,14 +661,23 @@ fn local_ca_pem(kubectl: &Kubectl, namespace: &str) -> Result<String, InstallErr
         })
 }
 
-/// Copies the CA of zot's certificate to the node, where the registry mirror checks zot against it.
-fn zot_ca(kubectl: &Kubectl) -> Result<(), InstallError> {
-    let pem = kubectl
+/// The CA of zot's certificate.
+fn zot_ca_pem(kubectl: &Kubectl) -> Result<String, InstallError> {
+    kubectl
         .get("secret", "zot-tls", Some("zot"))?
         .as_ref()
         .and_then(|s| kubectl::secret_key(s, "ca.crt"))
-        .ok_or_else(|| InstallError::Message("secret zot/zot-tls has no ca.crt".to_owned()))?;
-    files::write(Path::new(ZOT_CA_FILE), 0o644, &pem)?;
+        .and_then(|b| String::from_utf8(b).ok())
+        .ok_or_else(|| InstallError::Message("secret zot/zot-tls has no ca.crt".to_owned()))
+}
+
+/// Copies the CA of zot's certificate to the node, where the registry mirror checks zot against it.
+fn zot_ca(kubectl: &Kubectl) -> Result<(), InstallError> {
+    files::write(
+        Path::new(ZOT_CA_FILE),
+        0o644,
+        zot_ca_pem(kubectl)?.as_bytes(),
+    )?;
     Ok(())
 }
 
@@ -842,6 +851,19 @@ fn zeabur(kubectl: &Kubectl, plan: &Plan, config: &Config) -> Result<(), Install
                 "labels": {"app.kubernetes.io/managed-by": MANAGER},
             },
             "data": {"ca.crt": pem},
+        }))?;
+    }
+
+    if plan.components.iter().any(|c| c.id == plan::ZOT) {
+        kubectl.apply_object(&json!({
+            "apiVersion": "v1",
+            "kind": "ConfigMap",
+            "metadata": {
+                "name": plan::REGISTRY_CA_CONFIGMAP,
+                "namespace": ZEABUR_NAMESPACE,
+                "labels": {"app.kubernetes.io/managed-by": MANAGER},
+            },
+            "data": {"ca.crt": zot_ca_pem(kubectl)?},
         }))?;
     }
 

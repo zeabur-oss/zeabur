@@ -45,8 +45,7 @@ const FALLBACK: [&str; 2] = ["amd64", "arm64"];
 /// Reads images' configurations, and keeps the answers for a while.
 pub struct Inspector {
     transport: Arc<dyn Transport>,
-    /// Registries reached over plain HTTP: Zeabur Builder's, and loopback where every address
-    /// may be reached.
+    /// Registries reached over plain HTTP: loopback, where every address may be reached.
     insecure: Vec<String>,
     kept: Mutex<HashMap<String, (Instant, Inspected)>>,
 }
@@ -70,15 +69,15 @@ impl Inspector {
         }
     }
 
-    /// Through [`https::Https`] reaching `reach`, with Zeabur Builder's `build_registry` over
-    /// plain HTTP.
+    /// Through [`https::Https`] reaching `reach`. The registry of Zeabur Builder is read over
+    /// HTTPS like any other; `registry_ca`, a PEM bundle, is trusted for its certificate.
     #[must_use]
-    pub fn connected(reach: https::Reach, build_registry: Option<&str>) -> Self {
-        let transport: Arc<dyn Transport> = match https::Https::new(reach) {
+    pub fn connected(reach: https::Reach, registry_ca: Option<&[u8]>) -> Self {
+        let transport: Arc<dyn Transport> = match https::Https::new(reach, registry_ca) {
             Ok(client) => Arc::new(client),
             Err(error) => Arc::new(Broken(error)),
         };
-        let mut insecure: Vec<String> = build_registry.map(registry_name).into_iter().collect();
+        let mut insecure: Vec<String> = Vec::new();
         if reach == https::Reach::Any {
             insecure.extend(["localhost".to_owned(), "127.0.0.1".to_owned()]);
         }

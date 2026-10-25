@@ -388,7 +388,7 @@ pub fn router_with_images(access: Arc<dyn ClusterAccess>, images: images::Inspec
 fn inspector(reach: images::https::Reach, settings: &Settings) -> Arc<images::Inspector> {
     Arc::new(images::Inspector::connected(
         reach,
-        settings.builds.registry.as_deref(),
+        settings.build_registry_ca.as_deref(),
     ))
 }
 

@@ -344,6 +344,12 @@ EOF
   apply_secret zeabur tls zeabur-tls --cert="$tls/tls.crt" --key="$tls/tls.key"
   kubectl -n zeabur create configmap zeabur-identity-ca --from-file=ca.crt="$tls/ca.crt" \
     --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+  # Zeabur reads zot over HTTPS against its CA, as zeabur-installer sets it up.
+  if [[ "$profile" == full ]]; then
+    kubectl -n zot get secret zot-tls -o jsonpath='{.data.ca\.crt}' | base64 -d >"$state/zot-ca.crt"
+    kubectl -n zeabur create configmap zeabur-registry-ca --from-file=ca.crt="$state/zot-ca.crt" \
+      --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+  fi
 
   cat >"$state/install.yaml" <<EOF
 access: {mode: local, identity: $identity_host, zeabur: $zeabur_host}
@@ -358,6 +364,9 @@ EOF
     kubectl apply --server-side --force-conflicts -f - >/dev/null
   # What only this cluster sets: Zeabur Proxy when its image is built here.
   local values="{}"
+  if [[ "$profile" == full ]]; then
+    values='{"builds":{"caBundle":{"configMap":"zeabur-registry-ca"}}}'
+  fi
   if [[ -n "$proxy_image" ]]; then
     values=$(jq -c --arg r "${proxy_image%:*}" --arg t "${proxy_image##*:}" \
       '.proxy = {enabled: true, image: {repository: $r, tag: $t}}' <<<"$values")

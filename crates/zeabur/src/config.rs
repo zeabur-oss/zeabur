@@ -87,6 +87,10 @@ pub(crate) struct Args {
     /// deployed from Git.
     #[arg(long, env = "ZEABUR_BUILD_REGISTRY", default_value = "")]
     pub(crate) build_registry: String,
+    /// A PEM file of the certificate authorities that sign the build registry's certificate, on
+    /// top of the platform's roots. Needs `--build-registry`.
+    #[arg(long, env = "ZEABUR_BUILD_REGISTRY_CA_FILE")]
+    pub(crate) build_registry_ca_file: Option<PathBuf>,
     /// The namespace Zeabur runs in, where the ConfigMap `zeabur-settings` keeps the settings
     /// people choose. Empty: settings cannot be changed.
     #[arg(long, env = "ZEABUR_NAMESPACE", default_value = "")]
@@ -143,6 +147,7 @@ pub(crate) struct Config {
 
 impl Args {
     /// Checks every value and reads the files.
+    #[expect(clippy::too_many_lines, reason = "one step per flag")]
     pub(crate) fn check(&self) -> Result<Config, String> {
         let public_url =
             BaseUrl::parse_root(&self.public_url).map_err(|e| format!("--public-url: {e}"))?;
@@ -194,6 +199,7 @@ impl Args {
             );
         }
         (settings.domains, settings.builds) = (domains(self)?, builds(self)?);
+        settings.build_registry_ca = self.build_registry_ca(&settings.builds)?;
         let authority = public_url.authority();
         settings.public_host = Some(
             authority
@@ -244,6 +250,23 @@ impl Args {
             settings,
             proxy,
         })
+    }
+
+    /// The PEM bundle of the build registry's CA, checked.
+    fn build_registry_ca(
+        &self,
+        builds: &zeabur_api::settings::BuildSettings,
+    ) -> Result<Option<Vec<u8>>, String> {
+        let Some(path) = &self.build_registry_ca_file else {
+            return Ok(None);
+        };
+        if builds.registry.is_none() {
+            return Err("--build-registry-ca-file needs --build-registry".to_owned());
+        }
+        let pem = read(path, "--build-registry-ca-file")?;
+        ExtraRoots::from_pem(&pem)
+            .map_err(|e| format!("--build-registry-ca-file: {}: {e}", path.display()))?;
+        Ok(Some(pem.to_vec()))
     }
 }
 
@@ -649,6 +672,44 @@ qkDcEXA7cf4S+NsEneg=
         assert!(error.starts_with("--issuer-ca-file:"), "{error}");
         let error = args(&files, &["--issuer-ca-file", "/nonexistent/ca.crt"]).unwrap_err();
         assert!(error.starts_with("--issuer-ca-file:"), "{error}");
+    }
+
+    #[test]
+    fn a_build_registry_ca_file_is_checked_and_needs_a_registry() {
+        let files = Files::new("registry-ca");
+        assert_eq!(args(&files, &[]).unwrap().settings.build_registry_ca, None);
+        let ca = files.write("ca.crt", CA.as_bytes());
+        let config = args(
+            &files,
+            &[
+                "--build-registry",
+                "zot.zot.svc:5000",
+                "--build-registry-ca-file",
+                &ca,
+            ],
+        )
+        .unwrap();
+        assert_eq!(
+            config.settings.build_registry_ca.as_deref(),
+            Some(CA.as_bytes())
+        );
+        let error = args(&files, &["--build-registry-ca-file", &ca]).unwrap_err();
+        assert!(
+            error.starts_with("--build-registry-ca-file needs"),
+            "{error}"
+        );
+        let none = files.write("none.crt", b"not a certificate\n");
+        let error = args(
+            &files,
+            &[
+                "--build-registry",
+                "zot.zot.svc:5000",
+                "--build-registry-ca-file",
+                &none,
+            ],
+        )
+        .unwrap_err();
+        assert!(error.starts_with("--build-registry-ca-file:"), "{error}");
     }
 
     #[test]

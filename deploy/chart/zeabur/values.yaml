@@ -56,8 +56,15 @@ domains:
 # Services deployed from Git. registry: where Zeabur Builder pushes and nodes pull, the same as the
 # Builder's default registry; a new service runs <registry>/<project>/<service>. The default is the
 # catalog's Zot. Empty: "Deploy from Git" is turned off.
+# caBundle: a ConfigMap in this namespace with the CA (PEM) that signed the registry's certificate,
+# which Zeabur trusts when it reads an image from the registry. Zot serves HTTPS, so without it
+# the image form cannot read the registry. zeabur-installer copies zot's CA here. Empty: the
+# image's Mozilla CA bundle only.
 builds:
   registry: zot.zot.svc:5000
+  caBundle:
+    configMap: ""
+    key: ca.crt
 
 # Anything the cluster refuses offers to ask for the passkey again (Zeabur Identity's `elevate` scope) and
 # retry with admin rights. Needs a client registered with `--allow-elevation`.
