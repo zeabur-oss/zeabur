@@ -1,6 +1,6 @@
 ---
 title: 備份叢集並從備份還原
-description: 設定 Velero 的 S3 存放位置與排程，確認備份結果，並從備份還原命名空間。
+description: 設定 Velero 的 S3 存放位置與排程，確認備份結果，並從備份還原專案。
 ---
 
 打開 **叢集** → **備份**，先設定 **備份存放位置**，再設定 **排程**。按 **立即備份** 跑一次，等 **備份紀錄** 顯示 **成功**，就確定備份能用了。
@@ -63,17 +63,126 @@ description: 設定 Velero 的 S3 存放位置與排程，確認備份結果，�
 
 ## 從備份還原
 
-1. 在 **備份紀錄** 找到要用的備份，按該列的 **還原**。
-2. 在 **要還原的 Namespace** 勾選要還原的 Namespace，至少一個。選項是這份備份裡的 Namespace。
+還原分三步：先還原專案，檢查服務和資料，最後接回網域。原專案還在時，備份會另存成一個新專案，原專案照常執行。原專案已經刪除時，備份用原本的名稱還原。兩種還原都不帶網域，等你確認專案沒問題，再把網域接回來。
 
-   ![還原表單，從備份裡勾選要還原的 Namespace blog](https://oss.zeabur.com/shots/zeabur/zh-TW/light/backup-restore.avif)
+<Steps>
+<Step>
 
-3. 按 **檢查變更**，確認要還原的備份和 Namespace，再按 **還原**。Velero 會馬上開始。
-4. 到 **還原紀錄** 看這筆的狀態、來源備份、錯誤和警告數。
+### 選擇專案並檢查
 
-Velero 會略過已經存在的物件，所以還原只補回被刪掉的部分，其他維持原樣。想換回備份裡的版本，先刪除那個物件再還原。
+1. 在 **備份紀錄** 找到要用的備份，按該列的 **從備份建立新專案**。原專案已經刪除時也是按這個按鈕。
+2. 在 **要還原的專案** 選一個專案。選項是這份備份選定的專案；備份整個叢集時，選項是目前的專案。
+   - 原專案還在：**新專案名稱** 會帶入一個新名稱，可以改。按 **從備份建立新專案**。
+   - 原專案已經刪除：畫面會說明它會用原本的名稱還原。按 **還原**。
 
-還原後，到專案確認服務的副本都就緒、磁碟區掛上且資料正確，再開啟應用程式測試。用資料庫自己備份的資料，照該資料庫的還原步驟處理。
+   ![還原表單，選了備份裡的專案，並帶入新專案名稱](https://oss.zeabur.com/shots/zeabur/zh-TW/light/backup-restore.avif)
+
+3. 在檢查畫面確認內容。清單讀自備份本身，跟現在的專案無關：
+   - 備份裡的網域不會跟著還原。Ingress、HTTPRoute 和 cert-manager 的憑證都不還原，網域在最後一步接回，憑證到時重新申請。
+   - 另存成新專案時，備份裡的排程工作會先暫停，避免同一件事在兩個專案各跑一次。用原名稱還原時，排程工作照常執行。
+   - 另存成新專案時，畫面會列出備份裡的服務和機密。寫著 `<服務>.<原專案>.svc` 的值還是連到原專案，還原後用 **改寫位址** 改掉。
+   - 另存成新專案時，畫面會顯示節點資源夠不夠兩個專案同時執行。自動部署和 Git webhook 還是送到原專案。
+
+4. 套用後 Velero 馬上開始。到 **還原紀錄** 看這筆的狀態、來源備份、錯誤和警告數。
+
+</Step>
+<Step>
+
+### 檢查專案
+
+還原完成後，該筆紀錄下方會出現 **開啟專案** 和 **接回網域**，另存成新專案時還有 **改寫位址**。
+
+1. 按 **開啟專案**，確認服務的副本都就緒、磁碟區掛上且資料正確。用資料庫自己備份的資料，照[該資料庫的還原步驟](../deploy/databases.mdx)處理。
+2. 另存成新專案時，按 **改寫位址**，把指向原專案的服務位址改成新專案。
+3. 確認新專案沒問題後，到每個[排程工作](../deploy/cron-jobs.mdx)按 **恢復**。
+
+Velero 會略過已經存在的同名物件。另存成新專案後，原專案會繼續保留，不需要時自己刪除。
+
+</Step>
+<Step>
+
+### 接回網域
+
+按 **接回網域**。Zeabur 從備份讀出這個專案的網域，再檢查叢集裡有沒有其他專案正在使用。
+
+- 沒有其他專案在用：套用後 Velero 只還原這些路由，**還原紀錄** 會多一筆「網域接回」。cert-manager 會重新申請憑證。
+- 原專案還在用：這次不能套用。畫面會指出是哪個專案在用，例如原專案是 `blog` 時，按 **從 blog 移動網域**，把網域從 `blog` 移到新專案。
+
+</Step>
+</Steps>
+
+### 用 kubectl 做同樣的事
+
+把備份 `zeabur-20261020030000` 裡的 `blog` 另存成 `blog-restored`：先建立暫停排程工作的 ConfigMap（Velero 的 resource modifier），再建立 Restore，兩個都在 `velero` Namespace。ConfigMap 的 `namespaces` 填備份裡原本的 `blog`。
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: blog-restored
+  namespace: velero
+data:
+  cronjobs.yaml: |
+    version: v1
+    resourceModifierRules:
+    - conditions:
+        groupResource: cronjobs.batch
+        namespaces:
+        - blog
+      patches:
+      - operation: add
+        path: /spec/suspend
+        value: "true"
+---
+apiVersion: velero.io/v1
+kind: Restore
+metadata:
+  name: blog-restored
+  namespace: velero
+spec:
+  backupName: zeabur-20261020030000
+  includedNamespaces:
+  - blog
+  namespaceMapping:
+    blog: blog-restored
+  excludedResources:
+  - ingresses.networking.k8s.io
+  - httproutes.gateway.networking.k8s.io
+  - certificates.cert-manager.io
+  - certificaterequests.cert-manager.io
+  - orders.acme.cert-manager.io
+  - challenges.acme.cert-manager.io
+  resourceModifier:
+    kind: ConfigMap
+    name: blog-restored
+```
+
+用原名稱還原時，拿掉 `namespaceMapping` 和 `resourceModifier`，也不用建立 ConfigMap。Zeabur 建立的 ConfigMap 會把 Restore 設為擁有者，刪除 Restore 時一起刪除；自己建立的要在還原完成後用 `kubectl -n velero delete configmap blog-restored` 刪掉。
+
+確認專案後，用 `kubectl get ingress -A` 確認沒有其他專案在用同一個網域，再建立只還原路由的 Restore：
+
+```yaml
+apiVersion: velero.io/v1
+kind: Restore
+metadata:
+  name: blog-restored-domains
+  namespace: velero
+spec:
+  backupName: zeabur-20261020030000
+  includedNamespaces:
+  - blog
+  namespaceMapping:
+    blog: blog-restored
+  includedResources:
+  - ingresses.networking.k8s.io
+  - httproutes.gateway.networking.k8s.io
+```
+
+恢復排程工作：
+
+```sh
+kubectl -n blog-restored patch cronjob <名稱> -p '{"spec":{"suspend":false}}'
+```
 
 ## 備份的加密
 
@@ -117,7 +226,7 @@ kubectl -n velero get secret velero-repo-credentials velero-backup-key -o yaml >
 - **無法連線**：核對儲存貯體、端點、區域和金鑰，並看位置下方 Velero 的訊息。
 - 連線成功但備份失敗，儲存服務拒絕上傳：確認它支援 SSE-C，端點也用 HTTPS，見[備份的加密](#備份的加密)。
 - 沒有 **立即備份**：要先有 Zeabur 建立的排程，而排程要先有存放位置。
-- **還原** 按鈕無法使用：你不能在 Velero 的 Namespace 建立 Restore。還原時 Velero 用自己的權限寫入物件，所以只有管理員能還原，見[權限](../reference/permissions.mdx)。管理員按 **暫時使用管理員權限** 再試一次。
+- **從備份建立新專案** 按鈕無法使用：你不能在 Velero 的 Namespace 建立 Restore。還原時 Velero 用自己的權限寫入物件，所以只有管理員能還原，見[權限](../reference/permissions.mdx)。管理員按 **暫時使用管理員權限** 再試一次。
 - **部分失敗**：有些物件或磁碟區檔案沒有複製到，其餘的已存好。用 `velero backup describe <backup> --details` 查看失敗的項目，處理後再備份一次。
 - 畫面說備份途中 Velero 重新啟動：下一次會照排程執行，也可以按 **立即備份** 補一次。
 - **磁碟區** 顯示 **只備份物件，不複製磁碟區裡的檔案**：這是在 Zeabur 以外建立的排程，要到原本的設定開啟 `defaultVolumesToFsBackup`。

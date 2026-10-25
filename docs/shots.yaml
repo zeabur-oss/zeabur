@@ -288,7 +288,8 @@
   wait: '#backup-list'
   steps:
     - click: '#backup-list li:nth-child(3) button[aria-expanded]'
-    - click: '#backup-list li:has(form) label[for$="-blog"]'
+    - click: '#backup-list li:has(form) [data-slot="select-trigger"]'
+    - click: '[role="option"]:not([aria-selected="true"])'
   clip: '#backup-list li:has(form)'
 # Maintenance mode of one domain (docs/zh-TW/configure/maintenance.mdx).
 - id: domain-pages-open
