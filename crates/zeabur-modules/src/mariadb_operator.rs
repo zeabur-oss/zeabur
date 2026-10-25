@@ -64,17 +64,7 @@ fn state(server: &DynamicObject) -> State {
     match ready {
         None => State::Unknown,
         Some(c) if c["status"] == "True" => State::Ready,
-        Some(c) => {
-            let reason = c["reason"]
-                .as_str()
-                .unwrap_or_default()
-                .to_ascii_lowercase();
-            if reason.contains("fail") || reason.contains("error") {
-                State::Failed
-            } else {
-                State::Progressing
-            }
-        }
+        Some(_) => State::Progressing,
     }
 }
 
@@ -345,6 +335,7 @@ mod tests {
             &[],
         );
         assert_eq!(db.state, State::Progressing);
+        assert_eq!(db.phase.as_deref(), Some("Initializing"));
         assert_eq!(db.connection.host, "maria-primary.shop.svc");
         assert_eq!(db.app, None);
     }
