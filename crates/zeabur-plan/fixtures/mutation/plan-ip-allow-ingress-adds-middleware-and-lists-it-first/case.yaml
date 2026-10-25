@@ -1,0 +1,10 @@
+description: "Limiting client addresses on an Ingress adds an ipAllowList middleware that the Ingress owns, and lists it first."
+operation: mutation.plan
+params:
+  kinds: [{group: traefik.io, kind: Middleware, plural: middlewares, namespaced: true}]
+  request:
+    changes:
+      - op: ipAllow
+        route: {kind: Ingress, name: shop}
+        enabled: true
+        cidrs: [203.0.113.0/24, 198.51.100.7]

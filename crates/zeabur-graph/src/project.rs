@@ -270,6 +270,14 @@ fn route(object: &Ingress, mut maintenance: Vec<String>) -> Route {
             to: None,
             permanent: None,
         });
+    let ip_allow = Some(traefik::ip_allow_name(name))
+        .filter(|m| middlewares.contains(m))
+        .map(|middleware| RouteMiddleware {
+            host: None,
+            middleware,
+            to: None,
+            permanent: None,
+        });
     let error_pages = Some(traefik::error_pages_name(name))
         .filter(|m| middlewares.contains(m))
         .map(|middleware| RouteMiddleware {
@@ -287,6 +295,7 @@ fn route(object: &Ingress, mut maintenance: Vec<String>) -> Route {
         tls_hosts,
         redirects,
         basic_auth,
+        ip_allow,
         error_pages,
         maintenance: {
             maintenance.sort();
@@ -372,6 +381,7 @@ fn http_route(object: &Value, page: Option<&str>) -> Option<Route> {
         tls_hosts: Vec::new(),
         redirects,
         basic_auth: None,
+        ip_allow: None,
         error_pages: None,
         issuer: None,
         tls: Vec::new(),

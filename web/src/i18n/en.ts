@@ -1676,6 +1676,13 @@ export const en = {
   "confirm.errorPages": (route: string) =>
     `Show the project's error pages on every domain of Ingress ${route}.`,
   "confirm.errorPagesOff": (route: string) => `Stop showing the error pages on Ingress ${route}.`,
+  "confirm.ipAllow": (route: string, list: string) =>
+    `Only ${list} can open the domains of Ingress ${route}. Any other address gets 403 Forbidden.`,
+  "confirm.ipAllowOff": (route: string) => `Anyone can open the domains of Ingress ${route} again.`,
+  "confirm.egressLimit": (name: string, list: string) =>
+    `${name} can connect only to ${list}, this project and DNS.`,
+  "confirm.egressLimitNone": (name: string) => `${name} can connect only to this project and DNS.`,
+  "confirm.egressLimitOff": (name: string) => `${name} can connect anywhere again.`,
   "confirm.maintenance": (host: string) =>
     `Show the maintenance page on ${host}. The service keeps running.`,
   "confirm.maintenanceOff": (host: string) => `Send visitors of ${host} to the service again.`,
@@ -1738,6 +1745,8 @@ export const en = {
   "action.endMaintenance": "End maintenance",
   "action.showErrorPages": "Show error pages",
   "action.hideErrorPages": "Remove error pages",
+  "action.limitAddresses": "Limit addresses",
+  "action.removeLimit": "Remove limit",
   "action.delete": "Delete",
   // Toasts
   "toast.applied": "Applied",
@@ -3927,6 +3936,44 @@ export const en = {
   "ports.kube.how": "How it opens",
   "ports.kube.howValue":
     "A LoadBalancer Service. On K3s, and on RKE2 with ServiceLB turned on (as Zeabur's installer sets it up), ServiceLB listens on the port on every node.",
+  "ip.title": "IP limits",
+  "ip.about":
+    "Choose which addresses can open this service's domains, and which addresses its pods can connect to.",
+  "ip.in.title": "Who can open its domains",
+  "ip.in.anyone": "Anyone",
+  "ip.in.only": (list: string) => `Only ${list}`,
+  "ip.in.limited": "Limited",
+  "ip.in.some": "Limited on some domains",
+  "ip.in.noDomain": "Add a domain first.",
+  "ip.in.gateway": "Domains on a Gateway can't be limited here.",
+  "ip.out.title": "Where its pods can connect",
+  "ip.out.anywhere": "Anywhere",
+  "ip.out.only": (list: string) => `Only ${list}, this project and DNS`,
+  "ip.out.rules": "Limited by connection rules",
+  "ip.out.none": "Only this project and DNS",
+  "ip.edit": "Edit",
+  "ip.editIn": (name: string) => `Edit who can open ${name}`,
+  "ip.editOut": (name: string) => `Edit where ${name} can connect`,
+  "ip.in.drawer": (name: string) => `Who can open ${name}`,
+  "ip.out.drawer": (name: string) => `Where ${name} can connect`,
+  "ip.in.switch": "Only allow these addresses",
+  "ip.out.switch": "Only allow connections to these addresses",
+  "ip.addresses": "Addresses",
+  "ip.in.hint": "One IP address or CIDR range per line, like 203.0.113.0/24.",
+  "ip.out.hint":
+    "One IP address or CIDR range per line. Leave it empty to allow only this project and DNS.",
+  "ip.in.note":
+    "Any other address gets 403. Behind a load balancer or proxy, Traefik may see the proxy's address instead of the visitor's.",
+  "ip.out.note":
+    "Other services in this project and DNS stay reachable. The limit works only if the cluster's network plugin enforces NetworkPolicy.",
+  "ip.bad": (list: string) => `Not an IP address or CIDR range: ${list}.`,
+  "ip.needOne": "Enter at least one address.",
+  "ip.nothing": "Nothing changed.",
+  "ip.planIn": (name: string) => `Limit who can open ${name}`,
+  "ip.planOut": (name: string) => `Limit where ${name} can connect`,
+  "ip.kube.in": (route: string) =>
+    `Middleware ${route}-ip-allow ipAllowList, listed first on Ingress ${route}`,
+  "ip.kube.out": (name: string) => `NetworkPolicy ${name}, policyTypes Egress`,
   "shared.title": "Shared variables",
   "shared.lead":
     "Variables that several services read. A service reads new values when it restarts.",

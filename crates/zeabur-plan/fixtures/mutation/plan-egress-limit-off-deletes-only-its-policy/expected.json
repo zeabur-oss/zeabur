@@ -1,0 +1,16 @@
+{
+  "objects": [
+    {
+      "target": {
+        "apiVersion": "networking.k8s.io/v1",
+        "kind": "NetworkPolicy",
+        "plural": "networkpolicies",
+        "name": "web-egress-limit"
+      },
+      "write": {
+        "type": "delete"
+      }
+    }
+  ],
+  "warnings": []
+}

@@ -90,6 +90,8 @@ pub(crate) async fn compute(
         | Change::PageServer(_)
         | Change::Template(_)
         | Change::ErrorPages(_)
+        | Change::IpAllow(_)
+        | Change::EgressLimit(_)
         | Change::Maintenance(_)
         | Change::Restart { .. }
         | Change::Rollback { .. }

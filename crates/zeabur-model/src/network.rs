@@ -137,6 +137,10 @@ pub struct Route {
     /// of users has the same name.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub basic_auth: Option<RouteMiddleware>,
+    /// The Traefik `ipAllowList` middleware Zeabur makes to limit the client addresses that reach
+    /// the Ingress's hosts.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ip_allow: Option<RouteMiddleware>,
     /// The Traefik `errors` middleware Zeabur makes to show the project's error pages.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub error_pages: Option<RouteMiddleware>,

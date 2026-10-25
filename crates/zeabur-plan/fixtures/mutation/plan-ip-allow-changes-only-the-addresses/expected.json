@@ -1,0 +1,37 @@
+{
+  "objects": [
+    {
+      "target": {
+        "apiVersion": "traefik.io/v1alpha1",
+        "kind": "Middleware",
+        "plural": "middlewares",
+        "name": "shop-ip-allow"
+      },
+      "write": {
+        "type": "patch",
+        "operations": [
+          {
+            "op": "test",
+            "path": "/metadata/resourceVersion",
+            "value": "10"
+          },
+          {
+            "op": "test",
+            "path": "/spec/ipAllowList/sourceRange",
+            "value": [
+              "198.51.100.7"
+            ]
+          },
+          {
+            "op": "replace",
+            "path": "/spec/ipAllowList/sourceRange",
+            "value": [
+              "203.0.113.0/24"
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "warnings": []
+}

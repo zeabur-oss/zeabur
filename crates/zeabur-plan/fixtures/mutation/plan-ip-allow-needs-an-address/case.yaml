@@ -1,0 +1,10 @@
+description: "A limit with no address would block every client, so it is refused."
+operation: mutation.plan
+params:
+  kinds: [{group: traefik.io, kind: Middleware, plural: middlewares, namespaced: true}]
+  request:
+    changes:
+      - op: ipAllow
+        route: {kind: Ingress, name: shop}
+        enabled: true
+        cidrs: []

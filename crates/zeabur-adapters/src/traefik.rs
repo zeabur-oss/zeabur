@@ -1,5 +1,5 @@
 //! Traefik `Middleware` objects on an Ingress [traefik-ingress]: the annotation that lists them,
-//! and the names Zeabur gives the redirects and the basic auth it makes.
+//! and the names Zeabur gives the redirects, the basic auth and the IP limits it makes.
 //!
 //! [traefik-ingress]: https://doc.traefik.io/traefik/reference/routing-configuration/kubernetes/ingress/
 
@@ -49,6 +49,15 @@ pub fn redirect_name(ingress: &str, hostname: &str) -> String {
 #[must_use]
 pub fn basic_auth_name(ingress: &str) -> String {
     const SUFFIX: &str = "-basic-auth";
+    let mut name = ingress.to_owned();
+    name.truncate(NAME_MAX - SUFFIX.len());
+    format!("{name}{SUFFIX}")
+}
+
+/// The `ipAllowList` middleware that limits the client addresses of Ingress `ingress`.
+#[must_use]
+pub fn ip_allow_name(ingress: &str) -> String {
+    const SUFFIX: &str = "-ip-allow";
     let mut name = ingress.to_owned();
     name.truncate(NAME_MAX - SUFFIX.len());
     format!("{name}{SUFFIX}")

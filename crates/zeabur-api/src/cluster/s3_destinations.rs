@@ -432,6 +432,8 @@ pub(crate) async fn open(
             | Change::PageServer(_)
             | Change::Template(_)
             | Change::ErrorPages(_)
+            | Change::IpAllow(_)
+            | Change::EgressLimit(_)
             | Change::Maintenance(_)
             | Change::Certificate(_)
             | Change::EnvImport(_)

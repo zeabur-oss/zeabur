@@ -16,6 +16,15 @@ minor or patch release may break the API.
   ([docs/reference/releases.md](docs/reference/releases.md)). The chart's new `image.digest` value pins any image
   by content.
 
+- IP limits on a service's Networking tab. "Who can open its domains" lists the allowed addresses
+  in a Traefik `ipAllowList` Middleware (`<ingress>-ip-allow`) that each Traefik Ingress of the
+  service lists first; an `HTTPRoute` refuses it. "Where its pods can connect" makes a
+  `NetworkPolicy` for `Egress` (`<service>-egress-limit`) that keeps the project's pods and cluster
+  DNS and allows the listed `ipBlock` ranges. Both are planned first, have no finalizer and work
+  without Zeabur; the project's `zeabur-project` policy is not touched. It replaces the
+  `adminCidr` input of the templates
+  ([docs](docs/zh-TW/configure/ip-limits.mdx)).
+
 - The installer adds the admission policy `zeabur-system-hosts` with Zeabur: an Ingress or
   HTTPRoute in a project cannot use Zeabur's or Zeabur Identity's domain, in a rule, in
   `spec.tls` or through a wildcard, and every rule outside the installer's namespaces must name a

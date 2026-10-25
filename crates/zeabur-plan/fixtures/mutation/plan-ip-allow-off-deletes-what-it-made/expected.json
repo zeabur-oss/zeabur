@@ -1,0 +1,43 @@
+{
+  "objects": [
+    {
+      "target": {
+        "apiVersion": "networking.k8s.io/v1",
+        "kind": "Ingress",
+        "plural": "ingresses",
+        "name": "shop"
+      },
+      "write": {
+        "type": "patch",
+        "operations": [
+          {
+            "op": "test",
+            "path": "/metadata/resourceVersion",
+            "value": "9"
+          },
+          {
+            "op": "test",
+            "path": "/metadata/annotations/traefik.ingress.kubernetes.io~1router.middlewares",
+            "value": "demo-shop-ip-allow@kubernetescrd"
+          },
+          {
+            "op": "remove",
+            "path": "/metadata/annotations/traefik.ingress.kubernetes.io~1router.middlewares"
+          }
+        ]
+      }
+    },
+    {
+      "target": {
+        "apiVersion": "traefik.io/v1alpha1",
+        "kind": "Middleware",
+        "plural": "middlewares",
+        "name": "shop-ip-allow"
+      },
+      "write": {
+        "type": "delete"
+      }
+    }
+  ],
+  "warnings": []
+}

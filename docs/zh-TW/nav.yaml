@@ -23,6 +23,7 @@
     variables: 設定環境變數
     domains: 加上公開網域與 HTTPS
     dns: 設定 DNS 紀錄
+    ip-limits: 限制能連入和連出的 IP
     maintenance: 顯示維護與錯誤頁面
     volumes: 儲存檔案與備份磁碟區
     delete-project: 刪除專案

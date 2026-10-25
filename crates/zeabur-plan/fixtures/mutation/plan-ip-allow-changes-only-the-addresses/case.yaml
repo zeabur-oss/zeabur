@@ -1,0 +1,10 @@
+description: "New addresses replace sourceRange and leave the rest of the middleware, such as an ipStrategy a person set with kubectl."
+operation: mutation.plan
+params:
+  kinds: [{group: traefik.io, kind: Middleware, plural: middlewares, namespaced: true}]
+  request:
+    changes:
+      - op: ipAllow
+        route: {kind: Ingress, name: shop}
+        enabled: true
+        cidrs: [203.0.113.0/24]

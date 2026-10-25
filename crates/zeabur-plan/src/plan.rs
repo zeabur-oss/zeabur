@@ -450,6 +450,8 @@ impl<'a> Planner<'a> {
                 redirect.permanent,
             ),
             Change::BasicAuth(auth) => self.basic_auth(&auth.route, auth.user.as_ref()),
+            Change::IpAllow(allow) => self.ip_allow(&allow.route, allow.enabled, &allow.cidrs),
+            Change::EgressLimit(limit) => self.egress_limit(limit),
             Change::ErrorPageHtml(pages) => self.error_page_html(pages),
             Change::ErrorPages(pages) => self.error_pages(&pages.route, pages.enabled),
             Change::Maintenance(change) => {

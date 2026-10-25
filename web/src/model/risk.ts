@@ -135,6 +135,7 @@ function weighOne(change: Change, podsOf: PodsOf): OneWeight {
 }
 
 function weighAccess(change: AccessChange | ServiceChange): { risk: Risk; reason?: Reason } {
+  if (change.op === "egressLimit" && change.enabled) return { risk: "high", reason: "isolates" }
   return change.op === "publicPort" && !change.remove
     ? { risk: "high", reason: "opensPort" }
     : { risk: "normal" }
@@ -168,6 +169,8 @@ export type AccessChange = Extract<
       | "editTask"
       | "redirect"
       | "basicAuth"
+      | "ipAllow"
+      | "egressLimit"
       | "certificate"
       | "envImport"
       | "publicPort"
@@ -369,12 +372,14 @@ function accessTab(change: Change, service?: WorkloadRef): [WorkloadRef | undefi
     case "envImport":
       return [change.workload, "variables"]
     case "basicAuth":
+    case "ipAllow":
     case "errorPages":
     case "maintenance":
     case "certificate":
     case "redirect":
       return [service, "networking"]
     case "publicPort":
+    case "egressLimit":
       return [change.workload, "networking"]
     default:
       return [undefined, "networking"]

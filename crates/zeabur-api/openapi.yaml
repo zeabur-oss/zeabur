@@ -5424,6 +5424,38 @@ components:
           Ask for a user name and password on every hostname of an Ingress, or stop (see the
           `access` module).
       - allOf:
+        - $ref: "#/components/schemas/IpAllowChange"
+          description: |-
+            Let only these client addresses reach every hostname of an Ingress, or stop (see the
+            `ip_limits` module).
+        - type: object
+          required:
+          - op
+          properties:
+            op:
+              type: string
+              enum:
+              - ipAllow
+        description: |-
+          Let only these client addresses reach every hostname of an Ingress, or stop (see the
+          `ip_limits` module).
+      - allOf:
+        - $ref: "#/components/schemas/EgressLimitChange"
+          description: |-
+            Let a workload's pods connect only to these addresses, its project and cluster DNS, or
+            stop (see the `ip_limits` module).
+        - type: object
+          required:
+          - op
+          properties:
+            op:
+              type: string
+              enum:
+              - egressLimit
+        description: |-
+          Let a workload's pods connect only to these addresses, its project and cluster DNS, or
+          stop (see the `ip_limits` module).
+      - allOf:
         - $ref: "#/components/schemas/ErrorPageHtml"
           description: |-
             Write the HTML of the project's error pages, in the ConfigMap of its page server (see the
@@ -8278,6 +8310,26 @@ components:
           items:
             $ref: "#/components/schemas/UnreadableView"
           description: What could not be read.
+    EgressLimitChange:
+      type: object
+      description: A [`Change::EgressLimit`].
+      required:
+      - workload
+      - enabled
+      properties:
+        cidrs:
+          type: array
+          items:
+            type: string
+          description: |-
+            The addresses its pods may connect to besides the project and DNS: IP addresses or CIDR
+            ranges. May be empty when `enabled`: then nothing outside the project is reachable.
+        enabled:
+          type: boolean
+          description: Limit when true; stop when false.
+        workload:
+          $ref: "#/components/schemas/WorkloadRef"
+          description: The workload.
     Encoding:
       type: string
       description: The encoding of a generated value.
@@ -10146,6 +10198,24 @@ components:
         username:
           type: string
           description: Who it enrols a passkey for.
+    IpAllowChange:
+      type: object
+      description: A [`Change::IpAllow`].
+      required:
+      - route
+      - enabled
+      properties:
+        cidrs:
+          type: array
+          items:
+            type: string
+          description: "The addresses that may connect: IP addresses or CIDR ranges. At least one when `enabled`."
+        enabled:
+          type: boolean
+          description: Limit when true; stop when false.
+        route:
+          $ref: "#/components/schemas/RouteRef"
+          description: The Ingress.
     IssuerView:
       type: object
       description: One `ClusterIssuer`.
@@ -15207,6 +15277,13 @@ components:
           items:
             type: string
           description: The hosts its rules match.
+        ipAllow:
+          oneOf:
+          - $ref: "#/components/schemas/RouteMiddleware"
+            description: |-
+              The Traefik `ipAllowList` middleware Zeabur makes to limit the client addresses that reach
+              the Ingress's hosts.
+          - type: "null"
         issuer:
           type:
           - string

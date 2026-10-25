@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  namespace: demo
+  resourceVersion: "41"
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: web}
+  template:
+    metadata:
+      labels: {app: web}
+    spec:
+      containers:
+        - name: app
+          image: example/web:3.0
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: web-egress-limit
+  namespace: demo
+  resourceVersion: "52"
+spec:
+  podSelector: {matchLabels: {app: web}}
+  policyTypes: [Egress]
+  egress:
+    - to: [{podSelector: {}}]

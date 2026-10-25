@@ -171,7 +171,8 @@ fn issuing_others(object: &Value, hostname: &str) -> bool {
     named && rule_hosts(object).iter().any(|h| h != hostname)
 }
 
-/// Refuses to move `hostname` off Ingress `ingress` while the Ingress asks for a password, or
+/// Refuses to move `hostname` off Ingress `ingress` while the Ingress asks for a password or limits
+/// client addresses, or
 /// the hostname redirects or is in maintenance: the middlewares for these belong to the Ingress.
 fn refuse_move(
     meta: &ObjectMeta,
@@ -182,6 +183,8 @@ fn refuse_move(
     let listed = traefik::middlewares(meta);
     let first = if listed.contains(&traefik::basic_auth_name(ingress)) {
         format!("Stop asking for a password on {ingress}")
+    } else if listed.contains(&traefik::ip_allow_name(ingress)) {
+        format!("Stop limiting the client addresses of {ingress}")
     } else if listed.contains(&traefik::redirect_name(ingress, hostname)) {
         format!("Stop redirecting {hostname}")
     } else if in_maintenance {

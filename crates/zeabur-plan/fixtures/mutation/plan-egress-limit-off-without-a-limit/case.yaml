@@ -1,0 +1,8 @@
+description: "Stopping a limit that does not exist is refused."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - op: egressLimit
+        workload: {kind: Deployment, name: web}
+        enabled: false

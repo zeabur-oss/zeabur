@@ -67,6 +67,12 @@ pub enum Change {
     /// Ask for a user name and password on every hostname of an Ingress, or stop (see the
     /// `access` module).
     BasicAuth(BasicAuthChange),
+    /// Let only these client addresses reach every hostname of an Ingress, or stop (see the
+    /// `ip_limits` module).
+    IpAllow(IpAllowChange),
+    /// Let a workload's pods connect only to these addresses, its project and cluster DNS, or
+    /// stop (see the `ip_limits` module).
+    EgressLimit(EgressLimitChange),
     /// Write the HTML of the project's error pages, in the ConfigMap of its page server (see the
     /// `error_pages` module).
     ErrorPageHtml(ErrorPageHtml),
@@ -667,6 +673,35 @@ pub struct TemplateChange {
     /// The values of the inputs that are not generated, by name.
     #[serde(default)]
     pub inputs: BTreeMap<String, String>,
+}
+
+/// A [`Change::IpAllow`].
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[serde(rename_all = "camelCase")]
+pub struct IpAllowChange {
+    /// The Ingress.
+    pub route: RouteRef,
+    /// Limit when true; stop when false.
+    pub enabled: bool,
+    /// The addresses that may connect: IP addresses or CIDR ranges. At least one when `enabled`.
+    #[serde(default)]
+    pub cidrs: Vec<String>,
+}
+
+/// A [`Change::EgressLimit`].
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[serde(rename_all = "camelCase")]
+pub struct EgressLimitChange {
+    /// The workload.
+    pub workload: WorkloadRef,
+    /// Limit when true; stop when false.
+    pub enabled: bool,
+    /// The addresses its pods may connect to besides the project and DNS: IP addresses or CIDR
+    /// ranges. May be empty when `enabled`: then nothing outside the project is reachable.
+    #[serde(default)]
+    pub cidrs: Vec<String>,
 }
 
 /// A [`Change::ErrorPages`].

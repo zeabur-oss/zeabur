@@ -2940,6 +2940,14 @@ export interface components {
           /** @enum {string} */
           op: "basicAuth"
         })
+      | (components["schemas"]["IpAllowChange"] & {
+          /** @enum {string} */
+          op: "ipAllow"
+        })
+      | (components["schemas"]["EgressLimitChange"] & {
+          /** @enum {string} */
+          op: "egressLimit"
+        })
       | (components["schemas"]["ErrorPageHtml"] & {
           /** @enum {string} */
           op: "errorPageHtml"
@@ -4325,6 +4333,18 @@ export interface components {
       /** @description What could not be read. */
       unreadable: components["schemas"]["UnreadableView"][]
     }
+    /** @description A [`Change::EgressLimit`]. */
+    EgressLimitChange: {
+      /**
+       * @description The addresses its pods may connect to besides the project and DNS: IP addresses or CIDR
+       *     ranges. May be empty when `enabled`: then nothing outside the project is reachable.
+       */
+      cidrs?: string[]
+      /** @description Limit when true; stop when false. */
+      enabled: boolean
+      /** @description The workload. */
+      workload: components["schemas"]["WorkloadRef"]
+    }
     /**
      * @description The encoding of a generated value.
      * @enum {string}
@@ -5311,6 +5331,15 @@ export interface components {
       origin: components["schemas"]["Origin"]
       /** @description Who it enrols a passkey for. */
       username: string
+    }
+    /** @description A [`Change::IpAllow`]. */
+    IpAllowChange: {
+      /** @description The addresses that may connect: IP addresses or CIDR ranges. At least one when `enabled`. */
+      cidrs?: string[]
+      /** @description Limit when true; stop when false. */
+      enabled: boolean
+      /** @description The Ingress. */
+      route: components["schemas"]["RouteRef"]
     }
     /** @description One `ClusterIssuer`. */
     IssuerView: {
@@ -7871,6 +7900,7 @@ export interface components {
       errorPages?: components["schemas"]["RouteMiddleware"] | null
       /** @description The hosts its rules match. */
       hostnames: string[]
+      ipAllow?: components["schemas"]["RouteMiddleware"] | null
       /**
        * @description The cert-manager issuer the Ingress names in `cert-manager.io/cluster-issuer` or
        *     `cert-manager.io/issuer`: cert-manager issues a certificate for each of its `spec.tls`

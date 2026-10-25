@@ -84,7 +84,14 @@ pub fn middleware_read(change: &Change) -> Option<(ResourceRef, String)> {
             traefik::basic_auth_name(&auth.route.name),
         ));
     }
-    crate::error_pages::middleware_read(change)
+    crate::ip_limits::middleware_read(change)
+        .or_else(|| crate::error_pages::middleware_read(change))
+}
+
+/// The `NetworkPolicy` a change reads first, if any: the plan updates or deletes it.
+#[must_use]
+pub fn policy_read(change: &Change) -> Option<(ResourceRef, String)> {
+    crate::ip_limits::policy_read(change)
 }
 
 #[expect(
@@ -240,7 +247,11 @@ impl Planner<'_> {
 
     /// Route `route` as read, after the checks both changes share. An empty `hostname` is not
     /// checked.
-    fn access_route(&mut self, route: &RouteRef, hostname: &str) -> Result<Value, PlanError> {
+    pub(crate) fn access_route(
+        &mut self,
+        route: &RouteRef,
+        hostname: &str,
+    ) -> Result<Value, PlanError> {
         let object = self.checked_route(route, hostname)?;
         if route.kind == RouteKind::Ingress {
             self.refuse_without_traefik(&object, &route.name)?;
@@ -290,7 +301,7 @@ impl Planner<'_> {
             ErrorKind::Invalid,
             "needs_traefik",
             format!(
-                "Redirects, passwords and error pages on Ingress {name} need Traefik, and {}.",
+                "Redirects, passwords, IP limits and error pages on Ingress {name} need Traefik, and {}.",
                 if served {
                     "its class is not Traefik's"
                 } else {

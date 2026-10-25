@@ -1,0 +1,120 @@
+---
+title: 限制能連入和連出的 IP
+description: 只讓指定的 IP 開啟服務的網域，並限制服務的 Pod 能連到哪些 IP。
+---
+
+進入服務 **網路**，在 **IP 限制** 設定兩件事：**誰能開啟網域** 只讓指定的 IP 或 CIDR 範圍連到服務的公開網域，**能連到哪裡** 限制服務的 Pod 能主動連到哪些 IP。兩項各自獨立，檢查後套用才會寫進叢集。
+
+範本以前有 `adminCidr` 這類輸入，讓管理介面只對某個範圍開放。範本已經拿掉它，部署後改在這裡限制。
+
+## 開始前
+
+- 誰能開啟網域：網域要用 Traefik 提供的 Ingress。Gateway 的網域（HTTPRoute）沒有對應的設定，服務只有 Gateway 的網域時，面板會寫 **透過 Gateway 的網域不能在這裡限制**。
+- 能連到哪裡：叢集的網路外掛要支援 NetworkPolicy。K3s 內建的控制器就支援。外掛不支援時，物件建得起來，但不會擋任何連線。
+- 有權修改專案的網域和 NetworkPolicy。服務由 Helm、Argo CD 或 Flux 管理時，要回到原本的 values 或 Git 儲存庫修改。
+- 這和專案設定裡的 **隔離** 是兩回事。隔離管其他專案能不能連進來，IP 限制是針對單一服務，不會改動專案的 `zeabur-project` 規則。
+
+## 限制誰能開啟網域
+
+<Steps>
+<Step>
+
+### 輸入允許的 IP
+
+在 **IP 限制** 的 **誰能開啟網域** 按 **編輯**，打開 **只允許這些 IP**，一行輸入一個 IP 或 CIDR 範圍，例如 `203.0.113.0/24`。IPv4 和 IPv6 都可以。
+
+</Step>
+<Step>
+
+### 檢查並套用
+
+按 **檢查變更**，確認清單，再套用。這個服務每個走 Traefik 的 Ingress 都會設一份限制，同一個 Ingress 上所有網域都適用，包括別的服務共用的網域。
+
+其他 IP 開啟網域時會得到 403。限制排在 Ingress 的中介層最前面，早於轉址和密碼。
+
+</Step>
+</Steps>
+
+不想限制時，回到同一個面板關掉開關。每次修改都是整份清單取代前一份。
+
+### Traefik 看到的 IP
+
+Traefik 預設用連線的來源位址比對。叢集的入口如果會改掉來源位址，比對的就不是訪客的 IP，限制會擋掉所有人，或放行所有人。
+
+- 用 Zeabur 安裝程式裝的 Traefik，Service 的 `externalTrafficPolicy` 是 `Local`，連到 Traefik 所在節點的請求會保留訪客的位址。這份設定來自 Zeabur Catalog 的 Traefik 範本。ServiceLB 把其他節點的請求轉過來時，位址是否保留，還沒有驗證。
+- 前面還有 CDN、反向代理或雲端負載平衡器時，Traefik 看到的是它們的位址。這時要在 Middleware 設定 `ipStrategy`，讀 `X-Forwarded-For`，也要讓 Traefik 的 entry point 信任那層代理的位址（`forwardedHeaders.trustedIPs`）。Zeabur 不會替你改這些設定。
+- 後續修改清單時，Zeabur 只改 `sourceRange`，你加在 Middleware 上的 `ipStrategy` 會保留。
+
+套用後，從允許和不允許的 IP 各連一次，確認結果。
+
+```yaml
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: api-ip-allow
+spec:
+  ipAllowList:
+    sourceRange: [203.0.113.0/24]
+    ipStrategy:
+      depth: 1
+```
+
+設定項目見 Traefik 的 [ipAllowList](https://doc.traefik.io/traefik/reference/routing-configuration/http/middlewares/ipallowlist/) 文件。
+
+## 限制服務能連到哪裡
+
+<Steps>
+<Step>
+
+### 輸入允許連到的 IP
+
+在 **能連到哪裡** 按 **編輯**，打開 **只允許連到這些 IP**，一行輸入一個 IP 或 CIDR 範圍。單獨的 IP 會寫成 `/32`（IPv6 是 `/128`）。
+
+清單可以留空。留空時，服務只能連到同專案的服務和 DNS。
+
+</Step>
+<Step>
+
+### 檢查並套用
+
+按 **檢查變更**。檢查畫面會把風險標成高，因為套用後，清單以外的連線（包括更新套件、呼叫外部 API）都會失敗。確認後套用。
+
+</Step>
+</Steps>
+
+套用後，服務的 Pod 只能連到這些地方：
+
+- 同專案的所有 Pod。
+- 叢集的 DNS（`kube-system` 的 `kube-dns`，連接埠 53，UDP 和 TCP）。
+- 清單裡的 IP。
+
+其他專案的服務、叢集外的其他位址都連不到。服務連到同專案的資料庫不受影響。
+
+規則依 Pod 範本的標籤選 Pod，所以同一個服務的所有副本都適用，新的副本也一樣。
+
+## 用 kubectl 設定和移除
+
+兩種限制都是一般的 Kubernetes 物件，沒有 finalizer，也沒有依賴 Zeabur 的欄位。移除 Zeabur 之後，它們仍然有效。
+
+**誰能開啟網域**：每個 Ingress 會有一個 Middleware，名稱是 `<Ingress 名稱>-ip-allow`，它的 `ownerReferences` 指向 Ingress。Ingress 的 annotation `traefik.ingress.kubernetes.io/router.middlewares` 列出它。要移除，先從 annotation 拿掉 `<專案>-<Ingress 名稱>-ip-allow@kubernetescrd`，再刪 Middleware。先刪 Middleware 的話，Traefik 找不到它，網域會回 404。
+
+```sh
+kubectl -n shop annotate ingress api traefik.ingress.kubernetes.io/router.middlewares-
+kubectl -n shop delete middleware api-ip-allow
+```
+
+上面的 annotation 指令會移除整個清單。如果 Ingress 還有轉址、密碼等其他中介層，改用 `kubectl edit`，只拿掉這一項。
+
+**能連到哪裡**：NetworkPolicy 名稱是 `<服務名稱>-egress-limit`，`policyTypes` 只有 `Egress`。刪掉它，限制就解除：
+
+```sh
+kubectl -n shop delete networkpolicy api-egress-limit
+```
+
+要調整規則，直接編輯這個 NetworkPolicy，或另外建立自己的 NetworkPolicy。多個規則的允許範圍會相加，不會互相覆蓋。
+
+## 限制和 Zeabur 其他功能的關係
+
+- 維護模式使用另一個 Ingress，它不帶這份限制，所有 IP 都看得到維護頁面。
+- 搬移網域到獨立的 Ingress（更換憑證時會發生）前，要先停掉這個 Ingress 的 IP 限制。
+- 刪掉 Ingress 時，它擁有的 Middleware 會一起刪。刪除服務不會刪 NetworkPolicy，需要的話用上面的指令清掉。

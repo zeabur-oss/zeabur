@@ -1,0 +1,8 @@
+description: "Stopping the limit deletes the policy named for the workload."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - op: egressLimit
+        workload: {kind: Deployment, name: web}
+        enabled: false

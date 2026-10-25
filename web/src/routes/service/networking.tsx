@@ -63,6 +63,7 @@ import {
   type Service,
 } from "@/model/service"
 import { refusedPlaces } from "@/routes/project/data"
+import { IpLimits } from "@/routes/service/ip-limits"
 import { PublicPorts } from "@/routes/service/public-ports"
 import { Reachability } from "@/routes/service/reachability"
 
@@ -563,6 +564,13 @@ export function NetworkingTab({
           </section>
         </>
       )}
+      <IpLimits
+        project={project}
+        service={service}
+        ingresses={ingressesOf(network, service)}
+        gateway={routesOf(network, service).some(isGateway)}
+        reachability={reachability?.services.find((s) => s.service === service.id)}
+      />
       {reachability ? (
         <ReachabilityFor
           project={project}
@@ -658,6 +666,10 @@ function ExposeHint({ command }: { command?: string }) {
 function withAccess(route?: Schemas["Route"]): Schemas["Route"] | undefined {
   return route && (isGateway(route) || servedByTraefik(route)) ? route : undefined
 }
+
+/** The Ingresses of a service that Traefik serves, which an IP limit can list a middleware on. */
+const ingressesOf = (network: Network, service: Service) =>
+  routesOf(network, service).filter((r) => !isGateway(r) && servedByTraefik(r))
 
 const isGateway = (route: Schemas["Route"]) => route.origin.kind === "HTTPRoute"
 

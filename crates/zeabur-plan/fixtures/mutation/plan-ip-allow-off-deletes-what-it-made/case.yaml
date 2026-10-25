@@ -1,0 +1,9 @@
+description: "Stopping the limit takes the middleware out of the Ingress annotation first, then deletes the middleware."
+operation: mutation.plan
+params:
+  kinds: [{group: traefik.io, kind: Middleware, plural: middlewares, namespaced: true}]
+  request:
+    changes:
+      - op: ipAllow
+        route: {kind: Ingress, name: shop}
+        enabled: false

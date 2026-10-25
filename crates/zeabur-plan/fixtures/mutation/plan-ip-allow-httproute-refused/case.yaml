@@ -1,0 +1,9 @@
+description: "Gateway API has no filter for client addresses, so a limit on an HTTPRoute is refused."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - op: ipAllow
+        route: {kind: HTTPRoute, name: web-www}
+        enabled: true
+        cidrs: [203.0.113.0/24]

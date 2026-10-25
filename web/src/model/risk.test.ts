@@ -162,6 +162,18 @@ describe("weigh", () => {
   })
 })
 
+describe("IP limits", () => {
+  test("limiting where pods connect isolates them; lifting it and limiting domains do not", () => {
+    const limit: Change = { op: "egressLimit", workload: api, enabled: true, cidrs: [] }
+    expect(weigh([limit], pods({})).reasons).toStrictEqual(["isolates"])
+    expect(weigh([{ ...limit, enabled: false }], pods({})).risk).toBe("normal")
+    const route: Schemas["RouteRef"] = { kind: "Ingress", name: "web" }
+    expect(
+      weigh([{ op: "ipAllow", route, enabled: true, cidrs: ["10.0.0.0/8"] }], pods({})),
+    ).toStrictEqual({ risk: "normal", reasons: [] })
+  })
+})
+
 describe("undoOf", () => {
   test("scaling is undone by scaling back to the pods there were", () => {
     const known = pods({ api: { desired: 2, ready: 2 } })

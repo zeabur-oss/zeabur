@@ -1,0 +1,87 @@
+{
+  "impact": [
+    {
+      "kind": "Deployment",
+      "name": "web"
+    }
+  ],
+  "objects": [
+    {
+      "target": {
+        "apiVersion": "networking.k8s.io/v1",
+        "kind": "NetworkPolicy",
+        "plural": "networkpolicies",
+        "name": "web-egress-limit"
+      },
+      "write": {
+        "type": "create",
+        "body": {
+          "metadata": {
+            "name": "web-egress-limit",
+            "namespace": "demo"
+          },
+          "spec": {
+            "podSelector": {
+              "matchLabels": {
+                "app": "web"
+              }
+            },
+            "policyTypes": [
+              "Egress"
+            ],
+            "egress": [
+              {
+                "to": [
+                  {
+                    "podSelector": {}
+                  }
+                ]
+              },
+              {
+                "to": [
+                  {
+                    "namespaceSelector": {
+                      "matchLabels": {
+                        "kubernetes.io/metadata.name": "kube-system"
+                      }
+                    },
+                    "podSelector": {
+                      "matchLabels": {
+                        "k8s-app": "kube-dns"
+                      }
+                    }
+                  }
+                ],
+                "ports": [
+                  {
+                    "protocol": "UDP",
+                    "port": 53
+                  },
+                  {
+                    "protocol": "TCP",
+                    "port": 53
+                  }
+                ]
+              },
+              {
+                "to": [
+                  {
+                    "ipBlock": {
+                      "cidr": "203.0.113.0/24"
+                    }
+                  },
+                  {
+                    "ipBlock": {
+                      "cidr": "198.51.100.7/32"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "warnings": []
+}

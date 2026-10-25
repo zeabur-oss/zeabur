@@ -93,24 +93,25 @@ pub(super) async fn edited_objects(
     Ok(out)
 }
 
-/// The Traefik middlewares the request's redirects and basic auth update or delete, where they
-/// exist.
+/// The Traefik middlewares the request's redirects, basic auth and IP limits update or delete,
+/// and the NetworkPolicy of its egress limits, where they exist.
 async fn middlewares(
     cluster: &dyn Cluster,
     project: &str,
     request: &PlanRequest,
 ) -> Result<Vec<Fetched>, ApiError> {
     let mut out = Vec::new();
-    for (resource, name) in request
-        .changes
-        .iter()
-        .filter_map(zeabur_plan::access::middleware_read)
-    {
+    let mut reads = Vec::new();
+    for change in &request.changes {
+        reads.extend(zeabur_plan::access::policy_read(change).map(|read| ("NetworkPolicy", read)));
+        reads.extend(zeabur_plan::access::middleware_read(change).map(|read| ("Middleware", read)));
+    }
+    for (kind, (resource, name)) in reads {
         let reference = zeabur_kube::ResourceRef::new(
             &resource.group,
             &resource.version,
             &resource.resource,
-            "Middleware",
+            kind,
         );
         // Absent, or not served without Traefik: the plan then makes it, or says Traefik is needed.
         let found = cluster
@@ -125,7 +126,7 @@ async fn middlewares(
             .map_err(|e| {
                 read_problem(
                     e,
-                    &format!("middleware {name}"),
+                    &format!("{} {name}", resource.resource),
                     get_read(&resource.group, &resource.resource, Some(project), &name),
                 )
             })?;
