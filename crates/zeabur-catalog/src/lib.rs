@@ -22,8 +22,10 @@ pub const TEMPLATES: &[&str] = &["error-pages"];
 
 /// The `manifests.yaml` of Zeabur Catalog's `error-pages` template, a Go template whose only field
 /// is `{{ .Namespace }}`: the page server for a project's error pages and maintenance page.
-pub const ERROR_PAGES_MANIFESTS: &str =
-    include_str!(concat!(env!("OUT_DIR"), "/bundle/templates/error-pages/manifests.yaml"));
+pub const ERROR_PAGES_MANIFESTS: &str = include_str!(concat!(
+    env!("OUT_DIR"),
+    "/bundle/templates/error-pages/manifests.yaml"
+));
 
 /// The commit of Zeabur Catalog this build carries.
 pub const CATALOGUE_COMMIT: &str = env!("ZEABUR_CATALOG_COMMIT");

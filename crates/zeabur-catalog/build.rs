@@ -1,14 +1,13 @@
 //! Embeds Zeabur Catalog's `bundle.tar.gz` from `ZEABUR_CATALOG_RELEASE`, which the Nix dev shell
 //! sets to the catalog's `release` output at the commit in flake.lock. The components
 //! (`components/<capability>/<id>.yaml`), the `error-pages` template and the template measurements
-//! (`measurements/templates/<id>.json`) become sorted tables of `include_str!` entries, so the binary
-//! carries the catalogue it was built with and reads nothing at run time.
+//! (`measurements/templates/<id>.json`) become sorted tables of `include_str!` entries, so the
+//! binary carries the catalogue it was built with and reads nothing at run time.
 
 use std::fmt::Write as _;
 use std::fs::{self, File};
-use std::io;
-use std::path::{Component, Path, PathBuf};
-use std::{env, process};
+use std::path::{Path, PathBuf};
+use std::{env, io, process};
 
 fn main() {
     println!("cargo::rerun-if-env-changed=ZEABUR_CATALOG_RELEASE");
@@ -67,17 +66,13 @@ fn unpack(archive: &Path, dir: &Path) -> io::Result<(Components, Measurements)> 
     for entry in tar.entries()? {
         let mut entry = entry?;
         let path = entry.path()?.into_owned();
-        let parts: Vec<&str> = path
-            .components()
-            .filter_map(|c| match c {
-                Component::Normal(part) => part.to_str(),
-                _ => None,
-            })
-            .collect();
+        let parts: Vec<&str> = path.iter().filter_map(|part| part.to_str()).collect();
         let dest = dir.join(parts.join("/"));
         match parts.as_slice() {
             ["components", capability, file] => match file.strip_suffix(".yaml") {
-                Some(id) => components.push(((*capability).to_owned(), id.to_owned(), dest.clone())),
+                Some(id) => {
+                    components.push(((*capability).to_owned(), id.to_owned(), dest.clone()));
+                }
                 None => continue,
             },
             ["measurements", "templates", file] => match file.strip_suffix(".json") {
