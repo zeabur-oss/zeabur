@@ -1,8 +1,9 @@
 // Documentation screenshots (e2e/shots/), run by scripts/docs-shots.sh against a demo server:
 //   ZEABUR_SHOTS_URL       the demo's origin, http://127.0.0.1:<port>
-//   ZEABUR_SHOTS_MANIFEST  docs/shots.yaml as JSON
+//   ZEABUR_SHOTS_MANIFEST  the manifest (docs/shots.yaml) as JSON
 //   ZEABUR_SHOTS_SERVER    the demo's app and environment (e2e/shots/manifest.ts): only its shots run
 //   ZEABUR_SHOTS_OUT       receives <locale>/<theme>/<id>.png
+//   ZEABUR_SHOTS_SCALE     the manifest's scale
 import { defineConfig, devices } from "@playwright/test"
 import { locales, themes } from "./e2e/shots/manifest.ts"
 
@@ -21,7 +22,6 @@ export default defineConfig({
     baseURL: url,
     // Full Chromium in its new headless mode, as in playwright.config.ts.
     channel: "chromium",
-    // ZEABUR_SHOTS_SCALE: the README images use 1.
     deviceScaleFactor: Number(process.env.ZEABUR_SHOTS_SCALE ?? 2),
     reducedMotion: "reduce",
     timezoneId: "UTC",

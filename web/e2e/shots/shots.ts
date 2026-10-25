@@ -145,7 +145,7 @@ async function cropped(page: Page, selector: string, until: string | undefined, 
   await sheet.close()
 }
 
-for (const shot of readManifest(manifest).filter((s) => serversOf(s).includes(server))) {
+for (const shot of readManifest(manifest).shots.filter((s) => serversOf(s).includes(server))) {
   test.describe(() => {
     test.use({ viewport: viewports[shot.viewport] })
 
@@ -159,7 +159,7 @@ for (const shot of readManifest(manifest).filter((s) => serversOf(s).includes(se
       await page.goto(shot.path, { waitUntil: "networkidle" })
       if (shot.wait) await page.locator(shot.wait).first().waitFor()
       for (const step of shot.steps) await run(page, step)
-      await fit(page, shot.clip)
+      if (shot.viewport !== "cover") await fit(page, shot.clip)
       // A pointer left over a link or a row shows its hover state.
       const { width, height } = page.viewportSize()!
       if (!("hover" in (shot.steps.at(-1) ?? {}))) await page.mouse.move(width - 1, height - 1)
@@ -168,7 +168,7 @@ for (const shot of readManifest(manifest).filter((s) => serversOf(s).includes(se
       const path = `${out}/${info.project.name}/${shot.id}.png`
       const options = { path, animations: "disabled", caret: "hide" } as const
       if (shot.clip) await cropped(page, shot.clip, shot.until, path)
-      else await page.screenshot({ ...options, fullPage: true })
+      else await page.screenshot({ ...options, fullPage: shot.viewport !== "cover" })
     })
   })
 }

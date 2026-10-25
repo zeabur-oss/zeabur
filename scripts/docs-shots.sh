@@ -1,20 +1,16 @@
 #!/usr/bin/env bash
-# Takes the documentation screenshots that the manifest declares (docs/internal/screenshots.md),
-# from the demo server (crates/zeabur-api/examples/demo.rs) or the installer's pages with captured
-# responses, in each locale and theme, as AVIF.
-# Run inside `nix develop`.
+# Takes the screenshots that a manifest declares (docs/internal/screenshots.md), from the demo
+# server (crates/zeabur-api/examples/demo.rs) or the installer's pages with captured responses, in
+# each locale and theme, as AVIF. Each docs/*shots.yaml is one image set. Run inside `nix develop`.
 #   scripts/docs-shots.sh [manifest] [out] [version]
-# <out> receives <locale>/<theme>/<id>.avif and manifest.json; with a version, also
-# docs-shots-<version>.tar, which holds both. Images in <out> that this run does not take stay.
+# <out> defaults to the manifest's `out`, else target/docs-shots. A manifest without `out` also
+# gives <out>/manifest.json and, with a version, docs-shots-<version>.tar, which holds both.
+# Images in <out> that this run does not take stay, unless the manifest sets `clean`.
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
 manifest="$(realpath "${1:-$root/docs/shots.yaml}")"
-mkdir -p "${2:-$root/target/docs-shots}"
-out="$(realpath "${2:-$root/target/docs-shots}")"
 version="${3:-}"
-# ZEABUR_SHOTS_BUDGET_KB sets the largest AVIF; the README images use 30.
-budget=$((${ZEABUR_SHOTS_BUDGET_KB:-150} * 1024))
 port="${ZEABUR_SHOTS_PORT:-18300}"
 if [[ -n "$version" && ! "$version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
   echo "expected a version like v0.0.2" >&2
@@ -29,9 +25,21 @@ cleanup() {
 trap cleanup EXIT
 
 yq -o=json '.' "$manifest" >"$work/shots.json"
-servers="$(cd "$root/web" && bun e2e/shots/manifest.ts "$work/shots.json" "$manifest")"
+settings="$(cd "$root/web" && bun e2e/shots/manifest.ts "$work/shots.json" "$manifest")"
+kept="$(jq -r '.out // ""' <<<"$settings")"
+file="$(jq -r .file <<<"$settings")"
+budget=$(($(jq -r .budget <<<"$settings") * 1024))
+if [[ -n "$kept" && -n "$version" ]]; then
+  echo "error: $manifest names its own out; only a manifest without one makes a release tar" >&2
+  exit 2
+fi
+out="${2:-${kept:+$root/$kept}}"
+out="${out:-$root/target/docs-shots}"
+mkdir -p "$out"
+out="$(realpath "$out")"
+servers="$(jq -r '.servers[]' <<<"$settings")"
 
-mkdir -p "$work/png"
+mkdir -p "$work/png" "$work/avif"
 if grep -q '"app":"zeabur"' <<<"$servers"; then
   "$root/scripts/build-ui.sh"
   ZEABUR_UI_DIST="$root/web/dist" cargo build --locked -p zeabur-api --example demo
@@ -70,6 +78,7 @@ while IFS= read -r line; do
     cd "$root/web"
     ZEABUR_SHOTS_URL="http://127.0.0.1:$port" ZEABUR_SHOTS_MANIFEST="$work/shots.json" \
       ZEABUR_SHOTS_SERVER="$line" ZEABUR_SHOTS_OUT="$work/png" \
+      ZEABUR_SHOTS_SCALE="$(jq -r .scale <<<"$settings")" \
       bunx playwright test -c playwright.shots.config.ts --output="$root/target/docs-shots-results"
   )
   kill "$server"
@@ -77,11 +86,15 @@ while IFS= read -r line; do
   server=""
 done <<<"$servers"
 
-mkdir -p "$out"/{en,zh-TW,zh-CN}
+# Encode into $work/avif first, so a failed run leaves <out> as it was.
 over=()
 while IFS= read -r png; do
-  name="${png#"$work/png/"}"
-  avif="$out/${name%.png}.avif"
+  IFS=/ read -r locale theme id <<<"${png#"$work/png/"}"
+  id="${id%.png}"
+  name="${file//\{locale\}/$locale}"
+  name="${name//\{theme\}/$theme}"
+  name="${name//\{id\}/$id}"
+  avif="$work/avif/$name"
   mkdir -p "$(dirname "$avif")"
   # Lower the quality in steps until the file fits the budget, down to 40.
   for quality in 70 65 60 55 50 45 40; do
@@ -89,7 +102,7 @@ while IFS= read -r png; do
     size=$(wc -c <"$avif" | tr -d ' ')
     if ((size <= budget)); then break; fi
   done
-  if ((size > budget)); then over+=("${name%.png}.avif ($size bytes)"); fi
+  if ((size > budget)); then over+=("$name ($size bytes)"); fi
 done < <(find "$work/png" -name '*.png' | sort)
 
 if ((${#over[@]} > 0)); then
@@ -98,7 +111,18 @@ if ((${#over[@]} > 0)); then
   exit 1
 fi
 
+if [[ "$(jq -r .clean <<<"$settings")" == true ]]; then
+  rm -rf "$out"
+  mkdir -p "$out"
+fi
+cp -R "$work/avif/." "$out/"
+if [[ -n "$kept" ]]; then
+  echo "$(find "$work/avif" -name '*.avif' | wc -l | tr -d ' ') images in $out"
+  exit 0
+fi
+
 # The manifest lists every image in <out>, also the ones that earlier runs took.
+mkdir -p "$out"/{en,zh-TW,zh-CN}
 (cd "$out" && find en zh-TW zh-CN -name '*.avif' | sort | while IFS= read -r avif; do
   printf '%s\t%s\n' "$avif" "$(wc -c <"$avif" | tr -d ' ')"
 done) >"$work/sizes.tsv"

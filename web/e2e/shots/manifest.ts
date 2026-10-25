@@ -1,6 +1,7 @@
-// The screenshot manifest (docs/shots.yaml), as JSON from `yq -o=json`. Run by
-// scripts/docs-shots.sh: `bun e2e/shots/manifest.ts <shots.json> [name]` checks it and prints each
-// distinct demo server (its app and environment) as one line of JSON.
+// A screenshot manifest (docs/shots.yaml, docs/internal/screenshots.md), as JSON from
+// `yq -o=json`. Run by scripts/docs-shots.sh: `bun e2e/shots/manifest.ts <shots.json> [name]`
+// checks it and prints its settings and each distinct demo server (its app and environment) as
+// one line of JSON.
 import { readFileSync } from "node:fs"
 
 export type Step =
@@ -21,7 +22,7 @@ export type Shot = {
   steps: Step[]
   clip?: string
   until?: string
-  viewport: "desktop" | "phone"
+  viewport: Viewport
   env: Record<string, string>
   locales: Locale[]
   themes: Theme[]
@@ -33,10 +34,27 @@ export const themes = ["light", "dark"] as const
 export type Locale = keyof typeof locales
 export type Theme = (typeof themes)[number]
 
+// `cover` is the plate of a README cover (design-system covers/): the window keeps its size.
 export const viewports = {
   desktop: { width: 1440, height: 900 },
   phone: { width: 390, height: 844 },
+  cover: { width: 544, height: 544 },
 }
+export type Viewport = keyof typeof viewports
+
+// A manifest that names `out` holds images kept in git: the run writes only the images, to
+// <out>/<file>. Without `out`, the run also writes manifest.json and the release's tar.
+export type Settings = {
+  out?: string
+  file: string
+  scale: number
+  budget: number
+  clean: boolean
+}
+
+export type Manifest = Settings & { shots: Shot[] }
+
+const settingKeys = ["out", "file", "scale", "budget", "clean", "shots"]
 
 const shotKeys = [
   "id",
@@ -120,7 +138,10 @@ function shot(value: unknown, index: number): Shot {
   check(isSelector(clip), `${at}: clip must be a CSS selector`)
   check(isSelector(until), `${at}: until must be a CSS selector`)
   check(until === undefined || clip !== undefined, `${at}: until needs clip`)
-  check(viewport === "desktop" || viewport === "phone", `${at}: viewport must be desktop or phone`)
+  check(
+    Object.keys(viewports).includes(viewport as string),
+    `${at}: viewport must be ${Object.keys(viewports).join(", ")}`,
+  )
   check(
     value.fresh === undefined || typeof value.fresh === "boolean",
     `${at}: fresh must be true or false`,
@@ -159,22 +180,55 @@ export function serversOf(shot: Shot): string[] {
   )
 }
 
-export function readManifest(file: string): Shot[] {
+function settings(value: Record<string, unknown>, shots: Shot[]): Settings {
+  for (const key of Object.keys(value)) check(settingKeys.includes(key), `unknown key "${key}"`)
+  const { out, file = "{locale}/{theme}/{id}.avif", scale = 2, budget = 150, clean = false } = value
+  check(
+    out === undefined || (typeof out === "string" && out !== "" && !out.startsWith("/")),
+    "out must be a path relative to the repository",
+  )
+  const name = typeof file === "string" ? file : ""
+  check(
+    name.endsWith(".avif") &&
+      name.includes("{id}") &&
+      !/[{}]/.test(name.replace(/\{(id|locale|theme)\}/g, "")),
+    "file must end in .avif and hold {id}; it may hold {locale} and {theme}",
+  )
+  check(scale === 1 || scale === 2, "scale must be 1 or 2")
+  check(Number.isInteger(budget) && (budget as number) > 0, "budget must be a number of KB")
+  check(typeof clean === "boolean", "clean must be true or false")
+  check(!clean || out !== undefined, "clean needs out")
+  for (const s of shots) {
+    check(name.includes("{locale}") || s.locales.length === 1, `${s.id}: file needs {locale}`)
+    check(name.includes("{theme}") || s.themes.length === 1, `${s.id}: file needs {theme}`)
+  }
+  return {
+    out: out as string | undefined,
+    file: name,
+    scale: scale as number,
+    budget: budget as number,
+    clean: clean as boolean,
+  }
+}
+
+/** A manifest is a list of shots, or a mapping of settings with the shots in `shots`. */
+export function readManifest(file: string): Manifest {
   const data: unknown = JSON.parse(readFileSync(file, "utf8"))
-  if (!Array.isArray(data)) throw new Error("expected a list of shots")
-  const shots = data.map(shot)
+  const top = Array.isArray(data) ? { shots: data } : data
+  if (!isRecord(top) || !Array.isArray(top.shots)) throw new Error("expected a list of shots")
+  const shots = top.shots.map(shot)
   const seen = new Set<string>()
   for (const { id } of shots) {
     if (seen.has(id)) throw new Error(`${id}: duplicate id`)
     seen.add(id)
   }
-  return shots
+  return { ...settings(top, shots), shots }
 }
 
 if (import.meta.main) {
   try {
-    const shots = readManifest(process.argv[2])
-    for (const key of new Set(shots.flatMap(serversOf))) console.log(key)
+    const { shots, ...rest } = readManifest(process.argv[2])
+    console.log(JSON.stringify({ ...rest, servers: [...new Set(shots.flatMap(serversOf))] }))
   } catch (error) {
     console.error(`${process.argv[3] ?? process.argv[2]}: ${(error as Error).message}`)
     process.exit(1)
