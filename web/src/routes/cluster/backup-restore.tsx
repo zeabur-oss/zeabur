@@ -6,8 +6,14 @@ import { Link } from "@tanstack/react-router"
 import { useState } from "react"
 import WarningIcon from "~icons/ph/warning"
 
-import type { Schemas } from "@/api/client"
-import { configMapsQuery, objectsQuery, projectsQuery, revealSecret } from "@/api/queries"
+import { type Schemas, toProblem } from "@/api/client"
+import {
+  configMapsQuery,
+  deletedBackupProjectsQuery,
+  objectsQuery,
+  projectsQuery,
+  revealSecret,
+} from "@/api/queries"
 import { Ago } from "@/components/bits"
 import { useTargets } from "@/components/connect"
 import { FormField, NameField } from "@/components/form-field"
@@ -38,6 +44,20 @@ type Copy = Schemas["RestoreCopy"]
 
 const NAMESPACE_MAX = 63
 
+/** The projects a backup can restore, with the deleted ones it holds marked as such. */
+function useChoices(backup: Schemas["VeleroBackup"]) {
+  const t = useT()
+  const projects = useQuery(projectsQuery).data?.items ?? []
+  const deleted = useQuery({
+    ...deletedBackupProjectsQuery(backup.name),
+    enabled: backup.namespaces.length === 0,
+  })
+  const choices = restoreChoices(backup.namespaces, projects, deleted.data?.items)
+  const choiceLabel = (name: string) =>
+    projects.some((p) => p.name === name) ? name : t("clusterBackups.deletedChoice", name)
+  return { projects, deleted, choices, choiceLabel }
+}
+
 /** The project to restore and, while it exists, the new project's name. */
 export function RestoreForm({
   backup,
@@ -51,8 +71,7 @@ export function RestoreForm({
   onPlan: OnPlan
 }) {
   const t = useT()
-  const projects = useQuery(projectsQuery).data?.items ?? []
-  const choices = restoreChoices(backup.namespaces, projects)
+  const { projects, deleted, choices, choiceLabel } = useChoices(backup)
   const [namespace, setNamespace] = useState(choices.length === 1 ? (choices[0] ?? "") : "")
   const [typed, setTyped] = useState<string | undefined>(undefined)
   const [tried, setTried] = useState(false)
@@ -62,6 +81,7 @@ export function RestoreForm({
   return (
     <form
       className="mt-2 flex flex-col gap-4 rounded-xl border border-main bg-card p-5"
+      aria-busy={deleted.fetchStatus === "fetching"}
       onSubmit={(event) => {
         event.preventDefault()
         setTried(true)
@@ -88,10 +108,11 @@ export function RestoreForm({
           translate="no"
           items={[
             ...(namespace ? [] : [{ value: "", label: t("clusterBackups.chooseProject") }]),
-            ...choices.map((name) => ({ value: name, label: name })),
+            ...choices.map((name) => ({ value: name, label: choiceLabel(name) })),
           ]}
         />
       </FormField>
+      <DeletedNote fetching={deleted.fetchStatus === "fetching"} error={deleted.error} />
       {namespace ? (
         <IntoField
           namespace={namespace}
@@ -103,6 +124,19 @@ export function RestoreForm({
       ) : null}
       <FormButtons gate={gate} onCancel={onCancel} />
     </form>
+  )
+}
+
+/** While the backup is read for deleted projects, or why it could not be. */
+function DeletedNote({ fetching, error }: { fetching: boolean; error: unknown }) {
+  const t = useT()
+  if (!fetching && !error) return null
+  return (
+    <p className="type-meta text-muted-foreground">
+      {fetching
+        ? t("clusterBackups.readingDeleted")
+        : t("clusterBackups.deletedUnread", toProblem(error).detail)}
+    </p>
   )
 }
 
@@ -138,9 +172,9 @@ function IntoField({
 
 function Room({ room }: { room: Schemas["RestoreRoom"] }) {
   const t = useT()
-  const { memory, cores } = useQuantityFormat()
-  const need = t("clusterBackups.copy.amount", cores(room.needCpu), memory(room.needMemory))
-  const free = t("clusterBackups.copy.amount", cores(room.freeCpu), memory(room.freeMemory))
+  const { memory, cpuRequest } = useQuantityFormat()
+  const need = t("clusterBackups.copy.amount", cpuRequest(room.needCpu), memory(room.needMemory))
+  const free = t("clusterBackups.copy.amount", cpuRequest(room.freeCpu), memory(room.freeMemory))
   if (room.fit === "short")
     return (
       <Alert variant="warn" role="note">
@@ -397,6 +431,7 @@ function CopyActions({
           <Button
             size="xs"
             variant="outline"
+            data-testid="attach-domains"
             onClick={() =>
               onPlan(
                 next.attach,

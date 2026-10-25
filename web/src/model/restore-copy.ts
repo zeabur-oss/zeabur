@@ -31,13 +31,27 @@ export function afterRestore(restore: Restore):
 }
 
 /** The projects a backup can restore: those it names, or, when it names none, every project
- * Zeabur manages. */
-export function restoreChoices(named: readonly string[], projects: readonly Project[]): string[] {
+ * Zeabur manages and the deleted projects it holds. */
+export function restoreChoices(
+  named: readonly string[],
+  projects: readonly Project[],
+  deleted: readonly string[] = [],
+): string[] {
   if (named.length > 0) return [...named].sort()
-  return projects
-    .filter((p) => p.adopted && !p.system)
-    .map((p) => p.name)
-    .sort()
+  const current = projects.filter((p) => p.adopted && !p.system).map((p) => p.name)
+  return [...new Set([...current, ...deleted])].sort()
+}
+
+/** What the backup's restore button does: make a copy when every project it names exists,
+ * restore under the original name when every one is gone, else let the person choose. */
+export function restoreEntry(
+  named: readonly string[],
+  projects: readonly Project[],
+): "copy" | "sameName" | "choose" {
+  const exists = named.map((name) => projects.some((p) => p.name === name))
+  if (exists.length === 0) return "choose"
+  if (exists.every(Boolean)) return "copy"
+  return exists.some(Boolean) ? "choose" : "sameName"
 }
 
 /** Why the restore cannot be planned yet: no project chosen, or a new name that is taken. A

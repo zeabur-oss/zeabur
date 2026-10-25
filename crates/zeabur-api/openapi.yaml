@@ -168,6 +168,48 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/Problem"
+  "/api/v1/cluster/backups/{backup}/deleted-projects":
+    get:
+      tags:
+      - cluster
+      summary: |-
+        The projects in `backup` that no longer exist in the cluster: each comes back under its own
+        name. Read as the person, who must be able to create a `DownloadRequest` in Velero's
+        namespace.
+      operationId: listDeletedBackupProjects
+      parameters:
+      - name: backup
+        in: path
+        description: The backup
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeletedProjects"
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "503":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
   "/api/v1/cluster/backups/{backup}/download":
     get:
       tags:
@@ -4685,7 +4727,9 @@ components:
           type:
           - string
           - "null"
-          description: The restore a `restore` or `attachDomains` plan creates.
+          description: |-
+            The restore a `restore` or `attachDomains` plan creates; absent while `held` is not
+            empty.
         token:
           type: string
           description: Send this to `apply` to carry out exactly this plan.
@@ -7722,6 +7766,17 @@ components:
         target:
           type: string
           description: The container it shares processes with.
+    DeletedProjects:
+      type: object
+      description: The projects a backup holds that no longer exist.
+      required:
+      - items
+      properties:
+        items:
+          type: array
+          items:
+            type: string
+          description: Their names, sorted.
     Denied:
       type: object
       description: |-

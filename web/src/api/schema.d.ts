@@ -121,6 +121,27 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  "/api/v1/cluster/backups/{backup}/deleted-projects": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * The projects in `backup` that no longer exist in the cluster: each comes back under its own
+     *     name. Read as the person, who must be able to create a `DownloadRequest` in Velero's
+     *     namespace.
+     */
+    get: operations["listDeletedBackupProjects"]
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   "/api/v1/cluster/backups/{backup}/download": {
     parameters: {
       query?: never
@@ -2590,7 +2611,10 @@ export interface components {
       hosts?: string[]
       /** @description The routes a `moveDomains` plan leaves, because a tool manages them. */
       managed?: string[]
-      /** @description The restore a `restore` or `attachDomains` plan creates. */
+      /**
+       * @description The restore a `restore` or `attachDomains` plan creates; absent while `held` is not
+       *     empty.
+       */
       restore?: string | null
       /** @description Send this to `apply` to carry out exactly this plan. */
       token: string
@@ -4039,6 +4063,11 @@ export interface components {
       problem?: components["schemas"]["Problem"] | null
       /** @description The container it shares processes with. */
       target: string
+    }
+    /** @description The projects a backup holds that no longer exist. */
+    DeletedProjects: {
+      /** @description Their names, sorted. */
+      items: string[]
     }
     /**
      * @description The request kube-apiserver refused with `403`, as Zeabur made it.
@@ -9461,6 +9490,60 @@ export interface operations {
         }
       }
       422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
+  listDeletedBackupProjects: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description The backup */
+        backup: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["DeletedProjects"]
+        }
+      }
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      503: {
         headers: {
           [name: string]: unknown
         }

@@ -2056,6 +2056,11 @@ export const zhTW: Messages = {
   "clusterBackups.restores": "還原紀錄",
   "clusterBackups.restoredFrom": (backup) => `來自 ${backup}`,
   "clusterBackups.copyAction": "從備份建立新專案",
+  "clusterBackups.restoreGoneAction": "還原已刪除的專案",
+  "clusterBackups.chooseAction": "還原專案",
+  "clusterBackups.deletedChoice": (name) => `${name}（已刪除）`,
+  "clusterBackups.readingDeleted": "正在找備份裡已刪除的專案…",
+  "clusterBackups.deletedUnread": (reason) => `Zeabur 讀不到備份裡有哪些已刪除的專案：${reason}`,
   "clusterBackups.download": "下載備份",
   "clusterBackups.restoreFrom": "要還原的專案",
   "clusterBackups.chooseProject": "選擇專案",
@@ -2068,7 +2073,7 @@ export const zhTW: Messages = {
   "clusterBackups.copy.into": (source, into) =>
     `備份會還原到新專案 ${into}，服務、磁碟區和資料庫都是另外一份。${source} 不會變動。`,
   "clusterBackups.copy.keep": (source) => `原本的專案 ${source} 會繼續保留，不需要時請刪除。`,
-  "clusterBackups.copy.amount": (cpu, memory) => `${cpu} 核心 CPU、${memory} 記憶體`,
+  "clusterBackups.copy.amount": (cpu, memory) => `${cpu}、${memory} 記憶體`,
   "clusterBackups.copy.short": (need, free) =>
     `兩個專案會同時執行。新專案需要 ${need}，節點只剩 ${free}，部分服務可能無法啟動。先停掉用不到的服務，或加一台節點。`,
   "clusterBackups.copy.fits": (need, free) =>
@@ -3752,6 +3757,7 @@ export const zhTW: Messages = {
   "preview.pendingRestart": (name) => `${name} 重新啟動前會繼續使用舊的值。`,
   "preview.downtime": "會有短暫的時間沒有副本提供服務。",
   "preview.cores": (n) => `${n} 核心 CPU`,
+  "preview.millicores": (n) => `${n} CPU`,
   "preview.fits": (pods, cpu, memory) =>
     `資源足夠：尖峰時會多出 ${pods} 個副本、${cpu} 和 ${memory}。`,
   "preview.blockedQuota": (name, resource, need, left) =>

@@ -323,6 +323,21 @@ export async function planClusterBackups(
   return unwrap(await api.POST("/api/v1/cluster/backups/plan", { body: request, signal }))
 }
 
+/** The projects a backup holds that no longer exist; reading them downloads the backup's lists. */
+export const deletedBackupProjectsQuery = (backup: string) =>
+  queryOptions({
+    queryKey: ["cluster", "backups", backup, "deleted-projects"],
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.GET("/api/v1/cluster/backups/{backup}/deleted-projects", {
+          params: { path: { backup } },
+          signal,
+        }),
+      ),
+    retry: false,
+    staleTime: 60_000,
+  })
+
 export async function applyClusterBackups(token: string) {
   return unwrap(await api.POST("/api/v1/cluster/backups/apply", { body: { token } }))
 }

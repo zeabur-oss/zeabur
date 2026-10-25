@@ -7,6 +7,7 @@
 //! | `POST /api/v1/cluster/backups/plan` | what setting the location or the schedule, pausing it, backing up now or restoring a backup writes, and a token; writes nothing |
 //! | `POST /api/v1/cluster/backups/apply` | carries out that plan by its token |
 //! | `GET /api/v1/cluster/backups/{backup}/download` | the backup's contents as a file (see [`super::backup_download`]) |
+//! | `GET /api/v1/cluster/backups/{backup}/deleted-projects` | the projects in the backup that no longer exist (see [`super::restore_copy`]) |
 //!
 //! A project restore never brings back routes. The domains come back last: `attachDomains`
 //! restores only the routes from the backup, and refuses while another project serves one of
@@ -282,7 +283,8 @@ pub struct BackupsPlan {
     /// The backup a `backupNow` plan creates.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub backup: Option<String>,
-    /// The restore a `restore` or `attachDomains` plan creates.
+    /// The restore a `restore` or `attachDomains` plan creates; absent while `held` is not
+    /// empty.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub restore: Option<String>,
     /// What a `restore` plan copies, and what to check before it runs.
@@ -1390,10 +1392,12 @@ pub(crate) async fn plan(
         }
     }
     let restoring = restores(&request);
-    let (backup, restore) = if restoring {
+    let (backup, restore) = if !restoring {
+        (made.clone(), None)
+    } else if computed.held.is_empty() {
         (None, made.clone())
     } else {
-        (made.clone(), None)
+        (None, None)
     };
     let expires_at = now.as_second().saturating_add(LIFETIME_SECONDS);
     let claims = Claims {

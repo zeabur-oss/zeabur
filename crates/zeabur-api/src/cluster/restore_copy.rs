@@ -8,16 +8,29 @@
 //!   pauses, and the routes that come back in a last step.
 //! - **Room.** The copy's pods request what the original's running pods request. The room is what
 //!   every ready, schedulable node has left, as a plan's fit counts it.
+//! - **Deleted projects.** A backup of the whole cluster names no namespaces, so `GET
+//!   /api/v1/cluster/backups/{backup}/deleted-projects` reads them from the backup's list. Only the
+//!   archive holds their labels, so Zeabur downloads it only when a listed namespace is gone.
 //!
 //! [k8s-dns]: https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/#namespaces-of-services
 
+use std::collections::BTreeSet;
+
+use axum::Json;
+use axum::extract::{Path, State};
 use serde::Serialize;
+use serde_json::Value;
 use utoipa::ToSchema;
+use zeabur_core::names::{LABEL_PROJECT, is_system_namespace};
+use zeabur_core::problem::{MEDIA_TYPE as PROBLEM, Problem};
 use zeabur_kube::k8s_openapi::api::core::v1::Node;
 use zeabur_kube::{Cluster, ClusterExt as _, ClusterPod, ResourceRef};
 use zeabur_modules::velero::cluster::Inventory;
 
+use crate::cluster::backup_download;
 use crate::cluster::capacity::{Amount, pod_amounts};
+use crate::error::{ApiError, list_read, read_problem};
+use crate::handlers::{AppState, Person};
 use crate::projects::writes::preview::node_room;
 
 /// The most pods read to count the room.
@@ -124,6 +137,69 @@ pub(crate) async fn read_room(cluster: &dyn Cluster, copy: &mut Copy) {
         _ => room(&[], source, None),
     };
     copy.room = Some(fit);
+}
+
+/// The projects a backup holds that no longer exist.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+pub struct DeletedProjects {
+    /// Their names, sorted.
+    pub items: Vec<String>,
+}
+
+/// The projects in `backup` that no longer exist in the cluster: each comes back under its own
+/// name. Read as the person, who must be able to create a `DownloadRequest` in Velero's
+/// namespace.
+#[utoipa::path(get, path = "/api/v1/cluster/backups/{backup}/deleted-projects", tag = "cluster",
+    operation_id = "listDeletedBackupProjects",
+    params(("backup" = String, Path, description = "The backup")),
+    responses((status = 200, body = DeletedProjects),
+              (status = 403, body = Problem, content_type = PROBLEM),
+              (status = 404, body = Problem, content_type = PROBLEM),
+              (status = 422, body = Problem, content_type = PROBLEM),
+              (status = 503, body = Problem, content_type = PROBLEM)))]
+pub(crate) async fn deleted_projects(
+    State(state): State<AppState>,
+    Person(cluster): Person,
+    Path(backup): Path<String>,
+) -> Result<Json<DeletedProjects>, ApiError> {
+    let cluster = cluster.as_ref();
+    let list = backup_download::resource_list(&state, cluster, &backup).await?;
+    let live: BTreeSet<String> = cluster
+        .namespaces()
+        .await
+        .map_err(|e| {
+            read_problem(
+                e,
+                "the list of namespaces",
+                list_read("", "namespaces", None),
+            )
+        })?
+        .into_iter()
+        .filter_map(|n| n.metadata.name)
+        .collect();
+    let gone: Vec<String> = list
+        .get("v1/Namespace")
+        .into_iter()
+        .flatten()
+        .filter(|n| !is_system_namespace(n) && !live.contains(*n))
+        .cloned()
+        .collect();
+    if gone.is_empty() {
+        return Ok(Json(DeletedProjects { items: Vec::new() }));
+    }
+    let mut items: Vec<String> = backup_download::namespaces(&state, cluster, &backup, gone)
+        .await?
+        .iter()
+        .filter(|n| {
+            n.pointer("/metadata/labels")
+                .and_then(Value::as_object)
+                .is_some_and(|l| l.contains_key(LABEL_PROJECT))
+        })
+        .filter_map(|n| n.pointer("/metadata/name").and_then(Value::as_str))
+        .map(str::to_owned)
+        .collect();
+    items.sort();
+    Ok(Json(DeletedProjects { items }))
 }
 
 #[cfg(test)]

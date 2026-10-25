@@ -1,7 +1,8 @@
 //! The cluster's backups through Velero: not installed is an answer, setting the location keeps
 //! its keys out of every answer, the schedule is created, paused and backed up from, a finished
 //! backup goes into a new project while the original runs and back under its own name once it is
-//! gone, both without routes and with the plan read from the backup's list, domains come back
+//! gone, both without routes and with the plan read from the backup's list, a backup of the whole
+//! cluster offers the projects it holds that are gone, domains come back
 //! from the backup or move from the project that serves them, and the refusals: someone RBAC does
 //! not let write, a plan the cluster moved past, a domain another project serves.
 
@@ -395,30 +396,37 @@ mod tests {
         encoder.finish().unwrap()
     }
 
-    /// Velero's archive of a backup that holds `routes`, at the paths Velero writes.
-    fn contents(routes: &[Value]) -> Vec<u8> {
+    /// Velero's archive of a backup that holds `objects` (Ingresses and Namespaces), at the paths
+    /// Velero writes.
+    fn contents(objects: &[Value]) -> Vec<u8> {
         let mut archive = tar::Builder::new(Vec::new());
-        for route in routes {
-            let namespace = route["metadata"]["namespace"].as_str().unwrap();
-            let name = route["metadata"]["name"].as_str().unwrap();
-            let body = serde_json::to_vec(route).unwrap();
+        for object in objects {
+            let name = object["metadata"]["name"].as_str().unwrap();
+            let body = serde_json::to_vec(object).unwrap();
             for folder in ["", "v1-preferredversion/"] {
+                let path = object["metadata"]["namespace"].as_str().map_or_else(
+                    || format!("resources/namespaces/{folder}cluster/{name}.json"),
+                    |namespace| {
+                        format!(
+                            "resources/ingresses.networking.k8s.io/{folder}namespaces/{namespace}/{name}.json"
+                        )
+                    },
+                );
                 let mut header = tar::Header::new_gnu();
                 header.set_size(body.len() as u64);
                 header.set_mode(0o644);
                 header.set_cksum();
                 archive
-                    .append_data(
-                        &mut header,
-                        format!(
-                            "resources/ingresses.networking.k8s.io/{folder}namespaces/{namespace}/{name}.json"
-                        ),
-                        body.as_slice(),
-                    )
+                    .append_data(&mut header, path, body.as_slice())
                     .unwrap();
             }
         }
         gzip(&archive.into_inner().unwrap())
+    }
+
+    fn namespace_in_backup(name: &str, labels: &Value) -> Value {
+        json!({"apiVersion": "v1", "kind": "Namespace",
+               "metadata": {"name": name, "labels": labels}})
     }
 
     fn route(namespace: &str, name: &str, host: &str) -> Value {
@@ -427,8 +435,8 @@ mod tests {
                "spec": {"rules": [{"host": host}]}})
     }
 
-    /// The store of backup `zeabur-1`, which holds `shop` and `blog`, and Velero signing URLs
-    /// to it.
+    /// The store of every backup: each holds the projects `shop`, `blog` and `wiki` and the
+    /// namespaces `scratch` and `kube-system`. Velero signs URLs to it.
     async fn backup_store(cluster: &MemoryCluster) -> tokio::task::JoinHandle<()> {
         let list = json!({
             "v1/Service": ["shop/api", "shop/postgres", "blog/web"],
@@ -436,8 +444,9 @@ mod tests {
             "batch/v1/CronJob": ["shop/nightly"],
             "networking.k8s.io/v1/Ingress": ["shop/web", "blog/web"],
             "apps/v1/Deployment": ["shop/web"],
-            "v1/Namespace": ["blog", "shop"]
+            "v1/Namespace": ["blog", "kube-system", "scratch", "shop", "wiki"]
         });
+        let project = json!({"zeabur.com/project": "true"});
         let files = vec![
             (
                 "-resource-list.json.gz",
@@ -448,6 +457,11 @@ mod tests {
                 contents(&[
                     route("shop", "web", "shop.example.com"),
                     route("blog", "web", "blog.example.com"),
+                    namespace_in_backup("blog", &project),
+                    namespace_in_backup("shop", &project),
+                    namespace_in_backup("wiki", &project),
+                    namespace_in_backup("scratch", &json!({})),
+                    namespace_in_backup("kube-system", &json!({})),
                 ]),
             ),
         ];
@@ -648,6 +662,36 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn a_whole_cluster_backup_offers_the_projects_it_holds_that_are_gone() {
+        let cluster = with_shop();
+        cluster.update(|s| {
+            s.dynamic.push(object(json!({
+                "apiVersion": "velero.io/v1", "kind": "Backup",
+                "metadata": {"name": "zeabur-all", "namespace": "velero", "resourceVersion": "4"},
+                "spec": {"includedNamespaces": ["*"]}, "status": {"phase": "Completed"}
+            })));
+        });
+        let _velero = backup_store(&cluster).await;
+        let app = app(&cluster);
+        let (status, gone) = send(
+            &app,
+            "GET",
+            "/api/v1/cluster/backups/zeabur-all/deleted-projects",
+            None,
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{gone}");
+        assert_eq!(gone["items"], json!(["blog", "wiki"]));
+
+        let (planned, _) = applied(
+            &app,
+            &json!({"op": "restore", "backup": "zeabur-all", "namespace": "wiki"}),
+        )
+        .await;
+        assert_eq!(planned["copy"]["sameName"], true);
+    }
+
+    #[tokio::test]
     async fn domains_come_back_from_the_backup_unless_another_project_serves_them() {
         let cluster = with_shop();
         cluster.update(|s| {
@@ -666,6 +710,7 @@ mod tests {
             json!([{"host": "shop.example.com", "project": "shop"}])
         );
         assert_eq!(planned["writes"], json!([]));
+        assert_eq!(planned.get("restore"), None);
         let (status, problem) = apply(&app, &planned).await;
         assert_eq!(status, StatusCode::CONFLICT, "{problem}");
 

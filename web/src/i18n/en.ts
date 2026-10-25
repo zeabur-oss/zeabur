@@ -2215,6 +2215,12 @@ export const en = {
   "clusterBackups.restores": "Restores",
   "clusterBackups.restoredFrom": (backup: string) => `From ${backup}`,
   "clusterBackups.copyAction": "New project from backup",
+  "clusterBackups.restoreGoneAction": "Restore deleted project",
+  "clusterBackups.chooseAction": "Restore a project",
+  "clusterBackups.deletedChoice": (name: string) => `${name} (deleted)`,
+  "clusterBackups.readingDeleted": "Looking for deleted projects in the backup…",
+  "clusterBackups.deletedUnread": (reason: string) =>
+    `Zeabur couldn't read which deleted projects the backup holds: ${reason}`,
   "clusterBackups.download": "Download backup",
   "clusterBackups.restoreFrom": "Project to restore",
   "clusterBackups.chooseProject": "Choose a project",
@@ -2229,7 +2235,7 @@ export const en = {
     `The backup goes into a new project, ${into}, with its own copy of every service, volume and database. ${source} is not touched.`,
   "clusterBackups.copy.keep": (source: string) =>
     `The original project ${source} is kept. Delete it when you no longer need it.`,
-  "clusterBackups.copy.amount": (cpu: string, memory: string) => `${cpu} CPU and ${memory}`,
+  "clusterBackups.copy.amount": (cpu: string, memory: string) => `${cpu} and ${memory}`,
   "clusterBackups.copy.short": (need: string, free: string) =>
     `Both projects run at once. The new one asks for ${need}, but the nodes have ${free} left, so some services may not start. Stop services you don't need, or add a node.`,
   "clusterBackups.copy.fits": (need: string, free: string) =>
@@ -4097,6 +4103,7 @@ export const en = {
   "preview.pendingRestart": (name: string) => `${name} keeps the old value until it restarts.`,
   "preview.downtime": "Nothing serves for a moment.",
   "preview.cores": (n: string) => `${n} CPU`,
+  "preview.millicores": (n: string) => `${n} CPU`,
   "preview.fits": (replicas: number, cpu: string, memory: string) =>
     `Fits: it adds ${plural(replicas, "replica", "replicas")}, ${cpu} and ${memory} at its peak.`,
   "preview.blockedQuota": (name: string, resource: string, need: string, left: string) =>

@@ -24,6 +24,12 @@ export function useQuantityFormat() {
     /** Measured usage in cores, with the unit: `0.25 cores`. */
     cpu: (millicores: number) => t("usage.cores", two.format(millicores / 1000)),
     millicores: (millicores: number) => `${Math.round(millicores)}m`,
+    /** Requested CPU with the unit: cores with at most one decimal, or millicores when one
+     * decimal shows 0: `1.5 CPU`, `30m CPU`. */
+    cpuRequest: (millicores: number) =>
+      millicores > 0 && millicores < 50
+        ? t("preview.millicores", `${Math.round(millicores)}m`)
+        : t("preview.cores", one.format(millicores / 1000)),
     memoryParts,
     memory: (bytes: number) => memoryParts(bytes).join(" "),
     percent: (ratio: number) => percent.format(ratio),

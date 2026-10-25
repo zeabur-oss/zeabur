@@ -53,6 +53,7 @@ import {
   type ScheduleForm,
   type ScheduleProblem,
 } from "@/model/cluster-backups"
+import { restoreEntry } from "@/model/restore-copy"
 import type { Gate } from "@/model/rights"
 import {
   AttachFacts,
@@ -745,6 +746,12 @@ function BackupList({ data, gate, onPlan }: { data: Data; gate: Gate; onPlan: On
   )
 }
 
+const entryLabel = {
+  copy: "clusterBackups.copyAction",
+  sameName: "clusterBackups.restoreGoneAction",
+  choose: "clusterBackups.chooseAction",
+} as const
+
 function BackupRow({
   backup,
   gate,
@@ -758,6 +765,7 @@ function BackupRow({
   const [restoring, setRestoring] = useState(false)
   const restorable = backup.outcome === "succeeded" || backup.outcome === "partiallyFailed"
   const facts = useBackupFacts(backup)
+  const projects = useQuery(projectsQuery).data?.items ?? []
   return (
     <li className="flex flex-col gap-0.5 border-t border-rule py-2.5">
       <div className="flex min-w-0 items-center gap-2.5">
@@ -783,7 +791,7 @@ function BackupRow({
               aria-expanded={restoring}
               onClick={() => setRestoring((v) => !v)}
             >
-              {t("clusterBackups.copyAction")}
+              {t(entryLabel[restoreEntry(backup.namespaces, projects)])}
             </Button>
           </GateTip>
           <a

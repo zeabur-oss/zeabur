@@ -2,7 +2,7 @@
 //! file.
 //!
 //! Restore plans read the backup through the same path: its list of objects
-//! (`resource_list`) and the routes in its archive (`routes`).
+//! (`resource_list`), and the routes and Namespaces in its archive (`routes`, `namespaces`).
 //!
 //! As the person, Zeabur creates a `DownloadRequest` for the backup's contents or its list and
 //! waits until Velero signs a URL for it [velero-download]. That URL expires after ten minutes,
@@ -261,21 +261,57 @@ pub(crate) async fn resource_list(
 }
 
 /// The routes of `namespace` in `backup`'s archive, each once.
-///
-/// Velero writes an object at `resources/<resource.group>/namespaces/<namespace>/<name>.json`
-/// and again under the folder of its preferred version [velero-layout].
-///
-/// [velero-layout]: https://velero.io/docs/v1.17/output-file-format/
 pub(crate) async fn routes(
     state: &AppState,
     cluster: &dyn Cluster,
     backup: &str,
     namespace: &str,
 ) -> Result<Vec<Value>, ApiError> {
+    let folder = format!("namespaces/{namespace}/");
+    archived(state, cluster, backup, move |resource, rest| {
+        if !v::ROUTES.contains(&resource) {
+            return None;
+        }
+        let name = rest.strip_prefix(&folder)?.strip_suffix(".json")?;
+        Some(format!("{resource}/{name}"))
+    })
+    .await
+}
+
+/// The Namespace objects in `backup`'s archive whose names are in `names`, each once.
+pub(crate) async fn namespaces(
+    state: &AppState,
+    cluster: &dyn Cluster,
+    backup: &str,
+    names: Vec<String>,
+) -> Result<Vec<Value>, ApiError> {
+    archived(state, cluster, backup, move |resource, rest| {
+        if resource != "namespaces" {
+            return None;
+        }
+        let name = rest.strip_prefix("cluster/")?.strip_suffix(".json")?;
+        names.iter().any(|n| n == name).then(|| name.to_owned())
+    })
+    .await
+}
+
+/// The objects of `backup`'s archive that `pick` keys, each once by its key.
+///
+/// Velero writes an object at `resources/<resource.group>/namespaces/<namespace>/<name>.json`,
+/// or at `resources/<resource.group>/cluster/<name>.json` for a cluster-scoped one, and again
+/// under the folder of its preferred version [velero-layout]. `pick` gets `<resource.group>` and
+/// the rest of the path without that folder.
+///
+/// [velero-layout]: https://velero.io/docs/v1.17/output-file-format/
+async fn archived(
+    state: &AppState,
+    cluster: &dyn Cluster,
+    backup: &str,
+    pick: impl Fn(&str, &str) -> Option<String> + Send + 'static,
+) -> Result<Vec<Value>, ApiError> {
     let body = fetch(state, cluster, backup, Download::BackupContents).await?;
     let packed = collected(body, ARCHIVE_BYTES).await?;
-    let namespace = namespace.to_owned();
-    tokio::task::spawn_blocking(move || routes_in(&packed, &namespace))
+    tokio::task::spawn_blocking(move || objects_in(&packed, &pick))
         .await
         .map_err(|e| e.to_string())
         .flatten()
@@ -286,11 +322,13 @@ pub(crate) async fn routes(
         })
 }
 
-fn routes_in(packed: &[u8], namespace: &str) -> Result<Vec<Value>, String> {
+fn objects_in(
+    packed: &[u8],
+    pick: &impl Fn(&str, &str) -> Option<String>,
+) -> Result<Vec<Value>, String> {
     let unpacked = flate2::read::GzDecoder::new(packed).take(ARCHIVE_BYTES as u64);
     let mut archive = tar::Archive::new(unpacked);
     let mut found: BTreeMap<String, Value> = BTreeMap::new();
-    let folder = format!("/namespaces/{namespace}/");
     for entry in archive.entries().map_err(|e| e.to_string())? {
         let mut entry = entry.map_err(|e| e.to_string())?;
         let path = entry
@@ -298,23 +336,23 @@ fn routes_in(packed: &[u8], namespace: &str) -> Result<Vec<Value>, String> {
             .map_err(|e| e.to_string())?
             .to_string_lossy()
             .into_owned();
-        let Some(rest) = path.strip_prefix("resources/") else {
+        let Some((resource, rest)) = path
+            .strip_prefix("resources/")
+            .and_then(|r| r.split_once('/'))
+        else {
             continue;
         };
-        let kind = rest.split('/').next().unwrap_or_default();
-        if !v::ROUTES.contains(&kind) {
-            continue;
-        }
-        let Some((_, file)) = rest.split_once(&folder) else {
-            continue;
+        let rest = match rest.split_once('/') {
+            Some((folder, inner)) if folder.ends_with("-preferredversion") => inner,
+            _ => rest,
         };
-        let Some(name) = file.strip_suffix(".json") else {
+        let Some(key) = pick(resource, rest) else {
             continue;
         };
         let mut text = Vec::new();
         entry.read_to_end(&mut text).map_err(|e| e.to_string())?;
-        let route: Value = serde_json::from_slice(&text).map_err(|e| e.to_string())?;
-        found.insert(format!("{kind}/{name}"), route);
+        let object: Value = serde_json::from_slice(&text).map_err(|e| e.to_string())?;
+        found.insert(key, object);
     }
     Ok(found.into_values().collect())
 }

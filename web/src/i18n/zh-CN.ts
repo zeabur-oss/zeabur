@@ -2052,6 +2052,11 @@ export const zhCN: Messages = {
   "clusterBackups.restores": "还原记录",
   "clusterBackups.restoredFrom": (backup) => `来自 ${backup}`,
   "clusterBackups.copyAction": "从备份创建新项目",
+  "clusterBackups.restoreGoneAction": "还原已删除的项目",
+  "clusterBackups.chooseAction": "还原项目",
+  "clusterBackups.deletedChoice": (name) => `${name}（已删除）`,
+  "clusterBackups.readingDeleted": "正在查找备份里已删除的项目…",
+  "clusterBackups.deletedUnread": (reason) => `Zeabur 读不到备份里有哪些已删除的项目：${reason}`,
   "clusterBackups.download": "下载备份",
   "clusterBackups.restoreFrom": "要还原的项目",
   "clusterBackups.chooseProject": "选择项目",
@@ -2064,7 +2069,7 @@ export const zhCN: Messages = {
   "clusterBackups.copy.into": (source, into) =>
     `备份会还原到新项目 ${into}，服务、卷和数据库都是另外一份。${source} 不会变动。`,
   "clusterBackups.copy.keep": (source) => `原来的项目 ${source} 会继续保留，不需要时请删除。`,
-  "clusterBackups.copy.amount": (cpu, memory) => `${cpu} 核 CPU、${memory} 内存`,
+  "clusterBackups.copy.amount": (cpu, memory) => `${cpu}、${memory} 内存`,
   "clusterBackups.copy.short": (need, free) =>
     `两个项目会同时运行。新项目需要 ${need}，节点只剩 ${free}，部分服务可能无法启动。先停掉用不到的服务，或加一台节点。`,
   "clusterBackups.copy.fits": (need, free) =>
@@ -3743,6 +3748,7 @@ export const zhCN: Messages = {
   "preview.pendingRestart": (name) => `${name} 重新启动前会继续使用旧的值。`,
   "preview.downtime": "会有短暂的时间没有副本提供服务。",
   "preview.cores": (n) => `${n} 核 CPU`,
+  "preview.millicores": (n) => `${n} CPU`,
   "preview.fits": (pods, cpu, memory) =>
     `资源足够：峰值时会多出 ${pods} 个副本、${cpu} 和 ${memory}。`,
   "preview.blockedQuota": (name, resource, need, left) =>

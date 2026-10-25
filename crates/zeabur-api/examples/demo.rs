@@ -23,7 +23,9 @@
 //! read from a made-up registry (`Registry`) that says it listens on 8080 as user 101.
 //!
 //! Velero runs with a location on R2, a daily schedule and a week of backups, the newest failed:
-//! `ZEABUR_DEMO_VELERO=none` leaves it uninstalled, `location` keeps only the location.
+//! `ZEABUR_DEMO_VELERO=none` leaves it uninstalled, `location` keeps only the location. Each backup
+//! holds the projects as the demo starts and `wiki`, deleted since. A store on 127.0.0.1 answers
+//! the `DownloadRequest`s, so restore plans list what a backup holds.
 //!
 //! K8up backs up shop's Redis volume nightly to R2; the newest run failed. `ZEABUR_DEMO_K8UP=none`
 //! leaves it uninstalled. The cluster lists one S3 destination, `r2-backups`.
@@ -2520,6 +2522,7 @@ fn velero_served() -> Vec<ServedResource> {
         ("backups", "Backup"),
         ("podvolumebackups", "PodVolumeBackup"),
         ("restores", "Restore"),
+        ("downloadrequests", "DownloadRequest"),
     ]
     .into_iter()
     .map(|(resource, kind)| ServedResource::readable("velero.io", "v1", resource, kind, true))
@@ -2631,6 +2634,189 @@ fn velero() -> Vec<DynamicObject> {
             "startTimestamp": minutes_ago(day - 120), "completionTimestamp": minutes_ago(day - 122)}
     })));
     objects
+}
+
+/// The files of a backup's archive: path and object.
+type Files = Vec<(String, Value)>;
+
+/// The objects every demo backup holds: the cluster as it starts, and the project `wiki`, deleted
+/// since.
+fn backed_up(s: &State) -> (BTreeMap<String, Vec<String>>, Files) {
+    let mut list: BTreeMap<String, Vec<String>> = BTreeMap::new();
+    let mut files = Vec::new();
+    let mut add = |key: &str, namespace: &str, name: &str| {
+        list.entry(key.to_owned())
+            .or_default()
+            .push(format!("{namespace}/{name}"));
+    };
+    let name = |meta: &zeabur_kube::k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta| {
+        meta.name.clone().unwrap_or_default()
+    };
+    for (namespace, objects) in &s.objects {
+        for d in &objects.deployments {
+            add("apps/v1/Deployment", namespace, &name(&d.metadata));
+        }
+        for d in &objects.stateful_sets {
+            add("apps/v1/StatefulSet", namespace, &name(&d.metadata));
+        }
+        for d in &objects.services {
+            add("v1/Service", namespace, &name(&d.metadata));
+        }
+        for d in &objects.secrets {
+            add("v1/Secret", namespace, &name(&d.secret.metadata));
+        }
+        for d in &objects.cron_jobs {
+            add("batch/v1/CronJob", namespace, &name(&d.metadata));
+        }
+        for ingress in &objects.ingresses {
+            let route = name(&ingress.metadata);
+            add("networking.k8s.io/v1/Ingress", namespace, &route);
+            let body = typed(ingress, "networking.k8s.io/v1", "Ingress");
+            files.push((
+                format!(
+                    "resources/ingresses.networking.k8s.io/namespaces/{namespace}/{route}.json"
+                ),
+                body,
+            ));
+        }
+    }
+    for (key, name) in [
+        ("apps/v1/Deployment", "web"),
+        ("v1/Service", "web"),
+        ("networking.k8s.io/v1/Ingress", "web"),
+    ] {
+        add(key, "wiki", name);
+    }
+    files.push((
+        "resources/ingresses.networking.k8s.io/namespaces/wiki/web.json".to_owned(),
+        json!({"apiVersion": "networking.k8s.io/v1", "kind": "Ingress",
+            "metadata": {"name": "web", "namespace": "wiki"},
+            "spec": {"rules": [{"host": "wiki.example.com"}]}}),
+    ));
+    let mut namespaces = vec![(
+        "wiki".to_owned(),
+        json!({"apiVersion": "v1", "kind": "Namespace",
+            "metadata": {"name": "wiki", "labels": {"zeabur.com/project": "true"}}}),
+    )];
+    for namespace in &s.namespaces {
+        let body = typed(namespace, "v1", "Namespace");
+        namespaces.push((name(&namespace.metadata), body));
+    }
+    let mut names: Vec<String> = Vec::new();
+    for (namespace, body) in namespaces {
+        files.push((
+            format!("resources/namespaces/cluster/{namespace}.json"),
+            body,
+        ));
+        names.push(namespace);
+    }
+    names.sort();
+    list.insert("v1/Namespace".to_owned(), names);
+    for entries in list.values_mut() {
+        entries.sort();
+    }
+    (list, files)
+}
+
+/// `object` as JSON with its `apiVersion` and `kind`.
+fn typed(object: &impl serde::Serialize, api_version: &str, kind: &str) -> Value {
+    let mut body = serde_json::to_value(object).expect("an example object");
+    if let Some(map) = body.as_object_mut() {
+        map.insert("apiVersion".to_owned(), json!(api_version));
+        map.insert("kind".to_owned(), json!(kind));
+    }
+    body
+}
+
+/// Plays Velero's object store and its `DownloadRequest` controller: every backup's list of
+/// objects and archive come from a store on 127.0.0.1, which the location names as its
+/// `publicUrl`.
+async fn backup_store(cluster: MemoryCluster) -> std::io::Result<()> {
+    use std::io::Write as _;
+    let Some((list, files)) = cluster.inspect(backed_up) else {
+        return Ok(());
+    };
+    let gzip = |data: &[u8]| -> std::io::Result<Vec<u8>> {
+        let mut encoder = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::default());
+        encoder.write_all(data)?;
+        encoder.finish()
+    };
+    let mut archive = tar::Builder::new(Vec::new());
+    for (path, body) in &files {
+        let body = serde_json::to_vec(body)?;
+        let mut header = tar::Header::new_gnu();
+        header.set_size(body.len() as u64);
+        header.set_mode(0o644);
+        header.set_cksum();
+        archive.append_data(&mut header, path, body.as_slice())?;
+    }
+    let contents = Arc::new(gzip(&archive.into_inner()?)?);
+    let listed = Arc::new(gzip(&serde_json::to_vec(&list)?)?);
+    let router = axum::Router::new().route(
+        "/{*path}",
+        axum::routing::get(
+            move |axum::extract::Path(path): axum::extract::Path<String>| async move {
+                if path.ends_with("-resource-list.json.gz") {
+                    listed.as_ref().clone()
+                } else {
+                    contents.as_ref().clone()
+                }
+            },
+        ),
+    );
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
+    let base = format!("http://{}", listener.local_addr()?);
+    tokio::spawn(async move { axum::serve(listener, router).await });
+    cluster.update(|s| {
+        for location in s.dynamic.iter_mut().filter(|o| {
+            o.types
+                .as_ref()
+                .is_some_and(|t| t.kind == "BackupStorageLocation")
+        }) {
+            if let Some(config) = location
+                .data
+                .pointer_mut("/spec/config")
+                .and_then(Value::as_object_mut)
+            {
+                config.insert("publicUrl".to_owned(), json!(base));
+            }
+        }
+    });
+    tokio::spawn(async move {
+        loop {
+            cluster.update(|s| {
+                for request in s.dynamic.iter_mut().filter(|o| {
+                    o.types.as_ref().is_some_and(|t| t.kind == "DownloadRequest")
+                        && o.data.get("status").is_none()
+                }) {
+                    let text = |pointer: &str| {
+                        request
+                            .data
+                            .pointer(pointer)
+                            .and_then(Value::as_str)
+                            .unwrap_or_default()
+                            .to_owned()
+                    };
+                    let backup = text("/spec/target/name");
+                    let file = if text("/spec/target/kind") == "BackupResourceList" {
+                        "-resource-list.json.gz"
+                    } else {
+                        ".tar.gz"
+                    };
+                    let status = json!({
+                        "phase": "Processed",
+                        "downloadURL": format!("{base}/acme-backups/zeabur/backups/{backup}/{backup}{file}?X-Amz-Signature=demo"),
+                        "expiration": minutes_ago(-10)
+                    });
+                    if let Some(object) = request.data.as_object_mut() {
+                        object.insert("status".to_owned(), status);
+                    }
+                }
+            });
+            tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+        }
+    });
+    Ok(())
 }
 
 fn created(name: &str) -> String {
@@ -4042,6 +4228,9 @@ async fn main() -> std::io::Result<()> {
         Err(_) => None,
     };
     kubelet(cluster.clone());
+    if !matches!(velero_mode().as_str(), "none" | "location") {
+        backup_store(cluster.clone()).await?;
+    }
     let access = Demo {
         cluster: Arc::new(cluster),
         offered: std::env::var_os("ZEABUR_DEMO_ELEVATION").is_some(),

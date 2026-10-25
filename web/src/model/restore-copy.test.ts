@@ -5,6 +5,7 @@ import {
   afterRestore,
   ownSecrets,
   restoreChoices,
+  restoreEntry,
   restoreProblem,
   rewriteChanges,
   rewritten,
@@ -96,6 +97,19 @@ describe("choosing what to restore", () => {
 
   test("a backup of the whole cluster offers the projects Zeabur manages", () => {
     expect(restoreChoices([], projects)).toEqual(["blog", "shop"])
+  })
+
+  test("a backup of the whole cluster also offers the deleted projects it holds", () => {
+    expect(restoreChoices([], projects, ["wiki", "blog"])).toEqual(["blog", "shop", "wiki"])
+  })
+
+  test.each([
+    ["every project it names exists", ["shop", "blog"], "copy"],
+    ["every project it names is gone", ["wiki"], "sameName"],
+    ["some exist and some are gone", ["shop", "wiki"], "choose"],
+    ["it names none: the whole cluster", [], "choose"],
+  ] as const)("the restore button follows the backup when %s", (_, named, entry) => {
+    expect(restoreEntry(named, projects)).toBe(entry)
   })
 
   test("a project that still exists needs a new name nobody uses", () => {
