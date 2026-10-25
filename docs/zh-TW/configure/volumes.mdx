@@ -134,9 +134,9 @@ StatefulSet 的磁碟區在建立時就固定了（`volumeClaimTemplates` 建立
 
 ## 從備份還原檔案
 
-Zeabur 沒有磁碟區備份的還原操作。還原時由叢集管理員建立 K8up 的 Restore 物件，把備份複製到指定的磁碟區。
+在 **備份** 有備份點的磁碟區旁，按 **從備份點建立新磁碟區**，選時間點，檢查並套用，K8up 會把那個時間點的檔案還原到新磁碟區，原本的磁碟區不變。StatefulSet 的磁碟區改用 **停下服務、清空磁碟區、還原到原處**。
 
-準備以下資料交給管理員：
+沒有權限還原、要請管理員代為處理時，準備以下資料：
 
 - 來源 S3 端點、儲存貯體與資料夾，可從 K8up Schedule 的 `spec.backend` 確認。
 - S3 存取金鑰，以及備份 Secret 的 `RESTIC_PASSWORD`。
@@ -152,6 +152,49 @@ kubectl -n shop get secret data-redis-0-backup -o yaml
 這份 Secret 有 S3 金鑰和儲存庫密碼，存進團隊的密碼管理工具，不要貼進 issue 或聊天訊息。
 
 備份區的 **K8up：還原** 連到 [K8up 的還原說明](https://docs.k8up.io/k8up/2.16/how-tos/restore.html)。建議先還原到另一個新的磁碟區，確認檔案沒問題，再停掉服務的寫入、改掛新磁碟區。
+
+### 想下載某個備份時間點的檔案
+
+1. 照上面的步驟，把那個時間點還原到新磁碟區。不要按 **把服務改掛到新磁碟區**，那會讓執行中的服務改用舊檔案。
+2. 新磁碟區沒有任何服務掛載。用一個暫時的 Pod 掛上它。以下以專案 `shop`、新磁碟區 `data-restored-1025` 為例：
+
+   ```sh
+   kubectl -n shop apply -f - <<'EOF'
+   apiVersion: v1
+   kind: Pod
+   metadata:
+     name: restore-view
+   spec:
+     containers:
+       - name: restore-view
+         image: busybox:1.37
+         command: ["sleep", "3600"]
+         volumeMounts:
+           - name: data
+             mountPath: /restored
+     volumes:
+       - name: data
+         persistentVolumeClaim:
+           claimName: data-restored-1025
+   EOF
+   kubectl -n shop wait --for=condition=Ready pod/restore-view
+   ```
+
+3. 整個資料夾打包成 `backup.tgz`，或只複製要的檔案：
+
+   ```sh
+   kubectl -n shop exec restore-view -- tar czf - -C /restored . > backup.tgz
+   kubectl -n shop cp restore-view:/restored/path/to/file ./file
+   ```
+
+4. 下載完刪掉暫時的 Pod 和新磁碟區：
+
+   ```sh
+   kubectl -n shop delete pod restore-view
+   kubectl -n shop delete pvc data-restored-1025
+   ```
+
+資料庫用 **更多** → **匯出** 下載傾印檔，見[下載資料庫傾印檔](../deploy/databases.mdx#下載資料庫傾印檔)。要較早時間點的內容，先 **還原成新的資料庫**，再從新資料庫匯出。
 
 K8up 備份時應用程式照常執行，直接複製磁碟區上的檔案。如果磁碟區放的是正在寫入的資料庫，複製出來的檔案可能不一致，改用[資料庫自己的備份](../deploy/databases.mdx)。要備份整個叢集的物件，見[叢集備份](../cluster/backups.mdx)。
 
