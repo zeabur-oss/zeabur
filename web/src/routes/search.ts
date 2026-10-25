@@ -1,3 +1,5 @@
+import * as z from "zod/mini"
+
 import { ranges, splits, type Range, type Split } from "@/model/usage"
 
 /** A service's tabs, in their order. */
@@ -117,13 +119,21 @@ export function formerPlace(
   return servicePlace(tab as ServicePlace)
 }
 
-const str = (value: unknown) => (typeof value === "string" && value ? value : undefined)
-const oneOf = <T extends string>(values: readonly T[], value: unknown): T | undefined =>
-  typeof value === "string" && (values as readonly string[]).includes(value)
-    ? (value as T)
-    : undefined
+// An unknown or empty value reads as absent. No search param makes a page fail.
+const text = z.catch(z.optional(z.string().check(z.minLength(1))), undefined)
+const choice = <const T extends readonly string[]>(values: T) =>
+  z.catch(z.optional(z.enum(values)), undefined)
+const flag = z.catch(
+  z.optional(
+    z.pipe(
+      z.union([z.boolean(), z.literal("true")]),
+      z.transform((value) => (value === false ? undefined : true)),
+    ),
+  ),
+  undefined,
+)
 
-export interface ServiceSearch {
+interface ServiceSearch {
   /** Overview when absent. */
   tab?: ServiceTab
   /** The tab's own view when absent. */
@@ -139,26 +149,32 @@ export interface ServiceSearch {
   view?: string
 }
 
-export function validateServiceSearch(search: Record<string, unknown>): ServiceSearch {
-  const tab = str(search.tab)
-  const known = oneOf(serviceTabs, tab)
-  const former =
-    tab && !known && [...formerTabs, ...settingsParts].includes(tab as FormerTab)
-      ? tab
-      : search.mode === "terminal"
-        ? "terminal"
-        : str(search.former)
-  const mode = oneOf(modes, search.mode)
-  return {
-    tab: known === "overview" ? undefined : known,
-    mode: mode && known === serviceModes[mode] ? mode : undefined,
-    pod: str(search.pod),
-    range: oneOf(ranges, search.range),
-    split: oneOf(splits, search.split),
-    former,
-    view: former ? str(search.view) : undefined,
-  }
-}
+export const serviceSearch = z.pipe(
+  z.object({
+    tab: choice([...serviceTabs, ...formerTabs, ...settingsParts]),
+    mode: choice([...modes, "terminal"]),
+    pod: text,
+    range: choice(ranges),
+    split: choice(splits),
+    former: text,
+    view: text,
+  }),
+  z.transform((search): ServiceSearch => {
+    const known = serviceTabs.find((t) => t === search.tab)
+    const former =
+      search.tab && !known ? search.tab : search.mode === "terminal" ? "terminal" : search.former
+    const mode = search.mode === "terminal" ? undefined : search.mode
+    return {
+      tab: known === "overview" ? undefined : known,
+      mode: mode && known === serviceModes[mode] ? mode : undefined,
+      pod: search.pod,
+      range: search.range,
+      split: search.split,
+      former,
+      view: former ? search.view : undefined,
+    }
+  }),
+)
 
 /** A database's tabs, in their order. */
 export const databaseTabs = ["overview", "logs", "backups", "events", "settings"] as const
@@ -173,78 +189,50 @@ interface StoreSearch<Tab> {
   pod?: string
 }
 
-function validateStoreSearch<Tab extends string>(
-  tabs: readonly Tab[],
-  search: Record<string, unknown>,
-): StoreSearch<Tab> {
-  const tab = oneOf(tabs, search.tab)
-  return {
-    tab: tab === "overview" ? undefined : tab,
-    mode: tab === "settings" && search.mode === "yaml" ? "yaml" : undefined,
-    pod: tab === "logs" || tab === "events" ? str(search.pod) : undefined,
-  }
-}
+const storeSearch = <const Tabs extends readonly string[]>(tabs: Tabs) =>
+  z.pipe(
+    z.object({ tab: choice(tabs), mode: choice(["yaml"]), pod: text }),
+    z.transform(({ tab, mode, pod }): StoreSearch<Tabs[number]> => ({
+      tab: tab === "overview" ? undefined : tab,
+      mode: tab === "settings" ? mode : undefined,
+      pod: tab === "logs" || tab === "events" ? pod : undefined,
+    })),
+  )
 
-export type DatabaseSearch = StoreSearch<DatabaseTab>
-
-export const validateDatabaseSearch = (search: Record<string, unknown>): DatabaseSearch =>
-  validateStoreSearch(databaseTabs, search)
+export const databaseSearch = storeSearch(databaseTabs)
 
 export const objectStorageTabs = ["overview", "logs", "events", "settings"] as const
 export type ObjectStorageTab = (typeof objectStorageTabs)[number]
 
-export type ObjectStorageSearch = StoreSearch<ObjectStorageTab>
+export const objectStorageSearch = storeSearch(objectStorageTabs)
 
-export const validateObjectStorageSearch = (search: Record<string, unknown>): ObjectStorageSearch =>
-  validateStoreSearch(objectStorageTabs, search)
-
-export interface ObjectsSearch {
-  q?: string
+export const objectsSearch = z.object({
+  q: text,
   /** `group/version/resource/name` of the object whose YAML is open. */
-  object?: string
-  generated?: boolean
-  empty?: boolean
-}
-
-export function validateObjectsSearch(search: Record<string, unknown>): ObjectsSearch {
-  return {
-    q: str(search.q),
-    object: str(search.object),
-    generated: search.generated === true || search.generated === "true" ? true : undefined,
-    empty: search.empty === true || search.empty === "true" ? true : undefined,
-  }
-}
+  object: text,
+  generated: flag,
+  empty: flag,
+})
 
 export const profiles = ["single-node", "multi-node"] as const
 
-export interface ComponentsSearch {
+export const componentsSearch = z.object({
   /** `capability/id` of the component whose install texts are open. */
-  component?: string
+  component: text,
   /** The cluster's own when absent. */
-  profile?: (typeof profiles)[number]
-}
-
-export function validateComponentsSearch(search: Record<string, unknown>): ComponentsSearch {
-  return { component: str(search.component), profile: oneOf(profiles, search.profile) }
-}
+  profile: choice(profiles),
+})
 
 const projectSortKeys = ["health", "name"] as const
 export type ProjectSortKey = (typeof projectSortKeys)[number]
 
 /** The projects list on Home and Projects; only Projects has the filter. */
-export interface ProjectsSearch {
-  q?: string
-  sort?: ProjectSortKey
-  desc?: boolean
-}
-
-export function validateProjectsSearch(search: Record<string, unknown>): ProjectsSearch {
-  return {
-    q: str(search.q),
-    sort: oneOf(projectSortKeys, search.sort),
-    desc: search.desc === true || search.desc === "true" ? true : undefined,
-  }
-}
+export const projectsSearch = z.object({
+  q: text,
+  sort: choice(projectSortKeys),
+  desc: flag,
+})
+export type ProjectsSearch = z.output<typeof projectsSearch>
 
 const statusFilters = ["attention", "healthy"] as const
 const sortKeys = ["name", "status", "ready", "restarts", "kind"] as const
@@ -252,32 +240,20 @@ export type SortKey = (typeof sortKeys)[number]
 const projectViews = ["map", "list"] as const
 export type ProjectView = (typeof projectViews)[number]
 
-export interface ProjectSearch {
+export const projectSearch = z.object({
   /** The one last chosen when absent; a list for a project too big to draw. */
-  view?: ProjectView
+  view: choice(projectViews),
   /** `Kind/name` of the service in the quick look. */
-  service?: string
+  service: text,
   /** Absent: warnings only. */
-  events?: "all"
-  q?: string
-  status?: (typeof statusFilters)[number]
-  kind?: string
-  sort?: SortKey
-  desc?: boolean
-}
-
-export function validateProjectSearch(search: Record<string, unknown>): ProjectSearch {
-  return {
-    view: oneOf(projectViews, search.view),
-    service: str(search.service),
-    events: search.events === "all" ? "all" : undefined,
-    q: str(search.q),
-    status: oneOf(statusFilters, search.status),
-    kind: str(search.kind),
-    sort: oneOf(sortKeys, search.sort),
-    desc: search.desc === true || search.desc === "true" ? true : undefined,
-  }
-}
+  events: choice(["all"]),
+  q: text,
+  status: choice(statusFilters),
+  kind: text,
+  sort: choice(sortKeys),
+  desc: flag,
+})
+export type ProjectSearch = z.output<typeof projectSearch>
 
 /** The search of a page with a service's tabs once `next` is open: the pod stays on Logs and
  * Events. */

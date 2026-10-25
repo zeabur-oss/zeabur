@@ -1,4 +1,5 @@
 import { createContext, use, useEffect, useState, type ReactNode } from "react"
+import * as z from "zod/mini"
 
 import { core } from "@/i18n/en-core"
 import type { Messages } from "@/i18n/en"
@@ -76,10 +77,6 @@ export function prepareI18n(locale: Locale = initialLocale()): Promise<Catalogue
 
 const storageKey = "zeabur.locale"
 
-function isLocale(value: unknown): value is Locale {
-  return typeof value === "string" && (locales as readonly string[]).includes(value)
-}
-
 /** Maps a BCP 47 tag to a supported locale, or `undefined`. */
 function matchLocale(tag: string): Locale | undefined {
   const lower = tag.toLowerCase()
@@ -92,8 +89,7 @@ function matchLocale(tag: string): Locale | undefined {
 
 function savedLocale(): Locale | undefined {
   try {
-    const value = window.localStorage.getItem(storageKey)
-    return isLocale(value) ? value : undefined
+    return z.enum(locales).safeParse(window.localStorage.getItem(storageKey)).data
   } catch {
     return undefined
   }

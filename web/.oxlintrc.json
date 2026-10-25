@@ -23,6 +23,16 @@
     "no-restricted-imports": [
       "error",
       {
+        "paths": [
+          {
+            "name": "zod",
+            "message": "Import zod/mini. The full zod compiles parsers with `new Function`, which the Content Security Policy refuses."
+          },
+          {
+            "name": "zod/v4",
+            "message": "Import zod/mini. The full zod compiles parsers with `new Function`, which the Content Security Policy refuses."
+          }
+        ],
         "patterns": [
           {
             "group": [

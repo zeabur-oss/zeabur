@@ -1,26 +1,20 @@
 // Cross-Origin-Opener-Policy: same-origin severs `window.opener` on the trip through Zeabur
 // Identity, so the window's last page posts its outcome on a BroadcastChannel.
+import * as z from "zod/mini"
+
 import { queryClient } from "@/api/queries"
 import { REQUEST_HEADERS } from "@/auth/session"
 import { store } from "@/lib/stores"
 
-export type Outcome =
-  | { result: "done"; until?: string }
-  | { result: "not-allowed" | "cancelled" | "failed" | "signed-out" }
-  | { result: "blocked" }
-  | { result: "dismissed" }
+const fromServer = z.union([
+  z.object({ result: z.literal("done"), until: z.catch(z.optional(z.string()), undefined) }),
+  z.object({ result: z.enum(["not-allowed", "cancelled", "failed", "signed-out"]) }),
+])
 
-const fromServer = new Set(["done", "not-allowed", "cancelled", "failed", "signed-out"])
+export type Outcome = z.output<typeof fromServer> | { result: "blocked" } | { result: "dismissed" }
 
 export function outcomeOf(data: unknown): Outcome | undefined {
-  if (typeof data !== "object" || data === null || !("result" in data)) return undefined
-  const { result } = data
-  if (typeof result !== "string" || !fromServer.has(result)) return undefined
-  if (result === "done") {
-    const until = "until" in data && typeof data.until === "string" ? data.until : undefined
-    return { result, until }
-  }
-  return { result } as Outcome
+  return fromServer.safeParse(data).data
 }
 
 export interface Ports {

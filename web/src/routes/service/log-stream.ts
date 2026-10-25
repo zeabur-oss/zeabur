@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react"
+import * as z from "zod/mini"
 
 import { localProblem, type Problem } from "@/api/client"
 
@@ -14,9 +15,8 @@ export interface LogStream {
   endedAt?: string
 }
 
-function isProblem(value: unknown): value is Problem {
-  return typeof value === "object" && value !== null && "detail" in value && "fix" in value
-}
+// The schema checks only `detail` and `fix`. The server defines the rest of `Problem`.
+const streamProblem = z.looseObject({ detail: z.string(), fix: z.string() })
 
 /** A dropped connection ends the stream: EventSource would reconnect and repeat the tail. Callers
  * key the component by `url`, so a new URL starts empty. */
@@ -54,8 +54,8 @@ export function useLogStream(url: string): LogStream {
       let problem: Problem | undefined
       if (event instanceof MessageEvent && typeof event.data === "string") {
         try {
-          const parsed: unknown = JSON.parse(event.data)
-          problem = isProblem(parsed) ? parsed : localProblem(0, event.data)
+          const parsed = streamProblem.safeParse(JSON.parse(event.data))
+          problem = parsed.success ? (parsed.data as Problem) : localProblem(0, event.data)
         } catch {
           problem = localProblem(0, event.data)
         }

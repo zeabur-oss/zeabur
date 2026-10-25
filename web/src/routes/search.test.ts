@@ -1,11 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
-import {
-  formerPlace,
-  servicePlace,
-  validateDatabaseSearch,
-  validateServiceSearch,
-} from "@/routes/search"
+import { formerPlace, servicePlace, databaseSearch, serviceSearch } from "@/routes/search"
 
 describe("service places", () => {
   test("a place names its tab, and a part of Settings its anchor", () => {
@@ -37,34 +32,34 @@ describe("service places", () => {
     expect(formerPlace("terminal")).toEqual({ tab: "logs", terminal: true })
     expect(formerPlace("events")).toEqual({ tab: "deployments", mode: "events" })
     expect(formerPlace("yaml")).toEqual({ tab: "settings", mode: "yaml" })
-    expect(validateServiceSearch({ tab: "usage" })).toMatchObject({
+    expect(serviceSearch.parse({ tab: "usage" })).toMatchObject({
       tab: "usage",
       former: undefined,
     })
   })
 
   test("a former tab is kept for the redirect; an unknown one is dropped", () => {
-    expect(validateServiceSearch({ tab: "inspect", view: "yaml" })).toMatchObject({
+    expect(serviceSearch.parse({ tab: "inspect", view: "yaml" })).toMatchObject({
       tab: undefined,
       former: "inspect",
       view: "yaml",
     })
-    expect(validateServiceSearch({ tab: "logs" })).toMatchObject({ tab: "logs", former: undefined })
-    expect(validateServiceSearch({ tab: "terminal" })).toMatchObject({
+    expect(serviceSearch.parse({ tab: "logs" })).toMatchObject({ tab: "logs", former: undefined })
+    expect(serviceSearch.parse({ tab: "terminal" })).toMatchObject({
       tab: undefined,
       former: "terminal",
     })
     // Logs' terminal view is the dock now: the link opens Logs with the dock.
-    expect(validateServiceSearch({ tab: "logs", mode: "terminal" })).toMatchObject({
+    expect(serviceSearch.parse({ tab: "logs", mode: "terminal" })).toMatchObject({
       tab: "logs",
       mode: undefined,
       former: "terminal",
     })
-    expect(validateServiceSearch({ tab: "settings", mode: "events" })).toMatchObject({
+    expect(serviceSearch.parse({ tab: "settings", mode: "events" })).toMatchObject({
       tab: "settings",
       mode: undefined,
     })
-    expect(validateServiceSearch({ tab: "nonsense" })).toMatchObject({
+    expect(serviceSearch.parse({ tab: "nonsense" })).toMatchObject({
       tab: undefined,
       former: undefined,
     })
@@ -73,18 +68,18 @@ describe("service places", () => {
 
 describe("database places", () => {
   test("a tab, Settings' YAML view, and a pod where logs and events take one", () => {
-    expect(validateDatabaseSearch({ tab: "overview" })).toEqual({})
-    expect(validateDatabaseSearch({ tab: "settings", mode: "yaml" })).toEqual({
+    expect(databaseSearch.parse({ tab: "overview" })).toEqual({})
+    expect(databaseSearch.parse({ tab: "settings", mode: "yaml" })).toEqual({
       tab: "settings",
       mode: "yaml",
     })
-    expect(validateDatabaseSearch({ tab: "backups", mode: "yaml", pod: "pg-1" })).toEqual({
+    expect(databaseSearch.parse({ tab: "backups", mode: "yaml", pod: "pg-1" })).toEqual({
       tab: "backups",
     })
-    expect(validateDatabaseSearch({ tab: "logs", pod: "pg-1" })).toEqual({
+    expect(databaseSearch.parse({ tab: "logs", pod: "pg-1" })).toEqual({
       tab: "logs",
       pod: "pg-1",
     })
-    expect(validateDatabaseSearch({ tab: "deployments" })).toEqual({})
+    expect(databaseSearch.parse({ tab: "deployments" })).toEqual({})
   })
 })

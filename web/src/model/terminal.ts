@@ -1,4 +1,6 @@
 // Protocol: crates/zeabur-api/src/pods/exec.rs.
+import * as z from "zod/mini"
+
 import type { Problem, Schemas } from "@/api/client"
 import { isRefusal } from "@/model/problem"
 import { roleYaml } from "@/model/rbac"
@@ -61,15 +63,14 @@ export function reconnectsWithRights(
   )
 }
 
+// The schema checks only `type`. The server defines the rest of `ServerFrame`.
+const knownFrame = z.looseObject({ type: z.enum(["ready", "exit", "error"]) })
+
 /** `undefined` for an unknown frame: the protocol lets either side add frames. */
 export function parseFrame(text: string): ServerFrame | undefined {
   try {
-    const value: unknown = JSON.parse(text)
-    if (typeof value !== "object" || value === null || !("type" in value)) return undefined
-    const type = (value as { type: unknown }).type
-    return type === "ready" || type === "exit" || type === "error"
-      ? (value as ServerFrame)
-      : undefined
+    const frame = knownFrame.safeParse(JSON.parse(text))
+    return frame.success ? (frame.data as ServerFrame) : undefined
   } catch {
     return undefined
   }

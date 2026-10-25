@@ -39,13 +39,13 @@ import { RouteError, RoutePending } from "@/components/route-states"
 import { canonicalKind, isTask } from "@/model/service"
 import {
   formerPlace,
-  validateComponentsSearch,
-  validateObjectsSearch,
-  validateProjectSearch,
-  validateProjectsSearch,
-  validateDatabaseSearch,
-  validateObjectStorageSearch,
-  validateServiceSearch,
+  componentsSearch,
+  objectsSearch,
+  projectSearch,
+  projectsSearch,
+  databaseSearch,
+  objectStorageSearch,
+  serviceSearch,
 } from "@/routes/search"
 
 // Routes are defined in code; each page's component loads on first visit, so the first page load
@@ -127,7 +127,7 @@ const rootRoute = createRootRoute({
 const homeRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/",
-  validateSearch: validateProjectsSearch,
+  validateSearch: projectsSearch,
   loader: () =>
     load(
       ensure(projectsQuery),
@@ -155,7 +155,7 @@ const clusterRoute = createRoute({
 const projectsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/projects",
-  validateSearch: validateProjectsSearch,
+  validateSearch: projectsSearch,
   loader: () => load(ensure(projectsQuery)),
   component: lazyRouteComponent(() => import("@/routes/projects"), "ProjectsPage"),
 })
@@ -163,7 +163,7 @@ const projectsRoute = createRoute({
 const projectRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/projects/$project",
-  validateSearch: validateProjectSearch,
+  validateSearch: projectSearch,
   // Incidents and suggestions add to the header and the top of the page, so they are read first.
   loader: ({ params }) =>
     load(
@@ -179,7 +179,7 @@ const projectRoute = createRoute({
 const architectureRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/projects/$project/architecture",
-  validateSearch: validateProjectSearch,
+  validateSearch: projectSearch,
   beforeLoad: ({ params, search }) => {
     throw redirect({
       to: "/projects/$project",
@@ -193,7 +193,7 @@ const architectureRoute = createRoute({
 const servicesRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/projects/$project/services",
-  validateSearch: validateProjectSearch,
+  validateSearch: projectSearch,
   beforeLoad: ({ params, search }) => {
     throw redirect({
       to: "/projects/$project",
@@ -209,7 +209,7 @@ const servicesRoute = createRoute({
 const objectsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/projects/$project/objects",
-  validateSearch: validateObjectsSearch,
+  validateSearch: objectsSearch,
   remountDeps: ({ params }) => params.project,
   component: lazyRouteComponent(() => import("@/routes/project/objects"), "ObjectsPage"),
 })
@@ -232,7 +232,7 @@ const projectSettingsRoute = createRoute({
 const serviceRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/projects/$project/services/$kind/$name",
-  validateSearch: validateServiceSearch,
+  validateSearch: serviceSearch,
   // `deployment/worker`, as kubectl prints it, opens `Deployment/worker`.
   beforeLoad: ({ params, search, location, preload }) => {
     const kind = canonicalKind(params.kind)
@@ -272,7 +272,7 @@ const serviceRoute = createRoute({
 const databaseRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/projects/$project/databases/$engine/$name",
-  validateSearch: validateDatabaseSearch,
+  validateSearch: databaseSearch,
   loader: ({ params }) => load(ensure(databasesQuery(params.project))),
   remountDeps: ({ params }) => `${params.project}/${params.engine}/${params.name}`,
   component: lazyRouteComponent(() => import("@/routes/database/page"), "DatabasePage"),
@@ -281,7 +281,7 @@ const databaseRoute = createRoute({
 const objectStorageRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/projects/$project/object-storage/$name",
-  validateSearch: validateObjectStorageSearch,
+  validateSearch: objectStorageSearch,
   loader: ({ params }) => load(ensure(objectStorageQuery(params.project))),
   remountDeps: ({ params }) => `${params.project}/${params.name}`,
   component: lazyRouteComponent(() => import("@/routes/object-storage/page"), "ObjectStoragePage"),
@@ -327,7 +327,7 @@ const clusterNotificationsRoute = createRoute({
 const componentsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/cluster/components",
-  validateSearch: validateComponentsSearch,
+  validateSearch: componentsSearch,
   loader: () => load(ensure(clusterQuery), ensure(upgradesQuery), ensure(capabilitiesQuery)),
   component: lazyRouteComponent(() => import("@/routes/cluster/components"), "ComponentsPage"),
 })

@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react"
+import * as z from "zod/mini"
 
 export function store<T>(initial: T) {
   let value = initial
@@ -63,19 +64,17 @@ export const projectView = {
   set: (project: string, view: "map" | "list") => save(viewKey(project), view),
 }
 
-export interface Recent {
-  id: string
-  label: string
-  hint: string
-  href: string
-}
+const recents = z.array(
+  z.object({ id: z.string(), label: z.string(), hint: z.string(), href: z.string() }),
+)
+
+export type Recent = z.output<typeof recents>[number]
 
 const recentKey = "zeabur.recent"
 
 function loadRecent(): Recent[] {
   try {
-    const parsed: unknown = JSON.parse(load(recentKey) ?? "[]")
-    return Array.isArray(parsed) ? (parsed as Recent[]).slice(0, 5) : []
+    return (recents.safeParse(JSON.parse(load(recentKey) ?? "[]")).data ?? []).slice(0, 5)
   } catch {
     return []
   }

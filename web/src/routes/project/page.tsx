@@ -67,7 +67,7 @@ import {
   SectionChips,
   Storage,
 } from "@/routes/project/side"
-import { validateProjectSearch, type ProjectView } from "@/routes/search"
+import { projectSearch, type ProjectView } from "@/routes/search"
 
 const route = getRouteApi("/projects/$project")
 
@@ -371,7 +371,7 @@ function ListView({
 }) {
   // After Back, Forward or a link, the filter box starts again from the URL.
   const entry = useHistoryIndex()
-  const typed = useLocationText((search) => validateProjectSearch(search).q ?? "")
+  const typed = useLocationText((search) => projectSearch.parse(search).q ?? "")
   const events = useProjectEvents(project)
   const phone = useMedia(PHONE)
   const refused = (resources: readonly string[]) => refusedAmong(unreadable, resources)
