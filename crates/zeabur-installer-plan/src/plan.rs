@@ -615,19 +615,7 @@ fn products(
     let suffixes = suffixes(config, facts);
     warn_no_suffixes(config, facts, &suffixes, warnings);
     let mut values = zeabur_values(config, facts, tls_issuer, &zeabur_image, &suffixes);
-    if chosen.contains(ZOT)
-        && let Some(map) = values.as_object_mut()
-    {
-        map.insert(
-            "builds".to_owned(),
-            json!({"caBundle": {"configMap": REGISTRY_CA_CONFIGMAP}}),
-        );
-    }
-    if chosen.contains(VICTORIA_LOGS)
-        && let Some(map) = values.as_object_mut()
-    {
-        map.insert("proxy".to_owned(), json!({"enabled": true}));
-    }
+    chosen_values(chosen, &mut values);
     Ok((
         Some(identity),
         Some(ZeaburPlan {
@@ -636,6 +624,22 @@ fn products(
             values,
         }),
     ))
+}
+
+/// The chart values that follow from the chosen components.
+fn chosen_values(chosen: &BTreeSet<&str>, values: &mut Value) {
+    let Some(map) = values.as_object_mut() else {
+        return;
+    };
+    if chosen.contains(ZOT) {
+        map.insert(
+            "builds".to_owned(),
+            json!({"caBundle": {"configMap": REGISTRY_CA_CONFIGMAP}}),
+        );
+    }
+    if chosen.contains(VICTORIA_LOGS) {
+        map.insert("proxy".to_owned(), json!({"enabled": true}));
+    }
 }
 
 /// Zeabur Identity and Zeabur as `plan` gives them, for a cluster that has its components from
