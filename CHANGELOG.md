@@ -21,6 +21,14 @@ minor or patch release may break the API.
   `spec.tls` or through a wildcard, and every rule outside the installer's namespaces must name a
   host. Routes that already break it stay; the security reference lists how to find them and how
   to switch the policy to `Warn`.
+- Deploy from an uploaded folder: "Upload a folder" in the web interface (drop a folder or a
+  `.zip`) and `zeaburctl up`. The client packs the folder (`.gitignore` and `.dockerignore`
+  applied), Zeabur pushes it to the registry as an OCI artifact with the token of the `Build`'s
+  upload Secret, and a `Build` with `spec.source.archive` builds it
+  ([docs/zh-TW/deploy/upload.mdx](docs/zh-TW/deploy/upload.mdx)). Zeabur keeps no copy, and
+  needs no new rights: a project Developer already may create and patch `Build`s and read Secrets.
+  New changes `uploadToken` and `archiveDigest`, and
+  `POST /api/v1/projects/{p}/builds/{b}/source`.
 
 ### Changed
 

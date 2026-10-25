@@ -1,6 +1,6 @@
 ---
 title: zeaburctl
-description: 用目前的 kubeconfig 開啟 Zeabur，或檢查叢集。
+description: 用目前的 kubeconfig 開啟 Zeabur、上傳資料夾，或檢查叢集。
 ---
 
 已有能連線到叢集的 kubeconfig 時，執行 `zeaburctl ui` 就會在本機開啟 Zeabur。讀取、**檢查變更**與確認後的套用都使用該 context 的權限，叢集裡不需要先安裝 Zeabur 伺服器。
@@ -14,14 +14,16 @@ zeaburctl --version
 zeaburctl ui
 zeaburctl ui --context production --no-browser
 zeaburctl doctor --context production --output json
+zeaburctl up ./site --project shop --service site
 ```
 
-`ui`、`doctor` 各自接受 `--context`。省略時使用 kubeconfig 的目前 context，指令不會改動 kubeconfig。
+`ui`、`doctor`、`up` 各自接受 `--context`。省略時使用 kubeconfig 的目前 context，指令不會改動 kubeconfig。
 
 | 指令 | 成果 | 會變更什麼 |
 |---|---|---|
 | `ui` | 在本機瀏覽器開啟 Zeabur | 不在叢集安裝元件，在介面套用的變更直接寫入叢集 |
 | `doctor` | 檢查叢集版本、元件和 Zeabur Identity 設定 | 只讀取，不修改設定 |
+| `up` | 把資料夾上傳到從資料夾建立的服務，並開始建置 | 修改該服務的 Build，把資料夾推到 registry |
 
 ## `ui`
 
@@ -68,6 +70,34 @@ JSON 最外層是 `checks` 陣列，每一項有 `name`、`status`、`findings` 
 多種結果同時出現時，依嚴重問題、警告、無法執行的順序決定結束碼。`skipped` 不影響結束碼，監控程式要另外讀 `checks` 才知道哪些項目沒檢查。
 
 kube-apiserver 是否信任 Zeabur Identity 的 issuer，寫在控制平面的 `AuthenticationConfiguration` 檔案裡，RBAC 讀不到，所以這一項會標示未檢查。要在主機上檢查，用 [`zeabur-installer doctor`](./installer.mdx)。
+
+## `up`
+
+```sh
+zeaburctl up [資料夾] --project <專案> --service <服務>
+```
+
+把資料夾打包上傳，並讓服務的 Build 建置它。打包規則和網頁相同：略過 `.gitignore`、`.dockerignore` 排除的檔案和 `.git`，上限是打包後 256 MiB、解開後 1 GiB。資料夾省略時用目前的資料夾。
+
+服務要先在網頁用[上傳資料夾](../deploy/upload.mdx)建立。`up` 不會建立服務，也不會上傳給從 Git 建置的服務。
+
+指令用你的 kubeconfig 權限依序做三件事：
+
+1. 向 Build 要上傳權杖（變更計畫，直接套用）。
+2. 把資料夾推到 registry。
+3. 把推上去的 digest 寫進 Build，開始建置（變更計畫，直接套用）。
+
+兩次寫入都是 Zeabur 的變更計畫，和網頁用的一樣。下這個指令就是你的確認，所以不再詢問。
+
+| 選項 | 預設與用途 |
+|---|---|
+| `--project <name>` | 服務所在的專案，必填 |
+| `--service <name>` | 服務名稱，它的 Build 同名，必填 |
+| `--context <name>` | kubeconfig 的目前 context |
+| `--registry-address <host:port 或網址>` | 這台電腦連到 registry 的位址。叢集內的位址（例如 `zot.zot.svc:5000`）在你的電腦解析不到時使用，例如 `kubectl -n zot port-forward svc/zot 5000:5000` 後填 `https://localhost:5000` |
+| `--registry-ca-file <path>` | registry 憑證的 CA（PEM）。registry 用私有憑證時使用 |
+
+`kubectl port-forward` 需要在 `zot` 這個 Namespace 轉發連接埠的權限，專案的 Developer 角色沒有。沒有這項權限，也沒有其他連到 registry 的路時，改用叢集內 Zeabur 的網頁上傳。
 
 ## 連線與權限問題
 

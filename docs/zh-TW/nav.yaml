@@ -10,6 +10,7 @@
   label: 部署服務
   pages:
     git: 從 Git 建置並部署服務
+    upload: 上傳資料夾並部署服務
     image: 部署容器映像檔
     compose: 匯入 Docker Compose 服務
     templates: 從應用程式範本部署
