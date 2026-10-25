@@ -11,14 +11,14 @@ const denied = { verb: "list", group: "", resource: "nodes" }
 
 function refused(overrides: Partial<Problem> = {}): Problem {
   return {
-    type: "/problems/elevation-required",
-    title: "This needs admin rights",
+    type: "/problems/forbidden",
+    title: "You do not have permission",
     status: 403,
     detail: "You do not have permission to read the cluster's nodes.",
-    fix: "Retry with admin rights, or ask a cluster administrator for access.",
-    kind: "elevation-required",
+    fix: "Ask a cluster administrator for access, or use an account that has it.",
+    kind: "forbidden",
     summary: {
-      key: "problem.summary.elevation-required",
+      key: "problem.summary.forbidden",
       params: { verb: "list", resource: "nodes" },
     },
     denied,
@@ -62,8 +62,8 @@ describe("problem text", () => {
 
   test("without a keyed fix, the kind's fix comes from the catalogue", () => {
     const text = problemText(translator(zhTW), "zh-TW", refused())
-    expect(text.headline).toBe("你平常的權限不能列出 nodes。")
-    expect(text.fix).toBe(zhTW["problem.fix.elevation-required"])
+    expect(text.headline).toBe("你不能列出 nodes。")
+    expect(text.fix).toBe(zhTW["problem.fix.forbidden"])
     // The refusal is said by the summary; the server's English sentence is folded away.
     expect(text.why).toBe(undefined)
     expect(text.folded).toStrictEqual(["You do not have permission to read the cluster's nodes."])
@@ -73,7 +73,7 @@ describe("problem text", () => {
     const fix = "Ask a cluster administrator for `list` on `nodes` (cluster-wide)."
     expect(problemText(translator(en), "en", refused({ fix })).fix).toBe(fix)
     const zh = problemText(translator(zhTW), "zh-TW", refused({ fix }))
-    expect(zh.fix).toBe(zhTW["problem.fix.elevation-required"])
+    expect(zh.fix).toBe(zhTW["problem.fix.forbidden"])
     expect(zh.folded).toStrictEqual([
       "You do not have permission to read the cluster's nodes.",
       fix,

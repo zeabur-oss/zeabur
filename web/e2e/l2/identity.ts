@@ -47,7 +47,7 @@ export async function signInAtZeaburIdentity(page: Page, identity: string) {
   await expect(page).toHaveURL((url) => url.origin === identity)
   const left = page
     .waitForURL((url) => url.origin !== identity, { timeout: 30_000 })
-    // The elevation window may close itself as soon as it is back.
+    // A popup may close itself as soon as it is back.
     .catch((error: unknown) => {
       if (!page.isClosed()) throw error
     })

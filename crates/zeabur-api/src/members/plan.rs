@@ -21,16 +21,16 @@ use zeabur_core::problem::{Denied, Kind, MEDIA_TYPE as PROBLEM, Problem};
 use zeabur_kube::k8s_openapi::jiff::Timestamp;
 use zeabur_kube::{Cluster, ObjectTarget, Preconditions, ResourceRef, WriteBody, WriteRequest};
 
+use super::USER_PREFIX;
 use super::access::{self, Binding, ProjectGrant, RBAC_GROUP, Step};
-use super::directory::{IdentityKind, Object, UserSpec, request, setup_links};
+use super::directory::{AccountType, IdentityKind, Object, UserSpec, request, setup_links};
 use super::handlers::{directory, issuer_of, you};
 use super::writes::{
     INVITE_SECONDS, SetupLinkView, admin_patch, bad, is_username, issue, new_user, refuse,
     user_object,
 };
-use super::{ADMIN_GROUP, USER_PREFIX};
 use crate::error::{ApiError, read_problem};
-use crate::handlers::{AppState, Everyday, Person};
+use crate::handlers::{AppState, Person};
 use crate::plan_token::{self as token, LIFETIME_SECONDS, PlanKey, TokenError};
 use crate::projects::writes::token_problem;
 use crate::settings::IdentitySettings;
@@ -52,20 +52,20 @@ pub enum MemberChange {
         /// Name shown in the interface, for a new member.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         display_name: Option<String>,
-        /// Whether a new member may take on admin rights.
+        /// Whether a new member is an admin account.
         #[serde(default)]
         admin: bool,
         /// A new member's roles in projects, when they are not an admin.
         #[serde(default)]
         projects: Vec<ProjectGrant>,
     },
-    /// Change what a member may do: admin rights, or roles in chosen projects (a project left out
-    /// loses theirs). Nobody takes their own admin rights away.
+    /// Change what a member may do: an admin account, or roles in chosen projects (a project left
+    /// out loses theirs). Nobody makes their own account a regular one.
     #[serde(rename_all = "camelCase")]
     Access {
         /// The member.
         username: String,
-        /// May take on admin rights, which cover every project.
+        /// An admin account, with full rights in every project.
         admin: bool,
         /// Roles in projects; empty for an admin.
         #[serde(default)]
@@ -341,7 +341,7 @@ fn typed_user(user: &Value) -> Result<Object<UserSpec>, ApiError> {
 }
 
 fn is_admin(user: &Object<UserSpec>) -> bool {
-    user.spec.elevated_groups.iter().any(|g| g == ADMIN_GROUP)
+    user.spec.account_type == AccountType::Admin
 }
 
 /// Reads what `change` needs and works out its writes; writes nothing.
@@ -615,11 +615,10 @@ fn plan_key(state: &AppState) -> Result<std::sync::Arc<PlanKey>, ApiError> {
 pub(crate) async fn plan(
     State(state): State<AppState>,
     Person(cluster): Person,
-    Everyday(everyday): Everyday,
     Json(change): Json<MemberChange>,
 ) -> Result<Json<MemberPlan>, ApiError> {
     let sealing = plan_key(&state)?;
-    let identity = everyday
+    let identity = cluster
         .whoami()
         .await
         .map_err(|e| ApiError::from(e.into_problem("your identity")))?;
@@ -734,7 +733,6 @@ async fn send(cluster: &dyn Cluster, op: &Op, dry_run: bool) -> Result<(), ApiEr
 pub(crate) async fn apply(
     State(state): State<AppState>,
     Person(cluster): Person,
-    Everyday(everyday): Everyday,
     Json(request): Json<MemberApplyRequest>,
 ) -> Result<Json<MemberApplied>, ApiError> {
     let sealing = plan_key(&state)?;
@@ -742,7 +740,7 @@ pub(crate) async fn apply(
     if (state.clock)().as_second() >= claims.expires_at {
         return Err(token_problem(TokenError::Expired));
     }
-    let identity = everyday
+    let identity = cluster
         .whoami()
         .await
         .map_err(|e| ApiError::from(e.into_problem("your identity")))?;
@@ -891,11 +889,11 @@ mod tests {
     }
 
     #[test]
-    fn making_an_admin_patches_only_the_groups_and_shows_both_sides() {
+    fn making_an_admin_patches_the_account_type_and_shows_both_sides() {
         let user = json!({
             "apiVersion": "identity.zeabur.com/v1alpha1", "kind": "User",
             "metadata": {"name": "bob", "namespace": "ns", "uid": "u", "resourceVersion": "7"},
-            "spec": {"username": "bob", "groups": [], "elevatedGroups": []}
+            "spec": {"username": "bob", "groups": []}
         });
         let typed = typed_user(&user).unwrap();
         let mut computed = Computed::default();
@@ -905,8 +903,8 @@ mod tests {
         assert_eq!(computed.versions["User/ns/bob"], "7");
         let writes = writes_of(&computed, "ns", "bob", 0);
         let after = writes[0].after_yaml.as_deref().unwrap();
-        assert!(after.contains("admins"), "{after}");
-        assert!(!writes[0].before_yaml.as_deref().unwrap().contains("admins"));
+        assert!(after.contains("accountType: Admin"), "{after}");
+        assert!(!writes[0].before_yaml.as_deref().unwrap().contains("Admin"));
     }
 
     #[test]

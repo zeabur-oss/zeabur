@@ -2,14 +2,12 @@
 import * as z from "zod/mini"
 
 import type { Problem, Schemas } from "@/api/client"
-import { isRefusal } from "@/model/problem"
 import { roleYaml } from "@/model/rbac"
 
 export type ServerFrame = Schemas["ServerFrame"]
 export type ClientFrame = Schemas["ClientFrame"]
 
 // Any other close without an `exit` or `error` frame first is a lost connection.
-const closeExpired = 4000
 const closeIdle = 4001
 
 export type TerminalState =
@@ -22,7 +20,7 @@ export type TerminalState =
       message?: string
     }
   | { phase: "error"; problem: Problem }
-  | { phase: "closed"; why: "expired" | "idle" | "lost" }
+  | { phase: "closed"; why: "idle" | "lost" }
 
 export type TerminalEvent =
   | { type: "connect" }
@@ -48,19 +46,8 @@ export function nextState(state: TerminalState, event: TerminalEvent): TerminalS
     }
   }
   if (state.phase === "exited" || state.phase === "error") return state
-  if (event.code === closeExpired) return { phase: "closed", why: "expired" }
   if (event.code === closeIdle) return { phase: "closed", why: "idle" }
   return { phase: "closed", why: "lost" }
-}
-
-export function reconnectsWithRights(
-  state: TerminalState,
-  before: Schemas["ElevationState"] | undefined,
-  now: Schemas["ElevationState"] | undefined,
-): boolean {
-  return (
-    state.phase === "error" && isRefusal(state.problem) && before !== "active" && now === "active"
-  )
 }
 
 // The schema checks only `type`. The server defines the rest of `ServerFrame`.
@@ -100,18 +87,6 @@ export function toolsTerminalUrl(
   const base =
     project === undefined ? "/api/v1/cluster" : `/api/v1/projects/${encodeURIComponent(project)}`
   return `${scheme}//${location.host}${base}/tools/${encodeURIComponent(name)}/terminal`
-}
-
-/** The soonest of the credentials the open terminals were opened with: the first to close. */
-export function nearestExpiry(expiries: Iterable<string | null | undefined>): string | undefined {
-  let nearest: { at: number; iso: string } | undefined
-  for (const iso of expiries) {
-    if (!iso) continue
-    const at = Date.parse(iso)
-    if (Number.isNaN(at)) continue
-    if (!nearest || at < nearest.at) nearest = { at, iso }
-  }
-  return nearest?.iso
 }
 
 /** Both verbs on `pods/exec`: a WebSocket handshake is a GET (RFC 6455 §4.1), so RBAC checks `get`;

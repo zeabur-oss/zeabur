@@ -65,26 +65,10 @@ export const ruleOf = (right: Right): string => rules[right].rule
 export interface Asker {
   /** Signed in with Zeabur Identity, whose roles the interface can name. */
   member: boolean
-  /** In `zeabur:admins`. */
-  admin: boolean
-  elevation: Schemas["ElevationState"] | undefined
 }
 
-export function askerOf(
-  whoami: Pick<Schemas["WhoAmI"], "username" | "groups"> | undefined,
-  elevation: Schemas["ElevationState"] | undefined,
-): Asker {
-  return {
-    member: whoami?.username.startsWith("zeabur:") ?? false,
-    admin: whoami?.groups.includes("zeabur:admins") ?? false,
-    elevation,
-  }
-}
-
-/** Cluster administrators, and admins who may take admin rights: what only they may do (a node
- * terminal, the cluster's kubectl terminal) is offered, and its plan offers the rights. */
-export function mayActAsClusterAdmin(clusterAdmin: boolean | undefined, asker: Asker): boolean {
-  return clusterAdmin === true || (asker.admin && asker.elevation === "available")
+export function askerOf(whoami: Pick<Schemas["WhoAmI"], "username"> | undefined): Asker {
+  return { member: whoami?.username.startsWith("zeabur:") ?? false }
 }
 
 /** An action is open, or closed with the role (for a member) or the rule (for anyone else) that
@@ -96,11 +80,9 @@ export type Gate =
 const open: Gate = { open: true }
 
 /** Only a definite denial closes an action: `unknown` (another authorizer may allow it) and a
- * right not yet read stay open, and the plan's dry run decides. An admin who may take admin
- * rights keeps the action open too; the plan offers them. */
+ * right not yet read stay open, and the plan's dry run decides. */
 export function gate(right: Right, permission: Permission | undefined, asker: Asker): Gate {
   if (permission !== "denied") return open
-  if (asker.admin && asker.elevation === "available") return open
   return { open: false, right, ...rules[right], member: asker.member }
 }
 

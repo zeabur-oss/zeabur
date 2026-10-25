@@ -68,14 +68,6 @@ export const dockHeight = (() => {
   }
 })()
 
-/** When each tab's session opened, the expiry of the credential it was opened with. */
-export const dockExpiries = store<Record<string, string>>({})
-
-export function setExpiry(id: string, expiresAt: string | null | undefined) {
-  const { [id]: _, ...rest } = dockExpiries.get()
-  dockExpiries.set(expiresAt ? { ...rest, [id]: expiresAt } : rest)
-}
-
 const update = (patch: Partial<DockState>) => dock.set({ ...dock.get(), ...patch })
 
 export function showDock(open: boolean) {
@@ -175,7 +167,6 @@ export function closeTab(id: string) {
   const tabs = state.tabs.filter((tab) => tab.id !== id)
   const active =
     state.active === id ? (tabs[Math.min(index, tabs.length - 1)]?.id ?? undefined) : state.active
-  setExpiry(id, undefined)
   dock.set({ ...state, tabs, active, focus: state.focus + 1 })
 }
 

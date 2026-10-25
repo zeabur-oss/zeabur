@@ -15,11 +15,9 @@
 //!   kube-apiserver, which validates the access token itself, through a `SelfSubjectReview`. The
 //!   access token's lifetime comes from `expires_in` ([rfc6749] §5.1); an answer without it is
 //!   refused rather than guessed.
-//! - **One claim of the ID token is read**: `can_elevate`, which Zeabur Identity sets when an
-//!   `elevate` request would succeed. Its signature is not checked: the token comes straight from
-//!   the token endpoint over TLS ([oidc-core] §3.1.3.7, item 6), and the claim only decides whether
-//!   admin rights are offered. It grants nothing; kube-apiserver checks the elevated token. Without
-//!   the claim, or without an ID token, admin rights are not offered.
+//! - **`refresh_expires_in`**, which Zeabur Identity sends as Keycloak does, says how long the
+//!   refresh token lasts unused: one hour, or less for an admin account. The session ends when it
+//!   is idle that long ([`crate::session`]), so it never outlives the refresh token.
 //! - **Refresh** sends the refresh token and keeps the one the answer returns; Zeabur Identity
 //!   rotates it on every use and revokes the whole family when a used one comes back ([rfc9700]
 //!   §4.14.2), so refreshes of one session never overlap ([`crate::session`]).
@@ -36,8 +34,6 @@
 //!   Identification," RFC 9207, IETF, Mar. 2022. <https://www.rfc-editor.org/rfc/rfc9207>
 //! - [rfc9700] T. Lodderstedt, J. Bradley, A. Labunets and D. Fett, "Best Current Practice for
 //!   OAuth 2.0 Security," RFC 9700, IETF, Jan. 2025. <https://www.rfc-editor.org/rfc/rfc9700>
-//! - [oidc-core] N. Sakimura, J. Bradley, M. Jones, B. de Medeiros and C. Mortimore, "OpenID
-//!   Connect Core 1.0," OpenID Foundation. <https://openid.net/specs/openid-connect-core-1_0.html>
 //! - [oidc-discovery] N. Sakimura, J. Bradley, M. Jones and E. Jay, "OpenID Connect Discovery 1.0,"
 //!   OpenID Foundation. <https://openid.net/specs/openid-connect-discovery-1_0.html>
 //!
@@ -45,13 +41,12 @@
 //! [rfc7009]: https://www.rfc-editor.org/rfc/rfc7009
 //! [rfc9207]: https://www.rfc-editor.org/rfc/rfc9207
 //! [rfc9700]: https://www.rfc-editor.org/rfc/rfc9700
-//! [oidc-core]: https://openid.net/specs/openid-connect-core-1_0.html#TokenResponseValidation
 //! [oidc-discovery]: https://openid.net/specs/openid-connect-discovery-1_0.html
 
 use std::fmt;
 
 use base64::Engine as _;
-use base64::engine::general_purpose::{STANDARD, URL_SAFE_NO_PAD};
+use base64::engine::general_purpose::STANDARD;
 use bytes::Bytes;
 use http::{HeaderValue, Method, Request, StatusCode, header};
 use http_body_util::Full;
@@ -61,12 +56,12 @@ use serde::Deserialize;
 use tokio::sync::OnceCell;
 use zeabur_core::secret::join;
 
-use crate::flow::{Pending, Purpose};
+use crate::flow::Pending;
 pub use crate::http::ExtraRoots;
 use crate::http::Http;
 use crate::url::BaseUrl;
 
-/// Where the issuer sends the browser back: one path for signing in and for elevation.
+/// Where the issuer sends the browser back after sign-in.
 pub const CALLBACK_PATH: &str = "/auth/callback";
 
 /// How Zeabur is registered with the issuer.
@@ -122,10 +117,10 @@ pub struct TokenSet {
     pub access_token: SecretString,
     /// Its lifetime in seconds.
     pub expires_in: i64,
-    /// The refresh token, when one was issued (never with elevated tokens).
+    /// The refresh token, when one was issued.
     pub refresh_token: Option<SecretString>,
-    /// Whether the ID token says an `elevate` request would succeed.
-    pub can_elevate: bool,
+    /// How long the refresh token lasts unused, in seconds, when the issuer says.
+    pub refresh_expires_in: Option<i64>,
 }
 
 impl fmt::Debug for TokenSet {
@@ -133,7 +128,7 @@ impl fmt::Debug for TokenSet {
         f.debug_struct("TokenSet")
             .field("expires_in", &self.expires_in)
             .field("refresh_token", &self.refresh_token.is_some())
-            .field("can_elevate", &self.can_elevate)
+            .field("refresh_expires_in", &self.refresh_expires_in)
             .finish_non_exhaustive()
     }
 }
@@ -169,22 +164,7 @@ struct TokenAnswer {
     #[serde(default)]
     refresh_token: Option<SecretString>,
     #[serde(default)]
-    id_token: Option<SecretString>,
-}
-
-#[derive(Deserialize)]
-struct IdTokenClaims {
-    #[serde(default)]
-    can_elevate: bool,
-}
-
-/// The `can_elevate` claim of a compact JWS ID token; `false` when it cannot be read.
-fn can_elevate(id_token: Option<&str>) -> bool {
-    id_token
-        .and_then(|token| token.split('.').nth(1))
-        .and_then(|payload| URL_SAFE_NO_PAD.decode(payload).ok())
-        .and_then(|json| serde_json::from_slice::<IdTokenClaims>(&json).ok())
-        .is_some_and(|claims| claims.can_elevate)
+    refresh_expires_in: Option<i64>,
 }
 
 #[derive(Deserialize)]
@@ -312,18 +292,10 @@ impl OAuthClient {
             .append_pair("response_type", "code")
             .append_pair("client_id", &self.client_id)
             .append_pair("redirect_uri", &self.redirect_uri)
-            .append_pair("scope", pending.purpose().scope())
+            .append_pair("scope", "openid")
             .append_pair("state", pending.state())
             .append_pair("code_challenge", &pending.challenge())
             .append_pair("code_challenge_method", "S256");
-        match pending.purpose() {
-            // Ask for a fresh sign-in explicitly; Zeabur Identity has no single sign-on session, so
-            // it always asks anyway.
-            Purpose::Elevate => {
-                query.append_pair("prompt", "login");
-            }
-            Purpose::SignIn { .. } => {}
-        }
         let separator = if provider.authorization_endpoint.contains('?') {
             '&'
         } else {
@@ -438,7 +410,7 @@ impl OAuthClient {
             access_token: answer.access_token,
             expires_in,
             refresh_token: answer.refresh_token,
-            can_elevate: can_elevate(answer.id_token.as_ref().map(ExposeSecret::expose_secret)),
+            refresh_expires_in: answer.refresh_expires_in.filter(|seconds| *seconds > 0),
         })
     }
 
@@ -540,13 +512,7 @@ mod tests {
     async fn the_authorization_request_carries_pkce_state_and_the_exact_redirect_uri() {
         let issuer = FakeIssuer::start().await;
         let client = client_for(&issuer.url(), CLIENT_SECRET);
-        let pending = Pending::start(
-            Purpose::SignIn {
-                return_to: "/".to_owned(),
-            },
-            0,
-        )
-        .unwrap();
+        let pending = Pending::start("/".to_owned(), 0).unwrap();
         let url = client.authorization_url(&pending).await.unwrap();
         assert!(url.starts_with(&format!("{}/authorize?", issuer.url())));
         let params = query(&url);
@@ -562,19 +528,14 @@ mod tests {
         assert_eq!(params["code_challenge_method"], "S256");
         assert!(!params.contains_key("prompt"));
         assert!(!url.contains(pending.verifier()));
-
-        let elevate = Pending::start(Purpose::Elevate, 0).unwrap();
-        let params = query(&client.authorization_url(&elevate).await.unwrap());
-        assert_eq!(params["scope"], "openid elevate");
-        assert_eq!(params["prompt"], "login");
     }
 
     #[tokio::test]
     async fn a_code_is_redeemed_only_with_its_verifier_and_the_client_secret() {
         let issuer = FakeIssuer::start().await;
         let client = client_for(&issuer.url(), CLIENT_SECRET);
-        let pending = Pending::start(Purpose::Elevate, 0).unwrap();
-        let other = Pending::start(Purpose::Elevate, 0).unwrap();
+        let pending = Pending::start("/".to_owned(), 0).unwrap();
+        let other = Pending::start("/".to_owned(), 0).unwrap();
         let authorize = client.authorization_url(&pending).await.unwrap();
 
         let answer = query(&issuer.approve(&authorize, "alice"));
@@ -598,10 +559,10 @@ mod tests {
             .exchange(&answer["code"], pending.verifier())
             .await
             .unwrap();
-        assert_eq!(tokens.access_token.expose_secret(), "alice:elevated:3");
-        assert_eq!(tokens.expires_in, 300);
-        // An elevated token comes without a refresh token.
-        assert!(tokens.refresh_token.is_none());
+        assert_eq!(tokens.access_token.expose_secret(), "alice:3");
+        assert_eq!(tokens.expires_in, 600);
+        assert!(tokens.refresh_token.is_some());
+        assert_eq!(tokens.refresh_expires_in, Some(3600));
         assert!(!format!("{tokens:?}").contains("alice"));
     }
 

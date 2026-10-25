@@ -124,8 +124,7 @@ for values in "$chart"/ci/*-values.yaml; do
     grep -q "env = \"$env\"" "$root/crates/zeabur/src/config.rs" ||
       fail "$name: Zeabur does not read $env"
   done
-  # ZEABUR_ELEVATION is parsed as a bool: exactly true or false.
-  expect "$name" "$out" "$container | .env[] | select(.name == \"ZEABUR_ELEVATION\") | .value | test(\"^(true|false)$\")" true
+  # ZEABUR_MEMBER_ROLES is parsed as a bool: exactly true or false.
   expect "$name" "$out" "$container | .env[] | select(.name == \"ZEABUR_MEMBER_ROLES\") | .value | test(\"^(true|false)$\")" true
 done
 

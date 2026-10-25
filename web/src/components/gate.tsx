@@ -7,13 +7,12 @@ import LockSimpleIcon from "~icons/ph/lock-simple"
 
 import type { Schemas } from "@/api/client"
 import { accountQuery } from "@/api/members"
-import { clusterQuery, namespaceQuery, sessionQuery, whoamiQuery } from "@/api/queries"
+import { clusterQuery, namespaceQuery, whoamiQuery } from "@/api/queries"
 import { useT } from "@/i18n"
 import { cn } from "@/lib/utils"
 import {
   askerOf,
   gate,
-  mayActAsClusterAdmin,
   type ClusterRights,
   type Gate,
   type ProjectRights,
@@ -23,9 +22,7 @@ import {
 type Permission = Schemas["Permission"]
 
 function useAsker() {
-  const whoami = useQuery(whoamiQuery).data
-  const elevation = useQuery(sessionQuery).data?.elevation
-  return askerOf(whoami, elevation)
+  return askerOf(useQuery(whoamiQuery).data)
 }
 
 /** Whether the person may do `right` in `project`, from the namespace's rights. */
@@ -60,9 +57,8 @@ export function useClusterGate(right: keyof ClusterRights): Gate {
   return gate(right, cluster.data?.can[right], asker)
 }
 
-export function useMayActAsClusterAdmin(): boolean {
-  const account = useQuery(accountQuery).data
-  return mayActAsClusterAdmin(account?.clusterAdmin, useAsker())
+export function useClusterAdmin(): boolean {
+  return useQuery(accountQuery).data?.clusterAdmin === true
 }
 
 /** Why an action is closed, in a sentence; nothing when it is open. */

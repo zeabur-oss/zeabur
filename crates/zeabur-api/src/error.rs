@@ -1,26 +1,10 @@
 //! Problems as HTTP responses.
-//!
-//! **Refusals offer elevation.** Where elevation is offered and not in use
-//! ([`Elevation::Available`]), every refusal from kube-apiserver (a `403` that carries its
-//! answer in `kubernetes`, or the request a `SelfSubjectAccessReview` refused in `denied`) leaves
-//! as `elevation-required`: the same status, `denied` and
-//! `kubernetes`, so the interface can offer "Retry as admin" next to any of them. This happens
-//! once, in [`offer_elevation_on_refusal`] around every route, and for the terminal, whose
-//! refusal travels in a frame after the upgrade, in [`offer_elevation`] itself. Zeabur's own
-//! `403`s (a handshake from another origin, a plan made by someone else) carry no answer from
-//! the cluster and stay `forbidden`: admin rights would not change them. Neither does a refusal
-//! while the rights are in use, nor where they are not offered (local mode).
 
 use axum::Json;
-use axum::extract::{Request, State};
 use axum::http::{HeaderValue, StatusCode, header};
-use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
 use zeabur_core::problem::{Denied, Kind, MEDIA_TYPE, Problem};
 use zeabur_kube::ClusterError;
-
-use crate::access::Elevation;
-use crate::handlers::AppState;
 
 /// A [`Problem`] as an `application/problem+json` response.
 ///
@@ -40,65 +24,13 @@ impl IntoResponse for ApiError {
         let status =
             StatusCode::from_u16(self.0.status).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
         let retry_after = self.0.retry_after();
-        let refusal = is_cluster_refusal(&self.0).then(|| Refusal(self.0.clone()));
         let mut response = (status, Json(*self.0)).into_response();
         let headers = response.headers_mut();
         headers.insert(header::CONTENT_TYPE, HeaderValue::from_static(MEDIA_TYPE));
         if let Some(seconds) = retry_after {
             headers.insert(header::RETRY_AFTER, HeaderValue::from(seconds));
         }
-        if let Some(refusal) = refusal {
-            response.extensions_mut().insert(refusal);
-        }
         response
-    }
-}
-
-/// Whether kube-apiserver refused the request: a `forbidden` that carries its answer, or the
-/// request it said no to in a `SelfSubjectAccessReview` ([`review_refusal`]).
-fn is_cluster_refusal(problem: &Problem) -> bool {
-    problem.kind == Kind::Forbidden && (problem.kubernetes.is_some() || problem.denied.is_some())
-}
-
-/// A refusal from kube-apiserver, kept on its response for [`offer_elevation_on_refusal`].
-#[derive(Clone)]
-struct Refusal(Box<Problem>);
-
-/// `problem`, as `elevation-required` when kube-apiserver refused it and the person could retry
-/// as an administrator; its detail, kube-apiserver's answer and the refused request (`denied`)
-/// stay as they are (see [`Problem::refined`]).
-pub(crate) fn offer_elevation(problem: Problem, elevation: Elevation) -> Problem {
-    if is_cluster_refusal(&problem) && elevation == Elevation::Available {
-        let mut offered = problem.refined(Kind::ElevationRequired);
-        offered.fix_key = Some(zeabur_core::message::Message::new(
-            "problem.forbidden.fix.askOrRetry",
-        ));
-        offered
-    } else {
-        problem
-    }
-}
-
-/// [`offer_elevation`] on every answer of the API.
-pub(crate) async fn offer_elevation_on_refusal(
-    State(state): State<AppState>,
-    request: Request,
-    next: Next,
-) -> Response {
-    let (parts, body) = request.into_parts();
-    let elevation = state
-        .access
-        .for_request(&parts)
-        .map(|access| access.elevation);
-    let mut response = next.run(Request::from_parts(parts, body)).await;
-    match (elevation, response.extensions_mut().remove::<Refusal>()) {
-        (Ok(Elevation::Available), Some(Refusal(problem))) => {
-            ApiError::from(offer_elevation(*problem, Elevation::Available)).into_response()
-        }
-        (
-            Ok(Elevation::Available | Elevation::Unavailable | Elevation::Active { .. }) | Err(_),
-            _,
-        ) => response,
     }
 }
 

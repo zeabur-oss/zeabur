@@ -33,7 +33,6 @@ export function NodeShellTab({ tab, shown, focus }: NodeShellTabProps) {
   if (entered || running)
     return (
       <Session
-        id={tab.id}
         url={nodeShellUrl(window.location, tab.pod)}
         attempt={attempt}
         project={NODE_SHELL_NAMESPACE}
@@ -50,7 +49,7 @@ export function NodeShellTab({ tab, shown, focus }: NodeShellTabProps) {
       />
     )
   if (list.isPending) return <LoadingRows label={t("common.loading")} rows={2} />
-  if (list.isError) return <Problem error={list.error} retry={() => void list.refetch()} />
+  if (list.isError) return <Problem error={list.error} />
   if (!shell || shell.phase === "ended") return <Ended pod={tab.pod} />
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto px-3 py-3 text-sm">

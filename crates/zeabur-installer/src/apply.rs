@@ -930,7 +930,6 @@ fn oauth_client(kubectl: &Kubectl, plan: &Plan, url: &str) -> Result<(), Install
                 "zeabur",
                 "--type",
                 "confidential",
-                "--allow-elevation",
                 "--audience",
                 "kubernetes",
                 "--display-name",

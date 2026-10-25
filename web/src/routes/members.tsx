@@ -123,11 +123,7 @@ export function MembersPage() {
       ) : (
         <>
           <LinksUnavailable links={members.data.setupLinks} />
-          <ManageDenied
-            hint={members.data.canManage}
-            what={t("members.inviting")}
-            denied={t("members.denied")}
-          />
+          <ManageDenied hint={members.data.canManage} denied={t("members.denied")} />
           <MemberList items={members.data.items} projectRoles={projectRoles} onOpen={setOpen} />
           <RefusedSome unreadable={members.data.unreadable} />
           <Pending invitations={members.data.invitations} />

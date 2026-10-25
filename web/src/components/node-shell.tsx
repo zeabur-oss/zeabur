@@ -16,7 +16,7 @@ import {
 } from "@/api/node-shells"
 import { Ago, CopyButton } from "@/components/bits"
 import { Exposed, PlanFrame, PlanWrites } from "@/components/cluster-plan"
-import { useMayActAsClusterAdmin } from "@/components/gate"
+import { useClusterAdmin } from "@/components/gate"
 import { Consequence } from "@/components/members/frame"
 import { StatusDot } from "@/components/status"
 import { useT } from "@/i18n"
@@ -33,7 +33,7 @@ import { Tooltip } from "@zeabur/design-system/components/tooltip"
 /** A node row's root shell: the action, then the shell pods on the node. */
 export function NodeShells({ node }: { node: string }) {
   const t = useT()
-  const allowed = useMayActAsClusterAdmin()
+  const allowed = useClusterAdmin()
   const [opening, setOpening] = useState(false)
   if (!allowed) return null
   return (

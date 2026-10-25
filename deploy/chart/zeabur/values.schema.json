@@ -3,7 +3,7 @@
   "title": "zeabur chart values",
   "type": "object",
   "additionalProperties": false,
-  "required": ["image", "publicUrl", "issuer", "elevation", "planKey", "service", "ingress", "httpRoute", "resources"],
+  "required": ["image", "publicUrl", "issuer", "planKey", "service", "ingress", "httpRoute", "resources"],
   "definitions": {
     "origin": {
       "description": "An https URL with a host name and no path, query or trailing slash, as browsers write an origin.",
@@ -150,11 +150,6 @@
         },
         "required": ["configMap", "secret"]
       }
-    },
-    "elevation": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": { "enabled": { "type": "boolean" } }
     },
     "memberRoles": {
       "type": "object",

@@ -10,7 +10,6 @@ mod tests {
     use std::time::Duration;
 
     use axum::Router;
-    use axum::http::request::Parts;
     use futures_util::{SinkExt as _, StreamExt as _};
     use serde_json::{Value, json};
     use tokio::net::TcpStream;
@@ -18,12 +17,11 @@ mod tests {
     use tokio_tungstenite::tungstenite::protocol::frame::coding::CloseCode;
     use tokio_tungstenite::tungstenite::{Error as WsError, Message};
     use tokio_tungstenite::{MaybeTlsStream, WebSocketStream};
-    use zeabur_api::access::{Access, ClusterAccess, Elevation, SingleCluster};
-    use zeabur_core::problem::Problem;
+    use zeabur_api::access::SingleCluster;
     use zeabur_kube::k8s_openapi::api::core::v1::Pod;
-    use zeabur_kube::k8s_openapi::jiff::{SignedDuration, Timestamp};
+    use zeabur_kube::k8s_openapi::jiff::Timestamp;
     use zeabur_kube::memory::{MemoryCluster, State};
-    use zeabur_kube::{Cluster, NamespaceObjects, TerminalSize};
+    use zeabur_kube::{NamespaceObjects, TerminalSize};
 
     type Socket = WebSocketStream<MaybeTlsStream<TcpStream>>;
 
@@ -60,50 +58,6 @@ mod tests {
             )]),
             ..State::default()
         })
-    }
-
-    /// One person whose credential expires a second after [`now`].
-    struct Expiring(Arc<dyn Cluster>);
-
-    impl ClusterAccess for Expiring {
-        fn for_request(&self, _parts: &Parts) -> Result<Access, Box<Problem>> {
-            Ok(Access {
-                cluster: Arc::clone(&self.0),
-                elevation: Elevation::Unavailable,
-            })
-        }
-
-        fn credential_expiry(&self, _parts: &Parts) -> Option<Timestamp> {
-            Some(now() + SignedDuration::from_secs(1))
-        }
-    }
-
-    /// One person whose admin rights are offered and not in use (`admin` is `None`), or held
-    /// until a second after [`now`].
-    struct Elevating {
-        everyday: Arc<dyn Cluster>,
-        admin: Option<Arc<dyn Cluster>>,
-    }
-
-    impl ClusterAccess for Elevating {
-        fn for_request(&self, _parts: &Parts) -> Result<Access, Box<Problem>> {
-            let everyday = || Access {
-                cluster: Arc::clone(&self.everyday),
-                elevation: Elevation::Available,
-            };
-            Ok(self.admin.as_ref().map_or_else(everyday, |admin| Access {
-                cluster: Arc::clone(admin),
-                elevation: Elevation::Active {
-                    until: now() + SignedDuration::from_secs(1),
-                },
-            }))
-        }
-
-        fn credential_expiry(&self, _parts: &Parts) -> Option<Timestamp> {
-            self.admin
-                .as_ref()
-                .map(|_| now() + SignedDuration::from_secs(1))
-        }
     }
 
     async fn serve(router: Router) -> SocketAddr {
@@ -240,35 +194,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn the_terminal_closes_when_the_credential_expires() {
-        let cluster: Arc<dyn Cluster> = Arc::new(cluster());
-        let router = zeabur_api::router_at(Arc::new(Expiring(cluster)), now);
-        let mut socket = connect(router, "").await;
-        assert_eq!(frame(&mut socket).await["type"], "ready");
-        let (code, reason) = close_code(&mut socket).await;
-        assert_eq!(code, CloseCode::from(4000));
-        assert_eq!(reason, "session expired, reconnect");
-    }
-
-    /// While the person is elevated the terminal runs with the admin credential (the everyday
-    /// one is refused here) and ends when that one expires.
-    #[tokio::test]
-    async fn an_elevated_terminal_uses_the_admin_credential_until_it_expires() {
-        let everyday = cluster();
-        everyday.update(|s| {
-            s.exec_refused.insert("shop/web-1".to_owned());
-        });
-        let access = Elevating {
-            everyday: Arc::new(everyday),
-            admin: Some(Arc::new(cluster())),
-        };
-        let mut socket = connect(zeabur_api::router_at(Arc::new(access), now), "").await;
-        assert_eq!(frame(&mut socket).await["type"], "ready");
-        let (code, _) = close_code(&mut socket).await;
-        assert_eq!(code, CloseCode::from(4000));
-    }
-
-    #[tokio::test]
     async fn an_idle_terminal_is_closed() {
         let access = Arc::new(SingleCluster(Arc::new(cluster())));
         let router = zeabur_api::router_with_terminal_idle(access, now, Duration::from_millis(300));
@@ -277,51 +202,25 @@ mod tests {
         assert_eq!(close_code(&mut socket).await.0, CloseCode::from(4001));
     }
 
-    /// A refusal names the permission; it offers admin rights only where they are offered and
-    /// not in use (with them in use, retrying as admin would not help).
+    /// A refusal names the permission.
     #[tokio::test]
     async fn a_refused_exec_names_the_permission_it_needs() {
         let cluster = cluster();
         cluster.update(|s| {
             s.exec_refused.insert("shop/web-1".to_owned());
         });
-        let refused: Arc<dyn Cluster> = Arc::new(cluster.clone());
-        for (router, kind) in [
-            (app(&cluster), "forbidden"),
-            (
-                zeabur_api::router_at(
-                    Arc::new(Elevating {
-                        everyday: Arc::clone(&refused),
-                        admin: None,
-                    }),
-                    now,
-                ),
-                "elevation-required",
-            ),
-            (
-                zeabur_api::router_at(
-                    Arc::new(Elevating {
-                        everyday: Arc::clone(&refused),
-                        admin: Some(Arc::clone(&refused)),
-                    }),
-                    now,
-                ),
-                "forbidden",
-            ),
-        ] {
-            let mut socket = connect(router, "").await;
-            let error = frame(&mut socket).await;
-            assert_eq!(error["type"], "error");
-            assert_eq!(error["problem"]["status"], 403);
-            assert_eq!(error["problem"]["kind"], kind);
-            assert_eq!(error["problem"]["kubernetes"]["code"], 403);
-            assert_eq!(
-                error["problem"]["denied"],
-                json!({"verb": "create", "group": "", "resource": "pods/exec",
-                       "name": "web-1", "namespace": "shop"})
-            );
-            assert_eq!(close_code(&mut socket).await.0, CloseCode::Normal);
-        }
+        let mut socket = connect(app(&cluster), "").await;
+        let error = frame(&mut socket).await;
+        assert_eq!(error["type"], "error");
+        assert_eq!(error["problem"]["status"], 403);
+        assert_eq!(error["problem"]["kind"], "forbidden");
+        assert_eq!(error["problem"]["kubernetes"]["code"], 403);
+        assert_eq!(
+            error["problem"]["denied"],
+            json!({"verb": "create", "group": "", "resource": "pods/exec",
+                   "name": "web-1", "namespace": "shop"})
+        );
+        assert_eq!(close_code(&mut socket).await.0, CloseCode::Normal);
     }
 
     /// `get` on `pods/exec` is enough for kube-apiserver before 1.31 to open a WebSocket exec;
@@ -342,20 +241,6 @@ mod tests {
                    "name": "web-1", "namespace": "shop"})
         );
         assert_eq!(close_code(&mut socket).await.0, CloseCode::Normal);
-
-        let refused: Arc<dyn Cluster> = Arc::new(cluster.clone());
-        let elevating = zeabur_api::router_at(
-            Arc::new(Elevating {
-                everyday: refused,
-                admin: None,
-            }),
-            now,
-        );
-        let mut socket = connect(elevating, "").await;
-        assert_eq!(
-            frame(&mut socket).await["problem"]["kind"],
-            "elevation-required"
-        );
     }
 
     #[tokio::test]

@@ -50,7 +50,7 @@ use zeabur_kube::{Cluster, ClusterExt as _, ObjectTarget, ResourceRef, WriteBody
 
 use crate::error::{ApiError, get_read, read_problem};
 use crate::github::{self, Conversion, GitHub};
-use crate::handlers::{AppState, Everyday, Person};
+use crate::handlers::{AppState, Person};
 use crate::page::{self, Lang};
 use crate::plan_token::{self as token, LIFETIME_SECONDS, TokenError};
 use crate::projects::namespace::Permission;
@@ -645,7 +645,6 @@ fn manifest_of(request: &GitHubManifestRequest) -> Value {
 pub(crate) async fn manifest(
     State(state): State<AppState>,
     Person(cluster): Person,
-    Everyday(everyday): Everyday,
     Json(request): Json<GitHubManifestRequest>,
 ) -> Result<Json<GitHubManifest>, ApiError> {
     if let Some(why) = manifest_problem(&request, state.settings.public_host.as_deref()) {
@@ -663,7 +662,7 @@ pub(crate) async fn manifest(
             ),
         ));
     }
-    let identity = everyday
+    let identity = cluster
         .whoami()
         .await
         .map_err(|e| ApiError::from(e.into_problem("your identity")))?;
@@ -788,7 +787,6 @@ frame-ancestors 'none'"
 pub(crate) async fn conversion(
     State(state): State<AppState>,
     Person(cluster): Person,
-    Everyday(everyday): Everyday,
     Json(request): Json<GitHubConversionRequest>,
 ) -> Result<Json<GitHubAppPlan>, ApiError> {
     let opened: FlowState = token::open_as(&*sealing(&state)?, STATE_PREFIX, &request.state)
@@ -796,7 +794,7 @@ pub(crate) async fn conversion(
     if (state.clock)().as_second() >= opened.expires_at {
         return Err(flow_problem());
     }
-    let identity = everyday
+    let identity = cluster
         .whoami()
         .await
         .map_err(|e| ApiError::from(e.into_problem("your identity")))?;
@@ -828,7 +826,6 @@ pub(crate) async fn conversion(
 pub(crate) async fn plan(
     State(state): State<AppState>,
     Person(cluster): Person,
-    Everyday(everyday): Everyday,
     Json(request): Json<GitHubGrantRequest>,
 ) -> Result<Json<GitHubAppPlan>, ApiError> {
     let namespaces: BTreeSet<String> = request
@@ -845,7 +842,7 @@ pub(crate) async fn plan(
             "Choose an installation and projects by their names.",
         ));
     }
-    let identity = everyday
+    let identity = cluster
         .whoami()
         .await
         .map_err(|e| ApiError::from(e.into_problem("your identity")))?;
@@ -1187,7 +1184,6 @@ async fn send(cluster: &dyn Cluster, write: &Planned, dry_run: bool) -> Result<(
 pub(crate) async fn apply(
     State(state): State<AppState>,
     Person(cluster): Person,
-    Everyday(everyday): Everyday,
     Json(request): Json<GitHubAppApply>,
 ) -> Result<Json<GitHubAppApplied>, ApiError> {
     let claims: Claims =
@@ -1195,7 +1191,7 @@ pub(crate) async fn apply(
     if (state.clock)().as_second() >= claims.expires_at {
         return Err(token_problem(TokenError::Expired));
     }
-    let identity = everyday
+    let identity = cluster
         .whoami()
         .await
         .map_err(|e| ApiError::from(e.into_problem("your identity")))?;

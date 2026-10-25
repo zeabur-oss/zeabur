@@ -192,8 +192,7 @@ pub(crate) fn check_removal(
     let own = you == format!("{USER_PREFIX}{owner}");
     if own && credential.spec.kind == "Passkey" && directory.passkeys_of(owner) <= 1 {
         return Err(refuse(
-            "This is your only passkey. Admin rights need a passkey, so removing it would lock you \
-             out.",
+            "This is your only passkey, so removing it could lock you out.",
             "Add another passkey first, then remove this one.",
             "account.lastPasskey",
         ));

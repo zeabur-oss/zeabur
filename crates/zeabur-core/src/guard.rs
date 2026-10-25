@@ -405,6 +405,6 @@ mod tests {
         headers.append(header::COOKIE, HeaderValue::from_static("__Host-zeabur=id"));
         assert_eq!(cookie(&headers, "__Host-zeabur"), Some("id"));
         assert_eq!(cookie(&headers, "__Host-zeabur-signin"), Some("flow"));
-        assert_eq!(cookie(&headers, "__Host-zeabur-elevate"), None);
+        assert_eq!(cookie(&headers, "__Host-zeabur-other"), None);
     }
 }

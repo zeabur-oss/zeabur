@@ -19,7 +19,7 @@ mod tests {
     use tokio_tungstenite::tungstenite::Message;
     use tokio_tungstenite::tungstenite::client::IntoClientRequest as _;
     use zeabur_api::Settings;
-    use zeabur_api::access::{Access, ClusterAccess, Elevation, Handoff};
+    use zeabur_api::access::{ClusterAccess, Handoff};
     use zeabur_core::problem::Problem;
     use zeabur_kube::k8s_openapi::api::core::v1::Namespace;
     use zeabur_kube::k8s_openapi::jiff::{SignedDuration, Timestamp};
@@ -63,22 +63,14 @@ mod tests {
     struct Signed(Arc<dyn Cluster>);
 
     impl ClusterAccess for Signed {
-        fn for_request(&self, _parts: &Parts) -> Result<Access, Box<Problem>> {
-            Ok(Access {
-                cluster: Arc::clone(&self.0),
-                elevation: Elevation::Unavailable,
-            })
-        }
-
-        fn credential_expiry(&self, _parts: &Parts) -> Option<Timestamp> {
-            Some(Timestamp::now() + SignedDuration::from_mins(10))
+        fn for_request(&self, _parts: &Parts) -> Result<Arc<dyn Cluster>, Box<Problem>> {
+            Ok(Arc::clone(&self.0))
         }
 
         fn handoff(&self, _parts: &Parts) -> Option<Handoff> {
             Some(Handoff {
                 token: zeabur_kube::UserToken::new(SecretString::from(TOKEN)).unwrap(),
                 expires_at: Timestamp::now() + SignedDuration::from_mins(10),
-                admin: true,
             })
         }
     }

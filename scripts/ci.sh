@@ -163,6 +163,6 @@ case "$job" in
     fi
     ;;
   # Zeabur in a cluster with Zeabur Identity, from their images and Zeabur's chart, through a browser:
-  # passkey sign-in, elevation, terminal, rights, memory, removal.
+  # passkey sign-in, terminal, rights, memory, removal.
   kubernetes-l2) ZEABUR_L2_KEEP="${ZEABUR_CI_KEEP:-}" ./scripts/e2e-l2.sh ;;
 esac

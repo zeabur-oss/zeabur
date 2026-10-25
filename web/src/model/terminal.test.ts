@@ -3,10 +3,8 @@ import { describe, test, expect } from "bun:test"
 import type { Problem } from "@/api/client"
 import {
   execRole,
-  nearestExpiry,
   nextState,
   parseFrame,
-  reconnectsWithRights,
   terminalUrl,
   toolsTerminalUrl,
   type TerminalEvent,
@@ -55,26 +53,6 @@ describe("terminal states", () => {
     expect(state.phase === "exited" && state.reason).toBe("command-not-found")
   })
 
-  test("a refused terminal reconnects once admin rights become active, whatever granted them", () => {
-    const error = run(frame(JSON.stringify({ type: "error", problem: refused })))
-    expect(reconnectsWithRights(error, "available", "active")).toBe(true)
-    expect(reconnectsWithRights(error, undefined, "active")).toBe(true)
-    // No change of rights, or rights that went away: the refusal stands.
-    expect(reconnectsWithRights(error, "active", "active")).toBe(false)
-    expect(reconnectsWithRights(error, "available", "available")).toBe(false)
-    expect(reconnectsWithRights(error, "active", "available")).toBe(false)
-    // Only a refusal is retried: not another error, nor a terminal that runs or ended.
-    const failed = run(
-      frame(JSON.stringify({ type: "error", problem: { ...refused, kind: "unavailable" } })),
-    )
-    expect(reconnectsWithRights(failed, "available", "active")).toBe(false)
-    const open = run(frame(`{"type":"ready","container":"web"}`))
-    expect(reconnectsWithRights(open, "available", "active")).toBe(false)
-    expect(reconnectsWithRights(run({ type: "close", code: 4000 }), "available", "active")).toBe(
-      false,
-    )
-  })
-
   test("an error keeps its problem through the close", () => {
     const error = frame(JSON.stringify({ type: "error", problem: refused }))
     expect(run(error, { type: "close", code: 1000 })).toStrictEqual({
@@ -85,10 +63,6 @@ describe("terminal states", () => {
 
   test("the server's own closes say why; any other close is a lost connection", () => {
     const ready = frame(`{"type":"ready","container":"web"}`)
-    expect(run(ready, { type: "close", code: 4000 })).toStrictEqual({
-      phase: "closed",
-      why: "expired",
-    })
     expect(run(ready, { type: "close", code: 4001 })).toStrictEqual({
       phase: "closed",
       why: "idle",
@@ -130,22 +104,9 @@ describe("terminal address and access", () => {
 
 describe("the dock", () => {
   test("a reconnect starts over from connecting", () => {
-    const closed = run({ type: "close", code: 4000 })
-    expect(closed).toStrictEqual({ phase: "closed", why: "expired" })
+    const closed = run({ type: "close", code: 4001 })
+    expect(closed).toStrictEqual({ phase: "closed", why: "idle" })
     expect(nextState(closed, { type: "connect" })).toStrictEqual({ phase: "connecting" })
-  })
-
-  test("the nearest expiry is the soonest, skipping the ones without", () => {
-    expect(nearestExpiry([])).toBeUndefined()
-    expect(nearestExpiry([null, undefined, "not a date"])).toBeUndefined()
-    expect(
-      nearestExpiry([
-        "2026-10-21T15:34:00Z",
-        null,
-        "2026-10-21T15:04:00+00:00",
-        "2026-10-21T16:00:00Z",
-      ]),
-    ).toBe("2026-10-21T15:04:00+00:00")
   })
 
   test("a kubectl terminal's address", () => {

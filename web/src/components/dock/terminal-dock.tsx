@@ -7,11 +7,10 @@ import TerminalWindowIcon from "~icons/ph/terminal-window"
 import { projectQuery, toolsQuery } from "@/api/queries"
 import { NodeShellTab } from "@/components/dock/node-shell-tab"
 import { KubectlTab, ShellTab, ToolsPods } from "@/components/dock/tabs"
-import { useI18n, useT } from "@/i18n"
+import { useT } from "@/i18n"
 import {
   closeTab,
   dock,
-  dockExpiries,
   dockHeight,
   dockMinHeight,
   dockShortcut,
@@ -21,10 +20,8 @@ import {
   showDock,
   type DockTab as Tab,
 } from "@/lib/dock"
-import { formatClock } from "@/lib/identity"
 import { usePlace } from "@/lib/place"
 import { isTask, serviceId } from "@/model/service"
-import { nearestExpiry } from "@/model/terminal"
 import { Button } from "@zeabur/design-system/components/button"
 import {
   Dock,
@@ -53,10 +50,8 @@ const maxHeight = () => Math.max(dockMinHeight, window.innerHeight - pageRoom)
 
 export function TerminalDock() {
   const t = useT()
-  const { locale } = useI18n()
   const state = dock.useValue()
   const height = dockHeight.useValue()
-  const expiries = dockExpiries.useValue()
   // Mounted closed, so the first opening moves as every later one does.
   const [mounted, setMounted] = useState(false)
   useEffect(() => setMounted(true), [])
@@ -98,7 +93,6 @@ export function TerminalDock() {
     ? state.active
     : state.tabs[0]?.id
   const shown = Math.min(height, max)
-  const nearest = nearestExpiry(Object.values(expiries))
   const hide = (
     <Tooltip
       content={
@@ -194,11 +188,6 @@ export function TerminalDock() {
         >
           <TerminalWindowIcon aria-hidden="true" />
           <span>{t("dock.count", state.tabs.length)}</span>
-          {nearest ? (
-            <span className="truncate text-tertiary">
-              {t("dock.expires", formatClock(nearest, locale))}
-            </span>
-          ) : null}
           <span className="ml-auto flex items-center gap-2">
             <Kbd keys={dockShortcut} className="max-md:hidden" />
             <CaretUpIcon aria-hidden="true" />

@@ -16,13 +16,7 @@ import { Ago } from "@/components/bits"
 import { UpdatedAt } from "@/components/freshness"
 import { LoadingRows } from "@/components/page"
 import { Problem } from "@/components/problem"
-import {
-  permission,
-  Refused,
-  RefusedHint,
-  RefusedSome,
-  useHintOffersElevation,
-} from "@/components/refused"
+import { permission, Refused, RefusedSome } from "@/components/refused"
 import { Button, buttonVariants } from "@zeabur/design-system/components/button"
 import { useT } from "@/i18n"
 import { parseObjectKey } from "@/lib/objects"
@@ -57,12 +51,11 @@ type Row =
     }
   | { type: "object"; kind: Kind; object: Schemas["ObjectSummary"] }
   | { type: "refused"; kind: Kind; refused: Schemas["UnreadableView"] }
-  | { type: "denied"; kind: Kind }
 
 const HEAD = 40
 const ITEM = 34
 /** Estimates: a refusal row grows when its details open, and the list measures it. */
-const sizes: Record<Row["type"], number> = { kind: HEAD, object: ITEM, refused: 46, denied: 46 }
+const sizes: Record<Row["type"], number> = { kind: HEAD, object: ITEM, refused: 46 }
 
 /** As `unreadable` names a kind. */
 const resourceKey = (kind: Pick<Kind, "group" | "resource">) =>
@@ -220,7 +213,6 @@ function ObjectList({
   onOpen: (key: string) => void
 }) {
   const t = useT()
-  const elevation = useHintOffersElevation("denied")
   const scroller = useRef<HTMLDivElement>(null)
   const needle = query.trim().toLowerCase()
   const folded = kinds.filter((k) => k.generated)
@@ -239,17 +231,15 @@ function ObjectList({
     const matching = kind.items.filter((o) => kindMatches || o.name.toLowerCase().includes(needle))
     if (!kindMatches && matching.length === 0) continue
     const refused = refusedBy.get(resourceKey(kind))
-    const denied = !refused && kind.access === "denied" && elevation
     rows.push({
       type: "kind",
       kind,
       key,
       count: kind.listed ? matching.length : undefined,
       loading: loading.has(key),
-      refused: refused !== undefined || denied,
+      refused: refused !== undefined,
     })
     if (refused) rows.push({ type: "refused", kind, refused })
-    if (denied) rows.push({ type: "denied", kind })
     for (const object of matching) rows.push({ type: "object", kind, object })
   }
   const placed = new Set(rows.flatMap((r) => (r.type === "refused" ? [r.refused.resource] : [])))
@@ -368,15 +358,6 @@ function ObjectList({
                           {row.refused.kubernetes.message}
                         </p>
                       </Refused>
-                    </div>
-                  ) : row.type === "denied" ? (
-                    <div className="border-b px-4 py-2">
-                      <RefusedHint
-                        hint={row.kind.access}
-                        what={t("refused.see", row.kind.kind)}
-                        missing={[permission("list", row.kind.resource, row.kind.group)]}
-                        read
-                      />
                     </div>
                   ) : (
                     <button

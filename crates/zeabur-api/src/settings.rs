@@ -35,6 +35,7 @@
 
 pub mod cluster_name;
 pub mod domains;
+pub mod sign_in;
 
 use zeabur_kube::ServicePort;
 
@@ -357,13 +358,13 @@ pub(crate) mod store {
         pub(crate) stored: Option<Value>,
     }
 
-    fn config_map(namespace: &str) -> ObjectTarget {
+    fn config_map(namespace: &str, name: &str) -> ObjectTarget {
         ObjectTarget {
             api_version: "v1".to_owned(),
             kind: "ConfigMap".to_owned(),
             plural: "configmaps".to_owned(),
             namespace: namespace.to_owned(),
-            name: CONFIG_MAP.to_owned(),
+            name: name.to_owned(),
         }
     }
 
@@ -392,7 +393,17 @@ pub(crate) mod store {
         let Some(namespace) = &settings.namespace else {
             return Stored::default();
         };
-        let target = config_map(namespace);
+        read_config_map(cluster, namespace, CONFIG_MAP).await
+    }
+
+    /// The ConfigMap `name` in `namespace`, read as the person. A refusal is kept to say so;
+    /// another failure reads as no ConfigMap.
+    pub(crate) async fn read_config_map(
+        cluster: &dyn Cluster,
+        namespace: &str,
+        name: &str,
+    ) -> Stored {
+        let target = config_map(namespace, name);
         let read = cluster
             .find_object(&target.resource(), target.namespace(), &target.name)
             .await
@@ -444,13 +455,24 @@ pub(crate) mod store {
         let Some(namespace) = &settings.namespace else {
             return Permission::Denied;
         };
+        can_change_config_map(cluster, namespace, CONFIG_MAP, exists).await
+    }
+
+    /// Whether the person may change the ConfigMap `name` in `namespace`, or create it when it
+    /// does not exist, as far as their RBAC rules there tell.
+    pub(crate) async fn can_change_config_map(
+        cluster: &dyn Cluster,
+        namespace: &str,
+        name: &str,
+        exists: bool,
+    ) -> Permission {
         let resource = zeabur_kube::ResourceRef::new("", "v1", "configmaps", "ConfigMap");
         let verb = if exists { "patch" } else { "create" };
         cluster
             .access_rules(namespace)
             .await
             .map_or(Permission::Unknown, |rules| {
-                rules.allows(verb, &resource, CONFIG_MAP).into()
+                rules.allows(verb, &resource, name).into()
             })
     }
 
@@ -463,7 +485,19 @@ pub(crate) mod store {
         key: &str,
         value: Option<&str>,
     ) -> Result<(), ApiError> {
-        let Some(body) = write_body(stored, key, value) else {
+        write_config_map_key(cluster, namespace, CONFIG_MAP, stored, key, value).await
+    }
+
+    /// [`write_key`] for the ConfigMap `name`.
+    pub(crate) async fn write_config_map_key(
+        cluster: &dyn Cluster,
+        namespace: &str,
+        name: &str,
+        stored: Option<&Value>,
+        key: &str,
+        value: Option<&str>,
+    ) -> Result<(), ApiError> {
+        let Some(body) = write_body(name, stored, key, value) else {
             return Ok(());
         };
         let verb = match &body {
@@ -473,7 +507,7 @@ pub(crate) mod store {
             }
         };
         let request = WriteRequest {
-            target: config_map(namespace),
+            target: config_map(namespace, name),
             body,
             dry_run: false,
         };
@@ -490,7 +524,7 @@ pub(crate) mod store {
                 verb: verb.to_owned(),
                 group: String::new(),
                 resource: "configmaps".to_owned(),
-                name: (verb == "patch").then(|| CONFIG_MAP.to_owned()),
+                name: (verb == "patch").then(|| name.to_owned()),
                 namespace: Some(namespace.to_owned()),
             };
             read_problem(error, "the settings ConfigMap", refused)
@@ -699,13 +733,18 @@ pub(crate) mod store {
     /// The write that makes the ConfigMap hold `value` under `key` (or nothing, for the
     /// default); `None` when it already does. A patch tests the `resourceVersion` it was read at,
     /// so a change made in between is refused (`409`) rather than overwritten.
-    fn write_body(stored: Option<&Value>, key: &str, value: Option<&str>) -> Option<WriteBody> {
+    fn write_body(
+        name: &str,
+        stored: Option<&Value>,
+        key: &str,
+        value: Option<&str>,
+    ) -> Option<WriteBody> {
         let pointer = format!("/data/{key}");
         let Some(stored) = stored else {
             let value = value?;
             return Some(WriteBody::Create(json!({
                 "apiVersion": "v1", "kind": "ConfigMap",
-                "metadata": {"name": CONFIG_MAP},
+                "metadata": {"name": name},
                 "data": {key: value}
             })));
         };
@@ -739,22 +778,26 @@ pub(crate) mod store {
 
         #[test]
         fn the_first_choice_creates_the_config_map() {
-            let Some(WriteBody::Create(body)) =
-                write_body(None, METRICS_STORE_KEY, Some(&service().to_string()))
-            else {
+            let Some(WriteBody::Create(body)) = write_body(
+                CONFIG_MAP,
+                None,
+                METRICS_STORE_KEY,
+                Some(&service().to_string()),
+            ) else {
                 panic!("not a create");
             };
             assert_eq!(
                 body["data"][METRICS_STORE_KEY],
                 "observability/vmsingle-vm-victoria-metrics-k8s-stack:8428"
             );
-            assert_eq!(write_body(None, METRICS_STORE_KEY, None), None);
+            assert_eq!(write_body(CONFIG_MAP, None, METRICS_STORE_KEY, None), None);
         }
 
         #[test]
         fn a_change_tests_the_version_it_was_read_at() {
             let stored = json!({"metadata": {"resourceVersion": "7"}, "data": {"other": "x"}});
             let Some(WriteBody::JsonPatch(patch)) = write_body(
+                CONFIG_MAP,
                 Some(&stored),
                 METRICS_STORE_KEY,
                 Some(&service().to_string()),
@@ -769,6 +812,7 @@ pub(crate) mod store {
             assert_eq!(patch[1]["path"], "/data/metrics-store");
             let empty = json!({"metadata": {"resourceVersion": "7"}});
             let Some(WriteBody::JsonPatch(patch)) = write_body(
+                CONFIG_MAP,
                 Some(&empty),
                 METRICS_STORE_KEY,
                 Some(&service().to_string()),
@@ -783,7 +827,7 @@ pub(crate) mod store {
             let stored = json!({"metadata": {"resourceVersion": "7"},
                 "data": {METRICS_STORE_KEY: "a/b:80"}});
             let Some(WriteBody::JsonPatch(patch)) =
-                write_body(Some(&stored), METRICS_STORE_KEY, None)
+                write_body(CONFIG_MAP, Some(&stored), METRICS_STORE_KEY, None)
             else {
                 panic!("not a patch");
             };
@@ -792,7 +836,10 @@ pub(crate) mod store {
                 json!({"op": "remove", "path": "/data/metrics-store"})
             );
             let unchanged = json!({"metadata": {"resourceVersion": "7"}, "data": {}});
-            assert_eq!(write_body(Some(&unchanged), METRICS_STORE_KEY, None), None);
+            assert_eq!(
+                write_body(CONFIG_MAP, Some(&unchanged), METRICS_STORE_KEY, None),
+                None
+            );
         }
     }
 }

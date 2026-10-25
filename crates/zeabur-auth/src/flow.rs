@@ -1,6 +1,6 @@
 //! A sign-in in progress, between sending the browser to the issuer and its return.
 //!
-//! [`Pending`] holds the `state` value, the PKCE verifier and what the sign-in is for, sealed
+//! [`Pending`] holds the `state` value, the PKCE verifier and where to go afterwards, sealed
 //! with AES-256-GCM under a key made when the process starts, and travels in a cookie that
 //! lasts ten minutes. Nothing is stored on the server for a visitor who has not signed in, so
 //! starting sign-ins cannot fill memory; Zeabur Identity keeps its own unauthenticated flows the
@@ -34,31 +34,6 @@ const MAX_RETURN: usize = 2048;
 /// The associated data of a sealed flow, so no other sealed value opens as one.
 const AAD: &[u8] = b"zeabur-flow-v1";
 
-/// What a sign-in is for.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(tag = "for", rename_all = "camelCase")]
-pub enum Purpose {
-    /// Signing in; afterwards the browser goes to `return_to`, a path on this server.
-    SignIn {
-        /// Where to go afterwards.
-        return_to: String,
-    },
-    /// Asking for administrator rights, in a separate window, for a person already signed in.
-    Elevate,
-}
-
-impl Purpose {
-    /// The scopes to ask for: `elevate` adds the person's elevated groups to a short-lived
-    /// token (Zeabur Identity's `docs/managing-users.md`, "Admin rights").
-    #[must_use]
-    pub const fn scope(&self) -> &'static str {
-        match self {
-            Self::SignIn { .. } => "openid",
-            Self::Elevate => "openid elevate",
-        }
-    }
-}
-
 /// The key flows are sealed with, made when the process starts: a sign-in in progress does not
 /// survive a restart, and needs not.
 #[derive(Clone)]
@@ -86,32 +61,33 @@ impl FlowKey {
 pub struct Pending {
     state: String,
     verifier: String,
-    purpose: Purpose,
+    return_to: String,
     expires_at: i64,
 }
 
 impl fmt::Debug for Pending {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Pending")
-            .field("purpose", &self.purpose)
+            .field("return_to", &self.return_to)
             .field("expires_at", &self.expires_at)
             .finish_non_exhaustive()
     }
 }
 
 impl Pending {
-    /// A new sign-in for `purpose`, at `now` (seconds since the epoch).
+    /// A new sign-in at `now` (seconds since the epoch); afterwards the browser goes to
+    /// `return_to`, a path on this server (see [`return_path`]).
     ///
     /// # Errors
     ///
     /// When the system random number generator fails.
-    pub fn start(purpose: Purpose, now: i64) -> Result<Self, RandomError> {
+    pub fn start(return_to: String, now: i64) -> Result<Self, RandomError> {
         Ok(Self {
             // 256 bits each; RFC 7636 §7.1 asks for at least 256 bits of entropy in the verifier,
             // which is 43 characters of base64url (§4.1).
             state: random_token::<32>()?,
             verifier: URL_SAFE_NO_PAD.encode(random::<32>()?),
-            purpose,
+            return_to,
             expires_at: now.saturating_add(LIFETIME_SECONDS),
         })
     }
@@ -136,10 +112,10 @@ impl Pending {
         URL_SAFE_NO_PAD.encode(sha256(self.verifier.as_bytes()))
     }
 
-    /// What the sign-in is for.
+    /// Where to go afterwards.
     #[must_use]
-    pub const fn purpose(&self) -> &Purpose {
-        &self.purpose
+    pub fn return_to(&self) -> &str {
+        &self.return_to
     }
 
     /// Whether `state`, from the callback, is this sign-in's; in constant time.
@@ -200,7 +176,7 @@ mod tests {
 
     #[test]
     fn the_challenge_is_s256_of_the_verifier() {
-        let pending = Pending::start(Purpose::Elevate, NOW).unwrap();
+        let pending = Pending::start("/".to_owned(), NOW).unwrap();
         assert_eq!(pending.verifier().len(), 43);
         assert_eq!(
             pending.challenge(),
@@ -220,13 +196,7 @@ mod tests {
     #[test]
     fn a_sealed_flow_opens_only_unaltered_under_its_key_and_before_it_expires() {
         let key = FlowKey::random().unwrap();
-        let pending = Pending::start(
-            Purpose::SignIn {
-                return_to: "/projects/shop".to_owned(),
-            },
-            NOW,
-        )
-        .unwrap();
+        let pending = Pending::start("/projects/shop".to_owned(), NOW).unwrap();
         let sealed = pending.seal(&key).unwrap();
         assert!(!sealed.contains(pending.verifier()));
         assert_eq!(Pending::open(&key, &sealed, NOW + 1), Some(pending));
@@ -247,12 +217,12 @@ mod tests {
 
     #[test]
     fn state_matches_only_itself() {
-        let pending = Pending::start(Purpose::Elevate, NOW).unwrap();
+        let pending = Pending::start("/".to_owned(), NOW).unwrap();
         let state = pending.state().to_owned();
         assert!(pending.matches(&state));
         assert!(!pending.matches(""));
         assert!(!pending.matches(state.get(..63).unwrap()));
-        assert!(!pending.matches(&Pending::start(Purpose::Elevate, NOW).unwrap().state));
+        assert!(!pending.matches(&Pending::start("/".to_owned(), NOW).unwrap().state));
     }
 
     #[test]

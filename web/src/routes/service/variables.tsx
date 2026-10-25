@@ -800,22 +800,12 @@ export function VariablesTab({
         </Alert>
       ) : null}
       {refusedReveal?.[1].problem && !listRefused ? (
-        <Refused
-          refusal={refusedReveal[1].problem}
-          what={t("refused.reveal")}
-          retry={() => void reveal(refusedReveal[0])}
-          line
-        />
+        <Refused refusal={refusedReveal[1].problem} what={t("refused.reveal")} line />
       ) : null}
       {envSecrets.map((name) => {
         const problem = secrets[name]?.problem
         return problem && !isRefusal(problem) ? (
-          <Problem
-            key={name}
-            problem={problem}
-            retry={() => void reveal(name)}
-            what={t("refused.reveal")}
-          />
+          <Problem key={name} problem={problem} what={t("refused.reveal")} />
         ) : null
       })}
 

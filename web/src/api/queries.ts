@@ -46,7 +46,6 @@ export const sessionQuery = queryOptions({
   queryKey: ["session"],
   queryFn: async ({ signal }) => unwrap(await api.GET("/api/v1/session", { signal })),
   staleTime: 30_000,
-  refetchInterval: (query) => (query.state.data?.elevation === "active" ? 15_000 : false),
 })
 
 export const projectsQuery = queryOptions({
@@ -864,6 +863,11 @@ export const clusterNameQuery = queryOptions({
 export const domainsQuery = queryOptions({
   queryKey: ["settings", "domains"],
   queryFn: async ({ signal }) => unwrap(await api.GET("/api/v1/settings/domains", { signal })),
+})
+
+export const signInSettingQuery = queryOptions({
+  queryKey: ["settings", "sign-in"],
+  queryFn: async ({ signal }) => unwrap(await api.GET("/api/v1/settings/sign-in", { signal })),
 })
 
 export const metricsStoreQuery = queryOptions({

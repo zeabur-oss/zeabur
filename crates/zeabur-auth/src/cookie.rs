@@ -21,8 +21,6 @@
 pub const SESSION: &str = "__Host-zeabur";
 /// The cookie of a sign-in in progress.
 pub const SIGN_IN: &str = "__Host-zeabur-signin";
-/// The cookie of an elevation in progress, separate so that it does not replace a sign-in.
-pub const ELEVATE: &str = "__Host-zeabur-elevate";
 
 const ATTRIBUTES: &str = "Path=/; Secure; HttpOnly; SameSite=Lax";
 
@@ -60,6 +58,6 @@ mod tests {
             set(SIGN_IN, "x", Some(600)),
             "__Host-zeabur-signin=x; Max-Age=600; Path=/; Secure; HttpOnly; SameSite=Lax"
         );
-        assert!(clear(ELEVATE).starts_with("__Host-zeabur-elevate=; Max-Age=0; Path=/; Secure"));
+        assert!(clear(SIGN_IN).starts_with("__Host-zeabur-signin=; Max-Age=0; Path=/; Secure"));
     }
 }

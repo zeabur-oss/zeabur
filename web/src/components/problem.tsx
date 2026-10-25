@@ -17,18 +17,16 @@ import { isKind, problemText } from "@/model/problem"
 export function Problem({
   error,
   problem,
-  retry,
   what,
   action,
 }: {
   error?: unknown
   problem?: ProblemBody
-  retry?: () => void
   what?: string
   action?: ReactNode
 }) {
   const body = problem ?? toProblem(error)
-  if (isRefusal(body)) return <Refused refusal={body} what={what} retry={retry} />
+  if (isRefusal(body)) return <Refused refusal={body} what={what} />
   const retryAfter = error instanceof ApiError ? error.retryAfter : undefined
   return <Failure problem={body} retryAfter={retryAfter} action={action} />
 }

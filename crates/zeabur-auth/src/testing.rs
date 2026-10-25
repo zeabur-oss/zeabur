@@ -4,8 +4,8 @@
 //! `client_secret_basic`, rotating refresh tokens that revoke their family on reuse, as
 //! Zeabur Identity does) and revocation. A passkey sign-in is [`FakeIssuer::approve`].
 //!
-//! Access tokens read `<user>:<n>`, or `<user>:elevated:<n>` for an elevated one, so a test's
-//! [`crate::session::Bind`] can tell who holds them.
+//! Access tokens read `<user>:<n>`, so a test's [`crate::session::Bind`] can tell who holds
+//! them.
 
 #![expect(
     clippy::unwrap_used,
@@ -33,7 +33,6 @@ struct Code {
     user: String,
     challenge: String,
     redirect_uri: String,
-    elevated: bool,
 }
 
 /// The issuer's own records.
@@ -63,12 +62,11 @@ pub struct Recorded {
     pub revocations: Vec<String>,
     /// Lifetime of everyday access tokens, in seconds.
     pub expires_in: i64,
-    /// Whether the client may ask for `elevate`; otherwise `invalid_scope`.
-    pub elevation_allowed: bool,
+    /// `refresh_expires_in` of each answer with a refresh token: how long, in seconds, the
+    /// refresh token lasts unused. Zeabur Identity sends it; `None` leaves it out.
+    pub refresh_expires_in: Option<i64>,
     /// Whether the token endpoint fails with `503`.
     pub down: bool,
-    /// Users whose ID tokens lack `can_elevate`, as for someone with no elevated groups.
-    pub cannot_elevate: HashSet<String>,
 }
 
 /// The issuer.
@@ -105,7 +103,7 @@ impl FakeIssuer {
             books: Books::default(),
             recorded: Recorded {
                 expires_in: 600,
-                elevation_allowed: true,
+                refresh_expires_in: Some(3600),
                 ..Recorded::default()
             },
         }));
@@ -145,29 +143,21 @@ impl FakeIssuer {
             .into_owned()
             .collect();
         let state = params.get("state").cloned().unwrap_or_default();
-        let elevated = params
-            .get("scope")
-            .is_some_and(|s| s.split(' ').any(|s| s == "elevate"));
         let mut answer = form_urlencoded::Serializer::new(String::new());
         let mut inner = self.state.lock().unwrap();
-        let Inner { books, recorded } = &mut *inner;
-        if elevated && !recorded.elevation_allowed {
-            answer.append_pair("error", "invalid_scope");
-        } else {
-            books.next += 1;
-            let code = format!("code-{}", books.next);
-            books.codes.insert(
-                code.clone(),
-                Code {
-                    user: user.to_owned(),
-                    challenge: params.get("code_challenge").cloned().unwrap_or_default(),
-                    redirect_uri: params.get("redirect_uri").cloned().unwrap_or_default(),
-                    elevated,
-                },
-            );
-            answer.append_pair("code", &code);
-        }
+        let books = &mut inner.books;
+        books.next += 1;
+        let code = format!("code-{}", books.next);
+        books.codes.insert(
+            code.clone(),
+            Code {
+                user: user.to_owned(),
+                challenge: params.get("code_challenge").cloned().unwrap_or_default(),
+                redirect_uri: params.get("redirect_uri").cloned().unwrap_or_default(),
+            },
+        );
         answer
+            .append_pair("code", &code)
             .append_pair("state", &state)
             .append_pair("iss", self.url.as_str());
         answer.finish()
@@ -187,18 +177,17 @@ async fn metadata(State(shared): State<Shared>) -> Response {
     .into_response()
 }
 
-/// An unsigned ID token for `user`; Zeabur reads only its `can_elevate` claim.
-fn id_token(recorded: &Recorded, user: &str) -> String {
-    let claims = if recorded.cannot_elevate.contains(user) {
-        json!({"sub": user})
-    } else {
-        json!({"sub": user, "can_elevate": true})
-    };
-    format!(
-        "{}.{}.",
-        URL_SAFE_NO_PAD.encode(br#"{"alg":"none"}"#),
-        URL_SAFE_NO_PAD.encode(claims.to_string())
-    )
+/// A token answer for `user`'s access token number `n`, with `refresh`.
+fn tokens(recorded: &Recorded, user: &str, n: usize, refresh: &str) -> Response {
+    let mut answer = serde_json::Map::new();
+    answer.insert("access_token".into(), json!(format!("{user}:{n}")));
+    answer.insert("token_type".into(), json!("Bearer"));
+    answer.insert("expires_in".into(), json!(recorded.expires_in));
+    answer.insert("refresh_token".into(), json!(refresh));
+    if let Some(seconds) = recorded.refresh_expires_in {
+        answer.insert("refresh_expires_in".into(), json!(seconds));
+    }
+    axum::Json(answer).into_response()
 }
 
 fn oauth_error(status: StatusCode, error: &str) -> Response {
@@ -243,28 +232,11 @@ async fn token(State(shared): State<Shared>, headers: HeaderMap, body: String) -
             }
             books.next += 1;
             let n = books.next;
-            if code.elevated {
-                return axum::Json(json!({
-                    "access_token": format!("{}:elevated:{n}", code.user),
-                    "token_type": "Bearer",
-                    "expires_in": 300,
-                    "id_token": id_token(recorded, &code.user),
-                }))
-                .into_response();
-            }
             let refresh = format!("refresh-{n}");
             books
                 .current
                 .insert(refresh.clone(), (n, code.user.clone()));
-            let expires_in = recorded.expires_in;
-            axum::Json(json!({
-                "access_token": format!("{}:{n}", code.user),
-                "token_type": "Bearer",
-                "expires_in": expires_in,
-                "refresh_token": refresh,
-                "id_token": id_token(recorded, &code.user),
-            }))
-            .into_response()
+            tokens(recorded, &code.user, n, &refresh)
         }
         "refresh_token" => {
             let presented = param("refresh_token");
@@ -285,15 +257,7 @@ async fn token(State(shared): State<Shared>, headers: HeaderMap, body: String) -
             books
                 .current
                 .insert(refresh.clone(), (family, user.clone()));
-            let expires_in = recorded.expires_in;
-            axum::Json(json!({
-                "access_token": format!("{user}:{n}"),
-                "token_type": "Bearer",
-                "expires_in": expires_in,
-                "refresh_token": refresh,
-                "id_token": id_token(recorded, &user),
-            }))
-            .into_response()
+            tokens(recorded, &user, n, &refresh)
         }
         _ => oauth_error(StatusCode::BAD_REQUEST, "unsupported_grant_type"),
     }

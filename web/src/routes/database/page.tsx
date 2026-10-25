@@ -127,7 +127,7 @@ export function DatabasePage() {
   if (query.error)
     return (
       <Column>
-        <Problem error={query.error} what={t("db.title")} retry={() => void query.refetch()} />
+        <Problem error={query.error} what={t("db.title")} />
       </Column>
     )
   if (!query.data) return null

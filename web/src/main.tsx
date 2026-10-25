@@ -4,14 +4,14 @@ import { StrictMode } from "react"
 import { createRoot } from "react-dom/client"
 
 import { queryClient } from "@/api/queries"
-import { followElevation } from "@/auth/follow-elevation"
+import { followInput } from "@/auth/session"
 import { I18nProvider, prepareI18n } from "@/i18n"
 import { router } from "@/router"
 import "@/styles/app.css"
 import { followSystemTheme } from "@/theme"
 
 followSystemTheme()
-followElevation(queryClient)
+followInput()
 
 const root = document.getElementById("root")
 // A non-English catalogue loads before the first render, so it never flashes English.

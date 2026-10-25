@@ -740,7 +740,7 @@ export function terminalLines(t: Translate, plan: Pick<Plan, "warnings">): strin
       case "toolsPod": {
         const expires = w.credentialExpiresAt ? Date.parse(w.credentialExpiresAt) : NaN
         return [
-          t("confirm.toolsActsAs", w.person, w.admin),
+          t("confirm.toolsActsAs", w.person),
           Number.isNaN(expires)
             ? undefined
             : t("confirm.toolsCredential", minutes((expires - Date.now()) / 1000)),

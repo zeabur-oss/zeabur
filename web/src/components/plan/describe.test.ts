@@ -475,12 +475,12 @@ group("failureOf", () => {
     const f = failureOf(
       english,
       "en",
-      problem("elevation-required", {
+      problem("forbidden", {
         summary: {
-          key: "problem.summary.elevation-required",
+          key: "problem.summary.forbidden",
           params: { verb: "patch", name: "api", resource: "deployments" },
         },
-        fixKey: { key: "problem.forbidden.fix.askOrRetry" },
+        fixKey: { key: "problem.forbidden.fix.sendGrant" },
         kubernetes: {
           code: 403,
           reason: "Forbidden",
@@ -488,8 +488,10 @@ group("failureOf", () => {
         },
       }),
     )
-    expect(f.title).toBe("Your everyday rights can't change api.")
-    expect(f.description).toBe("Ask an admin, or retry with admin rights.")
+    expect(f.title).toBe("You can't change api.")
+    expect(f.description).toBe(
+      "Send this to an admin. It grants only that permission, and only in this project.",
+    )
     expect(f.review).toBe(false)
   })
 
@@ -582,7 +584,6 @@ group("terminals", () => {
         warnings: [
           {
             code: "toolsPod",
-            admin: false,
             credentialExpiresAt: expires,
             deadlineSeconds: 1800,
             graceSeconds: 60,
@@ -597,7 +598,7 @@ group("terminals", () => {
     )
     expect(said.lines).toEqual([
       "confirm.clusterTools",
-      "confirm.toolsActsAs(alice, false)",
+      "confirm.toolsActsAs(alice)",
       "confirm.toolsCredential(30)",
       "confirm.toolsStops(30, 1)",
     ])

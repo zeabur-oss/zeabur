@@ -10,12 +10,11 @@
 //!
 //! Everything is read and written as the person; Zeabur grants nothing. Every route asks
 //! kube-apiserver first whether the person may do everything everywhere (a
-//! `SelfSubjectAccessReview` of `*` on `*`): anyone else is refused, with admin rights offered
-//! where they are not in use. Opening writes the namespace (created, or labelled to let privileged
-//! pods in, when it has to be), the pod, and an Event about the node that names who opened it.
-//! A plan is refused while an RBAC binding lets anyone but cluster administrators create pods in
-//! the namespace or run commands in them ([`zeabur_plan::node_shell::exposures`]), and lists those
-//! bindings.
+//! `SelfSubjectAccessReview` of `*` on `*`): anyone else is refused. Opening writes the namespace
+//! (created, or labelled to let privileged pods in, when it has to be), the pod, and an Event about
+//! the node that names who opened it. A plan is refused while an RBAC binding lets anyone but
+//! cluster administrators create pods in the namespace or run commands in them
+//! ([`zeabur_plan::node_shell::exposures`]), and lists those bindings.
 //!
 //! The terminal opens only for the person who opened the shell (the pod's person label), after a
 //! review of `create` on `pods/exec`. When it closes, Zeabur deletes the pod at once (grace period
@@ -37,8 +36,8 @@ use zeabur_kube::{
 };
 use zeabur_plan::node_shell::{self as shell, NAMESPACE, NodeShell, ShellState};
 
-use crate::error::{ApiError, get_read, list_read, offer_elevation, read_problem, review_refusal};
-use crate::handlers::{AppState, Everyday, Person};
+use crate::error::{ApiError, get_read, list_read, read_problem, review_refusal};
+use crate::handlers::{AppState, Person};
 use crate::plan_token::{self as token, LIFETIME_SECONDS, TokenError};
 use crate::pods::exec::{self, ServerFrame, Terminal};
 use crate::projects::writes::token_problem;
@@ -336,12 +335,9 @@ async fn shell_pods(cluster: &dyn Cluster) -> Result<Vec<Value>, ApiError> {
     operation_id = "nodeShells",
     responses((status = 200, body = NodeShells),
               (status = 403, body = Problem, content_type = PROBLEM)))]
-pub(crate) async fn list(
-    Person(cluster): Person,
-    Everyday(everyday): Everyday,
-) -> Result<Json<NodeShells>, ApiError> {
+pub(crate) async fn list(Person(cluster): Person) -> Result<Json<NodeShells>, ApiError> {
     require_admin(cluster.as_ref(), "node shells", ROOT).await?;
-    let identity = everyday
+    let identity = cluster
         .whoami()
         .await
         .map_err(|e| ApiError::from(e.into_problem("your identity")))?;
@@ -718,12 +714,11 @@ async fn plan_remove(
 pub(crate) async fn plan(
     State(state): State<AppState>,
     Person(cluster): Person,
-    Everyday(everyday): Everyday,
     Json(request): Json<NodeShellPlanRequest>,
 ) -> Result<Json<NodeShellPlan>, ApiError> {
     let sealing = plan_key(&state)?;
     require_admin(cluster.as_ref(), "a shell on a node", ROOT).await?;
-    let identity = everyday
+    let identity = cluster
         .whoami()
         .await
         .map_err(|e| ApiError::from(e.into_problem("your identity")))?;
@@ -797,7 +792,6 @@ const fn delete_now(uid: Option<String>) -> WriteBody {
 pub(crate) async fn apply(
     State(state): State<AppState>,
     Person(cluster): Person,
-    Everyday(everyday): Everyday,
     Json(request): Json<NodeShellApply>,
 ) -> Result<Json<NodeShellApplied>, ApiError> {
     let sealing = plan_key(&state)?;
@@ -806,7 +800,7 @@ pub(crate) async fn apply(
     if now.as_second() >= claims.expires_at {
         return Err(token_problem(TokenError::Expired));
     }
-    let identity = everyday
+    let identity = cluster
         .whoami()
         .await
         .map_err(|e| ApiError::from(e.into_problem("your identity")))?;
@@ -945,10 +939,10 @@ async fn apply_open(
 
 /// The shell in a node shell pod the person opened, over a WebSocket.
 ///
-/// The same protocol as `…/pods/{pod}/exec` (`ClientFrame`, `ServerFrame`, close codes `4000`
-/// and `4001`); `ready` names the container `shell`. Failures arrive as an `error` frame: someone
-/// who may not do everything everywhere, or may not `create` `pods/exec` in the namespace
-/// (`403`, `elevation-required` where admin rights are offered and not in use), a pod that is not
+/// The same protocol as `…/pods/{pod}/exec` (`ClientFrame`, `ServerFrame`, close code `4001`);
+/// `ready` names the container `shell`. Failures arrive as an `error` frame: someone who may not
+/// do everything everywhere, or may not `create` `pods/exec` in the namespace (`403`), a pod that
+/// is not
 /// a node shell the person opened (`404`), one not running or already open in another terminal
 /// (`409`): one terminal per shell. When the terminal closes, Zeabur deletes the pod at once.
 #[utoipa::path(get, path = "/api/v1/cluster/node-shells/{pod}/terminal", tag = "cluster",
@@ -975,7 +969,7 @@ async fn run(mut socket: WebSocket, terminal: Terminal, pod: String) {
                 container: shell::CONTAINER.to_owned(),
             };
             if exec::send_frame(&mut socket, &ready).await {
-                exec::relay(socket, session, terminal.expires_in, terminal.idle).await;
+                exec::relay(socket, session, terminal.idle).await;
             }
             let ended = WriteRequest {
                 target: pod_target(&pod),
@@ -986,9 +980,7 @@ async fn run(mut socket: WebSocket, terminal: Terminal, pod: String) {
             let _deleted = cluster.write(&ended).await;
         }
         Err(problem) => {
-            let frame = ServerFrame::Error {
-                problem: Box::new(offer_elevation(*problem.0, terminal.elevation)),
-            };
+            let frame = ServerFrame::Error { problem: problem.0 };
             if exec::send_frame(&mut socket, &frame).await {
                 exec::close(&mut socket, 1000, "").await;
             }

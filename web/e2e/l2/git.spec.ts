@@ -2,15 +2,15 @@ import type { Page } from "@playwright/test"
 
 import { expect, test } from "../fixtures.ts"
 import { deleteService } from "./git.ts"
-import { invite, member, signInAsAdmin, toast } from "./members.ts"
+import { invite, member, signInAdmin, toast } from "./members.ts"
 
 // Deploy from Git: a Developer deploys a small public repository with its Dockerfile from its
 // default branch; the service is building until Zeabur Builder pushes the first image, then Keel
 // moves it there and it runs. A branch that does not exist fails the service at once.
 // scripts/e2e-l2-browser.sh sets, besides ZEABUR_L2_URL and ZEABUR_L2_NAMESPACE:
 //
-//   ZEABUR_L2_GIT_ADMIN_LINK  an invitation for `e2e-git-admin`, in the groups admins and elevated
-//                             admins; set only when Zeabur Builder, a registry and Keel run here
+//   ZEABUR_L2_GIT_ADMIN_LINK  an invitation for `e2e-git-admin`, an admin account (`invite --admin`);
+//                             set only when Zeabur Builder, a registry and Keel run here
 //   ZEABUR_L2_GIT_REPOSITORY  the repository, by default traefik/whoami (Dockerfile, port 80)
 //   ZEABUR_L2_GIT_BUILDER     how to build it, Dockerfile (default) or Railpack
 //   ZEABUR_L2_GIT_PORT        the port it listens on, by default 80
@@ -58,7 +58,7 @@ test("a Developer deploys a public repository from Git", async ({ page, browser 
   test.setTimeout(1_200_000)
   let developerLink = ""
   await test.step("the admin invites a Developer", async () => {
-    await signInAsAdmin(page, adminLink)
+    await signInAdmin(page, adminLink)
     developerLink = await invite(page, "e2e-git-developer", [{ project, role: "developer" }])
   })
   const developer = await member(browser, developerLink, "e2e-git-developer", zeabur)

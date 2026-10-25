@@ -17,7 +17,6 @@ import { GateTip, useGates } from "@/components/gate"
 import { usePlanner } from "@/components/plan/planner"
 import { Problem } from "@/components/problem"
 import { projectGlyphs } from "@/components/project-icon"
-import { permission, RefusedHint, useHintOffersElevation } from "@/components/refused"
 import { useI18n, useT } from "@/i18n"
 import { formatAgo } from "@/lib/format"
 import { projectCoverage } from "@/model/cluster-backups"
@@ -64,20 +63,11 @@ export function ProjectSettings({ namespace }: { namespace: Schemas["ProjectName
   const t = useT()
   const [help, setHelp] = useState(false)
   const readOnly = !mayChange(namespace)
-  const elevation = useHintOffersElevation(namespace.canChange)
   return (
     <>
       {namespace.adopted ? (
         <Group label={t("projectSettings.basic")}>
-          {elevation ? (
-            <div className="mb-3">
-              <RefusedHint
-                hint={namespace.canChange}
-                what={t("projectSettings.changeDetails")}
-                missing={[permission("patch", "namespaces")]}
-              />
-            </div>
-          ) : readOnly ? (
+          {readOnly ? (
             <p className="mb-3 flex flex-wrap items-center gap-2 text-sm text-secondary">
               {t("projectSettings.readOnly")}
               <Button size="sm" variant="link" onClick={() => setHelp(true)}>
@@ -156,7 +146,6 @@ export function ProjectSettings({ namespace }: { namespace: Schemas["ProjectName
           manage={false}
           guarded={namespace.labelsGuarded}
           onClose={() => setHelp(false)}
-          what={t("projectSettings.changeDetails")}
         />
       ) : null}
     </>

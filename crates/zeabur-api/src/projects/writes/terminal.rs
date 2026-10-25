@@ -297,7 +297,6 @@ pub(crate) fn tools_plan(
         namespace,
         scope,
         person: planner.person,
-        admin: handoff.admin,
         credential_expires_at: Some(handoff.expires_at.to_string()),
         image: &settings.tools_image,
         deadline_seconds: settings.tools_deadline_seconds,

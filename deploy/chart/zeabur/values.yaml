@@ -77,11 +77,6 @@ extraTrustedCA:
   secret: ""
   key: ca.crt
 
-# Anything the cluster refuses offers to ask for the passkey again (Zeabur Identity's `elevate` scope) and
-# retry with admin rights. Needs a client registered with `--allow-elevation`.
-elevation:
-  enabled: true
-
 # Members who are not admins: the ClusterRoles zeabur-member (node names and status, every
 # project's name), zeabur-project-developer and zeabur-project-viewer (files/member-roles.yaml).
 # Zeabur binds them per member when an admin invites or edits one. With them, the

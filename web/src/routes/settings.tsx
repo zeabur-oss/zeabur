@@ -1,26 +1,32 @@
-import { useMutation, useQuery } from "@tanstack/react-query"
+import { type UseMutationResult, useMutation, useQuery } from "@tanstack/react-query"
+import { Link } from "@tanstack/react-router"
 import { useId, useState } from "react"
 import { toast } from "sonner"
+import ArrowSquareOutIcon from "~icons/ph/arrow-square-out"
 import DesktopIcon from "~icons/ph/desktop"
 import MoonIcon from "~icons/ph/moon"
 import SunIcon from "~icons/ph/sun"
 
 import { api, unwrap, type Schemas } from "@/api/client"
+import { accountQuery } from "@/api/members"
 import {
   capabilitiesQuery,
   clusterNameQuery,
   clusterQuery,
   metricsStoreQuery,
   queryClient,
+  signInSettingQuery,
   whoamiQuery,
 } from "@/api/queries"
 import { Hint, Panel, Row, Rows, Segmented } from "@/components/bits"
 import { Problem } from "@/components/problem"
-import { permission, RefusedHint, useHintOffersElevation } from "@/components/refused"
+import { RefusedKinds } from "@/components/refused"
 import { StatusPill } from "@/components/status"
 import { Button } from "@zeabur/design-system/components/button"
 import { Input } from "@zeabur/design-system/components/input"
+import { Label } from "@zeabur/design-system/components/label"
 import { Select } from "@zeabur/design-system/components/select"
+import { Switch } from "@zeabur/design-system/components/switch"
 import { localeNames, locales, useI18n, useT } from "@/i18n"
 import { nameSourceOf } from "@/lib/cluster-name"
 import { setTheme, useTheme, type ThemeChoice } from "@/theme"
@@ -82,6 +88,8 @@ export function SettingsPage() {
       </Panel>
 
       <ClusterNamePanel />
+
+      <SignInPanel />
 
       <MetricsStorePanel />
 
@@ -155,21 +163,16 @@ function NameForm({ setting, cluster }: { setting: NameSetting; cluster: Schemas
   })
   const keeps = Boolean(setting.storedIn)
   const editable = keeps && setting.canChange !== "denied"
-  const elevation = useHintOffersElevation(setting.canChange)
   const changed = draft.trim() !== "" && draft.trim() !== cluster.name
   const source = <span className="text-xs text-muted-foreground">{nameSourceOf(cluster, t)}</span>
-  const who =
-    keeps && !editable && elevation ? null : (
-      <p id={`${inputId}-who`} className="text-xs text-muted-foreground">
-        {setting.storedIn ? t("settings.storeWho") : t("settings.clusterNameLocal")}
-        {keeps && !editable ? ` ${t("settings.storeDenied")}` : ""}
-        {setting.storedIn ? (
-          <Hint label={t("settings.storeWhereLabel")}>
-            {t("settings.storeWhere", setting.storedIn.namespace ?? "")}
-          </Hint>
-        ) : null}
-      </p>
-    )
+  const who = (
+    <StoreWho
+      id={`${inputId}-who`}
+      storedIn={setting.storedIn}
+      local={t("settings.clusterNameLocal")}
+      denied={keeps && !editable}
+    />
+  )
   const label = (
     <>
       {editable ? (
@@ -230,13 +233,6 @@ function NameForm({ setting, cluster }: { setting: NameSetting; cluster: Schemas
               </span>
               {source}
             </span>
-            {keeps ? (
-              <RefusedHint
-                hint={setting.canChange}
-                what={t("settings.clusterNameChange")}
-                missing={[permission("patch", "configmaps")]}
-              />
-            ) : null}
             {who}
           </div>
         )}
@@ -292,26 +288,19 @@ function StoreForm({ setting }: { setting: StoreSetting }) {
   })
   const keeps = Boolean(setting.storedIn)
   const editable = keeps && setting.canChange !== "denied"
-  // The hint is checked with everyday rights; admin rights may allow the change.
-  const elevation = useHintOffersElevation(setting.canChange)
   const changed = draft.trim() !== setting.service
   const isDefault = setting.service === setting.default
   const defaultMark = isDefault ? (
     <span className="text-xs text-muted-foreground">{t("settings.storeIsDefault")}</span>
   ) : null
-  // A refusal that offers admin rights says who may change it; the line below would repeat it.
-  const who =
-    keeps && !editable && elevation ? null : (
-      <p id={`${inputId}-who`} className="text-xs text-muted-foreground">
-        {setting.storedIn ? t("settings.storeWho") : t("settings.storeLocal")}
-        {keeps && !editable ? ` ${t("settings.storeDenied")}` : ""}
-        {setting.storedIn ? (
-          <Hint label={t("settings.storeWhereLabel")}>
-            {t("settings.storeWhere", setting.storedIn.namespace ?? "")}
-          </Hint>
-        ) : null}
-      </p>
-    )
+  const who = (
+    <StoreWho
+      id={`${inputId}-who`}
+      storedIn={setting.storedIn}
+      local={t("settings.storeLocal")}
+      denied={keeps && !editable}
+    />
+  )
   return (
     <Rows>
       <Row
@@ -372,13 +361,6 @@ function StoreForm({ setting }: { setting: StoreSetting }) {
               </span>
               {defaultMark}
             </span>
-            {keeps ? (
-              <RefusedHint
-                hint={setting.canChange}
-                what={t("settings.storeChange")}
-                missing={[permission("patch", "configmaps")]}
-              />
-            ) : null}
             {who}
           </div>
         )}
@@ -408,5 +390,161 @@ function StoreForm({ setting }: { setting: StoreSetting }) {
         </Row>
       )}
     </Rows>
+  )
+}
+
+type SignInSetting = Schemas["SignInSetting"]
+
+function SignInPanel() {
+  const t = useT()
+  const setting = useQuery(signInSettingQuery)
+  return (
+    <Panel id="settings-sign-in" title={t("settings.signIn")}>
+      {setting.data ? (
+        <SignInForm setting={setting.data} />
+      ) : setting.isError ? (
+        <Problem error={setting.error} />
+      ) : (
+        <p className="text-sm text-muted-foreground">…</p>
+      )}
+    </Panel>
+  )
+}
+
+function SignInForm({ setting }: { setting: SignInSetting }) {
+  const t = useT()
+  const save = useMutation({
+    mutationFn: async (body: Schemas["SignInChange"]) =>
+      unwrap(await api.PUT("/api/v1/settings/sign-in", { body })),
+    onSuccess: (next) => {
+      queryClient.setQueryData(signInSettingQuery.queryKey, next)
+      toast.success(t("settings.storeSaved"))
+    },
+  })
+  const editable = setting.canChange !== "denied" && setting.unreadable.length === 0
+  return (
+    <div className="flex flex-col gap-4">
+      <p className="text-sm text-muted-foreground">{t("settings.signInLead")}</p>
+      <RefusedKinds unreadable={setting.unreadable} line />
+      <Rows>
+        <TeamsRow setting={setting} editable={editable} save={save} />
+        <AdminAal3Row setting={setting} editable={editable} save={save} />
+      </Rows>
+      <StoreWho storedIn={setting.storedIn} denied={!editable} />
+      {save.isError ? <Problem error={save.error} what={t("settings.signIn")} /> : null}
+    </div>
+  )
+}
+
+type SignInSave = UseMutationResult<SignInSetting, Error, Schemas["SignInChange"]>
+type SignInRowProps = { setting: SignInSetting; editable: boolean; save: SignInSave }
+
+function TeamsRow({ setting, editable, save }: SignInRowProps) {
+  const t = useT()
+  return (
+    <Row
+      label={
+        <>
+          {t("settings.teams")}
+          <Hint label={t("settings.teams")}>{t("settings.teamsHint")}</Hint>
+        </>
+      }
+    >
+      <div className="flex flex-col items-start gap-1.5">
+        {editable ? (
+          <Segmented
+            label={t("settings.teams")}
+            value={setting.teams}
+            onChange={(teams) => {
+              if (!save.isPending && teams !== setting.teams) save.mutate({ teams })
+            }}
+            options={(["single", "multiple"] as const).map((value) => ({
+              value,
+              label: t(`settings.teams.${value}`),
+            }))}
+          />
+        ) : (
+          <span>{t(`settings.teams.${setting.teams}`)}</span>
+        )}
+        <p className="text-xs text-muted-foreground">{t(`settings.teams.${setting.teams}Means`)}</p>
+      </div>
+    </Row>
+  )
+}
+
+function AdminAal3Row({ setting, editable, save }: SignInRowProps) {
+  const t = useT()
+  const switchId = useId()
+  // Turning it off never locks anyone out; turning it on needs a passkey of your own that counts.
+  const mayTurnOn = setting.adminAal3 || setting.deviceBoundPasskey
+  return (
+    <Row label={t("settings.adminAccounts")}>
+      <div className="flex flex-col gap-1.5">
+        <div className="flex items-center gap-2">
+          <Switch
+            id={switchId}
+            size="sm"
+            checked={setting.adminAal3}
+            disabled={!editable || !mayTurnOn || save.isPending}
+            onCheckedChange={(adminAal3) => save.mutate({ adminAal3 })}
+          />
+          <Label htmlFor={switchId}>{t("settings.adminAal3")}</Label>
+          <Hint label={t("settings.adminAal3Trust")}>{t("settings.adminAal3TrustHint")}</Hint>
+        </div>
+        <p className="text-xs text-muted-foreground">{t("settings.adminAal3Means")}</p>
+        {editable && !mayTurnOn ? <AddDeviceBoundPasskey /> : null}
+      </div>
+    </Row>
+  )
+}
+
+function StoreWho({
+  id,
+  storedIn,
+  local,
+  denied,
+}: {
+  id?: string
+  storedIn?: { namespace?: string | null } | null
+  local?: string
+  denied: boolean
+}) {
+  const t = useT()
+  return (
+    <p id={id} className="text-xs text-muted-foreground">
+      {storedIn ? t("settings.storeWho") : local}
+      {denied ? ` ${t("settings.storeDenied")}` : ""}
+      {storedIn ? (
+        <Hint label={t("settings.storeWhereLabel")}>
+          {t("settings.storeWhere", storedIn.namespace ?? "")}
+        </Hint>
+      ) : null}
+    </p>
+  )
+}
+
+function AddDeviceBoundPasskey() {
+  const t = useT()
+  const url = useQuery(accountQuery).data?.manageSignInUrl
+  return (
+    <p className="text-xs">
+      {t("settings.adminAal3NeedsPasskey")}{" "}
+      {url ? (
+        <a
+          href={url}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex items-center gap-1 text-foreground hover:underline"
+        >
+          {t("settings.adminAal3AddPasskey")}
+          <ArrowSquareOutIcon aria-hidden="true" className="size-3" />
+          <span className="sr-only">{t("common.newTab")}</span>
+        </a>
+      ) : (
+        <Link to="/account" className="text-foreground hover:underline">
+          {t("settings.adminAal3AddPasskey")}
+        </Link>
+      )}
+    </p>
   )
 }

@@ -6,19 +6,17 @@ import "@xterm/xterm/css/xterm.css"
 import { useEffect, useReducer, useRef, useState, type ReactNode } from "react"
 import ArrowClockwiseIcon from "~icons/ph/arrow-clockwise"
 
-import { sessionQuery, whoamiQuery } from "@/api/queries"
+import { whoamiQuery } from "@/api/queries"
 import { Problem } from "@/components/problem"
 import { Refused } from "@/components/refused"
 import { YamlBlock } from "@/components/yaml"
 import { useT } from "@/i18n"
-import { setExpiry } from "@/lib/dock"
 import { cn } from "@/lib/utils"
 import { isRefusal } from "@/model/problem"
 import {
   execRole,
   nextState,
   parseFrame,
-  reconnectsWithRights,
   type ClientFrame,
   type TerminalEvent,
   type TerminalState,
@@ -30,7 +28,6 @@ import { Button } from "@zeabur/design-system/components/button"
  * same screen, so what was printed stays.
  */
 export function Session({
-  id,
   url,
   attempt,
   project,
@@ -43,8 +40,6 @@ export function Session({
   grant = true,
   onReconnect,
 }: {
-  /** The tab's, for the expiry it records. */
-  id: string
   url: string
   /** A new number reconnects. */
   attempt: number
@@ -66,21 +61,8 @@ export function Session({
   const host = useRef<HTMLDivElement>(null)
   const [terminal, setTerminal] = useState<Terminal>()
   const [state, dispatch] = useReducer(nextState, { phase: "connecting" })
-  const session = useQuery(sessionQuery).data
-  const elevation = session?.elevation
-  const seen = useRef(elevation)
-  const expiresAt = useRef(session?.expiresAt)
-  expiresAt.current = session?.expiresAt
   const visible = useRef(shown)
   visible.current = shown
-  // The server closes an admin terminal when the admin rights end.
-  const [asAdmin, setAsAdmin] = useState(elevation === "active")
-
-  useEffect(() => {
-    const before = seen.current
-    seen.current = elevation
-    if (reconnectsWithRights(state, before, elevation)) onReconnect()
-  }, [state, elevation, onReconnect])
 
   useEffect(() => {
     const element = host.current
@@ -108,16 +90,12 @@ export function Session({
   useEffect(() => {
     if (!terminal) return
     dispatch({ type: "connect" })
-    setAsAdmin(seen.current === "active")
     return relay(terminal, url, (event) => {
       dispatch(event)
-      if (event.type === "frame" && event.frame.type === "ready") {
-        setExpiry(id, expiresAt.current)
-        if (visible.current) terminal.focus()
-      }
-      if (event.type === "close") setExpiry(id, undefined)
+      if (event.type === "frame" && event.frame.type === "ready" && visible.current)
+        terminal.focus()
     })
-  }, [terminal, url, attempt, id])
+  }, [terminal, url, attempt])
 
   useEffect(() => {
     if (!shown) return
@@ -165,7 +143,6 @@ export function Session({
         <Notice
           state={state}
           project={project}
-          asAdmin={asAdmin}
           noShell={noShell}
           grant={grant}
           onReconnect={onReconnect}
@@ -200,14 +177,12 @@ function statusText(state: TerminalState, t: ReturnType<typeof useT>): string {
 function Notice({
   state,
   project,
-  asAdmin,
   noShell,
   grant,
   onReconnect,
 }: {
   state: TerminalState
   project: string
-  asAdmin: boolean
   noShell?: ReactNode
   grant: boolean
   onReconnect: () => void
@@ -221,7 +196,7 @@ function Notice({
   )
   if (problem && isRefusal(problem))
     return box(
-      <Refused refusal={problem} what={t("refused.terminal")} retry={onReconnect}>
+      <Refused refusal={problem} what={t("refused.terminal")}>
         {exec ? (
           <>
             <p className="text-sm text-secondary">{t("terminal.rbac")}</p>
@@ -233,7 +208,7 @@ function Notice({
         ) : null}
       </Refused>,
     )
-  if (problem) return box(<Problem problem={problem} retry={onReconnect} />)
+  if (problem) return box(<Problem problem={problem} />)
   if (state.phase === "exited" && state.reason === "command-not-found") return noShell ?? null
   if (state.phase === "exited" && state.reason === "failed")
     return box(
@@ -247,13 +222,7 @@ function Notice({
         role="status"
         className="mx-3 mb-2 flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-main bg-muted px-3 py-2"
       >
-        <p className="min-w-0 flex-1 text-sm">
-          {state.why === "expired"
-            ? asAdmin
-              ? t("terminal.adminEnded")
-              : t("tools.expired")
-            : t(`terminal.${state.why}`)}
-        </p>
+        <p className="min-w-0 flex-1 text-sm">{t(`terminal.${state.why}`)}</p>
         <Button size="sm" onClick={onReconnect}>
           {t("tools.reopen")}
         </Button>

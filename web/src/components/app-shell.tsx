@@ -4,11 +4,9 @@ import ListIcon from "~icons/ph/list"
 import MagnifyingGlassIcon from "~icons/ph/magnifying-glass"
 import XIcon from "~icons/ph/x"
 
-import { elevation } from "@/auth/elevation"
 import { PlanFallback } from "@/components/plan/fallback"
 import { CommandPalette } from "@/components/shell/command-palette"
 import { DockSlot } from "@/components/shell/dock-slot"
-import { AdminBadge } from "@/components/shell/admin-badge"
 import { Sidebar } from "@/components/shell/sidebar"
 import { useT } from "@/i18n"
 import { adding } from "@/lib/adding"
@@ -26,10 +24,6 @@ import { TooltipProvider } from "@zeabur/design-system/components/tooltip"
 const Toaster = lazy(() =>
   import("@zeabur/design-system/components/sonner").then((m) => ({ default: m.Toaster })),
 )
-// "Retry with admin rights" starts from a failure toast, so its dialog loads only then.
-const ElevationDialog = lazy(() =>
-  import("@/components/elevation-dialog").then((m) => ({ default: m.ElevationDialog })),
-)
 // Only project pages show the project sidebar, with its "New" menu and the services' states.
 const ProjectSidebar = lazy(() =>
   import("@/components/shell/project-sidebar").then((m) => ({ default: m.ProjectSidebar })),
@@ -41,7 +35,6 @@ export function AppShell() {
   const t = useT()
   const place = usePlace()
   const mobileOpen = mobileNav.useValue()
-  const elevating = elevation.useValue()
   const add = adding.useValue()
   const theme = useTheme()
   const pathname = useLocation({ select: (location) => location.pathname })
@@ -106,11 +99,6 @@ export function AppShell() {
           <AddHost key={`${add.project}/${add.what}`} project={add.project} what={add.what} />
         </Suspense>
       ) : null}
-      {elevating.phase === "idle" ? null : (
-        <Suspense fallback={null}>
-          <ElevationDialog state={elevating} />
-        </Suspense>
-      )}
       <Suspense fallback={<div aria-live="polite" />}>
         <Toaster theme={theme} position="bottom-right" containerAriaLabel={t("toast.region")} />
       </Suspense>
@@ -133,12 +121,10 @@ function PhoneBar() {
       <Link to="/" className="flex h-7 items-center rounded-md outline-none" aria-label="Zeabur">
         <Logo className="h-5" aria-hidden="true" />
       </Link>
-      <span className="ml-auto flex">
-        <AdminBadge />
-      </span>
       <Button
         variant="muted"
         size="icon-sm"
+        className="ml-auto"
         onClick={() => palette.set(true)}
         aria-label={t("shell.search")}
       >

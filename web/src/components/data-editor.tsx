@@ -212,9 +212,7 @@ export function DataEditor({
               <span className="type-meta text-muted-foreground">{t("yaml.hidden")}</span>
             </div>
           ) : null}
-          {revealing.problem ? (
-            <Problem problem={revealing.problem} retry={() => void reveal()} />
-          ) : null}
+          {revealing.problem ? <Problem problem={revealing.problem} /> : null}
           {pending ? (
             <LoadingRows label={t("common.loading")} rows={4} />
           ) : error ? (

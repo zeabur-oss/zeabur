@@ -45,15 +45,6 @@ export const en = {
   ...core,
   // Shell
   "shell.findProject": "Find a project",
-  // Admin rights
-  "elevate.retry": "Retry with admin rights",
-  "elevate.title": "Admin rights",
-  "elevate.waiting": "Confirm with your passkey in the new window.",
-  "elevate.notAllowed": "This Zeabur may not ask for admin rights. Ask your cluster administrator.",
-  "elevate.blocked": "The browser blocked the window. Allow pop-ups for this site, then try again.",
-  "elevate.failed": "Admin rights were not granted.",
-  "elevate.signedOut": "Your session ended. Sign in again.",
-  "elevate.signIn": "Sign in",
   "shell.switchProject": "Switch project",
   "column.label": "Services",
   "column.other": "Other objects",
@@ -90,7 +81,6 @@ export const en = {
   "problem.title.unauthenticated": "You are not signed in",
   "problem.title.signed-out": "You are signed out",
   "problem.title.forbidden": "You do not have permission",
-  "problem.title.elevation-required": "This needs admin rights",
   "problem.title.quota-exceeded": "This would go over the project's limit",
   "problem.title.policy-denied": "A policy in the cluster refused this",
   "problem.title.not-found": "This object doesn't exist",
@@ -107,8 +97,6 @@ export const en = {
   "problem.fix.unauthenticated": "Sign in again.",
   "problem.fix.signed-out": "Sign in again.",
   "problem.fix.forbidden": "Ask a cluster administrator for access, or use an account that has it.",
-  "problem.fix.elevation-required":
-    "Retry with admin rights, or ask a cluster administrator for access.",
   "problem.fix.quota-exceeded":
     "Ask for less, free some of what the project uses, or ask a cluster administrator to raise the limit.",
   "problem.fix.policy-denied":
@@ -140,8 +128,6 @@ export const en = {
     "Your Zeabur session ended, so Zeabur can no longer act for you in the cluster. Nothing is read or changed until you sign in again.",
   "problemPage.rule.forbidden":
     "The cluster decides what each person may do, by rules (RBAC) that say who may read or change which kinds of objects, in which projects. Zeabur acts only with your own rights: what they do not allow, it cannot do for you.",
-  "problemPage.rule.elevation-required":
-    "Your everyday rights do not allow this, but this Zeabur can give you admin rights for a short time once you confirm with your passkey. Everything you do then uses them, until they end or you drop them.",
   "problemPage.rule.quota-exceeded":
     "A project can have limits on what all its services may reserve together: CPU, memory, the number of replicas or objects. The cluster refuses a change that would go over them, whatever your rights.",
   "problemPage.rule.policy-denied":
@@ -166,12 +152,9 @@ export const en = {
     "Zeabur could not reach the cluster's API server: it may be down or restarting, or out of reach from where Zeabur runs.",
   "problemPage.rule.internal":
     "Something failed inside Zeabur itself, not in the cluster. The details hold what Zeabur knows about it.",
-  "refused.admin": "This needs admin rights.",
-  "refused.adminFor": (what: string) => `${what} needs admin rights.`,
   "refused.rights": "This needs more rights.",
   "refused.rightsFor": (what: string) => `${what} needs more rights.`,
   "refused.ask": "Ask a cluster administrator.",
-  "refused.view": "Use admin rights for a few minutes",
   "refused.details": "Details",
   "refused.missing": "Missing rights",
   "refused.see": (what: string) => `Seeing ${what}`,
@@ -179,10 +162,6 @@ export const en = {
   "refused.terminal": "Opening a terminal",
   "refused.reveal": "Showing Secret values",
   "refused.listThese": "Listing these",
-  "refused.adopt": (ns: string) => `Using the existing namespace ${ns}`,
-  "refused.createProject": (name: string) => `Creating project ${name}`,
-  "refused.unadopt": (ns: string) => `Removing ${ns} from Zeabur`,
-
   // Status words
   "status.ready": "Ready",
   "status.rollingOut": "Rolling out",
@@ -850,7 +829,6 @@ export const en = {
   "dock.resize": "Terminal height",
   "dock.close": (name: string) => `Close ${name}`,
   "dock.count": (count: number) => (count === 1 ? "1 terminal" : `${count} terminals`),
-  "dock.expires": (time: string) => `Credential expires at ${time}`,
   "dock.emptyTitle": "No terminal open",
   "dock.emptyBody": "Open one from a service's Logs tab or More menu, or from search.",
   "dock.gone": "This service is no longer in the project.",
@@ -869,8 +847,6 @@ export const en = {
   "terminal.debugEnded": "The debug container has ended. Open another to continue.",
   "terminal.debugOpen": "Connected to the debug container",
   "terminal.failed": "The container runtime ended the session.",
-  "terminal.adminEnded":
-    "Admin rights ended, so the terminal closed. Reopen it to continue with your own rights.",
   "terminal.idle": "Closed after 15 minutes without input or output.",
   "terminal.lost": "Connection lost.",
   "terminal.rbac":
@@ -886,8 +862,6 @@ export const en = {
   "tools.stopsAt": (when: string) => `Stops ${when}`,
   "tools.open": "Open",
   "tools.stop": "Stop",
-  "tools.expired":
-    "The credential in this terminal has expired. Reopen it to continue with a fresh one.",
   "tools.reopen": "Reopen",
   "clusterTools.about":
     "A terminal with kubectl and helm for the whole cluster, acting as you. kubectl starts in the default namespace. It runs in a temporary container that Zeabur deletes once you're done.",
@@ -1172,10 +1146,8 @@ export const en = {
     "A debug container already runs in this replica; the terminal opens in it.",
   "confirm.clusterTools":
     "Starts a temporary container with kubectl and helm for you, where only Zeabur and cluster administrators can reach it. kubectl starts in this project.",
-  "confirm.toolsActsAs": (person: string, admin: boolean) =>
-    admin
-      ? `kubectl and helm act as ${person}, with the admin rights you hold now.`
-      : `kubectl and helm act as ${person}, with your own permissions.`,
+  "confirm.toolsActsAs": (person: string) =>
+    `kubectl and helm act as ${person}, with your own permissions.`,
   "confirm.toolsCredential": (minutes: number) =>
     `Your credential in it runs out in ${plural(minutes, "minute", "minutes")}; reopen the terminal for a fresh one.`,
   "confirm.toolsStops": (most: number, after: number) =>
@@ -1203,7 +1175,6 @@ export const en = {
   "projectSettings.tooLong": (max: number) => `Use at most ${max} characters.`,
   "projectSettings.readOnly": "You can see these but not change them.",
   "projectSettings.getAccess": "How to get access",
-  "projectSettings.changeDetails": "Changing this project's details",
   "projectSettings.system":
     "Kubernetes keeps this namespace for its own components, so it can't be a project.",
   "projectSettings.title": "Project settings",
@@ -3139,7 +3110,6 @@ export const en = {
   "settings.clusterNameHint":
     "Shown in the sidebar and on Zeabur's pages, so people with several clusters can tell this one apart. Nothing in the cluster changes.",
   "settings.clusterNameReset": "Use the default name",
-  "settings.clusterNameChange": "Renaming the cluster",
   "settings.clusterNameLocal":
     "Zeabur runs on this computer and keeps no settings: the name is your kubeconfig's.",
   // Settings: the metrics store
@@ -3163,11 +3133,29 @@ export const en = {
   "settings.storeWhere": (namespace: string) =>
     `Kept in the ConfigMap zeabur-settings in the namespace ${namespace}. Anyone who can change that ConfigMap can change this setting.`,
   "settings.storeDenied": "You can't change it.",
-  "settings.storeChange": "Changing the history source",
   "settings.storeLocal":
     "Zeabur runs on this computer and keeps no settings. Start it with --metrics-service namespace/name:port to use another store.",
   "settings.storeTenancy":
     "Anyone who can read the store can read every project's metrics. Grant access only to people who may see the whole cluster.",
+  "settings.signIn": "Sign-in",
+  "settings.signInLead": "A session ends after 12 hours, or after an hour without use.",
+  "settings.teams": "Teams",
+  "settings.teamsHint": "How many teams share this cluster.",
+  "settings.teams.single": "One team",
+  "settings.teams.multiple": "Several teams",
+  "settings.teams.singleMeans":
+    "An admin account's session ends after an hour without use, like everyone else's.",
+  "settings.teams.multipleMeans": "An admin account's session ends after 15 minutes without use.",
+  "settings.adminAccounts": "Admin accounts",
+  "settings.adminAal3": "Sign in only with a device-bound passkey",
+  "settings.adminAal3Means":
+    "A device-bound passkey stays on a security key or on one device and is never synced. An admin account's session then also ends after 15 minutes without use. Regular accounts sign in as before.",
+  "settings.adminAal3Trust": "How Zeabur knows",
+  "settings.adminAal3TrustHint":
+    "The device that holds a passkey reports whether it is synced. Nothing verifies this.",
+  "settings.adminAal3NeedsPasskey":
+    "To turn this on, first add a device-bound passkey to your account: one kept on a security key or this device.",
+  "settings.adminAal3AddPasskey": "Add a passkey",
   // Account and members (Zeabur Identity)
   "account.title": "Account",
   "account.you": "You",
@@ -3242,14 +3230,13 @@ export const en = {
   "members.invite": "Invite",
   "members.denied":
     "You don't have the rights to invite or change members. Ask a cluster administrator.",
-  "members.inviting": "Inviting members",
   "members.filter": "Filter members",
   "members.none": "No one can sign in yet.",
   "members.noMatch": "No members match.",
   "members.you": "(you)",
-  "members.role.admin": "Admin",
+  "members.role.admin": "Admin account",
   "members.role.member": "Member",
-  "members.adminHint": "Can take on admin rights, which give full control of the cluster.",
+  "members.adminHint": "Signs in with a passkey only, and has full rights to the cluster.",
   "members.disabled": "Disabled",
   "members.column.name": "Name",
   "members.column.role": "Role",
@@ -3287,7 +3274,7 @@ export const en = {
     `${user} is already a member: the link adds a passkey to their account.`,
   "invite.displayName": "Display name",
   "invite.optional": "(optional)",
-  "invite.admin": "Admin",
+  "invite.admin": "Admin account",
   "invite.create": "Create link",
   "invite.action": (name: string) => `Invite ${name}`,
   "members.plan.adds": (name: string) => `Adds ${name} as a member.`,
@@ -3331,14 +3318,15 @@ export const en = {
   "roles.title": (name: string) => `Access for ${name}`,
   "roles.save": "Save access",
   "roles.saved": (name: string) => `Saved access for ${name}`,
-  "roles.losesAdmin": (name: string) => `${name} loses admin rights now.`,
+  "roles.losesAdmin": (name: string) =>
+    `${name} becomes a regular account and loses full rights to the cluster now.`,
   "roles.losesProjects": (name: string, projects: string) =>
     `${name} loses access to ${projects} now.`,
   "roles.losesChanges": (name: string, projects: string) =>
     `${name} can no longer change ${projects}.`,
   "roles.openTerminals": "A terminal already open stays open until it ends.",
   "roles.becomesAdmin": (name: string) =>
-    `${name} gets full control of the cluster: every project, the nodes and the members.`,
+    `${name} becomes an admin account, with full control of the cluster: every project, the nodes and the members. From then on, ${name} signs in with a passkey only.`,
   "reset.title": (name: string) => `New setup link for ${name}`,
   "reset.keep": (name: string) =>
     `Adds a passkey to ${name}'s account; nothing is removed. The link works once, for 24 hours.`,
@@ -3370,6 +3358,10 @@ export const en = {
   "sentence.members.noIssuer.fix": () => "Start Zeabur with --issuer-url.",
   "sentence.members.demoteSelf": () => "You can't take away your own admin rights",
   "sentence.members.demoteSelf.fix": () => "Ask another admin to change your access.",
+  "sentence.settings.signIn.noDeviceBound": () =>
+    "You have no device-bound passkey, so you couldn't sign in after this change.",
+  "sentence.settings.signIn.noDeviceBound.fix": () =>
+    "Add a passkey kept on a security key or this device, then try again.",
   "sentence.members.noProjectRoles": () => "Zeabur was installed without the member roles",
   "sentence.members.noProjectRoles.fix": () =>
     "Install the chart with memberRoles.enabled=true, or make the member an admin.",
@@ -3381,7 +3373,6 @@ export const en = {
   // above); `writeSentence` finds them under `sentence.<key>`.
   "sentence.problem.forbidden.fix.askForRule": (p: P) =>
     `Ask a cluster administrator for ${p.rule}, for example with a ClusterRole granting it and a ClusterRoleBinding to you.`,
-  "sentence.problem.forbidden.fix.askOrRetry": () => "Ask an admin, or retry with admin rights.",
   "sentence.problem.forbidden.fix.sendGrant": () =>
     "Send this to an admin. It grants only that permission, and only in this project.",
   "sentence.problem.planExpired.fix.again": (p: P) =>
@@ -3418,10 +3409,6 @@ export const en = {
   "sentence.problem.summary.signed-out": () => "You're signed out.",
   "sentence.problem.summary.forbidden": (p: P) =>
     p.verb ? `You can't ${verbEn[p.verb] ?? p.verb} ${thingEn(p)}.` : "You don't have permission.",
-  "sentence.problem.summary.elevation-required": (p: P) =>
-    p.verb
-      ? `Your everyday rights can't ${verbEn[p.verb] ?? p.verb} ${thingEn(p)}.`
-      : "This needs admin rights.",
   "sentence.problem.summary.not-found": (p: P) =>
     p.name ? `${p.name} doesn't exist.` : "It doesn't exist.",
   "sentence.problem.summary.log-unavailable": () => "This log can't be read.",

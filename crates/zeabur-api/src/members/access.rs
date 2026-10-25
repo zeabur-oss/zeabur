@@ -1,6 +1,6 @@
 //! Members' rights in projects: RBAC bindings to the chart's member roles.
 //!
-//! An admin is a member whose `User` has the group `admins` (see the parent module). Everyone
+//! An admin is a member whose `User` is an admin account (see the parent module). Everyone
 //! else gets, per project, a `RoleBinding` named `zeabur-member-<username>` in that project's
 //! namespace to the `ClusterRole` `zeabur-project-developer` or `zeabur-project-viewer`, for the
 //! user `zeabur:<username>`, and one `ClusterRoleBinding` of the same name to `zeabur-member`

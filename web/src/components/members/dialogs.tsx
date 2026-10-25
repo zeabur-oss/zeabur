@@ -8,7 +8,6 @@ import { Consequence, Frame } from "@/components/members/frame"
 import { MemberPlan } from "@/components/members/member-plan"
 import type { Schemas } from "@/api/client"
 import { Problem } from "@/components/problem"
-import { RefusedHint, useHintOffersElevation } from "@/components/refused"
 import { useI18n, useT } from "@/i18n"
 import { formatTime } from "@/lib/format"
 import {
@@ -325,21 +324,8 @@ export function LinksUnavailable({ links }: { links: SetupLinks }) {
   )
 }
 
-/** Why a change is not offered: admin rights would allow it, or the cluster does not. */
-export function ManageDenied({
-  hint,
-  what,
-  denied,
-}: {
-  hint: Schemas["Permission"]
-  what: string
-  denied: string
-}) {
-  const offered = useHintOffersElevation(hint)
+/** Why a change is not offered: the cluster does not allow it. */
+export function ManageDenied({ hint, denied }: { hint: Schemas["Permission"]; denied: string }) {
   if (hint !== "denied") return null
-  if (offered)
-    return (
-      <RefusedHint hint={hint} what={what} missing={["create invitations.identity.zeabur.com"]} />
-    )
   return <p className="text-sm text-muted-foreground">{denied}</p>
 }

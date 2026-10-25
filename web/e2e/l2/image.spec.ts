@@ -1,6 +1,6 @@
 import { expect, test } from "../fixtures.ts"
 import { deleteService } from "./git.ts"
-import { invite, member, planAndApply, signInAsAdmin, toast } from "./members.ts"
+import { invite, member, planAndApply, signInAdmin, toast } from "./members.ts"
 
 // Deploy an image, then delete it: the delete plan lists what the service made (its Kubernetes
 // Service, `-env` Secret, Ingress and volume claim) and, once applied, none of them is left. In a
@@ -8,8 +8,8 @@ import { invite, member, planAndApply, signInAsAdmin, toast } from "./members.ts
 // with a numeric user is Strict, both chosen for the Developer.
 // scripts/e2e-l2-browser.sh sets, besides ZEABUR_L2_URL and ZEABUR_L2_NAMESPACE:
 //
-//   ZEABUR_L2_IMAGE_ADMIN_LINK  an invitation for `e2e-image-admin`, in the groups admins and
-//                               elevated admins
+//   ZEABUR_L2_IMAGE_ADMIN_LINK  an invitation for `e2e-image-admin`, an admin account
+//                               (`invite --admin`)
 //   ZEABUR_L2_IMAGE             the image, by default traefik/whoami:v1.10.3 (port 80)
 const env = (name: string, fallback = "") => process.env[name] ?? fallback
 const adminLink = env("ZEABUR_L2_IMAGE_ADMIN_LINK")
@@ -27,7 +27,7 @@ test("a Developer deploys an image and deletes it with what it made", async ({ p
   test.setTimeout(600_000)
   let developerLink = ""
   await test.step("the admin invites a Developer", async () => {
-    await signInAsAdmin(page, adminLink)
+    await signInAdmin(page, adminLink)
     const created = await planAndApply(page, baselineProject, [
       { op: "createProject", displayName: null },
     ])

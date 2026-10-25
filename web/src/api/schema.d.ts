@@ -518,10 +518,10 @@ export interface paths {
     }
     /**
      * The shell in a node shell pod the person opened, over a WebSocket.
-     * @description The same protocol as `…/pods/{pod}/exec` (`ClientFrame`, `ServerFrame`, close codes `4000`
-     *     and `4001`); `ready` names the container `shell`. Failures arrive as an `error` frame: someone
-     *     who may not do everything everywhere, or may not `create` `pods/exec` in the namespace
-     *     (`403`, `elevation-required` where admin rights are offered and not in use), a pod that is not
+     * @description The same protocol as `…/pods/{pod}/exec` (`ClientFrame`, `ServerFrame`, close code `4001`);
+     *     `ready` names the container `shell`. Failures arrive as an `error` frame: someone who may not
+     *     do everything everywhere, or may not `create` `pods/exec` in the namespace (`403`), a pod that
+     *     is not
      *     a node shell the person opened (`404`), one not running or already open in another terminal
      *     (`409`): one terminal per shell. When the terminal closes, Zeabur deletes the pod at once.
      */
@@ -838,9 +838,8 @@ export interface paths {
     /**
      * A terminal in a cluster tools pod of the person's, over a WebSocket: the project tools
      *     terminal's protocol and credential (see the `tools` module), with `kubectl` starting in
-     *     namespace `default`. Failures arrive as an `error` frame, as there, and `403`
-     *     (`elevation-required` where admin rights are offered and not in use) for anyone who may not do
-     *     everything everywhere.
+     *     namespace `default`. Failures arrive as an `error` frame, as there, and `403` for
+     *     anyone who may not do everything everywhere.
      */
     get: operations["clusterToolsTerminal"]
     put?: never
@@ -1067,16 +1066,7 @@ export interface paths {
     }
     get?: never
     put?: never
-    /**
-     * Carries out a plan by its token: checks it, dry-runs every write, then writes.
-     * @description Reads and writes use the elevated credential while the person holds one, as every request
-     *     does. The plan's binding alone is checked against the everyday identity: elevation adds groups
-     *     but keeps the user name, so a plan made before elevating still applies after, and one made
-     *     while elevated still applies once the rights have ended (and is refused then if the everyday
-     *     credential may not write it). Where elevation is offered and not in use, a `403` from the
-     *     cluster is answered as `elevation-required` (same status, same `denied`; see the `error`
-     *     module), so the interface can offer to retry as an administrator.
-     */
+    /** Carries out a plan by its token: checks it, dry-runs every write, then writes. */
     post: operations["apply"]
     delete?: never
     options?: never
@@ -1599,11 +1589,10 @@ export interface paths {
      * @description Binary messages carry terminal bytes both ways; text messages are JSON control frames,
      *     `ClientFrame` to the server and `ServerFrame` to the browser. The handshake answers `101
      *     Switching Protocols`; every later failure (`403` with `denied` naming `create` on
-     *     `pods/exec`, `elevation-required` where admin rights are offered and not in use; a pod or
-     *     container that does not exist, a container that is not running) arrives as an `error` frame,
-     *     which a browser can read where it cannot read a refused handshake. After `exit` or `error` the
-     *     server closes with `1000`; it closes with `4000` when the credential in use expires (the admin
-     *     one's while it is in use) and `4001` after 15 minutes without a byte either way. A handshake
+     *     `pods/exec`; a pod or container that does not exist, a container that is not running) arrives
+     *     as an `error` frame, which a browser can read where it cannot read a refused handshake. After
+     *     `exit` or `error` the server closes with `1000`; it closes with `4001` after 15 minutes without
+     *     a byte either way. A handshake
      *     from another origin is refused with `403`.
      */
     get: operations["exec"]
@@ -2071,8 +2060,8 @@ export interface paths {
     }
     /**
      * A terminal in a tools pod of the person's, over a WebSocket.
-     * @description The same protocol as `…/pods/{pod}/exec` (`ClientFrame`, `ServerFrame`, close codes `4000`
-     *     and `4001`). Before the shell starts, Zeabur writes the person's current credential into the
+     * @description The same protocol as `…/pods/{pod}/exec` (`ClientFrame`, `ServerFrame`, close code `4001`).
+     *     Before the shell starts, Zeabur writes the person's current credential into the
      *     pod (see the module documentation); `ready` names the container `tools`. Failures arrive as an
      *     `error` frame: a pod that is not the person's (`404`), one not running yet (`409`), local mode
      *     (`400`), or `create` on `pods/exec` in the project refused (`403`). The pod is deleted a minute
@@ -2160,7 +2149,7 @@ export interface paths {
       path?: never
       cookie?: never
     }
-    /** How you are signed in to Zeabur: whether you can sign out, and admin rights in use. */
+    /** How you are signed in to Zeabur: whether you can sign out. */
     get: operations["getSession"]
     put?: never
     post?: never
@@ -2243,6 +2232,29 @@ export interface paths {
      *     now is, with the new store's probe.
      */
     put: operations["setMetricsStore"]
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  "/api/v1/settings/sign-in": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** How admin accounts sign in, and whether you may change it. */
+    get: operations["getSignInSetting"]
+    /**
+     * Changes how admin accounts sign in, by writing Zeabur Identity's settings ConfigMap as you
+     *     (created the first time). Who may: whoever may update (and create) the ConfigMap
+     *     `zeabur-identity-settings` in Zeabur Identity's namespace. Turning on `adminAal3` is refused
+     *     unless you are an admin account with a device-bound passkey.
+     */
+    put: operations["setSignInSetting"]
     post?: never
     delete?: never
     options?: never
@@ -4261,11 +4273,6 @@ export interface components {
       unreadable: components["schemas"]["UnreadableView"][]
     }
     /**
-     * @description Whether administrator rights are offered and in use.
-     * @enum {string}
-     */
-    ElevationState: "unavailable" | "available" | "active"
-    /**
      * @description The encoding of a generated value.
      * @enum {string}
      */
@@ -5287,7 +5294,6 @@ export interface components {
       | "unauthenticated"
       | "signed-out"
       | "forbidden"
-      | "elevation-required"
       | "quota-exceeded"
       | "policy-denied"
       | "not-found"
@@ -5486,7 +5492,7 @@ export interface components {
     /** @description A change to the members, as a person asks for it. */
     MemberChange:
       | {
-          /** @description Whether a new member may take on admin rights. */
+          /** @description Whether a new member is an admin account. */
           admin?: boolean
           /** @description Name shown in the interface, for a new member. */
           displayName?: string | null
@@ -5498,7 +5504,7 @@ export interface components {
           username: string
         }
       | {
-          /** @description May take on admin rights, which cover every project. */
+          /** @description An admin account, with full rights in every project. */
           admin: boolean
           /** @enum {string} */
           op: "access"
@@ -6555,8 +6561,6 @@ export interface components {
           rights: components["schemas"]["Denied"][]
         }
       | {
-          /** @description Whether they act with the administrator's credential, which the person holds now. */
-          admin: boolean
           /** @enum {string} */
           code: "toolsPod"
           /**
@@ -8249,16 +8253,6 @@ export interface components {
     }
     /** @description How the person is signed in to Zeabur. */
     SessionView: {
-      /** @description When the administrator rights end, RFC 3339, while they are in use. */
-      elevatedUntil?: string | null
-      /** @description Whether administrator rights are offered and in use. */
-      elevation: components["schemas"]["ElevationState"]
-      /**
-       * @description When the credential in use expires, RFC 3339: the everyday one, which Zeabur renews
-       *     before then while the session lasts, or while admin rights are in use theirs, which is
-       *     `elevatedUntil` and is not renewed.
-       */
-      expiresAt?: string | null
       /**
        * @description Whether people sign in to this server, and so can sign out. `false` on this machine
        *     (`zeaburctl ui`), which acts with the kubeconfig of whoever started it.
@@ -8362,6 +8356,32 @@ export interface components {
      * @enum {string}
      */
     ShellWriteAction: "create" | "patch" | "delete"
+    /** @description A change of how admin accounts sign in. A field left out stays as it is. */
+    SignInChange: {
+      /** @description Admin accounts sign in only with a device-bound passkey. */
+      adminAal3?: boolean | null
+      teams?: components["schemas"]["Teams"] | null
+    }
+    /** @description How admin accounts sign in. */
+    SignInSetting: {
+      /** @description Admin accounts sign in only with a device-bound passkey. */
+      adminAal3: boolean
+      /** @description Whether the person may change them, as far as their RBAC rules in that namespace tell. */
+      canChange: components["schemas"]["Permission"]
+      /**
+       * @description Whether the person is an admin account with a device-bound passkey, which turning on
+       *     `adminAal3` needs.
+       */
+      deviceBoundPasskey: boolean
+      /** @description `settings/sign-in`. */
+      id: string
+      /** @description The ConfigMap the settings are kept in. */
+      storedIn: components["schemas"]["Origin"]
+      /** @description How many teams share the cluster. */
+      teams: components["schemas"]["Teams"]
+      /** @description The ConfigMap, when it could not be read. */
+      unreadable: components["schemas"]["UnreadableView"][]
+    }
     /**
      * @description What an environment variable's value is read from.
      *
@@ -8542,6 +8562,11 @@ export interface components {
       /** @description The IANA time zone of the expression (`spec.timeZone`); absent: the controller's. */
       timeZone?: string | null
     }
+    /**
+     * @description How many teams share the cluster.
+     * @enum {string}
+     */
+    Teams: "single" | "multiple"
     /** @description A [`Change::Template`]. */
     TemplateChange: {
       /** @description The domain, for a template that routes one. */
@@ -13803,6 +13828,72 @@ export interface operations {
         }
         content: {
           "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
+  getSignInSetting: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["SignInSetting"]
+        }
+      }
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
+  setSignInSetting: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["SignInChange"]
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["SignInSetting"]
         }
       }
       403: {

@@ -77,16 +77,10 @@ pub enum Kind {
     SignedOut,
     /// Signed in, but the cluster does not allow this to this person.
     Forbidden,
-    /// The cluster refused a request (a read, a write, a terminal) to the person's everyday
-    /// credential, and they may retry it as an administrator after confirming with their passkey.
-    /// Zeabur's own refinement of [`Kind::Forbidden`], with the same `403` and the same
-    /// `denied` member; only where Zeabur signs people in and elevation is turned on.
-    ElevationRequired,
     /// The person may make the change, but it would take the project over one of its limits
     /// (a `ResourceQuota`): kube-apiserver's quota admission refused it with `403` after its
     /// authorizers allowed it [k8s-quota]. Zeabur's own refinement of [`Kind::Forbidden`], with
-    /// the same `403`; `why` gives the limit and what is used of it. Admin rights do not
-    /// change it, so it never becomes [`Kind::ElevationRequired`].
+    /// the same `403`; `why` gives the limit and what is used of it.
     ///
     /// [k8s-quota]: https://kubernetes.io/docs/concepts/policy/resource-quotas/
     QuotaExceeded,
@@ -95,7 +89,7 @@ pub enum Kind {
     /// [k8s-admission]. Zeabur's own refinement of [`Kind::Forbidden`], with the same `403`;
     /// `why` quotes the policy's own words. A webhook's denial arrives as `403`, or as `400` when
     /// the webhook gave no status code of `400` or more [k8s-webhook-errors]; both are this
-    /// kind. Admin rights do not change it, so it never becomes [`Kind::ElevationRequired`].
+    /// kind.
     ///
     /// [k8s-admission]: https://kubernetes.io/docs/reference/access-authn-authz/admission-controllers/
     /// [k8s-webhook-errors]: https://github.com/kubernetes/kubernetes/blob/master/staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/errors/statuserror.go
@@ -146,7 +140,7 @@ pub enum Kind {
 
 impl Kind {
     /// Every kind, in the order they were added.
-    pub const ALL: [Self; 17] = [
+    pub const ALL: [Self; 16] = [
         Self::BadRequest,
         Self::Unauthenticated,
         Self::Forbidden,
@@ -160,7 +154,6 @@ impl Kind {
         Self::PlanExpired,
         Self::SystemNamespace,
         Self::SignedOut,
-        Self::ElevationRequired,
         Self::LogUnavailable,
         Self::QuotaExceeded,
         Self::PolicyDenied,
@@ -172,10 +165,7 @@ impl Kind {
         match self {
             Self::BadRequest | Self::PlanExpired => 400,
             Self::Unauthenticated | Self::SignedOut => 401,
-            Self::Forbidden
-            | Self::ElevationRequired
-            | Self::QuotaExceeded
-            | Self::PolicyDenied => 403,
+            Self::Forbidden | Self::QuotaExceeded | Self::PolicyDenied => 403,
             Self::NotFound | Self::LogUnavailable => 404,
             Self::Conflict | Self::Managed => 409,
             Self::Invalid | Self::SystemNamespace => 422,
@@ -185,7 +175,7 @@ impl Kind {
         }
     }
 
-    /// The kind as it is written on the wire (`elevation-required`), and in message keys.
+    /// The kind as it is written on the wire (`quota-exceeded`), and in message keys.
     #[must_use]
     pub fn name(self) -> &'static str {
         self.type_uri()
@@ -201,7 +191,6 @@ impl Kind {
             Self::Unauthenticated => "/problems/unauthenticated",
             Self::SignedOut => "/problems/signed-out",
             Self::Forbidden => "/problems/forbidden",
-            Self::ElevationRequired => "/problems/elevation-required",
             Self::QuotaExceeded => "/problems/quota-exceeded",
             Self::PolicyDenied => "/problems/policy-denied",
             Self::NotFound => "/problems/not-found",
@@ -225,7 +214,6 @@ impl Kind {
             Self::Unauthenticated => "You are not signed in",
             Self::SignedOut => "You are signed out",
             Self::Forbidden => "You do not have permission",
-            Self::ElevationRequired => "This needs admin rights",
             Self::QuotaExceeded => "This would go over the project's limit",
             Self::PolicyDenied => "A policy in the cluster refused this",
             Self::NotFound => "It does not exist",
@@ -247,7 +235,6 @@ impl Kind {
         match self {
             Self::BadRequest => "Check the request and try again.",
             Self::Unauthenticated | Self::SignedOut => "Sign in again.",
-            Self::ElevationRequired => "Retry as admin, or ask a cluster administrator for access.",
             Self::QuotaExceeded => {
                 "Ask for less, free some of what the project uses, or ask a cluster \
                  administrator to raise the limit."
@@ -598,7 +585,7 @@ impl Problem {
         let detail = match kind {
             Kind::Forbidden => format!("The cluster does not let you read or change {what}."),
             // Nor with Zeabur's own sign-in kinds.
-            Kind::ElevationRequired | Kind::QuotaExceeded | Kind::PolicyDenied => {
+            Kind::QuotaExceeded | Kind::PolicyDenied => {
                 format!("The cluster does not let you change {what}.")
             }
             Kind::Unauthenticated | Kind::SignedOut => {
@@ -728,23 +715,6 @@ mod tests {
         assert_eq!(json["evidence"][0]["name"], "web");
         assert_eq!(json["fields"][0]["field"], "spec.replicas");
         assert!(json.get("why").is_none());
-
-        let mut refused = Problem::from_kubernetes(status(403, "Forbidden"), "Deployment web");
-        refused.deny(Denied {
-            verb: "patch".to_owned(),
-            group: "apps".to_owned(),
-            resource: "deployments".to_owned(),
-            name: Some("web".to_owned()),
-            namespace: Some("shop".to_owned()),
-        });
-        let elevated = refused.refined(Kind::ElevationRequired);
-        assert_eq!(elevated.summary.key, "problem.summary.elevation-required");
-        assert_eq!(
-            elevated.summary.params.get("verb").map(String::as_str),
-            Some("patch")
-        );
-        assert_eq!(elevated.status, 403);
-        assert!(elevated.denied.is_some() && elevated.kubernetes.is_some());
     }
 
     #[test]
@@ -803,10 +773,9 @@ mod tests {
             Kind::PlanExpired => 10,
             Kind::SystemNamespace => 11,
             Kind::SignedOut => 12,
-            Kind::ElevationRequired => 13,
-            Kind::LogUnavailable => 14,
-            Kind::QuotaExceeded => 15,
-            Kind::PolicyDenied => 16,
+            Kind::LogUnavailable => 13,
+            Kind::QuotaExceeded => 14,
+            Kind::PolicyDenied => 15,
         }
     }
 
@@ -821,9 +790,7 @@ mod tests {
                 Kind::PlanExpired => Kind::BadRequest,
                 Kind::SystemNamespace => Kind::Invalid,
                 Kind::SignedOut => Kind::Unauthenticated,
-                Kind::ElevationRequired | Kind::QuotaExceeded | Kind::PolicyDenied => {
-                    Kind::Forbidden
-                }
+                Kind::QuotaExceeded | Kind::PolicyDenied => Kind::Forbidden,
                 Kind::LogUnavailable => Kind::NotFound,
                 Kind::BadRequest
                 | Kind::Unauthenticated

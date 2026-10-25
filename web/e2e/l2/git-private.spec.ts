@@ -7,7 +7,7 @@ import type { Page } from "@playwright/test"
 
 import { expect, test } from "../fixtures.ts"
 import { deleteService } from "./git.ts"
-import { invite, member, signInAsAdmin, toast } from "./members.ts"
+import { invite, member, signInAdmin, toast } from "./members.ts"
 
 // Deploy from Git with a deploy key, against a real private repository on GitHub whose
 // Dockerfile serves a page on port 8080. Until the key is on the repository the service fails
@@ -91,7 +91,7 @@ test("a Developer deploys a private repository with a deploy key", async ({ page
   test.setTimeout(1_800_000)
   let developerLink = ""
   await test.step("the admin invites a Developer", async () => {
-    await signInAsAdmin(page, adminLink)
+    await signInAdmin(page, adminLink)
     developerLink = await invite(page, "e2e-git-private-developer", [
       { project, role: "developer" },
     ])

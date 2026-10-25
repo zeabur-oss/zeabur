@@ -14,10 +14,8 @@
 //! `pods`, `nodes.metrics.k8s.io`, `events.events.k8s.io`, `plans.upgrade.cattle.io`), to see a
 //! section's permission state; the listed kinds but `pods` are also refused in every namespace
 //! (`secrets`, `httproutes.gateway.networking.k8s.io`: a project's pages show them refused in
-//! place), and `pods/exec` refuses every terminal. With `ZEABUR_DEMO_ELEVATION=1` the demo says
-//! admin rights are offered, so refusals show "View as admin" or "Retry as admin" (the demo has
-//! no `/auth/elevate` to grant them). `services/proxy` in `ZEABUR_DEMO_FORBID` refuses the
-//! sample metrics store, whose history and disk use are made up like the live usage. A
+//! place), and `pods/exec` refuses every terminal. `services/proxy` in `ZEABUR_DEMO_FORBID` refuses
+//! the sample metrics store, whose history and disk use are made up like the live usage. A
 //! system-upgrade-controller Plan resolves a newer patch, so the cluster page shows one; the demo
 //! makes no outbound request: domains resolve from a fixed table (`dns`), and every image is
 //! read from a made-up registry (`Registry`) that says it listens on 8080 as user 101.
@@ -83,7 +81,7 @@ use axum::http::request::Parts;
 use secrecy::SecretString;
 use serde_json::{Value, json};
 use sha2::{Digest as _, Sha256};
-use zeabur_api::access::{Access, ClusterAccess, Elevation, Handoff};
+use zeabur_api::access::{ClusterAccess, Handoff};
 use zeabur_api::images::registry::{Answer, Get, Transport};
 use zeabur_core::problem::Problem;
 use zeabur_kube::k8s_openapi::api::apps::v1::{DaemonSet, Deployment, StatefulSet};
@@ -147,13 +145,13 @@ fn people() -> Vec<DynamicObject> {
         )
     };
     let user = |name: &str, display: &str, admin: bool, created: &str| {
-        let groups = if admin { json!(["admins"]) } else { json!([]) };
+        let account_type = if admin { "Admin" } else { "Regular" };
         identity_object(
             "User",
             name,
             created,
             &json!({"username": name, "displayName": display,
-            "groups": groups, "elevatedGroups": groups}),
+            "groups": [], "accountType": account_type}),
             &json!({}),
         )
     };
@@ -3450,23 +3448,15 @@ fn place(pods: &mut [Pod]) {
     }
 }
 
-/// One connection for every request, offering admin rights when `offered`.
+/// One connection for every request.
 struct Demo {
     cluster: Arc<dyn Cluster>,
-    offered: bool,
     tools: bool,
 }
 
 impl ClusterAccess for Demo {
-    fn for_request(&self, _parts: &Parts) -> Result<Access, Box<Problem>> {
-        Ok(Access {
-            cluster: Arc::clone(&self.cluster),
-            elevation: if self.offered {
-                Elevation::Available
-            } else {
-                Elevation::Unavailable
-            },
-        })
+    fn for_request(&self, _parts: &Parts) -> Result<Arc<dyn Cluster>, Box<Problem>> {
+        Ok(Arc::clone(&self.cluster))
     }
 
     fn handoff(&self, _parts: &Parts) -> Option<Handoff> {
@@ -3476,7 +3466,6 @@ impl ClusterAccess for Demo {
             expires_at: Timestamp::now()
                 .checked_add(SignedDuration::from_mins(30))
                 .expect("in range"),
-            admin: false,
         })
     }
 }
@@ -4264,7 +4253,6 @@ async fn main() -> std::io::Result<()> {
     let terminals = tools.then(|| Arc::clone(&cluster));
     let access = Demo {
         cluster,
-        offered: std::env::var_os("ZEABUR_DEMO_ELEVATION").is_some(),
         tools,
     };
     // Settings are kept in an `zeabur` namespace, as on the in-cluster server.

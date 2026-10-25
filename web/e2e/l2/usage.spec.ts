@@ -1,12 +1,12 @@
 import { expect, test } from "../fixtures.ts"
-import { invite, member, signInAsAdmin } from "./members.ts"
+import { invite, member, signInAdmin } from "./members.ts"
 
 // The cluster page's resource usage: an admin sees the test project and its services; a Viewer
 // of one project may not list every pod, so the section says it needs more rights.
 // scripts/e2e-l2-browser.sh sets, besides ZEABUR_L2_URL:
 //
-//   ZEABUR_L2_USAGE_ADMIN_LINK   an invitation for `e2e-usage-admin`, in the groups admins and
-//                                elevated admins
+//   ZEABUR_L2_USAGE_ADMIN_LINK   an invitation for `e2e-usage-admin`, an admin account
+//                                (`invite --admin`)
 //   ZEABUR_L2_NAMESPACE          a project with a running Deployment
 //   ZEABUR_L2_SERVICE            that Deployment (default talker)
 //
@@ -28,8 +28,8 @@ test("an admin sees what the test project uses; a Viewer is told it needs more r
 }) => {
   test.setTimeout(240_000)
 
-  await test.step("the admin signs in and takes on admin rights", async () => {
-    await signInAsAdmin(page, adminLink)
+  await test.step("the admin signs in", async () => {
+    await signInAdmin(page, adminLink)
   })
 
   await test.step("the admin sees the project and opens its services", async () => {
@@ -54,8 +54,5 @@ test("an admin sees what the test project uses; a Viewer is told it needs more r
     const usage = viewer.getByRole("region", { name: "Resource usage" })
     const refused = usage.getByText("Seeing what each namespace uses needs more rights.")
     await expect(refused).toBeVisible({ timeout: 30_000 })
-    await expect(
-      viewer.getByRole("button", { name: "Use admin rights for a few minutes" }),
-    ).toHaveCount(0)
   })
 })

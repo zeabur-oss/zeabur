@@ -6,7 +6,6 @@ import XIcon from "~icons/ph/x"
 import type { Schemas } from "@/api/client"
 import { FormField } from "@/components/form-field"
 import { usePlanner } from "@/components/plan/planner"
-import { permission, RefusedHint, useHintOffersElevation } from "@/components/refused"
 import { useT } from "@/i18n"
 import { DISPLAY_NAME_MAX, newProjectProblem } from "@/model/project"
 import { Button } from "@zeabur/design-system/components/button"
@@ -18,7 +17,7 @@ import {
 } from "@zeabur/design-system/components/dialog"
 import { Input } from "@zeabur/design-system/components/input"
 
-/** "New project", for those who may create namespaces, or may once they act as admin. */
+/** "New project", for those who may create namespaces. */
 export function NewProjectButton({
   canCreate,
   taken,
@@ -28,30 +27,19 @@ export function NewProjectButton({
 }) {
   const t = useT()
   const [open, setOpen] = useState(false)
-  const elevate = useHintOffersElevation(canCreate)
-  if (canCreate === "denied" && !elevate) return null
+  if (canCreate === "denied") return null
   return (
     <>
       <Button size="sm" data-testid="new-project" onClick={() => setOpen(true)}>
         <PlusIcon aria-hidden="true" data-icon="inline-start" />
         {t("projects.new")}
       </Button>
-      {open ? (
-        <NewProjectDialog canCreate={canCreate} taken={taken} onClose={() => setOpen(false)} />
-      ) : null}
+      {open ? <NewProjectDialog taken={taken} onClose={() => setOpen(false)} /> : null}
     </>
   )
 }
 
-function NewProjectDialog({
-  canCreate,
-  taken,
-  onClose,
-}: {
-  canCreate: Schemas["Permission"] | undefined
-  taken: string[]
-  onClose: () => void
-}) {
+function NewProjectDialog({ taken, onClose }: { taken: string[]; onClose: () => void }) {
   const t = useT()
   const navigate = useNavigate()
   const [name, setName] = useState("")
@@ -94,11 +82,6 @@ function NewProjectDialog({
             }}
           >
             <p className="type-meta text-muted-foreground">{t("projects.newBody")}</p>
-            <RefusedHint
-              hint={canCreate}
-              what={name ? t("refused.createProject", name) : t("projects.new")}
-              missing={[permission("create", "namespaces")]}
-            />
             <FormField
               label={t("projects.newName")}
               hint={t("projects.newNameHint")}

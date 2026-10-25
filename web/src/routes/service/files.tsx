@@ -245,9 +245,8 @@ function Browser({ project, pod, container }: { project: string; pod: string; co
   if (files.isPending) return <LoadingRows label={t("files.loading")} />
   if (files.isError) {
     const problem = toProblem(files.error)
-    if (isRefusal(problem))
-      return <RefusedFiles project={project} problem={problem} retry={() => void files.refetch()} />
-    return <Problem problem={problem} retry={() => void files.refetch()} />
+    if (isRefusal(problem)) return <RefusedFiles project={project} problem={problem} />
+    return <Problem problem={problem} />
   }
   const data = files.data
   const place: Place = { project, pod, container, via: data.reader.via ?? undefined }
@@ -264,20 +263,12 @@ function Browser({ project, pod, container }: { project: string; pod: string; co
   return <Folders place={place} files={data} />
 }
 
-function RefusedFiles({
-  project,
-  problem,
-  retry,
-}: {
-  project: string
-  problem: ProblemBody
-  retry: () => void
-}) {
+function RefusedFiles({ project, problem }: { project: string; problem: ProblemBody }) {
   const t = useT()
   const exec = problem.denied?.resource === "pods/exec"
   const whoami = useQuery({ ...whoamiQuery, enabled: exec })
   return (
-    <Refused refusal={problem} what={t("files.refusedWhat")} retry={retry}>
+    <Refused refusal={problem} what={t("files.refusedWhat")}>
       {exec ? (
         <>
           <p className="text-sm text-muted-foreground">{t("files.refusedRbac")}</p>
@@ -322,7 +313,7 @@ function NoTools({
     <div className="flex flex-col items-start gap-3 rounded-xl border border-dashed px-4 py-3 text-sm">
       <p className="font-medium">{t("files.noToolsTitle")}</p>
       <p className="max-w-prose text-muted-foreground">{t("files.noToolsBody")}</p>
-      {problem ? <Problem problem={problem} retry={start} /> : null}
+      {problem ? <Problem problem={problem} /> : null}
       {!may ? (
         <Refused
           refusal="hint"
@@ -684,11 +675,7 @@ function Folder({
         </div>
       ) : list.isError ? (
         <div className="p-4">
-          <FolderProblem
-            error={list.error}
-            project={place.project}
-            retry={() => void list.refetch()}
-          />
+          <FolderProblem error={list.error} project={place.project} />
         </div>
       ) : (
         <EntryTable
@@ -729,18 +716,10 @@ function Capped({ list, shown }: { list?: Schemas["FileList"]; shown: number }) 
   )
 }
 
-function FolderProblem({
-  error,
-  project,
-  retry,
-}: {
-  error: unknown
-  project: string
-  retry: () => void
-}) {
+function FolderProblem({ error, project }: { error: unknown; project: string }) {
   const problem = toProblem(error)
-  if (isRefusal(problem)) return <RefusedFiles project={project} problem={problem} retry={retry} />
-  return <Problem problem={problem} retry={retry} />
+  if (isRefusal(problem)) return <RefusedFiles project={project} problem={problem} />
+  return <Problem problem={problem} />
 }
 
 function WriteButton({
@@ -1029,7 +1008,7 @@ function Preview({ place, path, onClose }: { place: Place; path: string; onClose
           {preview.isPending ? (
             <LoadingRows label={t("files.loading")} />
           ) : preview.isError ? (
-            <Problem error={preview.error} retry={() => void preview.refetch()} />
+            <Problem error={preview.error} />
           ) : data?.tooLarge ? (
             <p className="text-sm text-muted-foreground">{t("files.tooLarge", size(data.size))}</p>
           ) : data?.text === undefined || data.text === null ? (

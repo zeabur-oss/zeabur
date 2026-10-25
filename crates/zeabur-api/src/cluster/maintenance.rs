@@ -26,7 +26,7 @@ use zeabur_kube::{
 };
 
 use crate::error::{ApiError, get_read, read_problem};
-use crate::handlers::{AppState, Everyday, Person};
+use crate::handlers::{AppState, Person};
 use crate::plan_token::{self as token, LIFETIME_SECONDS, TokenError};
 use crate::projects::writes::token_problem;
 
@@ -192,12 +192,11 @@ fn plan_key(state: &AppState) -> Result<std::sync::Arc<token::PlanKey>, ApiError
 pub(crate) async fn plan(
     State(state): State<AppState>,
     Person(cluster): Person,
-    Everyday(everyday): Everyday,
     Path(name): Path<String>,
     Json(request): Json<MaintenanceRequest>,
 ) -> Result<Json<MaintenancePlan>, ApiError> {
     let sealing = plan_key(&state)?;
-    let identity = everyday
+    let identity = cluster
         .whoami()
         .await
         .map_err(|e| ApiError::from(e.into_problem("your identity")))?;
@@ -282,7 +281,6 @@ async fn patch_node(cluster: &dyn Cluster, name: &str, patch: Value) -> Result<(
 async fn opened(
     state: &AppState,
     cluster: &dyn Cluster,
-    everyday: &dyn Cluster,
     name: &str,
     token: &str,
 ) -> Result<(Claims, Node), ApiError> {
@@ -291,7 +289,7 @@ async fn opened(
     if (state.clock)().as_second() >= claims.expires_at {
         return Err(token_problem(TokenError::Expired));
     }
-    let identity = everyday
+    let identity = cluster
         .whoami()
         .await
         .map_err(|e| ApiError::from(e.into_problem("your identity")))?;
@@ -330,18 +328,10 @@ async fn opened(
 pub(crate) async fn apply(
     State(state): State<AppState>,
     Person(cluster): Person,
-    Everyday(everyday): Everyday,
     Path(name): Path<String>,
     Json(request): Json<MaintenanceApply>,
 ) -> Result<Json<MaintenanceApplied>, ApiError> {
-    let (claims, node) = opened(
-        &state,
-        cluster.as_ref(),
-        everyday.as_ref(),
-        &name,
-        &request.token,
-    )
-    .await?;
+    let (claims, node) = opened(&state, cluster.as_ref(), &name, &request.token).await?;
     let cordon = claims.action == NodeAction::Cordon;
     if let Some(patch) = unschedulable_patch(&node, cordon) {
         patch_node(cluster.as_ref(), &name, patch).await?;

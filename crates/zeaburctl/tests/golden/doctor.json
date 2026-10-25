@@ -36,8 +36,7 @@
       "name": "zeabur-identity-client",
       "status": "ok",
       "findings": [
-        "OAuthClient zeabur-identity/zeabur gets tokens for kubernetes",
-        "OAuthClient zeabur-identity/zeabur may ask for elevation"
+        "OAuthClient zeabur-identity/zeabur gets tokens for kubernetes"
       ],
       "fix": null
     },

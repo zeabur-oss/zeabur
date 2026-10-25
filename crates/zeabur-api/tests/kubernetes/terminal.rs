@@ -19,7 +19,7 @@ use serde_json::{Value, json};
 use tokio_tungstenite::tungstenite::Message;
 use tokio_tungstenite::tungstenite::client::IntoClientRequest as _;
 use zeabur_api::Settings;
-use zeabur_api::access::{Access, ClusterAccess, Elevation, Handoff};
+use zeabur_api::access::{ClusterAccess, Handoff};
 use zeabur_core::problem::{Denied, Problem};
 use zeabur_kube::Cluster;
 use zeabur_kube::k8s_openapi::api::core::v1::Pod;
@@ -37,22 +37,14 @@ struct Signed {
 }
 
 impl ClusterAccess for Signed {
-    fn for_request(&self, _parts: &Parts) -> Result<Access, Box<Problem>> {
-        Ok(Access {
-            cluster: Arc::clone(&self.cluster),
-            elevation: Elevation::Unavailable,
-        })
-    }
-
-    fn credential_expiry(&self, _parts: &Parts) -> Option<Timestamp> {
-        Some(Timestamp::now() + SignedDuration::from_mins(10))
+    fn for_request(&self, _parts: &Parts) -> Result<Arc<dyn Cluster>, Box<Problem>> {
+        Ok(Arc::clone(&self.cluster))
     }
 
     fn handoff(&self, _parts: &Parts) -> Option<Handoff> {
         Some(Handoff {
             token: zeabur_kube::UserToken::new(SecretString::from(self.token.as_str())).unwrap(),
             expires_at: Timestamp::now() + SignedDuration::from_mins(10),
-            admin: false,
         })
     }
 }

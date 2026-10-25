@@ -1,14 +1,13 @@
 import type { Page } from "@playwright/test"
 
 import { expect, test } from "../fixtures.ts"
-import { invite, member, planAndApply, signInAsAdmin } from "./members.ts"
+import { invite, member, planAndApply, signInAdmin } from "./members.ts"
 
 // Roles per project: an admin invites a Developer of one project and a Viewer of another, and
-// each sees what their role allows. The Viewer, with no elevated groups, is not offered admin
-// rights. scripts/e2e-l2-browser.sh sets, besides ZEABUR_L2_URL:
+// each sees what their role allows. scripts/e2e-l2-browser.sh sets, besides ZEABUR_L2_URL:
 //
-//   ZEABUR_L2_ADMIN_LINK         an invitation `zeabur-identityctl invite` printed for `e2e-admin`,
-//                                in the groups admins and elevated admins
+//   ZEABUR_L2_ADMIN_LINK         an invitation `zeabur-identityctl invite --admin` printed for the
+//                                admin account `e2e-admin`
 //   ZEABUR_L2_NAMESPACE          the Developer's project, with a running Deployment
 //   ZEABUR_L2_SECOND_NAMESPACE   the Viewer's project, with a running Deployment of the same name
 //   ZEABUR_L2_SERVICE            that Deployment (default talker)
@@ -46,8 +45,8 @@ test("an admin invites a Developer and a Viewer, who each get what their role al
   let viewerLink = ""
   let developer: Page
 
-  await test.step("the admin signs in and takes on admin rights", async () => {
-    await signInAsAdmin(page, adminLink)
+  await test.step("the admin signs in", async () => {
+    await signInAdmin(page, adminLink)
   })
 
   await test.step("the admin invites a Developer of one project and a Viewer of the other", async () => {
@@ -193,23 +192,16 @@ test("an admin invites a Developer and a Viewer, who each get what their role al
     expect(await logHistory(second)).toBe("unreadable")
     expect(await logHistory(first)).toBe("unreadable")
 
-    // The Viewer has no elevated groups, so Zeabur Identity would refuse admin rights.
     await viewer.goto("/cluster")
     const warnings = viewer.getByRole("region", { name: "Warnings in the last hour" })
     await expect(
       warnings.getByText("Seeing the cluster's warnings needs more rights."),
     ).toBeVisible({ timeout: 30_000 })
-    await expect(
-      viewer.getByRole("button", { name: "Use admin rights for a few minutes" }),
-    ).toHaveCount(0)
     await viewer
       .getByRole("button", { name: /^Cluster .*, signed in as / })
       .first()
       .click()
     await expect(viewer.getByRole("menuitem", { name: "Sign out" })).toBeVisible()
-    await expect(
-      viewer.getByRole("menuitem", { name: "Use admin rights for a few minutes" }),
-    ).toHaveCount(0)
     await viewer.keyboard.press("Escape")
     await viewer.context().close()
   })

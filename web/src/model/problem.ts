@@ -11,7 +11,6 @@ const kinds = [
   "unauthenticated",
   "signed-out",
   "forbidden",
-  "elevation-required",
   "quota-exceeded",
   "policy-denied",
   "not-found",
@@ -67,7 +66,7 @@ export function problemText(t: Translate, locale: Locale, problem: Problem): Pro
   const headline =
     writeSentence(t, problem.summary) ?? writeSentence(t, { key: `problem.summary.${kind}` })
   const keyedWhy = problem.why ? writeSentence(t, problem.why) : undefined
-  const refusal = kind === "forbidden" || kind === "elevation-required"
+  const refusal = kind === "forbidden"
   const detailShown =
     !keyedWhy && (detailExplains.has(kind) || (refusal && problem.denied === undefined))
   // An unkeyed fix is English only: shown in English, else folded.
@@ -104,6 +103,5 @@ export function refusedField(
  * kube-apiserver answer and stay errors; quota and policy refusals are not about rights.
  */
 export function isRefusal(problem: Problem): boolean {
-  if (problem.kind === "elevation-required") return true
   return problem.kind === "forbidden" && Boolean(problem.kubernetes || problem.denied)
 }

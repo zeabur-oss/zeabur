@@ -1194,8 +1194,6 @@ pub enum Warning {
         image: String,
         /// Who `kubectl` and `helm` act as: the person's user name.
         person: String,
-        /// Whether they act with the administrator's credential, which the person holds now.
-        admin: bool,
         /// When the credential written into the pod expires, RFC 3339; `kubectl` is refused
         /// from then until a terminal opens again with a fresh one.
         #[serde(default, skip_serializing_if = "Option::is_none")]

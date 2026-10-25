@@ -29,16 +29,6 @@ async function change<T>(page: Page, path: RegExp, edit: (body: T) => T) {
 }
 
 const planPath = /\/api\/v1\/projects\/[^/]+\/plan$/
-const sessionPath = /\/api\/v1\/session$/
-
-const session = (elevation: "unavailable" | "available" | "active") => ({
-  signsIn: true,
-  elevation,
-  ...(elevation === "active"
-    ? { elevatedUntil: new Date(Date.now() + 600_000).toISOString() }
-    : {}),
-})
-
 const quota = {
   type: "/problems/quota-exceeded",
   title: "The project's limit does not allow this",
@@ -159,36 +149,7 @@ test("a pod that runs again after a recent crash keeps the service failing, in p
   await expect(status.getByText("Running, 5 restarts, last exit 1, 4 minutes ago")).toBeVisible()
 })
 
-test("the account menu offers admin rights while they are offered, and dropping them while in use", async ({
-  page,
-}) => {
-  await stub(page, sessionPath, session("available"))
-  await page.goto("/")
-  await page
-    .getByRole("button", { name: /^Cluster .*, signed in as / })
-    .first()
-    .click()
-  await expect(
-    page.getByRole("menuitem", { name: "Use admin rights for a few minutes" }),
-  ).toBeVisible()
-  await expect(page.getByRole("menuitem", { name: "Drop admin rights" })).toHaveCount(0)
-
-  await page.unroute(sessionPath)
-  await stub(page, sessionPath, session("active"))
-  await page.reload()
-  await page
-    .getByRole("button", { name: /^Cluster .*, signed in as / })
-    .first()
-    .click()
-  await expect(page.getByRole("menuitem", { name: "Drop admin rights" })).toBeVisible()
-  await expect(
-    page.getByRole("menuitem", { name: "Use admin rights for a few minutes" }),
-  ).toHaveCount(0)
-})
-
-test("project settings offer admin rights where the hint says no, and say who to ask otherwise", async ({
-  page,
-}) => {
+test("project settings say who to ask where the hint says no", async ({ page }) => {
   test.skip(namespace.startsWith("kube-"), "a system namespace is never a project")
   const namespacePath = /\/api\/v1\/projects\/[^/]+\/namespace$/
   await change<object>(page, namespacePath, (body) => ({
@@ -196,21 +157,8 @@ test("project settings offer admin rights where the hint says no, and say who to
     adopted: true,
     canChange: "denied",
   }))
-  await stub(page, sessionPath, session("available"))
   await page.goto(`${project}/settings`)
-  await expect(page.getByText("Changing this project's details needs admin rights.")).toBeVisible()
-  await expect(
-    page.getByRole("button", { name: "Use admin rights for a few minutes" }),
-  ).toBeVisible()
-  await expect(page.getByText("You can see these but not change them.")).toHaveCount(0)
-
-  await page.unroute(sessionPath)
-  await stub(page, sessionPath, session("unavailable"))
-  await page.reload()
   await expect(page.getByText("You can see these but not change them.")).toBeVisible()
-  await expect(
-    page.getByRole("button", { name: "Use admin rights for a few minutes" }),
-  ).toHaveCount(0)
 })
 
 test("each problem type has a page that explains its rule", async ({ page }) => {

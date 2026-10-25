@@ -532,8 +532,6 @@ pub struct ToolsPod<'a> {
     pub scope: ToolsScope<'a>,
     /// The person's user name.
     pub person: &'a str,
-    /// Whether the credential in use now is an administrator's.
-    pub admin: bool,
     /// When that credential expires, RFC 3339; `None` when Zeabur does not know.
     pub credential_expires_at: Option<String>,
     /// The image, with `kubectl` and `helm`.
@@ -714,7 +712,6 @@ pub fn tools_pod_with(request: &ToolsPod<'_>, conventions: &Conventions) -> Plan
             pod: name,
             image: request.image.to_owned(),
             person: request.person.to_owned(),
-            admin: request.admin,
             credential_expires_at: request.credential_expires_at.clone(),
             deadline_seconds: request.deadline_seconds,
             grace_seconds: request.grace_seconds,
@@ -884,12 +881,11 @@ mod tests {
         );
     }
 
-    fn tools(person: &str, admin: bool) -> ToolsPod<'static> {
+    fn tools(person: &str) -> ToolsPod<'static> {
         ToolsPod {
             namespace: "zeabur-terminals",
             scope: ToolsScope::Project("shop"),
             person: Box::leak(person.to_owned().into_boxed_str()),
-            admin,
             credential_expires_at: Some("2026-10-21T00:10:00Z".to_owned()),
             image: "alpine/k8s:1.36.5",
             deadline_seconds: 1800,
@@ -901,7 +897,7 @@ mod tests {
 
     #[test]
     fn a_tools_pod_has_no_service_account_token_and_no_privileges() {
-        let body = tools_pod_body(&tools("alice@example.com", false));
+        let body = tools_pod_body(&tools("alice@example.com"));
         let spec = &body["spec"];
         assert_eq!(spec["automountServiceAccountToken"], false);
         assert_eq!(spec["activeDeadlineSeconds"], 1800);
@@ -959,11 +955,11 @@ mod tests {
 
     #[test]
     fn a_tools_plan_says_who_it_acts_as() {
-        let plan = tools_pod(&tools("alice", true));
+        let plan = tools_pod(&tools("alice"));
         assert!(matches!(&plan.objects[0].write, Write::Create { .. }));
         assert!(matches!(
             plan.warnings.as_slice(),
-            [Warning::ToolsPod { person, namespace, admin: true, deadline_seconds: 1800, .. }]
+            [Warning::ToolsPod { person, namespace, deadline_seconds: 1800, .. }]
                 if person == "alice" && namespace == "zeabur-terminals"
         ));
     }
@@ -972,7 +968,7 @@ mod tests {
     fn a_cluster_tools_pod_names_no_project_and_is_not_a_projects() {
         let request = ToolsPod {
             scope: ToolsScope::Cluster,
-            ..tools("alice", true)
+            ..tools("alice")
         };
         let body = tools_pod_body(&request);
         assert_eq!(body["metadata"]["labels"][TOOLS_LABEL], "cluster");
@@ -1000,7 +996,7 @@ mod tests {
             tools_project_annotation: "example.com/project".into(),
             ..Conventions::default()
         };
-        let body = tools_pod_body_with(&tools("alice", false), &conventions);
+        let body = tools_pod_body_with(&tools("alice"), &conventions);
         let meta = &body["metadata"];
         assert!(meta["name"].as_str().unwrap().starts_with("example-tools-"));
         assert_eq!(meta["labels"]["app.kubernetes.io/name"], "example-tools");

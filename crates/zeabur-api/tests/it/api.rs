@@ -192,14 +192,11 @@ mod tests {
             .collect()
     }
 
-    /// On this machine nobody signs in: there is no signing out and no elevation to offer.
+    /// On this machine nobody signs in, so there is no signing out.
     #[tokio::test]
-    async fn the_local_session_offers_no_sign_out_and_no_elevation() {
+    async fn the_local_session_offers_no_sign_out() {
         let session = get(&cluster(), "/api/v1/session").await;
-        assert_eq!(
-            session,
-            json!({"signsIn": false, "elevation": "unavailable"})
-        );
+        assert_eq!(session, json!({"signsIn": false}));
     }
 
     #[tokio::test]

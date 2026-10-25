@@ -26,7 +26,7 @@ use zeabur_core::problem::{Kind, MEDIA_TYPE as PROBLEM, Problem};
 use zeabur_plan::{Change, PlanRequest};
 
 use crate::error::{ApiError, get_read, read_problem};
-use crate::handlers::{AppState, Everyday, Person};
+use crate::handlers::{AppState, Person};
 use crate::plan_token::{self as token, PlanKey, TokenError};
 
 const PREFIX: &str = "k1.";
@@ -199,7 +199,7 @@ fn key_of(state: &AppState) -> Result<std::sync::Arc<PlanKey>, ApiError> {
               (status = 400, body = Problem, content_type = PROBLEM)))]
 pub(crate) async fn create(
     State(state): State<AppState>,
-    Everyday(everyday): Everyday,
+    Person(cluster): Person,
     Path(project): Path<String>,
     Json(request): Json<DeployKeyRequest>,
 ) -> Result<Json<DeployKeyResponse>, ApiError> {
@@ -208,7 +208,7 @@ pub(crate) async fn create(
     let pinned =
         split_port(&host).is_some_and(|(name, port)| port == 22 && known_hosts(name).is_some());
     let sealing = key_of(&state)?;
-    let identity = everyday
+    let identity = cluster
         .whoami()
         .await
         .map_err(|e| ApiError::from(e.into_problem("your identity")))?;

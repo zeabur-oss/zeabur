@@ -134,7 +134,6 @@ function PodShell({
   const url = terminalUrl(window.location, tab.project, pod.name, debugName ?? chosen, command)
   return (
     <Session
-      id={tab.id}
       url={url}
       attempt={attempt}
       project={tab.project}
@@ -232,7 +231,7 @@ function DebugOffer({
       <p className="max-w-prose text-sm">
         {ended ? t("terminal.debugEnded") : t("terminal.noShell")}
       </p>
-      {problem ? <Problem problem={problem} retry={start} /> : null}
+      {problem ? <Problem problem={problem} /> : null}
       {waiting && !problem && !ended ? (
         <output className="text-sm text-secondary">{t("terminal.debugStarting")}</output>
       ) : (
@@ -337,7 +336,6 @@ export function KubectlTab({ tab, shown, focus }: KubectlTabProps) {
   if (shownPod)
     return (
       <Session
-        id={tab.id}
         url={toolsTerminalUrl(window.location, project, shownPod)}
         attempt={attempt}
         project={project ?? tools.data.namespace}
@@ -357,7 +355,7 @@ export function KubectlTab({ tab, shown, focus }: KubectlTabProps) {
           {waiting ? t("tools.starting") : t("action.openToolsTerminal")}
         </Button>
       </div>
-      {failed ? <Problem problem={failed} retry={start} /> : null}
+      {failed ? <Problem problem={failed} /> : null}
       {pods.length > 0 ? <ToolsPods project={project} pods={pods} onOpen={attach} /> : null}
       {dialog}
     </div>

@@ -10,7 +10,7 @@ info:
     
     **Consistency.** A project is read with one consistent LIST per kind, issued concurrently. Kinds are not read at one shared resourceVersion, which Kubernetes does not offer across kinds, so a response can briefly show, for example, a pod that a just-deleted workload owned; the next read corrects it. Zeabur promises freshness (nothing older than the request), not a single-revision snapshot.
     
-    **Errors.** The problem `kind` and `reason` are open enumerations: expect new values, treat an unknown `kind` by its HTTP status and ignore an unknown `reason`. `429` and `503` carry kube-apiserver's `Retry-After` when it gave one. Where admin rights are offered and not in use (`/api/v1/session`), a `403` from kube-apiserver comes as `elevation-required`, with the same `denied` and `kubernetes`; while they are in use, every request goes with them.
+    **Errors.** The problem `kind` and `reason` are open enumerations: expect new values, treat an unknown `kind` by its HTTP status and ignore an unknown `reason`. `429` and `503` carry kube-apiserver's `Retry-After` when it gave one.
     
     **Compatibility.** The embedded web interface ships with the API; other clients are not yet promised a stable `/api/v1`.
   license:
@@ -750,10 +750,10 @@ paths:
       - cluster
       summary: The shell in a node shell pod the person opened, over a WebSocket.
       description: |-
-        The same protocol as `…/pods/{pod}/exec` (`ClientFrame`, `ServerFrame`, close codes `4000`
-        and `4001`); `ready` names the container `shell`. Failures arrive as an `error` frame: someone
-        who may not do everything everywhere, or may not `create` `pods/exec` in the namespace
-        (`403`, `elevation-required` where admin rights are offered and not in use), a pod that is not
+        The same protocol as `…/pods/{pod}/exec` (`ClientFrame`, `ServerFrame`, close code `4001`);
+        `ready` names the container `shell`. Failures arrive as an `error` frame: someone who may not
+        do everything everywhere, or may not `create` `pods/exec` in the namespace (`403`), a pod that
+        is not
         a node shell the person opened (`404`), one not running or already open in another terminal
         (`409`): one terminal per shell. When the terminal closes, Zeabur deletes the pod at once.
       operationId: nodeShellTerminal
@@ -1230,9 +1230,8 @@ paths:
       summary: |-
         A terminal in a cluster tools pod of the person's, over a WebSocket: the project tools
         terminal's protocol and credential (see the `tools` module), with `kubectl` starting in
-        namespace `default`. Failures arrive as an `error` frame, as there, and `403`
-        (`elevation-required` where admin rights are offered and not in use) for anyone who may not do
-        everything everywhere.
+        namespace `default`. Failures arrive as an `error` frame, as there, and `403` for
+        anyone who may not do everything everywhere.
       operationId: clusterToolsTerminal
       parameters:
       - name: name
@@ -1572,14 +1571,6 @@ paths:
       tags:
       - projects
       summary: "Carries out a plan by its token: checks it, dry-runs every write, then writes."
-      description: |-
-        Reads and writes use the elevated credential while the person holds one, as every request
-        does. The plan's binding alone is checked against the everyday identity: elevation adds groups
-        but keeps the user name, so a plan made before elevating still applies after, and one made
-        while elevated still applies once the rights have ended (and is refused then if the everyday
-        credential may not write it). Where elevation is offered and not in use, a `403` from the
-        cluster is answered as `elevation-required` (same status, same `denied`; see the `error`
-        module), so the interface can offer to retry as an administrator.
       operationId: apply
       parameters:
       - name: project
@@ -2528,11 +2519,10 @@ paths:
         Binary messages carry terminal bytes both ways; text messages are JSON control frames,
         `ClientFrame` to the server and `ServerFrame` to the browser. The handshake answers `101
         Switching Protocols`; every later failure (`403` with `denied` naming `create` on
-        `pods/exec`, `elevation-required` where admin rights are offered and not in use; a pod or
-        container that does not exist, a container that is not running) arrives as an `error` frame,
-        which a browser can read where it cannot read a refused handshake. After `exit` or `error` the
-        server closes with `1000`; it closes with `4000` when the credential in use expires (the admin
-        one's while it is in use) and `4001` after 15 minutes without a byte either way. A handshake
+        `pods/exec`; a pod or container that does not exist, a container that is not running) arrives
+        as an `error` frame, which a browser can read where it cannot read a refused handshake. After
+        `exit` or `error` the server closes with `1000`; it closes with `4001` after 15 minutes without
+        a byte either way. A handshake
         from another origin is refused with `403`.
       operationId: exec
       parameters:
@@ -3749,8 +3739,8 @@ paths:
       - pods
       summary: A terminal in a tools pod of the person's, over a WebSocket.
       description: |-
-        The same protocol as `…/pods/{pod}/exec` (`ClientFrame`, `ServerFrame`, close codes `4000`
-        and `4001`). Before the shell starts, Zeabur writes the person's current credential into the
+        The same protocol as `…/pods/{pod}/exec` (`ClientFrame`, `ServerFrame`, close code `4001`).
+        Before the shell starts, Zeabur writes the person's current credential into the
         pod (see the module documentation); `ready` names the container `tools`. Failures arrive as an
         `error` frame: a pod that is not the person's (`404`), one not running yet (`409`), local mode
         (`400`), or `create` on `pods/exec` in the project refused (`403`). The pod is deleted a minute
@@ -3874,7 +3864,7 @@ paths:
     get:
       tags:
       - identity
-      summary: "How you are signed in to Zeabur: whether you can sign out, and admin rights in use."
+      summary: "How you are signed in to Zeabur: whether you can sign out."
       operationId: getSession
       responses:
         "200":
@@ -4044,6 +4034,54 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/Problem"
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  /api/v1/settings/sign-in:
+    get:
+      tags:
+      - settings
+      summary: How admin accounts sign in, and whether you may change it.
+      operationId: getSignInSetting
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SignInSetting"
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+    put:
+      tags:
+      - settings
+      summary: |-
+        Changes how admin accounts sign in, by writing Zeabur Identity's settings ConfigMap as you
+        (created the first time). Who may: whoever may update (and create) the ConfigMap
+        `zeabur-identity-settings` in Zeabur Identity's namespace. Turning on `adminAal3` is refused
+        unless you are an admin account with a device-bound passkey.
+      operationId: setSignInSetting
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SignInChange"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SignInSetting"
         "403":
           content:
             application/problem+json:
@@ -8101,13 +8139,6 @@ components:
           items:
             $ref: "#/components/schemas/UnreadableView"
           description: What could not be read.
-    ElevationState:
-      type: string
-      description: Whether administrator rights are offered and in use.
-      enum:
-      - unavailable
-      - available
-      - active
     Encoding:
       type: string
       description: The encoding of a generated value.
@@ -10034,7 +10065,6 @@ components:
       - unauthenticated
       - signed-out
       - forbidden
-      - elevation-required
       - quota-exceeded
       - policy-denied
       - not-found
@@ -10387,7 +10417,7 @@ components:
         properties:
           admin:
             type: boolean
-            description: Whether a new member may take on admin rights.
+            description: Whether a new member is an admin account.
           displayName:
             type:
             - string
@@ -10407,8 +10437,8 @@ components:
             description: "Login name: lower-case letters, digits, `-` and `.`, at most 63 characters."
       - type: object
         description: |-
-          Change what a member may do: admin rights, or roles in chosen projects (a project left out
-          loses theirs). Nobody takes their own admin rights away.
+          Change what a member may do: an admin account, or roles in chosen projects (a project left
+          out loses theirs). Nobody makes their own account a regular one.
         required:
         - username
         - admin
@@ -10416,7 +10446,7 @@ components:
         properties:
           admin:
             type: boolean
-            description: May take on admin rights, which cover every project.
+            description: An admin account, with full rights in every project.
           op:
             type: string
             enum:
@@ -12590,16 +12620,10 @@ components:
         - pod
         - image
         - person
-        - admin
         - deadlineSeconds
         - graceSeconds
         - code
         properties:
-          admin:
-            type: boolean
-            description: >-
-              Whether they act with the administrator's credential, which the person holds
-              now.
           code:
             type: string
             enum:
@@ -15871,24 +15895,7 @@ components:
       description: How the person is signed in to Zeabur.
       required:
       - signsIn
-      - elevation
       properties:
-        elevatedUntil:
-          type:
-          - string
-          - "null"
-          description: When the administrator rights end, RFC 3339, while they are in use.
-        elevation:
-          $ref: "#/components/schemas/ElevationState"
-          description: Whether administrator rights are offered and in use.
-        expiresAt:
-          type:
-          - string
-          - "null"
-          description: |-
-            When the credential in use expires, RFC 3339: the everyday one, which Zeabur renews
-            before then while the session lasts, or while admin rights are in use theirs, which is
-            `elevatedUntil` and is not renewed.
         signsIn:
           type: boolean
           description: |-
@@ -16057,6 +16064,60 @@ components:
       - create
       - patch
       - delete
+    SignInChange:
+      type: object
+      description: A change of how admin accounts sign in. A field left out stays as it is.
+      properties:
+        adminAal3:
+          type:
+          - boolean
+          - "null"
+          description: Admin accounts sign in only with a device-bound passkey.
+        teams:
+          oneOf:
+          - $ref: "#/components/schemas/Teams"
+            description: How many teams share the cluster.
+          - type: "null"
+      additionalProperties: false
+    SignInSetting:
+      type: object
+      description: How admin accounts sign in.
+      required:
+      - id
+      - teams
+      - adminAal3
+      - storedIn
+      - canChange
+      - deviceBoundPasskey
+      - unreadable
+      properties:
+        adminAal3:
+          type: boolean
+          description: Admin accounts sign in only with a device-bound passkey.
+        canChange:
+          $ref: "#/components/schemas/Permission"
+          description: >-
+            Whether the person may change them, as far as their RBAC rules in that
+            namespace tell.
+        deviceBoundPasskey:
+          type: boolean
+          description: |-
+            Whether the person is an admin account with a device-bound passkey, which turning on
+            `adminAal3` needs.
+        id:
+          type: string
+          description: "`settings/sign-in`."
+        storedIn:
+          $ref: "#/components/schemas/Origin"
+          description: The ConfigMap the settings are kept in.
+        teams:
+          $ref: "#/components/schemas/Teams"
+          description: How many teams share the cluster.
+        unreadable:
+          type: array
+          items:
+            $ref: "#/components/schemas/UnreadableView"
+          description: The ConfigMap, when it could not be read.
     SourceKind:
       type: string
       description: |-
@@ -16365,6 +16426,12 @@ components:
           - string
           - "null"
           description: "The IANA time zone of the expression (`spec.timeZone`); absent: the controller's."
+    Teams:
+      type: string
+      description: How many teams share the cluster.
+      enum:
+      - single
+      - multiple
     TemplateChange:
       type: object
       description: A [`Change::Template`].

@@ -22,9 +22,6 @@ const references: Partial<Record<Schemas["Kind"], { title: string; href: string 
   forbidden: [
     { title: "Using RBAC Authorization", href: `${docs}/reference/access-authn-authz/rbac/` },
   ],
-  "elevation-required": [
-    { title: "Using RBAC Authorization", href: `${docs}/reference/access-authn-authz/rbac/` },
-  ],
   "quota-exceeded": [
     { title: "Resource Quotas", href: `${docs}/concepts/policy/resource-quotas/` },
   ],

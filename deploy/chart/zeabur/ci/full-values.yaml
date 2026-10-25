@@ -18,8 +18,6 @@ extraTrustedCA:
 domains:
   suffixes: [apps.example.test, example.test]
   clusterIssuer: letsencrypt
-elevation:
-  enabled: false
 terminal:
   debugImage: registry.example.test/busybox:1.37.0
   toolsImage: registry.example.test/k8s:1.36.5

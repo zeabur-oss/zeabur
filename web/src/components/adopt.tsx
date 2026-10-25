@@ -5,7 +5,6 @@ import XIcon from "~icons/ph/x"
 import { namespaceQuery, queryClient } from "@/api/queries"
 import { NamespaceAccess } from "@/components/namespace-access"
 import { usePlanner } from "@/components/plan/planner"
-import { permission, RefusedHint } from "@/components/refused"
 import { Button } from "@zeabur/design-system/components/button"
 import {
   Dialog,
@@ -15,7 +14,7 @@ import {
 } from "@zeabur/design-system/components/dialog"
 import { Menu, MenuContent, MenuItem, MenuTrigger } from "@zeabur/design-system/components/menu"
 import { useT } from "@/i18n"
-import { MANAGE_VERB, mayAdopt } from "@/model/project"
+import { mayAdopt } from "@/model/project"
 
 /** Whether the person may adopt it or let it go, and whether the policy guards its labels. */
 async function adoptHint(namespace: string): Promise<{ allowed: boolean; guarded: boolean }> {
@@ -58,11 +57,6 @@ function useAdopt(namespace: string, adopted: boolean) {
           manage={help.guarded}
           guarded={help.guarded}
           onClose={() => setHelp(undefined)}
-          what={adopted ? t("refused.unadopt", namespace) : t("refused.adopt", namespace)}
-          retry={() => {
-            setHelp(undefined)
-            void start()
-          }}
         />
       ) : null}
     </>
@@ -127,16 +121,12 @@ export function AccessDialog({
   manage,
   guarded,
   onClose,
-  what,
-  retry,
 }: {
   namespace: string
   adopted: boolean
   manage: boolean
   guarded: boolean
   onClose: () => void
-  what: string
-  retry?: () => void
 }) {
   const t = useT()
   return (
@@ -153,16 +143,6 @@ export function AccessDialog({
           </DialogClose>
         </div>
         <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-5 py-4">
-          <RefusedHint
-            hint="denied"
-            what={what}
-            missing={
-              manage
-                ? [permission("patch", "namespaces"), permission(MANAGE_VERB, "namespaces")]
-                : [permission("patch", "namespaces")]
-            }
-            retry={retry}
-          />
           <NamespaceAccess
             namespace={namespace}
             adopted={adopted}

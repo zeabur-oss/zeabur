@@ -28,16 +28,15 @@
 //! # The credential
 //!
 //! The pod's spec holds no credential. Each time a terminal opens, Zeabur writes a kubeconfig
-//! with the person's current token (the administrator's while they hold it) into the pod's
+//! with the person's current token into the pod's
 //! memory-backed `~/.kube`, through standard input of a command run in it with `pods/exec`
 //! (`Cluster::run`), so it never appears in an object, an environment variable, a command line
 //! or a log. It names kube-apiserver's in-cluster address, the CA from the pod's
 //! `kube-root-ca.crt`, and the project as the namespace (`default` in a cluster tools pod). The
 //! token is the one the session uses (minutes long; see `zeabur_auth`), and kube-apiserver accepts
-//! it until it expires: Zeabur cannot revoke it. The terminal closes when it expires, as every
-//! terminal does (`4000`); the next one writes a fresh token. `kubectl` and `helm` in the pod are
-//! wrappers that refuse to run once the token has expired, with a message saying to reopen the
-//! terminal.
+//! it until it expires: Zeabur cannot revoke it. The next terminal writes a fresh token.
+//! `kubectl` and `helm` in the pod are wrappers that refuse to run once the token has expired, with
+//! a message saying to reopen the terminal.
 //!
 //! # Lifetime
 //!
@@ -72,8 +71,8 @@ use zeabur_kube::k8s_openapi::jiff::Timestamp;
 use zeabur_kube::{Cluster, ExecRequest, ExitStatus, WriteRequest};
 use zeabur_plan::terminal::{self as plans, TOOLS_CONTAINER, TOOLS_PROJECT_ANNOTATION, ToolsScope};
 
-use crate::access::{Elevation, Handoff};
-use crate::error::{ApiError, offer_elevation, read_problem, review_refusal};
+use crate::access::Handoff;
+use crate::error::{ApiError, read_problem, review_refusal};
 use crate::handlers::{AppState, Person};
 use crate::pods::exec::{self, ServerFrame, Terminal};
 use crate::projects::writes::terminal::{list_pods, local_mode, read_pod};
@@ -625,16 +624,11 @@ fn greeting(
     stops_at: Option<Timestamp>,
     grace_seconds: u64,
 ) -> String {
-    let rights = if handoff.admin {
-        " with admin rights"
-    } else {
-        ""
-    };
     let stops = stops_at.map_or_else(String::new, |t| format!(", and stops at {t} in any case"));
     format!(
-        "kubectl and helm here act as {person}{rights}, {place}.\n\
-         Your credential expires at {expires}; the terminal then closes, and reopening it \
-         brings a fresh one.\n\
+        "kubectl and helm here act as {person}, {place}.\n\
+         Your credential expires at {expires}; kubectl and helm then stop, and reopening the \
+         terminal brings a fresh one.\n\
          This pod is deleted {grace_seconds} seconds after its last terminal closes{stops}.\n",
         expires = handoff.expires_at,
     )
@@ -757,8 +751,8 @@ fn after_close(
 
 /// A terminal in a tools pod of the person's, over a WebSocket.
 ///
-/// The same protocol as `…/pods/{pod}/exec` (`ClientFrame`, `ServerFrame`, close codes `4000`
-/// and `4001`). Before the shell starts, Zeabur writes the person's current credential into the
+/// The same protocol as `…/pods/{pod}/exec` (`ClientFrame`, `ServerFrame`, close code `4001`).
+/// Before the shell starts, Zeabur writes the person's current credential into the
 /// pod (see the module documentation); `ready` names the container `tools`. Failures arrive as an
 /// `error` frame: a pod that is not the person's (`404`), one not running yet (`409`), local mode
 /// (`400`), or `create` on `pods/exec` in the project refused (`403`). The pod is deleted a minute
@@ -809,7 +803,7 @@ async fn run(
                 container: TOOLS_CONTAINER.to_owned(),
             };
             if exec::send_frame(&mut socket, &ready).await {
-                exec::relay(socket, session, terminal.expires_in, terminal.idle).await;
+                exec::relay(socket, session, terminal.idle).await;
             }
             if let (Some(closing), Some(zeabur)) =
                 (state.tools.closed(&key, (state.clock)()), zeabur)
@@ -826,10 +820,7 @@ async fn run(
         }
         Err(problem) => {
             let _last = state.tools.closed(&key, (state.clock)());
-            let elevation: Elevation = terminal.elevation;
-            let frame = ServerFrame::Error {
-                problem: Box::new(offer_elevation(*problem.0, elevation)),
-            };
+            let frame = ServerFrame::Error { problem: problem.0 };
             if exec::send_frame(&mut socket, &frame).await {
                 exec::close(&mut socket, 1000, "").await;
             }
@@ -890,7 +881,6 @@ mod tests {
         let handoff = Handoff {
             token: zeabur_kube::UserToken::new("t0ken".into()).unwrap(),
             expires_at: Timestamp::UNIX_EPOCH,
-            admin: false,
         };
         let config: Value = serde_json::from_slice(&kubeconfig(&handoff, "alice", "shop")).unwrap();
         assert_eq!(

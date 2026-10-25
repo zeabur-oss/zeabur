@@ -2,12 +2,19 @@
 import createClient from "openapi-fetch"
 
 import type { components, paths } from "@/api/schema"
-import { goToSignIn, REQUEST_HEADERS } from "@/auth/session"
+import { BACKGROUND_HEADER, backgroundNow, goToSignIn, REQUEST_HEADERS } from "@/auth/session"
 
 export type Schemas = components["schemas"]
 export type Problem = Schemas["Problem"]
 
 export const api = createClient<paths>({ credentials: "same-origin", headers: REQUEST_HEADERS })
+
+api.use({
+  onRequest: ({ request }) => {
+    if (backgroundNow(request.method)) request.headers.set(BACKGROUND_HEADER, "1")
+    return request
+  },
+})
 
 /** Carries the server's problem (RFC 9457). */
 export class ApiError extends Error {

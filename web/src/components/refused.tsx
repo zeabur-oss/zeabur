@@ -1,12 +1,8 @@
-import { useQuery } from "@tanstack/react-query"
 import type { ReactNode } from "react"
 import CaretRightIcon from "~icons/ph/caret-right"
 import LockSimpleIcon from "~icons/ph/lock-simple"
 
 import type { Problem, Schemas } from "@/api/client"
-import { sessionQuery } from "@/api/queries"
-import { retryAsAdmin } from "@/auth/elevation"
-import { Button } from "@zeabur/design-system/components/button"
 import {
   Collapsible,
   CollapsibleContent,
@@ -24,95 +20,31 @@ type Unreadable = Schemas["UnreadableView"]
 
 export { isRefusal }
 
-/** An answer read before the session's state was known is kube-apiserver's `forbidden` (it
- * carries `kubernetes`), not `elevation-required`. */
-export function offersElevation(
-  refusal: Refusal,
-  elevation: Schemas["ElevationState"] | undefined,
-): boolean {
-  if (typeof refusal !== "string" && refusal.kind === "elevation-required")
-    return elevation !== "active"
-  if (elevation !== "available") return false
-  return (
-    typeof refusal === "string" || (refusal.kind === "forbidden" && Boolean(refusal.kubernetes))
-  )
-}
-
-function useOffersElevation(refusal: Refusal): boolean {
-  const session = useQuery(sessionQuery).data
-  return offersElevation(refusal, session?.elevation)
-}
-
-/** The server checks hints with everyday rights, so `denied` is not final while admin rights are
- * offered. */
-export function hintOffersElevation(
-  hint: Schemas["Permission"] | undefined,
-  elevation: Schemas["ElevationState"] | undefined,
-): boolean {
-  return hint === "denied" && offersElevation("hint", elevation)
-}
-
-export function useHintOffersElevation(hint: Schemas["Permission"] | undefined): boolean {
-  const session = useQuery(sessionQuery).data
-  return hintOffersElevation(hint, session?.elevation)
-}
-
-/** Granted rights re-read every query (auth/follow-elevation.ts); `retry` runs what that does not. */
-export function RefusedHint({
-  hint,
-  what,
-  missing,
-  read,
-  retry,
-}: {
-  hint: Schemas["Permission"] | undefined
-  what: string
-  missing?: string[]
-  read?: boolean
-  retry?: () => void
-}) {
-  const offered = useHintOffersElevation(hint)
-  if (!offered) return null
-  return (
-    <Refused
-      refusal={read ? "unreadable" : "hint"}
-      what={what}
-      missing={missing}
-      retry={retry}
-      line
-    />
-  )
-}
-
 export function permission(verb: string, resource: string, group = ""): string {
   return `${verb} ${group ? `${resource}.${group}` : resource}`
 }
 
 /** The catalogue's `fix` is what the line already says; only one written for the occasion is added. */
 function serverSentences(problem: Problem): string[] {
-  const own = problem.kind === "forbidden" || problem.kind === "elevation-required"
-  const fix = own && problem.fix !== en[`problem.fix.${problem.kind}`] ? [problem.fix] : []
+  const fix =
+    problem.kind === "forbidden" && problem.fix !== en["problem.fix.forbidden"] ? [problem.fix] : []
   return [problem.detail, ...fix].filter(Boolean)
 }
 
-/** `retry` re-runs what refetching the page does not (a POST, a reconnect). */
 export function Refused({
   refusal,
   what,
-  retry,
   missing,
   line,
   children,
 }: {
   refusal: Refusal
   what?: string
-  retry?: () => void
   missing?: string[]
   line?: boolean
   children?: ReactNode
 }) {
   const t = useT()
-  const offered = useOffersElevation(refusal)
   const problem = typeof refusal === "string" ? undefined : refusal
   const rules =
     missing ??
@@ -122,13 +54,7 @@ export function Refused({
   const sentences = problem ? serverSentences(problem) : []
   const status = problem?.kubernetes ?? undefined
   const details = rules.length > 0 || sentences.length > 0 || status || children
-  const sentence = offered
-    ? what
-      ? t("refused.adminFor", what)
-      : t("refused.admin")
-    : what
-      ? t("refused.rightsFor", what)
-      : t("refused.rights")
+  const sentence = what ? t("refused.rightsFor", what) : t("refused.rights")
   return (
     <div
       data-refused=""
@@ -139,8 +65,7 @@ export function Refused({
           <p className="flex min-w-0 items-start gap-2 text-muted-foreground">
             <LockSimpleIcon aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
             <span>
-              {sentence}
-              {offered ? null : ` ${t("refused.ask")}`}
+              {sentence} {t("refused.ask")}
             </span>
           </p>
           {details ? (
@@ -148,20 +73,6 @@ export function Refused({
               <CaretRightIcon aria-hidden="true" />
               {t("refused.details")}
             </CollapsibleTrigger>
-          ) : null}
-          {offered ? (
-            <Button
-              variant="outline"
-              size="sm"
-              className="ml-auto"
-              onClick={() => void retryAsAdmin(retry)}
-            >
-              {refusal === "hint"
-                ? t("elevate.use")
-                : retry
-                  ? t("elevate.retry")
-                  : t("refused.view")}
-            </Button>
           ) : null}
         </div>
         {details ? (

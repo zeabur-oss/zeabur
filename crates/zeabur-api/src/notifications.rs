@@ -39,7 +39,7 @@ use zeabur_modules::alertmanager::{
 };
 
 use crate::error::{ApiError, get_read, list_read, read_problem};
-use crate::handlers::{AppState, Everyday, Person};
+use crate::handlers::{AppState, Person};
 use crate::plan_token::{self as token, LIFETIME_SECONDS, TokenError};
 use crate::projects::backups::ProviderState;
 use crate::projects::namespace::Permission;
@@ -769,13 +769,12 @@ fn plan_key(state: &AppState) -> Result<std::sync::Arc<token::PlanKey>, ApiError
 async fn plan_in(
     state: &AppState,
     cluster: &dyn Cluster,
-    everyday: &dyn Cluster,
     namespace: &str,
     scope: Scope,
     request: NotificationsPlanRequest,
 ) -> Result<NotificationsPlan, ApiError> {
     let sealing = plan_key(state)?;
-    let identity = everyday
+    let identity = cluster
         .whoami()
         .await
         .map_err(|e| ApiError::from(e.into_problem("your identity")))?;
@@ -853,7 +852,6 @@ async fn send(cluster: &dyn Cluster, write: &Planned, dry_run: bool) -> Result<(
 async fn apply_in(
     state: &AppState,
     cluster: &dyn Cluster,
-    everyday: &dyn Cluster,
     namespace: &str,
     scope: Scope,
     token: &str,
@@ -869,7 +867,7 @@ async fn apply_in(
             "This plan was made for another project.",
         )));
     }
-    let identity = everyday
+    let identity = cluster
         .whoami()
         .await
         .map_err(|e| ApiError::from(e.into_problem("your identity")))?;
@@ -922,20 +920,12 @@ async fn apply_in(
 pub(crate) async fn project_plan(
     State(state): State<AppState>,
     Person(cluster): Person,
-    Everyday(everyday): Everyday,
     Path(project): Path<String>,
     Json(request): Json<NotificationsPlanRequest>,
 ) -> Result<Json<NotificationsPlan>, ApiError> {
-    plan_in(
-        &state,
-        cluster.as_ref(),
-        everyday.as_ref(),
-        &project,
-        Scope::Project,
-        request,
-    )
-    .await
-    .map(Json)
+    plan_in(&state, cluster.as_ref(), &project, Scope::Project, request)
+        .await
+        .map(Json)
 }
 
 /// Carries out a project's notifications plan by its token: checks it, dry-runs every write,
@@ -951,14 +941,12 @@ pub(crate) async fn project_plan(
 pub(crate) async fn project_apply(
     State(state): State<AppState>,
     Person(cluster): Person,
-    Everyday(everyday): Everyday,
     Path(project): Path<String>,
     Json(request): Json<NotificationsApply>,
 ) -> Result<Json<NotificationsApplied>, ApiError> {
     apply_in(
         &state,
         cluster.as_ref(),
-        everyday.as_ref(),
         &project,
         Scope::Project,
         &request.token,
@@ -979,13 +967,11 @@ pub(crate) async fn project_apply(
 pub(crate) async fn cluster_plan(
     State(state): State<AppState>,
     Person(cluster): Person,
-    Everyday(everyday): Everyday,
     Json(request): Json<NotificationsPlanRequest>,
 ) -> Result<Json<NotificationsPlan>, ApiError> {
     plan_in(
         &state,
         cluster.as_ref(),
-        everyday.as_ref(),
         am::CLUSTER_NAMESPACE,
         Scope::Cluster,
         request,
@@ -1005,13 +991,11 @@ pub(crate) async fn cluster_plan(
 pub(crate) async fn cluster_apply(
     State(state): State<AppState>,
     Person(cluster): Person,
-    Everyday(everyday): Everyday,
     Json(request): Json<NotificationsApply>,
 ) -> Result<Json<NotificationsApplied>, ApiError> {
     apply_in(
         &state,
         cluster.as_ref(),
-        everyday.as_ref(),
         am::CLUSTER_NAMESPACE,
         Scope::Cluster,
         &request.token,

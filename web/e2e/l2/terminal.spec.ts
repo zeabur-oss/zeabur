@@ -1,15 +1,14 @@
 import type { Page } from "@playwright/test"
 
 import { expect, test } from "../fixtures.ts"
-import { invite, member, planAndApply, signInAsAdmin } from "./members.ts"
+import { invite, member, planAndApply, signInAdmin } from "./members.ts"
 
 // kubectl terminals: every tools pod runs in zeabur-terminals, where members have no rights. A
 // Developer opens their project's terminal and cannot see, list, delete or open an admin's tools
 // pod; the admin's terminal for the same project works. scripts/e2e-l2-browser.sh sets, besides
 // ZEABUR_L2_URL:
 //
-//   ZEABUR_L2_TERMINAL_ADMIN_LINK  an invitation for `e2e-terminal-admin`, in the groups admins and
-//                                  elevated admins
+//   ZEABUR_L2_TERMINAL_ADMIN_LINK  an invitation for the admin account `e2e-terminal-admin`
 //   ZEABUR_L2_NAMESPACE            the Developer's project
 const env = (name: string) => process.env[name] ?? ""
 const adminLink = env("ZEABUR_L2_TERMINAL_ADMIN_LINK")
@@ -86,7 +85,7 @@ test("a Developer's kubectl terminal is theirs alone, and an admin's works besid
   let adminPod = ""
 
   await test.step("the admin opens a kubectl terminal for the project", async () => {
-    await signInAsAdmin(page, adminLink)
+    await signInAdmin(page, adminLink)
     adminPod = await startTools(page)
     const { first, shown } = await terminal(
       page,

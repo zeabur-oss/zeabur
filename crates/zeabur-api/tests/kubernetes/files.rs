@@ -1,6 +1,6 @@
 //! The file manager on a real cluster, as the person: a claim's folder is listed and a file comes
 //! back byte for byte, odd names stay whole and run nothing, a Secret's files are named but never
-//! read, a refused `pods/exec` becomes `elevation-required`, and an image without `tar` (the pause
+//! read, a refused `pods/exec` names the right it needs, and an image without `tar` (the pause
 //! image) has its volume read through a debug container that mounts it.
 
 use std::sync::Arc;
@@ -8,15 +8,12 @@ use std::time::Duration;
 
 use axum::Router;
 use axum::body::Body;
-use axum::http::request::Parts;
 use axum::http::{Request, StatusCode};
 use http_body_util::BodyExt as _;
 use kube::api::Api;
 use serde_json::{Value, json};
 use tower::ServiceExt as _;
-use zeabur_api::access::{Access, ClusterAccess, Elevation};
-use zeabur_core::problem::Problem;
-use zeabur_kube::Cluster;
+use zeabur_api::access::SingleCluster;
 use zeabur_kube::k8s_openapi::api::core::v1::{PersistentVolumeClaim, Pod, Secret};
 use zeabur_test_support::sandbox::{Sandbox, create};
 
@@ -27,26 +24,8 @@ const WAIT: Duration = Duration::from_secs(180);
 
 const SECRET_VALUE: &str = "s3cr3t-file-that-must-not-leak";
 
-/// The person, with admin rights offered (`elevation`) or not.
-struct Person {
-    cluster: Arc<dyn Cluster>,
-    elevation: Elevation,
-}
-
-impl ClusterAccess for Person {
-    fn for_request(&self, _parts: &Parts) -> Result<Access, Box<Problem>> {
-        Ok(Access {
-            cluster: Arc::clone(&self.cluster),
-            elevation: self.elevation,
-        })
-    }
-}
-
-fn app(sandbox: &Sandbox, elevation: Elevation) -> Router {
-    zeabur_api::router(Arc::new(Person {
-        cluster: Arc::new(sandbox.user().clone()),
-        elevation,
-    }))
+fn app(sandbox: &Sandbox) -> Router {
+    zeabur_api::router(Arc::new(SingleCluster(Arc::new(sandbox.user().clone()))))
 }
 
 fn rules(exec: bool) -> Value {
@@ -185,7 +164,7 @@ async fn a_claims_files_are_listed_and_come_back_byte_for_byte() {
                "volumeMounts": [{"name": "db", "mountPath": "/run/secrets/db"}]}),
     )
     .await;
-    let app = app(&sandbox, Elevation::Unavailable);
+    let app = app(&sandbox);
     let base = format!("/api/v1/projects/{ns}/pods/store/files");
 
     let (status, files) = send(&app, "GET", &base, None).await;
@@ -344,7 +323,7 @@ async fn secret_files_are_never_read(app: &Router, base: &str) {
 
 #[tokio::test]
 #[ignore = "needs a disposable cluster"]
-async fn a_refused_exec_becomes_elevation_required() {
+async fn a_refused_exec_names_the_right() {
     let sandbox = Sandbox::new("zeabur-files-refused", rules(false)).await;
     let ns = sandbox.namespace().to_owned();
     pod(
@@ -357,17 +336,10 @@ async fn a_refused_exec_becomes_elevation_required() {
     .await;
     let base = format!("/api/v1/projects/{ns}/pods/store/files");
     let uri = format!("{base}/entries?{}", query(&[("path", "/data")]));
-    let (status, problem) = send(&app(&sandbox, Elevation::Unavailable), "GET", &uri, None).await;
+    let (status, problem) = send(&app(&sandbox), "GET", &uri, None).await;
     assert_eq!(status, StatusCode::FORBIDDEN, "{problem}");
     assert_eq!(problem["kind"], "forbidden");
     assert_eq!(problem["denied"]["resource"], "pods/exec");
-    let elevating = app(&sandbox, Elevation::Available);
-    for uri in [base.clone(), uri] {
-        let (status, problem) = send(&elevating, "GET", &uri, None).await;
-        assert_eq!(status, StatusCode::FORBIDDEN, "{problem}");
-        assert_eq!(problem["kind"], "elevation-required", "{uri}");
-        assert_eq!(problem["denied"]["verb"], "get");
-    }
 }
 
 /// The pause image has no `tar`, `find` or shell: the claim is read through a debug container
@@ -385,7 +357,7 @@ async fn an_image_without_tar_has_its_volume_read_through_a_debug_container() {
         json!({}),
     )
     .await;
-    let app = app(&sandbox, Elevation::Unavailable);
+    let app = app(&sandbox);
     let base = format!("/api/v1/projects/{ns}/pods/paused/files");
 
     let (status, files) = send(&app, "GET", &base, None).await;

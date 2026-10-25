@@ -19,7 +19,7 @@ mod tests {
     use tokio_tungstenite::tungstenite::Message;
     use tokio_tungstenite::tungstenite::client::IntoClientRequest as _;
     use zeabur_api::Settings;
-    use zeabur_api::access::{Access, ClusterAccess, Elevation, Handoff, SingleCluster};
+    use zeabur_api::access::{ClusterAccess, Handoff, SingleCluster};
     use zeabur_core::problem::Problem;
     use zeabur_kube::k8s_openapi::api::core::v1::{Namespace, Pod};
     use zeabur_kube::k8s_openapi::jiff::{SignedDuration, Timestamp};
@@ -100,26 +100,17 @@ mod tests {
     /// to a tools pod.
     struct Signed {
         cluster: Arc<dyn Cluster>,
-        admin: bool,
     }
 
     impl ClusterAccess for Signed {
-        fn for_request(&self, _parts: &Parts) -> Result<Access, Box<Problem>> {
-            Ok(Access {
-                cluster: Arc::clone(&self.cluster),
-                elevation: Elevation::Unavailable,
-            })
-        }
-
-        fn credential_expiry(&self, _parts: &Parts) -> Option<Timestamp> {
-            Some(Timestamp::now() + SignedDuration::from_mins(10))
+        fn for_request(&self, _parts: &Parts) -> Result<Arc<dyn Cluster>, Box<Problem>> {
+            Ok(Arc::clone(&self.cluster))
         }
 
         fn handoff(&self, _parts: &Parts) -> Option<Handoff> {
             Some(Handoff {
                 token: zeabur_kube::UserToken::new(SecretString::from(TOKEN)).unwrap(),
                 expires_at: Timestamp::now() + SignedDuration::from_mins(10),
-                admin: self.admin,
             })
         }
     }
@@ -137,11 +128,10 @@ mod tests {
         )
     }
 
-    fn signed(cluster: &MemoryCluster, zeabur: &MemoryCluster, admin: bool) -> Router {
+    fn signed(cluster: &MemoryCluster, zeabur: &MemoryCluster) -> Router {
         zeabur_api::router_with_terminals(
             Arc::new(Signed {
                 cluster: Arc::new(cluster.clone()),
-                admin,
             }),
             settings(),
             Arc::new(zeabur.clone()),
@@ -370,7 +360,7 @@ mod tests {
     async fn the_token_reaches_the_tools_pod_only_through_standard_input() {
         let cluster = cluster();
         let zeabur = zeabur();
-        let app = signed(&cluster, &zeabur, false);
+        let app = signed(&cluster, &zeabur);
         let (status, planned) = plan(&app, json!({"op": "clusterTools"})).await;
         assert_eq!(status, StatusCode::OK, "{planned}");
         assert!(!planned.to_string().contains("secret-token"));
@@ -378,7 +368,6 @@ mod tests {
         assert_eq!(tools["code"], "toolsPod");
         assert_eq!(tools["namespace"], TERMINALS);
         assert_eq!(tools["person"], "alice@example.com");
-        assert_eq!(tools["admin"], false);
         assert_eq!(tools["deadlineSeconds"], 1800);
         assert!(tools["credentialExpiresAt"].is_string());
         let name = tools["pod"].as_str().unwrap().to_owned();
@@ -460,27 +449,13 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn an_administrators_project_terminal_works_the_same_way() {
-        let cluster = cluster();
-        let zeabur = zeabur();
-        let app = signed(&cluster, &zeabur, true);
-        let (status, planned) = plan(&app, json!({"op": "clusterTools"})).await;
-        assert_eq!(status, StatusCode::OK, "{planned}");
-        assert_eq!(planned["warnings"][0]["admin"], true);
-        let (status, applied) = apply(&app, &planned).await;
-        assert_eq!(status, StatusCode::OK, "{applied}");
-        let name = planned["warnings"][0]["pod"].as_str().unwrap();
-        assert!(stored_pod(&zeabur, TERMINALS, name).is_some());
-    }
-
-    #[tokio::test]
     async fn without_the_right_to_run_commands_in_the_project_there_is_no_tools_pod() {
         let cluster = cluster();
         cluster.update(|s| {
             s.refused_rights.insert("create pods/exec".to_owned());
         });
         let zeabur = zeabur();
-        let app = signed(&cluster, &zeabur, false);
+        let app = signed(&cluster, &zeabur);
         let (status, refused) = plan(&app, json!({"op": "clusterTools"})).await;
         assert_eq!(status, StatusCode::FORBIDDEN, "{refused}");
         assert_eq!(refused["denied"]["resource"], "pods/exec", "{refused}");
@@ -527,7 +502,7 @@ mod tests {
                 .forbidden_writes
                 .insert("Pod/zeabur-tools-kept".to_owned());
         });
-        let app = signed(&cluster, &zeabur, false);
+        let app = signed(&cluster, &zeabur);
         let (_, listed) = send(&app, "GET", "/api/v1/projects/shop/tools", None).await;
         assert_eq!(listed["namespace"], TERMINALS);
         assert_eq!(listed["deleted"], json!(["zeabur-tools-old"]));

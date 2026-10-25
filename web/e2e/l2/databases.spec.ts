@@ -1,14 +1,14 @@
 import type { Page } from "@playwright/test"
 
 import { expect, test } from "../fixtures.ts"
-import { invite, member, planAndApply, signInAsAdmin, toast } from "./members.ts"
+import { invite, member, planAndApply, signInAdmin, toast } from "./members.ts"
 
 // Databases by role: a Developer creates a database, backs it up to S3 and backs it up now; a
 // Viewer of the same project sees it but cannot back it up or read its password.
 // scripts/e2e-l2-browser.sh sets, besides ZEABUR_L2_URL and ZEABUR_L2_NAMESPACE:
 //
-//   ZEABUR_L2_DB_ADMIN_LINK   an invitation for `e2e-db-admin`, in the groups admins and elevated
-//                             admins (links work once, so not the roles test's)
+//   ZEABUR_L2_DB_ADMIN_LINK   an invitation for `e2e-db-admin`, an admin account (`invite --admin`;
+//                             links work once, so not the roles test's)
 //   ZEABUR_L2_S3_ENDPOINT     an S3 endpoint the cluster reaches, with the bucket `backups` and
 //                             the keys below; set only when CloudNativePG runs in the cluster
 //   ZEABUR_L2_MONGODB         1 when the Percona Operator for MongoDB runs in the cluster too
@@ -116,7 +116,7 @@ test("a Developer creates and backs up databases; a Viewer only sees them", asyn
   let viewerLink = ""
 
   await test.step("the admin invites a Developer and a Viewer of the project", async () => {
-    await signInAsAdmin(page, adminLink)
+    await signInAdmin(page, adminLink)
     developerLink = await invite(page, "e2e-db-developer", [{ project, role: "developer" }])
     viewerLink = await invite(page, "e2e-db-viewer", [{ project, role: "viewer" }])
   })

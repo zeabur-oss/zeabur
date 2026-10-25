@@ -44,7 +44,7 @@ use zeabur_modules::velero::{self, cluster as v};
 use crate::cluster::restore_copy::{self, routes};
 use crate::cluster::{backup_download, s3_destinations};
 use crate::error::{ApiError, get_read, list_read, read_problem};
-use crate::handlers::{AppState, Everyday, Person};
+use crate::handlers::{AppState, Person};
 use crate::plan_token::{self as token, LIFETIME_SECONDS, TokenError};
 use crate::projects::backups::ProviderState;
 use crate::projects::namespace::Permission;
@@ -1350,11 +1350,10 @@ fn plan_key(state: &AppState) -> Result<std::sync::Arc<token::PlanKey>, ApiError
 pub(crate) async fn plan(
     State(state): State<AppState>,
     Person(cluster): Person,
-    Everyday(everyday): Everyday,
     Json(request): Json<BackupsPlanRequest>,
 ) -> Result<Json<BackupsPlan>, ApiError> {
     let sealing = plan_key(&state)?;
-    let identity = everyday
+    let identity = cluster
         .whoami()
         .await
         .map_err(|e| ApiError::from(e.into_problem("your identity")))?;
@@ -1531,7 +1530,6 @@ async fn send(cluster: &dyn Cluster, write: &Planned, dry_run: bool) -> Result<(
 pub(crate) async fn apply(
     State(state): State<AppState>,
     Person(cluster): Person,
-    Everyday(everyday): Everyday,
     Json(request): Json<BackupsApply>,
 ) -> Result<Json<BackupsApplied>, ApiError> {
     let sealing = plan_key(&state)?;
@@ -1539,7 +1537,7 @@ pub(crate) async fn apply(
     if (state.clock)().as_second() >= claims.expires_at {
         return Err(token_problem(TokenError::Expired));
     }
-    let identity = everyday
+    let identity = cluster
         .whoami()
         .await
         .map_err(|e| ApiError::from(e.into_problem("your identity")))?;

@@ -12,7 +12,7 @@ mod tests {
     use axum::http::request::Parts;
     use secrecy::{ExposeSecret as _, SecretString};
     use serde_json::json;
-    use zeabur_api::access::{Access, ClusterAccess, Elevation, Handoff, SingleCluster};
+    use zeabur_api::access::{ClusterAccess, Handoff, SingleCluster};
     use zeabur_api::services::logs::{LogProxy, ProxyAnswer};
     use zeabur_core::problem::Problem;
     use zeabur_kube::Cluster;
@@ -51,18 +51,14 @@ mod tests {
     struct Signed(Arc<dyn Cluster>);
 
     impl ClusterAccess for Signed {
-        fn for_request(&self, _parts: &Parts) -> Result<Access, Box<Problem>> {
-            Ok(Access {
-                cluster: Arc::clone(&self.0),
-                elevation: Elevation::Unavailable,
-            })
+        fn for_request(&self, _parts: &Parts) -> Result<Arc<dyn Cluster>, Box<Problem>> {
+            Ok(Arc::clone(&self.0))
         }
 
         fn handoff(&self, _parts: &Parts) -> Option<Handoff> {
             Some(Handoff {
                 token: zeabur_kube::UserToken::new(SecretString::from(TOKEN)).unwrap(),
                 expires_at: now() + SignedDuration::from_mins(10),
-                admin: false,
             })
         }
     }

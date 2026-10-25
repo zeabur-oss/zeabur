@@ -91,7 +91,7 @@ export function ObjectStoragePage() {
   if (query.error)
     return (
       <Column>
-        <Problem error={query.error} what={t("s3.title")} retry={() => void query.refetch()} />
+        <Problem error={query.error} what={t("s3.title")} />
       </Column>
     )
   if (!query.data) return null

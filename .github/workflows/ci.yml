@@ -135,7 +135,7 @@ jobs:
           ref: ${{ steps.zeabur-identity.outputs.rev }}
           path: .zeabur-identity
           persist-credentials: false
-      - name: End-to-end test (passkey sign-in, elevation, terminal, rights, memory, removal)
+      - name: End-to-end test (passkey sign-in, terminal, rights, memory, removal)
         env:
           ZEABUR_IDENTITY_SRC: ${{ github.workspace }}/.zeabur-identity
           K3S_IMAGE: rancher/k3s:${{ matrix.k3s }}

@@ -7,10 +7,8 @@
 //! first (a `SelfSubjectAccessReview`): the WebSocket handshake is a GET, which RBAC checks as
 //! `get` [k8s-verbs], and only from Kubernetes 1.31 does kube-apiserver also require `create`, as
 //! it always has for `kubectl exec` over SPDY [kep-4006]. Like every request, the terminal goes
-//! with the admin credential while the person holds one
-//! ([`ClusterAccess::for_request`](crate::access::ClusterAccess::for_request)); where admin rights
-//! are offered and not in use, the cluster's refusal arrives as an `error` frame with an
-//! `elevation-required` problem, so the interface can offer to retry as admin and reconnect.
+//! with the person's credential
+//! ([`ClusterAccess::for_request`](crate::access::ClusterAccess::for_request)).
 //! `command` may repeat, one argument each, as in the Kubernetes API; it
 //! defaults to `/bin/sh`. Images without a shell (distroless images [distroless]) end the session
 //! at once with `command-not-found`, which the interface explains; a `debugContainer` plan adds
@@ -31,16 +29,10 @@
 //! | to the browser | `{"type":"error","problem":{…}}` | the terminal could not be opened (a problem) |
 //!
 //! Unknown frames are ignored, so either side may add some. After `exit` or `error` the server
-//! closes with `1000`. It also closes on its own with:
-//!
-//! - **`4000` "session expired, reconnect"** when the credential the terminal uses expires
-//!   ([`ClusterAccess::credential_expiry`](crate::access::ClusterAccess::credential_expiry): the
-//!   admin credential's while it is in use). kube-apiserver authenticates a stream when it opens
-//!   and does not cut it when the token expires later, so a terminal opened a minute before expiry
-//!   would otherwise run on with a credential that is no longer valid.
-//! - **`4001` "idle, reconnect"** after [`IDLE`] without a byte either way. The kubelet has the
-//!   same kind of limit (`--streaming-connection-idle-timeout`, four hours by default [kubelet]); a
-//!   browser tab is left open more easily than a shell, so Zeabur's is shorter.
+//! closes with `1000`. It also closes on its own with **`4001` "idle, reconnect"** after [`IDLE`]
+//! without a byte either way. The kubelet has the same kind of limit
+//! (`--streaming-connection-idle-timeout`, four hours by default [kubelet]); a browser tab is left
+//! open more easily than a shell, so Zeabur's is shorter.
 //!
 //! Codes 4000–4999 are for private use [rfc6455] (§7.4.2).
 //!
@@ -102,8 +94,7 @@ use zeabur_kube::{
     Cluster, ClusterExt as _, ExecRequest, ExecSession, ExitStatus, ResourceRef, TerminalSize,
 };
 
-use crate::access::Elevation;
-use crate::error::{ApiError, get_read, offer_elevation, read_problem, review_refusal};
+use crate::error::{ApiError, get_read, read_problem, review_refusal};
 use crate::handlers::AppState;
 
 /// How long a terminal may stay without a byte either way before the server closes it.
@@ -122,8 +113,6 @@ const MAX_PENDING_INPUT: usize = 256 * 1024;
 /// How long the output may take to end after the process has exited.
 const DRAIN: Duration = Duration::from_secs(2);
 
-/// The close code when the person's credential expires.
-pub const CLOSE_EXPIRED: u16 = 4000;
 /// The close code after [`IDLE`].
 pub const CLOSE_IDLE: u16 = 4001;
 
@@ -247,12 +236,10 @@ fn same_origin(headers: &HeaderMap, public: Option<&str>) -> bool {
     origins.is_some_and(|origins| guard::websocket_allowed(&origins, headers))
 }
 
-/// The person opening a terminal: their cluster, when their credential expires and how long a
-/// terminal may idle. Refuses a handshake from another origin before anything else.
+/// The person opening a terminal: their cluster and how long a terminal may idle. Refuses a
+/// handshake from another origin before anything else.
 pub(crate) struct Terminal {
     pub(crate) cluster: Arc<dyn Cluster>,
-    pub(crate) elevation: Elevation,
-    pub(crate) expires_in: Option<Duration>,
     pub(crate) idle: Duration,
     /// The person's token, for a tools pod (see the `tools` module).
     pub(crate) handoff: Option<crate::access::Handoff>,
@@ -275,20 +262,10 @@ where
                 .access
                 .for_request(parts)
                 .map_err(ApiError)
-                .map(|access| {
-                    // The terminal ends when the credential it opened with does: the admin one's
-                    // while the person holds it.
-                    let expires_in = state.access.credential_expiry(parts).map(|expiry| {
-                        Duration::try_from(expiry.duration_since((state.clock)()))
-                            .unwrap_or(Duration::ZERO)
-                    });
-                    Self {
-                        cluster: access.cluster,
-                        elevation: access.elevation,
-                        expires_in,
-                        idle: state.terminal_idle,
-                        handoff: state.access.handoff(parts),
-                    }
+                .map(|cluster| Self {
+                    cluster,
+                    idle: state.terminal_idle,
+                    handoff: state.access.handoff(parts),
                 })
         } else {
             Err(ApiError::from(Problem::new(
@@ -305,11 +282,10 @@ where
 /// Binary messages carry terminal bytes both ways; text messages are JSON control frames,
 /// `ClientFrame` to the server and `ServerFrame` to the browser. The handshake answers `101
 /// Switching Protocols`; every later failure (`403` with `denied` naming `create` on
-/// `pods/exec`, `elevation-required` where admin rights are offered and not in use; a pod or
-/// container that does not exist, a container that is not running) arrives as an `error` frame,
-/// which a browser can read where it cannot read a refused handshake. After `exit` or `error` the
-/// server closes with `1000`; it closes with `4000` when the credential in use expires (the admin
-/// one's while it is in use) and `4001` after 15 minutes without a byte either way. A handshake
+/// `pods/exec`; a pod or container that does not exist, a container that is not running) arrives
+/// as an `error` frame, which a browser can read where it cannot read a refused handshake. After
+/// `exit` or `error` the server closes with `1000`; it closes with `4001` after 15 minutes without
+/// a byte either way. A handshake
 /// from another origin is refused with `403`.
 #[utoipa::path(get, path = "/api/v1/projects/{project}/pods/{pod}/exec", tag = "pods",
     params(("project" = String, Path), ("pod" = String, Path), ExecParams),
@@ -339,11 +315,7 @@ async fn run(
     let (container, session) = match opened {
         Ok(opened) => opened,
         Err(problem) => {
-            // After the upgrade, outside the API's own answer, so it offers elevation here.
-            let problem = offer_elevation(*problem.0, terminal.elevation);
-            let frame = ServerFrame::Error {
-                problem: Box::new(problem),
-            };
+            let frame = ServerFrame::Error { problem: problem.0 };
             if send_frame(&mut socket, &frame).await {
                 close(&mut socket, 1000, "").await;
             }
@@ -351,7 +323,7 @@ async fn run(
         }
     };
     if send_frame(&mut socket, &ServerFrame::Ready { container }).await {
-        relay(socket, session, terminal.expires_in, terminal.idle).await;
+        relay(socket, session, terminal.idle).await;
     }
 }
 
@@ -498,28 +470,16 @@ pub(crate) fn pick_container(
     Err(problem.into())
 }
 
-/// Copies bytes both ways until the process ends, the browser leaves, the credential expires or
-/// the terminal idles. Standard input is written as the process takes it, so a process that is
-/// busy writing output never blocks the reading of more input, nor the other way round.
-pub(crate) async fn relay(
-    mut socket: WebSocket,
-    session: ExecSession,
-    expires_in: Option<Duration>,
-    idle: Duration,
-) {
+/// Copies bytes both ways until the process ends, the browser leaves or the terminal idles.
+/// Standard input is written as the process takes it, so a process that is busy writing output
+/// never blocks the reading of more input, nor the other way round.
+pub(crate) async fn relay(mut socket: WebSocket, session: ExecSession, idle: Duration) {
     let ExecSession {
         mut input,
         mut output,
         mut resize,
         mut exit,
     } = session;
-    let expiry = async {
-        match expires_in {
-            Some(after) => tokio::time::sleep(after).await,
-            None => std::future::pending().await,
-        }
-    };
-    tokio::pin!(expiry);
     let idle_timer = tokio::time::sleep(idle);
     tokio::pin!(idle_timer);
     let mut pending = Vec::new();
@@ -559,10 +519,6 @@ pub(crate) async fn relay(
                 if send_frame(&mut socket, &ServerFrame::from(status)).await {
                     close(&mut socket, 1000, "").await;
                 }
-                return;
-            },
-            () = &mut expiry => {
-                close(&mut socket, CLOSE_EXPIRED, "session expired, reconnect").await;
                 return;
             },
             () = &mut idle_timer => {

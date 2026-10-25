@@ -9,20 +9,15 @@ mod tests {
     use std::sync::atomic::{AtomicI64, Ordering};
 
     use axum::Router;
-    use axum::body::Body;
-    use axum::http::request::Parts;
-    use axum::http::{Request, StatusCode};
-    use http_body_util::BodyExt as _;
+    use axum::http::StatusCode;
     use serde_json::{Value, json};
-    use tower::ServiceExt as _;
-    use zeabur_api::access::{Access, ClusterAccess, Elevation, SingleCluster};
+    use zeabur_api::access::SingleCluster;
     use zeabur_api::plan_token::LIFETIME_SECONDS;
-    use zeabur_core::problem::Problem;
     use zeabur_kube::k8s_openapi::api::apps::v1::Deployment;
     use zeabur_kube::k8s_openapi::api::core::v1::Namespace;
     use zeabur_kube::k8s_openapi::jiff::Timestamp;
     use zeabur_kube::memory::{MemoryCluster, State};
-    use zeabur_kube::{Cluster, Identity, NamespaceObjects, WriteBody};
+    use zeabur_kube::{Identity, NamespaceObjects, WriteBody};
 
     use crate::common::{app, send};
 
@@ -371,12 +366,11 @@ mod tests {
         assert_eq!(status, StatusCode::OK, "{applied}");
     }
 
-    /// The refusal is Zeabur's own, so it stays `forbidden` although admin rights are offered:
-    /// they would not change who made the plan.
+    /// The refusal is Zeabur's own: it stays `forbidden`.
     #[tokio::test]
     async fn a_plan_is_applied_only_by_the_person_who_made_it() {
         let cluster = cluster();
-        let app = elevating(&cluster, None);
+        let app = keyed(&cluster);
         let planned = plan(&app, &set_env("web")).await;
         cluster.update(|s| s.identity.username = "mallory".to_owned());
         let (status, problem) = post(
@@ -531,49 +525,11 @@ mod tests {
         assert_eq!(cluster.inspect(|s| s.writes.len()), Some(0));
     }
 
-    /// Everything as `elevated` while it is set, else as `base`, offering elevation when
-    /// `offered`; a plan's binding always as `base`.
-    struct Elevating {
-        base: MemoryCluster,
-        elevated: Option<MemoryCluster>,
-        offered: bool,
-    }
-
-    impl ClusterAccess for Elevating {
-        fn everyday(&self, _parts: &Parts) -> Result<Arc<dyn Cluster>, Box<Problem>> {
-            Ok(Arc::new(self.base.clone()))
-        }
-
-        fn for_request(&self, _parts: &Parts) -> Result<Access, Box<Problem>> {
-            let everyday = || Access {
-                cluster: Arc::new(self.base.clone()),
-                elevation: if self.offered {
-                    Elevation::Available
-                } else {
-                    Elevation::Unavailable
-                },
-            };
-            Ok(self
-                .elevated
-                .as_ref()
-                .map_or_else(everyday, |elevated| Access {
-                    cluster: Arc::new(elevated.clone()),
-                    elevation: Elevation::Active {
-                        until: Timestamp::MAX,
-                    },
-                }))
-        }
-    }
-
     /// One key for every router, as on a server that reads it from a file, so a plan made
     /// through one applies through another.
-    fn elevating(base: &MemoryCluster, elevated: Option<&MemoryCluster>) -> Router {
+    fn keyed(cluster: &MemoryCluster) -> Router {
         zeabur_api::router_with_key(
-            Arc::new(Elevating {
-                base: base.clone(),
-                elevated: elevated.cloned(),
-                offered: true,
-            }),
+            Arc::new(SingleCluster(Arc::new(cluster.clone()))),
             zeabur_api::plan_token::PlanKey::from_bytes([7; 32]),
             zeabur_api::Settings::default(),
             Arc::new(zeabur_api::account::Fixed(None)),
@@ -581,16 +537,15 @@ mod tests {
         )
     }
 
-    /// Given elevation is offered and not in use, when the cluster refuses a write, then the
-    /// answer is `elevation-required`, still a `403` with kube-apiserver's answer and the refused
-    /// request; nothing is written.
+    /// When the cluster refuses a write, the answer is `forbidden` with kube-apiserver's answer
+    /// and the refused request; nothing is written.
     #[tokio::test]
-    async fn a_refused_write_offers_elevation_where_it_is_available() {
+    async fn a_refused_write_names_the_refused_request() {
         let cluster = cluster();
         cluster.update(|s| {
             s.forbidden_writes.insert("Deployment/web".to_owned());
         });
-        let app = elevating(&cluster, None);
+        let app = keyed(&cluster);
         let planned = plan(&app, &set_env("web")).await;
         let (status, problem) = post(
             app.clone(),
@@ -599,32 +554,14 @@ mod tests {
         )
         .await;
         assert_eq!(status, StatusCode::FORBIDDEN);
-        assert_eq!(problem["type"], "/problems/elevation-required");
-        assert_eq!(problem["kind"], "elevation-required");
-        assert_eq!(problem["fixKey"]["key"], "problem.forbidden.fix.askOrRetry");
+        assert_eq!(problem["type"], "/problems/forbidden");
         assert_eq!(problem["kubernetes"]["code"], 403);
         assert_eq!(problem["denied"]["verb"], "patch");
         assert_eq!(cluster.inspect(|s| s.writes.len()), Some(0));
-
-        // Where it is not offered, the same refusal stays a plain `forbidden`.
-        let plain = zeabur_api::router(Arc::new(Elevating {
-            base: cluster.clone(),
-            elevated: None,
-            offered: false,
-        }));
-        let planned = plan(&plain, &set_env("web")).await;
-        let (_, problem) = post(
-            plain,
-            "/api/v1/projects/shop/apply",
-            &json!({"token": planned["token"]}),
-        )
-        .await;
-        assert_eq!(problem["type"], "/problems/forbidden");
     }
 
-    /// Given elevation is offered, when admission refuses a write the person's rights allow
-    /// (a quota's `403`), then the answer is `quota-exceeded` with the quota's limit and use read
-    /// from its status, and admin rights are not offered.
+    /// When admission refuses a write the person's rights allow (a quota's `403`), the answer is
+    /// `quota-exceeded` with the quota's limit and use read from its status.
     #[tokio::test]
     async fn a_write_over_a_quota_is_quota_exceeded_with_the_quotas_numbers() {
         let cluster = cluster();
@@ -652,7 +589,7 @@ mod tests {
                 ],
             );
         });
-        let app = elevating(&cluster, None);
+        let app = keyed(&cluster);
         let planned = plan(&app, &set_env("web")).await;
         let (status, problem) = post(
             app,
@@ -715,7 +652,7 @@ mod tests {
                     ),
                 );
             });
-            let app = elevating(&cluster, None);
+            let app = keyed(&cluster);
             let planned = plan(&app, &set_env("web")).await;
             let (status, problem) = post(
                 app,
@@ -733,87 +670,6 @@ mod tests {
             assert_eq!(problem["kubernetes"]["code"], code);
             assert_eq!(problem["fixKey"]["key"], "problem.policyDenied.fix.change");
         }
-    }
-
-    /// A refused read is offered elevation as a refused write is, from the one place every
-    /// answer passes: only where elevation is offered and not in use.
-    #[tokio::test]
-    async fn a_refused_read_offers_elevation_only_where_it_would_help() {
-        let refusing = cluster();
-        refusing.update(|s| {
-            s.forbidden_resources.insert("nodes".to_owned());
-        });
-        let offered = |elevated: Option<&MemoryCluster>, offered: bool| {
-            zeabur_api::router(Arc::new(Elevating {
-                base: refusing.clone(),
-                elevated: elevated.cloned(),
-                offered,
-            }))
-        };
-        for (app, expected) in [
-            (offered(None, true), "elevation-required"),
-            (offered(None, false), "forbidden"),
-            (offered(Some(&refusing), true), "forbidden"),
-        ] {
-            let request = Request::get("/api/v1/cluster/nodes")
-                .body(Body::empty())
-                .unwrap();
-            let response = app.oneshot(request).await.unwrap();
-            assert_eq!(response.status(), StatusCode::FORBIDDEN);
-            let bytes = response.into_body().collect().await.unwrap().to_bytes();
-            let problem: Value = serde_json::from_slice(&bytes).unwrap();
-            assert_eq!(problem["kind"], expected);
-            assert_eq!(problem["kubernetes"]["code"], 403);
-            assert_eq!(problem["denied"]["resource"], "nodes");
-        }
-        // With the rights in use, the read goes with them.
-        let request = Request::get("/api/v1/cluster/nodes")
-            .body(Body::empty())
-            .unwrap();
-        let response = offered(Some(&cluster()), true)
-            .oneshot(request)
-            .await
-            .unwrap();
-        assert_eq!(response.status(), StatusCode::OK);
-    }
-
-    /// Given a plan made with the everyday credential, when the person elevates (same user name,
-    /// more groups) and applies it, then the plan still applies, its writes go through the
-    /// elevated credential, and none through the everyday one. When the elevated credential is
-    /// refused too, the answer is a plain `forbidden`: retrying as an administrator again would
-    /// not help.
-    #[tokio::test]
-    async fn an_elevated_person_applies_a_plan_made_before_with_the_elevated_credential() {
-        let base = cluster();
-        base.update(|s| {
-            s.forbidden_writes.insert("Deployment/web".to_owned());
-        });
-        let planned = plan(&elevating(&base, None), &set_env("web")).await;
-
-        let elevated = cluster();
-        elevated.update(|s| s.identity.groups.push("elevated:admins".to_owned()));
-        let (status, body) = post(
-            elevating(&base, Some(&elevated)),
-            "/api/v1/projects/shop/apply",
-            &json!({"token": planned["token"]}),
-        )
-        .await;
-        assert_eq!(status, StatusCode::OK, "{body}");
-        assert_eq!(base.inspect(|s| s.writes.len()), Some(0));
-        assert_eq!(elevated.inspect(|s| s.writes.len()), Some(1));
-
-        let refused = cluster();
-        refused.update(|s| {
-            s.forbidden_writes.insert("Deployment/web".to_owned());
-        });
-        let (status, problem) = post(
-            elevating(&base, Some(&refused)),
-            "/api/v1/projects/shop/apply",
-            &json!({"token": planned["token"]}),
-        )
-        .await;
-        assert_eq!(status, StatusCode::FORBIDDEN);
-        assert_eq!(problem["type"], "/problems/forbidden");
     }
 
     fn delete(resource: &Value, name: &str, version: Option<&Value>) -> Value {

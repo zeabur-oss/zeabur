@@ -11,14 +11,13 @@
 //! | `GET /api/v1/cluster/tools/{name}/terminal` | a terminal in it, over a WebSocket |
 //! | `DELETE /api/v1/cluster/tools/{name}` | deletes it |
 //!
-//! Every route is refused unless kube-apiserver says the person may do everything everywhere,
-//! with admin rights offered where they are not in use. The pod goes in the terminal namespace
-//! with the projects' tools pods, and Zeabur's own service account creates it (see the `tools`
-//! module). `kubectl` starts in namespace `default`. As for node shells, a plan has no token while
-//! a binding lets anyone but cluster administrators and Zeabur's service account create pods in
-//! that namespace or run commands in its pods (`exposed`), and its apply is refused when one has
-//! appeared since. Everything else (the credential, the pod's lifetime) is the project tools
-//! pod's.
+//! Every route is refused unless kube-apiserver says the person may do everything everywhere. The
+//! pod goes in the terminal namespace with the projects' tools pods, and Zeabur's own service
+//! account creates it (see the `tools` module). `kubectl` starts in namespace `default`. As for
+//! node shells, a plan has no token while a binding lets anyone but cluster administrators and
+//! Zeabur's service account create pods in that namespace or run commands in its pods
+//! (`exposed`), and its apply is refused when one has appeared since. Everything else (the
+//! credential, the pod's lifetime) is the project tools pod's.
 
 use axum::Json;
 use axum::extract::{Path, State, WebSocketUpgrade};
@@ -39,7 +38,7 @@ use super::node_shells::{
 };
 use crate::access::Handoff;
 use crate::error::ApiError;
-use crate::handlers::{AppState, Credential, Everyday, Person};
+use crate::handlers::{AppState, Credential, Person};
 use crate::plan_token::{self as token, LIFETIME_SECONDS, TokenError};
 use crate::pods::exec::Terminal;
 use crate::projects::writes::terminal::{Planner, list_pods, local_mode, tools_plan};
@@ -223,14 +222,13 @@ pub(crate) async fn status(
 pub(crate) async fn plan(
     State(state): State<AppState>,
     Person(cluster): Person,
-    Everyday(everyday): Everyday,
     Credential(handoff): Credential,
 ) -> Result<Json<ClusterToolsPlan>, ApiError> {
     let sealing = plan_key(&state)?;
     require_admin(cluster.as_ref(), WHAT, CLUSTER_ADMIN).await?;
     let handoff = handoff.ok_or_else(local_mode)?;
     let zeabur = crate::tools::zeabur(&state)?;
-    let identity = everyday
+    let identity = cluster
         .whoami()
         .await
         .map_err(|e| ApiError::from(e.into_problem("your identity")))?;
@@ -296,7 +294,6 @@ pub(crate) async fn plan(
 pub(crate) async fn apply(
     State(state): State<AppState>,
     Person(cluster): Person,
-    Everyday(everyday): Everyday,
     Credential(handoff): Credential,
     Json(request): Json<ClusterToolsApply>,
 ) -> Result<Json<ClusterToolsApplied>, ApiError> {
@@ -305,7 +302,7 @@ pub(crate) async fn apply(
     if (state.clock)().as_second() >= claims.expires_at {
         return Err(token_problem(TokenError::Expired));
     }
-    let identity = everyday
+    let identity = cluster
         .whoami()
         .await
         .map_err(|e| ApiError::from(e.into_problem("your identity")))?;
@@ -382,9 +379,8 @@ pub(crate) async fn delete(
 
 /// A terminal in a cluster tools pod of the person's, over a WebSocket: the project tools
 /// terminal's protocol and credential (see the `tools` module), with `kubectl` starting in
-/// namespace `default`. Failures arrive as an `error` frame, as there, and `403`
-/// (`elevation-required` where admin rights are offered and not in use) for anyone who may not do
-/// everything everywhere.
+/// namespace `default`. Failures arrive as an `error` frame, as there, and `403` for
+/// anyone who may not do everything everywhere.
 #[utoipa::path(get, path = "/api/v1/cluster/tools/{name}/terminal", tag = "cluster",
     operation_id = "clusterToolsTerminal",
     params(("name" = String, Path)),

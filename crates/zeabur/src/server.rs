@@ -5,26 +5,17 @@
 //! |---|---|
 //! | `GET /api/healthz` | `ok`; outside every check below, for the kubelet |
 //! | `GET /auth/login?return=/path` | starts signing in; afterwards the browser goes to `return` |
-//! | `GET /auth/callback` | where Zeabur Identity sends the browser back, for signing in and elevation |
+//! | `GET /auth/callback` | where Zeabur Identity sends the browser back after signing in |
 //! | `POST /auth/logout` | ends the session and revokes its refresh token at Zeabur Identity |
-//! | `GET /auth/elevate` | in a window of its own: asks Zeabur Identity for administrator rights |
-//! | `DELETE /auth/elevation` | drops administrator rights |
 //! | `/api/…` | the API (`zeabur_api`), as the person the session belongs to |
 //! | anything else | the web interface; a page opened without a session goes to `/auth/login` first |
 //!
 //! Every request but the health check passes [`zeabur_core::guard`] first: its `Host` must be
 //! the public URL's, and a request that changes something must come from Zeabur's own page.
 //!
-//! **Elevation**, as `sudo`: while the session holds an elevated token, every request to the API
-//! goes with it (reads, writes, the terminal, revealing a Secret), and a terminal ends when it
-//! does. Only a plan's binding uses the base token, so plans survive elevating and the rights
-//! ending (see `zeabur_api::writes`). Where elevation is turned on and not in use, anything the
-//! cluster refuses comes back as `elevation-required` (see `zeabur_api`'s `error` module). The
-//! interface then opens `/auth/elevate` in a window: Zeabur Identity asks for the passkey and
-//! issues a token with the person's elevated groups, valid for minutes and never renewed. The
-//! callback checks that it belongs to the same user as the session (a token for someone else is
-//! refused), keeps it in the session, and its page tells the interface through a
-//! `BroadcastChannel`, which fetches again what was refused.
+//! **Idle sessions.** A request with the header [`BACKGROUND`] does not count as activity (see
+//! [`Activity`]): the interface sends it on requests it makes on its own after a minute without
+//! input, so an open tab does not keep a session alive.
 
 use std::collections::HashMap;
 use std::future::Future;
@@ -38,24 +29,27 @@ use axum::http::request::Parts;
 use axum::http::{HeaderMap, HeaderValue, StatusCode, Uri, header};
 use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
-use axum::routing::{delete, get, post};
+use axum::routing::{get, post};
 use zeabur_api::ApiError;
-use zeabur_api::access::{Access, ClusterAccess, Elevation, Handoff};
+use zeabur_api::access::{ClusterAccess, Handoff};
 use zeabur_api::account::SignInPage;
 use zeabur_api::plan_token::PlanKey;
 use zeabur_api::services::logs::LogProxy;
 use zeabur_auth::client::{AuthError, OAuthClient};
 use zeabur_auth::cookie;
-use zeabur_auth::flow::{FlowKey, LIFETIME_SECONDS, Pending, Purpose, return_path};
+use zeabur_auth::flow::{FlowKey, LIFETIME_SECONDS, Pending, return_path};
 use zeabur_auth::passkey::PasskeyEndpoints;
-use zeabur_auth::session::{Bind, Clock, Credentials, Lookup, Sessions};
+use zeabur_auth::session::{Activity, Bind, Clock, Credentials, Lookup, Sessions};
 use zeabur_auth::url::BaseUrl;
 use zeabur_core::guard::{self, Origins, Refusal};
 use zeabur_core::problem::{Kind, Problem};
 use zeabur_kube::k8s_openapi::jiff::Timestamp;
 use zeabur_kube::{Cluster, UserToken};
 
-use crate::pages::{self, Elevated, SignInProblem};
+use crate::pages::{self, SignInProblem};
+
+/// The header the interface sends on a request it makes on its own while nobody uses the page.
+pub(crate) const BACKGROUND: &str = "x-zeabur-background";
 
 /// A cluster connection bound to one person's token, and the token, which only a tools pod is
 /// handed (`zeabur_api::tools`).
@@ -78,7 +72,6 @@ pub(crate) struct Auth {
     pub(crate) sessions: Arc<Sessions<Connection>>,
     pub(crate) connect: Bind<Connection>,
     pub(crate) flow_key: FlowKey,
-    pub(crate) elevation: bool,
     pub(crate) clock: Clock,
 }
 
@@ -86,7 +79,6 @@ impl std::fmt::Debug for Auth {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Auth")
             .field("public", &self.public)
-            .field("elevation", &self.elevation)
             .finish_non_exhaustive()
     }
 }
@@ -116,7 +108,6 @@ pub(crate) fn app(
     log_proxy: Option<Arc<dyn LogProxy>>,
 ) -> Router {
     let access = Arc::new(SessionAccess {
-        elevation: auth.elevation,
         origin: auth.public.origin(),
     });
     let api = zeabur_api::router_with_key(access, plan_key, settings, sign_in, log_proxy).layer(
@@ -126,9 +117,6 @@ pub(crate) fn app(
         .route("/auth/login", get(login))
         .route("/auth/callback", get(callback))
         .route("/auth/logout", post(logout))
-        .route("/auth/elevate", get(elevate))
-        .route("/auth/elevation", delete(drop_elevation))
-        .route("/auth/elevated.js", get(|| async { pages::script() }))
         .with_state(Arc::clone(auth));
     let guarded = api.merge(sign_in);
     #[cfg(feature = "ui")]
@@ -179,7 +167,10 @@ async fn sign_in_first(State(auth): State<Arc<Auth>>, request: Request, next: Ne
         return next.run(request).await;
     }
     let signed_in = match cookie::get(request.headers(), cookie::SESSION) {
-        Some(id) => !matches!(auth.sessions.current(id).await, Lookup::SignedOut),
+        Some(id) => !matches!(
+            auth.sessions.current(id, Activity::Person).await,
+            Lookup::SignedOut
+        ),
         None => false,
     };
     if signed_in {
@@ -217,7 +208,12 @@ fn navigation(headers: &HeaderMap) -> bool {
 /// [`SessionAccess`] through the request's extensions.
 async fn session(State(auth): State<Arc<Auth>>, mut request: Request, next: Next) -> Response {
     if let Some(id) = cookie::get(request.headers(), cookie::SESSION) {
-        let signed = match auth.sessions.current(id).await {
+        let activity = if request.headers().contains_key(BACKGROUND) {
+            Activity::Background
+        } else {
+            Activity::Person
+        };
+        let signed = match auth.sessions.current(id, activity).await {
             Lookup::Active(credentials) => Some(Signed::In(credentials)),
             Lookup::IssuerUnavailable => Some(Signed::IssuerDown),
             Lookup::SignedOut => None,
@@ -229,12 +225,9 @@ async fn session(State(auth): State<Arc<Auth>>, mut request: Request, next: Next
     next.run(request).await
 }
 
-/// The API's view of sessions: every request with the elevated token while it lasts, otherwise
-/// with the base one. Admin rights are offered only when elevation is on and the ID token says
-/// they can be had (`can_elevate`), so a refusal does not offer what Zeabur Identity would refuse.
+/// The API's view of sessions: every request with the session's token.
 #[derive(Debug)]
 struct SessionAccess {
-    elevation: bool,
     /// The public URL's origin, which a terminal's handshake must come from.
     origin: String,
 }
@@ -269,55 +262,15 @@ fn timestamp(seconds: i64) -> Timestamp {
 }
 
 impl ClusterAccess for SessionAccess {
-    fn for_request(&self, parts: &Parts) -> Result<Access, Box<Problem>> {
-        let credentials = credentials(parts)?;
-        let offered = self.elevation && credentials.can_elevate;
-        Ok(match (&credentials.elevated, offered) {
-            (Some(elevated), _) => Access {
-                cluster: Arc::clone(&elevated.value.cluster),
-                elevation: Elevation::Active {
-                    until: timestamp(elevated.expires_at),
-                },
-            },
-            (None, true) => Access {
-                cluster: Arc::clone(&credentials.base.value.cluster),
-                elevation: Elevation::Available,
-            },
-            (None, false) => Access {
-                cluster: Arc::clone(&credentials.base.value.cluster),
-                elevation: Elevation::Unavailable,
-            },
-        })
-    }
-
-    /// The base token, for a plan's binding: elevating adds groups, and a plan made with one set
-    /// must still apply with the other.
-    fn everyday(&self, parts: &Parts) -> Result<Arc<dyn Cluster>, Box<Problem>> {
+    fn for_request(&self, parts: &Parts) -> Result<Arc<dyn Cluster>, Box<Problem>> {
         Ok(Arc::clone(&credentials(parts)?.base.value.cluster))
     }
 
-    /// The expiry of the token [`ClusterAccess::for_request`] uses: the elevated one's while it
-    /// is held, so a terminal ends with the admin rights.
-    fn credential_expiry(&self, parts: &Parts) -> Option<Timestamp> {
-        let credentials = credentials(parts).ok()?;
-        let expires_at = credentials
-            .elevated
-            .as_ref()
-            .map_or(credentials.base.expires_at, |elevated| elevated.expires_at);
-        Some(timestamp(expires_at))
-    }
-
-    /// The token of [`ClusterAccess::for_request`]: the elevated one while it is held.
     fn handoff(&self, parts: &Parts) -> Option<Handoff> {
-        let credentials = credentials(parts).ok()?;
-        let (bound, admin) = credentials
-            .elevated
-            .as_ref()
-            .map_or((&credentials.base, false), |elevated| (elevated, true));
+        let base = &credentials(parts).ok()?.base;
         Some(Handoff {
-            token: bound.value.token.clone(),
-            expires_at: timestamp(bound.expires_at),
-            admin,
+            token: base.value.token.clone(),
+            expires_at: timestamp(base.expires_at),
         })
     }
 
@@ -354,9 +307,9 @@ fn set_cookies(headers: &mut HeaderMap, cookies: &[String]) {
 const RANDOM_FAILED: &str =
     "The system random number generator failed, so Zeabur could not start a sign-in.";
 
-/// Sends the browser to Zeabur Identity for `purpose`, with the flow in `cookie_name`.
-async fn start(auth: &Auth, headers: &HeaderMap, purpose: Purpose, cookie_name: &str) -> Response {
-    let Ok(pending) = Pending::start(purpose, (auth.clock)()) else {
+/// Sends the browser to Zeabur Identity to sign in, back to `return_to` afterwards.
+async fn start(auth: &Auth, headers: &HeaderMap, return_to: String) -> Response {
+    let Ok(pending) = Pending::start(return_to, (auth.clock)()) else {
         return problem(Kind::Internal, RANDOM_FAILED);
     };
     let (Ok(sealed), url) = (
@@ -368,7 +321,11 @@ async fn start(auth: &Auth, headers: &HeaderMap, purpose: Purpose, cookie_name: 
     match url {
         Ok(url) => redirect(
             &url,
-            &[cookie::set(cookie_name, &sealed, Some(LIFETIME_SECONDS))],
+            &[cookie::set(
+                cookie::SIGN_IN,
+                &sealed,
+                Some(LIFETIME_SECONDS),
+            )],
         ),
         Err(error) => {
             tracing::warn!(event = "auth.discovery", %error, "cannot start a sign-in");
@@ -392,68 +349,22 @@ fn parameters(uri: &Uri) -> HashMap<String, String> {
 async fn login(State(auth): State<Arc<Auth>>, uri: Uri, headers: HeaderMap) -> Response {
     let query = parameters(&uri);
     let return_to = return_path(query.get("return").map(String::as_str));
-    start(
-        &auth,
-        &headers,
-        Purpose::SignIn { return_to },
-        cookie::SIGN_IN,
-    )
-    .await
+    start(&auth, &headers, return_to).await
 }
 
-/// `GET /auth/elevate`, in a window the interface opened.
-async fn elevate(State(auth): State<Arc<Auth>>, headers: HeaderMap) -> Response {
-    if !auth.elevation {
-        return problem(Kind::NotFound, "This Zeabur does not offer admin rights.");
-    }
-    // Only Zeabur's own page opens this window; a navigation from another site could start an
-    // elevation the person did not ask for.
-    if headers
-        .get("sec-fetch-site")
-        .is_some_and(|site| site != "same-origin")
-    {
-        return problem(
-            Kind::Forbidden,
-            "Only the Zeabur page itself can ask for admin rights.",
-        );
-    }
-    let signed_in = match cookie::get(&headers, cookie::SESSION) {
-        Some(id) => matches!(auth.sessions.current(id).await, Lookup::Active(_)),
-        None => false,
-    };
-    if !signed_in {
-        return pages::elevated(&headers, &Elevated::SignedOut);
-    }
-    start(&auth, &headers, Purpose::Elevate, cookie::ELEVATE).await
-}
-
-/// `GET /auth/callback`: Zeabur Identity's answer, for a sign-in or an elevation.
+/// `GET /auth/callback`: Zeabur Identity's answer to a sign-in.
 async fn callback(State(auth): State<Arc<Auth>>, uri: Uri, headers: HeaderMap) -> Response {
     let query = parameters(&uri);
     let state = query.get("state").map_or("", String::as_str);
     let now = (auth.clock)();
-    let flow = [cookie::SIGN_IN, cookie::ELEVATE]
-        .into_iter()
-        .find_map(|name| {
-            cookie::get(&headers, name)
-                .and_then(|sealed| Pending::open(&auth.flow_key, sealed, now))
-                .filter(|pending| pending.matches(state))
-                .map(|pending| (name, pending))
-        });
-    let Some((name, pending)) = flow else {
+    let Some(pending) = cookie::get(&headers, cookie::SIGN_IN)
+        .and_then(|sealed| Pending::open(&auth.flow_key, sealed, now))
+        .filter(|pending| pending.matches(state))
+    else {
         return pages::sign_in_problem(&headers, SignInProblem::Expired);
     };
-    let finished = cookie::clear(name);
-    let mut response = match pending.purpose() {
-        Purpose::SignIn { return_to } => {
-            sign_in(&auth, &headers, &query, &pending, return_to).await
-        }
-        Purpose::Elevate => {
-            let outcome = elevation(&auth, &headers, &query, &pending).await;
-            pages::elevated(&headers, &outcome)
-        }
-    };
-    set_cookies(response.headers_mut(), &[finished]);
+    let mut response = sign_in(&auth, &headers, &query, &pending).await;
+    set_cookies(response.headers_mut(), &[cookie::clear(cookie::SIGN_IN)]);
     response
 }
 
@@ -483,7 +394,6 @@ async fn sign_in(
     headers: &HeaderMap,
     query: &HashMap<String, String>,
     pending: &Pending,
-    return_to: &str,
 ) -> Response {
     let failed = |problem| pages::sign_in_problem(headers, problem);
     let code = match code(auth, query).await {
@@ -533,82 +443,18 @@ async fn sign_in(
         connection,
         tokens.expires_in,
         tokens.refresh_token,
-        tokens.can_elevate,
+        tokens.refresh_expires_in,
     ) {
         Ok(id) => {
             tracing::info!(event = "auth.sign_in", outcome = "success", user = %username, "signed in");
-            redirect(return_to, &[cookie::set(cookie::SESSION, &id, None)])
+            redirect(
+                pending.return_to(),
+                &[cookie::set(cookie::SESSION, &id, None)],
+            )
         }
         Err(error) => {
             tracing::error!(event = "auth.sign_in", outcome = "failure", %error, "cannot start a session");
             problem(Kind::Internal, "Zeabur could not start a session.")
-        }
-    }
-}
-
-async fn elevation(
-    auth: &Auth,
-    headers: &HeaderMap,
-    query: &HashMap<String, String>,
-    pending: &Pending,
-) -> Elevated {
-    let Some(id) = cookie::get(headers, cookie::SESSION) else {
-        return Elevated::SignedOut;
-    };
-    let Lookup::Active(session) = auth.sessions.current(id).await else {
-        return Elevated::SignedOut;
-    };
-    let code = match code(auth, query).await {
-        Ok(code) => code,
-        Err(Ok(error)) if error == "invalid_scope" => return Elevated::NotAllowed,
-        Err(Ok(error)) => {
-            tracing::info!(event = "auth.elevate", outcome = "failure", %error, "elevation did not finish");
-            return Elevated::Cancelled;
-        }
-        Err(Err(error)) => {
-            tracing::warn!(event = "auth.elevate", outcome = "failure", %error, "elevation refused");
-            return Elevated::Failed;
-        }
-    };
-    let tokens = match auth.oauth.exchange(code, pending.verifier()).await {
-        Ok(tokens) => tokens,
-        Err(error) => {
-            tracing::warn!(event = "auth.elevate", outcome = "failure", %error, "cannot redeem the code");
-            return Elevated::Failed;
-        }
-    };
-    // The elevated token must be the same person's: Zeabur Identity adds groups, never changes the
-    // user. A passkey of someone else, used in this window, must not lend its rights to this
-    // session; and the plan token's binding (the user name) stays true.
-    let connection = match (auth.connect)(tokens.access_token) {
-        Ok(connection) => connection,
-        Err(error) => {
-            tracing::warn!(event = "auth.elevate", outcome = "failure", %error, "the cluster did not accept the elevated token");
-            return Elevated::Failed;
-        }
-    };
-    match connection.cluster.whoami().await {
-        Ok(identity) if identity.username == session.username => {}
-        Ok(identity) => {
-            tracing::warn!(
-                event = "auth.elevate", outcome = "failure", user = %session.username,
-                presented = %identity.username, "elevated token belongs to another user"
-            );
-            return Elevated::Failed;
-        }
-        Err(error) => {
-            tracing::warn!(event = "auth.elevate", outcome = "failure", %error, "the cluster did not accept the elevated token");
-            return Elevated::Failed;
-        }
-    }
-    match auth.sessions.elevate(id, connection, tokens.expires_in) {
-        Ok(until) => {
-            tracing::info!(event = "auth.elevate", outcome = "success", user = %session.username, "admin rights granted");
-            Elevated::Done(timestamp(until).to_string())
-        }
-        Err(error) => {
-            tracing::warn!(event = "auth.elevate", outcome = "failure", %error, "cannot keep the elevated token");
-            Elevated::SignedOut
         }
     }
 }
@@ -631,14 +477,6 @@ async fn logout(State(auth): State<Arc<Auth>>, headers: HeaderMap) -> Response {
         }
     }
     no_content(&[cookie::clear(cookie::SESSION)])
-}
-
-/// `DELETE /auth/elevation`.
-async fn drop_elevation(State(auth): State<Arc<Auth>>, headers: HeaderMap) -> Response {
-    if let Some(id) = cookie::get(&headers, cookie::SESSION) {
-        auth.sessions.drop_elevation(id);
-    }
-    no_content(&[])
 }
 
 #[cfg(test)]

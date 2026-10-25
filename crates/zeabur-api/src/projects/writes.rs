@@ -21,15 +21,6 @@
 //! A plan that writes several objects is not one transaction: kube-apiserver has none across
 //! objects. The dry run catches what validation and admission would refuse; a write that fails
 //! after earlier ones succeeded answers with a problem naming the objects already written.
-//!
-//! # Elevation
-//!
-//! Plan and apply read and write with the connection every request uses, the administrator's
-//! while the person holds one ([`crate::access::ClusterAccess::for_request`]). Only the token's
-//! binding uses the everyday identity ([`crate::access::ClusterAccess::everyday`]), so elevating
-//! or the rights ending between plan and apply does not void a plan. A write the cluster refuses
-//! where elevation is offered answers `elevation-required`, as every refusal from the cluster
-//! does (the `error` module).
 
 pub(crate) mod admission;
 pub(crate) mod certificates;
@@ -69,7 +60,7 @@ use zeabur_plan::{Change, ErrorKind, Input, Plan, PlanError, PlanRequest, Write}
 
 use crate::cluster::s3_destinations;
 use crate::error::{ApiError, project_read, read_problem};
-use crate::handlers::{AppState, Credential, Everyday, Person};
+use crate::handlers::{AppState, Credential, Person};
 use crate::plan_token::{self as token, Claims, LIFETIME_SECONDS, PlanKey, TokenError};
 use crate::projects::{deploy_keys, snapshot, templates};
 
@@ -269,13 +260,12 @@ async fn compute_any(
 pub(crate) async fn plan(
     State(state): State<AppState>,
     Person(cluster): Person,
-    Everyday(everyday): Everyday,
     Credential(handoff): Credential,
     Path(project): Path<String>,
     Json(request): Json<PlanRequest>,
 ) -> Result<Json<PlanResponse>, ApiError> {
     let key = key(&state)?;
-    let identity = everyday
+    let identity = cluster
         .whoami()
         .await
         .map_err(|e| ApiError::from(e.into_problem("your identity")))?;
@@ -369,14 +359,6 @@ pub(crate) fn token_problem(error: TokenError) -> ApiError {
 }
 
 /// Carries out a plan by its token: checks it, dry-runs every write, then writes.
-///
-/// Reads and writes use the elevated credential while the person holds one, as every request
-/// does. The plan's binding alone is checked against the everyday identity: elevation adds groups
-/// but keeps the user name, so a plan made before elevating still applies after, and one made
-/// while elevated still applies once the rights have ended (and is refused then if the everyday
-/// credential may not write it). Where elevation is offered and not in use, a `403` from the
-/// cluster is answered as `elevation-required` (same status, same `denied`; see the `error`
-/// module), so the interface can offer to retry as an administrator.
 #[utoipa::path(post, path = "/api/v1/projects/{project}/apply", tag = "projects",
     params(("project" = String, Path, description = "The project's namespace")),
     request_body = ApplyRequest,
@@ -388,7 +370,6 @@ pub(crate) fn token_problem(error: TokenError) -> ApiError {
 pub(crate) async fn apply(
     State(state): State<AppState>,
     Person(cluster): Person,
-    Everyday(everyday): Everyday,
     Credential(handoff): Credential,
     Path(project): Path<String>,
     Json(request): Json<ApplyRequest>,
@@ -405,7 +386,7 @@ pub(crate) async fn apply(
             ),
         )));
     }
-    let identity = everyday
+    let identity = cluster
         .whoami()
         .await
         .map_err(|e| ApiError::from(e.into_problem("your identity")))?;

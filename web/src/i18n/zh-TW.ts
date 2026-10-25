@@ -50,18 +50,6 @@ export const zhTW: Messages = {
   "shell.whoamiUnknown": "不明使用者",
   "shell.signOut": "登出",
   "shell.theme": "主題",
-  "elevate.retry": "暫時用管理員權限重試",
-  "elevate.title": "管理員權限",
-  "elevate.waiting": "在新視窗用通行密鑰確認。",
-  "elevate.notAllowed": "這個 Zeabur 不能要求管理員權限，請洽叢集管理員。",
-  "elevate.blocked": "瀏覽器擋下了視窗。允許這個網站開啟彈出式視窗後，再試一次。",
-  "elevate.failed": "沒有取得管理員權限。",
-  "elevate.signedOut": "工作階段已結束，重新登入後再繼續。",
-  "elevate.signIn": "登入",
-  "elevate.until": (time) => `管理員權限至 ${time}`,
-  "elevate.activeDetail": "在此之前，你的所有操作都會使用管理員權限。",
-  "elevate.drop": "放棄管理員權限",
-  "elevate.use": "暫時使用管理員權限",
   "shell.switchProject": "切換專案",
   "column.label": "服務",
   "column.other": "其他物件",
@@ -101,7 +89,6 @@ export const zhTW: Messages = {
   "problem.title.unauthenticated": "你尚未登入",
   "problem.title.signed-out": "你已登出",
   "problem.title.forbidden": "你沒有權限",
-  "problem.title.elevation-required": "這需要管理員權限",
   "problem.title.quota-exceeded": "這會超過專案的用量上限",
   "problem.title.policy-denied": "叢集裡的政策拒絕了這項變更",
   "problem.title.not-found": "找不到這個物件",
@@ -118,7 +105,6 @@ export const zhTW: Messages = {
   "problem.fix.unauthenticated": "重新登入。",
   "problem.fix.signed-out": "重新登入。",
   "problem.fix.forbidden": "向叢集管理員要求權限，或改用有權限的帳號。",
-  "problem.fix.elevation-required": "暫時用管理員權限重試，或向叢集管理員要求權限。",
   "problem.fix.quota-exceeded": "調低要求的資源量、釋出專案正在用的資源，或請叢集管理員調高上限。",
   "problem.fix.policy-denied": "依政策指出的地方修改，或向叢集管理員詢問這項政策。",
   "problem.fix.not-found": "重新載入頁面，看看叢集目前有什麼。",
@@ -146,8 +132,6 @@ export const zhTW: Messages = {
     "你的 Zeabur 工作階段已結束，Zeabur 無法再代你存取叢集。在你重新登入之前，什麼都不會讀取或變更。",
   "problemPage.rule.forbidden":
     "叢集用 RBAC 規則決定每個人能在哪些專案裡讀取或變更哪些物件。Zeabur 只用你自己的權限操作，你的權限不允許的事，Zeabur 也無法代你做。",
-  "problemPage.rule.elevation-required":
-    "你平常的權限不允許這件事，但這個 Zeabur 可以在你用通行密鑰確認後，短時間給你管理員權限。在權限到期或你放棄之前，你的所有操作都會使用它。",
   "problemPage.rule.quota-exceeded":
     "專案可以設定所有服務加起來能保留的上限：CPU、記憶體、副本或物件的數量。變更如果會超過上限，叢集就會拒絕，與你的權限無關。",
   "problemPage.rule.policy-denied":
@@ -170,12 +154,9 @@ export const zhTW: Messages = {
   "problemPage.rule.unavailable":
     "Zeabur 連不到叢集的 API 伺服器：它可能停機或正在重新啟動，或從 Zeabur 執行的地方連不到。",
   "problemPage.rule.internal": "出錯的是 Zeabur 本身，不是叢集。詳細資料裡有 Zeabur 知道的資訊。",
-  "refused.admin": "這需要管理員權限。",
-  "refused.adminFor": (what) => `${what}${latinEnd(what)}需要管理員權限。`,
   "refused.rights": "這需要更多權限。",
   "refused.rightsFor": (what) => `${what}${latinEnd(what)}需要更多權限。`,
   "refused.ask": "請洽叢集管理員。",
-  "refused.view": "暫時使用管理員權限",
   "refused.details": "細節",
   "refused.missing": "缺少的權限",
   "refused.see": (what) => `檢視${latinStart(what)}${what}`,
@@ -183,10 +164,6 @@ export const zhTW: Messages = {
   "refused.terminal": "開啟終端機",
   "refused.reveal": "顯示 Secret 的值",
   "refused.listThese": "列出這些物件",
-  "refused.adopt": (ns) => `使用既有的 Namespace ${ns}`,
-  "refused.createProject": (name) => `建立專案 ${name}`,
-  "refused.unadopt": (ns) => `從 Zeabur 移除 ${ns}`,
-
   "status.ready": "就緒",
   "status.rollingOut": "部署中",
   "status.failing": "異常",
@@ -800,7 +777,6 @@ export const zhTW: Messages = {
   "dock.resize": "終端機高度",
   "dock.close": (name) => `關閉 ${name}`,
   "dock.count": (count) => `${count} 個終端機`,
-  "dock.expires": (time) => `認證資訊 ${time} 到期`,
   "dock.emptyTitle": "沒有開啟的終端機",
   "dock.emptyBody": "從服務的「日誌」分頁或「更多」選單開啟，也可以用搜尋。",
   "dock.gone": "這個服務已經不在專案裡。",
@@ -818,7 +794,6 @@ export const zhTW: Messages = {
   "terminal.debugEnded": "除錯容器已結束。再開一個即可繼續。",
   "terminal.debugOpen": "已連線到除錯容器",
   "terminal.failed": "容器執行環境結束了這個工作階段。",
-  "terminal.adminEnded": "管理員權限已結束，終端機已關閉。重新開啟後會改用你自己的權限。",
   "terminal.idle": "15 分鐘沒有輸入或輸出，已關閉。",
   "terminal.lost": "連線中斷。",
   "terminal.rbac":
@@ -834,7 +809,6 @@ export const zhTW: Messages = {
   "tools.stopsAt": (when: string) => `${when}停止`,
   "tools.open": "開啟",
   "tools.stop": "停止",
-  "tools.expired": "這個終端機裡的認證資訊已過期。重新開啟就會換上新的。",
   "tools.reopen": "重新開啟",
   "clusterTools.about":
     "內含 kubectl 和 helm 的終端機，以你的身分操作整個叢集，kubectl 預設在 default Namespace。終端機跑在暫時的容器裡，用完後 Zeabur 會刪除。",
@@ -1101,10 +1075,8 @@ export const zhTW: Messages = {
   "confirm.debugReused": "這個副本裡已經有除錯容器在執行，終端機會在其中開啟。",
   "confirm.clusterTools":
     "替你啟動一個暫時的容器，裡面有 kubectl 和 helm，只有 Zeabur 和叢集管理員碰得到。kubectl 預設在這個專案。",
-  "confirm.toolsActsAs": (person: string, admin: boolean) =>
-    admin
-      ? `kubectl 與 helm 會以 ${person} 的身分執行，使用你目前持有的管理員權限。`
-      : `kubectl 與 helm 會以 ${person} 的身分執行，使用你自己的權限。`,
+  "confirm.toolsActsAs": (person: string) =>
+    `kubectl 與 helm 會以 ${person} 的身分執行，使用你自己的權限。`,
   "confirm.toolsCredential": (minutes: number) =>
     `其中的認證資訊會在 ${minutes} 分鐘後失效，重新開啟終端機即可換上新的。`,
   "confirm.toolsStops": (most: number, after: number) =>
@@ -1131,7 +1103,6 @@ export const zhTW: Messages = {
   "projectSettings.tooLong": (max) => `縮短到 ${max} 個字元以內。`,
   "projectSettings.readOnly": "可以檢視，但無法變更。",
   "projectSettings.getAccess": "如何取得權限",
-  "projectSettings.changeDetails": "變更這個專案的資訊",
   "projectSettings.system": "這是 Kubernetes 留給自身元件的 Namespace，不能當作專案。",
   "projectSettings.title": "專案設定",
   "projectSettings.back": "返回",
@@ -2882,7 +2853,6 @@ export const zhTW: Messages = {
   "settings.clusterNameHint":
     "顯示在側邊欄和 Zeabur 的頁面上，讓管理多個叢集的人一眼分辨。叢集本身不會有任何變更。",
   "settings.clusterNameReset": "改用預設名稱",
-  "settings.clusterNameChange": "重新命名叢集",
   "settings.clusterNameLocal": "Zeabur 在這台電腦上執行，不保存設定：名稱沿用 kubeconfig 的名稱。",
   "settings.metricsStore": "用量歷史",
   "settings.store": "歷史資料來源",
@@ -2904,11 +2874,27 @@ export const zhTW: Messages = {
   "settings.storeWhere": (namespace) =>
     `存放在 Namespace ${namespace} 的 ConfigMap zeabur-settings。能修改這個 ConfigMap 的人，就能修改這項設定。`,
   "settings.storeDenied": "你不能修改這項設定。",
-  "settings.storeChange": "變更歷史資料來源",
   "settings.storeLocal":
     "Zeabur 在這台電腦上執行，不保存設定。要改用其他儲存服務，以 --metrics-service namespace/name:port 啟動。",
   "settings.storeTenancy":
     "能讀取儲存服務的人，就能看到所有專案的指標。只開放給可以檢視整個叢集的人。",
+  "settings.signIn": "登入設定",
+  "settings.signInLead": "每次登入最多維持 12 小時，超過一小時沒有使用也會登出。",
+  "settings.teams": "團隊",
+  "settings.teamsHint": "這個叢集有幾個團隊在用。",
+  "settings.teams.single": "一個團隊",
+  "settings.teams.multiple": "多個團隊",
+  "settings.teams.singleMeans": "管理員帳號和其他帳號一樣，一小時沒有使用就會登出。",
+  "settings.teams.multipleMeans": "管理員帳號 15 分鐘沒有使用就會登出。",
+  "settings.adminAccounts": "管理員帳號",
+  "settings.adminAal3": "只能用不會同步的通行密鑰登入",
+  "settings.adminAal3Means":
+    "不會同步的通行密鑰只存在安全金鑰或單一裝置上。開啟後，管理員帳號 15 分鐘沒有使用也會登出。一般帳號的登入方式不變。",
+  "settings.adminAal3Trust": "Zeabur 怎麼知道",
+  "settings.adminAal3TrustHint": "通行密鑰會不會同步，是存放它的裝置自己回報的，沒有人另外查證。",
+  "settings.adminAal3NeedsPasskey":
+    "要開啟這項設定，你的帳號得先有一把不會同步的通行密鑰，存在安全金鑰或這台裝置上。",
+  "settings.adminAal3AddPasskey": "新增通行密鑰",
   // 帳號與成員（Zeabur Identity）
   "shell.account": "帳號",
   "shell.members": "成員",
@@ -2976,14 +2962,13 @@ export const zhTW: Messages = {
   "members.everyone": "成員",
   "members.invite": "邀請",
   "members.denied": "你沒有邀請或變更成員的權限，請洽叢集管理員。",
-  "members.inviting": "邀請成員",
   "members.filter": "篩選成員",
   "members.none": "還沒有人可以登入。",
   "members.noMatch": "沒有符合的成員。",
   "members.you": "（你）",
-  "members.role.admin": "管理員",
+  "members.role.admin": "管理員帳號",
   "members.role.member": "成員",
-  "members.adminHint": "可以取得管理員權限，完整控制整個叢集。",
+  "members.adminHint": "只能用通行密鑰登入，對整個叢集有完整權限。",
   "members.disabled": "已停用",
   "members.column.name": "名稱",
   "members.column.role": "角色",
@@ -3019,7 +3004,7 @@ export const zhTW: Messages = {
   "invite.existing": (user) => `${user} 已經是成員：這個連結會在他的帳號新增一把通行密鑰。`,
   "invite.displayName": "顯示名稱",
   "invite.optional": "（選填）",
-  "invite.admin": "管理員",
+  "invite.admin": "管理員帳號",
   "invite.create": "產生連結",
   "invite.action": (name) => `邀請 ${name}`,
   "members.plan.adds": (name) => `把 ${name} 加為成員。`,
@@ -3060,11 +3045,12 @@ export const zhTW: Messages = {
   "roles.title": (name) => `${name} 的權限`,
   "roles.save": "儲存權限",
   "roles.saved": (name) => `已儲存 ${name} 的權限`,
-  "roles.losesAdmin": (name) => `${name} 會立即失去管理員權限。`,
+  "roles.losesAdmin": (name) => `${name} 會立即改成一般帳號，不再有整個叢集的完整權限。`,
   "roles.losesProjects": (name, projects) => `${name} 會立即失去 ${projects} 的存取權。`,
   "roles.losesChanges": (name, projects) => `${name} 將無法再修改 ${projects}。`,
   "roles.openTerminals": "已開啟的終端機會維持到結束為止。",
-  "roles.becomesAdmin": (name) => `${name} 將完整控制整個叢集：所有專案、節點和成員。`,
+  "roles.becomesAdmin": (name) =>
+    `${name} 會變成管理員帳號，完整控制整個叢集：所有專案、節點和成員。之後只能用通行密鑰登入。`,
   "reset.title": (name) => `${name} 的新設定連結`,
   "reset.keep": (name) =>
     `在 ${name} 的帳號新增一把通行密鑰，不會移除任何東西。連結只能使用一次，24 小時內有效。`,
@@ -3094,6 +3080,9 @@ export const zhTW: Messages = {
   "sentence.members.noIssuer.fix": () => "啟動 Zeabur 時加上 --issuer-url。",
   "sentence.members.demoteSelf": () => "你不能拿掉自己的管理員權限",
   "sentence.members.demoteSelf.fix": () => "請其他管理員變更你的權限。",
+  "sentence.settings.signIn.noDeviceBound": () => "你沒有不會同步的通行密鑰，改了之後會無法登入。",
+  "sentence.settings.signIn.noDeviceBound.fix": () =>
+    "先新增一把存在安全金鑰或這台裝置上的通行密鑰，再試一次。",
   "sentence.members.noProjectRoles": () => "安裝 Zeabur 時沒有啟用成員角色",
   "sentence.members.noProjectRoles.fix": () =>
     "安裝 Chart 時設定 memberRoles.enabled=true，或把這位成員設為管理員。",
@@ -3103,7 +3092,6 @@ export const zhTW: Messages = {
   // 帳號與成員結束
   "sentence.problem.forbidden.fix.askForRule": (p) =>
     `向叢集管理員要求 ${p.rule} 的權限，例如建立授予這項權限的 ClusterRole，以及綁定到你的 ClusterRoleBinding。`,
-  "sentence.problem.forbidden.fix.askOrRetry": () => "洽詢管理員，或暫時用管理員權限重試。",
   "sentence.problem.forbidden.fix.sendGrant": () =>
     "把下面的設定交給管理員。它只授予這項權限，而且只在這個專案有效。",
   "sentence.problem.planExpired.fix.again": (p) =>
@@ -3138,10 +3126,6 @@ export const zhTW: Messages = {
   "sentence.problem.summary.signed-out": () => "你已登出。",
   "sentence.problem.summary.forbidden": (p) =>
     p.verb ? `你不能${verbZhTW[p.verb] ?? p.verb} ${thingZh(p, "裡的")}。` : "你沒有權限。",
-  "sentence.problem.summary.elevation-required": (p) =>
-    p.verb
-      ? `你平常的權限不能${verbZhTW[p.verb] ?? p.verb} ${thingZh(p, "裡的")}。`
-      : "這需要管理員權限。",
   "sentence.problem.summary.not-found": (p) => (p.name ? `${p.name} 不存在。` : "它不存在。"),
   "sentence.problem.summary.log-unavailable": () => "無法讀取這份日誌。",
   "sentence.problem.summary.conflict": (p) =>

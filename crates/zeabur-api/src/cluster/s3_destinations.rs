@@ -47,7 +47,7 @@ use zeabur_modules::velero::cluster as v;
 use zeabur_plan::{Change, CopyS3KeysChange, PlanRequest};
 
 use crate::error::{ApiError, get_read, list_read, read_problem};
-use crate::handlers::{AppState, Everyday, Person};
+use crate::handlers::{AppState, Person};
 use crate::plan_token::{self as token, LIFETIME_SECONDS, TokenError};
 use crate::projects::namespace::Permission;
 use crate::projects::writes::token_problem;
@@ -949,11 +949,10 @@ fn plan_key(state: &AppState) -> Result<std::sync::Arc<token::PlanKey>, ApiError
 pub(crate) async fn plan(
     State(state): State<AppState>,
     Person(cluster): Person,
-    Everyday(everyday): Everyday,
     Json(request): Json<S3DestinationsPlanRequest>,
 ) -> Result<Json<S3DestinationsPlan>, ApiError> {
     let sealing = plan_key(&state)?;
-    let identity = everyday
+    let identity = cluster
         .whoami()
         .await
         .map_err(|e| ApiError::from(e.into_problem("your identity")))?;
@@ -1036,7 +1035,6 @@ async fn send(cluster: &dyn Cluster, write: &Planned, dry_run: bool) -> Result<(
 pub(crate) async fn apply(
     State(state): State<AppState>,
     Person(cluster): Person,
-    Everyday(everyday): Everyday,
     Json(request): Json<S3DestinationsApply>,
 ) -> Result<Json<S3DestinationsApplied>, ApiError> {
     let sealing = plan_key(&state)?;
@@ -1044,7 +1042,7 @@ pub(crate) async fn apply(
     if (state.clock)().as_second() >= claims.expires_at {
         return Err(token_problem(TokenError::Expired));
     }
-    let identity = everyday
+    let identity = cluster
         .whoami()
         .await
         .map_err(|e| ApiError::from(e.into_problem("your identity")))?;

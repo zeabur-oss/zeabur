@@ -2,15 +2,12 @@
 // to the outcome. Success names what changed and offers View (where to see it) or Undo (where the
 // change can be taken back, model/risk.ts). When the project moved on since the review and nothing
 // was written, the change is planned again and shown with what is new (replan.ts). Other failures
-// give the reason in plain words and, when the plan ran out, "Review again"; when the
-// cluster refused it and the server offers admin rights, "Retry with admin rights", which applies
-// the same plan again after the passkey confirmation (auth/elevation.ts); when Helm would undo it,
-// the kubectl terminal with `helm list` typed in.
+// give the reason in plain words and, when the plan ran out, "Review again"; when Helm would undo
+// it, the kubectl terminal with `helm list` typed in.
 import { toast } from "sonner"
 
 import { api, toProblem, unwrap, type Schemas } from "@/api/client"
 import { queryClient } from "@/api/queries"
-import { retryAsAdmin } from "@/auth/elevation"
 import { failureOf } from "@/components/plan/describe"
 import { markCreated } from "@/lib/created"
 import type { PlanAsk } from "@/components/plan/planner"
@@ -108,14 +105,7 @@ export async function carryOut(confirmed: Confirmed): Promise<void> {
       confirmed.reopen(ask, confirmed.reviewed ?? { objects: [] })
       return
     }
-    fail(
-      id,
-      t,
-      locale,
-      error,
-      () => confirmed.reopen(ask),
-      () => void carryOut(confirmed),
-    )
+    fail(id, t, locale, error, () => confirmed.reopen(ask))
   }
 }
 
@@ -136,24 +126,18 @@ async function takeBack(
   }
 }
 
-/** Reports a failed apply. `review` plans the change afresh; `again` applies the same plan once
- * more, which is what "Retry with admin rights" does after the passkey confirmation. */
+/** Reports a failed apply. `review` plans the change afresh. */
 function fail(
   id: string | number,
   t: Translate,
   locale: Locale,
   error: unknown,
   review?: () => void,
-  again?: () => void,
 ) {
   const problem = toProblem(error)
   const failure = failureOf(t, locale, problem)
   const action =
-    problem.kind === "elevation-required" && again
-      ? { label: t("elevate.retry"), onClick: () => void retryAsAdmin(again) }
-      : failure.review && review
-        ? { label: t("plan.replan"), onClick: () => review() }
-        : undefined
+    failure.review && review ? { label: t("plan.replan"), onClick: () => review() } : undefined
   toast.error(failure.title, {
     id,
     description: failure.description,

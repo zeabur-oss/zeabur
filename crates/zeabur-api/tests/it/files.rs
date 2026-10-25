@@ -5,20 +5,16 @@
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeMap;
-    use std::sync::Arc;
 
     use axum::Router;
     use axum::body::Body;
-    use axum::http::request::Parts;
     use axum::http::{Request, StatusCode};
     use http_body_util::BodyExt as _;
     use serde_json::{Value, json};
     use tower::ServiceExt as _;
-    use zeabur_api::access::{Access, ClusterAccess, Elevation};
-    use zeabur_core::problem::Problem;
+    use zeabur_kube::NamespaceObjects;
     use zeabur_kube::k8s_openapi::api::core::v1::Pod;
     use zeabur_kube::memory::{MemoryCluster, MemoryFiles, State};
-    use zeabur_kube::{Cluster, NamespaceObjects};
 
     use crate::common::{app, send};
 
@@ -423,20 +419,8 @@ mod tests {
         assert_eq!(status, StatusCode::NOT_FOUND);
     }
 
-    /// One person whose admin rights are offered and not in use.
-    struct Elevating(Arc<dyn Cluster>);
-
-    impl ClusterAccess for Elevating {
-        fn for_request(&self, _parts: &Parts) -> Result<Access, Box<Problem>> {
-            Ok(Access {
-                cluster: Arc::clone(&self.0),
-                elevation: Elevation::Available,
-            })
-        }
-    }
-
     #[tokio::test]
-    async fn a_refused_exec_names_the_right_and_offers_admin_rights() {
+    async fn a_refused_exec_names_the_right() {
         let cluster = cluster();
         cluster.update(|s| {
             s.exec_refused.insert("shop/web-1".to_owned());
@@ -449,16 +433,6 @@ mod tests {
             json!({"verb": "get", "group": "", "resource": "pods/exec",
                    "name": "web-1", "namespace": "shop"})
         );
-        let elevating = zeabur_api::router(Arc::new(Elevating(Arc::new(cluster.clone()))));
-        for uri in [
-            BASE.to_owned(),
-            format!("{BASE}/entries?{}", query("/data")),
-            format!("{BASE}/content?{}", query("/data/report.csv")),
-        ] {
-            let (status, problem) = send(&elevating, "GET", &uri, None).await;
-            assert_eq!(status, StatusCode::FORBIDDEN, "{uri}");
-            assert_eq!(problem["kind"], "elevation-required", "{uri}");
-        }
     }
 
     fn with_debug_container(cluster: &MemoryCluster, mounts: &Value) {

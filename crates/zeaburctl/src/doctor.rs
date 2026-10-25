@@ -562,7 +562,7 @@ fn zeabur_identity_installed(
     check
 }
 
-/// The `OAuthClient` `zeabur` exists, may ask for elevation and gets tokens for kube-apiserver.
+/// The `OAuthClient` `zeabur` exists and gets tokens for kube-apiserver.
 fn zeabur_identity_client(answer: Option<&Result<Value, Value>>) -> Check {
     const NAME: &str = "zeabur-identity-client";
     let mut check = Check::new(NAME);
@@ -580,7 +580,7 @@ fn zeabur_identity_client(answer: Option<&Result<Value, Value>>) -> Check {
                 "no OAuthClient {ZEABUR_CLIENT} in {ZEABUR_IDENTITY_NAMESPACE}"
             ));
             check.add_fix(&format!(
-                "zeabur-identityctl client create {ZEABUR_CLIENT} --type confidential --allow-elevation \
+                "zeabur-identityctl client create {ZEABUR_CLIENT} --type confidential \
                  --audience {KUBERNETES_AUDIENCE} --redirect-uri https://<Zeabur's host>/auth/callback \
                  | kubectl apply -f -"
             ));
@@ -615,20 +615,6 @@ fn zeabur_identity_client(answer: Option<&Result<Value, Value>>) -> Check {
         ));
         check.add_fix(&format!(
             "add {KUBERNETES_AUDIENCE} to spec.audiences of {where_}"
-        ));
-    }
-    if spec.get("allowElevation") == Some(&Value::Bool(true)) {
-        check
-            .findings
-            .push(format!("{where_} may ask for elevation"));
-    } else {
-        check.raise(Status::Warning);
-        check
-            .findings
-            .push(format!("{where_} may not ask for elevation"));
-        check.add_fix(&format!(
-            "set spec.allowElevation: true on {where_}, or install Zeabur with \
-             elevation.enabled=false"
         ));
     }
     check
@@ -790,7 +776,6 @@ mod tests {
                 "redirectUris": ["https://zeabur.example.com/auth/callback"],
                 "audiences": ["kubernetes"],
                 "secretHash": format!("sha256:{}", "0".repeat(64)),
-                "allowElevation": true,
             }))],
             facts: zeabur_kube::ClusterFacts {
                 version: version.to_owned(),
@@ -1006,7 +991,6 @@ mod tests {
             [
                 "OAuthClient zeabur-identity/zeabur does not get tokens for kubernetes: \
                  kube-apiserver refuses them",
-                "OAuthClient zeabur-identity/zeabur may not ask for elevation",
             ]
         );
     }

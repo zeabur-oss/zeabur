@@ -5,27 +5,21 @@ import { authenticator, enrol, signInAtZeaburIdentity } from "./identity.ts"
 
 type Grant = { project: string; role: "developer" | "viewer" }
 
-/** Enrols from an admin's invitation, signs in, and takes on admin rights on the Cluster page. */
-export async function signInAsAdmin(page: Page, link: string) {
-  const identity = new URL(link).origin
-  const device = await authenticator(page)
+/** Enrols from `link` with a virtual passkey, signs in, and waits for Home. */
+async function enrolAndSignIn(page: Page, link: string) {
+  await authenticator(page)
   await enrol(page, link)
   await page.goto("/")
-  await signInAtZeaburIdentity(page, identity)
+  await signInAtZeaburIdentity(page, new URL(link).origin)
   await expect(page.getByRole("heading", { level: 1, name: "Home" })).toBeVisible()
+}
+
+/** Enrols from an admin account's invitation (`zeabur-identityctl invite --admin`), signs in, and
+ * sees the Cluster page's nodes: an admin account acts with full rights from the start. */
+export async function signInAdmin(page: Page, link: string) {
+  await enrolAndSignIn(page, link)
   await page.goto("/cluster")
   const nodes = page.getByRole("region", { name: "Nodes" })
-  const view = nodes.getByRole("button", { name: "Use admin rights for a few minutes" })
-  await expect(view).toBeVisible({ timeout: 30_000 })
-  const opened = page.waitForEvent("popup")
-  await view.click()
-  const popup = await opened
-  await authenticator(popup, await device.passkeys())
-  await signInAtZeaburIdentity(popup, identity)
-  await expect(page.getByRole("dialog", { name: "Admin rights" })).toBeHidden({
-    timeout: 30_000,
-  })
-  if (!popup.isClosed()) await popup.close()
   await expect(nodes.getByRole("list", { name: "Nodes" })).toBeVisible({ timeout: 30_000 })
 }
 
@@ -83,11 +77,7 @@ export async function planAndApply(page: Page, project: string, changes: unknown
 export async function member(browser: Browser, link: string, username: string, zeabur: string) {
   const context = await browser.newContext({ baseURL: zeabur, locale: "en-US" })
   const page = await context.newPage()
-  await authenticator(page)
-  await enrol(page, link)
-  await page.goto("/")
-  await signInAtZeaburIdentity(page, new URL(link).origin)
-  await expect(page.getByRole("heading", { level: 1, name: "Home" })).toBeVisible()
+  await enrolAndSignIn(page, link)
   const whoami = (await (await page.request.get("/api/v1/whoami")).json()) as {
     username: string
     groups: string[]

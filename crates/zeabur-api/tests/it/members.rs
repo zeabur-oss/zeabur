@@ -27,11 +27,11 @@ mod tests {
     }
 
     fn user(name: &str, admin: bool) -> DynamicObject {
-        let groups = if admin { json!(["admins"]) } else { json!([]) };
+        let account_type = if admin { "Admin" } else { "Regular" };
         object(
             "User",
             name,
-            json!({"username": name, "groups": groups, "elevatedGroups": groups}),
+            json!({"username": name, "groups": [], "accountType": account_type}),
             json!({}),
         )
     }
@@ -427,7 +427,7 @@ mod tests {
             plan["writes"][0]["afterYaml"]
                 .as_str()
                 .unwrap()
-                .contains("- admins")
+                .contains("accountType: Admin")
         );
         assert_eq!(writes(&cluster).len(), 0);
 
@@ -458,8 +458,8 @@ mod tests {
         assert!(!stored.contains(token.split_once('.').unwrap().1));
         assert_eq!(invitation.data["spec"]["user"], "cy");
         assert_eq!(
-            dynamic(&cluster, NS, "cy").data["spec"]["elevatedGroups"],
-            json!(["admins"])
+            dynamic(&cluster, NS, "cy").data["spec"]["accountType"],
+            "Admin"
         );
     }
 
@@ -644,8 +644,8 @@ mod tests {
         assert_eq!(writes(&cluster).last().unwrap(), "patch User/bob");
         assert_eq!(planned(&plan).last().unwrap(), "patch User/bob");
         assert_eq!(
-            dynamic(&cluster, NS, "bob").data["spec"]["elevatedGroups"],
-            json!(["admins"])
+            dynamic(&cluster, NS, "bob").data["spec"]["accountType"],
+            "Admin"
         );
         let (status, body, _) = change(
             &cluster,
@@ -735,5 +735,52 @@ mod tests {
         )
         .await;
         assert_eq!(status, StatusCode::BAD_REQUEST);
+    }
+
+    /// Turning on AAL3 needs a device-bound passkey of your own, so you can still sign in after.
+    #[tokio::test]
+    async fn aal3_turns_on_only_for_an_admin_with_a_device_bound_passkey() {
+        let aal3 = json!({"adminAal3": true});
+        let uri = "/api/v1/settings/sign-in";
+        let (status, problem) = call(&signed_in("zeabur:bob"), "PUT", uri, Some(&aal3)).await;
+        assert_eq!(status, StatusCode::CONFLICT, "{problem}");
+        assert_eq!(problem["summary"]["key"], "settings.signIn.noDeviceBound");
+
+        let synced = signed_in("zeabur:ada");
+        synced.update(|s| {
+            for object in &mut s.dynamic {
+                if object.metadata.name.as_deref() == Some("ada-1") {
+                    object.data["spec"]["passkey"]["backupEligible"] = json!(true);
+                }
+            }
+        });
+        let (status, _) = call(&synced, "PUT", uri, Some(&aal3)).await;
+        assert_eq!(status, StatusCode::CONFLICT);
+        assert_eq!(writes(&synced), Vec::<String>::new());
+
+        let bound = signed_in("zeabur:ada");
+        let (_, before) = call(&bound, "GET", "/api/v1/settings/sign-in", None).await;
+        assert_eq!(
+            (
+                &before["teams"],
+                &before["adminAal3"],
+                &before["deviceBoundPasskey"]
+            ),
+            (&json!("single"), &json!(false), &json!(true))
+        );
+        let (status, after) = call(
+            &bound,
+            "PUT",
+            "/api/v1/settings/sign-in",
+            Some(&json!({"adminAal3": true, "teams": "multiple"})),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{after}");
+        assert_eq!(
+            (&after["teams"], &after["adminAal3"]),
+            (&json!("multiple"), &json!(true))
+        );
+        assert_eq!(after["storedIn"]["name"], "zeabur-identity-settings");
+        assert_eq!(after["storedIn"]["namespace"], NS);
     }
 }

@@ -3,7 +3,7 @@
 //! kube-apiserver answers `403 Forbidden` both when its authorizers refuse a request and when an
 //! admission plugin refuses it after they allowed it: a `ResourceQuota` [k8s-quota], a
 //! `LimitRange` [k8s-limitrange], Pod Security admission, a webhook. Only the first is about the
-//! person's rights; admin rights do not lift a quota. So on a `403` to a write, Zeabur asks one
+//! person's rights. So on a `403` to a write, Zeabur asks one
 //! `SelfSubjectAccessReview` for the same request, with the same credential
 //! ([`zeabur_kube::Cluster::review_access`]): allowed means admission refused it.
 //!
@@ -17,9 +17,6 @@
 //!   '{name}' with binding '{binding}' denied request: …" [k8s-vap-errors], with the status its
 //!   validation's `reason` gives (the chart's own gives `Forbidden`; without one it is `422
 //!   Invalid`, which is no malformed object either).
-//!
-//! Neither kind is a refusal for missing rights, so neither is offered as `elevation-required`
-//! ([`crate::error`]).
 //!
 //! [k8s-quota]: https://kubernetes.io/docs/concepts/policy/resource-quotas/
 //! [k8s-limitrange]: https://kubernetes.io/docs/concepts/policy/limit-range/
@@ -75,7 +72,6 @@ pub(crate) async fn refine(
         Kind::BadRequest
         | Kind::Unauthenticated
         | Kind::SignedOut
-        | Kind::ElevationRequired
         | Kind::QuotaExceeded
         | Kind::PolicyDenied
         | Kind::NotFound

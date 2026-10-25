@@ -1,18 +1,10 @@
 import { describe, expect, test } from "bun:test"
 
-import {
-  askerOf,
-  gate,
-  mayActAsClusterAdmin,
-  neededRole,
-  rightOfResource,
-  ruleOf,
-  unknownRights,
-} from "@/model/rights"
+import { askerOf, gate, neededRole, rightOfResource, ruleOf, unknownRights } from "@/model/rights"
 
-const member = askerOf({ username: "zeabur:bob", groups: ["zeabur:members"] }, "available")
-const admin = askerOf({ username: "zeabur:alice", groups: ["zeabur:admins"] }, "available")
-const kubeconfig = askerOf({ username: "carol", groups: [] }, "unavailable")
+const member = askerOf({ username: "zeabur:bob" })
+const admin = askerOf({ username: "zeabur:alice" })
+const kubeconfig = askerOf({ username: "carol" })
 
 describe("closing an action by the person's rights", () => {
   test("only a denial closes it, naming the role a member needs", () => {
@@ -27,21 +19,8 @@ describe("closing an action by the person's rights", () => {
     expect(gate("changeMembers", "denied", member)).toMatchObject({ role: "admin" })
   })
 
-  test("an admin who may take admin rights keeps it open; the plan offers them", () => {
-    expect(gate("installComponents", "denied", admin)).toStrictEqual({ open: true })
-    const elevated = askerOf({ username: "zeabur:alice", groups: ["zeabur:admins"] }, "active")
-    expect(gate("installComponents", "denied", elevated).open).toBe(false)
-    // Admin rights offered to someone outside the admins group would be refused by Zeabur Identity.
-    expect(gate("installComponents", "denied", member).open).toBe(false)
-  })
-
-  test("node and cluster terminals are offered to cluster administrators and admins who may elevate", () => {
-    const elevated = askerOf({ username: "zeabur:alice", groups: ["zeabur:admins"] }, "active")
-    expect(mayActAsClusterAdmin(true, kubeconfig)).toBe(true)
-    expect(mayActAsClusterAdmin(false, admin)).toBe(true)
-    expect(mayActAsClusterAdmin(false, elevated)).toBe(false)
-    expect(mayActAsClusterAdmin(false, member)).toBe(false)
-    expect(mayActAsClusterAdmin(undefined, kubeconfig)).toBe(false)
+  test("a denial closes it for an admin account too", () => {
+    expect(gate("installComponents", "denied", admin)).toMatchObject({ open: false, role: "admin" })
   })
 
   test("someone signed in with a kubeconfig is told the rule, not a role", () => {

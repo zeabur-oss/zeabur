@@ -334,7 +334,7 @@ EOF
   if ! kubectl -n zeabur-identity get oauthclients.identity.zeabur.com zeabur >/dev/null 2>&1 ||
     ! kubectl -n zeabur get secret zeabur-oidc >/dev/null 2>&1; then
     local secret
-    "$identityctl" client create zeabur --type confidential --allow-elevation --audience kubernetes \
+    "$identityctl" client create zeabur --type confidential --audience kubernetes \
       --display-name Zeabur --home-url "https://$zeabur_host/" \
       --redirect-uri "https://$zeabur_host/auth/callback" 2>"$state/client.err" |
       kubectl apply -f - >/dev/null

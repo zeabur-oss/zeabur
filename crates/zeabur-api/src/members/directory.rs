@@ -10,7 +10,7 @@ use zeabur_kube::{Cluster, ClusterError, DynamicObject, ResourceRef};
 use zeabur_model::Origin;
 
 use super::access::ProjectGrant;
-use super::{ADMIN_GROUP, API_VERSION, DEPLOYMENT, GROUP, USER_PREFIX, VERSION};
+use super::{API_VERSION, DEPLOYMENT, GROUP, USER_PREFIX, VERSION};
 use crate::error::{ApiError, list_read, read_problem};
 use crate::projects::namespace::Permission;
 use crate::settings::IdentitySettings;
@@ -64,7 +64,15 @@ pub(crate) struct UserSpec {
     #[serde(default)]
     pub(crate) disabled: bool,
     #[serde(default)]
-    pub(crate) elevated_groups: Vec<String>,
+    pub(crate) account_type: AccountType,
+}
+
+/// A `User`'s `spec.accountType`.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize)]
+pub(crate) enum AccountType {
+    #[default]
+    Regular,
+    Admin,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -319,7 +327,7 @@ impl Directory {
             .max()
             .map(|t| t.to_string());
         let spec = &user.spec;
-        let admin = spec.elevated_groups.iter().any(|g| g == ADMIN_GROUP);
+        let admin = spec.account_type == AccountType::Admin;
         MemberView {
             id: format!("members/{username}"),
             display_name: spec.display_name.clone().filter(|n| !n.trim().is_empty()),
@@ -560,7 +568,7 @@ pub struct LinkedAccountView {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub enum MemberRole {
-    /// May take on admin rights (`elevatedGroups` holds `admins`).
+    /// An admin account (`accountType: Admin`): full rights, passkey sign-in only.
     Admin,
     /// Signs in; their rights are whatever RBAC grants their name and groups.
     Member,
@@ -663,8 +671,8 @@ mod tests {
     fn user(name: &str, admin: bool) -> Object<UserSpec> {
         object(json!({
             "metadata": {"name": name},
-            "spec": {"username": name, "groups": if admin {json!(["admins"])} else {json!([])},
-                     "elevatedGroups": if admin {json!(["admins"])} else {json!([])}}
+            "spec": {"username": name, "groups": [],
+                     "accountType": if admin {"Admin"} else {"Regular"}}
         }))
     }
 

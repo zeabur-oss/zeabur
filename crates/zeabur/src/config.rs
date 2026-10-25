@@ -47,21 +47,17 @@ pub(crate) struct Args {
     /// bytes, or 64 hexadecimal digits.
     #[arg(long, env = "ZEABUR_PLAN_KEY_FILE")]
     pub(crate) plan_key_file: PathBuf,
-    /// Offer "Retry as admin" when the cluster refuses a change. The client must be allowed to
-    /// ask for elevation in Zeabur Identity (`--allow-elevation`). As an environment variable,
-    /// `true` or `false`.
-    #[arg(long, env = "ZEABUR_ELEVATION")]
-    pub(crate) elevation: bool,
     /// The chart installed the member roles (`zeabur-member`, `zeabur-project-developer`,
     /// `zeabur-project-viewer`), so members can be given rights in chosen projects. As an
     /// environment variable, `true` or `false`.
     #[arg(long, env = "ZEABUR_MEMBER_ROLES")]
     pub(crate) member_roles: bool,
-    /// Minutes a session may go unused before it ends.
-    #[arg(long, env = "ZEABUR_SESSION_IDLE_MINUTES", default_value_t = 30)]
+    /// Minutes a session may go unused before it ends. Zeabur Identity's idle limit for the
+    /// account, when shorter, applies instead.
+    #[arg(long, env = "ZEABUR_SESSION_IDLE_MINUTES", default_value_t = 60)]
     pub(crate) session_idle_minutes: u32,
     /// Hours a session lasts at most, used or not.
-    #[arg(long, env = "ZEABUR_SESSION_MAX_HOURS", default_value_t = 8)]
+    #[arg(long, env = "ZEABUR_SESSION_MAX_HOURS", default_value_t = 12)]
     pub(crate) session_max_hours: u32,
     /// The metrics store history is read from, until someone chooses another in the settings: a
     /// Service port serving the Prometheus HTTP API, as `namespace/name:port`. Empty: where
@@ -144,7 +140,6 @@ pub(crate) struct Config {
     pub(crate) client_id: String,
     pub(crate) client_secret: SecretString,
     pub(crate) plan_key: PlanKey,
-    pub(crate) elevation: bool,
     pub(crate) limits: Limits,
     pub(crate) settings: zeabur_api::Settings,
     pub(crate) proxy: Option<crate::proxy::Proxy>,
@@ -152,7 +147,6 @@ pub(crate) struct Config {
 
 impl Args {
     /// Checks every value and reads the files.
-    #[expect(clippy::too_many_lines, reason = "one step per flag")]
     pub(crate) fn check(&self) -> Result<Config, String> {
         let public_url =
             BaseUrl::parse_root(&self.public_url).map_err(|e| format!("--public-url: {e}"))?;
@@ -250,7 +244,6 @@ impl Args {
             client_id: self.client_id.clone(),
             client_secret: SecretString::from(secret),
             plan_key,
-            elevation: self.elevation,
             limits: Limits {
                 idle: i64::from(self.session_idle_minutes) * 60,
                 absolute: i64::from(self.session_max_hours) * 3600,
@@ -496,12 +489,11 @@ mod tests {
     #[test]
     fn a_complete_configuration_is_accepted() {
         let files = Files::new("ok");
-        let config = args(&files, &["--elevation"]).unwrap();
+        let config = args(&files, &[]).unwrap();
         assert_eq!(config.public_url.origin(), "https://zeabur.example.com");
         assert_eq!(config.client_id, "zeabur");
-        assert!(config.elevation);
-        assert_eq!(config.limits.idle, 1800);
-        assert_eq!(config.limits.absolute, 8 * 3600);
+        assert_eq!(config.limits.idle, 3600);
+        assert_eq!(config.limits.absolute, 12 * 3600);
         assert!(!format!("{config:?}").contains("s3cret"));
     }
 

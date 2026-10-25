@@ -11,7 +11,7 @@ use zeabur_core::problem::{Kind, Problem};
 use zeabur_kube::k8s_openapi::jiff::Timestamp;
 use zeabur_kube::{Cluster, ObjectTarget, Preconditions, WriteBody, WriteRequest};
 
-use super::directory::{Directory, IdentityKind, Object, UserSpec, request};
+use super::directory::{AccountType, Directory, IdentityKind, Object, UserSpec, request};
 use super::{ADMIN_GROUP, API_VERSION, EXPIRES_AT_ANNOTATION, EXPIRY_BUCKET_LABEL, USER_LABEL};
 use crate::error::{ApiError, read_problem};
 
@@ -165,11 +165,10 @@ pub(crate) fn new_user(
     display_name: Option<&str>,
     admin: bool,
 ) -> Value {
-    let groups: Vec<&str> = if admin { vec![ADMIN_GROUP] } else { Vec::new() };
     let mut spec = json!({
         "username": username,
-        "groups": groups,
-        "elevatedGroups": groups,
+        "groups": [],
+        "accountType": account_type(admin),
     });
     if let Some(name) = display_name.map(str::trim).filter(|n| !n.is_empty())
         && let Some(spec) = spec.as_object_mut()
@@ -188,32 +187,29 @@ pub(crate) fn new_user(
     })
 }
 
-/// `groups` with `admins` added or taken away, the rest kept in order.
-fn with_admin(groups: &[String], admin: bool) -> Vec<String> {
-    let mut groups: Vec<String> = groups
-        .iter()
-        .filter(|g| g.as_str() != ADMIN_GROUP)
-        .cloned()
-        .collect();
-    if admin {
-        groups.push(ADMIN_GROUP.to_owned());
-    }
-    groups
+const fn account_type(admin: bool) -> &'static str {
+    if admin { "Admin" } else { "Regular" }
 }
 
-/// The JSON Patch that makes `user` an admin or takes that away, against the object as read;
-/// `None` when it already is what is asked.
+/// The JSON Patch that makes `user` an admin account or a regular one, against the object as
+/// read; `None` when it already is what is asked. It also takes `admins` out of `groups`, which
+/// Zeabur Identity refuses there.
 pub(crate) fn admin_patch(user: &Object<UserSpec>, admin: bool) -> Option<Value> {
-    let groups = with_admin(&user.spec.groups, admin);
-    let elevated = with_admin(&user.spec.elevated_groups, admin);
-    if groups == user.spec.groups && elevated == user.spec.elevated_groups {
+    let groups: Vec<&String> = user
+        .spec
+        .groups
+        .iter()
+        .filter(|g| g.as_str() != ADMIN_GROUP)
+        .collect();
+    let is_admin = user.spec.account_type == AccountType::Admin;
+    if is_admin == admin && groups.len() == user.spec.groups.len() {
         return None;
     }
     Some(json!([
         {"op": "test", "path": "/metadata/uid", "value": user.metadata.uid},
         {"op": "test", "path": "/metadata/resourceVersion", "value": user.metadata.resource_version},
         {"op": "add", "path": "/spec/groups", "value": groups},
-        {"op": "add", "path": "/spec/elevatedGroups", "value": elevated},
+        {"op": "add", "path": "/spec/accountType", "value": account_type(admin)},
     ]))
 }
 
@@ -395,35 +391,37 @@ mod tests {
     }
 
     #[test]
-    fn a_new_admin_gets_the_admins_groups_and_a_member_none() {
+    fn a_new_admin_is_an_admin_account_and_a_member_a_regular_one() {
         let admin = new_user("ns", "cy", Some(" Cy "), true);
-        assert_eq!(admin["spec"]["groups"], json!(["admins"]));
-        assert_eq!(admin["spec"]["elevatedGroups"], json!(["admins"]));
+        assert_eq!(admin["spec"]["groups"], json!([]));
+        assert_eq!(admin["spec"]["accountType"], "Admin");
         assert_eq!(admin["spec"]["displayName"], "Cy");
         let member = new_user("ns", "cy", None, false);
         assert_eq!(member["spec"]["groups"], json!([]));
-        assert_eq!(member["spec"]["elevatedGroups"], json!([]));
+        assert_eq!(member["spec"]["accountType"], "Regular");
     }
 
     #[test]
-    fn admin_rights_add_or_take_only_the_admins_group() {
+    fn the_admin_role_changes_the_account_type_and_keeps_other_groups() {
         let user: Object<UserSpec> = serde_json::from_value(json!({
             "metadata": {"name": "bob", "uid": "u", "resourceVersion": "7"},
-            "spec": {"username": "bob", "groups": ["dev"], "elevatedGroups": []}
+            "spec": {"username": "bob", "groups": ["dev"]}
         }))
         .unwrap();
         let patch = admin_patch(&user, true).unwrap();
         assert_eq!(patch[1]["value"], "7");
-        assert_eq!(patch[2]["value"], json!(["dev", "admins"]));
-        assert_eq!(patch[3]["value"], json!(["admins"]));
+        assert_eq!(patch[2]["value"], json!(["dev"]));
+        assert_eq!(patch[3]["value"], "Admin");
         assert_eq!(admin_patch(&user, false), None);
+        // A group list from before admin accounts loses `admins`.
         let admin: Object<UserSpec> = serde_json::from_value(json!({
             "metadata": {"name": "ada", "uid": "u"},
-            "spec": {"username": "ada", "groups": ["admins", "dev"], "elevatedGroups": ["admins"]}
+            "spec": {"username": "ada", "groups": ["admins", "dev"], "accountType": "Admin"}
         }))
         .unwrap();
-        let patch = admin_patch(&admin, false).unwrap();
+        let patch = admin_patch(&admin, true).unwrap();
         assert_eq!(patch[2]["value"], json!(["dev"]));
-        assert_eq!(patch[3]["value"], json!([]));
+        let patch = admin_patch(&admin, false).unwrap();
+        assert_eq!(patch[3]["value"], "Regular");
     }
 }

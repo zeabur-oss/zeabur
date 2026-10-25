@@ -47,26 +47,19 @@ kubectl delete rolebindings,clusterrolebindings -A -l "$selector" --wait >/dev/n
 kubectl -n zeabur-identity delete users.identity.zeabur.com "${users[@]}" \
   --ignore-not-found --cascade=foreground --wait >/dev/null
 setup_link=$("$zeabur_identityctl" setup-link --username admin)
-admin_link=$("$zeabur_identityctl" invite --username e2e-admin --group admins \
-  --elevated-group admins)
+admin_link=$("$zeabur_identityctl" invite --username e2e-admin --admin)
 member_link=$("$zeabur_identityctl" invite --username e2e-member)
-db_admin_link=$("$zeabur_identityctl" invite --username e2e-db-admin --group admins \
-  --elevated-group admins)
-image_admin_link=$("$zeabur_identityctl" invite --username e2e-image-admin --group admins \
-  --elevated-group admins)
-usage_admin_link=$("$zeabur_identityctl" invite --username e2e-usage-admin --group admins \
-  --elevated-group admins)
-terminal_admin_link=$("$zeabur_identityctl" invite --username e2e-terminal-admin --group admins \
-  --elevated-group admins)
+db_admin_link=$("$zeabur_identityctl" invite --username e2e-db-admin --admin)
+image_admin_link=$("$zeabur_identityctl" invite --username e2e-image-admin --admin)
+usage_admin_link=$("$zeabur_identityctl" invite --username e2e-usage-admin --admin)
+terminal_admin_link=$("$zeabur_identityctl" invite --username e2e-terminal-admin --admin)
 # Deploy from Git, when Zeabur Builder runs here (e2e/l2/git.spec.ts skips otherwise), and from a
 # private repository when E2E_PRIVATE_GIT_REPO names one (e2e/l2/git-private.spec.ts).
 git_admin_link="" git_private_admin_link=""
 if has_crd builds.builder.zeabur.com; then
-  git_admin_link=$("$zeabur_identityctl" invite --username e2e-git-admin --group admins \
-    --elevated-group admins)
+  git_admin_link=$("$zeabur_identityctl" invite --username e2e-git-admin --admin)
   if [[ -n "${E2E_PRIVATE_GIT_REPO:-}" ]]; then
-    git_private_admin_link=$("$zeabur_identityctl" invite --username e2e-git-private-admin \
-      --group admins --elevated-group admins)
+    git_private_admin_link=$("$zeabur_identityctl" invite --username e2e-git-private-admin --admin)
   fi
 fi
 

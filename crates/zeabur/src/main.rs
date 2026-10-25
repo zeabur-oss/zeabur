@@ -133,7 +133,6 @@ async fn serve(args: &Args, config: Config) -> Result<(), String> {
         sessions: Arc::clone(&sessions),
         connect,
         flow_key: FlowKey::random().map_err(|e| e.to_string())?,
-        elevation: config.elevation,
         clock,
     });
     let log_proxy = config.proxy.map(|proxy| {

@@ -4,11 +4,8 @@
 //! router serves local mode (one person, their kubeconfig), the in-cluster server (a client per
 //! request, from the person's token) and tests (an in-memory cluster).
 //!
-//! There is one way to the cluster for a request, [`ClusterAccess::for_request`], which also says
-//! whether an administrator's credential is in use or offered ([`Elevation`]). Elevation works
-//! like `sudo`: while the person holds the admin credential, everything goes with it, reads
-//! included. The everyday credential stays reachable only for a plan's binding
-//! ([`ClusterAccess::everyday`]).
+//! There is one way to the cluster for a request, [`ClusterAccess::for_request`]. An admin
+//! account acts with its full rights directly.
 
 use std::sync::Arc;
 
@@ -17,38 +14,6 @@ use zeabur_core::problem::Problem;
 use zeabur_kube::k8s_openapi::jiff::Timestamp;
 use zeabur_kube::{Cluster, UserToken};
 
-/// Whether the person can act as an administrator for a while (the in-cluster server with
-/// elevation turned on; see the `zeabur` binary).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Elevation {
-    /// Not offered here: local mode, or a server without elevation.
-    Unavailable,
-    /// Offered, not in use: a request the cluster refuses may be retried as an administrator.
-    Available,
-    /// In use until this time: every request already carries the administrator's credential.
-    Active {
-        /// When the elevated credential expires.
-        until: Timestamp,
-    },
-}
-
-/// The connection a request goes through, and whether it is elevated.
-#[derive(Clone)]
-pub struct Access {
-    /// The connection: the administrator's while the person holds one, as with `sudo`.
-    pub cluster: Arc<dyn Cluster>,
-    /// Whether an administrator's credential is in use or could be.
-    pub elevation: Elevation,
-}
-
-impl std::fmt::Debug for Access {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Access")
-            .field("elevation", &self.elevation)
-            .finish_non_exhaustive()
-    }
-}
-
 /// A person's bearer token for kube-apiserver, as the session holds it now.
 #[derive(Clone)]
 pub struct Handoff {
@@ -56,49 +21,25 @@ pub struct Handoff {
     pub token: UserToken,
     /// When it expires.
     pub expires_at: Timestamp,
-    /// Whether it is the administrator's.
-    pub admin: bool,
 }
 
 impl std::fmt::Debug for Handoff {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Handoff")
             .field("expires_at", &self.expires_at)
-            .field("admin", &self.admin)
             .finish_non_exhaustive()
     }
 }
 
 /// Gives each request the cluster connection of the person who made it.
 pub trait ClusterAccess: Send + Sync + 'static {
-    /// The connection for this request and its elevation state, or the problem that prevents one
-    /// (not signed in, …). Every read, write and terminal goes through it: while the person holds
-    /// an administrator's credential it is that one, otherwise their everyday one.
+    /// The connection for this request, or the problem that prevents one (not signed in, …).
+    /// Every read, write and terminal goes through it.
     ///
     /// # Errors
     ///
     /// When the request carries no usable identity.
-    fn for_request(&self, parts: &Parts) -> Result<Access, Box<Problem>>;
-
-    /// The connection of the person's everyday credential, also while they are elevated. Only
-    /// for what must not change with elevation: a plan token is bound to the identity it was
-    /// made with, and binding it to the everyday one lets a plan made before elevating apply
-    /// after, and one made while elevated apply once the rights have ended (see the `writes`
-    /// module).
-    ///
-    /// # Errors
-    ///
-    /// When the request carries no usable identity.
-    fn everyday(&self, parts: &Parts) -> Result<Arc<dyn Cluster>, Box<Problem>> {
-        self.for_request(parts).map(|access| access.cluster)
-    }
-
-    /// When the credential of [`ClusterAccess::for_request`] stops being valid, if it does: the
-    /// administrator's while the person is elevated. kube-apiserver checks a token when a stream
-    /// opens, not while it stays open, so a terminal is closed at this time by Zeabur itself.
-    fn credential_expiry(&self, _parts: &Parts) -> Option<Timestamp> {
-        None
-    }
+    fn for_request(&self, parts: &Parts) -> Result<Arc<dyn Cluster>, Box<Problem>>;
 
     /// The token of [`ClusterAccess::for_request`], to hand to a tools pod (see the `tools`
     /// module) or to Zeabur Proxy (see `services::logs`); `None` where Zeabur holds no token of
@@ -133,10 +74,7 @@ impl std::fmt::Debug for SingleCluster {
 }
 
 impl ClusterAccess for SingleCluster {
-    fn for_request(&self, _parts: &Parts) -> Result<Access, Box<Problem>> {
-        Ok(Access {
-            cluster: Arc::clone(&self.0),
-            elevation: Elevation::Unavailable,
-        })
+    fn for_request(&self, _parts: &Parts) -> Result<Arc<dyn Cluster>, Box<Problem>> {
+        Ok(Arc::clone(&self.0))
     }
 }

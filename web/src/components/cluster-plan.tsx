@@ -67,7 +67,7 @@ export function PlanFrame<P extends { expiresAt: string; token?: string | null }
       {plan.isPending || plan.isFetching ? (
         <LoadingRows label={t("plan.planning")} rows={3} />
       ) : plan.isError ? (
-        <Problem error={plan.error} what={what} retry={() => void plan.refetch()} />
+        <Problem error={plan.error} what={what} />
       ) : (
         children(plan.data)
       )}

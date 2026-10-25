@@ -30,9 +30,10 @@ const HOST: (&str, &str) = ("host", "127.0.0.1:8080");
 const SAME_ORIGIN: [(&str, &str); 2] = [("sec-fetch-site", "same-origin"), ("zeabur-request", "1")];
 const NOW: i64 = 1_800_000_000;
 
-/// A project whose Deployment `web` the everyday credential may not change, in a cluster whose
-/// nodes it may not list.
-fn cluster(user: &str, elevated: bool) -> MemoryCluster {
+/// A project whose Deployment `web` only an admin account may change, in a cluster whose nodes
+/// only an admin account may list. The admin account is `root`.
+fn cluster(user: &str) -> MemoryCluster {
+    let admin = user == "root";
     let namespace: Namespace = serde_json::from_value(json!({"metadata": {"name": "shop",
         "labels": {"zeabur.com/project": "true"}}}))
     .unwrap();
@@ -46,8 +47,8 @@ fn cluster(user: &str, elevated: bool) -> MemoryCluster {
     }))
     .unwrap();
     let mut groups = vec!["developers".to_owned()];
-    if elevated {
-        groups.push("elevated:admins".to_owned());
+    if admin {
+        groups.push("admins".to_owned());
     }
     let cluster = MemoryCluster::new(State {
         identity: Identity {
@@ -65,7 +66,7 @@ fn cluster(user: &str, elevated: bool) -> MemoryCluster {
         )]),
         ..State::default()
     });
-    if !elevated {
+    if !admin {
         cluster.update(|s| {
             s.forbidden_writes.insert("Deployment/web".to_owned());
             s.forbidden_resources.insert("nodes".to_owned());
@@ -81,7 +82,7 @@ struct Rig {
 }
 
 impl Rig {
-    async fn new(elevation: bool) -> Self {
+    async fn new() -> Self {
         let issuer = FakeIssuer::start().await;
         let public = BaseUrl::parse_root(PUBLIC).unwrap();
         let oauth = Arc::new(
@@ -97,14 +98,14 @@ impl Rig {
         let now = Arc::new(AtomicI64::new(NOW));
         let read = Arc::clone(&now);
         let clock: zeabur_auth::session::Clock = Arc::new(move || read.load(Ordering::SeqCst));
-        // Tokens read `<user>:<n>` or `<user>:elevated:<n>`; kube-apiserver refuses `mallory`.
+        // Tokens read `<user>:<n>`; kube-apiserver refuses `mallory`.
         let connect: zeabur_auth::session::Bind<Connection> = Arc::new(|token: SecretString| {
             let text = token.expose_secret();
             let user = text.split(':').next().unwrap_or("");
             if user == "mallory" {
                 return Err("Unauthorized".to_owned());
             }
-            let cluster = Arc::new(cluster(user, text.contains(":elevated:")));
+            let cluster = Arc::new(cluster(user));
             Ok(Connection {
                 cluster,
                 token: UserToken::new(token).map_err(|e| e.to_string())?,
@@ -122,7 +123,6 @@ impl Rig {
             sessions,
             connect,
             flow_key: FlowKey::random().unwrap(),
-            elevation,
             clock,
         });
         Self {
@@ -186,35 +186,6 @@ impl Rig {
         assert_eq!(back.status(), StatusCode::SEE_OTHER, "{}", text(back).await);
         assert_eq!(location(&back), "/projects/shop");
         cookie_pair(&back, "__Host-zeabur")
-    }
-
-    /// `user` confirms admin rights in the window `/auth/elevate` opened; the page it ends on.
-    async fn elevate(&self, session: &str, user: &str) -> String {
-        let start = self
-            .send(
-                Method::GET,
-                "/auth/elevate",
-                &[HOST, ("cookie", session), ("sec-fetch-site", "same-origin")],
-            )
-            .await;
-        assert_eq!(
-            start.status(),
-            StatusCode::SEE_OTHER,
-            "{}",
-            text(start).await
-        );
-        let flow = cookie_pair(&start, "__Host-zeabur-elevate");
-        let answer = self.issuer.approve(location(&start), user);
-        let cookies = format!("{session}; {flow}");
-        let page = self
-            .send(
-                Method::GET,
-                &format!("/auth/callback?{answer}"),
-                &[HOST, ("cookie", &cookies)],
-            )
-            .await;
-        assert_eq!(page.status(), StatusCode::OK);
-        text(page).await
     }
 
     async fn plan_and_apply(&self, session: &str) -> (StatusCode, Value) {
@@ -296,7 +267,7 @@ fn form_urlencoded_pairs(query: &str) -> HashMap<String, String> {
 
 #[tokio::test]
 async fn the_health_check_needs_no_host_or_session() {
-    let rig = Rig::new(true).await;
+    let rig = Rig::new().await;
     let response = rig
         .send(Method::GET, "/api/healthz", &[("host", "10.42.0.7:8080")])
         .await;
@@ -305,7 +276,7 @@ async fn the_health_check_needs_no_host_or_session() {
 
 #[tokio::test]
 async fn without_a_session_the_api_answers_signed_out() {
-    let rig = Rig::new(true).await;
+    let rig = Rig::new().await;
     for cookie in ["", "__Host-zeabur=guess"] {
         let (status, problem) = rig.get_json("/api/v1/whoami", cookie).await;
         assert_eq!(status, StatusCode::UNAUTHORIZED);
@@ -340,7 +311,7 @@ async fn open_page(rig: &Rig, uri: &str, headers: &[(&str, &str)]) -> Option<Str
 #[cfg(feature = "ui")]
 #[tokio::test]
 async fn a_page_opened_without_a_session_goes_to_sign_in_first() {
-    let rig = Rig::new(true).await;
+    let rig = Rig::new().await;
     let page = [HOST, NAVIGATE[0], NAVIGATE[1]];
     assert_eq!(
         open_page(&rig, "/projects/shop?tab=logs", &page)
@@ -382,7 +353,7 @@ async fn a_page_opened_without_a_session_goes_to_sign_in_first() {
 #[cfg(feature = "ui")]
 #[tokio::test]
 async fn a_signed_in_page_load_gets_the_interface() {
-    let rig = Rig::new(true).await;
+    let rig = Rig::new().await;
     let session = rig.sign_in("alice").await;
     let page = [HOST, NAVIGATE[0], NAVIGATE[1], ("cookie", &session)];
     assert_eq!(open_page(&rig, "/projects/shop", &page).await, None);
@@ -392,7 +363,7 @@ async fn a_signed_in_page_load_gets_the_interface() {
 #[cfg(feature = "ui")]
 #[tokio::test]
 async fn the_return_path_never_leaves_this_server() {
-    let rig = Rig::new(true).await;
+    let rig = Rig::new().await;
     let page = [HOST, NAVIGATE[0], NAVIGATE[1]];
     for uri in ["//attacker.example/", "//attacker.example/projects"] {
         assert_eq!(
@@ -419,7 +390,7 @@ async fn the_return_path_never_leaves_this_server() {
 
 #[tokio::test]
 async fn signing_in_sends_the_browser_to_the_issuer_with_a_sealed_flow_cookie() {
-    let rig = Rig::new(true).await;
+    let rig = Rig::new().await;
     let login = rig
         .send(
             Method::GET,
@@ -463,21 +434,18 @@ async fn signing_in_sends_the_browser_to_the_issuer_with_a_sealed_flow_cookie() 
 
 #[tokio::test]
 async fn a_signed_in_person_uses_the_api_as_themselves() {
-    let rig = Rig::new(true).await;
+    let rig = Rig::new().await;
     let session = rig.sign_in("alice").await;
     let (status, whoami) = rig.get_json("/api/v1/whoami", &session).await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(whoami["username"], "alice");
     let (_, view) = rig.get_json("/api/v1/session", &session).await;
     assert_eq!(view["signsIn"], true);
-    assert_eq!(view["elevation"], "available");
-    assert!(view["expiresAt"].as_str().unwrap().ends_with('Z'));
-    assert!(view.get("elevatedUntil").is_none());
 }
 
 #[tokio::test]
 async fn a_callback_that_does_not_match_a_sign_in_in_this_browser_is_refused() {
-    let rig = Rig::new(true).await;
+    let rig = Rig::new().await;
     let login = rig.send(Method::GET, "/auth/login", &[HOST]).await;
     let flow = cookie_pair(&login, "__Host-zeabur-signin");
     let answer = rig.issuer.approve(location(&login), "alice");
@@ -520,7 +488,7 @@ async fn a_callback_that_does_not_match_a_sign_in_in_this_browser_is_refused() {
 
 #[tokio::test]
 async fn a_token_the_cluster_refuses_starts_no_session() {
-    let rig = Rig::new(true).await;
+    let rig = Rig::new().await;
     let login = rig.send(Method::GET, "/auth/login", &[HOST]).await;
     let flow = cookie_pair(&login, "__Host-zeabur-signin");
     let answer = rig.issuer.approve(location(&login), "mallory");
@@ -541,7 +509,7 @@ async fn a_token_the_cluster_refuses_starts_no_session() {
 
 #[tokio::test]
 async fn changes_from_other_sites_and_hosts_are_refused() {
-    let rig = Rig::new(true).await;
+    let rig = Rig::new().await;
     let session = rig.sign_in("alice").await;
     let apply = "/api/v1/projects/shop/apply";
     for headers in [
@@ -586,145 +554,66 @@ async fn changes_from_other_sites_and_hosts_are_refused() {
     assert_eq!(response.status(), StatusCode::FORBIDDEN);
 }
 
-/// The whole elevation: a refused write and a refused read offer it; the window ends with
-/// `done`; the same plan applies and the read succeeds with the elevated token; dropping it
-/// brings the offer back.
+/// No admin step: an admin account changes the project and reads the nodes directly, and a
+/// regular account gets a plain refusal.
 #[tokio::test]
-async fn a_refused_request_is_retried_as_an_administrator() {
-    let rig = Rig::new(true).await;
-    let session = rig.sign_in("alice").await;
-    let (status, problem) = rig.plan_and_apply(&session).await;
+async fn an_admin_account_acts_directly_and_a_regular_one_is_refused() {
+    let rig = Rig::new().await;
+    let alice = rig.sign_in("alice").await;
+    let (status, problem) = rig.plan_and_apply(&alice).await;
     assert_eq!(status, StatusCode::FORBIDDEN);
-    assert_eq!(problem["type"], "/problems/elevation-required");
+    assert_eq!(problem["type"], "/problems/forbidden");
     assert_eq!(problem["denied"]["verb"], "patch");
-    let (status, problem) = rig.get_json("/api/v1/cluster/nodes", &session).await;
+    let (status, problem) = rig.get_json("/api/v1/cluster/nodes", &alice).await;
     assert_eq!(status, StatusCode::FORBIDDEN);
-    assert_eq!(problem["type"], "/problems/elevation-required");
-    assert_eq!(problem["kubernetes"]["code"], 403);
+    assert_eq!(problem["type"], "/problems/forbidden");
     assert_eq!(problem["denied"]["resource"], "nodes");
 
-    // Plan before elevating, apply after: the plan's user binding still holds.
-    let change = json!({"changes": [{"op": "env",
-        "workload": {"kind": "Deployment", "name": "web"},
-        "changes": [{"op": "set", "name": "MODE", "value": "maintenance"}]}]});
-    let (_, plan) = rig
-        .post_json("/api/v1/projects/shop/plan", &session, &change)
-        .await;
-
-    let page = rig.elevate(&session, "alice").await;
-    assert!(page.contains(r#"data-result="done""#), "{page}");
-    assert!(
-        page.contains(r#"data-until="2027-01-15T08:05:00Z""#),
-        "{page}"
-    );
-    assert!(page.contains(r#"<script src="/auth/elevated.js"></script>"#));
-    let (_, view) = rig.get_json("/api/v1/session", &session).await;
-    assert_eq!(view["elevation"], "active");
-    assert_eq!(view["elevatedUntil"], "2027-01-15T08:05:00Z");
-
-    let (status, applied) = rig
-        .post_json(
-            "/api/v1/projects/shop/apply",
-            &session,
-            &json!({"token": plan["token"]}),
-        )
-        .await;
+    let root = rig.sign_in("root").await;
+    let (status, applied) = rig.plan_and_apply(&root).await;
     assert_eq!(status, StatusCode::OK, "{applied}");
-    // Reads go with the elevated token too, as with `sudo`.
-    let (status, nodes) = rig.get_json("/api/v1/cluster/nodes", &session).await;
+    let (status, nodes) = rig.get_json("/api/v1/cluster/nodes", &root).await;
     assert_eq!(status, StatusCode::OK, "{nodes}");
-    let (_, whoami) = rig.get_json("/api/v1/whoami", &session).await;
-    assert_eq!(whoami["groups"], json!(["developers", "elevated:admins"]));
-    // A plan made while elevated is bound to the everyday identity, so it applies as well.
-    let (status, applied) = rig.plan_and_apply(&session).await;
-    assert_eq!(status, StatusCode::OK, "{applied}");
-
-    let mut headers = vec![HOST, ("cookie", session.as_str())];
-    headers.extend(SAME_ORIGIN);
-    let dropped = rig.send(Method::DELETE, "/auth/elevation", &headers).await;
-    assert_eq!(dropped.status(), StatusCode::NO_CONTENT);
-    let (_, view) = rig.get_json("/api/v1/session", &session).await;
-    assert_eq!(view["elevation"], "available");
-    let (_, problem) = rig.get_json("/api/v1/cluster/nodes", &session).await;
-    assert_eq!(problem["type"], "/problems/elevation-required");
-
-    // And it ends on its own after five minutes.
-    rig.elevate(&session, "alice").await;
-    rig.now.fetch_add(300, Ordering::SeqCst);
-    let (_, view) = rig.get_json("/api/v1/session", &session).await;
-    assert_eq!(view["elevation"], "available");
 }
 
+/// A request marked as background work, such as a poll from a page left open, does not keep the
+/// session alive. The session ends at the shorter of Zeabur's idle limit and the one the issuer
+/// gives its refresh token.
 #[tokio::test]
-async fn elevation_ends_plainly_when_not_allowed_or_for_someone_else() {
-    let rig = Rig::new(true).await;
-    let session = rig.sign_in("alice").await;
-    // Someone else's passkey in the window lends nothing to this session.
-    let page = rig.elevate(&session, "bob").await;
-    assert!(page.contains(r#"data-result="failed""#), "{page}");
-    let (_, view) = rig.get_json("/api/v1/session", &session).await;
-    assert_eq!(view["elevation"], "available");
+async fn only_requests_a_person_makes_keep_the_session_alive() {
+    let rig = Rig::new().await;
+    let whoami = |session: String, background: bool| {
+        let rig = &rig;
+        async move {
+            let mut headers = vec![HOST, ("cookie", session.as_str())];
+            if background {
+                headers.push((super::BACKGROUND, "1"));
+            }
+            rig.send(Method::GET, "/api/v1/whoami", &headers)
+                .await
+                .status()
+        }
+    };
+    let person = rig.sign_in("alice").await;
+    let background = rig.sign_in("bob").await;
+    rig.now.fetch_add(3000, Ordering::SeqCst);
+    assert_eq!(whoami(person.clone(), false).await, StatusCode::OK);
+    assert_eq!(whoami(background.clone(), true).await, StatusCode::OK);
+    rig.now.fetch_add(700, Ordering::SeqCst);
+    assert_eq!(whoami(person, false).await, StatusCode::OK);
+    assert_eq!(whoami(background, true).await, StatusCode::UNAUTHORIZED);
 
-    rig.issuer.with(|r| r.elevation_allowed = false);
-    let page = rig.elevate(&session, "alice").await;
-    assert!(page.contains(r#"data-result="not-allowed""#), "{page}");
-
-    // Only Zeabur's own page opens the window.
-    let response = rig
-        .send(
-            Method::GET,
-            "/auth/elevate",
-            &[HOST, ("cookie", &session), ("sec-fetch-site", "cross-site")],
-        )
-        .await;
-    assert_eq!(response.status(), StatusCode::FORBIDDEN);
-}
-
-#[tokio::test]
-async fn without_elevation_a_refusal_stays_forbidden() {
-    let rig = Rig::new(false).await;
-    let session = rig.sign_in("alice").await;
-    let (status, problem) = rig.plan_and_apply(&session).await;
-    assert_eq!(status, StatusCode::FORBIDDEN);
-    assert_eq!(problem["type"], "/problems/forbidden");
-    let (status, problem) = rig.get_json("/api/v1/cluster/nodes", &session).await;
-    assert_eq!(status, StatusCode::FORBIDDEN);
-    assert_eq!(problem["type"], "/problems/forbidden");
-    let (_, view) = rig.get_json("/api/v1/session", &session).await;
-    assert_eq!(view["elevation"], "unavailable");
-    let response = rig
-        .send(
-            Method::GET,
-            "/auth/elevate",
-            &[
-                HOST,
-                ("cookie", &session),
-                ("sec-fetch-site", "same-origin"),
-            ],
-        )
-        .await;
-    assert_eq!(response.status(), StatusCode::NOT_FOUND);
-}
-
-#[tokio::test]
-async fn someone_who_cannot_elevate_is_not_offered_it() {
-    let rig = Rig::new(true).await;
-    rig.issuer
-        .with(|r| r.cannot_elevate.insert("alice".to_owned()));
-    let session = rig.sign_in("alice").await;
-    let (status, problem) = rig.plan_and_apply(&session).await;
-    assert_eq!(status, StatusCode::FORBIDDEN);
-    assert_eq!(problem["type"], "/problems/forbidden");
-    let (status, problem) = rig.get_json("/api/v1/cluster/nodes", &session).await;
-    assert_eq!(status, StatusCode::FORBIDDEN);
-    assert_eq!(problem["type"], "/problems/forbidden");
-    let (_, view) = rig.get_json("/api/v1/session", &session).await;
-    assert_eq!(view["elevation"], "unavailable");
+    rig.issuer.with(|r| r.refresh_expires_in = Some(900));
+    let short = rig.sign_in("root").await;
+    rig.now.fetch_add(800, Ordering::SeqCst);
+    assert_eq!(whoami(short.clone(), false).await, StatusCode::OK);
+    rig.now.fetch_add(901, Ordering::SeqCst);
+    assert_eq!(whoami(short, false).await, StatusCode::UNAUTHORIZED);
 }
 
 #[tokio::test]
 async fn signing_out_ends_the_session_and_revokes_its_refresh_token() {
-    let rig = Rig::new(true).await;
+    let rig = Rig::new().await;
     let session = rig.sign_in("alice").await;
     let mut headers = vec![HOST, ("cookie", session.as_str())];
     headers.extend(SAME_ORIGIN);
@@ -741,11 +630,10 @@ async fn signing_out_ends_the_session_and_revokes_its_refresh_token() {
 }
 
 /// The terminal's handshake must come from the public URL's origin: `Host` alone matching is not
-/// enough (here the scheme differs). The refusal is Zeabur's own, so it stays `forbidden` although
-/// elevation is offered: admin rights would not change it.
+/// enough (here the scheme differs).
 #[tokio::test]
 async fn a_terminal_opens_only_from_the_public_origin() {
-    let rig = Rig::new(true).await;
+    let rig = Rig::new().await;
     let session = rig.sign_in("alice").await;
     let uri = "/api/v1/projects/shop/pods/web-1/exec";
     for (origin, refused) in [
@@ -773,78 +661,37 @@ async fn a_terminal_opens_only_from_the_public_origin() {
     }
 }
 
-/// Which token a request goes with, and so what a terminal closes at: the everyday one, or while
-/// the person is elevated the admin one, for reads as for writes, and its expiry. A plan's binding
-/// alone keeps the everyday one.
+/// Every request goes with the session's token, and a terminal gets that token and its expiry.
 #[test]
-fn every_request_goes_with_the_token_in_use_and_ends_with_it() {
-    use zeabur_api::access::{ClusterAccess as _, Elevation};
+fn every_request_goes_with_the_session_token() {
+    use zeabur_api::access::ClusterAccess as _;
     use zeabur_auth::session::{Bound, Credentials};
-    use zeabur_kube::k8s_openapi::jiff::Timestamp;
 
     use super::{SessionAccess, Signed};
 
-    let connection = |elevated: bool, token: &str| Connection {
-        cluster: Arc::new(cluster("alice", elevated)),
-        token: UserToken::new(SecretString::from(token)).unwrap(),
+    let base = Connection {
+        cluster: Arc::new(cluster("alice")),
+        token: UserToken::new(SecretString::from("alice:1")).unwrap(),
     };
-    let base = connection(false, "alice:1");
-    let elevated = connection(true, "alice:elevated:1");
     let access = SessionAccess {
-        elevation: true,
         origin: PUBLIC.to_owned(),
     };
     let mut parts = Request::builder().body(()).unwrap().into_parts().0;
-    assert_eq!(access.credential_expiry(&parts), None);
+    assert!(access.for_request(&parts).is_err());
     assert!(access.handoff(&parts).is_none());
 
-    let mut credentials = Credentials {
+    parts.extensions.insert(Signed::In(Credentials {
         username: "alice".to_owned(),
         base: Bound {
             value: base.clone(),
             expires_at: NOW + 600,
         },
-        elevated: None,
-        can_elevate: true,
-    };
-    parts.extensions.insert(Signed::In(credentials.clone()));
-    assert_eq!(
-        access.credential_expiry(&parts).map(Timestamp::as_second),
-        Some(NOW + 600)
-    );
-    let now = access.for_request(&parts).unwrap();
-    assert!(Arc::ptr_eq(&now.cluster, &base.cluster));
-    assert!(matches!(now.elevation, Elevation::Available));
+    }));
+    let cluster = access.for_request(&parts).unwrap();
+    let expected: Arc<dyn zeabur_kube::Cluster> =
+        Arc::<dyn zeabur_kube::Cluster>::clone(&base.cluster);
+    assert!(Arc::ptr_eq(&cluster, &expected));
     let handoff = access.handoff(&parts).unwrap();
     assert_eq!(handoff.token.secret().expose_secret(), "alice:1");
-    assert_eq!(
-        (handoff.expires_at.as_second(), handoff.admin),
-        (NOW + 600, false)
-    );
-
-    credentials.elevated = Some(Bound {
-        value: elevated.clone(),
-        expires_at: NOW + 300,
-    });
-    parts.extensions.insert(Signed::In(credentials));
-    let now = access.for_request(&parts).unwrap();
-    assert!(Arc::ptr_eq(&now.cluster, &elevated.cluster));
-    match now.elevation {
-        Elevation::Active { until } => assert_eq!(until.as_second(), NOW + 300),
-        Elevation::Available | Elevation::Unavailable => panic!("not elevated"),
-    }
-    assert_eq!(
-        access.credential_expiry(&parts).map(Timestamp::as_second),
-        Some(NOW + 300)
-    );
-    assert!(Arc::ptr_eq(
-        &access.everyday(&parts).unwrap(),
-        &base.cluster
-    ));
-    let handoff = access.handoff(&parts).unwrap();
-    assert_eq!(handoff.token.secret().expose_secret(), "alice:elevated:1");
-    assert_eq!(
-        (handoff.expires_at.as_second(), handoff.admin),
-        (NOW + 300, true)
-    );
+    assert_eq!(handoff.expires_at.as_second(), NOW + 600);
 }

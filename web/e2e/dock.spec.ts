@@ -128,43 +128,21 @@ test("the dock folds to a bar with Ctrl+`, keeps Escape for the shell, and resiz
   )
 })
 
-test("a terminal closed when its credential expires keeps its tab and reopens", async ({
-  page,
-}) => {
-  const expiresAt = new Date(Date.UTC(2030, 0, 1, 15, 34)).toISOString()
-  await page.route("**/api/v1/session", async (route) => {
-    const response = await route.fetch()
-    await route.fulfill({ response, json: { ...(await response.json()), expiresAt } })
-  })
+test("a terminal closed for being idle keeps its tab and reopens", async ({ page }) => {
   let opened = 0
   await page.routeWebSocket(/\/exec/, (socket) => {
     opened += 1
     socket.send(JSON.stringify({ type: "ready", container: healthy }))
     socket.send(Buffer.from("$ "))
-    if (opened === 1) setTimeout(() => socket.close({ code: 4000, reason: "expired" }), 400)
-    if (opened === 2) setTimeout(() => socket.close({ code: 4001, reason: "idle" }), 400)
+    if (opened === 1) setTimeout(() => socket.close({ code: 4001, reason: "idle" }), 400)
   })
   await openShell(page)
   const panel = dock(page).getByRole("tabpanel")
-  await expect(panel.getByText("The credential in this terminal has expired.")).toBeVisible()
+  await expect(panel.getByText("Closed after 15 minutes without input or output.")).toBeVisible()
   await expect(dock(page)).toBeVisible()
   await expect(dock(page).getByRole("tab", { name: healthy })).toBeVisible()
   await panel.getByRole("button", { name: "Reopen" }).click()
-  await expect(panel.getByText("Closed after 15 minutes without input or output.")).toBeVisible()
-  await expect(dock(page)).toBeVisible()
-  await panel.getByRole("button", { name: "Reopen" }).click()
   await expect(connected(page)).toBeVisible()
-
-  // Folded, the bar says when the first of the open terminals will close.
-  await page.keyboard.press("Control+Backquote")
-  const clock = new Intl.DateTimeFormat("en", {
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23",
-  }).format(new Date(expiresAt))
-  await expect(page.getByRole("button", { name: /^1 terminal/ })).toContainText(
-    `Credential expires at ${clock}`,
-  )
 })
 
 test("an old link to Logs' terminal view opens the dock", async ({ page }) => {

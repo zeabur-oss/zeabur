@@ -50,18 +50,6 @@ export const zhCN: Messages = {
   "shell.whoamiUnknown": "未知用户",
   "shell.signOut": "退出登录",
   "shell.theme": "主题",
-  "elevate.retry": "临时用管理员权限重试",
-  "elevate.title": "管理员权限",
-  "elevate.waiting": "在新窗口用通行密钥确认。",
-  "elevate.notAllowed": "这个 Zeabur 不能请求管理员权限，请联系集群管理员。",
-  "elevate.blocked": "浏览器拦截了窗口。允许此网站弹出窗口后，再试一次。",
-  "elevate.failed": "没有获得管理员权限。",
-  "elevate.signedOut": "会话已结束，重新登录后再继续。",
-  "elevate.signIn": "登录",
-  "elevate.until": (time) => `管理员权限至 ${time}`,
-  "elevate.activeDetail": "在此之前，你的所有操作都会使用管理员权限。",
-  "elevate.drop": "放弃管理员权限",
-  "elevate.use": "临时使用管理员权限",
   "shell.switchProject": "切换项目",
   "column.label": "服务",
   "column.other": "其他对象",
@@ -101,7 +89,6 @@ export const zhCN: Messages = {
   "problem.title.unauthenticated": "你尚未登录",
   "problem.title.signed-out": "你已退出登录",
   "problem.title.forbidden": "你没有权限",
-  "problem.title.elevation-required": "这需要管理员权限",
   "problem.title.quota-exceeded": "这会超过项目的用量上限",
   "problem.title.policy-denied": "集群里的策略拒绝了这项更改",
   "problem.title.not-found": "找不到这个对象",
@@ -118,7 +105,6 @@ export const zhCN: Messages = {
   "problem.fix.unauthenticated": "重新登录。",
   "problem.fix.signed-out": "重新登录。",
   "problem.fix.forbidden": "向集群管理员申请权限，或改用有权限的账号。",
-  "problem.fix.elevation-required": "临时用管理员权限重试，或向集群管理员申请权限。",
   "problem.fix.quota-exceeded":
     "调低请求的资源量、释放项目正在占用的资源，或请集群管理员调高上限。",
   "problem.fix.policy-denied": "按策略指出的地方修改，或向集群管理员询问这项策略。",
@@ -146,8 +132,6 @@ export const zhCN: Messages = {
     "你的 Zeabur 会话已结束，Zeabur 无法再代你访问集群。在你重新登录之前，什么都不会读取或更改。",
   "problemPage.rule.forbidden":
     "集群用 RBAC 规则决定每个人能在哪些项目里读取或更改哪些对象。Zeabur 只用你自己的权限操作，你的权限不允许的事，Zeabur 也无法代你做。",
-  "problemPage.rule.elevation-required":
-    "你平常的权限不允许这件事，但这个 Zeabur 可以在你用通行密钥确认后，短时间给你管理员权限。在权限到期或你放弃之前，你的所有操作都会使用它。",
   "problemPage.rule.quota-exceeded":
     "项目可以设置所有服务加起来能预留的上限：CPU、内存、副本或对象的数量。更改如果会超过上限，集群就会拒绝，与你的权限无关。",
   "problemPage.rule.policy-denied":
@@ -170,12 +154,9 @@ export const zhCN: Messages = {
   "problemPage.rule.unavailable":
     "Zeabur 连不上集群的 API 服务器：它可能停机或正在重启，或从 Zeabur 运行的地方连不上。",
   "problemPage.rule.internal": "出错的是 Zeabur 本身，不是集群。详细信息里有 Zeabur 知道的情况。",
-  "refused.admin": "这需要管理员权限。",
-  "refused.adminFor": (what) => `${what}${latinEnd(what)}需要管理员权限。`,
   "refused.rights": "这需要更多权限。",
   "refused.rightsFor": (what) => `${what}${latinEnd(what)}需要更多权限。`,
   "refused.ask": "请联系集群管理员。",
-  "refused.view": "临时使用管理员权限",
   "refused.details": "详情",
   "refused.missing": "缺少的权限",
   "refused.see": (what) => `查看${latinStart(what)}${what}`,
@@ -183,10 +164,6 @@ export const zhCN: Messages = {
   "refused.terminal": "打开终端",
   "refused.reveal": "显示 Secret 的值",
   "refused.listThese": "列出这些对象",
-  "refused.adopt": (ns) => `使用已有的 Namespace ${ns}`,
-  "refused.createProject": (name) => `创建项目 ${name}`,
-  "refused.unadopt": (ns) => `从 Zeabur 移除 ${ns}`,
-
   "status.ready": "就绪",
   "status.rollingOut": "部署中",
   "status.failing": "异常",
@@ -799,7 +776,6 @@ export const zhCN: Messages = {
   "dock.resize": "终端高度",
   "dock.close": (name) => `关闭 ${name}`,
   "dock.count": (count) => `${count} 个终端`,
-  "dock.expires": (time) => `凭证 ${time} 到期`,
   "dock.emptyTitle": "没有打开的终端",
   "dock.emptyBody": "从服务的“日志”标签页或“更多”菜单打开，也可以用搜索。",
   "dock.gone": "这个服务已经不在项目中。",
@@ -817,7 +793,6 @@ export const zhCN: Messages = {
   "terminal.debugEnded": "调试容器已结束。再打开一个即可继续。",
   "terminal.debugOpen": "已连接到调试容器",
   "terminal.failed": "容器运行时结束了这个会话。",
-  "terminal.adminEnded": "管理员权限已结束，终端已关闭。重新打开后将改用你自己的权限。",
   "terminal.idle": "15 分钟没有输入或输出，已关闭。",
   "terminal.lost": "连接已断开。",
   "terminal.rbac":
@@ -833,7 +808,6 @@ export const zhCN: Messages = {
   "tools.stopsAt": (when: string) => `${when}停止`,
   "tools.open": "打开",
   "tools.stop": "停止",
-  "tools.expired": "这个终端里的凭证已过期。重新打开就会换上新的。",
   "tools.reopen": "重新打开",
   "clusterTools.about":
     "带 kubectl 和 helm 的终端，以你的身份操作整个集群，kubectl 默认在 default Namespace。终端运行在临时容器里，用完后 Zeabur 会删除。",
@@ -1099,10 +1073,8 @@ export const zhCN: Messages = {
   "confirm.debugReused": "这个副本里已有调试容器在运行，终端会在其中打开。",
   "confirm.clusterTools":
     "为你启动一个临时容器，里面有 kubectl 和 helm，只有 Zeabur 和集群管理员能接触到。kubectl 默认在这个项目。",
-  "confirm.toolsActsAs": (person: string, admin: boolean) =>
-    admin
-      ? `kubectl 和 helm 会以 ${person} 的身份运行，使用你当前持有的管理员权限。`
-      : `kubectl 和 helm 会以 ${person} 的身份运行，使用你自己的权限。`,
+  "confirm.toolsActsAs": (person: string) =>
+    `kubectl 和 helm 会以 ${person} 的身份运行，使用你自己的权限。`,
   "confirm.toolsCredential": (minutes: number) =>
     `其中的凭证会在 ${minutes} 分钟后失效，重新打开终端即可换上新的。`,
   "confirm.toolsStops": (most: number, after: number) =>
@@ -1129,7 +1101,6 @@ export const zhCN: Messages = {
   "projectSettings.tooLong": (max) => `缩短到 ${max} 个字符以内。`,
   "projectSettings.readOnly": "可以查看，但无法更改。",
   "projectSettings.getAccess": "如何获得权限",
-  "projectSettings.changeDetails": "更改这个项目的信息",
   "projectSettings.system": "这是 Kubernetes 留给自身组件的 Namespace，不能作为项目。",
   "projectSettings.title": "项目设置",
   "projectSettings.back": "返回",
@@ -2877,7 +2848,6 @@ export const zhCN: Messages = {
   "settings.clusterNameHint":
     "显示在侧边栏和 Zeabur 的页面上，方便管理多个集群的人一眼区分。集群本身不会有任何变更。",
   "settings.clusterNameReset": "改用默认名称",
-  "settings.clusterNameChange": "重命名集群",
   "settings.clusterNameLocal":
     "Zeabur 在这台电脑上运行，不保存设置：名称沿用 kubeconfig 中的名称。",
   "settings.metricsStore": "用量历史",
@@ -2900,11 +2870,27 @@ export const zhCN: Messages = {
   "settings.storeWhere": (namespace) =>
     `保存在 Namespace ${namespace} 的 ConfigMap zeabur-settings。能修改这个 ConfigMap 的人，就能修改这项设置。`,
   "settings.storeDenied": "你不能修改这项设置。",
-  "settings.storeChange": "更改历史数据来源",
   "settings.storeLocal":
     "Zeabur 在这台电脑上运行，不保存设置。要改用其他存储服务，用 --metrics-service namespace/name:port 启动。",
   "settings.storeTenancy":
     "能读取存储服务的人，就能看到所有项目的指标。只开放给可以查看整个集群的人。",
+  "settings.signIn": "登录设置",
+  "settings.signInLead": "每次登录最长保持 12 小时，超过一小时不使用也会退出登录。",
+  "settings.teams": "团队",
+  "settings.teamsHint": "这个集群有几个团队在用。",
+  "settings.teams.single": "一个团队",
+  "settings.teams.multiple": "多个团队",
+  "settings.teams.singleMeans": "管理员账号和其他账号一样，一小时不使用就会退出登录。",
+  "settings.teams.multipleMeans": "管理员账号 15 分钟不使用就会退出登录。",
+  "settings.adminAccounts": "管理员账号",
+  "settings.adminAal3": "只能用不会同步的通行密钥登录",
+  "settings.adminAal3Means":
+    "不会同步的通行密钥只存在安全密钥或单台设备上。开启后，管理员账号 15 分钟不使用也会退出登录。普通账号的登录方式不变。",
+  "settings.adminAal3Trust": "Zeabur 怎么知道",
+  "settings.adminAal3TrustHint": "通行密钥是否同步，是存放它的设备自己报告的，没有人另外核实。",
+  "settings.adminAal3NeedsPasskey":
+    "要开启这项设置，你的账号需要先有一个不会同步的通行密钥，存在安全密钥或这台设备上。",
+  "settings.adminAal3AddPasskey": "添加通行密钥",
   // 账号与成员（Zeabur Identity）
   "shell.account": "账号",
   "shell.members": "成员",
@@ -2972,14 +2958,13 @@ export const zhCN: Messages = {
   "members.everyone": "成员",
   "members.invite": "邀请",
   "members.denied": "你没有邀请或更改成员的权限，请联系集群管理员。",
-  "members.inviting": "邀请成员",
   "members.filter": "筛选成员",
   "members.none": "还没有人可以登录。",
   "members.noMatch": "没有匹配的成员。",
   "members.you": "（你）",
-  "members.role.admin": "管理员",
+  "members.role.admin": "管理员账号",
   "members.role.member": "成员",
-  "members.adminHint": "可以获得管理员权限，完全控制整个集群。",
+  "members.adminHint": "只能用通行密钥登录，对整个集群有完整权限。",
   "members.disabled": "已停用",
   "members.column.name": "名称",
   "members.column.role": "角色",
@@ -3015,7 +3000,7 @@ export const zhCN: Messages = {
   "invite.existing": (user) => `${user} 已经是成员：这个链接会在他的账号添加一把通行密钥。`,
   "invite.displayName": "显示名称",
   "invite.optional": "（选填）",
-  "invite.admin": "管理员",
+  "invite.admin": "管理员账号",
   "invite.create": "生成链接",
   "invite.action": (name) => `邀请 ${name}`,
   "members.plan.adds": (name) => `将 ${name} 添加为成员。`,
@@ -3056,11 +3041,12 @@ export const zhCN: Messages = {
   "roles.title": (name) => `${name} 的权限`,
   "roles.save": "保存权限",
   "roles.saved": (name) => `已保存 ${name} 的权限`,
-  "roles.losesAdmin": (name) => `${name} 会立即失去管理员权限。`,
+  "roles.losesAdmin": (name) => `${name} 会立即改为普通账号，不再有整个集群的完整权限。`,
   "roles.losesProjects": (name, projects) => `${name} 会立即失去 ${projects} 的访问权限。`,
   "roles.losesChanges": (name, projects) => `${name} 将无法再修改 ${projects}。`,
   "roles.openTerminals": "已打开的终端会保持到结束为止。",
-  "roles.becomesAdmin": (name) => `${name} 将完全控制整个集群：所有项目、节点和成员。`,
+  "roles.becomesAdmin": (name) =>
+    `${name} 会变成管理员账号，完全控制整个集群：所有项目、节点和成员。之后只能用通行密钥登录。`,
   "reset.title": (name) => `${name} 的新设置链接`,
   "reset.keep": (name) =>
     `在 ${name} 的账号添加一把通行密钥，不会移除任何东西。链接只能使用一次，24 小时内有效。`,
@@ -3090,6 +3076,9 @@ export const zhCN: Messages = {
   "sentence.members.noIssuer.fix": () => "启动 Zeabur 时加上 --issuer-url。",
   "sentence.members.demoteSelf": () => "你不能移除自己的管理员权限",
   "sentence.members.demoteSelf.fix": () => "请其他管理员更改你的权限。",
+  "sentence.settings.signIn.noDeviceBound": () => "你没有不会同步的通行密钥，改完后将无法登录。",
+  "sentence.settings.signIn.noDeviceBound.fix": () =>
+    "先添加一个存在安全密钥或这台设备上的通行密钥，再试一次。",
   "sentence.members.noProjectRoles": () => "安装 Zeabur 时没有启用成员角色",
   "sentence.members.noProjectRoles.fix": () =>
     "安装 Chart 时设置 memberRoles.enabled=true，或把这位成员设为管理员。",
@@ -3099,7 +3088,6 @@ export const zhCN: Messages = {
   // 账号与成员结束
   "sentence.problem.forbidden.fix.askForRule": (p) =>
     `向集群管理员申请 ${p.rule} 的权限，例如创建授予该权限的 ClusterRole，以及绑定到你的 ClusterRoleBinding。`,
-  "sentence.problem.forbidden.fix.askOrRetry": () => "联系管理员，或临时用管理员权限重试。",
   "sentence.problem.forbidden.fix.sendGrant": () =>
     "把下面的配置交给管理员。它只授予这项权限，而且只在这个项目有效。",
   "sentence.problem.planExpired.fix.again": (p) =>
@@ -3134,10 +3122,6 @@ export const zhCN: Messages = {
   "sentence.problem.summary.signed-out": () => "你已退出登录。",
   "sentence.problem.summary.forbidden": (p) =>
     p.verb ? `你不能${verbZhCN[p.verb] ?? p.verb} ${thingZh(p, "里的")}。` : "你没有权限。",
-  "sentence.problem.summary.elevation-required": (p) =>
-    p.verb
-      ? `你平时的权限不能${verbZhCN[p.verb] ?? p.verb} ${thingZh(p, "里的")}。`
-      : "这需要管理员权限。",
   "sentence.problem.summary.not-found": (p) => (p.name ? `${p.name} 不存在。` : "它不存在。"),
   "sentence.problem.summary.log-unavailable": () => "无法读取这份日志。",
   "sentence.problem.summary.conflict": (p) =>

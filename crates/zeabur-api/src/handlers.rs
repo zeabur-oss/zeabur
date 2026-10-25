@@ -55,8 +55,7 @@ impl std::fmt::Debug for AppState {
     }
 }
 
-/// The cluster connection of the person making the request: the administrator's while they hold
-/// one (see [`ClusterAccess::for_request`]).
+/// The cluster connection of the person making the request (see [`ClusterAccess::for_request`]).
 pub(crate) struct Person(pub(crate) Arc<dyn Cluster>);
 
 impl<S> FromRequestParts<S> for Person
@@ -72,27 +71,7 @@ where
     ) -> impl Future<Output = Result<Self, Self::Rejection>> + Send {
         let state = AppState::from_ref(state);
         let access = state.access.for_request(parts);
-        std::future::ready(access.map(|access| Self(access.cluster)).map_err(ApiError))
-    }
-}
-
-/// The person's everyday connection, also while they are elevated; only for binding a plan to
-/// its maker (see [`ClusterAccess::everyday`]).
-pub(crate) struct Everyday(pub(crate) Arc<dyn Cluster>);
-
-impl<S> FromRequestParts<S> for Everyday
-where
-    S: Send + Sync,
-    AppState: FromRef<S>,
-{
-    type Rejection = ApiError;
-
-    fn from_request_parts(
-        parts: &mut Parts,
-        state: &S,
-    ) -> impl Future<Output = Result<Self, Self::Rejection>> + Send {
-        let state = AppState::from_ref(state);
-        std::future::ready(state.access.everyday(parts).map(Self).map_err(ApiError))
+        std::future::ready(access.map(Self).map_err(ApiError))
     }
 }
 

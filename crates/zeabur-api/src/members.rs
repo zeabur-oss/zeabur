@@ -8,13 +8,12 @@
 //! # Rights
 //!
 //! Like everything else, every read and write goes to kube-apiserver as the person, so RBAC
-//! decides: Zeabur Identity's install gives `zeabur:admins` the `view` role, which does not
-//! reach these custom resources, and `zeabur:elevated:admins` `cluster-admin`, so in practice an
-//! administrator manages members, and everyone else sees the refusal with the rule it needs.
-//! A member who is not an admin has the rights of the [`access`] bindings: Developer or Viewer in
-//! chosen projects, and the names of nodes and projects. RBAC cannot narrow a `list` to the
-//! objects labelled with one's name ([k8s-rbac-names]), which is why one's own passkeys are
-//! managed at the issuer instead.
+//! decides: Zeabur Identity's install binds `zeabur:admins` to `cluster-admin`, and only admin
+//! accounts (`accountType: Admin`) carry that group, so in practice an admin manages members, and
+//! everyone else sees the refusal with the rule it needs. A member who is not an admin has the
+//! rights of the [`access`] bindings: Developer or Viewer in chosen projects, and the names of
+//! nodes and projects. RBAC cannot narrow a `list` to the objects labelled with one's name
+//! ([k8s-rbac-names]), which is why one's own passkeys are managed at the issuer instead.
 //!
 //! # Setup links
 //!
@@ -31,8 +30,8 @@
 //!
 //! A member is removed as Zeabur Identity's documentation says: their invitations, credentials
 //! and grants first, then the `User`, so no credential outlives the user and signs in as a new
-//! user of the same name. Nobody removes themselves here, nor their own last passkey: admin rights
-//! need a passkey, and one lost device must not lock the only administrator out.
+//! user of the same name. Nobody removes themselves here, nor their own last passkey: admin
+//! accounts sign in with a passkey only, and one lost device must not lock the only admin out.
 //!
 //! # Labels and last use
 //!
@@ -71,10 +70,32 @@ pub const USER_LABEL: &str = "identity.zeabur.com/user";
 pub const EXPIRES_AT_ANNOTATION: &str = "identity.zeabur.com/expires-at";
 /// Label selecting expiring objects for Zeabur Identity's garbage collector: the expiry hour.
 pub const EXPIRY_BUCKET_LABEL: &str = "identity.zeabur.com/expiry-bucket";
-/// The group Zeabur Identity's install binds: `zeabur:admins` reads the cluster, and
-/// `zeabur:elevated:admins` is `cluster-admin`.
+/// The group Zeabur Identity gives admin accounts' tokens, bound to `cluster-admin`. A `User`
+/// cannot list it in `groups`.
 pub const ADMIN_GROUP: &str = "admins";
 /// How Kubernetes sees a Zeabur Identity user: `zeabur:<username>`.
 pub const USER_PREFIX: &str = "zeabur:";
 /// The Identity Deployment, read for its issuer and whether it redeems invitations.
 pub const DEPLOYMENT: &str = "zeabur-identity";
+
+/// Whether `you` (the person's Kubernetes user name) is an admin account with a device-bound
+/// passkey: one whose authenticator reported the WebAuthn backup eligibility flag unset.
+pub(crate) async fn has_device_bound_passkey(
+    cluster: &dyn zeabur_kube::Cluster,
+    namespace: &str,
+    you: &str,
+) -> Result<bool, crate::error::ApiError> {
+    let Some(username) = you.strip_prefix(USER_PREFIX) else {
+        return Ok(false);
+    };
+    let directory = handlers::directory(cluster, namespace).await?;
+    let admin = directory
+        .user(username)
+        .is_some_and(|u| u.spec.account_type == directory::AccountType::Admin);
+    Ok(admin
+        && directory.credentials.iter().any(|c| {
+            c.spec.user == username
+                && c.spec.kind == "Passkey"
+                && c.spec.passkey.as_ref().is_some_and(|p| !p.backup_eligible)
+        }))
+}

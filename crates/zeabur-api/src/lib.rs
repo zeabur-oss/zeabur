@@ -7,7 +7,7 @@
 //! | Method and path | Returns |
 //! |---|---|
 //! | `GET /api/v1/whoami` | who the cluster says you are |
-//! | `GET /api/v1/session` | how you are signed in to Zeabur: signing out, admin rights in use |
+//! | `GET /api/v1/session` | how you are signed in to Zeabur, and whether you can sign out |
 //! | `GET /api/v1/cluster` | the cluster: its Kubernetes version and distribution |
 //! | `GET /api/v1/cluster/upgrades` | end of life, version skew and newer versions from Plans |
 //! | `GET /api/v1/cluster/nodes` | nodes, with requests against allocatable |
@@ -18,7 +18,7 @@
 //! | `GET /api/v1/cluster/node-shells` | the node shell pods (cluster administrators only) |
 //! | `GET /api/v1/cluster/node-shells/{pod}/terminal` | a root shell on the node, over a WebSocket, for whoever opened it |
 //! | `GET /api/v1/cluster/tools` | your cluster tools pods, for administrators; deletes those that have stopped (see `cluster::tools`) |
-//! | `GET /api/v1/cluster/tools/{name}/terminal` | a terminal in it, `kubectl` and `helm` acting as you with admin rights, over a WebSocket |
+//! | `GET /api/v1/cluster/tools/{name}/terminal` | a terminal in it, `kubectl` and `helm` acting as you, over a WebSocket |
 //! | `GET /api/v1/cluster/backups` | Velero's backup locations (and whether Velero reaches them), schedules and newest backups, or that Velero is not installed |
 //! | `GET /api/v1/cluster/capabilities` | what is installed (with versions), and what to install |
 //! | `GET /api/v1/cluster/components/{capability}/{component}/install` | how to install it yourself, in four forms |
@@ -26,6 +26,8 @@
 //! | `GET /api/v1/cluster/templates/{template}` | one of them, with what its pods use when idle |
 //! | `GET /api/v1/settings/metrics-store` | the metrics store history is read from, whether it answers, who may change it |
 //! | `PUT /api/v1/settings/metrics-store` | changes it, or goes back to the default |
+//! | `GET /api/v1/settings/sign-in` | how admin accounts sign in (Zeabur Identity's teams and AAL3 settings), who may change it |
+//! | `PUT /api/v1/settings/sign-in` | changes it |
 //! | `GET /api/v1/projects` | the projects, with the health of adopted ones |
 //! | `GET /api/v1/projects/{p}` | the project document |
 //! | `GET /api/v1/projects/{p}/namespace` | its Namespace: adopted or not, its details, whether you may change them |
@@ -182,9 +184,7 @@ snapshot.
 
 **Errors.** The problem `kind` and `reason` are open enumerations: expect new values, treat an \
 unknown `kind` by its HTTP status and ignore an unknown `reason`. `429` and `503` carry \
-kube-apiserver's `Retry-After` when it gave one. Where admin rights are offered and not in use \
-(`/api/v1/session`), a `403` from kube-apiserver comes as `elevation-required`, with the same \
-`denied` and `kubernetes`; while they are in use, every request goes with them.
+kube-apiserver's `Retry-After` when it gave one.
 
 **Compatibility.** The embedded web interface ships with the API; other clients are not yet \
 promised a stable `/api/v1`.",
@@ -325,6 +325,10 @@ fn remaining_routes(router: OpenApiRouter<AppState>) -> OpenApiRouter<AppState> 
         .routes(routes!(
             settings::domains::get_setting,
             settings::domains::set
+        ))
+        .routes(routes!(
+            settings::sign_in::get_setting,
+            settings::sign_in::set
         ))
         .routes(routes!(account::get))
         .routes(routes!(members::handlers::list))
@@ -622,10 +626,6 @@ fn build_with(
             }),
         )
         .route("/api/{*rest}", axum::routing::any(handlers::not_found))
-        .layer(axum::middleware::from_fn_with_state(
-            state.clone(),
-            error::offer_elevation_on_refusal,
-        ))
         .layer(axum::middleware::from_fn(cache::no_store))
         .with_state(state)
 }

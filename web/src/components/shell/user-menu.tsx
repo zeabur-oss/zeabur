@@ -6,19 +6,16 @@ import DesktopIcon from "~icons/ph/desktop"
 import HardDrivesIcon from "~icons/ph/hard-drives"
 import MoonIcon from "~icons/ph/moon"
 import PencilSimpleIcon from "~icons/ph/pencil-simple"
-import ShieldCheckIcon from "~icons/ph/shield-check"
-import ShieldSlashIcon from "~icons/ph/shield-slash"
 import SignOutIcon from "~icons/ph/sign-out"
 import SunIcon from "~icons/ph/sun"
 import UserCircleIcon from "~icons/ph/user-circle"
 
 import { clusterNameQuery, clusterQuery, sessionQuery, whoamiQuery } from "@/api/queries"
-import { dropElevation, retryAsAdmin } from "@/auth/elevation"
 import { signOut } from "@/auth/session"
 import { localeNames, locales, useI18n, useT } from "@/i18n"
 import { lastKnown } from "@/lib/last-known"
 import { nameSourceOf } from "@/lib/cluster-name"
-import { formatClock, personOf } from "@/lib/identity"
+import { personOf } from "@/lib/identity"
 import { setTheme, useTheme, type ThemeChoice } from "@/theme"
 import { Avatar } from "@zeabur/design-system/components/avatar"
 import {
@@ -37,7 +34,7 @@ const themes: { value: ThemeChoice; icon: typeof SunIcon }[] = [
   { value: "dark", icon: MoonIcon },
 ]
 
-/** Which cluster this is, who is signed in, and whether admin rights are on; the account menu. */
+/** Which cluster this is and who is signed in; the account menu. */
 export function ContextMenu() {
   const t = useT()
   const { locale, setLocale } = useI18n()
@@ -48,8 +45,6 @@ export function ContextMenu() {
   const username = whoami.data?.username ?? ""
   const name = personOf(username)
   const groups = whoami.data?.groups.join(", ")
-  const until = session?.elevation === "active" ? session.elevatedUntil : undefined
-  const time = until ? formatClock(until, locale) : undefined
   // While the cluster does not answer, its name as this browser last saw it.
   const place = cluster?.name ?? lastKnown().cluster ?? ""
   const source = cluster ? nameSourceOf(cluster, t) : undefined
@@ -74,7 +69,6 @@ export function ContextMenu() {
               </span>
             }
             avatar={<Avatar size="xs" shape="circle" className="size-6" name={name || undefined} />}
-            elevated={time ? t("elevate.until", time) : undefined}
           />
         }
         aria-label={t("shell.context", place, who)}
@@ -108,26 +102,6 @@ export function ContextMenu() {
           </span>
         </MenuItem>
         <RenameCluster />
-        {session?.elevation === "active" || session?.elevation === "available" ? (
-          <>
-            <MenuSeparator />
-            {session.elevation === "active" ? (
-              <>
-                <p className="px-2.5 py-1.5 text-xs text-secondary">{t("elevate.activeDetail")}</p>
-                <MenuItem onClick={() => void dropElevation()}>
-                  <ShieldSlashIcon aria-hidden="true" />
-                  {t("elevate.drop")}
-                </MenuItem>
-              </>
-            ) : (
-              // Granted rights re-read every query (auth/follow-elevation.ts): nothing to retry.
-              <MenuItem onClick={() => void retryAsAdmin()}>
-                <ShieldCheckIcon aria-hidden="true" />
-                {t("elevate.use")}
-              </MenuItem>
-            )}
-          </>
-        ) : null}
         <MenuSeparator />
         <MenuLabel>{t("settings.language")}</MenuLabel>
         {locales.map((value) => (
