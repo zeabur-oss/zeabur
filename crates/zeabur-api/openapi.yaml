@@ -9406,6 +9406,7 @@ components:
       - k3sPackaged
       - inputs
       - manifests
+      - privileged
     InstallFormat:
       type: string
       description: One way to install a component.

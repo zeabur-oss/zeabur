@@ -1942,6 +1942,8 @@ export const zhCN: Messages = {
   "install.blocked.inputs": "这个组件不由 Zeabur 直接安装：需要你填入一些值。",
   "install.blocked.manifests":
     "这个组件不由 Zeabur 直接安装：其中有一部分是普通 manifest，不是 chart。",
+  "install.blocked.privileged":
+    "这个组件不由 Zeabur 直接安装：它需要访问主机，所在的 Namespace 要先设为“不受限”。下方的内容已包含这一步。",
   "install.tool.k3s": "k3s 的 Helm 控制器",
   "install.tool.flux": "Flux",
   "install.tool.argoCd": "Argo CD",

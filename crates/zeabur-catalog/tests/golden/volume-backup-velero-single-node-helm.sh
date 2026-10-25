@@ -1,6 +1,10 @@
 # Profile: single-node
 
 kubectl create namespace velero --dry-run=client -o yaml | kubectl apply -f -
+kubectl label namespace velero --overwrite \
+  pod-security.kubernetes.io/enforce=privileged \
+  pod-security.kubernetes.io/audit=privileged \
+  pod-security.kubernetes.io/warn=privileged
 # Velero reads the bucket's credentials from this AWS-style credentials file.
 kubectl -n velero create secret generic velero-credentials \
   --from-literal=cloud='<credentials>' \

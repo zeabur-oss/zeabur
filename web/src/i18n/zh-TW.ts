@@ -1947,6 +1947,8 @@ export const zhTW: Messages = {
   "install.blocked.inputs": "這個元件不由 Zeabur 直接安裝：需要你填入一些值。",
   "install.blocked.manifests":
     "這個元件不由 Zeabur 直接安裝：其中有一部分是一般 manifest，不是 chart。",
+  "install.blocked.privileged":
+    "這個元件不由 Zeabur 直接安裝：它需要存取主機，所在的 Namespace 要先設為「不受限」。下方的內容已包含這一步。",
   "install.tool.k3s": "k3s 的 Helm 控制器",
   "install.tool.flux": "Flux",
   "install.tool.argoCd": "Argo CD",

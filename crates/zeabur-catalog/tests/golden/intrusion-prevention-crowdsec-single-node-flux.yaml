@@ -1,4 +1,13 @@
 # Profile: single-node. Commit to the repository Flux reconciles.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: crowdsec
+  labels:
+    pod-security.kubernetes.io/enforce: privileged
+    pod-security.kubernetes.io/audit: privileged
+    pod-security.kubernetes.io/warn: privileged
+---
 # Keep these values out of Git (SOPS, Sealed Secrets or a secret manager).
 # key: The Traefik bouncer uses this key to call the CrowdSec local API.
 apiVersion: v1

@@ -91,6 +91,9 @@ pub enum InstallBlocked {
     Inputs,
     /// Some of it is plain manifests, or applies only when CRDs are missing.
     Manifests,
+    /// It runs privileged: its namespace needs the `privileged` Pod Security level, which a
+    /// project plan does not set.
+    Privileged,
 }
 
 /// What a component's RBAC and network access amount to, from the catalogue.
@@ -457,8 +460,13 @@ impl<'a> Rendered<'a> {
         let mut out = self.k3s_packaged();
         push(&mut out, format!("# Profile: {}\n", self.profile));
         let secrets = self.secrets();
-        let mut namespaces: Vec<&str> = secrets.iter().map(|((ns, _), _)| *ns).collect();
-        namespaces.dedup();
+        let privileged = self.privileged_namespaces();
+        let mut namespaces: Vec<&str> = privileged.clone();
+        for ((ns, _), _) in &secrets {
+            if !namespaces.contains(ns) {
+                namespaces.push(ns);
+            }
+        }
         for ns in namespaces {
             push(
                 &mut out,
@@ -466,6 +474,19 @@ impl<'a> Rendered<'a> {
                     "\nkubectl create namespace {ns} --dry-run=client -o yaml | kubectl apply -f -\n"
                 ),
             );
+            if privileged.contains(&ns) {
+                let labels: Vec<String> = PSA_MODES
+                    .iter()
+                    .map(|mode| format!("pod-security.kubernetes.io/{mode}=privileged"))
+                    .collect();
+                push(
+                    &mut out,
+                    format!(
+                        "kubectl label namespace {ns} --overwrite \\\n  {}\n",
+                        labels.join(" \\\n  ")
+                    ),
+                );
+            }
         }
         for ((ns, name), inputs) in &secrets {
             for (input, _) in inputs {
@@ -642,6 +663,19 @@ impl<'a> Rendered<'a> {
     }
 
     /// Secret objects for inputs stored in Secrets, for the YAML forms.
+    /// The namespaces of its releases, when it runs privileged; in release order.
+    fn privileged_namespaces(&self) -> Vec<&str> {
+        let mut namespaces = Vec::new();
+        if self.file.security.privileged {
+            for release in &self.file.releases {
+                if !namespaces.contains(&release.namespace.as_str()) {
+                    namespaces.push(release.namespace.as_str());
+                }
+            }
+        }
+        namespaces
+    }
+
     fn secret_objects(&self) -> String {
         let mut out = String::new();
         for ((ns, name), inputs) in self.secrets() {
@@ -709,6 +743,10 @@ impl<'a> Rendered<'a> {
 
     /// Secrets, then each release: a manifest release as listed, a chart as its objects.
     fn append_releases(&self, out: &mut String, format: InstallFormat) {
+        for ns in self.privileged_namespaces() {
+            out.push_str(&namespace_object(ns));
+            out.push_str("---\n");
+        }
         out.push_str(&self.secret_objects());
         for (release, merged) in self.file.releases.iter().zip(&self.merged) {
             if let Some(text) = Self::manifest_release(release) {
@@ -734,8 +772,8 @@ impl<'a> Rendered<'a> {
         }
     }
 
-    /// Why a plan cannot install it: it replaces a component k3s packages, asks for values, or
-    /// is not only charts.
+    /// Why a plan cannot install it: it replaces a component k3s packages, asks for values, is
+    /// not only charts, or runs privileged.
     fn blocked(&self) -> Option<InstallBlocked> {
         if !self.file.detection.k3s_addons.is_empty() {
             Some(InstallBlocked::K3sPackaged)
@@ -748,6 +786,8 @@ impl<'a> Rendered<'a> {
             .any(|r| !r.is_chart() || !r.skip_if_present.is_empty())
         {
             Some(InstallBlocked::Manifests)
+        } else if self.file.security.privileged {
+            Some(InstallBlocked::Privileged)
         } else {
             None
         }
@@ -996,6 +1036,23 @@ fn set_path(root: &mut Value, path: &str, value: Value) {
 }
 
 /// Appends a formatted piece of text.
+/// The Pod Security modes a privileged component's namespace sets to `privileged`.
+const PSA_MODES: [&str; 3] = ["enforce", "audit", "warn"];
+
+/// A Namespace at the `privileged` Pod Security level, made before the releases in it; a
+/// cluster whose default is `restricted` (RKE2 with the CIS profile) refuses the pods otherwise.
+fn namespace_object(namespace: &str) -> String {
+    let mut out =
+        format!("apiVersion: v1\nkind: Namespace\nmetadata:\n  name: {namespace}\n  labels:\n");
+    for mode in PSA_MODES {
+        push(
+            &mut out,
+            format!("    pod-security.kubernetes.io/{mode}: privileged\n"),
+        );
+    }
+    out
+}
+
 fn push(out: &mut String, text: impl AsRef<str>) {
     out.push_str(text.as_ref());
 }
@@ -1077,6 +1134,41 @@ mod tests {
                         }
                     }
                 }
+            }
+        }
+    }
+
+    #[test]
+    fn a_privileged_component_gets_a_privileged_namespace_and_no_plan() {
+        let (_, _, text) = bundle::FILES
+            .iter()
+            .find(|(capability, id, _)| *capability == "databases" && *id == "cloudnative-pg")
+            .unwrap();
+        let mut file: File = serde_saphyr::from_str(text).unwrap();
+        file.security.privileged = true;
+        let rendered = Rendered::new(&file, "single-node").unwrap();
+        assert_eq!(rendered.blocked(), Some(InstallBlocked::Privileged));
+        let k3s = rendered.k3s();
+        let namespace = k3s.find("kind: Namespace").unwrap();
+        assert!(namespace < k3s.find("kind: HelmChart").unwrap());
+        for (capability, id, _) in bundle::FILES {
+            let guide = guide(&format!("{capability}/{id}"), "multi-node").unwrap();
+            if !guide.security.privileged {
+                continue;
+            }
+            assert!(guide.blocked.is_some(), "{capability}/{id}");
+            for text in &guide.formats {
+                assert!(text.objects.is_empty(), "{capability}/{id}");
+                let level = if text.format == InstallFormat::Helm {
+                    "pod-security.kubernetes.io/enforce=privileged"
+                } else {
+                    "pod-security.kubernetes.io/enforce: privileged"
+                };
+                assert!(
+                    text.text.contains(level),
+                    "{capability}/{id} {:?}",
+                    text.format
+                );
             }
         }
     }

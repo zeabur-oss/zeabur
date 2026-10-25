@@ -2098,6 +2098,8 @@ export const en = {
   "install.blocked.inputs": "Zeabur doesn't install this one itself: it needs values you fill in.",
   "install.blocked.manifests":
     "Zeabur doesn't install this one itself: part of it is plain manifests, not a chart.",
+  "install.blocked.privileged":
+    "Zeabur doesn't install this one itself: it needs access to the host, so its Namespace must be set to Unrestricted first. The text below does that.",
   "install.tool.k3s": "k3s's Helm controller",
   "install.tool.flux": "Flux",
   "install.tool.argoCd": "Argo CD",

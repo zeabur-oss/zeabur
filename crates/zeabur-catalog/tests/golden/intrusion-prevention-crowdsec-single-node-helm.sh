@@ -1,6 +1,10 @@
 # Profile: single-node
 
 kubectl create namespace crowdsec --dry-run=client -o yaml | kubectl apply -f -
+kubectl label namespace crowdsec --overwrite \
+  pod-security.kubernetes.io/enforce=privileged \
+  pod-security.kubernetes.io/audit=privileged \
+  pod-security.kubernetes.io/warn=privileged
 # The Traefik bouncer uses this key to call the CrowdSec local API.
 kubectl -n crowdsec create secret generic crowdsec-bouncer-key \
   --from-literal=key="$(openssl rand -hex 64)" \

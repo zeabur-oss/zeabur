@@ -4942,7 +4942,7 @@ export interface components {
      * @description Why a plan cannot install a component; the texts still work.
      * @enum {string}
      */
-    InstallBlocked: "k3sPackaged" | "inputs" | "manifests"
+    InstallBlocked: "k3sPackaged" | "inputs" | "manifests" | "privileged"
     /**
      * @description One way to install a component.
      * @enum {string}
