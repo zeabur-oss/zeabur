@@ -49,6 +49,8 @@ pub struct TemplateView {
     pub requests: Requests,
     /// What a person gives or the browser generates.
     pub inputs: Vec<TemplateInput>,
+    /// What to know before deploying it, with how to contain each. In English.
+    pub risks: Vec<zeabur_catalog::install::Risk>,
     /// It routes a domain: a deploy gives one.
     pub needs_domain: bool,
     /// It asks cert-manager for certificates through the cluster's issuer
@@ -172,6 +174,7 @@ fn view(
         labels: template.labels,
         services: template.services,
         inputs: template.inputs,
+        risks: template.risks,
         needs_domain: template.needs_domain,
         needs_cluster_issuer: template.needs_cluster_issuer,
     }

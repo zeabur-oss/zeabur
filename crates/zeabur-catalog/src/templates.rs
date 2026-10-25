@@ -24,6 +24,7 @@ use serde_json::{Value, json};
 use utoipa::ToSchema;
 
 use crate::bundle;
+use crate::install::Risk;
 
 /// The labels the catalogue's renderer adds to every object of an install.
 const INSTANCE_LABEL: &str = "app.kubernetes.io/instance";
@@ -61,6 +62,9 @@ pub struct Template {
     pub services: Vec<TemplateService>,
     /// What a person gives or the browser generates.
     pub inputs: Vec<TemplateInput>,
+    /// What to know before deploying it, and how to contain each risk. In English: the catalogue
+    /// has no other language for them.
+    pub risks: Vec<Risk>,
     /// It routes a domain: a deploy gives `domain`.
     pub needs_domain: bool,
     /// It asks cert-manager for certificates: a deploy needs the cluster's issuer.
@@ -237,6 +241,14 @@ struct File {
     services: Vec<FileService>,
     #[serde(default)]
     inputs: Vec<FileInput>,
+    #[serde(default)]
+    security: FileSecurity,
+}
+
+#[derive(Deserialize, Default)]
+struct FileSecurity {
+    #[serde(default)]
+    risks: Vec<Risk>,
 }
 
 #[derive(Deserialize)]
@@ -376,6 +388,15 @@ fn read(id: &str, file: &str, manifests: &str) -> Result<Template, RenderError> 
             })
             .collect(),
         inputs,
+        risks: file
+            .security
+            .risks
+            .into_iter()
+            .map(|r| Risk {
+                risk: r.risk.trim().to_owned(),
+                mitigation: r.mitigation.trim().to_owned(),
+            })
+            .collect(),
         needs_domain: uses(&nodes, &Field::Domain),
         needs_cluster_issuer: uses(&nodes, &Field::ClusterIssuer),
     })
@@ -1013,6 +1034,17 @@ mod tests {
                 "{name}"
             );
         }
+    }
+
+    #[test]
+    fn a_template_carries_the_risks_its_catalogue_names() {
+        let ghost = template("ghost").unwrap();
+        assert!(
+            ghost
+                .risks
+                .iter()
+                .any(|r| r.risk.contains("first visitor") && !r.mitigation.is_empty())
+        );
     }
 
     #[test]

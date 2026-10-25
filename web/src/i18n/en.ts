@@ -2587,6 +2587,9 @@ export const en = {
   "add.templateInputInvalid": (pattern: string) =>
     `Doesn't match the expected format (${pattern}).`,
   "add.templateOptional": "Optional",
+  "add.templateRisks": (n: number) => `Before you deploy: ${plural(n, "thing", "things")} to know`,
+  "add.templateRisksBody": "The template's author wrote these notes, in English.",
+  "add.templateRiskFix": "What to do",
   "add.composeTitle": "Import Docker Compose",
   "add.composeBody": (project: string) =>
     `Makes a service in ${project} for each service of a Compose file. You review the objects before anything is created.`,

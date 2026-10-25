@@ -16958,6 +16958,7 @@ components:
       - services
       - requests
       - inputs
+      - risks
       - needsDomain
       - needsClusterIssuer
       properties:
@@ -17009,6 +17010,11 @@ components:
           items:
             $ref: "#/components/schemas/Requirement"
           description: The components it needs, and whether each one is there.
+        risks:
+          type: array
+          items:
+            $ref: "#/components/schemas/Risk"
+          description: What to know before deploying it, with how to contain each. In English.
         services:
           type: array
           items:

@@ -31,6 +31,11 @@ import { templateRoom } from "@/model/template-room"
 import { Alert, AlertDescription, AlertTitle } from "@zeabur/design-system/components/alert"
 import { Button } from "@zeabur/design-system/components/button"
 import { Card } from "@zeabur/design-system/components/card"
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@zeabur/design-system/components/collapsible"
 import { Input } from "@zeabur/design-system/components/input"
 
 /** "App template": the catalogue's templates, then the form of the one picked, in one plan. */
@@ -223,6 +228,7 @@ function DeployForm({
       <About template={template} />
       <Requirements template={template} issuer={domains.clusterIssuer} />
       <RoomNote template={template} />
+      <Risks template={template} />
       {template.needsDomain ? (
         <DomainField
           host={host}
@@ -379,6 +385,33 @@ function Missing({ template }: { template: AppTemplate }) {
         </div>
       </AlertDescription>
     </Alert>
+  )
+}
+
+/** What the template's author says to know before deploying it; the conclusion, then the notes. */
+function Risks({ template }: { template: AppTemplate }) {
+  const t = useT()
+  if (template.risks.length === 0) return null
+  return (
+    <Collapsible>
+      <CollapsibleTrigger variant="disclosure">
+        <CaretRightIcon aria-hidden="true" />
+        {t("add.templateRisks", template.risks.length)}
+      </CollapsibleTrigger>
+      <CollapsibleContent>
+        <p className="pt-1 type-meta text-muted-foreground">{t("add.templateRisksBody")}</p>
+        <ul className="flex flex-col gap-3 pt-2" lang="en" translate="no">
+          {template.risks.map((r) => (
+            <li key={r.risk} className="flex flex-col gap-0.5">
+              <span className="type-body text-main">{r.risk}</span>
+              <span className="type-meta text-secondary">
+                <span className="font-medium">{t("add.templateRiskFix")}</span> {r.mitigation}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </CollapsibleContent>
+    </Collapsible>
   )
 }
 

@@ -60,6 +60,7 @@ const template = (patch: Partial<AppTemplate>): AppTemplate => ({
   services: [],
   requests: { cpuMillicores: 150, memoryBytes: 320 * 2 ** 20 },
   inputs: [],
+  risks: [],
   needsDomain: false,
   needsClusterIssuer: false,
   ...patch,

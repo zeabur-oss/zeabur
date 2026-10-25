@@ -10,6 +10,9 @@ minor or patch release may break the API.
 
 ### Added
 
+- The app template drawer shows what a template's author says to know before deploying it (the
+  catalogue's `security.risks`, with how to contain each), folded under "Before you deploy". The
+  template API (`GET /api/v1/cluster/templates`) carries them as `risks`.
 - Releases from CI only: the image `ghcr.io/zeabur-oss/zeabur` (linux/amd64, linux/arm64), the
   chart `oci://ghcr.io/zeabur-oss/charts/zeabur` pinned to the image's digest, and `zeaburctl`
   for Linux (amd64, arm64) and macOS (arm64), all signed with Sigstore and attested

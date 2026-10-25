@@ -2384,6 +2384,9 @@ export const zhTW: Messages = {
   "add.templateInputEmpty": "這一欄必填。",
   "add.templateInputInvalid": (pattern) => `格式不符（${pattern}）。`,
   "add.templateOptional": "選填",
+  "add.templateRisks": (n) => `部署前要知道的事（${n}）`,
+  "add.templateRisksBody": "這些說明由範本作者撰寫，目前只有英文。",
+  "add.templateRiskFix": "怎麼處理",
   "add.composeTitle": "匯入 Docker Compose",
   "add.composeBody": (project) =>
     `Compose 檔案裡的每個服務，都會在 ${project} 建立一個服務。建立前會先讓你確認要新增的物件。`,

@@ -2380,6 +2380,9 @@ export const zhCN: Messages = {
   "add.templateInputEmpty": "这一栏必填。",
   "add.templateInputInvalid": (pattern) => `格式不符（${pattern}）。`,
   "add.templateOptional": "选填",
+  "add.templateRisks": (n) => `部署前要了解的事（${n}）`,
+  "add.templateRisksBody": "这些说明由模板作者撰写，目前只有英文。",
+  "add.templateRiskFix": "怎么处理",
   "add.composeTitle": "导入 Docker Compose",
   "add.composeBody": (project) =>
     `Compose 文件中的每个服务都会在 ${project} 中创建一个服务。创建前会先让你确认要新增的对象。`,

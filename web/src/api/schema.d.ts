@@ -8819,6 +8819,8 @@ export interface components {
       requests: components["schemas"]["Requests"]
       /** @description The components it needs, and whether each one is there. */
       requires: components["schemas"]["Requirement"][]
+      /** @description What to know before deploying it, with how to contain each. In English. */
+      risks: components["schemas"]["Risk"][]
       /** @description Its services. */
       services: components["schemas"]["TemplateService"][]
       /** @description The application's version (`2.2.0`). */
