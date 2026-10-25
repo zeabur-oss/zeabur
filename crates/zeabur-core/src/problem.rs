@@ -52,7 +52,7 @@
 
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
-pub use zeabur_kernel::denied::Denied;
+pub use zeabur_model::kernel::denied::Denied;
 
 use crate::message::Message;
 use crate::origin::Origin;

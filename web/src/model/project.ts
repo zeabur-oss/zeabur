@@ -60,7 +60,7 @@ export const mayChange = (namespace: Pick<Schemas["ProjectNamespace"], "canChang
 export const mayAdopt = (namespace: Pick<Schemas["ProjectNamespace"], "canAdopt">) =>
   namespace.canAdopt !== "denied"
 
-/** zeabur-kernel `MANAGE_VERB`: what the chart's admission policy asks for before a label change. */
+/** zeabur-model `kernel::MANAGE_VERB`: what the chart's admission policy asks for before a label change. */
 const MANAGE_VERB = "zeabur-manage"
 
 export const namespaceOps = new Set<Schemas["Change"]["op"]>([

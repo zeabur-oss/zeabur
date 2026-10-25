@@ -12,7 +12,7 @@ use std::collections::BTreeMap;
 use k8s_openapi::api::core::v1::{ContainerState, ContainerStateTerminated, ContainerStatus, Pod};
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::{LabelSelector, ObjectMeta};
 use k8s_openapi::jiff::Timestamp;
-use zeabur_adapters::selector;
+use zeabur_model::adapters::selector;
 use zeabur_model::{
     ContainerStatusSummary, ContainerTermination, ContainerWaiting, Health, Origin, PodSummary,
 };

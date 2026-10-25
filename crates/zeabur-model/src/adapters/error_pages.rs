@@ -33,7 +33,7 @@ pub struct PageServer {
 /// Whether the object carries [`PAGE_SERVER_LABEL`].
 #[must_use]
 pub fn is_page_server(meta: &ObjectMeta) -> bool {
-    crate::label(meta.labels.as_ref(), PAGE_SERVER_LABEL) == Some("true")
+    crate::adapters::label(meta.labels.as_ref(), PAGE_SERVER_LABEL) == Some("true")
 }
 
 /// The page server `service` is: `None` without the label or without both ports.

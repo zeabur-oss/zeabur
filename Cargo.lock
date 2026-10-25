@@ -2413,15 +2413,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "zeabur-adapters"
-version = "0.0.1"
-dependencies = [
- "k8s-openapi",
- "serde_json",
- "zeabur-kernel",
-]
-
-[[package]]
 name = "zeabur-api"
 version = "0.0.1"
 dependencies = [
@@ -2453,7 +2444,6 @@ dependencies = [
  "tracing-subscriber",
  "utoipa",
  "utoipa-axum",
- "zeabur-adapters",
  "zeabur-catalog",
  "zeabur-core",
  "zeabur-gaps",
@@ -2517,17 +2507,7 @@ dependencies = [
  "serde_json",
  "thiserror",
  "utoipa",
- "zeabur-kernel",
-]
-
-[[package]]
-name = "zeabur-fixtures"
-version = "0.0.1"
-dependencies = [
- "serde",
- "serde-saphyr",
- "serde_json",
- "thiserror",
+ "zeabur-model",
 ]
 
 [[package]]
@@ -2537,10 +2517,9 @@ dependencies = [
  "k8s-openapi",
  "serde-saphyr",
  "serde_json",
- "zeabur-fixtures",
  "zeabur-graph",
- "zeabur-kernel",
  "zeabur-model",
+ "zeabur-test-support",
 ]
 
 [[package]]
@@ -2552,9 +2531,8 @@ dependencies = [
  "serde",
  "serde-saphyr",
  "serde_json",
- "zeabur-adapters",
- "zeabur-fixtures",
  "zeabur-model",
+ "zeabur-test-support",
 ]
 
 [[package]]
@@ -2602,17 +2580,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "zeabur-kernel"
-version = "0.0.1"
-dependencies = [
- "serde",
- "serde_json",
- "sha2",
- "thiserror",
- "utoipa",
-]
-
-[[package]]
 name = "zeabur-kube"
 version = "0.0.1"
 dependencies = [
@@ -2641,9 +2608,12 @@ dependencies = [
 name = "zeabur-model"
 version = "0.0.1"
 dependencies = [
+ "k8s-openapi",
  "serde",
+ "serde_json",
+ "sha2",
+ "thiserror",
  "utoipa",
- "zeabur-kernel",
 ]
 
 [[package]]
@@ -2655,11 +2625,9 @@ dependencies = [
  "serde-saphyr",
  "serde_json",
  "utoipa",
- "zeabur-adapters",
- "zeabur-fixtures",
- "zeabur-kernel",
  "zeabur-kube",
  "zeabur-model",
+ "zeabur-test-support",
 ]
 
 [[package]]
@@ -2676,11 +2644,9 @@ dependencies = [
  "sha2",
  "thiserror",
  "utoipa",
- "zeabur-adapters",
- "zeabur-fixtures",
  "zeabur-graph",
- "zeabur-kernel",
  "zeabur-model",
+ "zeabur-test-support",
 ]
 
 [[package]]
@@ -2718,10 +2684,11 @@ version = "0.0.1"
 dependencies = [
  "kube",
  "serde",
+ "serde-saphyr",
  "serde_json",
+ "thiserror",
  "tokio",
  "zeabur-core",
- "zeabur-fixtures",
  "zeabur-kube",
 ]
 

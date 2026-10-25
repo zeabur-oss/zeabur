@@ -15,7 +15,6 @@ minimum_test_timeout = 60
 exclude_globs = [
   # Test doubles and helpers: a mistake in them shows as a failing test elsewhere.
   "crates/zeabur-kube/src/memory.rs",
-  "crates/zeabur-fixtures/**",
   "crates/zeabur-test-support/**",
   # The kube-rs adapter is exercised by the cluster tests only, which need k3s.
   "crates/zeabur-kube/src/adapter.rs",

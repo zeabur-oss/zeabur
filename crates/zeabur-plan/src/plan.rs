@@ -36,11 +36,11 @@ use k8s_openapi::api::apps::v1::ReplicaSet;
 use k8s_openapi::api::networking::v1::Ingress;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use serde_json::{Value, json};
-use zeabur_adapters::error_pages::maintenance_of;
-use zeabur_adapters::gateway::Attachable;
-use zeabur_adapters::provenance::{Tool, detect_tool};
 use zeabur_graph::{Snapshot, Workload, workloads};
-use zeabur_kernel::names::Conventions;
+use zeabur_model::adapters::error_pages::maintenance_of;
+use zeabur_model::adapters::gateway::Attachable;
+use zeabur_model::adapters::provenance::{Tool, detect_tool};
+use zeabur_model::kernel::names::Conventions;
 use zeabur_model::{HttpRoute, Project, SourceKind, WorkloadKind, WorkloadRef};
 
 use crate::access::redirect_rule;
@@ -199,8 +199,8 @@ pub struct Input<'a> {
     pub issuers: &'a BTreeMap<String, IssuerRead>,
     /// The person's own certificates the request sets, checked, by hostname.
     pub certificates: &'a BTreeMap<String, CheckedCertificate>,
-    /// Some namespace carries [`zeabur_kernel::isolation::PLATFORM_LABEL`]: a new project gets
-    /// its `NetworkPolicy`.
+    /// Some namespace carries [`zeabur_model::kernel::isolation::PLATFORM_LABEL`]: a new project
+    /// gets its `NetworkPolicy`.
     pub platform_namespaces: bool,
 }
 

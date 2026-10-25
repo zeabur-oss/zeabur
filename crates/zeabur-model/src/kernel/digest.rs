@@ -2,7 +2,7 @@
 //!
 //! These digests make names short and stable; they protect nothing. The server's cryptography is
 //! `zeabur-core`'s, through aws-lc-rs; this module uses the pure-Rust `sha2`, so the crates that
-//! name things build without a C library, WebAssembly included.
+//! name things build without a C library.
 
 use sha2::{Digest as _, Sha256};
 

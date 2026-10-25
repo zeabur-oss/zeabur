@@ -11,7 +11,7 @@ one service". Pure functions from a snapshot to a projection, tested entirely wi
 
 ## Place in the workspace
 
-Level 2: may depend on `zeabur-kernel`, `zeabur-model` and `zeabur-adapters`. No I/O.
+Level 2: may depend on `zeabur-model`. No I/O.
 
 ## Design
 
@@ -31,7 +31,7 @@ Level 2: may depend on `zeabur-kernel`, `zeabur-model` and `zeabur-adapters`. No
 - **What is not a workload or a resource.** A Job a CronJob controls is one of its runs.
   Service account token and Helm release Secrets, and the `kube-root-ca.crt` ConfigMap, are
   machinery.
-- **Operator conventions decide grouping only through `zeabur-adapters`.** A workload a
+- **Operator conventions decide grouping only through `zeabur-model`'s `adapters`.** A workload a
   database operator controls goes to `databases`, an operator's Deployment to `operators`, and
   the explicit group label wins over both.
 - **Nothing is dropped.** A mount with no matching volume is shown as `Unknown`; a dangling

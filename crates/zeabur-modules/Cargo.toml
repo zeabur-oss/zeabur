@@ -11,10 +11,8 @@ publish.workspace = true
 workspace = true
 
 [dependencies]
-zeabur-adapters.workspace = true
-zeabur-kernel.workspace = true
-zeabur-kube.workspace = true
 zeabur-model.workspace = true
+zeabur-kube.workspace = true
 k8s-openapi.workspace = true
 serde.workspace = true
 serde_json.workspace = true
@@ -22,4 +20,4 @@ utoipa.workspace = true
 
 [dev-dependencies]
 serde-saphyr.workspace = true
-zeabur-fixtures.workspace = true
+zeabur-test-support.workspace = true

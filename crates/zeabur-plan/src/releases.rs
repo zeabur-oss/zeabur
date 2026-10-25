@@ -73,7 +73,7 @@ pub struct Release {
 }
 
 fn is_controlled_by(meta: &ObjectMeta, kind: &str, name: &str) -> bool {
-    zeabur_adapters::controller_of(meta).is_some_and(|o| o.kind == kind && o.name == name)
+    zeabur_model::adapters::controller_of(meta).is_some_and(|o| o.kind == kind && o.name == name)
 }
 
 fn images(template: &Value) -> Vec<String> {

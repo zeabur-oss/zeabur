@@ -16,6 +16,8 @@ use zeabur_model::{PodSecurityLevel, ProjectIcon, TaskConcurrency, WorkloadRef};
 use crate::checks::{ProbeRequest, ResourceRef, VolumeRequest};
 use crate::rules::{EnvEdit, FieldChange};
 
+// `zeabur-api` resolves `DeployKey`, `PageServer`, `Template` and `CopyS3Keys` into other
+// changes before the planner sees them. The planner rejects them.
 /// One change a person asks for.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
@@ -1187,7 +1189,7 @@ pub enum Warning {
         owner: Option<ObjectName>,
         /// The tool that manages it, for `managed`.
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        tool: Option<zeabur_kernel::tool::Tool>,
+        tool: Option<zeabur_model::kernel::tool::Tool>,
     },
     /// These workloads still use the deleted ConfigMap, Secret or claim: their pods that start
     /// after it is gone fail to start, and a claim in use stays until no pod uses it
@@ -1244,7 +1246,7 @@ pub enum Warning {
     #[serde(rename_all = "camelCase")]
     RightsMissing {
         /// Each right, as kube-apiserver would name it in a refusal.
-        rights: Vec<zeabur_kernel::denied::Denied>,
+        rights: Vec<zeabur_model::kernel::denied::Denied>,
     },
     /// The plan creates a tools pod: what runs where, as whom, until when.
     #[serde(rename_all = "camelCase")]
@@ -1350,7 +1352,7 @@ pub enum Warning {
     #[serde(rename_all = "camelCase")]
     Recreated {
         /// The tool.
-        tool: zeabur_kernel::tool::Tool,
+        tool: zeabur_model::kernel::tool::Tool,
         /// The objects.
         objects: Vec<ObjectName>,
     },

@@ -64,8 +64,8 @@
 use std::collections::BTreeMap;
 
 use serde_json::{Value, json};
-use zeabur_kernel::digest::{hex, sha256};
-pub use zeabur_kernel::names::{
+use zeabur_model::kernel::digest::{hex, sha256};
+pub use zeabur_model::kernel::names::{
     Conventions, DEBUG_PREFIX, TOOLS_LABEL, TOOLS_PERSON_ANNOTATION, TOOLS_PERSON_LABEL,
     TOOLS_PREFIX, TOOLS_PROJECT_ANNOTATION,
 };

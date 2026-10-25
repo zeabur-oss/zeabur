@@ -25,7 +25,7 @@ use k8s_openapi::api::core::v1::Secret;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use serde_json::{Value, json};
 use sha2::{Digest as _, Sha256};
-use zeabur_adapters::traefik::{self, MIDDLEWARES_ANNOTATION};
+use zeabur_model::adapters::traefik::{self, MIDDLEWARES_ANNOTATION};
 
 use crate::change::{BasicAuthUser, Change, ObjectName, RouteKind, RouteRef, Target, Warning};
 use crate::checks::ResourceRef;

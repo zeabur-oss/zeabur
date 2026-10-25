@@ -13,7 +13,7 @@ use std::collections::BTreeMap;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::LabelSelector;
 use serde_json::Value;
 
-use crate::selector;
+use crate::adapters::selector;
 
 const GATEWAY_GROUP: &str = "gateway.networking.k8s.io";
 

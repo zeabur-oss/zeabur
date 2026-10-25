@@ -1,10 +1,10 @@
 //! A container's environment and storage.
 
 use serde::{Deserialize, Serialize};
-use zeabur_kernel::quantity;
 
 use crate::attribution::Attribution;
 use crate::is_false;
+use crate::kernel::quantity;
 use crate::provenance::Tool;
 use crate::source::{ObjectRef, Origin, Source};
 

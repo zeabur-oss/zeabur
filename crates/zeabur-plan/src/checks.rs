@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
-use zeabur_kernel::quantity;
+use zeabur_model::kernel::quantity;
 
 use crate::rules::Refusal;
 

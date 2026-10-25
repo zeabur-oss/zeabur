@@ -1,7 +1,8 @@
 //! Which tool manages an object.
 
 use serde::{Deserialize, Serialize};
-pub use zeabur_kernel::tool::Tool;
+
+pub use crate::kernel::tool::Tool;
 
 /// Which tool manages an object, if any.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

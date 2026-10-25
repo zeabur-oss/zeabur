@@ -86,7 +86,7 @@ environment, not a fresh one; on a VM, snapshot its clean state and restore it a
 
 ## Fixtures
 - `crates/<crate>/fixtures/<area>/<case>/` holds language-neutral cases (format in
-  `fixtures/README.md`), loaded with `zeabur_fixtures::load!`. A new
+  `fixtures/README.md`), loaded with `zeabur_test_support::load!`. A new
   operation is documented in the README's table first; `zeabur-test-support`'s test fails on an
   undocumented one. Expected errors are snake_case codes, never message text.
 

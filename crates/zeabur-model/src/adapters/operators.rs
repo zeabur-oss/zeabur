@@ -4,8 +4,8 @@ use std::collections::BTreeMap;
 
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 
-use crate::group::{COMPONENT_LABEL, NAME_LABEL};
-use crate::label;
+use crate::adapters::group::{COMPONENT_LABEL, NAME_LABEL};
+use crate::adapters::label;
 
 /// A database engine an operator runs.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -191,7 +191,7 @@ pub struct DatabaseCluster<'a> {
 /// collection), and that does not hand it to their operator.
 #[must_use]
 pub fn database_cluster(meta: &ObjectMeta) -> Option<DatabaseCluster<'_>> {
-    crate::controller_of(meta).and_then(|owner| {
+    crate::adapters::controller_of(meta).and_then(|owner| {
         let group = api_group(&owner.api_version);
         DATABASE_OWNERS
             .iter()

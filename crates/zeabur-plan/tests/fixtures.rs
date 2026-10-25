@@ -6,7 +6,6 @@ mod tests {
 
     use k8s_openapi::api::apps::v1::ReplicaSet;
     use serde_json::{Value, from_value, json, to_value};
-    use zeabur_fixtures::{Fixture, compare, load};
     use zeabur_graph::Snapshot;
     use zeabur_model::WorkloadRef;
     use zeabur_plan::checks::{
@@ -18,6 +17,8 @@ mod tests {
         Attachable, CheckedCertificate, Fetched, Input, IssuerRead, PlanRequest, Release,
         ServedKind, StorageClassInfo, plan,
     };
+    use zeabur_test_support::fixtures::{Fixture, compare};
+    use zeabur_test_support::load;
 
     /// The resource (plural) of a kind, for the fixtures' objects.
     fn plural(kind: &str) -> String {

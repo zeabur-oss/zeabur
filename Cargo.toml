@@ -8,7 +8,6 @@ edition = "2024"
 rust-version = "1.99"
 license = "Apache-2.0"
 repository = "https://github.com/zeabur-oss/zeabur"
-# Only the pure crates and their fixture loader are published ([workspace.metadata.pure]).
 publish = false
 
 # Lint policy (see CONTRIBUTING.md).
@@ -18,11 +17,8 @@ publish = false
 # dependencies) only on workspace crates of a lower level. Test crates are dev-dependencies only.
 # (Levels order crates; the product layers L0-L4 in docs/reference/architecture.md are a different thing.)
 [workspace.metadata.levels]
-zeabur-kernel = 0
-zeabur-fixtures = 0
 zeabur-core = 1
-zeabur-model = 1
-zeabur-adapters = 1
+zeabur-model = 0
 zeabur-ui = 1
 zeabur-kube = 2
 zeabur-proxy = 1
@@ -50,38 +46,31 @@ composers = ["zeabur-api", "zeabur", "zeaburctl"]
 # Crates that run as their own component with a small trusted base, also checked by
 # scripts/check-levels.sh: each may depend only on the workspace crates listed for it.
 [workspace.metadata.isolated]
-zeabur-proxy = ["zeabur-kernel"]
+zeabur-proxy = []
 
-# Crates with no I/O and no key, packageable on their own and built for WebAssembly, also checked
-# by scripts/check-levels.sh: a pure crate depends only on pure workspace crates.
+# Crates with no I/O and no key, also checked by scripts/check-levels.sh: a pure crate depends only on pure workspace crates.
 [workspace.metadata.pure]
 crates = [
-  "zeabur-kernel",
   "zeabur-model",
-  "zeabur-adapters",
   "zeabur-graph",
   "zeabur-gaps",
   "zeabur-plan",
 ]
 
 [workspace.dependencies]
-# Workspace crates, levelled from the bottom up. A published crate's entry carries the workspace
-# version too, which a package needs; keep it equal to [workspace.package] version.
-zeabur-kernel = { path = "crates/zeabur-kernel", version = "0.0.1" }
+# Workspace crates, levelled from the bottom up.
 zeabur-core = { path = "crates/zeabur-core" }
-zeabur-model = { path = "crates/zeabur-model", version = "0.0.1" }
+zeabur-model = { path = "crates/zeabur-model" }
 zeabur-kube = { path = "crates/zeabur-kube" }
-zeabur-adapters = { path = "crates/zeabur-adapters", version = "0.0.1" }
-zeabur-graph = { path = "crates/zeabur-graph", version = "0.0.1" }
-zeabur-gaps = { path = "crates/zeabur-gaps", version = "0.0.1" }
+zeabur-graph = { path = "crates/zeabur-graph" }
+zeabur-gaps = { path = "crates/zeabur-gaps" }
 zeabur-catalog = { path = "crates/zeabur-catalog" }
 zeabur-modules = { path = "crates/zeabur-modules" }
-zeabur-plan = { path = "crates/zeabur-plan", version = "0.0.1" }
+zeabur-plan = { path = "crates/zeabur-plan" }
 zeabur-api = { path = "crates/zeabur-api" }
 zeabur-ui = { path = "crates/zeabur-ui" }
 zeabur-auth = { path = "crates/zeabur-auth" }
 zeabur-test-support = { path = "crates/zeabur-test-support" }
-zeabur-fixtures = { path = "crates/zeabur-fixtures", version = "0.0.1" }
 zeabur-installer-plan = { path = "crates/zeabur-installer-plan" }
 zeabur-installer-host = { path = "crates/zeabur-installer-host" }
 
@@ -124,7 +113,7 @@ secrecy = { version = "0.10", features = ["serde"] }
 serde = { version = "1", features = ["derive"] }
 serde-saphyr = { version = "0.0.29", default-features = false, features = ["deserialize"] }
 serde_json = "1"
-# SHA-256 for derived names in the pure crates (zeabur-kernel), which hold no C library.
+# SHA-256 for derived names in the pure crates (zeabur-model), which hold no C library.
 sha2 = { version = "0.11", default-features = false }
 tar = { version = "0.4", default-features = false }
 tempfile = "3"

@@ -1,5 +1,3 @@
-#![doc = include_str!("../README.md")]
-
 use std::collections::BTreeMap;
 
 pub mod error_pages;
@@ -12,11 +10,11 @@ pub mod selector;
 pub mod traefik;
 
 /// The label and annotation keys and the field manager, Zeabur's by default.
-pub use zeabur_kernel::names::Conventions;
+pub use crate::kernel::names::Conventions;
 /// The field manager (`fieldManager`) Zeabur's writes are recorded under in `managedFields`.
-pub use zeabur_kernel::names::FIELD_MANAGER;
+pub use crate::kernel::names::FIELD_MANAGER;
 /// The label that names the service a scheduled task was made from.
-pub use zeabur_kernel::names::{LABEL_SHARED_VARIABLES, LABEL_TASK_OF};
+pub use crate::kernel::names::{LABEL_SHARED_VARIABLES, LABEL_TASK_OF};
 
 /// The object's controller: the owner reference with `controller: true`, of which there is at
 /// most one [k8s-owners]. Other owners only keep the object from garbage collection.

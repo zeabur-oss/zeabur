@@ -107,6 +107,6 @@ object), so the operator's server-side-apply rules (`mutation.ownedFields`,
 
 ## Running them
 
-`zeabur-fixtures` loads a crate's cases (`load!("<area>")`) and compares results with them. The
+`zeabur-test-support` loads a crate's cases (`load!("<area>")`) and compares results with them. The
 crates under test run the cases of their area; `zeabur-test-support`'s test checks that every
 case parses and names a known operation.

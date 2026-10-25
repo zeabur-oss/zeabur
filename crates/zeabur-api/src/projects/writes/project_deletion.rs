@@ -195,9 +195,9 @@ async fn databases(
 }
 
 /// Whether a controller Deployment of the operator of API `group` has an available replica, from
-/// the Deployments of every namespace (`zeabur_adapters::operators::controllers_of`).
+/// the Deployments of every namespace (`zeabur_model::adapters::operators::controllers_of`).
 async fn operator(cluster: &dyn Cluster, group: &str) -> OperatorState {
-    let names = zeabur_adapters::operators::controllers_of(group);
+    let names = zeabur_model::adapters::operators::controllers_of(group);
     let resource = ResourceRef::new("apps", "v1", "deployments", "Deployment");
     let metadata = match cluster.list_metadata(&resource, None).await {
         Ok(Some(list)) => list,

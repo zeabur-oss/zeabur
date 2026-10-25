@@ -2,10 +2,9 @@
 
 use std::collections::BTreeMap;
 
+use crate::adapters::{Conventions, label};
 /// Zeabur's label naming a workload's group explicitly. It always wins.
-pub use zeabur_kernel::names::LABEL_GROUP as GROUP_LABEL;
-
-use crate::{Conventions, label};
+pub use crate::kernel::names::LABEL_GROUP as GROUP_LABEL;
 
 /// The recommended label for a component's role in an application, such as `database`.
 pub const COMPONENT_LABEL: &str = "app.kubernetes.io/component";

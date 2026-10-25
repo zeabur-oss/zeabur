@@ -452,7 +452,10 @@ mod tests {
         let Write::Create { body } = &policy.write else {
             panic!("the policy is created");
         };
-        assert_eq!(body, &zeabur_kernel::isolation::project_policy("my-app"));
+        assert_eq!(
+            body,
+            &zeabur_model::kernel::isolation::project_policy("my-app")
+        );
         // Without the label nothing tells which namespaces to let in: no policy.
         let unlabelled = create("my-app", None, None).unwrap();
         assert!(

@@ -4,7 +4,7 @@
 //! PostgreSQL by name only. Zeabur uses the name for hints, never for a decision a person cannot
 //! see and correct.
 
-pub use zeabur_kernel::data_store::DataStore;
+pub use crate::kernel::data_store::DataStore;
 
 /// Repository names (the last path segment, without tag or digest) of widely used images for
 /// data stores: databases, caches, queues and object stores, with the kind of each.

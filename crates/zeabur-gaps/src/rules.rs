@@ -9,8 +9,8 @@ use std::collections::BTreeSet;
 
 use serde_json::Value;
 use zeabur_graph::{Snapshot, ingress_backends};
-use zeabur_kernel::isolation::{PROJECT_POLICY, project_policy};
-use zeabur_kernel::names::GatewayRef;
+use zeabur_model::kernel::isolation::{PROJECT_POLICY, project_policy};
+use zeabur_model::kernel::names::GatewayRef;
 use zeabur_model::{
     Citation, Fix, FixKind, Gap, HttpRoute, Message, Origin, Project, Service, Severity,
     WorkloadKind,
@@ -608,7 +608,7 @@ pub struct NamespaceFact {
     pub name: String,
     /// It carries `LABEL_PROJECT`.
     pub project: bool,
-    /// It carries [`PLATFORM_LABEL`](zeabur_kernel::isolation::PLATFORM_LABEL).
+    /// It carries [`PLATFORM_LABEL`](zeabur_model::kernel::isolation::PLATFORM_LABEL).
     pub platform: bool,
     /// It holds the policy [`PROJECT_POLICY`].
     pub project_policy: bool,
@@ -635,9 +635,9 @@ fn project_policy_citations() -> Vec<Citation> {
 /// - An IngressClass served by a retired controller. Its fix is to install a maintained controller
 ///   from the catalogue.
 /// - A project namespace without [`PROJECT_POLICY`], when some namespace carries
-///   [`PLATFORM_LABEL`](zeabur_kernel::isolation::PLATFORM_LABEL). Without that label nothing tells
-///   which namespaces the platform runs in, and the policy would lock them out, so no gap is
-///   reported. Its fix plans the policy.
+///   [`PLATFORM_LABEL`](zeabur_model::kernel::isolation::PLATFORM_LABEL). Without that label
+///   nothing tells which namespaces the platform runs in, and the policy would lock them out, so no
+///   gap is reported. Its fix plans the policy.
 #[must_use]
 pub fn cluster_gaps(classes: &[IngressClassFact], namespaces: &[NamespaceFact]) -> Vec<Gap> {
     let rule = IngressToHttpRoute;

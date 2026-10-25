@@ -136,7 +136,7 @@ fn write_pages(object: &mut Value, pages: &ErrorPageHtml) {
         ("504.html", &pages.gateway_timeout),
         ("maintenance.html", &pages.maintenance),
     ];
-    if zeabur_adapters::error_pages::is_page_server(&meta(object))
+    if zeabur_model::adapters::error_pages::is_page_server(&meta(object))
         && object.get("kind").and_then(Value::as_str) == Some("ConfigMap")
         && let Some(data) = object.get_mut("data").and_then(Value::as_object_mut)
     {
@@ -201,7 +201,7 @@ mod tests {
         let service = named("Service", "error-pages").unwrap();
         assert_eq!(service.pointer("/metadata/namespace"), Some(&json!("shop")));
         assert!(
-            zeabur_adapters::error_pages::page_server(
+            zeabur_model::adapters::error_pages::page_server(
                 &serde_json::from_value(service.clone()).unwrap()
             )
             .is_some()

@@ -26,7 +26,7 @@
 use base64::Engine as _;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use serde_json::{Map, Value, json};
-use zeabur_adapters::traefik;
+use zeabur_model::adapters::traefik;
 
 use crate::access::{meta_of, owner_of};
 use crate::change::{CertificateSource, ObjectName, RouteKind, RouteRef, Target, Warning};

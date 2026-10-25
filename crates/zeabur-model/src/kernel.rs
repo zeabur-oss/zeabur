@@ -1,5 +1,3 @@
-#![doc = include_str!("../README.md")]
-
 pub mod data_store;
 pub mod denied;
 pub mod digest;

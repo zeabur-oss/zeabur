@@ -23,4 +23,4 @@ pub use trace::{
     Certificates, Resolved, TraceInput, diagnoses as trace_diagnoses, ingress_addresses,
     names_to_resolve, trace,
 };
-pub use zeabur_kernel::names::GatewayRef;
+pub use zeabur_model::kernel::names::GatewayRef;

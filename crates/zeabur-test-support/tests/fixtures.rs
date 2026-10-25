@@ -6,7 +6,7 @@ mod tests {
     use std::path::Path;
 
     use serde_json::Value;
-    use zeabur_fixtures::load_from;
+    use zeabur_test_support::fixtures::load_from;
 
     /// Each area, and the crate whose `fixtures/` holds it.
     const AREAS: [(&str, &str); 5] = [

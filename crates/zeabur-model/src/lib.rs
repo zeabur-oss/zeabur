@@ -1,5 +1,7 @@
 #![doc = include_str!("../README.md")]
 
+/// Conventions of third-party tools: Helm, Argo CD, Flux, operators, Gateway API.
+pub mod adapters;
 mod attribution;
 mod container;
 mod details;
@@ -8,6 +10,8 @@ mod gap;
 mod health;
 mod http_route;
 pub mod id;
+/// Names, quantities, JSON Patch and the values every layer shares.
+pub mod kernel;
 mod network;
 mod pod_security;
 mod project;

@@ -21,7 +21,7 @@ holding any power of its own. It is a projection: Kubernetes objects are the onl
   still cannot change Namespace labels
   ([Members' rights](../get-started/install.md#members-rights)).
   When some namespace carries `installer.zeabur.com/baseline: "true"`, creating a project also
-  writes the NetworkPolicy `zeabur-project` (`zeabur-kernel`'s `isolation`): ingress only from the
+  writes the NetworkPolicy `zeabur-project` (`zeabur-model`'s `kernel::isolation`): ingress only from the
   project, the labelled platform namespaces and `kube-system`, egress open. Without the label
   nothing tells which namespaces the platform runs in, so no policy is written.
   `GET /api/v1/cluster/gaps` names the project namespaces without it. The trust boundary is the

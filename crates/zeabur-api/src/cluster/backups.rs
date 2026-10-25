@@ -1132,7 +1132,7 @@ async fn move_writes(
         let metadata: ObjectMeta =
             serde_json::from_value(before.get("metadata").cloned().unwrap_or_default())
                 .unwrap_or_default();
-        if zeabur_adapters::provenance::detect_tool(&metadata).is_some() {
+        if zeabur_model::adapters::provenance::detect_tool(&metadata).is_some() {
             managed.push(format!("{kind}/{name}"));
             continue;
         }

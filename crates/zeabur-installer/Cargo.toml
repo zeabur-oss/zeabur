@@ -8,8 +8,6 @@ license.workspace = true
 publish.workspace = true
 repository.workspace = true
 readme = "../../docs/get-started/quickstart.md"
-keywords = ["kubernetes", "rke2", "installer"]
-categories = ["command-line-utilities"]
 
 [dependencies]
 zeabur-installer-host.workspace = true

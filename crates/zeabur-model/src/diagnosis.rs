@@ -1,8 +1,8 @@
 //! Why a service is unhealthy, in words a client translates.
 
 use serde::{Deserialize, Serialize};
-pub use zeabur_kernel::message::Message;
 
+pub use crate::kernel::message::Message;
 use crate::source::Origin;
 
 /// What kind of failure a diagnosis explains.

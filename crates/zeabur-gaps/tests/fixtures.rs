@@ -4,12 +4,13 @@
 mod tests {
     use k8s_openapi::jiff::Timestamp;
     use serde_json::{Value, from_value, to_value};
-    use zeabur_fixtures::{Fixture, compare, load};
     use zeabur_gaps::{
         BUILTIN, ClusterTraits, Event, GatewayRef, Input, Namespace, Rule, evaluate,
     };
     use zeabur_graph::{Snapshot, project};
     use zeabur_model::HttpRoute;
+    use zeabur_test_support::fixtures::{Fixture, compare};
+    use zeabur_test_support::load;
 
     /// The snapshot a cluster reader would build, the events and the `HTTPRoutes`, from the
     /// case's objects.

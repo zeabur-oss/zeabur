@@ -7,11 +7,11 @@ use k8s_openapi::api::core::v1::{
     VolumeMount,
 };
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
-use zeabur_adapters::Conventions;
-use zeabur_adapters::group::{
+use zeabur_model::adapters::Conventions;
+use zeabur_model::adapters::group::{
     DATABASES_GROUP, OPERATORS_GROUP, explicit_group_with, resolve_group_with,
 };
-use zeabur_adapters::operators::{database_cluster, is_operator};
+use zeabur_model::adapters::operators::{database_cluster, is_operator};
 use zeabur_model::{
     Classification, ManagedBy, Origin, Phase, Replicas, TaskConcurrency, TaskSchedule,
     WorkloadKind, WorkloadRef, WorkloadSummary,
@@ -139,12 +139,12 @@ pub fn workloads(snapshot: &Snapshot) -> Vec<Workload<'_>> {
 
 /// Whether the object's controller owner reference is of `kind`.
 fn controlled_by(meta: &ObjectMeta, kind: &str) -> bool {
-    zeabur_adapters::controller_of(meta).is_some_and(|owner| owner.kind == kind)
+    zeabur_model::adapters::controller_of(meta).is_some_and(|owner| owner.kind == kind)
 }
 
 /// Whether a Zeabur Builder `BuildRun` controls the object.
 fn built(meta: &ObjectMeta) -> bool {
-    zeabur_adapters::controller_of(meta).is_some_and(|owner| {
+    zeabur_model::adapters::controller_of(meta).is_some_and(|owner| {
         owner.kind == "BuildRun" && owner.api_version.starts_with("builder.zeabur.com/")
     })
 }
@@ -241,7 +241,7 @@ pub(crate) fn find_container<'a>(workload: Workload<'a>, name: &str) -> Option<C
 /// resource, is shown under the cluster's name when it holds the data, and goes to the
 /// `databases` group. An operator's own Deployment goes to `operators`. The explicit group
 /// label wins over both; otherwise the labels decide
-/// ([`resolve_group`](zeabur_adapters::group::resolve_group)).
+/// ([`resolve_group`](zeabur_model::adapters::group::resolve_group)).
 #[must_use]
 pub fn classify(workload: Workload<'_>) -> Classification {
     classify_with(workload, &Conventions::ZEABUR)
@@ -507,7 +507,7 @@ fn schedule(workload: Workload<'_>) -> Option<TaskSchedule> {
             .metadata
             .labels
             .as_ref()
-            .and_then(|l| l.get(zeabur_adapters::LABEL_TASK_OF))
+            .and_then(|l| l.get(zeabur_model::adapters::LABEL_TASK_OF))
             .cloned(),
         concurrency: TaskConcurrency::from_kubernetes(spec.concurrency_policy.as_deref()),
         keep_succeeded: spec.successful_jobs_history_limit.unwrap_or(3),

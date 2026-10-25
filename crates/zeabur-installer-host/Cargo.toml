@@ -8,8 +8,6 @@ license.workspace = true
 publish.workspace = true
 repository.workspace = true
 readme = "README.md"
-keywords = ["kubernetes", "rke2", "installer"]
-categories = ["command-line-utilities"]
 
 [dependencies]
 zeabur-installer-plan.workspace = true

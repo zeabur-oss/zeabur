@@ -11,8 +11,8 @@ in-cluster server and `zeaburctl ui`; the cryptography (randomness, AEAD, consta
 comparison, RS256 signatures) through aws-lc-rs; and how a secret is held in memory (`secret`:
 strings that never grow, no core dumps).
 
-It re-exports the modules of `zeabur-kernel`, so the server crates name them through one crate.
+It re-exports the modules of `zeabur-model`'s `kernel`, so the server crates name them through one crate.
 
 ## Place in the workspace
 
-Level 1: depends on `zeabur-kernel` only.
+Level 1: depends on `zeabur-model` only.

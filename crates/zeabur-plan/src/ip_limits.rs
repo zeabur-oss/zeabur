@@ -22,8 +22,8 @@ use std::collections::BTreeMap;
 use std::net::IpAddr;
 
 use serde_json::{Value, json};
-use zeabur_adapters::traefik;
 use zeabur_model::WorkloadRef;
+use zeabur_model::adapters::traefik;
 
 use crate::access::{meta_of, middleware_resource, owner_of};
 use crate::change::{Change, EgressLimitChange, RouteKind, RouteRef, Target};

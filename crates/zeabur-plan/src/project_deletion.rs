@@ -33,10 +33,10 @@ use std::collections::BTreeMap;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use zeabur_adapters::provenance::{Tool, detect_tool};
 use zeabur_graph::workloads;
-use zeabur_kernel::names::{LABEL_BASELINE, NODE_SHELL_NAMESPACE, is_system_namespace};
 use zeabur_model::WorkloadRef;
+use zeabur_model::adapters::provenance::{Tool, detect_tool};
+use zeabur_model::kernel::names::{LABEL_BASELINE, NODE_SHELL_NAMESPACE, is_system_namespace};
 
 use crate::change::{ObjectName, Target, Warning};
 use crate::checks::ResourceRef;
@@ -173,7 +173,7 @@ impl Planner<'_> {
 
         let services: Vec<WorkloadRef> = workloads(snapshot)
             .into_iter()
-            .filter(|w| zeabur_adapters::controller_of(w.meta()).is_none())
+            .filter(|w| zeabur_model::adapters::controller_of(w.meta()).is_none())
             .map(zeabur_graph::Workload::reference)
             .collect();
         let volumes = snapshot

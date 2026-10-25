@@ -1,6 +1,6 @@
 [package]
 name = "zeabur-test-support"
-description = "zeabur: test helpers (the cluster tests' sandbox, the fixture layout check)"
+description = "zeabur: test helpers (the fixture loader, the cluster tests' sandbox)"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -16,8 +16,6 @@ sandbox = [
   "dep:zeabur-core",
   "dep:zeabur-kube",
   "dep:kube",
-  "dep:serde",
-  "dep:serde_json",
   "dep:tokio",
 ]
 
@@ -25,10 +23,8 @@ sandbox = [
 zeabur-core = { workspace = true, optional = true }
 zeabur-kube = { workspace = true, optional = true }
 kube = { workspace = true, optional = true }
-serde = { workspace = true, optional = true }
-serde_json = { workspace = true, optional = true }
-tokio = { workspace = true, optional = true }
-
-[dev-dependencies]
-zeabur-fixtures.workspace = true
+serde.workspace = true
+serde-saphyr.workspace = true
 serde_json.workspace = true
+thiserror.workspace = true
+tokio = { workspace = true, optional = true }

@@ -18,9 +18,9 @@ use std::collections::BTreeSet;
 
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use serde_json::Value;
-use zeabur_adapters::provenance::{Tool, detect_tool};
-use zeabur_adapters::{controller_of, label};
 use zeabur_graph::{Snapshot, ingress_backends, is_machinery_secret, relations, workloads};
+use zeabur_model::adapters::provenance::{Tool, detect_tool};
+use zeabur_model::adapters::{controller_of, label};
 use zeabur_model::{HttpRoute, RelationKind, WorkloadKind, WorkloadRef};
 
 use crate::change::{KeptReason, ObjectName, Warning};

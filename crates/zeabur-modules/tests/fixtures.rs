@@ -5,9 +5,10 @@ mod tests {
     use std::collections::BTreeMap;
 
     use serde_json::{Value, from_value, to_value};
-    use zeabur_fixtures::{Fixture, compare, load};
     use zeabur_kube::DynamicObject;
     use zeabur_modules::{backups, cloudnative_pg, k8up, network_policy, velero};
+    use zeabur_test_support::fixtures::{Fixture, compare};
+    use zeabur_test_support::load;
 
     fn objects(fixture: &Fixture, kind: &str, api_group: &str) -> Vec<DynamicObject> {
         fixture

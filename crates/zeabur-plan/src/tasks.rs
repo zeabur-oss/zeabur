@@ -19,7 +19,7 @@
 use k8s_openapi::api::batch::v1::{CronJob, Job};
 use k8s_openapi::api::core::v1::Container;
 use serde_json::{Map, Value, json};
-use zeabur_adapters::LABEL_TASK_OF;
+use zeabur_model::adapters::LABEL_TASK_OF;
 use zeabur_model::{WorkloadKind, WorkloadRef};
 
 use crate::TaskConcurrency;

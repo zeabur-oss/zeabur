@@ -1,10 +1,10 @@
 //! A project: one namespace, seen as services.
 
 use serde::{Deserialize, Serialize};
-pub use zeabur_kernel::data_store::DataStore;
 
 use crate::attribution::{Attribution, WorkloadRef};
 use crate::container::Container;
+pub use crate::kernel::data_store::DataStore;
 use crate::network::{Endpoint, Route};
 use crate::provenance::Provenance;
 use crate::source::{ObjectRef, Origin};

@@ -36,8 +36,8 @@ proxy reads a renewed certificate without a restart.
 
 ## Place in the workspace
 
-Level 1. It runs as its own component, so it may depend on no workspace crate other than
-`zeabur-kernel` (`[workspace.metadata.isolated]`, checked by `scripts/check-levels.sh`), and it
+Level 1. It runs as its own component, so it may depend on no workspace crate
+(`[workspace.metadata.isolated]`, checked by `scripts/check-levels.sh`), and it
 talks to kube-apiserver with kube-rs directly rather than through `zeabur-kube`, keeping what it
 trusts small. The parser has a fuzz target in `fuzz/` (`cargo fuzz run parse`).
 

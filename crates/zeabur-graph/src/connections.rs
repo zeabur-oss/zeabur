@@ -17,8 +17,8 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use zeabur_adapters::group::DATABASES_GROUP;
-use zeabur_adapters::images::{DataStore, data_store_image};
+use zeabur_model::adapters::group::DATABASES_GROUP;
+use zeabur_model::adapters::images::{DataStore, data_store_image};
 use zeabur_model::{
     Connection, ConnectionEvidence, MountCategory, ObjectRef, Service, SourceKind, WorkloadKind,
     WorkloadRef,

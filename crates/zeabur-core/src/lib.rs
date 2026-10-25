@@ -6,6 +6,6 @@ pub mod problem;
 pub mod secret;
 pub mod ssh;
 
-pub use zeabur_kernel::{
+pub use zeabur_model::kernel::{
     data_store, isolation, json_patch, message, names, origin, quantity, tool,
 };

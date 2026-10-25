@@ -54,13 +54,13 @@
 //! [k8s-event]: https://kubernetes.io/docs/reference/kubernetes-api/cluster-resources/event-v1/
 
 use serde_json::{Value, json};
-use zeabur_kernel::digest::{hex, sha256};
-use zeabur_kernel::names::FIELD_MANAGER;
+use zeabur_model::kernel::digest::{hex, sha256};
+use zeabur_model::kernel::names::FIELD_MANAGER;
 
 pub use crate::terminal::person_key;
 
 /// The namespace node shells go in; never a project.
-pub const NAMESPACE: &str = zeabur_kernel::names::NODE_SHELL_NAMESPACE;
+pub const NAMESPACE: &str = zeabur_model::kernel::names::NODE_SHELL_NAMESPACE;
 /// The start of a node shell pod's name, followed by the node's.
 pub const PREFIX: &str = "zeabur-node-shell-";
 /// The label every node shell pod carries, `"true"`.

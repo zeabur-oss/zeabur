@@ -75,7 +75,7 @@ pub fn remove(path: &str) -> Value {
 
 /// Applied here to show the object as it will be; shared with the in-memory cluster, which
 /// applies it to store the object.
-pub use zeabur_kernel::json_patch::{PatchError, apply_patch};
+pub use zeabur_model::kernel::json_patch::{PatchError, apply_patch};
 
 /// The key field of a list Kubernetes keys by a field (its merge key), by the list's name.
 ///

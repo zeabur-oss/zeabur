@@ -1,9 +1,9 @@
 //! Where a projected value comes from.
 
 use serde::{Deserialize, Serialize};
-pub use zeabur_kernel::origin::Origin;
 
 use crate::is_false;
+pub use crate::kernel::origin::Origin;
 
 /// What an environment variable's value is read from.
 ///

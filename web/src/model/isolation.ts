@@ -1,4 +1,4 @@
-// The project's NetworkPolicy and the ones that let another project in, as zeabur-kernel's
+// The project's NetworkPolicy and the ones that let another project in, as zeabur-model's `kernel`
 // `isolation` writes them. https://kubernetes.io/docs/concepts/services-networking/network-policies/
 
 const PROJECT_POLICY = "zeabur-project"

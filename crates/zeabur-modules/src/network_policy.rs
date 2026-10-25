@@ -49,9 +49,9 @@ use k8s_openapi::api::networking::v1::{NetworkPolicy, NetworkPolicyPeer, Network
 use serde::Serialize;
 use serde_json::{Value, json};
 use utoipa::ToSchema;
-use zeabur_adapters::selector::{is_empty, matches};
-use zeabur_kernel::isolation::{PROJECT_POLICY, project_policy};
 use zeabur_kube::DynamicObject;
+use zeabur_model::adapters::selector::{is_empty, matches};
+use zeabur_model::kernel::isolation::{PROJECT_POLICY, project_policy};
 use zeabur_model::{Citation, Fix, FixKind, Gap, Message, Origin, Severity, WorkloadKind};
 
 use crate::{Finding, Module, Read};

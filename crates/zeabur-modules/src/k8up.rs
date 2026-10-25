@@ -42,8 +42,8 @@ use std::collections::BTreeMap;
 
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::LabelSelector;
 use serde_json::{Value, json};
-use zeabur_adapters::selector::matches;
 use zeabur_kube::DynamicObject;
+use zeabur_model::adapters::selector::matches;
 
 use crate::backups::{Findings, Outcome, Run, Schedule, Target, TargetKind, condition, newest};
 use crate::{Module, Read, text};

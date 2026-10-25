@@ -8,8 +8,8 @@ use k8s_openapi::apimachinery::pkg::api::resource::Quantity;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use k8s_openapi::apimachinery::pkg::util::intstr::IntOrString;
 use serde_json::Value;
-use zeabur_adapters::provenance::{detect_tool, managed_by};
-use zeabur_adapters::{Conventions, LABEL_SHARED_VARIABLES, error_pages, traefik};
+use zeabur_model::adapters::provenance::{detect_tool, managed_by};
+use zeabur_model::adapters::{Conventions, LABEL_SHARED_VARIABLES, error_pages, traefik};
 use zeabur_model::{
     Attribution, Container, ContainerResources, Endpoint, NamespaceAttribution, Origin, PageServer,
     ProbeHandler, ProbeSummary, Probes, Project, Provenance, Quantities, Resource, ResourceKind,

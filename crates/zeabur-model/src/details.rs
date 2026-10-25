@@ -6,7 +6,8 @@
 use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
-use zeabur_kernel::names::Conventions;
+
+use crate::kernel::names::Conventions;
 
 /// The longest display name, in characters: a name, not a sentence.
 pub const DISPLAY_NAME_MAX: usize = 64;
@@ -152,9 +153,8 @@ impl ProjectDetails {
 
 #[cfg(test)]
 mod tests {
-    use zeabur_kernel::names::{ANNOTATION_DESCRIPTION, ANNOTATION_DISPLAY_NAME, ANNOTATION_ICON};
-
     use super::*;
+    use crate::kernel::names::{ANNOTATION_DESCRIPTION, ANNOTATION_DISPLAY_NAME, ANNOTATION_ICON};
 
     #[test]
     fn every_icon_reads_back_from_its_annotation_value() {

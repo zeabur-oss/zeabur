@@ -6,8 +6,8 @@ use k8s_openapi::api::apps::v1::StatefulSet;
 use k8s_openapi::api::core::v1::{PodTemplateSpec, Secret, Service as KubeService, Volume};
 use k8s_openapi::api::networking::v1::Ingress;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
-use zeabur_adapters::error_pages;
-use zeabur_adapters::provenance::is_helm_release_secret;
+use zeabur_model::adapters::error_pages;
+use zeabur_model::adapters::provenance::is_helm_release_secret;
 use zeabur_model::{
     Attribution, NamespaceAttribution, ObjectRef, Origin, Ownership, Relation, RelationKind,
     WorkloadRef,

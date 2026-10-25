@@ -5,11 +5,9 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
-publish = true
+publish.workspace = true
 repository.workspace = true
 readme = "README.md"
-keywords = ["kubernetes", "zeabur", "projection"]
-categories = ["data-structures"]
 # Reads the chart corpus at the repository root, which the package does not carry.
 exclude = ["tests/coverage.rs"]
 
@@ -17,7 +15,6 @@ exclude = ["tests/coverage.rs"]
 workspace = true
 
 [dependencies]
-zeabur-adapters.workspace = true
 zeabur-model.workspace = true
 k8s-openapi.workspace = true
 serde.workspace = true
@@ -26,6 +23,6 @@ serde-saphyr = { workspace = true, features = ["serialize"] }
 serde_json.workspace = true
 
 [dev-dependencies]
-zeabur-fixtures.workspace = true
+zeabur-test-support.workspace = true
 proptest.workspace = true
 serde_json.workspace = true

@@ -1,5 +1,3 @@
-#![doc = include_str!("../README.md")]
-
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -12,7 +10,7 @@ use serde_json::Value;
 #[macro_export]
 macro_rules! load {
     ($area:expr) => {
-        $crate::load_from(
+        $crate::fixtures::load_from(
             &::std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("fixtures"),
             $area,
         )

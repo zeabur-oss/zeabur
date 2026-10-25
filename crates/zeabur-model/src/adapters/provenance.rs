@@ -2,7 +2,7 @@
 
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 
-use crate::label;
+use crate::adapters::label;
 
 /// The recommended label naming the tool that manages an object, read verbatim.
 pub const MANAGED_BY_LABEL: &str = "app.kubernetes.io/managed-by";
@@ -20,7 +20,7 @@ pub const HELM_RELEASE_NAME_ANNOTATION: &str = "meta.helm.sh/release-name";
 /// The `type` of the Secrets Helm's default storage driver keeps release records in.
 pub const HELM_RELEASE_SECRET_TYPE: &str = "helm.sh/release.v1";
 
-pub use zeabur_kernel::tool::Tool;
+pub use crate::kernel::tool::Tool;
 
 /// The tool managing an object, if its marks are present.
 ///

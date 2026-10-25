@@ -56,8 +56,8 @@ use std::collections::BTreeSet;
 
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use serde_json::Value;
-use zeabur_adapters::provenance::{Tool, detect_tool};
 use zeabur_graph::{Snapshot, pods_of, workloads};
+use zeabur_model::adapters::provenance::{Tool, detect_tool};
 use zeabur_model::{SourceKind, WorkloadKind, WorkloadRef};
 
 use crate::change::{ObjectName, PlannedObject, Target, Warning, Write};
@@ -112,7 +112,7 @@ fn mongodb_data_claims(cluster: &Value, snapshot: &Snapshot) -> Vec<String> {
     snapshot
         .persistent_volume_claims
         .iter()
-        .filter(|c| zeabur_adapters::controller_of(&c.metadata).is_none())
+        .filter(|c| zeabur_model::adapters::controller_of(&c.metadata).is_none())
         .filter_map(|c| c.metadata.name.clone())
         .filter(|claim| {
             replsets.iter().any(|rs| {
@@ -144,7 +144,7 @@ fn seaweed_data_claims(store: &Value, snapshot: &Snapshot) -> Vec<String> {
     snapshot
         .persistent_volume_claims
         .iter()
-        .filter(|c| zeabur_adapters::controller_of(&c.metadata).is_none())
+        .filter(|c| zeabur_model::adapters::controller_of(&c.metadata).is_none())
         .filter_map(|c| c.metadata.name.clone())
         .filter(|claim| {
             let disk = claim.strip_prefix("mount").and_then(|rest| {
@@ -245,7 +245,7 @@ impl Planner<'_> {
                 format!("{kind} {name} changed after version {expected}; review it again."),
             ));
         }
-        let controller = zeabur_adapters::controller_of(&meta);
+        let controller = zeabur_model::adapters::controller_of(&meta);
         match controller {
             Some(owner) if kind == "Pod" => self.warnings.push(Warning::PodReplaced {
                 pod: name.to_owned(),
@@ -708,8 +708,8 @@ fn certificates_of(snapshot: &Snapshot, name: &str) -> Vec<ObjectName> {
         let Some(secret) = snapshot.secret(secret_name) else {
             continue;
         };
-        let Some(certificate) =
-            zeabur_adapters::controller_of(&secret.metadata).filter(|c| c.kind == "Certificate")
+        let Some(certificate) = zeabur_model::adapters::controller_of(&secret.metadata)
+            .filter(|c| c.kind == "Certificate")
         else {
             continue;
         };

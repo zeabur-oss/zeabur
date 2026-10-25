@@ -54,6 +54,6 @@ pub use project_deletion::{
 pub use public_port::public_service_name;
 pub use releases::{Release, ReleasePods};
 pub use rules::{EnvEdit, EnvValueFrom, FieldChange};
-pub use zeabur_adapters::gateway::{Attachable, Listener, attachable};
-pub use zeabur_kernel::names::Conventions;
 pub use zeabur_model::TaskConcurrency;
+pub use zeabur_model::adapters::gateway::{Attachable, Listener, attachable};
+pub use zeabur_model::kernel::names::Conventions;

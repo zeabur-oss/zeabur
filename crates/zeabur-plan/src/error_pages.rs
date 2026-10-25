@@ -30,11 +30,11 @@
 
 use k8s_openapi::api::core::v1::{ConfigMap, Service};
 use serde_json::{Map, Value, json};
-use zeabur_adapters::error_pages::{
+use zeabur_model::adapters::error_pages::{
     MAINTENANCE_PORT, PAGE_SERVER_LABEL, PAGES_PORT, PageServer, is_page_server, maintenance_of,
     page_server,
 };
-use zeabur_adapters::traefik;
+use zeabur_model::adapters::traefik;
 
 use crate::access::{meta_of, middleware_resource, owner_of, redirect_rule};
 use crate::change::{Change, ErrorPageHtml, RouteKind, RouteRef, Target};
@@ -454,7 +454,8 @@ impl Planner<'_> {
                 .filter(|p| *p > 0);
             for rule in ingress.spec.iter().flat_map(|s| s.rules.iter().flatten()) {
                 let host = rule.host.as_deref().unwrap_or_default();
-                if !host.is_empty() && !zeabur_adapters::gateway::intersects(host, hostname) {
+                if !host.is_empty() && !zeabur_model::adapters::gateway::intersects(host, hostname)
+                {
                     continue;
                 }
                 for path in rule.http.iter().flat_map(|h| &h.paths) {

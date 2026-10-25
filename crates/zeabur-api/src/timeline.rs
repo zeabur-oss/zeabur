@@ -180,7 +180,7 @@ pub struct Timeline {
 fn tool(entry: &ManagedFieldsEntry) -> ManagerTool {
     let manager = entry.manager.as_deref().unwrap_or_default();
     match manager {
-        m if m == zeabur_adapters::FIELD_MANAGER => ManagerTool::Zeabur,
+        m if m == zeabur_model::adapters::FIELD_MANAGER => ManagerTool::Zeabur,
         "helm" => ManagerTool::Helm,
         "helm-controller" | "kustomize-controller" => ManagerTool::Flux,
         m if m.starts_with("argocd") => ManagerTool::ArgoCd,

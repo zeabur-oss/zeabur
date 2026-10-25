@@ -4,8 +4,8 @@ use std::collections::BTreeMap;
 
 use k8s_openapi::api::core::v1::{ConfigMap, EnvFromSource, EnvVar as KubeEnvVar};
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
-use zeabur_adapters::FIELD_MANAGER;
-use zeabur_adapters::provenance::detect_tool;
+use zeabur_model::adapters::FIELD_MANAGER;
+use zeabur_model::adapters::provenance::detect_tool;
 use zeabur_model::{EnvVar, ImportedEnv, ReadOnlyReason, Source, SourceKind};
 
 use crate::fields::{Step, reaches};

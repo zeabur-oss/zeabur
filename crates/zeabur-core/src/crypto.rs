@@ -20,7 +20,7 @@ use aws_lc_rs::rand::SystemRandom;
 use aws_lc_rs::signature::{RSA_PKCS1_SHA256, RsaKeyPair};
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD;
-pub use zeabur_kernel::digest::hex;
+pub use zeabur_model::kernel::digest::hex;
 
 /// The system random number generator failed. aws-lc-rs reports no detail.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]

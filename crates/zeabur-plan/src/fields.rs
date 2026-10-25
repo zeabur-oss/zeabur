@@ -1,8 +1,8 @@
 //! Who reapplies the fields they own; the ownership itself is read with
 //! [`zeabur_graph::fields`].
 
-use zeabur_adapters::provenance::Tool;
 pub use zeabur_graph::fields::{Step, owners};
+use zeabur_model::adapters::provenance::Tool;
 
 /// The tool behind a manager that reapplies what it owns: a field it owns changed by hand comes
 /// back on its next sync or upgrade, so Zeabur never takes one over.

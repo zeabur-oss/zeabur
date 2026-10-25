@@ -5,22 +5,18 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
-publish = true
+publish.workspace = true
 repository.workspace = true
 readme = "README.md"
-keywords = ["kubernetes", "zeabur", "json-patch", "plan"]
-categories = ["data-structures"]
 
 [lints]
 workspace = true
 
 [features]
 # `utoipa::ToSchema` for plans and changes, for the API's OpenAPI document.
-openapi = ["dep:utoipa", "zeabur-kernel/openapi", "zeabur-model/openapi"]
+openapi = ["dep:utoipa", "zeabur-model/openapi"]
 
 [dependencies]
-zeabur-adapters.workspace = true
-zeabur-kernel.workspace = true
 zeabur-graph.workspace = true
 zeabur-model.workspace = true
 base64.workspace = true
@@ -35,5 +31,5 @@ thiserror.workspace = true
 utoipa = { workspace = true, optional = true }
 
 [dev-dependencies]
-zeabur-fixtures.workspace = true
+zeabur-test-support.workspace = true
 proptest.workspace = true

@@ -3,14 +3,14 @@
 //!
 //! - **Creating** writes a new Namespace with the project label, the Pod Security labels and, when
 //!   given, the display name. When the cluster labels its platform namespaces
-//!   ([`zeabur_kernel::isolation::PLATFORM_LABEL`]), it also writes the project's `NetworkPolicy`
-//!   ([`zeabur_kernel::isolation`]); without the label, Zeabur cannot tell which namespaces the
-//!   ingress controller and the operators run in. The Pod Security labels enforce, audit and warn
-//!   at `baseline` [k8s-psa-labels], whatever the cluster's default, so a new project's pods are
-//!   held to the same level on every cluster: an image that runs as root starts, and a pod that
-//!   reaches the host does not. Each service can still meet `restricted` (the `pod_security`
-//!   module). kube-apiserver refuses the Namespace (`409 AlreadyExists`) if the name was taken
-//!   since the plan, which refuses a name that exists when it plans.
+//!   ([`zeabur_model::kernel::isolation::PLATFORM_LABEL`]), it also writes the project's
+//!   `NetworkPolicy` ([`zeabur_model::kernel::isolation`]); without the label, Zeabur cannot tell
+//!   which namespaces the ingress controller and the operators run in. The Pod Security labels
+//!   enforce, audit and warn at `baseline` [k8s-psa-labels], whatever the cluster's default, so a
+//!   new project's pods are held to the same level on every cluster: an image that runs as root
+//!   starts, and a pod that reaches the host does not. Each service can still meet `restricted`
+//!   (the `pod_security` module). kube-apiserver refuses the Namespace (`409 AlreadyExists`) if the
+//!   name was taken since the plan, which refuses a name that exists when it plans.
 //! - **Adopting** adds one label, `zeabur.com/project: "true"`; **letting go** removes it. Nothing
 //!   else on the Namespace changes, and nothing in it: a namespace that is no longer adopted keeps
 //!   every object, and is only no longer shown as a project.
@@ -24,16 +24,16 @@
 //! for any field ([`crate::fields::reapplying_tool`]): the tool would restore it.
 //!
 //! The namespaces Kubernetes keeps for itself (`kube-` prefix,
-//! [`zeabur_kernel::names::is_system_namespace`]) are never adopted, nor the one of node shells
-//! ([`NODE_SHELL_NAMESPACE`]), which only cluster administrators may use.
+//! [`zeabur_model::kernel::names::is_system_namespace`]) are never adopted, nor the one of node
+//! shells ([`NODE_SHELL_NAMESPACE`]), which only cluster administrators may use.
 //!
 //! [rfc6902-add]: https://www.rfc-editor.org/rfc/rfc6902#section-4.1
 //! [k8s-psa-labels]: https://kubernetes.io/docs/concepts/security/pod-security-admission/#pod-security-admission-labels-for-namespaces
 
 use k8s_openapi::api::networking::v1::NetworkPolicy;
 use serde_json::{Value, json};
-use zeabur_kernel::isolation::{PROJECT_POLICY, project_policy};
-use zeabur_kernel::names::{Conventions, NODE_SHELL_NAMESPACE, is_system_namespace};
+use zeabur_model::kernel::isolation::{PROJECT_POLICY, project_policy};
+use zeabur_model::kernel::names::{Conventions, NODE_SHELL_NAMESPACE, is_system_namespace};
 use zeabur_model::{DESCRIPTION_MAX, DISPLAY_NAME_MAX, PodSecurityLevel, ProjectIcon};
 
 use crate::change::Target;

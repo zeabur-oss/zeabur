@@ -7,11 +7,11 @@ use axum::Json;
 use axum::extract::Path;
 use serde::Serialize;
 use utoipa::ToSchema;
-use zeabur_adapters::controller_of;
 use zeabur_core::problem::{MEDIA_TYPE as PROBLEM, Problem};
 use zeabur_kube::k8s_openapi::api::batch::v1::Job;
 use zeabur_kube::k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use zeabur_model::WorkloadKind;
+use zeabur_model::adapters::controller_of;
 
 use crate::error::ApiError;
 use crate::handlers::Person;

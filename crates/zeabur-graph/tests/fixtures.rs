@@ -9,12 +9,13 @@ mod tests {
     use k8s_openapi::api::core::v1::{EnvFromSource, Secret, SecretEnvSource};
     use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
     use serde_json::{Value, from_value, json, to_value};
-    use zeabur_fixtures::{Fixture, compare, load};
     use zeabur_graph::{
         Snapshot, Workload, attribution, classify, deployment_phase, env, env_from,
         is_machinery_secret, mounts, pods_of, port_protocol, project, provenance, workloads,
     };
     use zeabur_model::WorkloadRef;
+    use zeabur_test_support::fixtures::{Fixture, compare};
+    use zeabur_test_support::load;
 
     /// Builds the snapshot a cluster reader would: every input object typed by its kind, and
     /// Secrets stripped to metadata and type.
@@ -59,7 +60,7 @@ mod tests {
             "graph.resolveGroup" => {
                 let labels: BTreeMap<String, String> =
                     from_value(fixture.case.params["labels"].clone()).unwrap();
-                json!(zeabur_adapters::group::resolve_group(Some(&labels)))
+                json!(zeabur_model::adapters::group::resolve_group(Some(&labels)))
             }
             "graph.attribution" => to_value(attribution(&snapshot)).unwrap(),
             "graph.deploymentPhase" => {

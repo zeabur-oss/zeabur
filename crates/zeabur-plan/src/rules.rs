@@ -8,7 +8,7 @@ use std::collections::BTreeSet;
 
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
-use zeabur_adapters::provenance::Tool;
+use zeabur_model::adapters::provenance::Tool;
 
 /// A refusal, as a stable `snake_case` code (the fixtures' `error`).
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]

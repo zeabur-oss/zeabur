@@ -244,7 +244,7 @@ fn listed(served: &ServedResource) -> bool {
 }
 
 fn summary(project: &str, resource: &ResourceRef, metadata: ObjectMeta) -> ObjectSummary {
-    let owner_kind = zeabur_adapters::controller_of(&metadata).map(|o| o.kind.clone());
+    let owner_kind = zeabur_model::adapters::controller_of(&metadata).map(|o| o.kind.clone());
     let name = metadata.name.unwrap_or_default();
     ObjectSummary {
         id: object_id(project, resource, &name),

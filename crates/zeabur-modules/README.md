@@ -11,7 +11,7 @@ Each component's resources and their shapes. The rest of Zeabur sees what a modu
 ## Place in the workspace
 
 Level 3: may depend on `zeabur-core`, `zeabur-model`, `zeabur-kube` (for the object types it
-reads) and `zeabur-adapters` (for label selectors). Only the crates that compose Zeabur
+reads) and `zeabur-model`'s `adapters` (for label selectors). Only the crates that compose Zeabur
 (`zeabur-api` and the binaries) may depend on it, never the core crates;
 `scripts/check-levels.sh` checks both (`[workspace.metadata.modules]` in the root `Cargo.toml`).
 

@@ -91,7 +91,7 @@ fn main() -> ExitCode {
 }
 
 /// Stops this process from writing a core dump, which would hold the tokens of requests in
-/// progress. The proxy depends on `zeabur-kernel` only, so this is a copy of
+/// progress. The proxy depends on no workspace crate, so this is a copy of
 /// `zeabur_core::secret::forbid_core_dumps`.
 fn forbid_core_dumps() -> Result<(), String> {
     let mut refused = Vec::new();
