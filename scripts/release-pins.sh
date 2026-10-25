@@ -1,20 +1,32 @@
 #!/usr/bin/env bash
 # Prints the pins of the catalog and Zeabur Identity releases that zeabur-installer installs, as
-# `ZEABUR_PIN_*=value` lines for $GITHUB_ENV. Each value comes from a checksum list that the
-# product's own release workflow signed, and cosign checks that signature first.
-# release-build.sh compiles the pins into the installer. Run inside `nix develop`.
-#   scripts/release-pins.sh v0.1.0 v0.0.1 >>"$GITHUB_ENV"
+# `ZEABUR_PIN_*=value` lines for $GITHUB_ENV. The catalog is the commit in flake.lock, Zeabur
+# Identity the commit in ZEABUR_IDENTITY_PINNED; each must carry a release tag. Each value comes
+# from a checksum list that the product's own release workflow signed, and cosign checks that
+# signature first. The catalog files this build embeds (ZEABUR_CATALOG_RELEASE) must match that
+# list. release-build.sh compiles the pins into the installer. Run inside `nix develop`.
+#   scripts/release-pins.sh >>"$GITHUB_ENV"
 set -euo pipefail
 
-if [[ $# != 2 ]]; then
-  echo "usage: release-pins.sh <catalog version> <identity version>" >&2
-  exit 2
-fi
-catalog="$1"
-identity="$2"
+root="$(cd "$(dirname "$0")/.." && pwd)"
 : "${IN_NIX_SHELL:?run inside nix develop}"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
+
+# Prints the one release tag on a commit.
+tag_at() { # $1 = repository, $2 = commit
+  local tags
+  tags="$(git ls-remote --tags "https://github.com/zeabur-oss/$1" |
+    awk -v c="$2" '$1 == c { sub("^refs/tags/", "", $2); sub("\\^\\{\\}$", "", $2); print $2 }' |
+    { grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' || true; } | sort -u)"
+  if [[ -z "$tags" || "$tags" == *$'\n'* ]]; then
+    echo "zeabur-oss/$1 $2 has no single release tag: tag it, or move the pin" >&2
+    return 1
+  fi
+  echo "$tags"
+}
+catalog="$(tag_at catalog "$ZEABUR_CATALOG_COMMIT")"
+identity="$(tag_at identity "$(tr -d '[:space:]' <"$root/ZEABUR_IDENTITY_PINNED")")"
 
 # Downloads a release's checksum list and checks the signature of the release workflow at its tag.
 signed_list() { # $1 = repository, $2 = version, $3 = list
@@ -36,6 +48,7 @@ sha() { # $1 = list, $2 = file
 }
 
 signed_list catalog "$catalog" checksums.txt
+(cd "$ZEABUR_CATALOG_RELEASE" && sha256sum --check --strict "$work/catalog/checksums.txt") >&2
 index="$(sha "$work/catalog/checksums.txt" index.json)"
 
 signed_list identity "$identity" SHA256SUMS

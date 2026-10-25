@@ -9,9 +9,10 @@ How a maintainer publishes a release. What a release contains and how to verify 
    `nix develop -c cargo update --workspace` for `Cargo.lock`) and in
    `deploy/chart/zeabur/Chart.yaml` (`version` and `appVersion`, without the `v`). Rename
    `## [Unreleased]` in `CHANGELOG.md` to `## [<version>] - <date>` and add its link at the end;
-   that section becomes the release notes. In `.github/workflows/release.yml`, set
-   `CATALOG_VERSION` and `IDENTITY_VERSION` to the catalog and Zeabur Identity releases the
-   installer installs; both must be published. Merge the pull request to `main`.
+   that section becomes the release notes. The catalog commit in `flake.lock` and the
+   Zeabur Identity commit in `ZEABUR_IDENTITY_PINNED` are what the release embeds and installs:
+   each must carry a published release tag, or the release stops (`scripts/release-pins.sh`).
+   Merge the pull request to `main`.
 2. Rehearse: **Actions → Release → Run workflow** on `main` with the version, `v<version>`. It
    runs all of CI and the three builds with their smoke tests and publishes nothing.
 3. Before the first release only, see [Settings the workflow needs](#settings-the-workflow-needs).

@@ -27,9 +27,6 @@ concurrency:
 
 env:
   CARGO_TERM_COLOR: always
-  # The releases that zeabur-installer installs with this one (scripts/release-pins.sh).
-  CATALOG_VERSION: v0.1.0
-  IDENTITY_VERSION: v0.0.1
 
 jobs:
   # The whole of CI on this commit, the cluster jobs included.
@@ -84,6 +81,10 @@ jobs:
         with:
           persist-credentials: false
       - uses: DeterminateSystems/determinate-nix-action@f296148a827001a9a82d3685b53210c06e5d3b67 # v3.24.0
+      # The binaries embed the catalog bundle; it must be the one the catalog's release signed.
+      - name: Check the catalog and Zeabur Identity pins
+        if: github.event_name == 'push'
+        run: nix develop -c ./scripts/release-pins.sh >/dev/null
       - name: Build the candidates
         env:
           VERSION: ${{ needs.prepare.outputs.version }}
@@ -192,7 +193,7 @@ jobs:
       - uses: DeterminateSystems/determinate-nix-action@f296148a827001a9a82d3685b53210c06e5d3b67 # v3.24.0
       - name: Pin the catalog and Zeabur Identity releases
         if: github.event_name == 'push'
-        run: nix develop -c ./scripts/release-pins.sh "$CATALOG_VERSION" "$IDENTITY_VERSION" >>"$GITHUB_ENV"
+        run: nix develop -c ./scripts/release-pins.sh >>"$GITHUB_ENV"
       - name: Build the installer
         env:
           VERSION: ${{ needs.prepare.outputs.version }}
