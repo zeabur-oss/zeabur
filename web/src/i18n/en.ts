@@ -430,7 +430,7 @@ export const en = {
   "cluster.tested": (version: string) => `Tested ${version}`,
   "cluster.testedVersion": "Tested version",
   "cluster.newerThanTested": "Newer than tested",
-  "cluster.sourceK3s": "k3s",
+  "cluster.sourceK3s": "K3s",
   "cluster.sourceHelmChart": "HelmChart",
   "cluster.sourceHelm": "Helm",
   "cluster.sourceOther": "—",
@@ -2090,17 +2090,17 @@ export const en = {
   "install.title": "Install",
   "install.helm": "Run these commands where helm and kubectl can reach the cluster.",
   "install.noController":
-    "Zeabur can install it for you when the cluster runs k3s, Flux or Argo CD.",
+    "Zeabur can install it for you when the cluster runs K3s, RKE2, Flux or Argo CD.",
   "install.installed": "Already installed in this cluster.",
   "install.yourself": "Apply it with kubectl, or commit it to your GitOps repository.",
   "install.blocked.k3sPackaged":
-    "Zeabur doesn't install this one itself: k3s ships its own copy, which has to be disabled on the servers first.",
+    "Zeabur doesn't install this one itself: K3s and RKE2 ship their own copy, which has to be turned off on the servers first.",
   "install.blocked.inputs": "Zeabur doesn't install this one itself: it needs values you fill in.",
   "install.blocked.manifests":
     "Zeabur doesn't install this one itself: part of it is plain manifests, not a chart.",
   "install.blocked.privileged":
     "Zeabur doesn't install this one itself: it needs access to the host, so its Namespace must be set to Unrestricted first. The text below does that.",
-  "install.tool.k3s": "k3s's Helm controller",
+  "install.tool.k3s": "the K3s/RKE2 Helm controller",
   "install.tool.flux": "Flux",
   "install.tool.argoCd": "Argo CD",
   "install.planWhat": (namespace: string, tool: string) =>
@@ -2128,7 +2128,11 @@ export const en = {
   "install.required": "required",
   "install.alsoAdds": "Also adds values to",
   "install.k3sPackaged": (addon: string) =>
-    `On k3s, first disable the packaged ${addon}: add it to disable in /etc/rancher/k3s/config.yaml on every server, then restart k3s.`,
+    `On K3s, first turn off the packaged ${addon}: add it to disable in /etc/rancher/k3s/config.yaml on every server, then restart k3s.`,
+  "install.rke2Packaged": (name: string) =>
+    `On RKE2, add ${name} to disable in /etc/rancher/rke2/config.yaml on every server, then restart rke2-server.`,
+  "install.rke2PackagedIngress":
+    "On RKE2, set ingress-controller: none in /etc/rancher/rke2/config.yaml on every server, then restart rke2-server.",
   "install.k3sPackagedTraefik":
     "That deletes the Traefik CRDs and any IngressRoute or Middleware objects; Ingress traffic stops until this one runs.",
   "install.k3sPackagedMetrics": "The metrics API is unavailable until this one runs.",
@@ -3815,7 +3819,7 @@ export const en = {
   "ports.kube.object": "Kubernetes object",
   "ports.kube.how": "How it opens",
   "ports.kube.howValue":
-    "A LoadBalancer Service. On k3s and RKE2, ServiceLB listens on the port on every node.",
+    "A LoadBalancer Service. On K3s, and on RKE2 with ServiceLB turned on (as Zeabur's installer sets it up), ServiceLB listens on the port on every node.",
   "shared.title": "Shared variables",
   "shared.lead":
     "Variables that several services read. A service reads new values when it restarts.",

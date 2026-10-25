@@ -400,7 +400,7 @@ export const zhCN: Messages = {
   "cluster.tested": (version) => `已测试 ${version}`,
   "cluster.testedVersion": "已测试版本",
   "cluster.newerThanTested": "比已测试版本新",
-  "cluster.sourceK3s": "k3s",
+  "cluster.sourceK3s": "K3s",
   "cluster.sourceHelmChart": "HelmChart",
   "cluster.sourceHelm": "Helm",
   "cluster.sourceOther": "—",
@@ -1931,17 +1931,17 @@ export const zhCN: Messages = {
   "gap.unreadable": "部分检查需要你没有的权限。",
   "install.title": "安装",
   "install.helm": "在能用 helm 和 kubectl 连到集群的电脑上运行这些命令。",
-  "install.noController": "集群里有 k3s、Flux 或 Argo CD 时，Zeabur 可以帮你安装。",
+  "install.noController": "集群用的是 K3s、RKE2，或装了 Flux、Argo CD 时，Zeabur 可以帮你安装。",
   "install.installed": "这个集群已经装好了。",
   "install.yourself": "用 kubectl 应用，或提交到 GitOps 仓库。",
   "install.blocked.k3sPackaged":
-    "这个组件不由 Zeabur 直接安装：k3s 内置了一份，要先在每台 server 上禁用。",
+    "这个组件不由 Zeabur 直接安装：K3s 和 RKE2 都内置了一份，要先在每台 server 上禁用。",
   "install.blocked.inputs": "这个组件不由 Zeabur 直接安装：需要你填入一些值。",
   "install.blocked.manifests":
     "这个组件不由 Zeabur 直接安装：其中有一部分是普通 manifest，不是 chart。",
   "install.blocked.privileged":
     "这个组件不由 Zeabur 直接安装：它需要访问主机，所在的 Namespace 要先设为“不受限”。下方的内容已包含这一步。",
-  "install.tool.k3s": "k3s 的 Helm 控制器",
+  "install.tool.k3s": "K3s/RKE2 的 Helm 控制器",
   "install.tool.flux": "Flux",
   "install.tool.argoCd": "Argo CD",
   "install.planWhat": (namespace, tool) =>
@@ -1968,7 +1968,11 @@ export const zhCN: Messages = {
   "install.required": "必填",
   "install.alsoAdds": "也会为这些组件添加值",
   "install.k3sPackaged": (addon: string) =>
-    `在 k3s 上，先禁用内置的 ${addon}：在每台 server 的 /etc/rancher/k3s/config.yaml 中把它加入 disable，然后重启 k3s。`,
+    `在 K3s 上，先禁用内置的 ${addon}：在每台 server 的 /etc/rancher/k3s/config.yaml 中把它加入 disable，然后重启 k3s。`,
+  "install.rke2Packaged": (name: string) =>
+    `在 RKE2 上，在每台 server 的 /etc/rancher/rke2/config.yaml 中把 ${name} 加入 disable，然后重启 rke2-server。`,
+  "install.rke2PackagedIngress":
+    "在 RKE2 上，在每台 server 的 /etc/rancher/rke2/config.yaml 中设置 ingress-controller: none，然后重启 rke2-server。",
   "install.k3sPackagedTraefik":
     "这会删除 Traefik 的 CRD 以及所有 IngressRoute、Middleware 对象。这个组件开始运行前，Ingress 流量会中断。",
   "install.k3sPackagedMetrics": "这个组件开始运行前，metrics API 不可用。",
@@ -3517,7 +3521,7 @@ export const zhCN: Messages = {
   "ports.kube.object": "Kubernetes 对象",
   "ports.kube.how": "开放方式",
   "ports.kube.howValue":
-    "LoadBalancer Service。在 k3s 和 RKE2 上，ServiceLB 会在每个节点监听这个端口。",
+    "LoadBalancer Service。在 K3s 上，以及开启 ServiceLB 的 RKE2 上（Zeabur 安装程序会开启），ServiceLB 会在每个节点监听这个端口。",
   "shared.title": "共享变量",
   "shared.lead": "多个服务一起读取的变量。服务重启后才会读到新的值。",
   "shared.secret": "Secret",

@@ -941,12 +941,12 @@ test("an install is Helm commands to copy, or objects a plan creates for the clu
   await sheet.getByRole("button", { name: /Several nodes/ }).click()
   await expect(page).toHaveURL(/profile=multi-node/)
   // Part of cert-manager is plain manifests: the k3s form is text to apply yourself.
-  await sheet.getByRole("tab", { name: "k3s HelmChart" }).click()
-  await expect(text("k3s HelmChart")).toContainText("cert-manager")
+  await sheet.getByRole("tab", { name: "K3s/RKE2 HelmChart" }).click()
+  await expect(text("K3s/RKE2 HelmChart")).toContainText("cert-manager")
   await expect(sheet).toContainText("Zeabur doesn't install this one itself")
   await expect(sheet.getByRole("button", { name: "Review and install" })).toHaveCount(0)
 
-  // Reloader is only a chart: k3s's Helm controller installs it from objects a plan creates.
+  // Reloader is only a chart: the K3s/RKE2 Helm controller installs it from objects a plan creates.
   await page.goto("/cluster/components?component=config-reload/reloader")
   const reloader = page.getByRole("dialog", { name: /Reloader/ })
   await reloader.getByRole("button", { name: "Review and install" }).click()

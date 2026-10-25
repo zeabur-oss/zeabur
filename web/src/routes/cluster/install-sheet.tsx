@@ -30,7 +30,7 @@ type Format = Schemas["InstallFormat"]
 
 const formatNames = {
   helm: "Helm",
-  k3s: "k3s HelmChart",
+  k3s: "K3s/RKE2 HelmChart",
   flux: "Flux",
   argoCd: "Argo CD",
 } as const
