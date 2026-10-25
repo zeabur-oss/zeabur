@@ -47,6 +47,10 @@ pub const MANAGE_VERB: &str = "zeabur-manage";
 /// administrators may run or enter. It is never a project, so no member role is bound in it.
 pub const NODE_SHELL_NAMESPACE: &str = "zeabur-node-shell";
 
+/// The label `zeabur-installer` puts on the namespace of each component it sets up, with the
+/// value `"true"`. Such a namespace is never deleted as a project.
+pub const LABEL_BASELINE: &str = "installer.zeabur.com/baseline";
+
 /// The name of every debug container Zeabur adds starts with this.
 pub const DEBUG_PREFIX: &str = "zeabur-debug-";
 

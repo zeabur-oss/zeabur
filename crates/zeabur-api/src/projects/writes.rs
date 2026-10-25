@@ -29,6 +29,7 @@ mod deletions;
 mod edits;
 mod namespace;
 pub(crate) mod preview;
+mod project_deletion;
 mod refusals;
 pub(crate) mod releases;
 mod secrets;
@@ -212,6 +213,7 @@ async fn compute(
             namespace: None,
             reloader,
             kinds: &kinds,
+            deletion: None,
             cluster_issuer,
             issuers: &issuers,
             certificates: &certificates,
@@ -240,9 +242,12 @@ async fn compute_any(
     request: &PlanRequest,
     now: &str,
     cluster_issuer: Option<&str>,
+    zeabur_namespaces: Vec<String>,
 ) -> Result<Plan, ApiError> {
     if request.changes.iter().any(Change::is_terminal_change) {
         terminal::compute(planner, cluster, project, request, now).await
+    } else if request.changes.iter().any(Change::is_project_deletion) {
+        project_deletion::compute(planner, cluster, project, request, now, zeabur_namespaces).await
     } else {
         compute(cluster, project, request, now, cluster_issuer).await
     }
@@ -291,6 +296,7 @@ pub(crate) async fn plan(
         &opened,
         &made_at,
         state.settings.domains.cluster_issuer.as_deref(),
+        project_deletion::zeabur_namespaces(&state.settings),
     )
     .await?;
     let from_yaml = creations::from_yaml(&opened);
@@ -417,6 +423,7 @@ pub(crate) async fn apply(
         &opened,
         &claims.made_at,
         state.settings.domains.cluster_issuer.as_deref(),
+        project_deletion::zeabur_namespaces(&state.settings),
     )
     .await?;
     let (namespace, target_cluster) =
@@ -426,6 +433,15 @@ pub(crate) async fn apply(
             Kind::Conflict,
             "Someone changed an object in this plan after the plan was made.",
         )));
+    }
+    if claims
+        .request
+        .changes
+        .iter()
+        .any(Change::is_project_deletion)
+    {
+        let applied = project_deletion::apply(&planner, cluster.as_ref(), &project, &plan).await?;
+        return Ok(Json(ApplyResponse { applied }));
     }
     let writes: Vec<(zeabur_plan::Target, WriteRequest)> = plan
         .objects

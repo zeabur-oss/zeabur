@@ -122,6 +122,7 @@ impl Sandbox {
         let cleanup = Cleanup {
             namespace: namespace.clone(),
             cluster_roles: Mutex::new(Vec::new()),
+            crds: Mutex::new(Vec::new()),
         };
         create(
             &Api::<Namespace>::all(admin.clone()),
@@ -208,6 +209,14 @@ impl Sandbox {
         }
     }
 
+    /// Deletes the `CustomResourceDefinition` called `name` with the sandbox, after its
+    /// namespace.
+    pub fn delete_crd(&self, name: &str) {
+        if let Ok(mut names) = self.cleanup.crds.lock() {
+            names.push(name.to_owned());
+        }
+    }
+
     /// An admin's handle on the namespace's objects of `K`.
     #[must_use]
     pub fn admin_api<K>(&self) -> Api<K>
@@ -263,6 +272,7 @@ where
 struct Cleanup {
     namespace: String,
     cluster_roles: Mutex<Vec<String>>,
+    crds: Mutex<Vec<String>>,
 }
 
 impl Drop for Cleanup {
@@ -270,6 +280,10 @@ impl Drop for Cleanup {
         let namespace = std::mem::take(&mut self.namespace);
         let cluster_roles = self
             .cluster_roles
+            .get_mut()
+            .map_or_else(|_| Vec::new(), std::mem::take);
+        let crds = self
+            .crds
             .get_mut()
             .map_or_else(|_| Vec::new(), std::mem::take);
         let cleanup = std::thread::spawn(move || {
@@ -292,9 +306,20 @@ impl Drop for Cleanup {
                         .delete(name, &delete)
                         .await;
                 }
-                let _ignored = Api::<Namespace>::all(admin)
+                let _ignored = Api::<Namespace>::all(admin.clone())
                     .delete(&namespace, &delete)
                     .await;
+                let definitions = Api::<kube::api::DynamicObject>::all_with(
+                    admin,
+                    &kube::discovery::ApiResource::from_gvk(&kube::core::GroupVersionKind::gvk(
+                        "apiextensions.k8s.io",
+                        "v1",
+                        "CustomResourceDefinition",
+                    )),
+                );
+                for name in &crds {
+                    let _ignored = definitions.delete(name, &delete).await;
+                }
             });
         });
         let _ignored = cleanup.join();

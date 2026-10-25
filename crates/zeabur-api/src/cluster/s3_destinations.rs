@@ -459,6 +459,7 @@ pub(crate) async fn open(
             | Change::Delete { .. }
             | Change::Adopt
             | Change::Unadopt
+            | Change::DeleteProject
             | Change::CreateProject { .. }
             | Change::Details { .. }
             | Change::ScheduleTask { .. }

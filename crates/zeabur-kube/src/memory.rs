@@ -507,6 +507,17 @@ impl State {
             items.retain(|o| o.metadata().name.as_deref() != Some(name));
         }
         self.dynamic.retain(|o| !is_target(o, target));
+        // The namespace controller's work, done at once: the objects in it go with it.
+        if target.kind == "Namespace" {
+            let name = target.name.as_str();
+            named(&mut self.namespaces, name);
+            self.objects.remove(name);
+            self.dynamic
+                .retain(|o| o.metadata.namespace.as_deref() != Some(name));
+            self.secret_values
+                .retain(|key, _| !key.starts_with(&format!("{name}/")));
+            return;
+        }
         if target.kind == "Node" {
             named(&mut self.nodes, &target.name);
             return;

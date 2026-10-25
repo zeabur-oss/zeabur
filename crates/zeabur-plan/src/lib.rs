@@ -17,6 +17,7 @@ mod owned;
 mod plan;
 mod pod_security;
 mod project;
+mod project_deletion;
 mod public_port;
 pub mod releases;
 mod reload;
@@ -45,6 +46,9 @@ pub use plan::{
     plan, plan_with, versions,
 };
 pub use project::project_namespace;
+pub use project_deletion::{
+    DatabaseDeletion, DatabaseObject, DeletionInput, OperatorState, ProjectDeletion, VolumeDeletion,
+};
 pub use public_port::public_service_name;
 pub use releases::{Release, ReleasePods};
 pub use rules::{EnvEdit, EnvValueFrom, FieldChange};

@@ -335,6 +335,9 @@ pub enum Change {
     /// Stop showing the namespace as a project: remove that label, and nothing else. Nothing in
     /// the namespace is deleted.
     Unadopt,
+    /// Delete the project: its database objects, then its Namespace and everything in it, as
+    /// `kubectl delete namespace` does (see the `project_deletion` module). Planned on its own.
+    DeleteProject,
     /// Create the project's Namespace, with the project label and, when given, its display
     /// name. Refused when a namespace of that name exists (adopt it instead), and for a name
     /// Kubernetes keeps for itself (`kube-` prefix). Planned on its own.
@@ -447,6 +450,12 @@ impl Change {
     #[must_use]
     pub const fn is_terminal_change(&self) -> bool {
         matches!(self, Self::DebugContainer { .. } | Self::ClusterTools)
+    }
+
+    /// Whether the change deletes the project ([`Change::DeleteProject`]).
+    #[must_use]
+    pub const fn is_project_deletion(&self) -> bool {
+        matches!(self, Self::DeleteProject)
     }
 
     /// Whether the change writes the project's Namespace (creating it, adopting it, letting it
@@ -1278,6 +1287,18 @@ pub enum Warning {
         from: WorkloadRef,
         /// The image.
         image: String,
+    },
+    /// The plan deletes the project's Namespace and everything in it: what goes, and what
+    /// happens to the data of each volume.
+    DeletesProject(crate::project_deletion::ProjectDeletion),
+    /// Helm, Argo CD or Flux manages these objects of the deleted project: if the tool still
+    /// deploys them, it creates them again after the deletion.
+    #[serde(rename_all = "camelCase")]
+    Recreated {
+        /// The tool.
+        tool: zeabur_kernel::tool::Tool,
+        /// The objects.
+        objects: Vec<ObjectName>,
     },
 }
 

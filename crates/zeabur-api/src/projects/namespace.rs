@@ -32,8 +32,11 @@
 //! [k8s-rbac-names]: https://kubernetes.io/docs/reference/access-authn-authz/rbac/#referring-to-resources
 //! [k8s-psa-labels]: https://kubernetes.io/docs/concepts/security/pod-security-admission/#pod-security-admission-labels-for-namespaces
 
+mod deleting;
+
 use axum::Json;
 use axum::extract::{Path, State};
+pub use deleting::{HeldObject, ProjectDeleting, RemainingContent, RemainingFinalizer};
 use serde::Serialize;
 use utoipa::ToSchema;
 use zeabur_core::names::{LABEL_PROJECT, MANAGE_VERB, is_system_namespace};
@@ -116,6 +119,9 @@ pub struct ProjectNamespace {
     /// Which Deployments, StatefulSets and DaemonSets the person may patch (change their
     /// variables).
     pub workload_patch: Vec<WorkloadPatch>,
+    /// The project is being deleted: what is left, and what holds it back. Absent otherwise.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub deleting: Option<ProjectDeleting>,
 }
 
 /// Whether the person may patch the workloads of one kind.
@@ -191,6 +197,7 @@ pub(crate) async fn get(
                 format!("There is no {what}."),
             ))
         })?;
+    let deleting = deleting::read(cluster.as_ref(), &project, &namespace).await;
     let metadata = namespace.metadata;
     let guarded = state.settings.identity.project_roles;
     let workload_patch = workload_patch(rules.as_ref().ok());
@@ -228,6 +235,7 @@ pub(crate) async fn get(
         can,
         labels_guarded: guarded,
         workload_patch,
+        deleting,
         name: project,
     }))
 }

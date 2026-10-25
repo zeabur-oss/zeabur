@@ -19,6 +19,9 @@ mod creations;
 #[path = "kubernetes/files.rs"]
 mod files;
 #[cfg(test)]
+#[path = "kubernetes/project_deletion.rs"]
+mod project_deletion;
+#[cfg(test)]
 #[path = "kubernetes/terminal.rs"]
 mod terminal;
 

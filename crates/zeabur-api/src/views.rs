@@ -158,6 +158,9 @@ pub struct ProjectSummary {
     /// workloads cannot be read.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub services: Option<Vec<ServiceSummary>>,
+    /// Its namespace is being deleted (`Terminating`).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub deleting: bool,
 }
 
 /// One service of a project in the list: which it is, how healthy and why, without its

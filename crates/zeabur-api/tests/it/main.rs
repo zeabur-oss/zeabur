@@ -30,6 +30,7 @@ mod node_shell;
 mod notifications;
 mod pod_security;
 mod preview;
+mod project_deletion;
 mod releases;
 mod reloader;
 mod rollout;

@@ -100,6 +100,7 @@ pub(crate) async fn list(Person(cluster): Person) -> Result<Json<ProjectList>, A
         .into_iter()
         .filter_map(|namespace| {
             let name = namespace.metadata.name?;
+            let deleting = namespace.metadata.deletion_timestamp.is_some();
             let adopted = namespace
                 .metadata
                 .labels
@@ -113,6 +114,7 @@ pub(crate) async fn list(Person(cluster): Person) -> Result<Json<ProjectList>, A
                 adopted,
                 health: None,
                 services: None,
+                deleting,
             })
         })
         .collect();

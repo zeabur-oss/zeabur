@@ -5999,6 +5999,17 @@ components:
             - unadopt
       - type: object
         description: |-
+          Delete the project: its database objects, then its Namespace and everything in it, as
+          `kubectl delete namespace` does (see the `project_deletion` module). Planned on its own.
+        required:
+        - op
+        properties:
+          op:
+            type: string
+            enum:
+            - deleteProject
+      - type: object
+        description: |-
           Create the project's Namespace, with the project label and, when given, its display
           name. Refused when a namespace of that name exists (adopt it instead), and for a name
           Kubernetes keeps for itself (`kube-` prefix). Planned on its own.
@@ -7663,6 +7674,25 @@ components:
           - string
           - "null"
           description: The Secret's key holding the user name.
+    DatabaseDeletion:
+      type: object
+      description: A database that goes with the project.
+      required:
+      - kind
+      - name
+      - operator
+      properties:
+        kind:
+          type: string
+          description: Its kind (`Cluster`).
+        name:
+          type: string
+          description: Its name.
+        operator:
+          $ref: "#/components/schemas/OperatorState"
+          description: >-
+            Whether its operator runs. Only while it runs does the apply wait for the
+            database to go.
     DatabaseEngine:
       type: string
       description: A database engine.
@@ -9443,6 +9473,33 @@ components:
         project:
           type: string
           description: The project whose route serves it.
+    HeldObject:
+      type: object
+      description: An object whose finalizers keep the Namespace.
+      required:
+      - group
+      - resource
+      - kind
+      - name
+      - finalizers
+      properties:
+        finalizers:
+          type: array
+          items:
+            type: string
+          description: Its finalizers.
+        group:
+          type: string
+          description: The API group; empty for the core group.
+        kind:
+          type: string
+          description: The kind.
+        name:
+          type: string
+          description: The name.
+        resource:
+          type: string
+          description: The resource (plural).
     HistorySource:
       type: object
       description: The store a history came from.
@@ -11872,6 +11929,13 @@ components:
           - string
           - "null"
           description: The kind of its controlling owner, when it has one (`ReplicaSet` for a pod).
+    OperatorState:
+      type: string
+      description: Whether the operator of a database runs, as far as the person can see.
+      enum:
+      - ready
+      - notReady
+      - unknown
     Origin:
       type: object
       description: |-
@@ -12821,6 +12885,43 @@ components:
           image:
             type: string
             description: The image.
+      - allOf:
+        - $ref: "#/components/schemas/ProjectDeletion"
+          description: |-
+            The plan deletes the project's Namespace and everything in it: what goes, and what
+            happens to the data of each volume.
+        - type: object
+          required:
+          - code
+          properties:
+            code:
+              type: string
+              enum:
+              - deletesProject
+        description: |-
+          The plan deletes the project's Namespace and everything in it: what goes, and what
+          happens to the data of each volume.
+      - type: object
+        description: |-
+          Helm, Argo CD or Flux manages these objects of the deleted project: if the tool still
+          deploys them, it creates them again after the deletion.
+        required:
+        - tool
+        - objects
+        - code
+        properties:
+          code:
+            type: string
+            enum:
+            - recreated
+          objects:
+            type: array
+            items:
+              $ref: "#/components/schemas/ObjectName"
+            description: The objects.
+          tool:
+            $ref: "#/components/schemas/Tool"
+            description: The tool.
       description: Something a person should know before applying.
     PlannedObject:
       type: object
@@ -13605,6 +13706,70 @@ components:
           items:
             $ref: "#/components/schemas/UnreadableView"
           description: What could not be read.
+    ProjectDeleting:
+      type: object
+      description: A project whose Namespace is being deleted.
+      required:
+      - since
+      - remaining
+      - finalizers
+      - held
+      properties:
+        finalizers:
+          type: array
+          items:
+            $ref: "#/components/schemas/RemainingFinalizer"
+          description: The finalizers that hold objects back, as the namespace controller counts them.
+        held:
+          type: array
+          items:
+            $ref: "#/components/schemas/HeldObject"
+          description: The objects with finalizers the person could read.
+        remaining:
+          type: array
+          items:
+            $ref: "#/components/schemas/RemainingContent"
+          description: What is left, by resource, as the namespace controller counts it.
+        since:
+          type: string
+          description: When the deletion started, RFC 3339.
+    ProjectDeletion:
+      type: object
+      description: What deleting the project takes with it ([`Warning::DeletesProject`]).
+      required:
+      - namespace
+      - services
+      - databases
+      - volumes
+      - toolsNamespace
+      - toolsPods
+      properties:
+        databases:
+          type: array
+          items:
+            $ref: "#/components/schemas/DatabaseDeletion"
+          description: Its databases, deleted before the Namespace.
+        namespace:
+          type: string
+          description: The project's Namespace.
+        services:
+          type: array
+          items:
+            $ref: "#/components/schemas/WorkloadRef"
+          description: "Its services: workloads no other object controls."
+        toolsNamespace:
+          type: string
+          description: The namespace of tools pods.
+        toolsPods:
+          type: array
+          items:
+            type: string
+          description: The person's tools pods for the project, deleted after the Namespace.
+        volumes:
+          type: array
+          items:
+            $ref: "#/components/schemas/VolumeDeletion"
+          description: Its volumes.
     ProjectDetails:
       type: object
       description: |-
@@ -13833,6 +13998,11 @@ components:
           canChange:
             $ref: "#/components/schemas/Permission"
             description: "Whether the person may patch the Namespace: change its details."
+          deleting:
+            oneOf:
+            - $ref: "#/components/schemas/ProjectDeleting"
+              description: "The project is being deleted: what is left, and what holds it back. Absent otherwise."
+            - type: "null"
           labelsGuarded:
             type: boolean
             description: |-
@@ -14055,6 +14225,9 @@ components:
             description: |-
               Whether the namespace carries Zeabur's project label. Any namespace can be opened; adopting
               it only adds the label.
+          deleting:
+            type: boolean
+            description: Its namespace is being deleted (`Terminating`).
           health:
             oneOf:
             - $ref: "#/components/schemas/ProjectHealth"
@@ -14407,6 +14580,40 @@ components:
       - stopped
       - notInstalled
       - unknown
+    RemainingContent:
+      type: object
+      description: Objects of one resource that are left.
+      required:
+      - group
+      - resource
+      - count
+      properties:
+        count:
+          type: integer
+          format: int64
+          description: How many.
+          minimum: 0
+        group:
+          type: string
+          description: The API group; empty for the core group.
+        resource:
+          type: string
+          description: The resource (plural).
+    RemainingFinalizer:
+      type: object
+      description: One finalizer that holds objects back.
+      required:
+      - finalizer
+      - count
+      properties:
+        count:
+          type: integer
+          format: int64
+          description: On how many objects.
+          minimum: 0
+        finalizer:
+          type: string
+          description: The finalizer (`cnpg.io/cleanup`).
     Removal:
       type: object
       description: A field the plan removes.
@@ -17305,6 +17512,33 @@ components:
         zeabur:
           type: boolean
           description: It is the schedule Zeabur sets up ([`SCHEDULE`]).
+    VolumeDeletion:
+      type: object
+      description: A volume that goes with the project.
+      required:
+      - claim
+      properties:
+        claim:
+          type: string
+          description: The PersistentVolumeClaim.
+        reclaimPolicy:
+          type:
+          - string
+          - "null"
+          description: |-
+            What happens to the data: the PersistentVolume's `persistentVolumeReclaimPolicy` when the
+            person could read it, else the `StorageClass`'s `reclaimPolicy` (`Delete` when it sets
+            none); absent when neither could be read.
+        storageClass:
+          type:
+          - string
+          - "null"
+          description: Its `StorageClass`; absent when it names none and no default is known.
+        volume:
+          type:
+          - string
+          - "null"
+          description: Its PersistentVolume; absent while the claim is not bound.
     VolumeRequest:
       type: object
       description: "A new volume for a workload: a PersistentVolumeClaim and where it is mounted."

@@ -188,6 +188,9 @@ pub struct Input<'a> {
     /// The kinds the cluster serves, from discovery: what a `create` may make. Empty: only the
     /// kinds [`CREATABLE`] lists.
     pub kinds: &'a [ServedKind],
+    /// What deleting the project reads besides its objects; `None` when the request does not
+    /// delete it.
+    pub deletion: Option<&'a crate::project_deletion::DeletionInput>,
     /// The `ClusterIssuer` the chart names for new hostnames (`domains.clusterIssuer`); `None`:
     /// a new hostname gets HTTPS only where its Ingress already asks cert-manager for it.
     pub cluster_issuer: Option<&'a str>,
@@ -223,6 +226,7 @@ impl<'a> Input<'a> {
             namespace: None,
             reloader: None,
             kinds: &[],
+            deletion: None,
             cluster_issuer: None,
             issuers: &NO_ISSUERS,
             certificates: &NO_CERTIFICATES,
@@ -366,6 +370,13 @@ pub fn plan_with(
             "namespace_change_alone",
             "Adopting a namespace, letting it go and a project's details are planned apart from \
              changes to the objects in it.",
+        ));
+    }
+    if request.changes.len() > 1 && request.changes.iter().any(Change::is_project_deletion) {
+        return Err(error(
+            ErrorKind::BadRequest,
+            "delete_project_alone",
+            "Deleting a project is planned on its own.",
         ));
     }
     if request.changes.len() > 1
@@ -517,6 +528,7 @@ impl<'a> Planner<'a> {
             Change::CreateProject { display_name } => self.create_project(display_name.as_deref()),
             Change::Adopt => self.adopt(),
             Change::Unadopt => self.unadopt(),
+            Change::DeleteProject => self.delete_project(),
             Change::Details {
                 display_name,
                 description,

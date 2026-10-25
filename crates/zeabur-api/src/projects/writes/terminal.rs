@@ -116,6 +116,7 @@ pub(crate) async fn compute(
         | Change::CreateProject { .. }
         | Change::Adopt
         | Change::Unadopt
+        | Change::DeleteProject
         | Change::Details { .. }
         | Change::ScheduleTask { .. }
         | Change::RunTask { .. }
@@ -157,15 +158,21 @@ fn right(verb: &str, resource: &str, namespace: &str, name: Option<&str>) -> Den
     }
 }
 
-/// The rights of `wanted` the person lacks, as a warning; none when all are granted or
-/// kube-apiserver would not say.
-async fn rights_missing(cluster: &dyn Cluster, wanted: Vec<Denied>) -> Option<Warning> {
+/// The rights of `wanted` the person lacks; none when all are granted or kube-apiserver would not
+/// say.
+pub(super) async fn denied(cluster: &dyn Cluster, wanted: Vec<Denied>) -> Vec<Denied> {
     let mut rights = Vec::new();
     for right in wanted {
         if matches!(cluster.review_access(&right).await, Ok(false)) {
             rights.push(right);
         }
     }
+    rights
+}
+
+/// [`denied`], as a warning.
+async fn rights_missing(cluster: &dyn Cluster, wanted: Vec<Denied>) -> Option<Warning> {
+    let rights = denied(cluster, wanted).await;
     (!rights.is_empty()).then_some(Warning::RightsMissing { rights })
 }
 

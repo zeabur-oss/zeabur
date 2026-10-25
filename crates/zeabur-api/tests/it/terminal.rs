@@ -1,7 +1,8 @@
 //! A debug container and a tools pod against an in-memory cluster: the plans and what they say,
 //! the writes, reuse, refusals in plain words, the terminal in each, and the tools pod's
-//! credential reaching it only through a command's standard input. Tools pods run in the
-//! terminal namespace, which only Zeabur's own service account uses; the person cannot see it.
+//! credential reaching it only through a command's standard input; deleting the project takes
+//! the person's tools pods of it along. Tools pods run in the terminal namespace, which only
+//! Zeabur's own service account uses; the person cannot see it.
 
 #[cfg(test)]
 mod tests {
@@ -174,6 +175,19 @@ mod tests {
                 })
             })
             .flatten()
+    }
+
+    fn tools_pod(name: &str, person: &str, project: &str, phase: &str) -> Pod {
+        let key = zeabur_plan::terminal::person_key(person);
+        pod(json!({
+            "metadata": {"name": name, "namespace": TERMINALS, "uid": format!("uid-{name}"),
+                "resourceVersion": "3", "creationTimestamp": "2026-10-21T00:00:00Z",
+                "labels": {"zeabur.com/tools": "true", "zeabur.com/tools-person": key},
+                "annotations": {"zeabur.com/tools-project": project}},
+            "spec": {"activeDeadlineSeconds": 1_000_000_000,
+                     "containers": [{"name": "tools", "image": "k8s"}]},
+            "status": {"phase": phase}
+        }))
     }
 
     fn set_pod_status(cluster: &MemoryCluster, namespace: &str, name: &str, status: Value) {
@@ -469,18 +483,6 @@ mod tests {
     async fn only_the_persons_own_tools_pods_of_the_project_are_listed_deleted_and_swept() {
         let cluster = cluster();
         let zeabur = zeabur();
-        let tools_pod = |name: &str, person: &str, project: &str, phase: &str| {
-            let key = zeabur_plan::terminal::person_key(person);
-            pod(json!({
-                "metadata": {"name": name, "namespace": TERMINALS, "uid": format!("uid-{name}"),
-                    "resourceVersion": "3", "creationTimestamp": "2026-10-21T00:00:00Z",
-                    "labels": {"zeabur.com/tools": "true", "zeabur.com/tools-person": key},
-                    "annotations": {"zeabur.com/tools-project": project}},
-                "spec": {"activeDeadlineSeconds": 1_000_000_000,
-                         "containers": [{"name": "tools", "image": "k8s"}]},
-                "status": {"phase": phase}
-            }))
-        };
         zeabur.update(|state| {
             let pods = &mut state.objects.get_mut(TERMINALS).unwrap().pods;
             let alice = "alice@example.com";
@@ -557,6 +559,41 @@ mod tests {
         .await;
         assert_eq!(status, StatusCode::NO_CONTENT);
         assert!(stored_pod(&zeabur, TERMINALS, "zeabur-tools-mine").is_none());
+    }
+
+    #[tokio::test]
+    async fn deleting_the_project_deletes_the_persons_tools_pods_of_it_and_no_others() {
+        let cluster = cluster();
+        cluster.update(|state| {
+            state.namespaces = vec![
+                serde_json::from_value(json!({"metadata": {"name": "shop",
+                    "labels": {"zeabur.com/project": "true"}}}))
+                .unwrap(),
+            ];
+        });
+        let zeabur = zeabur();
+        zeabur.update(|state| {
+            let pods = &mut state.objects.get_mut(TERMINALS).unwrap().pods;
+            let alice = "alice@example.com";
+            pods.push(tools_pod("zeabur-tools-mine", alice, "shop", "Running"));
+            pods.push(tools_pod("zeabur-tools-blog", alice, "blog", "Running"));
+            pods.push(tools_pod(
+                "zeabur-tools-bobs",
+                "bob@example.com",
+                "shop",
+                "Running",
+            ));
+        });
+        let app = signed(&cluster, &zeabur);
+        let (status, planned) = plan(&app, json!({"op": "deleteProject"})).await;
+        assert_eq!(status, StatusCode::OK, "{planned}");
+        let (status, applied) = apply(&app, &planned).await;
+        assert_eq!(status, StatusCode::OK, "{applied}");
+
+        assert!(stored_pod(&zeabur, TERMINALS, "zeabur-tools-mine").is_none());
+        for other in ["zeabur-tools-blog", "zeabur-tools-bobs"] {
+            assert!(stored_pod(&zeabur, TERMINALS, other).is_some(), "{other}");
+        }
     }
 
     type Socket = tokio_tungstenite::WebSocketStream<

@@ -235,6 +235,7 @@ mod tests {
             namespace: None,
             reloader: params.get("reloader").and_then(Value::as_bool),
             kinds: &kinds,
+            deletion: None,
             cluster_issuer: params.get("clusterIssuer").and_then(Value::as_str),
             issuers: &issuers,
             certificates: &certificates,
