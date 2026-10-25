@@ -2,7 +2,7 @@
 // missing there (or added there only) is a TypeScript error.
 import type { P } from "@/i18n/sentence-parts"
 import { core } from "@/i18n/en-core"
-import sentences from "@/i18n/generated/en"
+import { serverEn } from "@/i18n/server/en"
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
 const listEn = (items: string[]) => new Intl.ListFormat("en").format(items)
@@ -39,8 +39,8 @@ const waitEn = (s: number) =>
       : plural(Math.ceil(s / 3600), "hour", "hours")
 
 export const en = {
-  // Diagnoses, gaps, traces and incidents: crates/zeabur-gaps/messages
-  ...sentences,
+  // Diagnoses, gaps, traces and incidents: src/i18n/server
+  ...serverEn,
   // The shell: src/i18n/en-core.ts
   ...core,
   // Shell

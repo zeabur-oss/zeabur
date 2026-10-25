@@ -25,17 +25,17 @@
     { "file": "src/routes/service/page.tsx", "exports": ["ServicePage"] },
     { "file": "src/routes/settings.tsx", "exports": ["SettingsPage"] }
   ],
-  // Generated files, and the three catalogs, which repeat the same keys in each language.
+  // Generated files, and the catalogs, which repeat the same keys in each language.
   "duplicates": {
     "ignore": [
       "src/api/schema.d.ts",
-      "src/i18n/generated/**",
+      "src/i18n/server/**",
       "src/i18n/en.ts",
       "src/i18n/zh-CN.ts",
       "src/i18n/zh-TW.ts"
     ]
   },
-  "health": { "ignore": ["src/api/schema.d.ts", "src/i18n/generated/**"] },
+  "health": { "ignore": ["src/api/schema.d.ts"] },
   // Each layer imports only the layers below it.
   "boundaries": {
     "zones": [

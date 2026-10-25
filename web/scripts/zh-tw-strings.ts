@@ -37,26 +37,20 @@ const lines: string[] = []
 const print = (key: string, text: string) => lines.push(`[${key}] ${text.replace(/\s+/g, " ")}`)
 
 const { zhTW } = (await load("zh-TW.ts")) as { zhTW: Record<string, string | Message> }
-const params = new Proxy(
+// A sentence is called with several parameter sets, so each of its branches is printed.
+const everyParam = (text: (name: string) => string | undefined): Record<string, string> =>
+  new Proxy({}, { get: (_, name) => (typeof name === "string" ? text(name) : undefined) })
+const sentenceParams = [
+  everyParam((name) => `<${name}>`),
+  ...["true", "false", "0", "1", "120", "Secret"].map((value) => everyParam(() => value)),
   {},
-  { get: (_, key) => (typeof key === "string" ? `<${key}>` : undefined) },
-)
-// The catalogs' sentences as their examples write them, each branch with real values.
-const examples = new Map<string, Set<string>>()
-for (const example of JSON.parse(
-  readFileSync(
-    resolve(import.meta.dirname, "../../crates/zeabur-gaps/messages/examples.json"),
-    "utf8",
-  ),
-) as { key: string; "zh-TW": string }[]) {
-  const key = `sentence.${example.key}`
-  examples.set(key, (examples.get(key) ?? new Set()).add(example["zh-TW"]))
-}
+]
 for (const [key, value] of Object.entries(zhTW)) {
-  const written = examples.get(key)
-  if (written) written.forEach((text) => print(key, text))
-  else if (typeof value === "string") print(key, value)
-  else print(key, key.startsWith("sentence.") ? String(value(params)) : call(value))
+  if (typeof value === "string") print(key, value)
+  else if (key.startsWith("sentence."))
+    for (const text of new Set(sentenceParams.map((params) => String(value(params)))))
+      print(key, text)
+  else print(key, call(value))
 }
 
 const { summaries } = (await load("component-summaries.ts")) as {

@@ -1,6 +1,6 @@
 import type { Messages } from "@/i18n/en"
 import { listZh, thingZh } from "@/i18n/sentence-parts"
-import sentences from "@/i18n/generated/zh-CN"
+import { serverZhCn } from "@/i18n/server/zh-CN"
 
 // A space where Han text meets a Latin word ("查看 Secrets 需要…").
 
@@ -30,7 +30,7 @@ const waitZhCN = (s: number) =>
   s < 60 ? `${s} 秒` : s < 3600 ? `${Math.ceil(s / 60)} 分钟` : `${Math.ceil(s / 3600)} 小时`
 
 export const zhCN: Messages = {
-  ...sentences,
+  ...serverZhCn,
   "shell.skip": "跳到主要内容",
   "shell.nav": "主菜单",
   "shell.home": "首页",

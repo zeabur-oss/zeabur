@@ -256,33 +256,16 @@ why. Add a row before introducing a new concept.
 ## Server sentences
 
 Diagnoses, gaps, traces and incidents (`diagnosis.*`, `gap.*`, `trace.*`, `incident.*`) arrive
-from the API as a key and parameters, not prose. Their words live in
-`crates/zeabur-gaps/messages/{en,zh-TW,zh-CN}.json`, one template per key, so the web and any
-other client (`zeabur_gaps::messages::render`) word them the same way. The web reads them from
-`web/src/i18n/generated/`, which `web/scripts/gen-messages.ts` writes; never edit those files.
+from the API as a key and parameters, not prose. Their words are TypeScript functions in
+`web/src/i18n/server/{en,zh-TW,zh-CN}.ts`, one per key, named `sentence.<key>` and taking the
+parameters as strings. Problem sentences (`sentence.problem.*`, `sentence.members.*`,
+`sentence.account.*`, `sentence.page.*`) are written the same way in the three dictionaries. The
+server never renders them.
 
-To change a sentence, edit its template in all three catalogs, then run
-`bun scripts/gen-messages.ts` in `web/` (`bun run dev` and `bun run build` also do it) and commit
-both. `scripts/check-messages.sh` fails when the generated files are out of date, and
-`cargo test -p zeabur-gaps` when a key the fixtures send has no words in a language. When a
-sentence's output changes on purpose, update `messages/examples.json`, which both renderers are
-tested against. A new key needs a template in each catalog and a fixture that sends it.
-
-A template is text with placeholders, each `${name}` or `${name, kind, …}` with cases in braces:
-
-| Placeholder | Writes |
-|---|---|
-| `${name}` | the parameter; nothing when it is absent |
-| `${name, select, a {…} none {…} other {…}}` | the case named by the value; `none` when it is absent or empty, else `other` |
-| `${name, plural, one {# item} other {# items}}` | `one` when the value is 1; `#` is the value |
-| `${name, items, one {…} other {…}}` | `one` when the comma-separated value has one item |
-| `${name, first, a {…} other {…}}` | the case named by the first item |
-| `${name, list}` | the items joined with the language's `listSeparator` |
-| `${name, list, and, a {…} b {…}}` | each item's case, the last joined with `listAnd`; items with no case are left out |
-| `${name, duration}` | seconds in words, whole minutes as minutes (the catalog's `format`) |
-
-Cases nest. Text between placeholders is written as it is, so spacing and punctuation follow
-the locale's rules above.
+To change a sentence, edit its function in all three files; `tsc` fails when a language lacks a
+key. A new key needs a function in each file and a fixture or code in `zeabur-modules` that sends
+it; `bun test` fails when a key those crates send has no words. A parameter that may be absent
+is read as `p.name ?? ""`. Test a branch that is easy to get wrong in `web/src/i18n/server.test.ts`.
 
 ## Examples
 

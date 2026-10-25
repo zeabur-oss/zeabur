@@ -3,8 +3,7 @@ import { resolve } from "node:path"
 import tailwindcss from "@tailwindcss/vite"
 import react from "@vitejs/plugin-react"
 import Icons from "unplugin-icons/vite"
-import { defineConfig, type Plugin } from "vite"
-import { catalogs, generate } from "./scripts/gen-messages.ts"
+import { defineConfig } from "vite"
 
 // The Rust server the dev server forwards `/api` to (`cargo run -p zeabur-api --example demo`).
 const api = process.env.ZEABUR_API ?? "http://127.0.0.1:8080"
@@ -29,22 +28,8 @@ const designSystemImports = [
   ),
 ]
 
-// The server sentences' words, from their catalogs (scripts/gen-messages.ts).
-const messages: Plugin = {
-  name: "zeabur-messages",
-  buildStart() {
-    generate()
-    this.addWatchFile(catalogs)
-  },
-  configureServer(server) {
-    server.watcher.add(catalogs)
-    server.watcher.on("change", (file) => file.startsWith(catalogs) && generate())
-  },
-}
-
 export default defineConfig({
   plugins: [
-    messages,
     react({
       // The compiler skips node_modules on its own too, unless `sources` names the files.
       compiler: { sources: [resolve(import.meta.dirname, "src") + "/", designSystem] },

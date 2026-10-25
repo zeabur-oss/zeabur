@@ -109,14 +109,12 @@ case "$job" in
     cd crates/zeabur-proxy/fuzz
     cargo fuzz run parse --sanitizer none -- -max_total_time=60
     ;;
-  # The web interface: banned styles, generated sentences up to date (before the build regenerates
-  # them), lint, unused code and layer boundaries, new findings in the changed files, build, unit
-  # tests, generated API types up to date, the installer's interface built and linted, no use of a
+  # The web interface: banned styles, lint, unused code and layer boundaries, new findings in the changed
+  # files, build, unit tests, generated API types up to date, the installer's interface built and linted, no use of a
   # deprecated declaration in either, size budget, and a release build that embeds it. The health
   # and duplication report after it does not fail the job.
   ui)
     ./scripts/check-ui-styles.sh
-    ./scripts/check-messages.sh
     ./scripts/build-ui.sh
     (
       cd web

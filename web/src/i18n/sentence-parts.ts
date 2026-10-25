@@ -1,5 +1,5 @@
 // What the three catalogues' hand-written problem sentences share: the parameters' type and the
-// helpers that read them. Diagnoses, gaps, traces and incidents are in crates/zeabur-gaps/messages.
+// helpers that read them. Diagnoses, gaps, traces and incidents are in src/i18n/server.
 
 /** A server sentence's parameters, by name. */
 export type P = Record<string, string>
@@ -19,4 +19,23 @@ export function listZh(locale: "zh-TW" | "zh-CN", items: string[]): string {
       return `${before}${part.value}${after}`
     })
     .join("")
+}
+
+/** The items of a comma-separated parameter. */
+export const items = (value: string | undefined) => (value ?? "").split(",")
+
+/** `words` joined by `separator`, the last one by `last`. */
+export const joinWords = (words: string[], separator: string, last: string) =>
+  words.length > 1
+    ? `${words.slice(0, -1).join(separator)}${last}${words.at(-1)}`
+    : words.join(separator)
+
+/** A number of seconds as whole minutes when it is, else as seconds. */
+export function durationOf(
+  value: string | undefined,
+  seconds: (n: number) => string,
+  minutes: (n: number) => string,
+) {
+  const n = Number(value)
+  return n >= 60 && n % 60 === 0 ? minutes(n / 60) : seconds(n)
 }

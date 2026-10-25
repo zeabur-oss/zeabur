@@ -48,9 +48,8 @@ crate never depends on a module.
 
 ## Words
 
-`messages/` holds each sentence's words in English, Traditional and Simplified Chinese, as
-templates; `messages::render` writes a sentence in one of them, and the web generates its
-catalog from the same files. `docs/internal/wording.md` describes the templates and how to change them.
+The sentences carry a key and parameters only; the web writes them, in `web/src/i18n/server/`.
+`docs/internal/wording.md` describes how to change them.
 
 ## Hides
 
