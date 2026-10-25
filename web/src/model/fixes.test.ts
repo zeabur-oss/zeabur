@@ -2,7 +2,7 @@ import { describe, test, expect } from "bun:test"
 
 import type { Schemas } from "@/api/client"
 import type { Translate } from "@/i18n"
-import { fixLink, fixTemplates } from "@/model/fixes"
+import { fixLink, fixOf, fixTemplates } from "@/model/fixes"
 
 type Gap = Schemas["Gap"]
 type Project = Schemas["Project"]
@@ -167,5 +167,19 @@ describe("fixLink", () => {
   test("a declined template opens the part of Settings that sets it by hand", () => {
     const form = fixLink(withFix("probes.readiness", { service: "Deployment/api" }), shop([]))
     expect(form).toMatchObject({ label: "gap.openSettings", link: { hash: "health-checks" } })
+  })
+})
+
+describe("fixOf", () => {
+  test("a plan when a template writes one, else the form, and nothing without the project", () => {
+    const resources = { fix: { id: "compute.resources", params: target } } as unknown as Gap
+    expect(fixOf(resources, project({}), t).ask?.title).toBe("fix.resources")
+    const declined = {
+      fix: { id: "probes.readiness", params: target },
+      service: "Deployment/api",
+    } as unknown as Gap
+    const shop = { ...project({}), namespace: "shop" } as Project
+    expect(fixOf(declined, shop, t)).toMatchObject({ form: { label: "gap.openSettings" } })
+    expect(fixOf(resources, undefined, t)).toStrictEqual({})
   })
 })

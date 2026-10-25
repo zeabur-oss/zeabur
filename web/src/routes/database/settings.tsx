@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from "react"
 
+import { PartNav } from "@/components/part-nav"
 import { CopyText } from "@/components/copy-text"
 import { FormField } from "@/components/form-field"
 import { ObjectYaml } from "@/components/store-detail"
@@ -47,27 +48,7 @@ export function DatabaseSettings({
     <div className="flex flex-col gap-6">
       <ModeSwitch tab="settings" mode={mode} onMode={onMode}>
         {mode ? null : (
-          <nav
-            aria-label={t("db.settings")}
-            className="flex flex-wrap items-center gap-x-4 gap-y-1"
-          >
-            {parts.map((part) => (
-              <a
-                key={part}
-                href={`#${part}`}
-                onClick={(event) => {
-                  event.preventDefault()
-                  document
-                    .getElementById(part)
-                    ?.scrollIntoView({ block: "start", behavior: "smooth" })
-                  history.replaceState(history.state, "", `#${part}`)
-                }}
-                className="flex items-center gap-1.5 type-meta text-secondary outline-none hover:text-main focus-visible:underline"
-              >
-                {t(`part.${part}`)}
-              </a>
-            ))}
-          </nav>
+          <PartNav label={t("db.settings")} parts={parts} name={(part) => t(`part.${part}`)} />
         )}
       </ModeSwitch>
       {mode === "yaml" ? (

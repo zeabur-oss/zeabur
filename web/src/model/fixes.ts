@@ -40,6 +40,18 @@ function portOf(project: Project, service: Service): number | undefined {
   return undefined
 }
 
+function policyFix(gap: Gap, project: Project, t: Translate, side: "from" | "to") {
+  const object = gap.fix.params?.object
+  const from = project.services.find((s) => s.id === gap.fix.params?.from)
+  const to = project.services.find((s) => s.id === gap.fix.params?.to)
+  if (!object || !from || !to) return undefined
+  return {
+    title: t("reach.planAllowFrom", from.name, to.name),
+    changes: [{ op: "create" as const, object: JSON.parse(object) as Record<string, never> }],
+    service: workloadOf(side === "from" ? from : to),
+  }
+}
+
 export const fixTemplates: Record<string, FixTemplate> = {
   // Fill in only what is missing; what the container already sets is kept as it is.
   "compute.resources": (gap, project, t) => {
@@ -67,31 +79,10 @@ export const fixTemplates: Record<string, FixTemplate> = {
       ],
     }
   },
-  // The NetworkPolicy module's ready-made allow-from-service policy, which the server put in the
-  // gap: created as a new object.
-  "networkPolicy.allowFrom": (gap, project, t) => {
-    const object = gap.fix.params?.object
-    const from = project.services.find((s) => s.id === gap.fix.params?.from)
-    const to = project.services.find((s) => s.id === gap.fix.params?.to)
-    if (!object || !from || !to) return undefined
-    return {
-      title: t("reach.planAllowFrom", from.name, to.name),
-      changes: [{ op: "create", object: JSON.parse(object) as Record<string, never> }],
-      service: workloadOf(to),
-    }
-  },
-  // The NetworkPolicy module's ready-made policy that lets the sender's pods connect out.
-  "networkPolicy.allowEgress": (gap, project, t) => {
-    const object = gap.fix.params?.object
-    const from = project.services.find((s) => s.id === gap.fix.params?.from)
-    const to = project.services.find((s) => s.id === gap.fix.params?.to)
-    if (!object || !from || !to) return undefined
-    return {
-      title: t("reach.planAllowFrom", from.name, to.name),
-      changes: [{ op: "create", object: JSON.parse(object) as Record<string, never> }],
-      service: workloadOf(from),
-    }
-  },
+  // The NetworkPolicy module's ready-made policies: one that lets a service accept a connection,
+  // and one that lets the sender's pods connect out. Each is created as a new object.
+  "networkPolicy.allowFrom": (gap, project, t) => policyFix(gap, project, t, "to"),
+  "networkPolicy.allowEgress": (gap, project, t) => policyFix(gap, project, t, "from"),
   // The HTTPRoute the server built from the Ingress. The Ingress stays until the person deletes
   // it, so traffic does not stop while the route is new.
   "domains.httpRoute": (gap, _project, t) => {
@@ -219,4 +210,15 @@ export function fixLink(
     default:
       return undefined
   }
+}
+
+/** A gap's fix: the plan a template writes, or else the form that ends in one. */
+export function fixOf(
+  gap: Gap,
+  project: Project | undefined,
+  t: Translate,
+): { ask?: PlanAsk; form?: ReturnType<typeof fixLink> } {
+  if (!project) return {}
+  const ask = fixTemplates[gap.fix.id]?.(gap, project, t)
+  return ask ? { ask } : { form: fixLink(gap, project) }
 }

@@ -15,7 +15,7 @@ import {
 import { useSentence, useT } from "@/i18n"
 import { cn } from "@/lib/utils"
 import { serviceLink } from "@/lib/place"
-import { fixLink, fixTemplates } from "@/model/fixes"
+import { fixOf, type fixLink } from "@/model/fixes"
 import { suggestionsOf } from "@/model/overview"
 
 type Gap = Schemas["Gap"]
@@ -40,14 +40,13 @@ export function GapList({
             return project ? (
               <UncheckedRow key="unchecked" project={project} services={row.services} />
             ) : null
-          const gap = row.gap
-          const ask = document ? fixTemplates[gap.fix.id]?.(gap, document, t) : undefined
+          const { ask, form } = fixOf(row.gap, document, t)
           return (
             <GapRow
-              key={`${gap.rule}/${gap.subject.kind}/${gap.subject.name}/${gap.message.key}/${gap.message.params?.container ?? ""}`}
-              gap={gap}
+              key={gapKey(row.gap)}
+              gap={row.gap}
               onPlan={ask ? () => planner.plan(ask) : undefined}
-              form={ask || !document ? undefined : fixLink(gap, document)}
+              form={form}
             />
           )
         })}
@@ -56,6 +55,9 @@ export function GapList({
     </>
   )
 }
+
+const gapKey = (gap: Gap) =>
+  `${gap.rule}/${gap.subject.kind}/${gap.subject.name}/${gap.message.key}/${gap.message.params?.container ?? ""}`
 
 /** Every service without a traffic check, as one piece of advice; the names open below it. */
 function UncheckedRow({

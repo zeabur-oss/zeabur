@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query"
 
 import type { Schemas } from "@/api/client"
 import { buildsQuery } from "@/api/queries"
+import { PartNav } from "@/components/part-nav"
 import { LoadingRows } from "@/components/page"
 import { cn } from "@/lib/utils"
 import { useDraft } from "@/components/plan/draft"
@@ -81,28 +82,12 @@ export function SettingsTab({
     <div className="flex flex-col gap-6">
       <ModeSwitch tab="settings" mode={mode} onMode={onMode}>
         {mode ? null : (
-          <nav
-            aria-label={t("settings.sections")}
-            className="flex flex-wrap items-center gap-x-4 gap-y-1"
-          >
-            {parts.map((part) => (
-              <a
-                key={part}
-                href={`#${part}`}
-                onClick={(event) => {
-                  event.preventDefault()
-                  document
-                    .getElementById(part)
-                    ?.scrollIntoView({ block: "start", behavior: "smooth" })
-                  history.replaceState(history.state, "", `#${part}`)
-                }}
-                className="flex items-center gap-1.5 type-meta text-secondary outline-none hover:text-main focus-visible:underline"
-              >
-                {t(`part.${part}`)}
-                {draft?.parts.includes(part) ? <PendingMark /> : null}
-              </a>
-            ))}
-          </nav>
+          <PartNav
+            label={t("settings.sections")}
+            parts={parts}
+            name={(part) => t(`part.${part}`)}
+            mark={(part) => (draft?.parts.includes(part) ? <PendingMark /> : null)}
+          />
         )}
       </ModeSwitch>
       {mode === "yaml" ? <YamlTab project={project} service={service} /> : null}
