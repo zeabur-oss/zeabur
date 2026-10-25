@@ -1,6 +1,6 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "description": "Cargo crates, web/ packages (bun.lock), action digests, the k3s test version and the Zeabur Identity pin. Lock file maintenance updates flake.lock: the Rust nightly and the Zeabur Catalog commit that zeabur-catalog embeds. scripts/bump-rke2.sh updates the pinned RKE2 release and its digests.",
+  "description": "Cargo crates, web/ packages (bun.lock), action digests, the k3s test version and the Zeabur Identity release tag. Lock file maintenance updates flake.lock: the Rust nightly and the Zeabur Catalog commit that zeabur-catalog embeds. scripts/bump-rke2.sh updates the pinned RKE2 release and its digests.",
   "extends": [
     "config:recommended",
     ":semanticCommitTypeAll(chore)",
@@ -106,17 +106,15 @@
     },
     {
       "customType": "regex",
-      "description": "Zeabur Identity commit that e2e-l2 builds and a release installs.",
+      "description": "Zeabur Identity release tag that e2e-l2 builds and a release installs.",
       "managerFilePatterns": [
         "/^ZEABUR_IDENTITY_PINNED$/"
       ],
       "matchStrings": [
-        "(?<currentDigest>[0-9a-f]{40})"
+        "(?<currentValue>v[0-9]+\\.[0-9]+\\.[0-9]+)"
       ],
       "depNameTemplate": "zeabur-oss/identity",
-      "packageNameTemplate": "https://github.com/zeabur-oss/identity",
-      "currentValueTemplate": "main",
-      "datasourceTemplate": "git-refs"
+      "datasourceTemplate": "github-tags"
     }
   ]
 }

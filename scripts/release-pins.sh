@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Prints the pins of the catalog and Zeabur Identity releases that zeabur-installer installs, as
 # `ZEABUR_PIN_*=value` lines for $GITHUB_ENV. The catalog is the commit in flake.lock, Zeabur
-# Identity the commit in ZEABUR_IDENTITY_PINNED; each must carry a release tag. Each value comes
-# from a checksum list that the product's own release workflow signed, and cosign checks that
+# Identity the release tag (or a commit that carries one) in ZEABUR_IDENTITY_PINNED. Each value
+# comes from a checksum list that the product's own release workflow signed, and cosign checks that
 # signature first. The catalog files this build embeds (ZEABUR_CATALOG_RELEASE) must match that
 # list. release-build.sh compiles the pins into the installer. Run inside `nix develop`.
 #   scripts/release-pins.sh >>"$GITHUB_ENV"
@@ -13,9 +13,16 @@ root="$(cd "$(dirname "$0")/.." && pwd)"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 
-# Prints the one release tag on a commit.
-tag_at() { # $1 = repository, $2 = commit
+# Prints the one release tag of a pin: the pin itself when it is a release tag that exists, else
+# the one release tag on the commit.
+tag_at() { # $1 = repository, $2 = release tag or commit
   local tags
+  if [[ "$2" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    git ls-remote --exit-code --tags "https://github.com/zeabur-oss/$1" "refs/tags/$2" >/dev/null ||
+      { echo "zeabur-oss/$1 has no release tag $2" >&2; return 1; }
+    echo "$2"
+    return
+  fi
   tags="$(git ls-remote --tags "https://github.com/zeabur-oss/$1" |
     awk -v c="$2" '$1 == c { sub("^refs/tags/", "", $2); sub("\\^\\{\\}$", "", $2); print $2 }' |
     { grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' || true; } | sort -u)"

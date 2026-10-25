@@ -10,8 +10,10 @@ How a maintainer publishes a release. What a release contains and how to verify 
    `deploy/chart/zeabur/Chart.yaml` (`version` and `appVersion`, without the `v`). Rename
    `## [Unreleased]` in `CHANGELOG.md` to `## [<version>] - <date>` and add its link at the end;
    that section becomes the release notes. The catalog commit in `flake.lock` and the
-   Zeabur Identity commit in `ZEABUR_IDENTITY_PINNED` are what the release embeds and installs:
-   each must carry a published release tag, or the release stops (`scripts/release-pins.sh`).
+   Zeabur Identity release tag in `ZEABUR_IDENTITY_PINNED` are what the release embeds and
+   installs: the catalog commit must carry a published release tag and the Identity tag must
+   exist, or the release stops (`scripts/release-pins.sh`). Renovate moves the Identity tag only
+   to newer release tags.
    Merge the pull request to `main`.
 2. Rehearse: **Actions → Release → Run workflow** on `main` with the version, `v<version>`. It
    runs all of CI and the three builds with their smoke tests and publishes nothing.

@@ -41,6 +41,9 @@ minor or patch release may break the API.
 
 ### Changed
 
+- `ZEABUR_IDENTITY_PINNED` holds a release tag, Renovate moves it only to newer release tags,
+  and `scripts/release-pins.sh` accepts a tag or a tagged commit, so a release no longer stops on
+  a pin that Renovate pushed to an untagged commit.
 - Templates no longer carry consent inputs or default-deny NetworkPolicies, so the deploy form has no
   consent checkbox and a template is no longer "missing Traefik" outside the namespace `traefik`.
   The catalogue is at its latest main; the Traefik risk text says that a Middleware works only in
