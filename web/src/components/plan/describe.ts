@@ -14,6 +14,7 @@ import {
 } from "@/components/plan/groups"
 import { editCount, partOf } from "@/model/draft"
 import { problemText } from "@/model/problem"
+import { limitSentence } from "@/model/ip-limits"
 import { isolates, undoOf, type AccessChange, type PodsOf, type Reason } from "@/model/risk"
 import { imageTag } from "@/model/service"
 
@@ -247,6 +248,8 @@ type ServiceChange =
           | "labelVolume"
           | "uploadToken"
           | "archiveDigest"
+          | "ipAllow"
+          | "egressLimit"
       }
     >
   | PagesChange
@@ -275,14 +278,6 @@ const addVolumeSentence = (t: Translate, change: Extract<Change, { op: "addVolum
     ? t("confirm.addVolumeIn", change.volume.size, change.workload.name, change.container)
     : t("confirm.addVolume", change.volume.size, change.workload.name)
 
-function egressSentence(t: Translate, change: Extract<Change, { op: "egressLimit" }>): string {
-  if (!change.enabled) return t("confirm.egressLimitOff", change.workload.name)
-  const cidrs = change.cidrs ?? []
-  return cidrs.length === 0
-    ? t("confirm.egressLimitNone", change.workload.name)
-    : t("confirm.egressLimit", change.workload.name, t("common.list", cidrs))
-}
-
 function accessSentence(t: Translate, change: AccessChange | ServiceChange): string {
   switch (change.op) {
     case "scheduleTask":
@@ -299,12 +294,6 @@ function accessSentence(t: Translate, change: AccessChange | ServiceChange): str
       return change.user
         ? t("confirm.basicAuth", change.route.name)
         : t("confirm.basicAuthOff", change.route.name)
-    case "ipAllow":
-      return change.enabled
-        ? t("confirm.ipAllow", change.route.name, t("common.list", change.cidrs ?? []))
-        : t("confirm.ipAllowOff", change.route.name)
-    case "egressLimit":
-      return egressSentence(t, change)
     case "certificate":
       return change.certificate.from === "own"
         ? t("confirm.certificateOwn", change.hostname)
@@ -332,6 +321,9 @@ function serviceSentence(t: Translate, change: ServiceChange): string {
       return t("confirm.archiveDigest", change.build)
     case "labelVolume":
       return t("confirm.labelVolume", change.claim)
+    case "ipAllow":
+    case "egressLimit":
+      return limitSentence(t, change)
     default:
       return pagesSentence(t, change)
   }
@@ -922,9 +914,6 @@ function accessAction(t: Translate, change: AccessChange | ServiceChange): strin
       return change.to ? t("action.redirect") : t("action.stopRedirect")
     case "basicAuth":
       return change.user ? t("action.askPassword") : t("action.stopPassword")
-    case "ipAllow":
-    case "egressLimit":
-      return change.enabled ? t("action.limitAddresses") : t("action.removeLimit")
     case "certificate":
       return t("action.useCertificate")
     default:
@@ -945,6 +934,9 @@ function serviceAction(t: Translate, change: ServiceChange): string {
       return t("action.upload")
     case "labelVolume":
       return t("action.save")
+    case "ipAllow":
+    case "egressLimit":
+      return t(change.enabled ? "action.limitAddresses" : "action.removeLimit")
     default:
       return pagesAction(t, change)
   }

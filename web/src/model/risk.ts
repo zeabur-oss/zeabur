@@ -372,14 +372,12 @@ function accessTab(change: Change, service?: WorkloadRef): [WorkloadRef | undefi
     case "envImport":
       return [change.workload, "variables"]
     case "basicAuth":
-    case "ipAllow":
     case "errorPages":
     case "maintenance":
     case "certificate":
     case "redirect":
       return [service, "networking"]
     case "publicPort":
-    case "egressLimit":
       return [change.workload, "networking"]
     default:
       return [undefined, "networking"]
