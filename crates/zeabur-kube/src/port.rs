@@ -215,12 +215,6 @@ pub trait Cluster: Send + Sync {
     /// cluster costs little memory.
     fn cluster_pods(&self, limit: usize) -> Answer<'_, ClusterPods>;
 
-    /// The pods bound to `node`, of every namespace and phase, read with the field selector
-    /// `spec.nodeName=<node>` as `kubectl drain` reads them [kubectl-drain].
-    ///
-    /// [kubectl-drain]: https://github.com/kubernetes/kubectl/blob/master/pkg/drain/drain.go
-    fn node_pods<'a>(&'a self, node: &'a str) -> Answer<'a, Vec<Pod>>;
-
     /// Events of every namespace, in pages of 500, stopping after `limit`.
     fn cluster_events(&self, limit: usize) -> Answer<'_, ClusterEvents>;
 
@@ -541,13 +535,6 @@ pub enum WriteBody {
     /// A deletion, `DELETE` of the object with background propagation and these
     /// [`Preconditions`]; refused (`409 Conflict`) when the object no longer meets them.
     Delete(Preconditions),
-    /// An eviction of a Pod, `POST` of an `Eviction` to its `eviction` subresource [k8s-evict],
-    /// with these [`Preconditions`]. kube-apiserver deletes the pod gracefully unless a
-    /// `PodDisruptionBudget` forbids it, which it answers with `429 Too Many Requests`. RBAC sees a
-    /// `create` of `pods/eviction`.
-    ///
-    /// [k8s-evict]: https://kubernetes.io/docs/concepts/scheduling-eviction/api-eviction/
-    Evict(Preconditions),
 }
 
 /// What a deletion requires of the object, as `DeleteOptions.preconditions` names it

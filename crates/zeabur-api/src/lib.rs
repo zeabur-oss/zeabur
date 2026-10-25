@@ -78,9 +78,8 @@
 //! | `POST /api/v1/cluster/node-shells/apply` | carries out that plan by its token |
 //! | `POST /api/v1/cluster/tools/plan` | what starting a kubectl terminal for the whole cluster writes, and a token; writes nothing |
 //! | `POST /api/v1/cluster/tools/apply` | carries out that plan by its token |
-//! | `POST /api/v1/cluster/nodes/{node}/maintenance/plan` | what stopping scheduling, resuming it or maintenance does to a node's pods, and a token; writes nothing |
-//! | `POST /api/v1/cluster/nodes/{node}/maintenance/apply` | carries out that plan by its token: patches the node and makes the first eviction pass |
-//! | `POST /api/v1/cluster/nodes/{node}/maintenance/evict` | evicts that plan's pods still on the node, once more |
+//! | `POST /api/v1/cluster/nodes/{node}/maintenance/plan` | what stopping or resuming scheduling does to a node, and a token; writes nothing |
+//! | `POST /api/v1/cluster/nodes/{node}/maintenance/apply` | carries out that plan by its token: patches the node |
 //! | `DELETE /api/v1/cluster/tools/{name}` | deletes your cluster tools pod |
 //! | `DELETE /api/v1/members/invitations/{name}` | revokes a setup link |
 //! | `POST /api/v1/members/{username}/setup-links` | a new setup link for a member, optionally removing their passkeys first |
@@ -248,7 +247,6 @@ fn cluster_routes(router: OpenApiRouter<AppState>) -> OpenApiRouter<AppState> {
         .routes(routes!(cluster::tools::terminal))
         .routes(routes!(cluster::maintenance::plan))
         .routes(routes!(cluster::maintenance::apply))
-        .routes(routes!(cluster::maintenance::evict))
         .routes(routes!(cluster::nodes))
         .routes(routes!(cluster::usage::get))
         .routes(routes!(cluster::health))

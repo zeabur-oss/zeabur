@@ -287,40 +287,6 @@ fn pool(config: &kube::Config, idle: std::time::Duration) -> Result<Pool, Connec
     )
 }
 
-/// kube-rs's retry of `429`, `503` and `504`, except for evictions: their `429` is a disruption
-/// budget's answer, which the caller reports, and retrying it held a request for minutes.
-#[derive(Clone)]
-struct Retry(kube::client::retry::RetryPolicy);
-
-impl<Res>
-    tower::retry::Policy<http::Request<kube::client::Body>, http::Response<Res>, tower::BoxError>
-    for Retry
-{
-    type Future = tokio::time::Sleep;
-
-    fn retry(
-        &mut self,
-        request: &mut http::Request<kube::client::Body>,
-        result: &mut Result<http::Response<Res>, tower::BoxError>,
-    ) -> Option<Self::Future> {
-        if request.uri().path().ends_with("/eviction") {
-            return None;
-        }
-        self.0.retry(request, result)
-    }
-
-    fn clone_request(
-        &mut self,
-        request: &http::Request<kube::client::Body>,
-    ) -> Option<http::Request<kube::client::Body>> {
-        <kube::client::retry::RetryPolicy as tower::retry::Policy<
-            _,
-            http::Response<Res>,
-            tower::BoxError,
-        >>::clone_request(&mut self.0, request)
-    }
-}
-
 /// The layers of kube-rs's default client (retry, auth, extra headers, tracing) over `pool`.
 /// Each request carries `authorization` if it is set, else the credential of `config`.
 fn client(
@@ -336,7 +302,7 @@ fn client(
         .option_layer(
             config
                 .default_retry
-                .then(|| tower::retry::RetryLayer::new(Retry(RetryPolicy::server_retry()))),
+                .then(|| tower::retry::RetryLayer::new(RetryPolicy::server_retry())),
         )
         .option_layer(config.auth_layer().map_err(|e| refused(&e))?)
         .option_layer(authorization.map(|value| {
@@ -595,31 +561,6 @@ contexts:
             socket.write_all(reply.as_bytes()).await.unwrap();
         }
         seen
-    }
-
-    #[tokio::test]
-    async fn an_eviction_a_budget_refuses_is_answered_at_once() {
-        let (listener, url) = listen().await;
-        let server = tokio::spawn(busy_then_ok(listener));
-        let client = own_pool(kube::Config::new(url), std::time::Duration::from_secs(60));
-        let eviction = http::Request::post("/api/v1/namespaces/shop/pods/web-1/eviction")
-            .body(b"{}".to_vec())
-            .unwrap();
-        let answer = tokio::time::timeout(PATIENCE, client.kube().request_text(eviction))
-            .await
-            .expect("the eviction was retried");
-        assert!(
-            matches!(answer, Err(kube::Error::Api(ref status)) if status.code == 429),
-            "{answer:?}"
-        );
-        drop(client);
-        assert_eq!(
-            tokio::time::timeout(PATIENCE, server)
-                .await
-                .unwrap()
-                .unwrap(),
-            1
-        );
     }
 
     #[tokio::test]

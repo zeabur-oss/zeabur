@@ -32,13 +32,7 @@ import {
 import type { Health } from "@/model/service"
 import { useIssueText } from "@/routes/cluster/attention"
 import { Forbidden, overviewRole } from "@/routes/cluster/forbidden"
-import {
-  ContinueMaintenance,
-  NodeDialog,
-  NodeMenu,
-  type NodeOpen,
-  Removed,
-} from "@/routes/cluster/node-maintenance"
+import { NodeDialog, NodeMenu } from "@/routes/cluster/node-maintenance"
 import { Section } from "@/routes/cluster/section"
 import { Meter } from "@zeabur/design-system/components/meter"
 
@@ -262,7 +256,6 @@ function NodeList({
   const [query, setQuery] = useState("")
   const [sort, setSort] = useState<Sort>("worst")
   const [all, setAll] = useState(false)
-  const [removed, setRemoved] = useState<string>()
   const large = nodes.length > LIST_AT
   const needle = query.trim().toLowerCase()
   const matching = needle
@@ -311,12 +304,10 @@ function NodeList({
               node={node}
               skew={skew.find((s) => s.node === node.name)}
               metrics={metrics}
-              onRemoved={setRemoved}
             />
           ))}
         </ul>
       )}
-      <Removed node={removed} onClose={() => setRemoved(undefined)} />
       {large && sorted.length > ROWS_SHOWN ? (
         <div>
           <Button variant="ghost" size="sm" onClick={() => setAll(!all)} aria-expanded={all}>
@@ -398,16 +389,14 @@ function NodeRow({
   node,
   skew,
   metrics,
-  onRemoved,
 }: {
   node: NodeView
   skew?: Schemas["NodeSkew"]
   metrics: Schemas["MetricsState"]
-  onRemoved: (node: string) => void
 }) {
   const t = useT()
   const { cores, memory, percent } = useQuantityFormat()
-  const [open, setOpen] = useState<NodeOpen>()
+  const [action, setAction] = useState<Schemas["NodeAction"]>()
   const gauge = (
     title: string,
     allocatable: number,
@@ -520,20 +509,13 @@ function NodeRow({
             {t("node.pinnedLeft", node.pinnedPods ?? 0)}
           </p>
         ) : null}
-        <ContinueMaintenance node={node} onOpen={setOpen} />
       </div>
       <NodeMenu
         node={node}
         className="-my-1 self-start sm:order-last sm:self-center"
-        onOpen={setOpen}
+        onOpen={setAction}
       />
-      <NodeDialog
-        node={node.name}
-        open={open}
-        onOpen={setOpen}
-        onRemoved={onRemoved}
-        onClose={() => setOpen(undefined)}
-      />
+      <NodeDialog node={node.name} action={action} onClose={() => setAction(undefined)} />
       <div className="grid w-full grid-cols-2 items-start gap-x-4 gap-y-3 sm:flex sm:w-auto sm:gap-x-6">
         {gauge(
           t("cluster.cpu"),

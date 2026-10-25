@@ -341,8 +341,8 @@ export const en = {
   "node.cordoned.why": "New replicas are not placed there; the running ones stay.",
   "node.cordoned.fix": (n: number, node: string) =>
     n === 1
-      ? `Select Continue maintenance on ${node}'s row to move what is left. When the work is done, resume scheduling from its menu.`
-      : "Select Continue maintenance on each row to move what is left. When the work is done, resume scheduling from each node's menu.",
+      ? `To move what is left, run kubectl drain ${node} in the cluster's kubectl terminal. When the work is done, resume scheduling from its menu.`
+      : "To move what is left, run kubectl drain on each node in the cluster's kubectl terminal. When the work is done, resume scheduling from each node's menu.",
   "node.reservedMemory": (n: number, node: string, share: string) =>
     n === 1 ? `${node}: memory ${share} reserved` : `${n} nodes have almost all memory reserved`,
   "node.reservedMemory.why": "New replicas that ask for memory may wait for room.",
@@ -400,8 +400,7 @@ export const en = {
   "node.draining": (n: number, node: string) =>
     n === 1 ? `Replicas are moving off ${node}` : `Replicas are moving off ${n} nodes`,
   "node.draining.why": "Their services start them again on other nodes.",
-  "node.draining.fix":
-    "Replicas move only while the maintenance window is open. Select Continue maintenance on the node's row to keep moving them.",
+  "node.draining.fix": "They move while kubectl drain runs. If it stopped, run it again.",
   "cluster.cores": (n: string) => `${n} cores`,
   "cluster.requestedOf": (requested: string, allocatable: string) =>
     `${requested} of ${allocatable} reserved`,
@@ -488,104 +487,13 @@ export const en = {
   "clusterUsage.whatProjects": "which namespaces are projects",
   "maint.actions": (node: string) => `Actions for ${node}`,
   "maint.cordon": "Stop scheduling",
-  "maint.drain": "Maintenance mode",
-  "maint.continue": "Continue maintenance",
   "maint.uncordon": "Resume scheduling",
   "maint.title.cordon": (node: string) => `Stop scheduling on ${node}`,
-  "maint.title.drain": (node: string) => `Maintenance mode for ${node}`,
   "maint.title.uncordon": (node: string) => `Resume scheduling on ${node}`,
   "maint.lead.cordon": (node: string) =>
     `New replicas will not be placed on ${node}. The ones running there keep running.`,
   "maint.lead.uncordon": (node: string) => `New replicas can be placed on ${node} again.`,
-  "maint.lead.drain": (node: string, n: number) =>
-    n === 0
-      ? `${node} stops taking new replicas. No replica needs to move.`
-      : `${node} stops taking new replicas, then ${n === 1 ? "1 replica moves" : `${n} replicas move`} to other nodes.`,
-  "maint.lead.continue": (node: string, n: number) =>
-    n === 0
-      ? `Nothing on ${node} is left to move.`
-      : `${n === 1 ? "1 replica is" : `${n} replicas are`} still on ${node} and move to other nodes.`,
-  "maint.amounts": (cpu: string, memory: string) => `${cpu} and ${memory} of memory`,
-  "maint.fits": (needs: string, room: string) =>
-    `The other nodes have room: the replicas ask for ${needs}, and ${room} is free.`,
-  "maint.short": (n: number) =>
-    `The other nodes lack room for ${n === 1 ? "1 replica" : `${n} replicas`}. They wait until room frees up or a node is added.`,
-  "maint.shortDetail": (needs: string, room: string) =>
-    `They ask for ${needs}; the other nodes have ${room} free.`,
-  "maint.unknownRoom":
-    "Zeabur could not read every pod, so it cannot tell whether the other nodes have room.",
-  "maint.noOther": "No other node takes new replicas. The moved replicas wait until one does.",
-  "maint.controlPlane": (node: string) =>
-    `${node} runs the cluster's control plane. Its components stay on it, but while the node is down the cluster may not answer.`,
-  "maint.zeabur":
-    "Zeabur itself runs on this node. It moves last, once the other replicas have left; you are then signed in again and need to turn on admin rights again.",
-  "maint.moves": (n: number) => `Move to other nodes (${n})`,
-  "maint.scratch": (n: number) =>
-    `${n === 1 ? "1 of them loses" : `${n} of them lose`} what they keep in scratch space.`,
-  "maint.lose": "scratch space emptied",
-  "maint.budget": (name: string) => `may wait for PodDisruptionBudget ${name}`,
-  "maint.stuck": (n: number) => `Cannot move (${n})`,
-  "maint.stuck.why": (node: string) =>
-    `Their data is on a volume that stays on ${node}. Started on another node, they would wait for it until ${node} is back.`,
-  "maint.stuck.include": (node: string) => `Move them anyway; they stay down until ${node} is back`,
-  "maint.deleted": (n: number) => `Not run by a service (${n})`,
-  "maint.deleted.why": "Nothing starts them again: moving them deletes them for good.",
-  "maint.deleted.confirm": "Delete them",
-  "maint.stays": (n: number) => `Stay on the node (${n})`,
-  "maint.stays.why": "They run on every node, or the node starts them from its own files.",
-  "maint.reason.daemonSet": "on every node",
-  "maint.reason.static": "started by the node",
   "maint.kube.command": "Command",
-  "maint.kube.budgets": "PodDisruptionBudgets",
-  "maint.progress": (node: string, left: number, total: number) =>
-    `Moving replicas off ${node}: ${left} of ${total} left.`,
-  "maint.done": (node: string, kept: number) =>
-    kept === 0
-      ? `${node} is in maintenance. No replica is left to move.`
-      : `${node} is in maintenance. ${kept === 1 ? "1 replica stays because its data is" : `${kept} replicas stay because their data is`} only on ${node}.`,
-  "maint.stopped": "Some replicas could not be moved.",
-  "maint.zeaburMoving": (node: string) =>
-    `Zeabur itself is moving off ${node}, so this page loses its connection for a minute. Reload then, and turn on admin rights again.`,
-  "maint.outcome.waiting": (budget?: string) =>
-    budget ? `Waiting on PodDisruptionBudget ${budget}` : "Waiting on a PodDisruptionBudget",
-  "maint.outcome.refused": "You may not move it",
-  "maint.outcome.failed": "Could not move it",
-  "maint.outcome.last": "Zeabur itself: moves once the others have left",
-  "maint.leaveNote":
-    "You can close this. The node stays out of scheduling; open maintenance mode again to move what is left.",
-  "maint.retry": "Try again",
-  "maint.leave.title": "Stop moving replicas?",
-  "maint.leave.body": (node: string) =>
-    `Replicas move off ${node} only while this window is open. If you leave, ${node} stays out of scheduling and what is left stays on it until you continue maintenance.`,
-  "maint.leave.stay": "Keep moving",
-  "maint.leave.leave": "Leave",
-  "maint.unreadable":
-    "Some reads were refused, so this may miss PodDisruptionBudgets or volumes that stay on this node.",
-  "maint.remove": "Remove node",
-  "maint.removeNext": "Remove node",
-  "maint.title.remove": (node: string) => `Remove ${node}`,
-  "maint.lead.remove": (node: string) =>
-    `${node} leaves the cluster. The machine keeps running until you uninstall RKE2 on it.`,
-  "maint.removal.lastNode": (node: string) =>
-    `${node} is the cluster's only node. To take down the whole cluster, uninstall RKE2 on the machine.`,
-  "maint.removal.lastServer": (node: string) =>
-    `${node} is the only node that runs the control plane. Add another server first.`,
-  "maint.removal.notDrained": (node: string) =>
-    `Put ${node} in maintenance first, so its replicas move to other nodes. Then remove it.`,
-  "maint.removal.drainFirst": "Start maintenance",
-  "maint.removal.down": (node: string, n: number) =>
-    `${node} is not Ready. ${n === 1 ? "1 replica is" : `${n} replicas are`} still on it; Kubernetes deletes them with the node, and their services start them on other nodes.`,
-  "maint.removal.lose": (n: number, node: string) =>
-    `${n === 1 ? "1 replica keeps its" : `${n} replicas keep their`} data on a volume on ${node}. The data goes with the node.`,
-  "maint.removal.loseConfirm": "Delete this data with the node",
-  "maint.removal.servers": (n: number) =>
-    `After this, ${n === 1 ? "1 server runs" : `${n} servers run`} the control plane. It keeps running when a server goes down only with three or more.`,
-  "maint.removed": (node: string) => `${node} is removed from the cluster.`,
-  "maint.removed.run": (node: string) =>
-    `Run these on ${node} to uninstall RKE2 and the installer's files. Until then, it joins the cluster again when RKE2 restarts.`,
-  "maint.removed.commands": (node: string) => `Commands to run on ${node}`,
-  "maint.removed.volumes":
-    "Volumes under /var/lib/zeabur/storage stay on the machine. Delete them by hand once you no longer need them.",
 
   // Projects
   "projects.title": "Projects",

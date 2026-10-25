@@ -186,7 +186,7 @@ mod tests {
             .iter()
             .map(|w| {
                 let verb = match w.body {
-                    WriteBody::Create(_) | WriteBody::Evict(_) => "create",
+                    WriteBody::Create(_) => "create",
                     WriteBody::Delete(_) => "delete",
                     WriteBody::JsonPatch(_) | WriteBody::EphemeralContainers(_) => "patch",
                 };

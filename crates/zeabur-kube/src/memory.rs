@@ -10,13 +10,12 @@ use k8s_openapi::api::apps::v1::{
 };
 use k8s_openapi::api::batch::v1::{CronJob, Job};
 use k8s_openapi::api::core::v1::{
-    ConfigMap, Namespace, Node, PersistentVolumeClaim, Pod, ResourceQuota, Secret, Service,
+    ConfigMap, Namespace, Node, PersistentVolumeClaim, ResourceQuota, Secret, Service,
 };
 use k8s_openapi::api::events::v1::Event;
 use k8s_openapi::api::networking::v1::Ingress;
 use k8s_openapi::api::storage::v1::StorageClass;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
-use k8s_openapi::jiff::Timestamp;
 use kube::api::DynamicObject;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
@@ -145,9 +144,6 @@ pub struct State {
     /// pods/exec`); the calls themselves are not refused, as on a cluster that checks fewer
     /// verbs.
     pub refused_rights: BTreeSet<String>,
-    /// Pods, as `namespace/pod`, whose eviction is refused with this answer, as a
-    /// `PodDisruptionBudget`'s `429 Too Many Requests`.
-    pub eviction_refusals: BTreeMap<String, KubernetesStatus>,
 }
 
 /// A command [`Cluster::run`] ran.
@@ -352,9 +348,7 @@ impl State {
         Ok(out)
     }
 
-    /// Deletes the object `current`, or evicts it: an eviction is refused as
-    /// [`State::eviction_refusals`] says, and otherwise marks the pod as being deleted, as
-    /// kube-apiserver does before the kubelet stops it.
+    /// Deletes the object `current`.
     fn delete(
         &mut self,
         request: &WriteRequest,
@@ -362,31 +356,18 @@ impl State {
         preconditions: &Preconditions,
     ) -> Result<(), ClusterError> {
         let target = &request.target;
-        let Some(mut current) = current else {
+        let Some(current) = current else {
             return Err(not_found(&format!("{} \"{}\"", target.plural, target.name)));
         };
         check_preconditions(target, &current, preconditions)?;
-        let evict = matches!(request.body, WriteBody::Evict(_));
         let key = format!("{}/{}", target.namespace, target.name);
-        if let Some(refusal) = self.eviction_refusals.get(&key).filter(|_| evict) {
-            return Err(ClusterError::Status(refusal.clone()));
-        }
         if request.dry_run {
             self.dry_runs += 1;
             return Ok(());
         }
-        if evict {
-            if let Some(metadata) = current.get_mut("metadata").and_then(Value::as_object_mut) {
-                metadata
-                    .entry("deletionTimestamp")
-                    .or_insert_with(|| Timestamp::now().to_string().into());
-            }
-            self.store(target, current)?;
-        } else {
-            self.remove(target);
-            if target.kind == "Secret" {
-                self.secret_values.remove(&key);
-            }
+        self.remove(target);
+        if target.kind == "Secret" {
+            self.secret_values.remove(&key);
         }
         self.writes.push(request.clone());
         Ok(())
@@ -1010,19 +991,6 @@ impl Cluster for MemoryCluster {
         })
     }
 
-    fn node_pods<'a>(&'a self, node: &'a str) -> Answer<'a, Vec<Pod>> {
-        Box::pin(async move {
-            Ok(self
-                .wide("pods")?
-                .objects
-                .values()
-                .flat_map(|o| &o.pods)
-                .filter(|p| p.spec.as_ref().and_then(|s| s.node_name.as_deref()) == Some(node))
-                .cloned()
-                .collect())
-        })
-    }
-
     fn cluster_events(&self, limit: usize) -> Answer<'_, ClusterEvents> {
         Box::pin(async move {
             let mut events: Vec<Event> = self
@@ -1268,9 +1236,7 @@ impl Cluster for MemoryCluster {
                 .and_then(|o| o.pointer("/metadata/resourceVersion"))
                 .and_then(Value::as_str)
                 .map(str::to_owned);
-            if let WriteBody::Delete(preconditions) | WriteBody::Evict(preconditions) =
-                &request.body
-            {
+            if let WriteBody::Delete(preconditions) = &request.body {
                 state.delete(request, current, preconditions)?;
                 drop(state);
                 return Ok(Written {
@@ -1278,7 +1244,7 @@ impl Cluster for MemoryCluster {
                 });
             }
             let mut object = match (&request.body, &current) {
-                (WriteBody::Delete(_) | WriteBody::Evict(_), _) => return Err(not_applied()),
+                (WriteBody::Delete(_), _) => return Err(not_applied()),
                 (WriteBody::Create(_), Some(_)) => {
                     return Err(ClusterError::Status(KubernetesStatus::new(
                         409,

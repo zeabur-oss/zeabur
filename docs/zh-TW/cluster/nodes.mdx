@@ -1,9 +1,9 @@
 ---
 title: 新增與維護節點
-description: 用 zeabur-installer 加入新節點、移走維護中的副本、移除節點，並在需要時安全地開啟節點終端機。
+description: 用 zeabur-installer 加入新節點，停止排程，用 kubectl 移走副本與移除節點，並在需要時安全地開啟節點終端機。
 ---
 
-到 **叢集** → **概覽** 的 **節點** 查看每台主機的狀況。要多一台主機執行服務，見[加入節點](#加入節點)。主機要停機維護時，在該節點的操作選單選 **維護模式**，等副本移到其他節點後再關機。
+到 **叢集** → **概覽** 的 **節點** 查看每台主機的狀況。要多一台主機執行服務，見[加入節點](#加入節點)。主機要停機維護時，在該節點的操作選單選 **停止排程**，需要移走副本時再用 kubectl 的 `drain`。
 
 ![叢集概覽的節點清單](https://oss.zeabur.com/shots/zeabur/zh-TW/light/cluster-nodes.avif)
 
@@ -12,7 +12,7 @@ description: 用 zeabur-installer 加入新節點、移走維護中的副本、�
 - 只有用 Zeabur Installer（RKE2）安裝的叢集能用 `zeabur-installer node add` 加節點。其他叢集用原本的安裝工具。
 - 準備一台能用 root 操作的新 VM，以及安裝第一台伺服器時用的同一個 `zeabur-installer` 執行檔。
 - 所有節點放在同一家主機服務商的同一個區域，同區域內不同的可用區域沒有問題。跨服務商或跨區域時，延遲會拖慢 etcd、Kubernetes API 和儲存。
-- 維護需要修改 Node 和驅逐 Pod 的權限，移除節點還要能刪除 Node。節點終端機需要叢集管理員權限。
+- 停止排程和恢復排程需要修改 Node 的權限。`drain` 和 `delete node` 在 kubectl 終端機執行，用的是你自己的權限。節點終端機需要叢集管理員權限。
 
 節點之間的防火牆要開放：
 
@@ -85,23 +85,94 @@ etcd 需要過半數的伺服器才能運作。要在少一台時繼續運作，
 
 ## 讓節點停機維護
 
-只想讓新副本不再放到這個節點，在節點的操作選單選 **停止排程**，檢查後套用。上面正在執行的副本會繼續執行。
+### 只是重開機
 
-要先移走副本再維護主機：
+在節點選單選 **停止排程**，節點列就會標示已停止排程。這會阻止新的 Pod 排到這台節點，已經在跑的 Pod 會留在原處。只是要重開機，做到這一步就夠了，不需要執行 `drain`。
 
-1. 選 **維護模式**。視窗會分成 **移到其他節點**、**無法移走**、**不屬於任何服務** 和 **留在節點上** 四類列出副本。
-2. 看其他節點放不放得下。Zeabur 只用副本的保留量估算，不考慮 taint 和 affinity 這類排程限制。
-3. 確認本機磁碟區、暫存空間和不屬於任何服務的副本怎麼處理，再按 **套用**。
-4. 保持視窗開著，直到進度跑完。Zeabur 只在視窗開著時移出副本，移動途中離開頁面會先詢問。離開後節點維持停止排程，節點名稱下方會出現 **繼續維護**，按下就能移走剩下的副本。受 PodDisruptionBudget 限制的副本會等待，處理原因後按 **再試一次**。
-5. 畫面顯示節點已進入維護後，看一下留在原地的副本，再安排主機停機。
+也可以在 Zeabur **叢集** 頁標題旁點 **開啟 kubectl 終端機**，執行：
 
-<Callout type="warn">
-local-path 磁碟區的資料只在這個節點上。維護預設把用到這些資料的副本留在原地。如果勾選仍要移走，這個節點回來前，這些副本都無法使用。移走的副本，暫存空間會清空。不屬於任何服務的 Pod 刪掉後不會再啟動。
-</Callout>
+```sh
+kubectl cordon <node>
+```
 
-DaemonSet 和節點自己啟動的 Pod 會留在節點上。節點執行控制平面時，控制平面的元件也會留在上面，這台主機停機時叢集可能沒有回應。
+把 `<node>` 換成節點名稱。重開機完成後，再恢復排程。
 
-Zeabur 本身也在這個節點上時，會等其他副本都移走後最後才移走，頁面會斷線一分鐘左右。之後重新整理頁面、重新登入，再開一次管理員權限。
+### 要先移走副本再維護
+
+到 Zeabur **叢集** 頁標題旁點 **開啟 kubectl 終端機**，先列出這台節點上的 Pod，以及它們使用的 PVC：
+
+```sh
+kubectl get pods -A --field-selector spec.nodeName=<node> -o custom-columns=NS:.metadata.namespace,POD:.metadata.name,PVC:.spec.volumes[*].persistentVolumeClaim.claimName
+```
+
+對照清單中的 PVC，確認哪些使用這台節點的 `local-path` 磁碟區。這些磁碟區的資料只存在這台節點上，不會跟著 Pod 搬到其他節點。
+
+確認後，執行：
+
+```sh
+kubectl drain <node> --ignore-daemonsets --delete-emptydir-data
+```
+
+`drain` 會停止這台節點的排程，並驅逐 Pod，讓控制器在其他節點重新建立副本。DaemonSet 管理的 Pod 會留在原處。執行時請注意：
+
+- `drain` 會遵守 PodDisruptionBudget；被擋住時會一直重試，直到允許驅逐。
+- 遇到不屬於任何控制器的 Pod，`drain` 會停下來。這類 Pod 刪掉後不會自動啟動，確認可以刪除後，才在指令末尾加上 `--force`。
+- `--delete-emptydir-data` 會清空被驅逐 Pod 的 `emptyDir` 暫存資料。
+- 使用這台節點 `local-path` 磁碟區的 Pod 也會被驅逐。重新建立的 Pod 無法在其他節點使用這些磁碟區，會維持 `Pending`，直到原節點回來。資料不會因為 `drain` 遺失；對這些 Pod 來說，結果跟直接停機一樣，都得等這台節點恢復。
+
+如果 Zeabur 自己也跑在這台節點上，`drain` 時頁面會斷線約一分鐘。請重新整理頁面並重新登入；kubectl 終端機也會斷線，需要重新開啟。
+
+等 `drain` 完成後，再將節點停機維護。
+
+## 恢復排程
+
+維護完成、節點恢復運作後，在節點選單選 **恢復排程**。
+
+也可以到 Zeabur **叢集** 頁標題旁點 **開啟 kubectl 終端機**，執行：
+
+```sh
+kubectl uncordon <node>
+```
+
+恢復排程後，新的 Pod 就能排到這台節點。
+
+## 移除節點
+
+**不要移除叢集唯一的節點，也不要移除最後一台控制節點。**
+
+先到 Zeabur **叢集** 頁標題旁點 **開啟 kubectl 終端機**，確認控制節點數量：
+
+```sh
+kubectl get nodes -l node-role.kubernetes.io/control-plane
+```
+
+如果只剩一台控制節點，不要刪除它。移除後如果剩不到三台 server 節點，控制平面再少一台就無法運作。
+
+`local-path` 磁碟區的資料只在這台 VM 上。節點移除後，使用這些磁碟區的 Pod 沒有地方可以啟動。依照「讓節點停機維護」的步驟檢查 Pod 與磁碟區，再執行 `drain`，完成後才刪除節點：
+
+```sh
+kubectl drain <node> --ignore-daemonsets --delete-emptydir-data
+kubectl delete node <node>
+```
+
+接著登入被移除的那台 VM，以 `root` 執行：
+
+```sh
+/usr/local/bin/rke2-uninstall.sh
+zeabur-installer uninstall --purge
+```
+
+**刪除 Kubernetes 節點後，還要完成 VM 上的解除安裝。** 在執行解除安裝前，只要 RKE2 重新啟動，這台 VM 就會再次加入叢集。
+
+`/var/lib/zeabur/storage` 底下的磁碟區會留在 VM 上。確認不再需要這些資料後，再手動刪除。
+
+最後，回到執行 Zeabur Installer 的伺服器，執行：
+
+```sh
+sudo zeabur-installer node sync
+```
+
+這會把已移除節點的位址從基準網路政策中拿掉。
 
 ## 開啟節點終端機
 
@@ -119,30 +190,6 @@ Zeabur 本身也在這個節點上時，會等其他副本都移走後最後才�
 
 - 加入時連不到伺服器：確認新 VM 連得到 `node add` 印出的伺服器位址的 TCP 9345、6443，以及上面表格的其他連接埠。
 - 新節點已就緒，但不同節點上的服務連不到彼此：檢查 UDP 8472，以及網路政策是否已放行新節點。
-- 副本移不走：維護視窗會寫出原因，例如 **等待 PodDisruptionBudget 放行**、**你沒有權限移走它**，或資料只在這個節點上。
-- 維護視窗被關掉：節點維持停止排程。按節點名稱下方的 **繼續維護**，看過剩下的副本後再套用。
+- `drain` 一直停著：它在等 PodDisruptionBudget 放行，或停在不屬於任何控制器的 Pod 上。用 `kubectl get pdb -A` 看哪個預算擋住了，處理後再執行一次。
+- 副本在新節點 `Pending`：它用的是舊節點的 `local-path` 磁碟區，要等舊節點回來。
 - 終端機 Pod **無法啟動**：看該 Pod 的事件，常見原因是映像檔下載失敗。
-
-## 恢復排程與清除
-
-主機維護完、節點回到就緒後，在操作選單選 **恢復排程**，檢查並套用，新的副本就會再排到這個節點。確認受影響的服務都恢復後，移除用不到的終端機 Pod。
-
-## 移除節點
-
-要讓一台 VM 永久離開叢集，在節點的操作選單選 **移除節點**。
-
-1. 節點就緒而且上面還有能移走的副本時，視窗會請你先按 **開始維護**。照「讓節點停機維護」移走副本，跑完後按 **移除節點**。
-2. 有副本把資料放在這個節點的磁碟區時，要勾選 **連同節點刪除這些資料** 才能繼續。
-3. 檢查後按 **移除節點**。Zeabur 會刪除 Kubernetes 的 Node 物件。
-4. 在那台 VM 以 root 執行畫面列出的指令，解除安裝 RKE2 和 Installer 的檔案：
-
-   ```sh
-   /usr/local/bin/rke2-uninstall.sh
-   zeabur-installer uninstall --purge
-   ```
-
-   執行之前，只要 RKE2 重新啟動，這台 VM 就會再加入叢集。`/var/lib/zeabur/storage` 底下的磁碟區會留在 VM 上，不再需要時手動刪除。
-
-叢集唯一的節點，以及唯一執行控制平面的節點都不能移除。要移除伺服器時，先加入另一台伺服器。移除後剩不到三台伺服器時，視窗會提醒控制平面少一台就無法運作。
-
-移除後，在伺服器執行 `sudo zeabur-installer node sync`，把已移除節點的位址從基準網路政策拿掉。

@@ -764,9 +764,7 @@ paths:
     post:
       tags:
       - cluster
-      summary: |-
-        Carries out a plan by its token: patches `spec.unschedulable` and, for maintenance, makes the
-        first eviction pass.
+      summary: "Carries out a plan by its token: patches `spec.unschedulable`."
       operationId: applyNodeMaintenance
       parameters:
       - name: node
@@ -786,55 +784,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/DrainProgress"
-        "400":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/Problem"
-        "403":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/Problem"
-        "409":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/Problem"
-        "422":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/Problem"
-  "/api/v1/cluster/nodes/{node}/maintenance/evict":
-    post:
-      tags:
-      - cluster
-      summary: |-
-        Evicts the pods of a maintenance plan that are still on the node, once; the browser calls it
-        again while it waits. Accepted for an hour after the plan expires, while the node stays
-        cordoned.
-      operationId: evictNodePods
-      parameters:
-      - name: node
-        in: path
-        description: The node's name
-        required: true
-        schema:
-          type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/MaintenanceApply"
-        required: true
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/DrainProgress"
+                $ref: "#/components/schemas/MaintenanceApplied"
         "400":
           content:
             application/problem+json:
@@ -855,8 +805,8 @@ paths:
       tags:
       - cluster
       summary: |-
-        Works out what stopping scheduling, resuming it or maintenance does to the node and its pods,
-        and a token to apply it; writes nothing.
+        Works out what stopping or resuming scheduling does to the node, and a token to apply it;
+        writes nothing.
       operationId: planNodeMaintenance
       parameters:
       - name: node
@@ -5057,13 +5007,6 @@ components:
           items:
             $ref: "#/components/schemas/Capability"
           description: "Each capability, sorted by name: existing (with evidence) or not (with what to install)."
-    CapacityStatus:
-      type: string
-      description: Whether the other nodes have room for the pods that move.
-      enum:
-      - fits
-      - short
-      - unknown
     CertificateChange:
       type: object
       description: A [`Change::Certificate`].
@@ -8076,130 +8019,6 @@ components:
           items:
             $ref: "#/components/schemas/UnreadableView"
           description: What could not be read.
-    DrainCapacity:
-      type: object
-      description: The moving pods against the room on the other nodes.
-      required:
-      - status
-      - needs
-      - unplaced
-      properties:
-        needs:
-          $ref: "#/components/schemas/Resources"
-          description: What the moving pods request, with their count.
-        room:
-          oneOf:
-          - $ref: "#/components/schemas/Resources"
-            description: |-
-              What the other ready, schedulable nodes have left, with how many pods they take; absent
-              when unknown.
-          - type: "null"
-        status:
-          $ref: "#/components/schemas/CapacityStatus"
-          description: The verdict.
-        unplaced:
-          type: array
-          items:
-            type: string
-          description: The moving pods that fit on no node, as `namespace/name`.
-    DrainPod:
-      type: object
-      description: A pod on the node, and what maintenance does to it.
-      required:
-      - namespace
-      - name
-      - fate
-      - scratch
-      - localClaims
-      - budgetBlocks
-      - zeabur
-      - terminating
-      - requests
-      properties:
-        budget:
-          type:
-          - string
-          - "null"
-          description: The `PodDisruptionBudget` that covers it.
-        budgetBlocks:
-          type: boolean
-          description: |-
-            That budget allows fewer disruptions now than this node has pods under it, so some of
-            their evictions wait.
-        fate:
-          $ref: "#/components/schemas/PodFate"
-          description: What happens to it.
-        localClaims:
-          type: array
-          items:
-            type: string
-          description: Its claims bound to a volume kept on this node.
-        name:
-          type: string
-          description: Its name.
-        namespace:
-          type: string
-          description: Its namespace.
-        project:
-          type:
-          - string
-          - "null"
-          description: The project it is in, when its namespace is one.
-        projectName:
-          type:
-          - string
-          - "null"
-          description: The project's display name, when it has one.
-        requests:
-          $ref: "#/components/schemas/Resources"
-          description: What it requests.
-        scratch:
-          type: array
-          items:
-            type: string
-          description: Its `emptyDir` volumes, emptied when it is evicted.
-        stays:
-          oneOf:
-          - $ref: "#/components/schemas/StayReason"
-            description: Why it stays, when it does.
-          - type: "null"
-        terminating:
-          type: boolean
-          description: Already being deleted.
-        workload:
-          oneOf:
-          - $ref: "#/components/schemas/PodWorkload"
-            description: Its workload, when its controller says which.
-          - type: "null"
-        zeabur:
-          type: boolean
-          description: One of Zeabur's own pods.
-    DrainProgress:
-      type: object
-      description: The node after an apply or a pass.
-      required:
-      - cordoned
-      - pods
-      - remaining
-      - done
-      properties:
-        cordoned:
-          type: boolean
-          description: Whether the node is cordoned.
-        done:
-          type: boolean
-          description: None of them is left.
-        pods:
-          type: array
-          items:
-            $ref: "#/components/schemas/EvictedPod"
-          description: >-
-            The pods being evicted, in the plan's order; empty for stop and resume
-            scheduling.
-        remaining:
-          type: integer
-          description: How many of them are still on the node.
-          minimum: 0
     ElevationState:
       type: string
       description: Whether administrator rights are offered and in use.
@@ -8467,56 +8286,6 @@ components:
         type:
           type: string
           description: "`Normal` or `Warning`."
-    EvictOutcome:
-      type: string
-      description: What a pass found or did for one pod.
-      enum:
-      - gone
-      - leaving
-      - waiting
-      - refused
-      - failed
-      - last
-    EvictedPod:
-      type: object
-      description: One pod of a pass.
-      required:
-      - namespace
-      - name
-      - outcome
-      - zeabur
-      properties:
-        budget:
-          type:
-          - string
-          - "null"
-          description: The budget it waits on, when one was found.
-        detail:
-          type:
-          - string
-          - "null"
-          description: kube-apiserver's message, for a refusal or a failure.
-        name:
-          type: string
-          description: Its name.
-        namespace:
-          type: string
-          description: Its namespace.
-        outcome:
-          $ref: "#/components/schemas/EvictOutcome"
-          description: What happened.
-        retryAfterSeconds:
-          type:
-          - integer
-          - "null"
-          format: int32
-          description: How long kube-apiserver asked to wait before trying again.
-          minimum: 0
-        zeabur:
-          type: boolean
-          description: |-
-            One of Zeabur's own pods: once it is leaving, the passes after it fail until Zeabur is up
-            again on another node.
     EvidenceBundle:
       type: object
       description: A service's evidence, as Markdown.
@@ -10352,20 +10121,21 @@ components:
         origin:
           $ref: "#/components/schemas/Origin"
           description: The pod (and container, as `fieldPath`).
+    MaintenanceApplied:
+      type: object
+      description: The node after an apply.
+      required:
+      - cordoned
+      properties:
+        cordoned:
+          type: boolean
+          description: Whether the node is cordoned.
     MaintenanceApply:
       type: object
-      description: >-
-        The token of a plan, and what the person chose to evict besides the pods that
-        move.
+      description: The token of a plan.
       required:
       - token
       properties:
-        includeDeleted:
-          type: boolean
-          description: Also evict (delete) the pods without a controller.
-        includeStuck:
-          type: boolean
-          description: Also evict the pods whose volume is kept on this node.
         token:
           type: string
           description: The token `plan` returned.
@@ -10404,20 +10174,10 @@ components:
       - node
       - action
       - cordoned
-      - roles
-      - otherSchedulable
-      - zeaburHere
-      - pods
-      - unreadable
       properties:
         action:
           $ref: "#/components/schemas/NodeAction"
           description: The action.
-        capacity:
-          oneOf:
-          - $ref: "#/components/schemas/DrainCapacity"
-            description: Whether the moving pods fit elsewhere; maintenance only.
-          - type: "null"
         cordoned:
           type: boolean
           description: Whether the node is cordoned now.
@@ -10427,38 +10187,9 @@ components:
         node:
           type: string
           description: The node.
-        otherSchedulable:
-          type: integer
-          description: How many other nodes are ready and take new pods.
-          minimum: 0
-        pods:
-          type: array
-          items:
-            $ref: "#/components/schemas/DrainPod"
-          description: The pods on the node, those that move first, then by namespace and name.
-        removal:
-          oneOf:
-          - $ref: "#/components/schemas/NodeRemoval"
-            description: Whether the node can be removed; removing only.
-          - type: "null"
-        roles:
-          type: array
-          items:
-            type: string
-          description: Its roles (`control-plane`, `etcd`).
         token:
           type: string
           description: Send this to `apply` to carry out exactly this plan.
-        unreadable:
-          type: array
-          items:
-            $ref: "#/components/schemas/UnreadableView"
-          description: |-
-            Reads that were refused and what they leave unchecked (`persistentvolumes`,
-            `poddisruptionbudgets.policy`, `pods`).
-        zeaburHere:
-          type: boolean
-          description: Zeabur itself runs on this node.
     MaintenanceRequest:
       type: object
       description: The action to plan.
@@ -11174,8 +10905,6 @@ components:
       enum:
       - cordon
       - uncordon
-      - drain
-      - remove
     NodeCondition:
       type: object
       description: |-
@@ -11244,32 +10973,6 @@ components:
           type: integer
           description: Pods not yet placed on a node.
           minimum: 0
-    NodeRemoval:
-      type: object
-      description: Whether a node can be removed.
-      required:
-      - ready
-      - left
-      - otherServers
-      properties:
-        left:
-          type: integer
-          description: >-
-            Pods still on it that maintenance moves or deletes, those already leaving left
-            out.
-          minimum: 0
-        otherServers:
-          type: integer
-          description: Other nodes that run the control plane.
-          minimum: 0
-        ready:
-          type: boolean
-          description: The kubelet reports the node Ready.
-        refused:
-          oneOf:
-          - $ref: "#/components/schemas/RemovalRefusal"
-            description: Why apply refuses now; absent when it removes the node.
-          - type: "null"
     NodeShellApplied:
       type: object
       description: What an apply did.
@@ -13186,14 +12889,6 @@ components:
       description: |-
         How a planned write changes its object: a new object is created whole, an existing one is
         patched or deleted. Creations and patches go as the field manager `zeabur`.
-    PodFate:
-      type: string
-      description: What maintenance does to a pod.
-      enum:
-      - moves
-      - stays
-      - deleted
-      - stuck
     PodScan:
       type: string
       description: How much of the pods were read for the requests. An open set.
@@ -13304,19 +12999,6 @@ components:
         pod:
           type: string
           description: The pod.
-    PodWorkload:
-      type: object
-      description: The workload a pod belongs to, as the interface links it.
-      required:
-      - kind
-      - name
-      properties:
-        kind:
-          type: string
-          description: "`Deployment`, `StatefulSet`, `DaemonSet`, `Job`, or the controller's own kind."
-        name:
-          type: string
-          description: Its name.
     Port:
       allOf:
       - $ref: "#/components/schemas/ProtocolInference"
@@ -14672,13 +14354,6 @@ components:
         target:
           $ref: "#/components/schemas/ObjectName"
           description: The object.
-    RemovalRefusal:
-      type: string
-      description: Why a node cannot be removed now.
-      enum:
-      - lastNode
-      - lastServer
-      - notDrained
     Replicas:
       type: object
       description: Ready and desired replicas (per node for a DaemonSet, completions for a Job).
@@ -16364,12 +16039,6 @@ components:
       - completed
       - unknown
       - building
-    StayReason:
-      type: string
-      description: Why a pod stays.
-      enum:
-      - daemonSet
-      - static
     StorageClassView:
       type: object
       description: A `StorageClass`.

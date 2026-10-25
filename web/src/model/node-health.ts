@@ -83,7 +83,7 @@ export const isProblem = (issue: NodeIssue) =>
 
 /** A cordoned node, by what is still on it: replicas leaving, none left to move (maintenance), or
  * replicas that stay until someone moves them. Unknown when its pods cannot be read. */
-export function cordonedKind(node: NodeView): IssueKind {
+function cordonedKind(node: NodeView): IssueKind {
   if ((node.leavingPods ?? 0) > 0) return "draining"
   if (node.movablePods === 0) return "maintenance"
   return "cordoned"

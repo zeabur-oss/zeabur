@@ -549,32 +549,8 @@ export interface paths {
     }
     get?: never
     put?: never
-    /**
-     * Carries out a plan by its token: patches `spec.unschedulable` and, for maintenance, makes the
-     *     first eviction pass.
-     */
+    /** Carries out a plan by its token: patches `spec.unschedulable`. */
     post: operations["applyNodeMaintenance"]
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  "/api/v1/cluster/nodes/{node}/maintenance/evict": {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    get?: never
-    put?: never
-    /**
-     * Evicts the pods of a maintenance plan that are still on the node, once; the browser calls it
-     *     again while it waits. Accepted for an hour after the plan expires, while the node stays
-     *     cordoned.
-     */
-    post: operations["evictNodePods"]
     delete?: never
     options?: never
     head?: never
@@ -591,8 +567,8 @@ export interface paths {
     get?: never
     put?: never
     /**
-     * Works out what stopping scheduling, resuming it or maintenance does to the node and its pods,
-     *     and a token to apply it; writes nothing.
+     * Works out what stopping or resuming scheduling does to the node, and a token to apply it;
+     *     writes nothing.
      */
     post: operations["planNodeMaintenance"]
     delete?: never
@@ -2785,11 +2761,6 @@ export interface components {
       /** @description Each capability, sorted by name: existing (with evidence) or not (with what to install). */
       items: components["schemas"]["Capability"][]
     }
-    /**
-     * @description Whether the other nodes have room for the pods that move.
-     * @enum {string}
-     */
-    CapacityStatus: "fits" | "short" | "unknown"
     /** @description A [`Change::Certificate`]. */
     CertificateChange: {
       /** @description Where its certificate comes from. */
@@ -4241,59 +4212,6 @@ export interface components {
       /** @description What could not be read. */
       unreadable: components["schemas"]["UnreadableView"][]
     }
-    /** @description The moving pods against the room on the other nodes. */
-    DrainCapacity: {
-      /** @description What the moving pods request, with their count. */
-      needs: components["schemas"]["Resources"]
-      room?: components["schemas"]["Resources"] | null
-      /** @description The verdict. */
-      status: components["schemas"]["CapacityStatus"]
-      /** @description The moving pods that fit on no node, as `namespace/name`. */
-      unplaced: string[]
-    }
-    /** @description A pod on the node, and what maintenance does to it. */
-    DrainPod: {
-      /** @description The `PodDisruptionBudget` that covers it. */
-      budget?: string | null
-      /**
-       * @description That budget allows fewer disruptions now than this node has pods under it, so some of
-       *     their evictions wait.
-       */
-      budgetBlocks: boolean
-      /** @description What happens to it. */
-      fate: components["schemas"]["PodFate"]
-      /** @description Its claims bound to a volume kept on this node. */
-      localClaims: string[]
-      /** @description Its name. */
-      name: string
-      /** @description Its namespace. */
-      namespace: string
-      /** @description The project it is in, when its namespace is one. */
-      project?: string | null
-      /** @description The project's display name, when it has one. */
-      projectName?: string | null
-      /** @description What it requests. */
-      requests: components["schemas"]["Resources"]
-      /** @description Its `emptyDir` volumes, emptied when it is evicted. */
-      scratch: string[]
-      stays?: components["schemas"]["StayReason"] | null
-      /** @description Already being deleted. */
-      terminating: boolean
-      workload?: components["schemas"]["PodWorkload"] | null
-      /** @description One of Zeabur's own pods. */
-      zeabur: boolean
-    }
-    /** @description The node after an apply or a pass. */
-    DrainProgress: {
-      /** @description Whether the node is cordoned. */
-      cordoned: boolean
-      /** @description None of them is left. */
-      done: boolean
-      /** @description The pods being evicted, in the plan's order; empty for stop and resume scheduling. */
-      pods: components["schemas"]["EvictedPod"][]
-      /** @description How many of them are still on the node. */
-      remaining: number
-    }
     /**
      * @description Whether administrator rights are offered and in use.
      * @enum {string}
@@ -4430,34 +4348,6 @@ export interface components {
       reporter?: string | null
       /** @description `Normal` or `Warning`. */
       type: string
-    }
-    /**
-     * @description What a pass found or did for one pod.
-     * @enum {string}
-     */
-    EvictOutcome: "gone" | "leaving" | "waiting" | "refused" | "failed" | "last"
-    /** @description One pod of a pass. */
-    EvictedPod: {
-      /** @description The budget it waits on, when one was found. */
-      budget?: string | null
-      /** @description kube-apiserver's message, for a refusal or a failure. */
-      detail?: string | null
-      /** @description Its name. */
-      name: string
-      /** @description Its namespace. */
-      namespace: string
-      /** @description What happened. */
-      outcome: components["schemas"]["EvictOutcome"]
-      /**
-       * Format: int32
-       * @description How long kube-apiserver asked to wait before trying again.
-       */
-      retryAfterSeconds?: number | null
-      /**
-       * @description One of Zeabur's own pods: once it is leaving, the passes after it fail until Zeabur is up
-       *     again on another node.
-       */
-      zeabur: boolean
     }
     /** @description A service's evidence, as Markdown. */
     EvidenceBundle: {
@@ -5449,12 +5339,13 @@ export interface components {
       /** @description The pod (and container, as `fieldPath`). */
       origin: components["schemas"]["Origin"]
     }
-    /** @description The token of a plan, and what the person chose to evict besides the pods that move. */
+    /** @description The node after an apply. */
+    MaintenanceApplied: {
+      /** @description Whether the node is cordoned. */
+      cordoned: boolean
+    }
+    /** @description The token of a plan. */
     MaintenanceApply: {
-      /** @description Also evict (delete) the pods without a controller. */
-      includeDeleted?: boolean
-      /** @description Also evict the pods whose volume is kept on this node. */
-      includeStuck?: boolean
       /** @description The token `plan` returned. */
       token: string
     }
@@ -5472,29 +5363,14 @@ export interface components {
     MaintenancePlan: {
       /** @description The action. */
       action: components["schemas"]["NodeAction"]
-      capacity?: components["schemas"]["DrainCapacity"] | null
       /** @description Whether the node is cordoned now. */
       cordoned: boolean
       /** @description When the token stops working, RFC 3339. */
       expiresAt: string
       /** @description The node. */
       node: string
-      /** @description How many other nodes are ready and take new pods. */
-      otherSchedulable: number
-      /** @description The pods on the node, those that move first, then by namespace and name. */
-      pods: components["schemas"]["DrainPod"][]
-      removal?: components["schemas"]["NodeRemoval"] | null
-      /** @description Its roles (`control-plane`, `etcd`). */
-      roles: string[]
       /** @description Send this to `apply` to carry out exactly this plan. */
       token: string
-      /**
-       * @description Reads that were refused and what they leave unchecked (`persistentvolumes`,
-       *     `poddisruptionbudgets.policy`, `pods`).
-       */
-      unreadable: components["schemas"]["UnreadableView"][]
-      /** @description Zeabur itself runs on this node. */
-      zeaburHere: boolean
     }
     /** @description The action to plan. */
     MaintenanceRequest: {
@@ -5864,7 +5740,7 @@ export interface components {
      * @description What a plan changes on a node.
      * @enum {string}
      */
-    NodeAction: "cordon" | "uncordon" | "drain" | "remove"
+    NodeAction: "cordon" | "uncordon"
     /**
      * @description A node condition that is not as it should be: `Ready` not `True`, or a pressure that is
      *     `True`.
@@ -5897,16 +5773,6 @@ export interface components {
       unreadable: components["schemas"]["UnreadableView"][]
       /** @description Pods not yet placed on a node. */
       unscheduledPods: number
-    }
-    /** @description Whether a node can be removed. */
-    NodeRemoval: {
-      /** @description Pods still on it that maintenance moves or deletes, those already leaving left out. */
-      left: number
-      /** @description Other nodes that run the control plane. */
-      otherServers: number
-      /** @description The kubelet reports the node Ready. */
-      ready: boolean
-      refused?: components["schemas"]["RemovalRefusal"] | null
     }
     /** @description What an apply did. */
     NodeShellApplied: {
@@ -6815,11 +6681,6 @@ export interface components {
           type: "ephemeralContainers"
         }
     /**
-     * @description What maintenance does to a pod.
-     * @enum {string}
-     */
-    PodFate: "moves" | "stays" | "deleted" | "stuck"
-    /**
      * @description How much of the pods were read for the requests. An open set.
      * @enum {string}
      */
@@ -6884,13 +6745,6 @@ export interface components {
       origin: components["schemas"]["Origin"]
       /** @description The pod. */
       pod: string
-    }
-    /** @description The workload a pod belongs to, as the interface links it. */
-    PodWorkload: {
-      /** @description `Deployment`, `StatefulSet`, `DaemonSet`, `Job`, or the controller's own kind. */
-      kind: string
-      /** @description Its name. */
-      name: string
     }
     /** @description One port of a Kubernetes Service. */
     Port: components["schemas"]["ProtocolInference"] & {
@@ -7581,11 +7435,6 @@ export interface components {
       /** @description The object. */
       target: components["schemas"]["ObjectName"]
     }
-    /**
-     * @description Why a node cannot be removed now.
-     * @enum {string}
-     */
-    RemovalRefusal: "lastNode" | "lastServer" | "notDrained"
     /** @description Ready and desired replicas (per node for a DaemonSet, completions for a Job). */
     Replicas: {
       /**
@@ -8504,11 +8353,6 @@ export interface components {
       | "completed"
       | "unknown"
       | "building"
-    /**
-     * @description Why a pod stays.
-     * @enum {string}
-     */
-    StayReason: "daemonSet" | "static"
     /** @description A `StorageClass`. */
     StorageClassView: {
       /** @description `allowVolumeExpansion`: its claims may grow. */
@@ -10386,65 +10230,7 @@ export interface operations {
           [name: string]: unknown
         }
         content: {
-          "application/json": components["schemas"]["DrainProgress"]
-        }
-      }
-      400: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          "application/problem+json": components["schemas"]["Problem"]
-        }
-      }
-      403: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          "application/problem+json": components["schemas"]["Problem"]
-        }
-      }
-      409: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          "application/problem+json": components["schemas"]["Problem"]
-        }
-      }
-      422: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          "application/problem+json": components["schemas"]["Problem"]
-        }
-      }
-    }
-  }
-  evictNodePods: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        /** @description The node's name */
-        node: string
-      }
-      cookie?: never
-    }
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["MaintenanceApply"]
-      }
-    }
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          "application/json": components["schemas"]["DrainProgress"]
+          "application/json": components["schemas"]["MaintenanceApplied"]
         }
       }
       400: {

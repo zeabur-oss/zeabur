@@ -393,7 +393,7 @@ export async function applyNotifications(project: string | undefined, token: str
   )
 }
 
-/** What stopping scheduling, resuming it or maintenance does to a node's pods; writes nothing. */
+/** What stopping or resuming scheduling does to a node; writes nothing. */
 export async function planNodeMaintenance(
   node: string,
   action: Schemas["NodeAction"],
@@ -411,16 +411,6 @@ export async function planNodeMaintenance(
 export async function applyNodeMaintenance(node: string, body: Schemas["MaintenanceApply"]) {
   return unwrap(
     await api.POST("/api/v1/cluster/nodes/{node}/maintenance/apply", {
-      params: { path: { node } },
-      body,
-    }),
-  )
-}
-
-/** One more eviction pass of a maintenance plan. */
-export async function evictNodePods(node: string, body: Schemas["MaintenanceApply"]) {
-  return unwrap(
-    await api.POST("/api/v1/cluster/nodes/{node}/maintenance/evict", {
       params: { path: { node } },
       body,
     }),

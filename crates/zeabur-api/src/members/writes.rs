@@ -98,9 +98,7 @@ async fn send(
     let verb = match &body {
         WriteBody::Create(_) => "create",
         WriteBody::Delete(_) => "delete",
-        WriteBody::JsonPatch(_) | WriteBody::EphemeralContainers(_) | WriteBody::Evict(_) => {
-            "patch"
-        }
+        WriteBody::JsonPatch(_) | WriteBody::EphemeralContainers(_) => "patch",
     };
     let write = WriteRequest {
         target: target(kind, namespace, name),

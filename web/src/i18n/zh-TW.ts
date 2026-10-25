@@ -320,8 +320,8 @@ export const zhTW: Messages = {
   "node.cordoned.why": "新的副本不會放到上面，執行中的會留著。",
   "node.cordoned.fix": (n, node) =>
     n === 1
-      ? `在 ${node} 那一列選「繼續維護」，移走剩下的副本。維護完成後，再從它的選單恢復排程。`
-      : "在每個節點那一列選「繼續維護」，移走剩下的副本。維護完成後，再從各節點的選單恢復排程。",
+      ? `要移走剩下的副本，在叢集的 kubectl 終端機執行 kubectl drain ${node}。維護完成後，再從它的選單恢復排程。`
+      : "要移走剩下的副本，在叢集的 kubectl 終端機對每個節點執行 kubectl drain。維護完成後，再從各節點的選單恢復排程。",
   "node.reservedMemory": (n, node, share) =>
     n === 1 ? `${node}：記憶體已保留 ${share}` : `${n} 個節點的記憶體快被保留完了`,
   "node.reservedMemory.why": "要求記憶體的新副本可能要等到有空間。",
@@ -374,7 +374,7 @@ export const zhTW: Messages = {
   "node.maintenance.fix": "維護完成後，從節點選單恢復排程。",
   "node.draining": (n, node) => (n === 1 ? `正在把副本移出 ${node}` : `正在把副本移出 ${n} 個節點`),
   "node.draining.why": "這些副本會在其他節點重新啟動。",
-  "node.draining.fix": "維護視窗開著時才會移動副本。在節點那一列選「繼續維護」就能繼續移動。",
+  "node.draining.fix": "kubectl drain 執行時副本會一直移動。如果它中斷了，再執行一次。",
   "cluster.cores": (n) => `${n} 核`,
   "cluster.requestedOf": (requested, allocatable) => `已保留 ${requested}/${allocatable}`,
   "cluster.allocatable": (allocatable) => `可分配 ${allocatable}`,
@@ -458,95 +458,12 @@ export const zhTW: Messages = {
   "clusterUsage.whatProjects": "哪些 Namespace 是專案",
   "maint.actions": (node) => `${node} 的操作`,
   "maint.cordon": "停止排程",
-  "maint.drain": "維護模式",
-  "maint.continue": "繼續維護",
   "maint.uncordon": "恢復排程",
   "maint.title.cordon": (node) => `停止 ${node} 的排程`,
-  "maint.title.drain": (node) => `讓 ${node} 進入維護模式`,
   "maint.title.uncordon": (node) => `恢復 ${node} 的排程`,
   "maint.lead.cordon": (node) => `新的副本不會再放到 ${node}，上面正在執行的副本會繼續執行。`,
   "maint.lead.uncordon": (node) => `${node} 會再開始接收新的副本。`,
-  "maint.lead.drain": (node, n) =>
-    n === 0
-      ? `${node} 會停止排程，上面沒有需要移走的副本。`
-      : `${node} 會停止排程，再把 ${n} 個副本移到其他節點。`,
-  "maint.lead.continue": (node, n) =>
-    n === 0 ? `${node} 上已經沒有要移走的副本。` : `${node} 上還有 ${n} 個副本，會移到其他節點。`,
-  "maint.amounts": (cpu, memory) => `${cpu} CPU 和 ${memory} 記憶體`,
-  "maint.fits": (needs, room) => `其他節點放得下：這些副本要求 ${needs}，目前可用的還有 ${room}。`,
-  "maint.short": (n) => `其他節點放不下其中 ${n} 個副本，要等到有空間或加了節點才會啟動。`,
-  "maint.shortDetail": (needs, room) => `它們要求 ${needs}，其他節點只剩 ${room}。`,
-  "maint.unknownRoom": "Zeabur 沒辦法讀取所有 Pod，所以無法確認其他節點放不放得下。",
-  "maint.noOther": "沒有其他節點能放新的副本，移走的副本會一直等到有節點可用。",
-  "maint.controlPlane": (node) =>
-    `${node} 執行叢集的控制平面。控制平面的元件會留在上面，但這個節點停機時，叢集可能沒有回應。`,
-  "maint.zeabur":
-    "Zeabur 本身也在這個節點上，會等其他副本都移走後才移走。到時會自動重新登入，但管理員權限要再開一次。",
-  "maint.moves": (n) => `移到其他節點（${n}）`,
-  "maint.scratch": (n) => `其中 ${n} 個副本的暫存空間會清空。`,
-  "maint.lose": "暫存空間會清空",
-  "maint.budget": (name) => `受 PodDisruptionBudget ${name} 限制，可能要等一下`,
-  "maint.stuck": (n) => `無法移走（${n}）`,
-  "maint.stuck.why": (node) =>
-    `它們的資料只放在 ${node} 上，換到其他節點會讀不到，只能等 ${node} 回來。`,
-  "maint.stuck.include": (node) => `還是要移走，${node} 回來前這些副本都無法使用`,
-  "maint.deleted": (n) => `不屬於任何服務（${n}）`,
-  "maint.deleted.why": "它們不會在其他地方重新啟動，移走就等於永久刪除。",
-  "maint.deleted.confirm": "刪除它們",
-  "maint.stays": (n) => `留在節點上（${n}）`,
-  "maint.stays.why": "每個節點都會執行一份，或是由節點自己的檔案啟動。",
-  "maint.reason.daemonSet": "每個節點都有",
-  "maint.reason.static": "由節點啟動",
   "maint.kube.command": "指令",
-  "maint.kube.budgets": "PodDisruptionBudget",
-  "maint.progress": (node, left, total) =>
-    `正在把副本移出 ${node}，還剩 ${left} 個（共 ${total} 個）。`,
-  "maint.done": (node, kept) =>
-    kept === 0
-      ? `${node} 已進入維護，副本都移走了。`
-      : `${node} 已進入維護。有 ${kept} 個副本的資料只在 ${node} 上，所以留在原地。`,
-  "maint.stopped": "有些副本移不走。",
-  "maint.zeaburMoving": (node) =>
-    `Zeabur 本身正在移出 ${node}，這個頁面會斷線一分鐘左右。之後重新整理頁面，再開一次管理員權限。`,
-  "maint.outcome.waiting": (budget) =>
-    budget ? `等待 PodDisruptionBudget ${budget} 放行` : "等待 PodDisruptionBudget 放行",
-  "maint.outcome.refused": "你沒有權限移走它",
-  "maint.outcome.failed": "移不走",
-  "maint.outcome.last": "Zeabur 本身，等其他副本移走後再移",
-  "maint.leaveNote":
-    "可以先關掉這個視窗。節點會維持停止排程，要移走剩下的副本時，再打開維護模式就好。",
-  "maint.retry": "再試一次",
-  "maint.leave.title": "要停止移動副本嗎？",
-  "maint.leave.body": (node) =>
-    `只有這個視窗開著時，副本才會從 ${node} 移走。如果離開，${node} 會維持停止排程，剩下的副本會留在上面，直到你繼續維護。`,
-  "maint.leave.stay": "繼續移動",
-  "maint.leave.leave": "離開",
-  "maint.unreadable":
-    "有些資料無法讀取，這裡可能漏算了 PodDisruptionBudget，或只存在這個節點上的磁碟區。",
-  "maint.remove": "移除節點",
-  "maint.removeNext": "移除節點",
-  "maint.title.remove": (node) => `移除 ${node}`,
-  "maint.lead.remove": (node) =>
-    `${node} 會離開叢集。機器本身會繼續執行，直到你在上面解除安裝 RKE2。`,
-  "maint.removal.lastNode": (node) =>
-    `${node} 是叢集唯一的節點。如果要拆掉整個叢集，請在機器上解除安裝 RKE2。`,
-  "maint.removal.lastServer": (node) => `${node} 是唯一執行控制平面的節點。請先加入另一台伺服器。`,
-  "maint.removal.notDrained": (node) =>
-    `請先讓 ${node} 進入維護模式，把副本移到其他節點，再移除它。`,
-  "maint.removal.drainFirst": "開始維護",
-  "maint.removal.down": (node, n) =>
-    `${node} 沒有就緒，上面還有 ${n} 個副本。Kubernetes 會跟著節點刪掉它們，它們的服務會在其他節點重新啟動。`,
-  "maint.removal.lose": (n, node) =>
-    `有 ${n} 個副本把資料放在 ${node} 的磁碟區，這些資料會跟著節點一起消失。`,
-  "maint.removal.loseConfirm": "連同節點刪除這些資料",
-  "maint.removal.servers": (n) =>
-    `移除後剩 ${n} 台伺服器執行控制平面。要有三台以上，少一台時控制平面才能繼續運作。`,
-  "maint.removed": (node) => `${node} 已從叢集移除。`,
-  "maint.removed.run": (node) =>
-    `在 ${node} 上執行這些指令，解除安裝 RKE2 和安裝程式的檔案。執行之前，RKE2 一重新啟動，它就會再加入叢集。`,
-  "maint.removed.commands": (node) => `要在 ${node} 上執行的指令`,
-  "maint.removed.volumes":
-    "/var/lib/zeabur/storage 底下的磁碟區會留在機器上，不再需要時請手動刪除。",
 
   "projects.title": "專案",
   "projects.adopted": "專案",

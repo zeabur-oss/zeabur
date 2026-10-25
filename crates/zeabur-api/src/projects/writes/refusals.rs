@@ -175,7 +175,6 @@ pub(super) fn denied(write: &WriteRequest) -> Denied {
             ("patch", Some(target.name.clone()), "/ephemeralcontainers")
         }
         WriteBody::Delete(_) => ("delete", Some(target.name.clone()), ""),
-        WriteBody::Evict(_) => ("create", Some(target.name.clone()), "/eviction"),
     };
     Denied {
         verb: verb.to_owned(),

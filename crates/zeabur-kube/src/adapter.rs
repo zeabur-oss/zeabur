@@ -722,17 +722,6 @@ impl Cluster for UserClient {
         Box::pin(async move { wide::cluster_events(self.kube(), limit).await })
     }
 
-    fn node_pods<'a>(&'a self, node: &'a str) -> Answer<'a, Vec<Pod>> {
-        Box::pin(async move {
-            names::name(node)?;
-            let params = ListParams::default().fields(&format!("spec.nodeName={node}"));
-            Ok(Api::<Pod>::all(self.kube().clone())
-                .list(&params)
-                .await?
-                .items)
-        })
-    }
-
     fn serves<'a>(&'a self, group_version: &'a str) -> Answer<'a, Option<bool>> {
         Box::pin(async move { wide::serves(self.kube(), group_version).await })
     }
