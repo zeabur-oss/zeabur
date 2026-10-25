@@ -1358,7 +1358,12 @@ mod tests {
 
     #[test]
     fn standard_follows_the_catalog_and_leaves_out_k3s_only_components() {
-        let index = Index::parse(INDEX.as_bytes()).unwrap();
+        let mut index = Index::parse(INDEX.as_bytes()).unwrap();
+        for component in &mut index.components {
+            if component.id == "node-updates/system-upgrade-controller" {
+                component.distributions = vec!["k3s".to_owned()];
+            }
+        }
         let plan = plan(&index, &config(""), &facts()).unwrap();
         assert_eq!(
             ids(&plan),

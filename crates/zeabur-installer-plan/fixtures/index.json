@@ -80,42 +80,12 @@
   },
   "components": [
     {
-      "id": "certificates/cert-manager",
       "apiVersion": "catalog.zeabur.com/v1",
-      "kind": "Component",
       "capability": "certificates",
-      "metadata": {
-        "name": "cert-manager",
-        "description": "cert-manager is the standard Kubernetes certificate controller (CNCF graduated). Its issuers live in the cluster, so it renews certificates itself.\n",
-        "license": "Apache-2.0",
-        "homepage": "https://cert-manager.io"
-      },
-      "maturity": "cncf-graduated",
       "defaults": {
         "multi-node": "recommended",
         "single-node": "recommended"
       },
-      "requires": [
-        "ingress"
-      ],
-      "releases": [
-        {
-          "name": "cert-manager",
-          "namespace": "cert-manager",
-          "chart": "oci://quay.io/jetstack/charts/cert-manager",
-          "version": "v1.21.2",
-          "values": "crds:\n  # Upgrade CRDs with the chart, whatever the installer.\n  enabled: true\n  # Keep CRDs on uninstall; deleting them deletes every Certificate.\n  keep: true\nenableCertificateOwnerRef: true # Delete the TLS Secret with its Certificate.\nconfig:\n  # Typed controller config for the setting below.\n  apiVersion: controller.config.cert-manager.io/v1alpha1\n  kind: ControllerConfiguration\n  # Issue certificates for Gateway listeners.\n  enableGatewayAPI: true\n",
-          "profiles": {
-            "multi-node": "# Two replicas; leader election keeps one active.\nreplicaCount: 2\npodDisruptionBudget:\n  # Keep a controller during drains.\n  enabled: true\nwebhook:\n  # Gates every cert-manager write; stay available during drains.\n  replicaCount: 2\n  podDisruptionBudget:\n    enabled: true\ncainjector:\n  # Same reason as the controller.\n  replicaCount: 2\n  podDisruptionBudget:\n    enabled: true\n",
-            "single-node": "prometheus:\n  # Metrics on the pod port; no Prometheus operator assumed.\n  enabled: true\n  servicemonitor:\n    enabled: false\n# Idles at 20-40Mi; small requests fit a 2 GB node.\nresources:\n  requests: {cpu: 10m, memory: 32Mi}\n  limits: {memory: 128Mi}\nwebhook:\n  # Same sizing as the controller.\n  resources:\n    requests: {cpu: 10m, memory: 24Mi}\n    limits: {memory: 64Mi}\ncainjector:\n  # Caches watched Secrets; the limit bounds it.\n  resources:\n    requests: {cpu: 10m, memory: 32Mi}\n    limits: {memory: 128Mi}\nstartupapicheck:\n  # Short-lived post-install Job.\n  resources:\n    requests: {cpu: 10m, memory: 16Mi}\n    limits: {memory: 64Mi}\n"
-          }
-        },
-        {
-          "name": "issuers",
-          "namespace": "cert-manager",
-          "manifests": "# Try here first; production rate limits are far lower. Staging\n# certificates are not trusted by browsers.\napiVersion: cert-manager.io/v1\nkind: ClusterIssuer\nmetadata:\n  name: letsencrypt-staging\nspec:\n  acme:\n    server: https://acme-staging-v02.api.letsencrypt.org/directory\n    # No email: ACME accounts need no contact, and Let's Encrypt sends\n    # no expiry emails since 2025. Setting spec.acme.email later updates\n    # the registered account.\n    # Account key, created by cert-manager in its own namespace.\n    privateKeySecretRef:\n      name: letsencrypt-staging-account-key\n    solvers:\n      # HTTP-01 through Traefik's Ingress support; needs no Gateway, and\n      # also answers for names served by Gateway listeners. The name\n      # must reach port 80 of the cluster from the internet.\n      - http01:\n          ingress:\n            ingressClassName: traefik\n---\n# Trusted certificates; same settings as staging.\napiVersion: cert-manager.io/v1\nkind: ClusterIssuer\nmetadata:\n  name: letsencrypt\nspec:\n  acme:\n    server: https://acme-v02.api.letsencrypt.org/directory\n    privateKeySecretRef:\n      name: letsencrypt-account-key\n    solvers:\n      - http01:\n          ingress:\n            ingressClassName: traefik\n"
-        }
-      ],
       "detection": {
         "crds": [
           "certificates.cert-manager.io",
@@ -133,6 +103,85 @@
           }
         ]
       },
+      "id": "certificates/cert-manager",
+      "installOrder": {
+        "multi-node": [
+          "ingress/traefik",
+          "certificates/cert-manager"
+        ],
+        "single-node": [
+          "ingress/traefik",
+          "certificates/cert-manager"
+        ]
+      },
+      "kind": "Component",
+      "leftovers": [
+        "customresourcedefinitions",
+        "secrets/letsencrypt-staging-account-key",
+        "secrets/letsencrypt-account-key"
+      ],
+      "maturity": "cncf-graduated",
+      "measured": {
+        "multi-node-amd64-v1.36.4": {
+          "idleCPUm": 2,
+          "idleMemoryMiB": 88,
+          "measuredAt": "2026-10-11",
+          "versions": {
+            "cert-manager": "v1.21.2"
+          }
+        },
+        "multi-node-arm64-v1.36.4": {
+          "idleCPUm": 2,
+          "idleMemoryMiB": 92,
+          "measuredAt": "2026-10-11",
+          "versions": {
+            "cert-manager": "v1.21.2"
+          }
+        },
+        "single-node-amd64-v1.36.4": {
+          "idleCPUm": 1,
+          "idleMemoryMiB": 51,
+          "measuredAt": "2026-10-11",
+          "versions": {
+            "cert-manager": "v1.21.2"
+          }
+        },
+        "single-node-arm64-v1.36.4": {
+          "idleCPUm": 1,
+          "idleMemoryMiB": 50,
+          "measuredAt": "2026-10-13",
+          "versions": {
+            "cert-manager": "v1.21.2"
+          }
+        }
+      },
+      "metadata": {
+        "description": "cert-manager is the standard Kubernetes certificate controller (CNCF graduated). Its issuers live in the cluster, so it renews certificates itself.\n",
+        "homepage": "https://cert-manager.io",
+        "license": "Apache-2.0",
+        "name": "cert-manager"
+      },
+      "releases": [
+        {
+          "chart": "oci://quay.io/jetstack/charts/cert-manager",
+          "name": "cert-manager",
+          "namespace": "cert-manager",
+          "profiles": {
+            "multi-node": "# Two replicas; leader election keeps one active.\nreplicaCount: 2\npodDisruptionBudget:\n  # Keep a controller during drains.\n  enabled: true\nwebhook:\n  # Gates every cert-manager write; stay available during drains.\n  replicaCount: 2\n  podDisruptionBudget:\n    enabled: true\ncainjector:\n  # Same reason as the controller.\n  replicaCount: 2\n  podDisruptionBudget:\n    enabled: true\n",
+            "single-node": "prometheus:\n  # Metrics on the pod port; no Prometheus operator assumed.\n  enabled: true\n  servicemonitor:\n    enabled: false\n# Idles at 20-40Mi; small requests fit a 2 GB node.\nresources:\n  requests: {cpu: 10m, memory: 32Mi}\n  limits: {memory: 128Mi}\nwebhook:\n  # Same sizing as the controller.\n  resources:\n    requests: {cpu: 10m, memory: 24Mi}\n    limits: {memory: 64Mi}\ncainjector:\n  # Caches watched Secrets; the limit bounds it.\n  resources:\n    requests: {cpu: 10m, memory: 32Mi}\n    limits: {memory: 128Mi}\nstartupapicheck:\n  # Short-lived post-install Job.\n  resources:\n    requests: {cpu: 10m, memory: 16Mi}\n    limits: {memory: 64Mi}\n"
+          },
+          "values": "crds:\n  # Upgrade CRDs with the chart, whatever the installer.\n  enabled: true\n  # Keep CRDs on uninstall; deleting them deletes every Certificate.\n  keep: true\nenableCertificateOwnerRef: true # Delete the TLS Secret with its Certificate.\nconfig:\n  # Typed controller config for the setting below.\n  apiVersion: controller.config.cert-manager.io/v1alpha1\n  kind: ControllerConfiguration\n  # Issue certificates for Gateway listeners.\n  enableGatewayAPI: true\n",
+          "version": "v1.21.3"
+        },
+        {
+          "manifests": "# Try here first; production rate limits are far lower. Staging\n# certificates are not trusted by browsers.\napiVersion: cert-manager.io/v1\nkind: ClusterIssuer\nmetadata:\n  name: letsencrypt-staging\nspec:\n  acme:\n    server: https://acme-staging-v02.api.letsencrypt.org/directory\n    # No email: ACME accounts need no contact, and Let's Encrypt sends\n    # no expiry emails since 2025. Setting spec.acme.email later updates\n    # the registered account.\n    # Account key, created by cert-manager in its own namespace.\n    privateKeySecretRef:\n      name: letsencrypt-staging-account-key\n    solvers:\n      # HTTP-01 through Traefik's Ingress support; needs no Gateway, and\n      # also answers for names served by Gateway listeners. The name\n      # must reach port 80 of the cluster from the internet.\n      - http01:\n          ingress:\n            ingressClassName: traefik\n---\n# Trusted certificates; same settings as staging.\napiVersion: cert-manager.io/v1\nkind: ClusterIssuer\nmetadata:\n  name: letsencrypt\nspec:\n  acme:\n    server: https://acme-v02.api.letsencrypt.org/directory\n    privateKeySecretRef:\n      name: letsencrypt-account-key\n    solvers:\n      - http01:\n          ingress:\n            ingressClassName: traefik\n",
+          "name": "issuers",
+          "namespace": "cert-manager"
+        }
+      ],
+      "requires": [
+        "ingress"
+      ],
       "security": {
         "clusterWide": true,
         "credentials": "optional",
@@ -160,8 +209,8 @@
       },
       "smoke": [
         {
-          "name": "self-signed-certificate",
           "manifest": "apiVersion: cert-manager.io/v1\nkind: Issuer\nmetadata: {name: smoke, namespace: catalog-smoke}\nspec: {selfSigned: {}}\n---\napiVersion: cert-manager.io/v1\nkind: Certificate\nmetadata: {name: smoke, namespace: catalog-smoke}\nspec:\n  secretName: smoke-tls\n  dnsNames: [smoke.example.test]\n  issuerRef: {kind: Issuer, name: smoke}\n",
+          "name": "self-signed-certificate",
           "wait": [
             "-n catalog-smoke certificate/smoke --for=condition=Ready"
           ]
@@ -173,87 +222,15 @@
             "clusterissuer/letsencrypt --for=condition=Ready"
           ]
         }
-      ],
-      "leftovers": [
-        "customresourcedefinitions",
-        "secrets/letsencrypt-staging-account-key",
-        "secrets/letsencrypt-account-key"
-      ],
-      "installOrder": {
-        "multi-node": [
-          "ingress/traefik",
-          "certificates/cert-manager"
-        ],
-        "single-node": [
-          "ingress/traefik",
-          "certificates/cert-manager"
-        ]
-      },
-      "measured": {
-        "multi-node-amd64-v1.36.4": {
-          "idleMemoryMiB": 88,
-          "idleCPUm": 2,
-          "versions": {
-            "cert-manager": "v1.21.2"
-          },
-          "measuredAt": "2026-10-11"
-        },
-        "multi-node-arm64-v1.36.4": {
-          "idleMemoryMiB": 92,
-          "idleCPUm": 2,
-          "versions": {
-            "cert-manager": "v1.21.2"
-          },
-          "measuredAt": "2026-10-11"
-        },
-        "single-node-amd64-v1.36.4": {
-          "idleMemoryMiB": 51,
-          "idleCPUm": 1,
-          "versions": {
-            "cert-manager": "v1.21.2"
-          },
-          "measuredAt": "2026-10-11"
-        },
-        "single-node-arm64-v1.36.4": {
-          "idleMemoryMiB": 50,
-          "idleCPUm": 1,
-          "versions": {
-            "cert-manager": "v1.21.2"
-          },
-          "measuredAt": "2026-10-13"
-        }
-      }
+      ]
     },
     {
-      "id": "config-reload/reloader",
       "apiVersion": "catalog.zeabur.com/v1",
-      "kind": "Component",
       "capability": "config-reload",
-      "metadata": {
-        "name": "Stakater Reloader",
-        "description": "Rolls Deployments, StatefulSets and DaemonSets when a ConfigMap or Secret they use changes, whoever changed it. Optional: only workloads that opt in with an annotation restart.\n",
-        "license": "Apache-2.0",
-        "homepage": "https://github.com/stakater/Reloader"
-      },
-      "maturity": "independent",
       "defaults": {
         "multi-node": "optional",
         "single-node": "optional"
       },
-      "releases": [
-        {
-          "name": "reloader",
-          "namespace": "reloader",
-          "chart": "reloader",
-          "repo": "https://stakater.github.io/stakater-charts",
-          "version": "2.2.18",
-          "values": "reloader:\n  # Only workloads annotated reloader.stakater.com/auto or */reload restart.\n  autoReloadAll: false\n  # Marks the pod template with an annotation instead of adding an\n  # environment variable, which the upstream README prefers for Flux and Argo CD.\n  reloadStrategy: annotations\n  # Leave Jobs alone and never create Jobs from CronJobs; this also drops\n  # the chart's batch RBAC rules.\n  ignoreJobs: true\n  ignoreCronJobs: true\n  # Tenants opt in per workload; a namespace list would differ per cluster.\n  watchGlobally: true\n",
-          "profiles": {
-            "multi-node": "reloader:\n  # Leader election, so a standby takes over when the leader's node\n  # drains. A change made before it holds the Lease (up to 15s) is\n  # missed: syncAfterRestart would cover it by rolling every tracked\n  # workload on each handoff, so it stays off.\n  enableHA: true\n  deployment:\n    # One leader and one standby.\n    replicas: 2\n    resources:\n      # More ConfigMaps and Secrets to cache.\n      requests: {cpu: 20m, memory: 128Mi}\n      limits: {memory: 512Mi}\n",
-            "single-node": "reloader:\n  deployment:\n    resources:\n      # Caches every ConfigMap and Secret; grows with their count.\n      requests: {cpu: 10m, memory: 64Mi}\n      limits: {memory: 256Mi}\n"
-          }
-        }
-      ],
       "detection": {
         "helmCharts": [
           "reloader"
@@ -267,6 +244,40 @@
           }
         ]
       },
+      "id": "config-reload/reloader",
+      "installOrder": {
+        "multi-node": [
+          "config-reload/reloader"
+        ],
+        "single-node": [
+          "config-reload/reloader"
+        ]
+      },
+      "kind": "Component",
+      "leftovers": [
+        "configmaps/reloader-meta-info"
+      ],
+      "maturity": "independent",
+      "metadata": {
+        "description": "Rolls Deployments, StatefulSets and DaemonSets when a ConfigMap or Secret they use changes, whoever changed it. Optional: only workloads that opt in with an annotation restart.\n",
+        "homepage": "https://github.com/stakater/Reloader",
+        "license": "Apache-2.0",
+        "name": "Stakater Reloader"
+      },
+      "releases": [
+        {
+          "chart": "reloader",
+          "name": "reloader",
+          "namespace": "reloader",
+          "profiles": {
+            "multi-node": "reloader:\n  # Leader election, so a standby takes over when the leader's node\n  # drains. A change made before it holds the Lease (up to 15s) is\n  # missed: syncAfterRestart would cover it by rolling every tracked\n  # workload on each handoff, so it stays off.\n  enableHA: true\n  deployment:\n    # One leader and one standby.\n    replicas: 2\n    resources:\n      # More ConfigMaps and Secrets to cache.\n      requests: {cpu: 20m, memory: 128Mi}\n      limits: {memory: 512Mi}\n",
+            "single-node": "reloader:\n  deployment:\n    resources:\n      # Caches every ConfigMap and Secret; grows with their count.\n      requests: {cpu: 10m, memory: 64Mi}\n      limits: {memory: 256Mi}\n"
+          },
+          "repo": "https://stakater.github.io/stakater-charts",
+          "values": "reloader:\n  # Only workloads annotated reloader.stakater.com/auto or */reload restart.\n  autoReloadAll: false\n  # Marks the pod template with an annotation instead of adding an\n  # environment variable, which the upstream README prefers for Flux and Argo CD.\n  reloadStrategy: annotations\n  # Leave Jobs alone and never create Jobs from CronJobs; this also drops\n  # the chart's batch RBAC rules.\n  ignoreJobs: true\n  ignoreCronJobs: true\n  # Tenants opt in per workload; a namespace list would differ per cluster.\n  watchGlobally: true\n",
+          "version": "2.2.18"
+        }
+      ],
       "security": {
         "clusterWide": true,
         "risks": [
@@ -284,63 +295,30 @@
       },
       "smoke": [
         {
-          "name": "deployment-ready",
           "manifest": "apiVersion: v1\nkind: ConfigMap\nmetadata: {name: smoke, namespace: catalog-smoke}\ndata: {revision: \"1\"}\n---\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: smoke\n  namespace: catalog-smoke\n  annotations: {reloader.stakater.com/auto: \"true\"}\nspec:\n  selector: {matchLabels: {app: smoke}}\n  template:\n    metadata: {labels: {app: smoke}}\n    spec:\n      containers:\n        - name: pause\n          image: registry.k8s.io/pause:3.10\n          envFrom: [{configMapRef: {name: smoke}}]\n",
+          "name": "deployment-ready",
           "wait": [
             "-n catalog-smoke deployment/smoke --for=condition=Available"
           ]
         },
         {
-          "name": "rolls-on-configmap-change",
           "manifest": "apiVersion: v1\nkind: ConfigMap\nmetadata: {name: smoke, namespace: catalog-smoke}\ndata: {revision: \"2\"}\n",
+          "name": "rolls-on-configmap-change",
           "wait": [
             "-n catalog-smoke deployment/smoke --for=jsonpath={.spec.template.metadata.annotations.reloader\\.stakater\\.com/last-reloaded-from}",
             "-n catalog-smoke deployment/smoke --for=jsonpath={.metadata.generation}=2",
             "-n catalog-smoke deployment/smoke --for=condition=Available"
           ]
         }
-      ],
-      "leftovers": [
-        "configmaps/reloader-meta-info"
-      ],
-      "installOrder": {
-        "multi-node": [
-          "config-reload/reloader"
-        ],
-        "single-node": [
-          "config-reload/reloader"
-        ]
-      }
+      ]
     },
     {
-      "id": "event-autoscaling/keda",
       "apiVersion": "catalog.zeabur.com/v1",
-      "kind": "Component",
       "capability": "event-autoscaling",
-      "metadata": {
-        "name": "KEDA",
-        "description": "Scales workloads on events, down to zero, with scaling configured per namespace. Optional on a single node: there it costs more memory than scaling saves.\n",
-        "license": "Apache-2.0",
-        "homepage": "https://keda.sh"
-      },
-      "maturity": "cncf-graduated",
       "defaults": {
         "multi-node": "recommended",
         "single-node": "optional"
       },
-      "releases": [
-        {
-          "name": "keda",
-          "namespace": "keda",
-          "chart": "keda",
-          "repo": "https://kedacore.github.io/charts",
-          "version": "2.21.0",
-          "profiles": {
-            "multi-node": "operator:\n  # Leader-elected standby survives node drains.\n  replicaCount: 2\nresources:\n  # Room for a few hundred ScaledObjects.\n  operator:\n    requests: {cpu: 50m, memory: 128Mi}\n    limits: {memory: 512Mi}\n  metricServer:\n    requests: {cpu: 50m, memory: 96Mi}\n    limits: {memory: 512Mi}\n  webhooks:\n    requests: {cpu: 20m, memory: 48Mi}\n    limits: {memory: 256Mi}\n",
-            "single-node": "resources:\n  # Chart defaults (100Mi/1000Mi) far exceed idle use.\n  operator:\n    requests: {cpu: 20m, memory: 64Mi}\n    limits: {memory: 256Mi}\n  metricServer:\n    requests: {cpu: 20m, memory: 48Mi}\n    limits: {memory: 256Mi}\n  webhooks:\n    requests: {cpu: 10m, memory: 32Mi}\n    limits: {memory: 128Mi}\n"
-          }
-        }
-      ],
       "detection": {
         "apiServices": [
           "v1beta1.external.metrics.k8s.io"
@@ -360,6 +338,73 @@
           }
         ]
       },
+      "id": "event-autoscaling/keda",
+      "installOrder": {
+        "multi-node": [
+          "event-autoscaling/keda"
+        ],
+        "single-node": [
+          "event-autoscaling/keda"
+        ]
+      },
+      "kind": "Component",
+      "leftovers": [
+        "customresourcedefinitions"
+      ],
+      "maturity": "cncf-graduated",
+      "measured": {
+        "multi-node-amd64-v1.36.4": {
+          "idleCPUm": 4,
+          "idleMemoryMiB": 92,
+          "measuredAt": "2026-10-11",
+          "versions": {
+            "keda": "2.21.0"
+          }
+        },
+        "multi-node-arm64-v1.36.4": {
+          "idleCPUm": 3,
+          "idleMemoryMiB": 96,
+          "measuredAt": "2026-10-11",
+          "versions": {
+            "keda": "2.21.0"
+          }
+        },
+        "single-node-amd64-v1.36.4": {
+          "idleCPUm": 3,
+          "idleMemoryMiB": 69,
+          "measuredAt": "2026-10-11",
+          "versions": {
+            "keda": "2.21.0"
+          }
+        },
+        "single-node-arm64-v1.36.4": {
+          "idleCPUm": 4,
+          "idleMemoryMiB": 74,
+          "measuredAt": "2026-10-11",
+          "versions": {
+            "keda": "2.21.0"
+          }
+        }
+      },
+      "metadata": {
+        "description": "Scales workloads on events, down to zero, with scaling configured per namespace. Optional on a single node: there it costs more memory than scaling saves.\n",
+        "homepage": "https://keda.sh",
+        "license": "Apache-2.0",
+        "name": "KEDA"
+      },
+      "releases": [
+        {
+          "chart": "keda",
+          "name": "keda",
+          "namespace": "keda",
+          "profiles": {
+            "multi-node": "operator:\n  # Leader-elected standby survives node drains.\n  replicaCount: 2\nresources:\n  # Room for a few hundred ScaledObjects.\n  operator:\n    requests: {cpu: 50m, memory: 128Mi}\n    limits: {memory: 512Mi}\n  metricServer:\n    requests: {cpu: 50m, memory: 96Mi}\n    limits: {memory: 512Mi}\n  webhooks:\n    requests: {cpu: 20m, memory: 48Mi}\n    limits: {memory: 256Mi}\n",
+            "single-node": "resources:\n  # Chart defaults (100Mi/1000Mi) far exceed idle use.\n  operator:\n    requests: {cpu: 20m, memory: 64Mi}\n    limits: {memory: 256Mi}\n  metricServer:\n    requests: {cpu: 20m, memory: 48Mi}\n    limits: {memory: 256Mi}\n  webhooks:\n    requests: {cpu: 10m, memory: 32Mi}\n    limits: {memory: 128Mi}\n"
+          },
+          "repo": "https://kedacore.github.io/charts",
+          "version": "2.21.0"
+        }
+      ],
       "security": {
         "clusterWide": true,
         "credentials": "optional",
@@ -381,87 +426,15 @@
           "TriggerAuthentication"
         ],
         "tenants": "namespaced"
-      },
-      "leftovers": [
-        "customresourcedefinitions"
-      ],
-      "installOrder": {
-        "multi-node": [
-          "event-autoscaling/keda"
-        ],
-        "single-node": [
-          "event-autoscaling/keda"
-        ]
-      },
-      "measured": {
-        "multi-node-amd64-v1.36.4": {
-          "idleMemoryMiB": 92,
-          "idleCPUm": 4,
-          "versions": {
-            "keda": "2.21.0"
-          },
-          "measuredAt": "2026-10-11"
-        },
-        "multi-node-arm64-v1.36.4": {
-          "idleMemoryMiB": 96,
-          "idleCPUm": 3,
-          "versions": {
-            "keda": "2.21.0"
-          },
-          "measuredAt": "2026-10-11"
-        },
-        "single-node-amd64-v1.36.4": {
-          "idleMemoryMiB": 69,
-          "idleCPUm": 3,
-          "versions": {
-            "keda": "2.21.0"
-          },
-          "measuredAt": "2026-10-11"
-        },
-        "single-node-arm64-v1.36.4": {
-          "idleMemoryMiB": 74,
-          "idleCPUm": 4,
-          "versions": {
-            "keda": "2.21.0"
-          },
-          "measuredAt": "2026-10-11"
-        }
       }
     },
     {
-      "id": "event-autoscaling/keda-http-add-on",
       "apiVersion": "catalog.zeabur.com/v1",
-      "kind": "Component",
       "capability": "event-autoscaling",
-      "metadata": {
-        "name": "KEDA HTTP Add-on",
-        "description": "Scales HTTP services on request rate, including to zero; the interceptor holds the first request while the workload wakes. It is pre-1.0, so it is marked beta.\n",
-        "license": "Apache-2.0",
-        "homepage": "https://github.com/kedacore/http-add-on"
-      },
-      "maturity": "cncf-graduated",
-      "stability": "beta",
       "defaults": {
         "multi-node": "optional",
         "single-node": "optional"
       },
-      "requires": [
-        "event-autoscaling/keda"
-      ],
-      "releases": [
-        {
-          "name": "http-add-on",
-          "namespace": "keda",
-          "releaseName": "keda-add-ons-http",
-          "chart": "keda-add-ons-http",
-          "repo": "https://kedacore.github.io/charts",
-          "version": "0.16.0",
-          "profiles": {
-            "multi-node": "interceptor:\n  replicas:\n    # All scaled traffic passes the interceptor; keep the chart's floor.\n    min: 3\n    max: 50\nscaler:\n  # Keeps scaling during node drains.\n  replicas: 2\n",
-            "single-node": "interceptor:\n  replicas:\n    # Three interceptors add nothing on one node.\n    min: 1\n    max: 3\n  # On one node a PDB only blocks maintenance.\n  pdb:\n    enabled: false\nscaler:\n  # One scaler is enough on one node.\n  replicas: 1\n"
-          }
-        }
-      ],
       "detection": {
         "crds": [
           "httpscaledobjects.http.keda.sh"
@@ -479,6 +452,79 @@
           }
         ]
       },
+      "id": "event-autoscaling/keda-http-add-on",
+      "installOrder": {
+        "multi-node": [
+          "event-autoscaling/keda",
+          "event-autoscaling/keda-http-add-on"
+        ],
+        "single-node": [
+          "event-autoscaling/keda",
+          "event-autoscaling/keda-http-add-on"
+        ]
+      },
+      "kind": "Component",
+      "leftovers": [
+        "customresourcedefinitions"
+      ],
+      "maturity": "cncf-graduated",
+      "measured": {
+        "multi-node-amd64-v1.36.4": {
+          "idleCPUm": 11,
+          "idleMemoryMiB": 70,
+          "measuredAt": "2026-10-11",
+          "versions": {
+            "http-add-on": "0.16.0"
+          }
+        },
+        "multi-node-arm64-v1.36.4": {
+          "idleCPUm": 6,
+          "idleMemoryMiB": 102,
+          "measuredAt": "2026-10-11",
+          "versions": {
+            "http-add-on": "0.16.0"
+          }
+        },
+        "single-node-amd64-v1.36.4": {
+          "idleCPUm": 3,
+          "idleMemoryMiB": 34,
+          "measuredAt": "2026-10-11",
+          "versions": {
+            "http-add-on": "0.16.0"
+          }
+        },
+        "single-node-arm64-v1.36.4": {
+          "idleCPUm": 4,
+          "idleMemoryMiB": 34,
+          "measuredAt": "2026-10-11",
+          "versions": {
+            "http-add-on": "0.16.0"
+          }
+        }
+      },
+      "metadata": {
+        "description": "Scales HTTP services on request rate, including to zero; the interceptor holds the first request while the workload wakes. It is pre-1.0, so it is marked beta.\n",
+        "homepage": "https://github.com/kedacore/http-add-on",
+        "license": "Apache-2.0",
+        "name": "KEDA HTTP Add-on"
+      },
+      "releases": [
+        {
+          "chart": "keda-add-ons-http",
+          "name": "http-add-on",
+          "namespace": "keda",
+          "profiles": {
+            "multi-node": "interceptor:\n  replicas:\n    # All scaled traffic passes the interceptor; keep the chart's floor.\n    min: 3\n    max: 50\nscaler:\n  # Keeps scaling during node drains.\n  replicas: 2\n",
+            "single-node": "interceptor:\n  replicas:\n    # Three interceptors add nothing on one node.\n    min: 1\n    max: 3\n  # On one node a PDB only blocks maintenance.\n  pdb:\n    enabled: false\nscaler:\n  # One scaler is enough on one node.\n  replicas: 1\n"
+          },
+          "releaseName": "keda-add-ons-http",
+          "repo": "https://kedacore.github.io/charts",
+          "version": "0.16.0"
+        }
+      ],
+      "requires": [
+        "event-autoscaling/keda"
+      ],
       "security": {
         "clusterWide": true,
         "risks": [
@@ -493,104 +539,24 @@
         ],
         "tenants": "namespaced"
       },
-      "leftovers": [
-        "customresourcedefinitions"
-      ],
+      "stability": "beta",
       "upgradeNotes": [
         {
           "note": "HTTPScaledObject fields change between minor versions; read the release notes before upgrading.",
           "versions": "<1.0.0"
         }
-      ],
-      "installOrder": {
-        "multi-node": [
-          "event-autoscaling/keda",
-          "event-autoscaling/keda-http-add-on"
-        ],
-        "single-node": [
-          "event-autoscaling/keda",
-          "event-autoscaling/keda-http-add-on"
-        ]
-      },
-      "measured": {
-        "multi-node-amd64-v1.36.4": {
-          "idleMemoryMiB": 70,
-          "idleCPUm": 11,
-          "versions": {
-            "http-add-on": "0.16.0"
-          },
-          "measuredAt": "2026-10-11"
-        },
-        "multi-node-arm64-v1.36.4": {
-          "idleMemoryMiB": 102,
-          "idleCPUm": 6,
-          "versions": {
-            "http-add-on": "0.16.0"
-          },
-          "measuredAt": "2026-10-11"
-        },
-        "single-node-amd64-v1.36.4": {
-          "idleMemoryMiB": 34,
-          "idleCPUm": 3,
-          "versions": {
-            "http-add-on": "0.16.0"
-          },
-          "measuredAt": "2026-10-11"
-        },
-        "single-node-arm64-v1.36.4": {
-          "idleMemoryMiB": 34,
-          "idleCPUm": 4,
-          "versions": {
-            "http-add-on": "0.16.0"
-          },
-          "measuredAt": "2026-10-11"
-        }
-      }
+      ]
     },
     {
-      "id": "ingress/traefik",
-      "apiVersion": "catalog.zeabur.com/v1",
-      "kind": "Component",
-      "capability": "ingress",
-      "metadata": {
-        "name": "Traefik Proxy",
-        "description": "Serves Gateway API and Ingress, and hosts the CrowdSec bouncer. Ingress NGINX was retired in March 2026.\n",
-        "license": "MIT",
-        "homepage": "https://traefik.io/traefik/"
-      },
-      "maturity": "independent",
       "alternatives": {
         "envoy-gateway": "Serves Gateway API on Envoy; an existing installation is reused."
       },
+      "apiVersion": "catalog.zeabur.com/v1",
+      "capability": "ingress",
       "defaults": {
         "multi-node": "recommended",
         "single-node": "recommended"
       },
-      "disruptsTraffic": true,
-      "releases": [
-        {
-          "name": "gateway-api-crds",
-          "namespace": "kube-system",
-          "skipIfPresent": [
-            "httproutes.gateway.networking.k8s.io"
-          ],
-          "urls": [
-            "https://github.com/kubernetes-sigs/gateway-api/releases/download/{version}/standard-install.yaml"
-          ],
-          "version": "v1.6.2"
-        },
-        {
-          "name": "traefik",
-          "namespace": "traefik",
-          "chart": "oci://ghcr.io/traefik/helm/traefik",
-          "version": "41.7.1",
-          "values": "providers:\n  kubernetesGateway:\n    # Route web services with HTTPRoute.\n    enabled: true\n  kubernetesIngress:\n    # Many charts still ship Ingress objects.\n    enabled: true\n  kubernetesCRD:\n    # Middleware objects, such as the CrowdSec bouncer.\n    enabled: true\n    # No references to other namespaces.\n    allowCrossNamespace: false\ngatewayClass:\n  # Gateways reference GatewayClass \"traefik\".\n  enabled: true\n  name: traefik\ngateway:\n  # Gateways and listeners are created per domain, not by the chart.\n  enabled: false\napi:\n  # Unauthenticated surface; not needed.\n  dashboard: false\nservice:\n  spec:\n    # Skip source NAT so Traefik sees client addresses (CrowdSec, rate\n    # limits, logs); only nodes running Traefik serve traffic.\n    externalTrafficPolicy: Local\naccessLog:\n  # JSON access logs for metrics, log search and CrowdSec.\n  enabled: true\n  format: json\n  fields:\n    # Keep only the fields below; secrets live in headers and queries.\n    defaultMode: drop\n    names:\n      RequestHost: keep\n      RequestMethod: keep\n      RequestPath: keep\n      RequestProtocol: keep\n      DownstreamStatus: keep\n      DownstreamContentSize: keep\n      RequestContentSize: keep\n      Duration: keep\n      RouterName: keep\n      StartUTC: keep\n    headers:\n      # Headers carry cookies and bearer tokens.\n      defaultMode: drop\n    queryParameters:\n      # Query strings carry OAuth codes and signed-URL secrets.\n      defaultMode: drop\n",
-          "profiles": {
-            "multi-node": "deployment:\n  # One pod per node, so every node keeps client addresses under the\n  # Local traffic policy; k3s ServiceLB source-NATs on nodes without one.\n  # From a Deployment, annotate it helm.sh/resource-policy=keep before the\n  # upgrade and delete it after, or ingress drops for a few seconds.\n  kind: DaemonSet\ntolerations:\n  # The taints k3s ServiceLB tolerates, so Traefik runs wherever it listens.\n  - key: node-role.kubernetes.io/control-plane\n    operator: Exists\n    effect: NoSchedule\n  - key: CriticalAddonsOnly\n    operator: Exists\nmetrics:\n  prometheus:\n    # Request rate and latency metrics.\n    service:\n      enabled: true\nresources:\n  # Headroom for higher request rates.\n  requests: {cpu: 100m, memory: 128Mi}\n  limits: {memory: 512Mi}\n",
-            "single-node": "deployment:\n  # A second copy gains nothing on one node.\n  replicas: 1\nresources:\n  # Idles near 40Mi; the limit contains leaks.\n  requests: {cpu: 50m, memory: 64Mi}\n  limits: {memory: 256Mi}\n"
-          }
-        }
-      ],
       "detection": {
         "crds": [
           "ingressroutes.traefik.io",
@@ -623,6 +589,89 @@
           }
         ]
       },
+      "disruptsTraffic": true,
+      "id": "ingress/traefik",
+      "installOrder": {
+        "multi-node": [
+          "ingress/traefik"
+        ],
+        "single-node": [
+          "ingress/traefik"
+        ]
+      },
+      "kind": "Component",
+      "leftovers": [
+        "customresourcedefinitions"
+      ],
+      "maturity": "independent",
+      "measured": {
+        "multi-node-amd64-v1.36.4": {
+          "idleCPUm": 0,
+          "idleMemoryMiB": 45,
+          "measuredAt": "2026-10-11",
+          "versions": {
+            "gateway-api-crds": "v1.6.2",
+            "traefik": "41.7.1"
+          }
+        },
+        "multi-node-arm64-v1.36.4": {
+          "idleCPUm": 0,
+          "idleMemoryMiB": 56,
+          "measuredAt": "2026-10-11",
+          "versions": {
+            "gateway-api-crds": "v1.6.2",
+            "traefik": "41.7.1"
+          }
+        },
+        "single-node-amd64-v1.36.4": {
+          "idleCPUm": 0,
+          "idleMemoryMiB": 23,
+          "measuredAt": "2026-10-11",
+          "versions": {
+            "gateway-api-crds": "v1.6.2",
+            "traefik": "41.7.1"
+          }
+        },
+        "single-node-arm64-v1.36.4": {
+          "idleCPUm": 0,
+          "idleMemoryMiB": 22,
+          "measuredAt": "2026-10-13",
+          "versions": {
+            "gateway-api-crds": "v1.6.2",
+            "traefik": "41.7.1"
+          }
+        }
+      },
+      "metadata": {
+        "description": "Serves Gateway API and Ingress, and hosts the CrowdSec bouncer. Ingress NGINX was retired in March 2026.\n",
+        "homepage": "https://traefik.io/traefik/",
+        "license": "MIT",
+        "name": "Traefik Proxy"
+      },
+      "releases": [
+        {
+          "name": "gateway-api-crds",
+          "namespace": "kube-system",
+          "skipIfPresent": [
+            "httproutes.gateway.networking.k8s.io"
+          ],
+          "urls": [
+            "https://github.com/kubernetes-sigs/gateway-api/releases/download/{version}/standard-install.yaml"
+          ],
+          "version": "v1.6.3"
+        },
+        {
+          "chart": "oci://ghcr.io/traefik/helm/traefik",
+          "name": "traefik",
+          "namespace": "traefik",
+          "profiles": {
+            "multi-node": "deployment:\n  # One pod per node, so every node keeps client addresses under the\n  # Local traffic policy; k3s ServiceLB source-NATs on nodes without one.\n  # From a Deployment, annotate it helm.sh/resource-policy=keep before the\n  # upgrade and delete it after, or ingress drops for a few seconds.\n  kind: DaemonSet\ntolerations:\n  # The taints k3s ServiceLB tolerates, so Traefik runs wherever it listens.\n  - key: node-role.kubernetes.io/control-plane\n    operator: Exists\n    effect: NoSchedule\n  - key: CriticalAddonsOnly\n    operator: Exists\nmetrics:\n  prometheus:\n    # Request rate and latency metrics.\n    service:\n      enabled: true\nresources:\n  # Headroom for higher request rates.\n  requests: {cpu: 100m, memory: 128Mi}\n  limits: {memory: 512Mi}\n",
+            "single-node": "deployment:\n  # A second copy gains nothing on one node.\n  replicas: 1\nresources:\n  # Idles near 40Mi; the limit contains leaks.\n  requests: {cpu: 50m, memory: 64Mi}\n  limits: {memory: 256Mi}\n"
+          },
+          "values": "providers:\n  kubernetesGateway:\n    # Route web services with HTTPRoute.\n    enabled: true\n  kubernetesIngress:\n    # Many charts still ship Ingress objects.\n    enabled: true\n  kubernetesCRD:\n    # Middleware objects, such as the CrowdSec bouncer.\n    enabled: true\n    # No references to other namespaces.\n    allowCrossNamespace: false\n    # Only the traefik namespace can set the default TLS store.\n    defaultTLSResourcesNamespace: traefik\ngatewayClass:\n  # Gateways reference GatewayClass \"traefik\".\n  enabled: true\n  name: traefik\ngateway:\n  # Gateways and listeners are created per domain, not by the chart.\n  enabled: false\napi:\n  # Unauthenticated surface; not needed.\n  dashboard: false\nservice:\n  spec:\n    # Skip source NAT so Traefik sees client addresses (CrowdSec, rate\n    # limits, logs); only nodes running Traefik serve traffic.\n    externalTrafficPolicy: Local\naccessLog:\n  # JSON access logs for metrics, log search and CrowdSec.\n  enabled: true\n  format: json\n  fields:\n    # Keep only the fields below; secrets live in headers and queries.\n    defaultMode: drop\n    names:\n      RequestHost: keep\n      RequestMethod: keep\n      RequestPath: keep\n      RequestProtocol: keep\n      DownstreamStatus: keep\n      DownstreamContentSize: keep\n      RequestContentSize: keep\n      Duration: keep\n      RouterName: keep\n      StartUTC: keep\n    headers:\n      # Headers carry cookies and bearer tokens.\n      defaultMode: drop\n    queryParameters:\n      # Query strings carry OAuth codes and signed-URL secrets.\n      defaultMode: drop\n",
+          "version": "42.1.3"
+        }
+      ],
       "security": {
         "clusterWide": true,
         "risks": [
@@ -650,134 +699,22 @@
             "gatewayclass/traefik --for=condition=Accepted"
           ]
         }
-      ],
-      "leftovers": [
-        "customresourcedefinitions"
-      ],
-      "installOrder": {
-        "multi-node": [
-          "ingress/traefik"
-        ],
-        "single-node": [
-          "ingress/traefik"
-        ]
-      },
-      "measured": {
-        "multi-node-amd64-v1.36.4": {
-          "idleMemoryMiB": 45,
-          "idleCPUm": 0,
-          "versions": {
-            "gateway-api-crds": "v1.6.2",
-            "traefik": "41.7.1"
-          },
-          "measuredAt": "2026-10-11"
-        },
-        "multi-node-arm64-v1.36.4": {
-          "idleMemoryMiB": 56,
-          "idleCPUm": 0,
-          "versions": {
-            "gateway-api-crds": "v1.6.2",
-            "traefik": "41.7.1"
-          },
-          "measuredAt": "2026-10-11"
-        },
-        "single-node-amd64-v1.36.4": {
-          "idleMemoryMiB": 23,
-          "idleCPUm": 0,
-          "versions": {
-            "gateway-api-crds": "v1.6.2",
-            "traefik": "41.7.1"
-          },
-          "measuredAt": "2026-10-11"
-        },
-        "single-node-arm64-v1.36.4": {
-          "idleMemoryMiB": 22,
-          "idleCPUm": 0,
-          "versions": {
-            "gateway-api-crds": "v1.6.2",
-            "traefik": "41.7.1"
-          },
-          "measuredAt": "2026-10-13"
-        }
-      }
+      ]
     },
     {
-      "id": "intrusion-prevention/crowdsec",
       "apiVersion": "catalog.zeabur.com/v1",
-      "kind": "Component",
       "capability": "intrusion-prevention",
-      "metadata": {
-        "name": "CrowdSec",
-        "description": "Blocks brute-force attempts and scanners that show up in Traefik's access logs, for every app behind the ingress. It fails open, and the online API is off by default.\n",
-        "license": "MIT",
-        "homepage": "https://www.crowdsec.net"
-      },
-      "maturity": "independent",
+      "contributes": [
+        {
+          "release": "traefik",
+          "target": "ingress/traefik",
+          "values": "experimental:\n  plugins:\n    # Downloaded from plugins.traefik.io at start.\n    crowdsec-bouncer:\n      moduleName: github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin\n      version: v1.8.1\nports:\n  web:\n    http:\n      # Every request passes the bouncer; no app opts in.\n      middlewares: [crowdsec-bouncer@kubernetescrd]\n  websecure:\n    http:\n      # Same as web.\n      middlewares: [crowdsec-bouncer@kubernetescrd]\naccessLog:\n  fields:\n    names:\n      # CrowdSec's scenarios key on the client address.\n      ClientHost: keep\n    headers:\n      names:\n        # Bot scenarios match on the user agent.\n        User-Agent: keep\n"
+        }
+      ],
       "defaults": {
         "multi-node": "optional",
         "single-node": "optional"
       },
-      "persistsData": true,
-      "requires": [
-        "ingress/traefik"
-      ],
-      "inputs": [
-        {
-          "name": "bouncer-key",
-          "description": "The Traefik bouncer uses this key to call the CrowdSec local API.",
-          "secret": {
-            "name": "crowdsec-bouncer-key",
-            "key": "key",
-            "namespace": "crowdsec"
-          },
-          "generate": "random"
-        },
-        {
-          "name": "lapi-secret",
-          "description": "The local API (LAPI) signs agent sessions with this shared secret.",
-          "secret": {
-            "name": "crowdsec-lapi",
-            "key": "csLapiSecret",
-            "namespace": "crowdsec"
-          },
-          "generate": "random"
-        },
-        {
-          "name": "registration-token",
-          "description": "Agents register with the local API using this token.",
-          "secret": {
-            "name": "crowdsec-lapi",
-            "key": "registrationToken",
-            "namespace": "crowdsec"
-          },
-          "generate": "random"
-        }
-      ],
-      "releases": [
-        {
-          "name": "crowdsec",
-          "namespace": "crowdsec",
-          "chart": "oci://ghcr.io/crowdsecurity/helm-charts/crowdsec",
-          "version": "0.24.2",
-          "values": "# The runtime on k3s and mainstream distributions.\ncontainer_runtime: containerd\nsecrets:\n  externalSecret:\n    # Inputs, not chart-generated, so every render is identical.\n    name: crowdsec-lapi\nagent:\n  acquisition:\n    # Traefik's JSON access log.\n    - namespace: traefik\n      podName: traefik-*\n      program: traefik\n  env:\n    # Parsers and scenarios for Traefik plus generic HTTP attacks.\n    - name: COLLECTIONS\n      value: crowdsecurity/traefik\nlapi:\n  env:\n    # No data leaves the cluster unless the user opts in.\n    - name: DISABLE_ONLINE_API\n      value: \"true\"\n    # Registers the Traefik bouncer (input bouncer-key).\n    - name: BOUNCER_KEY_traefik\n      valueFrom:\n        secretKeyRef: {name: crowdsec-bouncer-key, key: key}\n  persistentVolume:\n    data:\n      # SQLite decisions and bouncer registrations.\n      enabled: true\n    config:\n      # Keeps machine credentials stable across restarts.\n      enabled: true\n",
-          "profiles": {
-            "multi-node": "agent:\n  resources:\n    # One agent per node; busier logs than single-node.\n    requests: {cpu: 50m, memory: 64Mi}\n    limits: {memory: 256Mi}\nlapi:\n  resources:\n    # Headroom for more agents and decisions.\n    requests: {cpu: 50m, memory: 96Mi}\n    limits: {memory: 384Mi}\n",
-            "single-node": "agent:\n  resources:\n    # Chart asks 250Mi; an idle agent uses under 100Mi.\n    requests: {cpu: 20m, memory: 48Mi}\n    limits: {memory: 192Mi}\nlapi:\n  resources:\n    # Chart asks 500Mi; LAPI on SQLite idles far below.\n    requests: {cpu: 20m, memory: 64Mi}\n    limits: {memory: 256Mi}\n"
-          }
-        },
-        {
-          "name": "bouncer-middleware",
-          "namespace": "crowdsec",
-          "manifests": "# Referenced from Traefik's entrypoints as crowdsec-bouncer@kubernetescrd.\napiVersion: traefik.io/v1alpha1\nkind: Middleware\nmetadata:\n  name: bouncer\n  namespace: crowdsec\nspec:\n  plugin:\n    crowdsec-bouncer:\n      enabled: true\n      # Local copy of decisions; requests never wait on LAPI.\n      crowdsecMode: stream\n      crowdsecLapiScheme: http\n      crowdsecLapiHost: crowdsec-service.crowdsec.svc.cluster.local:8080\n      # Read from the Secret in the Middleware's namespace.\n      crowdsecLapiKey: urn:k8s:secret:crowdsec-bouncer-key:key\n      # Fail open: if LAPI is unreachable, keep serving traffic.\n      updateMaxFailure: -1\n"
-        }
-      ],
-      "contributes": [
-        {
-          "target": "ingress/traefik",
-          "release": "traefik",
-          "values": "experimental:\n  plugins:\n    # Downloaded from plugins.traefik.io at start.\n    crowdsec-bouncer:\n      moduleName: github.com/maxlerebourg/crowdsec-bouncer-traefik-plugin\n      version: v1.7.1\nports:\n  web:\n    http:\n      # Every request passes the bouncer; no app opts in.\n      middlewares: [crowdsec-bouncer@kubernetescrd]\n  websecure:\n    http:\n      # Same as web.\n      middlewares: [crowdsec-bouncer@kubernetescrd]\naccessLog:\n  fields:\n    names:\n      # CrowdSec's scenarios key on the client address.\n      ClientHost: keep\n    headers:\n      names:\n        # Bot scenarios match on the user agent.\n        User-Agent: keep\n"
-        }
-      ],
       "detection": {
         "helmCharts": [
           "crowdsec"
@@ -792,6 +729,116 @@
           }
         ]
       },
+      "id": "intrusion-prevention/crowdsec",
+      "inputs": [
+        {
+          "description": "The Traefik bouncer uses this key to call the CrowdSec local API.",
+          "generate": "random",
+          "name": "bouncer-key",
+          "secret": {
+            "key": "key",
+            "name": "crowdsec-bouncer-key",
+            "namespace": "crowdsec"
+          }
+        },
+        {
+          "description": "The local API (LAPI) signs agent sessions with this shared secret.",
+          "generate": "random",
+          "name": "lapi-secret",
+          "secret": {
+            "key": "csLapiSecret",
+            "name": "crowdsec-lapi",
+            "namespace": "crowdsec"
+          }
+        },
+        {
+          "description": "Agents register with the local API using this token.",
+          "generate": "random",
+          "name": "registration-token",
+          "secret": {
+            "key": "registrationToken",
+            "name": "crowdsec-lapi",
+            "namespace": "crowdsec"
+          }
+        }
+      ],
+      "installOrder": {
+        "multi-node": [
+          "ingress/traefik",
+          "intrusion-prevention/crowdsec"
+        ],
+        "single-node": [
+          "ingress/traefik",
+          "intrusion-prevention/crowdsec"
+        ]
+      },
+      "kind": "Component",
+      "leftovers": [
+        "persistentvolumeclaims"
+      ],
+      "maturity": "independent",
+      "measured": {
+        "multi-node-amd64-v1.36.4": {
+          "idleCPUm": 2,
+          "idleMemoryMiB": 117,
+          "measuredAt": "2026-10-11",
+          "versions": {
+            "crowdsec": "0.24.2"
+          }
+        },
+        "multi-node-arm64-v1.36.4": {
+          "idleCPUm": 1,
+          "idleMemoryMiB": 119,
+          "measuredAt": "2026-10-11",
+          "versions": {
+            "crowdsec": "0.24.2"
+          }
+        },
+        "single-node-amd64-v1.36.4": {
+          "idleCPUm": 1,
+          "idleMemoryMiB": 76,
+          "measuredAt": "2026-10-11",
+          "versions": {
+            "crowdsec": "0.24.2"
+          }
+        },
+        "single-node-arm64-v1.36.4": {
+          "idleCPUm": 1,
+          "idleMemoryMiB": 82,
+          "measuredAt": "2026-10-13",
+          "versions": {
+            "crowdsec": "0.24.2"
+          }
+        }
+      },
+      "metadata": {
+        "description": "Blocks brute-force attempts and scanners that show up in Traefik's access logs, for every app behind the ingress. It fails open, and the online API is off by default.\n",
+        "homepage": "https://www.crowdsec.net",
+        "license": "MIT",
+        "name": "CrowdSec"
+      },
+      "persistsData": true,
+      "releases": [
+        {
+          "chart": "oci://ghcr.io/crowdsecurity/helm-charts/crowdsec",
+          "name": "crowdsec",
+          "namespace": "crowdsec",
+          "profiles": {
+            "multi-node": "agent:\n  resources:\n    # One agent per node; busier logs than single-node.\n    requests: {cpu: 50m, memory: 64Mi}\n    limits: {memory: 256Mi}\nlapi:\n  resources:\n    # Headroom for more agents and decisions.\n    requests: {cpu: 50m, memory: 96Mi}\n    limits: {memory: 384Mi}\n",
+            "single-node": "agent:\n  resources:\n    # Chart asks 250Mi; an idle agent uses under 100Mi.\n    requests: {cpu: 20m, memory: 48Mi}\n    limits: {memory: 192Mi}\nlapi:\n  resources:\n    # Chart asks 500Mi; LAPI on SQLite idles far below.\n    requests: {cpu: 20m, memory: 64Mi}\n    limits: {memory: 256Mi}\n"
+          },
+          "values": "# The runtime on k3s and mainstream distributions.\ncontainer_runtime: containerd\nsecrets:\n  externalSecret:\n    # Inputs, not chart-generated, so every render is identical.\n    name: crowdsec-lapi\nagent:\n  acquisition:\n    # Traefik's JSON access log.\n    - namespace: traefik\n      podName: traefik-*\n      program: traefik\n  env:\n    # Parsers and scenarios for Traefik plus generic HTTP attacks.\n    - name: COLLECTIONS\n      value: crowdsecurity/traefik\nlapi:\n  env:\n    # No data leaves the cluster unless the user opts in.\n    - name: DISABLE_ONLINE_API\n      value: \"true\"\n    # Registers the Traefik bouncer (input bouncer-key).\n    - name: BOUNCER_KEY_traefik\n      valueFrom:\n        secretKeyRef: {name: crowdsec-bouncer-key, key: key}\n  persistentVolume:\n    data:\n      # SQLite decisions and bouncer registrations.\n      enabled: true\n    config:\n      # Keeps machine credentials stable across restarts.\n      enabled: true\n",
+          "version": "0.24.2"
+        },
+        {
+          "manifests": "# Referenced from Traefik's entrypoints as crowdsec-bouncer@kubernetescrd.\napiVersion: traefik.io/v1alpha1\nkind: Middleware\nmetadata:\n  name: bouncer\n  namespace: crowdsec\nspec:\n  plugin:\n    crowdsec-bouncer:\n      enabled: true\n      # Local copy of decisions; requests never wait on LAPI.\n      crowdsecMode: stream\n      crowdsecLapiScheme: http\n      crowdsecLapiHost: crowdsec-service.crowdsec.svc.cluster.local:8080\n      # Read from the Secret in the Middleware's namespace.\n      crowdsecLapiKey: urn:k8s:secret:crowdsec-bouncer-key:key\n      # Fail open: if LAPI is unreachable, keep serving traffic.\n      updateMaxFailure: -1\n",
+          "name": "bouncer-middleware",
+          "namespace": "crowdsec"
+        }
+      ],
+      "requires": [
+        "ingress/traefik"
+      ],
       "security": {
         "egress": [
           "hub-data.crowdsec.net",
@@ -807,85 +854,18 @@
         ],
         "summary": "The agent reads node log files read-only and makes no API writes.",
         "tenants": "admin-only"
-      },
-      "leftovers": [
-        "persistentvolumeclaims"
-      ],
-      "installOrder": {
-        "multi-node": [
-          "ingress/traefik",
-          "intrusion-prevention/crowdsec"
-        ],
-        "single-node": [
-          "ingress/traefik",
-          "intrusion-prevention/crowdsec"
-        ]
-      },
-      "measured": {
-        "multi-node-amd64-v1.36.4": {
-          "idleMemoryMiB": 117,
-          "idleCPUm": 2,
-          "versions": {
-            "crowdsec": "0.24.2"
-          },
-          "measuredAt": "2026-10-11"
-        },
-        "multi-node-arm64-v1.36.4": {
-          "idleMemoryMiB": 119,
-          "idleCPUm": 1,
-          "versions": {
-            "crowdsec": "0.24.2"
-          },
-          "measuredAt": "2026-10-11"
-        },
-        "single-node-amd64-v1.36.4": {
-          "idleMemoryMiB": 76,
-          "idleCPUm": 1,
-          "versions": {
-            "crowdsec": "0.24.2"
-          },
-          "measuredAt": "2026-10-11"
-        },
-        "single-node-arm64-v1.36.4": {
-          "idleMemoryMiB": 82,
-          "idleCPUm": 1,
-          "versions": {
-            "crowdsec": "0.24.2"
-          },
-          "measuredAt": "2026-10-13"
-        }
       }
     },
     {
-      "id": "logs/victoria-logs",
-      "apiVersion": "catalog.zeabur.com/v1",
-      "kind": "Component",
-      "capability": "logs",
-      "metadata": {
-        "name": "VictoriaLogs",
-        "description": "Keeps and searches log history with low memory and disk use. It is Apache-2.0, unlike Loki, and runs on the VictoriaMetrics operator.\n",
-        "license": "Apache-2.0",
-        "homepage": "https://docs.victoriametrics.com/victorialogs/"
-      },
-      "maturity": "independent",
       "alternatives": {
         "loki": "Licensed AGPL-3.0; an existing installation is reused."
       },
+      "apiVersion": "catalog.zeabur.com/v1",
+      "capability": "logs",
       "defaults": {
         "multi-node": "recommended",
         "single-node": "recommended"
       },
-      "persistsData": true,
-      "requires": [
-        "observability-operator/victoria-metrics-operator"
-      ],
-      "releases": [
-        {
-          "name": "logs",
-          "namespace": "observability",
-          "manifests": "# The log store.\napiVersion: operator.victoriametrics.com/v1\nkind: VLSingle\nmetadata:\n  name: victoria-logs\n  namespace: observability\nspec:\n  # Two weeks, or less when the volume reaches 8GiB of its 10Gi.\n  retentionPeriod: 14d\n  retentionMaxDiskSpaceUsageBytes: 8GiB\n  storage:\n    resources:\n      requests: {storage: 10Gi}\n  resources:\n    requests: {cpu: 50m, memory: 64Mi}\n    limits: {memory: 1Gi}\n---\n# One collector per node, reading container logs.\napiVersion: operator.victoriametrics.com/v1\nkind: VLAgent\nmetadata:\n  name: collector\n  namespace: observability\nspec:\n  k8sCollector:\n    enabled: true\n    # Namespace, pod and container suffice; labels add cardinality.\n    includePodLabels: false\n  remoteWrite:\n    - url: http://vlsingle-victoria-logs.observability.svc:9428/internal/insert\n  resources:\n    requests: {cpu: 20m, memory: 32Mi}\n    limits: {memory: 256Mi}\n"
-        }
-      ],
       "detection": {
         "crds": [
           "vlsingles.operator.victoriametrics.com"
@@ -909,29 +889,7 @@
           }
         ]
       },
-      "security": {
-        "clusterWide": true,
-        "privileged": true,
-        "risks": [
-          {
-            "mitigation": "Don't expose it to tenants; query through a layer that filters by namespace.",
-            "risk": "The log store holds every tenant's logs in one place."
-          }
-        ],
-        "summary": "The collector reads pod metadata and node log files."
-      },
-      "smoke": [
-        {
-          "name": "operational",
-          "wait": [
-            "-n observability vlsingle/victoria-logs --for=jsonpath={.status.updateStatus}=operational",
-            "-n observability vlagent/collector --for=jsonpath={.status.updateStatus}=operational"
-          ]
-        }
-      ],
-      "leftovers": [
-        "persistentvolumeclaims"
-      ],
+      "id": "logs/victoria-logs",
       "installOrder": {
         "multi-node": [
           "ingress/traefik",
@@ -946,62 +904,85 @@
           "logs/victoria-logs"
         ]
       },
+      "kind": "Component",
+      "leftovers": [
+        "persistentvolumeclaims"
+      ],
+      "maturity": "independent",
       "measured": {
         "multi-node-amd64-v1.36.4": {
-          "idleMemoryMiB": 32,
           "idleCPUm": 5,
+          "idleMemoryMiB": 32,
           "measuredAt": "2026-10-11"
         },
         "multi-node-arm64-v1.36.4": {
-          "idleMemoryMiB": 38,
           "idleCPUm": 3,
+          "idleMemoryMiB": 38,
           "measuredAt": "2026-10-11"
         },
         "single-node-amd64-v1.36.4": {
-          "idleMemoryMiB": 38,
           "idleCPUm": 3,
+          "idleMemoryMiB": 38,
           "measuredAt": "2026-10-11"
         },
         "single-node-arm64-v1.36.4": {
-          "idleMemoryMiB": 35,
           "idleCPUm": 2,
+          "idleMemoryMiB": 35,
           "measuredAt": "2026-10-13"
         }
-      }
+      },
+      "metadata": {
+        "description": "Keeps and searches log history with low memory and disk use. It is Apache-2.0, unlike Loki, and runs on the VictoriaMetrics operator.\n",
+        "homepage": "https://docs.victoriametrics.com/victorialogs/",
+        "license": "Apache-2.0",
+        "name": "VictoriaLogs"
+      },
+      "persistsData": true,
+      "releases": [
+        {
+          "manifests": "# The log store.\napiVersion: operator.victoriametrics.com/v1\nkind: VLSingle\nmetadata:\n  name: victoria-logs\n  namespace: observability\nspec:\n  # Two weeks, or less when the volume reaches 8GiB of its 10Gi.\n  retentionPeriod: 14d\n  retentionMaxDiskSpaceUsageBytes: 8GiB\n  storage:\n    resources:\n      requests: {storage: 10Gi}\n  resources:\n    requests: {cpu: 50m, memory: 64Mi}\n    limits: {memory: 1Gi}\n---\n# One collector per node, reading container logs.\napiVersion: operator.victoriametrics.com/v1\nkind: VLAgent\nmetadata:\n  name: collector\n  namespace: observability\nspec:\n  k8sCollector:\n    enabled: true\n    # Namespace, pod and container suffice; labels add cardinality.\n    includePodLabels: false\n  remoteWrite:\n    - url: http://vlsingle-victoria-logs.observability.svc:9428/internal/insert\n  resources:\n    requests: {cpu: 20m, memory: 32Mi}\n    limits: {memory: 256Mi}\n---\n# Only the collector, the metrics stack's vmagent (the operator's scrape of\n# /metrics) and Zeabur Proxy in the zeabur namespace reach the log store.\napiVersion: networking.k8s.io/v1\nkind: NetworkPolicy\nmetadata:\n  name: victoria-logs\n  namespace: observability\nspec:\n  podSelector:\n    matchLabels: {app.kubernetes.io/name: vlsingle, app.kubernetes.io/instance: victoria-logs}\n  policyTypes: [Ingress]\n  ingress:\n    - ports: [{port: 9428, protocol: TCP}]\n      from:\n        - podSelector:\n            matchLabels: {app.kubernetes.io/name: vlagent, app.kubernetes.io/instance: collector}\n        - podSelector:\n            matchLabels: {app.kubernetes.io/name: vmagent}\n        # Both selectors: anyone can label a pod in their own namespace.\n        - namespaceSelector:\n            matchLabels: {kubernetes.io/metadata.name: zeabur}\n          podSelector:\n            matchLabels: {app.kubernetes.io/name: zeabur-proxy}\n",
+          "name": "logs",
+          "namespace": "observability"
+        }
+      ],
+      "requires": [
+        "observability-operator/victoria-metrics-operator"
+      ],
+      "security": {
+        "clusterWide": true,
+        "privileged": true,
+        "risks": [
+          {
+            "mitigation": "A NetworkPolicy lets only the collector, vmagent and Zeabur Proxy reach it; tenants query through Zeabur Proxy, which filters by namespace.",
+            "risk": "The log store holds every tenant's logs in one place."
+          },
+          {
+            "mitigation": "VictoriaLogs drops a line whose stream fields repeat, so it never lands under another namespace; re-run Zeabur Proxy's canary test on upgrades.",
+            "risk": "The collector adds a pod's JSON log fields to the line, so a pod can print kubernetes.pod_namespace to pose as another namespace."
+          }
+        ],
+        "summary": "The collector reads pod metadata and node log files."
+      },
+      "smoke": [
+        {
+          "name": "operational",
+          "wait": [
+            "-n observability vlsingle/victoria-logs --for=jsonpath={.status.updateStatus}=operational",
+            "-n observability vlagent/collector --for=jsonpath={.status.updateStatus}=operational"
+          ]
+        }
+      ]
     },
     {
-      "id": "metrics/metrics-server",
-      "apiVersion": "catalog.zeabur.com/v1",
-      "kind": "Component",
-      "capability": "metrics",
-      "metadata": {
-        "name": "Kubernetes Metrics Server",
-        "description": "Serves metrics.k8s.io for HPA and `kubectl top`. It keeps no history, so it is the cheapest source of live CPU and memory.\n",
-        "license": "Apache-2.0",
-        "homepage": "https://github.com/kubernetes-sigs/metrics-server"
-      },
-      "maturity": "kubernetes-sig",
       "alternatives": {
         "victoria-metrics": "Adds history and alerts at a few hundred MiB."
       },
+      "apiVersion": "catalog.zeabur.com/v1",
+      "capability": "metrics",
       "defaults": {
         "multi-node": "recommended",
         "single-node": "recommended"
       },
-      "releases": [
-        {
-          "name": "metrics-server",
-          "namespace": "kube-system",
-          "chart": "metrics-server",
-          "repo": "https://kubernetes-sigs.github.io/metrics-server",
-          "version": "3.14.0",
-          "values": "args:\n  # 15s is fresh enough for live views; the default is 60s.\n  - --metric-resolution=15s\n",
-          "profiles": {
-            "multi-node": "# HPA stops while metrics.k8s.io is down; two replicas.\nreplicas: 2\npodDisruptionBudget:\n  # Keep one replica during node drains.\n  enabled: true\n  minAvailable: 1\nresources:\n  # Covers clusters of a few dozen nodes.\n  requests: {cpu: 50m, memory: 96Mi}\n  limits: {memory: 256Mi}\n",
-            "single-node": "resources:\n  # The chart's 200Mi request is sized for 100+ nodes.\n  requests: {cpu: 20m, memory: 48Mi}\n  limits: {memory: 128Mi}\n"
-          }
-        }
-      ],
       "detection": {
         "apiServices": [
           "v1beta1.metrics.k8s.io"
@@ -1027,10 +1008,7 @@
           }
         ]
       },
-      "security": {
-        "clusterWide": true,
-        "summary": "Reads kubelet metrics; registers an aggregated API."
-      },
+      "id": "metrics/metrics-server",
       "installOrder": {
         "multi-node": [
           "metrics/metrics-server"
@@ -1039,79 +1017,85 @@
           "metrics/metrics-server"
         ]
       },
+      "kind": "Component",
+      "maturity": "kubernetes-sig",
       "measured": {
         "multi-node-amd64-v1.36.4": {
-          "idleMemoryMiB": 33,
           "idleCPUm": 4,
+          "idleMemoryMiB": 33,
+          "measuredAt": "2026-10-11",
           "versions": {
             "metrics-server": "3.14.0"
-          },
-          "measuredAt": "2026-10-11"
+          }
         },
         "multi-node-arm64-v1.36.4": {
-          "idleMemoryMiB": 35,
           "idleCPUm": 3,
+          "idleMemoryMiB": 35,
+          "measuredAt": "2026-10-11",
           "versions": {
             "metrics-server": "3.14.0"
-          },
-          "measuredAt": "2026-10-11"
+          }
         },
         "single-node-amd64-v1.36.4": {
-          "idleMemoryMiB": 17,
           "idleCPUm": 1,
+          "idleMemoryMiB": 17,
+          "measuredAt": "2026-10-11",
           "versions": {
             "metrics-server": "3.14.0"
-          },
-          "measuredAt": "2026-10-11"
+          }
         },
         "single-node-arm64-v1.36.4": {
-          "idleMemoryMiB": 17,
           "idleCPUm": 2,
+          "idleMemoryMiB": 17,
+          "measuredAt": "2026-10-11",
           "versions": {
             "metrics-server": "3.14.0"
-          },
-          "measuredAt": "2026-10-11"
+          }
         }
+      },
+      "metadata": {
+        "description": "Serves metrics.k8s.io for HPA and `kubectl top`. It keeps no history, so it is the cheapest source of live CPU and memory.\n",
+        "homepage": "https://github.com/kubernetes-sigs/metrics-server",
+        "license": "Apache-2.0",
+        "name": "Kubernetes Metrics Server"
+      },
+      "releases": [
+        {
+          "chart": "metrics-server",
+          "name": "metrics-server",
+          "namespace": "kube-system",
+          "profiles": {
+            "multi-node": "# HPA stops while metrics.k8s.io is down; two replicas.\nreplicas: 2\npodDisruptionBudget:\n  # Keep one replica during node drains.\n  enabled: true\n  minAvailable: 1\nresources:\n  # Covers clusters of a few dozen nodes.\n  requests: {cpu: 50m, memory: 96Mi}\n  limits: {memory: 256Mi}\n",
+            "single-node": "resources:\n  # The chart's 200Mi request is sized for 100+ nodes.\n  requests: {cpu: 20m, memory: 48Mi}\n  limits: {memory: 128Mi}\n"
+          },
+          "repo": "https://kubernetes-sigs.github.io/metrics-server",
+          "values": "args:\n  # 15s is fresh enough for live views; the default is 60s.\n  - --metric-resolution=15s\n",
+          "version": "3.14.0"
+        }
+      ],
+      "security": {
+        "clusterWide": true,
+        "summary": "Reads kubelet metrics; registers an aggregated API."
       }
     },
     {
-      "id": "metrics/victoria-metrics",
-      "apiVersion": "catalog.zeabur.com/v1",
-      "kind": "Component",
-      "capability": "metrics",
-      "metadata": {
-        "name": "VictoriaMetrics (k8s stack)",
-        "description": "Keeps metrics history and evaluates alerts with a fraction of Prometheus' memory. On one node it is tuned to about 200Mi.\n",
-        "license": "Apache-2.0",
-        "homepage": "https://victoriametrics.com"
-      },
-      "maturity": "independent",
       "alternatives": {
         "kube-prometheus-stack": "An existing installation is reused, but its memory use keeps it from being recommended.",
         "metrics-server": "Serves live CPU and memory only; it is installed alongside for the metrics API."
       },
+      "apiVersion": "catalog.zeabur.com/v1",
+      "capability": "metrics",
+      "contributes": [
+        {
+          "release": "falco",
+          "target": "runtime-security/falco",
+          "values": "falcosidekick:\n  config:\n    alertmanager:\n      # Falco alerts go to the cluster's channels only: they carry\n      # command lines from every namespace.\n      hostport: http://vmalertmanager-vm-victoria-metrics-k8s-stack.observability.svc:9093\n      # The chart's default is the v1 API, which Alertmanager 0.27 removed.\n      endpoint: /api/v2/alerts\n      # Notices are frequent and rarely need action.\n      minimumpriority: warning\n      # A Falco alert has no end. It ends 10 minutes after the last one.\n      expireafter: \"600\"\n      # The namespace label routes the alert to the cluster's channels;\n      # the pod's namespace stays in k8s_ns_name.\n      extralabels: \"namespace:observability,zeabur_event:runtime-security,zeabur_kind:event\"\n"
+        }
+      ],
       "defaults": {
         "multi-node": "recommended",
         "single-node": "recommended"
       },
-      "persistsData": true,
-      "requires": [
-        "observability-operator/victoria-metrics-operator"
-      ],
-      "releases": [
-        {
-          "name": "k8s-stack",
-          "namespace": "observability",
-          "releaseName": "vm",
-          "chart": "oci://ghcr.io/victoriametrics/helm-charts/victoria-metrics-k8s-stack",
-          "version": "0.95.2",
-          "values": "victoria-metrics-operator:\n  # The operator is its own component, shared with logs.\n  enabled: false\ngrafana:\n  # Grafana adds ~150Mi; install it separately if needed.\n  enabled: false\ndefaultDashboards:\n  # Dashboards only matter with Grafana.\n  enabled: false\nkube-state-metrics:\n  # Maps pods to workloads and exposes requests, limits and object state.\n  enabled: true\nvmagent:\n  spec:\n    # 30s cuts scrape cost by a third versus the chart's 20s.\n    scrapeInterval: 30s\n",
-          "profiles": {
-            "multi-node": "prometheus-node-exporter:\n  # Node disk and network metrics for capacity planning.\n  enabled: true\nvmsingle:\n  spec:\n    # Two weeks of history; the volume is sized for it.\n    retentionPeriod: 14d\n    storage:\n      resources:\n        requests: {storage: 20Gi}\n    resources:\n      requests: {cpu: 100m, memory: 512Mi}\n      limits: {memory: 2Gi}\nvmagent:\n  spec:\n    # More targets across nodes.\n    resources:\n      requests: {cpu: 50m, memory: 128Mi}\n      limits: {memory: 1Gi}\n",
-            "single-node": "prometheus-node-exporter:\n  # cAdvisor already covers containers; little gain on one node.\n  enabled: false\nkube-state-metrics:\n  # Only the objects needed to map pods to workloads.\n  collectors: [pods, replicasets, deployments, statefulsets, daemonsets, jobs, cronjobs, nodes, persistentvolumeclaims, namespaces]\n  metricLabelsAllowlist:\n    - pods=[app.kubernetes.io/name,app.kubernetes.io/component]\nkubeControllerManager:\n  # Embedded in k3s; nothing to scrape.\n  enabled: false\nkubeScheduler:\n  # Embedded in k3s; nothing to scrape.\n  enabled: false\nkubeEtcd:\n  # k3s single-node uses SQLite (kine), not etcd.\n  enabled: false\nkubeApiServer:\n  # Its histograms are ~half of all series; its alert rules go with it.\n  enabled: false\nkubelet:\n  vmScrape:\n    spec:\n      metricRelabelConfigs:\n        # Chart defaults: UIDs and cgroup ids only multiply series.\n        - action: labeldrop\n          regex: (uid)\n        - action: labeldrop\n          regex: (id|name)\n        # k3s kubelet also exports API server and kine histograms (~45% of series).\n        - action: drop\n          source_labels: [__name__]\n          regex: .+_bucket|(apiserver|etcd|kine|rest_client|workqueue|scheduler|authentication|authorization|aggregator|admission|watch_cache|storage)_.+\nvmsingle:\n  spec:\n    # A week of history fits 5Gi on one node.\n    retentionPeriod: 7d\n    storage:\n      resources:\n        requests: {storage: 5Gi}\n    resources:\n      requests: {cpu: 50m, memory: 128Mi}\n      limits: {memory: 512Mi}\nvmagent:\n  spec:\n    # Small scrape set on one node.\n    resources:\n      requests: {cpu: 20m, memory: 64Mi}\n      limits: {memory: 256Mi}\nvmalert:\n  spec:\n    # Evaluates the default alert rules.\n    resources:\n      requests: {cpu: 10m, memory: 32Mi}\n      limits: {memory: 128Mi}\nalertmanager:\n  spec:\n    # Routes alerts to configured receivers.\n    resources:\n      requests: {cpu: 10m, memory: 32Mi}\n      limits: {memory: 128Mi}\n"
-          }
-        }
-      ],
       "detection": {
         "crds": [
           "vmsingles.operator.victoriametrics.com"
@@ -1120,6 +1104,89 @@
           "victoria-metrics-k8s-stack"
         ]
       },
+      "id": "metrics/victoria-metrics",
+      "installOrder": {
+        "multi-node": [
+          "ingress/traefik",
+          "certificates/cert-manager",
+          "observability-operator/victoria-metrics-operator",
+          "metrics/victoria-metrics"
+        ],
+        "single-node": [
+          "ingress/traefik",
+          "certificates/cert-manager",
+          "observability-operator/victoria-metrics-operator",
+          "metrics/victoria-metrics"
+        ]
+      },
+      "kind": "Component",
+      "leftovers": [
+        "persistentvolumeclaims"
+      ],
+      "maturity": "independent",
+      "measured": {
+        "multi-node-amd64-v1.36.4": {
+          "idleCPUm": 52,
+          "idleMemoryMiB": 443,
+          "measuredAt": "2026-10-11",
+          "versions": {
+            "k8s-stack": "0.95.2"
+          }
+        },
+        "multi-node-arm64-v1.36.4": {
+          "idleCPUm": 33,
+          "idleMemoryMiB": 448,
+          "measuredAt": "2026-10-11",
+          "versions": {
+            "k8s-stack": "0.95.2"
+          }
+        },
+        "single-node-amd64-v1.36.4": {
+          "idleCPUm": 28,
+          "idleMemoryMiB": 207,
+          "measuredAt": "2026-10-11",
+          "versions": {
+            "k8s-stack": "0.95.2"
+          }
+        },
+        "single-node-arm64-v1.36.4": {
+          "idleCPUm": 26,
+          "idleMemoryMiB": 206,
+          "measuredAt": "2026-10-13",
+          "versions": {
+            "k8s-stack": "0.95.2"
+          }
+        }
+      },
+      "metadata": {
+        "description": "Keeps metrics history and evaluates alerts with a fraction of Prometheus' memory. On one node it idles at about 220Mi with node-exporter, more as pods add series. Its Alertmanager sends Zeabur's notifications: each project sets its own channels, the cluster administrator sets the cluster's.\n",
+        "homepage": "https://victoriametrics.com",
+        "license": "Apache-2.0",
+        "name": "VictoriaMetrics (k8s stack)"
+      },
+      "persistsData": true,
+      "releases": [
+        {
+          "chart": "oci://ghcr.io/victoriametrics/helm-charts/victoria-metrics-k8s-stack",
+          "name": "k8s-stack",
+          "namespace": "observability",
+          "profiles": {
+            "multi-node": "prometheus-node-exporter:\n  # Node disk and network metrics for capacity planning.\n  enabled: true\nvmsingle:\n  spec:\n    # Two weeks of history; the volume is sized for it.\n    retentionPeriod: 14d\n    storage:\n      resources:\n        requests: {storage: 20Gi}\n    resources:\n      requests: {cpu: 100m, memory: 512Mi}\n      limits: {memory: 2Gi}\nvmagent:\n  spec:\n    # More targets across nodes.\n    resources:\n      requests: {cpu: 50m, memory: 128Mi}\n      limits: {memory: 1Gi}\n",
+            "single-node": "prometheus-node-exporter:\n  # Node disk use (node_filesystem_*) has no other source; Zeabur reads it.\n  enabled: true\n  extraArgs:\n    # Only the collectors the default node-exporter, node and kubernetes rules query.\n    - --collector.disable-defaults\n    - --collector.filesystem\n    - --collector.cpu\n    - --collector.meminfo\n    - --collector.loadavg\n    - --collector.vmstat\n    - --collector.diskstats\n    - --collector.netdev\n    - --collector.netclass\n    - --collector.filefd\n    - --collector.conntrack\n    - --collector.timex\n    - --collector.mdadm\n    - --collector.bonding\n    - --collector.textfile\n    # The chart's excludes plus containerd's per-pod shm mounts (k3s keeps them under /run/k3s).\n    # /var/lib/kubelet itself stays visible; only mounts below it are dropped.\n    - --collector.filesystem.mount-points-exclude=^/(dev|proc|sys|run/containerd/.+|run/k3s/.+|var/lib/docker/.+|var/lib/kubelet/.+)($|/)\n    - --collector.filesystem.fs-types-exclude=^(autofs|binfmt_misc|bpf|cgroup2?|configfs|debugfs|devpts|devtmpfs|fusectl|hugetlbfs|iso9660|mqueue|nsfs|overlay|proc|procfs|pstore|rpc_pipefs|securityfs|selinuxfs|squashfs|erofs|sysfs|tracefs)$\n  resources:\n    # One small exporter per node.\n    requests: {cpu: 10m, memory: 16Mi}\n    limits: {memory: 64Mi}\nkube-state-metrics:\n  # Only the objects needed to map pods to workloads.\n  collectors: [pods, replicasets, deployments, statefulsets, daemonsets, jobs, cronjobs, nodes, persistentvolumeclaims, namespaces]\nkubeControllerManager:\n  # Embedded in k3s; nothing to scrape.\n  enabled: false\nkubeScheduler:\n  # Embedded in k3s; nothing to scrape.\n  enabled: false\nkubeEtcd:\n  # k3s single-node uses SQLite (kine), not etcd.\n  enabled: false\nkubeApiServer:\n  # Its histograms are ~half of all series; its alert rules go with it.\n  enabled: false\nkubelet:\n  vmScrape:\n    spec:\n      metricRelabelConfigs:\n        # Chart defaults: UIDs and cgroup ids only multiply series.\n        - action: labeldrop\n          regex: (uid)\n        - action: labeldrop\n          regex: (id|name)\n        # k3s kubelet also exports API server and kine histograms (~45% of series).\n        - action: drop\n          source_labels: [__name__]\n          regex: .+_bucket|(apiserver|etcd|kine|rest_client|workqueue|scheduler|authentication|authorization|aggregator|admission|watch_cache|storage)_.+\nvmsingle:\n  spec:\n    # A week of history fits 5Gi on one node.\n    retentionPeriod: 7d\n    storage:\n      resources:\n        requests: {storage: 5Gi}\n    resources:\n      requests: {cpu: 50m, memory: 128Mi}\n      limits: {memory: 512Mi}\nvmagent:\n  spec:\n    # Small scrape set on one node.\n    resources:\n      requests: {cpu: 20m, memory: 64Mi}\n      limits: {memory: 256Mi}\nvmalert:\n  spec:\n    # Evaluates the default alert rules.\n    resources:\n      requests: {cpu: 10m, memory: 32Mi}\n      limits: {memory: 128Mi}\nalertmanager:\n  spec:\n    # Routes alerts to configured receivers.\n    resources:\n      requests: {cpu: 10m, memory: 32Mi}\n      limits: {memory: 128Mi}\n"
+          },
+          "releaseName": "vm",
+          "values": "victoria-metrics-operator:\n  # The operator is its own component, shared with logs.\n  enabled: false\ngrafana:\n  # Grafana adds ~150Mi; install it separately if needed.\n  enabled: false\ndefaultDashboards:\n  # Dashboards only matter with Grafana.\n  enabled: false\nkube-state-metrics:\n  # Maps pods to workloads and exposes requests, limits and object state.\n  enabled: true\n  metricLabelsAllowlist:\n    # Pods: map pods to apps. Jobs: a notification test names its channel in\n    # this label. Namespaces: tell projects from the cluster's own namespaces.\n    - pods=[app.kubernetes.io/name,app.kubernetes.io/component]\n    - jobs=[zeabur.com/notification-test]\n    - namespaces=[zeabur.com/project]\n  rbac:\n    # Read the objects the custom resource metrics below come from.\n    extraRules:\n      - apiGroups: [builder.zeabur.com]\n        resources: [buildruns]\n        verbs: [list, watch]\n      - apiGroups: [postgresql.cnpg.io]\n        resources: [clusters, backups]\n        verbs: [list, watch]\n      - apiGroups: [psmdb.percona.com]\n        resources: [perconaservermongodbs, perconaservermongodbbackups]\n        verbs: [list, watch]\n      - apiGroups: [k8up.io]\n        resources: [backups]\n        verbs: [list, watch]\n      - apiGroups: [velero.io]\n        resources: [backups]\n        verbs: [list, watch]\n      - apiGroups: [cert-manager.io]\n        resources: [certificates]\n        verbs: [list, watch]\n  customResourceState:\n    # The status of builds, databases, backups and certificates as metrics,\n    # for the notification rules (release notifications). A kind that is not\n    # installed adds nothing. One series for each object: a Build keeps at\n    # most its historyLimit of BuildRuns, Velero and K8up delete old\n    # backups, but CloudNativePG and Percona keep every Backup object.\n    # The scrape below drops their successful backups.\n    enabled: true\n    config:\n      kind: CustomResourceStateMetrics\n      spec:\n        resources:\n          - groupVersionKind: {group: builder.zeabur.com, version: v1alpha1, kind: BuildRun}\n            metricNamePrefix: zeabur_builder_buildrun\n            labelsFromPath:\n              namespace: [metadata, namespace]\n              buildrun: [metadata, name]\n              build: [spec, buildRef]\n              phase: [status, phase]\n              reason: [status, reason]\n            metrics:\n              - name: completion_time\n                help: When the BuildRun finished; absent while it runs.\n                errorLogV: 5\n                each:\n                  type: Gauge\n                  gauge: {path: [status, completionTime]}\n          - groupVersionKind: {group: postgresql.cnpg.io, version: v1, kind: Cluster}\n            metricNamePrefix: zeabur_cnpg_cluster\n            labelsFromPath:\n              namespace: [metadata, namespace]\n              cluster: [metadata, name]\n            metrics:\n              - name: phase\n                help: The CloudNativePG cluster's phase.\n                each:\n                  type: Info\n                  info:\n                    labelsFromPath:\n                      phase: [status, phase]\n          - groupVersionKind: {group: postgresql.cnpg.io, version: v1, kind: Backup}\n            metricNamePrefix: zeabur_cnpg_backup\n            labelsFromPath:\n              namespace: [metadata, namespace]\n              backup: [metadata, name]\n              cluster: [spec, cluster, name]\n              phase: [status, phase]\n            metrics:\n              - name: created\n                help: When the Backup was created, by its phase.\n                each:\n                  type: Gauge\n                  gauge: {path: [metadata, creationTimestamp]}\n          - groupVersionKind: {group: psmdb.percona.com, version: v1, kind: PerconaServerMongoDB}\n            metricNamePrefix: zeabur_psmdb\n            labelsFromPath:\n              namespace: [metadata, namespace]\n              cluster: [metadata, name]\n            metrics:\n              - name: state\n                help: The MongoDB cluster's state.\n                each:\n                  type: Info\n                  info:\n                    labelsFromPath:\n                      state: [status, state]\n          - groupVersionKind: {group: psmdb.percona.com, version: v1, kind: PerconaServerMongoDBBackup}\n            metricNamePrefix: zeabur_psmdb_backup\n            labelsFromPath:\n              namespace: [metadata, namespace]\n              backup: [metadata, name]\n              cluster: [spec, clusterName]\n              state: [status, state]\n            metrics:\n              - name: created\n                help: When the backup was created, by its state.\n                each:\n                  type: Gauge\n                  gauge: {path: [metadata, creationTimestamp]}\n          - groupVersionKind: {group: k8up.io, version: v1, kind: Backup}\n            metricNamePrefix: zeabur_k8up_backup\n            labelsFromPath:\n              namespace: [metadata, namespace]\n              backup: [metadata, name]\n            metrics:\n              - name: condition_time\n                help: When each condition of the Backup last changed, by type and reason.\n                each:\n                  type: Gauge\n                  gauge:\n                    path: [status, conditions]\n                    labelsFromPath:\n                      type: [type]\n                      reason: [reason]\n                    valueFrom: [lastTransitionTime]\n          - groupVersionKind: {group: velero.io, version: v1, kind: Backup}\n            metricNamePrefix: zeabur_velero_backup\n            labelsFromPath:\n              namespace: [metadata, namespace]\n              backup: [metadata, name]\n              phase: [status, phase]\n            metrics:\n              - name: created\n                help: When the Velero backup was created, by its phase.\n                each:\n                  type: Gauge\n                  gauge: {path: [metadata, creationTimestamp]}\n          - groupVersionKind: {group: cert-manager.io, version: v1, kind: Certificate}\n            metricNamePrefix: zeabur_certmanager_certificate\n            labelsFromPath:\n              namespace: [metadata, namespace]\n              certificate: [metadata, name]\n            metrics:\n              - name: not_after\n                help: When the issued certificate expires.\n                errorLogV: 5\n                each:\n                  type: Gauge\n                  gauge: {path: [status, notAfter]}\n              - name: condition\n                help: The Certificate's conditions, 1 when true.\n                each:\n                  type: Gauge\n                  gauge:\n                    path: [status, conditions]\n                    labelsFromPath:\n                      type: [type]\n                    valueFrom: [status]\n  vmScrape:\n    spec:\n      endpoints:\n        # The chart's endpoint, plus two drops. The rules read failed\n        # backups only. Each successful backup adds one series.\n        - port: http\n          honorLabels: true\n          metricRelabelConfigs:\n            - action: labeldrop\n              regex: (uid|container_id|image_id)\n            - action: drop\n              if: '{__name__=\"zeabur_cnpg_backup_created\", phase=\"completed\"}'\n            - action: drop\n              if: '{__name__=\"zeabur_psmdb_backup_created\", state=\"ready\"}'\nalertmanager:\n  spec:\n    # Each project keeps its channels in VMAlertmanagerConfigs. The operator\n    # then routes a config only its own namespace's alerts, and refuses one\n    # that reads files from the Alertmanager pod.\n    disableNamespaceMatcher: false\n    arbitraryFSAccessThroughSMs:\n      deny: true\nvmagent:\n  spec:\n    # 30s cuts scrape cost by a third versus the chart's 20s.\n    scrapeInterval: 30s\n",
+          "version": "0.96.0"
+        },
+        {
+          "manifests": "apiVersion: operator.victoriametrics.com/v1beta1\nkind: VMRule\nmetadata:\n  name: zeabur-notifications\n  namespace: observability\nspec:\n  groups:\n    - name: zeabur-project\n      interval: 30s\n      rules:\n        - alert: ZeaburBuildFailed\n          expr: |\n            max by (namespace, build, buildrun, reason) (\n              zeabur_builder_buildrun_completion_time{phase=\"Failed\"}\n            ) > time() - 900\n            and on (namespace) kube_namespace_labels{label_zeabur_com_project!=\"\"}\n          labels: {zeabur_event: build-failed, zeabur_kind: event, severity: warning}\n          annotations:\n            summary: \"Build {{ $labels.build }} failed ({{ $labels.reason }}).\"\n            description: \"BuildRun {{ $labels.buildrun }} in {{ $labels.namespace }} failed with reason {{ $labels.reason }}.\"\n        - alert: ZeaburBuildSucceeded\n          expr: |\n            max by (namespace, build, buildrun) (\n              zeabur_builder_buildrun_completion_time{phase=\"Succeeded\"}\n            ) > time() - 900\n            and on (namespace) kube_namespace_labels{label_zeabur_com_project!=\"\"}\n          labels: {zeabur_event: build-succeeded, zeabur_kind: event, severity: info}\n          annotations:\n            summary: \"Build {{ $labels.build }} succeeded.\"\n            description: \"BuildRun {{ $labels.buildrun }} in {{ $labels.namespace }} succeeded.\"\n        # The Deployment controller gives up on a rollout after\n        # progressDeadlineSeconds (600 by default).\n        - alert: ZeaburDeployFailed\n          expr: |\n            max by (namespace, deployment) (\n              kube_deployment_status_condition{condition=\"Progressing\", status=\"false\"}\n            ) == 1\n            and on (namespace) kube_namespace_labels{label_zeabur_com_project!=\"\"}\n          labels: {zeabur_event: deploy-failed, zeabur_kind: state, severity: warning}\n          annotations:\n            summary: \"Deployment of {{ $labels.deployment }} failed.\"\n            description: \"The rollout of {{ $labels.deployment }} in {{ $labels.namespace }} passed its progress deadline.\"\n        # A rollout makes a new ReplicaSet. It succeeded when the\n        # Deployment then runs only up-to-date, available replicas. A\n        # rollback to an earlier ReplicaSet does not count.\n        - alert: ZeaburDeploySucceeded\n          expr: |\n            max by (namespace, deployment) (\n              label_replace(\n                (time() - kube_replicaset_created < 1800)\n                * on (namespace, replicaset) group_left (owner_name)\n                kube_replicaset_owner{owner_kind=\"Deployment\"},\n                \"deployment\", \"$1\", \"owner_name\", \"(.+)\"\n              )\n            )\n            and on (namespace, deployment) (kube_deployment_status_observed_generation == kube_deployment_metadata_generation)\n            and on (namespace, deployment) (kube_deployment_status_replicas_updated == kube_deployment_spec_replicas)\n            and on (namespace, deployment) (kube_deployment_status_replicas_available == kube_deployment_spec_replicas)\n            and on (namespace, deployment) (kube_deployment_status_replicas == kube_deployment_spec_replicas)\n            and on (namespace, deployment) (kube_deployment_spec_replicas > 0)\n            and on (namespace) kube_namespace_labels{label_zeabur_com_project!=\"\"}\n          labels: {zeabur_event: deploy-succeeded, zeabur_kind: event, severity: info}\n          annotations:\n            summary: \"{{ $labels.deployment }} is deployed.\"\n            description: \"All replicas of {{ $labels.deployment }} in {{ $labels.namespace }} run the new version.\"\n        - alert: ZeaburCrashLooping\n          expr: |\n            max by (namespace, pod, container) (\n              kube_pod_container_status_waiting_reason{reason=\"CrashLoopBackOff\"}\n            ) == 1\n            and on (namespace) kube_namespace_labels{label_zeabur_com_project!=\"\"}\n          for: 5m\n          labels: {zeabur_event: crash-loop, zeabur_kind: state, severity: warning}\n          annotations:\n            summary: \"{{ $labels.pod }} keeps crashing.\"\n            description: \"Container {{ $labels.container }} of {{ $labels.pod }} in {{ $labels.namespace }} has been in CrashLoopBackOff for 5 minutes.\"\n        - alert: ZeaburOutOfMemory\n          expr: |\n            max by (namespace, pod, container) (\n              kube_pod_container_status_last_terminated_reason{reason=\"OOMKilled\"}\n            ) == 1\n            and on (namespace, pod, container) (\n              max by (namespace, pod, container) (increase(kube_pod_container_status_restarts_total[10m])) > 0\n            )\n            and on (namespace) kube_namespace_labels{label_zeabur_com_project!=\"\"}\n          labels: {zeabur_event: out-of-memory, zeabur_kind: event, severity: warning}\n          annotations:\n            summary: \"{{ $labels.pod }} ran out of memory.\"\n            description: \"Container {{ $labels.container }} of {{ $labels.pod }} in {{ $labels.namespace }} used its memory limit and restarted.\"\n        # Without the phase in the grouping, a move from one unhealthy\n        # phase to another does not restart the 15 minutes.\n        - alert: ZeaburPostgresUnhealthy\n          expr: |\n            max by (namespace, cluster) (\n              zeabur_cnpg_cluster_phase{phase!=\"Cluster in healthy state\"}\n            ) == 1\n            and on (namespace) kube_namespace_labels{label_zeabur_com_project!=\"\"}\n          for: 15m\n          labels: {zeabur_event: database-unhealthy, zeabur_kind: state, severity: critical}\n          annotations:\n            summary: \"PostgreSQL {{ $labels.cluster }} is not healthy.\"\n            description: \"PostgreSQL cluster {{ $labels.cluster }} in {{ $labels.namespace }} has not been healthy for 15 minutes.\"\n        - alert: ZeaburMongoDBUnhealthy\n          expr: |\n            max by (namespace, cluster) (zeabur_psmdb_state{state=\"error\"}) == 1\n            and on (namespace) kube_namespace_labels{label_zeabur_com_project!=\"\"}\n          for: 10m\n          labels: {zeabur_event: database-unhealthy, zeabur_kind: state, severity: critical}\n          annotations:\n            summary: \"MongoDB {{ $labels.cluster }} is in error.\"\n            description: \"MongoDB cluster {{ $labels.cluster }} in {{ $labels.namespace }} has been in error for 10 minutes.\"\n        - alert: ZeaburPostgresBackupFailed\n          expr: |\n            max by (namespace, cluster, backup) (\n              zeabur_cnpg_backup_created{phase=~\"failed|walArchivingFailing\"}\n            ) > time() - 21600\n            and on (namespace) kube_namespace_labels{label_zeabur_com_project!=\"\"}\n          labels: {zeabur_event: backup-failed, zeabur_kind: event, severity: critical}\n          annotations:\n            summary: \"Backup {{ $labels.backup }} of PostgreSQL {{ $labels.cluster }} failed.\"\n            description: \"Backup {{ $labels.backup }} in {{ $labels.namespace }} failed.\"\n        - alert: ZeaburMongoDBBackupFailed\n          expr: |\n            max by (namespace, cluster, backup) (\n              zeabur_psmdb_backup_created{state=~\"error|rejected\"}\n            ) > time() - 21600\n            and on (namespace) kube_namespace_labels{label_zeabur_com_project!=\"\"}\n          labels: {zeabur_event: backup-failed, zeabur_kind: event, severity: critical}\n          annotations:\n            summary: \"Backup {{ $labels.backup }} of MongoDB {{ $labels.cluster }} failed.\"\n            description: \"Backup {{ $labels.backup }} in {{ $labels.namespace }} failed.\"\n        - alert: ZeaburVolumeBackupFailed\n          expr: |\n            max by (namespace, backup) (\n              zeabur_k8up_backup_condition_time{type=\"Completed\", reason=\"Failed\"}\n            ) > time() - 21600\n            and on (namespace) kube_namespace_labels{label_zeabur_com_project!=\"\"}\n          labels: {zeabur_event: backup-failed, zeabur_kind: event, severity: critical}\n          annotations:\n            summary: \"Volume backup {{ $labels.backup }} failed.\"\n            description: \"K8up backup {{ $labels.backup }} in {{ $labels.namespace }} failed.\"\n        # Volumes on local-path report no usage; this covers the others.\n        - alert: ZeaburVolumeAlmostFull\n          expr: |\n            max by (namespace, persistentvolumeclaim) (\n              kubelet_volume_stats_available_bytes / kubelet_volume_stats_capacity_bytes\n            ) < 0.1\n            and on (namespace) kube_namespace_labels{label_zeabur_com_project!=\"\"}\n          for: 10m\n          labels: {zeabur_event: volume-almost-full, zeabur_kind: state, severity: warning}\n          annotations:\n            summary: \"Volume {{ $labels.persistentvolumeclaim }} is almost full.\"\n            description: \"Less than 10% of volume {{ $labels.persistentvolumeclaim }} in {{ $labels.namespace }} is free.\"\n        # cert-manager renews 30 days before expiry, so 14 days left\n        # means renewal keeps failing.\n        - alert: ZeaburCertificateExpiring\n          expr: |\n            max by (namespace, certificate) (zeabur_certmanager_certificate_not_after) - time() < 14 * 86400\n            and on (namespace) kube_namespace_labels{label_zeabur_com_project!=\"\"}\n          labels: {zeabur_event: certificate, zeabur_kind: state, severity: warning}\n          annotations:\n            summary: \"Certificate {{ $labels.certificate }} expires soon.\"\n            description: \"Certificate {{ $labels.certificate }} in {{ $labels.namespace }} expires in less than 14 days and was not renewed.\"\n        - alert: ZeaburCertificateNotReady\n          expr: |\n            max by (namespace, certificate) (zeabur_certmanager_certificate_condition{type=\"Ready\"}) == 0\n            and on (namespace) kube_namespace_labels{label_zeabur_com_project!=\"\"}\n          for: 1h\n          labels: {zeabur_event: certificate, zeabur_kind: state, severity: warning}\n          annotations:\n            summary: \"Certificate {{ $labels.certificate }} is not ready.\"\n            description: \"Certificate {{ $labels.certificate }} in {{ $labels.namespace }} has not been issued for an hour.\"\n        # Zeabur creates a short-lived Job with this label to test a\n        # channel. The namespace comes from the Job, so a person can\n        # only test the channels of a namespace where they create Jobs.\n        - alert: ZeaburNotificationTest\n          expr: |\n            label_replace(\n              max by (namespace, label_zeabur_com_notification_test) (\n                kube_job_labels{label_zeabur_com_notification_test!=\"\"}\n              ),\n              \"zeabur_channel\", \"$1\", \"label_zeabur_com_notification_test\", \"(.+)\"\n            )\n          labels: {zeabur_event: test, zeabur_kind: event, severity: info}\n          annotations:\n            summary: \"Test notification from Zeabur.\"\n            description: \"This channel receives notifications from {{ $labels.namespace }}.\"\n    - name: zeabur-cluster\n      interval: 30s\n      # The cluster's channels are in observability.\n      labels: {namespace: observability}\n      rules:\n        - alert: ZeaburNodeNotReady\n          expr: |\n            max by (node) (kube_node_status_condition{condition=\"Ready\", status=\"true\"}) == 0\n          for: 5m\n          labels: {zeabur_event: node-not-ready, zeabur_kind: state, severity: critical}\n          annotations:\n            summary: \"Node {{ $labels.node }} is not ready.\"\n            description: \"Node {{ $labels.node }} has not been ready for 5 minutes.\"\n        - alert: ZeaburNodeDiskAlmostFull\n          expr: |\n            max by (instance, mountpoint) (\n              node_filesystem_avail_bytes{fstype!~\"tmpfs|ramfs\"} / node_filesystem_size_bytes{fstype!~\"tmpfs|ramfs\"}\n            ) < 0.1\n          for: 10m\n          labels: {zeabur_event: volume-almost-full, zeabur_kind: state, severity: warning}\n          annotations:\n            summary: \"Disk {{ $labels.mountpoint }} on {{ $labels.instance }} is almost full.\"\n            description: \"Less than 10% of {{ $labels.mountpoint }} on {{ $labels.instance }} is free.\"\n        - alert: ZeaburSystemCrashLooping\n          expr: |\n            label_move(\n              max by (namespace, pod, container) (\n                kube_pod_container_status_waiting_reason{reason=\"CrashLoopBackOff\"}\n              ) == 1\n              unless on (namespace) kube_namespace_labels{label_zeabur_com_project!=\"\"},\n              \"namespace\", \"object_namespace\"\n            )\n          for: 5m\n          labels: {zeabur_event: crash-loop, zeabur_kind: state, severity: critical}\n          annotations:\n            summary: \"System pod {{ $labels.pod }} keeps crashing.\"\n            description: \"Container {{ $labels.container }} of {{ $labels.pod }} in {{ $labels.object_namespace }} has been in CrashLoopBackOff for 5 minutes.\"\n        - alert: ZeaburSystemVolumeAlmostFull\n          expr: |\n            label_move(\n              max by (namespace, persistentvolumeclaim) (\n                kubelet_volume_stats_available_bytes / kubelet_volume_stats_capacity_bytes\n              ) < 0.1\n              unless on (namespace) kube_namespace_labels{label_zeabur_com_project!=\"\"},\n              \"namespace\", \"object_namespace\"\n            )\n          for: 10m\n          labels: {zeabur_event: volume-almost-full, zeabur_kind: state, severity: warning}\n          annotations:\n            summary: \"Volume {{ $labels.persistentvolumeclaim }} is almost full.\"\n            description: \"Less than 10% of volume {{ $labels.persistentvolumeclaim }} in {{ $labels.object_namespace }} is free.\"\n        - alert: ZeaburSystemCertificateExpiring\n          expr: |\n            label_move(\n              max by (namespace, certificate) (zeabur_certmanager_certificate_not_after) - time() < 14 * 86400\n              unless on (namespace) kube_namespace_labels{label_zeabur_com_project!=\"\"},\n              \"namespace\", \"object_namespace\"\n            )\n          labels: {zeabur_event: certificate, zeabur_kind: state, severity: warning}\n          annotations:\n            summary: \"Certificate {{ $labels.certificate }} expires soon.\"\n            description: \"Certificate {{ $labels.certificate }} in {{ $labels.object_namespace }} expires in less than 14 days and was not renewed.\"\n        - alert: ZeaburClusterBackupFailed\n          expr: |\n            label_move(\n              max by (namespace, backup) (\n                zeabur_velero_backup_created{phase=~\"Failed|PartiallyFailed|FailedValidation\"}\n              ) > time() - 21600,\n              \"namespace\", \"object_namespace\"\n            )\n          labels: {zeabur_event: backup-failed, zeabur_kind: event, severity: critical}\n          annotations:\n            summary: \"Cluster backup {{ $labels.backup }} failed.\"\n            description: \"Velero backup {{ $labels.backup }} did not complete.\"\n---\n# Only the alert senders and the scraper reach Alertmanager. Without\n# this, any pod could post alerts with another project's namespace, or\n# silence them. kubectl port-forward does not pass through\n# NetworkPolicies, so it still works.\napiVersion: networking.k8s.io/v1\nkind: NetworkPolicy\nmetadata:\n  name: vmalertmanager-senders-only\n  namespace: observability\nspec:\n  podSelector:\n    matchLabels: {app.kubernetes.io/name: vmalertmanager}\n  policyTypes: [Ingress]\n  ingress:\n    - from:\n        - podSelector:\n            matchLabels: {app.kubernetes.io/name: vmalert}\n      ports:\n        - {port: 9093, protocol: TCP}\n    - from:\n        - namespaceSelector:\n            matchLabels: {kubernetes.io/metadata.name: falco}\n          podSelector:\n            matchLabels: {app.kubernetes.io/name: falcosidekick}\n      ports:\n        - {port: 9093, protocol: TCP}\n    - from:\n        - podSelector:\n            matchLabels: {app.kubernetes.io/name: vmagent}\n      ports:\n        - {port: 9093, protocol: TCP}\n        - {port: 8435, protocol: TCP}\n    # Replicas gossip silences and notification state.\n    - from:\n        - podSelector:\n            matchLabels: {app.kubernetes.io/name: vmalertmanager}\n      ports:\n        - {port: 9094, protocol: TCP}\n        - {port: 9094, protocol: UDP}\n",
+          "name": "notifications",
+          "namespace": "observability"
+        }
+      ],
+      "requires": [
+        "observability-operator/victoria-metrics-operator"
+      ],
       "security": {
         "clusterWide": true,
         "risks": [
@@ -1134,9 +1201,21 @@
           {
             "mitigation": "Restrict tenant scrapes to their own namespace with an admission policy.",
             "risk": "Scrape objects can select pods in other namespaces."
+          },
+          {
+            "mitigation": "The operator adds a matcher for the config's own namespace to every route (disableNamespaceMatcher stays false) and refuses file references (arbitraryFSAccessThroughSMs.deny).\n",
+            "risk": "Project Developers write VMAlertmanagerConfigs for their notifications. A config could route other namespaces' alerts, or read files from the Alertmanager pod.\n"
+          },
+          {
+            "mitigation": "An egress NetworkPolicy is not practical: the config reloader needs the API server. Block metadata addresses at the node if that matters.\n",
+            "risk": "Webhook receivers make Alertmanager send requests to any address, including cluster services and cloud metadata. Only the alert text goes out and no response comes back.\n"
+          },
+          {
+            "mitigation": "A NetworkPolicy (vmalertmanager-senders-only) admits only vmalert, falcosidekick, vmagent and Alertmanager replicas.\n",
+            "risk": "Any pod could post alerts or silences to Alertmanager in another project's name."
           }
         ],
-        "summary": "Manages VictoriaMetrics objects and scrapes pods in all namespaces.",
+        "summary": "Manages VictoriaMetrics objects, scrapes pods in all namespaces, and reads builds, databases, backups and certificates in all namespaces for alerts.\n",
         "tenantCRDs": [
           "VMServiceScrape",
           "VMPodScrape",
@@ -1152,81 +1231,96 @@
             "-n observability vmsingle --all --for=jsonpath={.status.updateStatus}=operational"
           ]
         }
-      ],
-      "leftovers": [
-        "persistentvolumeclaims"
-      ],
-      "installOrder": {
-        "multi-node": [
-          "ingress/traefik",
-          "certificates/cert-manager",
-          "observability-operator/victoria-metrics-operator",
-          "metrics/victoria-metrics"
-        ],
-        "single-node": [
-          "ingress/traefik",
-          "certificates/cert-manager",
-          "observability-operator/victoria-metrics-operator",
-          "metrics/victoria-metrics"
-        ]
-      },
-      "measured": {
-        "multi-node-amd64-v1.36.4": {
-          "idleMemoryMiB": 443,
-          "idleCPUm": 52,
-          "versions": {
-            "k8s-stack": "0.95.2"
-          },
-          "measuredAt": "2026-10-11"
-        },
-        "multi-node-arm64-v1.36.4": {
-          "idleMemoryMiB": 448,
-          "idleCPUm": 33,
-          "versions": {
-            "k8s-stack": "0.95.2"
-          },
-          "measuredAt": "2026-10-11"
-        },
-        "single-node-amd64-v1.36.4": {
-          "idleMemoryMiB": 207,
-          "idleCPUm": 28,
-          "versions": {
-            "k8s-stack": "0.95.2"
-          },
-          "measuredAt": "2026-10-11"
-        },
-        "single-node-arm64-v1.36.4": {
-          "idleMemoryMiB": 206,
-          "idleCPUm": 26,
-          "versions": {
-            "k8s-stack": "0.95.2"
-          },
-          "measuredAt": "2026-10-13"
-        }
-      }
+      ]
     },
     {
-      "id": "node-updates/system-upgrade-controller",
-      "apiVersion": "catalog.zeabur.com/v1",
-      "kind": "Component",
-      "capability": "node-updates",
-      "metadata": {
-        "name": "System Upgrade Controller",
-        "description": "Upgrades k3s and node packages one node at a time from declarative Plans, with cordon, drain and concurrency limits. The catalog installs it from upstream manifests because the Rancher chart lags behind releases.\n",
-        "license": "Apache-2.0",
-        "homepage": "https://github.com/rancher/system-upgrade-controller"
-      },
-      "maturity": "independent",
       "alternatives": {
         "kured": "If installed, kured keeps handling reboots."
       },
+      "apiVersion": "catalog.zeabur.com/v1",
+      "capability": "node-updates",
       "defaults": {
         "multi-node": "recommended",
         "single-node": "recommended"
       },
+      "detection": {
+        "crds": [
+          "plans.upgrade.cattle.io"
+        ],
+        "helmCharts": [
+          "system-upgrade-controller"
+        ],
+        "workloads": [
+          {
+            "kind": "Deployment",
+            "labels": {
+              "upgrade.cattle.io/controller": "system-upgrade-controller"
+            }
+          }
+        ]
+      },
       "distributions": [
-        "k3s"
+        "k3s",
+        "rke2"
       ],
+      "id": "node-updates/system-upgrade-controller",
+      "installOrder": {
+        "multi-node": [
+          "node-updates/system-upgrade-controller"
+        ],
+        "single-node": [
+          "node-updates/system-upgrade-controller"
+        ]
+      },
+      "kind": "Component",
+      "leftovers": [
+        "customresourcedefinitions"
+      ],
+      "maturity": "independent",
+      "measured": {
+        "multi-node-amd64-v1.36.4": {
+          "idleCPUm": 0,
+          "idleMemoryMiB": 11,
+          "measuredAt": "2026-10-11",
+          "versions": {
+            "controller": "v0.20.2",
+            "crds": "v0.20.2"
+          }
+        },
+        "multi-node-arm64-v1.36.4": {
+          "idleCPUm": 0,
+          "idleMemoryMiB": 11,
+          "measuredAt": "2026-10-11",
+          "versions": {
+            "controller": "v0.20.2",
+            "crds": "v0.20.2"
+          }
+        },
+        "single-node-amd64-v1.36.4": {
+          "idleCPUm": 0,
+          "idleMemoryMiB": 12,
+          "measuredAt": "2026-10-11",
+          "versions": {
+            "controller": "v0.20.2",
+            "crds": "v0.20.2"
+          }
+        },
+        "single-node-arm64-v1.36.4": {
+          "idleCPUm": 0,
+          "idleMemoryMiB": 11,
+          "measuredAt": "2026-10-11",
+          "versions": {
+            "controller": "v0.20.2",
+            "crds": "v0.20.2"
+          }
+        }
+      },
+      "metadata": {
+        "description": "Upgrades k3s or RKE2 and node packages one node at a time from declarative Plans, with cordon, drain and concurrency limits. The catalog installs it from upstream manifests because the Rancher chart lags behind releases.\n",
+        "homepage": "https://github.com/rancher/system-upgrade-controller",
+        "license": "Apache-2.0",
+        "name": "System Upgrade Controller"
+      },
       "releases": [
         {
           "name": "crds",
@@ -1245,22 +1339,6 @@
           "version": "v0.20.2"
         }
       ],
-      "detection": {
-        "crds": [
-          "plans.upgrade.cattle.io"
-        ],
-        "helmCharts": [
-          "system-upgrade-controller"
-        ],
-        "workloads": [
-          {
-            "kind": "Deployment",
-            "labels": {
-              "upgrade.cattle.io/controller": "system-upgrade-controller"
-            }
-          }
-        ]
-      },
       "security": {
         "clusterWide": true,
         "privileged": true,
@@ -1272,92 +1350,18 @@
         ],
         "summary": "Cordons and drains nodes, and creates privileged Jobs that run Plan images on the host.",
         "tenants": "admin-only"
-      },
-      "leftovers": [
-        "customresourcedefinitions"
-      ],
-      "installOrder": {
-        "multi-node": [
-          "node-updates/system-upgrade-controller"
-        ],
-        "single-node": [
-          "node-updates/system-upgrade-controller"
-        ]
-      },
-      "measured": {
-        "multi-node-amd64-v1.36.4": {
-          "idleMemoryMiB": 11,
-          "idleCPUm": 0,
-          "versions": {
-            "controller": "v0.20.2",
-            "crds": "v0.20.2"
-          },
-          "measuredAt": "2026-10-11"
-        },
-        "multi-node-arm64-v1.36.4": {
-          "idleMemoryMiB": 11,
-          "idleCPUm": 0,
-          "versions": {
-            "controller": "v0.20.2",
-            "crds": "v0.20.2"
-          },
-          "measuredAt": "2026-10-11"
-        },
-        "single-node-amd64-v1.36.4": {
-          "idleMemoryMiB": 12,
-          "idleCPUm": 0,
-          "versions": {
-            "controller": "v0.20.2",
-            "crds": "v0.20.2"
-          },
-          "measuredAt": "2026-10-11"
-        },
-        "single-node-arm64-v1.36.4": {
-          "idleMemoryMiB": 11,
-          "idleCPUm": 0,
-          "versions": {
-            "controller": "v0.20.2",
-            "crds": "v0.20.2"
-          },
-          "measuredAt": "2026-10-11"
-        }
       }
     },
     {
-      "id": "observability-operator/victoria-metrics-operator",
-      "apiVersion": "catalog.zeabur.com/v1",
-      "kind": "Component",
-      "capability": "observability-operator",
-      "metadata": {
-        "name": "VictoriaMetrics operator",
-        "description": "One operator runs both the metrics and the logs stack from CRDs, and accepts Prometheus operator objects so existing app manifests keep working.\n",
-        "license": "Apache-2.0",
-        "homepage": "https://docs.victoriametrics.com/operator/"
-      },
-      "maturity": "independent",
       "alternatives": {
         "prometheus-operator": "An existing installation is reused, and the VictoriaMetrics operator converts its objects."
       },
+      "apiVersion": "catalog.zeabur.com/v1",
+      "capability": "observability-operator",
       "defaults": {
         "multi-node": "recommended",
         "single-node": "recommended"
       },
-      "requires": [
-        "certificates"
-      ],
-      "releases": [
-        {
-          "name": "operator",
-          "namespace": "observability",
-          "releaseName": "victoria-metrics-operator",
-          "chart": "oci://ghcr.io/victoriametrics/helm-charts/victoria-metrics-operator",
-          "version": "0.68.1",
-          "values": "admissionWebhooks:\n  certManager:\n    # cert-manager issues the webhook certificate, so every render is identical.\n    enabled: true\ncrds:\n  # Delete VM objects before uninstall so finalizers don't block the namespace.\n  cleanup:\n    enabled: true\n",
-          "profiles": {
-            "single-node": "resources:\n  # The operator idles near 40Mi.\n  requests: {cpu: 10m, memory: 48Mi}\n  limits: {memory: 256Mi}\n"
-          }
-        }
-      ],
       "detection": {
         "crds": [
           "vmsingles.operator.victoriametrics.com",
@@ -1375,16 +1379,7 @@
           }
         ]
       },
-      "security": {
-        "clusterWide": true,
-        "summary": "Manages VictoriaMetrics and VictoriaLogs objects and their workloads in all namespaces.",
-        "tenants": "admin-only"
-      },
-      "leftovers": [
-        "customresourcedefinitions",
-        "clusterroles/victoria-metrics-operator-cleanup-hook",
-        "clusterrolebindings/victoria-metrics-operator-cleanup-hook"
-      ],
+      "id": "observability-operator/victoria-metrics-operator",
       "installOrder": {
         "multi-node": [
           "ingress/traefik",
@@ -1397,95 +1392,82 @@
           "observability-operator/victoria-metrics-operator"
         ]
       },
+      "kind": "Component",
+      "leftovers": [
+        "customresourcedefinitions",
+        "clusterroles/victoria-metrics-operator-cleanup-hook",
+        "clusterrolebindings/victoria-metrics-operator-cleanup-hook"
+      ],
+      "maturity": "independent",
       "measured": {
         "multi-node-amd64-v1.36.4": {
-          "idleMemoryMiB": 20,
           "idleCPUm": 2,
+          "idleMemoryMiB": 20,
+          "measuredAt": "2026-10-11",
           "versions": {
             "operator": "0.68.1"
-          },
-          "measuredAt": "2026-10-11"
+          }
         },
         "multi-node-arm64-v1.36.4": {
-          "idleMemoryMiB": 19,
           "idleCPUm": 1,
+          "idleMemoryMiB": 19,
+          "measuredAt": "2026-10-11",
           "versions": {
             "operator": "0.68.1"
-          },
-          "measuredAt": "2026-10-11"
+          }
         },
         "single-node-amd64-v1.36.4": {
-          "idleMemoryMiB": 20,
           "idleCPUm": 2,
+          "idleMemoryMiB": 20,
+          "measuredAt": "2026-10-11",
           "versions": {
             "operator": "0.68.1"
-          },
-          "measuredAt": "2026-10-11"
+          }
         },
         "single-node-arm64-v1.36.4": {
-          "idleMemoryMiB": 20,
           "idleCPUm": 2,
+          "idleMemoryMiB": 20,
+          "measuredAt": "2026-10-13",
           "versions": {
             "operator": "0.68.1"
-          },
-          "measuredAt": "2026-10-13"
+          }
         }
+      },
+      "metadata": {
+        "description": "One operator runs both the metrics and the logs stack from CRDs, and accepts Prometheus operator objects so existing app manifests keep working.\n",
+        "homepage": "https://docs.victoriametrics.com/operator/",
+        "license": "Apache-2.0",
+        "name": "VictoriaMetrics operator"
+      },
+      "releases": [
+        {
+          "chart": "oci://ghcr.io/victoriametrics/helm-charts/victoria-metrics-operator",
+          "name": "operator",
+          "namespace": "observability",
+          "profiles": {
+            "single-node": "resources:\n  # The operator idles near 40Mi.\n  requests: {cpu: 10m, memory: 48Mi}\n  limits: {memory: 256Mi}\n"
+          },
+          "releaseName": "victoria-metrics-operator",
+          "values": "admissionWebhooks:\n  certManager:\n    # cert-manager issues the webhook certificate, so every render is identical.\n    enabled: true\ncrds:\n  # Delete VM objects before uninstall so finalizers don't block the namespace.\n  cleanup:\n    enabled: true\n",
+          "version": "0.68.1"
+        }
+      ],
+      "requires": [
+        "certificates"
+      ],
+      "security": {
+        "clusterWide": true,
+        "summary": "Manages VictoriaMetrics and VictoriaLogs objects and their workloads in all namespaces.",
+        "tenants": "admin-only"
       }
     },
     {
-      "id": "remote-access/tailscale-operator",
       "apiVersion": "catalog.zeabur.com/v1",
-      "kind": "Component",
       "capability": "remote-access",
-      "metadata": {
-        "name": "Tailscale Kubernetes operator",
-        "description": "Puts a Service or Ingress on the tailnet with no port open to the internet. An Ingress gets a MagicDNS name with a Let's Encrypt certificate, so a host without a domain still serves trusted HTTPS; a Service is proxied as it is, without TLS. Optional: it needs a Tailscale account, and an Ingress needs HTTPS and MagicDNS enabled on the tailnet.\n",
-        "license": "BSD-3-Clause",
-        "homepage": "https://tailscale.com/kb/1236/kubernetes-operator"
-      },
-      "maturity": "independent",
       "defaults": {
         "multi-node": "optional",
         "single-node": "optional"
       },
-      "inputs": [
-        {
-          "name": "oauth-client-id",
-          "description": "The operator uses the Tailscale OAuth client with this ID. The client needs write scope for Services, Devices Core and Auth Keys, and the tag tag:k8s-operator. The tailnet policy must make tag:k8s-operator an owner of tag:k8s, the proxies' default tag.\n",
-          "secret": {
-            "name": "operator-oauth",
-            "key": "client_id",
-            "namespace": "tailscale"
-          },
-          "required": true,
-          "testValue": "catalog-ci"
-        },
-        {
-          "name": "oauth-client-secret",
-          "description": "The operator authenticates with this OAuth client secret.",
-          "secret": {
-            "name": "operator-oauth",
-            "key": "client_secret",
-            "namespace": "tailscale"
-          },
-          "required": true,
-          "testValue": "catalog-ci"
-        }
-      ],
-      "releases": [
-        {
-          "name": "tailscale-operator",
-          "namespace": "tailscale",
-          "chart": "tailscale-operator",
-          "repo": "https://pkgs.tailscale.com/helmcharts",
-          "version": "1.104.1",
-          "values": "oauth:\n  # Empty, so the chart renders no Secret; the operator mounts\n  # operator-oauth, created from the inputs before install.\n  clientId: \"\"\n  clientSecret: \"\"\noperatorConfig:\n  image:\n    # The tag is pinned to the chart's appVersion; Always pulls on every restart.\n    pullPolicy: IfNotPresent\napiServerProxyConfig:\n  # No Kubernetes API proxy and no impersonation ClusterRole.\n  mode: \"false\"\n  allowImpersonation: \"false\"\n",
-          "profiles": {
-            "multi-node": "operatorConfig:\n  resources:\n    # More Services and Ingresses to reconcile.\n    requests: {cpu: 50m, memory: 128Mi}\n    limits: {memory: 512Mi}\n",
-            "single-node": "operatorConfig:\n  resources:\n    # Chart sets none; one controller and one tailnet node.\n    requests: {cpu: 20m, memory: 64Mi}\n    limits: {memory: 256Mi}\n"
-          }
-        }
-      ],
       "detection": {
         "crds": [
           "proxyclasses.tailscale.com",
@@ -1498,6 +1480,61 @@
           "tailscale.com/ts-ingress"
         ]
       },
+      "id": "remote-access/tailscale-operator",
+      "inputs": [
+        {
+          "description": "The operator uses the Tailscale OAuth client with this ID. The client needs write scope for Services, Devices Core and Auth Keys, and the tag tag:k8s-operator. The tailnet policy must make tag:k8s-operator an owner of tag:k8s, the proxies' default tag.\n",
+          "name": "oauth-client-id",
+          "required": true,
+          "secret": {
+            "key": "client_id",
+            "name": "operator-oauth",
+            "namespace": "tailscale"
+          },
+          "testValue": "catalog-ci"
+        },
+        {
+          "description": "The operator authenticates with this OAuth client secret.",
+          "name": "oauth-client-secret",
+          "required": true,
+          "secret": {
+            "key": "client_secret",
+            "name": "operator-oauth",
+            "namespace": "tailscale"
+          },
+          "testValue": "catalog-ci"
+        }
+      ],
+      "installOrder": {
+        "multi-node": [
+          "remote-access/tailscale-operator"
+        ],
+        "single-node": [
+          "remote-access/tailscale-operator"
+        ]
+      },
+      "kind": "Component",
+      "maturity": "independent",
+      "metadata": {
+        "description": "Puts a Service or Ingress on the tailnet with no port open to the internet. An Ingress gets a MagicDNS name with a Let's Encrypt certificate, so a host without a domain still serves trusted HTTPS; a Service is proxied as it is, without TLS. Optional: it needs a Tailscale account, and an Ingress needs HTTPS and MagicDNS enabled on the tailnet.\n",
+        "homepage": "https://tailscale.com/kb/1236/kubernetes-operator",
+        "license": "BSD-3-Clause",
+        "name": "Tailscale Kubernetes operator"
+      },
+      "releases": [
+        {
+          "chart": "tailscale-operator",
+          "name": "tailscale-operator",
+          "namespace": "tailscale",
+          "profiles": {
+            "multi-node": "operatorConfig:\n  resources:\n    # More Services and Ingresses to reconcile.\n    requests: {cpu: 50m, memory: 128Mi}\n    limits: {memory: 512Mi}\n",
+            "single-node": "operatorConfig:\n  resources:\n    # Chart sets none; one controller and one tailnet node.\n    requests: {cpu: 20m, memory: 64Mi}\n    limits: {memory: 256Mi}\n"
+          },
+          "repo": "https://pkgs.tailscale.com/helmcharts",
+          "values": "oauth:\n  # Empty, so the chart renders no Secret; the operator mounts\n  # operator-oauth, created from the inputs before install.\n  clientId: \"\"\n  clientSecret: \"\"\noperatorConfig:\n  image:\n    # The tag is pinned to the chart's appVersion; Always pulls on every restart.\n    pullPolicy: IfNotPresent\napiServerProxyConfig:\n  # No Kubernetes API proxy and no impersonation ClusterRole.\n  mode: \"false\"\n  allowImpersonation: \"false\"\n",
+          "version": "1.104.2"
+        }
+      ],
       "security": {
         "clusterWide": true,
         "credentials": "required",
@@ -1532,56 +1569,18 @@
             "crd/connectors.tailscale.com --for=condition=Established"
           ]
         }
-      ],
-      "installOrder": {
-        "multi-node": [
-          "remote-access/tailscale-operator"
-        ],
-        "single-node": [
-          "remote-access/tailscale-operator"
-        ]
-      }
+      ]
     },
     {
-      "id": "replicated-storage/longhorn",
-      "apiVersion": "catalog.zeabur.com/v1",
-      "kind": "Component",
-      "capability": "replicated-storage",
-      "metadata": {
-        "name": "Longhorn",
-        "description": "Block storage replicated across nodes: a volume survives losing its node, follows its pod to another node, and can be expanded in place. Recommended on multi-node, where it becomes the default storage class. Optional on single-node, where a replica has nowhere else to go; it still gives expandable volumes and snapshots there.\n",
-        "license": "Apache-2.0",
-        "homepage": "https://longhorn.io"
-      },
-      "maturity": "cncf-incubating",
       "alternatives": {
         "local-path": "What the cluster has without it. Faster, but a volume stays on the node that created it. Still the better class for databases that replicate themselves (CloudNativePG, MongoDB): a second layer of copies costs write latency and disk for nothing.\n"
       },
+      "apiVersion": "catalog.zeabur.com/v1",
+      "capability": "replicated-storage",
       "defaults": {
         "multi-node": "recommended",
         "single-node": "optional"
       },
-      "persistsData": true,
-      "disruptsTraffic": true,
-      "releases": [
-        {
-          "name": "longhorn",
-          "namespace": "longhorn-system",
-          "chart": "longhorn",
-          "repo": "https://charts.longhorn.io",
-          "version": "1.12.1",
-          "values": "persistence:\n  # PVCs can grow without moving data; local-path cannot.\n  defaultClassReplicaCount: 3\n  # Volumes outlive their claims only when a person asks for it, as with local-path.\n  reclaimPolicy: Delete\ndefaultSettings:\n  # With fewer nodes than replicas, volumes still attach (degraded) and gain\n  # their missing replicas as nodes join, so a class asking for 3 gives\n  # min(3, nodes) copies.\n  allowVolumeCreationWithDegradedAvailability: true\n  # Spread existing replicas onto nodes that join later.\n  replicaAutoBalance: best-effort\n  # No calls to Longhorn's upgrade server; versions change with the catalog.\n  upgradeChecker: false\n  allowCollectingLonghornUsageMetrics: false\n  # After a Longhorn upgrade, move attached volumes to the new engine one\n  # node at a time; otherwise they stay on the old one until done by hand.\n  concurrentAutomaticEngineUpgradePerNodeLimit: 1\nlonghornUI:\n  # No login: it acts as Longhorn's admin. ClusterIP only (the chart's\n  # default, no Ingress); reach it with kubectl port-forward.\n  replicas: 1\nlonghornManager:\n  resources:\n    # Idles near 100Mi per node; the chart sets none. No limit: killing\n    # the manager stalls attach and detach on its node.\n    requests: {cpu: 25m, memory: 128Mi}\n",
-          "profiles": {
-            "multi-node": "persistence:\n  # New volumes without a class survive losing a node. local-path stays\n  # available for databases that replicate themselves.\n  defaultClass: true\ndefaultSettings:\n  # A pod on a dead node otherwise holds its volume until someone\n  # force-deletes it; this lets it start elsewhere.\n  nodeDownPodDeletionPolicy: delete-both-statefulset-and-deployment-pod\n",
-            "single-node": "persistence:\n  # local-path stays the default: on one node it is faster, and\n  # Longhorn is for volumes that need to grow.\n  defaultClass: false\n  # One node: a second replica would sit on the same disk.\n  defaultClassReplicaCount: 1\ncsi:\n  # One node: the chart's three replicas of each sidecar gain nothing.\n  attacherReplicaCount: 1\n  provisionerReplicaCount: 1\n  resizerReplicaCount: 1\n  snapshotterReplicaCount: 1\n"
-          }
-        },
-        {
-          "name": "ui-policy",
-          "namespace": "longhorn-system",
-          "manifests": "apiVersion: networking.k8s.io/v1\nkind: NetworkPolicy\nmetadata:\n  name: longhorn-ui-port-forward-only\n  namespace: longhorn-system\nspec:\n  podSelector:\n    matchLabels: {app: longhorn-ui}\n  policyTypes: [Ingress]\n"
-        }
-      ],
       "detection": {
         "crds": [
           "volumes.longhorn.io",
@@ -1599,6 +1598,48 @@
           }
         ]
       },
+      "disruptsTraffic": true,
+      "id": "replicated-storage/longhorn",
+      "installOrder": {
+        "multi-node": [
+          "replicated-storage/longhorn"
+        ],
+        "single-node": [
+          "replicated-storage/longhorn"
+        ]
+      },
+      "kind": "Component",
+      "leftovers": [
+        "customresourcedefinitions",
+        "storageclasses/longhorn-static"
+      ],
+      "maturity": "cncf-incubating",
+      "metadata": {
+        "description": "Block storage replicated across nodes: a volume survives losing its node, follows its pod to another node, and can be expanded in place. Recommended on multi-node, where it becomes the default storage class. Optional on single-node, where a replica has nowhere else to go; it still gives expandable volumes and snapshots there.\n",
+        "homepage": "https://longhorn.io",
+        "license": "Apache-2.0",
+        "name": "Longhorn"
+      },
+      "persistsData": true,
+      "releases": [
+        {
+          "chart": "longhorn",
+          "name": "longhorn",
+          "namespace": "longhorn-system",
+          "profiles": {
+            "multi-node": "persistence:\n  # New volumes without a class survive losing a node. local-path stays\n  # available for databases that replicate themselves.\n  defaultClass: true\ndefaultSettings:\n  # A pod on a dead node otherwise holds its volume until someone\n  # force-deletes it; this lets it start elsewhere.\n  nodeDownPodDeletionPolicy: delete-both-statefulset-and-deployment-pod\n",
+            "single-node": "persistence:\n  # local-path stays the default: on one node it is faster, and\n  # Longhorn is for volumes that need to grow.\n  defaultClass: false\n  # One node: a second replica would sit on the same disk.\n  defaultClassReplicaCount: 1\ncsi:\n  # One node: the chart's three replicas of each sidecar gain nothing.\n  attacherReplicaCount: 1\n  provisionerReplicaCount: 1\n  resizerReplicaCount: 1\n  snapshotterReplicaCount: 1\nlonghornGlobalManager:\n  # One node: the chart's three warm standbys gain nothing.\n  replicas: 1\n"
+          },
+          "repo": "https://charts.longhorn.io",
+          "values": "persistence:\n  # One copy per node, up to three: losing a node leaves two while the\n  # third rebuilds. Two nodes give two copies; with one down, volumes\n  # run on a single copy until it is back.\n  defaultClassReplicaCount: 3\n  # Volumes outlive their claims only when a person asks for it, as with local-path.\n  reclaimPolicy: Delete\ndefaultSettings:\n  # With fewer nodes than replicas, volumes still attach (degraded) and gain\n  # their missing replicas as nodes join, so a class asking for 3 gives\n  # min(3, nodes) copies.\n  allowVolumeCreationWithDegradedAvailability: true\n  # Spread existing replicas onto nodes that join later.\n  replicaAutoBalance: best-effort\n  # No calls to Longhorn's upgrade server; versions change with the catalog.\n  upgradeChecker: false\n  allowCollectingLonghornUsageMetrics: false\n  # After a Longhorn upgrade, move attached volumes to the new engine one\n  # node at a time; otherwise they stay on the old one until done by hand.\n  concurrentAutomaticEngineUpgradePerNodeLimit: 1\nlonghornUI:\n  # No login: it acts as Longhorn's admin. ClusterIP only (the chart's\n  # default, no Ingress); reach it with kubectl port-forward.\n  replicas: 1\nlonghornManager:\n  resources:\n    # The chart sets none. No limit: killing the manager stalls attach\n    # and detach on its node.\n    requests: {cpu: 25m, memory: 128Mi}\n",
+          "version": "1.13.0"
+        },
+        {
+          "manifests": "apiVersion: networking.k8s.io/v1\nkind: NetworkPolicy\nmetadata:\n  name: longhorn-ui-port-forward-only\n  namespace: longhorn-system\nspec:\n  podSelector:\n    matchLabels: {app: longhorn-ui}\n  policyTypes: [Ingress]\n",
+          "name": "ui-policy",
+          "namespace": "longhorn-system"
+        }
+      ],
       "security": {
         "clusterWide": true,
         "egress": [
@@ -1630,62 +1671,29 @@
           ]
         },
         {
-          "name": "provision",
           "manifest": "apiVersion: v1\nkind: PersistentVolumeClaim\nmetadata: {name: smoke, namespace: catalog-smoke}\nspec:\n  accessModes: [ReadWriteOnce]\n  storageClassName: longhorn\n  resources:\n    requests: {storage: 1Gi}\n",
+          "name": "provision",
+          "timeout": "600s",
           "wait": [
             "-n catalog-smoke pvc/smoke --for=jsonpath={.status.phase}=Bound",
             "storageclass/longhorn --for=jsonpath={.allowVolumeExpansion}=true"
-          ],
-          "timeout": "600s"
+          ]
         }
-      ],
-      "leftovers": [
-        "customresourcedefinitions"
       ],
       "upgradeNotes": [
         {
           "note": "Upgrade one minor version at a time (1.12 to 1.13, never 1.11 to 1.13); the chart's pre-upgrade job refuses a skip. 1.13 needs Kubernetes 1.34 or later.\n",
           "versions": "*"
         }
-      ],
-      "installOrder": {
-        "multi-node": [
-          "replicated-storage/longhorn"
-        ],
-        "single-node": [
-          "replicated-storage/longhorn"
-        ]
-      }
+      ]
     },
     {
-      "id": "resource-recommendations/vertical-pod-autoscaler",
       "apiVersion": "catalog.zeabur.com/v1",
-      "kind": "Component",
       "capability": "resource-recommendations",
-      "metadata": {
-        "name": "Vertical Pod Autoscaler (recommender only)",
-        "description": "Suggests CPU and memory requests from observed usage. Recommender only: nothing changes pods unless you apply a suggestion.\n",
-        "license": "Apache-2.0",
-        "homepage": "https://github.com/kubernetes/autoscaler/tree/master/vertical-pod-autoscaler"
-      },
-      "maturity": "kubernetes-sig",
       "defaults": {
         "multi-node": "optional",
         "single-node": "optional"
       },
-      "requires": [
-        "metrics/metrics-server"
-      ],
-      "releases": [
-        {
-          "name": "vpa",
-          "namespace": "vpa-system",
-          "chart": "vertical-pod-autoscaler",
-          "repo": "https://kubernetes.github.io/autoscaler",
-          "version": "0.13.0",
-          "values": "recommender:\n  # Produces suggestions from metrics.k8s.io.\n  enabled: true\nupdater:\n  # Evicts pods to apply suggestions; keep changes manual.\n  enabled: false\nadmissionController:\n  # Rewrites pod resources at admission; same reason.\n  enabled: false\n"
-        }
-      ],
       "detection": {
         "crds": [
           "verticalpodautoscalers.autoscaling.k8s.io"
@@ -1702,6 +1710,75 @@
           }
         ]
       },
+      "id": "resource-recommendations/vertical-pod-autoscaler",
+      "installOrder": {
+        "multi-node": [
+          "metrics/metrics-server",
+          "resource-recommendations/vertical-pod-autoscaler"
+        ],
+        "single-node": [
+          "metrics/metrics-server",
+          "resource-recommendations/vertical-pod-autoscaler"
+        ]
+      },
+      "kind": "Component",
+      "leftovers": [
+        "customresourcedefinitions"
+      ],
+      "maturity": "kubernetes-sig",
+      "measured": {
+        "multi-node-amd64-v1.36.4": {
+          "idleCPUm": 1,
+          "idleMemoryMiB": 18,
+          "measuredAt": "2026-10-11",
+          "versions": {
+            "vpa": "0.13.0"
+          }
+        },
+        "multi-node-arm64-v1.36.4": {
+          "idleCPUm": 1,
+          "idleMemoryMiB": 16,
+          "measuredAt": "2026-10-11",
+          "versions": {
+            "vpa": "0.13.0"
+          }
+        },
+        "single-node-amd64-v1.36.4": {
+          "idleCPUm": 1,
+          "idleMemoryMiB": 17,
+          "measuredAt": "2026-10-11",
+          "versions": {
+            "vpa": "0.13.0"
+          }
+        },
+        "single-node-arm64-v1.36.4": {
+          "idleCPUm": 1,
+          "idleMemoryMiB": 17,
+          "measuredAt": "2026-10-11",
+          "versions": {
+            "vpa": "0.13.0"
+          }
+        }
+      },
+      "metadata": {
+        "description": "Suggests CPU and memory requests from observed usage. Recommender only: nothing changes pods unless you apply a suggestion.\n",
+        "homepage": "https://github.com/kubernetes/autoscaler/tree/master/vertical-pod-autoscaler",
+        "license": "Apache-2.0",
+        "name": "Vertical Pod Autoscaler (recommender only)"
+      },
+      "releases": [
+        {
+          "chart": "vertical-pod-autoscaler",
+          "name": "vpa",
+          "namespace": "vpa-system",
+          "repo": "https://kubernetes.github.io/autoscaler",
+          "values": "recommender:\n  # Produces suggestions from metrics.k8s.io.\n  enabled: true\nupdater:\n  # Evicts pods to apply suggestions; keep changes manual.\n  enabled: false\nadmissionController:\n  # Rewrites pod resources at admission; same reason.\n  enabled: false\n",
+          "version": "0.15.0"
+        }
+      ],
+      "requires": [
+        "metrics/metrics-server"
+      ],
       "security": {
         "clusterWide": true,
         "risks": [
@@ -1715,84 +1792,15 @@
           "VerticalPodAutoscaler"
         ],
         "tenants": "namespaced"
-      },
-      "leftovers": [
-        "customresourcedefinitions"
-      ],
-      "installOrder": {
-        "multi-node": [
-          "metrics/metrics-server",
-          "resource-recommendations/vertical-pod-autoscaler"
-        ],
-        "single-node": [
-          "metrics/metrics-server",
-          "resource-recommendations/vertical-pod-autoscaler"
-        ]
-      },
-      "measured": {
-        "multi-node-amd64-v1.36.4": {
-          "idleMemoryMiB": 18,
-          "idleCPUm": 1,
-          "versions": {
-            "vpa": "0.13.0"
-          },
-          "measuredAt": "2026-10-11"
-        },
-        "multi-node-arm64-v1.36.4": {
-          "idleMemoryMiB": 16,
-          "idleCPUm": 1,
-          "versions": {
-            "vpa": "0.13.0"
-          },
-          "measuredAt": "2026-10-11"
-        },
-        "single-node-amd64-v1.36.4": {
-          "idleMemoryMiB": 17,
-          "idleCPUm": 1,
-          "versions": {
-            "vpa": "0.13.0"
-          },
-          "measuredAt": "2026-10-11"
-        },
-        "single-node-arm64-v1.36.4": {
-          "idleMemoryMiB": 17,
-          "idleCPUm": 1,
-          "versions": {
-            "vpa": "0.13.0"
-          },
-          "measuredAt": "2026-10-11"
-        }
       }
     },
     {
-      "id": "runtime-security/falco",
       "apiVersion": "catalog.zeabur.com/v1",
-      "kind": "Component",
       "capability": "runtime-security",
-      "metadata": {
-        "name": "Falco",
-        "description": "Flags suspicious runtime behavior (container shells, privilege escalation) from kernel events as JSON logs. Optional: it needs a privileged eBPF probe and a BTF kernel (5.8+).\n",
-        "license": "Apache-2.0",
-        "homepage": "https://falco.org"
-      },
-      "maturity": "cncf-graduated",
       "defaults": {
         "multi-node": "optional",
         "single-node": "optional"
       },
-      "releases": [
-        {
-          "name": "falco",
-          "namespace": "falco",
-          "chart": "oci://ghcr.io/falcosecurity/charts/falco",
-          "version": "9.2.0",
-          "values": "driver:\n  # Built-in CO-RE eBPF probe: no kernel module or headers.\n  kind: modern_ebpf\nfalco:\n  # JSON alerts so the log store can index fields.\n  json_output: true\n  json_include_output_property: true\nfalcoctl:\n  artifact:\n    follow:\n      # Rules change only with chart upgrades; no background downloads.\n      enabled: false\n",
-          "profiles": {
-            "multi-node": "resources:\n  # Busier nodes mean more syscalls to evaluate.\n  requests: {cpu: 100m, memory: 256Mi}\n  limits: {memory: 1Gi}\n",
-            "single-node": "resources:\n  # The chart asks 512Mi; one node idles well below that.\n  requests: {cpu: 50m, memory: 128Mi}\n  limits: {memory: 768Mi}\n"
-          }
-        }
-      ],
       "detection": {
         "helmCharts": [
           "falco"
@@ -1806,20 +1814,7 @@
           }
         ]
       },
-      "security": {
-        "clusterWide": true,
-        "egress": [
-          "ghcr.io"
-        ],
-        "privileged": true,
-        "risks": [
-          {
-            "mitigation": "Expose alerts to cluster administrators only.",
-            "risk": "Alerts include command lines and file paths from every tenant's containers."
-          }
-        ],
-        "summary": "Reads pod and node metadata to enrich alerts."
-      },
+      "id": "runtime-security/falco",
       "installOrder": {
         "multi-node": [
           "runtime-security/falco"
@@ -1828,73 +1823,104 @@
           "runtime-security/falco"
         ]
       },
+      "kind": "Component",
+      "leftovers": [
+        "customresourcedefinitions"
+      ],
+      "maturity": "cncf-graduated",
       "measured": {
         "multi-node-amd64-v1.36.4": {
-          "idleMemoryMiB": 154,
           "idleCPUm": 30,
+          "idleMemoryMiB": 154,
+          "measuredAt": "2026-10-11",
           "versions": {
             "falco": "9.2.0"
-          },
-          "measuredAt": "2026-10-11"
+          }
         },
         "multi-node-arm64-v1.36.4": {
-          "idleMemoryMiB": 169,
           "idleCPUm": 17,
+          "idleMemoryMiB": 169,
+          "measuredAt": "2026-10-11",
           "versions": {
             "falco": "9.2.0"
-          },
-          "measuredAt": "2026-10-11"
+          }
         },
         "single-node-amd64-v1.36.4": {
-          "idleMemoryMiB": 53,
           "idleCPUm": 4,
+          "idleMemoryMiB": 53,
+          "measuredAt": "2026-10-11",
           "versions": {
             "falco": "9.2.0"
-          },
-          "measuredAt": "2026-10-11"
+          }
         },
         "single-node-arm64-v1.36.4": {
-          "idleMemoryMiB": 55,
           "idleCPUm": 4,
+          "idleMemoryMiB": 55,
+          "measuredAt": "2026-10-11",
           "versions": {
             "falco": "9.2.0"
-          },
-          "measuredAt": "2026-10-11"
+          }
         }
+      },
+      "metadata": {
+        "description": "Flags suspicious runtime behavior (container shells, privilege escalation) from kernel events, and keeps each namespace's recent alerts in a PolicyReport there, readable with namespace admin rights. Optional: it needs a privileged eBPF probe and a BTF kernel (5.8+).\n",
+        "homepage": "https://falco.org",
+        "license": "Apache-2.0",
+        "name": "Falco"
+      },
+      "releases": [
+        {
+          "name": "policy-report-crds",
+          "namespace": "falco",
+          "skipIfPresent": [
+            "policyreports.wgpolicyk8s.io"
+          ],
+          "urls": [
+            "https://raw.githubusercontent.com/kubernetes-retired/wg-policy-prototypes/{version}/policy-report/crd/wgpolicyk8s.io/v1alpha2/wgpolicyk8s.io_policyreports.yaml",
+            "https://raw.githubusercontent.com/kubernetes-retired/wg-policy-prototypes/{version}/policy-report/crd/wgpolicyk8s.io/v1alpha2/wgpolicyk8s.io_clusterpolicyreports.yaml"
+          ],
+          "version": "ed0ca5a1c7788055074c7500915b76fc4518ed33"
+        },
+        {
+          "manifests": "# Alerts carry command lines and file paths, so only namespace admins\n# (the built-in admin role, by aggregation) read their namespace's\n# report. Bind this role in a namespace to let others read it too.\napiVersion: rbac.authorization.k8s.io/v1\nkind: ClusterRole\nmetadata:\n  name: falco-alert-reader\n  labels:\n    rbac.authorization.k8s.io/aggregate-to-admin: \"true\"\nrules:\n  - apiGroups: [wgpolicyk8s.io]\n    resources: [policyreports]\n    verbs: [get, list, watch]\n",
+          "name": "alert-readers",
+          "namespace": "falco"
+        },
+        {
+          "chart": "oci://ghcr.io/falcosecurity/charts/falco",
+          "name": "falco",
+          "namespace": "falco",
+          "profiles": {
+            "multi-node": "resources:\n  # Busier nodes mean more syscalls to evaluate.\n  requests: {cpu: 100m, memory: 256Mi}\n  limits: {memory: 1Gi}\n",
+            "single-node": "resources:\n  # The chart asks 512Mi; one node idles well below that.\n  requests: {cpu: 50m, memory: 128Mi}\n  limits: {memory: 768Mi}\n"
+          },
+          "values": "driver:\n  # Built-in CO-RE eBPF probe: no kernel module or headers.\n  kind: modern_ebpf\nfalco:\n  # JSON alerts so the log store can index fields.\n  json_output: true\n  json_include_output_property: true\nfalcoctl:\n  artifact:\n    follow:\n      # Rules change only with chart upgrades; no background downloads.\n      enabled: false\nfalcosidekick:\n  # Forwards alerts to PolicyReports in the namespace they concern.\n  enabled: true\n  # One writer: reports are read, appended to and replaced whole, and a\n  # second replica's concurrent update would be refused and its alert lost.\n  replicaCount: 1\n  image:\n    # The chart's default repository. Renovate reads it to update the tag.\n    repository: falcosecurity/falcosidekick\n    # 2.35.0 writes the alert's time; earlier versions only its seconds\n    # within the minute.\n    tag: 2.35.0\n  resources:\n    # Idle most of the time; one report update per alert.\n    requests: {cpu: 10m, memory: 32Mi}\n    limits: {memory: 128Mi}\n  config:\n    policyreport:\n      enabled: true\n      # The newest 100 alerts per namespace. One alert is about 1.5 KiB and\n      # holds the command line twice. At the upstream 1000, a report passes\n      # the etcd limit of 1.5 MiB, and each later update fails.\n      maxevents: 100\n",
+          "version": "9.2.1"
+        }
+      ],
+      "security": {
+        "clusterWide": true,
+        "egress": [
+          "ghcr.io",
+          "docker.io"
+        ],
+        "privileged": true,
+        "risks": [
+          {
+            "mitigation": "Each namespace's report is readable by its admins only (falco-alert-reader, aggregated to admin); alerts without a namespace go to a ClusterPolicyReport for cluster administrators.\n",
+            "risk": "Alerts include command lines and file paths from every tenant's containers."
+          }
+        ],
+        "summary": "Reads pod and node metadata to enrich alerts; falcosidekick writes PolicyReports in every namespace.\n"
       }
     },
     {
-      "id": "uptime-probes/blackbox-exporter",
       "apiVersion": "catalog.zeabur.com/v1",
-      "kind": "Component",
       "capability": "uptime-probes",
-      "metadata": {
-        "name": "Prometheus Blackbox Exporter",
-        "description": "Probes HTTP, TCP and DNS targets; it comes from the Prometheus project, and uptime alerts are plain rules. It needs VictoriaMetrics, so it follows VictoriaMetrics' defaults.\n",
-        "license": "Apache-2.0",
-        "homepage": "https://github.com/prometheus/blackbox_exporter"
-      },
-      "maturity": "cncf-graduated",
       "defaults": {
         "multi-node": "recommended",
         "single-node": "optional"
       },
-      "requires": [
-        "metrics/victoria-metrics"
-      ],
-      "releases": [
-        {
-          "name": "blackbox-exporter",
-          "namespace": "observability",
-          "chart": "oci://ghcr.io/prometheus-community/charts/prometheus-blackbox-exporter",
-          "version": "11.20.0",
-          "values": "config:\n  modules:\n    # Uptime: a 2xx after redirects, IPv6 then IPv4.\n    http_2xx:\n      prober: http\n      timeout: 5s\n      http:\n        valid_http_versions: [\"HTTP/1.1\", \"HTTP/2.0\"]\n        follow_redirects: true\n        preferred_ip_protocol: ip6\n        ip_protocol_fallback: true\n    # Port checks for TCP services.\n    tcp_connect:\n      prober: tcp\n      timeout: 5s\n",
-          "profiles": {
-            "multi-node": "# Two replicas, so a failure means the target is down.\nreplicas: 2\nresources:\n  # More probes per interval.\n  requests: {cpu: 20m, memory: 32Mi}\n  limits: {memory: 128Mi}\n",
-            "single-node": "resources:\n  # Idles around 15Mi.\n  requests: {cpu: 10m, memory: 16Mi}\n  limits: {memory: 64Mi}\n"
-          }
-        }
-      ],
       "detection": {
         "helmCharts": [
           "prometheus-blackbox-exporter"
@@ -1908,19 +1934,7 @@
           }
         ]
       },
-      "security": {
-        "risks": [
-          {
-            "mitigation": "Admit only the namespace's own hostnames or public URLs with an admission policy.",
-            "risk": "Probe targets can reach cloud metadata or private services (SSRF)."
-          }
-        ],
-        "summary": "Has no API access and only makes outbound probes.",
-        "tenantCRDs": [
-          "VMProbe"
-        ],
-        "tenants": "admin-only"
-      },
+      "id": "uptime-probes/blackbox-exporter",
       "installOrder": {
         "multi-node": [
           "ingress/traefik",
@@ -1937,74 +1951,88 @@
           "uptime-probes/blackbox-exporter"
         ]
       },
+      "kind": "Component",
+      "maturity": "cncf-graduated",
       "measured": {
         "multi-node-amd64-v1.36.4": {
-          "idleMemoryMiB": 8,
           "idleCPUm": 0,
+          "idleMemoryMiB": 8,
+          "measuredAt": "2026-10-11",
           "versions": {
             "blackbox-exporter": "11.20.0"
-          },
-          "measuredAt": "2026-10-11"
+          }
         },
         "multi-node-arm64-v1.36.4": {
-          "idleMemoryMiB": 9,
           "idleCPUm": 0,
+          "idleMemoryMiB": 9,
+          "measuredAt": "2026-10-11",
           "versions": {
             "blackbox-exporter": "11.20.0"
-          },
-          "measuredAt": "2026-10-11"
+          }
         },
         "single-node-amd64-v1.36.4": {
-          "idleMemoryMiB": 4,
           "idleCPUm": 0,
+          "idleMemoryMiB": 4,
+          "measuredAt": "2026-10-11",
           "versions": {
             "blackbox-exporter": "11.20.0"
-          },
-          "measuredAt": "2026-10-11"
+          }
         },
         "single-node-arm64-v1.36.4": {
-          "idleMemoryMiB": 4,
           "idleCPUm": 0,
+          "idleMemoryMiB": 4,
+          "measuredAt": "2026-10-13",
           "versions": {
             "blackbox-exporter": "11.20.0"
-          },
-          "measuredAt": "2026-10-13"
+          }
         }
+      },
+      "metadata": {
+        "description": "Probes HTTP, TCP and DNS targets; it comes from the Prometheus project, and uptime alerts are plain rules. It needs VictoriaMetrics, so it follows VictoriaMetrics' defaults.\n",
+        "homepage": "https://github.com/prometheus/blackbox_exporter",
+        "license": "Apache-2.0",
+        "name": "Prometheus Blackbox Exporter"
+      },
+      "releases": [
+        {
+          "chart": "oci://ghcr.io/prometheus-community/charts/prometheus-blackbox-exporter",
+          "name": "blackbox-exporter",
+          "namespace": "observability",
+          "profiles": {
+            "multi-node": "# Two replicas, so a failure means the target is down.\nreplicas: 2\nresources:\n  # More probes per interval.\n  requests: {cpu: 20m, memory: 32Mi}\n  limits: {memory: 128Mi}\n",
+            "single-node": "resources:\n  # Idles around 15Mi.\n  requests: {cpu: 10m, memory: 16Mi}\n  limits: {memory: 64Mi}\n"
+          },
+          "values": "config:\n  modules:\n    # Uptime: a 2xx after redirects, IPv6 then IPv4.\n    http_2xx:\n      prober: http\n      timeout: 5s\n      http:\n        valid_http_versions: [\"HTTP/1.1\", \"HTTP/2.0\"]\n        follow_redirects: true\n        preferred_ip_protocol: ip6\n        ip_protocol_fallback: true\n    # Port checks for TCP services.\n    tcp_connect:\n      prober: tcp\n      timeout: 5s\n",
+          "version": "11.20.2"
+        }
+      ],
+      "requires": [
+        "metrics/victoria-metrics"
+      ],
+      "security": {
+        "risks": [
+          {
+            "mitigation": "Admit only the namespace's own hostnames or public URLs with an admission policy.",
+            "risk": "Probe targets can reach cloud metadata or private services (SSRF)."
+          }
+        ],
+        "summary": "Has no API access and only makes outbound probes.",
+        "tenantCRDs": [
+          "VMProbe"
+        ],
+        "tenants": "admin-only"
       }
     },
     {
-      "id": "volume-backup/k8up",
-      "apiVersion": "catalog.zeabur.com/v1",
-      "kind": "Component",
-      "capability": "volume-backup",
-      "metadata": {
-        "name": "K8up",
-        "description": "Backs up each namespace with restic to any S3-compatible store, so tenants can safely manage their own backups.\n",
-        "license": "Apache-2.0",
-        "homepage": "https://k8up.io"
-      },
-      "maturity": "cncf-sandbox",
       "alternatives": {
         "velero": "Backs up the whole cluster; for administrators only."
       },
+      "apiVersion": "catalog.zeabur.com/v1",
+      "capability": "volume-backup",
       "defaults": {
         "multi-node": "optional",
         "single-node": "optional"
       },
-      "releases": [
-        {
-          "name": "k8up",
-          "namespace": "k8up-system",
-          "chart": "k8up",
-          "repo": "https://k8up-io.github.io/k8up",
-          "version": "4.10.0",
-          "values": "k8up:\n  # Back up only PVCs annotated for backup.\n  skipWithoutAnnotation: true\n",
-          "profiles": {
-            "multi-node": "# Keeps schedules firing through node drains.\nreplicaCount: 2\nresources:\n  # More schedules on bigger clusters.\n  requests: {cpu: 20m, memory: 64Mi}\n  limits: {memory: 512Mi}\n",
-            "single-node": "k8up:\n  # No leader election with a single replica.\n  enableLeaderElection: false\nresources:\n  # Idle between schedules; backup Jobs have their own requests.\n  requests: {cpu: 10m, memory: 32Mi}\n  limits: {memory: 256Mi}\n"
-          }
-        }
-      ],
       "detection": {
         "crds": [
           "schedules.k8up.io",
@@ -2022,6 +2050,74 @@
           }
         ]
       },
+      "id": "volume-backup/k8up",
+      "installOrder": {
+        "multi-node": [
+          "volume-backup/k8up"
+        ],
+        "single-node": [
+          "volume-backup/k8up"
+        ]
+      },
+      "kind": "Component",
+      "leftovers": [
+        "customresourcedefinitions"
+      ],
+      "maturity": "cncf-sandbox",
+      "measured": {
+        "multi-node-amd64-v1.36.4": {
+          "idleCPUm": 2,
+          "idleMemoryMiB": 21,
+          "measuredAt": "2026-10-11",
+          "versions": {
+            "k8up": "4.10.0"
+          }
+        },
+        "multi-node-arm64-v1.36.4": {
+          "idleCPUm": 1,
+          "idleMemoryMiB": 21,
+          "measuredAt": "2026-10-11",
+          "versions": {
+            "k8up": "4.10.0"
+          }
+        },
+        "single-node-amd64-v1.36.4": {
+          "idleCPUm": 1,
+          "idleMemoryMiB": 11,
+          "measuredAt": "2026-10-11",
+          "versions": {
+            "k8up": "4.10.0"
+          }
+        },
+        "single-node-arm64-v1.36.4": {
+          "idleCPUm": 1,
+          "idleMemoryMiB": 11,
+          "measuredAt": "2026-10-11",
+          "versions": {
+            "k8up": "4.10.0"
+          }
+        }
+      },
+      "metadata": {
+        "description": "Backs up each namespace with restic to any S3-compatible store, so tenants can safely manage their own backups.\n",
+        "homepage": "https://k8up.io",
+        "license": "Apache-2.0",
+        "name": "K8up"
+      },
+      "releases": [
+        {
+          "chart": "k8up",
+          "name": "k8up",
+          "namespace": "k8up-system",
+          "profiles": {
+            "multi-node": "# Keeps schedules firing through node drains.\nreplicaCount: 2\nresources:\n  # More schedules on bigger clusters.\n  requests: {cpu: 20m, memory: 64Mi}\n  limits: {memory: 512Mi}\n",
+            "single-node": "k8up:\n  # No leader election with a single replica.\n  enableLeaderElection: false\nresources:\n  # Idle between schedules; backup Jobs have their own requests.\n  requests: {cpu: 10m, memory: 32Mi}\n  limits: {memory: 256Mi}\n"
+          },
+          "repo": "https://k8up-io.github.io/k8up",
+          "values": "k8up:\n  # Back up only PVCs annotated for backup.\n  skipWithoutAnnotation: true\n",
+          "version": "4.10.1"
+        }
+      ],
       "security": {
         "clusterWide": true,
         "credentials": "required",
@@ -2047,113 +2143,18 @@
           "Snapshot"
         ],
         "tenants": "namespaced"
-      },
-      "leftovers": [
-        "customresourcedefinitions"
-      ],
-      "installOrder": {
-        "multi-node": [
-          "volume-backup/k8up"
-        ],
-        "single-node": [
-          "volume-backup/k8up"
-        ]
-      },
-      "measured": {
-        "multi-node-amd64-v1.36.4": {
-          "idleMemoryMiB": 21,
-          "idleCPUm": 2,
-          "versions": {
-            "k8up": "4.10.0"
-          },
-          "measuredAt": "2026-10-11"
-        },
-        "multi-node-arm64-v1.36.4": {
-          "idleMemoryMiB": 21,
-          "idleCPUm": 1,
-          "versions": {
-            "k8up": "4.10.0"
-          },
-          "measuredAt": "2026-10-11"
-        },
-        "single-node-amd64-v1.36.4": {
-          "idleMemoryMiB": 11,
-          "idleCPUm": 1,
-          "versions": {
-            "k8up": "4.10.0"
-          },
-          "measuredAt": "2026-10-11"
-        },
-        "single-node-arm64-v1.36.4": {
-          "idleMemoryMiB": 11,
-          "idleCPUm": 1,
-          "versions": {
-            "k8up": "4.10.0"
-          },
-          "measuredAt": "2026-10-11"
-        }
       }
     },
     {
-      "id": "volume-backup/velero",
-      "apiVersion": "catalog.zeabur.com/v1",
-      "kind": "Component",
-      "capability": "volume-backup",
-      "metadata": {
-        "name": "Velero",
-        "description": "Backs up the whole cluster to S3 for disaster recovery. It can touch any namespace, so it is for administrators only.\n",
-        "license": "Apache-2.0",
-        "homepage": "https://velero.io"
-      },
-      "maturity": "cncf-sandbox",
       "alternatives": {
         "k8up": "Backs up each namespace on its own, so tenants can use it."
       },
+      "apiVersion": "catalog.zeabur.com/v1",
+      "capability": "volume-backup",
       "defaults": {
         "multi-node": "optional",
         "single-node": "optional"
       },
-      "inputs": [
-        {
-          "name": "bucket",
-          "description": "Velero stores backups in this S3 bucket.",
-          "path": "configuration.backupStorageLocation.0.bucket",
-          "required": true,
-          "testValue": "catalog-ci"
-        },
-        {
-          "name": "s3-url",
-          "description": "Velero connects to this S3 endpoint URL; any S3-compatible service works.",
-          "path": "configuration.backupStorageLocation.0.config.s3Url",
-          "required": true,
-          "testValue": "http://minio.invalid:9000"
-        },
-        {
-          "name": "credentials",
-          "description": "Velero reads the bucket's credentials from this AWS-style credentials file.",
-          "secret": {
-            "name": "velero-credentials",
-            "key": "cloud",
-            "namespace": "velero"
-          },
-          "required": true,
-          "testValue": "[default]\naws_access_key_id=ci\naws_secret_access_key=ci\n"
-        }
-      ],
-      "releases": [
-        {
-          "name": "velero",
-          "namespace": "velero",
-          "chart": "velero",
-          "repo": "https://vmware-tanzu.github.io/helm-charts",
-          "version": "12.2.1",
-          "values": "initContainers:\n  # AWS plugin covers any S3-compatible store; v1.14.x matches Velero 1.18.\n  - name: velero-plugin-for-aws\n    image: velero/velero-plugin-for-aws:v1.14.4\n    volumeMounts:\n      - mountPath: /target\n        name: plugins\ncredentials:\n  # Secret comes from the credentials input, not the chart.\n  useSecret: true\n  existingSecret: velero-credentials\nconfiguration:\n  backupStorageLocation:\n    # One S3 location; bucket and URL are inputs.\n    - name: default\n      provider: aws\n      default: true\n      config:\n        region: us-east-1\n        s3ForcePathStyle: \"true\"\n  # Kopia file-system backups work on any storage class, local-path included.\n  uploaderType: kopia\n  # Back up all volumes unless they opt out.\n  defaultVolumesToFsBackup: true\n# CSI snapshots need per-driver setup; use file-system backups instead.\nsnapshotsEnabled: false\n# Needed for file-system backups.\ndeployNodeAgent: true\n",
-          "profiles": {
-            "multi-node": "resources:\n  # Bigger clusters, bigger backup item lists.\n  requests: {cpu: 50m, memory: 128Mi}\n  limits: {memory: 1Gi}\n",
-            "single-node": "resources:\n  # Idle between backups; chart sets none.\n  requests: {cpu: 20m, memory: 64Mi}\n  limits: {memory: 512Mi}\n"
-          }
-        }
-      ],
       "detection": {
         "crds": [
           "backups.velero.io",
@@ -2171,27 +2172,54 @@
           }
         ]
       },
-      "security": {
-        "clusterWide": true,
-        "credentials": "required",
-        "credentialsNote": "Needs static S3 credentials; all backups share one Kopia key.",
-        "privileged": true,
-        "risks": [
-          {
-            "mitigation": "Never grant Velero CRDs to tenants.",
-            "risk": "Backups and Restores can include any namespace, including other tenants' Secrets."
-          }
-        ],
-        "summary": "Bound to cluster-admin; reads and restores every object.",
-        "tenants": "admin-only"
-      },
-      "leftovers": [
-        "customresourcedefinitions"
-      ],
-      "upgradeNotes": [
+      "id": "volume-backup/velero",
+      "inputs": [
         {
-          "note": "Upgrade the AWS plugin together with Velero.",
-          "versions": "*"
+          "description": "Velero stores backups in this S3 bucket.",
+          "name": "bucket",
+          "path": "configuration.backupStorageLocation.0.bucket",
+          "required": true,
+          "testValue": "catalog-ci"
+        },
+        {
+          "description": "Velero connects to this S3 endpoint URL; any S3-compatible service works.",
+          "name": "s3-url",
+          "path": "configuration.backupStorageLocation.0.config.s3Url",
+          "required": true,
+          "testValue": "http://minio.invalid:9000"
+        },
+        {
+          "description": "Velero reads the bucket's credentials from this AWS-style credentials file.",
+          "name": "credentials",
+          "required": true,
+          "secret": {
+            "key": "cloud",
+            "name": "velero-credentials",
+            "namespace": "velero"
+          },
+          "testValue": "[default]\naws_access_key_id=ci\naws_secret_access_key=ci\n"
+        },
+        {
+          "description": "Kopia encrypts file-system backups with this password. Without the Secret, Velero uses its built-in password, which is public.\n",
+          "generate": "random",
+          "name": "repository-password",
+          "secret": {
+            "key": "repository-password",
+            "name": "velero-repo-credentials",
+            "namespace": "velero"
+          }
+        },
+        {
+          "description": "The S3 server encrypts every backup object, Secrets included, with this SSE-C key. The AWS plugin needs exactly 32 bytes.\n",
+          "generate": "random",
+          "generateBytes": 24,
+          "generateEncoding": "base64url",
+          "name": "backup-key",
+          "secret": {
+            "key": "key",
+            "name": "velero-backup-key",
+            "namespace": "velero"
+          }
         }
       ],
       "installOrder": {
@@ -2202,71 +2230,105 @@
           "volume-backup/velero"
         ]
       },
+      "kind": "Component",
+      "leftovers": [
+        "customresourcedefinitions"
+      ],
+      "maturity": "cncf-sandbox",
       "measured": {
         "multi-node-amd64-v1.36.4": {
-          "idleMemoryMiB": 52,
           "idleCPUm": 1,
+          "idleMemoryMiB": 52,
+          "measuredAt": "2026-10-11",
           "versions": {
             "velero": "12.2.1"
-          },
-          "measuredAt": "2026-10-11"
+          }
         },
         "multi-node-arm64-v1.36.4": {
-          "idleMemoryMiB": 78,
           "idleCPUm": 1,
+          "idleMemoryMiB": 78,
+          "measuredAt": "2026-10-11",
           "versions": {
             "velero": "12.2.1"
-          },
-          "measuredAt": "2026-10-11"
+          }
         },
         "single-node-amd64-v1.36.4": {
-          "idleMemoryMiB": 38,
           "idleCPUm": 1,
+          "idleMemoryMiB": 38,
+          "measuredAt": "2026-10-11",
           "versions": {
             "velero": "12.2.1"
-          },
-          "measuredAt": "2026-10-11"
+          }
         },
         "single-node-arm64-v1.36.4": {
-          "idleMemoryMiB": 38,
           "idleCPUm": 1,
+          "idleMemoryMiB": 38,
+          "measuredAt": "2026-10-11",
           "versions": {
             "velero": "12.2.1"
-          },
-          "measuredAt": "2026-10-11"
+          }
         }
-      }
+      },
+      "metadata": {
+        "description": "Backs up the whole cluster to S3 for disaster recovery. It can touch any namespace, so it is for administrators only.\n",
+        "homepage": "https://velero.io",
+        "license": "Apache-2.0",
+        "name": "Velero"
+      },
+      "releases": [
+        {
+          "chart": "velero",
+          "name": "velero",
+          "namespace": "velero",
+          "profiles": {
+            "multi-node": "resources:\n  # Bigger clusters, bigger backup item lists.\n  requests: {cpu: 50m, memory: 128Mi}\n  limits: {memory: 1Gi}\n",
+            "single-node": "resources:\n  # Idle between backups; chart sets none.\n  requests: {cpu: 20m, memory: 64Mi}\n  limits: {memory: 512Mi}\n"
+          },
+          "repo": "https://vmware-tanzu.github.io/helm-charts",
+          "values": "initContainers:\n  # AWS plugin covers any S3-compatible store; v1.14.x matches Velero 1.18.\n  - name: velero-plugin-for-aws\n    image: velero/velero-plugin-for-aws:v1.14.4\n    volumeMounts:\n      - mountPath: /target\n        name: plugins\ncredentials:\n  # Secret comes from the credentials input, not the chart.\n  useSecret: true\n  existingSecret: velero-credentials\nconfiguration:\n  backupStorageLocation:\n    # One S3 location; bucket and URL are inputs.\n    - name: default\n      provider: aws\n      default: true\n      config:\n        region: us-east-1\n        s3ForcePathStyle: \"true\"\n        # Velero writes Secrets into the backup as they are. The\n        # store encrypts them with the backup-key input (SSE-C).\n        customerKeyEncryptionSecret: velero-backup-key/key\n  # Kopia file-system backups work on any storage class, local-path included.\n  uploaderType: kopia\n  # Back up all volumes unless they opt out.\n  defaultVolumesToFsBackup: true\n# CSI snapshots need per-driver setup; use file-system backups instead.\nsnapshotsEnabled: false\n# Needed for file-system backups.\ndeployNodeAgent: true\n",
+          "version": "12.2.1"
+        }
+      ],
+      "security": {
+        "clusterWide": true,
+        "credentials": "required",
+        "credentialsNote": "Needs static S3 credentials. All backups share one Kopia password and one SSE-C key, both in Secrets in the velero namespace.\n",
+        "privileged": true,
+        "risks": [
+          {
+            "mitigation": "Never grant Velero CRDs to tenants.",
+            "risk": "Backups and Restores can include any namespace, including other tenants' Secrets."
+          },
+          {
+            "mitigation": "Take one backup by hand after install, then download backups/<name>/velero-backup.json without the key: the store must refuse it. SeaweedFS supports SSE-C.\n",
+            "risk": "SSE-C sends the key with each request, so the S3 server sees the backup before it encrypts it. A store without SSE-C refuses the uploads, or ignores the key and keeps the backups in clear text.\n"
+          },
+          {
+            "mitigation": "Keep a copy of both Secrets outside the cluster. Before a restore into a new cluster, create them first.",
+            "risk": "Without the velero-repo-credentials and velero-backup-key Secrets, nobody can read the backups. Both are also inside the backups that they encrypt.\n"
+          }
+        ],
+        "summary": "Bound to cluster-admin; reads and restores every object.",
+        "tenants": "admin-only"
+      },
+      "upgradeNotes": [
+        {
+          "note": "Upgrade the AWS plugin together with Velero.",
+          "versions": "*"
+        },
+        {
+          "note": "If Velero ran before velero-repo-credentials existed, Velero made it with its public default password, and Kopia keeps the password of a repository. Point the location at a new prefix to start encrypted repositories. Backups made before SSE-C stay unencrypted.\n",
+          "versions": "*"
+        }
+      ]
     },
     {
-      "id": "vulnerability-scanning/trivy-operator",
       "apiVersion": "catalog.zeabur.com/v1",
-      "kind": "Component",
       "capability": "vulnerability-scanning",
-      "metadata": {
-        "name": "Trivy Operator",
-        "description": "Scans running images and workload configs and writes namespaced reports next to each workload. Optional: scan jobs cost noticeable CPU and memory.\n",
-        "license": "Apache-2.0",
-        "homepage": "https://aquasecurity.github.io/trivy-operator/"
-      },
-      "maturity": "independent",
       "defaults": {
         "multi-node": "optional",
         "single-node": "optional"
       },
-      "releases": [
-        {
-          "name": "trivy-operator",
-          "namespace": "trivy-system",
-          "chart": "trivy-operator",
-          "repo": "https://aquasecurity.github.io/helm-charts",
-          "version": "0.37.0",
-          "values": "operator:\n  # Reading every Secret is too broad; list pull secrets explicitly.\n  accessGlobalSecretsAndServiceAccount: false\n  # Compliance scans run privileged collectors; opt in explicitly.\n  infraAssessmentScannerEnabled: false\n  clusterComplianceEnabled: false\n  # SBOMs duplicate vulnerability reports and inflate operator memory.\n  sbomGenerationEnabled: false\ntrivy:\n  # Only fixable findings are actionable.\n  ignoreUnfixed: true\n",
-          "profiles": {
-            "multi-node": "operator:\n  # A few parallel scans keep reports fresh without flooding nodes.\n  scanJobsConcurrentLimit: 3\nresources:\n  # More workloads to track.\n  requests: {cpu: 50m, memory: 128Mi}\n  limits: {memory: 1Gi}\n",
-            "single-node": "operator:\n  # One scan at a time; each job loads an image and the DB.\n  scanJobsConcurrentLimit: 1\n  # One report per (mostly system) role; RBAC review is an admin task.\n  rbacAssessmentScannerEnabled: false\ntrivy:\n  # Low severity is noise on a small cluster.\n  severity: MEDIUM,HIGH,CRITICAL\nresources:\n  # The operator idles under 100Mi; scan jobs set their own.\n  requests: {cpu: 20m, memory: 64Mi}\n  limits: {memory: 512Mi}\n"
-          }
-        }
-      ],
       "detection": {
         "crds": [
           "vulnerabilityreports.aquasecurity.github.io"
@@ -2283,6 +2345,74 @@
           }
         ]
       },
+      "id": "vulnerability-scanning/trivy-operator",
+      "installOrder": {
+        "multi-node": [
+          "vulnerability-scanning/trivy-operator"
+        ],
+        "single-node": [
+          "vulnerability-scanning/trivy-operator"
+        ]
+      },
+      "kind": "Component",
+      "leftovers": [
+        "customresourcedefinitions"
+      ],
+      "maturity": "independent",
+      "measured": {
+        "multi-node-amd64-v1.36.4": {
+          "idleCPUm": 17,
+          "idleMemoryMiB": 127,
+          "measuredAt": "2026-10-11",
+          "versions": {
+            "trivy-operator": "0.37.0"
+          }
+        },
+        "multi-node-arm64-v1.36.4": {
+          "idleCPUm": 25,
+          "idleMemoryMiB": 314,
+          "measuredAt": "2026-10-11",
+          "versions": {
+            "trivy-operator": "0.37.0"
+          }
+        },
+        "single-node-amd64-v1.36.4": {
+          "idleCPUm": 4,
+          "idleMemoryMiB": 125,
+          "measuredAt": "2026-10-11",
+          "versions": {
+            "trivy-operator": "0.37.0"
+          }
+        },
+        "single-node-arm64-v1.36.4": {
+          "idleCPUm": 4,
+          "idleMemoryMiB": 123,
+          "measuredAt": "2026-10-11",
+          "versions": {
+            "trivy-operator": "0.37.0"
+          }
+        }
+      },
+      "metadata": {
+        "description": "Scans running images and workload configs and writes namespaced reports next to each workload. Optional: scan jobs cost noticeable CPU and memory.\n",
+        "homepage": "https://aquasecurity.github.io/trivy-operator/",
+        "license": "Apache-2.0",
+        "name": "Trivy Operator"
+      },
+      "releases": [
+        {
+          "chart": "trivy-operator",
+          "name": "trivy-operator",
+          "namespace": "trivy-system",
+          "profiles": {
+            "multi-node": "operator:\n  # A few parallel scans keep reports fresh without flooding nodes.\n  scanJobsConcurrentLimit: 3\nresources:\n  # More workloads to track.\n  requests: {cpu: 50m, memory: 128Mi}\n  limits: {memory: 1Gi}\n",
+            "single-node": "operator:\n  # One scan at a time; each job loads an image and the DB.\n  scanJobsConcurrentLimit: 1\n  # One report per (mostly system) role; RBAC review is an admin task.\n  rbacAssessmentScannerEnabled: false\ntrivy:\n  # Low severity is noise on a small cluster.\n  severity: MEDIUM,HIGH,CRITICAL\nresources:\n  # The operator idles under 100Mi; scan jobs set their own.\n  requests: {cpu: 20m, memory: 64Mi}\n  limits: {memory: 512Mi}\n"
+          },
+          "repo": "https://aquasecurity.github.io/helm-charts",
+          "values": "operator:\n  # Reading every Secret is too broad; list pull secrets explicitly.\n  accessGlobalSecretsAndServiceAccount: false\n  # Compliance scans run privileged collectors; opt in explicitly.\n  infraAssessmentScannerEnabled: false\n  clusterComplianceEnabled: false\n  # SBOMs duplicate vulnerability reports and inflate operator memory.\n  sbomGenerationEnabled: false\ntrivy:\n  # Only fixable findings are actionable.\n  ignoreUnfixed: true\n",
+          "version": "0.37.0"
+        }
+      ],
       "security": {
         "clusterWide": true,
         "egress": [
@@ -2306,51 +2436,6 @@
           "ExposedSecretReport"
         ],
         "tenants": "namespaced"
-      },
-      "leftovers": [
-        "customresourcedefinitions"
-      ],
-      "installOrder": {
-        "multi-node": [
-          "vulnerability-scanning/trivy-operator"
-        ],
-        "single-node": [
-          "vulnerability-scanning/trivy-operator"
-        ]
-      },
-      "measured": {
-        "multi-node-amd64-v1.36.4": {
-          "idleMemoryMiB": 127,
-          "idleCPUm": 17,
-          "versions": {
-            "trivy-operator": "0.37.0"
-          },
-          "measuredAt": "2026-10-11"
-        },
-        "multi-node-arm64-v1.36.4": {
-          "idleMemoryMiB": 314,
-          "idleCPUm": 25,
-          "versions": {
-            "trivy-operator": "0.37.0"
-          },
-          "measuredAt": "2026-10-11"
-        },
-        "single-node-amd64-v1.36.4": {
-          "idleMemoryMiB": 125,
-          "idleCPUm": 4,
-          "versions": {
-            "trivy-operator": "0.37.0"
-          },
-          "measuredAt": "2026-10-11"
-        },
-        "single-node-arm64-v1.36.4": {
-          "idleMemoryMiB": 123,
-          "idleCPUm": 4,
-          "versions": {
-            "trivy-operator": "0.37.0"
-          },
-          "measuredAt": "2026-10-11"
-        }
       }
     }
   ],
