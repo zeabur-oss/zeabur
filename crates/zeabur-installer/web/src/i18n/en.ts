@@ -83,7 +83,7 @@ export const en = {
   "code.swap.unknown": () => "Could not tell whether swap is on. Run swapon --show to see it.",
   "code.others.none": () => "None found.",
   "code.others.found": (...paths: string[]) =>
-    `Found another Kubernetes distribution (${list(paths)}). Uninstall it first: two distributions fight over the same ports.`,
+    `Found files of another Kubernetes distribution (${list(paths)}). If it still runs, uninstall it first.`,
   "code.ports.free": (...ports: string[]) => `${list(ports)} are free.`,
   "code.ports.busy": (...ports: string[]) =>
     `In use: ${list(ports)}. Run ss -ltnp to see what holds them.`,

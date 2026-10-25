@@ -32,8 +32,8 @@ At the end, `apply` prints Zeabur's address and a one-time link. Open the link t
 first admin's passkey.
 
 The server needs 4 GB of memory or more, 30 GB of free disk, and ports 80, 443, 6443, 9345 and
-10250 free. Before changing anything, `apply` checks these and the clock, and refuses to run on a
-server that already has k3s, kubeadm, k0s or MicroK8s.
+10250 free. Before changing anything, `apply` checks these and the clock, and warns when it finds
+files of k3s, kubeadm, k0s or MicroK8s.
 
 ## Commands
 

@@ -76,7 +76,7 @@ export const zhCN: Messages = {
   "code.swap.unknown": () => "无法判断 Swap 是否开启。请运行 swapon --show 查看。",
   "code.others.none": () => "未发现。",
   "code.others.found": (...paths) =>
-    `发现其他 Kubernetes 发行版（${listZh("zh-CN", paths)}）。请先卸载：两个发行版会争抢同样的端口。`,
+    `发现其他 Kubernetes 发行版的文件（${listZh("zh-CN", paths)}）。如果它还在运行，请先卸载。`,
   "code.ports.free": (...ports) => `${listZh("zh-CN", ports)} 均未被占用。`,
   "code.ports.busy": (...ports) =>
     `端口 ${listZh("zh-CN", ports)} 已被占用。运行 ss -ltnp 查看占用者。`,

@@ -327,9 +327,9 @@ fn other_distributions() -> Check {
         let paths: Vec<&str> = found.iter().map(|(path, _)| *path).collect();
         check(
             Topic::OtherKubernetes,
-            Status::Fail,
+            Status::Warn,
             format!(
-                "found {}; uninstall it first, two distributions fight over the same ports and iptables",
+                "found files of {}; if it still runs, uninstall it first",
                 named.join(", ")
             ),
             Code::OthersFound,

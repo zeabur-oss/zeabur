@@ -76,7 +76,7 @@ export const zhTW: Messages = {
   "code.swap.unknown": () => "無法判斷 Swap 是否開啟。請執行 swapon --show 確認。",
   "code.others.none": () => "沒有發現。",
   "code.others.found": (...paths) =>
-    `發現其他 Kubernetes 發行版（${listZh("zh-TW", paths)}）。請先解除安裝：兩套發行版會搶同樣的連接埠。`,
+    `發現其他 Kubernetes 發行版的檔案（${listZh("zh-TW", paths)}）。如果它還在執行，請先解除安裝。`,
   "code.ports.free": (...ports) => `${listZh("zh-TW", ports)} 都沒有被占用。`,
   "code.ports.busy": (...ports) =>
     `連接埠 ${listZh("zh-TW", ports)} 已被占用。執行 ss -ltnp 可看到是誰占用。`,
