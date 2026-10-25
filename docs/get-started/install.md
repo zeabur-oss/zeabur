@@ -287,6 +287,10 @@ removes their bindings first. Each rule names its verbs and resources, without `
 has RBAC objects, namespace creation or deletion, `nodes/proxy`, or `escalate`, `bind` and
 `impersonate`, so no member can widen their own rights
 ([RBAC good practices](https://kubernetes.io/docs/concepts/security/rbac-good-practices/#privilege-escalation-risks)).
+Developers may also restore volumes: `create` and `delete` on `restores.k8up.io` in the project's
+namespace, nothing cluster-wide. Two warnings come with it. An in-place restore overwrites the
+volume, and files added after the backup are removed. Whoever may restore can read every backup in
+the repository the project's Schedule names, so give each project its own backup path and password.
 Neither role has `velero.io`: Velero writes a Restore's objects with its own service account
 (`cluster-admin` by default) into each namespace the Restore names, RoleBindings and Secrets
 included, and RBAC on the Restore cannot limit those namespaces. Cluster backups and restores

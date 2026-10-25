@@ -2115,6 +2115,8 @@ export const zhCN: Messages = {
     `${claim} 当前的文件会全部换成备份点的内容，备份之后新增或修改的文件都会删除。`,
   "volumeRestore.stops": (service) => `${service} 会先停止，还原完成后再由你启动。`,
   "volumeRestore.noUndo": "清空后无法恢复。",
+  "volumeRestore.warnOverwrite": "还原到原处会覆盖整个卷，备份之后新增的文件会被删除。",
+  "volumeRestore.warnRepo": "能还原的人，就能读取这个项目备份仓库里的所有备份。",
   "volumeRestore.understood": (claim) => `我了解 ${claim} 当前的文件会清空`,
   "volumeRestore.exportNote": (when) =>
     `${when} 的备份点会打包为 .tar.gz 文件，放在备份用的存储桶里，完成后可以下载。`,

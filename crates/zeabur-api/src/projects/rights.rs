@@ -43,7 +43,8 @@ pub struct ProjectRights {
     /// Back up volumes: `create` on K8up's schedules, backups and pod configs.
     pub back_up_volumes: Permission,
     /// Restore volumes from their backups: `create` on K8up's restores and on
-    /// persistentvolumeclaims.
+    /// persistentvolumeclaims. A Developer has both. An in-place restore overwrites the volume,
+    /// and whoever may restore can read every backup in the project's repository.
     pub restore_volumes: Permission,
     /// Open a terminal in a container: `create` on `pods/exec`.
     pub open_terminal: Permission,
@@ -247,15 +248,13 @@ mod tests {
     }
 
     #[test]
-    fn a_developer_changes_everything_in_the_project_except_who_has_access_and_restores_no_volume()
-    {
+    fn a_developer_changes_everything_in_the_project_except_who_has_access() {
         let developer = rights(ProjectRole::Developer);
         let allowed = Permission::Allowed;
         assert_eq!(
             developer,
             ProjectRights {
                 change_members: Permission::Denied,
-                restore_volumes: Permission::Denied,
                 ..ProjectRights {
                     deploy: allowed,
                     change_services: allowed,

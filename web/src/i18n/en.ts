@@ -2287,6 +2287,10 @@ export const en = {
   "volumeRestore.stops": (service: string) =>
     `${service} stops. You start it again once the restore is done.`,
   "volumeRestore.noUndo": "This can't be undone.",
+  "volumeRestore.warnOverwrite":
+    "Restoring in place overwrites the volume. Files added after the backup are removed.",
+  "volumeRestore.warnRepo":
+    "Anyone who can restore can read every backup in this project's backup repository.",
   "volumeRestore.understood": (claim: string) =>
     `I understand the files now in ${claim} are cleared`,
   "volumeRestore.exportNote": (when: string) =>

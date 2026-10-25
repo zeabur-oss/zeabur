@@ -90,6 +90,12 @@ export function VolumeRestore({
           </>
         ) : null}
       </div>
+      {points ? (
+        <div className="flex flex-col gap-0.5 type-meta text-muted-foreground">
+          <p>{t("volumeRestore.warnOverwrite")}</p>
+          <p>{t("volumeRestore.warnRepo")}</p>
+        </div>
+      ) : null}
       {data.restores.length > 0 ? (
         <ul className="flex flex-col">
           {data.restores.slice(0, SHOWN).map((r) => (

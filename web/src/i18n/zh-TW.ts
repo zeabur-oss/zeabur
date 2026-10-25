@@ -2120,6 +2120,8 @@ export const zhTW: Messages = {
     `${claim} 會整個換回備份點當時的樣子，備份後新增或修改的檔案都會刪除。`,
   "volumeRestore.stops": (service) => `${service} 會先停下，還原完成後再由你啟動。`,
   "volumeRestore.noUndo": "清空後無法復原。",
+  "volumeRestore.warnOverwrite": "還原到原處會覆蓋整個磁碟區，備份之後新增的檔案會被刪除。",
+  "volumeRestore.warnRepo": "能還原的人，就能讀取這個專案備份倉庫裡的所有備份。",
   "volumeRestore.understood": (claim) => `我了解 ${claim} 目前的檔案會清空`,
   "volumeRestore.exportNote": (when) =>
     `${when} 的備份點會打包成 .tar.gz 檔，放在備份用的儲存貯體裡，完成後可以下載。`,

@@ -11,6 +11,11 @@
 # (`cluster-admin` by default) into each namespace the Restore names, RoleBindings and Secrets
 # included. RBAC on the Restore cannot limit those namespaces, so restores stay with cluster admins.
 # https://velero.io/docs/main/rbac/
+#
+# The Developer may create K8up Restores in the project's namespace. Two warnings apply. An
+# in-place restore overwrites the volume and removes files added after the backup. Whoever may
+# restore can read every backup in the repository the project's Schedule names. Give each project
+# its own backup path and password.
 
 # Everyone signed in: node names and status, the names of every project, the StorageClasses a
 # new volume can use, and the PersistentVolume behind a claim (where its data is). `get` without
@@ -209,14 +214,20 @@ zeabur-project-developer:
     resources: [seaweeds, buckets, s3identities, s3credentials, s3policies, s3policybindings]
     verbs: [get, list, watch, create, update, patch, delete]
   # Volume backups with K8up. Its backup and prune pods run under the namespace's Pod Security
-  # level like any pod the role may create; a PodConfig sets their security context. Restores and
-  # PreBackupPods stay read only or out: Zeabur does not make them.
+  # level like any pod the role may create; a PodConfig sets their security context. PreBackupPods
+  # stay out: Zeabur does not make them.
   - apiGroups: [k8up.io]
     resources: [schedules, backups, podconfigs]
     verbs: [get, list, watch, create, update, patch, delete]
   - apiGroups: [k8up.io]
-    resources: [snapshots, restores]
+    resources: [snapshots]
     verbs: [get, list, watch]
+  # A Restore writes into a volume of this namespace, and with `delete: true` it removes files that
+  # the backup does not hold. Whoever may create one can restore from every backup in the
+  # repository the namespace's Schedule names, so each project needs its own path and password.
+  - apiGroups: [k8up.io]
+    resources: [restores]
+    verbs: [get, list, watch, create, delete]
   # Notification channels. A channel's receivers only see alerts of this namespace: the operator
   # adds that matcher to every config.
   - apiGroups: [operator.victoriametrics.com]

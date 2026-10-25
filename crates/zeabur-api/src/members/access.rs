@@ -39,7 +39,8 @@ const MANAGED_BY: &str = "app.kubernetes.io/managed-by";
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub enum ProjectRole {
-    /// Deploys, changes variables, restarts, reads logs and Secrets, opens terminals.
+    /// Deploys, changes variables, restarts, reads logs and Secrets, opens terminals, backs up
+    /// and restores volumes with K8up.
     Developer,
     /// Reads status and events.
     Viewer,
@@ -578,7 +579,7 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn developers_schedule_volume_backups_and_nobody_restores_through_k8up() {
+    fn developers_back_up_and_restore_volumes_through_k8up_and_viewers_only_read() {
         let roles = roles();
         let developer = &roles[ProjectRole::Developer.cluster_role()];
         let viewer = &roles[ProjectRole::Viewer.cluster_role()];
@@ -590,10 +591,32 @@ pub(crate) mod tests {
             );
             assert!(!allows(viewer, "create", resource), "viewer {resource}");
         }
-        for resource in ["restores.k8up.io", "prebackuppods.k8up.io"] {
-            for role in [developer, viewer] {
-                assert!(!allows(role, "create", resource), "create {resource}");
-            }
+        for verb in ["get", "list", "watch", "create", "delete"] {
+            assert!(
+                allows(developer, verb, "restores.k8up.io"),
+                "developer {verb} restores"
+            );
+        }
+        for verb in ["update", "patch", "deletecollection"] {
+            assert!(
+                !allows(developer, verb, "restores.k8up.io"),
+                "developer {verb} restores"
+            );
+        }
+        for verb in ["get", "list", "watch"] {
+            assert!(
+                allows(viewer, verb, "restores.k8up.io"),
+                "viewer {verb} restores"
+            );
+        }
+        for verb in ["create", "update", "patch", "delete"] {
+            assert!(
+                !allows(viewer, verb, "restores.k8up.io"),
+                "viewer {verb} restores"
+            );
+        }
+        for role in [developer, viewer] {
+            assert!(!allows(role, "create", "prebackuppods.k8up.io"));
         }
     }
 

@@ -7635,7 +7635,8 @@ export interface components {
       readSecrets: components["schemas"]["Permission"]
       /**
        * @description Restore volumes from their backups: `create` on K8up's restores and on
-       *     persistentvolumeclaims.
+       *     persistentvolumeclaims. A Developer has both. An in-place restore overwrites the volume,
+       *     and whoever may restore can read every backup in the project's repository.
        */
       restoreVolumes: components["schemas"]["Permission"]
       /** @description Change the number of replicas: `patch` on `deployments/scale` or `statefulsets/scale`. */

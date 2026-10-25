@@ -25,9 +25,15 @@ description: 對照成員角色、Kubernetes RBAC 與暫時管理員權限，確
 | 修改專案顯示名稱、描述與圖示 | 無 | 可 |
 | 建立／刪除 Namespace、把 Namespace 加入或移出 Zeabur | 無 | 無 |
 | 修改角色與成員存取權、節點、叢集元件 | 無 | 無 |
+| 從磁碟區的備份還原（K8up） | 無 | 可 |
 | 設定叢集備份、從叢集備份還原 | 無 | 無 |
 
 標示「可」的操作仍要通過 ResourceQuota、Pod Security、admission policy 和元件自己的檢查。資料庫和備份要先裝好對應的 operator 才能建立。角色已經先列好這些 operator 的資源，裝好後不用改角色。
+
+開發者可以在自己的專案裡還原磁碟區，角色只多了該 Namespace 內 `restores.k8up.io` 的建立與刪除權限。使用前請注意兩件事：
+
+- 還原到原處會覆蓋整個磁碟區，備份之後新增的檔案會被刪除。
+- 能還原的人，就能讀取這個專案備份倉庫裡的所有備份。每個專案請用各自的備份路徑和密碼。
 
 叢集備份由 Velero 執行，還原時 Velero 用自己的權限（預設是 `cluster-admin`）把物件寫回 Restore 指定的 Namespace，包括 RoleBinding 和 Secret。RBAC 只能決定誰能建立 Restore，不能限制它寫進哪些 Namespace，所以成員角色沒有任何 `velero.io` 權限，還原只開放給管理員。沒有權限建立 Restore 的人，**還原** 按鈕無法使用。
 
