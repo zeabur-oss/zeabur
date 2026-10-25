@@ -7886,6 +7886,24 @@ components:
           - string
           - "null"
           description: When the backup was taken, RFC 3339.
+    DatabaseStart:
+      type: object
+      description: "A CloudNativePG `Cluster` a plan creates: its operator starts its instances."
+      required:
+      - name
+      - engine
+      - instances
+      properties:
+        engine:
+          type: string
+          description: The engine, as people write it (`PostgreSQL`).
+        instances:
+          type: integer
+          format: int32
+          description: Its instances (`spec.instances`).
+        name:
+          type: string
+          description: The `Cluster`'s name.
     DatabaseState:
       type: string
       description: How a database is, from its operator's status.
@@ -10075,6 +10093,19 @@ components:
       - appProtocol
       - name
       - protocol
+    InputLocale:
+      type: object
+      description: An input's words in one language.
+      required:
+      - label
+      - description
+      properties:
+        description:
+          type: string
+          description: What to give.
+        label:
+          type: string
+          description: A short name for the field.
     InspectRequest:
       type: object
       description: The image to read.
@@ -13933,6 +13964,8 @@ components:
       description: What a plan does once applied.
       required:
       - rollouts
+      - databases
+      - domains
       - fit
       - dataLoss
       - removals
@@ -13943,6 +13976,16 @@ components:
           items:
             $ref: "#/components/schemas/DataLoss"
           description: The data it loses.
+        databases:
+          type: array
+          items:
+            $ref: "#/components/schemas/DatabaseStart"
+          description: The databases it creates, by name. Their instances count in `fit`.
+        domains:
+          type: array
+          items:
+            type: string
+          description: The public domains its new Ingresses and `HTTPRoutes` route, sorted.
         fit:
           $ref: "#/components/schemas/Fit"
           description: Whether the new pods fit.
@@ -17232,9 +17275,21 @@ components:
               For a generated input: how to make the value. The value goes into `secret`, and a deploy
               never gives it.
           - type: "null"
+        label:
+          type:
+          - string
+          - "null"
+          description: A short name for the field, in English, for an input a person gives.
+        locales:
+          type: object
+          description: The label and description in other languages (`zh-TW`, `zh-CN`).
+          additionalProperties:
+            $ref: "#/components/schemas/InputLocale"
+          propertyNames:
+            type: string
         name:
           type: string
-          description: Its name (`kubeApiCidr`).
+          description: Its name (`adminEmail`).
         pattern:
           type: string
           description: The regular expression the whole value matches (RE2 syntax).
@@ -17257,14 +17312,6 @@ components:
           items:
             $ref: "#/components/schemas/TemplateView"
           description: Every template, by id.
-        kubeApiCidr:
-          type:
-          - string
-          - "null"
-          description: |-
-            The address of kube-apiserver as the `kubernetes` Service's endpoints give it, as an
-            IPv4 `/32`: what the catalogue's own tests give the `kubeApiCidr` input. Absent when the
-            person may not read it or it is not IPv4.
     TemplateService:
       type: object
       description: A service of a template.
@@ -17292,6 +17339,8 @@ components:
       - description
       - license
       - homepage
+      - version
+      - labels
       - requires
       - services
       - requests
@@ -17318,6 +17367,13 @@ components:
           items:
             $ref: "#/components/schemas/TemplateInput"
           description: What a person gives or the browser generates.
+        labels:
+          type: object
+          description: The labels of its objects, which the Secrets of generated values carry too.
+          additionalProperties:
+            type: string
+          propertyNames:
+            type: string
         license:
           type: string
           description: The licence of the application and its images (SPDX).
@@ -17345,6 +17401,9 @@ components:
           items:
             $ref: "#/components/schemas/TemplateService"
           description: Its services.
+        version:
+          type: string
+          description: The application's version (`2.2.0`).
     Timeline:
       type: object
       description: A timeline.

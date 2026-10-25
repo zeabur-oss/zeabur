@@ -2511,7 +2511,6 @@ export const zhTW: Messages = {
   "add.templateConsentNeeded": "同意後才能部署。",
   "add.templateInputEmpty": "這一欄必填。",
   "add.templateInputInvalid": (pattern) => `格式不符（${pattern}）。`,
-  "add.templateFromCluster": "已從叢集讀取。",
   "add.templateOptional": "選填",
   "add.composeTitle": "匯入 Docker Compose",
   "add.composeBody": (project) =>
@@ -3274,6 +3273,7 @@ export const zhTW: Messages = {
   "sentence.problem.badRequest.fix.planToken": () =>
     "重新檢查變更。只有檢查它的那台伺服器能套用，而且權杖不能改動。",
   "sentence.problem.conflict.fix.review": () => "重新檢查，以它目前的狀態為準。",
+  "sentence.problem.conflict.fix.alreadyExists": () => "先刪掉它們，或部署到別的專案。",
   "sentence.problem.conflict.fix.waitForContainer": () =>
     "等它開始執行。如果一直沒有執行，它的日誌和事件會說明原因。",
   "sentence.problem.unavailable.fix.tryAgainSoon": () => "稍後再試一次。",
@@ -3308,6 +3308,7 @@ export const zhTW: Messages = {
   "sentence.problem.summary.log-unavailable": () => "無法讀取這份日誌。",
   "sentence.problem.summary.conflict": (p) =>
     p.name ? `${p.name} 在你檢查之後又變了。` : "它在你檢查之後又變了。",
+  "sentence.problem.summary.already-exists": (p) => `專案 ${p.namespace} 裡已經有 ${p.objects}。`,
   "sentence.problem.summary.managed": (p) =>
     p.name ? `${p.name} 由其他工具管理。` : "這由其他工具管理。",
   "sentence.problem.summary.plan-expired": () => "這份變更已過期。",
@@ -3952,6 +3953,9 @@ export const zhTW: Messages = {
   "preview.scale": (name, from, to) => `${name} 從 ${from} 個副本變成 ${to} 個。`,
   "preview.start": (name, replicas) => `${name} 會啟動 ${replicas} 個副本。`,
   "preview.stop": (name) => `${name} 會停止。`,
+  "preview.database": (name, engine, replicas) =>
+    `${engine} 資料庫 ${name} 會啟動 ${replicas} 個副本。`,
+  "preview.domain": (host) => `網域 ${host} 會開始對外提供服務。`,
   "preview.pendingRestart": (name) => `${name} 重新啟動前會繼續使用舊的值。`,
   "preview.downtime": "會有短暫的時間沒有副本提供服務。",
   "preview.cores": (n) => `${n} 核心 CPU`,

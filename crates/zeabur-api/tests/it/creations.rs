@@ -515,7 +515,7 @@ stringData:
     async fn an_install_form_needs_its_controller() {
         let cluster = cluster();
         let app = app(&cluster);
-        let path = "/api/v1/cluster/components/databases/cloudnative-pg/install";
+        let path = "/api/v1/cluster/components/databases/mariadb-operator/install";
         let (status, guide) = send(&app, "GET", path, None).await;
         assert_eq!(status, StatusCode::OK, "{guide}");
         assert_eq!(formats(&guide), ["helm"]);
@@ -562,7 +562,7 @@ stringData:
             "kube-system",
         );
         let app = app(&cluster);
-        let path = "/api/v1/cluster/components/databases/cloudnative-pg/install";
+        let path = "/api/v1/cluster/components/databases/mariadb-operator/install";
         let (_, guide) = send(&app, "GET", path, None).await;
         assert_eq!(guide.get("blocked"), None, "{guide}");
         let k3s = &guide["formats"][1];

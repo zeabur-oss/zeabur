@@ -62,8 +62,7 @@ mod tests {
             {"op": "create", "object": {"apiVersion": "v1", "kind": "Secret",
                 "metadata": {"name": "miniflux-secrets"}, "type": "Opaque",
                 "stringData": {"admin-password": password}}},
-            {"op": "template", "template": "miniflux", "domain": "rss.example.com",
-                "inputs": {"kubeApiCidr": "10.0.0.1/32"}},
+            {"op": "template", "template": "miniflux", "domain": "rss.example.com"},
         ]})
     }
 
@@ -97,6 +96,11 @@ mod tests {
         .await;
         assert_eq!(status, StatusCode::OK, "{planned}");
         assert!(!planned.to_string().contains(&"a".repeat(43)), "{planned}");
+        // The database and the domain start too, and the database's instance counts.
+        let preview = &planned["preview"];
+        assert_eq!(preview["databases"][0]["name"], "miniflux-db", "{preview}");
+        assert_eq!(preview["domains"], json!(["rss.example.com"]), "{preview}");
+        assert_eq!(preview["fit"]["pods"], 2, "{preview}");
         let (status, applied) = send(
             &app,
             "POST",
@@ -139,6 +143,12 @@ mod tests {
                 "{kind} {name}"
             );
         }
+        for object in created.iter().filter(|o| o["kind"] != "Secret") {
+            assert_eq!(
+                object["metadata"]["labels"]["app.kubernetes.io/instance"], "miniflux",
+                "{object}"
+            );
+        }
         let ingress = named("Ingress", "miniflux");
         assert_eq!(ingress["spec"]["rules"][0]["host"], "rss.example.com");
         assert_eq!(
@@ -151,6 +161,45 @@ mod tests {
                 "miniflux",
                 "{policy}"
             );
+        }
+    }
+
+    #[tokio::test]
+    async fn deploying_a_template_again_names_every_object_that_exists() {
+        let cluster = cluster();
+        serve_cloudnative_pg(&cluster);
+        let app = app_with(&cluster, settings());
+        let (_, planned) = send(
+            &app,
+            "POST",
+            "/api/v1/projects/shop/plan",
+            Some(&miniflux()),
+        )
+        .await;
+        let (status, _) = send(
+            &app,
+            "POST",
+            "/api/v1/projects/shop/apply",
+            Some(&json!({"token": planned["token"]})),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        let (status, problem) = send(
+            &app,
+            "POST",
+            "/api/v1/projects/shop/plan",
+            Some(&miniflux()),
+        )
+        .await;
+        assert_eq!(status, StatusCode::CONFLICT, "{problem}");
+        assert_eq!(problem["summary"]["key"], "problem.summary.already-exists");
+        let objects = problem["summary"]["params"]["objects"].as_str().unwrap();
+        for object in [
+            "Secret miniflux-secrets",
+            "Deployment miniflux",
+            "Cluster miniflux-db",
+        ] {
+            assert!(objects.contains(object), "{problem}");
         }
     }
 
@@ -193,11 +242,11 @@ mod tests {
         let cluster = cluster();
         serve_cloudnative_pg(&cluster);
         let app = app_with(&cluster, settings());
-        let mut request = miniflux();
-        request["changes"][1]["inputs"]["kubeApiCidr"] = json!("10.0.0.1");
+        let request = json!({"changes": [{"op": "template", "template": "wordpress",
+            "domain": "blog.example.com", "inputs": {"adminEmail": "nope"}}]});
         let (status, problem) =
             send(&app, "POST", "/api/v1/projects/shop/plan", Some(&request)).await;
         assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{problem}");
-        assert_eq!(problem["at"]["field"], "inputs.kubeApiCidr", "{problem}");
+        assert_eq!(problem["at"]["field"], "inputs.adminEmail", "{problem}");
     }
 }

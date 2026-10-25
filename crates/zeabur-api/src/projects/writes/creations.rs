@@ -2,6 +2,7 @@
 //! taken, and, once planned, whether kube-apiserver would accept each object (a dry run).
 
 use serde_json::Value;
+use zeabur_core::message::Message;
 use zeabur_core::problem::{Kind, Problem, ProblemAt};
 use zeabur_kube::{Cluster, ServedResource, WriteRequest};
 use zeabur_model::Gap;
@@ -47,14 +48,16 @@ fn served_kind(served: &ServedResource) -> ServedKind {
     }
 }
 
-/// Refuses a `create` whose object already exists: a create never updates. A name the person may
-/// not read is left to the write, which kube-apiserver refuses with `409` when it is taken.
+/// Refuses `create`s whose objects already exist, naming each one: a create never updates. A name
+/// the person may not read is left to the write, which kube-apiserver refuses with `409` when it
+/// is taken.
 pub(super) async fn refuse_existing(
     cluster: &dyn Cluster,
     project: &str,
     request: &PlanRequest,
     kinds: &[ServedKind],
 ) -> Result<(), ApiError> {
+    let mut existing: Vec<(usize, String)> = Vec::new();
     for (index, change) in request.changes.iter().enumerate() {
         let Some(Ok(object)) = created_object(change) else {
             continue;
@@ -83,20 +86,32 @@ pub(super) async fn refuse_existing(
             }
         };
         if found {
-            return Err(ApiError::from(Problem {
-                at: Some(ProblemAt {
-                    change: index,
-                    line: None,
-                    field: Some("metadata.name".to_owned()),
-                }),
-                ..Problem::new(
-                    Kind::Conflict,
-                    format!("{kind} {name} already exists in project {project}."),
-                )
-            }));
+            existing.push((index, format!("{kind} {name}")));
         }
     }
-    Ok(())
+    let Some((index, _)) = existing.first() else {
+        return Ok(());
+    };
+    let objects: Vec<&str> = existing.iter().map(|(_, o)| o.as_str()).collect();
+    let mut problem = Problem {
+        at: Some(ProblemAt {
+            change: *index,
+            line: None,
+            field: Some("metadata.name".to_owned()),
+        }),
+        ..Problem::new(
+            Kind::Conflict,
+            format!("{} already exist in project {project}.", objects.join(", ")),
+        )
+    };
+    problem.summary = Message::new("problem.summary.already-exists")
+        .with("objects", objects.join(", "))
+        .with("namespace", project);
+    problem.fix_for_occasion(
+        "Delete them first, or deploy into another project.",
+        Message::new("problem.conflict.fix.alreadyExists"),
+    );
+    Err(ApiError::from(problem))
 }
 
 /// Sends every write of a plan that creates objects from YAML as a dry run, as the person: what

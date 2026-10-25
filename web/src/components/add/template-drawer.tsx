@@ -23,6 +23,7 @@ import {
   missing,
   shownInputs,
   startValues,
+  inputWords,
   templateChanges,
   type AppTemplate,
   type TemplateInput,
@@ -83,7 +84,6 @@ export function TemplateDrawer({ project, onClose }: { project: string; onClose:
           id={formId}
           project={project}
           template={picked}
-          kubeApiCidr={list?.kubeApiCidr}
           planner={planner}
         />
       ) : list ? (
@@ -188,18 +188,16 @@ function DeployForm({
   id,
   project,
   template,
-  kubeApiCidr,
   planner,
 }: {
   id: string
   project: string
   template: AppTemplate
-  kubeApiCidr?: string | null
   planner: PlanStepState
 }) {
   const t = useT()
   const domains = useQuery(clusterQuery).data?.domains ?? {}
-  const [values, setValues] = useState(() => startValues(template, kubeApiCidr))
+  const [values, setValues] = useState(() => startValues(template))
   const [generated] = useState(() => generateAll(template))
   const [typedHost, setTypedHost] = useState<string>()
   const [tried, setTried] = useState(false)
@@ -242,7 +240,6 @@ function DeployForm({
           key={input.name}
           input={input}
           value={values[input.name] ?? ""}
-          prefilled={input.name === "kubeApiCidr" && !!kubeApiCidr}
           problem={shown?.inputs[input.name]}
           onChange={(value) => setValues((v) => ({ ...v, [input.name]: value }))}
         />
@@ -412,23 +409,23 @@ function RoomNote({ template }: { template: AppTemplate }) {
 function InputField({
   input,
   value,
-  prefilled,
   problem,
   onChange,
 }: {
   input: TemplateInput
   value: string
-  prefilled: boolean
   problem?: "empty" | "invalid"
   onChange: (value: string) => void
 }) {
   const t = useT()
+  const { locale } = useI18n()
   const checkId = useId()
+  const words = inputWords(input, locale)
   if (inputKind(input) === "consent") {
     const accepted = acceptedValue(input.pattern) ?? ""
     return (
       <div className="flex flex-col gap-2">
-        <p className="type-meta text-muted-foreground">{input.description}</p>
+        <p className="type-meta text-muted-foreground">{words.description}</p>
         <div className="flex items-start gap-2">
           <Checkbox
             id={checkId}
@@ -448,7 +445,7 @@ function InputField({
   }
   const label = (
     <span className="flex items-center gap-2">
-      <span translate="no">{input.name}</span>
+      <span>{words.label}</span>
       {input.required ? null : (
         <span className="font-normal text-muted-foreground">{t("add.templateOptional")}</span>
       )}
@@ -457,12 +454,7 @@ function InputField({
   return (
     <FormField
       label={label}
-      hint={
-        <>
-          <span className="block">{input.description}</span>
-          {prefilled ? <span className="block">{t("add.templateFromCluster")}</span> : null}
-        </>
-      }
+      hint={words.description}
       errors={
         problem === "empty"
           ? [t("add.templateInputEmpty")]

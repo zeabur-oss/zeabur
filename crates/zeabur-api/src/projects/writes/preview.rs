@@ -213,12 +213,28 @@ pub struct Removal {
     pub left_out_of_edit: bool,
 }
 
+/// A CloudNativePG `Cluster` a plan creates: its operator starts its instances.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct DatabaseStart {
+    /// The `Cluster`'s name.
+    pub name: String,
+    /// The engine, as people write it (`PostgreSQL`).
+    pub engine: String,
+    /// Its instances (`spec.instances`).
+    pub instances: i32,
+}
+
 /// What a plan does once applied.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Preview {
     /// The workloads whose pods change, sorted.
     pub rollouts: Vec<Rollout>,
+    /// The databases it creates, by name. Their instances count in `fit`.
+    pub databases: Vec<DatabaseStart>,
+    /// The public domains its new Ingresses and `HTTPRoutes` route, sorted.
+    pub domains: Vec<String>,
     /// Whether the new pods fit.
     pub fit: Fit,
     /// The data it loses.
@@ -546,6 +562,85 @@ fn rollouts(plan: &Plan) -> (Vec<Rollout>, Need) {
     (out.into_values().collect(), need)
 }
 
+/// The CloudNativePG `Clusters` `plan` creates, with what their instances add to `need`.
+fn databases(plan: &Plan, need: &mut Need) -> Vec<DatabaseStart> {
+    let mut out = Vec::new();
+    for object in &plan.objects {
+        let Some(after) = after_of(object) else {
+            continue;
+        };
+        if object.before.is_some()
+            || object.target.kind != "Cluster"
+            || !object.target.api_version.starts_with("postgresql.cnpg.io/")
+        {
+            continue;
+        }
+        let instances = after
+            .pointer("/spec/instances")
+            .and_then(Value::as_i64)
+            .and_then(|n| i32::try_from(n).ok())
+            .unwrap_or(1);
+        let amount = |at: &str| Amount {
+            cpu: after
+                .pointer(&format!("/spec/resources/{at}/cpu"))
+                .and_then(Value::as_str)
+                .and_then(millicores)
+                .unwrap_or(0),
+            memory: after
+                .pointer(&format!("/spec/resources/{at}/memory"))
+                .and_then(Value::as_str)
+                .and_then(bytes)
+                .unwrap_or(0),
+        };
+        let count = u64::try_from(instances).unwrap_or(0);
+        let requests = amount("requests");
+        need.pods += count;
+        need.requests.add(times(requests, count));
+        need.limits.add(times(amount("limits"), count));
+        need.pod = requests;
+        need.placed += count;
+        out.push(DatabaseStart {
+            name: object.target.name.clone(),
+            engine: "PostgreSQL".to_owned(),
+            instances,
+        });
+    }
+    out
+}
+
+/// The hosts of the Ingresses and `HTTPRoutes` `plan` creates, sorted and without repeats.
+fn domains(plan: &Plan) -> Vec<String> {
+    let mut out = std::collections::BTreeSet::new();
+    for object in plan.objects.iter().filter(|o| o.before.is_none()) {
+        let Some(after) = after_of(object) else {
+            continue;
+        };
+        let hosts: Vec<&Value> = match object.target.kind.as_str() {
+            "Ingress" => after
+                .pointer("/spec/rules")
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten()
+                .filter_map(|r| r.get("host"))
+                .collect(),
+            "HTTPRoute" => after
+                .pointer("/spec/hostnames")
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten()
+                .collect(),
+            _ => Vec::new(),
+        };
+        out.extend(
+            hosts
+                .into_iter()
+                .filter_map(Value::as_str)
+                .map(str::to_owned),
+        );
+    }
+    out.into_iter().collect()
+}
+
 /// The quotas `need` exceeds.
 fn quota_blockers(need: Need, quotas: &[ResourceQuota]) -> Vec<Blocker> {
     let mut out = Vec::new();
@@ -806,12 +901,15 @@ pub(crate) fn preview(
     room: &Room,
     unreadable: Vec<UnreadableView>,
 ) -> Preview {
-    let (rollouts, need) = rollouts(plan);
+    let (rollouts, mut need) = rollouts(plan);
+    let databases = databases(plan, &mut need);
     Preview {
         fit: fit(need, room),
         data_loss: data_loss(plan, &rollouts),
         removals: removals(plan, request),
         rollouts,
+        databases,
+        domains: domains(plan),
         unreadable,
     }
 }
@@ -824,7 +922,8 @@ pub(crate) async fn read(
     request: &PlanRequest,
 ) -> Result<Preview, ApiError> {
     let mut unreadable = Vec::new();
-    let (_, need) = rollouts(plan);
+    let (_, mut need) = rollouts(plan);
+    databases(plan, &mut need);
     let room = if need.pods == 0 && need.requests == Amount::default() {
         Room::default()
     } else {

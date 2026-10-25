@@ -20,10 +20,15 @@ use std::net::IpAddr;
 
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{Value, json};
 use utoipa::ToSchema;
 
 use crate::bundle;
+
+/// The labels the catalogue's renderer adds to every object of an install.
+const INSTANCE_LABEL: &str = "app.kubernetes.io/instance";
+const TEMPLATE_LABEL: &str = "templates.zeabur.com/template";
+const VERSION_LABEL: &str = "app.kubernetes.io/version";
 
 /// The NetworkPolicy egress rule to cluster DNS that `{{ dnsEgress }}` writes, as the catalogue
 /// defines it.
@@ -37,6 +42,12 @@ pub struct Template {
     pub id: String,
     /// The application's name (`Miniflux`).
     pub name: String,
+    /// The application's version, the tag of its main image (`2.3.4`).
+    pub version: String,
+    /// The labels of every object of an install, and of the Secrets of its generated inputs:
+    /// `app.kubernetes.io/instance` and `templates.zeabur.com/template` (its id) and
+    /// `app.kubernetes.io/version`.
+    pub labels: BTreeMap<String, String>,
     /// The catalogue's description, in English, for operators.
     pub description: String,
     /// The licence of the application and its images (SPDX).
@@ -71,10 +82,16 @@ pub struct TemplateService {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct TemplateInput {
-    /// Its name (`kubeApiCidr`).
+    /// Its name (`adminEmail`).
     pub name: String,
     /// The catalogue's description, in English.
     pub description: String,
+    /// A short name for the field, in English, for an input a person gives.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
+    /// The label and description in other languages (`zh-TW`, `zh-CN`).
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    pub locales: BTreeMap<String, InputLocale>,
     /// A deploy must give it.
     pub required: bool,
     /// The regular expression the whole value matches (RE2 syntax).
@@ -86,6 +103,15 @@ pub struct TemplateInput {
     /// The Secret key that holds a generated value.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub secret: Option<SecretKey>,
+}
+
+/// An input's words in one language.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct InputLocale {
+    /// A short name for the field.
+    pub label: String,
+    /// What to give.
+    pub description: String,
 }
 
 /// How to make a generated value: random bytes, then encoded.
@@ -216,6 +242,7 @@ struct File {
 #[derive(Deserialize)]
 struct FileMetadata {
     name: String,
+    version: String,
     description: String,
     license: String,
     homepage: String,
@@ -233,6 +260,10 @@ struct FileService {
 struct FileInput {
     name: String,
     description: String,
+    #[serde(default)]
+    label: Option<String>,
+    #[serde(default)]
+    locales: BTreeMap<String, InputLocale>,
     #[serde(default)]
     required: bool,
     #[serde(default)]
@@ -303,6 +334,15 @@ fn read(id: &str, file: &str, manifests: &str) -> Result<Template, RenderError> 
             Ok(TemplateInput {
                 name: input.name,
                 description: input.description.trim().to_owned(),
+                label: input.label,
+                locales: input
+                    .locales
+                    .into_iter()
+                    .map(|(lang, l)| {
+                        let description = l.description.trim().to_owned();
+                        (lang, InputLocale { description, ..l })
+                    })
+                    .collect(),
                 required: input.required,
                 pattern: input.validation.pattern,
                 generate,
@@ -310,9 +350,19 @@ fn read(id: &str, file: &str, manifests: &str) -> Result<Template, RenderError> 
             })
         })
         .collect::<Result<Vec<_>, _>>()?;
+    let labels = [
+        (INSTANCE_LABEL, id),
+        (TEMPLATE_LABEL, id),
+        (VERSION_LABEL, file.metadata.version.as_str()),
+    ]
+    .into_iter()
+    .map(|(k, v)| (k.to_owned(), v.to_owned()))
+    .collect();
     Ok(Template {
         id: id.to_owned(),
         name: file.metadata.name,
+        version: file.metadata.version.clone(),
+        labels,
         description: file.metadata.description.trim().to_owned(),
         license: file.metadata.license,
         homepage: file.metadata.homepage,
@@ -365,7 +415,22 @@ pub fn render(id: &str, options: &RenderOptions<'_>) -> Result<Vec<Value>, Rende
     execute(&nodes, &values, &mut text).map_err(broken)?;
     let documents: Vec<Value> =
         serde_saphyr::from_multiple(&text).map_err(|e| broken(e.to_string()))?;
-    Ok(documents.into_iter().filter(|o| !o.is_null()).collect())
+    let mut objects: Vec<Value> = documents.into_iter().filter(|o| !o.is_null()).collect();
+    for object in &mut objects {
+        let metadata = object
+            .as_object_mut()
+            .map(|o| o.entry("metadata").or_insert_with(|| json!({})));
+        let labels = metadata
+            .and_then(Value::as_object_mut)
+            .map(|m| m.entry("labels").or_insert_with(|| json!({})));
+        let Some(labels) = labels.and_then(Value::as_object_mut) else {
+            return Err(broken("an object without metadata labels".to_owned()));
+        };
+        for (k, v) in &template.labels {
+            labels.insert(k.clone(), Value::from(v.as_str()));
+        }
+    }
+    Ok(objects)
 }
 
 fn check(template: &Template, options: &RenderOptions<'_>) -> Result<(), RenderError> {
@@ -729,7 +794,7 @@ mod tests {
     }
 
     /// The values the catalogue's own end-to-end run deploys each template with
-    /// (`config/e2e.yaml`), with fixed values for its S3 gateway and the Kubernetes API.
+    /// (`config/e2e.yaml`), with fixed values for its S3 gateway.
     fn e2e_inputs(template: &Template) -> BTreeMap<String, String> {
         #[derive(Deserialize)]
         #[serde(rename_all = "camelCase")]
@@ -751,7 +816,6 @@ mod tests {
         if let Some(own) = e2e.templates.get(&template.id) {
             values.extend(own.inputs.clone());
         }
-        values.insert("kubeApiCidr".to_owned(), "192.0.2.2/32".to_owned());
         values
             .into_iter()
             .filter(|(name, _)| {
@@ -771,7 +835,7 @@ mod tests {
     }
 
     #[test]
-    fn every_template_renders_into_its_namespace_and_keeps_its_traffic_to_itself() {
+    fn every_template_renders_into_its_namespace_with_its_labels_and_keeps_its_traffic_to_itself() {
         let all = templates().unwrap();
         assert!(all.iter().any(|t| t.id == "error-pages"));
         for template in &all {
@@ -794,6 +858,15 @@ mod tests {
                     "{}: {object}",
                     template.id
                 );
+                // `kubectl delete -l app.kubernetes.io/instance=<id>` finds every object.
+                for (key, value) in &template.labels {
+                    assert_eq!(
+                        object.pointer("/metadata/labels").and_then(|l| l.get(key)),
+                        Some(&Value::from(value.as_str())),
+                        "{}: {object}",
+                        template.id
+                    );
+                }
                 // Every NetworkPolicy selects the template's own pods, so other services of the
                 // namespace keep their traffic.
                 if object["kind"] == "NetworkPolicy" {
@@ -821,7 +894,7 @@ mod tests {
     fn checks_the_namespace_domain_and_issuer_a_deploy_gives() {
         let miniflux = template("miniflux").unwrap();
         assert!(miniflux.needs_domain && miniflux.needs_cluster_issuer);
-        let ok = given(&[("kubeApiCidr", "10.0.0.1/32")]);
+        let ok = BTreeMap::new();
         let options = RenderOptions {
             namespace: "shop",
             domain: Some("rss.example.com"),
@@ -872,27 +945,28 @@ mod tests {
                 "cluster_issuer_required",
             ),
         ];
-        assert_codes(cases);
+        assert_codes("miniflux", cases);
     }
 
     #[test]
     fn checks_the_inputs_a_deploy_gives() {
-        let ok = given(&[("kubeApiCidr", "10.0.0.1/32")]);
+        let ok = given(&[("adminEmail", "me@example.com")]);
         let options = RenderOptions {
             namespace: "shop",
-            domain: Some("rss.example.com"),
+            domain: Some("blog.example.com"),
             cluster_issuer: Some("letsencrypt"),
             inputs: &ok,
         };
-        let wrong_cidr = given(&[("kubeApiCidr", "10.0.0.1")]);
-        let generated = given(&[("kubeApiCidr", "10.0.0.1/32"), ("adminPassword", "x")]);
-        let unknown = given(&[("kubeApiCidr", "10.0.0.1/32"), ("other", "x")]);
+        assert!(render("wordpress", &options).is_ok());
+        let wrong_email = given(&[("adminEmail", "me")]);
+        let generated = given(&[("adminEmail", "me@example.com"), ("adminPassword", "x")]);
+        let unknown = given(&[("adminEmail", "me@example.com"), ("other", "x")]);
         let none = BTreeMap::new();
         let cases: &[(&str, RenderOptions<'_>, &str)] = &[
             (
                 "pattern",
                 RenderOptions {
-                    inputs: &wrong_cidr,
+                    inputs: &wrong_email,
                     ..options
                 },
                 "input_invalid",
@@ -922,7 +996,7 @@ mod tests {
                 "input_required",
             ),
         ];
-        assert_codes(cases);
+        assert_codes("wordpress", cases);
     }
 
     fn given(pairs: &[(&str, &str)]) -> BTreeMap<String, String> {
@@ -932,13 +1006,13 @@ mod tests {
             .collect()
     }
 
-    /// Each case renders Miniflux, or a template that does not exist, and fails with its code.
-    fn assert_codes(cases: &[(&str, RenderOptions<'_>, &str)]) {
+    /// Each case renders `template`, or a template that does not exist, and fails with its code.
+    fn assert_codes(template: &str, cases: &[(&str, RenderOptions<'_>, &str)]) {
         for (name, options, code) in cases {
             let id = if *name == "no such template" {
                 "ghost-blog"
             } else {
-                "miniflux"
+                template
             };
             assert_eq!(
                 render(id, options).map(|_| ()).map_err(|e| e.code()),

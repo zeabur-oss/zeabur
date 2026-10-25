@@ -107,6 +107,14 @@ export function PlanPreview({
         .filter((r) => tellsMore(r) || !isSaid(r))
         .toSorted((a, b) => Number(b.downtime) - Number(a.downtime))
     : []
+  const startsToo: (readonly [string, string])[] = showRollouts
+    ? [
+        ...preview.databases.map(
+          (d) => [`db/${d.name}`, t("preview.database", d.name, d.engine, d.instances)] as const,
+        ),
+        ...preview.domains.map((host) => [`domain/${host}`, t("preview.domain", host)] as const),
+      ]
+    : []
   const removals = showRemovals
     ? preview.removals.filter((r) => r.leftOutOfEdit || !envEntry.test(r.path))
     : []
@@ -117,12 +125,12 @@ export function PlanPreview({
     <div className="flex flex-col gap-3 empty:hidden">
       {(
         [
-          ["preview.starts", rollouts.filter(starts)],
-          ["preview.restarts", rollouts.filter((r) => !starts(r) && !stops(r))],
-          ["preview.stops", rollouts.filter(stops)],
+          ["preview.starts", rollouts.filter(starts), startsToo],
+          ["preview.restarts", rollouts.filter((r) => !starts(r) && !stops(r)), []],
+          ["preview.stops", rollouts.filter(stops), []],
         ] as const
-      ).map(([heading, list]) =>
-        list.length > 0 ? (
+      ).map(([heading, list, more]) =>
+        list.length + more.length > 0 ? (
           <section key={heading} aria-label={t(heading)} className="flex flex-col gap-1.5">
             <h3 className="type-meta font-medium text-muted-foreground">{t(heading)}</h3>
             <ul className="flex flex-col gap-1.5">
@@ -135,6 +143,11 @@ export function PlanPreview({
                   {rollout.downtime && !stops(rollout) ? (
                     <span className="text-warn-strong"> {t("preview.downtime")}</span>
                   ) : null}
+                </Line>
+              ))}
+              {more.map(([key, text]) => (
+                <Line key={key} health="idle">
+                  {text}
                 </Line>
               ))}
             </ul>

@@ -4157,6 +4157,18 @@ export interface components {
       /** @description When the backup was taken, RFC 3339. */
       time?: string | null
     }
+    /** @description A CloudNativePG `Cluster` a plan creates: its operator starts its instances. */
+    DatabaseStart: {
+      /** @description The engine, as people write it (`PostgreSQL`). */
+      engine: string
+      /**
+       * Format: int32
+       * @description Its instances (`spec.instances`).
+       */
+      instances: number
+      /** @description The `Cluster`'s name. */
+      name: string
+    }
     /**
      * @description How a database is, from its operator's status.
      * @enum {string}
@@ -5320,6 +5332,13 @@ export interface components {
      * @enum {string}
      */
     InferredFrom: "appProtocol" | "name" | "protocol"
+    /** @description An input's words in one language. */
+    InputLocale: {
+      /** @description What to give. */
+      description: string
+      /** @description A short name for the field. */
+      label: string
+    }
     /** @description The image to read. */
     InspectRequest: {
       /** @description The image reference, as a container's `image`. */
@@ -7222,6 +7241,10 @@ export interface components {
     Preview: {
       /** @description The data it loses. */
       dataLoss: components["schemas"]["DataLoss"][]
+      /** @description The databases it creates, by name. Their instances count in `fit`. */
+      databases: components["schemas"]["DatabaseStart"][]
+      /** @description The public domains its new Ingresses and `HTTPRoutes` route, sorted. */
+      domains: string[]
       /** @description Whether the new pods fit. */
       fit: components["schemas"]["Fit"]
       /** @description The fields it removes, by object then path. */
@@ -8972,7 +8995,13 @@ export interface components {
       /** @description The catalogue's description, in English. */
       description: string
       generate?: components["schemas"]["Generated"] | null
-      /** @description Its name (`kubeApiCidr`). */
+      /** @description A short name for the field, in English, for an input a person gives. */
+      label?: string | null
+      /** @description The label and description in other languages (`zh-TW`, `zh-CN`). */
+      locales?: {
+        [key: string]: components["schemas"]["InputLocale"]
+      }
+      /** @description Its name (`adminEmail`). */
       name: string
       /** @description The regular expression the whole value matches (RE2 syntax). */
       pattern: string
@@ -8984,12 +9013,6 @@ export interface components {
     TemplateList: {
       /** @description Every template, by id. */
       items: components["schemas"]["TemplateView"][]
-      /**
-       * @description The address of kube-apiserver as the `kubernetes` Service's endpoints give it, as an
-       *     IPv4 `/32`: what the catalogue's own tests give the `kubeApiCidr` input. Absent when the
-       *     person may not read it or it is not IPv4.
-       */
-      kubeApiCidr?: string | null
     }
     /** @description A service of a template. */
     TemplateService: {
@@ -9014,6 +9037,10 @@ export interface components {
       idle?: components["schemas"]["IdleUse"] | null
       /** @description What a person gives or the browser generates. */
       inputs: components["schemas"]["TemplateInput"][]
+      /** @description The labels of its objects, which the Secrets of generated values carry too. */
+      labels: {
+        [key: string]: string
+      }
       /** @description The licence of the application and its images (SPDX). */
       license: string
       /** @description The application's name (`Miniflux`). */
@@ -9031,6 +9058,8 @@ export interface components {
       requires: components["schemas"]["Requirement"][]
       /** @description Its services. */
       services: components["schemas"]["TemplateService"][]
+      /** @description The application's version (`2.2.0`). */
+      version: string
     }
     /** @description A timeline. */
     Timeline: {

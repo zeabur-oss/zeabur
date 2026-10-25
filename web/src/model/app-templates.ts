@@ -43,13 +43,17 @@ export function inputKind(input: TemplateInput): InputKind {
 export const shownInputs = (template: AppTemplate) =>
   template.inputs.filter((i) => inputKind(i) !== "generated")
 
-/** Values to start the form with: the kube-apiserver address the cluster gave, when the template
- * asks for it. */
-export function startValues(template: AppTemplate, kubeApiCidr?: string | null) {
-  const values: Record<string, string> = {}
-  for (const input of shownInputs(template)) values[input.name] = ""
-  if (kubeApiCidr && "kubeApiCidr" in values) values.kubeApiCidr = kubeApiCidr
-  return values
+/** Values to start the form with: all empty. */
+export const startValues = (template: AppTemplate) =>
+  Object.fromEntries(shownInputs(template).map((i) => [i.name, ""]))
+
+/** The input's label and description in `locale`, else in English. */
+export function inputWords(input: TemplateInput, locale: string) {
+  const local = input.locales?.[locale]
+  return {
+    label: local?.label ?? input.label ?? input.name,
+    description: local?.description ?? input.description,
+  }
 }
 
 /** Random bytes, encoded as the template asks. */
@@ -130,7 +134,7 @@ export function templateChanges(
       const secret: Record<string, unknown> = {
         apiVersion: "v1",
         kind: "Secret",
-        metadata: { name },
+        metadata: { name, labels: template.labels },
         type: "Opaque",
         stringData,
       }

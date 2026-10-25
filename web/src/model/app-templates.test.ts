@@ -10,6 +10,7 @@ import {
   generateAll,
   inputKind,
   inputProblem,
+  inputWords,
   listed,
   startValues,
   templateChanges,
@@ -55,6 +56,8 @@ const template = (patch: Partial<AppTemplate>): AppTemplate => ({
   description: "Miniflux feed reader over HTTPS.",
   license: "Apache-2.0",
   homepage: "https://miniflux.app/",
+  version: "2.2.0",
+  labels: { "app.kubernetes.io/instance": "miniflux" },
   requires: [],
   services: [],
   requests: { cpuMillicores: 150, memoryBytes: 320 * 2 ** 20 },
@@ -97,7 +100,7 @@ describe("app templates", () => {
 
   test("a value is checked against the whole pattern, and an empty one only when required", () => {
     const cidr = input({
-      name: "kubeApiCidr",
+      name: "storageCidr",
       required: true,
       pattern: "([0-9]{1,3}\\.){3}[0-9]{1,3}/([0-9]|[12][0-9]|3[0-2])",
     })
@@ -139,16 +142,23 @@ describe("app templates", () => {
     expect(deployProblems(template({}), {}, "", null).blocked).toBe(false)
   })
 
-  test("the kube-apiserver address fills kubeApiCidr only", () => {
-    const cidr = input({ name: "kubeApiCidr", required: true })
-    const email = input({ name: "adminEmail", required: true })
-    expect(startValues(template({ inputs: [cidr, email] }), "10.0.0.1/32")).toEqual({
-      kubeApiCidr: "10.0.0.1/32",
-      adminEmail: "",
+  test("an input is shown in the reader's language, else in English", () => {
+    const email = input({
+      name: "adminEmail",
+      label: "Admin email",
+      description: "The first account's email.",
+      locales: { "zh-TW": { label: "管理員電子郵件", description: "第一個帳號的電子郵件。" } },
     })
-    expect(startValues(template({ inputs: [email] }), "10.0.0.1/32")).toEqual({
-      adminEmail: "",
+    expect(inputWords(email, "zh-TW")).toEqual({
+      label: "管理員電子郵件",
+      description: "第一個帳號的電子郵件。",
     })
+    expect(inputWords(email, "zh-CN")).toEqual({
+      label: "Admin email",
+      description: "The first account's email.",
+    })
+    expect(inputWords(input({ name: "token" }), "en").label).toBe("token")
+    expect(startValues(template({ inputs: [email] }))).toEqual({ adminEmail: "" })
   })
 
   test("generated values sharing a Secret go in one create, before the template", () => {
@@ -176,7 +186,7 @@ describe("app templates", () => {
         object: {
           apiVersion: "v1",
           kind: "Secret",
-          metadata: { name: "wordpress-secrets" },
+          metadata: { name: "wordpress-secrets", labels: wordpress.labels },
           type: "Opaque",
           stringData: {
             "database-password": generated.databasePassword,
@@ -189,7 +199,7 @@ describe("app templates", () => {
         object: {
           apiVersion: "v1",
           kind: "Secret",
-          metadata: { name: "api-secrets" },
+          metadata: { name: "api-secrets", labels: wordpress.labels },
           type: "Opaque",
           stringData: { key: generated.apiKey },
         },

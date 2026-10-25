@@ -597,7 +597,17 @@ describe("MySQL, MariaDB and Dragonfly", () => {
   })
 
   test("MariaDB backs up through a scheduled Backup, and on demand to the same bucket", () => {
-    const maria = as("mariadb", "MariaDB", "mariadbs")
+    const maria = as("mariadb", "MariaDB", "mariadbs", {
+      podMetadata: { labels: { "templates.zeabur.com/template": "wordpress" } },
+    })
+    const backupPods = {
+      podMetadata: {
+        labels: {
+          "app.kubernetes.io/component": "backup",
+          "templates.zeabur.com/template": "wordpress",
+        },
+      },
+    }
     const [, backup] = enableBackups(maria, { ...target, keepDays: 3 })
     expect(backup?.op === "create" && backup.object?.spec).toMatchObject({
       schedule: { cron: "0 3 * * *" },
@@ -605,6 +615,7 @@ describe("MySQL, MariaDB and Dragonfly", () => {
       storage: {
         s3: { bucket: "backups", prefix: "db", endpoint: "s3.test:8333", tls: { enabled: false } },
       },
+      ...backupPods,
     })
     const now = backUpNow(
       {
@@ -626,6 +637,7 @@ describe("MySQL, MariaDB and Dragonfly", () => {
     expect(now[0]?.op === "create" && now[0].object?.spec).toMatchObject({
       mariaDbRef: { name: "db" },
       storage: { s3: { bucket: "backups", prefix: "db", region: "eu", tls: { enabled: true } } },
+      ...backupPods,
     })
   })
 

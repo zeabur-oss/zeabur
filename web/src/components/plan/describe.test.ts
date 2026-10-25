@@ -613,6 +613,8 @@ group("pods that do not fit", () => {
     ...over,
   })
   const preview = (blockers: Schemas["Blocker"][], rollouts: Rollout[]): Schemas["Preview"] => ({
+    databases: [],
+    domains: [],
     dataLoss: [],
     removals: [],
     unreadable: [],

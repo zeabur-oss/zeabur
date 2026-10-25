@@ -2505,7 +2505,6 @@ export const zhCN: Messages = {
   "add.templateConsentNeeded": "同意后才能部署。",
   "add.templateInputEmpty": "这一栏必填。",
   "add.templateInputInvalid": (pattern) => `格式不符（${pattern}）。`,
-  "add.templateFromCluster": "已从集群读取。",
   "add.templateOptional": "选填",
   "add.composeTitle": "导入 Docker Compose",
   "add.composeBody": (project) =>
@@ -3268,6 +3267,7 @@ export const zhCN: Messages = {
   "sentence.problem.badRequest.fix.planToken": () =>
     "重新检查变更。只有检查它的那台服务器能应用，而且令牌不能改动。",
   "sentence.problem.conflict.fix.review": () => "重新检查，以它当前的状态为准。",
+  "sentence.problem.conflict.fix.alreadyExists": () => "先删掉它们，或部署到其他项目。",
   "sentence.problem.conflict.fix.waitForContainer": () =>
     "等它开始运行。如果一直没有运行，它的日志和事件会说明原因。",
   "sentence.problem.unavailable.fix.tryAgainSoon": () => "稍后再试一次。",
@@ -3302,6 +3302,7 @@ export const zhCN: Messages = {
   "sentence.problem.summary.log-unavailable": () => "无法读取这份日志。",
   "sentence.problem.summary.conflict": (p) =>
     p.name ? `${p.name} 在你检查之后又有了改动。` : "它在你检查之后又有了改动。",
+  "sentence.problem.summary.already-exists": (p) => `项目 ${p.namespace} 里已经有 ${p.objects}。`,
   "sentence.problem.summary.managed": (p) =>
     p.name ? `${p.name} 由其他工具管理。` : "这由其他工具管理。",
   "sentence.problem.summary.plan-expired": () => "这份变更已过期。",
@@ -3941,6 +3942,9 @@ export const zhCN: Messages = {
   "preview.scale": (name, from, to) => `${name} 从 ${from} 个副本变成 ${to} 个。`,
   "preview.start": (name, replicas) => `${name} 会启动 ${replicas} 个副本。`,
   "preview.stop": (name) => `${name} 会停止。`,
+  "preview.database": (name, engine, replicas) =>
+    `${engine} 数据库 ${name} 会启动 ${replicas} 个副本。`,
+  "preview.domain": (host) => `域名 ${host} 会开始对外提供服务。`,
   "preview.pendingRestart": (name) => `${name} 重新启动前会继续使用旧的值。`,
   "preview.downtime": "会有短暂的时间没有副本提供服务。",
   "preview.cores": (n) => `${n} 核 CPU`,

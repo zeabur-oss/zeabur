@@ -611,6 +611,23 @@ function mariaStorage(
   }
 }
 
+const TEMPLATE_LABEL = "templates.zeabur.com/template"
+
+/** The labels of a MariaDB Backup's Pods: `app.kubernetes.io/component: backup`, and the template
+ * label of the database's Pods, so that a catalogue template's NetworkPolicies let them reach the
+ * database and the backup store. */
+function mariaBackupPods(database: Database) {
+  const spec = (database.object as { spec?: { podMetadata?: { labels?: Record<string, string> } } })
+    .spec
+  const template = spec?.podMetadata?.labels?.[TEMPLATE_LABEL]
+  return {
+    labels: {
+      "app.kubernetes.io/component": "backup",
+      ...(template ? { [TEMPLATE_LABEL]: template } : {}),
+    },
+  }
+}
+
 const awsKeys = (name: string, target: BackupTarget, region: string) =>
   keysSecret(name, target, AWS_KEYS, { AWS_REGION: region || "us-east-1" })
 
@@ -755,6 +772,7 @@ export function enableBackups(database: Database, target: BackupTarget): Change[
             region,
             names.secret,
           ),
+          podMetadata: mariaBackupPods(database),
           podSecurityContext: restrictedPod(999),
           securityContext: restricted,
         },
@@ -883,6 +901,7 @@ export function backUpNow(database: Database, now: Date): Change[] {
             store?.region ?? "",
             store?.secret ?? backupNames(database.name).secret,
           ),
+          podMetadata: mariaBackupPods(database),
           podSecurityContext: restrictedPod(999),
           securityContext: restricted,
         },

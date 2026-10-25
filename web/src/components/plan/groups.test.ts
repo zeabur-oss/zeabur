@@ -58,6 +58,8 @@ const apiChanges: Schemas["FieldChange"][] = [
 
 const preview = (over: Partial<Schemas["Preview"]> = {}): Schemas["Preview"] => ({
   rollouts: [],
+  databases: [],
+  domains: [],
   fit: { status: "notNeeded", pods: 0, cpuMillicores: 0, memoryBytes: 0 },
   dataLoss: [],
   removals: [],

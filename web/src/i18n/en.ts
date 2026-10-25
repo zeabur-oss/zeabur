@@ -2723,7 +2723,6 @@ export const en = {
   "add.templateInputEmpty": "Fill this in.",
   "add.templateInputInvalid": (pattern: string) =>
     `Doesn't match the expected format (${pattern}).`,
-  "add.templateFromCluster": "Read from the cluster.",
   "add.templateOptional": "Optional",
   "add.composeTitle": "Import Docker Compose",
   "add.composeBody": (project: string) =>
@@ -3567,6 +3566,8 @@ export const en = {
   "sentence.problem.badRequest.fix.planToken": () =>
     "Review the changes again. They apply only on the server that checked them, with their token unchanged.",
   "sentence.problem.conflict.fix.review": () => "Review again to start from its current state.",
+  "sentence.problem.conflict.fix.alreadyExists": () =>
+    "Delete them first, or deploy into another project.",
   "sentence.problem.conflict.fix.waitForContainer": () =>
     "Wait until it runs; its logs and events say why it doesn't.",
   "sentence.problem.unavailable.fix.tryAgainSoon": () => "Try again in a moment.",
@@ -3603,6 +3604,8 @@ export const en = {
   "sentence.problem.summary.log-unavailable": () => "This log can't be read.",
   "sentence.problem.summary.conflict": (p: P) =>
     p.name ? `${p.name} changed after you reviewed it.` : "It changed after you reviewed it.",
+  "sentence.problem.summary.already-exists": (p: P) =>
+    `${p.objects} already exist in project ${p.namespace}.`,
   "sentence.problem.summary.managed": (p: P) =>
     p.name ? `Another tool manages ${p.name}.` : "Another tool manages this.",
   "sentence.problem.summary.plan-expired": () => "These changes expired.",
@@ -4312,6 +4315,9 @@ export const en = {
   "preview.start": (name: string, replicas: number) =>
     `${name} starts ${plural(replicas, "replica", "replicas")}.`,
   "preview.stop": (name: string) => `${name} stops.`,
+  "preview.database": (name: string, engine: string, replicas: number) =>
+    `The ${engine} database ${name} starts ${plural(replicas, "replica", "replicas")}.`,
+  "preview.domain": (host: string) => `The domain ${host} starts serving.`,
   "preview.pendingRestart": (name: string) => `${name} keeps the old value until it restarts.`,
   "preview.downtime": "Nothing serves for a moment.",
   "preview.cores": (n: string) => `${n} CPU`,

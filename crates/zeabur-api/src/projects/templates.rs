@@ -217,16 +217,16 @@ mod tests {
     fn a_wrong_input_points_at_its_field() {
         let request = PlanRequest {
             changes: vec![Change::Template(TemplateChange {
-                template: "miniflux".to_owned(),
-                domain: Some("rss.example.com".to_owned()),
-                inputs: [("kubeApiCidr".to_owned(), "nope".to_owned())].into(),
+                template: "wordpress".to_owned(),
+                domain: Some("blog.example.com".to_owned()),
+                inputs: [("adminEmail".to_owned(), "nope".to_owned())].into(),
             })],
         };
         let problem = open("shop", Some("letsencrypt"), request).unwrap_err().0;
         assert_eq!(problem.kind, Kind::Invalid);
         assert_eq!(
             problem.at.and_then(|a| a.field).as_deref(),
-            Some("inputs.kubeApiCidr")
+            Some("inputs.adminEmail")
         );
     }
 }
