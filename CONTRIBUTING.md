@@ -72,15 +72,16 @@ written in English.
 
 ## Toolchain
 
-- `rust-toolchain.toml` is the only place the compiler version is set. rustup reads it directly;
-  the Nix flake reads it through fenix `fromToolchainFile`, so both use the same compiler.
+- `flake.lock` is the only place the compiler version is set. `nix develop` takes the newest
+  nightly in the locked rust-overlay that has every component and target listed in `flake.nix`.
+  There is no `rust-toolchain.toml`; use `nix develop`, not rustup.
 - The pinned nightly enables the parallel front end (`-Zthreads`), current clippy lints and
   rustfmt's import ordering. No `#![feature]` is used. Moving to stable is a configuration
-  change: drop `-Zthreads` from `.cargo/config.toml` and the nightly-only `rustfmt.toml` options.
-- A toolchain bump also updates the `sha256` in `flake.nix`. `scripts/bump-toolchain.sh` does
-  both, choosing the newest nightly of the last week with every listed component and target.
-- `.github/workflows/update-toolchain.yml` runs that script with `nix flake update` on the 1st
-  and 15th of each month and opens one pull request.
+  change: use `rust-bin.stable.latest` in `flake.nix`, drop `-Zthreads` from `.cargo/config.toml`
+  and the nightly-only `rustfmt.toml` options.
+- Renovate's lock file maintenance (`renovate.json`) updates `flake.lock` every Monday, and with it
+  the nightly. A new nightly can bring new clippy lints or change a nightly-only setting; fix those
+  on that pull request before merging.
 - `nix develop` sets `RUSTC_WRAPPER=kache`, a compiler cache (https://github.com/kunobi-ninja/kache)
   shared by every checkout and worktree on the machine. `scripts/release-build.sh` turns it off, so
   release binaries are always compiled. kache is pinned to a release tag in `flake.nix`.

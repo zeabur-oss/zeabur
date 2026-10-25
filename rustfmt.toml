@@ -1,5 +1,5 @@
-# Formatting policy (see CONTRIBUTING.md). Options marked nightly need the pinned nightly rustfmt.
-# Options marked (nightly) need the pinned nightly rustfmt from rust-toolchain.toml.
+# Formatting policy (see CONTRIBUTING.md). Options marked (nightly) need the nightly rustfmt from
+# `nix develop`.
 style_edition = "2024"
 newline_style = "Unix"
 use_field_init_shorthand = true

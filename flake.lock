@@ -3,6 +3,7 @@
     "fenix": {
       "inputs": {
         "nixpkgs": [
+          "zhtw-mcp",
           "nixpkgs"
         ],
         "rust-analyzer-src": "rust-analyzer-src"
@@ -25,7 +26,9 @@
         "nixpkgs": [
           "nixpkgs"
         ],
-        "rust-overlay": "rust-overlay",
+        "rust-overlay": [
+          "rust-overlay"
+        ],
         "treefmt-nix": "treefmt-nix"
       },
       "locked": {
@@ -59,9 +62,9 @@
     },
     "root": {
       "inputs": {
-        "fenix": "fenix",
         "kache": "kache",
         "nixpkgs": "nixpkgs",
+        "rust-overlay": "rust-overlay",
         "zhtw-mcp": "zhtw-mcp"
       }
     },
@@ -85,22 +88,20 @@
     "rust-overlay": {
       "inputs": {
         "nixpkgs": [
-          "kache",
           "nixpkgs"
         ]
       },
       "locked": {
-        "lastModified": 1791101754,
-        "narHash": "sha256-y/GF+9B0t0TZ0nQiSRMqDXpr76yT7sdDbS/3GNLhzkE=",
-        "owner": "oxalica",
-        "repo": "rust-overlay",
-        "rev": "dbc715a4b7c0ace63b9769a032d1dd34cd89e5bd",
-        "type": "github"
+        "lastModified": 1792825530,
+        "narHash": "sha256-aphXA2IFNd3q48++TKmfuuvDDjkrgGdJDnDIhij9684=",
+        "rev": "5b9f1198b59bcb31c5c3250b332e7d77590e6306",
+        "revCount": 2346,
+        "type": "tarball",
+        "url": "https://api.flakehub.com/f/pinned/oxalica/rust-overlay/0.1.2346%2Brev-5b9f1198b59bcb31c5c3250b332e7d77590e6306/01a16efe-2d7c-7a13-9c4d-04a837bcfe33/source.tar.gz"
       },
       "original": {
-        "owner": "oxalica",
-        "repo": "rust-overlay",
-        "type": "github"
+        "type": "tarball",
+        "url": "https://flakehub.com/f/oxalica/rust-overlay/0.1"
       }
     },
     "treefmt-nix": {
@@ -126,9 +127,7 @@
     },
     "zhtw-mcp": {
       "inputs": {
-        "fenix": [
-          "fenix"
-        ],
+        "fenix": "fenix",
         "nixpkgs": [
           "nixpkgs"
         ]

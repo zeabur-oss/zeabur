@@ -1,8 +1,9 @@
 name: Update catalog
 
 # Moves crates/zeabur-catalog/bundle to Zeabur Catalog's latest release in one pull request, which
-# CI then checks like any other. The GitHub App token (as in update-toolchain.yml) also reads the
-# catalog, which is private.
+# CI then checks like any other. A GitHub App token (`UPDATE_BOT_CLIENT_ID`,
+# `UPDATE_BOT_PRIVATE_KEY`; contents and pull requests read/write) opens it, because a pull request
+# made with GITHUB_TOKEN does not start CI. The token also reads the catalog, which is private.
 
 on:
   schedule:
