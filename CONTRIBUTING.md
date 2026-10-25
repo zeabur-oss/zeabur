@@ -158,46 +158,56 @@ What to test, at which level, and what not to test: [docs/internal/testing.md](d
 - **Unit and integration tests** run anywhere: `cargo nextest run --workspace`. They include the
   language-neutral cases in [`fixtures/`](fixtures/README.md).
 - **Cluster tests** and **end-to-end tests** are `#[ignore]`d and require a disposable cluster
-  where you are cluster admin. The setup below is shared with the `kubernetes` job in
-  `.github/workflows/ci.yml`.
+  where you are cluster admin: the development cluster below, which the cluster jobs in
+  `.github/workflows/ci.yml` use too.
 
-### Disposable k3d cluster
+### Development cluster
 
-Run from the Zeabur checkout on a Linux machine or VM with Docker running, Nix with flakes, and
-permission to use Docker. Enter `nix develop` for the tools, including k3d and kubectl. Do not use
-a production cluster: the tests create and delete namespaces, service accounts and RBAC.
+Three commands give a k3d cluster with Zeabur Identity and Zeabur, installed with the installer's
+own objects and values, at <https://zeabur.localhost>. Run them from the Zeabur checkout on a Linux
+machine or VM with Docker running, Nix with flakes, and permission to use Docker; the cluster
+uses port 443. Do not point anything at a production cluster: the tests create and delete
+namespaces, service accounts and RBAC.
 
 ```sh
-nix develop
-export KUBECONFIG=$(mktemp)
-k3d cluster create zeabur --image rancher/k3s:v1.36.5-k3s1 --no-lb --wait --timeout 300s
-docker pull busybox:1.37 && k3d image import busybox:1.37 --cluster zeabur
-kubectl get nodes                         # Ready
+git clone https://github.com/zeabur-oss/zeabur && cd zeabur
+nix run .#dev-cluster -- up       # prints the URL, a one-time setup link and the CA
+nix run .#dev-cluster -- down     # deletes the cluster, its volume and its images
+```
+
+`up` builds Zeabur and Zeabur Proxy from the checkout and Zeabur Identity from the commit in
+`ZEABUR_IDENTITY_PINNED` (no image of it is published yet), then prints the setup link that enrols
+the first admin's passkey. Your browser accepts the site once it trusts the printed CA
+(`target/dev-cluster/tls/ca.crt`). On a VM, forward port 443 from your machine
+(`sudo ssh -L 443:127.0.0.1:443 <vm>`); `*.localhost` resolves to your own machine. Run `up` again
+after a change: it rebuilds and redeploys what changed. Options:
+
+- `--profile full`: also CloudNativePG with the Barman Cloud plugin, the Percona Operator for
+  MongoDB, Keel, cert-manager, a test S3 and Zeabur Builder (from `ZEABUR_BUILDER_PINNED`).
+- `--identity-src ../identity`: Zeabur Identity from that working tree, as it is. To move to a newer
+  Zeabur Identity, write its commit to `ZEABUR_IDENTITY_PINNED`.
+- `ZEABUR_REGISTRY_MIRRORS=docker.io=http://mirror:5001,ghcr.io=http://mirror:5002`: the node pulls
+  through these registry mirrors (each `registry=endpoint`), for a machine behind a slow or
+  rate-limited link. `K3S_IMAGE` picks the k3s release.
+
+The tests, against that cluster (`nix develop` first):
+
+```sh
+export KUBECONFIG=$PWD/target/dev-cluster/kubeconfig
 cargo nextest run --locked --run-ignored only -E 'binary(kubernetes)'
-./scripts/build-ui.sh && ./scripts/e2e-ui.sh   # browser tests of zeaburctl ui (Playwright)
+./scripts/build-ui.sh && ./scripts/e2e-ui.sh     # zeaburctl ui in local mode (Playwright)
+./scripts/e2e-l2-browser.sh                      # Zeabur in the cluster (Playwright)
 ```
 
 Each cluster test works in a namespace of its own with a person in it, from
-`zeabur-test-support`'s `sandbox`, and deletes it when it ends. The separate kubeconfig prevents
-k3d from changing your normal cluster context. When finished:
+`zeabur-test-support`'s `sandbox`, and deletes it when it ends. A release `zeaburctl` embeds the
+interface: `./scripts/build-ui.sh && ZEABUR_UI_DIST=$PWD/web/dist cargo build --release -p zeaburctl`.
 
-```sh
-k3d cluster delete zeabur
-```
-
-### Zeabur in a cluster with Zeabur Identity
-
-`scripts/e2e-l2.sh` (the `kubernetes-l2` job) creates a cluster of its own, `zeabur-l2`, installs
-Zeabur Identity and Zeabur from their images (Zeabur with its chart) behind Traefik over HTTPS, and drives
-a browser through passkey sign-in, a terminal confirmed with the passkey again, and reads and
-changes with admin rights. It builds Zeabur Identity from a checkout next to this one (`ZEABUR_IDENTITY_SRC`,
-default `../identity`) at the commit in `ZEABUR_IDENTITY_PINNED`, refusing a checkout at another commit, and
-uses port 443 on the machine. To move to a newer Zeabur Identity, check it out, write its commit to
-`ZEABUR_IDENTITY_PINNED`, and run the script.
-
-```sh
-nix develop -c ./scripts/e2e-l2.sh
-```
+`scripts/e2e-l2.sh` (the `kubernetes-l2` job) is `up`, the browser tests, then checks from outside
+(Zeabur's service accounts have no extra rights, the idle pod's memory, removing Zeabur leaves the
+cluster as it was) and `down`. It takes `up`'s options; `ZEABUR_L2_KEEP=1` keeps the cluster and
+skips the removal check. On a cluster of `--profile full`, a browser test that would skip for want
+of a component fails instead.
 
 ## Web interface
 

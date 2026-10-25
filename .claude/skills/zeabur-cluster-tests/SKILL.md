@@ -20,31 +20,38 @@ remain the answer.
 
 ## Cluster
 ```sh
-export KUBECONFIG=$(mktemp)   # keep k3d away from your normal context
-k3d cluster create zeabur --image rancher/k3s:v1.36.5-k3s1 --no-lb --wait --timeout 300s
-docker pull busybox:1.37 && k3d image import busybox:1.37 --cluster zeabur   # the exec test's pod
+nix run .#dev-cluster -- up [--profile full] [--identity-src ../identity]
+export KUBECONFIG=$PWD/target/dev-cluster/kubeconfig   # never your normal context
+nix run .#dev-cluster -- down
 ```
-The `kubernetes` job in `.github/workflows/ci.yml` rebuilds busybox as a single-platform image
-before importing it and checks that the node really has it; do the same if the import seems to
-succeed but pods cannot find the image. To run the whole job as CI does, use
-`scripts/ci-local.sh kubernetes` (see `zeabur-ci`).
+`scripts/dev-cluster.sh` is the one cluster setup: the `kubernetes` and `kubernetes-l2` jobs,
+`e2e-l2.sh` and `release-smoke.sh` all use it. It installs Zeabur Identity (built from
+`ZEABUR_IDENTITY_PINNED`, fetched from `ZEABUR_IDENTITY_GIT`, or from `--identity-src`) and Zeabur
+from `zeabur-installer manifests` (the installer's own HelmChart and values; a `HelmChartConfig`
+adds Zeabur Proxy and, on the full profile, the Builder's registry), and imports busybox for the
+exec test. `--profile full` adds cert-manager, CloudNativePG with Barman Cloud, Percona MongoDB
+and Keel (each with the Helm commands Zeabur Catalog gives), the test S3, and Zeabur Builder from
+`ZEABUR_BUILDER_PINNED` with a Zot that takes anonymous pushes at a fixed ClusterIP. To run a whole
+job as CI does, use `scripts/ci-local.sh kubernetes` (see `zeabur-ci`).
 
 ## Run
 ```sh
 cargo nextest run --locked --run-ignored only -E 'binary(kubernetes)'   # every crate's tests/kubernetes.rs
 ./scripts/build-ui.sh && ./scripts/e2e-ui.sh                             # browser tests, local mode
-./scripts/e2e-l2.sh                   # in a cluster of its own with Zeabur Identity (needs ../identity, port 443)
+./scripts/e2e-l2-browser.sh           # web/e2e/l2, Zeabur in the cluster
+./scripts/e2e-l2.sh                   # up, web/e2e/l2, rights, memory, removal, down
 ```
 - `e2e-ui.sh` recreates the namespace `zeabur-e2e` from `web/e2e/manifests/talker.yaml` (a
   healthy service, a ConfigMap reader, and `crasher`, which exits 1 at once), waits until
   `crasher` has restarted twice, starts the release `zeaburctl ui`, and runs `web/e2e` with
   Playwright. Failures land in `target/e2e-ui/results/<test>/` (`error-context.md`, a trace).
-- `e2e-l2.sh` builds Zeabur Identity at the commit in `ZEABUR_IDENTITY_PINNED` from `ZEABUR_IDENTITY_SRC` (default
-  `../identity`, refused at another commit), creates the cluster `zeabur-l2`
-  (`ZEABUR_L2_KEEP=1` keeps it), and runs `web/e2e/l2`. Its header lists every step.
-- `e2e-l2-browser.sh [playwright args]` reruns only `web/e2e/l2` on that cluster once kept. It
-  deletes the e2e users and their `zeabur.com/member` bindings and makes them again first, so
-  every user comes from today's code; never reuse a user from an earlier run.
+- `e2e-l2.sh [up options]` brings the cluster up, runs `web/e2e/l2`, checks from outside, and
+  deletes the cluster (`ZEABUR_L2_KEEP=1` keeps it and skips the removal check). Its header lists
+  every step.
+- `e2e-l2-browser.sh [playwright args]` runs only `web/e2e/l2` on the cluster. It deletes the e2e
+  users and their `zeabur.com/member` bindings and makes them again first, so every user comes
+  from today's code; never reuse a user from an earlier run. On the full profile a spec that
+  would skip for a missing component fails instead.
 - `e2e/l2/git-private.spec.ts` deploys a private GitHub repository with a deploy key and runs
   only with `E2E_PRIVATE_GIT_REPO` set (e.g. `git@github.com:zeabur-oss/oss-private-git-demo.git`).
   With `E2E_GH_DEPLOY_KEY=1` it adds the key read-only and removes it with `gh repo deploy-key`
@@ -86,4 +93,4 @@ Wait on `restartCount` (as `e2e-ui.sh` does), and read both logs until one has t
 - **It fails on GitHub but not here**: see `zeabur-ci` (reading the job's log, reproducing with
   `scripts/ci-local.sh`, timing and `pipefail` pitfalls).
 
-Clean up with `k3d cluster delete zeabur`.
+Clean up with `nix run .#dev-cluster -- down`.

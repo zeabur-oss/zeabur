@@ -7,8 +7,8 @@ description: Investigate a failed or flaky CI or release run of Zeabur (GitHub A
 
 `.github/workflows/ci.yml` has three kinds of jobs: the `check` matrix (format, clippy, docs, test,
 cargo-deny, unsafe-report, levels, ui, no-ui, chart, wording), `kubernetes` (cluster tests,
-`zeaburctl doctor`, browser tests in local mode, the image) and `kubernetes-l2` (Zeabur and Zeabur Identity
-in a cluster, `scripts/e2e-l2.sh`); `dco` runs on pull requests only. What each cluster job runs
+`zeaburctl doctor`, browser tests in local mode) and `kubernetes-l2` (Zeabur and Zeabur Identity
+in a cluster, `scripts/e2e-l2.sh`), both on `scripts/dev-cluster.sh`; `dco` runs on pull requests only. What each cluster job runs
 is in `zeabur-cluster-tests`.
 
 `.github/workflows/release.yml` runs on a `v*` tag: all of `ci.yml` (`workflow_call`), then
@@ -78,8 +78,8 @@ ssh host 'cd zeabur && scripts/ci-local.sh'                # every job, a result
 - One run at a time per machine: check `pgrep -af 'ci-local.sh|ci.sh'` first.
 - It refuses to start with less than 25 GB free (`CI_LOCAL_MIN_FREE_GB`). Reclaim space with
   `docker builder prune -f` and `docker volume prune -f`.
-- `kubernetes-l2` needs a Zeabur Identity checkout at the commit in `ZEABUR_IDENTITY_PINNED` (`ZEABUR_IDENTITY_SRC`, default
-  `../identity`); sync it too.
+- The cluster jobs fetch Zeabur Identity at `ZEABUR_IDENTITY_PINNED` from `ZEABUR_IDENTITY_GIT`
+  (default GitHub); point it at a mirror, or set `ZEABUR_IDENTITY_SRC` to a checkout synced along.
 - For a timing failure, also observe the state directly (a `kubectl get -w`, or a loop printing
   the field the test reads every few seconds). One green run proves little; a recording of the
   state the test missed proves the cause.

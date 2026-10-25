@@ -370,6 +370,6 @@ kubectl delete rolebindings,clusterrolebindings -A -l zeabur.com/member
 
 Zeabur keeps no state outside its namespace but the member bindings admins made: no custom
 resources, and only those bindings cluster-wide, which the last command removes. After these
-commands the cluster is as it was before step 2. `scripts/e2e-l2.sh` checks this: it
+commands the cluster is as it was before step 2. `scripts/e2e-l2.sh` checks this after removing an installer-made install: it
 records every cluster-scoped object and every namespace's labels and annotations before the
 install and compares them after the removal.
