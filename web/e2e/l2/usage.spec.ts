@@ -2,7 +2,7 @@ import { expect, test } from "../fixtures.ts"
 import { invite, member, signInAsAdmin } from "./members.ts"
 
 // The cluster page's resource usage: an admin sees the test project and its services; a Viewer
-// of one project may not list every pod, so the section says it needs more rights.
+// of one project may not list every pod, so the section says it needs admin rights.
 // scripts/e2e-l2-browser.sh sets, besides ZEABUR_L2_URL:
 //
 //   ZEABUR_L2_USAGE_ADMIN_LINK   an invitation for `e2e-usage-admin`, in the groups admins and
@@ -22,7 +22,7 @@ test.beforeAll(() => {
   if (!project) throw new Error("ZEABUR_L2_NAMESPACE is not set")
 })
 
-test("an admin sees what the test project uses; a Viewer is told it needs more rights", async ({
+test("an admin sees what the test project uses; a Viewer is told it needs admin rights", async ({
   page,
   browser,
 }) => {
@@ -47,14 +47,14 @@ test("an admin sees what the test project uses; a Viewer is told it needs more r
     ).toBeVisible({ timeout: 30_000 })
   })
 
-  await test.step("a Viewer of the project sees that usage needs more rights", async () => {
+  await test.step("a Viewer of the project sees that usage needs admin rights", async () => {
     const link = await invite(page, "e2e-usage-viewer", [{ project, role: "viewer" }])
     const viewer = await member(browser, link, "e2e-usage-viewer", zeabur)
     await viewer.goto("/cluster")
     await expect(
       viewer
         .getByRole("region", { name: "Resource usage" })
-        .getByText("Seeing what each namespace uses needs more rights."),
+        .getByText("Seeing what each namespace uses needs admin rights."),
     ).toBeVisible({ timeout: 30_000 })
   })
 })
