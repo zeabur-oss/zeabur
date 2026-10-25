@@ -119,6 +119,8 @@ kubectl get storageclasses
 
 Chart 卸載會移除 `zeabur-member`、專案的聚合 ClusterRole、其規則集，以及 `zeabur-project-namespace` ValidatingAdmissionPolicy 與 binding。`zeabur-installer uninstall zeabur` 還會刪除 Zeabur 建立的成員 binding。
 
+installer 加上的 `zeabur-system-hosts` 政策和 binding 會留下，Zeabur Identity 的網域繼續受保護。`zeabur` Namespace 刪掉後，它的 binding 找不到 Ingress，不再擋任何路由。不需要時依[Zeabur 和 Zeabur Identity 的網域](../reference/security.mdx#zeabur-和-zeabur-identity-的網域)刪除或改成 `Warn`。
+
 仍要讓成員存取叢集時，先用自己的 RBAC 設定接手，確認每個角色實際能讀寫的範圍。若替代角色保留 `patch namespaces`，也要保留相等的欄位限制。chart 政策移除後，單靠 RBAC 無法把 patch 限定在顯示名稱、描述與圖示。既有的 Pod Security 與 NetworkPolicy 標籤會保留。
 
 用 `helm uninstall` 移除時，成員 binding 會留下。確認不再使用舊授權後一次刪除：

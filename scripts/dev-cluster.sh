@@ -321,6 +321,9 @@ EOF
     retry 300 "kube-apiserver to load Zeabur Identity's configuration" reloaded
   fi
 
+  # The domain policy, as zeabur-installer writes it with Zeabur. It stays when Zeabur is removed.
+  kubectl apply --server-side -f "$root/crates/zeabur-installer/manifests/system-hosts.yaml" >/dev/null
+
   # --- What the cluster looks like before Zeabur ------------------------------------------------
   # The projects the browser opens come first: their namespaces stay after Zeabur's removal.
   kubectl apply -f "$root/web/e2e/manifests/talker.yaml" \

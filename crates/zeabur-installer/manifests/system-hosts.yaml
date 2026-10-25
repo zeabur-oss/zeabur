@@ -1,0 +1,101 @@
+# Only the system namespace that serves a domain can use that domain. Each route outside the
+# system namespaces must name a domain: Traefik serves a rule without a host on all domains, and a
+# longer path or `router.priority` puts it before Zeabur's rule. Each binding names one system
+# namespace. Its Ingresses are the parameters, so this file does not change when a domain changes.
+# A wildcard covers all names below it, because Traefik and Gateway API match more than one label.
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: zeabur-system-hosts
+  labels:
+    app.kubernetes.io/managed-by: zeabur-installer
+spec:
+  failurePolicy: Fail
+  paramKind:
+    apiVersion: networking.k8s.io/v1
+    kind: Ingress
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [networking.k8s.io]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [ingresses]
+      - apiGroups: [gateway.networking.k8s.io]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [httproutes]
+  # An update that keeps `spec` passes, so an older route can still get labels or finalizers.
+  matchConditions:
+    - name: spec-changed
+      expression: request.operation == 'CREATE' || object.spec != oldObject.spec
+  variables:
+    - name: ingress
+      expression: request.kind.kind == 'Ingress'
+    - name: system
+      expression: >-
+        has(namespaceObject.metadata.labels) &&
+        'installer.zeabur.com/baseline' in namespaceObject.metadata.labels &&
+        namespaceObject.metadata.labels['installer.zeabur.com/baseline'] == 'true'
+    - name: owner
+      expression: request.namespace == params.metadata.namespace
+    # The domains of the request and of the parameter, as lists of host lists.
+    - name: claims
+      expression: >-
+        variables.ingress
+        ? [has(object.spec.rules) ? object.spec.rules.filter(r, has(r.host)).map(r, r.host) : []] +
+          (has(object.spec.tls) ? object.spec.tls.filter(t, has(t.hosts)).map(t, t.hosts) : [])
+        : [has(object.spec.hostnames) ? object.spec.hostnames : []]
+    - name: taken
+      expression: >-
+        [has(params.spec.rules) ? params.spec.rules.filter(r, has(r.host)).map(r, r.host) : []] +
+        (has(params.spec.tls) ? params.spec.tls.filter(t, has(t.hosts)).map(t, t.hosts) : [])
+  validations:
+    - expression: >-
+        variables.system || !variables.ingress || !has(object.spec.rules) ||
+        object.spec.rules.all(r, has(r.host) && r.host != '')
+      reason: Invalid
+      message: >-
+        Add a host to every rule of this Ingress. A rule without a host takes its path on every
+        domain, Zeabur's own included.
+    - expression: >-
+        variables.system || variables.ingress ||
+        (has(object.spec.hostnames) && size(object.spec.hostnames) > 0)
+      reason: Invalid
+      message: >-
+        Add a hostname to this HTTPRoute. Without one it takes every domain of its listener,
+        Zeabur's own included.
+    - expression: >-
+        variables.owner || !variables.claims.exists(c, c.exists(h, variables.taken.exists(t,
+        t.exists(s, h == s || (h.startsWith('*.') && s.endsWith(h.substring(1)))))))
+      reason: Forbidden
+      messageExpression: >-
+        'The ' + params.metadata.namespace + ' namespace serves this domain, so no other
+        namespace can use it or a wildcard that covers it. Choose another domain.'
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: zeabur-system-hosts-zeabur
+  labels:
+    app.kubernetes.io/managed-by: zeabur-installer
+spec:
+  policyName: zeabur-system-hosts
+  validationActions: [Deny]
+  paramRef:
+    namespace: zeabur
+    selector: {}
+    parameterNotFoundAction: Allow
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: zeabur-system-hosts-zeabur-identity
+  labels:
+    app.kubernetes.io/managed-by: zeabur-installer
+spec:
+  policyName: zeabur-system-hosts
+  validationActions: [Deny]
+  paramRef:
+    namespace: zeabur-identity
+    selector: {}
+    parameterNotFoundAction: Allow

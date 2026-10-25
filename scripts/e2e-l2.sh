@@ -87,6 +87,35 @@ for right in "create secrets" "create rolebindings" "patch pods"; do
 done
 echo "service account zeabur: pods in zeabur-terminals only"
 
+# --- Domains of the system namespaces (crates/zeabur-installer/manifests/system-hosts.yaml) -------
+# A project cannot take Zeabur's or Zeabur Identity's domain, or every domain; it can use its own.
+admit() { # $1 = kind, $2 = spec as JSON
+  jq -n --arg ns "$project" --arg kind "$1" --argjson spec "$2" '{kind: $kind, spec: $spec,
+    apiVersion: (if $kind == "Ingress" then "networking.k8s.io/v1" else "gateway.networking.k8s.io/v1" end),
+    metadata: {name: "zeabur-e2e-host", namespace: $ns}}' | kubectl apply --dry-run=server -f - 2>&1
+}
+backend='{"paths": [{"path": "/x", "pathType": "Prefix", "backend": {"service": {"name": "talker", "port": {"number": 80}}}}]}'
+refused=(
+  "Ingress|{\"rules\": [{\"host\": \"zeabur.localhost\", \"http\": $backend}]}"
+  "Ingress|{\"rules\": [{\"host\": \"identity.localhost\", \"http\": $backend}]}"
+  "Ingress|{\"rules\": [{\"http\": $backend}]}"
+  "Ingress|{\"rules\": [{\"host\": \"*.localhost\", \"http\": $backend}]}"
+  "Ingress|{\"tls\": [{\"hosts\": [\"zeabur.localhost\"]}], \"rules\": [{\"host\": \"shop.localhost\", \"http\": $backend}]}"
+)
+if kubectl get crd httproutes.gateway.networking.k8s.io >/dev/null 2>&1; then
+  refused+=("HTTPRoute|{\"rules\": [{}]}" "HTTPRoute|{\"hostnames\": [\"*.localhost\"], \"rules\": [{}]}")
+fi
+for case in "${refused[@]}"; do
+  if out=$(admit "${case%%|*}" "${case#*|}"); then
+    echo "error: the cluster accepted ${case#*|} in $project: $out" >&2
+    exit 1
+  fi
+  [[ "$out" == *zeabur-system-hosts* ]] || { echo "error: unexpected refusal: $out" >&2; exit 1; }
+done
+out=$(admit Ingress "{\"rules\": [{\"host\": \"shop.localhost\", \"http\": $backend}]}") ||
+  { echo "error: the cluster refused a project's own domain: $out" >&2; exit 1; }
+echo "domains: the system namespaces keep theirs"
+
 # --- Memory when idle -----------------------------------------------------------------------------
 # A fixed wait on purpose: the measure is the pod's working set after a minute of nothing, as
 # the kubelet reports it (Summary API, the figure eviction uses).

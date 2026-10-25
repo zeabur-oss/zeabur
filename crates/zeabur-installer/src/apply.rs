@@ -104,6 +104,7 @@ pub(crate) fn run(config_path: &Path) -> Result<(), InstallError> {
         if config.access.mode == AccessMode::Local {
             local_ca(&kubectl, &plan)?;
         }
+        system_hosts(&kubectl)?;
         identity(&kubectl, &plan)?;
         zeabur(&kubectl, &plan, &config)?;
         if !link_issued {
@@ -452,6 +453,39 @@ fn local_path_manifest(default: bool) -> String {
             &format!("{}: \"false\"", storage::DEFAULT_CLASS_ANNOTATION),
         )
     }
+}
+
+/// The policy that keeps the domains of `zeabur` and `zeabur-identity` to them, and its bindings.
+/// A binding that exists stays as it is, so one an admin set to `Warn` stays so.
+fn system_hosts(kubectl: &Kubectl) -> Result<(), InstallError> {
+    for (binding, document) in system_hosts_documents()? {
+        if let Some(name) = binding
+            && kubectl
+                .get("validatingadmissionpolicybinding", &name, None)?
+                .is_some()
+        {
+            continue;
+        }
+        kubectl.apply(document.as_bytes())?;
+    }
+    Ok(())
+}
+
+/// The documents of `manifests/system-hosts.yaml`, each with its name when it is a binding.
+fn system_hosts_documents() -> Result<Vec<(Option<String>, &'static str)>, InstallError> {
+    include_str!("../manifests/system-hosts.yaml")
+        .split("\n---\n")
+        .map(|document| {
+            let object: Value = serde_saphyr::from_str(document)
+                .map_err(|e| InstallError::Message(format!("reading system-hosts.yaml: {e}")))?;
+            let binding = (object.get("kind").and_then(Value::as_str)
+                == Some("ValidatingAdmissionPolicyBinding"))
+            .then(|| object.pointer("/metadata/name").and_then(Value::as_str))
+            .flatten()
+            .map(str::to_owned);
+            Ok((binding, document))
+        })
+        .collect()
 }
 
 /// Where traffic from the nodes comes from: the first address of each node's pod range, which a
@@ -1082,6 +1116,20 @@ fn record(kubectl: &Kubectl, plan: &Plan, link_issued: bool) -> Result<(), Insta
 
 #[cfg(test)]
 mod tests {
+
+    #[test]
+    fn system_hosts_bind_zeabur_and_identity() {
+        let mut protected = Vec::new();
+        for (binding, document) in system_hosts_documents().unwrap() {
+            let object: Value = serde_saphyr::from_str(document).unwrap();
+            if binding.is_some() {
+                assert_eq!(object["spec"]["policyName"], "zeabur-system-hosts");
+                protected.push(object["spec"]["paramRef"]["namespace"].clone());
+            }
+        }
+        protected.sort_by_key(ToString::to_string);
+        assert_eq!(protected, [ZEABUR_NAMESPACE, IDENTITY_NAMESPACE]);
+    }
 
     #[test]
     fn generated_values_use_the_encoding() {

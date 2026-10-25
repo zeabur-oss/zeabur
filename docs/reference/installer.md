@@ -80,8 +80,9 @@ interrupted install or repairs drift.
    helm-controller, with `failurePolicy: abort`. The installer waits for helm-controller's
    install job, then for the catalog's readiness checks. Catalog checks that create test objects
    are left to the catalog's own CI.
-8. **Zeabur Identity.** In `local` mode, the installer first makes the CA. It then applies
-   Zeabur Identity's CRDs, manifests and Ingress and waits for its rollout. It replaces the
+8. **Zeabur Identity.** In `local` mode, the installer first makes the CA. It writes the
+   admission policy `zeabur-system-hosts` (see [Security defaults](#security-defaults)). It then
+   applies Zeabur Identity's CRDs, manifests and Ingress and waits for its rollout. It replaces the
    authentication configuration with the one `zeabur-identityctl kube-config` writes, and waits
    until kube-apiserver's reload metric shows the new file was loaded. kube-apiserver reaches
    Zeabur Identity through its Service, so this step does not depend on DNS or the public
@@ -188,6 +189,18 @@ are backed up.
   `kubectl -n zeabur-identity wait certificate/<name> --for=condition=Ready`, and run
   `sudo zeabur-installer apply` on every server. Sign-in through Zeabur Identity stops working
   from the second delete until `apply` finishes.
+- **Zeabur's and Zeabur Identity's domains** stay theirs. With `zeabur: true`, the
+  ValidatingAdmissionPolicy `zeabur-system-hosts` refuses an Ingress or HTTPRoute in another
+  namespace that names a domain an Ingress in `zeabur` or `zeabur-identity` serves, in a rule or
+  in `spec.tls`, or a wildcard that covers one. Outside the installer's namespaces (labelled
+  `installer.zeabur.com/baseline`), every Ingress rule needs a `host` and every HTTPRoute a
+  hostname: Traefik serves a rule without one on every domain, and a longer path or
+  `router.priority` puts it ahead of Zeabur's. The domains are read from those Ingresses, so a
+  new domain needs no change. Only a change to `spec` is checked, and routes made before stay.
+  Admins are held to it too. `apply` leaves an existing binding as it is: set
+  `validationActions` to `[Warn]` on `zeabur-system-hosts-zeabur` or
+  `zeabur-system-hosts-zeabur-identity` to only warn. A deleted binding comes back on the next
+  `apply`. The policy stays when Zeabur is removed.
 - **Pinned RKE2 digests.** See the [security policy](../../SECURITY.md#what-the-installer-trusts).
 
 ## What is verified

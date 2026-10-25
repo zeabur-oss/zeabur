@@ -46,7 +46,7 @@ sudo zeabur-installer doctor
 3. 下載 RKE2 到 `/var/lib/rancher/zeabur-installer/downloads`，用 installer 釘選的 SHA-256 核對，啟動 `rke2-server`，等待 API 與節點就緒。
 4. 建立元件的 Namespace、基準 NetworkPolicy 和儲存類別。RKE2 CIS 在 `kube-system` 的預設政策會擋掉外部連到 ServiceLB 的流量。節點上沒有 Traefik 時，從這個節點進來的請求會到不了 Traefik，所以 installer 另外加上 `kube-system/zeabur-installer-servicelb`，只讓外部流量進 ServiceLB 的 Pod。
 5. 依 Catalog 順序安裝元件並等待就緒。
-6. `zeabur: true` 時，安裝 Zeabur Identity、讓 API server 信任它、註冊 OAuth client，再安裝 Zeabur。API server 連 Zeabur Identity 用的憑證由 cert-manager 自動續期，見[Zeabur Identity 的內部憑證](./security.mdx#zeabur-identity-的內部憑證)。
+6. `zeabur: true` 時，先加上 `zeabur-system-hosts` 准入政策，不讓專案用 Zeabur 和 Zeabur Identity 的網域，見[Zeabur 和 Zeabur Identity 的網域](./security.mdx#zeabur-和-zeabur-identity-的網域)。再安裝 Zeabur Identity、讓 API server 信任它、註冊 OAuth client，最後安裝 Zeabur。API server 連 Zeabur Identity 用的憑證由 cert-manager 自動續期，見[Zeabur Identity 的內部憑證](./security.mdx#zeabur-identity-的內部憑證)。
 7. 第一次安裝時印出第一位管理員的設定連結（24 小時內有效、只能用一次），並把安裝紀錄寫到 `kube-system/zeabur-installer` ConfigMap。
 
 完成後會印出 Zeabur 和 Zeabur Identity 的網址。開啟設定連結、新增通行密鑰，就能登入 Zeabur 看到叢集。`local` 模式要先讓瀏覽器信任 installer 產生的 CA。

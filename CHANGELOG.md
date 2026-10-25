@@ -16,6 +16,12 @@ minor or patch release may break the API.
   ([docs/reference/releases.md](docs/reference/releases.md)). The chart's new `image.digest` value pins any image
   by content.
 
+- The installer adds the admission policy `zeabur-system-hosts` with Zeabur: an Ingress or
+  HTTPRoute in a project cannot use Zeabur's or Zeabur Identity's domain, in a rule, in
+  `spec.tls` or through a wildcard, and every rule outside the installer's namespaces must name a
+  host. Routes that already break it stay; the security reference lists how to find them and how
+  to switch the policy to `Warn`.
+
 ### Changed
 
 - A new domain uses an Ingress unless "Add domain" names a Gateway listener. Before, any Gateway in

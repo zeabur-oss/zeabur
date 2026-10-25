@@ -176,6 +176,32 @@ installer 寫入 `/etc/rancher/rke2/audit-policy.yaml`（權限 `0600`），讓 
 
 RKE2 在檔案到 100 MB 時換新檔，最多留 10 個舊檔，最長 30 天。沒什麼操作的單台 server 每 5 分鐘約寫 13 到 23 KB，一天不到 7 MB。想把紀錄留在別處，用日誌收集工具收這個檔案，Zeabur 不會讀它。
 
+## Zeabur 和 Zeabur Identity 的網域
+
+開發者可以在專案裡建立 Ingress 和 HTTPRoute。如果沒有限制，他只要在 Zeabur 的網域寫一條路徑比較長的規則，就能搶走 Zeabur 某段網址，把請求導到自己的服務。所以 installer 安裝 Zeabur 時，會一起加上 `zeabur-system-hosts` 准入政策。專案新增或修改 Ingress、HTTPRoute 時，政策會檢查：
+
+- 不能用 `zeabur` 和 `zeabur-identity` Namespace 的 Ingress 正在用的網域，寫在 `spec.tls` 也不行。
+- 不能用涵蓋這些網域的萬用網域。例如 Zeabur 在 `zeabur.example.com` 時，政策會擋下 `*.example.com`。
+- Ingress 的每條規則都要寫 `host`，HTTPRoute 至少要有一個 `hostnames`。路由沒寫網域時，會接下每個網域的請求，包括 Zeabur 的。
+
+政策直接讀這兩個 Namespace 的 Ingress，Zeabur 或 Zeabur Identity 換網域時不用改政策。installer 建立的 Namespace（標籤 `installer.zeabur.com/baseline: "true"`）可以不寫網域，但一樣不能用 Zeabur 和 Zeabur Identity 的網域。只改標籤或 annotation、沒動 `spec` 的更新不檢查。管理員也受這條政策限制。
+
+政策只在寫入時檢查，安裝前就有的路由會留著。用下面的指令找出用到 Zeabur 網域或沒寫網域的 Ingress，再自己處理：
+
+```sh
+kubectl get ingress --all-namespaces \
+  -o custom-columns='NAMESPACE:.metadata.namespace,NAME:.metadata.name,HOSTS:.spec.rules[*].host'
+```
+
+要讓政策只警告、不擋下，把 binding 改成 `Warn`。Zeabur Identity 的 binding 是 `zeabur-system-hosts-zeabur-identity`，改法相同。之後再執行 `apply`，installer 不會改回來：
+
+```sh
+kubectl patch validatingadmissionpolicybinding zeabur-system-hosts-zeabur \
+  --type merge -p '{"spec":{"validationActions":["Warn"]}}'
+```
+
+刪掉 binding 或政策也可以，但下次 `apply` 會重新建立，要長期關掉就改成 `Warn`。移除 Zeabur 時政策會留下，Zeabur Identity 的網域繼續受保護。沒有安裝 Zeabur（`zeabur: false`）時，installer 不加這條政策。
+
 ## Installer 的主機與下載權限
 
 installer 以 root 寫入 RKE2 設定和 systemd unit、調整 kernel 參數、建立 `etcd` 使用者。選了 Longhorn 時還會安裝主機套件。GUI 以明文 HTTP 提供，讓它只監聽 loopback，透過 SSH tunnel 連線。
