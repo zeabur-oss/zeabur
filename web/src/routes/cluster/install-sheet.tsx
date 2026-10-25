@@ -3,12 +3,12 @@ import { useState } from "react"
 import WarningFillIcon from "~icons/ph/warning-fill"
 import XIcon from "~icons/ph/x"
 
+import type { Schemas } from "@/api/client"
 import { installQuery } from "@/api/queries"
 import { Segmented } from "@/components/bits"
-import { OpenInTerminal } from "@/components/dock/open-in-terminal"
 import { GateTip, useClusterGate } from "@/components/gate"
 import { LoadingRows } from "@/components/page"
-import { usePlanner } from "@/components/plan/planner"
+import { usePlanner, type PlanAsk } from "@/components/plan/planner"
 import { Problem } from "@/components/problem"
 import { Alert, AlertDescription } from "@zeabur/design-system/components/alert"
 import { Badge } from "@zeabur/design-system/components/badge"
@@ -22,11 +22,11 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@zeabur/design-system/components/tabs"
 import { YamlBlock } from "@/components/yaml"
 import { useT } from "@/i18n"
-import { installCommand } from "@/model/terminal"
 import { k3sPackagedNotes } from "@/routes/cluster/k3s-packaged"
 import type { profiles } from "@/routes/search"
 
 type Profile = (typeof profiles)[number]
+type Format = Schemas["InstallFormat"]
 
 const formatNames = {
   helm: "Helm",
@@ -39,6 +39,7 @@ export function InstallSheet({
   component,
   name,
   notes,
+  installed,
   profile,
   onProfile,
   onClose,
@@ -48,6 +49,8 @@ export function InstallSheet({
   name: string
   /** The catalogue's description: licence, sizing and packaging, in English. */
   notes?: string
+  /** Detection found this component in the cluster. */
+  installed: boolean
   profile?: Profile
   onProfile: (profile: Profile) => void
   onClose: () => void
@@ -55,22 +58,13 @@ export function InstallSheet({
   const t = useT()
   const [capability = "", id = ""] = component.split("/")
   const guide = useQuery({ ...installQuery(capability, id, profile), placeholderData: keep })
-  const [format, setFormat] = useState<string>("helm")
-  const [who, setWho] = useState<"zeabur" | "you">("zeabur")
-  const planner = usePlanner("kube-system", onClose, true)
-  const gate = useClusterGate("installComponents")
   const data = guide.data
-  const objects = data && !data.here.blocked ? data.here.objects : []
-  const mine = objects.length === 0 || who === "you"
-  const blocked = data?.here.blocked
-  const shownFormat = data?.formats.find((f) => f.format === format)
-  const install = () =>
-    planner.plan({
-      title: t("install.here.title", name),
-      changes: objects.map((yaml) => ({ op: "create", yaml })),
-      notes: [t("install.here.after")],
-      view: "/cluster/components",
-    })
+  const [chosen, setFormat] = useState<Format>()
+  const format =
+    data?.formats.find((f) => f.format === chosen) ??
+    data?.formats.find((f) => f.objects.length > 0) ??
+    data?.formats[0]
+  const planner = usePlanner(format?.namespace ?? "kube-system", onClose, true)
   return (
     <Dialog open onOpenChange={(open) => (open ? undefined : onClose())}>
       <DialogContent variant="panel">
@@ -219,61 +213,30 @@ export function InstallSheet({
                 ) : null}
               </dl>
               <section className="flex flex-col gap-3 border-t pt-5">
-                {objects.length > 0 ? (
-                  <Segmented
-                    label={t("install.who")}
-                    value={who}
-                    onChange={setWho}
-                    options={[
-                      { value: "zeabur", label: t("install.who.zeabur") },
-                      { value: "you", label: t("install.who.you") },
-                    ]}
-                  />
-                ) : null}
-                {mine ? (
-                  <>
-                    <p className="type-meta text-muted-foreground">
-                      {blocked ? `${t(`install.here.${blocked}`)} ` : ""}
-                      {t("install.note")}
-                    </p>
-                    <Tabs value={format} onValueChange={(value) => setFormat(String(value))}>
-                      <div className="flex flex-wrap items-center gap-2">
-                        <TabsList>
-                          {data.formats.map((f) => (
-                            <TabsTrigger key={f.format} value={f.format}>
-                              {formatNames[f.format]}
-                            </TabsTrigger>
-                          ))}
-                        </TabsList>
-                        {shownFormat ? (
-                          <OpenInTerminal
-                            command={installCommand(shownFormat.format, shownFormat.text)}
-                            label={t("action.openToolsTerminal")}
-                            variant="outline"
-                            className="ml-auto"
-                            onOpen={onClose}
-                          />
-                        ) : null}
+                <Tabs value={format?.format} onValueChange={(value) => setFormat(value as Format)}>
+                  <TabsList>
+                    {data.formats.map((f) => (
+                      <TabsTrigger key={f.format} value={f.format}>
+                        {formatNames[f.format]}
+                      </TabsTrigger>
+                    ))}
+                  </TabsList>
+                  {data.formats.map((f) => (
+                    <TabsContent key={f.format} value={f.format}>
+                      <div className="flex flex-col gap-3">
+                        <FormatNote
+                          text={f}
+                          name={name}
+                          blocked={data.blocked}
+                          installed={installed}
+                          alone={data.formats.length === 1}
+                          onPlan={planner.plan}
+                        />
+                        <YamlBlock yaml={f.text} label={`${name} ${formatNames[f.format]}`} />
                       </div>
-                      {data.formats.map((f) => (
-                        <TabsContent key={f.format} value={f.format}>
-                          <YamlBlock yaml={f.text} label={`${name} ${formatNames[f.format]}`} />
-                        </TabsContent>
-                      ))}
-                    </Tabs>
-                  </>
-                ) : (
-                  <>
-                    <p className="text-pretty">{t("install.here.what", objects.length)}</p>
-                    <div>
-                      <GateTip gate={gate}>
-                        <Button size="sm" onClick={install}>
-                          {t("install.here.action")}
-                        </Button>
-                      </GateTip>
-                    </div>
-                  </>
-                )}
+                    </TabsContent>
+                  ))}
+                </Tabs>
               </section>
             </>
           ) : null}
@@ -281,5 +244,67 @@ export function InstallSheet({
         {planner.dialog}
       </DialogContent>
     </Dialog>
+  )
+}
+
+const tools = {
+  k3s: "install.tool.k3s",
+  flux: "install.tool.flux",
+  argoCd: "install.tool.argoCd",
+} as const
+
+/** What a form's text is for: a plan Zeabur can run, or why the person runs it. */
+function FormatNote({
+  text,
+  name,
+  blocked,
+  installed,
+  alone,
+  onPlan,
+}: {
+  text: Schemas["InstallText"]
+  name: string
+  blocked?: Schemas["InstallBlocked"] | null
+  installed: boolean
+  /** No controller for any object form is served. */
+  alone: boolean
+  onPlan: (ask: PlanAsk) => void
+}) {
+  const t = useT()
+  const gate = useClusterGate("installComponents")
+  if (text.format === "helm")
+    return (
+      <p className="type-meta text-pretty text-muted-foreground">
+        {t("install.helm")}
+        {alone && !blocked ? ` ${t("install.noController")}` : ""}
+      </p>
+    )
+  if (installed) return <p className="type-meta text-muted-foreground">{t("install.installed")}</p>
+  if (blocked || text.objects.length === 0)
+    return (
+      <p className="type-meta text-pretty text-muted-foreground">
+        {blocked ? `${t(`install.blocked.${blocked}`)} ` : ""}
+        {t("install.yourself")}
+      </p>
+    )
+  const tool = t(tools[text.format])
+  const plan = () =>
+    onPlan({
+      title: t("install.planTitle", name),
+      changes: text.objects.map((yaml) => ({ op: "create", yaml })),
+      notes: [text.format === "argoCd" ? t("install.after", tool) : t("install.afterRemove", tool)],
+      view: "/cluster/components",
+    })
+  return (
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+      <p className="min-w-0 flex-1 text-pretty">
+        {t("install.planWhat", text.namespace ?? "", tool)}
+      </p>
+      <GateTip gate={gate}>
+        <Button size="sm" onClick={plan}>
+          {t("install.planAction")}
+        </Button>
+      </GateTip>
+    </div>
   )
 }

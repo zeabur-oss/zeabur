@@ -489,31 +489,67 @@ stringData:
         assert_eq!(status, StatusCode::NOT_FOUND, "{problem}");
     }
 
-    /// A component that is only charts is installed as k3s `HelmChart`s in `kube-system`,
-    /// planned there like any other object; without a Helm controller the answer says so.
+    fn serve(cluster: &MemoryCluster, group: &str, resource: &str, kind: &str, namespace: &str) {
+        cluster.update(|s| {
+            s.served.push(ServedResource {
+                verbs: ["create", "get", "list"].map(str::to_owned).to_vec(),
+                ..ServedResource::readable(group, "v1", resource, kind, true)
+            });
+            s.namespaces
+                .push(serde_json::from_value(json!({"metadata": {"name": namespace}})).unwrap());
+        });
+    }
+
+    fn formats(guide: &Value) -> Vec<&str> {
+        guide["formats"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|f| f["format"].as_str().unwrap())
+            .collect()
+    }
+
+    /// An object form is offered only when the cluster serves its controller.
     #[tokio::test]
-    async fn a_component_is_installed_as_helm_charts_in_kube_system() {
+    async fn an_install_form_needs_its_controller() {
         let cluster = cluster();
         let app = app(&cluster);
         let path = "/api/v1/cluster/components/databases/cloudnative-pg/install";
         let (status, guide) = send(&app, "GET", path, None).await;
         assert_eq!(status, StatusCode::OK, "{guide}");
-        assert_eq!(guide["here"]["blocked"], "noHelmController");
-        assert_eq!(guide["here"]["objects"], json!([]));
+        assert_eq!(formats(&guide), ["helm"]);
 
-        cluster.update(|s| {
-            s.served.push(ServedResource {
-                verbs: ["create", "get", "list"].map(str::to_owned).to_vec(),
-                ..ServedResource::readable("helm.cattle.io", "v1", "helmcharts", "HelmChart", true)
-            });
-            s.namespaces.push(
-                serde_json::from_value(json!({"metadata": {"name": "kube-system"}})).unwrap(),
-            );
-        });
+        serve(&cluster, "helm.toolkit.fluxcd.io", "helmreleases", "HelmRelease", "flux-system");
         let (_, guide) = send(&app, "GET", path, None).await;
-        assert_eq!(guide["here"].get("blocked"), None, "{guide}");
-        let objects = guide["here"]["objects"].as_array().unwrap();
-        assert_eq!(objects.len(), 2);
+        assert_eq!(formats(&guide), ["helm", "flux"]);
+        let flux = &guide["formats"][1];
+        assert_eq!(flux["namespace"], "flux-system");
+        serve(&cluster, "source.toolkit.fluxcd.io", "helmrepositories", "HelmRepository", "flux-system");
+        let creates: Vec<Value> = flux["objects"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|y| json!({"op": "create", "yaml": y}))
+            .collect();
+        let path = "/api/v1/projects/flux-system/plan";
+        let (status, planned) = send(&app, "POST", path, Some(&json!({"changes": creates}))).await;
+        assert_eq!(status, StatusCode::OK, "{planned}");
+    }
+
+    /// A component that is only charts is installed as k3s `HelmChart`s in `kube-system`,
+    /// planned there like any other object.
+    #[tokio::test]
+    async fn a_component_is_installed_as_helm_charts_in_kube_system() {
+        let cluster = cluster();
+        serve(&cluster, "helm.cattle.io", "helmcharts", "HelmChart", "kube-system");
+        let app = app(&cluster);
+        let path = "/api/v1/cluster/components/databases/cloudnative-pg/install";
+        let (_, guide) = send(&app, "GET", path, None).await;
+        assert_eq!(guide.get("blocked"), None, "{guide}");
+        let k3s = &guide["formats"][1];
+        assert_eq!(k3s["format"], "k3s");
+        let objects = k3s["objects"].as_array().unwrap();
+        assert!(!objects.is_empty());
         let request = json!({"changes": objects.iter().map(|y| json!({"op": "create", "yaml": y})).collect::<Vec<_>>()});
         let (status, planned) = send(
             &app,
@@ -532,39 +568,5 @@ stringData:
         .await;
         assert_eq!(status, StatusCode::OK, "{applied}");
         assert_eq!(cluster.inspect(|s| s.writes.len()), Some(objects.len()));
-    }
-
-    /// Once one of its `HelmChart`s exists, the answer says so instead of offering a plan whose
-    /// create can only be refused.
-    #[tokio::test]
-    async fn a_component_whose_helm_charts_exist_is_not_offered_again() {
-        let cluster = cluster();
-        cluster.update(|s| {
-            s.served.push(ServedResource {
-                verbs: ["create", "get", "list"].map(str::to_owned).to_vec(),
-                ..ServedResource::readable("helm.cattle.io", "v1", "helmcharts", "HelmChart", true)
-            });
-            s.namespaces.push(
-                serde_json::from_value(json!({"metadata": {"name": "kube-system"}})).unwrap(),
-            );
-        });
-        let app = app(&cluster);
-        let path = "/api/v1/cluster/components/databases/cloudnative-pg/install";
-        let (_, guide) = send(&app, "GET", path, None).await;
-        let object: Value =
-            serde_saphyr::from_str(guide["here"]["objects"][0].as_str().unwrap()).unwrap();
-        cluster.update(|s| {
-            s.dynamic.push(
-                serde_json::from_value(json!({
-                    "apiVersion": "helm.cattle.io/v1", "kind": "HelmChart",
-                    "metadata": {"name": object["metadata"]["name"], "namespace": "kube-system"}
-                }))
-                .unwrap(),
-            );
-        });
-        let (status, guide) = send(&app, "GET", path, None).await;
-        assert_eq!(status, StatusCode::OK, "{guide}");
-        assert_eq!(guide["here"]["blocked"], "installed");
-        assert_eq!(guide["here"]["objects"], json!([]));
     }
 }

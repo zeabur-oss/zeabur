@@ -929,18 +929,29 @@ test("the project's suggestions list what it misses, and a fix is planned and ap
   await expect(limits).toHaveCount(0, { timeout: 15_000 })
 })
 
-test("install texts come in four forms for a catalogue component", async ({ page }) => {
+test("an install is Helm commands to copy, or objects a plan creates for the cluster's controller", async ({
+  page,
+}) => {
   await page.goto("/cluster/components?component=certificates/cert-manager")
   const sheet = page.getByRole("dialog", { name: /cert-manager/ })
   // The texts are tested server-side (crates/zeabur-catalog/tests/golden).
   const text = (form: string) => sheet.getByRole("figure", { name: new RegExp(` ${form}$`) })
   await expect(text("Helm")).toContainText("cert-manager")
-  await sheet.getByRole("tab", { name: "Flux" }).click()
-  await expect(text("Flux")).toContainText("cert-manager")
+  await expect(sheet.getByRole("button", { name: /terminal/ })).toHaveCount(0)
   await sheet.getByRole("button", { name: /Several nodes/ }).click()
   await expect(page).toHaveURL(/profile=multi-node/)
-  await sheet.getByRole("tab", { name: "Argo CD" }).click()
-  await expect(text("Argo CD")).toContainText("cert-manager")
+  // Part of cert-manager is plain manifests: the k3s form is text to apply yourself.
+  await sheet.getByRole("tab", { name: "k3s HelmChart" }).click()
+  await expect(text("k3s HelmChart")).toContainText("cert-manager")
+  await expect(sheet).toContainText("Zeabur doesn't install this one itself")
+  await expect(sheet.getByRole("button", { name: "Review and install" })).toHaveCount(0)
+
+  // Reloader is only a chart: k3s's Helm controller installs it from objects a plan creates.
+  await page.goto("/cluster/components?component=config-reload/reloader")
+  const reloader = page.getByRole("dialog", { name: /Reloader/ })
+  await reloader.getByRole("button", { name: "Review and install" }).click()
+  const plan = page.getByRole("dialog", { name: "Install Stakater Reloader" })
+  await expect(plan).toContainText("HelmChart")
 })
 
 const noShell = env("ZEABUR_E2E_NO_SHELL")

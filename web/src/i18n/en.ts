@@ -2089,7 +2089,27 @@ export const en = {
   "fix.httpRouteNote": "The Ingress stays. Delete it once the new route works.",
   "gap.unreadable": "Some checks need rights you don't have.",
   "install.title": "Install",
-  "install.note": "Zeabur runs none of this. Run it, or commit it to your GitOps repository.",
+  "install.helm": "Run these commands where helm and kubectl can reach the cluster.",
+  "install.noController":
+    "Zeabur can install it for you when the cluster runs k3s, Flux or Argo CD.",
+  "install.installed": "Already installed in this cluster.",
+  "install.yourself": "Apply it with kubectl, or commit it to your GitOps repository.",
+  "install.blocked.k3sPackaged":
+    "Zeabur doesn't install this one itself: k3s ships its own copy, which has to be disabled on the servers first.",
+  "install.blocked.inputs": "Zeabur doesn't install this one itself: it needs values you fill in.",
+  "install.blocked.manifests":
+    "Zeabur doesn't install this one itself: part of it is plain manifests, not a chart.",
+  "install.tool.k3s": "k3s's Helm controller",
+  "install.tool.flux": "Flux",
+  "install.tool.argoCd": "Argo CD",
+  "install.planWhat": (namespace: string, tool: string) =>
+    `Zeabur creates these objects in ${namespace}, and ${tool} installs the chart from them. You check each object before anything is created.`,
+  "install.planAction": "Review and install",
+  "install.planTitle": (name: string) => `Install ${name}`,
+  "install.after": (tool: string) =>
+    `${tool} installs the chart once the objects exist, usually within a few minutes.`,
+  "install.afterRemove": (tool: string) =>
+    `${tool} installs the chart once the objects exist, usually within a few minutes. To remove it, delete these objects.`,
   "install.profile": "Profile",
   "install.singleNode": "Single node",
   "install.multiNode": "Several nodes",
@@ -2112,24 +2132,6 @@ export const en = {
     "That deletes the Traefik CRDs and any IngressRoute or Middleware objects; Ingress traffic stops until this one runs.",
   "install.k3sPackagedMetrics": "The metrics API is unavailable until this one runs.",
   "install.k3sPackagedOther": "Its workloads stop until this one runs.",
-  "install.who": "Who installs it",
-  "install.who.zeabur": "Install with Zeabur",
-  "install.who.you": "Run it yourself",
-  "install.here.what": (n: number) =>
-    `Zeabur creates ${n === 1 ? "a HelmChart object" : `${n} HelmChart objects`} in kube-system, and the cluster's Helm controller installs from ${n === 1 ? "it" : "them"}. You check each object before anything is created.`,
-  "install.here.action": "Review and install",
-  "install.here.title": (name: string) => `Install ${name}`,
-  "install.here.after":
-    "The Helm controller installs the charts once the objects exist, usually within a few minutes. To remove it, delete these objects.",
-  "install.here.k3sPackaged":
-    "Zeabur doesn't install this one itself: k3s ships its own copy, which has to be disabled on the servers first.",
-  "install.here.inputs": "Zeabur doesn't install this one itself: it needs values you fill in.",
-  "install.here.manifests":
-    "Zeabur doesn't install this one itself: part of it is plain manifests, not a chart.",
-  "install.here.noHelmController":
-    "This cluster has no Helm controller, so Zeabur doesn't install components itself.",
-  "install.here.installed":
-    "Already installed: its HelmChart objects are in kube-system. To change it, edit them there.",
   "reach.title": "Connection rules",
   "reach.addPolicy": "Add rule",
   "reach.isolate": "Isolate this service",

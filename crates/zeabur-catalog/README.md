@@ -3,13 +3,14 @@
 Reads Zeabur Catalog and tells, for each capability (ingress, certificates,
 backups, …), whether the cluster already has it; for a missing one it lists what could be
 installed, and writes the install as a `helm` command, a Flux `HelmRelease`, an Argo CD
-`Application` or a k3s `HelmChart` (`tests/golden/` holds each form for a few components). It
+`Application` or a k3s `HelmChart` (`tests/golden/` holds each form for a few components), with
+the objects of each form that a plan can create. It
 also says how long the cluster's Kubernetes version is supported and whether it should be upgraded
 (`versions`).
 
 ## Hides
 
-The catalogue format and the detection rules. Zeabur suggests; it never installs.
+The catalogue format and the detection rules. It renders texts and objects; it writes nothing to the cluster.
 
 ## Place in the workspace
 

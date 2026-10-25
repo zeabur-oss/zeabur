@@ -43,8 +43,9 @@ than you have, and keeps no state of its own: no database, no custom resources.
   a namespace. Remove Zeabur and the cluster is as it was.
 - **Works with Helm, Argo CD and Flux.** Objects they manage are shown as such; Zeabur does not
   fight them for fields.
-- **Suggests, does not install.** Missing pieces come with a `helm` command, a Flux
-  `HelmRelease`, an Argo CD `Application` or a k3s `HelmChart`.
+- **Suggests, and installs only through a plan.** Missing pieces come with a `helm` command, a
+  Flux `HelmRelease`, an Argo CD `Application` or a k3s `HelmChart`; when the cluster runs that
+  controller, a plan you review creates the objects.
 - **Light.** One static binary, small enough to run next to k3s on a 2 GB machine.
 
 ## What works today
@@ -71,8 +72,8 @@ than you have, and keeps no state of its own: no database, no custom resources.
 - **Logs and a terminal**: a pod's logs, followed live, and a shell in a container.
 - **Usage**: CPU and memory now (metrics-server) and their history (a Prometheus-compatible
   store such as VictoriaMetrics).
-- **Suggested installs** for missing components, as a `helm` command, a Flux `HelmRelease`, an
-  Argo CD `Application` or a k3s `HelmChart`, from
+- **Suggested installs** for missing components, as a `helm` command to copy, or a Flux
+  `HelmRelease`, an Argo CD `Application` or a k3s `HelmChart` that a plan creates, from
   [Zeabur Catalog](https://github.com/zeabur-oss/catalog).
 - **In a cluster**, with its Helm chart: sign-in through Zeabur Identity with a passkey, admin rights
   confirmed with the passkey again, and nothing left behind after uninstalling.

@@ -153,9 +153,9 @@ export interface paths {
       cookie?: never
     }
     /**
-     * How to install a catalogue component yourself: Helm commands, a k3s `HelmChart`, Flux objects
-     *     or an Argo CD `Application`, with the catalogue's pinned versions and values. Zeabur runs none
-     *     of them.
+     * How to install a catalogue component: Helm commands, a k3s `HelmChart`, Flux objects or an
+     *     Argo CD `Application`, with the catalogue's pinned versions and values. An object form is listed
+     *     only when the cluster serves its controller, with the objects a plan creates.
      */
     get: operations["guide_for"]
     put?: never
@@ -4768,11 +4768,6 @@ export interface components {
      * @enum {string}
      */
     Health: "fail" | "warn" | "progress" | "ok" | "idle"
-    /**
-     * @description Why a component is not installed by Zeabur itself.
-     * @enum {string}
-     */
-    HereBlocked: "k3sPackaged" | "inputs" | "manifests" | "noHelmController" | "installed"
     /** @description The store a history came from. */
     HistorySource: {
       /** @description Its Service port, `namespace/name:port`. */
@@ -4944,12 +4939,18 @@ export interface components {
       defaultProfile: string
     }
     /**
+     * @description Why a plan cannot install a component; the texts still work.
+     * @enum {string}
+     */
+    InstallBlocked: "k3sPackaged" | "inputs" | "manifests"
+    /**
      * @description One way to install a component.
      * @enum {string}
      */
     InstallFormat: "helm" | "k3s" | "flux" | "argoCd"
     /** @description How to install one catalogue component, for one profile. */
     InstallGuide: {
+      blocked?: components["schemas"]["InstallBlocked"] | null
       /** @description `<capability>/<id>`. */
       component: string
       /**
@@ -4959,8 +4960,6 @@ export interface components {
       contributesTo: string[]
       /** @description The texts, one per form. */
       formats: components["schemas"]["InstallText"][]
-      /** @description Whether Zeabur can install it itself, and how. */
-      here: components["schemas"]["InstallHere"]
       /** @description Values asked for or generated. */
       inputs: components["schemas"]["InstallInput"][]
       /** @description The profile the texts are for. */
@@ -4976,15 +4975,6 @@ export interface components {
       requires: string[]
       /** @description Its RBAC and network access. */
       security: components["schemas"]["Security"]
-    }
-    /**
-     * @description Whether Zeabur can install a component here itself, as k3s `HelmChart` objects in
-     *     `kube-system` that k3s's Helm controller installs, and those objects.
-     */
-    InstallHere: {
-      blocked?: components["schemas"]["HereBlocked"] | null
-      /** @description One `HelmChart` per chart release, YAML, in install order; empty when blocked. */
-      objects: string[]
     }
     /** @description A value the install needs from the person, or generates. */
     InstallInput: {
@@ -5006,6 +4996,13 @@ export interface components {
     InstallText: {
       /** @description The form. */
       format: components["schemas"]["InstallFormat"]
+      /** @description The namespace of the objects: `kube-system`, `flux-system` or `argocd`; absent for Helm. */
+      namespace?: string | null
+      /**
+       * @description The objects a plan creates, YAML, in install order, all in [`Self::namespace`]; empty for
+       *     Helm and when the guide is blocked.
+       */
+      objects: string[]
       /** @description The text to copy: shell for Helm, YAML for the others. */
       text: string
     }

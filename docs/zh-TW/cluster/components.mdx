@@ -3,14 +3,14 @@ title: 檢查並安裝叢集元件
 description: 查看叢集已偵測到的元件，檢查權限與相依項目，再用 Zeabur 或既有工具安裝。
 ---
 
-打開 **叢集** → **元件**，先看 **已安裝** 有什麼，再到 **目錄** 找需要的元件。按卡片上的 **安裝**，選好 **安裝方式**、看過相依項目和權限，再選由 Zeabur 安裝或自己執行。
+打開 **叢集** → **元件**，先看 **已安裝** 有什麼，再到 **目錄** 找需要的元件。按卡片上的 **安裝**，選好 **安裝方式**、看過相依項目和權限，再選一種格式安裝。
 
 ![叢集元件頁的已安裝清單和目錄](https://oss.zeabur.com/shots/zeabur/zh-TW/light/cluster-components.avif)
 
 ## 開始之前
 
 - 你能讀取整個叢集的 CRD、IngressClass 和各 Namespace 的工作負載，元件頁才偵測得到已安裝的元件。
-- 要由 Zeabur 安裝，叢集要有 Helm 控制器（k3s 和 RKE2 內建），你也要能在 `kube-system` 建立 `HelmChart`。管理員可以先按 **暫時使用管理員權限**。
+- 要由 Zeabur 安裝，叢集要有對應的控制器：k3s 和 RKE2 內建的 Helm 控制器、Flux 或 Argo CD。你也要能在它的 Namespace（`kube-system`、`flux-system` 或 `argocd`）建立物件。管理員可以先按 **暫時使用管理員權限**。
 - 如果這個元件已經由 Helm、Flux 或 Argo CD 管理，先找到原本的設定，在那裡修改。
 
 ## 先確認叢集裡已有什麼
@@ -35,24 +35,26 @@ description: 查看叢集已偵測到的元件，檢查權限與相依項目，�
 </Step>
 <Step>
 
-### 選擇由誰安裝
+### 選擇格式並安裝
 
-<Tabs items={["由 Zeabur 安裝", "自己執行"]}>
-<Tab value="由 Zeabur 安裝">
+分頁只列出叢集用得上的格式：**Helm** 一定會有，**k3s HelmChart**、**Flux**、**Argo CD** 要叢集裡有對應的控制器才會出現。
 
-選 **由 Zeabur 安裝**，按 **檢查並安裝**。檢查要在 `kube-system` 建立的每個 `HelmChart`，確認後套用。
+<Tabs items={["k3s HelmChart、Flux、Argo CD", "Helm"]}>
+<Tab value="k3s HelmChart、Flux、Argo CD">
 
-Helm 控制器通常會在幾分鐘內依這些物件裝好 chart。記下物件名稱，之後要調整或移除都在這些物件上做。
+按 **檢查並安裝**。檢查要在 `kube-system`、`flux-system` 或 `argocd` 建立的每個物件，確認後套用。
+
+控制器通常會在幾分鐘內依這些物件裝好 chart。記下物件名稱，之後要調整或移除都在這些物件上做。
 
 </Tab>
-<Tab value="自己執行">
+<Tab value="Helm">
 
-選 **自己執行**，再選 **Helm**、**k3s HelmChart**、**Flux** 或 **Argo CD** 格式。填好 **需要填入的值**，看過產生的版本和設定，再到自己的終端機執行，或提交到 GitOps 儲存庫。Zeabur 不會替你執行這些內容。
+複製指令，到能用 `helm` 和 `kubectl` 連到叢集的電腦上執行。Zeabur 不會替你執行這些指令。
 
 </Tab>
 </Tabs>
 
-以下情況沒有 **由 Zeabur 安裝**，視窗會寫出原因，只能自己執行：元件需要你填值、包含一般 manifest、要先停用 k3s 內建的同一個元件，或叢集沒有 Helm 控制器。
+以下情況沒有 **檢查並安裝**，分頁會寫出原因：元件需要你填值、包含一般 manifest，或要先停用 k3s 內建的同一個元件。這時填好 **需要填入的值**，用 `kubectl` 套用，或提交到 GitOps 儲存庫。
 
 </Step>
 <Step>
@@ -77,12 +79,13 @@ Helm 控制器通常會在幾分鐘內依這些物件裝好 chart。記下物件
 ## 常見失敗
 
 - 元件頁顯示權限不足：把畫面列出的缺少權限交給叢集管理員。
-- 沒有 **由 Zeabur 安裝**：看視窗寫的原因，改用 **自己執行**。
-- 畫面說已經安裝、HelmChart 物件在 `kube-system` 裡：直接修改那個 `HelmChart`，不要用同一個名稱再建立一次。
+- 沒有 **檢查並安裝**：看分頁寫的原因，複製內容自己套用。
+- 只有 **Helm** 分頁：叢集裡沒有 Helm 控制器、Flux 或 Argo CD，複製 Helm 指令自己執行。
+- 分頁說已經裝好了：找到當初安裝它的物件或工具，在那裡修改，不要再裝一份。
 - 套用後一直沒出現在 **已安裝**：看 Helm 控制器的安裝 Job 和元件工作負載有沒有錯誤。
 
 ## 移除元件
 
-元件頁沒有移除按鈕。由 Zeabur 安裝的元件，到 `kube-system` 刪除當時建立的 `HelmChart` 物件，Helm 控制器就會解除安裝。自己安裝的元件，從原本的 Helm、Flux 或 Argo CD 設定移除。
+元件頁沒有移除按鈕。用 k3s HelmChart 或 Flux 安裝的元件，刪除當時建立的 `HelmChart` 或 `HelmRelease`，控制器就會解除安裝。用 Argo CD 安裝的，在 Argo CD 刪除 `Application` 時選擇連同資源一起刪除。自己安裝的元件，從原本的 Helm、Flux 或 Argo CD 設定移除。
 
 移除前，先停掉用到它的功能，例如備份排程、通知管道或經過它的公開流量。移除後回到 **已安裝** 和這些功能頁確認。

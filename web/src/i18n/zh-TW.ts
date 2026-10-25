@@ -1939,7 +1939,25 @@ export const zhTW: Messages = {
   "fix.httpRouteNote": "原本的 Ingress 會保留，新路由正常後再刪掉它。",
   "gap.unreadable": "部分檢查需要你沒有的權限。",
   "install.title": "安裝",
-  "install.note": "Zeabur 不會執行這些內容。自己執行，或提交到 GitOps 儲存庫。",
+  "install.helm": "在能用 helm 和 kubectl 連到叢集的電腦上執行這些指令。",
+  "install.noController": "叢集裡有 k3s、Flux 或 Argo CD 時，Zeabur 可以幫你安裝。",
+  "install.installed": "這個叢集已經裝好了。",
+  "install.yourself": "用 kubectl 套用，或提交到 GitOps 儲存庫。",
+  "install.blocked.k3sPackaged":
+    "這個元件不由 Zeabur 直接安裝：k3s 內建了一份，要先在每台 server 上停用。",
+  "install.blocked.inputs": "這個元件不由 Zeabur 直接安裝：需要你填入一些值。",
+  "install.blocked.manifests":
+    "這個元件不由 Zeabur 直接安裝：其中有一部分是一般 manifest，不是 chart。",
+  "install.tool.k3s": "k3s 的 Helm 控制器",
+  "install.tool.flux": "Flux",
+  "install.tool.argoCd": "Argo CD",
+  "install.planWhat": (namespace, tool) =>
+    `Zeabur 會在 ${namespace} 建立這些物件，再由 ${tool} 安裝 chart。建立前會先讓你檢查每個物件。`,
+  "install.planAction": "檢查並安裝",
+  "install.planTitle": (name: string) => `安裝 ${name}`,
+  "install.after": (tool) => `物件建立後，${tool} 通常會在幾分鐘內裝好 chart。`,
+  "install.afterRemove": (tool) =>
+    `物件建立後，${tool} 通常會在幾分鐘內裝好 chart。要移除時，刪除這些物件即可。`,
   "install.profile": "安裝方式",
   "install.singleNode": "單一節點",
   "install.multiNode": "多個節點",
@@ -1962,22 +1980,6 @@ export const zhTW: Messages = {
     "這會刪除 Traefik 的 CRD 與所有 IngressRoute、Middleware 物件。這個元件開始執行前，Ingress 流量會中斷。",
   "install.k3sPackagedMetrics": "這個元件開始執行前，metrics API 無法使用。",
   "install.k3sPackagedOther": "這個元件開始執行前，內建版本的工作負載會停止。",
-  "install.who": "由誰安裝",
-  "install.who.zeabur": "由 Zeabur 安裝",
-  "install.who.you": "自己執行",
-  "install.here.what": (n: number) =>
-    `Zeabur 會在 kube-system 建立 ${n} 個 HelmChart 物件，叢集的 Helm 控制器再依此安裝。建立前會先讓你檢查每個物件。`,
-  "install.here.action": "檢查並安裝",
-  "install.here.title": (name: string) => `安裝 ${name}`,
-  "install.here.after":
-    "物件建立後，Helm 控制器通常會在幾分鐘內裝好 chart。要移除時，刪除這些物件即可。",
-  "install.here.k3sPackaged":
-    "這個元件不由 Zeabur 直接安裝：k3s 內建了一份，要先在每台 server 上停用。",
-  "install.here.inputs": "這個元件不由 Zeabur 直接安裝：需要你填入一些值。",
-  "install.here.manifests":
-    "這個元件不由 Zeabur 直接安裝：其中有一部分是一般 manifest，不是 chart。",
-  "install.here.noHelmController": "這個叢集沒有 Helm 控制器，所以 Zeabur 不直接安裝元件。",
-  "install.here.installed": "已經安裝：它的 HelmChart 物件在 kube-system 裡，要調整請直接改那裡。",
   "reach.title": "連線規則",
   "reach.addPolicy": "新增規則",
   "reach.isolate": "隔離這個服務",

@@ -27,8 +27,9 @@ holding any power of its own. It is a projection: Kubernetes objects are the onl
   references, backendRefs, operator conventions and the labels of Helm, Argo CD and Flux. For
   objects a GitOps tool or Helm manages, Zeabur exports a patch or warns, and never fights over
   fields.
-- **Suggest, not install.** Zeabur detects missing capabilities and writes the `helm` command, Flux
-  `HelmRelease`, Argo CD `Application` or k3s `HelmChart`; people install them.
+- **Suggest, then plan.** Zeabur detects missing capabilities and writes the `helm` command, Flux
+  `HelmRelease`, Argo CD `Application` or k3s `HelmChart`. People run the `helm` command
+  themselves; the objects are created by a plan they review, as the signed-in person.
 
 ## Product layers
 

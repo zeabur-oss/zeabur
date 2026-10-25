@@ -1,11 +1,12 @@
-//! How to install a catalogue component yourself, in four forms: Helm commands, a k3s
-//! `HelmChart`, Flux objects and an Argo CD `Application`.
+//! How to install a catalogue component, in four forms: Helm commands, a k3s `HelmChart`, Flux
+//! objects and an Argo CD `Application`.
 //!
-//! Zeabur recommends and never installs: these are texts to copy and run, or to commit to a Git
-//! repository a GitOps tool watches. Each renders the component's releases in order, with the
-//! catalogue's pinned versions and its values for the chosen profile (`single-node` or
-//! `multi-node`): the release's values, with the profile's merged over them as Helm merges values
-//! files, maps merged and lists replaced [helm-values].
+//! Each is a text to copy, or to commit to a Git repository a GitOps tool watches. The three
+//! object forms also list their objects, which a plan creates in one namespace (`kube-system`,
+//! `flux-system` or `argocd`) when the component is only charts and asks for nothing. Each renders
+//! the component's releases in order, with the catalogue's pinned versions and its values for the
+//! chosen profile (`single-node` or `multi-node`): the release's values, with the profile's merged
+//! over them as Helm merges values files, maps merged and lists replaced [helm-values].
 //!
 //! - **Helm** keeps the catalogue's two values files apart, comments and all, and passes both
 //!   (`--values base --values profile`), so the reasons for each value stay readable. `helm upgrade
@@ -72,37 +73,24 @@ pub struct InstallText {
     pub format: InstallFormat,
     /// The text to copy: shell for Helm, YAML for the others.
     pub text: String,
-}
-
-/// Whether Zeabur can install a component here itself, as k3s `HelmChart` objects in
-/// `kube-system` that k3s's Helm controller installs, and those objects.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct InstallHere {
-    /// One `HelmChart` per chart release, YAML, in install order; empty when blocked.
+    /// The objects a plan creates, YAML, in install order, all in [`Self::namespace`]; empty for
+    /// Helm and when the guide is blocked.
     pub objects: Vec<String>,
-    /// Why Zeabur cannot install it itself; the texts still work.
+    /// The namespace of the objects: `kube-system`, `flux-system` or `argocd`; absent for Helm.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub blocked: Option<HereBlocked>,
-    /// The objects' names, in the same order.
-    #[serde(skip)]
-    pub names: Vec<String>,
+    pub namespace: Option<String>,
 }
 
-/// Why a component is not installed by Zeabur itself.
+/// Why a plan cannot install a component; the texts still work.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
-pub enum HereBlocked {
+pub enum InstallBlocked {
     /// It replaces a component k3s packages, which is disabled on the servers first.
     K3sPackaged,
     /// It asks for values (a token, a domain) or generates secrets.
     Inputs,
     /// Some of it is plain manifests, or applies only when CRDs are missing.
     Manifests,
-    /// The cluster has no Helm controller (`helmcharts.helm.cattle.io`): it is not k3s.
-    NoHelmController,
-    /// Its `HelmChart` objects already exist in `kube-system`.
-    Installed,
 }
 
 /// What a component's RBAC and network access amount to, from the catalogue.
@@ -182,8 +170,9 @@ pub struct InstallGuide {
     pub replaces_k3s_packaged: Vec<String>,
     /// The texts, one per form.
     pub formats: Vec<InstallText>,
-    /// Whether Zeabur can install it itself, and how.
-    pub here: InstallHere,
+    /// Why no plan can install it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub blocked: Option<InstallBlocked>,
 }
 
 /// Why a guide could not be rendered.
@@ -389,21 +378,14 @@ pub fn guide(component: &str, profile: &str) -> Result<InstallGuide, InstallErro
             InstallText {
                 format: InstallFormat::Helm,
                 text: rendered.helm(),
+                objects: Vec::new(),
+                namespace: None,
             },
-            InstallText {
-                format: InstallFormat::K3s,
-                text: rendered.k3s(),
-            },
-            InstallText {
-                format: InstallFormat::Flux,
-                text: rendered.flux(),
-            },
-            InstallText {
-                format: InstallFormat::ArgoCd,
-                text: rendered.argo_cd(),
-            },
+            rendered.objects(InstallFormat::K3s, "kube-system"),
+            rendered.objects(InstallFormat::Flux, "flux-system"),
+            rendered.objects(InstallFormat::ArgoCd, "argocd"),
         ],
-        here: rendered.here(),
+        blocked: rendered.blocked(),
     })
 }
 
@@ -721,18 +703,80 @@ impl<'a> Rendered<'a> {
                 self.profile
             ),
         );
+        self.append_releases(&mut out, InstallFormat::K3s);
+        trim_separator(out)
+    }
+
+    /// Secrets, then each release: a manifest release as listed, a chart as its objects.
+    fn append_releases(&self, out: &mut String, format: InstallFormat) {
         out.push_str(&self.secret_objects());
         for (release, merged) in self.file.releases.iter().zip(&self.merged) {
             if let Some(text) = Self::manifest_release(release) {
                 out.push_str(&text);
                 continue;
             }
-            if let Some(object) = Self::helm_chart_object(release, merged) {
+            for object in Self::release_objects(format, release, merged) {
                 out.push_str(&object);
                 out.push_str("---\n");
             }
         }
-        trim_separator(out)
+    }
+
+    /// A chart release's objects in one form; empty for manifests and for Helm.
+    fn release_objects(format: InstallFormat, release: &Release, merged: &str) -> Vec<String> {
+        match format {
+            InstallFormat::Helm => Vec::new(),
+            InstallFormat::K3s => Self::helm_chart_object(release, merged)
+                .into_iter()
+                .collect(),
+            InstallFormat::Flux => Self::flux_objects(release, merged),
+            InstallFormat::ArgoCd => Self::argo_cd_objects(release, merged),
+        }
+    }
+
+    /// Why a plan cannot install it: it replaces a component k3s packages, asks for values, or
+    /// is not only charts.
+    fn blocked(&self) -> Option<InstallBlocked> {
+        if !self.file.detection.k3s_addons.is_empty() {
+            Some(InstallBlocked::K3sPackaged)
+        } else if !self.file.inputs.is_empty() {
+            Some(InstallBlocked::Inputs)
+        } else if self
+            .file
+            .releases
+            .iter()
+            .any(|r| !r.is_chart() || !r.skip_if_present.is_empty())
+        {
+            Some(InstallBlocked::Manifests)
+        } else {
+            None
+        }
+    }
+
+    /// A YAML form with the objects a plan creates.
+    fn objects(&self, format: InstallFormat, namespace: &str) -> InstallText {
+        let text = match format {
+            InstallFormat::Helm => self.helm(),
+            InstallFormat::K3s => self.k3s(),
+            InstallFormat::Flux => self.flux(),
+            InstallFormat::ArgoCd => self.argo_cd(),
+        };
+        let objects = if self.blocked().is_some() {
+            Vec::new()
+        } else {
+            self.file
+                .releases
+                .iter()
+                .zip(&self.merged)
+                .flat_map(|(release, merged)| Self::release_objects(format, release, merged))
+                .collect()
+        };
+        InstallText {
+            format,
+            text,
+            objects,
+            namespace: Some(namespace.to_owned()),
+        }
     }
 
     /// One chart release as a k3s `HelmChart` in `kube-system`; `None` for manifests.
@@ -767,43 +811,6 @@ impl<'a> Rendered<'a> {
         Some(out)
     }
 
-    /// The `HelmChart`s Zeabur would create, or why it does not: a component that replaces one
-    /// k3s packages, asks for values, or is not only charts is left to the texts.
-    fn here(&self) -> InstallHere {
-        let blocked = if !self.file.detection.k3s_addons.is_empty() {
-            Some(HereBlocked::K3sPackaged)
-        } else if !self.file.inputs.is_empty() {
-            Some(HereBlocked::Inputs)
-        } else if self
-            .file
-            .releases
-            .iter()
-            .any(|r| !r.is_chart() || !r.skip_if_present.is_empty())
-        {
-            Some(HereBlocked::Manifests)
-        } else {
-            None
-        };
-        let (names, objects) = if blocked.is_some() {
-            (Vec::new(), Vec::new())
-        } else {
-            self.file
-                .releases
-                .iter()
-                .zip(&self.merged)
-                .filter_map(|(release, merged)| {
-                    Self::helm_chart_object(release, merged)
-                        .map(|object| (release.release_name().to_owned(), object))
-                })
-                .unzip()
-        };
-        InstallHere {
-            objects,
-            blocked,
-            names,
-        }
-    }
-
     /// Flux sources and `HelmRelease`s.
     fn flux(&self) -> String {
         let mut out = self.k3s_packaged();
@@ -814,54 +821,43 @@ impl<'a> Rendered<'a> {
                 self.profile
             ),
         );
-        out.push_str(&self.secret_objects());
-        for (release, merged) in self.file.releases.iter().zip(&self.merged) {
-            if let Some(text) = Self::manifest_release(release) {
-                out.push_str(&text);
-                continue;
-            }
-            let name = release.release_name();
-            let chart_ref = match release.source() {
-                Some(Source::Oci { url, version }) => {
-                    push(
-                        &mut out,
-                        format!(
-                            "apiVersion: source.toolkit.fluxcd.io/v1\nkind: OCIRepository\nmetadata:\n  name: {name}\n  namespace: flux-system\nspec:\n  interval: 1h\n  url: {url}\n  ref:\n    tag: {version}\n  layerSelector:\n    mediaType: application/vnd.cncf.helm.chart.content.v1.tar+gzip\n    operation: copy\n---\n"
-                        ),
-                    );
-                    format!("  chartRef:\n    kind: OCIRepository\n    name: {name}\n")
-                }
-                Some(Source::Repo {
-                    repo,
-                    chart,
-                    version,
-                }) => {
-                    push(
-                        &mut out,
-                        format!(
-                            "apiVersion: source.toolkit.fluxcd.io/v1\nkind: HelmRepository\nmetadata:\n  name: {name}\n  namespace: flux-system\nspec:\n  interval: 1h\n  url: {repo}\n---\n"
-                        ),
-                    );
-                    format!(
-                        "  chart:\n    spec:\n      chart: {chart}\n      version: {version}\n      sourceRef:\n        kind: HelmRepository\n        name: {name}\n"
-                    )
-                }
-                _ => continue,
-            };
-            push(
-                &mut out,
-                format!(
-                    "apiVersion: helm.toolkit.fluxcd.io/v2\nkind: HelmRelease\nmetadata:\n  name: {name}\n  namespace: flux-system\nspec:\n  interval: 1h\n  releaseName: {name}\n  targetNamespace: {}\n  install:\n    createNamespace: true\n{chart_ref}",
-                    release.namespace
-                ),
-            );
-            if !merged.is_empty() {
-                out.push_str("  values:\n");
-                out.push_str(&indent_block(merged, 4));
-            }
-            out.push_str("---\n");
-        }
+        self.append_releases(&mut out, InstallFormat::Flux);
         trim_separator(out)
+    }
+
+    /// A chart release's Flux source and `HelmRelease` in `flux-system`.
+    fn flux_objects(release: &Release, merged: &str) -> Vec<String> {
+        let name = release.release_name();
+        let (source, chart_ref) = match release.source() {
+            Some(Source::Oci { url, version }) => (
+                format!(
+                    "apiVersion: source.toolkit.fluxcd.io/v1\nkind: OCIRepository\nmetadata:\n  name: {name}\n  namespace: flux-system\nspec:\n  interval: 1h\n  url: {url}\n  ref:\n    tag: {version}\n  layerSelector:\n    mediaType: application/vnd.cncf.helm.chart.content.v1.tar+gzip\n    operation: copy\n"
+                ),
+                format!("  chartRef:\n    kind: OCIRepository\n    name: {name}\n"),
+            ),
+            Some(Source::Repo {
+                repo,
+                chart,
+                version,
+            }) => (
+                format!(
+                    "apiVersion: source.toolkit.fluxcd.io/v1\nkind: HelmRepository\nmetadata:\n  name: {name}\n  namespace: flux-system\nspec:\n  interval: 1h\n  url: {repo}\n"
+                ),
+                format!(
+                    "  chart:\n    spec:\n      chart: {chart}\n      version: {version}\n      sourceRef:\n        kind: HelmRepository\n        name: {name}\n"
+                ),
+            ),
+            _ => return Vec::new(),
+        };
+        let mut helm_release = format!(
+            "apiVersion: helm.toolkit.fluxcd.io/v2\nkind: HelmRelease\nmetadata:\n  name: {name}\n  namespace: flux-system\nspec:\n  interval: 1h\n  releaseName: {name}\n  targetNamespace: {}\n  install:\n    createNamespace: true\n{chart_ref}",
+            release.namespace
+        );
+        if !merged.is_empty() {
+            helm_release.push_str("  values:\n");
+            helm_release.push_str(&indent_block(merged, 4));
+        }
+        vec![source, helm_release]
     }
 
     /// Argo CD `Application`s, and a repository Secret per OCI registry path.
@@ -874,51 +870,47 @@ impl<'a> Rendered<'a> {
                 self.profile
             ),
         );
-        out.push_str(&self.secret_objects());
-        for (release, merged) in self.file.releases.iter().zip(&self.merged) {
-            if let Some(text) = Self::manifest_release(release) {
-                out.push_str(&text);
-                continue;
-            }
-            let name = release.release_name();
-            let (repo_url, chart, version) = match release.source() {
-                Some(Source::Oci { url, version }) => {
-                    let path = url.trim_start_matches("oci://");
-                    let (registry_path, chart) = path.rsplit_once('/').unwrap_or((path, path));
-                    push(
-                        &mut out,
-                        format!(
-                            "# Argo CD reads OCI Helm charts through a repository with enableOCI.\napiVersion: v1\nkind: Secret\nmetadata:\n  name: {name}-oci\n  namespace: argocd\n  labels:\n    argocd.argoproj.io/secret-type: repository\nstringData:\n  type: helm\n  name: {name}-oci\n  url: {registry_path}\n  enableOCI: \"true\"\n---\n"
-                        ),
-                    );
-                    (registry_path.to_owned(), chart.to_owned(), version)
-                }
-                Some(Source::Repo {
-                    repo,
-                    chart,
-                    version,
-                }) => (repo.to_owned(), chart.to_owned(), version),
-                _ => continue,
-            };
-            push(
-                &mut out,
-                format!(
-                    "apiVersion: argoproj.io/v1alpha1\nkind: Application\nmetadata:\n  name: {name}\n  namespace: argocd\nspec:\n  project: default\n  source:\n    repoURL: {repo_url}\n    chart: {chart}\n    targetRevision: {version}\n    helm:\n      releaseName: {name}\n"
-                ),
-            );
-            if !merged.is_empty() {
-                out.push_str("      valuesObject:\n");
-                out.push_str(&indent_block(merged, 8));
-            }
-            push(
-                &mut out,
-                format!(
-                    "  destination:\n    server: https://kubernetes.default.svc\n    namespace: {}\n  syncPolicy:\n    syncOptions:\n      - CreateNamespace=true\n      - ServerSideApply=true\n---\n",
-                    release.namespace
-                ),
-            );
-        }
+        self.append_releases(&mut out, InstallFormat::ArgoCd);
         trim_separator(out)
+    }
+
+    /// A chart release's Argo CD `Application` in `argocd`, after the repository Secret an OCI
+    /// chart needs.
+    fn argo_cd_objects(release: &Release, merged: &str) -> Vec<String> {
+        let name = release.release_name();
+        let mut objects = Vec::new();
+        let (repo_url, chart, version) = match release.source() {
+            Some(Source::Oci { url, version }) => {
+                let path = url.trim_start_matches("oci://");
+                let (registry_path, chart) = path.rsplit_once('/').unwrap_or((path, path));
+                objects.push(format!(
+                    "# Argo CD reads OCI Helm charts through a repository with enableOCI.\napiVersion: v1\nkind: Secret\nmetadata:\n  name: {name}-oci\n  namespace: argocd\n  labels:\n    argocd.argoproj.io/secret-type: repository\nstringData:\n  type: helm\n  name: {name}-oci\n  url: {registry_path}\n  enableOCI: \"true\"\n"
+                ));
+                (registry_path.to_owned(), chart.to_owned(), version)
+            }
+            Some(Source::Repo {
+                repo,
+                chart,
+                version,
+            }) => (repo.to_owned(), chart.to_owned(), version),
+            _ => return Vec::new(),
+        };
+        let mut application = format!(
+            "apiVersion: argoproj.io/v1alpha1\nkind: Application\nmetadata:\n  name: {name}\n  namespace: argocd\nspec:\n  project: default\n  source:\n    repoURL: {repo_url}\n    chart: {chart}\n    targetRevision: {version}\n    helm:\n      releaseName: {name}\n"
+        );
+        if !merged.is_empty() {
+            application.push_str("      valuesObject:\n");
+            application.push_str(&indent_block(merged, 8));
+        }
+        push(
+            &mut application,
+            format!(
+                "  destination:\n    server: https://kubernetes.default.svc\n    namespace: {}\n  syncPolicy:\n    syncOptions:\n      - CreateNamespace=true\n      - ServerSideApply=true\n",
+                release.namespace
+            ),
+        );
+        objects.push(application);
+        objects
     }
 }
 
@@ -1090,36 +1082,85 @@ mod tests {
     }
 
     #[test]
-    fn zeabur_installs_only_components_that_are_charts_without_inputs() {
-        let here = |component: &str| guide(component, "single-node").unwrap().here;
-        let pg = here("databases/cloudnative-pg");
+    fn a_plan_installs_only_components_that_are_charts_without_inputs() {
+        let pg = guide("databases/cloudnative-pg", "single-node").unwrap();
         assert_eq!(pg.blocked, None);
-        assert_eq!(pg.objects.len(), 2);
-        for object in &pg.objects {
-            let parsed: Value = serde_saphyr::from_str(object).unwrap();
-            assert_eq!(parsed["kind"], "HelmChart");
-            assert_eq!(parsed["metadata"]["namespace"], "kube-system");
-            assert!(parsed["spec"]["version"].is_string());
+        let kinds = |format: InstallFormat| -> Vec<String> {
+            let text = pg.formats.iter().find(|t| t.format == format).unwrap();
+            assert!(!text.objects.is_empty() || format == InstallFormat::Helm);
+            text.objects
+                .iter()
+                .map(|object| {
+                    let parsed: Value = serde_saphyr::from_str(object).unwrap();
+                    assert_eq!(
+                        parsed["metadata"]["namespace"].as_str(),
+                        text.namespace.as_deref()
+                    );
+                    parsed["kind"].as_str().unwrap().to_owned()
+                })
+                .collect()
+        };
+        assert_eq!(kinds(InstallFormat::Helm), Vec::<String>::new());
+        assert!(kinds(InstallFormat::K3s).iter().all(|k| k == "HelmChart"));
+        assert!(kinds(InstallFormat::Flux).contains(&"HelmRelease".to_owned()));
+        assert!(kinds(InstallFormat::ArgoCd).contains(&"Application".to_owned()));
+        for (component, blocked) in [
+            ("volume-backup/velero", InstallBlocked::Inputs),
+            ("metrics/metrics-server", InstallBlocked::K3sPackaged),
+            ("certificates/cert-manager", InstallBlocked::Manifests),
+        ] {
+            let guide = guide(component, "single-node").unwrap();
+            assert_eq!(guide.blocked, Some(blocked), "{component}");
+            assert!(guide.formats.iter().all(|t| t.objects.is_empty()));
         }
-        assert_eq!(
-            here("volume-backup/velero").blocked,
-            Some(HereBlocked::Inputs)
-        );
-        assert_eq!(
-            here("metrics/metrics-server").blocked,
-            Some(HereBlocked::K3sPackaged)
-        );
-        assert_eq!(
-            here("certificates/cert-manager").blocked,
-            Some(HereBlocked::Manifests)
-        );
-        assert_eq!(here("volume-backup/velero").objects, Vec::<String>::new());
         for (capability, id, _) in bundle::FILES {
             let guide = guide(&format!("{capability}/{id}"), "multi-node").unwrap();
-            let k3s = &guide.formats[1].text;
-            for object in &guide.here.objects {
-                assert!(k3s.contains(object.as_str()), "{capability}/{id}");
+            for text in &guide.formats {
+                for object in &text.objects {
+                    assert!(text.text.contains(object.as_str()), "{capability}/{id}");
+                }
             }
+        }
+    }
+
+    #[test]
+    fn a_planned_install_is_found_in_every_form_by_its_chart_label() {
+        // Argo CD leaves no Helm release Secret, and a release named otherwise than its chart
+        // (`cnpg`) hides the Secret k3s or Flux leaves: the chart label is what every form leaves.
+        let components = crate::catalogue().unwrap();
+        for (capability, id, text) in bundle::FILES {
+            if guide(&format!("{capability}/{id}"), "single-node")
+                .unwrap()
+                .blocked
+                .is_some()
+            {
+                continue;
+            }
+            let file: File = serde_saphyr::from_str(text).unwrap();
+            let mut facts = zeabur_kube::ClusterFacts::default();
+            for release in &file.releases {
+                let (chart, version) = match release.source() {
+                    Some(Source::Oci { url, version }) => {
+                        (url.rsplit('/').next().unwrap_or(url), version)
+                    }
+                    Some(Source::Repo { chart, version, .. }) => (chart, version),
+                    _ => continue,
+                };
+                facts.workload_labels.push((
+                    "Deployment".to_owned(),
+                    std::collections::BTreeMap::from([(
+                        "helm.sh/chart".to_owned(),
+                        format!("{chart}-{version}"),
+                    )]),
+                ));
+            }
+            let found = crate::detect(&components, &facts);
+            assert!(
+                found
+                    .iter()
+                    .any(|c| c.installations.iter().any(|i| i.component == *id)),
+                "{capability}/{id}"
+            );
         }
     }
 

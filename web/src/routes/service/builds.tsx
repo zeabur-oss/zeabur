@@ -487,6 +487,7 @@ function AutoUpdate({
           <InstallSheet
             component="image-updates/keel"
             name="Keel"
+            installed={false}
             onProfile={() => undefined}
             onClose={() => setInstalling(false)}
           />

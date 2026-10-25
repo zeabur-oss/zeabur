@@ -151,6 +151,7 @@ export function ComponentsPage() {
             component={open}
             name={opened?.displayName ?? open}
             notes={opened?.description}
+            installed={list.some((c) => opened !== undefined && isInstalled(c, opened))}
             profile={search.profile}
             onProfile={(profile) =>
               void navigate({ search: (previous) => ({ ...previous, profile }), replace: true })

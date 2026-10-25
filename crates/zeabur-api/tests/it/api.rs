@@ -1662,7 +1662,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn install_texts_come_in_four_forms_for_the_profile_asked() {
+    async fn install_texts_come_for_the_profile_asked() {
         let cluster = cluster();
         let guide = get(
             &cluster,
@@ -1671,13 +1671,7 @@ mod tests {
         .await;
         assert_eq!(guide["defaultProfile"], "single-node");
         assert_eq!(guide["profile"], "single-node");
-        let formats: Vec<&str> = guide["formats"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .map(|f| f["format"].as_str().unwrap())
-            .collect();
-        assert_eq!(formats, ["helm", "k3s", "flux", "argoCd"]);
+        assert_eq!(guide["formats"][0]["format"], "helm");
         assert!(
             guide["formats"][0]["text"]
                 .as_str()
