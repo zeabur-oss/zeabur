@@ -188,7 +188,7 @@ after a change: it rebuilds and redeploys what changed. Options:
   Zeabur Identity, write its commit to `ZEABUR_IDENTITY_PINNED`.
 - `ZEABUR_REGISTRY_MIRRORS=docker.io=http://mirror:5001,ghcr.io=http://mirror:5002`: the node pulls
   through these registry mirrors (each `registry=endpoint`), for a machine behind a slow or
-  rate-limited link. `K3S_IMAGE` picks the k3s release.
+  rate-limited link. `K3S_IMAGE` picks the K3s release.
 
 - `--profile bare`: only the cluster. The cluster tests and local mode run there: their people
   are no admins, and Zeabur's admission policy would stop them changing a namespace's labels.

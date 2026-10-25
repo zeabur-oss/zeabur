@@ -49,7 +49,7 @@ enum Command {
     /// Install, or bring an existing install in line with the configuration. Safe to run again.
     Apply,
     /// Print Zeabur's namespace, Zeabur Identity's Ingress and Zeabur's `HelmChart` as `apply`
-    /// makes them, as a JSON `List`, for a k3s cluster that has its other parts from another
+    /// makes them, as a JSON `List`, for a K3s/RKE2 cluster that has its other parts from another
     /// source (`scripts/dev-cluster.sh`). Reads no host and no catalog.
     Manifests {
         /// The cluster's name, which `apply` takes from the host name.
