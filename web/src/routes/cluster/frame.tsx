@@ -3,6 +3,7 @@ import { useNavigate } from "@tanstack/react-router"
 import type { ReactNode } from "react"
 
 import { clusterQuery, upgradesQuery } from "@/api/queries"
+import { OpenClusterKubectl } from "@/components/dock/open-in-terminal"
 import { StatusPill } from "@/components/status"
 import { UnreachableBanner, useReachability } from "@/components/unreachable"
 import { Tabs, TabsList, TabsTrigger } from "@zeabur/design-system/components/tabs"
@@ -63,6 +64,7 @@ function Heading() {
   return (
     <PageHeader
       title={t("cluster.title")}
+      actions={<OpenClusterKubectl />}
       badges={
         <>
           {name ? (

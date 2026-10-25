@@ -234,7 +234,7 @@ test("the kubectl terminal opens through a review the first time and reuses its 
   await expect(page.getByRole("dialog")).toHaveCount(0)
 })
 
-test("a command on a page opens in the kubectl terminal, typed in and not run", async ({
+test("a command on a page is text to copy; the cluster page opens the cluster's kubectl terminal", async ({
   page,
 }) => {
   // crasher has no Service, so its Networking tab shows the command that adds one.
@@ -242,34 +242,24 @@ test("a command on a page opens in the kubectl terminal, typed in and not run", 
   const panel = page.getByRole("tabpanel", { name: "Networking" })
   const command = `kubectl -n ${namespace} expose deployment ${failing}`
   await expect(panel.getByText(command, { exact: true })).toBeVisible()
-  const open = panel.getByRole("button", { name: "Open in kubectl terminal" })
-  if (!(await toolsAvailable(page))) {
-    await expect(panel.getByRole("button", { name: "Copy" })).toBeVisible()
+  await expect(panel.getByRole("button", { name: "Copy" })).toBeVisible()
+  await expect(panel.getByRole("button", { name: /terminal/ })).toHaveCount(0)
+
+  await page.goto("/cluster")
+  const open = page.getByRole("button", { name: "Open kubectl terminal" })
+  const response = await page.request.get("/api/v1/cluster/tools")
+  const available =
+    response.status() === 403 ||
+    (response.ok() && ((await response.json()) as { available: boolean }).available)
+  if (!available) {
     await expect(open).toHaveCount(0)
     return
   }
-
   await open.click()
-  await expect(dock(page).getByRole("tab", { name: `kubectl ${namespace}` })).toHaveAttribute(
+  await expect(dock(page).getByRole("tab", { name: /^kubectl / })).toHaveAttribute(
     "aria-selected",
     "true",
   )
-  const dialog = page.getByRole("dialog", { name: "Open kubectl terminal" })
-  const reused = await dialog
-    .waitFor({ timeout: 5_000 })
-    .then(() => false)
-    .catch(() => true)
-  if (!reused) await dialog.getByRole("button", { name: "Open kubectl terminal" }).click()
-  await expect(connected(page)).toBeVisible({ timeout: 60_000 })
-  await expect(screen(page)).toContainText(command, { timeout: 10_000 })
-
-  // The keyboard is in the terminal, after the command: Enter runs what was typed. A dry run, so
-  // the cluster keeps no Service. The flag lands on the same line, so the command was typed and
-  // not run.
-  await expect.poll(() => inTerminal(page)).toBe(true)
-  await page.keyboard.type(" --dry-run=client\n")
-  await expect(screen(page)).toContainText(`${command} --dry-run=client`)
-  await expect(screen(page)).toContainText(/exposed \(dry run\)|couldn't find port/)
 })
 
 test("on a phone the dock is a sheet over the whole screen", async ({ page }) => {

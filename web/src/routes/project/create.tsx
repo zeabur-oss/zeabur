@@ -14,7 +14,6 @@ import XIcon from "~icons/ph/x"
 import type { Problem as ProblemBody, Schemas } from "@/api/client"
 import { creatableQuery, objectsQuery } from "@/api/queries"
 import { Hint } from "@/components/bits"
-import { OpenInTerminal } from "@/components/dock/open-in-terminal"
 import { usePlanner } from "@/components/plan/planner"
 import { Problem } from "@/components/problem"
 import { StatusDot } from "@/components/status"
@@ -35,7 +34,6 @@ import {
 import { deletionOf } from "@/model/risk"
 import { dropHandoff, handedOff } from "@/lib/adding"
 import { appended, offered, templateOf } from "@/model/templates"
-import { createCommand } from "@/model/terminal"
 import { Alert, AlertDescription } from "@zeabur/design-system/components/alert"
 import { Button, buttonVariants } from "@zeabur/design-system/components/button"
 import { Dialog, DialogContent, DialogTitle } from "@zeabur/design-system/components/dialog"
@@ -162,7 +160,6 @@ export function CreatePage() {
       changes: creates(docs),
     })
   }
-  const secret = docs.some((d) => d.kind === "Secret" && !d.apiVersion?.includes("/"))
 
   return (
     <div className="flex flex-col">
@@ -217,9 +214,6 @@ export function CreatePage() {
                 : null}
           </span>
           <span className="ml-auto flex flex-wrap items-center justify-end gap-2">
-            {secret || docs.length === 0 ? null : (
-              <OpenInTerminal project={project} command={createCommand(project, text)} />
-            )}
             <Link
               to="/projects/$project/objects"
               params={{ project }}

@@ -60,7 +60,7 @@ Pod Security 不管網路。要限制跨專案的流量，另外設定 NetworkPo
 
 ### kubectl 終端機
 
-Zeabur 在短暫的 tools Pod 裡提供 `kubectl` 和 `helm`，使用登入者當下的權杖。kubeconfig 透過 exec 的標準輸入寫進記憶體型的 `emptyDir`，不會出現在 Pod spec、環境變數、ConfigMap 或 Secret 裡。
+Zeabur 在短暫的 tools Pod 裡提供 `kubectl` 和 `helm`，使用登入者當下的權杖。專案的 kubectl 終端機從搜尋開啟，整個叢集的從 **叢集** 頁標題旁的 **開啟 kubectl 終端機** 開啟。kubeconfig 透過 exec 的標準輸入寫進記憶體型的 `emptyDir`，不會出現在 Pod spec、環境變數、ConfigMap 或 Secret 裡。
 
 <Callout type="warn">
 能在 tools Pod 所在 Namespace 執行 `pods/exec` 的人，以及那個節點的管理員，在權杖到期前都能讀到並使用這份 kubeconfig。管理員的叢集 tools Pod 放在獨立的 `zeabur-cluster-tools` Namespace。專案的 tools Pod 預設放在專案裡，可以用 chart 的 `terminal.toolsNamespace` 移到只有管理員能 exec 的 Namespace。

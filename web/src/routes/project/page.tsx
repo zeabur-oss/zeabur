@@ -14,7 +14,6 @@ import { projectGapsQuery, projectIncidentsQuery, projectQuery } from "@/api/que
 import { Segmented } from "@/components/bits"
 import { CopyText } from "@/components/copy-text"
 import { AddMenu, useAddChoices } from "@/components/add/menu"
-import { OpenInTerminal } from "@/components/dock/open-in-terminal"
 import { Freshness } from "@/components/freshness"
 import { GapList } from "@/components/gaps"
 import { IncidentRow, isTakenDown, takenDown } from "@/components/incident"
@@ -522,7 +521,6 @@ function NextStep({ project }: { project: string }) {
                       </code>
                       <div className="ml-auto flex items-center">
                         <CopyText value={() => command} label={t("common.copy")} />
-                        <OpenInTerminal project={project} command={command} />
                       </div>
                     </div>
                     <span className="type-meta text-muted-foreground">

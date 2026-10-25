@@ -1242,7 +1242,6 @@ export const zhCN: Messages = {
   "action.unadopt": "不再显示为项目",
   "action.openDebugTerminal": "打开调试终端",
   "action.openToolsTerminal": "打开 kubectl 终端",
-  "action.openInToolsTerminal": "在 kubectl 终端打开",
   "action.saveDetails": "保存详细信息",
   "title.adopt": (ns) => `使用已有的 Namespace ${ns}`,
   "title.unadopt": (ns) => `${ns} 不再显示为项目`,

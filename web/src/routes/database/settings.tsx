@@ -1,7 +1,6 @@
 import { useState, type ReactNode } from "react"
 
 import { CopyText } from "@/components/copy-text"
-import { OpenInTerminal } from "@/components/dock/open-in-terminal"
 import { FormField } from "@/components/form-field"
 import { ObjectYaml } from "@/components/store-detail"
 import { GateNote, GateTip, useGate } from "@/components/gate"
@@ -266,7 +265,6 @@ function Commands({ project, database }: { project: string; database: Database }
               </code>
               <div className="ml-auto flex items-center">
                 <CopyText value={() => row.command} label={t("common.copy")} />
-                <OpenInTerminal project={project} command={row.command} />
               </div>
             </div>
           </li>

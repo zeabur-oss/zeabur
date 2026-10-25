@@ -9,11 +9,10 @@
 import { toast } from "sonner"
 
 import { api, toProblem, unwrap, type Schemas } from "@/api/client"
-import { queryClient, toolsQuery } from "@/api/queries"
+import { queryClient } from "@/api/queries"
 import { retryAsAdmin } from "@/auth/elevation"
 import { failureOf } from "@/components/plan/describe"
 import { markCreated } from "@/lib/created"
-import { openKubectl } from "@/lib/dock"
 import type { PlanAsk } from "@/components/plan/planner"
 import { replansOn, type Reviewed } from "@/components/plan/replan"
 import type { Locale, Translate } from "@/i18n"
@@ -109,8 +108,7 @@ export async function carryOut(confirmed: Confirmed): Promise<void> {
       confirmed.reopen(ask, confirmed.reviewed ?? { objects: [] })
       return
     }
-    void fail(
-      project,
+    fail(
       id,
       t,
       locale,
@@ -134,16 +132,13 @@ async function takeBack(
     void queryClient.invalidateQueries({ queryKey: ["project", project] })
     toast.success(t("toast.undone"), { id, description: title })
   } catch (error) {
-    void fail(project, id, t, locale, error)
+    fail(id, t, locale, error)
   }
 }
 
 /** Reports a failed apply. `review` plans the change afresh; `again` applies the same plan once
- * more, which is what "Retry with admin rights" does after the passkey confirmation. A change Helm
- * would undo offers the kubectl terminal with `helm list` typed in, to find the release to
- * upgrade. */
-async function fail(
-  project: string,
+ * more, which is what "Retry with admin rights" does after the passkey confirmation. */
+function fail(
   id: string | number,
   t: Translate,
   locale: Locale,
@@ -158,12 +153,7 @@ async function fail(
       ? { label: t("elevate.retry"), onClick: () => void retryAsAdmin(again) }
       : failure.review && review
         ? { label: t("plan.replan"), onClick: () => review() }
-        : problem.managedBy === "Helm" && (await toolsAvailable(project))
-          ? {
-              label: t("action.openInToolsTerminal"),
-              onClick: () => openKubectl(project, { command: "helm list" }),
-            }
-          : undefined
+        : undefined
   toast.error(failure.title, {
     id,
     description: failure.description,
@@ -171,9 +161,3 @@ async function fail(
     action,
   })
 }
-
-const toolsAvailable = (project: string) =>
-  queryClient.fetchQuery(toolsQuery(project)).then(
-    (tools) => tools.available,
-    () => false,
-  )

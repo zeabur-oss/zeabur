@@ -1329,7 +1329,6 @@ export const en = {
   "action.unadopt": "Stop showing as a project",
   "action.openDebugTerminal": "Open debug terminal",
   "action.openToolsTerminal": "Open kubectl terminal",
-  "action.openInToolsTerminal": "Open in kubectl terminal",
   "action.saveDetails": "Save details",
   "title.adopt": (ns: string) => `Use the existing namespace ${ns}`,
   "title.unadopt": (ns: string) => `Stop showing ${ns} as a project`,
