@@ -98,7 +98,8 @@ import {
 // service changes, so nothing carries over to the next one.
 
 /** A query's data, from the cache when it is there. */
-const ensure: typeof queryClient.ensureQueryData = (options) => queryClient.ensureQueryData(options)
+const ensure: typeof queryClient.query = (options) =>
+  queryClient.query({ ...options, staleTime: "static" })
 
 /** Waits for every read, or for the first that finds the cluster away; a failure is left for the
  * page to show. */

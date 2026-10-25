@@ -38,11 +38,13 @@ const refusal: Problem = {
 async function page(error: ApiError): Promise<string> {
   // The answer stays as it is: nothing is fetched again while rendering.
   const client = new QueryClient({ defaultOptions: { queries: { retryOnMount: false } } })
-  await client.prefetchQuery({
-    ...capabilitiesQuery,
-    queryFn: () => Promise.reject(error),
-    retry: false,
-  })
+  await client
+    .query({
+      ...capabilitiesQuery,
+      queryFn: () => Promise.reject(error),
+      retry: false,
+    })
+    .catch(() => undefined)
   const rootRoute = createRootRoute()
   const components = createRoute({
     getParentRoute: () => rootRoute,

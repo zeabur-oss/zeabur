@@ -120,7 +120,7 @@ export function Reachability({
   const choose = async (kind: string, from?: string) => {
     setProblem(undefined)
     try {
-      const presets = await queryClient.fetchQuery(
+      const presets = await queryClient.query(
         networkPresetsQuery(project, `${service.kind}/${service.name}`),
       )
       const preset = presets.items.find((p) => p.kind === kind && (p.from ?? undefined) === from)

@@ -200,7 +200,7 @@ export function Diagnoses({
               primary={lead !== undefined}
               value={async () => {
                 try {
-                  const bundle = await queryClient.fetchQuery(
+                  const bundle = await queryClient.query(
                     evidenceQuery(project, service.kind, service.name),
                   )
                   return writeBundle(bundle.markdown, (sentence) => writeSentence(t, sentence))

@@ -109,7 +109,7 @@ describe("the query client", () => {
     jest.useFakeTimers()
     const client = new QueryClient({ defaultOptions: queryClient.getDefaultOptions() })
     let tries = 0
-    const read = client.fetchQuery({
+    const read = client.query({
       queryKey: ["limited"],
       queryFn: () => {
         tries += 1

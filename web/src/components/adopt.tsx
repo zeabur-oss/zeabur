@@ -20,7 +20,7 @@ import { MANAGE_VERB, mayAdopt } from "@/model/project"
 /** Whether the person may adopt it or let it go, and whether the policy guards its labels. */
 async function adoptHint(namespace: string): Promise<{ allowed: boolean; guarded: boolean }> {
   try {
-    const ns = await queryClient.fetchQuery({ ...namespaceQuery(namespace), staleTime: 0 })
+    const ns = await queryClient.query({ ...namespaceQuery(namespace), staleTime: 0 })
     return { allowed: mayAdopt(ns), guarded: ns.labelsGuarded }
   } catch {
     // The hint could not be read; the plan and its dry run will say.

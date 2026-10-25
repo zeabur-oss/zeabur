@@ -137,9 +137,9 @@ case "$job" in
     ;;
   # The web interface: banned styles, generated sentences up to date (before the build regenerates
   # them), lint, unused code and layer boundaries, new findings in the changed files, build, unit
-  # tests, generated API types up to date, the installer's interface built and linted, size budget,
-  # and a release build that embeds it. The health and duplication report after it does not fail
-  # the job.
+  # tests, generated API types up to date, the installer's interface built and linted, no use of a
+  # deprecated declaration in either, size budget, and a release build that embeds it. The health
+  # and duplication report after it does not fail the job.
   ui)
     ./scripts/check-ui-styles.sh
     ./scripts/check-messages.sh
@@ -156,6 +156,7 @@ case "$job" in
     git diff --exit-code -- web/src/api/schema.d.ts
     ./scripts/build-installer-ui.sh
     (cd crates/zeabur-installer/web; bun run lint)
+    (cd web; bun scripts/check-deprecated.ts . ../crates/zeabur-installer/web)
     ./scripts/ui-budget.sh
     ZEABUR_UI_DIST="$root/web/dist" cargo build --release --locked -p zeabur -p zeaburctl
     ZEABUR_UI_DIST="$root/web/dist" cargo nextest run --release --locked -p zeabur-ui

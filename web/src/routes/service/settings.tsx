@@ -1,4 +1,4 @@
-import { useForm, useStore } from "@tanstack/react-form"
+import { useForm, useSelector } from "@tanstack/react-form"
 import { useQuery } from "@tanstack/react-query"
 
 import type { Schemas } from "@/api/client"
@@ -158,8 +158,8 @@ function Compute({
     return changes
   }
   const form = useForm({ defaultValues: initial })
-  const values = useStore(form.store, (s) => s.values)
-  const valid = useStore(form.store, (s) => s.canSubmit)
+  const values = useSelector(form.store, (s) => s.values)
+  const valid = useSelector(form.store, (s) => s.canSubmit)
   const changes = disabled ? [] : changesOf(values)
   useHold(
     "compute",
@@ -392,8 +392,8 @@ function ProbeForm({
 }) {
   const t = useT()
   const form = useForm({ defaultValues: current })
-  const values = useStore(form.store, (s) => s.values)
-  const canSubmit = useStore(form.store, (s) => s.canSubmit)
+  const values = useSelector(form.store, (s) => s.values)
+  const canSubmit = useSelector(form.store, (s) => s.canSubmit)
   const valid = canSubmit && (values.handler !== "Exec" || values.command.trim() !== "")
   const edited = !disabled && JSON.stringify(values) !== JSON.stringify(current)
   useHold(

@@ -238,9 +238,7 @@ function ServiceView({
     )
   const copyDiagnosis = async () => {
     try {
-      const bundle = await queryClient.fetchQuery(
-        evidenceQuery(project, service.kind, service.name),
-      )
+      const bundle = await queryClient.query(evidenceQuery(project, service.kind, service.name))
       await navigator.clipboard.writeText(
         writeBundle(bundle.markdown, (sentence) => writeSentence(t, sentence)),
       )
