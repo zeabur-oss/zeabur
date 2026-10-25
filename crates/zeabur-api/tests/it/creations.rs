@@ -567,7 +567,12 @@ stringData:
         let k3s = &guide["formats"][1];
         assert_eq!(k3s["format"], "k3s");
         let objects = k3s["objects"].as_array().unwrap();
-        assert!(!objects.is_empty());
+        assert!(
+            objects
+                .first()
+                .and_then(Value::as_str)
+                .is_some_and(|y| y.contains("kind: HelmChart"))
+        );
         let request = json!({"changes": objects.iter().map(|y| json!({"op": "create", "yaml": y})).collect::<Vec<_>>()});
         let (status, planned) = send(
             &app,

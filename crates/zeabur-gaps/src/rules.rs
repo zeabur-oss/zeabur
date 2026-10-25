@@ -315,13 +315,15 @@ impl Rule for IngressToHttpRoute {
                     subject: Origin::object("Ingress", &route.name),
                     service: None,
                     message,
-                    fix: match http_route(input.project, &route.name, input.cluster) {
-                        Some(object) => plan(
-                            "domains.httpRoute",
-                            &[("ingress", &route.name), ("object", &object.to_string())],
-                        ),
-                        None => plan("domains.httpRoute", &[("ingress", &route.name)]),
-                    },
+                    fix: http_route(input.project, &route.name, input.cluster).map_or_else(
+                        || plan("domains.httpRoute", &[("ingress", &route.name)]),
+                        |object| {
+                            plan(
+                                "domains.httpRoute",
+                                &[("ingress", &route.name), ("object", &object.to_string())],
+                            )
+                        },
+                    ),
                     citations: self.citations(),
                 });
             }
@@ -355,7 +357,7 @@ fn http_route(project: &Project, ingress: &str, cluster: &ClusterTraits) -> Opti
             Some("Exact") => "Exact",
             _ => "PathPrefix",
         };
-        let mut backend = json!({"name": rule.service});
+        let mut backend = serde_json::Map::from_iter([("name".to_owned(), json!(rule.service))]);
         if let Some(port) = rule.port.as_deref() {
             let number = port.parse::<u16>().ok().or_else(|| {
                 project
@@ -365,19 +367,22 @@ fn http_route(project: &Project, ingress: &str, cluster: &ClusterTraits) -> Opti
                     .find(|p| p.name.as_deref() == Some(port))
                     .and_then(|p| u16::try_from(p.port).ok())
             })?;
-            backend["port"] = json!(number);
+            backend.insert("port".to_owned(), json!(number));
         }
         rules.push(json!({
             "matches": [{"path": {"type": kind, "value": rule.path.as_deref().unwrap_or("/")}}],
             "backendRefs": [backend],
         }));
     }
-    let mut spec = json!({
-        "parentRefs": [{"name": gateway.name, "namespace": gateway.namespace}],
-        "rules": rules,
-    });
+    let mut spec = serde_json::Map::from_iter([
+        (
+            "parentRefs".to_owned(),
+            json!([{"name": gateway.name, "namespace": gateway.namespace}]),
+        ),
+        ("rules".to_owned(), json!(rules)),
+    ]);
     if !hosts.is_empty() {
-        spec["hostnames"] = json!(hosts);
+        spec.insert("hostnames".to_owned(), json!(hosts));
     }
     Some(json!({
         "apiVersion": "gateway.networking.k8s.io/v1",
