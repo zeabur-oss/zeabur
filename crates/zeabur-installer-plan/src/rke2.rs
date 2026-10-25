@@ -38,6 +38,16 @@ pub const JOIN_TOKEN_FILE: &str = "/etc/rancher/rke2/zeabur-join-token";
 pub const SERVER_TOKEN_FILE: &str = "/var/lib/rancher/rke2/server/token";
 /// The kubelet's credentials on any node; a node may read its own Node object with them.
 pub const KUBELET_KUBECONFIG: &str = "/var/lib/rancher/rke2/agent/kubelet.kubeconfig";
+/// The catalog's in-cluster registry, as Zeabur and Zeabur Builder name its images.
+pub const ZOT_HOST: &str = "zot.zot.svc:5000";
+/// The fixed `ClusterIP` of the catalog's zot (its `cluster-ip` input). Kubernetes keeps the low
+/// end of the Service CIDR (RKE2's 10.43.0.0/16) for fixed addresses, as `CoreDNS`'s 10.43.0.10.
+pub const ZOT_CLUSTER_IP: &str = "10.43.0.50";
+/// The registry mirrors and their CAs, read when RKE2 starts.
+pub const REGISTRIES_FILE: &str = "/etc/rancher/rke2/registries.yaml";
+/// The CA of zot's certificate. containerd reads it on each pull, so the first server writes it
+/// once cert-manager has issued it, without a restart; a joining node writes it before starting.
+pub const ZOT_CA_FILE: &str = "/etc/rancher/rke2/zot-ca.crt";
 
 /// The TCP ports a node listens on, and what for, that must be free before RKE2 starts.
 ///
@@ -156,6 +166,31 @@ pub fn join_file(server: &str) -> HostFile {
         path: format!("{CONFIG_DIR}/config.yaml.d/10-join.yaml"),
         mode: 0o600,
         content: format!("{HEADER}server: {server}\ntoken-file: {JOIN_TOKEN_FILE}\n"),
+    }
+}
+
+/// The node's container runtime cannot resolve `zot.zot.svc`, so its images come from zot's fixed
+/// `ClusterIP`, which kube-proxy routes on every node and zot's certificate names.
+#[must_use]
+pub fn registries_file(cluster_ip: &str) -> HostFile {
+    HostFile {
+        path: REGISTRIES_FILE.to_owned(),
+        mode: 0o600,
+        content: format!(
+            "# Written by zeabur-installer; `zeabur-installer doctor` compares it.\n\
+             mirrors:\n  {ZOT_HOST}:\n    endpoint: [\"https://{cluster_ip}:5000\"]\n\
+             configs:\n  \"{cluster_ip}:5000\":\n    tls:\n      ca_file: {ZOT_CA_FILE}\n"
+        ),
+    }
+}
+
+/// zot's CA on a joining node, copied from the server by `node add`.
+#[must_use]
+pub fn zot_ca_file(pem: &str) -> HostFile {
+    HostFile {
+        path: ZOT_CA_FILE.to_owned(),
+        mode: 0o644,
+        content: pem.to_owned(),
     }
 }
 

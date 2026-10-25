@@ -5,6 +5,7 @@
 //! input names a file (mode 0600) the installer reads, or is generated.
 
 use std::collections::BTreeMap;
+use std::net::IpAddr;
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -200,6 +201,19 @@ pub struct Join {
     /// module before RKE2 starts.
     #[serde(default)]
     pub longhorn: bool,
+    /// The cluster runs the catalog's zot, so this node pulls its images through a mirror, as
+    /// `node add` printed it.
+    pub zot: Option<ZotMirror>,
+}
+
+/// zot's fixed `ClusterIP` and the CA of its certificate.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ZotMirror {
+    /// Its Service's `ClusterIP`.
+    pub cluster_ip: IpAddr,
+    /// The CA, PEM.
+    pub ca: String,
 }
 
 impl std::fmt::Debug for Join {
@@ -211,6 +225,7 @@ impl std::fmt::Debug for Join {
             .field("token_file", &self.token_file)
             .field("server_config", &self.server_config)
             .field("longhorn", &self.longhorn)
+            .field("zot", &self.zot)
             .finish()
     }
 }
@@ -270,6 +285,17 @@ impl JoinConfig {
     pub fn check(&self) -> Result<(), PlanError> {
         let join = &self.join;
         server_address(&join.server)?;
+        if let Some(zot) = &join.zot
+            && !zot
+                .ca
+                .trim_start()
+                .starts_with("-----BEGIN CERTIFICATE-----")
+        {
+            return Err(PlanError::Config(
+                "join.zot.ca is not a PEM certificate: copy it from the output of `zeabur-installer node add`"
+                    .to_owned(),
+            ));
+        }
         match (&join.token, &join.token_file) {
             (Some(_), Some(_)) => {
                 return Err(PlanError::Config(

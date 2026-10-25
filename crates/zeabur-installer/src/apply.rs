@@ -20,7 +20,7 @@ use zeabur_installer_plan::plan::{
     ZeaburPlan,
 };
 use zeabur_installer_plan::rke2::{
-    AUTHN_CONFIGMAP, AUTHN_FILE, ETCD_USER, HostFile, IMAGES_DIR, PREFIX,
+    AUTHN_CONFIGMAP, AUTHN_FILE, ETCD_USER, HostFile, IMAGES_DIR, PREFIX, ZOT_CA_FILE,
 };
 use zeabur_installer_plan::storage::{self, NodePrep, Storage};
 
@@ -87,6 +87,9 @@ pub(crate) fn run(config_path: &Path) -> Result<(), InstallError> {
             let mut args: Vec<&str> = wait.iter().map(String::as_str).collect();
             args.push("--timeout=5m");
             kubectl.wait(&args)?;
+        }
+        if component.id == plan::ZOT && plan.zot_cluster_ip.is_some() {
+            zot_ca(&kubectl)?;
         }
     }
 
@@ -656,6 +659,17 @@ fn local_ca_pem(kubectl: &Kubectl, namespace: &str) -> Result<String, InstallErr
         .ok_or_else(|| {
             InstallError::Message(format!("secret {namespace}/{LOCAL_ISSUER} has no ca.crt"))
         })
+}
+
+/// Copies the CA of zot's certificate to the node, where the registry mirror checks zot against it.
+fn zot_ca(kubectl: &Kubectl) -> Result<(), InstallError> {
+    let pem = kubectl
+        .get("secret", "zot-tls", Some("zot"))?
+        .as_ref()
+        .and_then(|s| kubectl::secret_key(s, "ca.crt"))
+        .ok_or_else(|| InstallError::Message("secret zot/zot-tls has no ca.crt".to_owned()))?;
+    files::write(Path::new(ZOT_CA_FILE), 0o644, &pem)?;
+    Ok(())
 }
 
 /// Where `apply` keeps a file of a pinned release.

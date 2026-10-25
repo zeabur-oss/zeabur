@@ -34,6 +34,10 @@ pub const IDENTITY_NAMESPACE: &str = "zeabur-identity";
 pub const ZEABUR_NAMESPACE: &str = "zeabur";
 /// The `ClusterIssuer` of `local` access: a CA cert-manager makes on the server.
 pub const LOCAL_ISSUER: &str = "zeabur-local-ca";
+/// The catalog's in-cluster registry, which nodes pull through a mirror to its fixed address.
+pub const ZOT: &str = "container-registry/zot";
+/// zot's input naming that address.
+const ZOT_CLUSTER_IP_INPUT: &str = "cluster-ip";
 /// The `ClusterIssuer` of `domain` access, shipped by the catalog's cert-manager component.
 pub const ACME_ISSUER: &str = "letsencrypt";
 /// RKE2's own memory at idle on one node, measured on the test VM (`kubectl top` plus containerd
@@ -94,6 +98,9 @@ pub struct Plan {
     pub storage: Storage,
     /// What every node needs before the components' pods run on it.
     pub node_prep: Option<NodePrep>,
+    /// zot's fixed `ClusterIP`, when it is installed: nodes pull its images through a mirror to
+    /// it, checked against its CA.
+    pub zot_cluster_ip: Option<String>,
     /// How the two web services get certificates.
     pub access: AccessMode,
     /// Zeabur Identity, when installed.
@@ -411,7 +418,8 @@ pub fn plan(index: &Index, config: &Config, facts: &Facts) -> Result<Plan, PlanE
         &mut warnings,
     )?;
 
-    let host_files = server_files(config, &chosen, facts);
+    let zot_cluster_ip = zot_cluster_ip(index, config, &chosen);
+    let host_files = server_files(config, &chosen, facts, zot_cluster_ip.as_deref());
 
     let memory = memory(&components, facts.memory_mib, &mut warnings);
 
@@ -425,6 +433,7 @@ pub fn plan(index: &Index, config: &Config, facts: &Facts) -> Result<Plan, PlanE
         components,
         left_out: selection.left_out,
         node_prep: storage::node_prep(chosen.iter().copied()),
+        zot_cluster_ip,
         access: config.access.mode,
         identity,
         zeabur,
@@ -868,7 +877,11 @@ fn inputs(component: &Component, config: &Config) -> Result<Inputs, PlanError> {
             let value = given
                 .and_then(|g| g.get(&input.name))
                 .cloned()
-                .or_else(|| input.default.clone());
+                .or_else(|| input.default.clone())
+                .or_else(|| {
+                    (id == ZOT && input.name == ZOT_CLUSTER_IP_INPUT)
+                        .then(|| json!(rke2::ZOT_CLUSTER_IP))
+                });
             let release = input
                 .release
                 .clone()
@@ -909,14 +922,36 @@ fn privileged(component: &Component) -> Option<String> {
 }
 
 /// The first server's RKE2 files.
-fn server_files(config: &Config, chosen: &BTreeSet<&str>, facts: &Facts) -> Vec<HostFile> {
+fn server_files(
+    config: &Config,
+    chosen: &BTreeSet<&str>,
+    facts: &Facts,
+    zot_cluster_ip: Option<&str>,
+) -> Vec<HostFile> {
     let mut files = rke2::host_files(&rke2::Options {
         tls_san: config.host.tls_san.clone(),
         disable: packaged_to_disable(chosen),
         identity: config.zeabur,
     });
     files.extend(rke2::node_ip_file(&facts.node_ips));
+    files.extend(zot_cluster_ip.map(rke2::registries_file));
     files
+}
+
+/// zot's fixed `ClusterIP`: the configured `cluster-ip` input, else [`rke2::ZOT_CLUSTER_IP`].
+/// `None` when zot is not installed, or its catalog release takes no such input.
+fn zot_cluster_ip(index: &Index, config: &Config, chosen: &BTreeSet<&str>) -> Option<String> {
+    let component = index.component(ZOT).filter(|_| chosen.contains(ZOT))?;
+    let input = component
+        .inputs
+        .iter()
+        .find(|i| i.name == ZOT_CLUSTER_IP_INPUT)?;
+    let given = config
+        .inputs
+        .get(ZOT)
+        .and_then(|g| g.get(&input.name))
+        .and_then(Value::as_str);
+    Some(given.unwrap_or(rke2::ZOT_CLUSTER_IP).to_owned())
 }
 
 /// A `HelmChart` in `kube-system`, labelled as the installer's.
@@ -1398,6 +1433,86 @@ mod tests {
         );
         let err = plan(&index, &config("disable: [ingress]\n"), &facts()).unwrap_err();
         assert!(matches!(err, PlanError::NeedsDisabled { .. }), "{err}");
+    }
+
+    /// The fixture's catalog with a zot that takes the `cluster-ip` input.
+    fn index_with_zot() -> Index {
+        let mut index: Value = serde_json::from_str(INDEX).unwrap();
+        let components = index["components"].as_array_mut().unwrap();
+        let mut zot = components
+            .iter()
+            .find(|c| c["id"] == "config-reload/reloader")
+            .unwrap()
+            .clone();
+        zot["id"] = json!(ZOT);
+        zot["capability"] = json!("container-registry");
+        zot["metadata"]["name"] = json!("zot");
+        zot["requires"] = json!(["certificates/cert-manager"]);
+        let order = json!(["ingress/traefik", "certificates/cert-manager", ZOT]);
+        zot["installOrder"] = json!({"single-node": order, "multi-node": order});
+        zot["inputs"] = json!([{
+            "name": "cluster-ip",
+            "description": "A fixed ClusterIP.",
+            "release": "zot",
+            "path": "service.clusterIP",
+        }]);
+        zot["releases"] = json!([{
+            "name": "zot",
+            "namespace": "zot",
+            "chart": "zot",
+            "repo": "https://zotregistry.dev/helm-charts",
+            "version": "0.1.128",
+            "values": "service:\n  type: ClusterIP\n",
+        }]);
+        components.push(zot);
+        Index::parse(index.to_string().as_bytes()).unwrap()
+    }
+
+    fn zot_values(plan: &Plan) -> String {
+        let zot = plan.components.iter().find(|c| c.id == ZOT).unwrap();
+        let ReleasePlan::HelmChart { object, .. } = &zot.releases[0] else {
+            panic!()
+        };
+        object["spec"]["valuesContent"].as_str().unwrap().to_owned()
+    }
+
+    #[test]
+    fn nodes_pull_from_zot_through_its_fixed_address() {
+        let index = index_with_zot();
+        let without = plan(&index, &config(""), &facts()).unwrap();
+        assert_eq!(without.zot_cluster_ip, None);
+        assert!(
+            !without
+                .host_file_paths
+                .contains(&rke2::REGISTRIES_FILE.to_owned())
+        );
+
+        let with = plan(
+            &index,
+            &config("enable: [container-registry/zot]\n"),
+            &facts(),
+        )
+        .unwrap();
+        assert_eq!(with.zot_cluster_ip.as_deref(), Some(rke2::ZOT_CLUSTER_IP));
+        assert!(zot_values(&with).contains(r#""clusterIP":"10.43.0.50""#));
+        let registries = with
+            .host_files
+            .iter()
+            .find(|f| f.path == rke2::REGISTRIES_FILE)
+            .unwrap();
+        assert_eq!(registries, &rke2::registries_file(rke2::ZOT_CLUSTER_IP));
+
+        let chosen = plan(
+            &index,
+            &config(
+                "enable: [container-registry/zot]\ninputs:\n  container-registry/zot:\n    \
+                 cluster-ip: 10.43.7.7\n",
+            ),
+            &facts(),
+        )
+        .unwrap();
+        assert_eq!(chosen.zot_cluster_ip.as_deref(), Some("10.43.7.7"));
+        assert!(zot_values(&chosen).contains(r#""clusterIP":"10.43.7.7""#));
     }
 
     #[test]

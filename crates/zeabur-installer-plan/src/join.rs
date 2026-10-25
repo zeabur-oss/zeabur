@@ -339,6 +339,10 @@ pub fn plan(config: &JoinConfig, facts: &JoinFacts) -> Result<JoinPlan, PlanErro
     };
     host_files.push(rke2::join_file(&join.server));
     host_files.extend(rke2::node_ip_file(&facts.facts.node_ips));
+    if let Some(zot) = &join.zot {
+        host_files.push(rke2::registries_file(&zot.cluster_ip.to_string()));
+        host_files.push(rke2::zot_ca_file(&zot.ca));
+    }
 
     warnings.push(same_region());
 
@@ -436,6 +440,21 @@ mod tests {
         assert_eq!(rtt(&[3, 1, 2, 4]).unwrap().median_us, 2);
         assert_eq!(ms(649), "0.6");
         assert_eq!(ms(12_340), "12.3");
+    }
+
+    #[test]
+    fn a_node_joining_a_cluster_with_zot_pulls_from_it_through_the_mirror() {
+        let ca = "-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----\n";
+        let c = config(&format!(
+            "  zot:\n    clusterIp: 10.43.0.50\n    ca: |\n      {}\n",
+            ca.trim_end().replace('\n', "\n      ")
+        ));
+        let p = plan(&c, &facts(&[500; 5])).unwrap();
+        assert!(p.host_files.contains(&rke2::registries_file("10.43.0.50")));
+        assert!(p.host_files.contains(&rke2::zot_ca_file(ca)));
+        let bad = "join:\n  server: https://10.0.0.5:9345\n  tokenFile: /etc/t\n  zot:\n    \
+                   clusterIp: 10.43.0.50\n    ca: not a certificate\n";
+        assert!(Document::parse(bad).is_err());
     }
 
     #[test]

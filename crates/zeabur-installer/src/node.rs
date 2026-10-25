@@ -16,7 +16,9 @@ use zeabur_installer_host::token::{self, BootstrapToken};
 use zeabur_installer_plan::config::{Document, Role};
 use zeabur_installer_plan::join;
 use zeabur_installer_plan::plan::{self, MANAGER};
-use zeabur_installer_plan::rke2::{ADMIN_KUBECONFIG, BIN_DIR, CONFIG_DIR, SERVER_TOKEN_FILE};
+use zeabur_installer_plan::rke2::{
+    ADMIN_KUBECONFIG, BIN_DIR, CONFIG_DIR, SERVER_TOKEN_FILE, ZOT_CA_FILE,
+};
 
 use crate::{InstallError, load, out};
 
@@ -88,6 +90,7 @@ pub(crate) fn add(config_path: &Path, options: &AddOptions) -> Result<(), Instal
     let longhorn = kubectl
         .get("customresourcedefinition", LONGHORN_CRD, None)?
         .is_some();
+    let zot = zot_mirror(&kubectl)?;
     let text = instructions(&Instructions {
         server: &server,
         role: options.role,
@@ -95,6 +98,7 @@ pub(crate) fn add(config_path: &Path, options: &AddOptions) -> Result<(), Instal
         expiry: expiry.as_ref().map(|(e, id)| (e.as_str(), id.as_str())),
         single_node,
         longhorn,
+        zot: zot.as_ref().map(|(ip, ca)| (ip.as_str(), ca.as_str())),
     });
     out::line(text.trim_end());
     Ok(())
@@ -112,6 +116,8 @@ pub(crate) struct Instructions<'a> {
     pub(crate) single_node: Option<String>,
     /// The cluster runs Longhorn, so the new node needs preparing for it.
     pub(crate) longhorn: bool,
+    /// zot's `ClusterIP` and CA, when the cluster runs it.
+    pub(crate) zot: Option<(&'a str, &'a str)>,
 }
 
 /// The text `node add` prints.
@@ -142,7 +148,7 @@ pub(crate) fn instructions(i: &Instructions<'_>) -> String {
         "On the new VM, as root, with the same zeabur-installer copied to it:",
     );
     push(&mut text, "");
-    text.push_str(&commands(i.server, i.role, i.token, i.longhorn));
+    text.push_str(&commands(i.server, i.role, i.token, i.longhorn, i.zot));
     push(&mut text, "");
     if let Some((expires, _)) = i.expiry {
         push(
@@ -190,13 +196,29 @@ fn push(text: &mut String, line: &str) {
 }
 
 /// The shell commands that write the join configuration and run the installer.
-pub(crate) fn commands(server: &str, role: Role, token: &str, longhorn: bool) -> String {
+pub(crate) fn commands(
+    server: &str,
+    role: Role,
+    token: &str,
+    longhorn: bool,
+    zot: Option<(&str, &str)>,
+) -> String {
     let mut yaml = format!(
         "join:\n  server: {server}\n  role: {}\n  token: {token}\n",
         role.as_str()
     );
     if longhorn {
         yaml.push_str("  longhorn: true\n");
+    }
+    if let Some((cluster_ip, ca)) = zot {
+        for part in ["  zot:\n    clusterIp: ", cluster_ip, "\n    ca: |\n"] {
+            yaml.push_str(part);
+        }
+        for line in ca.lines() {
+            for part in ["      ", line, "\n"] {
+                yaml.push_str(part);
+            }
+        }
     }
     if role == Role::Server {
         let (disable, identity) = server_config();
@@ -240,6 +262,18 @@ fn server_config() -> (Vec<String>, bool) {
     ))
     .exists();
     (disable, identity)
+}
+
+/// zot's `ClusterIP` and the CA `apply` copied to this server, when the cluster runs it.
+fn zot_mirror(kubectl: &Kubectl) -> Result<Option<(String, String)>, InstallError> {
+    let Ok(ca) = fs::read_to_string(ZOT_CA_FILE) else {
+        return Ok(None);
+    };
+    Ok(kubectl
+        .get("service", "zot", Some("zot"))?
+        .and_then(|s| s.pointer("/spec/clusterIP")?.as_str().map(str::to_owned))
+        .filter(|ip| ip != "None")
+        .map(|ip| (ip, ca)))
 }
 
 fn internal_ip(node: &Value) -> Option<String> {
@@ -366,6 +400,7 @@ mod tests {
             expiry: Some(("2026-10-23T09:00:00Z", "abcdef")),
             single_node: Some("/etc/zeabur-installer/config.yaml".to_owned()),
             longhorn: false,
+            zot: None,
         });
         assert_eq!(text, include_str!("../fixtures/node-add.txt"));
     }
@@ -379,6 +414,7 @@ mod tests {
             expiry: None,
             single_node: None,
             longhorn: false,
+            zot: None,
         });
         assert!(!text.contains("node sync"));
     }
@@ -390,6 +426,7 @@ mod tests {
             Role::Worker,
             "K10aa::abcdef.0123456789abcdef",
             false,
+            None,
         );
         assert_eq!(text, include_str!("../fixtures/node-add-worker.txt"));
         let yaml = text
@@ -403,6 +440,32 @@ mod tests {
     }
 
     #[test]
+    fn a_cluster_with_zot_gives_the_new_node_its_mirror() {
+        let ca = "-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----\n";
+        let text = commands(
+            "https://10.0.0.5:9345",
+            Role::Worker,
+            "K10aa::abcdef.0123456789abcdef",
+            false,
+            Some(("10.43.0.50", ca)),
+        );
+        let yaml = text
+            .split_once("<<'EOF'\n")
+            .and_then(|(_, rest)| rest.split_once("EOF\n"))
+            .map(|(yaml, _)| yaml)
+            .unwrap();
+        let hash = "a".repeat(64);
+        let Ok(Document::Join(config)) =
+            Document::parse(&yaml.replace("K10aa", &format!("K10{hash}")))
+        else {
+            panic!("not a join: {yaml}");
+        };
+        let zot = config.join.zot.unwrap();
+        assert_eq!(zot.cluster_ip.to_string(), "10.43.0.50");
+        assert_eq!(zot.ca, ca);
+    }
+
+    #[test]
     fn a_cluster_with_longhorn_prepares_the_new_node() {
         let text = instructions(&Instructions {
             server: "https://10.0.1.10:9345",
@@ -411,6 +474,7 @@ mod tests {
             expiry: Some(("2026-10-23T09:00:00Z", "abcdef")),
             single_node: None,
             longhorn: true,
+            zot: None,
         });
         assert!(text.contains("The cluster runs Longhorn"), "{text}");
         assert!(!text.contains("default local-path storage class"), "{text}");
