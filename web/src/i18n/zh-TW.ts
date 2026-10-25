@@ -2533,8 +2533,16 @@ export const zhTW: Messages = {
   "db.noRedundancy": (backedUp: boolean) =>
     `只有一個執行個體：它故障時沒有其他執行個體接手，資料也只在一個磁碟區上。${backedUp ? "" : "請設定備份。"}`,
   "db.replicaSetHint": "副本集有三個執行個體時，壞掉一個也能繼續運作。",
-  "db.kernelBlocked": (versions: string) =>
-    `這個叢集的節點核心是 Linux 6.19 以上，${versions} 無法在上面啟動。`,
+  "db.rseq.new":
+    "這個叢集有節點使用 Linux 6.19 以上的核心，MongoDB 8 要改一項記憶體設定才能在上面啟動。Zeabur 會幫你改好，效能可能會稍微低一點。",
+  "db.rseq.set":
+    "這個叢集有節點使用 Linux 6.19 以上的核心，MongoDB 8 要改一項記憶體設定才能在上面啟動。Zeabur 已經幫你改好，這個 MongoDB 的效能可能會稍微低一點。",
+  "db.rseq.missing":
+    "這個叢集有節點使用 Linux 6.19 以上的核心，MongoDB 8 要改一項記憶體設定才能在上面啟動。這個 MongoDB 還沒改，在這些節點上無法啟動。改了之後，效能可能會稍微低一點。",
+  "db.rseq.fix": "修改設定",
+  "db.rseq.plan": (name) => `修改 ${name} 的記憶體設定`,
+  "db.rseq.said": (name) =>
+    `${name} 會套用新設定（GLIBC_TUNABLES=glibc.pthread.rseq=1），一次重新啟動一個執行個體。`,
   "db.onOneNode": "這個叢集只有一個節點，所以預設一個執行個體。",
   "db.planCreate": (name) => `建立資料庫 ${name}`,
   "db.noOperator": "要建立資料庫，請先安裝資料庫元件。",

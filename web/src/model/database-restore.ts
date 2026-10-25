@@ -7,6 +7,7 @@ import {
   APP_DATABASE,
   APP_SECRET,
   newPassword,
+  perThreadCaches,
   splitDestination,
   type Database,
 } from "@/model/databases"
@@ -108,6 +109,7 @@ function restoreMongodb({ source, point, name, spec, store, object }: Restoring)
   const secrets = (spec.secrets as Manifest | undefined) ?? {}
   spec.backup = { ...backup, tasks: [] }
   spec.secrets = { ...secrets, users: secrets.users ?? `${source.name}-secrets` }
+  perThreadCaches(spec, source.version)
   return [
     create(object),
     create({

@@ -137,6 +137,27 @@ describe("restoring into a new database", () => {
     })
   })
 
+  test("a copy of a MongoDB 8 keeps rseq in glibc", () => {
+    const mongo = base({
+      engine: "mongodb",
+      apiVersion: "psmdb.percona.com/v1",
+      kind: "PerconaServerMongoDB",
+      backups: { schedules: [], runs: [], ready: true, store: { name: "backups", inUse: true } },
+      object: {
+        metadata: {},
+        spec: {
+          image: "percona/percona-server-mongodb:8.0.32-14",
+          replsets: [{ name: "rs0", size: 1 }],
+          backup: { enabled: true, storages: { backups: { s3: {} } } },
+        },
+      } as unknown as Database["object"],
+    })
+    const [cluster] = bodies(restoreChanges(mongo, point, "copy", "demo"))
+    expect(cluster?.spec.replsets[0].env).toEqual([
+      { name: "GLIBC_TUNABLES", value: "glibc.pthread.rseq=1" },
+    ])
+  })
+
   test("MySQL restores to the backup's time, reading the same bucket and the same app Secret", () => {
     const mysql = base({
       engine: "mysql",

@@ -135,24 +135,83 @@ export interface NewDatabase {
   size: SizePreset
 }
 
-/** `version`, or the newest version the kernels allow when they refuse it. */
-export function allowedVersion(engine: Engine, version: string, blocked: string[]): string {
-  if (!blocked.includes(version)) return version
-  return versions[engine].find((v) => !blocked.includes(v.label))?.label ?? version
+/** Linux 6.19 or later. Ubuntu's `7.0.0-38-generic` is 7.0. */
+export function kernel619OrLater(kernel: string): boolean {
+  const match = /^\D*(\d+)\.(\d+)/.exec(kernel)
+  if (!match) return false
+  const [major, minor] = [Number(match[1]), Number(match[2])]
+  return major > 6 || (major === 6 && minor >= 19)
+}
+
+/** MongoDB 8 or later, from a version label (`8.0`), a version (`8.0.32-14`) or an image. */
+function mongo8OrLater(version: string | null | undefined): boolean {
+  const match = /(?:^|:)(\d+)\./.exec(version ?? "")
+  return match ? Number(match[1]) >= 8 : false
+}
+
+// Percona's image sets glibc.pthread.rseq=0 for TCMalloc's per-CPU caches. mongod 8 does not
+// start with them on Linux 6.19 and later; with rseq=1 TCMalloc uses per-thread caches.
+// https://jira.mongodb.org/browse/SERVER-121912
+const TUNABLES = "GLIBC_TUNABLES"
+const RSEQ = "glibc.pthread.rseq"
+const PER_THREAD = `${RSEQ}=1`
+
+/** `env` with `GLIBC_TUNABLES` set to keep rseq in glibc; other tunables stay. */
+function withPerThreadCaches(env: Manifest[] = []): Manifest[] {
+  const current = env.find((e) => e.name === TUNABLES)
+  if (!current) return [...env, { name: TUNABLES, value: PER_THREAD }]
+  const others = typeof current.value === "string" ? current.value.split(":") : []
+  const value = [...others.filter((t) => t && !t.startsWith(`${RSEQ}=`)), PER_THREAD].join(":")
+  return env.map((e) => (e === current ? { name: TUNABLES, value } : e))
+}
+
+const hasPerThreadCaches = (replset: Manifest) =>
+  ((replset.env as Manifest[] | undefined) ?? []).some(
+    (e) =>
+      e.name === TUNABLES && typeof e.value === "string" && e.value.split(":").includes(PER_THREAD),
+  )
+
+/** Each replica set of a MongoDB 8 `PerconaServerMongoDB` spec with per-thread caches;
+ * `version` counts when the spec names no image. */
+export function perThreadCaches(spec: Manifest, version?: string | null) {
+  if (!mongo8OrLater((spec.image as string | undefined) ?? version)) return
+  const replsets = (spec.replsets as Manifest[] | undefined) ?? []
+  spec.replsets = replsets.map((r) =>
+    hasPerThreadCaches(r) ? r : { ...r, env: withPerThreadCaches(r.env as Manifest[]) },
+  )
+}
+
+/** Whether a new database of `form` gets the note: MongoDB 8 where a node runs Linux 6.19+. */
+export const kernelNoteForNew = (
+  form: Pick<NewDatabase, "engine" | "version">,
+  kernels: string[],
+) => form.engine === "mongodb" && mongo8OrLater(form.version) && kernels.some(kernel619OrLater)
+
+/** The note a MongoDB 8 gets where a node runs Linux 6.19+: the setting is there, or missing. */
+export function kernelNote(database: Database, kernels: string[]): "set" | "missing" | undefined {
+  if (database.engine !== "mongodb" || !mongo8OrLater(database.version ?? database.image)) return
+  if (!kernels.some(kernel619OrLater)) return
+  const spec = (database.object as Manifest & { spec?: Manifest }).spec ?? {}
+  const replsets = (spec.replsets as Manifest[] | undefined) ?? []
+  return replsets.every(hasPerThreadCaches) ? "set" : "missing"
+}
+
+/** The edit that gives an existing MongoDB 8 per-thread caches. */
+export function addPerThreadCaches(database: Database): Change[] {
+  const object = structuredClone(database.object) as Manifest & { spec?: Manifest }
+  perThreadCaches((object.spec ??= {}), database.version ?? database.image)
+  const { group, version, resource } = databaseAddress(database)
+  return [
+    {
+      op: "edit",
+      resource: { group, version, resource },
+      name: database.name,
+      yaml: JSON.stringify(object),
+    },
+  ]
 }
 
 /** Defaults for the form: one member on a single node, else three. */
-/** Versions that do not start on these kernels: MongoDB 8 refuses Linux 6.19 and newer
- * (https://jira.mongodb.org/browse/SERVER-121912). */
-export function blockedVersions(engine: Engine, kernels: string[]): string[] {
-  if (engine !== "mongodb") return []
-  const tooNew = kernels.some((kernel) => {
-    const [major = 0, minor = 0] = kernel.split(/[.-]/).map(Number)
-    return major > 6 || (major === 6 && minor >= 19)
-  })
-  return tooNew ? versions.mongodb.filter((v) => v.label.startsWith("8.")).map((v) => v.label) : []
-}
-
 const defaults: Record<Engine, { name: string; storage: string; quorum: boolean }> = {
   postgresql: { name: "postgres", storage: "5Gi", quorum: false },
   mongodb: { name: "mongodb", storage: "10Gi", quorum: true },
@@ -161,12 +220,12 @@ const defaults: Record<Engine, { name: string; storage: string; quorum: boolean 
   dragonfly: { name: "dragonfly", storage: "2Gi", quorum: false },
 }
 
-export function newDatabase(engine: Engine, nodes: number, blocked: string[] = []): NewDatabase {
+export function newDatabase(engine: Engine, nodes: number): NewDatabase {
   const d = defaults[engine]
   return {
     engine,
     name: d.name,
-    version: versions[engine].find((v) => !blocked.includes(v.label))?.label ?? "",
+    version: versions[engine][0]?.label ?? "",
     members: d.quorum && nodes > 1 ? 3 : 1,
     storage: d.storage,
     size: "small",
@@ -265,7 +324,7 @@ const BUILD: Record<Engine, Build> = {
     }
   },
   mongodb: (form, image, resources) => {
-    return {
+    const object = {
       apiVersion: "psmdb.percona.com/v1",
       kind: "PerconaServerMongoDB",
       // The operator deletes the data claims with the cluster, as CloudNativePG does.
@@ -296,6 +355,8 @@ const BUILD: Record<Engine, Build> = {
         backup: { enabled: false, image: PBM_IMAGE },
       },
     }
+    perThreadCaches(object.spec)
+    return object
   },
   mysql: (form, image, resources) => {
     // MOCO's images run as 10000. The annotations name the database and Secret that the

@@ -2735,8 +2735,16 @@ export const en = {
   "db.noRedundancy": (backedUp: boolean) =>
     `One instance: nothing takes over if it fails, and its data is on one volume.${backedUp ? "" : " Set up backups."}`,
   "db.replicaSetHint": "With three instances, a replica set keeps running when one fails.",
-  "db.kernelBlocked": (versions: string) =>
-    `This cluster's nodes run Linux 6.19 or newer, where ${versions} does not start.`,
+  "db.rseq.new":
+    "This cluster has nodes on Linux 6.19 or later, where MongoDB 8 starts only with a memory setting changed. Zeabur changes it for you, so MongoDB may run a little slower.",
+  "db.rseq.set":
+    "This cluster has nodes on Linux 6.19 or later, where MongoDB 8 starts only with a memory setting changed. Zeabur changed it, so this MongoDB may run a little slower.",
+  "db.rseq.missing":
+    "This cluster has nodes on Linux 6.19 or later, where MongoDB 8 starts only with a memory setting changed. This MongoDB does not have it yet and cannot start on those nodes. With it, MongoDB may run a little slower.",
+  "db.rseq.fix": "Change setting",
+  "db.rseq.plan": (name: string) => `Change the memory setting of ${name}`,
+  "db.rseq.said": (name: string) =>
+    `${name} takes the new setting (GLIBC_TUNABLES=glibc.pthread.rseq=1) and restarts one instance at a time.`,
   "db.onOneNode": "This cluster has one node, so one instance.",
   "db.planCreate": (name: string) => `Create database ${name}`,
   "db.noOperator": "To create databases, install a database component.",

@@ -4,20 +4,22 @@ import { actionOf, describe as describePlan } from "@/components/plan/describe"
 import type { Translate } from "@/i18n"
 
 import {
-  allowedVersion,
   backUpNow,
   backUpNowSummary,
   backupName,
   backupsSummary,
   canBackUpNow,
-  blockedVersions,
   commands,
   connectionUri,
   createDatabase,
   databaseAddress,
   deleteDatabase,
+  addPerThreadCaches,
   eventsOf,
   enableBackups,
+  kernel619OrLater,
+  kernelNote,
+  kernelNoteForNew,
   nameProblem,
   newBackupTarget,
   newDatabase,
@@ -104,20 +106,6 @@ describe("a new database", () => {
     expect(newDatabase("mongodb", 3).members).toBe(3)
   })
 
-  test("MongoDB 8 is not offered on Linux 6.19 and newer", () => {
-    expect(blockedVersions("mongodb", ["6.8.0-45-generic"])).toEqual([])
-    expect(blockedVersions("mongodb", ["6.8.0-45-generic", "6.19.2"])).toEqual(["8.0"])
-    expect(blockedVersions("mongodb", ["7.0.0-38-generic"])).toEqual(["8.0"])
-    expect(blockedVersions("postgresql", ["7.0.0-38-generic"])).toEqual([])
-    expect(newDatabase("mongodb", 1, ["8.0"]).version).toBe("7.0")
-  })
-
-  test("a version the kernels refuse moves to one they allow, as nodes load after the form", () => {
-    expect(allowedVersion("mongodb", "8.0", ["8.0"])).toBe("7.0")
-    expect(allowedVersion("mongodb", "8.0", [])).toBe("8.0")
-    expect(allowedVersion("mongodb", "7.0", ["8.0"])).toBe("7.0")
-  })
-
   test("PostgreSQL is a Cluster with the chosen image, size and resources", () => {
     const [change] = createDatabase({ ...newDatabase("postgresql", 1), name: "db", version: "17" })
     expect(change).toEqual({
@@ -191,6 +179,64 @@ describe("a new database", () => {
     const { requests, limits } = presetResources.postgresql.small
     expect(presetOf("postgresql", { limits, requests })).toBe("small")
     expect(presetOf("mongodb", { requests: { cpu: "3" } })).toBeUndefined()
+  })
+})
+
+const mongodEnv = (changes: unknown[]) =>
+  (changes[0] as { object: { spec: { replsets: { env?: unknown }[] } } }).object.spec.replsets[0]
+    ?.env
+
+describe("MongoDB 8 on Linux 6.19 and later", () => {
+  test("kernels from 6.19 on count, whatever the distribution appends", () => {
+    expect(kernel619OrLater("6.19.2")).toBe(true)
+    expect(kernel619OrLater("7.0.0-38-generic")).toBe(true)
+    expect(kernel619OrLater("10.1")).toBe(true)
+    expect(kernel619OrLater("6.18.9-arch1-1")).toBe(false)
+    expect(kernel619OrLater("6.8.0-45-generic")).toBe(false)
+    expect(kernel619OrLater("6.12.48+deb13-arm64")).toBe(false)
+    expect(kernel619OrLater("")).toBe(false)
+  })
+
+  test("a new MongoDB 8 keeps rseq in glibc on every kernel; MongoDB 7 is left alone", () => {
+    const eight = createDatabase({ ...newDatabase("mongodb", 1), version: "8.0" })
+    expect(mongodEnv(eight)).toEqual([{ name: "GLIBC_TUNABLES", value: "glibc.pthread.rseq=1" }])
+    const seven = createDatabase({ ...newDatabase("mongodb", 1), version: "7.0" })
+    expect(mongodEnv(seven)).toBeUndefined()
+  })
+
+  test("the form notes it only for MongoDB 8 with a node on Linux 6.19 or later", () => {
+    const form = { engine: "mongodb" as const, version: "8.0" }
+    expect(kernelNoteForNew(form, ["6.12.48+deb13-arm64", "7.0.0-38-generic"])).toBe(true)
+    expect(kernelNoteForNew(form, ["6.12.48+deb13-arm64"])).toBe(false)
+    expect(kernelNoteForNew({ ...form, version: "7.0" }, ["7.0.0-38-generic"])).toBe(false)
+    expect(kernelNoteForNew({ engine: "postgresql", version: "18" }, ["7.0.0-38-generic"])).toBe(
+      false,
+    )
+  })
+
+  const eight = { ...mongo, version: "8.0.32-14" }
+
+  test("an existing MongoDB 8 without the setting gets a fix that adds it", () => {
+    expect(kernelNote(eight, ["6.12.48+deb13-arm64"])).toBeUndefined()
+    expect(kernelNote(eight, ["7.0.0-38-generic"])).toBe("missing")
+    expect(kernelNote({ ...mongo, version: "7.0.43-23" }, ["7.0.0-38-generic"])).toBeUndefined()
+    const [change] = addPerThreadCaches(eight) as { yaml: string }[]
+    const fixed = { ...eight, object: JSON.parse(change?.yaml ?? "{}") as Database["object"] }
+    expect(kernelNote(fixed, ["7.0.0-38-generic"])).toBe("set")
+  })
+
+  test("the fix keeps other glibc tunables", () => {
+    const tuned = structuredClone(eight)
+    const spec = (tuned.object as unknown as { spec: { replsets: Record<string, unknown>[] } }).spec
+    spec.replsets[0] = {
+      ...spec.replsets[0],
+      env: [{ name: "GLIBC_TUNABLES", value: "glibc.malloc.arena_max=2:glibc.pthread.rseq=0" }],
+    }
+    const [change] = addPerThreadCaches(tuned) as { yaml: string }[]
+    const env = JSON.parse(change?.yaml ?? "{}").spec.replsets[0].env
+    expect(env).toEqual([
+      { name: "GLIBC_TUNABLES", value: "glibc.malloc.arena_max=2:glibc.pthread.rseq=1" },
+    ])
   })
 })
 
