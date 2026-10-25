@@ -248,6 +248,32 @@
     - click: '#backup-list li:has(form) [data-slot="select-trigger"]'
     - click: '[role="option"]:not([aria-selected="true"])'
   clip: '#backup-list li:has(form)'
+- id: backup-restore-deleted
+  path: /cluster/backups
+  wait: '#backup-list'
+  steps:
+    - click: '#backup-list li:nth-child(3) button[aria-expanded]'
+    - wait: '#backup-list li form[aria-busy="false"]'
+    - click: '#backup-list li:has(form) [data-slot="select-trigger"]'
+    - click: '[role="option"]:last-child'
+  clip: '#backup-list li:has(form)'
+- id: backup-restore-plan
+  path: /cluster/backups
+  wait: '#backup-list'
+  steps:
+    - click: '#backup-list li:nth-child(3) button[aria-expanded]'
+    - click: '#backup-list li:has(form) [data-slot="select-trigger"]'
+    - click: '[role="option"]:not([aria-selected="true"])'
+    - click: '#backup-list li:has(form) button[type="submit"]'
+    - wait: '[data-slot="dialog-content"] [data-slot="collapsible-trigger"]'
+  clip: '[data-slot="dialog-content"]'
+- id: backup-attach
+  path: /cluster/backups
+  wait: '#restore-list'
+  steps:
+    - click: '#restore-list [data-testid="attach-domains"]'
+    - wait: '[data-slot="dialog-content"] [data-slot="collapsible-trigger"]'
+  clip: '[data-slot="dialog-content"]'
 # Maintenance mode of one domain (docs/zh-TW/configure/maintenance.mdx).
 - id: domain-pages-open
   path: /projects/shop/services/Deployment/web?tab=networking
