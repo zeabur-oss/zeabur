@@ -45,7 +45,7 @@ export function YamlBlock({
       className={cn("relative min-w-0 rounded-lg border bg-muted/30", className)}
     >
       <CopyButton value={yaml} className="absolute top-2 right-2 z-10" />
-      <pre className="overflow-x-auto py-3 font-mono text-xs leading-5" translate="no">
+      <pre className="mr-11 overflow-x-auto py-3 font-mono text-xs leading-5" translate="no">
         <code className="flex flex-col">
           {rows.map((text, index) => {
             const hit = marked?.test(text)
@@ -55,7 +55,7 @@ export function YamlBlock({
                 key={index}
                 ref={hit ? scrollTo : undefined}
                 data-highlight={hit ? "" : undefined}
-                className={cn("flex pr-12", hit && "bg-brand-soft")}
+                className={cn("flex pr-3", hit && "bg-brand-soft")}
               >
                 <span
                   aria-hidden="true"
