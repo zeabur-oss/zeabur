@@ -8,7 +8,6 @@ type PageRight =
   | "testNotifications"
   | "changeClusterNotifications"
   | "testClusterNotifications"
-  | "changeIssuers"
   | "changeDomainSuffixes"
   | "changeS3Destinations"
   | "changeGitHubApp"
@@ -44,7 +43,6 @@ const rules: Record<Right, { role: NeededRole; rule: string }> = {
   changeNodes: { role: "admin", rule: "patch nodes" },
   changeBackups: { role: "admin", rule: "create schedules.velero.io" },
   restoreBackups: { role: "admin", rule: "create restores.velero.io" },
-  changeIssuers: { role: "admin", rule: "create clusterissuers.cert-manager.io" },
   changeDomainSuffixes: { role: "admin", rule: "patch configmaps/zeabur-settings" },
   changeNotifications: {
     role: "developer",
@@ -123,7 +121,6 @@ const clusterOnly: Record<keyof ClusterRights, true> = {
 
 const notProject: Record<Exclude<Right, keyof ProjectRights>, true> = {
   ...clusterOnly,
-  changeIssuers: true,
   changeDomainSuffixes: true,
   changeNotifications: true,
   testNotifications: true,

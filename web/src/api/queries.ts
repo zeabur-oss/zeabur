@@ -333,15 +333,6 @@ export const clusterIssuersQuery = queryOptions({
   retryOnMount: false,
 })
 
-/** What creating or changing a DNS-01 issuer writes, and the token; writes nothing. */
-export async function planClusterIssuer(request: Schemas["IssuerRequest"], signal?: AbortSignal) {
-  return unwrap(await api.POST("/api/v1/cluster/issuers/plan", { body: request, signal }))
-}
-
-export async function applyClusterIssuer(token: string) {
-  return unwrap(await api.POST("/api/v1/cluster/issuers/apply", { body: { token } }))
-}
-
 /** The dates of the certificate in a project's `kubernetes.io/tls` Secret; never its key. */
 export const certificateDatesQuery = (project: string, secret: string) =>
   queryOptions({

@@ -81,7 +81,53 @@ description: 將網域接到服務，設定 HTTPS 憑證、轉址與訪客密碼
 
 選 **由簽發者簽發，自動更新**，指定 **簽發者**，按 **加入變更**。同一個 Ingress 的網域共用一個簽發者，所以改了以後，面板列出的其他網域也會改由這個簽發者簽發。
 
-萬用字元網域顯示需要 DNS-01 時，請叢集管理員到 **叢集** → **概覽** 的 **憑證** 按 **新增 DNS-01 簽發者**，選擇 DNS 服務商並填入權杖或金鑰，再回到網域選它。
+萬用字元網域顯示需要 DNS-01 時，請叢集管理員照[下一節](#建立萬用字元網域的簽發者)建立簽發者，再回到網域選它。
+
+### 建立萬用字元網域的簽發者
+
+Let's Encrypt 只支援透過 DNS-01 驗證簽發萬用字元憑證。叢集管理員需要用 `kubectl` 建立 DNS-01 簽發者，讓 cert-manager 的 DNS-01 solver 使用 DNS 供應商的 API token 完成驗證。Token 只放在叢集裡的 Secret，Zeabur 不經手；**叢集** → **概覽** 的 **憑證** 只列出簽發者和狀態，不能新增。
+
+以下以 Cloudflare 為例。先建立 API token，將 DNS 編輯權限限制在要使用的那個 zone，再把下方的佔位符換成你的 token：
+
+```sh
+kubectl -n cert-manager create secret generic cloudflare-dns \
+  --from-literal=api-token='<只能編輯這個 zone 的 token>'
+```
+
+Secret 必須放在 `cert-manager` namespace。`ClusterIssuer` 只會讀取 cert-manager 設定的 *cluster resource namespace* 裡的 Secret；這裡使用的是 `cert-manager`。
+
+接著建立 `letsencrypt-dns` 簽發者。請將 `you@example.com` 換成你的聯絡信箱：
+
+```sh
+kubectl apply -f - <<'EOF'
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-dns
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: you@example.com
+    privateKeySecretRef:
+      name: letsencrypt-dns-account-key
+    solvers:
+      - dns01:
+          cloudflare:
+            apiTokenSecretRef:
+              name: cloudflare-dns
+              key: api-token
+EOF
+```
+
+建立後，確認簽發者的狀態：
+
+```sh
+kubectl get clusterissuer letsencrypt-dns
+```
+
+等 `READY` 顯示 `True`，回到 Zeabur 的**叢集** → **概覽** 的 **憑證**，就會看到 `letsencrypt-dns` 和它的就緒狀態。設定萬用字元網域時，在 **簽發者** 選擇 `letsencrypt-dns`。
+
+如果使用 Route 53、Cloud DNS、DigitalOcean 或 Azure DNS 等其他供應商，請換成對應的 solver，並依照 [cert-manager 的 DNS-01 文件](https://cert-manager.io/docs/configuration/acme/dns01/)設定憑證與權限。
 
 ### 上傳自己的憑證
 

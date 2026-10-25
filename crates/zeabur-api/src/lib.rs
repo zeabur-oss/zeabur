@@ -221,8 +221,6 @@ fn cluster_routes(router: OpenApiRouter<AppState>) -> OpenApiRouter<AppState> {
         .routes(routes!(cluster::backups::apply))
         .routes(routes!(cluster::backup_download::download))
         .routes(routes!(cluster::issuers::get))
-        .routes(routes!(cluster::issuers::plan))
-        .routes(routes!(cluster::issuers::apply))
         .routes(routes!(cluster::s3_destinations::get))
         .routes(routes!(cluster::s3_destinations::plan))
         .routes(routes!(cluster::s3_destinations::apply))

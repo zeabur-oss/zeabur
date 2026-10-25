@@ -22,7 +22,6 @@ mod files;
 mod github_app;
 mod images;
 mod incidents;
-mod issuers;
 mod log_history;
 mod maintenance;
 mod members;

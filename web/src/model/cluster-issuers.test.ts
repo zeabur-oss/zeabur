@@ -1,15 +1,7 @@
 import { describe, expect, test } from "bun:test"
 
 import type { Schemas } from "@/api/client"
-import {
-  canIssue,
-  certificateNow,
-  issuerForm,
-  issuerProblems,
-  issuerRequest,
-  pemProblems,
-  solverLabel,
-} from "@/model/cluster-issuers"
+import { canIssue, certificateNow, pemProblems, solverLabel } from "@/model/cluster-issuers"
 
 const route = (patch: Partial<Schemas["Route"]> = {}): Schemas["Route"] =>
   ({
@@ -19,43 +11,6 @@ const route = (patch: Partial<Schemas["Route"]> = {}): Schemas["Route"] =>
     origin: { kind: "Ingress", name: "shop" },
     ...patch,
   }) as Schemas["Route"]
-
-describe("issuer form", () => {
-  test("a new issuer needs its secret; a changed one keeps it when blank", () => {
-    const form = issuerForm()
-    expect(issuerProblems(form, false)).toEqual(["secret"])
-    expect(issuerProblems(form, true)).toEqual([])
-  })
-
-  test("a provider's plain fields are required, an optional one is not", () => {
-    const form = { ...issuerForm(), provider: "route53" as const, values: { region: "us-east-1" } }
-    expect(issuerProblems(form, true)).toEqual(["field"])
-    const filled = { ...form, values: { region: "us-east-1", accessKeyId: "AKIA" } }
-    expect(issuerProblems(filled, true)).toEqual([])
-  })
-
-  test("the request sends only the chosen provider's fields", () => {
-    const form = {
-      ...issuerForm(),
-      values: { apiToken: " token ", region: "left over" },
-    }
-    expect(issuerRequest(form).dns).toEqual({ provider: "cloudflare", apiToken: "token" })
-  })
-
-  test("an issuer the form can change reads back with its settings", () => {
-    const form = issuerForm({
-      name: "letsencrypt-dns",
-      solvers: ["dns01:route53"],
-      staging: true,
-      wildcards: true,
-      ready: "ready",
-      dns: { provider: "route53", region: "eu-west-1", accessKeyId: "AKIA", secretAccessKey: "" },
-    })
-    expect(form.provider).toBe("route53")
-    expect(form.staging).toBe(true)
-    expect(form.values.region).toBe("eu-west-1")
-  })
-})
 
 test("solvers read as people write them", () => {
   expect(solverLabel("http01")).toBe("HTTP-01")

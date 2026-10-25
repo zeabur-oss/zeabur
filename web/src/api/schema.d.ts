@@ -419,51 +419,10 @@ export interface paths {
       path?: never
       cookie?: never
     }
-    /**
-     * The `ClusterIssuers`, each with its `Ready` condition and, where the form can change it, its
-     *     DNS provider's settings without the secret. Read as the person.
-     */
+    /** The `ClusterIssuers`, each with its `Ready` condition. Read as the person. */
     get: operations["getClusterIssuers"]
     put?: never
     post?: never
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  "/api/v1/cluster/issuers/apply": {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    get?: never
-    put?: never
-    /** Carries out an issuer plan by its token: checks it, dry-runs every write, then writes. */
-    post: operations["applyClusterIssuer"]
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  "/api/v1/cluster/issuers/plan": {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    get?: never
-    put?: never
-    /**
-     * Works out what creating or changing a Let's Encrypt `ClusterIssuer` with a DNS-01 solver
-     *     writes, and a token to apply it; writes nothing. The provider's token never appears in the
-     *     answer.
-     */
-    post: operations["planClusterIssuer"]
     delete?: never
     options?: never
     head?: never
@@ -3409,8 +3368,6 @@ export interface components {
     }
     /** @description The cluster's `ClusterIssuers`. */
     ClusterIssuers: {
-      /** @description Whether the person may create `ClusterIssuers`. */
-      canChange: components["schemas"]["Permission"]
       /** @description The issuer a new domain gets when none is chosen. */
       default?: string | null
       /** @description The issuers, by name. */
@@ -4221,56 +4178,6 @@ export interface components {
        */
       usedBytes: number
     }
-    /** @description A DNS provider's settings for a DNS-01 solver. A blank secret field keeps the Secret's value. */
-    Dns01Provider:
-      | {
-          /** @description The API token. */
-          apiToken?: string
-          /** @enum {string} */
-          provider: "cloudflare"
-        }
-      | {
-          /** @description The access key ID. */
-          accessKeyId: string
-          /** @description The hosted zone; empty to let cert-manager find it. */
-          hostedZoneId?: string
-          /** @enum {string} */
-          provider: "route53"
-          /** @description The region. */
-          region: string
-          /** @description The secret access key. */
-          secretAccessKey?: string
-        }
-      | {
-          /** @description The Google Cloud project. */
-          project: string
-          /** @enum {string} */
-          provider: "cloudDns"
-          /** @description The service account's JSON key. */
-          serviceAccountJson?: string
-        }
-      | {
-          /** @enum {string} */
-          provider: "digitalocean"
-          /** @description The API token. */
-          token?: string
-        }
-      | {
-          /** @description The service principal's client ID. */
-          clientId: string
-          /** @description Its client secret. */
-          clientSecret?: string
-          /** @description The zone. */
-          hostedZoneName: string
-          /** @enum {string} */
-          provider: "azureDns"
-          /** @description The resource group of the zone. */
-          resourceGroupName: string
-          /** @description The subscription. */
-          subscriptionId: string
-          /** @description The tenant. */
-          tenantId: string
-        }
     /**
      * @description Whether a domain's DNS sends it to the cluster, as looked up from where Zeabur runs.
      * @enum {string}
@@ -5376,70 +5283,20 @@ export interface components {
       /** @description Who it enrols a passkey for. */
       username: string
     }
-    /** @description A Let's Encrypt `ClusterIssuer` with a DNS-01 solver, to create or change. */
-    IssuerRequest: {
-      /** @description The DNS provider. */
-      dns: components["schemas"]["Dns01Provider"]
-      /** @description Where Let's Encrypt sends expiry notices; may be empty. */
-      email?: string
-      /** @description The `ClusterIssuer`'s name. */
-      name: string
-      /** @description Use Let's Encrypt's staging server, whose certificates browsers do not trust. */
-      staging?: boolean
-    }
     /** @description One `ClusterIssuer`. */
     IssuerView: {
-      dns?: components["schemas"]["Dns01Provider"] | null
-      /** @description Its email. */
-      email?: string | null
       /** @description The condition's message. */
       message?: string | null
       /** @description Its name. */
       name: string
       /** @description Its `Ready` condition. */
       ready: components["schemas"]["Readiness"]
-      /** @description The ACME server; absent for a CA, Vault or self-signed issuer. */
-      server?: string | null
       /** @description Its challenge solvers: `http01`, or `dns01` with the provider, as `dns01:cloudflare`. */
       solvers: string[]
       /** @description It uses Let's Encrypt's staging server. */
       staging: boolean
       /** @description It can issue wildcard certificates. */
       wildcards: boolean
-    }
-    /** @description What an issuer plan writes. */
-    IssuerWrite: {
-      /** @description `create` or `patch`. */
-      action: string
-      /** @description The object as it will be, YAML; a Secret's value is not in it. */
-      afterYaml: string
-      /** @description The object as it is, YAML; absent for a creation. */
-      beforeYaml?: string | null
-      /** @description The object's kind. */
-      kind: string
-      /** @description Its name. */
-      name: string
-      /** @description Its namespace; empty for the `ClusterIssuer`. */
-      namespace: string
-    }
-    /** @description What an apply wrote. */
-    IssuersApplied: {
-      /** @description The objects written, `Kind/name`. */
-      written: string[]
-    }
-    /** @description The token of a plan to apply. */
-    IssuersApply: {
-      /** @description The token `plan` returned. */
-      token: string
-    }
-    /** @description An issuer plan, and the token that applies it. */
-    IssuersPlan: {
-      /** @description When the token stops working, RFC 3339. */
-      expiresAt: string
-      /** @description Send this to `apply` to carry out exactly this plan. */
-      token: string
-      /** @description The writes, in order; empty when nothing changes. */
-      writes: components["schemas"]["IssuerWrite"][]
     }
     /** @description A workload's Keel policy. */
     KeelPolicy: {
@@ -10315,100 +10172,6 @@ export interface operations {
         }
       }
       401: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          "application/problem+json": components["schemas"]["Problem"]
-        }
-      }
-    }
-  }
-  applyClusterIssuer: {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["IssuersApply"]
-      }
-    }
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          "application/json": components["schemas"]["IssuersApplied"]
-        }
-      }
-      400: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          "application/problem+json": components["schemas"]["Problem"]
-        }
-      }
-      403: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          "application/problem+json": components["schemas"]["Problem"]
-        }
-      }
-      409: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          "application/problem+json": components["schemas"]["Problem"]
-        }
-      }
-      422: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          "application/problem+json": components["schemas"]["Problem"]
-        }
-      }
-    }
-  }
-  planClusterIssuer: {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["IssuerRequest"]
-      }
-    }
-    responses: {
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          "application/json": components["schemas"]["IssuersPlan"]
-        }
-      }
-      403: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          "application/problem+json": components["schemas"]["Problem"]
-        }
-      }
-      422: {
         headers: {
           [name: string]: unknown
         }
