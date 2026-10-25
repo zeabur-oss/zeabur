@@ -17516,7 +17516,7 @@ components:
           type:
           - string
           - "null"
-          description: "`webhook`, `poll`, `manual`, `baseImage` or `replan`."
+          description: "`webhook`, `poll` or `manual`."
 tags:
 - name: identity
   description: Who you are and what you may do

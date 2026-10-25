@@ -831,8 +831,6 @@ export const zhCN: Messages = {
   "builds.trigger.webhook": "推送触发",
   "builds.trigger.poll": "新的提交",
   "builds.trigger.manual": "手动开始",
-  "builds.trigger.baseImage": "基础镜像更新",
-  "builds.trigger.replan": "重新规划",
   "builds.took": (seconds) =>
     seconds < 60 ? `用了 ${seconds} 秒` : `用了 ${Math.floor(seconds / 60)} 分 ${seconds % 60} 秒`,
   "builds.logs": "日志",

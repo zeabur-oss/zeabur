@@ -500,8 +500,6 @@ const triggers = {
   webhook: "builds.trigger.webhook",
   poll: "builds.trigger.poll",
   manual: "builds.trigger.manual",
-  baseImage: "builds.trigger.baseImage",
-  replan: "builds.trigger.replan",
 } as const
 
 function History({ project, runs }: { project: string; runs: BuildRun[] }) {

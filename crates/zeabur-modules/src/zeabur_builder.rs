@@ -180,7 +180,7 @@ pub struct ZeaburBuilderRun {
     pub revision: Option<String>,
     /// The ref the commit came from, such as `refs/heads/master`.
     pub git_ref: Option<String>,
-    /// `webhook`, `poll`, `manual`, `baseImage` or `replan`.
+    /// `webhook`, `poll` or `manual`.
     pub trigger: Option<String>,
     /// `Pending`, `Planning`, `Building`, `Succeeded`, `Failed` or `Cancelled`.
     pub phase: Option<String>,

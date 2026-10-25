@@ -887,8 +887,6 @@ export const en = {
   "builds.trigger.webhook": "Pushed",
   "builds.trigger.poll": "New commit",
   "builds.trigger.manual": "Started by hand",
-  "builds.trigger.baseImage": "Base image changed",
-  "builds.trigger.replan": "Planned again",
   "builds.took": (seconds: number) =>
     seconds < 60 ? `took ${seconds} s` : `took ${Math.floor(seconds / 60)} min ${seconds % 60} s`,
   "builds.logs": "Logs",

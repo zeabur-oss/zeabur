@@ -833,8 +833,6 @@ export const zhTW: Messages = {
   "builds.trigger.webhook": "推送觸發",
   "builds.trigger.poll": "新的提交",
   "builds.trigger.manual": "手動開始",
-  "builds.trigger.baseImage": "基底映像檔更新",
-  "builds.trigger.replan": "重新規劃",
   "builds.took": (seconds) =>
     seconds < 60 ? `花了 ${seconds} 秒` : `花了 ${Math.floor(seconds / 60)} 分 ${seconds % 60} 秒`,
   "builds.logs": "日誌",

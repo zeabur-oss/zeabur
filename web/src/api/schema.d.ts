@@ -9072,7 +9072,7 @@ export interface components {
       started?: string | null
       /** @description The tags pushed. */
       tags: string[]
-      /** @description `webhook`, `poll`, `manual`, `baseImage` or `replan`. */
+      /** @description `webhook`, `poll` or `manual`. */
       trigger?: string | null
     }
   }
