@@ -406,6 +406,7 @@ function UpgradeTag({ installation }: { installation: Schemas["Installation"] })
 
 const sourceKey = {
   k3s: "cluster.sourceK3s",
+  rke2: "cluster.sourceRke2",
   "helm-chart": "cluster.sourceHelmChart",
   helm: "cluster.sourceHelm",
   other: "cluster.sourceOther",

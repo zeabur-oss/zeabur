@@ -4991,7 +4991,7 @@ export interface components {
      * @description How a component was installed.
      * @enum {string}
      */
-    InstallSource: "k3s" | "helm-chart" | "helm" | "other"
+    InstallSource: "k3s" | "rke2" | "helm-chart" | "helm" | "other"
     /** @description One rendering of the install. */
     InstallText: {
       /** @description The form. */
@@ -5012,7 +5012,7 @@ export interface components {
       component: string
       /** @description Its name for people (`Traefik Proxy`). */
       displayName: string
-      /** @description The tool that manages it and upgrades it (`k3s`): never flagged for an upgrade. */
+      /** @description The tool that manages it and upgrades it (`k3s`, `RKE2`): never flagged for an upgrade. */
       managedBy?: string | null
       /** @description How it was installed. */
       source: components["schemas"]["InstallSource"]

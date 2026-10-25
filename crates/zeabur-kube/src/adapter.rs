@@ -692,6 +692,7 @@ impl Cluster for UserClient {
             let mut charts = Vec::new();
             take(k3s_charts?, &mut charts, &mut facts.unreadable);
             facts.k3s_helm_chart_versions = chart_versions(&charts);
+            facts.rke2_packaged_charts = rke2_packaged(&charts);
             facts.k3s_helm_charts = charts
                 .into_iter()
                 .filter_map(|c| {
@@ -864,6 +865,34 @@ fn proxy_path(service: &ServicePort, path_and_query: &str) -> Result<String, Clu
 }
 
 /// The `spec.version` of k3s `HelmChart` objects that name one, by `namespace/name`.
+/// The `HelmChart` objects RKE2 deploys from its own charts, as `namespace/name` → chart URL.
+fn rke2_packaged(charts: &[DynamicObject]) -> BTreeMap<String, String> {
+    charts
+        .iter()
+        .filter_map(|c| {
+            let annotations = c.metadata.annotations.as_ref()?;
+            if annotations
+                .get("rke2.cattle.io/inject-cluster-config")
+                .map(String::as_str)
+                != Some("true")
+            {
+                return None;
+            }
+            Some((
+                format!(
+                    "{}/{}",
+                    c.metadata.namespace.as_deref().unwrap_or_default(),
+                    c.metadata.name.as_deref().unwrap_or_default()
+                ),
+                annotations
+                    .get("helm.cattle.io/chart-url")
+                    .cloned()
+                    .unwrap_or_default(),
+            ))
+        })
+        .collect()
+}
+
 fn chart_versions(charts: &[DynamicObject]) -> BTreeMap<String, String> {
     charts
         .iter()
@@ -932,6 +961,38 @@ async fn releases_and_workloads(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn only_charts_rke2_marks_as_its_own_count_as_rke2_packaged() {
+        let chart = |name: &str, annotations: serde_json::Value| -> DynamicObject {
+            serde_json::from_value(serde_json::json!({
+                "apiVersion": "helm.cattle.io/v1", "kind": "HelmChart",
+                "metadata": {"name": name, "namespace": "kube-system", "annotations": annotations},
+                "spec": {"chartContent": "H4sI"}
+            }))
+            .unwrap()
+        };
+        let charts = [
+            chart(
+                "rke2-metrics-server",
+                serde_json::json!({
+                    "rke2.cattle.io/inject-cluster-config": "true",
+                    "helm.cattle.io/chart-url": "https://rke2-charts.rancher.io/assets/rke2-metrics-server/rke2-metrics-server-3.12.200.tgz"
+                }),
+            ),
+            chart("rke2-traefik", serde_json::json!({})),
+        ];
+        let packaged = rke2_packaged(&charts);
+        assert_eq!(
+            packaged
+                .get("kube-system/rke2-metrics-server")
+                .map(String::as_str),
+            Some(
+                "https://rke2-charts.rancher.io/assets/rke2-metrics-server/rke2-metrics-server-3.12.200.tgz"
+            )
+        );
+        assert!(!packaged.contains_key("kube-system/rke2-traefik"));
+    }
 
     /// How an exec ends when the kubelet sends this status.
     fn ended(json: serde_json::Value) -> ExitStatus {

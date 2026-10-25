@@ -7,6 +7,7 @@
 //! |---|---|---|
 //! | k3s packaged add-on (a `HelmChart` in `kube-system` whose chart is served from `/static/charts/`) | the chart file's name | no: "managed by k3s" |
 //! | k3s packaged manifest (metrics-server on k3s, with no Helm evidence) | not read | no: "managed by k3s" |
+//! | RKE2 packaged chart (a `HelmChart` named `rke2-<name>` with the `rke2.cattle.io/inject-cluster-config` annotation RKE2 puts on its own charts) | the `helm.cattle.io/chart-url` file name | no: "managed by RKE2" |
 //! | k3s `HelmChart` from a repository | `spec.version` | yes |
 //! | Helm (CLI or any tool that sets the label) | the workloads' `helm.sh/chart` label | yes |
 //! | anything else (plain manifests, operators) | not read | no |
@@ -14,7 +15,9 @@
 //! **Add-ons k3s packages are never flagged.** k3s ships Traefik and metrics-server itself and
 //! upgrades them with k3s [k3s-packaged]; its Traefik chart is a k3s build (`41.6.101+up41.6.1`)
 //! that would otherwise look older than the catalogue's `42.1.3`. They are "managed by k3s",
-//! and upgrading k3s is the way to upgrade them.
+//! and upgrading k3s is the way to upgrade them. RKE2 does the same with its `rke2-` charts
+//! (`rke2-traefik`, `rke2-metrics-server`, …), built into each release [rke2-charts]; they are
+//! "managed by RKE2".
 //!
 //! **Helm release Secrets are never decoded.** The chart and its version are inside the encoded
 //! release record; the Secret's `version` label is the release's revision, not the chart's version
@@ -26,6 +29,7 @@
 //! the interface says "tested", never "latest".
 //!
 //! [k3s-packaged]: https://github.com/k3s-io/k3s/tree/main/manifests
+//! [rke2-charts]: https://github.com/rancher/rke2/blob/master/charts/build-chart.sh
 //! [helm-secrets]: https://github.com/helm/helm/blob/main/pkg/storage/driver/util.go
 
 use std::cmp::Ordering;
@@ -42,6 +46,8 @@ use crate::Component;
 pub enum InstallSource {
     /// Packaged and upgraded by k3s.
     K3s,
+    /// Packaged and upgraded by RKE2.
+    Rke2,
     /// A k3s `HelmChart` object installing from a chart repository.
     HelmChart,
     /// A Helm release (found by its workloads' `helm.sh/chart` label).
@@ -81,14 +87,14 @@ pub struct Installation {
     /// The installed chart version, when it can be read.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub version: Option<String>,
-    /// The tool that manages it and upgrades it (`k3s`): never flagged for an upgrade.
+    /// The tool that manages it and upgrades it (`k3s`, `RKE2`): never flagged for an upgrade.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub managed_by: Option<String>,
     /// The chart version the catalogue tested, when it pins one.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tested: Option<String>,
-    /// The installed version against the tested one. Absent when it is managed by k3s or the
-    /// version is not known.
+    /// The installed version against the tested one. Absent when it is managed by k3s or RKE2, or
+    /// the version is not known.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub upgrade: Option<ComponentUpgrade>,
 }
@@ -149,6 +155,18 @@ pub fn installation(
         tested: component.tested_version.clone(),
         upgrade: None,
     };
+    for addon in &component.detection.k3s_addons {
+        let name = format!("rke2-{addon}");
+        if let Some(url) = facts
+            .rke2_packaged_charts
+            .get(&format!("kube-system/{name}"))
+        {
+            found.source = InstallSource::Rke2;
+            found.managed_by = Some("RKE2".to_owned());
+            found.version = packaged_chart_version(url, &name);
+            return found;
+        }
+    }
     for addon in &component.detection.k3s_addons {
         let key = format!("kube-system/{addon}");
         let Some(chart) = facts.k3s_helm_charts.get(&key) else {
@@ -233,6 +251,39 @@ mod tests {
         assert_eq!(found.upgrade, None);
         let metrics = installation(&component("metrics-server"), &facts, Some("k3s"));
         assert_eq!(metrics.managed_by.as_deref(), Some("k3s"));
+        assert_eq!(metrics.upgrade, None);
+    }
+
+    #[test]
+    fn rke2_packaged_charts_are_managed_by_rke2_and_never_flagged() {
+        let mut facts = ClusterFacts {
+            version: "v1.36.5+rke2r1".to_owned(),
+            ..ClusterFacts::default()
+        };
+        facts.rke2_packaged_charts.insert(
+            "kube-system/rke2-traefik".to_owned(),
+            "https://rke2-charts.rancher.io/assets/rke2-traefik/rke2-traefik-39.0.501+up39.0.5.tgz"
+                .to_owned(),
+        );
+        facts
+            .rke2_packaged_charts
+            .insert("kube-system/rke2-metrics-server".to_owned(), String::new());
+        facts.workload_labels.push((
+            "Deployment".to_owned(),
+            [(
+                "helm.sh/chart".to_owned(),
+                "metrics-server-3.12.200".to_owned(),
+            )]
+            .into(),
+        ));
+        let traefik = installation(&component("traefik"), &facts, Some("rke2"));
+        assert_eq!(traefik.source, InstallSource::Rke2);
+        assert_eq!(traefik.managed_by.as_deref(), Some("RKE2"));
+        assert_eq!(traefik.version.as_deref(), Some("39.0.501+up39.0.5"));
+        assert_eq!(traefik.upgrade, None);
+        let metrics = installation(&component("metrics-server"), &facts, Some("rke2"));
+        assert_eq!(metrics.source, InstallSource::Rke2);
+        assert_eq!(metrics.version, None);
         assert_eq!(metrics.upgrade, None);
     }
 

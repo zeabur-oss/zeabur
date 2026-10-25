@@ -431,6 +431,7 @@ export const en = {
   "cluster.testedVersion": "Tested version",
   "cluster.newerThanTested": "Newer than tested",
   "cluster.sourceK3s": "K3s",
+  "cluster.sourceRke2": "RKE2",
   "cluster.sourceHelmChart": "HelmChart",
   "cluster.sourceHelm": "Helm",
   "cluster.sourceOther": "—",

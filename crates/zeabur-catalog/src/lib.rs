@@ -360,6 +360,12 @@ fn evidence(detection: &Detection, facts: &ClusterFacts) -> Vec<String> {
         if facts.k3s_helm_charts.contains_key(&key) {
             found.push(format!("k3s add-on {addon}"));
         }
+        if facts
+            .rke2_packaged_charts
+            .contains_key(&format!("kube-system/rke2-{addon}"))
+        {
+            found.push(format!("RKE2 add-on rke2-{addon}"));
+        }
     }
     for wanted in &detection.workloads {
         if facts.workload_labels.iter().any(|(kind, labels)| {

@@ -401,6 +401,7 @@ export const zhCN: Messages = {
   "cluster.testedVersion": "已测试版本",
   "cluster.newerThanTested": "比已测试版本新",
   "cluster.sourceK3s": "K3s",
+  "cluster.sourceRke2": "RKE2",
   "cluster.sourceHelmChart": "HelmChart",
   "cluster.sourceHelm": "Helm",
   "cluster.sourceOther": "—",
