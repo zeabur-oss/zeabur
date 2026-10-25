@@ -23,10 +23,10 @@ pub const TEMPLATES: &[&str] = &["error-pages"];
 /// The `manifests.yaml` of Zeabur Catalog's `error-pages` template, a Go template whose only field
 /// is `{{ .Namespace }}`: the page server for a project's error pages and maintenance page.
 pub const ERROR_PAGES_MANIFESTS: &str =
-    include_str!("../bundle/templates/error-pages/manifests.yaml");
+    include_str!(concat!(env!("OUT_DIR"), "/bundle/templates/error-pages/manifests.yaml"));
 
 /// The commit of Zeabur Catalog this build carries.
-pub const CATALOGUE_COMMIT: &str = "a0e1cb1d0f5e857459351133d7922cd057a2d19d";
+pub const CATALOGUE_COMMIT: &str = env!("ZEABUR_CATALOG_COMMIT");
 
 /// One component of the catalogue: an upstream project that provides a capability.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
@@ -385,16 +385,24 @@ mod tests {
     #[test]
     fn every_catalogue_file_parses_and_has_a_detection_rule() {
         let components = catalogue().unwrap();
-        // Every file of the bundle is embedded.
-        let bundle = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("bundle/components");
-        let files = std::fs::read_dir(bundle)
+        // Every component of the release's index is embedded.
+        let index: serde_json::Value = serde_json::from_slice(
+            &std::fs::read(concat!(env!("ZEABUR_CATALOG_RELEASE"), "/index.json")).unwrap(),
+        )
+        .unwrap();
+        let mut listed: Vec<&str> = index["components"]
+            .as_array()
             .unwrap()
-            .filter_map(Result::ok)
-            .flat_map(|capability| std::fs::read_dir(capability.path()).unwrap())
-            .filter_map(Result::ok)
-            .filter(|f| f.path().extension().is_some_and(|e| e == "yaml"))
-            .count();
-        assert_eq!(components.len(), files);
+            .iter()
+            .map(|c| c["id"].as_str().unwrap())
+            .collect();
+        let mut embedded: Vec<String> = components
+            .iter()
+            .map(|c| format!("{}/{}", c.capability, c.id))
+            .collect();
+        listed.sort_unstable();
+        embedded.sort();
+        assert_eq!(embedded, listed);
         for component in &components {
             let d = &component.detection;
             let rules = d.crds.len()

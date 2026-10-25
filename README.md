@@ -122,8 +122,8 @@ Apache-2.0. Contributions are accepted under the [Developer Certificate of Origi
 
 Third-party content in this repository:
 
-- [Zeabur Catalog](https://github.com/zeabur-oss/catalog) in
-  `crates/zeabur-catalog/bundle` (Apache-2.0, `bundle/LICENSE`).
+- [Zeabur Catalog](https://github.com/zeabur-oss/catalog), embedded from its release bundle at the
+  commit in `flake.lock` (Apache-2.0).
 - Kubernetes' release schedule in `crates/zeabur-catalog/src/versions.rs`, from
   [kubernetes/website](https://github.com/kubernetes/website) `data/releases` (CC BY 4.0, The
   Kubernetes Authors).

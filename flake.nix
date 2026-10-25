@@ -15,6 +15,10 @@
       url = "github:sysprog21/zhtw-mcp/5b385b3d66b1554f6f9ae036017ef06dd8ec0da6";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    # Zeabur Catalog. flake.lock pins its commit: zeabur-catalog embeds the bundle that the
+    # catalog's `release` output builds there, and a release build checks that bundle against the
+    # signed release at that commit (scripts/release-pins.sh).
+    catalog.url = "github:zeabur-oss/catalog";
     # Compiler cache, built from source at a release tag.
     kache = {
       url = "github:kunobi-ninja/kache/v1.2.2";
@@ -125,6 +129,11 @@
               # Mozilla's CA bundle (MPL-2.0), copied into the image for outgoing TLS (Zeabur Identity's
               # discovery and token endpoints); pinned with nixpkgs.
               ZEABUR_CA_BUNDLE = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
+              # Zeabur Catalog at the commit in flake.lock: its source (scripts/render-chart-corpus.sh)
+              # and its release files, bundle.tar.gz, index.json and checksums.txt (zeabur-catalog).
+              ZEABUR_CATALOG = "${inputs.catalog}";
+              ZEABUR_CATALOG_COMMIT = inputs.catalog.rev or "dirty";
+              ZEABUR_CATALOG_RELEASE = "${inputs.catalog.packages.${system}.release}";
               # Browser tests (scripts/e2e-ui.sh) and screenshots (scripts/docs-shots.sh): Chromium
               # from nixpkgs, matching the @playwright/test version pinned in web/package.json
               # (playwright-driver.version).

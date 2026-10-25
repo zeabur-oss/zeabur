@@ -1,6 +1,6 @@
 [package]
 name = "zeabur-catalog"
-description = "zeabur: capability detection and install suggestions from the recommendations bundle"
+description = "zeabur: capability detection and install suggestions from the Zeabur Catalog bundle"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -17,3 +17,7 @@ serde-saphyr = { workspace = true, features = ["serialize"] }
 serde_json.workspace = true
 thiserror.workspace = true
 utoipa.workspace = true
+
+[build-dependencies]
+flate2.workspace = true
+tar.workspace = true

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { readdirSync, readFileSync } from "node:fs"
+import { readFileSync } from "node:fs"
 import { resolve } from "node:path"
 
 import { locales } from "@/i18n"
@@ -11,23 +11,16 @@ import {
   summaryOf,
 } from "@/i18n/component-summaries"
 
-const bundle = resolve(import.meta.dir, "../../../crates/zeabur-catalog/bundle/components")
+/** The embedded catalog's index.json; the Nix dev shell sets the directory. */
+const index = resolve(process.env.ZEABUR_CATALOG_RELEASE ?? "", "index.json")
 
 /** `capability/id` to the description, trimmed as the server sends it. */
 const catalogue = new Map<string, string>(
-  readdirSync(bundle).flatMap((capability) =>
-    readdirSync(resolve(bundle, capability))
-      .filter((file) => file.endsWith(".yaml"))
-      .map((file) => {
-        const { metadata } = Bun.YAML.parse(
-          readFileSync(resolve(bundle, capability, file), "utf8"),
-        ) as { metadata: { description: string } }
-        return [
-          `${capability}/${file.slice(0, -".yaml".length)}`,
-          metadata.description.trim(),
-        ] as const
-      }),
-  ),
+  (
+    JSON.parse(readFileSync(index, "utf8")) as {
+      components: { id: string; metadata: { description: string } }[]
+    }
+  ).components.map(({ id, metadata }) => [id, metadata.description.trim()] as const),
 )
 
 const keyOf = (component: string) => {

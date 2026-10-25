@@ -17,14 +17,14 @@ Level 3: may depend on `zeabur-core`, `zeabur-model` and `zeabur-kube` (for the 
 
 ## Design
 
-- **The catalogue is embedded.** `bundle/` is the
-  [Zeabur Catalog](https://github.com/zeabur-oss/catalog) at the commit in
-  `bundle/PINNED` (Apache-2.0, `bundle/LICENSE`); `scripts/check-catalog.sh` fails CI if a
-  change makes it differ from that commit. The binary carries the catalogue it was built with and
-  fetches nothing at run time. `scripts/vendor-catalog.sh <ref>` moves the pin; each week
-  `.github/workflows/update-catalog.yml` opens a pull request that moves it to the latest release.
-- **Templates' idle use is measured.** `template_idle` reads
-  `bundle/measurements/templates/<id>.json`, which Zeabur Catalog's nightly run writes, and takes
+- **The catalogue is embedded.** `build.rs` reads `bundle.tar.gz` of the
+  [Zeabur Catalog](https://github.com/zeabur-oss/catalog) (Apache-2.0) from
+  `ZEABUR_CATALOG_RELEASE`: the dev shell builds the catalog's `release` output at the commit in
+  `flake.lock`, byte for byte the bundle its release signs. `CATALOGUE_COMMIT` is that commit. The
+  binary carries the catalogue it was built with and fetches nothing at run time. Renovate moves
+  the pin.
+- **Templates' idle use is measured.** `template_idle` reads the bundle's
+  `measurements/templates/<id>.json`, which Zeabur Catalog's nightly run writes, and takes
   its newest single-node amd64 environment. A template without that file has no measurement, and
   the interface then says nothing about room.
 - **The description is the catalogue's own words.** It is English and written for operators

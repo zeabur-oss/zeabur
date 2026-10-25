@@ -123,20 +123,15 @@ mod tests {
             .iter()
             .map(|f| f.file_stem().unwrap().to_string_lossy().into_owned())
             .collect();
-        let bundle =
-            Path::new(env!("CARGO_MANIFEST_DIR")).join("../zeabur-catalog/bundle/components");
-        let mut components: Vec<String> = std::fs::read_dir(&bundle)
+        let index: Value = serde_json::from_slice(
+            &std::fs::read(concat!(env!("ZEABUR_CATALOG_RELEASE"), "/index.json")).unwrap(),
+        )
+        .unwrap();
+        let mut components: Vec<String> = index["components"]
+            .as_array()
             .unwrap()
-            .filter_map(Result::ok)
-            .flat_map(|capability| {
-                let name = capability.file_name().to_string_lossy().into_owned();
-                std::fs::read_dir(capability.path())
-                    .unwrap()
-                    .filter_map(Result::ok)
-                    .map(|e| e.path())
-                    .filter(|p| p.extension().is_some_and(|e| e == "yaml"))
-                    .map(move |p| format!("{name}__{}", p.file_stem().unwrap().to_string_lossy()))
-            })
+            .iter()
+            .map(|c| c["id"].as_str().unwrap().replace('/', "__"))
             .collect();
         charts.sort();
         components.sort();

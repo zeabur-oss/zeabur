@@ -48,14 +48,13 @@ string after its key; `.zhtw-mcp.toml` holds the rules, the catalogue's chosen t
 for each rule or term it relaxes. Any warning fails the check. How the interface's text reads in
 every locale, and the term chosen for each concept, is in [docs/internal/wording.md](docs/internal/wording.md).
 
-When you change the vendored recommendations or their pin, also run the check that compares them
-with their upstream (it downloads it; `.github/workflows/vendored.yml` runs it only for such
-changes). The files vendored for the interface's styles are checked in
+Zeabur Catalog comes in as a flake input: `flake.lock` pins its commit, and the dev shell builds
+the catalog's `release` output there, the same `bundle.tar.gz` and `index.json` that its release
+signs. `zeabur-catalog` embeds that bundle. To move the pin, run `nix flake update catalog`; to try
+an unpushed catalog, add `--override-input catalog git+file://$PWD/../catalog` to `nix develop`.
+A release checks the bundle against the catalog's signed release at that commit
+(`scripts/release-pins.sh`). The files vendored for the interface's styles are checked in
 [zeabur-oss/design-system](https://github.com/zeabur-oss/design-system).
-
-```sh
-./scripts/check-catalog.sh
-```
 
 Every CI job is a call to `scripts/ci.sh <job>` (`scripts/ci.sh --list` names them), which enters
 its dev shell itself; the workflow only checks out, installs Nix and restores caches. So a job runs
