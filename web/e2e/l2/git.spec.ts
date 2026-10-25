@@ -12,11 +12,15 @@ import { invite, member, signInAsAdmin, toast } from "./members.ts"
 //   ZEABUR_L2_GIT_ADMIN_LINK  an invitation for `e2e-git-admin`, in the groups admins and elevated
 //                             admins; set only when Zeabur Builder, a registry and Keel run here
 //   ZEABUR_L2_GIT_REPOSITORY  the repository, by default traefik/whoami (Dockerfile, port 80)
+//   ZEABUR_L2_GIT_BUILDER     how to build it, Dockerfile (default) or Railpack
+//   ZEABUR_L2_GIT_PORT        the port it listens on, by default 80
 const env = (name: string, fallback = "") => process.env[name] ?? fallback
 const adminLink = env("ZEABUR_L2_GIT_ADMIN_LINK")
 const project = env("ZEABUR_L2_NAMESPACE")
 const zeabur = env("ZEABUR_L2_URL")
 const repository = env("ZEABUR_L2_GIT_REPOSITORY", "https://github.com/traefik/whoami")
+const builder = env("ZEABUR_L2_GIT_BUILDER", "Dockerfile")
+const port = env("ZEABUR_L2_GIT_PORT", "80")
 
 test.skip(!adminLink, "Zeabur Builder, a registry and Keel are not in this cluster")
 test.use({ actionTimeout: 30_000 })
@@ -35,9 +39,9 @@ async function deploy(page: Page, service: string, branch = "") {
   await expect(branchBox).toHaveAttribute("placeholder", "Default branch")
   if (branch) await branchBox.fill(branch)
   await drawer.getByRole("combobox", { name: "Build with" }).click()
-  await page.getByRole("option", { name: "Dockerfile", exact: true }).click()
+  await page.getByRole("option", { name: builder, exact: true }).click()
   await drawer.getByRole("textbox", { name: "Name" }).fill(service)
-  await drawer.getByRole("textbox", { name: "Port" }).fill("80")
+  await drawer.getByRole("textbox", { name: "Port" }).fill(port)
   await drawer.getByRole("button", { name: "Review changes", exact: true }).click()
   const plan = page.getByRole("dialog", { name: `Deploy ${service} from Git` })
   await expect(plan.getByRole("button", { name: "Back" })).toBeVisible()
