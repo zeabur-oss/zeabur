@@ -14,7 +14,7 @@ import TextAlignLeftIcon from "~icons/ph/text-align-left"
 import WarningIcon from "~icons/ph/warning"
 
 import type { Schemas } from "@/api/client"
-import { databasesQuery, projectQuery } from "@/api/queries"
+import { databasesQuery, nodesQuery, projectQuery } from "@/api/queries"
 import { Ago } from "@/components/bits"
 import { ConnectServices } from "@/components/connect"
 import { CopyText } from "@/components/copy-text"
@@ -43,6 +43,7 @@ import type { Icon } from "@/lib/icon"
 import { partsOf } from "@/model/database-parts"
 import {
   APP_DATABASE,
+  addPerThreadCaches,
   backUpNow,
   backupsOn,
   canBackUpNow,
@@ -58,6 +59,7 @@ import {
   exportUrl,
   fixedFolder,
   keepsEverything,
+  kernelNote,
   lastRun,
   newBackupTarget,
   presetOf,
@@ -462,12 +464,62 @@ function Cautions({ project, database }: { project: string; database: Database }
       {troubled ? (
         <Diagnoses diagnoses={troubled.diagnoses} service={troubled} project={project} />
       ) : null}
+      <KernelNote project={project} database={database} />
       {database.engine === "dragonfly" && !database.app ? (
         <Alert variant="warn">
           <WarningIcon aria-hidden="true" />
           <AlertDescription>{t("db.noAuth", engineName(database.engine))}</AlertDescription>
         </Alert>
       ) : null}
+    </>
+  )
+}
+
+/** MongoDB 8 on a cluster with a node on Linux 6.19 or later, which needs per-thread caches. */
+function KernelNote({ project, database }: { project: string; database: Database }) {
+  const t = useT()
+  const nodes = useQuery(nodesQuery).data?.items ?? []
+  const gate = useGate(project, "changeDatabases")
+  const planner = usePlanner(project)
+  const note = kernelNote(
+    database,
+    nodes.map((n) => n.kernelVersion),
+  )
+  if (!note) return null
+  if (note === "set")
+    return (
+      <Alert variant="warn">
+        <WarningIcon aria-hidden="true" />
+        <AlertDescription>{t("db.rseq.set")}</AlertDescription>
+      </Alert>
+    )
+  return (
+    <>
+      <Alert variant="warn">
+        <WarningIcon aria-hidden="true" />
+        <AlertDescription>
+          <p>{t("db.rseq.missing")}</p>
+          <GateTip gate={gate}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() =>
+                planner.plan({
+                  title: t("db.rseq.plan", database.name),
+                  changes: addPerThreadCaches(database),
+                  summary: {
+                    lines: [t("db.rseq.said", database.name)],
+                    action: t("db.rseq.fix"),
+                  },
+                })
+              }
+            >
+              {t("db.rseq.fix")}
+            </Button>
+          </GateTip>
+        </AlertDescription>
+      </Alert>
+      {planner.dialog}
     </>
   )
 }
