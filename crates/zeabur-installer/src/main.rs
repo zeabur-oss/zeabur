@@ -48,6 +48,14 @@ enum Command {
     },
     /// Install, or bring an existing install in line with the configuration. Safe to run again.
     Apply,
+    /// Print Zeabur's namespace, Zeabur Identity's Ingress and Zeabur's `HelmChart` as `apply`
+    /// makes them, as a JSON `List`, for a k3s cluster that has its other parts from another
+    /// source (`scripts/dev-cluster.sh`). Reads no host and no catalog.
+    Manifests {
+        /// The cluster's name, which `apply` takes from the host name.
+        #[arg(long)]
+        cluster_name: String,
+    },
     /// Serve a page that walks through the configuration and runs `apply`, on 127.0.0.1 by
     /// default; reach it with `ssh -L`.
     Gui {
@@ -145,7 +153,7 @@ fn main() -> ExitCode {
         (Command::Uninstall { purge, .. }, Some(config)) => {
             join::uninstall(&config, &cli.config, *purge)
         }
-        (Command::Gui { .. } | Command::Node { .. }, Some(_)) => {
+        (Command::Gui { .. } | Command::Node { .. } | Command::Manifests { .. }, Some(_)) => {
             Err(InstallError::Message(format!(
                 "{} joins this machine to a cluster; run this command on the first server",
                 cli.config.display()
@@ -153,6 +161,7 @@ fn main() -> ExitCode {
         }
         (Command::Plan { json }, None) => show_plan(&cli, *json),
         (Command::Apply, None) => apply::run(&cli.config),
+        (Command::Manifests { cluster_name }, None) => manifests(&cli, cluster_name),
         (Command::Gui { listen }, None) => gui::run(&cli.config, *listen),
         (Command::Doctor, None) => return doctor::run(),
         (
@@ -233,6 +242,31 @@ fn show_plan(cli: &Cli, json: bool) -> Result<(), InstallError> {
             out::line("apply stops until what failed is fixed.");
         }
     }
+    Ok(())
+}
+
+fn manifests(cli: &Cli, cluster_name: &str) -> Result<(), InstallError> {
+    let config = load::config(&cli.config)?;
+    let facts = plan::Facts {
+        arch: facts::arch(std::env::consts::ARCH).to_owned(),
+        hostname: cluster_name.to_owned(),
+        memory_mib: 0,
+        node_ips: Vec::new(),
+    };
+    let (identity, zeabur) = plan::products_only(&config, &facts)?.ok_or_else(|| {
+        InstallError::Message(format!("{} says `zeabur: false`", cli.config.display()))
+    })?;
+    let namespace = plan::namespace_object(&plan::Namespace {
+        name: plan::ZEABUR_NAMESPACE.to_owned(),
+        privileged: None,
+        public: false,
+    });
+    let list = serde_json::json!({
+        "apiVersion": "v1",
+        "kind": "List",
+        "items": [namespace, identity.ingress, apply::zeabur_helm_chart(&zeabur)?],
+    });
+    out::line(&list.to_string());
     Ok(())
 }
 

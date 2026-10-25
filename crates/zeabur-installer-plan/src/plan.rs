@@ -610,6 +610,27 @@ fn products(
     ))
 }
 
+/// Zeabur Identity and Zeabur as `plan` gives them, for a cluster that has its components from
+/// another source (`scripts/dev-cluster.sh`). `None` when the configuration says `zeabur: false`.
+///
+/// # Errors
+///
+/// When a source is missing.
+pub fn products_only(
+    config: &Config,
+    facts: &Facts,
+) -> Result<Option<(IdentityPlan, ZeaburPlan)>, PlanError> {
+    let (identity, zeabur) = products(
+        config,
+        facts,
+        pins::PRODUCTS.as_ref(),
+        &BTreeSet::new(),
+        &mut BTreeMap::new(),
+        &mut Vec::new(),
+    )?;
+    Ok(identity.zip(zeabur))
+}
+
 /// Idle memory, and a warning when the host is short of it.
 fn memory(components: &[ComponentPlan], host_mib: u64, warnings: &mut Vec<Warning>) -> Memory {
     let unmeasured = components
@@ -1488,6 +1509,16 @@ mod tests {
                 "10.42.1.0",
                 "fd00:42:0:1::"
             ]
+        );
+    }
+
+    #[test]
+    fn products_only_are_what_the_plan_installs() {
+        let index = Index::parse(INDEX.as_bytes()).unwrap();
+        let p = plan(&index, &config(""), &facts()).unwrap();
+        assert_eq!(
+            products_only(&config(""), &facts()).unwrap(),
+            p.identity.zip(p.zeabur)
         );
     }
 

@@ -17,6 +17,7 @@ use zeabur_installer_plan::config::{AccessMode, Config};
 use zeabur_installer_plan::plan::{
     self, ComponentPlan, Download, IDENTITY_NAMESPACE, IdentityPlan, LOCAL_ISSUER, MANAGER,
     NAMESPACE_MANAGER, Plan, ReleasePlan, Rke2Plan, SecretSource, Source, ZEABUR_NAMESPACE,
+    ZeaburPlan,
 };
 use zeabur_installer_plan::rke2::{
     AUTHN_CONFIGMAP, AUTHN_FILE, ETCD_USER, HostFile, IMAGES_DIR, PREFIX,
@@ -830,6 +831,19 @@ fn zeabur(kubectl: &Kubectl, plan: &Plan, config: &Config) -> Result<(), Install
         }))?;
     }
 
+    helm_chart(kubectl, "zeabur", &zeabur_helm_chart(zeabur)?)?;
+    kubectl.wait(&[
+        "--namespace",
+        ZEABUR_NAMESPACE,
+        "deployment/zeabur",
+        "--for=condition=Available",
+        "--timeout=5m",
+    ])?;
+    Ok(())
+}
+
+/// The `HelmChart` that installs Zeabur's chart with the planned values.
+pub(crate) fn zeabur_helm_chart(zeabur: &ZeaburPlan) -> Result<Value, InstallError> {
     let chart = match &zeabur.chart {
         Source::Local(path) => chart_content(path)?,
         Source::Pinned(d) => {
@@ -838,7 +852,7 @@ fn zeabur(kubectl: &Kubectl, plan: &Plan, config: &Config) -> Result<(), Install
                 .map_err(|e| InstallError::Message(format!("{}: {e}", path.display())))?
         }
     };
-    let object = json!({
+    Ok(json!({
         "apiVersion": "helm.cattle.io/v1",
         "kind": "HelmChart",
         "metadata": {
@@ -854,16 +868,7 @@ fn zeabur(kubectl: &Kubectl, plan: &Plan, config: &Config) -> Result<(), Install
             "failurePolicy": "abort",
             "timeout": "10m0s",
         },
-    });
-    helm_chart(kubectl, "zeabur", &object)?;
-    kubectl.wait(&[
-        "--namespace",
-        ZEABUR_NAMESPACE,
-        "deployment/zeabur",
-        "--for=condition=Available",
-        "--timeout=5m",
-    ])?;
-    Ok(())
+    }))
 }
 
 /// Zeabur's OAuth client and the Secret holding its secret.
