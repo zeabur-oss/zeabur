@@ -111,7 +111,7 @@ regex = { version = "1.13", default-features = false, features = ["std", "unicod
 rustix = { version = "1", default-features = false, features = ["std", "process"] }
 secrecy = { version = "0.10", features = ["serde"] }
 serde = { version = "1", features = ["derive"] }
-serde-saphyr = { version = "0.0.29", default-features = false, features = ["deserialize"] }
+serde-saphyr = { version = "2.0.0", default-features = false, features = ["deserialize"] }
 serde_json = "1"
 # SHA-256 for derived names in the pure crates (zeabur-model), which hold no C library.
 sha2 = { version = "0.11", default-features = false }
