@@ -453,9 +453,8 @@ fn local_path_manifest(default: bool) -> String {
     }
 }
 
-/// Where traffic from the nodes comes from: each node's internal address, and the first address of
-/// its pod range, which a node's own traffic to pods on other nodes leaves from (Canal's VXLAN
-/// interface).
+/// Where traffic from the nodes comes from: the first address of each node's pod range, which a
+/// node's own traffic to pods on other nodes leaves from (Canal's VXLAN interface).
 pub(crate) fn node_addresses(kubectl: &Kubectl) -> Result<Vec<String>, InstallError> {
     let nodes = kubectl.run(&["get", "nodes", "--output=json"], None)?;
     let nodes: Value = serde_json::from_str(&nodes)

@@ -125,8 +125,10 @@ joined before Longhorn was added has none of it; `doctor` on a server reports th
 Longhorn finds not ready, from its `nodes.longhorn.io` conditions. Add `longhorn: true` to that
 node's configuration and run `apply` there.
 
-The baseline NetworkPolicies let in traffic from every node's address and from the first address
-of every node's pod range, where Canal's VXLAN traffic comes from. A new worker is not in them
+The baseline NetworkPolicies let in traffic from the first address of every node's pod range.
+Canal's VXLAN interface holds that address, and a node's traffic to pods on other nodes leaves
+from it: kube-apiserver calling a webhook, containerd pulling from zot. A node's traffic to its
+own pods, kubelet probes among them, passes without a rule. A new worker is not in the policies
 until `node sync` rewrites them; `doctor` on a server warns until then. A joining server runs the
 same sync itself once it is Ready.
 
@@ -182,4 +184,5 @@ are backed up.
 | Longhorn on RKE2 `cis` with the baseline NetworkPolicies; node preparation on Debian, RHEL and SUSE hosts; the multipath drop-in | **Not verified yet** |
 | Join planning: configuration, warnings, latency thresholds, `node add` output | Unit-tested |
 | A worker or server joining a real cluster, `node sync` with Canal | Verified on two Ubuntu 26.04 arm64 VMs, RKE2 v1.36.5 |
+| The baseline NetworkPolicies' node sources on two nodes: cert-manager's and CloudNativePG's webhooks on the worker, probes, ingress | Verified on two Ubuntu 26.04 arm64 VMs, RKE2 v1.36.5 |
 | The CA hash from `kube-root-ca.crt` equals the server token's | Checked by `node add` each time; equal on the same VMs |

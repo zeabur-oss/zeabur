@@ -118,7 +118,7 @@ sudo zeabur-installer node add --role server --address 10.0.0.5
 sudo zeabur-installer node sync
 ```
 
-`node sync` 把目前所有節點的位址加進 installer 建立的基準網路政策。新加入的 server 會自己同步。加入 worker 後，要在 server 執行一次。網路和儲存的前提見[加入節點](../cluster/nodes.mdx)。
+`node sync` 讓 installer 建立的基準網路政策放行目前每個節點的流量，也就是每個節點 Pod 網段的第一個位址。新加入的 server 會自己同步。加入 worker 後，要在 server 執行一次。網路和儲存的前提見[加入節點](../cluster/nodes.mdx)。
 
 ## `uninstall`
 

@@ -1039,41 +1039,21 @@ pub fn namespace_object(namespace: &Namespace) -> Value {
 
 /// The addresses node traffic comes from, read from `kubectl get nodes -o json`.
 ///
-/// Each node's `InternalIP`, and the first address of each pod range, which a node's traffic to
-/// pods on other nodes leaves from (Canal's VXLAN interface). Sorted and without repeats.
+/// The first address of each pod range: Canal's VXLAN interface holds it, and a node's traffic to
+/// pods on other nodes leaves from it. A node's traffic to its own pods passes without a rule.
+/// Sorted and without repeats.
 #[must_use]
 pub fn node_sources(nodes: &Value) -> Vec<String> {
-    let mut found = BTreeSet::new();
-    for node in nodes
+    let found: BTreeSet<String> = nodes
         .get("items")
         .and_then(Value::as_array)
         .into_iter()
         .flatten()
-    {
-        for address in node
-            .pointer("/status/addresses")
-            .and_then(Value::as_array)
-            .into_iter()
-            .flatten()
-        {
-            if address.get("type").and_then(Value::as_str) == Some("InternalIP")
-                && let Some(a) = address.get("address").and_then(Value::as_str)
-            {
-                found.insert(a.to_owned());
-            }
-        }
-        let cidrs = node
-            .pointer("/spec/podCIDRs")
-            .and_then(Value::as_array)
-            .into_iter()
-            .flatten()
-            .filter_map(Value::as_str);
-        for cidr in cidrs {
-            if let Some((base, _)) = cidr.split_once('/') {
-                found.insert(base.to_owned());
-            }
-        }
-    }
+        .filter_map(|node| node.pointer("/spec/podCIDRs").and_then(Value::as_array))
+        .flatten()
+        .filter_map(Value::as_str)
+        .filter_map(|cidr| cidr.split_once('/').map(|(base, _)| base.to_owned()))
+        .collect();
     found.into_iter().collect()
 }
 
@@ -1093,8 +1073,8 @@ pub fn policy_sources(policy: &Value) -> BTreeSet<String> {
 /// The baseline `NetworkPolicy` of a namespace that is not public.
 ///
 /// Traffic comes in from its own pods, from the installer's other namespaces (labelled
-/// [`BASELINE_LABEL`]; the ingress and the metrics collectors among them) and from the nodes
-/// (kube-apiserver calling webhooks, kubelet probes).
+/// [`BASELINE_LABEL`]; the ingress and the metrics collectors among them) and from the other
+/// nodes (kube-apiserver calling webhooks, containerd pulling from zot).
 #[must_use]
 pub fn network_policy(namespace: &str, node_addresses: &[String]) -> Value {
     let mut from = vec![
@@ -1663,13 +1643,7 @@ mod tests {
         ]});
         assert_eq!(
             node_sources(&nodes),
-            [
-                "10.0.0.5",
-                "10.0.0.6",
-                "10.42.0.0",
-                "10.42.1.0",
-                "fd00:42:0:1::"
-            ]
+            ["10.42.0.0", "10.42.1.0", "fd00:42:0:1::"]
         );
     }
 
