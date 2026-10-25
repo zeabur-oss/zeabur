@@ -1028,25 +1028,6 @@
   "zh-CN": "container1 无法下载镜像 image1：镜像仓库里没有这个镜像。"
  },
  {
-  "key": "diagnosis.imagePull.cause.notFoundOrPrivate",
-  "params": {
-   "container": "container1"
-  },
-  "en": "container1 can't download its image .",
-  "zh-TW": "container1 無法下載映像檔 。",
-  "zh-CN": "container1 无法下载镜像 。"
- },
- {
-  "key": "diagnosis.imagePull.cause.notFoundOrPrivate",
-  "params": {
-   "container": "container1",
-   "image": "image1"
-  },
-  "en": "container1 can't download its image image1.",
-  "zh-TW": "container1 無法下載映像檔 image1。",
-  "zh-CN": "container1 无法下载镜像 image1。"
- },
- {
   "key": "diagnosis.imagePull.cause.unauthorized",
   "params": {
    "container": "container1"
@@ -1117,13 +1098,6 @@
   "en": "Check the image's name and version tag.",
   "zh-TW": "確認映像檔的名稱與版本標籤。",
   "zh-CN": "确认镜像的名称与版本标签。"
- },
- {
-  "key": "diagnosis.imagePull.fix.notFoundOrPrivate",
-  "params": {},
-  "en": "Check the name and version tag; if the image is private, give the project a login for its registry.",
-  "zh-TW": "確認名稱與版本標籤。如果是私有映像檔，替專案加上映像檔倉庫的登入資訊。",
-  "zh-CN": "确认名称与版本标签。如果是私有镜像，为项目加上镜像仓库的登录信息。"
  },
  {
   "key": "diagnosis.imagePull.fix.unauthorized",

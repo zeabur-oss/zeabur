@@ -397,18 +397,6 @@ fn pull_class(reason: &str, text: &str) -> &'static str {
         "invalidName"
     } else if has(&["toomanyrequests", "429 too many", "rate limit"]) {
         "rateLimited"
-    } else if has(&["does not exist or may require"]) {
-        // Docker Hub answers the same for a missing and a private repository.
-        "notFoundOrPrivate"
-    } else if has(&["ghcr.io/"]) && has(&["anonymous token", "denied"]) {
-        // GitHub's container registry refuses an anonymous token for a package that does not
-        // exist and for a private one alike (k3s 1.36's containerd reports "failed to fetch
-        // anonymous token: … 403 Forbidden" for `ghcr.io/<owner>/<missing>`); a private package
-        // needs credentials [ghcr-auth]. With no credentials sent, that refusal says "missing or
-        // private", not "your credentials were refused".
-        //
-        // [ghcr-auth]: https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-container-registry#authenticating-to-the-container-registry
-        "notFoundOrPrivate"
     } else if has(&[
         "unauthorized",
         "authentication required",
@@ -1379,19 +1367,8 @@ mod tests {
             ),
             (
                 "ErrImagePull",
-                "pull access denied for x, repository does not exist or may require 'docker login'",
-                "notFoundOrPrivate",
-            ),
-            (
-                "ErrImagePull",
                 "failed to authorize: 401 Unauthorized",
                 "unauthorized",
-            ),
-            (
-                // As k3s v1.36.5 reports a missing ghcr.io image.
-                "ImagePullBackOff",
-                "Back-off pulling image \"ghcr.io/example/blog:2.4.1\": ErrImagePull: failed to pull and unpack image \"ghcr.io/example/blog:2.4.1\": failed to resolve reference \"ghcr.io/example/blog:2.4.1\": failed to authorize: failed to fetch anonymous token: unexpected status from GET request to https://ghcr.io/token?scope=repository%3Aexample%2Fblog%3Apull&service=ghcr.io: 403 Forbidden",
-                "notFoundOrPrivate",
             ),
             (
                 "ImagePullBackOff",

@@ -1,4 +1,0 @@
-description: GitHub's container registry refuses an anonymous token for a missing and a private package alike, so k3s's "failed to fetch anonymous token … 403 Forbidden" on a ghcr.io image is classified as not found or private, not as refused credentials.
-operation: gaps.diagnose
-params:
-  now: "2026-10-15T12:00:00Z"
