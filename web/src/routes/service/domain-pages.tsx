@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query"
 import { useId, useState } from "react"
 
-import { configMapsQuery, projectQuery } from "@/api/queries"
+import { configMapsQuery, nodesQuery, projectQuery, templateQuery } from "@/api/queries"
 import type { Schemas } from "@/api/client"
 import { FormField } from "@/components/form-field"
 import { KubeDetails } from "@/components/kube-details"
@@ -11,6 +11,7 @@ import type { PlanAsk } from "@/components/plan/planner"
 import { useT } from "@/i18n"
 import type { Translate } from "@/i18n"
 import { useProjectSummary } from "@/lib/project-name"
+import { useQuantityFormat } from "@/lib/quantity"
 import {
   defaultPage,
   PAGE_KEYS,
@@ -23,6 +24,7 @@ import {
 } from "@/model/error-pages"
 import { projectTitle } from "@/model/project"
 import type { Service } from "@/model/service"
+import { templateRoom } from "@/model/template-room"
 import { Alert, AlertDescription, AlertTitle } from "@zeabur/design-system/components/alert"
 import { Label } from "@zeabur/design-system/components/label"
 import { Select } from "@zeabur/design-system/components/select"
@@ -178,16 +180,40 @@ export default function DomainPagesDrawer({
   )
 }
 
-/** Says that review also deploys the Error pages template. */
+/** Says that review also deploys the Error pages template, and whether the cluster has room. */
 function NoServer({ shown }: { shown: boolean }) {
   const t = useT()
+  const room = useRoomSentence("error-pages", shown)
   if (!shown) return null
   return (
-    <Alert variant="info">
+    <Alert variant={room?.tight ? "warn" : "info"}>
       <AlertTitle>{t("domainPages.noServer")}</AlertTitle>
-      <AlertDescription>{t("domainPages.noServerHint")}</AlertDescription>
+      <AlertDescription>
+        <p>{t("domainPages.noServerHint")}</p>
+        {room && <p>{room.text}</p>}
+      </AlertDescription>
     </Alert>
   )
+}
+
+/** The template's measured idle use against what the cluster has free; nothing without both. */
+function useRoomSentence(id: string, enabled: boolean) {
+  const t = useT()
+  const q = useQuantityFormat()
+  const template = useQuery({ ...templateQuery(id), enabled })
+  const nodes = useQuery({ ...nodesQuery, enabled })
+  const room = templateRoom(template.data?.idle, nodes.data)
+  if (!room) return undefined
+  const tight = room.verdict === "tight"
+  if (room.resource === "cpu") {
+    return { tight, text: t("domainPages.tightCpu", q.cpu(room.use), q.cpu(room.free)) }
+  }
+  const use = q.memory(room.use)
+  const free = q.memory(room.free)
+  return {
+    tight,
+    text: tight ? t("domainPages.tightMemory", use, free) : t("domainPages.room", use, free),
+  }
 }
 
 function pagesFacts(t: Translate, route: Schemas["Route"], name?: string): [string, string][] {

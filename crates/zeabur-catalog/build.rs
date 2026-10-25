@@ -1,9 +1,9 @@
-//! Embeds the vendored Zeabur Catalog (`bundle/components/<capability>/<id>.yaml`)
-//! as a sorted table of `include_str!` entries, so the binary carries the catalogue it was built
-//! with and reads nothing at run time.
+//! Embeds the vendored Zeabur Catalog (`bundle/components/<capability>/<id>.yaml`, and
+//! `bundle/measurements/templates/<id>.json` when present) as sorted tables of `include_str!`
+//! entries, so the binary carries the catalogue it was built with and reads nothing at run time.
 
 use std::fmt::Write as _;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::{env, fs};
 
 fn main() {
@@ -38,8 +38,36 @@ fn main() {
         );
     }
     code.push_str("];\n");
+    code.push_str("pub(crate) static TEMPLATE_MEASUREMENTS: &[(&str, &str)] = &[\n");
+    for (id, path) in &template_measurements(&manifest.join("bundle/measurements/templates")) {
+        let _ignored = writeln!(
+            code,
+            "    ({id:?}, include_str!({:?})),",
+            path.display().to_string()
+        );
+    }
+    code.push_str("];\n");
     let out = PathBuf::from(env::var_os("OUT_DIR").unwrap_or_default()).join("bundle.rs");
     if let Err(error) = fs::write(&out, code) {
         println!("cargo::error=cannot write {}: {error}", out.display());
     }
+}
+
+fn template_measurements(dir: &Path) -> Vec<(String, PathBuf)> {
+    println!("cargo::rerun-if-changed={}", dir.display());
+    let mut entries: Vec<(String, PathBuf)> = fs::read_dir(dir)
+        .into_iter()
+        .flatten()
+        .flatten()
+        .map(|file| file.path())
+        .filter(|path| path.extension().is_some_and(|e| e == "json"))
+        .map(|path| {
+            let id = path
+                .file_stem()
+                .map_or_else(String::new, |s| s.to_string_lossy().into_owned());
+            (id, path)
+        })
+        .collect();
+    entries.sort();
+    entries
 }

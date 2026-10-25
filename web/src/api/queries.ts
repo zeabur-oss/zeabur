@@ -168,6 +168,20 @@ export const nodesQuery = queryOptions({
   retryOnMount: false,
 })
 
+/** A template of Zeabur Catalog this build carries; it changes only with the build. */
+export const templateQuery = (template: string) =>
+  queryOptions({
+    queryKey: ["cluster", "templates", template],
+    queryFn: async ({ signal }) =>
+      unwrap(
+        await api.GET("/api/v1/cluster/templates/{template}", {
+          params: { path: { template } },
+          signal,
+        }),
+      ),
+    staleTime: Infinity,
+  })
+
 export const clusterHealthQuery = queryOptions({
   queryKey: ["cluster", "health"],
   queryFn: async ({ signal }) => unwrap(await api.GET("/api/v1/cluster/health", { signal })),

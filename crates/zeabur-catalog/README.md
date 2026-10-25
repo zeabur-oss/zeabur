@@ -23,6 +23,10 @@ Level 3: may depend on `zeabur-core`, `zeabur-model` and `zeabur-kube` (for the 
   change makes it differ from that commit. The binary carries the catalogue it was built with and
   fetches nothing at run time. `scripts/vendor-catalog.sh <ref>` moves the pin; each week
   `.github/workflows/update-catalog.yml` opens a pull request that moves it to the latest release.
+- **Templates' idle use is measured.** `template_idle` reads
+  `bundle/measurements/templates/<id>.json`, which Zeabur Catalog's nightly run writes, and takes
+  its newest single-node amd64 environment. A template without that file has no measurement, and
+  the interface then says nothing about room.
 - **The description is the catalogue's own words.** It is English and written for operators
   (licence, sizing, packaging); the interface shows it as the install sheet's notes, and on each
   card a one-sentence summary per locale (`web/src/i18n/component-summaries.ts`), keyed by a hash

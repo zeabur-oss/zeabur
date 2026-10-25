@@ -3421,6 +3421,12 @@ export const zhTW: Messages = {
   "domainPages.noServer": "這個專案還沒有頁面伺服器",
   "domainPages.noServerHint":
     "這些頁面由 Error pages 範本提供。開啟任一個開關或編輯頁面時，會一併把它部署到這個專案。它是只讓 Traefik 連線的小型 nginx。",
+  "domainPages.room": (use, free) =>
+    `叢集還有空間：它閒置時大約用 ${use} 記憶體，目前還有 ${free} 可用。`,
+  "domainPages.tightMemory": (use, free) =>
+    `叢集的記憶體不太夠：它閒置時大約用 ${use}，目前只剩 ${free}。先騰出空間或加一個節點。`,
+  "domainPages.tightCpu": (use, free) =>
+    `叢集的 CPU 不太夠：它閒置時大約用 ${use}，目前只剩 ${free}。先騰出空間或加一個節點。`,
   "domainPages.page": "要編輯的頁面",
   "domainPages.page.maintenance": "維護",
   "domainPages.page.badGateway": "502 閘道錯誤",

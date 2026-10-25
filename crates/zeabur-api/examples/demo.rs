@@ -38,6 +38,9 @@
 //!
 //! `ZEABUR_DEMO_KEEL=1` installs Keel, so a project offers Deploy from Git.
 //!
+//! The Error pages template has a made-up idle use of 9 MiB, so turning on a domain's error pages
+//! says the cluster has room; `ZEABUR_DEMO_TEMPLATE_IDLE=large` makes it 24 GiB, to see it tight.
+//!
 //! `namespaces` in `ZEABUR_DEMO_FORBID` refuses creating projects. New public URLs are suggested
 //! under `apps.example.com` with HTTPS from the `ClusterIssuer` `letsencrypt`;
 //! `ZEABUR_DEMO_NO_DOMAINS=1` leaves both unset.
@@ -3976,6 +3979,18 @@ fn start(pod: &mut Pod, now: &str) {
     }
 }
 
+/// Made-up idle use for the Error pages template; `ZEABUR_DEMO_TEMPLATE_IDLE=large` makes it more
+/// than the cluster has free.
+fn template_idle(id: &str) -> Option<zeabur_catalog::IdleUse> {
+    let large = std::env::var("ZEABUR_DEMO_TEMPLATE_IDLE").is_ok_and(|v| v == "large");
+    (id == "error-pages").then(|| zeabur_catalog::IdleUse {
+        memory_bytes: if large { 24 << 30 } else { 9 << 20 },
+        cpu_millicores: if large { 6000 } else { 1 },
+        environment: "single-node-amd64-v1.36.4".to_owned(),
+        measured_at: "2026-10-24".to_owned(),
+    })
+}
+
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
     let cluster = MemoryCluster::new(state());
@@ -4056,11 +4071,12 @@ async fn main() -> std::io::Result<()> {
         ..zeabur_api::Settings::default()
     };
     let images = zeabur_api::images::Inspector::new(Arc::new(Registry::new()), Vec::new());
-    let app = zeabur_api::router_with_settings_resolver_and_images(
+    let app = zeabur_api::router_for_demo(
         Arc::new(access),
         settings,
         Arc::new(dns()),
         Arc::new(images),
+        template_idle,
     )
     .fallback_service(zeabur_ui::router());
     // Another port when 8080 is taken: ZEABUR_DEMO_ADDR=127.0.0.1:8090.

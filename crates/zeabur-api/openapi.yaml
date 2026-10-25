@@ -1019,6 +1019,32 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/Problem"
+  "/api/v1/cluster/templates/{template}":
+    get:
+      tags:
+      - cluster
+      summary: |-
+        A template this build carries, and what its pods use when idle, so a deploy can say whether
+        the cluster has room for it. Readable by every signed-in person.
+      operationId: getTemplate
+      parameters:
+      - name: template
+        in: path
+        description: The template's id (`error-pages`).
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TemplateView"
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
   /api/v1/cluster/tools:
     get:
       tags:
@@ -9079,6 +9105,33 @@ components:
       - noIssuer
       - certificatesElsewhere
       - wildcardNeedsDns01
+    IdleUse:
+      type: object
+      description: >-
+        What a template's pods used once idle, on a fresh cluster after its smoke
+        checks.
+      required:
+      - memoryBytes
+      - cpuMillicores
+      - environment
+      - measuredAt
+      properties:
+        cpuMillicores:
+          type: integer
+          format: int64
+          description: The pods' CPU in millicores.
+          minimum: 0
+        environment:
+          type: string
+          description: "Where it was measured: `<profile>-<architecture>-<Kubernetes version>`."
+        measuredAt:
+          type: string
+          description: The day it was measured (`2026-10-25`).
+        memoryBytes:
+          type: integer
+          format: int64
+          description: The pods' working set in bytes.
+          minimum: 0
     ImageInspection:
       type: object
       description: What the image's configuration says, or why it could not be read.
@@ -16164,6 +16217,20 @@ components:
           - string
           - "null"
           description: "The IANA time zone of the expression (`spec.timeZone`); absent: the controller's."
+    TemplateView:
+      type: object
+      description: A template of Zeabur Catalog.
+      required:
+      - id
+      properties:
+        id:
+          type: string
+          description: Its id (`error-pages`).
+        idle:
+          oneOf:
+          - $ref: "#/components/schemas/IdleUse"
+            description: What its pods use when idle; absent until Zeabur Catalog has measured it.
+          - type: "null"
     Timeline:
       type: object
       description: A timeline.

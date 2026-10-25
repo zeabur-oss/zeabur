@@ -476,6 +476,19 @@ stringData:
         );
     }
 
+    /// A template this build carries answers with its id; any other is not found.
+    #[tokio::test]
+    async fn only_a_carried_template_is_found() {
+        let cluster = cluster();
+        let app = app(&cluster);
+        let (status, template) =
+            send(&app, "GET", "/api/v1/cluster/templates/error-pages", None).await;
+        assert_eq!(status, StatusCode::OK, "{template}");
+        assert_eq!(template["id"], "error-pages");
+        let (status, problem) = send(&app, "GET", "/api/v1/cluster/templates/ghost", None).await;
+        assert_eq!(status, StatusCode::NOT_FOUND, "{problem}");
+    }
+
     /// A component that is only charts is installed as k3s `HelmChart`s in `kube-system`,
     /// planned there like any other object; without a Helm controller the answer says so.
     #[tokio::test]

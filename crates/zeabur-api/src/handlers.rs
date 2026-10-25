@@ -18,6 +18,9 @@ pub struct AppState {
     pub access: Arc<dyn ClusterAccess>,
     /// The embedded Zeabur Catalog.
     pub catalogue: Arc<Vec<zeabur_catalog::Component>>,
+    /// What a template uses when idle: [`zeabur_catalog::template_idle`], or made-up use in the
+    /// demo.
+    pub template_idle: fn(&str) -> Option<zeabur_catalog::IdleUse>,
     /// The key plan tokens are sealed with; `None` when none could be made.
     pub plan_key: Option<Arc<crate::plan_token::PlanKey>>,
     /// The time now: `Timestamp::now`, or a fixed time in tests, so answers that depend on the

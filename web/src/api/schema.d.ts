@@ -691,6 +691,26 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  "/api/v1/cluster/templates/{template}": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * A template this build carries, and what its pods use when idle, so a deploy can say whether
+     *     the cluster has room for it. Readable by every signed-in person.
+     */
+    get: operations["getTemplate"]
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   "/api/v1/cluster/tools": {
     parameters: {
       query?: never
@@ -4759,6 +4779,23 @@ export interface components {
      * @enum {string}
      */
     HttpOnlyReason: "noIssuer" | "certificatesElsewhere" | "wildcardNeedsDns01"
+    /** @description What a template's pods used once idle, on a fresh cluster after its smoke checks. */
+    IdleUse: {
+      /**
+       * Format: int64
+       * @description The pods' CPU in millicores.
+       */
+      cpuMillicores: number
+      /** @description Where it was measured: `<profile>-<architecture>-<Kubernetes version>`. */
+      environment: string
+      /** @description The day it was measured (`2026-10-25`). */
+      measuredAt: string
+      /**
+       * Format: int64
+       * @description The pods' working set in bytes.
+       */
+      memoryBytes: number
+    }
     /** @description What the image's configuration says, or why it could not be read. */
     ImageInspection: {
       /**
@@ -8367,6 +8404,12 @@ export interface components {
       /** @description The IANA time zone of the expression (`spec.timeZone`); absent: the controller's. */
       timeZone?: string | null
     }
+    /** @description A template of Zeabur Catalog. */
+    TemplateView: {
+      /** @description Its id (`error-pages`). */
+      id: string
+      idle?: components["schemas"]["IdleUse"] | null
+    }
     /** @description A timeline. */
     Timeline: {
       /** @description `projects/<project>/timeline` or `projects/<project>/services/<kind>/<name>/timeline`. */
@@ -10239,6 +10282,36 @@ export interface operations {
         }
       }
       422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
+  getTemplate: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description The template's id (`error-pages`). */
+        template: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["TemplateView"]
+        }
+      }
+      404: {
         headers: {
           [name: string]: unknown
         }

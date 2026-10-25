@@ -230,6 +230,7 @@ fn cluster_routes(router: OpenApiRouter<AppState>) -> OpenApiRouter<AppState> {
         .routes(routes!(notifications::cluster_apply))
         .routes(routes!(cluster::config_reload::get))
         .routes(routes!(cluster::install::guide_for))
+        .routes(routes!(cluster::templates::get))
         .routes(routes!(cluster::join::get))
         .routes(routes!(cluster::node_policies::get))
         .routes(routes!(cluster::node_policies::plan))
@@ -359,6 +360,7 @@ pub fn router_with_key(
         sign_in,
         log_proxy,
         images,
+        zeabur_catalog::template_idle,
     )
 }
 
@@ -374,6 +376,7 @@ pub fn router_with_images(access: Arc<dyn ClusterAccess>, images: images::Inspec
         Arc::new(account::Fixed(None)),
         None,
         Arc::new(images),
+        zeabur_catalog::template_idle,
     )
 }
 
@@ -400,6 +403,7 @@ pub fn router_with_log_proxy(
         Arc::new(account::Fixed(None)),
         Some(log_proxy),
         inspector(images::https::Reach::Any, &Settings::default()),
+        zeabur_catalog::template_idle,
     )
 }
 
@@ -459,16 +463,28 @@ pub fn router_with_settings_and_resolver(
     resolver: Arc<dyn resolve::Resolve>,
 ) -> Router {
     let images = inspector(images::https::Reach::Any, &settings);
-    router_with_settings_resolver_and_images(access, settings, resolver, images)
+    build_with(
+        access,
+        zeabur_kube::k8s_openapi::jiff::Timestamp::now,
+        PlanKey::random().ok().map(Arc::new),
+        pods::exec::IDLE,
+        settings,
+        resolver,
+        Arc::new(account::Fixed(None)),
+        None,
+        images,
+        zeabur_catalog::template_idle,
+    )
 }
 
-/// [`router_with_settings_and_resolver`], reading images' configurations with `images`; for the
-/// demo.
-pub fn router_with_settings_resolver_and_images(
+/// [`router_with_settings_and_resolver`], reading images' configurations with `images` and
+/// templates' idle use from `template_idle`; for the demo.
+pub fn router_for_demo(
     access: Arc<dyn ClusterAccess>,
     settings: Settings,
     resolver: Arc<dyn resolve::Resolve>,
     images: Arc<images::Inspector>,
+    template_idle: fn(&str) -> Option<zeabur_catalog::IdleUse>,
 ) -> Router {
     build_with(
         access,
@@ -480,6 +496,7 @@ pub fn router_with_settings_resolver_and_images(
         Arc::new(account::Fixed(None)),
         None,
         images,
+        template_idle,
     )
 }
 
@@ -501,6 +518,7 @@ fn build(
         Arc::new(account::Fixed(None)),
         None,
         images,
+        zeabur_catalog::template_idle,
     )
 }
 
@@ -518,11 +536,13 @@ fn build_with(
     sign_in: Arc<dyn account::SignInPage>,
     log_proxy: Option<Arc<dyn services::logs::LogProxy>>,
     images: Arc<images::Inspector>,
+    template_idle: fn(&str) -> Option<zeabur_catalog::IdleUse>,
 ) -> Router {
     let catalogue = Arc::new(zeabur_catalog::catalogue().unwrap_or_default());
     let state = AppState {
         access,
         catalogue,
+        template_idle,
         plan_key,
         clock,
         terminal_idle,

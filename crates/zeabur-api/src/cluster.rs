@@ -62,6 +62,7 @@ pub mod modules;
 pub mod node_policies;
 pub mod node_shells;
 pub mod s3_destinations;
+pub mod templates;
 pub mod tools;
 
 use std::collections::BTreeMap;

@@ -3413,6 +3413,12 @@ export const zhCN: Messages = {
   "domainPages.noServer": "这个项目还没有页面服务器",
   "domainPages.noServerHint":
     "这些页面由 Error pages 模板提供。开启任一开关或编辑页面时，会一并把它部署到这个项目。它是只允许 Traefik 连接的小型 nginx。",
+  "domainPages.room": (use, free) =>
+    `集群还有空间：它空闲时大约占用 ${use} 内存，目前还有 ${free} 可用。`,
+  "domainPages.tightMemory": (use, free) =>
+    `集群的内存不太够：它空闲时大约占用 ${use}，目前只剩 ${free}。先腾出空间或加一个节点。`,
+  "domainPages.tightCpu": (use, free) =>
+    `集群的 CPU 不太够：它空闲时大约占用 ${use}，目前只剩 ${free}。先腾出空间或加一个节点。`,
   "domainPages.page": "要编辑的页面",
   "domainPages.page.maintenance": "维护",
   "domainPages.page.badGateway": "502 网关错误",
