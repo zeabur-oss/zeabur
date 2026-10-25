@@ -20,12 +20,14 @@ use axum::Json;
 use axum::extract::Path;
 use serde::Serialize;
 use utoipa::ToSchema;
+use zeabur_core::isolation::{PLATFORM_LABEL, PROJECT_POLICY};
+use zeabur_core::names::LABEL_PROJECT;
 use zeabur_core::problem::{MEDIA_TYPE as PROBLEM, Problem};
 use zeabur_gaps::{
-    BUILTIN, ClusterTraits, GatewayRef, IngressClassFact, Input, Rule, cluster_gaps, evaluate,
-    retired_classes,
+    BUILTIN, ClusterTraits, GatewayRef, IngressClassFact, Input, NamespaceFact, Rule, cluster_gaps,
+    evaluate, retired_classes,
 };
-use zeabur_kube::{Cluster, ClusterExt as _, ResourceRef};
+use zeabur_kube::{Cluster, ClusterError, ClusterExt as _, ResourceRef};
 use zeabur_model::{Citation, Gap, HttpRoute};
 use zeabur_modules::Finding;
 
@@ -263,14 +265,70 @@ async fn module_findings(
     Ok(found)
 }
 
+/// The cluster's namespaces and which hold the project policy. A refused read is added to
+/// `unreadable` and gives none.
+async fn namespace_facts(
+    cluster: &dyn Cluster,
+    unreadable: &mut Vec<UnreadableView>,
+) -> Result<Vec<NamespaceFact>, ApiError> {
+    let namespaces = ResourceRef::new("", "v1", "namespaces", "Namespace");
+    let policies = ResourceRef::new(
+        "networking.k8s.io",
+        "v1",
+        "networkpolicies",
+        "NetworkPolicy",
+    );
+    let (found, isolated) = futures_util::future::join(
+        cluster.list_metadata(&namespaces, None),
+        cluster.list_metadata(&policies, None),
+    )
+    .await;
+    let mut read =
+        |resource: &ResourceRef, answer: Result<Option<Vec<_>>, ClusterError>| match answer {
+            Ok(list) => Ok(Some(list.unwrap_or_default())),
+            Err(error) => {
+                let refusal = error
+                    .into_unreadable(&resource.key())
+                    .map_err(|other| ApiError::from(other.into_problem(&resource.kind)))?;
+                unreadable.push(refusal.into());
+                Ok::<_, ApiError>(None)
+            }
+        };
+    let (Some(found), Some(isolated)) = (read(&namespaces, found)?, read(&policies, isolated)?)
+    else {
+        return Ok(Vec::new());
+    };
+    let isolated: std::collections::BTreeSet<&str> = isolated
+        .iter()
+        .filter(|p| p.name.as_deref() == Some(PROJECT_POLICY))
+        .filter_map(|p| p.namespace.as_deref())
+        .collect();
+    Ok(found
+        .iter()
+        .filter_map(|meta| {
+            let name = meta.name.clone()?;
+            let labels = meta.labels.as_ref();
+            Some(NamespaceFact {
+                project: labels.is_some_and(|l| l.contains_key(LABEL_PROJECT)),
+                platform: labels
+                    .is_some_and(|l| l.get(PLATFORM_LABEL).map(String::as_str) == Some("true")),
+                project_policy: isolated.contains(name.as_str()),
+                name,
+            })
+        })
+        .collect())
+}
+
 /// What the cluster itself is missing, apart from any project: an IngressClass served by a
-/// retired controller.
+/// retired controller, and a project namespace without its NetworkPolicy.
 #[utoipa::path(get, path = "/api/v1/cluster/gaps", tag = "cluster",
     responses((status = 200, body = GapList), (status = 403, body = Problem, content_type = PROBLEM)))]
 pub(crate) async fn cluster(Person(cluster): Person) -> Result<Json<GapList>, ApiError> {
-    let facts = facts(cluster.as_ref()).await?;
+    let cluster = cluster.as_ref();
+    let mut facts = facts(cluster).await?;
+    let namespaces = namespace_facts(cluster, &mut facts.unreadable).await?;
     Ok(Json(GapList {
-        items: cluster_gaps(&facts.classes),
+        items: cluster_gaps(&facts.classes, &namespaces),
         unreadable: facts.unreadable,
     }))
 }

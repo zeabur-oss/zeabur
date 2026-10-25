@@ -1614,11 +1614,11 @@ mod tests {
         let gap = find(&get(&cluster, "/api/v1/projects/shop/gaps").await).unwrap();
         assert_eq!(gap["severity"], "advice");
         assert_eq!(gap["fix"]["id"], "networkPolicy.isolateProject");
-        assert!(
-            !gap["fix"]["params"]["objects"]
-                .as_str()
-                .unwrap()
-                .contains("zeabur-allow-ingress-web")
+        let objects: Value =
+            serde_json::from_str(gap["fix"]["params"]["objects"].as_str().unwrap()).unwrap();
+        assert_eq!(
+            objects,
+            json!([zeabur_core::isolation::project_policy("shop")])
         );
         // An HTTPRoute sending traffic to web.
         cluster.update(|s| {
@@ -1640,9 +1640,10 @@ mod tests {
         assert_eq!(routed["severity"], "advice");
         assert_eq!(routed["subject"]["name"], "shop");
         assert_eq!(routed["message"]["params"]["services"], "web");
-        let objects: Value =
-            serde_json::from_str(routed["fix"]["params"]["objects"].as_str().unwrap()).unwrap();
-        assert_eq!(objects[1]["metadata"]["name"], "zeabur-allow-ingress-web");
+        assert_eq!(
+            routed["fix"]["params"]["objects"],
+            gap["fix"]["params"]["objects"]
+        );
         cluster.update(|s| {
             s.dynamic.push(
                 serde_json::from_value(json!({

@@ -1,6 +1,7 @@
 //! Plans that write the project's Namespace only: creating it, adopting it, letting it go, its
 //! details.
 
+use zeabur_core::isolation::PLATFORM_LABEL;
 use zeabur_kube::{Cluster, ClusterError};
 use zeabur_plan::{Change, Input, Plan, PlanRequest};
 
@@ -34,12 +35,24 @@ pub(super) async fn compute_namespace(
         namespace: project.to_owned(),
         ..zeabur_graph::Snapshot::default()
     };
+    let platform_namespaces = creating && platform_namespaces(cluster).await;
     zeabur_plan::plan(
         Input {
             namespace: namespace.as_ref(),
+            platform_namespaces,
             ..Input::new(&snapshot, now)
         },
         request,
     )
     .map_err(plan_problem)
+}
+
+/// Whether some namespace carries [`PLATFORM_LABEL`]. A refused or failed read answers `false`:
+/// the new project then gets no `NetworkPolicy`, and the cluster's gaps name it later.
+pub(crate) async fn platform_namespaces(cluster: &dyn Cluster) -> bool {
+    let resource = zeabur_kube::ResourceRef::new("", "v1", "namespaces", "Namespace");
+    cluster
+        .list_labelled(&resource, None, PLATFORM_LABEL, "true")
+        .await
+        .is_ok_and(|found| !found.is_empty())
 }

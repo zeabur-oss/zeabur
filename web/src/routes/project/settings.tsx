@@ -19,6 +19,7 @@ import { Problem } from "@/components/problem"
 import { projectGlyphs } from "@/components/project-icon"
 import { useI18n, useT } from "@/i18n"
 import { formatAgo } from "@/lib/format"
+import { NetworkSettings } from "@/routes/project/network-settings"
 import { projectCoverage } from "@/model/cluster-backups"
 import { DISPLAY_NAME_MAX, mayChange, projectIcons, type ProjectIconName } from "@/model/project"
 import type { Service } from "@/model/service"
@@ -116,6 +117,7 @@ export function ProjectSettings({ namespace }: { namespace: Schemas["ProjectName
           <Suspense fallback={<LoadingRows label={t("common.loading")} rows={2} />}>
             <SharedVariables project={namespace.name} />
           </Suspense>
+          <NetworkSettings project={namespace.name} />
           <ClusterBackups project={namespace.name} />
           <Group label={t("notify.title")}>
             <Notifications project={namespace.name} />

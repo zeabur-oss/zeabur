@@ -2656,6 +2656,7 @@ dependencies = [
  "utoipa",
  "zeabur-adapters",
  "zeabur-fixtures",
+ "zeabur-kernel",
  "zeabur-kube",
  "zeabur-model",
 ]

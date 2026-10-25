@@ -402,7 +402,7 @@ paths:
       - cluster
       summary: |-
         What the cluster itself is missing, apart from any project: an IngressClass served by a
-        retired controller.
+        retired controller, and a project namespace without its NetworkPolicy.
       operationId: cluster
       responses:
         "200":
@@ -10979,6 +10979,19 @@ components:
       - allowed
       - limited
       - blocked
+    NetworkPolicyAllowedNamespace:
+      type: object
+      description: A namespace that a policy lets reach every pod of the project.
+      required:
+      - namespace
+      - policy
+      properties:
+        namespace:
+          type: string
+          description: The namespace.
+        policy:
+          type: string
+          description: The policy that lets it in.
     NetworkPolicyConnection:
       type: object
       description: |-
@@ -11049,9 +11062,16 @@ components:
       description: The project's reachability.
       required:
       - policies
+      - projectPolicy
+      - allowedNamespaces
       - services
       - connections
       properties:
+        allowedNamespaces:
+          type: array
+          items:
+            $ref: "#/components/schemas/NetworkPolicyAllowedNamespace"
+          description: The other namespaces a policy lets in whole, by `kubernetes.io/metadata.name`.
         connections:
           type: array
           items:
@@ -11062,6 +11082,9 @@ components:
           items:
             type: string
           description: The project's policies, by name.
+        projectPolicy:
+          type: boolean
+          description: The project has its own policy, [`PROJECT_POLICY`].
         services:
           type: array
           items:

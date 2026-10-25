@@ -239,6 +239,7 @@ mod tests {
             cluster_issuer: params.get("clusterIssuer").and_then(Value::as_str),
             issuers: &issuers,
             certificates: &certificates,
+            platform_namespaces: false,
         };
         match plan(input, &request) {
             Ok(plan) => to_value(plan).unwrap(),

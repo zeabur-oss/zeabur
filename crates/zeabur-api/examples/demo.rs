@@ -2016,6 +2016,14 @@ fn state() -> State {
                      "allowedRoutes": {"namespaces": {"from": "All"}}}
                 ]}
             })),
+            // billing is isolated, and lets payments in.
+            from(zeabur_core::isolation::project_policy("billing")),
+            from(json!({
+                "apiVersion": "networking.k8s.io/v1", "kind": "NetworkPolicy",
+                "metadata": {"name": "zeabur-allow-from-payments", "namespace": "billing"},
+                "spec": {"podSelector": {}, "policyTypes": ["Ingress"], "ingress": [{"from": [
+                    {"namespaceSelector": {"matchLabels": {"kubernetes.io/metadata.name": "payments"}}}]}]}
+            })),
             from(json!({
                 "apiVersion": "traefik.io/v1alpha1", "kind": "Middleware",
                 "metadata": {"name": "web-error-pages", "namespace": "shop",

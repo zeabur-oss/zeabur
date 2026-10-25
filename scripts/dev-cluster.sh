@@ -127,6 +127,10 @@ import() {
   done
 }
 
+# Marks namespaces as the platform's, as zeabur-installer does: a project's NetworkPolicy lets
+# them in, and only then does Zeabur write one.
+platform() { kubectl label namespace "$@" installer.zeabur.com/baseline=true --overwrite >/dev/null; }
+
 # Runs the Helm commands Zeabur Catalog gives for a component (Cluster → Components) and waits for
 # its deployments.
 catalog_install() { # $1 = <capability>/<id>, $2 = namespace to wait for, $@ = <input>=<value>
@@ -136,6 +140,7 @@ catalog_install() { # $1 = <capability>/<id>, $2 = namespace to wait for, $@ = <
   cargo run -q --locked -p zeabur-catalog --example install -- "$component" single-node "$@" >"$work/install.sh"
   (cd "$work" && bash -euo pipefail install.sh)
   rm -rf "$work"
+  platform "$namespace"
   if [[ -n "$(kubectl -n "$namespace" get deployment -o name)" ]]; then
     kubectl -n "$namespace" wait deployment --all --for=condition=Available --timeout=300s
   fi
@@ -304,6 +309,7 @@ EOF
   "$identityctl" manifests --image "$identity_image" --serve-arg=--invitations |
     kubectl apply --server-side --force-conflicts -f - >/dev/null
   kubectl -n zeabur-identity rollout status deployment/zeabur-identity --timeout=300s
+  platform zeabur-identity
   apply_secret zeabur-identity tls zeabur-identity-tls --cert="$tls/tls.crt" --key="$tls/tls.key"
 
   # kube-apiserver trusts Zeabur Identity once it has re-read the file (about once a minute).
@@ -334,6 +340,7 @@ EOF
 
   # --- Zeabur, from zeabur-installer's HelmChart ------------------------------------------------
   kubectl create namespace zeabur --dry-run=client -o yaml | kubectl apply -f - >/dev/null
+  platform zeabur
   if ! kubectl -n zeabur-identity get oauthclients.identity.zeabur.com zeabur >/dev/null 2>&1 ||
     ! kubectl -n zeabur get secret zeabur-oidc >/dev/null 2>&1; then
     local secret
@@ -477,6 +484,7 @@ EOF
     --set registry.inCluster.podLabels.app\\.kubernetes\\.io/name=zot \
     --set-json 'extraArgs=["--buildkitd-host-users=false"]' >/dev/null
   kubectl -n builder-system rollout status deployment/zeabur-builder --timeout=180s
+  platform builder-system
 }
 
 case "${1:-}" in

@@ -199,6 +199,9 @@ pub struct Input<'a> {
     pub issuers: &'a BTreeMap<String, IssuerRead>,
     /// The person's own certificates the request sets, checked, by hostname.
     pub certificates: &'a BTreeMap<String, CheckedCertificate>,
+    /// Some namespace carries [`zeabur_kernel::isolation::PLATFORM_LABEL`]: a new project gets
+    /// its `NetworkPolicy`.
+    pub platform_namespaces: bool,
 }
 
 impl<'a> Input<'a> {
@@ -230,6 +233,7 @@ impl<'a> Input<'a> {
             cluster_issuer: None,
             issuers: &NO_ISSUERS,
             certificates: &NO_CERTIFICATES,
+            platform_namespaces: false,
         }
     }
 }

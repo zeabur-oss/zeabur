@@ -217,6 +217,7 @@ async fn compute(
             cluster_issuer,
             issuers: &issuers,
             certificates: &certificates,
+            platform_namespaces: false,
         },
         request,
     )
@@ -453,16 +454,7 @@ pub(crate) async fn apply(
             )
         })
         .collect();
-    for (target, write) in &writes {
-        let dry = WriteRequest {
-            dry_run: true,
-            ..write.clone()
-        };
-        if let Err(error) = target_cluster.write(&dry).await {
-            let problem = refused(target_cluster, namespace, target, write, error).await;
-            return Err(ApiError::from(refusal(problem, &plan, target, &[])));
-        }
-    }
+    dry_run(target_cluster, namespace, &plan, &writes).await?;
     let mut applied = Vec::new();
     for (target, write) in writes {
         match target_cluster.write(&write).await {
@@ -481,6 +473,33 @@ pub(crate) async fn apply(
 
 /// The problem for a refused write of `target`: the document it came from, when a create made
 /// it; what the apply wrote before it; no Secret's value.
+/// Sends each write as a dry run first, so a refusal stops the plan before anything changes.
+async fn dry_run(
+    target_cluster: &dyn Cluster,
+    namespace: &str,
+    plan: &Plan,
+    writes: &[(zeabur_plan::Target, WriteRequest)],
+) -> Result<(), ApiError> {
+    // kube-apiserver refuses a dry run in a namespace that does not exist yet.
+    let new_namespace = writes
+        .iter()
+        .any(|(target, write)| !target.namespaced() && matches!(write.body, WriteBody::Create(_)));
+    for (target, write) in writes {
+        if new_namespace && target.namespaced() {
+            continue;
+        }
+        let dry = WriteRequest {
+            dry_run: true,
+            ..write.clone()
+        };
+        if let Err(error) = target_cluster.write(&dry).await {
+            let problem = refused(target_cluster, namespace, target, write, error).await;
+            return Err(ApiError::from(refusal(problem, plan, target, &[])));
+        }
+    }
+    Ok(())
+}
+
 fn refusal(
     mut problem: Problem,
     plan: &Plan,

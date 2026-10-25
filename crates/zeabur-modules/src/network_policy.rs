@@ -50,6 +50,7 @@ use serde::Serialize;
 use serde_json::{Value, json};
 use utoipa::ToSchema;
 use zeabur_adapters::selector::{is_empty, matches};
+use zeabur_kernel::isolation::{PROJECT_POLICY, project_policy};
 use zeabur_kube::DynamicObject;
 use zeabur_model::{Citation, Fix, FixKind, Gap, Message, Origin, Severity, WorkloadKind};
 
@@ -173,10 +174,76 @@ pub struct Connection {
 pub struct Reachability {
     /// The project's policies, by name.
     pub policies: Vec<String>,
+    /// The project has its own policy, [`PROJECT_POLICY`].
+    pub project_policy: bool,
+    /// The other namespaces a policy lets in whole, by `kubernetes.io/metadata.name`.
+    pub allowed_namespaces: Vec<AllowedNamespace>,
     /// Every service, in the order given.
     pub services: Vec<ServiceReachability>,
     /// The connections given, in that order.
     pub connections: Vec<Connection>,
+}
+
+/// A namespace that a policy lets reach every pod of the project.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+#[schema(as = NetworkPolicyAllowedNamespace)]
+pub struct AllowedNamespace {
+    /// The namespace.
+    pub namespace: String,
+    /// The policy that lets it in.
+    pub policy: String,
+}
+
+/// The namespaces `policy` lets reach every pod of `namespace`, on every port. Only a policy of
+/// this shape counts, as a person writes it with kubectl:
+///
+/// ```yaml
+/// spec:
+///   podSelector: {}
+///   policyTypes: [Ingress]
+///   ingress:
+///     - from:
+///         - namespaceSelector:
+///             matchLabels: {kubernetes.io/metadata.name: <namespace>}
+/// ```
+fn allowed_namespaces(policy: &NetworkPolicy, namespace: &str) -> Vec<String> {
+    let Some(spec) = &policy.spec else {
+        return Vec::new();
+    };
+    let rules = spec.ingress.as_deref().unwrap_or_default();
+    if !is_empty(&spec.pod_selector.clone().unwrap_or_default())
+        || types(policy) != (true, false)
+        || rules.is_empty()
+    {
+        return Vec::new();
+    }
+    let mut found = Vec::new();
+    for rule in rules {
+        if rule.ports.as_ref().is_some_and(|p| !p.is_empty()) {
+            return Vec::new();
+        }
+        let peers = rule.from.as_deref().unwrap_or_default();
+        if peers.is_empty() {
+            return Vec::new();
+        }
+        for peer in peers {
+            let name = peer
+                .namespace_selector
+                .as_ref()
+                .filter(|_| peer.ip_block.is_none())
+                .filter(|_| peer.pod_selector.as_ref().is_none_or(is_empty))
+                .filter(|s| s.match_expressions.as_ref().is_none_or(Vec::is_empty))
+                .and_then(|s| s.match_labels.as_ref())
+                .filter(|labels| labels.len() == 1)
+                .and_then(|labels| labels.get(NAMESPACE_NAME_LABEL));
+            match name {
+                Some(name) if name != namespace => found.push(name.clone()),
+                _ => return Vec::new(),
+            }
+        }
+    }
+    found
 }
 
 /// What reachability is computed from.
@@ -580,11 +647,28 @@ pub fn reachability(input: Input<'_>) -> Reachability {
             })
         })
         .collect();
+    let mut allowed: Vec<AllowedNamespace> = policies
+        .iter()
+        .flat_map(|p| {
+            let name = p.metadata.name.clone().unwrap_or_default();
+            allowed_namespaces(p, input.namespace)
+                .into_iter()
+                .map(move |namespace| AllowedNamespace {
+                    namespace,
+                    policy: name.clone(),
+                })
+        })
+        .collect();
+    allowed.sort_by(|a, b| (&a.namespace, &a.policy).cmp(&(&b.namespace, &b.policy)));
     Reachability {
         policies: policies
             .iter()
             .filter_map(|p| p.metadata.name.clone())
             .collect(),
+        project_policy: policies
+            .iter()
+            .any(|p| p.metadata.name.as_deref() == Some(PROJECT_POLICY)),
+        allowed_namespaces: allowed,
         services,
         connections,
     }
@@ -826,27 +910,18 @@ pub fn unprotected(input: Input<'_>, exposed: Exposed<'_>) -> Option<Finding> {
     if open.is_empty() {
         return None;
     }
-    let mut objects: Vec<Value> = Vec::new();
-    for target in &open {
-        for preset in presets(input.namespace, target, &[]) {
-            if preset.kind == "isolate"
-                || (preset.kind == "allow-from-ingress-controller"
-                    && exposed.routed.contains(&target.id))
-            {
-                objects.push(preset.object);
-            }
-        }
-    }
+    let objects = vec![project_policy(input.namespace)];
     let mut applied = input.policies.to_vec();
     applied.extend(
         objects
             .iter()
             .filter_map(|o| serde_json::from_value(o.clone()).ok()),
     );
-    let after = reachability(Input {
+    let after_input = Input {
         policies: &applied,
         ..input
-    });
+    };
+    let after = reachability(after_input);
     let names: Vec<&str> = open
         .iter()
         .filter_map(|w| w.id.rsplit('/').next())
@@ -859,7 +934,10 @@ pub fn unprotected(input: Input<'_>, exposed: Exposed<'_>) -> Option<Finding> {
             service: None,
             message: Message::new("gap.noNetworkPolicy")
                 .with("services", names.join(","))
-                .with("cuts", cuts(&before, &after, &open, exposed).join(",")),
+                .with(
+                    "cuts",
+                    cuts(&before, &after, &open, exposed, after_input).join(","),
+                ),
             fix: Fix {
                 kind: FixKind::Plan,
                 id: "networkPolicy.isolateProject".to_owned(),
@@ -894,12 +972,13 @@ fn cuts(
     after: &Reachability,
     open: &[&Workload],
     exposed: Exposed<'_>,
+    applied: Input<'_>,
 ) -> Vec<&'static str> {
     let cut = |field: fn(&ServiceReachability) -> Access| {
         before.services.iter().zip(&after.services).any(|(b, a)| {
             open.iter().any(|w| w.id == b.service)
-                && field(b) != Access::Blocked
-                && field(a) == Access::Blocked
+                && field(b) == Access::Allowed
+                && field(a) > field(b)
         })
     };
     [
@@ -907,7 +986,9 @@ fn cuts(
         ("outside", cut(|s| s.to_outside)),
         (
             "published",
-            open.iter().any(|w| exposed.published.contains(&w.id)),
+            open.iter().any(|w| {
+                exposed.published.contains(&w.id) && blocks_internet(applied, &w.id).is_some()
+            }),
         ),
         (
             "connections",
@@ -1186,30 +1267,19 @@ mod tests {
         assert_eq!(gap.severity, Severity::Advice);
         assert_eq!(gap.subject, Origin::object("Namespace", "shop"));
         assert_eq!(gap.message.params["services"], "web,api");
-        assert_eq!(
-            gap.message.params["cuts"],
-            "otherNamespaces,outside,published"
-        );
+        // Only other projects lose access: the internet, egress and the ingress controller stay.
+        assert_eq!(gap.message.params["cuts"], "otherNamespaces");
         assert_eq!(gap.fix.kind, FixKind::Plan);
         let objects: Vec<Value> = serde_json::from_str(&gap.fix.params["objects"]).unwrap();
-        let names: Vec<&str> = objects
-            .iter()
-            .map(|o| o["metadata"]["name"].as_str().unwrap())
-            .collect();
-        assert_eq!(
-            names,
-            [
-                "zeabur-isolate-web",
-                "zeabur-allow-ingress-web",
-                "zeabur-isolate-api"
-            ]
-        );
-        // Applied, the plan leaves the project's connection and the ingress controller open.
+        assert_eq!(objects, [project_policy("shop")]);
         let applied: Vec<DynamicObject> = objects.into_iter().map(object).collect();
         let r = reachability(input(&workloads, &applied, &connections));
+        assert!(r.project_policy);
         assert_eq!(r.connections[0].access, Access::Allowed);
-        assert_eq!(r.services[0].from_ingress_controller, Access::Allowed);
-        assert!(r.services.iter().all(|s| s.ingress_isolated));
+        assert!(r.services.iter().all(|s| s.ingress_isolated
+            && s.from_ingress_controller == Access::Allowed
+            && s.from_other_namespaces != Access::Allowed
+            && s.to_outside == Access::Allowed));
         assert!(
             unprotected(
                 input(&workloads, &applied, &connections),
@@ -1233,8 +1303,46 @@ mod tests {
         let finding = unprotected(input(&workloads, &policies, &[]), Exposed::default()).unwrap();
         assert_eq!(finding.gap.message.params["services"], "api");
         let objects: Vec<Value> = serde_json::from_str(&finding.gap.fix.params["objects"]).unwrap();
-        assert_eq!(objects.len(), 1);
-        assert_eq!(objects[0]["metadata"]["name"], "zeabur-isolate-api");
+        assert_eq!(objects, [project_policy("shop")]);
+    }
+
+    fn allow_from(name: &str, from: &Value) -> DynamicObject {
+        object(json!({
+            "apiVersion": "networking.k8s.io/v1", "kind": "NetworkPolicy",
+            "metadata": {"name": name, "namespace": "shop"},
+            "spec": {"podSelector": {}, "policyTypes": ["Ingress"], "ingress": [{"from": from}]}
+        }))
+    }
+
+    #[test]
+    fn a_policy_that_lets_a_namespace_in_whole_is_listed() {
+        let workloads = [workload("api", "api")];
+        let policies = [
+            object(project_policy("shop")),
+            allow_from(
+                "zeabur-allow-from-blog",
+                &json!([{"namespaceSelector": {"matchLabels": {NAMESPACE_NAME_LABEL: "blog"}}}]),
+            ),
+            // Only some pods of the namespace, or only one port: not the whole namespace.
+            allow_from(
+                "some-pods",
+                &json!([{"namespaceSelector": {"matchLabels": {NAMESPACE_NAME_LABEL: "wiki"}},
+                    "podSelector": {"matchLabels": {"app": "x"}}}]),
+            ),
+            allow_from(
+                "by-team",
+                &json!([{"namespaceSelector": {"matchLabels": {"team": "a"}}}]),
+            ),
+        ];
+        let r = reachability(input(&workloads, &policies, &[]));
+        assert!(r.project_policy);
+        assert_eq!(
+            r.allowed_namespaces,
+            [AllowedNamespace {
+                namespace: "blog".to_owned(),
+                policy: "zeabur-allow-from-blog".to_owned(),
+            }]
+        );
     }
 
     #[test]

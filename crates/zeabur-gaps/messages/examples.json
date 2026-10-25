@@ -1283,6 +1283,16 @@
   "zh-CN": "Ingress ingress1 使用 class1，它的 controller 已停止维护。"
  },
  {
+  "key": "gap.projectWithoutNetworkPolicy",
+  "params": {
+   "namespace": "shop",
+   "policy": "zeabur-project"
+  },
+  "en": "Project shop has no NetworkPolicy zeabur-project, so any pod in the cluster can reach its services.",
+  "zh-TW": "專案 shop 沒有 NetworkPolicy zeabur-project，叢集裡任何 Pod 都連得到它的服務。",
+  "zh-CN": "项目 shop 没有 NetworkPolicy zeabur-project，集群里任何 Pod 都连得到它的服务。"
+ },
+ {
   "key": "gap.retiredIngressController",
   "params": {
    "class": "class1",

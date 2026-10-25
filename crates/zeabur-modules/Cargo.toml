@@ -12,6 +12,7 @@ workspace = true
 
 [dependencies]
 zeabur-adapters.workspace = true
+zeabur-kernel.workspace = true
 zeabur-kube.workspace = true
 zeabur-model.workspace = true
 k8s-openapi.workspace = true

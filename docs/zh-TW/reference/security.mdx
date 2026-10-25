@@ -85,7 +85,82 @@ kubectl label namespace <ns> \
 
 RKE2 CIS 對未加標籤的 Namespace 仍預設使用 `restricted`，專案自己的 `baseline` 標籤會覆蓋這個預設值。`kube-system` 和 Zeabur 自己的 Namespace 維持原設定。
 
-Pod Security 不管網路。要限制跨專案的流量，另外設定 NetworkPolicy。開發者可以修改 NetworkPolicy，所以也能改變專案的連線規則。
+Pod Security 不管網路，專案之間的連線見下一節。
+
+## 專案之間的網路
+
+Zeabur 的信任範圍是整個叢集：能登入的人都是可信任的使用者，Zeabur 沒有團隊的概念。要把彼此不信任的人分開，請分成不同的叢集。專案之間的網路隔離是為了減少意外：一個服務出問題或被入侵時，不會直接連到別的專案。
+
+### 新專案裡有什麼
+
+用 installer 安裝的叢集，平台元件所在的 Namespace 都有 `installer.zeabur.com/baseline: "true"` 標籤。叢集裡有這個標籤時，Zeabur 建立專案會寫入兩個物件：
+
+- Namespace，帶 `zeabur.com/project` 標籤和 Pod Security 標籤。
+- NetworkPolicy `zeabur-project`：專案裡每個 Pod 都只收以下來源的連線，往外的連線不限制。
+  - 同一個專案的 Pod。
+  - 帶 `installer.zeabur.com/baseline: "true"` 的 Namespace，也就是 Ingress controller、指標收集和資料庫 operator 這些平台元件。
+  - `kube-system`，k3s 的 Traefik 和 ServiceLB 在這裡。
+
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: zeabur-project
+  namespace: <專案>
+spec:
+  podSelector: {}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector: {}
+        - namespaceSelector:
+            matchLabels: {installer.zeabur.com/baseline: "true"}
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: kube-system}
+```
+
+同一台節點上的 kubelet 健康檢查不需要規則。公開網域、NodePort 和 LoadBalancer 的流量也照常進來。
+
+叢集裡沒有任何 Namespace 帶這個標籤時（例如在既有叢集上直接執行 `zeaburctl ui`），Zeabur 分不出哪些 Namespace 是平台元件，所以不寫 NetworkPolicy，以免擋掉 Ingress controller。要啟用，先替平台元件的 Namespace 加上標籤：
+
+```sh
+kubectl label namespace traefik cert-manager installer.zeabur.com/baseline=true
+```
+
+NetworkPolicy 要叢集的網路外掛（CNI）支援才會生效。RKE2 的 Canal 和 k3s 內建的 kube-router 都支援；KubeSolo 的 bridge CNI 不支援，寫了也不會擋任何連線。
+
+### 讓另一個專案連進來
+
+在專案的 **設定** → **網路** 選 **允許其他專案連入**，或用 kubectl 加一個 NetworkPolicy。以下讓 `blog` 的所有 Pod 連到 `shop` 的所有服務：
+
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: zeabur-allow-from-blog
+  namespace: shop
+spec:
+  podSelector: {}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: blog}
+```
+
+`kubernetes.io/metadata.name` 由 kube-apiserver 設定，等於 Namespace 的名稱，別人改不掉。NetworkPolicy 只能允許、不能拒絕，多個 NetworkPolicy 的規則會疊加，所以這個物件只會多開放 `blog`，不會影響 `zeabur-project`。要收回，刪掉它即可：
+
+```sh
+kubectl -n shop delete networkpolicy zeabur-allow-from-blog
+```
+
+已經建立的連線可能不會馬上斷，要等連線結束或服務重新啟動。
+
+### 既有的專案
+
+這項功能之前建立的專案沒有 `zeabur-project`。`zeaburctl doctor` 的 `cluster-gaps` 會列出這些專案，專案頁的建議也會提供 **隔離** 的變更。也可以直接用 kubectl 套用上面的 YAML。
+
+**開發者** 可以修改或刪除自己專案的 NetworkPolicy。刪掉 `zeabur-project` 只會讓自己的專案對其他專案開放，`zeaburctl doctor` 會繼續提醒。
 
 ## 終端機
 

@@ -429,6 +429,41 @@ mod tests {
     }
 
     #[test]
+    fn a_new_project_gets_its_network_policy_once_the_platform_is_labelled() {
+        let snapshot = Snapshot {
+            namespace: "my-app".to_owned(),
+            ..Snapshot::default()
+        };
+        let plan = plan(
+            Input {
+                platform_namespaces: true,
+                ..Input::new(&snapshot, "2026-10-26T00:00:00Z")
+            },
+            &PlanRequest {
+                changes: vec![Change::CreateProject { display_name: None }],
+            },
+        )
+        .unwrap();
+        let policy = plan
+            .objects
+            .iter()
+            .find(|o| o.target.plural == "networkpolicies")
+            .expect("a NetworkPolicy");
+        let Write::Create { body } = &policy.write else {
+            panic!("the policy is created");
+        };
+        assert_eq!(body, &zeabur_kernel::isolation::project_policy("my-app"));
+        // Without the label nothing tells which namespaces to let in: no policy.
+        let unlabelled = create("my-app", None, None).unwrap();
+        assert!(
+            unlabelled
+                .objects
+                .iter()
+                .all(|o| o.target.plural != "networkpolicies")
+        );
+    }
+
+    #[test]
     fn a_new_project_is_refused_for_a_taken_kept_or_invalid_name() {
         let taken = create("shop", Some(&shop(false)), None).unwrap_err();
         assert_eq!(

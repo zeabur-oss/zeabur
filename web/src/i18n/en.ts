@@ -1231,6 +1231,22 @@ export const en = {
   "projectSettings.shownYes": "Yes. The namespace has Zeabur's project label.",
   "projectSettings.shownNo":
     "No. Showing it as a project only adds Zeabur's project label; nothing else changes.",
+  "network.title": "Network",
+  "network.isolation": "Other projects",
+  "network.isolated":
+    "Can't reach this project's services. Services in this project and Zeabur's components still can.",
+  "network.open": "Any pod in the cluster can reach this project's services.",
+  "network.isolate": "Isolate",
+  "network.allowedHint": (policy: string) =>
+    `Can reach every service of this project (NetworkPolicy ${policy}).`,
+  "network.disallow": "Remove",
+  "network.disallowTitle": (from: string, project: string) =>
+    `Stop letting ${from} reach ${project}`,
+  "network.allow": "Let a project in",
+  "network.allowHint": "It can then reach every service of this project.",
+  "network.noOthers": "No other project to let in.",
+  "network.allowAction": "Allow",
+  "network.allowTitle": (from: string, project: string) => `Let ${from} reach ${project}`,
   "projectSettings.batch": "Batch actions",
   "projectSettings.pauseAll": "Pause all services",
   "projectSettings.pauseAllHint":

@@ -261,7 +261,7 @@ export interface paths {
     }
     /**
      * What the cluster itself is missing, apart from any project: an IngressClass served by a
-     *     retired controller.
+     *     retired controller, and a project namespace without its NetworkPolicy.
      */
     get: operations["cluster"]
     put?: never
@@ -5774,6 +5774,13 @@ export interface components {
      * @enum {string}
      */
     NetworkPolicyAccess: "allowed" | "limited" | "blocked"
+    /** @description A namespace that a policy lets reach every pod of the project. */
+    NetworkPolicyAllowedNamespace: {
+      /** @description The namespace. */
+      namespace: string
+      /** @description The policy that lets it in. */
+      policy: string
+    }
     /**
      * @description A connection the project shows (inferred from configuration), and whether the policies let it
      *     through.
@@ -5812,10 +5819,14 @@ export interface components {
     }
     /** @description The project's reachability. */
     NetworkPolicyReachability: {
+      /** @description The other namespaces a policy lets in whole, by `kubernetes.io/metadata.name`. */
+      allowedNamespaces: components["schemas"]["NetworkPolicyAllowedNamespace"][]
       /** @description The connections given, in that order. */
       connections: components["schemas"]["NetworkPolicyConnection"][]
       /** @description The project's policies, by name. */
       policies: string[]
+      /** @description The project has its own policy, [`PROJECT_POLICY`]. */
+      projectPolicy: boolean
       /** @description Every service, in the order given. */
       services: components["schemas"]["NetworkPolicyService"][]
     }

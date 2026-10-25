@@ -7,7 +7,9 @@
 
 use std::collections::BTreeSet;
 
+use serde_json::Value;
 use zeabur_graph::{Snapshot, ingress_backends};
+use zeabur_kernel::isolation::{PROJECT_POLICY, project_policy};
 use zeabur_kernel::names::GatewayRef;
 use zeabur_model::{
     Citation, Fix, FixKind, Gap, HttpRoute, Message, Origin, Project, Service, Severity,
@@ -599,10 +601,45 @@ pub fn retired_classes(classes: &[IngressClassFact]) -> BTreeSet<String> {
         .collect()
 }
 
-/// What the cluster itself is missing, apart from any project: an IngressClass served by a
-/// retired controller. Its fix is to install a maintained controller from the catalogue.
+/// A namespace, as the cluster rules read it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NamespaceFact {
+    /// Its name.
+    pub name: String,
+    /// It carries `LABEL_PROJECT`.
+    pub project: bool,
+    /// It carries [`PLATFORM_LABEL`](zeabur_kernel::isolation::PLATFORM_LABEL).
+    pub platform: bool,
+    /// It holds the policy [`PROJECT_POLICY`].
+    pub project_policy: bool,
+}
+
+/// The guidance behind the rule `project-without-network-policy`.
+fn project_policy_citations() -> Vec<Citation> {
+    vec![
+        Citation {
+            title: "RKE2 CIS 1.12 self-assessment, 5.3.2: every namespace has NetworkPolicies"
+                .to_owned(),
+            url: "https://docs.rke2.io/security/cis_self_assessment112".to_owned(),
+        },
+        Citation {
+            title: "Kubernetes: Network Policies".to_owned(),
+            url: "https://kubernetes.io/docs/concepts/services-networking/network-policies/"
+                .to_owned(),
+        },
+    ]
+}
+
+/// What the cluster itself is missing, apart from any project:
+///
+/// - An IngressClass served by a retired controller. Its fix is to install a maintained controller
+///   from the catalogue.
+/// - A project namespace without [`PROJECT_POLICY`], when some namespace carries
+///   [`PLATFORM_LABEL`](zeabur_kernel::isolation::PLATFORM_LABEL). Without that label nothing tells
+///   which namespaces the platform runs in, and the policy would lock them out, so no gap is
+///   reported. Its fix plans the policy.
 #[must_use]
-pub fn cluster_gaps(classes: &[IngressClassFact]) -> Vec<Gap> {
+pub fn cluster_gaps(classes: &[IngressClassFact], namespaces: &[NamespaceFact]) -> Vec<Gap> {
     let rule = IngressToHttpRoute;
     let mut gaps: Vec<Gap> = classes
         .iter()
@@ -623,12 +660,39 @@ pub fn cluster_gaps(classes: &[IngressClassFact]) -> Vec<Gap> {
             citations: rule.citations(),
         })
         .collect();
+    if namespaces.iter().any(|n| n.platform) {
+        gaps.extend(
+            namespaces
+                .iter()
+                .filter(|n| n.project && !n.platform && !n.project_policy)
+                .map(|namespace| Gap {
+                    rule: "project-without-network-policy".to_owned(),
+                    severity: Severity::Warning,
+                    subject: Origin::object("Namespace", &namespace.name),
+                    service: None,
+                    message: Message::new("gap.projectWithoutNetworkPolicy")
+                        .with("namespace", &namespace.name)
+                        .with("policy", PROJECT_POLICY),
+                    fix: Fix {
+                        kind: FixKind::Plan,
+                        id: "networkPolicy.isolateProject".to_owned(),
+                        params: std::collections::BTreeMap::from([(
+                            "objects".to_owned(),
+                            Value::Array(vec![project_policy(&namespace.name)]).to_string(),
+                        )]),
+                    },
+                    citations: project_policy_citations(),
+                }),
+        );
+    }
     gaps.sort_by(|a, b| a.subject.cmp(&b.subject));
     gaps
 }
 
 #[cfg(test)]
 mod tests {
+    use serde_json::json;
+
     use super::*;
 
     #[test]
@@ -643,7 +707,7 @@ mod tests {
                 controller: "traefik.io/ingress-controller".to_owned(),
             },
         ];
-        let gaps = cluster_gaps(&classes);
+        let gaps = cluster_gaps(&classes, &[]);
         assert_eq!(gaps.len(), 1);
         assert_eq!(gaps[0].subject, Origin::object("IngressClass", "nginx"));
         assert_eq!(gaps[0].fix.kind, FixKind::Install);
@@ -652,6 +716,33 @@ mod tests {
             retired_classes(&classes).into_iter().collect::<Vec<_>>(),
             ["nginx"]
         );
+    }
+
+    fn namespace(name: &str, project: bool, platform: bool, project_policy: bool) -> NamespaceFact {
+        NamespaceFact {
+            name: name.to_owned(),
+            project,
+            platform,
+            project_policy,
+        }
+    }
+
+    #[test]
+    fn a_project_without_its_policy_is_a_cluster_gap_once_the_platform_is_labelled() {
+        let namespaces = [
+            namespace("shop", true, false, false),
+            namespace("blog", true, false, true),
+            namespace("scratch", false, false, false),
+        ];
+        // No namespace names the platform: nothing to let in, so no gap.
+        assert_eq!(cluster_gaps(&[], &namespaces), Vec::<Gap>::new());
+        let mut labelled = namespaces.to_vec();
+        labelled.push(namespace("traefik", false, true, false));
+        let gaps = cluster_gaps(&[], &labelled);
+        let subjects: Vec<&Origin> = gaps.iter().map(|g| &g.subject).collect();
+        assert_eq!(subjects, [&Origin::object("Namespace", "shop")]);
+        let objects: Value = serde_json::from_str(&gaps[0].fix.params["objects"]).unwrap();
+        assert_eq!(objects, json!([project_policy("shop")]));
     }
 
     #[test]

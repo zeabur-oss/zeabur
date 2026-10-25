@@ -123,6 +123,7 @@
     "gap.healthChecks.none": "${container} 没有就绪检查，未就绪时也可能收到流量。",
     "gap.healthChecks.livenessOnly": "${container} 有存活检查，但没有就绪检查。",
     "gap.ingressToHttpRoute.retired": "Ingress ${ingress} 使用 ${class}，它的 controller 已停止维护。",
+    "gap.projectWithoutNetworkPolicy": "项目 ${namespace} 没有 NetworkPolicy ${policy}，集群里任何 Pod 都连得到它的服务。",
     "gap.retiredIngressController": "IngressClass ${class} 的 controller ${controller} 已停止维护。",
     "gap.danglingRoute.noService": "${kind} ${route} 指定的 Service ${services, list} 不在这个项目里。",
     "gap.danglingRoute.noGateway": "HTTPRoute ${route} 指定的 Gateway ${gateways, list} 不存在。",
