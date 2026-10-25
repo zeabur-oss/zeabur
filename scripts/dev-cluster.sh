@@ -401,15 +401,15 @@ EOF
   catalog_install databases/percona-mongodb psmdb-operator
   catalog_install image-updates/keel keel
 
-  # The test S3 the database backup test writes to, with its bucket.
+  # The test S3 the database backup test writes to, with its bucket (weed shell answers on stderr).
   kubectl apply -f "$root/web/e2e/manifests/s3.yaml" >/dev/null
   kubectl -n s3-test rollout status deployment/seaweedfs --timeout=180s
   bucket() {
     kubectl -n s3-test exec deploy/seaweedfs -- sh -c \
-      'echo s3.bucket.create -name backups | weed shell -master=localhost:9333 -filer=localhost:8888' 2>/dev/null |
+      'echo s3.bucket.create -name backups | weed shell -master=localhost:9333 -filer=localhost:8888' 2>&1 |
       grep -q 'created bucket\|already exists'
   }
-  retry 300 "the test S3's bucket" bucket
+  retry 120 "the test S3's bucket" bucket
 
   # --- Zeabur Builder, from its repository's deploy files ---------------------------------------
   if [[ -z "$builder_src" ]]; then
