@@ -1453,14 +1453,14 @@ export const en = {
   "create.button": "Create",
   "create.title": (project: string) => `Create in ${project}`,
   "create.palette": (project: string) => `Create in ${project}…`,
-  "create.templateAdd": "Add a template",
+  "create.templateAdd": "Insert example",
   "create.common": "Common kinds",
   "create.custom": "Custom resources",
   "create.more": "Other kinds you may create",
   "create.documents": (n: number) => plural(n, "document", "documents"),
   "create.editor": "YAML to create",
   "create.review": "Review changes",
-  "create.empty": "Write the objects as YAML, or add a template.",
+  "create.empty": "Write the objects as YAML, or insert an example.",
   "create.inOrder": "Created in this order",
   "create.inOrderHint":
     "ConfigMaps, Secrets, claims and service accounts first, then Services, then workloads, then the rest, so what a workload reads exists when it starts.",
@@ -1824,6 +1824,7 @@ export const en = {
   "confirm.errorPageHtml": "Write the project's error pages to the page server's ConfigMap.",
   "confirm.pageServer":
     "Deploy the Error pages template to the project as its page server, with these pages.",
+  "confirm.template": (template: string) => `Deploy the ${template} template in the project.`,
   "confirm.errorPages": (route: string) =>
     `Show the project's error pages on every domain of Ingress ${route}.`,
   "confirm.errorPagesOff": (route: string) => `Stop showing the error pages on Ingress ${route}.`,
@@ -2584,6 +2585,40 @@ export const en = {
   "add.palette.database": (engine: string, project: string) => `New ${engine} in ${project}`,
   "add.git": "Deploy from Git",
   "add.compose": "Docker Compose",
+  "add.template": "App template",
+  "add.templatesTitle": "App templates",
+  "add.templatesBody": (project: string) =>
+    `Apps ready to deploy in ${project}. You review the objects before anything is created.`,
+  "add.templateFilter": "Filter templates",
+  "add.templateNoMatch": (query: string) => `No template matches “${query}”.`,
+  "add.templateNeeds": (cpu: string, memory: string) => `Needs ${cpu} and ${memory} of memory`,
+  "add.templateTightMemory": "Not enough memory free",
+  "add.templateTightCpu": "Not enough CPU free",
+  "add.templateMissing": (names: string) => `Install ${names} first`,
+  "add.templateDeploy": (name: string) => `Deploy ${name}`,
+  "add.templateBack": "All templates",
+  "add.templateMissingBody":
+    "This app runs on that component. Install it from Components, then come back.",
+  "add.templateInstall": (name: string) => `Install ${name}`,
+  "add.templateUnknown": (names: string) =>
+    `Zeabur can't tell whether ${names} is installed. If it isn't, the review says so.`,
+  "add.templateNoIssuer":
+    "This app needs HTTPS, but Zeabur has no certificate issuer set. An administrator can set one with --cluster-issuer when starting Zeabur.",
+  "add.templateRoom": (use: string, free: string) =>
+    `The cluster has room for it: it needs ${use} of memory, and ${free} is free.`,
+  "add.templateLowMemory": (use: string, free: string) =>
+    `The cluster is low on memory for it: it needs ${use}, and ${free} is free. Make room or add a node first.`,
+  "add.templateLowCpu": (use: string, free: string) =>
+    `The cluster is low on CPU for it: it needs ${use}, and ${free} is free. Make room or add a node first.`,
+  "add.templateGenerated": (secrets: string) =>
+    `Passwords and keys are generated in your browser and kept in Secret ${secrets}.`,
+  "add.templateConsent": "I've read this and agree",
+  "add.templateConsentNeeded": "Agree to deploy this app.",
+  "add.templateInputEmpty": "Fill this in.",
+  "add.templateInputInvalid": (pattern: string) =>
+    `Doesn't match the expected format (${pattern}).`,
+  "add.templateFromCluster": "Read from the cluster.",
+  "add.templateOptional": "Optional",
   "add.composeTitle": "Import Docker Compose",
   "add.composeBody": (project: string) =>
     `Makes a service in ${project} for each service of a Compose file. You review the objects before anything is created.`,

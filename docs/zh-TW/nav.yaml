@@ -12,6 +12,7 @@
     git: 從 Git 建置並部署服務
     image: 部署容器映像檔
     compose: 匯入 Docker Compose 服務
+    templates: 從應用程式範本部署
     databases: 建立、備份與還原資料庫
     object-storage: 建立 S3 物件儲存與儲存貯體
     cron-jobs: 依排程執行服務指令

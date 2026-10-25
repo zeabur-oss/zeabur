@@ -232,8 +232,11 @@ mod tests {
                 .copied()
                 .find(|o| o["kind"] == kind && o["metadata"]["name"] == name)
         };
-        assert!(named("NetworkPolicy", "default-deny").is_none());
-        assert!(named("NetworkPolicy", "error-pages").is_some());
+        let deny = named("NetworkPolicy", "error-pages-default-deny").unwrap();
+        assert_eq!(
+            deny["spec"]["podSelector"]["matchLabels"]["templates.zeabur.com/template"],
+            "error-pages"
+        );
         assert!(named("Deployment", "error-pages").is_some());
         let service = named("Service", "error-pages").unwrap();
         assert_eq!(

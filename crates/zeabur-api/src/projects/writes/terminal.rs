@@ -79,6 +79,7 @@ pub(crate) async fn compute(
         | Change::BasicAuth(_)
         | Change::ErrorPageHtml(_)
         | Change::PageServer(_)
+        | Change::Template(_)
         | Change::ErrorPages(_)
         | Change::Maintenance(_)
         | Change::Restart { .. }

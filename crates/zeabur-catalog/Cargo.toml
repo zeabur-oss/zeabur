@@ -12,6 +12,7 @@ workspace = true
 
 [dependencies]
 zeabur-kube.workspace = true
+regex.workspace = true
 serde.workspace = true
 serde-saphyr = { workspace = true, features = ["serialize"] }
 serde_json.workspace = true

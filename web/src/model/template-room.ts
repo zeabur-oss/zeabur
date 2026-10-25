@@ -7,19 +7,19 @@ export interface TemplateRoom {
   verdict: "room" | "tight"
   /** The resource the verdict is about: memory, unless CPU is the one that is short. */
   resource: "memory" | "cpu"
-  /** The template's idle use of that resource: bytes or millicores. */
+  /** What the template uses of that resource: bytes or millicores. */
   use: number
   /** What is free of it now, never below zero. */
   free: number
 }
 
 /**
- * Whether the cluster has room for a template's measured idle use; `undefined` when the template
- * has no measurement or the nodes' use cannot be read. What is in use is the larger of what the
+ * Whether the cluster has room for what a template uses: its measured idle use, or what its pods
+ * request; `undefined` without it or when the nodes' use cannot be read. What is in use is the larger of what the
  * pods use and what they request, since the scheduler places pods by their requests.
  */
 export function templateRoom(
-  idle: Schemas["IdleUse"] | null | undefined,
+  idle: Pick<Schemas["IdleUse"], "memoryBytes" | "cpuMillicores"> | null | undefined,
   nodes: Schemas["NodeList"] | undefined,
 ): TemplateRoom | undefined {
   if (!idle || !nodes) return undefined

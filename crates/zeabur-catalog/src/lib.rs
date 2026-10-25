@@ -12,20 +12,12 @@ mod bundle {
 pub mod install;
 pub mod installed;
 pub mod measured;
+pub mod templates;
 pub mod versions;
 
 pub use installed::{ComponentUpgrade, InstallSource, Installation};
 pub use measured::{IdleUse, template_idle};
-
-/// The templates of Zeabur Catalog this build carries.
-pub const TEMPLATES: &[&str] = &["error-pages"];
-
-/// The `manifests.yaml` of Zeabur Catalog's `error-pages` template, a Go template whose only field
-/// is `{{ .Namespace }}`: the page server for a project's error pages and maintenance page.
-pub const ERROR_PAGES_MANIFESTS: &str = include_str!(concat!(
-    env!("OUT_DIR"),
-    "/bundle/templates/error-pages/manifests.yaml"
-));
+pub use templates::{RenderError, RenderOptions, Template, render, template, templates};
 
 /// The commit of Zeabur Catalog this build carries.
 pub const CATALOGUE_COMMIT: &str = env!("ZEABUR_CATALOG_COMMIT");

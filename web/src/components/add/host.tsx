@@ -3,6 +3,7 @@ import { ComposeDrawer } from "@/components/add/compose-drawer"
 import { NewObjectStorageDrawer, useObjectStorage } from "@/components/object-storage"
 import { GitDrawer } from "@/components/add/git-drawer"
 import { ImageDrawer } from "@/components/add/image-drawer"
+import { TemplateDrawer } from "@/components/add/template-drawer"
 import { adding, type AddWhat } from "@/lib/adding"
 import type { Engine } from "@/model/databases"
 
@@ -12,6 +13,7 @@ export function AddHost({ project, what }: { project: string; what: AddWhat }) {
   if (what === "image") return <ImageDrawer project={project} onClose={close} />
   if (what === "git") return <GitDrawer project={project} onClose={close} />
   if (what === "compose") return <ComposeDrawer project={project} onClose={close} />
+  if (what === "template") return <TemplateDrawer project={project} onClose={close} />
   if (what === "objectStorage") return <ObjectStorageForm project={project} onClose={close} />
   return <DatabaseForm project={project} engine={what} onClose={close} />
 }

@@ -1019,13 +1019,27 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/Problem"
+  /api/v1/cluster/templates:
+    get:
+      tags:
+      - cluster
+      summary: |-
+        The templates this build carries, with what each one needs and whether the cluster has the
+        components for it, read as the person.
+      operationId: listTemplates
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TemplateList"
   "/api/v1/cluster/templates/{template}":
     get:
       tags:
       - cluster
       summary: |-
-        A template this build carries, and what its pods use when idle, so a deploy can say whether
-        the cluster has room for it. Readable by every signed-in person.
+        A template this build carries, what it needs, and what its pods use when idle, so a deploy can
+        say whether the cluster has room for it. Readable by every signed-in person.
       operationId: getTemplate
       parameters:
       - name: template
@@ -5132,9 +5146,8 @@ components:
         - $ref: "#/components/schemas/ErrorPageHtml"
           description: |-
             Deploy the page server from Zeabur Catalog's `error-pages` template, with this HTML in
-            place of the template's pages. The API opens it into the `create` of each object; the
-            NetworkPolicy that denies traffic to every pod of the namespace is left out, so the
-            project's other services keep their traffic.
+            place of the template's pages. The API opens it as a [`Change::Template`] and writes the
+            HTML into the template's ConfigMap of pages.
         - type: object
           required:
           - op
@@ -5145,9 +5158,26 @@ components:
               - pageServer
         description: |-
           Deploy the page server from Zeabur Catalog's `error-pages` template, with this HTML in
-          place of the template's pages. The API opens it into the `create` of each object; the
-          NetworkPolicy that denies traffic to every pod of the namespace is left out, so the
-          project's other services keep their traffic.
+          place of the template's pages. The API opens it as a [`Change::Template`] and writes the
+          HTML into the template's ConfigMap of pages.
+      - allOf:
+        - $ref: "#/components/schemas/TemplateChange"
+          description: |-
+            Deploy a template of Zeabur Catalog in the project. The API renders it and opens it into
+            the `create` of each object. The values of its generated inputs are Secrets that the same
+            request creates.
+        - type: object
+          required:
+          - op
+          properties:
+            op:
+              type: string
+              enum:
+              - template
+        description: |-
+          Deploy a template of Zeabur Catalog in the project. The API renders it and opens it into
+          the `create` of each object. The values of its generated inputs are Secrets that the same
+          request creates.
       - allOf:
         - $ref: "#/components/schemas/ErrorPagesChange"
           description: Show the project's error pages on every hostname of an Ingress, or stop.
@@ -8043,6 +8073,12 @@ components:
       - unavailable
       - available
       - active
+    Encoding:
+      type: string
+      description: The encoding of a generated value.
+      enum:
+      - base64url
+      - hex
     Endpoint:
       type: object
       description: "A Kubernetes Service selecting workloads' pods: how they are reached inside the cluster."
@@ -9071,6 +9107,21 @@ components:
       enum:
       - warning
       - advice
+    Generated:
+      type: object
+      description: "How to make a generated value: random bytes, then encoded."
+      required:
+      - bytes
+      - encoding
+      properties:
+        bytes:
+          type: integer
+          format: int32
+          description: How many random bytes, 12 to 64.
+          minimum: 0
+        encoding:
+          $ref: "#/components/schemas/Encoding"
+          description: How to encode them.
     Health:
       type: string
       description: "A service's health, from worst to best: what a status dot shows."
@@ -14465,6 +14516,56 @@ components:
           type: integer
           format: int32
           description: Ready (or, for a Job, succeeded) pods.
+    Requests:
+      type: object
+      description: CPU and memory.
+      required:
+      - cpuMillicores
+      - memoryBytes
+      properties:
+        cpuMillicores:
+          type: integer
+          format: int64
+          description: Millicores.
+          minimum: 0
+        memoryBytes:
+          type: integer
+          format: int64
+          description: Bytes.
+          minimum: 0
+    Requirement:
+      type: object
+      description: A component a template needs.
+      required:
+      - capability
+      - name
+      - state
+      properties:
+        capability:
+          type: string
+          description: The capability (`databases`).
+        component:
+          type:
+          - string
+          - "null"
+          description: >-
+            The component (`cloudnative-pg`); absent when any component of the capability
+            does.
+        name:
+          type: string
+          description: >-
+            The component's name (`CloudNativePG`), or the capability's when any component
+            does.
+        state:
+          $ref: "#/components/schemas/RequirementState"
+          description: Whether it is there.
+    RequirementState:
+      type: string
+      description: Whether a component a template needs is there.
+      enum:
+      - installed
+      - missing
+      - unknown
     Resource:
       type: object
       description: A resource of the namespace and the workloads it belongs to.
@@ -15385,6 +15486,19 @@ components:
           - string
           - "null"
           description: The `SeaweedFS` version, from the image tag.
+    SecretKey:
+      type: object
+      description: A key of a Secret.
+      required:
+      - name
+      - key
+      properties:
+        key:
+          type: string
+          description: The key.
+        name:
+          type: string
+          description: The Secret's name.
     SecretValue:
       type: object
       description: One value of a revealed Secret.
@@ -16282,20 +16396,159 @@ components:
           - string
           - "null"
           description: "The IANA time zone of the expression (`spec.timeZone`); absent: the controller's."
+    TemplateChange:
+      type: object
+      description: A [`Change::Template`].
+      required:
+      - template
+      properties:
+        domain:
+          type:
+          - string
+          - "null"
+          description: The domain, for a template that routes one.
+        inputs:
+          type: object
+          description: The values of the inputs that are not generated, by name.
+          additionalProperties:
+            type: string
+          propertyNames:
+            type: string
+        template:
+          type: string
+          description: The template's id (`miniflux`).
+    TemplateInput:
+      type: object
+      description: An input of a template.
+      required:
+      - name
+      - description
+      - required
+      - pattern
+      properties:
+        description:
+          type: string
+          description: The catalogue's description, in English.
+        generate:
+          oneOf:
+          - $ref: "#/components/schemas/Generated"
+            description: |-
+              For a generated input: how to make the value. The value goes into `secret`, and a deploy
+              never gives it.
+          - type: "null"
+        name:
+          type: string
+          description: Its name (`kubeApiCidr`).
+        pattern:
+          type: string
+          description: The regular expression the whole value matches (RE2 syntax).
+        required:
+          type: boolean
+          description: A deploy must give it.
+        secret:
+          oneOf:
+          - $ref: "#/components/schemas/SecretKey"
+            description: The Secret key that holds a generated value.
+          - type: "null"
+    TemplateList:
+      type: object
+      description: The templates this build carries.
+      required:
+      - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/TemplateView"
+          description: Every template, by id.
+        kubeApiCidr:
+          type:
+          - string
+          - "null"
+          description: |-
+            The address of kube-apiserver as the `kubernetes` Service's endpoints give it, as an
+            IPv4 `/32`: what the catalogue's own tests give the `kubeApiCidr` input. Absent when the
+            person may not read it or it is not IPv4.
+    TemplateService:
+      type: object
+      description: A service of a template.
+      required:
+      - name
+      properties:
+        name:
+          type: string
+          description: The name of its workload or database object.
+        requests:
+          type: object
+          description: |-
+            The sum of its containers' requests, by resource (`cpu`, `memory`), as Kubernetes
+            quantities.
+          additionalProperties:
+            type: string
+          propertyNames:
+            type: string
     TemplateView:
       type: object
       description: A template of Zeabur Catalog.
       required:
       - id
+      - name
+      - description
+      - license
+      - homepage
+      - requires
+      - services
+      - requests
+      - inputs
+      - needsDomain
+      - needsClusterIssuer
       properties:
+        description:
+          type: string
+          description: The catalogue's description, in English, for operators.
+        homepage:
+          type: string
+          description: The application's home page.
         id:
           type: string
-          description: Its id (`error-pages`).
+          description: Its id (`miniflux`).
         idle:
           oneOf:
           - $ref: "#/components/schemas/IdleUse"
             description: What its pods use when idle; absent until Zeabur Catalog has measured it.
           - type: "null"
+        inputs:
+          type: array
+          items:
+            $ref: "#/components/schemas/TemplateInput"
+          description: What a person gives or the browser generates.
+        license:
+          type: string
+          description: The licence of the application and its images (SPDX).
+        name:
+          type: string
+          description: The application's name (`Miniflux`).
+        needsClusterIssuer:
+          type: boolean
+          description: |-
+            It asks cert-manager for certificates through the cluster's issuer
+            (`GET /api/v1/cluster`, `domains.clusterIssuer`).
+        needsDomain:
+          type: boolean
+          description: "It routes a domain: a deploy gives one."
+        requests:
+          $ref: "#/components/schemas/Requests"
+          description: "What its services request in all: what the scheduler must find free."
+        requires:
+          type: array
+          items:
+            $ref: "#/components/schemas/Requirement"
+          description: The components it needs, and whether each one is there.
+        services:
+          type: array
+          items:
+            $ref: "#/components/schemas/TemplateService"
+          description: Its services.
     Timeline:
       type: object
       description: A timeline.

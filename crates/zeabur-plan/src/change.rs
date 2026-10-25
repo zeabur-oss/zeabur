@@ -71,10 +71,13 @@ pub enum Change {
     /// `error_pages` module).
     ErrorPageHtml(ErrorPageHtml),
     /// Deploy the page server from Zeabur Catalog's `error-pages` template, with this HTML in
-    /// place of the template's pages. The API opens it into the `create` of each object; the
-    /// NetworkPolicy that denies traffic to every pod of the namespace is left out, so the
-    /// project's other services keep their traffic.
+    /// place of the template's pages. The API opens it as a [`Change::Template`] and writes the
+    /// HTML into the template's ConfigMap of pages.
     PageServer(ErrorPageHtml),
+    /// Deploy a template of Zeabur Catalog in the project. The API renders it and opens it into
+    /// the `create` of each object. The values of its generated inputs are Secrets that the same
+    /// request creates.
+    Template(TemplateChange),
     /// Show the project's error pages on every hostname of an Ingress, or stop.
     ErrorPages(ErrorPagesChange),
     /// Show the maintenance page on a hostname instead of its workload, or stop.
@@ -621,6 +624,21 @@ pub struct ErrorPageHtml {
     /// `maintenance.html`: what a hostname in maintenance shows.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub maintenance: Option<String>,
+}
+
+/// A [`Change::Template`].
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[serde(rename_all = "camelCase")]
+pub struct TemplateChange {
+    /// The template's id (`miniflux`).
+    pub template: String,
+    /// The domain, for a template that routes one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub domain: Option<String>,
+    /// The values of the inputs that are not generated, by name.
+    #[serde(default)]
+    pub inputs: BTreeMap<String, String>,
 }
 
 /// A [`Change::ErrorPages`].

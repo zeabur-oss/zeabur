@@ -24,6 +24,13 @@ Level 3: may depend on `zeabur-core`, `zeabur-model` and `zeabur-kube` (for the 
   `flake.lock`, byte for byte the bundle its release signs. `CATALOGUE_COMMIT` is that commit. The
   binary carries the catalogue it was built with and fetches nothing at run time. Renovate moves
   the pin.
+- **Templates are rendered here.** `build.rs` also embeds each `templates/<id>/` of the bundle,
+  and `templates::render` fills its `manifests.yaml` for a namespace, a domain, the cluster's
+  issuer and the inputs, as the catalogue's own Go renderer (`tools/internal/templates/render.go`)
+  does: the same checks and the same subset of `text/template`. Any other action is refused. The
+  generated inputs are not given to the renderer: the browser generates them and creates their
+  Secrets. A template needs a domain or an issuer when its manifests use `.Domain` or
+  `.ClusterIssuer`.
 - **Templates' idle use is measured.** `template_idle` reads the bundle's
   `measurements/templates/<id>.json`, which Zeabur Catalog's nightly run writes, and takes
   its newest single-node amd64 environment. A template without that file has no measurement, and

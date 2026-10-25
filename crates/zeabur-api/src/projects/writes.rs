@@ -71,7 +71,7 @@ use crate::cluster::s3_destinations;
 use crate::error::{ApiError, project_read, read_problem};
 use crate::handlers::{AppState, Credential, Everyday, Person};
 use crate::plan_token::{self as token, Claims, LIFETIME_SECONDS, PlanKey, TokenError};
-use crate::projects::{deploy_keys, page_server, snapshot};
+use crate::projects::{deploy_keys, snapshot, templates};
 
 /// A plan and the token that applies it.
 #[derive(Debug, Clone, Serialize, ToSchema)]
@@ -292,7 +292,11 @@ pub(crate) async fn plan(
     };
     let opened = deploy_keys::open(&state, &identity.username, &project, &request)?;
     let opened = s3_destinations::open(cluster.as_ref(), opened).await?;
-    let opened = page_server::open(&project, opened)?;
+    let opened = templates::open(
+        &project,
+        state.settings.domains.cluster_issuer.as_deref(),
+        opened,
+    )?;
     let plan = compute_any(
         &planner,
         cluster.as_ref(),
@@ -422,7 +426,11 @@ pub(crate) async fn apply(
     };
     let opened = deploy_keys::open(&state, &identity.username, &project, &claims.request)?;
     let opened = s3_destinations::open(cluster.as_ref(), opened).await?;
-    let opened = page_server::open(&project, opened)?;
+    let opened = templates::open(
+        &project,
+        state.settings.domains.cluster_issuer.as_deref(),
+        opened,
+    )?;
     let plan = compute_any(
         &planner,
         cluster.as_ref(),

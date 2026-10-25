@@ -2770,6 +2770,7 @@ name = "zeabur-catalog"
 version = "0.0.1"
 dependencies = [
  "flate2",
+ "regex",
  "serde",
  "serde-saphyr",
  "serde_json",

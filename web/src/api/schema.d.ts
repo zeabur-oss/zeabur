@@ -691,6 +691,26 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  "/api/v1/cluster/templates": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * The templates this build carries, with what each one needs and whether the cluster has the
+     *     components for it, read as the person.
+     */
+    get: operations["listTemplates"]
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   "/api/v1/cluster/templates/{template}": {
     parameters: {
       query?: never
@@ -699,8 +719,8 @@ export interface paths {
       cookie?: never
     }
     /**
-     * A template this build carries, and what its pods use when idle, so a deploy can say whether
-     *     the cluster has room for it. Readable by every signed-in person.
+     * A template this build carries, what it needs, and what its pods use when idle, so a deploy can
+     *     say whether the cluster has room for it. Readable by every signed-in person.
      */
     get: operations["getTemplate"]
     put?: never
@@ -2800,6 +2820,10 @@ export interface components {
           /** @enum {string} */
           op: "pageServer"
         })
+      | (components["schemas"]["TemplateChange"] & {
+          /** @enum {string} */
+          op: "template"
+        })
       | (components["schemas"]["ErrorPagesChange"] & {
           /** @enum {string} */
           op: "errorPages"
@@ -4211,6 +4235,11 @@ export interface components {
      * @enum {string}
      */
     ElevationState: "unavailable" | "available" | "active"
+    /**
+     * @description The encoding of a generated value.
+     * @enum {string}
+     */
+    Encoding: "base64url" | "hex"
     /** @description A Kubernetes Service selecting workloads' pods: how they are reached inside the cluster. */
     Endpoint: {
       /** @description The cluster IP. */
@@ -4762,6 +4791,16 @@ export interface components {
      * @enum {string}
      */
     GapSeverity: "warning" | "advice"
+    /** @description How to make a generated value: random bytes, then encoded. */
+    Generated: {
+      /**
+       * Format: int32
+       * @description How many random bytes, 12 to 64.
+       */
+      bytes: number
+      /** @description How to encode them. */
+      encoding: components["schemas"]["Encoding"]
+    }
     /**
      * @description A service's health, from worst to best: what a status dot shows.
      * @enum {string}
@@ -7456,6 +7495,35 @@ export interface components {
        */
       ready: number
     }
+    /** @description CPU and memory. */
+    Requests: {
+      /**
+       * Format: int64
+       * @description Millicores.
+       */
+      cpuMillicores: number
+      /**
+       * Format: int64
+       * @description Bytes.
+       */
+      memoryBytes: number
+    }
+    /** @description A component a template needs. */
+    Requirement: {
+      /** @description The capability (`databases`). */
+      capability: string
+      /** @description The component (`cloudnative-pg`); absent when any component of the capability does. */
+      component?: string | null
+      /** @description The component's name (`CloudNativePG`), or the capability's when any component does. */
+      name: string
+      /** @description Whether it is there. */
+      state: components["schemas"]["RequirementState"]
+    }
+    /**
+     * @description Whether a component a template needs is there.
+     * @enum {string}
+     */
+    RequirementState: "installed" | "missing" | "unknown"
     /** @description A resource of the namespace and the workloads it belongs to. */
     Resource: {
       /** @description Owned, shared or orphan, and by which workloads. */
@@ -7941,6 +8009,13 @@ export interface components {
       storageClass?: string | null
       /** @description The `SeaweedFS` version, from the image tag. */
       version?: string | null
+    }
+    /** @description A key of a Secret. */
+    SecretKey: {
+      /** @description The key. */
+      key: string
+      /** @description The Secret's name. */
+      name: string
     }
     /** @description One value of a revealed Secret. */
     SecretValue: {
@@ -8441,11 +8516,81 @@ export interface components {
       /** @description The IANA time zone of the expression (`spec.timeZone`); absent: the controller's. */
       timeZone?: string | null
     }
+    /** @description A [`Change::Template`]. */
+    TemplateChange: {
+      /** @description The domain, for a template that routes one. */
+      domain?: string | null
+      /** @description The values of the inputs that are not generated, by name. */
+      inputs?: {
+        [key: string]: string
+      }
+      /** @description The template's id (`miniflux`). */
+      template: string
+    }
+    /** @description An input of a template. */
+    TemplateInput: {
+      /** @description The catalogue's description, in English. */
+      description: string
+      generate?: components["schemas"]["Generated"] | null
+      /** @description Its name (`kubeApiCidr`). */
+      name: string
+      /** @description The regular expression the whole value matches (RE2 syntax). */
+      pattern: string
+      /** @description A deploy must give it. */
+      required: boolean
+      secret?: components["schemas"]["SecretKey"] | null
+    }
+    /** @description The templates this build carries. */
+    TemplateList: {
+      /** @description Every template, by id. */
+      items: components["schemas"]["TemplateView"][]
+      /**
+       * @description The address of kube-apiserver as the `kubernetes` Service's endpoints give it, as an
+       *     IPv4 `/32`: what the catalogue's own tests give the `kubeApiCidr` input. Absent when the
+       *     person may not read it or it is not IPv4.
+       */
+      kubeApiCidr?: string | null
+    }
+    /** @description A service of a template. */
+    TemplateService: {
+      /** @description The name of its workload or database object. */
+      name: string
+      /**
+       * @description The sum of its containers' requests, by resource (`cpu`, `memory`), as Kubernetes
+       *     quantities.
+       */
+      requests?: {
+        [key: string]: string
+      }
+    }
     /** @description A template of Zeabur Catalog. */
     TemplateView: {
-      /** @description Its id (`error-pages`). */
+      /** @description The catalogue's description, in English, for operators. */
+      description: string
+      /** @description The application's home page. */
+      homepage: string
+      /** @description Its id (`miniflux`). */
       id: string
       idle?: components["schemas"]["IdleUse"] | null
+      /** @description What a person gives or the browser generates. */
+      inputs: components["schemas"]["TemplateInput"][]
+      /** @description The licence of the application and its images (SPDX). */
+      license: string
+      /** @description The application's name (`Miniflux`). */
+      name: string
+      /**
+       * @description It asks cert-manager for certificates through the cluster's issuer
+       *     (`GET /api/v1/cluster`, `domains.clusterIssuer`).
+       */
+      needsClusterIssuer: boolean
+      /** @description It routes a domain: a deploy gives one. */
+      needsDomain: boolean
+      /** @description What its services request in all: what the scheduler must find free. */
+      requests: components["schemas"]["Requests"]
+      /** @description The components it needs, and whether each one is there. */
+      requires: components["schemas"]["Requirement"][]
+      /** @description Its services. */
+      services: components["schemas"]["TemplateService"][]
     }
     /** @description A timeline. */
     Timeline: {
@@ -10345,6 +10490,25 @@ export interface operations {
         }
         content: {
           "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
+  listTemplates: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["TemplateList"]
         }
       }
     }

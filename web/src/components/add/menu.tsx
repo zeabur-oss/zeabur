@@ -144,6 +144,13 @@ export function AddMenu({ project, compact = false }: { project: string; compact
         >
           {t("add.compose")}
         </GatedMenuItem>
+        <GatedMenuItem
+          gate={choices.gates.image}
+          testid="add-template"
+          onClick={() => openAdd(project, "template")}
+        >
+          {t("add.template")}
+        </GatedMenuItem>
         {!choices.gates.database.open ? (
           <>
             <MenuSeparator />

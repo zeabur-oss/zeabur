@@ -36,6 +36,7 @@ mod reloader;
 mod rollout;
 mod s3_destinations;
 mod storage;
+mod templates;
 mod terminal;
 mod timeline;
 mod trace;

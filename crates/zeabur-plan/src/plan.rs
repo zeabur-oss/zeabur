@@ -586,10 +586,10 @@ impl<'a> Planner<'a> {
                 "unopened_deploy_key",
                 "A deploy key is planned by the server that sealed it.",
             )),
-            Change::PageServer(_) => Err(error(
+            Change::PageServer(_) | Change::Template(_) => Err(error(
                 ErrorKind::BadRequest,
-                "unopened_page_server",
-                "The page server is planned by the server that carries its template.",
+                "unopened_template",
+                "A template is planned by the server that carries it.",
             )),
             Change::CopyS3Keys(_) => Err(error(
                 ErrorKind::BadRequest,

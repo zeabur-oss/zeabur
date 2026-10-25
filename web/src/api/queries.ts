@@ -168,7 +168,14 @@ export const nodesQuery = queryOptions({
   retryOnMount: false,
 })
 
-/** A template of Zeabur Catalog this build carries; it changes only with the build. */
+/** The templates of Zeabur Catalog this build carries, with whether the cluster serves the
+ * components each one needs. */
+export const templatesQuery = queryOptions({
+  queryKey: ["cluster", "templates"],
+  queryFn: async ({ signal }) => unwrap(await api.GET("/api/v1/cluster/templates", { signal })),
+})
+
+/** A template of Zeabur Catalog this build carries. Its idle use changes only with the build. */
 export const templateQuery = (template: string) =>
   queryOptions({
     queryKey: ["cluster", "templates", template],

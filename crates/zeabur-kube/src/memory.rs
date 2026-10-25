@@ -216,6 +216,12 @@ pub fn builtin_resources() -> Vec<ServedResource> {
         r("batch", "jobs", "Job", true),
         r("events.k8s.io", "events", "Event", true),
         r("networking.k8s.io", "ingresses", "Ingress", true),
+        r(
+            "networking.k8s.io",
+            "networkpolicies",
+            "NetworkPolicy",
+            true,
+        ),
     ]
 }
 

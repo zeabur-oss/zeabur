@@ -120,6 +120,8 @@ proptest = { version = "1", default-features = false, features = ["std"] }
 # The official Model Context Protocol SDK (modelcontextprotocol/rust-sdk), for `zeaburctl mcp`:
 # the server, its tool macros and the stdio transport. Its JSON Schemas come from the schemars it
 # re-exports.
+# The input patterns of Zeabur Catalog templates (RE2 syntax), checked before a template renders.
+regex = { version = "1.13", default-features = false, features = ["std", "unicode-perl"] }
 rmcp = { version = "3.5", default-features = false, features = ["server", "macros", "transport-io"] }
 # The schemars rmcp re-exports, named directly so that zeabur-modules can derive the schema of a
 # tool argument it shares with the API. Keep the version rmcp uses.

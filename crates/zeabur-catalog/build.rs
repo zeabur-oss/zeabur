@@ -1,8 +1,9 @@
 //! Embeds Zeabur Catalog's `bundle.tar.gz` from `ZEABUR_CATALOG_RELEASE`, which the Nix dev shell
 //! sets to the catalog's `release` output at the commit in flake.lock. The components
-//! (`components/<capability>/<id>.yaml`), the `error-pages` template and the template measurements
-//! (`measurements/templates/<id>.json`) become sorted tables of `include_str!` entries, so the
-//! binary carries the catalogue it was built with and reads nothing at run time.
+//! (`components/<capability>/<id>.yaml`), the templates (`templates/<id>/template.yaml` and
+//! `manifests.yaml`) and the template measurements (`measurements/templates/<id>.json`) become
+//! sorted tables of `include_str!` entries, so the binary carries the catalogue it was built with
+//! and reads nothing at run time. `config/e2e.yaml` is unpacked for the tests only.
 
 use std::fmt::Write as _;
 use std::fs::{self, File};
@@ -24,7 +25,7 @@ fn main() {
     let archive = Path::new(&release).join("bundle.tar.gz");
     println!("cargo::rerun-if-changed={}", archive.display());
     let out = PathBuf::from(env::var_os("OUT_DIR").unwrap_or_default());
-    let (components, measurements) = match unpack(&archive, &out.join("bundle")) {
+    let (components, templates, measurements) = match unpack(&archive, &out.join("bundle")) {
         Ok(tables) => tables,
         Err(error) => {
             println!("cargo::error=cannot read {}: {error}", archive.display());
@@ -37,6 +38,17 @@ fn main() {
             code,
             "    ({capability:?}, {id:?}, include_str!({:?})),",
             path.display().to_string()
+        );
+    }
+    code.push_str("];\n");
+    code.push_str("pub(crate) static TEMPLATES: &[(&str, &str, &str)] = &[\n");
+    for (id, dir) in &templates {
+        let file = |name: &str| dir.join(name).display().to_string();
+        let _ignored = writeln!(
+            code,
+            "    ({id:?}, include_str!({:?}), include_str!({:?})),",
+            file("template.yaml"),
+            file("manifests.yaml")
         );
     }
     code.push_str("];\n");
@@ -55,14 +67,15 @@ fn main() {
 }
 
 type Components = Vec<(String, String, PathBuf)>;
+type Templates = Vec<(String, PathBuf)>;
 type Measurements = Vec<(String, PathBuf)>;
 
-/// Writes the files Zeabur reads from the archive to `dir` and returns the components and the
-/// template measurements, sorted.
-fn unpack(archive: &Path, dir: &Path) -> io::Result<(Components, Measurements)> {
+/// Writes the files Zeabur reads from the archive to `dir` and returns the components, the
+/// template directories and the template measurements, sorted.
+fn unpack(archive: &Path, dir: &Path) -> io::Result<(Components, Templates, Measurements)> {
     let _ignored = fs::remove_dir_all(dir);
     let mut tar = tar::Archive::new(flate2::read::GzDecoder::new(File::open(archive)?));
-    let (mut components, mut measurements) = (Vec::new(), Vec::new());
+    let (mut components, mut templates, mut measurements) = (Vec::new(), Vec::new(), Vec::new());
     for entry in tar.entries()? {
         let mut entry = entry?;
         let path = entry.path()?.into_owned();
@@ -79,7 +92,10 @@ fn unpack(archive: &Path, dir: &Path) -> io::Result<(Components, Measurements)> 
                 Some(id) => measurements.push((id.to_owned(), dest.clone())),
                 None => continue,
             },
-            ["templates", "error-pages", "manifests.yaml"] => {}
+            ["templates", id, "template.yaml"] => {
+                templates.push(((*id).to_owned(), dir.join("templates").join(id)));
+            }
+            ["templates", _, "manifests.yaml"] | ["config", "e2e.yaml"] => {}
             _ => continue,
         }
         if let Some(parent) = dest.parent() {
@@ -88,6 +104,7 @@ fn unpack(archive: &Path, dir: &Path) -> io::Result<(Components, Measurements)> 
         io::copy(&mut entry, &mut File::create(dest)?)?;
     }
     components.sort();
+    templates.sort();
     measurements.sort();
-    Ok((components, measurements))
+    Ok((components, templates, measurements))
 }

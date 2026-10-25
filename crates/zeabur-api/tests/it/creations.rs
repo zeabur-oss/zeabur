@@ -485,7 +485,8 @@ stringData:
             send(&app, "GET", "/api/v1/cluster/templates/error-pages", None).await;
         assert_eq!(status, StatusCode::OK, "{template}");
         assert_eq!(template["id"], "error-pages");
-        let (status, problem) = send(&app, "GET", "/api/v1/cluster/templates/ghost", None).await;
+        let (status, problem) =
+            send(&app, "GET", "/api/v1/cluster/templates/no-such-app", None).await;
         assert_eq!(status, StatusCode::NOT_FOUND, "{problem}");
     }
 
