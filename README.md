@@ -31,7 +31,7 @@ than you have, and keeps no state of its own: no database, no custom resources.
 </tr>
 </table>
 
-<sub>Screenshots of the built-in demo data (`cargo run -p zeabur-api --example demo`), taken by `scripts/readme-images.sh`.</sub>
+<sub>Screenshots of the built-in demo data (`cargo run -p zeabur-api --example demo`), taken by `scripts/docs-shots.sh docs/readme-shots.yaml`.</sub>
 
 ## Principles
 

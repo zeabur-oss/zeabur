@@ -1,37 +1,43 @@
-# The README's screenshots, from the demo. scripts/readme-images.sh takes them into docs/images.
-- id: readme-home
-  path: /
-  wait: main h1
-  clip: main
-  locales: [en]
-  themes: [light, dark]
-- id: readme-project
-  path: /projects/shop
-  wait: main h1
-  clip: main
-  locales: [en]
-  themes: [light, dark]
-- id: readme-diagnosis
-  path: /projects/shop/services/Deployment/worker
-  wait: main h1
-  clip: main
-  locales: [en]
-  themes: [light, dark]
-- id: readme-database
-  path: /projects/shop/databases/postgresql/orders
-  wait: main h1
-  clip: main
-  locales: [en]
-  themes: [light, dark]
-- id: readme-rollout
-  path: /projects/payments/services/Deployment/api
-  wait: main h1
-  clip: main
-  locales: [en]
-  themes: [light, dark]
-- id: readme-cluster
-  path: /cluster
-  wait: main h1
-  clip: main
-  locales: [en]
-  themes: [light, dark]
+# The README's screenshots, from the demo, English only, at one pixel per CSS pixel and at most
+# 30 KB each: scripts/docs-shots.sh docs/readme-shots.yaml (docs/internal/screenshots.md).
+out: docs/images
+file: '{id}-{theme}.avif'
+scale: 1
+budget: 30
+shots:
+  - id: readme-home
+    path: /
+    wait: main h1
+    clip: main
+    locales: [en]
+    themes: [light, dark]
+  - id: readme-project
+    path: /projects/shop
+    wait: main h1
+    clip: main
+    locales: [en]
+    themes: [light, dark]
+  - id: readme-diagnosis
+    path: /projects/shop/services/Deployment/worker
+    wait: main h1
+    clip: main
+    locales: [en]
+    themes: [light, dark]
+  - id: readme-database
+    path: /projects/shop/databases/postgresql/orders
+    wait: main h1
+    clip: main
+    locales: [en]
+    themes: [light, dark]
+  - id: readme-rollout
+    path: /projects/payments/services/Deployment/api
+    wait: main h1
+    clip: main
+    locales: [en]
+    themes: [light, dark]
+  - id: readme-cluster
+    path: /cluster
+    wait: main h1
+    clip: main
+    locales: [en]
+    themes: [light, dark]
