@@ -165,10 +165,20 @@ kubectl -n shop get secret data-redis-0-backup -o yaml
    metadata:
      name: restore-view
    spec:
+     securityContext:
+       runAsNonRoot: true
+       runAsUser: 65532
+       fsGroup: 65532
+       seccompProfile:
+         type: RuntimeDefault
      containers:
        - name: restore-view
          image: busybox:1.37
          command: ["sleep", "3600"]
+         securityContext:
+           allowPrivilegeEscalation: false
+           capabilities:
+             drop: ["ALL"]
          volumeMounts:
            - name: data
              mountPath: /restored

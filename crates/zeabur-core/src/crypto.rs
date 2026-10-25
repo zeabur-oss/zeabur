@@ -103,16 +103,6 @@ pub fn sha256(data: &[u8]) -> [u8; 32] {
     out
 }
 
-/// The HMAC-SHA256 of `data` under `key`.
-#[must_use]
-pub fn hmac_sha256(key: &[u8], data: &[u8]) -> [u8; 32] {
-    let key = aws_lc_rs::hmac::Key::new(aws_lc_rs::hmac::HMAC_SHA256, key);
-    let tag = aws_lc_rs::hmac::sign(&key, data);
-    let mut out = [0_u8; 32];
-    out.copy_from_slice(tag.as_ref());
-    out
-}
-
 /// Whether `a` and `b` are equal, in time that does not depend on where they differ.
 #[must_use]
 pub fn equal(a: &[u8], b: &[u8]) -> bool {
@@ -212,14 +202,6 @@ mod tests {
         assert_eq!(
             hex(&sha256(b"abc")),
             "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
-        );
-    }
-
-    #[test]
-    fn hmac_sha256_matches_rfc_4231_test_case_2() {
-        assert_eq!(
-            hex(&hmac_sha256(b"Jefe", b"what do ya want for nothing?")),
-            "5bdcc146bf60754e6a042426089575c75a003f089d2739839dec58b964ec3843"
         );
     }
 
