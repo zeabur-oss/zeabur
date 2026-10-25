@@ -128,10 +128,6 @@ pub struct Sources {
 
 /// A configuration file: a new cluster, or a node joining one.
 #[derive(Debug, Clone, PartialEq, Eq)]
-#[expect(
-    clippy::large_enum_variant,
-    reason = "a run reads one configuration file"
-)]
 pub enum Document {
     /// The first server: RKE2, the components, Zeabur Identity and Zeabur.
     Install(Config),
