@@ -34,8 +34,9 @@ issuer:
     # stays out of Helm's release records.
     existingSecret: ""
     key: client-secret
-  # A ConfigMap with extra CA certificates (PEM) to trust for the issuer, for an issuer whose
-  # certificate a private CA signed. Empty: the image's Mozilla CA bundle only.
+  # A ConfigMap with extra CA certificates (PEM) to trust for the issuer only. zeabur-installer
+  # sets it to its local CA; set extraTrustedCA for your own private CA. Empty: extraTrustedCA
+  # and the image's Mozilla CA bundle.
   caBundle:
     configMap: ""
     key: ca.crt
@@ -67,10 +68,10 @@ builds:
     key: ca.crt
 
 # Extra CA certificates (PEM) Zeabur trusts, on top of the image's Mozilla CA bundle, for every
-# HTTPS connection it makes: reading images from registries, reading backups from object stores,
-# and GitHub. Use it when one of them, or a proxy that inspects TLS, presents a certificate a
+# HTTPS connection it makes: signing in with the issuer, reading images from registries, reading
+# backups from object stores, and GitHub. Use it when one of them, or a proxy that inspects TLS, presents a certificate a
 # private CA signed. Name a ConfigMap or a Secret in this namespace, not both; Zeabur reads it when
-# it starts. builds.caBundle is trusted the same way. Empty: the Mozilla CA bundle only.
+# it starts. issuer.caBundle and builds.caBundle, which zeabur-installer sets, are trusted on top. Empty: the Mozilla CA bundle only.
 extraTrustedCA:
   configMap: ""
   secret: ""

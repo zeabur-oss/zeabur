@@ -75,7 +75,7 @@ pub struct Settings {
     /// Where a service deployed from Git keeps its images.
     pub builds: BuildSettings,
     /// A PEM bundle trusted on top of the platform's roots by every HTTPS connection Zeabur
-    /// makes: to registries, object stores and GitHub (`--extra-ca-file` with
+    /// makes from the API: to registries, object stores and GitHub (`--extra-ca-file` with
     /// `--build-registry-ca-file`); `None`: the platform's roots only.
     pub trusted_ca: Option<Vec<u8>>,
     /// The GitHub the cluster's GitHub App is made on (see [`crate::cluster::github_app`]).

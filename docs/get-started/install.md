@@ -122,8 +122,7 @@ likely to set:
 | `issuer.url`, `issuer.clientId` | Zeabur Identity's issuer URL and the client registered in step 2. |
 | `issuer.clientSecret.existingSecret` | The Secret from step 2. The chart never takes the secret itself as a value, so it stays out of Helm's release records. |
 | `issuer.accountUrl` | Where people manage their passkeys and linked accounts; the Account page links there. Empty: the `manage` URL the issuer publishes at `/.well-known/passkey-endpoints`, else no link. |
-| `issuer.caBundle.configMap` | A ConfigMap with the CA that signed Zeabur Identity's certificate, when a private CA did (mkcert, an internal CA). |
-| `extraTrustedCA.configMap` or `extraTrustedCA.secret` | PEM certificates Zeabur trusts for every HTTPS connection it makes: registries, object stores and GitHub. Use it when one of them, or a proxy that inspects TLS, has a certificate a private CA signed. See [A private CA](#a-private-ca). |
+| `extraTrustedCA.configMap` or `extraTrustedCA.secret` | PEM certificates Zeabur trusts for every HTTPS connection it makes: Zeabur Identity, registries, object stores and GitHub. Use it when one of them, or a proxy that inspects TLS, has a certificate a private CA signed. See [A private CA](#a-private-ca). |
 | `elevation.enabled` | Whether anything the cluster refuses to everyday rights (a change, a read, a terminal) offers "Retry as admin", which asks for the passkey again. Only people who have elevated groups in Zeabur Identity get the offer. While admin rights last, a few minutes, every request goes with them, as with `sudo`. |
 | `ingress.*`, `httpRoute.*` | An Ingress, or a Gateway API HTTPRoute (`httpRoute.parentRefs` names the Gateway), for the public URL's host name. |
 | `domains.suffixes`, `domains.clusterIssuer` | How a new service's public URL is made; see [Public URLs for services](#public-urls-for-services). |
@@ -142,6 +141,10 @@ helm upgrade zeabur "oci://$chart" --version "$version" -n zeabur --reuse-values
 certificates. Zeabur reads the file when it starts, so after you change the ConfigMap, restart it
 with `kubectl -n zeabur rollout restart deployment/zeabur`. The certificates are added to the
 Mozilla CA bundle. Zeabur still refuses loopback and link-local addresses.
+
+zeabur-installer also sets `issuer.caBundle` (the local CA that signs Zeabur Identity's
+certificate) and `builds.caBundle` (Zot's CA). Each names a ConfigMap the installer keeps up to
+date, and Zeabur trusts them on top of `extraTrustedCA`, so you do not need to set them yourself.
 
 ### The plan key
 

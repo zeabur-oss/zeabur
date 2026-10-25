@@ -92,7 +92,7 @@ helm upgrade zeabur oci://ghcr.io/zeabur-oss/charts/zeabur \
 
 ## 信任私有 CA
 
-Registry、物件儲存或 GitHub Enterprise 使用私有 CA 簽發的憑證，或叢集透過會檢查 TLS 的代理伺服器連外時，把 CA 憑證放進 Zeabur 所在 Namespace 的 ConfigMap，再設定 `extraTrustedCA.configMap`：
+Zeabur Identity、Registry、物件儲存或 GitHub Enterprise 使用私有 CA 簽發的憑證，或叢集透過會檢查 TLS 的代理伺服器連外時，把 CA 憑證放進 Zeabur 所在 Namespace 的 ConfigMap，再設定 `extraTrustedCA.configMap`：
 
 ```sh
 kubectl -n zeabur create configmap corp-ca --from-file=ca.crt=corp-ca.pem
@@ -104,7 +104,9 @@ helm upgrade zeabur oci://ghcr.io/zeabur-oss/charts/zeabur \
 
 憑證放在 Secret 時，改設定 `extraTrustedCA.secret`。兩者只能擇一。鍵名預設是 `ca.crt`，可用 `extraTrustedCA.key` 修改，一個檔案可以放多張憑證。
 
-Zeabur 讀取映像檔、讀取物件儲存裡的備份、連線 GitHub 時，除了內建的 Mozilla CA，也信任這些憑證。Zeabur 只在啟動時讀取這個檔案，修改 ConfigMap 後要執行 `kubectl -n zeabur rollout restart deployment/zeabur`。Identity 的 CA 另外用 `issuer.caBundle.configMap` 設定。
+Zeabur 登入 Identity、讀取映像檔、讀取物件儲存裡的備份、連線 GitHub 時，除了內建的 Mozilla CA，也信任這些憑證。Zeabur 只在啟動時讀取這個檔案，修改 ConfigMap 後要執行 `kubectl -n zeabur rollout restart deployment/zeabur`。
+
+`issuer.caBundle` 和 `builds.caBundle` 由 zeabur-installer 設定，分別指向簽發 Identity 憑證的本機 CA 和 Zot 的 CA。Zeabur 會同時信任它們和 `extraTrustedCA`，不需要自己設定。
 
 ## 常見失敗
 
@@ -112,7 +114,7 @@ Zeabur 讀取映像檔、讀取物件儲存裡的備份、連線 GitHub 時，�
 | --- | --- |
 | 瀏覽器無法開啟 Zeabur | 核對公開 DNS、Ingress class、TLS Secret 和入口連線。先確認 Deployment 就緒，再查入口。 |
 | 登入後回不到 Zeabur | 核對 `publicUrl`、Identity 註冊的 `/auth/callback` 和 `issuer.url`。 |
-| Identity 使用私有 CA | 設定 `issuer.caBundle.configMap`，讓 Zeabur 信任簽發 Identity 憑證的 CA。 |
+| Identity 使用私有 CA | 設定 `extraTrustedCA`，讓 Zeabur 信任簽發 Identity 憑證的 CA。見[信任私有 CA](#信任私有-ca)。 |
 | 登入後讀取遭拒 | 在 Identity 確認成員身分與群組，再核對目標 Namespace 的 RoleBinding。見[權限參考](../reference/permissions.mdx)。 |
 | 新服務就緒，但網址不通 | 核對應用程式網域的 DNS 與憑證。管理介面與應用程式用的是不同網域，要分別設定。 |
 | 升級後需要重新登入 | chart 只執行一個 Zeabur Pod，工作階段存在記憶體中，Pod 替換後要重新登入。 |

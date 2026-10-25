@@ -92,7 +92,7 @@ pub(crate) struct Args {
     #[arg(long, env = "ZEABUR_BUILD_REGISTRY_CA_FILE")]
     pub(crate) build_registry_ca_file: Option<PathBuf>,
     /// A PEM file of certificate authorities Zeabur trusts, on top of the platform's roots, for
-    /// every HTTPS connection it makes: registries, object stores and GitHub.
+    /// every HTTPS connection it makes: the issuer, registries, object stores and GitHub.
     #[arg(long, env = "ZEABUR_EXTRA_CA_FILE")]
     pub(crate) extra_ca_file: Option<PathBuf>,
     /// The namespace Zeabur runs in, where the ConfigMap `zeabur-settings` keeps the settings
@@ -157,9 +157,13 @@ impl Args {
         let public_url =
             BaseUrl::parse_root(&self.public_url).map_err(|e| format!("--public-url: {e}"))?;
         let issuer = BaseUrl::parse(&self.issuer_url).map_err(|e| format!("--issuer-url: {e}"))?;
-        let issuer_ca = match &self.issuer_ca_file {
-            Some(path) => ExtraRoots::from_pem(&read(path, "--issuer-ca-file")?)
-                .map_err(|e| format!("--issuer-ca-file: {}: {e}", path.display()))?,
+        let issuer_ca = match bundle(&[
+            (&self.issuer_ca_file, "--issuer-ca-file"),
+            (&self.extra_ca_file, "--extra-ca-file"),
+        ])? {
+            Some(pem) => {
+                ExtraRoots::from_pem(&pem).map_err(|e| format!("--issuer-ca-file: {e}"))?
+            }
             None => ExtraRoots::default(),
         };
         if self.client_id.is_empty() {
@@ -257,7 +261,7 @@ impl Args {
         })
     }
 
-    /// One PEM bundle of the extra CAs and the build registry's CA, each file checked.
+    /// One PEM bundle of the extra CAs and the build registry's CA.
     fn trusted_ca(
         &self,
         builds: &zeabur_api::settings::BuildSettings,
@@ -265,22 +269,27 @@ impl Args {
         if self.build_registry_ca_file.is_some() && builds.registry.is_none() {
             return Err("--build-registry-ca-file needs --build-registry".to_owned());
         }
-        let mut bundle: Option<Vec<u8>> = None;
-        for (path, flag) in [
+        bundle(&[
             (&self.extra_ca_file, "--extra-ca-file"),
             (&self.build_registry_ca_file, "--build-registry-ca-file"),
-        ] {
-            let Some(path) = path else { continue };
-            let pem = read(path, flag)?;
-            ExtraRoots::from_pem(&pem).map_err(|e| format!("{flag}: {}: {e}", path.display()))?;
-            let bundle = bundle.get_or_insert_with(Vec::new);
-            if !bundle.is_empty() && !bundle.ends_with(b"\n") {
-                bundle.push(b'\n');
-            }
-            bundle.extend_from_slice(&pem);
-        }
-        Ok(bundle)
+        ])
     }
+}
+
+/// The PEM files given, each checked, joined into one bundle; `None` when none is given.
+fn bundle(files: &[(&Option<PathBuf>, &str)]) -> Result<Option<Vec<u8>>, String> {
+    let mut bundle: Option<Vec<u8>> = None;
+    for &(path, flag) in files {
+        let Some(path) = path else { continue };
+        let pem = read(path, flag)?;
+        ExtraRoots::from_pem(&pem).map_err(|e| format!("{flag}: {}: {e}", path.display()))?;
+        let bundle = bundle.get_or_insert_with(Vec::new);
+        if !bundle.is_empty() && !bundle.ends_with(b"\n") {
+            bundle.push(b'\n');
+        }
+        bundle.extend_from_slice(&pem);
+    }
+    Ok(bundle)
 }
 
 /// How new public URLs are made, from `args`.
@@ -742,6 +751,20 @@ qkDcEXA7cf4S+NsEneg=
         let none = files.write("none.crt", b"not a certificate\n");
         let error = args(&files, &["--extra-ca-file", &none]).unwrap_err();
         assert!(error.starts_with("--extra-ca-file:"), "{error}");
+    }
+
+    #[test]
+    fn the_issuer_trusts_the_extra_ca_file_too() {
+        let files = Files::new("issuer-extra-ca");
+        let ca = files.write("ca.crt", CA.as_bytes());
+        assert!(
+            !args(&files, &["--extra-ca-file", &ca])
+                .unwrap()
+                .issuer_ca
+                .is_empty()
+        );
+        let both = args(&files, &["--extra-ca-file", &ca, "--issuer-ca-file", &ca]).unwrap();
+        assert_eq!(both.issuer_ca.len(), 2);
     }
 
     #[test]

@@ -13,7 +13,8 @@ Flags, or the environment variable after each:
 |---|---|---|
 | `--public-url` | `ZEABUR_PUBLIC_URL` | where people open Zeabur, `https://` and the root of a host |
 | `--issuer-url` | `ZEABUR_ISSUER_URL` | Zeabur Identity's issuer URL |
-| `--issuer-ca-file` | `ZEABUR_ISSUER_CA_FILE` | a PEM file of extra CAs to trust for the issuer |
+| `--issuer-ca-file` | `ZEABUR_ISSUER_CA_FILE` | a PEM file of extra CAs to trust for the issuer only |
+| `--extra-ca-file` | `ZEABUR_EXTRA_CA_FILE` | a PEM file of extra CAs to trust for every HTTPS connection, the issuer included |
 | `--client-id` | `ZEABUR_CLIENT_ID` | the `client_id` (default `zeabur`) |
 | `--client-secret-file` | `ZEABUR_CLIENT_SECRET_FILE` | a file with the client secret |
 | `--plan-key-file` | `ZEABUR_PLAN_KEY_FILE` | a file with the plan-token key: 32 bytes, or 64 hex digits |
@@ -29,7 +30,7 @@ Flags, or the environment variable after each:
 Register Zeabur in Zeabur Identity as a confidential client with the redirect URI
 `<public URL>/auth/callback` and the audience kube-apiserver accepts (`--audience kubernetes`),
 plus `--allow-elevation` when `--elevation` is on. The issuer's certificate is checked against
-the image's CA bundle and, when given, `--issuer-ca-file` (for a private CA). A bad value stops the server at start
+the image's CA bundle and, when given, `--issuer-ca-file` and `--extra-ca-file` (for a private CA). A bad value stops the server at start
 with a message naming the flag.
 
 Run one replica: sessions live in memory (see `zeabur_auth::session`).
