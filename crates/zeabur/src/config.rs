@@ -147,6 +147,7 @@ pub(crate) struct Config {
 
 impl Args {
     /// Checks every value and reads the files.
+    #[expect(clippy::too_many_lines, reason = "one step per flag")]
     pub(crate) fn check(&self) -> Result<Config, String> {
         let public_url =
             BaseUrl::parse_root(&self.public_url).map_err(|e| format!("--public-url: {e}"))?;

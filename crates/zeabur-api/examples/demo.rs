@@ -4251,10 +4251,7 @@ async fn main() -> std::io::Result<()> {
     let tools = std::env::var_os("ZEABUR_DEMO_TOOLS").is_some();
     let cluster: Arc<dyn Cluster> = Arc::new(cluster);
     let terminals = tools.then(|| Arc::clone(&cluster));
-    let access = Demo {
-        cluster,
-        tools,
-    };
+    let access = Demo { cluster, tools };
     // Settings are kept in an `zeabur` namespace, as on the in-cluster server.
     let settings = zeabur_api::Settings {
         namespace: Some("zeabur".to_owned()),
