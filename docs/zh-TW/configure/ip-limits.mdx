@@ -117,4 +117,4 @@ kubectl -n shop delete networkpolicy api-egress-limit
 
 - 維護模式使用另一個 Ingress，它不帶這份限制，所有 IP 都看得到維護頁面。
 - 搬移網域到獨立的 Ingress（更換憑證時會發生）前，要先停掉這個 Ingress 的 IP 限制。
-- 刪掉 Ingress 時，它擁有的 Middleware 會一起刪。刪除服務不會刪 NetworkPolicy，需要的話用上面的指令清掉。
+- 刪除服務時，檢查畫面會列出 NetworkPolicy，一起刪除。刪掉 Ingress 時，它擁有的 Middleware 會一起刪。

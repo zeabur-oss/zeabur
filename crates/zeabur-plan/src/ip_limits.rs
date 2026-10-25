@@ -56,6 +56,18 @@ pub fn egress_limit_name(workload: &str) -> String {
     format!("{workload}-egress-limit")
 }
 
+/// The egress policy of workload `workload` as read, which deleting the workload with what it
+/// made also deletes.
+pub(crate) fn owned_policy(planner: &Planner<'_>, workload: &str) -> Option<String> {
+    let name = egress_limit_name(workload);
+    planner
+        .input
+        .objects
+        .iter()
+        .any(|f| f.resource == policy_resource() && f.name == name)
+        .then_some(name)
+}
+
 /// The Traefik `Middleware` a change reads first, if any.
 pub(crate) fn middleware_read(change: &Change) -> Option<(ResourceRef, String)> {
     let Change::IpAllow(allow) = change else {
@@ -71,10 +83,17 @@ pub(crate) fn middleware_read(change: &Change) -> Option<(ResourceRef, String)> 
 
 /// The `NetworkPolicy` a change reads first, if any.
 pub(crate) fn policy_read(change: &Change) -> Option<(ResourceRef, String)> {
-    let Change::EgressLimit(limit) = change else {
-        return None;
+    let name = match change {
+        Change::EgressLimit(limit) => &limit.workload.name,
+        Change::Delete {
+            resource,
+            name,
+            owned: true,
+            ..
+        } if crate::owned::workload_of(resource, name).is_some() => name,
+        _ => return None,
     };
-    Some((policy_resource(), egress_limit_name(&limit.workload.name)))
+    Some((policy_resource(), egress_limit_name(name)))
 }
 
 /// Each address of `given` as an IP address or a CIDR range, lower case, once. With `ranges`, an

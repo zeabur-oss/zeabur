@@ -1,0 +1,9 @@
+{
+  "objects": [
+    {"target": {"kind": "Deployment", "name": "web"}, "write": {"type": "delete"}},
+    {"target": {"kind": "NetworkPolicy", "name": "web-egress-limit"}, "write": {"type": "delete", "uid": "np-web", "resourceVersion": "52"}}
+  ],
+  "warnings": [
+    {"code": "deletesOwned", "target": {"kind": "Deployment", "name": "web"}, "objects": [{"kind": "NetworkPolicy", "name": "web-egress-limit"}]}
+  ]
+}

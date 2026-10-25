@@ -384,6 +384,17 @@ impl Planner<'_> {
                 name: object.clone(),
             });
         }
+        if let Some(policy) = crate::ip_limits::owned_policy(self, name)
+            && !self.deletes("NetworkPolicy", &policy)
+        {
+            let resource = ResourceRef {
+                group: "networking.k8s.io".to_owned(),
+                version: "v1".to_owned(),
+                resource: "networkpolicies".to_owned(),
+            };
+            self.delete(&resource, &policy, None)?;
+            objects.push(ObjectName::of("NetworkPolicy", &policy));
+        }
         if !objects.is_empty() {
             self.warnings.insert(
                 at,
