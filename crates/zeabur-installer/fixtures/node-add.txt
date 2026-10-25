@@ -20,6 +20,8 @@ zeabur-installer apply   # installs RKE2 and waits until the node is Ready
 
 The token joins workers until 2026-10-23T09:00:00Z. Revoke it as soon as the node is Ready; the node keeps working without it.
 
+After the worker joins, run zeabur-installer node sync on a server. Until then, the network policies refuse the new node's traffic.
+
 When the node is Ready, here:
   /var/lib/rancher/rke2/bin/kubectl --kubeconfig /etc/rancher/rke2/rke2.yaml get nodes -o wide
   zeabur-installer node sync   # lets the new node's traffic through the network policies

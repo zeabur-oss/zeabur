@@ -69,7 +69,7 @@ sudo zeabur-installer node sync
 sudo /var/lib/rancher/rke2/bin/kubectl --kubeconfig /etc/rancher/rke2/rke2.yaml get nodes -o wide
 ```
 
-`node sync` 把新節點的位址加進 Installer 建立的基準網路政策。新加入的伺服器會自己同步，加入工作節點後要手動執行一次。看到新節點 `Ready` 後，撤銷工作節點的權杖，把 `<ID>` 換成 `node add` 輸出最後一行裡的 ID：
+`node sync` 把新節點的位址加進 Installer 建立的基準網路政策。新加入的伺服器會自己同步。工作節點加入後，一定要在伺服器手動執行一次，在這之前網路政策會擋掉新節點的流量。看到新節點 `Ready` 後，撤銷工作節點的權杖，把 `<ID>` 換成 `node add` 輸出最後一行裡的 ID：
 
 ```sh
 sudo /var/lib/rancher/rke2/bin/kubectl --kubeconfig /etc/rancher/rke2/rke2.yaml \

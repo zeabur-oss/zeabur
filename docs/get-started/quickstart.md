@@ -44,7 +44,7 @@ files of k3s, kubeadm, k0s or MicroK8s.
 | `doctor` | Checks RKE2, each component's charts and readiness, the default storage class, Zeabur Identity and its internal certificate, Zeabur and disk encryption. Exits 0, 1 (warning) or 2 (critical), so a monitoring check can run it. |
 | `uninstall zeabur\|identity` | Removes Zeabur, or Zeabur and Zeabur Identity. To remove RKE2 and everything else, run `/usr/local/bin/rke2-uninstall.sh`. On a node that joined a cluster, `uninstall` prints how to take the node out. Once RKE2 is gone, `uninstall` lists the installer's files that are left and `uninstall --purge` removes them. |
 | `node add [--role worker\|server] [--ttl 1h]` | On a server: prints the configuration and commands that join another VM to the cluster. |
-| `node sync` | On a server: lets the current nodes' traffic through the installer's network policies. Run it after a node joins. |
+| `node sync` | On a server: lets the current nodes' traffic through the installer's network policies. Run it after a worker joins and after a node is removed. |
 
 Every command reads `/etc/zeabur-installer/config.yaml` unless `--config` names another file.
 
@@ -80,10 +80,11 @@ zeabur-installer node add --role server
 It prints a configuration to paste on the new VM, then `zeabur-installer plan` and
 `zeabur-installer apply` to run there. `plan` on the new VM measures the round trip to the server and checks the ports it can.
 `apply` installs RKE2 only, as an agent for a worker or a server for the control plane, and
-waits until the node is Ready. Zeabur's Cluster → Nodes page can add workers the same way.
+waits until the node is Ready.
 
-Once the node is Ready, run `zeabur-installer node sync` on a server and revoke the token with
-the command `node add` printed. The node keeps working after its token is gone.
+After a worker joins, run `zeabur-installer node sync` on a server. Until then, the network
+policies refuse the new node's traffic. Then revoke the token with the command `node add`
+printed. The node keeps working after its token is gone.
 
 Things to know:
 

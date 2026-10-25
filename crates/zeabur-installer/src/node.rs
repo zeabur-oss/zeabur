@@ -164,6 +164,14 @@ pub(crate) fn instructions(i: &Instructions<'_>) -> String {
              workers. Keep it out of chats and tickets.",
         );
     }
+    if i.role == Role::Worker {
+        push(&mut text, "");
+        push(
+            &mut text,
+            "After the worker joins, run zeabur-installer node sync on a server. Until then, the \
+             network policies refuse the new node's traffic.",
+        );
+    }
     push(&mut text, "");
     push(&mut text, "When the node is Ready, here:");
     push(

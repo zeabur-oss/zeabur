@@ -93,7 +93,8 @@ enum Command {
 #[derive(Debug, Subcommand)]
 enum NodeCommand {
     /// Print the configuration and commands that join a new VM to this cluster. The VM must be at
-    /// the same hosting provider and in the same region; another availability zone is fine.
+    /// the same hosting provider and in the same region; another availability zone is fine. After
+    /// a worker joins, run `node sync` on a server.
     Add {
         /// `worker` runs workloads; `server` also runs the control plane and etcd.
         #[arg(long, value_enum, default_value_t = NodeRole::Worker)]
@@ -105,8 +106,8 @@ enum NodeCommand {
         #[arg(long, default_value = "1h", value_parser = ttl)]
         ttl: Duration,
     },
-    /// Let the current nodes' traffic through the network policies the installer made. Run it
-    /// after a node joins.
+    /// Let the current nodes' traffic through the network policies the installer made. Run it on
+    /// a server after a worker joins and after a node is removed.
     Sync,
 }
 

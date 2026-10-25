@@ -137,8 +137,9 @@ The baseline NetworkPolicies let in traffic from the first address of every node
 Canal's VXLAN interface holds that address, and a node's traffic to pods on other nodes leaves
 from it: kube-apiserver calling a webhook, containerd pulling from zot. A node's traffic to its
 own pods, kubelet probes among them, passes without a rule. A new worker is not in the policies
-until `node sync` rewrites them; `doctor` on a server warns until then. A joining server runs the
-same sync itself once it is Ready.
+until `node sync` rewrites them: after a worker joins, run `zeabur-installer node sync` on a
+server. `node add` prints this step, and `doctor` on a server warns until it runs. A joining
+server runs the same sync itself once it is Ready.
 
 On a joined node, `doctor` checks the RKE2 unit, that the node is Ready, the distance to the
 server and the disk encryption, and on a server whether the authentication configuration matches
