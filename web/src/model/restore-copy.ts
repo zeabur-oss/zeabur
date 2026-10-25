@@ -1,5 +1,6 @@
-// A project restored from a Velero backup into a new namespace, and the values in it that still
-// name the original: in-cluster addresses such as `api.blog.svc` and `api.blog.svc.cluster.local`.
+// A project restored from a Velero backup, what comes after it (its domains, then the addresses of
+// a copy), and the values in a copy that still name the original: in-cluster addresses such as
+// `api.blog.svc` and `api.blog.svc.cluster.local`.
 import type { Schemas } from "@/api/client"
 import type { Target } from "@/model/connect"
 
@@ -7,6 +8,27 @@ type Change = Schemas["Change"]
 type Env = Target["containers"][number]["env"][number]
 
 type Project = { name: string; adopted?: boolean; system?: boolean }
+
+type Restore = Pick<Schemas["VeleroRestore"], "backup" | "namespaces" | "into" | "resources">
+
+/** What follows a project restore: open the project, bring its domains back from the backup, and,
+ * for a copy, rewrite the addresses of the original. Nothing follows a restore of only domains. */
+export function afterRestore(restore: Restore):
+  | {
+      project: string
+      attach: Extract<Schemas["BackupsPlanRequest"], { op: "attachDomains" }>
+      rewrite?: { source: string; into: string }
+    }
+  | undefined {
+  const source = restore.namespaces[0]
+  if (!source || (restore.resources?.length ?? 0) > 0) return undefined
+  const project = restore.into ?? source
+  return {
+    project,
+    attach: { op: "attachDomains", backup: restore.backup, namespace: source, to: project },
+    ...(restore.into ? { rewrite: { source, into: restore.into } } : {}),
+  }
+}
 
 /** The projects a backup can restore: those it names, or, when it names none, every project
  * Zeabur manages. */

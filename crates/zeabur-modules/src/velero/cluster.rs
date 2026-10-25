@@ -21,12 +21,16 @@
 //!   as it is:
 //!   - while the namespace exists, into a new namespace through `namespaceMapping`
 //!     [velero-restore]. Zeabur creates that namespace first as a project, so Velero keeps its
-//!     labels. Ingresses and HTTPRoutes stay out ([`HELD_BACK`]), so the copy claims no hostname
-//!     the original serves; moving them later deletes each from the original and creates it in the
-//!     copy ([`moved_route`]);
-//!   - when the namespace no longer exists, under its own name, with everything.
-//! - A download: a `DownloadRequest` for a backup's contents [velero-download]. Velero answers with
-//!   a signed URL to the location.
+//!     labels. A resource modifier ([`paused_cron_jobs`]) sets `spec.suspend` on every CronJob, so
+//!     the copy runs no scheduled job twice [velero-modifiers];
+//!   - when the namespace no longer exists, under its own name.
+//!
+//!   Both leave out Ingresses and HTTPRoutes ([`HELD_BACK`]), so no restore claims a hostname
+//!   before the person checks the project. The domains come back in a last step: a second
+//!   `Restore` of only the routes ([`domains_restore`]), or a move from the project that serves
+//!   them ([`moved_route`]).
+//! - A download: a `DownloadRequest` for a backup's contents or its list of objects
+//!   [velero-download]. Velero answers with a signed URL to the location.
 //!
 //! # Sizes
 //!
@@ -42,6 +46,7 @@
 //! [velero-cli]: https://velero.io/docs/v1.17/backup-reference/
 //! [velero-restore]: https://velero.io/docs/v1.17/restore-reference/
 //! [velero-download]: https://velero.io/docs/v1.17/api-types/downloadrequest/
+//! [velero-modifiers]: https://velero.io/docs/v1.17/restore-resource-modifiers/
 
 use std::collections::BTreeMap;
 
@@ -284,6 +289,9 @@ pub struct RestoreView {
     /// Velero's own words when it failed (`failureReason`, `validationErrors`).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reason: Option<String>,
+    /// The only kinds it restores (`includedResources`), as `resource.group`; empty for all.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub resources: Vec<String>,
 }
 
 fn namespace(object: &DynamicObject) -> String {
@@ -498,6 +506,10 @@ pub fn restore(object: &DynamicObject) -> RestoreView {
         warnings: number(object, "/status/warnings").unwrap_or(0),
         reason: text(object, "/status/failureReason")
             .or_else(|| (!validation.is_empty()).then(|| validation.join("; "))),
+        resources: strings(object, "/spec/includedResources")
+            .into_iter()
+            .filter(|r| r != "*")
+            .collect(),
         phase,
     }
 }
@@ -817,23 +829,49 @@ pub fn new_namespace_problem(source: &str, into: &str) -> Option<String> {
     })
 }
 
-/// The kinds a restore into a new namespace leaves out, so the copy claims no hostname of the
-/// original.
-///
-/// These are its routes, and cert-manager's certificates and ACME challenges for those
-/// hostnames. cert-manager makes the certificates again for a route that moves. Velero names
-/// them as `resource.group` [velero-restore].
-pub const HELD_BACK: [&str; 6] = [
+/// The kinds that carry hostnames, as Velero names them (`resource.group`) [velero-restore].
+pub const ROUTES: [&str; 2] = [
     "ingresses.networking.k8s.io",
     "httproutes.gateway.networking.k8s.io",
+];
+
+/// The kinds every project restore leaves out, so it claims no hostname.
+///
+/// These are the [`ROUTES`], and cert-manager's certificates and ACME challenges for those
+/// hostnames. cert-manager makes the certificates again when a route comes back.
+pub const HELD_BACK: [&str; 6] = [
+    ROUTES[0],
+    ROUTES[1],
     "certificates.cert-manager.io",
     "certificaterequests.cert-manager.io",
     "orders.acme.cert-manager.io",
     "challenges.acme.cert-manager.io",
 ];
 
-/// A restore of `source` from `backup`, in Velero's namespace `namespace`: into the new namespace
-/// `into` without the [`HELD_BACK`] kinds, or under its own name when `into` is `None`.
+fn restore_spec(backup: &str, source: &str, into: &str) -> Map<String, Value> {
+    let mut spec = Map::new();
+    spec.insert("backupName".to_owned(), json!(backup));
+    spec.insert("includedNamespaces".to_owned(), json!([source]));
+    if into != source {
+        spec.insert("namespaceMapping".to_owned(), json!({ source: into }));
+    }
+    spec
+}
+
+fn restore_named(namespace: &str, name: &str, spec: Map<String, Value>) -> Value {
+    json!({
+        "apiVersion": API_VERSION,
+        "kind": "Restore",
+        "metadata": {"name": name, "namespace": namespace},
+        "spec": Value::Object(spec),
+    })
+}
+
+/// A restore of `source` from `backup` without the [`HELD_BACK`] kinds, in Velero's namespace
+/// `namespace`.
+///
+/// With `into`, the restore goes into that new namespace and applies the resource modifier of
+/// the same name ([`paused_cron_jobs`]). Without it, the restore keeps the name `source`.
 #[must_use]
 pub fn restore_object(
     namespace: &str,
@@ -842,17 +880,124 @@ pub fn restore_object(
     source: &str,
     into: Option<&str>,
 ) -> Value {
-    let mut spec = json!({"backupName": backup, "includedNamespaces": [source]});
-    if let (Some(into), Some(map)) = (into, spec.as_object_mut()) {
-        map.insert("namespaceMapping".to_owned(), json!({ source: into }));
-        map.insert("excludedResources".to_owned(), json!(HELD_BACK));
+    let mut spec = restore_spec(backup, source, into.unwrap_or(source));
+    spec.insert("excludedResources".to_owned(), json!(HELD_BACK));
+    if into.is_some() {
+        spec.insert(
+            "resourceModifier".to_owned(),
+            json!({"kind": "ConfigMap", "name": name}),
+        );
     }
+    restore_named(namespace, name, spec)
+}
+
+/// The resource modifier `name` in Velero's namespace `namespace`: Velero sets `spec.suspend` on
+/// each CronJob of `source` before it creates it [velero-modifiers].
+///
+/// The rules match the namespace in the backup, not the mapped one. Velero reads a JSON Patch
+/// `value` of `"true"` as the boolean.
+#[must_use]
+pub fn paused_cron_jobs(namespace: &str, name: &str, source: &str) -> Value {
+    let rules = format!(
+        "version: v1\n\
+         resourceModifierRules:\n\
+         - conditions:\n    groupResource: cronjobs.batch\n    namespaces:\n    - {source}\n  \
+         patches:\n  - operation: add\n    path: /spec/suspend\n    value: \"true\"\n"
+    );
     json!({
-        "apiVersion": API_VERSION,
-        "kind": "Restore",
+        "apiVersion": "v1",
+        "kind": "ConfigMap",
         "metadata": {"name": name, "namespace": namespace},
-        "spec": spec,
+        "data": {"cronjobs.yaml": rules},
     })
+}
+
+/// The JSON Patch that makes the `Restore` `restore` own an object, so the garbage collector
+/// deletes the object with it; `None` when `restore` has no `uid` yet.
+#[must_use]
+pub fn owned_by(restore: &DynamicObject) -> Option<Value> {
+    let uid = restore.metadata.uid.as_deref()?;
+    let name = restore.metadata.name.as_deref()?;
+    Some(
+        json!([{"op": "add", "path": "/metadata/ownerReferences", "value": [{
+            "apiVersion": API_VERSION, "kind": "Restore", "name": name, "uid": uid,
+        }]}]),
+    )
+}
+
+/// A restore of only the routes of `source` from `backup` into the namespace `into`, which may
+/// be `source` itself [velero-restore]. Velero skips a route of the same name that is there.
+#[must_use]
+pub fn domains_restore(
+    namespace: &str,
+    name: &str,
+    backup: &str,
+    source: &str,
+    into: &str,
+) -> Value {
+    let mut spec = restore_spec(backup, source, into);
+    spec.insert("includedResources".to_owned(), json!(ROUTES));
+    restore_named(namespace, name, spec)
+}
+
+/// What a backup holds of one namespace, from Velero's list of the backup's objects.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+#[schema(as = VeleroBackupInventory)]
+pub struct Inventory {
+    /// The Services, whose in-cluster addresses name the namespace.
+    pub services: Vec<String>,
+    /// The Secrets.
+    pub secrets: Vec<String>,
+    /// The CronJobs.
+    pub cron_jobs: Vec<String>,
+    /// The routes, `Kind/name`.
+    pub routes: Vec<String>,
+}
+
+/// The objects of `namespace` in a backup's list of objects (`BackupResourceList`): a map from
+/// `group/version/Kind` (`v1/Kind` for the core group) to `namespace/name` [velero-describe].
+///
+/// [velero-describe]: https://github.com/vmware-tanzu/velero/blob/v1.17.0/pkg/backup/backed_up_items_map.go
+#[must_use]
+pub fn inventory(list: &BTreeMap<String, Vec<String>>, namespace: &str) -> Inventory {
+    let mut out = Inventory::default();
+    for (key, entries) in list {
+        let parts: Vec<&str> = key.split('/').collect();
+        let (group, kind) = match parts.as_slice() {
+            [_, kind] => ("", *kind),
+            [group, _, kind] => (*group, *kind),
+            _ => continue,
+        };
+        let names = entries
+            .iter()
+            .filter_map(|e| e.split_once('/'))
+            .filter(|(ns, _)| *ns == namespace)
+            .map(|(_, name)| name);
+        match (group, kind) {
+            ("", "Service") => out.services.extend(names.map(str::to_owned)),
+            ("", "Secret") => out.secrets.extend(
+                names
+                    .filter(|n| !n.starts_with("sh.helm.release.v1."))
+                    .map(str::to_owned),
+            ),
+            ("batch", "CronJob") => out.cron_jobs.extend(names.map(str::to_owned)),
+            ("networking.k8s.io", "Ingress") | ("gateway.networking.k8s.io", "HTTPRoute") => {
+                out.routes.extend(names.map(|n| format!("{kind}/{n}")));
+            }
+            _ => {}
+        }
+    }
+    for list in [
+        &mut out.services,
+        &mut out.secrets,
+        &mut out.cron_jobs,
+        &mut out.routes,
+    ] {
+        list.sort();
+        list.dedup();
+    }
+    out
 }
 
 /// The copy of the route `route` that `into` gets when its hostnames move there: the same spec,
@@ -910,14 +1055,27 @@ pub fn route_hosts(route: &Value) -> Vec<String> {
     out
 }
 
-/// A `DownloadRequest` for the contents of `backup` [velero-download].
+/// What a `DownloadRequest` asks for [velero-download].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Download {
+    /// The archive of the backup's objects, `.tar.gz`.
+    BackupContents,
+    /// The list of the backup's objects, gzipped JSON.
+    BackupResourceList,
+}
+
+/// A `DownloadRequest` for `what` of `backup` [velero-download].
 #[must_use]
-pub fn download_request(namespace: &str, name: &str, backup: &str) -> Value {
+pub fn download_request(namespace: &str, name: &str, backup: &str, what: Download) -> Value {
+    let kind = match what {
+        Download::BackupContents => "BackupContents",
+        Download::BackupResourceList => "BackupResourceList",
+    };
     json!({
         "apiVersion": API_VERSION,
         "kind": "DownloadRequest",
         "metadata": {"name": name, "namespace": namespace},
-        "spec": {"target": {"kind": "BackupContents", "name": backup}},
+        "spec": {"target": {"kind": kind, "name": backup}},
     })
 }
 
@@ -1156,11 +1314,16 @@ mod tests {
         assert_eq!(view.outcome, Outcome::PartiallyFailed);
         assert_eq!((view.errors, view.warnings), (1, 3));
         assert_eq!(copy["spec"]["excludedResources"], json!(HELD_BACK));
+        assert_eq!(
+            copy["spec"]["resourceModifier"],
+            json!({"kind": "ConfigMap", "name": "zeabur-1-2"})
+        );
 
         let same = restore_object("velero", "zeabur-1-2", "zeabur-1", "shop", None);
         assert_eq!(
             same["spec"],
-            json!({"backupName": "zeabur-1", "includedNamespaces": ["shop"]})
+            json!({"backupName": "zeabur-1", "includedNamespaces": ["shop"],
+                   "excludedResources": HELD_BACK})
         );
         assert_eq!(restore(&object(same)).into, None);
 
@@ -1172,6 +1335,66 @@ mod tests {
         for bad in ["shop", "Shop-2", "-x", ""] {
             assert!(new_namespace_problem("shop", bad).is_some(), "{bad}");
         }
+    }
+
+    #[test]
+    fn a_copy_pauses_the_cron_jobs_of_the_original_namespace_by_the_documented_rule_format() {
+        let modifier = paused_cron_jobs("velero", "zeabur-1-2", "shop");
+        assert_eq!(modifier["metadata"]["name"], "zeabur-1-2");
+        let rules: Value =
+            serde_saphyr::from_str(modifier["data"]["cronjobs.yaml"].as_str().unwrap()).unwrap();
+        assert_eq!(
+            rules,
+            json!({"version": "v1", "resourceModifierRules": [{
+                "conditions": {"groupResource": "cronjobs.batch", "namespaces": ["shop"]},
+                "patches": [{"operation": "add", "path": "/spec/suspend", "value": "true"}]
+            }]})
+        );
+        let restore = object(json!({
+            "apiVersion": API_VERSION, "kind": "Restore",
+            "metadata": {"name": "zeabur-1-2", "namespace": "velero", "uid": "u-1"}
+        }));
+        assert_eq!(
+            owned_by(&restore).unwrap()[0]["value"][0],
+            json!({"apiVersion": API_VERSION, "kind": "Restore", "name": "zeabur-1-2", "uid": "u-1"})
+        );
+    }
+
+    #[test]
+    fn domains_come_back_as_a_restore_of_only_the_routes() {
+        let back = domains_restore("velero", "zeabur-1-3", "zeabur-1", "shop", "shop-2");
+        assert_eq!(
+            back["spec"],
+            json!({"backupName": "zeabur-1", "includedNamespaces": ["shop"],
+                   "namespaceMapping": {"shop": "shop-2"}, "includedResources": ROUTES})
+        );
+        let view = restore(&object(back));
+        assert_eq!(view.resources, ROUTES);
+        let home = domains_restore("velero", "zeabur-1-3", "zeabur-1", "shop", "shop");
+        assert_eq!(home["spec"].get("namespaceMapping"), None);
+    }
+
+    #[test]
+    fn the_inventory_reads_one_namespace_of_the_backup_list() {
+        let list: BTreeMap<String, Vec<String>> = serde_json::from_value(json!({
+            "v1/Service": ["shop/api", "shop/postgres", "blog/web"],
+            "v1/Secret": ["shop/db-app", "shop/sh.helm.release.v1.x.v1"],
+            "batch/v1/CronJob": ["shop/nightly"],
+            "networking.k8s.io/v1/Ingress": ["shop/web"],
+            "gateway.networking.k8s.io/v1/HTTPRoute": ["blog/web"],
+            "v1/Namespace": ["shop"],
+            "apps/v1/Deployment": ["shop/api"]
+        }))
+        .unwrap();
+        assert_eq!(
+            inventory(&list, "shop"),
+            Inventory {
+                services: vec!["api".to_owned(), "postgres".to_owned()],
+                secrets: vec!["db-app".to_owned()],
+                cron_jobs: vec!["nightly".to_owned()],
+                routes: vec!["Ingress/web".to_owned()],
+            }
+        );
     }
 
     #[test]

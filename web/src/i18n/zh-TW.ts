@@ -2221,25 +2221,13 @@ export const zhTW: Messages = {
   "clusterBackups.chooseProject": "選擇專案",
   "clusterBackups.copyName": "新專案名稱",
   "clusterBackups.copyHint": (source) => `${source} 會照常執行，備份會還原到這個新專案。`,
-  "clusterBackups.goneBody": (source) =>
-    `${source} 已經不存在，會用原本的名稱還原，網域也一起還原。`,
   "clusterBackups.problem.intoTaken": "已經有專案用這個名稱，換一個。",
   "clusterBackups.restoredInto": (source, into) => `${source} → ${into}`,
   "clusterBackups.openCopy": "開啟專案",
   "clusterBackups.plan.copy": (source) => `從備份還原 ${source}`,
-  "clusterBackups.copy.sameName": (source) =>
-    `${source} 已經不存在，備份會用原本的名稱還原，網域也一起還原。`,
   "clusterBackups.copy.into": (source, into) =>
     `備份會還原到新專案 ${into}，服務、磁碟區和資料庫都是另外一份。${source} 不會變動。`,
   "clusterBackups.copy.keep": (source) => `原本的專案 ${source} 會繼續保留，不需要時請刪除。`,
-  "clusterBackups.copy.hosts": (hosts, source) =>
-    `${hosts} 會先留在 ${source}，之後用「把網域移到新專案」移過去。`,
-  "clusterBackups.copy.references": (source, n) =>
-    `有 ${n} 個值寫著 ${source} 裡的位址，新專案會因此連回原本的專案：`,
-  "clusterBackups.copy.rewriteLater": "還原完成後，用「改寫位址」把它們改成新專案的位址。",
-  "clusterBackups.copy.secrets": (names) =>
-    `這裡不會讀取這些機密的值，它們也可能寫著原本的位址：${names}。改寫位址時才會讀取。`,
-  "clusterBackups.copy.unchecked": (kinds) => `無法檢查 ${kinds}。`,
   "clusterBackups.copy.amount": (cpu, memory) => `${cpu} 核心 CPU、${memory} 記憶體`,
   "clusterBackups.copy.short": (need, free) =>
     `兩個專案會同時執行。新專案需要 ${need}，節點只剩 ${free}，部分服務可能無法啟動。先停掉用不到的服務，或加一台節點。`,
@@ -2248,7 +2236,30 @@ export const zhTW: Messages = {
   "clusterBackups.copy.roomUnknown": (need) =>
     `兩個專案會同時執行，新專案需要 ${need}。Zeabur 讀不到節點還剩多少資源。`,
   "clusterBackups.copy.webhooks": (source) => `自動部署和 Git webhook 仍然會送到 ${source}。`,
-  "clusterBackups.move.action": "把網域移到新專案",
+  "clusterBackups.goneBody": (source) =>
+    `${source} 已經不存在，會用原本的名稱還原。網域等你確認過專案後，最後再接回來。`,
+  "clusterBackups.copy.sameName": (source) => `${source} 已經不存在，備份會用原本的名稱還原。`,
+  "clusterBackups.copy.domainsLast": (routes) =>
+    `網域不會跟著還原（${routes}）。確認專案沒問題後，再按「接回網域」。`,
+  "clusterBackups.copy.domainsLastAny": "網域不會跟著還原。確認專案沒問題後，再按「接回網域」。",
+  "clusterBackups.copy.cronJobs": (n) =>
+    `${n} 個排程工作會先暫停，避免同一件事跑兩次。新專案確認沒問題後，到各自的頁面恢復：`,
+  "clusterBackups.copy.services": (source, into, example) =>
+    `用到這些服務位址的值（例如 ${example}.${source}.svc）還是會連到 ${source}。還原完成後，用「改寫位址」改成 ${into}：`,
+  "clusterBackups.copy.secrets": (source) =>
+    `這些機密也可能寫著 ${source} 的位址，「改寫位址」會一併讀取並修改：`,
+  "clusterBackups.copy.unread": (reason) =>
+    `Zeabur 讀不到備份裡有什麼，所以這裡列不出來：${reason}`,
+  "clusterBackups.move.action": "移動網域",
+  "clusterBackups.attach.action": "接回網域",
+  "clusterBackups.attach.title": (to) => `把網域接回 ${to}`,
+  "clusterBackups.attach.hosts": (hosts, to) => `會從備份把 ${hosts} 接回 ${to}。`,
+  "clusterBackups.attach.brief": "這些網域的憑證會重新申請。",
+  "clusterBackups.attach.held": (hosts, project, to) =>
+    `${project} 現在正在使用 ${hosts}，請改成從 ${project} 移到 ${to}。`,
+  "clusterBackups.attach.move": (project) => `從 ${project} 移動網域`,
+  "clusterBackups.domainsBack": (to) => `網域接回 ${to}`,
+  "clusterBackups.thing.ConfigMap": (name) => `暫停排程工作的規則 ${name}`,
   "clusterBackups.move.title": (into) => `把網域移到 ${into}`,
   "clusterBackups.move.hosts": (hosts, from, to) => `${hosts} 會從 ${from} 移到 ${to}。`,
   "clusterBackups.move.managed": (routes) => `這些路由由工具管理，不會移動：${routes}。`,

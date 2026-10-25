@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test"
 
 import type { Target } from "@/model/connect"
 import {
+  afterRestore,
   ownSecrets,
   restoreChoices,
   restoreProblem,
@@ -107,5 +108,34 @@ describe("choosing what to restore", () => {
 
   test("a project that is gone restores under its own name", () => {
     expect(restoreProblem("wiki", "", projects)).toBeUndefined()
+  })
+})
+
+describe("after a project restore", () => {
+  const restore = (into?: string, resources: string[] = []) => ({
+    name: "zeabur-1-20261025",
+    backup: "zeabur-1",
+    namespaces: ["blog"],
+    into,
+    resources,
+  })
+
+  test("a copy opens the new project, brings the domains back to it and rewrites addresses", () => {
+    expect(afterRestore(restore("blog-copy"))).toEqual({
+      project: "blog-copy",
+      attach: { op: "attachDomains", backup: "zeabur-1", namespace: "blog", to: "blog-copy" },
+      rewrite: { source: "blog", into: "blog-copy" },
+    })
+  })
+
+  test("a project back under its own name brings its domains back to itself", () => {
+    expect(afterRestore(restore())).toEqual({
+      project: "blog",
+      attach: { op: "attachDomains", backup: "zeabur-1", namespace: "blog", to: "blog" },
+    })
+  })
+
+  test("a restore of only the domains is the last step and offers nothing more", () => {
+    expect(afterRestore(restore("blog-copy", ["ingresses.networking.k8s.io"]))).toBeUndefined()
   })
 })

@@ -54,7 +54,13 @@ import {
   type ScheduleProblem,
 } from "@/model/cluster-backups"
 import type { Gate } from "@/model/rights"
-import { CopyFacts, MoveFacts, RestoreForm, RestoreList } from "@/routes/cluster/backup-restore"
+import {
+  AttachFacts,
+  CopyFacts,
+  MoveFacts,
+  RestoreForm,
+  RestoreList,
+} from "@/routes/cluster/backup-restore"
 import { ClusterFrame } from "@/routes/cluster/frame"
 import { Forbidden, type Role } from "@/routes/cluster/forbidden"
 import { S3DestinationsSection } from "@/routes/cluster/s3-destinations"
@@ -211,6 +217,7 @@ function Installed({ data }: { data: Data }) {
           request={plan.request}
           title={plan.title}
           action={plan.action}
+          onPlan={open}
           onClose={() => setPlan(undefined)}
         />
       ) : null}
@@ -862,11 +869,13 @@ function PlanDialog({
   request,
   title,
   action,
+  onPlan,
   onClose,
 }: {
   request: Request
   title: string
   action?: string
+  onPlan: OnPlan
   onClose: () => void
 }) {
   const t = useT()
@@ -896,10 +905,23 @@ function PlanDialog({
     >
       {(data) => (
         <>
-          <Planned writes={data.writes} />
+          {(data.held?.length ?? 0) > 0 ? null : <Planned writes={data.writes} />}
           {data.copy ? <CopyFacts copy={data.copy} /> : null}
           {request.op === "moveDomains" ? (
             <MoveFacts plan={data} from={request.from} to={request.to} />
+          ) : null}
+          {request.op === "attachDomains" ? (
+            <AttachFacts
+              plan={data}
+              to={request.to}
+              onMove={(from) =>
+                onPlan(
+                  { op: "moveDomains", from, to: request.to },
+                  t("clusterBackups.move.title", request.to),
+                  t("clusterBackups.move.action"),
+                )
+              }
+            />
           ) : null}
         </>
       )}
@@ -915,6 +937,7 @@ function Planned({ writes }: { writes: Schemas["BackupWrite"][] }) {
       case "Backup":
       case "Restore":
       case "Namespace":
+      case "ConfigMap":
         return t(`clusterBackups.thing.${write.kind}`, write.name)
       case "Ingress":
       case "HTTPRoute":

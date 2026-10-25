@@ -1,8 +1,9 @@
 //! The cluster's backups through Velero: not installed is an answer, setting the location keeps
 //! its keys out of every answer, the schedule is created, paused and backed up from, a finished
 //! backup goes into a new project while the original runs and back under its own name once it is
-//! gone, domains move to the copy, and the refusals: someone RBAC does not let write, a plan the
-//! cluster moved past.
+//! gone, both without routes and with the plan read from the backup's list, domains come back
+//! from the backup or move from the project that serves them, and the refusals: someone RBAC does
+//! not let write, a plan the cluster moved past, a domain another project serves.
 
 #[cfg(test)]
 mod tests {
@@ -385,7 +386,92 @@ mod tests {
         .unwrap()
     }
 
-    /// Velero, and the project `shop` with a route and a variable naming its own namespace.
+    const KEY: &str = "kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk";
+
+    fn gzip(data: &[u8]) -> Vec<u8> {
+        use std::io::Write as _;
+        let mut encoder = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::fast());
+        encoder.write_all(data).unwrap();
+        encoder.finish().unwrap()
+    }
+
+    /// Velero's archive of a backup that holds `routes`, at the paths Velero writes.
+    fn contents(routes: &[Value]) -> Vec<u8> {
+        let mut archive = tar::Builder::new(Vec::new());
+        for route in routes {
+            let namespace = route["metadata"]["namespace"].as_str().unwrap();
+            let name = route["metadata"]["name"].as_str().unwrap();
+            let body = serde_json::to_vec(route).unwrap();
+            for folder in ["", "v1-preferredversion/"] {
+                let mut header = tar::Header::new_gnu();
+                header.set_size(body.len() as u64);
+                header.set_mode(0o644);
+                header.set_cksum();
+                archive
+                    .append_data(
+                        &mut header,
+                        format!(
+                            "resources/ingresses.networking.k8s.io/{folder}namespaces/{namespace}/{name}.json"
+                        ),
+                        body.as_slice(),
+                    )
+                    .unwrap();
+            }
+        }
+        gzip(&archive.into_inner().unwrap())
+    }
+
+    fn route(namespace: &str, name: &str, host: &str) -> Value {
+        json!({"apiVersion": "networking.k8s.io/v1", "kind": "Ingress",
+               "metadata": {"name": name, "namespace": namespace},
+               "spec": {"rules": [{"host": host}]}})
+    }
+
+    /// The store of backup `zeabur-1`, which holds `shop` and `blog`, and Velero signing URLs
+    /// to it.
+    async fn backup_store(cluster: &MemoryCluster) -> tokio::task::JoinHandle<()> {
+        let list = json!({
+            "v1/Service": ["shop/api", "shop/postgres", "blog/web"],
+            "v1/Secret": ["shop/postgres-app"],
+            "batch/v1/CronJob": ["shop/nightly"],
+            "networking.k8s.io/v1/Ingress": ["shop/web", "blog/web"],
+            "apps/v1/Deployment": ["shop/web"],
+            "v1/Namespace": ["blog", "shop"]
+        });
+        let files = vec![
+            (
+                "-resource-list.json.gz",
+                gzip(&serde_json::to_vec(&list).unwrap()),
+            ),
+            (
+                ".tar.gz",
+                contents(&[
+                    route("shop", "web", "shop.example.com"),
+                    route("blog", "web", "blog.example.com"),
+                ]),
+            ),
+        ];
+        let location = store(KEY, files).await;
+        let base = location.data["spec"]["config"]["s3Url"]
+            .as_str()
+            .unwrap()
+            .to_owned();
+        cluster.update(|s| {
+            s.dynamic.retain(|o| {
+                o.types
+                    .as_ref()
+                    .is_none_or(|t| t.kind != "BackupStorageLocation")
+            });
+            s.dynamic.push(location);
+            s.secret_values.insert(
+                "velero/velero-backup-key".to_owned(),
+                [("key".to_owned(), KEY.as_bytes().to_vec())].into(),
+            );
+        });
+        sign_downloads(cluster, base)
+    }
+
+    /// Velero, and the project `shop` with a route.
     fn with_shop() -> MemoryCluster {
         let cluster = velero(vec![
             location(),
@@ -395,8 +481,7 @@ mod tests {
         ]);
         let deployment: Deployment = serde_json::from_value(json!({
             "metadata": {"name": "web", "namespace": "shop"},
-            "spec": {"selector": {}, "template": {"spec": {"containers": [{"name": "web",
-                "env": [{"name": "DB_HOST", "value": "postgres.shop.svc.cluster.local"}]}]}}}
+            "spec": {"selector": {}, "template": {"spec": {"containers": [{"name": "web"}]}}}
         }))
         .unwrap();
         cluster.update(|s| {
@@ -421,32 +506,68 @@ mod tests {
         cluster
     }
 
+    fn strings(value: &Value) -> Vec<&str> {
+        value
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter_map(Value::as_str)
+            .collect()
+    }
+
     #[tokio::test]
     async fn a_backup_goes_into_a_new_project_while_the_original_runs() {
         let cluster = with_shop();
+        let _velero = backup_store(&cluster).await;
         let app = app(&cluster);
         let request = json!({"op": "restore", "backup": "zeabur-1", "namespace": "shop", "into": "shop-copy"});
         let (planned, done) = applied(&app, &request).await;
         let copy = &planned["copy"];
         assert_eq!(copy["sameName"], false);
         assert_eq!(copy["into"], "shop-copy");
-        assert_eq!(copy["hosts"], json!(["shop.example.com"]));
-        assert_eq!(copy["references"][0]["key"], "DB_HOST");
-        assert_eq!(copy["references"][0]["kind"], "Deployment");
+        // What the plan lists comes from the backup, not from the running project.
+        assert_eq!(
+            copy["inventory"],
+            json!({"services": ["api", "postgres"], "secrets": ["postgres-app"],
+                   "cronJobs": ["nightly"], "routes": ["Ingress/web"]})
+        );
 
-        let made = stored(&cluster, "Restore", done["restore"].as_str().unwrap()).unwrap();
+        let name = done["restore"].as_str().unwrap();
+        let made = stored(&cluster, "Restore", name).unwrap();
         assert_eq!(
             made["spec"]["namespaceMapping"],
             json!({"shop": "shop-copy"})
         );
         assert_eq!(made["spec"]["includedNamespaces"], json!(["shop"]));
-        let held: Vec<&str> = made["spec"]["excludedResources"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .filter_map(Value::as_str)
-            .collect();
+        let held = strings(&made["spec"]["excludedResources"]);
         assert!(held.contains(&"ingresses.networking.k8s.io"), "{held:?}");
+        assert_eq!(
+            made["spec"]["resourceModifier"],
+            json!({"kind": "ConfigMap", "name": name})
+        );
+        let modifier = cluster
+            .inspect(|s| {
+                s.objects.get("velero").and_then(|o| {
+                    o.config_maps
+                        .iter()
+                        .find(|c| c.metadata.name.as_deref() == Some(name))
+                        .cloned()
+                })
+            })
+            .flatten()
+            .expect("the resource modifier");
+        let rules = &modifier.data.as_ref().unwrap()["cronjobs.yaml"];
+        assert!(rules.contains("groupResource: cronjobs.batch"), "{rules}");
+        assert!(rules.contains("- shop\n"), "{rules}");
+        let owner = &modifier.metadata.owner_references.as_ref().unwrap()[0];
+        assert_eq!(
+            (owner.kind.as_str(), owner.name.as_str(), Some(&owner.uid)),
+            (
+                "Restore",
+                name,
+                made["metadata"]["uid"].as_str().map(str::to_owned).as_ref()
+            )
+        );
 
         let labels = cluster
             .inspect(|s| {
@@ -490,12 +611,13 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn a_namespace_that_is_gone_comes_back_under_its_own_name_with_its_routes() {
+    async fn a_namespace_that_is_gone_comes_back_under_its_own_name_without_its_routes() {
         let cluster = velero(vec![
             location(),
             schedule(),
             backup("zeabur-1", "Completed"),
         ]);
+        let _velero = backup_store(&cluster).await;
         let app = app(&cluster);
         let (planned, done) = applied(
             &app,
@@ -505,6 +627,10 @@ mod tests {
         .await;
         assert_eq!(planned["copy"]["sameName"], true);
         assert_eq!(planned["copy"]["into"], "blog");
+        assert_eq!(
+            planned["copy"]["inventory"]["routes"],
+            json!(["Ingress/web"])
+        );
         let kinds: Vec<&str> = planned["writes"]
             .as_array()
             .unwrap()
@@ -513,10 +639,64 @@ mod tests {
             .collect();
         assert_eq!(kinds, ["Restore"]);
         let made = stored(&cluster, "Restore", done["restore"].as_str().unwrap()).unwrap();
+        assert_eq!(made["spec"]["includedNamespaces"], json!(["blog"]));
+        assert!(
+            strings(&made["spec"]["excludedResources"]).contains(&"ingresses.networking.k8s.io")
+        );
+        assert_eq!(made["spec"].get("resourceModifier"), None);
+        assert_eq!(made["spec"].get("namespaceMapping"), None);
+    }
+
+    #[tokio::test]
+    async fn domains_come_back_from_the_backup_unless_another_project_serves_them() {
+        let cluster = with_shop();
+        cluster.update(|s| {
+            s.namespaces.push(namespace("shop-copy", &json!({})));
+            s.namespaces.push(namespace("blog", &json!({})));
+        });
+        let _velero = backup_store(&cluster).await;
+        let app = app(&cluster);
+
+        let into_copy = json!({"op": "attachDomains", "backup": "zeabur-1", "namespace": "shop",
+                               "to": "shop-copy"});
+        let (status, planned) = plan(&app, &into_copy).await;
+        assert_eq!(status, StatusCode::OK, "{planned}");
+        assert_eq!(
+            planned["held"],
+            json!([{"host": "shop.example.com", "project": "shop"}])
+        );
+        assert_eq!(planned["writes"], json!([]));
+        let (status, problem) = apply(&app, &planned).await;
+        assert_eq!(status, StatusCode::CONFLICT, "{problem}");
+
+        let home = json!({"op": "attachDomains", "backup": "zeabur-1", "namespace": "blog",
+                          "to": "blog"});
+        let (planned, done) = applied(&app, &home).await;
+        assert_eq!(planned["hosts"], json!(["blog.example.com"]));
+        assert_eq!(planned.get("held"), None);
+        let made = stored(&cluster, "Restore", done["restore"].as_str().unwrap()).unwrap();
         assert_eq!(
             made["spec"],
-            json!({"backupName": "zeabur-1", "includedNamespaces": ["blog"]})
+            json!({"backupName": "zeabur-1", "includedNamespaces": ["blog"],
+                   "includedResources": ["ingresses.networking.k8s.io",
+                                         "httproutes.gateway.networking.k8s.io"]})
         );
+        let (_, found) = send(&app, "GET", "/api/v1/cluster/backups", None).await;
+        let listed = found["restores"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|r| r["name"] == done["restore"])
+            .unwrap();
+        assert_eq!(listed["resources"][0], "ingresses.networking.k8s.io");
+
+        let (status, problem) = plan(
+            &app,
+            &json!({"op": "attachDomains", "backup": "zeabur-1", "namespace": "blog",
+                    "to": "missing"}),
+        )
+        .await;
+        assert_eq!(status, StatusCode::NOT_FOUND, "{problem}");
     }
 
     #[tokio::test]
@@ -564,33 +744,41 @@ mod tests {
         assert_eq!(status, StatusCode::NOT_FOUND, "{problem}");
     }
 
-    /// A store at 127.0.0.1 that answers `body` only with the customer key `key`, and the
-    /// location of it.
-    async fn store(key: &'static str, body: &'static [u8]) -> DynamicObject {
+    /// A store at 127.0.0.1 that answers, only with the customer key `key`, the body of the first
+    /// of `files` whose suffix ends the path, and the location of it.
+    async fn store(key: &'static str, files: Vec<(&'static str, Vec<u8>)>) -> DynamicObject {
+        use axum::extract::Path;
         use axum::http::HeaderMap;
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let port = listener.local_addr().unwrap().port();
+        let files = std::sync::Arc::new(files);
         let app = Router::new().route(
             "/{*path}",
-            axum::routing::get(move |headers: HeaderMap| async move {
-                let sent = |name: &str| {
-                    headers
-                        .get(name)
-                        .and_then(|v| v.to_str().ok())
-                        .unwrap_or_default()
-                        .to_owned()
-                };
-                let encoded =
-                    base64::Engine::encode(&base64::engine::general_purpose::STANDARD, key);
-                if sent("x-amz-server-side-encryption-customer-key") == encoded
-                    && sent("x-amz-server-side-encryption-customer-algorithm") == "AES256"
-                    && !sent("x-amz-server-side-encryption-customer-key-md5").is_empty()
-                {
-                    (StatusCode::OK, body.to_vec())
-                } else {
-                    (StatusCode::BAD_REQUEST, Vec::new())
-                }
-            }),
+            axum::routing::get(
+                move |Path(path): Path<String>, headers: HeaderMap| async move {
+                    let body = files
+                        .iter()
+                        .find(|(suffix, _)| path.ends_with(suffix))
+                        .map_or_default(|(_, body)| body.clone());
+                    let sent = |name: &str| {
+                        headers
+                            .get(name)
+                            .and_then(|v| v.to_str().ok())
+                            .unwrap_or_default()
+                            .to_owned()
+                    };
+                    let encoded =
+                        base64::Engine::encode(&base64::engine::general_purpose::STANDARD, key);
+                    if sent("x-amz-server-side-encryption-customer-key") == encoded
+                        && sent("x-amz-server-side-encryption-customer-algorithm") == "AES256"
+                        && !sent("x-amz-server-side-encryption-customer-key-md5").is_empty()
+                    {
+                        (StatusCode::OK, body)
+                    } else {
+                        (StatusCode::BAD_REQUEST, Vec::new())
+                    }
+                },
+            ),
         );
         tokio::spawn(async move { axum::serve(listener, app).await });
         object(json!({
@@ -613,13 +801,15 @@ mod tests {
                     for request in s.dynamic.iter_mut().filter(|o| {
                         o.types.as_ref().is_some_and(|t| t.kind == "DownloadRequest")
                     }) {
-                        let backup = request.data["spec"]["target"]["name"]
-                            .as_str()
-                            .unwrap_or_default()
-                            .to_owned();
+                        let target = &request.data["spec"]["target"];
+                        let backup = target["name"].as_str().unwrap_or_default().to_owned();
+                        let file = match target["kind"].as_str() {
+                            Some("BackupResourceList") => "-resource-list.json.gz",
+                            _ => ".tar.gz",
+                        };
                         request.data["status"] = json!({
                             "phase": "Processed",
-                            "downloadURL": format!("{base}/backups/backups/{backup}/{backup}.tar.gz?X-Amz-Signature=x"),
+                            "downloadURL": format!("{base}/backups/backups/{backup}/{backup}{file}?X-Amz-Signature=x"),
                             "expiration": "2026-10-25T00:10:00Z"
                         });
                     }
@@ -631,7 +821,7 @@ mod tests {
 
     #[tokio::test]
     async fn a_backup_downloads_through_zeabur_with_its_key_and_no_url_reaches_the_page() {
-        let location = store("k".repeat(32).leak(), b"tarball").await;
+        let location = store(KEY, vec![(".tar.gz", b"tarball".to_vec())]).await;
         let base = location.data["spec"]["config"]["s3Url"]
             .as_str()
             .unwrap()
@@ -640,7 +830,7 @@ mod tests {
         cluster.update(|s| {
             s.secret_values.insert(
                 "velero/velero-backup-key".to_owned(),
-                [("key".to_owned(), "k".repeat(32).into_bytes())].into(),
+                [("key".to_owned(), KEY.as_bytes().to_vec())].into(),
             );
         });
         let velero = sign_downloads(&cluster, base.clone());

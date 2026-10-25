@@ -1,5 +1,6 @@
 // A Velero backup restored into a new project while the original runs, or under its own name
-// once the original is gone; then the domains and the addresses moved over.
+// once the original is gone, both without domains; then the domains brought back and, for a copy,
+// the addresses moved over.
 import { useQuery } from "@tanstack/react-query"
 import { Link } from "@tanstack/react-router"
 import { useState } from "react"
@@ -14,11 +15,17 @@ import { GateTip, useGate } from "@/components/gate"
 import { usePlanner } from "@/components/plan/planner"
 import { Problem } from "@/components/problem"
 import { StatusPill } from "@/components/status"
-import { useT } from "@/i18n"
+import { type Translate, useT } from "@/i18n"
 import { useQuantityFormat } from "@/lib/quantity"
 import { outcomeHealth } from "@/model/cluster-backups"
 import { restoredName } from "@/model/database-restore"
-import { ownSecrets, restoreChoices, restoreProblem, rewriteChanges } from "@/model/restore-copy"
+import {
+  afterRestore,
+  ownSecrets,
+  restoreChoices,
+  restoreProblem,
+  rewriteChanges,
+} from "@/model/restore-copy"
 import type { Gate } from "@/model/rights"
 import { FormButtons, Section } from "@/routes/cluster/section"
 import { Alert, AlertDescription } from "@zeabur/design-system/components/alert"
@@ -150,48 +157,77 @@ function Room({ room }: { room: Schemas["RestoreRoom"] }) {
   )
 }
 
-/** What a restore plan does to the projects, under the writes. */
+/** Names in a bounded, wrapping list. */
+function Names({ names }: { names: string[] }) {
+  return (
+    <ul
+      className="flex max-h-32 flex-wrap gap-x-3 gap-y-1 overflow-y-auto type-meta type-mono"
+      translate="no"
+    >
+      {names.map((name) => (
+        <li key={name}>{name}</li>
+      ))}
+    </ul>
+  )
+}
+
+function Listed({ text, names }: { text: string; names: string[] }) {
+  if (names.length === 0) return null
+  return (
+    <div className="flex flex-col gap-1">
+      <p>{text}</p>
+      <Names names={names} />
+    </div>
+  )
+}
+
+/** What a restore plan does to the projects, under the writes; the lists come from the backup. */
 export function CopyFacts({ copy }: { copy: Copy }) {
   const t = useT()
-  if (copy.sameName) return <p>{t("clusterBackups.copy.sameName", copy.source)}</p>
+  const inventory = copy.inventory
+  const routes = inventory?.routes ?? []
+  const services = inventory?.services ?? []
   return (
     <div className="flex flex-col gap-3">
-      <p>{t("clusterBackups.copy.into", copy.source, copy.into)}</p>
-      <p>{t("clusterBackups.copy.keep", copy.source)}</p>
-      {copy.hosts.length > 0 ? (
-        <p>{t("clusterBackups.copy.hosts", t("common.list", copy.hosts), copy.source)}</p>
-      ) : null}
-      {copy.references.length > 0 ? (
-        <div className="flex flex-col gap-1">
-          <p>{t("clusterBackups.copy.references", copy.source, copy.references.length)}</p>
-          <ul className="max-h-48 overflow-y-auto rounded-lg border border-main type-meta">
-            {copy.references.map((r) => (
-              <li
-                key={`${r.kind}/${r.name}/${r.container ?? ""}/${r.key}`}
-                className="truncate border-t border-rule px-3 py-1.5 first:border-t-0"
-                translate="no"
-              >
-                {`${r.kind}/${r.name}${t("common.sep")}${r.key}${r.value ? `${t("common.colon")}${r.value}` : ""}`}
-              </li>
-            ))}
-          </ul>
-          <p className="type-meta text-muted-foreground">{t("clusterBackups.copy.rewriteLater")}</p>
-        </div>
-      ) : null}
-      {copy.secrets.length > 0 ? (
-        <p className="type-meta text-muted-foreground">
-          {t("clusterBackups.copy.secrets", t("common.list", copy.secrets))}
+      {copy.sameName ? (
+        <p>{t("clusterBackups.copy.sameName", copy.source)}</p>
+      ) : (
+        <>
+          <p>{t("clusterBackups.copy.into", copy.source, copy.into)}</p>
+          <p>{t("clusterBackups.copy.keep", copy.source)}</p>
+        </>
+      )}
+      {inventory && routes.length === 0 ? null : (
+        <p>
+          {routes.length > 0
+            ? t("clusterBackups.copy.domainsLast", t("common.list", routes))
+            : t("clusterBackups.copy.domainsLastAny")}
         </p>
-      ) : null}
-      {copy.unchecked.length > 0 ? (
+      )}
+      {copy.sameName || !inventory ? null : (
+        <>
+          <Listed
+            text={t("clusterBackups.copy.cronJobs", inventory.cronJobs.length)}
+            names={inventory.cronJobs}
+          />
+          <Listed
+            text={t("clusterBackups.copy.services", copy.source, copy.into, services[0] ?? "")}
+            names={services}
+          />
+          <Listed text={t("clusterBackups.copy.secrets", copy.source)} names={inventory.secrets} />
+        </>
+      )}
+      {copy.unread ? (
         <p className="type-meta text-muted-foreground">
-          {t("clusterBackups.copy.unchecked", t("common.list", copy.unchecked))}
+          {t("clusterBackups.copy.unread", copy.unread)}
         </p>
       ) : null}
       {copy.room ? <Room room={copy.room} /> : null}
-      <p className="type-meta text-muted-foreground">
-        {t("clusterBackups.copy.webhooks", copy.source)}
-      </p>
+      {copy.sameName ? null : (
+        <p className="type-meta text-muted-foreground">
+          {t("clusterBackups.copy.webhooks", copy.source)}
+        </p>
+      )}
     </div>
   )
 }
@@ -220,6 +256,57 @@ export function MoveFacts({
         </p>
       ) : null}
       <p className="type-meta text-muted-foreground">{t("clusterBackups.move.brief")}</p>
+    </div>
+  )
+}
+
+/** What bringing domains back from a backup does, or which project still serves them and the
+ * move that frees them. */
+export function AttachFacts({
+  plan,
+  to,
+  onMove,
+}: {
+  plan: Schemas["BackupsPlan"]
+  to: string
+  onMove: (from: string) => void
+}) {
+  const t = useT()
+  const held = plan.held ?? []
+  const hosts = plan.hosts ?? []
+  if (held.length === 0)
+    return (
+      <div className="flex flex-col gap-2">
+        <p>{t("clusterBackups.attach.hosts", t("common.list", hosts), to)}</p>
+        <p className="type-meta text-muted-foreground">{t("clusterBackups.attach.brief")}</p>
+      </div>
+    )
+  const projects = [...new Set(held.map((h) => h.project))]
+  return (
+    <div className="flex flex-col gap-3">
+      {projects.map((project) => (
+        <Alert key={project} variant="warn" role="note">
+          <WarningIcon aria-hidden="true" />
+          <AlertDescription>
+            <div className="flex flex-col items-start gap-2">
+              <span>
+                {t(
+                  "clusterBackups.attach.held",
+                  t(
+                    "common.list",
+                    held.filter((h) => h.project === project).map((h) => h.host),
+                  ),
+                  project,
+                  to,
+                )}
+              </span>
+              <Button size="xs" variant="outline" onClick={() => onMove(project)}>
+                {t("clusterBackups.attach.move", project)}
+              </Button>
+            </div>
+          </AlertDescription>
+        </Alert>
+      ))}
     </div>
   )
 }
@@ -294,16 +381,15 @@ function CopyActions({
   onPlan: OnPlan
 }) {
   const t = useT()
-  const source = restore.namespaces[0]
-  const into = restore.into
-  if (!into || !source) return null
+  const next = afterRestore(restore)
+  if (!next) return null
   return (
     <div className="mt-1 flex flex-col gap-1.5">
       <div className="flex flex-wrap items-center gap-2">
         <Button
           size="xs"
           variant="outline"
-          render={<Link to="/projects/$project" params={{ project: into }} />}
+          render={<Link to="/projects/$project" params={{ project: next.project }} />}
         >
           {t("clusterBackups.openCopy")}
         </Button>
@@ -313,20 +399,31 @@ function CopyActions({
             variant="outline"
             onClick={() =>
               onPlan(
-                { op: "moveDomains", from: source, to: into },
-                t("clusterBackups.move.title", into),
-                t("clusterBackups.move.action"),
+                next.attach,
+                t("clusterBackups.attach.title", next.project),
+                t("clusterBackups.attach.action"),
               )
             }
           >
-            {t("clusterBackups.move.action")}
+            {t("clusterBackups.attach.action")}
           </Button>
         </GateTip>
-        <Rewrite source={source} into={into} />
+        {next.rewrite ? <Rewrite source={next.rewrite.source} into={next.rewrite.into} /> : null}
       </div>
-      <p className="type-meta text-muted-foreground">{t("clusterBackups.copy.keep", source)}</p>
+      {next.rewrite ? (
+        <p className="type-meta text-muted-foreground">
+          {t("clusterBackups.copy.keep", next.rewrite.source)}
+        </p>
+      ) : null}
     </div>
   )
+}
+
+function restoredWhat(t: Translate, r: Schemas["VeleroRestore"]): string {
+  if ((r.resources?.length ?? 0) > 0)
+    return t("clusterBackups.domainsBack", r.into ?? r.namespaces[0] ?? "")
+  if (r.into) return t("clusterBackups.restoredInto", r.namespaces[0] ?? "", r.into)
+  return t("common.list", r.namespaces)
 }
 
 export function RestoreList({
@@ -364,9 +461,7 @@ export function RestoreList({
             <span className="type-meta text-muted-foreground">
               {[
                 t("clusterBackups.restoredFrom", r.backup),
-                r.into
-                  ? t("clusterBackups.restoredInto", r.namespaces[0] ?? "", r.into)
-                  : t("common.list", r.namespaces),
+                restoredWhat(t, r),
                 r.errors > 0 ? t("clusterBackups.errors", r.errors) : "",
                 r.warnings > 0 ? t("clusterBackups.warnings", r.warnings) : "",
               ]

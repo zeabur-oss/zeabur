@@ -2215,25 +2215,13 @@ export const zhCN: Messages = {
   "clusterBackups.chooseProject": "选择项目",
   "clusterBackups.copyName": "新项目名称",
   "clusterBackups.copyHint": (source) => `${source} 会照常运行，备份会还原到这个新项目。`,
-  "clusterBackups.goneBody": (source) =>
-    `${source} 已经不存在，会用原来的名称还原，域名也一起还原。`,
   "clusterBackups.problem.intoTaken": "已经有项目用这个名称，换一个。",
   "clusterBackups.restoredInto": (source, into) => `${source} → ${into}`,
   "clusterBackups.openCopy": "打开项目",
   "clusterBackups.plan.copy": (source) => `从备份还原 ${source}`,
-  "clusterBackups.copy.sameName": (source) =>
-    `${source} 已经不存在，备份会用原来的名称还原，域名也一起还原。`,
   "clusterBackups.copy.into": (source, into) =>
     `备份会还原到新项目 ${into}，服务、卷和数据库都是另外一份。${source} 不会变动。`,
   "clusterBackups.copy.keep": (source) => `原来的项目 ${source} 会继续保留，不需要时请删除。`,
-  "clusterBackups.copy.hosts": (hosts, source) =>
-    `${hosts} 会先留在 ${source}，之后用“把域名移到新项目”移过去。`,
-  "clusterBackups.copy.references": (source, n) =>
-    `有 ${n} 个值写着 ${source} 里的地址，新项目会因此连回原来的项目：`,
-  "clusterBackups.copy.rewriteLater": "还原完成后，用“改写地址”把它们改成新项目的地址。",
-  "clusterBackups.copy.secrets": (names) =>
-    `这里不会读取这些密钥的值，它们也可能写着原来的地址：${names}。改写地址时才会读取。`,
-  "clusterBackups.copy.unchecked": (kinds) => `无法检查 ${kinds}。`,
   "clusterBackups.copy.amount": (cpu, memory) => `${cpu} 核 CPU、${memory} 内存`,
   "clusterBackups.copy.short": (need, free) =>
     `两个项目会同时运行。新项目需要 ${need}，节点只剩 ${free}，部分服务可能无法启动。先停掉用不到的服务，或加一台节点。`,
@@ -2242,7 +2230,30 @@ export const zhCN: Messages = {
   "clusterBackups.copy.roomUnknown": (need) =>
     `两个项目会同时运行，新项目需要 ${need}。Zeabur 读不到节点还剩多少资源。`,
   "clusterBackups.copy.webhooks": (source) => `自动部署和 Git webhook 仍然会发到 ${source}。`,
-  "clusterBackups.move.action": "把域名移到新项目",
+  "clusterBackups.goneBody": (source) =>
+    `${source} 已经不存在，会用原来的名称还原。域名等你确认过项目后，最后再接回来。`,
+  "clusterBackups.copy.sameName": (source) => `${source} 已经不存在，备份会用原来的名称还原。`,
+  "clusterBackups.copy.domainsLast": (routes) =>
+    `域名不会跟着还原（${routes}）。确认项目没问题后，再点“接回域名”。`,
+  "clusterBackups.copy.domainsLastAny": "域名不会跟着还原。确认项目没问题后，再点“接回域名”。",
+  "clusterBackups.copy.cronJobs": (n) =>
+    `${n} 个定时任务会先暂停，避免同一件事跑两次。新项目确认没问题后，到各自的页面恢复：`,
+  "clusterBackups.copy.services": (source, into, example) =>
+    `用到这些服务地址的值（例如 ${example}.${source}.svc）还是会连到 ${source}。还原完成后，用“改写地址”改成 ${into}：`,
+  "clusterBackups.copy.secrets": (source) =>
+    `这些密钥也可能写着 ${source} 的地址，“改写地址”会一并读取并修改：`,
+  "clusterBackups.copy.unread": (reason) =>
+    `Zeabur 读不到备份里有什么，所以这里列不出来：${reason}`,
+  "clusterBackups.move.action": "移动域名",
+  "clusterBackups.attach.action": "接回域名",
+  "clusterBackups.attach.title": (to) => `把域名接回 ${to}`,
+  "clusterBackups.attach.hosts": (hosts, to) => `会从备份把 ${hosts} 接回 ${to}。`,
+  "clusterBackups.attach.brief": "这些域名的证书会重新申请。",
+  "clusterBackups.attach.held": (hosts, project, to) =>
+    `${project} 现在正在使用 ${hosts}，请改为从 ${project} 移到 ${to}。`,
+  "clusterBackups.attach.move": (project) => `从 ${project} 移动域名`,
+  "clusterBackups.domainsBack": (to) => `域名接回 ${to}`,
+  "clusterBackups.thing.ConfigMap": (name) => `暂停定时任务的规则 ${name}`,
   "clusterBackups.move.title": (into) => `把域名移到 ${into}`,
   "clusterBackups.move.hosts": (hosts, from, to) => `${hosts} 会从 ${from} 移到 ${to}。`,
   "clusterBackups.move.managed": (routes) => `这些路由由工具管理，不会移动：${routes}。`,

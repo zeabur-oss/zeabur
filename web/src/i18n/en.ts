@@ -2397,27 +2397,14 @@ export const en = {
   "clusterBackups.copyName": "New project name",
   "clusterBackups.copyHint": (source: string) =>
     `${source} keeps running; the backup goes into this new project.`,
-  "clusterBackups.goneBody": (source: string) =>
-    `${source} no longer exists, so it comes back under its own name, domains included.`,
   "clusterBackups.problem.intoTaken": "Choose a name no project uses.",
   "clusterBackups.restoredInto": (source: string, into: string) => `${source} → ${into}`,
   "clusterBackups.openCopy": "Open project",
   "clusterBackups.plan.copy": (source: string) => `Restore ${source} from backup`,
-  "clusterBackups.copy.sameName": (source: string) =>
-    `${source} no longer exists, so the backup goes back under its own name, domains included.`,
   "clusterBackups.copy.into": (source: string, into: string) =>
     `The backup goes into a new project, ${into}, with its own copy of every service, volume and database. ${source} is not touched.`,
   "clusterBackups.copy.keep": (source: string) =>
     `The original project ${source} is kept. Delete it when you no longer need it.`,
-  "clusterBackups.copy.hosts": (hosts: string, source: string) =>
-    `${hosts} stay with ${source} until you move them with "Move domains to the new project".`,
-  "clusterBackups.copy.references": (source: string, n: number) =>
-    `${plural(n, "value names", "values name")} addresses in ${source}, so the new project would call the original:`,
-  "clusterBackups.copy.rewriteLater":
-    'Once the restore is done, use "Rewrite addresses" on it to point them at the new project.',
-  "clusterBackups.copy.secrets": (names: string) =>
-    `The values of these Secrets aren't read here and may name it too: ${names}. Rewriting addresses reads them.`,
-  "clusterBackups.copy.unchecked": (kinds: string) => `Couldn't look in ${kinds}.`,
   "clusterBackups.copy.amount": (cpu: string, memory: string) => `${cpu} CPU and ${memory}`,
   "clusterBackups.copy.short": (need: string, free: string) =>
     `Both projects run at once. The new one asks for ${need}, but the nodes have ${free} left, so some services may not start. Stop services you don't need, or add a node.`,
@@ -2427,7 +2414,33 @@ export const en = {
     `Both projects run at once, and the new one asks for ${need}. Zeabur couldn't read how much the nodes have left.`,
   "clusterBackups.copy.webhooks": (source: string) =>
     `Auto deploy and Git webhooks still go to ${source}.`,
-  "clusterBackups.move.action": "Move domains to the new project",
+  "clusterBackups.goneBody": (source: string) =>
+    `${source} no longer exists, so it comes back under its own name. Its domains come back in a last step, once you've checked it.`,
+  "clusterBackups.copy.sameName": (source: string) =>
+    `${source} no longer exists, so the backup goes back under its own name.`,
+  "clusterBackups.copy.domainsLast": (routes: string) =>
+    `Domains stay out of the restore (${routes}). Once you've checked the project, bring them back with "Bring domains back".`,
+  "clusterBackups.copy.domainsLastAny":
+    'Domains stay out of the restore. Once you\'ve checked the project, bring them back with "Bring domains back".',
+  "clusterBackups.copy.cronJobs": (n: number) =>
+    `${plural(n, "scheduled job starts", "scheduled jobs start")} paused, so nothing runs twice. Resume each on its page when the new project is ready:`,
+  "clusterBackups.copy.services": (source: string, into: string, example: string) =>
+    `Values that use these services' addresses, such as ${example}.${source}.svc, still reach ${source}. Once the restore is done, "Rewrite addresses" points them at ${into}:`,
+  "clusterBackups.copy.secrets": (source: string) =>
+    `These Secrets may also hold addresses in ${source}. "Rewrite addresses" reads and changes them too:`,
+  "clusterBackups.copy.unread": (reason: string) =>
+    `Zeabur couldn't read what the backup holds, so it can't list it here: ${reason}`,
+  "clusterBackups.move.action": "Move domains",
+  "clusterBackups.attach.action": "Bring domains back",
+  "clusterBackups.attach.title": (to: string) => `Bring domains back to ${to}`,
+  "clusterBackups.attach.hosts": (hosts: string, to: string) =>
+    `${hosts} come back to ${to} from the backup.`,
+  "clusterBackups.attach.brief": "Certificates for these domains are requested again.",
+  "clusterBackups.attach.held": (hosts: string, project: string, to: string) =>
+    `${project} serves ${hosts} right now. Move them from ${project} to ${to} instead.`,
+  "clusterBackups.attach.move": (project: string) => `Move domains from ${project}`,
+  "clusterBackups.domainsBack": (to: string) => `Domains back to ${to}`,
+  "clusterBackups.thing.ConfigMap": (name: string) => `the rule ${name} that pauses scheduled jobs`,
   "clusterBackups.move.title": (into: string) => `Move domains to ${into}`,
   "clusterBackups.move.hosts": (hosts: string, from: string, to: string) =>
     `${hosts} move from ${from} to ${to}.`,

@@ -1,16 +1,22 @@
 //! `GET /api/v1/cluster/backups/{backup}/download`: a Velero backup's contents, streamed as a
 //! file.
 //!
-//! As the person, Zeabur creates a `DownloadRequest` for the backup's contents and waits until
-//! Velero signs a URL for it [velero-download]. That URL expires after ten minutes, and Velero
-//! deletes the request after it expires. Zeabur fetches it from the location's endpoint, with
-//! the location's customer key when it encrypts with one, and streams the answer
-//! ([`super::object_store`]). The file is Velero's archive of the objects of the backup, as
-//! `velero backup download` saves it; the files of volumes are in the location's Kopia
-//! repository, not in it.
+//! Restore plans read the backup through the same path: its list of objects
+//! (`resource_list`) and the routes in its archive (`routes`).
+//!
+//! As the person, Zeabur creates a `DownloadRequest` for the backup's contents or its list and
+//! waits until Velero signs a URL for it [velero-download]. That URL expires after ten minutes,
+//! and Velero deletes the request after it expires. Zeabur fetches it from the location's
+//! endpoint, with the location's customer key when it encrypts with one ([`super::object_store`]).
+//! The contents are Velero's archive of the objects of the backup, as `velero backup download`
+//! saves it; the files of volumes are in the location's Kopia repository, not in it. The list is
+//! what `velero backup describe --details` prints, gzipped JSON [velero-describe].
 //!
 //! [velero-download]: https://velero.io/docs/v1.17/api-types/downloadrequest/
+//! [velero-describe]: https://github.com/vmware-tanzu/velero/blob/v1.17.0/pkg/cmd/util/downloadrequest/downloadrequest.go
 
+use std::collections::BTreeMap;
+use std::io::Read as _;
 use std::time::Duration;
 
 use axum::extract::{Path, State};
@@ -20,6 +26,7 @@ use serde_json::Value;
 use zeabur_core::problem::{Kind, MEDIA_TYPE as PROBLEM, Problem};
 use zeabur_kube::{Cluster, ClusterExt as _, ObjectTarget, WriteBody, WriteRequest};
 use zeabur_modules::backups::Outcome;
+use zeabur_modules::velero::cluster::Download;
 use zeabur_modules::velero::{self, cluster as v};
 
 use super::backups::{GROUP, chosen_location, not_installed, objects, target};
@@ -30,6 +37,10 @@ use crate::handlers::{AppState, Person};
 /// How long Velero may take to sign the URL.
 const SIGNING: Duration = Duration::from_secs(30);
 const POLL: Duration = Duration::from_millis(500);
+/// The most bytes read of a backup's list of objects, unpacked.
+const LIST_BYTES: usize = 16 << 20;
+/// The most bytes read of a backup's archive, packed and unpacked.
+const ARCHIVE_BYTES: usize = 512 << 20;
 
 fn bad_gateway(detail: String) -> ApiError {
     ApiError::from(Problem::new(Kind::Unavailable, detail))
@@ -124,35 +135,26 @@ fn request_name(
     Ok(format!("{}-{tail:06x}", v::backup_name(backup, &at)))
 }
 
-/// A Velero backup's contents, as a `.tar.gz` file. Read and written as the person: creating a
-/// `DownloadRequest` in Velero's namespace and reading the location's customer key. No URL or
-/// key reaches the answer.
-#[utoipa::path(get, path = "/api/v1/cluster/backups/{backup}/download", tag = "cluster",
-    operation_id = "downloadClusterBackup",
-    params(("backup" = String, Path, description = "The backup")),
-    responses((status = 200, description = "Velero's archive of the backup's objects", content_type = "application/gzip"),
-              (status = 403, body = Problem, content_type = PROBLEM),
-              (status = 404, body = Problem, content_type = PROBLEM),
-              (status = 422, body = Problem, content_type = PROBLEM),
-              (status = 503, body = Problem, content_type = PROBLEM)))]
-pub(crate) async fn download(
-    State(state): State<AppState>,
-    Person(cluster): Person,
-    Path(backup): Path<String>,
-) -> Result<Response, ApiError> {
-    let cluster = cluster.as_ref();
+/// `what` of `backup`, fetched as the person: Zeabur creates a `DownloadRequest` in Velero's
+/// namespace and reads the location's customer key. No URL or key leaves this function.
+pub(crate) async fn fetch(
+    state: &AppState,
+    cluster: &dyn Cluster,
+    backup: &str,
+    what: Download,
+) -> Result<axum::body::Body, ApiError> {
     let super::backups::Found::Read(found) = objects(cluster, None).await? else {
         return Err(not_installed());
     };
     let namespace = found.namespace.as_str();
     let object = cluster
-        .find_object(&velero::BACKUPS.resource(), Some(namespace), &backup)
+        .find_object(&velero::BACKUPS.resource(), Some(namespace), backup)
         .await
         .map_err(|e| {
             read_problem(
                 e,
                 &format!("backup {backup}"),
-                get_read(GROUP, "backups", Some(namespace), &backup),
+                get_read(GROUP, "backups", Some(namespace), backup),
             )
         })?
         .ok_or_else(|| {
@@ -161,11 +163,11 @@ pub(crate) async fn download(
                 format!("Velero has no backup {backup:?}."),
             ))
         })?;
-    let view = v::backup(&object, &std::collections::BTreeMap::new());
+    let view = v::backup(&object, &BTreeMap::new());
     if !matches!(view.outcome, Outcome::Succeeded | Outcome::PartiallyFailed) {
         return Err(ApiError::from(Problem::new(
             Kind::Invalid,
-            format!("Backup {backup} has not finished, so it cannot be downloaded."),
+            format!("Backup {backup} has not finished, so it cannot be read."),
         )));
     }
     let location = object
@@ -187,12 +189,12 @@ pub(crate) async fn download(
             ))
         })?;
 
-    let name = request_name(&backup, &(state.clock)())?;
+    let name = request_name(backup, &(state.clock)())?;
     let request = target("DownloadRequest", namespace, &name);
     cluster
         .write(&WriteRequest {
             target: request.clone(),
-            body: WriteBody::Create(v::download_request(namespace, &name, &backup)),
+            body: WriteBody::Create(v::download_request(namespace, &name, backup, what)),
             dry_run: false,
         })
         .await
@@ -214,14 +216,126 @@ pub(crate) async fn download(
         )));
     }
     let headers = customer_key(cluster, namespace, &location).await?;
-    let contents = fetched(
+    fetched(
         &state.store,
         &url,
         headers,
         "The backup location",
         "for the backup's contents",
     )
-    .await?;
+    .await
+}
+
+/// The first `limit` bytes of `body`; a problem when it holds more.
+async fn collected(body: axum::body::Body, limit: usize) -> Result<bytes::Bytes, ApiError> {
+    http_body_util::BodyExt::collect(http_body_util::Limited::new(body, limit))
+        .await
+        .map(http_body_util::Collected::to_bytes)
+        .map_err(|e| bad_gateway(format!("The backup could not be read: {e}")))
+}
+
+/// The objects of `backup` as Velero listed them: `group/version/Kind` to `namespace/name`.
+pub(crate) async fn resource_list(
+    state: &AppState,
+    cluster: &dyn Cluster,
+    backup: &str,
+) -> Result<BTreeMap<String, Vec<String>>, ApiError> {
+    let body = fetch(state, cluster, backup, Download::BackupResourceList).await?;
+    let packed = collected(body, LIST_BYTES).await?;
+    tokio::task::spawn_blocking(move || {
+        let mut text = Vec::new();
+        flate2::read::GzDecoder::new(packed.as_ref())
+            .take(LIST_BYTES as u64)
+            .read_to_end(&mut text)
+            .map_err(|e| e.to_string())?;
+        serde_json::from_slice(&text).map_err(|e| e.to_string())
+    })
+    .await
+    .map_err(|e| e.to_string())
+    .flatten()
+    .map_err(|e| {
+        bad_gateway(format!(
+            "Velero's list of backup {backup} could not be read: {e}"
+        ))
+    })
+}
+
+/// The routes of `namespace` in `backup`'s archive, each once.
+///
+/// Velero writes an object at `resources/<resource.group>/namespaces/<namespace>/<name>.json`
+/// and again under the folder of its preferred version [velero-layout].
+///
+/// [velero-layout]: https://velero.io/docs/v1.17/output-file-format/
+pub(crate) async fn routes(
+    state: &AppState,
+    cluster: &dyn Cluster,
+    backup: &str,
+    namespace: &str,
+) -> Result<Vec<Value>, ApiError> {
+    let body = fetch(state, cluster, backup, Download::BackupContents).await?;
+    let packed = collected(body, ARCHIVE_BYTES).await?;
+    let namespace = namespace.to_owned();
+    tokio::task::spawn_blocking(move || routes_in(&packed, &namespace))
+        .await
+        .map_err(|e| e.to_string())
+        .flatten()
+        .map_err(|e| {
+            bad_gateway(format!(
+                "The archive of backup {backup} could not be read: {e}"
+            ))
+        })
+}
+
+fn routes_in(packed: &[u8], namespace: &str) -> Result<Vec<Value>, String> {
+    let unpacked = flate2::read::GzDecoder::new(packed).take(ARCHIVE_BYTES as u64);
+    let mut archive = tar::Archive::new(unpacked);
+    let mut found: BTreeMap<String, Value> = BTreeMap::new();
+    let folder = format!("/namespaces/{namespace}/");
+    for entry in archive.entries().map_err(|e| e.to_string())? {
+        let mut entry = entry.map_err(|e| e.to_string())?;
+        let path = entry
+            .path()
+            .map_err(|e| e.to_string())?
+            .to_string_lossy()
+            .into_owned();
+        let Some(rest) = path.strip_prefix("resources/") else {
+            continue;
+        };
+        let kind = rest.split('/').next().unwrap_or_default();
+        if !v::ROUTES.contains(&kind) {
+            continue;
+        }
+        let Some((_, file)) = rest.split_once(&folder) else {
+            continue;
+        };
+        let Some(name) = file.strip_suffix(".json") else {
+            continue;
+        };
+        let mut text = Vec::new();
+        entry.read_to_end(&mut text).map_err(|e| e.to_string())?;
+        let route: Value = serde_json::from_slice(&text).map_err(|e| e.to_string())?;
+        found.insert(format!("{kind}/{name}"), route);
+    }
+    Ok(found.into_values().collect())
+}
+
+/// A Velero backup's contents, as a `.tar.gz` file. Read and written as the person: creating a
+/// `DownloadRequest` in Velero's namespace and reading the location's customer key. No URL or
+/// key reaches the answer.
+#[utoipa::path(get, path = "/api/v1/cluster/backups/{backup}/download", tag = "cluster",
+    operation_id = "downloadClusterBackup",
+    params(("backup" = String, Path, description = "The backup")),
+    responses((status = 200, description = "Velero's archive of the backup's objects", content_type = "application/gzip"),
+              (status = 403, body = Problem, content_type = PROBLEM),
+              (status = 404, body = Problem, content_type = PROBLEM),
+              (status = 422, body = Problem, content_type = PROBLEM),
+              (status = 503, body = Problem, content_type = PROBLEM)))]
+pub(crate) async fn download(
+    State(state): State<AppState>,
+    Person(cluster): Person,
+    Path(backup): Path<String>,
+) -> Result<Response, ApiError> {
+    let contents = fetch(&state, cluster.as_ref(), &backup, Download::BackupContents).await?;
     let mut response = Response::new(contents);
     let headers = response.headers_mut();
     headers.insert(

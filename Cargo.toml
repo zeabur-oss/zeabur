@@ -95,7 +95,8 @@ base64 = { version = "0.23", default-features = false, features = ["alloc"] }
 bcrypt = { version = "0.19", default-features = false, features = ["alloc"] }
 axum = { version = "0.8", default-features = false, features = ["http1", "tokio", "tracing", "json", "ws"] }
 clap = { version = "4", default-features = false, features = ["std", "derive", "env", "help", "usage", "error-context"] }
-# Unpacking the RKE2 release and packing a local chart (zeabur-installer-host).
+# Unpacking the RKE2 release and packing a local chart (zeabur-installer-host), and reading
+# Velero backups (zeabur-api).
 flate2 = { version = "1", default-features = false, features = ["rust_backend"] }
 form_urlencoded = "1"
 futures-util = { version = "0.3", default-features = false, features = ["std", "io", "async-await-macro"] }

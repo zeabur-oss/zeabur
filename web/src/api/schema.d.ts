@@ -111,9 +111,8 @@ export interface paths {
     put?: never
     /**
      * Works out what setting the backup location or Zeabur's schedule, pausing or resuming it,
-     *     backing up now, restoring a backup into a new project or moving domains to it writes, and a
-     *     token to apply it; writes nothing. The keys of a location never
-     *     appear in the answer.
+     *     backing up now, restoring a project, or bringing back or moving its domains writes, and a
+     *     token to apply it; writes nothing. The keys of a location never appear in the answer.
      */
     post: operations["planClusterBackups"]
     delete?: never
@@ -2708,7 +2707,7 @@ export interface components {
     BackupsApplied: {
       /** @description The backup a `backupNow` plan created. */
       backup?: string | null
-      /** @description The restore a `restore` plan created. */
+      /** @description The restore a `restore` or `attachDomains` plan created. */
       restore?: string | null
       /** @description The objects written, `Kind/name`. */
       written: string[]
@@ -2725,11 +2724,16 @@ export interface components {
       copy?: components["schemas"]["RestoreCopy"] | null
       /** @description When the token stops working, RFC 3339. */
       expiresAt: string
-      /** @description The hostnames a `moveDomains` plan moves. */
+      /**
+       * @description The hostnames of an `attachDomains` plan that another project serves. While there are
+       *     any, the plan writes nothing and apply refuses it.
+       */
+      held?: components["schemas"]["HeldDomain"][]
+      /** @description The hostnames a `moveDomains` or `attachDomains` plan moves or brings back. */
       hosts?: string[]
       /** @description The routes a `moveDomains` plan leaves, because a tool manages them. */
       managed?: string[]
-      /** @description The restore a `restore` plan creates. */
+      /** @description The restore a `restore` or `attachDomains` plan creates. */
       restore?: string | null
       /** @description Send this to `apply` to carry out exactly this plan. */
       token: string
@@ -2798,6 +2802,16 @@ export interface components {
           /** @enum {string} */
           op: "moveDomains"
           /** @description The project they move to. */
+          to: string
+        }
+      | {
+          /** @description The backup. */
+          backup: string
+          /** @description The namespace in the backup. */
+          namespace: string
+          /** @enum {string} */
+          op: "attachDomains"
+          /** @description The project the routes go to. */
           to: string
         }
     /** @description A baseline policy and the node addresses it does not let in. */
@@ -5148,6 +5162,13 @@ export interface components {
      * @enum {string}
      */
     Health: "fail" | "warn" | "progress" | "ok" | "idle"
+    /** @description A hostname that another project serves. */
+    HeldDomain: {
+      /** @description The hostname. */
+      host: string
+      /** @description The project whose route serves it. */
+      project: string
+    }
     /** @description The store a history came from. */
     HistorySource: {
       /** @description Its Service port, `namespace/name:port`. */
@@ -7951,45 +7972,24 @@ export interface components {
        */
       pods?: number | null
     }
-    /** @description What a restore into a new project reports. */
+    /** @description What a project restore reports. */
     RestoreCopy: {
-      /** @description The hostnames the original serves, which stay with it until they are moved. */
-      hosts: string[]
       /** @description The namespace it is restored into. */
       into: string
-      /** @description The values that name the original namespace; empty under the same name. */
-      references: components["schemas"]["RestoreReference"][]
+      inventory?: components["schemas"]["VeleroBackupInventory"] | null
       room?: components["schemas"]["RestoreRoom"] | null
-      /**
-       * @description The original no longer exists, so the backup goes back under its own name, routes
-       *     included.
-       */
+      /** @description The original no longer exists, so the backup goes back under its own name. */
       sameName: boolean
-      /** @description The Secrets whose values were not read, which may name it too. */
-      secrets: string[]
       /** @description The namespace restored. */
       source: string
-      /** @description The kinds that could not be read to look for them. */
-      unchecked: string[]
+      /** @description Why Velero's list could not be read. */
+      unread?: string | null
     }
     /**
      * @description Whether the cluster has room for the copy.
      * @enum {string}
      */
     RestoreFit: "fits" | "short" | "unknown"
-    /** @description A value of the original project that names the original namespace. */
-    RestoreReference: {
-      /** @description The container, for a variable. */
-      container?: string | null
-      /** @description The variable or key; the rule list (`ingress` or `egress`) of a NetworkPolicy. */
-      key: string
-      /** @description `Deployment`, `StatefulSet`, `DaemonSet`, `CronJob`, `ConfigMap` or `NetworkPolicy`. */
-      kind: string
-      /** @description The object. */
-      name: string
-      /** @description The value, for a variable or a ConfigMap key. */
-      value?: string | null
-    }
     /** @description The room the copy needs and the room there is. */
     RestoreRoom: {
       /** @description The verdict. */
@@ -9277,6 +9277,17 @@ export interface components {
        */
       warnings: number
     }
+    /** @description What a backup holds of one namespace, from Velero's list of the backup's objects. */
+    VeleroBackupInventory: {
+      /** @description The CronJobs. */
+      cronJobs: string[]
+      /** @description The routes, `Kind/name`. */
+      routes: string[]
+      /** @description The Secrets. */
+      secrets: string[]
+      /** @description The Services, whose in-cluster addresses name the namespace. */
+      services: string[]
+    }
     /**
      * @description Why a backup did not finish well, in the words the interface explains.
      * @enum {string}
@@ -9337,6 +9348,8 @@ export interface components {
       phase?: string | null
       /** @description Velero's own words when it failed (`failureReason`, `validationErrors`). */
       reason?: string | null
+      /** @description The only kinds it restores (`includedResources`), as `resource.group`; empty for all. */
+      resources?: string[]
       /** @description When it started, RFC 3339. */
       started?: string | null
       /**

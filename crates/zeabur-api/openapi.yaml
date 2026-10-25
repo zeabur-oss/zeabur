@@ -138,9 +138,8 @@ paths:
       - cluster
       summary: |-
         Works out what setting the backup location or Zeabur's schedule, pausing or resuming it,
-        backing up now, restoring a backup into a new project or moving domains to it writes, and a
-        token to apply it; writes nothing. The keys of a location never
-        appear in the answer.
+        backing up now, restoring a project, or bringing back or moving its domains writes, and a
+        token to apply it; writes nothing. The keys of a location never appear in the answer.
       operationId: planClusterBackups
       requestBody:
         content:
@@ -4846,7 +4845,7 @@ components:
           type:
           - string
           - "null"
-          description: The restore a `restore` plan created.
+          description: The restore a `restore` or `attachDomains` plan created.
         written:
           type: array
           items:
@@ -4882,11 +4881,18 @@ components:
         expiresAt:
           type: string
           description: When the token stops working, RFC 3339.
+        held:
+          type: array
+          items:
+            $ref: "#/components/schemas/HeldDomain"
+          description: |-
+            The hostnames of an `attachDomains` plan that another project serves. While there are
+            any, the plan writes nothing and apply refuses it.
         hosts:
           type: array
           items:
             type: string
-          description: The hostnames a `moveDomains` plan moves.
+          description: The hostnames a `moveDomains` or `attachDomains` plan moves or brings back.
         managed:
           type: array
           items:
@@ -4896,7 +4902,7 @@ components:
           type:
           - string
           - "null"
-          description: The restore a `restore` plan creates.
+          description: The restore a `restore` or `attachDomains` plan creates.
         token:
           type: string
           description: Send this to `apply` to carry out exactly this plan.
@@ -4990,9 +4996,9 @@ components:
             - backupNow
       - type: object
         description: |-
-          Restore one namespace of a backup into a new project. While the namespace exists, the
-          backup goes into the new namespace `into` without its routes; when it no longer exists,
-          back under its own name.
+          Restore one namespace of a backup without its routes. While the namespace exists, the
+          backup goes into the new namespace `into` with its CronJobs paused; when it no longer
+          exists, back under its own name.
         required:
         - backup
         - namespace
@@ -5032,6 +5038,29 @@ components:
           to:
             type: string
             description: The project they move to.
+      - type: object
+        description: |-
+          Restore only the routes of one namespace of a backup into the project `to`. Refused while
+          another project serves one of their hostnames.
+        required:
+        - backup
+        - namespace
+        - to
+        - op
+        properties:
+          backup:
+            type: string
+            description: The backup.
+          namespace:
+            type: string
+            description: The namespace in the backup.
+          op:
+            type: string
+            enum:
+            - attachDomains
+          to:
+            type: string
+            description: The project the routes go to.
       description: What to plan.
     BaselinePolicy:
       type: object
@@ -9754,6 +9783,19 @@ components:
       - progress
       - ok
       - idle
+    HeldDomain:
+      type: object
+      description: A hostname that another project serves.
+      required:
+      - host
+      - project
+      properties:
+        host:
+          type: string
+          description: The hostname.
+        project:
+          type: string
+          description: The project whose route serves it.
     HistorySource:
       type: object
       description: The store a history came from.
@@ -15339,29 +15381,20 @@ components:
           minimum: 0
     RestoreCopy:
       type: object
-      description: What a restore into a new project reports.
+      description: What a project restore reports.
       required:
       - source
       - into
       - sameName
-      - hosts
-      - references
-      - secrets
-      - unchecked
       properties:
-        hosts:
-          type: array
-          items:
-            type: string
-          description: The hostnames the original serves, which stay with it until they are moved.
         into:
           type: string
           description: The namespace it is restored into.
-        references:
-          type: array
-          items:
-            $ref: "#/components/schemas/RestoreReference"
-          description: The values that name the original namespace; empty under the same name.
+        inventory:
+          oneOf:
+          - $ref: "#/components/schemas/VeleroBackupInventory"
+            description: What the backup holds of `source`; absent when Velero's list could not be read.
+          - type: "null"
         room:
           oneOf:
           - $ref: "#/components/schemas/RestoreRoom"
@@ -15369,22 +15402,15 @@ components:
           - type: "null"
         sameName:
           type: boolean
-          description: |-
-            The original no longer exists, so the backup goes back under its own name, routes
-            included.
-        secrets:
-          type: array
-          items:
-            type: string
-          description: The Secrets whose values were not read, which may name it too.
+          description: The original no longer exists, so the backup goes back under its own name.
         source:
           type: string
           description: The namespace restored.
-        unchecked:
-          type: array
-          items:
-            type: string
-          description: The kinds that could not be read to look for them.
+        unread:
+          type:
+          - string
+          - "null"
+          description: Why Velero's list could not be read.
     RestoreFit:
       type: string
       description: Whether the cluster has room for the copy.
@@ -15392,33 +15418,6 @@ components:
       - fits
       - short
       - unknown
-    RestoreReference:
-      type: object
-      description: A value of the original project that names the original namespace.
-      required:
-      - kind
-      - name
-      - key
-      properties:
-        container:
-          type:
-          - string
-          - "null"
-          description: The container, for a variable.
-        key:
-          type: string
-          description: The variable or key; the rule list (`ingress` or `egress`) of a NetworkPolicy.
-        kind:
-          type: string
-          description: "`Deployment`, `StatefulSet`, `DaemonSet`, `CronJob`, `ConfigMap` or `NetworkPolicy`."
-        name:
-          type: string
-          description: The object.
-        value:
-          type:
-          - string
-          - "null"
-          description: The value, for a variable or a ConfigMap key.
     RestoreRoom:
       type: object
       description: The room the copy needs and the room there is.
@@ -17800,6 +17799,37 @@ components:
           format: int64
           description: Warnings Velero counted.
           minimum: 0
+    VeleroBackupInventory:
+      type: object
+      description: >-
+        What a backup holds of one namespace, from Velero's list of the backup's
+        objects.
+      required:
+      - services
+      - secrets
+      - cronJobs
+      - routes
+      properties:
+        cronJobs:
+          type: array
+          items:
+            type: string
+          description: The CronJobs.
+        routes:
+          type: array
+          items:
+            type: string
+          description: The routes, `Kind/name`.
+        secrets:
+          type: array
+          items:
+            type: string
+          description: The Secrets.
+        services:
+          type: array
+          items:
+            type: string
+          description: The Services, whose in-cluster addresses name the namespace.
     VeleroFailure:
       type: string
       description: Why a backup did not finish well, in the words the interface explains.
@@ -17925,6 +17955,13 @@ components:
           - string
           - "null"
           description: Velero's own words when it failed (`failureReason`, `validationErrors`).
+        resources:
+          type: array
+          items:
+            type: string
+          description: >-
+            The only kinds it restores (`includedResources`), as `resource.group`; empty
+            for all.
         started:
           type:
           - string
