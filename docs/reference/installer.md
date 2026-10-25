@@ -79,7 +79,9 @@ interrupted install or repairs drift.
    authentication configuration with the one `zeabur-identityctl kube-config` writes, and waits
    until kube-apiserver's reload metric shows the new file was loaded. kube-apiserver reaches
    Zeabur Identity through its Service, so this step does not depend on DNS or the public
-   certificate.
+   certificate. cert-manager issues the certificate on that Service from a private root CA
+   that lasts 10 years, and renews it on its own; the authentication configuration names only
+   the root CA, so it does not change when the certificate renews.
 9. **Zeabur.** The installer registers Zeabur's OAuth client, with Zeabur's URL as its home so
    Zeabur Identity lists it among the apps, and keeps its secret in a Secret.
    It creates the plan-signing key and, in `local` mode, the CA bundle. It then installs the chart
@@ -167,6 +169,17 @@ are backed up.
 - **No long-lived admin credential handed out.** People reach the cluster through Zeabur
   Identity. Their everyday tokens can read the cluster; changing it takes a fresh passkey tap.
   `/etc/rancher/rke2/rke2.yaml` stays on the server as root's credential of last resort.
+- **Zeabur Identity's internal certificate** renews on its own. Check it with
+  `kubectl -n zeabur-identity get certificate`; both certificates must show `READY True`, and
+  `doctor` checks the same. The root CA's private key is in the Secret
+  `zeabur-identity-internal-ca` in the `zeabur-identity` namespace. Anyone who can read Secrets
+  there can sign a certificate for Zeabur Identity's Service; with a way to intercept traffic to
+  that Service, they could make kube-apiserver accept tokens they sign. Zeabur Identity's own
+  ServiceAccount cannot read that Secret. To replace the root CA, delete the Secrets
+  `zeabur-identity-internal-ca` and then `zeabur-identity-internal-tls`, waiting after each with
+  `kubectl -n zeabur-identity wait certificate/<name> --for=condition=Ready`, and run
+  `sudo zeabur-installer apply` on every server. Sign-in through Zeabur Identity stops working
+  from the second delete until `apply` finishes.
 - **Pinned RKE2 digests.** See the [security policy](../../SECURITY.md#what-the-installer-trusts).
 
 ## What is verified

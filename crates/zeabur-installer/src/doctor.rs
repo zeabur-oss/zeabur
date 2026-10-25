@@ -66,6 +66,17 @@ pub(crate) fn run() -> ExitCode {
             }
             if plan.get("zeabur").is_some_and(|z| !z.is_null()) {
                 results.push(deployment(&kubectl, IDENTITY_NAMESPACE, "zeabur-identity"));
+                for name in IDENTITY_CERTIFICATES {
+                    let certificate = kubectl.get(
+                        "certificates.cert-manager.io",
+                        name,
+                        Some(IDENTITY_NAMESPACE),
+                    );
+                    results.push(identity_certificate(
+                        name,
+                        certificate.ok().flatten().as_ref(),
+                    ));
+                }
                 results.push(deployment(&kubectl, ZEABUR_NAMESPACE, "zeabur"));
             }
         }
@@ -314,6 +325,54 @@ fn longhorn_nodes(kubectl: &Kubectl) -> (Status, String) {
     }
 }
 
+/// The root CA kube-apiserver trusts and the certificate Zeabur Identity's internal listener
+/// serves. cert-manager renews both.
+const IDENTITY_CERTIFICATES: [&str; 2] = [
+    "zeabur-identity-internal-ca",
+    "zeabur-identity-internal-tls",
+];
+
+/// Whether cert-manager reports the Certificate `Ready`. Without it, kube-apiserver stops
+/// accepting new tokens once the certificate expires.
+fn identity_certificate(name: &str, certificate: Option<&Value>) -> (Status, String) {
+    let target = format!("{IDENTITY_NAMESPACE}/{name}");
+    let Some(certificate) = certificate else {
+        return (
+            Status::Warn,
+            format!("certificate {target} does not exist: run zeabur-installer apply"),
+        );
+    };
+    let ready = certificate
+        .pointer("/status/conditions")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .find(|c| c.get("type").and_then(Value::as_str) == Some("Ready"));
+    let field = |key: &str| {
+        ready
+            .and_then(|c| c.get(key))
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+    };
+    if field("status") == "True" {
+        let renewal = certificate
+            .pointer("/status/renewalTime")
+            .and_then(Value::as_str)
+            .unwrap_or("unknown");
+        return (
+            Status::Pass,
+            format!("certificate {target} is ready; cert-manager renews it at {renewal}"),
+        );
+    }
+    (
+        Status::Fail,
+        format!(
+            "certificate {target} is not ready ({}): kubectl describe -n {IDENTITY_NAMESPACE} certificate {name}",
+            field("message")
+        ),
+    )
+}
+
 fn deployment(kubectl: &Kubectl, namespace: &str, name: &str) -> (Status, String) {
     let target = format!("deployment/{name}");
     match kubectl.wait(&[
@@ -335,6 +394,8 @@ fn deployment(kubectl: &Kubectl, namespace: &str, name: &str) -> (Status, String
 
 #[cfg(test)]
 mod tests {
+    use serde_json::json;
+
     use super::*;
 
     #[test]
@@ -347,5 +408,31 @@ mod tests {
         assert_eq!(secrets_encryption(Some(&identity)).0, Status::Fail);
         assert_eq!(secrets_encryption(Some("{}")).0, Status::Fail);
         assert_eq!(secrets_encryption(None).0, Status::Fail);
+    }
+
+    #[test]
+    fn identity_certificate_passes_only_when_cert_manager_reports_ready() {
+        let certificate = |conditions: Value| json!({"status": {"conditions": conditions}});
+        let cases = [
+            (
+                "ready",
+                Some(certificate(json!([{"type": "Ready", "status": "True"}]))),
+                Status::Pass,
+            ),
+            (
+                "issuing failed",
+                Some(certificate(
+                    json!([{"type": "Ready", "status": "False", "message": "issuer not ready"}]),
+                )),
+                Status::Fail,
+            ),
+            ("no status yet", Some(json!({})), Status::Fail),
+            ("not created by this release", None, Status::Warn),
+        ];
+        for (case, object, status) in cases {
+            let (got, detail) =
+                identity_certificate("zeabur-identity-internal-tls", object.as_ref());
+            assert_eq!(got, status, "{case}: {detail}");
+        }
     }
 }

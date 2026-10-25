@@ -15,6 +15,30 @@ Zeabur 自己持有的機密只有 OAuth client secret 和變更權杖金鑰。C
 
 **暫時使用管理員權限** 要用通行密鑰確認。取得後，直到畫面顯示的時間，或按下 **放棄管理員權限** 之前，所有操作都使用管理員權限。管理員權限到期後不會自動延長，要再確認一次。一般登入權杖則會在工作階段期間自動更新。
 
+### Zeabur Identity 的內部憑證
+
+API server 從叢集內部連到 Zeabur Identity，取得驗證權杖用的公開金鑰。這條連線的憑證由 cert-manager 簽發，預設 90 天，到期前 30 天自動續期，不用重跑 `apply`。API server 只信任一個效期 10 年的根 CA，續期時根 CA 不變，API server 的設定也不用改。
+
+用叢集管理員的 kubeconfig 檢查，兩張憑證的 `READY` 都要是 `True`。`sudo zeabur-installer doctor` 也會檢查：
+
+```sh
+kubectl -n zeabur-identity get certificate
+```
+
+根 CA 的私鑰存在 `zeabur-identity` Namespace 的 Secret `zeabur-identity-internal-ca`。能讀這個 Namespace 的 Secret，就能簽出 Zeabur Identity ClusterIP 的憑證；如果還能在叢集裡攔下送往這個 ClusterIP 的連線，就能讓 API server 接受自己簽的權杖。這個權限只給管理員。Zeabur Identity 自己的 ServiceAccount 讀不到這個 Secret。
+
+懷疑私鑰外洩，或根 CA 快到期時，換一個新的根 CA：
+
+```sh
+kubectl -n zeabur-identity delete secret zeabur-identity-internal-ca
+kubectl -n zeabur-identity wait certificate/zeabur-identity-internal-ca --for=condition=Ready --timeout=2m
+kubectl -n zeabur-identity delete secret zeabur-identity-internal-tls
+kubectl -n zeabur-identity wait certificate/zeabur-identity-internal-tls --for=condition=Ready --timeout=2m
+sudo zeabur-installer apply
+```
+
+從刪掉 `zeabur-identity-internal-tls` 到 `apply` 完成，用 Zeabur Identity 登入的 kubectl 和 Zeabur 會暫時無法使用。叢集有多台 server 時，其他 server 也要各執行一次 `sudo zeabur-installer apply`。
+
 ## 本機介面
 
 `zeaburctl ui` 以啟動者的 kubeconfig 操作叢集，只監聽 `127.0.0.1` 上隨機的連接埠，並做以下檢查：

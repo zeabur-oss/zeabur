@@ -41,7 +41,7 @@ files of k3s, kubeadm, k0s or MicroK8s.
 |---|---|
 | `plan [--json]` | Shows the components, charts, namespaces, memory estimate and warnings. Reads the host, changes nothing. |
 | `apply` | Installs, or brings the server in line with the configuration. Each step checks what is already there, so an interrupted run resumes. |
-| `doctor` | Checks RKE2, each component's charts and readiness, the default storage class, Zeabur Identity, Zeabur and disk encryption. Exits 0, 1 (warning) or 2 (critical), so a monitoring check can run it. |
+| `doctor` | Checks RKE2, each component's charts and readiness, the default storage class, Zeabur Identity and its internal certificate, Zeabur and disk encryption. Exits 0, 1 (warning) or 2 (critical), so a monitoring check can run it. |
 | `uninstall zeabur\|identity` | Removes Zeabur, or Zeabur and Zeabur Identity. To remove RKE2 and everything else, run `/usr/local/bin/rke2-uninstall.sh`. On a node that joined a cluster, `uninstall` prints how to take the node out. Once RKE2 is gone, `uninstall` lists the installer's files that are left and `uninstall --purge` removes them. |
 | `node add [--role worker\|server] [--ttl 1h]` | On a server: prints the configuration and commands that join another VM to the cluster. |
 | `node sync` | On a server: lets the current nodes' traffic through the installer's network policies. Run it after a node joins. |

@@ -12,7 +12,7 @@
 #   --profile bare          only the cluster, for the cluster tests of crates/*/tests and
 #                           zeaburctl in local mode
 #   --profile full          also CloudNativePG with the Barman Cloud plugin, the Percona Operator
-#                           for MongoDB, Keel, cert-manager, zot, a test S3 and Zeabur Builder
+#                           for MongoDB, Keel, zot, a test S3 and Zeabur Builder
 #   --identity-src <dir>    build Zeabur Identity from this working tree, as it is
 #   --builder-src <dir>     build Zeabur Builder from this working tree, as it is (full profile)
 #   --zeabur-image <image>  run this Zeabur image (a local image is imported, any other is pulled)
@@ -288,6 +288,10 @@ EOF
     kubectl -n "$namespace" create secret "$@" --dry-run=client -o yaml | kubectl apply -f - >/dev/null
   }
 
+  # cert-manager issues the certificate kube-apiserver checks on Zeabur Identity's internal
+  # address, and the full profile's certificates.
+  catalog_install certificates/cert-manager cert-manager
+
   # --- Full profile: the components Zeabur works with -------------------------------------------
   # Before Zeabur, so that e2e-l2's removal check counts them as the cluster's own.
   if [[ "$profile" == full ]]; then
@@ -404,7 +408,6 @@ EOF
 
 full_profile() { # $1 = Zeabur Builder working tree, or empty for the pinned commit
   local builder_src="$1"
-  catalog_install certificates/cert-manager cert-manager
   # The ClusterIssuer local access names, signing with this cluster's CA.
   apply_secret cert-manager tls zeabur-local-ca --cert="$tls/ca.crt" --key="$tls/ca.key"
   kubectl apply -f - >/dev/null <<EOF
