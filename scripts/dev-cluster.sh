@@ -409,7 +409,7 @@ EOF
       'echo s3.bucket.create -name backups | weed shell -master=localhost:9333 -filer=localhost:8888' 2>/dev/null |
       grep -q 'created bucket\|already exists'
   }
-  retry 60 "the test S3's bucket" bucket
+  retry 300 "the test S3's bucket" bucket
 
   # --- Zeabur Builder, from its repository's deploy files ---------------------------------------
   if [[ -z "$builder_src" ]]; then
