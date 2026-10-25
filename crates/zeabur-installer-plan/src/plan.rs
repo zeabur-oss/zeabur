@@ -267,6 +267,9 @@ pub enum ReleasePlan {
         name: String,
         /// The object.
         object: Value,
+        /// `sha256:<hex>` the chart must have; the installer then puts the checked chart in the
+        /// object.
+        digest: Option<String>,
     },
     /// Manifests applied with server-side apply.
     Manifests {
@@ -285,6 +288,8 @@ pub enum ReleasePlan {
         namespace: String,
         /// URLs.
         urls: Vec<String>,
+        /// `sha256:<hex>` of each URL's file, in order; empty when the catalog has none.
+        digests: Vec<String>,
         /// Skipped when one of these CRDs exists.
         skip_if_present: Vec<String>,
     },
@@ -809,6 +814,7 @@ fn component_plan(
             releases.push(ReleasePlan::HelmChart {
                 object: helm_chart(&name, id, &spec),
                 name,
+                digest: release.chart_digest.clone(),
             });
         } else if let Some(yaml) = &release.manifests {
             releases.push(ReleasePlan::Manifests {
@@ -831,6 +837,7 @@ fn component_plan(
                     .iter()
                     .map(|u| u.replace(placeholder, &version))
                     .collect(),
+                digests: release.url_digests.clone(),
                 skip_if_present: release.skip_if_present.clone(),
             });
         }

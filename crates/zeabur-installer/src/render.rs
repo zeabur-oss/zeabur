@@ -32,7 +32,7 @@ pub(crate) fn plan(plan: &Plan) -> String {
         push(&mut s, &format!("  {:<48} {:<10} {memory}", c.id, c.why));
         for release in &c.releases {
             let what = match release {
-                ReleasePlan::HelmChart { name, object } => format!(
+                ReleasePlan::HelmChart { name, object, .. } => format!(
                     "chart {name} {}",
                     object
                         .pointer("/spec/version")

@@ -109,6 +109,11 @@ pub struct Release {
     pub urls: Vec<String>,
     /// The chart or manifest version.
     pub version: Option<String>,
+    /// `sha256:<hex>` of the chart: of the `.tgz` from `repo`, or of an `oci://` chart's manifest.
+    pub chart_digest: Option<String>,
+    /// `sha256:<hex>` of each file in `urls`, in the same order.
+    #[serde(default)]
+    pub url_digests: Vec<String>,
     /// Inline manifests.
     pub manifests: Option<String>,
     /// Values shared by every profile, as YAML.

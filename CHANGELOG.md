@@ -13,6 +13,11 @@ minor or patch release may break the API.
 - The app template drawer shows what a template's author says to know before deploying it (the
   catalogue's `security.risks`, with how to contain each), folded under "Before you deploy". The
   template API (`GET /api/v1/cluster/templates`) carries them as `risks`.
+- The installer checks each catalog chart and manifest URL against the catalog's `chartDigest`
+  and `urlDigests` before applying it, and stops on a mismatch. The checked chart goes into the
+  `HelmChart`'s `chartContent`, so helm-controller installs that archive instead of fetching
+  the chart again. Catalog releases without digests install as before
+  ([docs/zh-TW/reference/security.mdx](docs/zh-TW/reference/security.mdx)).
 - Releases from CI only: the image `ghcr.io/zeabur-oss/zeabur` (linux/amd64, linux/arm64), the
   chart `oci://ghcr.io/zeabur-oss/charts/zeabur` pinned to the image's digest, and `zeaburctl`
   for Linux (amd64, arm64) and macOS (arm64), all signed with Sigstore and attested

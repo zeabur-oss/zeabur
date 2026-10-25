@@ -11,7 +11,7 @@ use serde_json::{Value, json};
 use zeabur_installer_host::kubectl::{self, Kubectl};
 use zeabur_installer_host::nodeprep::{self, Stage};
 use zeabur_installer_host::preflight::{self, Status};
-use zeabur_installer_host::{archive, cmd, download, facts, files, systemd};
+use zeabur_installer_host::{archive, chart, cmd, download, facts, files, systemd};
 use zeabur_installer_plan::catalog::Encoding;
 use zeabur_installer_plan::config::{AccessMode, Config};
 use zeabur_installer_plan::plan::{
@@ -537,7 +537,14 @@ fn encode(bytes: &[u8], encoding: Encoding) -> String {
 fn releases(kubectl: &Kubectl, component: &ComponentPlan) -> Result<(), InstallError> {
     for release in &component.releases {
         match release {
-            ReleasePlan::HelmChart { name, object } => helm_chart(kubectl, name, object)?,
+            ReleasePlan::HelmChart {
+                name,
+                object,
+                digest,
+            } => match digest {
+                Some(digest) => helm_chart(kubectl, name, &checked_chart(object, digest)?)?,
+                None => helm_chart(kubectl, name, object)?,
+            },
             ReleasePlan::Manifests {
                 namespace, yaml, ..
             } => {
@@ -547,6 +554,7 @@ fn releases(kubectl: &Kubectl, component: &ComponentPlan) -> Result<(), InstallE
                 name,
                 namespace,
                 urls,
+                digests,
                 skip_if_present,
             } => {
                 let mut present = false;
@@ -561,14 +569,52 @@ fn releases(kubectl: &Kubectl, component: &ComponentPlan) -> Result<(), InstallE
                     ));
                     continue;
                 }
+                if !digests.is_empty() && digests.len() != urls.len() {
+                    return Err(InstallError::Message(format!(
+                        "{name}: the catalog has {} URLs but {} digests",
+                        urls.len(),
+                        digests.len()
+                    )));
+                }
                 let agent = download::agent();
-                for url in urls {
-                    kubectl.apply_in(namespace, download::fetch_text(&agent, url)?.as_bytes())?;
+                for (i, url) in urls.iter().enumerate() {
+                    let text =
+                        download::fetch_text(&agent, url, digests.get(i).map(String::as_str))?;
+                    kubectl.apply_in(namespace, text.as_bytes())?;
                 }
             }
         }
     }
     Ok(())
+}
+
+/// `object` with the chart downloaded and checked against `digest` in `chartContent`, which
+/// helm-controller installs instead of fetching `chart` itself [helm-controller].
+///
+/// [helm-controller]: https://docs.rke2.io/helm#helmchart-field-definitions
+fn checked_chart(object: &Value, digest: &str) -> Result<Value, InstallError> {
+    let field = |key: &str| {
+        object
+            .pointer(&format!("/spec/{key}"))
+            .and_then(Value::as_str)
+    };
+    let name = field("chart")
+        .ok_or_else(|| InstallError::Message("a HelmChart without a chart".to_owned()))?;
+    let chart = chart::fetch(
+        &download::agent(),
+        field("repo"),
+        name,
+        field("version").unwrap_or_default(),
+        digest,
+    )?;
+    let mut object = object.clone();
+    if let Some(spec) = object.get_mut("spec").and_then(Value::as_object_mut) {
+        for key in ["chart", "repo", "version"] {
+            spec.remove(key);
+        }
+        spec.insert("chartContent".to_owned(), json!(STANDARD.encode(chart)));
+    }
+    Ok(object)
 }
 
 /// Applies a `HelmChart` and waits for helm-controller's `helm upgrade --install` job, so running

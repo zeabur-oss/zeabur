@@ -93,23 +93,46 @@ pub fn fetch(
     Ok(actual)
 }
 
-/// Downloads a text document, such as a manifest, of at most 64 MiB.
+/// Downloads a text document, such as a manifest, of at most 64 MiB, and checks it against
+/// `sha256` (`sha256:<hex>`) when one is given.
 ///
 /// # Errors
 ///
-/// When the download fails.
-pub fn fetch_text(agent: &Agent, url: &str) -> Result<String, HostError> {
+/// When the download fails or the digest differs.
+pub fn fetch_text(agent: &Agent, url: &str, sha256: Option<&str>) -> Result<String, HostError> {
     let fail = |reason: String| HostError::Download {
         url: url.to_owned(),
         reason,
     };
     let response = agent.get(url).call().map_err(|e| fail(e.to_string()))?;
-    response
+    let text = response
         .into_body()
         .with_config()
         .limit(64 << 20)
         .read_to_string()
-        .map_err(|e| fail(e.to_string()))
+        .map_err(|e| fail(e.to_string()))?;
+    if let Some(expected) = sha256 {
+        check(url, expected, text.as_bytes())?;
+    }
+    Ok(text)
+}
+
+/// Checks `bytes` against `expected`, `sha256:<hex>` or bare hex.
+///
+/// # Errors
+///
+/// When the digest differs.
+pub fn check(what: &str, expected: &str, bytes: &[u8]) -> Result<(), HostError> {
+    let expected = expected.strip_prefix("sha256:").unwrap_or(expected);
+    let actual = hex::encode(Sha256::digest(bytes));
+    if actual == expected {
+        return Ok(());
+    }
+    Err(HostError::Digest {
+        file: what.to_owned(),
+        expected: expected.to_owned(),
+        actual,
+    })
 }
 
 /// The SHA-256 of a file.

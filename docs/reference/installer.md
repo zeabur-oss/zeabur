@@ -77,7 +77,10 @@ interrupted install or repairs drift.
 7. **Components.** Components are installed in the catalog's order, Longhorn first so that the
    volumes of the components after it land on its class. For each one, the installer creates
    its Secrets and applies its releases. A chart release becomes a `HelmChart` object for RKE2's
-   helm-controller, with `failurePolicy: abort`. The installer waits for helm-controller's
+   helm-controller, with `failurePolicy: abort`. The installer first downloads the chart and
+   checks it against the catalog's `chartDigest`, then puts it in the object's `chartContent`,
+   so helm-controller installs that archive and fetches nothing. Manifest URLs are checked
+   against `urlDigests` the same way. A mismatch stops `apply`. The installer waits for helm-controller's
    install job, then for the catalog's readiness checks. Catalog checks that create test objects
    are left to the catalog's own CI.
 8. **Zeabur Identity.** In `local` mode, the installer first makes the CA. It writes the
@@ -210,6 +213,7 @@ are backed up.
 | Planning: selection, dependencies, values, inputs, secrets, namespaces, RKE2 files | Unit-tested |
 | Host helpers: atomic files, secret file modes, digests, checksum lists, chart packing | Unit-tested |
 | RKE2 digests | Checked against the release's lists by `scripts/bump-rke2.sh` |
+| Catalog chart and URL digests: repository index lookup, registry token, mismatch | Unit-tested; downloads from real registries **not verified yet** |
 | `apply` on a fresh server | Verified with the `minimal` preset on Ubuntu 26.04 arm64, RKE2 v1.36.5 |
 | RKE2 `cis` with the catalog's components (Pod Security exemptions, NetworkPolicy baseline) | **Not verified yet** |
 | Authentication file with `anonymous.enabled: false` on RKE2 | **Not verified yet**: RKE2 runs k3s's server, which drops `--anonymous-auth=false` when the file is set, so the file follows k3s's form |

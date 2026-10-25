@@ -36,8 +36,11 @@ on a machine meant for this, not on a shared server.
   digests are where trust in RKE2 starts. Choosing another version with `rke2Version` falls back
   to the release's own checksum list, served from the same place as the files; the plan marks
   that version unsupported.
-- **Catalog charts** are fetched by RKE2's helm-controller from the repositories and versions the
-  Zeabur Catalog release names.
+- **Catalog charts and manifests** are downloaded by the installer and checked against the
+  SHA-256 digests the Zeabur Catalog release names; a mismatch stops `apply`. The checked chart
+  goes into the `HelmChart` object, so helm-controller fetches nothing. The catalog also pins
+  every component image by digest. A catalog release without digests falls back to
+  helm-controller fetching the chart by version, unchecked.
 - **Secrets** never appear in the configuration file or the plan. A secret input names a file
   with mode 0600, which the installer refuses when the group or others can read it, or is
   generated once and kept in its Kubernetes Secret.
