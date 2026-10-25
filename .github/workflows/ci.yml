@@ -105,29 +105,10 @@ jobs:
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           key: kubernetes
-      # Zeabur Identity at its pinned commit, which scripts/dev-cluster.sh builds.
-      - id: zeabur-identity
-        run: echo "rev=$(tr -d '[:space:]' < ZEABUR_IDENTITY_PINNED)" >> "$GITHUB_OUTPUT"
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          repository: zeabur-oss/identity
-          ref: ${{ steps.zeabur-identity.outputs.rev }}
-          path: .zeabur-identity
-          persist-credentials: false
       - name: Integration tests, zeaburctl doctor, browser tests
         env:
-          ZEABUR_IDENTITY_SRC: ${{ github.workspace }}/.zeabur-identity
           K3S_IMAGE: rancher/k3s:${{ matrix.k3s }}
         run: ./scripts/ci.sh kubernetes
-      - name: Report sizes
-        if: always()
-        run: |
-          {
-            echo "### Sizes (k3s ${{ matrix.k3s }})"
-            echo "| Measure | Bytes |"
-            echo "|---|---|"
-            echo "| Image \`zeabur\` | $(docker image inspect --format '{{.Size}}' zeabur:dev 2>/dev/null || echo n/a) |"
-          } >> "$GITHUB_STEP_SUMMARY"
 
   kubernetes-l2:
     name: kubernetes-l2 (k3s ${{ matrix.k3s }})
@@ -159,13 +140,14 @@ jobs:
           ZEABUR_IDENTITY_SRC: ${{ github.workspace }}/.zeabur-identity
           K3S_IMAGE: rancher/k3s:${{ matrix.k3s }}
         run: ./scripts/ci.sh kubernetes-l2
-      - name: Report memory
+      - name: Report sizes and memory
         if: always()
         run: |
           {
             echo "### Zeabur in the cluster (k3s ${{ matrix.k3s }})"
             echo "| Measure | Bytes |"
             echo "|---|---|"
+            echo "| Image \`zeabur\` | $(docker image inspect --format '{{.Size}}' zeabur:dev 2>/dev/null || echo n/a) |"
             echo "| Pod working set after 60 s idle | $(jq -r .pod_working_set_bytes target/dev-cluster/measurements.json 2>/dev/null || echo n/a) |"
           } >> "$GITHUB_STEP_SUMMARY"
 

@@ -49,9 +49,8 @@ check_matrix() {
   fi
 }
 
-# As k3d's cluster admin, on the development cluster: nothing critical, every check runs, and
-# Zeabur Identity is installed, has Zeabur's client and is trusted; the exit code is the most
-# serious status in the JSON (crates/zeaburctl/README.md).
+# As k3d's cluster admin, without Zeabur Identity: nothing critical and every check runs; the exit code is
+# the most serious status in the JSON (crates/zeaburctl/README.md).
 check_doctor() {
   cargo build --locked -p zeaburctl --no-default-features
   local code=0 expected
@@ -65,9 +64,9 @@ check_doctor() {
     and all(.checks[]; (.status | IN("ok", "warning", "critical", "skipped", "error"))
       and (.findings | type == "array") and (.fix == null or (.fix | type == "string")))
     and (status("components") | IN("ok", "warning"))
-    and status("zeabur-identity-installed") == "ok"
-    and status("zeabur-identity-client") == "ok"
-    and status("zeabur-identity-issuer-trust") == "ok"
+    and status("zeabur-identity-installed") == "warning"
+    and status("zeabur-identity-client") == "skipped"
+    and status("zeabur-identity-user") == "skipped"
   ' target/doctor.json
   expected=$(jq '.checks | map(.status)
     | if any(. == "critical") then 2 elif any(. == "warning") then 1
@@ -153,7 +152,8 @@ case "$job" in
     if [[ -z "${ZEABUR_CI_KEEP:-}" ]]; then
       trap './scripts/dev-cluster.sh down' EXIT
     fi
-    ./scripts/dev-cluster.sh up
+    # Bare: the cluster tests' people are no admins, whom Zeabur's admission policy would stop.
+    ./scripts/dev-cluster.sh up --profile bare
     export KUBECONFIG="$root/target/dev-cluster/kubeconfig"
     cargo nextest run --locked --run-ignored only -E 'binary(kubernetes)'
     check_doctor

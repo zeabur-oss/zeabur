@@ -190,12 +190,17 @@ after a change: it rebuilds and redeploys what changed. Options:
   through these registry mirrors (each `registry=endpoint`), for a machine behind a slow or
   rate-limited link. `K3S_IMAGE` picks the k3s release.
 
-The tests, against that cluster (`nix develop` first):
+- `--profile bare`: only the cluster. The cluster tests and local mode run there: their people
+  are no admins, and Zeabur's admission policy would stop them changing a namespace's labels.
+
+The tests (`nix develop` first):
 
 ```sh
 export KUBECONFIG=$PWD/target/dev-cluster/kubeconfig
+# on `up --profile bare`
 cargo nextest run --locked --run-ignored only -E 'binary(kubernetes)'
 ./scripts/build-ui.sh && ./scripts/e2e-ui.sh     # zeaburctl ui in local mode (Playwright)
+# on `up` or `up --profile full`
 ./scripts/e2e-l2-browser.sh                      # Zeabur in the cluster (Playwright)
 ```
 

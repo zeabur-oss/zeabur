@@ -9,6 +9,8 @@
 #   scripts/dev-cluster.sh snapshot        # cluster-scoped objects and namespace metadata
 #
 # Options of `up`:
+#   --profile bare          only the cluster, for the cluster tests of crates/*/tests and
+#                           zeaburctl in local mode
 #   --profile full          also CloudNativePG with the Barman Cloud plugin, the Percona Operator
 #                           for MongoDB, Keel, cert-manager, a test S3 and Zeabur Builder
 #   --identity-src <dir>    build Zeabur Identity from this working tree, as it is
@@ -143,7 +145,7 @@ up() {
   local zeabur_image="" chart="$root/deploy/chart/zeabur"
   while (($#)); do
     case "$1" in
-      --profile) profile="${2:?--profile needs default or full}"; shift 2 ;;
+      --profile) profile="${2:?--profile needs bare, default or full}"; shift 2 ;;
       --identity-src) identity_src="${2:?}"; shift 2 ;;
       --builder-src) builder_src="${2:?}"; shift 2 ;;
       --zeabur-image) zeabur_image="${2:?}"; shift 2 ;;
@@ -151,7 +153,7 @@ up() {
       *) usage ;;
     esac
   done
-  [[ "$profile" == default || "$profile" == full ]] || usage
+  [[ "$profile" == bare || "$profile" == default || "$profile" == full ]] || usage
   for tool in docker k3d kubectl helm openssl jq git curl; do
     command -v "$tool" >/dev/null || { echo "error: $tool is not on PATH" >&2; exit 1; }
   done
@@ -159,33 +161,36 @@ up() {
   # No attestation manifests: see `import`.
   export BUILDX_NO_DEFAULT_ATTESTATIONS=1
 
-  # --- Images -----------------------------------------------------------------------------------
-  if [[ -z "$identity_src" ]]; then
-    identity_src="$state/identity"
-    checkout "$identity_src" "$(tr -d '[:space:]' <"$root/ZEABUR_IDENTITY_PINNED")" \
-      "${ZEABUR_IDENTITY_GIT:-https://github.com/zeabur-oss/identity.git}"
-  fi
-  identity_src="$(cd "$identity_src" && pwd)"
-  (cd "$identity_src" && nix develop "$identity_src" --command bash -c \
-    './scripts/build-image.sh docker.io/library/zeabur-identity:dev &&
-     cargo build --release --locked -p zeabur-identityctl')
-  ln -sfn "$identity_src/target/release/zeabur-identityctl" "$state/identityctl"
-  local identityctl="$state/identityctl" identity_image zeabur_import=() proxy_image=""
-  identity_image=$(content_tag docker.io/library/zeabur-identity:dev)
-  if [[ -z "$zeabur_image" ]]; then
-    "$root/scripts/build-image.sh" docker.io/library/zeabur:dev
-    "$root/scripts/build-image.sh" docker.io/library/zeabur-proxy:dev zeabur-proxy
-    zeabur_image=$(content_tag docker.io/library/zeabur:dev)
-    proxy_image=$(content_tag docker.io/library/zeabur-proxy:dev)
-    zeabur_import=("$zeabur_image" "$proxy_image")
-  elif docker image inspect "$zeabur_image" >/dev/null 2>&1; then
-    zeabur_image=$(content_tag "$zeabur_image")
-    zeabur_import=("$zeabur_image")
-  fi
   docker pull -q busybox:1.37 >/dev/null
   # One plain image: Docker's containerd store keeps busybox as a multi-platform index.
   printf 'FROM busybox:1.37\nLABEL com.zeabur.test=busybox\n' |
     DOCKER_BUILDKIT=0 docker build -q -t busybox:1.37 - >/dev/null
+
+  # --- Images -----------------------------------------------------------------------------------
+  local identityctl="$state/identityctl" identity_image="" zeabur_import=() proxy_image=""
+  if [[ "$profile" != bare ]]; then
+    if [[ -z "$identity_src" ]]; then
+      identity_src="$state/identity"
+      checkout "$identity_src" "$(tr -d '[:space:]' <"$root/ZEABUR_IDENTITY_PINNED")" \
+        "${ZEABUR_IDENTITY_GIT:-https://github.com/zeabur-oss/identity.git}"
+    fi
+    identity_src="$(cd "$identity_src" && pwd)"
+    (cd "$identity_src" && nix develop "$identity_src" --command bash -c \
+      './scripts/build-image.sh docker.io/library/zeabur-identity:dev &&
+       cargo build --release --locked -p zeabur-identityctl')
+    ln -sfn "$identity_src/target/release/zeabur-identityctl" "$state/identityctl"
+    identity_image=$(content_tag docker.io/library/zeabur-identity:dev)
+    if [[ -z "$zeabur_image" ]]; then
+      "$root/scripts/build-image.sh" docker.io/library/zeabur:dev
+      "$root/scripts/build-image.sh" docker.io/library/zeabur-proxy:dev zeabur-proxy
+      zeabur_image=$(content_tag docker.io/library/zeabur:dev)
+      proxy_image=$(content_tag docker.io/library/zeabur-proxy:dev)
+      zeabur_import=("$zeabur_image" "$proxy_image")
+    elif docker image inspect "$zeabur_image" >/dev/null 2>&1; then
+      zeabur_image=$(content_tag "$zeabur_image")
+      zeabur_import=("$zeabur_image")
+    fi
+  fi
 
   # --- Chart ------------------------------------------------------------------------------------
   if [[ "$chart" == oci://* ]]; then
@@ -227,10 +232,15 @@ up() {
       --port "443:443@server:0:direct"
   fi
   k3d kubeconfig get "$cluster" >"$KUBECONFIG"
-  import "$identity_image" busybox:1.37 "${zeabur_import[@]}"
+  import busybox:1.37 ${identity_image:+"$identity_image"} "${zeabur_import[@]}"
 
   retry 300 "Traefik to be installed" kubectl -n kube-system get deployment/traefik
   kubectl -n kube-system rollout status deployment/traefik --timeout=300s
+  if [[ "$profile" == bare ]]; then
+    echo bare >"$state/profile"
+    echo "kubectl: export KUBECONFIG=$KUBECONFIG"
+    return
+  fi
 
   # Both host names resolve to Traefik in the cluster too, so Zeabur reaches Zeabur Identity at
   # its public URL (https://docs.k3s.io/networking/networking-services#coredns).

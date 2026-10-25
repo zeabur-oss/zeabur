@@ -20,7 +20,7 @@ remain the answer.
 
 ## Cluster
 ```sh
-nix run .#dev-cluster -- up [--profile full] [--identity-src ../identity]
+nix run .#dev-cluster -- up [--profile bare|full] [--identity-src ../identity]
 export KUBECONFIG=$PWD/target/dev-cluster/kubeconfig   # never your normal context
 nix run .#dev-cluster -- down
 ```
@@ -31,7 +31,10 @@ from `zeabur-installer manifests` (the installer's own HelmChart and values; a `
 adds Zeabur Proxy and, on the full profile, the Builder's registry), and imports busybox for the
 exec test. `--profile full` adds cert-manager, CloudNativePG with Barman Cloud, Percona MongoDB
 and Keel (each with the Helm commands Zeabur Catalog gives), the test S3, and Zeabur Builder from
-`ZEABUR_BUILDER_PINNED` with a Zot that takes anonymous pushes at a fixed ClusterIP. To run a whole
+`ZEABUR_BUILDER_PINNED` with a Zot that takes anonymous pushes at a fixed ClusterIP.
+`--profile bare` is the cluster alone: run `binary(kubernetes)` and `e2e-ui.sh` there (the
+`kubernetes` job does), since Zeabur's ValidatingAdmissionPolicy `zeabur-project-namespace` stops
+their non-admin people from changing namespace labels. To run a whole
 job as CI does, use `scripts/ci-local.sh kubernetes` (see `zeabur-ci`).
 
 ## Run
