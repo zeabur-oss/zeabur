@@ -35,7 +35,7 @@
       "src/i18n/zh-TW.ts"
     ]
   },
-  "health": { "ignore": ["src/api/schema.d.ts"] },
+  "health": { "ignore": ["src/api/schema.d.ts", "src/i18n/server/**"] },
   // Each layer imports only the layers below it.
   "boundaries": {
     "zones": [
