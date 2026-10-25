@@ -108,7 +108,7 @@
               kubectl
 
               # The Helm chart (deploy/chart/zeabur, scripts/check-chart.sh) and the in-cluster
-              # end-to-end test (scripts/e2e-l2.sh: a CA and certificates for its host names)
+              # development cluster (scripts/dev-cluster.sh: a CA and certificates for its host names)
               kubernetes-helm
               yq-go
               openssl
@@ -171,6 +171,25 @@
       # zhtw-mcp on its own, so CI can key a cache on its derivation (`.#zhtw-mcp.drvPath`).
       packages = forEachSupportedSystem (
         { system, ... }: { inherit (inputs.zhtw-mcp.packages.${system}) zhtw-mcp; }
+      );
+
+      # `nix run .#dev-cluster -- up`: scripts/dev-cluster.sh of the checkout it runs in, not of
+      # the flake's copy in the store.
+      apps = forEachSupportedSystem (
+        { pkgs, ... }:
+        {
+          dev-cluster = {
+            type = "app";
+            meta.description = "A k3d cluster with Zeabur Identity and Zeabur";
+            program = pkgs.lib.getExe (
+              pkgs.writeShellApplication {
+                name = "dev-cluster";
+                runtimeInputs = [ pkgs.git ];
+                text = ''exec "$(git rev-parse --show-toplevel)/scripts/dev-cluster.sh" "$@"'';
+              }
+            );
+          };
+        }
       );
 
       formatter = forEachSupportedSystem ({ pkgs, ... }: pkgs.nixfmt);
