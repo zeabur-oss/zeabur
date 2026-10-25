@@ -2,7 +2,7 @@ import { durationOf, items, joinWords, type P } from "@/i18n/sentence-parts"
 
 const seconds = (n: number) => `${n} 秒`
 const minutes = (n: number) => `${n} 分钟`
-const words = (list: string[], and = false) => joinWords(list, "、", "、")
+const words = (list: string[]) => joinWords(list, "、", "、")
 const duration = (value: string | undefined) => durationOf(value, seconds, minutes)
 
 export const serverZhCn = {
@@ -235,24 +235,7 @@ export const serverZhCn = {
   "sentence.gap.blockedConnection": (p: P) =>
     `${p.at === "egress" ? `${p.from ?? ""} 的环境变量指向 ${p.to ?? ""}，但 ${p.from ?? ""} 的 NetworkPolicy 不允许连出。` : p.at === "both" ? `${p.from ?? ""} 的环境变量指向 ${p.to ?? ""}，但两端的 NetworkPolicy 都拦截了这条连接。` : `${p.from ?? ""} 的环境变量指向 ${p.to ?? ""}，但 ${p.to ?? ""} 的 NetworkPolicy 不允许 ${p.from ?? ""} 连入。`}`,
   "sentence.gap.noNetworkPolicy": (p: P) =>
-    `没有 NetworkPolicy 保护 ${words(items(p.services))}：集群里任何 Pod 都连得到。NetworkPolicy 要集群的网络插件（CNI）支持才会生效。${
-      !p.cuts || p.cuts === "none"
-        ? ``
-        : `隔离后也会拦截${items(p.cuts)[0] === "published" ? ` ` : ``}${words(
-            items(p.cuts).flatMap((item) =>
-              item === "otherNamespaces"
-                ? [`来自其他 Namespace 的连接`]
-                : item === "outside"
-                  ? [`连到集群外的连接`]
-                  : item === "published"
-                    ? [`NodePort 与 LoadBalancer 的流量`]
-                    : item === "connections"
-                      ? [`服务之间的一条连接`]
-                      : [],
-            ),
-            true,
-          )}。`
-    }`,
+    `没有 NetworkPolicy 保护 ${words(items(p.services))}：集群里任何 Pod 都连得到。NetworkPolicy 要集群的网络插件（CNI）支持才会生效。${!p.cuts || p.cuts === "none" ? `` : `隔离后也会拦截${items(p.cuts)[0] === "published" ? ` ` : ``}${words(items(p.cuts).flatMap((item) => (item === "otherNamespaces" ? [`来自其他 Namespace 的连接`] : item === "outside" ? [`连到集群外的连接`] : item === "published" ? [`NodePort 与 LoadBalancer 的流量`] : item === "connections" ? [`服务之间的一条连接`] : [])))}。`}`,
   "sentence.gap.volumeWithoutBackup": (p: P) => `卷 ${p.claim ?? ""} 没有定时备份。`,
   "sentence.gap.databaseWithoutBackup": (p: P) => `数据库 ${p.database ?? ""} 没有定时备份。`,
   "sentence.incident.componentDown.cause.ingressController": (p: P) =>

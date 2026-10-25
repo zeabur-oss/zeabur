@@ -2,7 +2,7 @@ import { durationOf, items, joinWords, type P } from "@/i18n/sentence-parts"
 
 const seconds = (n: number) => `${n} 秒`
 const minutes = (n: number) => `${n} 分鐘`
-const words = (list: string[], and = false) => joinWords(list, "、", "、")
+const words = (list: string[]) => joinWords(list, "、", "、")
 const duration = (value: string | undefined) => durationOf(value, seconds, minutes)
 
 export const serverZhTw = {
@@ -237,24 +237,7 @@ export const serverZhTw = {
   "sentence.gap.blockedConnection": (p: P) =>
     `${p.at === "egress" ? `${p.from ?? ""} 的環境變數指向 ${p.to ?? ""}，但 ${p.from ?? ""} 的 NetworkPolicy 不允許連出。` : p.at === "both" ? `${p.from ?? ""} 的環境變數指向 ${p.to ?? ""}，但兩端的 NetworkPolicy 都封鎖了這條連線。` : `${p.from ?? ""} 的環境變數指向 ${p.to ?? ""}，但 ${p.to ?? ""} 的 NetworkPolicy 不允許 ${p.from ?? ""} 連入。`}`,
   "sentence.gap.noNetworkPolicy": (p: P) =>
-    `沒有 NetworkPolicy 保護 ${words(items(p.services))}：叢集裡任何 Pod 都連得到。NetworkPolicy 要叢集的網路外掛（CNI）支援才會生效。${
-      !p.cuts || p.cuts === "none"
-        ? ``
-        : `隔離後也會封鎖${items(p.cuts)[0] === "published" ? ` ` : ``}${words(
-            items(p.cuts).flatMap((item) =>
-              item === "otherNamespaces"
-                ? [`來自其他 Namespace 的連線`]
-                : item === "outside"
-                  ? [`連到叢集外的連線`]
-                  : item === "published"
-                    ? [`NodePort 與 LoadBalancer 的流量`]
-                    : item === "connections"
-                      ? [`服務之間的一條連線`]
-                      : [],
-            ),
-            true,
-          )}。`
-    }`,
+    `沒有 NetworkPolicy 保護 ${words(items(p.services))}：叢集裡任何 Pod 都連得到。NetworkPolicy 要叢集的網路外掛（CNI）支援才會生效。${!p.cuts || p.cuts === "none" ? `` : `隔離後也會封鎖${items(p.cuts)[0] === "published" ? ` ` : ``}${words(items(p.cuts).flatMap((item) => (item === "otherNamespaces" ? [`來自其他 Namespace 的連線`] : item === "outside" ? [`連到叢集外的連線`] : item === "published" ? [`NodePort 與 LoadBalancer 的流量`] : item === "connections" ? [`服務之間的一條連線`] : [])))}。`}`,
   "sentence.gap.volumeWithoutBackup": (p: P) => `磁碟區 ${p.claim ?? ""} 沒有備份排程。`,
   "sentence.gap.databaseWithoutBackup": (p: P) => `資料庫 ${p.database ?? ""} 沒有備份排程。`,
   "sentence.incident.componentDown.cause.ingressController": (p: P) =>
