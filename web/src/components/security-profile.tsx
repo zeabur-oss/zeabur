@@ -4,30 +4,17 @@ import { Select } from "@zeabur/design-system/components/select"
 import { namespaceQuery } from "@/api/queries"
 import { FormField } from "@/components/form-field"
 import { KubeDetails } from "@/components/kube-details"
-import { permission, RefusedHint } from "@/components/refused"
 import { useT } from "@/i18n"
-import {
-  lowersProject,
-  profiles,
-  RESTRICTED_FIELDS,
-  type Level,
-  type Profile,
-} from "@/model/pod-security"
-import { MANAGE_VERB } from "@/model/project"
+import { profiles, RESTRICTED_FIELDS, type Level, type Profile } from "@/model/pod-security"
 
-/** The project's enforced Pod Security level and whether the person may change it. */
-export function useProjectSecurity(project: string) {
-  const namespace = useQuery(namespaceQuery(project)).data
-  return { enforced: namespace?.podSecurity ?? undefined, canChange: namespace?.canAdopt }
-}
-
-/** Strict or Compatible, with what each means and, when Compatible lowers the project and the
- * person may not, why and the way to admin rights. */
+/** Strict or Compatible, with what each means and, in a project that still enforces restricted,
+ * that Compatible will not start there. */
 export function SecurityProfileField({
   project,
   value,
   current,
   built,
+  picked,
   disabled,
   onChange,
 }: {
@@ -37,21 +24,19 @@ export function SecurityProfileField({
   current?: Level
   /** Built from Git, where the build, not an image's name, decides the user. */
   built?: boolean
+  /** Why Zeabur chose `value`, until the person chooses. */
+  picked?: string
   disabled?: boolean
   onChange: (profile: Profile) => void
 }) {
   const t = useT()
-  const { enforced, canChange } = useProjectSecurity(project)
-  const lowers = lowersProject(value, enforced)
+  const enforced = useQuery(namespaceQuery(project)).data?.podSecurity ?? undefined
   const shown = current === "privileged" ? "privileged" : value
+  const about =
+    built && shown === "restricted" ? t("security.aboutBuilt") : t(`security.about.${shown}`)
   return (
     <div className="flex flex-col gap-2">
-      <FormField
-        label={t("part.security")}
-        hint={
-          built && shown === "restricted" ? t("security.aboutBuilt") : t(`security.about.${shown}`)
-        }
-      >
+      <FormField label={t("part.security")} hint={picked ? `${picked} ${about}` : about}>
         <Select
           size="sm"
           value={shown}
@@ -65,17 +50,8 @@ export function SecurityProfileField({
           ]}
         />
       </FormField>
-      {lowers ? (
-        <p className="type-meta text-muted-foreground">
-          {canChange === "denied" ? t("security.needsAdmin") : t("security.lowers")}
-        </p>
-      ) : null}
-      {lowers ? (
-        <RefusedHint
-          hint={canChange}
-          what={t("security.what")}
-          missing={[permission("patch", "namespaces"), permission(MANAGE_VERB, "namespaces")]}
-        />
+      {shown === "baseline" && enforced === "restricted" ? (
+        <p className="type-meta text-muted-foreground">{t("security.projectRestricted")}</p>
       ) : null}
       <KubeDetails
         facts={[

@@ -75,7 +75,6 @@ const conversion: Conversion = {
 const context: ComposeContext = {
   project: "shop",
   domains: { suffixes: ["apps.example.com"] },
-  enforced: "restricted",
   options: { port: true, publicUrl: true, secrets: true, volume: true },
   nodes: 1,
 }
@@ -97,7 +96,7 @@ describe("composeChanges", () => {
       managed: new Set(["db", "cache"]),
       published: new Map([["web", ""]]),
     })
-    expect(ops.filter((op) => op === "podSecurity")).toHaveLength(1)
+    expect(ops.every((op) => op === "create")).toBe(true)
     expect(named(made, "Cluster", "db")?.spec.imageName).toContain(":16-")
     expect(named(made, "Dragonfly", "cache")).toBeDefined()
     expect(named(made, "PersistentVolumeClaim", "db-db-data")).toBeUndefined()

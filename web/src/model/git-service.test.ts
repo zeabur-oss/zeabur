@@ -13,6 +13,7 @@ import {
   branchProblem,
   buildOptionsChanges,
   buildOptionsOf,
+  buildProfile,
   createGitService,
   deployKeyHost,
   deployKeyPage,
@@ -218,19 +219,16 @@ describe("the objects", () => {
       allowPrivilegeEscalation: false,
       capabilities: { drop: ["ALL"] },
     })
-    const changes = createGitService(form({}), "shop", "zot:5000", {}, "restricted")
-    expect(changes.some((c) => c.op === "podSecurity")).toBe(false)
   })
 
-  test("a Compatible Git service lowers a Strict project in the same plan", () => {
-    const changes = createGitService(
-      form({ security: "baseline" }),
-      "shop",
-      "zot:5000",
-      {},
-      "restricted",
-    )
-    expect(changes.at(-1)).toEqual({ op: "podSecurity", level: "baseline" })
+  test("Railpack builds are Strict and Dockerfile builds Compatible", () => {
+    expect(buildProfile("railpack")).toBe("restricted")
+    expect(buildProfile("dockerfile")).toBe("baseline")
+  })
+
+  test("a Compatible Git service writes only its own objects", () => {
+    const changes = createGitService(form({ security: "baseline" }), "shop", "zot:5000", {})
+    expect(changes.every((c) => c.op === "create")).toBe(true)
     const deployment = changes.find(
       (c) => c.op === "create" && (c.object as Object).kind === "Deployment",
     ) as { object: Object }

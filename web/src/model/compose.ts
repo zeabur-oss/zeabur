@@ -19,7 +19,6 @@ import {
 import {
   imageObjects,
   newImageService,
-  projectLevel,
   suggestedHost,
   type DomainSettings,
   type ImageService,
@@ -75,7 +74,6 @@ export function managedOffer(
 export interface ComposeContext {
   project: string
   domains: DomainSettings
-  enforced?: Schemas["PodSecurityLevel"] | null
   /** Which parts of a service the person's rights allow (`imageOptions`). */
   options: { port: boolean; publicUrl: boolean; secrets: boolean; volume: boolean }
   nodes: number
@@ -283,7 +281,7 @@ export function composeChanges(
       })),
     )
   }
-  return [...changes, ...projectLevel("baseline", context.enforced)]
+  return changes
 }
 
 /** The service's ports; a database image without any listens on its usual one. */

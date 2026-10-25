@@ -16,11 +16,12 @@ import { useTakenNames } from "@/components/add/taken"
 import { FormField } from "@/components/form-field"
 import { PlanDrawer } from "@/components/plan/plan-drawer"
 import { usePlanStep } from "@/components/plan/planner"
-import { SecurityProfileField, useProjectSecurity } from "@/components/security-profile"
+import { SecurityProfileField } from "@/components/security-profile"
 import { useT } from "@/i18n"
 import { serviceLink } from "@/lib/place"
 import {
   buildMethods,
+  buildProfile,
   createGitService,
   deployKeyHost,
   deployKeyPage,
@@ -43,6 +44,7 @@ import {
   suggestedHost,
   type ImageSize,
 } from "@/model/image-service"
+import type { Profile } from "@/model/pod-security"
 import { Alert, AlertDescription } from "@zeabur/design-system/components/alert"
 import { Button } from "@zeabur/design-system/components/button"
 import {
@@ -74,13 +76,13 @@ export function GitDrawer({ project, onClose }: { project: string; onClose: () =
   const registry = cluster?.builds.registry ?? ""
   const options = imageOptions(rightsOf(useQuery(creatableQuery(project)).data))
   const taken = useTakenNames(project)
-  const { enforced } = useProjectSecurity(project)
   const [form, setForm] = useState<GitService>(newGitService)
   const [env, setEnv] = useState("")
   const [buildEnv, setBuildEnv] = useState("")
   const [named, setNamed] = useState(false)
   const [hosted, setHosted] = useState(false)
   const [userSet, setUserSet] = useState(false)
+  const [securitySet, setSecuritySet] = useState(false)
   const [tried, setTried] = useState(false)
   const [moreShown, setMoreShown] = useState(false)
   const [deployKey, setDeployKey] = useState<DeployKey>()
@@ -107,6 +109,7 @@ export function GitDrawer({ project, onClose }: { project: string; onClose: () =
   const dockerfile = form.method === "dockerfile" ? form.dockerfile : ""
   const username = userSet ? form.username : tokenUser(repo?.host)
   const key = deployKey && deployKey.host === keyHost ? deployKey : undefined
+  const security = securitySet ? form.security : buildProfile(form.method)
 
   const resolved: GitService = {
     ...form,
@@ -124,6 +127,7 @@ export function GitDrawer({ project, onClose }: { project: string; onClose: () =
       "value" in v ? [{ name: v.name, value: v.value }] : [],
     ),
     sealedKey: key?.key,
+    security,
   }
   const problems = gitProblems(resolved, {
     taken,
@@ -142,7 +146,7 @@ export function GitDrawer({ project, onClose }: { project: string; onClose: () =
     if (blocked) return
     planner.plan({
       title: t("add.planGit", name),
-      changes: createGitService(resolved, project, registry, domains, enforced),
+      changes: createGitService(resolved, project, registry, domains),
     })
   }
 
@@ -366,6 +370,11 @@ export function GitDrawer({ project, onClose }: { project: string; onClose: () =
               project={project}
               form={form}
               set={set}
+              security={security}
+              onSecurity={(chosen) => {
+                setSecuritySet(true)
+                set({ security: chosen })
+              }}
               env={env}
               onEnv={setEnv}
               buildEnv={buildEnv}
@@ -474,6 +483,8 @@ function MoreFields({
   project,
   form,
   set,
+  security,
+  onSecurity,
   env,
   onEnv,
   buildEnv,
@@ -485,6 +496,8 @@ function MoreFields({
   project: string
   form: GitService
   set: (patch: Partial<GitService>) => void
+  security: Profile
+  onSecurity: (profile: Profile) => void
   env: string
   onEnv: (env: string) => void
   buildEnv: string
@@ -582,12 +595,7 @@ function MoreFields({
           items={imageSizes.map((p) => ({ value: p, label: t(`db.size.${p}`) }))}
         />
       </FormField>
-      <SecurityProfileField
-        project={project}
-        built
-        value={form.security}
-        onChange={(security) => set({ security })}
-      />
+      <SecurityProfileField project={project} built value={security} onChange={onSecurity} />
     </div>
   )
 }

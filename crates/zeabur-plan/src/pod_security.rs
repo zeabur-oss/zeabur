@@ -1,43 +1,30 @@
-//! The planner for Pod Security [k8s-pss]: the level a workload's pods meet, and the level Pod
-//! Security admission enforces in the project [k8s-psa].
+//! The planner for Pod Security [k8s-pss]: the level a workload's pods meet.
 //!
-//! - **A workload's profile.** `restricted` sets, on the pod template, `runAsNonRoot: true` and a
-//!   `RuntimeDefault` seccomp profile unless it names a confined one, and on every container
-//!   `allowPrivilegeEscalation: false` and `capabilities.drop: [ALL]`; it removes a container's
-//!   `runAsNonRoot: false` and `Unconfined` seccomp profile, which would override the pod's. It is
-//!   refused when the template still breaks the level afterwards (`runAsUser: 0`, a `hostPath`
-//!   volume, an added capability), which only an edit of those fields can change. `baseline`
-//!   removes `runAsNonRoot: true` and the dropped `ALL`, which stop an image that runs as root from
-//!   starting or from using the capabilities a root process expects; it keeps the seccomp profile
-//!   and `allowPrivilegeEscalation: false`, which do not.
-//! - **The project's level** is the Namespace's `pod-security.kubernetes.io/enforce` label; the
-//!   `audit` and `warn` labels stay as they are. Lowering it to `baseline` replaces only a
-//!   `restricted` label: without the label the cluster's default applies, which Zeabur cannot read,
-//!   and writing one could make a namespace stricter than it was. Raising it to `restricted` is
-//!   refused while a workload, as the plan leaves it, does not meet it, since admission would then
-//!   refuse that workload's new pods. The Namespace is written first, so a workload's new pods meet
-//!   the new level when they are created.
+//! `restricted` sets, on the pod template, `runAsNonRoot: true` and a
+//! `RuntimeDefault` seccomp profile unless it names a confined one, and on every container
+//! `allowPrivilegeEscalation: false` and `capabilities.drop: [ALL]`; it removes a container's
+//! `runAsNonRoot: false` and `Unconfined` seccomp profile, which would override the pod's. It is
+//! refused when the template still breaks the level afterwards (`runAsUser: 0`, a `hostPath`
+//! volume, an added capability), which only an edit of those fields can change. `baseline`
+//! removes `runAsNonRoot: true` and the dropped `ALL`, which stop an image that runs as root from
+//! starting or from using the capabilities a root process expects; it keeps the seccomp profile
+//! and `allowPrivilegeEscalation: false`, which do not.
 //!
-//! The chart's admission policy refuses a change to the Namespace's labels unless the person
-//! may also `zeabur-manage` it (`deploy/chart/zeabur/templates/namespace-policy.yaml`): a
-//! Developer can switch a workload to `restricted`, but lowering the project's level needs an
-//! administrator.
+//! A project's Namespace enforces `baseline` (`crate::project`), so either profile is admitted;
+//! an administrator may label it `restricted` to refuse every pod that breaks that level.
 //!
 //! [k8s-pss]: https://kubernetes.io/docs/concepts/security/pod-security-standards/
-//! [k8s-psa]: https://kubernetes.io/docs/concepts/security/pod-security-admission/
 
 use k8s_openapi::api::core::v1::PodSpec;
 use serde_json::{Map, Value, json};
 use zeabur_graph::fields::Step;
-use zeabur_graph::{pod_security, workloads};
+use zeabur_graph::pod_security;
 use zeabur_model::{PodSecurityLevel, WorkloadKind, WorkloadRef};
 
-use crate::change::{Target, Warning};
 use crate::json::{add, pointer, remove, replace, test};
 use crate::plan::{
-    ErrorKind, PlanError, Planner, Working, error, pod_spec_steps, workload_json, workload_target,
+    ErrorKind, PlanError, Planner, error, pod_spec_steps, workload_json, workload_target,
 };
-use crate::project::{set_key, shown, steps};
 
 /// A `securityContext` to write: where, who may own it, and its value before and after.
 struct Edit {
@@ -177,13 +164,6 @@ fn spec_tokens(kind: WorkloadKind) -> Vec<&'static str> {
     tokens
 }
 
-fn enforced(namespace: &Value) -> Option<PodSecurityLevel> {
-    namespace
-        .pointer(&pointer(&["metadata", "labels", PodSecurityLevel::ENFORCE]))
-        .and_then(Value::as_str)
-        .and_then(PodSecurityLevel::parse)
-}
-
 #[expect(
     clippy::multiple_inherent_impl,
     reason = "the planner's change kinds are split across modules by area"
@@ -270,156 +250,6 @@ impl Planner<'_> {
             }
         }
         Ok(())
-    }
-
-    pub(crate) fn ask_pod_security(&mut self, level: PodSecurityLevel) -> Result<(), PlanError> {
-        if level == PodSecurityLevel::Privileged {
-            return Err(error(
-                ErrorKind::BadRequest,
-                "unknown_level",
-                "A project enforces restricted or baseline; label the namespace yourself for \
-                 privileged.",
-            ));
-        }
-        if self.pod_security.replace(level).is_some() {
-            return Err(error(
-                ErrorKind::BadRequest,
-                "pod_security_twice",
-                "A plan sets the project's Pod Security level once.",
-            ));
-        }
-        Ok(())
-    }
-
-    /// The project's level, after every other change: the Namespace's write, put first, or the
-    /// warning that it could be raised.
-    pub(crate) fn project_pod_security(
-        &mut self,
-        alone: bool,
-        restricts: bool,
-    ) -> Result<(), PlanError> {
-        let asked = self.pod_security;
-        let Some(namespace) = self.input.namespace else {
-            return match asked {
-                Some(_) => Err(error(
-                    ErrorKind::NotFound,
-                    "unknown_namespace",
-                    "The namespace could not be read.",
-                )),
-                None => Ok(()),
-            };
-        };
-        let now = enforced(namespace);
-        let write = match asked {
-            None => {
-                if restricts
-                    && let Some(level) = now.filter(|l| *l < PodSecurityLevel::Restricted)
-                    && self.unmet_restricted().is_empty()
-                {
-                    self.warnings
-                        .push(Warning::ProjectCanBeRestricted { level });
-                }
-                None
-            }
-            Some(PodSecurityLevel::Baseline) => {
-                (now == Some(PodSecurityLevel::Restricted)).then_some(PodSecurityLevel::Baseline)
-            }
-            Some(level) => {
-                if now == Some(level) {
-                    None
-                } else {
-                    let unmet = self.unmet_restricted();
-                    if !unmet.is_empty() {
-                        return Err(error(
-                            ErrorKind::Conflict,
-                            "pod_security_unmet",
-                            format!(
-                                "{} would not start under the restricted level; switch them to \
-                                 it first.",
-                                unmet.join(", ")
-                            ),
-                        ));
-                    }
-                    Some(level)
-                }
-            }
-        };
-        let Some(level) = write else {
-            if alone && asked.is_some() {
-                return Err(error(
-                    ErrorKind::BadRequest,
-                    "unchanged",
-                    "The project already enforces this level, or leaves it to the cluster.",
-                ));
-            }
-            return Ok(());
-        };
-        let name = namespace
-            .pointer("/metadata/name")
-            .and_then(Value::as_str)
-            .unwrap_or_default();
-        self.objects.push(Working {
-            target: Target::namespace(name),
-            original: Some(namespace.clone()),
-            current: namespace.clone(),
-            operations: Vec::new(),
-            owners: Vec::new(),
-            deleted: false,
-        });
-        let index = self.objects.len() - 1;
-        let key = PodSecurityLevel::ENFORCE;
-        self.claim(index, &steps("labels", key), &shown("labels", key))?;
-        let path = pointer(&["metadata", "labels", key]);
-        let current = self.current(index);
-        let operations = current.pointer(&path).map_or_else(
-            || set_key(&current, "labels", key, level.as_str()),
-            |before| {
-                vec![
-                    test(&path, before.clone()),
-                    replace(&path, json!(level.as_str())),
-                ]
-            },
-        );
-        self.patch(index, operations)?;
-        let working = self.objects.remove(index);
-        self.objects.insert(0, working);
-        Ok(())
-    }
-
-    /// The workloads that, as the plan leaves them, do not meet the restricted level.
-    fn unmet_restricted(&self) -> Vec<String> {
-        let below = |spec: Option<PodSpec>| {
-            spec.is_some_and(|s| pod_security::level(&s) < PodSecurityLevel::Restricted)
-        };
-        let from = |object: &Value, kind: WorkloadKind| {
-            object
-                .pointer(&pointer(&spec_tokens(kind)))
-                .and_then(|s| serde_json::from_value::<PodSpec>(s.clone()).ok())
-        };
-        let mut names = Vec::new();
-        for workload in workloads(self.input.snapshot) {
-            let target = workload_target(workload);
-            let spec = match self.objects.iter().find(|o| o.target == target) {
-                Some(working) if working.deleted => continue,
-                Some(working) => from(&working.current, workload.kind()),
-                None => workload.pod_spec().cloned(),
-            };
-            if below(spec) {
-                names.push(workload.name().to_owned());
-            }
-        }
-        for working in self.objects.iter().filter(|o| o.original.is_none()) {
-            let kind = WorkloadKind::ALL.into_iter().find(|k| {
-                k.as_str() == working.target.kind
-                    && matches!(working.target.api_version.as_str(), "apps/v1" | "batch/v1")
-            });
-            if let Some(kind) = kind
-                && below(from(&working.current, kind))
-            {
-                names.push(working.target.name.clone());
-            }
-        }
-        names
     }
 }
 

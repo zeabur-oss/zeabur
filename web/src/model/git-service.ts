@@ -7,11 +7,11 @@ import {
   hostProblem,
   imageObjects,
   portProblem,
-  projectLevel,
   serviceNameProblem,
   type DomainSettings,
   type ImageService,
 } from "@/model/image-service"
+import type { Profile } from "@/model/pod-security"
 
 type Change = Schemas["Change"]
 type EnvEdit = Schemas["EnvEdit"]
@@ -80,6 +80,11 @@ export const newGitService = (): GitService => ({
   size: "small",
   security: "restricted",
 })
+
+/** The profile a build's image suits: Railpack's images run as user 1000, a Dockerfile's as it
+ * says, often root. */
+export const buildProfile = (method: BuildMethod): Profile =>
+  method === "railpack" ? "restricted" : "baseline"
 
 const SEGMENT = /^[A-Za-z0-9._-]+$/
 const BRANCH = /^(?!\/|.*\/\/|.*\.\.|.*\/$|.*\.lock$)[A-Za-z0-9._/-]+$/
@@ -312,7 +317,6 @@ export function createGitService(
   project: string,
   registry: string,
   domains: DomainSettings,
-  enforced?: Schemas["PodSecurityLevel"] | null,
 ): Change[] {
   const changes: Change[] = gitObjects(form, project, registry, domains).map((object) => ({
     op: "create",
@@ -320,7 +324,6 @@ export function createGitService(
   }))
   if (form.access === "deployKey" && form.sealedKey)
     changes.push({ op: "deployKey", name: credentialsName(form.name), key: form.sealedKey })
-  changes.push(...projectLevel(form.security, enforced))
   return changes
 }
 

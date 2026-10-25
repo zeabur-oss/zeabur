@@ -13,7 +13,7 @@ description: 用一個公開的 Nginx 映像檔，從建立專案走到在瀏覽
 
 ![新增專案視窗，名稱填了 hello](https://oss.zeabur.com/shots/zeabur/zh-TW/light/project-new.avif)
 
-按**檢查變更**，畫面會列出 Zeabur 準備做的事：建立 `hello` Namespace，加上專案標籤，並套用嚴格的 Pod Security 設定。確認沒問題就按**建立**。
+按**檢查變更**，畫面會列出 Zeabur 準備做的事：建立 `hello` Namespace，加上專案標籤，並套用 Pod Security `baseline` 設定，允許容器以 root 執行，但禁止存取主機。確認沒問題就按**建立**。
 
 ![建立專案 hello 前的確認畫面，說明會建立的 Namespace 與安全性設定](https://oss.zeabur.com/shots/zeabur/zh-TW/light/project-new-review.avif)
 
@@ -30,7 +30,7 @@ description: 用一個公開的 Nginx 映像檔，從建立專案走到在瀏覽
 | **連接埠** | `8080` |
 | **公開網域** | 開啟，用建議的網址或你準備的網域 |
 
-新專案預設採用 **嚴格（建議）** 安全性，容器不能用 root 執行。官方的 `nginx` 映像檔一啟動就需要 root，所以這裡換成 `nginx-unprivileged`：它用一般使用者執行，監聽 `8080`。
+Zeabur 讀出 `nginx-unprivileged` 以使用者 101 執行，會自動選 **嚴格**，表單會說明選擇原因。這個映像檔監聽 `8080`。`nginx:latest` 也能執行，Zeabur 會為它選 **相容**；建立前仍能自行切換。
 
 填完映像檔後，表單會讀出映像檔宣告的連接埠，正常會自動帶入 `8080`。
 
@@ -65,7 +65,7 @@ description: 用一個公開的 Nginx 映像檔，從建立專案走到在瀏覽
 | 看到的狀況 | 先檢查 |
 | --- | --- |
 | 副本一直沒有就緒，事件寫著拉不到映像檔 | 映像檔名稱和版本有沒有打錯，節點能不能連到 Docker Hub |
-| 副本一直是 0，事件提到 Pod Security | 是不是換成了需要 root 的映像檔 |
+| 副本一直是 0，事件提到 Pod Security | 需要 root 的映像檔是否選了 **相容**；專案仍強制 `restricted` 時，請管理員把專案的 Pod Security 等級改為 `baseline` |
 | `1/1` 就緒，網址卻打不開 | DNS 有沒有指向叢集的入口，**連接埠**是不是 `8080` |
 | 按套用時出現**這份變更已過期** | 按**重新檢查**，看過新的差異再套用 |
 

@@ -1186,7 +1186,7 @@ fn pod_security_refused(found: &mut Found, workload: Workload<'_>, events: &[&Ev
             .with("level", level)
             .with("breaks", truncate(breaks));
         let fix = if level == "restricted" {
-            Message::new("diagnosis.podSecurity.fix.compatible")
+            Message::new("diagnosis.podSecurity.fix.strict")
         } else {
             Message::new("diagnosis.podSecurity.fix.privileged").with("level", level)
         };

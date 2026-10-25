@@ -193,10 +193,6 @@ function sentenceOf(
       return change.profile === "restricted"
         ? t("confirm.securityRestricted", change.workload.name)
         : t("confirm.securityBaseline", change.workload.name)
-    case "podSecurity":
-      return change.level === "restricted"
-        ? t("confirm.podSecurityRestricted")
-        : t("confirm.podSecurityBaseline")
     case "image":
       return t("confirm.image", change.workload.name, imageTag(change.image))
     case "rebuild":
@@ -868,8 +864,6 @@ function switchAction(t: Translate, change: Change): string {
       return t(change.enabled ? "action.autoUpdateOn" : "action.autoUpdateOff")
     case "securityProfile":
       return change.profile === "restricted" ? t("action.makeStrict") : t("action.makeCompatible")
-    case "podSecurity":
-      return change.level === "restricted" ? t("action.makeStrict") : t("action.save")
     default:
       return accessAction(t, change as Parameters<typeof accessAction>[1])
   }

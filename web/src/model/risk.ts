@@ -103,7 +103,6 @@ const fixedWeight: Partial<Record<Change["op"], OneWeight>> = {
   debugContainer: { risk: "normal" },
   clusterTools: { risk: "normal" },
   securityProfile: { risk: "normal" },
-  podSecurity: { risk: "normal" },
   deployKey: { risk: "normal" },
   adopt: { risk: "low" },
   createProject: { risk: "low" },

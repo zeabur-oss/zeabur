@@ -5,7 +5,8 @@
 `zeabur-installer` installs, on a single server:
 
 - **[RKE2](https://docs.rke2.io)** with its CIS profile. Secrets are encrypted at rest, Pod
-  Security `restricted` applies outside the system namespaces, and an audit log is kept.
+  Security defaults to `restricted` for unlabelled namespaces, and an audit log is kept.
+  Project namespaces Zeabur creates use their own `baseline` labels.
 - The **[Zeabur Catalog](https://github.com/zeabur-oss/catalog)** components you choose: ingress,
   certificates, metrics, logs and, with `preset: secure`, runtime detection, vulnerability
   scanning and intrusion prevention.

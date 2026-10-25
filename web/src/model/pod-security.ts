@@ -1,6 +1,5 @@
 // A service's security profile, Strict or Compatible: the Pod Security Standards level its pods
-// meet (`restricted`, `baseline`), and what choosing one does to the project's enforced level.
-// Mirrors crates/zeabur-plan/src/pod_security.rs.
+// meet (`restricted`, `baseline`). Mirrors crates/zeabur-plan/src/pod_security.rs.
 import type { Schemas } from "@/api/client"
 
 type Change = Schemas["Change"]
@@ -36,18 +35,14 @@ export function templateSecurity(profile: Profile): { pod: Manifest; container: 
       }
 }
 
-/** Compatible lowers a project that enforces restricted; any other level already allows it, and
- * a project with no level is left to the cluster's default. */
-export const lowersProject = (profile: Profile, enforced: Level | null | undefined) =>
-  profile === "baseline" && enforced === "restricted"
-
-/** The changes that make an existing workload `profile`, the project's level with them. */
-export function profileChanges(
-  workload: Schemas["WorkloadRef"],
-  profile: Profile,
-  enforced: Level | null | undefined,
-): Change[] {
-  const changes: Change[] = [{ op: "securityProfile", workload, profile }]
-  if (lowersProject(profile, enforced)) changes.push({ op: "podSecurity", level: "baseline" })
-  return changes
+/** The profile for an image whose configuration sets `user`: Strict only for a numeric user other
+ * than root, because the kubelet's `runAsNonRoot` check refuses a user name it cannot resolve. */
+export function imageProfile(user: string | null | undefined): Profile {
+  const uid = (user ?? "").split(":")[0]?.trim() ?? ""
+  return /^\d+$/.test(uid) && Number(uid) !== 0 ? "restricted" : "baseline"
 }
+
+/** The change that makes an existing workload `profile`. */
+export const profileChanges = (workload: Schemas["WorkloadRef"], profile: Profile): Change[] => [
+  { op: "securityProfile", workload, profile },
+]

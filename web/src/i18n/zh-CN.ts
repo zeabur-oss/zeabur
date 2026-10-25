@@ -1089,7 +1089,7 @@ export const zhCN: Messages = {
   "title.pauseAll": (ns) => `暂停 ${ns} 的所有服务`,
   "title.restartAll": (ns) => `重启 ${ns} 的所有服务`,
   "confirm.createProject":
-    "创建带有项目标签的 Namespace，只允许“严格”服务（Pod Security restricted）。其他内容都不会改变。",
+    "创建带有项目标签的 Namespace。里面的服务可以用 root 运行，但不能访问主机（Pod Security baseline）。其他内容都不会改变。",
   "confirm.adopt": "为这个 Namespace 加上项目标签，其中的对象都不会改变。",
   "confirm.unadopt": "这个 Namespace 不再显示为项目，其中的对象都不会删除。",
   "confirm.debugContainer": (pod: string) =>
@@ -1277,7 +1277,6 @@ export const zhCN: Messages = {
   "plan.noMatch": "没有匹配的变更。",
   "plan.showAll": (n) => `显示全部 ${n} 个`,
   "plan.alsoRestart": () => "一并重启",
-  "plan.alsoRestrict": "项目也恢复为严格",
   "plan.restartByItself": "下次自动重启",
   "plan.other": "其他字段",
   "plan.field.size": "大小",
@@ -1345,7 +1344,6 @@ export const zhCN: Messages = {
     `${route} 的 HTTPS 配置仍是旧域名，${host} 需要新的证书`,
   "warn.httpsCertificate": (host: string, issuer: string) =>
     `${host} 会使用 HTTPS：应用后由 cert-manager（${issuer}）签发证书`,
-  "warn.projectCanBeRestricted": "项目里已经没有服务需要“兼容”，项目可以恢复为“严格”。",
   "warn.httpOnlyNoIssuer": (host: string) =>
     `${host} 只有 HTTP。管理员指定 cert-manager 的签发者后，新域名会使用 HTTPS`,
   "warn.httpOnlyElsewhere": (host: string, route: string) =>
@@ -1418,15 +1416,10 @@ export const zhCN: Messages = {
     `${name} 改为“严格”：以非 root 用户运行，且无法提升权限。它的副本会换成新的。`,
   "confirm.securityBaseline": (name) =>
     `${name} 改为“兼容”：允许以 root 运行。它的副本会换成新的。`,
-  "confirm.podSecurityBaseline":
-    "项目改为允许“兼容”服务：Pod Security 强制等级从 restricted 改为 baseline。不符合 restricted 的服务仍会出现警告，并记入审计日志。",
-  "confirm.podSecurityRestricted":
-    "项目恢复为“严格”：Pod Security 强制 restricted 等级，拒绝以 root 运行的副本。",
   "title.security": (name) => `${name} 的安全性`,
-  "title.projectStrict": "将项目恢复为严格",
   "security.hint":
-    "服务的容器能做哪些事。“严格”适合大多数镜像。镜像必须以 root 运行时，请选“兼容”。",
-  "security.profile.restricted": "严格（推荐）",
+    "服务的容器能做哪些事。“兼容”能运行任何镜像；镜像以数字指定非 root 用户时，适合“严格”。",
+  "security.profile.restricted": "严格",
   "security.profile.baseline": "兼容",
   "security.profile.privileged": "不受限",
   "security.about.restricted":
@@ -1436,15 +1429,10 @@ export const zhCN: Messages = {
   "security.about.baseline": "允许以 root 运行，但仍无法访问主机或提升权限。",
   "security.about.privileged":
     "这个服务有超出“兼容”范围的设置，例如访问主机，是在 Zeabur 以外设置的。要更改请编辑 YAML。",
-  "security.lowers": "项目目前只允许“严格”服务，这次变更也会让它允许“兼容”服务。",
-  "security.needsAdmin": "“兼容”需要项目允许，而变更项目的安全性需要管理员。",
-  "security.what": "让项目允许“兼容”服务",
-  "security.project": "项目",
-  "security.projectLevel.restricted": "所有服务都是严格",
-  "security.projectLevel.baseline": "允许兼容服务",
-  "security.projectLevel.privileged": "不受限",
-  "security.projectLevel.unset": "集群默认",
-  "security.raise": "将项目恢复为严格",
+  "security.picked.restricted": (user) => `镜像以用户 ${user} 运行，所以 Zeabur 选了“严格”。`,
+  "security.picked.baseline": "镜像以 root 运行，或用名称指定用户，所以 Zeabur 选了“兼容”。",
+  "security.projectRestricted":
+    "这个项目只允许“严格”的服务，“兼容”的服务无法启动。请管理员把项目的 Pod Security 等级改为 baseline。",
   "security.kube.service": "服务符合",
   "security.kube.project": "项目强制",
   "security.kube.unset": "没有标签：集群默认",

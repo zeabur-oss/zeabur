@@ -1,6 +1,5 @@
-//! Pod Security through the API: a new project enforces `restricted`, a service shows the level
-//! its pods meet, and switching one to `baseline` lowers the project's level in the same apply,
-//! Namespace first.
+//! Pod Security through the API: a new project enforces `baseline`, a service shows the level
+//! its pods meet, and switching it writes only the service, whatever the project enforces.
 
 #[cfg(test)]
 mod tests {
@@ -8,10 +7,10 @@ mod tests {
 
     use axum::http::StatusCode;
     use serde_json::json;
+    use zeabur_kube::NamespaceObjects;
     use zeabur_kube::k8s_openapi::api::apps::v1::Deployment;
     use zeabur_kube::k8s_openapi::api::core::v1::Namespace;
     use zeabur_kube::memory::{MemoryCluster, State};
-    use zeabur_kube::{NamespaceObjects, WriteBody};
 
     use crate::common::{app, planned_and_applied, send};
 
@@ -56,18 +55,18 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn a_new_project_enforces_restricted_and_says_so() {
+    async fn a_new_project_enforces_baseline_and_says_so() {
         let cluster = MemoryCluster::new(State::default());
         let app = app(&cluster);
         planned_and_applied(&app, "my-app", json!([{"op": "createProject"}])).await;
         let (status, namespace) =
             send(&app, "GET", "/api/v1/projects/my-app/namespace", None).await;
         assert_eq!(status, StatusCode::OK, "{namespace}");
-        assert_eq!(namespace["podSecurity"], "restricted", "{namespace}");
+        assert_eq!(namespace["podSecurity"], "baseline", "{namespace}");
     }
 
     #[tokio::test]
-    async fn switching_a_service_to_baseline_lowers_the_project_first() {
+    async fn switching_a_service_writes_only_the_service() {
         let cluster = cluster("restricted");
         let app = app(&cluster);
         let (status, project) = send(&app, "GET", "/api/v1/projects/shop", None).await;
@@ -78,65 +77,22 @@ mod tests {
         );
 
         let web = json!({"kind": "Deployment", "name": "web"});
-        let planned = planned_and_applied(
-            &app,
-            "shop",
-            json!([
-                {"op": "securityProfile", "workload": web, "profile": "baseline"},
-                {"op": "podSecurity", "level": "baseline"}
-            ]),
-        )
-        .await;
-        assert_eq!(
-            planned["objects"][0]["target"]["kind"], "Namespace",
-            "{planned}"
-        );
-        let writes = cluster.inspect(|s| s.writes.clone()).unwrap();
-        let order: Vec<&str> = writes.iter().map(|w| w.target.kind.as_str()).collect();
-        assert_eq!(order, ["Namespace", "Deployment"]);
-        assert!(matches!(writes[0].body, WriteBody::JsonPatch(_)));
-
-        let (_, namespace) = send(&app, "GET", "/api/v1/projects/shop/namespace", None).await;
-        assert_eq!(namespace["podSecurity"], "baseline", "{namespace}");
-        let (_, project) = send(&app, "GET", "/api/v1/projects/shop", None).await;
-        assert_eq!(
-            project["services"][0]["podSecurity"], "baseline",
-            "{project}"
-        );
-    }
-
-    #[tokio::test]
-    async fn raising_the_project_is_refused_while_a_service_needs_baseline() {
-        let cluster = cluster("baseline");
-        let app = app(&cluster);
-        let web = json!({"kind": "Deployment", "name": "web"});
         planned_and_applied(
             &app,
             "shop",
             json!([{"op": "securityProfile", "workload": web, "profile": "baseline"}]),
         )
         .await;
-        let (status, refused) = send(
-            &app,
-            "POST",
-            "/api/v1/projects/shop/plan",
-            Some(&json!({"changes": [{"op": "podSecurity", "level": "restricted"}]})),
-        )
-        .await;
-        assert_eq!(status, StatusCode::CONFLICT, "{refused}");
-        let (status, planned) = send(
-            &app,
-            "POST",
-            "/api/v1/projects/shop/plan",
-            Some(&json!({"changes": [
-                {"op": "securityProfile", "workload": web, "profile": "restricted"}
-            ]})),
-        )
-        .await;
-        assert_eq!(status, StatusCode::OK, "{planned}");
+        let writes = cluster.inspect(|s| s.writes.clone()).unwrap();
+        let order: Vec<&str> = writes.iter().map(|w| w.target.kind.as_str()).collect();
+        assert_eq!(order, ["Deployment"]);
+
+        let (_, namespace) = send(&app, "GET", "/api/v1/projects/shop/namespace", None).await;
+        assert_eq!(namespace["podSecurity"], "restricted", "{namespace}");
+        let (_, project) = send(&app, "GET", "/api/v1/projects/shop", None).await;
         assert_eq!(
-            planned["warnings"],
-            json!([{"code": "projectCanBeRestricted", "level": "baseline"}])
+            project["services"][0]["podSecurity"], "baseline",
+            "{project}"
         );
     }
 }

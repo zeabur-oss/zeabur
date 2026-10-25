@@ -9,7 +9,7 @@ import { FormField, quantity } from "@/components/form-field"
 import { PlanDrawer } from "@/components/plan/plan-drawer"
 import { PortNoteHint, useImageInspection } from "@/components/add/image-port"
 import { usePlanStep } from "@/components/plan/planner"
-import { SecurityProfileField, useProjectSecurity } from "@/components/security-profile"
+import { SecurityProfileField } from "@/components/security-profile"
 import { growthWords, useStorage } from "@/components/storage-class"
 import { useT } from "@/i18n"
 import { handOff } from "@/lib/adding"
@@ -35,6 +35,7 @@ import {
   type ImageService,
   type ImageSize,
 } from "@/model/image-service"
+import { imageProfile, type Profile } from "@/model/pod-security"
 import { Button } from "@zeabur/design-system/components/button"
 import {
   Collapsible,
@@ -81,7 +82,6 @@ export function ImageDrawer({ project, onClose }: { project: string; onClose: ()
   const domains = useQuery(clusterQuery).data?.domains ?? {}
   const options = imageOptions(rightsOf(useQuery(creatableQuery(project)).data))
   const taken = useTakenNames(project)
-  const { enforced } = useProjectSecurity(project)
   const [form, setForm] = useState<ImageService>(newImageService)
   const [extras, setExtras] = useState<Extras>(newExtras)
   const [named, setNamed] = useState(false)
@@ -94,11 +94,19 @@ export function ImageDrawer({ project, onClose }: { project: string; onClose: ()
 
   const name = named ? form.name : form.image.trim() ? nameFromImage(form.image, taken) : ""
   const [typedPort, setTypedPort] = useState<string>()
+  const [chosenSecurity, setChosenSecurity] = useState<Profile>()
   const login = options.secrets && extras.registry ? registryLogin(extras) : undefined
-  const inspection = useImageInspection(project, options.port, {
+  const inspection = useImageInspection(project, {
     image: form.image.trim(),
     registry: login,
   }).data
+  const security = chosenSecurity ?? imageProfile(inspection?.user)
+  const picked =
+    chosenSecurity === undefined && inspection?.user != null
+      ? security === "restricted"
+        ? t("security.picked.restricted", inspection.user)
+        : t("security.picked.baseline")
+      : undefined
   const portValue = shownPort(typedPort, inspection)
   const note = portNote(portValue, inspection)
   const port = options.port ? portValue.trim() : ""
@@ -111,6 +119,7 @@ export function ImageDrawer({ project, onClose }: { project: string; onClose: ()
 
   const service = (): ImageService => ({
     ...form,
+    security,
     name,
     port,
     publicUrl,
@@ -148,7 +157,7 @@ export function ImageDrawer({ project, onClose }: { project: string; onClose: ()
     if (blocked) return
     planner.plan({
       title: t("add.planImage", name),
-      changes: createImageService(service(), domains, enforced),
+      changes: createImageService(service(), domains),
     })
   }
   const editYaml = () => {
@@ -454,8 +463,9 @@ export function ImageDrawer({ project, onClose }: { project: string; onClose: ()
               ) : null}
               <SecurityProfileField
                 project={project}
-                value={form.security}
-                onChange={(security) => set({ security })}
+                value={security}
+                picked={picked}
+                onChange={setChosenSecurity}
               />
             </div>
           </CollapsibleContent>

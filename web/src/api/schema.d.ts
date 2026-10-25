@@ -3081,12 +3081,6 @@ export interface components {
           workload: components["schemas"]["WorkloadRef"]
         }
       | {
-          /** @description `restricted` or `baseline`. */
-          level: components["schemas"]["PodSecurityLevel"]
-          /** @enum {string} */
-          op: "podSecurity"
-        }
-      | {
           /** @description Its name. */
           name: string
           /** @enum {string} */
@@ -6636,12 +6630,6 @@ export interface components {
           from: components["schemas"]["WorkloadRef"]
           /** @description The image. */
           image: string
-        }
-      | {
-          /** @enum {string} */
-          code: "projectCanBeRestricted"
-          /** @description The level the project enforces now. */
-          level: components["schemas"]["PodSecurityLevel"]
         }
     /** @description One object a plan writes. */
     PlannedObject: {

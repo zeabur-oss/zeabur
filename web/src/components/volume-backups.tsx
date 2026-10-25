@@ -1,3 +1,4 @@
+import { useQuery } from "@tanstack/react-query"
 import { Link } from "@tanstack/react-router"
 import { useState } from "react"
 import ArchiveIcon from "~icons/ph/archive"
@@ -5,6 +6,7 @@ import ArrowSquareOutIcon from "~icons/ph/arrow-square-out"
 import WarningIcon from "~icons/ph/warning"
 
 import type { Schemas } from "@/api/client"
+import { namespaceQuery } from "@/api/queries"
 import { BackupDetails, CoverageRow, RunRow, useBackups } from "@/components/backups"
 import { FormField } from "@/components/form-field"
 import { GateTip, useGate } from "@/components/gate"
@@ -12,7 +14,6 @@ import { PlanDrawer, ReviewFooter, ReviewForm } from "@/components/plan/plan-dra
 import { usePlanner, usePlanStep } from "@/components/plan/planner"
 import { FrequencyField, S3Fields } from "@/components/s3-fields"
 import { Schedule } from "@/components/schedule"
-import { useProjectSecurity } from "@/components/security-profile"
 import { VolumeRestore } from "@/components/volume-restore"
 import { type Translate, useT } from "@/i18n"
 import {
@@ -298,7 +299,7 @@ function ScheduleDrawer({
   const [target, setTarget] = useState<VolumeTarget>(newVolumeTarget)
   const [tried, setTried] = useState(false)
   const step = usePlanStep(project, onClose)
-  const { enforced } = useProjectSecurity(project)
+  const enforced = useQuery(namespaceQuery(project)).data?.podSecurity
   const refused = user.root && enforced === "restricted"
   const problems = volumeTargetProblems(target)
   const set = (patch: Partial<VolumeTarget>) => setTarget((v) => ({ ...v, ...patch }))

@@ -161,9 +161,10 @@ are backed up.
 
 ## Security defaults
 
-- **RKE2's `cis` profile**: Secrets are encrypted at rest, Pod Security `restricted` applies
-  outside the exempt namespaces, NetworkPolicies cover the system namespaces, and the kubelet
-  protects kernel defaults.
+- **RKE2's `cis` profile**: Secrets are encrypted at rest, Pod Security defaults to `restricted`
+  for unlabelled namespaces, NetworkPolicies cover the system namespaces, and the kubelet
+  protects kernel defaults. Project namespaces Zeabur creates override that default with
+  `baseline` labels; `kube-system` and Zeabur's own namespaces are unchanged.
 - **Audit log**: request metadata only, so Secret values stay out of it. Every request on
   Secrets is kept, from anyone. Of the rest, only writes by people and workloads are kept: reads,
   Events, Leases, access reviews, health checks and requests from nodes and the control plane are

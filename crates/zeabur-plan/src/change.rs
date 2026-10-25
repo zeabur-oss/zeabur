@@ -263,16 +263,6 @@ pub enum Change {
         /// `restricted` or `baseline`.
         profile: PodSecurityLevel,
     },
-    /// Set the Pod Security level enforced in the project, the Namespace's
-    /// `pod-security.kubernetes.io/enforce` label (see the `pod_security` module). `baseline`
-    /// lowers only a `restricted` label and writes nothing otherwise; `restricted` is refused
-    /// while a workload, as the plan leaves it, does not meet it. Written before the other
-    /// changes of the plan.
-    #[serde(rename_all = "camelCase")]
-    PodSecurity {
-        /// `restricted` or `baseline`.
-        level: PodSecurityLevel,
-    },
     /// Replace one object of the project with an edited copy, written as YAML.
     ///
     /// Fields the server sets (`status`, `resourceVersion`, `managedFields`, …) are kept whatever
@@ -1301,13 +1291,6 @@ pub enum Warning {
         from: WorkloadRef,
         /// The image.
         image: String,
-    },
-    /// Once applied, every workload of the project meets the restricted level, but the project
-    /// enforces only this one: a `podSecurity` change to `restricted` would raise it.
-    #[serde(rename_all = "camelCase")]
-    ProjectCanBeRestricted {
-        /// The level the project enforces now.
-        level: PodSecurityLevel,
     },
 }
 

@@ -1,12 +1,14 @@
 //! Host files written before RKE2 first starts.
 //!
 //! RKE2's `cis` profile already does most of the CIS benchmark: Secrets are encrypted at rest,
-//! Pod Security `restricted` is enforced outside `kube-system`, `NetworkPolicies` guard the system
-//! namespaces and the service-account and kubelet flags are set
-//! (<https://docs.rke2.io/security/hardening_guide>). What it leaves to the host is written here:
-//! the kernel parameters it refuses to start without, an audit policy (RKE2's own logs nothing),
-//! and the file kube-apiserver reads Zeabur Identity's issuer from, which must exist before the
-//! first start because RKE2 mounts only files that exist.
+//! Pod Security `restricted` is the default outside `kube-system`, `NetworkPolicies` guard the
+//! system namespaces and the service-account and kubelet flags are set
+//! (<https://docs.rke2.io/security/hardening_guide>). The default applies only to a namespace
+//! without its own Pod Security labels: Zeabur labels a project `baseline`, and Zeabur's own
+//! namespaces keep `restricted` or the exemption the plan gives them. What it leaves to the host is
+//! written here: the kernel parameters it refuses to start without, an audit policy (RKE2's own
+//! logs nothing), and the file kube-apiserver reads Zeabur Identity's issuer from, which must exist
+//! before the first start because RKE2 mounts only files that exist.
 //!
 //! RKE2 reads `config.yaml`, then `config.yaml.d/*.yaml` in name order; a later file replaces a key
 //! unless the key ends in `+`. Each key here is set in exactly one file, so a person's own

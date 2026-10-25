@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
-import { lowersProject, profileChanges, templateSecurity } from "@/model/pod-security"
+import { imageProfile, templateSecurity } from "@/model/pod-security"
 
 describe("security profiles", () => {
   test("Strict writes the restricted settings and Compatible lets root back in", () => {
@@ -21,18 +21,11 @@ describe("security profiles", () => {
     })
   })
 
-  test("Compatible lowers only a project that enforces restricted", () => {
-    expect(lowersProject("baseline", "restricted")).toBe(true)
-    expect(lowersProject("baseline", "baseline")).toBe(false)
-    expect(lowersProject("baseline", undefined)).toBe(false)
-    expect(lowersProject("restricted", "restricted")).toBe(false)
-    const web = { kind: "Deployment" as const, name: "web" }
-    expect(profileChanges(web, "baseline", "restricted")).toStrictEqual([
-      { op: "securityProfile", workload: web, profile: "baseline" },
-      { op: "podSecurity", level: "baseline" },
-    ])
-    expect(profileChanges(web, "restricted", "baseline")).toStrictEqual([
-      { op: "securityProfile", workload: web, profile: "restricted" },
-    ])
+  test("an image with a numeric user other than root is Strict, any other is Compatible", () => {
+    for (const user of ["101", "1000:1000", "65532:0"])
+      expect(imageProfile(user)).toBe("restricted")
+    for (const user of ["", "0", "0:0", "root", "nginx", "nginx:nginx", "1000x"])
+      expect(imageProfile(user)).toBe("baseline")
+    expect(imageProfile(undefined)).toBe("baseline")
   })
 })

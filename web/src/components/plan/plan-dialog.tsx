@@ -196,9 +196,6 @@ function usePlan(
           }}
         />
       ) : null}
-      {plan.data && !plan.isFetching ? (
-        <RaiseProject ask={ask} plan={plan.data} reopen={reopen} />
-      ) : null}
       {named !== undefined && plan.data ? (
         <div className="mt-4 flex flex-col gap-2">
           <Label htmlFor="plan-typed-name">{t("plan.typeName", named)}</Label>
@@ -448,34 +445,6 @@ function Readers({
           {t("plan.restartByItself")}
         </Button>
       ) : null}
-    </div>
-  )
-}
-
-/** The last service made Strict leaves the project allowing Compatible: make it Strict too. */
-function RaiseProject({
-  ask,
-  plan,
-  reopen,
-}: {
-  ask: PlanAsk
-  plan: Schemas["PlanResponse"]
-  reopen: (ask: PlanAsk) => void
-}) {
-  const t = useT()
-  const canRaise = plan.warnings.some((w) => w.code === "projectCanBeRestricted")
-  if (!canRaise || ask.changes.some((c) => c.op === "podSecurity")) return null
-  return (
-    <div className="mt-3">
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={() =>
-          reopen({ ...ask, changes: [...ask.changes, { op: "podSecurity", level: "restricted" }] })
-        }
-      >
-        {t("plan.alsoRestrict")}
-      </Button>
     </div>
   )
 }
@@ -754,8 +723,6 @@ function warningSentence(
       return t("warn.gatewayChosen", `${warning.namespace}/${warning.name}`, warning.of)
     case "gatewaysUnreadable":
       return t("warn.gatewaysUnreadable")
-    case "projectCanBeRestricted":
-      return t("warn.projectCanBeRestricted")
     case "secretValuesUnknown":
       return t("warn.secretValuesUnknown", warning.name)
     case "configNotRolledBack":

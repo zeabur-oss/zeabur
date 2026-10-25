@@ -107,7 +107,6 @@ pub(crate) async fn compute(
         | Change::Scale { .. }
         | Change::ConfigReload { .. }
         | Change::SecurityProfile { .. }
-        | Change::PodSecurity { .. }
         | Change::Resources { .. }
         | Change::Edit { .. }
         | Change::Create { .. }

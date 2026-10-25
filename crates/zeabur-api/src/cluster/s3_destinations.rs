@@ -453,7 +453,6 @@ pub(crate) async fn open(
             | Change::Scale { .. }
             | Change::Resources { .. }
             | Change::SecurityProfile { .. }
-            | Change::PodSecurity { .. }
             | Change::Edit { .. }
             | Change::Create { .. }
             | Change::DeployKey { .. }

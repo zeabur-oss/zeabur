@@ -1,8 +1,8 @@
 {{- if .Values.memberRoles.enabled }}
 # A Developer may patch their project's Namespace (files/member-roles.yaml), and RBAC cannot narrow
 # that to some fields. This keeps such a patch to the project's details: labels select the
-# namespace for Pod Security admission and for NetworkPolicies, and Zeabur's project label is
-# what adopting writes.
+# namespace for Pod Security admission (a Developer must not set `privileged`) and for
+# NetworkPolicies, and Zeabur's project label is what adopting writes.
 #
 # It skips whoever may `zeabur-manage` the Namespace (cluster-admin's `*` covers it) or patch or
 # update every namespace, so admins, controllers and Helm are not held to it. The namespace

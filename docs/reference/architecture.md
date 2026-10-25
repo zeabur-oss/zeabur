@@ -15,9 +15,10 @@ holding any power of its own. It is a projection: Kubernetes objects are the onl
   chart's ValidatingAdmissionPolicy keeps that patch to the project's details, since labels decide
   Pod Security admission and NetworkPolicy namespace selectors, and adopting is a label, left to
   whoever may `zeabur-manage` the namespace. Every member can list namespaces and so read their
-  annotations: details hold no secrets. A project Zeabur creates enforces Pod Security
-  `restricted` and a new service is Strict; making one Compatible lowers the project's `enforce`
-  label to `baseline` in the same plan, which needs that same right
+  annotations: details hold no secrets. A project Zeabur creates enforces, audits, and warns at
+  Pod Security `baseline`. New services select Strict or Compatible based on the image user or
+  build method. Switching profiles changes only the service and needs no admin rights; Developers
+  still cannot change Namespace labels
   ([Members' rights](../get-started/install.md#members-rights)).
 - **Kubernetes objects are the only state.** No database, no cache of Secret values, and no
   custom resources for layers L0 to L2. A project is a namespace; creating one is a plan like

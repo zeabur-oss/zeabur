@@ -260,20 +260,33 @@ labels decide Pod Security admission and which NetworkPolicies of other projects
 namespace, and adopting is a label. The policy skips whoever may `zeabur-manage` the Namespace
 (a custom verb that `cluster-admin`'s `*` covers) or patch every namespace, so admins and
 controllers work as before. It needs Kubernetes 1.30 or later.
+Developers cannot change Namespace labels, including setting a Pod Security level to `privileged`.
 
-A project Zeabur creates enforces, audits and warns at Pod Security's `restricted` level (the
-`pod-security.kubernetes.io/enforce`, `audit` and `warn` labels), and a new service is Strict:
-its pod template sets `runAsNonRoot`, the `RuntimeDefault` seccomp profile and
-`allowPrivilegeEscalation: false`, drops every capability, and does not mount the service
-account's token. A service built from Git is Strict too: Zeabur Builder's Railpack images run as
-uid 1000, and a Dockerfile needs a numeric user other than root, such as `USER 1000`. A service
-whose image must run as root can be Compatible (`baseline`), chosen when it is created or in its
-settings; the same plan lowers the project's `enforce` label to `baseline` and leaves `audit`
-and `warn` at `restricted`. That is a label, so the policy above leaves it to whoever may
-`zeabur-manage` the Namespace: a Developer asks an admin, or takes admin rights. Zeabur does not raise the label back by itself; when the last Compatible service is made
-Strict, the plan offers to, and refuses while any workload in the namespace would break
-`restricted`. A namespace without an `enforce` label is never lowered: the cluster's default
-applies there.
+A project Zeabur creates enforces, audits, and warns at Pod Security's `baseline` level (the
+`pod-security.kubernetes.io/enforce`, `audit`, and `warn` labels), so Developers can run root
+images such as `nginx:latest` without admin rights. For a new Docker image service, Zeabur reads
+the image config's `User`: a numeric UID other than 0, such as `101` or `1000:1000`, selects
+Strict; no user, `root`, `0`, or a user name such as `nginx` selects Compatible. The form
+explains the choice, and either profile can be selected before creating the service.
+For Git deployments, Railpack builds default to Strict (their images run as UID 1000), and
+Dockerfile builds default to Compatible; the choice can be changed. Compose imports use Compatible.
+
+Strict applies `restricted` settings to the service's pod template: `runAsNonRoot`, the
+`RuntimeDefault` seccomp profile, `allowPrivilegeEscalation: false`, all capabilities dropped,
+and no service account token mount. Compatible uses `baseline`. Switching an existing service
+between Strict and Compatible changes only that service and needs no admin rights. It leaves
+the namespace labels unchanged.
+
+Older projects, and namespaces an admin has deliberately set to enforce `restricted`, still
+refuse root containers. The service settings ask an admin to change the project's Pod Security
+level to `baseline`. To migrate an older project, an admin runs this once per namespace:
+
+```sh
+kubectl label namespace <ns> pod-security.kubernetes.io/enforce=baseline pod-security.kubernetes.io/audit=baseline pod-security.kubernetes.io/warn=baseline --overwrite
+```
+
+RKE2's CIS default remains `restricted` for unlabelled namespaces; a project's own `baseline`
+labels override it. `kube-system` and Zeabur's own namespaces are unchanged.
 
 Developer and Viewer are the ClusterRoles `zeabur-project-developer` and `zeabur-project-viewer`.
 Each aggregates the rule sets `deploy/chart/zeabur/files/member-role-sets.yaml` names for it,

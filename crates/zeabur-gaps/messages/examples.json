@@ -3040,8 +3040,15 @@
  {
   "key": "diagnosis.podSecurity.fix.compatible",
   "params": {},
-  "en": "Use an image that runs without root: nginxinc/nginx-unprivileged instead of nginx, or, for a service built from your Dockerfile, a numeric user such as USER 1000 in it. Otherwise, choose Compatible security in the service's settings.",
-  "zh-TW": "改用不需要 root 的映像檔：例如以 nginxinc/nginx-unprivileged 取代 nginx。如果服務從你的 Dockerfile 建置，就在 Dockerfile 裡用數字指定使用者，例如 USER 1000。否則請在服務設定裡把安全性改為「相容」。",
-  "zh-CN": "改用不需要 root 的镜像：例如以 nginxinc/nginx-unprivileged 替代 nginx。如果服务从你的 Dockerfile 构建，就在 Dockerfile 里用数字指定用户，例如 USER 1000。否则请在服务设置里把安全性改为“兼容”。"
+  "en": "Choose Compatible security in the service's settings. To keep Strict, use an image that runs without root, such as nginxinc/nginx-unprivileged instead of nginx, or put a numeric user such as USER 1000 in your Dockerfile.",
+  "zh-TW": "在服務設定裡把安全性改為「相容」。想維持「嚴格」，就改用不需要 root 的映像檔，例如用 nginxinc/nginx-unprivileged 取代 nginx，或在 Dockerfile 裡用數字指定使用者，例如 USER 1000。",
+  "zh-CN": "在服务设置里把安全性改为“兼容”。想保持“严格”，就改用不需要 root 的镜像，例如用 nginxinc/nginx-unprivileged 替代 nginx，或在 Dockerfile 里用数字指定用户，例如 USER 1000。"
+ },
+ {
+  "key": "diagnosis.podSecurity.fix.strict",
+  "params": {},
+  "en": "The project allows only Strict services. Make the service Strict in its settings, or ask an admin to set the project's Pod Security level to baseline.",
+  "zh-TW": "這個專案只允許「嚴格」的服務。在服務設定裡把安全性改為「嚴格」，或請管理員把專案的 Pod Security 等級改為 baseline。",
+  "zh-CN": "这个项目只允许“严格”的服务。在服务设置里把安全性改为“严格”，或请管理员把项目的 Pod Security 等级改为 baseline。"
  }
 ]

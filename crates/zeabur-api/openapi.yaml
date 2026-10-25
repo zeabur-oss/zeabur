@@ -5779,24 +5779,6 @@ components:
             description: "The workload: a Deployment, StatefulSet, DaemonSet or CronJob."
       - type: object
         description: |-
-          Set the Pod Security level enforced in the project, the Namespace's
-          `pod-security.kubernetes.io/enforce` label (see the `pod_security` module). `baseline`
-          lowers only a `restricted` label and writes nothing otherwise; `restricted` is refused
-          while a workload, as the plan leaves it, does not meet it. Written before the other
-          changes of the plan.
-        required:
-        - level
-        - op
-        properties:
-          level:
-            $ref: "#/components/schemas/PodSecurityLevel"
-            description: "`restricted` or `baseline`."
-          op:
-            type: string
-            enum:
-            - podSecurity
-      - type: object
-        description: |-
           Replace one object of the project with an edited copy, written as YAML.
           
           Fields the server sets (`status`, `resourceVersion`, `managedFields`, …) are kept whatever
@@ -12779,21 +12761,6 @@ components:
           image:
             type: string
             description: The image.
-      - type: object
-        description: |-
-          Once applied, every workload of the project meets the restricted level, but the project
-          enforces only this one: a `podSecurity` change to `restricted` would raise it.
-        required:
-        - level
-        - code
-        properties:
-          code:
-            type: string
-            enum:
-            - projectCanBeRestricted
-          level:
-            $ref: "#/components/schemas/PodSecurityLevel"
-            description: The level the project enforces now.
       description: Something a person should know before applying.
     PlannedObject:
       type: object

@@ -39,7 +39,7 @@ use serde_json::{Value, json};
 use zeabur_adapters::provenance::{Tool, detect_tool};
 use zeabur_graph::{Snapshot, Workload, workloads};
 use zeabur_kernel::names::{Conventions, GatewayRef};
-use zeabur_model::{HttpRoute, PodSecurityLevel, Project, SourceKind, WorkloadKind, WorkloadRef};
+use zeabur_model::{HttpRoute, Project, SourceKind, WorkloadKind, WorkloadRef};
 
 use crate::certificates::{
     CLUSTER_ISSUER, CheckedCertificate, ISSUER, IssuerRead, issued_secret_name,
@@ -320,8 +320,6 @@ pub(crate) struct Planner<'a> {
     pub(crate) created: Vec<(Target, usize)>,
     /// The objects the request's `create` changes give, read before any change is planned.
     pub(crate) requested: Vec<Value>,
-    /// The level a `podSecurity` change asks the project to enforce.
-    pub(crate) pod_security: Option<PodSecurityLevel>,
 }
 
 /// The plan for `request` against `input`.
@@ -391,7 +389,6 @@ pub fn plan_with(
             .filter_map(crate::create::created_object)
             .filter_map(Result::ok)
             .collect(),
-        pod_security: None,
     };
     for index in crate::create::order(&request.changes) {
         let Some(change) = request.changes.get(index) else {
@@ -402,24 +399,6 @@ pub fn plan_with(
             ..e
         })?;
     }
-    let restricts = request.changes.iter().any(|c| {
-        matches!(
-            c,
-            Change::SecurityProfile {
-                profile: PodSecurityLevel::Restricted,
-                ..
-            }
-        )
-    });
-    planner
-        .project_pod_security(request.changes.len() == 1, restricts)
-        .map_err(|e| PlanError {
-            change: request
-                .changes
-                .iter()
-                .position(|c| matches!(c, Change::PodSecurity { .. })),
-            ..e
-        })?;
     planner.finish()
 }
 
@@ -518,7 +497,6 @@ impl<'a> Planner<'a> {
             Change::SecurityProfile { workload, profile } => {
                 self.security_profile(workload, *profile)
             }
-            Change::PodSecurity { level } => self.ask_pod_security(*level),
             Change::Resources {
                 workload,
                 container,

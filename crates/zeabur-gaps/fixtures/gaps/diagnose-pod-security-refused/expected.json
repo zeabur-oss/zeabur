@@ -18,7 +18,7 @@
       }
     },
     "fix": {
-      "key": "diagnosis.podSecurity.fix.compatible"
+      "key": "diagnosis.podSecurity.fix.strict"
     },
     "evidence": [
       {

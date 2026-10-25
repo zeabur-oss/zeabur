@@ -1091,7 +1091,7 @@ export const zhTW: Messages = {
   "title.pauseAll": (ns) => `暫停 ${ns} 的所有服務`,
   "title.restartAll": (ns) => `重新啟動 ${ns} 的所有服務`,
   "confirm.createProject":
-    "建立帶有專案標籤的 Namespace，只允許「嚴格」服務（Pod Security restricted）。其他東西都不會變。",
+    "建立帶有專案標籤的 Namespace。裡面的服務可以用 root 執行，但不能存取主機（Pod Security baseline）。其他東西都不會變。",
   "confirm.adopt": "為這個 Namespace 加上專案標籤，裡面的物件都不會變。",
   "confirm.unadopt": "這個 Namespace 不再顯示為專案，裡面的物件都不會刪除。",
   "confirm.debugContainer": (pod: string) =>
@@ -1279,7 +1279,6 @@ export const zhTW: Messages = {
   "plan.noMatch": "沒有符合的變更。",
   "plan.showAll": (n) => `顯示全部 ${n} 個`,
   "plan.alsoRestart": () => "一併重新啟動",
-  "plan.alsoRestrict": "專案也恢復為嚴格",
   "plan.restartByItself": "下次自動重新啟動",
   "plan.other": "其他欄位",
   "plan.field.size": "大小",
@@ -1347,7 +1346,6 @@ export const zhTW: Messages = {
     `${route} 的 HTTPS 設定仍是舊網域，${host} 需要新的憑證`,
   "warn.httpsCertificate": (host: string, issuer: string) =>
     `${host} 會使用 HTTPS：套用後由 cert-manager（${issuer}）簽發憑證`,
-  "warn.projectCanBeRestricted": "專案裡已經沒有服務需要「相容」，專案可以恢復為「嚴格」。",
   "warn.httpOnlyNoIssuer": (host: string) =>
     `${host} 只有 HTTP。管理員指定 cert-manager 的簽發者後，新網域會使用 HTTPS`,
   "warn.httpOnlyElsewhere": (host: string, route: string) =>
@@ -1420,15 +1418,10 @@ export const zhTW: Messages = {
     `${name} 改為「嚴格」：以非 root 使用者執行，且無法提升權限。它的副本會換成新的。`,
   "confirm.securityBaseline": (name) =>
     `${name} 改為「相容」：允許以 root 執行。它的副本會換成新的。`,
-  "confirm.podSecurityBaseline":
-    "專案改為允許「相容」服務：Pod Security 強制等級從 restricted 改為 baseline。不符合 restricted 的服務仍會出現警告，並記入稽核紀錄。",
-  "confirm.podSecurityRestricted":
-    "專案恢復為「嚴格」：Pod Security 強制 restricted 等級，拒絕以 root 執行的副本。",
   "title.security": (name) => `${name} 的安全性`,
-  "title.projectStrict": "將專案恢復為嚴格",
   "security.hint":
-    "服務的容器能做哪些事。「嚴格」適合大多數映像檔。映像檔必須以 root 執行時，請選「相容」。",
-  "security.profile.restricted": "嚴格（建議）",
+    "服務的容器能做哪些事。「相容」能執行任何映像檔；映像檔以數字指定非 root 使用者時，適合「嚴格」。",
+  "security.profile.restricted": "嚴格",
   "security.profile.baseline": "相容",
   "security.profile.privileged": "不受限",
   "security.about.restricted":
@@ -1438,15 +1431,10 @@ export const zhTW: Messages = {
   "security.about.baseline": "允許以 root 執行，但仍無法存取主機或提升權限。",
   "security.about.privileged":
     "這個服務有超出「相容」範圍的設定，例如存取主機，是在 Zeabur 以外設定的。要變更請編輯 YAML。",
-  "security.lowers": "專案目前只允許「嚴格」服務，這次變更也會讓它允許「相容」服務。",
-  "security.needsAdmin": "「相容」需要專案允許，而變更專案的安全性需要管理員。",
-  "security.what": "讓專案允許「相容」服務",
-  "security.project": "專案",
-  "security.projectLevel.restricted": "所有服務都是嚴格",
-  "security.projectLevel.baseline": "允許相容服務",
-  "security.projectLevel.privileged": "不受限",
-  "security.projectLevel.unset": "叢集預設",
-  "security.raise": "將專案恢復為嚴格",
+  "security.picked.restricted": (user) => `映像檔以使用者 ${user} 執行，所以 Zeabur 選了「嚴格」。`,
+  "security.picked.baseline": "映像檔以 root 執行，或用名稱指定使用者，所以 Zeabur 選了「相容」。",
+  "security.projectRestricted":
+    "這個專案只允許「嚴格」的服務，「相容」的服務無法啟動。請管理員把專案的 Pod Security 等級改為 baseline。",
   "security.kube.service": "服務符合",
   "security.kube.project": "專案強制",
   "security.kube.unset": "沒有標籤：叢集預設",

@@ -1161,7 +1161,7 @@ export const en = {
   "title.pauseAll": (ns: string) => `Pause every service in ${ns}`,
   "title.restartAll": (ns: string) => `Restart every service in ${ns}`,
   "confirm.createProject":
-    "Creates the namespace with the project label; it allows only Strict services (Pod Security restricted). Nothing else changes.",
+    "Creates the namespace with the project label; services in it may run as root but can't reach the host (Pod Security baseline). Nothing else changes.",
   "confirm.adopt": "Adds the project label to the namespace. Nothing in it changes.",
   "confirm.unadopt": "The namespace stops showing as a project. Nothing in it is deleted.",
   "confirm.debugContainer": (pod: string) =>
@@ -1365,7 +1365,6 @@ export const en = {
   "plan.showAll": (n: number) => `Show all ${n}`,
   "plan.alsoRestart": (count: number): string =>
     count === 1 ? "Restart it too" : "Restart them too",
-  "plan.alsoRestrict": "Make the project Strict too",
   "plan.restartByItself": "Restart automatically next time",
   "plan.other": "Other fields",
   "plan.field.size": "Size",
@@ -1440,8 +1439,6 @@ export const en = {
     `${route} lists the old host for HTTPS; ${host} needs a new certificate`,
   "warn.httpsCertificate": (host: string, issuer: string) =>
     `${host} uses HTTPS: cert-manager (${issuer}) issues its certificate after you apply`,
-  "warn.projectCanBeRestricted":
-    "No service in the project needs Compatible any more; the project can be Strict again.",
   "warn.httpOnlyNoIssuer": (host: string) =>
     `${host} is HTTP only. An administrator can name a cert-manager issuer to make new domains HTTPS`,
   "warn.httpOnlyElsewhere": (host: string, route: string) =>
@@ -1530,15 +1527,10 @@ export const en = {
     `${name} becomes Strict: it runs as a non-root user and can't gain privileges. Its replicas are replaced.`,
   "confirm.securityBaseline": (name: string) =>
     `${name} becomes Compatible: it may run as root. Its replicas are replaced.`,
-  "confirm.podSecurityBaseline":
-    "The project allows Compatible services: Pod Security enforces baseline instead of restricted. Services that break restricted are still warned about and audited.",
-  "confirm.podSecurityRestricted":
-    "The project becomes Strict again: Pod Security enforces restricted and refuses replicas that run as root.",
   "title.security": (name: string) => `Security of ${name}`,
-  "title.projectStrict": "Make the project Strict",
   "security.hint":
-    "What the service's containers may do. Strict suits most images; choose Compatible for an image that must run as root.",
-  "security.profile.restricted": "Strict (recommended)",
+    "What the service's containers may do. Compatible runs any image; Strict suits an image that runs as a numeric non-root user.",
+  "security.profile.restricted": "Strict",
   "security.profile.baseline": "Compatible",
   "security.profile.privileged": "Unrestricted",
   "security.about.restricted":
@@ -1548,17 +1540,12 @@ export const en = {
   "security.about.baseline": "May run as root, but still can't reach the host or gain privileges.",
   "security.about.privileged":
     "Its settings ask for more than Compatible allows, such as reaching the host; they were set outside Zeabur. Edit its YAML to change them.",
-  "security.lowers":
-    "The project allows only Strict services now; this also lets it run Compatible ones.",
-  "security.needsAdmin":
-    "Compatible needs the project to allow it, and changing the project's security needs an admin.",
-  "security.what": "Letting the project run Compatible services",
-  "security.project": "Project",
-  "security.projectLevel.restricted": "Strict for every service",
-  "security.projectLevel.baseline": "Allows Compatible services",
-  "security.projectLevel.privileged": "Unrestricted",
-  "security.projectLevel.unset": "The cluster's default",
-  "security.raise": "Make the project Strict",
+  "security.picked.restricted": (user: string) =>
+    `The image runs as user ${user}, so Zeabur chose Strict.`,
+  "security.picked.baseline":
+    "The image runs as root or names its user, so Zeabur chose Compatible.",
+  "security.projectRestricted":
+    "This project allows only Strict services, so a Compatible one won't start. Ask an admin to set the project's Pod Security level to baseline.",
   "security.kube.service": "Service meets",
   "security.kube.project": "Project enforces",
   "security.kube.unset": "No label: the cluster's default",

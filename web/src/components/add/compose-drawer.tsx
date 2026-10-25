@@ -14,7 +14,6 @@ import { useTakenNames } from "@/components/add/taken"
 import { useGates } from "@/components/gate"
 import { PlanDrawer } from "@/components/plan/plan-drawer"
 import { usePlanStep } from "@/components/plan/planner"
-import { useProjectSecurity } from "@/components/security-profile"
 import { TextFile } from "@/components/text-file"
 import { useT, type Translate } from "@/i18n"
 import {
@@ -60,12 +59,11 @@ function useComposeContext(project: string) {
   const databases = gates("changeDatabases").open
   const objectStorage = gates("changeObjectStorage").open
   const mayCreate = (engine: Managed) => (engine === "objectStorage" ? objectStorage : databases)
-  const { enforced } = useProjectSecurity(project)
   const taken = useTakenNames(project)
   const states: Partial<Record<Managed, (typeof operators)[number]["state"]>> = {}
   for (const o of operators) states[o.engine] = o.state
   if (store) states.objectStorage = store
-  return { domains, options, nodes, enforced, states, mayCreate, taken }
+  return { domains, options, nodes, states, mayCreate, taken }
 }
 
 /** The file as the server reads it, and whether the text changed since. */

@@ -73,7 +73,7 @@ describe("variables", () => {
 
 describe("objects", () => {
   test("only an image is a worker: one Deployment, no Service", () => {
-    const objects = imageObjects(form({}), {})
+    const objects = imageObjects(form({ security: "restricted" }), {})
     expect(kinds(objects)).toEqual(["Deployment/web"])
     const container = (objects[0] as any).spec.template.spec.containers[0]
     expect(container).toEqual({
@@ -170,16 +170,12 @@ describe("objects", () => {
     ])
   })
 
-  test("Compatible lowers a project that allows only Strict services, in the same plan", () => {
-    const compatible = form({ security: "baseline" })
-    expect(createImageService(compatible, {}, "restricted").at(-1)).toEqual({
-      op: "podSecurity",
-      level: "baseline",
-    })
-    expect(createImageService(compatible, {}, "baseline").map((c) => c.op)).toEqual(["create"])
-    expect(createImageService(form({}), {}, "restricted").map((c) => c.op)).toEqual(["create"])
-    const pod = (imageObjects(compatible, {})[0] as any).spec.template.spec
+  test("a new image service is Compatible: root may run, nothing else is let in", () => {
+    expect(newImageService().security).toBe("baseline")
+    expect(createImageService(form({}), {}).map((c) => c.op)).toEqual(["create"])
+    const pod = (imageObjects(form({}), {})[0] as any).spec.template.spec
     expect(pod.securityContext).toEqual({ seccompProfile: { type: "RuntimeDefault" } })
+    expect(pod.containers[0].securityContext).toEqual({ allowPrivilegeEscalation: false })
   })
 })
 

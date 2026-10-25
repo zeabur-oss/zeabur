@@ -197,7 +197,6 @@ async fn compute(
     let issuers = certificates::issuers(cluster, request, &snapshot, cluster_issuer).await;
     let mut objects = edited_objects(cluster, project, request).await?;
     objects.extend(certificates::issued(cluster, project, request, &snapshot).await);
-    let namespace = namespace::pod_security_namespace(cluster, project, request).await?;
     let replica_sets = replica_sets_of_deleted(cluster, project, request).await?;
     let reclaim_policies = reclaim_policies(cluster, request, &snapshot, &routes, &objects).await?;
     let changes_data = request.changes.iter().any(|c| {
@@ -222,7 +221,7 @@ async fn compute(
             objects: &objects,
             replica_sets: &replica_sets,
             reclaim_policies: &reclaim_policies,
-            namespace: namespace.as_ref(),
+            namespace: None,
             reloader,
             kinds: &kinds,
             cluster_issuer,

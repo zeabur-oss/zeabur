@@ -68,9 +68,22 @@ sudo zeabur-installer apply
 
 ## 服務的安全性
 
-新專案的 Pod Security `enforce`、`audit`、`warn` 都是 `restricted`。服務設為 **嚴格（建議）** 時，以非 root 執行、不能提升權限、移除所有 capabilities，並使用 `RuntimeDefault` seccomp profile。
+新專案的 Pod Security `enforce`、`audit`、`warn` 都是 `baseline`，開發者可以直接部署需要 root 的映像檔。服務設為 **嚴格** 時，以非 root 執行、不能提升權限、移除所有 capabilities，並使用 `RuntimeDefault` seccomp profile。
 
-映像檔需要 root 時選 **相容**。專案強制 `restricted` 時，同一份變更會把 Namespace 的 `enforce` 降為 `baseline`，這一步要由管理員或有 Namespace 管理權的人套用。`audit` 和 `warn` 不變，所以不符合 `restricted` 的服務仍會被警告並記入稽核紀錄。套用後服務副本會替換。
+新增 Docker 映像檔服務時，Zeabur 會讀取映像檔的 `User`。數字 UID 不是 0（例如 `101`、`1000:1000`）時選 **嚴格**；沒有指定使用者，或指定 `root`、`0`、`nginx` 這類使用者名稱時選 **相容**。表單會說明選擇原因，建立前仍能切換。從 Git 部署時，Railpack 映像檔以 UID 1000 執行，預設選 **嚴格**；Dockerfile 預設選 **相容**，也能自行切換。Compose 匯入的服務使用 **相容**。
+
+既有服務切換 **嚴格** 或 **相容** 時，變更只影響該服務，不改 Namespace 標籤，也不需要管理員權限。套用後服務副本會替換。Chart 的 `zeabur-project-namespace` 政策仍禁止開發者修改 Namespace 標籤，包括任何 Pod Security 標籤，因此無法自行設為 `privileged`。
+
+舊版 Zeabur 建立的專案，或管理員刻意設為 `restricted` 的專案，仍會拒絕 root 容器。服務設定會顯示「這個專案只允許『嚴格』的服務，『相容』的服務無法啟動。請管理員把專案的 Pod Security 等級改為 baseline。」管理員對每個舊專案的 Namespace 執行一次：
+
+```sh
+kubectl label namespace <ns> \
+  pod-security.kubernetes.io/enforce=baseline \
+  pod-security.kubernetes.io/audit=baseline \
+  pod-security.kubernetes.io/warn=baseline --overwrite
+```
+
+RKE2 CIS 對未加標籤的 Namespace 仍預設使用 `restricted`，專案自己的 `baseline` 標籤會覆蓋這個預設值。`kube-system` 和 Zeabur 自己的 Namespace 維持原設定。
 
 Pod Security 不管網路。要限制跨專案的流量，另外設定 NetworkPolicy。開發者可以修改 NetworkPolicy，所以也能改變專案的連線規則。
 
