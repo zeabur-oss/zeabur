@@ -100,7 +100,6 @@ describe("the commands on the new VM", () => {
       joinScript({
         server: " https://10.0.0.5:9345 ",
         token: "K10abc::id.secret",
-        expect: { provider: "hetzner", region: "fsn1" },
       }),
     ).toBe(
       [
@@ -110,26 +109,12 @@ describe("the commands on the new VM", () => {
         "  server: https://10.0.0.5:9345",
         "  role: worker",
         "  token: K10abc::id.secret",
-        "  expect:",
-        "    provider: hetzner",
-        "    region: fsn1",
         "EOF",
         "zeabur-installer plan     # what it installs, network checks and warnings; changes nothing",
         "zeabur-installer apply    # installs RKE2 as an agent and waits for the node to be Ready",
         "",
       ].join("\n"),
     )
-  })
-
-  test("expect is left out without a location, and odd values are quoted", () => {
-    const plain = joinScript({ server: "https://a:9345", token: "t" })
-    expect(plain).not.toContain("expect")
-    const odd = joinScript({
-      server: "https://a:9345",
-      token: "t",
-      expect: { provider: "aws", region: "us east" },
-    })
-    expect(odd).toContain('region: "us east"')
   })
 
   test("the server is an https URL with a port", () => {

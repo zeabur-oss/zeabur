@@ -38,12 +38,6 @@ pub const JOIN_TOKEN_FILE: &str = "/etc/rancher/rke2/zeabur-join-token";
 pub const SERVER_TOKEN_FILE: &str = "/var/lib/rancher/rke2/server/token";
 /// The kubelet's credentials on any node; a node may read its own Node object with them.
 pub const KUBELET_KUBECONFIG: &str = "/var/lib/rancher/rke2/agent/kubelet.kubeconfig";
-/// The node label naming the cloud provider, set by the installer.
-pub const PROVIDER_LABEL: &str = "installer.zeabur.com/provider";
-/// The well-known region label.
-pub const REGION_LABEL: &str = "topology.kubernetes.io/region";
-/// The well-known zone label.
-pub const ZONE_LABEL: &str = "topology.kubernetes.io/zone";
 
 /// The TCP ports a node listens on, and what for, that must be free before RKE2 starts.
 ///
@@ -67,38 +61,6 @@ pub fn node_ports(server: bool) -> Vec<(u16, &'static str)> {
     }
     ports.push((10250, "kubelet"));
     ports
-}
-
-/// A string as a label value: characters other than letters, digits, `-`, `_` and `.` become
-/// `-`, at most 63, starting and ending with a letter or digit. `None` when nothing is left.
-#[must_use]
-pub fn label_value(value: &str) -> Option<String> {
-    let cleaned: String = value
-        .chars()
-        .map(|c| {
-            if c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.') {
-                c
-            } else {
-                '-'
-            }
-        })
-        .take(63)
-        .collect();
-    let trimmed = cleaned.trim_matches(|c: char| !c.is_ascii_alphanumeric());
-    (!trimmed.is_empty()).then(|| trimmed.to_owned())
-}
-
-/// The node labels of a location.
-#[must_use]
-pub fn location_labels(location: &crate::config::Location) -> Vec<(String, String)> {
-    [
-        (PROVIDER_LABEL, Some(location.provider.as_str())),
-        (REGION_LABEL, Some(location.region.as_str())),
-        (ZONE_LABEL, location.zone.as_deref()),
-    ]
-    .into_iter()
-    .filter_map(|(key, value)| Some((key.to_owned(), label_value(value?)?)))
-    .collect()
 }
 
 /// A file the installer owns.
@@ -187,23 +149,13 @@ pub fn agent_files() -> Vec<HostFile> {
     ]
 }
 
-/// The drop-in naming the server to join, the token file and the node's labels. The labels apply
-/// when the node registers.
+/// The drop-in naming the server to join and the token file.
 #[must_use]
-pub fn join_file(server: &str, labels: &[(String, String)]) -> HostFile {
-    let mut content = format!("{HEADER}server: {server}\ntoken-file: {JOIN_TOKEN_FILE}\n");
-    if !labels.is_empty() {
-        content.push_str("node-label:\n");
-        for (key, value) in labels {
-            for part in ["  - ", key, "=", value, "\n"] {
-                content.push_str(part);
-            }
-        }
-    }
+pub fn join_file(server: &str) -> HostFile {
     HostFile {
         path: format!("{CONFIG_DIR}/config.yaml.d/10-join.yaml"),
         mode: 0o600,
-        content,
+        content: format!("{HEADER}server: {server}\ntoken-file: {JOIN_TOKEN_FILE}\n"),
     }
 }
 
@@ -375,17 +327,6 @@ mod tests {
     }
 
     #[test]
-    fn label_values() {
-        assert_eq!(
-            label_value("Uocm:AP-TOKYO-1-AD-1").unwrap(),
-            "Uocm-AP-TOKYO-1-AD-1"
-        );
-        assert_eq!(label_value("fsn1-dc14").unwrap(), "fsn1-dc14");
-        assert_eq!(label_value(":::"), None);
-        assert_eq!(label_value(&"a".repeat(80)).unwrap().len(), 63);
-    }
-
-    #[test]
     fn the_audit_policy_keeps_every_secret_request_first_and_never_bodies() {
         let policy: serde_json::Value = serde_saphyr::from_str(AUDIT_POLICY).unwrap();
         let rules = policy["rules"].as_array().unwrap();
@@ -413,14 +354,10 @@ mod tests {
         assert!(agent[1].content.contains("profile: cis\n"));
         assert!(agent[1].content.contains("pod-max-pids=4096"));
         assert!(!agent[1].content.contains("audit-policy-file"));
-        let join = join_file(
-            "https://10.0.0.5:9345",
-            &[(REGION_LABEL.to_owned(), "fsn1".to_owned())],
-        );
+        let join = join_file("https://10.0.0.5:9345");
         let value: serde_json::Value = serde_saphyr::from_str(&join.content).unwrap();
         assert_eq!(value["server"], "https://10.0.0.5:9345");
         assert_eq!(value["token-file"], JOIN_TOKEN_FILE);
-        assert_eq!(value["node-label"][0], "topology.kubernetes.io/region=fsn1");
         assert_eq!(join.mode, 0o600);
         let ip = node_ip_file(&["10.0.0.6".to_owned(), "fd00::6".to_owned()]).unwrap();
         let value: serde_json::Value = serde_saphyr::from_str(&ip.content).unwrap();

@@ -78,8 +78,7 @@ zeabur-installer node add --role server
 ```
 
 It prints a configuration to paste on the new VM, then `zeabur-installer plan` and
-`zeabur-installer apply` to run there. `plan` on the new VM compares its cloud provider and
-region with the server's, measures the round trip to the server and checks the ports it can.
+`zeabur-installer apply` to run there. `plan` on the new VM measures the round trip to the server and checks the ports it can.
 `apply` installs RKE2 only, as an agent for a worker or a server for the control plane, and
 waits until the node is Ready. Zeabur's Cluster → Nodes page can add workers the same way.
 

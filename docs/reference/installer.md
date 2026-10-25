@@ -101,25 +101,23 @@ interrupted install or repairs drift.
   SHA-256 of the cluster CA, so the new VM refuses a server with another CA. Zeabur creates the
   same Secret through the API. RKE2 accepts bootstrap tokens on the agent routes only, so a
   server gets the cluster's server token instead, which does not expire.
-- **Location**: the server's provider and region, from its node labels.
 - For a server, **`serverConfig`**: the components the cluster disables and whether
   kube-apiserver trusts Zeabur Identity. Every server must agree on these.
 
-On the new VM, `plan` reads the cloud metadata (AWS, GCP, Azure, DigitalOcean, Hetzner, Vultr,
-Linode and Oracle; 300 ms to connect, 1 s to answer, nothing if absent) and compares it with the
-expected location. It times five TCP connections to port 9345 and warns when the median is over
+On the new VM, `plan` times five TCP connections to port 9345 and warns when the median is over
 10 ms, or calls it critical over 50 ms: between availability zones of one region a round trip
 takes about 0.5 to 2 ms, and every etcd write waits for a majority of servers. It tries the TCP
 ports it needs. UDP 8472 cannot be checked this way, and the plan says so.
 
 `apply` writes the token to `/etc/rancher/rke2/zeabur-join-token` (mode 0600), the same CIS
 profile, kernel parameters and kubelet settings as the first server, and a drop-in
-`config.yaml.d/10-join.yaml` with the server, the token file and the node's location labels
-(`installer.zeabur.com/provider`, `topology.kubernetes.io/region` and `zone`). It installs RKE2,
+`config.yaml.d/10-join.yaml` with the server and the token file. It installs RKE2,
 starts `rke2-agent` or `rke2-server`, and waits until the node is Ready, reading its own Node
 with the kubelet's credentials. A server also copies Zeabur Identity's authentication
 configuration from the ConfigMap `kube-system/zeabur-identity-authn`, which `apply` on the first
 server publishes.
+The installer sets no `topology.kubernetes.io/region` or `zone` labels; an admin who wants them
+sets them on the nodes with `kubectl label node`.
 
 When the cluster runs Longhorn, `node add` adds `longhorn: true` to the join configuration, and
 `apply` on the new VM prepares it as on the first server before installing RKE2. A node that
@@ -182,7 +180,6 @@ are backed up.
 | `local` mode name resolution from pods (sslip.io names, hairpin through ServiceLB) | **Not verified yet** |
 | Storage classes and Longhorn node preparation: planning, the default class, package names per distribution | Unit-tested |
 | Longhorn on RKE2 `cis` with the baseline NetworkPolicies; node preparation on Debian, RHEL and SUSE hosts; the multipath drop-in | **Not verified yet** |
-| Join planning: configuration, warnings, latency thresholds, location comparison, `node add` output | Unit-tested |
-| Cloud metadata on real providers | **Not verified yet**: parsers are tested against documented responses |
+| Join planning: configuration, warnings, latency thresholds, `node add` output | Unit-tested |
 | A worker or server joining a real cluster, `node sync` with Canal | Verified on two Ubuntu 26.04 arm64 VMs, RKE2 v1.36.5 |
 | The CA hash from `kube-root-ca.crt` equals the server token's | Checked by `node add` each time; equal on the same VMs |

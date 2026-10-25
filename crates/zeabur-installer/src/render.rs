@@ -1,6 +1,6 @@
 //! The plan, written for people.
 
-use zeabur_installer_plan::config::{AccessMode, Location, Role};
+use zeabur_installer_plan::config::{AccessMode, Role};
 use zeabur_installer_plan::join::{self, JoinPlan};
 use zeabur_installer_plan::plan::{Plan, ReleasePlan};
 use zeabur_installer_plan::rke2::JOIN_TOKEN_FILE;
@@ -145,14 +145,6 @@ pub(crate) fn join_plan(plan: &JoinPlan) -> String {
         &format!("  {JOIN_TOKEN_FILE} (the token, mode 0600)"),
     );
     push(&mut s, "");
-    push(
-        &mut s,
-        &format!(
-            "Location         this VM: {}; the server: {}",
-            location(plan.location.as_ref()),
-            location(plan.expect.as_ref())
-        ),
-    );
     match &plan.rtt {
         Some(rtt) => push(
             &mut s,
@@ -165,14 +157,6 @@ pub(crate) fn join_plan(plan: &JoinPlan) -> String {
             ),
         ),
         None => push(&mut s, "Distance         the server did not answer"),
-    }
-    if !plan.labels.is_empty() {
-        let labels: Vec<String> = plan
-            .labels
-            .iter()
-            .map(|(k, v)| format!("{k}={v}"))
-            .collect();
-        push(&mut s, &format!("Node labels      {}", labels.join(", ")));
     }
     if let Some(prep) = &plan.node_prep {
         node_prep(&mut s, prep);
@@ -264,19 +248,6 @@ fn node_addresses(s: &mut String, addresses: &[String]) {
     push(s, &format!("Node addresses   {text}"));
 }
 
-fn location(location: Option<&Location>) -> String {
-    location.map_or_else(
-        || "unknown".to_owned(),
-        |l| {
-            let zone = l
-                .zone
-                .as_ref()
-                .map_or_else(String::new, |z| format!(" ({z})"));
-            format!("{} {}{zone}", l.provider, l.region)
-        },
-    )
-}
-
 fn push(s: &mut String, line: &str) {
     s.push_str(line);
     s.push('\n');
@@ -290,7 +261,7 @@ mod tests {
 
     use super::*;
 
-    fn plan(yaml: &str, rtt_us: &[u64], here: Option<Location>) -> JoinPlan {
+    fn plan(yaml: &str, rtt_us: &[u64]) -> JoinPlan {
         let Document::Join(config) = Document::parse(yaml).unwrap() else {
             panic!("not a join");
         };
@@ -301,7 +272,6 @@ mod tests {
                 memory_mib: 8192,
                 node_ips: vec!["10.0.0.6".to_owned(), "fd00::6".to_owned()],
             },
-            location: here,
             rtt_us: rtt_us.to_vec(),
             ports: vec![
                 (9345, !rtt_us.is_empty()),
@@ -315,32 +285,22 @@ mod tests {
         join::plan(&config, &facts).unwrap()
     }
 
-    fn hetzner(region: &str) -> Location {
-        Location {
-            provider: "hetzner".to_owned(),
-            region: region.to_owned(),
-            zone: Some(format!("{region}-dc14")),
-        }
-    }
-
     #[test]
-    fn a_worker_in_the_same_region() {
+    fn a_worker_near_the_server() {
         let p = plan(
             include_str!("../../../docs/reference/installer-examples/join.yaml"),
             &[640, 610, 700, 900, 650],
-            Some(hetzner("fsn1")),
         );
         let text = join_plan(&p).replace(&p.rke2.version, "<rke2>");
         assert_eq!(text, include_str!("../fixtures/join-worker.txt"));
     }
 
     #[test]
-    fn a_server_in_another_region() {
+    fn a_server_far_from_the_server() {
         let p = plan(
             "join:\n  server: https://10.0.0.5:9345\n  role: server\n  tokenFile: /root/token\n  \
-             expect: {provider: hetzner, region: fsn1}\n  serverConfig: {disable: [rke2-metrics-server], identity: true}\n",
+             serverConfig: {disable: [rke2-metrics-server], identity: true}\n",
             &[24_000, 23_500, 25_100, 24_200, 23_900],
-            Some(hetzner("hel1")),
         );
         let text = join_plan(&p).replace(&p.rke2.version, "<rke2>");
         assert_eq!(text, include_str!("../fixtures/join-server.txt"));
@@ -351,7 +311,6 @@ mod tests {
         let p = plan(
             include_str!("../../../docs/reference/installer-examples/join.yaml"),
             &[],
-            None,
         );
         let text = join_plan(&p);
         assert!(text.contains("Distance         the server did not answer"));

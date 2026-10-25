@@ -147,8 +147,6 @@ sources:
 | `join.role` | `worker`。也接受 `server` |
 | `join.token` | 和 `tokenFile` 擇一。直接寫權杖時，設定檔權限要是 `0600` |
 | `join.tokenFile` | 和 `token` 擇一。權限 `0600` 的權杖檔案 |
-| `join.expect.provider` | server 所在的主機商，新主機用來比對自己是否在同一處 |
-| `join.expect.region` | server 所在的區域。`expect.zone` 可另外記錄可用區 |
 | `join.serverConfig` | `server` 必填，worker 不接受。照抄 `node add --role server` 印出的 `disable` 和 `identity` |
 | `join.longhorn` | `false`。`true` 時在 RKE2 啟動前先裝好 Longhorn 需要的主機套件 |
 

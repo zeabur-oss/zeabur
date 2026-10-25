@@ -91,7 +91,6 @@ export function AddNodeButton() {
         <AddNodeDrawer
           server={join.data.server ?? ""}
           caHash={join.data.caHash ?? ""}
-          expect={join.data.expect ?? undefined}
           taken={join.data.tokens.map((token) => token.id)}
           onClose={() => setOpen(false)}
         />
@@ -108,13 +107,11 @@ type Stage =
 function AddNodeDrawer({
   server: suggested,
   caHash,
-  expect,
   taken,
   onClose,
 }: {
   server: string
   caHash: string
-  expect?: { provider: string; region: string }
   taken: string[]
   onClose: () => void
 }) {
@@ -176,7 +173,7 @@ function AddNodeDrawer({
         ) : (
           <Ready
             server={server.trim()}
-            script={joinScript({ server, token: tokenString(caHash, stage.token), expect })}
+            script={joinScript({ server, token: tokenString(caHash, stage.token) })}
             until={formatTime(stage.until, locale)}
             token={stage.token.id}
             before={stage.before}

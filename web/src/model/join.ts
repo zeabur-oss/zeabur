@@ -88,28 +88,8 @@ export function serverProblem(server: string): "empty" | "invalid" | undefined {
 }
 
 /** The block pasted on the new VM as root: the join configuration, then plan and apply. */
-export function joinScript({
-  server,
-  token,
-  expect,
-}: {
-  server: string
-  token: string
-  expect?: Schemas["JoinExpect"]
-}): string {
-  const config = [
-    "join:",
-    `  server: ${server.trim()}`,
-    "  role: worker",
-    `  token: ${token}`,
-    ...(expect
-      ? [
-          "  expect:",
-          `    provider: ${quoted(expect.provider)}`,
-          `    region: ${quoted(expect.region)}`,
-        ]
-      : []),
-  ]
+export function joinScript({ server, token }: { server: string; token: string }): string {
+  const config = ["join:", `  server: ${server.trim()}`, "  role: worker", `  token: ${token}`]
   return [
     "install -d -m 0700 /etc/zeabur-installer",
     "(umask 077; cat > /etc/zeabur-installer/config.yaml) <<'EOF'",
@@ -120,8 +100,6 @@ export function joinScript({
     "",
   ].join("\n")
 }
-
-const quoted = (value: string) => (/^[A-Za-z0-9._-]+$/.test(value) ? value : JSON.stringify(value))
 
 /** Why Zeabur cannot add a node here, if it cannot. */
 export type Unavailable = "notRke2" | "noCaHash"

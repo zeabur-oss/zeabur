@@ -242,16 +242,10 @@ export const zhTW: Messages = {
     `這個安裝程式不支援 RKE2 ${version}：下載的檔案只能用該版本自己附的檢查碼驗證。`,
   "warning.join.sameRegion": () =>
     "所有節點都要在同一家主機服務商的同一個區域。同一區域內的不同可用區域沒有問題；跨服務商或跨區域時，延遲會拖慢 etcd、Kubernetes API 和儲存，甚至讓叢集不穩定。",
-  "warning.join.provider.differs": (here, server) =>
-    `這台 VM 在 ${here}，伺服器在 ${server}。節點必須在同一家主機服務商。`,
-  "warning.join.region.differs": (here, server) =>
-    `這台 VM 在 ${here}，伺服器在 ${server}。節點必須在同一個區域；可用區域不同沒有關係。`,
-  "warning.join.location.unknown": () =>
-    "無法從雲端中繼資料讀出這台 VM 或伺服器的服務商和區域，請自行確認兩者相同。",
   "warning.join.rtt.high": (median, limit) =>
     `到伺服器的延遲是 ${median} 毫秒（連到 9345 埠 5 次 TCP 連線的中位數）；同一區域內通常低於 ${limit} 毫秒。`,
   "warning.join.rtt.critical": (median, limit) =>
-    `到伺服器的延遲是 ${median} 毫秒（連到 9345 埠 5 次 TCP 連線的中位數）。超過 ${limit} 毫秒，叢集會變慢又不穩定，伺服器看起來在另一個區域。`,
+    `到伺服器的延遲是 ${median} 毫秒（連到 9345 埠 5 次 TCP 連線的中位數）。超過 ${limit} 毫秒，叢集會變慢又不穩定。`,
   "warning.join.port.closed": (ports, host) =>
     `這台 VM 連不到 ${host} 的 TCP ${ports}，請檢查防火牆或安全群組。`,
   "warning.join.ports": () =>

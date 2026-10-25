@@ -13,9 +13,7 @@ Files
   /etc/rancher/rke2/config.yaml.d/20-node-ip.yaml
   /etc/rancher/rke2/zeabur-join-token (the token, mode 0600)
 
-Location         this VM: hetzner hel1 (hel1-dc14); the server: hetzner fsn1
 Distance         24.0 ms to the server (median of 5 TCP connects; 23.5 to 25.1)
-Node labels      installer.zeabur.com/provider=hetzner, topology.kubernetes.io/region=hel1, topology.kubernetes.io/zone=hel1-dc14
 Ports on the server
   open    TCP 9345  RKE2 supervisor
   open    TCP 6443  Kubernetes API
@@ -31,7 +29,6 @@ Ports on this VM, free before RKE2 starts (apply checks them)
   TCP 10250 kubelet
 
 warning: Put every node at the same hosting provider and in the same region. Different availability zones in one region are fine. Between providers or regions, latency slows etcd, the Kubernetes API and storage, and can make the cluster unstable.
-warning: This VM is in hetzner hel1, the server in hetzner fsn1. Nodes need the same region; a different availability zone is fine.
 warning: The server is 24.0 ms away (median of 5 TCP connects to port 9345); within a region it is usually under 10.0 ms.
 warning: TCP 2380 on 10.0.0.5 cannot be reached from this VM; check the firewall or security group.
 warning: Allow these between the nodes: TCP 9345 and 6443 to the servers, TCP 10250 and 9099 and UDP 8472 (Canal VXLAN) between all nodes, and TCP 2379 to 2381 between servers. Keep UDP 8472 closed to the internet.

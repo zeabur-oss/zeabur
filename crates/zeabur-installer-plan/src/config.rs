@@ -127,6 +127,10 @@ pub struct Sources {
 
 /// A configuration file: a new cluster, or a node joining one.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[expect(
+    clippy::large_enum_variant,
+    reason = "a run reads one configuration file"
+)]
 pub enum Document {
     /// The first server: RKE2, the components, Zeabur Identity and Zeabur.
     Install(Config),
@@ -190,8 +194,6 @@ pub struct Join {
     pub token: Option<String>,
     /// A file (mode 0600) holding the join token.
     pub token_file: Option<String>,
-    /// The server's provider and region, as `node add` printed them.
-    pub expect: Option<Location>,
     /// Settings every server of the cluster must share, as `node add --role server` printed them.
     pub server_config: Option<ServerConfig>,
     /// The cluster runs Longhorn, so this node gets its iSCSI initiator, NFS client and kernel
@@ -207,7 +209,6 @@ impl std::fmt::Debug for Join {
             .field("role", &self.role)
             .field("token", &self.token.as_ref().map(|_| "<redacted>"))
             .field("token_file", &self.token_file)
-            .field("expect", &self.expect)
             .field("server_config", &self.server_config)
             .field("longhorn", &self.longhorn)
             .finish()
@@ -234,19 +235,6 @@ impl Role {
             Self::Server => "server",
         }
     }
-}
-
-/// Where a machine runs, from its cloud's instance metadata.
-#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct Location {
-    /// `aws`, `gcp`, `azure`, `digitalocean`, `hetzner`, `vultr`, `linode` or `oracle`.
-    pub provider: String,
-    /// The provider's region, such as `ap-northeast-1` or `fsn1`.
-    pub region: String,
-    /// The availability zone, when the provider has one.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub zone: Option<String>,
 }
 
 /// RKE2 server settings that must match on every server.
@@ -579,19 +567,10 @@ mod tests {
 
     #[test]
     fn a_join_key_makes_a_join_configuration() {
-        let Document::Join(c) = join("  expect: {provider: hetzner, region: fsn1}\n").unwrap()
-        else {
+        let Document::Join(c) = join("").unwrap() else {
             panic!("not a join");
         };
         assert_eq!(c.join.role, Role::Worker);
-        assert_eq!(
-            c.join.expect,
-            Some(Location {
-                provider: "hetzner".to_owned(),
-                region: "fsn1".to_owned(),
-                zone: None
-            })
-        );
         assert!(!format!("{c:?}").contains("0123456789abcdef"));
         assert!(matches!(
             Document::parse(MINIMAL).unwrap(),

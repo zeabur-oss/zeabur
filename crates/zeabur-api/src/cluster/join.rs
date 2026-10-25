@@ -7,8 +7,7 @@
 //!
 //! - the CA hash, SHA-256 of `kube-root-ca.crt`'s `ca.crt` (`get` it in `kube-system`), the same
 //!   bytes the supervisor serves at `/cacerts`, hashed as k3s's `hashCA` does;
-//! - the supervisor, `https://<InternalIP>:9345` of a Ready control-plane node, and that node's
-//!   provider and region labels for `join.expect` (`list nodes`);
+//! - the supervisor, `https://<InternalIP>:9345` of a Ready control-plane node (`list nodes`);
 //! - the bootstrap tokens that have not expired, without their secrets (`list` and `get` on
 //!   `secrets` in `kube-system`).
 //!
@@ -35,8 +34,6 @@ const BOOTSTRAP_TOKEN: &str = "bootstrap.kubernetes.io/token";
 /// The RKE2 supervisor's port.
 const SUPERVISOR_PORT: u16 = 9345;
 const CONTROL_PLANE: &str = "node-role.kubernetes.io/control-plane";
-const PROVIDER: &str = "installer.zeabur.com/provider";
-const REGION: &str = "topology.kubernetes.io/region";
 
 /// Why this cluster cannot take a node from Zeabur.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
@@ -45,15 +42,6 @@ pub enum JoinBlocked {
     /// Not RKE2 (k3s, or a distribution the version does not name): the installer joins RKE2
     /// agents only.
     NotRke2,
-}
-
-/// Where the server is, from its node's labels, for the new node to compare with its own.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
-pub struct JoinExpect {
-    /// `installer.zeabur.com/provider`.
-    pub provider: String,
-    /// `topology.kubernetes.io/region`.
-    pub region: String,
 }
 
 /// A bootstrap token that has not expired, without its secret.
@@ -93,9 +81,6 @@ pub struct JoinInfo {
     /// 64 hex characters of the cluster CA's SHA-256, for the `K10` token.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ca_hash: Option<String>,
-    /// The server's provider and region, when its node is labelled with both.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub expect: Option<JoinExpect>,
     /// Bootstrap tokens that have not expired, soonest to expire first.
     pub tokens: Vec<JoinToken>,
     /// The reads that were refused.
@@ -103,7 +88,7 @@ pub struct JoinInfo {
 }
 
 /// What a new node needs to join the cluster: the supervisor's address, the CA hash for the
-/// token, the server's location, and the join tokens that have not expired (never their
+/// token, and the join tokens that have not expired (never their
 /// secrets). Each read is the person's; one they may not make is listed in `unreadable`.
 #[utoipa::path(get, path = "/api/v1/cluster/join", tag = "cluster", operation_id = "getJoin",
     responses((status = 200, body = JoinInfo), (status = 401, body = Problem, content_type = PROBLEM)))]
@@ -120,7 +105,6 @@ pub(crate) async fn get(
         kubernetes_version: version,
         server: None,
         ca_hash: None,
-        expect: None,
         tokens: Vec::new(),
         unreadable: Vec::new(),
     };
@@ -138,18 +122,6 @@ pub(crate) async fn get(
     let nodes = readable(nodes, "nodes", &mut info.unreadable).map_err(fail("nodes"))?;
     if let Some(server) = nodes.as_deref().and_then(server_node) {
         info.server = internal_ip(server).map(|ip| supervisor(&ip));
-        let label = |key: &str| {
-            server
-                .metadata
-                .labels
-                .as_ref()
-                .and_then(|l| l.get(key))
-                .filter(|v| !v.is_empty())
-                .cloned()
-        };
-        if let (Some(provider), Some(region)) = (label(PROVIDER), label(REGION)) {
-            info.expect = Some(JoinExpect { provider, region });
-        }
     }
     if let Some(Some(map)) =
         readable(ca, "configmaps", &mut info.unreadable).map_err(fail("kube-root-ca.crt"))?

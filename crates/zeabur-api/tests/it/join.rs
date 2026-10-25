@@ -85,9 +85,7 @@ mod tests {
                 node(
                     "server-1",
                     &json!({"node-role.kubernetes.io/control-plane": "true",
-                           "node-role.kubernetes.io/etcd": "true",
-                           "installer.zeabur.com/provider": "hetzner",
-                           "topology.kubernetes.io/region": "fsn1"}),
+                           "node-role.kubernetes.io/etcd": "true"}),
                     "10.0.0.5",
                     "True",
                 ),
@@ -128,7 +126,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn an_rke2_cluster_gives_the_supervisor_ca_hash_location_and_live_tokens() {
+    async fn an_rke2_cluster_gives_the_supervisor_ca_hash_and_live_tokens() {
         let cluster = cluster("v1.34.1+rke2r1");
         let body = join(&cluster).await;
         let hash = hex::encode(Sha256::digest(CA.as_bytes()));
@@ -138,7 +136,6 @@ mod tests {
                 "kubernetesVersion": "v1.34.1+rke2r1",
                 "server": "https://10.0.0.5:9345",
                 "caHash": hash,
-                "expect": {"provider": "hetzner", "region": "fsn1"},
                 "tokens": [{"id": "abc123", "secret": "bootstrap-token-abc123",
                             "description": "zeabur-installer node add",
                             "expires": "2999-01-01T00:00:00Z",
@@ -199,7 +196,6 @@ mod tests {
         });
         let body = join(&cluster).await;
         assert_eq!(body["server"], "https://[fd00::2]:9345");
-        assert_eq!(body.get("expect"), None);
     }
 
     /// The plan never shows the token's secret; applied, the token is listed; deleted, it is

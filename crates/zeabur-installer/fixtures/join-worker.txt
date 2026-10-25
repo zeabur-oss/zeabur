@@ -10,9 +10,7 @@ Files
   /etc/rancher/rke2/config.yaml.d/20-node-ip.yaml
   /etc/rancher/rke2/zeabur-join-token (the token, mode 0600)
 
-Location         this VM: hetzner fsn1 (fsn1-dc14); the server: hetzner fsn1
 Distance         0.7 ms to the server (median of 5 TCP connects; 0.6 to 0.9)
-Node labels      installer.zeabur.com/provider=hetzner, topology.kubernetes.io/region=fsn1, topology.kubernetes.io/zone=fsn1-dc14
 Ports on the server
   open    TCP 9345  RKE2 supervisor
   open    TCP 6443  Kubernetes API

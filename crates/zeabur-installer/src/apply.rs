@@ -11,7 +11,7 @@ use serde_json::{Value, json};
 use zeabur_installer_host::kubectl::{self, Kubectl};
 use zeabur_installer_host::nodeprep::{self, Stage};
 use zeabur_installer_host::preflight::{self, Status};
-use zeabur_installer_host::{archive, cloud, cmd, download, facts, files, systemd};
+use zeabur_installer_host::{archive, cmd, download, facts, files, systemd};
 use zeabur_installer_plan::catalog::Encoding;
 use zeabur_installer_plan::config::{AccessMode, Config};
 use zeabur_installer_plan::plan::{
@@ -19,7 +19,7 @@ use zeabur_installer_plan::plan::{
     NAMESPACE_MANAGER, Plan, ReleasePlan, Rke2Plan, SecretSource, Source, ZEABUR_NAMESPACE,
 };
 use zeabur_installer_plan::rke2::{
-    self, AUTHN_CONFIGMAP, AUTHN_FILE, ETCD_USER, HostFile, IMAGES_DIR, PREFIX,
+    AUTHN_CONFIGMAP, AUTHN_FILE, ETCD_USER, HostFile, IMAGES_DIR, PREFIX,
 };
 use zeabur_installer_plan::storage::{self, NodePrep, Storage};
 
@@ -63,7 +63,6 @@ pub(crate) fn run(config_path: &Path) -> Result<(), InstallError> {
             || crate::join::node_ready(&kubectl, &name, started).unwrap_or(false),
         )?;
     }
-    label_location(&kubectl, &plan.facts.hostname)?;
 
     out::step("Namespaces and network policies");
     let nodes = node_addresses(&kubectl)?;
@@ -382,28 +381,6 @@ fn stale_archives(present: &[String], sources: &[String]) -> Vec<String> {
         })
         .cloned()
         .collect()
-}
-
-/// Labels the node with its cloud provider, region and zone, as joining nodes label themselves.
-/// Labels already there are kept.
-fn label_location(kubectl: &Kubectl, hostname: &str) -> Result<(), InstallError> {
-    let Some(location) = cloud::detect() else {
-        return Ok(());
-    };
-    let name = hostname.to_ascii_lowercase();
-    let node = kubectl.get("node", &name, None)?;
-    let labels = node.as_ref().and_then(|n| n.pointer("/metadata/labels"));
-    let mut args = vec!["label".to_owned(), "node".to_owned(), name];
-    for (key, value) in rke2::location_labels(&location) {
-        if labels.and_then(|l| l.get(&key)).is_none() {
-            args.push(format!("{key}={value}"));
-        }
-    }
-    if args.len() > 3 {
-        let args: Vec<&str> = args.iter().map(String::as_str).collect();
-        kubectl.run(&args, None)?;
-    }
-    Ok(())
 }
 
 /// local-path, the default class unless the plan makes Longhorn's the default. A default class the

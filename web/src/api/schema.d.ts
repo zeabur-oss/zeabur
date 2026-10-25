@@ -339,7 +339,7 @@ export interface paths {
     }
     /**
      * What a new node needs to join the cluster: the supervisor's address, the CA hash for the
-     *     token, the server's location, and the join tokens that have not expired (never their
+     *     token, and the join tokens that have not expired (never their
      *     secrets). Each read is the person's; one they may not make is listed in `unreadable`.
      */
     get: operations["getJoin"]
@@ -5112,19 +5112,11 @@ export interface components {
      * @enum {string}
      */
     JoinBlocked: "notRke2"
-    /** @description Where the server is, from its node's labels, for the new node to compare with its own. */
-    JoinExpect: {
-      /** @description `installer.zeabur.com/provider`. */
-      provider: string
-      /** @description `topology.kubernetes.io/region`. */
-      region: string
-    }
     /** @description What a new node needs to join, as far as the person may read it. */
     JoinInfo: {
       blocked?: components["schemas"]["JoinBlocked"] | null
       /** @description 64 hex characters of the cluster CA's SHA-256, for the `K10` token. */
       caHash?: string | null
-      expect?: components["schemas"]["JoinExpect"] | null
       /** @description kube-apiserver's version (`v1.34.1+rke2r1`). */
       kubernetesVersion: string
       /** @description The supervisor a new node joins, `https://<address>:9345`. */

@@ -126,7 +126,6 @@ one. `zeabur-installer node add` on a server prints it. Only `rke2Version`, `hos
 | `role` | `worker` (default) or `server`. |
 | `token` | The token `node add` printed. The file must then be mode 0600. |
 | `tokenFile` | Or a file holding it, mode 0600. |
-| `expect.provider`, `expect.region` | The server's location. `plan` compares it with this VM's. |
 | `serverConfig` | Servers only, required: `disable` (RKE2 components the cluster disables) and `identity` (whether kube-apiserver trusts Zeabur Identity). |
 | `longhorn` | `true` when the cluster runs Longhorn: `apply` prepares this node for it as on the first server. `node add` sets it. |
 

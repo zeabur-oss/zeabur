@@ -7,7 +7,7 @@ use std::time::Duration;
 use serde_json::Value;
 use zeabur_installer_host::kubectl::{self, Kubectl};
 use zeabur_installer_host::preflight::{self, Encryption, Status};
-use zeabur_installer_host::{cloud, facts, files, network, systemd};
+use zeabur_installer_host::{facts, files, network, systemd};
 use zeabur_installer_plan::config::{self, JoinConfig, Role};
 use zeabur_installer_plan::join::{
     self, JoinFacts, JoinPlan, Latency, RTT_SAMPLES, SUPERVISOR_PORT,
@@ -36,7 +36,7 @@ fn token(config: &JoinConfig) -> Result<String, InstallError> {
     Ok(token)
 }
 
-/// Reads the host, the cloud location and the way to the server.
+/// Reads the host and the way to the server.
 fn read_facts(config: &JoinConfig, token: &str) -> Result<JoinFacts, InstallError> {
     let (host, port) = config::server_address(&config.join.server)?;
     let rtt_us = network::connect_times(&host, port, RTT_SAMPLES);
@@ -53,7 +53,6 @@ fn read_facts(config: &JoinConfig, token: &str) -> Result<JoinFacts, InstallErro
         .collect();
     Ok(JoinFacts {
         facts: facts::read()?,
-        location: cloud::detect(),
         rtt_us,
         ports,
         token_pinned: config::token_pins_ca(token),

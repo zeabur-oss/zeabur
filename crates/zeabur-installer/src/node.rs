@@ -1,7 +1,7 @@
 //! `node add` and `node sync`, run on a server of the cluster.
 //!
-//! `node add` prints what the new VM needs: the server's address, a join token and its location,
-//! as a configuration to paste. A worker gets a bootstrap token that expires, made as Zeabur makes
+//! `node add` prints what the new VM needs: the server's address and a join token, as a
+//! configuration to paste. A worker gets a bootstrap token that expires, made as Zeabur makes
 //! one through the API; a server gets the cluster's server token, which a bootstrap token cannot
 //! replace.
 
@@ -10,16 +10,13 @@ use std::path::Path;
 use std::time::Duration;
 
 use serde_json::Value;
+use zeabur_installer_host::facts;
 use zeabur_installer_host::kubectl::Kubectl;
 use zeabur_installer_host::token::{self, BootstrapToken};
-use zeabur_installer_host::{cloud, facts};
-use zeabur_installer_plan::config::{Document, Location, Role};
+use zeabur_installer_plan::config::{Document, Role};
 use zeabur_installer_plan::join;
 use zeabur_installer_plan::plan::{self, MANAGER};
-use zeabur_installer_plan::rke2::{
-    ADMIN_KUBECONFIG, BIN_DIR, CONFIG_DIR, PROVIDER_LABEL, REGION_LABEL, SERVER_TOKEN_FILE,
-    ZONE_LABEL,
-};
+use zeabur_installer_plan::rke2::{ADMIN_KUBECONFIG, BIN_DIR, CONFIG_DIR, SERVER_TOKEN_FILE};
 
 use crate::{InstallError, load, out};
 
@@ -63,7 +60,6 @@ pub(crate) fn add(config_path: &Path, options: &AddOptions) -> Result<(), Instal
         address
     };
     let server = format!("https://{host}:{}", join::SUPERVISOR_PORT);
-    let location = location_of(&node).or_else(cloud::detect);
     let server_token = fs::read_to_string(SERVER_TOKEN_FILE).ok();
 
     let (token, expiry) = match options.role {
@@ -96,7 +92,6 @@ pub(crate) fn add(config_path: &Path, options: &AddOptions) -> Result<(), Instal
         server: &server,
         role: options.role,
         token: &token,
-        location: location.as_ref(),
         expiry: expiry.as_ref().map(|(e, id)| (e.as_str(), id.as_str())),
         single_node,
         longhorn,
@@ -111,7 +106,6 @@ pub(crate) struct Instructions<'a> {
     pub(crate) server: &'a str,
     pub(crate) role: Role,
     pub(crate) token: &'a str,
-    pub(crate) location: Option<&'a Location>,
     /// A bootstrap token's expiry and id.
     pub(crate) expiry: Option<(&'a str, &'a str)>,
     /// The configuration file, when it still says `profile: single-node`.
@@ -128,23 +122,6 @@ pub(crate) fn instructions(i: &Instructions<'_>) -> String {
         &mut text,
         &format!("Add a {role} to this cluster through {}.", i.server),
     );
-    match i.location {
-        Some(l) => push(
-            &mut text,
-            &format!(
-                "This server: {} {}{}.",
-                l.provider,
-                l.region,
-                l.zone
-                    .as_ref()
-                    .map_or_else(String::new, |z| format!(" ({z})"))
-            ),
-        ),
-        None => push(
-            &mut text,
-            "This server's provider and region are not known; compare them yourself.",
-        ),
-    }
     push(&mut text, "");
     push(&mut text, "Before you start");
     for advice in join::advice(i.role, i.longhorn) {
@@ -165,7 +142,7 @@ pub(crate) fn instructions(i: &Instructions<'_>) -> String {
         "On the new VM, as root, with the same zeabur-installer copied to it:",
     );
     push(&mut text, "");
-    text.push_str(&commands(i.server, i.role, i.token, i.location, i.longhorn));
+    text.push_str(&commands(i.server, i.role, i.token, i.longhorn));
     push(&mut text, "");
     if let Some((expires, _)) = i.expiry {
         push(
@@ -213,33 +190,13 @@ fn push(text: &mut String, line: &str) {
 }
 
 /// The shell commands that write the join configuration and run the installer.
-pub(crate) fn commands(
-    server: &str,
-    role: Role,
-    token: &str,
-    location: Option<&Location>,
-    longhorn: bool,
-) -> String {
+pub(crate) fn commands(server: &str, role: Role, token: &str, longhorn: bool) -> String {
     let mut yaml = format!(
         "join:\n  server: {server}\n  role: {}\n  token: {token}\n",
         role.as_str()
     );
     if longhorn {
         yaml.push_str("  longhorn: true\n");
-    }
-    if let Some(l) = location {
-        for part in [
-            "  expect:
-    provider: ",
-            &l.provider,
-            "
-    region: ",
-            &l.region,
-            "
-",
-        ] {
-            yaml.push_str(part);
-        }
     }
     if role == Role::Server {
         let (disable, identity) = server_config();
@@ -293,17 +250,6 @@ fn internal_ip(node: &Value) -> Option<String> {
         .get("address")?
         .as_str()
         .map(str::to_owned)
-}
-
-/// The location `apply` labelled the node with.
-fn location_of(node: &Value) -> Option<Location> {
-    let labels = node.pointer("/metadata/labels")?;
-    let get = |key: &str| labels.get(key).and_then(Value::as_str).map(str::to_owned);
-    Some(Location {
-        provider: get(PROVIDER_LABEL)?,
-        region: get(REGION_LABEL)?,
-        zone: get(ZONE_LABEL),
-    })
 }
 
 /// The cluster CA's hash, from `kube-root-ca.crt` as Zeabur reads it, checked against the hash in
@@ -413,16 +359,10 @@ mod tests {
 
     #[test]
     fn what_node_add_prints() {
-        let location = Location {
-            provider: "aws".to_owned(),
-            region: "ap-northeast-1".to_owned(),
-            zone: Some("ap-northeast-1a".to_owned()),
-        };
         let text = instructions(&Instructions {
             server: "https://10.0.1.10:9345",
             role: Role::Worker,
             token: "K10aa::abcdef.0123456789abcdef",
-            location: Some(&location),
             expiry: Some(("2026-10-23T09:00:00Z", "abcdef")),
             single_node: Some("/etc/zeabur-installer/config.yaml".to_owned()),
             longhorn: false,
@@ -436,7 +376,6 @@ mod tests {
             server: "https://10.0.1.10:9345",
             role: Role::Server,
             token: "K10aa::server:0123456789abcdef",
-            location: None,
             expiry: None,
             single_node: None,
             longhorn: false,
@@ -446,16 +385,10 @@ mod tests {
 
     #[test]
     fn the_commands_to_paste() {
-        let location = Location {
-            provider: "hetzner".to_owned(),
-            region: "fsn1".to_owned(),
-            zone: Some("fsn1-dc14".to_owned()),
-        };
         let text = commands(
             "https://10.0.0.5:9345",
             Role::Worker,
             "K10aa::abcdef.0123456789abcdef",
-            Some(&location),
             false,
         );
         assert_eq!(text, include_str!("../fixtures/node-add-worker.txt"));
@@ -475,7 +408,6 @@ mod tests {
             server: "https://10.0.1.10:9345",
             role: Role::Worker,
             token: "K10aa::abcdef.0123456789abcdef",
-            location: None,
             expiry: Some(("2026-10-23T09:00:00Z", "abcdef")),
             single_node: None,
             longhorn: true,

@@ -1,5 +1,5 @@
 # Another node for an existing cluster. `zeabur-installer node add` on a server prints this file
-# with the address, token and location filled in. Nodes must be at the same hosting provider and
+# with the address and token filled in. Nodes must be at the same hosting provider and
 # in the same region; different availability zones are fine.
 join:
   server: https://10.0.0.5:9345      # a server's address and the RKE2 supervisor port
@@ -7,7 +7,4 @@ join:
   # The token node add printed, in a file only root can read (chmod 0600). Or put it inline as
   # `token:`, and keep this file mode 0600.
   tokenFile: /etc/zeabur-installer/join-token
-  expect:                            # the server's location, as node add printed it
-    provider: hetzner
-    region: fsn1
   # longhorn: true                   # the cluster runs Longhorn; node add sets it

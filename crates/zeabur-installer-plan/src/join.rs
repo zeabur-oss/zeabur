@@ -3,22 +3,20 @@
 //!
 //! Every node of a cluster belongs at one provider in one region. etcd waits for a majority on
 //! every write, the kubelet and the API server talk constantly, and volumes are local, so a node
-//! farther away slows the whole cluster or drops out of it. `plan` measures and compares what it
-//! can and always says the rule.
-
-use std::collections::BTreeMap;
+//! farther away slows the whole cluster or drops out of it. `plan` measures the round trip and
+//! always says the rule.
 
 use serde::Serialize;
 
 use crate::PlanError;
-use crate::config::{JoinConfig, Location, Role};
+use crate::config::{JoinConfig, Role};
 use crate::plan::{Facts, Rke2Plan, Warning, rke2_plan, warning};
 use crate::rke2::{self, HostFile};
 use crate::storage::{self, NodePrep};
 
 /// Connections timed to the server's port 9345.
 pub const RTT_SAMPLES: usize = 5;
-/// Above this median round trip, in microseconds, the server is probably in another region:
+/// Above this median round trip, in microseconds, the server is farther than one region allows:
 /// between availability zones of one region round trips are about 0.5 to 2 ms.
 pub const RTT_WARN_US: u64 = 10_000;
 /// Above this median round trip, in microseconds, the cluster is at risk: etcd's heartbeat is
@@ -47,8 +45,6 @@ pub fn server_ports(role: Role) -> Vec<(u16, &'static str)> {
 pub struct JoinFacts {
     /// The host.
     pub facts: Facts,
-    /// This VM's provider and region, when its cloud's metadata said.
-    pub location: Option<Location>,
     /// TCP connect times to the server's port 9345, in microseconds; empty when it did not answer.
     pub rtt_us: Vec<u64>,
     /// Each port of `server_ports` and whether a TCP connection to it succeeded.
@@ -90,7 +86,7 @@ pub struct Rtt {
 pub enum Latency {
     /// Within what one region gives.
     Fine,
-    /// Probably another region.
+    /// More than one region gives.
     High,
     /// The cluster will be slow and unstable.
     Critical,
@@ -122,37 +118,6 @@ pub fn rtt(samples: &[u64]) -> Option<Rtt> {
     })
 }
 
-/// Where this VM is compared with the server.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Placement {
-    /// Same provider and region; the zone may differ.
-    Same,
-    /// Another provider: (this VM's, the server's).
-    OtherProvider(String, String),
-    /// Same provider, another region: (this VM's, the server's).
-    OtherRegion(String, String),
-    /// One side's location is not known.
-    Unknown,
-}
-
-/// Compares this VM's location with the server's.
-#[must_use]
-pub fn compare(here: Option<&Location>, server: Option<&Location>) -> Placement {
-    let (Some(here), Some(server)) = (here, server) else {
-        return Placement::Unknown;
-    };
-    if !here.provider.eq_ignore_ascii_case(&server.provider) {
-        Placement::OtherProvider(here.provider.clone(), server.provider.clone())
-    } else if !here.region.eq_ignore_ascii_case(&server.region) {
-        Placement::OtherRegion(
-            format!("{} {}", here.provider, here.region),
-            format!("{} {}", server.provider, server.region),
-        )
-    } else {
-        Placement::Same
-    }
-}
-
 /// Milliseconds with one decimal.
 #[must_use]
 pub fn ms(us: u64) -> String {
@@ -179,14 +144,8 @@ pub struct JoinPlan {
     pub host_files: Vec<HostFile>,
     /// Their paths, for the JSON form.
     pub host_file_paths: Vec<String>,
-    /// Labels the node registers with.
-    pub labels: BTreeMap<String, String>,
     /// What this node needs before the cluster's components run on it.
     pub node_prep: Option<NodePrep>,
-    /// This VM's location.
-    pub location: Option<Location>,
-    /// The server's location, as `node add` printed it.
-    pub expect: Option<Location>,
     /// Round trips to the server.
     pub rtt: Option<Rtt>,
     /// Ports on the server, and UDP ports that cannot be checked.
@@ -197,34 +156,6 @@ pub struct JoinPlan {
     pub warnings: Vec<Warning>,
     /// Things `apply` refuses to go on with.
     pub blockers: Vec<Warning>,
-}
-
-fn placement_warning(placement: Placement) -> Option<Warning> {
-    match placement {
-        Placement::Same => None,
-        Placement::OtherProvider(here, server) => Some(warning(
-            "join.provider.differs",
-            &[&here, &server],
-            format!(
-                "This VM is at {here}, the server at {server}. Nodes need the same hosting provider."
-            ),
-        )),
-        Placement::OtherRegion(here, server) => Some(warning(
-            "join.region.differs",
-            &[&here, &server],
-            format!(
-                "This VM is in {here}, the server in {server}. Nodes need the same region; a \
-                 different availability zone is fine."
-            ),
-        )),
-        Placement::Unknown => Some(warning(
-            "join.location.unknown",
-            &[],
-            "Could not read the provider and region of this VM or the server from cloud \
-             metadata. Check yourself that they match."
-                .to_owned(),
-        )),
-    }
 }
 
 fn rtt_warning(rtt: Rtt) -> Option<Warning> {
@@ -246,8 +177,7 @@ fn rtt_warning(rtt: Rtt) -> Option<Warning> {
             &[&median, &ms(RTT_CRITICAL_US)],
             format!(
                 "The server is {median} ms away (median of {} TCP connects to port \
-                 {SUPERVISOR_PORT}). Above {} ms the cluster will be slow and unstable; this \
-                 looks like another region.",
+                 {SUPERVISOR_PORT}). Above {} ms the cluster will be slow and unstable.",
                 rtt.samples,
                 ms(RTT_CRITICAL_US)
             ),
@@ -393,11 +323,6 @@ pub fn plan(config: &JoinConfig, facts: &JoinFacts) -> Result<JoinPlan, PlanErro
         &mut warnings,
     )?;
 
-    let label_list = facts
-        .location
-        .as_ref()
-        .map_or_else(Vec::new, rke2::location_labels);
-    let labels: BTreeMap<String, String> = label_list.iter().cloned().collect();
     let (mut host_files, unit) = match join.role {
         Role::Worker => (rke2::agent_files(), "rke2-agent"),
         Role::Server => {
@@ -412,14 +337,10 @@ pub fn plan(config: &JoinConfig, facts: &JoinFacts) -> Result<JoinPlan, PlanErro
             )
         }
     };
-    host_files.push(rke2::join_file(&join.server, &label_list));
+    host_files.push(rke2::join_file(&join.server));
     host_files.extend(rke2::node_ip_file(&facts.facts.node_ips));
 
     warnings.push(same_region());
-    warnings.extend(placement_warning(compare(
-        facts.location.as_ref(),
-        join.expect.as_ref(),
-    )));
 
     let (host, _) = crate::config::server_address(&join.server)?;
     let rtt = rtt(&facts.rtt_us);
@@ -451,10 +372,7 @@ pub fn plan(config: &JoinConfig, facts: &JoinFacts) -> Result<JoinPlan, PlanErro
         rke2,
         host_file_paths: host_files.iter().map(|f| f.path.clone()).collect(),
         host_files,
-        labels,
         node_prep: join.longhorn.then_some(storage::LONGHORN_PREP),
-        location: facts.location.clone(),
-        expect: join.expect.clone(),
         rtt,
         ports,
         local_ports: rke2::node_ports(join.role == Role::Server)
@@ -475,7 +393,6 @@ pub fn plan(config: &JoinConfig, facts: &JoinFacts) -> Result<JoinPlan, PlanErro
 mod tests {
     use super::*;
     use crate::config::{Document, JoinConfig};
-    use crate::rke2::{REGION_LABEL, ZONE_LABEL};
 
     fn config(extra: &str) -> JoinConfig {
         let yaml = format!(
@@ -487,15 +404,7 @@ mod tests {
         }
     }
 
-    fn here(provider: &str, region: &str) -> Location {
-        Location {
-            provider: provider.to_owned(),
-            region: region.to_owned(),
-            zone: Some(format!("{region}-dc1")),
-        }
-    }
-
-    fn facts(rtt_us: &[u64], location: Option<Location>) -> JoinFacts {
+    fn facts(rtt_us: &[u64]) -> JoinFacts {
         JoinFacts {
             facts: Facts {
                 arch: "amd64".to_owned(),
@@ -503,7 +412,6 @@ mod tests {
                 memory_mib: 4096,
                 node_ips: vec!["10.0.0.6".to_owned(), "fd00::6".to_owned()],
             },
-            location,
             rtt_us: rtt_us.to_vec(),
             ports: vec![(9345, true), (6443, true), (10250, false)],
             token_pinned: true,
@@ -531,35 +439,8 @@ mod tests {
     }
 
     #[test]
-    fn locations() {
-        let a = here("hetzner", "fsn1");
-        let mut zone = a.clone();
-        zone.zone = Some("fsn1-dc14".to_owned());
-        assert_eq!(compare(Some(&a), Some(&zone)), Placement::Same);
-        assert_eq!(
-            compare(Some(&a), Some(&here("Hetzner", "FSN1"))),
-            Placement::Same
-        );
-        assert_eq!(
-            compare(Some(&a), Some(&here("hetzner", "nbg1"))),
-            Placement::OtherRegion("hetzner fsn1".to_owned(), "hetzner nbg1".to_owned())
-        );
-        assert_eq!(
-            compare(Some(&a), Some(&here("aws", "eu-central-1"))),
-            Placement::OtherProvider("hetzner".to_owned(), "aws".to_owned())
-        );
-        assert_eq!(compare(None, Some(&a)), Placement::Unknown);
-        assert_eq!(compare(Some(&a), None), Placement::Unknown);
-    }
-
-    #[test]
     fn a_worker_near_the_server() {
-        let c = config("  expect: {provider: hetzner, region: fsn1}\n");
-        let p = plan(
-            &c,
-            &facts(&[600, 700, 650, 900, 640], Some(here("hetzner", "fsn1"))),
-        )
-        .unwrap();
+        let p = plan(&config(""), &facts(&[600, 700, 650, 900, 640])).unwrap();
         assert_eq!(p.unit, "rke2-agent");
         assert_eq!(
             p.host_file_paths,
@@ -585,8 +466,6 @@ mod tests {
             ]
         );
         assert_eq!(p.blockers.len(), 0);
-        assert_eq!(p.labels[REGION_LABEL], "fsn1");
-        assert_eq!(p.labels[ZONE_LABEL], "fsn1-dc1");
         let closed = &p.warnings[1];
         assert_eq!(closed.values, ["10250", "10.0.0.5"]);
         let udp = p.ports.iter().find(|p| p.protocol == "udp").unwrap();
@@ -594,10 +473,9 @@ mod tests {
     }
 
     #[test]
-    fn far_or_unknown_servers_are_warned_about() {
-        let c = config("  expect: {provider: aws, region: ap-northeast-1}\n");
-        let p = plan(&c, &facts(&[70_000; 5], Some(here("hetzner", "fsn1")))).unwrap();
-        assert!(codes(&p).contains(&"join.provider.differs"));
+    fn far_servers_are_warned_about() {
+        let c = config("");
+        let p = plan(&c, &facts(&[70_000; 5])).unwrap();
         assert!(codes(&p).contains(&"join.rtt.critical"));
         let critical = p
             .warnings
@@ -606,26 +484,23 @@ mod tests {
             .unwrap();
         assert_eq!(critical.values, ["70.0", "50.0"]);
 
-        let c = config("");
-        let mut f = facts(&[20_000; 5], None);
+        let mut f = facts(&[20_000; 5]);
         f.token_pinned = false;
         let p = plan(&c, &f).unwrap();
-        assert!(codes(&p).contains(&"join.location.unknown"));
         assert!(codes(&p).contains(&"join.rtt.high"));
         assert!(codes(&p).contains(&"join.token.unpinned"));
-        assert!(p.labels.is_empty());
 
-        let p = plan(&c, &facts(&[], None)).unwrap();
+        let p = plan(&c, &facts(&[])).unwrap();
         assert_eq!(p.blockers[0].code, "join.server.unreachable");
     }
 
     #[test]
     fn a_node_joining_a_longhorn_cluster_is_prepared_for_it() {
-        let p = plan(&config("  longhorn: true\n"), &facts(&[500; 5], None)).unwrap();
+        let p = plan(&config("  longhorn: true\n"), &facts(&[500; 5])).unwrap();
         assert_eq!(p.node_prep, Some(storage::LONGHORN_PREP));
         assert!(codes(&p).contains(&"join.storage.longhorn"));
         assert!(!codes(&p).contains(&"join.storage.local"));
-        let p = plan(&config(""), &facts(&[500; 5], None)).unwrap();
+        let p = plan(&config(""), &facts(&[500; 5])).unwrap();
         assert_eq!(p.node_prep, None);
     }
 
@@ -657,7 +532,7 @@ mod tests {
         let c = config(
             "  role: server\n  serverConfig: {disable: [rke2-metrics-server], identity: true}\n",
         );
-        let p = plan(&c, &facts(&[500; 5], None)).unwrap();
+        let p = plan(&c, &facts(&[500; 5])).unwrap();
         assert_eq!(p.unit, "rke2-server");
         assert!(codes(&p).contains(&"join.servers.ha"));
         let config = p

@@ -262,16 +262,10 @@ export const en = {
     `RKE2 ${version} is not supported by this installer: its downloads are checked only against the release's own checksums.`,
   "warning.join.sameRegion": () =>
     "Put every node at the same hosting provider and in the same region. Different availability zones in one region are fine. Between providers or regions, latency slows etcd, the Kubernetes API and storage, and can make the cluster unstable.",
-  "warning.join.provider.differs": (here: string, server: string) =>
-    `This VM is at ${here}, the server at ${server}. Nodes need the same hosting provider.`,
-  "warning.join.region.differs": (here: string, server: string) =>
-    `This VM is in ${here}, the server in ${server}. Nodes need the same region; a different availability zone is fine.`,
-  "warning.join.location.unknown": () =>
-    "Could not read the provider and region of this VM or the server from cloud metadata. Check yourself that they match.",
   "warning.join.rtt.high": (median: string, limit: string) =>
     `The server is ${median} ms away (median of 5 TCP connects to port 9345); within a region it is usually under ${limit} ms.`,
   "warning.join.rtt.critical": (median: string, limit: string) =>
-    `The server is ${median} ms away (median of 5 TCP connects to port 9345). Above ${limit} ms the cluster will be slow and unstable; this looks like another region.`,
+    `The server is ${median} ms away (median of 5 TCP connects to port 9345). Above ${limit} ms the cluster will be slow and unstable.`,
   "warning.join.port.closed": (ports: string, host: string) =>
     `TCP ${ports} on ${host} cannot be reached from this VM; check the firewall or security group.`,
   "warning.join.ports": () =>
