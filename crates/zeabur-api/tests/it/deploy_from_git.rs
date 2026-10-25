@@ -154,7 +154,7 @@ mod tests {
     }
 
     /// A key made for one project does not open in another's plan, nor does an altered one; a
-    /// host without a pinned host key gets none.
+    /// host without a pinned host key gets none until the person gives its `known_hosts` lines.
     #[tokio::test]
     async fn a_deploy_key_works_only_where_it_was_made() {
         let cluster = cluster();
@@ -183,6 +183,76 @@ mod tests {
         )
         .await;
         assert_eq!(status, StatusCode::BAD_REQUEST);
+    }
+
+    /// Another host's key trusts the Ed25519 and ECDSA lines the person gave for that host and
+    /// port, says their fingerprints, and refuses lines for another host or only RSA.
+    #[tokio::test]
+    async fn a_deploy_key_for_another_host_trusts_the_lines_given() {
+        let cluster = cluster();
+        let app = app(&cluster);
+        let ed25519 = "ssh-ed25519 \
+            AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl";
+        let given = format!(
+            "# git.example.com:2222 SSH-2.0-OpenSSH_9.6\n\
+             [git.example.com]:2222 ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC7\n\
+             [git.example.com]:2222 {ed25519}\n\
+             git.example.com {ed25519}\n"
+        );
+        let (status, key) = send(
+            &app,
+            "POST",
+            "/api/v1/projects/shop/deploy-keys",
+            Some(&json!({"host": "git.example.com:2222", "knownHosts": given})),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{key}");
+        assert_eq!(
+            key["hostKeys"],
+            json!([{"algorithm": "ssh-ed25519",
+                    "fingerprint": "SHA256:+DiY3wvvV6TuJJhbpZisF/zLDA0zPMSvHdkr4UvCOqU"}])
+        );
+        let request =
+            json!({"changes": [{"op": "deployKey", "name": "site-git", "key": key["key"]}]});
+        let (status, planned) =
+            send(&app, "POST", "/api/v1/projects/shop/plan", Some(&request)).await;
+        assert_eq!(status, StatusCode::OK, "{planned}");
+        let (status, applied) = send(
+            &app,
+            "POST",
+            "/api/v1/projects/shop/apply",
+            Some(&json!({"token": planned["token"]})),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{applied}");
+        let writes = cluster.inspect(|s| s.writes.clone()).unwrap();
+        let secret = writes
+            .iter()
+            .find_map(|w| match &w.body {
+                WriteBody::Create(body) if w.target.kind == "Secret" => Some(body.clone()),
+                _ => None,
+            })
+            .expect("the Secret is created");
+        assert_eq!(
+            secret["stringData"]["known_hosts"],
+            format!("[git.example.com]:2222 {ed25519}\n")
+        );
+        for refused in [
+            json!({"host": "git.example.com:2222"}),
+            json!({"host": "git.example.com:2222",
+                   "knownHosts": format!("git.example.com {ed25519}\n")}),
+            json!({"host": "git.example.com:2222",
+                   "knownHosts": "[git.example.com]:2222 ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQC7\n"}),
+        ] {
+            let (status, problem) = send(
+                &app,
+                "POST",
+                "/api/v1/projects/shop/deploy-keys",
+                Some(&refused),
+            )
+            .await;
+            assert_eq!(status, StatusCode::BAD_REQUEST, "{refused} {problem}");
+        }
     }
 
     /// The cluster answer names the registry builds push to, from the settings.

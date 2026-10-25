@@ -59,8 +59,16 @@ description: 連接 Git 儲存庫、完成第一次建置，並選擇新映像�
 | 選項 | 操作 |
 | --- | --- |
 | **公開儲存庫** | 不加認證資訊。 |
-| **部署金鑰** | 適用 `github.com`、`gitlab.com`。按 **建立部署金鑰**，複製 **公開金鑰**，用旁邊的連結加入該儲存庫的部署金鑰，保留唯讀權限。 |
+| **部署金鑰** | 按 **建立部署金鑰**，複製 **公開金鑰**，用旁邊的連結加入該儲存庫的部署金鑰，保留唯讀權限。 |
 | **存取權杖** | 填入能讀取儲存庫的 **帳號** 與 **權杖**，透過 HTTPS 存取。GitHub 預填 `x-access-token`，GitLab 預填 `oauth2`。 |
+
+部署金鑰適用任何能用 SSH 連線的 Git 主機。Zeabur 內建 GitHub 和 GitLab 的主機金鑰，其他主機要先貼上它的主機金鑰：
+
+1. 在你的電腦執行表單列出的指令，例如 `ssh-keyscan -t ed25519,ecdsa -p 2222 git.example.com`。SSH 連接埠是 22 時沒有 `-p`。
+2. 把輸出貼到 **主機金鑰（known_hosts）**，按 **建立部署金鑰**。Zeabur Builder 只接受 Ed25519 和 ECDSA 金鑰。
+3. 表單會列出每把主機金鑰的指紋，例如 `SHA256:+DiY3wvvV6TuJJhbpZisF/zLDA0zPMSvHdkr4UvCOqU`。和 Git 主機管理員公布的指紋對照，或請管理員在主機上執行 `ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub`。指紋一樣，再把公開金鑰加到儲存庫。
+
+儲存庫網址填 HTTPS 時，Zeabur 改用 `git@主機:路徑.git` 連線。SSH 不在 22 埠，或使用者不是 `git` 時，直接填 SSH 網址，例如 `ssh://git@git.example.com:2222/acme/site.git`。
 
 </Step>
 <Step>

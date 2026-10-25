@@ -29,8 +29,8 @@ const DEFAULT_BRANCH_REF = "HEAD"
 /** The tag the Deployment names until the first build. */
 const PENDING_TAG = "pending"
 const GIT_CREDENTIALS_LABEL = "builder.zeabur.com/git-credentials"
-/** Hosts whose SSH host keys Zeabur knows, so a deploy key works there. */
-const DEPLOY_KEY_HOSTS = ["github.com", "gitlab.com"] as const
+/** Hosts whose SSH host keys Zeabur pins; any other host takes the person's `known_hosts`. */
+const PINNED_HOSTS = ["github.com", "gitlab.com"]
 
 export interface Repository {
   host: string
@@ -121,10 +121,29 @@ export function parseRepository(url: string): Repository | undefined {
 }
 
 const httpsUrl = (repo: Repository) => `https://${repo.host}/${repo.path}.git`
-const sshUrl = (repo: Repository) => `git@${repo.host}:${repo.path}.git`
+const overHttps = (url: string) => /^https?:/i.test(url.trim())
 
-export const deployKeyHost = (repo: Repository | undefined) =>
-  DEPLOY_KEY_HOSTS.find((h) => h === repo?.host)
+/** The repository over SSH: as typed when it is an SSH URL, else `git@host:path.git`. */
+function sshUrl(url: string, repo: Repository): string {
+  if (!overHttps(url)) return url.trim()
+  return `git@${repo.host.replace(/:\d+$/, "")}:${repo.path}.git`
+}
+
+/** The SSH host a deploy key for `url` is for, with `:port` from an `ssh://` URL. */
+export function deployKeyHost(url: string): string | undefined {
+  const repo = parseRepository(url)
+  if (!repo) return undefined
+  return overHttps(url) ? repo.host.replace(/:\d+$/, "") : repo.host
+}
+
+/** Zeabur knows the host key, so the person need not give it. */
+export const pinnedHost = (host: string) => PINNED_HOSTS.includes(host)
+
+/** The command that prints `host`'s keys in the types Zeabur Builder takes. */
+export function keyscanCommand(host: string): string {
+  const [name, port] = host.split(":")
+  return `ssh-keyscan -t ed25519,ecdsa ${port ? `-p ${port} ` : ""}${name}`
+}
 
 /** Where the host takes a deploy key for the repository. */
 export function deployKeyPage(repo: Repository): string | undefined {
@@ -216,7 +235,11 @@ function gitSource(form: GitService): Manifest {
   const repo = parseRepository(form.url)
   const directory = cleanPath(form.directory)
   const dockerfile = form.method === "dockerfile" ? cleanPath(form.dockerfile) : ""
-  const url = !repo ? form.url : form.access === "deployKey" ? sshUrl(repo) : httpsUrl(repo)
+  const url = !repo
+    ? form.url
+    : form.access === "deployKey"
+      ? sshUrl(form.url, repo)
+      : httpsUrl(repo)
   return {
     url,
     ref: form.branch.trim() || DEFAULT_BRANCH_REF,

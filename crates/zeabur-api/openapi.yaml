@@ -7809,7 +7809,16 @@ components:
       properties:
         host:
           type: string
-          description: "`github.com` or `gitlab.com`."
+          description: |-
+            The host as the repository's SSH URL names it, with `:port` when it is not 22
+            (`git.example.com:2222`, `[2001:db8::1]:2222`).
+        knownHosts:
+          type:
+          - string
+          - "null"
+          description: |-
+            The host's `known_hosts` lines, as `ssh-keyscan` prints them; needed for any host but
+            `github.com` and `gitlab.com`, whose keys Zeabur pins.
     DeployKeyResponse:
       type: object
       description: A new deploy key.
@@ -7817,10 +7826,16 @@ components:
       - publicKey
       - key
       - expiresAt
+      - hostKeys
       properties:
         expiresAt:
           type: string
           description: When the sealed key stops working, RFC 3339.
+        hostKeys:
+          type: array
+          items:
+            $ref: "#/components/schemas/TrustedHostKey"
+          description: The host keys the Secret will trust.
         key:
           type: string
           description: "The private key, sealed: give it back in a plan's `deployKey` change."
@@ -16659,6 +16674,19 @@ components:
           description: |-
             The person's tools pods there that have not stopped and are not being deleted, oldest
             first.
+    TrustedHostKey:
+      type: object
+      description: A host key a deploy key's Secret trusts.
+      required:
+      - algorithm
+      - fingerprint
+      properties:
+        algorithm:
+          type: string
+          description: The key type, such as `ssh-ed25519`.
+        fingerprint:
+          type: string
+          description: "`SHA256:…`, as `ssh-keygen -l` prints it."
     UnavailableLog:
       type: string
       description: Why a container's log cannot be read, from the kubelet's answer.

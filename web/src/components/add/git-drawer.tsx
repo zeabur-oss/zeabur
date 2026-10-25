@@ -26,8 +26,10 @@ import {
   deployKeyHost,
   deployKeyPage,
   gitProblems,
+  keyscanCommand,
   newGitService,
   parseRepository,
+  pinnedHost,
   tokenUser,
   type Access,
   type BuildMethod,
@@ -64,6 +66,7 @@ interface DeployKey {
   host: string
   publicKey: string
   key: string
+  hostKeys: { algorithm: string; fingerprint: string }[]
 }
 
 /** "Deploy from Git": Zeabur Builder's Build, the service that runs what it builds, and the
@@ -93,7 +96,7 @@ export function GitDrawer({ project, onClose }: { project: string; onClose: () =
   const fromGitHub = github.source === "github"
   const url = repositoryUrl(github, form.url)
   const repo = parseRepository(url)
-  const keyHost = deployKeyHost(repo)
+  const keyHost = deployKeyHost(url)
   const secrets = options.secrets
   const access = accessOf(form.access, { fromGitHub, secrets, keyHost })
   const name = named
@@ -306,9 +309,7 @@ export function GitDrawer({ project, onClose }: { project: string; onClose: () =
                 value="deployKey"
                 disabled={!keyHost}
                 label={t("add.access.deployKey")}
-                description={
-                  keyHost ? t("add.access.deployKeyHint") : t("add.access.deployKeyHosts")
-                }
+                description={t("add.access.deployKeyHint")}
               />
               <RadioOption
                 value="token"
@@ -323,6 +324,7 @@ export function GitDrawer({ project, onClose }: { project: string; onClose: () =
             <DeployKeyFields
               project={project}
               host={keyHost}
+              pinned={pinnedHost(keyHost)}
               page={repo ? deployKeyPage(repo) : undefined}
               made={key}
               missing={tried && !!problems.key}
@@ -403,10 +405,11 @@ function accessOf(
 }
 
 /** A deploy key for the repository's host: made on the server, its public half to add on the
- * host. */
+ * host. A host whose key Zeabur does not pin takes the person's `known_hosts` lines first. */
 function DeployKeyFields({
   project,
   host,
+  pinned,
   page,
   made,
   missing,
@@ -414,18 +417,20 @@ function DeployKeyFields({
 }: {
   project: string
   host: string
+  pinned: boolean
   page?: string
   made?: DeployKey
   missing: boolean
   onMade: (key: DeployKey) => void
 }) {
   const t = useT()
+  const [knownHosts, setKnownHosts] = useState("")
   const makeKey = useMutation({
     mutationFn: async (gitHost: string) =>
       unwrap(
         await api.POST("/api/v1/projects/{project}/deploy-keys", {
           params: { path: { project } },
-          body: { host: gitHost },
+          body: { host: gitHost, ...(pinned ? {} : { knownHosts }) },
         }),
       ),
     onSuccess: (key, gitHost) => onMade({ host: gitHost, ...key }),
@@ -451,15 +456,44 @@ function DeployKeyFields({
               </a>
             ) : null}
           </p>
+          {pinned ? null : (
+            <div className="flex flex-col gap-1">
+              <p className="text-sm font-medium">{t("add.hostKeys")}</p>
+              <ul className="flex flex-col gap-0.5 font-mono text-xs break-all">
+                {made.hostKeys.map((k) => (
+                  <li key={k.fingerprint}>
+                    {k.algorithm} {k.fingerprint}
+                  </li>
+                ))}
+              </ul>
+              <p className="type-meta text-muted-foreground">{t("add.hostKeysCheck")}</p>
+            </div>
+          )}
         </>
       ) : (
         <div className="flex flex-col gap-1.5">
+          {pinned ? null : (
+            <>
+              <FormField label={t("add.keyscan")}>
+                <CopyInput value={keyscanCommand(host)} copyLabel={t("common.copy")} />
+              </FormField>
+              <FormField label={t("add.knownHosts")} hint={t("add.knownHostsHint")}>
+                <Textarea
+                  mono
+                  rows={3}
+                  value={knownHosts}
+                  spellCheck={false}
+                  onChange={(event) => setKnownHosts(event.target.value)}
+                />
+              </FormField>
+            </>
+          )}
           <Button
             type="button"
             variant="outline"
             size="sm"
             className="self-start"
-            disabled={makeKey.isPending}
+            disabled={makeKey.isPending || (!pinned && knownHosts.trim() === "")}
             onClick={() => makeKey.mutate(host)}
           >
             {t("add.deployKeyMake")}

@@ -17,6 +17,8 @@ import {
   createGitService,
   deployKeyHost,
   deployKeyPage,
+  keyscanCommand,
+  pinnedHost,
   gitMissing,
   gitObjects,
   newGitService,
@@ -60,15 +62,27 @@ describe("repository addresses", () => {
     expect(urlProblem("https://me:ghp_secret@github.com/acme/site")).toBe("invalid")
   })
 
-  test("deploy keys are for GitHub and GitLab, each with its own page", () => {
-    const github = parseRepository("https://github.com/acme/site")
-    const gitea = parseRepository("https://git.example.com/acme/site")
-    expect(deployKeyHost(github)).toBe("github.com")
-    expect(deployKeyHost(gitea)).toBeUndefined()
-    expect(deployKeyPage(github!)).toBe("https://github.com/acme/site/settings/keys/new")
+  test("a deploy key is for the SSH host, with its port, and pinned only for GitHub and GitLab", () => {
+    expect(deployKeyHost("https://github.com/acme/site")).toBe("github.com")
+    expect(deployKeyHost("https://git.example.com:8443/acme/site")).toBe("git.example.com")
+    expect(deployKeyHost("ssh://git@git.example.com:2222/acme/site.git")).toBe(
+      "git.example.com:2222",
+    )
+    expect(deployKeyHost("git@git.example.com:acme/site.git")).toBe("git.example.com")
+    expect(deployKeyHost("not a url")).toBeUndefined()
+    expect(pinnedHost("github.com")).toBe(true)
+    expect(pinnedHost("git.example.com")).toBe(false)
+    expect(keyscanCommand("git.example.com")).toBe("ssh-keyscan -t ed25519,ecdsa git.example.com")
+    expect(keyscanCommand("git.example.com:2222")).toBe(
+      "ssh-keyscan -t ed25519,ecdsa -p 2222 git.example.com",
+    )
+    expect(deployKeyPage(parseRepository("https://github.com/acme/site")!)).toBe(
+      "https://github.com/acme/site/settings/keys/new",
+    )
     expect(deployKeyPage(parseRepository("git@gitlab.com:g/app.git")!)).toBe(
       "https://gitlab.com/g/app/-/settings/repository#js-deploy-keys-settings",
     )
+    expect(deployKeyPage(parseRepository("https://git.example.com/acme/site")!)).toBeUndefined()
     expect(tokenUser("github.com")).toBe("x-access-token")
     expect(tokenUser("gitlab.com")).toBe("oauth2")
     expect(tokenUser("git.example.com")).toBe("")
@@ -182,6 +196,14 @@ describe("the objects", () => {
     ) as { object: Object }
     expect(build.object.spec.source.git.url).toBe("git@github.com:acme/site.git")
     expect(JSON.stringify(changes)).not.toContain("PRIVATE KEY")
+    const typed = "ssh://git@git.example.com:2222/acme/site.git"
+    const other = createGitService(
+      form({ url: typed, access: "deployKey", sealedKey: "k1.sealed" }),
+      "shop",
+      "zot:5000",
+      {},
+    ).find((c) => c.op === "create" && (c.object as Object).kind === "Build") as { object: Object }
+    expect(other.object.spec.source.git.url).toBe(typed)
   })
 
   test("a repository picked from the GitHub App names its installation and no Secret", () => {

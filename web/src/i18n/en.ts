@@ -2633,7 +2633,6 @@ export const en = {
   "add.access.deployKey": "Deploy key",
   "add.access.deployKeyHint":
     "Zeabur makes an SSH key for you to add to the repository, read-only.",
-  "add.access.deployKeyHosts": "For repositories on GitHub or GitLab.",
   "add.access.token": "Access token",
   "add.access.tokenHint": "A token that can read the repository, used over HTTPS.",
   "add.source": "Source",
@@ -2651,6 +2650,13 @@ export const en = {
   "add.deployKeyPublic": "Public key",
   "add.deployKeyAdd": "Add this key to the repository's deploy keys, without write access.",
   "add.deployKeyOpen": (host: string) => `Open deploy keys on ${host}`,
+  "add.keyscan": "Run on your computer",
+  "add.knownHosts": "Host keys (known_hosts)",
+  "add.knownHostsHint":
+    "Paste what the command prints. Zeabur Builder connects only to a host that holds one of these keys.",
+  "add.hostKeys": "Host keys Zeabur Builder trusts",
+  "add.hostKeysCheck":
+    "Compare these fingerprints with the ones the Git host's admin publishes. Add the public key only when they match.",
   "add.problem.deployKey": "Create the deploy key and add it to the repository.",
   "add.token": "Token",
   "add.problem.token": "Enter the username and token.",

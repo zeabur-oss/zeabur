@@ -1,14 +1,20 @@
-//! SSH deploy keys: an Ed25519 key pair in the formats Git hosts and OpenSSH read [ssh-key].
+//! SSH deploy keys: an Ed25519 key pair in the formats Git hosts and OpenSSH read [ssh-key], and
+//! the `known_hosts` lines that vouch for a Git host [sshd-known-hosts].
 //!
 //! The public key is one `authorized_keys` line (`ssh-ed25519 AAAA… comment`), what GitHub and
 //! GitLab take as a deploy key. The private key is OpenSSH's own unencrypted format
 //! (`-----BEGIN OPENSSH PRIVATE KEY-----`), which `ssh` and libraries such as russh read.
 //!
+//! Host keys are read as Zeabur Builder reads them: a plain host pattern (`host` on port 22,
+//! `[host]:port` on any port), and only Ed25519 and ECDSA keys.
+//!
 //! [ssh-key]: https://cvsweb.openbsd.org/src/usr.bin/ssh/PROTOCOL.key?rev=HEAD
+//! [sshd-known-hosts]: https://man.openbsd.org/sshd.8#SSH_KNOWN_HOSTS_FILE_FORMAT
 
+use aws_lc_rs::digest::{SHA256, digest};
 use aws_lc_rs::signature::{Ed25519KeyPair, KeyPair as _};
 use base64::Engine as _;
-use base64::engine::general_purpose::STANDARD;
+use base64::engine::general_purpose::{STANDARD, STANDARD_NO_PAD};
 
 use crate::crypto::{RandomError, random};
 
@@ -126,6 +132,127 @@ pub fn public_key(private: &str) -> Option<String> {
     Some(format!("{kind} {}", STANDARD.encode(blob)))
 }
 
+/// The host key types Zeabur Builder accepts.
+const HOST_KEY_TYPES: [&str; 4] = [
+    "ssh-ed25519",
+    "ecdsa-sha2-nistp256",
+    "ecdsa-sha2-nistp384",
+    "ecdsa-sha2-nistp521",
+];
+/// The most `known_hosts` text taken.
+pub const KNOWN_HOSTS_MAX: usize = 16 * 1024;
+
+/// A host key `known_hosts` lists for a host.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct HostKey {
+    /// The line to write: the host pattern, the key type and the key.
+    pub line: String,
+    /// The key type, such as `ssh-ed25519`.
+    pub algorithm: String,
+    /// `SHA256:` and the key's digest in unpadded base64, as `ssh-keygen -l` prints it.
+    pub fingerprint: String,
+}
+
+/// Why `known_hosts` vouches for no key of the host.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum KnownHostsError {
+    /// Longer than [`KNOWN_HOSTS_MAX`].
+    TooLong,
+    /// The host names are hashed (`ssh-keyscan -H`), so they cannot be matched.
+    Hashed,
+    /// The host is listed only with keys of other types, such as RSA.
+    Unsupported,
+    /// No line names the host on the port.
+    NotListed,
+}
+
+/// The host pattern `known_hosts` names `host` on `port` with.
+#[must_use]
+pub fn host_pattern(host: &str, port: u16) -> String {
+    if port == 22 {
+        host.to_owned()
+    } else {
+        format!("[{host}]:{port}")
+    }
+}
+
+/// The Ed25519 and ECDSA keys `known_hosts` lists for `host` on `port`, each as one line naming
+/// the host as [`host_pattern`] does. Comments, markers (`@cert-authority`, `@revoked`) and other
+/// hosts are left out.
+///
+/// # Errors
+///
+/// When no key of a type Zeabur Builder takes is listed for the host.
+pub fn host_keys(
+    known_hosts: &str,
+    host: &str,
+    port: u16,
+) -> Result<Vec<HostKey>, KnownHostsError> {
+    if known_hosts.len() > KNOWN_HOSTS_MAX {
+        return Err(KnownHostsError::TooLong);
+    }
+    let pattern = host_pattern(host, port);
+    let names = |patterns: &str| {
+        let mut hit = false;
+        for one in patterns.split(',') {
+            let (negated, one) = one.strip_prefix('!').map_or((false, one), |n| (true, n));
+            let matches = one.eq_ignore_ascii_case(&pattern)
+                || (port == 22 && one.eq_ignore_ascii_case(&format!("[{host}]:22")));
+            if matches && negated {
+                return false;
+            }
+            hit |= matches;
+        }
+        hit
+    };
+    let (mut keys, mut hashed, mut other_types) = (Vec::new(), false, false);
+    for line in known_hosts.lines().map(str::trim) {
+        if line.is_empty() || line.starts_with('#') || line.starts_with('@') {
+            continue;
+        }
+        let mut fields = line.split_ascii_whitespace();
+        let (Some(patterns), Some(algorithm), Some(key)) =
+            (fields.next(), fields.next(), fields.next())
+        else {
+            continue;
+        };
+        hashed |= patterns.starts_with("|1|");
+        if !names(patterns) {
+            continue;
+        }
+        let Some(blob) = STANDARD
+            .decode(key)
+            .ok()
+            .filter(|blob| field(blob).is_some_and(|(kind, _)| kind == algorithm.as_bytes()))
+        else {
+            other_types = true;
+            continue;
+        };
+        if !HOST_KEY_TYPES.contains(&algorithm) {
+            other_types = true;
+            continue;
+        }
+        let fingerprint = format!(
+            "SHA256:{}",
+            STANDARD_NO_PAD.encode(digest(&SHA256, &blob).as_ref())
+        );
+        let line = format!("{pattern} {algorithm} {key}");
+        if !keys.iter().any(|k: &HostKey| k.line == line) {
+            keys.push(HostKey {
+                line,
+                algorithm: algorithm.to_owned(),
+                fingerprint,
+            });
+        }
+    }
+    match (keys.is_empty(), other_types, hashed) {
+        (false, ..) => Ok(keys),
+        (true, true, _) => Err(KnownHostsError::Unsupported),
+        (true, false, true) => Err(KnownHostsError::Hashed),
+        (true, false, false) => Err(KnownHostsError::NotListed),
+    }
+}
+
 /// One length-prefixed string and what follows it.
 fn field(bytes: &[u8]) -> Option<(&[u8], &[u8])> {
     let (length, rest) = bytes.split_first_chunk::<4>()?;
@@ -192,6 +319,73 @@ mod tests {
         assert_eq!(
             public_key(&key.private.replace("b3BlbnNzaC1rZXktdjE", "AAAA")),
             None
+        );
+    }
+
+    /// GitHub's published Ed25519 host key and its fingerprint (`https://api.github.com/meta`).
+    const GITHUB: &str =
+        "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl";
+
+    #[test]
+    fn host_keys_keep_the_hosts_ed25519_and_ecdsa_lines_with_their_fingerprints() {
+        let text = format!(
+            "# git.example.com:2222 SSH-2.0-OpenSSH_9.6\n\
+             [git.example.com]:2222 ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQ\n\
+             [git.example.com]:2222 {GITHUB}\n\
+             [git.example.com]:2222 {GITHUB}\n\
+             other.example.com {GITHUB}\n"
+        );
+        let keys = host_keys(&text, "git.example.com", 2222).unwrap();
+        assert_eq!(
+            keys,
+            [HostKey {
+                line: format!("[git.example.com]:2222 {GITHUB}"),
+                algorithm: "ssh-ed25519".to_owned(),
+                fingerprint: "SHA256:+DiY3wvvV6TuJJhbpZisF/zLDA0zPMSvHdkr4UvCOqU".to_owned(),
+            }]
+        );
+        let plain = host_keys(
+            &format!("Git.Example.com,10.0.0.1 {GITHUB}"),
+            "git.example.com",
+            22,
+        )
+        .unwrap();
+        assert_eq!(plain[0].line, format!("git.example.com {GITHUB}"));
+    }
+
+    #[test]
+    fn host_keys_say_why_nothing_vouches_for_the_host() {
+        let rsa = "git.example.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQ";
+        assert_eq!(
+            host_keys(rsa, "git.example.com", 22),
+            Err(KnownHostsError::Unsupported)
+        );
+        let hashed = format!("|1|aGFzaA==|c2FsdA== {GITHUB}");
+        assert_eq!(
+            host_keys(&hashed, "git.example.com", 22),
+            Err(KnownHostsError::Hashed)
+        );
+        let elsewhere = format!("git.example.com {GITHUB}");
+        assert_eq!(
+            host_keys(&elsewhere, "git.example.com", 2222),
+            Err(KnownHostsError::NotListed)
+        );
+        let negated = format!("*.example.com,!git.example.com {GITHUB}");
+        assert_eq!(
+            host_keys(&negated, "git.example.com", 22),
+            Err(KnownHostsError::NotListed)
+        );
+        let mislabelled = format!(
+            "git.example.com ecdsa-sha2-nistp256 {}",
+            GITHUB.split(' ').nth(1).unwrap()
+        );
+        assert_eq!(
+            host_keys(&mislabelled, "git.example.com", 22),
+            Err(KnownHostsError::Unsupported)
+        );
+        assert_eq!(
+            host_keys(&" ".repeat(KNOWN_HOSTS_MAX + 1), "git.example.com", 22),
+            Err(KnownHostsError::TooLong)
         );
     }
 }

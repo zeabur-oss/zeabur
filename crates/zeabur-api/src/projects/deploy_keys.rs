@@ -1,7 +1,7 @@
 //! Deploy keys for Zeabur Builder: `POST /projects/{p}/deploy-keys`.
 //!
-//! It makes an SSH key pair whose public half the person adds to the repository on GitHub or
-//! GitLab; the private half never leaves the server in the clear.
+//! It makes an SSH key pair whose public half the person adds to the repository on its Git host;
+//! the private half never leaves the server in the clear.
 //!
 //! The answer carries the private key sealed (AES-256-GCM under the plan key, as plan tokens
 //! are), bound to the person, the project and the Git host. A plan's
@@ -10,9 +10,10 @@
 //! `known_hosts`, which Zeabur Builder requires. The plan shows the Secret with its values hidden,
 //! like every Secret it writes.
 //!
-//! Only hosts whose SSH host keys are pinned here get a key: Zeabur does not fetch a host key
-//! over the network, since a first connection cannot tell a real host from one in between. Any
-//! other host takes an HTTPS access token instead.
+//! GitHub's and GitLab's host keys are pinned here. For any other host the person gives its
+//! `known_hosts` lines, from `ssh-keyscan` and checked against the fingerprints the host
+//! publishes; the answer repeats each key's fingerprint. Zeabur does not fetch a host key over the
+//! network, since a first connection cannot tell a real host from one in between.
 
 use std::collections::BTreeMap;
 
@@ -51,9 +52,25 @@ pub const KNOWN_HOSTS: [(&str, &str); 2] = [
 
 /// The Git host a deploy key is for.
 #[derive(Debug, Clone, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct DeployKeyRequest {
-    /// `github.com` or `gitlab.com`.
+    /// The host as the repository's SSH URL names it, with `:port` when it is not 22
+    /// (`git.example.com:2222`, `[2001:db8::1]:2222`).
     pub host: String,
+    /// The host's `known_hosts` lines, as `ssh-keyscan` prints them; needed for any host but
+    /// `github.com` and `gitlab.com`, whose keys Zeabur pins.
+    #[serde(default)]
+    pub known_hosts: Option<String>,
+}
+
+/// A host key a deploy key's Secret trusts.
+#[derive(Debug, Clone, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct TrustedHostKey {
+    /// The key type, such as `ssh-ed25519`.
+    pub algorithm: String,
+    /// `SHA256:…`, as `ssh-keygen -l` prints it.
+    pub fingerprint: String,
 }
 
 /// A new deploy key.
@@ -66,6 +83,8 @@ pub struct DeployKeyResponse {
     pub key: String,
     /// When the sealed key stops working, RFC 3339.
     pub expires_at: String,
+    /// The host keys the Secret will trust.
+    pub host_keys: Vec<TrustedHostKey>,
 }
 
 /// The public half of a deploy key Zeabur made.
@@ -83,6 +102,9 @@ struct Claims {
     host: String,
     private: String,
     expires_at: i64,
+    /// The person's `known_hosts` lines, for a host whose keys are not pinned.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    known_hosts: Option<String>,
 }
 
 fn known_hosts(host: &str) -> Option<&'static str> {
@@ -90,6 +112,72 @@ fn known_hosts(host: &str) -> Option<&'static str> {
         .iter()
         .find(|(name, _)| *name == host)
         .map(|(_, line)| *line)
+}
+
+/// The name and port of `host:port`, `[v6]:port` or a bare name.
+fn split_port(host: &str) -> Option<(&str, u16)> {
+    if let Some(rest) = host.strip_prefix('[') {
+        let (name, after) = rest.split_once(']')?;
+        let port = match after.strip_prefix(':') {
+            Some(port) => port.parse().ok()?,
+            None if after.is_empty() => 22,
+            None => return None,
+        };
+        return Some((name, port));
+    }
+    match host.rsplit_once(':') {
+        Some((name, port)) if !name.contains(':') => Some((name, port.parse().ok()?)),
+        Some(_) => None,
+        None => Some((host, 22)),
+    }
+}
+
+/// The `known_hosts` lines a key for `host` writes, and the keys they hold.
+fn trusted(host: &str, given: Option<&str>) -> Result<(String, Vec<TrustedHostKey>), ApiError> {
+    let (name, port) = split_port(host)
+        .filter(|(name, _)| !name.is_empty())
+        .ok_or_else(|| refused(&format!("{host:?} is not a host such as git.example.com.")))?;
+    let pinned = known_hosts(name).filter(|_| port == 22);
+    let text = match (pinned, given) {
+        (Some(line), _) => line,
+        (None, Some(text)) if !text.trim().is_empty() => text,
+        (None, _) => {
+            return Err(refused(&format!(
+                "Add the known_hosts lines of {host}: Zeabur pins host keys for GitHub and GitLab \
+                 only."
+            )));
+        }
+    };
+    let keys = zeabur_core::ssh::host_keys(text, name, port).map_err(|e| {
+        use zeabur_core::ssh::KnownHostsError;
+        let pattern = zeabur_core::ssh::host_pattern(name, port);
+        refused(&match e {
+            KnownHostsError::TooLong => format!(
+                "The known_hosts lines are longer than {} KiB.",
+                zeabur_core::ssh::KNOWN_HOSTS_MAX / 1024
+            ),
+            KnownHostsError::Hashed => format!(
+                "The host names are hashed. Run ssh-keyscan without -H, so the lines start with \
+                 {pattern}."
+            ),
+            KnownHostsError::Unsupported => format!(
+                "Zeabur Builder takes Ed25519 or ECDSA host keys, and the lines list none for \
+                 {pattern}. Run ssh-keyscan -t ed25519,ecdsa."
+            ),
+            KnownHostsError::NotListed => {
+                format!("No line names {pattern}. Paste the lines ssh-keyscan prints for it.")
+            }
+        })
+    })?;
+    let lines: String = keys.iter().map(|k| format!("{}\n", k.line)).collect();
+    let shown = keys
+        .into_iter()
+        .map(|k| TrustedHostKey {
+            algorithm: k.algorithm,
+            fingerprint: k.fingerprint,
+        })
+        .collect();
+    Ok((lines, shown))
 }
 
 fn key_of(state: &AppState) -> Result<std::sync::Arc<PlanKey>, ApiError> {
@@ -116,15 +204,9 @@ pub(crate) async fn create(
     Json(request): Json<DeployKeyRequest>,
 ) -> Result<Json<DeployKeyResponse>, ApiError> {
     let host = request.host.trim().to_ascii_lowercase();
-    if known_hosts(&host).is_none() {
-        return Err(ApiError::from(Problem::new(
-            Kind::BadRequest,
-            format!(
-                "Zeabur makes deploy keys for GitHub and GitLab only, not {host}; use an access \
-                 token over HTTPS."
-            ),
-        )));
-    }
+    let (lines, host_keys) = trusted(&host, request.known_hosts.as_deref())?;
+    let pinned =
+        split_port(&host).is_some_and(|(name, port)| port == 22 && known_hosts(name).is_some());
     let sealing = key_of(&state)?;
     let identity = everyday
         .whoami()
@@ -139,6 +221,7 @@ pub(crate) async fn create(
         host,
         private: pair.private,
         expires_at,
+        known_hosts: (!pinned).then_some(lines),
     };
     let key = token::sign_as(&sealing, PREFIX, &claims).map_err(random)?;
     Ok(Json(DeployKeyResponse {
@@ -147,6 +230,7 @@ pub(crate) async fn create(
         expires_at: zeabur_kube::k8s_openapi::jiff::Timestamp::from_second(expires_at)
             .unwrap_or(zeabur_kube::k8s_openapi::jiff::Timestamp::UNIX_EPOCH)
             .to_string(),
+        host_keys,
     }))
 }
 
@@ -236,10 +320,12 @@ pub(crate) fn open(
                     "This deploy key was made for someone else or another project.",
                 ));
             }
-            let hosts = known_hosts(&claims.host)
-                .ok_or_else(|| refused("The deploy key is for a host Zeabur no longer knows."))?;
+            let hosts = match claims.known_hosts {
+                Some(lines) => lines,
+                None => trusted(&claims.host, None)?.0,
+            };
             Ok(Change::Create {
-                object: secret(name, &claims.private, hosts),
+                object: secret(name, &claims.private, &hosts),
                 yaml: None,
             })
         })
@@ -254,7 +340,7 @@ fn secret(name: &str, private: &str, known_hosts: &str) -> serde_json::Value {
         "kind": "Secret",
         "metadata": {"name": name, "labels": labels},
         "type": "kubernetes.io/ssh-auth",
-        "stringData": {"ssh-privatekey": private, "known_hosts": format!("{known_hosts}\n")},
+        "stringData": {"ssh-privatekey": private, "known_hosts": known_hosts},
     })
 }
 
@@ -271,8 +357,23 @@ mod tests {
     }
 
     #[test]
+    fn a_host_names_its_port_when_it_is_not_22() {
+        assert_eq!(split_port("git.example.com"), Some(("git.example.com", 22)));
+        assert_eq!(
+            split_port("git.example.com:2222"),
+            Some(("git.example.com", 2222))
+        );
+        assert_eq!(
+            split_port("[2001:db8::1]:2222"),
+            Some(("2001:db8::1", 2222))
+        );
+        assert_eq!(split_port("git.example.com:x"), None);
+        assert_eq!(split_port("2001:db8::1"), None);
+    }
+
+    #[test]
     fn the_secret_is_one_zeabur_builder_reads() {
-        let object = secret("web-git", "PRIVATE", "github.com ssh-ed25519 AAAA");
+        let object = secret("web-git", "PRIVATE", "github.com ssh-ed25519 AAAA\n");
         assert_eq!(object["type"], "kubernetes.io/ssh-auth");
         assert_eq!(object["metadata"]["labels"][GIT_CREDENTIALS_LABEL], "true");
         assert_eq!(object["stringData"]["ssh-privatekey"], "PRIVATE");

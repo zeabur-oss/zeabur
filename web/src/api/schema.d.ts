@@ -4089,13 +4089,23 @@ export interface components {
     }
     /** @description The Git host a deploy key is for. */
     DeployKeyRequest: {
-      /** @description `github.com` or `gitlab.com`. */
+      /**
+       * @description The host as the repository's SSH URL names it, with `:port` when it is not 22
+       *     (`git.example.com:2222`, `[2001:db8::1]:2222`).
+       */
       host: string
+      /**
+       * @description The host's `known_hosts` lines, as `ssh-keyscan` prints them; needed for any host but
+       *     `github.com` and `gitlab.com`, whose keys Zeabur pins.
+       */
+      knownHosts?: string | null
     }
     /** @description A new deploy key. */
     DeployKeyResponse: {
       /** @description When the sealed key stops working, RFC 3339. */
       expiresAt: string
+      /** @description The host keys the Secret will trust. */
+      hostKeys: components["schemas"]["TrustedHostKey"][]
       /** @description The private key, sealed: give it back in a plan's `deployKey` change. */
       key: string
       /** @description The public key, one `ssh-ed25519 …` line, to add on the Git host. */
@@ -8680,6 +8690,13 @@ export interface components {
        *     first.
        */
       pods: components["schemas"]["ToolsPodStatus"][]
+    }
+    /** @description A host key a deploy key's Secret trusts. */
+    TrustedHostKey: {
+      /** @description The key type, such as `ssh-ed25519`. */
+      algorithm: string
+      /** @description `SHA256:…`, as `ssh-keygen -l` prints it. */
+      fingerprint: string
     }
     /**
      * @description Why a container's log cannot be read, from the kubelet's answer.
