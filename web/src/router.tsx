@@ -40,6 +40,7 @@ import { canonicalKind, isTask } from "@/model/service"
 import {
   formerPlace,
   componentsSearch,
+  gitHubAppSearch,
   objectsSearch,
   projectSearch,
   projectsSearch,
@@ -58,6 +59,8 @@ import {
 //                                              run
 //   /cluster/notifications                     where node and runtime-security alerts go
 //   /cluster/components                        installed components and the catalogue
+//   /cluster/github-app                        where GitHub sends the browser back after it
+//                                              makes the cluster's GitHub App
 //   /projects                                  every project and namespace
 //   /projects/$project                         the project: its problems, then its services as a
 //                                              map or a list (?view=map|list, ?service=… quick look)
@@ -333,6 +336,14 @@ const componentsRoute = createRoute({
   component: lazyRouteComponent(() => import("@/routes/cluster/components"), "ComponentsPage"),
 })
 
+const gitHubAppRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/cluster/github-app",
+  validateSearch: gitHubAppSearch,
+  loader: () => load(ensure(clusterQuery), ensure(upgradesQuery)),
+  component: lazyRouteComponent(() => import("@/routes/cluster/github-app"), "GitHubAppPage"),
+})
+
 // What each problem type means: its `type` URI is this page (RFC 9457, section 3.1.1).
 const problemRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -369,6 +380,7 @@ export const router = createRouter({
     clusterBackupsRoute,
     clusterNotificationsRoute,
     componentsRoute,
+    gitHubAppRoute,
     problemRoute,
     movedComponentsRoute,
   ]),

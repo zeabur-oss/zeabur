@@ -1,5 +1,5 @@
-//! Randomness, authenticated encryption and constant-time comparison, through aws-lc-rs, the one
-//! cryptographic library Zeabur ships (it is already rustls's provider).
+//! Randomness, authenticated encryption, constant-time comparison and RS256 signatures, through
+//! aws-lc-rs, the one cryptographic library Zeabur ships (it is already rustls's provider).
 //!
 //! # References
 //!
@@ -8,12 +8,18 @@
 //! - [sp800-38d] M. Dworkin, "Recommendation for Block Cipher Modes of Operation:
 //!   Galois/Counter Mode (GCM) and GMAC," NIST SP 800-38D, 2007.
 //!   <https://doi.org/10.6028/NIST.SP.800-38D>
+//! - [rfc7518] M. Jones, "JSON Web Algorithms (JWA)," RFC 7518, 2015, section 3.3. <https://www.rfc-editor.org/rfc/rfc7518#section-3.3>
 //!
 //! [rfc5116]: https://www.rfc-editor.org/rfc/rfc5116
 //! [sp800-38d]: https://doi.org/10.6028/NIST.SP.800-38D
+//! [rfc7518]: https://www.rfc-editor.org/rfc/rfc7518#section-3.3
 
 use aws_lc_rs::aead::{AES_256_GCM, Aad, LessSafeKey, NONCE_LEN, Nonce, UnboundKey};
 use aws_lc_rs::constant_time::verify_slices_are_equal;
+use aws_lc_rs::rand::SystemRandom;
+use aws_lc_rs::signature::{RSA_PKCS1_SHA256, RsaKeyPair};
+use base64::Engine as _;
+use base64::engine::general_purpose::STANDARD;
 pub use zeabur_kernel::digest::hex;
 
 /// The system random number generator failed. aws-lc-rs reports no detail.
@@ -103,9 +109,80 @@ pub fn equal(a: &[u8], b: &[u8]) -> bool {
     verify_slices_are_equal(a, b).is_ok()
 }
 
+/// Why an RSA private key cannot sign.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum KeyError {
+    /// It is not a PEM RSA private key, PKCS#1 (`RSA PRIVATE KEY`) or PKCS#8 (`PRIVATE KEY`).
+    #[error("the key is not a PEM RSA private key")]
+    NotPem,
+    /// aws-lc-rs refuses it, such as a key shorter than 2048 bits.
+    #[error("the key is refused: {0}")]
+    Refused(String),
+}
+
+/// Signs `message` with RSASSA-PKCS1-v1_5 and SHA-256, the JWS algorithm `RS256` [rfc7518],
+/// under the PEM private key `pem`.
+///
+/// [rfc7518]: https://www.rfc-editor.org/rfc/rfc7518#section-3.3
+///
+/// # Errors
+///
+/// When `pem` is not an RSA private key aws-lc-rs accepts, or signing fails.
+pub fn sign_rs256(pem: &str, message: &[u8]) -> Result<Vec<u8>, KeyError> {
+    let label = |l: &str| pem.contains(&format!("-----BEGIN {l}-----"));
+    let pkcs1 = label("RSA PRIVATE KEY");
+    if !pkcs1 && !label("PRIVATE KEY") {
+        return Err(KeyError::NotPem);
+    }
+    let body: String = pem
+        .lines()
+        .map(str::trim)
+        .filter(|l| !l.is_empty() && !l.starts_with("-----"))
+        .collect();
+    let der = STANDARD.decode(body).map_err(|_error| KeyError::NotPem)?;
+    let key = if pkcs1 {
+        RsaKeyPair::from_der(&der)
+    } else {
+        RsaKeyPair::from_pkcs8(&der)
+    }
+    .map_err(|e| KeyError::Refused(e.to_string()))?;
+    let mut signature = vec![0; key.public_modulus_len()];
+    key.sign(
+        &RSA_PKCS1_SHA256,
+        &SystemRandom::new(),
+        message,
+        &mut signature,
+    )
+    .map_err(|_unspecified| KeyError::Refused("signing failed".to_owned()))?;
+    Ok(signature)
+}
+
 #[cfg(test)]
 mod tests {
+    use aws_lc_rs::encoding::AsDer as _;
+    use aws_lc_rs::rsa::KeySize;
+    use aws_lc_rs::signature::{KeyPair as _, RSA_PKCS1_2048_8192_SHA256, UnparsedPublicKey};
+
     use super::*;
+
+    #[test]
+    fn rs256_signatures_verify_with_the_public_key() {
+        let key = RsaKeyPair::generate(KeySize::Rsa2048).unwrap();
+        let der = STANDARD.encode(key.as_der().unwrap().as_ref());
+        let pem = format!("-----BEGIN PRIVATE KEY-----\n{der}\n-----END PRIVATE KEY-----\n");
+        let signature = sign_rs256(&pem, b"header.claims").unwrap();
+        UnparsedPublicKey::new(&RSA_PKCS1_2048_8192_SHA256, key.public_key().as_ref())
+            .verify(b"header.claims", &signature)
+            .unwrap();
+        assert_eq!(sign_rs256("not a key", b"x"), Err(KeyError::NotPem));
+        assert!(
+            sign_rs256(
+                "-----BEGIN RSA PRIVATE KEY-----\nAAAA\n-----END RSA PRIVATE KEY-----",
+                b"x"
+            )
+            .is_err()
+        );
+    }
 
     #[test]
     fn tokens_are_hex_of_the_requested_length_and_differ() {

@@ -20,7 +20,8 @@ type Manifest = Record<string, unknown>
 export type BuildMethod = "railpack" | "dockerfile"
 export const buildMethods: BuildMethod[] = ["railpack", "dockerfile"]
 
-export type Access = "public" | "deployKey" | "token"
+/** `githubApp`: the cluster's GitHub App, through an installation granted to the project. */
+export type Access = "public" | "deployKey" | "token" | "githubApp"
 
 /** The ref Zeabur Builder takes for the repository's default branch. */
 const DEFAULT_BRANCH_REF = "HEAD"
@@ -57,6 +58,8 @@ export interface GitService extends Pick<
   token: string
   /** For `deployKey`: the sealed key `POST /deploy-keys` answered. */
   sealedKey?: string
+  /** For `githubApp`. */
+  installationId?: number
 }
 
 export const newGitService = (): GitService => ({
@@ -184,6 +187,7 @@ export function gitProblems(
     buildEnv: badBuildEnv,
     key: form.access === "deployKey" && !hasKey,
     token: form.access === "token" && (form.token.trim() === "" || form.username.trim() === ""),
+    installation: form.access === "githubApp" && !form.installationId,
   }
 }
 
@@ -202,6 +206,30 @@ const fromSecret = (secret: string, name: string) => ({
   valueFrom: { secretKeyRef: { name: secret, key: name } },
 })
 
+/** The Build's `spec.source.git`: the repository, over SSH for a deploy key. */
+function gitSource(form: GitService): Manifest {
+  const repo = parseRepository(form.url)
+  const directory = cleanPath(form.directory)
+  const dockerfile = form.method === "dockerfile" ? cleanPath(form.dockerfile) : ""
+  const url = !repo ? form.url : form.access === "deployKey" ? sshUrl(repo) : httpsUrl(repo)
+  return {
+    url,
+    ref: form.branch.trim() || DEFAULT_BRANCH_REF,
+    ...(directory ? { contextDir: directory } : {}),
+    ...(dockerfile ? { dockerfile } : {}),
+  }
+}
+
+/** The Build's `spec.source`: the repository, and how Zeabur Builder reads it. */
+function buildSource(form: GitService, credentials: string | undefined): Manifest {
+  const installationId = form.access === "githubApp" ? form.installationId : undefined
+  return {
+    git: gitSource(form),
+    ...(credentials ? { credentialsRef: { name: credentials } } : {}),
+    ...(installationId ? { githubApp: { installationId } } : {}),
+  }
+}
+
 /** The objects the form creates, the deploy key aside: it is a change of its own. */
 export function gitObjects(
   form: GitService,
@@ -209,7 +237,6 @@ export function gitObjects(
   registry: string,
   domains: DomainSettings,
 ): Manifest[] {
-  const repo = parseRepository(form.url)
   const name = form.name
   const labels = { "app.kubernetes.io/name": name }
   const repository = imageRepository(registry, project, name)
@@ -243,7 +270,8 @@ export function gitObjects(
         }
       : object,
   )
-  const credentials = form.access === "public" ? undefined : credentialsName(name)
+  const credentials =
+    form.access === "public" || form.access === "githubApp" ? undefined : credentialsName(name)
   const objects: Manifest[] = []
   if (form.access === "token")
     objects.push({
@@ -253,8 +281,6 @@ export function gitObjects(
       type: "kubernetes.io/basic-auth",
       stringData: { username: form.username.trim(), password: form.token.trim() },
     })
-  const directory = cleanPath(form.directory)
-  const dockerfile = form.method === "dockerfile" ? cleanPath(form.dockerfile) : ""
   const envSecret = buildEnvSecret(name)
   if (form.buildVariables.length > 0)
     objects.push({
@@ -270,15 +296,7 @@ export function gitObjects(
     metadata: { name, labels },
     spec: {
       builderRef: form.method,
-      source: {
-        git: {
-          url: repo ? (form.access === "deployKey" ? sshUrl(repo) : httpsUrl(repo)) : form.url,
-          ref: form.branch.trim() || DEFAULT_BRANCH_REF,
-          ...(directory ? { contextDir: directory } : {}),
-          ...(dockerfile ? { dockerfile } : {}),
-        },
-        ...(credentials ? { credentialsRef: { name: credentials } } : {}),
-      },
+      source: buildSource(form, credentials),
       output: { image: repository },
       ...(form.buildVariables.length > 0
         ? { env: form.buildVariables.map((v) => fromSecret(envSecret, v.name)) }

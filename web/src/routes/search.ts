@@ -223,6 +223,12 @@ export const componentsSearch = z.object({
   profile: choice(profiles),
 })
 
+/** What GitHub sends back at the end of its manifest flow. */
+export const gitHubAppSearch = z.object({
+  code: text,
+  state: text,
+})
+
 const projectSortKeys = ["health", "name"] as const
 export type ProjectSortKey = (typeof projectSortKeys)[number]
 

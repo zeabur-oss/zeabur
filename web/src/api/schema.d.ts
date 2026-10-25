@@ -230,6 +230,124 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  "/api/v1/cluster/github-app": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * The App, its installations and their projects. The installations are read from GitHub with
+     *     the App's private key, read as the person; a person who may not read it sees the App without
+     *     them.
+     */
+    get: operations["getGitHubApp"]
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  "/api/v1/cluster/github-app/apply": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** Carries out a GitHub App plan by its token: checks it, dry-runs every write, then writes. */
+    post: operations["applyGitHubApp"]
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  "/api/v1/cluster/github-app/conversion": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Turns the code GitHub sent back into the App, and plans storing it in Builder's Secret;
+     *     writes nothing. The private key and the webhook secret travel only sealed in the token.
+     */
+    post: operations["convertGitHubApp"]
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  "/api/v1/cluster/github-app/form": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * The page that sends the manifest to GitHub: a form with one button, no script, whose policy
+     *     lets forms go to GitHub only.
+     */
+    get: operations["gitHubAppForm"]
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  "/api/v1/cluster/github-app/manifest": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Starts GitHub's manifest flow: a `state` sealed for the person, valid for an hour, and the
+     *     page that sends the manifest to GitHub. Writes nothing.
+     */
+    post: operations["startGitHubAppManifest"]
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  "/api/v1/cluster/github-app/plan": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Plans granting an installation to projects: Builder's grant, and the repositories it can read
+     *     in each project; writes nothing. The repositories are read from GitHub now.
+     */
+    post: operations["planGitHubApp"]
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   "/api/v1/cluster/health": {
     parameters: {
       query?: never
@@ -1286,6 +1404,26 @@ export interface paths {
     }
     /** What a project is missing, by the built-in rules, each with its citations and fix. */
     get: operations["project"]
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  "/api/v1/projects/{project}/github-app": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * The installations granted to the project, and the repositories each could read when it was
+     *     granted; read as the person from the project's ConfigMap [`PROJECT_CONFIG_MAP`].
+     */
+    get: operations["getProjectGitHubApp"]
     put?: never
     post?: never
     delete?: never
@@ -4801,6 +4939,130 @@ export interface components {
       /** @description How to encode them. */
       encoding: components["schemas"]["Encoding"]
     }
+    /** @description The cluster's GitHub App. */
+    GitHubApp: {
+      app?: components["schemas"]["GitHubAppView"] | null
+      /** @description Whether the person may make the App and grant its installations. */
+      canChange: components["schemas"]["Permission"]
+      /** @description The App's installations; absent when they could not be read. */
+      installations?: components["schemas"]["GitHubInstallation"][] | null
+      /** @description Why the installations could not be read, in GitHub's or Zeabur's words. */
+      installationsProblem?: string | null
+      /** @description Zeabur Builder's namespace, where the App is kept. */
+      namespace: string
+      /** @description What could not be read. */
+      unreadable: components["schemas"]["UnreadableView"][]
+      /** @description Where people open GitHub, `https://github.com`. */
+      webUrl: string
+    }
+    /** @description What an apply wrote. */
+    GitHubAppApplied: {
+      /** @description The objects written, `Kind/namespace/name`. */
+      written: string[]
+    }
+    /** @description The token of a plan to apply. */
+    GitHubAppApply: {
+      /** @description The token a plan returned. */
+      token: string
+    }
+    /** @description A plan, and the token that applies it. */
+    GitHubAppPlan: {
+      /** @description When the token stops working, RFC 3339. */
+      expiresAt: string
+      /** @description Send this to `apply` to carry out exactly this plan. */
+      token: string
+      /** @description What to know first. */
+      warnings: components["schemas"]["GitHubAppWarning"][]
+      /** @description The writes, in order; empty when nothing changes. */
+      writes: components["schemas"]["GitHubAppWrite"][]
+    }
+    /** @description The App, without its keys. */
+    GitHubAppView: {
+      /** @description Its page on GitHub, `https://github.com/apps/<slug>`; empty when not known. */
+      htmlUrl: string
+      /** @description Where to install it on an account; empty when not known. */
+      installUrl: string
+      /** @description Whether it receives push events; without, Builder asks for new commits every minute. */
+      webhook: boolean
+    }
+    /**
+     * @description What the person should know before applying a plan.
+     * @enum {string}
+     */
+    GitHubAppWarning: "replacesApp" | "noWebhook" | "wasEveryNamespace" | "removesNamespaces"
+    /** @description One object a plan writes. */
+    GitHubAppWrite: {
+      /** @description What it does. */
+      action: components["schemas"]["GitHubAppWriteAction"]
+      /** @description The object as it will be, YAML, a Secret's values hidden. */
+      afterYaml?: string | null
+      /** @description The object as it is, YAML; absent for a creation and for a Secret. */
+      beforeYaml?: string | null
+      /** @description The object's kind. */
+      kind: string
+      /** @description Its name. */
+      name: string
+      /** @description Its namespace. */
+      namespace: string
+    }
+    /**
+     * @description What a write does.
+     * @enum {string}
+     */
+    GitHubAppWriteAction: "create" | "patch"
+    /** @description What GitHub sent back. */
+    GitHubConversionRequest: {
+      /** @description The `code` query parameter. */
+      code: string
+      /** @description The `state` query parameter. */
+      state: string
+    }
+    /** @description An installation to grant to projects. */
+    GitHubGrantRequest: {
+      /**
+       * Format: int64
+       * @description The installation.
+       */
+      installationId: number
+      /** @description The namespaces that may use it, all of them; empty takes it from every namespace. */
+      namespaces: string[]
+    }
+    /** @description One installation of the App, and the projects it is granted to. */
+    GitHubInstallation: {
+      /** @description The user or organization it is installed on. */
+      account: string
+      /** @description `User` or `Organization`. */
+      accountType: string
+      /** @description Every namespace may use it (`*`). */
+      everyNamespace: boolean
+      /**
+       * Format: int64
+       * @description Its ID.
+       */
+      id: number
+      /** @description The namespaces that may use it. */
+      namespaces: string[]
+      /** @description `all` or `selected` repositories. */
+      repositorySelection: string
+      /** @description Its settings page on GitHub. */
+      settingsUrl: string
+    }
+    /** @description The state of a manifest flow. */
+    GitHubManifest: {
+      /** @description Open this page, which sends the manifest to GitHub. */
+      formUrl: string
+    }
+    /** @description What the manifest flow needs. */
+    GitHubManifestRequest: {
+      /** @description The App's name on GitHub, unique there, at most 34 characters. */
+      name: string
+      /** @description The organization to make the App in; empty for the person's own account. */
+      organization?: string
+      /** @description Where GitHub sends the browser back, `https://<zeabur>/settings/github-app`. */
+      redirectUrl: string
+      /** @description Builder's webhook URL, `https://<host>/hooks/github-app`; empty when its receiver is off. */
+      webhookUrl?: string
+    }
     /**
      * @description A service's health, from worst to best: what a status dot shows.
      * @enum {string}
@@ -7102,6 +7364,11 @@ export interface components {
     ProjectExtensions: {
       networkPolicy?: components["schemas"]["NetworkPolicyReachability"] | null
     }
+    /** @description The installations granted to a project. */
+    ProjectGitHubApp: {
+      /** @description The installations, by account. */
+      installations: components["schemas"]["ProjectInstallation"][]
+    }
     /** @description A member's role in a project. */
     ProjectGrant: {
       /** @description The project (its namespace). */
@@ -7147,6 +7414,20 @@ export interface components {
       | "game"
       | "heart"
       | "briefcase"
+    /** @description An installation granted to a project, as the grant left it. */
+    ProjectInstallation: {
+      /** @description The user or organization it is installed on. */
+      account: string
+      /**
+       * Format: int64
+       * @description Its ID.
+       */
+      id: number
+      /** @description When the list was read from GitHub, RFC 3339. */
+      refreshedAt: string
+      /** @description The repositories it could read. */
+      repositories: components["schemas"]["ProjectRepository"][]
+    }
     /** @description The projects (namespaces) the person may list. */
     ProjectList: {
       /** @description Whether the person may create a project (`create` on `namespaces`, cluster-wide). */
@@ -7200,6 +7481,15 @@ export interface components {
       state: components["schemas"]["ProviderState"]
       /** @description What could not be read. */
       unreadable: components["schemas"]["UnreadableView"][]
+    }
+    /** @description A repository a project may build with an installation. */
+    ProjectRepository: {
+      /** @description Its default branch. */
+      defaultBranch: string
+      /** @description `owner/name`. */
+      fullName: string
+      /** @description Whether it is private. */
+      private: boolean
     }
     /** @description What the person may change in one project. */
     ProjectRights: {
@@ -9583,6 +9873,245 @@ export interface operations {
       }
     }
   }
+  getGitHubApp: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["GitHubApp"]
+        }
+      }
+      401: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
+  applyGitHubApp: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["GitHubAppApply"]
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["GitHubAppApplied"]
+        }
+      }
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
+  convertGitHubApp: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["GitHubConversionRequest"]
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["GitHubAppPlan"]
+        }
+      }
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      503: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
+  gitHubAppForm: {
+    parameters: {
+      query: {
+        /** @description The state `manifest` answered */
+        state: string
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description The page */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "text/html": unknown
+        }
+      }
+      /** @description The state is not valid */
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "text/html": unknown
+        }
+      }
+    }
+  }
+  startGitHubAppManifest: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["GitHubManifestRequest"]
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["GitHubManifest"]
+        }
+      }
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
+  planGitHubApp: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["GitHubGrantRequest"]
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["GitHubAppPlan"]
+        }
+      }
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      422: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      503: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
   getClusterHealth: {
     parameters: {
       query?: never
@@ -11637,6 +12166,36 @@ export interface operations {
         }
         content: {
           "application/json": components["schemas"]["GapList"]
+        }
+      }
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
+  getProjectGitHubApp: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        /** @description The project's namespace */
+        project: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["ProjectGitHubApp"]
         }
       }
       403: {

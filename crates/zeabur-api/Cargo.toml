@@ -45,6 +45,8 @@ utoipa.workspace = true
 utoipa-axum.workspace = true
 
 [dev-dependencies]
+# A fake GitHub's App key in the GitHub App tests.
+aws-lc-rs.workspace = true
 zeabur-kube = { workspace = true, features = ["memory"] }
 zeabur-test-support = { workspace = true, features = ["sandbox"] }
 zeabur-ui.workspace = true

@@ -19,6 +19,7 @@ mod durability;
 mod evidence;
 mod exec;
 mod files;
+mod github_app;
 mod images;
 mod incidents;
 mod issuers;

@@ -77,6 +77,29 @@ pub struct Settings {
     /// A PEM bundle of the CA that signed the build registry's certificate, trusted when Zeabur
     /// reads an image from it (`--build-registry-ca-file`); `None`: the platform's roots only.
     pub build_registry_ca: Option<Vec<u8>>,
+    /// The GitHub the cluster's GitHub App is made on (see [`crate::cluster::github_app`]).
+    pub github: GitHubSettings,
+}
+
+/// The GitHub the cluster's GitHub App is made on: github.com by default.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct GitHubSettings {
+    /// Where people open GitHub, `https://github.com`.
+    pub web_url: String,
+    /// Its REST API, `https://api.github.com`.
+    pub api_url: String,
+}
+
+/// github.com's REST API.
+pub const GITHUB_API: &str = "https://api.github.com";
+
+impl Default for GitHubSettings {
+    fn default() -> Self {
+        Self {
+            web_url: "https://github.com".to_owned(),
+            api_url: GITHUB_API.to_owned(),
+        }
+    }
 }
 
 /// How a new service's public URL is made, as an administrator installed Zeabur (the chart's
@@ -143,6 +166,7 @@ impl Default for Settings {
             domains: DomainSettings::default(),
             builds: BuildSettings::default(),
             build_registry_ca: None,
+            github: GitHubSettings::default(),
         }
     }
 }

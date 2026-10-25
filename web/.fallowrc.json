@@ -9,6 +9,7 @@
     { "file": "src/routes/account.tsx", "exports": ["AccountPage"] },
     { "file": "src/routes/cluster/backups.tsx", "exports": ["BackupsPage"] },
     { "file": "src/routes/cluster/components.tsx", "exports": ["ComponentsPage"] },
+    { "file": "src/routes/cluster/github-app.tsx", "exports": ["GitHubAppPage"] },
     { "file": "src/routes/cluster/notifications.tsx", "exports": ["NotificationsPage"] },
     { "file": "src/routes/cluster/page.tsx", "exports": ["ClusterPage"] },
     { "file": "src/routes/database/page.tsx", "exports": ["DatabasePage"] },

@@ -38,6 +38,10 @@
 //!
 //! `ZEABUR_DEMO_KEEL=1` installs Keel, so a project offers Deploy from Git.
 //!
+//! `ZEABUR_DEMO_GITHUB=1` starts a fake GitHub on 127.0.0.1, so Cluster → GitHub App goes through
+//! the manifest flow without leaving the demo. `ZEABUR_DEMO_GITHUB=installed` also makes the App
+//! at the start: it is installed on `acme` and `bob`, and `acme` is granted to `shop`.
+//!
 //! The Error pages template has a made-up idle use of 9 MiB, so turning on a domain's error pages
 //! says the cluster has room; `ZEABUR_DEMO_TEMPLATE_IDLE=large` makes it 24 GiB, to see it tight.
 //!
@@ -4004,6 +4008,229 @@ fn template_idle(id: &str) -> Option<zeabur_catalog::IdleUse> {
     })
 }
 
+/// The demo's GitHub App: its key, and the installations of `ZEABUR_DEMO_GITHUB`.
+struct FakeGitHub {
+    pem: String,
+}
+
+const DEMO_CLIENT_ID: &str = "Iv23lidemo";
+
+fn demo_installations() -> Value {
+    json!([
+        {"id": 4242, "account": {"login": "acme", "type": "Organization"},
+         "repository_selection": "selected",
+         "html_url": "https://github.com/organizations/acme/settings/installations/4242"},
+        {"id": 7070, "account": {"login": "bob", "type": "User"},
+         "repository_selection": "all",
+         "html_url": "https://github.com/settings/installations/7070"},
+    ])
+}
+
+fn demo_repositories(installation: &str) -> Value {
+    let names: &[(&str, &str, bool)] = if installation == "4242" {
+        &[
+            ("acme/shop-web", "main", true),
+            ("acme/shop-api", "main", true),
+            (
+                "acme/storefront-with-a-rather-long-repository-name",
+                "trunk",
+                true,
+            ),
+            ("acme/docs", "main", false),
+        ]
+    } else {
+        &[("bob/blog", "main", false)]
+    };
+    let repositories: Vec<Value> = names
+        .iter()
+        .map(|(name, branch, private)| {
+            json!({"full_name": name, "default_branch": branch, "private": private})
+        })
+        .collect();
+    json!({"total_count": repositories.len(), "repositories": repositories})
+}
+
+/// GitHub's web pages and REST API as far as Zeabur uses them, at `http://127.0.0.1:<port>`.
+/// Nothing checks the App's JWT.
+async fn fake_github() -> std::io::Result<(String, Arc<FakeGitHub>)> {
+    use aws_lc_rs::encoding::AsDer as _;
+    use aws_lc_rs::rsa::{KeyPair, KeySize};
+    use axum::extract::{Path, RawQuery, State as Shared};
+    use axum::http::StatusCode;
+    use axum::response::Html;
+    use axum::routing::{get, post};
+    use axum::{Json, Router};
+    use base64::Engine as _;
+
+    let key = KeyPair::generate(KeySize::Rsa2048).map_err(std::io::Error::other)?;
+    let der = base64::engine::general_purpose::STANDARD
+        .encode(key.as_der().map_err(std::io::Error::other)?.as_ref());
+    let fake = Arc::new(FakeGitHub {
+        pem: format!("-----BEGIN PRIVATE KEY-----\n{der}\n-----END PRIVATE KEY-----\n"),
+    });
+    let router = Router::new()
+        // GitHub's confirmation page: a link back with a code. A redirect would break the form's
+        // `form-action`, which GitHub does not do either.
+        .route(
+            "/settings/apps/new",
+            post(async |RawQuery(query): RawQuery, body: String| {
+                let field = |text: &str, name: &str| {
+                    form_urlencoded::parse(text.as_bytes())
+                        .find(|(k, _)| k == name)
+                        .map_or_default(|(_, v)| v.into_owned())
+                };
+                let manifest: Value =
+                    serde_json::from_str(&field(&body, "manifest")).unwrap_or_default();
+                let back = manifest
+                    .get("redirect_url")
+                    .and_then(Value::as_str)
+                    .unwrap_or("/");
+                let state = field(&query.unwrap_or_default(), "state");
+                let query = form_urlencoded::Serializer::new(String::new())
+                    .append_pair("code", "demo-code")
+                    .append_pair("state", &state)
+                    .finish();
+                let name = manifest
+                    .get("name")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default()
+                    .replace('&', "&amp;")
+                    .replace('<', "&lt;");
+                let link = format!("{back}?{query}")
+                    .replace('&', "&amp;")
+                    .replace('"', "&quot;");
+                Html(format!(
+                    "<!doctype html><title>GitHub (demo)</title><p>Create GitHub App \
+                     <b>{name}</b> for acme?</p><p><a href=\"{link}\">Create GitHub App</a></p>"
+                ))
+            }),
+        )
+        .route(
+            "/app-manifests/{code}/conversions",
+            post(async |Shared(fake): Shared<Arc<FakeGitHub>>| {
+                (
+                    StatusCode::CREATED,
+                    Json(
+                        json!({"id": 1001, "slug": "zeabur-demo", "client_id": DEMO_CLIENT_ID,
+                                "pem": fake.pem, "webhook_secret": null,
+                                "html_url": "https://github.com/apps/zeabur-demo",
+                                "owner": {"login": "acme", "type": "Organization"}}),
+                    ),
+                )
+            }),
+        )
+        .route(
+            "/app/installations",
+            get(async || Json(demo_installations())),
+        )
+        .route(
+            "/app/installations/{id}",
+            get(async |Path(id): Path<i64>| {
+                demo_installations()
+                    .as_array()
+                    .and_then(|all| all.iter().find(|i| i["id"] == id).cloned())
+                    .map_or_else(
+                        || (StatusCode::NOT_FOUND, Json(json!({"message": "Not Found"}))),
+                        |i| (StatusCode::OK, Json(i)),
+                    )
+            }),
+        )
+        .route(
+            "/app/installations/{id}/access_tokens",
+            post(async |Path(id): Path<String>| {
+                (
+                    StatusCode::CREATED,
+                    Json(json!({"token": format!("ghs_demo_{id}")})),
+                )
+            }),
+        )
+        .route(
+            "/installation/repositories",
+            get(async |headers: axum::http::HeaderMap| {
+                let token = headers
+                    .get("authorization")
+                    .and_then(|v| v.to_str().ok())
+                    .unwrap_or_default();
+                Json(demo_repositories(
+                    token.trim_start_matches("Bearer ghs_demo_"),
+                ))
+            }),
+        )
+        .with_state(Arc::clone(&fake));
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
+    let url = format!("http://{}", listener.local_addr()?);
+    tokio::spawn(async move { axum::serve(listener, router).await });
+    Ok((url, fake))
+}
+
+/// Zeabur Builder's namespace, empty for the manifest flow.
+fn builder_system(s: &mut State) {
+    s.namespaces
+        .push(from(json!({"metadata": {"name": "builder-system"}})));
+}
+
+/// Zeabur Builder's namespace with the App of [`fake_github`] in it, installed on `acme` and
+/// `bob`; `acme` granted to `shop`.
+fn github_app(s: &mut State, fake: &FakeGitHub) {
+    let namespace = "builder-system";
+    builder_system(s);
+    s.objects.insert(
+        namespace.to_owned(),
+        NamespaceObjects {
+            namespace: namespace.to_owned(),
+            config_maps: vec![from(json!({
+                "metadata": {"name": "github-app-installations", "namespace": namespace,
+                             "resourceVersion": "3"},
+                "data": {"4242": "shop"}
+            }))],
+            secrets: vec![SecretSummary {
+                secret: from(json!({
+                    "metadata": {"name": "github-app", "namespace": namespace,
+                                 "resourceVersion": "2",
+                                 "annotations": {
+                                     "builder.zeabur.com/github-app":
+                                         "https://github.com/apps/zeabur-demo"}},
+                    "type": "Opaque"
+                })),
+                key_count: 3,
+            }],
+            ..NamespaceObjects::default()
+        },
+    );
+    s.secret_values.insert(
+        format!("{namespace}/github-app"),
+        [
+            ("app-id", "1001"),
+            ("client-id", DEMO_CLIENT_ID),
+            ("private-key", fake.pem.as_str()),
+        ]
+        .into_iter()
+        .map(|(k, v)| (k.to_owned(), v.as_bytes().to_vec()))
+        .collect(),
+    );
+    let repositories: Vec<Value> = demo_repositories("4242")
+        .get("repositories")
+        .and_then(Value::as_array)
+        .map_or_default(|all| {
+            all.iter()
+                .map(|r| {
+                    let field = |name: &str| r.get(name).cloned().unwrap_or_default();
+                    json!({"fullName": field("full_name"), "defaultBranch": field("default_branch"),
+                           "private": field("private")})
+                })
+                .collect()
+        });
+    let granted = json!({"id": 4242, "account": "acme", "repositories": repositories,
+                         "refreshedAt": minutes_ago(90)});
+    if let Some(shop) = s.objects.get_mut("shop") {
+        shop.config_maps.push(from(json!({
+            "metadata": {"name": "zeabur-github-app", "namespace": "shop",
+                         "labels": {"zeabur.com/github-app": "true"}, "resourceVersion": "4"},
+            "data": {"4242": granted.to_string()}
+        })));
+    }
+}
+
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
     let cluster = MemoryCluster::new(state());
@@ -4055,6 +4282,18 @@ async fn main() -> std::io::Result<()> {
         cluster.update(rke2);
         joining(cluster.clone());
     }
+    let github = match std::env::var("ZEABUR_DEMO_GITHUB") {
+        Ok(mode) => {
+            let (url, fake) = fake_github().await?;
+            if mode == "installed" {
+                cluster.update(|s| github_app(s, &fake));
+            } else {
+                cluster.update(builder_system);
+            }
+            Some(url)
+        }
+        Err(_) => None,
+    };
     kubelet(cluster.clone());
     evictions(cluster.clone());
     let access = Demo {
@@ -4081,6 +4320,10 @@ async fn main() -> std::io::Result<()> {
         builds: zeabur_api::settings::BuildSettings {
             registry: Some("zot.zot.svc:5000".to_owned()),
         },
+        github: github.map_or_default(|url| zeabur_api::settings::GitHubSettings {
+            web_url: url.clone(),
+            api_url: url,
+        }),
         ..zeabur_api::Settings::default()
     };
     let images = zeabur_api::images::Inspector::new(Arc::new(Registry::new()), Vec::new());

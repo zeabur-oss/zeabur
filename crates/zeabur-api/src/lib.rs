@@ -128,6 +128,7 @@ mod cache;
 pub mod cluster;
 mod error;
 pub mod gaps;
+mod github;
 mod handlers;
 pub mod identity;
 pub mod images;
@@ -228,6 +229,12 @@ fn cluster_routes(router: OpenApiRouter<AppState>) -> OpenApiRouter<AppState> {
         .routes(routes!(cluster::s3_destinations::get))
         .routes(routes!(cluster::s3_destinations::plan))
         .routes(routes!(cluster::s3_destinations::apply))
+        .routes(routes!(cluster::github_app::get))
+        .routes(routes!(cluster::github_app::manifest))
+        .routes(routes!(cluster::github_app::form))
+        .routes(routes!(cluster::github_app::conversion))
+        .routes(routes!(cluster::github_app::plan))
+        .routes(routes!(cluster::github_app::apply))
         .routes(routes!(notifications::cluster_get))
         .routes(routes!(notifications::cluster_plan))
         .routes(routes!(notifications::cluster_apply))
@@ -308,6 +315,7 @@ fn remaining_routes(router: OpenApiRouter<AppState>) -> OpenApiRouter<AppState> 
         .routes(routes!(projects::database_export::export))
         .routes(routes!(projects::builds::get))
         .routes(routes!(projects::deploy_keys::create))
+        .routes(routes!(cluster::github_app::project))
         .routes(routes!(images::inspect))
         .routes(routes!(projects::compose::convert_compose))
         .routes(routes!(projects::deploy_keys::public))
@@ -366,6 +374,7 @@ pub fn router_with_key(
         log_proxy,
         images,
         zeabur_catalog::template_idle,
+        images::https::Reach::Public,
     )
 }
 
@@ -382,6 +391,7 @@ pub fn router_with_images(access: Arc<dyn ClusterAccess>, images: images::Inspec
         None,
         Arc::new(images),
         zeabur_catalog::template_idle,
+        images::https::Reach::Any,
     )
 }
 
@@ -409,6 +419,7 @@ pub fn router_with_log_proxy(
         Some(log_proxy),
         inspector(images::https::Reach::Any, &Settings::default()),
         zeabur_catalog::template_idle,
+        images::https::Reach::Any,
     )
 }
 
@@ -479,6 +490,7 @@ pub fn router_with_settings_and_resolver(
         None,
         images,
         zeabur_catalog::template_idle,
+        images::https::Reach::Any,
     )
 }
 
@@ -502,6 +514,7 @@ pub fn router_for_demo(
         None,
         images,
         template_idle,
+        images::https::Reach::Any,
     )
 }
 
@@ -524,6 +537,7 @@ fn build(
         None,
         images,
         zeabur_catalog::template_idle,
+        images::https::Reach::Any,
     )
 }
 
@@ -542,8 +556,10 @@ fn build_with(
     log_proxy: Option<Arc<dyn services::logs::LogProxy>>,
     images: Arc<images::Inspector>,
     template_idle: fn(&str) -> Option<zeabur_catalog::IdleUse>,
+    reach: images::https::Reach,
 ) -> Router {
     let catalogue = Arc::new(zeabur_catalog::catalogue().unwrap_or_default());
+    let github = images::https::Https::new(reach, None).ok();
     let state = AppState {
         access,
         catalogue,
@@ -557,6 +573,7 @@ fn build_with(
         sign_in,
         log_proxy,
         images,
+        github,
     };
     let (router, api) = routes().split_for_parts();
     let spec = Arc::new(serde_json::to_string(&api).unwrap_or_default());

@@ -2716,6 +2716,15 @@ export const en = {
   "add.access.deployKeyHosts": "For repositories on GitHub or GitLab.",
   "add.access.token": "Access token",
   "add.access.tokenHint": "A token that can read the repository, used over HTTPS.",
+  "add.source": "Source",
+  "add.source.github": "GitHub",
+  "add.source.url": "Git URL",
+  "add.githubSearch": "Search repositories",
+  "add.githubEmpty": "No repository matches.",
+  "add.githubListed": (date: string) =>
+    `List from ${date}. Missing a repository? Ask a cluster admin to open it to this project again.`,
+  "add.githubAccess": "Read through the cluster's GitHub App. Nothing else to set up.",
+  "add.problem.githubRepository": "Pick a repository.",
   "add.access.noSecrets":
     "Your role can't add Secrets in this project, so only public repositories work.",
   "add.deployKeyMake": "Create deploy key",
@@ -2937,6 +2946,58 @@ export const en = {
   "db.backup.setUp": "Set up backups",
   "db.backup.setUpBody":
     "Backups go to an S3-compatible bucket you provide. The keys are kept as a Secret in this project.",
+  "githubApp.title": "GitHub App",
+  "githubApp.body":
+    "Once it is set up, project members pick a GitHub repository to deploy, and every push builds on its own. No deploy keys or webhooks to set up.",
+  "githubApp.what": "Setting up the GitHub App",
+  "githubApp.none":
+    "This cluster has no GitHub App yet. Create one on GitHub; it takes about a minute.",
+  "githubApp.create": "Create GitHub App",
+  "githubApp.field.name": "Name on GitHub",
+  "githubApp.field.nameHint": "It must be unique on GitHub.",
+  "githubApp.field.organization": "Organization",
+  "githubApp.field.organizationHint": "Leave empty to create it under your own account.",
+  "githubApp.field.webhook": "Webhook URL",
+  "githubApp.field.webhookHint":
+    "Only if Zeabur Builder's webhook receiver is on. Without it, Zeabur Builder checks GitHub for new commits every minute.",
+  "githubApp.problem.name.empty": "Enter a name for the App.",
+  "githubApp.problem.name.long": "A name can have up to 34 characters.",
+  "githubApp.problem.webhook": "The URL starts with https://.",
+  "githubApp.continue": "Continue on GitHub",
+  "githubApp.install": "Install on GitHub",
+  "githubApp.open": "Open on GitHub",
+  "githubApp.pollsOnly": "No webhook: new commits are picked up within a minute.",
+  "githubApp.installations": "Installed on",
+  "githubApp.noInstallations":
+    "Not installed on any account yet. Install it on the accounts or organizations that hold your repositories.",
+  "githubApp.installationsProblem": "Couldn't read the installations from GitHub.",
+  "githubApp.selection.all": "All repositories",
+  "githubApp.selection.selected": "Selected repositories",
+  "githubApp.everyProject": "Every project",
+  "githubApp.noProject": "No project can use it yet",
+  "githubApp.choose": "Choose projects",
+  "githubApp.grantHint":
+    "Members of these projects can deploy the repositories the App can read on this account.",
+  "githubApp.plan.save": "Save the GitHub App",
+  "githubApp.plan.grant": (account: string) => `Choose which projects can use ${account}`,
+  "githubApp.plan.secret":
+    "Saves the App's keys, which Zeabur Builder reads the repositories with.",
+  "githubApp.plan.grants": "Updates which projects Zeabur Builder lets use the installation.",
+  "githubApp.plan.project": (project: string) =>
+    `Updates the repositories ${project} can pick from.`,
+  "githubApp.plan.keysHidden": "The private key goes into a Secret and isn't shown here.",
+  "githubApp.warning.replacesApp":
+    "This replaces the cluster's current GitHub App. Services built with the old App stop picking up new commits until you open the new App to their projects.",
+  "githubApp.warning.noWebhook":
+    "Without a webhook, Zeabur Builder checks GitHub for new commits every minute.",
+  "githubApp.warning.wasEveryNamespace":
+    "Every project could use this account before. After this, only the projects you chose can.",
+  "githubApp.warning.removesNamespaces":
+    "Projects you unchecked can no longer build from this account's repositories.",
+  "githubApp.callback.title": "Finishing the GitHub App",
+  "githubApp.callback.missing":
+    "GitHub didn't send back a code. Go back to the cluster page and start again.",
+  "githubApp.callback.back": "Back to the cluster",
   "s3d.title": "S3 destinations",
   "s3d.body":
     "Backup forms offer these. Choosing one copies its keys into the project. New keys saved here go to the copies you may change.",
@@ -3421,6 +3482,9 @@ export const en = {
   "sentence.problem.summary.invalid": (p: P) =>
     p.name ? `The cluster refused the change to ${p.name}.` : "The cluster refused the change.",
   "sentence.problem.summary.too-many-requests": () => "The cluster is busy.",
+  "sentence.problem.summary.github": (p: P) => `GitHub didn't answer as expected: ${p.detail}`,
+  "sentence.problem.github.fix": () =>
+    "Try again. If it keeps failing, check that the cluster can reach GitHub.",
   "sentence.problem.summary.unavailable": () => "The cluster can't be reached.",
   "sentence.problem.summary.internal": () => "Something went wrong in Zeabur.",
   "sentence.problem.summary.quota-exceeded": (p: P) =>

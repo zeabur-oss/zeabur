@@ -183,6 +183,21 @@ describe("the objects", () => {
     expect(JSON.stringify(changes)).not.toContain("PRIVATE KEY")
   })
 
+  test("a repository picked from the GitHub App names its installation and no Secret", () => {
+    const objects = gitObjects(
+      form({ access: "githubApp", installationId: 4242, branch: "trunk" }),
+      "shop",
+      "zot:5000",
+      {},
+    )
+    const build = find(objects, "Build")
+    expect(build.spec.source.git.url).toBe("https://github.com/acme/site.git")
+    expect(build.spec.source.git.ref).toBe("trunk")
+    expect(build.spec.source.githubApp).toEqual({ installationId: 4242 })
+    expect(build.spec.source.credentialsRef).toBeUndefined()
+    expect(objects.some((o) => (o.metadata as Object).name === "site-git")).toBe(false)
+  })
+
   test("no branch follows the default branch; a branch is taken as typed", () => {
     expect(newGitService().branch).toBe("")
     const ref = (branch: string) =>

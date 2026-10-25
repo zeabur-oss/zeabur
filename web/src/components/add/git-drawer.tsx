@@ -6,6 +6,12 @@ import CaretRightIcon from "~icons/ph/caret-right"
 
 import { api, toProblem, unwrap } from "@/api/client"
 import { clusterQuery, creatableQuery } from "@/api/queries"
+import {
+  GitHubAccess,
+  RepositoryField,
+  repositoryUrl,
+  useGitHubSource,
+} from "@/components/add/repository-field"
 import { useTakenNames } from "@/components/add/taken"
 import { FormField } from "@/components/form-field"
 import { PlanDrawer } from "@/components/plan/plan-drawer"
@@ -81,11 +87,13 @@ export function GitDrawer({ project, onClose }: { project: string; onClose: () =
   const ids = { publicUrl: useId() }
   const set = (patch: Partial<GitService>) => setForm((f) => ({ ...f, ...patch }))
 
-  const repo = parseRepository(form.url)
+  const github = useGitHubSource(project)
+  const fromGitHub = github.source === "github"
+  const url = repositoryUrl(github, form.url)
+  const repo = parseRepository(url)
   const keyHost = deployKeyHost(repo)
   const secrets = options.secrets
-  const access: Access =
-    !secrets || (form.access === "deployKey" && !keyHost) ? "public" : form.access
+  const access = accessOf(form.access, { fromGitHub, secrets, keyHost })
   const name = named
     ? form.name
     : repo
@@ -100,20 +108,11 @@ export function GitDrawer({ project, onClose }: { project: string; onClose: () =
   const username = userSet ? form.username : tokenUser(repo?.host)
   const key = deployKey && deployKey.host === keyHost ? deployKey : undefined
 
-  const makeKey = useMutation({
-    mutationFn: async (gitHost: string) =>
-      unwrap(
-        await api.POST("/api/v1/projects/{project}/deploy-keys", {
-          params: { path: { project } },
-          body: { host: gitHost },
-        }),
-      ),
-    onSuccess: (made, gitHost) => setDeployKey({ host: gitHost, ...made }),
-  })
-
   const resolved: GitService = {
     ...form,
+    url,
     access,
+    installationId: github.picked?.installationId,
     name,
     port,
     publicUrl,
@@ -149,7 +148,6 @@ export function GitDrawer({ project, onClose }: { project: string; onClose: () =
 
   const moreOpen =
     tried && (!!problems.directory || !!problems.dockerfile || problems.env || problems.buildEnv)
-  const keyPage = repo ? deployKeyPage(repo) : undefined
 
   return (
     <PlanDrawer
@@ -175,21 +173,16 @@ export function GitDrawer({ project, onClose }: { project: string; onClose: () =
           review()
         }}
       >
-        <FormField
-          label={t("add.field.repository")}
-          errors={shown(problems.url, () => t(`add.problem.repository.${problems.url ?? "empty"}`))}
-        >
-          <Input
-            size="sm"
-            mono
-            value={form.url}
-            placeholder="https://github.com/acme/web"
-            autoComplete="off"
-            spellCheck={false}
-            autoFocus
-            onChange={(event) => set({ url: event.target.value })}
-          />
-        </FormField>
+        <RepositoryField
+          github={github}
+          url={form.url}
+          onUrl={(next) => set({ url: next })}
+          errors={shown(problems.url || problems.installation, () =>
+            fromGitHub
+              ? t("add.problem.githubRepository")
+              : t(`add.problem.repository.${problems.url ?? "empty"}`),
+          )}
+        />
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <FormField
             label={t("add.field.branch")}
@@ -200,7 +193,7 @@ export function GitDrawer({ project, onClose }: { project: string; onClose: () =
               size="sm"
               mono
               value={form.branch}
-              placeholder={t("add.branchDefault")}
+              placeholder={github.picked?.defaultBranch ?? t("add.branchDefault")}
               autoComplete="off"
               spellCheck={false}
               onChange={(event) => set({ branch: event.target.value })}
@@ -300,7 +293,9 @@ export function GitDrawer({ project, onClose }: { project: string; onClose: () =
         )}
         <fieldset className="flex min-w-0 flex-col gap-2">
           <legend className="mb-1.5 text-sm font-medium">{t("add.access")}</legend>
-          {secrets ? (
+          {fromGitHub ? (
+            <GitHubAccess listedAt={github.listedAt} />
+          ) : secrets ? (
             <RadioGroup value={access} onValueChange={(value) => set({ access: value as Access })}>
               <RadioOption value="public" label={t("add.access.public")} />
               <RadioOption
@@ -321,52 +316,14 @@ export function GitDrawer({ project, onClose }: { project: string; onClose: () =
             <Note>{t("add.access.noSecrets")}</Note>
           )}
           {access === "deployKey" && keyHost ? (
-            <div className="flex flex-col gap-2 pt-2">
-              {key ? (
-                <>
-                  <FormField label={t("add.deployKeyPublic")}>
-                    <CopyInput value={key.publicKey} copyLabel={t("common.copy")} />
-                  </FormField>
-                  <p className="flex flex-wrap items-baseline gap-x-2 type-meta text-muted-foreground">
-                    {t("add.deployKeyAdd")}
-                    {keyPage ? (
-                      <a
-                        href={keyPage}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center gap-1 text-foreground hover:underline"
-                      >
-                        {t("add.deployKeyOpen", keyHost === "github.com" ? "GitHub" : "GitLab")}
-                        <ArrowSquareOutIcon aria-hidden="true" className="size-3.5" />
-                      </a>
-                    ) : null}
-                  </p>
-                </>
-              ) : (
-                <div className="flex flex-col gap-1.5">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="self-start"
-                    disabled={makeKey.isPending}
-                    onClick={() => makeKey.mutate(keyHost)}
-                  >
-                    {t("add.deployKeyMake")}
-                  </Button>
-                  {tried && problems.key ? (
-                    <p className="text-xs leading-4 text-destructive">
-                      {t("add.problem.deployKey")}
-                    </p>
-                  ) : null}
-                </div>
-              )}
-              {makeKey.isError ? (
-                <Alert variant="destructive">
-                  <AlertDescription>{toProblem(makeKey.error).detail}</AlertDescription>
-                </Alert>
-              ) : null}
-            </div>
+            <DeployKeyFields
+              project={project}
+              host={keyHost}
+              page={repo ? deployKeyPage(repo) : undefined}
+              made={key}
+              missing={tried && !!problems.key}
+              onMade={setDeployKey}
+            />
           ) : null}
           {access === "token" ? (
             <div className="grid grid-cols-1 gap-4 pt-2 sm:grid-cols-2">
@@ -422,6 +379,93 @@ export function GitDrawer({ project, onClose }: { project: string; onClose: () =
         <Note>{t("add.gitAfter")}</Note>
       </form>
     </PlanDrawer>
+  )
+}
+
+/** The access the form builds with: the App for a picked repository; otherwise what the person
+ * chose, as far as their rights and the host allow. */
+function accessOf(
+  chosen: Access,
+  { fromGitHub, secrets, keyHost }: { fromGitHub: boolean; secrets: boolean; keyHost?: string },
+): Access {
+  if (fromGitHub) return "githubApp"
+  if (!secrets || chosen === "githubApp") return "public"
+  return chosen === "deployKey" && !keyHost ? "public" : chosen
+}
+
+/** A deploy key for the repository's host: made on the server, its public half to add on the
+ * host. */
+function DeployKeyFields({
+  project,
+  host,
+  page,
+  made,
+  missing,
+  onMade,
+}: {
+  project: string
+  host: string
+  page?: string
+  made?: DeployKey
+  missing: boolean
+  onMade: (key: DeployKey) => void
+}) {
+  const t = useT()
+  const makeKey = useMutation({
+    mutationFn: async (gitHost: string) =>
+      unwrap(
+        await api.POST("/api/v1/projects/{project}/deploy-keys", {
+          params: { path: { project } },
+          body: { host: gitHost },
+        }),
+      ),
+    onSuccess: (key, gitHost) => onMade({ host: gitHost, ...key }),
+  })
+  return (
+    <div className="flex flex-col gap-2 pt-2">
+      {made ? (
+        <>
+          <FormField label={t("add.deployKeyPublic")}>
+            <CopyInput value={made.publicKey} copyLabel={t("common.copy")} />
+          </FormField>
+          <p className="flex flex-wrap items-baseline gap-x-2 type-meta text-muted-foreground">
+            {t("add.deployKeyAdd")}
+            {page ? (
+              <a
+                href={page}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 text-foreground hover:underline"
+              >
+                {t("add.deployKeyOpen", host === "github.com" ? "GitHub" : "GitLab")}
+                <ArrowSquareOutIcon aria-hidden="true" className="size-3.5" />
+              </a>
+            ) : null}
+          </p>
+        </>
+      ) : (
+        <div className="flex flex-col gap-1.5">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="self-start"
+            disabled={makeKey.isPending}
+            onClick={() => makeKey.mutate(host)}
+          >
+            {t("add.deployKeyMake")}
+          </Button>
+          {missing ? (
+            <p className="text-xs leading-4 text-destructive">{t("add.problem.deployKey")}</p>
+          ) : null}
+        </div>
+      )}
+      {makeKey.isError ? (
+        <Alert variant="destructive">
+          <AlertDescription>{toProblem(makeKey.error).detail}</AlertDescription>
+        </Alert>
+      ) : null}
+    </div>
   )
 }
 

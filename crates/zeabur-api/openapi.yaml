@@ -332,6 +332,183 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/Problem"
+  /api/v1/cluster/github-app:
+    get:
+      tags:
+      - cluster
+      summary: |-
+        The App, its installations and their projects. The installations are read from GitHub with
+        the App's private key, read as the person; a person who may not read it sees the App without
+        them.
+      operationId: getGitHubApp
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GitHubApp"
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  /api/v1/cluster/github-app/apply:
+    post:
+      tags:
+      - cluster
+      summary: "Carries out a GitHub App plan by its token: checks it, dry-runs every write, then writes."
+      operationId: applyGitHubApp
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GitHubAppApply"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GitHubAppApplied"
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  /api/v1/cluster/github-app/conversion:
+    post:
+      tags:
+      - cluster
+      summary: |-
+        Turns the code GitHub sent back into the App, and plans storing it in Builder's Secret;
+        writes nothing. The private key and the webhook secret travel only sealed in the token.
+      operationId: convertGitHubApp
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GitHubConversionRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GitHubAppPlan"
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "503":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  /api/v1/cluster/github-app/form:
+    get:
+      tags:
+      - cluster
+      summary: |-
+        The page that sends the manifest to GitHub: a form with one button, no script, whose policy
+        lets forms go to GitHub only.
+      operationId: gitHubAppForm
+      parameters:
+      - name: state
+        in: query
+        description: The state `manifest` answered
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: The page
+          content:
+            text/html: {}
+        "400":
+          description: The state is not valid
+          content:
+            text/html: {}
+  /api/v1/cluster/github-app/manifest:
+    post:
+      tags:
+      - cluster
+      summary: |-
+        Starts GitHub's manifest flow: a `state` sealed for the person, valid for an hour, and the
+        page that sends the manifest to GitHub. Writes nothing.
+      operationId: startGitHubAppManifest
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GitHubManifestRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GitHubManifest"
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  /api/v1/cluster/github-app/plan:
+    post:
+      tags:
+      - cluster
+      summary: |-
+        Plans granting an installation to projects: Builder's grant, and the repositories it can read
+        in each project; writes nothing. The repositories are read from GitHub now.
+      operationId: planGitHubApp
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GitHubGrantRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GitHubAppPlan"
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "503":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
   /api/v1/cluster/health:
     get:
       tags:
@@ -1959,6 +2136,32 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/GapList"
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  "/api/v1/projects/{project}/github-app":
+    get:
+      tags:
+      - projects
+      summary: |-
+        The installations granted to the project, and the repositories each could read when it was
+        granted; read as the person from the project's ConfigMap [`PROJECT_CONFIG_MAP`].
+      operationId: getProjectGitHubApp
+      parameters:
+      - name: project
+        in: path
+        description: The project's namespace
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProjectGitHubApp"
         "403":
           content:
             application/problem+json:
@@ -9122,6 +9325,252 @@ components:
         encoding:
           $ref: "#/components/schemas/Encoding"
           description: How to encode them.
+    GitHubApp:
+      type: object
+      description: The cluster's GitHub App.
+      required:
+      - namespace
+      - canChange
+      - webUrl
+      - unreadable
+      properties:
+        app:
+          oneOf:
+          - $ref: "#/components/schemas/GitHubAppView"
+            description: The App; absent when there is none, or when the person may not read its Secret.
+          - type: "null"
+        canChange:
+          $ref: "#/components/schemas/Permission"
+          description: Whether the person may make the App and grant its installations.
+        installations:
+          type:
+          - array
+          - "null"
+          items:
+            $ref: "#/components/schemas/GitHubInstallation"
+          description: The App's installations; absent when they could not be read.
+        installationsProblem:
+          type:
+          - string
+          - "null"
+          description: Why the installations could not be read, in GitHub's or Zeabur's words.
+        namespace:
+          type: string
+          description: Zeabur Builder's namespace, where the App is kept.
+        unreadable:
+          type: array
+          items:
+            $ref: "#/components/schemas/UnreadableView"
+          description: What could not be read.
+        webUrl:
+          type: string
+          description: Where people open GitHub, `https://github.com`.
+    GitHubAppApplied:
+      type: object
+      description: What an apply wrote.
+      required:
+      - written
+      properties:
+        written:
+          type: array
+          items:
+            type: string
+          description: The objects written, `Kind/namespace/name`.
+    GitHubAppApply:
+      type: object
+      description: The token of a plan to apply.
+      required:
+      - token
+      properties:
+        token:
+          type: string
+          description: The token a plan returned.
+    GitHubAppPlan:
+      type: object
+      description: A plan, and the token that applies it.
+      required:
+      - token
+      - expiresAt
+      - writes
+      - warnings
+      properties:
+        expiresAt:
+          type: string
+          description: When the token stops working, RFC 3339.
+        token:
+          type: string
+          description: Send this to `apply` to carry out exactly this plan.
+        warnings:
+          type: array
+          items:
+            $ref: "#/components/schemas/GitHubAppWarning"
+          description: What to know first.
+        writes:
+          type: array
+          items:
+            $ref: "#/components/schemas/GitHubAppWrite"
+          description: The writes, in order; empty when nothing changes.
+    GitHubAppView:
+      type: object
+      description: The App, without its keys.
+      required:
+      - htmlUrl
+      - installUrl
+      - webhook
+      properties:
+        htmlUrl:
+          type: string
+          description: Its page on GitHub, `https://github.com/apps/<slug>`; empty when not known.
+        installUrl:
+          type: string
+          description: Where to install it on an account; empty when not known.
+        webhook:
+          type: boolean
+          description: >-
+            Whether it receives push events; without, Builder asks for new commits every
+            minute.
+    GitHubAppWarning:
+      type: string
+      description: What the person should know before applying a plan.
+      enum:
+      - replacesApp
+      - noWebhook
+      - wasEveryNamespace
+      - removesNamespaces
+    GitHubAppWrite:
+      type: object
+      description: One object a plan writes.
+      required:
+      - action
+      - kind
+      - name
+      - namespace
+      properties:
+        action:
+          $ref: "#/components/schemas/GitHubAppWriteAction"
+          description: What it does.
+        afterYaml:
+          type:
+          - string
+          - "null"
+          description: The object as it will be, YAML, a Secret's values hidden.
+        beforeYaml:
+          type:
+          - string
+          - "null"
+          description: The object as it is, YAML; absent for a creation and for a Secret.
+        kind:
+          type: string
+          description: The object's kind.
+        name:
+          type: string
+          description: Its name.
+        namespace:
+          type: string
+          description: Its namespace.
+    GitHubAppWriteAction:
+      type: string
+      description: What a write does.
+      enum:
+      - create
+      - patch
+    GitHubConversionRequest:
+      type: object
+      description: What GitHub sent back.
+      required:
+      - code
+      - state
+      properties:
+        code:
+          type: string
+          description: The `code` query parameter.
+        state:
+          type: string
+          description: The `state` query parameter.
+    GitHubGrantRequest:
+      type: object
+      description: An installation to grant to projects.
+      required:
+      - installationId
+      - namespaces
+      properties:
+        installationId:
+          type: integer
+          format: int64
+          description: The installation.
+        namespaces:
+          type: array
+          items:
+            type: string
+          description: >-
+            The namespaces that may use it, all of them; empty takes it from every
+            namespace.
+    GitHubInstallation:
+      type: object
+      description: One installation of the App, and the projects it is granted to.
+      required:
+      - id
+      - account
+      - accountType
+      - repositorySelection
+      - settingsUrl
+      - namespaces
+      - everyNamespace
+      properties:
+        account:
+          type: string
+          description: The user or organization it is installed on.
+        accountType:
+          type: string
+          description: "`User` or `Organization`."
+        everyNamespace:
+          type: boolean
+          description: Every namespace may use it (`*`).
+        id:
+          type: integer
+          format: int64
+          description: Its ID.
+        namespaces:
+          type: array
+          items:
+            type: string
+          description: The namespaces that may use it.
+        repositorySelection:
+          type: string
+          description: "`all` or `selected` repositories."
+        settingsUrl:
+          type: string
+          description: Its settings page on GitHub.
+    GitHubManifest:
+      type: object
+      description: The state of a manifest flow.
+      required:
+      - formUrl
+      properties:
+        formUrl:
+          type: string
+          description: Open this page, which sends the manifest to GitHub.
+    GitHubManifestRequest:
+      type: object
+      description: What the manifest flow needs.
+      required:
+      - name
+      - redirectUrl
+      properties:
+        name:
+          type: string
+          description: The App's name on GitHub, unique there, at most 34 characters.
+        organization:
+          type: string
+          description: The organization to make the App in; empty for the person's own account.
+        redirectUrl:
+          type: string
+          description: Where GitHub sends the browser back, `https://<zeabur>/settings/github-app`.
+        webhookUrl:
+          type: string
+          description: >-
+            Builder's webhook URL, `https://<host>/hooks/github-app`; empty when its
+            receiver is off.
     Health:
       type: string
       description: "A service's health, from worst to best: what a status dot shows."
@@ -13799,6 +14248,17 @@ components:
               Who may reach each service, from the project's NetworkPolicy objects. Whether the
               cluster's network plugin enforces them is not known.
           - type: "null"
+    ProjectGitHubApp:
+      type: object
+      description: The installations granted to a project.
+      required:
+      - installations
+      properties:
+        installations:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProjectInstallation"
+          description: The installations, by account.
     ProjectGrant:
       type: object
       description: A member's role in a project.
@@ -13867,6 +14327,30 @@ components:
       - game
       - heart
       - briefcase
+    ProjectInstallation:
+      type: object
+      description: An installation granted to a project, as the grant left it.
+      required:
+      - id
+      - account
+      - repositories
+      - refreshedAt
+      properties:
+        account:
+          type: string
+          description: The user or organization it is installed on.
+        id:
+          type: integer
+          format: int64
+          description: Its ID.
+        refreshedAt:
+          type: string
+          description: When the list was read from GitHub, RFC 3339.
+        repositories:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProjectRepository"
+          description: The repositories it could read.
     ProjectList:
       type: object
       description: The projects (namespaces) the person may list.
@@ -13978,6 +14462,23 @@ components:
           items:
             $ref: "#/components/schemas/UnreadableView"
           description: What could not be read.
+    ProjectRepository:
+      type: object
+      description: A repository a project may build with an installation.
+      required:
+      - fullName
+      - defaultBranch
+      - private
+      properties:
+        defaultBranch:
+          type: string
+          description: Its default branch.
+        fullName:
+          type: string
+          description: "`owner/name`."
+        private:
+          type: boolean
+          description: Whether it is private.
     ProjectRights:
       type: object
       description: What the person may change in one project.

@@ -14,7 +14,7 @@ use std::time::Duration;
 
 use axum::http::{self, Request};
 use bytes::Bytes;
-use http_body_util::{BodyExt as _, Empty, Limited};
+use http_body_util::{BodyExt as _, Full, Limited};
 use hyper_rustls::HttpsConnector;
 use hyper_util::client::legacy::Client;
 use hyper_util::client::legacy::connect::HttpConnector;
@@ -41,7 +41,7 @@ pub enum Reach {
 /// A registry client.
 #[derive(Clone)]
 pub struct Https {
-    client: Client<HttpsConnector<HttpConnector<Guarded>>, Empty<Bytes>>,
+    client: Client<HttpsConnector<HttpConnector<Guarded>>, Full<Bytes>>,
     reach: Reach,
 }
 
@@ -121,7 +121,7 @@ impl Https {
             value.set_sensitive(true);
             request = request.header(http::header::AUTHORIZATION, value);
         }
-        let request = request.body(Empty::new()).map_err(|e| e.to_string())?;
+        let request = request.body(Full::default()).map_err(|e| e.to_string())?;
         let response = self
             .client
             .request(request)
@@ -155,6 +155,42 @@ impl Https {
             content_type,
             body,
         })
+    }
+
+    /// Sends `request` and reads at most `limit` bytes of the answer, whatever its status, within
+    /// [`DEADLINE`]; the status and the body. For the GitHub client.
+    pub(crate) async fn exchange(
+        &self,
+        request: Request<Full<Bytes>>,
+        limit: usize,
+    ) -> Result<(u16, Vec<u8>), String> {
+        if let Some(ip) = request
+            .uri()
+            .host()
+            .map(|h| h.trim_start_matches('[').trim_end_matches(']'))
+            .and_then(|h| h.parse::<IpAddr>().ok())
+            && !allowed(self.reach, ip)
+        {
+            return Err(format!("Zeabur does not connect to {ip}"));
+        }
+        let exchange = async {
+            let response = self
+                .client
+                .request(request)
+                .await
+                .map_err(|e| describe(&e))?;
+            let status = response.status().as_u16();
+            let body = Limited::new(response.into_body(), limit)
+                .collect()
+                .await
+                .map_err(|e| e.to_string())?
+                .to_bytes()
+                .to_vec();
+            Ok((status, body))
+        };
+        tokio::time::timeout(DEADLINE, exchange)
+            .await
+            .map_err(|_elapsed| "the server did not answer in time".to_owned())?
     }
 }
 
