@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # Tries release artifacts as they will ship, never rebuilding them: the zeaburctl archive, and the
-# chart installed on a disposable k3s cluster of its own. With an image (a local candidate from
-# release-build.sh), the chart runs exactly that image, imported into the node; without one, the
-# node pulls the image the chart names, as an installation would (release-verify.sh).
-# Run inside `nix develop` on Linux amd64 or arm64 with Docker; it never touches the caller's
-# kubeconfig.
+# chart installed on the development cluster (scripts/dev-cluster.sh). With an image (a local
+# candidate from release-build.sh), the chart runs exactly that image, imported into the node;
+# without one, the node pulls the image the chart names, as an installation would
+# (release-verify.sh). Run inside `nix develop` on Linux amd64 or arm64 with Docker; it uses port
+# 443 and never touches the caller's kubeconfig.
 #   scripts/release-smoke.sh dist/zeaburctl-v0.0.2-linux-arm64.tar.gz deploy/chart/zeabur zeabur:release-arm64
 #   scripts/release-smoke.sh zeaburctl-v0.0.2-linux-arm64.tar.gz oci://ghcr.io/zeabur-oss/charts/zeabur@sha256:…
 set -euo pipefail
@@ -22,32 +22,14 @@ case "$(uname -s):$(uname -m)" in
   Linux:aarch64) arch=arm64 ;;
   *) echo "release smoke runs on Linux amd64 or arm64 only" >&2; exit 2 ;;
 esac
-k3s_image="${K3S_IMAGE:-rancher/k3s:v1.36.5-k3s1}"
 work="$(mktemp -d)"
-cluster="zeabur-release-${work##*.}"
-cluster="${cluster,,}"
-local_image="docker.io/library/zeabur:smoke-${cluster#zeabur-release-}"
-namespace=zeabur
-cluster_started=false
-image_tagged=false
-forward_pid=
-export KUBECONFIG="$work/kubeconfig"
+root="$(cd "$(dirname "$0")/.." && pwd)"
+state="$root/target/dev-cluster"
 
 cleanup() {
   local status=$?
   trap - EXIT
-  if [[ -n "$forward_pid" ]]; then
-    kill "$forward_pid" 2>/dev/null || true
-    wait "$forward_pid" 2>/dev/null || true
-  fi
-  if [[ "$status" != 0 && -s "$KUBECONFIG" ]]; then
-    kubectl --request-timeout=10s -n "$namespace" get pods -o wide >&2 || true
-    kubectl --request-timeout=10s -n "$namespace" describe deployment zeabur >&2 || true
-    kubectl --request-timeout=10s -n "$namespace" logs deployment/zeabur --tail=100 >&2 || true
-    kubectl --request-timeout=10s -n "$namespace" get events --sort-by=.lastTimestamp >&2 || true
-  fi
-  [[ "$cluster_started" == true ]] && { k3d cluster delete "$cluster" >&2 || true; }
-  [[ "$image_tagged" == true ]] && { docker image rm "$local_image" >/dev/null || true; }
+  "$root/scripts/dev-cluster.sh" down >&2 || true
   rm -rf "$work"
   exit "$status"
 }
@@ -75,77 +57,33 @@ if [[ "$version" != "$expected" ]]; then
   exit 1
 fi
 
-helm_args=()
+# The chart's own image when no candidate is given, as an installation would pull it.
 if [[ -n "$image" ]]; then
-  # Pin the candidate by its image ID: a new tag changes no bytes, and pullPolicy Never below
-  # keeps any registry from replacing it.
-  image_id="$(docker image inspect --format '{{.Id}}' "$image")"
-  platform="$(docker image inspect --format '{{.Os}}/{{.Architecture}}' "$image_id")"
+  platform="$(docker image inspect --format '{{.Os}}/{{.Architecture}}' "$image")"
   if [[ "$platform" != "linux/$arch" ]]; then
     echo "image $image is $platform, this machine linux/$arch" >&2
     exit 1
   fi
-  docker tag "$image_id" "$local_image"
-  image_tagged=true
-  # Only this platform: with Docker's containerd store an image can be a multi-platform index
-  # whose other platforms are absent, and the node's import then fails while k3d reports success.
-  docker image save --platform "linux/$arch" --output "$work/image.tar" "$local_image"
-  helm_args+=(--set image.repository="${local_image%:*}" --set image.tag="${local_image##*:}"
-    --set image.digest= --set image.pullPolicy=Never)
+else
+  image="$(helm show values "$chart" | yq '.image.repository + "@" + .image.digest')"
 fi
 
-cluster_started=true
-k3d cluster create "$cluster" --image "$k3s_image" --no-lb --wait --timeout 300s \
-  --kubeconfig-update-default=false --kubeconfig-switch-context=false \
-  --k3s-arg '--disable=traefik@server:0' --k3s-arg '--disable=servicelb@server:0'
-k3d kubeconfig get "$cluster" >"$KUBECONFIG"
-if [[ -n "$image" ]]; then
-  k3d image import "$work/image.tar" --cluster "$cluster"
-  # The import's exit code is not proof: read what the node has. Capture first, then match
-  # (`grep -q` under pipefail; see the zeabur-ci skill).
-  images="$(docker exec "k3d-$cluster-server-0" crictl images)"
-  if ! grep -q "docker.io/library/zeabur *${local_image##*:}" <<<"$images"; then
-    echo "the node does not have $local_image after the import" >&2
-    exit 1
-  fi
-fi
-
-# The chart as people install it: its default values but the required ones, which name hosts
-# that do not resolve. Zeabur starts without its issuer and asks again at sign-in.
-kubectl create namespace "$namespace"
-kubectl -n "$namespace" create secret generic zeabur-oidc --from-literal=client-secret=release-smoke
-helm install zeabur "$chart" --namespace "$namespace" --wait --timeout 5m \
-  --set publicUrl=https://zeabur.release-smoke.invalid \
-  --set issuer.url=https://identity.release-smoke.invalid \
-  --set issuer.clientSecret.existingSecret=zeabur-oidc "${helm_args[@]}"
-running="$(kubectl -n "$namespace" get pods -l app.kubernetes.io/name=zeabur \
+# The chart on the development cluster, with zeabur-installer's values, Zeabur Identity, and Zeabur
+# Proxy off as the chart's default.
+"$root/scripts/dev-cluster.sh" up --zeabur-chart "$chart" --zeabur-image "$image"
+export KUBECONFIG="$state/kubeconfig"
+running="$(kubectl -n zeabur get pods -l app.kubernetes.io/name=zeabur \
   -o jsonpath='{.items[0].status.containerStatuses[0].imageID}')"
 echo "zeabur runs $running"
-
-# The kernel picks the local port, so concurrent runs do not collide. The log exists before the
-# port-forward starts writing to it.
-: >"$work/port-forward.log"
-kubectl -n "$namespace" port-forward --address 127.0.0.1 service/zeabur :80 >"$work/port-forward.log" 2>&1 &
-forward_pid=$!
-port=
-for ((attempt = 0; attempt < 60; attempt++)); do
-  kill -0 "$forward_pid" 2>/dev/null || { cat "$work/port-forward.log" >&2; exit 1; }
-  log="$(cat "$work/port-forward.log")"
-  if [[ "$log" =~ Forwarding\ from\ 127\.0\.0\.1:([0-9]+) ]]; then
-    port="${BASH_REMATCH[1]}"
-    break
-  fi
-  sleep 1
-done
-[[ -n "$port" ]] || { echo "port-forward did not start" >&2; exit 1; }
-health="$(curl --fail --silent --show-error --max-time 10 "http://127.0.0.1:$port/api/healthz")"
+health="$(curl --fail --silent --show-error --max-time 10 --cacert "$state/tls/ca.crt" \
+  --resolve zeabur.localhost:443:127.0.0.1 https://zeabur.localhost/api/healthz)"
 [[ "$health" == ok ]] || { echo "/api/healthz answered '$health'" >&2; exit 1; }
 
-# zeaburctl against the same cluster as its admin, without Zeabur Identity: a JSON report and an exit code
-# of 0 (all ok) or 1 (warnings: Zeabur Identity is missing), as in scripts/ci.sh.
+# zeaburctl against the same cluster as its admin: a JSON report and an exit code of 0 (all ok)
+# or 1 (warnings), as in scripts/ci.sh.
 code=0
 "$work/zeaburctl" doctor --output json >"$work/doctor.json" || code=$?
 [[ $code -eq 0 || $code -eq 1 ]] || { cat "$work/doctor.json" >&2; echo "zeaburctl doctor exited $code" >&2; exit 1; }
 jq -e '.checks | length > 0' "$work/doctor.json" >/dev/null
 
-echo "smoke passed: $(basename "$archive"), chart $chart${image:+, image $image}"
+echo "smoke passed: $(basename "$archive"), chart $chart, image $image"

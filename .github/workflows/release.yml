@@ -90,9 +90,20 @@ jobs:
           VERSION: ${{ needs.prepare.outputs.version }}
           ARCH: ${{ matrix.arch }}
         run: nix develop -c ./scripts/release-build.sh "$VERSION" "$ARCH" dist
+      - id: zeabur-identity
+        if: matrix.os == 'linux'
+        run: echo "rev=$(tr -d '[:space:]' < ZEABUR_IDENTITY_PINNED)" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: matrix.os == 'linux'
+        with:
+          repository: zeabur-oss/identity
+          ref: ${{ steps.zeabur-identity.outputs.rev }}
+          path: .zeabur-identity
+          persist-credentials: false
       - name: Smoke the archive, the chart and the image as built
         if: matrix.os == 'linux'
         env:
+          ZEABUR_IDENTITY_SRC: ${{ github.workspace }}/.zeabur-identity
           VERSION: ${{ needs.prepare.outputs.version }}
           ARCH: ${{ matrix.arch }}
         run: >-

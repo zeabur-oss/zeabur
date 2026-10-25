@@ -7,9 +7,9 @@
 #   scripts/ci.sh <job>      # run one job; it enters its Nix dev shell itself
 #   scripts/ci.sh --list     # the job names, `check` matrix first
 #
-# The cluster jobs create k3d clusters (`zeabur`, `zeabur-l2`) and delete them when they end; set
-# ZEABUR_CI_KEEP=1 to keep `zeabur` for a look afterwards. K3S_IMAGE picks the k3s release.
-# kubernetes-l2 builds Zeabur Identity from ZEABUR_IDENTITY_SRC (default ../identity) at the commit in ZEABUR_IDENTITY_PINNED.
+# The cluster jobs run on the development cluster (scripts/dev-cluster.sh, which also reads
+# ZEABUR_IDENTITY_SRC, K3S_IMAGE and ZEABUR_REGISTRY_MIRRORS) and delete it when they end; set
+# ZEABUR_CI_KEEP=1 to keep it for a look afterwards.
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
@@ -36,7 +36,6 @@ if [[ "${ZEABUR_CI_SHELL:-}" != "$shell" ]]; then
 fi
 
 export RUSTDOCFLAGS="-D warnings"
-k3s_image="${K3S_IMAGE:-rancher/k3s:v1.36.5-k3s1}"
 
 # The `check` matrix in ci.yml must list exactly the jobs above, or a job runs only locally.
 check_matrix() {
@@ -50,33 +49,9 @@ check_matrix() {
   fi
 }
 
-# The disposable cluster of the kubernetes job, in a kubeconfig of its own so that it never
-# changes the machine's current context.
-start_cluster() {
-  export KUBECONFIG="$root/target/ci/kubeconfig"
-  mkdir -p "$(dirname "$KUBECONFIG")"
-  k3d cluster delete zeabur >/dev/null 2>&1 || true
-  if [[ -z "${ZEABUR_CI_KEEP:-}" ]]; then
-    trap 'k3d cluster delete zeabur >/dev/null 2>&1 || true' EXIT
-  fi
-  k3d cluster create zeabur --image "$k3s_image" --no-lb --wait --timeout 300s
-  # Docker's containerd store keeps busybox as a multi-platform index, and the k3s node's import
-  # fails on the platforms it lacks while k3d still reports success. Rebuild it as one plain image
-  # (the classic builder writes no index or attestations; the label makes it a new image rather
-  # than the same index), import that, and fail unless the node really has it. Read the whole
-  # list before matching: `grep -q` exits at the first match, and under pipefail the SIGPIPE
-  # crictl then gets would fail the check.
-  docker pull busybox:1.37
-  printf 'FROM busybox:1.37\nLABEL com.zeabur.test=busybox\n' |
-    DOCKER_BUILDKIT=0 docker build -t busybox:1.37 -
-  k3d image import busybox:1.37 --cluster zeabur
-  local images
-  images=$(docker exec k3d-zeabur-server-0 crictl images)
-  grep -q 'docker.io/library/busybox *1.37' <<<"$images"
-}
-
-# As k3d's cluster admin, without Zeabur Identity: nothing critical and every check runs; the exit code is
-# the most serious status in the JSON (crates/zeaburctl/README.md).
+# As k3d's cluster admin, on the development cluster: nothing critical, every check runs, and
+# Zeabur Identity is installed, has Zeabur's client and is trusted; the exit code is the most
+# serious status in the JSON (crates/zeaburctl/README.md).
 check_doctor() {
   cargo build --locked -p zeaburctl --no-default-features
   local code=0 expected
@@ -90,9 +65,9 @@ check_doctor() {
     and all(.checks[]; (.status | IN("ok", "warning", "critical", "skipped", "error"))
       and (.findings | type == "array") and (.fix == null or (.fix | type == "string")))
     and (status("components") | IN("ok", "warning"))
-    and status("zeabur-identity-installed") == "warning"
-    and status("zeabur-identity-client") == "skipped"
-    and status("zeabur-identity-user") == "skipped"
+    and status("zeabur-identity-installed") == "ok"
+    and status("zeabur-identity-client") == "ok"
+    and status("zeabur-identity-issuer-trust") == "ok"
   ' target/doctor.json
   expected=$(jq '.checks | map(.status)
     | if any(. == "critical") then 2 elif any(. == "warning") then 1
@@ -172,20 +147,22 @@ case "$job" in
     ./scripts/check-zh-tw.sh
     ./scripts/check-brand.sh
     ;;
-  # Integration tests (JSON Patch writes, dry run, identity, revocation), `zeaburctl doctor`,
-  # browser tests in local mode with the embedded interface, and the image.
+  # Integration tests (JSON Patch writes, dry run, identity, revocation), `zeaburctl doctor`, and
+  # browser tests in local mode with the embedded interface.
   kubernetes)
-    start_cluster
+    if [[ -z "${ZEABUR_CI_KEEP:-}" ]]; then
+      trap './scripts/dev-cluster.sh down' EXIT
+    fi
+    ./scripts/dev-cluster.sh up
+    export KUBECONFIG="$root/target/dev-cluster/kubeconfig"
     cargo nextest run --locked --run-ignored only -E 'binary(kubernetes)'
     check_doctor
     if ! { ./scripts/build-ui.sh && ./scripts/e2e-ui.sh; }; then
       browser_failure_context
       exit 1
     fi
-    ./scripts/build-image.sh zeabur:ci
-    ./scripts/build-image.sh zeabur-proxy:ci zeabur-proxy
     ;;
   # Zeabur in a cluster with Zeabur Identity, from their images and Zeabur's chart, through a browser:
   # passkey sign-in, elevation, terminal, rights, memory, removal.
-  kubernetes-l2) K3S_IMAGE="$k3s_image" ./scripts/e2e-l2.sh ;;
+  kubernetes-l2) ZEABUR_L2_KEEP="${ZEABUR_CI_KEEP:-}" ./scripts/e2e-l2.sh ;;
 esac
