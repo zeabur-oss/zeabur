@@ -136,8 +136,9 @@ export function keelPolicy(builds: Builds, service: Service): string | undefined
   return policy && policy !== "never" ? policy : undefined
 }
 
-/** A commit's short form. */
-export const shortSha = (sha?: string | null) => (sha ? sha.slice(0, 7) : undefined)
+/** A commit's or an uploaded folder's short form. */
+export const shortSha = (sha?: string | null) =>
+  sha ? sha.replace(/^sha256:/, "").slice(0, 7) : undefined
 
 const BUILD_RESOURCE = { group: "builder.zeabur.com", version: "v1alpha1", resource: "builds" }
 const SECRET_RESOURCE = { version: "v1", resource: "secrets" }

@@ -54,10 +54,12 @@ image_admin_link=$("$zeabur_identityctl" invite --username e2e-image-admin --adm
 usage_admin_link=$("$zeabur_identityctl" invite --username e2e-usage-admin --admin)
 terminal_admin_link=$("$zeabur_identityctl" invite --username e2e-terminal-admin --admin)
 # Deploy from Git, when Zeabur Builder runs here (e2e/l2/git.spec.ts skips otherwise), and from a
-# private repository when E2E_PRIVATE_GIT_REPO names one (e2e/l2/git-private.spec.ts).
-git_admin_link="" git_private_admin_link=""
+# private repository when E2E_PRIVATE_GIT_REPO names one (e2e/l2/git-private.spec.ts), and from an
+# uploaded folder (e2e/l2/upload.spec.ts).
+git_admin_link="" git_private_admin_link="" upload_admin_link=""
 if has_crd builds.builder.zeabur.com; then
   git_admin_link=$("$zeabur_identityctl" invite --username e2e-git-admin --admin)
+  upload_admin_link=$("$zeabur_identityctl" invite --username e2e-upload-admin --admin)
   if [[ -n "${E2E_PRIVATE_GIT_REPO:-}" ]]; then
     git_private_admin_link=$("$zeabur_identityctl" invite --username e2e-git-private-admin --admin)
   fi
@@ -97,6 +99,7 @@ NODE_EXTRA_CA_CERTS="$tls/ca.crt" \
   ZEABUR_L2_IMAGE_ADMIN_LINK="$image_admin_link" ZEABUR_L2_USAGE_ADMIN_LINK="$usage_admin_link" \
   ZEABUR_L2_TERMINAL_ADMIN_LINK="$terminal_admin_link" \
   ZEABUR_L2_GIT_ADMIN_LINK="$git_admin_link" ZEABUR_L2_GIT_PRIVATE_ADMIN_LINK="$git_private_admin_link" \
+  ZEABUR_L2_UPLOAD_ADMIN_LINK="$upload_admin_link" \
   ZEABUR_L2_S3_ENDPOINT="$s3_endpoint" ZEABUR_L2_MONGODB="$mongodb" \
   ZEABUR_L2_DB_KEEP="${ZEABUR_L2_DB_KEEP:-}" \
   ZEABUR_L2_NAMESPACE="$first" ZEABUR_L2_SECOND_NAMESPACE="$second" ZEABUR_L2_SERVICE=talker \

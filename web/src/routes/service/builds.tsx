@@ -3,8 +3,10 @@ import { lazy, Suspense, useState } from "react"
 import ArrowClockwiseIcon from "~icons/ph/arrow-clockwise"
 import ArrowSquareOutIcon from "~icons/ph/arrow-square-out"
 import CubeIcon from "~icons/ph/cube"
+import FolderSimpleIcon from "~icons/ph/folder-simple"
 import GitBranchIcon from "~icons/ph/git-branch"
 import RocketLaunchIcon from "~icons/ph/rocket-launch"
+import UploadSimpleIcon from "~icons/ph/upload-simple"
 
 import { api, toProblem, unwrap } from "@/api/client"
 import { buildsQuery, capabilitiesQuery, logsQuery } from "@/api/queries"
@@ -15,6 +17,7 @@ import { KubeDetails } from "@/components/kube-details"
 import { usePlanner } from "@/components/plan/planner"
 import { FormField } from "@/components/form-field"
 import { Problem } from "@/components/problem"
+import { UploadFolderDrawer, UploadProgress } from "@/components/upload-folder"
 import { Alert, AlertAction, AlertDescription } from "@zeabur/design-system/components/alert"
 import { Button } from "@zeabur/design-system/components/button"
 import { CopyInput } from "@zeabur/design-system/components/copy-input"
@@ -175,6 +178,34 @@ const words = {
   Cancelled: "builds.word.cancelled",
 } as const
 
+/** Whether the service runs the newest image, in a sentence. */
+function currentWords(
+  t: ReturnType<typeof useT>,
+  service: Service,
+  build: Build,
+  current: boolean | undefined,
+) {
+  if (current === true) return t("builds.current", service.name)
+  if (current === false && build.latestImage)
+    return t("builds.behind", service.name, imageTag(build.latestImage))
+  return t("builds.noImage")
+}
+
+/** The word for where the build is: waiting for the folder, why it cannot build, or its run. */
+function statusWord(
+  t: ReturnType<typeof useT>,
+  { waiting, problem, latest }: { waiting: boolean; problem: Build["problem"]; latest?: BuildRun },
+) {
+  if (waiting) return t("builds.word.waitingUpload")
+  if (!problem) return phaseWord(t, latest)
+  if (!problem.lasting) return t("builds.word.retrying")
+  return t(
+    problem.condition === "BuilderReady"
+      ? "builds.word.builderMissing"
+      : "builds.word.sourceFailed",
+  )
+}
+
 function phaseWord(t: ReturnType<typeof useT>, run?: BuildRun) {
   const key = run?.phase ? words[run.phase as keyof typeof words] : undefined
   return key ? t(key) : t("builds.word.none")
@@ -274,6 +305,8 @@ function Summary({
   const refused = refusedCredentials(build, latest)
   const deployGate = useHereGate("changeServices")
   const rebuildGate = useHereGate("build")
+  const [uploading, setUploading] = useState(false)
+  const waiting = build.awaitingUpload && !build.latestImage
   const deployButton = (
     <Button
       variant={current === false ? "default" : "outline"}
@@ -299,17 +332,7 @@ function Summary({
                 : "idle"
           }
         >
-          <SummaryCardWord>
-            {problem
-              ? t(
-                  !problem.lasting
-                    ? "builds.word.retrying"
-                    : problem.condition === "BuilderReady"
-                      ? "builds.word.builderMissing"
-                      : "builds.word.sourceFailed",
-                )
-              : phaseWord(t, latest)}
-          </SummaryCardWord>
+          <SummaryCardWord>{statusWord(t, { waiting, problem, latest })}</SummaryCardWord>
         </SummaryCardStatus>
         {since ? (
           <SummaryCardSince>
@@ -317,11 +340,9 @@ function Summary({
           </SummaryCardSince>
         ) : null}
         <p className="mt-1 max-w-prose text-sm text-secondary">
-          {current === true
-            ? t("builds.current", service.name)
-            : current === false && build.latestImage
-              ? t("builds.behind", service.name, imageTag(build.latestImage))
-              : t("builds.noImage")}
+          {waiting
+            ? t("builds.waitingUpload", service.name)
+            : currentWords(t, service, build, current)}
         </p>
         {failure ? (
           <p
@@ -341,22 +362,12 @@ function Summary({
           </p>
         ) : null}
         {refused ? <Refused project={project} build={build} kind={refused} /> : null}
+        <UploadProgress project={project} build={build.name} />
         {build.suspended ? (
           <p className="mt-1 text-sm text-warn-strong">{t("builds.suspended")}</p>
         ) : null}
         <SummaryCardFacts>
-          {build.gitUrl ? (
-            <SummaryCardFact label={t("overview.source")}>
-              <GitBranchIcon aria-hidden="true" />
-              <span className="truncate font-mono" title={build.gitUrl} translate="no">
-                {build.gitUrl.replace(/^https?:\/\//, "")}
-                {branch ? `@${branch}` : ""}
-              </span>
-              {branch ? null : (
-                <span className="shrink-0 text-secondary">{t("builds.defaultBranch")}</span>
-              )}
-            </SummaryCardFact>
-          ) : null}
+          <SourceFact build={build} branch={branch} />
           {build.latestImage ? (
             <SummaryCardFact label={t("builds.image")}>
               <CubeIcon aria-hidden="true" />
@@ -389,15 +400,64 @@ function Summary({
           ) : (
             <GateTip gate={deployGate}>{deployButton}</GateTip>
           )}
-          <GateTip gate={rebuildGate}>
-            <Button variant="outline" size="sm" onClick={onRebuild}>
-              <ArrowClockwiseIcon aria-hidden="true" data-icon="inline-start" />
-              {t("builds.rebuild")}
-            </Button>
-          </GateTip>
+          {build.archive ? (
+            <GateTip gate={rebuildGate}>
+              <Button
+                variant={waiting ? "default" : "outline"}
+                size="sm"
+                onClick={() => setUploading(true)}
+              >
+                <UploadSimpleIcon aria-hidden="true" data-icon="inline-start" />
+                {t("builds.upload")}
+              </Button>
+            </GateTip>
+          ) : null}
+          {waiting ? null : (
+            <GateTip gate={rebuildGate}>
+              <Button variant="outline" size="sm" onClick={onRebuild}>
+                <ArrowClockwiseIcon aria-hidden="true" data-icon="inline-start" />
+                {t("builds.rebuild")}
+              </Button>
+            </GateTip>
+          )}
         </SummaryCardActions>
       </SummaryCardMain>
+      {uploading ? (
+        <UploadFolderDrawer
+          project={project}
+          build={build.name}
+          onClose={() => setUploading(false)}
+        />
+      ) : null}
     </SummaryCard>
+  )
+}
+
+/** Where the build takes its source from: the uploaded folder or the Git repository. */
+function SourceFact({ build, branch }: { build: Build; branch: string | undefined }) {
+  const t = useT()
+  if (build.archive)
+    return (
+      <SummaryCardFact label={t("overview.source")}>
+        <FolderSimpleIcon aria-hidden="true" />
+        <span className="truncate">{t("builds.sourceUpload")}</span>
+        {build.archiveDigest ? (
+          <span className="truncate font-mono text-secondary" translate="no">
+            {shortSha(build.archiveDigest)}
+          </span>
+        ) : null}
+      </SummaryCardFact>
+    )
+  if (!build.gitUrl) return null
+  return (
+    <SummaryCardFact label={t("overview.source")}>
+      <GitBranchIcon aria-hidden="true" />
+      <span className="truncate font-mono" title={build.gitUrl} translate="no">
+        {build.gitUrl.replace(/^https?:\/\//, "")}
+        {branch ? `@${branch}` : ""}
+      </span>
+      {branch ? null : <span className="shrink-0 text-secondary">{t("builds.defaultBranch")}</span>}
+    </SummaryCardFact>
   )
 }
 

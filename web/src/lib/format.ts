@@ -36,3 +36,17 @@ export function updatedWords(t: Translate, updatedAt: number, now: number): stri
   if (seconds < 86_400) return t("freshness.ago", Math.floor(seconds / 3_600), "hour")
   return t("freshness.ago", Math.floor(seconds / 86_400), "day")
 }
+
+const SIZE_UNITS = ["B", "kB", "MB", "GB", "TB"]
+
+/** Decimal units, one decimal from kB up: `12.4 MB`. */
+export function formatSize(bytes: number, locale: string): string {
+  let value = bytes
+  let unit = 0
+  while (value >= 1000 && unit < SIZE_UNITS.length - 1) {
+    value /= 1000
+    unit += 1
+  }
+  const number = new Intl.NumberFormat(locale, { maximumFractionDigits: unit === 0 ? 0 : 1 })
+  return `${number.format(value)} ${SIZE_UNITS[unit]}`
+}

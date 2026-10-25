@@ -109,6 +109,8 @@ const fixedWeight: Partial<Record<Change["op"], OneWeight>> = {
   createProject: { risk: "low" },
   details: { risk: "low" },
   rebuild: { risk: "low" },
+  uploadToken: { risk: "low" },
+  archiveDigest: { risk: "normal" },
 }
 
 function weighOne(change: Change, podsOf: PodsOf): OneWeight {
@@ -144,6 +146,8 @@ type ServiceChange = Extract<
   {
     op:
       | "buildOptions"
+      | "uploadToken"
+      | "archiveDigest"
       | "labelVolume"
       | "errorPageHtml"
       | "pageServer"
@@ -298,6 +302,19 @@ const workloadTab: Partial<Record<Change["op"], Tab>> = {
   swapClaim: "settings#storage",
 }
 
+const isNetworkPolicy = (object: unknown) => isRecord(object) && object.kind === "NetworkPolicy"
+
+/** The Objects page at the object the plan's first write addresses. */
+function objectLink(project: string, plan: Pick<Plan, "objects"> | undefined): string | undefined {
+  const target = plan?.objects[0]?.target
+  if (!target) return undefined
+  const [group, version] = target.apiVersion.includes("/")
+    ? target.apiVersion.split("/")
+    : ["core", target.apiVersion]
+  const key = [group, version, target.plural, target.name].join("/")
+  return `/projects/${encodeURIComponent(project)}/objects?object=${encodeURIComponent(key)}`
+}
+
 /** Where to look at what a plan changed, as a path and query: the service page tab for a
  * workload's change, the object on the Objects page for anything else. `service` is the service
  * the change was asked from, for changes that name only a route, a claim or an object. */
@@ -322,15 +339,7 @@ export function destinationOf(
     workload
       ? `/projects/${encodeURIComponent(project)}/services/${workload.kind}/${encodeURIComponent(workload.name)}?tab=${name}`
       : undefined
-  const object = () => {
-    const target = plan?.objects[0]?.target
-    if (!target) return undefined
-    const [group, version] = target.apiVersion.includes("/")
-      ? target.apiVersion.split("/")
-      : ["core", target.apiVersion]
-    const key = [group, version, target.plural, target.name].join("/")
-    return `/projects/${encodeURIComponent(project)}/objects?object=${encodeURIComponent(key)}`
-  }
+  const object = () => objectLink(project, plan)
   const own = workloadTab[change.op]
   if (own && "workload" in change) return tab(change.workload ?? undefined, own)
   const place = projectPlace[change.op]
@@ -342,9 +351,7 @@ export function destinationOf(
     case "expandVolume":
       return tab(service, "settings#storage") ?? object()
     case "create":
-      return isRecord(change.object) && change.object.kind === "NetworkPolicy" && service
-        ? tab(service, "networking")
-        : object()
+      return isNetworkPolicy(change.object) && service ? tab(service, "networking") : object()
     case "data":
     case "edit":
       return object()

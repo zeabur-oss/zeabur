@@ -172,7 +172,7 @@ export function branchProblem(branch: string): "invalid" | undefined {
 }
 
 /** A path inside the repository as the Build takes it: no `./` in front, no `/` behind. */
-const cleanPath = (path: string) =>
+export const cleanPath = (path: string) =>
   path
     .trim()
     .replace(/^\.?\/+/, "")
@@ -188,6 +188,26 @@ export function pathProblem(path: string): "invalid" | undefined {
   return value.split("/").every((s) => PATH_SEGMENT.test(s)) ? undefined : "invalid"
 }
 
+/** What is wrong with the fields every service built by Zeabur Builder has. */
+export function builtProblems(
+  form: BuiltService,
+  {
+    taken,
+    badEnv,
+    badBuildEnv,
+  }: { taken: readonly string[]; badEnv: boolean; badBuildEnv: boolean },
+) {
+  return {
+    name: serviceNameProblem(form.name, taken),
+    port: portProblem(form.port),
+    host: form.publicUrl ? hostProblem(form.host) : undefined,
+    directory: pathProblem(form.directory),
+    dockerfile: pathProblem(form.dockerfile),
+    env: badEnv,
+    buildEnv: badBuildEnv,
+  }
+}
+
 /** What is wrong with each field of a form whose name, port, host, access and user are already
  * resolved. */
 export function gitProblems(
@@ -200,22 +220,14 @@ export function gitProblems(
   }: { taken: readonly string[]; badEnv: boolean; badBuildEnv: boolean; hasKey: boolean },
 ) {
   return {
+    ...builtProblems(form, { taken, badEnv, badBuildEnv }),
     url: urlProblem(form.url),
     branch: branchProblem(form.branch),
-    name: serviceNameProblem(form.name, taken),
-    port: portProblem(form.port),
-    host: form.publicUrl ? hostProblem(form.host) : undefined,
-    directory: pathProblem(form.directory),
-    dockerfile: pathProblem(form.dockerfile),
-    env: badEnv,
-    buildEnv: badBuildEnv,
     key: form.access === "deployKey" && !hasKey,
     token: form.access === "token" && (form.token.trim() === "" || form.username.trim() === ""),
     installation: form.access === "githubApp" && !form.installationId,
   }
 }
-
-export type GitProblems = ReturnType<typeof gitProblems>
 
 /** `<registry>/<project>/<service>`: where the Build pushes and the Deployment pulls from. */
 const imageRepository = (registry: string, project: string, name: string) =>
@@ -258,12 +270,32 @@ function buildSource(form: GitService, credentials: string | undefined): Manifes
   }
 }
 
-/** The objects the form creates, the deploy key aside: it is a change of its own. */
-export function gitObjects(
-  form: GitService,
+/** What a service built by Zeabur Builder needs from its form, whatever the source. */
+export type BuiltService = Pick<
+  GitService,
+  | "name"
+  | "port"
+  | "publicUrl"
+  | "host"
+  | "variables"
+  | "size"
+  | "security"
+  | "method"
+  | "buildVariables"
+  | "directory"
+  | "dockerfile"
+>
+
+/**
+ * The objects of a service whose image a Build makes: the Build with `source`, its build variables'
+ * Secret, and the image service that runs what it builds.
+ */
+export function builtObjects(
+  form: BuiltService,
   project: string,
   registry: string,
   domains: DomainSettings,
+  build: { source: Manifest; annotations?: Record<string, string> },
 ): Manifest[] {
   const name = form.name
   const labels = { "app.kubernetes.io/name": name }
@@ -298,17 +330,7 @@ export function gitObjects(
         }
       : object,
   )
-  const credentials =
-    form.access === "public" || form.access === "githubApp" ? undefined : credentialsName(name)
   const objects: Manifest[] = []
-  if (form.access === "token")
-    objects.push({
-      apiVersion: "v1",
-      kind: "Secret",
-      metadata: { name: credentials, labels: { ...labels, [GIT_CREDENTIALS_LABEL]: "true" } },
-      type: "kubernetes.io/basic-auth",
-      stringData: { username: form.username.trim(), password: form.token.trim() },
-    })
   const envSecret = buildEnvSecret(name)
   if (form.buildVariables.length > 0)
     objects.push({
@@ -321,10 +343,10 @@ export function gitObjects(
   objects.push(...service, {
     apiVersion: "builder.zeabur.com/v1alpha1",
     kind: "Build",
-    metadata: { name, labels },
+    metadata: { name, labels, ...(build.annotations ? { annotations: build.annotations } : {}) },
     spec: {
       builderRef: form.method,
-      source: buildSource(form, credentials),
+      source: build.source,
       output: { image: repository },
       ...(form.buildVariables.length > 0
         ? { env: form.buildVariables.map((v) => fromSecret(envSecret, v.name)) }
@@ -332,6 +354,34 @@ export function gitObjects(
       notify: [{ type: "keel", url: KEEL_WEBHOOK }],
     },
   })
+  return objects
+}
+
+/** The objects the form creates, the deploy key aside: it is a change of its own. */
+export function gitObjects(
+  form: GitService,
+  project: string,
+  registry: string,
+  domains: DomainSettings,
+): Manifest[] {
+  const name = form.name
+  const labels = { "app.kubernetes.io/name": name }
+  const credentials =
+    form.access === "public" || form.access === "githubApp" ? undefined : credentialsName(name)
+  const objects: Manifest[] = []
+  if (form.access === "token")
+    objects.push({
+      apiVersion: "v1",
+      kind: "Secret",
+      metadata: { name: credentials, labels: { ...labels, [GIT_CREDENTIALS_LABEL]: "true" } },
+      type: "kubernetes.io/basic-auth",
+      stringData: { username: form.username.trim(), password: form.token.trim() },
+    })
+  objects.push(
+    ...builtObjects(form, project, registry, domains, {
+      source: buildSource(form, credentials),
+    }),
+  )
   return objects
 }
 

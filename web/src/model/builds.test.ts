@@ -8,6 +8,7 @@ import {
   refusedCredentials,
   repositoryOf,
   runsLatest,
+  shortSha,
   type Build,
   type BuildRun,
   type Builds,
@@ -21,6 +22,8 @@ const build = (over: Partial<Build> = {}): Build => ({
   repository: "zot.zot.svc:5000/shop/web",
   latestImage: `zot.zot.svc:5000/shop/web:main-2-bbbbbbb@${digest("b")}`,
   suspended: false,
+  archive: false,
+  awaitingUpload: false,
   keelWebhooks: [],
   env: [],
   ...over,
@@ -164,5 +167,13 @@ describe("refusedCredentials", () => {
     expect(
       refusedCredentials({ ...ssh, problem: { ...refused, reason: "RefNotFound" } }, undefined),
     ).toBe(undefined)
+  })
+})
+
+describe("shortSha", () => {
+  test("a commit and an uploaded folder's digest both read as seven hexadecimal digits", () => {
+    expect(shortSha("3f9a1c2b7d4e5f60718293a4b5c6d7e8f9012345")).toBe("3f9a1c2")
+    expect(shortSha(digest("a"))).toBe("aaaaaaa")
+    expect(shortSha(undefined)).toBeUndefined()
   })
 })

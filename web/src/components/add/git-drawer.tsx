@@ -1,28 +1,30 @@
-import { useMutation, useQuery } from "@tanstack/react-query"
+import { useMutation } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
-import { useId, useState, type ReactNode } from "react"
+import { useState } from "react"
 import ArrowSquareOutIcon from "~icons/ph/arrow-square-out"
-import CaretRightIcon from "~icons/ph/caret-right"
 
 import { api, toProblem, unwrap } from "@/api/client"
-import { clusterQuery, creatableQuery } from "@/api/queries"
+import {
+  MethodField,
+  MoreSection,
+  ServiceNameField,
+  Note,
+  BuiltPort,
+  BuiltPublicUrl,
+  useBuiltForm,
+} from "@/components/add/built-service"
 import {
   GitHubAccess,
   RepositoryField,
   repositoryUrl,
   useGitHubSource,
 } from "@/components/add/repository-field"
-import { ImageSizeField } from "@/components/add/image-size"
-import { useTakenNames } from "@/components/add/taken"
 import { FormField } from "@/components/form-field"
-import { PlanDrawer } from "@/components/plan/plan-drawer"
+import { PlanDrawer, ReviewFooter, ReviewForm } from "@/components/plan/plan-drawer"
 import { usePlanStep } from "@/components/plan/planner"
-import { SecurityProfileField } from "@/components/security-profile"
 import { useT } from "@/i18n"
 import { serviceLink } from "@/lib/place"
 import {
-  buildMethods,
-  buildProfile,
   createGitService,
   deployKeyHost,
   deployKeyPage,
@@ -33,31 +35,14 @@ import {
   pinnedHost,
   tokenUser,
   type Access,
-  type BuildMethod,
-  type GitProblems,
   type GitService,
 } from "@/model/git-service"
-import {
-  imageOptions,
-  nameFromImage,
-  parseEnv,
-  rightsOf,
-  suggestedHost,
-} from "@/model/image-service"
-import type { Profile } from "@/model/pod-security"
+import { nameFromImage } from "@/model/image-service"
 import { Alert, AlertDescription } from "@zeabur/design-system/components/alert"
 import { Button } from "@zeabur/design-system/components/button"
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@zeabur/design-system/components/collapsible"
 import { CopyInput } from "@zeabur/design-system/components/copy-input"
 import { Input } from "@zeabur/design-system/components/input"
-import { Label } from "@zeabur/design-system/components/label"
 import { RadioGroup, RadioOption } from "@zeabur/design-system/components/radio"
-import { Select } from "@zeabur/design-system/components/select"
-import { Switch } from "@zeabur/design-system/components/switch"
 import { Textarea } from "@zeabur/design-system/components/textarea"
 
 interface DeployKey {
@@ -72,78 +57,44 @@ interface DeployKey {
 export function GitDrawer({ project, onClose }: { project: string; onClose: () => void }) {
   const t = useT()
   const navigate = useNavigate()
-  const cluster = useQuery(clusterQuery).data
-  const domains = cluster?.domains ?? {}
-  const registry = cluster?.builds.registry ?? ""
-  const options = imageOptions(rightsOf(useQuery(creatableQuery(project)).data))
-  const taken = useTakenNames(project)
-  const [form, setForm] = useState<GitService>(newGitService)
-  const [env, setEnv] = useState("")
-  const [buildEnv, setBuildEnv] = useState("")
-  const [named, setNamed] = useState(false)
-  const [hosted, setHosted] = useState(false)
-  const [userSet, setUserSet] = useState(false)
-  const [securitySet, setSecuritySet] = useState(false)
-  const [tried, setTried] = useState(false)
-  const [moreShown, setMoreShown] = useState(false)
-  const [deployKey, setDeployKey] = useState<DeployKey>()
-  const ids = { publicUrl: useId() }
-  const set = (patch: Partial<GitService>) => setForm((f) => ({ ...f, ...patch }))
-
   const github = useGitHubSource(project)
   const fromGitHub = github.source === "github"
+  const built = useBuiltForm<GitService>(project, newGitService, (f, taken) => {
+    const repo = parseRepository(repositoryUrl(github, f.url))
+    return repo ? nameFromImage(repo.path.split("/").at(-1) ?? "", taken) : ""
+  })
+  const { form, set, shown, options, name, domains, registry } = built
+  const [userSet, setUserSet] = useState(false)
+  const [deployKey, setDeployKey] = useState<DeployKey>()
+
   const url = repositoryUrl(github, form.url)
   const repo = parseRepository(url)
   const keyHost = deployKeyHost(url)
   const secrets = options.secrets
   const access = accessOf(form.access, { fromGitHub, secrets, keyHost })
-  const name = named
-    ? form.name
-    : repo
-      ? nameFromImage(repo.path.split("/").at(-1) ?? "", taken)
-      : ""
-  const port = options.port ? form.port.trim() : ""
-  const publicUrl = options.publicUrl && port !== "" && form.publicUrl
-  const host = hosted ? form.host : suggestedHost(name, project, domains.suffixes?.[0])
-  const variables = parseEnv(env)
-  const buildVariables = parseEnv(buildEnv)
-  const dockerfile = form.method === "dockerfile" ? form.dockerfile : ""
   const username = userSet ? form.username : tokenUser(repo?.host)
   const key = deployKey && deployKey.host === keyHost ? deployKey : undefined
-  const security = securitySet ? form.security : buildProfile(form.method)
-
   const resolved: GitService = {
-    ...form,
+    ...built.resolved,
     url,
     access,
     installationId: github.picked?.installationId,
-    name,
-    port,
-    publicUrl,
-    host,
     username,
-    variables: variables.variables,
-    dockerfile,
-    buildVariables: buildVariables.variables.flatMap((v) =>
-      "value" in v ? [{ name: v.name, value: v.value }] : [],
-    ),
     sealedKey: key?.key,
-    security,
   }
   const problems = gitProblems(resolved, {
-    taken,
-    badEnv: variables.bad.length > 0,
-    badBuildEnv: buildVariables.bad.length > 0,
+    taken: built.taken,
+    badEnv: built.badEnv.length > 0,
+    badBuildEnv: built.badBuildEnv.length > 0,
     hasKey: !!key,
   })
   const blocked = Object.values(problems).some(Boolean)
-  const shown = (problem: unknown, text: () => string) => (tried && problem ? [text()] : [])
 
   const planner = usePlanStep(project, onClose, () => {
     void navigate(serviceLink(project, { kind: "Deployment", name }))
   })
   const review = () => {
-    setTried(true)
+    built.try()
     if (blocked) return
     planner.plan({
       title: t("add.planGit", name),
@@ -151,33 +102,15 @@ export function GitDrawer({ project, onClose }: { project: string; onClose: () =
     })
   }
 
-  const moreOpen =
-    tried && (!!problems.directory || !!problems.dockerfile || problems.env || problems.buildEnv)
-
   return (
     <PlanDrawer
       step={planner}
       onClose={onClose}
       title={t("add.gitTitle")}
       description={t("add.gitBody", project)}
-      footer={
-        <div className="ml-auto flex gap-2">
-          <Button variant="ghost" size="sm" onClick={onClose}>
-            {t("edit.cancel")}
-          </Button>
-          <Button size="sm" onClick={review}>
-            {t("edit.review")}
-          </Button>
-        </div>
-      }
+      footer={<ReviewFooter onCancel={onClose} onReview={review} />}
     >
-      <form
-        className="flex flex-col gap-4"
-        onSubmit={(event) => {
-          event.preventDefault()
-          review()
-        }}
-      >
+      <ReviewForm onReview={review}>
         <RepositoryField
           github={github}
           url={form.url}
@@ -204,98 +137,13 @@ export function GitDrawer({ project, onClose }: { project: string; onClose: () =
               onChange={(event) => set({ branch: event.target.value })}
             />
           </FormField>
-          <FormField label={t("add.field.method")} hint={t(`add.methodHint.${form.method}`)}>
-            <Select
-              size="sm"
-              value={form.method}
-              onValueChange={(method) => set({ method: method as BuildMethod })}
-              items={buildMethods.map((m) => ({ value: m, label: t(`add.method.${m}`) }))}
-            />
-          </FormField>
+          <MethodField built={built} source="git" />
         </div>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <FormField
-            label={t("db.field.name")}
-            errors={shown(problems.name, () => t(`add.problem.name.${problems.name ?? "empty"}`))}
-          >
-            <Input
-              size="sm"
-              mono
-              value={name}
-              autoComplete="off"
-              spellCheck={false}
-              onChange={(event) => {
-                setNamed(true)
-                set({ name: event.target.value.trim() })
-              }}
-            />
-          </FormField>
-          {options.port ? (
-            <FormField
-              label={t("add.field.port")}
-              hint={t("add.gitPortHint")}
-              errors={shown(problems.port, () => t("add.problem.port.invalid"))}
-            >
-              <Input
-                size="sm"
-                mono
-                inputMode="numeric"
-                value={form.port}
-                placeholder="8080"
-                onChange={(event) => set({ port: event.target.value })}
-              />
-            </FormField>
-          ) : null}
+          <ServiceNameField built={built} problems={problems} />
+          <BuiltPort built={built} problems={problems} />
         </div>
-        {port === "" ? null : options.publicUrl ? (
-          <div className="flex flex-col gap-3">
-            <div className="flex items-center gap-2">
-              <Switch
-                id={ids.publicUrl}
-                size="sm"
-                checked={form.publicUrl}
-                onCheckedChange={(on) => set({ publicUrl: on })}
-              />
-              <Label htmlFor={ids.publicUrl}>{t("add.publicUrl")}</Label>
-            </div>
-            {publicUrl ? (
-              <FormField
-                label={t("add.publicUrl")}
-                hideLabel
-                hint={
-                  <>
-                    {domains.suffixes?.length ? null : (
-                      <span className="block">{t("add.hostHint")}</span>
-                    )}
-                    <span className="block">
-                      {domains.clusterIssuer
-                        ? t("add.https", domains.clusterIssuer)
-                        : t("add.httpOnly")}
-                    </span>
-                  </>
-                }
-                errors={shown(problems.host, () =>
-                  t(`add.problem.host.${problems.host ?? "empty"}`),
-                )}
-              >
-                <Input
-                  size="sm"
-                  mono
-                  value={host}
-                  placeholder={domains.suffixes?.length ? undefined : "web.example.com"}
-                  autoComplete="off"
-                  spellCheck={false}
-                  onChange={(event) => {
-                    setHosted(true)
-                    set({ host: event.target.value.trim() })
-                  }}
-                />
-              </FormField>
-            ) : null}
-          </div>
-        ) : (
-          <Note>{t("add.noPublicUrl")}</Note>
-        )}
+        <BuiltPublicUrl built={built} problems={problems} />
         <fieldset className="flex min-w-0 flex-col gap-2">
           <legend className="mb-1.5 text-sm font-medium">{t("add.access")}</legend>
           {fromGitHub ? (
@@ -325,7 +173,7 @@ export function GitDrawer({ project, onClose }: { project: string; onClose: () =
               pinned={pinnedHost(keyHost)}
               page={repo ? deployKeyPage(repo) : undefined}
               made={key}
-              missing={tried && !!problems.key}
+              missing={built.tried && !!problems.key}
               onMade={setDeployKey}
             />
           ) : null}
@@ -357,36 +205,9 @@ export function GitDrawer({ project, onClose }: { project: string; onClose: () =
             </div>
           ) : null}
         </fieldset>
-        <Collapsible open={moreShown || moreOpen} onOpenChange={setMoreShown}>
-          <CollapsibleTrigger variant="disclosure">
-            <CaretRightIcon aria-hidden="true" />
-            {t("add.more")}
-          </CollapsibleTrigger>
-          {moreShown || moreOpen ? null : (
-            <p className="mt-1 type-meta text-muted-foreground">{t("add.gitMoreSummary")}</p>
-          )}
-          <CollapsibleContent>
-            <MoreFields
-              project={project}
-              form={form}
-              set={set}
-              security={security}
-              onSecurity={(chosen) => {
-                setSecuritySet(true)
-                set({ security: chosen })
-              }}
-              env={env}
-              onEnv={setEnv}
-              buildEnv={buildEnv}
-              onBuildEnv={setBuildEnv}
-              problems={problems}
-              bad={{ env: variables.bad, buildEnv: buildVariables.bad }}
-              shown={shown}
-            />
-          </CollapsibleContent>
-        </Collapsible>
+        <MoreSection built={built} problems={problems} source="git" />
         <Note>{t("add.gitAfter")}</Note>
-      </form>
+      </ReviewForm>
     </PlanDrawer>
   )
 }
@@ -543,113 +364,3 @@ function MadeDeployKey({
     </>
   )
 }
-
-/** The fields behind "More settings": where and how to build, variables, size and security. */
-function MoreFields({
-  project,
-  form,
-  set,
-  security,
-  onSecurity,
-  env,
-  onEnv,
-  buildEnv,
-  onBuildEnv,
-  problems,
-  bad,
-  shown,
-}: {
-  project: string
-  form: GitService
-  set: (patch: Partial<GitService>) => void
-  security: Profile
-  onSecurity: (profile: Profile) => void
-  env: string
-  onEnv: (env: string) => void
-  buildEnv: string
-  onBuildEnv: (env: string) => void
-  problems: GitProblems
-  bad: { env: number[]; buildEnv: number[] }
-  shown: (problem: unknown, text: () => string) => string[]
-}) {
-  const t = useT()
-  return (
-    <div className="flex flex-col gap-4 pt-4">
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <FormField
-          label={t("add.field.directory")}
-          hint={t("add.directoryHint")}
-          errors={shown(problems.directory, () => t("add.problem.directory"))}
-        >
-          <Input
-            size="sm"
-            mono
-            value={form.directory}
-            placeholder="apps/web"
-            autoComplete="off"
-            spellCheck={false}
-            onChange={(event) => set({ directory: event.target.value })}
-          />
-        </FormField>
-        {form.method === "dockerfile" ? (
-          <FormField
-            label={t("add.field.dockerfile")}
-            hint={t("add.dockerfileHint")}
-            errors={shown(problems.dockerfile, () => t("add.problem.dockerfile"))}
-          >
-            <Input
-              size="sm"
-              mono
-              value={form.dockerfile}
-              placeholder="Dockerfile"
-              autoComplete="off"
-              spellCheck={false}
-              onChange={(event) => set({ dockerfile: event.target.value })}
-            />
-          </FormField>
-        ) : null}
-      </div>
-      <FormField
-        label={t("add.variables")}
-        hint={t("add.variablesHint")}
-        errors={shown(problems.env, () => t("add.variablesBad", bad.env.join(", ")))}
-      >
-        <Textarea
-          mono
-          rows={4}
-          value={env}
-          placeholder={"DATABASE_URL=postgres://…\nLOG_LEVEL=info"}
-          spellCheck={false}
-          onChange={(event) => onEnv(event.target.value)}
-        />
-      </FormField>
-      <FormField
-        label={t("add.buildVariables")}
-        hint={
-          <>
-            <span className="block">{t("add.buildVariablesHint")}</span>
-            {form.method === "dockerfile" ? (
-              <span className="block">{t("add.buildVariablesDockerfile")}</span>
-            ) : null}
-          </>
-        }
-        errors={shown(problems.buildEnv, () => t("add.variablesBad", bad.buildEnv.join(", ")))}
-      >
-        <Textarea
-          mono
-          rows={3}
-          value={buildEnv}
-          placeholder="NPM_TOKEN=…"
-          spellCheck={false}
-          onChange={(event) => onBuildEnv(event.target.value)}
-        />
-      </FormField>
-      <ImageSizeField size={form.size} onSize={(size) => set({ size })} />
-      <SecurityProfileField project={project} built value={security} onChange={onSecurity} />
-    </div>
-  )
-}
-
-const Note = ({ children }: { children: ReactNode }) => (
-  <p className="type-meta text-muted-foreground">{children}</p>
-)

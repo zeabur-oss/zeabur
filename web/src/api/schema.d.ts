@@ -1116,6 +1116,27 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  "/api/v1/projects/{project}/builds/{build}/source": {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Pushes the request's body, a gzip tar of the folder, as the `Build`'s next source.
+     * @description `Content-Length` is the size, at most 256 MiB. `request` is the value of the `uploadToken`
+     *     change the controller has answered; the upload goes to the registry the token names.
+     */
+    post: operations["uploadBuildSource"]
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   "/api/v1/projects/{project}/certificates/{secret}": {
     parameters: {
       query?: never
@@ -3058,6 +3079,25 @@ export interface components {
           build: string
           /** @enum {string} */
           op: "rebuild"
+        }
+      | {
+          /** @description The `Build`. */
+          build: string
+          /** @enum {string} */
+          op: "uploadToken"
+          /**
+           * @description A value the `Build` has not been asked with before; the controller answers it in
+           *     `status.uploadToken.request`.
+           */
+          request: string
+        }
+      | {
+          /** @description The `Build`. */
+          build: string
+          /** @description The manifest digest of the pushed folder, `sha256:` and 64 hexadecimal digits. */
+          digest: string
+          /** @enum {string} */
+          op: "archiveDigest"
         }
       | (components["schemas"]["BuildOptionsChange"] & {
           /** @enum {string} */
@@ -8935,6 +8975,20 @@ export interface components {
       /** @description Nodes system-upgrade-controller is upgrading now. */
       upgrading: string[]
     }
+    /** @description The folder as pushed. */
+    UploadedSource: {
+      /** @description The artifact's manifest digest, for the `archiveDigest` change. */
+      digest: string
+      /** @description The `Build`. */
+      origin: components["schemas"]["Origin"]
+      /**
+       * Format: int64
+       * @description The compressed size.
+       */
+      size: number
+      /** @description The tag it was pushed under. */
+      tag: string
+    }
     /** @description Every namespace together. */
     UsageTotals: {
       /** @description Limits. */
@@ -9335,9 +9389,15 @@ export interface components {
     }
     /** @description A `Build`. */
     ZeaburBuilderBuild: {
+      /** @description Built from an uploaded folder (`spec.source.archive`) instead of a Git ref. */
+      archive: boolean
+      /** @description The uploaded folder's manifest digest, once it is named. */
+      archiveDigest?: string | null
+      /** @description An uploaded folder not yet named: the `Build` waits for its upload. */
+      awaitingUpload: boolean
       /** @description The `ClusterBuilder`. */
       builder?: string | null
-      /** @description The build context inside the repository; none for its root. */
+      /** @description The build context inside the repository or folder; none for its root. */
       contextDir?: string | null
       /** @description The Secret it reads the repository's credentials from. */
       credentials?: string | null
@@ -9347,7 +9407,7 @@ export interface components {
       env: components["schemas"]["ZeaburBuilderEnv"][]
       /** @description The branch or tag it follows; `HEAD` (or none) follows the repository's default branch. */
       gitRef?: string | null
-      /** @description The Git repository. */
+      /** @description The Git repository; none for an uploaded folder. */
       gitUrl?: string | null
       /** @description The Keel webhooks it tells of new images. */
       keelWebhooks: string[]
@@ -9380,6 +9440,13 @@ export interface components {
       resolvedRef?: string | null
       /** @description Whether builds are paused. */
       suspended: boolean
+      /** @description When that upload token expires. */
+      uploadExpires?: string | null
+      /**
+       * @description The upload token request the controller last answered
+       *     (`status.uploadToken.request`).
+       */
+      uploadRequest?: string | null
     }
     /** @description A build variable of a `Build`. */
     ZeaburBuilderEnv: {
@@ -11573,6 +11640,75 @@ export interface operations {
         }
       }
       403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+    }
+  }
+  uploadBuildSource: {
+    parameters: {
+      query: {
+        /** @description The upload token request the Build has answered */
+        request: string
+      }
+      header?: never
+      path: {
+        project: string
+        build: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        "application/gzip": number[]
+      }
+    }
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/json": components["schemas"]["UploadedSource"]
+        }
+      }
+      400: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      403: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      404: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      409: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          "application/problem+json": components["schemas"]["Problem"]
+        }
+      }
+      503: {
         headers: {
           [name: string]: unknown
         }

@@ -54,6 +54,7 @@ import { Menu, MenuContent, MenuItem, MenuTrigger } from "@zeabur/design-system/
 import { Select } from "@zeabur/design-system/components/select"
 import { Tooltip } from "@zeabur/design-system/components/tooltip"
 import { useI18n, useT, type Translate } from "@/i18n"
+import { formatSize } from "@/lib/format"
 import { cn } from "@/lib/utils"
 import type { Service } from "@/model/service"
 import { execRole } from "@/model/terminal"
@@ -155,17 +156,7 @@ const kernel = ["/proc", "/sys", "/dev"]
 
 function useSize() {
   const { locale } = useI18n()
-  const units = ["B", "kB", "MB", "GB", "TB"]
-  return (bytes: number) => {
-    let value = bytes
-    let unit = 0
-    while (value >= 1000 && unit < units.length - 1) {
-      value /= 1000
-      unit += 1
-    }
-    const number = new Intl.NumberFormat(locale, { maximumFractionDigits: unit === 0 ? 0 : 1 })
-    return `${number.format(value)} ${units[unit]}`
-  }
+  return (bytes: number) => formatSize(bytes, locale)
 }
 
 const isoOf = (seconds: number) => new Date(seconds * 1000).toISOString()

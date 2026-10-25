@@ -237,7 +237,18 @@ function sentenceOf(
 }
 
 type ServiceChange =
-  | Extract<Change, { op: "envImport" | "publicPort" | "buildOptions" | "labelVolume" }>
+  | Extract<
+      Change,
+      {
+        op:
+          | "envImport"
+          | "publicPort"
+          | "buildOptions"
+          | "labelVolume"
+          | "uploadToken"
+          | "archiveDigest"
+      }
+    >
   | PagesChange
 
 type PagesChange = Extract<
@@ -301,6 +312,10 @@ function serviceSentence(t: Translate, change: ServiceChange): string {
         : t("confirm.publicPort", change.port, change.workload.name)
     case "buildOptions":
       return t("confirm.buildOptions", change.build)
+    case "uploadToken":
+      return t("confirm.uploadToken", change.build)
+    case "archiveDigest":
+      return t("confirm.archiveDigest", change.build)
     case "labelVolume":
       return t("confirm.labelVolume", change.claim)
     default:
@@ -908,6 +923,9 @@ function serviceAction(t: Translate, change: ServiceChange): string {
       return change.remove ? t("action.closePort") : t("action.openPort")
     case "buildOptions":
       return t("action.saveBuildOptions")
+    case "uploadToken":
+    case "archiveDigest":
+      return t("action.upload")
     case "labelVolume":
       return t("action.save")
     default:

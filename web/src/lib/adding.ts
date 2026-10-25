@@ -4,6 +4,7 @@ import { store } from "@/lib/stores"
 export type AddWhat =
   | "image"
   | "git"
+  | "upload"
   | "compose"
   | "template"
   | "objectStorage"

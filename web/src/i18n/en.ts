@@ -712,6 +712,12 @@ export const en = {
   "builds.builder": "Builder",
   "builds.deploy": "Deploy newest",
   "builds.rebuild": "Build again",
+  "builds.word.waitingUpload": "Waiting for the folder",
+  "builds.waitingUpload": (service: string) => `${service} starts once you upload a folder.`,
+  "builds.sourceUpload": "Uploaded folder",
+  "builds.upload": "Upload a folder",
+  "builds.uploadBody": (build: string) =>
+    `Builds the folder with the settings of ${build}. The service updates when the build finishes.`,
   "builds.managedDeploy": (tool: string) =>
     `${tool} sets this service's image and would set it back. Change it at ${tool}'s source.`,
   "builds.autoUpdate": "Auto-deploy new builds",
@@ -1589,6 +1595,10 @@ export const en = {
     `Zeabur Builder builds ${build} again from the newest commit of its branch.`,
   "confirm.buildOptions": (build: string) =>
     `Zeabur Builder builds ${build} with these options from the next build.`,
+  "confirm.uploadToken": (build: string) =>
+    `Zeabur Builder lets you upload a folder to ${build} for 15 minutes.`,
+  "confirm.archiveDigest": (build: string) =>
+    `Zeabur Builder builds ${build} from the folder you uploaded.`,
   "confirm.autoUpdateOn": (service: string) =>
     `Each new build of ${service} will go live as soon as it finishes.`,
   "confirm.autoUpdateOff": (service: string) =>
@@ -1680,6 +1690,7 @@ export const en = {
   "action.restart": "Restart",
   "action.deploy": "Deploy",
   "action.rebuild": "Build again",
+  "action.upload": "Upload",
   "action.saveBuildOptions": "Save build options",
   "action.autoUpdateOn": "Turn on",
   "action.autoUpdateOff": "Turn off",
@@ -2715,6 +2726,52 @@ export const en = {
   "add.gitMissing.keel": "Needs Keel for auto-deploy. Install it in Components.",
   "add.gitMissing.registrySetting":
     "Zeabur has no registry for builds: set builds.registry in its chart.",
+  "add.upload": "Upload a folder",
+  "add.card.upload": "Build a folder from your computer and run it.",
+  "add.palette.upload": (project: string) => `Upload a folder in ${project}`,
+  "add.planUpload": (name: string) => `Deploy ${name} from a folder`,
+  "upload.title": "Upload a folder",
+  "upload.body": (project: string) =>
+    `Builds a folder from your computer and runs it in ${project}. You review the objects before anything is created.`,
+  "upload.zone": "Folder to upload",
+  "upload.drop": "Drop a folder or a .zip file here",
+  "upload.dropActive": "Drop to use it",
+  "upload.choose": "Choose folder",
+  "upload.chooseZip": "Choose .zip file",
+  "upload.reading": "Reading and packing the files…",
+  "upload.ready": (files: number, size: string) =>
+    `${plural(files, "file", "files")}, ${size} packed`,
+  "upload.left": (n: number) =>
+    `${plural(n, "file", "files")} left out by .gitignore, .dockerignore or .git.`,
+  "upload.change": "Choose another",
+  "upload.problem.folder": "Choose a folder or a .zip file.",
+  "upload.problem.empty": "The folder has no files to build.",
+  "upload.problem.packed": (largest: string) =>
+    `The folder packs to more than 256 MiB. Leave the largest out in .gitignore: ${largest}.`,
+  "upload.problem.unpacked": (largest: string) =>
+    `The files add up to more than 1 GiB. Leave the largest out in .gitignore: ${largest}.`,
+  "upload.problem.zipInvalid": "Unable to read this .zip file.",
+  "upload.problem.zipBomb": "The .zip file holds more than 1 GiB once unpacked.",
+  "upload.moreSummary": "Folder to build, variables, build variables, size and security.",
+  "upload.directoryHint": "The folder to build inside the upload. Empty: the whole upload.",
+  "upload.methodHint.railpack":
+    "Detects the language and builds without a Dockerfile. Pick Dockerfile if the folder has one.",
+  "upload.methodHint.dockerfile":
+    "Builds the Dockerfile in the folder's top level. Name another file under More settings.",
+  "upload.problem.directory": "A folder in the upload, like apps/web.",
+  "upload.problem.dockerfile": "A file in the upload, like docker/Dockerfile.prod.",
+  "upload.after":
+    "The folder goes up as soon as you apply, and the first build starts once it is there. To build a new version, upload the folder again from the service.",
+  "upload.keepOpen": "Keep this page open until the upload finishes.",
+  "upload.stage.token": "Asking Zeabur Builder for permission to upload…",
+  "upload.stage.sending": (sent: string, total: string) => `Uploading… ${sent} of ${total}`,
+  "upload.stage.naming": "Starting the build…",
+  "upload.failed.token": "Zeabur Builder did not allow the upload.",
+  "upload.failed.sending": "The folder did not upload.",
+  "upload.failed.naming": "The folder is uploaded, but the build did not start.",
+  "upload.retry": "Try again",
+  "upload.sent": (build: string) => `Uploaded. ${build} is building.`,
+  "upload.start": "Upload",
   "overview.building": "The image is being built. The service starts when the build finishes.",
   "overview.seeBuild": "See the build",
   "db.title": "Databases",

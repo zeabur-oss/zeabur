@@ -136,7 +136,8 @@ export function AddMenu({ project, compact = false }: { project: string; compact
         >
           {t("add.image")}
         </GatedMenuItem>
-        <GitItem project={project} git={choices.git} />
+        <GitItem project={project} git={choices.git} what="git" />
+        <GitItem project={project} git={choices.git} what="upload" />
         <GatedMenuItem
           gate={choices.gates.image}
           testid="add-compose"
@@ -216,20 +217,28 @@ export function AddMenu({ project, compact = false }: { project: string; compact
   )
 }
 
-/** "Deploy from Git"; what the cluster lacks closes it, with where to install it when Components
- * has it. */
-function GitItem({ project, git }: { project: string; git: AddChoices["git"] }) {
+/** "Deploy from Git" or "Upload a folder", which need the same of the cluster; what it lacks
+ * closes them, with where to install it when Components has it. */
+function GitItem({
+  project,
+  git,
+  what,
+}: {
+  project: string
+  git: AddChoices["git"]
+  what: "git" | "upload"
+}) {
   const t = useT()
   if (!git.gate.open || !git.missing)
     return (
-      <GatedMenuItem gate={git.gate} testid="add-git" onClick={() => openAdd(project, "git")}>
-        {t("add.git")}
+      <GatedMenuItem gate={git.gate} testid={`add-${what}`} onClick={() => openAdd(project, what)}>
+        {t(`add.${what}`)}
       </GatedMenuItem>
     )
   const why = t(`add.gitMissing.${git.missing}`)
   const label = (
     <span className="flex min-w-0 flex-col gap-0.5">
-      <span className="text-muted-foreground">{t("add.git")}</span>
+      <span className="text-muted-foreground">{t(`add.${what}`)}</span>
       <span className="type-meta text-muted-foreground">{why}</span>
     </span>
   )

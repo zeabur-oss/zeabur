@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
-import { useId, useState, type ReactNode } from "react"
+import { useState } from "react"
 import CaretRightIcon from "~icons/ph/caret-right"
 
 import { clusterQuery, creatableQuery } from "@/api/queries"
@@ -8,6 +8,7 @@ import { useTakenNames } from "@/components/add/taken"
 import { FormField, quantity } from "@/components/form-field"
 import { PlanDrawer } from "@/components/plan/plan-drawer"
 import { PortNoteHint, useImageInspection } from "@/components/add/image-port"
+import { Note, PortField, PublicUrlFields, Toggle } from "@/components/add/built-service"
 import { ImageSizeField } from "@/components/add/image-size"
 import { usePlanStep } from "@/components/plan/planner"
 import { SecurityProfileField } from "@/components/security-profile"
@@ -41,9 +42,7 @@ import {
   CollapsibleTrigger,
 } from "@zeabur/design-system/components/collapsible"
 import { Input } from "@zeabur/design-system/components/input"
-import { Label } from "@zeabur/design-system/components/label"
 import { Select } from "@zeabur/design-system/components/select"
-import { Switch } from "@zeabur/design-system/components/switch"
 import { Textarea } from "@zeabur/design-system/components/textarea"
 
 const MOUNT_PATH = /^\/\S*$/
@@ -86,7 +85,6 @@ export function ImageDrawer({ project, onClose }: { project: string; onClose: ()
   const [hosted, setHosted] = useState(false)
   const [tried, setTried] = useState(false)
   const [moreShown, setMoreShown] = useState(false)
-  const ids = { publicUrl: useId(), secret: useId(), volume: useId(), registry: useId() }
   const set = (patch: Partial<ImageService>) => setForm((f) => ({ ...f, ...patch }))
   const more = (patch: Partial<Extras>) => setExtras((e) => ({ ...e, ...patch }))
 
@@ -228,8 +226,9 @@ export function ImageDrawer({ project, onClose }: { project: string; onClose: ()
             />
           </FormField>
           {options.port ? (
-            <FormField
-              label={t("add.field.port")}
+            <PortField
+              value={portValue}
+              onChange={setTypedPort}
               hint={
                 note ? (
                   <PortNoteHint note={note} port={portValue} onPick={setTypedPort} />
@@ -237,65 +236,23 @@ export function ImageDrawer({ project, onClose }: { project: string; onClose: ()
                   t("add.portHint")
                 )
               }
-              errors={shown(problems.port, () => t("add.problem.port.invalid"))}
-            >
-              <Input
-                size="sm"
-                mono
-                inputMode="numeric"
-                value={portValue}
-                placeholder="8080"
-                onChange={(event) => setTypedPort(event.target.value)}
-              />
-            </FormField>
+              error={shown(problems.port, () => t("add.problem.port.invalid"))}
+            />
           ) : null}
         </div>
-        {port === "" ? null : options.publicUrl ? (
-          <div className="flex flex-col gap-3">
-            <Toggle
-              id={ids.publicUrl}
-              checked={form.publicUrl}
-              onChange={(publicUrl) => set({ publicUrl })}
-              label={t("add.publicUrl")}
-            />
-            {publicUrl ? (
-              <FormField
-                label={t("add.publicUrl")}
-                hideLabel
-                hint={
-                  <>
-                    {domains.suffixes?.length ? null : (
-                      <span className="block">{t("add.hostHint")}</span>
-                    )}
-                    <span className="block">
-                      {domains.clusterIssuer
-                        ? t("add.https", domains.clusterIssuer)
-                        : t("add.httpOnly")}
-                    </span>
-                  </>
-                }
-                errors={shown(problems.host, () =>
-                  t(`add.problem.host.${problems.host ?? "empty"}`),
-                )}
-              >
-                <Input
-                  size="sm"
-                  mono
-                  value={host}
-                  placeholder={domains.suffixes?.length ? undefined : "web.example.com"}
-                  autoComplete="off"
-                  spellCheck={false}
-                  onChange={(event) => {
-                    setHosted(true)
-                    set({ host: event.target.value.trim() })
-                  }}
-                />
-              </FormField>
-            ) : null}
-          </div>
-        ) : (
-          <Note>{t("add.noPublicUrl")}</Note>
-        )}
+        <PublicUrlFields
+          port={port}
+          canPublish={options.publicUrl}
+          on={form.publicUrl}
+          onToggle={(publicUrl) => set({ publicUrl })}
+          host={host}
+          onHost={(typed) => {
+            setHosted(true)
+            set({ host: typed })
+          }}
+          domains={domains}
+          error={shown(problems.host, () => t(`add.problem.host.${problems.host ?? "empty"}`))}
+        />
         <Collapsible open={moreShown || moreOpen} onOpenChange={setMoreShown}>
           <CollapsibleTrigger variant="disclosure">
             <CaretRightIcon aria-hidden="true" />
@@ -323,7 +280,6 @@ export function ImageDrawer({ project, onClose }: { project: string; onClose: ()
               {secrets ? (
                 env.variables.length > 0 ? (
                   <Toggle
-                    id={ids.secret}
                     checked={form.secretVariables}
                     onChange={(secretVariables) => set({ secretVariables })}
                     label={t("add.variablesSecret", `${name || "…"}-env`)}
@@ -335,7 +291,6 @@ export function ImageDrawer({ project, onClose }: { project: string; onClose: ()
               {options.volume ? (
                 <div className="flex flex-col gap-3">
                   <Toggle
-                    id={ids.volume}
                     checked={extras.volume}
                     onChange={(on) => more({ volume: on })}
                     label={t("add.volume")}
@@ -395,7 +350,6 @@ export function ImageDrawer({ project, onClose }: { project: string; onClose: ()
               {secrets ? (
                 <div className="flex flex-col gap-3">
                   <Toggle
-                    id={ids.registry}
                     checked={extras.registry}
                     onChange={(on) => more({ registry: on })}
                     label={t("add.registry")}
@@ -470,26 +424,3 @@ function useImageSecurity(inspection: { user?: string | null } | undefined) {
         : t("security.picked.baseline")
   return { security, picked, choose }
 }
-
-function Toggle({
-  id,
-  checked,
-  onChange,
-  label,
-}: {
-  id: string
-  checked: boolean
-  onChange: (checked: boolean) => void
-  label: string
-}) {
-  return (
-    <div className="flex items-center gap-2">
-      <Switch id={id} size="sm" checked={checked} onCheckedChange={onChange} />
-      <Label htmlFor={id}>{label}</Label>
-    </div>
-  )
-}
-
-const Note = ({ children }: { children: ReactNode }) => (
-  <p className="type-meta text-muted-foreground">{children}</p>
-)

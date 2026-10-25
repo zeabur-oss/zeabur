@@ -31,6 +31,8 @@
     "@zeabur/design-system": "git+ssh://git@github.com/zeabur-oss/design-system.git#c656ef79d0e6fa844bf94a188d572fbdbe596192",
     "class-variance-authority": "0.7.1",
     "cn": "0.5.0",
+    "fflate": "0.8.3",
+    "ignore": "7.0.12",
     "openapi-fetch": "0.17.0",
     "react": "19.3.1",
     "react-dom": "19.3.1",

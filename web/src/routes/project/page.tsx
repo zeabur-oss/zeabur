@@ -4,6 +4,7 @@ import { Fragment, useState, type ReactNode } from "react"
 import CaretRightIcon from "~icons/ph/caret-right"
 import DatabaseIcon from "~icons/ph/database"
 import GitBranchIcon from "~icons/ph/git-branch"
+import UploadSimpleIcon from "~icons/ph/upload-simple"
 import ListBulletsIcon from "~icons/ph/list-bullets"
 import LightbulbIcon from "~icons/ph/lightbulb"
 import PackageIcon from "~icons/ph/package"
@@ -465,12 +466,20 @@ function NextStep({ project }: { project: string }) {
                   />
                 ) : null}
                 {choices.git.open ? (
-                  <AddTile
-                    icon={<GitBranchIcon aria-hidden="true" />}
-                    label={t("add.git")}
-                    body={t("add.card.git")}
-                    onClick={() => openAdd(project, "git")}
-                  />
+                  <>
+                    <AddTile
+                      icon={<GitBranchIcon aria-hidden="true" />}
+                      label={t("add.git")}
+                      body={t("add.card.git")}
+                      onClick={() => openAdd(project, "git")}
+                    />
+                    <AddTile
+                      icon={<UploadSimpleIcon aria-hidden="true" />}
+                      label={t("add.upload")}
+                      body={t("add.card.upload")}
+                      onClick={() => openAdd(project, "upload")}
+                    />
+                  </>
                 ) : null}
                 {installed.map(({ engine }) => (
                   <AddTile
