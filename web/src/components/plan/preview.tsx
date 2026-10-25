@@ -58,12 +58,12 @@ export function useShortfall(
   preview?: Preview,
 ): { cost: string; reasons: string[]; fix: string } | undefined {
   const t = useT()
-  const { cores, memory } = useQuantityFormat()
+  const { cpuRequest, memory } = useQuantityFormat()
   const short = preview ? shortfall(t, preview) : undefined
   if (!preview || !short) return undefined
   const amount = (resource: string, value: number) =>
     resource.endsWith("cpu")
-      ? t("preview.cores", cores(value))
+      ? cpuRequest(value)
       : resource.endsWith("memory")
         ? memory(value)
         : String(value)
@@ -98,7 +98,7 @@ export function PlanPreview({
   removals?: boolean
 }) {
   const t = useT()
-  const { cores, memory } = useQuantityFormat()
+  const { cpuRequest, memory } = useQuantityFormat()
   const { fit } = preview
   const isSaid = (r: Rollout) =>
     said.some((w) => w.kind === r.workload.kind && w.name === r.workload.name)
@@ -157,12 +157,7 @@ export function PlanPreview({
       {fit.status === "fits" ? (
         <ul>
           <Line health="ok">
-            {t(
-              "preview.fits",
-              fit.pods,
-              t("preview.cores", cores(fit.cpuMillicores)),
-              memory(fit.memoryBytes),
-            )}
+            {t("preview.fits", fit.pods, cpuRequest(fit.cpuMillicores), memory(fit.memoryBytes))}
           </Line>
         </ul>
       ) : fit.status === "unknown" ? (
@@ -171,7 +166,7 @@ export function PlanPreview({
             {t(
               "preview.fitUnknown",
               fit.pods,
-              t("preview.cores", cores(fit.cpuMillicores)),
+              cpuRequest(fit.cpuMillicores),
               memory(fit.memoryBytes),
             )}
           </Line>
