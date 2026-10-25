@@ -1,0 +1,25 @@
+# The plate of Zeabur's README cover (design-system covers/zeabur): the review of a new service, at
+# the plate's size. Needs the design-system checkout beside this one; then render the cover there
+# (covers/README.md): scripts/docs-shots.sh docs/cover-shots.yaml
+out: ../design-system/covers/zeabur
+file: '{id}-{theme}.avif'
+shots:
+  - id: shot
+    path: /projects/shop
+    wait: '[data-testid="add"]'
+    viewport: cover
+    steps:
+      - click: '[data-testid="add"]'
+      - click: '[data-testid="add-image"]'
+      - fill: '[data-slot="dialog-content"] input'
+        value: docker.io/nginxinc/nginx-unprivileged:1.30.5-alpine-slim
+      - fill: ':nth-match([data-slot="dialog-content"] input, 2)'
+        value: blog
+      - fill: ':nth-match([data-slot="dialog-content"] input, 3)'
+        value: '8080'
+      - click: '[data-slot="dialog-content"] [data-slot="switch"]'
+      - wait: '[data-slot="dialog-content"] input[value$="example.com"]'
+      - click: '[data-slot="dialog-footer"] button:last-child'
+      - click: '[data-slot="dialog-body"] > :not([hidden]) [data-slot="collapsible-trigger"]'
+    locales: [en]
+    themes: [light, dark]
