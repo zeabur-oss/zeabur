@@ -22,8 +22,6 @@ export type DockTab =
       asked: number
       /** The tools pod the last ask named. */
       pod?: string
-      /** Typed into the shell once it opens, for the person to read and run with Enter. */
-      command?: string
     }
   | {
       id: string
@@ -122,9 +120,8 @@ export const openDatabaseShell = (
     name: database.name,
   })
 
-/** Opens the project's kubectl terminal, or shows it. An ask attaches to the tools pod named, or a
- * running one, or plans one; without, the tab lists the person's tools pods. A `command` is typed
- * in once the shell opens, and not run. */
+/** Opens the project's kubectl terminal, or shows it. Each ask attaches to the tools pod named, or a
+ * running one, or plans one. */
 export const openKubectl = (project: string, options?: KubectlOptions) =>
   openTools(project, options)
 
@@ -132,26 +129,22 @@ export const openKubectl = (project: string, options?: KubectlOptions) =>
 export const openClusterKubectl = (options?: KubectlOptions) => openTools(undefined, options)
 
 interface KubectlOptions {
-  ask?: boolean
   pod?: string
-  command?: string
 }
 
 /** `@` is in no namespace's name, so the cluster's never meets a project's. */
 const kubectlId = (project: string | undefined) =>
   project === undefined ? "kubectl@cluster" : `kubectl:${project}`
 
-function openTools(project: string | undefined, { ask = true, pod, command }: KubectlOptions = {}) {
+function openTools(project: string | undefined, { pod }: KubectlOptions = {}) {
   const state = dock.get()
   const id = kubectlId(project)
   const found = state.tabs.find((tab) => tab.id === id)
   const tabs = found
     ? state.tabs.map((tab) =>
-        tab.id === id && tab.kind === "kubectl" && ask
-          ? { ...tab, asked: tab.asked + 1, pod, command: command ?? tab.command }
-          : tab,
+        tab.id === id && tab.kind === "kubectl" ? { ...tab, asked: tab.asked + 1, pod } : tab,
       )
-    : [...state.tabs, { id, kind: "kubectl" as const, project, asked: ask ? 1 : 0, pod, command }]
+    : [...state.tabs, { id, kind: "kubectl" as const, project, asked: 1, pod }]
   dock.set({ tabs, active: id, open: true, focus: state.focus + 1 })
 }
 
@@ -163,16 +156,6 @@ export function openNodeShell(node: string, pod: string) {
     ? state.tabs
     : [...state.tabs, { id, kind: "node" as const, node, pod }]
   dock.set({ tabs, active: id, open: true, focus: state.focus + 1 })
-}
-
-/** Its command is in the shell now. */
-export function commandTyped(id: string) {
-  const state = dock.get()
-  update({
-    tabs: state.tabs.map((tab) =>
-      tab.id === id && tab.kind === "kubectl" ? { ...tab, command: undefined } : tab,
-    ),
-  })
 }
 
 export function updateShell(id: string, patch: { pod?: string; container?: string }) {

@@ -113,11 +113,6 @@ export function nearestExpiry(expiries: Iterable<string | null | undefined>): st
   return nearest?.iso
 }
 
-/** Typed into a shell, a command waits for Enter: no line break after it. */
-export function typedCommand(command: string): string {
-  return command.replace(/\r\n?/g, "\n").trimEnd()
-}
-
 /** Both verbs on `pods/exec`: a WebSocket handshake is a GET (RFC 6455 §4.1), so RBAC checks `get`;
  * Zeabur, `kubectl exec` and kube-apiserver from 1.31 also require `create`
  * (https://kubernetes.io/docs/reference/access-authn-authz/authorization/#determine-the-request-verb). */

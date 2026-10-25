@@ -10,13 +10,7 @@ import { LoadingRows } from "@/components/page"
 import { usePlanner } from "@/components/plan/planner"
 import { Problem } from "@/components/problem"
 import { useI18n, useT } from "@/i18n"
-import {
-  commandTyped,
-  openClusterKubectl,
-  openKubectl,
-  updateShell,
-  type DockTab,
-} from "@/lib/dock"
+import { openClusterKubectl, openKubectl, updateShell, type DockTab } from "@/lib/dock"
 import { formatAgo } from "@/lib/format"
 import { serverContainer, shellCommand, shellPod } from "@/model/databases"
 import type { Pod } from "@/model/service"
@@ -349,9 +343,7 @@ export function KubectlTab({ tab, shown, focus }: KubectlTabProps) {
         project={project ?? tools.data.namespace}
         shown={shown}
         focus={focus}
-        command={tab.command}
         grant={project !== undefined}
-        onTyped={() => commandTyped(tab.id)}
         onReconnect={() => setAttempt(attempt + 1)}
       />
     )

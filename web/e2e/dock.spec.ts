@@ -167,9 +167,7 @@ test("a terminal closed when its credential expires keeps its tab and reopens", 
   )
 })
 
-test("old links open the dock: Logs' terminal view and the project's kubectl page", async ({
-  page,
-}) => {
+test("an old link to Logs' terminal view opens the dock", async ({ page }) => {
   await page.goto(`${project}/services/Deployment/${healthy}?tab=logs&mode=terminal`)
   await expect(page).toHaveURL(
     (url) => url.searchParams.get("tab") === "logs" && !url.searchParams.has("mode"),
@@ -178,20 +176,6 @@ test("old links open the dock: Logs' terminal view and the project's kubectl pag
     "aria-selected",
     "true",
   )
-
-  await page.goto(`${project}/terminal`)
-  await expect(page).toHaveURL((url) => url.pathname === project)
-  await expect(dock(page)).toBeVisible()
-  if (await toolsAvailable(page)) {
-    await expect(dock(page).getByRole("tab", { name: `kubectl ${namespace}` })).toHaveAttribute(
-      "aria-selected",
-      "true",
-    )
-    // An old link opens nothing on its own: the person asks.
-    await expect(page.getByRole("dialog")).toHaveCount(0)
-  } else {
-    await expect(dock(page)).toContainText("No terminal open")
-  }
 })
 
 test("the kubectl terminal opens through a review the first time and reuses its pod after", async ({

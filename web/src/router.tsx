@@ -28,14 +28,13 @@ import {
   queryClient,
   recentWarningsQuery,
   rolloutQuery,
-  toolsQuery,
   upgradesQuery,
 } from "@/api/queries"
 import { isUnreachable } from "@/api/client"
 import { accountQuery, membersQuery } from "@/api/members"
 import { AppShell } from "@/components/app-shell"
 import { NotFound } from "@/components/not-found"
-import { openKubectl, openShell, showDock } from "@/lib/dock"
+import { openShell } from "@/lib/dock"
 import { RouteError, RoutePending } from "@/components/route-states"
 import { canonicalKind, isTask } from "@/model/service"
 import {
@@ -230,21 +229,6 @@ const projectSettingsRoute = createRoute({
   component: lazyRouteComponent(() => import("@/routes/project/settings"), "ProjectSettingsPage"),
 })
 
-// The kubectl terminal was a page; it is a tab of the dock under every page now.
-const toolsTerminalRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/projects/$project/terminal",
-  beforeLoad: async ({ params, preload }) => {
-    if (!preload) {
-      // Where Zeabur runs on the person's computer there is no kubectl terminal: the dock opens empty.
-      const tools = await ensure(toolsQuery(params.project)).catch(() => undefined)
-      if (tools?.available) openKubectl(params.project, { ask: false })
-      else showDock(true)
-    }
-    throw redirect({ to: "/projects/$project", params, replace: true })
-  },
-})
-
 const serviceRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/projects/$project/services/$kind/$name",
@@ -375,7 +359,6 @@ export const router = createRouter({
     objectsRoute,
     createObjectsRoute,
     projectSettingsRoute,
-    toolsTerminalRoute,
     serviceRoute,
     databaseRoute,
     objectStorageRoute,

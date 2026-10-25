@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, test } from "bun:test"
 
 import {
   closeTab,
-  commandTyped,
   dock,
   isDockShortcut,
   openClusterKubectl,
@@ -63,36 +62,15 @@ describe("the dock", () => {
     ])
   })
 
-  test("asking for kubectl again counts the ask; opening from an old link does not", () => {
-    openKubectl("shop", { ask: false })
-    expect(dock.get().tabs[0]).toMatchObject({ asked: 0 })
-    openKubectl("shop")
-    expect(dock.get().tabs[0]).toMatchObject({ asked: 1 })
-  })
-
-  test("a command waits on the kubectl tab until its shell has it; a plain ask keeps it", () => {
-    openKubectl("shop", { command: "kubectl get pods" })
-    expect(dock.get().tabs[0]).toMatchObject({ asked: 1, command: "kubectl get pods" })
-    openKubectl("shop")
-    expect(dock.get().tabs[0]).toMatchObject({ asked: 2, command: "kubectl get pods" })
-    openKubectl("shop", { command: "helm list" })
-    expect(dock.get().tabs[0]).toMatchObject({ asked: 3, command: "helm list" })
-    commandTyped("kubectl:shop")
-    expect(dock.get().tabs[0]).toMatchObject({ asked: 3, command: undefined })
-    expect(dock.get()).toMatchObject({ open: true, active: "kubectl:shop" })
-  })
-
   test("the cluster's kubectl terminal is a tab of its own, beside a project's", () => {
     openKubectl("shop")
-    openClusterKubectl({ command: "helm list -A" })
+    openClusterKubectl()
     openClusterKubectl()
     const state = dock.get()
     expect(state.tabs.map((tab) => tab.id)).toStrictEqual(["kubectl:shop", "kubectl@cluster"])
-    expect(state.tabs[1]).toMatchObject({ kind: "kubectl", asked: 2, command: "helm list -A" })
+    expect(state.tabs[1]).toMatchObject({ kind: "kubectl", asked: 2 })
     expect(state.tabs[1]).not.toHaveProperty("project", expect.anything())
     expect(state.active).toBe("kubectl@cluster")
-    commandTyped("kubectl@cluster")
-    expect(dock.get().tabs[1]).toMatchObject({ command: undefined })
   })
 
   test("closing shows the tab beside it and leaves the dock open after the last", () => {

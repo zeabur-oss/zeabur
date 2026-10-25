@@ -4,7 +4,6 @@ import type { Problem } from "@/api/client"
 import {
   execRole,
   nearestExpiry,
-  typedCommand,
   nextState,
   parseFrame,
   reconnectsWithRights,
@@ -156,12 +155,5 @@ describe("the dock", () => {
     expect(toolsTerminalUrl({ protocol: "http:", host: "z.local" }, undefined, "tools-ada")).toBe(
       "ws://z.local/api/v1/cluster/tools/tools-ada/terminal",
     )
-  })
-})
-
-describe("a command typed into the kubectl terminal", () => {
-  test("ends without a line break, so it waits for Enter", () => {
-    expect(typedCommand("kubectl get pods\n")).toBe("kubectl get pods")
-    expect(typedCommand("kubectl get pods\r\n\r\n")).toBe("kubectl get pods")
   })
 })
