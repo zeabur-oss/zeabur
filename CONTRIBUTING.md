@@ -250,11 +250,12 @@ ZEABUR_INSTALLER_UI_DIST="$PWD/crates/zeabur-installer/web/dist" cargo build --r
 
 A release build embeds the web interface and stops without `ZEABUR_INSTALLER_UI_DIST`; a debug
 build embeds a placeholder page instead. The interface is in `crates/zeabur-installer/web`, with
-its own `package.json` and the same lint and format rules as `web/`. CI does not check it yet.
-Check it by hand:
+its own `package.json`, `bun.lock` and the same lint and format rules as `web/`. CI installs
+exactly the lock file (`bun ci`), checks the format in the `format` job, and builds and lints it in
+the `ui` job. To check it by hand:
 
 ```sh
-(cd crates/zeabur-installer/web && bun install && bun run fmt:check && bun run lint && bun run typecheck)
+(cd crates/zeabur-installer/web && bun ci && bun run fmt:check && bun run lint && bun run typecheck)
 ```
 
 `crates/zeabur-installer-plan/src/pins.rs` names the RKE2 release and its SHA-256 digests.

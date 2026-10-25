@@ -7,5 +7,6 @@ set -euo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$root/crates/zeabur-installer/web"
-bun install
+# Installs exactly bun.lock; fails if package.json and the lock file disagree.
+bun ci
 bun run build
