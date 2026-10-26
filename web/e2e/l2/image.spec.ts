@@ -107,7 +107,7 @@ test("a Developer deploys an image and deletes it with what it made", async ({ p
             `Service ${name}`,
             `Secret ${name}-env`,
             `Ingress ${name}`,
-            `PersistentVolumeClaim ${name}-data`,
+            `Disk ${name}-data`,
           ],
         }))
     await test.step(`the admin deletes ${baselineProject}`, async () => {
