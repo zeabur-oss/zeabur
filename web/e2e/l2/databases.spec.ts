@@ -270,7 +270,7 @@ test("a Developer creates and backs up databases; a Viewer only sees them", asyn
       const title = `Disconnect ${service} from ${db.name}`
       const plan = developer.getByRole("dialog", { name: title })
       // The database and its Secret stay; for MongoDB the password goes with the URL.
-      await expect(plan).toContainText(`${db.name} and its Secret`)
+      await expect(plan).toContainText(`${db.name} and its secret`)
       for (const name of db.variables) await expect(plan).toContainText(name)
       await apply(developer, title)
       await expect
