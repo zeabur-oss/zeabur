@@ -1,0 +1,45 @@
+# Where Zeabur is, for zeaburctl: the public URL in a ConfigMap in kube-public, as kubeadm's
+# cluster-info publishes the API server's address. It holds nothing secret, so anyone who can
+# reach the API server may read this one ConfigMap, signed in or not.
+# https://kubernetes.io/docs/reference/setup-tools/kubeadm/implementation-details/#generate-the-cluster-info-configmap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: zeabur-info
+  namespace: kube-public
+  labels:
+    {{- include "zeabur.labels" . | nindent 4 }}
+data:
+  url: {{ required "publicUrl is required" .Values.publicUrl | trimSuffix "/" | quote }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: zeabur-info-reader
+  namespace: kube-public
+  labels:
+    {{- include "zeabur.labels" . | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    resourceNames: ["zeabur-info"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: zeabur-info-reader
+  namespace: kube-public
+  labels:
+    {{- include "zeabur.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: zeabur-info-reader
+subjects:
+  - apiGroup: rbac.authorization.k8s.io
+    kind: Group
+    name: system:authenticated
+  - apiGroup: rbac.authorization.k8s.io
+    kind: User
+    name: system:anonymous

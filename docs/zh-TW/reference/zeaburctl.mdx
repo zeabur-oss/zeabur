@@ -74,12 +74,12 @@ kube-apiserver 是否信任 Zeabur Identity 的 issuer，寫在控制平面的 `
 ## `up`
 
 ```sh
-zeaburctl up [資料夾] --server <位址> [--project <專案>] [--service <服務>]
+zeaburctl up [資料夾] [--project <專案>] [--service <服務>]
 ```
 
 把資料夾上傳到叢集裡的 Zeabur，開始建置。資料夾省略時用目前的資料夾。如果服務還不存在，指令會建立它。專案必須已存在，指令不會建立專案。
 
-`--server` 填你在瀏覽器開啟 Zeabur 的網址，例如 `https://zeabur.example.com`。也可以用環境變數 `ZEABUR_SERVER` 設定，兩者至少要提供一個。
+指令從叢集的 `kube-public` 命名空間裡的 `zeabur-info` ConfigMap 讀到 Zeabur 的網址，不用另外設定。要改用別的網址時，加上 `--server`，或設定環境變數 `ZEABUR_SERVER`。
 
 指令和網頁用同一組 API，把壓縮檔交給 Zeabur，再由 Zeabur 推到 registry。你不需要知道 registry 的位址。`--registry-address` 和 `--registry-ca-file` 已移除。
 
@@ -119,7 +119,7 @@ zeaburctl up [資料夾] --server <位址> [--project <專案>] [--service <服�
 
 | 選項 | 預設與用途 |
 |---|---|
-| `--server <位址>` | 叢集裡 Zeabur 的網址，例如 `https://zeabur.example.com`。必須提供此選項或環境變數 `ZEABUR_SERVER` |
+| `--server <位址>` | 預設讀 `zeabur-info` 裡的網址。要用別的網址時指定，例如 `https://zeabur.example.com`，也可以用環境變數 `ZEABUR_SERVER` |
 | `--project <專案>` | 服務所在的既有專案。省略時在終端機從清單選擇，腳本與 CI 必填 |
 | `--service <服務>` | 服務名稱。省略時在終端機詢問，預設用資料夾名稱，腳本與 CI 必填 |
 | `--context <名稱>` | 預設用 kubeconfig 的目前 context |

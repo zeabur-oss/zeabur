@@ -46,10 +46,12 @@ minor or patch release may break the API.
   needs no new rights: a project Developer already may create and patch `Build`s and read Secrets.
   New changes `uploadToken` and `archiveDigest`, and
   `POST /api/v1/projects/{p}/builds/{b}/source`.
-- `zeaburctl up --server <address>` sends the archive through Zeabur in the cluster with the
+- `zeaburctl up` sends the archive through Zeabur in the cluster with the
   kubeconfig's bearer token, so it needs no registry address and no port-forward, and makes the
   service when it does not exist (`--project`, `--service`, `--port`, `--method`, `--yes`; asked
-  for in a terminal). The server accepts `Authorization: Bearer` on the API when there is no
+  for in a terminal) with one new change, `createUploadService`, which the web interface sends too.
+  It finds Zeabur at the `url` of the ConfigMap `kube-public/zeabur-info`, which the chart
+  publishes and everyone may read (`--server` or `ZEABUR_SERVER` overrides it). The server accepts `Authorization: Bearer` on the API when there is no
   session cookie, acting as the token's holder; changes still carry `Origin` and `Zeabur-Request`.
 
 ### Changed

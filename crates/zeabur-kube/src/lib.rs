@@ -313,12 +313,43 @@ impl UserClient {
         client(config, pool, None).map(|client| Self { client, name })
     }
 
+    /// Where Zeabur says it is: the `url` of the ConfigMap [`INFO_CONFIG_MAP`] in
+    /// [`INFO_NAMESPACE`], which the chart publishes for everyone to read. `None` when the
+    /// cluster has none.
+    ///
+    /// # Errors
+    ///
+    /// When kube-apiserver cannot be reached or refuses the read.
+    pub async fn zeabur_url(&self) -> Result<Option<String>, ConnectError> {
+        let maps = kube::Api::<k8s_openapi::api::core::v1::ConfigMap>::namespaced(
+            self.client.clone(),
+            INFO_NAMESPACE,
+        );
+        let map = maps
+            .get_opt(INFO_CONFIG_MAP)
+            .await
+            .map_err(|e| ConnectError::Read(e.to_string()))?;
+        Ok(map.and_then(url_of))
+    }
+
     /// The underlying kube-rs client, bound to this person.
     #[must_use]
     pub const fn kube(&self) -> &kube::Client {
         &self.client
     }
 }
+
+fn url_of(map: k8s_openapi::api::core::v1::ConfigMap) -> Option<String> {
+    let url = map.data?.remove("url")?;
+    let url = url.trim();
+    (!url.is_empty()).then(|| url.to_owned())
+}
+
+/// The namespace every signed-in person and anonymous client may read, as kubeadm's cluster-info
+/// lives in.
+pub const INFO_NAMESPACE: &str = "kube-public";
+/// The ConfigMap whose `url` is where Zeabur is.
+pub const INFO_CONFIG_MAP: &str = "zeabur-info";
 
 /// How long a connection to kube-apiserver stays open unused.
 const POOL_IDLE: std::time::Duration = std::time::Duration::from_secs(30);
@@ -470,6 +501,9 @@ pub enum ConnectError {
     /// The HTTP client could not be built.
     #[error("cannot build the Kubernetes client: {0}")]
     Client(String),
+    /// A ConfigMap Zeabur publishes could not be read.
+    #[error("cannot read {INFO_NAMESPACE}/{INFO_CONFIG_MAP}: {0}")]
+    Read(String),
     /// The token has a character that an HTTP header cannot carry.
     #[error("the token is not a valid bearer token")]
     Token,
@@ -478,6 +512,24 @@ pub enum ConnectError {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn zeabur_is_where_the_info_config_map_says() {
+        let map = |data: serde_json::Value| {
+            serde_json::from_value::<k8s_openapi::api::core::v1::ConfigMap>(
+                serde_json::json!({"metadata": {"name": INFO_CONFIG_MAP}, "data": data}),
+            )
+            .unwrap()
+        };
+        assert_eq!(
+            url_of(map(
+                serde_json::json!({"url": " https://zeabur.example.com\n"})
+            )),
+            Some("https://zeabur.example.com".to_owned())
+        );
+        assert_eq!(url_of(map(serde_json::json!({"url": ""}))), None);
+        assert_eq!(url_of(map(serde_json::json!({"other": "x"}))), None);
+    }
 
     #[tokio::test]
     async fn a_kubeconfig_token_is_the_bearer_token_and_a_certificate_is_none() {

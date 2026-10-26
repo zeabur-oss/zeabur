@@ -88,7 +88,7 @@ for values in "$chart"/ci/*-values.yaml; do
     "$terminals/zeabur-terminals>zeabur-terminals>zeabur/zeabur"
   expect "$name" "$out" \
     "[select(.kind == \"Role\" and .metadata.namespace != \"$terminals\") | .metadata.namespace + \"/\" + .metadata.name + \":\" + (.rules[] | [.apiGroups, .resources, .resourceNames // [], .verbs] | map(join(\",\")) | join(\"|\"))] | sort | join(\" \")" \
-    'zeabur-s3-destinations/zeabur-s3-destinations-reader:|configmaps||get,list zeabur/zeabur-settings-reader:|configmaps|zeabur-settings|get'
+    'kube-public/zeabur-info-reader:|configmaps|zeabur-info|get zeabur-s3-destinations/zeabur-s3-destinations-reader:|configmaps||get,list zeabur/zeabur-settings-reader:|configmaps|zeabur-settings|get'
   expect "$name" "$out" \
     "[select(.kind == \"Role\" and .metadata.namespace == \"$terminals\") | .metadata.name + \":\" + (.rules[] | [.apiGroups, .resources, .resourceNames // [], .verbs] | map(join(\",\")) | join(\"|\"))] | join(\" \")" \
     'zeabur-terminals:|pods||create,get,list,delete zeabur-terminals:|pods/exec||create,get'

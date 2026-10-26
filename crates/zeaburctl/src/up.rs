@@ -14,7 +14,7 @@ use std::process::ExitCode;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use serde_json::{Value, json};
-use zeabur_kube::UserToken;
+use zeabur_kube::{UserClient, UserToken};
 
 use crate::server::Server;
 use crate::{output, pack};
@@ -39,9 +39,10 @@ pub(crate) struct UpArgs {
     /// The folder to upload (default: the current one).
     #[arg(default_value = ".")]
     folder: PathBuf,
-    /// The address of Zeabur in the cluster, like `https://zeabur.example.com`.
+    /// The address of Zeabur, like `https://zeabur.example.com`. Default: the one Zeabur
+    /// publishes in the cluster (the ConfigMap `zeabur-info` in `kube-public`).
     #[arg(long, env = "ZEABUR_SERVER")]
-    server: String,
+    server: Option<String>,
     /// The project the service is in. Asked for in a terminal when left out.
     #[arg(long)]
     project: Option<String>,
@@ -115,7 +116,11 @@ async fn up(args: &UpArgs) -> Result<(), String> {
     let token = UserToken::from_kubeconfig(args.context.as_deref())
         .await
         .map_err(|e| e.to_string())?;
-    let server = Server::new(&args.server, token)?;
+    let address = match &args.server {
+        Some(address) => address.clone(),
+        None => published_address(args.context.as_deref()).await?,
+    };
+    let server = Server::new(&address, token)?;
     let target = Target {
         project: args.project.clone(),
         service: args.service.clone(),
@@ -144,6 +149,21 @@ async fn up(args: &UpArgs) -> Result<(), String> {
     .await?;
     output::info(&format!("Uploaded. {service} is building the new folder."));
     Ok(())
+}
+
+/// Where Zeabur says it is in the cluster the kubeconfig names.
+async fn published_address(context: Option<&str>) -> Result<String, String> {
+    let client = UserClient::from_kubeconfig(context)
+        .await
+        .map_err(|e| e.to_string())?;
+    client
+        .zeabur_url()
+        .await
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| {
+            "This cluster does not say where Zeabur is. Pass --server with the address you open Zeabur at."
+                .to_owned()
+        })
 }
 
 /// How often and how long to ask for the upload token.
