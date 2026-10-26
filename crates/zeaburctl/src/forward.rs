@@ -109,7 +109,11 @@ async fn may_forward(client: &kube::Client, pod: &str, namespace: &str) -> Resul
         .create(&PostParams::default(), &review)
         .await;
     // When the question cannot be asked, the upload tries and tells what it gets.
-    if answer.ok().and_then(|a| a.status).is_some_and(|s| !s.allowed) {
+    if answer
+        .ok()
+        .and_then(|a| a.status)
+        .is_some_and(|s| !s.allowed)
+    {
         return Err(format!(
             "Your kubeconfig is not allowed to forward a port to the registry in the namespace {namespace}, which uploading a folder from this computer needs. Ask a cluster administrator for `create` on `pods/portforward` there, or upload from Zeabur's web interface."
         ));
