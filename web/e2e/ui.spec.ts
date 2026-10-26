@@ -543,23 +543,17 @@ test("Objects lists the project's objects and opens one as YAML", async ({ page 
   await expect(page).not.toHaveURL(/object=/)
 })
 
-test("Objects loads unusual kinds on click and on a scan", async ({ page }) => {
+test("Objects reads every served kind when it opens", async ({ page }) => {
   await page.goto(`${project}/objects`)
   const list = page.getByRole("list", { name: "Objects" })
   const filter = page.getByRole("searchbox", { name: "Filter objects" })
-  // The list is virtual, so find the kind by name.
+  // The list is virtual, so find the kind by name. Reading every kind, CRDs included, is slow on
+  // a slow runner.
   await page.getByRole("button", { name: /^Generated/ }).click()
   await filter.fill("Lease")
-  const leases = list.getByRole("button", { name: "Load Lease", exact: true })
-  await expect(leases).toBeVisible()
-  await leases.click()
-  await expect(leases).toBeHidden()
+  await expect(list.getByText("Lease", { exact: true })).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByText("Scanning…")).toBeHidden({ timeout: 30_000 })
   await filter.fill("")
-  // Reads every served kind, CRDs included: slow on a slow runner.
-  await page.getByRole("button", { name: "Scan all kinds" }).click()
-  await expect(page.getByText("All kinds loaded")).toBeVisible({
-    timeout: 30_000,
-  })
   await page.getByRole("button", { name: "Refresh" }).click()
   await expect(list.getByRole("button", { name: /^editor-config/ })).toBeVisible()
 })
@@ -858,7 +852,7 @@ test("Deployments lists the releases and rolls back to one through a plan", asyn
     page,
     new RegExp(`^Roll back ${editor} to #\\d+$`),
     /^Roll back to revision \d+$/,
-    "A rollback leaves ConfigMap and Secret contents as they are.",
+    "A rollback leaves config file and secret contents as they are.",
   )
 })
 

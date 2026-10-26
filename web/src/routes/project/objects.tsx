@@ -1,4 +1,4 @@
-import { useQueries, useQuery, useQueryClient } from "@tanstack/react-query"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { useVirtualizer } from "@tanstack/react-virtual"
 import { getRouteApi, Link } from "@tanstack/react-router"
 import { lazy, Suspense, useRef, useState, type ReactNode } from "react"
@@ -73,8 +73,6 @@ export function ObjectsPage() {
   const navigate = route.useNavigate()
   const client = useQueryClient()
   const pins = pinnedKinds.useValue()
-  const [opened, setOpened] = useState<string[]>([])
-  const [scan, setScan] = useState(false)
   const [query, setQuery] = useState(search.q ?? "")
 
   const base = useQuery(objectsQuery(project))
@@ -85,16 +83,13 @@ export function ObjectsPage() {
     ...objectsQuery(project, { kinds: pinned }),
     enabled: base.isSuccess && pinned.length > 0,
   })
-  const openedReads = useQueries({
-    queries: opened.map((k) => objectsQuery(project, { kinds: [k] })),
-  })
-  const scanned = useQuery({ ...objectsQuery(project, { all: true }), enabled: scan })
+  const scanned = useQuery({ ...objectsQuery(project, { all: true }), enabled: base.isSuccess })
 
   const set = (patch: { q?: string; object?: string; generated?: boolean; empty?: boolean }) =>
     void navigate({ search: (previous) => ({ ...previous, ...patch }), replace: !patch.object })
   const address = search.object ? parseObjectKey(search.object) : undefined
 
-  const reads = [pinnedRead, ...openedReads, scanned]
+  const reads = [pinnedRead, scanned]
   const kinds = new Map<string, Kind>()
   const unreadable = new Map<string, Schemas["UnreadableView"]>()
   for (const answer of [base, ...reads]) {
@@ -105,7 +100,6 @@ export function ObjectsPage() {
   const loading = new Set(
     [
       ...(pinnedRead.isFetching ? pinned : []),
-      ...opened.filter((_, i) => openedReads[i]?.isFetching),
       ...(scanned.isFetching ? [...kinds.keys()] : []),
     ].filter((k) => !kinds.get(k)?.listed),
   )
@@ -137,7 +131,6 @@ export function ObjectsPage() {
             unreadable={[...unreadable.values()]}
             loading={loading}
             pins={pins}
-            scanned={scan && scanned.isSuccess}
             scanning={scanned.isFetching}
             updated={updated}
             refreshing={base.isFetching}
@@ -150,8 +143,6 @@ export function ObjectsPage() {
             onGenerated={(value) => set({ generated: value || undefined })}
             empty={search.empty ?? false}
             onEmpty={(value) => set({ empty: value || undefined })}
-            onLoad={(key) => setOpened((keys) => (keys.includes(key) ? keys : [...keys, key]))}
-            onScan={() => setScan(true)}
             onRefresh={() =>
               void client.invalidateQueries({ queryKey: ["project", project, "objects"] })
             }
@@ -179,7 +170,6 @@ function ObjectList({
   unreadable,
   loading,
   pins,
-  scanned,
   scanning,
   updated,
   refreshing,
@@ -189,8 +179,6 @@ function ObjectList({
   onGenerated,
   empty,
   onEmpty,
-  onLoad,
-  onScan,
   onRefresh,
   onOpen,
 }: {
@@ -198,7 +186,6 @@ function ObjectList({
   unreadable: Schemas["UnreadableView"][]
   loading: Set<string>
   pins: string[]
-  scanned: boolean
   scanning: boolean
   updated?: string
   refreshing: boolean
@@ -208,8 +195,6 @@ function ObjectList({
   onGenerated: (value: boolean) => void
   empty: boolean
   onEmpty: (value: boolean) => void
-  onLoad: (key: string) => void
-  onScan: () => void
   onRefresh: () => void
   onOpen: (key: string) => void
 }) {
@@ -278,13 +263,9 @@ function ObjectList({
           {t("objects.empty")}
           <span className="text-muted-foreground tabular-nums">{emptyKinds.length}</span>
         </Toggle>
-        {scanned ? (
-          <span className="type-meta text-muted-foreground">{t("objects.scanned")}</span>
-        ) : (
-          <Button variant="outline" size="sm" onClick={onScan} disabled={scanning}>
-            {scanning ? t("objects.scanning") : t("objects.scan")}
-          </Button>
-        )}
+        {scanning ? (
+          <span className="type-meta text-muted-foreground">{t("objects.scanning")}</span>
+        ) : null}
         <span className="ml-auto flex items-center gap-2 type-meta text-muted-foreground tabular-nums">
           {t("objects.count", total)}
           {updated ? (
@@ -344,11 +325,7 @@ function ObjectList({
                   style={{ "--y": `${item.start}px` }}
                 >
                   {row.type === "kind" ? (
-                    <KindRow
-                      row={row}
-                      pinned={pins.includes(row.key)}
-                      onLoad={() => onLoad(row.key)}
-                    />
+                    <KindRow row={row} pinned={pins.includes(row.key)} />
                   ) : row.type === "refused" ? (
                     <div className="border-b px-4 py-2">
                       <Refused
@@ -422,20 +399,11 @@ function Toggle({
   )
 }
 
-function KindRow({
-  row,
-  pinned,
-  onLoad,
-}: {
-  row: Extract<Row, { type: "kind" }>
-  pinned: boolean
-  onLoad: () => void
-}) {
+function KindRow({ row, pinned }: { row: Extract<Row, { type: "kind" }>; pinned: boolean }) {
   const t = useT()
   const { kind } = row
   const plain = kindName(t, kind.kind)
   const denied = kind.access === "denied"
-  const readable = !kind.listed && !denied
   const label = (
     <>
       {kind.listed ? (
@@ -454,19 +422,7 @@ function KindRow({
   )
   return (
     <div className="flex h-10 items-center gap-2 border-b bg-muted/30 px-4">
-      {readable ? (
-        <button
-          type="button"
-          onClick={onLoad}
-          disabled={row.loading}
-          aria-label={t("objects.load", plain)}
-          className="flex min-w-0 flex-1 items-center gap-2 text-left outline-none hover:underline"
-        >
-          {label}
-        </button>
-      ) : (
-        <span className="flex min-w-0 flex-1 items-center gap-2">{label}</span>
-      )}
+      <span className="flex min-w-0 flex-1 items-center gap-2">{label}</span>
       <span className="type-meta text-muted-foreground tabular-nums">
         {row.refused
           ? null
@@ -476,7 +432,7 @@ function KindRow({
               ? t("common.loading")
               : row.count !== undefined
                 ? row.count
-                : t("objects.unread")}
+                : null}
       </span>
       <button
         type="button"
