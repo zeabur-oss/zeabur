@@ -5,7 +5,8 @@
 #
 # A project role aggregates the ClusterRoles labelled `zeabur.com/aggregate-to-<role>`: the rule
 # sets files/member-role-sets.yaml names for it (its own rules are `<role>-rules`) and those of
-# components installed next to it, such as Zeabur Proxy's zeabur-proxy-logs-reader.
+# components installed next to it, such as Zeabur Proxy's zeabur-proxy-logs-reader and
+# zeabur-proxy-metrics-reader.
 # kube-controller-manager writes the aggregate's rules, so the chart leaves the field out
 # (with it, a server-side apply upgrade conflicts with the controller)
 # (https://kubernetes.io/docs/reference/access-authn-authz/rbac/#aggregated-clusterroles).
@@ -57,6 +58,23 @@ metadata:
 rules:
   - apiGroups: [proxy.zeabur.com]
     resources: [logs]
+    verbs: [get]
+---
+# Reading a project's usage history through Zeabur Proxy, which holds every query to the
+# namespace. Viewers and developers have it, and so does Kubernetes' view (and through it edit and
+# admin): all of them already read the same pods' current usage (`pods.metrics.k8s.io`).
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: zeabur-proxy-metrics-reader
+  labels:
+    {{- include "zeabur.labels" . | nindent 4 }}
+    zeabur.com/aggregate-to-zeabur-project-developer: "true"
+    zeabur.com/aggregate-to-zeabur-project-viewer: "true"
+    rbac.authorization.k8s.io/aggregate-to-view: "true"
+rules:
+  - apiGroups: [proxy.zeabur.com]
+    resources: [metrics]
     verbs: [get]
 ---
 # Gateway API ships no aggregated roles, so Kubernetes' view (and through it edit and admin)

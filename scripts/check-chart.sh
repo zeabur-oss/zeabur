@@ -42,23 +42,26 @@ for values in "$chart"/ci/*-values.yaml; do
   # let people read Zeabur's settings (`get` on the ConfigMap zeabur-settings) and the S3
   # destinations (the ConfigMaps of their namespace). The ClusterRoles are the member roles, which
   # Zeabur binds per member, the rule sets the project roles aggregate, and Zeabur Proxy's logs
-  # reader.
+  # and metrics readers.
   expect "$name" "$out" '[select(.kind == "ClusterRoleBinding")] | length' 0
   expect "$name" "$out" '[select(.kind == "ClusterRole") | .metadata.name] | sort | join(",")' \
-    zeabur-gateway-routes-reader,zeabur-member,zeabur-project-builds-read,zeabur-project-builds-write,zeabur-project-developer,zeabur-project-developer-rules,zeabur-project-viewer,zeabur-project-viewer-rules,zeabur-proxy-logs-reader
+    zeabur-gateway-routes-reader,zeabur-member,zeabur-project-builds-read,zeabur-project-builds-write,zeabur-project-developer,zeabur-project-developer-rules,zeabur-project-viewer,zeabur-project-viewer-rules,zeabur-proxy-logs-reader,zeabur-proxy-metrics-reader
   # A project role is exactly what its own label selects: nothing else of the chart's widens it.
   expect "$name" "$out" \
     '[select(.kind == "ClusterRole" and .aggregationRule) | .metadata.name + "=" + (.aggregationRule.clusterRoleSelectors[].matchLabels | keys | join("+")) + ((.rules // []) | length | tostring)] | join(",")' \
     "zeabur-project-developer=zeabur.com/aggregate-to-zeabur-project-developer0,zeabur-project-viewer=zeabur.com/aggregate-to-zeabur-project-viewer0"
   expect "$name" "$out" \
     "[select(.kind == \"ClusterRole\") | .metadata.name as \$n | .metadata.labels | keys | .[] | select(test(\"aggregate-to\")) | \$n + \">\" + sub(\".*aggregate-to-\"; \"\")] | join(\",\")" \
-    "zeabur-project-builds-read>zeabur-project-developer,zeabur-project-builds-read>zeabur-project-viewer,zeabur-project-builds-write>zeabur-project-developer,zeabur-project-developer-rules>zeabur-project-developer,zeabur-project-viewer-rules>zeabur-project-viewer,zeabur-proxy-logs-reader>zeabur-project-developer,zeabur-proxy-logs-reader>view,zeabur-gateway-routes-reader>view"
+    "zeabur-project-builds-read>zeabur-project-developer,zeabur-project-builds-read>zeabur-project-viewer,zeabur-project-builds-write>zeabur-project-developer,zeabur-project-developer-rules>zeabur-project-developer,zeabur-project-viewer-rules>zeabur-project-viewer,zeabur-proxy-logs-reader>zeabur-project-developer,zeabur-proxy-logs-reader>view,zeabur-proxy-metrics-reader>zeabur-project-developer,zeabur-proxy-metrics-reader>zeabur-project-viewer,zeabur-proxy-metrics-reader>view,zeabur-gateway-routes-reader>view"
   expect "$name" "$out" \
     'select(.kind == "ClusterRole" and .metadata.name == "zeabur-gateway-routes-reader") | .rules[] | [.apiGroups, .resources, .verbs] | map(join(",")) | join("|")' \
     'gateway.networking.k8s.io|httproutes|get,list,watch'
   expect "$name" "$out" \
     'select(.kind == "ClusterRole" and .metadata.name == "zeabur-proxy-logs-reader") | .rules[] | [.apiGroups, .resources, .verbs] | map(join(",")) | join("|")' \
     'proxy.zeabur.com|logs|get'
+  expect "$name" "$out" \
+    'select(.kind == "ClusterRole" and .metadata.name == "zeabur-proxy-metrics-reader") | .rules[] | [.apiGroups, .resources, .verbs] | map(join(",")) | join("|")' \
+    'proxy.zeabur.com|metrics|get'
   # Viewers read no logs: neither the pods' nor the log history's.
   expect "$name" "$out" \
     '[select(.kind == "ClusterRole" and .metadata.name == "zeabur-project-viewer-rules") | .rules[].resources[] | select(. == "pods/log")] | length' 0
@@ -186,7 +189,7 @@ expect configMap "$(render -f "$chart/ci/minimal-values.yaml" --set extraTrusted
 # Zeabur Proxy: off unless asked for; on, a locked-down pod with no token that only Zeabur reaches,
 # over TLS whose CA (and only the CA) Zeabur trusts.
 expect minimal "$(render -f "$chart/ci/minimal-values.yaml")" \
-  '[select(.metadata.name | test("proxy"))] | map(.kind) | join(",")' ClusterRole
+  '[select(.metadata.name | test("proxy"))] | map(.kind) | join(",")' ClusterRole,ClusterRole
 proxy_check() { # $1 = values name, $2 = rendered YAML
   local pod='select(.kind == "Deployment" and .metadata.name == "zeabur-proxy") | .spec.template.spec'
   local container="$pod | .containers[0]"
@@ -210,14 +213,24 @@ proxy_check() { # $1 = values name, $2 = rendered YAML
   expect "$1" "$2" "$policy | .policyTypes | join(\",\")" Ingress,Egress
   expect "$1" "$2" "$policy | .ingress[] | .from[] | .podSelector.matchLabels | to_entries | map(.key + \"=\" + .value) | join(\",\")" \
     app.kubernetes.io/name=zeabur,app.kubernetes.io/instance=zeabur
-  expect "$1" "$2" "$policy | .egress | length" 3
+  expect "$1" "$2" "$policy | .egress | length" 4
+  # The metrics store Zeabur reads by default, and only its pods.
+  expect "$1" "$2" "$container | .env[] | select(.name == \"ZEABUR_PROXY_METRICS_URL\") | .value" \
+    http://vmsingle-vm-victoria-metrics-k8s-stack.observability.svc:8428
+  expect "$1" "$2" "$policy | .egress[2] | [.to[0].namespaceSelector.matchLabels[], (.to[0].podSelector.matchLabels | to_entries | map(.key + \"=\" + .value) | join(\"+\")), (.ports[0].port | tostring)] | join(\",\")" \
+    observability,app.kubernetes.io/instance=vm-victoria-metrics-k8s-stack+app.kubernetes.io/name=vmsingle,8428
 }
 proxy_check proxy "$(render -f "$chart/ci/minimal-values.yaml" --set proxy.enabled=true)"
 expect proxy "$(render -f "$chart/ci/minimal-values.yaml" --set proxy.enabled=true)" \
   'select(.kind == "Secret" and .metadata.name == "zeabur-proxy-tls") | .data | keys | join(",")' ca.crt,tls.crt,tls.key
 proxy_check full "$(render -f "$chart/ci/full-values.yaml")"
 expect full "$(render -f "$chart/ci/full-values.yaml")" \
-  'select(.kind == "NetworkPolicy") | .spec.egress[2].to[].ipBlock.cidr' 192.0.2.10/32
+  'select(.kind == "NetworkPolicy") | .spec.egress[3].to[].ipBlock.cidr' 192.0.2.10/32
+expect proxy "$(render -f "$chart/ci/minimal-values.yaml" --set proxy.enabled=true --set metricsStore.service=monitoring/prometheus:9090)" \
+  'select(.kind == "Deployment" and .metadata.name == "zeabur-proxy") | .spec.template.spec.containers[0].env[] | select(.name == "ZEABUR_PROXY_METRICS_URL") | .value' \
+  http://prometheus.monitoring.svc:9090
+expect proxy "$(render -f "$chart/ci/minimal-values.yaml" --set proxy.enabled=true --set proxy.metrics.enabled=false)" \
+  '[select(.kind == "Deployment" and .metadata.name == "zeabur-proxy") | .spec.template.spec.containers[0].env[] | select(.name == "ZEABUR_PROXY_METRICS_URL")] | length' 0
 
 # Values that must be refused before anything is installed.
 refuse() { # $1 = why, $@ = helm arguments
@@ -245,6 +258,7 @@ refuse "a terminal namespace that is not a name" --set terminal.namespace=Tools
 refuse "a tools resource Zeabur does not set" --set terminal.toolsResources.limits.gpu=1
 refuse "an image digest without its algorithm" --set image.digest="$(printf '%064d' 0)"
 refuse "a logs URL with https or a path" --set proxy.logs.url=https://vl.example.test:9428/select
+refuse "metrics through the proxy from a named port" --set proxy.enabled=true --set metricsStore.service=monitoring/prometheus:web
 refuse "an apiServer address that is not a CIDR" --set 'proxy.apiServer[0]=kubernetes.default'
 if render >/dev/null 2>&1; then fail "accepted no values at all"; fi
 

@@ -240,6 +240,20 @@
             "maxHours": { "type": "integer", "minimum": 1, "maximum": 8784 }
           }
         },
+        "metrics": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["enabled", "podLabels"],
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "podLabels": {
+              "type": "object",
+              "minProperties": 1,
+              "additionalProperties": { "type": "string" }
+            },
+            "maxHours": { "type": "integer", "minimum": 1, "maximum": 8784 }
+          }
+        },
         "tls": {
           "type": "object",
           "additionalProperties": false,

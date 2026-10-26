@@ -1,6 +1,14 @@
 {{- if .Values.proxy.enabled }}
 {{- $proxy := .Values.proxy }}
 {{- $name := include "zeabur.proxyName" . }}
+{{- /* The metrics store Zeabur reads by default, as namespace/name:port. */}}
+{{- $store := .Values.metricsStore.service | default "observability/vmsingle-vm-victoria-metrics-k8s-stack:8428" }}
+{{- $storeNamespace := first (splitList "/" $store) }}
+{{- $storeService := last (splitList "/" $store) }}
+{{- $storePort := last (splitList ":" $storeService) }}
+{{- if and $proxy.metrics.enabled (not (regexMatch "^[0-9]+$" $storePort)) }}
+{{- fail "proxy.metrics needs metricsStore.service with a port number, or proxy.metrics.enabled=false" }}
+{{- end }}
 {{- if not $proxy.tls.existingSecret }}
 {{- $secret := include "zeabur.proxyTlsSecret" . }}
 {{- $existing := lookup "v1" "Secret" .Release.Namespace $secret }}
@@ -110,6 +118,12 @@ spec:
               value: {{ $proxy.logs.maxLimit | int | quote }}
             - name: ZEABUR_PROXY_LOGS_MAX_HOURS
               value: {{ $proxy.logs.maxHours | int | quote }}
+            {{- if $proxy.metrics.enabled }}
+            - name: ZEABUR_PROXY_METRICS_URL
+              value: {{ printf "http://%s.%s.svc:%s" (first (splitList ":" $storeService)) $storeNamespace $storePort | quote }}
+            - name: ZEABUR_PROXY_METRICS_MAX_HOURS
+              value: {{ $proxy.metrics.maxHours | int | quote }}
+            {{- end }}
           ports:
             - name: https
               containerPort: 8443
@@ -175,7 +189,8 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
 ---
-# Only Zeabur reaches the proxy, and the proxy reaches only DNS, kube-apiserver and the logs.
+# Only Zeabur reaches the proxy, and the proxy reaches only DNS, kube-apiserver, the logs and the
+# metrics store.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -212,6 +227,18 @@ spec:
       ports:
         - port: {{ $proxy.logs.port }}
           protocol: TCP
+    {{- if $proxy.metrics.enabled }}
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ $storeNamespace }}
+          podSelector:
+            matchLabels:
+              {{- toYaml $proxy.metrics.podLabels | nindent 14 }}
+      ports:
+        - port: {{ $storePort | int }}
+          protocol: TCP
+    {{- end }}
     {{- /* NetworkPolicies match kube-apiserver's own addresses and port, after the Service
            `kubernetes` is translated, so the rule names its endpoints. */}}
     {{- $apiServer := $proxy.apiServer }}
