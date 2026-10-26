@@ -921,7 +921,7 @@ fn lab() -> NamespaceObjects {
     );
     if let Some(spec) = editor.spec.as_mut().and_then(|s| s.template.spec.as_mut()) {
         spec.volumes = Some(from(json!([{"name": "data",
-            "persistentVolumeClaim": {"claimName": "editor-e2e-data"}}])));
+            "persistentVolumeClaim": {"claimName": "editor-data"}}])));
         if let Some(container) = spec.containers.first_mut() {
             container.volume_mounts = Some(from(json!([{"name": "data", "mountPath": "/data"}])));
         }
@@ -949,7 +949,7 @@ fn lab() -> NamespaceObjects {
     }));
     let pending = json!({"phase": "Pending", "conditions": [{"type": "PodScheduled",
         "status": "False", "reason": "Unschedulable", "lastTransitionTime": minutes_ago(118),
-        "message": "0/1 nodes are available: persistentvolumeclaim \"editor-e2e-data\" not found. not found"}]});
+        "message": "0/1 nodes are available: persistentvolumeclaim \"editor-data\" not found. not found"}]});
     let claim = |name: &str, size: &str, owner: Value| {
         from::<PersistentVolumeClaim>(json!({"metadata": {"name": name, "namespace": ns,
                 "ownerReferences": owner},
@@ -1769,7 +1769,7 @@ fn state() -> State {
                         "editor-5c8d9f7b6-q2w3e",
                         "Warning",
                         "FailedScheduling",
-                        "0/1 nodes are available: persistentvolumeclaim \"editor-e2e-data\" not found. not found",
+                        "0/1 nodes are available: persistentvolumeclaim \"editor-data\" not found. not found",
                         119,
                     ),
                 ],

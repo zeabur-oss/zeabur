@@ -51,13 +51,13 @@
 //! [k8s-emptydir]: https://kubernetes.io/docs/concepts/storage/volumes/#emptydir
 //! [k8s-statefulset-pvc-retention]: https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/#persistentvolumeclaim-retention
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use serde::Serialize;
 use serde_json::Value;
 use utoipa::ToSchema;
 use zeabur_kube::k8s_openapi::api::core::v1::{Node, PodSpec, ResourceQuota};
-use zeabur_kube::{Cluster, ClusterExt as _, ClusterPod};
+use zeabur_kube::{Cluster, ClusterExt as _, ClusterPod, NamespaceObjects};
 use zeabur_model::{WorkloadKind, WorkloadRef};
 use zeabur_plan::{Change, ObjectName, Plan, PlanRequest, PlannedObject, Warning, Write};
 
@@ -608,9 +608,28 @@ fn databases(plan: &Plan, need: &mut Need) -> Vec<DatabaseStart> {
     out
 }
 
-/// The hosts of the Ingresses and `HTTPRoutes` `plan` creates, sorted and without repeats.
-fn domains(plan: &Plan) -> Vec<String> {
-    let mut out = std::collections::BTreeSet::new();
+/// The hosts the Ingresses and `HTTPRoutes` of the namespace serve now.
+fn serving(objects: &NamespaceObjects) -> BTreeSet<String> {
+    let ingresses = objects
+        .ingresses
+        .iter()
+        .filter_map(|i| i.spec.as_ref()?.rules.as_ref())
+        .flatten()
+        .filter_map(|r| r.host.clone());
+    let routes = objects
+        .http_routes
+        .iter()
+        .filter_map(|r| r.pointer("/spec/hostnames")?.as_array())
+        .flatten()
+        .filter_map(|h| h.as_str().map(str::to_owned));
+    ingresses.chain(routes).collect()
+}
+
+/// The hosts of the Ingresses and `HTTPRoutes` `plan` creates that do not serve yet, sorted and
+/// without repeats: a second route for a host that serves (maintenance, a split route) starts
+/// nothing.
+fn domains(plan: &Plan, serving: &BTreeSet<String>) -> Vec<String> {
+    let mut out = BTreeSet::new();
     for object in plan.objects.iter().filter(|o| o.before.is_none()) {
         let Some(after) = after_of(object) else {
             continue;
@@ -638,7 +657,7 @@ fn domains(plan: &Plan) -> Vec<String> {
                 .map(str::to_owned),
         );
     }
-    out.into_iter().collect()
+    out.into_iter().filter(|h| !serving.contains(h)).collect()
 }
 
 /// The quotas `need` exceeds.
@@ -899,6 +918,7 @@ pub(crate) fn preview(
     plan: &Plan,
     request: &PlanRequest,
     room: &Room,
+    serving: &BTreeSet<String>,
     unreadable: Vec<UnreadableView>,
 ) -> Preview {
     let (rollouts, mut need) = rollouts(plan);
@@ -909,7 +929,7 @@ pub(crate) fn preview(
         removals: removals(plan, request),
         rollouts,
         databases,
-        domains: domains(plan),
+        domains: domains(plan, serving),
         unreadable,
     }
 }
@@ -944,7 +964,19 @@ pub(crate) async fn read(
             quotas: quotas_read.then_some(quotas),
         }
     };
-    Ok(preview(plan, request, &room, unreadable))
+    let creates_route = plan
+        .objects
+        .iter()
+        .any(|o| o.before.is_none() && matches!(o.target.kind.as_str(), "Ingress" | "HTTPRoute"));
+    let serving = if creates_route {
+        cluster
+            .namespace_objects(project)
+            .await
+            .map_or_default(|objects| serving(&objects))
+    } else {
+        BTreeSet::new()
+    };
+    Ok(preview(plan, request, &room, &serving, unreadable))
 }
 
 #[cfg(test)]

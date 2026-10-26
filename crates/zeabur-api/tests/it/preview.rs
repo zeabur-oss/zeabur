@@ -9,7 +9,7 @@ mod tests {
     use zeabur_kube::k8s_openapi::api::apps::v1::Deployment;
     use zeabur_kube::k8s_openapi::api::core::v1::{Namespace, Node, ResourceQuota};
     use zeabur_kube::memory::{MemoryCluster, State};
-    use zeabur_kube::{Identity, NamespaceObjects};
+    use zeabur_kube::{Identity, NamespaceObjects, ServedResource};
 
     use crate::common::{app, send};
 
@@ -146,5 +146,45 @@ mod tests {
                 .any(|r| r["path"].as_str().unwrap().contains("env") && r["leftOutOfEdit"] == true),
             "{preview}"
         );
+    }
+
+    #[tokio::test]
+    async fn maintenance_on_a_serving_domain_does_not_list_it_as_starting() {
+        let cluster = cluster("0");
+        cluster.update(|s| {
+            s.served.push(ServedResource::readable(
+                "traefik.io",
+                "v1alpha1",
+                "middlewares",
+                "Middleware",
+                true,
+            ));
+            let objects = s.objects.get_mut("shop").unwrap();
+            objects.services.push(
+                serde_json::from_value(json!({
+                    "metadata": {"name": "error-pages", "namespace": "shop",
+                        "labels": {"zeabur.com/page-server": "true"}},
+                    "spec": {"ports": [{"name": "pages", "port": 8080},
+                        {"name": "maintenance", "port": 8081}]}
+                }))
+                .unwrap(),
+            );
+            objects.ingresses.push(
+                serde_json::from_value(json!({
+                    "metadata": {"name": "web", "namespace": "shop", "uid": "u-1"},
+                    "spec": {"ingressClassName": "traefik", "rules": [{"host": "shop.example.com",
+                        "http": {"paths": [{"path": "/", "pathType": "Prefix",
+                            "backend": {"service": {"name": "web", "port": {"number": 80}}}}]}}]}
+                }))
+                .unwrap(),
+            );
+        });
+        let preview = preview(
+            &cluster,
+            json!([{"op": "maintenance", "route": {"kind": "Ingress", "name": "web"},
+                "hostname": "shop.example.com", "enabled": true}]),
+        )
+        .await;
+        assert_eq!(preview["domains"], json!([]), "{preview}");
     }
 }
