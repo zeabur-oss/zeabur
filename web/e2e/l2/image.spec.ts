@@ -103,12 +103,7 @@ test("a Developer deploys an image and deletes it with what it made", async ({ p
     if (made)
       await test.step(`the Developer deletes ${name}, its Ingress and its volume`, () =>
         deleteService(developer, project, name, {
-          also: [
-            `Service ${name}`,
-            `Secret ${name}-env`,
-            `Ingress ${name}`,
-            `Disk ${name}-data`,
-          ],
+          also: [`Service ${name}`, `Secret ${name}-env`, `Ingress ${name}`, `Disk ${name}-data`],
         }))
     await test.step(`the admin deletes ${baselineProject}`, async () => {
       const deleted = await planAndApply(page, baselineProject, [{ op: "deleteProject" }])
