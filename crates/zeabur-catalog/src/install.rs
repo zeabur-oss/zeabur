@@ -114,7 +114,11 @@ pub struct Security {
     #[serde(default)]
     pub privileged: bool,
     /// The Pod Security level its namespaces need when it is not `restricted`: `baseline`.
-    #[serde(default, rename = "podSecurity", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        rename = "podSecurity",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub level: Option<String>,
     /// Hosts it connects to.
     #[serde(default)]

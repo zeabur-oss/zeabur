@@ -15968,6 +15968,11 @@ components:
           items:
             type: string
           description: Hosts it connects to.
+        podSecurity:
+          type:
+          - string
+          - "null"
+          description: "The Pod Security level its namespaces need when it is not `restricted`: `baseline`."
         privileged:
           type: boolean
           description: It runs privileged.

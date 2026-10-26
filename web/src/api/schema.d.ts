@@ -8248,6 +8248,8 @@ export interface components {
       credentialsNote?: string | null
       /** @description Hosts it connects to. */
       egress?: string[]
+      /** @description The Pod Security level its namespaces need when it is not `restricted`: `baseline`. */
+      podSecurity?: string | null
       /** @description It runs privileged. */
       privileged?: boolean
       /** @description Known risks and how to contain them. */
