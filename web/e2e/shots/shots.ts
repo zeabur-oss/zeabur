@@ -6,6 +6,7 @@ import {
   serversOf,
   viewports,
   type Locale,
+  type Shot,
   type Step,
   type Theme,
 } from "./manifest.ts"
@@ -145,21 +146,26 @@ async function cropped(page: Page, selector: string, until: string | undefined, 
   await sheet.close()
 }
 
+function wanted(shot: Shot, project: string): boolean {
+  const [locale, theme] = project.split("/") as [Locale, Theme]
+  return (
+    shot.locales.includes(locale) &&
+    shot.themes.includes(theme) &&
+    (only === undefined || only === project)
+  )
+}
+
 for (const shot of readManifest(manifest).shots.filter((s) => serversOf(s).includes(server))) {
   test.describe(() => {
     test.use({ viewport: viewports[shot.viewport] })
 
     test(shot.id, async ({ page }, info) => {
-      const [locale, theme] = info.project.name.split("/") as [Locale, Theme]
-      test.skip(
-        !shot.locales.includes(locale) ||
-          !shot.themes.includes(theme) ||
-          (only !== undefined && only !== info.project.name),
-      )
+      test.skip(!wanted(shot, info.project.name))
       await page.goto(shot.path, { waitUntil: "networkidle" })
       if (shot.wait) await page.locator(shot.wait).first().waitFor()
       for (const step of shot.steps) await run(page, step)
-      if (shot.viewport !== "cover") await fit(page, shot.clip)
+      const plate = shot.viewport === "cover"
+      if (!plate) await fit(page, shot.clip)
       // A pointer left over a link or a row shows its hover state.
       const { width, height } = page.viewportSize()!
       if (!("hover" in (shot.steps.at(-1) ?? {}))) await page.mouse.move(width - 1, height - 1)
@@ -168,7 +174,7 @@ for (const shot of readManifest(manifest).shots.filter((s) => serversOf(s).inclu
       const path = `${out}/${info.project.name}/${shot.id}.png`
       const options = { path, animations: "disabled", caret: "hide" } as const
       if (shot.clip) await cropped(page, shot.clip, shot.until, path)
-      else await page.screenshot({ ...options, fullPage: shot.viewport !== "cover" })
+      else await page.screenshot({ ...options, fullPage: !plate })
     })
   })
 }

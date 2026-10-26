@@ -180,13 +180,7 @@ export function serversOf(shot: Shot): string[] {
   )
 }
 
-function settings(value: Record<string, unknown>, shots: Shot[]): Settings {
-  for (const key of Object.keys(value)) check(settingKeys.includes(key), `unknown key "${key}"`)
-  const { out, file = "{locale}/{theme}/{id}.avif", scale = 2, budget = 150, clean = false } = value
-  check(
-    out === undefined || (typeof out === "string" && out !== "" && !out.startsWith("/")),
-    "out must be a path relative to the repository",
-  )
+function fileName(file: unknown, shots: Shot[]): string {
   const name = typeof file === "string" ? file : ""
   check(
     name.endsWith(".avif") &&
@@ -194,17 +188,27 @@ function settings(value: Record<string, unknown>, shots: Shot[]): Settings {
       !/[{}]/.test(name.replace(/\{(id|locale|theme)\}/g, "")),
     "file must end in .avif and hold {id}; it may hold {locale} and {theme}",
   )
-  check(scale === 1 || scale === 2, "scale must be 1 or 2")
-  check(Number.isInteger(budget) && (budget as number) > 0, "budget must be a number of KB")
-  check(typeof clean === "boolean", "clean must be true or false")
-  check(!clean || out !== undefined, "clean needs out")
   for (const s of shots) {
     check(name.includes("{locale}") || s.locales.length === 1, `${s.id}: file needs {locale}`)
     check(name.includes("{theme}") || s.themes.length === 1, `${s.id}: file needs {theme}`)
   }
+  return name
+}
+
+function settings(value: Record<string, unknown>, shots: Shot[]): Settings {
+  for (const key of Object.keys(value)) check(settingKeys.includes(key), `unknown key "${key}"`)
+  const { out, file = "{locale}/{theme}/{id}.avif", scale = 2, budget = 150, clean = false } = value
+  check(
+    out === undefined || (typeof out === "string" && out !== "" && !out.startsWith("/")),
+    "out must be a path relative to the repository",
+  )
+  check(scale === 1 || scale === 2, "scale must be 1 or 2")
+  check(Number.isInteger(budget) && (budget as number) > 0, "budget must be a number of KB")
+  check(typeof clean === "boolean", "clean must be true or false")
+  check(!clean || out !== undefined, "clean needs out")
   return {
     out: out as string | undefined,
-    file: name,
+    file: fileName(file, shots),
     scale: scale as number,
     budget: budget as number,
     clean: clean as boolean,
