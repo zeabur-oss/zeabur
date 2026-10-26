@@ -23,7 +23,7 @@ use serde_json::{Value, json};
 use zeabur_installer_host::{facts, files, preflight, systemd};
 use zeabur_installer_plan::catalog::{Default, Index};
 use zeabur_installer_plan::config::{Config, Document, PersonalConfig};
-use zeabur_installer_plan::select::{self, PERSONAL, PERSONAL_DISTRIBUTION};
+use zeabur_installer_plan::select::{self, BUILD_CAPABILITIES, PERSONAL, PERSONAL_DISTRIBUTION};
 use zeabur_installer_plan::{kubesolo, personal, plan};
 
 use self::http::{Request, Response};
@@ -465,6 +465,9 @@ fn catalog_json(index: &Index, profile: &str, arch: &str) -> Value {
                 "personal": c.supports(PERSONAL_DISTRIBUTION)
                     && PERSONAL.contains(&c.capability.as_str()),
                 "distributions": c.distributions,
+                "personalMinMemoryMib": BUILD_CAPABILITIES
+                    .contains(&c.capability.as_str())
+                    .then_some(personal::BUILDS_MIN_MEMORY_MIB),
                 "needs": c
                     .install_order
                     .get(profile)

@@ -96,7 +96,7 @@ zeaburctl up [資料夾] [--project <專案>] [--service <服務>]
 
 本機模式還需要：
 
-- 叢集裝了 Zeabur Builder。沒裝時，指令在上傳前就會停下來。[個人安裝](../get-started/personal.mdx)沒有 Zeabur Builder，請改用映像檔部署。
+- 叢集裝了 Zeabur Builder。沒裝時，指令在上傳前就會停下來。[自己用的安裝](../get-started/personal.mdx)預設沒有 Zeabur Builder，要勾選才會裝；沒裝時請改用映像檔部署。
 - 連得到 registry。registry 在叢集裡時（例如 `zot.zot.svc:5000`），指令會透過 Kubernetes API 自動轉發連接埠，就像 `kubectl port-forward`。你要在 registry 的命名空間有 `get services`、`list endpointslices` 和 `create pods/portforward` 權限，也要能讀 registry 憑證的 CA ConfigMap。管理員都有這些權限，專案的 Developer 沒有。
 - 叢集有 `zeabur-info`。指令從這裡知道 registry 在哪裡。叢集裡沒有 Zeabur 伺服器時，指令不能建立新服務，也不會自動轉發連接埠。
 

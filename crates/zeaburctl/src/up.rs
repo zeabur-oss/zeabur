@@ -30,7 +30,7 @@ use crate::{output, pack};
 const TOKEN_WAIT: Duration = Duration::from_secs(60);
 /// The longest service name.
 const NAME_MAX: usize = 40;
-const NO_BUILDER: &str = "Zeabur Builder is not installed in this cluster, so it cannot build a folder. Nothing was uploaded. A personal install has no Zeabur Builder: deploy an image instead.";
+const NO_BUILDER: &str = "Zeabur Builder is not installed in this cluster, so it cannot build a folder. Nothing was uploaded. A personal install has it only when you ticked Zeabur Builder at install: otherwise deploy an image.";
 
 /// How a new service is built.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, clap::ValueEnum)]

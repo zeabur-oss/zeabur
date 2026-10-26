@@ -8,7 +8,7 @@ use serde::Serialize;
 use zeabur_installer_plan::kubesolo;
 use zeabur_installer_plan::rke2::node_ports;
 
-use crate::cmd;
+use crate::{cmd, systemd};
 
 /// How a check came out.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -67,6 +67,7 @@ keyed! {
         KernelModules => "kernelModules",
         Services => "services",
         Multipathd => "multipathd",
+        Docker => "docker",
     }
 }
 
@@ -87,6 +88,7 @@ impl Topic {
             Self::KernelModules => "kernel modules",
             Self::Services => "services",
             Self::Multipathd => "multipathd",
+            Self::Docker => "Docker",
         }
     }
 }
@@ -129,6 +131,9 @@ keyed! {
         ServiceStopped => "prep.service.stopped",
         MultipathToBlock => "prep.multipath.toBlock",
         MultipathOpen => "prep.multipath.open",
+        DockerNone => "docker.none",
+        DockerFound => "docker.found",
+        ForwardDrop => "docker.forwardDrop",
     }
 }
 
@@ -220,6 +225,9 @@ pub fn run(options: Options) -> Vec<Check> {
         swap(),
         other_distributions(options.node),
     ];
+    if options.node == Node::KubeSolo {
+        checks.push(docker());
+    }
     if !options.cluster_running {
         checks.push(ports(options.node));
     }
@@ -369,6 +377,63 @@ fn other_distributions(node: Node) -> Check {
             Code::OthersFound,
         )
         .values(&paths)
+    }
+}
+
+/// Where Docker's binary and socket are. Docker sets the iptables FORWARD policy to DROP, so
+/// Pods of `KubeSolo` cannot reach the internet and ACME fails.
+const DOCKER_PATHS: [&str; 5] = [
+    "/usr/bin/docker",
+    "/usr/local/bin/docker",
+    "/snap/bin/docker",
+    "/run/docker.sock",
+    "/var/run/docker.sock",
+];
+const DOCKER_UNITS: [&str; 2] = ["docker.service", "docker.socket"];
+
+fn docker() -> Check {
+    let mut found: Vec<String> = DOCKER_PATHS
+        .iter()
+        .filter(|path| Path::new(path).exists())
+        .map(|&path| path.to_owned())
+        .collect();
+    found.extend(
+        DOCKER_UNITS
+            .iter()
+            .filter(|unit| systemd::is_active(unit))
+            .map(|&unit| unit.to_owned()),
+    );
+    let iptables = cmd::run("iptables", &["-S", "FORWARD"], None).unwrap_or_default();
+    docker_check(&found, &iptables)
+}
+
+fn docker_check(found: &[String], iptables: &str) -> Check {
+    if !found.is_empty() {
+        let names: Vec<&str> = found.iter().map(String::as_str).collect();
+        check(
+            Topic::Docker,
+            Status::Fail,
+            format!(
+                "Docker is on this host ({}). It sets the iptables FORWARD policy to DROP, so Pods cannot reach the internet and certificates fail. Stop and remove Docker first",
+                names.join(", ")
+            ),
+            Code::DockerFound,
+        )
+        .values(&names)
+    } else if iptables.lines().any(|l| l.trim() == "-P FORWARD DROP") {
+        check(
+            Topic::Docker,
+            Status::Fail,
+            "the iptables FORWARD policy is DROP, so Pods cannot reach the internet and certificates fail; find what sets it (Docker, ufw) and change it",
+            Code::ForwardDrop,
+        )
+    } else {
+        check(
+            Topic::Docker,
+            Status::Pass,
+            "no Docker, and the iptables FORWARD policy is not DROP",
+            Code::DockerNone,
+        )
     }
 }
 
@@ -546,6 +611,23 @@ pub fn disk_encryption(path: &str) -> Encryption {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn docker_or_a_dropping_forward_policy_stops_the_install() {
+        let found = vec!["/usr/bin/docker".to_owned()];
+        let policy = "-P FORWARD ACCEPT\n";
+        let drop = "-P FORWARD DROP\n-A FORWARD -j DOCKER-USER\n";
+        let case = |found: &[String], iptables: &str| {
+            let c = docker_check(found, iptables);
+            (c.status, c.code)
+        };
+        assert_eq!(case(&[], policy), (Status::Pass, Code::DockerNone));
+        assert_eq!(case(&[], ""), (Status::Pass, Code::DockerNone));
+        assert_eq!(case(&found, policy), (Status::Fail, Code::DockerFound));
+        assert_eq!(case(&[], drop), (Status::Fail, Code::ForwardDrop));
+        assert_eq!(case(&found, drop), (Status::Fail, Code::DockerFound));
+        assert_eq!(docker_check(&found, policy).values, ["/usr/bin/docker"]);
+    }
 
     #[test]
     fn parsing() {

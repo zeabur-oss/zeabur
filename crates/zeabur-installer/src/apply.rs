@@ -93,7 +93,7 @@ pub(crate) fn run(config_path: &Path) -> Result<(), InstallError> {
             kubectl.apply_object(&plan::zot_builder_policy())?;
         }
         if component.id == plan::ZOT && plan.zot_cluster_ip.is_some() {
-            zot_ca(&kubectl)?;
+            zot_ca(&kubectl, Path::new(ZOT_CA_FILE))?;
         }
     }
 
@@ -749,7 +749,7 @@ fn local_ca_pem(kubectl: &Kubectl, namespace: &str) -> Result<String, InstallErr
 }
 
 /// The CA of zot's certificate.
-fn zot_ca_pem(kubectl: &Kubectl) -> Result<String, InstallError> {
+pub(crate) fn zot_ca_pem(kubectl: &Kubectl) -> Result<String, InstallError> {
     kubectl
         .get("secret", "zot-tls", Some("zot"))?
         .as_ref()
@@ -759,12 +759,8 @@ fn zot_ca_pem(kubectl: &Kubectl) -> Result<String, InstallError> {
 }
 
 /// Copies the CA of zot's certificate to the node, where the registry mirror checks zot against it.
-fn zot_ca(kubectl: &Kubectl) -> Result<(), InstallError> {
-    files::write(
-        Path::new(ZOT_CA_FILE),
-        0o644,
-        zot_ca_pem(kubectl)?.as_bytes(),
-    )?;
+pub(crate) fn zot_ca(kubectl: &Kubectl, path: &Path) -> Result<(), InstallError> {
+    files::write(path, 0o644, zot_ca_pem(kubectl)?.as_bytes())?;
     Ok(())
 }
 

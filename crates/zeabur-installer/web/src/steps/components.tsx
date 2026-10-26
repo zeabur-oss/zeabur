@@ -34,6 +34,8 @@ export function ComponentsStep({ wizard }: { wizard: Wizard }) {
   // A personal install offers only what the catalog tests on KubeSolo.
   const offered = new Set(all.filter((c) => c.personal).map((c) => c.capability))
   const catalog = personal ? all.filter((c) => offered.has(c.capability)) : all
+  const hostMib = wizard.server.facts?.memoryMib ?? Infinity
+  const tooSmall = (c: CatalogComponent) => personal && hostMib < (c.personalMinMemoryMib ?? 0)
   const plan = planned && "plan" in planned ? planned.plan : null
   const fit = plan ? memoryFit(plan, catalog) : null
   const why = new Map(wizard.shown?.components.map((c) => [c.id, c.why]))
@@ -123,7 +125,12 @@ export function ComponentsStep({ wizard }: { wizard: Wizard }) {
                 mib={component.idleMemoryMib ?? measured.get(component.id) ?? null}
                 leftOut={plan?.leftOut[component.id]}
                 onToggle={(on) => toggle(component.id, on)}
-                supported={personal ? component.personal === true : component.supported}
+                supported={
+                  personal
+                    ? component.personal === true && !tooSmall(component)
+                    : component.supported
+                }
+                tooSmall={tooSmall(component)}
                 wizard={wizard}
               />
             ))}
@@ -137,6 +144,8 @@ export function ComponentsStep({ wizard }: { wizard: Wizard }) {
 /** The plan's reason for leaving a component out, in the words the components page uses. */
 export function leftOutReason(t: Translate, reason: string): string {
   if (reason === "not part of a personal install") return t("components.notPersonal")
+  const memory = /^needs (\d+) MiB of memory$/.exec(reason)
+  if (memory) return t("components.needsMemory", Number(memory[1]))
   const only = /^runs on (.+) only$/.exec(reason)
   if (only) return t("components.runsOn", only[1]!)
   const profile = /^unsupported on (.+)$/.exec(reason)
@@ -152,6 +161,7 @@ function ComponentRow({
   leftOut,
   onToggle,
   supported,
+  tooSmall,
   wizard,
 }: {
   component: CatalogComponent
@@ -161,6 +171,7 @@ function ComponentRow({
   leftOut: string | undefined
   onToggle: (on: boolean) => void
   supported: boolean
+  tooSmall: boolean
   wizard: Wizard
 }) {
   const t = useT()
@@ -168,11 +179,13 @@ function ComponentRow({
   const disabled = !supported || needed
   const required = component.inputs.filter((input) => input.required)
   const optional = component.inputs.filter((input) => !input.required)
-  const unsupported = component.distributions?.length
-    ? t("components.runsOn", t("common.list", component.distributions))
-    : leftOut
-      ? leftOutReason(t, leftOut)
-      : t("components.unsupported")
+  const unsupported = tooSmall
+    ? t("components.needsMemory", component.personalMinMemoryMib ?? 0)
+    : component.distributions?.length
+      ? t("components.runsOn", t("common.list", component.distributions))
+      : leftOut
+        ? leftOutReason(t, leftOut)
+        : t("components.unsupported")
   return (
     <div className="px-5 py-2">
       <Collapsible className="flex flex-col">

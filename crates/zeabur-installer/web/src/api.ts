@@ -28,6 +28,8 @@ export interface CatalogComponent {
   supported: boolean
   /** Offered in a personal install; older installers leave it out. */
   personal?: boolean
+  /** A personal install offers it only on a server with this much memory. */
+  personalMinMemoryMib?: number | null
   /** Where it runs, when not everywhere; older installers leave it out. */
   distributions?: string[]
   /** The components installed before it because it needs them. */

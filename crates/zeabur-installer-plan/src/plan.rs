@@ -399,7 +399,7 @@ pub fn plan(index: &Index, config: &Config, facts: &Facts) -> Result<Plan, PlanE
         &mut warnings,
     )?;
 
-    let zot_cluster_ip = zot_cluster_ip(index, config, &chosen);
+    let zot_cluster_ip = zot_cluster_ip(index, &config.inputs, &chosen);
     let host_files = server_files(config, &chosen, facts, zot_cluster_ip.as_deref());
 
     let memory = memory(&components, facts.memory_mib, &mut warnings);
@@ -1024,14 +1024,17 @@ fn server_files(
 
 /// zot's fixed `ClusterIP`: the configured `cluster-ip` input, else [`rke2::ZOT_CLUSTER_IP`].
 /// `None` when zot is not installed, or its catalog release takes no such input.
-fn zot_cluster_ip(index: &Index, config: &Config, chosen: &BTreeSet<&str>) -> Option<String> {
+pub(crate) fn zot_cluster_ip(
+    index: &Index,
+    inputs: &BTreeMap<String, BTreeMap<String, Value>>,
+    chosen: &BTreeSet<&str>,
+) -> Option<String> {
     let component = index.component(ZOT).filter(|_| chosen.contains(ZOT))?;
     let input = component
         .inputs
         .iter()
         .find(|i| i.name == ZOT_CLUSTER_IP_INPUT)?;
-    let given = config
-        .inputs
+    let given = inputs
         .get(ZOT)
         .and_then(|g| g.get(&input.name))
         .and_then(Value::as_str);

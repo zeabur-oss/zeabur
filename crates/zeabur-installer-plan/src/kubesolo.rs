@@ -30,6 +30,13 @@ pub const STATE_DIR: &str = "/var/lib/zeabur-installer";
 pub const KUBECTL: &str = "/var/lib/zeabur-installer/bin/kubectl";
 /// The kubeconfig the installer writes for the person's own computer.
 pub const PERSONAL_KUBECONFIG: &str = "/etc/zeabur-installer/kubeconfig.yaml";
+/// The directory containerd reads registry settings from, one directory per registry host.
+pub const REGISTRY_DIR: &str = "/var/lib/kubesolo/containerd/registry";
+/// zot's CA on the host: containerd reads it on each pull.
+pub const ZOT_CA_FILE: &str = "/var/lib/kubesolo/containerd/registry/zot.zot.svc:5000/ca.crt";
+/// The `hosts.toml` that sends `zot.zot.svc:5000` to zot's address.
+pub const ZOT_HOSTS_FILE: &str =
+    "/var/lib/kubesolo/containerd/registry/zot.zot.svc:5000/hosts.toml";
 /// `KubeSolo`'s storage class, the default.
 pub const LOCAL_PATH_CLASS: &str = "local-path";
 
@@ -49,6 +56,22 @@ pub fn ports() -> Vec<(u16, &'static str)> {
         (10250, "kubelet"),
         (10443, "KubeSolo's node-assignment webhook"),
     ]
+}
+
+/// The containerd of `KubeSolo` cannot resolve `zot.zot.svc`, so its images come from zot's fixed
+/// `ClusterIP`, which zot's certificate names.
+#[must_use]
+pub fn zot_hosts_file(cluster_ip: &str) -> HostFile {
+    HostFile {
+        path: ZOT_HOSTS_FILE.to_owned(),
+        mode: 0o644,
+        content: format!(
+            "# Written by zeabur-installer; `zeabur-installer doctor` compares it.\n\
+             server = \"https://{cluster_ip}:5000\"\n\n\
+             [host.\"https://{cluster_ip}:5000\"]\n  capabilities = [\"pull\", \"resolve\"]\n  \
+             ca = \"{ZOT_CA_FILE}\"\n"
+        ),
+    }
 }
 
 /// What the configuration file sets.
@@ -133,19 +156,23 @@ OOMScoreAdjust=-500
 WantedBy=multi-user.target
 ";
 
-/// Waits until this start of `KubeSolo` has written its webhook configuration, then removes
-/// `jobs` from its rules. The `test` operation leaves another `KubeSolo` version's rules alone.
+/// Removes `jobs` from the rules of `KubeSolo`'s webhook, and keeps watching for a minute: the
+/// object from the last start exists before `KubeSolo` writes it again, so the script patches
+/// whenever the rules name `jobs` and ends when they have not for a minute. It does not read the
+/// journal. The `test` operation leaves another `KubeSolo` version's rules alone.
 const WEBHOOK_SCRIPT_TEXT: &str = r#"#!/bin/sh
 # Written by zeabur-installer. KubeSolo's webhook replaces a new Job's nodeSelector,
 # and helm-controller then replaces its Job again and again. Pods still get the node.
 kubectl="/var/lib/zeabur-installer/bin/kubectl --kubeconfig=/var/lib/kubesolo/pki/admin/admin.kubeconfig --context=kubernetes-admin@kubesolo"
 patch='[{"op":"test","path":"/webhooks/0/rules/0/resources","value":["pods","persistentvolumeclaims","jobs"]},{"op":"replace","path":"/webhooks/0/rules/0/resources","value":["pods","persistentvolumeclaims"]}]'
 i=0
+quiet=0
 while [ "$i" -lt 900 ]; do
-  if journalctl -u kubesolo "_SYSTEMD_INVOCATION_ID=$INVOCATION_ID" -o cat | grep -q "webhook configuration"; then
-    $kubectl patch mutatingwebhookconfiguration webhook.kubesolo.io --type=json -p "$patch"
-    exit 0
-  fi
+  rules=$($kubectl get mutatingwebhookconfiguration webhook.kubesolo.io -o jsonpath='{.webhooks[0].rules[0].resources}' 2>/dev/null)
+  case "$rules" in
+    *jobs*) $kubectl patch mutatingwebhookconfiguration webhook.kubesolo.io --type=json -p "$patch" && quiet=0 ;;
+    ?*) quiet=$((quiet + 1)); [ "$quiet" -ge 30 ] && exit 0 ;;
+  esac
   i=$((i + 1))
   sleep 2
 done

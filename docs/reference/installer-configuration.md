@@ -122,7 +122,7 @@ with no Zeabur, Zeabur Identity, members or isolation; see
 
 | Field | Meaning |
 |---|---|
-| `enable` | Ingress and certificates come by default; `databases`, or component ids under these capabilities, may be added. |
+| `enable` | Ingress and certificates come by default; `builds` (Zeabur Builder, installed with zot, needs 1800 MiB of memory), or component ids under these capabilities, may be added. |
 | `disable` | Capabilities or component ids taken out. |
 | `inputs`, `secretFiles` | As for a team install. |
 | `host.tlsSan` | Extra API server certificate names, for when your computer reaches the server by another name. |

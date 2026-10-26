@@ -68,6 +68,7 @@ export const zhTW: Messages = {
   "check.kernelModules": "核心模組",
   "check.services": "系統服務",
   "check.multipathd": "multipathd",
+  "check.docker": "Docker",
 
   "code.root.ok": () => "以 root 執行。",
   "code.root.no": () => "請用 sudo 啟動安裝程式。",
@@ -99,6 +100,11 @@ export const zhTW: Messages = {
     `${path} 不在加密的裝置上，上面的磁碟區也就沒有加密。測試機無妨，正式環境的資料請裝在加密的磁碟上。`,
   "code.crypt.unknown": (path) =>
     `無法判斷 ${path} 是否加密。請執行 lsblk，看它底下有沒有 crypt 裝置。`,
+  "code.docker.none": () => "這台伺服器沒有 Docker。",
+  "code.docker.found": (...found) =>
+    `這台伺服器裝了 Docker（${listZh("zh-TW", found)}）。它會讓 Pod 連不上網路，憑證也申請不到。請先停止並移除 Docker，再重新檢查。`,
+  "code.docker.forwardDrop": () =>
+    "防火牆擋住了轉送的流量，Pod 連不上網路，憑證也申請不到。通常是 Docker 或 ufw 設的，請移除或改掉，再重新檢查。",
   "code.prep.package.ok": (binary) => `已安裝 ${binary}。`,
   "code.prep.package.toInstall": (binary, component) =>
     `${component} 需要 ${binary}，安裝時會一併裝好。`,
@@ -178,8 +184,10 @@ export const zhTW: Messages = {
   "components.privilegedHint":
     "以主機權限執行，所以它的 Namespace 不套用 restricted Pod 安全等級。",
   "components.personalDescription":
-    "預設會裝 Ingress 和憑證，需要資料庫再自己加。元件需要的其他元件會一起加入。",
+    "預設會裝 Ingress 和憑證，要從 Git 或資料夾建置，再勾選 Zeabur Builder。元件需要的其他元件會一起加入。",
   "components.notPersonal": "自己用的版本沒有這個",
+  "components.needsMemory": (mib) =>
+    `建置應用程式至少要 ${mib.toLocaleString("zh-TW")} MiB 記憶體，這台不夠`,
   "components.unsupported": "不支援 RKE2",
   "components.runsOn": (where) => `只能在 ${where} 上執行`,
   "components.unsupportedOn": (profile) => `不支援 ${profile}`,
@@ -191,7 +199,9 @@ export const zhTW: Messages = {
   "components.list": "格式為清單：[a, b]。",
   "components.secret": "只存進僅 root 可讀的檔案，不會寫進設定檔。",
   "capability.certificates": "憑證",
+  "capability.builds": "建置",
   "capability.config-reload": "自動重新載入設定",
+  "capability.container-registry": "映像倉庫",
   "capability.dns": "DNS",
   "capability.event-autoscaling": "事件驅動的自動擴充",
   "capability.ingress": "Ingress",

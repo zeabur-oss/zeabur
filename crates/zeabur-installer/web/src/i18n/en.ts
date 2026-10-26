@@ -76,6 +76,7 @@ export const en = {
   "check.kernelModules": "Kernel modules",
   "check.services": "Services",
   "check.multipathd": "multipathd",
+  "check.docker": "Docker",
 
   "code.root.ok": () => "Running as root.",
   "code.root.no": () => "Start the installer with sudo.",
@@ -113,6 +114,11 @@ export const en = {
     `${path} is not on an encrypted device, so volumes on it are not encrypted. Fine for a test machine; for production data, install on an encrypted disk.`,
   "code.crypt.unknown": (path: string) =>
     `Could not tell whether ${path} is encrypted. Run lsblk to see whether a crypt device is under it.`,
+  "code.docker.none": () => "Docker is not on this server.",
+  "code.docker.found": (...found: string[]) =>
+    `Docker is on this server (${list(found)}). It blocks Pods from reaching the internet, so certificates fail. Stop and remove Docker, then check again.`,
+  "code.docker.forwardDrop": () =>
+    "The firewall drops forwarded traffic, so Pods cannot reach the internet and certificates fail. Docker or ufw usually sets this; remove or change it, then check again.",
   "code.prep.package.ok": (binary: string) => `${binary} is installed.`,
   "code.prep.package.toInstall": (binary: string, component: string) =>
     `${component} needs ${binary}. The install adds it.`,
@@ -199,8 +205,10 @@ export const en = {
   "components.privilegedHint":
     "Runs with host access, so its namespace is exempt from the restricted Pod Security level.",
   "components.personalDescription":
-    "Ingress and certificates come by default. Add databases if you want them. What a component needs is added with it.",
+    "Ingress and certificates come by default. Tick Zeabur Builder if you want to build apps from Git or a folder. What a component needs is added with it.",
   "components.notPersonal": "Not in a personal install",
+  "components.needsMemory": (mib: number) =>
+    `Needs ${mib.toLocaleString("en")} MiB of memory to build apps, and this server has less`,
   "components.unsupported": "Not on RKE2",
   "components.runsOn": (where: string) => `Runs on ${where} only`,
   "components.unsupportedOn": (profile: string) => `Not supported on ${profile}`,
@@ -212,7 +220,9 @@ export const en = {
   "components.list": "Write a list: [a, b].",
   "components.secret": "Saved to a file only root can read, never in the configuration.",
   "capability.certificates": "Certificates",
+  "capability.builds": "Builds",
   "capability.config-reload": "Config reload",
+  "capability.container-registry": "Image registry",
   "capability.dns": "DNS",
   "capability.event-autoscaling": "Event autoscaling",
   "capability.ingress": "Ingress",

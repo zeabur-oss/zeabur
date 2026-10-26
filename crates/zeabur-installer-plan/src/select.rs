@@ -22,8 +22,16 @@ pub const PERSONAL_DISTRIBUTION: &str = "kubesolo";
 pub const PERSONAL_PROFILE: &str = "single-node";
 
 /// What a personal install offers: the capabilities the catalog tests on `KubeSolo` (catalog
-/// `config/kubernetes.yaml`).
-pub const PERSONAL: &[&str] = &["ingress", "certificates", "databases"];
+/// `config/kubernetes.yaml`), less `databases`.
+///
+/// `KubeSolo`'s webhook replaces the annotations of
+/// every PVC, which stops `CloudNativePG`, and removing PVCs from the webhook's rules leaves
+/// volumes unbound.
+pub const PERSONAL: &[&str] = &["ingress", "certificates", "container-registry", "builds"];
+
+/// The capabilities of Zeabur Builder and zot. A personal install offers them, but only on a
+/// host with enough memory.
+pub const BUILD_CAPABILITIES: &[&str] = &["container-registry", "builds"];
 
 /// What a personal install installs unless told otherwise.
 const PERSONAL_DEFAULT: &[&str] = &["ingress", "certificates"];

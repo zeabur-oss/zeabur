@@ -142,7 +142,7 @@ sources:
 
 ```yaml title="/etc/zeabur-installer/config.yaml"
 use: personal
-enable: [databases]
+enable: [builds]
 host:
   tlsSan: [solo.example.com]
 ```
@@ -151,7 +151,7 @@ host:
 
 | 欄位 | 預設與用途 |
 |---|---|
-| `enable` | `[]`。Ingress 和憑證是預設的，只能再加 `databases`，或這幾個 capability 底下的元件 ID |
+| `enable` | `[]`。Ingress 和憑證是預設的，只能再加 `builds`（Zeabur Builder，會連 zot 一起裝，記憶體要 1800 MiB 以上），或這幾個 capability 底下的元件 ID |
 | `disable` | `[]`。排除 capability 或完整元件 ID |
 | `inputs` | `{}`。和建立叢集的檔案一樣，依元件 ID 分組 |
 | `secretFiles` | `{}`。和建立叢集的檔案一樣，檔案權限要是 `0600` |

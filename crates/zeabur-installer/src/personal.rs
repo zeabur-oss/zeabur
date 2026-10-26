@@ -14,11 +14,13 @@ use zeabur_installer_host::{archive, cmd, download, facts, files, systemd};
 use zeabur_installer_plan::config::PersonalConfig;
 use zeabur_installer_plan::kubesolo::{
     ADMIN_KUBECONFIG, BINARY, DATA_DIR, KUBECTL, PERSONAL_KUBECONFIG, STATE_DIR, UNIT,
-    WEBHOOK_SCRIPT, helm_controller_manifest, job_image_mismatches, personal_kubeconfig,
+    WEBHOOK_SCRIPT, ZOT_CA_FILE, helm_controller_manifest, job_image_mismatches,
+    personal_kubeconfig,
 };
 use zeabur_installer_plan::personal::{self, PersonalPlan};
 use zeabur_installer_plan::pins::HELM_CONTROLLER;
 use zeabur_installer_plan::plan::{self, MANAGER, NAMESPACE_MANAGER};
+use zeabur_installer_plan::rke2::ZOT_HOST;
 
 use crate::apply::STATE_CONFIGMAP;
 use crate::{InstallError, doctor, load, out, render};
@@ -112,6 +114,12 @@ pub(crate) fn apply(config: &PersonalConfig) -> Result<(), InstallError> {
             args.push("--timeout=5m");
             kubectl.wait(&args)?;
         }
+        if component.id == plan::ZOT && plan.zot_cluster_ip.is_some() {
+            crate::apply::zot_ca(&kubectl, Path::new(ZOT_CA_FILE))?;
+        }
+    }
+    if plan.components.iter().any(|c| c.id == plan::ZOT) {
+        registry_info(&kubectl)?;
     }
     let wrong = job_images(&kubectl, &plan)?;
     if !wrong.is_empty() {
@@ -128,6 +136,27 @@ pub(crate) fn apply(config: &PersonalConfig) -> Result<(), InstallError> {
 
     out::step("Done");
     out::line(&done_text(&name, &facts::addresses()));
+    Ok(())
+}
+
+/// What `zeaburctl up` reads to push to zot: the registry's address and the ConfigMap with its CA.
+fn registry_info(kubectl: &Kubectl) -> Result<(), InstallError> {
+    let labels = json!({"app.kubernetes.io/managed-by": MANAGER});
+    kubectl.apply_object(&json!({
+        "apiVersion": "v1",
+        "kind": "ConfigMap",
+        "metadata": {"name": plan::REGISTRY_CA_CONFIGMAP, "namespace": "kube-public", "labels": labels},
+        "data": {"ca.crt": crate::apply::zot_ca_pem(kubectl)?},
+    }))?;
+    kubectl.apply_object(&json!({
+        "apiVersion": "v1",
+        "kind": "ConfigMap",
+        "metadata": {"name": "zeabur-info", "namespace": "kube-public", "labels": labels},
+        "data": {
+            "registry": ZOT_HOST,
+            "registryCa": format!("kube-public/{}/ca.crt", plan::REGISTRY_CA_CONFIGMAP),
+        },
+    }))?;
     Ok(())
 }
 
@@ -354,6 +383,7 @@ pub(crate) fn doctor(config: &PersonalConfig) -> ExitCode {
                 .unwrap_or_default();
             results.extend(doctor::components(&kubectl, &plan));
             results.push(doctor::default_class(&kubectl, &plan));
+            results.extend(registry_checks(&kubectl, &plan));
         }
         Ok(None) => results.push((
             Status::Fail,
@@ -368,6 +398,47 @@ pub(crate) fn doctor(config: &PersonalConfig) -> ExitCode {
             .to_owned(),
     ));
     doctor::report(&results)
+}
+
+/// Zeabur Builder and zot, when the plan has them: Builder runs, and containerd trusts the CA zot
+/// serves with.
+fn registry_checks(kubectl: &Kubectl, plan: &Value) -> Vec<(Status, String)> {
+    let has = |id: &str| {
+        plan.get("components")
+            .and_then(Value::as_array)
+            .is_some_and(|c| {
+                c.iter()
+                    .any(|c| c.get("id").and_then(Value::as_str) == Some(id))
+            })
+    };
+    let mut results = Vec::new();
+    if has("builds/zeabur-builder") {
+        results.push(doctor::deployment(
+            kubectl,
+            "builder-system",
+            "zeabur-builder",
+        ));
+    }
+    if has(plan::ZOT) && plan.get("zotClusterIp").is_some_and(|ip| !ip.is_null()) {
+        let served = crate::apply::zot_ca_pem(kubectl).ok();
+        let on_host = fs::read_to_string(ZOT_CA_FILE).ok();
+        results.push(match (served, on_host) {
+            (Some(served), Some(on_host)) if served == on_host => (
+                Status::Pass,
+                "containerd trusts the CA zot serves with".to_owned(),
+            ),
+            (None, _) => (
+                Status::Fail,
+                "secret zot/zot-tls has no ca.crt: kubectl describe -n zot certificate/zot-tls"
+                    .to_owned(),
+            ),
+            _ => (
+                Status::Fail,
+                format!("{ZOT_CA_FILE} is not the CA zot serves with, so nodes cannot pull images built here: zeabur-installer apply"),
+            ),
+        });
+    }
+    results
 }
 
 /// Whether `KubeSolo`'s webhook still changes Jobs, which stops helm-controller (`kubesolo.rs`).

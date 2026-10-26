@@ -68,6 +68,7 @@ export const zhCN: Messages = {
   "check.kernelModules": "内核模块",
   "check.services": "系统服务",
   "check.multipathd": "multipathd",
+  "check.docker": "Docker",
 
   "code.root.ok": () => "以 root 运行。",
   "code.root.no": () => "请用 sudo 启动安装程序。",
@@ -99,6 +100,11 @@ export const zhCN: Messages = {
     `${path} 不在加密的设备上，上面的卷也就没有加密。测试机无妨，正式环境的数据请装在加密的磁盘上。`,
   "code.crypt.unknown": (path) =>
     `无法判断 ${path} 是否加密。请运行 lsblk，查看它下面有没有 crypt 设备。`,
+  "code.docker.none": () => "这台服务器没有 Docker。",
+  "code.docker.found": (...found) =>
+    `这台服务器装了 Docker（${listZh("zh-CN", found)}）。它会让 Pod 连不上网络，证书也申请不到。请先停止并移除 Docker，再重新检查。`,
+  "code.docker.forwardDrop": () =>
+    "防火墙挡住了转发的流量，Pod 连不上网络，证书也申请不到。通常是 Docker 或 ufw 设的，请移除或改掉，再重新检查。",
   "code.prep.package.ok": (binary) => `已安装 ${binary}。`,
   "code.prep.package.toInstall": (binary, component) =>
     `${component} 需要 ${binary}，安装时会一并装好。`,
@@ -178,8 +184,10 @@ export const zhCN: Messages = {
   "components.privilegedHint":
     "以主机权限运行，因此它的 Namespace 不适用 restricted Pod 安全级别。",
   "components.personalDescription":
-    "默认会装 Ingress 和证书，需要数据库再自己加。组件依赖的其他组件会一并加入。",
+    "默认会装 Ingress 和证书，要从 Git 或文件夹构建，再勾选 Zeabur Builder。组件依赖的其他组件会一并加入。",
   "components.notPersonal": "自己用的版本没有这个",
+  "components.needsMemory": (mib) =>
+    `构建应用至少要 ${mib.toLocaleString("zh-CN")} MiB 内存，这台不够`,
   "components.unsupported": "不支持 RKE2",
   "components.runsOn": (where) => `仅能在 ${where} 上运行`,
   "components.unsupportedOn": (profile) => `不支持 ${profile}`,
@@ -191,7 +199,9 @@ export const zhCN: Messages = {
   "components.list": "格式为列表：[a, b]。",
   "components.secret": "只保存到仅 root 可读的文件，不会写入配置文件。",
   "capability.certificates": "证书",
+  "capability.builds": "构建",
   "capability.config-reload": "自动重新加载配置",
+  "capability.container-registry": "镜像仓库",
   "capability.dns": "DNS",
   "capability.event-autoscaling": "事件驱动自动扩缩",
   "capability.ingress": "Ingress",

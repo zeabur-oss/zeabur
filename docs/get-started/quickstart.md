@@ -43,10 +43,10 @@ A team install needs 4 GB of memory. For one person, `use: personal` installs
 
 ```yaml
 use: personal
-enable: [databases]   # ingress and certificates come by default
+enable: [builds]      # ingress and certificates come by default; Zeabur Builder and zot are optional
 ```
 
-The server runs no Zeabur, Zeabur Identity, Builder or registry. You run Zeabur on your own
+The server runs no Zeabur or Zeabur Identity, and Zeabur Builder and zot only when you enable `builds` (it needs 1800 MiB of memory). There are no databases. You run Zeabur on your own
 computer with `zeaburctl ui` and the kubeconfig `apply` writes to
 `/etc/zeabur-installer/kubeconfig.yaml`; `apply` prints the two commands. Whoever has that file
 is cluster admin. There are no members or roles, one node only, and no isolation between

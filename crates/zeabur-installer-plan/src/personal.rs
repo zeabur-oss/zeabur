@@ -1,10 +1,10 @@
 //! The plan of a personal install: `KubeSolo`, the standalone helm-controller and the components.
 //!
-//! There is no Zeabur panel, Zeabur Identity, Builder or zot. The person runs `zeaburctl ui` on
-//! their own computer with the admin kubeconfig. Nothing is isolated: `KubeSolo`'s bridge CNI
-//! enforces no `NetworkPolicy`, there is one admin and one node. The plan makes no network
-//! policies, and every object it makes is one `kubectl apply` can make and `kubectl delete` can
-//! remove without the installer.
+//! There is no Zeabur panel or Zeabur Identity. Zeabur Builder and zot are options. The person runs
+//! `zeaburctl ui` on their own computer with the admin kubeconfig. Nothing is isolated:
+//! `KubeSolo`'s bridge CNI enforces no `NetworkPolicy`, there is one admin and one node. The plan
+//! makes no network policies, and every object it makes is one `kubectl apply` can make and
+//! `kubectl delete` can remove without the installer.
 
 use std::collections::BTreeMap;
 
@@ -15,10 +15,10 @@ use crate::config::PersonalConfig;
 use crate::pins::{HELM_CONTROLLER, KUBECTL, KUBESOLO};
 use crate::plan::{
     Choices, ComponentPlan, Download, Facts, Memory, Namespace, Warning, components, idle_memory,
-    warning,
+    warning, zot_cluster_ip,
 };
 use crate::rke2::HostFile;
-use crate::select::{self, PERSONAL_DISTRIBUTION, PERSONAL_PROFILE};
+use crate::select::{self, BUILD_CAPABILITIES, PERSONAL_DISTRIBUTION, PERSONAL_PROFILE};
 use crate::storage::Storage;
 use crate::{PlanError, kubesolo};
 
@@ -28,6 +28,9 @@ pub const KUBESOLO_IDLE_MIB: u64 = 700;
 /// The least memory a personal install is planned for: a host with 1.5 GiB, less what the kernel
 /// and firmware keep.
 pub const MIN_MEMORY_MIB: u64 = 1400;
+/// The least memory for Zeabur Builder and zot: idle, and one small build. A 1.5 GiB host built
+/// one with 221 MiB to spare, so a 2 GiB host leaves room for an app next to it.
+pub const BUILDS_MIN_MEMORY_MIB: u64 = 1800;
 
 /// The whole plan of a personal install.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -55,6 +58,8 @@ pub struct PersonalPlan {
     pub components: Vec<ComponentPlan>,
     /// Catalog components named but left out, with the reason.
     pub left_out: BTreeMap<String, String>,
+    /// zot's fixed `ClusterIP`, when zot is installed: containerd pulls its images through it.
+    pub zot_cluster_ip: Option<String>,
     /// The storage class: `KubeSolo`'s local-path.
     pub storage: Storage,
     /// Idle memory: `KubeSolo` plus the measured components.
@@ -105,6 +110,26 @@ fn helm_controller() -> HelmControllerPlan {
     }
 }
 
+/// Takes Zeabur Builder and zot out of the selection on a host with too little memory.
+fn leave_out_builds(index: &Index, selection: &mut select::Selection, memory_mib: u64) {
+    if memory_mib >= BUILDS_MIN_MEMORY_MIB {
+        return;
+    }
+    let (kept, dropped): (Vec<_>, Vec<_>) = std::mem::take(&mut selection.components)
+        .into_iter()
+        .partition(|(id, _)| {
+            !index
+                .component(id)
+                .is_some_and(|c| BUILD_CAPABILITIES.contains(&c.capability.as_str()))
+        });
+    selection.components = kept;
+    for (id, _) in dropped {
+        selection
+            .left_out
+            .insert(id, format!("needs {BUILDS_MIN_MEMORY_MIB} MiB of memory"));
+    }
+}
+
 /// Computes the plan of a personal install.
 ///
 /// # Errors
@@ -146,7 +171,8 @@ pub fn plan(
         ));
     }
 
-    let selection = select::select_personal(index, config)?;
+    let mut selection = select::select_personal(index, config)?;
+    leave_out_builds(index, &mut selection, facts.memory_mib);
     let choices = Choices {
         inputs: &config.inputs,
         secret_files: &config.secret_files,
@@ -184,10 +210,13 @@ pub fn plan(
         ));
     }
 
-    let host_files = kubesolo::host_files(&kubesolo::Options {
+    let chosen = components.iter().map(|c| c.id.as_str()).collect();
+    let zot_cluster_ip = zot_cluster_ip(index, &config.inputs, &chosen);
+    let mut host_files = kubesolo::host_files(&kubesolo::Options {
         node_ip: facts.node_ips.first().cloned(),
         tls_san: config.host.tls_san.clone(),
     });
+    host_files.extend(zot_cluster_ip.as_deref().map(kubesolo::zot_hosts_file));
     Ok(PersonalPlan {
         use_: "personal",
         facts: facts.clone(),
@@ -203,6 +232,7 @@ pub fn plan(
         namespaces: namespaces.into_values().collect(),
         components,
         left_out: selection.left_out,
+        zot_cluster_ip,
         storage: Storage {
             default_class: kubesolo::LOCAL_PATH_CLASS.to_owned(),
             other_classes: Vec::new(),
@@ -257,6 +287,83 @@ mod tests {
                 }
             }
         }
+    }
+
+    /// The fixture's catalog with zot and Zeabur Builder, which needs zot.
+    fn index_with_builds() -> Index {
+        let mut index: serde_json::Value = serde_json::from_str(INDEX).unwrap();
+        let components = index["components"].as_array_mut().unwrap();
+        let template = components
+            .iter()
+            .find(|c| c["id"] == "config-reload/reloader")
+            .unwrap()
+            .clone();
+        let order = [
+            "ingress/traefik",
+            "certificates/cert-manager",
+            crate::plan::ZOT,
+        ];
+        let mut zot = template.clone();
+        zot["id"] = serde_json::json!(crate::plan::ZOT);
+        zot["capability"] = serde_json::json!("container-registry");
+        zot["requires"] = serde_json::json!(["certificates/cert-manager"]);
+        zot["installOrder"] = serde_json::json!({"single-node": order, "multi-node": order});
+        zot["inputs"] = serde_json::json!([{
+            "name": "cluster-ip",
+            "description": "A fixed ClusterIP.",
+            "release": "zot",
+            "path": "service.clusterIP",
+        }]);
+        zot["releases"] = serde_json::json!([{
+            "name": "zot", "namespace": "zot", "chart": "zot",
+            "repo": "https://zotregistry.dev/helm-charts", "version": "0.1.128",
+            "values": "service:\n  type: ClusterIP\n",
+        }]);
+        let mut builder = template;
+        let order = [order[0], order[1], order[2], "builds/zeabur-builder"];
+        builder["id"] = serde_json::json!("builds/zeabur-builder");
+        builder["capability"] = serde_json::json!("builds");
+        builder["requires"] = serde_json::json!([crate::plan::ZOT]);
+        builder["installOrder"] = serde_json::json!({"single-node": order, "multi-node": order});
+        builder["releases"][0]["name"] = serde_json::json!("builder");
+        components.extend([zot, builder]);
+        Index::parse(index.to_string().as_bytes()).unwrap()
+    }
+
+    #[test]
+    fn builder_and_zot_are_an_option_that_needs_the_memory() {
+        let index = index_with_builds();
+        let off = plan(&index, &config(""), &facts(4096)).unwrap();
+        assert!(!ids(&off).contains(&"builds/zeabur-builder") && off.zot_cluster_ip.is_none());
+
+        let on = plan(&index, &config("enable: [builds]\n"), &facts(4096)).unwrap();
+        let ids = ids(&on);
+        assert!(
+            ids.contains(&crate::plan::ZOT) && ids.contains(&"builds/zeabur-builder"),
+            "{ids:?}"
+        );
+        assert_eq!(on.zot_cluster_ip.as_deref(), Some("10.43.0.50"));
+        let hosts = on
+            .host_files
+            .iter()
+            .find(|f| f.path == kubesolo::ZOT_HOSTS_FILE)
+            .unwrap();
+        assert!(hosts.content.contains("https://10.43.0.50:5000"));
+
+        let small = plan(
+            &index,
+            &config("enable: [builds]\n"),
+            &facts(BUILDS_MIN_MEMORY_MIB - 1),
+        )
+        .unwrap();
+        assert!(!ids_of(&small).contains(&crate::plan::ZOT));
+        assert!(small.left_out.contains_key("builds/zeabur-builder"));
+        assert!(small.left_out.contains_key(crate::plan::ZOT));
+        assert!(small.zot_cluster_ip.is_none());
+    }
+
+    fn ids_of(plan: &PersonalPlan) -> Vec<&str> {
+        ids(plan)
     }
 
     #[test]

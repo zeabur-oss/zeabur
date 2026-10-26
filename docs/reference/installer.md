@@ -156,7 +156,9 @@ policies.
 
 With `use: personal`, `apply`:
 
-1. Checks the host as for a server, with KubeSolo's ports: 80, 443, 6443, 10250 and 10443.
+1. Checks the host as for a server, with KubeSolo's ports: 80, 443, 6443, 10250 and 10443. It
+   stops when Docker is on the host (its binary, socket or service) or the iptables FORWARD
+   policy is DROP: Pods could not reach the internet and certificates would fail.
 2. Downloads the pinned kubectl and KubeSolo's offline archive, checked by SHA-256, and writes
    `/etc/kubesolo/config.yaml` and the `kubesolo` systemd unit.
 3. Starts KubeSolo and waits for the node, CoreDNS and the local-path provisioner.
@@ -171,10 +173,15 @@ With `use: personal`, `apply`:
    ran, `apply` and `doctor` compare the digest they ran with the pinned one.
    KubeSolo's webhook replaces a new Job's whole `nodeSelector`, which also makes helm-controller
    replace its Jobs forever, so the `kubesolo` unit runs `/usr/local/libexec/zeabur-kubesolo-webhook`
-   after each start: it removes `jobs` from the rules of `webhook.kubesolo.io` once KubeSolo has
-   written them. Pods still get the node from the same webhook.
+   after each start: it removes `jobs` from the rules of `webhook.kubesolo.io` with kubectl, and
+   watches for a minute in case KubeSolo writes them again. Pods and volumes still get the node
+   from the same webhook.
 5. Creates the components' namespaces and installs each component as a `HelmChart` in
    `kube-system`, as for a team install. No network policies: KubeSolo does not enforce them.
+   With `enable: [builds]` that includes zot and Zeabur Builder (on a host with 1800 MiB or
+   more): containerd gets a `hosts.toml` and zot's CA under
+   `/var/lib/kubesolo/containerd/registry/zot.zot.svc:5000/`, and `kube-public/zeabur-info` names
+   the registry for `zeaburctl up`.
 6. Records the install in the ConfigMap `kube-system/zeabur-installer` and writes a kubeconfig with
    the admin client certificate to `/etc/zeabur-installer/kubeconfig.yaml`, mode 0600.
 
