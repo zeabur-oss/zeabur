@@ -1,8 +1,8 @@
 # Until Zeabur, Zeabur Identity and the catalog publish releases, an install names its sources.
 access:
   mode: local
-  identity: login.10.211.55.20.sslip.io
-  zeabur: zeabur.10.211.55.20.sslip.io
+  identity: login.192.0.2.20.sslip.io
+  zeabur: zeabur.192.0.2.20.sslip.io
 
 sources:
   catalog: /root/catalog/index.json

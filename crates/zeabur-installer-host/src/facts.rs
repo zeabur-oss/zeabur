@@ -175,7 +175,7 @@ mod tests {
     use super::*;
 
     const IP_ADDR: &str = "\
-2: enp0s5    inet 10.211.55.121/24 brd 10.211.55.255 scope global dynamic noprefixroute enp0s5\\       valid_lft 1107sec preferred_lft 1107sec
+2: enp0s5    inet 192.0.2.121/24 brd 192.0.2.255 scope global dynamic noprefixroute enp0s5\\       valid_lft 1107sec preferred_lft 1107sec
 11: flannel.1    inet 10.42.5.0/32 scope global flannel.1\\       valid_lft forever preferred_lft forever
 2: enp0s5    inet6 fdb2:2c26:f4e4:0:9b2d:5a24:581b:f432/64 scope global temporary dynamic \\       valid_lft 172109sec preferred_lft 85390sec
 2: enp0s5    inet6 fdb2:2c26:f4e4:0:3ad8:c781:797:77a5/64 scope global dynamic mngtmpaddr noprefixroute \\       valid_lft 2591869sec preferred_lft 604669sec
@@ -189,11 +189,11 @@ mod tests {
         assert!(addresses[2].temporary && !addresses[3].temporary);
         assert_eq!(
             choose_node_ips(&addresses, Some("enp0s5"), Some("enp0s5")),
-            ["10.211.55.121", "fdb2:2c26:f4e4:0:3ad8:c781:797:77a5"]
+            ["192.0.2.121", "fdb2:2c26:f4e4:0:3ad8:c781:797:77a5"]
         );
         assert_eq!(
             choose_node_ips(&addresses, Some("enp0s5"), None),
-            ["10.211.55.121"]
+            ["192.0.2.121"]
         );
         let only_temporary: Vec<HostAddress> = addresses
             .iter()
@@ -202,7 +202,7 @@ mod tests {
             .collect();
         assert_eq!(
             choose_node_ips(&only_temporary, Some("enp0s5"), Some("enp0s5")),
-            ["10.211.55.121"]
+            ["192.0.2.121"]
         );
     }
 

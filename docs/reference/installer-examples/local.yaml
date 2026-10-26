@@ -4,7 +4,7 @@
 # as <address>.sslip.io do so without setting up DNS.
 access:
   mode: local
-  identity: login.10.211.55.20.sslip.io
-  zeabur: zeabur.10.211.55.20.sslip.io
+  identity: login.192.0.2.20.sslip.io
+  zeabur: zeabur.192.0.2.20.sslip.io
 
 preset: minimal
