@@ -58,7 +58,7 @@ test("a Developer uploads a folder and the service runs it", async ({ page, brow
       await drawer.getByRole("button", { name: "Review changes", exact: true }).click()
       const plan = developer.getByRole("dialog", { name: `Deploy ${name} from a folder` })
       await expect(plan).toContainText("Build")
-      await plan.getByRole("button").last().click()
+      await plan.getByRole("button", { name: "Create", exact: true }).click()
       await expect(toast(developer, "Uploaded")).toBeVisible({ timeout: 120_000 })
     })
 
