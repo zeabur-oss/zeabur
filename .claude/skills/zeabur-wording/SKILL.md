@@ -10,7 +10,7 @@ description: Write or revise any text people read in Zeabur — interface string
 1. **Start from what the reader sees and wants to do**, not from how Zeabur or Kubernetes works.
    Name the thing by its plain term first; the Kubernetes term follows as secondary text only
    where a professional needs it (`docs/internal/wording.md`, "Terms"). Never invent a term; use the
-   glossary's (通行密鑰, 機密, 磁碟區, 用量, 概覽 …).
+   glossary's (通行密鑰, 機密變數, 磁碟, 磁碟區, 用量, 概覽 …).
 2. **Write English first** (`web/src/i18n/en.ts` is the source; zh-TW and zh-CN are typed against
    it). Sentence case, the verb on the button, a label that names its content.
 3. **Write each Chinese locale as its own text**, not a translation of the English: Taiwan and

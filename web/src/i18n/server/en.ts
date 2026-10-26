@@ -27,25 +27,25 @@ export const serverEn = {
   "sentence.diagnosis.probeFailure.why.startup": (p: P) =>
     `${!p.period || p.period === "none" ? `The other checks wait for the startup check; if it doesn't pass in time, the cluster restarts the container.` : `${p.periodDefault === "true" ? `${p.thresholdDefault === "true" ? `By default, the container has ${p.threshold ?? ""} × ${duration(p.period)} (${duration(p.total)}) to pass the startup check; then the cluster restarts it.` : `The container has ${p.threshold ?? ""} × ${duration(p.period)} (${duration(p.total)}) to pass the startup check; then the cluster restarts it. Every ${duration(p.period)} is the default.`}` : `The container has ${p.threshold ?? ""} × ${duration(p.period)} (${duration(p.total)}) to pass the startup check; then the cluster restarts it.${p.thresholdDefault === "true" ? ` ${p.threshold ?? ""} failures is the default.` : ``}`}`}`,
   "sentence.diagnosis.configMissing.cause.object": (p: P) =>
-    `${p.container ?? ""} can't start: ${p.object === "Secret" ? `secret ${p.name ?? ""}` : `config ${p.name ?? ""}`} doesn't exist.`,
+    `${p.container ?? ""} can't start: ${p.object === "Secret" ? `secret ${p.name ?? ""}` : `config file ${p.name ?? ""}`} doesn't exist.`,
   "sentence.diagnosis.configMissing.cause.key": (p: P) =>
-    `${p.container ?? ""} can't start: ${p.object === "Secret" ? `secret ${p.name ?? ""}` : `config ${p.name ?? ""}`} has no ${p.key ?? ""}.`,
+    `${p.container ?? ""} can't start: ${p.object === "Secret" ? `secret ${p.name ?? ""}` : `config file ${p.name ?? ""}`} has no ${p.key ?? ""}.`,
   "sentence.diagnosis.configMissing.cause.unknown": (p: P) =>
     `${p.container ?? ""} can't start: a secret or config it reads is missing.`,
   "sentence.diagnosis.configMissing.cause.volume": (p: P) =>
-    `${!p.container || p.container === "none" ? `Replica ${p.pod ?? ""}` : `${p.container ?? ""}`} can't start: volume ${p.volume ?? ""} comes from ${p.object === "Secret" ? `secret ${p.name ?? ""}` : `config ${p.name ?? ""}`}, which doesn't exist.`,
+    `${!p.container || p.container === "none" ? `Replica ${p.pod ?? ""}` : `${p.container ?? ""}`} can't start: volume ${p.volume ?? ""} comes from ${p.object === "Secret" ? `secret ${p.name ?? ""}` : `config file ${p.name ?? ""}`}, which doesn't exist.`,
   "sentence.diagnosis.configMissing.why": () =>
     "The cluster starts a container only once every secret and config it reads, and every key it names, exists.",
   "sentence.diagnosis.configMissing.why.volume": () =>
     "The cluster mounts every volume before it starts a replica's containers; a volume from a secret or config that doesn't exist can't be mounted, so they keep waiting.",
   "sentence.diagnosis.configMissing.fix.object": (p: P) =>
-    `Add ${p.object === "Secret" ? `secret ${p.name ?? ""}` : `config ${p.name ?? ""}`} to the project, or stop reading it.`,
+    `Add ${p.object === "Secret" ? `secret ${p.name ?? ""}` : `config file ${p.name ?? ""}`} to the project, or stop reading it.`,
   "sentence.diagnosis.configMissing.fix.key": (p: P) =>
-    `Add ${p.key ?? ""} to ${p.object === "Secret" ? `secret ${p.name ?? ""}` : `config ${p.name ?? ""}`}, or stop reading it.`,
+    `Add ${p.key ?? ""} to ${p.object === "Secret" ? `secret ${p.name ?? ""}` : `config file ${p.name ?? ""}`}, or stop reading it.`,
   "sentence.diagnosis.configMissing.fix.unknown": () =>
     "The replica's events name what is missing; add it, or stop reading it.",
   "sentence.diagnosis.configMissing.fix.volume": (p: P) =>
-    `Add ${p.object === "Secret" ? `secret ${p.name ?? ""}` : `config ${p.name ?? ""}`} to the project, or remove volume ${p.volume ?? ""}.`,
+    `Add ${p.object === "Secret" ? `secret ${p.name ?? ""}` : `config file ${p.name ?? ""}`} to the project, or remove volume ${p.volume ?? ""}.`,
   "sentence.diagnosis.unschedulable.cause.cpu": (p: P) =>
     `${p.service ?? ""} is waiting for room: no machine has enough CPU free.`,
   "sentence.diagnosis.unschedulable.cause.memory": (p: P) =>
@@ -234,7 +234,7 @@ export const serverEn = {
   "sentence.gap.ingressToHttpRoute.retired": (p: P) =>
     `Ingress ${p.ingress ?? ""} uses ${p.class ?? ""}, whose controller is no longer maintained.`,
   "sentence.gap.projectWithoutNetworkPolicy": (p: P) =>
-    `Project ${p.namespace ?? ""} has no NetworkPolicy ${p.policy ?? ""}, so any pod in the cluster can reach its services.`,
+    `Project ${p.namespace ?? ""} has no NetworkPolicy ${p.policy ?? ""}, so any replica in the cluster can reach its services.`,
   "sentence.gap.retiredIngressController": (p: P) =>
     `IngressClass ${p.class ?? ""} is served by ${p.controller ?? ""}, which is no longer maintained.`,
   "sentence.gap.danglingRoute.noService": (p: P) =>
@@ -248,7 +248,7 @@ export const serverEn = {
   "sentence.gap.blockedConnection": (p: P) =>
     `${p.at === "egress" ? `${p.from ?? ""}'s variables point to ${p.to ?? ""}, but ${p.from ?? ""}'s own NetworkPolicy blocks the outgoing connection.` : p.at === "both" ? `${p.from ?? ""}'s variables point to ${p.to ?? ""}, but NetworkPolicy blocks the connection at both ends.` : `${p.from ?? ""}'s variables point to ${p.to ?? ""}, but ${p.to ?? ""}'s NetworkPolicy doesn't let ${p.from ?? ""} in.`}`,
   "sentence.gap.noNetworkPolicy": (p: P) =>
-    `No NetworkPolicy protects ${words(items(p.services))}: any pod in the cluster can reach ${items(p.services).length === 1 ? `it` : `them`}. Policies only work if the cluster's network plugin enforces them.${
+    `No NetworkPolicy protects ${words(items(p.services))}: any replica in the cluster can reach ${items(p.services).length === 1 ? `it` : `them`}. Policies only work if the cluster's network plugin enforces them.${
       !p.cuts || p.cuts === "none"
         ? ``
         : ` Isolating also blocks ${words(
@@ -296,7 +296,7 @@ export const serverEn = {
   "sentence.incident.nodeNotReady.cause": (p: P) =>
     `${p.status === "Unknown" ? `Node ${p.node ?? ""} stopped reporting to the cluster` : `Node ${p.node ?? ""} is not ready`}${!p.reason || p.reason === "none" ? `` : ` (${p.reason ?? ""})`}.`,
   "sentence.incident.nodeNotReady.why": (p: P) =>
-    `A node that isn't ready starts nothing new, and after a grace period, 5 minutes by default, the cluster removes its pods so they can start elsewhere. ${Number(p.pods) === 1 ? `${p.pods ?? ""} pod runs` : `${p.pods ?? ""} pods run`} on it; ${Number(p.services) === 1 ? `${p.services ?? ""} service has` : `${p.services ?? ""} services have`} replicas there.`,
+    `A node that isn't ready starts nothing new, and after a grace period, 5 minutes by default, the cluster removes its replicas so they can start elsewhere. ${Number(p.pods) === 1 ? `${p.pods ?? ""} replica runs` : `${p.pods ?? ""} replicas run`} on it, from ${Number(p.services) === 1 ? `${p.services ?? ""} service` : `${p.services ?? ""} services`}.`,
   "sentence.incident.nodeNotReady.fix": (p: P) =>
     `Check the machine behind ${p.node ?? ""}: whether it is on, its network, and its node agent (kubelet). If it won't come back, drain it and replace it.`,
   "sentence.trace.dns.ok": (p: P) => `${p.host ?? ""} resolves.`,

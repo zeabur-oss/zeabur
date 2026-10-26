@@ -23,7 +23,7 @@ rereading; they do not decide it.
    limit: "Choose a name with at most 63 characters", not "Invalid name". Do not guess a cause,
    echo a secret, blame, apologise or add "Oops".
 5. **Alert titles describe the situation; buttons name the result.** Never "Error" as a title;
-   "Delete PVC" / "Cancel", not "OK" / "Yes". Body text only when it adds a consequence; do not
+   "Delete disk" / "Cancel", not "OK" / "Yes". Body text only when it adds a consequence; do not
    explain the buttons. The button that applies a review follows one rule, whether a form, YAML,
    a drawer or the draft asked: one kind of change takes its verb ("Restart 3 services", "Save
    variables"); changes that only create say "Create", with the count when there are more than
@@ -31,7 +31,7 @@ rereading; they do not decide it.
    are only the means (database backups) says the change in its own words and takes its own verb
    ("Set up backups"), not the object edits.
 6. **Limits where they bite.** Warn only before an uncommon or irreversible action, and state the
-   real consequence. Whether deleting a PVC deletes data depends on its reclaim policy; say what
+   real consequence. Whether deleting a disk deletes data depends on its reclaim policy; say what
    is known.
 7. **Empty states say what would appear and how to get it**, with a button or link where one
    exists; never a bare "None." (see "Empty states"). Nothing the reader needs may live only in
@@ -41,9 +41,13 @@ rereading; they do not decide it.
    allows you to*, and needless *there is* / *you can*; keep one only when it carries meaning.
 10. **No manufactured structure.** A contrast ("not X but Y", 「不是…而是…」) only when the
     contrast is the information; three items only when there are three; no closing summary.
-11. **One term per concept**, from the term list below. Kubernetes kinds and fields (Deployment,
-    ConfigMap, selector, `replicas`) stay as they are and may repeat. Interpolations, numbers,
-    defaults and code stay exact.
+11. **One term per concept**, from the term list below. Four kinds people meet every day have a
+    plain word and use it everywhere on screen: Pod is *replica* (副本), PersistentVolumeClaim is
+    *disk* (磁碟), Secret is *secret* (機密變數), ConfigMap is *config file* (設定檔). The kind
+    name appears only where a reader needs it for `kubectl`: in YAML, in the Kubernetes details
+    and as a secondary label beside the plain word (the Objects page, an object's title), never
+    in a heading or a sentence. Other kinds and fields (Deployment, selector, `replicas`) stay as
+    they are and may repeat. Interpolations, numbers, defaults and code stay exact.
 
 ### English
 
@@ -102,8 +106,8 @@ zh-TW and zh-CN are two editorial passes, not a character conversion.
     where dropping it would change who acts.
 13. **Plain verbs.** 「驗證設定」, not 「對設定進行驗證」; 「是」「有」, not 「作為」「擁有」.
     Drop 「有關」「關於」「們」「一個」 when they add nothing.
-14. **An event or clause as subject; break 的 chains and long pre-modifiers.** 「Pod 重新啟動後，
-    連線會中斷」, not 「Pod 的重新啟動會導致連線的中斷」.
+14. **An event or clause as subject; break 的 chains and long pre-modifiers.** 「副本重新啟動後，
+    連線會中斷」, not 「副本的重新啟動會導致連線的中斷」.
 15. **Chinese order.** Condition first (「如果…，…」), one idea per sentence; no copied pairs
     (因為…所以, 當…的時候), no 「最…之一」「值得注意的是」「這意味著」. 「；」 is allowed where it
     makes the relation clearer; split the sentence when it does not.
@@ -143,10 +147,11 @@ Source text, not a CSS transform. Product, API and code names keep their exact c
   stay in Latin letters.
 - A *service* is what the reader deploys (服務／服务); `Service` is the Kubernetes kind. A
   *project* is a namespace Zeabur shows as one (專案／项目). A *replica* is a pod of a service
-  (副本); `Pod` stays where the page is about the cluster rather than one service.
-- Kubernetes kinds stay in Latin letters in Chinese, Namespace included, as Zeabur's hosted
+  (副本), and so is every other Pod, the cluster's own counts included.
+- Other Kubernetes kinds stay in Latin letters in Chinese, Namespace included, as Zeabur's hosted
   dashboard writes it; in English running text they are lower case unless the kind itself is
-  meant (`the Namespace shop`).
+  meant (`the Namespace shop`). The four kinds of rule 11 are the exception;
+  `web/src/i18n/kind-name.ts` gives the plain word for a kind in code.
 
 ## Terms
 
@@ -161,11 +166,11 @@ why. Add a row before introducing a new concept.
 | cluster | 叢集 | 集群 | |
 | node | 節點 | 节点 | |
 | namespace | Namespace | Namespace | Kubernetes kind, as the dashboard writes it. Only where the namespace is what's chosen (use an existing namespace); a name kept by Kubernetes is a name, not a namespace |
-| replica | 副本 | 副本 | Also where a node's trouble stops or blocks them (kubelet stopping pods); Pod stays for the cluster's own counts and the pod network. The replicas list's Kubernetes details say Pod |
+| replica (a Pod) | 副本 | 副本 | Everywhere: a node's counts, the replica network, a terminal replica (終端機副本). The Kubernetes details and YAML say Pod |
 | instance (a database's server: CNPG `spec.instances`, a replica set's `size`) | 執行個體 | 实例 | Never 成員, which names a person on the Members page |
 | container | 容器 | 容器 | |
 | image | 映像檔 | 镜像 | |
-| volume | 磁碟區 | 卷 | The dashboard also says 硬碟／硬盘; a claim is not a disk. A sentence says 磁碟區 with the claim's name in parentheses, never "claim"; the PersistentVolume behind it is named as one |
+| volume | 磁碟區 | 卷 | What a service mounts. A sentence says 磁碟區 with the disk's name in parentheses, never "claim"; the PersistentVolume behind it is named as one |
 | port | 連接埠 | 端口 | |
 | domain | 網域 | 域名 | |
 | environment variable; Variables tab | 環境變數 | 环境变量; tab 变量 | Tab names as on the dashboard |
@@ -175,8 +180,9 @@ why. Add a row before introducing a new concept.
 | General (settings section) | 一般設定 | 通用设置 | |
 | Description | 描述 | 描述 | |
 | Danger zone | 危險區域 | 危险区域 | |
-| secret (a Secret, in plain words) | 機密 | 机密 | 密钥 is a key |
-| config file (a ConfigMap, in plain words) | 設定檔 | 配置文件 | |
+| secret (a Secret) | 機密變數 | 机密变量 | 密钥 is a key. The S3 "secret access key" keeps its name |
+| config file (a ConfigMap) | 設定檔 | 配置文件 | |
+| disk (a PersistentVolumeClaim) | 磁碟 | 磁盘 | The claim a volume is made from. What a service mounts is a volume (磁碟區／卷). The PersistentVolume behind it is named as one |
 | configuration | 設定 | 配置 | |
 | logs | 日誌 | 日志 | |
 | event | 事件 | 事件 | |
@@ -247,7 +253,7 @@ why. Add a row before introducing a new concept.
 | storage class | 儲存類別 | 存储类 | `StorageClass` |
 | debug container (a shell added beside a container that has none) | 除錯容器 | 调试容器 | An ephemeral container; it stays until the replica is replaced |
 | kubectl terminal (a shell with kubectl and helm in the cluster) | kubectl 終端機 | kubectl 终端 | Runs as the signed-in user |
-| node terminal (a root shell on a node's host); terminal pod (the privileged pod it runs in) | 節點終端機；終端機 Pod | 节点终端；终端 Pod | For cluster administrators only. Say plainly that it is full root on the host and bypasses Zeabur |
+| node terminal (a root shell on a node's host); terminal replica (the privileged replica it runs in) | 節點終端機；終端機副本 | 节点终端；终端副本 | For cluster administrators only. Say plainly that it is full root on the host and bypasses Zeabur |
 | scratch space (an `emptyDir`) | 暫存空間 | 临时空间 | Emptied when the replica is replaced |
 | Strict (a service's security; the project allowing only Strict services) | 嚴格 | 严格 | Pod Security `restricted`: runs as non-root, no privilege escalation. Zeabur picks it for an image whose user is a numeric UID other than 0; the level is in the Kubernetes details |
 | Compatible (security that lets a container run as root) | 相容 | 兼容 | Pod Security `baseline`, which a new project enforces |

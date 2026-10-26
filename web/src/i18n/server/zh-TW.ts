@@ -27,25 +27,25 @@ export const serverZhTw = {
   "sentence.diagnosis.probeFailure.why.startup": (p: P) =>
     `${!p.period || p.period === "none" ? `其他檢查會等啟動檢查通過，如果沒有在時限內通過，叢集就會重新啟動容器。` : `${p.periodDefault === "true" ? `${p.thresholdDefault === "true" ? `預設情況下，容器有 ${p.threshold ?? ""} × ${duration(p.period)}（${duration(p.total)}）可以通過啟動檢查，超過時叢集就會重新啟動它。` : `容器有 ${p.threshold ?? ""} × ${duration(p.period)}（${duration(p.total)}）可以通過啟動檢查，超過時叢集就會重新啟動它。每 ${duration(p.period)}是預設值。`}` : `容器有 ${p.threshold ?? ""} × ${duration(p.period)}（${duration(p.total)}）可以通過啟動檢查，超過時叢集就會重新啟動它。${p.thresholdDefault === "true" ? `${p.threshold ?? ""} 次是預設值。` : ``}`}`}`,
   "sentence.diagnosis.configMissing.cause.object": (p: P) =>
-    `${p.container ?? ""} 無法啟動：${p.object === "Secret" ? `機密 ${p.name ?? ""}` : `設定檔 ${p.name ?? ""}`} 不存在。`,
+    `${p.container ?? ""} 無法啟動：${p.object === "Secret" ? `機密變數 ${p.name ?? ""}` : `設定檔 ${p.name ?? ""}`} 不存在。`,
   "sentence.diagnosis.configMissing.cause.key": (p: P) =>
-    `${p.container ?? ""} 無法啟動：${p.object === "Secret" ? `機密 ${p.name ?? ""}` : `設定檔 ${p.name ?? ""}`} 裡沒有 ${p.key ?? ""}。`,
+    `${p.container ?? ""} 無法啟動：${p.object === "Secret" ? `機密變數 ${p.name ?? ""}` : `設定檔 ${p.name ?? ""}`} 裡沒有 ${p.key ?? ""}。`,
   "sentence.diagnosis.configMissing.cause.unknown": (p: P) =>
-    `${p.container ?? ""} 無法啟動：缺少它讀取的機密或設定檔。`,
+    `${p.container ?? ""} 無法啟動：缺少它讀取的機密變數或設定檔。`,
   "sentence.diagnosis.configMissing.cause.volume": (p: P) =>
-    `${!p.container || p.container === "none" ? `副本 ${p.pod ?? ""}` : `${p.container ?? ""}`} 無法啟動：磁碟區 ${p.volume ?? ""} 取自 ${p.object === "Secret" ? `機密 ${p.name ?? ""}` : `設定檔 ${p.name ?? ""}`}，但它不存在。`,
+    `${!p.container || p.container === "none" ? `副本 ${p.pod ?? ""}` : `${p.container ?? ""}`} 無法啟動：磁碟區 ${p.volume ?? ""} 取自 ${p.object === "Secret" ? `機密變數 ${p.name ?? ""}` : `設定檔 ${p.name ?? ""}`}，但它不存在。`,
   "sentence.diagnosis.configMissing.why": () =>
-    "容器讀取的每個機密、設定檔和其中的鍵都存在之後，叢集才會啟動它。",
+    "容器讀取的每個機密變數、設定檔和其中的鍵都存在之後，叢集才會啟動它。",
   "sentence.diagnosis.configMissing.why.volume": () =>
-    "叢集會先掛載所有磁碟區，再啟動副本的容器。磁碟區如果取自不存在的機密或設定檔，就無法掛載，容器會一直等待。",
+    "叢集會先掛載所有磁碟區，再啟動副本的容器。磁碟區如果取自不存在的機密變數或設定檔，就無法掛載，容器會一直等待。",
   "sentence.diagnosis.configMissing.fix.object": (p: P) =>
-    `在專案裡加上 ${p.object === "Secret" ? `機密 ${p.name ?? ""}` : `設定檔 ${p.name ?? ""}`}，或不再讀取它。`,
+    `在專案裡加上 ${p.object === "Secret" ? `機密變數 ${p.name ?? ""}` : `設定檔 ${p.name ?? ""}`}，或不再讀取它。`,
   "sentence.diagnosis.configMissing.fix.key": (p: P) =>
-    `在 ${p.object === "Secret" ? `機密 ${p.name ?? ""}` : `設定檔 ${p.name ?? ""}`} 加上 ${p.key ?? ""}，或不再讀取它。`,
+    `在 ${p.object === "Secret" ? `機密變數 ${p.name ?? ""}` : `設定檔 ${p.name ?? ""}`} 加上 ${p.key ?? ""}，或不再讀取它。`,
   "sentence.diagnosis.configMissing.fix.unknown": () =>
     "副本的事件會說缺少什麼。把它加上，或不再讀取它。",
   "sentence.diagnosis.configMissing.fix.volume": (p: P) =>
-    `在專案裡加上 ${p.object === "Secret" ? `機密 ${p.name ?? ""}` : `設定檔 ${p.name ?? ""}`}，或移除磁碟區 ${p.volume ?? ""}。`,
+    `在專案裡加上 ${p.object === "Secret" ? `機密變數 ${p.name ?? ""}` : `設定檔 ${p.name ?? ""}`}，或移除磁碟區 ${p.volume ?? ""}。`,
   "sentence.diagnosis.unschedulable.cause.cpu": (p: P) =>
     `${p.service ?? ""} 正在等待可用資源：沒有機器有足夠的 CPU。`,
   "sentence.diagnosis.unschedulable.cause.memory": (p: P) =>
@@ -223,7 +223,7 @@ export const serverZhTw = {
   "sentence.gap.ingressToHttpRoute.retired": (p: P) =>
     `Ingress ${p.ingress ?? ""} 使用 ${p.class ?? ""}，它的 controller 已停止維護。`,
   "sentence.gap.projectWithoutNetworkPolicy": (p: P) =>
-    `專案 ${p.namespace ?? ""} 沒有 NetworkPolicy ${p.policy ?? ""}，叢集裡任何 Pod 都連得到它的服務。`,
+    `專案 ${p.namespace ?? ""} 沒有 NetworkPolicy ${p.policy ?? ""}，叢集裡任何副本都連得到它的服務。`,
   "sentence.gap.retiredIngressController": (p: P) =>
     `IngressClass ${p.class ?? ""} 的 controller ${p.controller ?? ""} 已停止維護。`,
   "sentence.gap.danglingRoute.noService": (p: P) =>
@@ -237,7 +237,7 @@ export const serverZhTw = {
   "sentence.gap.blockedConnection": (p: P) =>
     `${p.at === "egress" ? `${p.from ?? ""} 的環境變數指向 ${p.to ?? ""}，但 ${p.from ?? ""} 的 NetworkPolicy 不允許連出。` : p.at === "both" ? `${p.from ?? ""} 的環境變數指向 ${p.to ?? ""}，但兩端的 NetworkPolicy 都封鎖了這條連線。` : `${p.from ?? ""} 的環境變數指向 ${p.to ?? ""}，但 ${p.to ?? ""} 的 NetworkPolicy 不允許 ${p.from ?? ""} 連入。`}`,
   "sentence.gap.noNetworkPolicy": (p: P) =>
-    `沒有 NetworkPolicy 保護 ${words(items(p.services))}：叢集裡任何 Pod 都連得到。NetworkPolicy 要叢集的網路外掛（CNI）支援才會生效。${!p.cuts || p.cuts === "none" ? `` : `隔離後也會封鎖${items(p.cuts)[0] === "published" ? ` ` : ``}${words(items(p.cuts).flatMap((item) => (item === "otherNamespaces" ? [`來自其他 Namespace 的連線`] : item === "outside" ? [`連到叢集外的連線`] : item === "published" ? [`NodePort 與 LoadBalancer 的流量`] : item === "connections" ? [`服務之間的一條連線`] : [])))}。`}`,
+    `沒有 NetworkPolicy 保護 ${words(items(p.services))}：叢集裡任何副本都連得到。NetworkPolicy 要叢集的網路外掛（CNI）支援才會生效。${!p.cuts || p.cuts === "none" ? `` : `隔離後也會封鎖${items(p.cuts)[0] === "published" ? ` ` : ``}${words(items(p.cuts).flatMap((item) => (item === "otherNamespaces" ? [`來自其他 Namespace 的連線`] : item === "outside" ? [`連到叢集外的連線`] : item === "published" ? [`NodePort 與 LoadBalancer 的流量`] : item === "connections" ? [`服務之間的一條連線`] : [])))}。`}`,
   "sentence.gap.volumeWithoutBackup": (p: P) => `磁碟區 ${p.claim ?? ""} 沒有備份排程。`,
   "sentence.gap.databaseWithoutBackup": (p: P) => `資料庫 ${p.database ?? ""} 沒有備份排程。`,
   "sentence.incident.componentDown.cause.ingressController": (p: P) =>
@@ -267,7 +267,7 @@ export const serverZhTw = {
   "sentence.incident.nodeNotReady.cause": (p: P) =>
     `${p.status === "Unknown" ? `節點 ${p.node ?? ""} 不再向叢集回報狀態` : `節點 ${p.node ?? ""} 未就緒`}${!p.reason || p.reason === "none" ? `` : `（${p.reason ?? ""}）`}。`,
   "sentence.incident.nodeNotReady.why": (p: P) =>
-    `節點未就緒時不會再啟動新的 Pod。寬限期（預設 5 分鐘）過後，叢集會移除上面的 Pod，讓它們到別處啟動。這個節點上有 ${p.pods ?? ""} 個 Pod，${p.services ?? ""} 個服務有副本在上面。`,
+    `節點未就緒時不會再啟動新的副本。寬限期（預設 5 分鐘）過後，叢集會移除上面的副本，讓它們到別處啟動。這個節點上有 ${p.pods ?? ""} 個副本，${p.services ?? ""} 個服務有副本在上面。`,
   "sentence.incident.nodeNotReady.fix": (p: P) =>
     `檢查 ${p.node ?? ""} 背後的機器：是否開機、網路，以及節點代理程式（kubelet）。如果它無法恢復，就清空這個節點並換掉它。`,
   "sentence.trace.dns.ok": (p: P) => `${p.host ?? ""} 可以解析。`,
@@ -293,7 +293,7 @@ export const serverZhTw = {
   "sentence.trace.controller.down": (p: P) =>
     `Ingress 控制器 ${p.workload ?? ""} 沒有就緒的副本，所以沒有東西處理 ${p.route ?? ""}。`,
   "sentence.trace.certificate.defaultCertificate": (p: P) =>
-    `${p.route ?? ""} 為 ${p.host ?? ""} 啟用 HTTPS，卻沒有指定機密，所以控制器會提供它的預設憑證。`,
+    `${p.route ?? ""} 為 ${p.host ?? ""} 啟用 HTTPS，卻沒有指定機密變數，所以控制器會提供它的預設憑證。`,
   "sentence.trace.certificate.ok": (p: P) =>
     `${p.host ?? ""} 的憑證已簽發${!p.until || p.until === "none" ? `` : `，有效期限到 ${p.until ?? ""}`}。`,
   "sentence.trace.certificate.notReady": (p: P) =>
@@ -303,11 +303,11 @@ export const serverZhTw = {
   "sentence.trace.certificate.pending": (p: P) =>
     `${p.host ?? ""} 的憑證 ${p.certificate ?? ""} 還沒有結果。`,
   "sentence.trace.certificate.unreadable": (p: P) =>
-    `Zeabur 無法讀取專案的機密，因此無法檢查機密 ${p.secret ?? ""} 裡 ${p.host ?? ""} 的憑證。`,
+    `Zeabur 無法讀取專案的機密變數，因此無法檢查機密變數 ${p.secret ?? ""} 裡 ${p.host ?? ""} 的憑證。`,
   "sentence.trace.certificate.notChecked": (p: P) =>
-    `機密 ${p.secret ?? ""} 存有 ${p.host ?? ""} 的憑證，Zeabur 不會進一步檢查。`,
+    `機密變數 ${p.secret ?? ""} 存有 ${p.host ?? ""} 的憑證，Zeabur 不會進一步檢查。`,
   "sentence.trace.certificate.secretMissing": (p: P) =>
-    `${p.route ?? ""} 從機密 ${p.secret ?? ""} 讀取 ${p.host ?? ""} 的憑證，但專案裡沒有這個機密。控制器可能改用預設憑證，Zeabur 無法檢查它。`,
+    `${p.route ?? ""} 從機密變數 ${p.secret ?? ""} 讀取 ${p.host ?? ""} 的憑證，但專案裡沒有這個機密變數。控制器可能改用預設憑證，Zeabur 無法檢查它。`,
   "sentence.trace.route.noStatus": (p: P) =>
     `還沒有任何元件寫入 ${p.route ?? ""} 的狀態，無法得知它是否已生效。`,
   "sentence.trace.route.ok": (p: P) => `${p.route ?? ""} 已生效：控制器已在它的狀態裡寫入位址。`,
@@ -353,7 +353,7 @@ export const serverZhTw = {
   "sentence.diagnosis.unreachable.cause.certificateNotReady": (p: P) =>
     `${p.host ?? ""} 的 HTTPS 連線失敗：憑證 ${p.certificate ?? ""} 尚未簽發${!p.reason || p.reason === "none" ? `` : `（${p.reason ?? ""}）`}。`,
   "sentence.diagnosis.unreachable.why.certificateNotReady": (p: P) =>
-    `cert-manager 簽發憑證後才會把它寫進機密 ${p.secret ?? ""}。在那之前，控制器會改用預設憑證，瀏覽器會拒絕它。`,
+    `cert-manager 簽發憑證後才會把它寫進機密變數 ${p.secret ?? ""}。在那之前，控制器會改用預設憑證，瀏覽器會拒絕它。`,
   "sentence.diagnosis.unreachable.fix.certificateNotReady": (p: P) =>
     `憑證 ${p.certificate ?? ""} 的狀態和事件會說明它為什麼還沒簽發。`,
   "sentence.diagnosis.unreachable.cause.backendPortMissing": (p: P) =>

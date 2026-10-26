@@ -160,7 +160,7 @@ export const en = {
   "refused.see": (what: string) => `Seeing ${what}`,
   "refused.some": "Some of this page",
   "refused.terminal": "Opening a terminal",
-  "refused.reveal": "Showing Secret values",
+  "refused.reveal": "Showing secret values",
   "refused.listThese": "Listing these",
   // Status words
   "status.ready": "Ready",
@@ -299,7 +299,7 @@ export const en = {
   "node.pidPressure.fix":
     "Find the service that starts too many processes, and restart or limit it.",
   "node.networkUnavailable": (n: number, node: string) =>
-    n === 1 ? `${node} has no pod network` : `${n} nodes have no pod network`,
+    n === 1 ? `${node} has no replica network` : `${n} nodes have no replica network`,
   "node.networkUnavailable.why": "Replicas there cannot reach other replicas or services.",
   "node.networkUnavailable.fix": "Check the network plugin on the node.",
   "node.memoryFull": (n: number, node: string, share: string) =>
@@ -387,8 +387,8 @@ export const en = {
   "cluster.allocatable": (allocatable: string) => `${allocatable} allocatable`,
   "cluster.used": (used: string) => `${used} used`,
   "cluster.limits": (limits: string) => `${limits} maximum`,
-  "cluster.podsOf": (placed: string, room: string) => `${placed} of ${room} pods`,
-  "cluster.pods": "Pods",
+  "cluster.podsOf": (placed: string, room: string) => `${placed} of ${room} replicas`,
+  "cluster.pods": "Replicas",
   "cluster.worker": "worker",
   "cluster.kubelet": "kubelet",
   "cluster.skewMixed": "Supported, though its minor version differs from the control plane's.",
@@ -397,8 +397,8 @@ export const en = {
   "cluster.noMetrics": "Install metrics-server to see usage.",
   "cluster.metricsUnavailable": "metrics-server did not respond.",
   "cluster.noUsageYet": "No usage measured yet.",
-  "cluster.partialPods": (n: number) => `Reserved amounts count the first ${n} pods only.`,
-  "cluster.unscheduled": (n: number) => `${n} pods waiting for a node`,
+  "cluster.partialPods": (n: number) => `Reserved amounts count the first ${n} replicas only.`,
+  "cluster.unscheduled": (n: number) => `${n} replicas waiting for a node`,
   "cluster.warnings": "Warnings in the last hour",
   "home.showWarnings": (n: number) => `Show ${plural(n, "warning", "warnings")}`,
   "cluster.noWarnings": "No warnings in the last hour.",
@@ -415,11 +415,11 @@ export const en = {
   "cluster.sourceHelm": "Helm",
   "cluster.sourceOther": "—",
   "cluster.roleReadsSecrets":
-    "This role can read every Secret in the cluster: passwords, keys, and tokens. Grant it only to someone you would trust as a cluster administrator.",
+    "This role can read every secret in the cluster: passwords, keys, and tokens. Grant it only to someone you would trust as a cluster administrator.",
   "cluster.copyRole": "Copy ClusterRole",
   "cluster.whatProjects": "the projects",
   "cluster.whatNodes": "the nodes",
-  "cluster.whatRequests": "what pods reserve",
+  "cluster.whatRequests": "what replicas reserve",
   "cluster.whatUpgrades": "the upgrade plans",
   "cluster.whatUsage": "node usage",
   "cluster.whatWarnings": "the cluster's warnings",
@@ -442,7 +442,7 @@ export const en = {
     share
       ? `${name} reserves the most CPU: ${amount}, ${share} of the cluster.`
       : `${name} reserves the most CPU: ${amount}.`,
-  "clusterUsage.nothingRunning": "No pods are running.",
+  "clusterUsage.nothingRunning": "No replicas are running.",
   "clusterUsage.projectsTotal": (amount: string) => `Projects ${amount}`,
   "clusterUsage.othersTotal": (amount: string) => `Other namespaces ${amount}`,
   "clusterUsage.systemTotal": (amount: string) => `Kubernetes system ${amount}`,
@@ -450,7 +450,7 @@ export const en = {
   "clusterUsage.others": "Other namespaces",
   "clusterUsage.namespaces": "Namespaces",
   "clusterUsage.system": "Kubernetes system",
-  "clusterUsage.pods": (n: number) => plural(n, "pod", "pods"),
+  "clusterUsage.pods": (n: number) => plural(n, "replica", "replicas"),
   "clusterUsage.notMeasured": (n: number) => `${n} not measured yet`,
   "clusterUsage.reserved": (amount: string) => `${amount} reserved`,
   "clusterUsage.ofCluster": (share: string) => `${share} of the cluster`,
@@ -458,11 +458,11 @@ export const en = {
   "clusterUsage.noServices": "No service in this project has usage to show.",
   "clusterUsage.servicesUnreadable": "Zeabur could not read this project's services.",
   "clusterUsage.unknown.not-installed":
-    "Use is unknown: metrics-server is not installed. The rows show what pods reserve.",
+    "Use is unknown: metrics-server is not installed. The rows show what replicas reserve.",
   "clusterUsage.unknown.unavailable":
-    "Use is unknown: metrics-server did not respond. The rows show what pods reserve.",
-  "clusterUsage.unknown.unreadable": "The rows show what pods reserve.",
-  "clusterUsage.whatUsage": "what pods use",
+    "Use is unknown: metrics-server did not respond. The rows show what replicas reserve.",
+  "clusterUsage.unknown.unreadable": "The rows show what replicas reserve.",
+  "clusterUsage.whatUsage": "what replicas use",
   "clusterUsage.whatPods": "what each namespace uses",
   "clusterUsage.whatProjects": "which namespaces are projects",
   "maint.actions": (node: string) => `Actions for ${node}`,
@@ -529,13 +529,13 @@ export const en = {
   "deletion.dataUnknown": "Unable to tell whether its data stays",
   "deletion.backUpFirst": "Back up first",
   "deletion.backUpVolume": (claim: string) => `Back up ${claim} now`,
-  "deletion.toolsPods": "Your tools pods for this project are deleted too",
+  "deletion.toolsPods": "The kubectl terminal you opened in this project is deleted too",
   "deletion.operatorDown": (names: string) =>
     `No operator is running for ${names}, so their cleanup can't run and the project may take a long time to go away`,
   "deletion.stays": "Stays",
   "deletion.staysBackups": "Backups in S3",
   "deletion.resticPassword":
-    "Volume backups in S3 stay, but the restic password that restores them is in a Secret in this project and goes with it. Keep a copy first.",
+    "Volume backups in S3 stay, but the restic password that restores them is in a secret in this project and goes with it. Keep a copy first.",
   "deletion.staysOutside":
     "Everything outside the project, such as other projects and cluster settings",
   "deletion.restore": (action: string) =>
@@ -650,7 +650,7 @@ export const en = {
   "canvas.fit": "Fit to screen",
   "canvas.legend": "About the lines",
   "canvas.legendHint":
-    "Drawn from Kubernetes objects and variable values, not from traffic. Configured connection: an Ingress, or a Secret or ConfigMap both services read. Guessed from variables: a variable's value names the other service's private address (Kubernetes Service).",
+    "Drawn from Kubernetes objects and variable values, not from traffic. Configured connection: an Ingress, or a secret or config file both services read. Guessed from variables: a variable's value names the other service's private address (Kubernetes Service).",
   "architecture.edges": (n: number) => plural(n, "connection", "connections"),
   "quickLook.label": (name: string) => `Quick look: ${name}`,
   "quickLook.open": "Open service page",
@@ -737,7 +737,8 @@ export const en = {
   "builds.logs": "Logs",
   "builds.hideLogs": "Hide logs",
   "builds.step": "Step",
-  "builds.logsGone": "Logs are deleted with the build's pod, ten minutes after the build finishes.",
+  "builds.logsGone":
+    "Logs are deleted with the build's replica, ten minutes after the build finishes.",
   "builds.noLogsYet": "This step has not started yet.",
   "builds.emptyLog": "Nothing logged.",
   "overview.source": "Source",
@@ -808,7 +809,7 @@ export const en = {
   "pod.logsOf": (pod: string) => `Logs of ${pod}`,
   "resources.title": "Resources",
   "resources.hint":
-    "Reserved amounts and maximums from the pod template. Usage needs metrics-server.",
+    "Reserved amounts and maximums from the replica template. Usage needs metrics-server.",
   "resources.container": "Container",
   "resources.cpu": "CPU",
   "resources.memory": "Memory",
@@ -914,7 +915,7 @@ export const en = {
   "nodeShell.action": "Node terminal",
   "nodeShell.actionOn": (node: string) => `Node terminal on ${node}`,
   "nodeShell.what": "Opening a node terminal",
-  "nodeShell.pods": (node: string) => `Terminal pods on ${node}`,
+  "nodeShell.pods": (node: string) => `Terminal replicas on ${node}`,
   "nodeShell.byYou": "opened by you",
   "nodeShell.by": (person: string) => `opened by ${person}`,
   "nodeShell.word.starting": "Starting",
@@ -923,30 +924,30 @@ export const en = {
   "nodeShell.word.deadline": "Ended at its time limit",
   "nodeShell.word.ended": "Ended",
   "nodeShell.openTitle": (node: string) => `Open a node terminal on ${node}`,
-  "nodeShell.removeTitle": "Remove terminal pod",
+  "nodeShell.removeTitle": "Remove terminal replica",
   "nodeShell.open": "Open terminal",
-  "nodeShell.remove": "Remove terminal pod",
+  "nodeShell.remove": "Remove terminal replica",
   "nodeShell.removeLine": (pod: string, node: string) =>
     `Deletes ${pod} from ${node} right away. A terminal still open in it ends.`,
   "nodeShell.openedBy": (person: string) => `${person} opened it.`,
   "nodeShell.root": (node: string) =>
     `This is full root on ${node}'s host: every file, process and network interface. What you do there bypasses Zeabur and Kubernetes permissions, and nothing undoes it.`,
   "nodeShell.lasts": (minutes: number) =>
-    `The terminal pod is removed when you close the terminal, and after ${minutes} minutes at most.`,
+    `The terminal replica is removed when you close the terminal, and after ${minutes} minutes at most.`,
   "nodeShell.firstSession": (minutes: number) =>
-    `If no terminal connects within ${minutes} minutes, the pod ends on its own.`,
+    `If no terminal connects within ${minutes} minutes, the replica ends on its own.`,
   "nodeShell.recorded": "The node records an event with who opened it and when.",
   "nodeShell.exposedTitle": "Others could enter this terminal",
   "nodeShell.exposed": (namespace: string) =>
-    `These role bindings let someone other than a cluster administrator create pods or open terminals in ${namespace}. Remove them, then check again.`,
+    `These role bindings let someone other than a cluster administrator create replicas or open terminals in ${namespace}. Remove them, then check again.`,
   "nodeShell.kubectl": "The same with kubectl",
   "nodeShell.write.create": "add",
   "nodeShell.write.patch": "change",
   "nodeShell.write.delete": "delete",
-  "nodeShell.starting": (node: string) => `Starting the terminal pod on ${node}…`,
+  "nodeShell.starting": (node: string) => `Starting the terminal replica on ${node}…`,
   "nodeShell.ended": "The session ended.",
-  "nodeShell.left": "The session ended, but its terminal pod is still on the node.",
-  "nodeShell.gone": "The session ended and its terminal pod was removed.",
+  "nodeShell.left": "The session ended, but its terminal replica is still on the node.",
+  "nodeShell.gone": "The session ended and its terminal replica was removed.",
 
   // Variables
   "vars.title": "Environment variables",
@@ -963,12 +964,12 @@ export const en = {
   "vars.fromCluster": "Filled in by Kubernetes",
   "vars.reveal": (secret: string) => `Show values in ${secret}`,
   "vars.hide": (secret: string) => `Hide values in ${secret}`,
-  "vars.secretsHint": "About Secret values",
+  "vars.secretsHint": "About secret values",
   "vars.revealHint":
     "Zeabur fetches a value only when you reveal it, and keeps it on this page only.",
-  "vars.revealAll": "Show Secret values",
-  "vars.hideAll": "Hide Secret values",
-  "vars.lockedHint": "Your rights don't let you read Secrets, so their values stay hidden.",
+  "vars.revealAll": "Show secret values",
+  "vars.hideAll": "Hide secret values",
+  "vars.lockedHint": "Your rights don't let you read secrets, so their values stay hidden.",
   "vars.view": "View",
   "vars.list": "List",
   "vars.names": (service: string) => `Points to the service ${service}`,
@@ -1242,7 +1243,7 @@ export const en = {
   "network.isolation": "Other projects",
   "network.isolated":
     "Can't reach this project's services. Services in this project and Zeabur's components still can.",
-  "network.open": "Any pod in the cluster can reach this project's services.",
+  "network.open": "Any replica in the cluster can reach this project's services.",
   "network.isolate": "Isolate",
   "network.allowedHint": (policy: string) =>
     `Can reach every service of this project (NetworkPolicy ${policy}).`,
@@ -1322,7 +1323,7 @@ export const en = {
   "create.empty": "Write the objects as YAML, or insert an example.",
   "create.inOrder": "Created in this order",
   "create.inOrderHint":
-    "ConfigMaps, Secrets, claims and service accounts first, then Services, then workloads, then the rest, so what a workload reads exists when it starts.",
+    "Config files, secrets, disks and service accounts first, then Services, then workloads, then the rest, so what a workload reads exists when it starts.",
   "create.docLine": (document: number, line: number) => `Document ${document}, line ${line}`,
   "create.docLineField": (document: number, line: number, field: string) =>
     `Document ${document}, line ${line}, ${field}`,
@@ -1484,7 +1485,7 @@ export const en = {
   "warn.secretValuesUnknown": (name: string) =>
     `Unable to read ${name}'s values: the diff shows keys only`,
   "warn.configNotRolledBack": (workload: string) =>
-    `${workload} reads ConfigMaps or Secrets: a rollback leaves their contents as they are`,
+    `${workload} reads config files or secrets: a rollback leaves their contents as they are`,
   "warn.storageClassUnknown": (claim: string) =>
     `Unable to read the volume's StorageClass (${claim}): the cluster decides whether it can grow`,
   "warn.readWriteOnceShared": (workload: string) =>
@@ -1557,7 +1558,7 @@ export const en = {
   "confirm.reloaderMayRestart": (names: string, count: number) =>
     `${names} ${count === 1 ? "is" : "are"} set to restart with Reloader; Zeabur can't see whether it runs in this cluster.`,
   "confirm.configReloadOn": (name: string) =>
-    `${name} restarts when a ConfigMap or Secret it reads changes. Nothing restarts now.`,
+    `${name} restarts when a config file or secret it reads changes. Nothing restarts now.`,
   "confirm.securityRestricted": (name: string) =>
     `${name} becomes Strict: it runs as a non-root user and can't gain privileges. Its replicas are replaced.`,
   "confirm.securityBaseline": (name: string) =>
@@ -1586,7 +1587,7 @@ export const en = {
   "security.kube.unset": "No label: the cluster's default",
   "security.kube.strict": "Strict sets",
   "confirm.configReloadOff": (name: string) =>
-    `${name} no longer restarts when its ConfigMaps or Secrets change.`,
+    `${name} no longer restarts when its config files or secrets change.`,
   "confirm.alsoReads": (names: string, object: string, count: number) =>
     `Also affects ${names} (${count === 1 ? "it reads" : "they read"} ${object}).`,
   "confirm.alsoAffects": (names: string) => `Also affects ${names}.`,
@@ -1608,7 +1609,7 @@ export const en = {
   "confirm.removeDomain": (host: string) => `Requests to ${host} no longer reach this project.`,
   "confirm.rollback": (revision: number) =>
     `Template changes made after revision ${revision} are undone.`,
-  "confirm.notRolledBack": "A rollback leaves ConfigMap and Secret contents as they are.",
+  "confirm.notRolledBack": "A rollback leaves config file and secret contents as they are.",
   "confirm.noShrink": "A volume can't shrink after it grows.",
   "confirm.addVolume": (size: string, service: string) => `${service} gets a new ${size} volume.`,
   "confirm.addVolumeIn": (size: string, service: string, container: string) =>
@@ -1619,7 +1620,7 @@ export const en = {
   "confirm.writable": (path: string, service: string) => `Make ${path} writable in ${service}.`,
   "confirm.mount": (service: string) => `Change a mount of ${service}.`,
   "confirm.removeVolume": (service: string, path: string) =>
-    `${service} stops mounting ${path}. The volume and the data on it stay; to free the space, delete its PersistentVolumeClaim under Objects.`,
+    `${service} stops mounting ${path}. The volume and the data on it stay; to free the space, delete its disk under Objects.`,
   "confirm.swapClaim": (service: string, from: string, to: string) =>
     `${service} stops, then starts again with volume ${to} in place of ${from}. It is down for a short time.`,
   "confirm.probeSet.readiness": (check: string, period: number, _failures: number) =>
@@ -1670,7 +1671,7 @@ export const en = {
   "confirm.basicAuth": (route: string) =>
     `Ask for a password on every domain of Ingress ${route}. The cluster keeps only a bcrypt hash of it.`,
   "confirm.basicAuthOff": (route: string) => `Stop asking for a password on Ingress ${route}.`,
-  "confirm.errorPageHtml": "Write the project's error pages to the page server's ConfigMap.",
+  "confirm.errorPageHtml": "Write the project's error pages to the page server's config file.",
   "confirm.pageServer":
     "Deploy the Error pages template to the project as its page server, with these pages.",
   "confirm.template": (template: string) => `Deploy the ${template} template in the project.`,
@@ -1688,8 +1689,8 @@ export const en = {
     `Show the maintenance page on ${host}. The service keeps running.`,
   "confirm.maintenanceOff": (host: string) => `Send visitors of ${host} to the service again.`,
   "confirm.copyS3Keys": (name: string, destination: string) =>
-    `Copy the keys of ${destination} into Secret ${name}.`,
-  "confirm.deployKey": (name: string) => `Create Secret ${name} with the new deploy key.`,
+    `Copy the keys of ${destination} into secret ${name}.`,
+  "confirm.deployKey": (name: string) => `Create secret ${name} with the new deploy key.`,
   "confirm.isolates": (name: string) =>
     `${name} then accepts and sends only what this and other policies allow; the cluster blocks the rest.`,
   "confirm.delete": (name: string) => `Delete ${name}. This can't be undone.`,
@@ -1830,8 +1831,8 @@ export const en = {
   "form.volumeName": "Name",
   "form.statefulVolumes": "A StatefulSet's volumes are set when it is created.",
   "form.advanced": "Advanced",
-  "form.claimName": "Claim name",
-  "form.claimNameHint": "Creates a new claim. The name must not be in use already.",
+  "form.claimName": "Disk name",
+  "form.claimNameHint": "Creates a new disk. The name must not be in use already.",
   "form.accessMode": "Access mode",
   "form.accessModeHint": "Many-node modes need storage that supports them.",
   "ops.managedEdit": (tool: string) => `Managed by ${tool}: change it at its source`,
@@ -1885,6 +1886,10 @@ export const en = {
   "vars.field.memoryRequest": "The reserved memory",
   "vars.field.other": (path: string) => `The replica's ${path}`,
   "kube.details": "Details for Kubernetes users",
+  "kind.Pod": "Replica",
+  "kind.PersistentVolumeClaim": "Disk",
+  "kind.Secret": "Secret",
+  "kind.ConfigMap": "Config file",
   "vars.add": "Add variable",
   "vars.name": "Name",
   "vars.value": "Value",
@@ -1892,13 +1897,13 @@ export const en = {
   "data.addKey": "Add key",
   "data.key": "Key",
   "data.readers": "Read by",
-  "reload.switch": "Restart when its ConfigMaps or Secrets change",
+  "reload.switch": "Restart when its config files or secrets change",
   "reload.hint":
-    "Changing this service's variables, image or resources redeploys it right away. A change to a ConfigMap or Secret it uses only takes effect after a restart; turn this on to restart automatically.",
+    "Changing this service's variables, image or resources redeploys it right away. A change to a config file or secret it uses only takes effect after a restart; turn this on to restart automatically.",
   "reload.on":
-    "On: a change to a ConfigMap or Secret it uses restarts it, whoever makes the change.",
+    "On: a change to a config file or secret it uses restarts it, whoever makes the change.",
   "restart.rule":
-    "Changes to variables, the image or resources redeploy right away. A change to a ConfigMap or Secret takes effect when the service restarts, unless it restarts on such changes automatically.",
+    "Changes to variables, the image or resources redeploy right away. A change to a config file or secret takes effect when the service restarts, unless it restarts on such changes automatically.",
   "reload.notInstalled":
     "Reloader isn't installed in this cluster, so nothing restarts yet. Ask a cluster administrator to install Stakater Reloader.",
   "reload.stopped":
@@ -2077,14 +2082,14 @@ export const en = {
   "backups.scheduledOf": (scheduled: number, total: number) => `${scheduled}/${total} scheduled`,
   "backups.volume.set": "Back up this volume",
   "backups.volume.body":
-    "K8up copies this volume's files to S3-compatible storage on a schedule. The keys and the repository password stay in a Secret of this project, and the backups keep running without Zeabur.",
+    "K8up copies this volume's files to S3-compatible storage on a schedule. The keys and the repository password stay in a secret of this project, and the backups keep running without Zeabur.",
   "backups.volume.folderHint": (folder: string) => `${folder} when left empty.`,
   "backups.volume.keepLast": "Keep the newest",
   "backups.volume.keepDaily": "Keep daily, in days",
   "backups.volume.keepWeekly": "Keep weekly, in weeks",
   "backups.volume.problem.keep": "Whole numbers: 1 to 365 days, up to 100 newest, up to 520 weeks.",
   "backups.volume.password": (secret: string) =>
-    `Zeabur makes a repository password and keeps it in the Secret ${secret}. Without it the backups can't be read, so keep a copy somewhere else.`,
+    `Zeabur makes a repository password and keeps it in the secret ${secret}. Without it the backups can't be read, so keep a copy somewhere else.`,
   "backups.volume.root":
     "The service runs as root, so its backups do too and can read every file of the volume.",
   "backups.volume.user": (user: number) =>
@@ -2092,12 +2097,12 @@ export const en = {
   "backups.volume.imageUser":
     "The service sets no user, so backups run as K8up's non-root user and meet Strict security. They skip files that only the service's user may read: set a user in the service's security settings to include them.",
   "backups.volume.restricted":
-    "This project allows only Strict services and refuses pods that run as root, but backups of this service run as root. Set the service to Strict, or ask an administrator to let the project allow Compatible services.",
+    "This project allows only Strict services and refuses replicas that run as root, but backups of this service run as root. Set the service to Strict, or ask an administrator to let the project allow Compatible services.",
   "backups.volume.openSecurity": "Open security settings",
   "backups.volume.stop": "Stop backups",
   "backups.volume.planStop": (claim: string) => `Stop backups of ${claim}`,
   "backups.volume.stopSaid": (claim: string, secret: string) =>
-    `K8up stops backing up ${claim}. The backups taken stay in the bucket, and Secret ${secret} keeps the password that restores them.`,
+    `K8up stops backing up ${claim}. The backups taken stay in the bucket, and secret ${secret} keeps the password that restores them.`,
   "backups.volume.long": "K8up can't select this volume: its name is longer than 63 characters.",
   "backups.volume.notInstalled":
     "Volume backups need K8up, which this cluster doesn't have. An administrator can install it.",
@@ -2293,7 +2298,7 @@ export const en = {
   "clusterBackups.copy.services": (source: string, into: string, example: string) =>
     `Values that use these services' addresses, such as ${example}.${source}.svc, still reach ${source}. Once the restore is done, "Rewrite addresses" points them at ${into}:`,
   "clusterBackups.copy.secrets": (source: string) =>
-    `These Secrets may also hold addresses in ${source}. "Rewrite addresses" reads and changes them too:`,
+    `These secrets may also hold addresses in ${source}. "Rewrite addresses" reads and changes them too:`,
   "clusterBackups.copy.unread": (reason: string) =>
     `Zeabur couldn't read what the backup holds, so it can't list it here: ${reason}`,
   "clusterBackups.move.action": "Move domains",
@@ -2319,7 +2324,7 @@ export const en = {
   "clusterBackups.rewrite.note": (source: string, into: string) =>
     `Values that name ${source}.svc will name ${into}.svc.`,
   "clusterBackups.rewrite.none": (source: string) =>
-    `No variable, ConfigMap or Secret in the new project names ${source}.`,
+    `No variable, config file or secret in the new project names ${source}.`,
   "clusterBackups.thing.Restore": (name: string) => `restore ${name}, which starts now`,
   "clusterBackups.plan.location": "Set where backups go",
   "clusterBackups.plan.schedule": "Set the backup schedule",
@@ -2330,7 +2335,7 @@ export const en = {
   "clusterBackups.plan.patch": (what: string) => `Changes ${what}.`,
   "clusterBackups.plan.delete": (what: string) => `Removes ${what}.`,
   "clusterBackups.plan.nothing": "Nothing to change.",
-  "clusterBackups.plan.keysHidden": "The keys go into a Secret and aren't shown here.",
+  "clusterBackups.plan.keysHidden": "The keys go into a secret and aren't shown here.",
   "clusterBackups.thing.Secret": "the storage keys",
   "clusterBackups.thing.BackupStorageLocation": "where backups go",
   "clusterBackups.thing.Schedule": "the schedule",
@@ -2395,7 +2400,7 @@ export const en = {
   "notify.required": "Required.",
   "notify.chatIdProblem": "Enter a number, such as -1001234567.",
   "notify.secretNote":
-    "URLs and tokens go into a Secret in this namespace. Zeabur doesn't show them again.",
+    "URLs and tokens go into a secret in this namespace. Zeabur doesn't show them again.",
   "notify.status.active": "Active",
   "notify.status.rejected": "Rejected",
   "notify.status.waiting": "Waiting",
@@ -2457,7 +2462,7 @@ export const en = {
   "notify.plan.patch": (what: string) => `Changes ${what}.`,
   "notify.plan.delete": (what: string) => `Deletes ${what}.`,
   "notify.plan.nothing": "Nothing to change.",
-  "notify.plan.hidden": "The URL and tokens go into a Secret and aren't shown here.",
+  "notify.plan.hidden": "The URL and tokens go into a secret and aren't shown here.",
   "notify.plan.testHow":
     "The test is a Job that does nothing for up to two minutes. The alert rules see it and send a test alert to this channel only.",
   "notify.thing.channel": (name: string) => `channel ${name}`,
@@ -2519,7 +2524,7 @@ export const en = {
   "add.variables": "Variables",
   "add.variablesHint": "KEY=value lines, as in a .env file.",
   "add.variablesBad": (lines: string) => `Not KEY=value: line ${lines}.`,
-  "add.variablesSecret": (name: string) => `Keep the values in Secret ${name}`,
+  "add.variablesSecret": (name: string) => `Keep the values in secret ${name}`,
   "add.volume": "Volume",
   "add.volumePath": "Mount path",
   "add.volumeSize": "Volume size",
@@ -2534,7 +2539,7 @@ export const en = {
   "add.registryPassword": "Password",
   "add.problem.registry": "Fill in the registry, username and password.",
   "add.noSecrets":
-    "Your role can't create Secrets in this project: variables go in the Deployment, and private registries aren't offered.",
+    "Your role can't create secrets in this project: variables go in the Deployment, and private registries aren't offered.",
   "add.noVolume": "Your role can't add volumes in this project.",
   "add.editYaml": "Edit as YAML",
   "add.planImage": (name: string) => `Deploy ${name}`,
@@ -2579,7 +2584,7 @@ export const en = {
   "add.templateLowCpu": (use: string, free: string) =>
     `The cluster is low on CPU for it: it needs ${use}, and ${free} is free. Make room or add a node first.`,
   "add.templateGenerated": (secrets: string) =>
-    `Passwords and keys are generated in your browser and kept in Secret ${secrets}.`,
+    `Passwords and keys are generated in your browser and kept in secret ${secrets}.`,
   "add.templateInputEmpty": "Fill this in.",
   "add.templateInputInvalid": (pattern: string) =>
     `Doesn't match the expected format (${pattern}).`,
@@ -2647,7 +2652,7 @@ export const en = {
   "add.composeFinding.dockerSocket": (source: string) =>
     `${source} isn't mounted: the Docker socket controls the whole node, and nodes may not run Docker.`,
   "add.composeFinding.hostPath": (source: string, target: string) =>
-    `${source} isn't mounted at ${target}: it is a folder on the Docker host. Put its files in a volume or a ConfigMap after import.`,
+    `${source} isn't mounted at ${target}: it is a folder on the Docker host. Put its files in a volume or a config file after import.`,
   "add.composeFinding.healthcheck":
     "healthcheck is left out: Zeabur checks that the first port accepts connections. Change the check in Settings.",
   "add.composeFinding.build": (image: string) =>
@@ -2694,7 +2699,7 @@ export const en = {
   "add.githubAccess": "Read through the cluster's GitHub App. Nothing else to set up.",
   "add.problem.githubRepository": "Pick a repository.",
   "add.access.noSecrets":
-    "Your role can't add Secrets in this project, so only public repositories work.",
+    "Your role can't add secrets in this project, so only public repositories work.",
   "add.deployKeyMake": "Create deploy key",
   "add.deployKeyPublic": "Public key",
   "add.deployKeyAdd": "Add this key to the repository's deploy keys, without write access.",
@@ -2841,7 +2846,7 @@ export const en = {
   "db.delete.made":
     "Also deletes the passwords, backup settings and other objects Zeabur made for it. Backups already in the bucket stay.",
   "db.delete.kept": (name: string, by: string) =>
-    `Keeps the Secret ${name}, which ${by} still uses.`,
+    `Keeps the secret ${name}, which ${by} still uses.`,
   "db.delete.unlisted": (label: string) =>
     `Zeabur could not list everything it made for this database, so some objects may stay. Remove them with kubectl delete -l ${label}.`,
   "db.settings": "Settings of this database",
@@ -2887,16 +2892,16 @@ export const en = {
   "connect.extras": (names: string) => `Also add ${names}`,
   "connect.adds": "Variables added",
   "connect.note.postgresql": (secret: string) =>
-    `The values stay in Secret ${secret}; the service only points to them.`,
+    `The values stay in secret ${secret}; the service only points to them.`,
   "connect.note.url": (secret: string, url: string, password: string) =>
-    `The password stays in Secret ${secret}; ${url} takes it from ${password} when the service starts.`,
+    `The password stays in secret ${secret}; ${url} takes it from ${password} when the service starts.`,
   "connect.taken": (name: string, service: string) => `${service} already has ${name}.`,
   "connect.disconnect": "Disconnect",
   "connect.actionsFor": (name: string) => `Actions for ${name}`,
   "connect.disconnectTitle": (service: string, database: string) =>
     `Disconnect ${service} from ${database}`,
   "connect.disconnectNote": (database: string, secret: string) =>
-    `Only the service's variables are removed. ${database} and its Secret ${secret} stay.`,
+    `Only the service's variables are removed. ${database} and its secret ${secret} stay.`,
   "connect.noApp": (database: string) =>
     `${database} has no app user with a generated password, so it cannot be connected here. Databases created in Zeabur have one.`,
   "connect.noDatabases": "No database in this project can be connected.",
@@ -2906,7 +2911,7 @@ export const en = {
   "connect.none": "Not connected to a service yet.",
   "connect.bucket": "Bucket",
   "connect.note.s3": (secret: string) =>
-    `The keys stay in Secret ${secret}; the service only points to them.`,
+    `The keys stay in secret ${secret}; the service only points to them.`,
   "connect.noKey": (store: string) =>
     `${store} has no access key that Zeabur made, so it cannot be connected here. Object storage created in Zeabur has one.`,
   "s3.title": "Object storage",
@@ -2967,8 +2972,8 @@ export const en = {
   "db.uri": "Connection string",
   "db.reveal": "Reveal",
   "db.hide": "Hide",
-  "db.inSecret": (secret: string) => `In Secret ${secret}`,
-  "db.revealFailed": "Could not read the Secret.",
+  "db.inSecret": (secret: string) => `In secret ${secret}`,
+  "db.revealFailed": "Could not read the secret.",
   "db.commands": "Commands",
   "db.command.describe": "The database object",
   "db.command.shell": "A shell in the database",
@@ -2977,7 +2982,7 @@ export const en = {
   "db.backup.noRun": "No backup yet",
   "db.backup.setUp": "Set up backups",
   "db.backup.setUpBody":
-    "Backups go to an S3-compatible bucket you provide. The keys are kept as a Secret in this project.",
+    "Backups go to an S3-compatible bucket you provide. The keys are kept as a secret in this project.",
   "githubApp.title": "GitHub App",
   "githubApp.body":
     "Once it is set up, project members pick a GitHub repository to deploy, and every push builds on its own. No deploy keys or webhooks to set up.",
@@ -3017,7 +3022,7 @@ export const en = {
   "githubApp.plan.grants": "Updates which projects Zeabur Builder lets use the installation.",
   "githubApp.plan.project": (project: string) =>
     `Updates the repositories ${project} can pick from.`,
-  "githubApp.plan.keysHidden": "The private key goes into a Secret and isn't shown here.",
+  "githubApp.plan.keysHidden": "The private key goes into a secret and isn't shown here.",
   "githubApp.warning.replacesApp":
     "This replaces the cluster's current GitHub App. Services built with the old App stop picking up new commits until you open the new App to their projects.",
   "githubApp.warning.noWebhook":
@@ -3041,7 +3046,7 @@ export const en = {
   "s3d.plan.keptUnknown": (copies: string) =>
     `${copies} do not name their keys, so they keep the old keys.`,
   "s3d.plan.unsearched":
-    "You cannot list Secrets in every namespace, so copies of these keys elsewhere keep the old keys.",
+    "You cannot list secrets in every namespace, so copies of these keys elsewhere keep the old keys.",
   "s3d.add": "Add destination",
   "s3d.plan.save": (name: string) => `Save S3 destination ${name}`,
   "s3d.plan.remove": (name: string) => `Remove S3 destination ${name}`,
@@ -3051,7 +3056,7 @@ export const en = {
   "s3d.copied": (name: string) =>
     `The plan copies the keys of ${name} here. New keys saved to ${name} go to this copy too.`,
   "s3d.denied": (namespace: string) =>
-    `You may not read the keys (Secrets in ${namespace}). Enter them yourself.`,
+    `You may not read the keys (secrets in ${namespace}). Enter them yourself.`,
   "s3d.from": (name: string) => `Keys copied from ${name}`,
   "s3d.none":
     "Buckets in the cluster's S3 destinations can be picked here, without typing their keys.",
@@ -3075,7 +3080,7 @@ export const en = {
   "db.backup.said": (name: string, weekly: boolean, where: string) =>
     `Back up ${name} ${weekly ? "every Sunday" : "every day"} at 03:00 UTC to ${where}.`,
   "db.backup.saidKeep": (days: number) => `Each backup is kept for ${plural(days, "day", "days")}.`,
-  "db.backup.saidKeys": (secret: string) => `The access keys are saved as Secret ${secret}.`,
+  "db.backup.saidKeys": (secret: string) => `The access keys are saved as secret ${secret}.`,
   "db.backup.saidRestart": (name: string) => `${name} restarts to start backing up.`,
   "db.backup.saidNow": (name: string, where: string) => `Back up ${name} to ${where} now.`,
   "db.backup.now": "Back up now",
@@ -3133,7 +3138,7 @@ export const en = {
   "db.restore.asOf":
     "The new database holds the data as of the backup, not what was written after it.",
   "db.restore.copiedSecret": (from: string, into: string) =>
-    `The backup holds the passwords in ${from}, so the new database gets its own Secret ${into} with the same values. It keeps working after the original is deleted.`,
+    `The backup holds the passwords in ${from}, so the new database gets its own secret ${into} with the same values. It keeps working after the original is deleted.`,
   "db.restored.from": (name: string, time: string) => `Restored from ${name}'s backup of ${time}`,
   "db.restored.copy": (name: string, time: string) =>
     `${name} was restored from this database's backup of ${time}`,
@@ -3258,7 +3263,7 @@ export const en = {
   "settings.storeWho": "Usually only cluster administrators can change this.",
   "settings.storeWhereLabel": "Where this is kept",
   "settings.storeWhere": (namespace: string) =>
-    `Kept in the ConfigMap zeabur-settings in the namespace ${namespace}. Anyone who can change that ConfigMap can change this setting.`,
+    `Kept in the config file zeabur-settings in the namespace ${namespace}. Anyone who can change that config file can change this setting.`,
   "settings.storeDenied": "You can't change it.",
   "settings.storeLocal":
     "Zeabur runs on this computer and keeps no settings. Start it with --metrics-service namespace/name:port to use another store.",
@@ -3428,9 +3433,9 @@ export const en = {
   "roles.developer": "Developer",
   "roles.viewer": "Viewer",
   "roles.developerHint":
-    "Developers deploy, change variables, restart, read logs and open terminals, and can read Secret values.",
+    "Developers deploy, change variables, restart, read logs and open terminals, and can read secret values.",
   "roles.viewerHint":
-    "Viewers see status and events. They can't read logs, change anything, open a terminal or read Secret values.",
+    "Viewers see status and events. They can't read logs, change anything, open a terminal or read secret values.",
   "roles.filter": "Filter projects",
   "roles.noProjects": "There are no projects yet.",
   "roles.noMatch": "No projects match.",
@@ -3660,12 +3665,12 @@ export const en = {
   "buildOptions.hint":
     "Where in the repository Zeabur Builder builds from, and the variables only the build can read.",
   "buildOptions.none": "No build variables yet. Add KEY=value lines below.",
-  "buildOptions.fromSecret": (secret: string) => `Value in Secret ${secret}`,
+  "buildOptions.fromSecret": (secret: string) => `Value in secret ${secret}`,
   "buildOptions.literal": "Value written in the Build",
   "buildOptions.remove": "Remove",
   "buildOptions.add": "Add or replace",
   "buildOptions.addHint": (secret: string) =>
-    `KEY=value lines. The values go to Secret ${secret}; the build reads them as secrets and does not keep them in the image.`,
+    `KEY=value lines. The values go to secret ${secret}; the build reads them as secrets and does not keep them in the image.`,
   "part.build": "Build",
   "part.health-checks": "Health checks",
   "part.security": "Security",
@@ -3741,7 +3746,7 @@ export const en = {
   "domainCert.planTitle": (host: string) => `Change the certificate of ${host}`,
   "domainCert.lead": "Choose who signs the HTTPS certificate, or upload your own.",
   "domainCert.nowIssuer": (issuer: string) => `Signed by cert-manager (${issuer}).`,
-  "domainCert.nowOwn": (secret: string) => `Uses the certificate in Secret ${secret}.`,
+  "domainCert.nowOwn": (secret: string) => `Uses the certificate in secret ${secret}.`,
   "domainCert.nowNone": "No HTTPS certificate yet.",
   "domainCert.expires": (date: string) => `Expires on ${date}.`,
   "domainCert.from": "Certificate",
@@ -3763,7 +3768,7 @@ export const en = {
   "domainCert.certificateHint": "The certificate first, then any intermediate certificates.",
   "domainCert.key": "Private key (PEM)",
   "domainCert.keyHint":
-    "Paste an unencrypted key. Zeabur stores it in a Secret and never shows it again.",
+    "Paste an unencrypted key. Zeabur stores it in a secret and never shows it again.",
   "domainCert.badCert": "Paste a PEM certificate that starts with -----BEGIN CERTIFICATE-----",
   "domainCert.badKey": "Paste a PEM private key that starts with -----BEGIN PRIVATE KEY-----",
   "domainCert.upload": "Upload file",
@@ -3905,9 +3910,9 @@ export const en = {
   "domainPages.default.retry": "Please try again in a few minutes.",
   "domainPages.kube.server": "Server",
   "domainPages.kube.serverValue": (name: string) =>
-    `Service ${name} and its ConfigMap, found by label zeabur.com/page-server`,
+    `Service ${name} and its config file, found by label zeabur.com/page-server`,
   "domainPages.kube.serverNew":
-    "Error pages template: Deployment, Service, ConfigMaps and NetworkPolicy error-pages, labelled zeabur.com/page-server",
+    "Error pages template: Deployment, Service, config files and NetworkPolicy error-pages, labelled zeabur.com/page-server",
   "domainPages.kube.errors": "Error pages",
   "domainPages.kube.maintenance": "Maintenance",
   "domainPages.kube.maintenanceIngress": (route: string) =>
@@ -3942,7 +3947,7 @@ export const en = {
     "A LoadBalancer Service. On K3s, and on RKE2 with ServiceLB turned on (as Zeabur's installer sets it up), ServiceLB listens on the port on every node.",
   "ip.title": "IP limits",
   "ip.about":
-    "Choose which addresses can open this service's domains, and which addresses its pods can connect to.",
+    "Choose which addresses can open this service's domains, and which addresses its replicas can connect to.",
   "ip.noLimit": "No limit",
   "ip.limited": "Limited",
   "ip.some": "Limited on some domains",
@@ -3951,7 +3956,7 @@ export const en = {
   "ip.in.only": (list: string) => `Only ${list}`,
   "ip.in.noDomain": "Add a domain first.",
   "ip.in.gateway": "Domains on a Gateway can't be limited here.",
-  "ip.out.title": "Where its pods can connect",
+  "ip.out.title": "Where its replicas can connect",
   "ip.out.only": (list: string) => `Only ${list}, this project and DNS`,
   "ip.out.none": "Only this project and DNS",
   "ip.edit": "Edit",
@@ -3982,7 +3987,7 @@ export const en = {
     "Variables that several services read. A service reads new values when it restarts.",
   "shared.secret": "Secret",
   "shared.plain": "Plain text",
-  "shared.secretHint": "Values stay hidden until someone allowed to read Secrets shows them.",
+  "shared.secretHint": "Values stay hidden until someone allowed to read secrets shows them.",
   "shared.plainHint": "Anyone who can see the project can read the values.",
   "shared.usedBy": "Used by",
   "shared.unused": "No service uses it yet.",
@@ -4288,7 +4293,7 @@ export const en = {
   "files.roleLabel": "Role and RoleBinding",
   "files.noToolsTitle": "This image has no tar.",
   "files.noToolsBody":
-    "Files are read and written with tar, as kubectl cp does, and distroless images leave it out. The volumes below come from the pod spec.",
+    "Files are read and written with tar, as kubectl cp does, and distroless images leave it out. The volumes below come from the replica spec.",
   "files.addDebugBody":
     "A debug container (busybox) can be added to this replica to read its volumes, not the image's own files. It stays until the replica is replaced.",
   "files.addDebug": "Add a debug container",
@@ -4301,15 +4306,15 @@ export const en = {
   "files.what": "Kind",
   "files.keeps": "Kept",
   "files.part": "(part)",
-  "files.kind.claim": "Claim",
-  "files.kind.configMap": "ConfigMap",
+  "files.kind.claim": "Disk",
+  "files.kind.configMap": "Config file",
   "files.kind.secret": "Secret",
   "files.kind.emptyDir": "Scratch",
   "files.kind.image": "Image",
   "files.kind.other": "Volume",
-  "files.kindHint.claim": "A PersistentVolumeClaim: kept when replicas are replaced.",
-  "files.kindHint.configMap": "Files from a ConfigMap. Kubernetes always mounts it read-only.",
-  "files.kindHint.secret": "Files from a Secret. Kubernetes always mounts it read-only.",
+  "files.kindHint.claim": "A disk: kept when replicas are replaced.",
+  "files.kindHint.configMap": "Files from a config file. Kubernetes always mounts it read-only.",
+  "files.kindHint.secret": "Files from a secret. Kubernetes always mounts it read-only.",
   "files.kindHint.emptyDir":
     "An emptyDir: kept while the replica runs, deleted when it is replaced.",
   "files.kindHint.image": "The image's own files, outside any volume.",
@@ -4341,9 +4346,9 @@ export const en = {
   "files.shownOfHint": (limit: number) =>
     `A folder lists at most ${limit.toLocaleString("en")} entries. Filter by name to find the rest; the filter runs in the container.`,
   "files.configMapNotice": (name: string) =>
-    `These files are the keys of ConfigMap ${name}. Change them in its editor.`,
+    `These files are the keys of config file ${name}. Change them in its editor.`,
   "files.secretNotice": (name: string) =>
-    `These files are the keys of Secret ${name}. Their contents stay hidden here.`,
+    `These files are the keys of secret ${name}. Their contents stay hidden here.`,
   "files.edit": (name: string) => `Edit ${name}`,
   "files.reveal": (name: string) => `Reveal in ${name}`,
   "files.hidden": "hidden",
@@ -4388,12 +4393,12 @@ export const en = {
   "sentence.files.imageUnreachable": (p: P) =>
     `${p.path} is in the image's own files, which the debug container doesn't reach.`,
   "sentence.files.imageUnreachable.fix": () => "Only the volumes can be read through it.",
-  "sentence.files.secret": (p: P) => `This file is in Secret ${p.secret}'s volume.`,
-  "sentence.files.secret.fix": () => "Read its value in the Secret's editor, after revealing it.",
-  "sentence.files.configMapReadOnly": (p: P) => `These files come from ConfigMap ${p.object}.`,
-  "sentence.files.configMapReadOnly.fix": () => "Change them in the ConfigMap's editor.",
-  "sentence.files.secretReadOnly": (p: P) => `These files come from Secret ${p.object}.`,
-  "sentence.files.secretReadOnly.fix": () => "Change them in the Secret's editor.",
+  "sentence.files.secret": (p: P) => `This file is in secret ${p.secret}'s volume.`,
+  "sentence.files.secret.fix": () => "Read its value in the secret's editor, after revealing it.",
+  "sentence.files.configMapReadOnly": (p: P) => `These files come from config file ${p.object}.`,
+  "sentence.files.configMapReadOnly.fix": () => "Change them in the config file's editor.",
+  "sentence.files.secretReadOnly": (p: P) => `These files come from secret ${p.object}.`,
+  "sentence.files.secretReadOnly.fix": () => "Change them in the secret's editor.",
   "sentence.databases.exportFailed": (p: P) => `The dump did not start: ${p.detail}`,
   "sentence.databases.exportFailed.fix": () =>
     "Check that the database is running, then try again.",

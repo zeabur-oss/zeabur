@@ -19,6 +19,7 @@ import { Problem } from "@/components/problem"
 import { permission, Refused, RefusedSome } from "@/components/refused"
 import { Button, buttonVariants } from "@zeabur/design-system/components/button"
 import { useT } from "@/i18n"
+import { kindName } from "@/i18n/kind-name"
 import { parseObjectKey } from "@/lib/objects"
 import { pinnedKinds, togglePinnedKind } from "@/lib/stores"
 import { cn } from "@/lib/utils"
@@ -227,7 +228,9 @@ function ObjectList({
   const rows: Row[] = []
   for (const kind of shown) {
     const key = kindKey(kind)
-    const kindMatches = !needle || `${kind.kind} ${kind.group}`.toLowerCase().includes(needle)
+    const kindMatches =
+      !needle ||
+      `${kind.kind} ${kindName(t, kind.kind)} ${kind.group}`.toLowerCase().includes(needle)
     const matching = kind.items.filter((o) => kindMatches || o.name.toLowerCase().includes(needle))
     if (!kindMatches && matching.length === 0) continue
     const refused = refusedBy.get(resourceKey(kind))
@@ -376,7 +379,7 @@ function ObjectList({
                       </span>
                       {row.object.ownerKind ? (
                         <span className="hidden type-meta text-muted-foreground sm:inline">
-                          {t("objects.owner", row.object.ownerKind)}
+                          {t("objects.owner", kindName(t, row.object.ownerKind))}
                         </span>
                       ) : null}
                       <Ago iso={row.object.created} className="type-meta text-muted-foreground" />
@@ -430,6 +433,7 @@ function KindRow({
 }) {
   const t = useT()
   const { kind } = row
+  const plain = kindName(t, kind.kind)
   const denied = kind.access === "denied"
   const readable = !kind.listed && !denied
   const label = (
@@ -439,10 +443,11 @@ function KindRow({
       ) : (
         <CaretRightIcon className="size-3 shrink-0 text-muted-foreground" aria-hidden="true" />
       )}
-      <span className="text-sm font-medium" translate="no">
-        {kind.kind}
+      <span className="text-sm font-medium" translate={plain === kind.kind ? "no" : undefined}>
+        {plain}
       </span>
       <span className="truncate type-meta text-muted-foreground" translate="no">
+        {plain === kind.kind ? "" : `${kind.kind} `}
         {kind.group ? `${kind.group}/${kind.version}` : kind.version}
       </span>
     </>
@@ -454,7 +459,7 @@ function KindRow({
           type="button"
           onClick={onLoad}
           disabled={row.loading}
-          aria-label={t("objects.load", kind.kind)}
+          aria-label={t("objects.load", plain)}
           className="flex min-w-0 flex-1 items-center gap-2 text-left outline-none hover:underline"
         >
           {label}
@@ -476,8 +481,8 @@ function KindRow({
       <button
         type="button"
         aria-pressed={pinned}
-        aria-label={pinned ? t("objects.unpin", kind.kind) : t("objects.pin", kind.kind)}
-        title={pinned ? t("objects.unpin", kind.kind) : t("objects.pin", kind.kind)}
+        aria-label={pinned ? t("objects.unpin", plain) : t("objects.pin", plain)}
+        title={pinned ? t("objects.unpin", plain) : t("objects.pin", plain)}
         onClick={() => togglePinnedKind(row.key)}
         className={cn(
           "-mr-1 rounded p-1 outline-none hover:bg-muted",

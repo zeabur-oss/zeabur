@@ -29,6 +29,7 @@ import {
 } from "@zeabur/design-system/components/collapsible"
 import { Skeleton } from "@zeabur/design-system/components/skeleton"
 import { useT } from "@/i18n"
+import { kindName } from "@/i18n/kind-name"
 import { lastKnown, rememberKnown } from "@/lib/last-known"
 import { serviceLink } from "@/lib/place"
 import { originOf, originRank, type Origin } from "@/model/origin"
@@ -648,7 +649,7 @@ function WarningsSection({ adopted }: { adopted: ProjectItem[] }) {
                           className="shrink-0 whitespace-nowrap type-meta text-muted-foreground"
                           translate="no"
                         >
-                          {regarding.kind}
+                          {kindName(t, regarding.kind)}
                         </span>
                       ) : null}
                     </span>

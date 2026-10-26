@@ -21,6 +21,7 @@ import { SearchRow } from "@/components/shell/search-row"
 import { ProjectSwitcher } from "@/components/shell/switchers"
 import { StatusDot, StatusPill, useStatusWord } from "@/components/status"
 import { useT } from "@/i18n"
+import { kindName } from "@/i18n/kind-name"
 import type { Icon } from "@/lib/icon"
 import { addressOf, objectKey } from "@/lib/objects"
 import {
@@ -435,7 +436,7 @@ function OtherObjects({ project, data }: { project: string; data: Project }) {
                 {t("resource.unused")}
               </StatusPill>
             ) : (
-              <span>{r.kind}</span>
+              <span>{kindName(t, r.kind)}</span>
             )
           }
         >

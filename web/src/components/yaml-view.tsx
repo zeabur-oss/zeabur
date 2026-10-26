@@ -10,6 +10,7 @@ import { Skeleton } from "@zeabur/design-system/components/skeleton"
 import { Tooltip } from "@zeabur/design-system/components/tooltip"
 import { YamlBlock } from "@/components/yaml"
 import { useT } from "@/i18n"
+import { kindName } from "@/i18n/kind-name"
 import { rightOfResource, type Gate } from "@/model/rights"
 
 const YamlEditor = lazy(() =>
@@ -69,7 +70,7 @@ export function YamlView({
       : undefined
   const planDeletion = () =>
     deleter.plan({
-      title: t("title.delete", kind ?? address.resource, address.name),
+      title: t("title.delete", kind ? kindName(t, kind) : address.resource, address.name),
       changes: [
         {
           op: "delete",

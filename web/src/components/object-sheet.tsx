@@ -20,6 +20,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@zeabur/design-system/components/tabs"
 import { YamlView } from "@/components/yaml-view"
 import { useT } from "@/i18n"
+import { kindName } from "@/i18n/kind-name"
 
 export function ObjectSheet({
   project,
@@ -46,6 +47,7 @@ export function ObjectSheet({
               className="ml-2 shrink-0 type-meta font-normal text-muted-foreground"
               translate="no"
             >
+              {kind && kindName(t, kind) !== kind ? `${kindName(t, kind)} · ` : ""}
               {kind ?? address.resource}
               {address.group ? ` ${address.group}` : ""}
             </span>

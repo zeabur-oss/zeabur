@@ -28,6 +28,7 @@ import { Input } from "@zeabur/design-system/components/input"
 import { Spinner } from "@zeabur/design-system/components/spinner"
 import { Textarea } from "@zeabur/design-system/components/textarea"
 import { useT } from "@/i18n"
+import { kindName } from "@/i18n/kind-name"
 import { useScrollOnce } from "@/lib/in-view"
 import { addressOf } from "@/lib/objects"
 import { cn } from "@/lib/utils"
@@ -101,7 +102,7 @@ export function DataEditor({
     defaultValues: blank,
     onSubmit: ({ value }) => {
       const staged = planner.plan({
-        title: t("title.data", kind, name),
+        title: t("title.data", kindName(t, kind), name),
         changes: [{ op: "data", kind, name, changes: changesOf(value) }],
         service,
       })

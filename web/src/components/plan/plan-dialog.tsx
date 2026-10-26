@@ -46,6 +46,7 @@ import { Input } from "@zeabur/design-system/components/input"
 import { Label } from "@zeabur/design-system/components/label"
 import { YamlDiff } from "@/components/yaml"
 import { useI18n, useT, writeSentence, type Translate } from "@/i18n"
+import { kindName } from "@/i18n/kind-name"
 import { cn } from "@/lib/utils"
 import { toolNotes, type Skipped, type ToolNote } from "@/model/managed"
 import {
@@ -670,7 +671,7 @@ function warningsSaid(t: Translate, warnings: Schemas["PlanWarning"][]): Said[] 
       return [
         namedText(
           t,
-          w.objects.map((o) => `${o.kind} ${o.name}`),
+          w.objects.map((o) => `${kindName(t, o.kind)} ${o.name}`),
           (list) => t("warn.recreated", list, w.tool),
         ),
       ]
@@ -686,13 +687,13 @@ function warningText(
     case "deletesDependents":
       return namedText(
         t,
-        warning.dependents.map((d) => `${d.kind} ${d.name}`),
+        warning.dependents.map((d) => `${kindName(t, d.kind)} ${d.name}`),
         (list) => t("warn.deletesDependents", warning.target.name, list),
       )
     case "deletesOwned":
       return namedText(
         t,
-        warning.objects.map((o) => `${o.kind} ${o.name}`),
+        warning.objects.map((o) => `${kindName(t, o.kind)} ${o.name}`),
         (list) => t("warn.deletesOwned", warning.target.name, list),
       )
     case "stays":
@@ -738,7 +739,7 @@ function staysSentence(
   t: Translate,
   warning: Extract<Schemas["PlanWarning"], { code: "stays" }>,
 ): string {
-  const object = `${warning.object.kind} ${warning.object.name}`
+  const object = `${kindName(t, warning.object.kind)} ${warning.object.name}`
   switch (warning.reason) {
     case "shared":
       return t("warn.staysShared", object, names(t, warning.workloads ?? []))
@@ -748,7 +749,7 @@ function staysSentence(
       return t(
         "warn.staysControlled",
         object,
-        warning.owner ? `${warning.owner.kind} ${warning.owner.name}` : "",
+        warning.owner ? `${kindName(t, warning.owner.kind)} ${warning.owner.name}` : "",
       )
     case "managed":
       return t("warn.staysManaged", object, warning.tool ?? "")
@@ -797,7 +798,11 @@ function warningSentence(
     case "readWriteOncePodShared":
       return t("warn.readWriteOncePodShared", warning.workload.name)
     case "podReplaced":
-      return t("warn.podReplaced", warning.pod, `${warning.owner.kind} ${warning.owner.name}`)
+      return t(
+        "warn.podReplaced",
+        warning.pod,
+        `${kindName(t, warning.owner.kind)} ${warning.owner.name}`,
+      )
     case "stillUsed":
       return warning.target.kind === "PersistentVolumeClaim"
         ? t("warn.claimStillMounted", warning.target.name, names(t, warning.workloads))
@@ -867,11 +872,15 @@ function routeWarning(
       return t(
         "warn.domainMoved",
         warning.hostname,
-        `${warning.from.kind} ${warning.from.name}`,
-        `${warning.to.kind} ${warning.to.name}`,
+        `${kindName(t, warning.from.kind)} ${warning.from.name}`,
+        `${kindName(t, warning.to.kind)} ${warning.to.name}`,
       )
     case "routeDeleted":
-      return t("warn.routeDeleted", `${warning.route.kind} ${warning.route.name}`, warning.hostname)
+      return t(
+        "warn.routeDeleted",
+        `${kindName(t, warning.route.kind)} ${warning.route.name}`,
+        warning.hostname,
+      )
   }
 }
 

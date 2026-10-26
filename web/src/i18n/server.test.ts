@@ -75,7 +75,7 @@ describe("server sentences", () => {
   test("a list joins its items with the language's separator", () => {
     const key = "gap.noNetworkPolicy"
     expect(say("en", key, { services: "api,web,worker" })).toContain(
-      "protects api, web, worker: any pod in the cluster can reach them.",
+      "protects api, web, worker: any replica in the cluster can reach them.",
     )
     expect(say("zh-TW", key, { services: "api,web" })).toContain("保護 api、web：")
     expect(say("zh-CN", key, { services: "api" })).toContain("保护 api：")

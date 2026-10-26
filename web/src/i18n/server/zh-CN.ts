@@ -27,25 +27,25 @@ export const serverZhCn = {
   "sentence.diagnosis.probeFailure.why.startup": (p: P) =>
     `${!p.period || p.period === "none" ? `其他检查会等启动检查通过，如果没有在时限内通过，集群就会重启容器。` : `${p.periodDefault === "true" ? `${p.thresholdDefault === "true" ? `默认情况下，容器有 ${p.threshold ?? ""} × ${duration(p.period)}（${duration(p.total)}）可以通过启动检查，超过时集群就会重启它。` : `容器有 ${p.threshold ?? ""} × ${duration(p.period)}（${duration(p.total)}）可以通过启动检查，超过时集群就会重启它。每 ${duration(p.period)}是默认值。`}` : `容器有 ${p.threshold ?? ""} × ${duration(p.period)}（${duration(p.total)}）可以通过启动检查，超过时集群就会重启它。${p.thresholdDefault === "true" ? `${p.threshold ?? ""} 次是默认值。` : ``}`}`}`,
   "sentence.diagnosis.configMissing.cause.object": (p: P) =>
-    `${p.container ?? ""} 无法启动：${p.object === "Secret" ? `机密 ${p.name ?? ""}` : `配置文件 ${p.name ?? ""}`} 不存在。`,
+    `${p.container ?? ""} 无法启动：${p.object === "Secret" ? `机密变量 ${p.name ?? ""}` : `配置文件 ${p.name ?? ""}`} 不存在。`,
   "sentence.diagnosis.configMissing.cause.key": (p: P) =>
-    `${p.container ?? ""} 无法启动：${p.object === "Secret" ? `机密 ${p.name ?? ""}` : `配置文件 ${p.name ?? ""}`} 里没有 ${p.key ?? ""}。`,
+    `${p.container ?? ""} 无法启动：${p.object === "Secret" ? `机密变量 ${p.name ?? ""}` : `配置文件 ${p.name ?? ""}`} 里没有 ${p.key ?? ""}。`,
   "sentence.diagnosis.configMissing.cause.unknown": (p: P) =>
-    `${p.container ?? ""} 无法启动：缺少它读取的机密或配置文件。`,
+    `${p.container ?? ""} 无法启动：缺少它读取的机密变量或配置文件。`,
   "sentence.diagnosis.configMissing.cause.volume": (p: P) =>
-    `${!p.container || p.container === "none" ? `副本 ${p.pod ?? ""}` : `${p.container ?? ""}`} 无法启动：卷 ${p.volume ?? ""} 来自 ${p.object === "Secret" ? `机密 ${p.name ?? ""}` : `配置文件 ${p.name ?? ""}`}，但它不存在。`,
+    `${!p.container || p.container === "none" ? `副本 ${p.pod ?? ""}` : `${p.container ?? ""}`} 无法启动：卷 ${p.volume ?? ""} 来自 ${p.object === "Secret" ? `机密变量 ${p.name ?? ""}` : `配置文件 ${p.name ?? ""}`}，但它不存在。`,
   "sentence.diagnosis.configMissing.why": () =>
-    "容器读取的每个机密、配置文件和其中的键都存在之后，集群才会启动它。",
+    "容器读取的每个机密变量、配置文件和其中的键都存在之后，集群才会启动它。",
   "sentence.diagnosis.configMissing.why.volume": () =>
-    "集群会先挂载所有卷，再启动副本的容器。卷如果来自不存在的机密或配置文件，就无法挂载，容器会一直等待。",
+    "集群会先挂载所有卷，再启动副本的容器。卷如果来自不存在的机密变量或配置文件，就无法挂载，容器会一直等待。",
   "sentence.diagnosis.configMissing.fix.object": (p: P) =>
-    `在项目里加上 ${p.object === "Secret" ? `机密 ${p.name ?? ""}` : `配置文件 ${p.name ?? ""}`}，或不再读取它。`,
+    `在项目里加上 ${p.object === "Secret" ? `机密变量 ${p.name ?? ""}` : `配置文件 ${p.name ?? ""}`}，或不再读取它。`,
   "sentence.diagnosis.configMissing.fix.key": (p: P) =>
-    `在 ${p.object === "Secret" ? `机密 ${p.name ?? ""}` : `配置文件 ${p.name ?? ""}`} 加上 ${p.key ?? ""}，或不再读取它。`,
+    `在 ${p.object === "Secret" ? `机密变量 ${p.name ?? ""}` : `配置文件 ${p.name ?? ""}`} 加上 ${p.key ?? ""}，或不再读取它。`,
   "sentence.diagnosis.configMissing.fix.unknown": () =>
     "副本的事件会说缺少什么。把它加上，或不再读取它。",
   "sentence.diagnosis.configMissing.fix.volume": (p: P) =>
-    `在项目里加上 ${p.object === "Secret" ? `机密 ${p.name ?? ""}` : `配置文件 ${p.name ?? ""}`}，或移除卷 ${p.volume ?? ""}。`,
+    `在项目里加上 ${p.object === "Secret" ? `机密变量 ${p.name ?? ""}` : `配置文件 ${p.name ?? ""}`}，或移除卷 ${p.volume ?? ""}。`,
   "sentence.diagnosis.unschedulable.cause.cpu": (p: P) =>
     `${p.service ?? ""} 正在等待可用资源：没有机器有足够的 CPU。`,
   "sentence.diagnosis.unschedulable.cause.memory": (p: P) =>
@@ -221,7 +221,7 @@ export const serverZhCn = {
   "sentence.gap.ingressToHttpRoute.retired": (p: P) =>
     `Ingress ${p.ingress ?? ""} 使用 ${p.class ?? ""}，它的 controller 已停止维护。`,
   "sentence.gap.projectWithoutNetworkPolicy": (p: P) =>
-    `项目 ${p.namespace ?? ""} 没有 NetworkPolicy ${p.policy ?? ""}，集群里任何 Pod 都连得到它的服务。`,
+    `项目 ${p.namespace ?? ""} 没有 NetworkPolicy ${p.policy ?? ""}，集群里任何副本都连得到它的服务。`,
   "sentence.gap.retiredIngressController": (p: P) =>
     `IngressClass ${p.class ?? ""} 的 controller ${p.controller ?? ""} 已停止维护。`,
   "sentence.gap.danglingRoute.noService": (p: P) =>
@@ -235,7 +235,7 @@ export const serverZhCn = {
   "sentence.gap.blockedConnection": (p: P) =>
     `${p.at === "egress" ? `${p.from ?? ""} 的环境变量指向 ${p.to ?? ""}，但 ${p.from ?? ""} 的 NetworkPolicy 不允许连出。` : p.at === "both" ? `${p.from ?? ""} 的环境变量指向 ${p.to ?? ""}，但两端的 NetworkPolicy 都拦截了这条连接。` : `${p.from ?? ""} 的环境变量指向 ${p.to ?? ""}，但 ${p.to ?? ""} 的 NetworkPolicy 不允许 ${p.from ?? ""} 连入。`}`,
   "sentence.gap.noNetworkPolicy": (p: P) =>
-    `没有 NetworkPolicy 保护 ${words(items(p.services))}：集群里任何 Pod 都连得到。NetworkPolicy 要集群的网络插件（CNI）支持才会生效。${!p.cuts || p.cuts === "none" ? `` : `隔离后也会拦截${items(p.cuts)[0] === "published" ? ` ` : ``}${words(items(p.cuts).flatMap((item) => (item === "otherNamespaces" ? [`来自其他 Namespace 的连接`] : item === "outside" ? [`连到集群外的连接`] : item === "published" ? [`NodePort 与 LoadBalancer 的流量`] : item === "connections" ? [`服务之间的一条连接`] : [])))}。`}`,
+    `没有 NetworkPolicy 保护 ${words(items(p.services))}：集群里任何副本都连得到。NetworkPolicy 要集群的网络插件（CNI）支持才会生效。${!p.cuts || p.cuts === "none" ? `` : `隔离后也会拦截${items(p.cuts)[0] === "published" ? ` ` : ``}${words(items(p.cuts).flatMap((item) => (item === "otherNamespaces" ? [`来自其他 Namespace 的连接`] : item === "outside" ? [`连到集群外的连接`] : item === "published" ? [`NodePort 与 LoadBalancer 的流量`] : item === "connections" ? [`服务之间的一条连接`] : [])))}。`}`,
   "sentence.gap.volumeWithoutBackup": (p: P) => `卷 ${p.claim ?? ""} 没有定时备份。`,
   "sentence.gap.databaseWithoutBackup": (p: P) => `数据库 ${p.database ?? ""} 没有定时备份。`,
   "sentence.incident.componentDown.cause.ingressController": (p: P) =>
@@ -265,7 +265,7 @@ export const serverZhCn = {
   "sentence.incident.nodeNotReady.cause": (p: P) =>
     `${p.status === "Unknown" ? `节点 ${p.node ?? ""} 不再向集群报告状态` : `节点 ${p.node ?? ""} 未就绪`}${!p.reason || p.reason === "none" ? `` : `（${p.reason ?? ""}）`}。`,
   "sentence.incident.nodeNotReady.why": (p: P) =>
-    `节点未就绪时不会再启动新的 Pod。宽限期（默认 5 分钟）过后，集群会移除上面的 Pod，让它们到别处启动。这个节点上有 ${p.pods ?? ""} 个 Pod，${p.services ?? ""} 个服务有副本在上面。`,
+    `节点未就绪时不会再启动新的副本。宽限期（默认 5 分钟）过后，集群会移除上面的副本，让它们到别处启动。这个节点上有 ${p.pods ?? ""} 个副本，${p.services ?? ""} 个服务有副本在上面。`,
   "sentence.incident.nodeNotReady.fix": (p: P) =>
     `检查 ${p.node ?? ""} 背后的机器：是否开机、网络，以及节点代理（kubelet）。如果它无法恢复，就清空这个节点并替换它。`,
   "sentence.trace.dns.ok": (p: P) => `${p.host ?? ""} 可以解析。`,
@@ -291,7 +291,7 @@ export const serverZhCn = {
   "sentence.trace.controller.down": (p: P) =>
     `Ingress 控制器 ${p.workload ?? ""} 没有就绪的副本，所以没有东西处理 ${p.route ?? ""}。`,
   "sentence.trace.certificate.defaultCertificate": (p: P) =>
-    `${p.route ?? ""} 为 ${p.host ?? ""} 启用 HTTPS，却没有指定机密，所以控制器会提供它的默认证书。`,
+    `${p.route ?? ""} 为 ${p.host ?? ""} 启用 HTTPS，却没有指定机密变量，所以控制器会提供它的默认证书。`,
   "sentence.trace.certificate.ok": (p: P) =>
     `${p.host ?? ""} 的证书已签发${!p.until || p.until === "none" ? `` : `，有效期至 ${p.until ?? ""}`}。`,
   "sentence.trace.certificate.notReady": (p: P) =>
@@ -301,11 +301,11 @@ export const serverZhCn = {
   "sentence.trace.certificate.pending": (p: P) =>
     `${p.host ?? ""} 的证书 ${p.certificate ?? ""} 还没有结果。`,
   "sentence.trace.certificate.unreadable": (p: P) =>
-    `Zeabur 无法读取项目的机密，因此无法检查机密 ${p.secret ?? ""} 里 ${p.host ?? ""} 的证书。`,
+    `Zeabur 无法读取项目的机密变量，因此无法检查机密变量 ${p.secret ?? ""} 里 ${p.host ?? ""} 的证书。`,
   "sentence.trace.certificate.notChecked": (p: P) =>
-    `机密 ${p.secret ?? ""} 存有 ${p.host ?? ""} 的证书，Zeabur 不会进一步检查。`,
+    `机密变量 ${p.secret ?? ""} 存有 ${p.host ?? ""} 的证书，Zeabur 不会进一步检查。`,
   "sentence.trace.certificate.secretMissing": (p: P) =>
-    `${p.route ?? ""} 从机密 ${p.secret ?? ""} 读取 ${p.host ?? ""} 的证书，但项目里没有这个机密。控制器可能改用默认证书，Zeabur 无法检查它。`,
+    `${p.route ?? ""} 从机密变量 ${p.secret ?? ""} 读取 ${p.host ?? ""} 的证书，但项目里没有这个机密变量。控制器可能改用默认证书，Zeabur 无法检查它。`,
   "sentence.trace.route.noStatus": (p: P) =>
     `还没有任何组件写入 ${p.route ?? ""} 的状态，无法得知它是否已生效。`,
   "sentence.trace.route.ok": (p: P) => `${p.route ?? ""} 已生效：控制器已在它的状态里写入地址。`,
@@ -351,7 +351,7 @@ export const serverZhCn = {
   "sentence.diagnosis.unreachable.cause.certificateNotReady": (p: P) =>
     `${p.host ?? ""} 的 HTTPS 连接失败：证书 ${p.certificate ?? ""} 尚未签发${!p.reason || p.reason === "none" ? `` : `（${p.reason ?? ""}）`}。`,
   "sentence.diagnosis.unreachable.why.certificateNotReady": (p: P) =>
-    `cert-manager 签发证书后才会把它写进机密 ${p.secret ?? ""}。在那之前，控制器会改用默认证书，浏览器会拒绝它。`,
+    `cert-manager 签发证书后才会把它写进机密变量 ${p.secret ?? ""}。在那之前，控制器会改用默认证书，浏览器会拒绝它。`,
   "sentence.diagnosis.unreachable.fix.certificateNotReady": (p: P) =>
     `证书 ${p.certificate ?? ""} 的状态和事件会说明它为什么还没签发。`,
   "sentence.diagnosis.unreachable.cause.backendPortMissing": (p: P) =>
