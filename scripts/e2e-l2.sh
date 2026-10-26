@@ -147,6 +147,11 @@ kubectl delete rolebindings,clusterrolebindings -A -l app.kubernetes.io/managed-
 # The chart keeps the S3 destinations' namespace on purpose; the project's name is the person's.
 kubectl delete namespace zeabur-s3-destinations --wait --timeout=180s
 kubectl annotate namespace "$project" zeabur.com/display-name-
+# Zeabur Builder keeps a buildkitd, with its cache volume, for every namespace that built something.
+# The project stays, so its builds' daemon goes here (full profile only).
+if kubectl get namespace builder-system >/dev/null 2>&1; then
+  kubectl -n builder-system delete statefulset "buildkitd-$project" --ignore-not-found --wait --timeout=180s
+fi
 # A volume's PersistentVolume goes after its claim, when the provisioner has cleaned the disk.
 for _ in $(seq 36); do
   "$root/scripts/dev-cluster.sh" snapshot >"$state/after.txt"
