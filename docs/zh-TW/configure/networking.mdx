@@ -29,7 +29,7 @@ description: 用私有位址連到同叢集的服務，把資料庫這類不走 
 kubectl -n demo expose deployment web --port=8080
 ```
 
-容器沒有宣告連接埠時，指令一定要加 `--port`，填應用程式監聽的連接埠。
+就緒檢查用的是數字連接埠時，指令會直接帶上那個連接埠。否則指令會寫 `--port=<port>`，執行前把 `<port>` 換成應用程式監聽的連接埠。
 
 ## 開放連接埠到網際網路
 
@@ -82,7 +82,7 @@ ServiceLB 會在每個節點監聽同一個連接埠號碼，所以整個叢集�
 規則可以疊加。常見的組合是先 **隔離這個服務**，再加 **允許來自公開網域的流量** 和需要連進來的服務。
 
 <Callout type="warn">
-隔離後，服務的公開網域會連不上，直到加上 **允許來自公開網域的流量**。這條規則找的是 `kube-system` 裡的 Traefik，也就是 K3s 內建的那一個。用 Zeabur 安裝程式裝的叢集，Traefik 在 `traefik` Namespace，這條規則放不進它的請求，要改用 kubectl 寫一條允許 `traefik` Namespace 的規則，見下一節。
+隔離後，服務的公開網域會連不上，直到加上 **允許來自公開網域的流量**。
 </Callout>
 
 要讓隔離的服務連到外部 API，到同一頁的 **IP 限制** 把位址加進 **能連到哪裡**，見[限制能連入和連出的 IP](./ip-limits.mdx)。
@@ -204,7 +204,7 @@ spec:
               app.kubernetes.io/name: web
 ```
 
-**允許來自公開網域的流量**。Zeabur 寫的是 `kube-system` 的 Traefik：
+**允許來自公開網域的流量**。規則允許兩個地方的 Traefik：K3s 內建的在 `kube-system`，Zeabur 安裝程式裝的在有 `zeabur.com/platform: "true"` 標籤的 Namespace：
 
 ```yaml
 apiVersion: networking.k8s.io/v1
@@ -227,12 +227,12 @@ spec:
           podSelector:
             matchLabels:
               app.kubernetes.io/name: traefik
-```
-
-Traefik 在別的 Namespace 時，把 `kube-system` 換成它所在的 Namespace，例如 Zeabur 安裝程式用的 `traefik`。先查 Traefik 在哪裡：
-
-```sh
-kubectl get pods -A -l app.kubernetes.io/name=traefik
+        - namespaceSelector:
+            matchLabels:
+              zeabur.com/platform: "true"
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: traefik
 ```
 
 刪除規則：
@@ -258,9 +258,9 @@ kubectl -n demo run probe --rm -it --restart=Never --image=busybox:1.37 -- wget 
 | 畫面或結果 | 接著處理 |
 | --- | --- |
 | **web 沒有私有位址** | 執行畫面上的 `kubectl expose` 指令，或套用上面的 Service。 |
-| `kubectl expose` 回覆 `couldn't find port via --port flag or introspection` | 容器沒有宣告連接埠，加上 `--port`。 |
+| `kubectl expose` 回覆 `couldn't find port via --port flag or introspection` | 容器沒有宣告連接埠。在 `--port=` 後面填應用程式監聽的連接埠。 |
 | 一直顯示 **正在等負載平衡器分配位址** | 節點上這個連接埠已經有別的服務在用，或叢集沒有負載平衡器。換一個連接埠，或請管理員確認 ServiceLB。 |
 | 開放連接埠時回覆已有服務開放同一個連接埠 | 同專案已經開放了這個連接埠號碼，先關閉那一個。 |
-| 隔離後公開網域逾時 | 加上 **允許來自公開網域的流量**。Traefik 不在 `kube-system` 時，用 kubectl 改寫那條規則的 Namespace。 |
+| 隔離後公開網域逾時 | 加上 **允許來自公開網域的流量**。 |
 | 隔離後服務連不到外部 API | 隔離只允許連到同專案和 DNS。在 **IP 限制** 的 **能連到哪裡** 加上外部 API 的位址。 |
 | 加了規則，連線卻照樣通 | 叢集的網路外掛不支援 NetworkPolicy。 |
