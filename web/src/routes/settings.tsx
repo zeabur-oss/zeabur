@@ -19,6 +19,7 @@ import {
   whoamiQuery,
 } from "@/api/queries"
 import { Hint, Panel, Row, Rows, Segmented } from "@/components/bits"
+import { KubeDetails } from "@/components/kube-details"
 import { Problem } from "@/components/problem"
 import { RefusedKinds } from "@/components/refused"
 import { StatusPill } from "@/components/status"
@@ -112,14 +113,16 @@ export function SettingsPage() {
               <Row label={t("settings.kubernetesVersion")}>
                 <span className="font-mono text-xs">{cluster.data?.kubernetesVersion ?? "—"}</span>
               </Row>
-              <Row label={t("settings.catalogueCommit")}>
-                <span className="font-mono text-xs">
-                  {capabilities.data.catalogueCommit.slice(0, 12)}
-                </span>
-              </Row>
             </>
           ) : null}
         </Rows>
+        {capabilities.data ? (
+          <KubeDetails
+            facts={[
+              [t("settings.catalogueCommit"), capabilities.data.catalogueCommit.slice(0, 12)],
+            ]}
+          />
+        ) : null}
       </Panel>
     </PageColumn>
   )

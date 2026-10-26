@@ -96,20 +96,16 @@ export function ProjectSettings({ namespace }: { namespace: Schemas["ProjectName
               <CopyButton value={namespace.name} />
             </span>
           </CardRow>
-          <CardRow
-            label={t("projectSettings.shown")}
-            description={
-              namespace.system
-                ? t("projectSettings.system")
-                : namespace.adopted
-                  ? t("projectSettings.shownYes")
-                  : t("projectSettings.shownNo")
-            }
-          >
-            {namespace.system || namespace.adopted ? null : (
-              <AdoptButton namespace={namespace.name} adopted={false} />
-            )}
-          </CardRow>
+          {namespace.adopted && !namespace.system ? null : (
+            <CardRow
+              label={t("projectSettings.shown")}
+              description={
+                namespace.system ? t("projectSettings.system") : t("projectSettings.shownNo")
+              }
+            >
+              {namespace.system ? null : <AdoptButton namespace={namespace.name} adopted={false} />}
+            </CardRow>
+          )}
         </Card>
       </Group>
       {namespace.adopted ? (

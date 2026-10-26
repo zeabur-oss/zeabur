@@ -10,7 +10,7 @@ import GlobeIcon from "~icons/ph/globe"
 import WarningCircleFillIcon from "~icons/ph/warning-circle-fill"
 
 import { useLogsReadable } from "@/api/logs-access"
-import { clusterQuery, projectAlertsQuery, rolloutQuery, traceQuery } from "@/api/queries"
+import { projectAlertsQuery, rolloutQuery, traceQuery } from "@/api/queries"
 import { AlertList, RecentNote } from "@/components/alerts"
 import { Ago, CopyButton } from "@/components/bits"
 import { Diagnoses } from "@/components/diagnoses"
@@ -421,7 +421,6 @@ function Summary({
   const t = useT()
   const { locale } = useI18n()
   const headline = useHeadline()
-  const cluster = useQuery(clusterQuery).data?.name
   const status = statusOf(service)
   const facts = useStatusFacts()(undefined, status.pod)
   const term = status.pod?.running ? undefined : status.reason
@@ -480,13 +479,6 @@ function Summary({
                 <span className="shrink-0">:{imageTag(service.image)}</span>
               </span>
               <CopyButton value={service.image} />
-            </SummaryCardFact>
-          ) : null}
-          {cluster ? (
-            <SummaryCardFact label={t("overview.cluster")}>
-              <span className="truncate font-mono" translate="no">
-                {cluster}
-              </span>
             </SummaryCardFact>
           ) : null}
           {service.provenance.tool ? (

@@ -414,15 +414,21 @@ function KindRow({ row, pinned }: { row: Extract<Row, { type: "kind" }>; pinned:
       <span className="text-sm font-medium" translate={plain === kind.kind ? "no" : undefined}>
         {plain}
       </span>
-      <span className="truncate type-meta text-muted-foreground" translate="no">
-        {plain === kind.kind ? "" : `${kind.kind} `}
-        {kind.group ? `${kind.group}/${kind.version}` : kind.version}
-      </span>
+      {plain === kind.kind ? null : (
+        <span className="truncate type-meta text-muted-foreground" translate="no">
+          {kind.kind}
+        </span>
+      )}
     </>
   )
   return (
     <div className="flex h-10 items-center gap-2 border-b bg-muted/30 px-4">
-      <span className="flex min-w-0 flex-1 items-center gap-2">{label}</span>
+      <span
+        className="flex min-w-0 flex-1 items-center gap-2"
+        title={kind.group ? `${kind.group}/${kind.version}` : kind.version}
+      >
+        {label}
+      </span>
       <span className="type-meta text-muted-foreground tabular-nums">
         {row.refused
           ? null

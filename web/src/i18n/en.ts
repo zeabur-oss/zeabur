@@ -742,7 +742,6 @@ export const en = {
   "builds.noLogsYet": "This step has not started yet.",
   "builds.emptyLog": "Nothing logged.",
   "overview.source": "Source",
-  "overview.cluster": "Cluster",
   "overview.managedBy": "Managed by",
   "overview.replicas": (ready: number, desired: number) => `Replicas ${ready}/${desired}`,
   "overview.replicaSettings": "Replica settings",
@@ -1236,7 +1235,6 @@ export const en = {
   "projectSettings.namespace": "Namespace",
   "projectSettings.namespaceHint": "The project is this namespace. Its name can't change.",
   "projectSettings.shown": "Shown as a project",
-  "projectSettings.shownYes": "Yes. The namespace has Zeabur's project label.",
   "projectSettings.shownNo":
     "No. Showing it as a project only adds Zeabur's project label; nothing else changes.",
   "network.title": "Network",
