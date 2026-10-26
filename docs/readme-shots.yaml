@@ -9,6 +9,7 @@ shots:
     path: /
     wait: main h1
     clip: main
+    until: 'section[aria-labelledby="home-problems"]'
     locales: [en]
     themes: [light, dark]
   - id: readme-project
@@ -39,5 +40,6 @@ shots:
     path: /cluster
     wait: main h1
     clip: main
+    until: '#cluster-nodes'
     locales: [en]
     themes: [light, dark]

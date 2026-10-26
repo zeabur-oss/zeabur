@@ -69,9 +69,9 @@ export function UploadDrawer({ project, onClose }: { project: string; onClose: (
         <FolderDrop folder={folder} missing={built.tried && problems.folder && !ready} />
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <ServiceNameField built={built} problems={problems} />
-          <MethodField built={built} source="upload" />
+          <BuiltPort built={built} problems={problems} />
         </div>
-        <BuiltPort built={built} problems={problems} />
+        <MethodField built={built} source="upload" />
         <BuiltPublicUrl built={built} problems={problems} />
         <MoreSection built={built} problems={problems} source="upload" />
         <Note>{t("upload.after")}</Note>

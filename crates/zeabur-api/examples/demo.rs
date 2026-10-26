@@ -10,7 +10,8 @@
 //! (cd web && bun run dev)                          # or Vite's dev server on :5173, proxying /api
 //! ```
 //!
-//! `ZEABUR_DEMO_NOW=2026-10-26T09:00:00Z` (RFC 3339) is the "now" of every relative object time.
+//! `ZEABUR_DEMO_NOW=2026-10-26T09:00:00Z` (RFC 3339) is the "now" of every relative object time and
+//! of plan expiry.
 //! `ZEABUR_DEMO_FORBID=events.events.k8s.io,pods` refuses those cluster-wide reads (`nodes`,
 //! `pods`, `nodes.metrics.k8s.io`, `events.events.k8s.io`, `plans.upgrade.cattle.io`), to see a
 //! section's permission state; the listed kinds but `pods` are also refused in every namespace
@@ -4543,6 +4544,7 @@ async fn main() -> std::io::Result<()> {
     let images = zeabur_api::images::Inspector::new(Arc::new(Registry::new()), Vec::new());
     let app = zeabur_api::router_for_demo(
         Arc::new(access),
+        clock,
         settings,
         Arc::new(dns()),
         Arc::new(images),

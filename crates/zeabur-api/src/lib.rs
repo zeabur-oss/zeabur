@@ -522,9 +522,10 @@ pub fn router_with_settings_and_resolver(
 }
 
 /// [`router_with_settings_and_resolver`], reading images' configurations with `images` and
-/// templates' idle use from `template_idle`; for the demo.
+/// templates' idle use from `template_idle`; for the demo, whose `clock` may be fixed.
 pub fn router_for_demo(
     access: Arc<dyn ClusterAccess>,
+    clock: fn() -> zeabur_kube::k8s_openapi::jiff::Timestamp,
     settings: Settings,
     resolver: Arc<dyn resolve::Resolve>,
     images: Arc<images::Inspector>,
@@ -533,7 +534,7 @@ pub fn router_for_demo(
 ) -> Router {
     build_with(
         access,
-        zeabur_kube::k8s_openapi::jiff::Timestamp::now,
+        clock,
         PlanKey::random().ok().map(Arc::new),
         pods::exec::IDLE,
         settings,

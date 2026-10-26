@@ -6,7 +6,9 @@ use zeabur_core::message::Message;
 use zeabur_core::problem::{Kind, Problem, ProblemAt};
 use zeabur_kube::{Cluster, ServedResource, WriteRequest};
 use zeabur_model::Gap;
-use zeabur_plan::{Change, Plan, PlanRequest, ServedKind, Write, created_object, resolve};
+use zeabur_plan::{
+    Change, Plan, PlanRequest, RouteKind, ServedKind, Write, created_object, resolve,
+};
 
 use super::refusals::refused;
 use crate::error::{ApiError, get_read, read_problem};
@@ -19,6 +21,11 @@ pub(super) fn from_yaml(request: &PlanRequest) -> bool {
         .any(|c| matches!(c, Change::Create { yaml: Some(_), .. }))
 }
 
+/// Maintenance on an Ingress needs Traefik, though it reads no middleware first.
+fn is_ingress_maintenance(change: &Change) -> bool {
+    matches!(change, Change::Maintenance(m) if m.enabled && m.route.kind == RouteKind::Ingress)
+}
+
 /// The kinds discovery names, for a request that creates objects or Traefik middlewares; none
 /// otherwise, and the planner knows only the kinds it creates itself.
 pub(super) async fn served_kinds(
@@ -28,7 +35,7 @@ pub(super) async fn served_kinds(
     let middlewares = request
         .changes
         .iter()
-        .any(|c| zeabur_plan::access::middleware_read(c).is_some());
+        .any(|c| zeabur_plan::access::middleware_read(c).is_some() || is_ingress_maintenance(c));
     if !from_yaml(request) && !middlewares {
         return Ok(Vec::new());
     }
