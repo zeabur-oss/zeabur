@@ -6,11 +6,11 @@
         "nixpkgs": "nixpkgs"
       },
       "locked": {
-        "lastModified": 1793000640,
-        "narHash": "sha256-uV90UYDqVJI/nBVUG+F6wtP8+3NWnl+2cJ+27dKBW1c=",
+        "lastModified": 1793008557,
+        "narHash": "sha256-zJgVd25SzCVLNBrY5bBZDlso2lAtYdjf+wTLY1aaTg8=",
         "ref": "refs/heads/main",
-        "rev": "84e0ce42553efb0c1db2a106b2e91e06886362f6",
-        "revCount": 150,
+        "rev": "ca08e67ce85441c85200a97db9e179b3f8b53944",
+        "revCount": 153,
         "type": "git",
         "url": "ssh://git@github.com/zeabur-oss/catalog.git"
       },
