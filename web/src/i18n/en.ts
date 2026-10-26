@@ -1007,6 +1007,8 @@ export const en = {
   "net.fullForm": "From another project",
   "net.forwardsTo": (port: string) => `Forwarded to the container's port ${port}`,
   "net.exposeHint": "To add one, apply a Kubernetes Service or run this command.",
+  "net.exposePort": (placeholder: string) =>
+    `Replace ${placeholder} with the port your app listens on.`,
   "net.noneTitle": (name: string) => `${name} can't receive connections`,
   "net.noneBody":
     "It has no private address and no public domain. A background service that only makes outgoing connections needs neither, and can still reach other services and the internet.",

@@ -72,6 +72,20 @@ function named<T extends { name: string }>(list: readonly T[], names: readonly s
   return names.flatMap((name) => index.get(name) ?? [])
 }
 
+/** The port placeholder in {@link exposeCommand} when the port is not known. */
+export const PORT_PLACEHOLDER = "<port>"
+
+/** The kubectl command that gives a Deployment a Service. A container that declares no port needs
+ * `--port`: it is the readiness probe's port when that is a number, else {@link PORT_PLACEHOLDER}. */
+export function exposeCommand(service: Service): string | undefined {
+  if (service.kind !== "Deployment") return undefined
+  const port = service.containers
+    .filter((c) => !c.init)
+    .map((c) => c.probes?.readiness?.port)
+    .find((p) => p && /^\d+$/.test(p))
+  return `kubectl -n ${service.namespace} expose deployment ${service.name} --port=${port ?? PORT_PLACEHOLDER}`
+}
+
 export const endpointsOf = (network: Network, service: Service): Endpoint[] =>
   named(network.endpoints, service.endpointNames)
 

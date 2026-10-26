@@ -933,6 +933,7 @@ export const zhCN: Messages = {
   "net.fullForm": "从其他项目连接",
   "net.forwardsTo": (port) => `转发到容器的端口 ${port}`,
   "net.exposeHint": "要添加私有地址，请应用 Kubernetes Service 或运行这条命令。",
+  "net.exposePort": (placeholder) => `把 ${placeholder} 换成应用监听的端口。`,
   "net.noneTitle": (name) => `${name} 无法接收连接`,
   "net.noneBody":
     "它没有私有地址，也没有公开域名。只主动向外连接的后台服务两者都不需要，仍然可以连接其他服务和互联网。",

@@ -202,8 +202,8 @@ test("a command on a page is text to copy; the cluster page opens the cluster's 
   // crasher has no Service, so its Networking tab shows the command that adds one.
   await page.goto(`${project}/services/Deployment/${failing}?tab=networking`)
   const panel = page.getByRole("tabpanel", { name: "Networking" })
-  const command = `kubectl -n ${namespace} expose deployment ${failing}`
-  await expect(panel.getByText(command, { exact: true })).toBeVisible()
+  const command = new RegExp(`^kubectl -n ${namespace} expose deployment ${failing} --port=\\S+$`)
+  await expect(panel.getByText(command)).toBeVisible()
   await expect(panel.getByRole("button", { name: "Copy" })).toBeVisible()
   await expect(panel.getByRole("button", { name: /terminal/ })).toHaveCount(0)
 

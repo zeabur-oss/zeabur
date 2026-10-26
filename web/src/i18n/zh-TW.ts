@@ -934,6 +934,7 @@ export const zhTW: Messages = {
   "net.fullForm": "從其他專案連線",
   "net.forwardsTo": (port) => `轉送到容器的連接埠 ${port}`,
   "net.exposeHint": "要新增私有位址，請套用 Kubernetes Service 或執行這個指令。",
+  "net.exposePort": (placeholder) => `把 ${placeholder} 換成應用程式監聽的連接埠。`,
   "net.noneTitle": (name) => `${name} 無法接收連線`,
   "net.noneBody":
     "它沒有私有位址，也沒有公開網域。只會主動往外連的背景服務兩者都不需要，仍然可以連到其他服務和網際網路。",

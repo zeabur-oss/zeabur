@@ -54,7 +54,9 @@ import { offered, parentOf } from "@/model/gateways"
 import { isLongList } from "@/model/lists"
 import {
   endpointsOf,
+  exposeCommand,
   hostUrl,
+  PORT_PLACEHOLDER,
   publicRoutesOf,
   routesOf,
   type Endpoint,
@@ -164,10 +166,7 @@ export function NetworkingTab({
     adding === undefined &&
     refusedRoutes.length === 0 &&
     refusedEndpoints.length === 0
-  const expose =
-    service.kind === "Deployment"
-      ? `kubectl -n ${service.namespace} expose deployment ${service.name}`
-      : undefined
+  const expose = exposeCommand(service)
 
   return (
     <div className="flex flex-col gap-8">
@@ -650,7 +649,10 @@ function ExposeHint({ command }: { command?: string }) {
   if (!command) return null
   return (
     <div className="mt-2 flex w-full flex-col gap-1.5">
-      <span className="type-meta text-muted-foreground">{t("net.exposeHint")}</span>
+      <span className="type-meta text-muted-foreground">
+        {t("net.exposeHint")}
+        {command.endsWith(PORT_PLACEHOLDER) ? ` ${t("net.exposePort", PORT_PLACEHOLDER)}` : null}
+      </span>
       <span className="flex max-w-full min-w-0 items-center gap-1 self-start rounded-md bg-muted px-2 py-1">
         <code className="min-w-0 font-mono text-xs break-all" translate="no">
           {command}

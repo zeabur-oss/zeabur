@@ -5,6 +5,7 @@ import {
   canonicalKind,
   domainsOf,
   envSecretsOf,
+  exposeCommand,
   roleOf,
   type Network,
   type Service,
@@ -106,5 +107,30 @@ describe("the Secrets a service's variables read", () => {
       ],
     } as unknown as Partial<Service>)
     expect(envSecretsOf(db)).toStrictEqual(["users", "backup-s3"])
+  })
+})
+
+describe("the command that adds a private address", () => {
+  const web = (probes?: object) =>
+    service("web", {
+      namespace: "shop",
+      containers: [{ name: "app", probes }],
+    } as unknown as Partial<Service>)
+
+  test("names the readiness probe's port", () => {
+    expect(exposeCommand(web({ readiness: { handler: "httpGet", port: "8080" } }))).toBe(
+      "kubectl -n shop expose deployment web --port=8080",
+    )
+  })
+
+  test("asks for the port when no number is known", () => {
+    expect(exposeCommand(web())).toBe("kubectl -n shop expose deployment web --port=<port>")
+    expect(exposeCommand(web({ readiness: { handler: "httpGet", port: "http" } }))).toBe(
+      "kubectl -n shop expose deployment web --port=<port>",
+    )
+  })
+
+  test("is only for a Deployment", () => {
+    expect(exposeCommand(service("db", { kind: "StatefulSet" }))).toBeUndefined()
   })
 })
