@@ -375,6 +375,10 @@ const BUILD: Record<Engine, Build> = {
             securityContext: restrictedPod(10000),
             containers: [{ name: "mysqld", image, resources, securityContext: restricted }],
           },
+          overwriteContainers: MOCO_CONTAINERS.map((name) => ({
+            name,
+            securityContext: restricted,
+          })),
         },
         volumeClaimTemplates: [
           {
@@ -382,10 +386,6 @@ const BUILD: Record<Engine, Build> = {
             spec: claimSpec(form.storage, form.storageClass),
           },
         ],
-        overwriteContainers: MOCO_CONTAINERS.map((name) => ({
-          name,
-          securityContext: restricted,
-        })),
       },
     }
   },
@@ -563,14 +563,13 @@ export function splitDestination(destination: string | null | undefined) {
   return { bucket, folder: rest.join("/") }
 }
 
-/** The ServiceAccount of MOCO's backup and restore Jobs. It has no Role and no token, as the Jobs
- * call no Kubernetes API. */
+/** The ServiceAccount of MOCO's backup and restore Jobs. MOCO binds it to a Role of its own and the
+ * Jobs read the cluster through it, so its token stays mounted. */
 export const jobAccount = (name: string): Change =>
   create({
     apiVersion: "v1",
     kind: "ServiceAccount",
     metadata: { name },
-    automountServiceAccountToken: false,
   })
 
 /** MOCO's backup and restore Jobs: the bucket, the keys from `secretName` as AWS variables, and a

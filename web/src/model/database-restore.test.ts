@@ -264,7 +264,7 @@ describe("restoring into a new database", () => {
     )
     const cluster = made.find((b) => b?.kind === "MySQLCluster")
     const account = made.find((b) => b?.kind === "ServiceAccount")
-    expect(account).toMatchObject({ automountServiceAccountToken: false })
+    expect(account).not.toHaveProperty("automountServiceAccountToken")
     expect(cluster?.spec.restore).toMatchObject({
       jobConfig: { serviceAccountName: account?.metadata.name },
     })

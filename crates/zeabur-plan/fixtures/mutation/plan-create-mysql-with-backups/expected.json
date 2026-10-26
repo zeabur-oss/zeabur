@@ -141,7 +141,42 @@
                     }
                   }
                 ]
-              }
+              },
+              "overwriteContainers": [
+                {
+                  "name": "agent",
+                  "securityContext": {
+                    "allowPrivilegeEscalation": false,
+                    "capabilities": {
+                      "drop": [
+                        "ALL"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "name": "moco-init",
+                  "securityContext": {
+                    "allowPrivilegeEscalation": false,
+                    "capabilities": {
+                      "drop": [
+                        "ALL"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "name": "slow-log",
+                  "securityContext": {
+                    "allowPrivilegeEscalation": false,
+                    "capabilities": {
+                      "drop": [
+                        "ALL"
+                      ]
+                    }
+                  }
+                }
+              ]
             },
             "volumeClaimTemplates": [
               {
@@ -157,41 +192,6 @@
                     "requests": {
                       "storage": "10Gi"
                     }
-                  }
-                }
-              }
-            ],
-            "overwriteContainers": [
-              {
-                "name": "agent",
-                "securityContext": {
-                  "allowPrivilegeEscalation": false,
-                  "capabilities": {
-                    "drop": [
-                      "ALL"
-                    ]
-                  }
-                }
-              },
-              {
-                "name": "moco-init",
-                "securityContext": {
-                  "allowPrivilegeEscalation": false,
-                  "capabilities": {
-                    "drop": [
-                      "ALL"
-                    ]
-                  }
-                }
-              },
-              {
-                "name": "slow-log",
-                "securityContext": {
-                  "allowPrivilegeEscalation": false,
-                  "capabilities": {
-                    "drop": [
-                      "ALL"
-                    ]
                   }
                 }
               }
@@ -222,7 +222,7 @@
             "schedule": "0 3 * * *",
             "concurrencyPolicy": "Forbid",
             "jobConfig": {
-              "serviceAccountName":"mysql-backup",
+              "serviceAccountName": "mysql-backup",
               "bucketConfig": {
                 "bucketName": "b",
                 "endpointURL": "https://s3.example.com",

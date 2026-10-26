@@ -515,11 +515,9 @@ describe("MySQL, MariaDB and Dragonfly", () => {
       name: "mysqld",
       securityContext: { allowPrivilegeEscalation: false, capabilities: { drop: ["ALL"] } },
     })
-    expect(cluster?.spec.overwriteContainers.map((c: { name: string }) => c.name)).toEqual([
-      "agent",
-      "moco-init",
-      "slow-log",
-    ])
+    expect(
+      cluster?.spec.podTemplate.overwriteContainers.map((c: { name: string }) => c.name),
+    ).toEqual(["agent", "moco-init", "slow-log"])
     expect(cluster?.spec.volumeClaimTemplates[0].spec.storageClassName).toBe("fast")
   })
 
@@ -596,14 +594,14 @@ describe("MySQL, MariaDB and Dragonfly", () => {
     expect(canBackUpNow("mysql")).toBe(false)
   })
 
-  test("MOCO's jobs run as a ServiceAccount of their own that has no token", () => {
+  test("MOCO's jobs run as a ServiceAccount of their own, whose token MOCO's Role needs", () => {
     const [account, , policy] = enableBackups(as("mysql", "MySQLCluster", "mysqlclusters"), target)
     const made = (change: unknown) => (change as { object: Record<string, never> }).object
     expect(made(account)).toMatchObject({
       kind: "ServiceAccount",
       metadata: { name: "db-backup" },
-      automountServiceAccountToken: false,
     })
+    expect(made(account)).not.toHaveProperty("automountServiceAccountToken")
     expect(made(policy)).toMatchObject({ spec: { jobConfig: { serviceAccountName: "db-backup" } } })
   })
 

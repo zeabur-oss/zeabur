@@ -62,7 +62,42 @@
                     }
                   }
                 ]
-              }
+              },
+              "overwriteContainers": [
+                {
+                  "name": "agent",
+                  "securityContext": {
+                    "allowPrivilegeEscalation": false,
+                    "capabilities": {
+                      "drop": [
+                        "ALL"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "name": "moco-init",
+                  "securityContext": {
+                    "allowPrivilegeEscalation": false,
+                    "capabilities": {
+                      "drop": [
+                        "ALL"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "name": "slow-log",
+                  "securityContext": {
+                    "allowPrivilegeEscalation": false,
+                    "capabilities": {
+                      "drop": [
+                        "ALL"
+                      ]
+                    }
+                  }
+                }
+              ]
             },
             "volumeClaimTemplates": [
               {
@@ -82,47 +117,12 @@
                 }
               }
             ],
-            "overwriteContainers": [
-              {
-                "name": "agent",
-                "securityContext": {
-                  "allowPrivilegeEscalation": false,
-                  "capabilities": {
-                    "drop": [
-                      "ALL"
-                    ]
-                  }
-                }
-              },
-              {
-                "name": "moco-init",
-                "securityContext": {
-                  "allowPrivilegeEscalation": false,
-                  "capabilities": {
-                    "drop": [
-                      "ALL"
-                    ]
-                  }
-                }
-              },
-              {
-                "name": "slow-log",
-                "securityContext": {
-                  "allowPrivilegeEscalation": false,
-                  "capabilities": {
-                    "drop": [
-                      "ALL"
-                    ]
-                  }
-                }
-              }
-            ],
             "restore": {
               "sourceName": "shop",
               "sourceNamespace": "demo",
               "restorePoint": "2026-10-22T03:00:00Z",
               "jobConfig": {
-                "serviceAccountName":"mysql-backup",
+                "serviceAccountName": "mysql-backup",
                 "bucketConfig": {
                   "bucketName": "b",
                   "endpointURL": "https://s3.example.com",
