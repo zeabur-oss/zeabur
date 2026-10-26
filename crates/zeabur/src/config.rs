@@ -122,7 +122,8 @@ pub(crate) struct Args {
     /// The tools container's limits, as `cpu=1,memory=512Mi`. Empty: these.
     #[arg(long, env = "ZEABUR_TOOLS_LIMITS", default_value = "")]
     pub(crate) tools_limits: String,
-    /// Zeabur Proxy, for log history, as `https://host[:port]`. Empty: there is no log history.
+    /// Zeabur Proxy, for log and usage history, as `https://host[:port]`. Empty: there is no log
+    /// history, and usage history is read from the store directly.
     #[arg(long, env = "ZEABUR_PROXY_URL", default_value = "")]
     pub(crate) proxy_url: String,
     /// A PEM file of the certificate authorities that sign Zeabur Proxy's certificate; the only

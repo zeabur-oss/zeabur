@@ -3,16 +3,22 @@
 //!
 //! # Who can see it
 //!
-//! The store is read through kube-apiserver's service proxy as the person, so the right that
-//! decides is `get` on `services/proxy` for the store's Service. kube-apiserver does not tell the
-//! store who is asking (it removes `Authorization` and the impersonation headers before
-//! proxying) [k8s-authn-filter], and the store has no notion of projects: whoever may reach it
-//! may ask it anything, about every namespace. Zeabur's queries name only this project's pods,
-//! but that limits what Zeabur shows, not what the person could read. So the rule is: being
-//! allowed history is being allowed every project's metrics, and only people who may see the
-//! whole cluster should be. Kubernetes' `edit` and `admin` roles include `services/proxy` only in
-//! their own namespace, and `view` not at all [k8s-bootstrap-policy], so a tenant does not get it
-//! unless someone grants it.
+//! The store has no notion of projects: whoever may reach it may ask it anything, about every
+//! namespace. So it is read one of two ways.
+//!
+//! - Through Zeabur Proxy (`crates/zeabur-proxy`), when Zeabur has one and the store in use is the
+//!   default one, the store the proxy reads. Zeabur hands it the person's token; the proxy asks
+//!   kube-apiserver whether they may `get` `metrics.proxy.zeabur.com` in the project's namespace
+//!   and holds every query to that namespace (VictoriaMetrics' `extra_label`). Viewers, developers
+//!   and anyone with Kubernetes' `view` have that right (the chart's
+//!   `zeabur-proxy-metrics-reader`), the same people who may read the pods' current usage.
+//! - Otherwise, through kube-apiserver's service proxy as the person, so the right that decides is
+//!   `get` on `services/proxy` for the store's Service. kube-apiserver does not tell the store who
+//!   is asking (it removes `Authorization` and the impersonation headers before proxying)
+//!   [k8s-authn-filter], so being allowed this is being allowed every project's metrics, and only
+//!   people who may see the whole cluster should be. Kubernetes' `edit` and `admin` roles include
+//!   `services/proxy` only in their own namespace, and `view` not at all [k8s-bootstrap-policy], so
+//!   a tenant does not get it unless someone grants it.
 //!
 //! [k8s-authn-filter]: https://github.com/kubernetes/kubernetes/blob/master/staging/src/k8s.io/apiserver/pkg/endpoints/filters/authentication.go
 //! [k8s-bootstrap-policy]: https://github.com/kubernetes/kubernetes/blob/master/plugin/pkg/auth/authorizer/rbac/bootstrappolicy/policy.go
@@ -20,16 +26,20 @@
 use axum::Json;
 use axum::extract::{Path, RawQuery, State};
 use serde::Serialize;
+use serde_json::Value;
 use utoipa::ToSchema;
-use zeabur_core::problem::{Kind, MEDIA_TYPE as PROBLEM, Problem};
-use zeabur_kube::Cluster;
+use zeabur_core::problem::{Kind, KubernetesStatus, MEDIA_TYPE as PROBLEM, Problem};
+use zeabur_kube::{Cluster, ServicePort, UserToken};
 use zeabur_modules::prometheus_api::{
     self, PrometheusRange, PrometheusRestart, PrometheusSeries, QUERY_RANGE, Query,
 };
 
 use crate::error::ApiError;
-use crate::handlers::{AppState, Person};
-use crate::settings::{Proxied, StoreState, metrics_store, proxy_get, proxy_refusal};
+use crate::handlers::{AppState, Credential, Person};
+use crate::services::proxy::{ZeaburProxy, detail};
+use crate::settings::{
+    Proxied, SettingSource, StoreState, metrics_store, proxy_get, proxy_refusal,
+};
 use crate::views::UnreadableView;
 
 /// The store a history came from.
@@ -38,6 +48,19 @@ use crate::views::UnreadableView;
 pub struct HistorySource {
     /// Its Service port, `namespace/name:port`.
     pub service: String,
+    /// How it was read, which decides who may read it.
+    pub via: HistoryVia,
+}
+
+/// How the store was read. An open set.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum HistoryVia {
+    /// Through Zeabur Proxy, held to the project's namespace: project members may read it.
+    ZeaburProxy,
+    /// Through kube-apiserver's service proxy: whoever may read it may read every project's
+    /// metrics.
+    ServiceProxy,
 }
 
 /// A service's CPU, memory and restarts over a range, one value per pod and time.
@@ -98,32 +121,97 @@ fn range(raw: Option<&str>) -> Result<PrometheusRange, ApiError> {
     }
 }
 
-/// `history` as the store's failure leaves it: its state, its words, and a refusal named.
-fn failed(history: &mut ServiceHistory, service: &zeabur_kube::ServicePort, failed: Proxied) {
-    if let Proxied::Failed {
-        state,
-        status,
-        message,
-    } = failed
-    {
-        history.state = state;
-        history.message = Some(message);
-        if state == StoreState::Unreadable {
-            history
-                .unreadable
-                .extend(status.map(|status| proxy_refusal(service, status)));
+/// Where the history is read from.
+#[derive(Clone, Copy)]
+enum Source<'a> {
+    /// The store's Service through kube-apiserver's service proxy.
+    Store(&'a dyn Cluster, &'a ServicePort),
+    /// Zeabur Proxy, holding every query to the project's namespace.
+    Proxy(&'a dyn ZeaburProxy, &'a UserToken, &'a str),
+}
+
+/// Why a read gave no values.
+enum Missed {
+    /// Zeabur Proxy serves no metrics store: read the store directly.
+    NoProxyBackend,
+    /// Zeabur Proxy could not reach the store, which may not be installed yet; its words.
+    ProxyBackendDown(String),
+    /// The state it means, the right that is missing, and the words.
+    Failed(StoreState, Option<UnreadableView>, String),
+}
+
+/// The right Zeabur Proxy checks, named for the interface.
+fn proxy_refused(project: &str, message: String) -> UnreadableView {
+    UnreadableView {
+        resource: format!("metrics.proxy.zeabur.com ({project})"),
+        kubernetes: KubernetesStatus::new(403, "Forbidden", message),
+    }
+}
+
+/// `GET path_and_query` of the store's Prometheus API, as the person.
+async fn fetch(source: Source<'_>, path: &str, encoded: &str) -> Result<Value, Missed> {
+    match source {
+        Source::Store(cluster, service) => {
+            match proxy_get(cluster, service, &format!("{path}?{encoded}")).await {
+                Proxied::Answer(answer) => Ok(answer),
+                Proxied::Failed {
+                    state,
+                    status,
+                    message,
+                } => {
+                    let refusal = (state == StoreState::Unreadable)
+                        .then_some(status)
+                        .flatten()
+                        .map(|status| proxy_refusal(service, status));
+                    Err(Missed::Failed(state, refusal, message))
+                }
+            }
+        }
+        Source::Proxy(proxy, token, project) => {
+            let namespace = form_urlencoded::Serializer::new(String::new())
+                .append_pair("namespace", project)
+                .finish();
+            let answer = proxy
+                .get(token, format!("/metrics{path}?{namespace}&{encoded}"))
+                .await
+                .map_err(|error| {
+                    Missed::Failed(
+                        StoreState::Unavailable,
+                        None,
+                        format!("Zeabur Proxy did not answer: {error}"),
+                    )
+                })?;
+            match answer.status {
+                200 => serde_json::from_slice(&answer.body).map_err(|error| {
+                    Missed::Failed(StoreState::Unavailable, None, error.to_string())
+                }),
+                404 => Err(Missed::NoProxyBackend),
+                502 => Err(Missed::ProxyBackendDown(detail(&answer.body))),
+                403 => {
+                    let message = detail(&answer.body);
+                    Err(Missed::Failed(
+                        StoreState::Unreadable,
+                        Some(proxy_refused(project, message.clone())),
+                        message,
+                    ))
+                }
+                _ => Err(Missed::Failed(
+                    StoreState::Unavailable,
+                    None,
+                    detail(&answer.body),
+                )),
+            }
         }
     }
 }
 
-/// One range query, as the person; the values, or how it failed.
+/// One range query; the values, or why there are none.
 async fn query(
-    cluster: &dyn Cluster,
-    service: &zeabur_kube::ServicePort,
+    source: Source<'_>,
     query: &Query,
     range: PrometheusRange,
     times: &[i64],
-) -> Result<Vec<PrometheusSeries>, Proxied> {
+) -> Result<Vec<PrometheusSeries>, Missed> {
     let (Some(&start), Some(&end)) = (times.first(), times.last()) else {
         return Ok(Vec::new());
     };
@@ -133,25 +221,60 @@ async fn query(
         .append_pair("end", &end.to_string())
         .append_pair("step", &range.step().to_string())
         .finish();
-    match proxy_get(cluster, service, &format!("{QUERY_RANGE}?{encoded}")).await {
-        Proxied::Answer(answer) => {
-            prometheus_api::series(&answer, times, query.scale).map_err(|error| Proxied::Failed {
-                state: StoreState::Unavailable,
-                status: None,
-                message: error.message,
-            })
+    let answer = fetch(source, QUERY_RANGE, &encoded).await?;
+    prometheus_api::series(&answer, times, query.scale)
+        .map_err(|error| Missed::Failed(StoreState::Unavailable, None, error.message))
+}
+
+/// CPU, memory and restarts (`None` when the store keeps no restart counts).
+type Readings = (
+    Vec<PrometheusSeries>,
+    Vec<PrometheusSeries>,
+    Option<Vec<PrometheusRestart>>,
+);
+
+async fn read(
+    source: Source<'_>,
+    queries: &prometheus_api::Queries,
+    range: PrometheusRange,
+    times: &[i64],
+) -> Result<Readings, Missed> {
+    let (cpu, memory, restarts) = futures_util::join!(
+        query(source, &queries.cpu, range, times),
+        query(source, &queries.memory, range, times),
+        query(source, &queries.restarts, range, times),
+    );
+    let (cpu, memory) = (cpu?, memory?);
+    // No restart counts at all: the store has no kube-state-metrics, so restarts are unknown.
+    let restarts = match restarts {
+        Ok(counts) if !counts.is_empty() => {
+            let oom_killed = if counts
+                .iter()
+                .flat_map(|s| &s.values)
+                .flatten()
+                .any(|&v| v >= 0.5)
+            {
+                query(source, &queries.oom_killed, range, times)
+                    .await
+                    .unwrap_or_default()
+            } else {
+                Vec::new()
+            };
+            Some(prometheus_api::restarts(&counts, &oom_killed, times))
         }
-        failed @ Proxied::Failed { .. } => Err(failed),
-    }
+        Ok(_) | Err(_) => None,
+    };
+    Ok((cpu, memory, restarts))
 }
 
 /// What a service's pods used over the last hour, 6 hours, day or week, from the metrics store,
 /// as you: CPU (millicores) and memory (the working set, bytes) per pod, and restarts when the
 /// store has kube-state-metrics. Pods are the service's by name, so those a rollout replaced
 /// are included. Always `200` once the parameters are valid: `state` says when there is no
-/// store, you may not read it (`get` on its `services/proxy`; `unreadable` names it), or it did
-/// not answer. Reading the store is reading every project's metrics: see the description of
-/// `GET /api/v1/settings/metrics-store`.
+/// store, you may not read it (`unreadable` names the right), or it did not answer. With Zeabur
+/// Proxy and the default store, the right is `get` on `metrics.proxy.zeabur.com` in the project,
+/// which project members have; otherwise it is `get` on the store's `services/proxy`, which is
+/// reading every project's metrics: see the description of `GET /api/v1/settings/metrics-store`.
 #[utoipa::path(get, path = "/api/v1/projects/{project}/services/{kind}/{name}/history",
     tag = "services", operation_id = "getServiceHistory",
     params(("project" = String, Path, description = "The project's namespace"),
@@ -163,6 +286,7 @@ async fn query(
 pub(crate) async fn get(
     State(state): State<AppState>,
     Person(cluster): Person,
+    Credential(handoff): Credential,
     Path((project, kind, name)): Path<(String, String, String)>,
     RawQuery(raw): RawQuery,
 ) -> Result<Json<ServiceHistory>, ApiError> {
@@ -193,6 +317,7 @@ pub(crate) async fn get(
         state: StoreState::Available,
         source: HistorySource {
             service: store.service.to_string(),
+            via: HistoryVia::ServiceProxy,
         },
         range,
         step: range.step(),
@@ -203,44 +328,50 @@ pub(crate) async fn get(
         message: None,
         unreadable: store.unreadable.clone().into_iter().collect(),
     };
-    let service = &store.service;
-    let (cpu, memory, restarts) = futures_util::join!(
-        query(cluster.as_ref(), service, &queries.cpu, range, &times),
-        query(cluster.as_ref(), service, &queries.memory, range, &times),
-        query(cluster.as_ref(), service, &queries.restarts, range, &times),
-    );
-    let (cpu, memory) = match (cpu, memory) {
-        (Ok(cpu), Ok(memory)) => (cpu, memory),
-        (Err(failure), _) | (_, Err(failure)) => {
-            failed(&mut history, service, failure);
+    let direct = Source::Store(cluster.as_ref(), &store.service);
+    let through_proxy = match (&state.zeabur_proxy, &handoff, store.source) {
+        (Some(proxy), Some(handoff), SettingSource::Default) => Some(Source::Proxy(
+            proxy.as_ref(),
+            &handoff.token,
+            project.as_str(),
+        )),
+        _ => None,
+    };
+    let readings = match through_proxy {
+        Some(source) => match read(source, &queries, range, &times).await {
+            Err(Missed::NoProxyBackend) => read(direct, &queries, range, &times).await,
+            // Read directly whoever may: an administrator then sees that there is no store.
+            Err(Missed::ProxyBackendDown(message)) => {
+                match read(direct, &queries, range, &times).await {
+                    Err(Missed::Failed(StoreState::Unreadable, ..)) => {
+                        history.source.via = HistoryVia::ZeaburProxy;
+                        Err(Missed::Failed(StoreState::Unavailable, None, message))
+                    }
+                    other => other,
+                }
+            }
+            other => {
+                history.source.via = HistoryVia::ZeaburProxy;
+                other
+            }
+        },
+        None => read(direct, &queries, range, &times).await,
+    };
+    let (cpu, memory, restarts) = match readings {
+        Ok(readings) => readings,
+        Err(Missed::Failed(state, refusal, message)) => {
+            history.state = state;
+            history.message = Some(message);
+            history.unreadable.extend(refusal);
+            return Ok(Json(history));
+        }
+        Err(Missed::NoProxyBackend | Missed::ProxyBackendDown(_)) => {
+            history.state = StoreState::Unavailable;
+            history.message = Some("Zeabur Proxy did not reach the metrics store.".to_owned());
             return Ok(Json(history));
         }
     };
-    // No restart counts at all: the store has no kube-state-metrics, so restarts are unknown.
-    history.restarts = match restarts {
-        Ok(counts) if !counts.is_empty() => {
-            let oom_killed = if counts
-                .iter()
-                .flat_map(|s| &s.values)
-                .flatten()
-                .any(|&v| v >= 0.5)
-            {
-                query(
-                    cluster.as_ref(),
-                    service,
-                    &queries.oom_killed,
-                    range,
-                    &times,
-                )
-                .await
-                .unwrap_or_default()
-            } else {
-                Vec::new()
-            };
-            Some(prometheus_api::restarts(&counts, &oom_killed, &times))
-        }
-        Ok(_) | Err(_) => None,
-    };
+    history.restarts = restarts;
     history.times = times;
     history.cpu = cpu;
     history.memory = memory;

@@ -25,6 +25,7 @@ mod incidents;
 mod log_history;
 mod maintenance;
 mod members;
+mod metrics_history;
 mod namespace;
 mod node_shell;
 mod notifications;

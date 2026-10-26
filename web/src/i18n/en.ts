@@ -3223,6 +3223,8 @@ export const en = {
   "usage.whatHistory": "Seeing usage history",
   "usage.proxyHint":
     "Zeabur reads the metrics store through the Kubernetes API as you. Anyone allowed to do that can read every project's metrics, so usually only administrators have that permission.",
+  "usage.memberHint":
+    "Members of this project can see its usage history. Ask an administrator to add you to the project.",
   "usage.storeUnavailable": "The metrics store did not respond.",
   "usage.noSeries": (name: string, range: string) => `No samples for ${name} in the last ${range}.`,
   "usage.noSeriesHint":
@@ -3233,6 +3235,8 @@ export const en = {
   "usage.tenancy": "Who can see this",
   "usage.tenancyHint":
     "Zeabur asks only for this project's replicas. The store itself is not split by project: anyone allowed to open it can read every project's metrics.",
+  "usage.memberTenancyHint":
+    "Zeabur reads the store through Zeabur Proxy, which only returns this project's metrics. Viewers and developers of the project can see them.",
   "usage.loadingChart": "Loading chart…",
 
   // Settings: the cluster's name

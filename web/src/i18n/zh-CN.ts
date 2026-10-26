@@ -2945,6 +2945,7 @@ export const zhCN: Messages = {
   "usage.whatHistory": "查看用量历史",
   "usage.proxyHint":
     "Zeabur 以你的身份通过 Kubernetes API 读取指标存储服务。能这样读取的人可以看到所有项目的指标，所以通常只有管理员有这项权限。",
+  "usage.memberHint": "这个项目的成员才能看到用量历史记录。请管理员把你加入这个项目。",
   "usage.storeUnavailable": "指标存储服务没有响应。",
   "usage.noSeries": (name, range) => `最近 ${range} 没有 ${name} 的数据。`,
   "usage.noSeriesHint":
@@ -2955,6 +2956,8 @@ export const zhCN: Messages = {
   "usage.tenancy": "谁看得到",
   "usage.tenancyHint":
     "Zeabur 只查询这个项目的副本。但存储服务本身不分项目：能打开它的人可以读到所有项目的指标。",
+  "usage.memberTenancyHint":
+    "Zeabur 通过 Zeabur Proxy 读取，只拿得到这个项目的指标。这个项目的查看者和开发者都能看到。",
   "usage.loadingChart": "正在加载图表…",
 
   // 设置：指标存储服务

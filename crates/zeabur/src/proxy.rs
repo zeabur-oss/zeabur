@@ -16,7 +16,7 @@ use hyper_util::client::legacy::connect::HttpConnector;
 use hyper_util::rt::TokioExecutor;
 use rustls::pki_types::CertificateDer;
 use rustls::pki_types::pem::PemObject as _;
-use zeabur_api::services::logs::{LogProxy, ProxyAnswer};
+use zeabur_api::services::proxy::{ProxyAnswer, ZeaburProxy};
 use zeabur_kube::UserToken;
 
 /// Longer than the proxy's own 30 s for its backend, so its answer arrives first.
@@ -109,7 +109,7 @@ impl Proxy {
     }
 }
 
-impl LogProxy for Proxy {
+impl ZeaburProxy for Proxy {
     fn get<'a>(
         &'a self,
         token: &'a UserToken,

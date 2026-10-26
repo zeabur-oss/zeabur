@@ -2951,6 +2951,7 @@ export const zhTW: Messages = {
   "usage.whatHistory": "檢視用量歷史紀錄",
   "usage.proxyHint":
     "Zeabur 以你的身分透過 Kubernetes API 讀取指標儲存服務。能這樣讀取的人可以看到所有專案的指標，所以通常只有管理員有這項權限。",
+  "usage.memberHint": "這個專案的成員才看得到用量歷史紀錄。請管理員把你加進這個專案。",
   "usage.storeUnavailable": "指標儲存服務沒有回應。",
   "usage.noSeries": (name, range) => `最近 ${range} 沒有 ${name} 的資料。`,
   "usage.noSeriesHint":
@@ -2961,6 +2962,8 @@ export const zhTW: Messages = {
   "usage.tenancy": "誰看得到",
   "usage.tenancyHint":
     "Zeabur 只查詢這個專案的副本。但儲存服務本身不分專案：能開啟它的人可以讀到所有專案的指標。",
+  "usage.memberTenancyHint":
+    "Zeabur 透過 Zeabur Proxy 讀取，只拿得到這個專案的指標。這個專案的檢視者和開發者都看得到。",
   "usage.loadingChart": "正在載入圖表…",
 
   // 設定：指標儲存服務

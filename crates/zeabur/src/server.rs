@@ -42,7 +42,7 @@ use zeabur_api::ApiError;
 use zeabur_api::access::{ClusterAccess, Handoff};
 use zeabur_api::account::SignInPage;
 use zeabur_api::plan_token::PlanKey;
-use zeabur_api::services::logs::LogProxy;
+use zeabur_api::services::proxy::ZeaburProxy;
 use zeabur_auth::client::{AuthError, OAuthClient};
 use zeabur_auth::cookie;
 use zeabur_auth::flow::{FlowKey, LIFETIME_SECONDS, Pending, return_path};
@@ -117,12 +117,12 @@ pub(crate) fn app(
     plan_key: PlanKey,
     settings: zeabur_api::Settings,
     sign_in: Arc<dyn SignInPage>,
-    log_proxy: Option<Arc<dyn LogProxy>>,
+    zeabur_proxy: Option<Arc<dyn ZeaburProxy>>,
 ) -> Router {
     let access = Arc::new(SessionAccess {
         origin: auth.public.origin(),
     });
-    let api = zeabur_api::router_with_key(access, plan_key, settings, sign_in, log_proxy).layer(
+    let api = zeabur_api::router_with_key(access, plan_key, settings, sign_in, zeabur_proxy).layer(
         axum::middleware::from_fn_with_state(Arc::clone(auth), session),
     );
     let sign_in = Router::new()

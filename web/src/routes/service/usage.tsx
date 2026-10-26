@@ -45,6 +45,11 @@ const HistoryChart = lazy(() => import("@/routes/service/history-chart"))
 
 const route = getRouteApi("/projects/$project/services/$kind/$name")
 
+const VIA_HINTS = {
+  "zeabur-proxy": { refused: "usage.memberHint", tenancy: "usage.memberTenancyHint" },
+  "service-proxy": { refused: "usage.proxyHint", tenancy: "usage.tenancyHint" },
+} as const
+
 export function UsagePanel({ project, service }: { project: string; service: Service }) {
   const t = useT()
   const usage = useQuery(usageQuery(project))
@@ -593,7 +598,9 @@ function HistoryBody({
           missing={history.unreadable.map((u) => `get ${u.resource}`)}
           line
         >
-          <p className="type-meta text-muted-foreground">{t("usage.proxyHint")}</p>
+          <p className="type-meta text-muted-foreground">
+            {t(VIA_HINTS[history.source.via].refused)}
+          </p>
         </Refused>
       )
     case "unavailable":
@@ -709,7 +716,7 @@ function HistoryBody({
           </span>
         </span>
         <span>{stepText}</span>
-        <Hint label={t("usage.tenancy")}>{t("usage.tenancyHint")}</Hint>
+        <Hint label={t("usage.tenancy")}>{t(VIA_HINTS[history.source.via].tenancy)}</Hint>
       </p>
     </div>
   )

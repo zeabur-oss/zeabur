@@ -1859,9 +1859,10 @@ export interface paths {
      *     as you: CPU (millicores) and memory (the working set, bytes) per pod, and restarts when the
      *     store has kube-state-metrics. Pods are the service's by name, so those a rollout replaced
      *     are included. Always `200` once the parameters are valid: `state` says when there is no
-     *     store, you may not read it (`get` on its `services/proxy`; `unreadable` names it), or it did
-     *     not answer. Reading the store is reading every project's metrics: see the description of
-     *     `GET /api/v1/settings/metrics-store`.
+     *     store, you may not read it (`unreadable` names the right), or it did not answer. With Zeabur
+     *     Proxy and the default store, the right is `get` on `metrics.proxy.zeabur.com` in the project,
+     *     which project members have; otherwise it is `get` on the store's `services/proxy`, which is
+     *     reading every project's metrics: see the description of `GET /api/v1/settings/metrics-store`.
      */
     get: operations["getServiceHistory"]
     put?: never
@@ -5049,7 +5050,14 @@ export interface components {
     HistorySource: {
       /** @description Its Service port, `namespace/name:port`. */
       service: string
+      /** @description How it was read, which decides who may read it. */
+      via: components["schemas"]["HistoryVia"]
     }
+    /**
+     * @description How the store was read. An open set.
+     * @enum {string}
+     */
+    HistoryVia: "zeabur-proxy" | "service-proxy"
     /** @description One hop and what was seen there. */
     Hop: {
       /** @description The objects and fields it rests on. */

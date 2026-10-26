@@ -13,7 +13,7 @@ mod tests {
     use secrecy::{ExposeSecret as _, SecretString};
     use serde_json::json;
     use zeabur_api::access::{ClusterAccess, Handoff, SingleCluster};
-    use zeabur_api::services::logs::{LogProxy, ProxyAnswer};
+    use zeabur_api::services::proxy::{ProxyAnswer, ZeaburProxy};
     use zeabur_core::problem::Problem;
     use zeabur_kube::Cluster;
     use zeabur_kube::k8s_openapi::jiff::{SignedDuration, Timestamp};
@@ -34,7 +34,7 @@ mod tests {
         asked: Mutex<Vec<(String, String)>>,
     }
 
-    impl LogProxy for Fake {
+    impl ZeaburProxy for Fake {
         fn get<'a>(
             &'a self,
             token: &'a zeabur_kube::UserToken,
@@ -69,9 +69,9 @@ mod tests {
             asked: Mutex::new(Vec::new()),
         });
         let cluster: Arc<dyn Cluster> = Arc::new(MemoryCluster::new(State::default()));
-        let proxy: Arc<dyn LogProxy> = Arc::<Fake>::clone(&fake);
+        let proxy: Arc<dyn ZeaburProxy> = Arc::<Fake>::clone(&fake);
         (
-            zeabur_api::router_with_log_proxy(Arc::new(Signed(cluster)), now, proxy),
+            zeabur_api::router_with_zeabur_proxy(Arc::new(Signed(cluster)), now, proxy),
             fake,
         )
     }
@@ -176,7 +176,7 @@ mod tests {
         let cluster: Arc<dyn Cluster> = Arc::new(MemoryCluster::new(State::default()));
         for app in [
             zeabur_api::router(Arc::new(Signed(Arc::clone(&cluster)))),
-            zeabur_api::router_with_log_proxy(
+            zeabur_api::router_with_zeabur_proxy(
                 Arc::new(SingleCluster(Arc::clone(&cluster))),
                 now,
                 Arc::new(Fake {

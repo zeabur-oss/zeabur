@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
-# Zeabur Proxy against the real VictoriaLogs: a canary written in one namespace never reaches a
-# person whose rights are in another. Namespace B's name starts with A's. A reader with `view` in
+# Zeabur Proxy against the real VictoriaLogs and VictoriaMetrics: a canary written in one namespace
+# never reaches a person whose rights are in another. Namespace B's name starts with A's. A reader with `view` in
 # A asks the proxy for B's marker in every way below, and none of its answers carries it; a reader
 # with `view` in B sees it, so the marker was there to leak. A pod in A that writes JSON naming B
-# never shows up in B, and a pod in A reaches neither VictoriaLogs nor the proxy.
+# never shows up in B, and a pod in A reaches neither VictoriaLogs nor the proxy. For metrics, a
+# pod in B named after B's marker is the canary: A's reader asks for B's series in every way below,
+# and no answer names that pod. The metrics part is skipped when the proxy serves no metrics store.
 #
 # Needs a cluster where the chart runs with `proxy.enabled` and the catalog's logs capability
 # (VictoriaLogs, vlagent, its NetworkPolicy) is installed; KUBECONFIG points at it. Run inside
@@ -66,6 +68,7 @@ writer() { # namespace, name, shell loop body
 }
 writer "$a" writer "echo $marker_a"
 writer "$b" writer "echo $marker_b"
+writer "$b" "$marker_b" "true"
 # Lines that name B in every shape a collector might take a field from.
 kubectl apply -f - >/dev/null <<EOF
 apiVersion: v1
@@ -181,7 +184,7 @@ refused "tail" "400|404" GET "/logs/select/logsql/tail?namespace=$a&query=*"
 refused "field values" "400|404" GET \
   "/logs/select/logsql/field_values?namespace=$a&field=kubernetes.pod_namespace"
 refused "the backend's own path" "400|404" GET "/select/logsql/query?query=$marker_b"
-refused "the metrics side" "400|404" GET "/metrics/api/v1/query?namespace=$a&query=up"
+refused "another backend" "400|404" GET "/traces/api/v1/query?namespace=$a&query=up"
 query "$token_a" "$a" "$marker_b" -H "AccountID: 1" -H "ProjectID: 1" >/dev/null
 clean "tenant headers" 200
 ask "$token_a" GET "/logs/select/logsql/hits?namespace=$a" -G \
@@ -199,6 +202,71 @@ pass "a forged token (401)"
 [[ $(ask "$token_b" GET "/logs/select/logsql/query?namespace=$a&query=*") == 403 ]] ||
   fail "B's reader in A: $(cat "$work/status")"
 pass "B's reader in A (403)"
+
+# --- Metrics: A's reader reads A's usage and none of B's --------------------------------------------
+metrics() { # token namespace endpoint [curl args]
+  local token=$1 ns=$2 endpoint=$3
+  shift 3
+  ask "$token" GET "/metrics/api/v1/$endpoint?namespace=$ns" -G "$@"
+}
+if [[ $(metrics "$token_a" "$a" labels) =~ ^(404|502)$ ]]; then
+  echo "skip metrics: the proxy serves no metrics store ($(cat "$work/status"))"
+else
+  in_store() { # token namespace marker: whether the namespace's series name the marker yet
+    [[ $(metrics "$1" "$2" query --data-urlencode "query=container_memory_working_set_bytes") == 200 ]] &&
+      grep -q "$3" "$work/body"
+  }
+  retry 240 "B's canary pod in the metrics store" in_store "$token_b" "$b" "$marker_b"
+  retry 60 "A's writer in the metrics store" in_store "$token_a" "$a" '"writer"'
+  pass "B's reader sees B's canary pod; A's reader sees A's writer"
+  [[ $(metrics "$token_a" "$a" "label/namespace/values") == 200 ]] &&
+    [[ $(jq -c .data "$work/body") == "[\"$a\"]" ]] ||
+    fail "A's namespace values: $(head -c 300 "$work/body")"
+  pass "A's reader sees only A among the namespaces"
+  now=$(date +%s)
+  for q in \
+    "container_memory_working_set_bytes" \
+    "{__name__=~\".+\"}" \
+    "{namespace=\"$b\"}" \
+    "{namespace=~\"$a.*\"}" \
+    "{namespace!=\"$a\"}" \
+    "{pod=\"$marker_b\"}" \
+    "count by (namespace, pod) ({__name__=~\"container_.+\"})" \
+    "sum by (pod) (rate(container_cpu_usage_seconds_total{namespace=\"$b\"}[5m]))" \
+    "max_over_time(container_memory_working_set_bytes{namespace=\"$b\"}[1h:1m])" \
+    "container_memory_working_set_bytes{namespace=\"$b\"} offset 1m" \
+    "container_memory_working_set_bytes{namespace=\"$b\"} or vector(1)" \
+    "union(container_memory_working_set_bytes{namespace=\"$b\"}, up)" \
+    "WITH (x = {namespace=\"$b\"}) x" \
+    "topk(5, container_memory_working_set_bytes) @ end()"; do
+    metrics "$token_a" "$a" query --data-urlencode "query=$q" >/dev/null
+    clean "metrics query $q" "200|400|422"
+    metrics "$token_a" "$a" query_range --data-urlencode "query=$q" \
+      --data-urlencode "start=$((now - 3600))" --data-urlencode "end=$now" --data-urlencode "step=60" \
+      >/dev/null
+    clean "metrics range query $q" "200|400|422"
+  done
+  for match in "{__name__=~\".+\"}" "{namespace=\"$b\"}" "{pod=\"$marker_b\"}"; do
+    metrics "$token_a" "$a" series --data-urlencode "match[]=$match" >/dev/null
+    clean "series $match" 200
+    metrics "$token_a" "$a" labels --data-urlencode "match[]=$match" >/dev/null
+    clean "labels $match" 200
+    metrics "$token_a" "$a" "label/pod/values" --data-urlencode "match[]=$match" >/dev/null
+    clean "pod values $match" 200
+  done
+  refused "B's metrics" 403 GET "/metrics/api/v1/query?namespace=$b&query=up"
+  refused "B's pod names" 403 GET "/metrics/api/v1/label/pod/values?namespace=$b"
+  refused "a label filter of its own" 400 GET \
+    "/metrics/api/v1/query?namespace=$a&query=up&extra_label=namespace%3D$b"
+  refused "a series filter of its own" 400 GET \
+    "/metrics/api/v1/query?namespace=$a&query=up&extra_filters%5B%5D=%7Bnamespace%3D%22$b%22%7D"
+  refused "export" "400|404" GET "/metrics/api/v1/export?namespace=$a&match%5B%5D=%7Bnamespace%3D%22$b%22%7D"
+  refused "federate" "400|404" GET "/metrics/federate?namespace=$a&match%5B%5D=%7Bnamespace%3D%22$b%22%7D"
+  refused "TSDB status" "400|404" GET "/metrics/api/v1/status/tsdb?namespace=$a"
+  refused "vmalert's alerts" "400|404" GET "/metrics/api/v1/alerts?namespace=$a"
+  refused "a POSTed query" "400|404|405" POST "/metrics/api/v1/query?namespace=$a" \
+    --data-urlencode "query={namespace=\"$b\"}"
+fi
 
 # --- The spoofer's lines stay in A ------------------------------------------------------------------
 sleep 10

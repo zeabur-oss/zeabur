@@ -4,6 +4,7 @@
 pub mod evidence;
 pub mod history;
 pub mod logs;
+pub mod proxy;
 pub mod releases;
 pub mod rollout;
 pub mod runs;

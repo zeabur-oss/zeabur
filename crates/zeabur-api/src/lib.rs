@@ -352,13 +352,13 @@ pub fn router(access: Arc<dyn ClusterAccess>) -> Router {
 ///
 /// Plan tokens are sealed with `plan_key` instead of a key made at start, so that they outlive a
 /// restart, `sign_in` finds the issuer's page where people manage how they sign in, and
-/// `log_proxy` reaches Zeabur Proxy for log history, when it is installed.
+/// `zeabur_proxy` reaches Zeabur Proxy for log and usage history, when it is installed.
 pub fn router_with_key(
     access: Arc<dyn ClusterAccess>,
     plan_key: PlanKey,
     settings: Settings,
     sign_in: Arc<dyn account::SignInPage>,
-    log_proxy: Option<Arc<dyn services::logs::LogProxy>>,
+    zeabur_proxy: Option<Arc<dyn services::proxy::ZeaburProxy>>,
 ) -> Router {
     let images = inspector(images::https::Reach::Public, &settings);
     let terminals = tools::connect(&settings.terminal);
@@ -370,7 +370,7 @@ pub fn router_with_key(
         settings,
         Arc::new(resolve::System),
         sign_in,
-        log_proxy,
+        zeabur_proxy,
         images,
         zeabur_catalog::template_idle,
         images::https::Reach::Public,
@@ -403,11 +403,11 @@ fn inspector(reach: images::https::Reach, settings: &Settings) -> Arc<images::In
     ))
 }
 
-/// [`router_at`], reaching Zeabur Proxy through `log_proxy`; for tests.
-pub fn router_with_log_proxy(
+/// [`router_at`], reaching Zeabur Proxy through `zeabur_proxy`; for tests.
+pub fn router_with_zeabur_proxy(
     access: Arc<dyn ClusterAccess>,
     clock: fn() -> zeabur_kube::k8s_openapi::jiff::Timestamp,
-    log_proxy: Arc<dyn services::logs::LogProxy>,
+    zeabur_proxy: Arc<dyn services::proxy::ZeaburProxy>,
 ) -> Router {
     build_with(
         access,
@@ -417,7 +417,7 @@ pub fn router_with_log_proxy(
         Settings::default(),
         Arc::new(resolve::System),
         Arc::new(account::Fixed(None)),
-        Some(log_proxy),
+        Some(zeabur_proxy),
         inspector(images::https::Reach::Any, &Settings::default()),
         zeabur_catalog::template_idle,
         images::https::Reach::Any,
@@ -584,7 +584,7 @@ fn build_with(
     settings: Settings,
     resolver: Arc<dyn resolve::Resolve>,
     sign_in: Arc<dyn account::SignInPage>,
-    log_proxy: Option<Arc<dyn services::logs::LogProxy>>,
+    zeabur_proxy: Option<Arc<dyn services::proxy::ZeaburProxy>>,
     images: Arc<images::Inspector>,
     template_idle: fn(&str) -> Option<zeabur_catalog::IdleUse>,
     reach: images::https::Reach,
@@ -604,7 +604,7 @@ fn build_with(
         resolver,
         tools: Arc::new(tools::Sessions::default()),
         sign_in,
-        log_proxy,
+        zeabur_proxy,
         pusher: Arc::new(projects::oci_push::Pusher::new(
             reach,
             trusted_ca.as_deref(),

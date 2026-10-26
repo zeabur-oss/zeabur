@@ -136,8 +136,8 @@ async fn serve(args: &Args, config: Config) -> Result<(), String> {
         flow_key: FlowKey::random().map_err(|e| e.to_string())?,
         clock,
     });
-    let log_proxy = config.proxy.map(|proxy| {
-        let proxy: Arc<dyn zeabur_api::services::logs::LogProxy> = Arc::new(proxy);
+    let zeabur_proxy = config.proxy.map(|proxy| {
+        let proxy: Arc<dyn zeabur_api::services::proxy::ZeaburProxy> = Arc::new(proxy);
         proxy
     });
     let app = server::app(
@@ -145,7 +145,7 @@ async fn serve(args: &Args, config: Config) -> Result<(), String> {
         config.plan_key,
         config.settings,
         Arc::new(IssuerPage(passkeys)),
-        log_proxy,
+        zeabur_proxy,
     );
 
     tokio::spawn(async move {

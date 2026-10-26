@@ -37,7 +37,7 @@ pub struct AppState {
     /// Where the issuer lets people manage how they sign in (see [`crate::account`]).
     pub sign_in: Arc<dyn crate::account::SignInPage>,
     /// Zeabur Proxy, for log history (see [`crate::services::logs`]); `None` without one.
-    pub log_proxy: Option<Arc<dyn crate::services::logs::LogProxy>>,
+    pub zeabur_proxy: Option<Arc<dyn crate::services::proxy::ZeaburProxy>>,
     /// Reads images' configurations from their registries (see [`crate::images`]).
     pub images: Arc<crate::images::Inspector>,
     /// The client of GitHub's API; `None` when TLS could not be set up.

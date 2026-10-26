@@ -10,42 +10,20 @@
 //! `view` have that right (the chart's `zeabur-proxy-logs-reader`), the same people who may read
 //! the pods' logs (`pods/log`); Viewers do not.
 
-use std::future::Future;
-use std::pin::Pin;
-
 use axum::Json;
 use axum::extract::{Path, RawQuery, State};
 use serde::Serialize;
 use utoipa::ToSchema;
 use zeabur_core::problem::{Kind, MEDIA_TYPE as PROBLEM, Problem};
-use zeabur_kube::UserToken;
 use zeabur_kube::k8s_openapi::jiff::Timestamp;
 use zeabur_modules::prometheus_api::{PrometheusRange, pod_pattern};
 
 use crate::error::ApiError;
 use crate::handlers::{AppState, Credential};
+use crate::services::proxy::detail;
 
 /// The most lines one history holds.
 const MAX_LINES: u32 = 1000;
-
-/// Zeabur Proxy, as Zeabur reaches it.
-pub trait LogProxy: Send + Sync {
-    /// `GET path_and_query` with `token` as the bearer token.
-    fn get<'a>(
-        &'a self,
-        token: &'a UserToken,
-        path_and_query: String,
-    ) -> Pin<Box<dyn Future<Output = Result<ProxyAnswer, String>> + Send + 'a>>;
-}
-
-/// What Zeabur Proxy answered.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ProxyAnswer {
-    /// The HTTP status.
-    pub status: u16,
-    /// The body.
-    pub body: Vec<u8>,
-}
 
 /// Whether the history could be read, as the person. An open set.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
@@ -214,19 +192,6 @@ fn lines(body: &[u8]) -> Vec<LogHistoryLine> {
     lines.into_iter().map(|(_, line)| line).collect()
 }
 
-/// The `detail` of the proxy's problem, else its body as text.
-fn detail(body: &[u8]) -> String {
-    serde_json::from_slice::<serde_json::Value>(body)
-        .ok()
-        .and_then(|problem| {
-            problem
-                .get("detail")
-                .and_then(serde_json::Value::as_str)
-                .map(str::to_owned)
-        })
-        .unwrap_or_else(|| String::from_utf8_lossy(body).trim().to_owned())
-}
-
 /// What a service's pods logged over the last hour, 6 hours, day or week, also pods replaced
 /// since, as you, from the cluster's VictoriaLogs through Zeabur Proxy. Always `200` once the
 /// parameters are valid: `state` says when Zeabur Proxy is not installed, you may not read the
@@ -268,7 +233,7 @@ pub(crate) async fn history(
         truncated: false,
         message: None,
     };
-    let (Some(proxy), Some(handoff)) = (state.log_proxy.as_ref(), handoff) else {
+    let (Some(proxy), Some(handoff)) = (state.zeabur_proxy.as_ref(), handoff) else {
         return Ok(Json(history));
     };
     let start = (state.clock)()

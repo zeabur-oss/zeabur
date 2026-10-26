@@ -128,6 +128,22 @@ test("an admin invites a Developer and a Viewer, who each get what their role al
     expect(["available", "unavailable"]).toContain(
       ((await history.json()) as { state: string }).state,
     )
+
+    // Usage history goes through Zeabur Proxy too, held to the person's own project.
+    const usage = async (project: string) =>
+      (await (
+        await developer.request.get(
+          `/api/v1/projects/${encodeURIComponent(project)}/services/deployment/${service}/history`,
+        )
+      ).json()) as { state: string; source: { via: string }; unreadable: { resource: string }[] }
+    const own = await usage(first)
+    expect(own.source.via).toBe("zeabur-proxy")
+    expect(["available", "unavailable"]).toContain(own.state)
+    const other = await usage(second)
+    expect(other.state).toBe("unreadable")
+    expect(other.unreadable.map((u) => u.resource)).toEqual([
+      `metrics.proxy.zeabur.com (${second})`,
+    ])
     await developer.context().close()
   })
 
