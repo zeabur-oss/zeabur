@@ -395,7 +395,7 @@ pub fn plan(index: &Index, config: &Config, facts: &Facts) -> Result<Plan, PlanE
             profile,
             &facts.arch,
         )?);
-        let privileged = privileged(component);
+        let privileged = privileged(component, config);
         for release in &component.releases {
             if release.namespace == "kube-system" {
                 continue;
@@ -937,8 +937,18 @@ fn inputs(component: &Component, config: &Config) -> Result<Inputs, PlanError> {
 }
 
 /// Why a component's namespaces need the `privileged` Pod Security level, if they do.
-fn privileged(component: &Component) -> Option<String> {
+fn privileged(component: &Component, config: &Config) -> Option<String> {
     let id = &component.id;
+    if id == "volume-backup/velero" {
+        // Only its node agent needs the level, and the `file-backup` input installs it.
+        let agent = config
+            .inputs
+            .get(id)
+            .and_then(|given| given.get("file-backup"))
+            .and_then(Value::as_bool)
+            .unwrap_or(false);
+        return agent.then(|| format!("{id}: its node agent mounts host paths and runs as root"));
+    }
     PRIVILEGED
         .iter()
         .find(|(c, _)| c == id)
@@ -1419,6 +1429,29 @@ mod tests {
         assert_eq!(plan.storage.default_class, "local-path");
         assert_eq!(plan.storage.other_classes, Vec::<String>::new());
         assert_eq!(plan.node_prep, None);
+    }
+
+    #[test]
+    fn velero_needs_the_privileged_level_only_for_its_node_agent() {
+        let index = Index::parse(INDEX.as_bytes()).unwrap();
+        let level = |extra: &str| {
+            let plan = plan(
+                &index,
+                &config(&format!(
+                    "enable: [volume-backup/velero]\ninputs:\n  volume-backup/velero:\n    \
+                     bucket: b\n    s3-url: http://s3:9000\n{extra}\
+                     secretFiles:\n  volume-backup/velero:\n    credentials: /tmp/c\n"
+                )),
+                &facts(),
+            )
+            .unwrap();
+            plan.namespaces
+                .iter()
+                .find(|n| n.name == "velero")
+                .map(|n| n.privileged.is_some())
+        };
+        assert_eq!(level(""), Some(false));
+        assert_eq!(level("    file-backup: true\n"), Some(true));
     }
 
     #[test]
