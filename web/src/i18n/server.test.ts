@@ -7,7 +7,7 @@ import { zhCN } from "@/i18n/zh-CN"
 import { zhTW } from "@/i18n/zh-TW"
 
 const crates = resolve(import.meta.dir, "../../../crates")
-const scopes = /^(diagnosis|gap|trace|incident)\./
+const scopes = /^(diagnosis|gap|trace|incident|problem)\./
 
 function files(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) =>
@@ -23,7 +23,8 @@ function sentKeys() {
       for (const match of readFileSync(file, "utf8").matchAll(pattern))
         if (scopes.test(match[1]!)) found.add(match[1]!)
   }
-  read(join(crates, "zeabur-modules/src"), /Message::new\("([^"]+)"/g)
+  for (const crate of ["zeabur-modules", "zeabur-plan", "zeabur-api"])
+    read(join(crates, crate, "src"), /Message::new\("([^"]+)"/g)
   for (const crate of ["zeabur-modules", "zeabur-gaps"])
     read(join(crates, crate, "fixtures"), /"?\bkey"?: *"?([\w.]+)/g)
   return [...found].sort()

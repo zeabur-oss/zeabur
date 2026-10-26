@@ -46,8 +46,8 @@ pub use delete::{MONGODB_CLAIMS_FINALIZER, data_claims};
 pub use ip_limits::egress_limit_name;
 pub use owned::{Owned, SERVICE_LABEL, owned, workload_of};
 pub use plan::{
-    CREATABLE, ErrorKind, Fetched, Input, PlanError, RESTARTED_AT, StorageClassInfo, creatable,
-    plan, plan_with, versions,
+    CREATABLE, ErrorKind, Fetched, Input, PlanError, RESTARTED_AT, StorageClassInfo, Words,
+    creatable, plan, plan_with, versions,
 };
 pub use project::{DEFAULT_ACCOUNT, project_namespace};
 pub use project_deletion::{

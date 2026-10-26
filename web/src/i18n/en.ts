@@ -3535,6 +3535,28 @@ export const en = {
     "Read the replica's events for the reason; a policy may forbid the user it runs as.",
   "sentence.problem.badRequest.fix.toolsLocally": () =>
     "Run kubectl and helm in your own terminal; they use the same kubeconfig as Zeabur.",
+  "sentence.problem.summary.publicPort.alreadyPublic": (p: P) =>
+    `A Service named ${p.name} already exists.`,
+  "sentence.problem.publicPort.fix.alreadyPublic": () =>
+    "Reload the page: this port may already be open.",
+  "sentence.problem.summary.publicPort.nameTooLong": (p: P) =>
+    `${p.name} is longer than the 63 characters a Service name can have.`,
+  "sentence.problem.publicPort.fix.nameTooLong": () =>
+    "Use a Service with a shorter name, then try again.",
+  "sentence.problem.summary.publicPort.unknownPort": (p: P) => `The service has no port ${p.port}.`,
+  "sentence.problem.publicPort.fix.unknownPort": () =>
+    "Reload the page and pick one of the ports it lists.",
+  "sentence.problem.summary.publicPort.noSelector": (p: P) =>
+    `Service ${p.service} doesn't pick any pods, so an open port would lead nowhere.`,
+  "sentence.problem.publicPort.fix.noSelector": () =>
+    "Use a Service that picks this service's pods.",
+  "sentence.problem.summary.publicPort.portTaken": (p: P) =>
+    `Another service in this project already has port ${p.port} open.`,
+  "sentence.problem.publicPort.fix.portTaken": () =>
+    "Close the port there first, or open a different one.",
+  "sentence.problem.summary.publicPort.notPublic": (p: P) =>
+    `Port ${p.port} isn't open to the internet.`,
+  "sentence.problem.publicPort.fix.notPublic": () => "Reload the page: it may already be closed.",
   "sentence.problem.summary.bad-request": () => "The request isn't valid.",
   "sentence.problem.summary.unauthenticated": () => "The cluster didn't accept your sign-in.",
   "sentence.problem.summary.signed-out": () => "You're signed out.",

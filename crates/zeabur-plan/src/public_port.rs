@@ -15,10 +15,25 @@
 
 use k8s_openapi::api::core::v1::{Service as KubeService, ServicePort};
 use serde_json::{Value, json};
+use zeabur_model::Message;
 
 use crate::change::{PublicPortChange, Target, Warning};
 use crate::owned::SERVICE_LABEL;
-use crate::plan::{ErrorKind, PlanError, Planner, Working, error, to_json};
+use crate::plan::{ErrorKind, PlanError, Planner, Words, Working, error, to_json};
+
+/// A refusal a client words from `summary` and `fix`.
+fn refusal(
+    kind: ErrorKind,
+    code: &str,
+    detail: String,
+    summary: Message,
+    fix: Message,
+) -> PlanError {
+    PlanError {
+        words: Some(Box::new(Words { summary, fix })),
+        ..error(kind, code, detail)
+    }
+}
 
 fn service_target(name: &str) -> Target {
     Target {
@@ -74,24 +89,31 @@ impl<'a> Planner<'a> {
             return self.close_public_port(change, &name, existing);
         }
         if existing.is_some() {
-            return Err(error(
+            return Err(refusal(
                 ErrorKind::Conflict,
                 "already_public",
                 format!("A Service named {name} already exists."),
+                Message::new("problem.summary.publicPort.alreadyPublic").with("name", name),
+                Message::new("problem.publicPort.fix.alreadyPublic"),
             ));
         }
         if name.len() > 63 {
-            return Err(error(
+            return Err(refusal(
                 ErrorKind::BadRequest,
                 "name_too_long",
                 format!("{name} is longer than the 63 characters a Service name can have."),
+                Message::new("problem.summary.publicPort.nameTooLong").with("name", name),
+                Message::new("problem.publicPort.fix.nameTooLong"),
             ));
         }
         let unknown = || {
-            error(
+            refusal(
                 ErrorKind::NotFound,
                 "unknown_port",
                 format!("Service {} has no port {}.", change.service, change.port),
+                Message::new("problem.summary.publicPort.unknownPort")
+                    .with("port", change.port.to_string()),
+                Message::new("problem.publicPort.fix.unknownPort"),
             )
         };
         let source = self.kube_service(&change.service).ok_or_else(unknown)?;
@@ -103,32 +125,19 @@ impl<'a> Planner<'a> {
             .find(|p| p.port == change.port)
             .ok_or_else(unknown)?;
         let Some(selector) = spec.selector.as_ref().filter(|s| !s.is_empty()) else {
-            return Err(error(
+            return Err(refusal(
                 ErrorKind::Invalid,
                 "no_selector",
                 format!(
                     "Service {} selects no pods, so a copy of it would reach nothing.",
                     change.service
                 ),
+                Message::new("problem.summary.publicPort.noSelector")
+                    .with("service", change.service.clone()),
+                Message::new("problem.publicPort.fix.noSelector"),
             ));
         };
-        let taken = self.input.snapshot.services.iter().any(|s| {
-            is_load_balancer(s)
-                && s.spec
-                    .iter()
-                    .flat_map(|spec| spec.ports.iter().flatten())
-                    .any(|p| p.port == change.port && p.protocol == port.protocol)
-        });
-        if taken {
-            return Err(error(
-                ErrorKind::Conflict,
-                "port_taken",
-                format!(
-                    "Another Service of this project is already open on port {}.",
-                    change.port
-                ),
-            ));
-        }
+        self.refuse_taken(port)?;
         let entry = port_entry(port);
         let body = json!({
             "apiVersion": "v1",
@@ -163,6 +172,31 @@ impl<'a> Planner<'a> {
         Ok(())
     }
 
+    /// Refuses `port` when another `LoadBalancer` Service of the project is open on it.
+    fn refuse_taken(&self, port: &ServicePort) -> Result<(), PlanError> {
+        let taken = self.input.snapshot.services.iter().any(|s| {
+            is_load_balancer(s)
+                && s.spec
+                    .iter()
+                    .flat_map(|spec| spec.ports.iter().flatten())
+                    .any(|p| p.port == port.port && p.protocol == port.protocol)
+        });
+        if !taken {
+            return Ok(());
+        }
+        Err(refusal(
+            ErrorKind::Conflict,
+            "port_taken",
+            format!(
+                "Another Service of this project is already open on port {}.",
+                port.port
+            ),
+            Message::new("problem.summary.publicPort.portTaken")
+                .with("port", port.port.to_string()),
+            Message::new("problem.publicPort.fix.portTaken"),
+        ))
+    }
+
     fn close_public_port(
         &mut self,
         change: &PublicPortChange,
@@ -170,13 +204,16 @@ impl<'a> Planner<'a> {
         existing: Option<&KubeService>,
     ) -> Result<(), PlanError> {
         let Some(object) = existing.filter(|o| is_load_balancer(o)) else {
-            return Err(error(
+            return Err(refusal(
                 ErrorKind::NotFound,
                 "not_public",
                 format!(
                     "Port {} of {} is not open to the internet.",
                     change.port, change.service
                 ),
+                Message::new("problem.summary.publicPort.notPublic")
+                    .with("port", change.port.to_string()),
+                Message::new("problem.publicPort.fix.notPublic"),
             ));
         };
         let object = to_json(object)?;

@@ -737,6 +737,47 @@ mod tests {
         );
     }
 
+    /// Given a port another service already opens, when the port is opened again, then the
+    /// refusal says so in words a client puts in the reader's language, with what to do.
+    #[tokio::test]
+    async fn a_port_taken_by_another_service_is_refused_in_the_readers_words() {
+        let app = app(&cluster());
+        let objects = [
+            json!({"apiVersion": "v1", "kind": "Service", "metadata": {"name": "web"},
+                "spec": {"selector": {"app": "web"}, "ports": [{"port": 8080}]}}),
+            json!({"apiVersion": "v1", "kind": "Service", "metadata": {"name": "other-public-8080"},
+                "spec": {"type": "LoadBalancer", "selector": {"app": "other"},
+                    "ports": [{"port": 8080}]}}),
+        ];
+        for object in objects {
+            let planned = plan(
+                &app,
+                &json!({"changes": [{"op": "create", "object": object}]}),
+            )
+            .await;
+            let (status, applied) = post(
+                app.clone(),
+                "/api/v1/projects/shop/apply",
+                &json!({"token": planned["token"]}),
+            )
+            .await;
+            assert_eq!(status, StatusCode::OK, "{applied}");
+        }
+        let (status, problem) = post(
+            app.clone(),
+            "/api/v1/projects/shop/plan",
+            &json!({"changes": [{"op": "publicPort",
+                "workload": {"kind": "Deployment", "name": "web"}, "service": "web", "port": 8080}]}),
+        )
+        .await;
+        assert_eq!(status, StatusCode::CONFLICT, "{problem}");
+        assert_eq!(
+            problem["summary"],
+            json!({"key": "problem.summary.publicPort.portTaken", "params": {"port": "8080"}})
+        );
+        assert_eq!(problem["fixKey"]["key"], "problem.publicPort.fix.portTaken");
+    }
+
     #[tokio::test]
     async fn a_created_policy_is_undone_by_deleting_the_version_it_was_created_at() {
         let cluster = cluster();

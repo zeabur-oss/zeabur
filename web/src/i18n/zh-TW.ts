@@ -3238,6 +3238,22 @@ export const zhTW: Messages = {
     "副本的事件會說明原因，可能是某項政策不允許它用這個使用者身分執行。",
   "sentence.problem.badRequest.fix.toolsLocally": () =>
     "在你自己的終端機執行 kubectl 和 helm，它們和 Zeabur 用的是同一份 kubeconfig。",
+  "sentence.problem.summary.publicPort.alreadyPublic": (p) => `已經有名為 ${p.name} 的 Service。`,
+  "sentence.problem.publicPort.fix.alreadyPublic": () =>
+    "重新整理頁面看看，這個連接埠可能已經開放了。",
+  "sentence.problem.summary.publicPort.nameTooLong": (p) =>
+    `${p.name} 超過 Service 名稱的 63 個字元上限。`,
+  "sentence.problem.publicPort.fix.nameTooLong": () => "換個短一點的 Service 名稱再試一次。",
+  "sentence.problem.summary.publicPort.unknownPort": (p) => `這個服務沒有連接埠 ${p.port}。`,
+  "sentence.problem.publicPort.fix.unknownPort": () => "重新整理頁面，從列出的連接埠裡選一個。",
+  "sentence.problem.summary.publicPort.noSelector": (p) =>
+    `Service ${p.service} 沒有選取任何 Pod，開放連接埠也連不到東西。`,
+  "sentence.problem.publicPort.fix.noSelector": () => "改用會選到這個服務 Pod 的 Service。",
+  "sentence.problem.summary.publicPort.portTaken": (p) =>
+    `這個專案裡已經有其他服務開放了連接埠 ${p.port}。`,
+  "sentence.problem.publicPort.fix.portTaken": () => "先關掉那邊的連接埠，或改開放其他連接埠。",
+  "sentence.problem.summary.publicPort.notPublic": (p) => `連接埠 ${p.port} 沒有對網際網路開放。`,
+  "sentence.problem.publicPort.fix.notPublic": () => "重新整理頁面看看，它可能已經關閉了。",
   "sentence.problem.summary.bad-request": () => "這個請求無效。",
   "sentence.problem.summary.unauthenticated": () => "叢集不接受你的登入。",
   "sentence.problem.summary.signed-out": () => "你已登出。",

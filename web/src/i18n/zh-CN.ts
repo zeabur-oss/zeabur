@@ -3232,6 +3232,21 @@ export const zhCN: Messages = {
     "副本的事件会说明原因，可能是某项策略不允许它以这个用户身份运行。",
   "sentence.problem.badRequest.fix.toolsLocally": () =>
     "在你自己的终端里运行 kubectl 和 helm，它们与 Zeabur 使用同一份 kubeconfig。",
+  "sentence.problem.summary.publicPort.alreadyPublic": (p) => `已经有名为 ${p.name} 的 Service。`,
+  "sentence.problem.publicPort.fix.alreadyPublic": () => "刷新页面看看，这个端口可能已经开放了。",
+  "sentence.problem.summary.publicPort.nameTooLong": (p) =>
+    `${p.name} 超过了 Service 名称 63 个字符的上限。`,
+  "sentence.problem.publicPort.fix.nameTooLong": () => "换个短一点的 Service 名称再试一次。",
+  "sentence.problem.summary.publicPort.unknownPort": (p) => `这个服务没有端口 ${p.port}。`,
+  "sentence.problem.publicPort.fix.unknownPort": () => "刷新页面，从列出的端口里选一个。",
+  "sentence.problem.summary.publicPort.noSelector": (p) =>
+    `Service ${p.service} 没有选中任何 Pod，开放端口也连不到东西。`,
+  "sentence.problem.publicPort.fix.noSelector": () => "改用能选中这个服务 Pod 的 Service。",
+  "sentence.problem.summary.publicPort.portTaken": (p) =>
+    `这个项目里已经有其他服务开放了端口 ${p.port}。`,
+  "sentence.problem.publicPort.fix.portTaken": () => "先关掉那边的端口，或者改为开放其他端口。",
+  "sentence.problem.summary.publicPort.notPublic": (p) => `端口 ${p.port} 没有对互联网开放。`,
+  "sentence.problem.publicPort.fix.notPublic": () => "刷新页面看看，它可能已经关闭了。",
   "sentence.problem.summary.bad-request": () => "这个请求无效。",
   "sentence.problem.summary.unauthenticated": () => "集群不接受你的登录。",
   "sentence.problem.summary.signed-out": () => "你已退出登录。",

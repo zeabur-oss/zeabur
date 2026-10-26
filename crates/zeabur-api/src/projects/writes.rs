@@ -124,11 +124,16 @@ pub(crate) fn plan_problem(error: PlanError) -> ApiError {
         line: error.line,
         field: error.field,
     });
-    ApiError::from(Problem {
+    let mut problem = Problem {
         managed_by: error.managed_by,
         at,
         ..Problem::new(kind, error.detail)
-    })
+    };
+    if let Some(words) = error.words {
+        problem.summary = words.summary;
+        problem.fix_key = Some(words.fix);
+    }
+    ApiError::from(problem)
 }
 
 fn key(state: &AppState) -> Result<Arc<PlanKey>, ApiError> {

@@ -41,7 +41,7 @@ use zeabur_model::adapters::error_pages::maintenance_of;
 use zeabur_model::adapters::gateway::Attachable;
 use zeabur_model::adapters::provenance::{Tool, detect_tool};
 use zeabur_model::kernel::names::Conventions;
-use zeabur_model::{HttpRoute, Project, SourceKind, WorkloadKind, WorkloadRef};
+use zeabur_model::{HttpRoute, Message, Project, SourceKind, WorkloadKind, WorkloadRef};
 
 use crate::access::redirect_rule;
 use crate::certificates::{
@@ -284,6 +284,17 @@ pub struct PlanError {
     pub line: Option<u64>,
     /// The field it concerns, as kube-apiserver writes it (`metadata.namespace`).
     pub field: Option<String>,
+    /// What happened and what to do, as sentences a client words; `None`: the problem kind's own.
+    pub words: Option<Box<Words>>,
+}
+
+/// A [`PlanError`] as sentences a client words.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Words {
+    /// What happened.
+    pub summary: Message,
+    /// What to do.
+    pub fix: Message,
 }
 
 /// The kinds of [`PlanError`], which map onto problem kinds.
@@ -310,6 +321,7 @@ pub(crate) fn error(kind: ErrorKind, code: &str, detail: impl Into<String>) -> P
         change: None,
         line: None,
         field: None,
+        words: None,
     }
 }
 
