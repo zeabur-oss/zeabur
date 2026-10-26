@@ -175,6 +175,56 @@ impl UserToken {
         })))
     }
 
+    /// The bearer token the kubeconfig signs `context` (the current one when `None`) in with,
+    /// as the kubeconfig's own token, token file or credential plugin gives it now.
+    ///
+    /// # Errors
+    ///
+    /// When the kubeconfig cannot be used, or signs in without a bearer token (a client
+    /// certificate, a password).
+    pub async fn from_kubeconfig(context: Option<&str>) -> Result<Self, ConnectError> {
+        let options = kube::config::KubeConfigOptions {
+            context: context.map(str::to_owned),
+            ..kube::config::KubeConfigOptions::default()
+        };
+        let config = kube::Config::from_kubeconfig(&options)
+            .await
+            .map_err(|e| ConnectError::Kubeconfig(e.to_string()))?;
+        Self::signed_in_by(config).await
+    }
+
+    async fn signed_in_by(config: kube::Config) -> Result<Self, ConnectError> {
+        use kube::client::ConfigExt as _;
+        let seen = Arc::new(Mutex::new(None::<http::HeaderValue>));
+        let sink = Arc::clone(&seen);
+        let capture = tower::service_fn(move |request: http::Request<kube::client::Body>| {
+            let header = request.headers().get(http::header::AUTHORIZATION).cloned();
+            *sink.lock().unwrap_or_else(PoisonError::into_inner) = header;
+            std::future::ready(Ok::<_, std::convert::Infallible>(http::Response::new(
+                kube::client::Body::empty(),
+            )))
+        });
+        let service = tower::ServiceBuilder::new()
+            .option_layer(config.auth_layer().map_err(|e| refused(&e))?)
+            .map_err(tower::BoxError::from)
+            .service(capture);
+        let probe = kube::Client::new(service, config.default_namespace);
+        // The answer is empty on purpose; only the header the auth layer adds matters.
+        drop(probe.apiserver_version().await);
+        let header = seen
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .take()
+            .and_then(|value| value.to_str().ok().map(str::to_owned));
+        let token = header
+            .as_deref()
+            .and_then(|value| value.strip_prefix("Bearer "))
+            .ok_or_else(|| {
+                ConnectError::Kubeconfig("it does not sign in with a bearer token".to_owned())
+            })?;
+        Self::new(SecretString::from(token.to_owned()))
+    }
+
     /// The token.
     #[must_use]
     pub fn secret(&self) -> &SecretString {
@@ -428,6 +478,20 @@ pub enum ConnectError {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn a_kubeconfig_token_is_the_bearer_token_and_a_certificate_is_none() {
+        let mut config = kube::Config::new(http::Uri::from_static("https://10.0.0.1:6443"));
+        config.auth_info.token = Some(SecretString::from("person-token"));
+        let token = UserToken::signed_in_by(config.clone()).await.unwrap();
+        assert_eq!(token.secret().expose_secret(), "person-token");
+        config.auth_info.token = None;
+        config.auth_info.client_certificate = Some("/cert".to_owned());
+        assert!(matches!(
+            UserToken::signed_in_by(config).await,
+            Err(ConnectError::Kubeconfig(_))
+        ));
+    }
 
     #[test]
     fn an_endpoint_drops_every_credential_of_the_config_it_came_from() {

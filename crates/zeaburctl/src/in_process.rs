@@ -58,36 +58,6 @@ impl InProcess {
             .await
     }
 
-    /// `POST` `body` as JSON to `path_and_query`.
-    pub(crate) async fn post(&self, path_and_query: &str, body: &Value) -> Result<Value, Value> {
-        let bytes = serde_json::to_vec(body)
-            .map_err(|e| internal(&format!("The request is not JSON: {e}")))?;
-        self.send(
-            Method::POST,
-            path_and_query,
-            Some(("application/json", bytes.len())),
-            Body::from(bytes),
-        )
-        .await
-    }
-
-    /// `POST` `bytes` to `path_and_query` as `content_type`.
-    pub(crate) async fn post_bytes(
-        &self,
-        path_and_query: &str,
-        content_type: &str,
-        bytes: Vec<u8>,
-    ) -> Result<Value, Value> {
-        let length = bytes.len();
-        self.send(
-            Method::POST,
-            path_and_query,
-            Some((content_type, length)),
-            Body::from(bytes),
-        )
-        .await
-    }
-
     async fn send(
         &self,
         method: Method,

@@ -1,6 +1,6 @@
 ---
 title: 上傳資料夾並部署服務
-description: 把電腦上的資料夾或 .zip 檔交給 Zeabur Builder 建置，之後用網頁或 zeaburctl 再上傳新版本。
+description: 把電腦上的資料夾或 .zip 檔交給 Zeabur Builder 建置。用網頁或 zeaburctl 建立服務、上傳新版本。
 ---
 
 在專案選擇 **新增** → **上傳資料夾**，把資料夾拖進虛線框，填入服務名稱與連接埠，再 **檢查變更**。套用後資料夾馬上上傳，上傳完成就開始第一次建置。
@@ -55,9 +55,17 @@ description: 把電腦上的資料夾或 .zip 檔交給 Zeabur Builder 建置，
 
 ## 上傳新版本
 
-在服務的 **建置** 分頁按 **上傳資料夾**，選擇新的資料夾。Zeabur 用這個服務原本的建置方式與設定建置它。
+在服務的 **建置** 分頁按 **上傳資料夾**，選擇新版的資料夾。Zeabur 會沿用這個服務的建置方式與設定。
 
-用 [`zeaburctl up`](../reference/zeaburctl.mdx) 也能上傳，適合在終端機或腳本裡使用。
+## 用 zeaburctl 上傳
+
+終端機和腳本可以用 [`zeaburctl up`](../reference/zeaburctl.mdx#up)。它用你 kubeconfig 的權杖登入，把資料夾交給叢集裡的 Zeabur，不用知道 registry 的位址。`--server` 填你在瀏覽器開啟 Zeabur 的網址。
+
+```sh
+zeaburctl up ./site --server https://zeabur.example.com --project shop --service site
+```
+
+服務不存在時，指令會替你建立。在腳本或 CI 裡，`--project` 和 `--service` 都要填，專案必須已存在。
 
 ## 上傳停住時
 

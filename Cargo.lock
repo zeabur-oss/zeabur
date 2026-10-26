@@ -2706,9 +2706,17 @@ name = "zeaburctl"
 version = "0.0.1"
 dependencies = [
  "axum",
+ "bytes",
  "clap",
  "flate2",
+ "http",
+ "http-body-util",
+ "hyper-rustls",
+ "hyper-util",
  "regex",
+ "rustls",
+ "rustls-platform-verifier",
+ "secrecy",
  "serde",
  "serde-saphyr",
  "serde_json",

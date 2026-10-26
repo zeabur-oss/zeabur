@@ -74,30 +74,58 @@ kube-apiserver 是否信任 Zeabur Identity 的 issuer，寫在控制平面的 `
 ## `up`
 
 ```sh
-zeaburctl up [資料夾] --project <專案> --service <服務>
+zeaburctl up [資料夾] --server <位址> [--project <專案>] [--service <服務>]
 ```
 
-把資料夾打包上傳，並讓服務的 Build 建置它。打包規則和網頁相同：略過 `.gitignore`、`.dockerignore` 排除的檔案和 `.git`，上限是打包後 256 MiB、解開後 1 GiB。資料夾省略時用目前的資料夾。
+把資料夾上傳到叢集裡的 Zeabur，開始建置。資料夾省略時用目前的資料夾。如果服務還不存在，指令會建立它。專案必須已存在，指令不會建立專案。
 
-服務要先在網頁用[上傳資料夾](../deploy/upload.mdx)建立。`up` 不會建立服務，也不會上傳給從 Git 建置的服務。
+`--server` 填你在瀏覽器開啟 Zeabur 的網址，例如 `https://zeabur.example.com`。也可以用環境變數 `ZEABUR_SERVER` 設定，兩者至少要提供一個。
 
-指令用你的 kubeconfig 權限依序做三件事：
+指令和網頁用同一組 API，把壓縮檔交給 Zeabur，再由 Zeabur 推到 registry。你不需要知道 registry 的位址。`--registry-address` 和 `--registry-ca-file` 已移除。
 
-1. 向 Build 要上傳權杖（變更計畫，直接套用）。
-2. 把資料夾推到 registry。
-3. 把推上去的 digest 寫進 Build，開始建置（變更計畫，直接套用）。
+### 登入與權限
 
-兩次寫入都是 Zeabur 的變更計畫，和網頁用的一樣。下這個指令就是你的確認，所以不再詢問。
+指令從 kubeconfig 的目前 context 取得你的權杖，也可以用 `--context` 指定其他 context。Zeabur 用你的權限處理上傳和變更，無法執行你沒有權限的操作。如果 kubeconfig 用用戶端憑證登入，沒有權杖，就無法使用 `up`。
+
+叢集裡的 Zeabur 要更新到支援權杖登入的版本。如果舊版 Zeabur 回覆「登入已結束」，先更新 Zeabur 再重試。
+
+### 選擇專案與服務
+
+在終端機執行時，如果沒給 `--project`，指令會讓你從清單選專案。如果沒給 `--service`，指令會詢問服務名稱，預設用資料夾名稱。
+
+如果服務不存在，指令會在建立前詢問一次。加上 `--yes` 可以跳過這次確認。
+
+在腳本或 CI 裡執行時，指令不會詢問。你必須用 `--project` 和 `--service` 指定專案與服務。如果服務不存在，指令會直接建立，不需要加 `--yes`。
+
+新服務的內容和網頁「上傳資料夾」建立的相同，包含 Build 和 Deployment。如果有給 `--port`，也會建立 Service，並設定 `PORT` 環境變數。如果沒給連接埠，服務就不接受連線。建置方式預設是 `railpack`，也可以用 `--method dockerfile` 改用 Dockerfile。
+
+如果服務已存在，指令會沿用原本的建置設定。如果服務從 Git 建置，指令會拒絕上傳，不修改任何東西。
+
+### 打包與上傳
+
+打包規則和[網頁上傳](../deploy/upload.mdx)相同，會略過 `.gitignore`、`.dockerignore` 排除的檔案和 `.git`。上限是打包後 256 MiB、解開後 1 GiB。
+
+指令送出 `tar.gz` 壓縮檔，保留檔案的可執行權限，也保留指向上傳資料夾內的符號連結。
+
+上傳依序分成三步：
+
+1. 向 Build 要上傳權杖。這是一個變更計畫，直接套用。
+2. 把壓縮檔上傳給 Zeabur，由 Zeabur 推到 registry。
+3. 把 digest 寫進 Build，開始建置。這也是變更計畫，直接套用。
+
+這些變更計畫和網頁用的一樣。執行指令就是你對套用的確認，指令不會再詢問。如果要建立新服務，建立服務的變更計畫就已包含上傳權杖的要求。
+
+### 選項
 
 | 選項 | 預設與用途 |
 |---|---|
-| `--project <name>` | 服務所在的專案，必填 |
-| `--service <name>` | 服務名稱，它的 Build 同名，必填 |
-| `--context <name>` | kubeconfig 的目前 context |
-| `--registry-address <host:port 或網址>` | 這台電腦連到 registry 的位址。叢集內的位址（例如 `zot.zot.svc:5000`）在你的電腦解析不到時使用，例如 `kubectl -n zot port-forward svc/zot 5000:5000` 後填 `https://localhost:5000` |
-| `--registry-ca-file <path>` | registry 憑證的 CA（PEM）。registry 用私有憑證時使用 |
-
-`kubectl port-forward` 需要在 `zot` 這個 Namespace 轉發連接埠的權限，專案的 Developer 角色沒有。沒有這項權限，也沒有其他連到 registry 的路時，改用叢集內 Zeabur 的網頁上傳。
+| `--server <位址>` | 叢集裡 Zeabur 的網址，例如 `https://zeabur.example.com`。必須提供此選項或環境變數 `ZEABUR_SERVER` |
+| `--project <專案>` | 服務所在的既有專案。省略時在終端機從清單選擇，腳本與 CI 必填 |
+| `--service <服務>` | 服務名稱。省略時在終端機詢問，預設用資料夾名稱，腳本與 CI 必填 |
+| `--context <名稱>` | 預設用 kubeconfig 的目前 context |
+| `--method railpack\|dockerfile` | 新服務的建置方式，預設是 `railpack` |
+| `--port <連接埠>` | 新服務接收連線的連接埠，同時設定 Service 和 `PORT` 環境變數。省略時不接受連線 |
+| `--yes` | 在終端機建立新服務前，跳過建立確認 |
 
 ## 連線與權限問題
 

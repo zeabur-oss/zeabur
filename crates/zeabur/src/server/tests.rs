@@ -443,6 +443,54 @@ async fn a_signed_in_person_uses_the_api_as_themselves() {
     assert_eq!(view["signsIn"], true);
 }
 
+/// A command-line client presents the person's own token instead of a cookie: it acts as that
+/// person, with that person's rights, and the guard still wants a change to say where it comes
+/// from.
+#[tokio::test]
+async fn a_bearer_token_acts_as_the_person_who_holds_it() {
+    let rig = Rig::new().await;
+    let get = |token: &'static str| {
+        let authorization = format!("Bearer {token}");
+        let rig = &rig;
+        async move {
+            let response = rig
+                .send(
+                    Method::GET,
+                    "/api/v1/whoami",
+                    &[HOST, ("authorization", &authorization)],
+                )
+                .await;
+            (response.status(), json_of(response).await)
+        }
+    };
+    let (status, whoami) = get("alice:1").await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(whoami["username"], "alice");
+    let (status, problem) = get("mallory:1").await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED, "{problem}");
+
+    let plan = json!({"changes": [{"op": "env",
+        "workload": {"kind": "Deployment", "name": "web"},
+        "changes": [{"op": "set", "name": "MODE", "value": "maintenance"}]}]});
+    let post = |headers: &[(&str, &str)]| {
+        let mut request = Request::post("/api/v1/projects/shop/plan")
+            .header("host", HOST.1)
+            .header("authorization", "Bearer alice:1")
+            .header("content-type", "application/json");
+        for (name, value) in headers {
+            request = request.header(*name, *value);
+        }
+        let request = request.body(Body::from(plan.to_string())).unwrap();
+        let app = rig.app.clone();
+        async move { app.oneshot(request).await.unwrap().status() }
+    };
+    assert_eq!(post(&[]).await, StatusCode::FORBIDDEN);
+    assert_eq!(
+        post(&[("origin", PUBLIC), ("zeabur-request", "1")]).await,
+        StatusCode::OK
+    );
+}
+
 #[tokio::test]
 async fn a_callback_that_does_not_match_a_sign_in_in_this_browser_is_refused() {
     let rig = Rig::new().await;

@@ -6,6 +6,7 @@ mod doctor;
 mod in_process;
 mod output;
 mod pack;
+mod server;
 mod ui;
 mod up;
 
@@ -34,8 +35,9 @@ enum Command {
     Doctor(doctor::DoctorArgs),
     /// Upload a folder to a service that builds one, and build it.
     ///
-    /// The files `.gitignore` and `.dockerignore` leave out are not sent. The service is made with
-    /// "Upload a folder" in the web interface.
+    /// The files `.gitignore` and `.dockerignore` leave out are not sent. The service is made when
+    /// it does not exist. The folder goes through Zeabur in the cluster with your kubeconfig's
+    /// token, so no address of the registry is needed.
     Up(up::UpArgs),
 }
 

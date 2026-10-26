@@ -13,6 +13,11 @@
 //! Every request but the health check passes [`zeabur_core::guard`] first: its `Host` must be
 //! the public URL's, and a request that changes something must come from Zeabur's own page.
 //!
+//! **Command line.** A request with no session cookie may carry `Authorization: Bearer <token>`,
+//! the person's own token for kube-apiserver (`zeaburctl up`). Zeabur acts with it as with a
+//! session's, so kube-apiserver decides what it may do and refuses a token it does not know; it
+//! is not kept. The guard still applies, so such a client sends `Origin` and the custom header.
+//!
 //! **Idle sessions.** A request with the header [`BACKGROUND`] does not count as activity (see
 //! [`Activity`]): the interface sends it on requests it makes on its own after a minute without
 //! input, so an open tab does not keep a session alive.
@@ -87,6 +92,8 @@ impl std::fmt::Debug for Auth {
 #[derive(Clone)]
 enum Signed {
     In(Credentials<Connection>),
+    /// A bearer token the request presented itself.
+    Token(Connection),
     IssuerDown,
 }
 
@@ -207,22 +214,32 @@ fn navigation(headers: &HeaderMap) -> bool {
 /// Finds the session of an API request (renewing its token when due) and hands it to
 /// [`SessionAccess`] through the request's extensions.
 async fn session(State(auth): State<Arc<Auth>>, mut request: Request, next: Next) -> Response {
-    if let Some(id) = cookie::get(request.headers(), cookie::SESSION) {
+    let signed = if let Some(id) = cookie::get(request.headers(), cookie::SESSION) {
         let activity = if request.headers().contains_key(BACKGROUND) {
             Activity::Background
         } else {
             Activity::Person
         };
-        let signed = match auth.sessions.current(id, activity).await {
+        match auth.sessions.current(id, activity).await {
             Lookup::Active(credentials) => Some(Signed::In(credentials)),
             Lookup::IssuerUnavailable => Some(Signed::IssuerDown),
             Lookup::SignedOut => None,
-        };
-        if let Some(signed) = signed {
-            request.extensions_mut().insert(signed);
         }
+    } else {
+        bearer(request.headers()).and_then(|token| (auth.connect)(token).ok().map(Signed::Token))
+    };
+    if let Some(signed) = signed {
+        request.extensions_mut().insert(signed);
     }
     next.run(request).await
+}
+
+/// The token of `Authorization: Bearer <token>`.
+fn bearer(headers: &HeaderMap) -> Option<secrecy::SecretString> {
+    let value = headers.get(header::AUTHORIZATION)?.to_str().ok()?;
+    let (scheme, token) = value.split_once(' ')?;
+    (scheme.eq_ignore_ascii_case("bearer") && !token.trim().is_empty())
+        .then(|| secrecy::SecretString::from(token.trim().to_owned()))
 }
 
 /// The API's view of sessions: every request with the session's token.
@@ -239,9 +256,10 @@ fn signed_out() -> Box<Problem> {
     ))
 }
 
-fn credentials(parts: &Parts) -> Result<&Credentials<Connection>, Box<Problem>> {
+fn connection(parts: &Parts) -> Result<&Connection, Box<Problem>> {
     match parts.extensions.get::<Signed>() {
-        Some(Signed::In(credentials)) => Ok(credentials),
+        Some(Signed::In(credentials)) => Ok(&credentials.base.value),
+        Some(Signed::Token(connection)) => Ok(connection),
         Some(Signed::IssuerDown) => {
             let mut problem = Problem::new(
                 Kind::Unavailable,
@@ -257,17 +275,25 @@ fn credentials(parts: &Parts) -> Result<&Credentials<Connection>, Box<Problem>> 
     }
 }
 
+/// The session's credentials; a bare token has none.
+fn credentials(parts: &Parts) -> Option<&Credentials<Connection>> {
+    match parts.extensions.get::<Signed>() {
+        Some(Signed::In(credentials)) => Some(credentials),
+        Some(Signed::Token(_) | Signed::IssuerDown) | None => None,
+    }
+}
+
 fn timestamp(seconds: i64) -> Timestamp {
     Timestamp::from_second(seconds).unwrap_or(Timestamp::UNIX_EPOCH)
 }
 
 impl ClusterAccess for SessionAccess {
     fn for_request(&self, parts: &Parts) -> Result<Arc<dyn Cluster>, Box<Problem>> {
-        Ok(Arc::clone(&credentials(parts)?.base.value.cluster))
+        Ok(Arc::clone(&connection(parts)?.cluster))
     }
 
     fn handoff(&self, parts: &Parts) -> Option<Handoff> {
-        let base = &credentials(parts).ok()?.base;
+        let base = &credentials(parts)?.base;
         Some(Handoff {
             token: base.value.token.clone(),
             expires_at: timestamp(base.expires_at),
@@ -275,7 +301,7 @@ impl ClusterAccess for SessionAccess {
     }
 
     fn signed_out(&self, parts: &Parts) -> Option<tokio::sync::watch::Receiver<bool>> {
-        Some(credentials(parts).ok()?.signed_out.clone())
+        Some(credentials(parts)?.signed_out.clone())
     }
 
     fn signs_in(&self) -> bool {
