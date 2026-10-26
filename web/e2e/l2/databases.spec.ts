@@ -295,10 +295,9 @@ test("a Developer creates and backs up databases; a Viewer only sees them", asyn
         { op: "delete", resource: db.resource, name: db.name },
       ])
       expect(deleted.status, JSON.stringify(deleted.body)).toBe(200)
-      if (db.path === "mongodb")
-        await expect
-          .poll(() => claimsOf(developer, `mongod-data-${db.name}-`), { timeout: 300_000 })
-          .toEqual([])
+      // The claims go with the database, and their volumes with them.
+      const claims = db.path === "mongodb" ? `mongod-data-${db.name}-` : `${db.name}-`
+      await expect.poll(() => claimsOf(developer, claims), { timeout: 300_000 }).toEqual([])
     }
     await developer.context().close()
   })

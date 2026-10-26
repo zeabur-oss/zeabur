@@ -147,8 +147,14 @@ kubectl delete rolebindings,clusterrolebindings -A -l app.kubernetes.io/managed-
 # The chart keeps the S3 destinations' namespace on purpose; the project's name is the person's.
 kubectl delete namespace zeabur-s3-destinations --wait --timeout=180s
 kubectl annotate namespace "$project" zeabur.com/display-name-
-"$root/scripts/dev-cluster.sh" snapshot >"$state/after.txt"
+# A volume's PersistentVolume goes after its claim, when the provisioner has cleaned the disk.
+for _ in $(seq 36); do
+  "$root/scripts/dev-cluster.sh" snapshot >"$state/after.txt"
+  diff -q "$state/before.txt" "$state/after.txt" >/dev/null && break
+  sleep 5
+done
 if ! diff -u "$state/before.txt" "$state/after.txt"; then
+  kubectl get persistentvolumes -o custom-columns='PV:.metadata.name,CLAIM:.spec.claimRef.name,NAMESPACE:.spec.claimRef.namespace,CLASS:.spec.storageClassName,RECLAIM:.spec.persistentVolumeReclaimPolicy,PHASE:.status.phase' >&2 || true
   echo "error: the cluster differs from before the installation (above)" >&2
   exit 1
 fi
