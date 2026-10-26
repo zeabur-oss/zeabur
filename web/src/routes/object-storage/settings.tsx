@@ -1,17 +1,18 @@
 import { useState } from "react"
 
+import { AmountInput } from "@/components/amount-input"
 import { FormField } from "@/components/form-field"
 import { GateNote, GateTip, useGate } from "@/components/gate"
 import { usePlanner } from "@/components/plan/planner"
 import { kindWord, useGrowth } from "@/components/storage-class"
 import { ObjectYaml } from "@/components/store-detail"
 import { useT } from "@/i18n"
+import { useQuantityFormat } from "@/lib/quantity"
 import { storageProblem } from "@/model/databases"
 import { growObjectStorage, storeAddress, type ObjectStorage } from "@/model/object-storage"
 import type { ServiceMode } from "@/routes/search"
 import { ModeSwitch } from "@/routes/service/views"
 import { Button } from "@zeabur/design-system/components/button"
-import { Input } from "@zeabur/design-system/components/input"
 import { SectionHeader } from "@zeabur/design-system/components/section-header"
 
 /** The volume servers' disk; or, in its YAML view, the operator's object. */
@@ -40,6 +41,7 @@ export function ObjectStorageSettings({
 
 function Storage({ project, store }: { project: string; store: ObjectStorage }) {
   const t = useT()
+  const { amount } = useQuantityFormat()
   const gate = useGate(project, "changeObjectStorage")
   const planner = usePlanner(project)
   const [storage, setStorage] = useState(store.storage ?? "")
@@ -54,8 +56,15 @@ function Storage({ project, store }: { project: string; store: ObjectStorage }) 
       title: t("s3.grow", store.name),
       changes: growObjectStorage(store, storage),
       summary: {
-        lines: [t("s3.growSentence", store.name, store.storage ?? "—", storage.trim())],
-        action: t("action.grow", storage.trim()),
+        lines: [
+          t(
+            "s3.growSentence",
+            store.name,
+            store.storage ? amount(store.storage, "bytes") : "—",
+            amount(storage.trim(), "bytes"),
+          ),
+        ],
+        action: t("action.grow", amount(storage.trim(), "bytes")),
       },
     })
   }
@@ -82,20 +91,17 @@ function Storage({ project, store }: { project: string; store: ObjectStorage }) 
               tried && problem
                 ? [
                     problem === "shrink"
-                      ? t("db.storage.shrink", store.storage ?? "")
+                      ? t("db.storage.shrink", amount(store.storage, "bytes"))
                       : t("db.storage.invalid"),
                   ]
                 : []
             }
           >
-            <Input
-              size="sm"
-              mono
+            <AmountInput
+              dimension="bytes"
               value={storage}
               disabled={!gate.open || fixed}
-              autoComplete="off"
-              spellCheck={false}
-              onChange={(event) => setStorage(event.target.value)}
+              onChange={setStorage}
             />
           </FormField>
         </div>

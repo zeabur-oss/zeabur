@@ -2,6 +2,9 @@
 // and scaling of many services by what happens to each.
 import type { Schemas } from "@/api/client"
 import type { Translate } from "@/i18n"
+import { kindName } from "@/i18n/kind-name"
+import type { Dimension } from "@/lib/amount"
+import { plainAmount } from "@/lib/quantity"
 import { partOrder } from "@/model/draft"
 import type { PodsOf } from "@/model/risk"
 import type { DraftPart } from "@/routes/search"
@@ -67,10 +70,23 @@ interface Slot {
   container?: string
   label?: string
   name?: string
+  /** The values are CPU or memory in Kubernetes' units; the rows show them in plain ones. */
+  amount?: Dimension
   /** A keyed list entry whose leaves make one row. */
   entry?: string
   /** The leaf below the entry, `value` or `readOnly`. */
   leaf?: string
+}
+
+function resourceSlot(
+  t: Translate,
+  container: string | undefined,
+  [bound, resource]: string[],
+  name: string,
+): Slot {
+  const label = resourceLabel(t, bound, resource)
+  if (!label) return { part: "compute", container, name }
+  return { part: "compute", container, label, amount: resource === "cpu" ? "cpu" : "bytes" }
 }
 
 function slotOf(t: Translate, kind: string, path: string): Slot | undefined {
@@ -93,13 +109,7 @@ function slotOf(t: Translate, kind: string, path: string): Slot | undefined {
         if (what.startsWith("env[")) return { ...entrySlot("variables", what, below), container }
         if (what.startsWith("volumeMounts["))
           return { ...entrySlot("storage", what, below), container }
-        if (what === "resources") {
-          const [bound, resource] = below
-          const label = resourceLabel(t, bound, resource)
-          return label
-            ? { part: "compute", container, label }
-            : { part: "compute", container, name: rest.join(".") }
-        }
+        if (what === "resources") return resourceSlot(t, container, below, rest.join("."))
         const probe = /^(readiness|liveness|startup)Probe$/.exec(what)?.[1] as
           | Schemas["ProbeKind"]
           | undefined
@@ -124,7 +134,7 @@ function slotOf(t: Translate, kind: string, path: string): Slot | undefined {
   }
   if (kind === "PersistentVolumeClaim")
     return path === "spec.resources.requests.storage"
-      ? { part: "storage", label: t("plan.field.size") }
+      ? { part: "storage", label: t("plan.field.size"), amount: "bytes" }
       : { part: "storage", name: path }
   if (networkKinds.has(kind)) return { part: "networking", name: path }
   return { part: "other", name: path }
@@ -168,7 +178,7 @@ export function editGroups(t: Translate, plan: Pick<Plan, "objects">): EditGroup
   const groups: EditGroup[] = []
   for (const object of plan.objects) {
     const { kind, name } = object.target
-    const label = named ? `${kind} ${name}` : undefined
+    const label = named ? `${kindName(t, kind)} ${name}` : undefined
     const created = !object.beforeYaml && !object.before
     const deleted = object.write.type === "delete"
     if (created || deleted) {
@@ -202,6 +212,10 @@ export function editGroups(t: Translate, plan: Pick<Plan, "objects">): EditGroup
     const containers = new Set(placed.map((p) => p.slot.container).filter(Boolean))
     for (const { slot, change } of placed) {
       const container = containers.size > 1 ? slot.container : undefined
+      const show = (value?: string | null) =>
+        value === undefined || value === null || !slot.amount
+          ? (value ?? undefined)
+          : plainAmount(t, value, slot.amount)
       const key = `${kind}/${name}/${slot.part}/${container ?? ""}`
       const bucket = buckets.get(key) ?? {
         group: { key, object: label, part: slot.part, container, rows: [] },
@@ -214,8 +228,8 @@ export function editGroups(t: Translate, plan: Pick<Plan, "objects">): EditGroup
           kind: kindOf(change.before, change.after),
           label: slot.label,
           name: slot.name,
-          before: change.before ?? undefined,
-          after: change.after ?? undefined,
+          before: show(change.before),
+          after: show(change.after),
         })
         continue
       }

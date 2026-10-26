@@ -12,6 +12,7 @@ import {
   type MountsOf,
   type OutcomeGroup,
 } from "@/components/plan/groups"
+import { plainAmount } from "@/lib/quantity"
 import { editCount, partOf } from "@/model/draft"
 import { problemText } from "@/model/problem"
 import { limitSentence } from "@/model/ip-limits"
@@ -276,8 +277,13 @@ function editTaskWords(t: Translate, change: Extract<Change, { op: "editTask" }>
 
 const addVolumeSentence = (t: Translate, change: Extract<Change, { op: "addVolume" }>) =>
   change.container
-    ? t("confirm.addVolumeIn", change.volume.size, change.workload.name, change.container)
-    : t("confirm.addVolume", change.volume.size, change.workload.name)
+    ? t(
+        "confirm.addVolumeIn",
+        plainAmount(t, change.volume.size, "bytes"),
+        change.workload.name,
+        change.container,
+      )
+    : t("confirm.addVolume", plainAmount(t, change.volume.size, "bytes"), change.workload.name)
 
 function accessSentence(t: Translate, change: AccessChange | ServiceChange): string {
   switch (change.op) {
@@ -381,7 +387,7 @@ function probeSentence(
   return t(`confirm.probeSet.${probe}`, check, period, failures)
 }
 
-/** Each value set, with what it was ("100m → 250m"); one the change drops, as no longer set. */
+/** Each value set, with what it was ("0.1 cores → 0.25 cores"); one the change drops, as no longer set. */
 function resourcesSentence(
   t: Translate,
   requests: Record<string, string> = {},
@@ -392,6 +398,8 @@ function resourcesSentence(
     cpu: [t("form.cpuRequest"), t("form.cpuLimit")],
     memory: [t("form.memoryRequest"), t("form.memoryLimit")],
   }
+  const amount = (resource: string, raw: string) =>
+    plainAmount(t, raw, resource === "cpu" ? "cpu" : "bytes")
   const before = (bound: string, resource: string) =>
     fields.find((f) => f.path.endsWith(`.resources.${bound}.${resource}`))?.before ?? undefined
   const pairs: [string, string][] = []
@@ -401,7 +409,9 @@ function resourcesSentence(
       const was = before(bound, resource)
       pairs.push([
         labels[resource]?.[index] ?? resource,
-        was && was !== value ? `${was} → ${value}` : value,
+        was && was !== value
+          ? `${amount(resource, was)} → ${amount(resource, value)}`
+          : amount(resource, value),
       ])
     }
     for (const field of fields) {
@@ -409,7 +419,10 @@ function resourcesSentence(
       const resource = match?.[1]
       if (!resource || resource in values || typeof field.after === "string") continue
       if (typeof field.before !== "string") continue
-      pairs.push([labels[resource]?.[index] ?? resource, `${field.before} → ${t("form.notSet")}`])
+      pairs.push([
+        labels[resource]?.[index] ?? resource,
+        `${amount(resource, field.before)} → ${t("form.notSet")}`,
+      ])
     }
   }
   shown("requests", requests)
@@ -879,7 +892,7 @@ function oneAction(t: Translate, change: Change, changes: readonly Change[]): st
     case "rollback":
       return t("action.rollback", change.revision)
     case "expandVolume":
-      return t("action.grow", change.size)
+      return t("action.grow", plainAmount(t, change.size, "bytes"))
     case "scale":
       return scaleAction(t, change.replicas, changes)
     case "create":

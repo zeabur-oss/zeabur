@@ -1061,7 +1061,7 @@ export const en = {
   "storage.blocked": (n: number) => `Fix ${plural(n, "volume", "volumes")} to save.`,
   "storage.problem.badPath": "Enter an absolute path, such as /data.",
   "storage.problem.pathTaken": "Another mount uses this path.",
-  "storage.problem.badSize": "Enter a size such as 1Gi.",
+  "storage.problem.badSize": "Enter a size such as 1 GiB.",
   "storage.problem.shrinks": "A volume can grow but never shrink.",
   "storage.problem.badName": "Use lowercase letters, digits and -.",
   "storage.problem.nameTaken": "Another new volume has this name.",
@@ -1790,8 +1790,8 @@ export const en = {
   "form.replicas": "Replicas",
   "form.cpuRequest": "Reserved CPU",
   "form.notSet": "Not set",
-  "form.cpuUnset": "Not set: nothing reserved. 250m is a quarter of a core.",
-  "form.memoryUnset": "Not set: nothing reserved. For example 256Mi.",
+  "form.cpuUnset": "Not set: nothing reserved. For example 0.25 cores.",
+  "form.memoryUnset": "Not set: nothing reserved. For example 256 MiB.",
   "form.noLimit": "Not set: no limit",
   "form.memoryRequest": "Reserved memory",
   "form.cpuLimit": "Maximum CPU",
@@ -1799,7 +1799,7 @@ export const en = {
   "form.computeHint":
     "The node sets the reserved amount aside for each replica. When a replica uses more memory than its maximum, its container restarts; CPU above the maximum is slowed down.",
   "form.largestNode": (cores: string, memory: string) => `Largest node: ${cores} cores, ${memory}`,
-  "form.badQuantity": "Use a quantity such as 250m, 1 or 512Mi.",
+  "form.badQuantity": "Enter an amount such as 0.25 cores or 512 MiB.",
   "form.badReplicas": "Enter a whole number from 0 to 1000.",
   "form.badNumber": "Enter a whole number above 0.",
   "form.probe.readiness": "Traffic check",
@@ -2807,7 +2807,7 @@ export const en = {
   "db.size.medium": "Medium",
   "db.size.large": "Large",
   "db.sizeDetail": (cpu: string, memory: string, limit: string) =>
-    `Each instance reserves ${cpu} CPU and ${memory} memory, and may use up to ${limit}.`,
+    `Each instance reserves ${cpu} and ${memory} of memory, and may use up to ${limit}.`,
   "db.name.empty": "Give it a name.",
   "db.name.invalid": "Lowercase letters, digits and hyphens, starting with a letter.",
   "db.name.long": "At most 30 characters.",
@@ -2848,7 +2848,7 @@ export const en = {
   "db.settings": "Settings of this database",
   "db.computeHint": "How many instances run, and the CPU and memory each one gets.",
   "db.customSize": "Set by hand in the object; picking a size replaces it.",
-  "db.storage.invalid": "A size such as 10Gi.",
+  "db.storage.invalid": "A size such as 10 GiB.",
   "db.storage.shrink": (current: string) => `It can grow, not go below ${current}.`,
   "db.storage.operatorFixed": (engine: string) =>
     `The ${engine} operator does not grow its snapshot volume. Set the size when you create it.`,
@@ -3152,7 +3152,7 @@ export const en = {
   "usage.live": "Live",
   "usage.liveHint":
     "Approximate values from metrics-server, measured about every 15 seconds. Memory is the working set, the figure the kubelet acts on. The tick marks what each replica reserves (its request); the bar ends at its maximum (its limit) and is hatched when there is none.",
-  "usage.cores": (n: string) => `${n} cores`,
+  "usage.cores": (n: string) => (n === "1" ? "1 core" : `${n} cores`),
   "usage.coresUnit": "cores",
   "usage.usedWord": (v: string) => `${v} used`,
   "usage.reservedWord": (v: string) => `${v} reserved`,
@@ -4246,8 +4246,6 @@ export const en = {
   "preview.domain": (host: string) => `The domain ${host} starts serving.`,
   "preview.pendingRestart": (name: string) => `${name} keeps the old value until it restarts.`,
   "preview.downtime": "Nothing serves for a moment.",
-  "preview.cores": (n: string) => `${n} CPU`,
-  "preview.millicores": (n: string) => `${n} CPU`,
   "preview.fits": (replicas: number, cpu: string, memory: string) =>
     `Fits: it adds ${plural(replicas, "replica", "replicas")}, ${cpu} and ${memory} at its peak.`,
   "preview.blockedQuota": (name: string, resource: string, need: string, left: string) =>

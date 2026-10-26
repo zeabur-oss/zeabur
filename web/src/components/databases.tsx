@@ -6,6 +6,7 @@ import WarningIcon from "~icons/ph/warning"
 import type { Schemas } from "@/api/client"
 import { databasesQuery, nodesQuery } from "@/api/queries"
 import { Ago } from "@/components/bits"
+import { SizeDetail } from "@/components/amount-input"
 import { FormField, NameField, quantity } from "@/components/form-field"
 import { ConnectFields, useNewConnections } from "@/components/connect"
 import { PlanDrawer, ReviewFooter, ReviewForm } from "@/components/plan/plan-drawer"
@@ -294,15 +295,7 @@ export function NewDatabaseDrawer({
             bad={tried && storageBad}
             onChange={(value) => set({ storage: value })}
           />
-          <FormField
-            label={t("db.field.size")}
-            hint={t(
-              "db.sizeDetail",
-              resources.requests.cpu,
-              resources.requests.memory,
-              resources.limits.memory,
-            )}
-          >
+          <FormField label={t("db.field.size")} hint={<SizeDetail resources={resources} />}>
             <Select
               size="sm"
               value={form.size}

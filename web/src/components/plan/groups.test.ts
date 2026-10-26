@@ -110,10 +110,10 @@ group("editGroups", () => {
       { kind: "added", name: "FOO", before: undefined, after: "bar" },
     ])
     expect(groups[1]?.rows.map((r) => [r.kind, r.label, r.before, r.after])).toStrictEqual([
-      ["removed", "form.memoryRequest", "128Mi", undefined],
+      ["removed", "form.memoryRequest", "128 MiB", undefined],
       ["changed", "form.replicas", "3", "5"],
-      ["changed", "form.memoryLimit", "256Mi", "512Mi"],
-      ["changed", "form.cpuRequest", "100m", "250m"],
+      ["changed", "form.memoryLimit", "256 MiB", "512 MiB"],
+      ["changed", "form.cpuRequest", "usage.cores(0.1)", "usage.cores(0.25)"],
     ])
   })
 
@@ -354,7 +354,7 @@ group("describe at 1, 5 and 45 changes", () => {
       pods({}),
     )
     expect(d.lines[0]).toBe(
-      "Reserved CPU 100m → 250m, Reserved memory 128Mi → Not set, Maximum memory 256Mi → 512Mi.",
+      "Reserved CPU 0.1 cores → 0.25 cores, Reserved memory 128 MiB → Not set, Maximum memory 256 MiB → 512 MiB.",
     )
   })
 })

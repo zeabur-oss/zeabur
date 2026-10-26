@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query"
 
 import { storageQuery } from "@/api/queries"
+import { AmountInput } from "@/components/amount-input"
 import { FormField } from "@/components/form-field"
 import { KubeDetails } from "@/components/kube-details"
 import { permission, Refused } from "@/components/refused"
@@ -13,7 +14,6 @@ import {
   type ProjectStorage,
   type StorageClass,
 } from "@/model/storage"
-import { Input } from "@zeabur/design-system/components/input"
 import { Select } from "@zeabur/design-system/components/select"
 
 const CLASSES = "storageclasses.storage.k8s.io"
@@ -182,7 +182,7 @@ export function StorageSizeField({
       hint={growthWords(t, storage, storageClass)}
       errors={bad ? [t("storage.problem.badSize")] : []}
     >
-      <Input size="sm" mono value={value} onChange={(event) => onChange(event.target.value)} />
+      <AmountInput dimension="bytes" value={value} onChange={onChange} />
     </FormField>
   )
 }

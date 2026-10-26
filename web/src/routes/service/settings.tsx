@@ -14,7 +14,9 @@ import { useQuantityFormat } from "@/lib/quantity"
 import { serviceSettingsSections } from "@/modules/service-settings"
 import { refusedField } from "@/model/problem"
 import { endpointsOf, type Endpoint, type Network, type Service } from "@/model/service"
-import { FormField, quantity } from "@/components/form-field"
+import { AmountInput } from "@/components/amount-input"
+import { FormField } from "@/components/form-field"
+import { isAmount, type Dimension } from "@/lib/amount"
 import { SectionHeader } from "@zeabur/design-system/components/section-header"
 import { useHold } from "@/components/plan/draft"
 
@@ -171,8 +173,10 @@ function Compute({
         }
       : undefined,
   )
-  const amount = ({ value }: { value: string }) =>
-    value.trim() === "" || quantity.test(value.trim()) ? undefined : t("form.badQuantity")
+  const amount =
+    (dimension: Dimension) =>
+    ({ value }: { value: string }) =>
+      isAmount(value, dimension) ? undefined : t("form.badQuantity")
 
   return (
     <form
@@ -233,7 +237,7 @@ function Compute({
                 <form.Field
                   key={key}
                   name={`containers[${index}].${key}`}
-                  validators={{ onChange: amount }}
+                  validators={{ onChange: amount(key.startsWith("cpu") ? "cpu" : "bytes") }}
                 >
                   {(f) => (
                     <FormField
@@ -247,12 +251,11 @@ function Compute({
                         ),
                       ]}
                     >
-                      <Input
-                        size="sm"
-                        mono
+                      <AmountInput
+                        dimension={key.startsWith("cpu") ? "cpu" : "bytes"}
                         value={f.state.value}
                         placeholder={t("form.notSet")}
-                        onChange={(e) => f.handleChange(e.target.value)}
+                        onChange={f.handleChange}
                         onBlur={f.handleBlur}
                         disabled={disabled}
                       />

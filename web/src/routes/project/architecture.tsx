@@ -21,6 +21,7 @@ import { EngineVersion, useDatabases } from "@/components/databases"
 import { KubeTip } from "@/components/kube-details"
 import { Badge } from "@zeabur/design-system/components/badge"
 import { usePresence } from "@zeabur/design-system/components/presence"
+import { Amount } from "@/components/amount-input"
 import { ServiceIcon } from "@/components/service-icon"
 import { StatusDot, useStatusWord } from "@/components/status"
 import { useT } from "@/i18n"
@@ -596,17 +597,23 @@ function ServiceCard({
         </span>
       </button>
       {volumes.map((m) => (
-        <div
-          key={claimOf(m)}
-          className="relative mx-2 -mt-2 flex h-9.5 items-end gap-2 rounded-b-xl border border-t-0 bg-muted/70 px-3 pb-2 type-micro leading-normal text-muted-foreground"
-        >
-          <HardDriveIcon className="size-3.5" aria-hidden="true" />
-          <span className="truncate font-mono" translate="no">
-            {claimOf(m)}
-          </span>
-          <span className="ml-auto font-medium text-foreground/70 tabular-nums">{m.size}</span>
-        </div>
+        <VolumeChip key={claimOf(m)} name={claimOf(m)} size={m.size} />
       ))}
+    </div>
+  )
+}
+
+/** A volume under its card: its name and size. */
+function VolumeChip({ name, size }: { name: string; size?: string | null }) {
+  return (
+    <div className="relative mx-2 -mt-2 flex h-9.5 items-end gap-2 rounded-b-xl border border-t-0 bg-muted/70 px-3 pb-2 type-micro leading-normal text-muted-foreground">
+      <HardDriveIcon className="size-3.5" aria-hidden="true" />
+      <span className="truncate font-mono" translate="no">
+        {name}
+      </span>
+      <span className="ml-auto font-medium text-foreground/70 tabular-nums">
+        <Amount value={size} dimension="bytes" />
+      </span>
     </div>
   )
 }
@@ -665,16 +672,7 @@ function DatabaseCard({
         </span>
       </Link>
       {volumes.map((volume) => (
-        <div
-          key={volume.name}
-          className="relative mx-2 -mt-2 flex h-9.5 items-end gap-2 rounded-b-xl border border-t-0 bg-muted/70 px-3 pb-2 type-micro leading-normal text-muted-foreground"
-        >
-          <HardDriveIcon className="size-3.5" aria-hidden="true" />
-          <span className="truncate font-mono" translate="no">
-            {volume.name}
-          </span>
-          <span className="ml-auto font-medium text-foreground/70 tabular-nums">{volume.size}</span>
-        </div>
+        <VolumeChip key={volume.name} name={volume.name} size={volume.size} />
       ))}
     </div>
   )

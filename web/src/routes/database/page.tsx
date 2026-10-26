@@ -38,6 +38,7 @@ import { FrequencyField, S3Fields } from "@/components/s3-fields"
 import { Schedule } from "@/components/schedule"
 import { StatusPill } from "@/components/status"
 import { useT } from "@/i18n"
+import { useQuantityFormat } from "@/lib/quantity"
 import { openDatabaseShell } from "@/lib/dock"
 import type { Icon } from "@/lib/icon"
 import { partsOf } from "@/model/database-parts"
@@ -391,6 +392,7 @@ function Overview({
   onEvents: () => void
 }) {
   const t = useT()
+  const { amount } = useQuantityFormat()
   const preset = presetOf(database.engine, database.resources)
   const run = lastRun(database)
   return (
@@ -421,8 +423,8 @@ function Overview({
               <span translate="no">
                 {database.storage
                   ? database.members > 1
-                    ? `${database.members} × ${database.storage}`
-                    : database.storage
+                    ? `${database.members} × ${amount(database.storage, "bytes")}`
+                    : amount(database.storage, "bytes")
                   : "—"}
               </span>
             </SummaryCardFact>

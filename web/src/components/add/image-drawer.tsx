@@ -5,6 +5,7 @@ import CaretRightIcon from "~icons/ph/caret-right"
 
 import { clusterQuery, creatableQuery } from "@/api/queries"
 import { useTakenNames } from "@/components/add/taken"
+import { AmountInput } from "@/components/amount-input"
 import { FormField, quantity } from "@/components/form-field"
 import { PlanDrawer } from "@/components/plan/plan-drawer"
 import { PortNoteHint, useImageInspection } from "@/components/add/image-port"
@@ -314,11 +315,10 @@ export function ImageDrawer({ project, onClose }: { project: string; onClose: ()
                           hint={growthWords(t, storage)}
                           errors={shown(problems.volumeSize, () => t("storage.problem.badSize"))}
                         >
-                          <Input
-                            size="sm"
-                            mono
+                          <AmountInput
+                            dimension="bytes"
                             value={extras.volumeSize}
-                            onChange={(event) => more({ volumeSize: event.target.value })}
+                            onChange={(volumeSize) => more({ volumeSize })}
                           />
                         </FormField>
                       </div>

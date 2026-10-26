@@ -2,12 +2,14 @@ import { useState, type ReactNode } from "react"
 
 import { PartNav } from "@/components/part-nav"
 import { CopyText } from "@/components/copy-text"
+import { AmountInput, SizeDetail } from "@/components/amount-input"
 import { FormField } from "@/components/form-field"
 import { ObjectYaml } from "@/components/store-detail"
 import { GateNote, GateTip, useGate } from "@/components/gate"
 import { kindWord, useGrowth } from "@/components/storage-class"
 import { usePlanner } from "@/components/plan/planner"
 import { useT } from "@/i18n"
+import { plainAmount } from "@/lib/quantity"
 import {
   commands,
   databaseAddress,
@@ -25,7 +27,6 @@ import {
 import type { ServiceMode } from "@/routes/search"
 import { ModeSwitch } from "@/routes/service/views"
 import { Button } from "@zeabur/design-system/components/button"
-import { Input } from "@zeabur/design-system/components/input"
 import { SectionHeader } from "@zeabur/design-system/components/section-header"
 import { Select } from "@zeabur/design-system/components/select"
 
@@ -128,14 +129,11 @@ function Shape({ project, database }: { project: string; database: Database }) {
           <FormField
             label={t("db.field.size")}
             hint={
-              size === "custom"
-                ? t("db.customSize")
-                : t(
-                    "db.sizeDetail",
-                    presetResources[database.engine][size].requests.cpu,
-                    presetResources[database.engine][size].requests.memory,
-                    presetResources[database.engine][size].limits.memory,
-                  )
+              size === "custom" ? (
+                t("db.customSize")
+              ) : (
+                <SizeDetail resources={presetResources[database.engine][size]} />
+              )
             }
           >
             <Select
@@ -164,20 +162,17 @@ function Shape({ project, database }: { project: string; database: Database }) {
               tried && problem
                 ? [
                     problem === "shrink"
-                      ? t("db.storage.shrink", database.storage ?? "")
+                      ? t("db.storage.shrink", plainAmount(t, database.storage ?? "", "bytes"))
                       : t("db.storage.invalid"),
                   ]
                 : []
             }
           >
-            <Input
-              size="sm"
-              mono
+            <AmountInput
+              dimension="bytes"
               value={storage}
               disabled={disabled || fixed}
-              autoComplete="off"
-              spellCheck={false}
-              onChange={(event) => setStorage(event.target.value)}
+              onChange={setStorage}
             />
           </FormField>
         </div>

@@ -219,6 +219,7 @@ function Overview({
   onEvents: () => void
 }) {
   const t = useT()
+  const { amount } = useQuantityFormat()
   return (
     <div className="flex flex-col gap-7">
       <SummaryCard>
@@ -236,7 +237,7 @@ function Overview({
               </span>
             </SummaryCardFact>
             <SummaryCardFact label={t("db.fact.storage")}>
-              <span translate="no">{store.storage ?? "—"}</span>
+              <span translate="no">{store.storage ? amount(store.storage, "bytes") : "—"}</span>
             </SummaryCardFact>
             <SummaryCardFact label={t("s3.fact.buckets")}>{store.buckets.length}</SummaryCardFact>
           </SummaryCardFacts>

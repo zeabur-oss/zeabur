@@ -14,6 +14,7 @@ import { PlanDrawer, ReviewFooter, ReviewForm } from "@/components/plan/plan-dra
 import { type PlanAsk, usePlanner, usePlanStep } from "@/components/plan/planner"
 import { StatusPill } from "@/components/status"
 import { type Translate, useI18n, useT } from "@/i18n"
+import { plainAmount } from "@/lib/quantity"
 import type { Messages } from "@/i18n/en"
 import { formatTime } from "@/lib/format"
 import { outcomeHealth } from "@/model/cluster-backups"
@@ -371,7 +372,11 @@ const badName = (name: string, claim: string) =>
   !/^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/.test(name) || name === claim
 
 const sameAs = (t: Translate, mount: Mount | undefined) =>
-  t("volumeRestore.sameAs", mount?.size ?? "—", mount?.storageClass ?? "—")
+  t(
+    "volumeRestore.sameAs",
+    mount?.size ? plainAmount(t, mount.size, "bytes") : "—",
+    mount?.storageClass ?? "—",
+  )
 
 function SnapshotField({
   snapshots,

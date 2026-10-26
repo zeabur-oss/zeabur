@@ -219,7 +219,7 @@ group("describe", () => {
     // Said once, as what happens; the title already says the new size.
     expect(d.lines).toStrictEqual(["confirm.noShrink"])
     expect(d.consequence).toBe(undefined)
-    expect(d.action).toBe("action.grow(20Gi)")
+    expect(d.action).toBe("action.grow(20 GiB)")
   })
 
   test("a probe says what it does, with its port and Kubernetes' default timing", () => {
@@ -283,7 +283,7 @@ group("describe", () => {
       pods({}),
     )
     expect(d.lines).toStrictEqual([
-      "confirm.resources([[form.cpuRequest, 100m], [form.memoryRequest, 128Mi], [form.memoryLimit, 256Mi]])",
+      "confirm.resources([[form.cpuRequest, usage.cores(0.1)], [form.memoryRequest, 128 MiB], [form.memoryLimit, 256 MiB]])",
     ])
   })
 

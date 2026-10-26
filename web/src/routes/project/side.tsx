@@ -631,7 +631,7 @@ const volumeNames = (row: StorageRow) => row.claims.map((claim) => claim.name).j
 
 function VolumeRow({ project, volume }: { project: string; volume: Sized }) {
   const t = useT()
-  const { memoryParts } = useQuantityFormat()
+  const { memoryParts, amount } = useQuantityFormat()
   const { row, bytes, part } = volume
   const [claim] = row.claims
   const services = row.claims.flatMap((c) => c.services)
@@ -697,7 +697,9 @@ function VolumeRow({ project, volume }: { project: string; volume: Sized }) {
           {value} <span className="type-meta text-muted-foreground">{unit}</span>
         </span>
       ) : (
-        <span className="shrink-0 text-muted-foreground">{claim?.size ?? "—"}</span>
+        <span className="shrink-0 text-muted-foreground">
+          {claim?.size ? amount(claim.size, "bytes") : "—"}
+        </span>
       )}
     </li>
   )

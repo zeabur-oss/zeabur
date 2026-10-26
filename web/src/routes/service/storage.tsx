@@ -16,6 +16,7 @@ import {
   VolumeUseMissing,
 } from "@/components/volume-use"
 import { ManagedTip, Panel } from "@/components/bits"
+import { Amount, AmountInput } from "@/components/amount-input"
 import { FormField } from "@/components/form-field"
 import { KubeDetails } from "@/components/kube-details"
 import {
@@ -400,7 +401,7 @@ function MountRow({
         {fill ? <VolumeFullNote fill={fill} grows={canGrow(storage, mount.storageClass)} /> : null}
       </span>
       <span className="font-mono type-body tabular-nums" translate="no">
-        {mount.size ?? "—"}
+        <Amount value={mount.size} dimension="bytes" fallback="—" />
       </span>
       <span className="type-body text-secondary max-sm:justify-self-end">
         {mount.readOnly ? t("storage.readOnly") : t("storage.writable")}
@@ -551,7 +552,7 @@ function EditRow({
           {row.was?.mountPath}
         </span>
         <span className="font-mono type-body text-tertiary line-through" translate="no">
-          {row.was?.size}
+          <Amount value={row.was?.size} dimension="bytes" />
         </span>
         <span className="max-sm:hidden" />
         <span className="type-meta text-fail-strong">{t("vars.state.removed")}</span>
@@ -585,15 +586,14 @@ function EditRow({
         autoFocus={focus}
         onChange={(event) => onChange((r) => ({ ...r, mountPath: event.target.value }))}
       />
-      <Input
-        size="sm"
-        mono
+      <AmountInput
+        dimension="bytes"
         aria-label={t("storage.sizeOf", label)}
         aria-invalid={invalid("badSize", "shrinks")}
         aria-describedby={describedBy}
         disabled={fixedSize !== undefined}
         value={row.size}
-        onChange={(event) => onChange((r) => ({ ...r, size: event.target.value }))}
+        onChange={(size) => onChange((r) => ({ ...r, size }))}
       />
       <span className="flex items-center max-sm:justify-self-end">
         {row.was ? (
