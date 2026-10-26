@@ -803,7 +803,7 @@ async fn run(
                 container: TOOLS_CONTAINER.to_owned(),
             };
             if exec::send_frame(&mut socket, &ready).await {
-                exec::relay(socket, session, terminal.idle).await;
+                exec::relay(socket, session, terminal.idle, terminal.signed_out.clone()).await;
             }
             if let (Some(closing), Some(zeabur)) =
                 (state.tools.closed(&key, (state.clock)()), zeabur)

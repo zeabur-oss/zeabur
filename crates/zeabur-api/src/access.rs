@@ -49,6 +49,12 @@ pub trait ClusterAccess: Send + Sync + 'static {
         None
     }
 
+    /// Turns `true` when the person of [`ClusterAccess::for_request`] signs out; their open
+    /// terminals close then. `None` where nobody signs out.
+    fn signed_out(&self, _parts: &Parts) -> Option<tokio::sync::watch::Receiver<bool>> {
+        None
+    }
+
     /// Whether people sign in to this server (and can sign out), as opposed to local mode.
     fn signs_in(&self) -> bool {
         false

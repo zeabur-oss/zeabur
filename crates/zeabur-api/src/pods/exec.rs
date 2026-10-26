@@ -32,7 +32,8 @@
 //! closes with `1000`. It also closes on its own with **`4001` "idle, reconnect"** after [`IDLE`]
 //! without a byte either way. The kubelet has the same kind of limit
 //! (`--streaming-connection-idle-timeout`, four hours by default [kubelet]); a browser tab is left
-//! open more easily than a shell, so Zeabur's is shorter.
+//! open more easily than a shell, so Zeabur's is shorter. When the person signs out, the server
+//! closes their terminals at once with **`4002` "signed out"**.
 //!
 //! Codes 4000–4999 are for private use [rfc6455] (§7.4.2).
 //!
@@ -115,6 +116,9 @@ const DRAIN: Duration = Duration::from_secs(2);
 
 /// The close code after [`IDLE`].
 pub const CLOSE_IDLE: u16 = 4001;
+
+/// The close code when the person signs out.
+pub const CLOSE_SIGNED_OUT: u16 = 4002;
 
 /// A control frame from the browser.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
@@ -243,6 +247,8 @@ pub(crate) struct Terminal {
     pub(crate) idle: Duration,
     /// The person's token, for a tools pod (see the `tools` module).
     pub(crate) handoff: Option<crate::access::Handoff>,
+    /// Turns `true` when the person signs out.
+    pub(crate) signed_out: Option<tokio::sync::watch::Receiver<bool>>,
 }
 
 impl<S> FromRequestParts<S> for Terminal
@@ -266,6 +272,7 @@ where
                     cluster,
                     idle: state.terminal_idle,
                     handoff: state.access.handoff(parts),
+                    signed_out: state.access.signed_out(parts),
                 })
         } else {
             Err(ApiError::from(Problem::new(
@@ -323,7 +330,7 @@ async fn run(
         }
     };
     if send_frame(&mut socket, &ServerFrame::Ready { container }).await {
-        relay(socket, session, terminal.idle).await;
+        relay(socket, session, terminal.idle, terminal.signed_out).await;
     }
 }
 
@@ -470,10 +477,16 @@ pub(crate) fn pick_container(
     Err(problem.into())
 }
 
-/// Copies bytes both ways until the process ends, the browser leaves or the terminal idles.
+/// Copies bytes both ways until the process ends, the browser leaves, the person signs out or
+/// the terminal idles.
 /// Standard input is written as the process takes it, so a process that is busy writing output
 /// never blocks the reading of more input, nor the other way round.
-pub(crate) async fn relay(mut socket: WebSocket, session: ExecSession, idle: Duration) {
+pub(crate) async fn relay(
+    mut socket: WebSocket,
+    session: ExecSession,
+    idle: Duration,
+    mut signed_out: Option<tokio::sync::watch::Receiver<bool>>,
+) {
     let ExecSession {
         mut input,
         mut output,
@@ -521,6 +534,10 @@ pub(crate) async fn relay(mut socket: WebSocket, session: ExecSession, idle: Dur
                 }
                 return;
             },
+            () = signed_out_signal(&mut signed_out) => {
+                close(&mut socket, CLOSE_SIGNED_OUT, "signed out").await;
+                return;
+            },
             () = &mut idle_timer => {
                 close(&mut socket, CLOSE_IDLE, "idle, reconnect").await;
                 return;
@@ -531,6 +548,18 @@ pub(crate) async fn relay(mut socket: WebSocket, session: ExecSession, idle: Dur
                 .as_mut()
                 .reset(tokio::time::Instant::now() + idle);
         }
+    }
+}
+
+/// Completes when the person signs out; never when nobody can.
+async fn signed_out_signal(signed_out: &mut Option<tokio::sync::watch::Receiver<bool>>) {
+    match signed_out {
+        Some(receiver) => {
+            if receiver.wait_for(|ended| *ended).await.is_err() {
+                std::future::pending::<()>().await;
+            }
+        }
+        None => std::future::pending().await,
     }
 }
 

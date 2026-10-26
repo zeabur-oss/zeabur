@@ -686,6 +686,7 @@ fn every_request_goes_with_the_session_token() {
             value: base.clone(),
             expires_at: NOW + 600,
         },
+        signed_out: tokio::sync::watch::channel(false).1,
     }));
     let cluster = access.for_request(&parts).unwrap();
     let expected: Arc<dyn zeabur_kube::Cluster> =

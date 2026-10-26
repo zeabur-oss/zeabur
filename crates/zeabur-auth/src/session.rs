@@ -90,6 +90,9 @@ pub enum Activity {
     Background,
 }
 
+/// Turns `true` when the person signs out of the session.
+pub type SignedOut = tokio::sync::watch::Receiver<bool>;
+
 /// A credential and when it expires.
 #[derive(Debug, Clone)]
 pub struct Bound<T> {
@@ -106,6 +109,8 @@ pub struct Credentials<T> {
     pub username: String,
     /// The credential.
     pub base: Bound<T>,
+    /// Open terminals watch this to close at sign-out.
+    pub signed_out: SignedOut,
 }
 
 /// The outcome of looking a session up.
@@ -148,6 +153,7 @@ struct Entry<T> {
     state: Mutex<State<T>>,
     /// Held while the session's token is renewed.
     renewing: tokio::sync::Mutex<()>,
+    signed_out: tokio::sync::watch::Sender<bool>,
 }
 
 impl<T> Entry<T> {
@@ -239,6 +245,7 @@ impl<T: Clone + Send + Sync + 'static> Sessions<T> {
                 refresh,
             }),
             renewing: tokio::sync::Mutex::new(()),
+            signed_out: tokio::sync::watch::channel(false).0,
         });
         self.entries().insert(hash, entry);
         Ok(id)
@@ -271,6 +278,7 @@ impl<T: Clone + Send + Sync + 'static> Sessions<T> {
         Credentials {
             username: state.username.clone(),
             base: state.base.clone(),
+            signed_out: entry.signed_out.subscribe(),
         }
     }
 
@@ -350,10 +358,12 @@ impl<T: Clone + Send + Sync + 'static> Sessions<T> {
         }
     }
 
-    /// Ends the session `id`; returns its refresh token, to revoke.
+    /// Ends the session `id` and tells its watchers ([`Credentials::signed_out`]); returns its
+    /// refresh token, to revoke.
     pub fn end_session(&self, id: &str) -> Option<SecretString> {
         let entry = self.find(id)?;
         self.end(&entry);
+        entry.signed_out.send_replace(true);
         entry.state().refresh.take()
     }
 
@@ -672,5 +682,17 @@ mod tests {
             Lookup::SignedOut
         ));
         assert!(rig.sessions.end_session(&id).is_none());
+    }
+
+    #[tokio::test]
+    async fn signing_out_tells_the_watchers_of_the_session() {
+        let rig = Rig::new(Limits::default()).await;
+        let id = rig.sign_in("alice").await;
+        let Lookup::Active(credentials) = rig.sessions.current(&id, Activity::Person).await else {
+            panic!("signed in");
+        };
+        assert!(!*credentials.signed_out.borrow());
+        rig.sessions.end_session(&id);
+        assert!(*credentials.signed_out.borrow());
     }
 }

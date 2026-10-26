@@ -274,6 +274,10 @@ impl ClusterAccess for SessionAccess {
         })
     }
 
+    fn signed_out(&self, parts: &Parts) -> Option<tokio::sync::watch::Receiver<bool>> {
+        Some(credentials(parts).ok()?.signed_out.clone())
+    }
+
     fn signs_in(&self) -> bool {
         true
     }

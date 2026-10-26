@@ -10,6 +10,7 @@ mod tests {
     use std::time::Duration;
 
     use axum::Router;
+    use axum::http::request::Parts;
     use futures_util::{SinkExt as _, StreamExt as _};
     use serde_json::{Value, json};
     use tokio::net::TcpStream;
@@ -17,11 +18,12 @@ mod tests {
     use tokio_tungstenite::tungstenite::protocol::frame::coding::CloseCode;
     use tokio_tungstenite::tungstenite::{Error as WsError, Message};
     use tokio_tungstenite::{MaybeTlsStream, WebSocketStream};
-    use zeabur_api::access::SingleCluster;
+    use zeabur_api::access::{ClusterAccess, SingleCluster};
+    use zeabur_core::problem::Problem;
     use zeabur_kube::k8s_openapi::api::core::v1::Pod;
     use zeabur_kube::k8s_openapi::jiff::Timestamp;
     use zeabur_kube::memory::{MemoryCluster, State};
-    use zeabur_kube::{NamespaceObjects, TerminalSize};
+    use zeabur_kube::{Cluster, NamespaceObjects, TerminalSize};
 
     type Socket = WebSocketStream<MaybeTlsStream<TcpStream>>;
 
@@ -200,6 +202,31 @@ mod tests {
         let mut socket = connect(router, "").await;
         assert_eq!(frame(&mut socket).await["type"], "ready");
         assert_eq!(close_code(&mut socket).await.0, CloseCode::from(4001));
+    }
+
+    #[tokio::test]
+    async fn signing_out_closes_an_open_terminal_at_once() {
+        struct Access {
+            cluster: Arc<dyn Cluster>,
+            signed_out: tokio::sync::watch::Receiver<bool>,
+        }
+        impl ClusterAccess for Access {
+            fn for_request(&self, _parts: &Parts) -> Result<Arc<dyn Cluster>, Box<Problem>> {
+                Ok(Arc::clone(&self.cluster))
+            }
+            fn signed_out(&self, _parts: &Parts) -> Option<tokio::sync::watch::Receiver<bool>> {
+                Some(self.signed_out.clone())
+            }
+        }
+        let (sign_out, signed_out) = tokio::sync::watch::channel(false);
+        let access = Arc::new(Access {
+            cluster: Arc::new(cluster()),
+            signed_out,
+        });
+        let mut socket = connect(zeabur_api::router_at(access, now), "").await;
+        assert_eq!(frame(&mut socket).await["type"], "ready");
+        sign_out.send_replace(true);
+        assert_eq!(close_code(&mut socket).await.0, CloseCode::from(4002));
     }
 
     /// A refusal names the permission.
