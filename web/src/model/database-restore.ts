@@ -6,6 +6,7 @@ import { databaseOfEnv, type Target } from "@/model/connect"
 import {
   APP_DATABASE,
   APP_SECRET,
+  jobAccount,
   madeFor,
   newPassword,
   perThreadCaches,
@@ -196,12 +197,13 @@ function restoreMysql({ source, point, name, project, spec, store, object, copie
   const { bucket } = splitDestination(store?.destination)
   const endpoint = store?.endpoint ? { endpointURL: store.endpoint } : {}
   const storageClass = source.storageClass ? { storageClassName: source.storageClass } : {}
+  const account = `${name}-restore`
   spec.restore = {
     sourceName: source.name,
     sourceNamespace: project,
     restorePoint: point.from,
     jobConfig: {
-      serviceAccountName: "default",
+      serviceAccountName: account,
       bucketConfig: { bucketName: bucket, ...endpoint, usePathStyle: true },
       envFrom: [{ secretRef: { name: store?.secret ?? `${source.name}-backups-s3` } }],
       workVolume: {
@@ -217,10 +219,10 @@ function restoreMysql({ source, point, name, project, spec, store, object, copie
       },
     },
   }
-  if (!copied) return [create(object)]
+  if (!copied) return [jobAccount(account), create(object)]
   const metadata = object.metadata as { annotations: Record<string, string> }
   metadata.annotations[APP_SECRET] = `${name}-app`
-  return [secretOf(`${name}-app`, copied), create(object)]
+  return [jobAccount(account), secretOf(`${name}-app`, copied), create(object)]
 }
 
 // The dump holds the original's root password: the copy's root Secret has the same values.

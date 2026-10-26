@@ -466,10 +466,24 @@ mod tests {
         .await;
         assert_eq!(status, StatusCode::OK, "{applied}");
         let writes = cluster.inspect(|s| s.writes.clone()).unwrap();
-        assert_eq!(writes.len(), 1);
         assert_eq!(writes[0].target.namespace, "");
         assert_eq!(writes[0].target.plural, "namespaces");
         assert!(matches!(writes[0].body, WriteBody::Create(_)));
+        let account = writes
+            .iter()
+            .find(|w| w.target.kind == "ServiceAccount")
+            .expect("the default ServiceAccount is written");
+        assert_eq!(
+            (
+                account.target.namespace.as_str(),
+                account.target.name.as_str()
+            ),
+            ("my-app", "default")
+        );
+        assert!(
+            matches!(&account.body, WriteBody::Create(b) if b["automountServiceAccountToken"] == false),
+            "{account:?}"
+        );
         let created = summary(&app, "my-app").await;
         assert_eq!(created["adopted"], true, "{created}");
         assert_eq!(created["displayName"], "My app", "{created}");

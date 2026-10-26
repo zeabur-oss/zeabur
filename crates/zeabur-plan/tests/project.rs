@@ -399,9 +399,19 @@ mod tests {
     }
 
     #[test]
-    fn a_new_project_is_a_baseline_namespace_with_the_project_label_and_nothing_else() {
+    fn a_new_project_is_a_baseline_namespace_with_the_project_label_and_a_default_account_without_token()
+     {
         let plan = create("my-app", None, Some("  My app ")).unwrap();
-        assert_eq!(plan.objects.len(), 1);
+        let account = plan
+            .objects
+            .iter()
+            .find(|o| o.target.plural == "serviceaccounts")
+            .expect("a ServiceAccount");
+        assert_eq!(account.target.name, "default");
+        let Write::Create { body } = &account.write else {
+            panic!("the account is created");
+        };
+        assert_eq!(body["automountServiceAccountToken"], false);
         let object = &plan.objects[0];
         assert_eq!(object.target.plural, "namespaces");
         assert!(!object.target.namespaced());
@@ -421,6 +431,7 @@ mod tests {
                 "annotations": {"zeabur.com/display-name": "My app"}
             }})
         );
+        assert_eq!(object.target.plural, "namespaces");
         let unnamed = create("my-app", None, Some(" ")).unwrap();
         let Write::Create { body } = &unnamed.objects[0].write else {
             panic!("a new Namespace is created");

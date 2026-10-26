@@ -545,6 +545,7 @@ export const backupNames = (name: string) => ({
   secret: `${name}-backups-s3`,
   store: `${name}-backups`,
   schedule: `${name}-scheduled`,
+  account: `${name}-backup`,
 })
 
 const folder = (target: BackupTarget, name: string) =>
@@ -562,18 +563,28 @@ export function splitDestination(destination: string | null | undefined) {
   return { bucket, folder: rest.join("/") }
 }
 
+/** The ServiceAccount of MOCO's backup and restore Jobs. It has no Role and no token, as the Jobs
+ * call no Kubernetes API. */
+export const jobAccount = (name: string): Change =>
+  create({
+    apiVersion: "v1",
+    kind: "ServiceAccount",
+    metadata: { name },
+    automountServiceAccountToken: false,
+  })
+
 /** MOCO's backup and restore Jobs: the bucket, the keys from `secretName` as AWS variables, and a
- * scratch volume as big as the data. They run as the namespace's `default` ServiceAccount, as
- * MOCO's Jobs call no Kubernetes API.
+ * scratch volume as big as the data. They run as the ServiceAccount `account`.
  * https://cybozu-go.github.io/moco/backup.html */
 function mocoJobConfig(
   database: Pick<Database, "storage" | "storageClass">,
   bucket: string,
   endpoint: string | null | undefined,
   secretName: string,
+  account: string,
 ) {
   return {
-    serviceAccountName: "default",
+    serviceAccountName: account,
     bucketConfig: {
       bucketName: bucket,
       ...(endpoint ? { endpointURL: endpoint } : {}),
@@ -748,11 +759,11 @@ export function enableBackups(database: Database, target: BackupTarget): Change[
         spec: {
           schedule: cron(target.frequency, false),
           concurrencyPolicy: "Forbid",
-          jobConfig: mocoJobConfig(database, bucket, endpoint, names.secret),
+          jobConfig: mocoJobConfig(database, bucket, endpoint, names.secret, names.account),
         },
       })
       spec.backupPolicyName = names.store
-      return madeFor(database.name, [keys, policy, edit()])
+      return madeFor(database.name, [jobAccount(names.account), keys, policy, edit()])
     }
     case "mariadb": {
       const keys = awsKeys(names.secret, target, region)

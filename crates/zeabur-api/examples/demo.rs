@@ -2153,7 +2153,7 @@ fn state() -> State {
             from(json!({
                 "apiVersion": "moco.cybozu.com/v1beta2", "kind": "BackupPolicy",
                 "metadata": {"name": "mysql-mvjrswvl-backups", "namespace": "lab"},
-                "spec": {"schedule": "0 3 * * *", "jobConfig": {"serviceAccountName": "default",
+                "spec": {"schedule": "0 3 * * *", "jobConfig": {"serviceAccountName": "mysql-mvjrswvl-backup",
                     "bucketConfig": {"bucketName": "lab-backups", "endpointURL": "https://s3.example.com", "usePathStyle": true},
                     "envFrom": [{"secretRef": {"name": "mysql-mvjrswvl-backups-s3"}}],
                     "workVolume": {"emptyDir": {}}}}

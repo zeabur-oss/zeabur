@@ -93,9 +93,10 @@ Zeabur 的信任範圍是整個叢集：能登入的人都是可信任的使用�
 
 ### 新專案裡有什麼
 
-用 installer 安裝的叢集，平台元件所在的 Namespace 都有 `zeabur.com/platform: "true"` 標籤。叢集裡有這個標籤時，Zeabur 建立專案會寫入兩個物件：
+用 installer 安裝的叢集，平台元件所在的 Namespace 都有 `zeabur.com/platform: "true"` 標籤。叢集裡有這個標籤時，Zeabur 建立專案會寫入三個物件：
 
 - Namespace，帶 `zeabur.com/project` 標籤和 Pod Security 標籤。
+- ServiceAccount `default`，`automountServiceAccountToken: false`。沒指定 ServiceAccount 的 Pod 不會拿到 token；要呼叫 Kubernetes API 的工作負載請自己指定 ServiceAccount。
 - NetworkPolicy `zeabur-project`：專案裡每個 Pod 都只收以下來源的連線，往外的連線不限制。
   - 同一個專案的 Pod。
   - 帶 `zeabur.com/platform: "true"` 的 Namespace，也就是 Ingress controller、指標收集和資料庫 operator 這些平台元件。

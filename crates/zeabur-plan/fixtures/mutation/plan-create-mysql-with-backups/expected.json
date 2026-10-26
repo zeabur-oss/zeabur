@@ -222,7 +222,7 @@
             "schedule": "0 3 * * *",
             "concurrencyPolicy": "Forbid",
             "jobConfig": {
-              "serviceAccountName": "default",
+              "serviceAccountName":"mysql-backup",
               "bucketConfig": {
                 "bucketName": "b",
                 "endpointURL": "https://s3.example.com",

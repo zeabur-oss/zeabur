@@ -579,7 +579,7 @@ describe("MySQL, MariaDB and Dragonfly", () => {
 
   test("MySQL backs up through a BackupPolicy the cluster names, with its keys as AWS variables", () => {
     const changes = enableBackups(as("mysql", "MySQLCluster", "mysqlclusters"), target)
-    const [keys, policy, edit] = changes
+    const [, keys, policy, edit] = changes
     expect(keys?.op === "create" && keys.object?.stringData).toMatchObject({
       AWS_ACCESS_KEY_ID: "id",
       AWS_REGION: "us-east-1",
@@ -587,13 +587,24 @@ describe("MySQL, MariaDB and Dragonfly", () => {
     expect(policy?.op === "create" && policy.object?.spec).toMatchObject({
       schedule: "0 3 * * *",
       jobConfig: {
-        serviceAccountName: "default",
+        serviceAccountName: "db-backup",
         bucketConfig: { bucketName: "backups", endpointURL: "http://s3.test:8333" },
         envFrom: [{ secretRef: { name: "db-backups-s3" } }],
       },
     })
     expect(edit?.op === "edit" && JSON.parse(edit.yaml).spec.backupPolicyName).toBe("db-backups")
     expect(canBackUpNow("mysql")).toBe(false)
+  })
+
+  test("MOCO's jobs run as a ServiceAccount of their own that has no token", () => {
+    const [account, , policy] = enableBackups(as("mysql", "MySQLCluster", "mysqlclusters"), target)
+    const made = (change: unknown) => (change as { object: Record<string, never> }).object
+    expect(made(account)).toMatchObject({
+      kind: "ServiceAccount",
+      metadata: { name: "db-backup" },
+      automountServiceAccountToken: false,
+    })
+    expect(made(policy)).toMatchObject({ spec: { jobConfig: { serviceAccountName: "db-backup" } } })
   })
 
   test("MariaDB backs up through a scheduled Backup, and on demand to the same bucket", () => {

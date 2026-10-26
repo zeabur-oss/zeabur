@@ -122,7 +122,7 @@
               "sourceNamespace": "demo",
               "restorePoint": "2026-10-22T03:00:00Z",
               "jobConfig": {
-                "serviceAccountName": "default",
+                "serviceAccountName":"mysql-backup",
                 "bucketConfig": {
                   "bucketName": "b",
                   "endpointURL": "https://s3.example.com",

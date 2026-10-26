@@ -259,9 +259,15 @@ describe("restoring into a new database", () => {
         spec: { replicas: 3, backupPolicyName: "shop-backups" },
       } as unknown as Database["object"],
     })
-    const [cluster] = bodies(
+    const made = bodies(
       restoreChanges(mysql, { ...point, from: "2026-10-22T03:00:00Z" }, "copy", "demo"),
     )
+    const cluster = made.find((b) => b?.kind === "MySQLCluster")
+    const account = made.find((b) => b?.kind === "ServiceAccount")
+    expect(account).toMatchObject({ automountServiceAccountToken: false })
+    expect(cluster?.spec.restore).toMatchObject({
+      jobConfig: { serviceAccountName: account?.metadata.name },
+    })
     expect(cluster?.metadata.annotations).toMatchObject({ "zeabur.com/app-secret": "shop-app" })
     expect(cluster?.spec.backupPolicyName).toBeUndefined()
     expect(cluster?.spec.restore).toMatchObject({

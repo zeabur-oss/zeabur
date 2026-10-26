@@ -27,7 +27,8 @@ holding any power of its own. It is a projection: Kubernetes objects are the onl
   cluster, label them yourself: `kubectl label namespace <ns> zeabur.com/platform=true`.
   `GET /api/v1/cluster/gaps` names the project namespaces without it. The trust boundary is the
   cluster: everyone who signs in is trusted, and the policy only limits the damage one compromised
-  service can do.
+  service can do. A new project's `default` ServiceAccount has `automountServiceAccountToken:
+  false`; a workload that calls the Kubernetes API names a ServiceAccount of its own.
 - **Kubernetes objects are the only state.** No database, no cache of Secret values, and no
   custom resources for layers L0 to L2. A project is a namespace; creating one is a plan like
   any other change, and adopting one only adds a label. Removing Zeabur leaves the cluster as it

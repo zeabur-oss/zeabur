@@ -10,7 +10,10 @@
 //!   new project's pods are held to the same level on every cluster: an image that runs as root
 //!   starts, and a pod that reaches the host does not. Each service can still meet `restricted`
 //!   (the `pod_security` module). kube-apiserver refuses the Namespace (`409 AlreadyExists`) if the
-//!   name was taken since the plan, which refuses a name that exists when it plans.
+//!   name was taken since the plan, which refuses a name that exists when it plans. It also writes
+//!   the `default` `ServiceAccount` with `automountServiceAccountToken: false`, so a pod that names
+//!   no ServiceAccount gets no token. A workload that calls the Kubernetes API names a
+//!   ServiceAccount of its own.
 //! - **Adopting** adds one label, `zeabur.com/project: "true"`; **letting go** removes it. Nothing
 //!   else on the Namespace changes, and nothing in it: a namespace that is no longer adopted keeps
 //!   every object, and is only no longer shown as a project.
@@ -30,6 +33,7 @@
 //! [rfc6902-add]: https://www.rfc-editor.org/rfc/rfc6902#section-4.1
 //! [k8s-psa-labels]: https://kubernetes.io/docs/concepts/security/pod-security-admission/#pod-security-admission-labels-for-namespaces
 
+use k8s_openapi::api::core::v1::ServiceAccount;
 use k8s_openapi::api::networking::v1::NetworkPolicy;
 use serde_json::{Value, json};
 use zeabur_model::kernel::isolation::{PROJECT_POLICY, project_policy};
@@ -52,6 +56,9 @@ fn node_shell_namespace(name: &str) -> PlanError {
         ),
     )
 }
+
+/// The ServiceAccount every namespace gets; a project's has no token.
+pub const DEFAULT_ACCOUNT: &str = "default";
 
 /// The value of the project label.
 const ADOPTED: &str = "true";
@@ -164,6 +171,18 @@ impl Planner<'_> {
             target: Target::namespace(&name),
             original: None,
             current: namespace,
+            operations: Vec::new(),
+            owners: Vec::new(),
+            deleted: false,
+        });
+        self.objects.push(Working {
+            target: Target::of::<ServiceAccount>(DEFAULT_ACCOUNT),
+            original: None,
+            current: json!({
+                "apiVersion": "v1", "kind": "ServiceAccount",
+                "metadata": {"name": DEFAULT_ACCOUNT, "namespace": name},
+                "automountServiceAccountToken": false,
+            }),
             operations: Vec::new(),
             owners: Vec::new(),
             deleted: false,

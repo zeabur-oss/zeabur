@@ -457,7 +457,7 @@ pub(crate) async fn apply(
     dry_run(target_cluster, namespace, &plan, &writes).await?;
     let mut applied = Vec::new();
     for (target, write) in writes {
-        match target_cluster.write(&write).await {
+        match write_once(target_cluster, &target, &write).await {
             Ok(written) => applied.push(Applied {
                 target,
                 resource_version: written.resource_version,
@@ -469,6 +469,32 @@ pub(crate) async fn apply(
         }
     }
     Ok(Json(ApplyResponse { applied }))
+}
+
+/// Writes `write`. kube-apiserver makes the `default` ServiceAccount of a new namespace on its
+/// own, and may be first; its token is then switched off by a patch.
+async fn write_once(
+    cluster: &dyn Cluster,
+    target: &zeabur_plan::Target,
+    write: &WriteRequest,
+) -> Result<zeabur_kube::Written, zeabur_kube::ClusterError> {
+    let result = cluster.write(write).await;
+    let taken = matches!(&result, Err(e) if e.code() == Some(409));
+    if taken
+        && target.kind == "ServiceAccount"
+        && target.name == zeabur_plan::DEFAULT_ACCOUNT
+        && matches!(write.body, WriteBody::Create(_))
+    {
+        return cluster
+            .write(&WriteRequest {
+                body: WriteBody::JsonPatch(serde_json::json!([
+                    {"op": "add", "path": "/automountServiceAccountToken", "value": false}
+                ])),
+                ..write.clone()
+            })
+            .await;
+    }
+    result
 }
 
 /// The problem for a refused write of `target`: the document it came from, when a create made
