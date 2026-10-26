@@ -105,7 +105,7 @@ zeabur-identityctl invite --username alice --admin
 zeabur-identityctl account-type alice admin     # 改回一般帳號：regular
 ```
 
-`admins` 群組只能從帳號類型取得，Zeabur Identity 不接受把它寫進使用者的 `groups`。細節見 Zeabur Identity 的[管理員帳號](https://github.com/zeabur-oss/identity/blob/main/docs/managing-users.md#admin-accounts)。
+`admins` 群組只能從帳號類型取得，Zeabur Identity 不接受把它寫進使用者的 `groups`。細節見 Zeabur Identity 的[管理員帳號](https://oss.zeabur.com/docs/identity/managing-users#admin-accounts)。
 
 ## 登入能維持多久
 
@@ -149,7 +149,7 @@ kubectl -n zeabur-identity patch configmap zeabur-identity-settings --type merge
 
 NIST SP 800-63B-4 規定會同步的通行密鑰最高只到 AAL2，不會同步的才可能達到 AAL3。通行密鑰會不會同步，是驗證器自己回報的（WebAuthn 的 backup eligibility 旗標，BE）。Zeabur Identity 不要求 attestation，所以沒有人驗證這個回報是真的。AAL3 能擋掉會同步的通行密鑰，但不能證明金鑰存在什麼硬體裡。
 
-開啟前，先確認每位管理員都有不會同步的通行密鑰。你自己沒有的話，Zeabur 不會讓你開啟，避免把自己鎖在外面。其他沒有的管理員開啟後就登不進來，要用 `zeabur-identityctl setup-link --username <管理員> --reset` 產生新連結，讓他註冊安全金鑰。檢查每把通行密鑰的方式見 Zeabur Identity 的 [AAL3 for admins](https://github.com/zeabur-oss/identity/blob/main/docs/managing-users.md#aal3-for-admins)。
+開啟前，先確認每位管理員都有不會同步的通行密鑰。你自己沒有的話，Zeabur 不會讓你開啟，避免把自己鎖在外面。其他沒有的管理員開啟後就登不進來，要用 `zeabur-identityctl setup-link --username <管理員> --reset` 產生新連結，讓他註冊安全金鑰。檢查每把通行密鑰的方式見 Zeabur Identity 的 [AAL3 for admins](https://oss.zeabur.com/docs/identity/managing-users#aal3-for-admins)。
 
 ## 用 kubectl 操作
 
@@ -162,7 +162,7 @@ kubelogin 預設把 refresh token 存在 `~/.kube/cache/oidc-login`。不想把�
 - `--token-cache-storage=keyring`：存進作業系統的鑰匙圈。
 - `--token-cache-storage=none`：什麼都不存，每個 kubectl 指令都會開登入頁。
 
-設定 kubeconfig 的步驟見 Zeabur Identity 的[入門](https://github.com/zeabur-oss/identity/blob/main/docs/get-started.md#7-set-up-kubectl-on-your-computer)。
+設定 kubeconfig 的步驟見 Zeabur Identity 的[入門](https://oss.zeabur.com/docs/identity/get-started#7-set-up-kubectl-on-your-computer)。
 
 ## 用 kubectl 確認權限
 

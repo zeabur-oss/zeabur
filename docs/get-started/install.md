@@ -24,7 +24,7 @@ The examples use these names; replace them with yours:
 - Kubernetes 1.30 or later, for the member roles' admission policy (`ValidatingAdmissionPolicy`
   is GA from 1.30). With `memberRoles.enabled=false` the chart installs none.
 - A cluster whose kube-apiserver trusts Zeabur Identity's tokens, with Zeabur Identity's sign-in page published
-  over HTTPS: Zeabur Identity's [Get started](https://github.com/zeabur-oss/identity/blob/main/docs/get-started.md)
+  over HTTPS: Zeabur Identity's [Get started](https://oss.zeabur.com/docs/identity/get-started)
   sets this up on k3s. Run `zeabur-identityctl` and `kubectl` below with the cluster admin's kubeconfig.
 - An ingress controller (an `Ingress` or a Gateway API `Gateway`) and a TLS certificate for
   Zeabur's host name, for example from cert-manager. Browsers offer passkeys only on pages they
@@ -88,7 +88,7 @@ unset CLIENT_SECRET
 ```
 
 See Zeabur Identity's
-[Registering clients](https://github.com/zeabur-oss/identity/blob/main/docs/clients.md) for the
+[Registering clients](https://oss.zeabur.com/docs/identity/clients) for the
 options.
 
 ## 3. Install the chart
@@ -374,7 +374,7 @@ everyday work; teams that want more turn on AAL3 (below).
 The first admin comes from the setup link (`zeabur-identityctl setup-link`). On the command
 line, `zeabur-identityctl invite --username alice --admin` invites an admin and
 `zeabur-identityctl account-type alice admin` (or `regular`) changes an existing account; see
-Zeabur Identity's [Admin accounts](https://github.com/zeabur-oss/identity/blob/main/docs/managing-users.md#admin-accounts).
+Zeabur Identity's [Admin accounts](https://oss.zeabur.com/docs/identity/managing-users#admin-accounts).
 
 | Account | Access token | Session ends when idle for | Session ends at the latest |
 |---|---|---|---|
@@ -416,7 +416,7 @@ passkeys out, it does not prove what hardware holds the key. Zeabur refuses to t
 unless the admin making the change has a device-bound passkey; other admins without one are
 locked out until `zeabur-identityctl setup-link --username <admin> --reset`. Regular accounts
 never change. See Zeabur Identity's
-[AAL3 for admins](https://github.com/zeabur-oss/identity/blob/main/docs/managing-users.md#aal3-for-admins).
+[AAL3 for admins](https://oss.zeabur.com/docs/identity/managing-users#aal3-for-admins).
 
 ### kubectl
 
@@ -472,7 +472,7 @@ Earlier versions gave admins everyday rights and a "Retry with admin rights" but
 accounts replace it. When upgrading:
 
 1. Upgrade Zeabur Identity first, following its
-   [From elevation to admin accounts](https://github.com/zeabur-oss/identity/blob/main/docs/operations.md#from-elevation-to-admin-accounts).
+   [From elevation to admin accounts](https://oss.zeabur.com/docs/identity/operations#from-elevation-to-admin-accounts).
 2. Make everyone who had `admins` in `groups` or `elevatedGroups` an admin account, with
    `zeabur-identityctl account-type <user> admin` or the Admin role on the Members page.
    Zeabur Identity refuses `admins` in a user's `groups` from now on.

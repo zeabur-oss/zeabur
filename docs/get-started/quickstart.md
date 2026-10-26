@@ -126,8 +126,8 @@ Things to know:
 
 - [How it works](../reference/installer.md): the steps of `apply`, the security defaults, and what has
   and has not been tested.
-- [Contributing](../../CONTRIBUTING.md#installer) and the [security policy](../../SECURITY.md).
+- [Contributing](https://github.com/zeabur-oss/zeabur/blob/main/CONTRIBUTING.md#installer) and the [security policy](https://github.com/zeabur-oss/zeabur/blob/main/SECURITY.md).
 
 ## License
 
-[Apache-2.0](../../LICENSE).
+[Apache-2.0](https://github.com/zeabur-oss/zeabur/blob/main/LICENSE).

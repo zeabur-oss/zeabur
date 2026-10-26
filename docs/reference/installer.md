@@ -235,7 +235,7 @@ are backed up.
   `validationActions` to `[Warn]` on `zeabur-system-hosts-zeabur` or
   `zeabur-system-hosts-zeabur-identity` to only warn. A deleted binding comes back on the next
   `apply`. The policy stays when Zeabur is removed.
-- **Pinned RKE2 digests.** See the [security policy](../../SECURITY.md#what-the-installer-trusts).
+- **Pinned RKE2 digests.** See the [security policy](https://github.com/zeabur-oss/zeabur/blob/main/SECURITY.md#what-the-installer-trusts).
 
 ## What is verified
 

@@ -3,19 +3,19 @@
 # translations' nav.yaml refers to it, and it is part of each page's URL.
 - group: get-started
   label: Get started
-  pages: [quickstart, advanced-install, install, first-project, how-it-works]
+  pages: [quickstart, advanced-install, personal, install, first-project, how-it-works]
 - group: deploy
   label: Deploy
-  pages: [git, image, compose, databases, object-storage, cron-jobs]
+  pages: [git, upload, image, compose, templates, databases, object-storage, cron-jobs]
 - group: configure
   label: Configure
-  pages: [variables, domains, dns, maintenance, volumes, delete-project]
+  pages: [variables, domains, dns, ip-limits, maintenance, volumes, delete-project]
 - group: cluster
   label: Operate the cluster
   pages: [members, notifications, backups, nodes, components, external-secrets, s3-destinations]
 - group: reference
   label: Reference
-  pages: [zeaburctl, installer-configuration, installer, permissions, api, architecture, releases, security]
+  pages: [zeaburctl, installer-configuration, installer, permissions, architecture, releases, security]
 - group: leave
   label: Leave Zeabur
   pages: [uninstall]
