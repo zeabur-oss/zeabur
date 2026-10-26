@@ -5,7 +5,10 @@
 use std::net::Ipv4Addr;
 
 use kube::Api;
-use kube::api::ListParams;
+use kube::api::{ListParams, PostParams};
+use zeabur_kube::k8s_openapi::api::authorization::v1::{
+    ResourceAttributes, SelfSubjectAccessReview, SelfSubjectAccessReviewSpec,
+};
 use zeabur_kube::k8s_openapi::api::core::v1::{Pod, Service};
 use zeabur_kube::k8s_openapi::api::discovery::v1::EndpointSlice;
 use zeabur_kube::k8s_openapi::apimachinery::pkg::util::intstr::IntOrString;
@@ -58,6 +61,7 @@ pub(crate) async fn start(client: kube::Client, service: &ServiceAddress) -> Res
             service.namespace
         )
     })?;
+    may_forward(&client, &pod, &service.namespace).await?;
     let listener = tokio::net::TcpListener::bind((Ipv4Addr::LOCALHOST, 0))
         .await
         .map_err(|e| format!("cannot listen on 127.0.0.1: {e}"))?;
@@ -82,6 +86,35 @@ pub(crate) async fn start(client: kube::Client, service: &ServiceAddress) -> Res
         }
     });
     Ok(local)
+}
+
+/// Asks kube-apiserver whether the kubeconfig may forward a port to `pod`, so a missing right is
+/// told at the start and not as a refused connection halfway through the upload.
+async fn may_forward(client: &kube::Client, pod: &str, namespace: &str) -> Result<(), String> {
+    let review = SelfSubjectAccessReview {
+        spec: SelfSubjectAccessReviewSpec {
+            resource_attributes: Some(ResourceAttributes {
+                namespace: Some(namespace.to_owned()),
+                verb: Some("create".to_owned()),
+                resource: Some("pods".to_owned()),
+                subresource: Some("portforward".to_owned()),
+                name: Some(pod.to_owned()),
+                ..ResourceAttributes::default()
+            }),
+            ..SelfSubjectAccessReviewSpec::default()
+        },
+        ..SelfSubjectAccessReview::default()
+    };
+    let answer = Api::<SelfSubjectAccessReview>::all(client.clone())
+        .create(&PostParams::default(), &review)
+        .await;
+    // When the question cannot be asked, the upload tries and tells what it gets.
+    if answer.ok().and_then(|a| a.status).is_some_and(|s| !s.allowed) {
+        return Err(format!(
+            "Your kubeconfig is not allowed to forward a port to the registry in the namespace {namespace}, which uploading a folder from this computer needs. Ask a cluster administrator for `create` on `pods/portforward` there, or upload from Zeabur's web interface."
+        ));
+    }
+    Ok(())
 }
 
 /// A ready pod behind `service`, and the pod's port for it.
