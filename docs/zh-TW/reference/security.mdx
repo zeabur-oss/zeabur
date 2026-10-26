@@ -50,6 +50,31 @@ sudo zeabur-installer apply
 
 以同一個作業系統使用者執行的其他程式，本來就能直接讀 kubeconfig，這些檢查不處理這種情況。
 
+## 把面板放到 VPN 後面
+
+想讓只有團隊成員連得到面板，可以用 Tailscale 或 Cloudflare Zero Trust 擋在前面。登入和 Kubernetes 權限照舊檢查，VPN 只決定誰連得到登入頁。
+
+登入要用到兩個網域，也就是設定檔 `access.zeabur` 和 `access.identity` 的值（例如 `zeabur.example.com` 和 `login.example.com`）。成員的瀏覽器兩個都要連得到。
+
+**Tailscale**
+
+1. 在伺服器安裝 Tailscale 並加入團隊的 tailnet。
+2. 把兩個網域指向伺服器的 Tailscale 位址（`100.` 開頭），或用 split DNS 只在 tailnet 內解析。
+3. 防火牆對網際網路關閉 TCP 443，只允許 `tailscale0` 介面進來。
+4. 成員的電腦也安裝 Tailscale，加入同一個 tailnet。
+
+**Cloudflare Zero Trust**
+
+1. 在伺服器執行 `cloudflared`，建立 Tunnel，把兩個網域轉到 `https://localhost:443`，並開啟 `noTLSVerify`。
+2. 兩個網域的 DNS 紀錄用橘色雲朵（經過 Cloudflare）。
+3. 建立涵蓋兩個網域的 Access 應用程式，政策只允許團隊成員。
+
+有幾個連線不能關：
+
+- `access.mode: domain` 時，Let's Encrypt 用 HTTP-01 驗證，TCP 80 要對網際網路開放。改用 DNS-01 簽發憑證就可以關掉，見[建立萬用字元網域的簽發者](../configure/domains.mdx#建立萬用字元網域的簽發者)。
+- 服務自己的公開網域照舊對外，不受影響。
+- Kubernetes API 用 TCP 6443，節點加入用 9345。這兩個不經過面板，請另外限制來源，只留給管理員和節點。
+
 ## Secret 與一般設定
 
 能讀 Secret（包括 `list secrets`）就看得到它的值。**檢視者** 讀不到 Secret 和日誌，**開發者** 可以讀寫 Secret、讀日誌、在容器裡執行指令。日誌、ConfigMap 和工作負載裡直接寫的環境變數，也可能有應用程式寫出的敏感資料。
@@ -277,6 +302,28 @@ kubectl patch validatingadmissionpolicybinding zeabur-system-hosts-zeabur \
 ```
 
 刪掉 binding 或政策也可以，但下次 `apply` 會重新建立，要長期關掉就改成 `Warn`。移除 Zeabur 時政策會留下，Zeabur Identity 的網域繼續受保護。沒有安裝 Zeabur（`zeabur: false`）時，installer 不加這條政策。
+
+### 確認政策還在擋
+
+用下面的指令看兩個 binding 還在不在：
+
+```sh
+kubectl get validatingadmissionpolicybinding \
+  zeabur-system-hosts-zeabur zeabur-system-hosts-zeabur-identity \
+  -o custom-columns='NAME:.metadata.name,ACTIONS:.spec.validationActions'
+```
+
+兩列的 `ACTIONS` 都應該是 `[Deny]`。
+
+- 顯示 `Warn`：有人改成只警告，政策不會擋下請求。`apply` 不會改回來，用下面的指令改回 `Deny`。
+- 顯示 `NotFound`：binding 不見了。執行 `sudo zeabur-installer apply`，installer 會重新建立。
+
+```sh
+kubectl patch validatingadmissionpolicybinding zeabur-system-hosts-zeabur \
+  --type merge -p '{"spec":{"validationActions":["Deny"]}}'
+```
+
+`zeabur-system-hosts-zeabur-identity` 的改法相同。
 
 ## Installer 的主機與下載權限
 

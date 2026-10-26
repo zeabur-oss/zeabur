@@ -84,6 +84,17 @@ fix is to get the operator running again; it removes its finalizer when its clea
 never removes a finalizer: that skips the cleanup and can leave resources outside the cluster,
 such as cloud disks or files in S3.
 
+## Create a project again with the same name
+
+If another team will get the name of a project you deleted, wait 70 minutes first.
+
+The registry token that Zeabur Builder uses to push images names repositories, which are the
+project name, and not the namespace UID. After a project is deleted and a project with the same
+name is created, a token issued for the old one can still push to the new project's repositories
+until it expires. A build token lasts at most 70 minutes (the default build deadline of 60
+minutes plus 10), and a token for uploading a source archive lasts 15 minutes. Deleting and
+re-creating your own project needs no wait.
+
 ## Bring a project back
 
 In **Cluster** → **Backups**, pick a backup from before the deletion and press **Restore deleted
