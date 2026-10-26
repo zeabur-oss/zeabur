@@ -92,8 +92,8 @@ pub struct TemplateInput {
     pub locales: BTreeMap<String, InputLocale>,
     /// A deploy must give it.
     pub required: bool,
-    /// The value when a deploy does not give the input. Not part of the API.
-    #[serde(skip)]
+    /// The value when a deploy does not give the input.
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub default: Option<String>,
     /// The regular expression the whole value matches (RE2 syntax).
     pub pattern: String,
@@ -730,6 +730,18 @@ mod tests {
                 .iter()
                 .any(|i| i.name == "providerEndpoint" && i.default.is_some())
         );
+    }
+
+    #[test]
+    fn the_api_shows_the_default_of_an_input() {
+        let template = template("hermes-agent").unwrap();
+        let input = template
+            .inputs
+            .iter()
+            .find(|i| i.name == "providerEndpoint")
+            .unwrap();
+        let shown = serde_json::to_value(input).unwrap();
+        assert_eq!(shown["default"], json!(input.default));
     }
 
     /// What `catalog crosscheck` records for a template: the options of its end-to-end render

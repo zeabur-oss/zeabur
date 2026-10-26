@@ -2383,6 +2383,7 @@ export const zhTW: Messages = {
   "add.templateGenerated": (secrets) => `密碼和金鑰會在你的瀏覽器產生，存進機密 ${secrets}。`,
   "add.templateInputEmpty": "這一欄必填。",
   "add.templateInputInvalid": (pattern) => `格式不符（${pattern}）。`,
+  "add.templateInputDefault": (value) => `留空會用 ${value}。`,
   "add.templateOptional": "選填",
   "add.templateRisks": (n) => `部署前要知道的事（${n}）`,
   "add.templateRisksBody": "這些說明由範本作者撰寫，目前只有英文。",

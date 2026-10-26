@@ -460,7 +460,11 @@ function InputField({
   return (
     <FormField
       label={label}
-      hint={words.description}
+      hint={
+        input.default
+          ? `${words.description} ${t("add.templateInputDefault", input.default)}`
+          : words.description
+      }
       errors={
         problem === "empty"
           ? [t("add.templateInputEmpty")]
@@ -473,6 +477,7 @@ function InputField({
         size="sm"
         mono
         value={value}
+        placeholder={input.default ?? undefined}
         autoComplete="off"
         spellCheck={false}
         onChange={(event) => onChange(event.target.value.trim())}

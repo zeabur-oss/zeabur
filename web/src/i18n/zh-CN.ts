@@ -2379,6 +2379,7 @@ export const zhCN: Messages = {
   "add.templateGenerated": (secrets) => `密码和密钥会在你的浏览器生成，存进机密 ${secrets}。`,
   "add.templateInputEmpty": "这一栏必填。",
   "add.templateInputInvalid": (pattern) => `格式不符（${pattern}）。`,
+  "add.templateInputDefault": (value) => `留空会用 ${value}。`,
   "add.templateOptional": "选填",
   "add.templateRisks": (n) => `部署前要了解的事（${n}）`,
   "add.templateRisksBody": "这些说明由模板作者撰写，目前只有英文。",

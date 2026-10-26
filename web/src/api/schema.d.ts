@@ -8755,6 +8755,8 @@ export interface components {
     }
     /** @description An input of a template. */
     TemplateInput: {
+      /** @description The value when a deploy does not give the input. */
+      default?: string | null
       /** @description The catalogue's description, in English. */
       description: string
       generate?: components["schemas"]["Generated"] | null

@@ -2586,6 +2586,7 @@ export const en = {
   "add.templateInputEmpty": "Fill this in.",
   "add.templateInputInvalid": (pattern: string) =>
     `Doesn't match the expected format (${pattern}).`,
+  "add.templateInputDefault": (value: string) => `Left empty, it becomes ${value}.`,
   "add.templateOptional": "Optional",
   "add.templateRisks": (n: number) => `Before you deploy: ${plural(n, "thing", "things")} to know`,
   "add.templateRisksBody": "The template's author wrote these notes, in English.",

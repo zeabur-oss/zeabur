@@ -16878,6 +16878,11 @@ components:
       - required
       - pattern
       properties:
+        default:
+          type:
+          - string
+          - "null"
+          description: The value when a deploy does not give the input.
         description:
           type: string
           description: The catalogue's description, in English.
