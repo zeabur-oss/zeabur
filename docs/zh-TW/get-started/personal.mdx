@@ -20,7 +20,9 @@ description: 只有自己要用時，用 KubeSolo 在 1.5 GiB 記憶體的機器
 
 自己用的版本預設不裝 Zeabur Builder 和 zot（放建置結果的映像倉庫），所以只能部署現成的容器映像檔。要從 Git 或資料夾建置，安裝時勾選 Zeabur Builder，zot 會一起裝。這兩個要多用大約 300 MiB 記憶體，機器的記憶體不到 1800 MiB 時，安裝程式不讓你勾選。
 
-自己用的版本也不提供資料庫。KubeSolo 會改掉每個磁碟區（PVC）上的註解，CloudNativePG 靠這些註解記錄資料庫的順序，被改掉就一直卡在「Setting up primary」。把磁碟區從 KubeSolo 的這個機制拿掉，磁碟區又綁不上去，所以沒有辦法繞過。要用資料庫，請用團隊用的版本，或自己在別的機器架資料庫。
+自己用的版本也不提供資料庫。KubeSolo 建立磁碟區（PVC）時，會把磁碟區原本的註解全部換掉，只留它自己加的那一個（[portainer/kubesolo#222](https://github.com/portainer/kubesolo/issues/222)）。CloudNativePG 用其中的 `cnpg.io/nodeSerial` 記錄資料庫的順序，少了它就一直卡在「Setting up primary」。KubeSolo 的修正在 [#228](https://github.com/portainer/kubesolo/pull/228)，發版後 Zeabur 會升級 KubeSolo，自己用的版本也會提供資料庫。在那之前要用資料庫，請用團隊用的版本，或在別的機器架資料庫。
+
+自己用的版本也沒有成員和權限。Zeabur Identity 發的登入憑證，要 kube-apiserver 用 `--authentication-config` 載入設定才會認得，KubeSolo 目前沒有開放這個設定（[portainer/kubesolo#231](https://github.com/portainer/kubesolo/issues/231)）。所以只能用伺服器給的 kubeconfig 連線，拿到它的人可以控制整個叢集，不適合讓多個人或多個團隊共用。
 
 伺服器可用記憶體低於 3800 MiB 時，installer 只接受自己用。之後要給團隊用，沒有辦法直接升級，要在 4 GiB 記憶體的伺服器上重新用 RKE2 安裝。
 
