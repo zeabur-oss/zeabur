@@ -49,7 +49,7 @@ import { serviceLink } from "@/lib/place"
 import { cn } from "@/lib/utils"
 import type { Schemas } from "@/api/client"
 import { alertsFor, folded } from "@/model/alerts"
-import { buildProblem, refusedCredentials, runsOf } from "@/model/builds"
+import { failureText, refusedCredentials, runsOf } from "@/model/builds"
 import { neighboursOf, type Edge } from "@/model/connections"
 import { edgeText } from "@/model/evidence"
 import { overviewOf, type Overview } from "@/model/overview"
@@ -374,16 +374,9 @@ function BuildLine({
   const run = build ? runsOf(builds.data?.runs ?? [], build)[0] : undefined
   const failed = statusOf(service).reason === "BuildFailed"
   const waiting = !failed && statusOf(service).word === "waitingUpload"
-  const problem = build ? buildProblem(build, run) : undefined
   const refused = build ? refusedCredentials(build, run) : undefined
   const why = failed
-    ? ((refused ? t(`builds.refused.${refused}`) : undefined) ??
-      problem?.message ??
-      run?.message ??
-      run?.reason ??
-      build?.message ??
-      build?.reason ??
-      undefined)
+    ? ((refused ? t(`builds.refused.${refused}`) : undefined) ?? failureText(build, run))
     : waiting
       ? t("builds.waitingUpload", service.name)
       : t("overview.building")

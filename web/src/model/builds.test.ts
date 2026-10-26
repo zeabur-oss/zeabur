@@ -5,6 +5,7 @@ import {
   building,
   builtContainers,
   durationOf,
+  failureText,
   refusedCredentials,
   repositoryOf,
   runsLatest,
@@ -175,5 +176,14 @@ describe("shortSha", () => {
     expect(shortSha("3f9a1c2b7d4e5f60718293a4b5c6d7e8f9012345")).toBe("3f9a1c2")
     expect(shortSha(digest("a"))).toBe("aaaaaaa")
     expect(shortSha(undefined)).toBeUndefined()
+  })
+})
+
+describe("failureText", () => {
+  test("the build's problem comes before the run's words, and those before the resource's", () => {
+    const run = { message: "run said", reason: "RunReason" } as BuildRun
+    expect(failureText(build({ message: "build said" }), run)).toBe("run said")
+    expect(failureText(build({ reason: "BuildReason" }), undefined)).toBe("BuildReason")
+    expect(failureText(undefined, undefined)).toBeUndefined()
   })
 })

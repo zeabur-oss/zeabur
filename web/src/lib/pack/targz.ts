@@ -46,56 +46,66 @@ function join(a: Uint8Array, b: Uint8Array): Uint8Array {
   return out
 }
 
+/** Walks the tar headers of the unpacked bytes, which come in chunks. */
+class Scanner {
+  files = 0
+  bytes = 0
+  seen = 0
+  ended = false
+  private skip = 0
+  private carry: Uint8Array = new Uint8Array(0)
+
+  push(chunk: Uint8Array) {
+    this.seen += chunk.length
+    let rest = chunk
+    while (rest.length > 0 && !this.ended) {
+      if (this.skip > 0) {
+        const n = Math.min(this.skip, rest.length)
+        this.skip -= n
+        rest = rest.subarray(n)
+        continue
+      }
+      const need = BLOCK - this.carry.length
+      if (rest.length < need) {
+        this.carry = join(this.carry, rest)
+        return
+      }
+      const block = join(this.carry, rest.subarray(0, need))
+      this.carry = new Uint8Array(0)
+      rest = rest.subarray(need)
+      this.header(block)
+    }
+  }
+
+  private header(block: Uint8Array) {
+    if (block.every((byte) => byte === 0)) {
+      this.ended = true
+      return
+    }
+    checked(block)
+    const size = sizeOf(block)
+    const type = field(block, 156, 157)
+    if (type === "" || type === "0" || type === "7") {
+      this.files++
+      this.bytes += size
+      if (this.bytes > MAX_UNPACKED) throw new TarGzError("bomb")
+    }
+    this.skip = Math.ceil(size / BLOCK) * BLOCK
+  }
+}
+
 /** The archive with its file count and unpacked size; it is sent unchanged. */
 export async function inspectTarGz(archive: Blob): Promise<Packed> {
   if (archive.size > MAX_PACKED) throw new TarGzError("packed")
-  let files = 0
-  let bytes = 0
-  let seen = 0
-  let skip = 0
-  let carry: Uint8Array = new Uint8Array(0)
-  let ended = false
+  const scan = new Scanner()
   try {
     const reader = archive.stream().pipeThrough(new DecompressionStream("gzip")).getReader()
-    while (!ended) {
-      const { done, value } = await reader.read()
-      if (done) break
-      let chunk: Uint8Array = value
-      seen += chunk.length
-      while (chunk.length > 0 && !ended) {
-        if (skip > 0) {
-          const n = Math.min(skip, chunk.length)
-          skip -= n
-          chunk = chunk.subarray(n)
-          continue
-        }
-        const need = BLOCK - carry.length
-        if (chunk.length < need) {
-          carry = join(carry, chunk)
-          break
-        }
-        const block = join(carry, chunk.subarray(0, need))
-        carry = new Uint8Array(0)
-        chunk = chunk.subarray(need)
-        if (block.every((byte) => byte === 0)) {
-          ended = true
-          break
-        }
-        checked(block)
-        const size = sizeOf(block)
-        const type = field(block, 156, 157)
-        if (type === "" || type === "0" || type === "7") {
-          files++
-          bytes += size
-          if (bytes > MAX_UNPACKED) throw new TarGzError("bomb")
-        }
-        skip = Math.ceil(size / BLOCK) * BLOCK
-      }
-    }
+    for (let next = await reader.read(); !next.done && !scan.ended; next = await reader.read())
+      scan.push(next.value)
     await reader.cancel()
   } catch (error) {
     throw error instanceof TarGzError ? error : new TarGzError("invalid")
   }
-  if (seen === 0) throw new TarGzError("invalid")
-  return { blob: archive, files, left: 0, bytes }
+  if (scan.seen === 0) throw new TarGzError("invalid")
+  return { blob: archive, files: scan.files, left: 0, bytes: scan.bytes }
 }

@@ -173,3 +173,12 @@ export function refusedCredentials(build: Build, latest: BuildRun | undefined) {
   if (problem?.reason !== "AuthFailed" || !build.credentials) return undefined
   return /^(ssh:\/\/|[\w.-]+@[^:/]+:)/.test(build.gitUrl ?? "") ? "deployKey" : "token"
 }
+
+/** The first words that say why a build failed: its own message, then the run's, then the
+ * resource's. */
+export function failureText(build: Build | undefined, run: BuildRun | undefined) {
+  const problem = build ? buildProblem(build, run) : undefined
+  return [problem?.message, run?.message, run?.reason, build?.message, build?.reason].find(
+    (text) => !!text,
+  )
+}
