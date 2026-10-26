@@ -80,6 +80,55 @@
   env:
     ZEABUR_DEMO_INSTALL: fail
 
+# Personal install (docs/zh-TW/get-started/personal.mdx). ZEABUR_DEMO_HOST: small has 1.5 GiB, docker has Docker.
+- id: installer-personal-choose
+  app: installer
+  path: /
+  steps:
+    - click: '[data-slot="radio-option"]'
+    - wait: '[data-slot="radio-option"][data-checked]'
+- id: installer-personal-small
+  app: installer
+  path: /
+  wait: '[data-slot="radio-option"][data-checked]'
+  env:
+    ZEABUR_DEMO_HOST: small
+- id: installer-personal-docker
+  app: installer
+  path: /
+  steps:
+    - click: '[data-slot="radio-option"]'
+    - wait: '[data-slot="radio-option"][data-checked]'
+  env:
+    ZEABUR_DEMO_HOST: docker
+- id: installer-personal-components
+  app: installer
+  path: /
+  steps:
+    - click: '[data-slot="radio-option"]'
+    - click: '[data-testid="step-next"] button:last-child'
+    - click: '[data-slot="checkbox"]:not([data-checked]):not([data-disabled])'
+    - wait: '[data-slot="checkbox"][data-disabled][data-checked]'
+- id: installer-personal-components-small
+  app: installer
+  path: /
+  steps:
+    - click: '[data-testid="step-next"] button:last-child'
+    - wait: '[data-slot="checkbox"][data-checked]'
+  env:
+    ZEABUR_DEMO_HOST: small
+- id: installer-personal-done
+  app: installer
+  path: /
+  steps:
+    - click: '[data-slot="radio-option"]'
+    - click: '[data-testid="step-next"] button:last-child'
+    - click: '[data-testid="step-next"] button:last-child'
+    - click: '[data-testid="step-next"] button:last-child'
+    - wait: '[data-slot="copy-input"]'
+  env:
+    ZEABUR_DEMO_INSTALL: done
+
 # Zeabur pages, from the demo.
 - id: git-builds
   path: /projects/blog/services/Deployment/docs?tab=builds
@@ -91,6 +140,10 @@
   clip: main
 - id: project-services
   path: /projects/shop
+  wait: 'main h1'
+  clip: main
+- id: existing-namespaces
+  path: /projects
   wait: 'main h1'
   clip: main
 - id: database-overview

@@ -1,0 +1,48 @@
+KubeSolo v1.2.2 (Kubernetes 1.35, pinned), for one person, on vps-1 (amd64, 7936 MiB)
+helm-controller  v0.17.9 (its image pinned by digest; the Jobs' image checked by digest after they run)
+Node address     203.0.113.10; the kubeconfig names it
+
+Components
+  ingress/traefik            preset    23 MiB
+      manifests gateway-api-crds (1 URLs)
+      chart traefik 41.7.1
+  certificates/cert-manager  preset    51 MiB
+      chart cert-manager v1.21.2
+      manifests issuers
+
+Storage          local-path (KubeSolo's local-path), the default
+Zeabur           none on the server: run `zeaburctl ui` on your computer
+
+Memory at idle   about 774 MiB of 7936 (KubeSolo 700, components 74)
+warning: A personal install is for one person: whoever has the kubeconfig is cluster admin, and nothing isolates apps from each other (KubeSolo enforces no NetworkPolicy). For a team, install with RKE2 on a server with at least 4 GiB.
+==> Checking the host
+    ok   root               running as root
+    ok   systemd            systemd is the init system
+    ok   time               the clock is synchronised
+    ok   swap               swap is off
+    ok   other Kubernetes   none found
+    ok   Docker             no Docker, and the iptables FORWARD policy is not DROP
+    ok   ports              80, 443, 6443, 10250 and 10443 are free
+    ok   disk space         152.3 GiB free under /var/lib
+    warn disk encryption    /var/lib is not on an encrypted device; Secrets are encrypted in etcd, volumes are not
+==> KubeSolo v1.2.2 (kubesolo.service)
+    https://dl.k8s.io/release/v1.35.7/bin/linux/amd64/kubectl
+    https://github.com/portainer/kubesolo/releases/download/v1.2.2/kubesolo-v1.2.2-linux-amd64-offline.tar.gz
+    restarting kubesolo.service for the new configuration
+==> helm-controller v0.17.9
+customresourcedefinition.apiextensions.k8s.io/helmcharts.helm.cattle.io serverside-applied
+deployment.apps/helm-controller serverside-applied
+==> Namespaces
+namespace/cert-manager serverside-applied
+namespace/traefik serverside-applied
+==> Traefik Proxy (ingress/traefik)
+helmchart.helm.cattle.io/traefik serverside-applied
+==> cert-manager (certificates/cert-manager)
+helmchart.helm.cattle.io/cert-manager serverside-applied
+==> Done
+This server runs KubeSolo and the components, for one person. On your own computer:
+
+  ssh <you>@203.0.113.10 sudo cat /etc/zeabur-installer/kubeconfig.yaml > ~/.kube/vps-1.yaml
+  KUBECONFIG=~/.kube/vps-1.yaml zeaburctl ui --context vps-1
+
+Whoever has this file is cluster admin; keep it like an SSH key. If your computer reaches the server at another address, change `server:` in the file and add the address to host.tlsSan.

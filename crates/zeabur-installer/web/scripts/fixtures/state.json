@@ -4,6 +4,21 @@
   "catalog": {
     "components": [
       {
+        "capability": "builds",
+        "default": "optional",
+        "displayName": "Zeabur Builder",
+        "distributions": [],
+        "id": "builds/zeabur-builder",
+        "idleMemoryMib": null,
+        "inputs": [],
+        "needs": ["ingress/traefik", "certificates/cert-manager", "container-registry/zot"],
+        "personal": true,
+        "personalMinMemoryMib": 1800,
+        "privileged": true,
+        "security": "ClusterRole: manages Builds, BuildRuns and Jobs in every namespace; reads Pods and Namespaces; reads, creates, updates and deletes Secrets in every namespace (the Git credentials Builds name, and the copies it puts in build namespaces). Runs one privileged buildkitd per building namespace in its own namespace, with a user namespace and an egress policy.\n",
+        "supported": true
+      },
+      {
         "capability": "certificates",
         "default": "recommended",
         "displayName": "cert-manager",
@@ -12,6 +27,8 @@
         "idleMemoryMib": 51,
         "inputs": [],
         "needs": ["ingress/traefik"],
+        "personal": true,
+        "personalMinMemoryMib": null,
         "privileged": false,
         "security": "Writes Secrets in all namespaces and manages webhook CA bundles.",
         "supported": true
@@ -25,8 +42,34 @@
         "idleMemoryMib": null,
         "inputs": [],
         "needs": [],
+        "personal": false,
+        "personalMinMemoryMib": null,
         "privileged": false,
         "security": "ClusterRole: reads, lists and watches every Secret and ConfigMap; reads, updates and patches Deployments, StatefulSets and DaemonSets; creates Events. Role in its namespace: lists, reads, watches, creates and updates every ConfigMap there, not only its own, and on multi-node the leader-election Lease.\n",
+        "supported": true
+      },
+      {
+        "capability": "container-registry",
+        "default": "optional",
+        "displayName": "zot",
+        "distributions": [],
+        "id": "container-registry/zot",
+        "idleMemoryMib": null,
+        "inputs": [
+          {
+            "default": null,
+            "description": "A free address in the cluster's Service CIDR for the registry's Service, such as 10.43.0.50 on k3s and RKE2. Nodes pull through a registry mirror to it. Left out: an address is assigned and only pods reach the registry.\n",
+            "generated": false,
+            "name": "cluster-ip",
+            "required": false,
+            "secret": false
+          }
+        ],
+        "needs": ["ingress/traefik", "certificates/cert-manager"],
+        "personal": true,
+        "personalMinMemoryMib": 1800,
+        "privileged": false,
+        "security": "No RBAC: a ServiceAccount without roles. Serves the OCI registry API over TLS on port 5000 inside the cluster.\n",
         "supported": true
       },
       {
@@ -38,6 +81,8 @@
         "idleMemoryMib": 69,
         "inputs": [],
         "needs": [],
+        "personal": false,
+        "personalMinMemoryMib": null,
         "privileged": false,
         "security": "Reads scale targets and trigger secrets cluster-wide; serves the external metrics API.",
         "supported": true
@@ -51,6 +96,8 @@
         "idleMemoryMib": 34,
         "inputs": [],
         "needs": ["event-autoscaling/keda"],
+        "personal": false,
+        "personalMinMemoryMib": null,
         "privileged": false,
         "security": "Reads HTTPScaledObjects, Services and EndpointSlices cluster-wide; creates ScaledObjects.",
         "supported": true
@@ -64,6 +111,8 @@
         "idleMemoryMib": 23,
         "inputs": [],
         "needs": [],
+        "personal": true,
+        "personalMinMemoryMib": null,
         "privileged": false,
         "security": "Reads Services, Secrets and routes cluster-wide; writes route status.",
         "supported": true
@@ -102,6 +151,8 @@
           }
         ],
         "needs": ["ingress/traefik"],
+        "personal": false,
+        "personalMinMemoryMib": null,
         "privileged": true,
         "security": "The agent reads node log files read-only and makes no API writes.",
         "supported": true
@@ -119,6 +170,8 @@
           "certificates/cert-manager",
           "observability-operator/victoria-metrics-operator"
         ],
+        "personal": false,
+        "personalMinMemoryMib": null,
         "privileged": true,
         "security": "The collector reads pod metadata and node log files.",
         "supported": true
@@ -132,6 +185,8 @@
         "idleMemoryMib": 17,
         "inputs": [],
         "needs": [],
+        "personal": false,
+        "personalMinMemoryMib": null,
         "privileged": false,
         "security": "Reads kubelet metrics; registers an aggregated API.",
         "supported": true
@@ -149,6 +204,8 @@
           "certificates/cert-manager",
           "observability-operator/victoria-metrics-operator"
         ],
+        "personal": false,
+        "personalMinMemoryMib": null,
         "privileged": false,
         "security": "Manages VictoriaMetrics objects and scrapes pods in all namespaces.",
         "supported": true
@@ -162,6 +219,8 @@
         "idleMemoryMib": 12,
         "inputs": [],
         "needs": [],
+        "personal": false,
+        "personalMinMemoryMib": null,
         "privileged": true,
         "security": "Cordons and drains nodes, and creates privileged Jobs that run Plan images on the host.",
         "supported": false
@@ -175,6 +234,8 @@
         "idleMemoryMib": 20,
         "inputs": [],
         "needs": ["ingress/traefik", "certificates/cert-manager"],
+        "personal": false,
+        "personalMinMemoryMib": null,
         "privileged": false,
         "security": "Manages VictoriaMetrics and VictoriaLogs objects and their workloads in all namespaces.",
         "supported": true
@@ -205,6 +266,8 @@
           }
         ],
         "needs": [],
+        "personal": false,
+        "personalMinMemoryMib": null,
         "privileged": true,
         "security": "Creates, updates and deletes Services and Ingresses (and their status) in every namespace; reads nodes and EndpointSlices; manages ValidatingAdmissionPolicies and their bindings. In its own namespace it manages Secrets, ConfigMaps, ServiceAccounts, StatefulSets, Deployments, Roles and RoleBindings. Installs eight CRDs (connectors, dnsconfigs, peerrelays, proxyclasses, proxygrouppolicies, proxygroups, recorders, tailnets) and the IngressClass tailscale.\n",
         "supported": true
@@ -218,6 +281,8 @@
         "idleMemoryMib": null,
         "inputs": [],
         "needs": [],
+        "personal": false,
+        "personalMinMemoryMib": null,
         "privileged": true,
         "security": "Privileged pods on every node: they mount /dev, /proc, /boot, /etc and /var/lib/longhorn from the host, run iscsiadm and mount in the host's namespaces, and manage pods, PVs and storage classes cluster-wide.\n",
         "supported": true
@@ -231,6 +296,8 @@
         "idleMemoryMib": 17,
         "inputs": [],
         "needs": ["metrics/metrics-server"],
+        "personal": false,
+        "personalMinMemoryMib": null,
         "privileged": false,
         "security": "Reads pods, workloads and metrics in all namespaces; writes VPA status.",
         "supported": true
@@ -244,6 +311,8 @@
         "idleMemoryMib": 53,
         "inputs": [],
         "needs": [],
+        "personal": false,
+        "personalMinMemoryMib": null,
         "privileged": true,
         "security": "Reads pod and node metadata to enrich alerts.",
         "supported": true
@@ -262,6 +331,8 @@
           "observability-operator/victoria-metrics-operator",
           "metrics/victoria-metrics"
         ],
+        "personal": false,
+        "personalMinMemoryMib": null,
         "privileged": false,
         "security": "Has no API access and only makes outbound probes.",
         "supported": true
@@ -275,6 +346,8 @@
         "idleMemoryMib": 11,
         "inputs": [],
         "needs": [],
+        "personal": false,
+        "personalMinMemoryMib": null,
         "privileged": false,
         "security": "Watches K8up objects cluster-wide; backup Jobs mount PVCs in their own namespace.",
         "supported": true
@@ -313,6 +386,8 @@
           }
         ],
         "needs": [],
+        "personal": false,
+        "personalMinMemoryMib": null,
         "privileged": true,
         "security": "Bound to cluster-admin; reads and restores every object.",
         "supported": true
@@ -326,6 +401,8 @@
         "idleMemoryMib": 125,
         "inputs": [],
         "needs": [],
+        "personal": false,
+        "personalMinMemoryMib": null,
         "privileged": false,
         "security": "Reads workloads cluster-wide, runs scan Jobs and writes reports next to workloads.",
         "supported": true
@@ -426,5 +503,86 @@
     "hostname": "vps-1",
     "memoryMib": 7936,
     "nodeIps": ["203.0.113.10"]
-  }
+  },
+  "personal": {
+    "disable": [],
+    "enable": [],
+    "host": {
+      "requireEncryptedDisk": false,
+      "tlsSan": []
+    },
+    "inputs": {},
+    "secretFiles": {},
+    "sources": {
+      "catalog": null
+    },
+    "use": "personal"
+  },
+  "personalChecks": [
+    {
+      "code": "root.ok",
+      "detail": "running as root",
+      "name": "root",
+      "status": "pass",
+      "values": []
+    },
+    {
+      "code": "systemd.ok",
+      "detail": "systemd is the init system",
+      "name": "systemd",
+      "status": "pass",
+      "values": []
+    },
+    {
+      "code": "time.ok",
+      "detail": "the clock is synchronised",
+      "name": "time",
+      "status": "pass",
+      "values": []
+    },
+    {
+      "code": "swap.off",
+      "detail": "swap is off",
+      "name": "swap",
+      "status": "pass",
+      "values": []
+    },
+    {
+      "code": "others.none",
+      "detail": "none found",
+      "name": "otherKubernetes",
+      "status": "pass",
+      "values": []
+    },
+    {
+      "code": "docker.none",
+      "detail": "no Docker, and the iptables FORWARD policy is not DROP",
+      "name": "docker",
+      "status": "pass",
+      "values": []
+    },
+    {
+      "code": "ports.free",
+      "detail": "80, 443, 6443, 10250 and 10443 are free",
+      "name": "ports",
+      "status": "pass",
+      "values": ["80", "443", "6443", "10250", "10443"]
+    },
+    {
+      "code": "disk.ok",
+      "detail": "152.3 GiB free under /var/lib",
+      "name": "diskSpace",
+      "status": "pass",
+      "values": ["152.3", "/var/lib"]
+    },
+    {
+      "code": "crypt.no",
+      "detail": "/var/lib is not on an encrypted device; Secrets are encrypted in etcd, volumes are not",
+      "name": "diskEncryption",
+      "status": "warn",
+      "values": ["/var/lib"]
+    }
+  ],
+  "teamMinMemoryMib": 3800,
+  "use": "team"
 }

@@ -69,6 +69,8 @@ kubectl -n zeabur rollout status deployment/zeabur
 
 開啟 `https://zeabur.example.com`，完成通行密鑰登入。進入**專案**，在**其他 Namespace**找到既有應用程式，開啟查看服務。
 
+![「專案」頁的「其他 Namespace」列出叢集裡還不是專案的 Namespace](https://oss.zeabur.com/shots/zeabur/zh-TW/light/existing-namespaces.avif)
+
 要把它固定列為專案，選擇**使用這個 Namespace**，檢查並套用。這只加上專案標籤，裡面的 Deployment、Service 與資料不會搬動。
 
 能登入卻看不到服務時，先確認該使用者的 Kubernetes 權限：Zeabur 用登入者自己的 token 讀取叢集，它的 ServiceAccount 只能在 `zeabur-terminals` 使用 kubectl 終端機的 Pod。管理員可以在[成員](../cluster/members.mdx)授予專案角色。

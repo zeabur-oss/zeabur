@@ -1,0 +1,176 @@
+{
+  "plan": {
+    "components": [
+      {
+        "contributedBy": [],
+        "displayName": "Traefik Proxy",
+        "id": "ingress/traefik",
+        "idleMemoryMib": 23,
+        "releases": [
+          {
+            "kind": "urls",
+            "name": "gateway-api-crds",
+            "namespace": "kube-system",
+            "skip_if_present": ["httproutes.gateway.networking.k8s.io"],
+            "urls": [
+              "https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.6.2/standard-install.yaml"
+            ]
+          },
+          {
+            "kind": "helmChart",
+            "name": "traefik",
+            "object": {
+              "apiVersion": "helm.cattle.io/v1",
+              "kind": "HelmChart",
+              "metadata": {
+                "annotations": {
+                  "installer.zeabur.com/component": "ingress/traefik"
+                },
+                "labels": {
+                  "app.kubernetes.io/managed-by": "zeabur-installer"
+                },
+                "name": "traefik",
+                "namespace": "kube-system"
+              },
+              "spec": {
+                "chart": "oci://ghcr.io/traefik/helm/traefik",
+                "createNamespace": false,
+                "failurePolicy": "abort",
+                "targetNamespace": "traefik",
+                "timeout": "10m0s",
+                "valuesContent": "{\"accessLog\":{\"enabled\":true,\"fields\":{\"defaultMode\":\"drop\",\"headers\":{\"defaultMode\":\"drop\"},\"names\":{\"DownstreamContentSize\":\"keep\",\"DownstreamStatus\":\"keep\",\"Duration\":\"keep\",\"RequestContentSize\":\"keep\",\"RequestHost\":\"keep\",\"RequestMethod\":\"keep\",\"RequestPath\":\"keep\",\"RequestProtocol\":\"keep\",\"RouterName\":\"keep\",\"StartUTC\":\"keep\"},\"queryParameters\":{\"defaultMode\":\"drop\"}},\"format\":\"json\"},\"api\":{\"dashboard\":false},\"deployment\":{\"replicas\":1},\"gateway\":{\"enabled\":false},\"gatewayClass\":{\"enabled\":true,\"name\":\"traefik\"},\"providers\":{\"kubernetesCRD\":{\"allowCrossNamespace\":false,\"enabled\":true},\"kubernetesGateway\":{\"enabled\":true},\"kubernetesIngress\":{\"enabled\":true}},\"resources\":{\"limits\":{\"memory\":\"256Mi\"},\"requests\":{\"cpu\":\"50m\",\"memory\":\"64Mi\"}},\"service\":{\"spec\":{\"externalTrafficPolicy\":\"Local\"}}}",
+                "version": "41.7.1"
+              }
+            }
+          }
+        ],
+        "secrets": [],
+        "security": "Reads Services, Secrets and routes cluster-wide; writes route status.",
+        "smoke": [["gatewayclass/traefik", "--for=condition=Accepted"]],
+        "why": "preset"
+      },
+      {
+        "contributedBy": [],
+        "displayName": "cert-manager",
+        "id": "certificates/cert-manager",
+        "idleMemoryMib": 51,
+        "releases": [
+          {
+            "kind": "helmChart",
+            "name": "cert-manager",
+            "object": {
+              "apiVersion": "helm.cattle.io/v1",
+              "kind": "HelmChart",
+              "metadata": {
+                "annotations": {
+                  "installer.zeabur.com/component": "certificates/cert-manager"
+                },
+                "labels": {
+                  "app.kubernetes.io/managed-by": "zeabur-installer"
+                },
+                "name": "cert-manager",
+                "namespace": "kube-system"
+              },
+              "spec": {
+                "chart": "oci://quay.io/jetstack/charts/cert-manager",
+                "createNamespace": false,
+                "failurePolicy": "abort",
+                "targetNamespace": "cert-manager",
+                "timeout": "10m0s",
+                "valuesContent": "{\"cainjector\":{\"resources\":{\"limits\":{\"memory\":\"128Mi\"},\"requests\":{\"cpu\":\"10m\",\"memory\":\"32Mi\"}}},\"config\":{\"apiVersion\":\"controller.config.cert-manager.io/v1alpha1\",\"enableGatewayAPI\":true,\"kind\":\"ControllerConfiguration\"},\"crds\":{\"enabled\":true,\"keep\":true},\"enableCertificateOwnerRef\":true,\"prometheus\":{\"enabled\":true,\"servicemonitor\":{\"enabled\":false}},\"resources\":{\"limits\":{\"memory\":\"128Mi\"},\"requests\":{\"cpu\":\"10m\",\"memory\":\"32Mi\"}},\"startupapicheck\":{\"resources\":{\"limits\":{\"memory\":\"64Mi\"},\"requests\":{\"cpu\":\"10m\",\"memory\":\"16Mi\"}}},\"webhook\":{\"resources\":{\"limits\":{\"memory\":\"64Mi\"},\"requests\":{\"cpu\":\"10m\",\"memory\":\"24Mi\"}}}}",
+                "version": "v1.21.2"
+              }
+            }
+          },
+          {
+            "kind": "manifests",
+            "name": "issuers",
+            "namespace": "cert-manager",
+            "yaml": "# Try here first; production rate limits are far lower. Staging\n# certificates are not trusted by browsers.\napiVersion: cert-manager.io/v1\nkind: ClusterIssuer\nmetadata:\n  name: letsencrypt-staging\nspec:\n  acme:\n    server: https://acme-staging-v02.api.letsencrypt.org/directory\n    # No email: ACME accounts need no contact, and Let's Encrypt sends\n    # no expiry emails since 2025. Setting spec.acme.email later updates\n    # the registered account.\n    # Account key, created by cert-manager in its own namespace.\n    privateKeySecretRef:\n      name: letsencrypt-staging-account-key\n    solvers:\n      # HTTP-01 through Traefik's Ingress support; needs no Gateway, and\n      # also answers for names served by Gateway listeners. The name\n      # must reach port 80 of the cluster from the internet.\n      - http01:\n          ingress:\n            ingressClassName: traefik\n---\n# Trusted certificates; same settings as staging.\napiVersion: cert-manager.io/v1\nkind: ClusterIssuer\nmetadata:\n  name: letsencrypt\nspec:\n  acme:\n    server: https://acme-v02.api.letsencrypt.org/directory\n    privateKeySecretRef:\n      name: letsencrypt-account-key\n    solvers:\n      - http01:\n          ingress:\n            ingressClassName: traefik\n"
+          }
+        ],
+        "secrets": [],
+        "security": "Writes Secrets in all namespaces and manages webhook CA bundles.",
+        "smoke": [
+          ["clusterissuer/letsencrypt-staging", "--for=condition=Ready"],
+          ["clusterissuer/letsencrypt", "--for=condition=Ready"]
+        ],
+        "why": "preset"
+      }
+    ],
+    "facts": {
+      "arch": "amd64",
+      "hostname": "vps-1",
+      "memoryMib": 7936,
+      "nodeIps": ["203.0.113.10"]
+    },
+    "helmController": {
+      "images": [
+        "rancher/helm-controller:v0.17.9@sha256:25a4fcbbf9fa8396ded332165e4497eb45e08a8f6677158c0f861a2d15982afc"
+      ],
+      "jobImage": "rancher/klipper-helm:v0.13.3-build20261021",
+      "jobImageDigest": "sha256:391ec9f4824d631c49b52c1e3d10e4a2ced37a784afd75852e34bb2a6c7309b1",
+      "manifest": {
+        "file": "deploy-cluster-scoped.yaml",
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "url": "https://github.com/k3s-io/helm-controller/releases/download/v0.17.9/deploy-cluster-scoped.yaml"
+      },
+      "version": "v0.17.9"
+    },
+    "hostFilePaths": [
+      "/etc/kubesolo/config.yaml",
+      "/usr/local/libexec/zeabur-kubesolo-webhook",
+      "/etc/systemd/system/kubesolo.service"
+    ],
+    "kubectl": {
+      "file": "kubectl",
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "url": "https://dl.k8s.io/release/v1.35.7/bin/linux/amd64/kubectl"
+    },
+    "kubesolo": {
+      "download": {
+        "file": "kubesolo-v1.2.2-linux-amd64-offline.tar.gz",
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "url": "https://github.com/portainer/kubesolo/releases/download/v1.2.2/kubesolo-v1.2.2-linux-amd64-offline.tar.gz"
+      },
+      "kubernetes": "1.35",
+      "version": "v1.2.2"
+    },
+    "leftOut": {},
+    "memory": {
+      "clusterMib": 700,
+      "componentsMib": 74,
+      "hostMib": 7936,
+      "unmeasured": 0
+    },
+    "namespaces": [
+      {
+        "baseline": null,
+        "name": "cert-manager",
+        "privileged": null,
+        "public": false
+      },
+      {
+        "baseline": null,
+        "name": "traefik",
+        "privileged": null,
+        "public": true
+      }
+    ],
+    "storage": {
+      "defaultClass": "local-path",
+      "otherClasses": []
+    },
+    "use": "personal",
+    "warnings": [
+      {
+        "code": "personal.isolation",
+        "text": "A personal install is for one person: whoever has the kubeconfig is cluster admin, and nothing isolates apps from each other (KubeSolo enforces no NetworkPolicy). For a team, install with RKE2 on a server with at least 4 GiB.",
+        "values": []
+      }
+    ],
+    "zotClusterIp": null
+  },
+  "text": "KubeSolo v1.2.2 (Kubernetes 1.35, pinned), for one person, on vps-1 (amd64, 7936 MiB)\nhelm-controller  v0.17.9 (its image pinned by digest; the Jobs' image checked by digest after they run)\nNode address     203.0.113.10; the kubeconfig names it\n\nComponents\n  ingress/traefik            preset    23 MiB\n      manifests gateway-api-crds (1 URLs)\n      chart traefik 41.7.1\n  certificates/cert-manager  preset    51 MiB\n      chart cert-manager v1.21.2\n      manifests issuers\n\nStorage          local-path (KubeSolo's local-path), the default\nZeabur           none on the server: run `zeaburctl ui` on your computer\n\nMemory at idle   about 774 MiB of 7936 (KubeSolo 700, components 74)\nwarning: A personal install is for one person: whoever has the kubeconfig is cluster admin, and nothing isolates apps from each other (KubeSolo enforces no NetworkPolicy). For a team, install with RKE2 on a server with at least 4 GiB.\n",
+  "yaml": "use: personal\nenable: []\ndisable: []\ninputs: {}\nsecretFiles: {}\nhost:\n  tlsSan: []\n  requireEncryptedDisk: false\nsources:\n  catalog: null\n"
+}
