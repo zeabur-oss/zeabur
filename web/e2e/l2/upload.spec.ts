@@ -47,8 +47,7 @@ test("a Developer uploads a folder and the service runs it", async ({ page, brow
       await developer.getByRole("menuitem", { name: "Upload a folder", exact: true }).click()
       const drawer = developer.getByRole("dialog", { name: "Upload a folder" })
       await drawer
-        .locator("input[type=file]")
-        .first()
+        .locator("input[type=file][webkitdirectory]")
         .setInputFiles(await folder())
       await expect(drawer).toContainText("2 files")
       await expect(drawer).toContainText("1 file left out")
