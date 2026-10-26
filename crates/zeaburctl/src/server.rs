@@ -41,7 +41,8 @@ impl std::fmt::Debug for Server {
 }
 
 impl Server {
-    /// The server at `address`, `https://host[:port]` (`http://` only for a machine of your own).
+    /// The server at `address`, `https://host[:port]`. `http://` is only for this computer
+    /// (`localhost`, `127.0.0.1`, `::1`), as the token must not cross a network in clear text.
     pub(crate) fn new(address: &str, token: UserToken) -> Result<Self, String> {
         let uri: Uri = address
             .trim()
@@ -57,6 +58,15 @@ impl Server {
         if !plain {
             return Err(format!(
                 "--server {address:?} is not an address like https://zeabur.example.com"
+            ));
+        }
+        let local = matches!(
+            uri.host().unwrap_or_default(),
+            "localhost" | "127.0.0.1" | "[::1]"
+        );
+        if scheme == "http" && !local {
+            return Err(format!(
+                "--server {address:?} uses http://, which sends your token in clear text. Use https://; http:// works only for localhost."
             ));
         }
         Ok(Self {
@@ -210,6 +220,8 @@ mod tests {
         for good in [
             "https://zeabur.example.com",
             "http://127.0.0.1:8080/",
+            "http://localhost:8080",
+            "http://[::1]:8080",
             " https://a.b:8443 ",
         ] {
             assert!(Server::new(good, token()).is_ok(), "{good}");
@@ -218,6 +230,9 @@ mod tests {
             "zeabur.example.com",
             "ftp://a.b",
             "https://a.b/projects",
+            "http://zeabur.example.com",
+            "http://10.0.0.5:8080",
+            "http://localhost.example.com",
             "",
         ] {
             assert!(Server::new(bad, token()).is_err(), "{bad}");

@@ -238,4 +238,58 @@ mod tests {
             "invalid_env_name"
         );
     }
+
+    /// `security: privileged` gives no privileged settings: the pod is at least baseline.
+    #[test]
+    fn a_privileged_choice_plans_no_privileged_pod() {
+        let mut change = service();
+        change.method = UploadMethod::Dockerfile;
+        change.security = Some(PodSecurityLevel::Privileged);
+        let plan = planned(change, Some("zot:5000"), None).unwrap();
+        let deployment = created(&plan, "Deployment").unwrap();
+        let pod = &deployment["spec"]["template"]["spec"];
+        assert_eq!(
+            level(&serde_json::from_value(pod.clone()).unwrap()),
+            PodSecurityLevel::Baseline
+        );
+        assert_eq!(
+            pod["containers"][0]["securityContext"]["allowPrivilegeEscalation"],
+            false
+        );
+        assert!(pod["containers"][0]["securityContext"]["privileged"].is_null());
+    }
+
+    /// A host with a wildcard or upper case, a Dockerfile path that leaves the folder and a
+    /// build variable name the shell cannot read are refused.
+    #[test]
+    fn unsafe_hosts_paths_and_build_variables_are_refused() {
+        let code = |edit: &dyn Fn(&mut UploadServiceChange)| {
+            let mut change = service();
+            change.method = UploadMethod::Dockerfile;
+            change.port = Some(80);
+            edit(&mut change);
+            planned(change, Some("zot:5000"), None).unwrap_err().code
+        };
+        for host in ["*.example.com", "Site.example.com"] {
+            assert_eq!(
+                code(&|c| c.host = Some(host.to_owned())),
+                "invalid_host",
+                "{host}"
+            );
+        }
+        for path in ["../Dockerfile", "docker/../../Dockerfile"] {
+            assert_eq!(
+                code(&|c| c.dockerfile = Some(path.to_owned())),
+                "invalid_path",
+                "{path}"
+            );
+        }
+        assert_eq!(
+            code(&|c| c.build_variables = vec![NameValue {
+                name: "NPM-TOKEN".to_owned(),
+                value: String::new()
+            }]),
+            "invalid_env_name"
+        );
+    }
 }

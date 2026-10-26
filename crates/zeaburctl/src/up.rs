@@ -13,6 +13,7 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
+use secrecy::ExposeSecret as _;
 use serde_json::{Value, json};
 use zeabur_kube::{UserClient, UserToken};
 
@@ -116,9 +117,19 @@ async fn up(args: &UpArgs) -> Result<(), String> {
     let token = UserToken::from_kubeconfig(args.context.as_deref())
         .await
         .map_err(|e| e.to_string())?;
-    let address = match &args.server {
-        Some(address) => address.clone(),
-        None => published_address(args.context.as_deref()).await?,
+    let info = UserClient::from_kubeconfig(args.context.as_deref())
+        .await
+        .map_err(|e| e.to_string())?
+        .zeabur_info()
+        .await
+        .map_err(|e| e.to_string())?;
+    check_token(&token, info.issuer.as_deref())?;
+    let address = match (&args.server, info.url) {
+        (Some(address), _) => address.clone(),
+        (None, Some(url)) => url,
+        (None, None) => {
+            return Err("This cluster does not say where Zeabur is. Pass --server with the address you open Zeabur at.".to_owned());
+        }
     };
     let server = Server::new(&address, token)?;
     let target = Target {
@@ -151,19 +162,20 @@ async fn up(args: &UpArgs) -> Result<(), String> {
     Ok(())
 }
 
-/// Where Zeabur says it is in the cluster the kubeconfig names.
-async fn published_address(context: Option<&str>) -> Result<String, String> {
-    let client = UserClient::from_kubeconfig(context)
-        .await
-        .map_err(|e| e.to_string())?;
-    client
-        .zeabur_url()
-        .await
-        .map_err(|e| e.to_string())?
-        .ok_or_else(|| {
-            "This cluster does not say where Zeabur is. Pass --server with the address you open Zeabur at."
-                .to_owned()
-        })
+/// Sends the kubeconfig's token to Zeabur only when Zeabur Identity issued it. Another token
+/// (a cloud provider's, a ServiceAccount's, a static one) is of no use to Zeabur, and Zeabur
+/// must not get it.
+fn check_token(token: &UserToken, issuer: Option<&str>) -> Result<(), String> {
+    let Some(issuer) = issuer else {
+        return Err("This cluster does not say which Zeabur Identity signs people in. Upgrade Zeabur, then try again.".to_owned());
+    };
+    if zeabur_kube::issued_by(token.secret().expose_secret(), issuer) {
+        Ok(())
+    } else {
+        Err(format!(
+            "The kubeconfig does not sign in with a token from Zeabur Identity ({issuer}), so zeaburctl does not send it to Zeabur. A token from a cloud provider, a ServiceAccount or a static token does not work. Sign in to the cluster with Zeabur Identity, then try again."
+        ))
+    }
 }
 
 /// How often and how long to ask for the upload token.

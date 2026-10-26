@@ -14,9 +14,11 @@
 //! the public URL's, and a request that changes something must come from Zeabur's own page.
 //!
 //! **Command line.** A request with no session cookie may carry `Authorization: Bearer <token>`,
-//! the person's own token for kube-apiserver (`zeaburctl up`). Zeabur acts with it as with a
-//! session's, so kube-apiserver decides what it may do and refuses a token it does not know; it
-//! is not kept. The guard still applies, so such a client sends `Origin` and the custom header.
+//! the person's own token for kube-apiserver (`zeaburctl up`). It must be a JWT from Zeabur
+//! Identity: Zeabur reads its `iss` and does not use another token. Zeabur acts with it as with
+//! a session's, so kube-apiserver checks the signature and decides what it may do. It is not
+//! kept, and a tools pod or Zeabur Proxy never gets it. The guard still applies, so such a client
+//! sends `Origin` and the custom header.
 //!
 //! **Idle sessions.** A request with the header [`BACKGROUND`] does not count as activity (see
 //! [`Activity`]): the interface sends it on requests it makes on its own after a minute without
@@ -35,6 +37,7 @@ use axum::http::{HeaderMap, HeaderValue, StatusCode, Uri, header};
 use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
+use secrecy::ExposeSecret as _;
 use zeabur_api::ApiError;
 use zeabur_api::access::{ClusterAccess, Handoff};
 use zeabur_api::account::SignInPage;
@@ -73,6 +76,8 @@ impl std::fmt::Debug for Connection {
 /// What the sign-in routes and the API share.
 pub(crate) struct Auth {
     pub(crate) public: BaseUrl,
+    /// The Zeabur Identity issuer. A bearer token must name it as `iss`.
+    pub(crate) issuer: BaseUrl,
     pub(crate) oauth: Arc<OAuthClient>,
     pub(crate) sessions: Arc<Sessions<Connection>>,
     pub(crate) connect: Bind<Connection>,
@@ -226,7 +231,9 @@ async fn session(State(auth): State<Arc<Auth>>, mut request: Request, next: Next
             Lookup::SignedOut => None,
         }
     } else {
-        bearer(request.headers()).and_then(|token| (auth.connect)(token).ok().map(Signed::Token))
+        bearer(request.headers())
+            .filter(|token| zeabur_kube::issued_by(token.expose_secret(), auth.issuer.as_str()))
+            .and_then(|token| (auth.connect)(token).ok().map(Signed::Token))
     };
     if let Some(signed) = signed {
         request.extensions_mut().insert(signed);

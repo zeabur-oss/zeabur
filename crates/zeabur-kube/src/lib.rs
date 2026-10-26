@@ -313,14 +313,14 @@ impl UserClient {
         client(config, pool, None).map(|client| Self { client, name })
     }
 
-    /// Where Zeabur says it is: the `url` of the ConfigMap [`INFO_CONFIG_MAP`] in
-    /// [`INFO_NAMESPACE`], which the chart publishes for everyone to read. `None` when the
-    /// cluster has none.
+    /// What Zeabur publishes about itself in the ConfigMap [`INFO_CONFIG_MAP`] in
+    /// [`INFO_NAMESPACE`], which every signed-in person may read. Empty when the cluster has
+    /// none.
     ///
     /// # Errors
     ///
     /// When kube-apiserver cannot be reached or refuses the read.
-    pub async fn zeabur_url(&self) -> Result<Option<String>, ConnectError> {
+    pub async fn zeabur_info(&self) -> Result<ZeaburInfo, ConnectError> {
         let maps = kube::Api::<k8s_openapi::api::core::v1::ConfigMap>::namespaced(
             self.client.clone(),
             INFO_NAMESPACE,
@@ -329,7 +329,7 @@ impl UserClient {
             .get_opt(INFO_CONFIG_MAP)
             .await
             .map_err(|e| ConnectError::Read(e.to_string()))?;
-        Ok(map.and_then(url_of))
+        Ok(map.map_or_default(info_of))
     }
 
     /// The underlying kube-rs client, bound to this person.
@@ -339,16 +339,51 @@ impl UserClient {
     }
 }
 
-fn url_of(map: k8s_openapi::api::core::v1::ConfigMap) -> Option<String> {
-    let url = map.data?.remove("url")?;
-    let url = url.trim();
-    (!url.is_empty()).then(|| url.to_owned())
+/// The data of the ConfigMap [`INFO_CONFIG_MAP`].
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ZeaburInfo {
+    /// Where Zeabur is.
+    pub url: Option<String>,
+    /// The Zeabur Identity issuer whose tokens Zeabur accepts.
+    pub issuer: Option<String>,
 }
 
-/// The namespace every signed-in person and anonymous client may read, as kubeadm's cluster-info
-/// lives in.
+fn info_of(map: k8s_openapi::api::core::v1::ConfigMap) -> ZeaburInfo {
+    let mut data = map.data.unwrap_or_default();
+    let mut take = |key: &str| {
+        let value = data.remove(key)?;
+        let value = value.trim();
+        (!value.is_empty()).then(|| value.to_owned())
+    };
+    ZeaburInfo {
+        url: take("url"),
+        issuer: take("issuer"),
+    }
+}
+
+/// Whether `token` is a JWT whose `iss` is `issuer`. The signature is not checked here;
+/// kube-apiserver checks it.
+#[must_use]
+pub fn issued_by(token: &str, issuer: &str) -> bool {
+    use base64::Engine as _;
+    let mut parts = token.split('.');
+    let (Some(_header), Some(payload), Some(_signature), None) =
+        (parts.next(), parts.next(), parts.next(), parts.next())
+    else {
+        return false;
+    };
+    let Ok(payload) = base64::engine::general_purpose::URL_SAFE_NO_PAD.decode(payload) else {
+        return false;
+    };
+    serde_json::from_slice::<serde_json::Value>(&payload)
+        .ok()
+        .and_then(|claims| claims.get("iss")?.as_str().map(str::to_owned))
+        .is_some_and(|iss| iss.trim_end_matches('/') == issuer.trim_end_matches('/'))
+}
+
+/// The namespace every signed-in person may read, as kubeadm's cluster-info lives in.
 pub const INFO_NAMESPACE: &str = "kube-public";
-/// The ConfigMap whose `url` is where Zeabur is.
+/// The ConfigMap whose `url` is where Zeabur is and whose `issuer` signs its people in.
 pub const INFO_CONFIG_MAP: &str = "zeabur-info";
 
 /// How long a connection to kube-apiserver stays open unused.
@@ -514,7 +549,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn zeabur_is_where_the_info_config_map_says() {
+    fn zeabur_info_is_what_the_config_map_says() {
         let map = |data: serde_json::Value| {
             serde_json::from_value::<k8s_openapi::api::core::v1::ConfigMap>(
                 serde_json::json!({"metadata": {"name": INFO_CONFIG_MAP}, "data": data}),
@@ -522,13 +557,19 @@ mod tests {
             .unwrap()
         };
         assert_eq!(
-            url_of(map(
-                serde_json::json!({"url": " https://zeabur.example.com\n"})
-            )),
-            Some("https://zeabur.example.com".to_owned())
+            info_of(map(serde_json::json!({
+                "url": " https://zeabur.example.com\n",
+                "issuer": "https://identity.example.com",
+            }))),
+            ZeaburInfo {
+                url: Some("https://zeabur.example.com".to_owned()),
+                issuer: Some("https://identity.example.com".to_owned()),
+            }
         );
-        assert_eq!(url_of(map(serde_json::json!({"url": ""}))), None);
-        assert_eq!(url_of(map(serde_json::json!({"other": "x"}))), None);
+        assert_eq!(
+            info_of(map(serde_json::json!({"url": ""}))),
+            ZeaburInfo::default()
+        );
     }
 
     #[tokio::test]

@@ -51,8 +51,12 @@ minor or patch release may break the API.
   service when it does not exist (`--project`, `--service`, `--port`, `--method`, `--yes`; asked
   for in a terminal) with one new change, `createUploadService`, which the web interface sends too.
   It finds Zeabur at the `url` of the ConfigMap `kube-public/zeabur-info`, which the chart
-  publishes and everyone may read (`--server` or `ZEABUR_SERVER` overrides it). The server accepts `Authorization: Bearer` on the API when there is no
-  session cookie, acting as the token's holder; changes still carry `Origin` and `Zeabur-Request`.
+  publishes and every signed-in person may read (`--server` or `ZEABUR_SERVER` overrides it;
+  `http://` only for localhost). It sends the token only when it is a JWT whose `iss` is the
+  ConfigMap's `issuer`, so a cloud provider's, ServiceAccount or static token stays home. The
+  server accepts `Authorization: Bearer` on the API when there is no session cookie, only for a
+  token Zeabur Identity issued, acting as the token's holder; changes still carry `Origin` and
+  `Zeabur-Request`.
 
 ### Changed
 

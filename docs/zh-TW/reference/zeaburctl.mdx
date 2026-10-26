@@ -79,13 +79,17 @@ zeaburctl up [資料夾] [--project <專案>] [--service <服務>]
 
 把資料夾上傳到叢集裡的 Zeabur，開始建置。資料夾省略時用目前的資料夾。如果服務還不存在，指令會建立它。專案必須已存在，指令不會建立專案。
 
-指令從叢集的 `kube-public` 命名空間裡的 `zeabur-info` ConfigMap 讀到 Zeabur 的網址，不用另外設定。要改用別的網址時，加上 `--server`，或設定環境變數 `ZEABUR_SERVER`。
+指令從叢集的 `kube-public` 命名空間裡的 `zeabur-info` ConfigMap 讀到 Zeabur 的網址和 Zeabur Identity 的位址，不用另外設定。登入叢集的人都能讀這個 ConfigMap，沒登入的人讀不到。要改用別的網址時，加上 `--server`，或設定環境變數 `ZEABUR_SERVER`。
 
 指令和網頁用同一組 API，把壓縮檔交給 Zeabur，再由 Zeabur 推到 registry。你不需要知道 registry 的位址。`--registry-address` 和 `--registry-ca-file` 已移除。
 
 ### 登入與權限
 
 指令從 kubeconfig 的目前 context 取得你的權杖，也可以用 `--context` 指定其他 context。Zeabur 用你的權限處理上傳和變更，無法執行你沒有權限的操作。如果 kubeconfig 用用戶端憑證登入，沒有權杖，就無法使用 `up`。
+
+指令只會把 Zeabur Identity 發的權杖送給 Zeabur。如果 kubeconfig 用的是雲端服務的權杖（例如 GKE、EKS）、ServiceAccount 權杖或固定的權杖，指令會停下來說明原因，不送出權杖。這時請改用 Zeabur Identity 登入叢集。Zeabur 也只接受 Zeabur Identity 發的權杖，其他權杖會當成沒登入。
+
+Zeabur 的網址必須用 `https://`。只有在自己電腦上測試時（`localhost`、`127.0.0.1`、`::1`），才能用 `http://`。
 
 叢集裡的 Zeabur 要更新到支援權杖登入的版本。如果舊版 Zeabur 回覆「登入已結束」，先更新 Zeabur 再重試。
 

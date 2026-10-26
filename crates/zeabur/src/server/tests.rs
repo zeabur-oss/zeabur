@@ -98,10 +98,13 @@ impl Rig {
         let now = Arc::new(AtomicI64::new(NOW));
         let read = Arc::clone(&now);
         let clock: zeabur_auth::session::Clock = Arc::new(move || read.load(Ordering::SeqCst));
-        // Tokens read `<user>:<n>`; kube-apiserver refuses `mallory`.
+        // Tokens read `<user>:<n>`, or are a JWT with the user as `sub`; kube-apiserver refuses
+        // `mallory`.
         let connect: zeabur_auth::session::Bind<Connection> = Arc::new(|token: SecretString| {
             let text = token.expose_secret();
-            let user = text.split(':').next().unwrap_or("");
+            let user =
+                sub_of(text).unwrap_or_else(|| text.split(':').next().unwrap_or("").to_owned());
+            let user = user.as_str();
             if user == "mallory" {
                 return Err("Unauthorized".to_owned());
             }
@@ -119,6 +122,7 @@ impl Rig {
         ));
         let auth = Arc::new(Auth {
             public,
+            issuer: issuer.url(),
             oauth,
             sessions,
             connect,
@@ -136,6 +140,11 @@ impl Rig {
             ),
             now,
         }
+    }
+
+    /// A token Zeabur Identity issued to `user`.
+    fn token(&self, user: &str) -> String {
+        jwt(&json!({"iss": self.issuer.url().as_str(), "sub": user}))
     }
 
     async fn send(&self, method: Method, uri: &str, headers: &[(&str, &str)]) -> Response {
@@ -211,6 +220,30 @@ impl Rig {
         let status = response.status();
         (status, json_of(response).await)
     }
+}
+
+fn encode(bytes: &[u8]) -> String {
+    use base64::Engine as _;
+    base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(bytes)
+}
+
+/// A JWT with `claims`; only kube-apiserver checks its signature.
+fn jwt(claims: &Value) -> String {
+    format!(
+        "{}.{}.signature",
+        encode(br#"{"alg":"RS256","typ":"JWT"}"#),
+        encode(claims.to_string().as_bytes())
+    )
+}
+
+fn sub_of(token: &str) -> Option<String> {
+    use base64::Engine as _;
+    let payload = token.split('.').nth(1)?;
+    let payload = base64::engine::general_purpose::URL_SAFE_NO_PAD
+        .decode(payload)
+        .ok()?;
+    let claims: Value = serde_json::from_slice(&payload).ok()?;
+    claims["sub"].as_str().map(str::to_owned)
 }
 
 fn location(response: &Response) -> &str {
@@ -449,7 +482,7 @@ async fn a_signed_in_person_uses_the_api_as_themselves() {
 #[tokio::test]
 async fn a_bearer_token_acts_as_the_person_who_holds_it() {
     let rig = Rig::new().await;
-    let get = |token: &'static str| {
+    let get = |token: String| {
         let authorization = format!("Bearer {token}");
         let rig = &rig;
         async move {
@@ -463,19 +496,20 @@ async fn a_bearer_token_acts_as_the_person_who_holds_it() {
             (response.status(), json_of(response).await)
         }
     };
-    let (status, whoami) = get("alice:1").await;
+    let (status, whoami) = get(rig.token("alice")).await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(whoami["username"], "alice");
-    let (status, problem) = get("mallory:1").await;
+    let (status, problem) = get(rig.token("mallory")).await;
     assert_eq!(status, StatusCode::UNAUTHORIZED, "{problem}");
 
+    let alice = format!("Bearer {}", rig.token("alice"));
     let plan = json!({"changes": [{"op": "env",
         "workload": {"kind": "Deployment", "name": "web"},
         "changes": [{"op": "set", "name": "MODE", "value": "maintenance"}]}]});
     let post = |headers: &[(&str, &str)]| {
         let mut request = Request::post("/api/v1/projects/shop/plan")
             .header("host", HOST.1)
-            .header("authorization", "Bearer alice:1")
+            .header("authorization", alice.as_str())
             .header("content-type", "application/json");
         for (name, value) in headers {
             request = request.header(*name, *value);
@@ -489,6 +523,90 @@ async fn a_bearer_token_acts_as_the_person_who_holds_it() {
         post(&[("origin", PUBLIC), ("zeabur-request", "1")]).await,
         StatusCode::OK
     );
+}
+
+/// Zeabur uses only a token from Zeabur Identity. A ServiceAccount token, a token of another
+/// issuer or a static token is signed out, also when kube-apiserver accepts it.
+#[tokio::test]
+async fn a_bearer_token_of_another_issuer_is_signed_out() {
+    let rig = Rig::new().await;
+    for token in [
+        jwt(
+            &json!({"iss": "https://kubernetes.default.svc.cluster.local",
+            "sub": "system:serviceaccount:shop:default"}),
+        ),
+        jwt(&json!({"iss": "kubernetes/serviceaccount", "sub": "alice"})),
+        jwt(&json!({"iss": "https://accounts.google.com", "sub": "alice"})),
+        jwt(&json!({"sub": "alice"})),
+        "alice:1".to_owned(),
+    ] {
+        let response = rig
+            .send(
+                Method::GET,
+                "/api/v1/whoami",
+                &[HOST, ("authorization", &format!("Bearer {token}"))],
+            )
+            .await;
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED, "{token}");
+        assert_eq!(json_of(response).await["type"], "/problems/signed-out");
+    }
+}
+
+/// A request with a session cookie uses only the session. When the session ended, a bearer
+/// token in the same request does not sign it in.
+#[tokio::test]
+async fn an_ended_session_does_not_fall_back_to_a_bearer_token() {
+    let rig = Rig::new().await;
+    rig.issuer.with(|r| r.refresh_expires_in = Some(900));
+    let session = rig.sign_in("alice").await;
+    rig.now.fetch_add(901, Ordering::SeqCst);
+    let response = rig
+        .send(
+            Method::GET,
+            "/api/v1/whoami",
+            &[
+                HOST,
+                ("cookie", session.as_str()),
+                ("authorization", &format!("Bearer {}", rig.token("alice"))),
+            ],
+        )
+        .await;
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+}
+
+/// A bearer token is not kept, so a tools pod or Zeabur Proxy (log history) never gets it.
+#[tokio::test]
+async fn a_bearer_token_starts_no_tools_pod() {
+    let rig = Rig::new().await;
+    let request = Request::post("/api/v1/cluster/tools/plan")
+        .header("host", HOST.1)
+        .header("authorization", format!("Bearer {}", rig.token("root")))
+        .header("origin", PUBLIC)
+        .header("zeabur-request", "1")
+        .header("content-type", "application/json")
+        .body(Body::from("{}"))
+        .unwrap();
+    let response = rig.app.clone().oneshot(request).await.unwrap();
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    assert_eq!(json_of(response).await["type"], "/problems/bad-request");
+}
+
+#[test]
+fn a_bearer_token_is_never_handed_on() {
+    use zeabur_api::access::ClusterAccess as _;
+
+    use super::{SessionAccess, Signed};
+
+    let access = SessionAccess {
+        origin: PUBLIC.to_owned(),
+    };
+    let mut parts = Request::builder().body(()).unwrap().into_parts().0;
+    parts.extensions.insert(Signed::Token(Connection {
+        cluster: Arc::new(cluster("alice")),
+        token: UserToken::new(SecretString::from("alice:1")).unwrap(),
+    }));
+    assert!(access.for_request(&parts).is_ok());
+    assert!(access.handoff(&parts).is_none());
 }
 
 #[tokio::test]

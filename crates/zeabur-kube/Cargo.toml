@@ -17,6 +17,8 @@ memory = []
 
 [dependencies]
 zeabur-core.workspace = true
+# Already in the binary through k8s-openapi: the claims of a JWT.
+base64.workspace = true
 futures-util.workspace = true
 http.workspace = true
 # kube-rs's default client with a pool that closes idle connections (see `client` in lib.rs);

@@ -129,6 +129,7 @@ async fn serve(args: &Args, config: Config) -> Result<(), String> {
     ));
     let auth = Arc::new(Auth {
         public: config.public_url,
+        issuer: config.issuer.clone(),
         oauth,
         sessions: Arc::clone(&sessions),
         connect,

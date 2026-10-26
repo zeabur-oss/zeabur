@@ -2391,6 +2391,7 @@ name = "zeabur"
 version = "0.0.1"
 dependencies = [
  "axum",
+ "base64 0.23.1",
  "bytes",
  "clap",
  "form_urlencoded",
@@ -2583,6 +2584,7 @@ dependencies = [
 name = "zeabur-kube"
 version = "0.0.1"
 dependencies = [
+ "base64 0.23.1",
  "futures-util",
  "http",
  "hyper",
