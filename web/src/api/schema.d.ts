@@ -1426,7 +1426,7 @@ export interface paths {
     }
     /**
      * Ready-made NetworkPolicy objects for one service, to plan as new objects (`create`): isolate
-     *     it (its project and cluster DNS stay reachable), let the ingress controller (k3s's Traefik)
+     *     it (its project and cluster DNS stay reachable), let the ingress controller (Traefik)
      *     reach it, or let one other service reach it. Nothing is written; whether the cluster enforces
      *     NetworkPolicy depends on its network plugin.
      */
@@ -5905,7 +5905,7 @@ export interface components {
     NetworkPolicyService: {
       /** @description A policy limits where it goes. */
       egressIsolated: boolean
-      /** @description The ingress controller (k3s's Traefik). */
+      /** @description The ingress controller (Traefik). */
       fromIngressController: components["schemas"]["NetworkPolicyAccess"]
       /** @description Pods of other namespaces, whatever their labels. */
       fromOtherNamespaces: components["schemas"]["NetworkPolicyAccess"]

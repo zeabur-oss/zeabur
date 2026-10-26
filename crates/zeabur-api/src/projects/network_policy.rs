@@ -183,7 +183,7 @@ pub struct PresetList {
 }
 
 /// Ready-made NetworkPolicy objects for one service, to plan as new objects (`create`): isolate
-/// it (its project and cluster DNS stay reachable), let the ingress controller (k3s's Traefik)
+/// it (its project and cluster DNS stay reachable), let the ingress controller (Traefik)
 /// reach it, or let one other service reach it. Nothing is written; whether the cluster enforces
 /// NetworkPolicy depends on its network plugin.
 #[utoipa::path(get, path = "/api/v1/projects/{project}/network-policy/presets", tag = "projects",

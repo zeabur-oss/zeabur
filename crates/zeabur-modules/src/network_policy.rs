@@ -26,8 +26,10 @@
 //! - Namespaces carry the label `kubernetes.io/metadata.name` set to their name, which the API
 //!   server has added to every namespace since Kubernetes 1.21 [k8s-ns-label]; other namespace
 //!   labels are not read, so a `namespaceSelector` on another label is [`Access::Limited`].
-//! - The ingress controller is k3s's packaged Traefik: namespace `kube-system`, pods labelled
-//!   `app.kubernetes.io/name: traefik` [k3s-traefik].
+//! - The ingress controller is Traefik, pods labelled `app.kubernetes.io/name: traefik`, in one of
+//!   two namespaces: `kube-system` (k3s's packaged Traefik [k3s-traefik]) or `traefik`, which
+//!   zeabur-installer labels [`PLATFORM_LABEL`]. The project cannot see which one, so when the two
+//!   give different answers, the ingress controller is [`Access::Limited`].
 //! - Cluster DNS runs in `kube-system`, pods labelled `k8s-app: kube-dns`, port 53 [k8s-dns].
 //!
 //! # What is not known
@@ -51,7 +53,7 @@ use serde_json::{Value, json};
 use utoipa::ToSchema;
 use zeabur_kube::DynamicObject;
 use zeabur_model::adapters::selector::{is_empty, matches};
-use zeabur_model::kernel::isolation::{PROJECT_POLICY, project_policy};
+use zeabur_model::kernel::isolation::{PLATFORM_LABEL, PROJECT_POLICY, project_policy};
 use zeabur_model::{Citation, Fix, FixKind, Gap, Message, Origin, Severity, WorkloadKind};
 
 use crate::{Finding, Module, Read};
@@ -126,7 +128,7 @@ pub struct ServiceReachability {
     pub egress_isolated: bool,
     /// Services of the project that may reach it, with how far.
     pub from_services: Vec<Peer>,
-    /// The ingress controller (k3s's Traefik).
+    /// The ingress controller (Traefik).
     pub from_ingress_controller: Access,
     /// Pods of other namespaces, whatever their labels.
     pub from_other_namespaces: Access,
@@ -262,6 +264,8 @@ pub struct Input<'a> {
 /// A pod somewhere, as a rule's peer: its namespace's name and, where known, its labels.
 struct Pod<'a> {
     namespace: &'a str,
+    /// The namespace has [`PLATFORM_LABEL`]; `None`: not known.
+    platform: Option<bool>,
     /// `None`: any labels (unknown).
     labels: Option<&'a BTreeMap<String, String>>,
 }
@@ -325,22 +329,28 @@ fn peer_access(peers: Option<&Vec<NetworkPolicyPeer>>, namespace: &str, pod: &Po
                 }
             }
             Some(selector) => {
-                let labels =
+                let mut labels =
                     BTreeMap::from([(NAMESPACE_NAME_LABEL.to_owned(), pod.namespace.to_owned())]);
+                if pod.platform == Some(true) {
+                    labels.insert(PLATFORM_LABEL.to_owned(), "true".to_owned());
+                }
+                let known = |key: &str| {
+                    key == NAMESPACE_NAME_LABEL || (key == PLATFORM_LABEL && pod.platform.is_some())
+                };
                 if matches(selector, &labels) {
                     Access::Allowed
                 } else if selector
                     .match_labels
                     .iter()
                     .flatten()
-                    .all(|(k, _)| k == NAMESPACE_NAME_LABEL)
+                    .all(|(k, _)| known(k))
                     && selector
                         .match_expressions
                         .iter()
                         .flatten()
-                        .all(|e| e.key == NAMESPACE_NAME_LABEL)
+                        .all(|e| known(&e.key))
                 {
-                    // Decided by the one label Zeabur knows: it does not match.
+                    // Decided by the labels Zeabur knows: it does not match.
                     Access::Blocked
                 } else {
                     Access::Limited
@@ -516,6 +526,7 @@ fn between<'p>(
         &from.labels,
         Some(&Pod {
             namespace,
+            platform: None,
             labels: Some(&to.labels),
         }),
         false,
@@ -526,6 +537,7 @@ fn between<'p>(
         &to.labels,
         &Pod {
             namespace,
+            platform: None,
             labels: Some(&from.labels),
         },
     );
@@ -580,21 +592,33 @@ fn service(policies: &[NetworkPolicy], input: Input<'_>, w: &Workload) -> Servic
                 }
             })
             .collect(),
-        from_ingress_controller: ingress(
-            policies,
-            namespace,
-            &w.labels,
-            &Pod {
-                namespace: "kube-system",
-                labels: Some(&traefik),
-            },
-        ),
+        from_ingress_controller: {
+            let from = |namespace_name, platform| {
+                ingress(
+                    policies,
+                    namespace,
+                    &w.labels,
+                    &Pod {
+                        namespace: namespace_name,
+                        platform,
+                        labels: Some(&traefik),
+                    },
+                )
+            };
+            let (k3s, installer) = (from("kube-system", None), from("traefik", Some(true)));
+            if k3s == installer {
+                k3s
+            } else {
+                Access::Limited
+            }
+        },
         from_other_namespaces: ingress(
             policies,
             namespace,
             &w.labels,
             &Pod {
                 namespace: "",
+                platform: None,
                 labels: None,
             },
         ),
@@ -604,6 +628,7 @@ fn service(policies: &[NetworkPolicy], input: Input<'_>, w: &Workload) -> Servic
             &w.labels,
             Some(&Pod {
                 namespace: "kube-system",
+                platform: None,
                 labels: Some(&core_dns),
             }),
             true,
@@ -741,6 +766,7 @@ pub fn blocks_internet(input: Input<'_>, id: &str) -> Option<Vec<String>> {
     let policies = policies(input.policies);
     let kube_system = Pod {
         namespace: "kube-system",
+        platform: None,
         labels: None,
     };
     let isolating: Vec<&NetworkPolicy> = policies
@@ -1056,7 +1082,8 @@ fn policy(namespace: &str, name: &str, spec: &Value) -> Value {
 ///
 /// - `isolate`: only the project's own pods reach it, and it reaches only the project and cluster
 ///   DNS (port 53, UDP and TCP) — without the DNS rule every name lookup would fail;
-/// - `allow-from-ingress-controller`: k3s's Traefik (`kube-system`) may reach it;
+/// - `allow-from-ingress-controller`: Traefik's pods may reach it, in `kube-system` (k3s) or in a
+///   namespace labelled [`PLATFORM_LABEL`] (zeabur-installer);
 /// - `allow-from-service`, one per other service: that service's pods may reach it.
 ///
 /// Allow rules add to an isolation; on their own they also isolate the service for ingress
@@ -1097,10 +1124,16 @@ pub fn presets(namespace: &str, target: &Workload, others: &[Workload]) -> Vec<P
                 &json!({
                     "podSelector": pods,
                     "policyTypes": ["Ingress"],
-                    "ingress": [{"from": [{
-                        "namespaceSelector": {"matchLabels": {NAMESPACE_NAME_LABEL: "kube-system"}},
-                        "podSelector": {"matchLabels": {"app.kubernetes.io/name": "traefik"}},
-                    }]}],
+                    "ingress": [{"from": [
+                        {
+                            "namespaceSelector": {"matchLabels": {NAMESPACE_NAME_LABEL: "kube-system"}},
+                            "podSelector": {"matchLabels": {"app.kubernetes.io/name": "traefik"}},
+                        },
+                        {
+                            "namespaceSelector": {"matchLabels": {PLATFORM_LABEL: "true"}},
+                            "podSelector": {"matchLabels": {"app.kubernetes.io/name": "traefik"}},
+                        },
+                    ]}],
                 }),
             ),
         },
@@ -1188,6 +1221,35 @@ mod tests {
         assert_eq!(api.to_outside, Access::Blocked);
         assert_eq!(api.from_ingress_controller, Access::Blocked);
         assert_eq!(api.from_other_namespaces, Access::Blocked);
+    }
+
+    #[test]
+    fn the_ingress_preset_admits_traefik_where_k3s_or_zeabur_installer_runs_it() {
+        let workloads = [workload("web", "web")];
+        let preset = |kind: &str| {
+            let found = presets("shop", &workloads[0], &workloads)
+                .into_iter()
+                .find(|p| p.kind == kind)
+                .unwrap();
+            object(found.object)
+        };
+        let from_traefik = |policies: &[DynamicObject]| {
+            reachability(input(&workloads, policies, &[])).services[0].from_ingress_controller
+        };
+        let isolate = preset("isolate");
+        assert_eq!(
+            from_traefik(&[isolate.clone(), preset("allow-from-ingress-controller")]),
+            Access::Allowed
+        );
+        let kube_system_only = object(json!({
+            "apiVersion": "networking.k8s.io/v1", "kind": "NetworkPolicy",
+            "metadata": {"name": "web-from-k3s-traefik", "namespace": "shop"},
+            "spec": {"podSelector": {"matchLabels": {"app": "web"}}, "ingress": [{"from": [{
+                "namespaceSelector": {"matchLabels": {"kubernetes.io/metadata.name": "kube-system"}},
+                "podSelector": {"matchLabels": {"app.kubernetes.io/name": "traefik"}},
+            }]}]}
+        }));
+        assert_eq!(from_traefik(&[isolate, kube_system_only]), Access::Limited);
     }
 
     fn input<'a>(

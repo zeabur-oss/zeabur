@@ -2216,7 +2216,7 @@ paths:
       - projects
       summary: |-
         Ready-made NetworkPolicy objects for one service, to plan as new objects (`create`): isolate
-        it (its project and cluster DNS stay reachable), let the ingress controller (k3s's Traefik)
+        it (its project and cluster DNS stay reachable), let the ingress controller (Traefik)
         reach it, or let one other service reach it. Nothing is written; whether the cluster enforces
         NetworkPolicy depends on its network plugin.
       operationId: listNetworkPolicyPresets
@@ -11299,7 +11299,7 @@ components:
           description: A policy limits where it goes.
         fromIngressController:
           $ref: "#/components/schemas/NetworkPolicyAccess"
-          description: The ingress controller (k3s's Traefik).
+          description: The ingress controller (Traefik).
         fromOtherNamespaces:
           $ref: "#/components/schemas/NetworkPolicyAccess"
           description: Pods of other namespaces, whatever their labels.
