@@ -7,6 +7,7 @@ import {
   APP_DATABASE,
   APP_SECRET,
   jobAccount,
+  MOCO_JOB_RESOURCES,
   madeFor,
   newPassword,
   perThreadCaches,
@@ -206,6 +207,7 @@ function restoreMysql({ source, point, name, project, spec, store, object, copie
       serviceAccountName: account,
       bucketConfig: { bucketName: bucket, ...endpoint, usePathStyle: true },
       envFrom: [{ secretRef: { name: store?.secret ?? `${source.name}-backups-s3` } }],
+      ...MOCO_JOB_RESOURCES,
       workVolume: {
         ephemeral: {
           volumeClaimTemplate: {

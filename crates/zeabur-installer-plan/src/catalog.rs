@@ -200,6 +200,9 @@ pub struct Security {
     /// Runs privileged pods or host access.
     #[serde(default)]
     pub privileged: bool,
+    /// The Pod Security level its namespaces need when it cannot run under `restricted`.
+    #[serde(default)]
+    pub pod_security: Option<String>,
     /// Hosts it calls.
     #[serde(default)]
     pub egress: Vec<String>,

@@ -191,6 +191,8 @@ pub struct Namespace {
     pub name: String,
     /// Why it is `privileged` instead of RKE2's default `restricted`.
     pub privileged: Option<String>,
+    /// Why it is `baseline` instead of `restricted`; ignored when it is `privileged`.
+    pub baseline: Option<String>,
     /// Open to traffic from anywhere (the ingress namespace); otherwise only its own namespace,
     /// the ingress and the metrics collectors reach it.
     pub public: bool,
@@ -516,6 +518,7 @@ fn products(
             Namespace {
                 name: name.to_owned(),
                 privileged: None,
+                baseline: None,
                 public: false,
             },
         );
@@ -766,6 +769,7 @@ pub(crate) fn components(
             arch,
         )?);
         let privileged = privileged(component, choices);
+        let baseline = baseline(component);
         for release in &component.releases {
             if release.namespace == "kube-system" {
                 continue;
@@ -775,10 +779,14 @@ pub(crate) fn components(
                 .or_insert_with(|| Namespace {
                     name: release.namespace.clone(),
                     privileged: None,
+                    baseline: None,
                     public: component.capability == "ingress",
                 });
             if entry.privileged.is_none() {
                 entry.privileged.clone_from(&privileged);
+            }
+            if entry.baseline.is_none() {
+                entry.baseline.clone_from(&baseline);
             }
         }
     }
@@ -987,6 +995,16 @@ fn privileged(component: &Component, choices: &Choices<'_>) -> Option<String> {
         })
 }
 
+/// Why a component's namespaces need the `baseline` Pod Security level, if they do.
+fn baseline(component: &Component) -> Option<String> {
+    (component.security.pod_security.as_deref() == Some("baseline")).then(|| {
+        format!(
+            "{}: its pods set no seccomp profile or dropped capabilities",
+            component.id
+        )
+    })
+}
+
 /// The first server's RKE2 files.
 fn server_files(
     config: &Config,
@@ -1073,21 +1091,21 @@ fn ingress(namespace: &str, service: &str, host: &str, issuer: &str) -> Value {
 #[must_use]
 pub fn namespace_object(namespace: &Namespace) -> Value {
     let mut labels = json!({"app.kubernetes.io/managed-by": MANAGER, BASELINE_LABEL: "true"});
-    if namespace.privileged.is_some()
-        && let Some(map) = labels.as_object_mut()
-    {
+    let (level, reason) = match (&namespace.privileged, &namespace.baseline) {
+        (Some(why), _) => (Some("privileged"), Some(why)),
+        (None, Some(why)) => (Some("baseline"), Some(why)),
+        (None, None) => (None, None),
+    };
+    if let (Some(level), Some(map)) = (level, labels.as_object_mut()) {
         for mode in ["enforce", "audit", "warn"] {
-            map.insert(
-                format!("pod-security.kubernetes.io/{mode}"),
-                json!("privileged"),
-            );
+            map.insert(format!("pod-security.kubernetes.io/{mode}"), json!(level));
         }
     }
     let mut metadata = json!({"name": namespace.name, "labels": labels});
-    if let (Some(reason), Some(map)) = (&namespace.privileged, metadata.as_object_mut()) {
+    if let (Some(level), Some(reason), Some(map)) = (level, reason, metadata.as_object_mut()) {
         map.insert(
             "annotations".to_owned(),
-            json!({"installer.zeabur.com/privileged": reason}),
+            json!({format!("installer.zeabur.com/{level}"): reason}),
         );
     }
     json!({"apiVersion": "v1", "kind": "Namespace", "metadata": metadata})
@@ -1481,6 +1499,18 @@ mod tests {
     }
 
     #[test]
+    fn k8up_namespace_gets_the_baseline_level() {
+        let index = Index::parse(INDEX.as_bytes()).unwrap();
+        let plan = plan(&index, &config("enable: [volume-backup/k8up]\n"), &facts()).unwrap();
+        let k8up = plan
+            .namespaces
+            .iter()
+            .find(|n| n.name == "k8up-system")
+            .unwrap();
+        assert!(k8up.baseline.is_some() && k8up.privileged.is_none());
+    }
+
+    #[test]
     fn multi_node_makes_longhorn_the_default_and_installs_it_first() {
         let index = Index::parse(INDEX.as_bytes()).unwrap();
         let plan = plan(&index, &config("profile: multi-node\n"), &facts()).unwrap();
@@ -1720,10 +1750,28 @@ mod tests {
     }
 
     #[test]
+    fn baseline_namespace_is_labelled_baseline() {
+        let ns = Namespace {
+            name: "k8up-system".to_owned(),
+            privileged: None,
+            baseline: Some("x".to_owned()),
+            public: false,
+        };
+        let object = namespace_object(&ns);
+        for mode in ["enforce", "audit", "warn"] {
+            assert_eq!(
+                object["metadata"]["labels"][format!("pod-security.kubernetes.io/{mode}")],
+                "baseline"
+            );
+        }
+    }
+
+    #[test]
     fn privileged_namespaces_and_policies() {
         let ns = Namespace {
             name: "observability".to_owned(),
             privileged: Some("x".to_owned()),
+            baseline: Some("y".to_owned()),
             public: false,
         };
         let object = namespace_object(&ns);

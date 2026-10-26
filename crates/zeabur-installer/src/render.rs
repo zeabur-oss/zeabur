@@ -27,21 +27,21 @@ pub(crate) fn plan(plan: &Plan) -> String {
     push(&mut s, "");
     components(&mut s, &plan.components, &plan.left_out);
     push(&mut s, "");
-    let privileged: Vec<String> = plan
+    let exempt: Vec<String> = plan
         .namespaces
         .iter()
-        .filter_map(|n| {
-            n.privileged
-                .as_ref()
-                .map(|why| format!("  {} ({why})", n.name))
+        .filter_map(|n| match (&n.privileged, &n.baseline) {
+            (Some(why), _) => Some(format!("  {} ({why})", n.name)),
+            (None, Some(why)) => Some(format!("  {} (baseline: {why})", n.name)),
+            (None, None) => None,
         })
         .collect();
-    if !privileged.is_empty() {
+    if !exempt.is_empty() {
         push(
             &mut s,
             "Namespaces exempt from the restricted Pod Security level",
         );
-        for line in &privileged {
+        for line in &exempt {
             push(&mut s, line);
         }
         push(&mut s, "");

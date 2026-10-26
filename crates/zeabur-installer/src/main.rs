@@ -288,6 +288,7 @@ fn manifests(cli: &Cli, cluster_name: &str) -> Result<(), InstallError> {
     let namespace = plan::namespace_object(&plan::Namespace {
         name: plan::ZEABUR_NAMESPACE.to_owned(),
         privileged: None,
+        baseline: None,
         public: false,
     });
     let list = serde_json::json!({

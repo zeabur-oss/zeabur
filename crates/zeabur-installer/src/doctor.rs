@@ -189,7 +189,8 @@ const fn rank(status: Status) -> u8 {
     }
 }
 
-/// Each component's `HelmCharts` installed and its smoke waits met.
+/// Each component's `HelmCharts` installed, its Deployments and `DaemonSets` available and its
+/// smoke waits met.
 pub(crate) fn components(kubectl: &Kubectl, plan: &Value) -> Vec<(Status, String)> {
     let mut results = Vec::new();
     for component in plan
@@ -203,12 +204,23 @@ pub(crate) fn components(kubectl: &Kubectl, plan: &Value) -> Vec<(Status, String
             .and_then(Value::as_str)
             .unwrap_or_default();
         let mut problems = Vec::new();
+        let mut namespaces: Vec<&str> = Vec::new();
         for release in component
             .get("releases")
             .and_then(Value::as_array)
             .into_iter()
             .flatten()
         {
+            let namespace = release
+                .get("namespace")
+                .or_else(|| release.pointer("/object/spec/targetNamespace"))
+                .and_then(Value::as_str);
+            if let Some(ns) = namespace
+                && ns != "kube-system"
+                && !namespaces.contains(&ns)
+            {
+                namespaces.push(ns);
+            }
             if release.get("kind").and_then(Value::as_str) != Some("helmChart") {
                 continue;
             }
@@ -225,6 +237,28 @@ pub(crate) fn components(kubectl: &Kubectl, plan: &Value) -> Vec<(Status, String
                     == 0
             {
                 problems.push(format!("chart {name} is not installed (kubectl logs -n kube-system job/helm-install-{name})"));
+            }
+        }
+        for ns in namespaces {
+            match kubectl.run(
+                &[
+                    "get",
+                    "deployments,daemonsets",
+                    "--namespace",
+                    ns,
+                    "--output=json",
+                ],
+                None,
+            ) {
+                Ok(out) => {
+                    let list = serde_json::from_str::<Value>(&out).unwrap_or_default();
+                    problems.extend(
+                        unavailable(&list)
+                            .into_iter()
+                            .map(|w| format!("{ns}: {w} (kubectl get pods -n {ns})")),
+                    );
+                }
+                Err(e) => problems.push(format!("reading workloads in {ns}: {e}")),
             }
         }
         for wait in component
@@ -251,6 +285,43 @@ pub(crate) fn components(kubectl: &Kubectl, plan: &Value) -> Vec<(Status, String
         }
     }
     results
+}
+
+/// The Deployments and `DaemonSets` in a list that have fewer Pods available than they want, as
+/// text.
+fn unavailable(list: &Value) -> Vec<String> {
+    let mut found = Vec::new();
+    for item in list
+        .get("items")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+    {
+        let kind = item.get("kind").and_then(Value::as_str).unwrap_or_default();
+        let name = item
+            .pointer("/metadata/name")
+            .and_then(Value::as_str)
+            .unwrap_or_default();
+        let count = |path: &str| item.pointer(path).and_then(Value::as_u64);
+        let (want, have) = if kind == "DaemonSet" {
+            (
+                count("/status/desiredNumberScheduled").unwrap_or(0),
+                count("/status/numberAvailable").unwrap_or(0),
+            )
+        } else {
+            (
+                count("/spec/replicas").unwrap_or(1),
+                count("/status/availableReplicas").unwrap_or(0),
+            )
+        };
+        if have < want {
+            found.push(format!(
+                "{}/{name} has {have} of {want} Pods available",
+                kind.to_ascii_lowercase()
+            ));
+        }
+    }
+    found
 }
 
 /// Whether the cluster's default storage class is the one the plan chose, and the only one.
@@ -408,6 +479,27 @@ mod tests {
         assert_eq!(secrets_encryption(Some(&identity)).0, Status::Fail);
         assert_eq!(secrets_encryption(Some("{}")).0, Status::Fail);
         assert_eq!(secrets_encryption(None).0, Status::Fail);
+    }
+
+    #[test]
+    fn workloads_with_fewer_pods_available_than_wanted_are_listed() {
+        let list = json!({"items": [
+            {"kind": "Deployment", "metadata": {"name": "moco-controller"},
+             "spec": {"replicas": 2}, "status": {}},
+            {"kind": "Deployment", "metadata": {"name": "ready"},
+             "spec": {"replicas": 1}, "status": {"availableReplicas": 1}},
+            {"kind": "Deployment", "metadata": {"name": "off"},
+             "spec": {"replicas": 0}, "status": {}},
+            {"kind": "DaemonSet", "metadata": {"name": "agent"},
+             "status": {"desiredNumberScheduled": 3, "numberAvailable": 2}},
+        ]});
+        assert_eq!(
+            unavailable(&list),
+            [
+                "deployment/moco-controller has 0 of 2 Pods available",
+                "daemonset/agent has 2 of 3 Pods available"
+            ]
+        );
     }
 
     #[test]

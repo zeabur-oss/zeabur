@@ -572,6 +572,10 @@ export const jobAccount = (name: string): Change =>
     metadata: { name },
   })
 
+/** What MOCO's backup and restore Jobs ask for. The upstream default, 4 CPUs and 4 GiB, leaves
+ * the Jobs Pending on a small node. */
+export const MOCO_JOB_RESOURCES = { threads: 2, cpu: "500m", memory: "1Gi" } as const
+
 /** MOCO's backup and restore Jobs: the bucket, the keys from `secretName` as AWS variables, and a
  * scratch volume as big as the data. They run as the ServiceAccount `account`.
  * https://cybozu-go.github.io/moco/backup.html */
@@ -590,6 +594,7 @@ function mocoJobConfig(
       usePathStyle: true,
     },
     envFrom: [{ secretRef: { name: secretName } }],
+    ...MOCO_JOB_RESOURCES,
     workVolume: {
       ephemeral: {
         volumeClaimTemplate: {
