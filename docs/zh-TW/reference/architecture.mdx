@@ -63,7 +63,7 @@ Helm、Argo CD、Flux 管理的物件，Zeabur 只接受重新啟動，其他修
 
 **部署紀錄** 來自工作負載保留的修訂版本，時間和修改者來自事件、容器狀態和 `managedFields`。叢集清掉的修訂版本、超過保留期的事件，Zeabur 也讀不到。
 
-容器日誌預設來自 kubelet，只有副本這一次和上一次執行的內容。啟用 Zeabur Proxy 後，可以依專案權限讀取 VictoriaLogs 裡的歷史日誌。移除 chart 時 Proxy 一起移除，VictoriaLogs 裡的日誌不受影響。
+容器日誌預設來自 kubelet，只有副本這一次和上一次執行的內容。啟用 Zeabur Proxy 後，可以依專案權限讀取 VictoriaLogs 裡的歷史日誌。移除 chart 時 Proxy 一起移除，VictoriaLogs 裡的日誌不受影響。日誌收集器的 `includePodLabels: false` 在 operator v0.75.0 沒有作用，日誌仍會帶 `kubernetes.pod_labels.*`。
 
 ## Zeabur 自己儲存什麼
 

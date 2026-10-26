@@ -1146,3 +1146,16 @@ name = "utf8-zero"
 kind = "unsafe"
 reason = "ureq's text decoding"
 approved = "2026-10-24"
+
+# --- Parser stack growth (pest 2.9.4 uses stacker to avoid stack overflow on deep input).
+[[crate]]
+name = "psm"
+kind = "unsafe"
+reason = "Stack pointer switching under stacker"
+approved = "2026-10-26"
+
+[[crate]]
+name = "stacker"
+kind = "unsafe"
+reason = "Grows the stack for recursive parsing in pest"
+approved = "2026-10-26"

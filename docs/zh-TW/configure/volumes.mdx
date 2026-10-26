@@ -11,6 +11,7 @@ description: 為服務掛載持續保存的磁碟區、擴充容量，並用 K8u
 - 叢集有可用的儲存類別，你也有權新增磁碟區、修改服務。
 - 如果服務由 Helm、Argo CD 或 Flux 管理，要回到原本的 values 或 Git 儲存庫修改。
 - 要備份的話，叢集要裝 K8up，並準備可寫入的 S3 相容儲存空間和存取金鑰。管理員可以先登錄 [S3 目的地](../cluster/s3-destinations.mdx)，備份表單就能直接選用。
+- 升級 K8up 的 Helm chart 時，Helm 不會更新 `crds/` 裡的 CRD，升級後要自己 `kubectl apply` 新版的 CRD。
 
 ![服務 redis 的儲存空間與磁碟區備份設定](https://oss.zeabur.com/shots/zeabur/zh-TW/light/service-storage.avif)
 

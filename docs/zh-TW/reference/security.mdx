@@ -188,6 +188,10 @@ kubectl -n shop delete networkpolicy zeabur-allow-from-blog
 
 **開發者** 可以修改或刪除自己專案的 NetworkPolicy。刪掉 `zeabur-project` 只會讓自己的專案對其他專案開放，`zeaburctl doctor` 會繼續提醒。
 
+### 專案之間的網域
+
+同一個叢集裡，專案之間不會互相保護網域。兩個專案可以設定同一個網域，Traefik 會把這些路由合併，請求可能送到另一個專案的服務。需要分開的團隊，請使用不同的叢集。
+
 ## 終端機
 
 ### 容器終端機與除錯容器
@@ -219,6 +223,8 @@ tools Pod 預設最多執行 30 分鐘。最後一個終端機關閉時，Zeabur
 能透過 `services/proxy` 查詢 metrics store 的人，也查得到同一個 metrics store 裡其他專案的指標。
 
 Zeabur Proxy 啟用後（chart 預設關閉，安裝器在裝了 VictoriaLogs 時會打開），使用者要能在該 Namespace `get logs.proxy.zeabur.com`，才讀得到它的歷史日誌，查詢也只限於這個 Namespace。VictoriaLogs 本身如果能直接連線，就能繞過這層檢查，要另外限制。
+
+防止專案用假標籤冒充別人的日誌，靠的是 VictoriaLogs 會把 stream 欄位重複的整行丟掉。這是它的副作用，不是它保證的行為，升級 VictoriaLogs 後要再確認。
 
 ## 機密的加密與存取紀錄
 
