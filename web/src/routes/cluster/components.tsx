@@ -4,7 +4,6 @@ import { lazy, Suspense, useState } from "react"
 import ArchiveIcon from "~icons/ph/archive"
 import ArrowSquareOutIcon from "~icons/ph/arrow-square-out"
 import ArrowsClockwiseIcon from "~icons/ph/arrows-clockwise"
-import BellIcon from "~icons/ph/bell"
 import CertificateIcon from "~icons/ph/certificate"
 import ChartLineIcon from "~icons/ph/chart-line"
 import ClockCounterClockwiseIcon from "~icons/ph/clock-counter-clockwise"
@@ -55,7 +54,7 @@ const categories: {
   { key: "traffic", names: ["ingress", "certificates", "dns"] },
   {
     key: "observability",
-    names: ["metrics", "logs", "observability-operator", "uptime-probes", "gotify-notifications"],
+    names: ["metrics", "logs", "observability-operator", "uptime-probes"],
   },
   { key: "scaling", names: ["event-autoscaling", "resource-recommendations"] },
   {
@@ -84,7 +83,6 @@ const icons: Record<string, Icon> = {
   "vulnerability-scanning": MagnifyingGlassIcon,
   "node-updates": CloudArrowUpIcon,
   "volume-backup": ClockCounterClockwiseIcon,
-  "gotify-notifications": BellIcon,
   databases: DatabaseIcon,
   postgres: DatabaseIcon,
   "replicated-storage": HardDriveIcon,

@@ -4,22 +4,13 @@ type Settings = Schemas["AlertmanagerChannelSettings"]
 export type ChannelKind = Settings["kind"]
 export type Event = Schemas["AlertmanagerEvent"]
 
-/** Alerting comes with the metrics component; Gotify needs its bridge too. */
+/** Alerting comes with the metrics component. */
 export const METRICS_COMPONENT = "metrics/victoria-metrics"
-export const GOTIFY_COMPONENT = "gotify-notifications/alertmanager-gotify-bridge"
 
 /** `NAME_MAX` in zeabur-modules' alertmanager. */
 export const NAME_MAX = 30
 
-export const KINDS: ChannelKind[] = [
-  "slack",
-  "discord",
-  "telegram",
-  "email",
-  "webhook",
-  "ntfy",
-  "gotify",
-]
+export const KINDS: ChannelKind[] = ["slack", "discord", "telegram", "email", "webhook", "ntfy"]
 
 export type Field =
   | "webhookUrl"
@@ -35,7 +26,6 @@ export type Field =
   | "server"
   | "topic"
   | "accessToken"
-  | "appToken"
 
 /** The fields of each kind, in order; the second value says whether it may stay empty. */
 export const FIELDS: Record<ChannelKind, [Field, boolean][]> = {
@@ -61,7 +51,6 @@ export const FIELDS: Record<ChannelKind, [Field, boolean][]> = {
     ["topic", false],
     ["accessToken", true],
   ],
-  gotify: [["appToken", false]],
 }
 
 /** Fields whose value goes into the Secret: typed as passwords and never shown again. */
@@ -72,7 +61,6 @@ export const SECRET_FIELDS: Field[] = [
   "url",
   "bearerToken",
   "accessToken",
-  "appToken",
 ]
 
 /** Fields kept in the channel's Secret. An edit shows them empty, and empty keeps them. */
@@ -139,8 +127,6 @@ export function settingsOf(form: ChannelForm): Settings {
       return { kind: "webhook", url: v("url"), bearerToken: v("bearerToken") }
     case "ntfy":
       return { kind: "ntfy", server: v("server"), topic: v("topic"), accessToken: v("accessToken") }
-    case "gotify":
-      return { kind: "gotify", appToken: v("appToken") }
   }
 }
 

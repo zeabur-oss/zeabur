@@ -2399,7 +2399,6 @@ export interface components {
       | "email"
       | "webhook"
       | "ntfy"
-      | "gotify"
       | "other"
     /**
      * @description A channel's settings, secrets included. They go into the channel's Secret and spec; Zeabur
@@ -2460,12 +2459,6 @@ export interface components {
           server?: string
           /** @description The topic. */
           topic: string
-        }
-      | {
-          /** @description The application's token. */
-          appToken: string
-          /** @enum {string} */
-          kind: "gotify"
         }
     /**
      * @description Whether Alertmanager took a channel.

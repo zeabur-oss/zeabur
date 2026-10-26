@@ -70,6 +70,9 @@ minor or patch release may break the API.
 ### Removed
 
 - The suggestion to move an Ingress to an HTTPRoute.
+- The Gotify notification channel (`gotify` in `AlertmanagerChannelKind` and
+  `AlertmanagerChannelSettings`) and the catalog's Gotify bridge component. Use ntfy or a webhook
+  instead. A channel that still carries the `gotify` kind annotation shows as `other`.
 
 ## [0.0.1] - 2026-10-18
 

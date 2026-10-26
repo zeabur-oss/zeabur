@@ -66,11 +66,6 @@ export const summaries: Record<string, Summary> = {
     "zh-TW": "把 Vault、1Password 等外部儲存的機密複製進叢集，並保持同步。",
     "zh-CN": "把 Vault、1Password 等外部存储的密钥复制进集群，并保持同步。",
   },
-  "gotify-notifications/alertmanager-gotify-bridge#15013f81": {
-    en: "Lets notification channels send alerts to a Gotify server.",
-    "zh-TW": "讓通知管道把警示送到 Gotify 伺服器。",
-    "zh-CN": "让通知渠道把告警发到 Gotify 服务器。",
-  },
   "image-updates/keel#9ece2498": {
     en: "Deploys each new image to the services you turn auto-deploy on for.",
     "zh-TW": "新的映像檔一建好，就部署到開了自動部署的服務。",

@@ -90,7 +90,6 @@ licence() {
     echo "[Apache-2.0]($gh/kedacore/charts/blob/main/LICENSE)"
     ;;
   external-secrets/external-secrets) echo "[Apache-2.0]($gh/external-secrets/external-secrets/blob/main/LICENSE)" ;;
-  gotify-notifications/alertmanager-gotify-bridge) echo "$catalog" ;;
   image-updates/keel) echo "[MPL-2.0]($gh/keel-hq/keel/blob/master/LICENSE)" ;;
   ingress/traefik)
     echo "gateway-api-crds: [Apache-2.0]($gh/kubernetes-sigs/gateway-api/blob/main/LICENSE); traefik: [Apache-2.0]($gh/traefik/traefik-helm-chart/blob/master/LICENSE)"

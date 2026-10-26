@@ -7,7 +7,6 @@ const knownCapabilities = [
   "container-registry",
   "databases",
   "event-autoscaling",
-  "gotify-notifications",
   "image-updates",
   "ingress",
   "intrusion-prevention",

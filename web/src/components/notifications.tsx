@@ -28,7 +28,6 @@ import {
   FIELDS,
   fixOf,
   formOf,
-  GOTIFY_COMPONENT,
   KINDS,
   METRICS_COMPONENT,
   missing,
@@ -468,7 +467,6 @@ function ChannelDialog({
             onChange={(value) => set(field, value)}
           />
         ))}
-        {form.kind === "gotify" ? <GotifyNote /> : null}
         <EventChoices
           events={events}
           chosen={form.events}
@@ -498,23 +496,6 @@ function startForm(events: Event[], channel?: Channel): ChannelForm {
     values: {},
     events: events.filter((e) => e.endsWith("-failed") || e === "crash-loop"),
   }
-}
-
-function GotifyNote() {
-  const t = useT()
-  return (
-    <p className="type-meta text-muted-foreground">
-      {t("notify.gotifyBridge")}
-      {t("common.gap")}
-      <Link
-        to="/cluster/components"
-        search={{ component: GOTIFY_COMPONENT }}
-        className="text-foreground hover:underline"
-      >
-        {t("notify.gotifyInstall")}
-      </Link>
-    </p>
-  )
 }
 
 function ChannelField({

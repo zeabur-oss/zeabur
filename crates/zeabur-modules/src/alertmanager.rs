@@ -69,15 +69,13 @@ pub const RULES_NAME: &str = "zeabur-notifications";
 pub const CHANNEL_LABEL: &str = "zeabur.com/notification-channel";
 /// What a channel sends to, without its secrets: an address, a chat, a server.
 pub const TARGET_ANNOTATION: &str = "zeabur.com/notification-target";
-/// Where a channel sends ([`AlertmanagerChannelKind`]); ntfy and Gotify are webhooks to
+/// Where a channel sends ([`AlertmanagerChannelKind`]); ntfy is a webhook to
 /// Alertmanager.
 pub const KIND_ANNOTATION: &str = "zeabur.com/notification-kind";
 /// The label of a test Job; its value is the channel's name.
 pub const TEST_LABEL: &str = "zeabur.com/notification-test";
 /// The longest channel name: the test Job's name must stay within 63 characters.
 pub const NAME_MAX: usize = 30;
-/// The Gotify bridge the catalog's `gotify-notifications` component runs.
-const GOTIFY_BRIDGE: &str = "http://gotify-bridge.observability.svc:8080/gotify_webhook";
 const PREFIX: &str = "zeabur-notify-";
 const EVENTS_MATCHER: &str = "zeabur_event=~";
 
@@ -187,21 +185,18 @@ pub enum AlertmanagerChannelKind {
     Webhook,
     /// An ntfy topic.
     Ntfy,
-    /// A Gotify application, through the Gotify bridge.
-    Gotify,
     /// Something Zeabur does not set up.
     Other,
 }
 
 impl AlertmanagerChannelKind {
-    const ALL: [Self; 7] = [
+    const ALL: [Self; 6] = [
         Self::Slack,
         Self::Discord,
         Self::Telegram,
         Self::Email,
         Self::Webhook,
         Self::Ntfy,
-        Self::Gotify,
     ];
 
     const fn label(self) -> &'static str {
@@ -212,7 +207,6 @@ impl AlertmanagerChannelKind {
             Self::Email => "email",
             Self::Webhook => "webhook",
             Self::Ntfy => "ntfy",
-            Self::Gotify => "gotify",
             Self::Other => "other",
         }
     }
@@ -278,12 +272,6 @@ pub enum AlertmanagerChannelSettings {
         #[serde(default, rename = "accessToken")]
         access_token: String,
     },
-    /// A Gotify application, through the Gotify bridge.
-    Gotify {
-        /// The application's token.
-        #[serde(rename = "appToken")]
-        app_token: String,
-    },
 }
 
 impl AlertmanagerChannelSettings {
@@ -297,7 +285,6 @@ impl AlertmanagerChannelSettings {
             Self::Email { .. } => AlertmanagerChannelKind::Email,
             Self::Webhook { .. } => AlertmanagerChannelKind::Webhook,
             Self::Ntfy { .. } => AlertmanagerChannelKind::Ntfy,
-            Self::Gotify { .. } => AlertmanagerChannelKind::Gotify,
         }
     }
 }
@@ -451,8 +438,6 @@ fn settings_problem(settings: &AlertmanagerChannelSettings) -> Option<String> {
                 None
             }
         }
-        AlertmanagerChannelSettings::Gotify { app_token } => (!token_like(app_token.trim()))
-            .then(|| "Paste the application's token from Gotify.".to_owned()),
     }
 }
 
@@ -493,9 +478,6 @@ fn secret_values(settings: &AlertmanagerChannelSettings) -> Vec<(&'static str, S
                 out.push(("token", access_token.trim().to_owned()));
             }
             out
-        }
-        AlertmanagerChannelSettings::Gotify { app_token } => {
-            vec![("url", format!("{GOTIFY_BRIDGE}?token={}", app_token.trim()))]
         }
     }
 }
@@ -595,9 +577,7 @@ fn receiver(
             }
             ("email_configs", config)
         }
-        AlertmanagerChannelSettings::Webhook { .. }
-        | AlertmanagerChannelSettings::Ntfy { .. }
-        | AlertmanagerChannelSettings::Gotify { .. } => {
+        AlertmanagerChannelSettings::Webhook { .. } | AlertmanagerChannelSettings::Ntfy { .. } => {
             let mut config = json!({"url_secret": key(name, "url")});
             if let Some(http) = bearer(name, settings) {
                 set(&mut config, "http_config", http);
@@ -632,9 +612,9 @@ fn target(settings: &AlertmanagerChannelSettings) -> Option<String> {
         AlertmanagerChannelSettings::Ntfy { server, .. } => {
             host(server).or_else(|| Some("ntfy.sh".to_owned()))
         }
-        AlertmanagerChannelSettings::Slack { .. }
-        | AlertmanagerChannelSettings::Discord { .. }
-        | AlertmanagerChannelSettings::Gotify { .. } => None,
+        AlertmanagerChannelSettings::Slack { .. } | AlertmanagerChannelSettings::Discord { .. } => {
+            None
+        }
     }
 }
 
@@ -810,12 +790,15 @@ pub fn channel(object: &DynamicObject) -> AlertmanagerChannel {
     };
     let kind = annotation(KIND_ANNOTATION)
         .filter(|_| label.is_some())
-        .and_then(|k| {
-            AlertmanagerChannelKind::ALL
-                .into_iter()
-                .find(|c| c.label() == k)
-        })
-        .unwrap_or_else(|| kind(&spec));
+        .map_or_else(
+            || kind(&spec),
+            |k| {
+                AlertmanagerChannelKind::ALL
+                    .into_iter()
+                    .find(|c| c.label() == k)
+                    .unwrap_or(AlertmanagerChannelKind::Other)
+            },
+        );
     let (status, reason) = match text(object, "/status/updateStatus").as_deref() {
         Some("operational") => (AlertmanagerChannelStatus::Active, None),
         Some("failed") => (
@@ -970,9 +953,6 @@ pub fn edit(
                 access_token: kept.or(access_token, "token", KEPT),
             }
         }
-        S::Gotify { app_token } => S::Gotify {
-            app_token: kept.or(app_token, "url", KEPT),
-        },
     };
     let fresh = kept.fresh;
     if let Some(problem) = settings_problem(&settings) {
@@ -989,8 +969,7 @@ pub fn edit(
         | S::Telegram { .. }
         | S::Email { .. }
         | S::Webhook { .. }
-        | S::Ntfy { .. }
-        | S::Gotify { .. } => target(&settings),
+        | S::Ntfy { .. } => target(&settings),
     };
     Ok(Edited {
         settings,
@@ -1194,6 +1173,20 @@ mod tests {
         assert_eq!(channel.kind, AlertmanagerChannelKind::Other);
         assert_eq!(channel.events, Vec::new());
         assert_eq!(channel.status, AlertmanagerChannelStatus::Active);
+    }
+
+    #[test]
+    fn a_channel_of_a_removed_kind_is_shown_as_other() {
+        let old = object(json!({
+            "apiVersion": "operator.victoriametrics.com/v1beta1",
+            "kind": "VMAlertmanagerConfig",
+            "metadata": {"name": "zeabur-notify-pager", "namespace": "shop",
+                "labels": {CHANNEL_LABEL: "pager"},
+                "annotations": {KIND_ANNOTATION: "gotify"}},
+            "spec": {"route": {"receiver": "p"}, "receivers": [{"name": "p", "webhook_configs": [{}]}]},
+            "status": {"updateStatus": "operational"}
+        }));
+        assert_eq!(channel(&old).kind, AlertmanagerChannelKind::Other);
     }
 
     #[test]

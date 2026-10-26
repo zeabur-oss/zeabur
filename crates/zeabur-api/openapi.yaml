@@ -4363,7 +4363,6 @@ components:
       - email
       - webhook
       - ntfy
-      - gotify
       - other
     AlertmanagerChannelSettings:
       oneOf:
@@ -4473,19 +4472,6 @@ components:
           topic:
             type: string
             description: The topic.
-      - type: object
-        description: A Gotify application, through the Gotify bridge.
-        required:
-        - appToken
-        - kind
-        properties:
-          appToken:
-            type: string
-            description: The application's token.
-          kind:
-            type: string
-            enum:
-            - gotify
       description: |-
         A channel's settings, secrets included. They go into the channel's Secret and spec; Zeabur
         never shows them again.
