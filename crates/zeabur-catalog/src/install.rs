@@ -617,6 +617,18 @@ impl<'a> Rendered<'a> {
                 files.push(file);
             }
         }
+        if let Some(lists) = self.input_lists(release) {
+            let file = format!("{}-inputs.yaml", release.name);
+            push(
+                out,
+                format!(
+                    "{indent}# Helm replaces a list as a whole, so this file repeats each list an input is in.\n\
+                     {indent}cat > {file} <<'ZEABUR_VALUES'\n{}ZEABUR_VALUES\n",
+                    ensure_newline(&lists)
+                ),
+            );
+            files.push(file);
+        }
         let mut args = vec![format!(
             "{indent}helm upgrade --install {} {chart}",
             release.release_name()
@@ -635,7 +647,9 @@ impl<'a> Rendered<'a> {
             let Some(path) = input.path.as_deref() else {
                 continue;
             };
-            if input.release.as_deref().unwrap_or(first_chart) != release.name {
+            if input.release.as_deref().unwrap_or(first_chart) != release.name
+                || list_of(path).is_some()
+            {
                 continue;
             }
             let value = if input.generate.is_some() {
@@ -647,6 +661,36 @@ impl<'a> Rendered<'a> {
         }
         out.push_str(&args.join(&format!(" \\\n{indent}  ")));
         out.push('\n');
+    }
+
+    /// The lists of `release`'s merged values that hold an input, as YAML: `helm --set` with an
+    /// index replaces the whole list item, so these inputs go in a values file. `None` when no
+    /// input of the release is in a list.
+    fn input_lists(&self, release: &Release) -> Option<String> {
+        let first_chart = self.first_chart();
+        let index = self
+            .file
+            .releases
+            .iter()
+            .position(|r| std::ptr::eq(r, release))?;
+        let merged = parse_values(self.merged.get(index).map(String::as_str)).ok()?;
+        let mut lists = Value::Object(Map::new());
+        for input in &self.file.inputs {
+            if input.release.as_deref().unwrap_or(first_chart) != release.name {
+                continue;
+            }
+            let Some(list) = input.path.as_deref().and_then(list_of) else {
+                continue;
+            };
+            let pointer = format!("/{}", list.replace('.', "/"));
+            if let Some(value) = merged.pointer(&pointer) {
+                set_path(&mut lists, &list, value.clone());
+            }
+        }
+        if lists.as_object().is_some_and(Map::is_empty) {
+            return None;
+        }
+        serde_saphyr::to_string(&lists).ok()
     }
 
     fn first_chart(&self) -> &str {
@@ -1032,6 +1076,14 @@ fn merge(base: &mut Value, over: Value) {
         }
         (base, over) => *base = over,
     }
+}
+
+/// The path of the list a dotted path indexes into (`a.b` for `a.b.0.c`); `None` when it has no
+/// index.
+fn list_of(path: &str) -> Option<String> {
+    let segments: Vec<&str> = path.split('.').collect();
+    let at = segments.iter().position(|s| s.parse::<usize>().is_ok())?;
+    Some(segments.get(..at)?.join("."))
 }
 
 /// Sets `value` at a dotted path; numeric segments index lists, which grow as needed.

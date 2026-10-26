@@ -26,11 +26,14 @@ fn main() -> Result<(), Box<dyn Error>> {
         let Some((name, value)) = input.split_once('=') else {
             return Err(format!("{input}: not <input>=<value>").into());
         };
-        let placeholder = format!("'<{name}>'");
-        if !text.contains(&placeholder) {
+        // A shell argument (`'<name>'`), or a YAML value in a values file (`<name>`).
+        let argument = format!("'<{name}>'");
+        let yaml = format!("<{name}>");
+        if !text.contains(&yaml) {
             return Err(format!("{component} takes no input {name}").into());
         }
-        text = text.replace(&placeholder, &format!("'{}'", value.replace('\'', r"'\''")));
+        text = text.replace(&argument, &format!("'{}'", value.replace('\'', r"'\''")));
+        text = text.replace(&yaml, &serde_json::to_string(value)?);
     }
     std::io::stdout().write_all(text.as_bytes())?;
     Ok(())

@@ -56,12 +56,25 @@ resources:
   requests: {cpu: 20m, memory: 64Mi}
   limits: {memory: 512Mi}
 ZEABUR_VALUES
+# Helm replaces a list as a whole, so this file repeats each list an input is in.
+cat > velero-inputs.yaml <<'ZEABUR_VALUES'
+configuration:
+  backupStorageLocation:
+  - bucket: <bucket>
+    config:
+      customerKeyEncryptionSecret: velero-backup-key/key
+      region: us-east-1
+      s3ForcePathStyle: "true"
+      s3Url: <s3-url>
+    default: true
+    name: default
+    provider: aws
+ZEABUR_VALUES
 helm upgrade --install velero velero \
   --repo https://vmware-tanzu.github.io/helm-charts \
   --version 12.2.1 \
   --namespace velero --create-namespace \
   --values velero-values.yaml \
   --values velero-single-node.yaml \
-  --set configuration.backupStorageLocation.0.bucket='<bucket>' \
-  --set configuration.backupStorageLocation.0.config.s3Url='<s3-url>' \
+  --values velero-inputs.yaml \
   --set deployNodeAgent='<file-backup>'
