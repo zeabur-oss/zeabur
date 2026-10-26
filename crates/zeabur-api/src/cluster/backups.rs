@@ -30,6 +30,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use utoipa::ToSchema;
 use zeabur_core::problem::{Denied, Kind, MEDIA_TYPE as PROBLEM, Problem};
+use zeabur_kube::k8s_openapi::api::apps::v1::DaemonSet;
 use zeabur_kube::k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use zeabur_kube::k8s_openapi::jiff::Timestamp;
 use zeabur_kube::{
@@ -1178,6 +1179,17 @@ async fn move_writes(
     Ok((writes, hosts, managed))
 }
 
+/// Whether Velero's node agent runs in `namespace`; `None` when the person may not list
+/// DaemonSets there.
+async fn node_agent(cluster: &dyn Cluster, namespace: &str) -> Option<bool> {
+    let daemon_sets: Vec<DaemonSet> = cluster.list(Some(namespace)).await.ok()?;
+    Some(
+        daemon_sets
+            .iter()
+            .any(|d| d.metadata.name.as_deref() == Some(v::NODE_AGENT)),
+    )
+}
+
 /// The writes of `request`; `made` names the backup or restore the plan creates.
 #[expect(clippy::too_many_lines, reason = "one arm per request kind")]
 async fn compute(
@@ -1257,7 +1269,12 @@ async fn compute(
                 format!("Schedule/{}", v::SCHEDULE),
                 version(schedule.as_ref()),
             );
-            let after = v::schedule_object(namespace, schedule.as_ref(), &request);
+            let after = v::schedule_object(
+                namespace,
+                schedule.as_ref(),
+                &request,
+                node_agent(cluster, namespace).await,
+            );
             change("Schedule", namespace, v::SCHEDULE, schedule, after)
                 .into_iter()
                 .collect()
@@ -1274,7 +1291,7 @@ async fn compute(
             let current = schedule.ok_or_else(no_schedule)?;
             versions.insert(format!("Schedule/{}", v::SCHEDULE), version(Some(&current)));
             let name = made.unwrap_or_default();
-            let made = v::backup_now(&current, name);
+            let made = v::backup_now(&current, name, node_agent(cluster, namespace).await);
             change("Backup", namespace, name, None, made)
                 .into_iter()
                 .collect()

@@ -11,7 +11,9 @@
 //!   `spec.credential` [velero-bsl]; a location that names no Secret keeps Velero's own.
 //! - The schedule [`SCHEDULE`]: its cron, the namespaces it covers (`*` for all), its `ttl`, and
 //!   file-system backup of every volume (`defaultVolumesToFsBackup`) [velero-fsb], since local-path
-//!   volumes have no snapshots.
+//!   volumes have no snapshots. That setting follows the node agent ([`NODE_AGENT`]): a cluster
+//!   without it gets `false`, because Velero fails a backup that asks for file-system backup
+//!   without the agent.
 //! - A backup now: a `Backup` with the schedule's template and its `velero.io/schedule-name` label,
 //!   named `<schedule>-<UTC time>`, as `velero backup create --from-schedule` makes one
 //!   [velero-cli].
@@ -725,13 +727,20 @@ pub fn credentials_secret(namespace: &str, string_data: &str) -> Value {
     })
 }
 
+/// The name of Velero's node agent, the DaemonSet that copies volume files.
+pub const NODE_AGENT: &str = "node-agent";
+
 /// The schedule as it will be: `current` with the request's fields, or Zeabur's new schedule.
 /// Whatever else `current` sets (hooks, other filters, its location) stays.
+///
+/// `node_agent` is whether the node agent runs; `None` when that is not known, which keeps the
+/// file-system backup setting of `current` and turns it off in a new schedule.
 #[must_use]
 pub fn schedule_object(
     namespace: &str,
     current: Option<&Value>,
     request: &ScheduleRequest,
+    node_agent: Option<bool>,
 ) -> Value {
     let mut object = current.cloned().unwrap_or_else(|| {
         json!({
@@ -757,7 +766,9 @@ pub fn schedule_object(
     if let Some(template) = map_at(&mut object, &["spec", "template"]) {
         template.insert("includedNamespaces".to_owned(), json!(namespaces));
         template.insert("ttl".to_owned(), json!(ttl(request.keep_days)));
-        template.insert("defaultVolumesToFsBackup".to_owned(), json!(true));
+        if let Some(files) = node_agent.or_else(|| current.is_none().then_some(false)) {
+            template.insert("defaultVolumesToFsBackup".to_owned(), json!(files));
+        }
     }
     object
 }
@@ -779,9 +790,10 @@ pub fn backup_name(schedule: &str, compact_time: &str) -> String {
     format!("{schedule}-{compact_time}")
 }
 
-/// A backup now with `schedule`'s template, labelled as the schedule's.
+/// A backup now with `schedule`'s template, labelled as the schedule's. Without the node agent
+/// (`node_agent` is `Some(false)`) it does not ask for file-system backup.
 #[must_use]
-pub fn backup_now(schedule: &Value, name: &str) -> Value {
+pub fn backup_now(schedule: &Value, name: &str, node_agent: Option<bool>) -> Value {
     let at = |pointer: &str| schedule.pointer(pointer).cloned().unwrap_or(Value::Null);
     let mut labels = schedule
         .pointer("/metadata/labels")
@@ -789,11 +801,18 @@ pub fn backup_now(schedule: &Value, name: &str) -> Value {
         .cloned()
         .unwrap_or_default();
     labels.insert(SCHEDULE_LABEL.to_owned(), at("/metadata/name"));
+    let mut spec = at("/spec/template");
+    if node_agent == Some(false)
+        && let Some(spec) = spec.as_object_mut()
+        && spec.get("defaultVolumesToFsBackup") == Some(&json!(true))
+    {
+        spec.insert("defaultVolumesToFsBackup".to_owned(), json!(false));
+    }
     json!({
         "apiVersion": API_VERSION,
         "kind": "Backup",
         "metadata": {"name": name, "namespace": at("/metadata/namespace"), "labels": labels},
-        "spec": at("/spec/template"),
+        "spec": spec,
     })
 }
 
@@ -1172,6 +1191,7 @@ mod tests {
                 keep_days: 7,
                 namespaces: vec![],
             },
+            Some(true),
         );
         assert_eq!(all["spec"]["schedule"], "0 3 * * *");
         assert_eq!(
@@ -1197,6 +1217,7 @@ mod tests {
                 keep_days: 30,
                 namespaces: vec!["shop".into(), "blog".into()],
             },
+            None,
         );
         assert_eq!(some["spec"]["paused"], true);
         assert_eq!(some["spec"]["template"]["storageLocation"], "default");
@@ -1205,6 +1226,40 @@ mod tests {
             json!(["shop", "blog"])
         );
         assert_eq!(some["spec"]["template"]["ttl"], "720h0m0s");
+    }
+
+    #[test]
+    fn a_schedule_asks_for_file_backup_only_where_the_node_agent_runs() {
+        let request = ScheduleRequest {
+            cron: "0 3 * * *".into(),
+            keep_days: 7,
+            namespaces: vec![],
+        };
+        let files = |object: &Value| object["spec"]["template"]["defaultVolumesToFsBackup"].clone();
+        assert_eq!(
+            files(&schedule_object("velero", None, &request, Some(false))),
+            json!(false)
+        );
+        assert_eq!(
+            files(&schedule_object("velero", None, &request, None)),
+            json!(false)
+        );
+        let current = schedule_object("velero", None, &request, Some(true));
+        assert_eq!(
+            files(&schedule_object(
+                "velero",
+                Some(&current),
+                &request,
+                Some(false)
+            )),
+            json!(false)
+        );
+        assert_eq!(
+            files(&schedule_object("velero", Some(&current), &request, None)),
+            json!(true)
+        );
+        let now = backup_now(&current, "zeabur-20261026000000", Some(false));
+        assert_eq!(now["spec"]["defaultVolumesToFsBackup"], json!(false));
     }
 
     #[test]
@@ -1237,7 +1292,7 @@ mod tests {
                      "template": {"includedNamespaces": ["*"], "ttl": "168h0m0s",
                                   "defaultVolumesToFsBackup": true}}});
         let name = backup_name("zeabur", "20261023101500");
-        let made = backup_now(&current, &name);
+        let made = backup_now(&current, &name, None);
         assert_eq!(made["metadata"]["name"], "zeabur-20261023101500");
         assert_eq!(
             made["metadata"]["labels"],

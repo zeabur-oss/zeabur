@@ -11,7 +11,7 @@ mod tests {
     use axum::Router;
     use axum::http::StatusCode;
     use serde_json::{Value, json};
-    use zeabur_kube::k8s_openapi::api::apps::v1::Deployment;
+    use zeabur_kube::k8s_openapi::api::apps::v1::{DaemonSet, Deployment};
     use zeabur_kube::k8s_openapi::api::core::v1::Namespace;
     use zeabur_kube::k8s_openapi::api::networking::v1::Ingress;
     use zeabur_kube::memory::{MemoryCluster, State};
@@ -224,6 +224,33 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn the_schedule_asks_for_file_backup_when_the_node_agent_runs() {
+        let cluster = velero(vec![location()]);
+        let agent: DaemonSet = serde_json::from_value(json!({
+            "metadata": {"name": "node-agent", "namespace": "velero"}
+        }))
+        .unwrap();
+        cluster.update(|s| {
+            s.objects.insert(
+                "velero".to_owned(),
+                NamespaceObjects {
+                    namespace: "velero".to_owned(),
+                    daemon_sets: vec![agent],
+                    ..NamespaceObjects::default()
+                },
+            );
+        });
+        let app = app(&cluster);
+        applied(
+            &app,
+            &json!({"op": "schedule", "cron": "0 3 * * *", "keepDays": 14, "namespaces": []}),
+        )
+        .await;
+        let made = stored(&cluster, "Schedule", "zeabur").unwrap();
+        assert_eq!(made["spec"]["template"]["defaultVolumesToFsBackup"], true);
+    }
+
+    #[tokio::test]
     async fn the_schedule_is_created_paused_and_backed_up_from() {
         let cluster = velero(vec![location()]);
         let app = app(&cluster);
@@ -237,7 +264,7 @@ mod tests {
         assert_eq!(
             made["spec"]["template"],
             json!({"includedNamespaces": ["shop", "blog"], "ttl": "336h0m0s",
-                   "defaultVolumesToFsBackup": true})
+                   "defaultVolumesToFsBackup": false})
         );
 
         applied(&app, &json!({"op": "pause", "paused": true})).await;
