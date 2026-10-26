@@ -2059,7 +2059,7 @@ export const en = {
   "alerts.severity.low": "Low",
   "alerts.severity.info": "Info",
   "alerts.output": "Falco's message",
-  "alerts.recent": "Up to 1,000 recent alerts; when full, Falco drops the least serious first.",
+  "alerts.recent": "Up to 100 recent alerts per project; when full, Falco drops the oldest first.",
   "alerts.seeing": "Seeing runtime alerts",
   "alerts.filter": "Filter alerts",
   "backups.title": "Backups",

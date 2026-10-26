@@ -1904,7 +1904,7 @@ export const zhTW: Messages = {
   "alerts.severity.low": "低",
   "alerts.severity.info": "資訊",
   "alerts.output": "Falco 的原始訊息",
-  "alerts.recent": "最多保留 1,000 則近期警示。滿了之後，Falco 會先刪掉最不嚴重的。",
+  "alerts.recent": "每個專案最多保留 100 則近期警示。滿了之後，Falco 會先刪掉最舊的。",
   "alerts.seeing": "檢視執行期警示",
   "alerts.filter": "篩選警示",
   "backups.title": "備份",

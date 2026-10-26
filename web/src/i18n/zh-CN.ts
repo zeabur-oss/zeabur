@@ -1901,7 +1901,7 @@ export const zhCN: Messages = {
   "alerts.severity.low": "低",
   "alerts.severity.info": "信息",
   "alerts.output": "Falco 的原始消息",
-  "alerts.recent": "最多保留 1,000 条近期告警。满了以后，Falco 先删掉最不严重的。",
+  "alerts.recent": "每个项目最多保留 100 条近期告警。满了以后，Falco 先删掉最旧的。",
   "alerts.seeing": "查看运行时告警",
   "alerts.filter": "筛选告警",
   "backups.title": "备份",
