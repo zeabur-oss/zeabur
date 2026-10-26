@@ -8,9 +8,9 @@
 //! - **Why databases go first.** An operator puts finalizers on its database objects and removes
 //!   them when it has cleaned up. If the namespace controller deletes the operator's other objects
 //!   in the same pass, or the operator does not run, the finalizers stay and the Namespace stays
-//!   `Terminating` [k8s-finalizers]. The API deletes the database objects, waits while their
-//!   operators run, then deletes the Namespace. A database whose operator has no ready controller
-//!   gets [`OperatorState::NotReady`], and the plan says so.
+//!   `Terminating` [k8s-finalizers]. The API deletes the database objects, waits for them to go,
+//!   then deletes the Namespace. When a finalizer stays, the Namespace stays `Terminating`, and the
+//!   interface lists the objects that hold it.
 //! - **What goes and what stays** is told in one [`Warning::DeletesProject`]: the services, the
 //!   databases, the volumes and what their reclaim policy does with the data [k8s-reclaim], and the
 //!   person's tools pods for the project. Backups in object storage and everything outside the
@@ -42,19 +42,6 @@ use crate::change::{ObjectName, Target, Warning};
 use crate::checks::ResourceRef;
 use crate::plan::{ErrorKind, PlanError, Planner, Working, error};
 
-/// Whether the operator of a database runs, as far as the person can see.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
-#[serde(rename_all = "camelCase")]
-pub enum OperatorState {
-    /// A controller Deployment of the operator has an available replica.
-    Ready,
-    /// No controller Deployment of the operator has an available replica.
-    NotReady,
-    /// The person may not read the operator's Deployments.
-    Unknown,
-}
-
 /// A database object of the project, as read.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DatabaseObject {
@@ -62,8 +49,6 @@ pub struct DatabaseObject {
     pub resource: ResourceRef,
     /// The object, with `metadata`.
     pub object: Value,
-    /// Whether its operator runs.
-    pub operator: OperatorState,
 }
 
 /// What deleting the project reads beyond the project's objects.
@@ -111,8 +96,6 @@ pub struct DatabaseDeletion {
     pub kind: String,
     /// Its name.
     pub name: String,
-    /// Whether its operator runs. Only while it runs does the apply wait for the database to go.
-    pub operator: OperatorState,
 }
 
 /// A volume that goes with the project.
@@ -208,7 +191,6 @@ impl Planner<'_> {
             .map(|d| DatabaseDeletion {
                 kind: text(&d.object, "/kind"),
                 name: text(&d.object, "/metadata/name"),
-                operator: d.operator,
             })
             .collect();
         self.warnings.push(Warning::DeletesProject(ProjectDeletion {

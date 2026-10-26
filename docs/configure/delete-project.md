@@ -57,9 +57,9 @@ Type the project name, or click the name in the prompt to fill it in, then press
 Zeabur deletes as you, in this order:
 
 1. The database objects, such as CloudNativePG's `Cluster`, so each operator can clean up its way.
-   While the operator runs, Zeabur waits up to a minute for the database to go. When the review
-   says a database's operator isn't running, that cleanup won't happen and the project may stay
-   in deletion.
+   Zeabur waits up to a minute for the databases to go. When an operator isn't running, its
+   cleanup won't happen and the project stays in deletion; the project page lists the objects
+   still there and their finalizers.
 2. The namespace. Kubernetes then deletes what is left in it.
 3. Your tools pods for the project.
 

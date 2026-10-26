@@ -4,14 +4,12 @@ import { useQuery } from "@tanstack/react-query"
 import { Link } from "@tanstack/react-router"
 import type { ReactNode } from "react"
 import ArchiveIcon from "~icons/ph/archive"
-import WarningFillIcon from "~icons/ph/warning-fill"
 
 import type { Schemas } from "@/api/client"
 import { databasesQuery } from "@/api/queries"
 import { CoverageRow, useBackups, type Coverage } from "@/components/backups"
 import { bounded } from "@/components/plan/groups"
 import type { PlanAsk } from "@/components/plan/planner"
-import { Alert, AlertDescription } from "@zeabur/design-system/components/alert"
 import { Button } from "@zeabur/design-system/components/button"
 import { useT, type Translate } from "@/i18n"
 import { backUpNow, backUpNowSummary, canBackUpNow } from "@/model/databases"
@@ -88,7 +86,6 @@ function Deletion({
     const changes = backUpVolumeNow(schedule, claim, now)
     return changes.length > 0 ? backUp({ title: t("deletion.backUpVolume", claim), changes }) : null
   }
-  const down = deletion.databases.filter((d) => d.operator === "notReady")
   return (
     <div className="mt-4 flex flex-col gap-4">
       <section className="flex flex-col gap-1" aria-labelledby="deletion-goes">
@@ -136,20 +133,6 @@ function Deletion({
           <p className="type-meta text-muted-foreground">{t("deletion.toolsPods")}</p>
         ) : null}
       </section>
-      {down.length > 0 ? (
-        <Alert variant="warn" role="note">
-          <WarningFillIcon aria-hidden="true" />
-          <AlertDescription>
-            {t(
-              "deletion.operatorDown",
-              bounded(
-                t,
-                down.map((d) => d.name),
-              ).text,
-            )}
-          </AlertDescription>
-        </Alert>
-      ) : null}
       <section className="flex flex-col gap-1" aria-labelledby="deletion-stays">
         <h3 id="deletion-stays" className="type-label">
           {t("deletion.stays")}

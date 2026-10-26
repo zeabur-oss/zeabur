@@ -64,7 +64,7 @@ kubectl -n shop get secret data-redis-0-backup -o jsonpath='{.data.RESTIC_PASSWO
 
 Zeabur 用你的身分照順序刪除：
 
-1. 先刪資料庫物件，例如 CloudNativePG 的 `Cluster`，讓 operator 有機會照它的方式收尾。operator 有在執行時，Zeabur 最多等一分鐘讓資料庫消失。檢查畫面說某個資料庫的 operator 沒有在執行時，它的收尾不會發生，專案可能卡在刪除中。
+1. 先刪資料庫物件，例如 CloudNativePG 的 `Cluster`，讓 operator 有機會照它的方式收尾。Zeabur 最多等一分鐘讓資料庫消失。operator 沒有在執行時，它的收尾不會發生，專案會卡在刪除中，專案頁面會列出還沒刪掉的物件和它們的 finalizer。
 2. 再刪 Namespace，Kubernetes 接著刪掉裡面剩下的東西。
 3. 最後刪掉你在這個專案開的工具 Pod。
 

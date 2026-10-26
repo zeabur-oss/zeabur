@@ -530,8 +530,6 @@ export const en = {
   "deletion.backUpFirst": "Back up first",
   "deletion.backUpVolume": (claim: string) => `Back up ${claim} now`,
   "deletion.toolsPods": "The kubectl terminal you opened in this project is deleted too",
-  "deletion.operatorDown": (names: string) =>
-    `No operator is running for ${names}, so their cleanup can't run and the project may take a long time to go away`,
   "deletion.stays": "Stays",
   "deletion.staysBackups": "Backups in S3",
   "deletion.resticPassword":

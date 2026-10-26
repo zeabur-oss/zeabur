@@ -10,8 +10,8 @@ mod tests {
     use zeabur_graph::Snapshot;
     use zeabur_model::{Tool, WorkloadKind, WorkloadRef};
     use zeabur_plan::{
-        Change, DatabaseObject, DeletionInput, ObjectName, OperatorState, Plan, PlanError,
-        PlanRequest, ResourceRef, VolumeDeletion, Warning, Write, plan,
+        Change, DatabaseObject, DeletionInput, ObjectName, Plan, PlanError, PlanRequest,
+        ResourceRef, VolumeDeletion, Warning, Write, plan,
     };
 
     fn namespace(name: &str, labels: &Value) -> Value {
@@ -32,13 +32,12 @@ mod tests {
         }
     }
 
-    fn database(name: &str, operator: OperatorState) -> DatabaseObject {
+    fn database(name: &str) -> DatabaseObject {
         DatabaseObject {
             resource: cnpg(),
             object: json!({"apiVersion": "postgresql.cnpg.io/v1", "kind": "Cluster",
                 "metadata": {"name": name, "uid": format!("{name}-uid"), "resourceVersion": "40",
                     "finalizers": ["cnpg.io/cleanup"]}}),
-            operator,
         }
     }
 
@@ -73,7 +72,7 @@ mod tests {
     fn deletion() -> DeletionInput {
         DeletionInput {
             zeabur_namespaces: vec!["zeabur".to_owned(), "zeabur-terminals".to_owned()],
-            databases: vec![database("db", OperatorState::Ready)],
+            databases: vec![database("db")],
             class_reclaim: BTreeMap::from([("local-path".to_owned(), "Delete".to_owned())]),
             default_class: Some("local-path".to_owned()),
             tools_namespace: "zeabur-terminals".to_owned(),
@@ -151,10 +150,7 @@ mod tests {
                 name: "web".to_owned()
             }]
         );
-        assert_eq!(
-            (gone.databases[0].name.as_str(), gone.databases[0].operator),
-            ("db", OperatorState::Ready)
-        );
+        assert_eq!(gone.databases[0].name, "db");
         let volume = |claim: &str| gone.volumes.iter().find(|v| v.claim == claim).unwrap();
         // The volume's own policy wins over its class's; an unbound claim takes the default
         // class's.

@@ -155,22 +155,6 @@ const OPERATOR_NAMES: [&str; 14] = [
     "seaweedfs-operator",
 ];
 
-/// The `app.kubernetes.io/name` values of the controller Deployments that act on objects of the
-/// API `group`; none for a group this build does not know.
-#[must_use]
-pub fn controllers_of(group: &str) -> &'static [&'static str] {
-    match group {
-        "postgresql.cnpg.io" => &["cloudnative-pg"],
-        "psmdb.percona.com" => &["psmdb-operator", "percona-server-mongodb-operator"],
-        "mongodbcommunity.mongodb.com" => &["mongodb-kubernetes-operator"],
-        "pxc.percona.com" => &["percona-xtradb-cluster-operator"],
-        "moco.cybozu.com" => &["moco"],
-        "k8s.mariadb.com" => &["mariadb-operator"],
-        "dragonflydb.io" => &["dragonfly-operator"],
-        _ => &[],
-    }
-}
-
 /// The database cluster a workload belongs to.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DatabaseCluster<'a> {

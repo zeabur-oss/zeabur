@@ -49,7 +49,7 @@ pub use plan::{
 };
 pub use project::project_namespace;
 pub use project_deletion::{
-    DatabaseDeletion, DatabaseObject, DeletionInput, OperatorState, ProjectDeletion, VolumeDeletion,
+    DatabaseDeletion, DatabaseObject, DeletionInput, ProjectDeletion, VolumeDeletion,
 };
 pub use public_port::public_service_name;
 pub use releases::{Release, ReleasePods};

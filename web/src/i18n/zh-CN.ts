@@ -494,8 +494,6 @@ export const zhCN: Messages = {
   "deletion.backUpFirst": "先备份一次",
   "deletion.backUpVolume": (claim) => `现在备份 ${claim}`,
   "deletion.toolsPods": "你在这个项目中打开的 kubectl 终端也会删除",
-  "deletion.operatorDown": (names) =>
-    `${names} 的 operator 没有在运行，无法清理，项目可能要很久才能删除`,
   "deletion.stays": "会保留",
   "deletion.staysBackups": "S3 中的备份",
   "deletion.resticPassword":

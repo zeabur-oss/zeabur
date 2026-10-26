@@ -2,15 +2,15 @@
 //! See `zeabur_plan::ProjectDeletion` for what the plan says.
 //!
 //! The plan reads as the person: the Namespace, the objects in it, the database objects of each
-//! operator this build knows, the `StorageClass`es and the bound PersistentVolumes (for what
-//! happens to the data), and whether each database's operator has a ready controller Deployment.
+//! operator this build knows, and the `StorageClass`es and the bound PersistentVolumes (for what
+//! happens to the data).
 //! A read the person may not make leaves its part out; a refused read of database objects is told
 //! as a right the person lacks.
 //!
 //! The apply dry-runs every write, then deletes the database objects, waits up to
-//! [`DATABASE_WAIT`] for each whose operator runs (or may run) to go, deletes the Namespace, and
+//! [`DATABASE_WAIT`] for them to go, deletes the Namespace, and
 //! last deletes the person's tools pods for the project with Zeabur's service account. The wait
-//! ends early when the operators are done; past the deadline the Namespace is deleted all the
+//! ends early when they are gone; past the deadline the Namespace is deleted all the
 //! same, and the namespace controller deletes what is left.
 
 use std::collections::BTreeMap;
@@ -23,9 +23,7 @@ use zeabur_kube::k8s_openapi::api::storage::v1::StorageClass;
 use zeabur_kube::{Cluster, ClusterError, ClusterExt as _, ResourceRef, WriteRequest};
 use zeabur_modules::{Reading, cloudnative_pg, dragonfly, mariadb_operator, moco, percona_mongodb};
 use zeabur_plan::terminal::{self as plans, ToolsScope};
-use zeabur_plan::{
-    DatabaseObject, DeletionInput, Input, OperatorState, Plan, PlanRequest, Warning, Write,
-};
+use zeabur_plan::{DatabaseObject, DeletionInput, Input, Plan, PlanRequest, Warning, Write};
 
 use super::terminal::{self, Planner};
 use super::{Applied, plan_problem, refusal, refused, write_request};
@@ -136,7 +134,7 @@ pub(super) async fn compute(
     Ok(plan)
 }
 
-/// The project's database objects, each with whether its operator runs. A kind whose list is
+/// The project's database objects. A kind whose list is
 /// refused is left out, and its `list` right named in `unreadable`.
 async fn databases(
     cluster: &dyn Cluster,
@@ -144,7 +142,6 @@ async fn databases(
     unreadable: &mut Vec<Denied>,
 ) -> Result<Vec<DatabaseObject>, ApiError> {
     let mut out = Vec::new();
-    let mut operators: BTreeMap<&str, OperatorState> = BTreeMap::new();
     for read in DATABASES {
         let objects = match crate::cluster::modules::read_in(cluster, read, Some(project))
             .await
@@ -166,13 +163,6 @@ async fn databases(
         if objects.is_empty() {
             continue;
         }
-        let operator = if let Some(state) = operators.get(read.group) {
-            *state
-        } else {
-            let state = operator(cluster, read.group).await;
-            operators.insert(read.group, state);
-            state
-        };
         for object in objects {
             let mut object = serde_json::to_value(object).map_err(|e| {
                 ApiError::from(ClusterError::Decode(e.to_string()).into_problem(read.kind))
@@ -187,50 +177,10 @@ async fn databases(
                     resource: read.resource.to_owned(),
                 },
                 object,
-                operator,
             });
         }
     }
     Ok(out)
-}
-
-/// Whether a controller Deployment of the operator of API `group` has an available replica, from
-/// the Deployments of every namespace (`zeabur_model::adapters::operators::controllers_of`).
-async fn operator(cluster: &dyn Cluster, group: &str) -> OperatorState {
-    let names = zeabur_model::adapters::operators::controllers_of(group);
-    let resource = ResourceRef::new("apps", "v1", "deployments", "Deployment");
-    let metadata = match cluster.list_metadata(&resource, None).await {
-        Ok(Some(list)) => list,
-        Ok(None) => return OperatorState::NotReady,
-        Err(_) => return OperatorState::Unknown,
-    };
-    let controllers = metadata.iter().filter(|m| {
-        m.labels
-            .as_ref()
-            .and_then(|l| l.get("app.kubernetes.io/name"))
-            .is_some_and(|n| names.contains(&n.as_str()))
-    });
-    for meta in controllers {
-        let (Some(namespace), Some(name)) = (meta.namespace.as_deref(), meta.name.as_deref())
-        else {
-            continue;
-        };
-        match cluster.get_object(&resource, Some(namespace), name).await {
-            Ok(Some(found)) => {
-                let available = found
-                    .data
-                    .pointer("/status/availableReplicas")
-                    .and_then(Value::as_i64)
-                    .unwrap_or(0);
-                if available > 0 {
-                    return OperatorState::Ready;
-                }
-            }
-            Ok(None) => {}
-            Err(_) => return OperatorState::Unknown,
-        }
-    }
-    OperatorState::NotReady
 }
 
 /// The `reclaimPolicy` of each `StorageClass` (`Delete` when it sets none, as kube-apiserver
@@ -342,19 +292,6 @@ pub(super) async fn apply(
             return Err(ApiError::from(refusal(problem, plan, target, &[])));
         }
     }
-    let waited: Vec<&str> = match plan
-        .warnings
-        .iter()
-        .find(|w| matches!(w, Warning::DeletesProject(_)))
-    {
-        Some(Warning::DeletesProject(gone)) => gone
-            .databases
-            .iter()
-            .filter(|d| d.operator != OperatorState::NotReady)
-            .map(|d| d.name.as_str())
-            .collect(),
-        _ => Vec::new(),
-    };
     let (databases, namespace): (Vec<_>, Vec<_>) = writes
         .into_iter()
         .partition(|(target, _)| target.namespaced());
@@ -362,10 +299,7 @@ pub(super) async fn apply(
     for (target, write) in &databases {
         write_one(cluster, project, plan, target, write, &mut applied).await?;
     }
-    let pending: Vec<&(zeabur_plan::Target, WriteRequest)> = databases
-        .iter()
-        .filter(|(t, _)| waited.contains(&t.name.as_str()))
-        .collect();
+    let pending: Vec<&(zeabur_plan::Target, WriteRequest)> = databases.iter().collect();
     wait_gone(cluster, project, &pending).await;
     for (target, write) in &namespace {
         write_one(cluster, project, plan, target, write, &mut applied).await?;

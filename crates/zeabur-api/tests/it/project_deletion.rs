@@ -42,14 +42,6 @@ mod tests {
         .unwrap()
     }
 
-    fn operator(available: i32) -> Deployment {
-        serde_json::from_value(json!({"metadata": {"name": "cnpg-controller-manager",
-                "namespace": "cnpg-system", "labels": {"app.kubernetes.io/name": "cloudnative-pg"}},
-            "spec": {"selector": {}, "template": {"spec": {"containers": []}}},
-            "status": {"availableReplicas": available}}))
-        .unwrap()
-    }
-
     fn cluster(shop: Namespace) -> MemoryCluster {
         let web: Deployment = serde_json::from_value(json!({
             "metadata": {"name": "web", "namespace": "shop", "uid": "web-uid", "resourceVersion": "3"},
@@ -65,24 +57,14 @@ mod tests {
                     "zeabur.com/project": "true", "zeabur.com/platform": "true"}}}),
                 ),
             ],
-            objects: [
-                (
-                    "shop".to_owned(),
-                    NamespaceObjects {
-                        namespace: "shop".to_owned(),
-                        deployments: vec![web],
-                        ..NamespaceObjects::default()
-                    },
-                ),
-                (
-                    "cnpg-system".to_owned(),
-                    NamespaceObjects {
-                        namespace: "cnpg-system".to_owned(),
-                        deployments: vec![operator(1)],
-                        ..NamespaceObjects::default()
-                    },
-                ),
-            ]
+            objects: [(
+                "shop".to_owned(),
+                NamespaceObjects {
+                    namespace: "shop".to_owned(),
+                    deployments: vec![web],
+                    ..NamespaceObjects::default()
+                },
+            )]
             .into(),
             served: vec![ServedResource::readable(
                 "postgresql.cnpg.io",
@@ -124,7 +106,7 @@ mod tests {
         );
         assert_eq!(
             gone["databases"],
-            json!([{"kind": "Cluster", "name": "db", "operator": "ready"}])
+            json!([{"kind": "Cluster", "name": "db"}])
         );
 
         let (status, applied) =
@@ -154,28 +136,6 @@ mod tests {
                 .iter()
                 .any(|p| p["name"] == "shop"),
             "{list}"
-        );
-    }
-
-    #[tokio::test]
-    async fn a_database_whose_operator_does_not_run_is_named() {
-        let cluster = cluster(namespace("shop", &json!({})));
-        cluster.update(|s| {
-            if let Some(objects) = s.objects.get_mut("cnpg-system") {
-                objects.deployments = vec![operator(0)];
-            }
-        });
-        let (status, plan) = send(
-            &app(&cluster),
-            "POST",
-            "/api/v1/projects/shop/plan",
-            Some(&json!({"changes": [{"op": "deleteProject"}]})),
-        )
-        .await;
-        assert_eq!(status, StatusCode::OK, "{plan}");
-        assert_eq!(
-            deletes_project(&plan)["databases"][0]["operator"],
-            "notReady"
         );
     }
 

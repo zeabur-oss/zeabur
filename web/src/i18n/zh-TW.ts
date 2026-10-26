@@ -494,8 +494,6 @@ export const zhTW: Messages = {
   "deletion.backUpFirst": "先備份一次",
   "deletion.backUpVolume": (claim) => `現在備份 ${claim}`,
   "deletion.toolsPods": "你在這個專案開的 kubectl 終端機也會刪除",
-  "deletion.operatorDown": (names) =>
-    `${names} 的 operator 沒有在執行，沒辦法做清理，專案可能要很久才刪得掉`,
   "deletion.stays": "會留下",
   "deletion.staysBackups": "S3 裡的備份",
   "deletion.resticPassword":

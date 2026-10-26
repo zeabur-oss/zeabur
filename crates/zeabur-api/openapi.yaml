@@ -7807,7 +7807,6 @@ components:
       required:
       - kind
       - name
-      - operator
       properties:
         kind:
           type: string
@@ -7815,11 +7814,6 @@ components:
         name:
           type: string
           description: Its name.
-        operator:
-          $ref: "#/components/schemas/OperatorState"
-          description: >-
-            Whether its operator runs. Only while it runs does the apply wait for the
-            database to go.
     DatabaseEngine:
       type: string
       description: A database engine.
@@ -12117,13 +12111,6 @@ components:
           - string
           - "null"
           description: The kind of its controlling owner, when it has one (`ReplicaSet` for a pod).
-    OperatorState:
-      type: string
-      description: Whether the operator of a database runs, as far as the person can see.
-      enum:
-      - ready
-      - notReady
-      - unknown
     Origin:
       type: object
       description: |-

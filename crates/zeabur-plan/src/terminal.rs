@@ -739,8 +739,9 @@ pub fn tools_pod_reused(namespace: &str, pod: &str) -> Plan {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use zeabur_model::kernel::names::LABEL_PROJECT;
+
+    use super::*;
 
     fn pod() -> Value {
         json!({

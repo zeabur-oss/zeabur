@@ -4052,8 +4052,6 @@ export interface components {
       kind: string
       /** @description Its name. */
       name: string
-      /** @description Whether its operator runs. Only while it runs does the apply wait for the database to go. */
-      operator: components["schemas"]["OperatorState"]
     }
     /**
      * @description A database engine.
@@ -6307,11 +6305,6 @@ export interface components {
       /** @description The kind of its controlling owner, when it has one (`ReplicaSet` for a pod). */
       ownerKind?: string | null
     }
-    /**
-     * @description Whether the operator of a database runs, as far as the person can see.
-     * @enum {string}
-     */
-    OperatorState: "ready" | "notReady" | "unknown"
     /**
      * @description Where a value is *declared* or read from: the Kubernetes object and the field inside it.
      *
