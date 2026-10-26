@@ -181,7 +181,7 @@ function ComponentRow({
   const optional = component.inputs.filter((input) => !input.required)
   const unsupported = tooSmall
     ? t("components.needsMemory", component.personalMinMemoryMib ?? 0)
-    : component.distributions?.length
+    : component.distributions.length
       ? t("components.runsOn", t("common.list", component.distributions))
       : leftOut
         ? leftOutReason(t, leftOut)

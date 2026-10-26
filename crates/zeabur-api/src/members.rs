@@ -70,9 +70,6 @@ pub const USER_LABEL: &str = "identity.zeabur.com/user";
 pub const EXPIRES_AT_ANNOTATION: &str = "identity.zeabur.com/expires-at";
 /// Label selecting expiring objects for Zeabur Identity's garbage collector: the expiry hour.
 pub const EXPIRY_BUCKET_LABEL: &str = "identity.zeabur.com/expiry-bucket";
-/// The group Zeabur Identity gives admin accounts' tokens, bound to `cluster-admin`. A `User`
-/// cannot list it in `groups`.
-pub const ADMIN_GROUP: &str = "admins";
 /// How Kubernetes sees a Zeabur Identity user: `zeabur:<username>`.
 pub const USER_PREFIX: &str = "zeabur:";
 /// The Identity Deployment, read for its issuer and whether it redeems invitations.

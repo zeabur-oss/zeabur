@@ -566,7 +566,7 @@ mod tests {
         );
 
         // A Secret edited as YAML: the masked value stays, the new key lands.
-        let yaml = "apiVersion: v1\nkind: Secret\nmetadata: {name: web}\ntype: Opaque\ndata:\n  password: \u{ab}redacted\u{bb}\nstringData:\n  token: abc\n";
+        let yaml = "apiVersion: v1\nkind: Secret\nmetadata: {name: web}\ntype: Opaque\ndata:\n  password: (hidden)\nstringData:\n  token: abc\n";
         let (status, body) = plan_and_apply(&app, &ns, json!([{"op": "edit",
             "resource": {"group": "", "version": "v1", "resource": "secrets"}, "name": "web", "yaml": yaml}])).await;
         assert_eq!(status, StatusCode::OK, "{body}");

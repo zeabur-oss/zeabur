@@ -12,7 +12,7 @@ use zeabur_kube::k8s_openapi::jiff::Timestamp;
 use zeabur_kube::{Cluster, ObjectTarget, Preconditions, WriteBody, WriteRequest};
 
 use super::directory::{AccountType, Directory, IdentityKind, Object, UserSpec, request};
-use super::{ADMIN_GROUP, API_VERSION, EXPIRES_AT_ANNOTATION, EXPIRY_BUCKET_LABEL, USER_LABEL};
+use super::{API_VERSION, EXPIRES_AT_ANNOTATION, EXPIRY_BUCKET_LABEL, USER_LABEL};
 use crate::error::{ApiError, read_problem};
 
 /// How long a link made for a new member lasts, as `zeabur-identityctl invite`'s default.
@@ -192,23 +192,14 @@ const fn account_type(admin: bool) -> &'static str {
 }
 
 /// The JSON Patch that makes `user` an admin account or a regular one, against the object as
-/// read; `None` when it already is what is asked. It also takes `admins` out of `groups`, which
-/// Zeabur Identity refuses there.
+/// read; `None` when it already is what is asked.
 pub(crate) fn admin_patch(user: &Object<UserSpec>, admin: bool) -> Option<Value> {
-    let groups: Vec<&String> = user
-        .spec
-        .groups
-        .iter()
-        .filter(|g| g.as_str() != ADMIN_GROUP)
-        .collect();
-    let is_admin = user.spec.account_type == AccountType::Admin;
-    if is_admin == admin && groups.len() == user.spec.groups.len() {
+    if (user.spec.account_type == AccountType::Admin) == admin {
         return None;
     }
     Some(json!([
         {"op": "test", "path": "/metadata/uid", "value": user.metadata.uid},
         {"op": "test", "path": "/metadata/resourceVersion", "value": user.metadata.resource_version},
-        {"op": "add", "path": "/spec/groups", "value": groups},
         {"op": "add", "path": "/spec/accountType", "value": account_type(admin)},
     ]))
 }
@@ -402,7 +393,7 @@ mod tests {
     }
 
     #[test]
-    fn the_admin_role_changes_the_account_type_and_keeps_other_groups() {
+    fn the_admin_role_changes_only_the_account_type() {
         let user: Object<UserSpec> = serde_json::from_value(json!({
             "metadata": {"name": "bob", "uid": "u", "resourceVersion": "7"},
             "spec": {"username": "bob", "groups": ["dev"]}
@@ -410,18 +401,8 @@ mod tests {
         .unwrap();
         let patch = admin_patch(&user, true).unwrap();
         assert_eq!(patch[1]["value"], "7");
-        assert_eq!(patch[2]["value"], json!(["dev"]));
-        assert_eq!(patch[3]["value"], "Admin");
+        assert_eq!(patch[2]["path"], "/spec/accountType");
+        assert_eq!(patch[2]["value"], "Admin");
         assert_eq!(admin_patch(&user, false), None);
-        // A group list from before admin accounts loses `admins`.
-        let admin: Object<UserSpec> = serde_json::from_value(json!({
-            "metadata": {"name": "ada", "uid": "u"},
-            "spec": {"username": "ada", "groups": ["admins", "dev"], "accountType": "Admin"}
-        }))
-        .unwrap();
-        let patch = admin_patch(&admin, true).unwrap();
-        assert_eq!(patch[2]["value"], json!(["dev"]));
-        let patch = admin_patch(&admin, false).unwrap();
-        assert_eq!(patch[3]["value"], "Regular");
     }
 }

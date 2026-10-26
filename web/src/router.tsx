@@ -34,11 +34,9 @@ import { isUnreachable } from "@/api/client"
 import { accountQuery, membersQuery } from "@/api/members"
 import { AppShell } from "@/components/app-shell"
 import { NotFound } from "@/components/not-found"
-import { openShell } from "@/lib/dock"
 import { RouteError, RoutePending } from "@/components/route-states"
 import { canonicalKind, isTask } from "@/model/service"
 import {
-  formerPlace,
   componentsSearch,
   gitHubAppSearch,
   objectsSearch,
@@ -64,20 +62,15 @@ import {
 //   /projects                                  every project and namespace
 //   /projects/$project                         the project: its problems, then its services as a
 //                                              map or a list (?view=map|list, ?service=… quick look)
-//   /projects/$project/architecture, /services moved: redirect to the project with that view
 //   /projects/$project/settings                Settings: the project's details, adopted or not,
 //                                              and where its alerts go
 //   /projects/$project/objects                 Objects: every object by kind, ?object=… opens
 //                                              its YAML
 //   /projects/$project/create                  objects written as YAML, created through a plan
-//   /projects/$project/terminal                moved: the project, with its kubectl terminal in
-//                                              the dock
 //   /projects/$project/services/$kind/$name    one service: ?tab=logs|deployments|networking|
 //                                              variables|settings (Overview when absent), or a
-//                                              view from its menu (events, yaml); a former
-//                                              terminal view opens Logs with the dock;
-//                                              Settings' parts as #anchors; a former ?tab=status…
-//                                              redirects to its place
+//                                              view from its menu (events, yaml); Settings'
+//                                              parts as #anchors
 //   /projects/$project/databases/$engine/$name one database an operator runs: ?tab=logs|backups|
 //                                              events|settings (Overview when absent), and
 //                                              Settings' YAML view (?mode=yaml)
@@ -87,7 +80,6 @@ import {
 //                                              project, a link to manage how you sign in
 //   /members                                   everyone Zeabur Identity signs in: invite, setup
 //                                              links, reset, remove
-//   /settings/components                       moved: redirects to /cluster/components
 //   /problems/$kind                            what one kind of problem means, and what to do
 //
 // Data. Each route's loader asks TanStack Query for what its page reads, so a page opens with its
@@ -179,35 +171,6 @@ const projectRoute = createRoute({
   component: lazyRouteComponent(() => import("@/routes/project/page"), "ProjectPage"),
 })
 
-// Architecture and Services were pages of their own; old links still arrive.
-const architectureRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/projects/$project/architecture",
-  validateSearch: projectSearch,
-  beforeLoad: ({ params, search }) => {
-    throw redirect({
-      to: "/projects/$project",
-      params,
-      search: { ...search, view: "map" },
-      replace: true,
-    })
-  },
-})
-
-const servicesRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/projects/$project/services",
-  validateSearch: projectSearch,
-  beforeLoad: ({ params, search }) => {
-    throw redirect({
-      to: "/projects/$project",
-      params,
-      search: { ...search, view: "list" },
-      replace: true,
-    })
-  },
-})
-
 // Objects reads a dozen or so kinds when it opens and more on demand, so its loader does not wait
 // for them: the page shows its own loading state, and reads only while it is open.
 const objectsRoute = createRoute({
@@ -238,27 +201,16 @@ const serviceRoute = createRoute({
   path: "/projects/$project/services/$kind/$name",
   validateSearch: serviceSearch,
   // `deployment/worker`, as kubectl prints it, opens `Deployment/worker`.
-  beforeLoad: ({ params, search, location, preload }) => {
+  beforeLoad: ({ params, search, location }) => {
     const kind = canonicalKind(params.kind)
-    const former = search.former
-    if (kind !== params.kind || former) {
-      const place = former ? formerPlace(former, search.view, location.hash) : undefined
-      if (place?.terminal && !preload)
-        openShell(params.project, { kind, name: params.name }, search.pod)
+    if (kind !== params.kind)
       throw redirect({
         to: "/projects/$project/services/$kind/$name",
         params: { ...params, kind },
-        search: {
-          ...search,
-          tab: place ? place.tab : search.tab,
-          mode: place ? place.mode : search.mode,
-          former: undefined,
-          view: undefined,
-        },
-        hash: place ? place.hash : location.hash,
+        search,
+        hash: location.hash,
         replace: true,
       })
-    }
   },
   // The rollout and the cluster's name are in the status at the top, so they are read first.
   loader: ({ params }) =>
@@ -351,23 +303,12 @@ const problemRoute = createRoute({
   component: lazyRouteComponent(() => import("@/routes/problem"), "ProblemPage"),
 })
 
-// Components used to be a settings page; old links still arrive.
-const movedComponentsRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: "/settings/components",
-  beforeLoad: () => {
-    throw redirect({ to: "/cluster/components", replace: true })
-  },
-})
-
 export const router = createRouter({
   routeTree: rootRoute.addChildren([
     homeRoute,
     clusterRoute,
     projectsRoute,
     projectRoute,
-    architectureRoute,
-    servicesRoute,
     objectsRoute,
     createObjectsRoute,
     projectSettingsRoute,
@@ -382,7 +323,6 @@ export const router = createRouter({
     componentsRoute,
     gitHubAppRoute,
     problemRoute,
-    movedComponentsRoute,
   ]),
   defaultPreload: "intent",
   defaultPreloadStaleTime: 0,

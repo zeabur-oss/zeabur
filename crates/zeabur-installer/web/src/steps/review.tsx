@@ -39,7 +39,7 @@ export function ReviewStep({ wizard }: { wizard: Wizard }) {
   const { config, planned, server } = wizard
   const personal = wizard.use === "personal"
   const catalog = server.catalog?.components ?? []
-  const checks = personal ? (server.personalChecks ?? server.checks) : server.checks
+  const checks = personal ? server.personalChecks : server.checks
   const failed = checks.filter((c) => c.status === "fail")
   const result = planned && "plan" in planned ? planned : null
   const plan = result?.plan

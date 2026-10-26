@@ -40,8 +40,7 @@ export function HostStep({ wizard }: { wizard: Wizard }) {
   const t = useT()
   const { server } = wizard
   const facts = server.facts
-  const checks =
-    wizard.use === "personal" ? (server.personalChecks ?? server.checks) : server.checks
+  const checks = wizard.use === "personal" ? server.personalChecks : server.checks
   const failed = checks.filter((c) => c.status === "fail").length
   const warned = checks.filter((c) => c.status === "warn").length
   const exceptions = checks

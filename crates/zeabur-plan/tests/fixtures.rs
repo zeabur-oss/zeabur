@@ -326,9 +326,7 @@ mod tests {
             for object in actual["objects"].as_array().into_iter().flatten() {
                 let write = object["write"].to_string();
                 assert!(
-                    !write.contains("«redacted»")
-                        && !write.contains("(hidden)")
-                        && !write.contains('•'),
+                    !write.contains("(hidden)") && !write.contains('•'),
                     "{}: a write carries a mask: {write}",
                     fixture.name
                 );

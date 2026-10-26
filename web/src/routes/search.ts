@@ -36,49 +36,19 @@ export type SettingsPart = (typeof settingsParts)[number]
 /** The parts a pending edit can belong to. */
 export type DraftPart = "variables" | "networking" | SettingsPart
 
-/**
- * Names `?tab=` had before: Status, Changes, Configure and Inspect, the tabs before them, and the
- * views that were tabs of their own. The terminal, a view of Logs, is in the dock now.
- */
-const formerTabs = [
-  "status",
-  "changes",
-  "configure",
-  "inspect",
-  "releases",
-  "metrics",
-  "terminal",
-  ...modes,
-] as const
-type FormerTab = (typeof formerTabs)[number]
+/** A place on a service's page: a tab, a view, or a part of Settings. */
+export type ServicePlace = ServiceTab | ServiceMode | SettingsPart
 
-/** A place on a service's page: a tab, a view, a part of Settings, or a former tab's name. */
-export type ServicePlace = ServiceTab | ServiceMode | SettingsPart | FormerTab
-
-/** Where a place is: the tab, its view, the part of Settings (the hash), and whether the
- * service's terminal opens in the dock. */
+/** Where a place is: the tab, its view, and the part of Settings (the hash). */
 export function servicePlace(place?: ServicePlace): {
   tab?: ServiceTab
   mode?: ServiceMode
   hash?: SettingsPart
-  terminal?: true
 } {
   switch (place) {
     case undefined:
     case "overview":
-    case "status":
       return {}
-    case "changes":
-    case "releases":
-      return { tab: "deployments" }
-    case "configure":
-      return { tab: "variables" }
-    case "inspect":
-      return { tab: "logs" }
-    case "metrics":
-      return { tab: "usage" }
-    case "terminal":
-      return { tab: "logs", terminal: true }
     case "events":
     case "yaml":
       return { tab: serviceModes[place], mode: place }
@@ -93,30 +63,6 @@ export function servicePlace(place?: ServicePlace): {
     default:
       return { tab: place }
   }
-}
-
-/**
- * Where a link from before the seven tabs leads: `?tab=inspect&view=…`, `?tab=configure#part`, a
- * former section, a view that was a tab, or a part of Settings named as a tab.
- */
-export function formerPlace(
-  tab: string,
-  view?: string,
-  hash?: string,
-): ReturnType<typeof servicePlace> {
-  if (tab === "inspect" && view === "metrics") return { tab: "usage" }
-  if (
-    tab === "inspect" &&
-    view &&
-    [...serviceTabs, ...modes, "terminal"].includes(view as ServiceTab)
-  )
-    return servicePlace(view as ServicePlace)
-  if (tab === "configure" && hash) {
-    if (hash === "variables" || hash === "networking") return { tab: hash }
-    if ((settingsParts as readonly string[]).includes(hash))
-      return { tab: "settings", hash: hash as SettingsPart }
-  }
-  return servicePlace(tab as ServicePlace)
 }
 
 // An unknown or empty value reads as absent. No search param makes a page fail.
@@ -143,37 +89,23 @@ interface ServiceSearch {
   range?: Range
   /** Per replica when absent. */
   split?: Split
-  /** A `?tab=` from before the seven tabs, kept until the route redirects to its place. */
-  former?: string
-  /** Inspect's `?view=`, read only to redirect. */
-  view?: string
 }
 
 export const serviceSearch = z.pipe(
   z.object({
-    tab: choice([...serviceTabs, ...formerTabs, ...settingsParts]),
-    mode: choice([...modes, "terminal"]),
+    tab: choice(serviceTabs),
+    mode: choice(modes),
     pod: text,
     range: choice(ranges),
     split: choice(splits),
-    former: text,
-    view: text,
   }),
-  z.transform((search): ServiceSearch => {
-    const known = serviceTabs.find((t) => t === search.tab)
-    const former =
-      search.tab && !known ? search.tab : search.mode === "terminal" ? "terminal" : search.former
-    const mode = search.mode === "terminal" ? undefined : search.mode
-    return {
-      tab: known === "overview" ? undefined : known,
-      mode: mode && known === serviceModes[mode] ? mode : undefined,
-      pod: search.pod,
-      range: search.range,
-      split: search.split,
-      former,
-      view: former ? search.view : undefined,
-    }
-  }),
+  z.transform(({ tab, mode, pod, range, split }): ServiceSearch => ({
+    tab: tab === "overview" ? undefined : tab,
+    mode: mode && tab === serviceModes[mode] ? mode : undefined,
+    pod,
+    range,
+    split,
+  })),
 )
 
 /** A database's tabs, in their order. */

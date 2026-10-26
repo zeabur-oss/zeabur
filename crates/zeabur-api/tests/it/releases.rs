@@ -166,7 +166,7 @@ mod tests {
     #[tokio::test]
     async fn a_secret_edit_never_writes_the_mask() {
         let cluster = cluster();
-        let yaml = "apiVersion: v1\nkind: Secret\nmetadata: {name: web-secret, labels: {tier: data}}\ntype: Opaque\ndata:\n  password: (hidden)\n  user: \u{2022}\u{2022}\u{2022}\u{2022}\n  legacy: \u{ab}redacted\u{bb}\nstringData:\n  token: plain-typed-value\n  note: (hidden)\n";
+        let yaml = "apiVersion: v1\nkind: Secret\nmetadata: {name: web-secret, labels: {tier: data}}\ntype: Opaque\ndata:\n  password: (hidden)\n  user: \u{2022}\u{2022}\u{2022}\u{2022}\nstringData:\n  token: plain-typed-value\n  note: (hidden)\n";
         let (planned, writes) = plan_and_apply(
             &cluster,
             json!([{"op": "edit", "resource": {"group": "", "version": "v1", "resource": "secrets"},
@@ -178,7 +178,7 @@ mod tests {
         };
         let text = operations.to_string();
         assert!(
-            !text.contains("redacted") && !text.contains("(hidden)") && !text.contains('\u{2022}'),
+            !text.contains("(hidden)") && !text.contains('\u{2022}'),
             "{text}"
         );
         assert!(

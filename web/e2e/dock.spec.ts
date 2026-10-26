@@ -145,17 +145,6 @@ test("a terminal closed for being idle keeps its tab and reopens", async ({ page
   await expect(connected(page)).toBeVisible()
 })
 
-test("an old link to Logs' terminal view opens the dock", async ({ page }) => {
-  await page.goto(`${project}/services/Deployment/${healthy}?tab=logs&mode=terminal`)
-  await expect(page).toHaveURL(
-    (url) => url.searchParams.get("tab") === "logs" && !url.searchParams.has("mode"),
-  )
-  await expect(dock(page).getByRole("tab", { name: healthy })).toHaveAttribute(
-    "aria-selected",
-    "true",
-  )
-})
-
 test("the kubectl terminal opens through a review the first time and reuses its pod after", async ({
   page,
 }) => {

@@ -26,16 +26,16 @@ export interface CatalogComponent {
   displayName: string
   default: "recommended" | "optional" | "unsupported"
   supported: boolean
-  /** Offered in a personal install; older installers leave it out. */
-  personal?: boolean
+  /** Offered in a personal install. */
+  personal: boolean
   /** A personal install offers it only on a server with this much memory. */
   personalMinMemoryMib?: number | null
-  /** Where it runs, when not everywhere; older installers leave it out. */
-  distributions?: string[]
+  /** Where it runs; empty when everywhere. */
+  distributions: string[]
   /** The components installed before it because it needs them. */
   needs?: string[]
-  /** Measured idle memory on this server's architecture; older installers leave it out. */
-  idleMemoryMib?: number | null
+  /** Measured idle memory on this server's architecture. */
+  idleMemoryMib: number | null
   security: string
   privileged: boolean
   inputs: Input[]
@@ -74,11 +74,11 @@ export interface PersonalConfig {
 export interface ServerState {
   facts: { arch: string; hostname: string; memoryMib: number } | null
   checks: Check[]
-  /** The checks for a personal install; older installers leave them out. */
-  personalChecks?: Check[]
+  /** The checks for a personal install. */
+  personalChecks: Check[]
   addresses: string[]
-  /** What the saved configuration is for; older installers leave it out. */
-  use?: Use
+  /** What the saved configuration is for. */
+  use: Use
   config: Config | null
   personal?: PersonalConfig
   /** Below this, only a personal install fits. */

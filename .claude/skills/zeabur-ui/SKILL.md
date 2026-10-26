@@ -43,8 +43,7 @@ description: Change Zeabur's web interface (web/: React, TanStack, shadcn/ui on 
   page with a `SectionNav`, and edits in Networking, Variables and Settings collect in one
   `DraftBar`. The Kubernetes view of a tab is a second segment inside it (`?mode=`: Logs'
   Terminal, Deployments' Events, Settings' YAML). The header's ⋯ menu holds actions only (Copy
-  diagnosis, Delete), never a view; a tab is never also a header button. An old `?tab=` must keep
-  redirecting (`routes/search.ts`). Overview leads with one sentence each: health, then each domain
+  diagnosis, Delete), never a view; a tab is never also a header button. Overview leads with one sentence each: health, then each domain
   reachable, not reachable with its fix, waiting on the cause above, or not verified (never red
   for a hop Zeabur could not check); each cause is said once, with what it also takes down inside
   it (`model/overview.ts`). Projects are a compact table by default, cards on request

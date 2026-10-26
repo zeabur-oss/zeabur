@@ -355,12 +355,10 @@ fn image_archives(sources: &[String]) -> Result<bool, InstallError> {
     for name in stale_archives(&present, &names) {
         let path = dir.join(&name);
         fs::remove_file(&path).map_err(io(&path))?;
-        let why = if name.starts_with(ARCHIVE_PREFIX) {
-            "no longer in sources.imageArchives".to_owned()
-        } else {
-            format!("replaced by {ARCHIVE_PREFIX}{name}")
-        };
-        out::err(&format!("    removed {}: {why}", path.display()));
+        out::err(&format!(
+            "    removed {}: no longer in sources.imageArchives",
+            path.display()
+        ));
     }
     for name in present.iter().filter(|n| !n.starts_with('.')) {
         let path = dir.join(name);
@@ -385,16 +383,13 @@ fn whole_second_mtime(path: &Path) -> std::io::Result<()> {
 }
 
 /// The archives in the image directory to remove, given the file names of `sources.imageArchives`:
-/// the installer's copies of archives no longer listed, and archives an earlier installer copied
-/// under the listed names themselves, which its prefixed copies replace.
+/// the installer's copies of archives no longer listed. Files it did not copy stay.
 fn stale_archives(present: &[String], sources: &[String]) -> Vec<String> {
     present
         .iter()
         .filter(|name| {
-            name.strip_prefix(ARCHIVE_PREFIX).map_or_else(
-                || sources.contains(name),
-                |source| !sources.iter().any(|s| s == source),
-            )
+            name.strip_prefix(ARCHIVE_PREFIX)
+                .is_some_and(|source| !sources.iter().any(|s| s == source))
         })
         .cloned()
         .collect()
@@ -1214,7 +1209,7 @@ mod tests {
     }
 
     #[test]
-    fn archives_no_longer_listed_or_copied_under_their_own_name_go() {
+    fn archives_no_longer_listed_go_and_others_stay() {
         let present: Vec<String> = [
             "rke2-images-core.linux-arm64.tar.zst",
             "zeabur.tar",
@@ -1228,7 +1223,7 @@ mod tests {
         let sources = ["zeabur.tar".to_owned()];
         assert_eq!(
             stale_archives(&present, &sources),
-            ["zeabur.tar", "zeabur-installer-old.tar"]
+            ["zeabur-installer-old.tar"]
         );
         assert_eq!(
             stale_archives(&present, &[]),

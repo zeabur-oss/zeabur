@@ -189,10 +189,6 @@ test("the cluster page shows the cluster itself, and its components on their own
   await expect(page.getByRole("region", { name: "Catalog" })).toBeVisible()
   await page.goBack()
   await expect(page).toHaveURL(/\/cluster$/)
-
-  // Old address redirects.
-  await page.goto("/settings/components")
-  await expect(page).toHaveURL(/\/cluster\/components$/)
 })
 
 test("the project page puts the failing service first, with a link to its failing pod's logs", async ({
@@ -353,21 +349,6 @@ test("the service page has eight tabs and an actions menu, and Logs follows a po
   await expect(page).toHaveURL(
     (url) => url.searchParams.get("tab") === "settings" && !url.searchParams.has("mode"),
   )
-
-  // Links from before the seven tabs still lead to their place: one of each kind of redirect.
-  // src/routes/search.test.ts holds where each old link leads.
-  await page.goto(`${project}/services/Deployment/${healthy}?tab=terminal`)
-  await expect(page).toHaveURL(
-    (url) => url.searchParams.get("tab") === "logs" && !url.searchParams.has("mode"),
-  )
-  await page.goto(`${project}/services/Deployment/${healthy}?tab=events`)
-  await expect(page).toHaveURL(modeUrl("deployments", "events"))
-  await page.goto(`${project}/services/Deployment/${healthy}?tab=compute`)
-  await expect(page).toHaveURL(/tab=settings#compute$/)
-  await page.goto(`${project}/services/Deployment/${healthy}?tab=status`)
-  await expect(page).toHaveURL(new RegExp(`/services/Deployment/${healthy}$`))
-  await page.goto(`${project}/architecture`)
-  await expect(page).toHaveURL(new RegExp(`${project}\\?view=map$`))
 })
 
 const canvasZoom = (page: Page) => page.getByText(/^\d+%$/)
@@ -566,7 +547,7 @@ test("YAML never shows a Secret's values", async ({ page }) => {
   await expect(yaml).toContainText("greeting")
   await expect(yaml).not.toContainText(secretValue)
 
-  await page.goto(`${project}/services/Deployment/${healthy}?tab=yaml`)
+  await page.goto(`${project}/services/Deployment/${healthy}?tab=settings&mode=yaml`)
   const workload = page.getByRole("figure", { name: `YAML of ${healthy}` })
   await expect(workload).toContainText("kind: Deployment")
   await expect(workload).toContainText(secret)
@@ -763,7 +744,7 @@ test("a change made meanwhile is planned again in the review, and saved from the
 })
 
 test("scaling goes through a plan from Compute, and is undone from its toast", async ({ page }) => {
-  await page.goto(`${project}/services/Deployment/${editor}?tab=compute`)
+  await page.goto(`${project}/services/Deployment/${editor}?tab=settings#compute`)
   const panel = page.getByRole("region", { name: "Compute" })
   const replicas = panel.getByRole("textbox", { name: /^Replicas/ })
   const before = await editorReplicas(page)
@@ -784,7 +765,7 @@ test("scaling goes through a plan from Compute, and is undone from its toast", a
 })
 
 test("a readiness probe is set through a plan", async ({ page }) => {
-  await page.goto(`${project}/services/Deployment/${editor}?tab=health-checks`)
+  await page.goto(`${project}/services/Deployment/${editor}?tab=settings#health-checks`)
   const form = page.getByRole("form", { name: "Traffic check" })
   // The Select's list is portalled to the page's root, outside the form.
   await form.getByRole("combobox", { name: "Check" }).click()
@@ -800,7 +781,7 @@ test("a readiness probe is set through a plan", async ({ page }) => {
 })
 
 test("volumes are added, changed and removed in one list under Storage", async ({ page }) => {
-  await page.goto(`${project}/services/Deployment/${editor}?tab=storage`)
+  await page.goto(`${project}/services/Deployment/${editor}?tab=settings#storage`)
   const part = page.locator("#storage")
   await expect(part).toContainText(`${editor} has no volume`)
   await part.getByRole("button", { name: "Add a volume" }).click()

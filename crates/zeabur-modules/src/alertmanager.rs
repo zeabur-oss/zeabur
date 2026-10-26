@@ -1176,17 +1176,17 @@ mod tests {
     }
 
     #[test]
-    fn a_channel_of_a_removed_kind_is_shown_as_other() {
-        let old = object(json!({
+    fn a_channel_of_an_unknown_kind_is_shown_as_other() {
+        let unknown = object(json!({
             "apiVersion": "operator.victoriametrics.com/v1beta1",
             "kind": "VMAlertmanagerConfig",
             "metadata": {"name": "zeabur-notify-pager", "namespace": "shop",
                 "labels": {CHANNEL_LABEL: "pager"},
-                "annotations": {KIND_ANNOTATION: "gotify"}},
+                "annotations": {KIND_ANNOTATION: "pigeon"}},
             "spec": {"route": {"receiver": "p"}, "receivers": [{"name": "p", "webhook_configs": [{}]}]},
             "status": {"updateStatus": "operational"}
         }));
-        assert_eq!(channel(&old).kind, AlertmanagerChannelKind::Other);
+        assert_eq!(channel(&unknown).kind, AlertmanagerChannelKind::Other);
     }
 
     #[test]

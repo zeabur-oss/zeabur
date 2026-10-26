@@ -74,11 +74,9 @@ fn bad(refusal: Refusal, detail: &str) -> PlanError {
 }
 
 /// Whether a Secret value in an edited copy is a mask a person was shown: the YAML view's
-/// [`REDACTED`], the older `«redacted»`, or a run of `•`.
+/// [`REDACTED`] or a run of `•`.
 fn is_mask(value: &str) -> bool {
-    value == REDACTED
-        || value == "\u{ab}redacted\u{bb}"
-        || (!value.is_empty() && value.chars().all(|c| c == '\u{2022}'))
+    value == REDACTED || (!value.is_empty() && value.chars().all(|c| c == '\u{2022}'))
 }
 
 #[expect(

@@ -72,12 +72,12 @@ describe("members", () => {
 
   it("filters by every word, in names and groups", () => {
     const all = [
-      member("ada", { displayName: "Ada Lovelace", groups: ["admins"] }),
+      member("ada", { displayName: "Ada Lovelace", groups: ["ops"] }),
       member("bob", { displayName: "Bob Chen" }),
     ]
     expect(filterMembers(all, "")).toStrictEqual(all)
     expect(filterMembers(all, "LOVE").map((m) => m.username)).toStrictEqual(["ada"])
-    expect(filterMembers(all, "admins ada").map((m) => m.username)).toStrictEqual(["ada"])
+    expect(filterMembers(all, "ops ada").map((m) => m.username)).toStrictEqual(["ada"])
     expect(filterMembers(all, "chen ada")).toHaveLength(0)
   })
 
