@@ -1,10 +1,6 @@
 # Profile: single-node
 
 kubectl create namespace velero --dry-run=client -o yaml | kubectl apply -f -
-kubectl label namespace velero --overwrite \
-  pod-security.kubernetes.io/enforce=privileged \
-  pod-security.kubernetes.io/audit=privileged \
-  pod-security.kubernetes.io/warn=privileged
 # Velero reads the bucket's credentials from this AWS-style credentials file.
 kubectl -n velero create secret generic velero-credentials \
   --from-literal=cloud='<credentials>' \
@@ -49,8 +45,8 @@ configuration:
         customerKeyEncryptionSecret: velero-backup-key/key
   # Kopia file-system backups work on any storage class, local-path included.
   uploaderType: kopia
-  # Back up all volumes unless they opt out. Needs the file-backup input.
-  defaultVolumesToFsBackup: true
+  # No node agent by default, so no volume copy. Backups opt in with file-backup.
+  defaultVolumesToFsBackup: false
 # CSI snapshots need per-driver setup; use file-system backups instead.
 snapshotsEnabled: false
 ZEABUR_VALUES

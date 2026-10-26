@@ -2256,8 +2256,8 @@
           }
         },
         {
-          "default": true,
-          "description": "Installs the node agent on every node, so Velero can copy volume files with Kopia. The agent runs as root and holds Velero's cluster-admin token. Set false only if every Backup and Schedule sets defaultVolumesToFsBackup to false. Zeabur's backup schedule sets it to true, so without the agent its backups fail partly.\n",
+          "default": false,
+          "description": "Off by default. Set true to install the node agent on every node, so Velero can copy volume files with Kopia. The agent runs as root, mounts host paths, holds Velero's cluster-admin token, and needs the velero namespace to allow the privileged Pod Security level. Each Backup and Schedule must then set defaultVolumesToFsBackup to true. Zeabur's schedule does. While the input is false, such a backup fails partly.\n",
           "name": "file-backup",
           "path": "deployNodeAgent"
         }
@@ -2326,7 +2326,7 @@
             "single-node": "resources:\n  # Idle between backups; chart sets none.\n  requests: {cpu: 20m, memory: 64Mi}\n  limits: {memory: 512Mi}\n"
           },
           "repo": "https://vmware-tanzu.github.io/helm-charts",
-          "values": "# Pinned by digest; a tag alone can move.\nimage:\n  repository: docker.io/velero/velero\n  tag: v1.18.2@sha256:37396519f399536e5f01427d723565ae69294ec3fb5625cf1c87c09eaa9de16b\ninitContainers:\n  # AWS plugin covers any S3-compatible store; v1.14.x matches Velero 1.18.\n  - name: velero-plugin-for-aws\n    image: velero/velero-plugin-for-aws:v1.14.4@sha256:c85a7fa803569e3128c33e4f5766f84ab156c8d171c9f1dd2715581d45ce98fa\n    volumeMounts:\n      - mountPath: /target\n        name: plugins\ncredentials:\n  # Secret comes from the credentials input, not the chart.\n  useSecret: true\n  existingSecret: velero-credentials\nconfiguration:\n  backupStorageLocation:\n    # One S3 location; bucket and URL are inputs.\n    - name: default\n      provider: aws\n      default: true\n      config:\n        region: us-east-1\n        s3ForcePathStyle: \"true\"\n        # Velero writes Secrets into the backup as they are. The\n        # store encrypts them with the backup-key input (SSE-C).\n        customerKeyEncryptionSecret: velero-backup-key/key\n  # Kopia file-system backups work on any storage class, local-path included.\n  uploaderType: kopia\n  # Back up all volumes unless they opt out. Needs the file-backup input.\n  defaultVolumesToFsBackup: true\n# CSI snapshots need per-driver setup; use file-system backups instead.\nsnapshotsEnabled: false\n",
+          "values": "# Pinned by digest; a tag alone can move.\nimage:\n  repository: docker.io/velero/velero\n  tag: v1.18.2@sha256:37396519f399536e5f01427d723565ae69294ec3fb5625cf1c87c09eaa9de16b\ninitContainers:\n  # AWS plugin covers any S3-compatible store; v1.14.x matches Velero 1.18.\n  - name: velero-plugin-for-aws\n    image: velero/velero-plugin-for-aws:v1.14.4@sha256:c85a7fa803569e3128c33e4f5766f84ab156c8d171c9f1dd2715581d45ce98fa\n    volumeMounts:\n      - mountPath: /target\n        name: plugins\ncredentials:\n  # Secret comes from the credentials input, not the chart.\n  useSecret: true\n  existingSecret: velero-credentials\nconfiguration:\n  backupStorageLocation:\n    # One S3 location; bucket and URL are inputs.\n    - name: default\n      provider: aws\n      default: true\n      config:\n        region: us-east-1\n        s3ForcePathStyle: \"true\"\n        # Velero writes Secrets into the backup as they are. The\n        # store encrypts them with the backup-key input (SSE-C).\n        customerKeyEncryptionSecret: velero-backup-key/key\n  # Kopia file-system backups work on any storage class, local-path included.\n  uploaderType: kopia\n  # No node agent by default, so no volume copy. Backups opt in with file-backup.\n  defaultVolumesToFsBackup: false\n# CSI snapshots need per-driver setup; use file-system backups instead.\nsnapshotsEnabled: false\n",
           "version": "12.2.1"
         }
       ],
@@ -2334,7 +2334,7 @@
         "clusterWide": true,
         "credentials": "required",
         "credentialsNote": "Needs static S3 credentials. All backups share one Kopia password and one SSE-C key, both in Secrets in the velero namespace.\n",
-        "privileged": true,
+        "privileged": false,
         "risks": [
           {
             "mitigation": "Never grant Velero CRDs to tenants.",
@@ -2349,7 +2349,7 @@
             "risk": "Without the velero-repo-credentials and velero-backup-key Secrets, nobody can read the backups. Both are also inside the backups that they encrypt.\n"
           }
         ],
-        "summary": "Bound to cluster-admin; reads and restores every object. With the file-backup input, a root node agent on every node holds the same token.\n",
+        "summary": "Bound to cluster-admin; reads and restores every object. By default no Pod is privileged and the velero namespace needs only the baseline Pod Security level. With the file-backup input, a root node agent on every node holds the same token, mounts host paths and needs the privileged level.\n",
         "tenants": "admin-only"
       },
       "upgradeNotes": [

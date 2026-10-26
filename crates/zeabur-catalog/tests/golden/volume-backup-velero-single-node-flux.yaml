@@ -1,13 +1,4 @@
 # Profile: single-node. Commit to the repository Flux reconciles.
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: velero
-  labels:
-    pod-security.kubernetes.io/enforce: privileged
-    pod-security.kubernetes.io/audit: privileged
-    pod-security.kubernetes.io/warn: privileged
----
 # Keep these values out of Git (SOPS, Sealed Secrets or a secret manager).
 # cloud: Velero reads the bucket's credentials from this AWS-style credentials file.
 apiVersion: v1
@@ -77,12 +68,12 @@ spec:
         default: true
         name: default
         provider: aws
-      defaultVolumesToFsBackup: true
+      defaultVolumesToFsBackup: false
       uploaderType: kopia
     credentials:
       existingSecret: velero-credentials
       useSecret: true
-    deployNodeAgent: true
+    deployNodeAgent: false
     image:
       repository: docker.io/velero/velero
       tag: v1.18.2@sha256:37396519f399536e5f01427d723565ae69294ec3fb5625cf1c87c09eaa9de16b
