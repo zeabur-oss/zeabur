@@ -360,6 +360,7 @@ fn find(id: &str) -> Result<&'static (&'static str, &'static str, &'static str),
         .ok_or_else(|| RenderError::UnknownTemplate(id.to_owned()))
 }
 
+#[expect(clippy::too_many_lines, reason = "one pass over the file's parts")]
 fn read(id: &str, file: &str, manifests: &str) -> Result<Template, RenderError> {
     let broken = |detail: String| RenderError::Broken {
         template: id.to_owned(),
@@ -1034,10 +1035,11 @@ mod tests {
     fn a_template_carries_its_security_words_in_other_languages() {
         let ghost = template("ghost").unwrap();
         for lang in ["zh-TW", "zh-CN"] {
-            assert!(!ghost.summary_locales[lang].is_empty());
+            assert_ne!(ghost.summary_locales[lang], "");
             for risk in &ghost.risks {
                 let words = &risk.locales[lang];
-                assert!(!words.risk.is_empty() && !words.mitigation.is_empty());
+                assert_ne!(words.risk, "");
+                assert_ne!(words.mitigation, "");
             }
         }
     }
