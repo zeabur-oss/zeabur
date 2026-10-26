@@ -24,7 +24,7 @@ second=zeabur-e2e-second   # web/e2e/manifests/second-project.yaml
 users=(admin e2e-admin e2e-developer e2e-viewer e2e-member e2e-db-admin e2e-db-developer e2e-db-viewer
   e2e-git-admin e2e-git-developer e2e-git-private-admin e2e-git-private-developer
   e2e-image-admin e2e-image-developer e2e-usage-admin e2e-usage-viewer
-  e2e-terminal-admin e2e-terminal-developer)
+  e2e-terminal-admin e2e-terminal-developer e2e-upload-admin e2e-upload-developer)
 
 for file in "$out/kubeconfig" "$out/profile" "$tls/ca.crt" "$zeabur_identityctl"; do
   [[ -e "$file" ]] || { echo "error: $file is missing; run scripts/dev-cluster.sh up first" >&2; exit 1; }
