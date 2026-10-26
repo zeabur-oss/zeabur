@@ -103,10 +103,8 @@ kubectl delete namespace shop
 `kubectl delete namespace shop` alone deletes everything too; the difference is that databases go
 at the same time as everything else, and their operators may not get to clean up.
 
-A tools pod's project is in its `zeabur.com/tools-project` annotation, which a label selector can't
-match. List the pods of `shop` in `zeabur-terminals`, then delete them:
+List the tools pods of `shop` in `zeabur-terminals`, then delete them:
 
 ```sh
-kubectl get pods -n zeabur-terminals \
-  -o jsonpath='{range .items[?(@.metadata.annotations.zeabur\.com/tools-project=="shop")]}{.metadata.name}{"\n"}{end}'
+kubectl get pods -n zeabur-terminals -l zeabur.com/project=shop
 ```

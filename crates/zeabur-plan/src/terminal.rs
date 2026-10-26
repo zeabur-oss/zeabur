@@ -597,12 +597,22 @@ pub fn tools_pod_body_with(request: &ToolsPod<'_>, conventions: &Conventions) ->
     );
     let home = TOOLS_HOME;
     let mut annotations = json!({(&*conventions.tools_person_annotation): request.person});
-    if let (ToolsScope::Project(project), Some(map)) = (request.scope, annotations.as_object_mut())
-    {
-        map.insert(
-            conventions.tools_project_annotation.to_string(),
-            json!(project),
-        );
+    let mut labels = json!({
+        "app.kubernetes.io/name": conventions.tools_prefix.trim_end_matches('-'),
+        "app.kubernetes.io/managed-by": conventions.field_manager,
+        (&*conventions.tools_label): request.scope.label(),
+        (&*conventions.tools_person_label): key,
+    });
+    if let ToolsScope::Project(project) = request.scope {
+        if let Some(map) = annotations.as_object_mut() {
+            map.insert(
+                conventions.tools_project_annotation.to_string(),
+                json!(project),
+            );
+        }
+        if let Some(map) = labels.as_object_mut() {
+            map.insert(conventions.project_label.to_string(), json!(project));
+        }
     }
     json!({
         "apiVersion": "v1",
@@ -610,12 +620,7 @@ pub fn tools_pod_body_with(request: &ToolsPod<'_>, conventions: &Conventions) ->
         "metadata": {
             "name": name,
             "namespace": request.namespace,
-            "labels": {
-                "app.kubernetes.io/name": conventions.tools_prefix.trim_end_matches('-'),
-                "app.kubernetes.io/managed-by": conventions.field_manager,
-                (&*conventions.tools_label): request.scope.label(),
-                (&*conventions.tools_person_label): key,
-            },
+            "labels": labels,
             "annotations": annotations,
         },
         "spec": {
@@ -735,6 +740,7 @@ pub fn tools_pod_reused(namespace: &str, pod: &str) -> Plan {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use zeabur_model::kernel::names::LABEL_PROJECT;
 
     fn pod() -> Value {
         json!({
@@ -965,6 +971,12 @@ mod tests {
     }
 
     #[test]
+    fn a_project_tools_pod_can_be_listed_by_the_project_label() {
+        let body = tools_pod_body(&tools("alice"));
+        assert_eq!(body["metadata"]["labels"][LABEL_PROJECT], "shop");
+    }
+
+    #[test]
     fn a_cluster_tools_pod_names_no_project_and_is_not_a_projects() {
         let request = ToolsPod {
             scope: ToolsScope::Cluster,
@@ -972,6 +984,7 @@ mod tests {
         };
         let body = tools_pod_body(&request);
         assert_eq!(body["metadata"]["labels"][TOOLS_LABEL], "cluster");
+        assert!(body["metadata"]["labels"].get(LABEL_PROJECT).is_none());
         assert!(
             body["metadata"]["annotations"]
                 .get(TOOLS_PROJECT_ANNOTATION)

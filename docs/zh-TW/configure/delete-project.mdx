@@ -96,11 +96,10 @@ kubectl delete clusters.postgresql.cnpg.io --all -n shop   # 每種資料庫各�
 kubectl delete namespace shop
 ```
 
-工具 Pod 的專案記在 annotation `zeabur.com/tools-project`，沒辦法用 label 挑出來。列出 `zeabur-terminals` 裡屬於 `shop` 的 Pod，再逐一刪除：
+列出 `zeabur-terminals` 裡屬於 `shop` 的工具 Pod，再逐一刪除：
 
 ```sh
-kubectl get pods -n zeabur-terminals \
-  -o jsonpath='{range .items[?(@.metadata.annotations.zeabur\.com/tools-project=="shop")]}{.metadata.name}{"\n"}{end}'
+kubectl get pods -n zeabur-terminals -l zeabur.com/project=shop
 ```
 
 只執行 `kubectl delete namespace shop` 也會刪掉所有東西，差別在資料庫和其他物件同時刪除，operator 不一定來得及收尾。
