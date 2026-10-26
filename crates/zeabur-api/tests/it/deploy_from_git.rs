@@ -364,6 +364,30 @@ mod tests {
         assert_eq!(service["status"]["reason"], "BuildFailed");
     }
 
+    /// A service whose folder nobody has uploaded waits for the upload; it is not building.
+    #[tokio::test]
+    async fn a_service_waiting_for_its_upload_is_not_building() {
+        let cluster = cluster();
+        waiting_service_with(
+            &cluster,
+            None,
+            Some(
+                &json!({"uploadToken": {"request": "u1", "secretName": "site-upload",
+                    "expiresAt": "2026-10-23T08:15:00Z"},
+                "conditions": [
+                    {"type": "SourceReady", "status": "False", "reason": "WaitingForUpload"},
+                    {"type": "Ready", "status": "False", "reason": "SourceNotReady"}]}),
+            ),
+        );
+        cluster.update(|s| {
+            let build = s.dynamic.last_mut().unwrap();
+            build.data["spec"]["source"] = json!({"archive": {}});
+        });
+        let service = site(&cluster).await;
+        assert_eq!(service["status"]["word"], "waitingUpload", "{service}");
+        assert_eq!(service["diagnoses"], json!([]), "{service}");
+    }
+
     fn cluster_failed() -> MemoryCluster {
         let cluster = cluster();
         waiting_service(&cluster, Some("Failed"));

@@ -713,8 +713,9 @@ export const en = {
   "builds.builder": "Builder",
   "builds.deploy": "Deploy newest",
   "builds.rebuild": "Build again",
-  "builds.word.waitingUpload": "Waiting for the folder",
-  "builds.waitingUpload": (service: string) => `${service} starts once you upload a folder.`,
+  "builds.word.waitingUpload": "Waiting for upload",
+  "builds.waitingUpload": (service: string) =>
+    `${service} starts once you upload a folder or an archive.`,
   "builds.sourceUpload": "Uploaded folder",
   "builds.upload": "Upload a folder",
   "builds.uploadBody": (build: string) =>
@@ -2741,24 +2742,27 @@ export const en = {
   "upload.body": (project: string) =>
     `Builds a folder from your computer and runs it in ${project}. You review the objects before anything is created.`,
   "upload.zone": "Folder to upload",
-  "upload.drop": "Drop a folder or a .zip file here",
+  "upload.drop": "Compress the folder to a .zip or .tar.gz first, then drop it here",
+  "upload.dropNote":
+    "A .tar.gz keeps file permissions and symlinks. A folder or a .zip also works but loses both; only files that start with #! stay executable.",
   "upload.dropActive": "Drop to use it",
   "upload.choose": "Choose folder",
-  "upload.chooseZip": "Choose .zip file",
+  "upload.chooseArchive": "Choose .zip or .tar.gz",
   "upload.reading": "Reading and packing the files…",
   "upload.ready": (files: number, size: string) =>
     `${plural(files, "file", "files")}, ${size} packed`,
   "upload.left": (n: number) =>
     `${plural(n, "file", "files")} left out by .gitignore, .dockerignore or .git.`,
   "upload.change": "Choose another",
-  "upload.problem.folder": "Choose a folder or a .zip file.",
+  "upload.problem.folder": "Choose an archive or a folder.",
   "upload.problem.empty": "The folder has no files to build.",
   "upload.problem.packed": (largest: string) =>
     `The folder packs to more than 256 MiB. Leave the largest out in .gitignore: ${largest}.`,
   "upload.problem.unpacked": (largest: string) =>
     `The files add up to more than 1 GiB. Leave the largest out in .gitignore: ${largest}.`,
-  "upload.problem.zipInvalid": "Unable to read this .zip file.",
-  "upload.problem.zipBomb": "The .zip file holds more than 1 GiB once unpacked.",
+  "upload.problem.archiveInvalid": "Unable to read this archive.",
+  "upload.problem.archivePacked": "The archive is over 256 MiB.",
+  "upload.problem.archiveBomb": "The archive holds more than 1 GiB once unpacked.",
   "upload.moreSummary": "Folder to build, variables, build variables, size and security.",
   "upload.directoryHint": "The folder to build inside the upload. Empty: the whole upload.",
   "upload.methodHint.railpack":

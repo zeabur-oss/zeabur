@@ -50,6 +50,8 @@ pub enum StatusWord {
     Unknown,
     /// Its image is still being built: Zeabur Builder has not pushed the first one yet.
     Building,
+    /// Its image comes from an uploaded folder or archive that nobody has uploaded yet.
+    WaitingUpload,
 }
 
 /// A service's health, the word for it, and why when a pod keeps failing.

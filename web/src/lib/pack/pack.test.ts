@@ -98,3 +98,21 @@ describe("pack", () => {
     expect((error as TooLarge).largest[0]?.name).toBe("node_modules")
   })
 })
+
+describe("inspectTarGz", () => {
+  test("an archive goes up as it is, counted by its files", async () => {
+    const { inspectTarGz } = await import("@/lib/pack/targz")
+    const made = await pack([file("a.txt", "one"), file("src/b.txt", "three")])
+    const found = await inspectTarGz(made.blob)
+    expect(found.blob).toBe(made.blob)
+    expect(found.files).toBe(2)
+    expect(found.bytes).toBe(8)
+  })
+
+  test("something that is not a gzip tar is refused", async () => {
+    const { inspectTarGz } = await import("@/lib/pack/targz")
+    await expect(inspectTarGz(new Blob(["not an archive"]))).rejects.toMatchObject({
+      reason: "invalid",
+    })
+  })
+})

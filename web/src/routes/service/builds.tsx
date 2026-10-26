@@ -305,7 +305,6 @@ function Summary({
   const refused = refusedCredentials(build, latest)
   const deployGate = useHereGate("changeServices")
   const rebuildGate = useHereGate("build")
-  const [uploading, setUploading] = useState(false)
   const waiting = build.awaitingUpload && !build.latestImage
   const deployButton = (
     <Button
@@ -401,16 +400,7 @@ function Summary({
             <GateTip gate={deployGate}>{deployButton}</GateTip>
           )}
           {build.archive ? (
-            <GateTip gate={rebuildGate}>
-              <Button
-                variant={waiting ? "default" : "outline"}
-                size="sm"
-                onClick={() => setUploading(true)}
-              >
-                <UploadSimpleIcon aria-hidden="true" data-icon="inline-start" />
-                {t("builds.upload")}
-              </Button>
-            </GateTip>
+            <UploadAction project={project} build={build.name} primary={waiting} />
           ) : null}
           {waiting ? null : (
             <GateTip gate={rebuildGate}>
@@ -422,14 +412,39 @@ function Summary({
           )}
         </SummaryCardActions>
       </SummaryCardMain>
-      {uploading ? (
-        <UploadFolderDrawer
-          project={project}
-          build={build.name}
-          onClose={() => setUploading(false)}
-        />
-      ) : null}
     </SummaryCard>
+  )
+}
+
+/** The button that uploads a folder or archive to a build, with its drawer. */
+export function UploadAction({
+  project,
+  build,
+  primary,
+}: {
+  project: string
+  build: string
+  primary: boolean
+}) {
+  const t = useT()
+  const gate = useHereGate("build")
+  const [uploading, setUploading] = useState(false)
+  return (
+    <>
+      <GateTip gate={gate}>
+        <Button
+          variant={primary ? "default" : "outline"}
+          size="sm"
+          onClick={() => setUploading(true)}
+        >
+          <UploadSimpleIcon aria-hidden="true" data-icon="inline-start" />
+          {t("builds.upload")}
+        </Button>
+      </GateTip>
+      {uploading ? (
+        <UploadFolderDrawer project={project} build={build} onClose={() => setUploading(false)} />
+      ) : null}
+    </>
   )
 }
 

@@ -350,7 +350,8 @@ pub const BUILD_FAILED: &str = "BuildFailed";
 /// [`ZeaburBuilderProblem`], such as a branch that does not exist or a deploy key the host
 /// refuses.
 ///
-/// A `Build` that waits for its folder to be uploaded has not failed.
+/// A `Build` that waits for its folder to be uploaded has not failed. Its service is waiting for
+/// the upload, not building.
 ///
 /// Before the first image the service is building, not failing to pull an image that does not
 /// exist, or it has failed with [`BUILD_FAILED`]; its diagnoses go, since the missing image and
@@ -399,6 +400,12 @@ pub fn built_image(
     }
     service.status = if failed {
         build_failed(zeabur_model::StatusWord::Failed)
+    } else if build.awaiting_upload && !running {
+        zeabur_model::ServiceStatus {
+            health: zeabur_model::Health::Idle,
+            word: zeabur_model::StatusWord::WaitingUpload,
+            reason: None,
+        }
     } else {
         zeabur_model::ServiceStatus {
             health: zeabur_model::Health::Progress,

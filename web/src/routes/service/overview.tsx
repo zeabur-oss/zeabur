@@ -66,7 +66,7 @@ import {
   type Service,
 } from "@/model/service"
 import type { ServicePlace } from "@/routes/search"
-import { useServiceBuilds } from "@/routes/service/builds"
+import { UploadAction, useServiceBuilds } from "@/routes/service/builds"
 import { TaskRunsCard } from "@/routes/service/tasks"
 import { UsageGlance } from "@/routes/service/usage"
 
@@ -354,7 +354,8 @@ function Rollout({
 }
 
 const buildSays = (service: Service) =>
-  statusOf(service).word === "building" || statusOf(service).reason === "BuildFailed"
+  ["building", "waitingUpload"].includes(statusOf(service).word) ||
+  statusOf(service).reason === "BuildFailed"
 
 /** The build of a service waiting for its first image, under way or failed, or of one whose
  * latest build failed: why. */
@@ -372,6 +373,7 @@ function BuildLine({
   const build = built[0]?.build
   const run = build ? runsOf(builds.data?.runs ?? [], build)[0] : undefined
   const failed = statusOf(service).reason === "BuildFailed"
+  const waiting = !failed && statusOf(service).word === "waitingUpload"
   const problem = build ? buildProblem(build, run) : undefined
   const refused = build ? refusedCredentials(build, run) : undefined
   const why = failed
@@ -382,10 +384,15 @@ function BuildLine({
       build?.message ??
       build?.reason ??
       undefined)
-    : t("overview.building")
+    : waiting
+      ? t("builds.waitingUpload", service.name)
+      : t("overview.building")
   return (
     <p className="mt-1 flex max-w-prose flex-wrap items-baseline gap-x-2 gap-y-1 text-sm text-secondary">
       {why ? <span className="min-w-0 break-words">{why}</span> : null}
+      {waiting && build?.archive ? (
+        <UploadAction project={project} build={build.name} primary />
+      ) : null}
       <More onClick={() => onTab("builds")}>{t("overview.seeBuild")}</More>
     </p>
   )

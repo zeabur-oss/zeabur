@@ -9,7 +9,9 @@ import {
   entriesOfDrop,
   filesOfEntries,
   filesOfInput,
-  zipOfDrop,
+  archiveKindOf,
+  archiveOfDrop,
+  type ArchiveKind,
   type SourceFile,
 } from "@/lib/pack/source"
 import { cn } from "@/lib/utils"
@@ -44,8 +46,10 @@ export function useFolder() {
           ),
         ),
       }
-    if (reason === "bomb") return { phase: "failed", message: t("upload.problem.zipBomb") }
-    if (reason === "invalid") return { phase: "failed", message: t("upload.problem.zipInvalid") }
+    if (reason === "packed") return { phase: "failed", message: t("upload.problem.archivePacked") }
+    if (reason === "bomb") return { phase: "failed", message: t("upload.problem.archiveBomb") }
+    if (reason === "invalid")
+      return { phase: "failed", message: t("upload.problem.archiveInvalid") }
     return { phase: "failed", message: error instanceof Error ? error.message : String(error) }
   }
   const take = async (files: () => Promise<SourceFile[]>, name: string) => {
@@ -63,28 +67,47 @@ export function useFolder() {
       setState(fail(error))
     }
   }
-  const takeZip = (zip: Promise<File> | File, name: string) =>
-    take(async () => (await import("@/lib/pack/zip")).filesOfZip(await zip), name)
+  const takeArchive = async (kind: ArchiveKind, archive: Promise<File> | File, name: string) => {
+    if (kind === "zip")
+      return take(async () => (await import("@/lib/pack/zip")).filesOfZip(await archive), name)
+    setState({ phase: "reading" })
+    try {
+      const { inspectTarGz } = await import("@/lib/pack/targz")
+      const packed = await inspectTarGz(await archive)
+      setState(
+        packed.files === 0
+          ? { phase: "failed", message: t("upload.problem.empty") }
+          : { phase: "ready", packed, name },
+      )
+    } catch (error) {
+      setState(fail(error))
+    }
+  }
   return {
     state,
     drop: (transfer: DataTransfer) => {
       const entries = entriesOfDrop(transfer)
-      const zip = zipOfDrop(entries)
+      const archive = archiveOfDrop(entries)
       const name = entries.length === 1 ? (entries[0]?.name ?? "") : ""
-      return zip ? takeZip(zip, withoutZip(name)) : take(() => filesOfEntries(entries), name)
+      return archive
+        ? takeArchive(archive.kind, archive.file, withoutArchive(name))
+        : take(() => filesOfEntries(entries), name)
     },
     folder: (list: FileList) =>
       take(async () => filesOfInput(list), list[0]?.webkitRelativePath.split("/")[0] ?? ""),
-    zip: (file: File) => takeZip(file, withoutZip(file.name)),
+    archive: (file: File) => {
+      const kind = archiveKindOf(file.name)
+      return kind ? takeArchive(kind, file, withoutArchive(file.name)) : undefined
+    },
     clear: () => setState({ phase: "empty" }),
   }
 }
 
-const withoutZip = (name: string) => name.replace(/\.zip$/i, "")
+const withoutArchive = (name: string) => name.replace(/\.(zip|tar\.gz|tgz)$/i, "")
 
 export type Folder = ReturnType<typeof useFolder>
 
-/** Where a folder or a .zip file is dropped, or chosen with the file dialog. */
+/** Where an archive or a folder is dropped, or chosen with the file dialog. */
 export function FolderDrop({ folder, missing }: { folder: Folder; missing?: boolean }) {
   const t = useT()
   const [over, setOver] = useState(false)
@@ -153,19 +176,22 @@ function DropBody({ folder, over }: { folder: Folder; over: boolean }) {
     )
   return (
     <>
-      <FolderSimpleIcon aria-hidden="true" className="size-6 text-secondary" />
-      <p className="text-sm">{over ? t("upload.dropActive") : t("upload.drop")}</p>
+      <ZipIcon aria-hidden="true" className="size-6 text-secondary" />
+      <div className="flex max-w-prose flex-col gap-1">
+        <p className="text-sm">{over ? t("upload.dropActive") : t("upload.drop")}</p>
+        <p className="type-meta text-muted-foreground">{t("upload.dropNote")}</p>
+      </div>
       <div className="flex flex-wrap justify-center gap-2">
+        <Picker
+          label={t("upload.chooseArchive")}
+          icon={<ZipIcon aria-hidden="true" />}
+          onFiles={(list) => void (list[0] && folder.archive(list[0]))}
+        />
         <Picker
           label={t("upload.choose")}
           icon={<FolderSimpleIcon aria-hidden="true" />}
           directory
           onFiles={folder.folder}
-        />
-        <Picker
-          label={t("upload.chooseZip")}
-          icon={<ZipIcon aria-hidden="true" />}
-          onFiles={(list) => void (list[0] && folder.zip(list[0]))}
         />
       </div>
     </>
@@ -198,7 +224,7 @@ function Picker({
         }}
         type="file"
         hidden
-        accept={directory ? undefined : ".zip,application/zip"}
+        accept={directory ? undefined : ".zip,.tar.gz,.tgz,application/zip,application/gzip"}
         onChange={(event) => {
           if (event.target.files?.length) onFiles(event.target.files)
           event.target.value = ""

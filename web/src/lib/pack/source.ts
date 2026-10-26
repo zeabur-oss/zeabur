@@ -1,4 +1,4 @@
-// The files a person gives: a dropped folder or zip, or a folder picked with the file dialog.
+// The files a person gives: a dropped folder or archive, or a folder picked with the file dialog.
 export interface SourceFile {
   /** Relative to the folder, with `/`. */
   path: string
@@ -48,10 +48,21 @@ export function entriesOfDrop(transfer: DataTransfer): Entry[] {
     .filter((entry): entry is Entry => entry !== null)
 }
 
-/** The zip file alone in a drop, if that is what it holds. */
-export function zipOfDrop(entries: Entry[]): Promise<File> | undefined {
+export type ArchiveKind = "zip" | "targz"
+
+/** Which archive a file name says it is. */
+export function archiveKindOf(name: string): ArchiveKind | undefined {
+  if (/\.zip$/i.test(name)) return "zip"
+  return /\.(tar\.gz|tgz)$/i.test(name) ? "targz" : undefined
+}
+
+/** The archive alone in a drop, if that is what it holds. */
+export function archiveOfDrop(
+  entries: Entry[],
+): { kind: ArchiveKind; file: Promise<File> } | undefined {
   const only = entries.length === 1 ? entries[0] : undefined
-  return only?.isFile && /\.zip$/i.test(only.name) ? fileOf(only as FileSystemFileEntry) : undefined
+  const kind = only?.isFile ? archiveKindOf(only.name) : undefined
+  return only && kind ? { kind, file: fileOf(only as FileSystemFileEntry) } : undefined
 }
 
 /** The files of a dropped folder, or of several dropped files and folders as one folder. */
