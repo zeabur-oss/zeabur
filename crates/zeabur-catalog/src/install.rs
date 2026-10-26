@@ -96,7 +96,7 @@ pub enum InstallBlocked {
     Inputs,
     /// Some of it is plain manifests, or applies only when CRDs are missing.
     Manifests,
-    /// It runs privileged: its namespace needs the `privileged` Pod Security level, which a
+    /// It runs privileged or needs `baseline`: its namespace needs a Pod Security level that a
     /// project plan does not set.
     Privileged,
 }
@@ -113,6 +113,9 @@ pub struct Security {
     /// It runs privileged.
     #[serde(default)]
     pub privileged: bool,
+    /// The Pod Security level its namespaces need when it is not `restricted`: `baseline`.
+    #[serde(default, rename = "podSecurity", skip_serializing_if = "Option::is_none")]
+    pub level: Option<String>,
     /// Hosts it connects to.
     #[serde(default)]
     pub egress: Vec<String>,
@@ -464,8 +467,8 @@ impl<'a> Rendered<'a> {
     /// `kubectl` commands that make the namespaces the secrets and a privileged component need.
     fn namespace_commands(&self, secrets: &[SecretInputs<'_>]) -> String {
         let mut out = String::new();
-        let privileged = self.privileged_namespaces();
-        let mut namespaces: Vec<&str> = privileged.clone();
+        let exempt = self.exempt_namespaces();
+        let mut namespaces: Vec<&str> = exempt.iter().map(|(ns, _)| *ns).collect();
         for ((ns, _), _) in secrets {
             if !namespaces.contains(ns) {
                 namespaces.push(ns);
@@ -478,10 +481,10 @@ impl<'a> Rendered<'a> {
                     "\nkubectl create namespace {ns} --dry-run=client -o yaml | kubectl apply -f -\n"
                 ),
             );
-            if privileged.contains(&ns) {
+            if let Some((_, level)) = exempt.iter().find(|(name, _)| *name == ns) {
                 let labels: Vec<String> = PSA_MODES
                     .iter()
-                    .map(|mode| format!("pod-security.kubernetes.io/{mode}=privileged"))
+                    .map(|mode| format!("pod-security.kubernetes.io/{mode}={level}"))
                     .collect();
                 push(
                     &mut out,
@@ -687,14 +690,20 @@ impl<'a> Rendered<'a> {
     }
 
     /// Secret objects for inputs stored in Secrets, for the YAML forms.
-    /// The namespaces of its releases, when it runs privileged; in release order.
-    fn privileged_namespaces(&self) -> Vec<&str> {
-        let mut namespaces = Vec::new();
-        if self.file.security.privileged {
-            for release in &self.file.releases {
-                if !namespaces.contains(&release.namespace.as_str()) {
-                    namespaces.push(release.namespace.as_str());
-                }
+    /// The namespaces of its releases with the Pod Security level they need when it is not
+    /// `restricted`; in release order.
+    fn exempt_namespaces(&self) -> Vec<(&str, &'static str)> {
+        let level = if self.file.security.privileged {
+            "privileged"
+        } else if self.file.security.level.as_deref() == Some("baseline") {
+            "baseline"
+        } else {
+            return Vec::new();
+        };
+        let mut namespaces: Vec<(&str, &'static str)> = Vec::new();
+        for release in &self.file.releases {
+            if !namespaces.iter().any(|(ns, _)| *ns == release.namespace) {
+                namespaces.push((release.namespace.as_str(), level));
             }
         }
         namespaces
@@ -767,8 +776,8 @@ impl<'a> Rendered<'a> {
 
     /// Secrets, then each release: a manifest release as listed, a chart as its objects.
     fn append_releases(&self, out: &mut String, format: InstallFormat) {
-        for ns in self.privileged_namespaces() {
-            out.push_str(&namespace_object(ns));
+        for (ns, level) in self.exempt_namespaces() {
+            out.push_str(&namespace_object(ns, level));
             out.push_str("---\n");
         }
         out.push_str(&self.secret_objects());
@@ -810,7 +819,7 @@ impl<'a> Rendered<'a> {
             .any(|r| !r.is_chart() || !r.skip_if_present.is_empty())
         {
             Some(InstallBlocked::Manifests)
-        } else if self.file.security.privileged {
+        } else if self.file.security.privileged || self.file.security.level.is_some() {
             Some(InstallBlocked::Privileged)
         } else {
             None
@@ -1063,15 +1072,15 @@ fn set_path(root: &mut Value, path: &str, value: Value) {
 /// The Pod Security modes a privileged component's namespace sets to `privileged`.
 const PSA_MODES: [&str; 3] = ["enforce", "audit", "warn"];
 
-/// A Namespace at the `privileged` Pod Security level, made before the releases in it; a
-/// cluster whose default is `restricted` (RKE2 with the CIS profile) refuses the pods otherwise.
-fn namespace_object(namespace: &str) -> String {
+/// A Namespace at the given Pod Security level, made before the releases in it; a cluster whose
+/// default is `restricted` (RKE2 with the CIS profile) refuses the pods otherwise.
+fn namespace_object(namespace: &str, level: &str) -> String {
     let mut out =
         format!("apiVersion: v1\nkind: Namespace\nmetadata:\n  name: {namespace}\n  labels:\n");
     for mode in PSA_MODES {
         push(
             &mut out,
-            format!("    pod-security.kubernetes.io/{mode}: privileged\n"),
+            format!("    pod-security.kubernetes.io/{mode}: {level}\n"),
         );
     }
     out
@@ -1194,6 +1203,21 @@ mod tests {
                     text.format
                 );
             }
+        }
+    }
+
+    #[test]
+    fn a_baseline_component_gets_a_baseline_namespace_in_every_form() {
+        let guide = guide("volume-backup/k8up", "single-node").unwrap();
+        assert_eq!(guide.security.level.as_deref(), Some("baseline"));
+        assert!(guide.blocked.is_some());
+        for text in &guide.formats {
+            let label = if text.format == InstallFormat::Helm {
+                "pod-security.kubernetes.io/enforce=baseline"
+            } else {
+                "pod-security.kubernetes.io/enforce: baseline"
+            };
+            assert!(text.text.contains(label), "{:?}", text.format);
         }
     }
 
