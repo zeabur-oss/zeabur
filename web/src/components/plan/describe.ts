@@ -242,17 +242,14 @@ type ServiceChange =
   | Extract<
       Change,
       {
-        op:
-          | "envImport"
-          | "publicPort"
-          | "buildOptions"
-          | "labelVolume"
-          | "uploadToken"
-          | "archiveDigest"
+        op: "envImport" | "publicPort" | "buildOptions" | "labelVolume"
       }
     >
+  | UploadChange
   | PagesChange
   | LimitChange
+
+type UploadChange = Extract<Change, { op: "uploadToken" | "createUploadService" | "archiveDigest" }>
 
 type LimitChange = Extract<Change, { op: "ipAllow" | "egressLimit" }>
 
@@ -322,12 +319,21 @@ function serviceSentence(t: Translate, change: ServiceChange): string {
         : t("confirm.publicPort", change.port, change.workload.name)
     case "buildOptions":
       return t("confirm.buildOptions", change.build)
+    case "labelVolume":
+      return t("confirm.labelVolume", change.claim)
+    default:
+      return uploadSentence(t, change)
+  }
+}
+
+function uploadSentence(t: Translate, change: UploadChange | LimitChange | PagesChange): string {
+  switch (change.op) {
+    case "createUploadService":
+      return t("confirm.createUploadService", change.name)
     case "uploadToken":
       return t("confirm.uploadToken", change.build)
     case "archiveDigest":
       return t("confirm.archiveDigest", change.build)
-    case "labelVolume":
-      return t("confirm.labelVolume", change.claim)
     default:
       return limitOrPagesSentence(t, change)
   }
@@ -823,7 +829,9 @@ const storageOps = new Set<Change["op"]>([
 // A deploy key and copied S3 keys open into the create of a Secret: a form that sends one still
 // creates.
 const opOf = (change: Change): Change["op"] =>
-  change.op === "deployKey" || change.op === "copyS3Keys" ? "create" : change.op
+  change.op === "deployKey" || change.op === "copyS3Keys" || change.op === "createUploadService"
+    ? "create"
+    : change.op
 
 const secretName = (object: unknown): string => {
   const meta = (object as { metadata?: { name?: unknown } }).metadata
@@ -951,11 +959,20 @@ function serviceAction(t: Translate, change: ServiceChange): string {
       return change.remove ? t("action.closePort") : t("action.openPort")
     case "buildOptions":
       return t("action.saveBuildOptions")
+    case "labelVolume":
+      return t("action.save")
+    default:
+      return uploadAction(t, change)
+  }
+}
+
+function uploadAction(t: Translate, change: UploadChange | LimitChange | PagesChange): string {
+  switch (change.op) {
+    case "createUploadService":
+      return t("action.create")
     case "uploadToken":
     case "archiveDigest":
       return t("action.upload")
-    case "labelVolume":
-      return t("action.save")
     default:
       return limitOrPagesAction(t, change)
   }

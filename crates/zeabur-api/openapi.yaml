@@ -6026,6 +6026,24 @@ components:
             description: |-
               The object as one YAML document, as a person wrote it; a problem with it names the
               line.
+      - allOf:
+        - $ref: "#/components/schemas/UploadServiceChange"
+          description: |-
+            Create a service that runs a folder the person uploads: a Zeabur Builder `Build` with an
+            uploaded-folder source that asks for its upload token, and the objects of the service that
+            runs the image it builds (see the `upload_service` module).
+        - type: object
+          required:
+          - op
+          properties:
+            op:
+              type: string
+              enum:
+              - createUploadService
+        description: |-
+          Create a service that runs a folder the person uploads: a Zeabur Builder `Build` with an
+          uploaded-folder source that asks for its upload token, and the objects of the service that
+          runs the image it builds (see the `upload_service` module).
       - type: object
         description: |-
           Create the Secret that holds an SSH deploy key Zeabur generated, for Zeabur Builder to
@@ -11077,6 +11095,19 @@ components:
       - install
       - kubeconfig
       - address
+    NameValue:
+      type: object
+      description: A variable and its value.
+      required:
+      - name
+      - value
+      properties:
+        name:
+          type: string
+          description: The variable's name.
+        value:
+          type: string
+          description: Its value.
     NamespaceUsage:
       type: object
       description: One namespace's pods together.
@@ -16189,6 +16220,13 @@ components:
           items:
             $ref: "#/components/schemas/UnreadableView"
           description: The settings ConfigMap or the store, when the person may not read it.
+    ServiceSize:
+      type: string
+      description: How much a new service asks for.
+      enum:
+      - small
+      - medium
+      - large
     ServiceStatus:
       type: object
       description: A service's health, the word for it, and why when a pod keeps failing.
@@ -17383,6 +17421,77 @@ components:
           items:
             type: string
           description: Nodes system-upgrade-controller is upgrading now.
+    UploadMethod:
+      type: string
+      description: How Zeabur Builder builds an uploaded folder.
+      enum:
+      - railpack
+      - dockerfile
+    UploadServiceChange:
+      type: object
+      description: A [`Change::CreateUploadService`].
+      required:
+      - name
+      - request
+      - method
+      properties:
+        buildVariables:
+          type: array
+          items:
+            $ref: "#/components/schemas/NameValue"
+          description: Variables of the build, kept in the Secret `<name>-build-env`.
+        directory:
+          type:
+          - string
+          - "null"
+          description: "The folder inside the upload to build. Left out: the whole upload."
+        dockerfile:
+          type:
+          - string
+          - "null"
+          description: The Dockerfile, relative to the directory, for [`UploadMethod::Dockerfile`].
+        host:
+          type:
+          - string
+          - "null"
+          description: A public hostname for the port, with HTTPS where the cluster has an issuer.
+        method:
+          $ref: "#/components/schemas/UploadMethod"
+          description: How the folder is built.
+        name:
+          type: string
+          description: The service's name, which its `Build`, workload and Service share.
+        port:
+          type:
+          - integer
+          - "null"
+          format: int32
+          description: "The port the app listens on. Left out: a worker, which takes no connections."
+          minimum: 0
+        request:
+          type: string
+          description: |-
+            A value the `Build` has not been asked with before, for its upload token (see
+            [`Change::UploadToken`]).
+        security:
+          oneOf:
+          - $ref: "#/components/schemas/PodSecurityLevel"
+            description: |-
+              `restricted` or `baseline`. Left out: `restricted` for Railpack, whose images run as a
+              regular user, and `baseline` for a Dockerfile, which often runs as root.
+          - type: "null"
+        size:
+          oneOf:
+          - $ref: "#/components/schemas/ServiceSize"
+            description: "What the app asks for. Left out: small."
+          - type: "null"
+        variables:
+          type: array
+          items:
+            $ref: "#/components/schemas/NameValue"
+          description: >-
+            Variables of the app, kept in the Secret `<name>-env`. `PORT` is added from
+            `port`.
     UploadedSource:
       type: object
       description: The folder as pushed.

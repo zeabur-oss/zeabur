@@ -290,7 +290,7 @@ export type BuiltService = Pick<
  * The objects of a service whose image a Build makes: the Build with `source`, its build variables'
  * Secret, and the image service that runs what it builds.
  */
-export function builtObjects(
+function builtObjects(
   form: BuiltService,
   project: string,
   registry: string,

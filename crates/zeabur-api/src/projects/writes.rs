@@ -64,6 +64,7 @@ use crate::error::{ApiError, project_read, read_problem};
 use crate::handlers::{AppState, Credential, Person};
 use crate::plan_token::{self as token, Claims, LIFETIME_SECONDS, PlanKey, TokenError};
 use crate::projects::{deploy_keys, snapshot, templates};
+use crate::settings::Settings;
 
 /// A plan and the token that applies it.
 #[derive(Debug, Clone, Serialize, ToSchema)]
@@ -146,6 +147,7 @@ async fn compute(
     request: &PlanRequest,
     now: &str,
     cluster_issuer: Option<&str>,
+    build_registry: Option<&str>,
 ) -> Result<Plan, ApiError> {
     if request.changes.iter().any(Change::is_namespace_change) {
         return compute_namespace(cluster, project, request, now).await;
@@ -218,6 +220,7 @@ async fn compute(
             issuers: &issuers,
             certificates: &certificates,
             platform_namespaces: false,
+            build_registry,
         },
         request,
     )
@@ -242,15 +245,30 @@ async fn compute_any(
     project: &str,
     request: &PlanRequest,
     now: &str,
-    cluster_issuer: Option<&str>,
-    zeabur_namespaces: Vec<String>,
+    settings: &Settings,
 ) -> Result<Plan, ApiError> {
     if request.changes.iter().any(Change::is_terminal_change) {
         terminal::compute(planner, cluster, project, request, now).await
     } else if request.changes.iter().any(Change::is_project_deletion) {
-        project_deletion::compute(planner, cluster, project, request, now, zeabur_namespaces).await
+        project_deletion::compute(
+            planner,
+            cluster,
+            project,
+            request,
+            now,
+            project_deletion::zeabur_namespaces(settings),
+        )
+        .await
     } else {
-        compute(cluster, project, request, now, cluster_issuer).await
+        compute(
+            cluster,
+            project,
+            request,
+            now,
+            settings.domains.cluster_issuer.as_deref(),
+            settings.builds.registry.as_deref(),
+        )
+        .await
     }
 }
 
@@ -296,8 +314,7 @@ pub(crate) async fn plan(
         &project,
         &opened,
         &made_at,
-        state.settings.domains.cluster_issuer.as_deref(),
-        project_deletion::zeabur_namespaces(&state.settings),
+        &state.settings,
     )
     .await?;
     let from_yaml = creations::from_yaml(&opened);
@@ -423,8 +440,7 @@ pub(crate) async fn apply(
         &project,
         &opened,
         &claims.made_at,
-        state.settings.domains.cluster_issuer.as_deref(),
-        project_deletion::zeabur_namespaces(&state.settings),
+        &state.settings,
     )
     .await?;
     let (namespace, target_cluster) =

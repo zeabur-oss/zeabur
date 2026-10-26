@@ -3175,6 +3175,10 @@ export interface components {
            */
           yaml?: string | null
         }
+      | (components["schemas"]["UploadServiceChange"] & {
+          /** @enum {string} */
+          op: "createUploadService"
+        })
       | {
           /** @description The sealed key, as `POST /projects/{p}/deploy-keys` returned it. */
           key: string
@@ -5801,6 +5805,13 @@ export interface components {
      * @enum {string}
      */
     NameSource: "setting" | "install" | "kubeconfig" | "address"
+    /** @description A variable and its value. */
+    NameValue: {
+      /** @description The variable's name. */
+      name: string
+      /** @description Its value. */
+      value: string
+    }
     /** @description One namespace's pods together. */
     NamespaceUsage: {
       /**
@@ -8356,6 +8367,11 @@ export interface components {
       /** @description The settings ConfigMap or the store, when the person may not read it. */
       unreadable: components["schemas"]["UnreadableView"][]
     }
+    /**
+     * @description How much a new service asks for.
+     * @enum {string}
+     */
+    ServiceSize: "small" | "medium" | "large"
     /** @description A service's health, the word for it, and why when a pod keeps failing. */
     ServiceStatus: {
       /** @description What its status dot shows. */
@@ -9022,6 +9038,40 @@ export interface components {
       unreadable: components["schemas"]["UnreadableView"][]
       /** @description Nodes system-upgrade-controller is upgrading now. */
       upgrading: string[]
+    }
+    /**
+     * @description How Zeabur Builder builds an uploaded folder.
+     * @enum {string}
+     */
+    UploadMethod: "railpack" | "dockerfile"
+    /** @description A [`Change::CreateUploadService`]. */
+    UploadServiceChange: {
+      /** @description Variables of the build, kept in the Secret `<name>-build-env`. */
+      buildVariables?: components["schemas"]["NameValue"][]
+      /** @description The folder inside the upload to build. Left out: the whole upload. */
+      directory?: string | null
+      /** @description The Dockerfile, relative to the directory, for [`UploadMethod::Dockerfile`]. */
+      dockerfile?: string | null
+      /** @description A public hostname for the port, with HTTPS where the cluster has an issuer. */
+      host?: string | null
+      /** @description How the folder is built. */
+      method: components["schemas"]["UploadMethod"]
+      /** @description The service's name, which its `Build`, workload and Service share. */
+      name: string
+      /**
+       * Format: int32
+       * @description The port the app listens on. Left out: a worker, which takes no connections.
+       */
+      port?: number | null
+      /**
+       * @description A value the `Build` has not been asked with before, for its upload token (see
+       *     [`Change::UploadToken`]).
+       */
+      request: string
+      security?: components["schemas"]["PodSecurityLevel"] | null
+      size?: components["schemas"]["ServiceSize"] | null
+      /** @description Variables of the app, kept in the Secret `<name>-env`. `PORT` is added from `port`. */
+      variables?: components["schemas"]["NameValue"][]
     }
     /** @description The folder as pushed. */
     UploadedSource: {

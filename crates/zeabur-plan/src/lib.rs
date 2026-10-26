@@ -29,14 +29,16 @@ mod shared;
 mod tasks;
 pub mod terminal;
 pub mod token;
+mod upload_service;
 
 pub use certificates::{CheckedCertificate, IssuerRead, own_secret_name};
 pub use change::{
     AddDomainChange, BasicAuthUser, BuildOptionsChange, CertificateChange, CertificateSource,
     Change, ConnectionRef, CopyS3KeysChange, DataEdit, DataKind, EgressLimitChange,
     EnvImportChange, ErrorPageHtml, FieldOwners, GatewayParent, HttpOnlyReason, IpAllowChange,
-    KeptReason, LabelVolumeChange, ObjectName, Plan, PlanRequest, PlannedObject, ProbeKind,
-    PublicPortChange, RouteKind, RouteRef, Target, TemplateChange, Warning, Write,
+    KeptReason, LabelVolumeChange, NameValue, ObjectName, Plan, PlanRequest, PlannedObject,
+    ProbeKind, PublicPortChange, RouteKind, RouteRef, ServiceSize, Target, TemplateChange,
+    UploadMethod, UploadServiceChange, Warning, Write,
 };
 pub use checks::{AccessMode, ProbeHandler, ProbeRequest, ResourceRef, VolumeRequest};
 pub use create::{ServedKind, created_object, resolve};

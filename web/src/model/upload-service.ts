@@ -1,13 +1,11 @@
-// A service from an uploaded folder: Zeabur Builder's Build with an archive source, and the
-// objects of an image service whose image is the Build's, as for Git (git-service.ts). The Build
-// is created with a token request, which Zeabur Builder answers; the folder goes up after that
+// A service from an uploaded folder: one change, which the server turns into Zeabur Builder's
+// Build with an archive source and the objects of the service that runs its image. The Build is
+// created with a token request, which Zeabur Builder answers; the folder goes up after that
 // (upload.ts).
 import type { Schemas } from "@/api/client"
-import { builtObjects, builtProblems, cleanPath, type BuiltService } from "@/model/git-service"
-import type { DomainSettings } from "@/model/image-service"
+import { builtProblems, cleanPath, type BuiltService } from "@/model/git-service"
 
 type Change = Schemas["Change"]
-type Manifest = Record<string, unknown>
 
 /** `directory` is the folder inside the upload to build (empty: the whole upload). */
 export type UploadService = BuiltService
@@ -39,44 +37,25 @@ export function uploadProblems(
   return { ...builtProblems(form, { taken, badEnv, badBuildEnv }), folder: !hasFolder }
 }
 
-/** The Build's `spec.source`: an uploaded folder, with no digest until it is pushed. */
-function archiveSource(form: UploadService): Manifest {
+/** The change that makes the service; the server builds the Build and the objects that run it. */
+export function createUploadService(form: UploadService, request: string): Change {
+  const port = form.port.trim()
   const directory = cleanPath(form.directory)
   const dockerfile = form.method === "dockerfile" ? cleanPath(form.dockerfile) : ""
   return {
-    archive: {
-      ...(directory ? { contextDir: directory } : {}),
-      ...(dockerfile ? { dockerfile } : {}),
-    },
+    op: "createUploadService",
+    name: form.name,
+    request,
+    method: form.method,
+    ...(directory ? { directory } : {}),
+    ...(dockerfile ? { dockerfile } : {}),
+    ...(port ? { port: Number(port) } : {}),
+    ...(port && form.publicUrl ? { host: form.host.trim() } : {}),
+    variables: form.variables.flatMap((v) =>
+      "value" in v ? [{ name: v.name, value: v.value }] : [],
+    ),
+    buildVariables: form.buildVariables,
+    size: form.size,
+    security: form.security,
   }
-}
-
-/** The annotation whose value Zeabur Builder answers with an upload token. */
-export const UPLOAD_TOKEN_REQUEST = "builder.zeabur.com/upload-token-request"
-
-/** The objects the form creates; the Build asks for its upload token as it is made. */
-export function uploadObjects(
-  form: UploadService,
-  project: string,
-  registry: string,
-  domains: DomainSettings,
-  request: string,
-): Manifest[] {
-  return builtObjects(form, project, registry, domains, {
-    source: archiveSource(form),
-    annotations: { [UPLOAD_TOKEN_REQUEST]: request },
-  })
-}
-
-export function createUploadService(
-  form: UploadService,
-  project: string,
-  registry: string,
-  domains: DomainSettings,
-  request: string,
-): Change[] {
-  return uploadObjects(form, project, registry, domains, request).map((object) => ({
-    op: "create",
-    object: object as Record<string, never>,
-  }))
 }

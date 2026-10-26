@@ -35,7 +35,7 @@ export function UploadDrawer({ project, onClose }: { project: string; onClose: (
   const built = useBuiltForm<UploadService>(project, newUploadService, (_, taken) =>
     ready?.name ? nameFromImage(ready.name.toLowerCase(), taken) : "",
   )
-  const { name, domains, registry } = built
+  const { name } = built
   const problems = uploadProblems(built.resolved, {
     taken: built.taken,
     badEnv: built.badEnv.length > 0,
@@ -53,7 +53,7 @@ export function UploadDrawer({ project, onClose }: { project: string; onClose: (
     if (blocked) return
     planner.plan({
       title: t("add.planUpload", name),
-      changes: createUploadService(built.resolved, project, registry, domains, request),
+      changes: [createUploadService(built.resolved, request)],
     })
   }
 

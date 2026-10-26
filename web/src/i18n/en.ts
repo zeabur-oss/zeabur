@@ -1683,6 +1683,8 @@ export const en = {
   "confirm.maintenanceOff": (host: string) => `Send visitors of ${host} to the service again.`,
   "confirm.copyS3Keys": (name: string, destination: string) =>
     `Copy the keys of ${destination} into secret ${name}.`,
+  "confirm.createUploadService": (name: string) =>
+    `Create service ${name} and the build that runs the folder you uploaded.`,
   "confirm.deployKey": (name: string) => `Create secret ${name} with the new deploy key.`,
   "confirm.isolates": (name: string) =>
     `${name} then accepts and sends only what this and other policies allow; the cluster blocks the rest.`,

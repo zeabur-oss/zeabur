@@ -98,7 +98,7 @@ pub fn validate_env(changes: &[EnvEdit]) -> Result<(), Refusal> {
     Ok(())
 }
 
-fn is_c_identifier(name: &str) -> bool {
+pub(crate) fn is_c_identifier(name: &str) -> bool {
     let mut bytes = name.bytes();
     bytes
         .next()

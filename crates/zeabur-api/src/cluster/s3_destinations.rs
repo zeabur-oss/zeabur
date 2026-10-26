@@ -459,6 +459,7 @@ pub(crate) async fn open(
             | Change::SecurityProfile { .. }
             | Change::Edit { .. }
             | Change::Create { .. }
+            | Change::CreateUploadService(_)
             | Change::DeployKey { .. }
             | Change::Delete { .. }
             | Change::Adopt

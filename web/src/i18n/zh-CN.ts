@@ -1540,6 +1540,7 @@ export const zhCN: Messages = {
   "confirm.maintenanceOff": (host) => `${host} 的访客重新连到服务。`,
   "confirm.copyS3Keys": (name, destination) =>
     `创建机密变量 ${name}，复制 S3 目的地 ${destination} 的密钥。`,
+  "confirm.createUploadService": (name) => `创建服务 ${name}，并用你上传的文件夹构建。`,
   "confirm.deployKey": (name) => `用新的部署密钥创建机密变量 ${name}。`,
   "confirm.isolates": (name) =>
     `之后 ${name} 只收发这条和其他连接规则允许的流量，集群会拦截其余流量。`,

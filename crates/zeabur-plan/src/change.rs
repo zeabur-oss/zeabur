@@ -319,6 +319,10 @@ pub enum Change {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         yaml: Option<String>,
     },
+    /// Create a service that runs a folder the person uploads: a Zeabur Builder `Build` with an
+    /// uploaded-folder source that asks for its upload token, and the objects of the service that
+    /// runs the image it builds (see the `upload_service` module).
+    CreateUploadService(UploadServiceChange),
     /// Create the Secret that holds an SSH deploy key Zeabur generated, for Zeabur Builder to
     /// fetch a private repository: a `kubernetes.io/ssh-auth` Secret with the private key and the
     /// Git host's `known_hosts`, labelled `builder.zeabur.com/git-credentials: "true"`. The key is
@@ -593,6 +597,80 @@ pub struct BuildOptionsChange {
     /// `secretName` and `key`.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub env: Vec<EnvEdit>,
+}
+
+/// How Zeabur Builder builds an uploaded folder.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[serde(rename_all = "camelCase")]
+pub enum UploadMethod {
+    /// Railpack picks the language.
+    Railpack,
+    /// The folder's Dockerfile.
+    Dockerfile,
+}
+
+/// How much a new service asks for.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[serde(rename_all = "camelCase")]
+pub enum ServiceSize {
+    /// 100m CPU and 128Mi memory, at most 256Mi.
+    Small,
+    /// 250m CPU and 256Mi memory, at most 512Mi.
+    Medium,
+    /// 500m CPU and 512Mi memory, at most 1Gi.
+    Large,
+}
+
+/// A variable and its value.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[serde(rename_all = "camelCase")]
+pub struct NameValue {
+    /// The variable's name.
+    pub name: String,
+    /// Its value.
+    pub value: String,
+}
+
+/// A [`Change::CreateUploadService`].
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[serde(rename_all = "camelCase")]
+pub struct UploadServiceChange {
+    /// The service's name, which its `Build`, workload and Service share.
+    pub name: String,
+    /// A value the `Build` has not been asked with before, for its upload token (see
+    /// [`Change::UploadToken`]).
+    pub request: String,
+    /// How the folder is built.
+    pub method: UploadMethod,
+    /// The folder inside the upload to build. Left out: the whole upload.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub directory: Option<String>,
+    /// The Dockerfile, relative to the directory, for [`UploadMethod::Dockerfile`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dockerfile: Option<String>,
+    /// The port the app listens on. Left out: a worker, which takes no connections.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub port: Option<u16>,
+    /// A public hostname for the port, with HTTPS where the cluster has an issuer.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub host: Option<String>,
+    /// Variables of the app, kept in the Secret `<name>-env`. `PORT` is added from `port`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub variables: Vec<NameValue>,
+    /// Variables of the build, kept in the Secret `<name>-build-env`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub build_variables: Vec<NameValue>,
+    /// What the app asks for. Left out: small.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub size: Option<ServiceSize>,
+    /// `restricted` or `baseline`. Left out: `restricted` for Railpack, whose images run as a
+    /// regular user, and `baseline` for a Dockerfile, which often runs as root.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub security: Option<PodSecurityLevel>,
 }
 
 /// A [`Change::PublicPort`].

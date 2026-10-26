@@ -158,8 +158,12 @@ impl Planner<'_> {
         let Some(object) = created_object(change) else {
             return Ok(());
         };
-        let object = object?;
-        let target = self.created_target(&object)?;
+        self.create_object(&object?, index)
+    }
+
+    /// The same for an object the planner made itself.
+    pub(crate) fn create_object(&mut self, object: &Value, index: usize) -> Result<(), PlanError> {
+        let target = self.created_target(object)?;
         let namespace = self.input.snapshot.namespace.clone();
         let mut metadata = Map::new();
         metadata.insert("name".to_owned(), json!(target.name));

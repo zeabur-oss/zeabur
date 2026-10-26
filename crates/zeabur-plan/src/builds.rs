@@ -64,7 +64,7 @@ const MAX_BUILD_PATH: usize = 1024;
 
 /// Whether `path` is a relative path that the `Build` accepts: no segment starts with `.`, so
 /// the path cannot climb out with `..`.
-fn build_path(path: &str) -> bool {
+pub(crate) fn build_path(path: &str) -> bool {
     path.len() <= MAX_BUILD_PATH
         && path.split('/').all(|segment| {
             segment

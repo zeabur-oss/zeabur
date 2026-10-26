@@ -21,10 +21,6 @@ use crate::{output, pack};
 
 /// How long the controller may take to answer an upload token request.
 const TOKEN_WAIT: Duration = Duration::from_secs(60);
-/// The webhook Keel is told of a new image at, as the web interface names it.
-const KEEL_WEBHOOK: &str = "http://keel.keel.svc.cluster.local:9300/v1/webhooks/native";
-/// The annotation whose value Zeabur Builder answers with an upload token.
-const TOKEN_REQUEST: &str = "builder.zeabur.com/upload-token-request";
 /// The longest service name.
 const NAME_MAX: usize = 40;
 
@@ -186,15 +182,6 @@ fn folder_name(path: &Path) -> String {
     }
 }
 
-/// Whether `name` is a service name the web interface accepts.
-fn valid_name(name: &str) -> bool {
-    let mut chars = name.chars();
-    name.len() <= NAME_MAX
-        && chars.next().is_some_and(|c| c.is_ascii_lowercase())
-        && !name.ends_with('-')
-        && chars.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
-}
-
 /// What a problem says, for the terminal.
 fn said(problem: &Value) -> String {
     problem
@@ -306,89 +293,8 @@ fn choose_service(target: &Target, ask: &mut Ask<'_>) -> Result<String, String> 
     })
 }
 
-/// The objects of a new upload service, as the web interface makes them: the app, a Service when
-/// it has a port, and the `Build` that asks for its upload token as it is made.
-fn new_service(
-    project: &str,
-    name: &str,
-    registry: &str,
-    target: &Target,
-    request: &str,
-) -> Vec<Value> {
-    let labels = json!({"app.kubernetes.io/name": name});
-    let repository = format!("{}/{project}/{name}", registry.trim_end_matches('/'));
-    let restricted = target.method == Method::Railpack;
-    let (pod_security, container_security) = if restricted {
-        (
-            json!({"automountServiceAccountToken": false,
-                "securityContext": {"runAsNonRoot": true, "seccompProfile": {"type": "RuntimeDefault"}}}),
-            json!({"securityContext": {"allowPrivilegeEscalation": false,
-                "capabilities": {"drop": ["ALL"]}}}),
-        )
-    } else {
-        (
-            json!({"automountServiceAccountToken": false,
-                "securityContext": {"seccompProfile": {"type": "RuntimeDefault"}}}),
-            json!({"securityContext": {"allowPrivilegeEscalation": false}}),
-        )
-    };
-    let mut container = json!({
-        "name": name,
-        "image": format!("{repository}:pending"),
-        "resources": {"requests": {"cpu": "100m", "memory": "128Mi"},
-            "limits": {"memory": "256Mi"}},
-    });
-    let mut pod = pod_security;
-    let mut objects = Vec::new();
-    if let (Some(container), Some(security)) =
-        (container.as_object_mut(), container_security.as_object())
-    {
-        container.extend(security.clone());
-        if let Some(port) = target.port {
-            container.insert("ports".to_owned(), json!([{"containerPort": port}]));
-            container.insert(
-                "readinessProbe".to_owned(),
-                json!({"tcpSocket": {"port": port}}),
-            );
-            container.insert(
-                "envFrom".to_owned(),
-                json!([{"secretRef": {"name": format!("{name}-env")}}]),
-            );
-            objects.push(json!({"apiVersion": "v1", "kind": "Secret",
-                "metadata": {"name": format!("{name}-env"), "labels": labels},
-                "type": "Opaque", "stringData": {"PORT": port.to_string()}}));
-        }
-    }
-    if let Some(pod) = pod.as_object_mut() {
-        pod.insert("containers".to_owned(), json!([container]));
-    }
-    objects.push(json!({"apiVersion": "apps/v1", "kind": "Deployment",
-        "metadata": {"name": name, "labels": labels,
-            "annotations": {"keel.sh/policy": "force"}},
-        "spec": {"replicas": 1, "selector": {"matchLabels": labels},
-            "template": {"metadata": {"labels": labels}, "spec": pod}}}));
-    if let Some(port) = target.port {
-        objects.push(json!({"apiVersion": "v1", "kind": "Service",
-            "metadata": {"name": name, "labels": labels},
-            "spec": {"selector": labels,
-                "ports": [{"name": "http", "port": port, "targetPort": port}]}}));
-    }
-    objects.push(
-        json!({"apiVersion": "builder.zeabur.com/v1alpha1", "kind": "Build",
-        "metadata": {"name": name, "labels": labels,
-            "annotations": {TOKEN_REQUEST: request}},
-        "spec": {"builderRef": match target.method {
-                Method::Railpack => "railpack",
-                Method::Dockerfile => "dockerfile",
-            },
-            "source": {"archive": {}},
-            "output": {"image": repository},
-            "notify": [{"type": "keel", "url": KEEL_WEBHOOK}]}}),
-    );
-    objects
-}
-
-/// Makes the service `name` in `project`.
+/// Makes the service `name` in `project`: one change, which Zeabur turns into the objects the
+/// web interface makes.
 async fn create_service(
     server: &Server,
     project: &str,
@@ -396,22 +302,19 @@ async fn create_service(
     target: &Target,
     request: &str,
 ) -> Result<(), String> {
-    if !valid_name(name) {
-        return Err(format!(
-            "{name:?} is not a service name: use lower case letters, digits and hyphens, start with a letter, at most {NAME_MAX} characters."
-        ));
+    let mut change = json!({
+        "op": "createUploadService",
+        "name": name,
+        "request": request,
+        "method": match target.method {
+            Method::Railpack => "railpack",
+            Method::Dockerfile => "dockerfile",
+        },
+    });
+    if let (Some(port), Some(change)) = (target.port, change.as_object_mut()) {
+        change.insert("port".to_owned(), json!(port));
     }
-    let cluster = server.get("/api/v1/cluster").await.map_err(|p| said(&p))?;
-    let registry = cluster
-        .pointer("/builds/registry")
-        .and_then(Value::as_str)
-        .filter(|r| !r.is_empty())
-        .ok_or("This cluster has no registry for Zeabur Builder. Ask an administrator.")?;
-    let changes = new_service(project, name, registry, target, request)
-        .into_iter()
-        .map(|object| json!({"op": "create", "object": object}))
-        .collect();
-    plan_and_apply(server, project, changes).await
+    plan_and_apply(server, project, vec![change]).await
 }
 
 /// Chooses the project and the service, makes the service when it is missing, then pushes the
@@ -526,6 +429,8 @@ mod tests {
     use zeabur_kube::{Identity, NamespaceObjects, ServedResource, WriteBody};
 
     use super::*;
+
+    const TOKEN_REQUEST: &str = "builder.zeabur.com/upload-token-request";
 
     /// A registry that takes everything and says where to go on.
     async fn registry() -> String {
@@ -883,8 +788,6 @@ mod tests {
             std::fs::create_dir(&path).unwrap();
             let name = folder_name(&path);
             assert_eq!(name, expected, "{folder}");
-            assert!(valid_name(&name), "{name}");
         }
-        assert!(!valid_name("Site") && !valid_name("a_b") && !valid_name(&"a".repeat(41)));
     }
 }

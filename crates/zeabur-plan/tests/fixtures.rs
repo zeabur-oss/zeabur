@@ -241,6 +241,7 @@ mod tests {
             issuers: &issuers,
             certificates: &certificates,
             platform_namespaces: false,
+            build_registry: params.get("buildRegistry").and_then(Value::as_str),
         };
         match plan(input, &request) {
             Ok(plan) => to_value(plan).unwrap(),

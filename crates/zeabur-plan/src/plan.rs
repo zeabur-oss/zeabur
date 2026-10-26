@@ -202,6 +202,9 @@ pub struct Input<'a> {
     /// Some namespace carries [`zeabur_model::kernel::isolation::PLATFORM_LABEL`]: a new project
     /// gets its `NetworkPolicy`.
     pub platform_namespaces: bool,
+    /// The registry Zeabur Builder pushes to and nodes pull from (`builds.registry`); `None`:
+    /// services are not built in this cluster.
+    pub build_registry: Option<&'a str>,
 }
 
 impl<'a> Input<'a> {
@@ -234,6 +237,7 @@ impl<'a> Input<'a> {
             issuers: &NO_ISSUERS,
             certificates: &NO_CERTIFICATES,
             platform_namespaces: false,
+            build_registry: None,
         }
     }
 }
@@ -460,6 +464,7 @@ impl<'a> Planner<'a> {
             Change::EnvImport(import) => self.env_import(import),
             Change::PublicPort(public) => self.public_port(public),
             Change::Create { .. } => self.create(change, index),
+            Change::CreateUploadService(service) => self.create_upload_service(service, index),
             Change::Restart { workload } => self.restart_workload(workload),
             Change::Rollback { workload, revision } => self.rollback(workload, *revision),
             Change::ExpandVolume { claim, size } => self.expand_volume(claim, size),

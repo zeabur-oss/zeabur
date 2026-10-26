@@ -719,6 +719,18 @@ group("deploying from Git", () => {
   })
 })
 
+group("deploying an uploaded folder", () => {
+  const changes: Schemas["Change"][] = [
+    { op: "createUploadService", name: "site", request: "u1", method: "railpack" },
+  ]
+
+  test("one sentence names the service, and the button creates", () => {
+    const d = describe(t, { changes }, plan(), pods({}))
+    expect(d.lines).toContain("confirm.createUploadService(site)")
+    expect(actionOf(t, { changes })).toBe("action.create")
+  })
+})
+
 group("a deleted claim's data", () => {
   const warning = (
     reclaimPolicy?: string,
