@@ -535,7 +535,7 @@ test("Objects lists the project's objects and opens one as YAML", async ({ page 
   await list.getByRole("button", { name: /^editor-config/ }).click()
   await expect(page).toHaveURL(/object=core(%2F|\/)v1(%2F|\/)configmaps(%2F|\/)editor-config/)
   const panel = page.getByRole("dialog").filter({ hasText: "editor-config" })
-  await panel.getByRole("tab", { name: "YAML" }).click()
+  await panel.getByRole("button", { name: "YAML", exact: true }).click()
   await expect(panel.getByRole("figure", { name: "YAML of editor-config" })).toContainText(
     /mode: (blue|green)/,
   )
@@ -560,7 +560,7 @@ test("Objects reads every served kind when it opens", async ({ page }) => {
 
 test("YAML never shows a Secret's values", async ({ page }) => {
   await page.goto(`${project}/objects?object=core/v1/secrets/${secret}`)
-  await page.getByRole("tab", { name: "YAML" }).click()
+  await page.getByRole("button", { name: "YAML", exact: true }).click()
   const yaml = page.getByRole("figure", { name: `YAML of ${secret}` })
   await expect(yaml).toContainText("kind: Secret")
   await expect(yaml).toContainText("greeting")
@@ -727,7 +727,7 @@ test("restart of a single pod is confirmed in full, then reported in a toast", a
     `${editor} has one replica, so it may be down for a few seconds while it restarts.`,
   )
   await expect(dialog).not.toContainText("restartedAt")
-  await dialog.getByRole("button", { name: "Technical details" }).click()
+  await dialog.getByRole("button", { name: "YAML", exact: true }).click()
   await expect(dialog).toContainText("restartedAt")
   const applied = await confirmPlan(page, `Restart ${editor}`, "Restart")
   await expect(applied).toContainText(`Restart ${editor}`)
@@ -861,7 +861,7 @@ test("Deployments lists the releases and rolls back to one through a plan", asyn
 test("an object's YAML is edited and planned", async ({ page }) => {
   await page.goto(`${project}/objects?object=core/v1/configmaps/editor-config`)
   const panel = page.getByRole("dialog").filter({ hasText: "editor-config" })
-  await panel.getByRole("tab", { name: "YAML" }).click()
+  await panel.getByRole("button", { name: "YAML", exact: true }).click()
   await panel.getByRole("button", { name: "Edit" }).click()
   const text = panel.getByRole("textbox", { name: "YAML of editor-config" })
   await expect(panel.locator(".cm-editor")).toHaveCSS("display", "flex")
@@ -1049,7 +1049,7 @@ test("a ready-made policy is undone from its toast, and deleted from Objects onc
   await allowIngress()
   const address = `networking.k8s.io/v1/networkpolicies/${policy}`
   await page.goto(`${project}/objects?object=${encodeURIComponent(address)}`)
-  await page.getByRole("tab", { name: "YAML" }).click()
+  await page.getByRole("button", { name: "YAML", exact: true }).click()
   await page.getByRole("button", { name: "Delete", exact: true }).click()
   const dialog = page.getByRole("dialog", {
     name: `Delete NetworkPolicy ${policy}`,

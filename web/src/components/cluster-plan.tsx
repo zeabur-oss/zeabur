@@ -2,24 +2,20 @@
 // the plan until its token runs out.
 import type { UseMutationResult, UseQueryResult } from "@tanstack/react-query"
 import type { ReactNode } from "react"
-import CaretRightIcon from "~icons/ph/caret-right"
 import WarningCircleIcon from "~icons/ph/warning-circle"
 
 import type { Schemas } from "@/api/client"
+import { DescribeYaml } from "@/components/describe-yaml"
 import { Frame } from "@/components/members/frame"
 import { LoadingRows } from "@/components/page"
 import { COUNTDOWN_FROM_SECONDS, clock, useSecondsLeft } from "@/components/plan/expiry"
 import { Problem } from "@/components/problem"
 import { YamlBlock, YamlDiff } from "@/components/yaml"
 import { useT } from "@/i18n"
+import { kindName } from "@/i18n/kind-name"
 import { subjectName } from "@/model/node-shell"
 import { Alert, AlertDescription, AlertTitle } from "@zeabur/design-system/components/alert"
 import { Button } from "@zeabur/design-system/components/button"
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@zeabur/design-system/components/collapsible"
 
 /** A plan dialog: planning, then what the plan does, and a footer that applies it. */
 export function PlanFrame<P extends { expiresAt: string; token?: string | null }>({
@@ -141,16 +137,29 @@ function Expiry({ left }: { left: number | undefined }) {
 export function PlanWrites({ writes }: { writes: Schemas["ShellWrite"][] }) {
   const t = useT()
   return (
-    <Details>
-      {writes.map((write) => {
-        const label = `${write.kind}/${write.name}`
-        return (
-          <WriteSection key={label} label={label} meta={t(`nodeShell.write.${write.action}`)}>
-            {write.yaml ? <YamlBlock yaml={write.yaml} label={label} /> : null}
-          </WriteSection>
-        )
-      })}
-    </Details>
+    <DescribeYaml
+      describe={
+        <WrittenList
+          items={writes.map((write) => ({
+            kind: write.kind,
+            name: write.name,
+            state: t(`nodeShell.write.${write.action}`),
+          }))}
+        />
+      }
+      yaml={
+        <div className="flex flex-col gap-4">
+          {writes.map((write) => {
+            const label = `${write.kind}/${write.name}`
+            return (
+              <WriteSection key={label} label={label} meta={t(`nodeShell.write.${write.action}`)}>
+                {write.yaml ? <YamlBlock yaml={write.yaml} label={label} /> : null}
+              </WriteSection>
+            )
+          })}
+        </div>
+      }
+    />
   )
 }
 
@@ -166,33 +175,69 @@ export function PlanDiffs({
     afterYaml?: string | null
   }[]
 }) {
+  const t = useT()
+  const stateOf = (write: (typeof writes)[number]) =>
+    !write.beforeYaml
+      ? t("plan.create")
+      : !write.afterYaml
+        ? t("plan.delete")
+        : t("members.plan.changed")
   return (
-    <Details>
-      {writes.map((write) => (
-        <WriteSection
-          key={`${write.namespace}/${write.kind}/${write.name}`}
-          label={`${write.kind}/${write.name}`}
-          meta={write.namespace}
-        >
-          <YamlDiff before={write.beforeYaml ?? ""} after={write.afterYaml ?? ""} />
-        </WriteSection>
-      ))}
-    </Details>
+    <DescribeYaml
+      describe={
+        <WrittenList
+          items={writes.map((write) => ({
+            kind: write.kind,
+            name: write.name,
+            state: stateOf(write),
+            place: write.namespace,
+          }))}
+        />
+      }
+      yaml={
+        <div className="flex flex-col gap-4">
+          {writes.map((write) => (
+            <WriteSection
+              key={`${write.namespace}/${write.kind}/${write.name}`}
+              label={`${write.kind}/${write.name}`}
+              meta={write.namespace}
+            >
+              <YamlDiff before={write.beforeYaml ?? ""} after={write.afterYaml ?? ""} />
+            </WriteSection>
+          ))}
+        </div>
+      }
+    />
   )
 }
 
-function Details({ children }: { children: ReactNode }) {
+/** What a plan writes, by the plain name of each kind. */
+export function WrittenList({
+  items,
+}: {
+  items: { kind: string; name: string; state: string; place?: string }[]
+}) {
   const t = useT()
   return (
-    <Collapsible>
-      <CollapsibleTrigger variant="disclosure">
-        <CaretRightIcon aria-hidden="true" />
-        {t("plan.details")}
-      </CollapsibleTrigger>
-      <CollapsibleContent>
-        <div className="flex flex-col gap-4 pt-3">{children}</div>
-      </CollapsibleContent>
-    </Collapsible>
+    <ul className="flex flex-col gap-1.5 text-sm">
+      {items.map((item) => (
+        <li
+          key={`${item.place ?? ""}/${item.kind}/${item.name}`}
+          className="flex min-w-0 flex-wrap items-baseline gap-x-2"
+        >
+          <span>{kindName(t, item.kind)}</span>
+          <span className="min-w-0 font-mono break-all" translate="no">
+            {item.name}
+          </span>
+          <span className="type-meta text-muted-foreground">{item.state}</span>
+          {item.place ? (
+            <span className="type-meta text-muted-foreground" translate="no">
+              {item.place}
+            </span>
+          ) : null}
+        </li>
+      ))}
+    </ul>
   )
 }
 

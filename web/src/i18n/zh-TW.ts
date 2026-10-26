@@ -1257,7 +1257,6 @@ export const zhTW: Messages = {
   "create.keep": "保留",
   "create.cleanupTitle": (n) => `刪除剛建立的 ${n} 個物件`,
   "objects.unpin": (kind: string) => `取消釘選 ${kind}`,
-  "object.tabs": "物件細節",
   "object.conditions": "狀況",
   "object.status": "狀態",
   "object.noStatus": "這個物件沒有回報狀態。",
@@ -1265,6 +1264,7 @@ export const zhTW: Messages = {
   "object.statusLabel": (name: string) => `${name} 的狀態`,
   "tab.yaml": "YAML",
   "yaml.hidden": "機密變數的值已隱藏。",
+  "yaml.intro": (name: string) => `這份是目前 ${name} 在叢集裡的設定，改了會照原樣寫入。`,
   "yaml.label": (name: string) => `${name} 的 YAML`,
 
   // 檢查變更
@@ -1741,6 +1741,8 @@ export const zhTW: Messages = {
   "vars.field.memoryRequest": "記憶體保留量",
   "vars.field.other": (path: string) => `副本的 ${path}`,
   "kube.details": "給 Kubernetes 使用者的細節",
+  "describe.view": "檢視",
+  "describe.describe": "描述",
   "kind.Pod": "副本",
   "kind.PersistentVolumeClaim": "磁碟",
   "kind.Secret": "機密變數",

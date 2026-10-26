@@ -24,6 +24,7 @@ import { PlanGroups } from "@/components/plan/groups-view"
 import { COUNTDOWN_FROM_SECONDS, clock, useSecondsLeft } from "@/components/plan/expiry"
 import { carryOut } from "@/components/plan/outcome"
 import type { PlanAsk, PlanHooks } from "@/components/plan/planner"
+import { DescribeYaml } from "@/components/describe-yaml"
 import { PlanPreview, useShortfall } from "@/components/plan/preview"
 import { ProjectDeletion } from "@/components/plan/project-deletion"
 import { changedSince, type Reviewed } from "@/components/plan/replan"
@@ -512,8 +513,8 @@ function PlanBody({
     ...toolNotes(plan, skipped).map((note) => noteText(t, note)),
   ]
   const grouped = !!description.facts
-  return (
-    <div className="flex flex-col gap-3">
+  const described = (
+    <>
       {alerted && first ? (
         <Alert variant={alertVariant(plan.warnings)} role="note">
           <WarningFillIcon aria-hidden="true" />
@@ -563,25 +564,9 @@ function PlanBody({
         </ul>
       ) : null}
       {grouped ? <PlanGroups edits={description.edits} outcomes={description.outcomes} /> : null}
-      <Collapsible>
-        <CollapsibleTrigger variant="disclosure" className="mt-1">
-          <CaretRightIcon aria-hidden="true" />
-          {t("plan.details")}
-        </CollapsibleTrigger>
-        <CollapsibleContent>
-          <div className="flex flex-col gap-4 pt-3">
-            {plan.objects.map((object) => (
-              <PlannedObject
-                key={`${object.target.kind}/${object.target.name}`}
-                object={object}
-                named={plan.objects.length > 1}
-              />
-            ))}
-          </div>
-        </CollapsibleContent>
-      </Collapsible>
-    </div>
+    </>
   )
+  return <DescribeYaml describe={described} yaml={plannedObjects(plan.objects)} />
 }
 
 /** "Type <name> to confirm", where the name is a button that types it. */
@@ -602,6 +587,22 @@ function TypeNameLabel({ name, onFill }: { name: string; onFill: () => void }) {
       </button>
       {after}
     </Label>
+  )
+}
+
+/** The YAML of each object, or nothing when the plan writes none. */
+function plannedObjects(objects: Schemas["PlannedObject"][]) {
+  if (objects.length === 0) return undefined
+  return (
+    <div className="flex flex-col gap-4">
+      {objects.map((object) => (
+        <PlannedObject
+          key={`${object.target.kind}/${object.target.name}`}
+          object={object}
+          named={objects.length > 1}
+        />
+      ))}
+    </div>
   )
 }
 

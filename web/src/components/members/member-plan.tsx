@@ -1,6 +1,5 @@
 import { useMutation, useQuery } from "@tanstack/react-query"
 import CaretLeftIcon from "~icons/ph/caret-left"
-import CaretRightIcon from "~icons/ph/caret-right"
 
 import type { Schemas } from "@/api/client"
 import {
@@ -9,6 +8,8 @@ import {
   refreshMembers,
   type MemberChange,
 } from "@/api/members"
+import { WrittenList } from "@/components/cluster-plan"
+import { DescribeYaml } from "@/components/describe-yaml"
 import { Consequence, Frame } from "@/components/members/frame"
 import { LoadingRows } from "@/components/page"
 import { useSecondsLeft } from "@/components/plan/expiry"
@@ -20,11 +21,6 @@ import { useT } from "@/i18n"
 import { writeCounts, writtenName, type MemberWrite } from "@/model/members"
 import { projectMention } from "@/model/project"
 import { Button } from "@zeabur/design-system/components/button"
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@zeabur/design-system/components/collapsible"
 
 /** A change to the members as its plan: what it does in words first, the objects it writes behind
  * Technical details, and the button that applies exactly that. */
@@ -152,14 +148,27 @@ function Writes({ writes }: { writes: MemberWrite[] }) {
     counts.delete > 0 ? t("members.plan.deletes", counts.delete) : "",
   ].filter(Boolean)
   return (
-    <Collapsible>
-      <CollapsibleTrigger variant="disclosure" className="mt-1">
-        <CaretRightIcon aria-hidden="true" />
-        {t("plan.details")}
-        <span className="font-normal text-muted-foreground">{said.join(t("common.sep"))}</span>
-      </CollapsibleTrigger>
-      <CollapsibleContent>
-        <div className="flex flex-col gap-4 pt-3">
+    <DescribeYaml
+      describe={
+        <div className="flex flex-col gap-2">
+          <p className="text-sm">{said.join(t("common.sep"))}</p>
+          <WrittenList
+            items={writes.map((write) => ({
+              kind: write.kind,
+              name: writtenName(write),
+              state:
+                write.action === "create"
+                  ? t("plan.create")
+                  : write.action === "delete"
+                    ? t("plan.delete")
+                    : t("members.plan.changed"),
+              place: write.namespace ?? undefined,
+            }))}
+          />
+        </div>
+      }
+      yaml={
+        <div className="flex flex-col gap-4">
           {writes.map((write, i) => (
             <Written
               key={`${i}-${write.kind}/${write.namespace ?? ""}/${write.name}`}
@@ -167,8 +176,8 @@ function Writes({ writes }: { writes: MemberWrite[] }) {
             />
           ))}
         </div>
-      </CollapsibleContent>
-    </Collapsible>
+      }
+    />
   )
 }
 

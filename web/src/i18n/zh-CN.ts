@@ -1255,7 +1255,6 @@ export const zhCN: Messages = {
   "create.keep": "保留",
   "create.cleanupTitle": (n) => `删除刚创建的 ${n} 个对象`,
   "objects.unpin": (kind: string) => `取消固定 ${kind}`,
-  "object.tabs": "对象详情",
   "object.conditions": "状况",
   "object.status": "状态",
   "object.noStatus": "这个对象没有报告状态。",
@@ -1263,6 +1262,7 @@ export const zhCN: Messages = {
   "object.statusLabel": (name: string) => `${name} 的状态`,
   "tab.yaml": "YAML",
   "yaml.hidden": "机密变量的值已隐藏。",
+  "yaml.intro": (name: string) => `这份是目前 ${name} 在集群里的配置，改了会照原样写入。`,
   "yaml.label": (name: string) => `${name} 的 YAML`,
 
   // 检查变更
@@ -1739,6 +1739,8 @@ export const zhCN: Messages = {
   "vars.field.memoryRequest": "内存预留量",
   "vars.field.other": (path: string) => `副本的 ${path}`,
   "kube.details": "给 Kubernetes 用户的细节",
+  "describe.view": "查看",
+  "describe.describe": "描述",
   "kind.Pod": "副本",
   "kind.PersistentVolumeClaim": "磁盘",
   "kind.Secret": "机密变量",

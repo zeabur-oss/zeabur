@@ -1,11 +1,11 @@
 // The server's YAML leaves out bookkeeping fields and hides a Secret's values; the status comes
 // beside it.
 import { useQuery } from "@tanstack/react-query"
-import { useState } from "react"
 import GitBranchIcon from "~icons/ph/git-branch"
 import XIcon from "~icons/ph/x"
 
 import { objectQuery, type ObjectAddress } from "@/api/queries"
+import { DescribeYaml } from "@/components/describe-yaml"
 import { ObjectOverview } from "@/components/object-overview"
 import { LoadingRows } from "@/components/page"
 import { Problem } from "@/components/problem"
@@ -17,7 +17,6 @@ import {
   DialogContent,
   DialogTitle,
 } from "@zeabur/design-system/components/dialog"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@zeabur/design-system/components/tabs"
 import { YamlView } from "@/components/yaml-view"
 import { useT } from "@/i18n"
 import { kindName } from "@/i18n/kind-name"
@@ -34,7 +33,6 @@ export function ObjectSheet({
   const t = useT()
   const object = useQuery(objectQuery(project, address, { poll: true }))
   const kind = object.data?.origin.kind
-  const [tab, setTab] = useState<"overview" | "yaml">("overview")
   return (
     <Dialog open onOpenChange={(open) => (open ? undefined : onClose())}>
       <DialogContent variant="panel">
@@ -47,7 +45,7 @@ export function ObjectSheet({
               className="ml-2 shrink-0 type-meta font-normal text-muted-foreground"
               translate="no"
             >
-              {kind && kindName(t, kind) !== kind ? `${kindName(t, kind)} · ` : ""}
+              {kind && kindName(t, kind) !== kind ? `${kindName(t, kind)}${t("common.sep")}` : ""}
               {kind ?? address.resource}
               {address.group ? ` ${address.group}` : ""}
             </span>
@@ -80,28 +78,17 @@ export function ObjectSheet({
             <Problem error={object.error} />
           </div>
         ) : (
-          <Tabs
-            value={tab}
-            onValueChange={(value) => setTab(value === "yaml" ? "yaml" : "overview")}
-            variant="page"
-            className="min-h-0 flex-1"
-          >
-            <div className="px-6 pt-4">
-              <TabsList aria-label={t("object.tabs")}>
-                <TabsTrigger value="overview">{t("tab.overview")}</TabsTrigger>
-                <TabsTrigger value="yaml">{t("tab.yaml")}</TabsTrigger>
-              </TabsList>
-            </div>
-            <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
-              <TabsContent value="overview">
+          <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
+            <DescribeYaml
+              describe={
                 <ObjectOverview
                   project={project}
                   address={address}
                   kind={object.data.origin.kind}
                   status={object.data.status}
                 />
-              </TabsContent>
-              <TabsContent value="yaml">
+              }
+              yaml={
                 <YamlView
                   project={project}
                   address={address}
@@ -110,9 +97,10 @@ export function ObjectSheet({
                   kind={kind}
                   onDeleted={onClose}
                 />
-              </TabsContent>
-            </div>
-          </Tabs>
+              }
+              className="flex flex-col gap-4"
+            />
+          </div>
         )}
       </DialogContent>
     </Dialog>

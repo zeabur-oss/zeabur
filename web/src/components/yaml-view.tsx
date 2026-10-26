@@ -84,10 +84,11 @@ export function YamlView({
     return (
       <div className="flex flex-col gap-2">
         <div className="flex items-center gap-2">
-          {address.resource === "secrets" ? (
-            <p className="type-meta text-muted-foreground">{t("yaml.hidden")}</p>
-          ) : null}
-          <span className="ml-auto flex gap-1.5">
+          <p className="min-w-0 type-meta text-muted-foreground">
+            {t("yaml.intro", address.name)}
+            {address.resource === "secrets" ? ` ${t("yaml.hidden")}` : ""}
+          </p>
+          <span className="ml-auto flex shrink-0 gap-1.5">
             {onDeleted ? (
               undeletable ? (
                 <Tooltip content={undeletable}>

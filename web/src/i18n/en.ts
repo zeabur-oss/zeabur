@@ -1300,7 +1300,6 @@ export const en = {
   "objects.denied": "No access",
   "objects.pin": (kind: string) => `Pin ${kind}`,
   "objects.unpin": (kind: string) => `Unpin ${kind}`,
-  "object.tabs": "Object details",
   "object.conditions": "Conditions",
   "object.status": "Status",
   "object.noStatus": "This object reports no status.",
@@ -1356,6 +1355,8 @@ export const en = {
     n === 1 ? "Delete the object just created" : `Delete the ${n} objects just created`,
   "tab.yaml": "YAML",
   "yaml.hidden": "Secret values are hidden.",
+  "yaml.intro": (name: string) =>
+    `This is how ${name} is set up in the cluster now. A change is written as you make it.`,
   "yaml.label": (name: string) => `YAML of ${name}`,
 
   // Plans
@@ -1882,6 +1883,8 @@ export const en = {
   "vars.field.memoryRequest": "The reserved memory",
   "vars.field.other": (path: string) => `The replica's ${path}`,
   "kube.details": "Details for Kubernetes users",
+  "describe.view": "View",
+  "describe.describe": "Description",
   "kind.Pod": "Replica",
   "kind.PersistentVolumeClaim": "Disk",
   "kind.Secret": "Secret",
