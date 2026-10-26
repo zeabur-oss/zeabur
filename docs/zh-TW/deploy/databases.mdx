@@ -157,6 +157,549 @@ PostgreSQL、MongoDB、MySQL、MariaDB 只會列出成功且含還原資訊的�
 
 下載的傾印檔可交給相應資料庫工具處理。**還原成新的資料庫** 使用的是 S3 備份紀錄，沒有上傳傾印檔的欄位。
 
+## 確認結果
+
+資料庫頁面顯示 **就緒**，**連線** 列出主機和連接埠，就可以使用。設定備份後，**備份紀錄** 的第一筆顯示成功，才有可以還原的備份。
+
+用 kubectl 等資料庫就緒，每種引擎看的欄位不同：
+
+```sh
+kubectl -n shop wait --for=condition=Ready cluster.postgresql.cnpg.io/orders --timeout=10m
+kubectl -n shop wait --for=jsonpath='{.status.state}'=ready psmdb/catalog --timeout=10m
+kubectl -n shop wait --for=condition=Healthy mysqlcluster/shopdb --timeout=10m
+kubectl -n shop wait --for=condition=Ready mariadb/blogdb --timeout=10m
+kubectl -n shop wait --for=jsonpath='{.status.phase}'=Ready dragonfly/cache --timeout=10m
+```
+
+Zeabur 建立的資料庫物件、機密和備份設定都帶有 `zeabur.com/database: <名稱>`，用它列出同一個資料庫的物件：
+
+```sh
+kubectl -n shop get secret,job -l zeabur.com/database=shopdb
+```
+
+MySQL 另有 `shopdb-app-setup` Job，它建立資料庫 `app` 和使用者 `app`，`COMPLETIONS` 是 `1/1` 後應用程式才連得上。
+
+備份紀錄是 operator 的物件：
+
+```sh
+kubectl -n shop get backups.postgresql.cnpg.io -l zeabur.com/database=orders
+kubectl -n shop get psmdb-backup
+kubectl -n shop get backups.k8s.mariadb.com
+```
+
+PostgreSQL 的 Backup `PHASE` 是 `completed`，MongoDB 的備份 `STATUS` 是 `ready`，就是成功。MySQL 的排程備份是 MOCO 建立的 CronJob，看 `kubectl -n shop get cronjob,job` 的結果。
+
+## 用 kubectl 做同樣的事
+
+資料庫由各引擎的 operator 管理，Zeabur 只寫 operator 讀的物件。移除 Zeabur 後，operator 照樣運作。下面的 YAML 都是表單用預設值（一個執行個體、**小** 規格）建立的內容，存成檔案後用 `kubectl -n shop apply -f <檔案>` 套用。`<24 個英數字>` 換成自己產生的密碼，例如 `openssl rand -base64 18 | tr -d '/+='`。
+
+<Tabs items={["PostgreSQL", "MongoDB", "MySQL", "MariaDB", "Dragonfly"]}>
+<Tab value="PostgreSQL">
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: orders
+  labels:
+    zeabur.com/database: orders
+spec:
+  instances: 1
+  imageName: ghcr.io/cloudnative-pg/postgresql:18-standard-trixie
+  storage:
+    size: 5Gi
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 512Mi
+```
+
+CloudNativePG 會自己建立 `orders-app` 機密，`uri` 是完整的連線字串，另有 `host`、`port`、`username`、`password`、`dbname`。服務連到 `orders-rw`，連接埠 5432。
+
+</Tab>
+<Tab value="MongoDB">
+
+```yaml
+apiVersion: psmdb.percona.com/v1
+kind: PerconaServerMongoDB
+metadata:
+  name: catalog
+  labels:
+    zeabur.com/database: catalog
+  finalizers:
+    - percona.com/delete-psmdb-pvc
+spec:
+  image: percona/percona-server-mongodb:8.0.32-14
+  unsafeFlags:
+    replsetSize: true
+  replsets:
+    - name: rs0
+      size: 1
+      env:
+        - name: GLIBC_TUNABLES
+          value: glibc.pthread.rseq=1
+      resources:
+        requests:
+          cpu: 100m
+          memory: 512Mi
+        limits:
+          memory: 1Gi
+      volumeSpec:
+        persistentVolumeClaim:
+          resources:
+            requests:
+              storage: 10Gi
+  sharding:
+    enabled: false
+  users:
+    - name: app
+      db: app
+      roles:
+        - name: readWrite
+          db: app
+  backup:
+    enabled: false
+    image: percona/percona-backup-mongodb:2.15.0
+```
+
+只有一個或兩個成員時要加 `unsafeFlags.replsetSize: true`。MongoDB 7.0 改用 `percona/percona-server-mongodb:7.0.43-23`，不需要 `GLIBC_TUNABLES`。operator 把使用者 `app` 的密碼放在 `catalog-custom-user-secret` 的 `app`，服務連到 `catalog-rs0`，連接埠 27017。
+
+</Tab>
+<Tab value="MySQL">
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: shopdb-app
+  labels:
+    zeabur.com/database: shopdb
+type: Opaque
+stringData:
+  password: <24 個英數字>
+---
+apiVersion: moco.cybozu.com/v1beta2
+kind: MySQLCluster
+metadata:
+  name: shopdb
+  labels:
+    zeabur.com/database: shopdb
+  annotations:
+    zeabur.com/app-database: app
+    zeabur.com/app-secret: shopdb-app
+spec:
+  replicas: 1
+  podTemplate:
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10000
+        runAsGroup: 10000
+        fsGroup: 10000
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: mysqld
+          image: ghcr.io/cybozu-go/moco/mysql:8.4.10
+          resources:
+            requests:
+              cpu: 100m
+              memory: 512Mi
+            limits:
+              memory: 1Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+    overwriteContainers:
+      - name: agent
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop: [ALL]
+      - name: moco-init
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop: [ALL]
+      - name: slow-log
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop: [ALL]
+  volumeClaimTemplates:
+    - metadata:
+        name: mysql-data
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources:
+          requests:
+            storage: 10Gi
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: shopdb-app-setup
+  labels:
+    zeabur.com/database: shopdb
+spec:
+  backoffLimit: 6
+  template:
+    spec:
+      restartPolicy: OnFailure
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10000
+        runAsGroup: 10000
+        fsGroup: 10000
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: setup
+          image: ghcr.io/cybozu-go/moco/mysql:8.4.10
+          command:
+            - bash
+            - -c
+            - |
+              set -eu
+              sql() { mysql --defaults-extra-file=<(printf '[client]\npassword=%s\n' "$WRITABLE_PASSWORD") -h "$HOST" -u moco-writable "$@"; }
+              for _ in $(seq 120); do sql -e 'SELECT 1' >/dev/null 2>&1 && break; sleep 5; done
+              sql <<SQL
+              CREATE DATABASE IF NOT EXISTS app;
+              CREATE USER IF NOT EXISTS 'app'@'%' IDENTIFIED BY '$APP_PASSWORD';
+              GRANT ALL ON app.* TO 'app'@'%';
+              SQL
+          env:
+            - name: HOST
+              value: moco-shopdb-primary
+            - name: WRITABLE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: moco-shopdb
+                  key: WRITABLE_PASSWORD
+            - name: APP_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: shopdb-app
+                  key: password
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+```
+
+MOCO 不會建立應用程式的資料庫，所以多一個 Job，用 MOCO 的 `moco-writable` 帳號建立資料庫 `app` 和使用者 `app`。annotation `zeabur.com/app-database` 和 `zeabur.com/app-secret` 告訴 Zeabur 應用程式的資料庫和密碼機密。不加的話 MySQL 照樣運作，但介面的 **接到服務** 找不到應用程式帳號。服務連到 `moco-shopdb-primary`，連接埠 3306。
+
+</Tab>
+<Tab value="MariaDB">
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: blogdb-root
+  labels:
+    zeabur.com/database: blogdb
+type: Opaque
+stringData:
+  password: <24 個英數字>
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: blogdb-app
+  labels:
+    zeabur.com/database: blogdb
+type: Opaque
+stringData:
+  password: <24 個英數字>
+---
+apiVersion: k8s.mariadb.com/v1alpha1
+kind: MariaDB
+metadata:
+  name: blogdb
+  labels:
+    zeabur.com/database: blogdb
+spec:
+  image: mariadb:12.3.3
+  replicas: 1
+  rootPasswordSecretKeyRef:
+    name: blogdb-root
+    key: password
+    generate: false
+  database: app
+  username: app
+  passwordSecretKeyRef:
+    name: blogdb-app
+    key: password
+    generate: false
+  storage:
+    size: 10Gi
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 512Mi
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 999
+    runAsGroup: 999
+    fsGroup: 999
+    fsGroupChangePolicy: OnRootMismatch
+    seccompProfile:
+      type: RuntimeDefault
+  securityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop: [ALL]
+```
+
+兩個以上的執行個體時加 `replication: {enabled: true}`，服務改連 `blogdb-primary`。只有一個時連 `blogdb`，連接埠 3306。
+
+</Tab>
+<Tab value="Dragonfly">
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: cache-auth
+  labels:
+    zeabur.com/database: cache
+type: Opaque
+stringData:
+  password: <24 個英數字>
+---
+apiVersion: dragonflydb.io/v1alpha1
+kind: Dragonfly
+metadata:
+  name: cache
+  labels:
+    zeabur.com/database: cache
+spec:
+  image: docker.dragonflydb.io/dragonflydb/dragonfly:v1.34.1
+  replicas: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 512Mi
+  authentication:
+    passwordFromSecret:
+      name: cache-auth
+      key: password
+  snapshot:
+    cron: "0 * * * *"
+    persistentVolumeClaimSpec:
+      accessModes: [ReadWriteOnce]
+      resources:
+        requests:
+          storage: 2Gi
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 999
+    runAsGroup: 999
+    fsGroup: 999
+    fsGroupChangePolicy: OnRootMismatch
+    seccompProfile:
+      type: RuntimeDefault
+  containerSecurityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop: [ALL]
+```
+
+服務連到 `cache`，連接埠 6379，密碼在 `cache-auth` 的 `password`。
+
+</Tab>
+</Tabs>
+
+### 接到服務
+
+**接到服務** 只是替服務加環境變數。PostgreSQL 讀機密裡的 `uri`：
+
+```yaml
+spec:
+  template:
+    spec:
+      containers:
+        - name: web
+          env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: orders-app
+                  key: uri
+```
+
+其他引擎先從機密讀密碼，再用 `$(變數)` 組出連線字串。Kubernetes 只會展開寫在前面的變數，所以密碼變數要放在前面：
+
+```yaml
+spec:
+  template:
+    spec:
+      containers:
+        - name: web
+          env:
+            - name: MONGOPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: catalog-custom-user-secret
+                  key: app
+            - name: MONGO_URL
+              value: mongodb://app:$(MONGOPASSWORD)@catalog-rs0.shop.svc:27017/app?replicaSet=rs0&authSource=app
+```
+
+存成 `connect.yaml`，用 `kubectl -n shop patch deployment web --patch-file connect.yaml` 套用。MySQL、MariaDB 的 `DATABASE_URL` 是 `mysql://app:$(MYSQLPASSWORD)@<主機>:3306/app`，Dragonfly 的 `REDIS_URL` 是 `redis://:$(REDIS_PASSWORD)@cache.shop.svc:6379`。
+
+### 設定 PostgreSQL 備份
+
+PostgreSQL 的備份用 Barman Cloud 外掛，要建立金鑰機密、ObjectStore 和 ScheduledBackup，再讓 Cluster 用外掛封存預寫式日誌：
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: orders-backups-s3
+  labels:
+    zeabur.com/database: orders
+type: Opaque
+stringData:
+  ACCESS_KEY_ID: <存取金鑰 ID>
+  ACCESS_SECRET_KEY: <私密存取金鑰>
+  REGION: us-east-1
+---
+apiVersion: barmancloud.cnpg.io/v1
+kind: ObjectStore
+metadata:
+  name: orders-backups
+  labels:
+    zeabur.com/database: orders
+spec:
+  retentionPolicy: 7d
+  configuration:
+    destinationPath: s3://backups/orders
+    endpointURL: https://s3.example.com
+    s3Credentials:
+      accessKeyId:
+        name: orders-backups-s3
+        key: ACCESS_KEY_ID
+      secretAccessKey:
+        name: orders-backups-s3
+        key: ACCESS_SECRET_KEY
+      region:
+        name: orders-backups-s3
+        key: REGION
+    wal:
+      compression: gzip
+    data:
+      compression: gzip
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: orders-scheduled
+  labels:
+    zeabur.com/database: orders
+spec:
+  schedule: "0 0 3 * * *"
+  backupOwnerReference: self
+  cluster:
+    name: orders
+  method: plugin
+  pluginConfiguration:
+    name: barman-cloud.cloudnative-pg.io
+```
+
+```sh
+kubectl -n shop patch cluster.postgresql.cnpg.io orders --type=merge \
+  -p '{"spec":{"plugins":[{"name":"barman-cloud.cloudnative-pg.io","isWALArchiver":true,"parameters":{"barmanObjectName":"orders-backups"}}]}}'
+```
+
+CloudNativePG 的排程有秒的欄位，`0 0 3 * * *` 是每天 03:00（UTC）。**立即備份** 是一個 Backup：
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Backup
+metadata:
+  name: orders-20261026-030000
+  labels:
+    zeabur.com/database: orders
+spec:
+  cluster:
+    name: orders
+  method: plugin
+  pluginConfiguration:
+    name: barman-cloud.cloudnative-pg.io
+```
+
+其他引擎的備份設定寫在這些地方，名稱規則相同（金鑰機密都叫 `<名稱>-backups-s3`）：
+
+| 引擎 | 物件 |
+| --- | --- |
+| MongoDB | PerconaServerMongoDB 的 `spec.backup`：`storages.backups.s3` 寫儲存貯體和端點，`credentialsSecret` 指向金鑰機密（`AWS_ACCESS_KEY_ID`、`AWS_SECRET_ACCESS_KEY`），`tasks` 有一項 `scheduled`。立即備份是 PerconaServerMongoDBBackup。 |
+| MySQL | ServiceAccount `<名稱>-backup`、BackupPolicy `<名稱>-backups`，MySQLCluster 的 `spec.backupPolicyName` 指向它。 |
+| MariaDB | Backup `<名稱>-scheduled`，`schedule.cron` 是排程，`maxRetention` 是保留時間。 |
+| Dragonfly | Dragonfly 的 `spec.args` 加 `--s3_endpoint`、`--s3_use_https`，`spec.env` 讀金鑰，`spec.snapshot.dir` 改成 `s3://<儲存貯體>/<資料夾>`。 |
+
+欄位的完整內容，可以先在介面設定一次，再用 `kubectl -n shop get <種類> <名稱> -o yaml` 對照。
+
+### 從備份還原 PostgreSQL
+
+還原會建立新的 Cluster，從 ObjectStore 讀備份。先查備份 ID：
+
+```sh
+kubectl -n shop get backup.postgresql.cnpg.io orders-20261026-030000 -o jsonpath='{.status.backupId}'
+```
+
+再建立新的 Cluster，`spec` 照原資料庫，拿掉 `plugins`，加上 `bootstrap.recovery` 和 `externalClusters`：
+
+```yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: orders-restored-1026
+  labels:
+    zeabur.com/database: orders-restored-1026
+  annotations:
+    zeabur.com/restored-from: orders
+    zeabur.com/restored-backup: orders-20261026-030000
+spec:
+  instances: 1
+  imageName: ghcr.io/cloudnative-pg/postgresql:18-standard-trixie
+  storage:
+    size: 5Gi
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 512Mi
+  bootstrap:
+    recovery:
+      source: orders
+      database: app
+      owner: app
+      recoveryTarget:
+        backupID: <備份 ID>
+        targetImmediate: true
+  externalClusters:
+    - name: orders
+      plugin:
+        name: barman-cloud.cloudnative-pg.io
+        parameters:
+          barmanObjectName: orders-backups
+          serverName: orders
+```
+
+`zeabur.com/restored-*` annotation 讓介面顯示還原資訊和 **把服務指向這裡**，不加也能還原。要還原到某個時間點，`recoveryTarget` 改成 `targetTime: "2026-10-26T02:00:00Z"`。
+
 ## 調整容量與處理失敗
 
 - 要變更 **執行個體數**、**規格** 或 **每個執行個體的儲存空間**，到 **設定** 修改，再 **檢查變更**。儲存空間只能擴大，且要使用支援擴充的儲存類別。Dragonfly 的快照磁碟區大小在建立時決定，設定表單不提供擴充。

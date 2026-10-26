@@ -9,10 +9,10 @@
   pages: [git, upload, image, compose, templates, databases, object-storage, cron-jobs]
 - group: configure
   label: Configure
-  pages: [variables, domains, dns, ip-limits, maintenance, volumes, delete-project]
+  pages: [projects, service-settings, restart-rollback, variables, domains, dns, networking, ip-limits, maintenance, volumes, logs-terminal, objects-yaml, delete-project]
 - group: cluster
   label: Operate the cluster
-  pages: [members, notifications, backups, nodes, components, external-secrets, s3-destinations]
+  pages: [settings, members, github-app, notifications, backups, nodes, components, external-secrets, s3-destinations, diagnosis]
 - group: reference
   label: Reference
   pages: [zeaburctl, installer-configuration, installer, permissions, architecture, releases, security]

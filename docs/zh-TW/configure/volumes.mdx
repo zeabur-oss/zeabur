@@ -209,6 +209,154 @@ kubectl -n shop get secret data-redis-0-backup -o yaml
 
 K8up 備份時應用程式照常執行，直接複製磁碟區上的檔案。如果磁碟區放的是正在寫入的資料庫，複製出來的檔案可能不一致，改用[資料庫自己的備份](../deploy/databases.mdx)。要備份整個叢集的物件，見[叢集備份](../cluster/backups.mdx)。
 
+## 用 kubectl 做同樣的事
+
+磁碟區是一般的 PVC，備份是 K8up 的 Schedule 和 Secret。移除 Zeabur 之後，掛載和備份排程都照常運作。以下以專案 `demo`、Deployment `web`、磁碟區名稱 `uploads` 為例。
+
+### 新增磁碟區
+
+Zeabur 建立的 PVC 名稱是 `<服務>-<磁碟區名稱>`，存取模式預設 `ReadWriteOnce`。要指定儲存類別時，加上 `storageClassName`：
+
+```yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: web-uploads
+  namespace: demo
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 5Gi
+```
+
+再把它掛到容器上：在 Pod template 加一筆 `volumes`，在容器加一筆 `volumeMounts`。這和 Zeabur 寫入的 JSON Patch 相同：
+
+```sh
+kubectl -n demo patch deployment web --type=json -p='[
+  {"op":"add","path":"/spec/template/spec/volumes/-","value":{"name":"uploads","persistentVolumeClaim":{"claimName":"web-uploads"}}},
+  {"op":"add","path":"/spec/template/spec/containers/0/volumeMounts/-","value":{"name":"uploads","mountPath":"/srv/uploads"}}
+]'
+```
+
+Pod template 還沒有 `volumes` 或容器還沒有 `volumeMounts` 時，`/-` 會失敗，改用 `kubectl edit deployment web` 直接加上這兩段。建立服務時就加了磁碟區的話，Zeabur 會把 Deployment 設成 1 個副本和 `strategy: Recreate`，避免新舊副本搶同一個 ReadWriteOnce 磁碟。之後才加磁碟區時不會改這兩項，檢查畫面會提醒多個副本共用 ReadWriteOnce 磁碟的限制。
+
+### 擴充容量
+
+加大 PVC 的 `spec.resources.requests.storage`。儲存類別要有 `allowVolumeExpansion: true`，而且不能縮小：
+
+```sh
+kubectl -n demo patch pvc web-uploads -p '{"spec":{"resources":{"requests":{"storage":"10Gi"}}}}'
+```
+
+### 設定備份
+
+備份需要三樣東西：存放 S3 金鑰和 restic 密碼的 Secret、PVC 上的標籤和 annotation、K8up 的 Schedule。Secret 和 Schedule 都叫 `<PVC 名稱>-backup`：
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: web-uploads-backup
+  namespace: demo
+type: Opaque
+stringData:
+  AWS_ACCESS_KEY_ID: AKIAEXAMPLE
+  AWS_SECRET_ACCESS_KEY: change-me
+  RESTIC_PASSWORD: a-long-random-password
+---
+apiVersion: k8up.io/v1
+kind: Schedule
+metadata:
+  name: web-uploads-backup
+  namespace: demo
+spec:
+  backend:
+    repoPasswordSecretRef:
+      name: web-uploads-backup
+      key: RESTIC_PASSWORD
+    s3:
+      endpoint: https://s3.example.com
+      bucket: backups/demo/web-uploads
+      accessKeyIDSecretRef:
+        name: web-uploads-backup
+        key: AWS_ACCESS_KEY_ID
+      secretAccessKeySecretRef:
+        name: web-uploads-backup
+        key: AWS_SECRET_ACCESS_KEY
+  podSecurityContext:
+    runAsUser: 0
+  backup:
+    schedule: "0 3 * * *"
+    labelSelectors:
+      - matchLabels:
+          zeabur.com/backup-volume: web-uploads
+  prune:
+    schedule: "0 4 * * *"
+    retention:
+      keepLast: 3
+      keepDaily: 7
+      keepWeekly: 4
+```
+
+`bucket` 是儲存貯體加上資料夾，Zeabur 預設的資料夾是 `<專案>/<PVC 名稱>`。S3 需要區域時，在 Secret 加上 `AWS_DEFAULT_REGION`，並在 `backend` 加上 `envFrom: [{secretRef: {name: web-uploads-backup}}]`。備份不以 root 執行時，Zeabur 會改寫一個同名的 K8up PodConfig，`podSecurityContext` 換成 `podConfigRef`。
+
+接著替 PVC 加上 Schedule 選取的標籤，以及 K8up 的 annotation：
+
+```sh
+kubectl -n demo label pvc web-uploads zeabur.com/backup-volume=web-uploads
+kubectl -n demo annotate pvc web-uploads k8up.io/backup=true
+```
+
+**立即備份** 是一個 K8up Backup，內容是 Schedule 的 `backup`，加上同樣的 `backend` 和 `podSecurityContext`：
+
+```yaml
+apiVersion: k8up.io/v1
+kind: Backup
+metadata:
+  name: web-uploads-now
+  namespace: demo
+spec:
+  labelSelectors:
+    - matchLabels:
+        zeabur.com/backup-volume: web-uploads
+  backend:
+    repoPasswordSecretRef:
+      name: web-uploads-backup
+      key: RESTIC_PASSWORD
+    s3:
+      endpoint: https://s3.example.com
+      bucket: backups/demo/web-uploads
+      accessKeyIDSecretRef:
+        name: web-uploads-backup
+        key: AWS_ACCESS_KEY_ID
+      secretAccessKeySecretRef:
+        name: web-uploads-backup
+        key: AWS_SECRET_ACCESS_KEY
+  podSecurityContext:
+    runAsUser: 0
+```
+
+**停止備份** 只刪 Schedule（和 PodConfig），保留 Secret：
+
+```sh
+kubectl -n demo delete schedule.k8up.io web-uploads-backup
+```
+
+## 確認結果
+
+在服務 **設定** → **儲存空間**，磁碟區狀態是 **就緒**，**給 Kubernetes 使用者的細節** 列出 PVC 名稱和儲存類別。**備份** 下方的 **這些磁碟區的備份** 列出每次執行，顯示 **成功** 才表示檔案已經複製到 S3。
+
+用 kubectl 確認：
+
+```sh
+kubectl -n demo get pvc web-uploads
+kubectl -n demo get schedule.k8up.io,backup.k8up.io
+kubectl -n demo get snapshot.k8up.io
+```
+
+PVC 的 `STATUS` 是 `Bound`，`CAPACITY` 是目前的大小。擴充時，等 `CAPACITY` 變成新的大小才算完成。Backup 跑完後 `COMPLETION` 會顯示 `Succeeded`，`kubectl get snapshot.k8up.io` 會多一筆這次的快照。
+
 ## 遇到問題
 
 | 畫面或結果 | 接著處理 |

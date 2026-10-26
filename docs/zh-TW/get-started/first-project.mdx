@@ -60,6 +60,20 @@ Zeabur 讀出 `nginx-unprivileged` 以使用者 101 執行，會自動選 **嚴�
 
 ![web 服務的概覽頁，顯示副本、映像檔與分頁](https://oss.zeabur.com/shots/zeabur/zh-TW/light/service-overview.avif)
 
+## 確認結果
+
+- 服務 **概覽** 顯示 `1/1` **就緒**，瀏覽器打開網址看到 Nginx 的歡迎頁。
+- 用 kubectl 也能看到剛才建立的三個物件，都帶 label `app.kubernetes.io/name: web`：
+
+```sh
+kubectl get namespace hello --show-labels
+kubectl -n hello get deploy,svc,ingress -l app.kubernetes.io/name=web
+```
+
+Namespace 帶 `zeabur.com/project=true`，Deployment 的 `READY` 是 `1/1`，Ingress 的 `HOSTS` 是你的網域。
+
+這些都是一般的 Kubernetes 物件，不用 Zeabur 也能用 `kubectl apply` 建出一模一樣的服務，完整的 YAML 見[部署容器映像檔](../deploy/image.mdx)的「用 kubectl 做同樣的事」。
+
 ## 網頁沒有出來
 
 | 看到的狀況 | 先檢查 |

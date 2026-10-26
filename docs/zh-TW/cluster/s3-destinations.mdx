@@ -77,6 +77,74 @@ description: 登錄 S3 儲存位置供資料庫、K8up 與 Velero 備份選用�
 在儲存服務上撤銷舊金鑰之前，先確認檢查畫面沒有列出沿用舊金鑰的複本，並等下一次備份成功。不然那些備份會開始失敗。
 </Callout>
 
+## 用 kubectl 做同樣的事
+
+一個目的地是 `zeabur-s3-destinations` Namespace 裡兩個同名的物件：ConfigMap 放端點、儲存貯體、區域和資料夾，Secret 放金鑰。兩個都要有 label `zeabur.com/s3-destination: <名稱>`，Zeabur 才會把它列進清單。`region` 和 `prefix` 沒有值時不用寫。
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: r2-backups
+  namespace: zeabur-s3-destinations
+  labels:
+    zeabur.com/s3-destination: r2-backups
+data:
+  endpoint: https://s3.example.com
+  bucket: team-backups
+  region: auto
+  prefix: zeabur
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: r2-backups
+  namespace: zeabur-s3-destinations
+  labels:
+    zeabur.com/s3-destination: r2-backups
+type: Opaque
+stringData:
+  AWS_ACCESS_KEY_ID: AKIAEXAMPLE
+  AWS_SECRET_ACCESS_KEY: example-secret-key
+```
+
+備份表單選了目的地後，寫進專案的金鑰複本長這樣。label 記住來源，annotation `zeabur.com/s3-destination-keys` 寫出哪兩個鍵存放存取金鑰 ID 和私密存取金鑰，鍵名依備份種類而不同。這個例子是 PostgreSQL 備份用的 Secret：
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: shop-db-backups-s3
+  namespace: shop
+  labels:
+    zeabur.com/s3-destination: r2-backups
+  annotations:
+    zeabur.com/s3-destination-keys: ACCESS_KEY_ID,ACCESS_SECRET_KEY
+type: Opaque
+stringData:
+  ACCESS_KEY_ID: AKIAEXAMPLE
+  ACCESS_SECRET_KEY: example-secret-key
+```
+
+自己更換金鑰時，先改目的地的 Secret，再找出每份複本，依 annotation 寫的鍵名逐一更新：
+
+```sh
+kubectl get secret -A -l zeabur.com/s3-destination=r2-backups \
+  -o custom-columns=NS:.metadata.namespace,NAME:.metadata.name,KEYS:.metadata.annotations.zeabur\.com/s3-destination-keys
+```
+
+移除目的地就是刪掉這兩個物件。複本不受影響：
+
+```sh
+kubectl -n zeabur-s3-destinations delete configmap,secret r2-backups
+```
+
+## 確認結果
+
+- **叢集** → **備份** 的 **S3 目的地** 列出名稱、儲存貯體、資料夾和端點。
+- `kubectl -n zeabur-s3-destinations get configmap,secret -l zeabur.com/s3-destination` 列出每個目的地的 ConfigMap 和 Secret 各一個。
+- 備份套用後，上面那行 `kubectl get secret -A -l zeabur.com/s3-destination=<名稱>` 會多出備份所在 Namespace 的複本。
+
 ## 常見失敗
 
 - 選單停在 **手動輸入**、不能切換：你沒有讀取 `zeabur-s3-destinations` 裡 Secret 的權限。請管理員授權，或自己填金鑰。

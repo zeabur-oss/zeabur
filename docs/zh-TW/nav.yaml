@@ -21,23 +21,32 @@
 - group: configure
   label: 調整服務設定
   pages:
+    projects: 建立與管理專案
+    service-settings: 調整副本、資源與健康檢查
+    restart-rollback: 重新啟動、回滾與暫停服務
     variables: 設定環境變數
     domains: 加上公開網域與 HTTPS
     dns: 設定 DNS 紀錄
+    networking: 服務之間的連線與對外連接埠
     ip-limits: 限制能連入和連出的 IP
     maintenance: 顯示維護與錯誤頁面
     volumes: 儲存檔案與備份磁碟區
+    logs-terminal: 查看日誌、事件與用量，開啟終端機
+    objects-yaml: 用 YAML 建立和編輯物件
     delete-project: 刪除專案
 - group: cluster
   label: 管理叢集
   pages:
+    settings: 調整叢集名稱、網域與用量歷史
     members: 邀請成員並分配專案權限
+    github-app: 用 GitHub App 部署私有儲存庫
     notifications: 把叢集警示送到通知管道
     backups: 備份叢集並從備份還原
     nodes: 新增與維護節點
     components: 檢查並安裝叢集元件
     external-secrets: 從外部機密庫同步機密
     s3-destinations: 登錄共用的 S3 備份目的地
+    diagnosis: 看懂狀態、警告與診斷
 - group: reference
   label: 參考
   pages:

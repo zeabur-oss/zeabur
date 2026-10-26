@@ -110,6 +110,123 @@ HTML 存在 ConfigMap 裡，頁面伺服器每次請求都從掛載的檔案讀�
 
 一個專案只能有一個帶這個標籤的 Service。也可以自己用 `kubectl` 部署這個範本，或改用符合上表的其他伺服器，Zeabur 一樣認得。這些都是一般的 Kubernetes 物件，不用 Zeabur 也照常運作。
 
+## 用 kubectl 做同樣的事
+
+維護模式和錯誤頁面只用到 Ingress、HTTPRoute、Traefik Middleware 和頁面伺服器，移除 Zeabur 之後照樣運作。以下以專案 `demo`、Ingress `web-app-example-com`、網域 `app.example.com` 為例，假設專案已經有頁面伺服器 `error-pages`。
+
+### 開啟維護模式（Ingress）
+
+新增一個 Ingress，名稱是 `<服務>-<網域，點換成破折號>-maintenance`，同一個網域的所有路徑都轉到頁面伺服器的 `maintenance` 連接埠。`router.priority` 要比這個網域其他路由都高，Traefik 才會優先用它。`ownerReferences` 指向原本的 Ingress，Zeabur 靠它認出這是維護用的 Ingress，所以先查原本 Ingress 的 `uid`：
+
+```sh
+kubectl -n demo get ingress web-app-example-com -o jsonpath='{.metadata.uid}'
+```
+
+把查到的值填進 `uid`：
+
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: web-app-example-com-maintenance
+  namespace: demo
+  annotations:
+    traefik.ingress.kubernetes.io/router.priority: "1000"
+  ownerReferences:
+    - apiVersion: networking.k8s.io/v1
+      kind: Ingress
+      name: web-app-example-com
+      uid: 0b8f9a52-5d6e-4c1a-9f3e-2a7b1c4d5e6f
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts: [app.example.com]
+      secretName: web-app-example-com-tls
+  rules:
+    - host: app.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: error-pages
+                port:
+                  name: maintenance
+```
+
+Zeabur 寫的版本還會：
+
+- 把 `router.priority` 設成這個網域現有路由的最高優先權加 1。Traefik 沒有指定優先權時，用規則的長度當優先權，所以這個數字通常不大。上面的 `1000` 只要高過原本的路由就好。
+- 複製原本 Ingress 的 `traefik.ingress.kubernetes.io/router.*` annotation（`router.middlewares` 和 `router.priority` 除外）、`ingressClassName` 和這個網域的 `tls`。
+
+有了 `ownerReferences`，刪掉原本的 Ingress 時，Kubernetes 會一起刪掉維護用的 Ingress。
+
+關閉維護模式就是刪掉這個 Ingress：
+
+```sh
+kubectl -n demo delete ingress web-app-example-com-maintenance
+```
+
+### 開啟維護模式（HTTPRoute）
+
+HTTPRoute 沒有另一份物件。Zeabur 把每條規則原本後端的 `weight` 改成 `0`，再加上頁面伺服器的 `maintenance` 連接埠，權重 `1`。用 `kubectl edit httproute <名稱>` 照這樣改，例如：
+
+```yaml
+rules:
+  - backendRefs:
+      - name: web
+        port: 8080
+        weight: 0
+      - name: error-pages
+        port: 8081
+        weight: 1
+```
+
+`8081` 換成頁面伺服器 Service 上 `maintenance` 連接埠的號碼。恢復時把 `web` 的權重改回 `1`，並拿掉 `error-pages` 那一項。
+
+### 顯示錯誤頁面
+
+錯誤頁面是 Middleware `<Ingress 名稱>-error-pages`，`ownerReferences` 指向 Ingress。Traefik 遇到 502 到 504 的回應時，改向頁面伺服器的 `pages` 連接埠要 `/<狀態碼>.html`：
+
+```yaml
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: web-app-example-com-error-pages
+  namespace: demo
+spec:
+  errors:
+    status: ["502-504"]
+    service:
+      name: error-pages
+      port: 8080
+    query: /{status}.html
+```
+
+`8080` 換成頁面伺服器 Service 上 `pages` 連接埠的號碼。再把它加進 Ingress 的 `traefik.ingress.kubernetes.io/router.middlewares`，寫成 `demo-web-app-example-com-error-pages@kubernetescrd`。已有其他 Middleware 時，用 `kubectl edit` 加在清單裡，轉址仍要排第一個。
+
+要改頁面內容，直接改 ConfigMap `error-pages`：
+
+```sh
+kubectl -n demo edit configmap error-pages
+```
+
+## 確認結果
+
+在服務 **網路**，維護中的網域列會標上 **維護中**。面板裡 **維護模式** 和 **顯示錯誤頁面** 的開關會反映叢集裡的設定，用 kubectl 開啟的也一樣。
+
+用 kubectl 確認物件，再從叢集外看回應：
+
+```sh
+kubectl -n demo get ingress
+kubectl -n demo get middleware.traefik.io
+kubectl -n demo get svc,configmap -l zeabur.com/page-server=true
+curl -sI https://app.example.com/
+```
+
+維護中時，`kubectl get ingress` 會多一個 `-maintenance` 結尾的 Ingress，`curl` 的狀態碼是 `503`。關閉後這個 Ingress 消失，`curl` 回到服務原本的回應。
+
 ## 遇到問題
 
 | 畫面或結果 | 接著處理 |

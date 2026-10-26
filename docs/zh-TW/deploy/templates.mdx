@@ -48,6 +48,45 @@ description: 從 Zeabur Catalog 的範本挑一個應用程式，填好網域和
 </Step>
 </Steps>
 
+## 確認結果
+
+套用後，範本的服務和資料庫會出現在專案裡。打開各服務的 **概覽**，等副本就緒，再打開範本的公開網域，確認看到應用程式的頁面。
+
+範本的每個物件，以及產生的密碼機密，都帶有三個標籤：`app.kubernetes.io/instance` 和 `templates.zeabur.com/template` 是範本 ID，`app.kubernetes.io/version` 是應用程式版本。用 kubectl 列出這次部署的物件：
+
+```sh
+kubectl -n shop get deploy,statefulset,svc,ingress,pvc,secret -l app.kubernetes.io/instance=miniflux
+```
+
+用到資料庫的範本，也要確認 operator 的物件已就緒，例如 `kubectl -n shop get clusters.postgresql.cnpg.io -l app.kubernetes.io/instance=miniflux` 的 `STATUS` 是 `Cluster in healthy state`。
+
+## 用 kubectl 做同樣的事
+
+Zeabur 用內建的 [Zeabur Catalog](https://github.com/zeabur-oss/catalog) 把範本轉成 YAML。轉換在 Zeabur 裡做，沒有對應的叢集物件，但你可以用 Catalog 的 `catalog` 指令得到同樣的 YAML，再用 kubectl 套用。
+
+先查 Zeabur 用的 Catalog 版本：到 **設定**，在 **關於** 展開 **給 Kubernetes 使用者的細節**，**Zeabur Catalog** 是它的提交。在 Catalog 的原始碼切到這個提交，進入 `nix develop` 後執行：
+
+```sh
+umask 077
+go run ./tools/cmd/catalog template inputs -namespace shop miniflux > secrets.json
+go run ./tools/cmd/catalog template render -namespace shop \
+  -domain miniflux.example.com -cluster-issuer letsencrypt miniflux > plan.yaml
+kubectl -n shop apply -f secrets.json
+kubectl -n shop apply -f plan.yaml
+```
+
+- `template inputs` 產生範本要的密碼和金鑰，每次執行都是新的值，只執行一次，之後升級沿用同一份機密。`secrets.json` 不要放進版本控制。
+- 範本有要你填的欄位時，把值寫成 JSON 物件，例如 Dify 的 `{"storageRegion":"us-east-1", ...}`，用 `-values inputs.json` 傳入。欄位名稱在範本的 `template.yaml` 的 `inputs`。
+- 範本 `requires` 列出的元件要先裝好。
+
+刪掉整個範本：
+
+```sh
+kubectl -n shop delete all,ingress,pvc,secret,configmap,networkpolicy -l app.kubernetes.io/instance=miniflux
+```
+
+資料庫等 operator 的物件也帶同樣的標籤，用 `kubectl -n shop get <種類> -l app.kubernetes.io/instance=miniflux` 找出來再刪。刪除磁碟區和資料庫會一起刪掉資料。
+
 ## 網路規則
 
 範本不會擋下整個專案的流量。誰能連進專案裡的 Pod，由專案的 `zeabur-project` 決定，見[安全性](../reference/security.mdx)。連出去的連線不擋，應用程式可以連到模型服務、Webhook、郵件伺服器和備份用的 S3。

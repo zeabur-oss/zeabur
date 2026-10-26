@@ -127,9 +127,29 @@ web-shop.203-0-113-7.sslip.io
 
 這種網址包含伺服器 IP，簽發的憑證也會出現在公開的憑證透明度（CT）紀錄裡。Let's Encrypt 給 `sslip.io` 的簽發額度由所有使用者共用，遇到限流時憑證會晚一點簽好，cert-manager 會自己重試。正式上線的服務，換成自己的網域。
 
-## 確認 DNS 已生效
+## 用 kubectl 查應用程式網域和入口位址
 
-用 `dig` 查應用程式網域底下任一個名稱：
+DNS 紀錄在叢集外，Zeabur 不寫入任何物件，只讀兩樣東西來列出要新增的紀錄。
+
+應用程式網域：安裝時填的值是 Helm chart 的 `domains.suffixes`。在 **叢集** 頁改過的話，新的清單存在 Zeabur Namespace 的 ConfigMap `zeabur-settings`，鍵是 `domain-suffixes`，一行一個網域：
+
+```sh
+kubectl -n zeabur get configmap zeabur-settings -o jsonpath='{.data.domain-suffixes}'
+```
+
+沒有輸出時，用的是安裝時的值。
+
+紀錄要指向的位址：Zeabur 讀 Ingress 的 `status.loadBalancer`，也就是入口對外的位址：
+
+```sh
+kubectl get ingress -A
+```
+
+`ADDRESS` 欄就是 A 或 AAAA 紀錄要填的值。這一欄是空的時，入口還沒拿到對外位址，向叢集管理員確認伺服器的公開 IP。
+
+## 確認結果
+
+**叢集** 頁的 **網域** 區塊，每個應用程式網域會寫出目前有沒有解析到叢集，改了紀錄後按 **重新檢查**。在自己的電腦上用 `dig` 查應用程式網域底下任一個名稱：
 
 ```sh
 dig +short anything.apps.example.com

@@ -67,7 +67,7 @@ LOG_LEVEL=info
 改 ConfigMap 或 Secret 的內容後，已啟動的容器環境變數會保留舊值。變更檢查會列出需要重新啟動的服務，以及可能由 Reloader 自動重新啟動的服務。
 
 - 手動處理時，對每個需要新值的服務執行 **重新啟動**，再檢查副本是否就緒。
-- 要自動處理，進入服務 **設定** → **運算資源**，開啟 **ConfigMap 或 Secret 變更時自動重新啟動**，再檢查並套用。叢集要有正在執行的 Stakater Reloader，單獨開啟選項不會重新啟動服務。
+- 要自動處理，進入服務 **設定** → **運算資源**，開啟 **設定檔或機密變數變更時自動重新啟動**，再檢查並套用。叢集要有正在執行的 Stakater Reloader，單獨開啟選項不會重新啟動服務。
 - 開啟後，不論是在 Zeabur 還是用其他工具修改來源，服務都會重新啟動。如果讀取這個來源的服務都開了這個選項，它們會一起重新啟動。
 
 看到 **重新啟動前可能仍在使用舊的值**，表示來源在某個副本啟動後才改過。展開提示可以看到是哪些副本。已經跑完的 Job 不會因為來源改了而重新執行。
@@ -104,6 +104,119 @@ LOG_LEVEL=info
 
 </Step>
 </Steps>
+
+## 用 kubectl 做同樣的事
+
+環境變數寫在工作負載的 Pod template 裡，共用變數是一般的 ConfigMap 或 Secret，Zeabur 沒有另外保存任何資料。以下以專案 `demo`、服務 `web` 為例。
+
+直接設定和移除一個變數，等於修改容器的 `env`：
+
+```sh
+kubectl -n demo set env deployment/web NODE_ENV=production
+kubectl -n demo set env deployment/web NODE_ENV-
+```
+
+共用變數就是帶 `zeabur.com/shared-variables: "true"` 標籤的 ConfigMap 或 Secret。專案 **設定** → **共用變數** 依這個標籤列出它們：
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+  namespace: demo
+  labels:
+    zeabur.com/shared-variables: "true"
+data:
+  APP_URL: https://app.example.com
+  LOG_LEVEL: info
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: app-secrets
+  namespace: demo
+  labels:
+    zeabur.com/shared-variables: "true"
+type: Opaque
+stringData:
+  api-token: change-me
+```
+
+服務讀取共用變數的方式寫在容器上。**所有鍵** 是 `envFrom`，**單一個鍵** 是 `env` 的 `valueFrom`。**設定檔或機密變數變更時自動重新啟動** 是工作負載本身（不是 Pod template）的 annotation `reloader.stakater.com/auto: "true"`，只有 Deployment、StatefulSet 和 DaemonSet 能開：
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  namespace: demo
+  labels:
+    app.kubernetes.io/name: web
+  annotations:
+    reloader.stakater.com/auto: "true"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: web
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: web
+    spec:
+      containers:
+        - name: web
+          image: nginxinc/nginx-unprivileged:1.29
+          env:
+            - name: NODE_ENV
+              value: production
+            - name: API_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: api-token
+            - name: LOG_LEVEL
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: LOG_LEVEL
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+          envFrom:
+            - configMapRef:
+                name: app-config
+```
+
+只開關自動重新啟動，用 annotate 就好，它不會替換副本：
+
+```sh
+kubectl -n demo annotate deployment web reloader.stakater.com/auto=true
+kubectl -n demo annotate deployment web reloader.stakater.com/auto-
+```
+
+改了共用來源、又沒有 Reloader 時，自己重新啟動讀取它的服務：
+
+```sh
+kubectl -n demo rollout restart deployment/web
+```
+
+移除 Zeabur 之後，這些變數照樣由 Kubernetes 注入容器。Reloader 是獨立的元件，也會繼續依 annotation 重新啟動服務。
+
+## 確認結果
+
+在 **環境變數** 分頁，直接設定的變數列在 **直接設定**，從共用變數讀來的列在 **來自設定檔和機密**，並寫出來源名稱。專案 **設定** → **共用變數** 的 **使用的服務** 會列出讀取它的服務。
+
+用 kubectl 看 Pod template 裡的設定，和實際在容器裡的值：
+
+```sh
+kubectl -n demo get deployment web -o jsonpath='{.spec.template.spec.containers[0].env}'
+kubectl -n demo get configmap,secret -l zeabur.com/shared-variables=true
+kubectl -n demo exec deploy/web -- printenv NODE_ENV
+```
+
+`printenv` 印出新值，表示副本已經用新設定啟動。印出舊值時，等新副本就緒，或照上面的步驟重新啟動。
 
 ## 遇到問題
 

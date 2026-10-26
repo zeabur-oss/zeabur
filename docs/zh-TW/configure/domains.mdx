@@ -170,7 +170,7 @@ HTTPRoute 的轉址作用在整條路由。同一條 HTTPRoute 還有其他網�
 
 叢集只保存密碼的 bcrypt 雜湊值，忘記密碼時只能換一組。已有密碼時按 **變更** 換帳號密碼。關閉 **要求輸入密碼** 再套用，就會拿掉這個 Ingress 的密碼。
 
-轉址排在密碼前面。來源網域同時設了轉址，訪客不用輸入密碼就會被轉到目標。目標要密碼保護，就在目標網域自己的面板設定。
+轉址排在密碼前面。來源網域同時設了轉址，訪客不用輸入密碼就會直接轉到目標。目標要密碼保護，就在目標網域自己的面板設定。
 
 ## 改名、移除與清除 DNS
 
@@ -179,6 +179,151 @@ HTTPRoute 的轉址作用在整條路由。同一條 HTTPRoute 還有其他網�
 - 移除路由的最後一個網域：移除按鈕會寫出連同哪條路由一起移除，例如 **移除 app.example.com，連同沒有其他網域的路由 web**。檢查變更時會列出要刪除的 Ingress 或 HTTPRoute。
 
 還沒套用的網域變更，可以在該列按 **復原**，或按頁面下方 **捨棄** 放棄整份草稿。側邊面板按 **加入變更** 之前關掉，就不會留下任何變更。
+
+## 用 kubectl 做同樣的事
+
+網域、憑證、轉址和密碼都是一般的 Ingress、HTTPRoute、Secret 和 Traefik Middleware。Zeabur 沒有自己的 CRD 或控制器，移除 Zeabur 之後，網站照樣由 Traefik 和 cert-manager 提供。以下以專案 `demo`、服務 `web`（Service 連接埠 `8080`）、網域 `app.example.com` 為例。
+
+### 新增網域
+
+服務還沒有路由時，Zeabur 建立名為 `<服務>-<網域，點換成破折號>` 的 Ingress。cert-manager 依 annotation 簽發憑證，存到 `<Ingress 名稱>-tls`：
+
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: web-app-example-com
+  namespace: demo
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt
+spec:
+  tls:
+    - hosts: [app.example.com]
+      secretName: web-app-example-com-tls
+  rules:
+    - host: app.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: web
+                port:
+                  number: 8080
+```
+
+`letsencrypt` 換成叢集裡簽發者的名稱，用 `kubectl get clusterissuer` 查。服務已經有 Ingress 時，Zeabur 會把新網域加成同一個 Ingress 的另一條 `rules`，並在 `tls` 加一筆。
+
+選了 Gateway 的網域是一條 HTTPRoute，`parentRefs` 指向 Gateway 和它的 listener：
+
+```yaml
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: web-app-example-com
+  namespace: demo
+spec:
+  parentRefs:
+    - name: public
+      namespace: gateway
+      sectionName: https
+  hostnames: [app.example.com]
+  rules:
+    - backendRefs:
+        - name: web
+          port: 8080
+```
+
+### 使用自己的憑證
+
+自己的憑證是一個 `kubernetes.io/tls` Secret，Ingress 的 `tls.secretName` 指向它。Zeabur 建立的 Secret 名稱是 `<Ingress 名稱>-cert`，`ownerReferences` 指向 Ingress。Ingress 只有這個網域時，用 kubectl 建立 Secret，再把 Ingress 改成讀它，並拿掉 cert-manager 的 annotation：
+
+```sh
+kubectl -n demo create secret tls web-app-example-com-cert --cert=fullchain.pem --key=privkey.pem
+kubectl -n demo patch ingress web-app-example-com --type=json -p='[{"op":"replace","path":"/spec/tls/0/secretName","value":"web-app-example-com-cert"}]'
+kubectl -n demo annotate ingress web-app-example-com cert-manager.io/cluster-issuer-
+kubectl -n demo delete certificate web-app-example-com-tls
+```
+
+最後一行刪掉 cert-manager 之前為這個網域建立的 Certificate，Zeabur 換成自己的憑證時也會這樣做。
+
+### 轉址和密碼
+
+轉址和密碼是 Traefik 的 Middleware，`ownerReferences` 指向 Ingress，刪掉 Ingress 時一起刪除。Ingress 的 annotation `traefik.ingress.kubernetes.io/router.middlewares` 依序列出它們，格式是 `<專案>-<Middleware 名稱>@kubernetescrd`，以逗號分隔。轉址排第一個，密碼排最後一個。
+
+轉址的名稱是 `<Ingress 名稱>-redirect-<來源網域，點換成破折號>`，只比對來源網域，保留路徑。`permanent: true` 是 301，`false` 是 302：
+
+```yaml
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: web-app-example-com-redirect-app-example-com
+  namespace: demo
+spec:
+  redirectRegex:
+    regex: ^https?://app\.example\.com(:[0-9]+)?/(.*)
+    replacement: https://www.example.com/${2}
+    permanent: false
+```
+
+密碼的 Secret 和 Middleware 都叫 `<Ingress 名稱>-basic-auth`。Secret 的 `users` 是一行 htpasswd，密碼用 bcrypt 雜湊。用 `htpasswd -nbB` 產生這一行：
+
+```sh
+kubectl -n demo create secret generic web-app-example-com-basic-auth \
+  --from-literal=users="$(htpasswd -nbB ops '換成你的密碼')"
+```
+
+```yaml
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: web-app-example-com-basic-auth
+  namespace: demo
+spec:
+  basicAuth:
+    secret: web-app-example-com-basic-auth
+    removeHeader: true
+```
+
+最後把兩個 Middleware 寫進 Ingress 的 annotation，轉址在前：
+
+```sh
+kubectl -n demo annotate ingress web-app-example-com --overwrite \
+  traefik.ingress.kubernetes.io/router.middlewares=demo-web-app-example-com-redirect-app-example-com@kubernetescrd,demo-web-app-example-com-basic-auth@kubernetescrd
+```
+
+要取消轉址或密碼，先從 annotation 拿掉那一項，再刪 Middleware（和密碼的 Secret）。順序相反的話，Traefik 找不到 Middleware，網域會回 404。
+
+### 移除網域
+
+Ingress 只剩這個網域時，刪掉整個 Ingress。它擁有的 Middleware、維護 Ingress 和自己上傳的憑證 Secret 會一起刪除：
+
+```sh
+kubectl -n demo delete ingress web-app-example-com
+```
+
+Ingress 還有其他網域時，用 `kubectl edit` 只拿掉這個網域的 `rules` 和 `tls.hosts`。
+
+## 確認結果
+
+在服務 **網路** 的 **公開網域**，網域列會寫出 DNS 和憑證狀態，以及 **轉送到** 的服務和連接埠。設了轉址或密碼的網域，旁邊的按鈕會顯示目前的設定。
+
+用 kubectl 看路由和憑證：
+
+```sh
+kubectl -n demo get ingress
+kubectl -n demo get certificate
+kubectl -n demo get middleware.traefik.io
+```
+
+`kubectl get ingress` 的 `HOSTS` 欄有這個網域，`ADDRESS` 欄是入口的對外位址。`kubectl get certificate` 的 `READY` 是 `True`，表示 cert-manager 已經簽好憑證。最後從叢集外確認：
+
+```sh
+curl -sI https://app.example.com/
+```
+
+回應的狀態碼是服務自己的回應（例如 `200`）。設了轉址時是 `301` 或 `302`，`location` 指向目標網域。設了密碼時是 `401`。
 
 ## 遇到問題
 

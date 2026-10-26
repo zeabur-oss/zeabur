@@ -65,6 +65,129 @@ description: 新增通知管道、選擇事件並傳送測試，讓節點與叢�
 
 類型不能改。要從 Slack 改送到電子郵件這類不同的類型，先新增另一個管道、傳送測試並確認收到，再移除舊的管道。
 
+## 用 kubectl 做同樣的事
+
+一個管道是兩個名為 `zeabur-notify-<名稱>` 的物件，都帶 label `zeabur.com/notification-channel: <名稱>`：Secret 放網址、權杖和密碼，`VMAlertmanagerConfig` 寫路由和接收設定。叢集的管道放在 `observability` Namespace，專案的管道放在專案自己的 Namespace。
+
+下面是專案 `shop` 的 Slack 管道，收當機重啟和部署失敗：
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: zeabur-notify-ops
+  namespace: shop
+  labels:
+    zeabur.com/notification-channel: ops
+type: Opaque
+stringData:
+  url: https://hooks.slack.com/services/T000/B000/XXXX
+---
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMAlertmanagerConfig
+metadata:
+  name: zeabur-notify-ops
+  namespace: shop
+  labels:
+    zeabur.com/notification-channel: ops
+  annotations:
+    zeabur.com/notification-kind: slack
+spec:
+  route:
+    receiver: events
+    matchers:
+      - zeabur_event=~"crash-loop|deploy-failed|test"
+      - zeabur_channel=~"|ops"
+    group_by: ["..."]
+    group_wait: 30s
+    group_interval: 5m
+    repeat_interval: 12h
+    routes:
+      - receiver: states
+        matchers:
+          - zeabur_kind="state"
+        group_by: [alertname]
+  receivers:
+    - name: events
+      slack_configs:
+        - api_url: {name: zeabur-notify-ops, key: url}
+          title: '{{ if eq .Status "resolved" }}Resolved: {{ end }}{{ (index .Alerts 0).Annotations.summary }}'
+          text: "{{ range .Alerts }}{{ .Annotations.description }}\n{{ end }}"
+          send_resolved: false
+    - name: states
+      slack_configs:
+        - api_url: {name: zeabur-notify-ops, key: url}
+          title: '{{ if eq .Status "resolved" }}Resolved: {{ end }}{{ (index .Alerts 0).Annotations.summary }}'
+          text: "{{ range .Alerts }}{{ .Annotations.description }}\n{{ end }}"
+          send_resolved: true
+```
+
+幾個要照著寫的地方：
+
+- 第一個 matcher 列出要收的事件，最後要加上 `test`，**傳送測試** 才收得到。專案可用的事件有 `build-failed`、`build-succeeded`、`deploy-failed`、`deploy-succeeded`、`crash-loop`、`out-of-memory`、`database-unhealthy`、`backup-failed`、`volume-almost-full`、`certificate`。叢集的管道可用 `node-not-ready`、`runtime-security`、`crash-loop`、`volume-almost-full`、`certificate`、`backup-failed`。
+- 第二個 matcher 的 `|ops` 讓這個管道收一般警示，也收指名給 `ops` 的測試。
+- `events` 和 `states` 兩個接收設定內容相同，只差 `send_resolved`。狀態類的警示恢復時會再通知一次。
+
+其他類型的 Secret 鍵和接收設定：
+
+| 類型 | Secret 的鍵 | 接收設定 |
+| --- | --- | --- |
+| Discord | `url` | `discord_configs`，`webhook_url_secret` 指向 `url` |
+| Telegram | `token` | `telegram_configs`，`bot_token` 指向 `token`，`chat_id` 寫數字 |
+| 電子郵件 | `password`（有填才有） | `email_configs`，`to`、`from`、`smarthost`、`require_tls: true`，`auth_username`、`auth_password` 選填 |
+| Webhook | `url`，`token` 選填 | `webhook_configs`，`url_secret` 指向 `url`；有權杖時加 `http_config.authorization`（`type: Bearer`，`credentials` 指向 `token`） |
+| ntfy | `url`，`token` 選填 | 同 Webhook。`url` 寫 `https://ntfy.sh/<主題>?template=alertmanager`，自架伺服器就換掉網域 |
+
+傳送測試是建立一個帶 `zeabur.com/notification-test: <名稱>` 的 Job。指標元件的警示規則看到它，就送出一則指名給這個管道的測試警示：
+
+```yaml
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: zeabur-notify-test-ops-1761456000
+  namespace: shop
+  labels:
+    zeabur.com/notification-test: ops
+spec:
+  activeDeadlineSeconds: 120
+  ttlSecondsAfterFinished: 300
+  backoffLimit: 0
+  template:
+    metadata:
+      labels:
+        zeabur.com/notification-test: ops
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      enableServiceLinks: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65535
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: wait
+          image: registry.k8s.io/pause:3.10
+          resources:
+            requests: {cpu: 1m, memory: 4Mi}
+            limits: {cpu: 10m, memory: 8Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+```
+
+移除管道就是刪掉這兩個物件：
+
+```sh
+kubectl -n shop delete vmalertmanagerconfig,secret zeabur-notify-ops
+```
+
+## 確認結果
+
+- 管道列不再顯示 **等待中**，也沒有 **被拒絕**。
+- `kubectl -n shop get vmalertmanagerconfig zeabur-notify-ops -o jsonpath='{.status.updateStatus}'` 印出 `operational`。印出 `failed` 時，把路徑換成 `{.status.reason}` 看原因。
+- 傳送測試後一兩分鐘內，接收位置收到一則測試訊息。
+
 ## 常見失敗
 
 - **等待中**：Alertmanager 還沒載入這個管道，稍後再看。

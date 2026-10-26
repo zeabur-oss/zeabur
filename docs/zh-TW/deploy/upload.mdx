@@ -67,6 +67,60 @@ zeaburctl up ./site --project shop --service site
 
 服務不存在時，指令會替你建立。在腳本或 CI 裡，`--project` 和 `--service` 都要填，專案必須已存在。
 
+## 確認結果
+
+上傳完成後，**建置** 分頁會出現一筆建置，成功後 **概覽** 顯示服務就緒。用 kubectl 查看：
+
+```sh
+kubectl -n shop get build site
+kubectl -n shop get buildruns
+```
+
+Build 的 `SOURCE` 是 `Archive`，`REVISION` 是上傳內容的 digest。BuildRun 的 `PHASE` 變成 `Succeeded` 後，Deployment 的映像檔會換成 `archive-<時間>-<digest 前七碼>` 這種 tag。
+
+## 用 kubectl 做同樣的事
+
+上傳建立的物件和[從 Git 部署](./git.mdx#用-kubectl-做同樣的事)相同，只有 Build 的來源不一樣：`spec.source` 是 `archive`，不是 `git`，也沒有 `credentialsRef`。Deployment、Service、`<服務名稱>-env` 照 Git 頁面的 YAML 建立，把 `web` 換成 `site`，再建立這個 Build：
+
+```yaml
+apiVersion: builder.zeabur.com/v1alpha1
+kind: Build
+metadata:
+  name: site
+  labels:
+    app.kubernetes.io/name: site
+  annotations:
+    builder.zeabur.com/upload-token-request: u1
+spec:
+  builderRef: railpack
+  source:
+    archive: {}
+  output:
+    image: zot.zot.svc:5000/shop/site
+  notify:
+    - type: keel
+      url: http://keel.keel.svc.cluster.local:9300/v1/webhooks/native
+```
+
+annotation `builder.zeabur.com/upload-token-request` 的值可以自己取，每換一個新值，Zeabur Builder 就發一個新權杖，寫進 `<服務名稱>-upload` 機密，15 分鐘內有效。接著用 [ORAS](https://oras.land) 把資料夾推到 registry，再把 digest 寫進 Build：
+
+```sh
+kubectl -n shop wait build/site --for=jsonpath='{.status.uploadToken.request}'=u1
+printf '{"auths":{"localhost:5000":{"registrytoken":"%s"}}}' \
+  "$(kubectl -n shop get secret site-upload -o jsonpath='{.data.token}' | base64 -d)" > auth.json
+kubectl -n zot get secret zot-tls -o jsonpath='{.data.ca\.crt}' | base64 -d > ca.crt
+kubectl -n zot port-forward svc/zot 5000:5000 &
+tar -czf source.tar.gz -C ./site .
+oras push --registry-config auth.json --ca-file ca.crt \
+  localhost:5000/shop/site/source:upload-1 \
+  --artifact-type application/vnd.zeabur.source.v1+tar \
+  source.tar.gz:application/vnd.oci.image.layer.v1.tar+gzip
+kubectl -n shop patch build site --type=merge \
+  -p '{"spec":{"source":{"archive":{"digest":"sha256:<oras 印出的 digest>"}}}}'
+```
+
+上傳新版本時，換一個 annotation 值、推新的內容，再改 `digest`。網頁和 `zeaburctl up` 會替你套用 `.gitignore`、`.dockerignore` 和大小限制，自己打包時要自己排除不需要的檔案。推送的格式和限制見 [Zeabur Builder 的說明](https://oss.zeabur.com/docs/builder/archive-source)。
+
 ## 上傳停住時
 
 | 畫面上的情況 | 接著做 |

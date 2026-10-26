@@ -82,9 +82,19 @@ description: 連接 Git 儲存庫、完成第一次建置，並選擇新映像�
 </Step>
 </Steps>
 
-## 確認服務已上線
+## 確認結果
 
 在 **建置** 確認已有成功的映像檔，再到 **概覽** 確認服務就緒。若開啟公開網域，到 **網路** 打開網址，確認看到應用程式。
+
+用 kubectl 查看 Build 和每次建置：
+
+```sh
+kubectl -n shop get build web -o wide
+kubectl -n shop get buildruns
+kubectl -n shop get deployment web -o jsonpath='{.spec.template.spec.containers[0].image}'
+```
+
+Build 的 `READY` 是 `True`，`REVISION` 是建置的提交，`-o wide` 多出的 `IMAGE` 是最新的映像檔。每次建置是一個 BuildRun，`PHASE` 依序經過 `Pending`、`Planning`、`Building`，最後是 `Succeeded` 或 `Failed`，失敗原因在 `REASON`。Deployment 的映像檔從 `:pending` 換成 Build 推送的 tag，表示 Keel 已經部署新版。
 
 ![服務的建置分頁，列出最新映像檔和建置紀錄](https://oss.zeabur.com/shots/zeabur/zh-TW/light/git-builds.avif)
 
@@ -97,6 +107,155 @@ Zeabur Builder 每分鐘檢查一次分支。有新的提交時，它建置新�
 要馬上建置一次，在 **建置** 按 **重新建置**，檢查變更後套用。Builder 會用分支最新的提交。想先確認建置結果再上線，就關閉 **新建置完成後自動部署**，建置成功後按 **部署最新版**，檢查並套用映像檔變更。
 
 要改建置資料夾、Dockerfile 或建置變數，到服務 **設定** 的 **建置** 修改，下一次建置開始生效。
+
+## 用 kubectl 做同樣的事
+
+表單建立的物件如下，存成 `web.yaml` 後用 `kubectl -n shop apply -f web.yaml` 套用。registry 位址 `zot.zot.svc:5000` 換成 chart 的 `builds.registry`，路徑固定是 `<registry>/<專案>/<服務名稱>`：
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: web-git
+  labels:
+    app.kubernetes.io/name: web
+    builder.zeabur.com/git-credentials: "true"
+type: kubernetes.io/basic-auth
+stringData:
+  username: x-access-token
+  password: <權杖>
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: web-env
+  labels:
+    app.kubernetes.io/name: web
+type: Opaque
+stringData:
+  PORT: "8080"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: web-build-env
+  labels:
+    app.kubernetes.io/name: web
+type: Opaque
+stringData:
+  NPM_TOKEN: <權杖>
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  labels:
+    app.kubernetes.io/name: web
+  annotations:
+    keel.sh/policy: force
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: web
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: web
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: web
+          image: zot.zot.svc:5000/shop/web:pending
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - secretRef:
+                name: web-env
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              memory: 256Mi
+          readinessProbe:
+            tcpSocket:
+              port: 8080
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web
+  labels:
+    app.kubernetes.io/name: web
+spec:
+  selector:
+    app.kubernetes.io/name: web
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+---
+apiVersion: builder.zeabur.com/v1alpha1
+kind: Build
+metadata:
+  name: web
+  labels:
+    app.kubernetes.io/name: web
+spec:
+  builderRef: railpack
+  source:
+    git:
+      url: https://github.com/acme/web.git
+      ref: main
+    credentialsRef:
+      name: web-git
+  output:
+    image: zot.zot.svc:5000/shop/web
+  env:
+    - name: NPM_TOKEN
+      valueFrom:
+        secretKeyRef:
+          name: web-build-env
+          key: NPM_TOKEN
+  notify:
+    - type: keel
+      url: http://keel.keel.svc.cluster.local:9300/v1/webhooks/native
+```
+
+- `web-git` 只在私有儲存庫用存取權杖時需要，Build 用 `spec.source.credentialsRef` 指向它，標籤 `builder.zeabur.com/git-credentials: "true"` 讓 Zeabur Builder 讀得到。公開儲存庫拿掉這個機密和 `credentialsRef`。
+- `web-build-env` 和 Build 的 `spec.env` 只在有建置變數時需要。
+- Deployment 先用不存在的 `:pending` tag，第一次建置完成後由 Keel 換掉。`keel.sh/policy: force` 就是 **新建置完成後自動部署**。
+- 用 Dockerfile 建置時，`builderRef` 改成 `dockerfile`，需要時在 `spec.source.git` 加 `contextDir` 和 `dockerfile`。`ref` 留空時，表單寫 `HEAD`，追蹤預設分支。
+
+改用部署金鑰時，自己產生金鑰，把公開金鑰加到儲存庫，再把私密金鑰和 `known_hosts` 放進 `kubernetes.io/ssh-auth` 機密。Build 的 `url` 改成 SSH 網址，例如 `git@github.com:acme/web.git`：
+
+```sh
+ssh-keygen -t ed25519 -N '' -C web-deploy -f ./web-deploy
+ssh-keyscan -t ed25519,ecdsa github.com > known_hosts
+kubectl -n shop create secret generic web-git --type=kubernetes.io/ssh-auth \
+  --from-file=ssh-privatekey=./web-deploy --from-file=known_hosts=./known_hosts
+kubectl -n shop label secret web-git app.kubernetes.io/name=web builder.zeabur.com/git-credentials=true
+```
+
+建置之後的動作也都是一般的 kubectl 指令：
+
+| 介面動作 | kubectl |
+| --- | --- |
+| **重新建置** | `kubectl -n shop annotate build web --overwrite builder.zeabur.com/rebuild="$(date -u +%Y-%m-%dT%H:%M:%SZ)"` |
+| 關閉 **新建置完成後自動部署** | `kubectl -n shop annotate deployment web keel.sh/policy-` |
+| 開啟 **新建置完成後自動部署** | `kubectl -n shop annotate deployment web keel.sh/policy=force` |
+| **部署最新版** | `kubectl -n shop set image deployment/web web="$(kubectl -n shop get build web -o jsonpath='{.status.latestImage}')"` |
+
+移除 Zeabur 之後，Zeabur Builder 和 Keel 仍會繼續建置和部署，它們不需要 Zeabur。
 
 ## 建置或部署停住時
 

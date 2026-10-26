@@ -105,6 +105,83 @@ description: 從現有服務建立排程工作，指定時區與重疊策略，�
 
 要暫停自動排程，在 **概覽** 的 **執行紀錄** 旁按 **暫停**，檢查後套用。暫停後 **立即執行** 仍可使用。要恢復，按同一位置的 **恢復**。
 
+## 確認結果
+
+排程工作建立後，**執行紀錄** 會列出每次執行，標示 **成功** 或 **失敗**。用 kubectl 查看：
+
+```sh
+kubectl -n shop get cronjob nightly-report
+kubectl -n shop get jobs -l app.kubernetes.io/name=nightly-report
+kubectl -n shop logs job/<Job 名稱>
+```
+
+CronJob 的 `SCHEDULE` 和 `TIMEZONE` 是你填的值，`SUSPEND` 在暫停時是 `True`，`LAST SCHEDULE` 是上次執行距今多久。每次執行是一個 Job，`STATUS` 是 `Complete` 表示成功，`Failed` 表示失敗。手動執行的 Job 名稱是 `<排程工作名稱>-manual-<時間>`。
+
+## 用 kubectl 做同樣的事
+
+排程工作就是一個 CronJob。下面的 YAML 等於從服務 `web` 建立 `nightly-report`，每天台灣時間 03:00 執行 `npm run report`：
+
+```yaml
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: nightly-report
+  labels:
+    app.kubernetes.io/name: nightly-report
+    zeabur.com/task-of: web
+spec:
+  schedule: "0 3 * * *"
+  timeZone: Asia/Taipei
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: nightly-report
+        spec:
+          securityContext:
+            runAsNonRoot: true
+            seccompProfile:
+              type: RuntimeDefault
+          restartPolicy: Never
+          containers:
+            - name: web
+              image: ghcr.io/acme/web:1.4
+              command: ["/bin/sh", "-c", "npm run report"]
+              envFrom:
+                - secretRef:
+                    name: web-env
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 128Mi
+                limits:
+                  memory: 256Mi
+              securityContext:
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop: [ALL]
+```
+
+- 標籤 `zeabur.com/task-of` 是來源服務的名稱，介面靠它把工作列在來源服務的 **排程工作** 裡。來源服務有 `zeabur.com/group` 標籤時，也會一起複製。
+- 容器的 `image`、`env`、`envFrom`、`workingDir`、`imagePullPolicy`、`resources`、`securityContext`、`volumeMounts` 從來源容器複製，Pod 的 `serviceAccountName`、`securityContext`、`imagePullSecrets`、`nodeSelector`、`affinity`、`tolerations` 從來源 Pod 複製。有掛載磁碟區時，也複製用到的 `volumes`。
+- 指令一律寫成 `["/bin/sh", "-c", "<指令>"]`。
+- `concurrencyPolicy` 的 `Forbid`、`Allow`、`Replace` 依序是 **略過這次**、**兩次同時執行**、**停止上一次，改跑這次**。
+
+其他動作：
+
+| 介面動作 | kubectl |
+| --- | --- |
+| **立即執行** | `kubectl -n shop create job --from=cronjob/nightly-report nightly-report-manual-$(date +%s)` |
+| **暫停** | `kubectl -n shop patch cronjob nightly-report -p '{"spec":{"suspend":true}}'` |
+| **恢復** | `kubectl -n shop patch cronjob nightly-report -p '{"spec":{"suspend":false}}'` |
+| 刪除 | `kubectl -n shop delete cronjob nightly-report` |
+
+Zeabur 的 **立即執行** 和 `kubectl create job --from` 一樣，Job 帶 annotation `cronjob.kubernetes.io/instantiate: manual`，擁有者是 CronJob。
+
 ## 常見失敗
 
 | 情況 | 處理方式 |

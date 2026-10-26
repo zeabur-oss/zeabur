@@ -72,6 +72,84 @@ description: 用一次性設定連結邀請成員，再依專案分配開發者�
 
 裝置遺失或遭竊時，選 **遺失裝置後重設**，勾選 **同時移除他的通行密鑰、連結的帳號和工作階段**，再按 **重設並產生連結**。在對方開啟新連結之前，沒有人能用這個帳號登入。
 
+## 用 kubectl 做同樣的事
+
+成員是 Zeabur Identity 的 `User`，放在 `zeabur-identity` Namespace。權限是一般的角色綁定，名稱都是 `zeabur-member-<使用者名稱>`：一個 ClusterRoleBinding 綁到 `zeabur-member`，讓他能登入並看到節點和專案名稱；每個分到的專案再一個 RoleBinding，綁到 `zeabur-project-developer` 或 `zeabur-project-viewer`。Kubernetes 看到的使用者名稱是 `zeabur:<使用者名稱>`。
+
+下面讓 `erin` 成為一般帳號，在 `shop` 擔任開發者：
+
+```yaml
+apiVersion: identity.zeabur.com/v1alpha1
+kind: User
+metadata:
+  name: erin
+  namespace: zeabur-identity
+  labels:
+    app.kubernetes.io/managed-by: zeabur
+spec:
+  username: erin
+  displayName: Erin Lin
+  groups: []
+  accountType: Regular
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: zeabur-member-erin
+  labels:
+    app.kubernetes.io/managed-by: zeabur
+    zeabur.com/member: erin
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: zeabur-member
+subjects:
+  - apiGroup: rbac.authorization.k8s.io
+    kind: User
+    name: zeabur:erin
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: zeabur-member-erin
+  namespace: shop
+  labels:
+    app.kubernetes.io/managed-by: zeabur
+    zeabur.com/member: erin
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: zeabur-project-developer
+subjects:
+  - apiGroup: rbac.authorization.k8s.io
+    kind: User
+    name: zeabur:erin
+```
+
+要給管理員，把 `accountType` 改成 `Admin`，不用另外綁角色。`groups` 不能寫 `admins`，這個群組只從帳號類型來。
+
+套用後，用 `zeabur-identityctl invite` 產生設定連結，傳給對方：
+
+```sh
+zeabur-identityctl invite --username erin
+```
+
+改權限就改 RoleBinding 的 `roleRef`（`roleRef` 不能修改，要刪掉重建），或在其他專案建立同樣的 RoleBinding。移除成員時，先刪角色綁定，再刪他的設定連結、通行密鑰和工作階段，最後刪 `User`：
+
+```sh
+kubectl delete clusterrolebinding,rolebinding -A -l zeabur.com/member=erin
+kubectl -n zeabur-identity delete zbinvite,zbcred,zbgrant -l identity.zeabur.com/user=erin
+kubectl -n zeabur-identity delete zbuser erin
+```
+
+其他做法，例如用群組授權、停用帳號，見 Zeabur Identity 的[管理使用者](https://oss.zeabur.com/docs/identity/managing-users)。
+
+## 確認結果
+
+- **成員** 列出 `erin`，**通行密鑰** 欄在對方設定好後出現數字，權限欄寫出 `shop` 和角色。
+- `kubectl get clusterrolebinding,rolebinding -A -l zeabur.com/member=erin` 列出一個 ClusterRoleBinding 和每個專案一個 RoleBinding。
+- 對方登入後，在他的電腦執行 `kubectl auth whoami`，使用者名稱是 `zeabur:erin`。管理員可以用 `kubectl auth can-i --as zeabur:erin -n shop create deployments` 檢查，開發者印出 `yes`，檢視者印出 `no`。
+
 ## 常見失敗
 
 - **沒有安裝 Zeabur Identity**：請叢集管理員安裝 Zeabur Identity，或以它所在的 Namespace 啟動 Zeabur。

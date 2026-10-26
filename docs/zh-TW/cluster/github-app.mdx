@@ -1,0 +1,154 @@
+---
+title: 用 GitHub App 部署私有儲存庫
+description: 替叢集建立 GitHub App 並開放給專案，成員就能直接挑 GitHub 儲存庫部署，不用另外設定部署金鑰。
+---
+
+設定好叢集的 GitHub App，專案成員新增服務時就能直接挑 GitHub 儲存庫，私有儲存庫也不用另外加部署金鑰或權杖。做法是先在 **叢集** → **概覽** 建立 App，安裝到放儲存庫的 GitHub 帳號或組織，再開放給專案。
+
+## 開始之前
+
+- 叢集裝了 Zeabur Builder，也就是有 `builder-system` Namespace。沒有的話，Zeabur 會說 Zeabur Builder 沒有安裝。
+- 你能在 `builder-system` 寫入 Secret 和 ConfigMap，一般只有叢集管理員可以。
+- 你能在 GitHub 建立 App。要建在組織底下，你要是那個組織的擁有者。
+
+## 建立並安裝 App
+
+<Steps>
+<Step>
+
+### 填入 App 的名稱
+
+到 **叢集** → **概覽** 的 **GitHub App** 區塊，按 **建立 GitHub App**，填入：
+
+| 欄位 | 填寫方式 |
+| --- | --- |
+| **在 GitHub 上的名稱** | 預設是「Zeabur」加上叢集名稱，最多 34 個字元，不能和 GitHub 上其他 App 同名。 |
+| **組織** | 留空就建在你自己的帳號下。 |
+| **Webhook 網址** | `https://` 開頭。Zeabur Builder 有開 Webhook 接收器才需要填。沒填的話，Zeabur Builder 每分鐘去 GitHub 看一次有沒有新提交。 |
+
+</Step>
+<Step>
+
+### 到 GitHub 建立後存回 Zeabur
+
+按 **前往 GitHub**，在 GitHub 確認建立。這個 App 不公開，權限只有讀取儲存庫內容、寫入提交狀態。有填 Webhook 網址時，它也會收到 push 事件。
+
+GitHub 會把你帶回 Zeabur 的 **完成 GitHub App 設定**。檢查要寫入的機密變數（私密金鑰不會顯示），按 **儲存 GitHub App**。從按下 **建立 GitHub App** 算起，一小時內要完成這一步。
+
+叢集已經有 App 時，新的會取代它。用舊 App 建置的服務，要等你把新 App 開放給它們的專案，才會再抓到新提交。
+
+</Step>
+<Step>
+
+### 安裝到放儲存庫的帳號
+
+按 **安裝到 GitHub**，在 GitHub 選帳號或組織，再選 **所有儲存庫** 或指定的儲存庫。回到 Zeabur，**已安裝的帳號** 會列出它。
+
+</Step>
+<Step>
+
+### 開放給專案
+
+在帳號列按 **選擇專案**，勾選要開放的專案。這些專案的成員可以部署這個帳號底下、App 讀得到的儲存庫。按 **檢查變更**，再按 **套用**。
+
+取消勾選的專案，之後就不能再從這個帳號的儲存庫建置。
+
+</Step>
+</Steps>
+
+## 在專案裡選儲存庫部署
+
+在開放的專案新增服務，來源選 **GitHub**，用 **搜尋儲存庫** 找到儲存庫，存取方式會寫「透過叢集的 GitHub App 讀取，不用另外設定。」其他步驟和[從 Git 建置並部署服務](../deploy/git.mdx)相同。
+
+清單是開放給專案當下 App 讀得到的儲存庫，畫面會寫出更新時間。GitHub 上新增了儲存庫，到 **選擇專案** 再套用一次，清單才會更新。
+
+## 用 kubectl 做同樣的事
+
+Zeabur Builder 從 `builder-system` 的 Secret `github-app` 讀 App 的金鑰。這些值在 GitHub 的 App 設定頁都找得到，私密金鑰要在那裡產生並下載。用 GitHub Enterprise Server 時，再加一個 `api-url` 鍵，寫它的 API 網址。annotation 只是讓 Zeabur 連到 App 的頁面。
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: github-app
+  namespace: builder-system
+  annotations:
+    builder.zeabur.com/github-app: https://github.com/apps/zeabur-example
+type: Opaque
+stringData:
+  app-id: "123456"
+  client-id: Iv23liEXAMPLE
+  private-key: |
+    -----BEGIN RSA PRIVATE KEY-----
+    (the private key downloaded from GitHub)
+    -----END RSA PRIVATE KEY-----
+  webhook-secret: example-webhook-secret
+```
+
+哪些專案能用哪個安裝，寫在同一個 Namespace 的 ConfigMap `github-app-installations`。鍵是安裝 ID（GitHub 安裝頁網址最後的數字），值是專案名稱，用逗號分開。寫 `*` 代表所有專案：
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: github-app-installations
+  namespace: builder-system
+data:
+  "87654321": shop, blog
+```
+
+Zeabur 另外會在每個開放的專案寫一個 ConfigMap `zeabur-github-app`（label `zeabur.com/github-app: "true"`），記下當時讀得到的儲存庫，讓沒有權限讀 `builder-system` 的成員也能挑儲存庫。Zeabur Builder 不讀它，用 kubectl 設定時可以不寫，只是畫面上的清單會是空的，要自己填儲存庫網址。
+
+服務的 Build 用 `spec.source.githubApp.installationId` 指定安裝：
+
+```yaml
+apiVersion: builder.zeabur.com/v1alpha1
+kind: Build
+metadata:
+  name: web
+  namespace: shop
+  labels:
+    app.kubernetes.io/name: web
+spec:
+  builderRef: railpack
+  source:
+    git:
+      url: https://github.com/example/web.git
+      ref: HEAD
+    githubApp:
+      installationId: 87654321
+  output:
+    image: registry.example.com/shop/web
+  notify:
+    - type: keel
+      url: http://keel.keel.svc.cluster.local:9300/v1/webhooks/native
+```
+
+## 確認結果
+
+- **GitHub App** 區塊顯示 App 名稱和 **在 GitHub 上開啟**，**已安裝的帳號** 列出帳號和開放的專案。
+- `kubectl -n builder-system get secret github-app` 和 `kubectl -n builder-system get configmap github-app-installations -o yaml` 都找得到，ConfigMap 有你的安裝 ID。
+- 從私有儲存庫部署的服務，**建置** 分頁的第一次建置成功。`kubectl -n shop get build web` 也看得到它的狀態。
+
+## 遇到問題
+
+| 狀況 | 處理方式 |
+| --- | --- |
+| 畫面說 Zeabur Builder 沒有安裝 | 先安裝 Zeabur Builder，見[檢查並安裝叢集元件](./components.mdx)。 |
+| 不能按 **建立 GitHub App** | 你沒有寫入 `builder-system` Secret 的權限，請叢集管理員處理。 |
+| 回到 Zeabur 時說 GitHub 沒有帶回驗證碼 | 按 **回到叢集** 重新開始。 |
+| **已安裝的帳號** 讀不到 | Zeabur 連不到 GitHub，或 App 的私密金鑰不對。到 GitHub 重新產生私密金鑰，更新 Secret 的 `private-key`。 |
+| 專案裡找不到儲存庫 | App 安裝時沒選這個儲存庫，或清單是舊的。到 GitHub 調整安裝的儲存庫，再到 **選擇專案** 套用一次。 |
+| 推送後要等一分鐘才建置 | 沒有設定 Webhook，Zeabur Builder 每分鐘檢查一次。 |
+
+## 移除
+
+到 GitHub 解除安裝或刪除 App，再刪掉叢集上的設定：
+
+```sh
+kubectl -n builder-system delete secret github-app
+kubectl -n builder-system delete configmap github-app-installations
+kubectl delete configmap -A -l zeabur.com/github-app=true
+```
+
+用 App 建置的服務會留著，跑的是最後一次建置的映像檔，之後不會再建置新提交。要繼續建置，把它改成部署金鑰或存取權杖，見[從 Git 建置並部署服務](../deploy/git.mdx)。

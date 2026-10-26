@@ -69,7 +69,7 @@ Zeabur 會從映像檔讀取它宣告的連接埠。確認 **連接埠** 和應�
 </Step>
 </Steps>
 
-## 確認成功
+## 確認結果
 
 在服務 **概覽** 確認副本就緒，再看 **日誌** 是否已啟動應用程式。填了連接埠時，Zeabur 會替它加上 TCP 就緒檢查，副本能接受連線後才開始收到流量。
 
@@ -77,7 +77,148 @@ Zeabur 會從映像檔讀取它宣告的連接埠。確認 **連接埠** 和應�
 
 有公開網域時，到 **網路** 開啟網址，確認應用程式能回應。私有服務可從叢集內其他服務連到 **私有網路** 顯示的位址。
 
+用 kubectl 查看時，Zeabur 建立的物件都帶有 `app.kubernetes.io/name: <服務名稱>`：
+
+```sh
+kubectl -n shop get deploy,svc,ingress,secret,pvc -l app.kubernetes.io/name=web
+kubectl -n shop rollout status deployment/web
+```
+
+`deployment.apps/web` 的 `READY` 是 `1/1`，`rollout status` 印出 `successfully rolled out`，就表示副本已通過就緒檢查。Ingress 的 `HOSTS` 是你填的網域，`ADDRESS` 是叢集入口的位址。
+
 部署後要調整變數或磁碟區，前往[環境變數](../configure/variables.mdx)與[磁碟區](../configure/volumes.mdx)。
+
+## 用 kubectl 做同樣的事
+
+表單建立的是一般的 Kubernetes 物件，沒有 Zeabur 專屬的欄位。把下面的 YAML 存成 `web.yaml`，用 `kubectl -n shop apply -f web.yaml` 套用，結果和表單選 **嚴格**、**小** 規格、開啟公開網域相同：
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: web-env
+  labels:
+    app.kubernetes.io/name: web
+type: Opaque
+stringData:
+  APP_ENV: production
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  labels:
+    app.kubernetes.io/name: web
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: web
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: web
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: web
+          image: ghcr.io/acme/web:1.4
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - secretRef:
+                name: web-env
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              memory: 256Mi
+          readinessProbe:
+            tcpSocket:
+              port: 8080
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web
+  labels:
+    app.kubernetes.io/name: web
+spec:
+  selector:
+    app.kubernetes.io/name: web
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: web
+  labels:
+    app.kubernetes.io/name: web
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt
+spec:
+  tls:
+    - hosts: [web.example.com]
+      secretName: web-tls
+  rules:
+    - host: web.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: web
+                port:
+                  number: 8080
+```
+
+和表單選項的對應：
+
+- **相容**：Pod 的 `securityContext` 只留 `seccompProfile`，容器的 `securityContext` 只留 `allowPrivilegeEscalation: false`。
+- **中**、**大** 規格：CPU 和記憶體保留量分別是 `250m`／`256Mi`（上限 `512Mi`）和 `500m`／`512Mi`（上限 `1Gi`）。
+- 沒有憑證簽發者時，Ingress 不帶 annotation 和 `tls`。`letsencrypt` 換成叢集實際的 ClusterIssuer 名稱，用 `kubectl get clusterissuer` 查看。
+- 多個連接埠：Service 的第一個連接埠叫 `http`，其他叫 `port-<號碼>`。
+- **把值放在 Secret** 關閉時，變數改寫在容器的 `env`，不建立 `web-env`。
+
+私有 registry 的帳密放在 `kubernetes.io/dockerconfigjson` 類型的機密，名稱是 `<服務名稱>-registry`，Deployment 用 `imagePullSecrets` 指向它：
+
+```sh
+kubectl -n shop create secret docker-registry web-registry \
+  --docker-server=ghcr.io --docker-username=acme --docker-password=<權杖>
+kubectl -n shop label secret web-registry app.kubernetes.io/name=web
+kubectl -n shop patch deployment web -p '{"spec":{"template":{"spec":{"imagePullSecrets":[{"name":"web-registry"}]}}}}'
+```
+
+磁碟區是一個 PVC，名稱是 `<服務名稱>-<磁碟區名稱>`：
+
+```yaml
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: web-data
+  labels:
+    app.kubernetes.io/name: web
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 5Gi
+```
+
+掛載它時，Deployment 的 `spec.replicas` 固定為 `1`，並加上 `strategy: {type: Recreate}`，Pod 的 `volumes` 寫 `persistentVolumeClaim: {claimName: web-data}`，容器的 `volumeMounts` 寫 `mountPath: /data`。已經建立的服務，到[磁碟區](../configure/volumes.mdx)用表單加比較簡單。
 
 ## 常見失敗
 

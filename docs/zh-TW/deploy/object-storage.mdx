@@ -102,6 +102,196 @@ description: 建立 SeaweedFS 物件儲存，讓應用程式透過 S3 連線上�
 
 要把檔案留在另一個位置，從能連到私有端點的應用程式或 S3 用戶端，將貯體內容複製到另一個 S3 服務，並確認複本能讀取。檔案的複製排程與還原由該工具管理，這個頁面沒有資料庫那樣的 **備份** 分頁或還原按鈕。
 
+## 確認結果
+
+**概覽** 顯示 **就緒**，**組成部分** 的 master、volume、filer、S3 都在執行，**儲存貯體** 每一列顯示 `Ready`，**連線** 有 **存取金鑰 ID**，就可以使用。用 kubectl 查看：
+
+```sh
+kubectl -n shop get seaweed files
+kubectl -n shop get buckets.seaweed.seaweedfs.com
+kubectl -n shop get secret files-app -o jsonpath='{.data.accessKey}' | base64 -d
+```
+
+`files-app` 機密由 SeaweedFS Operator 依 S3Credentials 建立，有 `accessKey` 和 `secretKey`。它出現之後，應用程式就能連線。從叢集內的 Pod 用 S3 用戶端列出儲存貯體，例如 `aws --endpoint-url http://files-s3.shop.svc:8333 s3 ls`，看得到 `uploads` 就表示金鑰和端點都對。
+
+## 用 kubectl 做同樣的事
+
+物件儲存由 SeaweedFS Operator 管理，Zeabur 只寫 operator 讀的物件，移除 Zeabur 後照樣運作。下面的 YAML 等於表單用名稱 `files`、容量 `10Gi`、儲存貯體 `uploads` 建立，存成 `files.yaml` 後用 `kubectl -n shop apply -f files.yaml` 套用：
+
+```yaml
+apiVersion: seaweed.seaweedfs.com/v1
+kind: Seaweed
+metadata:
+  name: files
+spec:
+  image: chrislusf/seaweedfs:4.48
+  volumeServerDiskCount: 1
+  master:
+    replicas: 1
+    persistence:
+      enabled: true
+      resources:
+        requests:
+          storage: 1Gi
+    podSecurityContext:
+      runAsNonRoot: true
+      runAsUser: 1000
+      runAsGroup: 1000
+      fsGroup: 1000
+      seccompProfile:
+        type: RuntimeDefault
+    containerSecurityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop: [ALL]
+  volume:
+    replicas: 1
+    requests:
+      storage: 10Gi
+    podSecurityContext:
+      runAsNonRoot: true
+      runAsUser: 1000
+      runAsGroup: 1000
+      fsGroup: 1000
+      seccompProfile:
+        type: RuntimeDefault
+    containerSecurityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop: [ALL]
+  filer:
+    replicas: 1
+    persistence:
+      enabled: true
+      resources:
+        requests:
+          storage: 1Gi
+    podSecurityContext:
+      runAsNonRoot: true
+      runAsUser: 1000
+      runAsGroup: 1000
+      fsGroup: 1000
+      seccompProfile:
+        type: RuntimeDefault
+    containerSecurityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop: [ALL]
+  s3:
+    replicas: 1
+    port: 8333
+    podSecurityContext:
+      runAsNonRoot: true
+      runAsUser: 1000
+      runAsGroup: 1000
+      fsGroup: 1000
+      seccompProfile:
+        type: RuntimeDefault
+    containerSecurityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop: [ALL]
+---
+apiVersion: seaweed.seaweedfs.com/v1
+kind: S3Identity
+metadata:
+  name: files-app
+spec:
+  seaweedRef:
+    name: files
+---
+apiVersion: seaweed.seaweedfs.com/v1
+kind: S3Credentials
+metadata:
+  name: files-app
+spec:
+  seaweedRef:
+    name: files
+  identityRef:
+    name: files-app
+---
+apiVersion: seaweed.seaweedfs.com/v1
+kind: S3Policy
+metadata:
+  name: files-app
+spec:
+  seaweedRef:
+    name: files
+  statements:
+    - effect: Allow
+      actions: ["s3:*"]
+      resources: ["*"]
+---
+apiVersion: seaweed.seaweedfs.com/v1
+kind: S3PolicyBinding
+metadata:
+  name: files-app
+spec:
+  seaweedRef:
+    name: files
+  policyRef:
+    name: files-app
+  subjects:
+    - kind: S3Identity
+      name: files-app
+---
+apiVersion: seaweed.seaweedfs.com/v1
+kind: Bucket
+metadata:
+  name: files-uploads
+spec:
+  name: uploads
+  clusterRef:
+    name: files
+  reclaimPolicy: Delete
+  access:
+    - user: files-app
+      actions: [Read, Write, List, Tagging]
+```
+
+- Seaweed 是儲存服務本身。S3 端點是 `files-s3`，連接埠 8333。
+- S3Identity、S3Credentials、S3Policy、S3PolicyBinding 建立應用程式用的帳號 `files-app`，並允許它存取所有儲存貯體。
+- 每個儲存貯體是一個 Bucket，名稱是 `<物件儲存名稱>-<儲存貯體名稱>`，`spec.name` 才是 S3 看到的名稱。新增儲存貯體就是再建一個 Bucket。
+- 要指定儲存類別，在 `master.persistence`、`filer.persistence` 加 `storageClassName`，在 `volume` 加 `storageClassName`。
+- 擴充容量：改 `spec.volume.requests.storage`，例如 `kubectl -n shop patch seaweed files --type=merge -p '{"spec":{"volume":{"requests":{"storage":"20Gi"}}}}'`。
+
+**接到服務** 只是替服務加環境變數。存成 `connect.yaml`，用 `kubectl -n shop patch deployment web --patch-file connect.yaml` 套用：
+
+```yaml
+spec:
+  template:
+    spec:
+      containers:
+        - name: web
+          env:
+            - name: S3_ENDPOINT
+              value: http://files-s3.shop.svc:8333
+            - name: S3_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: files-app
+                  key: accessKey
+            - name: S3_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: files-app
+                  key: secretKey
+            - name: S3_REGION
+              value: us-east-1
+            - name: S3_BUCKET
+              value: uploads
+```
+
+刪除儲存貯體或整個物件儲存，就是刪除這些物件：
+
+```sh
+kubectl -n shop delete buckets.seaweed.seaweedfs.com files-uploads
+kubectl -n shop delete s3policybinding/files-app s3policy/files-app s3credentials/files-app s3identity/files-app
+kubectl -n shop delete seaweed files
+```
+
+先刪儲存貯體，再刪帳號，最後刪 Seaweed，和介面的 **刪除物件儲存** 順序相同。`Delete` 回收政策的儲存貯體會連同檔案刪除。
+
 ## 無法連線或沒有金鑰時
 
 | 情況 | 接著做 |

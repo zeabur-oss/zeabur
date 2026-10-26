@@ -1,0 +1,102 @@
+---
+title: 調整叢集名稱、網域與用量歷史
+description: 在設定頁改叢集名稱、用量歷史的來源和登入設定，在叢集頁改新服務的網域；每一項都存在 ConfigMap 裡。
+---
+
+左側的 **設定** 放的是整個叢集共用的設定：**叢集名稱**、**用量歷史** 和 **登入設定**。新服務網址用的網域在 **叢集** → **概覽** 的 **網域** 區塊。這些設定都存在 ConfigMap 裡，能修改那份 ConfigMap 的人就能修改設定，一般是叢集管理員。
+
+**偏好設定** 的語言和主題只存在你的瀏覽器，不影響其他人。
+
+## 開始之前
+
+- Zeabur 裝在叢集裡。用 `zeaburctl ui` 在自己電腦上執行時，Zeabur 不保存設定，名稱沿用 kubeconfig 裡的叢集名稱，用量歷史要用 `--metrics-service` 指定。
+- 你能更新 Zeabur 所在 Namespace（預設是 `zeabur`）的 ConfigMap `zeabur-settings`，第一次設定時還要能建立它。
+
+## 改叢集名稱
+
+叢集名稱顯示在側邊欄和每一頁，管理多個叢集時用來分辨。叢集本身不會有任何變更。
+
+<Steps>
+<Step>
+
+### 填入名稱
+
+到 **設定** → **叢集名稱**，在 **名稱** 填入新名稱，最多 63 個字元，只能有一行。按 **儲存**。
+
+</Step>
+<Step>
+
+### 改回預設
+
+按 **改用預設名稱**，就改回安裝時的 `clusterName`。安裝時沒有設定的話，會用 Zeabur 網址的主機名稱。
+
+</Step>
+</Steps>
+
+## 選擇用量歷史的來源
+
+服務和節點的 **用量** 圖表、磁碟用量，都從一個支援 Prometheus HTTP API 的儲存服務讀取。Zeabur 透過 Kubernetes API，以每個人自己的權限讀它。
+
+到 **設定** → **用量歷史**，**歷史資料來源** 填入它的 Service，格式是 `namespace/name:port`。預設是 Zeabur 推薦的 VictoriaMetrics：`observability/vmsingle-vm-victoria-metrics-k8s-stack:8428`。按 **儲存** 後，**狀態** 會顯示：
+
+| 狀態 | 意思 |
+| --- | --- |
+| **有回應** | 讀得到資料。 |
+| **找不到** | 沒有這個 Service，或還沒裝指標元件。 |
+| **沒有權限** | 你不能透過 Kubernetes API 讀這個 Service。 |
+| **沒有回應** | Service 存在，但沒有回應 Prometheus API 的查詢。 |
+
+能讀取儲存服務的人，就能看到所有專案的指標，所以只開放給可以檢視整個叢集的人。按 **改回預設** 就回到安裝時的設定。
+
+## 設定新服務的網域
+
+新服務的網址會建議成 `<服務>-<專案>.<網域>`。到 **叢集** → **概覽** 的 **網域** 區塊，按 **編輯**，用 **新增網域** 加入網域，按 **儲存**。第一個網域是預設，最多 20 個。按 **改回安裝時的網域** 就回到安裝時的設定。
+
+每個網域旁邊會顯示 DNS 有沒有指向這個叢集。要新增的萬用字元紀錄見[設定 DNS 紀錄](../configure/dns.mdx)。
+
+## 登入設定
+
+**設定** → **登入設定** 決定管理員帳號閒置多久會登出，以及是否只能用不會同步的通行密鑰登入。這兩項存在 Zeabur Identity 的設定檔，說明和 kubectl 做法見[權限](../reference/permissions.mdx)。
+
+## 你的帳號和通行密鑰
+
+左側的 **帳號** 列出你的使用者名稱、群組、在每個專案的角色，以及你的通行密鑰和連結的帳號。通行密鑰、連結的帳號和工作階段都由 Zeabur Identity 管理，按 **管理登入方式** 到 Zeabur Identity 新增或移除通行密鑰、登出其他裝置。
+
+建議在手機上再新增一把通行密鑰備用，遺失一台裝置時才不會無法登入。
+
+## 用 kubectl 做同樣的事
+
+叢集名稱、用量歷史和網域都存在 `zeabur` Namespace 的 ConfigMap `zeabur-settings`。沒寫的鍵就用安裝時的值。`domain-suffixes` 一行一個網域，也可以用逗號分開，第一個是預設：
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: zeabur-settings
+  namespace: zeabur
+data:
+  cluster-name: tokyo-prod
+  metrics-store: observability/vmsingle-vm-victoria-metrics-k8s-stack:8428
+  domain-suffixes: |
+    apps.example.com
+    example.net
+```
+
+要改回預設，刪掉那個鍵：
+
+```sh
+kubectl -n zeabur patch configmap zeabur-settings --type json -p '[{"op":"remove","path":"/data/cluster-name"}]'
+```
+
+安裝時的值來自 Chart 的 `clusterName`、`metricsStore.service` 和 `domains.suffixes`。用 Installer 安裝時，網域來自設定檔的 `suffixes`，見 [Installer 設定](../reference/installer-configuration.mdx)。
+
+## 確認結果
+
+- 側邊欄顯示新的叢集名稱。
+- **用量歷史** 的 **狀態** 是 **有回應**，服務的 **用量** 分頁有圖表。
+- 新增服務時，網址預設用第一個網域。
+- `kubectl -n zeabur get configmap zeabur-settings -o yaml` 看得到你設定的值。
+
+## 移除 Zeabur 之後
+
+這些設定只有 Zeabur 會讀，刪掉 `zeabur-settings` 不影響任何服務。
