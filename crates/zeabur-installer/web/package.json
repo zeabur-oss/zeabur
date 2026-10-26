@@ -21,7 +21,7 @@
   },
   "devDependencies": {
     "@iconify-json/ph": "1.2.2",
-    "@shadcn/lint": "0.2.1",
+    "@shadcn/lint": "0.2.3",
     "@svgr/core": "8.1.0",
     "@svgr/plugin-jsx": "8.1.0",
     "@tailwindcss/vite": "4.3.3",
