@@ -404,7 +404,7 @@ mod tests {
         );
         match Document::parse(&yaml).unwrap() {
             Document::Join(c) => c,
-            Document::Install(_) => panic!("not a join"),
+            Document::Install(_) | Document::Personal(_) => panic!("not a join"),
         }
     }
 

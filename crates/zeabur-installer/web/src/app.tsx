@@ -6,11 +6,13 @@ import SunIcon from "~icons/ph/sun"
 import {
   api,
   type Config,
+  type PersonalConfig,
   type Plan,
   type Planned,
   type Progress,
   type Secrets,
   type ServerState,
+  type Use,
 } from "@/api"
 import { Steps } from "@/components/bits"
 import { localeNames, locales, useI18n, useT } from "@/i18n"
@@ -30,10 +32,37 @@ import { Tooltip } from "@zeabur/design-system/components/tooltip"
 
 const steps = ["host", "access", "components", "review", "install"] as const
 export type Step = (typeof steps)[number]
+/** A personal install has no Zeabur panel, so nothing to reach it by. */
+const personalSteps: readonly Step[] = steps.filter((s) => s !== "access")
+
+/** The memory below which a team install is refused (plan.rs, `MIN_MEMORY_MIB`). */
+const teamMinMemoryMib = 3800
+
+const emptyPersonal: PersonalConfig = {
+  use: "personal",
+  enable: [],
+  disable: [],
+  inputs: {},
+  secretFiles: {},
+  host: { tlsSan: [], requireEncryptedDisk: false },
+  sources: {},
+}
+
+/** The choices the components page edits, in either kind of configuration. */
+export type Choices = Pick<Config, "enable" | "disable" | "inputs">
 
 export interface Wizard {
   server: ServerState
+  use: Use
+  /** Whether a team install fits this server's memory. */
+  teamFits: boolean
+  setUse: (use: Use) => void
   config: Config
+  personal: PersonalConfig
+  /** The configuration of the chosen kind, as `apply` gets it. */
+  active: Config | PersonalConfig
+  setChoices: (choices: Choices) => void
+  steps: readonly Step[]
   secrets: Secrets
   planned: Planned | null
   /** The last plan that succeeded, so choices stay visible while a newer one fails. */
@@ -54,6 +83,8 @@ export function App() {
   const [server, setServer] = useState<ServerState | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [config, setConfigState] = useState<Config | null>(null)
+  const [personal, setPersonal] = useState<PersonalConfig>(emptyPersonal)
+  const [use, setUseState] = useState<Use | null>(null)
   const [secrets, setSecrets] = useState<Secrets>({})
   const [planned, setPlanned] = useState<Planned | null>(null)
   const [shown, setShown] = useState<Plan | null>(null)
@@ -67,6 +98,13 @@ export function App() {
       (state) => {
         setServer(state)
         setConfigState((current) => current ?? state.config)
+        if (state.personal)
+          setPersonal((current) => (current === emptyPersonal ? state.personal! : current))
+        const fits =
+          (state.facts?.memoryMib ?? Infinity) >= (state.teamMinMemoryMib ?? teamMinMemoryMib)
+        setUseState(
+          (current) => current ?? (state.use === "personal" || !fits ? "personal" : "team"),
+        )
         if (state.applying) {
           setStep("install")
           setProgress({ ...idle, running: true })
@@ -77,13 +115,15 @@ export function App() {
   }
   useEffect(load, [])
 
+  const active = use === "personal" ? personal : config
+
   // Every change is planned by the server, so the pages show exactly what `apply` would do.
   useEffect(() => {
-    if (!config || !server?.catalog) return
+    if (!active || !server?.catalog) return
     let current = true
     setPlanning(true)
     const timer = setTimeout(() => {
-      api.plan(config, secrets).then(
+      api.plan(active, secrets).then(
         (next) => {
           if (!current) return
           setPlanned(next)
@@ -101,7 +141,7 @@ export function App() {
       current = false
       clearTimeout(timer)
     }
-  }, [config, secrets, server?.catalog])
+  }, [active, secrets, server?.catalog])
 
   // The log, read while the install runs.
   useEffect(() => {
@@ -121,8 +161,8 @@ export function App() {
   }
 
   const install = () => {
-    if (!config) return
-    api.apply(config, secrets).then(
+    if (!active) return
+    api.apply(active, secrets).then(
       (result) => {
         if ("error" in result) {
           setPlanned({ error: result.error })
@@ -135,11 +175,28 @@ export function App() {
     )
   }
 
+  const teamFits =
+    (server?.facts?.memoryMib ?? Infinity) >= (server?.teamMinMemoryMib ?? teamMinMemoryMib)
+  const shownSteps = use === "personal" ? personalSteps : steps
   const wizard: Wizard | null =
-    server && config
+    server && config && use && active
       ? {
           server,
+          use,
+          teamFits,
+          setUse: (next) => {
+            if (next === "team" && !teamFits) return
+            setUseState(next)
+            setShown(null)
+          },
           config,
+          personal,
+          active,
+          setChoices: (choices) =>
+            use === "personal"
+              ? setPersonal({ ...personal, ...choices })
+              : setConfigState({ ...config, ...choices }),
+          steps: shownSteps,
           secrets,
           planned,
           shown,
@@ -163,9 +220,9 @@ export function App() {
       <main className="flex-1 px-4 md:px-8">
         <PageColumn width="content" gap="md" className="my-6 md:my-10">
           <Steps
-            label={t("step.of", steps.indexOf(step) + 1, steps.length)}
-            steps={steps.map((s) => t(`step.${s}`))}
-            current={steps.indexOf(step)}
+            label={t("step.of", shownSteps.indexOf(step) + 1, shownSteps.length)}
+            steps={shownSteps.map((s) => t(`step.${s}`))}
+            current={shownSteps.indexOf(step)}
           />
           {loadError ? (
             <Alert variant="destructive">

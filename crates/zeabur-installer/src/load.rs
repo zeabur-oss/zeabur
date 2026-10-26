@@ -6,7 +6,7 @@ use std::path::Path;
 
 use zeabur_installer_host::{download, facts};
 use zeabur_installer_plan::catalog::Index;
-use zeabur_installer_plan::config::{Config, Document, JoinConfig, Sources};
+use zeabur_installer_plan::config::{Config, Document, JoinConfig, PersonalConfig};
 use zeabur_installer_plan::{PlanError, pins};
 
 use crate::InstallError;
@@ -40,7 +40,18 @@ pub(crate) fn join(path: &Path) -> Option<JoinConfig> {
     }
     match document(path) {
         Ok(Document::Join(config)) => Some(config),
-        Ok(Document::Install(_)) | Err(_) => None,
+        Ok(Document::Install(_) | Document::Personal(_)) | Err(_) => None,
+    }
+}
+
+/// The personal configuration at `path`, if that is what it holds.
+pub(crate) fn personal(path: &Path) -> Option<PersonalConfig> {
+    if !path.exists() {
+        return None;
+    }
+    match document(path) {
+        Ok(Document::Personal(config)) => Some(config),
+        Ok(Document::Install(_) | Document::Join(_)) | Err(_) => None,
     }
 }
 
@@ -77,18 +88,23 @@ pub(crate) fn config(path: &Path) -> Result<Config, InstallError> {
             "{} joins this server to a cluster; only plan, apply, doctor and uninstall read it",
             path.display()
         ))),
+        Document::Personal(_) => Err(InstallError::Message(format!(
+            "{} is a personal install; only plan, apply, doctor and uninstall read it",
+            path.display()
+        ))),
     }
 }
 
-/// Reads the catalog index: `sources.catalog`, or the pinned release checked against its digest.
-pub(crate) fn catalog(sources: &Sources) -> Result<Index, InstallError> {
-    let bytes = match (&sources.catalog, pins::PRODUCTS) {
+/// Reads the catalog index: `sources.catalog`, or the pinned release checked against its digest
+/// and kept in `state_dir`.
+pub(crate) fn catalog(source: Option<&str>, state_dir: &str) -> Result<Index, InstallError> {
+    let bytes = match (source, pins::PRODUCTS) {
         (Some(path), _) => {
             fs::read(path).map_err(|e| InstallError::Message(format!("{path}: {e}")))?
         }
         (None, Some(products)) => {
             let index = products.catalog.index();
-            let dest = Path::new(crate::apply::STATE_DIR).join("index.json");
+            let dest = Path::new(state_dir).join("index.json");
             download::fetch(&download::agent(), &index.url, &dest, Some(index.sha256))?;
             fs::read(&dest)
                 .map_err(|e| InstallError::Message(format!("{}: {e}", dest.display())))?

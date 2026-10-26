@@ -1,0 +1,365 @@
+//! A personal install: `KubeSolo`, the standalone helm-controller and the components. Each step
+//! checks what is already there, so `apply` runs again safely.
+
+use std::fs::{self, Permissions};
+use std::os::unix::fs::PermissionsExt as _;
+use std::path::{Path, PathBuf};
+use std::process::ExitCode;
+use std::time::Duration;
+
+use serde_json::{Value, json};
+use zeabur_installer_host::kubectl::{self, Kubectl};
+use zeabur_installer_host::preflight::{self, Node, Status};
+use zeabur_installer_host::{archive, cmd, download, facts, files, systemd};
+use zeabur_installer_plan::config::PersonalConfig;
+use zeabur_installer_plan::kubesolo::{
+    ADMIN_KUBECONFIG, BINARY, DATA_DIR, KUBECTL, PERSONAL_KUBECONFIG, STATE_DIR, UNIT,
+    personal_kubeconfig, pin_images,
+};
+use zeabur_installer_plan::personal::{self, PersonalPlan};
+use zeabur_installer_plan::pins::HELM_CONTROLLER;
+use zeabur_installer_plan::plan::{self, MANAGER, NAMESPACE_MANAGER};
+
+use crate::apply::STATE_CONFIGMAP;
+use crate::{InstallError, doctor, load, out, render};
+
+fn make_plan(config: &PersonalConfig) -> Result<PersonalPlan, InstallError> {
+    let index = load::catalog(config.sources.catalog.as_deref(), STATE_DIR)?;
+    Ok(personal::plan(&index, config, &facts::read()?)?)
+}
+
+pub(crate) fn show_plan(config: &PersonalConfig, json: bool) -> Result<(), InstallError> {
+    let plan = make_plan(config)?;
+    if json {
+        let text = serde_json::to_string_pretty(&plan)
+            .map_err(|e| InstallError::Message(e.to_string()))?;
+        out::line(&text);
+    } else {
+        out::line(render::personal_plan(&plan).trim_end());
+        if show_checks(config) {
+            out::line("apply stops until what failed is fixed.");
+        }
+    }
+    Ok(())
+}
+
+/// Runs and prints the preflight checks. Returns whether one failed.
+pub(crate) fn show_checks(config: &PersonalConfig) -> bool {
+    out::step("Checking the host");
+    let checks = preflight::run(preflight::Options {
+        cluster_running: systemd::is_active(UNIT),
+        require_encrypted_disk: config.host.require_encrypted_disk,
+        node: Node::KubeSolo,
+    });
+    for check in &checks {
+        let mark = match check.status {
+            Status::Pass => "ok  ",
+            Status::Warn => "warn",
+            Status::Fail => "FAIL",
+        };
+        out::err(&format!(
+            "    {mark} {:<18} {}",
+            check.name.label(),
+            check.detail
+        ));
+    }
+    checks.iter().any(|c| c.status == Status::Fail)
+}
+
+fn kubectl() -> Kubectl {
+    Kubectl::new(KUBECTL, ADMIN_KUBECONFIG)
+}
+
+pub(crate) fn apply(config: &PersonalConfig) -> Result<(), InstallError> {
+    let plan = make_plan(config)?;
+    out::line(render::personal_plan(&plan).trim_end());
+    if show_checks(config) {
+        return Err(InstallError::Message(
+            "the host is not ready; fix what failed and run apply again".to_owned(),
+        ));
+    }
+
+    install_kubesolo(&plan)?;
+    let kubectl = kubectl();
+    kubectl.wait_ready(Duration::from_mins(10))?;
+    kubectl::poll(Duration::from_mins(10), "the node to be Ready", || {
+        kubectl
+            .wait(&["node", "--all", "--for=condition=Ready", "--timeout=10s"])
+            .is_ok()
+    })?;
+    for (namespace, deployment) in [
+        ("kube-system", "coredns"),
+        ("local-path-storage", "local-path-provisioner"),
+    ] {
+        wait_available(&kubectl, namespace, deployment)?;
+    }
+
+    helm_controller(&kubectl, &plan)?;
+
+    out::step("Namespaces");
+    for namespace in &plan.namespaces {
+        kubectl.apply_as(
+            NAMESPACE_MANAGER,
+            plan::namespace_object(namespace).to_string().as_bytes(),
+        )?;
+    }
+    for component in &plan.components {
+        out::step(&format!("{} ({})", component.display_name, component.id));
+        crate::apply::secrets(&kubectl, component)?;
+        crate::apply::releases(&kubectl, component)?;
+        for wait in &component.smoke {
+            let mut args: Vec<&str> = wait.iter().map(String::as_str).collect();
+            args.push("--timeout=5m");
+            kubectl.wait(&args)?;
+        }
+    }
+    record(&kubectl, &plan)?;
+    let name = plan.facts.hostname.to_ascii_lowercase();
+    write_kubeconfig(&name)?;
+
+    out::step("Done");
+    out::line(&done_text(&name, &facts::addresses()));
+    Ok(())
+}
+
+/// What to run on the person's own computer.
+fn done_text(name: &str, addresses: &[String]) -> String {
+    let host = addresses.first().map_or("<this server>", String::as_str);
+    format!(
+        "This server runs KubeSolo and the components, for one person. On your own computer:\n\
+         \n  ssh <you>@{host} sudo cat {PERSONAL_KUBECONFIG} > ~/.kube/{name}.yaml\n  \
+         KUBECONFIG=~/.kube/{name}.yaml zeaburctl ui --context {name}\n\n\
+         Whoever has this file is cluster admin; keep it like an SSH key. If your computer \
+         reaches the server at another address, change `server:` in the file and add the \
+         address to host.tlsSan."
+    )
+}
+
+fn wait_available(kubectl: &Kubectl, namespace: &str, name: &str) -> Result<(), InstallError> {
+    let target = format!("deployment/{name}");
+    kubectl::poll(
+        Duration::from_mins(10),
+        &format!("{namespace}/{name}"),
+        || {
+            kubectl
+                .wait(&[
+                    "--namespace",
+                    namespace,
+                    &target,
+                    "--for=condition=Available",
+                    "--timeout=10s",
+                ])
+                .is_ok()
+        },
+    )?;
+    Ok(())
+}
+
+/// Downloads `KubeSolo` and kubectl, writes the files and starts or restarts `KubeSolo`.
+fn install_kubesolo(plan: &PersonalPlan) -> Result<(), InstallError> {
+    out::step(&format!("KubeSolo {} ({UNIT})", plan.kubesolo.version));
+    let agent = download::agent();
+    let kubectl = Path::new(KUBECTL);
+    out::err(&format!("    {}", plan.kubectl.url));
+    download::fetch(
+        &agent,
+        &plan.kubectl.url,
+        kubectl,
+        plan.kubectl.sha256.as_deref(),
+    )?;
+    fs::set_permissions(kubectl, Permissions::from_mode(0o755)).map_err(io(kubectl))?;
+
+    let mut changed = false;
+    for file in &plan.host_files {
+        changed |= files::write(Path::new(&file.path), file.mode, file.content.as_bytes())?;
+    }
+    let installed = cmd::run(BINARY, &["--version"], None).unwrap_or_default();
+    if !installed.contains(&plan.kubesolo.version) {
+        let download = &plan.kubesolo.download;
+        let dir = PathBuf::from(STATE_DIR)
+            .join("downloads")
+            .join(&plan.kubesolo.version);
+        out::err(&format!("    {}", download.url));
+        download::fetch(
+            &agent,
+            &download.url,
+            &dir.join(&download.file),
+            download.sha256.as_deref(),
+        )?;
+        let unpacked = dir.join("unpacked");
+        archive::unpack_tar_gz(&dir.join(&download.file), &unpacked)?;
+        let source = unpacked.join("kubesolo");
+        let temp = Path::new(BINARY).with_extension("zeabur-installer");
+        fs::copy(&source, &temp).map_err(io(&temp))?;
+        fs::set_permissions(&temp, Permissions::from_mode(0o755)).map_err(io(&temp))?;
+        fs::rename(&temp, BINARY).map_err(io(Path::new(BINARY)))?;
+        fs::remove_dir_all(&unpacked).map_err(io(&unpacked))?;
+        changed = true;
+    }
+    if changed {
+        systemd::daemon_reload()?;
+    }
+    if !systemd::is_active(UNIT) {
+        out::err(&format!(
+            "    starting {UNIT}; the first start takes a few minutes"
+        ));
+        systemd::enable_now(UNIT)?;
+    } else if changed {
+        out::err(&format!("    restarting {UNIT} for the new configuration"));
+        systemd::restart(UNIT)?;
+    }
+    Ok(())
+}
+
+fn io(path: &Path) -> impl Fn(std::io::Error) -> InstallError {
+    let path = path.display().to_string();
+    move |e| InstallError::Message(format!("{path}: {e}"))
+}
+
+/// The standalone helm-controller, its images pinned by digest.
+fn helm_controller(kubectl: &Kubectl, plan: &PersonalPlan) -> Result<(), InstallError> {
+    out::step(&format!("helm-controller {}", plan.helm_controller.version));
+    let manifest = &plan.helm_controller.manifest;
+    let text = download::fetch_text(
+        &download::agent(),
+        &manifest.url,
+        manifest.sha256.as_deref(),
+    )?;
+    kubectl.apply(pin_images(&text, HELM_CONTROLLER.images)?.as_bytes())?;
+    wait_available(kubectl, "helm-controller", "helm-controller")
+}
+
+fn record(kubectl: &Kubectl, plan: &PersonalPlan) -> Result<(), InstallError> {
+    let components: Vec<&str> = plan.components.iter().map(|c| c.id.as_str()).collect();
+    let summary = serde_json::to_string(plan).map_err(|e| InstallError::Message(e.to_string()))?;
+    kubectl.apply_object(&json!({
+        "apiVersion": "v1",
+        "kind": "ConfigMap",
+        "metadata": {
+            "name": STATE_CONFIGMAP,
+            "namespace": "kube-system",
+            "labels": {"app.kubernetes.io/managed-by": MANAGER},
+        },
+        "data": {
+            "installer": env!("CARGO_PKG_VERSION"),
+            "use": "personal",
+            "kubesolo": plan.kubesolo.version,
+            "components": components.join(","),
+            "plan": summary,
+        },
+    }))?;
+    Ok(())
+}
+
+/// Writes the kubeconfig for the person's computer, readable by root only.
+fn write_kubeconfig(name: &str) -> Result<(), InstallError> {
+    let path = Path::new(ADMIN_KUBECONFIG);
+    let text = fs::read_to_string(path).map_err(io(path))?;
+    let admin: Value = serde_saphyr::from_str(&text)
+        .map_err(|e| InstallError::Message(format!("{ADMIN_KUBECONFIG}: {e}")))?;
+    let config = personal_kubeconfig(&admin, name, None)?;
+    let yaml =
+        serde_saphyr::to_string(&config).map_err(|e| InstallError::Message(e.to_string()))?;
+    files::write(Path::new(PERSONAL_KUBECONFIG), 0o600, yaml.as_bytes())?;
+    Ok(())
+}
+
+pub(crate) fn doctor(config: &PersonalConfig) -> ExitCode {
+    if let Some(code) = doctor::cannot_run() {
+        return code;
+    }
+    if !systemd::is_active(UNIT) {
+        out::line(&format!(
+            "CRITICAL {UNIT} is not running: journalctl -u {UNIT}"
+        ));
+        return ExitCode::from(2);
+    }
+    let kubectl = kubectl();
+    if kubectl.wait_ready(Duration::from_secs(30)).is_err() {
+        out::line("CRITICAL the Kubernetes API does not answer /readyz");
+        return ExitCode::from(2);
+    }
+    let mut results = vec![(
+        Status::Pass,
+        format!("{UNIT} is running and the API is ready"),
+    )];
+    if let Ok(plan) = make_plan(config) {
+        for file in &plan.host_files {
+            if fs::read_to_string(&file.path).ok().as_deref() != Some(file.content.as_str()) {
+                results.push((
+                    Status::Warn,
+                    format!(
+                        "{} differs from the plan: zeabur-installer apply",
+                        file.path
+                    ),
+                ));
+            }
+        }
+    }
+    results.push(doctor::deployment(
+        &kubectl,
+        "helm-controller",
+        "helm-controller",
+    ));
+    match kubectl.get("configmap", STATE_CONFIGMAP, Some("kube-system")) {
+        Ok(Some(state)) => {
+            let plan = state
+                .pointer("/data/plan")
+                .and_then(Value::as_str)
+                .and_then(|p| serde_json::from_str::<Value>(p).ok())
+                .unwrap_or_default();
+            results.extend(doctor::components(&kubectl, &plan));
+            results.push(doctor::default_class(&kubectl, &plan));
+        }
+        Ok(None) => results.push((
+            Status::Fail,
+            "no record of an install: run zeabur-installer apply".to_owned(),
+        )),
+        Err(e) => results.push((Status::Fail, format!("reading the install record: {e}"))),
+    }
+    results.push((
+        Status::Warn,
+        "a personal install isolates nothing: one admin, one node, and no NetworkPolicy is \
+         enforced"
+            .to_owned(),
+    ));
+    doctor::report(&results)
+}
+
+/// How to remove a personal install. Nothing in it depends on the installer, so it only prints
+/// the commands.
+pub(crate) fn uninstall_text() -> String {
+    format!(
+        "A personal install is KubeSolo and what runs on it. The components keep running without \
+         the installer; manage them with kubectl (kubectl get helmcharts -n kube-system).\n\n\
+         To remove everything, apps and volumes included:\n\n  \
+         sudo systemctl disable --now {UNIT}\n  \
+         sudo rm -f /etc/systemd/system/{UNIT}.service {BINARY}\n  \
+         sudo systemctl daemon-reload\n  \
+         sudo rm -rf {DATA_DIR} /etc/kubesolo {STATE_DIR} /etc/zeabur-installer\n  \
+         sudo reboot    # clears KubeSolo's network interfaces and mounts\n"
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_last_words_say_how_to_reach_the_cluster() {
+        let text = done_text("solo", &["203.0.113.7".to_owned()]);
+        assert!(text.contains(&format!(
+            "ssh <you>@203.0.113.7 sudo cat {PERSONAL_KUBECONFIG}"
+        )));
+        assert!(text.contains("zeaburctl ui --context solo"));
+        assert!(done_text("solo", &[]).contains("<this server>"));
+    }
+
+    #[test]
+    fn uninstall_removes_kubesolo_with_plain_commands() {
+        let text = uninstall_text();
+        assert!(text.contains(&format!("systemctl disable --now {UNIT}")));
+        assert!(text.contains(DATA_DIR));
+        assert!(!text.contains("zeabur-installer uninstall"));
+    }
+}

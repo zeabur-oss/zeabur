@@ -16,6 +16,9 @@ use crate::PlanError;
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Config {
+    /// `team`, the default; `personal` makes a [`PersonalConfig`].
+    #[serde(default, rename = "use", skip_serializing_if = "Use::is_team")]
+    pub use_: Use,
     /// Which components to install.
     #[serde(default)]
     pub preset: Preset,
@@ -49,6 +52,108 @@ pub struct Config {
     /// Releases to install instead of the pinned ones, for development builds.
     #[serde(default)]
     pub sources: Sources,
+}
+
+/// Who the install is for.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum Use {
+    /// One person: `KubeSolo` and the components, reached with `zeaburctl ui` and the admin
+    /// kubeconfig. No isolation, roles or other nodes.
+    Personal,
+    /// A team: RKE2, the components, Zeabur Identity and Zeabur.
+    #[default]
+    Team,
+}
+
+impl Use {
+    /// Whether it is [`Use::Team`].
+    #[must_use]
+    #[expect(
+        clippy::trivially_copy_pass_by_ref,
+        reason = "serde's skip_serializing_if passes a reference"
+    )]
+    pub const fn is_team(&self) -> bool {
+        matches!(self, Self::Team)
+    }
+}
+
+/// A personal install: `KubeSolo`, the standalone helm-controller and the components.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct PersonalConfig {
+    /// Always `personal`.
+    #[serde(rename = "use")]
+    pub use_: Use,
+    /// Capabilities or component ids added to the personal set.
+    #[serde(default)]
+    pub enable: Vec<String>,
+    /// Capabilities or component ids taken out of the personal set.
+    #[serde(default)]
+    pub disable: Vec<String>,
+    /// Values for catalog inputs, by component id then input name.
+    #[serde(default)]
+    pub inputs: BTreeMap<String, BTreeMap<String, Value>>,
+    /// Files holding secret catalog inputs, by component id then input name.
+    #[serde(default)]
+    pub secret_files: BTreeMap<String, BTreeMap<String, String>>,
+    /// Host settings.
+    #[serde(default)]
+    pub host: Host,
+    /// Releases to use instead of the pinned ones, for development builds.
+    #[serde(default)]
+    pub sources: PersonalSources,
+}
+
+/// Files a development build of a personal install takes from this host.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct PersonalSources {
+    /// The catalog's `index.json`.
+    pub catalog: Option<String>,
+}
+
+impl PersonalConfig {
+    /// The configuration used when there is no file.
+    #[must_use]
+    pub fn defaults() -> Self {
+        Self {
+            use_: Use::Personal,
+            enable: Vec::new(),
+            disable: Vec::new(),
+            inputs: BTreeMap::new(),
+            secret_files: BTreeMap::new(),
+            host: Host::default(),
+            sources: PersonalSources::default(),
+        }
+    }
+
+    /// Parses and checks a personal configuration file.
+    ///
+    /// # Errors
+    ///
+    /// When the YAML does not match or `use` is not `personal`.
+    pub fn parse(yaml: &str) -> Result<Self, PlanError> {
+        let config: Self =
+            serde_saphyr::from_str(yaml).map_err(|e| PlanError::Config(e.to_string()))?;
+        config.check()?;
+        Ok(config)
+    }
+
+    /// Checks the values serde cannot.
+    ///
+    /// # Errors
+    ///
+    /// When `use` is not `personal`.
+    pub fn check(&self) -> Result<(), PlanError> {
+        if self.use_ != Use::Personal {
+            return Err(PlanError::Config(
+                "use: this file has the fields of a personal install; set `use: personal`"
+                    .to_owned(),
+            ));
+        }
+        Ok(())
+    }
 }
 
 /// A named set of components.
@@ -133,10 +238,13 @@ pub enum Document {
     Install(Config),
     /// Another node: RKE2 only, joined to an existing cluster.
     Join(JoinConfig),
+    /// A personal install on `KubeSolo`.
+    Personal(PersonalConfig),
 }
 
 impl Document {
-    /// Parses a configuration file of either kind; a top-level `join` key makes it a join.
+    /// Parses a configuration file of any kind: a top-level `join` key makes it a join, and
+    /// `use: personal` a personal install.
     ///
     /// # Errors
     ///
@@ -146,6 +254,8 @@ impl Document {
             serde_saphyr::from_str(yaml).map_err(|e| PlanError::Config(e.to_string()))?;
         if value.get("join").is_some() {
             JoinConfig::parse(yaml).map(Self::Join)
+        } else if value.get("use").and_then(Value::as_str) == Some("personal") {
+            PersonalConfig::parse(yaml).map(Self::Personal)
         } else {
             Config::parse(yaml).map(Self::Install)
         }
@@ -449,6 +559,7 @@ impl Config {
     pub fn defaults(address: &str) -> Self {
         let name = address.replace(':', "-");
         Self {
+            use_: Use::Team,
             preset: Preset::default(),
             enable: Vec::new(),
             disable: Vec::new(),
@@ -487,6 +598,12 @@ impl Config {
     ///
     /// The first invalid value.
     pub fn check(&self) -> Result<(), PlanError> {
+        if self.use_ != Use::Team {
+            return Err(PlanError::Config(
+                "use: personal takes only enable, disable, inputs, secretFiles, host and sources"
+                    .to_owned(),
+            ));
+        }
         if !matches!(self.profile.as_str(), "single-node" | "multi-node") {
             return Err(PlanError::Config(format!(
                 "profile `{}` is not single-node or multi-node",
@@ -577,6 +694,25 @@ mod tests {
         let shared = MINIMAL.replace("zeabur.example.com", "login.example.com");
         assert!(Config::parse(&shared).is_err());
         assert!(Config::parse(&format!("{MINIMAL}typo: 1\n")).is_err());
+    }
+
+    #[test]
+    fn use_personal_makes_a_personal_configuration() {
+        let Document::Personal(c) = Document::parse(
+            "use: personal\nenable: [databases]\nhost: {tlsSan: [a.example.com]}\n",
+        )
+        .unwrap() else {
+            panic!("not personal");
+        };
+        assert_eq!(c.enable, ["databases"]);
+        assert!(Document::parse("use: personal\naccess: {mode: local}\n").is_err());
+        assert!(Document::parse("use: personal\npreset: secure\n").is_err());
+        let team = format!("use: team\n{MINIMAL}");
+        assert!(matches!(
+            Document::parse(&team).unwrap(),
+            Document::Install(_)
+        ));
+        assert!(PersonalConfig::parse("use: team\n").is_err());
     }
 
     const HASH: &str = "2c2a4a3f5e0e5e7f3c1b1d9a8f7e6d5c4b3a29181716151413121110090807aa";

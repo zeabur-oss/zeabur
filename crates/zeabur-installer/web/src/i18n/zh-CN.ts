@@ -32,6 +32,13 @@ export const zhCN: Messages = {
   "step.install": "安装",
   "step.of": (n, total) => `第 ${n} 步，共 ${total} 步`,
 
+  "use.title": "给谁用",
+  "use.personal": "自己用",
+  "use.personalHint":
+    "只装 KubeSolo 和组件，在自己的电脑上用 zeaburctl ui 打开。没有团队账号、隔离，也不能加节点。1.5 GiB 内存就能跑。",
+  "use.team": "团队用",
+  "use.teamHint": "装 RKE2 和 Zeabur 面板，有账号、角色和项目隔离。需要 4 GiB 内存。",
+  "use.teamTooSmall": "需要 4 GiB 内存的服务器。这台不够，只能装自己用的版本。",
   "host.title": "检查服务器",
   "host.description": "点击安装之前不会做任何更改。未通过的项目需要先修复，警告最好也看一下。",
   "host.server": "这台服务器",
@@ -65,7 +72,7 @@ export const zhCN: Messages = {
   "code.root.ok": () => "以 root 运行。",
   "code.root.no": () => "请用 sudo 启动安装程序。",
   "code.systemd.ok": () => "这台服务器使用 systemd 管理服务。",
-  "code.systemd.no": () => "RKE2 以 systemd 服务运行，但这台服务器没有使用 systemd。",
+  "code.systemd.no": () => "Kubernetes 以 systemd 服务运行，但这台服务器没有使用 systemd。",
   "code.time.ok": () => "时钟已同步。",
   "code.time.drift": () =>
     "时钟未同步。时间一有偏差，证书和登录都会失败。请运行 timedatectl set-ntp true。",
@@ -81,7 +88,7 @@ export const zhCN: Messages = {
   "code.ports.busy": (...ports) =>
     `端口 ${listZh("zh-CN", ports)} 已被占用。运行 ss -ltnp 查看占用者。`,
   "code.disk.unknown": (path) => `无法读取 ${path} 的可用空间。请运行 df -h ${path} 查看。`,
-  "code.disk.low": (gib, path, need) => `${path} 只剩 ${gib} GiB，需要 ${need} GiB。`,
+  "code.disk.low": (gib, path, need) => `${path} 只剩 ${gib} GiB，Kubernetes 需要 ${need} GiB。`,
   "code.disk.tight": (gib, path, need) =>
     `${path} 剩余 ${gib} GiB，建议 ${need} GiB 以上，以便存放日志、指标和应用。`,
   "code.disk.ok": (gib, path) => `${path} 剩余 ${gib} GiB。`,
@@ -89,7 +96,7 @@ export const zhCN: Messages = {
   "code.crypt.requiredPlain": (path) => `${path} 不在加密设备上，但配置要求加密。`,
   "code.crypt.requiredUnknown": (path) => `无法判断 ${path} 是否加密，但配置要求加密。`,
   "code.crypt.no": (path) =>
-    `${path} 不在加密设备上。集群中的 Secret 会加密，卷不会。测试机没关系，生产数据请装在加密磁盘上。`,
+    `${path} 不在加密的设备上，上面的卷也就没有加密。测试机无妨，正式环境的数据请装在加密的磁盘上。`,
   "code.crypt.unknown": (path) =>
     `无法判断 ${path} 是否加密。请运行 lsblk，查看它下面有没有 crypt 设备。`,
   "code.prep.package.ok": (binary) => `已安装 ${binary}。`,
@@ -170,6 +177,9 @@ export const zhCN: Messages = {
   "components.privileged": "特权",
   "components.privilegedHint":
     "以主机权限运行，因此它的 Namespace 不适用 restricted Pod 安全级别。",
+  "components.personalDescription":
+    "默认会装 Ingress 和证书，需要数据库再自己加。组件依赖的其他组件会一并加入。",
+  "components.notPersonal": "自己用的版本没有这个",
   "components.unsupported": "不支持 RKE2",
   "components.runsOn": (where) => `仅能在 ${where} 上运行`,
   "components.unsupportedOn": (profile) => `不支持 ${profile}`,
@@ -204,6 +214,9 @@ export const zhCN: Messages = {
   "review.kubernetes": "Kubernetes",
   "review.rke2": (version) => `RKE2 ${version}`,
   "review.rke2Custom": (version) => `RKE2 ${version}（不受支持）`,
+  "review.kubesolo": (version) => `KubeSolo ${version}`,
+  "review.personalAccess": "在自己的电脑上用 zeaburctl ui",
+  "review.personalLimits": "拿到 kubeconfig 的人可以控制整个集群，应用之间也没有隔离。",
   "review.access": "访问方式",
   "review.suffixes": "应用域名",
   "review.suffixesNone": "没有，每个服务都要自己填完整域名。",
@@ -259,7 +272,12 @@ export const zhCN: Messages = {
     `这台服务器没有公网地址，新服务不会有建议网址。可以把 ${suffix} 加成应用域名，网址只有这个网络里能访问。`,
   "warning.local.dns": (identity, zeabur) =>
     `${zeabur} 和 ${identity} 必须在 DNS 上解析到这台服务器，浏览器和服务器本身都要查得到。只改 hosts 文件不够，Pod 不会读取它。`,
-  "warning.memory.low": (host) => `RKE2 需要至少 4 GiB 内存，这台服务器只有 ${mib(host)}。`,
+  "warning.personal.isolation": () =>
+    "自己用的版本只适合一个人。拿到 kubeconfig 的人可以控制整个集群，应用之间也没有隔离，因为 KubeSolo 不会执行网络规则。要给团队用，请在 4 GiB 内存的服务器上用 RKE2 安装。",
+  "warning.memory.personal.low": (host) =>
+    `自己用的版本至少需要 1.5 GiB 内存，这台机器只有 ${mib(host)}。`,
+  "warning.memory.personal.tight": (idle, host) =>
+    `空闲时 KubeSolo 和组件大约用掉 ${mib(idle)}，这台机器总共 ${mib(host)}。`,
   "warning.memory.tight": (idle, host) =>
     `空闲时，RKE2 和组件约使用 ${mib(idle)}，这台服务器共有 ${mib(host)}。`,
   "warning.rke2.unsupported": (version) =>
@@ -317,6 +335,9 @@ export const zhCN: Messages = {
   "install.toComponents": "选择组件",
   "phase.host": "检查服务器",
   "phase.rke2": (version) => `安装 Kubernetes（RKE2 ${version}）`,
+  "phase.kubesolo": (version) => `安装 Kubernetes（KubeSolo ${version}）`,
+  "phase.helmController": "Helm controller",
+  "phase.namespacesOnly": "Namespace",
   "phase.namespaces": "Namespace 和连接规则",
   "phase.storage": "存储",
   "phase.ca": "证书颁发机构",
@@ -327,6 +348,12 @@ export const zhCN: Messages = {
   "done.title": "Zeabur 已就绪",
   "done.description":
     "先注册第一位管理员的通行密钥，再登录 Zeabur。完成后在终端按 Ctrl-C 退出安装程序。",
+  "done.personalTitle": "集群已就绪",
+  "done.personalDescription":
+    "把 kubeconfig 复制到自己的电脑，再用 zeaburctl ui 打开 Zeabur。用完按 Ctrl-C 关掉安装程序。",
+  "done.personal": "在你的电脑上",
+  "done.personalHint": "先从这台服务器复制 kubeconfig，再用它打开 Zeabur。",
+  "done.personalKey": "kubeconfig 可以控制整个集群，请像 SSH 密钥一样自己保管。",
   "done.setup": "第一位管理员",
   "done.setupHint": "此链接只能使用一次，24 小时内有效。",
   "done.register": "注册通行密钥",

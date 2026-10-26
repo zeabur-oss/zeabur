@@ -37,8 +37,10 @@ const whys = ["preset", "enabled", "dependency"] as const
 export function ReviewStep({ wizard }: { wizard: Wizard }) {
   const t = useT()
   const { config, planned, server } = wizard
+  const personal = wizard.use === "personal"
   const catalog = server.catalog?.components ?? []
-  const failed = server.checks.filter((c) => c.status === "fail")
+  const checks = personal ? (server.personalChecks ?? server.checks) : server.checks
+  const failed = checks.filter((c) => c.status === "fail")
   const result = planned && "plan" in planned ? planned : null
   const plan = result?.plan
   const fit = plan ? memoryFit(plan, catalog) : null
@@ -58,8 +60,9 @@ export function ReviewStep({ wizard }: { wizard: Wizard }) {
       ? t("review.blockedMemory")
       : null
   const advice = fit ? memoryAdvice(t, fit) : ""
-  // The memory row already says what `memory.tight` says.
-  const warnings = plan?.warnings.filter((warning) => warning.code !== "memory.tight") ?? []
+  // The memory row already says what `memory.tight` says, and the access row the isolation.
+  const repeated = ["memory.tight", "memory.personal.tight", "personal.isolation"]
+  const warnings = plan?.warnings.filter((warning) => !repeated.includes(warning.code)) ?? []
   return (
     <StepPage
       title={t("review.title")}
@@ -118,7 +121,7 @@ export function ReviewStep({ wizard }: { wizard: Wizard }) {
             <Row label={t("review.components")}>
               <div className="flex flex-col gap-1">
                 <span>
-                  {t(`preset.${config.preset}`)}
+                  {personal ? t("use.personal") : t(`preset.${config.preset}`)}
                   {t("common.sep")}
                   {t("components.chosen", plan.components.length)}
                   {privileged ? (
@@ -149,22 +152,35 @@ export function ReviewStep({ wizard }: { wizard: Wizard }) {
               </div>
             </Row>
             <Row label={t("review.kubernetes")}>
-              {plan.rke2.pinned
-                ? t("review.rke2", plan.rke2.version)
-                : t("review.rke2Custom", plan.rke2.version)}
+              {plan.use === "personal"
+                ? t("review.kubesolo", plan.kubesolo.version)
+                : plan.rke2.pinned
+                  ? t("review.rke2", plan.rke2.version)
+                  : t("review.rke2Custom", plan.rke2.version)}
             </Row>
-            <Row label={t("review.access")}>
-              <div className="flex min-w-0 flex-col gap-1">
-                <span>{t(config.access.mode === "domain" ? "access.domain" : "access.local")}</span>
-                <span className="font-mono text-xs break-all text-secondary">
-                  {plan.zeabur?.url}
-                </span>
-                <span className="font-mono text-xs break-all text-secondary">
-                  {plan.identity?.issuer}
-                </span>
-              </div>
-            </Row>
-            {plan.zeabur ? (
+            {plan.use === "personal" ? (
+              <Row label={t("review.access")}>
+                <div className="flex min-w-0 flex-col gap-1">
+                  <span>{t("review.personalAccess")}</span>
+                  <span className="text-xs text-secondary">{t("review.personalLimits")}</span>
+                </div>
+              </Row>
+            ) : (
+              <Row label={t("review.access")}>
+                <div className="flex min-w-0 flex-col gap-1">
+                  <span>
+                    {t(config.access.mode === "domain" ? "access.domain" : "access.local")}
+                  </span>
+                  <span className="font-mono text-xs break-all text-secondary">
+                    {plan.zeabur?.url}
+                  </span>
+                  <span className="font-mono text-xs break-all text-secondary">
+                    {plan.identity?.issuer}
+                  </span>
+                </div>
+              </Row>
+            )}
+            {plan.use !== "personal" && plan.zeabur ? (
               <Row label={t("review.suffixes")}>
                 {plan.zeabur.values?.domains?.suffixes?.length ? (
                   <span className="font-mono text-xs break-all">

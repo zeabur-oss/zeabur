@@ -10,10 +10,23 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::PlanError;
 use crate::catalog::{Default, Index};
-use crate::config::{Config, Preset};
+use crate::config::{Config, PersonalConfig, Preset};
 
-/// The distribution this installer sets up.
+/// The distribution of a team install.
 pub const DISTRIBUTION: &str = "rke2";
+
+/// The distribution of a personal install.
+pub const PERSONAL_DISTRIBUTION: &str = "kubesolo";
+
+/// The profile whose values a personal install uses.
+pub const PERSONAL_PROFILE: &str = "single-node";
+
+/// What a personal install offers: the capabilities the catalog tests on `KubeSolo` (catalog
+/// `config/kubernetes.yaml`).
+pub const PERSONAL: &[&str] = &["ingress", "certificates", "databases"];
+
+/// What a personal install installs unless told otherwise.
+const PERSONAL_DEFAULT: &[&str] = &["ingress", "certificates"];
 
 /// Components `minimal` installs: reachable over HTTPS, and usage numbers for Zeabur.
 const MINIMAL: &[&str] = &["ingress", "certificates", "metrics/metrics-server"];
@@ -54,9 +67,6 @@ pub enum Why {
 /// When a name matches nothing, or a chosen component needs one that is disabled or unsupported.
 pub fn select(index: &Index, config: &Config) -> Result<Selection, PlanError> {
     let profile = config.profile.as_str();
-    let mut chosen: BTreeMap<String, Why> = BTreeMap::new();
-    let mut left_out = BTreeMap::new();
-
     let preset: Vec<String> = match config.preset {
         Preset::Minimal => resolve_all(index, profile, MINIMAL)?,
         Preset::Standard => recommended(index, profile),
@@ -66,14 +76,61 @@ pub fn select(index: &Index, config: &Config) -> Result<Selection, PlanError> {
             ids
         }
     };
-    for id in preset {
-        chosen.insert(id, Why::Preset);
+    choose(
+        index,
+        &Wanted {
+            base: preset,
+            enable: &config.enable,
+            disable: &config.disable,
+            profile,
+            distribution: DISTRIBUTION,
+            offered: None,
+        },
+    )
+}
+
+/// Chooses the components of a personal install: ingress and certificates, then `enable` and
+/// `disable` within [`PERSONAL`].
+///
+/// # Errors
+///
+/// As [`select`].
+pub fn select_personal(index: &Index, config: &PersonalConfig) -> Result<Selection, PlanError> {
+    choose(
+        index,
+        &Wanted {
+            base: resolve_all(index, PERSONAL_PROFILE, PERSONAL_DEFAULT)?,
+            enable: &config.enable,
+            disable: &config.disable,
+            profile: PERSONAL_PROFILE,
+            distribution: PERSONAL_DISTRIBUTION,
+            offered: Some(PERSONAL),
+        },
+    )
+}
+
+struct Wanted<'a> {
+    base: Vec<String>,
+    enable: &'a [String],
+    disable: &'a [String],
+    profile: &'a str,
+    distribution: &'a str,
+    /// Capabilities outside this list are left out of a personal install.
+    offered: Option<&'a [&'a str]>,
+}
+
+fn choose(index: &Index, wanted: &Wanted<'_>) -> Result<Selection, PlanError> {
+    let profile = wanted.profile;
+    let mut chosen: BTreeMap<String, Why> = BTreeMap::new();
+    let mut left_out = BTreeMap::new();
+    for id in &wanted.base {
+        chosen.insert(id.clone(), Why::Preset);
     }
-    for name in &config.enable {
+    for name in wanted.enable {
         chosen.insert(resolve(index, profile, name)?, Why::Enabled);
     }
     let mut disabled = BTreeSet::new();
-    for name in &config.disable {
+    for name in wanted.disable {
         let matched: Vec<String> = chosen
             .keys()
             .filter(|id| matches(index, id, name))
@@ -92,7 +149,12 @@ pub fn select(index: &Index, config: &Config) -> Result<Selection, PlanError> {
         .keys()
         .filter_map(|id| {
             let component = index.component(id)?;
-            if !component.supports(DISTRIBUTION) {
+            if wanted
+                .offered
+                .is_some_and(|offered| !offered.contains(&component.capability.as_str()))
+            {
+                left_out.insert(id.clone(), "not part of a personal install".to_owned());
+            } else if !component.supports(wanted.distribution) {
                 left_out.insert(
                     id.clone(),
                     format!("runs on {} only", component.distributions.join(", ")),

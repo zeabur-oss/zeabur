@@ -1,0 +1,105 @@
+---
+title: 自己用：在小機器上安裝
+description: 只有自己要用時，用 KubeSolo 在 1.5 GiB 記憶體的機器裝好 Kubernetes 和元件，再在自己的電腦用 zeaburctl ui 打開 Zeabur。
+---
+
+只有自己要用時，installer 可以改裝 KubeSolo。伺服器上只有 Kubernetes 和元件，不跑 Zeabur 面板和 Zeabur Identity。要用 Zeabur 時，在自己的電腦執行 `zeaburctl ui`，用伺服器給你的 kubeconfig 連線。
+
+## 自己用和團隊用差在哪
+
+| | 自己用 | 團隊用 |
+| --- | --- | --- |
+| Kubernetes | KubeSolo | RKE2 |
+| 記憶體 | 1.5 GiB 起 | 4 GiB 起 |
+| 怎麼打開 Zeabur | 在自己的電腦執行 `zeaburctl ui` | 開啟伺服器上的 Zeabur 網址，用通行密鑰登入 |
+| 成員和權限 | 沒有。拿到 kubeconfig 的人可以控制整個叢集 | Zeabur Identity 帳號和專案角色 |
+| 專案之間的網路 | 不隔離。KubeSolo 不執行網路政策 | 用網路政策隔離 |
+| 節點 | 只有這一台 | 可以再加入節點 |
+| 元件 | Ingress 和憑證，可以再加資料庫 | Catalog 的全部元件 |
+
+自己用的版本沒有 Builder 和映像檔 registry，所以不能從 Git 或資料夾建置，只能部署現成的容器映像檔。
+
+伺服器可用記憶體低於 3800 MiB 時，installer 只接受自己用。之後要給團隊用，沒有辦法直接升級，要在 4 GiB 記憶體的伺服器上重新用 RKE2 安裝。
+
+## 先準備機器
+
+- 使用 systemd 的 Linux，架構為 amd64 或 arm64。
+- 具備 root 權限。
+- 記憶體至少 1.5 GiB。
+- `/var/lib/kubesolo` 至少有 10 GiB 可用空間。
+- TCP 連接埠 80、443、6443、10250、10443 沒有被占用。
+- 沒有安裝 RKE2、k3s、kubeadm、k0s 或 MicroK8s。
+
+自己的電腦要有 [`zeaburctl`](../reference/zeaburctl.mdx)，而且連得到伺服器的 TCP 6443。
+
+installer 釘選 KubeSolo、helm-controller 和 kubectl 的版本，下載後核對 SHA-256。helm-controller 的映像檔也用 digest 指定。
+
+## 用網頁介面安裝
+
+照[在一台伺服器安裝 Zeabur](quickstart.mdx#開啟安裝介面)開啟安裝介面。在「檢查伺服器」的「給誰用」選「自己用」，步驟會少掉「連線方式」。
+
+在「選擇元件」，Ingress 和憑證是預設的，需要資料庫再勾選。在「確認」核對內容後按「安裝」。
+
+## 用設定檔安裝
+
+以 root 權限建立 `/etc/zeabur-installer/config.yaml`：
+
+```yaml title="/etc/zeabur-installer/config.yaml"
+use: personal
+```
+
+先看計畫，再安裝：
+
+```sh
+sudo zeabur-installer plan
+sudo zeabur-installer apply
+```
+
+要加資料庫，寫 `enable: [databases]`。其他欄位見 [Installer 設定](../reference/installer-configuration.mdx#自己用的檔案)。
+
+## 在自己的電腦打開 Zeabur
+
+安裝完成後，installer 會印出兩行指令。在自己的電腦執行，`<伺服器>` 換成伺服器位址，`<名稱>` 是伺服器的主機名稱：
+
+```sh
+ssh <你>@<伺服器> sudo cat /etc/zeabur-installer/kubeconfig.yaml > ~/.kube/<名稱>.yaml
+KUBECONFIG=~/.kube/<名稱>.yaml zeaburctl ui --context <名稱>
+```
+
+<Callout type="warn">
+這份 kubeconfig 可以控制整個叢集，請像 SSH 金鑰一樣自己保管，不要交給別人或放進 Git 儲存庫。
+</Callout>
+
+kubeconfig 裡的 API 位址是伺服器自己選的位址。自己的電腦要用別的位址或網域連線時，修改檔案裡的 `server:`，並把同一個位址或網域加進設定檔的 `host.tlsSan`，再執行一次 `apply`。
+
+## 不用 installer 也能管理
+
+安裝完成後，installer 就不用再跑。叢集裡的東西都能用 kubectl 管理：
+
+- KubeSolo 是 systemd 服務 `kubesolo`，設定在 `/etc/kubesolo/config.yaml`，日誌用 `journalctl -u kubesolo` 查看。
+- 每個元件是 `kube-system` 裡的一個 `HelmChart`，由 helm-controller 安裝。用 `kubectl get helmcharts -n kube-system` 列出，改設定就改 `HelmChart`。
+- 安裝紀錄在 `kube-system` 的 ConfigMap `zeabur-installer`，只是給 `doctor` 讀的紀錄。
+
+installer 做的事，手動也做得到：照 [KubeSolo 的說明](https://github.com/portainer/kubesolo)安裝 KubeSolo，`kubectl apply` [helm-controller](https://github.com/k3s-io/helm-controller) 的 release manifest，再為每個元件建立 `HelmChart`。
+
+## 檢查安裝結果
+
+```sh
+sudo zeabur-installer doctor
+```
+
+這會檢查 KubeSolo、元件和預設儲存類別，也會提醒這台機器沒有隔離。結束碼和團隊用的一樣，見[檢查安裝結果](quickstart.mdx#檢查安裝結果)。
+
+## 移除
+
+`sudo zeabur-installer uninstall` 不會刪東西，只印出移除指令。要連應用程式和磁碟區一起刪掉，依序執行：
+
+```sh
+sudo systemctl disable --now kubesolo
+sudo rm -f /etc/systemd/system/kubesolo.service /usr/local/bin/kubesolo
+sudo systemctl daemon-reload
+sudo rm -rf /var/lib/kubesolo /etc/kubesolo /var/lib/zeabur-installer /etc/zeabur-installer
+sudo reboot
+```
+
+重新開機會清掉 KubeSolo 留下的網路介面和掛載點。

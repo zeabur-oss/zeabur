@@ -134,6 +134,10 @@ sudo zeabur-installer uninstall zeabur
 
 RKE2 移除後，`uninstall --purge` 清掉 installer 的下載快取、本機 CA 副本和設定，磁碟區保留。`--purge` 不能和 `zeabur`、`identity` 一起用。要保留叢集，就不要執行 RKE2 移除腳本或 `--purge`。
 
+### 自己用的安裝
+
+設定檔是 `use: personal` 時，`uninstall` 不刪東西，只印出移除 KubeSolo 的指令，見[自己用：在小機器上安裝](../get-started/personal.mdx#移除)。`node add` 和 `node sync` 不能用，因為 KubeSolo 只有一個節點。
+
 ## 安裝中斷時
 
 - 主機檢查失敗：依輸出釋出連接埠或修正磁碟，再重跑 `plan`、`apply`。

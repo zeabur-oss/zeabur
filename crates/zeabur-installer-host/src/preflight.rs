@@ -5,6 +5,7 @@ use std::net::TcpListener;
 use std::path::Path;
 
 use serde::Serialize;
+use zeabur_installer_plan::kubesolo;
 use zeabur_installer_plan::rke2::node_ports;
 
 use crate::cmd;
@@ -160,24 +161,52 @@ pub enum Encryption {
 /// What the checks need to know.
 #[derive(Debug, Clone, Copy)]
 pub struct Options {
-    /// RKE2 from an earlier `apply` is running, so its ports are expected to be in use.
-    pub rke2_running: bool,
+    /// The cluster from an earlier `apply` is running, so its ports are expected to be in use.
+    pub cluster_running: bool,
     /// Fail on a disk that is not encrypted.
     pub require_encrypted_disk: bool,
-    /// An RKE2 server, which also listens on the API and supervisor ports; otherwise an agent.
-    pub server: bool,
+    /// What this host runs.
+    pub node: Node,
 }
 
-/// Files left by other Kubernetes distributions.
-const OTHERS: [(&str, &str); 5] = [
-    ("/usr/local/bin/k3s", "k3s"),
-    ("/etc/rancher/k3s", "k3s"),
-    ("/etc/kubernetes/admin.conf", "kubeadm"),
-    ("/var/lib/k0s", "k0s"),
-    ("/snap/bin/microk8s", "MicroK8s"),
-];
+/// What a host runs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Node {
+    /// An RKE2 server, which also listens on the API and supervisor ports.
+    Server,
+    /// An RKE2 agent.
+    Agent,
+    /// `KubeSolo`, for a personal install.
+    KubeSolo,
+}
 
-const DATA_DIR: &str = "/var/lib/rancher";
+impl Node {
+    const fn is_rke2(self) -> bool {
+        matches!(self, Self::Server | Self::Agent)
+    }
+
+    const fn data_dir(self) -> &'static str {
+        if self.is_rke2() {
+            "/var/lib/rancher"
+        } else {
+            kubesolo::DATA_DIR
+        }
+    }
+}
+
+/// Files left by other Kubernetes distributions, and whether each is RKE2's or `KubeSolo`'s,
+/// which the other kind of install also reports.
+const OTHERS: [(&str, &str, Option<Node>); 9] = [
+    ("/usr/local/bin/k3s", "k3s", None),
+    ("/etc/rancher/k3s", "k3s", None),
+    ("/etc/kubernetes/admin.conf", "kubeadm", None),
+    ("/var/lib/k0s", "k0s", None),
+    ("/snap/bin/microk8s", "MicroK8s", None),
+    ("/usr/local/bin/rke2", "RKE2", Some(Node::Server)),
+    ("/etc/rancher/rke2", "RKE2", Some(Node::Server)),
+    (kubesolo::BINARY, "KubeSolo", Some(Node::KubeSolo)),
+    (kubesolo::DATA_DIR, "KubeSolo", Some(Node::KubeSolo)),
+];
 const DISK_NEEDED_GIB: u64 = 10;
 const DISK_ROOMY_GIB: u64 = 30;
 
@@ -189,13 +218,16 @@ pub fn run(options: Options) -> Vec<Check> {
         systemd(),
         time_sync(),
         swap(),
-        other_distributions(),
+        other_distributions(options.node),
     ];
-    if !options.rke2_running {
-        checks.push(ports(options.server));
+    if !options.cluster_running {
+        checks.push(ports(options.node));
     }
-    checks.push(disk_space());
-    checks.push(encryption(options.require_encrypted_disk));
+    checks.push(disk_space(options.node.data_dir()));
+    checks.push(encryption(
+        options.node.data_dir(),
+        options.require_encrypted_disk,
+    ));
     checks
 }
 
@@ -256,7 +288,7 @@ fn systemd() -> Check {
         check(
             Topic::Systemd,
             Status::Fail,
-            "RKE2 runs as a systemd service; this host does not run systemd",
+            "Kubernetes runs as a systemd service; this host does not run systemd",
             Code::SystemdNo,
         )
     }
@@ -307,10 +339,12 @@ fn swap() -> Check {
     }
 }
 
-fn other_distributions() -> Check {
-    let found: Vec<&(&str, &str)> = OTHERS
+fn other_distributions(node: Node) -> Check {
+    let found: Vec<(&str, &str)> = OTHERS
         .iter()
-        .filter(|(path, _)| Path::new(path).exists())
+        .filter(|(_, _, own)| own.is_none_or(|own| own.is_rke2() != node.is_rke2()))
+        .filter(|(path, ..)| Path::new(path).exists())
+        .map(|&(path, name, _)| (path, name))
         .collect();
     if found.is_empty() {
         check(
@@ -338,8 +372,18 @@ fn other_distributions() -> Check {
     }
 }
 
-fn ports(server: bool) -> Check {
-    let ports = node_ports(server);
+/// The TCP ports a node needs free.
+#[must_use]
+pub fn needed_ports(node: Node) -> Vec<(u16, &'static str)> {
+    match node {
+        Node::Server => node_ports(true),
+        Node::Agent => node_ports(false),
+        Node::KubeSolo => kubesolo::ports(),
+    }
+}
+
+fn ports(node: Node) -> Check {
+    let ports = needed_ports(node);
     let busy: Vec<&(u16, &str)> = ports
         .iter()
         .filter(|(port, _)| TcpListener::bind(("0.0.0.0", *port)).is_err())
@@ -378,12 +422,16 @@ fn and_list(items: &[String]) -> String {
     }
 }
 
-fn disk_space() -> Check {
-    let target = if Path::new(DATA_DIR).exists() {
-        DATA_DIR
+fn existing_or_var_lib(dir: &str) -> &str {
+    if Path::new(dir).exists() {
+        dir
     } else {
         "/var/lib"
-    };
+    }
+}
+
+fn disk_space(data_dir: &str) -> Check {
+    let target = existing_or_var_lib(data_dir);
     let Some(kib) = cmd::run("df", &["-Pk", target], None)
         .ok()
         .and_then(|out| available_kib(&out))
@@ -401,7 +449,7 @@ fn disk_space() -> Check {
         check(
             Topic::DiskSpace,
             Status::Fail,
-            format!("{gib} GiB free under {target}; RKE2's images and data need at least {DISK_NEEDED_GIB} GiB"),
+            format!("{gib} GiB free under {target}; the cluster's images and data need at least {DISK_NEEDED_GIB} GiB"),
             Code::DiskLow,
         )
         .values(&[&gib, target, &DISK_NEEDED_GIB.to_string()])
@@ -436,12 +484,8 @@ fn available_kib(df: &str) -> Option<u64> {
     df.lines().nth(1)?.split_whitespace().nth(3)?.parse().ok()
 }
 
-fn encryption(required: bool) -> Check {
-    let target = if Path::new(DATA_DIR).exists() {
-        DATA_DIR
-    } else {
-        "/var/lib"
-    };
+fn encryption(data_dir: &str, required: bool) -> Check {
+    let target = existing_or_var_lib(data_dir);
     let found = disk_encryption(target);
     let (status, detail, code) = match (found, required) {
         (Encryption::Encrypted, _) => (
@@ -463,9 +507,7 @@ fn encryption(required: bool) -> Check {
         ),
         (Encryption::Plain, false) => (
             Status::Warn,
-            format!(
-                "{target} is not on an encrypted device; Secrets are encrypted in etcd, volumes are not"
-            ),
+            format!("{target} is not on an encrypted device; so volumes on it are not encrypted"),
             Code::CryptNo,
         ),
         (Encryption::Unknown, false) => (
@@ -513,13 +555,20 @@ mod tests {
         assert_eq!(available_kib(df), Some(49_094_708));
         assert_eq!(gib(3_250_586), "3.1");
         assert_eq!(gib(10 << 20), "10.0");
-        let ports = |server| -> Vec<String> {
-            node_ports(server)
+        let ports = |node| -> Vec<String> {
+            needed_ports(node)
                 .iter()
                 .map(|(p, _)| p.to_string())
                 .collect()
         };
-        assert_eq!(and_list(&ports(false)), "80, 443 and 10250");
-        assert_eq!(and_list(&ports(true)), "80, 443, 6443, 9345 and 10250");
+        assert_eq!(and_list(&ports(Node::Agent)), "80, 443 and 10250");
+        assert_eq!(
+            and_list(&ports(Node::Server)),
+            "80, 443, 6443, 9345 and 10250"
+        );
+        assert_eq!(
+            and_list(&ports(Node::KubeSolo)),
+            "80, 443, 6443, 10250 and 10443"
+        );
     }
 }

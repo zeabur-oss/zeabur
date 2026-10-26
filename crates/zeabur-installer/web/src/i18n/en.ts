@@ -37,6 +37,15 @@ export const en = {
   "step.of": (n: number, total: number) => `Step ${n} of ${total}`,
 
   // Server
+  "use.title": "Who is it for",
+  "use.personal": "Just me",
+  "use.personalHint":
+    "KubeSolo and the components only. You run zeaburctl ui on your own computer. No team accounts, isolation or extra nodes. Works from 1.5 GiB of memory.",
+  "use.team": "A team",
+  "use.teamHint":
+    "RKE2 and the Zeabur panel, with accounts, roles and project isolation. Needs 4 GiB of memory.",
+  "use.teamTooSmall":
+    "Needs a server with 4 GiB of memory. This one has less, so only a personal install fits.",
   "host.title": "Check the server",
   "host.description":
     "Nothing changes until you install. A failed check has to be fixed first; a warning is worth reading.",
@@ -71,7 +80,8 @@ export const en = {
   "code.root.ok": () => "Running as root.",
   "code.root.no": () => "Start the installer with sudo.",
   "code.systemd.ok": () => "systemd manages services on this server.",
-  "code.systemd.no": () => "RKE2 runs as a systemd service, and this server does not use systemd.",
+  "code.systemd.no": () =>
+    "Kubernetes runs as a systemd service, and this server does not use systemd.",
   "code.time.ok": () => "The clock is synchronized.",
   "code.time.drift": () =>
     "The clock is not synchronized; certificates and sign-ins fail when it drifts. Run timedatectl set-ntp true.",
@@ -90,7 +100,7 @@ export const en = {
   "code.disk.unknown": (path: string) =>
     `Could not read the free space under ${path}. Run df -h ${path} to see it.`,
   "code.disk.low": (gib: string, path: string, need: string) =>
-    `Only ${gib} GiB free under ${path}; RKE2 needs at least ${need} GiB.`,
+    `Only ${gib} GiB free under ${path}; Kubernetes needs at least ${need} GiB.`,
   "code.disk.tight": (gib: string, path: string, need: string) =>
     `${gib} GiB free under ${path}; ${need} GiB or more leaves room for logs, metrics and apps.`,
   "code.disk.ok": (gib: string, path: string) => `${gib} GiB free under ${path}.`,
@@ -100,7 +110,7 @@ export const en = {
   "code.crypt.requiredUnknown": (path: string) =>
     `Could not tell whether ${path} is encrypted, and the configuration requires it.`,
   "code.crypt.no": (path: string) =>
-    `${path} is not on an encrypted device. Secrets are encrypted in the cluster; volumes are not. Fine for a test machine; for production data, install on an encrypted disk.`,
+    `${path} is not on an encrypted device, so volumes on it are not encrypted. Fine for a test machine; for production data, install on an encrypted disk.`,
   "code.crypt.unknown": (path: string) =>
     `Could not tell whether ${path} is encrypted. Run lsblk to see whether a crypt device is under it.`,
   "code.prep.package.ok": (binary: string) => `${binary} is installed.`,
@@ -188,6 +198,9 @@ export const en = {
   "components.privileged": "Privileged",
   "components.privilegedHint":
     "Runs with host access, so its namespace is exempt from the restricted Pod Security level.",
+  "components.personalDescription":
+    "Ingress and certificates come by default. Add databases if you want them. What a component needs is added with it.",
+  "components.notPersonal": "Not in a personal install",
   "components.unsupported": "Not on RKE2",
   "components.runsOn": (where: string) => `Runs on ${where} only`,
   "components.unsupportedOn": (profile: string) => `Not supported on ${profile}`,
@@ -223,6 +236,10 @@ export const en = {
   "review.kubernetes": "Kubernetes",
   "review.rke2": (version: string) => `RKE2 ${version}`,
   "review.rke2Custom": (version: string) => `RKE2 ${version} (unsupported)`,
+  "review.kubesolo": (version: string) => `KubeSolo ${version}`,
+  "review.personalAccess": "zeaburctl ui on your own computer",
+  "review.personalLimits":
+    "Whoever has the kubeconfig has full control. Apps are not isolated from each other.",
   "review.access": "Access",
   "review.suffixes": "App domains",
   "review.suffixesNone": "None: people type each service's whole domain.",
@@ -280,8 +297,12 @@ export const en = {
     `This server has no public address, so new services get no suggested URL. Add ${suffix} as an app domain for URLs only this network reaches.`,
   "warning.local.dns": (identity: string, zeabur: string) =>
     `${zeabur} and ${identity} must resolve to this server through DNS, for browsers and for the server itself. A hosts file is not enough: pods do not read it.`,
-  "warning.memory.low": (host: string) =>
-    `RKE2 asks for a server with at least 4 GiB of memory; this server has ${mib(host)}.`,
+  "warning.personal.isolation": () =>
+    "A personal install is for one person. Whoever has the kubeconfig has full control, and apps are not isolated from each other: KubeSolo ignores network policies. For a team, install with RKE2 on a server with 4 GiB of memory.",
+  "warning.memory.personal.low": (host: string) =>
+    `A personal install needs at least 1.5 GiB of memory; this machine has ${mib(host)}.`,
+  "warning.memory.personal.tight": (idle: string, host: string) =>
+    `At idle, KubeSolo and the components use about ${mib(idle)} of this machine's ${mib(host)}.`,
   "warning.memory.tight": (idle: string, host: string) =>
     `At idle, RKE2 and the components use about ${mib(idle)} of this server's ${mib(host)}.`,
   "warning.rke2.unsupported": (version: string) =>
@@ -341,6 +362,9 @@ export const en = {
   "install.toComponents": "Choose components",
   "phase.host": "Check the server",
   "phase.rke2": (version: string) => `Install Kubernetes (RKE2 ${version})`,
+  "phase.kubesolo": (version: string) => `Install Kubernetes (KubeSolo ${version})`,
+  "phase.helmController": "Helm controller",
+  "phase.namespacesOnly": "Namespaces",
   "phase.namespaces": "Namespaces and network policies",
   "phase.storage": "Storage",
   "phase.ca": "Certificate authority",
@@ -352,6 +376,13 @@ export const en = {
   "done.title": "Zeabur is ready",
   "done.description":
     "Register the first administrator's passkey, then sign in to Zeabur. Stop the installer with Ctrl-C when you are done.",
+  "done.personalTitle": "Your cluster is ready",
+  "done.personalDescription":
+    "Copy the kubeconfig to your own computer and open Zeabur there with zeaburctl ui. Stop the installer with Ctrl-C when you are done.",
+  "done.personal": "On your computer",
+  "done.personalHint": "Copy the kubeconfig from this server, then open Zeabur with it.",
+  "done.personalKey":
+    "The kubeconfig has full control of the cluster. Keep it to yourself, like an SSH key.",
   "done.setup": "First administrator",
   "done.setupHint": "This link works once, within 24 hours.",
   "done.register": "Register a passkey",

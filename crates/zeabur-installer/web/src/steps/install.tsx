@@ -25,18 +25,32 @@ interface Phase {
   starts: (step: string) => boolean
 }
 
-/** What `apply` does, in its order (crates/zeabur-installer/src/apply.rs). */
+/** What `apply` does, in its order (crates/zeabur-installer/src/apply.rs, personal.rs). */
 function phases(t: Translate, plan: Plan | undefined, local: boolean): Phase[] {
+  const components = (plan?.components ?? []).map((c) => ({
+    title: c.displayName,
+    starts: (s: string) => s === `${c.displayName} (${c.id})`,
+  }))
+  if (plan?.use === "personal") {
+    return [
+      { title: t("phase.host"), starts: (s) => s === "Checking the host" },
+      {
+        title: t("phase.kubesolo", plan.kubesolo.version),
+        starts: (s) => s.startsWith("KubeSolo "),
+      },
+      { title: t("phase.helmController"), starts: (s) => s.startsWith("helm-controller ") },
+      { title: t("phase.namespacesOnly"), starts: (s) => s === "Namespaces" },
+      ...components,
+      { title: t("phase.done"), starts: (s) => s === "Done" },
+    ]
+  }
   const rke2 = plan?.rke2.version ?? ""
   return [
     { title: t("phase.host"), starts: (s) => s === "Checking the host" },
     { title: t("phase.rke2", rke2), starts: (s) => s.startsWith("RKE2 ") },
     { title: t("phase.namespaces"), starts: (s) => s === "Namespaces and network policies" },
     { title: t("phase.storage"), starts: (s) => s === "Storage" },
-    ...(plan?.components ?? []).map((c) => ({
-      title: c.displayName,
-      starts: (s: string) => s === `${c.displayName} (${c.id})`,
-    })),
+    ...components,
     ...(local
       ? [{ title: t("phase.ca"), starts: (s: string) => s === "Local certificate authority" }]
       : []),
@@ -79,8 +93,9 @@ export function InstallStep({ wizard }: { wizard: Wizard }) {
   const done = progress.code === 0
   const failed = progress.code !== null && progress.code !== 0
   const link = setupLink(progress.lines)
-  const zeabur = plan?.zeabur?.url ?? `https://${config.access.zeabur}`
-  const identity = plan?.identity?.issuer ?? `https://${config.access.identity}`
+  const team = plan?.use === "personal" ? undefined : plan
+  const zeabur = team?.zeabur?.url ?? `https://${config.access.zeabur}`
+  const identity = team?.identity?.issuer ?? `https://${config.access.identity}`
 
   const [expanded, setExpanded] = useState(false)
   const at = all[current]?.title ?? ""
@@ -110,9 +125,19 @@ export function InstallStep({ wizard }: { wizard: Wizard }) {
 
   return (
     <StepPage
-      title={done ? t("done.title") : failed ? t("install.failedTitle") : t("install.title")}
+      title={
+        done
+          ? t(wizard.use === "personal" ? "done.personalTitle" : "done.title")
+          : failed
+            ? t("install.failedTitle")
+            : t("install.title")
+      }
       description={
-        done ? t("done.description") : failed ? t("install.failed") : t("install.description")
+        done
+          ? t(wizard.use === "personal" ? "done.personalDescription" : "done.description")
+          : failed
+            ? t("install.failed")
+            : t("install.description")
       }
       badges={
         done ? (
@@ -170,7 +195,9 @@ export function InstallStep({ wizard }: { wizard: Wizard }) {
         </Alert>
       ) : null}
 
-      {done ? (
+      {done && wizard.use === "personal" ? <PersonalDone wizard={wizard} /> : null}
+
+      {done && wizard.use === "team" ? (
         <>
           <Panel title={t("done.setup")}>
             {link ? (
@@ -269,6 +296,30 @@ export function InstallStep({ wizard }: { wizard: Wizard }) {
 
       <Log key={failed ? "failed" : "running"} lines={progress.lines} defaultOpen={failed} />
     </StepPage>
+  )
+}
+
+/** The commands `apply` prints for the person's own computer (personal.rs, `done_text`). */
+function PersonalDone({ wizard }: { wizard: Wizard }) {
+  const t = useT()
+  const name = (wizard.server.facts?.hostname ?? "kubesolo").toLowerCase()
+  const host = wizard.server.addresses[0] ?? "<server>"
+  const kubeconfig = `~/.kube/${name}.yaml`
+  return (
+    <Panel title={t("done.personal")}>
+      <div className="flex flex-col gap-3">
+        <p className="text-sm text-secondary">{t("done.personalHint")}</p>
+        <CopyInput
+          value={`ssh <you>@${host} sudo cat /etc/zeabur-installer/kubeconfig.yaml > ${kubeconfig}`}
+          copyLabel={t("common.copy")}
+        />
+        <CopyInput
+          value={`KUBECONFIG=${kubeconfig} zeaburctl ui --context ${name}`}
+          copyLabel={t("common.copy")}
+        />
+        <p className="text-xs text-tertiary">{t("done.personalKey")}</p>
+      </div>
+    </Panel>
   )
 }
 

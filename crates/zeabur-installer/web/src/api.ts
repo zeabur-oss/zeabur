@@ -26,6 +26,8 @@ export interface CatalogComponent {
   displayName: string
   default: "recommended" | "optional" | "unsupported"
   supported: boolean
+  /** Offered in a personal install; older installers leave it out. */
+  personal?: boolean
   /** Where it runs, when not everywhere; older installers leave it out. */
   distributions?: string[]
   /** The components installed before it because it needs them. */
@@ -54,11 +56,31 @@ export interface Config {
   sources: Record<string, unknown>
 }
 
+/** Who the install is for: one person on KubeSolo, or a team on RKE2 with the Zeabur panel. */
+export type Use = "personal" | "team"
+
+export interface PersonalConfig {
+  use: "personal"
+  enable: string[]
+  disable: string[]
+  inputs: Record<string, Record<string, unknown>>
+  secretFiles: Record<string, Record<string, string>>
+  host: { tlsSan: string[]; requireEncryptedDisk: boolean }
+  sources: Record<string, unknown>
+}
+
 export interface ServerState {
   facts: { arch: string; hostname: string; memoryMib: number } | null
   checks: Check[]
+  /** The checks for a personal install; older installers leave them out. */
+  personalChecks?: Check[]
   addresses: string[]
+  /** What the saved configuration is for; older installers leave it out. */
+  use?: Use
   config: Config | null
+  personal?: PersonalConfig
+  /** Below this, only a personal install fits. */
+  teamMinMemoryMib?: number
   configExists: boolean
   configPath: string
   catalog: { components: CatalogComponent[] } | null
@@ -84,16 +106,30 @@ export interface PlannedComponent {
   releases: Release[]
 }
 
-export interface Plan {
-  rke2: { version: string; pinned: boolean }
+interface PlanBase {
   components: PlannedComponent[]
   leftOut: Record<string, string>
+  /** The distribution itself (RKE2 or KubeSolo), then the measured components. */
+  memory: { clusterMib: number; componentsMib: number; unmeasured: number; hostMib: number }
+  warnings: Warning[]
+}
+
+export interface TeamPlan extends PlanBase {
+  use?: undefined
+  rke2: { version: string; pinned: boolean }
   access: AccessMode
   identity: { issuer: string; host: string } | null
   zeabur: { url: string; values?: { domains?: { suffixes?: string[] } } } | null
-  memory: { rke2Mib: number; componentsMib: number; unmeasured: number; hostMib: number }
-  warnings: Warning[]
 }
+
+export interface PersonalPlan extends PlanBase {
+  use: "personal"
+  facts: { hostname: string; nodeIps: string[] }
+  kubesolo: { version: string; kubernetes: string }
+  helmController: { version: string }
+}
+
+export type Plan = TeamPlan | PersonalPlan
 
 export type Planned = { plan: Plan; text: string; yaml: string } | { error: string }
 
@@ -125,8 +161,9 @@ export const api = {
   state: () => call<ServerState>("/api/state"),
   resolve: (name: string) =>
     call<{ name: string; addresses: string[] }>(`/api/resolve?name=${encodeURIComponent(name)}`),
-  plan: (config: Config, secrets: Secrets) => call<Planned>("/api/plan", { config, secrets }),
-  apply: (config: Config, secrets: Secrets) =>
+  plan: (config: Config | PersonalConfig, secrets: Secrets) =>
+    call<Planned>("/api/plan", { config, secrets }),
+  apply: (config: Config | PersonalConfig, secrets: Secrets) =>
     call<{ started: true } | { error: string }>("/api/apply", { config, secrets }),
   progress: (from: number) => call<Progress>(`/api/apply?from=${from}`),
 }

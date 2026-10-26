@@ -190,7 +190,7 @@ const fn rank(status: Status) -> u8 {
 }
 
 /// Each component's `HelmCharts` installed and its smoke waits met.
-fn components(kubectl: &Kubectl, plan: &Value) -> Vec<(Status, String)> {
+pub(crate) fn components(kubectl: &Kubectl, plan: &Value) -> Vec<(Status, String)> {
     let mut results = Vec::new();
     for component in plan
         .get("components")
@@ -254,7 +254,7 @@ fn components(kubectl: &Kubectl, plan: &Value) -> Vec<(Status, String)> {
 }
 
 /// Whether the cluster's default storage class is the one the plan chose, and the only one.
-fn default_class(kubectl: &Kubectl, plan: &Value) -> (Status, String) {
+pub(crate) fn default_class(kubectl: &Kubectl, plan: &Value) -> (Status, String) {
     let Some(planned) = plan
         .pointer("/storage/defaultClass")
         .and_then(Value::as_str)
@@ -373,7 +373,7 @@ fn identity_certificate(name: &str, certificate: Option<&Value>) -> (Status, Str
     )
 }
 
-fn deployment(kubectl: &Kubectl, namespace: &str, name: &str) -> (Status, String) {
+pub(crate) fn deployment(kubectl: &Kubectl, namespace: &str, name: &str) -> (Status, String) {
     let target = format!("deployment/{name}");
     match kubectl.wait(&[
         "--namespace",

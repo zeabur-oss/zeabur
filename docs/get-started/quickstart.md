@@ -36,6 +36,26 @@ The server needs 4 GB of memory or more, 30 GB of free disk, and ports 80, 443, 
 10250 free. Before changing anything, `apply` checks these and the clock, and warns when it finds
 files of k3s, kubeadm, k0s or MicroK8s.
 
+## For yourself
+
+A team install needs 4 GB of memory. For one person, `use: personal` installs
+[KubeSolo](https://github.com/portainer/kubesolo) and the components instead, from about 1.5 GB:
+
+```yaml
+use: personal
+enable: [databases]   # ingress and certificates come by default
+```
+
+The server runs no Zeabur, Zeabur Identity, Builder or registry. You run Zeabur on your own
+computer with `zeaburctl ui` and the kubeconfig `apply` writes to
+`/etc/zeabur-installer/kubeconfig.yaml`; `apply` prints the two commands. Whoever has that file
+is cluster admin. There are no members or roles, one node only, and no isolation between
+projects: KubeSolo does not enforce NetworkPolicies. Components are `HelmChart` objects in
+`kube-system`, run by the standalone helm-controller, so plain kubectl manages everything without
+the installer. When the server has less than 3800 MiB of memory, a team install stops and points
+here. See [Installer configuration](../reference/installer-configuration.md#use-personal) and
+[How it works](../reference/installer.md#a-personal-install).
+
 ## Commands
 
 | Command | What it does |

@@ -22,8 +22,9 @@ use std::thread::{self, JoinHandle};
 use serde_json::{Value, json};
 use zeabur_installer_host::{facts, files, preflight, systemd};
 use zeabur_installer_plan::catalog::{Default, Index};
-use zeabur_installer_plan::config::{Config, Sources};
-use zeabur_installer_plan::plan;
+use zeabur_installer_plan::config::{Config, Document, PersonalConfig};
+use zeabur_installer_plan::select::{self, PERSONAL, PERSONAL_DISTRIBUTION};
+use zeabur_installer_plan::{kubesolo, personal, plan};
 
 use self::http::{Request, Response};
 use crate::{InstallError, apply, load, out, render};
@@ -193,29 +194,42 @@ impl Server {
     fn state(&self) -> Response {
         let existing = fs::read_to_string(&self.config_path)
             .ok()
-            .and_then(|text| Config::parse(&text).ok());
+            .and_then(|text| Document::parse(&text).ok());
         let config_exists = existing.is_some();
         let addresses = facts::addresses();
-        let existing = existing.or_else(|| addresses.first().map(|a| Config::defaults(a)));
+        let (team, personal) = match existing {
+            Some(Document::Install(config)) => (Some(config), None),
+            Some(Document::Personal(config)) => (None, Some(config)),
+            Some(Document::Join(_)) | None => (None, None),
+        };
+        let chosen_use = if personal.is_some() {
+            "personal"
+        } else {
+            "team"
+        };
+        let team = team.or_else(|| addresses.first().map(|a| Config::defaults(a)));
+        let personal = personal.unwrap_or_else(PersonalConfig::defaults);
         let host = facts::read().ok();
         let facts = host.as_ref().map_or(Value::Null, |f| json!(f));
         let checks = preflight::run(preflight::Options {
-            rke2_running: systemd::is_active("rke2-server"),
-            require_encrypted_disk: existing
-                .as_ref()
-                .is_some_and(|c| c.host.require_encrypted_disk),
-            server: true,
+            cluster_running: systemd::is_active("rke2-server"),
+            require_encrypted_disk: team.as_ref().is_some_and(|c| c.host.require_encrypted_disk),
+            node: preflight::Node::Server,
         });
-        let sources = existing
+        let personal_checks = preflight::run(preflight::Options {
+            cluster_running: systemd::is_active(kubesolo::UNIT),
+            require_encrypted_disk: personal.host.require_encrypted_disk,
+            node: preflight::Node::KubeSolo,
+        });
+        let source = team
             .as_ref()
-            .map_or_else(Sources::default, |c| c.sources.clone());
-        let (catalog, catalog_error) = match load::catalog(&sources) {
+            .and_then(|c| c.sources.catalog.clone())
+            .or_else(|| personal.sources.catalog.clone());
+        let (catalog, catalog_error) = match load::catalog(source.as_deref(), apply::STATE_DIR) {
             Ok(index) => (
                 catalog_json(
                     &index,
-                    existing
-                        .as_ref()
-                        .map_or("single-node", |c| c.profile.as_str()),
+                    team.as_ref().map_or("single-node", |c| c.profile.as_str()),
                     host.as_ref().map_or("", |f| f.arch.as_str()),
                 ),
                 None,
@@ -232,8 +246,12 @@ impl Server {
             &json!({
                 "facts": facts,
                 "checks": checks,
+                "personalChecks": personal_checks,
                 "addresses": addresses,
-                "config": existing,
+                "use": chosen_use,
+                "config": team,
+                "personal": personal,
+                "teamMinMemoryMib": plan::MIN_MEMORY_MIB,
                 "configExists": config_exists,
                 "configPath": self.config_path,
                 "catalog": catalog,
@@ -245,7 +263,7 @@ impl Server {
 
     /// The configuration the page sends, with secret values replaced by the files they will be
     /// written to.
-    fn config(&self, body: &[u8]) -> Result<(Config, Vec<(PathBuf, String)>), InstallError> {
+    fn config(&self, body: &[u8]) -> Result<(Chosen, Vec<(PathBuf, String)>), InstallError> {
         let mut input: Value =
             serde_json::from_slice(body).map_err(|e| InstallError::Message(e.to_string()))?;
         let secrets: BTreeMap<String, BTreeMap<String, String>> = serde_json::from_value(
@@ -254,9 +272,13 @@ impl Server {
                 .map_or_else(|| json!({}), Value::take),
         )
         .map_err(|e| InstallError::Message(e.to_string()))?;
-        let mut config: Config =
-            serde_json::from_value(input.get_mut("config").map_or(Value::Null, Value::take))
-                .map_err(|e| InstallError::Message(format!("configuration: {e}")))?;
+        let value = input.get_mut("config").map_or(Value::Null, Value::take);
+        let parse = |e: serde_json::Error| InstallError::Message(format!("configuration: {e}"));
+        let mut config = if value.get("use").and_then(Value::as_str) == Some("personal") {
+            Chosen::Personal(serde_json::from_value(value).map_err(parse)?)
+        } else {
+            Chosen::Team(Box::new(serde_json::from_value(value).map_err(parse)?))
+        };
         let dir = self
             .config_path
             .parent()
@@ -267,7 +289,7 @@ impl Server {
             for (name, value) in values.into_iter().filter(|(_, v)| !v.is_empty()) {
                 let path = dir.join(format!("{}.{name}", component.replace('/', "_")));
                 config
-                    .secret_files
+                    .secret_files()
                     .entry(component.clone())
                     .or_default()
                     .insert(name, path.display().to_string());
@@ -280,17 +302,26 @@ impl Server {
 
     fn plan(&self, body: &[u8]) -> Response {
         let planned = self.config(body).and_then(|(config, _)| {
-            let index = load::catalog(&config.sources)?;
-            let plan = plan::plan(&index, &config, &facts::read()?)?;
-            let yaml = serde_saphyr::to_string(&config)
-                .map_err(|e| InstallError::Message(e.to_string()))?;
-            Ok((plan, yaml))
+            let facts = facts::read()?;
+            let (plan, text) = match &config {
+                Chosen::Team(config) => {
+                    let index = load::catalog(config.sources.catalog.as_deref(), apply::STATE_DIR)?;
+                    let plan = plan::plan(&index, config, &facts)?;
+                    (json!(plan), render::plan(&plan))
+                }
+                Chosen::Personal(config) => {
+                    let index =
+                        load::catalog(config.sources.catalog.as_deref(), kubesolo::STATE_DIR)?;
+                    let plan = personal::plan(&index, config, &facts)?;
+                    (json!(plan), render::personal_plan(&plan))
+                }
+            };
+            Ok((plan, text, config.yaml()?))
         });
         match planned {
-            Ok((plan, yaml)) => Response::json(
-                200,
-                &json!({"plan": plan, "text": render::plan(&plan), "yaml": yaml}),
-            ),
+            Ok((plan, text, yaml)) => {
+                Response::json(200, &json!({"plan": plan, "text": text, "yaml": yaml}))
+            }
             Err(e) => Response::json(200, &json!({"error": e.to_string()})),
         }
     }
@@ -308,9 +339,7 @@ impl Server {
             for (path, value) in &secrets {
                 files::write(path, 0o600, value.as_bytes())?;
             }
-            let yaml = serde_saphyr::to_string(&config)
-                .map_err(|e| InstallError::Message(e.to_string()))?;
-            files::write(&self.config_path, 0o600, yaml.as_bytes())?;
+            files::write(&self.config_path, 0o600, config.yaml()?.as_bytes())?;
             let exe = std::env::current_exe().map_err(|e| InstallError::Message(e.to_string()))?;
             // One pipe for both streams keeps the steps (stderr) and results (stdout) in order.
             let message = |e: io::Error| InstallError::Message(e.to_string());
@@ -354,6 +383,37 @@ impl Server {
             200,
             &json!({"lines": lines, "next": job.dropped + skip + lines.len(), "running": job.running, "code": job.code}),
         )
+    }
+}
+
+/// The configuration of either kind of install the page sends.
+enum Chosen {
+    Team(Box<Config>),
+    Personal(PersonalConfig),
+}
+
+impl Chosen {
+    const fn secret_files(&mut self) -> &mut BTreeMap<String, BTreeMap<String, String>> {
+        match self {
+            Self::Team(config) => &mut config.secret_files,
+            Self::Personal(config) => &mut config.secret_files,
+        }
+    }
+
+    fn check(&self) -> Result<(), InstallError> {
+        match self {
+            Self::Team(config) => config.check()?,
+            Self::Personal(config) => config.check()?,
+        }
+        Ok(())
+    }
+
+    fn yaml(&self) -> Result<String, InstallError> {
+        match self {
+            Self::Team(config) => serde_saphyr::to_string(config),
+            Self::Personal(config) => serde_saphyr::to_string(config),
+        }
+        .map_err(|e| InstallError::Message(e.to_string()))
     }
 }
 
@@ -401,7 +461,9 @@ fn catalog_json(index: &Index, profile: &str, arch: &str) -> Value {
                     Default::Optional => "optional",
                     Default::Unsupported => "unsupported",
                 },
-                "supported": c.supports(zeabur_installer_plan::select::DISTRIBUTION),
+                "supported": c.supports(select::DISTRIBUTION),
+                "personal": c.supports(PERSONAL_DISTRIBUTION)
+                    && PERSONAL.contains(&c.capability.as_str()),
                 "distributions": c.distributions,
                 "needs": c
                     .install_order

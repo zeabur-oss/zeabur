@@ -2,7 +2,8 @@
 
 use zeabur_installer_plan::config::{AccessMode, Role};
 use zeabur_installer_plan::join::{self, JoinPlan};
-use zeabur_installer_plan::plan::{Plan, ReleasePlan};
+use zeabur_installer_plan::personal::PersonalPlan;
+use zeabur_installer_plan::plan::{ComponentPlan, Plan, ReleasePlan};
 use zeabur_installer_plan::rke2::JOIN_TOKEN_FILE;
 use zeabur_installer_plan::storage::NodePrep;
 
@@ -24,32 +25,7 @@ pub(crate) fn plan(plan: &Plan) -> String {
     );
     node_addresses(&mut s, &plan.facts.node_ips);
     push(&mut s, "");
-    push(&mut s, "Components");
-    for c in &plan.components {
-        let memory = c
-            .idle_memory_mib
-            .map_or_else(|| "unmeasured".to_owned(), |m| format!("{m} MiB"));
-        push(&mut s, &format!("  {:<48} {:<10} {memory}", c.id, c.why));
-        for release in &c.releases {
-            let what = match release {
-                ReleasePlan::HelmChart { name, object, .. } => format!(
-                    "chart {name} {}",
-                    object
-                        .pointer("/spec/version")
-                        .and_then(|v| v.as_str())
-                        .unwrap_or_default()
-                ),
-                ReleasePlan::Manifests { name, .. } => format!("manifests {name}"),
-                ReleasePlan::Urls { name, urls, .. } => {
-                    format!("manifests {name} ({} URLs)", urls.len())
-                }
-            };
-            push(&mut s, &format!("      {what}"));
-        }
-    }
-    for (id, reason) in &plan.left_out {
-        push(&mut s, &format!("  {id:<48} left out: {reason}"));
-    }
+    components(&mut s, &plan.components, &plan.left_out);
     push(&mut s, "");
     let privileged: Vec<String> = plan
         .namespaces
@@ -96,9 +72,105 @@ pub(crate) fn plan(plan: &Plan) -> String {
         &mut s,
         &format!(
             "Memory at idle   about {} MiB of {} (RKE2 {}, components {}{unmeasured})",
-            m.rke2_mib + m.components_mib,
+            m.cluster_mib + m.components_mib,
             m.host_mib,
-            m.rke2_mib,
+            m.cluster_mib,
+            m.components_mib
+        ),
+    );
+    for warning in &plan.warnings {
+        push(&mut s, &format!("warning: {}", warning.text));
+    }
+    s
+}
+
+fn components(
+    s: &mut String,
+    components: &[ComponentPlan],
+    left_out: &std::collections::BTreeMap<String, String>,
+) {
+    push(s, "Components");
+    for c in components {
+        let memory = c
+            .idle_memory_mib
+            .map_or_else(|| "unmeasured".to_owned(), |m| format!("{m} MiB"));
+        push(s, &format!("  {:<48} {:<10} {memory}", c.id, c.why));
+        for release in &c.releases {
+            let what = match release {
+                ReleasePlan::HelmChart { name, object, .. } => format!(
+                    "chart {name} {}",
+                    object
+                        .pointer("/spec/version")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or_default()
+                ),
+                ReleasePlan::Manifests { name, .. } => format!("manifests {name}"),
+                ReleasePlan::Urls { name, urls, .. } => {
+                    format!("manifests {name} ({} URLs)", urls.len())
+                }
+            };
+            push(s, &format!("      {what}"));
+        }
+    }
+    for (id, reason) in left_out {
+        push(s, &format!("  {id:<48} left out: {reason}"));
+    }
+}
+
+/// The plan of a personal install as text.
+pub(crate) fn personal_plan(plan: &PersonalPlan) -> String {
+    let mut s = String::new();
+    push(
+        &mut s,
+        &format!(
+            "KubeSolo {} (Kubernetes {}, pinned), for one person, on {} ({}, {} MiB)",
+            plan.kubesolo.version,
+            plan.kubesolo.kubernetes,
+            plan.facts.hostname,
+            plan.facts.arch,
+            plan.facts.memory_mib
+        ),
+    );
+    push(
+        &mut s,
+        &format!(
+            "helm-controller  {} (images pinned by digest)",
+            plan.helm_controller.version
+        ),
+    );
+    let address = plan.facts.node_ips.first().map_or_else(
+        || "chosen by KubeSolo: this host's addresses could not be read".to_owned(),
+        |ip| format!("{ip}; the kubeconfig names it"),
+    );
+    push(&mut s, &format!("Node address     {address}"));
+    push(&mut s, "");
+    components(&mut s, &plan.components, &plan.left_out);
+    push(&mut s, "");
+    push(
+        &mut s,
+        &format!(
+            "Storage          {} (KubeSolo's local-path), the default",
+            plan.storage.default_class
+        ),
+    );
+    push(
+        &mut s,
+        "Zeabur           none on the server: run `zeaburctl ui` on your computer",
+    );
+    push(&mut s, "");
+    let m = &plan.memory;
+    let unmeasured = if m.unmeasured > 0 {
+        format!(", plus {} unmeasured", m.unmeasured)
+    } else {
+        String::new()
+    };
+    push(
+        &mut s,
+        &format!(
+            "Memory at idle   about {} MiB of {} (KubeSolo {}, components {}{unmeasured})",
+            m.cluster_mib + m.components_mib,
+            m.host_mib,
+            m.cluster_mib,
             m.components_mib
         ),
     );

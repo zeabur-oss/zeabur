@@ -114,6 +114,23 @@ installer would otherwise download.
 | `zeaburImage` | Zeabur's image reference. |
 | `zeaburChart` | Zeabur's chart: a directory or a packaged `.tgz`. |
 
+## `use: personal`
+
+`use` is `team` by default. `use: personal` installs KubeSolo and the components for one person,
+with no Zeabur, Zeabur Identity, members or isolation; see
+[A personal install](installer.md#a-personal-install). Such a file takes only these fields:
+
+| Field | Meaning |
+|---|---|
+| `enable` | Ingress and certificates come by default; `databases`, or component ids under these capabilities, may be added. |
+| `disable` | Capabilities or component ids taken out. |
+| `inputs`, `secretFiles` | As for a team install. |
+| `host.tlsSan` | Extra API server certificate names, for when your computer reaches the server by another name. |
+| `host.requireEncryptedDisk` | Stop when `/var/lib/kubesolo` is not on a dm-crypt device. |
+| `sources.catalog` | A catalog `index.json` on disk. |
+
+KubeSolo, helm-controller and kubectl are pinned by the installer; no field changes them.
+
 ## `join`
 
 A file with a top-level `join` makes this machine join an existing cluster instead of creating

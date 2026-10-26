@@ -331,7 +331,7 @@
     "memory": {
       "componentsMib": 356,
       "hostMib": 7936,
-      "rke2Mib": 1300,
+      "clusterMib": 1300,
       "unmeasured": 0
     },
     "namespaces": [

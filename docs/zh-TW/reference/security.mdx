@@ -288,6 +288,12 @@ Catalog 元件的 chart 和 manifest 檔，installer 會先下載，跟 Catalog 
 
 RKE2 以 CIS profile 安裝，並加密 etcd 裡的 Secret，見[機密的加密與存取紀錄](#機密的加密與存取紀錄)。主機磁碟有沒有加密另外檢查。設 `host.requireEncryptedDisk: true` 時，沒加密就不安裝。備份目的地的存取權和加密，在備份工具和儲存服務那邊設定。
 
+### 自己用的安裝
+
+自己用的安裝跑在 KubeSolo 上，沒有上面這些保護。拿到 `/etc/zeabur-installer/kubeconfig.yaml` 的人可以控制整個叢集。KubeSolo 不執行網路政策，Zeabur 為專案建立的網路政策不會生效，專案之間也就沒有隔離。KubeSolo 把資料存在 SQLite，installer 不替 Secret 另外加密，也不套用 CIS profile。這樣的安裝只適合一個人用，見[自己用：在小機器上安裝](../get-started/personal.mdx)。
+
+helm-controller 照上游的設定執行，它的 ServiceAccount 有整個叢集的權限，安裝元件的 Job 也用同一個身分。
+
 ## 私下回報漏洞
 
 透過 [GitHub 私密漏洞回報](https://github.com/zeabur-oss/zeabur/security/advisories/new) 提供版本或 commit、執行方式、Kubernetes 發行版和版本，以及重現步驟。Zeabur Identity 的漏洞送到 [Zeabur Identity 的私密回報](https://github.com/zeabur-oss/identity/security/advisories/new)。安全問題請不要開公開 issue、discussion 或 pull request。

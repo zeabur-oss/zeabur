@@ -28,6 +28,7 @@ host:
 
 | 欄位 | 預設 | 用途 |
 |---|---|---|
+| `use` | `team` | `team` 是團隊用。`personal` 改成自己用，可用的欄位見[自己用的檔案](#自己用的檔案) |
 | `access` | 必填 | 登入服務與 Zeabur 的網域和憑證模式 |
 | `preset` | `standard` | `minimal`、`standard` 或 `secure` |
 | `profile` | `single-node` | `single-node` 或 `multi-node`，選取 Catalog 對應的元件設定 |
@@ -134,6 +135,31 @@ sources:
 | `zeaburChart` | Helm chart 目錄或封裝好的 `.tgz` |
 
 從 `imageArchives` 拿掉的檔案，下次 `apply` 時也會從 RKE2 的匯入目錄移除。這份清單放的是已經在主機上的封存檔，和私有 registry 的存取設定無關。
+
+## 自己用的檔案
+
+頂層寫 `use: personal` 時，installer 改裝 KubeSolo 和元件，不裝 Zeabur 面板和 Zeabur Identity。做法和限制見[自己用：在小機器上安裝](../get-started/personal.mdx)。
+
+```yaml title="/etc/zeabur-installer/config.yaml"
+use: personal
+enable: [databases]
+host:
+  tlsSan: [solo.example.com]
+```
+
+同一份檔案只能再放下表的欄位，`preset`、`profile`、`access`、`zeabur`、`rke2Version` 和 `join` 都不接受。
+
+| 欄位 | 預設與用途 |
+|---|---|
+| `enable` | `[]`。Ingress 和憑證是預設的，只能再加 `databases`，或這幾個 capability 底下的元件 ID |
+| `disable` | `[]`。排除 capability 或完整元件 ID |
+| `inputs` | `{}`。和建立叢集的檔案一樣，依元件 ID 分組 |
+| `secretFiles` | `{}`。和建立叢集的檔案一樣，檔案權限要是 `0600` |
+| `host.tlsSan` | `[]`。自己的電腦用別的位址或網域連 API 時，把它加在這裡 |
+| `host.requireEncryptedDisk` | `false`。設為 `true` 時，`/var/lib/kubesolo` 不在加密裝置上，`apply` 就停下 |
+| `sources.catalog` | 選填。本機的 Catalog `index.json`，取代釘選的版本 |
+
+元件裝在 KubeSolo 內建的 `local-path` 儲存類別，資料放在 `/var/lib/kubesolo` 底下。KubeSolo、helm-controller 和 kubectl 的版本由 installer 釘選，沒有欄位可以改。
 
 ## 加入既有叢集的檔案
 

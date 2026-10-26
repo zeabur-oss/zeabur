@@ -152,6 +152,26 @@ address, or one the host no longer has. `uninstall` there prints how to drain an
 node, run `rke2-uninstall.sh`, then `node sync` on a server to take its addresses out of the
 policies.
 
+## A personal install
+
+With `use: personal`, `apply`:
+
+1. Checks the host as for a server, with KubeSolo's ports: 80, 443, 6443, 10250 and 10443.
+2. Downloads the pinned kubectl and KubeSolo's offline archive, checked by SHA-256, and writes
+   `/etc/kubesolo/config.yaml` and the `kubesolo` systemd unit.
+3. Starts KubeSolo and waits for the node, CoreDNS and the local-path provisioner.
+4. Applies the release manifest of the standalone
+   [helm-controller](https://github.com/k3s-io/helm-controller), checked by SHA-256, with its
+   images pinned by digest. It runs as upstream ships it: its ServiceAccount is cluster admin.
+5. Creates the components' namespaces and installs each component as a `HelmChart` in
+   `kube-system`, as for a team install. No network policies: KubeSolo does not enforce them.
+6. Records the install in the ConfigMap `kube-system/zeabur-installer` and writes a kubeconfig with
+   the admin client certificate to `/etc/zeabur-installer/kubeconfig.yaml`, mode 0600.
+
+Nothing of the installer runs afterwards, and none of this needs it: KubeSolo is a systemd
+service, and the components are `HelmChart` objects that kubectl reads and changes. `uninstall`
+removes nothing; it prints the commands that remove KubeSolo and its data.
+
 ## What stays after uninstalling
 
 `rke2-uninstall.sh` removes RKE2 and its data, but not the installer's own files: the download

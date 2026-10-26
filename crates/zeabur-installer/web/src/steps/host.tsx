@@ -1,13 +1,14 @@
 import ArrowClockwiseIcon from "~icons/ph/arrow-clockwise"
 import CaretRightIcon from "~icons/ph/caret-right"
 
-import type { Check } from "@/api"
+import type { Check, Use } from "@/api"
 import type { Wizard } from "@/app"
 import { Panel, Row, Rows, StatusDot, StatusPill, type Health } from "@/components/bits"
 import { coded, useT } from "@/i18n"
 import { StepPage } from "@/steps/frame"
 import { Alert, AlertDescription, AlertTitle } from "@zeabur/design-system/components/alert"
 import { Button } from "@zeabur/design-system/components/button"
+import { RadioGroup, RadioOption } from "@zeabur/design-system/components/radio"
 import {
   Collapsible,
   CollapsibleContent,
@@ -39,12 +40,14 @@ export function HostStep({ wizard }: { wizard: Wizard }) {
   const t = useT()
   const { server } = wizard
   const facts = server.facts
-  const failed = server.checks.filter((c) => c.status === "fail").length
-  const warned = server.checks.filter((c) => c.status === "warn").length
-  const exceptions = server.checks
+  const checks =
+    wizard.use === "personal" ? (server.personalChecks ?? server.checks) : server.checks
+  const failed = checks.filter((c) => c.status === "fail").length
+  const warned = checks.filter((c) => c.status === "warn").length
+  const exceptions = checks
     .filter((c) => c.status !== "pass")
     .sort((a, b) => order[a.status] - order[b.status])
-  const passed = server.checks.filter((c) => c.status === "pass")
+  const passed = checks.filter((c) => c.status === "pass")
   return (
     <StepPage
       title={t("host.title")}
@@ -64,12 +67,35 @@ export function HostStep({ wizard }: { wizard: Wizard }) {
             <ArrowClockwiseIcon aria-hidden="true" />
             {t("host.recheck")}
           </Button>
-          <Button disabled={!server.catalog} onClick={() => wizard.go("access")}>
+          <Button
+            disabled={!server.catalog}
+            onClick={() => wizard.go(wizard.use === "personal" ? "components" : "access")}
+          >
             {t("common.continue")}
           </Button>
         </>
       }
     >
+      <Panel title={t("use.title")}>
+        <RadioGroup
+          aria-label={t("use.title")}
+          value={wizard.use}
+          onValueChange={(value) => wizard.setUse(value as Use)}
+        >
+          <RadioOption
+            value="personal"
+            label={t("use.personal")}
+            description={t("use.personalHint")}
+          />
+          <RadioOption
+            value="team"
+            label={t("use.team")}
+            description={wizard.teamFits ? t("use.teamHint") : t("use.teamTooSmall")}
+            disabled={!wizard.teamFits}
+          />
+        </RadioGroup>
+      </Panel>
+
       <Panel title={t("host.server")}>
         <Rows>
           <Row label={t("host.name")}>

@@ -28,13 +28,18 @@ const presets: Preset[] = ["minimal", "standard", "secure"]
 export function ComponentsStep({ wizard }: { wizard: Wizard }) {
   const t = useT()
   const { config, planned } = wizard
-  const catalog = wizard.server.catalog?.components ?? []
+  const choices = wizard.active
+  const personal = wizard.use === "personal"
+  const all = wizard.server.catalog?.components ?? []
+  // A personal install offers only what the catalog tests on KubeSolo.
+  const offered = new Set(all.filter((c) => c.personal).map((c) => c.capability))
+  const catalog = personal ? all.filter((c) => offered.has(c.capability)) : all
   const plan = planned && "plan" in planned ? planned.plan : null
   const fit = plan ? memoryFit(plan, catalog) : null
   const why = new Map(wizard.shown?.components.map((c) => [c.id, c.why]))
   const measured = new Map(wizard.shown?.components.map((c) => [c.id, c.idleMemoryMib]))
   const chosen = (id: string) =>
-    config.enable.includes(id) || (why.has(id) && !config.disable.includes(id))
+    choices.enable.includes(id) || (why.has(id) && !choices.disable.includes(id))
   const needs = new Map(catalog.map((c) => [c.id, c.needs ?? []]))
   const needed = new Set(
     [...why.keys()].filter((id) => chosen(id)).flatMap((id) => needs.get(id) ?? []),
@@ -44,21 +49,21 @@ export function ComponentsStep({ wizard }: { wizard: Wizard }) {
     groups.set(component.capability, [...(groups.get(component.capability) ?? []), component])
   }
   const toggle = (id: string, on: boolean) => {
-    const enable = config.enable.filter((x) => x !== id)
-    const disable = config.disable.filter((x) => x !== id)
-    wizard.setConfig({
-      ...config,
+    const enable = choices.enable.filter((x) => x !== id)
+    const disable = choices.disable.filter((x) => x !== id)
+    wizard.setChoices({
       enable: on ? [...enable, id] : enable,
       disable: on ? disable : [...disable, id],
+      inputs: choices.inputs,
     })
   }
   const advice = fit ? memoryAdvice(t, fit) : ""
   return (
     <StepPage
       title={t("components.title")}
-      description={t("components.description")}
+      description={t(personal ? "components.personalDescription" : "components.description")}
       back={
-        <Button variant="outline" onClick={() => wizard.go("access")}>
+        <Button variant="outline" onClick={() => wizard.go(personal ? "host" : "access")}>
           {t("common.back")}
         </Button>
       }
@@ -68,17 +73,21 @@ export function ComponentsStep({ wizard }: { wizard: Wizard }) {
         </Button>
       }
     >
-      <Panel title={t("components.preset")}>
-        <div className="flex flex-col gap-3">
-          <Segmented<Preset>
-            label={t("components.preset")}
-            value={config.preset}
-            onChange={(preset) => wizard.setConfig({ ...config, preset, enable: [], disable: [] })}
-            options={presets.map((value) => ({ value, label: t(`preset.${value}`) }))}
-          />
-          <p className="text-sm text-secondary">{t(`presetHint.${config.preset}`)}</p>
-        </div>
-      </Panel>
+      {personal ? null : (
+        <Panel title={t("components.preset")}>
+          <div className="flex flex-col gap-3">
+            <Segmented<Preset>
+              label={t("components.preset")}
+              value={config.preset}
+              onChange={(preset) =>
+                wizard.setConfig({ ...config, preset, enable: [], disable: [] })
+              }
+              options={presets.map((value) => ({ value, label: t(`preset.${value}`) }))}
+            />
+            <p className="text-sm text-secondary">{t(`presetHint.${config.preset}`)}</p>
+          </div>
+        </Panel>
+      )}
 
       {planned && "error" in planned ? (
         <Alert variant="destructive">
@@ -114,6 +123,7 @@ export function ComponentsStep({ wizard }: { wizard: Wizard }) {
                 mib={component.idleMemoryMib ?? measured.get(component.id) ?? null}
                 leftOut={plan?.leftOut[component.id]}
                 onToggle={(on) => toggle(component.id, on)}
+                supported={personal ? component.personal === true : component.supported}
                 wizard={wizard}
               />
             ))}
@@ -126,6 +136,7 @@ export function ComponentsStep({ wizard }: { wizard: Wizard }) {
 
 /** The plan's reason for leaving a component out, in the words the components page uses. */
 export function leftOutReason(t: Translate, reason: string): string {
+  if (reason === "not part of a personal install") return t("components.notPersonal")
   const only = /^runs on (.+) only$/.exec(reason)
   if (only) return t("components.runsOn", only[1]!)
   const profile = /^unsupported on (.+)$/.exec(reason)
@@ -140,6 +151,7 @@ function ComponentRow({
   mib,
   leftOut,
   onToggle,
+  supported,
   wizard,
 }: {
   component: CatalogComponent
@@ -148,11 +160,12 @@ function ComponentRow({
   mib: number | null
   leftOut: string | undefined
   onToggle: (on: boolean) => void
+  supported: boolean
   wizard: Wizard
 }) {
   const t = useT()
   const id = useId()
-  const disabled = !component.supported || needed
+  const disabled = !supported || needed
   const required = component.inputs.filter((input) => input.required)
   const optional = component.inputs.filter((input) => !input.required)
   const unsupported = component.distributions?.length
@@ -174,7 +187,7 @@ function ComponentRow({
             <label htmlFor={id} className="text-sm font-medium text-main">
               {component.displayName}
             </label>
-            {!component.supported ? <Badge variant="secondary">{unsupported}</Badge> : null}
+            {!supported ? <Badge variant="secondary">{unsupported}</Badge> : null}
             {needed ? <Badge variant="secondary">{t("components.needed")}</Badge> : null}
             {component.privileged ? (
               <Tooltip content={t("components.privilegedHint")}>
@@ -263,20 +276,20 @@ function InputField({
   wizard: Wizard
 }) {
   const t = useT()
-  const { config } = wizard
+  const choices = wizard.active
   const value = input.secret
     ? (wizard.secrets[component]?.[input.name] ?? "")
-    : show(config.inputs[component]?.[input.name])
+    : show(choices.inputs[component]?.[input.name])
   const set = (text: string) => {
     if (input.secret) {
       wizard.setSecret(component, input.name, text)
       return
     }
-    const values = { ...config.inputs[component] }
+    const values = { ...choices.inputs[component] }
     if (text.trim() === "") delete values[input.name]
     else values[input.name] = parse(text)
-    const inputs: Config["inputs"] = { ...config.inputs, [component]: values }
-    wizard.setConfig({ ...config, inputs })
+    const inputs: Config["inputs"] = { ...choices.inputs, [component]: values }
+    wizard.setChoices({ enable: choices.enable, disable: choices.disable, inputs })
   }
   const notes = [
     input.description,

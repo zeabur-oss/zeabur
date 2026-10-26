@@ -32,6 +32,13 @@ export const zhTW: Messages = {
   "step.install": "安裝",
   "step.of": (n, total) => `第 ${n} 步，共 ${total} 步`,
 
+  "use.title": "給誰用",
+  "use.personal": "自己用",
+  "use.personalHint":
+    "只裝 KubeSolo 和元件，在自己的電腦用 zeaburctl ui 打開。沒有團隊帳號、隔離，也不能加節點。1.5 GiB 記憶體就能跑。",
+  "use.team": "團隊用",
+  "use.teamHint": "裝 RKE2 和 Zeabur 面板，有帳號、角色和專案隔離。需要 4 GiB 記憶體。",
+  "use.teamTooSmall": "需要 4 GiB 記憶體的伺服器。這台不夠，只能裝自己用的版本。",
   "host.title": "檢查伺服器",
   "host.description": "按下安裝之前不會變更任何東西。未通過的項目要先修正，警告最好也看一下。",
   "host.server": "這台伺服器",
@@ -65,7 +72,7 @@ export const zhTW: Messages = {
   "code.root.ok": () => "以 root 執行。",
   "code.root.no": () => "請用 sudo 啟動安裝程式。",
   "code.systemd.ok": () => "這台伺服器以 systemd 管理服務。",
-  "code.systemd.no": () => "RKE2 以 systemd 服務執行，但這台伺服器沒有使用 systemd。",
+  "code.systemd.no": () => "Kubernetes 以 systemd 服務執行，但這台伺服器沒有使用 systemd。",
   "code.time.ok": () => "時鐘已同步。",
   "code.time.drift": () =>
     "時鐘沒有同步。時間一有偏差，憑證和登入都會失敗。請執行 timedatectl set-ntp true。",
@@ -81,7 +88,7 @@ export const zhTW: Messages = {
   "code.ports.busy": (...ports) =>
     `連接埠 ${listZh("zh-TW", ports)} 已被占用。執行 ss -ltnp 可看到是誰占用。`,
   "code.disk.unknown": (path) => `讀不到 ${path} 的可用空間。請執行 df -h ${path} 確認。`,
-  "code.disk.low": (gib, path, need) => `${path} 只剩 ${gib} GiB，需要 ${need} GiB。`,
+  "code.disk.low": (gib, path, need) => `${path} 只剩 ${gib} GiB，Kubernetes 需要 ${need} GiB。`,
   "code.disk.tight": (gib, path, need) =>
     `${path} 剩 ${gib} GiB，建議 ${need} GiB 以上，才有空間放日誌、指標和應用程式。`,
   "code.disk.ok": (gib, path) => `${path} 剩 ${gib} GiB。`,
@@ -89,7 +96,7 @@ export const zhTW: Messages = {
   "code.crypt.requiredPlain": (path) => `${path} 不在加密的裝置上，但設定要求加密。`,
   "code.crypt.requiredUnknown": (path) => `無法判斷 ${path} 是否加密，但設定要求加密。`,
   "code.crypt.no": (path) =>
-    `${path} 不在加密的裝置上。叢集裡的 Secret 會加密，磁碟區則不會。測試機無妨，正式環境的資料請裝在加密的磁碟上。`,
+    `${path} 不在加密的裝置上，上面的磁碟區也就沒有加密。測試機無妨，正式環境的資料請裝在加密的磁碟上。`,
   "code.crypt.unknown": (path) =>
     `無法判斷 ${path} 是否加密。請執行 lsblk，看它底下有沒有 crypt 裝置。`,
   "code.prep.package.ok": (binary) => `已安裝 ${binary}。`,
@@ -170,6 +177,9 @@ export const zhTW: Messages = {
   "components.privileged": "特權",
   "components.privilegedHint":
     "以主機權限執行，所以它的 Namespace 不套用 restricted Pod 安全等級。",
+  "components.personalDescription":
+    "預設會裝 Ingress 和憑證，需要資料庫再自己加。元件需要的其他元件會一起加入。",
+  "components.notPersonal": "自己用的版本沒有這個",
   "components.unsupported": "不支援 RKE2",
   "components.runsOn": (where) => `只能在 ${where} 上執行`,
   "components.unsupportedOn": (profile) => `不支援 ${profile}`,
@@ -204,6 +214,9 @@ export const zhTW: Messages = {
   "review.kubernetes": "Kubernetes",
   "review.rke2": (version) => `RKE2 ${version}`,
   "review.rke2Custom": (version) => `RKE2 ${version}（不受支援）`,
+  "review.kubesolo": (version) => `KubeSolo ${version}`,
+  "review.personalAccess": "在自己的電腦用 zeaburctl ui",
+  "review.personalLimits": "拿到 kubeconfig 的人可以控制整個叢集，應用程式之間也沒有隔離。",
   "review.access": "連線方式",
   "review.suffixes": "應用程式網域",
   "review.suffixesNone": "沒有，每個服務都要自己填完整網域。",
@@ -259,7 +272,12 @@ export const zhTW: Messages = {
     `這台伺服器沒有公開位址，新服務不會有建議網址。可以把 ${suffix} 加成應用程式網域，網址只有這個網路裡連得到。`,
   "warning.local.dns": (identity, zeabur) =>
     `${zeabur} 和 ${identity} 必須在 DNS 上解析到這台伺服器，瀏覽器和伺服器本身都要查得到。只改 hosts 檔不夠，Pod 不會讀它。`,
-  "warning.memory.low": (host) => `RKE2 需要至少 4 GiB 記憶體，這台伺服器只有 ${mib(host)}。`,
+  "warning.personal.isolation": () =>
+    "自己用的版本只適合一個人。拿到 kubeconfig 的人可以控制整個叢集，應用程式之間也沒有隔離，因為 KubeSolo 不會執行網路規則。要給團隊用，請在 4 GiB 記憶體的伺服器上用 RKE2 安裝。",
+  "warning.memory.personal.low": (host) =>
+    `自己用的版本至少需要 1.5 GiB 記憶體，這台機器只有 ${mib(host)}。`,
+  "warning.memory.personal.tight": (idle, host) =>
+    `閒置時 KubeSolo 和元件大約用掉 ${mib(idle)}，這台機器總共 ${mib(host)}。`,
   "warning.memory.tight": (idle, host) =>
     `閒置時，RKE2 和元件約使用 ${mib(idle)}，這台伺服器共有 ${mib(host)}。`,
   "warning.rke2.unsupported": (version) =>
@@ -317,6 +335,9 @@ export const zhTW: Messages = {
   "install.toComponents": "選擇元件",
   "phase.host": "檢查伺服器",
   "phase.rke2": (version) => `安裝 Kubernetes（RKE2 ${version}）`,
+  "phase.kubesolo": (version) => `安裝 Kubernetes（KubeSolo ${version}）`,
+  "phase.helmController": "Helm controller",
+  "phase.namespacesOnly": "Namespace",
   "phase.namespaces": "Namespace 和連線規則",
   "phase.storage": "儲存空間",
   "phase.ca": "憑證授權單位",
@@ -327,6 +348,12 @@ export const zhTW: Messages = {
   "done.title": "Zeabur 已就緒",
   "done.description":
     "先註冊第一位管理員的通行密鑰，再登入 Zeabur。完成後在終端機按 Ctrl-C 結束安裝程式。",
+  "done.personalTitle": "叢集已就緒",
+  "done.personalDescription":
+    "把 kubeconfig 複製到自己的電腦，再用 zeaburctl ui 打開 Zeabur。用完按 Ctrl-C 關掉安裝程式。",
+  "done.personal": "在你的電腦上",
+  "done.personalHint": "先從這台伺服器複製 kubeconfig，再用它打開 Zeabur。",
+  "done.personalKey": "kubeconfig 可以控制整個叢集，請像 SSH 金鑰一樣自己保管。",
   "done.setup": "第一位管理員",
   "done.setupHint": "這個連結只能用一次，24 小時內有效。",
   "done.register": "註冊通行密鑰",

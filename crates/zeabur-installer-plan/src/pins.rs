@@ -211,3 +211,141 @@ pub const PRODUCTS: Option<Products> = match (
     }),
     _ => None,
 };
+
+/// A file of one architecture and its SHA-256.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ArchFiles {
+    /// SHA-256 of the amd64 file.
+    pub amd64: &'static str,
+    /// SHA-256 of the arm64 file.
+    pub arm64: &'static str,
+}
+
+impl ArchFiles {
+    /// The SHA-256 of an architecture (`amd64`, `arm64`).
+    #[must_use]
+    pub const fn get(&self, arch: &str) -> Option<&'static str> {
+        match arch.as_bytes() {
+            b"amd64" => Some(self.amd64),
+            b"arm64" => Some(self.arm64),
+            _ => None,
+        }
+    }
+}
+
+/// A `KubeSolo` release, for a personal install.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct KubeSolo {
+    /// `v1.2.2`.
+    pub version: &'static str,
+    /// The Kubernetes minor it ships, for the catalog's tested list.
+    pub kubernetes: &'static str,
+    /// The offline archive, which carries the images `KubeSolo` runs (pause, `CoreDNS`,
+    /// local-path-provisioner). The online one pulls them by tag.
+    pub offline: ArchFiles,
+}
+
+/// The `KubeSolo` release a personal install runs. Upstream publishes checksums only on the
+/// release page, so the digests are copied here as for RKE2.
+pub const KUBESOLO: KubeSolo = KubeSolo {
+    version: "v1.2.2",
+    kubernetes: "1.35",
+    offline: ArchFiles {
+        amd64: "44e434ed77438556cb6cb2ee255339de3af8473109a93fa64df7b614e041218b",
+        arm64: "85ab7edb265b1f1559a1937b92eee8d6b0352c3c7fe78f4c641752b7cacc3a5c",
+    },
+};
+
+impl KubeSolo {
+    /// The offline archive of an architecture.
+    #[must_use]
+    pub fn archive(&self, arch: &str) -> Option<Asset> {
+        let sha256 = self.offline.get(arch)?;
+        let file = format!("kubesolo-{}-linux-{arch}-offline.tar.gz", self.version);
+        Some(Asset {
+            url: format!(
+                "https://github.com/portainer/kubesolo/releases/download/{}/{file}",
+                self.version
+            ),
+            file,
+            sha256,
+        })
+    }
+}
+
+/// The standalone helm-controller, which installs `HelmChart` objects on a cluster without one.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct HelmController {
+    /// `v0.17.9`.
+    pub version: &'static str,
+    /// SHA-256 of `deploy-cluster-scoped.yaml`.
+    pub manifest_sha256: &'static str,
+    /// The images the manifest names by tag, and the digest each one is pinned to.
+    pub images: &'static [(&'static str, &'static str)],
+}
+
+/// The helm-controller release the catalog tests on `KubeSolo` (catalog `config/kubernetes.yaml`).
+pub const HELM_CONTROLLER: HelmController = HelmController {
+    version: "v0.17.9",
+    manifest_sha256: "53da110ca271b6d6415e84bfc5ffe47d726fa35d1fb3acda47e6649ee05d4791",
+    images: &[
+        (
+            "rancher/helm-controller:v0.17.9",
+            "sha256:25a4fcbbf9fa8396ded332165e4497eb45e08a8f6677158c0f861a2d15982afc",
+        ),
+        (
+            "ghcr.io/k3s-io/klipper-helm:v0.9.10-build20251111",
+            "sha256:251a6a3983934f1026c34f4337fc5a87e093a142438c7d16f7b31c179162176e",
+        ),
+    ],
+};
+
+impl HelmController {
+    /// The manifest.
+    #[must_use]
+    pub fn manifest(&self) -> Asset {
+        let file = "deploy-cluster-scoped.yaml".to_owned();
+        Asset {
+            url: format!(
+                "https://github.com/k3s-io/helm-controller/releases/download/{}/{file}",
+                self.version
+            ),
+            file,
+            sha256: self.manifest_sha256,
+        }
+    }
+}
+
+/// kubectl of the Kubernetes release `KubeSolo` ships; `KubeSolo` has none.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Kubectl {
+    /// `v1.35.7`.
+    pub version: &'static str,
+    /// SHA-256 of the binary.
+    pub binary: ArchFiles,
+}
+
+/// The kubectl a personal install uses.
+pub const KUBECTL: Kubectl = Kubectl {
+    version: "v1.35.7",
+    binary: ArchFiles {
+        amd64: "12e97f9d23a9f6cbb87b89becd6bd291e1a858a3379a4e11e2c822c4c1530052",
+        arm64: "5103d45b8881434d417694057b8ccb5ae79fd310a5c5c13e403c5e62e15909be",
+    },
+};
+
+impl Kubectl {
+    /// The binary of an architecture.
+    #[must_use]
+    pub fn binary(&self, arch: &str) -> Option<Asset> {
+        let sha256 = self.binary.get(arch)?;
+        Some(Asset {
+            url: format!(
+                "https://dl.k8s.io/release/{}/bin/linux/{arch}/kubectl",
+                self.version
+            ),
+            file: "kubectl".to_owned(),
+            sha256,
+        })
+    }
+}

@@ -21,8 +21,8 @@ const essential = (id: string) =>
   id.startsWith("ingress/") || id.startsWith("certificates/") || id === "metrics/metrics-server"
 
 export function memoryFit(plan: Plan, catalog: CatalogComponent[]): Fit {
-  const { rke2Mib, componentsMib, hostMib } = plan.memory
-  const used = rke2Mib + componentsMib
+  const { clusterMib, componentsMib, hostMib } = plan.memory
+  const used = clusterMib + componentsMib
   const verdict: Verdict = used > hostMib ? "over" : used > hostMib * tight ? "tight" : "fits"
   const short =
     verdict === "over"

@@ -14,7 +14,7 @@ use crate::catalog::{Component, Encoding, Index, SecretRef};
 use crate::config::{AccessMode, Config};
 use crate::pins::{self, RKE2};
 use crate::rke2::{self, HostFile};
-use crate::select::{self, Why};
+use crate::select::{self, Selection, Why};
 use crate::storage::{self, NodePrep, Storage};
 use crate::{PlanError, values};
 
@@ -50,8 +50,8 @@ pub const ACME_ISSUER: &str = "letsencrypt";
 /// and the rke2 process), rounded up.
 const RKE2_IDLE_MIB: u64 = 1300;
 /// The least memory of a server with 4 GiB, RKE2's minimum. The kernel and the firmware keep part
-/// of the 4096 MiB, so such a server reports less.
-const MIN_MEMORY_MIB: u64 = 3800;
+/// of the 4096 MiB, so such a server reports less. A smaller host can only be a personal install.
+pub const MIN_MEMORY_MIB: u64 = 3800;
 
 /// Why components' pods need more than `restricted`: those the catalog does not mark privileged,
 /// and those whose reason is worth more than the catalog's flag.
@@ -329,8 +329,8 @@ pub struct ZeaburPlan {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Memory {
-    /// RKE2 itself.
-    pub rke2_mib: u64,
+    /// The Kubernetes distribution itself: RKE2 or `KubeSolo`.
+    pub cluster_mib: u64,
     /// The components with a measurement.
     pub components_mib: u64,
     /// Components without a measurement for this architecture.
@@ -345,6 +345,9 @@ pub struct Memory {
 ///
 /// When the selection fails, values do not parse or a required input is missing.
 pub fn plan(index: &Index, config: &Config, facts: &Facts) -> Result<Plan, PlanError> {
+    if facts.memory_mib < MIN_MEMORY_MIB {
+        return Err(PlanError::TeamMemory(facts.memory_mib));
+    }
     let selection = select::select(index, config)?;
     let profile = config.profile.as_str();
     let chosen: BTreeSet<&str> = selection
@@ -371,47 +374,12 @@ pub fn plan(index: &Index, config: &Config, facts: &Facts) -> Result<Plan, PlanE
         ));
     }
 
-    // Longhorn first, so the volumes of the components after it find its class.
-    let mut ordered = selection.components.clone();
-    ordered.sort_by_key(|(id, _)| id != storage::LONGHORN);
-    let mut components = Vec::new();
-    let mut namespaces: BTreeMap<String, Namespace> = BTreeMap::new();
-    for (id, why) in &ordered {
-        let component = index
-            .component(id)
-            .ok_or_else(|| PlanError::Unknown(id.clone()))?;
-        let contributors: Vec<&Component> = index
-            .components
-            .iter()
-            .filter(|c| {
-                chosen.contains(c.id.as_str()) && c.contributes.iter().any(|x| x.target == *id)
-            })
-            .collect();
-        components.push(component_plan(
-            component,
-            *why,
-            &contributors,
-            config,
-            profile,
-            &facts.arch,
-        )?);
-        let privileged = privileged(component, config);
-        for release in &component.releases {
-            if release.namespace == "kube-system" {
-                continue;
-            }
-            let entry = namespaces
-                .entry(release.namespace.clone())
-                .or_insert_with(|| Namespace {
-                    name: release.namespace.clone(),
-                    privileged: None,
-                    public: component.capability == "ingress",
-                });
-            if entry.privileged.is_none() {
-                entry.privileged.clone_from(&privileged);
-            }
-        }
-    }
+    let choices = Choices {
+        inputs: &config.inputs,
+        secret_files: &config.secret_files,
+    };
+    let (components, mut namespaces) =
+        components(index, &selection, &choices, profile, &facts.arch)?;
 
     if !chosen.contains("certificates/cert-manager") && config.zeabur {
         return Err(PlanError::NeedsDisabled {
@@ -670,26 +638,9 @@ pub fn products_only(
 
 /// Idle memory, and a warning when the host is short of it.
 fn memory(components: &[ComponentPlan], host_mib: u64, warnings: &mut Vec<Warning>) -> Memory {
-    let unmeasured = components
-        .iter()
-        .filter(|c| c.idle_memory_mib.is_none())
-        .count();
-    let memory = Memory {
-        rke2_mib: RKE2_IDLE_MIB,
-        components_mib: components.iter().filter_map(|c| c.idle_memory_mib).sum(),
-        unmeasured,
-        host_mib,
-    };
-    if host_mib < MIN_MEMORY_MIB {
-        warnings.push(warning(
-            "memory.low",
-            &[&host_mib.to_string()],
-            format!(
-                "RKE2 asks for a server with at least 4 GiB of memory; this host has {host_mib} MiB."
-            ),
-        ));
-    } else if memory.rke2_mib + memory.components_mib > host_mib * 3 / 4 {
-        let idle = memory.rke2_mib + memory.components_mib;
+    let memory = idle_memory(RKE2_IDLE_MIB, components, host_mib);
+    let idle = memory.cluster_mib + memory.components_mib;
+    if idle > host_mib * 3 / 4 {
         warnings.push(warning(
             "memory.tight",
             &[&idle.to_string(), &host_mib.to_string()],
@@ -697,6 +648,18 @@ fn memory(components: &[ComponentPlan], host_mib: u64, warnings: &mut Vec<Warnin
         ));
     }
     memory
+}
+
+pub(crate) fn idle_memory(cluster_mib: u64, components: &[ComponentPlan], host_mib: u64) -> Memory {
+    Memory {
+        cluster_mib,
+        components_mib: components.iter().filter_map(|c| c.idle_memory_mib).sum(),
+        unmeasured: components
+            .iter()
+            .filter(|c| c.idle_memory_mib.is_none())
+            .count(),
+        host_mib,
+    }
 }
 
 pub(crate) fn rke2_plan(
@@ -759,16 +722,79 @@ pub(crate) fn rke2_plan(
     })
 }
 
+/// What a configuration gives the components: input values and secret files.
+pub(crate) struct Choices<'a> {
+    pub(crate) inputs: &'a BTreeMap<String, BTreeMap<String, Value>>,
+    pub(crate) secret_files: &'a BTreeMap<String, BTreeMap<String, String>>,
+}
+
+/// The chosen components and the namespaces their releases install into.
+pub(crate) fn components(
+    index: &Index,
+    selection: &Selection,
+    choices: &Choices<'_>,
+    profile: &str,
+    arch: &str,
+) -> Result<(Vec<ComponentPlan>, BTreeMap<String, Namespace>), PlanError> {
+    let chosen: BTreeSet<&str> = selection
+        .components
+        .iter()
+        .map(|(id, _)| id.as_str())
+        .collect();
+    // Longhorn first, so the volumes of the components after it find its class.
+    let mut ordered = selection.components.clone();
+    ordered.sort_by_key(|(id, _)| id != storage::LONGHORN);
+    let mut components = Vec::new();
+    let mut namespaces: BTreeMap<String, Namespace> = BTreeMap::new();
+    for (id, why) in &ordered {
+        let component = index
+            .component(id)
+            .ok_or_else(|| PlanError::Unknown(id.clone()))?;
+        let contributors: Vec<&Component> = index
+            .components
+            .iter()
+            .filter(|c| {
+                chosen.contains(c.id.as_str()) && c.contributes.iter().any(|x| x.target == *id)
+            })
+            .collect();
+        components.push(component_plan(
+            component,
+            *why,
+            &contributors,
+            choices,
+            profile,
+            arch,
+        )?);
+        let privileged = privileged(component, choices);
+        for release in &component.releases {
+            if release.namespace == "kube-system" {
+                continue;
+            }
+            let entry = namespaces
+                .entry(release.namespace.clone())
+                .or_insert_with(|| Namespace {
+                    name: release.namespace.clone(),
+                    privileged: None,
+                    public: component.capability == "ingress",
+                });
+            if entry.privileged.is_none() {
+                entry.privileged.clone_from(&privileged);
+            }
+        }
+    }
+    Ok((components, namespaces))
+}
+
 fn component_plan(
     component: &Component,
     why: Why,
     contributors: &[&Component],
-    config: &Config,
+    choices: &Choices<'_>,
     profile: &str,
     arch: &str,
 ) -> Result<ComponentPlan, PlanError> {
     let id = component.id.as_str();
-    let (secrets, paths) = inputs(component, config)?;
+    let (secrets, paths) = inputs(component, choices)?;
 
     let mut releases = Vec::new();
     for release in &component.releases {
@@ -872,15 +898,15 @@ fn component_plan(
 /// The component's Secrets, and the values of its path inputs as (release, path, value).
 type Inputs = (Vec<SecretPlan>, Vec<(String, String, Value)>);
 
-fn inputs(component: &Component, config: &Config) -> Result<Inputs, PlanError> {
+fn inputs(component: &Component, choices: &Choices<'_>) -> Result<Inputs, PlanError> {
     let id = component.id.as_str();
     let first_chart = component
         .releases
         .iter()
         .find(|r| r.chart.is_some())
         .map(|r| r.name.clone());
-    let given = config.inputs.get(id);
-    let files = config.secret_files.get(id);
+    let given = choices.inputs.get(id);
+    let files = choices.secret_files.get(id);
     let mut secrets = Vec::new();
     let mut paths: Vec<(String, String, Value)> = Vec::new();
     for input in &component.inputs {
@@ -937,11 +963,11 @@ fn inputs(component: &Component, config: &Config) -> Result<Inputs, PlanError> {
 }
 
 /// Why a component's namespaces need the `privileged` Pod Security level, if they do.
-fn privileged(component: &Component, config: &Config) -> Option<String> {
+fn privileged(component: &Component, choices: &Choices<'_>) -> Option<String> {
     let id = &component.id;
     if id == "volume-backup/velero" {
         // Only its node agent needs the level, and the `file-backup` input installs it.
-        let agent = config
+        let agent = choices
             .inputs
             .get(id)
             .and_then(|given| given.get("file-backup"))
@@ -1948,15 +1974,15 @@ mod tests {
     }
 
     #[test]
-    fn a_server_with_4_gib_is_enough_memory() {
-        for (host_mib, low) in [(3800, false), (3799, true)] {
-            let mut warnings = Vec::new();
-            memory(&[], host_mib, &mut warnings);
-            assert_eq!(
-                warnings.iter().any(|w| w.code == "memory.low"),
-                low,
-                "{host_mib} MiB"
-            );
-        }
+    fn a_team_install_needs_a_server_with_4_gib() {
+        let index = Index::parse(INDEX.as_bytes()).unwrap();
+        let mut small = facts();
+        small.memory_mib = 3800;
+        assert!(plan(&index, &config(""), &small).is_ok());
+        small.memory_mib = 3799;
+        let Err(error) = plan(&index, &config(""), &small) else {
+            panic!("3799 MiB is too little for a team install");
+        };
+        assert!(error.to_string().contains("use: personal"), "{error}");
     }
 }

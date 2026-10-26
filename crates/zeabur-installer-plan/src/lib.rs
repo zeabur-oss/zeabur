@@ -3,6 +3,8 @@
 pub mod catalog;
 pub mod config;
 pub mod join;
+pub mod kubesolo;
+pub mod personal;
 pub mod pins;
 pub mod plan;
 pub mod rke2;
@@ -53,8 +55,14 @@ pub enum PlanError {
         reason: String,
     },
     /// The host's CPU architecture.
-    #[error("RKE2 has no release for the {0} architecture; amd64 and arm64 are supported")]
+    #[error("there is no release for the {0} architecture; amd64 and arm64 are supported")]
     Arch(String),
+    /// Too little memory for a team install.
+    #[error(
+        "a team install needs a server with at least 4 GiB of memory (RKE2 and Zeabur); this one \
+         has {0} MiB. Install for yourself instead: set `use: personal` (docs/reference/installer-configuration.md)"
+    )]
+    TeamMemory(u64),
     /// This build pins no release, and `sources` does not name these keys.
     #[error(
         "this installer is a development build and pins no release: set {} in the configuration \

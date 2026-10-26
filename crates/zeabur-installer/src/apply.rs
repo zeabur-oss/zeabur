@@ -35,7 +35,7 @@ const RELOADS_METRIC: &str = "apiserver_authentication_config_controller_automat
 
 pub(crate) fn run(config_path: &Path) -> Result<(), InstallError> {
     let config = load::config(config_path)?;
-    let index = load::catalog(&config.sources)?;
+    let index = load::catalog(config.sources.catalog.as_deref(), STATE_DIR)?;
     let plan = plan::plan(&index, &config, &facts::read()?)?;
     out::line(render::plan(&plan).trim_end());
 
@@ -153,9 +153,13 @@ pub(crate) fn show_checks(
 ) -> bool {
     out::step("Checking the host");
     let mut checks = preflight::run(preflight::Options {
-        rke2_running: systemd::is_active(unit),
+        cluster_running: systemd::is_active(unit),
         require_encrypted_disk,
-        server: unit == UNIT,
+        node: if unit == UNIT {
+            preflight::Node::Server
+        } else {
+            preflight::Node::Agent
+        },
     });
     if let Some(prep) = prep {
         checks.extend(nodeprep::check(prep, Stage::Before));
@@ -498,7 +502,7 @@ pub(crate) fn node_addresses(kubectl: &Kubectl) -> Result<Vec<String>, InstallEr
 }
 
 /// Creates the component's Secrets; generated values are made once and kept.
-fn secrets(kubectl: &Kubectl, component: &ComponentPlan) -> Result<(), InstallError> {
+pub(crate) fn secrets(kubectl: &Kubectl, component: &ComponentPlan) -> Result<(), InstallError> {
     let mut by_secret: BTreeMap<(&str, &str), Vec<_>> = BTreeMap::new();
     for s in &component.secrets {
         by_secret
@@ -534,7 +538,7 @@ fn encode(bytes: &[u8], encoding: Encoding) -> String {
     }
 }
 
-fn releases(kubectl: &Kubectl, component: &ComponentPlan) -> Result<(), InstallError> {
+pub(crate) fn releases(kubectl: &Kubectl, component: &ComponentPlan) -> Result<(), InstallError> {
     for release in &component.releases {
         match release {
             ReleasePlan::HelmChart {

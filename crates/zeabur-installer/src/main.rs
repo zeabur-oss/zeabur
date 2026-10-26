@@ -1,4 +1,5 @@
-//! `zeabur-installer`: RKE2, Zeabur Catalog components, Zeabur Identity and Zeabur on one server.
+//! `zeabur-installer`: RKE2, Zeabur Catalog components, Zeabur Identity and Zeabur on one server,
+//! or `KubeSolo` and the components for one person.
 
 mod apply;
 mod doctor;
@@ -7,6 +8,7 @@ mod join;
 mod load;
 mod node;
 mod out;
+mod personal;
 mod render;
 mod uninstall;
 
@@ -21,7 +23,8 @@ use zeabur_installer_plan::config::Role;
 use zeabur_installer_plan::{PlanError, plan};
 
 /// Install RKE2 hardened with the CIS profile, the Zeabur Catalog's components, Zeabur Identity
-/// and Zeabur on one Linux server, from one configuration file.
+/// and Zeabur on one Linux server, from one configuration file. With `use: personal`, install
+/// `KubeSolo` and the components for one person instead.
 #[derive(Debug, Parser)]
 #[command(name = "zeabur-installer", version, about)]
 struct Cli {
@@ -146,6 +149,9 @@ enum InstallError {
 fn main() -> ExitCode {
     let cli = Cli::parse();
     // A configuration that does not parse is reported by the command itself.
+    if let Some(config) = load::personal(&cli.config) {
+        return personal(&cli, &config);
+    }
     let joining = load::join(&cli.config);
     let result = match (&cli.command, joining) {
         (Command::Plan { json }, Some(config)) => join::show_plan(&config, *json),
@@ -207,6 +213,10 @@ fn main() -> ExitCode {
             None,
         ) => node::sync(&cli.config),
     };
+    finish(result)
+}
+
+fn finish(result: Result<(), InstallError>) -> ExitCode {
     match result {
         Ok(()) => ExitCode::SUCCESS,
         Err(error) => {
@@ -216,9 +226,27 @@ fn main() -> ExitCode {
     }
 }
 
+/// The commands of a personal install.
+fn personal(cli: &Cli, config: &zeabur_installer_plan::config::PersonalConfig) -> ExitCode {
+    finish(match &cli.command {
+        Command::Doctor => return personal::doctor(config),
+        Command::Plan { json } => personal::show_plan(config, *json),
+        Command::Apply => personal::apply(config),
+        Command::Gui { listen } => gui::run(&cli.config, *listen),
+        Command::Uninstall { .. } => {
+            out::line(&personal::uninstall_text());
+            Ok(())
+        }
+        Command::Node { .. } | Command::Manifests { .. } => Err(InstallError::Message(format!(
+            "{} is a personal install: one node and no Zeabur panel",
+            cli.config.display()
+        ))),
+    })
+}
+
 fn show_plan(cli: &Cli, json: bool) -> Result<(), InstallError> {
     let (config, defaults) = load::config_or_defaults(&cli.config)?;
-    let index = load::catalog(&config.sources)?;
+    let index = load::catalog(config.sources.catalog.as_deref(), apply::STATE_DIR)?;
     let plan = plan::plan(&index, &config, &facts::read()?)?;
     if defaults && !json {
         out::line(&format!(
