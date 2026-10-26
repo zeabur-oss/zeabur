@@ -56,6 +56,7 @@ accessLog:
     # Keep only the fields below; secrets live in headers and queries.
     defaultMode: drop
     names:
+      ClientHost: keep
       RequestHost: keep
       RequestMethod: keep
       RequestPath: keep

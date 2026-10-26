@@ -588,6 +588,9 @@ describe("MySQL, MariaDB and Dragonfly", () => {
         serviceAccountName: "db-backup",
         bucketConfig: { bucketName: "backups", endpointURL: "http://s3.test:8333" },
         envFrom: [{ secretRef: { name: "db-backups-s3" } }],
+        threads: 2,
+        cpu: "500m",
+        memory: "1Gi",
       },
     })
     expect(edit?.op === "edit" && JSON.parse(edit.yaml).spec.backupPolicyName).toBe("db-backups")

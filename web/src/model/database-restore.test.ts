@@ -277,6 +277,9 @@ describe("restoring into a new database", () => {
       jobConfig: {
         bucketConfig: { bucketName: "b", endpointURL: "https://s3.test" },
         envFrom: [{ secretRef: { name: "shop-backups-s3" } }],
+        threads: 2,
+        cpu: "500m",
+        memory: "1Gi",
       },
     })
   })

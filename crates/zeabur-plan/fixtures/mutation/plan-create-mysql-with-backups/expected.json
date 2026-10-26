@@ -235,6 +235,9 @@
                   }
                 }
               ],
+              "threads": 2,
+              "cpu": "500m",
+              "memory": "1Gi",
               "workVolume": {
                 "ephemeral": {
                   "volumeClaimTemplate": {

@@ -28,6 +28,7 @@ spec:
         headers:
           defaultMode: drop
         names:
+          ClientHost: keep
           DownstreamContentSize: keep
           DownstreamStatus: keep
           Duration: keep

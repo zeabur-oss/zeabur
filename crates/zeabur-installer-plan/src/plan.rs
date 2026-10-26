@@ -997,7 +997,7 @@ fn privileged(component: &Component, choices: &Choices<'_>) -> Option<String> {
 
 /// Why a component's namespaces need the `baseline` Pod Security level, if they do.
 fn baseline(component: &Component) -> Option<String> {
-    (component.security.pod_security.as_deref() == Some("baseline")).then(|| {
+    (component.security.level.as_deref() == Some("baseline")).then(|| {
         format!(
             "{}: its pods set no seccomp profile or dropped capabilities",
             component.id
