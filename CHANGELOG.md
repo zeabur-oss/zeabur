@@ -57,6 +57,12 @@ minor or patch release may break the API.
   server accepts `Authorization: Bearer` on the API when there is no session cookie, only for a
   token Zeabur Identity issued, acting as the token's holder; changes still carry `Origin` and
   `Zeabur-Request`.
+- `zeaburctl up` runs in local mode when the token is not from Zeabur Identity or the cluster has
+  no `zeabur-info` (an administrator's kubeconfig, a client certificate, a cloud provider's or
+  ServiceAccount token): the same plans and upload run in the process, as in `zeaburctl ui`, and
+  the credentials stay on the computer. It stops before uploading when the cluster serves no
+  Zeabur Builder, and reaches an in-cluster registry through a port-forward. `zeabur-info` now
+  also has `registry` and `registryCa` (the CA's ConfigMap) from the chart's `builds`.
 
 ### Changed
 

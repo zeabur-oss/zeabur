@@ -59,7 +59,7 @@ description: 把電腦上的資料夾或 .zip 檔交給 Zeabur Builder 建置。
 
 ## 用 zeaburctl 上傳
 
-終端機和腳本可以用 [`zeaburctl up`](../reference/zeaburctl.mdx#up)。它用你 kubeconfig 的權杖登入，把資料夾交給叢集裡的 Zeabur，不用知道 registry 或 Zeabur 的位址。
+終端機和腳本可以用 [`zeaburctl up`](../reference/zeaburctl.mdx#up)，不用知道 registry 或 Zeabur 的位址。用 Zeabur Identity 登入時，資料夾交給叢集裡的 Zeabur。用安裝程式給的管理員 kubeconfig 等其他憑證時，指令在你的電腦上跑同樣的步驟，憑證不會離開你的電腦。
 
 ```sh
 zeaburctl up ./site --project shop --service site

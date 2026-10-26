@@ -310,6 +310,27 @@ mod tests {
         assert_eq!(heard(&other), Vec::<String>::new());
     }
 
+    /// `upload_address` (the port-forward of `zeaburctl up` in local mode) takes the push in place
+    /// of the host the Secret names.
+    #[tokio::test]
+    async fn the_upload_address_takes_the_push() {
+        let (forwarded, registry) = serve_registry().await;
+        let settings = zeabur_api::Settings {
+            upload_address: Some(format!("http://{forwarded}")),
+            ..zeabur_api::Settings::default()
+        };
+        let app = zeabur_api::router_with_settings(
+            Arc::new(zeabur_api::access::SingleCluster(Arc::new(cluster(
+                "zot.zot.svc:5000",
+                "u1",
+            )))),
+            settings,
+        );
+        let (status, answer) = post(&app, UPLOAD, vec![1; 10]).await;
+        assert_eq!(status, StatusCode::OK, "{answer}");
+        assert!(heard(&registry).iter().any(|a| a.contains(TOKEN)));
+    }
+
     /// Naming the pushed digest is a plan: the Build's `archive.digest` is patched, and a digest
     /// of another form is refused.
     #[tokio::test]

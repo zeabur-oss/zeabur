@@ -3,6 +3,7 @@
 #![forbid(unsafe_code)]
 
 mod doctor;
+mod forward;
 mod in_process;
 mod output;
 mod pack;
@@ -36,8 +37,9 @@ enum Command {
     /// Upload a folder to a service that builds one, and build it.
     ///
     /// The files `.gitignore` and `.dockerignore` leave out are not sent. The service is made when
-    /// it does not exist. The folder goes through Zeabur in the cluster with your kubeconfig's
-    /// token, so no address of the registry is needed.
+    /// it does not exist. With a token from Zeabur Identity, the folder goes through Zeabur in the
+    /// cluster. With other credentials, zeaburctl does the same steps on this computer, and the
+    /// credentials stay here.
     Up(up::UpArgs),
 }
 

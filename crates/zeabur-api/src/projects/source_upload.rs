@@ -171,7 +171,12 @@ async fn issued_target(
         .get(".dockerconfigjson")
         .and_then(|c| serde_json::from_slice::<Value>(c).ok())
         .and_then(|c| c.get("auths")?.as_object()?.keys().next().cloned());
-    let address = host.ok_or_else(|| bad("The upload Secret names no registry."))?;
+    let address = state
+        .settings
+        .upload_address
+        .clone()
+        .or(host)
+        .ok_or_else(|| bad("The upload Secret names no registry."))?;
 
     Ok(Target {
         address,

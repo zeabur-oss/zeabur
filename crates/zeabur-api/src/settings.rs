@@ -81,6 +81,10 @@ pub struct Settings {
     pub trusted_ca: Option<Vec<u8>>,
     /// The GitHub the cluster's GitHub App is made on (see [`crate::cluster::github_app`]).
     pub github: GitHubSettings,
+    /// Where Zeabur reaches the registry to push an uploaded folder, as `host:port` or a URL,
+    /// when that is not the host the upload Secret names: the port-forward of `zeaburctl up` in
+    /// local mode.
+    pub upload_address: Option<String>,
 }
 
 /// The GitHub the cluster's GitHub App is made on: github.com by default.
@@ -169,6 +173,7 @@ impl Default for Settings {
             builds: BuildSettings::default(),
             trusted_ca: None,
             github: GitHubSettings::default(),
+            upload_address: None,
         }
     }
 }

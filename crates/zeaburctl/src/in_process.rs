@@ -41,10 +41,15 @@ impl InProcess {
         let cluster = UserClient::from_kubeconfig(context)
             .await
             .map_err(|e| e.to_string())?;
-        Ok(Self::new(zeabur_api::router_with_settings(
+        Ok(Self::with_client(cluster, settings))
+    }
+
+    /// The API acting as the person `cluster` signs in as.
+    pub(crate) fn with_client(cluster: UserClient, settings: zeabur_api::Settings) -> Self {
+        Self::new(zeabur_api::router_with_settings(
             Arc::new(SingleCluster(Arc::new(cluster))),
             settings,
-        )))
+        ))
     }
 
     /// `router` as the API; tests pass one over an in-memory cluster.
@@ -56,6 +61,36 @@ impl InProcess {
     pub(crate) async fn get(&self, path_and_query: &str) -> Result<Value, Value> {
         self.send(Method::GET, path_and_query, None, Body::empty())
             .await
+    }
+
+    /// `POST` `body` as JSON to `path_and_query`.
+    pub(crate) async fn post(&self, path_and_query: &str, body: &Value) -> Result<Value, Value> {
+        let bytes = serde_json::to_vec(body)
+            .map_err(|e| internal(&format!("The request is not JSON: {e}")))?;
+        self.send(
+            Method::POST,
+            path_and_query,
+            Some(("application/json", bytes.len())),
+            Body::from(bytes),
+        )
+        .await
+    }
+
+    /// `POST` `bytes` to `path_and_query` as `content_type`.
+    pub(crate) async fn post_bytes(
+        &self,
+        path_and_query: &str,
+        content_type: &str,
+        bytes: Vec<u8>,
+    ) -> Result<Value, Value> {
+        let length = bytes.len();
+        self.send(
+            Method::POST,
+            path_and_query,
+            Some((content_type, length)),
+            Body::from(bytes),
+        )
+        .await
     }
 
     async fn send(

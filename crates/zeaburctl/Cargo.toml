@@ -30,6 +30,7 @@ http.workspace = true
 http-body-util.workspace = true
 hyper-rustls.workspace = true
 hyper-util.workspace = true
+kube.workspace = true
 regex.workspace = true
 rustls.workspace = true
 rustls-platform-verifier.workspace = true

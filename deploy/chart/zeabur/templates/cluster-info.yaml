@@ -1,7 +1,8 @@
 # Where Zeabur is, for zeaburctl: the public URL and the Zeabur Identity issuer in a ConfigMap in
 # kube-public, as kubeadm's cluster-info publishes the API server's address. zeaburctl sends a
 # token to Zeabur only when this issuer issued it. Every signed-in person may read this one
-# ConfigMap.
+# ConfigMap. registry and registryCa (the CA's ConfigMap, as namespace/name/key) let zeaburctl up
+# in local mode push to the registry through a port-forward.
 # https://kubernetes.io/docs/reference/setup-tools/kubeadm/implementation-details/#generate-the-cluster-info-configmap
 apiVersion: v1
 kind: ConfigMap
@@ -13,6 +14,12 @@ metadata:
 data:
   url: {{ required "publicUrl is required" .Values.publicUrl | trimSuffix "/" | quote }}
   issuer: {{ required "issuer.url is required" .Values.issuer.url | quote }}
+  {{- with .Values.builds.registry }}
+  registry: {{ . | quote }}
+  {{- if $.Values.builds.caBundle.configMap }}
+  registryCa: {{ printf "%s/%s/%s" $.Release.Namespace $.Values.builds.caBundle.configMap $.Values.builds.caBundle.key | quote }}
+  {{- end }}
+  {{- end }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
