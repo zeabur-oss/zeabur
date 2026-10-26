@@ -12,7 +12,7 @@ machine), shows the cluster as projects and services, explains what is wrong in 
 change things safely. It works with the objects you already have, never acts with more rights
 than you have, and keeps no state of its own: no database, no custom resources.
 
-> **Status: pre-alpha (0.0.1).** It works end to end, on your machine and in a cluster, but
+> **Status: pre-alpha (0.1.0).** It works end to end, on your machine and in a cluster, but
 > there are no published images or binaries yet, the API may still change, and it has been tried
 > on few clusters. Do not point it at a cluster you cannot afford to break.
 

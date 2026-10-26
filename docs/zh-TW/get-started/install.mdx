@@ -120,23 +120,6 @@ Zeabur 登入 Identity、讀取映像檔、讀取物件儲存裡的備份、連�
 | 新服務就緒，但網址不通 | 核對應用程式網域的 DNS 與憑證。管理介面與應用程式用的是不同網域，要分別設定。 |
 | 升級後需要重新登入 | chart 只執行一個 Zeabur Pod，工作階段存在記憶體中，Pod 替換後要重新登入。 |
 
-## 從有「暫時使用管理員權限」的舊版升級
-
-舊版的管理員平常只有一般權限，要按**暫時使用管理員權限**才能改叢集。新版拿掉了這個按鈕，改用管理員帳號。升級時：
-
-1. 先照 Zeabur Identity 的 [From elevation to admin accounts](https://oss.zeabur.com/docs/identity/operations#from-elevation-to-admin-accounts)升級 Zeabur Identity。
-2. 原本在 `groups` 或 `elevatedGroups` 有 `admins` 的人，改成管理員帳號：
-
-   ```sh
-   zeabur-identityctl account-type alice admin
-   ```
-
-   這個指令會一併把 `admins` 從 `groups` 拿掉，之後 Zeabur Identity 不接受 `groups` 裡有 `admins`。升級後也可以到**成員**把他設為**管理員**。
-3. Zeabur 的 OAuthClient 拿掉 `allowElevation`。新版 Zeabur Identity 不認得這個欄位，放在 Git 裡的 manifest 也一起刪掉。
-4. Helm values 拿掉整個 `elevation`。新版 chart 的 schema 會拒絕它，`helm upgrade` 會失敗。
-
-`zeaburctl doctor` 也不再檢查 OAuthClient 的 `allowElevation`。
-
 ## 用 GitOps 管理 chart
 
 Zeabur 用一把金鑰簽署檢查過的變更。chart 在首次安裝時建立這把金鑰，之後用 `helm upgrade` 升級會讀回同一把。Argo CD 或 `helm template` 不連叢集就產生 manifest，每次都會換一把新金鑰，已檢查、還沒套用的變更就會失效。這時先建立固定的金鑰，再設定 `planKey.existingSecret`：

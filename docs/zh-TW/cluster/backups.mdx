@@ -120,25 +120,6 @@ Velero 會略過已經存在的同名物件。另存成新專案後，原專案�
 
 - 原專案還在用：這次不能套用。畫面會指出是哪個專案在用，例如原專案是 `blog` 時，按 **從 blog 移動網域**，把網域從 `blog` 移到新專案。
 
-0.0.1 的備份裡，正在轉址或維護的路由把原本的設定存在註解 `zeabur.com/redirect-rules` 和 `zeabur.com/maintenance-backend`。現在的 Zeabur 不再讀這兩個註解，接回網域後先找出還有它們的路由：
-
-```sh
-kubectl get ingress,httproute -n blog-restored -o json | jq -r '.items[]
-  | select(.metadata.annotations // {} | has("zeabur.com/redirect-rules") or has("zeabur.com/maintenance-backend"))
-  | "\(.kind) \(.metadata.name)"'
-```
-
-HTTPRoute 有 `zeabur.com/redirect-rules` 時，把規則寫回去再刪註解，轉址之後在面板重新設定：
-
-```sh
-rules=$(kubectl get httproute web -n blog-restored -o jsonpath='{.metadata.annotations.zeabur\.com/redirect-rules}')
-kubectl patch httproute web -n blog-restored --type=json -p "[
-  {\"op\":\"replace\",\"path\":\"/spec/rules\",\"value\":$rules},
-  {\"op\":\"remove\",\"path\":\"/metadata/annotations/zeabur.com~1redirect-rules\"}]"
-```
-
-有 `zeabur.com/maintenance-backend` 時，註解記著每個網域原本的後端。到路由的 **YAML**，把指到頁面伺服器 `maintenance` 連接埠的後端改回註解裡的值，刪掉註解後套用，需要時再從面板開維護模式。
-
 </Step>
 </Steps>
 
@@ -246,7 +227,7 @@ kubectl -n velero get secret velero-repo-credentials velero-backup-key -o yaml >
 
 ### 之前就裝了 Velero
 
-舊版 Catalog 沒有建立 `velero-repo-credentials`，Velero 會自己用公開的預設密碼 `static-passw0rd` 建立它，而 Kopia 儲存庫會一直沿用建立時的密碼。這種叢集要把存放位置的 **資料夾** 換成新的，讓 Kopia 用新密碼建立儲存庫。加入 SSE-C 之前的備份不會被加密，到期刪除後就不留明文。
+Velero 不是從 Catalog 安裝時，叢集裡可能沒有 `velero-repo-credentials`。這時 Velero 會自己用公開的預設密碼 `static-passw0rd` 建立它，而 Kopia 儲存庫會一直沿用建立時的密碼。這種叢集要把存放位置的 **資料夾** 換成新的，讓 Kopia 用新密碼建立儲存庫。加入 SSE-C 之前的備份不會被加密，到期刪除後就不留明文。
 
 ### 其他備份
 

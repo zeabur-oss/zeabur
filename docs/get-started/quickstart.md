@@ -14,7 +14,7 @@
   passkey; no `admin.conf` gets copied around.
 - **[Zeabur](../../README.md)**, the web console for the cluster.
 
-> **Status: v0.0.1 alpha.** Nothing is published yet, so an install names development
+> **Status: v0.1.0 alpha.** Nothing is published yet, so an install names development
 > sources (see [examples/development.yaml](../reference/installer-examples/development.yaml)). It has not been run end
 > to end on a fresh server yet; see [What is verified](../reference/installer.md#what-is-verified).
 

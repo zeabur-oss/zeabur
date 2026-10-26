@@ -22,8 +22,8 @@ How a maintainer publishes a release. What a release contains and how to verify 
 
    ```sh
    git fetch origin
-   git tag -s v0.0.2 -m v0.0.2 <commit on main>
-   git push origin v0.0.2
+   git tag -s v0.1.0 -m v0.1.0 <commit on main>
+   git push origin v0.1.0
    ```
 
 5. Watch the **Release** run. When it succeeds, the image and the chart are in the registry (their
@@ -35,7 +35,7 @@ How a maintainer publishes a release. What a release contains and how to verify 
 6. Check the draft: the notes, the asset list, the digests. Optionally install it on a cluster of
    your own as [Install on an existing cluster](../get-started/install.md) describes.
 7. Publish it: on the release page, **Edit → Publish release**, or
-   `gh release edit v0.0.2 --repo zeabur-oss/zeabur --draft=false`. It stays marked as a
+   `gh release edit v0.1.0 --repo zeabur-oss/zeabur --draft=false`. It stays marked as a
    pre-release while Zeabur is before 1.0. Then download it once without signing in and repeat
    the checks above against the public release.
 
@@ -67,7 +67,7 @@ Never move a published tag and never replace a published asset or image tag:
 already exists.
 
 - **Before `publish`** (CI, a build, a smoke test): nothing was published. Fix it on `main`; if
-  the fix changes the release commit, delete the tag (`git push origin :refs/tags/v0.0.2`) and tag
+  the fix changes the release commit, delete the tag (`git push origin :refs/tags/v0.1.0`) and tag
   the new commit.
 - **In `verify`**, after `publish` succeeded: keep the draft, the tag and the registry
   artifacts. Fix the cause (a package that is still private, or the verification scripts on
@@ -75,7 +75,7 @@ already exists.
 
   ```sh
   gh workflow run release.yml --repo zeabur-oss/zeabur --ref main \
-    -f version=v0.0.2 -F verify_only=true
+    -f version=v0.1.0 -F verify_only=true
   ```
 
   It builds and publishes nothing, uses the tag's Nix shell, and keeps the tag's signing

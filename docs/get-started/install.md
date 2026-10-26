@@ -44,7 +44,7 @@ signed by the release workflow at the release's tag (keyless, with
 The release lists their digests in `digests.txt`, covered by the signed `SHA256SUMS`:
 
 ```sh
-version=0.0.2
+version=0.1.0
 identity="https://github.com/zeabur-oss/zeabur/.github/workflows/release.yml@refs/tags/v$version"
 issuer=https://token.actions.githubusercontent.com
 gh release download "v$version" --repo zeabur-oss/zeabur --dir "zeabur-$version" \
@@ -293,9 +293,9 @@ and no service account token mount. Compatible uses `baseline`. Switching an exi
 between Strict and Compatible changes only that service and needs no admin rights. It leaves
 the namespace labels unchanged.
 
-Older projects, and namespaces an admin has deliberately set to enforce `restricted`, still
-refuse root containers. The service settings ask an admin to change the project's Pod Security
-level to `baseline`. To migrate an older project, an admin runs this once per namespace:
+A namespace an admin has deliberately set to enforce `restricted` still refuses root
+containers. The service settings ask an admin to change the project's Pod Security level to
+`baseline`. To change it, an admin runs this once per namespace:
 
 ```sh
 kubectl label namespace <ns> pod-security.kubernetes.io/enforce=baseline pod-security.kubernetes.io/audit=baseline pod-security.kubernetes.io/warn=baseline --overwrite
@@ -348,10 +348,6 @@ on `persistentvolumes`, is the ClusterRole `zeabur-member`. Zeabur binds it per 
 ClusterRoleBinding `zeabur-member-<user>` made on invitation or on a change of access: Zeabur
 Identity puts no group on every member, and `system:authenticated` would grant it to every
 ServiceAccount too.
-
-Upgrading from a release without roles means inviting members again: Zeabur does not migrate the
-members made before roles. Remove each of them on the Members page and invite them anew; inviting
-someone who is still a member only gives them a setup link.
 
 `memberRoles.enabled=false` installs no ClusterRole and no admission policy; Zeabur then offers
 only Admin or nothing, and RBAC you write yourself decides the rest. The ClusterRole names are fixed: install one Zeabur
@@ -465,23 +461,6 @@ To see what a member may do, ask as them:
 ```sh
 kubectl auth can-i --list -n shop --as=zeabur:bob
 ```
-
-## Upgrade from a version with elevation
-
-Earlier versions gave admins everyday rights and a "Retry with admin rights" button. Admin
-accounts replace it. When upgrading:
-
-1. Upgrade Zeabur Identity first, following its
-   [From elevation to admin accounts](https://oss.zeabur.com/docs/identity/operations#from-elevation-to-admin-accounts).
-2. Make everyone who had `admins` in `groups` or `elevatedGroups` an admin account, with
-   `zeabur-identityctl account-type <user> admin` or the Admin role on the Members page.
-   Zeabur Identity refuses `admins` in a user's `groups` from now on.
-3. Remove `allowElevation` from Zeabur's OAuthClient, including manifests kept in Git: Zeabur
-   Identity no longer knows it.
-4. Remove `elevation` from your Helm values. The chart's schema refuses it, so `helm upgrade`
-   fails until you do.
-
-`zeaburctl doctor` no longer checks whether the OAuthClient may ask for elevation.
 
 ## Uninstall
 

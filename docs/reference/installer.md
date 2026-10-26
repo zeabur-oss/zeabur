@@ -44,9 +44,8 @@ interrupted install or repairs drift.
    size or modification time changes, and it records the time in whole seconds, so the
    installer drops the fraction from each archive's time and an unchanged one is not imported
    again on each start.
-   Archives the installer copied that are no longer listed, and archives from older installers
-   under a listed name without the prefix, are removed, so an old archive never overrides a
-   newer image.
+   Archives the installer copied that are no longer listed are removed, so an old archive never
+   overrides a newer image.
 5. **Namespaces.** The installer creates every namespace the components use. A namespace is
    exempt from the `restricted` Pod Security level only when its component needs more, and the
    plan says why. `longhorn-system` is one: Longhorn's manager, CSI plugin and instance managers

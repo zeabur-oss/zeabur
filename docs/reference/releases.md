@@ -5,7 +5,7 @@ tag `v<version>`. The workflow publishes the image and the chart, and leaves a *
 release; a maintainer checks the draft and publishes it by hand. CI never publishes a release.
 
 ```text
-tag v0.0.2 ─▶ CI ─▶ build (Linux amd64/arm64, macOS arm64) ─▶ smoke ─▶ publish the image and
+tag v0.1.0 ─▶ CI ─▶ build (Linux amd64/arm64, macOS arm64) ─▶ smoke ─▶ publish the image and
   the chart by digest, sign, attest ─▶ build the installer with those digests ─▶ draft release
   ─▶ verify the draft ─▶ a maintainer publishes it
 ```
@@ -41,7 +41,7 @@ below, then `xattr -d com.apple.quarantine zeaburctl`.
 With `gh`, `cosign` 3 and GNU `sha256sum` (all in `nix develop`):
 
 ```sh
-version=0.0.2
+version=0.1.0
 platform=darwin-arm64     # linux-amd64, linux-arm64
 identity="https://github.com/zeabur-oss/zeabur/.github/workflows/release.yml@refs/tags/v$version"
 gh release download "v$version" --repo zeabur-oss/zeabur --dir "zeabur-$version" \

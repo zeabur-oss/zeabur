@@ -99,7 +99,7 @@ sudo zeabur-installer apply
 
 既有服務切換 **嚴格** 或 **相容** 時，變更只影響該服務，不改 Namespace 標籤，也不需要管理員權限。套用後服務副本會替換。Chart 的 `zeabur-project-namespace` 政策仍禁止開發者修改 Namespace 標籤，包括任何 Pod Security 標籤，因此無法自行設為 `privileged`。
 
-舊版 Zeabur 建立的專案，或管理員刻意設為 `restricted` 的專案，仍會拒絕 root 容器。服務設定會顯示「這個專案只允許『嚴格』的服務，『相容』的服務無法啟動。請管理員把專案的 Pod Security 等級改為 baseline。」管理員對每個舊專案的 Namespace 執行一次：
+管理員刻意設為 `restricted` 的專案仍會拒絕 root 容器。服務設定會顯示「這個專案只允許『嚴格』的服務，『相容』的服務無法啟動。請管理員把專案的 Pod Security 等級改為 baseline。」管理員對這些專案的 Namespace 各執行一次：
 
 ```sh
 kubectl label namespace <ns> \

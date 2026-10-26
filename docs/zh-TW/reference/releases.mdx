@@ -23,10 +23,10 @@ description: 依作業系統選擇 Zeabur 發行檔，驗證 checksum、簽章�
 
 ## 下載與驗證執行檔
 
-需要 GitHub CLI `gh`、cosign 3 和 GNU `sha256sum`。把 `version` 換成你選的版本，下例用 `0.0.1`：
+需要 GitHub CLI `gh`、cosign 3 和 GNU `sha256sum`。把 `version` 換成你選的版本，下例用 `0.1.0`：
 
 ```sh
-version=0.0.1
+version=0.1.0
 platform=darwin-arm64
 binary=zeaburctl
 identity="https://github.com/zeabur-oss/zeabur/.github/workflows/release.yml@refs/tags/v$version"

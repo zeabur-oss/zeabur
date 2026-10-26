@@ -18,7 +18,7 @@ shows. The others are.
 ```sh
 nix develop -c scripts/docs-shots.sh                         # docs/shots.yaml into target/docs-shots
 nix develop -c scripts/docs-shots.sh docs/readme-shots.yaml  # into docs/images
-nix develop -c scripts/docs-shots.sh web/e2e/shots/fixture.yaml target/docs-shots v0.0.2
+nix develop -c scripts/docs-shots.sh web/e2e/shots/fixture.yaml target/docs-shots v0.1.0
 ```
 
 The script builds the web interface and the demo (`crates/zeabur-api/examples/demo.rs`), starts
