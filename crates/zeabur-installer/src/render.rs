@@ -134,7 +134,7 @@ pub(crate) fn personal_plan(plan: &PersonalPlan) -> String {
     push(
         &mut s,
         &format!(
-            "helm-controller  {} (images pinned by digest)",
+            "helm-controller  {} (its image pinned by digest; the Jobs' image checked by digest after they run)",
             plan.helm_controller.version
         ),
     );

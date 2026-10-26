@@ -23,8 +23,8 @@ use crate::storage::Storage;
 use crate::{PlanError, kubesolo};
 
 /// `KubeSolo` at idle with its own pods (`CoreDNS`, local-path-provisioner) and the
-/// helm-controller, measured on a 1 CPU / 1.5 GiB arm64 VM, rounded up.
-pub const KUBESOLO_IDLE_MIB: u64 = 600;
+/// helm-controller: about 670 MiB resident on a 1 CPU / 1.5 GiB arm64 VM, rounded up.
+pub const KUBESOLO_IDLE_MIB: u64 = 700;
 /// The least memory a personal install is planned for: a host with 1.5 GiB, less what the kernel
 /// and firmware keep.
 pub const MIN_MEMORY_MIB: u64 = 1400;
@@ -85,6 +85,24 @@ pub struct HelmControllerPlan {
     pub manifest: Download,
     /// The images the manifest names, as the installer pins them: `ref@digest`.
     pub images: Vec<String>,
+    /// The install Jobs' image by tag, and the digest it must resolve to.
+    pub job_image: String,
+    /// The digest `apply` and `doctor` compare with what the Jobs ran.
+    pub job_image_digest: String,
+}
+
+fn helm_controller() -> HelmControllerPlan {
+    HelmControllerPlan {
+        version: HELM_CONTROLLER.version.to_owned(),
+        manifest: HELM_CONTROLLER.manifest().into(),
+        images: HELM_CONTROLLER
+            .images
+            .iter()
+            .map(|(reference, digest)| format!("{reference}@{digest}"))
+            .collect(),
+        job_image: HELM_CONTROLLER.job_image.reference.to_owned(),
+        job_image_digest: HELM_CONTROLLER.job_image.digest.to_owned(),
+    }
 }
 
 /// Computes the plan of a personal install.
@@ -178,15 +196,7 @@ pub fn plan(
             kubernetes: KUBESOLO.kubernetes.to_owned(),
             download: archive.into(),
         },
-        helm_controller: HelmControllerPlan {
-            version: HELM_CONTROLLER.version.to_owned(),
-            manifest: HELM_CONTROLLER.manifest().into(),
-            images: HELM_CONTROLLER
-                .images
-                .iter()
-                .map(|(reference, digest)| format!("{reference}@{digest}"))
-                .collect(),
-        },
+        helm_controller: helm_controller(),
         kubectl: kubectl.into(),
         host_file_paths: host_files.iter().map(|f| f.path.clone()).collect(),
         host_files,
@@ -296,6 +306,7 @@ mod tests {
                 .iter()
                 .all(|i| i.contains("@sha256:"))
         );
+        assert!(plan.helm_controller.job_image_digest.starts_with("sha256:"));
         let mut riscv = facts(4096);
         riscv.arch = "riscv64".to_owned();
         assert!(matches!(

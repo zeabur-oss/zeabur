@@ -14,7 +14,7 @@ use zeabur_installer_host::{archive, cmd, download, facts, files, systemd};
 use zeabur_installer_plan::config::PersonalConfig;
 use zeabur_installer_plan::kubesolo::{
     ADMIN_KUBECONFIG, BINARY, DATA_DIR, KUBECTL, PERSONAL_KUBECONFIG, STATE_DIR, UNIT,
-    personal_kubeconfig, pin_images,
+    WEBHOOK_SCRIPT, helm_controller_manifest, job_image_mismatches, personal_kubeconfig,
 };
 use zeabur_installer_plan::personal::{self, PersonalPlan};
 use zeabur_installer_plan::pins::HELM_CONTROLLER;
@@ -113,6 +113,15 @@ pub(crate) fn apply(config: &PersonalConfig) -> Result<(), InstallError> {
             kubectl.wait(&args)?;
         }
     }
+    let wrong = job_images(&kubectl, &plan)?;
+    if !wrong.is_empty() {
+        return Err(InstallError::Message(format!(
+            "the install Jobs ran an image other than {}@{}:\n  {}",
+            plan.helm_controller.job_image,
+            plan.helm_controller.job_image_digest,
+            wrong.join("\n  ")
+        )));
+    }
     record(&kubectl, &plan)?;
     let name = plan.facts.hostname.to_ascii_lowercase();
     write_kubeconfig(&name)?;
@@ -120,6 +129,26 @@ pub(crate) fn apply(config: &PersonalConfig) -> Result<(), InstallError> {
     out::step("Done");
     out::line(&done_text(&name, &facts::addresses()));
     Ok(())
+}
+
+/// The install Job Pods that ran another image than the pinned digest.
+fn job_images(kubectl: &Kubectl, plan: &PersonalPlan) -> Result<Vec<String>, InstallError> {
+    let text = kubectl.run(
+        &[
+            "get",
+            "pods",
+            "--all-namespaces",
+            "--selector=helmcharts.helm.cattle.io/chart",
+            "--output=json",
+        ],
+        None,
+    )?;
+    let pods: Value =
+        serde_json::from_str(&text).map_err(|e| InstallError::Message(e.to_string()))?;
+    Ok(job_image_mismatches(
+        &pods,
+        &plan.helm_controller.job_image_digest,
+    ))
 }
 
 /// What to run on the person's own computer.
@@ -225,7 +254,7 @@ fn helm_controller(kubectl: &Kubectl, plan: &PersonalPlan) -> Result<(), Install
         &manifest.url,
         manifest.sha256.as_deref(),
     )?;
-    kubectl.apply(pin_images(&text, HELM_CONTROLLER.images)?.as_bytes())?;
+    kubectl.apply(helm_controller_manifest(&text, &HELM_CONTROLLER)?.as_bytes())?;
     wait_available(kubectl, "helm-controller", "helm-controller")
 }
 
@@ -295,7 +324,22 @@ pub(crate) fn doctor(config: &PersonalConfig) -> ExitCode {
                 ));
             }
         }
+        match job_images(&kubectl, &plan) {
+            Ok(wrong) if wrong.is_empty() => results.push((
+                Status::Pass,
+                "the install Jobs ran the pinned klipper-helm image".to_owned(),
+            )),
+            Ok(wrong) => results.push((
+                Status::Fail,
+                format!(
+                    "the install Jobs ran an image other than the pinned one: {}",
+                    wrong.join(", ")
+                ),
+            )),
+            Err(e) => results.push((Status::Warn, format!("reading the install Jobs: {e}"))),
+        }
     }
+    results.push(webhook_check(&kubectl));
     results.push(doctor::deployment(
         &kubectl,
         "helm-controller",
@@ -326,6 +370,30 @@ pub(crate) fn doctor(config: &PersonalConfig) -> ExitCode {
     doctor::report(&results)
 }
 
+/// Whether `KubeSolo`'s webhook still changes Jobs, which stops helm-controller (`kubesolo.rs`).
+fn webhook_check(kubectl: &Kubectl) -> (Status, String) {
+    let config = kubectl.get("mutatingwebhookconfiguration", "webhook.kubesolo.io", None);
+    let jobs = config.ok().flatten().is_some_and(|c| {
+        c.pointer("/webhooks/0/rules/0/resources")
+            .and_then(Value::as_array)
+            .is_some_and(|r| r.iter().any(|v| v == "jobs"))
+    });
+    if jobs {
+        (
+            Status::Warn,
+            format!(
+                "KubeSolo's webhook still changes Jobs, so charts do not install: \
+                 sudo {WEBHOOK_SCRIPT}, or journalctl -u {UNIT}"
+            ),
+        )
+    } else {
+        (
+            Status::Pass,
+            "KubeSolo's webhook leaves Jobs alone".to_owned(),
+        )
+    }
+}
+
 /// How to remove a personal install. Nothing in it depends on the installer, so it only prints
 /// the commands.
 pub(crate) fn uninstall_text() -> String {
@@ -334,10 +402,10 @@ pub(crate) fn uninstall_text() -> String {
          the installer; manage them with kubectl (kubectl get helmcharts -n kube-system).\n\n\
          To remove everything, apps and volumes included:\n\n  \
          sudo systemctl disable --now {UNIT}\n  \
-         sudo rm -f /etc/systemd/system/{UNIT}.service {BINARY}\n  \
+         sudo rm -f /etc/systemd/system/{UNIT}.service {BINARY} {WEBHOOK_SCRIPT}\n  \
          sudo systemctl daemon-reload\n  \
-         sudo rm -rf {DATA_DIR} /etc/kubesolo {STATE_DIR} /etc/zeabur-installer\n  \
-         sudo reboot    # clears KubeSolo's network interfaces and mounts\n"
+         sudo reboot    # the containers and their mounts outlive the service\n  \
+         sudo rm -rf {DATA_DIR} /etc/kubesolo {STATE_DIR} /etc/zeabur-installer\n"
     )
 }
 
@@ -359,7 +427,12 @@ mod tests {
     fn uninstall_removes_kubesolo_with_plain_commands() {
         let text = uninstall_text();
         assert!(text.contains(&format!("systemctl disable --now {UNIT}")));
-        assert!(text.contains(DATA_DIR));
+        let reboot = text.find("reboot").unwrap();
+        let remove = text.find(&format!("rm -rf {DATA_DIR}")).unwrap();
+        assert!(
+            reboot < remove,
+            "the data is busy until the containers are gone"
+        );
         assert!(!text.contains("zeabur-installer uninstall"));
     }
 }

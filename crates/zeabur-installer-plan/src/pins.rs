@@ -282,22 +282,40 @@ pub struct HelmController {
     pub manifest_sha256: &'static str,
     /// The images the manifest names by tag, and the digest each one is pinned to.
     pub images: &'static [(&'static str, &'static str)],
+    /// The image of the install Jobs.
+    pub job_image: JobImage,
+}
+
+/// The image helm-controller runs its install Jobs with.
+///
+/// The release manifest names klipper-helm v0.9.10, which does not label a release with the
+/// chart's configuration hash, so helm-controller upgrades a finished chart again and again. k3s
+/// runs helm-controller v0.17.9 with this image. It stays a tag: helm-controller keeps only 64
+/// characters of each string of a Job it applied, so a reference with a digest always differs and
+/// the Job is replaced again and again. The installer compares the digest after the Jobs ran.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct JobImage {
+    /// The image the release manifest names.
+    pub replaces: &'static str,
+    /// The image set in its place.
+    pub reference: &'static str,
+    /// The digest `reference` must resolve to.
+    pub digest: &'static str,
 }
 
 /// The helm-controller release the catalog tests on `KubeSolo` (catalog `config/kubernetes.yaml`).
 pub const HELM_CONTROLLER: HelmController = HelmController {
     version: "v0.17.9",
     manifest_sha256: "53da110ca271b6d6415e84bfc5ffe47d726fa35d1fb3acda47e6649ee05d4791",
-    images: &[
-        (
-            "rancher/helm-controller:v0.17.9",
-            "sha256:25a4fcbbf9fa8396ded332165e4497eb45e08a8f6677158c0f861a2d15982afc",
-        ),
-        (
-            "ghcr.io/k3s-io/klipper-helm:v0.9.10-build20251111",
-            "sha256:251a6a3983934f1026c34f4337fc5a87e093a142438c7d16f7b31c179162176e",
-        ),
-    ],
+    images: &[(
+        "rancher/helm-controller:v0.17.9",
+        "sha256:25a4fcbbf9fa8396ded332165e4497eb45e08a8f6677158c0f861a2d15982afc",
+    )],
+    job_image: JobImage {
+        replaces: "ghcr.io/k3s-io/klipper-helm:v0.9.10-build20251111",
+        reference: "rancher/klipper-helm:v0.13.3-build20261021",
+        digest: "sha256:391ec9f4824d631c49b52c1e3d10e4a2ced37a784afd75852e34bb2a6c7309b1",
+    },
 };
 
 impl HelmController {

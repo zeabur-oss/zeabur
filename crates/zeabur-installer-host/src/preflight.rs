@@ -507,7 +507,7 @@ fn encryption(data_dir: &str, required: bool) -> Check {
         ),
         (Encryption::Plain, false) => (
             Status::Warn,
-            format!("{target} is not on an encrypted device; so volumes on it are not encrypted"),
+            format!("{target} is not on an encrypted device, so volumes on it are not encrypted"),
             Code::CryptNo,
         ),
         (Encryption::Unknown, false) => (

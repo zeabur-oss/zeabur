@@ -29,10 +29,11 @@ description: 只有自己要用時，用 KubeSolo 在 1.5 GiB 記憶體的機器
 - `/var/lib/kubesolo` 至少有 10 GiB 可用空間。
 - TCP 連接埠 80、443、6443、10250、10443 沒有被占用。
 - 沒有安裝 RKE2、k3s、kubeadm、k0s 或 MicroK8s。
+- 沒有在跑 Docker。Docker 會把轉送的封包預設丟掉，Pod 就連不到外面，也申請不到憑證。
 
 自己的電腦要有 [`zeaburctl`](../reference/zeaburctl.mdx)，而且連得到伺服器的 TCP 6443。
 
-installer 釘選 KubeSolo、helm-controller 和 kubectl 的版本，下載後核對 SHA-256。helm-controller 的映像檔也用 digest 指定。
+installer 釘選 KubeSolo、helm-controller 和 kubectl 的版本，下載後核對 SHA-256。helm-controller 的映像檔用 digest 指定。安裝元件的 Job 映像檔只能寫標籤，Job 跑完後 installer 會核對它實際用的 digest，不對就停下。
 
 ## 用網頁介面安裝
 
@@ -80,7 +81,10 @@ kubeconfig 裡的 API 位址是伺服器自己選的位址。自己的電腦要�
 - 每個元件是 `kube-system` 裡的一個 `HelmChart`，由 helm-controller 安裝。用 `kubectl get helmcharts -n kube-system` 列出，改設定就改 `HelmChart`。
 - 安裝紀錄在 `kube-system` 的 ConfigMap `zeabur-installer`，只是給 `doctor` 讀的紀錄。
 
-installer 做的事，手動也做得到：照 [KubeSolo 的說明](https://github.com/portainer/kubesolo)安裝 KubeSolo，`kubectl apply` [helm-controller](https://github.com/k3s-io/helm-controller) 的 release manifest，再為每個元件建立 `HelmChart`。
+installer 做的事，手動也做得到：照 [KubeSolo 的說明](https://github.com/portainer/kubesolo)安裝 KubeSolo，`kubectl apply` [helm-controller](https://github.com/k3s-io/helm-controller) 的 release manifest，再為每個元件建立 `HelmChart`。手動做時要多改兩個地方，不然 `HelmChart` 會一直重裝：
+
+- KubeSolo 的 webhook 會蓋掉 Job 的 `nodeSelector`，helm-controller 看到 Job 被改過，就刪掉重建。installer 讓 systemd 在 KubeSolo 每次啟動後執行 `/usr/local/libexec/zeabur-kubesolo-webhook`，把 Job 從 MutatingWebhookConfiguration `webhook.kubesolo.io` 的規則拿掉。Pod 還是由同一個 webhook 指定節點。
+- helm-controller release manifest 裡的 klipper-helm 版本太舊，裝完不會標記設定的雜湊值，helm-controller 會一直升級同一個 chart。installer 把 `DEFAULT_JOB_IMAGE` 換成 k3s 搭配同版 helm-controller 的 `rancher/klipper-helm:v0.13.3-build20261021`。
 
 ## 檢查安裝結果
 
@@ -96,10 +100,13 @@ sudo zeabur-installer doctor
 
 ```sh
 sudo systemctl disable --now kubesolo
-sudo rm -f /etc/systemd/system/kubesolo.service /usr/local/bin/kubesolo
+sudo rm -f /etc/systemd/system/kubesolo.service /usr/local/bin/kubesolo /usr/local/libexec/zeabur-kubesolo-webhook
 sudo systemctl daemon-reload
-sudo rm -rf /var/lib/kubesolo /etc/kubesolo /var/lib/zeabur-installer /etc/zeabur-installer
 sudo reboot
 ```
 
-重新開機會清掉 KubeSolo 留下的網路介面和掛載點。
+停掉服務後，容器和它們的掛載點還在，要重新開機才會清掉。開機後再刪掉資料：
+
+```sh
+sudo rm -rf /var/lib/kubesolo /etc/kubesolo /var/lib/zeabur-installer /etc/zeabur-installer
+```

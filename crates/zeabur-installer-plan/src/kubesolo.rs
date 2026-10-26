@@ -7,6 +7,7 @@
 use serde_json::{Value, json};
 
 use crate::PlanError;
+use crate::pins::HelmController;
 use crate::rke2::HostFile;
 
 /// The systemd unit.
@@ -21,6 +22,8 @@ pub const CONFIG_FILE: &str = "/etc/kubesolo/config.yaml";
 pub const UNIT_FILE: &str = "/etc/systemd/system/kubesolo.service";
 /// The cluster-admin kubeconfig `KubeSolo` writes.
 pub const ADMIN_KUBECONFIG: &str = "/var/lib/kubesolo/pki/admin/admin.kubeconfig";
+/// The script the unit runs after `KubeSolo` starts; see [`host_files`].
+pub const WEBHOOK_SCRIPT: &str = "/usr/local/libexec/zeabur-kubesolo-webhook";
 /// The installer's downloads and the kubectl it uses.
 pub const STATE_DIR: &str = "/var/lib/zeabur-installer";
 /// The pinned kubectl.
@@ -60,7 +63,12 @@ pub struct Options {
 
 const HEADER: &str = "# Written by zeabur-installer; `zeabur-installer doctor` compares it.\n";
 
-/// The configuration file and the unit, in the order to write them.
+/// The configuration file, the webhook script and the unit, in the order to write them.
+///
+/// `KubeSolo` v1.2.2's webhook sets a new Job's whole `nodeSelector` to the node, so
+/// `kubernetes.io/os` goes away. helm-controller then finds its Job changed and replaces it again
+/// and again, and no chart installs. The script takes Jobs out of the webhook's rules after each
+/// start. The same webhook still gives each Pod the node.
 #[must_use]
 pub fn host_files(options: &Options) -> Vec<HostFile> {
     let mut lines = vec![
@@ -86,6 +94,11 @@ pub fn host_files(options: &Options) -> Vec<HostFile> {
             content: config,
         },
         HostFile {
+            path: WEBHOOK_SCRIPT.to_owned(),
+            mode: 0o755,
+            content: WEBHOOK_SCRIPT_TEXT.to_owned(),
+        },
+        HostFile {
             path: UNIT_FILE.to_owned(),
             mode: 0o644,
             content: UNIT_TEXT.to_owned(),
@@ -104,6 +117,7 @@ After=network-online.target
 [Service]
 Type=simple
 ExecStart=/usr/local/bin/kubesolo --config=/etc/kubesolo/config.yaml
+ExecStartPost=-/usr/local/libexec/zeabur-kubesolo-webhook
 KillMode=process
 Delegate=yes
 LimitNOFILE=65535
@@ -119,35 +133,98 @@ OOMScoreAdjust=-500
 WantedBy=multi-user.target
 ";
 
-/// Pins each image of `manifest` to its digest: `ref` becomes `ref@digest`.
+/// Waits until this start of `KubeSolo` has written its webhook configuration, then removes
+/// `jobs` from its rules. The `test` operation leaves another `KubeSolo` version's rules alone.
+const WEBHOOK_SCRIPT_TEXT: &str = r#"#!/bin/sh
+# Written by zeabur-installer. KubeSolo's webhook replaces a new Job's nodeSelector,
+# and helm-controller then replaces its Job again and again. Pods still get the node.
+kubectl="/var/lib/zeabur-installer/bin/kubectl --kubeconfig=/var/lib/kubesolo/pki/admin/admin.kubeconfig --context=kubernetes-admin@kubesolo"
+patch='[{"op":"test","path":"/webhooks/0/rules/0/resources","value":["pods","persistentvolumeclaims","jobs"]},{"op":"replace","path":"/webhooks/0/rules/0/resources","value":["pods","persistentvolumeclaims"]}]'
+i=0
+while [ "$i" -lt 900 ]; do
+  if journalctl -u kubesolo "_SYSTEMD_INVOCATION_ID=$INVOCATION_ID" -o cat | grep -q "webhook configuration"; then
+    $kubectl patch mutatingwebhookconfiguration webhook.kubesolo.io --type=json -p "$patch"
+    exit 0
+  fi
+  i=$((i + 1))
+  sleep 2
+done
+echo "KubeSolo did not write its webhook configuration in 30 minutes" >&2
+exit 1
+"#;
+
+/// The helm-controller release manifest as the installer applies it: the controller's image
+/// pinned by digest and the install Jobs' image set to [`HelmController::job_image`].
 ///
 /// # Errors
 ///
-/// When an image is not in the manifest, which means the pins and the manifest differ.
-pub fn pin_images(manifest: &str, images: &[(&str, &str)]) -> Result<String, PlanError> {
+/// When the manifest does not name an image the pins expect, which means they differ.
+pub fn helm_controller_manifest(
+    manifest: &str,
+    pins: &HelmController,
+) -> Result<String, PlanError> {
+    let mut images: Vec<(&str, String)> = pins
+        .images
+        .iter()
+        .map(|(reference, digest)| (*reference, format!("{reference}@{digest}")))
+        .collect();
+    images.push((pins.job_image.replaces, pins.job_image.reference.to_owned()));
+    set_images(manifest, &images)
+}
+
+fn set_images(manifest: &str, images: &[(&str, String)]) -> Result<String, PlanError> {
     let mut out = manifest.to_owned();
-    for (reference, digest) in images {
+    for (from, to) in images {
         let lines: Vec<String> = out
             .lines()
-            .map(|line| {
-                let value = line.split_once(": ").map(|(_, v)| v.trim());
-                if value == Some(reference) {
-                    format!("{line}@{digest}")
-                } else {
-                    line.to_owned()
-                }
+            .map(|line| match line.split_once(": ") {
+                Some((key, value)) if value.trim() == *from => format!("{key}: {to}"),
+                _ => line.to_owned(),
             })
             .collect();
-        let pinned = lines.join("\n") + if out.ends_with('\n') { "\n" } else { "" };
-        if pinned == out {
+        let set = lines.join("\n") + if out.ends_with('\n') { "\n" } else { "" };
+        if set == out {
             return Err(PlanError::Values {
                 what: "helm-controller manifest".to_owned(),
-                reason: format!("it does not name the image {reference}"),
+                reason: format!("it does not name the image {from}"),
             });
         }
-        out = pinned;
+        out = set;
     }
     Ok(out)
+}
+
+/// The install Job Pods of `pods` (a `kubectl get pods -o json` list) whose `helm` container ran
+/// an image other than `digest`, as `namespace/name: image id`. A Pod that has not pulled its
+/// image yet is not listed.
+#[must_use]
+pub fn job_image_mismatches(pods: &Value, digest: &str) -> Vec<String> {
+    let Some(items) = pods.get("items").and_then(Value::as_array) else {
+        return Vec::new();
+    };
+    items
+        .iter()
+        .flat_map(|pod| {
+            let name = format!(
+                "{}/{}",
+                pod.pointer("/metadata/namespace")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default(),
+                pod.pointer("/metadata/name")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default()
+            );
+            pod.pointer("/status/containerStatuses")
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten()
+                .filter(|c| c.get("name").and_then(Value::as_str) == Some("helm"))
+                .filter_map(|c| c.get("imageID").and_then(Value::as_str))
+                .filter(|id| !id.is_empty() && !id.ends_with(&format!("@{digest}")))
+                .map(move |id| format!("{name}: {id}"))
+                .collect::<Vec<_>>()
+        })
+        .collect()
 }
 
 /// The admin kubeconfig as a file for the person's computer: only the certificate user, with the
@@ -204,6 +281,7 @@ pub fn personal_kubeconfig(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::pins::JobImage;
 
     #[test]
     fn the_config_names_the_address_and_certificate_names() {
@@ -234,19 +312,46 @@ mod tests {
     }
 
     #[test]
-    fn images_are_pinned_by_digest() {
+    fn the_controller_is_pinned_and_the_jobs_get_their_image() {
         let manifest = "        image: rancher/helm-controller:v0.17.9\n        - name: DEFAULT_JOB_IMAGE\n          value: ghcr.io/k3s-io/klipper-helm:v0.9.10\n";
-        let pinned = pin_images(
-            manifest,
-            &[
-                ("rancher/helm-controller:v0.17.9", "sha256:aa"),
-                ("ghcr.io/k3s-io/klipper-helm:v0.9.10", "sha256:bb"),
-            ],
-        )
-        .unwrap();
-        assert!(pinned.contains("image: rancher/helm-controller:v0.17.9@sha256:aa\n"));
-        assert!(pinned.contains("value: ghcr.io/k3s-io/klipper-helm:v0.9.10@sha256:bb\n"));
-        assert!(pin_images(manifest, &[("rancher/other:v1", "sha256:cc")]).is_err());
+        let pins = HelmController {
+            version: "v0.17.9",
+            manifest_sha256: "",
+            images: &[("rancher/helm-controller:v0.17.9", "sha256:aa")],
+            job_image: JobImage {
+                replaces: "ghcr.io/k3s-io/klipper-helm:v0.9.10",
+                reference: "rancher/klipper-helm:v0.13.3",
+                digest: "sha256:bb",
+            },
+        };
+        let set = helm_controller_manifest(manifest, &pins).unwrap();
+        assert!(set.contains("image: rancher/helm-controller:v0.17.9@sha256:aa\n"));
+        assert!(set.contains("value: rancher/klipper-helm:v0.13.3\n"));
+        assert!(!set.contains("ghcr.io"));
+        let other = HelmController {
+            images: &[("rancher/other:v1", "sha256:cc")],
+            ..pins
+        };
+        assert!(helm_controller_manifest(manifest, &other).is_err());
+    }
+
+    #[test]
+    fn a_job_that_ran_another_image_is_named() {
+        let pod = |name: &str, id: &str| {
+            json!({
+                "metadata": {"namespace": "kube-system", "name": name},
+                "status": {"containerStatuses": [{"name": "helm", "imageID": id}]},
+            })
+        };
+        let pods = json!({"items": [
+            pod("helm-install-a", "ghcr.io/k3s-io/klipper-helm@sha256:aa"),
+            pod("helm-install-b", "ghcr.io/k3s-io/klipper-helm@sha256:bb"),
+            pod("helm-install-c", ""),
+        ]});
+        assert_eq!(
+            job_image_mismatches(&pods, "sha256:aa"),
+            vec!["kube-system/helm-install-b: ghcr.io/k3s-io/klipper-helm@sha256:bb"]
+        );
     }
 
     #[test]

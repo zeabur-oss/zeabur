@@ -161,8 +161,18 @@ With `use: personal`, `apply`:
    `/etc/kubesolo/config.yaml` and the `kubesolo` systemd unit.
 3. Starts KubeSolo and waits for the node, CoreDNS and the local-path provisioner.
 4. Applies the release manifest of the standalone
-   [helm-controller](https://github.com/k3s-io/helm-controller), checked by SHA-256, with its
-   images pinned by digest. It runs as upstream ships it: its ServiceAccount is cluster admin.
+   [helm-controller](https://github.com/k3s-io/helm-controller), checked by SHA-256, with the
+   controller's image pinned by digest. It runs as upstream ships it: its ServiceAccount is
+   cluster admin. The manifest's klipper-helm v0.9.10 does not label a release with the chart's
+   configuration hash, so helm-controller would upgrade every chart again and again; the install
+   Jobs run `rancher/klipper-helm:v0.13.3-build20261021`, the image k3s pairs with this
+   helm-controller. That image stays a tag, because helm-controller keeps only 64 characters of
+   each string of a Job it applied and would replace a Job named by digest forever; once the Jobs
+   ran, `apply` and `doctor` compare the digest they ran with the pinned one.
+   KubeSolo's webhook replaces a new Job's whole `nodeSelector`, which also makes helm-controller
+   replace its Jobs forever, so the `kubesolo` unit runs `/usr/local/libexec/zeabur-kubesolo-webhook`
+   after each start: it removes `jobs` from the rules of `webhook.kubesolo.io` once KubeSolo has
+   written them. Pods still get the node from the same webhook.
 5. Creates the components' namespaces and installs each component as a `HelmChart` in
    `kube-system`, as for a team install. No network policies: KubeSolo does not enforce them.
 6. Records the install in the ConfigMap `kube-system/zeabur-installer` and writes a kubeconfig with
@@ -170,7 +180,8 @@ With `use: personal`, `apply`:
 
 Nothing of the installer runs afterwards, and none of this needs it: KubeSolo is a systemd
 service, and the components are `HelmChart` objects that kubectl reads and changes. `uninstall`
-removes nothing; it prints the commands that remove KubeSolo and its data.
+removes nothing; it prints the commands that remove KubeSolo and, after a reboot (containers and
+their mounts outlive the service), its data.
 
 ## What stays after uninstalling
 

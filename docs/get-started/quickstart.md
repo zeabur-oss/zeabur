@@ -53,7 +53,8 @@ is cluster admin. There are no members or roles, one node only, and no isolation
 projects: KubeSolo does not enforce NetworkPolicies. Components are `HelmChart` objects in
 `kube-system`, run by the standalone helm-controller, so plain kubectl manages everything without
 the installer. When the server has less than 3800 MiB of memory, a team install stops and points
-here. See [Installer configuration](../reference/installer-configuration.md#use-personal) and
+here. Stop Docker on the server first: it drops forwarded packets, so pods cannot reach the
+internet and cert-manager gets no certificates. See [Installer configuration](../reference/installer-configuration.md#use-personal) and
 [How it works](../reference/installer.md#a-personal-install).
 
 ## Commands
