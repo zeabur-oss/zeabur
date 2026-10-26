@@ -7,6 +7,7 @@ import { hostProblem } from "@/model/image-service"
 type Change = Schemas["Change"]
 export type AppTemplate = Schemas["TemplateView"]
 export type TemplateInput = Schemas["TemplateInput"]
+export type TemplateRisk = Schemas["TemplateRisk"]
 
 /** The page server of the error pages, which a domain's settings deploy. */
 const ELSEWHERE = new Set(["error-pages"])
@@ -39,6 +40,22 @@ export function inputWords(input: TemplateInput, locale: string) {
   return {
     label: local?.label ?? input.label ?? input.name,
     description: local?.description ?? input.description,
+  }
+}
+
+/** The security summary in `locale`, else in English; `undefined` when the template has none. */
+export function summaryWords(template: AppTemplate, locale: string) {
+  const text = template.summaryLocales?.[locale] ?? template.summary
+  return text ? { text, english: !template.summaryLocales?.[locale] } : undefined
+}
+
+/** A risk and its mitigation in `locale`, else in English. */
+export function riskWords(risk: TemplateRisk, locale: string) {
+  const local = risk.locales?.[locale]
+  return {
+    risk: local?.risk ?? risk.risk,
+    mitigation: local?.mitigation ?? risk.mitigation,
+    english: !local,
   }
 }
 

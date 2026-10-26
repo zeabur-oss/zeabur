@@ -172,6 +172,7 @@ export const en = {
   "status.rolloutStuck": "Rollout stuck",
   "status.failed": "Failed",
   "status.building": "Building",
+  "status.waitingUpload": "Waiting for upload",
   "status.scaledToZero": "Scaled to 0",
   "status.completed": "Completed",
   "status.unknown": "Unknown",
@@ -2589,7 +2590,7 @@ export const en = {
   "add.templateInputDefault": (value: string) => `Left empty, it becomes ${value}.`,
   "add.templateOptional": "Optional",
   "add.templateRisks": (n: number) => `Before you deploy: ${plural(n, "thing", "things")} to know`,
-  "add.templateRisksBody": "The template's author wrote these notes, in English.",
+  "add.templateRisksBody": "The template's author wrote these notes.",
   "add.templateRiskFix": "What to do",
   "add.composeTitle": "Import Docker Compose",
   "add.composeBody": (project: string) =>

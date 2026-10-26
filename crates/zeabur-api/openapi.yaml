@@ -15093,6 +15093,19 @@ components:
         risk:
           type: string
           description: The risk.
+    RiskLocale:
+      type: object
+      description: A risk's words in one language.
+      required:
+      - risk
+      - mitigation
+      properties:
+        mitigation:
+          type: string
+          description: How to contain it.
+        risk:
+          type: string
+          description: The risk.
     Rollout:
       type: object
       description: One workload whose pods a plan changes.
@@ -16566,6 +16579,7 @@ components:
       - completed
       - unknown
       - building
+      - waitingUpload
     StorageClassView:
       type: object
       description: A `StorageClass`.
@@ -16930,6 +16944,26 @@ components:
           items:
             $ref: "#/components/schemas/TemplateView"
           description: Every template, by id.
+    TemplateRisk:
+      type: object
+      description: A known risk of a template, with how to contain it.
+      required:
+      - risk
+      - mitigation
+      properties:
+        locales:
+          type: object
+          description: The risk and its mitigation in other languages (`zh-TW`, `zh-CN`).
+          additionalProperties:
+            $ref: "#/components/schemas/RiskLocale"
+          propertyNames:
+            type: string
+        mitigation:
+          type: string
+          description: How to contain it, in English.
+        risk:
+          type: string
+          description: The risk, in English.
     TemplateService:
       type: object
       description: A service of a template.
@@ -16963,6 +16997,7 @@ components:
       - services
       - requests
       - inputs
+      - summary
       - risks
       - needsDomain
       - needsClusterIssuer
@@ -17018,13 +17053,27 @@ components:
         risks:
           type: array
           items:
-            $ref: "#/components/schemas/Risk"
-          description: What to know before deploying it, with how to contain each. In English.
+            $ref: "#/components/schemas/TemplateRisk"
+          description: |-
+            What to know before deploying it, with how to contain each. In English, with the other
+            languages in `locales`.
         services:
           type: array
           items:
             $ref: "#/components/schemas/TemplateService"
           description: Its services.
+        summary:
+          type: string
+          description: >-
+            What to know before deploying it, in one paragraph, in English; empty when it
+            has none.
+        summaryLocales:
+          type: object
+          description: The summary in other languages (`zh-TW`, `zh-CN`).
+          additionalProperties:
+            type: string
+          propertyNames:
+            type: string
         version:
           type: string
           description: The application's version (`2.2.0`).

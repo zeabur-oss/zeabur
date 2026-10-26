@@ -7800,6 +7800,13 @@ export interface components {
       /** @description The risk. */
       risk: string
     }
+    /** @description A risk's words in one language. */
+    RiskLocale: {
+      /** @description How to contain it. */
+      mitigation: string
+      /** @description The risk. */
+      risk: string
+    }
     /** @description One workload whose pods a plan changes. */
     Rollout: {
       /** @description What happens to its pods. */
@@ -8583,6 +8590,7 @@ export interface components {
       | "completed"
       | "unknown"
       | "building"
+      | "waitingUpload"
     /** @description A `StorageClass`. */
     StorageClassView: {
       /** @description `allowVolumeExpansion`: its claims may grow. */
@@ -8779,6 +8787,17 @@ export interface components {
       /** @description Every template, by id. */
       items: components["schemas"]["TemplateView"][]
     }
+    /** @description A known risk of a template, with how to contain it. */
+    TemplateRisk: {
+      /** @description The risk and its mitigation in other languages (`zh-TW`, `zh-CN`). */
+      locales?: {
+        [key: string]: components["schemas"]["RiskLocale"]
+      }
+      /** @description How to contain it, in English. */
+      mitigation: string
+      /** @description The risk, in English. */
+      risk: string
+    }
     /** @description A service of a template. */
     TemplateService: {
       /** @description The name of its workload or database object. */
@@ -8821,10 +8840,19 @@ export interface components {
       requests: components["schemas"]["Requests"]
       /** @description The components it needs, and whether each one is there. */
       requires: components["schemas"]["Requirement"][]
-      /** @description What to know before deploying it, with how to contain each. In English. */
-      risks: components["schemas"]["Risk"][]
+      /**
+       * @description What to know before deploying it, with how to contain each. In English, with the other
+       *     languages in `locales`.
+       */
+      risks: components["schemas"]["TemplateRisk"][]
       /** @description Its services. */
       services: components["schemas"]["TemplateService"][]
+      /** @description What to know before deploying it, in one paragraph, in English; empty when it has none. */
+      summary: string
+      /** @description The summary in other languages (`zh-TW`, `zh-CN`). */
+      summaryLocales?: {
+        [key: string]: string
+      }
       /** @description The application's version (`2.2.0`). */
       version: string
     }

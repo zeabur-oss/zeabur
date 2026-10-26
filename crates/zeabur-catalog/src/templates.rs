@@ -22,7 +22,6 @@ use serde_json::{Value, json};
 use utoipa::ToSchema;
 
 use crate::bundle;
-use crate::install::Risk;
 
 /// The labels the catalogue's renderer adds to every object of an install.
 const INSTANCE_LABEL: &str = "app.kubernetes.io/instance";
@@ -56,9 +55,15 @@ pub struct Template {
     pub services: Vec<TemplateService>,
     /// What a person gives or the browser generates.
     pub inputs: Vec<TemplateInput>,
-    /// What to know before deploying it, and how to contain each risk. In English: the catalogue
-    /// has no other language for them.
-    pub risks: Vec<Risk>,
+    /// What to know before deploying it, in one paragraph, in English. Empty when the template
+    /// has none.
+    pub summary: String,
+    /// The summary in other languages (`zh-TW`, `zh-CN`).
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    pub summary_locales: BTreeMap<String, String>,
+    /// What to know before deploying it, and how to contain each risk. In English, with the
+    /// other languages in `locales`.
+    pub risks: Vec<TemplateRisk>,
     /// It routes a domain: a deploy gives `domain`.
     pub needs_domain: bool,
     /// It asks cert-manager for certificates: a deploy needs the cluster's issuer.
@@ -74,6 +79,27 @@ pub struct TemplateService {
     /// quantities.
     #[serde(default)]
     pub requests: BTreeMap<String, String>,
+}
+
+/// A known risk of a template, with how to contain it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct TemplateRisk {
+    /// The risk, in English.
+    pub risk: String,
+    /// How to contain it, in English.
+    pub mitigation: String,
+    /// The risk and its mitigation in other languages (`zh-TW`, `zh-CN`).
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub locales: BTreeMap<String, RiskLocale>,
+}
+
+/// A risk's words in one language.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+pub struct RiskLocale {
+    /// The risk.
+    pub risk: String,
+    /// How to contain it.
+    pub mitigation: String,
 }
 
 /// An input of a template.
@@ -245,7 +271,16 @@ struct File {
 #[derive(Deserialize, Default)]
 struct FileSecurity {
     #[serde(default)]
-    risks: Vec<Risk>,
+    summary: String,
+    #[serde(default)]
+    locales: BTreeMap<String, FileSummary>,
+    #[serde(default)]
+    risks: Vec<TemplateRisk>,
+}
+
+#[derive(Deserialize)]
+struct FileSummary {
+    summary: String,
 }
 
 #[derive(Deserialize)]
@@ -406,13 +441,31 @@ fn read(id: &str, file: &str, manifests: &str) -> Result<Template, RenderError> 
             })
             .collect(),
         inputs,
+        summary: file.security.summary.trim().to_owned(),
+        summary_locales: file
+            .security
+            .locales
+            .into_iter()
+            .map(|(lang, l)| (lang, l.summary.trim().to_owned()))
+            .collect(),
         risks: file
             .security
             .risks
             .into_iter()
-            .map(|r| Risk {
+            .map(|r| TemplateRisk {
                 risk: r.risk.trim().to_owned(),
                 mitigation: r.mitigation.trim().to_owned(),
+                locales: r
+                    .locales
+                    .into_iter()
+                    .map(|(lang, l)| {
+                        let words = RiskLocale {
+                            risk: l.risk.trim().to_owned(),
+                            mitigation: l.mitigation.trim().to_owned(),
+                        };
+                        (lang, words)
+                    })
+                    .collect(),
             })
             .collect(),
         needs_domain: routes_domain,
@@ -975,6 +1028,18 @@ mod tests {
                 .iter()
                 .any(|r| r.risk.contains("first visitor") && !r.mitigation.is_empty())
         );
+    }
+
+    #[test]
+    fn a_template_carries_its_security_words_in_other_languages() {
+        let ghost = template("ghost").unwrap();
+        for lang in ["zh-TW", "zh-CN"] {
+            assert!(!ghost.summary_locales[lang].is_empty());
+            for risk in &ghost.risks {
+                let words = &risk.locales[lang];
+                assert!(!words.risk.is_empty() && !words.mitigation.is_empty());
+            }
+        }
     }
 
     #[test]

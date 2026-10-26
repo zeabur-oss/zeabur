@@ -22,6 +22,8 @@ import {
   shownInputs,
   startValues,
   inputWords,
+  riskWords,
+  summaryWords,
   templateChanges,
   type AppTemplate,
   type TemplateInput,
@@ -391,7 +393,9 @@ function Missing({ template }: { template: AppTemplate }) {
 /** What the template's author says to know before deploying it; the conclusion, then the notes. */
 function Risks({ template }: { template: AppTemplate }) {
   const t = useT()
+  const { locale } = useI18n()
   if (template.risks.length === 0) return null
+  const summary = summaryWords(template, locale)
   return (
     <Collapsible>
       <CollapsibleTrigger variant="disclosure">
@@ -400,15 +404,28 @@ function Risks({ template }: { template: AppTemplate }) {
       </CollapsibleTrigger>
       <CollapsibleContent>
         <p className="pt-1 type-meta text-muted-foreground">{t("add.templateRisksBody")}</p>
-        <ul className="flex flex-col gap-3 pt-2" lang="en" translate="no">
-          {template.risks.map((r) => (
-            <li key={r.risk} className="flex flex-col gap-0.5">
-              <span className="type-body text-main">{r.risk}</span>
-              <span className="type-meta text-secondary">
-                <span className="font-medium">{t("add.templateRiskFix")}</span> {r.mitigation}
-              </span>
-            </li>
-          ))}
+        {summary ? (
+          <p className="pt-2 type-body text-main" lang={summary.english ? "en" : undefined}>
+            {summary.text}
+          </p>
+        ) : null}
+        <ul className="flex flex-col gap-3 pt-2">
+          {template.risks.map((r) => {
+            const words = riskWords(r, locale)
+            return (
+              <li
+                key={r.risk}
+                className="flex flex-col gap-0.5"
+                lang={words.english ? "en" : undefined}
+                translate={words.english ? "no" : undefined}
+              >
+                <span className="type-body text-main">{words.risk}</span>
+                <span className="type-meta text-secondary">
+                  <span className="font-medium">{t("add.templateRiskFix")}</span> {words.mitigation}
+                </span>
+              </li>
+            )
+          })}
         </ul>
       </CollapsibleContent>
     </Collapsible>

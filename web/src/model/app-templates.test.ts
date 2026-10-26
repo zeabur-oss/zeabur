@@ -10,7 +10,9 @@ import {
   inputProblem,
   inputWords,
   listed,
+  riskWords,
   startValues,
+  summaryWords,
   templateChanges,
   type AppTemplate,
   type TemplateInput,
@@ -60,6 +62,7 @@ const template = (patch: Partial<AppTemplate>): AppTemplate => ({
   services: [],
   requests: { cpuMillicores: 150, memoryBytes: 320 * 2 ** 20 },
   inputs: [],
+  summary: "",
   risks: [],
   needsDomain: false,
   needsClusterIssuer: false,
@@ -148,6 +151,31 @@ describe("app templates", () => {
     })
     expect(inputWords(input({ name: "token" }), "en").label).toBe("token")
     expect(startValues(template({ inputs: [email] }))).toEqual({ adminEmail: "" })
+  })
+
+  test("security words are shown in the reader's language, else in English", () => {
+    const risk = {
+      risk: "Open to all.",
+      mitigation: "Add a policy.",
+      locales: { "zh-TW": { risk: "對所有人開放。", mitigation: "加上政策。" } },
+    }
+    expect(riskWords(risk, "zh-TW")).toEqual({
+      risk: "對所有人開放。",
+      mitigation: "加上政策。",
+      english: false,
+    })
+    expect(riskWords(risk, "zh-CN")).toEqual({
+      risk: "Open to all.",
+      mitigation: "Add a policy.",
+      english: true,
+    })
+    const said = template({
+      summary: "Runs restricted.",
+      summaryLocales: { "zh-TW": "受限執行。" },
+    })
+    expect(summaryWords(said, "zh-TW")).toEqual({ text: "受限執行。", english: false })
+    expect(summaryWords(said, "en")).toEqual({ text: "Runs restricted.", english: true })
+    expect(summaryWords(template({ summary: "" }), "en")).toBeUndefined()
   })
 
   test("generated values sharing a Secret go in one create, before the template", () => {

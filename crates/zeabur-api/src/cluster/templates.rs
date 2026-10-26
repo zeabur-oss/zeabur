@@ -49,8 +49,14 @@ pub struct TemplateView {
     pub requests: Requests,
     /// What a person gives or the browser generates.
     pub inputs: Vec<TemplateInput>,
-    /// What to know before deploying it, with how to contain each. In English.
-    pub risks: Vec<zeabur_catalog::install::Risk>,
+    /// What to know before deploying it, in one paragraph, in English; empty when it has none.
+    pub summary: String,
+    /// The summary in other languages (`zh-TW`, `zh-CN`).
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    pub summary_locales: BTreeMap<String, String>,
+    /// What to know before deploying it, with how to contain each. In English, with the other
+    /// languages in `locales`.
+    pub risks: Vec<zeabur_catalog::templates::TemplateRisk>,
     /// It routes a domain: a deploy gives one.
     pub needs_domain: bool,
     /// It asks cert-manager for certificates through the cluster's issuer
@@ -174,6 +180,8 @@ fn view(
         labels: template.labels,
         services: template.services,
         inputs: template.inputs,
+        summary: template.summary,
+        summary_locales: template.summary_locales,
         risks: template.risks,
         needs_domain: template.needs_domain,
         needs_cluster_issuer: template.needs_cluster_issuer,

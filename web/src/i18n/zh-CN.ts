@@ -173,6 +173,7 @@ export const zhCN: Messages = {
   "status.rolloutStuck": "部署卡住",
   "status.failed": "失败",
   "status.building": "构建中",
+  "status.waitingUpload": "等待上传",
   "status.scaledToZero": "已缩容到 0",
   "status.completed": "已完成",
   "status.unknown": "未知",
@@ -2382,7 +2383,7 @@ export const zhCN: Messages = {
   "add.templateInputDefault": (value) => `留空会用 ${value}。`,
   "add.templateOptional": "选填",
   "add.templateRisks": (n) => `部署前要了解的事（${n}）`,
-  "add.templateRisksBody": "这些说明由模板作者撰写，目前只有英文。",
+  "add.templateRisksBody": "这些说明由模板作者撰写。",
   "add.templateRiskFix": "怎么处理",
   "add.composeTitle": "导入 Docker Compose",
   "add.composeBody": (project) =>

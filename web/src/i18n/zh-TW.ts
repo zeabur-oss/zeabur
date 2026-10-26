@@ -173,6 +173,7 @@ export const zhTW: Messages = {
   "status.rolloutStuck": "部署卡住",
   "status.failed": "失敗",
   "status.building": "建置中",
+  "status.waitingUpload": "等待上傳",
   "status.scaledToZero": "已縮為 0",
   "status.completed": "已完成",
   "status.unknown": "未知",
@@ -2386,7 +2387,7 @@ export const zhTW: Messages = {
   "add.templateInputDefault": (value) => `留空會用 ${value}。`,
   "add.templateOptional": "選填",
   "add.templateRisks": (n) => `部署前要知道的事（${n}）`,
-  "add.templateRisksBody": "這些說明由範本作者撰寫，目前只有英文。",
+  "add.templateRisksBody": "這些說明由範本作者撰寫。",
   "add.templateRiskFix": "怎麼處理",
   "add.composeTitle": "匯入 Docker Compose",
   "add.composeBody": (project) =>
