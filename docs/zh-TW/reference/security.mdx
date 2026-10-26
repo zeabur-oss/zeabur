@@ -222,6 +222,8 @@ tools Pod 預設最多執行 30 分鐘。最後一個終端機關閉時，Zeabur
 
 能透過 `services/proxy` 查詢 metrics store 的人，也查得到同一個 metrics store 裡其他專案的指標。
 
+Zeabur Proxy 啟用後，用量歷史改由它讀取預設的 metrics store。使用者要能在該 Namespace `get metrics.proxy.zeabur.com`，每個查詢也會加上 VictoriaMetrics 的 `extra_label=namespace=<Namespace>`，所以只拿得到這個 Namespace 的 series。Proxy 只開放查詢、範圍查詢、series、label 名稱和 label 值這幾個 API，匯出、federate 和 TSDB 狀態都拒絕。專案沒有權限建立 VMServiceScrape 這類抓取設定，不能替別的 Namespace 寫入指標。範圍選擇器、subquery 和 `offset` 會讀到查詢起點之前的資料，所以刪掉後再用同名重建的 Namespace，可能看到前一個 Namespace 剛建立前後的用量。
+
 Zeabur Proxy 啟用後（chart 預設關閉，安裝器在裝了 VictoriaLogs 時會打開），使用者要能在該 Namespace `get logs.proxy.zeabur.com`，才讀得到它的歷史日誌，查詢也只限於這個 Namespace。VictoriaLogs 本身如果能直接連線，就能繞過這層檢查，要另外限制。
 
 防止專案用假標籤冒充別人的日誌，靠的是 VictoriaLogs 會把 stream 欄位重複的整行丟掉。這是它的副作用，不是它保證的行為，升級 VictoriaLogs 後要再確認。

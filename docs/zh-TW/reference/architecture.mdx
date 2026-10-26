@@ -59,7 +59,7 @@ Helm、Argo CD、Flux 管理的物件，Zeabur 只接受重新啟動，其他修
 
 ## 狀態與歷史紀錄從哪裡來
 
-即時 CPU 和記憶體用量來自 metrics-server。用量歷史、節點磁碟和磁碟區用量來自支援 Prometheus HTTP API 的 metrics store，Zeabur 以使用者的權限透過 Kubernetes Service proxy 查詢。
+即時 CPU 和記憶體用量來自 metrics-server。用量歷史、節點磁碟和磁碟區用量來自支援 Prometheus HTTP API 的 metrics store，Zeabur 以使用者的權限透過 Kubernetes Service proxy 查詢。啟用 Zeabur Proxy 時，用量歷史改由 Proxy 依專案權限查詢預設的 metrics store。
 
 **部署紀錄** 來自工作負載保留的修訂版本，時間和修改者來自事件、容器狀態和 `managedFields`。叢集清掉的修訂版本、超過保留期的事件，Zeabur 也讀不到。
 

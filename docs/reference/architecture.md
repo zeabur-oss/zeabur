@@ -132,7 +132,9 @@ namespace.
 
 CPU and memory use come from metrics-server (`metrics.k8s.io`). Everything else measured
 comes from the metrics store, a Service serving the Prometheus HTTP API, read through
-kube-apiserver's service proxy as the person (`get` on its `services/proxy`):
+kube-apiserver's service proxy as the person (`get` on its `services/proxy`). With Zeabur Proxy,
+history from the default store goes through the proxy instead, held to the project's namespace
+(`get` on `metrics.proxy.zeabur.com`):
 
 - **History**: range queries over the series the store keeps.
 - **Node disk**: node-exporter's `node_filesystem_size_bytes`, `node_filesystem_avail_bytes`

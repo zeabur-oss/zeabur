@@ -213,6 +213,15 @@ metrics for volume use; VictoriaMetrics' k8s-stack chart and kube-prometheus-sta
 by default. Zeabur Catalog's single-node VictoriaMetrics profile turns node-exporter off, so
 there the cluster page says node disk use is not collected. Nobody needs `nodes/proxy`.
 
+With `proxy.enabled`, a service's use history from the default store is read through Zeabur
+Proxy instead (`proxy.metrics`): it reads only the project's namespace, adding
+`extra_label=namespace=<project>` to every query, and only for people who may `get`
+`metrics.proxy.zeabur.com` there. The chart's `zeabur-proxy-metrics-reader` gives that to
+project Viewers and Developers and to Kubernetes' `view`, `edit` and `admin`, who already read
+the pods' current use. The proxy reads the store named by `metricsStore.service` (which then
+needs a port number) and reaches only the pods `proxy.metrics.podLabels` names. A store chosen
+later in Settings is read directly, as above.
+
 ### Log history
 
 The installer sets `proxy.enabled=true` when it installs VictoriaLogs. With it, the Logs tab also shows lines from replicas that are gone, read from

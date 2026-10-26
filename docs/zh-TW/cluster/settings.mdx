@@ -35,7 +35,7 @@ description: 在設定頁改叢集名稱、用量歷史的來源和登入設定�
 
 ## 選擇用量歷史的來源
 
-服務和節點的 **用量** 圖表、磁碟用量，都從一個支援 Prometheus HTTP API 的儲存服務讀取。Zeabur 透過 Kubernetes API，以每個人自己的權限讀它。
+服務和節點的 **用量** 圖表、磁碟用量，都從一個支援 Prometheus HTTP API 的儲存服務讀取。Zeabur 透過 Kubernetes API，以每個人自己的權限讀它。開啟 Zeabur Proxy 時，服務的用量歷史改由 Proxy 讀取預設的儲存服務，專案成員只看得到自己專案的指標。
 
 到 **設定** → **用量歷史**，**歷史資料來源** 填入它的 Service，格式是 `namespace/name:port`。預設是 Zeabur 推薦的 VictoriaMetrics：`observability/vmsingle-vm-victoria-metrics-k8s-stack:8428`。按 **儲存** 後，**狀態** 會顯示：
 
@@ -46,7 +46,7 @@ description: 在設定頁改叢集名稱、用量歷史的來源和登入設定�
 | **沒有權限** | 你不能透過 Kubernetes API 讀這個 Service。 |
 | **沒有回應** | Service 存在，但沒有回應 Prometheus API 的查詢。 |
 
-能讀取儲存服務的人，就能看到所有專案的指標，所以只開放給可以檢視整個叢集的人。按 **改回預設** 就回到安裝時的設定。
+能直接讀取儲存服務的人，就能看到所有專案的指標，所以只開放給可以檢視整個叢集的人。改用其他儲存服務後，Zeabur Proxy 不會讀它，專案成員就看不到用量歷史，只剩能直接讀取的人看得到。按 **改回預設** 就回到安裝時的設定。
 
 ## 設定新服務的網域
 
