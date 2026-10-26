@@ -23,6 +23,7 @@
               "spec": {
                 "restartPolicy": "Never",
                 "serviceAccountName": "web",
+                "automountServiceAccountToken": false,
                 "containers": [{
                   "name": "app",
                   "image": "example/web:1.0",

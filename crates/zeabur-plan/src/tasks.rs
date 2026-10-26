@@ -44,8 +44,9 @@ const KEPT_CONTAINER: [&str; 9] = [
 ];
 
 /// The pod fields a task keeps from the service's pod; `volumes` is filtered apart.
-const KEPT_POD: [&str; 6] = [
+const KEPT_POD: [&str; 7] = [
     "serviceAccountName",
+    "automountServiceAccountToken",
     "securityContext",
     "imagePullSecrets",
     "nodeSelector",

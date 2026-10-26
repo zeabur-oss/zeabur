@@ -13,6 +13,7 @@ spec:
       labels: {app: web}
     spec:
       serviceAccountName: web
+      automountServiceAccountToken: false
       containers:
         - name: app
           image: example/web:1.0

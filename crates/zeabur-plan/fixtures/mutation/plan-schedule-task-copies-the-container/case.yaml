@@ -1,3 +1,3 @@
-description: "A scheduled task copies the service's container with the person's command, and only the volumes it mounts; the pod labels are the task's own, so the service's Service does not select its pods."
+description: "A scheduled task copies the service's container with the person's command, keeps the service account settings, and only the volumes it mounts; the pod labels are the task's own, so the service's Service does not select its pods."
 operation: mutation.plan
 params: {"request": {"changes": [{"op": "scheduleTask", "from": {"kind": "Deployment", "name": "web"}, "container": "app", "name": "web-cleanup", "schedule": "0 3 * * *", "command": "bin/cleanup --days 30"}]}}
