@@ -13,7 +13,7 @@ same place. It removes the project label only.
 - You need the right to delete the namespace (`delete namespaces/<project>`) and the database
   objects in it. The review lists any right you lack, and the cluster refuses the apply.
 - Zeabur's own namespaces, `kube-*` namespaces, components the installer put in (labelled
-  `installer.zeabur.com/baseline=true`) and `zeabur-terminals` can't be deleted here.
+  `zeabur.com/platform=true`) and `zeabur-terminals` can't be deleted here.
 
 ## Review what goes
 

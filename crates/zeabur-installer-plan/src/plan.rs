@@ -22,7 +22,7 @@ use crate::{PlanError, values};
 pub const MANAGER: &str = "zeabur-installer";
 /// The label the baseline policies let traffic in from. `app.kubernetes.io/managed-by` cannot be
 /// it: a product that labels its own namespace, as Zeabur Identity does, takes that one over.
-pub const BASELINE_LABEL: &str = "installer.zeabur.com/baseline";
+pub const BASELINE_LABEL: &str = "zeabur.com/platform";
 /// The field manager that applies the installer's labels on namespaces, and nothing else. Its own
 /// manager keeps them when other manifests that hold the same namespace are applied.
 pub const NAMESPACE_MANAGER: &str = "zeabur-installer-namespaces";

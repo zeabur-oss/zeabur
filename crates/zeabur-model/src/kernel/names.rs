@@ -49,7 +49,7 @@ pub const NODE_SHELL_NAMESPACE: &str = "zeabur-node-shell";
 
 /// The label `zeabur-installer` puts on the namespace of each component it sets up, with the
 /// value `"true"`. Such a namespace is never deleted as a project.
-pub const LABEL_BASELINE: &str = "installer.zeabur.com/baseline";
+pub const LABEL_BASELINE: &str = "zeabur.com/platform";
 
 /// The name of every debug container Zeabur adds starts with this.
 pub const DEBUG_PREFIX: &str = "zeabur-debug-";

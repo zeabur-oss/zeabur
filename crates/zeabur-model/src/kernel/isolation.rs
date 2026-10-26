@@ -19,7 +19,7 @@ pub const PROJECT_POLICY: &str = "zeabur-project";
 /// The label on the namespaces of the platform: the ingress controller, metrics collectors and
 /// database operators. zeabur-installer sets it on each namespace it makes (its
 /// `BASELINE_LABEL`).
-pub const PLATFORM_LABEL: &str = "installer.zeabur.com/baseline";
+pub const PLATFORM_LABEL: &str = "zeabur.com/platform";
 
 /// The namespace label the API server sets to the namespace's name.
 pub const NAMESPACE_NAME_LABEL: &str = "kubernetes.io/metadata.name";

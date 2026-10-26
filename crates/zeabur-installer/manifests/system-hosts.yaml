@@ -34,8 +34,8 @@ spec:
     - name: system
       expression: >-
         has(namespaceObject.metadata.labels) &&
-        'installer.zeabur.com/baseline' in namespaceObject.metadata.labels &&
-        namespaceObject.metadata.labels['installer.zeabur.com/baseline'] == 'true'
+        'zeabur.com/platform' in namespaceObject.metadata.labels &&
+        namespaceObject.metadata.labels['zeabur.com/platform'] == 'true'
     - name: owner
       expression: request.namespace == params.metadata.namespace
     # The domains of the request and of the parameter, as lists of host lists.

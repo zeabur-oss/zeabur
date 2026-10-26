@@ -7,7 +7,7 @@ describe("isolation", () => {
     const from = projectPolicy("shop").spec.ingress[0]?.from
     expect(from).toEqual([
       { podSelector: {} },
-      { namespaceSelector: { matchLabels: { "installer.zeabur.com/baseline": "true" } } },
+      { namespaceSelector: { matchLabels: { "zeabur.com/platform": "true" } } },
       { namespaceSelector: { matchLabels: { "kubernetes.io/metadata.name": "kube-system" } } },
     ])
   })

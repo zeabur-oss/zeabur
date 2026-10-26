@@ -129,7 +129,7 @@ import() {
 
 # Marks namespaces as the platform's, as zeabur-installer does: a project's NetworkPolicy lets
 # them in, and only then does Zeabur write one.
-platform() { kubectl label namespace "$@" installer.zeabur.com/baseline=true --overwrite >/dev/null; }
+platform() { kubectl label namespace "$@" zeabur.com/platform=true --overwrite >/dev/null; }
 
 # Runs the Helm commands Zeabur Catalog gives for a component (Cluster → Components) and waits for
 # its deployments.

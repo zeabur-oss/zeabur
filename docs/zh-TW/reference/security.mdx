@@ -93,12 +93,12 @@ Zeabur 的信任範圍是整個叢集：能登入的人都是可信任的使用�
 
 ### 新專案裡有什麼
 
-用 installer 安裝的叢集，平台元件所在的 Namespace 都有 `installer.zeabur.com/baseline: "true"` 標籤。叢集裡有這個標籤時，Zeabur 建立專案會寫入兩個物件：
+用 installer 安裝的叢集，平台元件所在的 Namespace 都有 `zeabur.com/platform: "true"` 標籤。叢集裡有這個標籤時，Zeabur 建立專案會寫入兩個物件：
 
 - Namespace，帶 `zeabur.com/project` 標籤和 Pod Security 標籤。
 - NetworkPolicy `zeabur-project`：專案裡每個 Pod 都只收以下來源的連線，往外的連線不限制。
   - 同一個專案的 Pod。
-  - 帶 `installer.zeabur.com/baseline: "true"` 的 Namespace，也就是 Ingress controller、指標收集和資料庫 operator 這些平台元件。
+  - 帶 `zeabur.com/platform: "true"` 的 Namespace，也就是 Ingress controller、指標收集和資料庫 operator 這些平台元件。
   - `kube-system`，k3s 的 Traefik 和 ServiceLB 在這裡。
 
 ```yaml
@@ -114,7 +114,7 @@ spec:
     - from:
         - podSelector: {}
         - namespaceSelector:
-            matchLabels: {installer.zeabur.com/baseline: "true"}
+            matchLabels: {zeabur.com/platform: "true"}
         - namespaceSelector:
             matchLabels: {kubernetes.io/metadata.name: kube-system}
 ```
@@ -124,7 +124,7 @@ spec:
 叢集裡沒有任何 Namespace 帶這個標籤時（例如在既有叢集上直接執行 `zeaburctl ui`），Zeabur 分不出哪些 Namespace 是平台元件，所以不寫 NetworkPolicy，以免擋掉 Ingress controller。要啟用，先替平台元件的 Namespace 加上標籤：
 
 ```sh
-kubectl label namespace traefik cert-manager installer.zeabur.com/baseline=true
+kubectl label namespace traefik cert-manager zeabur.com/platform=true
 ```
 
 NetworkPolicy 要叢集的網路外掛（CNI）支援才會生效。RKE2 的 Canal 和 k3s 內建的 kube-router 都支援；KubeSolo 的 bridge CNI 不支援，寫了也不會擋任何連線。
@@ -259,7 +259,7 @@ RKE2 在檔案到 100 MB 時換新檔，最多留 10 個舊檔，最長 30 天�
 - 不能用涵蓋這些網域的萬用網域。例如 Zeabur 在 `zeabur.example.com` 時，政策會擋下 `*.example.com`。
 - Ingress 的每條規則都要寫 `host`，HTTPRoute 至少要有一個 `hostnames`。路由沒寫網域時，會接下每個網域的請求，包括 Zeabur 的。
 
-政策直接讀這兩個 Namespace 的 Ingress，Zeabur 或 Zeabur Identity 換網域時不用改政策。installer 建立的 Namespace（標籤 `installer.zeabur.com/baseline: "true"`）可以不寫網域，但一樣不能用 Zeabur 和 Zeabur Identity 的網域。只改標籤或 annotation、沒動 `spec` 的更新不檢查。管理員也受這條政策限制。
+政策直接讀這兩個 Namespace 的 Ingress，Zeabur 或 Zeabur Identity 換網域時不用改政策。installer 建立的 Namespace（標籤 `zeabur.com/platform: "true"`）可以不寫網域，但一樣不能用 Zeabur 和 Zeabur Identity 的網域。只改標籤或 annotation、沒動 `spec` 的更新不檢查。管理員也受這條政策限制。
 
 政策只在寫入時檢查，安裝前就有的路由會留著。用下面的指令找出用到 Zeabur 網域或沒寫網域的 Ingress，再自己處理：
 

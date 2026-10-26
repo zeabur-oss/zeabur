@@ -2,7 +2,7 @@
 // `isolation` writes them. https://kubernetes.io/docs/concepts/services-networking/network-policies/
 
 const PROJECT_POLICY = "zeabur-project"
-const PLATFORM_LABEL = "installer.zeabur.com/baseline"
+const PLATFORM_LABEL = "zeabur.com/platform"
 const NAME_LABEL = "kubernetes.io/metadata.name"
 
 export const networkPolicies = {

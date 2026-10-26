@@ -20,10 +20,11 @@ holding any power of its own. It is a projection: Kubernetes objects are the onl
   build method. Switching profiles changes only the service and needs no admin rights; Developers
   still cannot change Namespace labels
   ([Members' rights](../get-started/install.md#members-rights)).
-  When some namespace carries `installer.zeabur.com/baseline: "true"`, creating a project also
+  When some namespace carries `zeabur.com/platform: "true"`, creating a project also
   writes the NetworkPolicy `zeabur-project` (`zeabur-model`'s `kernel::isolation`): ingress only from the
   project, the labelled platform namespaces and `kube-system`, egress open. Without the label
-  nothing tells which namespaces the platform runs in, so no policy is written.
+  nothing tells which namespaces the platform runs in, so no policy is written. On an existing
+  cluster, label them yourself: `kubectl label namespace <ns> zeabur.com/platform=true`.
   `GET /api/v1/cluster/gaps` names the project namespaces without it. The trust boundary is the
   cluster: everyone who signs in is trusted, and the policy only limits the damage one compromised
   service can do.

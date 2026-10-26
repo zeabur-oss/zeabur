@@ -10,7 +10,7 @@ description: 刪除專案的 Namespace 和裡面的所有東西，先看清楚�
 ## 開始前
 
 - 你要能刪除這個 Namespace（`delete namespaces/<專案>`），也要能刪除裡面的資料庫物件。少了哪一項，檢查畫面會列出來，套用時叢集也會拒絕。
-- Zeabur 自己的 Namespace、`kube-` 開頭的系統 Namespace、installer 裝的元件（標了 `installer.zeabur.com/baseline=true`）和 `zeabur-terminals` 都不能從這裡刪除。
+- Zeabur 自己的 Namespace、`kube-` 開頭的系統 Namespace、installer 裝的元件（標了 `zeabur.com/platform=true`）和 `zeabur-terminals` 都不能從這裡刪除。
 
 ## 檢查要刪的東西
 

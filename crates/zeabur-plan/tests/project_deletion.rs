@@ -249,7 +249,7 @@ mod tests {
                 "a component's",
                 namespace(
                     "traefik",
-                    &json!({"zeabur.com/project": "true", "installer.zeabur.com/baseline": "true"}),
+                    &json!({"zeabur.com/project": "true", "zeabur.com/platform": "true"}),
                 ),
                 "component_namespace",
             ),

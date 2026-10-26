@@ -8,7 +8,7 @@ metadata:
   name: local-path-storage
   labels:
     app.kubernetes.io/managed-by: zeabur-installer
-    installer.zeabur.com/baseline: "true"
+    zeabur.com/platform: "true"
     # Helper pods mount the volume directory from the host.
     pod-security.kubernetes.io/enforce: privileged
     pod-security.kubernetes.io/warn: privileged

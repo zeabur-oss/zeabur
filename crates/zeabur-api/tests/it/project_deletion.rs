@@ -62,7 +62,7 @@ mod tests {
                 namespace(
                     "traefik",
                     &json!({"metadata": {"labels": {
-                    "zeabur.com/project": "true", "installer.zeabur.com/baseline": "true"}}}),
+                    "zeabur.com/project": "true", "zeabur.com/platform": "true"}}}),
                 ),
             ],
             objects: [

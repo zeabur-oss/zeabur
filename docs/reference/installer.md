@@ -54,7 +54,7 @@ interrupted install or repairs drift.
    host's namespaces. Every namespace except the ingress namespace gets a baseline `NetworkPolicy`:
    traffic may come in from the same namespace, from the installer's other namespaces and from
    the nodes, and from nowhere else. The installer's namespaces carry the label
-   `installer.zeabur.com/baseline: "true"`, which the policies select, and the installer applies
+   `zeabur.com/platform: "true"`, which the policies select, and the installer applies
    namespaces under their own field manager, so a component's own namespace labels (Zeabur
    Identity's `app.kubernetes.io/managed-by`, for one) are merged rather than replaced.
    RKE2's CIS profile adds `kube-system/default-network-policy`, which lets in only pods of
@@ -196,7 +196,7 @@ are backed up.
   ValidatingAdmissionPolicy `zeabur-system-hosts` refuses an Ingress or HTTPRoute in another
   namespace that names a domain an Ingress in `zeabur` or `zeabur-identity` serves, in a rule or
   in `spec.tls`, or a wildcard that covers one. Outside the installer's namespaces (labelled
-  `installer.zeabur.com/baseline`), every Ingress rule needs a `host` and every HTTPRoute a
+  `zeabur.com/platform`), every Ingress rule needs a `host` and every HTTPRoute a
   hostname: Traefik serves a rule without one on every domain, and a longer path or
   `router.priority` puts it ahead of Zeabur's. The domains are read from those Ingresses, so a
   new domain needs no change. Only a change to `spec` is checked, and routes made before stay.
