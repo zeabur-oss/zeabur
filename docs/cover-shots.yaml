@@ -20,6 +20,6 @@ shots:
       - click: '[data-slot="dialog-content"] [data-slot="switch"]'
       - wait: '[data-slot="dialog-content"] input[value$="example.com"]'
       - click: '[data-slot="dialog-footer"] button:last-child'
-      - click: '[data-slot="dialog-body"] > :not([hidden]) [data-slot="collapsible-trigger"]'
+      - click: '[data-slot="dialog-body"] > :not([hidden]) button:text-is("YAML")'
     locales: [en]
     themes: [light, dark]

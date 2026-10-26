@@ -74,7 +74,7 @@ shots:
       - fill: '[data-slot="tabs-content"] input[data-slot="input"] >> nth=1'
         value: staging
       - click: '[data-slot="draft-bar"] button[data-slot="button"]:last-child'
-      - click: '[role="dialog"] [data-slot="collapsible-trigger"]'
+      - click: '[role="dialog"] button:text-is("YAML")'
       - wait: '[role="dialog"] pre, [role="dialog"] code'
     clip: '[role="dialog"]'
     themes: [light, dark]

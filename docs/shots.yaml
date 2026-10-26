@@ -170,7 +170,7 @@
     - click: '[data-slot="dialog-content"] li:has(label[for$="-shop"]) [data-slot="select-trigger"]'
     - click: '[role="option"]:not([aria-selected="true"])'
     - click: '[data-slot="dialog-content"] > div:last-child button:last-child'
-    - wait: '[data-slot="dialog-content"] [data-slot="collapsible-trigger"]'
+    - wait: '[data-slot="dialog-content"] button:text-is("YAML")'
   clip: '[data-slot="dialog-content"]'
 - id: members-invite-link
   path: /members
@@ -180,7 +180,7 @@
       value: erin
     - click: '[data-slot="dialog-content"] label[for$="-shop"]'
     - click: '[data-slot="dialog-content"] > div:last-child button:last-child'
-    - wait: '[data-slot="dialog-content"] [data-slot="collapsible-trigger"]'
+    - wait: '[data-slot="dialog-content"] button:text-is("YAML")'
     - click: '[data-slot="dialog-content"] > div:last-child button:last-child'
     - wait: '[data-slot="dialog-content"] [data-slot="copy-input"]'
   clip: '[data-slot="dialog-content"]'
@@ -216,7 +216,7 @@
     - fill: '#s3-destinations form input[type="password"]'
       value: demo-new-secret-key
     - click: '#s3-destinations form button[type="submit"]'
-    - wait: '[data-slot="dialog-content"] [data-slot="collapsible-trigger"]'
+    - wait: '[data-slot="dialog-content"] button:text-is("YAML")'
   clip: '[data-slot="dialog-content"]'
 - id: backup-location-form
   path: /cluster/backups
@@ -265,14 +265,14 @@
     - click: '#backup-list li:has(form) [data-slot="select-trigger"]'
     - click: '[role="option"]:not([aria-selected="true"])'
     - click: '#backup-list li:has(form) button[type="submit"]'
-    - wait: '[data-slot="dialog-content"] [data-slot="collapsible-trigger"]'
+    - wait: '[data-slot="dialog-content"] button:text-is("YAML")'
   clip: '[data-slot="dialog-content"]'
 - id: backup-attach
   path: /cluster/backups
   wait: '#restore-list'
   steps:
     - click: '#restore-list [data-testid="attach-domains"]'
-    - wait: '[data-slot="dialog-content"] [data-slot="collapsible-trigger"]'
+    - wait: '[data-slot="dialog-content"] button:text-is("YAML")'
   clip: '[data-slot="dialog-content"]'
 # Maintenance mode of one domain (docs/zh-TW/configure/maintenance.mdx).
 - id: domain-pages-open
@@ -296,7 +296,7 @@
     - click: '[data-slot="dialog-content"] [data-slot="switch"]'
     - click: '[data-slot="dialog-footer"] button:last-child'
     - click: '[data-slot="draft-bar"] button:last-child'
-    - wait: '[data-slot="dialog-content"] [data-slot="collapsible-trigger"]'
+    - wait: '[data-slot="dialog-content"]:has-text("shop.example.com")'
   clip: '[data-slot="dialog-content"]'
 - id: domain-maintenance-on
   path: /projects/shop/services/Deployment/web?tab=networking
@@ -306,7 +306,7 @@
     - click: '[data-slot="dialog-content"] [data-slot="switch"]'
     - click: '[data-slot="dialog-footer"] button:last-child'
     - click: '[data-slot="draft-bar"] button:last-child'
-    - wait: '[data-slot="dialog-content"] [data-slot="collapsible-trigger"]'
+    - wait: '[data-slot="dialog-content"] button:text-is("YAML")'
     - click: '[data-slot="dialog-content"] > div:last-child button:last-child'
     - wait: '[data-testid="in-maintenance"]'
   clip: 'section[aria-labelledby="net-public"]'
@@ -328,8 +328,8 @@
     - fill: '[data-slot="dialog-content"] input'
       value: hello
     - click: '[data-slot="dialog-content"] button[type="submit"]'
-    - wait: '[data-slot="dialog-content"] [data-slot="collapsible-trigger"]'
-  clip: '[data-slot="dialog-content"]:has([data-slot="collapsible-trigger"])'
+    - wait: '[data-slot="dialog-content"] button:text-is("YAML")'
+  clip: '[data-slot="dialog-content"]:has(button:text-is("YAML"))'
 - id: image-form
   path: /projects/edge
   wait: '[data-testid="add"]'
@@ -356,7 +356,7 @@
     - click: '[data-slot="dialog-content"] [data-slot="switch"]'
     - wait: '[data-slot="dialog-content"] input[value$="apps.example.com"]'
     - click: '[data-slot="dialog-footer"] button:last-child'
-    - wait: '[data-slot="dialog-body"] > :not([hidden]) [data-slot="collapsible-trigger"]'
+    - wait: '[data-slot="dialog-body"] > :not([hidden]) button:text-is("YAML")'
   clip: '[data-slot="dialog-content"]'
 # Git (docs/zh-TW/deploy/git.mdx); Keel makes Deploy from Git available.
 - id: git-form
@@ -464,5 +464,5 @@
       value: app.example.com
     - click: 'section[aria-labelledby="net-public"] form button[type="submit"]'
     - click: '[data-slot="draft-bar"] button:last-child'
-    - wait: '[data-slot="dialog-content"] [data-slot="collapsible-trigger"]'
+    - wait: '[data-slot="dialog-content"] button:text-is("YAML")'
   clip: '[data-slot="dialog-content"]'
