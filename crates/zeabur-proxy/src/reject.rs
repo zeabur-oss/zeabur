@@ -39,6 +39,9 @@ pub enum Reject {
     /// `limit` is not a positive integer.
     #[error("limit must be a positive integer")]
     InvalidLimit,
+    /// `step` is not a whole number of seconds from 1, or makes too many points.
+    #[error("step must be whole seconds from 1, with at most 11000 points in the range")]
+    InvalidStep,
     /// `query` is too long or holds control characters.
     #[error("query is too long or holds control characters")]
     InvalidQuery,
@@ -75,6 +78,7 @@ impl Reject {
             | Self::InvalidNamespace
             | Self::InvalidTime
             | Self::InvalidLimit
+            | Self::InvalidStep
             | Self::InvalidQuery
             | Self::BeforeNamespace => StatusCode::BAD_REQUEST,
             Self::Forbidden => StatusCode::FORBIDDEN,
@@ -99,6 +103,7 @@ impl Reject {
             Self::InvalidNamespace => "invalid_namespace",
             Self::InvalidTime => "invalid_time",
             Self::InvalidLimit => "invalid_limit",
+            Self::InvalidStep => "invalid_step",
             Self::InvalidQuery => "invalid_query",
             Self::BeforeNamespace => "before_namespace",
             Self::Forbidden => "forbidden",

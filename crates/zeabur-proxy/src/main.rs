@@ -14,6 +14,7 @@ use clap::Parser;
 use k8s_openapi::jiff::SignedDuration;
 use zeabur_proxy::access::KubeReviewer;
 use zeabur_proxy::logs::LogsLimits;
+use zeabur_proxy::metrics::MetricsLimits;
 use zeabur_proxy::server::{self, BackendConfig, Proxy, Settings};
 
 /// Reads shared backends for one namespace at a time, as the person asking.
@@ -39,6 +40,14 @@ struct Args {
     /// The longest range one log query covers, in hours.
     #[arg(long, env = "ZEABUR_PROXY_LOGS_MAX_HOURS", default_value_t = 24 * 7)]
     logs_max_hours: i64,
+    /// VictoriaMetrics' (or another Prometheus API's with `extra_label`) base URL, such as
+    /// `http://vmsingle-vm-victoria-metrics-k8s-stack.observability.svc:8428`. Unset: `/metrics/`
+    /// is not served.
+    #[arg(long, env = "ZEABUR_PROXY_METRICS_URL")]
+    metrics_url: Option<http::Uri>,
+    /// The longest range one metrics query covers, in hours.
+    #[arg(long, env = "ZEABUR_PROXY_METRICS_MAX_HOURS", default_value_t = 24 * 7)]
+    metrics_max_hours: i64,
     /// How long a backend may take to answer, in seconds.
     #[arg(long, env = "ZEABUR_PROXY_TIMEOUT", default_value_t = 30)]
     timeout: u64,
@@ -124,26 +133,27 @@ async fn run(args: Args) -> Result<(), String> {
     let reviewer =
         KubeReviewer::in_cluster(REVIEW_TIMEOUT, Duration::from_secs(args.review_cache))?;
     let timeout = Duration::from_secs(args.timeout);
-    let logs = match args.logs_url {
-        Some(url) if url.scheme_str() == Some("http") && url.host().is_some() => {
-            Some(BackendConfig {
-                url,
-                limits: LogsLimits {
-                    max_limit: args.logs_max_limit,
-                    max_span: SignedDuration::from_hours(args.logs_max_hours),
-                    ..LogsLimits::default()
-                },
-                timeout,
-                max_bytes: args.max_bytes,
-            })
-        }
-        Some(url) => {
-            return Err(format!(
-                "the logs URL must be http://host[:port], not {url}"
-            ));
-        }
-        None => None,
-    };
+    let logs = backend(
+        "logs",
+        args.logs_url,
+        LogsLimits {
+            max_limit: args.logs_max_limit,
+            max_span: SignedDuration::from_hours(args.logs_max_hours),
+            ..LogsLimits::default()
+        },
+        timeout,
+        args.max_bytes,
+    )?;
+    let metrics = backend(
+        "metrics",
+        args.metrics_url,
+        MetricsLimits {
+            max_span: SignedDuration::from_hours(args.metrics_max_hours),
+            ..MetricsLimits::default()
+        },
+        timeout,
+        args.max_bytes,
+    )?;
     let tls = match (args.tls_cert, args.tls_key) {
         (Some(cert), Some(key)) => Some(tokio_rustls::TlsAcceptor::from(Arc::new(
             zeabur_proxy::tls::Reloading::new(cert, key)?.config(),
@@ -160,6 +170,7 @@ async fn run(args: Args) -> Result<(), String> {
         reviewer,
         Settings {
             logs,
+            metrics,
             max_inflight: args.max_inflight,
             max_inflight_per_person: args.max_inflight_per_person,
         },
@@ -171,6 +182,29 @@ async fn run(args: Args) -> Result<(), String> {
     tokio::select! {
         served = server::serve(listener, tls, proxy) => served.map_err(|e| e.to_string()),
         () = stopped() => Ok(()),
+    }
+}
+
+fn backend<L>(
+    name: &str,
+    url: Option<http::Uri>,
+    limits: L,
+    timeout: Duration,
+    max_bytes: u64,
+) -> Result<Option<BackendConfig<L>>, String> {
+    match url {
+        Some(url) if url.scheme_str() == Some("http") && url.host().is_some() => {
+            Ok(Some(BackendConfig {
+                url,
+                limits,
+                timeout,
+                max_bytes,
+            }))
+        }
+        Some(url) => Err(format!(
+            "the {name} URL must be http://host[:port], not {url}"
+        )),
+        None => Ok(None),
     }
 }
 

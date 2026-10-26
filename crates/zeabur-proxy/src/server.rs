@@ -16,6 +16,7 @@ use tokio_rustls::TlsAcceptor;
 use crate::access::{Reviewer, Token};
 use crate::audit::{Audit, Inflight};
 use crate::logs::{Logs, LogsLimits};
+use crate::metrics::{Metrics, MetricsLimits};
 use crate::reject::Reject;
 use crate::rules::{Authorized, Backend, Scoped as _};
 use crate::upstream::{self, Answer, Capped, Client};
@@ -41,6 +42,8 @@ pub struct BackendConfig<L> {
 pub struct Settings {
     /// VictoriaLogs, when one is configured.
     pub logs: Option<BackendConfig<LogsLimits>>,
+    /// VictoriaMetrics, when one is configured.
+    pub metrics: Option<BackendConfig<MetricsLimits>>,
     /// Queries in flight for the whole proxy.
     pub max_inflight: usize,
     /// Queries in flight for one person.
@@ -88,6 +91,16 @@ impl<R: Reviewer> Proxy<R> {
                 match &self.settings.logs {
                     Some(config) => {
                         self.serve::<Logs>(config, &method, &uri, &token, &mut audit)
+                            .await
+                    }
+                    None => Err(Reject::UnknownBackend),
+                }
+            }
+            Ok(token) if uri.path().starts_with(Metrics::PREFIX) => {
+                audit.backend("metrics");
+                match &self.settings.metrics {
+                    Some(config) => {
+                        self.serve::<Metrics>(config, &method, &uri, &token, &mut audit)
                             .await
                     }
                     None => Err(Reject::UnknownBackend),
@@ -301,8 +314,8 @@ mod tests {
     use crate::access::Grant;
     use crate::namespace::Namespace;
 
-    /// Grants `get` on `logs` in the namespaces listed for the token `good`, and records what it
-    /// was asked.
+    /// Grants `get` on `logs` and `metrics` in the namespaces listed, and records what it was
+    /// asked.
     #[derive(Debug, Default)]
     struct Fake {
         allowed: Vec<&'static str>,
@@ -320,10 +333,12 @@ mod tests {
             self.asked.lock().unwrap().push(namespace.to_string());
             let answer = if self.down {
                 Err(Reject::Unavailable)
-            } else if self.allowed.contains(&namespace.as_str()) && resource == "logs" {
+            } else if self.allowed.contains(&namespace.as_str())
+                && (resource == "logs" || resource == "metrics")
+            {
                 Ok(Grant::for_tests(
                     namespace.as_str(),
-                    "logs",
+                    resource,
                     "2026-01-01T00:00:00Z".parse::<Timestamp>().unwrap(),
                 ))
             } else {
@@ -381,8 +396,14 @@ mod tests {
             fake,
             Settings {
                 logs: Some(BackendConfig {
-                    url,
+                    url: url.clone(),
                     limits: LogsLimits::default(),
+                    timeout: Duration::from_secs(5),
+                    max_bytes,
+                }),
+                metrics: Some(BackendConfig {
+                    url,
+                    limits: MetricsLimits::default(),
                     timeout: Duration::from_secs(5),
                     max_bytes,
                 }),
@@ -490,7 +511,7 @@ mod tests {
                 "path",
             ),
             (
-                "/metrics/api/v1/query?namespace=a",
+                "/traces/api/v1/query?namespace=a",
                 Some("good"),
                 404,
                 "unknown_backend",
@@ -517,6 +538,86 @@ mod tests {
             ["b", "a"],
             "only well-formed requests are reviewed"
         );
+    }
+
+    #[tokio::test]
+    async fn a_metrics_query_reaches_the_backend_held_to_the_granted_namespace() {
+        let (url, seen) = backend(200, "{\"status\":\"success\"}").await;
+        let proxy = proxy(url, allowing(&["a"]), 1 << 20);
+        let response = Arc::clone(&proxy)
+            .handle(get(
+                "/metrics/api/v1/query_range?namespace=a\
+                 &query=up%7Bnamespace%3D%22b%22%7D&step=60",
+                Some("good"),
+            ))
+            .await;
+        assert_eq!(response.status(), StatusCode::OK);
+        let seen = seen.lock().unwrap().clone();
+        let (target, sent) = &seen[0];
+        assert!(target.starts_with("/api/v1/query_range?query="), "{target}");
+        assert!(target.ends_with("&extra_label=namespace%3Da"), "{target}");
+        for name in ["authorization", "cookie", "accountid", "projectid"] {
+            assert!(sent.get(name).is_none(), "{name}");
+        }
+    }
+
+    #[tokio::test]
+    async fn metrics_of_another_namespace_never_reach_the_person() {
+        let (url, seen) = backend(200, "secret").await;
+        let proxy = proxy(url, allowing(&["a"]), 1 << 20);
+        for (target, status, code) in [
+            (
+                "/metrics/api/v1/query?namespace=b&query=up",
+                403,
+                "forbidden",
+            ),
+            (
+                "/metrics/api/v1/label/namespace/values?namespace=b",
+                403,
+                "forbidden",
+            ),
+            (
+                "/metrics/api/v1/query?namespace=a&query=up&extra_label=namespace%3Db",
+                400,
+                "unknown_parameter",
+            ),
+            (
+                "/metrics/api/v1/series?namespace=a&match%5B%5D=up\
+                 &extra_filters%5B%5D=%7Bnamespace%3D%22b%22%7D",
+                400,
+                "unknown_parameter",
+            ),
+            (
+                "/metrics/api/v1/export?namespace=a&match%5B%5D=up",
+                400,
+                "path",
+            ),
+            ("/metrics/federate?namespace=a&match%5B%5D=up", 400, "path"),
+            ("/metrics/api/v1/status/tsdb?namespace=a", 400, "path"),
+        ] {
+            let response = Arc::clone(&proxy).handle(get(target, Some("good"))).await;
+            assert_eq!(response.status().as_u16(), status, "{target}");
+            let text = body(response).await.unwrap();
+            assert!(
+                text.contains(&format!("\"code\":\"{code}\"")),
+                "{target}: {text}"
+            );
+            assert!(!text.contains("secret"));
+        }
+        assert!(seen.lock().unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn a_query_the_metrics_store_cannot_run_is_explained() {
+        let (url, _) = backend(422, "cannot parse query").await;
+        let response = proxy(url, allowing(&["a"]), 1 << 20)
+            .handle(get(
+                "/metrics/api/v1/query?namespace=a&query=sum(",
+                Some("good"),
+            ))
+            .await;
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+        assert!(body(response).await.unwrap().contains("cannot parse query"));
     }
 
     #[tokio::test]

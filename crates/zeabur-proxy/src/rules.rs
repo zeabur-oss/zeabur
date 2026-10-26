@@ -83,19 +83,22 @@ impl<Q: Scoped> Authorized<Q> {
 /// header of the original request and no part of its query string is carried over.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Upstream {
-    path: &'static str,
+    path: String,
     params: Vec<(&'static str, String)>,
 }
 
 impl Upstream {
-    pub(crate) const fn new(path: &'static str, params: Vec<(&'static str, String)>) -> Self {
-        Self { path, params }
+    pub(crate) fn new(path: impl Into<String>, params: Vec<(&'static str, String)>) -> Self {
+        Self {
+            path: path.into(),
+            params,
+        }
     }
 
     /// The backend's path.
     #[must_use]
-    pub const fn path(&self) -> &'static str {
-        self.path
+    pub fn path(&self) -> &str {
+        &self.path
     }
 
     /// The parameters, in order.

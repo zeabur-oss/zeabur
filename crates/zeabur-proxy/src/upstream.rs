@@ -37,7 +37,7 @@ pub(crate) enum Answer {
         content_type: Option<http::HeaderValue>,
         body: Incoming,
     },
-    /// The backend refused the query itself (bad LogsQL); its explanation, shortened.
+    /// The backend refused the query itself (bad LogsQL or PromQL); its explanation, shortened.
     Refused(String),
 }
 
@@ -74,7 +74,8 @@ pub(crate) async fn send(
             body: response.into_body(),
         });
     }
-    if status == StatusCode::BAD_REQUEST {
+    // VictoriaMetrics answers a query it cannot parse or run with 422.
+    if status == StatusCode::BAD_REQUEST || status == StatusCode::UNPROCESSABLE_ENTITY {
         let mut text = Vec::new();
         let mut body = response.into_body();
         while text.len() < MAX_REFUSAL {

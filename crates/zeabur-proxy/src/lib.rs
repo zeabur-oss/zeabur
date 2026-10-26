@@ -4,6 +4,7 @@
 pub mod access;
 mod audit;
 pub mod logs;
+pub mod metrics;
 pub mod namespace;
 pub mod reject;
 pub mod rules;

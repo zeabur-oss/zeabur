@@ -203,12 +203,12 @@ impl Backend for Logs {
     }
 }
 
-const fn forbidden_char(c: char) -> bool {
+pub(crate) const fn forbidden_char(c: char) -> bool {
     c.is_control() && c != '\t' && c != '\n'
 }
 
 /// An RFC 3339 time, or whole Unix seconds.
-fn time(text: &str) -> Result<Timestamp, Reject> {
+pub(crate) fn time(text: &str) -> Result<Timestamp, Reject> {
     if !text.is_empty() && text.bytes().all(|b| b.is_ascii_digit()) {
         let seconds = text
             .parse::<i64>()
@@ -218,7 +218,7 @@ fn time(text: &str) -> Result<Timestamp, Reject> {
     Timestamp::from_str(text).map_err(|_invalid| Reject::InvalidTime)
 }
 
-fn positive(text: &str) -> Option<u32> {
+pub(crate) fn positive(text: &str) -> Option<u32> {
     if text.is_empty() || !text.bytes().all(|b| b.is_ascii_digit()) {
         return None;
     }

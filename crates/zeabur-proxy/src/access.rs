@@ -365,6 +365,7 @@ impl Cache {
                 | Reject::InvalidNamespace
                 | Reject::InvalidTime
                 | Reject::InvalidLimit
+                | Reject::InvalidStep
                 | Reject::InvalidQuery
                 | Reject::BeforeNamespace
                 | Reject::Busy
