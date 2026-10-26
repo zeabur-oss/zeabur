@@ -12,6 +12,8 @@ root="$(cd "$(dirname "$0")/.." && pwd)"
 manifest="$(realpath "${1:-$root/docs/shots.yaml}")"
 version="${3:-}"
 port="${ZEABUR_SHOTS_PORT:-18300}"
+# The demo server and the browser both take this as the time now, so dates are the same on every run.
+export ZEABUR_DEMO_NOW="${ZEABUR_DEMO_NOW:-2026-10-26T09:00:00Z}"
 if [[ -n "$version" && ! "$version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
   echo "expected a version like v0.0.2" >&2
   exit 2

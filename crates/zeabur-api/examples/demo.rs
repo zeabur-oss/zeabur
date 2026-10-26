@@ -10,6 +10,7 @@
 //! (cd web && bun run dev)                          # or Vite's dev server on :5173, proxying /api
 //! ```
 //!
+//! `ZEABUR_DEMO_NOW=2026-10-26T09:00:00Z` (RFC 3339) is the "now" of every relative object time.
 //! `ZEABUR_DEMO_FORBID=events.events.k8s.io,pods` refuses those cluster-wide reads (`nodes`,
 //! `pods`, `nodes.metrics.k8s.io`, `events.events.k8s.io`, `plans.upgrade.cattle.io`), to see a
 //! section's permission state; the listed kinds but `pods` are also refused in every namespace
@@ -138,7 +139,7 @@ fn identity_object(
 /// Zeabur Identity's people: Alice (an admin with two passkeys), Bob (one passkey and a link
 /// that adds another), Carol (GitHub and a passkey), and Dan, invited and not yet signed in.
 fn people() -> Vec<DynamicObject> {
-    let now = Timestamp::now().as_second();
+    let now = clock().as_second();
     let passkey = |name: &str, user: &str, created: &str, label: &str, extra: &Value| {
         identity_object(
             "Credential",
@@ -2885,8 +2886,23 @@ fn created(name: &str) -> String {
     minutes_ago(days * 24 * 60)
 }
 
+/// The time every relative object time counts from: `ZEABUR_DEMO_NOW` (RFC 3339) when set, so
+/// screenshots have the same dates on every run.
+fn clock() -> Timestamp {
+    static FIXED: std::sync::OnceLock<Option<Timestamp>> = std::sync::OnceLock::new();
+    FIXED
+        .get_or_init(|| {
+            std::env::var("ZEABUR_DEMO_NOW").ok().map(|value| {
+                value
+                    .parse()
+                    .expect("ZEABUR_DEMO_NOW is an RFC 3339 time, such as 2026-10-26T09:00:00Z")
+            })
+        })
+        .unwrap_or_else(Timestamp::now)
+}
+
 fn minutes_ago(minutes: i64) -> String {
-    let now = Timestamp::now();
+    let now = clock();
     now.checked_sub(SignedDuration::from_mins(minutes))
         .unwrap_or(now)
         .to_string()
@@ -3221,7 +3237,7 @@ static DISKS: std::sync::OnceLock<Vec<Value>> = std::sync::OnceLock::new();
 fn sample(name: &str, labels: &Value, value: u64) -> Value {
     let mut metric = labels.as_object().cloned().unwrap_or_default();
     metric.insert("__name__".to_owned(), json!(name));
-    json!({"metric": metric, "value": [Timestamp::now().as_second(), value.to_string()]})
+    json!({"metric": metric, "value": [clock().as_second(), value.to_string()]})
 }
 
 /// The disk series the sample store holds: each node's filesystem and the volume of each
@@ -3320,9 +3336,9 @@ fn nodes() -> Vec<Node> {
         for role in roles {
             labels.insert(format!("node-role.kubernetes.io/{role}"), json!("true"));
         }
-        let created = Timestamp::now()
+        let created = clock()
             .checked_sub(SignedDuration::from_hours(24 * age_days))
-            .unwrap_or_else(|_| Timestamp::now())
+            .unwrap_or_else(|_| clock())
             .to_string();
         let taints = if cordoned {
             json!([{"key": "node.kubernetes.io/unschedulable", "effect": "NoSchedule"}])
@@ -4122,7 +4138,7 @@ fn kubelet(cluster: MemoryCluster) {
     tokio::spawn(async move {
         loop {
             tokio::time::sleep(std::time::Duration::from_millis(700)).await;
-            let now = Timestamp::now().to_string();
+            let now = clock().to_string();
             cluster.update(|s| {
                 for objects in s.objects.values_mut() {
                     for pod in &mut objects.pods {

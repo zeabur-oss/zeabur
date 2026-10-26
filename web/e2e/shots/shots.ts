@@ -161,6 +161,7 @@ for (const shot of readManifest(manifest).shots.filter((s) => serversOf(s).inclu
 
     test(shot.id, async ({ page }, info) => {
       test.skip(!wanted(shot, info.project.name))
+      if (process.env.ZEABUR_DEMO_NOW) await page.clock.setFixedTime(process.env.ZEABUR_DEMO_NOW)
       await page.goto(shot.path, { waitUntil: "networkidle" })
       if (shot.wait) await page.locator(shot.wait).first().waitFor()
       for (const step of shot.steps) await run(page, step)
