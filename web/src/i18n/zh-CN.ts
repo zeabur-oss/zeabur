@@ -2518,7 +2518,7 @@ export const zhCN: Messages = {
   "upload.zone": "要上传的文件夹",
   "upload.drop": "先把文件夹压缩成 .zip 或 .tar.gz，再拖到这里",
   "upload.dropNote":
-    ".tar.gz 会保留文件权限和符号链接。直接拖文件夹或用 .zip 也行，但这两样会丢失，只有以 #! 开头的文件保持可执行。",
+    ".tar.gz 会保留文件权限和符号链接。直接拖文件夹或用 .zip 也行，但这两样会丢失，只有带 shebang 行的文件保持可执行。",
   "upload.dropActive": "松开就会使用",
   "upload.choose": "选择文件夹",
   "upload.chooseArchive": "选择 .zip 或 .tar.gz",

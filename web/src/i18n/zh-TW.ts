@@ -2523,7 +2523,7 @@ export const zhTW: Messages = {
   "upload.zone": "要上傳的資料夾",
   "upload.drop": "先把資料夾壓縮成 .zip 或 .tar.gz，再拖到這裡",
   "upload.dropNote":
-    ".tar.gz 會保留檔案權限和符號連結。直接拖資料夾或用 .zip 也行，但這兩樣會遺失，只有開頭是 #! 的檔案維持可執行。",
+    ".tar.gz 會保留檔案權限和符號連結。直接拖資料夾或用 .zip 也行，但這兩樣會遺失，只有帶 shebang 行的檔案維持可執行。",
   "upload.dropActive": "放開就會使用",
   "upload.choose": "選擇資料夾",
   "upload.chooseArchive": "選擇 .zip 或 .tar.gz",
