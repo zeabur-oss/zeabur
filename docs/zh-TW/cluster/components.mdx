@@ -1,7 +1,7 @@
 ---
 title: 檢視與安裝叢集元件
 description: 檢視叢集裝了哪些元件、狀態如何、還缺什麼，再到伺服器上用 zeabur-installer 安裝或移除。
-source: "3d2b8319e857"
+source: "48ad32b19af2"
 ---
 
 打開 **叢集** → **元件**，**已安裝** 列出偵測到的元件，**目錄** 列出 Zeabur Catalog 裡的元件。元件由 zeabur-installer 在伺服器上安裝和移除，Zeabur 只顯示狀態和要執行的指令。
@@ -107,7 +107,7 @@ zeaburctl components export volume-backup/velero > velero.yaml
 zeaburctl components export volume-backup/velero --format helm
 ```
 
-一次要裝好幾個時，把 ID 都寫上，例如 `zeaburctl components export container-registry/zot image-updates/keel`，內容會依序接在一起。
+一次要裝好幾個時，把 ID 都寫上，例如 `zeaburctl components export builds/zeabur-builder image-updates/keel`，內容會依序接在一起。
 
 預設印出 K3s/RKE2 的 `HelmChart`，由叢集內建的 helm-controller 安裝。其他叢集用 `--format` 改成 `helm`、`flux` 或 `argocd`。元件要填的值會留成 `<名稱>`，先換成實際的值，再用 `kubectl apply -f` 套用，或提交到 GitOps 儲存庫。指令說明見 [zeaburctl](../reference/zeaburctl.mdx#components-export)。
 

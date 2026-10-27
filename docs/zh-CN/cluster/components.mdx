@@ -1,7 +1,7 @@
 ---
 title: 查看和安装集群组件
 description: 查看集群安装了哪些组件、状态如何、还缺什么，再到服务器上用 zeabur-installer 安装或移除。
-source: "3d2b8319e857"
+source: "48ad32b19af2"
 ---
 
 打开 **集群** → **组件**，**已安装** 列出检测到的组件，**目录** 列出 Zeabur Catalog 中的组件。组件由 zeabur-installer 在服务器上安装和移除，Zeabur 只显示状态和需要运行的命令。
@@ -107,7 +107,7 @@ zeaburctl components export volume-backup/velero > velero.yaml
 zeaburctl components export volume-backup/velero --format helm
 ```
 
-一次要安装多个时，把 ID 都写上，例如 `zeaburctl components export container-registry/zot image-updates/keel`，内容会依次接在一起。
+一次要安装多个时，把 ID 都写上，例如 `zeaburctl components export builds/zeabur-builder image-updates/keel`，内容会依次接在一起。
 
 默认输出 K3s/RKE2 的 `HelmChart`，由集群内置的 helm-controller 安装。其他集群可用 `--format` 改为 `helm`、`flux` 或 `argocd`。组件需要填写的值会保留为 `<名称>`，先替换为实际值，再用 `kubectl apply -f` 应用，或提交到 GitOps 仓库。命令说明参见 [zeaburctl](../reference/zeaburctl.mdx#components-export)。
 

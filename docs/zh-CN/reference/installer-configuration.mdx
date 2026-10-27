@@ -1,7 +1,7 @@
 ---
 title: Installer 配置
 description: 查阅创建集群和加入节点所用的 YAML 字段、默认值及机密文件格式。
-source: "abdad64d732e"
+source: "74cc2f2d3eb9"
 ---
 
 将域名、组件选择和主机配置写入 YAML，运行 `zeabur-installer --config config.yaml plan`，先查看安装内容。文件默认位于 `/etc/zeabur-installer/config.yaml`。字段使用 camelCase；字段拼写错误或存在多余字段时，installer 会直接停止。
@@ -63,7 +63,7 @@ host:
 ### 组件选择
 
 - `minimal`：ingress、证书和 metrics-server，即 Zeabur 能够连接和显示用量所需的组件。
-- `standard`：Catalog 为此 profile 推荐的所有组件，外加 `container-registry`（zot）、`image-updates`（Keel）和 `databases/cloudnative-pg`，装完就能用镜像部署和创建 PostgreSQL 数据库。Zeabur Builder 不在其中，因为固定版本的 Catalog 还没有 `builds` 组件。
+- `standard`：Catalog 为此 profile 推荐的所有组件，外加 `image-updates`（Keel）和 `databases/cloudnative-pg`，装完就能用镜像部署和创建 PostgreSQL 数据库。Zeabur Builder 不在其中，要使用时在 `enable` 中添加 `builds`，zot 会一并安装。
 - `secure`：在 `standard` 的基础上添加运行时检测、漏洞扫描和入侵防护。
 
 `enable` 可以填写 capability（例如 `runtime-security`）或完整组件 ID（例如 `volume-backup/velero`），依赖的组件会一并添加。如果 `disable` 排除了其他组件依赖的组件，`plan` 会列出两者并停止。最终安装的组件、安装顺序和排除原因，见 `plan` 的输出。
@@ -79,7 +79,7 @@ inputs:
 
 Catalog 定义了每个组件有哪些 input 及其类型。缺少必填值时，`plan` 会指出需要补充的字段。
 
-installer 会自动填写 External Secrets 的 `kube-api-cidr`（节点地址所在的子网）和 zot 的 `cluster-ip`。要修改，在 `inputs` 中填写值即可。
+installer 会自动填写 External Secrets 的 `kube-api-cidr`（节点地址所在的子网）和 Zeabur Builder 的 `cluster-ip`（zot 的固定地址）。要修改，在 `inputs` 中填写值即可。
 
 Velero 还接受 installer 自己的 `region` input，即存储桶的区域，默认 `us-east-1`。Cloudflare R2 要填 `auto`。网页界面会分别询问访问密钥 ID 和私密访问密钥，再自己生成 `credentials` 文件。
 

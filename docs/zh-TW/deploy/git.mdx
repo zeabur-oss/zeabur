@@ -1,7 +1,7 @@
 ---
 title: 從 Git 建置並部署服務
 description: 連接 Git 儲存庫、完成第一次建置，並選擇新映像檔何時上線。
-source: "932bd4ebacee"
+source: "57a598cda189"
 ---
 
 在專案選擇 **新增** → **從 Git 部署**，填入儲存庫與應用程式的連接埠，再 **檢查變更**。套用後，Zeabur Builder 開始建置。第一個映像檔完成並部署後，服務才會啟動。
@@ -9,8 +9,8 @@ source: "932bd4ebacee"
 ## 開始前
 
 - 已有專案，以及在專案建立服務、Kubernetes Service 和 Build 的權限。使用私有儲存庫或建置變數時，也需要建立機密的權限。
-- 叢集已安裝 Zeabur Builder 和 Keel；registry 用預設的 zot 時，也要裝 zot。缺少元件時，**新增** 選單會在 **從 Git 部署** 下方寫出缺哪些，點下去會一次列出全部的安裝指令，見[檢視與安裝叢集元件](../cluster/components.mdx)。
-- 建置好的映像檔推到 Zeabur chart 的 `builds.registry`，預設是元件目錄的 Zot（`zot.zot.svc:5000`）。改用 Harbor 或外部 registry 時，管理員在 chart 設定 `builds.registry`，並讓 Builder 與節點能存取它。
+- 叢集已安裝 Zeabur Builder 和 Keel。從元件目錄裝 Zeabur Builder 時，zot 會一起裝。缺少元件時，**新增** 選單會在 **從 Git 部署** 下方寫出缺哪些，點下去會一次列出全部的安裝指令，見[檢視與安裝叢集元件](../cluster/components.mdx)。
+- 建置好的映像檔推到 Zeabur chart 的 `builds.registry`，預設是和 Zeabur Builder 一起裝的 Zot（`zot.zot.svc:5000`）。改用 Harbor 或外部 registry 時，管理員在 chart 設定 `builds.registry`，並讓 Builder 與節點能存取它。
 - 用安裝程式裝的 Zot 只讓 Builder、建置用的 Pod 和節點連進來。專案裡其他的 Pod 連不到 Zot，所以被入侵的應用程式拉不到別的專案的映像檔。
 - 準備應用程式實際監聽的連接埠。要公開網站，另備可指向叢集入口的網域。
 
@@ -276,7 +276,7 @@ kubectl -n shop label secret web-git app.kubernetes.io/name=web builder.zeabur.c
 
 | 畫面上的情況 | 接著做 |
 | --- | --- |
-| **從 Git 部署** 下方寫著 **需要先安裝…** | 點它，照視窗列出的指令一次裝好。registry 也可以由管理員在 Zeabur chart 設定 `builds.registry`，改用別的 registry 就不用裝 zot。 |
+| **從 Git 部署** 下方寫著 **需要先安裝…** | 點它，照視窗列出的指令一次裝好。改用別的 registry 時，管理員在 Zeabur chart 設定 `builds.registry`，Zeabur Builder 改用它自己的 Helm chart 安裝，見 [Zeabur Builder 文件](https://oss.zeabur.com/docs/builder/)。 |
 | 儲存庫存取遭拒 | 使用部署金鑰時，在 **建置** 按 **顯示部署金鑰**，確認已加到正確的儲存庫。使用權杖時，檢查讀取範圍與有效期限。修正後 **重新建置**。 |
 | 找不到分支或建置器 | 依建置頁的原因檢查儲存庫分支，以及叢集內對應的 Railpack 或 Dockerfile 建置器。 |
 | 建置成功，服務仍使用舊映像檔 | 檢查 **新建置完成後自動部署** 和 Keel 狀態，或按 **部署最新版** 手動套用。 |

@@ -136,7 +136,7 @@ Uninstalling deletes the CRDs that the chart puts in its templates, along with e
 |---|---|
 | A component with custom resources | Objects of the CRDs the Catalog lists for it, or of CRDs the uninstall will delete, exist outside the namespaces of components being removed together. For CRDs the uninstall will delete, cluster-scoped objects count too |
 | Longhorn | A PersistentVolume with the driver `driver.longhorn.io` still exists |
-| zot | A replica outside zot's namespace uses an image from `zot.zot.svc:5000` |
+| Zeabur Builder | A replica outside zot's namespace uses an image from `zot.zot.svc:5000` |
 
 Delete or move those first. Trivy Operator's reports are its own output, so they don't count.
 

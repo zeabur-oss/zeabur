@@ -1,7 +1,7 @@
 ---
 title: 从 Git 构建并部署服务
 description: 连接 Git 仓库、完成首次构建，并选择新镜像何时上线。
-source: "932bd4ebacee"
+source: "57a598cda189"
 ---
 
 在项目中选择 **新增** → **从 Git 部署**，填写仓库和应用的端口，再点击 **检查变更**。应用变更后，Zeabur Builder 开始构建。首个镜像构建完成并部署后，服务才会启动。
@@ -9,8 +9,8 @@ source: "932bd4ebacee"
 ## 开始前
 
 - 已有项目，并具备在项目中创建服务、Kubernetes Service 和 Build 的权限。使用私有仓库或构建变量时，还需要创建机密变量的权限。
-- 集群已安装 Zeabur Builder 和 Keel；registry 使用默认的 zot 时，也要安装 zot。缺少组件时，**新增** 菜单会在 **从 Git 部署** 下方写出缺少哪些，点击后会一次列出全部安装命令，见[查看与安装集群组件](../cluster/components.mdx)。
-- 构建完成的镜像会推送到 Zeabur chart 的 `builds.registry`，默认是组件目录中的 Zot（`zot.zot.svc:5000`）。改用 Harbor 或外部 registry 时，管理员需要在 chart 中配置 `builds.registry`，并确保 Builder 和节点能访问它。
+- 集群已安装 Zeabur Builder 和 Keel。从组件目录安装 Zeabur Builder 时，zot 会一并安装。缺少组件时，**新增** 菜单会在 **从 Git 部署** 下方写出缺少哪些，点击后会一次列出全部安装命令，见[查看与安装集群组件](../cluster/components.mdx)。
+- 构建完成的镜像会推送到 Zeabur chart 的 `builds.registry`，默认是和 Zeabur Builder 一起安装的 Zot（`zot.zot.svc:5000`）。改用 Harbor 或外部 registry 时，管理员需要在 chart 中配置 `builds.registry`，并确保 Builder 和节点能访问它。
 - 通过安装程序安装的 Zot 只允许 Builder、构建用的副本和节点连接。项目中的其他副本无法连接 Zot，因此遭入侵的应用无法拉取其他项目的镜像。
 - 准备好应用实际监听的端口。要公开网站，还需准备能指向集群入口的域名。
 
@@ -276,7 +276,7 @@ kubectl -n shop label secret web-git app.kubernetes.io/name=web builder.zeabur.c
 
 | 界面上的情况 | 下一步 |
 | --- | --- |
-| **从 Git 部署** 下方写着 **需要先安装…** | 点击它，按弹窗列出的命令一次装好。管理员也可以在 Zeabur chart 中配置 `builds.registry`，改用其他 registry 就不需要安装 zot。 |
+| **从 Git 部署** 下方写着 **需要先安装…** | 点击它，按弹窗列出的命令一次装好。改用其他 registry 时，管理员在 Zeabur chart 中配置 `builds.registry`，Zeabur Builder 改用它自己的 Helm chart 安装，见 [Zeabur Builder 文档](https://oss.zeabur.com/docs/builder/)。 |
 | 仓库访问遭拒 | 使用部署密钥时，在 **构建** 中点击 **显示部署密钥**，确认已将其添加到正确的仓库。使用令牌时，检查读取范围和有效期。修正后 **重新构建**。 |
 | 找不到分支或构建器 | 根据构建页面显示的原因，检查仓库分支和集群中对应的 Railpack 或 Dockerfile 构建器。 |
 | 构建成功，服务仍使用旧镜像 | 检查 **新构建完成后自动部署** 和 Keel 状态，或点击 **部署最新版** 手动应用。 |

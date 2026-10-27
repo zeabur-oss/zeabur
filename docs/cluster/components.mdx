@@ -106,7 +106,7 @@ zeaburctl components export volume-backup/velero > velero.yaml
 zeaburctl components export volume-backup/velero --format helm
 ```
 
-To install several at once, list all their IDs, for example `zeaburctl components export container-registry/zot image-updates/keel`. The output puts them one after another.
+To install several at once, list all their IDs, for example `zeaburctl components export builds/zeabur-builder image-updates/keel`. The output puts them one after another.
 
 By default, the command prints a K3s/RKE2 `HelmChart`, which the cluster's built-in helm-controller installs. For other clusters, use `--format` to choose `helm`, `flux`, or `argocd`. Required component values appear as `<name>` placeholders. Replace them with actual values, then apply the manifest with `kubectl apply -f` or commit it to a GitOps repository. For command details, see [zeaburctl](../reference/zeaburctl.mdx#components-export).
 

@@ -1,7 +1,7 @@
 ---
 title: Installer 指令
 description: 查閱 zeabur-installer 的規劃、安裝、健康檢查、加入節點與移除指令。
-source: "15ba87337f28"
+source: "401be9b27c38"
 ---
 
 先用 `plan` 看設定會建立什麼，再以 root 執行 `apply`。安裝中斷時，修正原因後用同一份設定重跑 `apply`，每個步驟會先看現況，只補上缺少或不同的部分。
@@ -137,7 +137,7 @@ Chart 放在 templates 裡的 CRD，解除安裝時會一起刪掉，叢集裡�
 |---|---|
 | 有自訂資源的元件 | 一起移除的元件的 Namespace 以外，還有 Catalog 為它列的 CRD 的物件，或解除安裝會刪掉的 CRD 的物件。會刪掉的 CRD，叢集層級的物件也算 |
 | Longhorn | 還有 driver 是 `driver.longhorn.io` 的 PersistentVolume |
-| zot | zot 的 Namespace 以外，還有副本用 `zot.zot.svc:5000` 的映像檔 |
+| Zeabur Builder | zot 的 Namespace 以外，還有副本用 `zot.zot.svc:5000` 的映像檔 |
 
 先刪掉或搬走這些。Trivy Operator 的報告是它自己產生的，不算在內。
 

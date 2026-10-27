@@ -1,7 +1,7 @@
 ---
 title: 个人使用：在小型服务器上安装
 description: 只有自己使用时，用 KubeSolo 在 1.5 GiB 内存的服务器上安装 Kubernetes 和组件，也可以勾选 Zeabur Builder，再在自己的电脑上用 zeaburctl ui 打开 Zeabur。
-source: "cfd99901fd7e"
+source: "9ecbdbd6bd2b"
 ---
 
 只有自己使用时，installer 可以改用 KubeSolo。服务器上只有 Kubernetes 和组件，不运行 Zeabur 面板和 Zeabur Identity。要使用 Zeabur，在自己的电脑上运行 `zeaburctl ui`，用服务器提供的 kubeconfig 连接。
@@ -16,7 +16,7 @@ source: "cfd99901fd7e"
 | 成员和权限 | 没有。拿到 kubeconfig 的人可以控制整个集群 | Zeabur Identity 账号和项目角色 |
 | 项目之间的网络 | 不隔离。KubeSolo 不执行网络策略 | 用网络策略隔离 |
 | 节点 | 只有这一台 | 可以继续添加节点 |
-| 组件 | Ingress 和证书，也可以勾选 Zeabur Builder 和 zot | Catalog 的全部组件 |
+| 组件 | Ingress 和证书，也可以勾选 Zeabur Builder（含 zot） | Catalog 的全部组件 |
 | 数据库 | 不提供 | 有 |
 
 个人版默认不安装 Zeabur Builder 和 zot（存放构建结果的镜像仓库），因此只能部署现成的容器镜像。要从 Git 或文件夹构建，安装时勾选 Zeabur Builder，zot 会一并安装。这两个组件需要额外使用约 300 MiB 内存，服务器内存不足 1800 MiB 时，安装程序不允许勾选。
@@ -55,13 +55,13 @@ installer 固定 KubeSolo、helm-controller 和 kubectl 的版本，下载后校
 
 ![“检查服务器”显示 Docker 检查未通过，提示需要先停止并移除 Docker](https://oss.zeabur.com/shots/zeabur/zh-CN/light/installer-personal-docker.avif)
 
-在“选择组件”中，Ingress 和证书默认选中。要从 Git 或文件夹构建，勾选“Zeabur Builder”，zot 会一并添加，并标注“其他组件需要”。
+在“选择组件”中，Ingress 和证书默认选中。要从 Git 或文件夹构建，勾选“Zeabur Builder”，zot 会随它一并安装。
 
-![“选择组件”中勾选了 Zeabur Builder，zot 一并添加，上方显示内存估算](https://oss.zeabur.com/shots/zeabur/zh-CN/light/installer-personal-components.avif)
+![“选择组件”中勾选了 Zeabur Builder，上方显示内存估算](https://oss.zeabur.com/shots/zeabur/zh-CN/light/installer-personal-components.avif)
 
-内存不足时，Zeabur Builder 和 zot 不可选，旁边会注明所需内存。
+内存不足时，Zeabur Builder 不可选，旁边会注明所需内存。
 
-![在内存为 1.5 GiB 的服务器上，Zeabur Builder 和 zot 不可选，旁边注明至少需要 1,800 MiB](https://oss.zeabur.com/shots/zeabur/zh-CN/light/installer-personal-components-small.avif)
+![在内存为 1.5 GiB 的服务器上，Zeabur Builder 不可选，旁边注明至少需要 1,800 MiB](https://oss.zeabur.com/shots/zeabur/zh-CN/light/installer-personal-components-small.avif)
 
 在“确认”中核对内容后，点击“安装”。
 

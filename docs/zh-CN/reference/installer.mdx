@@ -1,7 +1,7 @@
 ---
 title: Installer 命令
 description: 查阅 zeabur-installer 的规划、安装、健康检查、添加节点和卸载命令。
-source: "15ba87337f28"
+source: "401be9b27c38"
 ---
 
 先用 `plan` 查看配置会创建什么，再以 root 运行 `apply`。如果安装中断，排除原因后，用同一份配置重新运行 `apply`。每个步骤都会先检查当前状态，只补上缺少或不同的部分。
@@ -137,7 +137,7 @@ Chart 放在 templates 中的 CRD 会在卸载时一并删除，集群中这些 
 |---|---|
 | 有自定义资源的组件 | 在一并卸载的组件的 Namespace 之外，仍有 Catalog 为该组件列出的 CRD 的对象，或卸载时会删除的 CRD 的对象。对于会删除的 CRD，集群级别的对象也算在内 |
 | Longhorn | 仍有 driver 为 `driver.longhorn.io` 的 PersistentVolume |
-| zot | 在 zot 的 Namespace 之外，仍有副本使用 `zot.zot.svc:5000` 的镜像 |
+| Zeabur Builder | 在 zot 的 Namespace 之外，仍有副本使用 `zot.zot.svc:5000` 的镜像 |
 
 先删除或迁移这些对象。Trivy Operator 的报告由它自行生成，不计入其中。
 

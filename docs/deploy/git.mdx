@@ -8,8 +8,8 @@ In a project, select **Add** → **Deploy from Git**, enter the repository and t
 ## Before you begin
 
 - You need a project and permission to create services, Kubernetes Services, and Builds in it. Private repositories and build variables also require permission to create secrets.
-- The cluster must have Zeabur Builder and Keel installed, and zot too when the registry is the default zot. If components are missing, the **Add** menu lists them under **Deploy from Git**, and clicking it shows the install commands for all of them at once. See [Manage cluster components](../cluster/components.mdx).
-- Built images are pushed to the registry set by `builds.registry` in the Zeabur chart. The default is Zot from the component catalog (`zot.zot.svc:5000`). To use Harbor or an external registry, an administrator must set `builds.registry` in the chart and give the Builder and nodes access to it.
+- The cluster must have Zeabur Builder and Keel installed. Installing Zeabur Builder from the component catalog adds zot with it. If components are missing, the **Add** menu lists them under **Deploy from Git**, and clicking it shows the install commands for all of them at once. See [Manage cluster components](../cluster/components.mdx).
+- Built images are pushed to the registry set by `builds.registry` in the Zeabur chart. The default is the Zot installed with Zeabur Builder (`zot.zot.svc:5000`). To use Harbor or an external registry, an administrator must set `builds.registry` in the chart and give the Builder and nodes access to it.
 - Zot installed by the installer only accepts connections from the Builder, build replicas, and nodes. Other replicas in projects can't connect to Zot, so a compromised app can't pull images from other projects.
 - Have the port the app actually listens on ready. To make a website public, you also need a domain that can point to the cluster's entry point.
 
@@ -275,7 +275,7 @@ Zeabur Builder and Keel keep building and deploying after you remove Zeabur. The
 
 | What you see | What to do next |
 | --- | --- |
-| **Deploy from Git** says **Install … first** | Click it and run the commands it lists to install everything at once. An administrator can also set `builds.registry` in the Zeabur chart; with another registry, you don't need zot. |
+| **Deploy from Git** says **Install … first** | Click it and run the commands it lists to install everything at once. To use another registry, an administrator sets `builds.registry` in the Zeabur chart and installs Zeabur Builder from its own Helm chart. See the [Zeabur Builder docs](https://oss.zeabur.com/docs/builder/). |
 | Repository access is denied | If you're using a deploy key, select **Show deploy key** in **Builds** and check that you've added it to the correct repository. If you're using a token, check its read scope and expiration date. After fixing access, select **Build again**. |
 | Branch or builder not found | Use the reason shown on the build page to check the repository branch and the corresponding Railpack or Dockerfile builder in the cluster. |
 | The build succeeded, but the service still uses the old image | Check **Auto-deploy new builds** and Keel's status, or select **Deploy newest** to apply the image manually. |

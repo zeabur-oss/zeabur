@@ -1,7 +1,7 @@
 ---
 title: 自己用：在小機器上安裝
 description: 只有自己要用時，用 KubeSolo 在 1.5 GiB 記憶體的機器裝好 Kubernetes 和元件，可以再勾選 Zeabur Builder，再在自己的電腦用 zeaburctl ui 打開 Zeabur。
-source: "cfd99901fd7e"
+source: "9ecbdbd6bd2b"
 ---
 
 只有自己要用時，installer 可以改裝 KubeSolo。伺服器上只有 Kubernetes 和元件，不跑 Zeabur 面板和 Zeabur Identity。要用 Zeabur 時，在自己的電腦執行 `zeaburctl ui`，用伺服器給你的 kubeconfig 連線。
@@ -16,7 +16,7 @@ source: "cfd99901fd7e"
 | 成員和權限 | 沒有。拿到 kubeconfig 的人可以控制整個叢集 | Zeabur Identity 帳號和專案角色 |
 | 專案之間的網路 | 不隔離。KubeSolo 不執行網路政策 | 用網路政策隔離 |
 | 節點 | 只有這一台 | 可以再加入節點 |
-| 元件 | Ingress 和憑證，可以再勾選 Zeabur Builder 和 zot | Catalog 的全部元件 |
+| 元件 | Ingress 和憑證，可以再勾選 Zeabur Builder（含 zot） | Catalog 的全部元件 |
 | 資料庫 | 不提供 | 有 |
 
 自己用的版本預設不裝 Zeabur Builder 和 zot（放建置結果的映像倉庫），所以只能部署現成的容器映像檔。要從 Git 或資料夾建置，安裝時勾選 Zeabur Builder，zot 會一起裝。這兩個要多用大約 300 MiB 記憶體，機器的記憶體不到 1800 MiB 時，安裝程式不讓你勾選。
@@ -55,13 +55,13 @@ installer 釘選 KubeSolo、helm-controller 和 kubectl 的版本，下載後核
 
 ![「檢查伺服器」顯示 Docker 未通過，說明要先停止並移除 Docker](https://oss.zeabur.com/shots/zeabur/zh-TW/light/installer-personal-docker.avif)
 
-在「選擇元件」，Ingress 和憑證是預設的。要從 Git 或資料夾建置，勾選「Zeabur Builder」，zot 會一起加入，標示「其他元件需要」。
+在「選擇元件」，Ingress 和憑證是預設的。要從 Git 或資料夾建置，勾選「Zeabur Builder」，zot 會跟它一起裝。
 
-![「選擇元件」勾選了 Zeabur Builder，zot 一起加入，上方顯示記憶體估算](https://oss.zeabur.com/shots/zeabur/zh-TW/light/installer-personal-components.avif)
+![「選擇元件」勾選了 Zeabur Builder，上方顯示記憶體估算](https://oss.zeabur.com/shots/zeabur/zh-TW/light/installer-personal-components.avif)
 
-記憶體不夠時，Zeabur Builder 和 zot 是灰的，旁邊會寫需要多少。
+記憶體不夠時，Zeabur Builder 是灰的，旁邊會寫需要多少。
 
-![記憶體 1.5 GiB 的伺服器上，Zeabur Builder 和 zot 是灰的，旁邊寫著至少要 1,800 MiB](https://oss.zeabur.com/shots/zeabur/zh-TW/light/installer-personal-components-small.avif)
+![記憶體 1.5 GiB 的伺服器上，Zeabur Builder 是灰的，旁邊寫著至少要 1,800 MiB](https://oss.zeabur.com/shots/zeabur/zh-TW/light/installer-personal-components-small.avif)
 
 在「確認」核對內容後按「安裝」。
 

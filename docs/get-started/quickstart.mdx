@@ -111,10 +111,10 @@ Under “Choose components,” select a “Preset,” then select or clear indiv
 | Preset | Includes |
 | --- | --- |
 | “Minimal” | Ingress, certificates, and metrics-server |
-| “Standard” | The components the catalog recommends for a single server, plus a container registry (zot), image updates (Keel), and PostgreSQL (CloudNativePG); this is the default |
+| “Standard” | The components the catalog recommends for a single server, plus image updates (Keel) and PostgreSQL (CloudNativePG); this is the default |
 | “Hardened” | “Standard” plus runtime threat detection, vulnerability scanning, and intrusion prevention |
 
-With “Standard,” you can deploy apps from images and create PostgreSQL databases right after installation. Deploying from Git needs Zeabur Builder, which this version's catalog doesn't include yet.
+With “Standard,” you can deploy apps from images and create PostgreSQL databases right after installation. Deploying from Git needs Zeabur Builder: select it in the component list, and zot comes with it.
 
 Some components need settings before you can continue. For example, Velero asks for the S3 endpoint, bucket, region, and access keys, and the installer writes the credentials file Velero needs.
 

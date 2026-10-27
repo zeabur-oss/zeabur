@@ -62,7 +62,7 @@ Both the browser and the server must be able to resolve these two names. Replica
 ### Component selection
 
 - `minimal`: ingress, certificates, and metrics-server—the components Zeabur needs to be reachable and show resource usage.
-- `standard`: everything the Catalog recommends for this profile, plus `container-registry` (zot), `image-updates` (Keel), and `databases/cloudnative-pg`, so you can deploy from images and create PostgreSQL databases right after installation. Zeabur Builder isn't included because the pinned Catalog doesn't have a `builds` component yet.
+- `standard`: everything the Catalog recommends for this profile, plus `image-updates` (Keel) and `databases/cloudnative-pg`, so you can deploy from images and create PostgreSQL databases right after installation. Zeabur Builder isn't included; add `builds` to `enable` to install it with zot.
 - `secure`: `standard` plus runtime detection, vulnerability scanning, and intrusion prevention.
 
 `enable` accepts capabilities, such as `runtime-security`, or full component IDs, such as `volume-backup/velero`. A component's dependencies are added with it. If `disable` excludes a component that another component needs, `plan` names both and stops. The `plan` output lists the final components, their installation order, and the reasons for exclusions.
@@ -78,7 +78,7 @@ inputs:
 
 The Catalog defines each component's inputs and their types. If a required value is missing, `plan` names the field to add.
 
-The installer fills in `kube-api-cidr` for External Secrets (the subnet containing the node address) and `cluster-ip` for zot. A value in `inputs` overrides it.
+The installer fills in `kube-api-cidr` for External Secrets (the subnet containing the node address) and `cluster-ip` for Zeabur Builder (zot's fixed address). A value in `inputs` overrides it.
 
 Velero also accepts the installer's own `region` input, the bucket's region. It defaults to `us-east-1`; Cloudflare R2 needs `auto`. The web interface asks for the access key ID and secret access key separately and writes the `credentials` file from them.
 
