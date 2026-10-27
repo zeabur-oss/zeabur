@@ -103,6 +103,82 @@
       },
       {
         "contributedBy": [],
+        "displayName": "Zeabur Builder",
+        "id": "builds/zeabur-builder",
+        "idleMemoryMib": null,
+        "releases": [
+          {
+            "kind": "manifests",
+            "name": "tls",
+            "namespace": "zot",
+            "yaml": "# Signs the CA below; nothing else uses it.\napiVersion: cert-manager.io/v1\nkind: Issuer\nmetadata:\n  name: zot-selfsigned\n  namespace: zot\nspec:\n  selfSigned: {}\n"
+          },
+          {
+            "kind": "helmChart",
+            "name": "zot",
+            "object": {
+              "apiVersion": "helm.cattle.io/v1",
+              "kind": "HelmChart",
+              "metadata": {
+                "annotations": {
+                  "installer.zeabur.com/component": "builds/zeabur-builder"
+                },
+                "labels": {
+                  "app.kubernetes.io/managed-by": "zeabur-installer"
+                },
+                "name": "zot",
+                "namespace": "kube-system"
+              },
+              "spec": {
+                "chart": "zot",
+                "createNamespace": false,
+                "failurePolicy": "abort",
+                "targetNamespace": "zot",
+                "timeout": "10m0s",
+                "valuesContent": "{\"service\":{\"type\":\"ClusterIP\",\"port\":5000,\"clusterIP\":\"10.43.0.50\"},\"persistence\":true}",
+                "version": "0.1.128"
+              }
+            }
+          },
+          {
+            "kind": "helmChart",
+            "name": "builder",
+            "object": {
+              "apiVersion": "helm.cattle.io/v1",
+              "kind": "HelmChart",
+              "metadata": {
+                "annotations": {
+                  "installer.zeabur.com/component": "builds/zeabur-builder"
+                },
+                "labels": {
+                  "app.kubernetes.io/managed-by": "zeabur-installer"
+                },
+                "name": "builder",
+                "namespace": "kube-system"
+              },
+              "spec": {
+                "chart": "oci://ghcr.io/zeabur-oss/charts/zeabur-builder",
+                "createNamespace": false,
+                "failurePolicy": "abort",
+                "targetNamespace": "builder-system",
+                "timeout": "10m0s",
+                "valuesContent": "{\"registry\":{\"host\":\"zot.zot.svc:5000\"}}",
+                "version": "0.0.1"
+              }
+            }
+          }
+        ],
+        "secrets": [],
+        "security": "Zeabur Builder: a ClusterRole that manages Builds, BuildRuns and Jobs in every namespace; reads Pods and Namespaces; reads, creates, updates and deletes Secrets in every namespace (the Git credentials Builds name, and the copies it puts in build namespaces), and reads the zot token signer. Runs one privileged buildkitd per building namespace in its own namespace, with a user namespace and an egress policy. An admission policy limits the Jobs and StatefulSets it can create. zot: no RBAC, a ServiceAccount without roles; serves the OCI registry API over TLS on port 5000 inside the cluster.\n",
+        "smoke": [
+          ["-n", "zot", "certificate/zot-tls", "--for=condition=Ready"],
+          ["-n", "zot", "statefulset/zot", "--for=jsonpath={.status.readyReplicas}=1"],
+          ["-n", "builder-system", "deployment/zeabur-builder", "--for=condition=Available"]
+        ],
+        "why": "preset"
+      },
+      {
+        "contributedBy": [],
         "displayName": "CloudNativePG",
         "id": "databases/cloudnative-pg",
         "idleMemoryMib": null,
@@ -491,9 +567,15 @@
       "clusterMib": 2140,
       "componentsMib": 368,
       "hostMib": 5836,
-      "unmeasured": 2
+      "unmeasured": 3
     },
     "namespaces": [
+      {
+        "baseline": null,
+        "name": "builder-system",
+        "privileged": "builds/zeabur-builder is privileged",
+        "public": false
+      },
       {
         "baseline": null,
         "name": "cert-manager",
@@ -541,6 +623,12 @@
         "name": "zeabur-identity",
         "privileged": null,
         "public": false
+      },
+      {
+        "baseline": null,
+        "name": "zot",
+        "privileged": null,
+        "public": false
       }
     ],
     "nodePrep": null,
@@ -581,6 +669,11 @@
       },
       "url": "https://zeabur.203.0.113.10.sslip.io",
       "values": {
+        "builds": {
+          "caBundle": {
+            "configMap": "zeabur-registry-ca"
+          }
+        },
         "clusterName": "vps-1",
         "domains": {
           "clusterIssuer": "zeabur-local-ca"
@@ -617,6 +710,6 @@
     },
     "removals": []
   },
-  "text": "K3s v1.36.5+k3s1 (pinned, checked against this installer's digests), CIS hardened, on vps-1 (amd64, 5836 MiB)\nNode addresses   203.0.113.10 (temporary IPv6 addresses left out)\n\nComponents\n  ingress/traefik                                  preset     23 MiB\n      manifests gateway-api-crds (1 URLs)\n      chart traefik 42.1.3\n  certificates/cert-manager                        preset     51 MiB\n      chart cert-manager v1.21.3\n      manifests issuers\n  databases/cloudnative-pg                         preset     unmeasured\n      chart cnpg 0.29.1\n      chart plugin-barman-cloud 0.8.1\n  image-updates/keel                               preset     unmeasured\n      chart keel v1.2.3\n      manifests webhook-policy\n  observability-operator/victoria-metrics-operator preset     20 MiB\n      chart victoria-metrics-operator 0.68.1\n  logs/victoria-logs                               preset     38 MiB\n      manifests logs\n  metrics/metrics-server                           preset     17 MiB\n      chart metrics-server 3.14.0\n  metrics/victoria-metrics                         preset     207 MiB\n      chart vm 0.96.0\n      manifests notifications\n  node-updates/system-upgrade-controller           preset     12 MiB\n      manifests crds (1 URLs)\n      manifests controller (1 URLs)\n\nNamespaces exempt from the restricted Pod Security level\n  observability (logs/victoria-logs is privileged)\n  system-upgrade (node-updates/system-upgrade-controller is privileged)\n\nStorage          local-path (default)\n\nZeabur           https://zeabur.203.0.113.10.sslip.io (certificates from a CA made on this server)\nZeabur Identity  https://login.203.0.113.10.sslip.io\n\nMemory at idle   about 1668 MiB of 5836 (K3s 1300, components 368, plus 2 unmeasured)\nwarning: Local access: login.203.0.113.10.sslip.io and zeabur.203.0.113.10.sslip.io must resolve to this server for browsers and for the server itself, through DNS (names such as <address>.sslip.io do) rather than a hosts file, which pods do not read.\nwarning: This server has no public address, so new services get no suggested URL. Add `suffixes: [203-0-113-10.sslip.io]` under access for URLs only this network reaches, signed by the local CA.\n",
+  "text": "K3s v1.36.5+k3s1 (pinned, checked against this installer's digests), CIS hardened, on vps-1 (amd64, 5836 MiB)\nNode addresses   203.0.113.10 (temporary IPv6 addresses left out)\n\nComponents\n  ingress/traefik                                  preset     23 MiB\n      manifests gateway-api-crds (1 URLs)\n      chart traefik 42.1.3\n  certificates/cert-manager                        preset     51 MiB\n      chart cert-manager v1.21.3\n      manifests issuers\n  builds/zeabur-builder                            preset     unmeasured\n      manifests tls\n      chart zot 0.1.128\n      chart builder 0.0.1\n  databases/cloudnative-pg                         preset     unmeasured\n      chart cnpg 0.29.1\n      chart plugin-barman-cloud 0.8.1\n  image-updates/keel                               preset     unmeasured\n      chart keel v1.2.3\n      manifests webhook-policy\n  observability-operator/victoria-metrics-operator preset     20 MiB\n      chart victoria-metrics-operator 0.68.1\n  logs/victoria-logs                               preset     38 MiB\n      manifests logs\n  metrics/metrics-server                           preset     17 MiB\n      chart metrics-server 3.14.0\n  metrics/victoria-metrics                         preset     207 MiB\n      chart vm 0.96.0\n      manifests notifications\n  node-updates/system-upgrade-controller           preset     12 MiB\n      manifests crds (1 URLs)\n      manifests controller (1 URLs)\n\nNamespaces exempt from the restricted Pod Security level\n  builder-system (builds/zeabur-builder is privileged)\n  observability (logs/victoria-logs is privileged)\n  system-upgrade (node-updates/system-upgrade-controller is privileged)\n\nStorage          local-path (default)\n\nZeabur           https://zeabur.203.0.113.10.sslip.io (certificates from a CA made on this server)\nZeabur Identity  https://login.203.0.113.10.sslip.io\n\nMemory at idle   about 1668 MiB of 5836 (K3s 1300, components 368, plus 3 unmeasured)\nwarning: Local access: login.203.0.113.10.sslip.io and zeabur.203.0.113.10.sslip.io must resolve to this server for browsers and for the server itself, through DNS (names such as <address>.sslip.io do) rather than a hosts file, which pods do not read.\nwarning: This server has no public address, so new services get no suggested URL. Add `suffixes: [203-0-113-10.sslip.io]` under access for URLs only this network reaches, signed by the local CA.\n",
   "yaml": "preset: standard\nenable: []\ndisable: []\nprofile: single-node\naccess:\n  mode: local\n  identity: login.203.0.113.10.sslip.io\n  zeabur: zeabur.203.0.113.10.sslip.io\n  invitations: true\nzeabur: true\ninputs: {}\nsecretFiles: {}\nrke2Version: null\nhost:\n  tlsSan: []\n  requireEncryptedDisk: false\nsources:\n  catalog: null\n  imageArchives: []\n  identityImage: null\n  identityctl: null\n  zeaburImage: null\n  zeaburChart: null\n"
 }

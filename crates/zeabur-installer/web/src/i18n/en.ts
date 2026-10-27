@@ -212,7 +212,7 @@ export const en = {
   "preset.secure": "Hardened",
   "presetHint.minimal": "Ingress, certificates and metrics-server: what Zeabur needs to run.",
   "presetHint.standard":
-    "Everything the catalog recommends for one server, plus image updates and PostgreSQL.",
+    "Everything the catalog recommends for one server, plus Zeabur Builder for Git builds, image updates and PostgreSQL.",
   "presetHint.secure":
     "Standard, plus runtime threat detection, vulnerability scanning and intrusion prevention.",
   "components.chosen": (n: number) => `${plural(n, "component", "components")} chosen`,
@@ -236,6 +236,8 @@ export const en = {
   "components.list": "Write a list: [a, b].",
   "components.secret": "Saved to a file only root can read, never in the configuration.",
   "components.incomplete": (names: string) => `Fill in the settings of ${names} to continue.`,
+  "note.builds/zeabur-builder":
+    "Builds run in a privileged buildkitd, so a build that escapes its sandbox reaches the node. Only admins should have access to the builder-system and zot namespaces.",
   "note.volume-backup/k8up": "Backs up volumes to S3. Database backups don't need it.",
   "note.volume-backup/velero": "Backs up the whole cluster to S3. Database backups don't need it.",
   "velero.endpoint": "Endpoint",

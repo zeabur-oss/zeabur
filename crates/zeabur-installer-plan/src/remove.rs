@@ -485,8 +485,8 @@ mod tests {
 
     #[test]
     fn removing_builder_removes_its_zot_and_waits_for_builds_and_images() {
-        let before = planned("enable: [builds]\n");
-        let after = planned("");
+        let before = planned("");
+        let after = planned("disable: [builds]\n");
         let removals = removals(&index(), &after, &installed(&before), "single-node", &[]).0;
         let builder = removals.iter().find(|r| r.id == BUILDER).unwrap();
         assert_eq!(builder.helm_charts, ["zot", "builder"]);

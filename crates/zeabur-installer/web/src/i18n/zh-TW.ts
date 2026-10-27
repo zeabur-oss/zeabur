@@ -191,7 +191,8 @@ export const zhTW: Messages = {
   "preset.standard": "標準",
   "preset.secure": "強化",
   "presetHint.minimal": "Ingress、憑證和 metrics-server：Zeabur 執行所需的元件。",
-  "presetHint.standard": "單台伺服器建議安裝的元件，再加上映像檔自動更新和 PostgreSQL。",
+  "presetHint.standard":
+    "單台伺服器建議安裝的元件，再加上從 Git 建置的 Zeabur Builder、映像檔自動更新和 PostgreSQL。",
   "presetHint.secure": "標準組合，再加上執行期威脅偵測、弱點掃描和入侵防護。",
   "components.chosen": (n) => `已選 ${n} 個元件`,
   "components.needed": "其他元件需要",
@@ -214,6 +215,8 @@ export const zhTW: Messages = {
   "components.list": "格式為清單：[a, b]。",
   "components.secret": "只存進僅 root 可讀的檔案，不會寫進設定檔。",
   "components.incomplete": (names) => `填好 ${names} 的設定才能繼續。`,
+  "note.builds/zeabur-builder":
+    "建置在有特權的 buildkitd 裡執行，逃出沙箱的建置可以碰到節點。builder-system 和 zot 這兩個 Namespace 只讓管理員存取。",
   "note.volume-backup/k8up": "把磁碟區備份到 S3。資料庫備份不需要它。",
   "note.volume-backup/velero": "把整個叢集備份到 S3。資料庫備份不需要它。",
   "velero.endpoint": "端點",

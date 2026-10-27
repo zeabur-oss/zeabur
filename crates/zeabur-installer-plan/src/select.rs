@@ -36,10 +36,9 @@ const PERSONAL_DEFAULT: &[&str] = &["ingress", "certificates"];
 /// Components `minimal` installs: reachable over HTTPS, and usage numbers for Zeabur.
 const MINIMAL: &[&str] = &["ingress", "certificates", "metrics/metrics-server"];
 
-/// What `standard` adds to the catalog's recommended components, so that a team can deploy
-/// images and make PostgreSQL databases. Zeabur Builder, with its zot, is chosen on its own: its
-/// buildkitd runs privileged.
-const STANDARD: &[&str] = &["image-updates", "databases/cloudnative-pg"];
+/// What `standard` adds to the catalog's recommended components, so that a team can deploy from
+/// images and Git and make PostgreSQL databases. Zeabur Builder brings zot.
+const STANDARD: &[&str] = &["builds", "image-updates", "databases/cloudnative-pg"];
 
 /// What `secure` adds to `standard`. Backups are left out until the installer can configure an
 /// encrypted repository: an unencrypted backup undoes disk encryption.

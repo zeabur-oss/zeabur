@@ -177,7 +177,8 @@ impl PersonalConfig {
 pub enum Preset {
     /// Ingress, certificates and metrics-server: what Zeabur needs to be reached and to show usage.
     Minimal,
-    /// Everything the catalog recommends for the profile, with Keel and `CloudNativePG`.
+    /// Everything the catalog recommends for the profile, with Zeabur Builder, Keel and
+    /// `CloudNativePG`.
     #[default]
     Standard,
     /// `standard` with runtime detection, vulnerability scanning and intrusion prevention.

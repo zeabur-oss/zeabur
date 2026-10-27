@@ -1,7 +1,7 @@
 ---
 title: Installer 配置
 description: 查阅创建集群和加入节点所用的 YAML 字段、默认值及机密文件格式。
-source: "74cc2f2d3eb9"
+source: "4e8df4d58d74"
 ---
 
 将域名、组件选择和主机配置写入 YAML，运行 `zeabur-installer --config config.yaml plan`，先查看安装内容。文件默认位于 `/etc/zeabur-installer/config.yaml`。字段使用 camelCase；字段拼写错误或存在多余字段时，installer 会直接停止。
@@ -63,7 +63,7 @@ host:
 ### 组件选择
 
 - `minimal`：ingress、证书和 metrics-server，即 Zeabur 能够连接和显示用量所需的组件。
-- `standard`：Catalog 为此 profile 推荐的所有组件，外加 `image-updates`（Keel）和 `databases/cloudnative-pg`，装完就能用镜像部署和创建 PostgreSQL 数据库。Zeabur Builder 不在其中，要使用时在 `enable` 中添加 `builds`，zot 会一并安装。
+- `standard`：Catalog 为此 profile 推荐的所有组件，外加 `builds`（Zeabur Builder 和 zot）、`image-updates`（Keel）和 `databases/cloudnative-pg`，装完就能用镜像或 Git 部署，也能创建 PostgreSQL 数据库。Zeabur Builder 用有特权的 buildkitd 构建，逃出沙箱的构建可以接触到节点；不需要时在 `disable` 中添加 `builds`。
 - `secure`：在 `standard` 的基础上添加运行时检测、漏洞扫描和入侵防护。
 
 `enable` 可以填写 capability（例如 `runtime-security`）或完整组件 ID（例如 `volume-backup/velero`），依赖的组件会一并添加。如果 `disable` 排除了其他组件依赖的组件，`plan` 会列出两者并停止。最终安装的组件、安装顺序和排除原因，见 `plan` 的输出。

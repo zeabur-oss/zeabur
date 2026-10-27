@@ -62,7 +62,7 @@ Both the browser and the server must be able to resolve these two names. Replica
 ### Component selection
 
 - `minimal`: ingress, certificates, and metrics-server—the components Zeabur needs to be reachable and show resource usage.
-- `standard`: everything the Catalog recommends for this profile, plus `image-updates` (Keel) and `databases/cloudnative-pg`, so you can deploy from images and create PostgreSQL databases right after installation. Zeabur Builder isn't included; add `builds` to `enable` to install it with zot.
+- `standard`: everything the Catalog recommends for this profile, plus `builds` (Zeabur Builder and zot), `image-updates` (Keel), and `databases/cloudnative-pg`, so you can deploy from images or Git and create PostgreSQL databases right after installation. Zeabur Builder builds in a privileged buildkitd, so a build that escapes its sandbox reaches the node; add `builds` to `disable` if you don't need it.
 - `secure`: `standard` plus runtime detection, vulnerability scanning, and intrusion prevention.
 
 `enable` accepts capabilities, such as `runtime-security`, or full component IDs, such as `volume-backup/velero`. A component's dependencies are added with it. If `disable` excludes a component that another component needs, `plan` names both and stops. The `plan` output lists the final components, their installation order, and the reasons for exclusions.

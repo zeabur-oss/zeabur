@@ -191,7 +191,8 @@ export const zhCN: Messages = {
   "preset.standard": "标准",
   "preset.secure": "加固",
   "presetHint.minimal": "Ingress、证书和 metrics-server：Zeabur 运行所需的组件。",
-  "presetHint.standard": "单台服务器推荐安装的组件，外加镜像自动更新和 PostgreSQL。",
+  "presetHint.standard":
+    "单台服务器推荐安装的组件，外加从 Git 构建的 Zeabur Builder、镜像自动更新和 PostgreSQL。",
   "presetHint.secure": "标准组合，外加运行时威胁检测、漏洞扫描和入侵防护。",
   "components.chosen": (n) => `已选 ${n} 个组件`,
   "components.needed": "其他组件需要",
@@ -214,6 +215,8 @@ export const zhCN: Messages = {
   "components.list": "格式为列表：[a, b]。",
   "components.secret": "只保存到仅 root 可读的文件，不会写入配置文件。",
   "components.incomplete": (names) => `填好 ${names} 的设置才能继续。`,
+  "note.builds/zeabur-builder":
+    "构建在有特权的 buildkitd 中运行，逃出沙箱的构建可以接触到节点。builder-system 和 zot 这两个 Namespace 只允许管理员访问。",
   "note.volume-backup/k8up": "把卷备份到 S3。数据库备份不需要它。",
   "note.volume-backup/velero": "把整个集群备份到 S3。数据库备份不需要它。",
   "velero.endpoint": "端点",

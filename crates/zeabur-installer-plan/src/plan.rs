@@ -1595,6 +1595,7 @@ mod tests {
             [
                 "ingress/traefik",
                 "certificates/cert-manager",
+                "builds/zeabur-builder",
                 "databases/cloudnative-pg",
                 "image-updates/keel",
                 "observability-operator/victoria-metrics-operator",
@@ -1812,7 +1813,7 @@ mod tests {
     #[test]
     fn nodes_pull_from_builders_zot_through_its_fixed_address() {
         let index = Index::parse(INDEX.as_bytes()).unwrap();
-        let without = plan(&index, &config(""), &facts()).unwrap();
+        let without = plan(&index, &config("disable: [builds]\n"), &facts()).unwrap();
         assert_eq!(without.zot_cluster_ip, None);
         let k3s = Distribution::K3s;
         assert!(
@@ -1821,7 +1822,7 @@ mod tests {
                 .contains(&k3s.layout().registries_file.to_owned())
         );
 
-        let with = plan(&index, &config("enable: [builds]\n"), &facts()).unwrap();
+        let with = plan(&index, &config(""), &facts()).unwrap();
         assert_eq!(
             with.zot_cluster_ip.as_deref(),
             Some(cluster::ZOT_CLUSTER_IP)
@@ -1837,7 +1838,7 @@ mod tests {
         let chosen = plan(
             &index,
             &config(
-                "enable: [builds]\ninputs:\n  builds/zeabur-builder:\n    \
+                "inputs:\n  builds/zeabur-builder:\n    \
                  cluster-ip: 10.43.7.7\n",
             ),
             &facts(),
@@ -2011,7 +2012,7 @@ mod tests {
     #[test]
     fn products_only_are_what_the_plan_installs() {
         let index = Index::parse(INDEX.as_bytes()).unwrap();
-        let none = "disable: [logs/victoria-logs, metrics/victoria-metrics]\n";
+        let none = "disable: [logs/victoria-logs, metrics/victoria-metrics, builds]\n";
         let p = plan(&index, &config(none), &facts()).unwrap();
         assert_eq!(
             products_only(&config(none), &facts()).unwrap(),
@@ -2063,9 +2064,9 @@ mod tests {
     #[test]
     fn zeabur_trusts_zots_ca_only_when_builder_is_installed() {
         let index = Index::parse(INDEX.as_bytes()).unwrap();
-        let without = plan(&index, &config(""), &facts()).unwrap();
+        let without = plan(&index, &config("disable: [builds]\n"), &facts()).unwrap();
         assert!(without.zeabur.unwrap().values.get("builds").is_none());
-        let with = plan(&index, &config("enable: [builds]\n"), &facts()).unwrap();
+        let with = plan(&index, &config(""), &facts()).unwrap();
         assert_eq!(
             with.zeabur.unwrap().values["builds"]["caBundle"]["configMap"],
             REGISTRY_CA_CONFIGMAP

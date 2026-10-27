@@ -1,7 +1,7 @@
 ---
 title: 在一台伺服器安裝 Zeabur
 description: 用 Zeabur Installer 的網頁介面檢查伺服器、選元件並安裝，最後註冊第一位管理員的通行密鑰。
-source: "aa9d3bf1cee5"
+source: "65421e9039df"
 ---
 
 用 Zeabur Installer 的網頁介面完成五個步驟，就能開啟 Zeabur 並註冊第一位管理員的通行密鑰。按下「安裝」之前，installer 不會改動伺服器。
@@ -112,10 +112,10 @@ ssh -L 8085:127.0.0.1:8085 root@203.0.113.10
 | 預設組合 | 內容 |
 | --- | --- |
 | 「精簡」 | Ingress、憑證和 metrics-server |
-| 「標準」 | 元件目錄建議單台伺服器安裝的元件，再加上映像檔自動更新（Keel）和 PostgreSQL（CloudNativePG）。這是預設選項 |
+| 「標準」 | 元件目錄建議單台伺服器安裝的元件，再加上 Zeabur Builder（含 zot）、映像檔自動更新（Keel）和 PostgreSQL（CloudNativePG）。這是預設選項 |
 | 「強化」 | 「標準」再加執行期威脅偵測、弱點掃描和入侵防護 |
 
-「標準」裝完就能用映像檔部署應用程式和建立 PostgreSQL 資料庫。從 Git 部署需要 Zeabur Builder，在元件清單勾選它，zot 會一起裝。
+「標準」裝完就能用映像檔或 Git 部署應用程式，也能建立 PostgreSQL 資料庫。Zeabur Builder 用有特權的 buildkitd 建置，逃出沙箱的建置可以碰到節點，所以 builder-system 和 zot 這兩個 Namespace 只讓管理員存取。用不到 Git 部署時，在元件清單取消勾選 Zeabur Builder。
 
 有些元件要先填設定才能繼續，例如 Velero 要填 S3 的端點、儲存貯體、區域和存取金鑰，installer 會自己組成 Velero 需要的憑證檔。
 
