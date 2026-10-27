@@ -344,42 +344,38 @@ describe("build options in the service's settings", () => {
 describe("what the cluster lacks", () => {
   const capability = (name: string, existing: boolean) =>
     ({ name, existing, components: [], evidence: [], installations: [] }) as never
-  const noZot = capability("container-registry", false)
   const noKeel = capability("image-updates", false)
   const zot = "zot.zot.svc:5000"
   test.each([
     [
-      "everything, all at once",
+      "Builder, which brings zot, and Keel, all at once",
       "not-installed",
-      [noZot, noKeel],
+      [noKeel],
       zot,
-      {
-        install: ["builds", "container-registry/zot", "image-updates/keel"],
-        registrySetting: false,
-      },
+      { install: ["builds/zeabur-builder", "image-updates/keel"], registrySetting: false },
     ],
     [
       "the Builder alone",
       "not-installed",
       [],
       zot,
-      { install: ["builds"], registrySetting: false },
+      { install: ["builds/zeabur-builder"], registrySetting: false },
     ],
     [
       "the registry setting, which no component gives",
       "installed",
-      [noZot],
+      [],
       "",
       { install: [], registrySetting: true },
     ],
     [
-      "Keel, past a configured registry detection doesn't know",
+      "Keel, with another registry",
       "installed",
-      [noZot, noKeel],
+      [noKeel],
       "ghcr.io/acme",
       { install: ["image-updates/keel"], registrySetting: false },
     ],
-    ["nothing with a configured registry", "installed", [noZot], "harbor.example.com", undefined],
+    ["nothing with a configured registry", "installed", [], "harbor.example.com", undefined],
     ["nothing while unknown", undefined, undefined, undefined, undefined],
   ] as const)("%s", (_, builds, capabilities, registry, needs) => {
     expect(gitNeeds({ builds, capabilities: capabilities as never, registry })).toEqual(

@@ -24,11 +24,11 @@ pub const PERSONAL_PROFILE: &str = "single-node";
 /// `KubeSolo`'s webhook replaces the annotations of
 /// every PVC, which stops `CloudNativePG`, and removing PVCs from the webhook's rules leaves
 /// volumes unbound.
-pub const PERSONAL: &[&str] = &["ingress", "certificates", "container-registry", "builds"];
+pub const PERSONAL: &[&str] = &["ingress", "certificates", "builds"];
 
-/// The capabilities of Zeabur Builder and zot. A personal install offers them, but only on a
-/// host with enough memory.
-pub const BUILD_CAPABILITIES: &[&str] = &["container-registry", "builds"];
+/// The capability of Zeabur Builder, which brings zot. A personal install offers it, but only on
+/// a host with enough memory.
+pub const BUILD_CAPABILITIES: &[&str] = &["builds"];
 
 /// What a personal install installs unless told otherwise.
 const PERSONAL_DEFAULT: &[&str] = &["ingress", "certificates"];
@@ -37,13 +37,9 @@ const PERSONAL_DEFAULT: &[&str] = &["ingress", "certificates"];
 const MINIMAL: &[&str] = &["ingress", "certificates", "metrics/metrics-server"];
 
 /// What `standard` adds to the catalog's recommended components, so that a team can deploy
-/// images and make PostgreSQL databases. Zeabur Builder is not here: the pinned catalog has no
-/// `builds` component.
-const STANDARD: &[&str] = &[
-    "container-registry",
-    "image-updates",
-    "databases/cloudnative-pg",
-];
+/// images and make PostgreSQL databases. Zeabur Builder, with its zot, is chosen on its own: its
+/// buildkitd runs privileged.
+const STANDARD: &[&str] = &["image-updates", "databases/cloudnative-pg"];
 
 /// What `secure` adds to `standard`. Backups are left out until the installer can configure an
 /// encrypted repository: an unencrypted backup undoes disk encryption.

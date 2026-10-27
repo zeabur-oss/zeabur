@@ -33,9 +33,9 @@ nix develop -c scripts/render-chart-corpus.sh
 
 | Component | File | Releases (name@version) | Licence | Documents | Bytes |
 | --- | --- | --- | --- | --- | --- |
+| builds/zeabur-builder | `builds__zeabur-builder.yaml` | tls@inline, zot@0.1.128, builder@0.0.1 | tls: [Apache-2.0](https://github.com/zeabur-oss/catalog/blob/main/LICENSE) (catalogue); zot: [Apache-2.0](https://github.com/project-zot/helm-charts/blob/main/LICENSE); builder: [Apache-2.0](https://github.com/zeabur-oss/builder/blob/main/LICENSE) | 29 | 66941 |
 | certificates/cert-manager | `certificates__cert-manager.yaml` | cert-manager@v1.21.3, issuers@inline | [Apache-2.0](https://github.com/cert-manager/cert-manager/blob/master/LICENSE) | 47 | 47501 |
 | config-reload/reloader | `config-reload__reloader.yaml` | reloader@2.2.18 | [Apache-2.0](https://github.com/stakater/Reloader/blob/master/LICENSE) | 6 | 6727 |
-| container-registry/zot | `container-registry__zot.yaml` | tls@inline, zot@0.1.128 | tls: [Apache-2.0](https://github.com/zeabur-oss/catalog/blob/main/LICENSE) (catalogue); zot: [Apache-2.0](https://github.com/project-zot/helm-charts/blob/main/LICENSE) | 10 | 7048 |
 | databases/cloudnative-pg | `databases__cloudnative-pg.yaml` | cloudnative-pg@0.29.1, plugin-barman-cloud@0.8.1 | [Apache-2.0](https://github.com/cloudnative-pg/charts/blob/main/LICENSE) | 22 | 45653 |
 | databases/dragonfly-operator | `databases__dragonfly-operator.yaml` | dragonfly-operator@v1.7.1 | [Apache-2.0](https://github.com/dragonflydb/dragonfly-operator/blob/main/LICENSE) | 14 | 15159 |
 | databases/mariadb-operator | `databases__mariadb-operator.yaml` | mariadb-operator-crds@26.10.1, mariadb-operator@26.10.1 | [MIT](https://github.com/mariadb-operator/mariadb-operator/blob/main/LICENSE), notice in `LICENSE-mariadb-operator.txt` | 16 | 19690 |
@@ -62,4 +62,4 @@ nix develop -c scripts/render-chart-corpus.sh
 | volume-backup/velero | `volume-backup__velero.yaml` | velero@12.2.1 | [Apache-2.0](https://github.com/vmware-tanzu/helm-charts/blob/main/LICENSE) | 13 | 12691 |
 | vulnerability-scanning/trivy-operator | `vulnerability-scanning__trivy-operator.yaml` | trivy-operator@0.37.0 | [Apache-2.0](https://github.com/aquasecurity/trivy-operator/blob/main/LICENSE), NOTICE in `LICENSE-trivy-operator-NOTICE.txt` | 21 | 66828 |
 
-Total: 599986 bytes.
+Total: 657609 bytes.

@@ -89,16 +89,17 @@ pub(crate) fn run(config_path: &Path) -> Result<(), InstallError> {
     for component in &plan.components {
         out::step(&format!("{} ({})", component.display_name, component.id));
         secrets(&kubectl, component)?;
+        if component.id == plan::BUILDER {
+            // Before Builder starts, so it reaches zot from its first run.
+            kubectl.apply_object(&plan::zot_builder_policy())?;
+        }
         releases(&kubectl, component)?;
         for wait in &component.smoke {
             let mut args: Vec<&str> = wait.iter().map(String::as_str).collect();
             args.push("--timeout=5m");
             kubectl.wait(&args)?;
         }
-        if component.id == plan::ZOT {
-            kubectl.apply_object(&plan::zot_builder_policy())?;
-        }
-        if component.id == plan::ZOT && plan.zot_cluster_ip.is_some() {
+        if component.id == plan::BUILDER && plan.zot_cluster_ip.is_some() {
             zot_ca(&kubectl, Path::new(distribution.layout().zot_ca_file))?;
         }
     }
@@ -1060,7 +1061,7 @@ fn zeabur(kubectl: &Kubectl, plan: &Plan, config: &Config) -> Result<(), Install
         }))?;
     }
 
-    if plan.components.iter().any(|c| c.id == plan::ZOT) {
+    if plan.components.iter().any(|c| c.id == plan::BUILDER) {
         kubectl.apply_object(&json!({
             "apiVersion": "v1",
             "kind": "ConfigMap",

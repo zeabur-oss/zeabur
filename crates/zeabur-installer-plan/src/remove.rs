@@ -16,7 +16,7 @@ use serde::Serialize;
 
 use crate::catalog::{Component, Index};
 use crate::cluster::ZOT_HOST;
-use crate::plan::{COMPONENT_ANNOTATION, ComponentPlan, MANAGER, Warning, ZOT, warning};
+use crate::plan::{BUILDER, COMPONENT_ANNOTATION, ComponentPlan, MANAGER, Warning, warning};
 use crate::storage::LONGHORN;
 
 /// The leftover that means the chart's volumes stay.
@@ -266,21 +266,24 @@ fn removal(component: &Component, installed: &[Installed], allow_data_loss: &[St
         vec![InUse::Volumes {
             driver: LONGHORN_DRIVER.to_owned(),
         }]
-    } else if id == ZOT {
-        vec![InUse::Images {
-            registry: ZOT_HOST.to_owned(),
-        }]
     } else if OUTPUT_ONLY.contains(&id) {
         Vec::new()
     } else {
-        component
+        let mut in_use: Vec<InUse> = component
             .detection
             .crds
             .iter()
             .map(|crd| InUse::Objects {
                 resource: crd.clone(),
             })
-            .collect()
+            .collect();
+        // Zeabur Builder's zot goes with it.
+        if id == BUILDER {
+            in_use.push(InUse::Images {
+                registry: ZOT_HOST.to_owned(),
+            });
+        }
+        in_use
     };
     let loses_data = component.persists_data && !component.leftovers.iter().any(|l| l == VOLUMES);
     let confirmed = allow_data_loss.iter().any(|a| a == id);
@@ -478,6 +481,23 @@ mod tests {
             }]
         );
         assert!(!keda.loses_data);
+    }
+
+    #[test]
+    fn removing_builder_removes_its_zot_and_waits_for_builds_and_images() {
+        let before = planned("enable: [builds]\n");
+        let after = planned("");
+        let removals = removals(&index(), &after, &installed(&before), "single-node", &[]).0;
+        let builder = removals.iter().find(|r| r.id == BUILDER).unwrap();
+        assert_eq!(builder.helm_charts, ["zot", "builder"]);
+        assert_eq!(builder.namespaces, ["zot", "builder-system"]);
+        assert!(builder.in_use.contains(&InUse::Objects {
+            resource: "builds.builder.zeabur.com".to_owned()
+        }));
+        assert!(builder.in_use.contains(&InUse::Images {
+            registry: ZOT_HOST.to_owned()
+        }));
+        assert!(!builder.loses_data);
     }
 
     fn crd(name: &str, annotations: &serde_json::Value) -> serde_json::Value {

@@ -1,6 +1,5 @@
 import { useQuery } from "@tanstack/react-query"
 import type { ReactNode } from "react"
-import ArrowSquareOutIcon from "~icons/ph/arrow-square-out"
 import XIcon from "~icons/ph/x"
 
 import { capabilitiesQuery } from "@/api/queries"
@@ -13,10 +12,9 @@ import {
   DialogTitle,
 } from "@zeabur/design-system/components/dialog"
 import { useT } from "@/i18n"
-import { BUILDER, exportable, type Needed } from "@/model/installer"
+import type { Needed } from "@/model/installer"
 
 const CONFIG = "/etc/zeabur-installer/config.yaml"
-const BUILDER_DOCS = "https://oss.zeabur.com/docs/builder/"
 
 /** The installer commands that install components on the server, all in one step, or remove one.
  * Where zeabur-installer did not set up the cluster, `zeaburctl components export` instead. */
@@ -115,30 +113,12 @@ function InstallerSteps({
 
 function ExportStep({ components, installer }: { components: Needed[]; installer?: boolean }) {
   const t = useT()
-  const printed = exportable(components)
-  const builder = components.some((c) => c.id === BUILDER.id)
   return (
     <section className="flex flex-col gap-2">
-      {printed.length > 0 ? (
-        <>
-          <p className="text-pretty">
-            {installer === false ? t("installer.notHere") : t("installer.otherCluster")}
-          </p>
-          <Command text={`zeaburctl components export ${printed.map((c) => c.id).join(" ")}`} />
-        </>
-      ) : null}
-      {builder ? (
-        <a
-          href={BUILDER_DOCS}
-          target="_blank"
-          rel="noreferrer noopener"
-          className="inline-flex items-center gap-1 self-start type-meta text-muted-foreground hover:text-foreground"
-        >
-          {t("installer.builderDocs")}
-          <ArrowSquareOutIcon className="size-3" aria-hidden="true" />
-          <span className="sr-only">{t("settings.opensInNewTab")}</span>
-        </a>
-      ) : null}
+      <p className="text-pretty">
+        {installer === false ? t("installer.notHere") : t("installer.otherCluster")}
+      </p>
+      <Command text={`zeaburctl components export ${components.map((c) => c.id).join(" ")}`} />
     </section>
   )
 }

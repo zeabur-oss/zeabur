@@ -41,8 +41,8 @@
 //! reading the storage classes (local-path, the default, and Longhorn) and the volumes behind
 //! claims.
 //!
-//! `ZEABUR_DEMO_KEEL=1` installs Keel and zot, so a project offers Deploy from Git and Upload a
-//! folder; without it both name the two as missing. A registry on 127.0.0.1 takes the uploaded
+//! `ZEABUR_DEMO_KEEL=1` installs Keel, so a project offers Deploy from Git and Upload a folder;
+//! without it both name Keel as missing. A registry on 127.0.0.1 takes the uploaded
 //! folders, and a stand-in for Zeabur Builder's controller answers upload token requests and builds
 //! the digest named in a `Build` (a few seconds, then it is built).
 //!
@@ -1764,13 +1764,6 @@ fn state() -> State {
             BTreeMap::from([
                 ("app".to_owned(), "keel".to_owned()),
                 ("helm.sh/chart".to_owned(), "keel-1.0.5".to_owned()),
-            ]),
-        ));
-        facts.workload_labels.push((
-            "StatefulSet".to_owned(),
-            BTreeMap::from([
-                ("app.kubernetes.io/name".to_owned(), "zot".to_owned()),
-                ("helm.sh/chart".to_owned(), "zot-0.1.128".to_owned()),
             ]),
         ));
     }

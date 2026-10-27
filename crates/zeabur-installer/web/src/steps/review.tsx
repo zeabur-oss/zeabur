@@ -381,7 +381,6 @@ function Disclosure({
 /** The Zeabur features that need a component, with the components that give them. */
 const features = [
   ["git", (id: string) => id.startsWith("builds/")],
-  ["registry", (id: string) => id.startsWith("container-registry/")],
   ["updates", (id: string) => id.startsWith("image-updates/")],
   ["postgres", (id: string) => id === "databases/cloudnative-pg"],
   ["usage", (id: string) => id === "metrics/victoria-metrics"],

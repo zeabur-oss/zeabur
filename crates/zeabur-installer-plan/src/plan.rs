@@ -35,8 +35,9 @@ pub const IDENTITY_NAMESPACE: &str = "zeabur-identity";
 pub const ZEABUR_NAMESPACE: &str = "zeabur";
 /// The `ClusterIssuer` of `local` access: a CA cert-manager makes on the server.
 pub const LOCAL_ISSUER: &str = "zeabur-local-ca";
-/// The catalog's in-cluster registry, which nodes pull through a mirror to its fixed address.
-pub const ZOT: &str = "container-registry/zot";
+/// The catalog's Zeabur Builder, which brings zot: the in-cluster registry that nodes pull
+/// through a mirror to its fixed address.
+pub const BUILDER: &str = "builds/zeabur-builder";
 /// The label Zeabur Builder puts on the Pods of a build's Job.
 const BUILD_RUN_LABEL: &str = "builder.zeabur.com/buildrun";
 /// The ConfigMap in Zeabur's namespace with zot's CA, which Zeabur trusts to read its images.
@@ -115,8 +116,8 @@ pub struct Plan {
     pub storage: Storage,
     /// What every node needs before the components' pods run on it.
     pub node_prep: Option<NodePrep>,
-    /// zot's fixed `ClusterIP`, when it is installed: nodes pull its images through a mirror to
-    /// it, checked against its CA.
+    /// zot's fixed `ClusterIP`, when Zeabur Builder brings zot: nodes pull its images through a
+    /// mirror to it, checked against its CA.
     pub zot_cluster_ip: Option<String>,
     /// How the two web services get certificates.
     pub access: AccessMode,
@@ -644,7 +645,7 @@ fn chosen_values(chosen: &BTreeSet<&str>, values: &mut Value) {
     let Some(map) = values.as_object_mut() else {
         return;
     };
-    if chosen.contains(ZOT) {
+    if chosen.contains(BUILDER) {
         map.insert(
             "builds".to_owned(),
             json!({"caBundle": {"configMap": REGISTRY_CA_CONFIGMAP}}),
@@ -812,7 +813,7 @@ pub(crate) struct Choices<'a> {
 pub fn installer_fills(component: &str, input: &str) -> bool {
     matches!(
         (component, input),
-        (ZOT, ZOT_CLUSTER_IP_INPUT) | (EXTERNAL_SECRETS, KUBE_API_CIDR_INPUT)
+        (BUILDER, ZOT_CLUSTER_IP_INPUT) | (EXTERNAL_SECRETS, KUBE_API_CIDR_INPUT)
     )
 }
 
@@ -828,7 +829,7 @@ const INSTALLER_INPUTS: &[(&str, &str, &str, &str)] = &[(
 /// The value of an input the installer knows; a configured value wins over it.
 fn known_input(component: &str, input: &str, facts: &Facts) -> Option<Value> {
     match (component, input) {
-        (ZOT, ZOT_CLUSTER_IP_INPUT) => Some(json!(cluster::ZOT_CLUSTER_IP)),
+        (BUILDER, ZOT_CLUSTER_IP_INPUT) => Some(json!(cluster::ZOT_CLUSTER_IP)),
         (EXTERNAL_SECRETS, KUBE_API_CIDR_INPUT) => {
             let ip = facts
                 .node_ips
@@ -1143,19 +1144,21 @@ fn server_files(
 }
 
 /// zot's fixed `ClusterIP`: the configured `cluster-ip` input, else [`cluster::ZOT_CLUSTER_IP`].
-/// `None` when zot is not installed, or its catalog release takes no such input.
+/// `None` when Zeabur Builder is not chosen, or its catalog release takes no such input.
 pub(crate) fn zot_cluster_ip(
     index: &Index,
     inputs: &BTreeMap<String, BTreeMap<String, Value>>,
     chosen: &BTreeSet<&str>,
 ) -> Option<String> {
-    let component = index.component(ZOT).filter(|_| chosen.contains(ZOT))?;
+    let component = index
+        .component(BUILDER)
+        .filter(|_| chosen.contains(BUILDER))?;
     let input = component
         .inputs
         .iter()
         .find(|i| i.name == ZOT_CLUSTER_IP_INPUT)?;
     let given = inputs
-        .get(ZOT)
+        .get(BUILDER)
         .and_then(|g| g.get(&input.name))
         .and_then(Value::as_str);
     Some(given.unwrap_or(cluster::ZOT_CLUSTER_IP).to_owned())
@@ -1592,7 +1595,6 @@ mod tests {
             [
                 "ingress/traefik",
                 "certificates/cert-manager",
-                "container-registry/zot",
                 "databases/cloudnative-pg",
                 "image-updates/keel",
                 "observability-operator/victoria-metrics-operator",
@@ -1795,7 +1797,7 @@ mod tests {
     }
 
     fn zot_values(plan: &Plan) -> String {
-        let zot = plan.components.iter().find(|c| c.id == ZOT).unwrap();
+        let zot = plan.components.iter().find(|c| c.id == BUILDER).unwrap();
         zot.releases
             .iter()
             .find_map(|release| match release {
@@ -1808,9 +1810,9 @@ mod tests {
     }
 
     #[test]
-    fn nodes_pull_from_zot_through_its_fixed_address() {
+    fn nodes_pull_from_builders_zot_through_its_fixed_address() {
         let index = Index::parse(INDEX.as_bytes()).unwrap();
-        let without = plan(&index, &config("disable: [container-registry]\n"), &facts()).unwrap();
+        let without = plan(&index, &config(""), &facts()).unwrap();
         assert_eq!(without.zot_cluster_ip, None);
         let k3s = Distribution::K3s;
         assert!(
@@ -1819,12 +1821,7 @@ mod tests {
                 .contains(&k3s.layout().registries_file.to_owned())
         );
 
-        let with = plan(
-            &index,
-            &config("enable: [container-registry/zot]\n"),
-            &facts(),
-        )
-        .unwrap();
+        let with = plan(&index, &config("enable: [builds]\n"), &facts()).unwrap();
         assert_eq!(
             with.zot_cluster_ip.as_deref(),
             Some(cluster::ZOT_CLUSTER_IP)
@@ -1840,7 +1837,7 @@ mod tests {
         let chosen = plan(
             &index,
             &config(
-                "enable: [container-registry/zot]\ninputs:\n  container-registry/zot:\n    \
+                "enable: [builds]\ninputs:\n  builds/zeabur-builder:\n    \
                  cluster-ip: 10.43.7.7\n",
             ),
             &facts(),
@@ -2014,7 +2011,7 @@ mod tests {
     #[test]
     fn products_only_are_what_the_plan_installs() {
         let index = Index::parse(INDEX.as_bytes()).unwrap();
-        let none = "disable: [logs/victoria-logs, metrics/victoria-metrics, container-registry]\n";
+        let none = "disable: [logs/victoria-logs, metrics/victoria-metrics]\n";
         let p = plan(&index, &config(none), &facts()).unwrap();
         assert_eq!(
             products_only(&config(none), &facts()).unwrap(),
@@ -2064,16 +2061,11 @@ mod tests {
     }
 
     #[test]
-    fn zeabur_trusts_zots_ca_only_when_zot_is_installed() {
+    fn zeabur_trusts_zots_ca_only_when_builder_is_installed() {
         let index = Index::parse(INDEX.as_bytes()).unwrap();
-        let without = plan(&index, &config("disable: [container-registry]\n"), &facts()).unwrap();
+        let without = plan(&index, &config(""), &facts()).unwrap();
         assert!(without.zeabur.unwrap().values.get("builds").is_none());
-        let with = plan(
-            &index,
-            &config("enable: [container-registry/zot]\n"),
-            &facts(),
-        )
-        .unwrap();
+        let with = plan(&index, &config("enable: [builds]\n"), &facts()).unwrap();
         assert_eq!(
             with.zeabur.unwrap().values["builds"]["caBundle"]["configMap"],
             REGISTRY_CA_CONFIGMAP

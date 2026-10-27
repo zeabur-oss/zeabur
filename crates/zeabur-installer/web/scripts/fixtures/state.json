@@ -10,12 +10,22 @@
         "distributions": [],
         "id": "builds/zeabur-builder",
         "idleMemoryMib": null,
-        "inputs": [],
-        "needs": ["ingress/traefik", "certificates/cert-manager", "container-registry/zot"],
+        "inputs": [
+          {
+            "default": null,
+            "description": "A free address in the cluster's Service CIDR for the registry's Service, such as 10.43.0.50 on k3s and RKE2. Nodes pull through a registry mirror to it. Left out: an address is assigned and only pods reach the registry.\n",
+            "filled": true,
+            "generated": false,
+            "name": "cluster-ip",
+            "required": false,
+            "secret": false
+          }
+        ],
+        "needs": ["ingress/traefik", "certificates/cert-manager"],
         "personal": true,
         "personalMinMemoryMib": 1800,
         "privileged": true,
-        "security": "ClusterRole: manages Builds, BuildRuns and Jobs in every namespace; reads Pods and Namespaces; reads, creates, updates and deletes Secrets in every namespace (the Git credentials Builds name, and the copies it puts in build namespaces). Runs one privileged buildkitd per building namespace in its own namespace, with a user namespace and an egress policy.\n"
+        "security": "Zeabur Builder: a ClusterRole that manages Builds, BuildRuns and Jobs in every namespace; reads Pods and Namespaces; reads, creates, updates and deletes Secrets in every namespace (the Git credentials Builds name, and the copies it puts in build namespaces), and reads the zot token signer. Runs one privileged buildkitd per building namespace in its own namespace, with a user namespace and an egress policy. An admission policy limits the Jobs and StatefulSets it can create. zot: no RBAC, a ServiceAccount without roles; serves the OCI registry API over TLS on port 5000 inside the cluster.\n"
       },
       {
         "capability": "certificates",
@@ -44,30 +54,6 @@
         "personalMinMemoryMib": null,
         "privileged": false,
         "security": "ClusterRole: reads, lists and watches every Secret and ConfigMap; reads, updates and patches Deployments, StatefulSets and DaemonSets; creates Events. Role in its namespace: lists, reads, watches, creates and updates every ConfigMap there, not only its own, and on multi-node the leader-election Lease.\n"
-      },
-      {
-        "capability": "container-registry",
-        "default": "optional",
-        "displayName": "zot",
-        "distributions": [],
-        "id": "container-registry/zot",
-        "idleMemoryMib": null,
-        "inputs": [
-          {
-            "default": null,
-            "description": "A free address in the cluster's Service CIDR for the registry's Service, such as 10.43.0.50 on k3s and RKE2. Nodes pull through a registry mirror to it. Left out: an address is assigned and only pods reach the registry.\n",
-            "filled": true,
-            "generated": false,
-            "name": "cluster-ip",
-            "required": false,
-            "secret": false
-          }
-        ],
-        "needs": ["ingress/traefik", "certificates/cert-manager"],
-        "personal": true,
-        "personalMinMemoryMib": 1800,
-        "privileged": false,
-        "security": "No RBAC: a ServiceAccount without roles. Serves the OCI registry API over TLS on port 5000 inside the cluster.\n"
       },
       {
         "capability": "databases",

@@ -11,7 +11,7 @@ import {
   type DomainSettings,
   type ImageService,
 } from "@/model/image-service"
-import { BUILDER, KEEL, ZOT } from "@/model/installer"
+import { BUILDER, KEEL } from "@/model/installer"
 import type { Profile } from "@/model/pod-security"
 
 type Change = Schemas["Change"]
@@ -481,9 +481,6 @@ export interface GitNeeds {
   registrySetting: boolean
 }
 
-/** The catalogue's zot, at the address the chart names by default. */
-const ZOT_ADDRESS = /^zot\.zot\.svc(\.cluster\.local)?(:\d+)?$/
-
 export function gitNeeds({
   builds,
   capabilities,
@@ -496,9 +493,8 @@ export function gitNeeds({
 }): GitNeeds | undefined {
   const absent = (name: string) => capabilities?.find((c) => c.name === name)?.existing === false
   const install: string[] = []
-  if (builds === "not-installed") install.push(BUILDER.id)
-  // Detection only recognises the catalogue's zot, so another registry is taken as running.
-  if (registry && ZOT_ADDRESS.test(registry) && absent("container-registry")) install.push(ZOT)
+  // Zeabur Builder brings zot.
+  if (builds === "not-installed") install.push(BUILDER)
   if (absent("image-updates")) install.push(KEEL)
   const registrySetting = registry === ""
   return install.length > 0 || registrySetting ? { install, registrySetting } : undefined

@@ -212,7 +212,7 @@ export const en = {
   "preset.secure": "Hardened",
   "presetHint.minimal": "Ingress, certificates and metrics-server: what Zeabur needs to run.",
   "presetHint.standard":
-    "Everything the catalog recommends for one server, plus a container registry, image updates and PostgreSQL.",
+    "Everything the catalog recommends for one server, plus image updates and PostgreSQL.",
   "presetHint.secure":
     "Standard, plus runtime threat detection, vulnerability scanning and intrusion prevention.",
   "components.chosen": (n: number) => `${plural(n, "component", "components")} chosen`,
@@ -278,7 +278,6 @@ export const en = {
   "capability.certificates": "Certificates",
   "capability.builds": "Builds",
   "capability.config-reload": "Config reload",
-  "capability.container-registry": "Container registry",
   "capability.dns": "DNS",
   "capability.event-autoscaling": "Event autoscaling",
   "capability.ingress": "Ingress",
@@ -335,7 +334,6 @@ export const en = {
   "can.git": "deploy from Git",
   "can.postgres": "create PostgreSQL databases",
   "feature.git": "Deploy from Git",
-  "feature.registry": "Container registry",
   "feature.updates": "Image updates",
   "feature.postgres": "PostgreSQL",
   "feature.usage": "Usage history",

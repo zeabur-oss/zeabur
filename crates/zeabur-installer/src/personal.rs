@@ -159,11 +159,11 @@ pub(crate) fn apply(config: &PersonalConfig) -> Result<(), InstallError> {
             args.push("--timeout=5m");
             kubectl.wait(&args)?;
         }
-        if component.id == plan::ZOT && plan.zot_cluster_ip.is_some() {
+        if component.id == plan::BUILDER && plan.zot_cluster_ip.is_some() {
             crate::apply::zot_ca(&kubectl, Path::new(ZOT_CA_FILE))?;
         }
     }
-    if plan.components.iter().any(|c| c.id == plan::ZOT) {
+    if plan.components.iter().any(|c| c.id == plan::BUILDER) {
         registry_info(&kubectl)?;
     }
     let wrong = job_images(&kubectl, &plan)?;
@@ -445,8 +445,8 @@ pub(crate) fn doctor(config: &PersonalConfig) -> ExitCode {
     doctor::report(&results)
 }
 
-/// Zeabur Builder and zot, when the plan has them: Builder runs, and containerd trusts the CA zot
-/// serves with.
+/// Zeabur Builder, when the plan has it: Builder runs, and containerd trusts the CA its zot serves
+/// with.
 fn registry_checks(kubectl: &Kubectl, plan: &Value) -> Vec<(Status, String)> {
     let has = |id: &str| {
         plan.get("components")
@@ -457,14 +457,14 @@ fn registry_checks(kubectl: &Kubectl, plan: &Value) -> Vec<(Status, String)> {
             })
     };
     let mut results = Vec::new();
-    if has("builds/zeabur-builder") {
+    if has(plan::BUILDER) {
         results.push(doctor::deployment(
             kubectl,
             "builder-system",
             "zeabur-builder",
         ));
     }
-    if has(plan::ZOT) && plan.get("zotClusterIp").is_some_and(|ip| !ip.is_null()) {
+    if has(plan::BUILDER) && plan.get("zotClusterIp").is_some_and(|ip| !ip.is_null()) {
         let served = crate::apply::zot_ca_pem(kubectl).ok();
         let on_host = fs::read_to_string(ZOT_CA_FILE).ok();
         results.push(match (served, on_host) {

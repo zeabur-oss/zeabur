@@ -10,6 +10,11 @@ type Summary = { en: string } & Partial<Record<Exclude<Locale, "en">, string>>
 export const completeLocales: readonly Locale[] = ["en", "zh-TW", "zh-CN"]
 
 export const summaries: Record<string, Summary> = {
+  "builds/zeabur-builder#2cd98802": {
+    en: "Builds images from your Git repositories and keeps them in the cluster, so services can deploy from Git.",
+    "zh-TW": "從 Git 儲存庫建置映像檔並存放在叢集裡，讓服務可以從 Git 部署。",
+    "zh-CN": "从 Git 仓库构建镜像并存放在集群里，让服务可以从 Git 部署。",
+  },
   "certificates/cert-manager#c364a1d4": {
     en: "Issues TLS certificates for your domains and renews them.",
     "zh-TW": "為你的網域簽發 TLS 憑證，並自動續期。",
@@ -19,11 +24,6 @@ export const summaries: Record<string, Summary> = {
     en: "Restarts services when a ConfigMap or Secret they use changes.",
     "zh-TW": "服務使用的 ConfigMap 或 Secret 變更時，自動重新啟動服務。",
     "zh-CN": "服务使用的 ConfigMap 或 Secret 变更时，自动重启服务。",
-  },
-  "container-registry/zot#1e24c1ce": {
-    en: "Stores the images Zeabur Builder builds, inside the cluster.",
-    "zh-TW": "在叢集裡存放 Zeabur Builder 建置的映像檔。",
-    "zh-CN": "在集群里存放 Zeabur Builder 构建的镜像。",
   },
   "databases/cloudnative-pg#e5be71dc": {
     en: "Runs PostgreSQL databases with failover and backups to S3.",

@@ -1,0 +1,1806 @@
+---
+# Signs the CA below; nothing else uses it.
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: zot-selfsigned
+  namespace: zot
+spec:
+  selfSigned: {}
+---
+# A CA of its own: no public CA signs *.svc names. Nodes and buildkitd
+# trust ca.crt from the zot-tls Secret; to use a CA you already
+# distribute, point zot-tls at your own issuer instead. Ten years,
+# because every node holds a copy and rotating it means redistributing.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: zot-ca
+  namespace: zot
+spec:
+  isCA: true
+  commonName: zot-ca
+  secretName: zot-ca
+  duration: 87600h
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  issuerRef:
+    kind: Issuer
+    name: zot-selfsigned
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: zot-ca
+  namespace: zot
+spec:
+  ca:
+    secretName: zot-ca
+---
+# The serving certificate. localhost and 127.0.0.1 let nodes pull
+# through a loopback port-forward or mirror; no node addresses, which
+# differ per cluster. zot reloads it when cert-manager renews it.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: zot-tls
+  namespace: zot
+spec:
+  secretName: zot-tls
+  dnsNames:
+    - zot.zot.svc
+    - zot.zot.svc.cluster.local
+    - localhost
+  ipAddresses: [127.0.0.1]
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  issuerRef:
+    kind: Issuer
+    name: zot-ca
+---
+# Source: zot/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: zot
+  namespace: zot
+  labels:
+    helm.sh/chart: zot-0.1.128
+    app.kubernetes.io/name: zot
+    app.kubernetes.io/instance: zot
+    app.kubernetes.io/version: "v2.1.22"
+    app.kubernetes.io/managed-by: Helm
+
+---
+# Source: zot/templates/configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: zot-config
+  namespace: zot
+  labels:
+    helm.sh/chart: zot-0.1.128
+    app.kubernetes.io/name: zot
+    app.kubernetes.io/instance: zot
+    app.kubernetes.io/version: "v2.1.22"
+    app.kubernetes.io/managed-by: Helm
+data:
+  config.json: "{\n  \"distSpecVersion\": \"1.1.1\",\n  \"storage\": {\n    \"rootDirectory\": \"/var/lib/registry\",\n    \"dedupe\": true,\n    \"gc\": true,\n    \"gcDelay\": \"2h\",\n    \"gcInterval\": \"1h\",\n    \"retention\": {\n      \"delay\": \"2h\",\n      \"policies\": [\n        {\n          \"repositories\": [\"**\"],\n          \"deleteReferrers\": true,\n          \"deleteUntagged\": true,\n          \"keepTags\": [{\"mostRecentlyPushedCount\": 20}]\n        }\n      ]\n    }\n  },\n  \"http\": {\n    \"address\": \"0.0.0.0\",\n    \"port\": \"5000\",\n    \"tls\": {\"cert\": \"/tls/tls.crt\", \"key\": \"/tls/tls.key\"}\n  },\n  \"log\": {\"level\": \"info\"}\n}"
+
+---
+# Source: zot/templates/service.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: zot
+  namespace: zot
+  labels:
+    helm.sh/chart: zot-0.1.128
+    app.kubernetes.io/name: zot
+    app.kubernetes.io/instance: zot
+    app.kubernetes.io/version: "v2.1.22"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  type: ClusterIP
+  ports:
+    - port: 5000
+      targetPort: zot
+      protocol: TCP
+      name: zot
+  selector:
+    app.kubernetes.io/name: zot
+    app.kubernetes.io/instance: zot
+
+---
+# Source: zot/templates/statefulset.yaml
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: zot
+  namespace: zot
+  labels:
+    helm.sh/chart: zot-0.1.128
+    app.kubernetes.io/name: zot
+    app.kubernetes.io/instance: zot
+    app.kubernetes.io/version: "v2.1.22"
+    app.kubernetes.io/managed-by: Helm
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: zot
+      app.kubernetes.io/instance: zot
+  minReadySeconds: 10
+  volumeClaimTemplates:
+    - metadata:
+        name: zot-pvc
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 20Gi
+  template:
+    metadata:
+      annotations:
+        checksum/configFiles: ff6573b0bbd74ccdbf807c01aa0c12127681c322e1d10ada4b5dc73cb72c86af
+      labels:
+        app.kubernetes.io/name: zot
+        app.kubernetes.io/instance: zot
+    spec:
+      serviceAccountName: zot
+      securityContext:
+        null
+      containers:
+        - name: zot
+          securityContext:
+            null
+          image: "ghcr.io/project-zot/zot:v2.1.22"
+          imagePullPolicy: IfNotPresent
+          env:
+            null
+          ports:
+            - name: zot
+              containerPort: 5000
+              protocol: TCP
+          volumeMounts:
+            - mountPath: '/var/lib/registry'
+              name: zot-pvc
+            - mountPath: '/etc/zot'
+              name: zot-config
+            - mountPath: "/tls"
+              name: "zot-tls"
+          livenessProbe:
+            initialDelaySeconds: 5
+            httpGet:
+              path: /livez
+              port: 5000
+              scheme: HTTPS
+          readinessProbe:
+            initialDelaySeconds: 5
+            httpGet:
+              path: /readyz
+              port: 5000
+              scheme: HTTPS
+          startupProbe:
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            failureThreshold: 3
+            httpGet:
+              path: /startupz
+              port: 5000
+              scheme: HTTPS
+          resources:
+            limits:
+              memory: 512Mi
+            requests:
+              cpu: 20m
+              memory: 64Mi
+      volumes:
+        - name: zot-config
+          projected:
+            sources:
+              - configMap:
+                  name: zot-config
+        - name: zot-tls
+          secret:
+            secretName: zot-tls
+      dnsPolicy: ClusterFirst
+---
+# Source: zot/templates/tests/test-connection-fails.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "zot-test-connection-fails"
+  namespace: zot
+  labels:
+    helm.sh/chart: zot-0.1.128
+    app.kubernetes.io/name: zot
+    app.kubernetes.io/instance: zot
+    app.kubernetes.io/version: "v2.1.22"
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    "helm.sh/hook": test
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded,hook-failed
+spec:
+  containers:
+    - name: wget
+      image: alpine:3.18
+      command:
+      - sh
+      - -c
+      - |
+        scheme="http"
+          scheme="https"
+        echo "$scheme"
+          wget --no-check-certificate $scheme://zot:5000/v2/_catalog
+  restartPolicy: Never
+
+---
+# Source: zot/templates/tests/test-connection.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "zot-test-connection"
+  namespace: zot
+  labels:
+    helm.sh/chart: zot-0.1.128
+    app.kubernetes.io/name: zot
+    app.kubernetes.io/instance: zot
+    app.kubernetes.io/version: "v2.1.22"
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    "helm.sh/hook": test
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded,hook-failed
+spec:
+  containers:
+    - name: wget
+      image: alpine:3.18
+      command:
+      - sh
+      - -c
+      - |
+        scheme="http"
+          scheme="https"
+        echo "$scheme"
+          wget --no-check-certificate $scheme://zot:5000/v2/_catalog
+  restartPolicy: Never
+
+---
+{
+  "apiVersion": "apiextensions.k8s.io/v1",
+  "kind": "CustomResourceDefinition",
+  "metadata": {
+    "name": "clusterbuilders.builder.zeabur.com"
+  },
+  "spec": {
+    "group": "builder.zeabur.com",
+    "names": {
+      "categories": [
+        "zeabur-builder"
+      ],
+      "kind": "ClusterBuilder",
+      "plural": "clusterbuilders",
+      "shortNames": [
+        "cbuilder"
+      ],
+      "singular": "clusterbuilder"
+    },
+    "scope": "Cluster",
+    "versions": [
+      {
+        "additionalPrinterColumns": [
+          {
+            "jsonPath": ".spec.type",
+            "name": "Type",
+            "type": "string"
+          },
+          {
+            "jsonPath": ".spec.frontend.type",
+            "name": "Frontend",
+            "type": "string"
+          },
+          {
+            "jsonPath": ".metadata.creationTimestamp",
+            "name": "Age",
+            "type": "date"
+          }
+        ],
+        "name": "v1alpha1",
+        "schema": {
+          "openAPIV3Schema": {
+            "description": "How Zeabur Builder plans and builds: Dockerfile or Railpack.",
+            "properties": {
+              "spec": {
+                "description": "A way to build. Every builder reduces to the same shape: an optional planner that writes files\ninto `/workspace/plan`, then a `BuildKit` frontend with options that reads them.",
+                "properties": {
+                  "frontend": {
+                    "description": "The frontend that builds the plan.",
+                    "properties": {
+                      "opts": {
+                        "additionalProperties": {
+                          "maxLength": 4096,
+                          "type": "string"
+                        },
+                        "description": "Frontend options added to every build, as `buildctl --opt key=value`.",
+                        "maxProperties": 32,
+                        "type": "object"
+                      },
+                      "source": {
+                        "description": "The frontend image for `gateway.v0`, such as\n`ghcr.io/railwayapp/railpack-frontend:v0.43.0`. It must match the planner's version.",
+                        "maxLength": 512,
+                        "nullable": true,
+                        "type": "string"
+                      },
+                      "type": {
+                        "description": "`dockerfile.v0` (built into buildkitd) or `gateway.v0` (an image).",
+                        "enum": [
+                          "dockerfile.v0",
+                          "gateway.v0"
+                        ],
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "type"
+                    ],
+                    "type": "object",
+                    "x-kubernetes-validations": [
+                      {
+                        "message": "source is required for gateway.v0 and forbidden for dockerfile.v0",
+                        "rule": "self.type == 'gateway.v0' ? has(self.source) && self.source != '' : !has(self.source)"
+                      }
+                    ]
+                  },
+                  "planner": {
+                    "description": "The planner; absent when the builder needs no plan.",
+                    "nullable": true,
+                    "properties": {
+                      "image": {
+                        "description": "The planner image, pinned by digest in production.",
+                        "maxLength": 512,
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "resources": {
+                        "description": "CPU and memory for the plan container.",
+                        "nullable": true,
+                        "properties": {
+                          "limits": {
+                            "description": "Limits.",
+                            "nullable": true,
+                            "properties": {
+                              "cpu": {
+                                "description": "CPU, such as `500m`.",
+                                "maxLength": 32,
+                                "nullable": true,
+                                "type": "string"
+                              },
+                              "memory": {
+                                "description": "Memory, such as `1Gi`.",
+                                "maxLength": 32,
+                                "nullable": true,
+                                "type": "string"
+                              }
+                            },
+                            "type": "object"
+                          },
+                          "requests": {
+                            "description": "Requests.",
+                            "nullable": true,
+                            "properties": {
+                              "cpu": {
+                                "description": "CPU, such as `500m`.",
+                                "maxLength": 32,
+                                "nullable": true,
+                                "type": "string"
+                              },
+                              "memory": {
+                                "description": "Memory, such as `1Gi`.",
+                                "maxLength": 32,
+                                "nullable": true,
+                                "type": "string"
+                              }
+                            },
+                            "type": "object"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "timeout": {
+                        "description": "How long planning may take. Default `10m`.",
+                        "maxLength": 32,
+                        "nullable": true,
+                        "pattern": "^([0-9]{1,6}(\\.[0-9]{1,3})?(ms|s|m|h))+$",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "image"
+                    ],
+                    "type": "object"
+                  },
+                  "type": {
+                    "description": "What the planning step does.",
+                    "enum": [
+                      "dockerfile",
+                      "railpack"
+                    ],
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "frontend",
+                  "type"
+                ],
+                "type": "object",
+                "x-kubernetes-validations": [
+                  {
+                    "message": "planner is required for railpack, and forbidden for dockerfile",
+                    "rule": "self.type == 'dockerfile' ? !has(self.planner) : has(self.planner)"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "spec"
+            ],
+            "title": "ClusterBuilder",
+            "type": "object"
+          }
+        },
+        "served": true,
+        "storage": true
+      }
+    ]
+  }
+}
+---
+{
+  "apiVersion": "apiextensions.k8s.io/v1",
+  "kind": "CustomResourceDefinition",
+  "metadata": {
+    "name": "builds.builder.zeabur.com"
+  },
+  "spec": {
+    "group": "builder.zeabur.com",
+    "names": {
+      "categories": [
+        "zeabur-builder"
+      ],
+      "kind": "Build",
+      "plural": "builds",
+      "shortNames": [
+        "zbbuild"
+      ],
+      "singular": "build"
+    },
+    "scope": "Namespaced",
+    "versions": [
+      {
+        "additionalPrinterColumns": [
+          {
+            "jsonPath": ".spec.builderRef",
+            "name": "Builder",
+            "type": "string"
+          },
+          {
+            "jsonPath": ".status.sourceMode",
+            "name": "Source",
+            "type": "string"
+          },
+          {
+            "jsonPath": ".status.latestRevision",
+            "name": "Revision",
+            "type": "string"
+          },
+          {
+            "jsonPath": ".status.conditions[?(@.type==\"Ready\")].status",
+            "name": "Ready",
+            "type": "string"
+          },
+          {
+            "jsonPath": ".status.latestImage",
+            "name": "Image",
+            "priority": 1,
+            "type": "string"
+          },
+          {
+            "jsonPath": ".metadata.creationTimestamp",
+            "name": "Age",
+            "type": "date"
+          }
+        ],
+        "name": "v1alpha1",
+        "schema": {
+          "openAPIV3Schema": {
+            "description": "A Git ref or an uploaded archive that Zeabur Builder keeps built into a container image.",
+            "properties": {
+              "spec": {
+                "description": "A Git ref to follow, or an uploaded archive, and the image to keep built from it.\n\n```yaml\napiVersion: builder.zeabur.com/v1alpha1\nkind: Build\nmetadata: {name: api, namespace: team-a}\nspec:\n  source: {git: {url: https://github.com/acme/api, ref: main}}\n  builderRef: railpack\n```",
+                "properties": {
+                  "builderRef": {
+                    "description": "The `ClusterBuilder`.",
+                    "maxLength": 253,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "concurrency": {
+                    "default": "Replace",
+                    "description": "What a new commit does to a running build.",
+                    "enum": [
+                      "Replace",
+                      "Queue"
+                    ],
+                    "type": "string"
+                  },
+                  "env": {
+                    "description": "Build variables, always passed as `BuildKit` secrets, never as build arguments.",
+                    "items": {
+                      "description": "A build variable.",
+                      "properties": {
+                        "name": {
+                          "description": "The name, as the build sees it.",
+                          "maxLength": 128,
+                          "minLength": 1,
+                          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+                          "type": "string"
+                        },
+                        "value": {
+                          "description": "A literal value.",
+                          "maxLength": 32768,
+                          "nullable": true,
+                          "type": "string"
+                        },
+                        "valueFrom": {
+                          "description": "A value from a Secret in the same namespace.",
+                          "nullable": true,
+                          "properties": {
+                            "secretKeyRef": {
+                              "description": "A key of a Secret.",
+                              "properties": {
+                                "key": {
+                                  "description": "The key.",
+                                  "maxLength": 253,
+                                  "minLength": 1,
+                                  "type": "string"
+                                },
+                                "name": {
+                                  "description": "The Secret's name.",
+                                  "maxLength": 253,
+                                  "minLength": 1,
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "key",
+                                "name"
+                              ],
+                              "type": "object"
+                            }
+                          },
+                          "required": [
+                            "secretKeyRef"
+                          ],
+                          "type": "object"
+                        }
+                      },
+                      "required": [
+                        "name"
+                      ],
+                      "type": "object",
+                      "x-kubernetes-validations": [
+                        {
+                          "message": "set exactly one of value and valueFrom",
+                          "rule": "has(self.value) != has(self.valueFrom)"
+                        }
+                      ]
+                    },
+                    "maxItems": 128,
+                    "type": "array"
+                  },
+                  "historyLimit": {
+                    "description": "Finished `BuildRun`s to keep. The newest success is always kept. Default 10.",
+                    "format": "int32",
+                    "maximum": 100.0,
+                    "minimum": 1.0,
+                    "nullable": true,
+                    "type": "integer"
+                  },
+                  "notify": {
+                    "description": "Who to tell after a successful build.",
+                    "items": {
+                      "description": "A notification after a successful build.",
+                      "properties": {
+                        "secretRef": {
+                          "description": "A token or HMAC key.",
+                          "nullable": true,
+                          "properties": {
+                            "name": {
+                              "description": "The Secret's name.",
+                              "maxLength": 253,
+                              "minLength": 1,
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "name"
+                          ],
+                          "type": "object"
+                        },
+                        "type": {
+                          "description": "The receiver.",
+                          "enum": [
+                            "keel"
+                          ],
+                          "type": "string"
+                        },
+                        "url": {
+                          "description": "Where to POST.",
+                          "maxLength": 2048,
+                          "minLength": 1,
+                          "pattern": "^https?://",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "url"
+                      ],
+                      "type": "object"
+                    },
+                    "maxItems": 8,
+                    "type": "array"
+                  },
+                  "output": {
+                    "description": "Where to push. Default: `<defaultRegistry>/<namespace>/<name>`.",
+                    "nullable": true,
+                    "properties": {
+                      "extraTags": {
+                        "description": "Fixed tags pushed as well, such as `latest`. Rollout tools should not rely on them.",
+                        "items": {
+                          "maxLength": 128,
+                          "pattern": "^[A-Za-z0-9_][A-Za-z0-9._-]{0,127}$",
+                          "type": "string"
+                        },
+                        "maxItems": 8,
+                        "type": "array"
+                      },
+                      "image": {
+                        "description": "The image repository, without a tag.",
+                        "maxLength": 512,
+                        "nullable": true,
+                        "pattern": "^[a-z0-9]([a-z0-9._:/-]*[a-z0-9])?$",
+                        "type": "string"
+                      },
+                      "pushSecretRef": {
+                        "description": "Push credentials for an image outside the default registry: a\n`kubernetes.io/dockerconfigjson` Secret in the same namespace, labelled\n`builder.zeabur.com/push-credentials: \"true\"`. The default registry gets a token\ninstead.",
+                        "nullable": true,
+                        "properties": {
+                          "name": {
+                            "description": "The Secret's name.",
+                            "maxLength": 253,
+                            "minLength": 1,
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "name"
+                        ],
+                        "type": "object"
+                      },
+                      "tagTemplate": {
+                        "description": "The tag: `{{.Field}}` with `.Branch`, `.ShortSHA`, `.SHA`, `.UnixTime` and `.BuildRun`.\nDefault `{{.Branch}}-{{.UnixTime}}-{{.ShortSHA}}`.",
+                        "maxLength": 256,
+                        "nullable": true,
+                        "type": "string"
+                      }
+                    },
+                    "type": "object"
+                  },
+                  "source": {
+                    "description": "Where the source comes from.",
+                    "properties": {
+                      "archive": {
+                        "description": "An archive pushed as an OCI artifact to `<registry>/<namespace>/<name>/source`\n(`docs/builds/archive-source.mdx`).",
+                        "nullable": true,
+                        "properties": {
+                          "contextDir": {
+                            "description": "The build context inside the archive.",
+                            "maxLength": 1024,
+                            "nullable": true,
+                            "pattern": "^[A-Za-z0-9_@+-][A-Za-z0-9._@+-]*(/[A-Za-z0-9_@+-][A-Za-z0-9._@+-]*)*$",
+                            "type": "string"
+                          },
+                          "digest": {
+                            "description": "The artifact's manifest digest. Unset: the `Build` waits for an upload.",
+                            "maxLength": 71,
+                            "nullable": true,
+                            "pattern": "^sha256:[0-9a-f]{64}$",
+                            "type": "string"
+                          },
+                          "dockerfile": {
+                            "description": "The Dockerfile, relative to the context, for the `dockerfile` builder. Default\n`Dockerfile`.",
+                            "maxLength": 1024,
+                            "nullable": true,
+                            "pattern": "^[A-Za-z0-9_@+-][A-Za-z0-9._@+-]*(/[A-Za-z0-9_@+-][A-Za-z0-9._@+-]*)*$",
+                            "type": "string"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "credentialsRef": {
+                        "description": "Credentials for a plain Git server: a `kubernetes.io/ssh-auth` Secret (with `known_hosts`)\nor a `kubernetes.io/basic-auth` one, labelled `builder.zeabur.com/git-credentials: \"true\"`.",
+                        "nullable": true,
+                        "properties": {
+                          "name": {
+                            "description": "The Secret's name.",
+                            "maxLength": 253,
+                            "minLength": 1,
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "name"
+                        ],
+                        "type": "object"
+                      },
+                      "git": {
+                        "description": "The Git repository.",
+                        "nullable": true,
+                        "properties": {
+                          "contextDir": {
+                            "description": "The build context inside the repository, for monorepos.",
+                            "maxLength": 1024,
+                            "nullable": true,
+                            "pattern": "^[A-Za-z0-9_@+-][A-Za-z0-9._@+-]*(/[A-Za-z0-9_@+-][A-Za-z0-9._@+-]*)*$",
+                            "type": "string"
+                          },
+                          "dockerfile": {
+                            "description": "The Dockerfile, relative to the context, for the `dockerfile` builder. Default\n`Dockerfile`.",
+                            "maxLength": 1024,
+                            "nullable": true,
+                            "pattern": "^[A-Za-z0-9_@+-][A-Za-z0-9._@+-]*(/[A-Za-z0-9_@+-][A-Za-z0-9._@+-]*)*$",
+                            "type": "string"
+                          },
+                          "ref": {
+                            "default": "HEAD",
+                            "description": "A branch or tag; no wildcards. Default `HEAD`: the repository's default branch, which is\nresolved again on every poll, so a renamed default branch is followed.",
+                            "maxLength": 255,
+                            "minLength": 1,
+                            "type": "string"
+                          },
+                          "url": {
+                            "description": "`https://`, `ssh://` or `user@host:path`.",
+                            "maxLength": 2048,
+                            "minLength": 1,
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "url"
+                        ],
+                        "type": "object"
+                      },
+                      "githubApp": {
+                        "description": "Reach the repository through an installation of the cluster's GitHub App, which a cluster\nadmin has allowed for this namespace.",
+                        "nullable": true,
+                        "properties": {
+                          "installationId": {
+                            "description": "The installation's id, from `https://github.com/settings/installations/<id>`.",
+                            "format": "int64",
+                            "minimum": 1.0,
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "installationId"
+                        ],
+                        "type": "object"
+                      }
+                    },
+                    "type": "object",
+                    "x-kubernetes-validations": [
+                      {
+                        "message": "set exactly one of git and archive",
+                        "rule": "has(self.git) != has(self.archive)"
+                      },
+                      {
+                        "message": "credentialsRef and githubApp need a git source",
+                        "rule": "has(self.git) || !(has(self.credentialsRef) || has(self.githubApp))"
+                      },
+                      {
+                        "message": "set at most one of credentialsRef and githubApp",
+                        "rule": "!(has(self.credentialsRef) && has(self.githubApp))"
+                      },
+                      {
+                        "message": "a githubApp source needs an https URL",
+                        "rule": "!has(self.githubApp) || (has(self.git) && self.git.url.startsWith('https://'))"
+                      }
+                    ]
+                  },
+                  "suspend": {
+                    "description": "Stop automatic builds. `BuildRun`s created by hand still run.",
+                    "type": "boolean"
+                  },
+                  "triggers": {
+                    "default": {},
+                    "description": "What starts a build.",
+                    "properties": {
+                      "pollInterval": {
+                        "description": "How often to check the ref. Default `1m`; `10m`, as a safety net, for a `githubApp`\nsource when the controller receives webhooks.",
+                        "maxLength": 32,
+                        "nullable": true,
+                        "pattern": "^([0-9]{1,6}(\\.[0-9]{1,3})?(ms|s|m|h))+$",
+                        "type": "string"
+                      },
+                      "webhook": {
+                        "description": "Push events from a repository webhook, signed with a secret this `Build` names. A\n`githubApp` source also wakes on the App's push events, without this.",
+                        "nullable": true,
+                        "properties": {
+                          "secretRef": {
+                            "description": "The shared secret, in a Secret in the same namespace: the webhook's secret on GitHub,\nGitea, Forgejo and Bitbucket, its secret token or signing token on GitLab, and a\n`whsec_` key for the generic form.",
+                            "properties": {
+                              "key": {
+                                "description": "The key.",
+                                "maxLength": 253,
+                                "minLength": 1,
+                                "type": "string"
+                              },
+                              "name": {
+                                "description": "The Secret's name.",
+                                "maxLength": 253,
+                                "minLength": 1,
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "key",
+                              "name"
+                            ],
+                            "type": "object"
+                          }
+                        },
+                        "required": [
+                          "secretRef"
+                        ],
+                        "type": "object"
+                      }
+                    },
+                    "type": "object"
+                  }
+                },
+                "required": [
+                  "builderRef",
+                  "source"
+                ],
+                "type": "object",
+                "x-kubernetes-validations": [
+                  {
+                    "message": "an archive source has no webhook trigger",
+                    "rule": "!has(self.source.archive) || !has(self.triggers.webhook)"
+                  }
+                ]
+              },
+              "status": {
+                "description": "What the controller knows about a `Build`.",
+                "nullable": true,
+                "properties": {
+                  "baseImages": {
+                    "description": "Base images of the newest successful build, `name@sha256:…`.",
+                    "items": {
+                      "maxLength": 1024,
+                      "type": "string"
+                    },
+                    "maxItems": 10,
+                    "type": "array"
+                  },
+                  "conditions": {
+                    "description": "`SourceReady`, `BuilderReady` and `Ready`.",
+                    "items": {
+                      "description": "A status condition, as `metav1.Condition`.",
+                      "properties": {
+                        "lastTransitionTime": {
+                          "description": "When the status last changed (RFC 3339).",
+                          "format": "date-time",
+                          "type": "string"
+                        },
+                        "message": {
+                          "description": "A human-readable message.",
+                          "maxLength": 32768,
+                          "type": "string"
+                        },
+                        "observedGeneration": {
+                          "description": "The `metadata.generation` the condition was computed from.",
+                          "format": "int64",
+                          "minimum": 0.0,
+                          "nullable": true,
+                          "type": "integer"
+                        },
+                        "reason": {
+                          "description": "A `CamelCase` reason.",
+                          "maxLength": 1024,
+                          "minLength": 1,
+                          "type": "string"
+                        },
+                        "status": {
+                          "description": "`True`, `False` or `Unknown`.",
+                          "enum": [
+                            "True",
+                            "False",
+                            "Unknown"
+                          ],
+                          "type": "string"
+                        },
+                        "type": {
+                          "description": "`Ready`, `SourceReady` or `BuilderReady`.",
+                          "maxLength": 316,
+                          "minLength": 1,
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "lastTransitionTime",
+                        "reason",
+                        "status",
+                        "type"
+                      ],
+                      "type": "object"
+                    },
+                    "maxItems": 8,
+                    "type": "array"
+                  },
+                  "lastBuildRunRef": {
+                    "description": "The newest `BuildRun`.",
+                    "maxLength": 253,
+                    "nullable": true,
+                    "type": "string"
+                  },
+                  "lastResolvedAt": {
+                    "description": "When the ref was last resolved.",
+                    "format": "date-time",
+                    "nullable": true,
+                    "type": "string"
+                  },
+                  "lastRunRevision": {
+                    "description": "The revision the controller last created a `BuildRun` for. Deleting that run does not\nbuild the revision again.",
+                    "maxLength": 71,
+                    "nullable": true,
+                    "pattern": "^([0-9a-f]{40}|sha256:[0-9a-f]{64})$",
+                    "type": "string"
+                  },
+                  "lastWebhookAt": {
+                    "description": "When a webhook last woke this `Build`; written by the receiver only. Later than\n`lastResolvedAt`: the ref is asked again.",
+                    "format": "date-time",
+                    "nullable": true,
+                    "type": "string"
+                  },
+                  "latestImage": {
+                    "description": "Its image, `<repository>:<tag>@<digest>`.",
+                    "maxLength": 1024,
+                    "nullable": true,
+                    "type": "string"
+                  },
+                  "latestRevision": {
+                    "description": "The commit or archive digest of the newest successful build.",
+                    "maxLength": 71,
+                    "nullable": true,
+                    "pattern": "^([0-9a-f]{40}|sha256:[0-9a-f]{64})$",
+                    "type": "string"
+                  },
+                  "observedGeneration": {
+                    "description": "The generation last acted on.",
+                    "format": "int64",
+                    "nullable": true,
+                    "type": "integer"
+                  },
+                  "remoteRevision": {
+                    "description": "The commit the ref points at, or the archive's digest.",
+                    "maxLength": 71,
+                    "nullable": true,
+                    "pattern": "^([0-9a-f]{40}|sha256:[0-9a-f]{64})$",
+                    "type": "string"
+                  },
+                  "resolvedRef": {
+                    "description": "The full name of the ref `remoteRevision` came from, such as `refs/heads/master` when\n`ref` is `HEAD`.",
+                    "maxLength": 1024,
+                    "nullable": true,
+                    "type": "string"
+                  },
+                  "sourceMode": {
+                    "description": "How the source is reached.",
+                    "enum": [
+                      "GitHubApp",
+                      "PlainGit",
+                      "Archive"
+                    ],
+                    "nullable": true,
+                    "type": "string"
+                  },
+                  "uploadToken": {
+                    "description": "The last upload token the controller issued, for the annotation\n`builder.zeabur.com/upload-token-request`.",
+                    "nullable": true,
+                    "properties": {
+                      "expiresAt": {
+                        "description": "When the token expires.",
+                        "format": "date-time",
+                        "type": "string"
+                      },
+                      "request": {
+                        "description": "The annotation value it answers.",
+                        "maxLength": 63,
+                        "type": "string"
+                      },
+                      "secretName": {
+                        "description": "The `kubernetes.io/dockerconfigjson` Secret, in the `Build`'s namespace. Its key `token`\nholds the bare token.",
+                        "maxLength": 253,
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "expiresAt",
+                      "request",
+                      "secretName"
+                    ],
+                    "type": "object"
+                  }
+                },
+                "type": "object"
+              }
+            },
+            "required": [
+              "spec"
+            ],
+            "title": "Build",
+            "type": "object"
+          }
+        },
+        "served": true,
+        "storage": true,
+        "subresources": {
+          "status": {}
+        }
+      }
+    ]
+  }
+}
+---
+{
+  "apiVersion": "apiextensions.k8s.io/v1",
+  "kind": "CustomResourceDefinition",
+  "metadata": {
+    "name": "buildruns.builder.zeabur.com"
+  },
+  "spec": {
+    "group": "builder.zeabur.com",
+    "names": {
+      "categories": [
+        "zeabur-builder"
+      ],
+      "kind": "BuildRun",
+      "plural": "buildruns",
+      "shortNames": [
+        "zbrun"
+      ],
+      "singular": "buildrun"
+    },
+    "scope": "Namespaced",
+    "versions": [
+      {
+        "additionalPrinterColumns": [
+          {
+            "jsonPath": ".spec.buildRef",
+            "name": "Build",
+            "type": "string"
+          },
+          {
+            "jsonPath": ".spec.revision",
+            "name": "Revision",
+            "priority": 1,
+            "type": "string"
+          },
+          {
+            "jsonPath": ".status.phase",
+            "name": "Phase",
+            "type": "string"
+          },
+          {
+            "jsonPath": ".status.reason",
+            "name": "Reason",
+            "type": "string"
+          },
+          {
+            "jsonPath": ".status.startTime",
+            "name": "Started",
+            "type": "date"
+          },
+          {
+            "jsonPath": ".status.completionTime",
+            "name": "Finished",
+            "type": "date"
+          },
+          {
+            "jsonPath": ".metadata.creationTimestamp",
+            "name": "Age",
+            "type": "date"
+          }
+        ],
+        "name": "v1alpha1",
+        "schema": {
+          "openAPIV3Schema": {
+            "description": "One build of one Git commit or uploaded archive by Zeabur Builder.",
+            "properties": {
+              "spec": {
+                "description": "One build of one commit or archive. The spec is immutable: to build again, create another.",
+                "properties": {
+                  "buildRef": {
+                    "description": "The `Build`.",
+                    "maxLength": 253,
+                    "minLength": 1,
+                    "type": "string"
+                  },
+                  "ref": {
+                    "description": "The full name of the ref `revision` was resolved from, such as `refs/heads/master`.",
+                    "maxLength": 1024,
+                    "nullable": true,
+                    "type": "string"
+                  },
+                  "revision": {
+                    "description": "The full commit SHA of a Git source, or the manifest digest of an archive source.",
+                    "maxLength": 71,
+                    "pattern": "^([0-9a-f]{40}|sha256:[0-9a-f]{64})$",
+                    "type": "string"
+                  },
+                  "trigger": {
+                    "description": "What started a `BuildRun`.",
+                    "enum": [
+                      "webhook",
+                      "poll",
+                      "manual"
+                    ],
+                    "nullable": true,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "buildRef",
+                  "revision"
+                ],
+                "type": "object",
+                "x-kubernetes-validations": [
+                  {
+                    "message": "a BuildRun's spec is immutable; create another",
+                    "rule": "self == oldSelf"
+                  }
+                ]
+              },
+              "status": {
+                "description": "Progress and result.",
+                "nullable": true,
+                "properties": {
+                  "baseImages": {
+                    "description": "Base images, `name@sha256:…`.",
+                    "items": {
+                      "maxLength": 1024,
+                      "type": "string"
+                    },
+                    "maxItems": 10,
+                    "type": "array"
+                  },
+                  "buildkitdInstance": {
+                    "description": "The namespace's buildkitd Pod, such as `buildkitd-team-a-0`.",
+                    "maxLength": 253,
+                    "nullable": true,
+                    "type": "string"
+                  },
+                  "cacheStats": {
+                    "description": "Build steps and cache hits.",
+                    "nullable": true,
+                    "properties": {
+                      "cached": {
+                        "description": "Steps answered from cache.",
+                        "format": "int64",
+                        "minimum": 0.0,
+                        "type": "integer"
+                      },
+                      "total": {
+                        "description": "Distinct steps.",
+                        "format": "int64",
+                        "minimum": 0.0,
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "cached",
+                      "total"
+                    ],
+                    "type": "object"
+                  },
+                  "checkRunID": {
+                    "description": "The GitHub check run.",
+                    "format": "int64",
+                    "nullable": true,
+                    "type": "integer"
+                  },
+                  "completionTime": {
+                    "description": "When it finished.",
+                    "format": "date-time",
+                    "nullable": true,
+                    "type": "string"
+                  },
+                  "imageDigest": {
+                    "description": "The pushed manifest's digest.",
+                    "maxLength": 71,
+                    "nullable": true,
+                    "pattern": "^sha256:[0-9a-f]{64}$",
+                    "type": "string"
+                  },
+                  "jobRef": {
+                    "description": "The Job.",
+                    "maxLength": 253,
+                    "nullable": true,
+                    "type": "string"
+                  },
+                  "message": {
+                    "description": "Details for people, at most 1 KiB from the Job.",
+                    "maxLength": 4096,
+                    "nullable": true,
+                    "type": "string"
+                  },
+                  "notifiedAt": {
+                    "description": "When the `Build`'s notify targets were sent this run's image, whatever they answered.\nSet once; a run with it is not sent again.",
+                    "format": "date-time",
+                    "nullable": true,
+                    "type": "string"
+                  },
+                  "phase": {
+                    "description": "The phases: `Pending → Planning → Building → Succeeded | Failed | Cancelled`.",
+                    "enum": [
+                      "Pending",
+                      "Planning",
+                      "Building",
+                      "Succeeded",
+                      "Failed",
+                      "Cancelled"
+                    ],
+                    "nullable": true,
+                    "type": "string"
+                  },
+                  "phaseDurations": {
+                    "additionalProperties": {
+                      "maxLength": 32,
+                      "type": "string"
+                    },
+                    "description": "Time per phase (`fetch`, `plan`, `build`, `push`), as durations such as `82.0s`.",
+                    "maxProperties": 8,
+                    "type": "object"
+                  },
+                  "planDigest": {
+                    "description": "The plan used.",
+                    "maxLength": 71,
+                    "nullable": true,
+                    "pattern": "^sha256:[0-9a-f]{64}$",
+                    "type": "string"
+                  },
+                  "planSource": {
+                    "description": "Where a plan came from.",
+                    "enum": [
+                      "generated",
+                      "none"
+                    ],
+                    "nullable": true,
+                    "type": "string"
+                  },
+                  "reason": {
+                    "description": "Why a `BuildRun` waits or failed.",
+                    "enum": [
+                      "QuotaExceeded",
+                      "BuildkitdStarting",
+                      "RegistryCredentialsMissing",
+                      "SourceFailed",
+                      "PlanFailed",
+                      "BuildFailed",
+                      "Timeout",
+                      "Cancelled",
+                      "InfraError"
+                    ],
+                    "nullable": true,
+                    "type": "string"
+                  },
+                  "startTime": {
+                    "description": "When the Job was created.",
+                    "format": "date-time",
+                    "nullable": true,
+                    "type": "string"
+                  },
+                  "tags": {
+                    "description": "The tags pushed.",
+                    "items": {
+                      "maxLength": 128,
+                      "type": "string"
+                    },
+                    "maxItems": 16,
+                    "type": "array"
+                  }
+                },
+                "type": "object"
+              }
+            },
+            "required": [
+              "spec"
+            ],
+            "title": "BuildRun",
+            "type": "object"
+          }
+        },
+        "selectableFields": [
+          {
+            "jsonPath": ".spec.buildRef"
+          },
+          {
+            "jsonPath": ".status.phase"
+          }
+        ],
+        "served": true,
+        "storage": true,
+        "subresources": {
+          "status": {}
+        }
+      }
+    ]
+  }
+}
+
+---
+# Source: zeabur-builder/templates/buildkitd.yaml
+# buildkitd may resolve names, reach the registry and reach public addresses; not Pods,
+# Services, nodes or the cloud metadata endpoint.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: buildkitd-egress
+  labels:
+    app.kubernetes.io/name: zeabur-builder
+    app.kubernetes.io/instance: builder
+spec:
+  podSelector:
+    matchLabels: {app.kubernetes.io/name: buildkitd}
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: kube-system}
+          podSelector:
+            matchLabels: {k8s-app: kube-dns}
+      ports: [{port: 53, protocol: UDP}, {port: 53, protocol: TCP}]
+    - to:
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: zot}
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: zot
+      ports: [{port: 5000, protocol: TCP}]
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 100.64.0.0/10
+              - 127.0.0.0/8
+              - 169.254.0.0/16
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+
+---
+# Source: zeabur-builder/templates/rbac.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: zeabur-builder
+  labels:
+    app.kubernetes.io/name: zeabur-builder
+    app.kubernetes.io/instance: builder
+
+---
+# Source: zeabur-builder/templates/buildkitd.yaml
+# What every namespace's buildkitd shares: its config, and the egress policy of its RUN steps.
+# The controller creates each namespace's StatefulSet, headless Service and ingress NetworkPolicy
+# in this namespace the first time the namespace builds.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: buildkitd
+  labels:
+    app.kubernetes.io/name: zeabur-builder
+    app.kubernetes.io/instance: builder
+data:
+  buildkitd.toml: |
+    # RUN --network=host and --security=insecure stay refused.
+    insecure-entitlements = []
+
+    [worker.oci]
+      enabled = true
+      # Each RUN step gets its own network namespace on a bridge, masqueraded to the Pod's
+      # address, so the egress policy below applies to it. "auto" would give RUN the Pod's own
+      # network namespace when /etc/buildkit/cni.json is missing.
+      networkMode = "bridge"
+      gc = true
+      [[worker.oci.gcpolicy]]
+        all = true
+        maxUsedSpace = "80%"
+        # Prune before the node's disk reaches kubelet's eviction threshold (by default 10% free
+        # on nodefs, 15% on imagefs, 5% on k3s), whatever the cache size.
+        minFreeSpace = "20%"
+    [worker.containerd]
+      enabled = false
+
+    # Gateway frontends, including those a Dockerfile names in `# syntax=`, only from these
+    # repositories.
+    [frontend."gateway.v0"]
+      allowedRepositories = [
+        "docker.io/docker/dockerfile",
+        "docker.io/docker/dockerfile-upstream",
+        "ghcr.io/railwayapp/railpack-frontend",
+      ]
+
+---
+# Source: zeabur-builder/templates/rbac.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: builder-zeabur-builder
+  labels:
+    app.kubernetes.io/name: zeabur-builder
+    app.kubernetes.io/instance: builder
+rules:
+  - apiGroups: [builder.zeabur.com]
+    resources: [builds, buildruns, clusterbuilders]
+    verbs: [get, list, watch, create, delete]
+  - apiGroups: [builder.zeabur.com]
+    resources: [builds/status, buildruns/status]
+    verbs: [get, patch]
+  - apiGroups: [batch]
+    resources: [jobs]
+    verbs: [get, list, watch, create, delete]
+  - apiGroups: [""]
+    resources: [pods]
+    verbs: [get, list, watch]
+  # A namespace's max-concurrent-builds annotation, and which namespaces still exist.
+  - apiGroups: [""]
+    resources: [namespaces]
+    verbs: [get, list]
+  # Credentials and webhook secrets Builds name, the Secrets copied into build namespaces, and
+  # upload tokens. Cluster-wide get is wider than needed (open issue in docs/reference/status.mdx).
+  - apiGroups: [""]
+    resources: [secrets]
+    verbs: [get, create, update, delete]
+  - apiGroups: [events.k8s.io]
+    resources: [events]
+    verbs: [create, patch]
+
+---
+# Source: zeabur-builder/templates/rbac.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: builder-zeabur-builder
+  labels:
+    app.kubernetes.io/name: zeabur-builder
+    app.kubernetes.io/instance: builder
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: ClusterRole, name: builder-zeabur-builder}
+subjects:
+  - {kind: ServiceAccount, name: zeabur-builder, namespace: builder-system}
+
+---
+# Source: zeabur-builder/templates/rbac.yaml
+# Each namespace's buildkitd, the GitHub App's installation grants and the leader election Lease,
+# in this namespace only.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: zeabur-builder
+  labels:
+    app.kubernetes.io/name: zeabur-builder
+    app.kubernetes.io/instance: builder
+rules:
+  - apiGroups: [apps]
+    resources: [statefulsets]
+    verbs: [get, list, watch, create, patch, delete]
+  - apiGroups: [apps]
+    resources: [statefulsets/scale]
+    verbs: [patch]
+  - apiGroups: [""]
+    resources: [services]
+    verbs: [get, create, patch, delete]
+  - apiGroups: [networking.k8s.io]
+    resources: [networkpolicies]
+    verbs: [get, create, patch, delete]
+  - apiGroups: [""]
+    resources: [configmaps]
+    resourceNames: [github-app-installations]
+    verbs: [get]
+  # The leader election Lease. `create` cannot be limited to one name.
+  - apiGroups: [coordination.k8s.io]
+    resources: [leases]
+    verbs: [create]
+  - apiGroups: [coordination.k8s.io]
+    resources: [leases]
+    resourceNames: [zeabur-builder]
+    verbs: [get, patch]
+
+---
+# Source: zeabur-builder/templates/rbac.yaml
+# The registry token key, in the registry's namespace: this one Secret, read only.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: builder-zeabur-builder-token-key
+  namespace: zot
+  labels:
+    app.kubernetes.io/name: zeabur-builder
+    app.kubernetes.io/instance: builder
+rules:
+  - apiGroups: [""]
+    resources: [secrets]
+    resourceNames: [zot-token-signer]
+    verbs: [get]
+
+---
+# Source: zeabur-builder/templates/rbac.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: zeabur-builder
+  labels:
+    app.kubernetes.io/name: zeabur-builder
+    app.kubernetes.io/instance: builder
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: Role, name: zeabur-builder}
+subjects:
+  - {kind: ServiceAccount, name: zeabur-builder, namespace: builder-system}
+
+---
+# Source: zeabur-builder/templates/rbac.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: builder-zeabur-builder-token-key
+  namespace: zot
+  labels:
+    app.kubernetes.io/name: zeabur-builder
+    app.kubernetes.io/instance: builder
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: Role, name: builder-zeabur-builder-token-key}
+subjects:
+  - {kind: ServiceAccount, name: zeabur-builder, namespace: builder-system}
+
+---
+# Source: zeabur-builder/templates/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: zeabur-builder
+  labels:
+    app.kubernetes.io/name: zeabur-builder
+    app.kubernetes.io/instance: builder
+spec:
+  # Only the holder of the Lease `zeabur-builder` reconciles. Another replica waits for it.
+  replicas: 1
+  strategy: {type: Recreate}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: zeabur-builder
+      app.kubernetes.io/instance: builder
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: zeabur-builder
+        app.kubernetes.io/instance: builder
+    spec:
+      serviceAccountName: zeabur-builder
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: controller
+          image: "ghcr.io/zeabur-oss/builder:0.0.1"
+          imagePullPolicy: IfNotPresent
+          args:
+            - controller
+            - --github-app-secret=github-app
+            - --github-app-grants=github-app-installations
+            - --buildkitd-image=docker.io/moby/buildkit:v0.34.1@sha256:99368f3e46177c6405b9740e4461d91cee004128daeecca78d4ceac50ec1da5c
+            - --buildkitd-cache-size=10Gi
+          env:
+            - name: POD_NAMESPACE
+              valueFrom: {fieldRef: {fieldPath: metadata.namespace}}
+            - name: POD_NAME
+              valueFrom: {fieldRef: {fieldPath: metadata.name}}
+            - name: ZEABUR_BUILDER_DEFAULT_REGISTRY
+              value: "zot.zot.svc:5000"
+            - name: ZEABUR_BUILDER_JOB_IMAGE
+              value: "ghcr.io/zeabur-oss/builder-job:0.0.1"
+            - name: ZEABUR_BUILDER_REGISTRY_TOKEN_KEY
+              value: "zot/zot-token-signer"
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+          resources:
+            limits:
+              memory: 256Mi
+            requests:
+              cpu: 10m
+              memory: 32Mi
+
+---
+# Source: zeabur-builder/templates/clusterbuilders.yaml
+# The two builders Zeabur offers. Builds name them in spec.builderRef.
+apiVersion: builder.zeabur.com/v1alpha1
+kind: ClusterBuilder
+metadata:
+  name: dockerfile
+  labels:
+    app.kubernetes.io/name: zeabur-builder
+    app.kubernetes.io/instance: builder
+spec:
+  type: dockerfile
+  frontend: {type: dockerfile.v0}
+
+---
+# Source: zeabur-builder/templates/clusterbuilders.yaml
+apiVersion: builder.zeabur.com/v1alpha1
+kind: ClusterBuilder
+metadata:
+  name: railpack
+  labels:
+    app.kubernetes.io/name: zeabur-builder
+    app.kubernetes.io/instance: builder
+spec:
+  type: railpack
+  planner:
+    image: "ghcr.io/zeabur-oss/builder-railpack:0.0.1"
+  frontend:
+    type: gateway.v0
+    source: "ghcr.io/railwayapp/railpack-frontend:v0.43.0"
+
+---
+# Source: zeabur-builder/templates/admission.yaml
+# The controller can create Jobs in every namespace. A Job it creates must be a build Job: the
+# chart's images, no privilege, no host namespace, port or path, the default ServiceAccount
+# without a token, and not in a system namespace or one that holds the registry's keys.
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: builder-zeabur-builder-jobs
+  labels:
+    app.kubernetes.io/name: zeabur-builder
+    app.kubernetes.io/instance: builder
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [batch]
+        apiVersions: ["*"]
+        operations: [CREATE, UPDATE]
+        resources: [jobs]
+  matchConditions:
+    - name: controller
+      expression: request.userInfo.username == 'system:serviceaccount:builder-system:zeabur-builder'
+  variables:
+    - name: pod
+      expression: object.spec.template.spec
+    - name: containers
+      expression: >-
+        has(variables.pod.initContainers) ? variables.pod.containers + variables.pod.initContainers
+        : variables.pod.containers
+  validations:
+    - expression: >-
+        !request.namespace.startsWith('kube-') &&
+        !(request.namespace in ['builder-system', 'zot'])
+      message: the controller may not create Jobs in this namespace
+    - expression: >-
+        variables.containers.all(c, c.image in ['ghcr.io/zeabur-oss/builder-job:0.0.1', 'ghcr.io/zeabur-oss/builder-railpack:0.0.1'])
+      message: a build Job runs only the chart's images
+    - expression: >-
+        variables.containers.all(c, has(c.securityContext) &&
+        has(c.securityContext.allowPrivilegeEscalation) &&
+        !c.securityContext.allowPrivilegeEscalation &&
+        !(has(c.securityContext.privileged) && c.securityContext.privileged) &&
+        !(has(c.securityContext.capabilities) && has(c.securityContext.capabilities.add)))
+      message: a build Job runs without privilege
+    - expression: >-
+        has(variables.pod.securityContext) && has(variables.pod.securityContext.runAsNonRoot) &&
+        variables.pod.securityContext.runAsNonRoot
+      message: a build Job runs as non-root
+    - expression: >-
+        !(has(variables.pod.hostNetwork) && variables.pod.hostNetwork) &&
+        !(has(variables.pod.hostPID) && variables.pod.hostPID) &&
+        !(has(variables.pod.hostIPC) && variables.pod.hostIPC) &&
+        variables.containers.all(c, !has(c.ports) || c.ports.all(p, !has(p.hostPort) || p.hostPort == 0))
+      message: a build Job uses no host network, PID, IPC or port
+    - expression: >-
+        !has(variables.pod.volumes) || variables.pod.volumes.all(v, has(v.emptyDir) || has(v.secret))
+      message: a build Job mounts only emptyDir and Secret volumes
+    - expression: >-
+        (!has(variables.pod.serviceAccountName) || variables.pod.serviceAccountName == 'default') &&
+        (!has(variables.pod.serviceAccount) || variables.pod.serviceAccount == 'default') &&
+        has(variables.pod.automountServiceAccountToken) && !variables.pod.automountServiceAccountToken
+      message: a build Job runs as the default ServiceAccount without its token
+
+---
+# Source: zeabur-builder/templates/admission.yaml
+# The controller can create StatefulSets in this namespace, which allows privileged Pods. A
+# StatefulSet it creates must be a buildkitd: buildkitdImage only, no host namespace, port or
+# path, the default ServiceAccount without a token.
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: builder-zeabur-builder-buildkitd
+  labels:
+    app.kubernetes.io/name: zeabur-builder
+    app.kubernetes.io/instance: builder
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [apps]
+        apiVersions: ["*"]
+        operations: [CREATE, UPDATE]
+        resources: [statefulsets]
+  matchConditions:
+    - name: controller
+      expression: request.userInfo.username == 'system:serviceaccount:builder-system:zeabur-builder'
+  variables:
+    - name: pod
+      expression: object.spec.template.spec
+    - name: containers
+      expression: >-
+        has(variables.pod.initContainers) ? variables.pod.containers + variables.pod.initContainers
+        : variables.pod.containers
+  validations:
+    - expression: request.namespace == 'builder-system'
+      message: the controller creates StatefulSets only in its own namespace
+    - expression: variables.containers.all(c, c.image == 'docker.io/moby/buildkit:v0.34.1@sha256:99368f3e46177c6405b9740e4461d91cee004128daeecca78d4ceac50ec1da5c')
+      message: a buildkitd StatefulSet runs only buildkitdImage
+    - expression: >-
+        !(has(variables.pod.hostNetwork) && variables.pod.hostNetwork) &&
+        !(has(variables.pod.hostPID) && variables.pod.hostPID) &&
+        !(has(variables.pod.hostIPC) && variables.pod.hostIPC) &&
+        variables.containers.all(c, !has(c.ports) || c.ports.all(p, !has(p.hostPort) || p.hostPort == 0))
+      message: a buildkitd StatefulSet uses no host network, PID, IPC or port
+    - expression: >-
+        !has(variables.pod.volumes) ||
+        variables.pod.volumes.all(v, has(v.emptyDir) || has(v.secret) || has(v.configMap))
+      message: a buildkitd StatefulSet mounts only emptyDir, Secret and ConfigMap volumes
+    - expression: >-
+        (!has(variables.pod.serviceAccountName) || variables.pod.serviceAccountName == 'default') &&
+        (!has(variables.pod.serviceAccount) || variables.pod.serviceAccount == 'default') &&
+        has(variables.pod.automountServiceAccountToken) && !variables.pod.automountServiceAccountToken
+      message: a buildkitd StatefulSet runs as the default ServiceAccount without its token
+
+---
+# Source: zeabur-builder/templates/admission.yaml
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: builder-zeabur-builder-jobs
+  labels:
+    app.kubernetes.io/name: zeabur-builder
+    app.kubernetes.io/instance: builder
+spec:
+  policyName: builder-zeabur-builder-jobs
+  validationActions: [Deny]
+
+---
+# Source: zeabur-builder/templates/admission.yaml
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: builder-zeabur-builder-buildkitd
+  labels:
+    app.kubernetes.io/name: zeabur-builder
+    app.kubernetes.io/instance: builder
+spec:
+  policyName: builder-zeabur-builder-buildkitd
+  validationActions: [Deny]

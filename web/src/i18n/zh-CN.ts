@@ -1073,7 +1073,6 @@ export const zhCN: Messages = {
     "集群不是用 zeabur-installer 装的话，可以打印 manifests，用 kubectl 应用，或提交到 GitOps 仓库。加上 --format helm 会改为打印 Helm 命令。",
   "installer.notHere":
     "这个集群不是用 zeabur-installer 装的。打印 manifests 后用 kubectl 应用，或提交到 GitOps 仓库。加上 --format helm 会改为打印 Helm 命令。",
-  "installer.builderDocs": "按 Zeabur Builder 文档安装",
   "settings.homepage": "主页",
   "settings.opensInNewTab": "（在新标签页打开）",
   "category.traffic": "流量",
@@ -1083,9 +1082,9 @@ export const zhCN: Messages = {
   "category.data": "数据",
   "category.operations": "运维",
   "category.other": "其他",
+  "cap.builds": "镜像构建",
   "cap.certificates": "证书",
   "cap.config-reload": "配置变更时重启",
-  "cap.container-registry": "容器镜像仓库",
   "cap.databases": "数据库",
   "cap.event-autoscaling": "事件驱动自动扩缩容",
   "cap.image-updates": "镜像自动更新",

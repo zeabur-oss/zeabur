@@ -1,7 +1,7 @@
 //! The plan of a personal install: `KubeSolo`, the standalone helm-controller and the components.
 //!
-//! There is no Zeabur panel or Zeabur Identity. Zeabur Builder and zot are options. The person runs
-//! `zeaburctl ui` on their own computer with the admin kubeconfig. Nothing is isolated:
+//! There is no Zeabur panel or Zeabur Identity. Zeabur Builder, with its zot, is an option. The
+//! person runs `zeaburctl ui` on their own computer with the admin kubeconfig. Nothing is isolated:
 //! `KubeSolo`'s bridge CNI enforces no `NetworkPolicy`, there is one admin and one node. The plan
 //! makes no network policies, and every object it makes is one `kubectl apply` can make and
 //! `kubectl delete` can remove without the installer.
@@ -114,7 +114,7 @@ fn helm_controller() -> HelmControllerPlan {
     }
 }
 
-/// Takes Zeabur Builder and zot out of the selection on a host with too little memory.
+/// Takes Zeabur Builder, with its zot, out of the selection on a host with too little memory.
 fn leave_out_builds(index: &Index, selection: &mut select::Selection, memory_mib: u64) {
     if memory_mib >= BUILDS_MIN_MEMORY_MIB {
         return;
@@ -296,59 +296,15 @@ mod tests {
         }
     }
 
-    /// The fixture's catalog with zot and Zeabur Builder, which needs zot.
-    fn index_with_builds() -> Index {
-        let mut index: serde_json::Value = serde_json::from_str(INDEX).unwrap();
-        let components = index["components"].as_array_mut().unwrap();
-        let template = components
-            .iter()
-            .find(|c| c["id"] == "config-reload/reloader")
-            .unwrap()
-            .clone();
-        let order = [
-            "ingress/traefik",
-            "certificates/cert-manager",
-            crate::plan::ZOT,
-        ];
-        let mut zot = template.clone();
-        zot["id"] = serde_json::json!(crate::plan::ZOT);
-        zot["capability"] = serde_json::json!("container-registry");
-        zot["requires"] = serde_json::json!(["certificates/cert-manager"]);
-        zot["installOrder"] = serde_json::json!({"single-node": order, "multi-node": order});
-        zot["inputs"] = serde_json::json!([{
-            "name": "cluster-ip",
-            "description": "A fixed ClusterIP.",
-            "release": "zot",
-            "path": "service.clusterIP",
-        }]);
-        zot["releases"] = serde_json::json!([{
-            "name": "zot", "namespace": "zot", "chart": "zot",
-            "repo": "https://zotregistry.dev/helm-charts", "version": "0.1.128",
-            "values": "service:\n  type: ClusterIP\n",
-        }]);
-        let mut builder = template;
-        let order = [order[0], order[1], order[2], "builds/zeabur-builder"];
-        builder["id"] = serde_json::json!("builds/zeabur-builder");
-        builder["capability"] = serde_json::json!("builds");
-        builder["requires"] = serde_json::json!([crate::plan::ZOT]);
-        builder["installOrder"] = serde_json::json!({"single-node": order, "multi-node": order});
-        builder["releases"][0]["name"] = serde_json::json!("builder");
-        components.extend([zot, builder]);
-        Index::parse(index.to_string().as_bytes()).unwrap()
-    }
-
     #[test]
-    fn builder_and_zot_are_an_option_that_needs_the_memory() {
-        let index = index_with_builds();
+    fn builder_with_its_zot_is_an_option_that_needs_the_memory() {
+        let index = Index::parse(INDEX.as_bytes()).unwrap();
         let off = plan(&index, &config(""), &facts(4096)).unwrap();
-        assert!(!ids(&off).contains(&"builds/zeabur-builder") && off.zot_cluster_ip.is_none());
+        assert!(!ids(&off).contains(&crate::plan::BUILDER) && off.zot_cluster_ip.is_none());
 
         let on = plan(&index, &config("enable: [builds]\n"), &facts(4096)).unwrap();
-        let ids = ids(&on);
-        assert!(
-            ids.contains(&crate::plan::ZOT) && ids.contains(&"builds/zeabur-builder"),
-            "{ids:?}"
-        );
+        let chosen = ids(&on);
+        assert!(chosen.contains(&crate::plan::BUILDER), "{chosen:?}");
         assert_eq!(on.zot_cluster_ip.as_deref(), Some("10.43.0.50"));
         let hosts = on
             .host_files
@@ -363,14 +319,9 @@ mod tests {
             &facts(BUILDS_MIN_MEMORY_MIB - 1),
         )
         .unwrap();
-        assert!(!ids_of(&small).contains(&crate::plan::ZOT));
-        assert!(small.left_out.contains_key("builds/zeabur-builder"));
-        assert!(small.left_out.contains_key(crate::plan::ZOT));
+        assert!(!ids(&small).contains(&crate::plan::BUILDER));
+        assert!(small.left_out.contains_key(crate::plan::BUILDER));
         assert!(small.zot_cluster_ip.is_none());
-    }
-
-    fn ids_of(plan: &PersonalPlan) -> Vec<&str> {
-        ids(plan)
     }
 
     #[test]

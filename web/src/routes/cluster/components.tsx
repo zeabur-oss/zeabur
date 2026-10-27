@@ -62,7 +62,7 @@ const categories: {
   { key: "data", names: ["databases", "postgres", "object-storage", "replicated-storage"] },
   {
     key: "operations",
-    names: ["node-updates", "volume-backup", "container-registry", "image-updates"],
+    names: ["node-updates", "volume-backup", "builds", "image-updates"],
   },
 ]
 
@@ -85,7 +85,7 @@ const icons: Record<string, Icon> = {
   postgres: DatabaseIcon,
   "replicated-storage": HardDriveIcon,
   "object-storage": ArchiveIcon,
-  "container-registry": PackageIcon,
+  builds: PackageIcon,
   "image-updates": ArrowsClockwiseIcon,
 }
 

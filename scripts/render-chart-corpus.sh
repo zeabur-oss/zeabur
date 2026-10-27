@@ -72,11 +72,11 @@ filter() {
 licence() {
   local gh=https://github.com catalog="[Apache-2.0](https://github.com/zeabur-oss/catalog/blob/main/LICENSE) (catalogue)"
   case $1 in
+  builds/zeabur-builder)
+    echo "tls: $catalog; zot: [Apache-2.0]($gh/project-zot/helm-charts/blob/main/LICENSE); builder: [Apache-2.0]($gh/zeabur-oss/builder/blob/main/LICENSE)"
+    ;;
   certificates/cert-manager) echo "[Apache-2.0]($gh/cert-manager/cert-manager/blob/master/LICENSE)" ;;
   config-reload/reloader) echo "[Apache-2.0]($gh/stakater/Reloader/blob/master/LICENSE)" ;;
-  container-registry/zot)
-    echo "tls: $catalog; zot: [Apache-2.0]($gh/project-zot/helm-charts/blob/main/LICENSE)"
-    ;;
   databases/cloudnative-pg) echo "[Apache-2.0]($gh/cloudnative-pg/charts/blob/main/LICENSE)" ;;
   databases/dragonfly-operator)
     echo "[Apache-2.0]($gh/dragonflydb/dragonfly-operator/blob/main/LICENSE)"

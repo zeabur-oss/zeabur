@@ -139,11 +139,14 @@ platform() { kubectl label namespace "$@" zeabur.com/platform=true --overwrite >
 
 # Runs the Helm commands Zeabur Catalog gives for a component (Cluster → Components) and waits for
 # its deployments.
-catalog_install() { # $1 = <capability>/<id>, $2 = namespace to wait for, $@ = <input>=<value>
+# $1 = <capability>/<id>, $2 = namespace to wait for, $@ = <input>=<value>. With CATALOG_STOP_AT
+# set, the releases from that one on are left out.
+catalog_install() {
   local component="$1" namespace="$2" work
   shift 2
   work=$(mktemp -d)
-  cargo run -q --locked -p zeabur-catalog --example install -- "$component" single-node "$@" >"$work/install.sh"
+  cargo run -q --locked -p zeabur-catalog --example install -- "$component" single-node "$@" |
+    if [[ -n "${CATALOG_STOP_AT:-}" ]]; then sed "/^# $CATALOG_STOP_AT\$/,\$d"; else cat; fi >"$work/install.sh"
   (cd "$work" && bash -euo pipefail install.sh)
   rm -rf "$work"
   platform "$namespace"
@@ -448,9 +451,10 @@ EOF
   }
   retry 120 "the test S3's bucket" bucket
 
-  # zot, with the fixed ClusterIP the node's mirror points at. Its CA goes where the mirror reads
-  # it, as zeabur-installer copies it; containerd reads it on each pull.
-  catalog_install container-registry/zot zot cluster-ip="$zot_ip"
+  # zot from Zeabur Builder's component, with the fixed ClusterIP the node's mirror points at;
+  # Builder itself comes from source below. zot's CA goes where the mirror reads it, as
+  # zeabur-installer copies it; containerd reads it on each pull.
+  CATALOG_STOP_AT=builder catalog_install builds/zeabur-builder zot cluster-ip="$zot_ip"
   kubectl -n zot wait certificate/zot-tls --for=condition=Ready --timeout=120s >/dev/null
   kubectl -n zot rollout status statefulset/zot --timeout=180s
   kubectl -n zot get secret zot-tls -o jsonpath='{.data.ca\.crt}' | base64 -d |

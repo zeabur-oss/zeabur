@@ -2,9 +2,9 @@
 import { useT } from "@/i18n"
 
 const knownCapabilities = [
+  "builds",
   "certificates",
   "config-reload",
-  "container-registry",
   "databases",
   "event-autoscaling",
   "image-updates",

@@ -3,8 +3,7 @@
 //! `scripts/dev-cluster.sh` runs them:
 //!
 //! ```sh
-//! cargo run -q -p zeabur-catalog --example install -- container-registry/zot single-node \
-//!   cluster-ip=10.43.0.50 | bash
+//! cargo run -q -p zeabur-catalog --example install -- image-updates/keel single-node | bash
 //! ```
 
 use std::error::Error;

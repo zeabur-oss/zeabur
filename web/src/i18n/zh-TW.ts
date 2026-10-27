@@ -1077,7 +1077,6 @@ export const zhTW: Messages = {
     "叢集不是用 zeabur-installer 裝的話，可以印出 manifests，用 kubectl 套用，或提交到 GitOps 儲存庫。加上 --format helm 會改印 Helm 指令。",
   "installer.notHere":
     "這個叢集不是用 zeabur-installer 裝的。印出 manifests 後用 kubectl 套用，或提交到 GitOps 儲存庫。加上 --format helm 會改印 Helm 指令。",
-  "installer.builderDocs": "照 Zeabur Builder 文件安裝",
   "settings.homepage": "首頁",
   "settings.opensInNewTab": "（在新分頁開啟）",
   "category.traffic": "流量",
@@ -1087,9 +1086,9 @@ export const zhTW: Messages = {
   "category.data": "資料",
   "category.operations": "維運",
   "category.other": "其他",
+  "cap.builds": "映像檔建置",
   "cap.certificates": "憑證",
   "cap.config-reload": "設定變更時重新啟動",
-  "cap.container-registry": "容器映像檔倉庫",
   "cap.databases": "資料庫",
   "cap.event-autoscaling": "事件驅動自動擴縮",
   "cap.image-updates": "映像檔自動更新",

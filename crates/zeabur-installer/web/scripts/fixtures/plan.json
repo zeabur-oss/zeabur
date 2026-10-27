@@ -103,56 +103,6 @@
       },
       {
         "contributedBy": [],
-        "displayName": "zot",
-        "id": "container-registry/zot",
-        "idleMemoryMib": null,
-        "releases": [
-          {
-            "kind": "manifests",
-            "name": "tls",
-            "namespace": "zot",
-            "yaml": "# Signs the CA below; nothing else uses it.\napiVersion: cert-manager.io/v1\nkind: Issuer\nmetadata:\n  name: zot-selfsigned\n  namespace: zot\nspec:\n  selfSigned: {}\n---\n# A CA of its own: no public CA signs *.svc names. Nodes and buildkitd\n# trust ca.crt from the zot-tls Secret; to use a CA you already\n# distribute, point zot-tls at your own issuer instead. Ten years,\n# because every node holds a copy and rotating it means redistributing.\napiVersion: cert-manager.io/v1\nkind: Certificate\nmetadata:\n  name: zot-ca\n  namespace: zot\nspec:\n  isCA: true\n  commonName: zot-ca\n  secretName: zot-ca\n  duration: 87600h\n  privateKey:\n    algorithm: ECDSA\n    size: 256\n  issuerRef:\n    kind: Issuer\n    name: zot-selfsigned\n---\napiVersion: cert-manager.io/v1\nkind: Issuer\nmetadata:\n  name: zot-ca\n  namespace: zot\nspec:\n  ca:\n    secretName: zot-ca\n---\n# The key that signs push tokens. Zeabur Builder reads tls.key and signs\n# a short-lived token for each push; zot checks it with tls.crt. Only\n# the key matters, so a renewal keeps it (rotationPolicy: Never). zot\n# reads tls.crt once at start: to rotate the key, delete the Secret\n# zot-token-signer, wait for cert-manager to issue it again, and restart\n# zot.\napiVersion: cert-manager.io/v1\nkind: Certificate\nmetadata:\n  name: zot-token-signer\n  namespace: zot\nspec:\n  commonName: zot-token-signer\n  secretName: zot-token-signer\n  duration: 87600h\n  privateKey:\n    algorithm: Ed25519\n    encoding: PKCS8\n    rotationPolicy: Never\n  issuerRef:\n    kind: Issuer\n    name: zot-selfsigned\n"
-          },
-          {
-            "digest": "sha256:0bc91fa8585454c2fc1dbcc51e51cb33b2f4533b5ae45cdaa529c09e4e75337f",
-            "kind": "helmChart",
-            "name": "zot",
-            "object": {
-              "apiVersion": "helm.cattle.io/v1",
-              "kind": "HelmChart",
-              "metadata": {
-                "annotations": {
-                  "installer.zeabur.com/component": "container-registry/zot"
-                },
-                "labels": {
-                  "app.kubernetes.io/managed-by": "zeabur-installer"
-                },
-                "name": "zot",
-                "namespace": "kube-system"
-              },
-              "spec": {
-                "chart": "zot",
-                "createNamespace": false,
-                "failurePolicy": "abort",
-                "repo": "https://zotregistry.dev/helm-charts",
-                "targetNamespace": "zot",
-                "timeout": "10m0s",
-                "valuesContent": "{\"config\":{\"distSpecVersion\":\"1.1.1\",\"http\":{\"accessControl\":{\"repositories\":{\"**\":{\"anonymousPolicy\":[\"read\"]},\"**/source\":{\"policies\":[]}}},\"address\":\"0.0.0.0\",\"auth\":{\"bearer\":{\"cert\":\"/token/tls.crt\",\"realm\":\"https://zot.zot.svc:5000/zot/auth/token\",\"service\":\"zot\"}},\"port\":\"5000\",\"tls\":{\"cert\":\"/tls/tls.crt\",\"key\":\"/tls/tls.key\"}},\"log\":{\"level\":\"info\"},\"storage\":{\"dedupe\":true,\"gc\":true,\"gcDelay\":\"2h\",\"gcInterval\":\"1h\",\"retention\":{\"delay\":\"2h\",\"policies\":[{\"deleteReferrers\":true,\"deleteUntagged\":true,\"keepTags\":[{\"mostRecentlyPushedCount\":20}],\"repositories\":[\"**\"]}]},\"rootDirectory\":\"/var/lib/registry\"}},\"configFiles\":{\"config.json\":null},\"externalSecrets\":[{\"mountPath\":\"/tls\",\"secretName\":\"zot-tls\"}],\"extraObjects\":[{\"apiVersion\":\"cert-manager.io/v1\",\"kind\":\"Certificate\",\"metadata\":{\"name\":\"zot-tls\",\"namespace\":\"zot\"},\"spec\":{\"dnsNames\":[\"zot.zot.svc\",\"zot.zot.svc.cluster.local\",\"localhost\"],\"ipAddresses\":[\"127.0.0.1\",\"{{ .Values.service.clusterIP | default \\\"::1\\\" }}\"],\"issuerRef\":{\"kind\":\"Issuer\",\"name\":\"zot-ca\"},\"privateKey\":{\"algorithm\":\"ECDSA\",\"size\":256},\"secretName\":\"zot-tls\"}}],\"extraVolumeMounts\":[{\"mountPath\":\"/token\",\"name\":\"token\",\"readOnly\":true}],\"extraVolumes\":[{\"name\":\"token\",\"secret\":{\"items\":[{\"key\":\"tls.crt\",\"path\":\"tls.crt\"}],\"secretName\":\"zot-token-signer\"}}],\"httpGet\":{\"scheme\":\"HTTPS\"},\"image\":{\"repository\":\"ghcr.io/project-zot/zot\",\"tag\":\"v2.1.22@sha256:96cda11459ce6f8c60da3b03f03e9f67fd11b3ae2d82c4c04c92b3c608996080\"},\"mountConfig\":false,\"persistence\":true,\"podSecurityContext\":{\"fsGroup\":65532,\"runAsGroup\":65532,\"runAsNonRoot\":true,\"runAsUser\":65532,\"seccompProfile\":{\"type\":\"RuntimeDefault\"}},\"pvc\":{\"storage\":\"20Gi\"},\"resources\":{\"limits\":{\"memory\":\"512Mi\"},\"requests\":{\"cpu\":\"20m\",\"memory\":\"64Mi\"}},\"securityContext\":{\"allowPrivilegeEscalation\":false,\"capabilities\":{\"drop\":[\"ALL\"]}},\"service\":{\"clusterIP\":\"10.43.0.50\",\"port\":5000,\"type\":\"ClusterIP\"}}",
-                "version": "0.1.128"
-              }
-            }
-          }
-        ],
-        "secrets": [],
-        "security": "No RBAC: a ServiceAccount without roles. Serves the OCI registry API over TLS on port 5000 inside the cluster.\n",
-        "smoke": [
-          ["-n", "zot", "certificate/zot-tls", "--for=condition=Ready"],
-          ["-n", "zot", "statefulset/zot", "--for=jsonpath={.status.readyReplicas}=1"]
-        ],
-        "why": "preset"
-      },
-      {
-        "contributedBy": [],
         "displayName": "CloudNativePG",
         "id": "databases/cloudnative-pg",
         "idleMemoryMib": null,
@@ -541,7 +491,7 @@
       "clusterMib": 2140,
       "componentsMib": 368,
       "hostMib": 5836,
-      "unmeasured": 3
+      "unmeasured": 2
     },
     "namespaces": [
       {
@@ -589,12 +539,6 @@
       {
         "baseline": null,
         "name": "zeabur-identity",
-        "privileged": null,
-        "public": false
-      },
-      {
-        "baseline": null,
-        "name": "zot",
         "privileged": null,
         "public": false
       }
@@ -673,6 +617,6 @@
     },
     "removals": []
   },
-  "text": "K3s v1.36.5+k3s1 (pinned, checked against this installer's digests), CIS hardened, on vps-1 (amd64, 5836 MiB)\nNode addresses   203.0.113.10 (temporary IPv6 addresses left out)\n\nComponents\n  ingress/traefik                                  preset     23 MiB\n      manifests gateway-api-crds (1 URLs)\n      chart traefik 42.1.3\n  certificates/cert-manager                        preset     51 MiB\n      chart cert-manager v1.21.3\n      manifests issuers\n  container-registry/zot                           preset     unmeasured\n      manifests tls\n      chart zot 0.1.128\n  databases/cloudnative-pg                         preset     unmeasured\n      chart cnpg 0.29.1\n      chart plugin-barman-cloud 0.8.1\n  image-updates/keel                               preset     unmeasured\n      chart keel v1.2.3\n      manifests webhook-policy\n  observability-operator/victoria-metrics-operator preset     20 MiB\n      chart victoria-metrics-operator 0.68.1\n  logs/victoria-logs                               preset     38 MiB\n      manifests logs\n  metrics/metrics-server                           preset     17 MiB\n      chart metrics-server 3.14.0\n  metrics/victoria-metrics                         preset     207 MiB\n      chart vm 0.96.0\n      manifests notifications\n  node-updates/system-upgrade-controller           preset     12 MiB\n      manifests crds (1 URLs)\n      manifests controller (1 URLs)\n\nNamespaces exempt from the restricted Pod Security level\n  observability (logs/victoria-logs is privileged)\n  system-upgrade (node-updates/system-upgrade-controller is privileged)\n\nStorage          local-path (default)\n\nZeabur           https://zeabur.203.0.113.10.sslip.io (certificates from a CA made on this server)\nZeabur Identity  https://login.203.0.113.10.sslip.io\n\nMemory at idle   about 1668 MiB of 5836 (K3s 1300, components 368, plus 3 unmeasured)\nwarning: Local access: login.203.0.113.10.sslip.io and zeabur.203.0.113.10.sslip.io must resolve to this server for browsers and for the server itself, through DNS (names such as <address>.sslip.io do) rather than a hosts file, which pods do not read.\nwarning: This server has no public address, so new services get no suggested URL. Add `suffixes: [203-0-113-10.sslip.io]` under access for URLs only this network reaches, signed by the local CA.\n",
+  "text": "K3s v1.36.5+k3s1 (pinned, checked against this installer's digests), CIS hardened, on vps-1 (amd64, 5836 MiB)\nNode addresses   203.0.113.10 (temporary IPv6 addresses left out)\n\nComponents\n  ingress/traefik                                  preset     23 MiB\n      manifests gateway-api-crds (1 URLs)\n      chart traefik 42.1.3\n  certificates/cert-manager                        preset     51 MiB\n      chart cert-manager v1.21.3\n      manifests issuers\n  databases/cloudnative-pg                         preset     unmeasured\n      chart cnpg 0.29.1\n      chart plugin-barman-cloud 0.8.1\n  image-updates/keel                               preset     unmeasured\n      chart keel v1.2.3\n      manifests webhook-policy\n  observability-operator/victoria-metrics-operator preset     20 MiB\n      chart victoria-metrics-operator 0.68.1\n  logs/victoria-logs                               preset     38 MiB\n      manifests logs\n  metrics/metrics-server                           preset     17 MiB\n      chart metrics-server 3.14.0\n  metrics/victoria-metrics                         preset     207 MiB\n      chart vm 0.96.0\n      manifests notifications\n  node-updates/system-upgrade-controller           preset     12 MiB\n      manifests crds (1 URLs)\n      manifests controller (1 URLs)\n\nNamespaces exempt from the restricted Pod Security level\n  observability (logs/victoria-logs is privileged)\n  system-upgrade (node-updates/system-upgrade-controller is privileged)\n\nStorage          local-path (default)\n\nZeabur           https://zeabur.203.0.113.10.sslip.io (certificates from a CA made on this server)\nZeabur Identity  https://login.203.0.113.10.sslip.io\n\nMemory at idle   about 1668 MiB of 5836 (K3s 1300, components 368, plus 2 unmeasured)\nwarning: Local access: login.203.0.113.10.sslip.io and zeabur.203.0.113.10.sslip.io must resolve to this server for browsers and for the server itself, through DNS (names such as <address>.sslip.io do) rather than a hosts file, which pods do not read.\nwarning: This server has no public address, so new services get no suggested URL. Add `suffixes: [203-0-113-10.sslip.io]` under access for URLs only this network reaches, signed by the local CA.\n",
   "yaml": "preset: standard\nenable: []\ndisable: []\nprofile: single-node\naccess:\n  mode: local\n  identity: login.203.0.113.10.sslip.io\n  zeabur: zeabur.203.0.113.10.sslip.io\n  invitations: true\nzeabur: true\ninputs: {}\nsecretFiles: {}\nrke2Version: null\nhost:\n  tlsSan: []\n  requireEncryptedDisk: false\nsources:\n  catalog: null\n  imageArchives: []\n  identityImage: null\n  identityctl: null\n  zeaburImage: null\n  zeaburChart: null\n"
 }

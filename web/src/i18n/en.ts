@@ -1155,7 +1155,6 @@ export const en = {
     "For a cluster that zeabur-installer didn't install, print the manifests. Apply them with kubectl, or commit them to your GitOps repository. Add --format helm for Helm commands.",
   "installer.notHere":
     "zeabur-installer didn't set up this cluster. Print the manifests, then apply them with kubectl or commit them to your GitOps repository. Add --format helm for Helm commands.",
-  "installer.builderDocs": "Install Zeabur Builder from its docs",
   "settings.homepage": "Home page",
   "settings.opensInNewTab": "(opens in a new tab)",
   "category.traffic": "Traffic",
@@ -1165,9 +1164,9 @@ export const en = {
   "category.data": "Data",
   "category.operations": "Operations",
   "category.other": "Other",
+  "cap.builds": "Image builds",
   "cap.certificates": "Certificates",
   "cap.config-reload": "Restart on config change",
-  "cap.container-registry": "Container registry",
   "cap.databases": "Databases",
   "cap.event-autoscaling": "Event autoscaling",
   "cap.image-updates": "Image updates",

@@ -99,8 +99,8 @@
       },
       {
         "contributedBy": [],
-        "displayName": "zot",
-        "id": "container-registry/zot",
+        "displayName": "Zeabur Builder",
+        "id": "builds/zeabur-builder",
         "idleMemoryMib": null,
         "releases": [
           {
@@ -117,7 +117,7 @@
               "kind": "HelmChart",
               "metadata": {
                 "annotations": {
-                  "installer.zeabur.com/component": "container-registry/zot"
+                  "installer.zeabur.com/component": "builds/zeabur-builder"
                 },
                 "labels": {
                   "app.kubernetes.io/managed-by": "zeabur-installer"
@@ -135,22 +135,7 @@
                 "version": "0.1.128"
               }
             }
-          }
-        ],
-        "secrets": [],
-        "security": "No RBAC: a ServiceAccount without roles. Serves the OCI registry API over TLS on port 5000 inside the cluster.\n",
-        "smoke": [
-          ["-n", "zot", "certificate/zot-tls", "--for=condition=Ready"],
-          ["-n", "zot", "statefulset/zot", "--for=jsonpath={.status.readyReplicas}=1"]
-        ],
-        "why": "dependency"
-      },
-      {
-        "contributedBy": [],
-        "displayName": "Zeabur Builder",
-        "id": "builds/zeabur-builder",
-        "idleMemoryMib": null,
-        "releases": [
+          },
           {
             "kind": "helmChart",
             "name": "builder",
@@ -180,8 +165,10 @@
           }
         ],
         "secrets": [],
-        "security": "ClusterRole: manages Builds, BuildRuns and Jobs in every namespace; reads Pods and Namespaces; reads, creates, updates and deletes Secrets in every namespace (the Git credentials Builds name, and the copies it puts in build namespaces). Runs one privileged buildkitd per building namespace in its own namespace, with a user namespace and an egress policy.\n",
+        "security": "Zeabur Builder: a ClusterRole that manages Builds, BuildRuns and Jobs in every namespace; reads Pods and Namespaces; reads, creates, updates and deletes Secrets in every namespace (the Git credentials Builds name, and the copies it puts in build namespaces), and reads the zot token signer. Runs one privileged buildkitd per building namespace in its own namespace, with a user namespace and an egress policy. An admission policy limits the Jobs and StatefulSets it can create. zot: no RBAC, a ServiceAccount without roles; serves the OCI registry API over TLS on port 5000 inside the cluster.\n",
         "smoke": [
+          ["-n", "zot", "certificate/zot-tls", "--for=condition=Ready"],
+          ["-n", "zot", "statefulset/zot", "--for=jsonpath={.status.readyReplicas}=1"],
           ["-n", "builder-system", "deployment/zeabur-builder", "--for=condition=Available"]
         ],
         "why": "enabled"
@@ -274,6 +261,6 @@
     "zotClusterIp": "10.43.0.50",
     "removals": []
   },
-  "text": "KubeSolo v1.2.2 (Kubernetes 1.35, pinned), for one person, on vps-1 (amd64, 5836 MiB)\nhelm-controller  v0.17.9 (its image pinned by digest; the Jobs' image checked by digest after they run)\nNode address     203.0.113.10; the kubeconfig names it\n\nComponents\n  ingress/traefik            preset    23 MiB\n      manifests gateway-api-crds (1 URLs)\n      chart traefik 41.7.1\n  certificates/cert-manager  preset    51 MiB\n      chart cert-manager v1.21.2\n      manifests issuers\n  container-registry/zot     dependency\n      manifests tls (1 manifests)\n      chart zot 0.1.128\n  builds/zeabur-builder      enabled   \n      chart zeabur-builder 0.0.1\n\nStorage          local-path (KubeSolo's local-path), the default\nZeabur           none on the server: run `zeaburctl ui` on your computer\n\nMemory at idle   about 774 MiB of 5836 (KubeSolo 700, components 74, plus 2 unmeasured)\nwarning: A personal install is for one person: whoever has the kubeconfig is cluster admin, and nothing isolates apps from each other (KubeSolo enforces no NetworkPolicy). For a team, install with K3s or RKE2 on a server with at least 4 GiB.\n",
+  "text": "KubeSolo v1.2.2 (Kubernetes 1.35, pinned), for one person, on vps-1 (amd64, 5836 MiB)\nhelm-controller  v0.17.9 (its image pinned by digest; the Jobs' image checked by digest after they run)\nNode address     203.0.113.10; the kubeconfig names it\n\nComponents\n  ingress/traefik            preset    23 MiB\n      manifests gateway-api-crds (1 URLs)\n      chart traefik 41.7.1\n  certificates/cert-manager  preset    51 MiB\n      chart cert-manager v1.21.2\n      manifests issuers\n  builds/zeabur-builder      enabled   \n      manifests tls (1 manifests)\n      chart zot 0.1.128\n      chart zeabur-builder 0.0.1\n\nStorage          local-path (KubeSolo's local-path), the default\nZeabur           none on the server: run `zeaburctl ui` on your computer\n\nMemory at idle   about 774 MiB of 5836 (KubeSolo 700, components 74, plus 2 unmeasured)\nwarning: A personal install is for one person: whoever has the kubeconfig is cluster admin, and nothing isolates apps from each other (KubeSolo enforces no NetworkPolicy). For a team, install with K3s or RKE2 on a server with at least 4 GiB.\n",
   "yaml": "use: personal\nenable: [builds/zeabur-builder]\ndisable: []\ninputs: {}\nsecretFiles: {}\nhost:\n  tlsSan: []\n  requireEncryptedDisk: false\nsources:\n  catalog: null\n"
 }
