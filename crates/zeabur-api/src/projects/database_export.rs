@@ -54,18 +54,27 @@ struct Dump {
 
 const SYSTEM_SCHEMAS: &str = "'mysql','information_schema','performance_schema','sys'";
 
-/// A Bash script that dumps every database but the system ones with `client` and `dump`. It reads
-/// the password from standard input when `password` is `-`, else from that variable.
-fn sql_dump(client: &str, dump: &str, user: &str, password: &str, extra: &str) -> Vec<String> {
-    let read = if password == "-" {
-        "IFS= read -r password\n"
-    } else {
-        ""
-    };
-    let variable = if password == "-" {
-        "password"
-    } else {
-        password
+/// Where a SQL dump's script reads the password.
+#[derive(Clone, Copy)]
+enum PasswordSource {
+    /// The first line of standard input.
+    Stdin,
+    /// The server container's environment variable.
+    Env(&'static str),
+}
+
+/// A Bash script that dumps every database but the system ones with `client` and `dump`, as
+/// `user` with the password from `source`.
+fn sql_dump(
+    client: &str,
+    dump: &str,
+    user: &str,
+    source: PasswordSource,
+    extra: &str,
+) -> Vec<String> {
+    let (read, variable) = match source {
+        PasswordSource::Stdin => ("IFS= read -r password\n", "password"),
+        PasswordSource::Env(variable) => ("", variable),
     };
     let script = format!(
         "set -o pipefail\n{read}\
@@ -137,7 +146,7 @@ async fn plan(cluster: &dyn Cluster, project: &str, database: &Database) -> Resu
                     "mysql",
                     "mysqldump",
                     moco::WRITABLE,
-                    "-",
+                    PasswordSource::Stdin,
                     " --set-gtid-purged=OFF",
                 ),
                 input: Some(password),
@@ -151,7 +160,7 @@ async fn plan(cluster: &dyn Cluster, project: &str, database: &Database) -> Resu
                 "mariadb",
                 "mariadb-dump",
                 "root",
-                "MARIADB_ROOT_PASSWORD",
+                PasswordSource::Env("MARIADB_ROOT_PASSWORD"),
                 "",
             ),
             input: None,
