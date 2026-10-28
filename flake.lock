@@ -6,11 +6,11 @@
         "nixpkgs": "nixpkgs"
       },
       "locked": {
-        "lastModified": 1793206910,
+        "lastModified": 1793210313,
         "narHash": "sha256-rg28lGsUw5yJHNVU0K3zZKMHY9FkLPPqY4xIHFM4Ukw=",
         "owner": "zeabur-oss",
         "repo": "catalog",
-        "rev": "7e8105d08eec25d6245d99fa1812d3d75a4f1b79",
+        "rev": "87fc2fc4f16ebe77a36630b4fe01138e6ba6ab3d",
         "type": "github"
       },
       "original": {
