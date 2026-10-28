@@ -22,8 +22,10 @@ nix develop -c scripts/docs-shots.sh web/e2e/shots/fixture.yaml target/docs-shot
 ```
 
 The script builds the web interface and the demo (`crates/zeabur-api/examples/demo.rs`), starts
-one demo server for each distinct `app` and `env`, and takes each shot in every locale (`en`, `zh-TW`, `zh-CN`) and the light theme at twice the pixel
-density, with reduced motion. A shot that a dark-theme `<picture>` needs lists `themes`; a shot
+one demo server for each distinct `app` and `env`, and takes each shot in every locale (`en`,
+`zh-TW`, `zh-CN`) and the manifest's themes at twice the pixel density, with reduced motion. The
+themes are light only unless the manifest sets `themes`; `docs/shots.yaml` takes light and dark,
+and the site shows the one the reader's theme is in. A shot can list its own `themes`, and a shot
 that only one page uses can list fewer `locales`. It writes:
 
 ```text
@@ -59,7 +61,7 @@ fails, Playwright's trace is in `target/docs-shots-results`. The demo listens on
   until: '#cluster-nodes'       # optional, with clip: the crop ends at the bottom of this element
   viewport: desktop             # desktop (1440×900), phone (390×844) or cover (544×544); default desktop
   locales: [en]                 # optional: en, zh-TW, zh-CN; default all three
-  themes: [light, dark]         # optional: light, dark; default [light]
+  themes: [light]               # optional: light, dark; default the manifest's `themes`
   env:                          # optional: the demo's ZEABUR_DEMO_* variables, as strings
     ZEABUR_DEMO_FORBID: nodes,pods
   fresh: true                   # optional: a new demo for each locale and theme
@@ -93,7 +95,8 @@ Two runs on the same machine on the same day give the same files. Two limits:
 
 - The demo dates its objects relative to the moment it starts, so a page that shows a date
   (for example "Created on Sep 26, 2026") changes from one day to the next.
-- Fonts render differently on macOS and Linux. The release takes the shots on Linux.
+- Fonts render differently on macOS and Linux. The release takes the shots on Linux. There,
+  Chromium has only the fonts of the dev shell's `FONTCONFIG_FILE`: Noto Sans CJK for Chinese.
 
 ## Image sets kept in git
 
@@ -105,13 +108,15 @@ file: '{id}-{theme}.avif'       # optional: the path in <out>; default {locale}/
 scale: 1                        # optional: pixels for each CSS pixel, 1 or 2; default 2
 budget: 30                      # optional: the largest AVIF in KB; default 150
 clean: true                     # optional: empty <out> first, when the set owns it
+themes: [light, dark]           # optional: the themes of a shot that lists none; default [light]
 shots:
   - id: readme-home
     ...
 ```
 
 With `out`, the run writes only the images: no `manifest.json` and no tar. `file` must hold
-`{locale}` or `{theme}` when a shot has more than one of them.
+`{locale}` or `{theme}` when a shot has more than one of them. `docs/shots.yaml` is a mapping too,
+for its `themes`, but names no `out`.
 
 - **README** (`docs/readme-shots.yaml`): one pixel for each CSS pixel, light and dark, English only,
   at most 30 KB each. The fonts of macOS make some of them larger; take them on Linux.

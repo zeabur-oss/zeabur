@@ -13,9 +13,13 @@
 #   until: '#cluster-nodes'     # optional, with clip: the crop ends at the bottom of this element
 #   viewport: desktop           # desktop (1440x900) or phone (390x844); default desktop
 #   locales: [en]               # optional; default en, zh-TW, zh-CN
-#   themes: [light, dark]       # optional; default [light]
+#   themes: [light]             # optional; default the `themes` below
 #   env: {}                     # optional demo env vars, e.g. ZEABUR_DEMO_FORBID
 #   fresh: true                 # optional; a new demo for each locale and theme, for steps that change it
+
+# Every shot in both themes: the site shows the one the reader's theme is in.
+themes: [light, dark]
+shots:
 
 # The installer (docs/zh-TW/get-started/quickstart.mdx). Each step's last button continues.
 - id: installer-host

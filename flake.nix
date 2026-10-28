@@ -140,6 +140,10 @@
                 "AR_${triple}" = "${bin}ar";
                 "CARGO_TARGET_${pkgs.lib.toUpper triple}_LINKER" = "${bin}cc";
                 PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS = "true";
+                # Chromium's fonts. nixpkgs gives it none and a Linux runner has no Chinese font, so
+                # zh-TW and zh-CN text would show as boxes. Noto Sans CJK (OFL-1.1) is the Linux font
+                # the design system names for Chinese; on macOS Chromium uses PingFang.
+                FONTCONFIG_FILE = pkgs.makeFontsConf { fontDirectories = [ pkgs.noto-fonts-cjk-sans ]; };
               }
             );
           };

@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/*"]
+members = ["crates/*", "xtask"]
 
 [workspace.package]
 version = "0.1.1"
@@ -35,6 +35,8 @@ zeabur-test-support = 6
 zeabur-installer-plan = 0
 zeabur-installer-host = 1
 zeabur-installer = 5
+# Development tasks (`cargo xtask`); nothing depends on it.
+xtask = 7
 
 # Integrations with installed components (see zeabur-modules' README), also checked by
 # scripts/check-levels.sh: only the composers may depend on a module crate, so the core crates

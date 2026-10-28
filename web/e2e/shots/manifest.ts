@@ -43,18 +43,20 @@ export const viewports = {
 export type Viewport = keyof typeof viewports
 
 // A manifest that names `out` holds images kept in git: the run writes only the images, to
-// <out>/<file>. Without `out`, the run also writes manifest.json and the release's tar.
+// <out>/<file>. Without `out`, the run also writes manifest.json and the release's tar. `themes` is
+// the themes of a shot that lists none.
 export type Settings = {
   out?: string
   file: string
   scale: number
   budget: number
   clean: boolean
+  themes: Theme[]
 }
 
 export type Manifest = Settings & { shots: Shot[] }
 
-const settingKeys = ["out", "file", "scale", "budget", "clean", "shots"]
+const settingKeys = ["out", "file", "scale", "budget", "clean", "themes", "shots"]
 
 const shotKeys = [
   "id",
@@ -122,12 +124,12 @@ function subset<T extends string>(value: unknown, allowed: readonly T[], at: str
   return value as T[]
 }
 
-function shot(value: unknown, index: number): Shot {
+function shot(value: unknown, index: number, defaultThemes: Theme[]): Shot {
   if (!isRecord(value)) throw new Error(`shot ${index}: expected a mapping`)
   const at = typeof value.id === "string" ? value.id : `shot ${index}`
   for (const key of Object.keys(value)) check(shotKeys.includes(key), `${at}: unknown key "${key}"`)
   const { id, app = "zeabur", path, wait, clip, until, viewport = "desktop", steps = [] } = value
-  const { locales: shotLocales = Object.keys(locales), themes: shotThemes = ["light"] } = value
+  const { locales: shotLocales = Object.keys(locales), themes: shotThemes = defaultThemes } = value
   check(
     typeof id === "string" && /^[a-z0-9]+(-[a-z0-9]+)*$/.test(id),
     `${at}: id must be kebab-case`,
@@ -195,7 +197,7 @@ function fileName(file: unknown, shots: Shot[]): string {
   return name
 }
 
-function settings(value: Record<string, unknown>, shots: Shot[]): Settings {
+function settings(value: Record<string, unknown>, shots: Shot[], themes: Theme[]): Settings {
   for (const key of Object.keys(value)) check(settingKeys.includes(key), `unknown key "${key}"`)
   const { out, file = "{locale}/{theme}/{id}.avif", scale = 2, budget = 150, clean = false } = value
   check(
@@ -212,6 +214,7 @@ function settings(value: Record<string, unknown>, shots: Shot[]): Settings {
     scale: scale as number,
     budget: budget as number,
     clean: clean as boolean,
+    themes,
   }
 }
 
@@ -220,13 +223,14 @@ export function readManifest(file: string): Manifest {
   const data: unknown = JSON.parse(readFileSync(file, "utf8"))
   const top = Array.isArray(data) ? { shots: data } : data
   if (!isRecord(top) || !Array.isArray(top.shots)) throw new Error("expected a list of shots")
-  const shots = top.shots.map(shot)
+  const defaultThemes = subset(top.themes ?? ["light"], themes, "themes")
+  const shots = top.shots.map((s, i) => shot(s, i, defaultThemes))
   const seen = new Set<string>()
   for (const { id } of shots) {
     if (seen.has(id)) throw new Error(`${id}: duplicate id`)
     seen.add(id)
   }
-  return { ...settings(top, shots), shots }
+  return { ...settings(top, shots, defaultThemes), shots }
 }
 
 if (import.meta.main) {
