@@ -720,7 +720,7 @@
   - click: main [data-slot="collapsible-trigger"]
   clip: main
 - id: cluster-attention
-  path: /cluster/github-app
+  path: /cluster
   wait: '#cluster-attention-title'
   clip: section:has(#cluster-attention-title)
 # GitHub App, made by the demo's fake GitHub (docs/zh-TW/cluster/github-app.mdx); `installed` also installs it.
