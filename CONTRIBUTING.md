@@ -255,8 +255,8 @@ pins; install those with `npx skills experimental_install` (they are not kept in
 
 ## Installer
 
-`zeabur-installer` installs RKE2, Zeabur Catalog components, Zeabur Identity and Zeabur on a
-Linux server ([guide](docs/get-started/quickstart.md)). It is three crates, each depending only on the
+`zeabur-installer` installs K3s or RKE2, Zeabur Catalog components, Zeabur Identity and Zeabur on a
+Linux server ([guide](https://oss.zeabur.com/docs/zeabur/get-started/quickstart/)). It is three crates, each depending only on the
 ones above it:
 
 - `zeabur-installer-plan`: configuration, catalog, selection, values and the plan. No I/O.

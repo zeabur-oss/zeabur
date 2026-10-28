@@ -63,7 +63,7 @@ pub enum PlanError {
     /// Too little memory for a team install.
     #[error(
         "a team install on {} needs a server with at least {min} MiB of memory; this one has {have} \
-         MiB. Install for yourself instead: set `use: personal` (docs/reference/installer-configuration.md)",
+         MiB. Install for yourself instead: set `use: personal` (https://oss.zeabur.com/docs/zeabur/reference/installer-configuration/)",
         .distribution.title()
     )]
     TeamMemory {
@@ -77,7 +77,7 @@ pub enum PlanError {
     /// This build pins no release, and `sources` does not name these keys.
     #[error(
         "this installer is a development build and pins no release: set {} in the configuration \
-         (docs/reference/installer-configuration.md)",
+         (https://oss.zeabur.com/docs/zeabur/reference/installer-configuration/)",
         .0.iter().map(|k| format!("sources.{k}")).collect::<Vec<_>>().join(", ")
     )]
     Unpublished(Vec<&'static str>),

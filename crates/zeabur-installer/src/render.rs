@@ -165,7 +165,7 @@ pub(crate) fn removals(removals: &[Removal]) -> String {
     }
     push(
         &mut s,
-        "  What stays is deleted by hand (docs/reference/installer.md#remove-a-component).",
+        "  What stays is deleted by hand (https://oss.zeabur.com/docs/zeabur/reference/installer/#remove-components).",
     );
     push(&mut s, "");
     s

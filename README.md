@@ -12,9 +12,13 @@ machine), shows the cluster as projects and services, explains what is wrong in 
 change things safely. It works with the objects you already have, never acts with more rights
 than you have, and keeps no state of its own: no database, no custom resources.
 
-> **Status: pre-alpha (0.1.1).** It works end to end, on your machine and in a cluster, but
-> there are no published images or binaries yet, the API may still change, and it has been tried
-> on few clusters. Do not point it at a cluster you cannot afford to break.
+**[oss.zeabur.com/zeabur](https://oss.zeabur.com/zeabur/)** shows what Zeabur does, and
+**[the documentation](https://oss.zeabur.com/docs/zeabur/)** covers installing, deploying,
+configuring and operating the cluster, and leaving Zeabur, in English,
+[繁體中文](https://oss.zeabur.com/zh-TW/docs/zeabur/) and [简体中文](https://oss.zeabur.com/zh-CN/docs/zeabur/).
+
+> **Status: pre-alpha (0.1.1).** The API may still change, and it has been tried on few
+> clusters. Do not point it at a cluster you cannot afford to break.
 
 <table>
 <tr>
@@ -33,62 +37,22 @@ than you have, and keeps no state of its own: no database, no custom resources.
 
 <sub>Screenshots of the built-in demo data (`cargo run -p zeabur-api --example demo`), taken by `scripts/docs-shots.sh docs/readme-shots.yaml`.</sub>
 
-## Principles
+## Get started
 
-- **Your rights, not Zeabur's.** Every request is made with your own credential (a token from
-  [Zeabur Identity](https://github.com/zeabur-oss/identity), or your kubeconfig on your machine);
-  kube-apiserver decides. In a cluster, admin rights are asked for only when your everyday ones
-  are refused; they need your passkey again and last a few minutes.
-- **Kubernetes objects are the only state.** No database and no custom resources: a project is
-  a namespace. Remove Zeabur and the cluster is as it was.
-- **Works with Helm, Argo CD and Flux.** Objects they manage are shown as such; Zeabur does not
-  fight them for fields.
-- **Suggests, and installs only through a plan.** Missing pieces come with a `helm` command, a
-  Flux `HelmRelease`, an Argo CD `Application` or a K3s/RKE2 `HelmChart`; when the cluster runs that
-  controller, a plan you review creates the objects.
-- **Light.** One static binary, small enough to run next to K3s or RKE2 on a 2 GB machine.
+- **One Linux server**: the installer sets up K3s (or RKE2), Zeabur Identity and Zeabur.
+  [Install on a single server](https://oss.zeabur.com/docs/zeabur/get-started/quickstart/)
+- **An existing Kubernetes cluster**: install the Helm chart, with sign-in through Zeabur Identity.
+  [Install in an existing cluster](https://oss.zeabur.com/docs/zeabur/get-started/install/)
+- **Just you, with your kubeconfig**: `zeaburctl ui` opens Zeabur in your browser on your own
+  computer. [Personal use](https://oss.zeabur.com/docs/zeabur/get-started/personal/) and
+  [zeaburctl](https://oss.zeabur.com/docs/zeabur/reference/zeaburctl/)
 
-## What works today
+[Releases](https://oss.zeabur.com/docs/zeabur/reference/releases/) lists what a release contains
+and how to verify it.
 
-- **Projects and services.** Namespaces shown as projects, and their workloads, Services,
-  routes, ConfigMaps, Secrets and volumes grouped into services, with what Helm, Argo CD or Flux
-  manages marked as such. The cluster page shows the API server's readiness, the nodes, how long
-  the Kubernetes version is supported, upgrades, and which recommended components are installed.
-- **Diagnoses in plain words.** Why a service is unhealthy (a crash loop, out of memory, an image
-  that cannot be pulled, a failing probe, traffic that cannot reach it, a quota, no node with
-  room, missing configuration), with the fix and the status fields and events it rests on; and
-  what a project is missing (resource requests and limits, readiness probes, Ingresses that can
-  move to Gateway API). A refusal by RBAC is told apart from a component that is not installed.
-- **Changes as plan, confirm, apply.** Environment variables, ConfigMap and Secret keys,
-  hostnames, restarts, scaling, probes, resources, volumes and mounts (on a chosen storage
-  class, grown only where the class allows), an object's YAML, deleting an object, ready-made
-  NetworkPolicies, adopting a namespace as a project and its details. A plan shows the fields it writes and who owns them now; the apply writes only those
-  fields, and is refused if anything changed since the plan.
-- **Releases and rollback** of a workload's pod template, through the same plans.
-- **Cluster backups** with [Velero](https://velero.io): where they go (S3-compatible storage,
-  keys kept in a Secret), a schedule for the whole cluster or chosen projects with the files in
-  volumes copied, and each backup's outcome in plain words, set through the same plans.
-  Databases keep their own backups; restoring is left to the `velero` command-line tool.
-- **Logs and a terminal**: a pod's logs, followed live, and a shell in a container.
-- **Usage**: CPU and memory now (metrics-server) and their history (a Prometheus-compatible
-  store such as VictoriaMetrics).
-- **Suggested installs** for missing components, as a `helm` command to copy, or a Flux
-  `HelmRelease`, an Argo CD `Application` or a K3s/RKE2 `HelmChart` that a plan creates, from
-  [Zeabur Catalog](https://github.com/zeabur-oss/catalog).
-- **In a cluster**, with its Helm chart: sign-in through Zeabur Identity with a passkey, admin rights
-  confirmed with the passkey again, and nothing left behind after uninstalling.
-- **`zeaburctl doctor`**: checks the cluster version, the Zeabur Identity setup and the recommended
-  components, as text or JSON, with an exit code for scripts.
+## Build from source
 
-Not yet: creating new workloads, editing or deleting objects that Helm, Argo CD or Flux manage
-(they can be restarted), more than one replica in a cluster, and signing in without Zeabur Identity.
-
-## Quick start
-
-On your machine, with your kubeconfig. Download `zeaburctl` for Linux or macOS (Apple silicon)
-from a [release](https://github.com/zeabur-oss/zeabur/releases) and verify it
-([Releases](docs/reference/releases.md#download-and-verify-zeaburctl)), or build it from source in the
-[Nix](https://nixos.org) dev shell, which provides every tool:
+In the [Nix](https://nixos.org) dev shell, which provides every tool:
 
 ```sh
 git clone https://github.com/zeabur-oss/zeabur && cd zeabur
@@ -99,20 +63,14 @@ ZEABUR_UI_DIST="$PWD/web/dist" cargo build --release --locked -p zeaburctl
 ```
 
 `zeaburctl ui` listens on a random loopback port, opens the browser, and makes every request
-with your current kubeconfig context. `zeaburctl doctor` uses it the same way.
+with your current kubeconfig context.
 
-In a cluster, for everyone who signs in through Zeabur Identity: [Install on an existing cluster](docs/get-started/install.md).
-On a fresh Linux server, `zeabur-installer` installs RKE2, Zeabur Identity and Zeabur in one
-step: [Quickstart](docs/get-started/quickstart.md).
+## Contributing
 
-## Learn more
-
-- [Documentation](docs/): installing, deploying, configuring and operating the cluster,
-  and leaving Zeabur.
-- [Releases](docs/reference/releases.md): what a release contains and how to verify it.
-- [Architecture](docs/reference/architecture.md): principles and how Zeabur explains problems.
 - [Contributing](CONTRIBUTING.md): environment, checks, dependency policy, tests.
 - [Developer docs](docs/internal/): crates, testing, wording, releasing.
+- [`docs/`](docs/) holds the sources of the documentation; edit a page there and it is published
+  to [oss.zeabur.com](https://oss.zeabur.com/docs/zeabur/).
 
 ## Licence and credits
 

@@ -1,8 +1,8 @@
-# Zeabur's in-cluster server. docs/get-started/install.md walks through an installation; values.schema.json
+# Zeabur's in-cluster server. docs/get-started/install.mdx walks through an installation; values.schema.json
 # checks these values.
 
 image:
-  # Published for linux/amd64 and linux/arm64 by the release workflow, signed (docs/reference/releases.md).
+  # Published for linux/amd64 and linux/arm64 by the release workflow, signed (docs/reference/releases.mdx).
   repository: ghcr.io/zeabur-oss/zeabur
   # Defaults to the chart's appVersion. Ignored when digest is set.
   tag: ""
@@ -30,7 +30,7 @@ issuer:
   clientId: zeabur
   clientSecret:
     # The Secret holding the client secret `zeabur-identityctl client create` printed. Required; create
-    # it before installing (docs/get-started/install.md). The chart never takes the secret as a value, so it
+    # it before installing (docs/get-started/install.mdx). The chart never takes the secret as a value, so it
     # stays out of Helm's release records.
     existingSecret: ""
     key: client-secret

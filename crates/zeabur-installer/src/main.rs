@@ -285,7 +285,7 @@ fn show_plan(cli: &Cli, json: bool) -> Result<(), InstallError> {
         };
         out::line(&format!(
             "No configuration at {}; planning with the defaults: {} and {} {kind}, \
-             standard components. Write the file to change them (docs/reference/installer-configuration.md).\n",
+             standard components. Write the file to change them (https://oss.zeabur.com/docs/zeabur/reference/installer-configuration/).\n",
             cli.config.display(),
             config.access.zeabur,
             config.access.identity

@@ -1499,7 +1499,7 @@ pub fn is_public(address: &str) -> bool {
     }
 }
 
-/// The chart values of docs/get-started/install.md, with the Secrets the installer creates.
+/// The chart values of docs/get-started/install.mdx, with the Secrets the installer creates.
 fn zeabur_values(
     config: &Config,
     facts: &Facts,

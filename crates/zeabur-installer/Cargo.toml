@@ -7,7 +7,7 @@ rust-version.workspace = true
 license.workspace = true
 publish.workspace = true
 repository.workspace = true
-readme = "../../docs/get-started/quickstart.md"
+readme = "../../docs/get-started/quickstart.mdx"
 
 [dependencies]
 zeabur-installer-host.workspace = true
