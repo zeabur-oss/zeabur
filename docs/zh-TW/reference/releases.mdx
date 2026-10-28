@@ -4,7 +4,7 @@ description: 依作業系統選擇 Zeabur 發行檔，驗證 checksum、簽章�
 source: "a1e700d331bf"
 ---
 
-在 [GitHub Releases](https://github.com/zeabur-oss/zeabur/releases) 選好版本，下載對應的 archive、`SHA256SUMS` 和簽章。驗證時把簽署者限定為該版本 tag 的 release workflow，通過了才解壓縮、執行。
+在 [GitHub Releases](https://github.com/zeabur-oss/zeabur/releases) 選好版本，下載對應的 archive、`SHA256SUMS` 和簽章。驗證時把簽署者限定為 zeabur-oss 共用的 release workflow，且是為本 repository 該版本 tag 執行的那一次，通過了才解壓縮、執行。
 
 ## 檔案與平台
 
@@ -24,13 +24,13 @@ source: "a1e700d331bf"
 
 ## 下載與驗證執行檔
 
-需要 GitHub CLI `gh`、cosign 3 和 GNU `sha256sum`。把 `version` 換成你選的版本，下例用 `0.1.0`：
+需要 GitHub CLI `gh`、cosign 3 和 GNU `sha256sum`。把 `version` 換成你選的版本，下例用 `0.1.1`：
 
 ```sh
-version=0.1.0
+version=0.1.1
 platform=darwin-arm64
 binary=zeaburctl
-identity="https://github.com/zeabur-oss/zeabur/.github/workflows/release.yml@refs/tags/v$version"
+signer='^https://github\.com/zeabur-oss/\.github/\.github/workflows/release\.yml@'
 
 gh release download "v$version" --repo zeabur-oss/zeabur \
   --dir "zeabur-$version" \
@@ -41,22 +41,25 @@ gh release download "v$version" --repo zeabur-oss/zeabur \
 
 `platform` 可以換成 `linux-amd64` 或 `linux-arm64`。下載 installer 時，把 `binary` 改成 `zeabur-installer`，並選 Linux 平台。
 
-進入下載目錄，依序驗證 checksum 清單的簽署者、檔案內容和建置來源：
+zeabur-oss 的每個版本都由 [zeabur-oss/.github](https://github.com/zeabur-oss/.github) 裡共用的 release workflow 建置與簽署，所以簽署者是那個 workflow（下面的 `signer`），憑證上另外記著它是為哪個 repository、哪個 tag 執行。進入下載目錄，依序驗證 checksum 清單的簽署者、檔案內容和建置來源：
 
 ```sh
 cd "zeabur-$version"
 
 cosign verify-blob \
   --bundle SHA256SUMS.sigstore.json \
-  --certificate-identity "$identity" \
+  --certificate-identity-regexp "$signer" \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  --certificate-github-workflow-repository zeabur-oss/zeabur \
+  --certificate-github-workflow-ref "refs/tags/v$version" \
   SHA256SUMS
 
 sha256sum --check --ignore-missing SHA256SUMS
 
 gh attestation verify "$binary-v$version-$platform.tar.gz" \
   --repo zeabur-oss/zeabur \
-  --cert-identity "$identity"
+  --signer-workflow zeabur-oss/.github/.github/workflows/release.yml \
+  --source-ref "refs/tags/v$version"
 ```
 
 三項都通過後再解壓縮：
@@ -66,7 +69,7 @@ tar -xzf "$binary-v$version-$platform.tar.gz" "$binary"
 "./$binary" --version
 ```
 
-checksum 不符時，重新下載那個檔案。簽署者、issuer 或 attestation 不符時，不要執行檔案，先核對 release、檔名和 workflow 身分，也不要放寬驗證參數來讓它通過。
+checksum 不符時，重新下載那個檔案。簽署者、issuer 或 attestation 不符時，不要執行檔案，先核對 release、檔名、workflow 身分、repository 和 tag，也不要放寬驗證參數來讓它通過。
 
 用 macOS 瀏覽器下載的檔案會帶 quarantine 標記。驗證通過後，對解出的檔案執行：
 
@@ -82,13 +85,17 @@ xattr -d com.apple.quarantine zeaburctl
 
 ```sh
 cosign verify \
-  --certificate-identity "$identity" \
+  --certificate-identity-regexp "$signer" \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  --certificate-github-workflow-repository zeabur-oss/zeabur \
+  --certificate-github-workflow-ref "refs/tags/v$version" \
   'ghcr.io/zeabur-oss/zeabur@sha256:<image-index-digest>'
 
 cosign verify \
-  --certificate-identity "$identity" \
+  --certificate-identity-regexp "$signer" \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  --certificate-github-workflow-repository zeabur-oss/zeabur \
+  --certificate-github-workflow-ref "refs/tags/v$version" \
   'ghcr.io/zeabur-oss/charts/zeabur@sha256:<chart-digest>'
 ```
 
@@ -96,7 +103,7 @@ cosign verify \
 
 ## 發行流程
 
-維護者推送 `v<version>` tag 後，release workflow 跑 CI、建置 Linux 和 macOS 版本、做 smoke test、發布映像檔和 chart，再以 Sigstore keyless 簽署映像檔、chart 和 checksum 清單，並為三者產生建置來源 attestation。
+維護者推送 `v<version>` tag 後，release workflow（本 repository 的 `release.yml`，它呼叫 `zeabur-oss/.github` 裡共用的那一個）跑 CI、建置 Linux 和 macOS 版本、做 smoke test、發布映像檔和 chart，再以 Sigstore keyless 簽署映像檔、chart 和 checksum 清單，並為三者產生建置來源 attestation。
 
 Workflow 最後建立 GitHub release 草稿，維護者檢查後才公開。Releases 頁面上看得到的版本，才有可下載的檔案。
 

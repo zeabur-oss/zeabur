@@ -4,24 +4,36 @@
 # image, then the artifacts themselves. On Linux it installs the published chart on a disposable
 # k3s cluster, whose node pulls the published image (release-smoke.sh); on macOS it runs
 # zeaburctl. Run inside `nix develop` on Linux amd64/arm64 or macOS arm64; `gh` must be signed in
-# (the attestations are read from GitHub's API).
-#   scripts/release-verify.sh v0.0.2 downloaded \
-#     https://github.com/zeabur-oss/zeabur/.github/workflows/release.yml@refs/tags/v0.0.2
+# (the attestations are read from GitHub's API). `scripts/release.sh verify` runs it.
+#   scripts/release-verify.sh v0.1.1 downloaded
+#
+# Every signature and attestation names the workflow that ran, zeabur-oss/.github's shared
+# release.yml, and the repository and tag it ran for. The shared workflow sets these, and they
+# default to a release of zeabur-oss/zeabur:
+#   RELEASE_CERT_IDENTITY_REGEXP  the signing workflow's certificate identity
+#   RELEASE_SIGNER_WORKFLOW       the same workflow, as `gh attestation verify --signer-workflow`
+#   RELEASE_SOURCE_REPOSITORY     the repository released (zeabur-oss/zeabur)
+#   RELEASE_SOURCE_REF            its tag (refs/tags/<version>)
 set -euo pipefail
 
-if [[ $# != 3 ]]; then
-  echo "usage: release-verify.sh <vVERSION> <directory> <certificate-identity>" >&2
+if [[ $# != 2 ]]; then
+  echo "usage: release-verify.sh <vVERSION> <directory>" >&2
   exit 2
 fi
 version="$1"
 directory="$(cd "$2" && pwd)"
-identity="$3"
 root="$(cd "$(dirname "$0")/.." && pwd)"
 : "${IN_NIX_SHELL:?run inside nix develop}"
-if [[ ! "$version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ || -z "$identity" ]]; then
-  echo "expected a version like v0.0.2 and the exact signing identity" >&2
+if [[ ! "$version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+  echo "expected a version like v0.1.1" >&2
   exit 2
 fi
+identity_regexp="${RELEASE_CERT_IDENTITY_REGEXP:-^https://github\.com/zeabur-oss/\.github/\.github/workflows/release\.yml@}"
+signer_workflow="${RELEASE_SIGNER_WORKFLOW:-zeabur-oss/.github/.github/workflows/release.yml}"
+repository="${RELEASE_SOURCE_REPOSITORY:-zeabur-oss/zeabur}"
+source_ref="${RELEASE_SOURCE_REF:-refs/tags/$version}"
+[[ "$source_ref" == "refs/tags/$version" ]] ||
+  { echo "RELEASE_SOURCE_REF is $source_ref, not the tag refs/tags/$version" >&2; exit 2; }
 case "$(uname -s):$(uname -m)" in
   Linux:x86_64) platform=linux-amd64 ;;
   Linux:aarch64) platform=linux-arm64 ;;
@@ -29,16 +41,18 @@ case "$(uname -s):$(uname -m)" in
   *) echo "release verification runs on Linux amd64/arm64 or macOS arm64" >&2; exit 2 ;;
 esac
 plain="${version#v}"
-repository="${GITHUB_REPOSITORY:-zeabur-oss/zeabur}"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 # A fresh, empty registry configuration: a publisher's login must not hide a private package.
 export DOCKER_CONFIG="$work/docker" HELM_REGISTRY_CONFIG="$work/docker/config.json"
 mkdir -p "$DOCKER_CONFIG"
-certificate=(--certificate-identity "$identity" --certificate-oidc-issuer https://token.actions.githubusercontent.com)
-attestation=(--repo "$repository" --cert-identity "$identity")
+certificate=(--certificate-identity-regexp "$identity_regexp"
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
+  --certificate-github-workflow-repository "$repository" --certificate-github-workflow-ref "$source_ref")
+attestation=(--repo "$repository" --signer-workflow "$signer_workflow" --source-ref "$source_ref")
 
-# 1. The checksums: signed by the release workflow at this tag, and covering every asset.
+# 1. The checksums: signed by the release workflow for this repository's tag, and covering every
+# asset.
 cosign verify-blob "${certificate[@]}" --bundle "$directory/SHA256SUMS.sigstore.json" "$directory/SHA256SUMS"
 expected=(digests.txt "zeabur-$plain.tgz" "docs-shots-$version.tar")
 for build in linux-amd64 linux-arm64 darwin-arm64; do
@@ -55,7 +69,7 @@ if [[ "$listed" != "$(printf '%s\n' "${expected[@]}" | sort)" ]]; then
 fi
 (cd "$directory" && sha256sum --check --strict SHA256SUMS)
 
-# 2. Provenance of every asset: built by this repository's release workflow at this tag.
+# 2. Provenance of every asset: built by the release workflow from this repository's tag.
 for asset in "${expected[@]}"; do
   gh attestation verify "$directory/$asset" "${attestation[@]}" >/dev/null
   echo "provenance verified: $asset"

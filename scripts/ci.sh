@@ -1,14 +1,19 @@
 #!/usr/bin/env bash
-# One CI job, as .github/workflows/ci.yml runs it and as anyone runs it locally: the workflow only
-# checks out, installs Nix and restores caches, then calls this script. Everything a job checks is
-# here, so a job behaves the same on GitHub and on any Linux machine with Nix (and Docker for the
-# cluster jobs); there is no runner image to emulate.
+# One CI job, as .github/workflows/ci.yml runs it (through zeabur-oss/.github's shared CI workflow,
+# one job each) and as anyone runs it locally: the workflow only checks out, installs Nix and
+# restores caches, then calls this script. Everything a job checks is here, so a job behaves the
+# same on GitHub and on any Linux machine with Nix (and Docker for the cluster jobs); there is no
+# runner image to emulate.
 #
 #   scripts/ci.sh <job>      # run one job; it enters its Nix dev shell itself
-#   scripts/ci.sh --list     # the job names, `check` matrix first
+#   scripts/ci.sh --list     # the job names, without the dev shell
+#
+# A job leaves what is worth keeping (the unsafe report, the cluster's measurements) in
+# $CI_ARTIFACTS when it is set; the workflow uploads it as the artifact ci-<job>.
 #
 # The cluster jobs run on the development cluster (scripts/dev-cluster.sh, which also reads
-# ZEABUR_IDENTITY_SRC, K3S_IMAGE and ZEABUR_REGISTRY_MIRRORS) and delete it when they end; set
+# ZEABUR_IDENTITY_SRC, K3S_IMAGE and ZEABUR_REGISTRY_MIRRORS; without ZEABUR_IDENTITY_SRC it fetches
+# Zeabur Identity at ZEABUR_IDENTITY_PINNED itself) and delete it when they end; set
 # ZEABUR_CI_KEEP=1 to keep it for a look afterwards.
 set -euo pipefail
 
@@ -37,16 +42,25 @@ fi
 
 export RUSTDOCFLAGS="-D warnings"
 
-# The `check` matrix in ci.yml must list exactly the jobs above, or a job runs only locally.
-check_matrix() {
-  local listed
-  listed=$(awk '/^  check:/{in_check=1} /^  [a-z]/ && !/^  check:/{in_check=0}
-    in_check && /^          - name: /{sub(/^          - name: /, ""); print}' .github/workflows/ci.yml)
-  if [[ "$listed" != "$(printf '%s\n' "${check_jobs[@]}")" ]]; then
-    echo "error: the check matrix in ci.yml differs from scripts/ci.sh:" >&2
-    diff <(printf '%s\n' "${check_jobs[@]}") <(echo "$listed") >&2 || true
-    return 1
-  fi
+# Copies a file into $CI_ARTIFACTS, which the workflow uploads; nothing without it or the file.
+keep() { # $1 = file
+  [[ -n "${CI_ARTIFACTS:-}" && -f "$1" ]] || return 0
+  mkdir -p "$CI_ARTIFACTS"
+  cp "$1" "$CI_ARTIFACTS/"
+}
+
+# The image's size and Zeabur's memory after kubernetes-l2, in the run's summary when there is one.
+l2_report() {
+  local measurements="target/dev-cluster/measurements.json"
+  keep "$measurements"
+  [[ -n "${GITHUB_STEP_SUMMARY:-}" ]] || return 0
+  {
+    echo "### Zeabur in the cluster (${K3S_IMAGE:-the default k3s})"
+    echo "| Measure | Bytes |"
+    echo "|---|---|"
+    echo "| Image \`zeabur\` | $(docker image inspect --format '{{.Size}}' zeabur:dev 2>/dev/null || echo n/a) |"
+    echo "| Pod working set after 60 s idle | $(jq -r .pod_working_set_bytes "$measurements" 2>/dev/null || echo n/a) |"
+  } >>"$GITHUB_STEP_SUMMARY"
 }
 
 # As k3d's cluster admin, without Zeabur Identity: nothing critical and every check runs; the exit code is
@@ -89,7 +103,6 @@ browser_failure_context() {
 
 case "$job" in
   format)
-    check_matrix
     cargo fmt --all --check
     nixfmt --check flake.nix
     shellcheck scripts/*.sh
@@ -101,7 +114,12 @@ case "$job" in
   docs) cargo doc --workspace --no-deps --document-private-items --locked ;;
   test) cargo nextest run --workspace --all-features --locked --no-tests=warn ;;
   cargo-deny) cargo deny --locked check ;;
-  unsafe-report) ./scripts/unsafe-report.sh ;;
+  unsafe-report)
+    status=0
+    ./scripts/unsafe-report.sh || status=$?
+    keep target/unsafe-report.md
+    exit "$status"
+    ;;
   levels) ./scripts/check-levels.sh ;;
   # Zeabur Proxy's request parser for a minute (crates/zeabur-proxy/fuzz). Without a sanitizer the
   # stable toolchain builds it; the target's own assertions are what it checks.
@@ -162,5 +180,10 @@ case "$job" in
     ;;
   # Zeabur in a cluster with Zeabur Identity, from their images and Zeabur's chart, through a browser:
   # passkey sign-in, terminal, rights, memory, removal.
-  kubernetes-l2) ZEABUR_L2_KEEP="${ZEABUR_CI_KEEP:-}" ./scripts/e2e-l2.sh ;;
+  kubernetes-l2)
+    status=0
+    ZEABUR_L2_KEEP="${ZEABUR_CI_KEEP:-}" ./scripts/e2e-l2.sh || status=$?
+    l2_report
+    exit "$status"
+    ;;
 esac

@@ -5,16 +5,20 @@ description: Investigate a failed or flaky CI or release run of Zeabur (GitHub A
 
 # When CI fails
 
-`.github/workflows/ci.yml` has three kinds of jobs: the `check` matrix (format, clippy, docs, test,
-cargo-deny, unsafe-report, levels, ui, no-ui, chart, wording), `kubernetes` (cluster tests,
+`.github/workflows/ci.yml` calls zeabur-oss/.github's shared CI workflow, which runs one job per
+line of `scripts/ci.sh --list` (shown as `ci / <job>`): the checks (format, clippy, docs, test,
+cargo-deny, unsafe-report, levels, fuzz, ui, no-ui, chart, wording), `kubernetes` (cluster tests,
 `zeaburctl doctor`, browser tests in local mode) and `kubernetes-l2` (Zeabur and Zeabur Identity
-in a cluster, `scripts/e2e-l2.sh`), both on `scripts/dev-cluster.sh`; `dco` runs on pull requests only. What each cluster job runs
+in a cluster, `scripts/e2e-l2.sh`), both on `scripts/dev-cluster.sh`; a job's `$CI_ARTIFACTS`
+is uploaded as `ci-<job>`. `dco / DCO` runs on pull requests only. What each cluster job runs
 is in `zeabur-cluster-tests`.
 
-`.github/workflows/release.yml` runs on a `v*` tag: all of `ci.yml` (`workflow_call`), then
-`build` (Linux amd64/arm64, macOS arm64: `scripts/release-build.sh`, then
-`scripts/release-smoke.sh` on Linux), `publish` (`scripts/release-publish.sh`, attestations, the
-draft release) and `verify` (`scripts/release-verify.sh` on the draft's assets). For a failed
+`.github/workflows/release.yml` runs on a `vX.Y.Z` tag: all of `ci.yml` (`workflow_call`), then
+zeabur-oss/.github's shared release workflow, each stage `scripts/release.sh <stage>`: `build`
+(Linux amd64/arm64, macOS arm64: `scripts/release-build.sh`, then `scripts/release-smoke.sh` on
+Linux and the docs screenshots on Linux amd64), `publish` (`scripts/release-publish.sh`), `attest`,
+`finish` (the installers), `release` (`scripts/release-assets.sh`, the draft release) and `verify`
+(`scripts/release-verify.sh` on the draft's assets). For a failed
 release run, read [RELEASE-RECOVERY.md](RELEASE-RECOVERY.md) before changing permissions,
 packages or artifacts.
 

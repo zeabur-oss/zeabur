@@ -3,7 +3,7 @@ title: Release files and verification
 description: Choose Zeabur release files for your operating system, then verify checksums, signatures, and build provenance before running them.
 ---
 
-Choose a version on [GitHub Releases](https://github.com/zeabur-oss/zeabur/releases), then download the matching archive, `SHA256SUMS`, and signature. When verifying, restrict the signer to the release workflow at that version's tag. Extract and run the files only after verification passes.
+Choose a version on [GitHub Releases](https://github.com/zeabur-oss/zeabur/releases), then download the matching archive, `SHA256SUMS`, and signature. When verifying, restrict the signer to the release workflow that zeabur-oss runs for every repository, running for this repository at that version's tag. Extract and run the files only after verification passes.
 
 ## Files and platforms
 
@@ -23,13 +23,13 @@ At release time, the chart's `image.digest` is pinned to that release's image in
 
 ## Download and verify binaries
 
-You'll need GitHub CLI `gh`, cosign 3, and GNU `sha256sum`. Set `version` to the version you chose. This example uses `0.1.0`:
+You'll need GitHub CLI `gh`, cosign 3, and GNU `sha256sum`. Set `version` to the version you chose. This example uses `0.1.1`:
 
 ```sh
-version=0.1.0
+version=0.1.1
 platform=darwin-arm64
 binary=zeaburctl
-identity="https://github.com/zeabur-oss/zeabur/.github/workflows/release.yml@refs/tags/v$version"
+signer='^https://github\.com/zeabur-oss/\.github/\.github/workflows/release\.yml@'
 
 gh release download "v$version" --repo zeabur-oss/zeabur \
   --dir "zeabur-$version" \
@@ -40,22 +40,25 @@ gh release download "v$version" --repo zeabur-oss/zeabur \
 
 You can set `platform` to `linux-amd64` or `linux-arm64`. To download the installer, set `binary` to `zeabur-installer` and choose a Linux platform.
 
-Open the download directory, then verify the checksum list's signer, the file contents, and the build provenance in that order:
+Every zeabur-oss release is built and signed by the shared release workflow in [zeabur-oss/.github](https://github.com/zeabur-oss/.github), so the signer is that workflow (`signer` below), and the certificate also names the repository and tag it ran for. Open the download directory, then verify the checksum list's signer, the file contents, and the build provenance in that order:
 
 ```sh
 cd "zeabur-$version"
 
 cosign verify-blob \
   --bundle SHA256SUMS.sigstore.json \
-  --certificate-identity "$identity" \
+  --certificate-identity-regexp "$signer" \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  --certificate-github-workflow-repository zeabur-oss/zeabur \
+  --certificate-github-workflow-ref "refs/tags/v$version" \
   SHA256SUMS
 
 sha256sum --check --ignore-missing SHA256SUMS
 
 gh attestation verify "$binary-v$version-$platform.tar.gz" \
   --repo zeabur-oss/zeabur \
-  --cert-identity "$identity"
+  --signer-workflow zeabur-oss/.github/.github/workflows/release.yml \
+  --source-ref "refs/tags/v$version"
 ```
 
 Extract the binary only after all three checks pass:
@@ -65,7 +68,7 @@ tar -xzf "$binary-v$version-$platform.tar.gz" "$binary"
 "./$binary" --version
 ```
 
-If a checksum doesn't match, download that file again. If the signer, issuer, or attestation doesn't match, don't run the file. Check the release, filename, and workflow identity first. Don't relax the verification parameters to make it pass.
+If a checksum doesn't match, download that file again. If the signer, issuer, or attestation doesn't match, don't run the file. Check the release, filename, workflow identity, repository, and tag first. Don't relax the verification parameters to make it pass.
 
 Files downloaded in a browser on macOS carry a quarantine flag. After verification passes, run this command on the extracted file:
 
@@ -81,13 +84,17 @@ xattr -d com.apple.quarantine zeaburctl
 
 ```sh
 cosign verify \
-  --certificate-identity "$identity" \
+  --certificate-identity-regexp "$signer" \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  --certificate-github-workflow-repository zeabur-oss/zeabur \
+  --certificate-github-workflow-ref "refs/tags/v$version" \
   'ghcr.io/zeabur-oss/zeabur@sha256:<image-index-digest>'
 
 cosign verify \
-  --certificate-identity "$identity" \
+  --certificate-identity-regexp "$signer" \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  --certificate-github-workflow-repository zeabur-oss/zeabur \
+  --certificate-github-workflow-ref "refs/tags/v$version" \
   'ghcr.io/zeabur-oss/charts/zeabur@sha256:<chart-digest>'
 ```
 
@@ -95,7 +102,7 @@ Replace the placeholders in angle brackets with the values from `digests.txt`. F
 
 ## Release process
 
-When a maintainer pushes a `v<version>` tag, the release workflow runs CI, builds the Linux and macOS binaries, runs smoke tests, and publishes the image and chart. It then signs the image, chart, and checksum list with Sigstore keyless signing and generates build provenance attestations for all three.
+When a maintainer pushes a `v<version>` tag, the release workflow (this repository's `release.yml`, which calls the shared one in `zeabur-oss/.github`) runs CI, builds the Linux and macOS binaries, runs smoke tests, and publishes the image and chart. It then signs the image, chart, and checksum list with Sigstore keyless signing and generates build provenance attestations for all three.
 
 The workflow finishes by creating a draft GitHub release. A maintainer checks the draft before publishing it. Downloadable files are available only for versions visible on the Releases page.
 

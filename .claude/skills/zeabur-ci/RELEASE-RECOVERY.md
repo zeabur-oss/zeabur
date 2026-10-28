@@ -1,14 +1,15 @@
 # When a release run fails
 
-Read `docs/internal/releasing.md` ("When a release run fails"), `.github/workflows/release.yml` and the
-`scripts/release-*.sh` it calls first: they are the recovery path. Never push or move a tag,
+Read `docs/internal/releasing.md` ("When a release run fails"), `.github/workflows/release.yml`, the
+shared workflow it calls (zeabur-oss/.github) and the `scripts/release*.sh` it runs first: they are the recovery path. Never push or move a tag,
 publish a release, dispatch the workflow or change a package's settings yourself; those are the
 maintainers'. Propose the command or the setting instead.
 
 ## Keep what was published
 
-Once `publish` succeeded, the image, the chart and the draft's assets are signed with the tag's
-identity (`…/release.yml@refs/tags/v<version>`). Do not rebuild, re-sign, overwrite or delete
+Once `publish` succeeded, the image, the chart and the draft's assets are signed by the shared
+workflow (`https://github.com/zeabur-oss/.github/.github/workflows/release.yml@…`) for
+`zeabur-oss/zeabur` at `refs/tags/v<version>`. Do not rebuild, re-sign, overwrite or delete
 them to make a check pass: `scripts/release-publish.sh` refuses an existing release, image tag or
 chart version on purpose. Fix the check on `main`, then a maintainer runs
 `gh workflow run release.yml --ref main -f version=v<version> -F verify_only=true`, which takes
@@ -24,8 +25,8 @@ workflow file and permissions and picks up no fix.
   smoke cluster: the package is private. A public repository does not make its packages public,
   and the first run creates `zeabur` and `charts/zeabur` private. `release-verify.sh` uses an
   empty registry configuration on purpose, so a login cannot hide this.
-- **`gh attestation verify` finds nothing**: the attestation steps in `publish` did not run or
-  failed; read that job's log. An image tag or a chart version that exists without attestations
+- **`gh attestation verify` finds nothing**: the `attest` jobs (image and chart) or the
+  attestation step of `release` (assets) did not run or failed; read that job's log. An image tag or a chart version that exists without attestations
   is a failed publish, not a verification bug.
 
 ## An image import that reports success

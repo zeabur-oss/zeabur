@@ -15,7 +15,7 @@ messages follow [Conventional Commits](https://www.conventionalcommits.org/).
 
 ## Before you open a pull request
 
-Run what CI runs (the `check` jobs of `.github/workflows/ci.yml`), inside `nix develop`:
+Run what CI runs (the jobs of `scripts/ci.sh` that need no cluster), inside `nix develop`:
 
 ```sh
 cargo fmt --all --check && nixfmt --check flake.nix && shellcheck scripts/*.sh && actionlint
@@ -163,8 +163,8 @@ What to test, at which level, and what not to test: [docs/internal/testing.md](d
 - **Unit and integration tests** run anywhere: `cargo nextest run --workspace`. They include the
   language-neutral cases in [`fixtures/`](fixtures/README.md).
 - **Cluster tests** and **end-to-end tests** are `#[ignore]`d and require a disposable cluster
-  where you are cluster admin: the development cluster below, which the cluster jobs in
-  `.github/workflows/ci.yml` use too.
+  where you are cluster admin: the development cluster below, which the cluster jobs of
+  `scripts/ci.sh` use too.
 
 ### Development cluster
 

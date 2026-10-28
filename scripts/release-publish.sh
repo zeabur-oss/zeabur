@@ -1,18 +1,21 @@
 #!/usr/bin/env bash
 # Publishes the candidates that release-build.sh built and release-smoke.sh tried, compiling
 # nothing: the image by digest and the chart pinned to that digest, each signed. The installer is
-# built next with these digests, and release-assets.sh then makes the release assets. Every
-# signature is keyless (Sigstore, with the workflow's identity token). A maintainer publishes the
-# draft release (docs/internal/releasing.md).
-# CI only, from .github/workflows/release.yml, inside `nix develop`; Docker is the runner's.
-#   scripts/release-publish.sh v0.0.2 candidates published
+# built next with these digests (`release.sh finish`), and release-assets.sh then makes the
+# release assets. Every signature is keyless (Sigstore, with the workflow's identity token); the
+# shared release workflow attests what subjects.json lists. A maintainer publishes the draft
+# release (docs/internal/releasing.md).
+# CI only, from `scripts/release.sh publish`, inside `nix develop`; Docker is the runner's.
+#   scripts/release-publish.sh v0.1.1 artifacts published
 #
-# <candidates> holds one directory per build (release-linux-amd64, release-darwin-arm64, …) and
-# release-docs-shots; <out> receives notes.md and assets/ with digests.txt and the chart.
+# <artifacts> holds one directory per build (candidate-linux-amd64, candidate-darwin-arm64, …);
+# candidate-linux-amd64 also has the documentation screenshots. <out> receives notes.md,
+# assets/ with digests.txt and the chart, subjects.json (the image index and the chart, to attest)
+# and outputs.env (the installer's ZEABUR_PIN_ZEABUR_* values).
 set -euo pipefail
 
-version="${1:?usage: release-publish.sh <vVERSION> <candidates> <out>}"
-candidates="$(realpath "${2:?candidate directory required}")"
+version="${1:?usage: release-publish.sh <vVERSION> <artifacts> <out>}"
+candidates="$(realpath "${2:?artifact directory required}")"
 mkdir -p "${3:?output directory required}/assets"
 out="$(realpath "$3")"
 assets="$out/assets"
@@ -56,16 +59,16 @@ for ref in "$image:$plain" "$charts/zeabur:$plain"; do
   fi
 done
 for build in linux-amd64 linux-arm64 darwin-arm64; do
-  [[ -f "$candidates/release-$build/zeaburctl-$version-$build.tar.gz" ]] ||
+  [[ -f "$candidates/candidate-$build/zeaburctl-$version-$build.tar.gz" ]] ||
     { echo "missing the $build build" >&2; exit 1; }
 done
-[[ -f "$candidates/release-docs-shots/docs-shots-$version.tar" ]] ||
+[[ -f "$candidates/candidate-linux-amd64/docs-shots-$version.tar" ]] ||
   { echo "missing the documentation screenshots" >&2; exit 1; }
 
 # The image: each platform's candidate by digest, then one index of exactly those two.
 refs=()
 for arch in amd64 arm64; do
-  dir="$candidates/release-linux-$arch"
+  dir="$candidates/candidate-linux-$arch"
   candidate="$image:candidate-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT-$arch"
   # The input is this run's own smoked build, not a registry image: no signature policy applies.
   skopeo --insecure-policy copy "${auth[@]}" "docker-archive:$dir/image.tar" "docker://$candidate"
@@ -95,10 +98,10 @@ chart_digest="sha256:$(skopeo inspect --raw "${auth[@]}" "docker://$charts/zeabu
 cosign sign --yes "$charts/zeabur@$chart_digest"
 printf 'chart  %s\n' "$charts/zeabur@$chart_digest" >>"$assets/digests.txt"
 
+# What the shared workflow attests, and what the installer pins.
+jq -n --arg image "$image" --arg index "$index" --arg chart "$charts/zeabur" --arg chart_digest "$chart_digest" \
+  '[{name: $image, digest: $index}, {name: $chart, digest: $chart_digest}]' >"$out/subjects.json"
 {
-  echo "image=$image"
-  echo "image-digest=$index"
-  echo "chart=$charts/zeabur"
-  echo "chart-digest=$chart_digest"
-  echo "chart-sha256=$(sha256sum "$assets/zeabur-$plain.tgz" | cut -d ' ' -f 1)"
-} >>"${GITHUB_OUTPUT:?}"
+  echo "ZEABUR_PIN_ZEABUR_IMAGE=$image@$index"
+  echo "ZEABUR_PIN_ZEABUR_CHART_SHA256=$(sha256sum "$assets/zeabur-$plain.tgz" | cut -d ' ' -f 1)"
+} >"$out/outputs.env"

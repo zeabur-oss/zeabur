@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # Prints the pins of the catalog and Zeabur Identity releases that zeabur-installer installs, as
-# `ZEABUR_PIN_*=value` lines for $GITHUB_ENV. The catalog is the commit in flake.lock, Zeabur
-# Identity the release tag (or a commit that carries one) in ZEABUR_IDENTITY_PINNED. Each value
-# comes from a checksum list that the product's own release workflow signed, and cosign checks that
-# signature first. The catalog files this build embeds (ZEABUR_CATALOG_RELEASE) must match that
-# list. release-build.sh compiles the pins into the installer. Run inside `nix develop`.
-#   scripts/release-pins.sh >>"$GITHUB_ENV"
+# `ZEABUR_PIN_*=value` lines. The catalog is the commit in flake.lock, Zeabur Identity the release
+# tag (or a commit that carries one) in ZEABUR_IDENTITY_PINNED. Each value comes from a checksum
+# list that the product's release signed, and cosign checks that signature first. The catalog files this build embeds (ZEABUR_CATALOG_RELEASE) must match that
+# list. release-build.sh compiles the pins into the installer (`scripts/release.sh finish`). Run
+# inside `nix develop`.
+#   scripts/release-pins.sh
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
@@ -35,7 +35,9 @@ tag_at() { # $1 = repository, $2 = release tag or commit
 catalog="$(tag_at catalog "$ZEABUR_CATALOG_COMMIT")"
 identity="$(tag_at identity "$(tr -d '[:space:]' <"$root/ZEABUR_IDENTITY_PINNED")")"
 
-# Downloads a release's checksum list and checks the signature of the release workflow at its tag.
+# Downloads a release's checksum list and checks its signature: by zeabur-oss/.github's shared
+# release workflow, run for that repository's tag (the signer of every zeabur-oss release from
+# v0.1.1 on).
 signed_list() { # $1 = repository, $2 = version, $3 = list
   local base="https://github.com/zeabur-oss/$1/releases/download/$2"
   mkdir -p "$work/$1"
@@ -43,7 +45,8 @@ signed_list() { # $1 = repository, $2 = version, $3 = list
     curl --fail --silent --show-error --location --retry 3 --output "$work/$1/$file" "$base/$file"
   done
   cosign verify-blob --bundle "$work/$1/$3.sigstore.json" \
-    --certificate-identity "https://github.com/zeabur-oss/$1/.github/workflows/release.yml@refs/tags/$2" \
+    --certificate-identity-regexp '^https://github\.com/zeabur-oss/\.github/\.github/workflows/release\.yml@' \
+    --certificate-github-workflow-repository "zeabur-oss/$1" --certificate-github-workflow-ref "refs/tags/$2" \
     --certificate-oidc-issuer https://token.actions.githubusercontent.com "$work/$1/$3" >&2
 }
 

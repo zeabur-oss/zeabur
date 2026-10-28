@@ -1,5 +1,8 @@
 name: CI
 
+# Every job of `scripts/ci.sh --list`, each as `scripts/ci.sh <job>`, through the shared CI workflow
+# of zeabur-oss/.github: it only checks out, installs Nix and restores caches. A job runs the same
+# on any Linux machine with Nix (scripts/ci-local.sh).
 on:
   push:
     branches: [main]
@@ -16,147 +19,12 @@ concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-env:
-  CARGO_TERM_COLOR: always
-  RUSTDOCFLAGS: -D warnings
-
 jobs:
-  # Every job's checks are in scripts/ci.sh, which runs the same on any Linux machine with Nix
-  # (scripts/ci-local.sh); the jobs here only check out, install Nix and restore caches.
-  check:
-    name: ${{ matrix.name }}
-    runs-on: ubuntu-26.04-arm
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - name: format
-          - name: clippy
-          - name: docs
-          - name: test
-          - name: cargo-deny
-          - name: unsafe-report
-          - name: levels
-          - name: fuzz
-          - name: ui
-          - name: no-ui
-          - name: chart
-          # zhtw-mcp is in a dev shell of its own (cached below) and needs no Rust cache.
-          - name: wording
-            no-rust: true
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-          # `fallow audit` in the ui job compares HEAD with HEAD^.
-          fetch-depth: 2
-      - uses: DeterminateSystems/determinate-nix-action@f296148a827001a9a82d3685b53210c06e5d3b67 # v3.24.0
-      # rust-cache keys on `rustc -vV`: put the pinned toolchain from the dev shell on PATH first,
-      # otherwise it fails ("Command failed: rustc -vV") or keys on the image's rustc.
-      - if: ${{ !matrix.no-rust }}
-        run: dirname "$(nix develop --command bash -c 'command -v rustc')" >> "$GITHUB_PATH"
-      - if: ${{ !matrix.no-rust }}
-        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
-        with:
-          key: ${{ matrix.name }}
-      # zhtw-mcp builds from source, and no public cache has it (it follows this flake's nixpkgs).
-      # Its closure is kept in a file:// binary cache keyed on its derivation, so the
-      # key changes exactly when the build would.
-      - if: matrix.name == 'wording'
-        id: zhtw
-        run: |
-          drv=$(nix eval --raw .#zhtw-mcp.drvPath)
-          echo "key=zhtw-mcp-$(basename "$drv" .drv)" >> "$GITHUB_OUTPUT"
-      - if: matrix.name == 'wording'
-        id: zhtw-cache
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ~/.cache/zhtw-mcp-nar
-          key: ${{ steps.zhtw.outputs.key }}
-      - if: steps.zhtw-cache.outputs.cache-hit == 'true'
-        run: nix copy --no-check-sigs --from "file://$HOME/.cache/zhtw-mcp-nar" .#zhtw-mcp
-      - run: ./scripts/ci.sh ${{ matrix.name }}
-      - if: matrix.name == 'wording' && steps.zhtw-cache.outputs.cache-hit != 'true'
-        run: nix copy --to "file://$HOME/.cache/zhtw-mcp-nar?compression=zstd" .#zhtw-mcp
-      - if: matrix.name == 'wording' && steps.zhtw-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ~/.cache/zhtw-mcp-nar
-          key: ${{ steps.zhtw.outputs.key }}
-      - if: matrix.name == 'unsafe-report' && always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: unsafe-report
-          path: target/unsafe-report.md
-
-  kubernetes:
-    name: kubernetes (k3s ${{ matrix.k3s }})
-    runs-on: ubuntu-26.04-arm
-    strategy:
-      fail-fast: false
-      matrix:
-        k3s: [v1.36.5-k3s1]
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: DeterminateSystems/determinate-nix-action@f296148a827001a9a82d3685b53210c06e5d3b67 # v3.24.0
-      - run: dirname "$(nix develop --command bash -c 'command -v rustc')" >> "$GITHUB_PATH"
-      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
-        with:
-          key: kubernetes
-      - name: Integration tests, zeaburctl doctor, browser tests
-        env:
-          K3S_IMAGE: rancher/k3s:${{ matrix.k3s }}
-        run: ./scripts/ci.sh kubernetes
-
-  kubernetes-l2:
-    name: kubernetes-l2 (k3s ${{ matrix.k3s }})
-    runs-on: ubuntu-26.04-arm
-    strategy:
-      fail-fast: false
-      matrix:
-        k3s: [v1.36.5-k3s1]
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: DeterminateSystems/determinate-nix-action@f296148a827001a9a82d3685b53210c06e5d3b67 # v3.24.0
-      - run: dirname "$(nix develop --command bash -c 'command -v rustc')" >> "$GITHUB_PATH"
-      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
-        with:
-          key: kubernetes-l2
-      # Zeabur Identity at its pinned commit, which scripts/dev-cluster.sh builds.
-      - id: zeabur-identity
-        run: echo "rev=$(tr -d '[:space:]' < ZEABUR_IDENTITY_PINNED)" >> "$GITHUB_OUTPUT"
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          repository: zeabur-oss/identity
-          ref: ${{ steps.zeabur-identity.outputs.rev }}
-          path: .zeabur-identity
-          persist-credentials: false
-      - name: End-to-end test (passkey sign-in, terminal, rights, memory, removal)
-        env:
-          ZEABUR_IDENTITY_SRC: ${{ github.workspace }}/.zeabur-identity
-          K3S_IMAGE: rancher/k3s:${{ matrix.k3s }}
-        run: ./scripts/ci.sh kubernetes-l2
-      - name: Report sizes and memory
-        if: always()
-        run: |
-          {
-            echo "### Zeabur in the cluster (k3s ${{ matrix.k3s }})"
-            echo "| Measure | Bytes |"
-            echo "|---|---|"
-            echo "| Image \`zeabur\` | $(docker image inspect --format '{{.Size}}' zeabur:dev 2>/dev/null || echo n/a) |"
-            echo "| Pod working set after 60 s idle | $(jq -r .pod_working_set_bytes target/dev-cluster/measurements.json 2>/dev/null || echo n/a) |"
-          } >> "$GITHUB_STEP_SUMMARY"
-
+  ci:
+    uses: zeabur-oss/.github/.github/workflows/ci.yml@9d500376d4e7202c9343656fb6b85dc2eba26dd3 # main
+    with:
+      rust-cache: true
+      # `fallow audit` in the ui job compares HEAD with HEAD^.
+      fetch-depth: 2
   dco:
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-slim
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-      - run: ./scripts/check-dco.sh "${{ github.event.pull_request.base.sha }}" "${{ github.event.pull_request.head.sha }}"
+    uses: zeabur-oss/.github/.github/workflows/dco.yml@9d500376d4e7202c9343656fb6b85dc2eba26dd3 # main
