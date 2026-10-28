@@ -559,7 +559,7 @@ spec:
       serviceAccountName: victoria-metrics-operator
       containers:
         - name: operator
-          image: victoriametrics/operator:v0.75.0
+          image: victoriametrics/operator:v0.75.0@sha256:78da26b41a819093707be2ab6a65a5dc19f43d58ec52f30b49a545c2c6b7bd55
           imagePullPolicy: IfNotPresent
           env:
             - name: POD_NAME
@@ -1548,7 +1548,7 @@ spec:
       serviceAccountName: victoria-metrics-operator-cleanup-hook
       containers:
         - name: kubectl
-          image: registry.k8s.io/kubectl:v1.37.0
+          image: registry.k8s.io/kubectl:v1.36.0@sha256:63e5e76b746bb8b891a94968d380736c035e768dab0d56ddad1f50c750a4be39
           imagePullPolicy: IfNotPresent
           resources: 
             limits:

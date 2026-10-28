@@ -495,7 +495,7 @@ spec:
             - --upstream=http://127.0.0.1:8080/
             - --logtostderr=true
             - --v=0
-          image: "quay.io/brancz/kube-rbac-proxy:v0.20.2"
+          image: "quay.io/brancz/kube-rbac-proxy:v0.20.2@sha256:ad0fa9f0adc928b557663297bd22c610533960d77acdec289ce8a636f0ea2114"
           imagePullPolicy: IfNotPresent
           name: kube-rbac-proxy
           securityContext:
@@ -530,7 +530,7 @@ spec:
             capabilities:
               drop:
               - ALL
-          image: "docker.dragonflydb.io/dragonflydb/operator:v1.7.1"
+          image: "docker.dragonflydb.io/dragonflydb/operator:v1.7.1@sha256:bc0067369a456810d00715d7292da32b82f6df491fd51d6c57f2b2b3193ab490"
           imagePullPolicy: IfNotPresent
           livenessProbe:
             httpGet:

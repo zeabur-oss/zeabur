@@ -408,7 +408,7 @@ spec:
             - ALL
           readOnlyRootFilesystem: true
           runAsNonRoot: true
-        image: "chrislusf/seaweedfs-operator:1.0.40"
+        image: "chrislusf/seaweedfs-operator:1.0.40@sha256:41c72bcfa39f4f8f7ae0d384d70c87ad81118834a189876ca0f22824eddee752"
         imagePullPolicy: IfNotPresent
         command:
         - /manager

@@ -204,7 +204,7 @@ spec:
         version: v1.4.22
     spec:
       containers:
-      - image: "ghcr.io/stakater/reloader:v1.4.22"
+      - image: "ghcr.io/stakater/reloader:v1.4.22@sha256:def2480040adc164b3a57340e77674eadfd88fb7f0593df25e93297f29c7fd7c"
         imagePullPolicy: IfNotPresent
         name: reloader-reloader
         env:

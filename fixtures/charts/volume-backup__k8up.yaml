@@ -320,12 +320,12 @@ spec:
         {}
       containers:
         - name: k8up-operator
-          image: "ghcr.io/k8up-io/k8up:v2.16.1"
+          image: "ghcr.io/k8up-io/k8up:v2.16.1@sha256:f59bfa37c51511d5ad67e53816fb55c62d0e6411890e59bb6b965923129f30b5"
           imagePullPolicy: IfNotPresent
           args: [ operator ]
           env:
             - name: BACKUP_IMAGE
-              value: "ghcr.io/k8up-io/k8up:v2.16.1"
+              value: "ghcr.io/k8up-io/k8up:v2.16.1@sha256:f59bfa37c51511d5ad67e53816fb55c62d0e6411890e59bb6b965923129f30b5"
             - name: BACKUP_ENABLE_LEADER_ELECTION
               value: "false"
             - name: BACKUP_SKIP_WITHOUT_ANNOTATION
@@ -461,7 +461,7 @@ spec:
         {}
       containers:
       - name: "k8up-cleanup"
-        image: "ghcr.io/k8up-io/k8up:v2.16.1"
+        image: "ghcr.io/k8up-io/k8up:v2.16.1@sha256:f59bfa37c51511d5ad67e53816fb55c62d0e6411890e59bb6b965923129f30b5"
         imagePullPolicy: IfNotPresent
         command:
           - sh

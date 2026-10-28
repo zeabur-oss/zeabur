@@ -779,7 +779,7 @@ spec:
     spec:
       containers:
       - name: longhorn-manager
-        image: docker.io/longhornio/longhorn-manager:v1.13.0
+        image: docker.io/longhornio/longhorn-manager:v1.13.0@sha256:7372f3c59239e9a67c0017b3af32fabdf08c4dcc0631140161da9a47e3b142f0
         imagePullPolicy: IfNotPresent
         securityContext:
           privileged: true
@@ -792,13 +792,13 @@ spec:
         - --instance-manager-image
         - "docker.io/longhornio/longhorn-instance-manager:v1.13.0"
         - --share-manager-image
-        - "docker.io/longhornio/longhorn-share-manager:v1.13.0"
+        - "docker.io/longhornio/longhorn-share-manager:v1.13.0@sha256:53950f78b7af38b8a943c298cd3020622191a4661a13036f69d83c154cc8690d"
         - --backing-image-manager-image
         - "docker.io/longhornio/backing-image-manager:v1.13.0"
         - --support-bundle-manager-image
         - "docker.io/longhornio/support-bundle-kit:v0.0.98"
         - --manager-image
-        - "docker.io/longhornio/longhorn-manager:v1.13.0"
+        - "docker.io/longhornio/longhorn-manager:v1.13.0@sha256:7372f3c59239e9a67c0017b3af32fabdf08c4dcc0631140161da9a47e3b142f0"
         - --service-account
         - longhorn-service-account
         - --upgrade-version-check
@@ -857,7 +857,7 @@ spec:
             memory: 128Mi
       - name: pre-pull-share-manager-image
         imagePullPolicy: IfNotPresent
-        image: docker.io/longhornio/longhorn-share-manager:v1.13.0
+        image: docker.io/longhornio/longhorn-share-manager:v1.13.0@sha256:53950f78b7af38b8a943c298cd3020622191a4661a13036f69d83c154cc8690d
         command: ["sh", "-c", "echo share-manager image pulled && sleep infinity"]
       volumes:
       - name: boot
@@ -915,18 +915,18 @@ spec:
     spec:
       initContainers:
         - name: wait-longhorn-manager
-          image: docker.io/longhornio/longhorn-manager:v1.13.0
+          image: docker.io/longhornio/longhorn-manager:v1.13.0@sha256:7372f3c59239e9a67c0017b3af32fabdf08c4dcc0631140161da9a47e3b142f0
           command: ['sh', '-c', 'while [ $(curl -m 1 -s -o /dev/null -w "%{http_code}" http://longhorn-backend:9500/v1) != "200" ]; do echo waiting; sleep 2; done']
       containers:
         - name: longhorn-driver-deployer
-          image: docker.io/longhornio/longhorn-manager:v1.13.0
+          image: docker.io/longhornio/longhorn-manager:v1.13.0@sha256:7372f3c59239e9a67c0017b3af32fabdf08c4dcc0631140161da9a47e3b142f0
           imagePullPolicy: IfNotPresent
           command:
           - longhorn-manager
           - -d
           - deploy-driver
           - --manager-image
-          - "docker.io/longhornio/longhorn-manager:v1.13.0"
+          - "docker.io/longhornio/longhorn-manager:v1.13.0@sha256:7372f3c59239e9a67c0017b3af32fabdf08c4dcc0631140161da9a47e3b142f0"
           - --manager-url
           - http://longhorn-backend:9500/v1
           env:
@@ -1004,7 +1004,7 @@ spec:
     spec:
       containers:
       - name: longhorn-global-manager
-        image: docker.io/longhornio/longhorn-manager:v1.13.0
+        image: docker.io/longhornio/longhorn-manager:v1.13.0@sha256:7372f3c59239e9a67c0017b3af32fabdf08c4dcc0631140161da9a47e3b142f0
         imagePullPolicy: IfNotPresent
         command:
         - longhorn-manager
@@ -1092,7 +1092,7 @@ spec:
             weight: 1
       containers:
       - name: longhorn-ui
-        image: docker.io/longhornio/longhorn-ui:v1.13.0
+        image: docker.io/longhornio/longhorn-ui:v1.13.0@sha256:f22fb0254ae50195c1635ce428dfae26375956b3d7bd39640fae8fe33a236023
         imagePullPolicy: IfNotPresent
         volumeMounts:
         - name: nginx-cache
@@ -1150,7 +1150,7 @@ spec:
     spec:
       containers:
       - name: longhorn-post-upgrade
-        image: docker.io/longhornio/longhorn-manager:v1.13.0
+        image: docker.io/longhornio/longhorn-manager:v1.13.0@sha256:7372f3c59239e9a67c0017b3af32fabdf08c4dcc0631140161da9a47e3b142f0
         imagePullPolicy: IfNotPresent
         command:
         - longhorn-manager
@@ -1196,7 +1196,7 @@ spec:
     spec:
       containers:
       - name: longhorn-pre-upgrade
-        image: docker.io/longhornio/longhorn-manager:v1.13.0
+        image: docker.io/longhornio/longhorn-manager:v1.13.0@sha256:7372f3c59239e9a67c0017b3af32fabdf08c4dcc0631140161da9a47e3b142f0
         imagePullPolicy: IfNotPresent
         securityContext:
           privileged: true
@@ -1252,7 +1252,7 @@ spec:
     spec:
       containers:
       - name: longhorn-uninstall
-        image: docker.io/longhornio/longhorn-manager:v1.13.0
+        image: docker.io/longhornio/longhorn-manager:v1.13.0@sha256:7372f3c59239e9a67c0017b3af32fabdf08c4dcc0631140161da9a47e3b142f0
         imagePullPolicy: IfNotPresent
         command:
         - longhorn-manager

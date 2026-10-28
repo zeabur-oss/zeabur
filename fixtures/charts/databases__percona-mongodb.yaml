@@ -242,7 +242,7 @@ spec:
         - name: psmdb-operator
           securityContext:
             {}
-          image: "percona/percona-server-mongodb-operator:1.23.1"
+          image: "percona/percona-server-mongodb-operator:1.23.1@sha256:78c87b933e184b9af36dbb0078751862c75934c1521c33d3be4d0a38aa58dd0a"
           imagePullPolicy: IfNotPresent
           ports:
           - containerPort: 8080

@@ -38,27 +38,28 @@ spec:
   ca:
     secretName: zot-ca
 ---
-# The serving certificate. localhost and 127.0.0.1 let nodes pull
-# through a loopback port-forward or mirror; no node addresses, which
-# differ per cluster. zot reloads it when cert-manager renews it.
+# The key that signs push tokens. Zeabur Builder reads tls.key and signs
+# a short-lived token for each push; zot checks it with tls.crt. Only
+# the key matters, so a renewal keeps it (rotationPolicy: Never). zot
+# reads tls.crt once at start: to rotate the key, delete the Secret
+# zot-token-signer, wait for cert-manager to issue it again, and restart
+# zot.
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
-  name: zot-tls
+  name: zot-token-signer
   namespace: zot
 spec:
-  secretName: zot-tls
-  dnsNames:
-    - zot.zot.svc
-    - zot.zot.svc.cluster.local
-    - localhost
-  ipAddresses: [127.0.0.1]
+  commonName: zot-token-signer
+  secretName: zot-token-signer
+  duration: 87600h
   privateKey:
-    algorithm: ECDSA
-    size: 256
+    algorithm: Ed25519
+    encoding: PKCS8
+    rotationPolicy: Never
   issuerRef:
     kind: Issuer
-    name: zot-ca
+    name: zot-selfsigned
 ---
 # Source: zot/templates/serviceaccount.yaml
 apiVersion: v1
@@ -74,9 +75,9 @@ metadata:
     app.kubernetes.io/managed-by: Helm
 
 ---
-# Source: zot/templates/configmap.yaml
+# Source: zot/templates/config.yaml
 apiVersion: v1
-kind: ConfigMap
+kind: Secret
 metadata:
   name: zot-config
   namespace: zot
@@ -86,8 +87,9 @@ metadata:
     app.kubernetes.io/instance: zot
     app.kubernetes.io/version: "v2.1.22"
     app.kubernetes.io/managed-by: Helm
+type: Opaque
 data:
-  config.json: "{\n  \"distSpecVersion\": \"1.1.1\",\n  \"storage\": {\n    \"rootDirectory\": \"/var/lib/registry\",\n    \"dedupe\": true,\n    \"gc\": true,\n    \"gcDelay\": \"2h\",\n    \"gcInterval\": \"1h\",\n    \"retention\": {\n      \"delay\": \"2h\",\n      \"policies\": [\n        {\n          \"repositories\": [\"**\"],\n          \"deleteReferrers\": true,\n          \"deleteUntagged\": true,\n          \"keepTags\": [{\"mostRecentlyPushedCount\": 20}]\n        }\n      ]\n    }\n  },\n  \"http\": {\n    \"address\": \"0.0.0.0\",\n    \"port\": \"5000\",\n    \"tls\": {\"cert\": \"/tls/tls.crt\", \"key\": \"/tls/tls.key\"}\n  },\n  \"log\": {\"level\": \"info\"}\n}"
+  config.json: eyJkaXN0U3BlY1ZlcnNpb24iOiIxLjEuMSIsImh0dHAiOnsiYWNjZXNzQ29udHJvbCI6eyJyZXBvc2l0b3JpZXMiOnsiKioiOnsiYW5vbnltb3VzUG9saWN5IjpbInJlYWQiXX0sIioqL3NvdXJjZSI6eyJwb2xpY2llcyI6W119fX0sImFkZHJlc3MiOiIwLjAuMC4wIiwiYXV0aCI6eyJiZWFyZXIiOnsiY2VydCI6Ii90b2tlbi90bHMuY3J0IiwicmVhbG0iOiJodHRwczovL3pvdC56b3Quc3ZjOjUwMDAvem90L2F1dGgvdG9rZW4iLCJzZXJ2aWNlIjoiem90In19LCJwb3J0IjoiNTAwMCIsInRscyI6eyJjZXJ0IjoiL3Rscy90bHMuY3J0Iiwia2V5IjoiL3Rscy90bHMua2V5In19LCJsb2ciOnsibGV2ZWwiOiJpbmZvIn0sInN0b3JhZ2UiOnsiZGVkdXBlIjp0cnVlLCJnYyI6dHJ1ZSwiZ2NEZWxheSI6IjJoIiwiZ2NJbnRlcnZhbCI6IjFoIiwicmV0ZW50aW9uIjp7ImRlbGF5IjoiMmgiLCJwb2xpY2llcyI6W3siZGVsZXRlUmVmZXJyZXJzIjp0cnVlLCJkZWxldGVVbnRhZ2dlZCI6dHJ1ZSwia2VlcFRhZ3MiOlt7Im1vc3RSZWNlbnRseVB1c2hlZENvdW50IjoyMH1dLCJyZXBvc2l0b3JpZXMiOlsiKioiXX1dfSwicm9vdERpcmVjdG9yeSI6Ii92YXIvbGliL3JlZ2lzdHJ5In19
 
 ---
 # Source: zot/templates/service.yaml
@@ -145,19 +147,27 @@ spec:
   template:
     metadata:
       annotations:
-        checksum/configFiles: ff6573b0bbd74ccdbf807c01aa0c12127681c322e1d10ada4b5dc73cb72c86af
+        checksum/config: c0d2c34fda0f279b90e91b730cdbb9f0326212cd821bfcd1a0372a4f21bf2dac
       labels:
         app.kubernetes.io/name: zot
         app.kubernetes.io/instance: zot
     spec:
       serviceAccountName: zot
       securityContext:
-        null
+        fsGroup: 65532
+        runAsGroup: 65532
+        runAsNonRoot: true
+        runAsUser: 65532
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: zot
           securityContext:
-            null
-          image: "ghcr.io/project-zot/zot:v2.1.22"
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+          image: "ghcr.io/project-zot/zot:v2.1.22@sha256:96cda11459ce6f8c60da3b03f03e9f67fd11b3ae2d82c4c04c92b3c608996080"
           imagePullPolicy: IfNotPresent
           env:
             null
@@ -172,6 +182,9 @@ spec:
               name: zot-config
             - mountPath: "/tls"
               name: "zot-tls"
+            - mountPath: /token
+              name: token
+              readOnly: true
           livenessProbe:
             initialDelaySeconds: 5
             httpGet:
@@ -202,12 +215,40 @@ spec:
         - name: zot-config
           projected:
             sources:
-              - configMap:
+              - secret:
                   name: zot-config
         - name: zot-tls
           secret:
             secretName: zot-tls
+        - name: token
+          secret:
+            items:
+            - key: tls.crt
+              path: tls.crt
+            secretName: zot-token-signer
       dnsPolicy: ClusterFirst
+---
+# Source: zot/templates/extra-objects.yaml
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: zot-tls
+  namespace: zot
+spec:
+  dnsNames:
+  - zot.zot.svc
+  - zot.zot.svc.cluster.local
+  - localhost
+  ipAddresses:
+  - 127.0.0.1
+  - '::1'
+  issuerRef:
+    kind: Issuer
+    name: zot-ca
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  secretName: zot-tls
 ---
 # Source: zot/templates/tests/test-connection-fails.yaml
 apiVersion: v1
@@ -1603,7 +1644,7 @@ spec:
         seccompProfile: {type: RuntimeDefault}
       containers:
         - name: controller
-          image: "ghcr.io/zeabur-oss/builder:0.0.1"
+          image: "ghcr.io/zeabur-oss/builder@sha256:f964d8b5ca515bc84466971ab02aff86f4b7d6ecdca59f753e85cffbb92e78ed"
           imagePullPolicy: IfNotPresent
           args:
             - controller
@@ -1619,7 +1660,7 @@ spec:
             - name: ZEABUR_BUILDER_DEFAULT_REGISTRY
               value: "zot.zot.svc:5000"
             - name: ZEABUR_BUILDER_JOB_IMAGE
-              value: "ghcr.io/zeabur-oss/builder-job:0.0.1"
+              value: "ghcr.io/zeabur-oss/builder-job@sha256:722af492c8c6442de2af773dad1836e04cf8cd0d7e5e788150f2b47fda66df7d"
             - name: ZEABUR_BUILDER_REGISTRY_TOKEN_KEY
               value: "zot/zot-token-signer"
           securityContext:
@@ -1659,7 +1700,7 @@ metadata:
 spec:
   type: railpack
   planner:
-    image: "ghcr.io/zeabur-oss/builder-railpack:0.0.1"
+    image: "ghcr.io/zeabur-oss/builder-railpack@sha256:db71c5e8c5f6cb17578e75ba7d0ff03abc7da0b1069253b8e7aa8058404dd77c"
   frontend:
     type: gateway.v0
     source: "ghcr.io/railwayapp/railpack-frontend:v0.43.0"
@@ -1700,7 +1741,7 @@ spec:
         !(request.namespace in ['builder-system', 'zot'])
       message: the controller may not create Jobs in this namespace
     - expression: >-
-        variables.containers.all(c, c.image in ['ghcr.io/zeabur-oss/builder-job:0.0.1', 'ghcr.io/zeabur-oss/builder-railpack:0.0.1'])
+        variables.containers.all(c, c.image in ['ghcr.io/zeabur-oss/builder-job@sha256:722af492c8c6442de2af773dad1836e04cf8cd0d7e5e788150f2b47fda66df7d', 'ghcr.io/zeabur-oss/builder-railpack@sha256:db71c5e8c5f6cb17578e75ba7d0ff03abc7da0b1069253b8e7aa8058404dd77c'])
       message: a build Job runs only the chart's images
     - expression: >-
         variables.containers.all(c, has(c.securityContext) &&

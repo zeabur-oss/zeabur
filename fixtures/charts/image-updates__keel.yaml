@@ -145,7 +145,7 @@ spec:
       containers:
         - name: keel
           # Note that we use appVersion to get images tag.
-          image: "ghcr.io/keel-hq/keel:0.22.4"
+          image: "ghcr.io/keel-hq/keel:0.22.4@sha256:09872633675df8da591fd2c2a7a37fbe8f08e19f9972c8f64a4c1e473876ac05"
           imagePullPolicy: IfNotPresent
           command: ["/bin/keel"]
           securityContext:
@@ -201,3 +201,20 @@ spec:
             requests:
               cpu: 10m
               memory: 32Mi
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: keel-webhook
+  namespace: keel
+spec:
+  podSelector:
+    matchLabels: {app: keel}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: builder-system}
+        - podSelector: {}
+      ports:
+        - {port: 9300, protocol: TCP}

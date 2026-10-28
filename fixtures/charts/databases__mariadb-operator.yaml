@@ -26,7 +26,7 @@ metadata:
 # Source: mariadb-operator/templates/operator/configmap.yaml
 apiVersion: v1
 data:
-  MARIADB_OPERATOR_IMAGE: "ghcr.io/mariadb-operator/mariadb-operator:26.10.1"
+  MARIADB_OPERATOR_IMAGE: "ghcr.io/mariadb-operator/mariadb-operator:26.10.1@sha256:37714fb240a53b2a496fd77d784879961b098bdbe0ef344ac7ba703ee3632017"
   MARIADB_GALERA_LIB_PATH: "/usr/lib/galera/libgalera_smm.so"
   MARIADB_DEFAULT_VERSION: "12.3"
   RELATED_IMAGE_MARIADB: "mariadb:12.3.3"
@@ -445,7 +445,7 @@ spec:
   template:
     metadata:
       annotations:
-        checksum/config: 30a21b2086bb1fc70b4df960f56275d2bb11233df1aaa0a10beb416485ebe631
+        checksum/config: c142130d868997730f445eb0aabd26df12b61b2a718a3fc80e6d18e2ab130dc1
       labels:
         app.kubernetes.io/name: mariadb-operator
         app.kubernetes.io/instance: mariadb-operator
@@ -459,7 +459,7 @@ spec:
         seccompProfile:
           type: RuntimeDefault
       containers:
-        - image: "ghcr.io/mariadb-operator/mariadb-operator:26.10.1"
+        - image: "ghcr.io/mariadb-operator/mariadb-operator:26.10.1@sha256:37714fb240a53b2a496fd77d784879961b098bdbe0ef344ac7ba703ee3632017"
           imagePullPolicy: IfNotPresent
           name: controller
           args:
@@ -537,7 +537,7 @@ spec:
           type: RuntimeDefault
       hostNetwork: false
       containers:
-        - image: "ghcr.io/mariadb-operator/mariadb-operator:26.10.1"
+        - image: "ghcr.io/mariadb-operator/mariadb-operator:26.10.1@sha256:37714fb240a53b2a496fd77d784879961b098bdbe0ef344ac7ba703ee3632017"
           imagePullPolicy: IfNotPresent
           name: webhook
           args:

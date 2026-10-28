@@ -118,100 +118,6 @@ spec:
     app.kubernetes.io/instance: velero
 
 ---
-# Source: velero/templates/node-agent-daemonset.yaml
-apiVersion: apps/v1
-kind: DaemonSet
-metadata:
-  name: node-agent
-  namespace: velero
-  labels:
-    app.kubernetes.io/name: velero
-    app.kubernetes.io/instance: velero
-    app.kubernetes.io/managed-by: Helm
-    app.kubernetes.io/version: 1.18.2
-    helm.sh/chart: velero-12.2.1
-spec:
-  selector:
-    matchLabels:
-      name: node-agent
-  template:
-    metadata:
-      labels:
-        name: node-agent
-        role: node-agent
-        app.kubernetes.io/name: velero
-        app.kubernetes.io/instance: velero
-        app.kubernetes.io/managed-by: Helm
-        app.kubernetes.io/version: 1.18.2
-        helm.sh/chart: velero-12.2.1
-      annotations:
-        prometheus.io/path: /metrics
-        prometheus.io/port: "8085"
-        prometheus.io/scrape: "true"
-    spec:
-      serviceAccountName: velero-server
-      automountServiceAccountToken: true
-      securityContext:
-        runAsUser: 0
-      terminationGracePeriodSeconds: 3600
-      volumes:
-        - name: cloud-credentials
-          secret:
-            secretName: velero-credentials
-        - name: host-pods
-          hostPath:
-            path: /var/lib/kubelet/pods
-        - name: host-plugins
-          hostPath:
-            path: /var/lib/kubelet/plugins
-        - name: scratch
-          emptyDir: {}
-      dnsPolicy: ClusterFirst
-      containers:
-        - name: node-agent
-          image: "docker.io/velero/velero:v1.18.2"
-          imagePullPolicy: IfNotPresent
-          ports:
-            - name: http-monitoring
-              containerPort: 8085
-          command:
-            - /velero
-          args:
-            - node-agent
-            - server
-          volumeMounts:
-            - name: cloud-credentials
-              mountPath: /credentials
-            - name: host-pods
-              mountPath: /host_pods
-              mountPropagation: HostToContainer
-            - name: host-plugins
-              mountPath: /host_plugins
-              mountPropagation: HostToContainer
-            - name: scratch
-              mountPath: /scratch
-          env:
-            - name: VELERO_NAMESPACE
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.namespace
-            - name: NODE_NAME
-              valueFrom:
-                fieldRef:
-                  fieldPath: spec.nodeName
-            - name: VELERO_SCRATCH_DIR
-              value: /scratch
-            - name: AWS_SHARED_CREDENTIALS_FILE
-              value: /credentials/cloud
-            - name: GOOGLE_APPLICATION_CREDENTIALS
-              value: /credentials/cloud
-            - name: AZURE_CREDENTIALS_FILE
-              value: /credentials/cloud
-            - name: ALIBABA_CLOUD_CREDENTIALS_FILE
-              value: /credentials/cloud
-          securityContext:
-
----
 # Source: velero/templates/deployment.yaml
 apiVersion: apps/v1
 kind: Deployment
@@ -253,7 +159,7 @@ spec:
       terminationGracePeriodSeconds: 3600
       containers:
         - name: velero
-          image: "docker.io/velero/velero:v1.18.2"
+          image: "docker.io/velero/velero:v1.18.2@sha256:37396519f399536e5f01427d723565ae69294ec3fb5625cf1c87c09eaa9de16b"
           imagePullPolicy: IfNotPresent
           ports:
             - name: http-monitoring
@@ -264,7 +170,6 @@ spec:
             - server
             ### Flags
             - --uploader-type=kopia
-            - --default-volumes-to-fs-backup
             ### Global Flags
             - --repo-maintenance-job-configmap=velero-repo-maintenance
           resources:
@@ -320,7 +225,7 @@ spec:
               value: /credentials/cloud
       dnsPolicy: ClusterFirst
       initContainers:
-        - image: velero/velero-plugin-for-aws:v1.14.4
+        - image: velero/velero-plugin-for-aws:v1.14.4@sha256:c85a7fa803569e3128c33e4f5766f84ab156c8d171c9f1dd2715581d45ce98fa
           name: velero-plugin-for-aws
           volumeMounts:
           - mountPath: /target
@@ -456,7 +361,7 @@ spec:
       automountServiceAccountToken: true
       containers:
         - name: velero
-          image: "docker.io/velero/velero:v1.18.2"
+          image: "docker.io/velero/velero:v1.18.2@sha256:37396519f399536e5f01427d723565ae69294ec3fb5625cf1c87c09eaa9de16b"
           imagePullPolicy: IfNotPresent
           command:
             - /velero

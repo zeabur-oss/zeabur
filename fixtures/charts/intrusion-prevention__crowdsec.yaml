@@ -523,7 +523,7 @@ spec:
     spec:
       initContainers:
       - name: wait-for-lapi-and-register
-        image: "crowdsecurity/crowdsec:v1.8.1"
+        image: "crowdsecurity/crowdsec:v1.8.1@sha256:0f2523fa61ef507f15d953045cface490cc880670c62f2755ced17524107f71a"
         imagePullPolicy: IfNotPresent
         command: ['sh', '-c', 'until nc "$LAPI_HOST" "$LAPI_PORT" -z; do echo waiting for lapi to start; sleep 5; done; ln -s /staging/etc/crowdsec /etc/crowdsec && cscli lapi register --machine "$USERNAME" -u "$LAPI_URL" --token "$REGISTRATION_TOKEN" && cp /etc/crowdsec/local_api_credentials.yaml /tmp_config/local_api_credentials.yaml']
         resources:
@@ -556,7 +556,7 @@ spec:
             value: "8080"
       containers:
       - name: crowdsec-agent
-        image: "crowdsecurity/crowdsec:v1.8.1"
+        image: "crowdsecurity/crowdsec:v1.8.1@sha256:0f2523fa61ef507f15d953045cface490cc880670c62f2755ced17524107f71a"
         imagePullPolicy: IfNotPresent
         command: ['sh', '-c', 'cp /tmp_config/local_api_credentials.yaml /staging/etc/crowdsec/local_api_credentials.yaml && ./docker_start.sh']
         env:
@@ -684,7 +684,7 @@ spec:
     spec:
       containers:
       - name: crowdsec-lapi
-        image: "crowdsecurity/crowdsec:v1.8.1"
+        image: "crowdsecurity/crowdsec:v1.8.1@sha256:0f2523fa61ef507f15d953045cface490cc880670c62f2755ced17524107f71a"
         imagePullPolicy: IfNotPresent
         env:
           - name: LOCAL_API_URL
