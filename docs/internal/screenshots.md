@@ -9,8 +9,9 @@ takes them from the demo server with Chromium from nixpkgs. Each manifest is one
 | `docs/readme-shots.yaml` | The README, English, 1×, at most 30 KB | `docs/images/<id>-<theme>.avif`          |
 | `docs/cover-shots.yaml`  | The plate of the README cover          | `../design-system/covers/zeabur`         |
 
-All of them are kept in git. Nothing in CI or the release takes them: run the script after
-changing a page a shot covers, and commit the images.
+All of them are kept in git. Run the script after changing a page a shot covers, and commit the
+images. After each change on main that can move a screen, `.github/workflows/shots.yml` takes
+`docs/shots.yaml` again and opens a pull request, `update/shots`, with the images that changed.
 
 Each locale's screenshots sit in its docs folder: `docs/images/shots` for English,
 `docs/zh-TW/images/shots` for Traditional Chinese. A page shows them by a relative path, which

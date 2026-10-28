@@ -1,0 +1,82 @@
+name: Screenshots
+
+# Takes docs/shots.yaml again after a change on main that can move a screen, and opens one pull
+# request with the images that changed (docs/internal/screenshots.md). A GitHub App token
+# (`UPDATE_BOT_CLIENT_ID`, `UPDATE_BOT_PRIVATE_KEY`; contents and pull requests read/write) opens
+# it, because a pull request made with GITHUB_TOKEN does not start CI. GitHub signs the commit,
+# as main requires.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - web/**
+      - crates/**
+      - Cargo.lock
+      - flake.lock
+      - docs/shots.yaml
+      - scripts/docs-shots.sh
+      - scripts/build-ui.sh
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  shots:
+    runs-on: ubuntu-26.04-arm
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: DeterminateSystems/determinate-nix-action@f296148a827001a9a82d3685b53210c06e5d3b67 # v3.24.0
+      - run: dirname "$(nix develop --command bash -c 'command -v rustc')" >> "$GITHUB_PATH"
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        with:
+          key: shots
+      - run: nix develop --command scripts/docs-shots.sh docs/shots.yaml
+      - id: changed
+        run: |
+          if [[ -n "$(git status --porcelain -- docs)" ]]; then echo "changed=true" >> "$GITHUB_OUTPUT"; fi
+      - uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        if: steps.changed.outputs.changed
+        id: app
+        with:
+          client-id: ${{ vars.UPDATE_BOT_CLIENT_ID }}
+          private-key: ${{ secrets.UPDATE_BOT_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+      # The commit's author must match its sign-off (the DCO check).
+      - if: steps.changed.outputs.changed
+        id: bot
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          APP_SLUG: ${{ steps.app.outputs.app-slug }}
+        run: |
+          id="$(gh api "/users/${APP_SLUG}[bot]" --jq .id)"
+          echo "identity=${APP_SLUG}[bot] <${id}+${APP_SLUG}[bot]@users.noreply.github.com>" >> "$GITHUB_OUTPUT"
+      - uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
+        if: steps.changed.outputs.changed
+        with:
+          token: ${{ steps.app.outputs.token }}
+          author: ${{ steps.bot.outputs.identity }}
+          committer: ${{ steps.bot.outputs.identity }}
+          signoff: true
+          sign-commits: true
+          add-paths: docs
+          branch: update/shots
+          delete-branch: true
+          commit-message: "docs: take the screenshots again"
+          title: "docs: take the screenshots again"
+          body: |
+            `.github/workflows/shots.yml` took `docs/shots.yaml` again on main at ${{ github.sha }}
+            and these images changed. Look at each one before merging: a screen that moved on
+            purpose is fine, one that broke is a bug in the change that moved it.
