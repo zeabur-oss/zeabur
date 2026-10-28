@@ -28,7 +28,7 @@ nix develop -c cargo lint          # clippy --workspace --all-targets --all-feat
 RUSTDOCFLAGS="-D warnings" nix develop -c cargo doc --workspace --no-deps --document-private-items --locked
 nix develop -c cargo nextest run --workspace --all-features --locked --no-tests=warn
 nix develop -c cargo deny --locked check
-nix develop -c ./scripts/unsafe-report.sh
+nix develop -c ./scripts/ci.sh unsafe-report
 nix develop -c ./scripts/check-levels.sh
 nix develop -c bash -c 'shellcheck scripts/*.sh && actionlint && nixfmt --check flake.nix'
 nix develop -c cargo build --release --locked --no-default-features -p zeabur -p zeaburctl

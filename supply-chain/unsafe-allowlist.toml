@@ -1,5 +1,5 @@
 # Dependencies that are allowed to contain `unsafe` code or link native (C/asm) code.
-# Policy: CONTRIBUTING.md, "Dependencies". scripts/unsafe-report.sh enforces it.
+# Policy: CONTRIBUTING.md, "Dependencies". `scripts/ci.sh unsafe-report` enforces it.
 #
 # `approved` is the date a maintainer approved the entry. "pending" is a proposal that does not
 # count until a maintainer replaces it with a date. Entries are keyed by crate name, not version: a version

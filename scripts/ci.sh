@@ -116,7 +116,7 @@ case "$job" in
   cargo-deny) cargo deny --locked check ;;
   unsafe-report)
     status=0
-    ./scripts/unsafe-report.sh || status=$?
+    zeabur-oss-unsafe-report zeabur zeaburctl zeabur-proxy zeabur-installer || status=$?
     keep target/unsafe-report.md
     exit "$status"
     ;;

@@ -23,7 +23,7 @@ cargo lint                                   # clippy, all targets and features,
 RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --document-private-items --locked
 cargo nextest run --workspace --all-features --locked
 cargo deny --locked check
-./scripts/unsafe-report.sh
+./scripts/ci.sh unsafe-report
 ./scripts/check-levels.sh
 ./scripts/check-chart.sh                     # the Helm chart: lint, renderings, refused values
 ./scripts/build-without-ui.sh                # the API-only build, without bun
@@ -153,11 +153,11 @@ the same delay.
 
 A dependency that reaches the shipped binaries and contains `unsafe` code or builds native code
 needs an entry in `supply-chain/unsafe-allowlist.toml` with a reason and the date a maintainer
-approved it. `scripts/unsafe-report.sh` scans the shipped dependency graph (normal and build
-dependencies of `zeabur`, `zeaburctl`, `zeabur-proxy` and `zeabur-installer` for the image
-target), lists every such crate and fails
-on one that is not approved; an entry marked `pending` is a proposal awaiting review. The count
-is a review signal, not an audit.
+approved it. `zeabur-oss-unsafe-report` (from zeabur-oss/.github, run by `scripts/ci.sh
+unsafe-report`) scans the shipped dependency graph (normal and build dependencies of `zeabur`,
+`zeaburctl`, `zeabur-proxy` and `zeabur-installer` for the image target), lists every such crate and
+fails on one that is not approved; an entry marked `pending` is a proposal awaiting review. The
+count is a review signal, not an audit.
 
 ## Tests
 
