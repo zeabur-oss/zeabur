@@ -4,6 +4,8 @@
 [alias]
 # The exact checks CI runs.
 lint = "clippy --workspace --all-targets --all-features --locked -- -D warnings"
+# Development tasks (xtask/, https://github.com/matklad/cargo-xtask).
+xtask = "run --locked --package xtask --"
 
 [profile.release]
 # No build-host paths in release binaries (reproducible builds). Kept here rather than in Cargo.toml

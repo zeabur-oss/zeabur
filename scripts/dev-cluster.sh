@@ -85,22 +85,10 @@ down() {
   echo "cluster $cluster deleted"
 }
 
-# A checkout of `$2` (a commit) from `$3` (a Git URL) in `$1`, kept between runs for its build
-# cache. A server that refuses to send a single commit gets a fetch of its branches.
-checkout() { # $1 = directory, $2 = commit, $3 = URL
-  # A partial .git (e.g. from a CI cache) would make git act on the enclosing repository.
-  if [[ -e "$1" && "$(git -C "$1" rev-parse --show-toplevel 2>/dev/null)" != "$(cd "$1" && pwd -P)" ]]; then
-    rm -rf "$1"
-  fi
-  [[ -d "$1/.git" ]] || git init -q "$1"
-  if ! git -C "$1" cat-file -e "$2^{commit}" 2>/dev/null; then
-    local ref="$2"
-    [[ "$2" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] && ref="+refs/tags/$2:refs/tags/$2"
-    git -C "$1" fetch -q --depth 1 "$3" "$ref" 2>/dev/null ||
-      git -C "$1" fetch -q "$3" '+refs/heads/*:refs/remotes/origin/*' '+refs/tags/*:refs/tags/*'
-  fi
-  git -C "$1" -c advice.detachedHead=false checkout -q --force "$2"
-  git -C "$1" clean -qfdx -e target
+# A checkout of the pin in file `$2` (a commit or release tag) from `$3` (a Git URL) in `$1`, kept
+# between runs for its build cache (xtask/src/checkout.rs).
+checkout() { # $1 = directory, $2 = pin file, $3 = URL
+  (cd "$root" && cargo -q xtask dev-cluster checkout "$1" "$(<"$2")" "$3")
 }
 
 # Tags image `$1` by its content, so that a changed image gets a new tag and the cluster a new
@@ -183,7 +171,7 @@ up() {
   if [[ "$profile" != bare ]]; then
     if [[ -z "$identity_src" ]]; then
       identity_src="$state/identity"
-      checkout "$identity_src" "$(tr -d '[:space:]' <"$root/ZEABUR_IDENTITY_PINNED")" \
+      checkout "$identity_src" "$root/ZEABUR_IDENTITY_PINNED" \
         "${ZEABUR_IDENTITY_GIT:-https://github.com/zeabur-oss/identity.git}"
     fi
     identity_src="$(cd "$identity_src" && pwd)"
@@ -459,7 +447,7 @@ EOF
   # --- Zeabur Builder, from its chart -----------------------------------------------------------
   if [[ -z "$builder_src" ]]; then
     builder_src="$state/builder"
-    checkout "$builder_src" "$(tr -d '[:space:]' <"$root/ZEABUR_BUILDER_PINNED")" \
+    checkout "$builder_src" "$root/ZEABUR_BUILDER_PINNED" \
       "${ZEABUR_BUILDER_GIT:-https://github.com/zeabur-oss/builder.git}"
   fi
   builder_src="$(cd "$builder_src" && pwd)"
