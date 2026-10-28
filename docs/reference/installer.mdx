@@ -26,7 +26,7 @@ sudo zeabur-installer --config /etc/zeabur-installer/config.yaml plan --json
 
 `plan` reads the configuration, Catalog, and host information, then lists the Kubernetes distribution (K3s or RKE2), components, namespaces, host files, storage classes, memory estimates, and warnings. It then runs the same host checks as `apply` without changing the host. If a check fails, it reports that `apply` will stop. Add `--json` to output JSON without running the host checks.
 
-Without a configuration file, `plan` generates `sslip.io` names from the host's address and uses the `standard` preset so you can preview the result. It uses `domain` certificate mode (Let's Encrypt) when the host has a public address, and `local` when it has only private, CGNAT, or link-local addresses. `apply` always requires a configuration file.
+Without a configuration file, `plan` generates `sslip.io` names from the host's address and the default components so you can preview the result. It uses `domain` certificate mode (Let's Encrypt) when the host has a public address, and `local` when it has only private, CGNAT, or link-local addresses. `apply` always requires a configuration file.
 
 `apply` recalculates the installation from the configuration when it runs. If you change the YAML after running `plan`, `apply` installs the new configuration.
 

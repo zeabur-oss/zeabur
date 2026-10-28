@@ -5,18 +5,21 @@
         "contributedBy": [],
         "displayName": "Traefik Proxy",
         "id": "ingress/traefik",
-        "idleMemoryMib": 23,
+        "idleMemoryMib": 22,
+        "networkPolicies": [],
         "releases": [
           {
+            "digests": ["sha256:356c2b8e286a964dc20995435659ad1095386329974793af10bbfe3eff977fe5"],
             "kind": "urls",
             "name": "gateway-api-crds",
             "namespace": "kube-system",
             "skip_if_present": ["httproutes.gateway.networking.k8s.io"],
             "urls": [
-              "https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.6.2/standard-install.yaml"
+              "https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.6.3/standard-install.yaml"
             ]
           },
           {
+            "digest": "sha256:49458ccd9673cd828ee0b091030f5747f5d95f205bbd0cf0b6c3bf757398cae1",
             "kind": "helmChart",
             "name": "traefik",
             "object": {
@@ -38,8 +41,8 @@
                 "failurePolicy": "abort",
                 "targetNamespace": "traefik",
                 "timeout": "10m0s",
-                "valuesContent": "{\"accessLog\":{\"enabled\":true,\"fields\":{\"defaultMode\":\"drop\",\"headers\":{\"defaultMode\":\"drop\"},\"names\":{\"DownstreamContentSize\":\"keep\",\"DownstreamStatus\":\"keep\",\"Duration\":\"keep\",\"RequestContentSize\":\"keep\",\"RequestHost\":\"keep\",\"RequestMethod\":\"keep\",\"RequestPath\":\"keep\",\"RequestProtocol\":\"keep\",\"RouterName\":\"keep\",\"StartUTC\":\"keep\"},\"queryParameters\":{\"defaultMode\":\"drop\"}},\"format\":\"json\"},\"api\":{\"dashboard\":false},\"deployment\":{\"replicas\":1},\"gateway\":{\"enabled\":false},\"gatewayClass\":{\"enabled\":true,\"name\":\"traefik\"},\"providers\":{\"kubernetesCRD\":{\"allowCrossNamespace\":false,\"enabled\":true},\"kubernetesGateway\":{\"enabled\":true},\"kubernetesIngress\":{\"enabled\":true}},\"resources\":{\"limits\":{\"memory\":\"256Mi\"},\"requests\":{\"cpu\":\"50m\",\"memory\":\"64Mi\"}},\"service\":{\"spec\":{\"externalTrafficPolicy\":\"Local\"}}}",
-                "version": "41.7.1"
+                "valuesContent": "{\"accessLog\":{\"enabled\":true,\"fields\":{\"defaultMode\":\"drop\",\"headers\":{\"defaultMode\":\"drop\"},\"names\":{\"ClientHost\":\"keep\",\"DownstreamContentSize\":\"keep\",\"DownstreamStatus\":\"keep\",\"Duration\":\"keep\",\"RequestContentSize\":\"keep\",\"RequestHost\":\"keep\",\"RequestMethod\":\"keep\",\"RequestPath\":\"keep\",\"RequestProtocol\":\"keep\",\"RouterName\":\"keep\",\"StartUTC\":\"keep\"},\"queryParameters\":{\"defaultMode\":\"drop\"}},\"format\":\"json\"},\"api\":{\"dashboard\":false},\"deployment\":{\"replicas\":1},\"gateway\":{\"enabled\":false},\"gatewayClass\":{\"enabled\":true,\"name\":\"traefik\"},\"image\":{\"repository\":\"traefik\",\"tag\":\"v3.7.16@sha256:c8a121e4bb1347e8fd52657fab12f2cb70b68f8a018895e2068f92c9e519b9c2\"},\"providers\":{\"kubernetesCRD\":{\"allowCrossNamespace\":false,\"defaultTLSResourcesNamespace\":\"traefik\",\"enabled\":true},\"kubernetesGateway\":{\"enabled\":true},\"kubernetesIngress\":{\"enabled\":true}},\"resources\":{\"limits\":{\"memory\":\"256Mi\"},\"requests\":{\"cpu\":\"50m\",\"memory\":\"64Mi\"}},\"service\":{\"spec\":{\"externalTrafficPolicy\":\"Local\"}}}",
+                "version": "42.1.3"
               }
             }
           }
@@ -47,15 +50,17 @@
         "secrets": [],
         "security": "Reads Services, Secrets and routes cluster-wide; writes route status.",
         "smoke": [["gatewayclass/traefik", "--for=condition=Accepted"]],
-        "why": "preset"
+        "why": "default"
       },
       {
         "contributedBy": [],
         "displayName": "cert-manager",
         "id": "certificates/cert-manager",
-        "idleMemoryMib": 51,
+        "idleMemoryMib": 54,
+        "networkPolicies": [],
         "releases": [
           {
+            "digest": "sha256:e482675aec32862d323a9218293ff7de81192337998615e4378c56498473f240",
             "kind": "helmChart",
             "name": "cert-manager",
             "object": {
@@ -77,8 +82,8 @@
                 "failurePolicy": "abort",
                 "targetNamespace": "cert-manager",
                 "timeout": "10m0s",
-                "valuesContent": "{\"cainjector\":{\"resources\":{\"limits\":{\"memory\":\"128Mi\"},\"requests\":{\"cpu\":\"10m\",\"memory\":\"32Mi\"}}},\"config\":{\"apiVersion\":\"controller.config.cert-manager.io/v1alpha1\",\"enableGatewayAPI\":true,\"kind\":\"ControllerConfiguration\"},\"crds\":{\"enabled\":true,\"keep\":true},\"enableCertificateOwnerRef\":true,\"prometheus\":{\"enabled\":true,\"servicemonitor\":{\"enabled\":false}},\"resources\":{\"limits\":{\"memory\":\"128Mi\"},\"requests\":{\"cpu\":\"10m\",\"memory\":\"32Mi\"}},\"startupapicheck\":{\"resources\":{\"limits\":{\"memory\":\"64Mi\"},\"requests\":{\"cpu\":\"10m\",\"memory\":\"16Mi\"}}},\"webhook\":{\"resources\":{\"limits\":{\"memory\":\"64Mi\"},\"requests\":{\"cpu\":\"10m\",\"memory\":\"24Mi\"}}}}",
-                "version": "v1.21.2"
+                "valuesContent": "{\"cainjector\":{\"image\":{\"repository\":\"quay.io/jetstack/cert-manager-cainjector\",\"tag\":\"v1.21.3@sha256:083d0e906f8eb44e255fe4ff817ae54e49f9ed82e22f1011bb4e9e4f4b8a641f\"},\"resources\":{\"limits\":{\"memory\":\"128Mi\"},\"requests\":{\"cpu\":\"10m\",\"memory\":\"32Mi\"}}},\"config\":{\"apiVersion\":\"controller.config.cert-manager.io/v1alpha1\",\"enableGatewayAPI\":true,\"kind\":\"ControllerConfiguration\"},\"crds\":{\"enabled\":true,\"keep\":true},\"enableCertificateOwnerRef\":true,\"image\":{\"repository\":\"quay.io/jetstack/cert-manager-controller\",\"tag\":\"v1.21.3@sha256:9f4f96a33c7774cef24466fcd85031997531a03a8d117f151126baa8d1290dcc\"},\"prometheus\":{\"enabled\":true,\"servicemonitor\":{\"enabled\":false}},\"resources\":{\"limits\":{\"memory\":\"128Mi\"},\"requests\":{\"cpu\":\"10m\",\"memory\":\"32Mi\"}},\"startupapicheck\":{\"image\":{\"repository\":\"quay.io/jetstack/cert-manager-startupapicheck\",\"tag\":\"v1.21.3@sha256:1c519d4afca1413d1e4ccd78bdc756184418ab55a34569a3b3de39d32f9974e1\"},\"resources\":{\"limits\":{\"memory\":\"64Mi\"},\"requests\":{\"cpu\":\"10m\",\"memory\":\"16Mi\"}}},\"webhook\":{\"image\":{\"repository\":\"quay.io/jetstack/cert-manager-webhook\",\"tag\":\"v1.21.3@sha256:055ac8e9de6a0ba6763794838fe38944acc650f68ebe1b01dd8be079e580f458\"},\"resources\":{\"limits\":{\"memory\":\"64Mi\"},\"requests\":{\"cpu\":\"10m\",\"memory\":\"24Mi\"}}}}",
+                "version": "v1.21.3"
               }
             }
           },
@@ -95,18 +100,17 @@
           ["clusterissuer/letsencrypt-staging", "--for=condition=Ready"],
           ["clusterissuer/letsencrypt", "--for=condition=Ready"]
         ],
-        "why": "preset"
+        "why": "default"
       }
     ],
     "facts": {
       "arch": "amd64",
+      "hostHex": "3f9a2c",
       "hostname": "vps-1",
       "memoryMib": 5836,
       "nodeIps": ["203.0.113.10"],
-      "nodeName": null,
-      "randomHex": "3f9a2c"
+      "nodeName": null
     },
-    "nodeName": "vps-1",
     "helmController": {
       "images": [
         "rancher/helm-controller:v0.17.9@sha256:25a4fcbbf9fa8396ded332165e4497eb45e08a8f6677158c0f861a2d15982afc"
@@ -115,7 +119,7 @@
       "jobImageDigest": "sha256:391ec9f4824d631c49b52c1e3d10e4a2ced37a784afd75852e34bb2a6c7309b1",
       "manifest": {
         "file": "deploy-cluster-scoped.yaml",
-        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "sha256": "53da110ca271b6d6415e84bfc5ffe47d726fa35d1fb3acda47e6649ee05d4791",
         "url": "https://github.com/k3s-io/helm-controller/releases/download/v0.17.9/deploy-cluster-scoped.yaml"
       },
       "version": "v0.17.9"
@@ -127,13 +131,13 @@
     ],
     "kubectl": {
       "file": "kubectl",
-      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "sha256": "12e97f9d23a9f6cbb87b89becd6bd291e1a858a3379a4e11e2c822c4c1530052",
       "url": "https://dl.k8s.io/release/v1.35.7/bin/linux/amd64/kubectl"
     },
     "kubesolo": {
       "download": {
         "file": "kubesolo-v1.2.2-linux-amd64-offline.tar.gz",
-        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "sha256": "44e434ed77438556cb6cb2ee255339de3af8473109a93fa64df7b614e041218b",
         "url": "https://github.com/portainer/kubesolo/releases/download/v1.2.2/kubesolo-v1.2.2-linux-amd64-offline.tar.gz"
       },
       "kubernetes": "1.35",
@@ -142,7 +146,7 @@
     "leftOut": {},
     "memory": {
       "clusterMib": 700,
-      "componentsMib": 74,
+      "componentsMib": 76,
       "hostMib": 5836,
       "unmeasured": 0
     },
@@ -160,6 +164,9 @@
         "public": true
       }
     ],
+    "nodeName": "vps-1",
+    "registry": null,
+    "removals": [],
     "storage": {
       "defaultClass": "local-path",
       "otherClasses": []
@@ -168,13 +175,11 @@
     "warnings": [
       {
         "code": "personal.isolation",
-        "text": "A personal install is for one person: whoever has the kubeconfig is cluster admin, and nothing isolates apps from each other (KubeSolo enforces no NetworkPolicy). For a team, install with K3s or RKE2 on a server with at least 4 GiB.",
+        "text": "A personal install is for one person: whoever has the kubeconfig is cluster admin, and nothing isolates apps from each other (KubeSolo enforces no NetworkPolicy). For a team, install with K3s or RKE2 on a server with 4 GiB.",
         "values": []
       }
-    ],
-    "zotClusterIp": null,
-    "removals": []
+    ]
   },
-  "text": "KubeSolo v1.2.2 (Kubernetes 1.35, pinned), for one person, on vps-1 (amd64, 5836 MiB)\nNode name        vps-1\nhelm-controller  v0.17.9 (its image pinned by digest; the Jobs' image checked by digest after they run)\nNode address     203.0.113.10; the kubeconfig names it\n\nComponents\n  ingress/traefik            preset    23 MiB\n      manifests gateway-api-crds (1 URLs)\n      chart traefik 41.7.1\n  certificates/cert-manager  preset    51 MiB\n      chart cert-manager v1.21.2\n      manifests issuers\n\nStorage          local-path (KubeSolo's local-path), the default\nZeabur           none on the server: run `zeaburctl ui` on your computer\n\nMemory at idle   about 774 MiB of 5836 (KubeSolo 700, components 74)\nwarning: A personal install is for one person: whoever has the kubeconfig is cluster admin, and nothing isolates apps from each other (KubeSolo enforces no NetworkPolicy). For a team, install with K3s or RKE2 on a server with at least 4 GiB.\n",
+  "text": "KubeSolo v1.2.2 (Kubernetes 1.35, pinned), for one person, on vps-1 (amd64, 5836 MiB)\nNode name        vps-1\nhelm-controller  v0.17.9 (its image pinned by digest; the Jobs' image checked by digest after they run)\nNode address     203.0.113.10; the kubeconfig names it\n\nComponents\n  ingress/traefik                                  default    22 MiB\n      manifests gateway-api-crds (1 URLs)\n      chart traefik 42.1.3\n  certificates/cert-manager                        default    54 MiB\n      chart cert-manager v1.21.3\n      manifests issuers\n\nStorage          local-path (KubeSolo's local-path), the default\nZeabur           none on the server: run `zeaburctl ui` on your computer\n\nMemory at idle   about 776 MiB of 5836 (KubeSolo 700, components 76)\nwarning: A personal install is for one person: whoever has the kubeconfig is cluster admin, and nothing isolates apps from each other (KubeSolo enforces no NetworkPolicy). For a team, install with K3s or RKE2 on a server with 4 GiB.\n",
   "yaml": "use: personal\nenable: []\ndisable: []\ninputs: {}\nsecretFiles: {}\nhost:\n  tlsSan: []\n  requireEncryptedDisk: false\nsources:\n  catalog: null\n"
 }

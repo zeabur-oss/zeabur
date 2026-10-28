@@ -1,7 +1,7 @@
 ---
 title: Installer 指令
 description: 查閱 zeabur-installer 的規劃、安裝、健康檢查、加入節點與移除指令。
-source: "401be9b27c38"
+source: "9c36b7d3c51e"
 ---
 
 先用 `plan` 看設定會建立什麼，再以 root 執行 `apply`。安裝中斷時，修正原因後用同一份設定重跑 `apply`，每個步驟會先看現況，只補上缺少或不同的部分。
@@ -27,7 +27,7 @@ sudo zeabur-installer --config /etc/zeabur-installer/config.yaml plan --json
 
 `plan` 讀取設定、Catalog 和主機資訊，列出 Kubernetes 的種類（K3s 或 RKE2）、元件、Namespace、主機檔案、儲存類別、記憶體估算和提醒，接著執行和 `apply` 相同的主機檢查，不會改動主機。有檢查未通過時，它會說 `apply` 會停下。加 `--json` 輸出 JSON，這時不跑主機檢查。
 
-沒有設定檔時，`plan` 用主機位址產生 `sslip.io` 名稱，搭配 `standard` preset，讓你先看結果。主機有公開位址時用 `domain` 憑證模式（Let's Encrypt），只有私有、CGNAT 或 link-local 位址時用 `local`。`apply` 一定要有設定檔。
+沒有設定檔時，`plan` 用主機位址產生 `sslip.io` 名稱，搭配預設元件，讓你先看結果。主機有公開位址時用 `domain` 憑證模式（Let's Encrypt），只有私有、CGNAT 或 link-local 位址時用 `local`。`apply` 一定要有設定檔。
 
 `apply` 依執行當下的設定重新計算安裝內容。`plan` 之後改了 YAML，`apply` 就照新的內容安裝。
 

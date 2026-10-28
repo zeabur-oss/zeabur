@@ -63,7 +63,7 @@ import {
   type Built,
 } from "@/model/builds"
 import { deployKeyPage, parseRepository } from "@/model/git-service"
-import { KEEL, needed } from "@/model/installer"
+import { needed } from "@/model/installer"
 import { imageTag, isTask, type Service } from "@/model/service"
 
 /** The service's builds, when a Zeabur Builder `Build` makes one of its images. */
@@ -539,7 +539,7 @@ function AutoUpdate({
         <InstallAlert
           variant="info"
           text={t("builds.keelMissing")}
-          components={[needed(KEEL, capabilities.data?.items)]}
+          components={[needed("image-updates", capabilities.data?.items)]}
         />
       ) : null}
     </section>

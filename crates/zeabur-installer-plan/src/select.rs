@@ -1,16 +1,16 @@
-//! Choosing components: a preset, then `enable` and `disable`, then dependencies.
+//! Choosing components: the defaults, then `enable` and `disable`, then dependencies.
 //!
-//! A preset is only a choice of capabilities; the catalog decides which component fills each one,
-//! so a new catalog release changes `standard` without an installer release. The install order is
-//! the union of each chosen component's `installOrder`, taken in id order: every list already
-//! places a component after its dependencies, so the union does too, and the result never depends
-//! on the order of the configuration file.
+//! A team install installs the catalog's recommended components for the profile and
+//! [`FEATURES`]. Names are capabilities or component ids, so the catalog decides which component
+//! fills each one. The install order is the union of each chosen component's `installOrder`, taken
+//! in id order: every list already places a component after its dependencies, so the union does
+//! too, and the result never depends on the order of the configuration file.
 
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::PlanError;
 use crate::catalog::{Default, Index};
-use crate::config::{Config, PersonalConfig, Preset};
+use crate::config::{Config, PersonalConfig};
 
 /// The distribution of a personal install.
 pub const PERSONAL_DISTRIBUTION: &str = "kubesolo";
@@ -18,42 +18,23 @@ pub const PERSONAL_DISTRIBUTION: &str = "kubesolo";
 /// The profile whose values a personal install uses.
 pub const PERSONAL_PROFILE: &str = "single-node";
 
-/// What a personal install offers: the capabilities the catalog tests on `KubeSolo` (catalog
-/// `config/kubernetes.yaml`), less `databases`.
-///
-/// `KubeSolo`'s webhook replaces the annotations of
-/// every PVC, which stops `CloudNativePG`, and removing PVCs from the webhook's rules leaves
-/// volumes unbound.
-pub const PERSONAL: &[&str] = &["ingress", "certificates", "builds"];
+/// What a team install adds to the catalog's recommended components: deploying from images and
+/// Git, and PostgreSQL databases.
+pub const FEATURES: &[&str] = &["builds", "image-updates", "databases/cloudnative-pg"];
 
-/// The capability of Zeabur Builder, which brings zot. A personal install offers it, but only on
-/// a host with enough memory.
-pub const BUILD_CAPABILITIES: &[&str] = &["builds"];
+/// What Zeabur needs to run: HTTPS and usage numbers.
+pub const REQUIRED: &[&str] = &["ingress", "certificates", "metrics/metrics-server"];
 
-/// What a personal install installs unless told otherwise.
-const PERSONAL_DEFAULT: &[&str] = &["ingress", "certificates"];
-
-/// Components `minimal` installs: reachable over HTTPS, and usage numbers for Zeabur.
-const MINIMAL: &[&str] = &["ingress", "certificates", "metrics/metrics-server"];
-
-/// What `standard` adds to the catalog's recommended components, so that a team can deploy from
-/// images and Git and make PostgreSQL databases. Zeabur Builder brings zot.
-const STANDARD: &[&str] = &["builds", "image-updates", "databases/cloudnative-pg"];
-
-/// What `secure` adds to `standard`. Backups are left out until the installer can configure an
-/// encrypted repository: an unencrypted backup undoes disk encryption.
-const SECURE: &[&str] = &[
-    "runtime-security",
-    "vulnerability-scanning",
-    "intrusion-prevention",
-];
+/// What a personal install offers. Not `databases`: `KubeSolo`'s webhook replaces the annotations
+/// of every PVC, which stops `CloudNativePG`.
+pub const PERSONAL_CAPABILITIES: &[&str] = &["ingress", "certificates", "builds"];
 
 /// The chosen components, in install order.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Selection {
     /// Component ids and why each is installed, in install order.
     pub components: Vec<(String, Why)>,
-    /// Components the preset or configuration named that this installer leaves out, with the
+    /// Components the defaults or configuration named that this installer leaves out, with the
     /// reason.
     pub left_out: BTreeMap<String, String>,
 }
@@ -61,8 +42,8 @@ pub struct Selection {
 /// Why a component is installed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Why {
-    /// Part of the preset.
-    Preset,
+    /// Installed by default.
+    Default,
     /// Named in `enable`.
     Enabled,
     /// Another chosen component needs it.
@@ -76,19 +57,12 @@ pub enum Why {
 /// When a name matches nothing, or a chosen component needs one that is disabled or unsupported.
 pub fn select(index: &Index, config: &Config) -> Result<Selection, PlanError> {
     let profile = config.profile.as_str();
-    let preset: Vec<String> = match config.preset {
-        Preset::Minimal => resolve_all(index, profile, MINIMAL)?,
-        Preset::Standard => standard(index, profile)?,
-        Preset::Secure => {
-            let mut ids = standard(index, profile)?;
-            ids.extend(resolve_all(index, profile, SECURE)?);
-            ids
-        }
-    };
+    let mut base = recommended(index, profile);
+    base.extend(resolve_all(index, profile, FEATURES)?);
     choose(
         index,
         &Wanted {
-            base: preset,
+            base,
             enable: &config.enable,
             disable: &config.disable,
             profile,
@@ -98,8 +72,8 @@ pub fn select(index: &Index, config: &Config) -> Result<Selection, PlanError> {
     )
 }
 
-/// Chooses the components of a personal install: ingress and certificates, then `enable` and
-/// `disable` within [`PERSONAL`].
+/// Chooses the components of a personal install: the recommended providers of what it offers,
+/// then `enable` and `disable` within that.
 ///
 /// # Errors
 ///
@@ -108,12 +82,12 @@ pub fn select_personal(index: &Index, config: &PersonalConfig) -> Result<Selecti
     choose(
         index,
         &Wanted {
-            base: resolve_all(index, PERSONAL_PROFILE, PERSONAL_DEFAULT)?,
+            base: personal_default(index),
             enable: &config.enable,
             disable: &config.disable,
             profile: PERSONAL_PROFILE,
             distribution: PERSONAL_DISTRIBUTION,
-            offered: Some(PERSONAL),
+            offered: Some(PERSONAL_CAPABILITIES),
         },
     )
 }
@@ -133,7 +107,7 @@ fn choose(index: &Index, wanted: &Wanted<'_>) -> Result<Selection, PlanError> {
     let mut chosen: BTreeMap<String, Why> = BTreeMap::new();
     let mut left_out = BTreeMap::new();
     for id in &wanted.base {
-        chosen.insert(id.clone(), Why::Preset);
+        chosen.insert(id.clone(), Why::Default);
     }
     for name in wanted.enable {
         chosen.insert(resolve(index, profile, name)?, Why::Enabled);
@@ -214,10 +188,18 @@ fn choose(index: &Index, wanted: &Wanted<'_>) -> Result<Selection, PlanError> {
     })
 }
 
-fn standard(index: &Index, profile: &str) -> Result<Vec<String>, PlanError> {
-    let mut ids = recommended(index, profile);
-    ids.extend(resolve_all(index, profile, STANDARD)?);
-    Ok(ids)
+/// What a personal install installs unless told otherwise: the components it offers that are
+/// recommended on [`PERSONAL_PROFILE`].
+fn personal_default(index: &Index) -> Vec<String> {
+    index
+        .components
+        .iter()
+        .filter(|c| {
+            PERSONAL_CAPABILITIES.contains(&c.capability.as_str())
+                && c.default_for(PERSONAL_PROFILE) == Default::Recommended
+        })
+        .map(|c| c.id.clone())
+        .collect()
 }
 
 fn recommended(index: &Index, profile: &str) -> Vec<String> {
@@ -226,6 +208,15 @@ fn recommended(index: &Index, profile: &str) -> Vec<String> {
         .iter()
         .filter(|c| c.default_for(profile) == Default::Recommended)
         .map(|c| c.id.clone())
+        .collect()
+}
+
+/// The components that [`REQUIRED`] names on a profile; names the catalog lacks are skipped.
+#[must_use]
+pub fn required(index: &Index, profile: &str) -> BTreeSet<String> {
+    REQUIRED
+        .iter()
+        .filter_map(|name| resolve(index, profile, name).ok())
         .collect()
 }
 

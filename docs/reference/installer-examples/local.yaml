@@ -6,5 +6,3 @@ access:
   mode: local
   identity: login.192.0.2.20.sslip.io
   zeabur: zeabur.192.0.2.20.sslip.io
-
-preset: minimal

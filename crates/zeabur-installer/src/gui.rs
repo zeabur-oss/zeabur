@@ -24,7 +24,7 @@ use zeabur_installer_host::{facts, files, preflight, systemd};
 use zeabur_installer_plan::catalog::{Default, Index};
 use zeabur_installer_plan::cluster::Distribution;
 use zeabur_installer_plan::config::{Config, Document, PersonalConfig};
-use zeabur_installer_plan::select::{BUILD_CAPABILITIES, PERSONAL, PERSONAL_DISTRIBUTION};
+use zeabur_installer_plan::select::{self, PERSONAL_CAPABILITIES, PERSONAL_DISTRIBUTION};
 use zeabur_installer_plan::{kubesolo, node_name, personal, plan};
 
 use self::http::{Request, Response};
@@ -508,6 +508,7 @@ fn velero_credentials(values: &mut BTreeMap<String, String>) -> Result<(), Insta
 
 /// The catalog, as the components page shows it.
 fn catalog_json(index: &Index, profile: &str, arch: &str) -> Value {
+    let required = select::required(index, profile);
     let components: Vec<Value> = index
         .components
         .iter()
@@ -523,7 +524,7 @@ fn catalog_json(index: &Index, profile: &str, arch: &str) -> Value {
                         "generated": i.generate.is_some(),
                         "required": i.required,
                         "default": i.default,
-                        "filled": plan::installer_fills(&c.id, &i.name),
+                        "filled": plan::installer_fills(i),
                     })
                 })
                 .collect();
@@ -537,11 +538,10 @@ fn catalog_json(index: &Index, profile: &str, arch: &str) -> Value {
                     Default::Unsupported => "unsupported",
                 },
                 "personal": c.supports(PERSONAL_DISTRIBUTION)
-                    && PERSONAL.contains(&c.capability.as_str()),
+                    && PERSONAL_CAPABILITIES.contains(&c.capability.as_str()),
                 "distributions": c.distributions,
-                "personalMinMemoryMib": BUILD_CAPABILITIES
-                    .contains(&c.capability.as_str())
-                    .then_some(personal::BUILDS_MIN_MEMORY_MIB),
+                "personalMinMemoryMib": personal::min_memory_mib(c, arch),
+                "required": required.contains(&c.id),
                 "needs": c
                     .install_order
                     .get(profile)
@@ -591,11 +591,18 @@ fn asset(request: &Request, path: &str) -> Response {
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeMap;
+    use std::fs;
+    use std::path::Path;
 
+    use serde_json::{Value, json};
     use zeabur_installer_host::preflight::{Code, Topic};
-    use zeabur_installer_plan::config::PersonalConfig;
+    use zeabur_installer_plan::catalog::Index;
+    use zeabur_installer_plan::config::{Config, PersonalConfig};
+    use zeabur_installer_plan::plan::{self, Facts};
+    use zeabur_installer_plan::{personal, pins};
 
-    use super::{ssh_host, velero_credentials};
+    use super::{catalog_json, ssh_host, velero_credentials};
+    use crate::render;
 
     #[test]
     fn velero_gets_a_credentials_file_from_two_keys() {
@@ -623,6 +630,84 @@ mod tests {
         assert_eq!(ssh_host(&addresses, Some("vps-1")), "203.0.114.7");
         assert_eq!(ssh_host(&addresses[..1], Some("vps-1")), "10.0.0.5");
         assert_eq!(ssh_host(&[], Some("vps-1")), "vps-1");
+    }
+
+    /// The captured responses that `bun run dev` answers with follow the pinned catalog. After a
+    /// catalog bump, `ZEABUR_UPDATE_GOLDEN=1 cargo nextest run -p zeabur-installer fixtures`
+    /// rewrites them, and `bun run fmt` in web/ formats them.
+    #[test]
+    fn the_web_fixtures_follow_the_catalog() {
+        let index = Index::parse(include_bytes!(concat!(
+            env!("ZEABUR_CATALOG_RELEASE"),
+            "/index.json"
+        )))
+        .unwrap();
+        let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("web/scripts/fixtures");
+        let read = |name: &str| -> Value {
+            serde_json::from_str(&fs::read_to_string(dir.join(name)).unwrap()).unwrap()
+        };
+        let mut expected = BTreeMap::new();
+
+        let mut state = read("state.json");
+        state["catalog"] = catalog_json(
+            &index,
+            state["config"]["profile"].as_str().unwrap(),
+            state["facts"]["arch"].as_str().unwrap(),
+        );
+        expected.insert("state.json", state);
+
+        let mut team = read("plan.json");
+        let config = Config::parse(team["yaml"].as_str().unwrap()).unwrap();
+        let facts: Facts = serde_json::from_value(team["plan"]["facts"].clone()).unwrap();
+        let fake = "a".repeat(64).leak();
+        let image = |repository: &str| format!("ghcr.io/zeabur-oss/{repository}@sha256:{fake}");
+        let products = pins::Products {
+            catalog: pins::Catalog {
+                version: "v0.0.1",
+                index_sha256: fake,
+            },
+            identity: pins::Identity {
+                version: "v0.0.1",
+                image: image("zeabur-identity").leak(),
+                identityctl_amd64: fake,
+                identityctl_arm64: fake,
+            },
+            zeabur: pins::Zeabur {
+                version: "v0.0.1",
+                image: image("zeabur").leak(),
+                chart_sha256: fake,
+            },
+        };
+        let plan = plan::plan_with(&index, &config, &facts, Some(&products)).unwrap();
+        team["text"] = json!(render::plan(&plan));
+        team["plan"] = json!(plan);
+        expected.insert("plan.json", team);
+
+        for name in ["personal-plan.json", "personal-builds-plan.json"] {
+            let mut fixture = read(name);
+            let config = PersonalConfig::parse(fixture["yaml"].as_str().unwrap()).unwrap();
+            let facts: Facts = serde_json::from_value(fixture["plan"]["facts"].clone()).unwrap();
+            let plan = personal::plan(&index, &config, &facts).unwrap();
+            fixture["text"] = json!(render::personal_plan(&plan));
+            fixture["plan"] = json!(plan);
+            expected.insert(name, fixture);
+        }
+
+        let update = std::env::var_os("ZEABUR_UPDATE_GOLDEN").is_some();
+        let mut drifted = Vec::new();
+        for (name, value) in expected {
+            if update {
+                let text = serde_json::to_string_pretty(&value).unwrap() + "\n";
+                fs::write(dir.join(name), text).unwrap();
+            } else if read(name) != value {
+                drifted.push(name);
+            }
+        }
+        assert!(
+            drifted.is_empty(),
+            "{drifted:?} differ from what this catalog gives: ZEABUR_UPDATE_GOLDEN=1 cargo nextest \
+             run -p zeabur-installer fixtures, then bun run fmt in crates/zeabur-installer/web"
+        );
     }
 
     /// zh-TW and zh-CN are typed against English, so TypeScript rejects a key missing there.

@@ -11,7 +11,6 @@ import {
   type DomainSettings,
   type ImageService,
 } from "@/model/image-service"
-import { BUILDER, KEEL } from "@/model/installer"
 import type { Profile } from "@/model/pod-security"
 
 type Change = Schemas["Change"]
@@ -493,9 +492,8 @@ export function gitNeeds({
 }): GitNeeds | undefined {
   const absent = (name: string) => capabilities?.find((c) => c.name === name)?.existing === false
   const install: string[] = []
-  // Zeabur Builder brings zot.
-  if (builds === "not-installed") install.push(BUILDER)
-  if (absent("image-updates")) install.push(KEEL)
+  if (builds === "not-installed") install.push("builds")
+  if (absent("image-updates")) install.push("image-updates")
   const registrySetting = registry === ""
   return install.length > 0 || registrySetting ? { install, registrySetting } : undefined
 }

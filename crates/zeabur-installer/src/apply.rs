@@ -18,8 +18,8 @@ use zeabur_installer_plan::config::{AccessMode, Config};
 use zeabur_installer_plan::k3s;
 use zeabur_installer_plan::plan::{
     self, ClusterPlan, ComponentPlan, Download, IDENTITY_NAMESPACE, IdentityPlan, LOCAL_ISSUER,
-    MANAGER, NAMESPACE_MANAGER, Plan, ReleasePlan, SecretSource, Source, ZEABUR_NAMESPACE,
-    ZeaburPlan,
+    MANAGER, NAMESPACE_MANAGER, Plan, RegistryPlan, ReleasePlan, SecretRefPlan, SecretSource,
+    Source, ZEABUR_NAMESPACE, ZeaburPlan,
 };
 use zeabur_installer_plan::rke2::{ETCD_USER, PREFIX};
 use zeabur_installer_plan::storage::{self, NodePrep, Storage};
@@ -86,23 +86,7 @@ pub(crate) fn run(config_path: &Path) -> Result<(), InstallError> {
 
     storage(&kubectl, &plan.storage)?;
 
-    for component in &plan.components {
-        out::step(&format!("{} ({})", component.display_name, component.id));
-        secrets(&kubectl, component)?;
-        if component.id == plan::BUILDER {
-            // Before Builder starts, so it reaches zot from its first run.
-            kubectl.apply_object(&plan::zot_builder_policy())?;
-        }
-        releases(&kubectl, component)?;
-        for wait in &component.smoke {
-            let mut args: Vec<&str> = wait.iter().map(String::as_str).collect();
-            args.push("--timeout=5m");
-            kubectl.wait(&args)?;
-        }
-        if component.id == plan::BUILDER && plan.zot_cluster_ip.is_some() {
-            zot_ca(&kubectl, Path::new(distribution.layout().zot_ca_file))?;
-        }
-    }
+    install_components(&kubectl, &plan)?;
 
     let mut report = Vec::new();
     let mut link_issued = !first_install(&kubectl)?;
@@ -134,6 +118,36 @@ pub(crate) fn run(config_path: &Path) -> Result<(), InstallError> {
     }
     for line in report {
         out::line(&line);
+    }
+    Ok(())
+}
+
+/// Installs the planned components in order.
+fn install_components(kubectl: &Kubectl, plan: &Plan) -> Result<(), InstallError> {
+    for component in &plan.components {
+        out::step(&format!("{} ({})", component.display_name, component.id));
+        secrets(kubectl, component)?;
+        // Before its pods start, so its clients reach it from their first run.
+        for policy in &component.network_policies {
+            kubectl.apply_object(policy)?;
+        }
+        releases(kubectl, component)?;
+        for wait in &component.smoke {
+            let mut args: Vec<&str> = wait.iter().map(String::as_str).collect();
+            args.push("--timeout=5m");
+            kubectl.wait(&args)?;
+        }
+        if let Some(registry) = plan
+            .registry
+            .as_ref()
+            .filter(|r| r.component == component.id && r.cluster_ip.is_some())
+        {
+            registry_ca(
+                kubectl,
+                registry,
+                Path::new(plan.cluster.distribution.layout().registry_ca_file),
+            )?;
+        }
     }
     Ok(())
 }
@@ -823,7 +837,7 @@ fn conditions(object: &Value) -> impl Iterator<Item = (&str, &str)> {
 fn cert_manager_namespace(plan: &Plan) -> Result<String, InstallError> {
     plan.components
         .iter()
-        .filter(|c| c.id == "certificates/cert-manager")
+        .filter(|c| c.id == plan::CERT_MANAGER)
         .flat_map(|c| &c.releases)
         .find_map(|r| match r {
             ReleasePlan::HelmChart { object, .. } => object
@@ -868,19 +882,32 @@ fn local_ca_pem(kubectl: &Kubectl, namespace: &str) -> Result<String, InstallErr
         })
 }
 
-/// The CA of zot's certificate.
-pub(crate) fn zot_ca_pem(kubectl: &Kubectl) -> Result<String, InstallError> {
+/// The CA of the registry's certificate.
+pub(crate) fn registry_ca_pem(
+    kubectl: &Kubectl,
+    registry: &RegistryPlan,
+) -> Result<String, InstallError> {
+    let SecretRefPlan {
+        namespace,
+        name,
+        key,
+    } = &registry.ca;
     kubectl
-        .get("secret", "zot-tls", Some("zot"))?
+        .get("secret", name, Some(namespace))?
         .as_ref()
-        .and_then(|s| kubectl::secret_key(s, "ca.crt"))
+        .and_then(|s| kubectl::secret_key(s, key))
         .and_then(|b| String::from_utf8(b).ok())
-        .ok_or_else(|| InstallError::Message("secret zot/zot-tls has no ca.crt".to_owned()))
+        .ok_or_else(|| InstallError::Message(format!("secret {namespace}/{name} has no {key}")))
 }
 
-/// Copies the CA of zot's certificate to the node, where the registry mirror checks zot against it.
-pub(crate) fn zot_ca(kubectl: &Kubectl, path: &Path) -> Result<(), InstallError> {
-    files::write(path, 0o644, zot_ca_pem(kubectl)?.as_bytes())?;
+/// Copies the CA of the registry's certificate to the node, where the registry mirror checks the
+/// registry against it.
+pub(crate) fn registry_ca(
+    kubectl: &Kubectl,
+    registry: &RegistryPlan,
+    path: &Path,
+) -> Result<(), InstallError> {
+    files::write(path, 0o644, registry_ca_pem(kubectl, registry)?.as_bytes())?;
     Ok(())
 }
 
@@ -1061,7 +1088,7 @@ fn zeabur(kubectl: &Kubectl, plan: &Plan, config: &Config) -> Result<(), Install
         }))?;
     }
 
-    if plan.components.iter().any(|c| c.id == plan::BUILDER) {
+    if let Some(registry) = &plan.registry {
         kubectl.apply_object(&json!({
             "apiVersion": "v1",
             "kind": "ConfigMap",
@@ -1070,7 +1097,7 @@ fn zeabur(kubectl: &Kubectl, plan: &Plan, config: &Config) -> Result<(), Install
                 "namespace": ZEABUR_NAMESPACE,
                 "labels": {"app.kubernetes.io/managed-by": MANAGER},
             },
-            "data": {"ca.crt": zot_ca_pem(kubectl)?},
+            "data": {"ca.crt": registry_ca_pem(kubectl, registry)?},
         }))?;
     }
 

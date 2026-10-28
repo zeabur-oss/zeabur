@@ -31,6 +31,8 @@ export interface CatalogComponent {
   personal: boolean
   /** A personal install offers it only on a server with this much memory. */
   personalMinMemoryMib?: number | null
+  /** Zeabur needs it to run, so it is never suggested for leaving out. */
+  required: boolean
   /** Where it runs; empty when everywhere. */
   distributions: string[]
   /** The components installed before it because it needs them. */
@@ -42,7 +44,6 @@ export interface CatalogComponent {
   inputs: Input[]
 }
 
-export type Preset = "minimal" | "standard" | "secure"
 /** The Kubernetes of a team install. */
 export type Distribution = "k3s" | "rke2"
 
@@ -54,7 +55,6 @@ export const runsOn = (component: CatalogComponent, distribution: string) =>
 export type AccessMode = "domain" | "local"
 
 export interface Config {
-  preset: Preset
   enable: string[]
   disable: string[]
   profile: string
@@ -127,7 +127,7 @@ export type Release =
 export interface PlannedComponent {
   id: string
   displayName: string
-  why: "preset" | "enabled" | "dependency"
+  why: "default" | "enabled" | "dependency"
   idleMemoryMib: number | null
   releases: Release[]
 }

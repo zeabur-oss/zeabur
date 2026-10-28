@@ -5,18 +5,21 @@
         "contributedBy": [],
         "displayName": "Traefik Proxy",
         "id": "ingress/traefik",
-        "idleMemoryMib": 23,
+        "idleMemoryMib": 22,
+        "networkPolicies": [],
         "releases": [
           {
+            "digests": ["sha256:356c2b8e286a964dc20995435659ad1095386329974793af10bbfe3eff977fe5"],
             "kind": "urls",
             "name": "gateway-api-crds",
             "namespace": "kube-system",
             "skip_if_present": ["httproutes.gateway.networking.k8s.io"],
             "urls": [
-              "https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.6.2/standard-install.yaml"
+              "https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.6.3/standard-install.yaml"
             ]
           },
           {
+            "digest": "sha256:49458ccd9673cd828ee0b091030f5747f5d95f205bbd0cf0b6c3bf757398cae1",
             "kind": "helmChart",
             "name": "traefik",
             "object": {
@@ -38,8 +41,8 @@
                 "failurePolicy": "abort",
                 "targetNamespace": "traefik",
                 "timeout": "10m0s",
-                "valuesContent": "{\"accessLog\":{\"enabled\":true,\"fields\":{\"defaultMode\":\"drop\",\"headers\":{\"defaultMode\":\"drop\"},\"names\":{\"DownstreamContentSize\":\"keep\",\"DownstreamStatus\":\"keep\",\"Duration\":\"keep\",\"RequestContentSize\":\"keep\",\"RequestHost\":\"keep\",\"RequestMethod\":\"keep\",\"RequestPath\":\"keep\",\"RequestProtocol\":\"keep\",\"RouterName\":\"keep\",\"StartUTC\":\"keep\"},\"queryParameters\":{\"defaultMode\":\"drop\"}},\"format\":\"json\"},\"api\":{\"dashboard\":false},\"deployment\":{\"replicas\":1},\"gateway\":{\"enabled\":false},\"gatewayClass\":{\"enabled\":true,\"name\":\"traefik\"},\"providers\":{\"kubernetesCRD\":{\"allowCrossNamespace\":false,\"enabled\":true},\"kubernetesGateway\":{\"enabled\":true},\"kubernetesIngress\":{\"enabled\":true}},\"resources\":{\"limits\":{\"memory\":\"256Mi\"},\"requests\":{\"cpu\":\"50m\",\"memory\":\"64Mi\"}},\"service\":{\"spec\":{\"externalTrafficPolicy\":\"Local\"}}}",
-                "version": "41.7.1"
+                "valuesContent": "{\"accessLog\":{\"enabled\":true,\"fields\":{\"defaultMode\":\"drop\",\"headers\":{\"defaultMode\":\"drop\"},\"names\":{\"ClientHost\":\"keep\",\"DownstreamContentSize\":\"keep\",\"DownstreamStatus\":\"keep\",\"Duration\":\"keep\",\"RequestContentSize\":\"keep\",\"RequestHost\":\"keep\",\"RequestMethod\":\"keep\",\"RequestPath\":\"keep\",\"RequestProtocol\":\"keep\",\"RouterName\":\"keep\",\"StartUTC\":\"keep\"},\"queryParameters\":{\"defaultMode\":\"drop\"}},\"format\":\"json\"},\"api\":{\"dashboard\":false},\"deployment\":{\"replicas\":1},\"gateway\":{\"enabled\":false},\"gatewayClass\":{\"enabled\":true,\"name\":\"traefik\"},\"image\":{\"repository\":\"traefik\",\"tag\":\"v3.7.16@sha256:c8a121e4bb1347e8fd52657fab12f2cb70b68f8a018895e2068f92c9e519b9c2\"},\"providers\":{\"kubernetesCRD\":{\"allowCrossNamespace\":false,\"defaultTLSResourcesNamespace\":\"traefik\",\"enabled\":true},\"kubernetesGateway\":{\"enabled\":true},\"kubernetesIngress\":{\"enabled\":true}},\"resources\":{\"limits\":{\"memory\":\"256Mi\"},\"requests\":{\"cpu\":\"50m\",\"memory\":\"64Mi\"}},\"service\":{\"spec\":{\"externalTrafficPolicy\":\"Local\"}}}",
+                "version": "42.1.3"
               }
             }
           }
@@ -47,15 +50,17 @@
         "secrets": [],
         "security": "Reads Services, Secrets and routes cluster-wide; writes route status.",
         "smoke": [["gatewayclass/traefik", "--for=condition=Accepted"]],
-        "why": "preset"
+        "why": "default"
       },
       {
         "contributedBy": [],
         "displayName": "cert-manager",
         "id": "certificates/cert-manager",
-        "idleMemoryMib": 51,
+        "idleMemoryMib": 54,
+        "networkPolicies": [],
         "releases": [
           {
+            "digest": "sha256:e482675aec32862d323a9218293ff7de81192337998615e4378c56498473f240",
             "kind": "helmChart",
             "name": "cert-manager",
             "object": {
@@ -77,8 +82,8 @@
                 "failurePolicy": "abort",
                 "targetNamespace": "cert-manager",
                 "timeout": "10m0s",
-                "valuesContent": "{\"cainjector\":{\"resources\":{\"limits\":{\"memory\":\"128Mi\"},\"requests\":{\"cpu\":\"10m\",\"memory\":\"32Mi\"}}},\"config\":{\"apiVersion\":\"controller.config.cert-manager.io/v1alpha1\",\"enableGatewayAPI\":true,\"kind\":\"ControllerConfiguration\"},\"crds\":{\"enabled\":true,\"keep\":true},\"enableCertificateOwnerRef\":true,\"prometheus\":{\"enabled\":true,\"servicemonitor\":{\"enabled\":false}},\"resources\":{\"limits\":{\"memory\":\"128Mi\"},\"requests\":{\"cpu\":\"10m\",\"memory\":\"32Mi\"}},\"startupapicheck\":{\"resources\":{\"limits\":{\"memory\":\"64Mi\"},\"requests\":{\"cpu\":\"10m\",\"memory\":\"16Mi\"}}},\"webhook\":{\"resources\":{\"limits\":{\"memory\":\"64Mi\"},\"requests\":{\"cpu\":\"10m\",\"memory\":\"24Mi\"}}}}",
-                "version": "v1.21.2"
+                "valuesContent": "{\"cainjector\":{\"image\":{\"repository\":\"quay.io/jetstack/cert-manager-cainjector\",\"tag\":\"v1.21.3@sha256:083d0e906f8eb44e255fe4ff817ae54e49f9ed82e22f1011bb4e9e4f4b8a641f\"},\"resources\":{\"limits\":{\"memory\":\"128Mi\"},\"requests\":{\"cpu\":\"10m\",\"memory\":\"32Mi\"}}},\"config\":{\"apiVersion\":\"controller.config.cert-manager.io/v1alpha1\",\"enableGatewayAPI\":true,\"kind\":\"ControllerConfiguration\"},\"crds\":{\"enabled\":true,\"keep\":true},\"enableCertificateOwnerRef\":true,\"image\":{\"repository\":\"quay.io/jetstack/cert-manager-controller\",\"tag\":\"v1.21.3@sha256:9f4f96a33c7774cef24466fcd85031997531a03a8d117f151126baa8d1290dcc\"},\"prometheus\":{\"enabled\":true,\"servicemonitor\":{\"enabled\":false}},\"resources\":{\"limits\":{\"memory\":\"128Mi\"},\"requests\":{\"cpu\":\"10m\",\"memory\":\"32Mi\"}},\"startupapicheck\":{\"image\":{\"repository\":\"quay.io/jetstack/cert-manager-startupapicheck\",\"tag\":\"v1.21.3@sha256:1c519d4afca1413d1e4ccd78bdc756184418ab55a34569a3b3de39d32f9974e1\"},\"resources\":{\"limits\":{\"memory\":\"64Mi\"},\"requests\":{\"cpu\":\"10m\",\"memory\":\"16Mi\"}}},\"webhook\":{\"image\":{\"repository\":\"quay.io/jetstack/cert-manager-webhook\",\"tag\":\"v1.21.3@sha256:055ac8e9de6a0ba6763794838fe38944acc650f68ebe1b01dd8be079e580f458\"},\"resources\":{\"limits\":{\"memory\":\"64Mi\"},\"requests\":{\"cpu\":\"10m\",\"memory\":\"24Mi\"}}}}",
+                "version": "v1.21.3"
               }
             }
           },
@@ -95,21 +100,23 @@
           ["clusterissuer/letsencrypt-staging", "--for=condition=Ready"],
           ["clusterissuer/letsencrypt", "--for=condition=Ready"]
         ],
-        "why": "preset"
+        "why": "default"
       },
       {
         "contributedBy": [],
         "displayName": "Zeabur Builder",
         "id": "builds/zeabur-builder",
-        "idleMemoryMib": null,
+        "idleMemoryMib": 50,
+        "networkPolicies": [],
         "releases": [
           {
             "kind": "manifests",
             "name": "tls",
             "namespace": "zot",
-            "yaml": "# Signs the CA below; nothing else uses it.\napiVersion: cert-manager.io/v1\nkind: Issuer\nmetadata:\n  name: zot-selfsigned\n  namespace: zot\nspec:\n  selfSigned: {}\n"
+            "yaml": "# Signs the CA below; nothing else uses it.\napiVersion: cert-manager.io/v1\nkind: Issuer\nmetadata:\n  name: zot-selfsigned\n  namespace: zot\nspec:\n  selfSigned: {}\n---\n# A CA of its own: no public CA signs *.svc names. Nodes and buildkitd\n# trust ca.crt from the zot-tls Secret; to use a CA you already\n# distribute, point zot-tls at your own issuer instead. Ten years,\n# because every node holds a copy and rotating it means redistributing.\napiVersion: cert-manager.io/v1\nkind: Certificate\nmetadata:\n  name: zot-ca\n  namespace: zot\nspec:\n  isCA: true\n  commonName: zot-ca\n  secretName: zot-ca\n  duration: 87600h\n  privateKey:\n    algorithm: ECDSA\n    size: 256\n  issuerRef:\n    kind: Issuer\n    name: zot-selfsigned\n---\napiVersion: cert-manager.io/v1\nkind: Issuer\nmetadata:\n  name: zot-ca\n  namespace: zot\nspec:\n  ca:\n    secretName: zot-ca\n---\n# The key that signs push tokens. Zeabur Builder reads tls.key and signs\n# a short-lived token for each push; zot checks it with tls.crt. Only\n# the key matters, so a renewal keeps it (rotationPolicy: Never). zot\n# reads tls.crt once at start: to rotate the key, delete the Secret\n# zot-token-signer, wait for cert-manager to issue it again, and restart\n# zot.\napiVersion: cert-manager.io/v1\nkind: Certificate\nmetadata:\n  name: zot-token-signer\n  namespace: zot\nspec:\n  commonName: zot-token-signer\n  secretName: zot-token-signer\n  duration: 87600h\n  privateKey:\n    algorithm: Ed25519\n    encoding: PKCS8\n    rotationPolicy: Never\n  issuerRef:\n    kind: Issuer\n    name: zot-selfsigned\n"
           },
           {
+            "digest": "sha256:0bc91fa8585454c2fc1dbcc51e51cb33b2f4533b5ae45cdaa529c09e4e75337f",
             "kind": "helmChart",
             "name": "zot",
             "object": {
@@ -129,14 +136,16 @@
                 "chart": "zot",
                 "createNamespace": false,
                 "failurePolicy": "abort",
+                "repo": "https://zotregistry.dev/helm-charts",
                 "targetNamespace": "zot",
                 "timeout": "10m0s",
-                "valuesContent": "{\"service\":{\"type\":\"ClusterIP\",\"port\":5000,\"clusterIP\":\"10.43.0.50\"},\"persistence\":true}",
+                "valuesContent": "{\"config\":{\"distSpecVersion\":\"1.1.1\",\"http\":{\"accessControl\":{\"repositories\":{\"**\":{\"anonymousPolicy\":[\"read\"]},\"**/source\":{\"policies\":[]}}},\"address\":\"0.0.0.0\",\"auth\":{\"bearer\":{\"cert\":\"/token/tls.crt\",\"realm\":\"https://zot.zot.svc:5000/zot/auth/token\",\"service\":\"zot\"}},\"port\":\"5000\",\"tls\":{\"cert\":\"/tls/tls.crt\",\"key\":\"/tls/tls.key\"}},\"log\":{\"level\":\"info\"},\"storage\":{\"dedupe\":true,\"gc\":true,\"gcDelay\":\"2h\",\"gcInterval\":\"1h\",\"retention\":{\"delay\":\"2h\",\"policies\":[{\"deleteReferrers\":true,\"deleteUntagged\":true,\"keepTags\":[{\"mostRecentlyPushedCount\":20}],\"repositories\":[\"**\"]}]},\"rootDirectory\":\"/var/lib/registry\"}},\"configFiles\":{\"config.json\":null},\"externalSecrets\":[{\"mountPath\":\"/tls\",\"secretName\":\"zot-tls\"}],\"extraObjects\":[{\"apiVersion\":\"cert-manager.io/v1\",\"kind\":\"Certificate\",\"metadata\":{\"name\":\"zot-tls\",\"namespace\":\"zot\"},\"spec\":{\"dnsNames\":[\"zot.zot.svc\",\"zot.zot.svc.cluster.local\",\"localhost\"],\"ipAddresses\":[\"127.0.0.1\",\"{{ .Values.service.clusterIP | default \\\"::1\\\" }}\"],\"issuerRef\":{\"kind\":\"Issuer\",\"name\":\"zot-ca\"},\"privateKey\":{\"algorithm\":\"ECDSA\",\"size\":256},\"secretName\":\"zot-tls\"}}],\"extraVolumeMounts\":[{\"mountPath\":\"/token\",\"name\":\"token\",\"readOnly\":true}],\"extraVolumes\":[{\"name\":\"token\",\"secret\":{\"items\":[{\"key\":\"tls.crt\",\"path\":\"tls.crt\"}],\"secretName\":\"zot-token-signer\"}}],\"httpGet\":{\"scheme\":\"HTTPS\"},\"image\":{\"repository\":\"ghcr.io/project-zot/zot\",\"tag\":\"v2.1.22@sha256:96cda11459ce6f8c60da3b03f03e9f67fd11b3ae2d82c4c04c92b3c608996080\"},\"mountConfig\":false,\"persistence\":true,\"podSecurityContext\":{\"fsGroup\":65532,\"runAsGroup\":65532,\"runAsNonRoot\":true,\"runAsUser\":65532,\"seccompProfile\":{\"type\":\"RuntimeDefault\"}},\"pvc\":{\"storage\":\"20Gi\"},\"resources\":{\"limits\":{\"memory\":\"512Mi\"},\"requests\":{\"cpu\":\"20m\",\"memory\":\"64Mi\"}},\"securityContext\":{\"allowPrivilegeEscalation\":false,\"capabilities\":{\"drop\":[\"ALL\"]}},\"service\":{\"clusterIP\":\"10.43.0.50\",\"port\":5000,\"type\":\"ClusterIP\"}}",
                 "version": "0.1.128"
               }
             }
           },
           {
+            "digest": "sha256:c3c2a8091ef6dd2572bcd2cd5d77c1cad166330dc3653bc4733ddde4a0c468c8",
             "kind": "helmChart",
             "name": "builder",
             "object": {
@@ -158,8 +167,8 @@
                 "failurePolicy": "abort",
                 "targetNamespace": "builder-system",
                 "timeout": "10m0s",
-                "valuesContent": "{\"registry\":{\"host\":\"zot.zot.svc:5000\"}}",
-                "version": "0.0.1"
+                "valuesContent": "{\"extraArgs\":[\"--buildkitd-cache-size=10Gi\"],\"registry\":{\"caFrom\":{\"namespace\":\"zot\",\"secret\":\"zot-tls\"},\"host\":\"zot.zot.svc:5000\",\"inCluster\":{\"namespace\":\"zot\",\"podLabels\":{\"app.kubernetes.io/name\":\"zot\"},\"port\":5000},\"tokenKey\":{\"namespace\":\"zot\",\"secret\":\"zot-token-signer\"}},\"resources\":{\"limits\":{\"memory\":\"256Mi\"},\"requests\":{\"cpu\":\"10m\",\"memory\":\"32Mi\"}}}",
+                "version": "0.1.1"
               }
             }
           }
@@ -169,20 +178,20 @@
         "smoke": [
           ["-n", "zot", "certificate/zot-tls", "--for=condition=Ready"],
           ["-n", "zot", "statefulset/zot", "--for=jsonpath={.status.readyReplicas}=1"],
-          ["-n", "builder-system", "deployment/zeabur-builder", "--for=condition=Available"]
+          ["-n", "builder-system", "deployment/zeabur-builder", "--for=condition=Available"],
+          ["--for=condition=Established", "crd/builds.builder.zeabur.com"]
         ],
         "why": "enabled"
       }
     ],
     "facts": {
       "arch": "amd64",
+      "hostHex": "3f9a2c",
       "hostname": "vps-1",
       "memoryMib": 5836,
       "nodeIps": ["203.0.113.10"],
-      "nodeName": null,
-      "randomHex": "3f9a2c"
+      "nodeName": null
     },
-    "nodeName": "vps-1",
     "helmController": {
       "images": [
         "rancher/helm-controller:v0.17.9@sha256:25a4fcbbf9fa8396ded332165e4497eb45e08a8f6677158c0f861a2d15982afc"
@@ -191,7 +200,7 @@
       "jobImageDigest": "sha256:391ec9f4824d631c49b52c1e3d10e4a2ced37a784afd75852e34bb2a6c7309b1",
       "manifest": {
         "file": "deploy-cluster-scoped.yaml",
-        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "sha256": "53da110ca271b6d6415e84bfc5ffe47d726fa35d1fb3acda47e6649ee05d4791",
         "url": "https://github.com/k3s-io/helm-controller/releases/download/v0.17.9/deploy-cluster-scoped.yaml"
       },
       "version": "v0.17.9"
@@ -204,13 +213,13 @@
     ],
     "kubectl": {
       "file": "kubectl",
-      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "sha256": "12e97f9d23a9f6cbb87b89becd6bd291e1a858a3379a4e11e2c822c4c1530052",
       "url": "https://dl.k8s.io/release/v1.35.7/bin/linux/amd64/kubectl"
     },
     "kubesolo": {
       "download": {
         "file": "kubesolo-v1.2.2-linux-amd64-offline.tar.gz",
-        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "sha256": "44e434ed77438556cb6cb2ee255339de3af8473109a93fa64df7b614e041218b",
         "url": "https://github.com/portainer/kubesolo/releases/download/v1.2.2/kubesolo-v1.2.2-linux-amd64-offline.tar.gz"
       },
       "kubernetes": "1.35",
@@ -219,15 +228,15 @@
     "leftOut": {},
     "memory": {
       "clusterMib": 700,
-      "componentsMib": 74,
+      "componentsMib": 126,
       "hostMib": 5836,
-      "unmeasured": 2
+      "unmeasured": 0
     },
     "namespaces": [
       {
         "baseline": null,
         "name": "builder-system",
-        "privileged": "builds/zeabur-builder is privileged",
+        "privileged": "builds/zeabur-builder: Zeabur Builder: a ClusterRole that manages Builds, BuildRuns and Jobs in every namespace; reads Pods and Namespaces; reads, creates, updates and deletes Secrets in every namespace (the Git credentials Builds name, and the copies it puts in build namespaces), and reads the zot token signer. Runs one privileged buildkitd per building namespace in its own namespace, with a user namespace and an egress policy. An admission policy limits the Jobs and StatefulSets it can create. zot: no RBAC, a ServiceAccount without roles; serves the OCI registry API over TLS on port 5000 inside the cluster.",
         "public": false
       },
       {
@@ -245,10 +254,22 @@
       {
         "baseline": null,
         "name": "zot",
-        "privileged": null,
+        "privileged": "builds/zeabur-builder: Zeabur Builder: a ClusterRole that manages Builds, BuildRuns and Jobs in every namespace; reads Pods and Namespaces; reads, creates, updates and deletes Secrets in every namespace (the Git credentials Builds name, and the copies it puts in build namespaces), and reads the zot token signer. Runs one privileged buildkitd per building namespace in its own namespace, with a user namespace and an egress policy. An admission policy limits the Jobs and StatefulSets it can create. zot: no RBAC, a ServiceAccount without roles; serves the OCI registry API over TLS on port 5000 inside the cluster.",
         "public": false
       }
     ],
+    "nodeName": "vps-1",
+    "registry": {
+      "ca": {
+        "key": "ca.crt",
+        "name": "zot-tls",
+        "namespace": "zot"
+      },
+      "clusterIp": "10.43.0.50",
+      "component": "builds/zeabur-builder",
+      "host": "zot.zot.svc:5000"
+    },
+    "removals": [],
     "storage": {
       "defaultClass": "local-path",
       "otherClasses": []
@@ -257,13 +278,11 @@
     "warnings": [
       {
         "code": "personal.isolation",
-        "text": "A personal install is for one person: whoever has the kubeconfig is cluster admin, and nothing isolates apps from each other (KubeSolo enforces no NetworkPolicy). For a team, install with K3s or RKE2 on a server with at least 4 GiB.",
+        "text": "A personal install is for one person: whoever has the kubeconfig is cluster admin, and nothing isolates apps from each other (KubeSolo enforces no NetworkPolicy). For a team, install with K3s or RKE2 on a server with 4 GiB.",
         "values": []
       }
-    ],
-    "zotClusterIp": "10.43.0.50",
-    "removals": []
+    ]
   },
-  "text": "KubeSolo v1.2.2 (Kubernetes 1.35, pinned), for one person, on vps-1 (amd64, 5836 MiB)\nNode name        vps-1\nhelm-controller  v0.17.9 (its image pinned by digest; the Jobs' image checked by digest after they run)\nNode address     203.0.113.10; the kubeconfig names it\n\nComponents\n  ingress/traefik            preset    23 MiB\n      manifests gateway-api-crds (1 URLs)\n      chart traefik 41.7.1\n  certificates/cert-manager  preset    51 MiB\n      chart cert-manager v1.21.2\n      manifests issuers\n  builds/zeabur-builder      enabled   \n      manifests tls (1 manifests)\n      chart zot 0.1.128\n      chart zeabur-builder 0.0.1\n\nStorage          local-path (KubeSolo's local-path), the default\nZeabur           none on the server: run `zeaburctl ui` on your computer\n\nMemory at idle   about 774 MiB of 5836 (KubeSolo 700, components 74, plus 2 unmeasured)\nwarning: A personal install is for one person: whoever has the kubeconfig is cluster admin, and nothing isolates apps from each other (KubeSolo enforces no NetworkPolicy). For a team, install with K3s or RKE2 on a server with at least 4 GiB.\n",
+  "text": "KubeSolo v1.2.2 (Kubernetes 1.35, pinned), for one person, on vps-1 (amd64, 5836 MiB)\nNode name        vps-1\nhelm-controller  v0.17.9 (its image pinned by digest; the Jobs' image checked by digest after they run)\nNode address     203.0.113.10; the kubeconfig names it\n\nComponents\n  ingress/traefik                                  default    22 MiB\n      manifests gateway-api-crds (1 URLs)\n      chart traefik 42.1.3\n  certificates/cert-manager                        default    54 MiB\n      chart cert-manager v1.21.3\n      manifests issuers\n  builds/zeabur-builder                            enabled    50 MiB\n      manifests tls\n      chart zot 0.1.128\n      chart builder 0.1.1\n\nStorage          local-path (KubeSolo's local-path), the default\nZeabur           none on the server: run `zeaburctl ui` on your computer\n\nMemory at idle   about 826 MiB of 5836 (KubeSolo 700, components 126)\nwarning: A personal install is for one person: whoever has the kubeconfig is cluster admin, and nothing isolates apps from each other (KubeSolo enforces no NetworkPolicy). For a team, install with K3s or RKE2 on a server with 4 GiB.\n",
   "yaml": "use: personal\nenable: [builds/zeabur-builder]\ndisable: []\ninputs: {}\nsecretFiles: {}\nhost:\n  tlsSan: []\n  requireEncryptedDisk: false\nsources:\n  catalog: null\n"
 }

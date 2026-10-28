@@ -1,12 +1,41 @@
 {
   "plan": {
     "access": "local",
+    "calico": {
+      "file": "calico-vxlan.yaml",
+      "sha256": "5aa751a909fdf761b58e97953ec92173018115b3ae405f4c9dfc475f54bf737f",
+      "url": "https://raw.githubusercontent.com/projectcalico/calico/v3.32.2/manifests/calico-vxlan.yaml"
+    },
+    "cluster": {
+      "checksums": null,
+      "distribution": "k3s",
+      "images": [
+        {
+          "file": "k3s-airgap-images-amd64.tar.zst",
+          "sha256": "7d939471907df2d4e537a9c308bf94173e453fff4a2e9e77e9ae92a64be3007f",
+          "url": "https://github.com/k3s-io/k3s/releases/download/v1.36.5%2Bk3s1/k3s-airgap-images-amd64.tar.zst"
+        }
+      ],
+      "installScript": {
+        "file": "install.sh",
+        "sha256": "46177d4c99440b4c0311b67233823a8e8a2fc09693f6c89af1a7161e152fbfad",
+        "url": "https://raw.githubusercontent.com/k3s-io/k3s/v1.36.5%2Bk3s1/install.sh"
+      },
+      "pinned": true,
+      "release": {
+        "file": "k3s",
+        "sha256": "d73847bcd3c5fccef0115b372e2f9a91f3032dc84bbf71518a4617565294d313",
+        "url": "https://github.com/k3s-io/k3s/releases/download/v1.36.5%2Bk3s1/k3s"
+      },
+      "version": "v1.36.5+k3s1"
+    },
     "components": [
       {
         "contributedBy": [],
         "displayName": "Traefik Proxy",
         "id": "ingress/traefik",
         "idleMemoryMib": 23,
+        "networkPolicies": [],
         "releases": [
           {
             "digests": ["sha256:356c2b8e286a964dc20995435659ad1095386329974793af10bbfe3eff977fe5"],
@@ -50,13 +79,14 @@
         "secrets": [],
         "security": "Reads Services, Secrets and routes cluster-wide; writes route status.",
         "smoke": [["gatewayclass/traefik", "--for=condition=Accepted"]],
-        "why": "preset"
+        "why": "default"
       },
       {
         "contributedBy": [],
         "displayName": "cert-manager",
         "id": "certificates/cert-manager",
         "idleMemoryMib": 51,
+        "networkPolicies": [],
         "releases": [
           {
             "digest": "sha256:e482675aec32862d323a9218293ff7de81192337998615e4378c56498473f240",
@@ -99,21 +129,97 @@
           ["clusterissuer/letsencrypt-staging", "--for=condition=Ready"],
           ["clusterissuer/letsencrypt", "--for=condition=Ready"]
         ],
-        "why": "preset"
+        "why": "default"
       },
       {
         "contributedBy": [],
         "displayName": "Zeabur Builder",
         "id": "builds/zeabur-builder",
-        "idleMemoryMib": null,
+        "idleMemoryMib": 49,
+        "networkPolicies": [
+          {
+            "apiVersion": "networking.k8s.io/v1",
+            "kind": "NetworkPolicy",
+            "metadata": {
+              "annotations": {
+                "installer.zeabur.com/component": "builds/zeabur-builder"
+              },
+              "labels": {
+                "app.kubernetes.io/managed-by": "zeabur-installer"
+              },
+              "name": "zot-builder",
+              "namespace": "zot"
+            },
+            "spec": {
+              "ingress": [
+                {
+                  "from": [
+                    {
+                      "namespaceSelector": {
+                        "matchLabels": {
+                          "kubernetes.io/metadata.name": "builder-system"
+                        }
+                      },
+                      "podSelector": {
+                        "matchLabels": {
+                          "app.kubernetes.io/name": "buildkitd"
+                        }
+                      }
+                    },
+                    {
+                      "namespaceSelector": {
+                        "matchLabels": {
+                          "kubernetes.io/metadata.name": "builder-system"
+                        }
+                      },
+                      "podSelector": {
+                        "matchLabels": {
+                          "app.kubernetes.io/name": "zeabur-builder"
+                        }
+                      }
+                    },
+                    {
+                      "namespaceSelector": {
+                        "matchLabels": {
+                          "zeabur.com/project": "true"
+                        }
+                      },
+                      "podSelector": {
+                        "matchExpressions": [
+                          {
+                            "key": "builder.zeabur.com/buildrun",
+                            "operator": "Exists"
+                          }
+                        ]
+                      }
+                    }
+                  ],
+                  "ports": [
+                    {
+                      "port": 5000,
+                      "protocol": "TCP"
+                    }
+                  ]
+                }
+              ],
+              "podSelector": {
+                "matchLabels": {
+                  "app.kubernetes.io/name": "zot"
+                }
+              },
+              "policyTypes": ["Ingress"]
+            }
+          }
+        ],
         "releases": [
           {
             "kind": "manifests",
             "name": "tls",
             "namespace": "zot",
-            "yaml": "# Signs the CA below; nothing else uses it.\napiVersion: cert-manager.io/v1\nkind: Issuer\nmetadata:\n  name: zot-selfsigned\n  namespace: zot\nspec:\n  selfSigned: {}\n"
+            "yaml": "# Signs the CA below; nothing else uses it.\napiVersion: cert-manager.io/v1\nkind: Issuer\nmetadata:\n  name: zot-selfsigned\n  namespace: zot\nspec:\n  selfSigned: {}\n---\n# A CA of its own: no public CA signs *.svc names. Nodes and buildkitd\n# trust ca.crt from the zot-tls Secret; to use a CA you already\n# distribute, point zot-tls at your own issuer instead. Ten years,\n# because every node holds a copy and rotating it means redistributing.\napiVersion: cert-manager.io/v1\nkind: Certificate\nmetadata:\n  name: zot-ca\n  namespace: zot\nspec:\n  isCA: true\n  commonName: zot-ca\n  secretName: zot-ca\n  duration: 87600h\n  privateKey:\n    algorithm: ECDSA\n    size: 256\n  issuerRef:\n    kind: Issuer\n    name: zot-selfsigned\n---\napiVersion: cert-manager.io/v1\nkind: Issuer\nmetadata:\n  name: zot-ca\n  namespace: zot\nspec:\n  ca:\n    secretName: zot-ca\n---\n# The key that signs push tokens. Zeabur Builder reads tls.key and signs\n# a short-lived token for each push; zot checks it with tls.crt. Only\n# the key matters, so a renewal keeps it (rotationPolicy: Never). zot\n# reads tls.crt once at start: to rotate the key, delete the Secret\n# zot-token-signer, wait for cert-manager to issue it again, and restart\n# zot.\napiVersion: cert-manager.io/v1\nkind: Certificate\nmetadata:\n  name: zot-token-signer\n  namespace: zot\nspec:\n  commonName: zot-token-signer\n  secretName: zot-token-signer\n  duration: 87600h\n  privateKey:\n    algorithm: Ed25519\n    encoding: PKCS8\n    rotationPolicy: Never\n  issuerRef:\n    kind: Issuer\n    name: zot-selfsigned\n"
           },
           {
+            "digest": "sha256:0bc91fa8585454c2fc1dbcc51e51cb33b2f4533b5ae45cdaa529c09e4e75337f",
             "kind": "helmChart",
             "name": "zot",
             "object": {
@@ -133,14 +239,16 @@
                 "chart": "zot",
                 "createNamespace": false,
                 "failurePolicy": "abort",
+                "repo": "https://zotregistry.dev/helm-charts",
                 "targetNamespace": "zot",
                 "timeout": "10m0s",
-                "valuesContent": "{\"service\":{\"type\":\"ClusterIP\",\"port\":5000,\"clusterIP\":\"10.43.0.50\"},\"persistence\":true}",
+                "valuesContent": "{\"config\":{\"distSpecVersion\":\"1.1.1\",\"http\":{\"accessControl\":{\"repositories\":{\"**\":{\"anonymousPolicy\":[\"read\"]},\"**/source\":{\"policies\":[]}}},\"address\":\"0.0.0.0\",\"auth\":{\"bearer\":{\"cert\":\"/token/tls.crt\",\"realm\":\"https://zot.zot.svc:5000/zot/auth/token\",\"service\":\"zot\"}},\"port\":\"5000\",\"tls\":{\"cert\":\"/tls/tls.crt\",\"key\":\"/tls/tls.key\"}},\"log\":{\"level\":\"info\"},\"storage\":{\"dedupe\":true,\"gc\":true,\"gcDelay\":\"2h\",\"gcInterval\":\"1h\",\"retention\":{\"delay\":\"2h\",\"policies\":[{\"deleteReferrers\":true,\"deleteUntagged\":true,\"keepTags\":[{\"mostRecentlyPushedCount\":20}],\"repositories\":[\"**\"]}]},\"rootDirectory\":\"/var/lib/registry\"}},\"configFiles\":{\"config.json\":null},\"externalSecrets\":[{\"mountPath\":\"/tls\",\"secretName\":\"zot-tls\"}],\"extraObjects\":[{\"apiVersion\":\"cert-manager.io/v1\",\"kind\":\"Certificate\",\"metadata\":{\"name\":\"zot-tls\",\"namespace\":\"zot\"},\"spec\":{\"dnsNames\":[\"zot.zot.svc\",\"zot.zot.svc.cluster.local\",\"localhost\"],\"ipAddresses\":[\"127.0.0.1\",\"{{ .Values.service.clusterIP | default \\\"::1\\\" }}\"],\"issuerRef\":{\"kind\":\"Issuer\",\"name\":\"zot-ca\"},\"privateKey\":{\"algorithm\":\"ECDSA\",\"size\":256},\"secretName\":\"zot-tls\"}}],\"extraVolumeMounts\":[{\"mountPath\":\"/token\",\"name\":\"token\",\"readOnly\":true}],\"extraVolumes\":[{\"name\":\"token\",\"secret\":{\"items\":[{\"key\":\"tls.crt\",\"path\":\"tls.crt\"}],\"secretName\":\"zot-token-signer\"}}],\"httpGet\":{\"scheme\":\"HTTPS\"},\"image\":{\"repository\":\"ghcr.io/project-zot/zot\",\"tag\":\"v2.1.22@sha256:96cda11459ce6f8c60da3b03f03e9f67fd11b3ae2d82c4c04c92b3c608996080\"},\"mountConfig\":false,\"persistence\":true,\"podSecurityContext\":{\"fsGroup\":65532,\"runAsGroup\":65532,\"runAsNonRoot\":true,\"runAsUser\":65532,\"seccompProfile\":{\"type\":\"RuntimeDefault\"}},\"pvc\":{\"storage\":\"20Gi\"},\"resources\":{\"limits\":{\"memory\":\"512Mi\"},\"requests\":{\"cpu\":\"20m\",\"memory\":\"64Mi\"}},\"securityContext\":{\"allowPrivilegeEscalation\":false,\"capabilities\":{\"drop\":[\"ALL\"]}},\"service\":{\"clusterIP\":\"10.43.0.50\",\"port\":5000,\"type\":\"ClusterIP\"}}",
                 "version": "0.1.128"
               }
             }
           },
           {
+            "digest": "sha256:c3c2a8091ef6dd2572bcd2cd5d77c1cad166330dc3653bc4733ddde4a0c468c8",
             "kind": "helmChart",
             "name": "builder",
             "object": {
@@ -162,8 +270,8 @@
                 "failurePolicy": "abort",
                 "targetNamespace": "builder-system",
                 "timeout": "10m0s",
-                "valuesContent": "{\"registry\":{\"host\":\"zot.zot.svc:5000\"}}",
-                "version": "0.0.1"
+                "valuesContent": "{\"extraArgs\":[\"--buildkitd-cache-size=10Gi\"],\"registry\":{\"caFrom\":{\"namespace\":\"zot\",\"secret\":\"zot-tls\"},\"host\":\"zot.zot.svc:5000\",\"inCluster\":{\"namespace\":\"zot\",\"podLabels\":{\"app.kubernetes.io/name\":\"zot\"},\"port\":5000},\"tokenKey\":{\"namespace\":\"zot\",\"secret\":\"zot-token-signer\"}},\"resources\":{\"limits\":{\"memory\":\"256Mi\"},\"requests\":{\"cpu\":\"10m\",\"memory\":\"32Mi\"}}}",
+                "version": "0.1.1"
               }
             }
           }
@@ -173,15 +281,17 @@
         "smoke": [
           ["-n", "zot", "certificate/zot-tls", "--for=condition=Ready"],
           ["-n", "zot", "statefulset/zot", "--for=jsonpath={.status.readyReplicas}=1"],
-          ["-n", "builder-system", "deployment/zeabur-builder", "--for=condition=Available"]
+          ["-n", "builder-system", "deployment/zeabur-builder", "--for=condition=Available"],
+          ["--for=condition=Established", "crd/builds.builder.zeabur.com"]
         ],
-        "why": "preset"
+        "why": "default"
       },
       {
         "contributedBy": [],
         "displayName": "CloudNativePG",
         "id": "databases/cloudnative-pg",
-        "idleMemoryMib": null,
+        "idleMemoryMib": 31,
+        "networkPolicies": [],
         "releases": [
           {
             "digest": "sha256:b53d3991fe84bcf38767e7702cae78666265427a127a26fff168ab4207d2b1df",
@@ -245,13 +355,14 @@
         "secrets": [],
         "security": "Manages pods, Services, Secrets and PVCs for Clusters in every namespace.",
         "smoke": [],
-        "why": "preset"
+        "why": "default"
       },
       {
         "contributedBy": [],
         "displayName": "Keel",
         "id": "image-updates/keel",
-        "idleMemoryMib": null,
+        "idleMemoryMib": 15,
+        "networkPolicies": [],
         "releases": [
           {
             "digest": "sha256:ba5b56c43064f653759f81f99f6c42ec97feba98224b5dc26e414c91295c4b8b",
@@ -292,13 +403,14 @@
         "secrets": [],
         "security": "ClusterRole: reads, lists and watches every Secret (registry credentials of tracked workloads), Namespace and Node; reads, updates and deletes Pods, ReplicaSets, ReplicationControllers, Deployments, StatefulSets, DaemonSets, Jobs and CronJobs in every namespace.\n",
         "smoke": [],
-        "why": "preset"
+        "why": "default"
       },
       {
         "contributedBy": [],
         "displayName": "VictoriaMetrics operator",
         "id": "observability-operator/victoria-metrics-operator",
         "idleMemoryMib": 20,
+        "networkPolicies": [],
         "releases": [
           {
             "digest": "sha256:1817be5446c975a306e404d6b605eafc45dbe6512a64d25b80d72f458fa4664a",
@@ -323,7 +435,7 @@
                 "failurePolicy": "abort",
                 "targetNamespace": "observability",
                 "timeout": "10m0s",
-                "valuesContent": "{\"admissionWebhooks\":{\"certManager\":{\"enabled\":true}},\"crds\":{\"cleanup\":{\"enabled\":true,\"image\":{\"repository\":\"registry.k8s.io/kubectl\",\"tag\":\"v1.36.0@sha256:63e5e76b746bb8b891a94968d380736c035e768dab0d56ddad1f50c750a4be39\"}}},\"image\":{\"repository\":\"victoriametrics/operator\",\"tag\":\"v0.75.0@sha256:78da26b41a819093707be2ab6a65a5dc19f43d58ec52f30b49a545c2c6b7bd55\"},\"resources\":{\"limits\":{\"memory\":\"256Mi\"},\"requests\":{\"cpu\":\"10m\",\"memory\":\"48Mi\"}}}",
+                "valuesContent": "{\"admissionWebhooks\":{\"certManager\":{\"enabled\":true}},\"crds\":{\"cleanup\":{\"enabled\":true,\"image\":{\"repository\":\"registry.k8s.io/kubectl\",\"tag\":\"v1.36.0@sha256:63e5e76b746bb8b891a94968d380736c035e768dab0d56ddad1f50c750a4be39\"}}},\"image\":{\"repository\":\"victoriametrics/operator\",\"tag\":\"v0.75.0@sha256:78da26b41a819093707be2ab6a65a5dc19f43d58ec52f30b49a545c2c6b7bd55\"},\"resources\":{\"limits\":{\"memory\":\"256Mi\"},\"requests\":{\"cpu\":\"10m\",\"memory\":\"48Mi\"}},\"securityContext\":{\"runAsNonRoot\":true,\"runAsUser\":65534,\"seccompProfile\":{\"type\":\"RuntimeDefault\"}}}",
                 "version": "0.68.1"
               }
             }
@@ -332,13 +444,14 @@
         "secrets": [],
         "security": "Manages VictoriaMetrics and VictoriaLogs objects and their workloads in all namespaces. It can read every Secret, create pods in any namespace, and create ClusterRoles and bindings, so its token equals cluster-admin.\n",
         "smoke": [],
-        "why": "preset"
+        "why": "default"
       },
       {
         "contributedBy": [],
         "displayName": "VictoriaLogs",
         "id": "logs/victoria-logs",
         "idleMemoryMib": 38,
+        "networkPolicies": [],
         "releases": [
           {
             "kind": "manifests",
@@ -363,13 +476,14 @@
             "--for=jsonpath={.status.updateStatus}=operational"
           ]
         ],
-        "why": "preset"
+        "why": "default"
       },
       {
         "contributedBy": [],
         "displayName": "Kubernetes Metrics Server",
         "id": "metrics/metrics-server",
         "idleMemoryMib": 17,
+        "networkPolicies": [],
         "releases": [
           {
             "digest": "sha256:c2ca1185c01e6e7f53dd1b7d131f0c9b3fa50e003ed068b784563a1b5a3422a1",
@@ -404,13 +518,14 @@
         "secrets": [],
         "security": "Reads kubelet metrics; registers an aggregated API.",
         "smoke": [],
-        "why": "preset"
+        "why": "default"
       },
       {
         "contributedBy": [],
         "displayName": "VictoriaMetrics (k8s stack)",
         "id": "metrics/victoria-metrics",
         "idleMemoryMib": 207,
+        "networkPolicies": [],
         "releases": [
           {
             "digest": "sha256:5f3e783289f25f6498a9f0f66a8d1b2aa54256df48452863f449bc36dae0ee39",
@@ -448,7 +563,7 @@
           }
         ],
         "secrets": [],
-        "security": "Manages VictoriaMetrics objects, scrapes pods in all namespaces, and reads builds, databases, backups and certificates in all namespaces for alerts.\n",
+        "security": "Manages VictoriaMetrics objects, scrapes pods in all namespaces, and reads builds, databases, backups and certificates in all namespaces for alerts. node-exporter reads the host's /proc and /sys on the host network.\n",
         "smoke": [
           [
             "-n",
@@ -458,13 +573,14 @@
             "--for=jsonpath={.status.updateStatus}=operational"
           ]
         ],
-        "why": "preset"
+        "why": "default"
       },
       {
         "contributedBy": [],
         "displayName": "System Upgrade Controller",
         "id": "node-updates/system-upgrade-controller",
         "idleMemoryMib": 12,
+        "networkPolicies": [],
         "releases": [
           {
             "digests": ["sha256:1fb061e0d8bf9534da0145e614a9e03ca376cd5d1adcca17d13cfa12e211c48c"],
@@ -490,26 +606,28 @@
         "secrets": [],
         "security": "Cordons and drains nodes, and creates privileged Jobs that run Plan images on the host.",
         "smoke": [],
-        "why": "preset"
+        "why": "default"
       }
     ],
     "facts": {
       "arch": "amd64",
+      "hostHex": "3f9a2c",
       "hostname": "vps-1",
       "memoryMib": 5836,
       "nodeIps": ["203.0.113.10"],
-      "nodeName": null,
-      "randomHex": "3f9a2c"
+      "nodeName": null
     },
-    "nodeName": "vps-1",
     "hostFilePaths": [
-      "/etc/sysctl.d/60-rke2-cis.conf",
-      "/etc/rancher/rke2/audit-policy.yaml",
-      "/etc/rancher/rke2/config.yaml",
-      "/etc/rancher/rke2/config.yaml.d/50-zeabur-identity.yaml",
-      "/etc/rancher/rke2/zeabur-identity/authn.yaml",
-      "/etc/rancher/rke2/config.yaml.d/15-node-name.yaml",
-      "/etc/rancher/rke2/config.yaml.d/20-node-ip.yaml"
+      "/etc/sysctl.d/60-k3s-cis.conf",
+      "/etc/rancher/k3s/audit-policy.yaml",
+      "/etc/rancher/k3s/admission.yaml",
+      "/etc/rancher/k3s/config.yaml",
+      "/var/lib/rancher/k3s/server/manifests/zeabur-cis.yaml",
+      "/etc/rancher/k3s/config.yaml.d/50-zeabur-identity.yaml",
+      "/etc/rancher/k3s/zeabur-identity/authn.yaml",
+      "/etc/rancher/k3s/config.yaml.d/15-node-name.yaml",
+      "/etc/rancher/k3s/config.yaml.d/20-node-ip.yaml",
+      "/etc/rancher/k3s/registries.yaml"
     ],
     "identity": {
       "host": "login.203.0.113.10.sslip.io",
@@ -568,16 +686,16 @@
     },
     "leftOut": {},
     "memory": {
-      "clusterMib": 2140,
-      "componentsMib": 368,
+      "clusterMib": 1940,
+      "componentsMib": 463,
       "hostMib": 5836,
-      "unmeasured": 3
+      "unmeasured": 0
     },
     "namespaces": [
       {
         "baseline": null,
         "name": "builder-system",
-        "privileged": "builds/zeabur-builder is privileged",
+        "privileged": "builds/zeabur-builder: Zeabur Builder: a ClusterRole that manages Builds, BuildRuns and Jobs in every namespace; reads Pods and Namespaces; reads, creates, updates and deletes Secrets in every namespace (the Git credentials Builds name, and the copies it puts in build namespaces), and reads the zot token signer. Runs one privileged buildkitd per building namespace in its own namespace, with a user namespace and an egress policy. An admission policy limits the Jobs and StatefulSets it can create. zot: no RBAC, a ServiceAccount without roles; serves the OCI registry API over TLS on port 5000 inside the cluster.",
         "public": false
       },
       {
@@ -601,13 +719,13 @@
       {
         "baseline": null,
         "name": "observability",
-        "privileged": "logs/victoria-logs is privileged",
+        "privileged": "logs/victoria-logs: The collector reads pod metadata and node log files.",
         "public": false
       },
       {
         "baseline": null,
         "name": "system-upgrade",
-        "privileged": "node-updates/system-upgrade-controller is privileged",
+        "privileged": "node-updates/system-upgrade-controller: Cordons and drains nodes, and creates privileged Jobs that run Plan images on the host.",
         "public": false
       },
       {
@@ -631,24 +749,23 @@
       {
         "baseline": null,
         "name": "zot",
-        "privileged": null,
+        "privileged": "builds/zeabur-builder: Zeabur Builder: a ClusterRole that manages Builds, BuildRuns and Jobs in every namespace; reads Pods and Namespaces; reads, creates, updates and deletes Secrets in every namespace (the Git credentials Builds name, and the copies it puts in build namespaces), and reads the zot token signer. Runs one privileged buildkitd per building namespace in its own namespace, with a user namespace and an egress policy. An admission policy limits the Jobs and StatefulSets it can create. zot: no RBAC, a ServiceAccount without roles; serves the OCI registry API over TLS on port 5000 inside the cluster.",
         "public": false
       }
     ],
+    "nodeName": "vps-1",
     "nodePrep": null,
-    "cluster": {
-      "distribution": "k3s",
-      "version": "v1.36.5+k3s1",
-      "pinned": true,
-      "checksums": null,
-      "release": {
-        "file": "k3s",
-        "url": "https://github.com/k3s-io/k3s/releases/download/v1.36.5%2Bk3s1/k3s",
-        "sha256": "d73847bc"
+    "registry": {
+      "ca": {
+        "key": "ca.crt",
+        "name": "zot-tls",
+        "namespace": "zot"
       },
-      "images": [],
-      "installScript": null
+      "clusterIp": "10.43.0.50",
+      "component": "builds/zeabur-builder",
+      "host": "zot.zot.svc:5000"
     },
+    "removals": [],
     "storage": {
       "defaultClass": "local-path",
       "otherClasses": []
@@ -676,11 +793,13 @@
         "builds": {
           "caBundle": {
             "configMap": "zeabur-registry-ca"
-          }
+          },
+          "registry": "zot.zot.svc:5000"
         },
         "clusterName": "vps-1",
         "domains": {
-          "clusterIssuer": "zeabur-local-ca"
+          "clusterIssuer": "zeabur-local-ca",
+          "suffixes": []
         },
         "image": {
           "digest": "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
@@ -709,11 +828,16 @@
         "planKey": {
           "existingSecret": "zeabur-plan-key"
         },
+        "proxy": {
+          "enabled": true,
+          "logs": {
+            "enabled": true
+          }
+        },
         "publicUrl": "https://zeabur.203.0.113.10.sslip.io"
       }
-    },
-    "removals": []
+    }
   },
-  "text": "K3s v1.36.5+k3s1 (pinned, checked against this installer's digests), CIS hardened, on vps-1 (amd64, 5836 MiB)\nNode name        vps-1\nNode addresses   203.0.113.10 (temporary IPv6 addresses left out)\n\nComponents\n  ingress/traefik                                  preset     23 MiB\n      manifests gateway-api-crds (1 URLs)\n      chart traefik 42.1.3\n  certificates/cert-manager                        preset     51 MiB\n      chart cert-manager v1.21.3\n      manifests issuers\n  builds/zeabur-builder                            preset     unmeasured\n      manifests tls\n      chart zot 0.1.128\n      chart builder 0.0.1\n  databases/cloudnative-pg                         preset     unmeasured\n      chart cnpg 0.29.1\n      chart plugin-barman-cloud 0.8.1\n  image-updates/keel                               preset     unmeasured\n      chart keel v1.2.3\n      manifests webhook-policy\n  observability-operator/victoria-metrics-operator preset     20 MiB\n      chart victoria-metrics-operator 0.68.1\n  logs/victoria-logs                               preset     38 MiB\n      manifests logs\n  metrics/metrics-server                           preset     17 MiB\n      chart metrics-server 3.14.0\n  metrics/victoria-metrics                         preset     207 MiB\n      chart vm 0.96.0\n      manifests notifications\n  node-updates/system-upgrade-controller           preset     12 MiB\n      manifests crds (1 URLs)\n      manifests controller (1 URLs)\n\nNamespaces exempt from the restricted Pod Security level\n  builder-system (builds/zeabur-builder is privileged)\n  observability (logs/victoria-logs is privileged)\n  system-upgrade (node-updates/system-upgrade-controller is privileged)\n\nStorage          local-path (default)\n\nZeabur           https://zeabur.203.0.113.10.sslip.io (certificates from a CA made on this server)\nZeabur Identity  https://login.203.0.113.10.sslip.io\n\nMemory at idle   about 1668 MiB of 5836 (K3s 1300, components 368, plus 3 unmeasured)\nwarning: Local access: login.203.0.113.10.sslip.io and zeabur.203.0.113.10.sslip.io must resolve to this server for browsers and for the server itself, through DNS (names such as <address>.sslip.io do) rather than a hosts file, which pods do not read.\nwarning: This server has no public address, so new services get no suggested URL. Add `suffixes: [203-0-113-10.sslip.io]` under access for URLs only this network reaches, signed by the local CA.\n",
-  "yaml": "preset: standard\nenable: []\ndisable: []\nprofile: single-node\naccess:\n  mode: local\n  identity: login.203.0.113.10.sslip.io\n  zeabur: zeabur.203.0.113.10.sslip.io\n  invitations: true\nzeabur: true\ninputs: {}\nsecretFiles: {}\nrke2Version: null\nhost:\n  tlsSan: []\n  requireEncryptedDisk: false\nsources:\n  catalog: null\n  imageArchives: []\n  identityImage: null\n  identityctl: null\n  zeaburImage: null\n  zeaburChart: null\n"
+  "text": "K3s v1.36.5+k3s1 (pinned, checked against this installer's digests), CIS hardened, on vps-1 (amd64, 5836 MiB)\nNode name        vps-1\nNode addresses   203.0.113.10 (temporary IPv6 addresses left out)\n\nComponents\n  ingress/traefik                                  default    23 MiB\n      manifests gateway-api-crds (1 URLs)\n      chart traefik 42.1.3\n  certificates/cert-manager                        default    51 MiB\n      chart cert-manager v1.21.3\n      manifests issuers\n  builds/zeabur-builder                            default    49 MiB\n      manifests tls\n      chart zot 0.1.128\n      chart builder 0.1.1\n  databases/cloudnative-pg                         default    31 MiB\n      chart cnpg 0.29.1\n      chart plugin-barman-cloud 0.8.1\n  image-updates/keel                               default    15 MiB\n      chart keel v1.2.3\n      manifests webhook-policy\n  observability-operator/victoria-metrics-operator default    20 MiB\n      chart victoria-metrics-operator 0.68.1\n  logs/victoria-logs                               default    38 MiB\n      manifests logs\n  metrics/metrics-server                           default    17 MiB\n      chart metrics-server 3.14.0\n  metrics/victoria-metrics                         default    207 MiB\n      chart vm 0.96.0\n      manifests notifications\n  node-updates/system-upgrade-controller           default    12 MiB\n      manifests crds (1 URLs)\n      manifests controller (1 URLs)\n\nNamespaces exempt from the restricted Pod Security level\n  builder-system (builds/zeabur-builder: Zeabur Builder: a ClusterRole that manages Builds, BuildRuns and Jobs in every namespace; reads Pods and Namespaces; reads, creates, updates and deletes Secrets in every namespace (the Git credentials Builds name, and the copies it puts in build namespaces), and reads the zot token signer. Runs one privileged buildkitd per building namespace in its own namespace, with a user namespace and an egress policy. An admission policy limits the Jobs and StatefulSets it can create. zot: no RBAC, a ServiceAccount without roles; serves the OCI registry API over TLS on port 5000 inside the cluster.)\n  observability (logs/victoria-logs: The collector reads pod metadata and node log files.)\n  system-upgrade (node-updates/system-upgrade-controller: Cordons and drains nodes, and creates privileged Jobs that run Plan images on the host.)\n  zot (builds/zeabur-builder: Zeabur Builder: a ClusterRole that manages Builds, BuildRuns and Jobs in every namespace; reads Pods and Namespaces; reads, creates, updates and deletes Secrets in every namespace (the Git credentials Builds name, and the copies it puts in build namespaces), and reads the zot token signer. Runs one privileged buildkitd per building namespace in its own namespace, with a user namespace and an egress policy. An admission policy limits the Jobs and StatefulSets it can create. zot: no RBAC, a ServiceAccount without roles; serves the OCI registry API over TLS on port 5000 inside the cluster.)\n\nStorage          local-path (default)\n\nZeabur           https://zeabur.203.0.113.10.sslip.io (certificates from a CA made on this server)\nZeabur Identity  https://login.203.0.113.10.sslip.io\n\nMemory at idle   about 2403 MiB of 5836 (K3s 1940, components 463)\nwarning: Local access: login.203.0.113.10.sslip.io and zeabur.203.0.113.10.sslip.io must resolve to this server for browsers and for the server itself, through DNS (names such as <address>.sslip.io do) rather than a hosts file, which pods do not read.\nwarning: This server has no public address, so new services get no suggested URL. Add `suffixes: [203-0-113-10.sslip.io]` under access for URLs only this network reaches, signed by the local CA.\n",
+  "yaml": "enable: []\ndisable: []\nprofile: single-node\naccess:\n  mode: local\n  identity: login.203.0.113.10.sslip.io\n  zeabur: zeabur.203.0.113.10.sslip.io\n  invitations: true\nzeabur: true\ninputs: {}\nsecretFiles: {}\nrke2Version: null\nhost:\n  tlsSan: []\n  requireEncryptedDisk: false\nsources:\n  catalog: null\n  imageArchives: []\n  identityImage: null\n  identityctl: null\n  zeaburImage: null\n  zeaburChart: null\n"
 }

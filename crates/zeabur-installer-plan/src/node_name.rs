@@ -129,7 +129,6 @@ mod tests {
             host_hex: "a1b2c3".to_owned(),
             memory_mib: 4096,
             node_ips: vec!["10.211.55.189".to_owned(), "fd00::5".to_owned()],
-            node_prefix: Some(24),
         }
     }
 

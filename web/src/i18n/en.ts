@@ -1147,7 +1147,7 @@ export const en = {
   "installer.config": (path: string, many: boolean) =>
     `Or add ${many ? "them" : "it"} to enable in ${path}, then apply:`,
   "installer.configRemove": (path: string) =>
-    `Or take it out of enable in ${path} (for a component the preset installs, add it to disable), then apply:`,
+    `Or take it out of enable in ${path} (for a component installed by default, add it to disable), then apply:`,
   "installer.stays":
     "Its namespace and volumes stay. Some charts also delete their CRDs and all their objects; the installer's review lists them. The installer docs say how to delete what stays.",
   "installer.elsewhere": "If Helm, K3s or a GitOps tool installed it, remove it with that tool.",

@@ -34,11 +34,6 @@ pub const KUBECTL: &str = "/var/lib/zeabur-installer/bin/kubectl";
 pub const PERSONAL_KUBECONFIG: &str = "/etc/zeabur-installer/kubeconfig.yaml";
 /// The directory containerd reads registry settings from, one directory per registry host.
 pub const REGISTRY_DIR: &str = "/var/lib/kubesolo/containerd/registry";
-/// zot's CA on the host: containerd reads it on each pull.
-pub const ZOT_CA_FILE: &str = "/var/lib/kubesolo/containerd/registry/zot.zot.svc:5000/ca.crt";
-/// The `hosts.toml` that sends `zot.zot.svc:5000` to zot's address.
-pub const ZOT_HOSTS_FILE: &str =
-    "/var/lib/kubesolo/containerd/registry/zot.zot.svc:5000/hosts.toml";
 /// `KubeSolo`'s storage class, the default.
 pub const LOCAL_PATH_CLASS: &str = "local-path";
 
@@ -60,18 +55,26 @@ pub fn ports() -> Vec<(u16, &'static str)> {
     ]
 }
 
-/// The containerd of `KubeSolo` cannot resolve `zot.zot.svc`, so its images come from zot's fixed
-/// `ClusterIP`, which zot's certificate names.
+/// The registry's CA on the host: containerd reads it on each pull.
 #[must_use]
-pub fn zot_hosts_file(cluster_ip: &str) -> HostFile {
+pub fn registry_ca_file(host: &str) -> String {
+    format!("{REGISTRY_DIR}/{host}/ca.crt")
+}
+
+/// The containerd of `KubeSolo` cannot resolve the in-cluster registry's host, so its images come
+/// from the registry's fixed `ClusterIP`, which its certificate names.
+#[must_use]
+pub fn registry_hosts_file(host: &str, cluster_ip: &str) -> HostFile {
+    let port = host.rsplit_once(':').map_or("443", |(_, p)| p);
+    let ca = registry_ca_file(host);
     HostFile {
-        path: ZOT_HOSTS_FILE.to_owned(),
+        path: format!("{REGISTRY_DIR}/{host}/hosts.toml"),
         mode: 0o644,
         content: format!(
             "# Written by zeabur-installer; `zeabur-installer doctor` compares it.\n\
-             server = \"https://{cluster_ip}:5000\"\n\n\
-             [host.\"https://{cluster_ip}:5000\"]\n  capabilities = [\"pull\", \"resolve\"]\n  \
-             ca = \"{ZOT_CA_FILE}\"\n"
+             server = \"https://{cluster_ip}:{port}\"\n\n\
+             [host.\"https://{cluster_ip}:{port}\"]\n  capabilities = [\"pull\", \"resolve\"]\n  \
+             ca = \"{ca}\"\n"
         ),
     }
 }

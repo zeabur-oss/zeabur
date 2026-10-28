@@ -26,7 +26,7 @@ access:
 
 Replace both domains with the ones you want to use. For DNS and port requirements in public domain mode, see [connection options in the quickstart](quickstart.mdx#2-choose-how-to-connect).
 
-If you omit `preset`, the installer uses `standard`. If you omit `profile`, it uses `single-node`. If you omit `distribution`, it installs K3s. For a server with 8 GiB of memory or more, or to run the control plane on three servers later, add `distribution: rke2`.
+If you omit `enable` and `disable`, the installer installs the [default components](../reference/installer-configuration.mdx#component-selection). If you omit `profile`, it uses `single-node`. If you omit `distribution`, it installs K3s. For a server with 8 GiB of memory or more, or to run the control plane on three servers later, add `distribution: rke2`.
 
 For a test machine, use `local` mode instead:
 
@@ -68,7 +68,7 @@ sudo zeabur-installer plan --json
 
 `plan --json` doesn't run host checks.
 
-Without a config file, `plan` generates sslip.io names from the server's address and shows a preview using the `standard` preset. It uses `domain` mode when the server has a public address, and `local` mode otherwise. You must create a config file before running `apply`.
+Without a config file, `plan` generates sslip.io names from the server's address and shows a preview with the default components. It uses `domain` mode when the server has a public address, and `local` mode otherwise. You must create a config file before running `apply`.
 
 ## Run the installation
 

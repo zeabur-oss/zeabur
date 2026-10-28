@@ -1,10 +1,19 @@
 // What each catalogue template is, in one sentence per locale. Keys are `id#hash`, the hash of the
-// catalogue description the sentence summarises, as in component-summaries.ts; a changed
-// description falls back to the catalogue's English until someone rewrites the sentence.
+// catalogue description the sentence summarises; a changed description falls back to the
+// catalogue's English until someone rewrites the sentence.
 import type { Locale } from "@/i18n"
-import { sourceHash } from "@/i18n/component-summaries"
 
 type Summary = { en: string } & Partial<Record<Exclude<Locale, "en">, string>>
+
+/** Locales whose every summary must be written; the others fall back to English. */
+export const completeLocales: readonly Locale[] = ["en", "zh-TW", "zh-CN"]
+
+/** FNV-1a (32 bits, hex) of the text's UTF-8 bytes. */
+function sourceHash(text: string): string {
+  let hash = 0x811c9dc5
+  for (const byte of new TextEncoder().encode(text)) hash = Math.imul(hash ^ byte, 0x01000193) >>> 0
+  return hash.toString(16).padStart(8, "0")
+}
 
 export const templateSummaries: Record<string, Summary> = {
   "browserless#6cec3184": {

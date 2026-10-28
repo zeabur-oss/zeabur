@@ -3,10 +3,10 @@ helm-controller  v0.17.9 (its image pinned by digest; the Jobs' image checked by
 Node address     203.0.113.10; the kubeconfig names it
 
 Components
-  ingress/traefik            preset    23 MiB
+  ingress/traefik            default   23 MiB
       manifests gateway-api-crds (1 URLs)
       chart traefik 41.7.1
-  certificates/cert-manager  preset    51 MiB
+  certificates/cert-manager  default   51 MiB
       chart cert-manager v1.21.2
       manifests issuers
 
