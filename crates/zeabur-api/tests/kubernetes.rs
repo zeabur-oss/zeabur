@@ -414,6 +414,24 @@ mod tests {
                             "command": ["sleep", "3600"], "ports": [{"containerPort": 8080}]}]}}}})
         };
         create(&deployments, web("busybox:1.37")).await;
+        // The controller makes a ReplicaSet only for the template it sees: patched before it has
+        // seen the first, the Deployment has one release, not two.
+        let replica_sets = api("apps", "v1", "ReplicaSet");
+        let mut seen = false;
+        for _ in 0..60 {
+            if !replica_sets
+                .list(&kube::api::ListParams::default())
+                .await
+                .unwrap()
+                .items
+                .is_empty()
+            {
+                seen = true;
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+        }
+        assert!(seen, "no ReplicaSet for busybox:1.37");
         deployments
             .patch("web", &kube::api::PatchParams::default(), &kube::api::Patch::Merge(json!({
                 "spec": {"template": {"spec": {"containers": [{"name": "web", "image": "busybox:1.36"}]}}}})))
