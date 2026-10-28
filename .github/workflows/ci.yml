@@ -7,14 +7,10 @@ on:
   push:
     branches: [main]
   pull_request:
-  # The release workflow runs all of CI on the commit it releases.
-  workflow_call:
 
 permissions:
   contents: read
 
-# Called from the release workflow, `github.workflow` is the caller's name; the prefix keeps this
-# group apart from the caller's own (group names ignore case).
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true

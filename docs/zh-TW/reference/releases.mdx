@@ -103,7 +103,7 @@ cosign verify \
 
 ## 發行流程
 
-維護者推送 `v<version>` tag 後，release workflow（本 repository 的 `release.yml`，它呼叫 `zeabur-oss/.github` 裡共用的那一個）跑 CI、建置 Linux 和 macOS 版本、做 smoke test、發布映像檔和 chart，再以 Sigstore keyless 簽署映像檔、chart 和 checksum 清單，並為三者產生建置來源 attestation。
+維護者推送 `v<version>` tag 後，release workflow（本 repository 的 `release.yml`，它呼叫 `zeabur-oss/.github` 裡共用的那一個）確認該 commit 在 `main` 上的 CI 已通過、建置 Linux 和 macOS 版本、做 smoke test、發布映像檔和 chart，再以 Sigstore keyless 簽署映像檔、chart 和 checksum 清單，並為三者產生建置來源 attestation。
 
 Workflow 最後建立 GitHub release 草稿，維護者檢查後才公開。Releases 頁面上看得到的版本，才有可下載的檔案。
 
