@@ -31,7 +31,7 @@ A maintainer releases: they bump the version (`Cargo.toml`, `Chart.yaml`, a `CHA
 section), merge it, push the tag `v<version>`, check the draft release the workflow leaves and
 publish it by hand (`docs/internal/releasing.md`). Never push a tag, create, edit or publish a release,
 dispatch `release.yml` or change a repository or package setting yourself; prepare the pull
-request and name the step that is theirs. A change to a `scripts/release-*.sh` is checked with
+request and name the step that is theirs. A change to `scripts/release.sh` or a `scripts/release-*.sh` is checked with
 `shellcheck` and `actionlint`, and on Linux by running `release-build.sh` and
 `release-smoke.sh`; the macOS build runs on a Mac. A failed release run: `zeabur-ci`.
 

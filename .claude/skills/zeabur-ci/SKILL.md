@@ -16,9 +16,9 @@ is in `zeabur-cluster-tests`.
 `.github/workflows/release.yml` runs on a `vX.Y.Z` tag: all of `ci.yml` (`workflow_call`), then
 zeabur-oss/.github's shared release workflow, each stage `scripts/release.sh <stage>`: `build`
 (Linux amd64/arm64, macOS arm64: `scripts/release-build.sh`, then `scripts/release-smoke.sh` on
-Linux and the docs screenshots on Linux amd64), `publish` (`scripts/release-publish.sh`), `attest`,
-`finish` (the installers), `release` (`scripts/release-assets.sh`, the draft release) and `verify`
-(`scripts/release-verify.sh` on the draft's assets). For a failed
+Linux and the docs screenshots on Linux amd64), `publish`, `attest`, `finish` (the installers),
+`release` (`assets`, the draft release) and `verify` (on the draft's assets); `zeabur-oss-release`
+from zeabur-oss/.github pushes, signs and verifies. For a failed
 release run, read [RELEASE-RECOVERY.md](RELEASE-RECOVERY.md) before changing permissions,
 packages or artifacts.
 

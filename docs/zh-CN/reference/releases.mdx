@@ -1,7 +1,7 @@
 ---
 title: 发行文件与验证
 description: 按操作系统选择 Zeabur 发行文件，验证校验和、签名和构建来源后再运行。
-source: "a1e700d331bf"
+source: "3896a0a6cfe9"
 ---
 
 在 [GitHub Releases](https://github.com/zeabur-oss/zeabur/releases) 选好版本，下载对应的压缩包、`SHA256SUMS` 和签名。验证时，将签名者限定为 zeabur-oss 共用的 release workflow，且是为本仓库该版本 tag 运行的那一次，验证通过后再解压、运行。
@@ -81,7 +81,21 @@ xattr -d com.apple.quarantine zeaburctl
 
 ## 验证镜像与 chart
 
-`digests.txt` 列出了镜像索引、各平台镜像和 chart 的完整 registry 引用。该文件也列在 `SHA256SUMS` 中，先按上面的流程验证它，再把其中的摘要交给 cosign：
+发行说明只写这一版改了什么，不列出摘要。`digests.txt` 每行一条，列出各平台镜像、镜像索引和 chart 的完整 registry 引用：
+
+```text
+linux/amd64  ghcr.io/zeabur-oss/zeabur@sha256:...
+linux/arm64  ghcr.io/zeabur-oss/zeabur@sha256:...
+index  ghcr.io/zeabur-oss/zeabur@sha256:...
+chart  ghcr.io/zeabur-oss/charts/zeabur@sha256:...
+```
+
+该文件也列在 `SHA256SUMS` 中。把它下载到同一个目录，先按上面的流程验证，再把其中的摘要交给 cosign：
+
+```sh
+gh release download "v$version" --repo zeabur-oss/zeabur \
+  --dir "zeabur-$version" --pattern digests.txt
+```
 
 ```sh
 cosign verify \

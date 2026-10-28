@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Before 1.0.0, a
 minor or patch release may break the API.
 
+## [Unreleased]
+
+### Changed
+
+- Release notes are the changelog section and a link to the documentation. The digests of the
+  image, each platform's image and the chart are in the signed `digests.txt` asset, as
+  [Releases](docs/reference/releases.mdx) shows.
+- The image is pushed by digest with no `candidate-*` tags left in GHCR.
+
 ## [0.1.1] - 2026-10-28
 
 The first published release. 0.1.0 was never published: zeabur-oss withdrew it in every
@@ -131,4 +140,5 @@ Never published.
   seven-day minimum age for new crate and package releases, and a reviewed allowlist for
   shipped `unsafe` and native code.
 
+[Unreleased]: https://github.com/zeabur-oss/zeabur/compare/v0.1.1...HEAD
 [0.1.1]: https://github.com/zeabur-oss/zeabur/releases/tag/v0.1.1

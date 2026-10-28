@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Builds one platform's release candidates; publishes nothing. `scripts/release.sh build` runs it
 # on a runner of each platform, then smokes what it built (release-smoke.sh) before anything is
-# published (release-publish.sh). Run inside `nix develop`, from a git checkout: archive
+# published (`release.sh publish`). Run inside `nix develop`, from a git checkout: archive
 # entries carry the commit's time (SOURCE_DATE_EPOCH), not the build's.
 #   scripts/release-build.sh v0.0.2 arm64 dist
 #
@@ -14,7 +14,7 @@
 #   (`ClusterEndpoint::in_cluster`), so there is no macOS `zeabur`.
 #
 # With `installer` (Linux only): zeabur-installer-<version>-linux-<arch>.tar.gz. The installer pins
-# the image and the chart that release-publish.sh published, so `scripts/release.sh finish` builds
+# the image and the chart that `release.sh publish` published, so `scripts/release.sh finish` builds
 # it after that step. It compiles in the ZEABUR_PIN_* variables (release-pins.sh): all of them, or none for a
 # development build.
 #   scripts/release-build.sh v0.0.2 arm64 dist installer

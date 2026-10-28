@@ -141,7 +141,7 @@ expect full "$out" 'select(.kind == "Deployment" and .metadata.name == "zeabur")
   zeabur-plan-key
 
 # The image: the published one at the chart's appVersion, or exactly the digest a release pins
-# (scripts/release-publish.sh).
+# (`scripts/release.sh publish`).
 image='select(.kind == "Deployment" and .metadata.name == "zeabur") | .spec.template.spec.containers[0].image'
 app_version=$(yq '.appVersion' "$chart/Chart.yaml")
 expect minimal "$(render -f "$chart/ci/minimal-values.yaml")" "$image" "ghcr.io/zeabur-oss/zeabur:$app_version"

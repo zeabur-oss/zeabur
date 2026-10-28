@@ -10,7 +10,7 @@ maintainers'. Propose the command or the setting instead.
 Once `publish` succeeded, the image, the chart and the draft's assets are signed by the shared
 workflow (`https://github.com/zeabur-oss/.github/.github/workflows/release.yml@…`) for
 `zeabur-oss/zeabur` at `refs/tags/v<version>`. Do not rebuild, re-sign, overwrite or delete
-them to make a check pass: `scripts/release-publish.sh` refuses an existing release, image tag or
+them to make a check pass: `scripts/release.sh publish` refuses an existing release, image tag or
 chart version on purpose. Fix the check on `main`, then a maintainer runs
 `gh workflow run release.yml --ref main -f version=v<version> -F verify_only=true`, which takes
 the scripts from `main` and the Nix shell from the tag. Re-running the failed run reuses its old
@@ -23,7 +23,7 @@ workflow file and permissions and picks up no fix.
   `contents: write`. Check the job's permissions; never publish the draft to get past it.
 - **`unauthorized` or `denied` pulling from ghcr.io** in `verify`, or `ErrImagePull` in the
   smoke cluster: the package is private. A public repository does not make its packages public,
-  and the first run creates `zeabur` and `charts/zeabur` private. `release-verify.sh` uses an
+  and the first run creates `zeabur` and `charts/zeabur` private. `scripts/release.sh verify` uses an
   empty registry configuration on purpose, so a login cannot hide this.
 - **`gh attestation verify` finds nothing**: the `attest` jobs (image and chart) or the
   attestation step of `release` (assets) did not run or failed; read that job's log. An image tag or a chart version that exists without attestations

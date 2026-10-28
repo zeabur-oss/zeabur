@@ -80,7 +80,21 @@ xattr -d com.apple.quarantine zeaburctl
 
 ## Verify the image and chart
 
-`digests.txt` lists the full registry references for the image index, each platform's image, and the chart. It's also listed in `SHA256SUMS`. Verify it with the steps above first, then pass the digests it contains to cosign:
+The release notes say what changed; they don't list digests. `digests.txt` lists the full registry references for each platform's image, the image index, and the chart, one per line:
+
+```text
+linux/amd64  ghcr.io/zeabur-oss/zeabur@sha256:...
+linux/arm64  ghcr.io/zeabur-oss/zeabur@sha256:...
+index  ghcr.io/zeabur-oss/zeabur@sha256:...
+chart  ghcr.io/zeabur-oss/charts/zeabur@sha256:...
+```
+
+It's also listed in `SHA256SUMS`. Download it into the same directory, verify it with the steps above, then pass the digests it contains to cosign:
+
+```sh
+gh release download "v$version" --repo zeabur-oss/zeabur \
+  --dir "zeabur-$version" --pattern digests.txt
+```
 
 ```sh
 cosign verify \

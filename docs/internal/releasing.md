@@ -11,10 +11,10 @@ stage as `scripts/release.sh <stage>` in this repository's Nix dev shell:
 |---|---|---|
 | `check` | once | The tag is the version of every crate, `Cargo.lock`, the chart (`version`, `appVersion`), `web/package.json`, the installer's `package.json` and `openapi.yaml`, and `CHANGELOG.md` has its section. |
 | `build` | Linux amd64 and arm64, macOS arm64 | On a tag, the catalog and Zeabur Identity pins resolve (`release-pins.sh`). Builds the platform (`release-build.sh`); on Linux, smokes the archive, the chart and the image on a k3s cluster with Zeabur Identity at `ZEABUR_IDENTITY_PINNED` (`release-smoke.sh`). A rehearsal also builds a development installer on Linux, which it does not keep. |
-| `publish` | once, tag only | Pushes the image and the chart by digest and signs them (`release-publish.sh`); writes `published/subjects.json`, which the shared workflow attests, and `published/outputs.env`, the installer's pins of both. |
+| `publish` | once, tag only | Pushes the image and the chart by digest and signs them (`zeabur-oss-release push-image`, `push-chart`); writes `published/subjects.json`, which the shared workflow attests, and `published/outputs.env`, the installer's pins of both. |
 | `finish` | every platform, tag only | Builds `zeabur-installer` on Linux, pinned to the catalog, Zeabur Identity and what `publish` pushed. macOS has no installer and leaves only a note, which no asset includes. |
-| `assets` | once, tag only | Makes the assets and the signed `SHA256SUMS` (`release-assets.sh`); the shared workflow attests them and creates the draft. |
-| `verify` | every platform | Downloads the draft and checks it as a user would (`release-verify.sh`). |
+| `assets` | once, tag only | Makes the assets, the signed `SHA256SUMS` (`zeabur-oss-release checksums`) and the notes from `CHANGELOG.md` with a link to the documentation (`zeabur-oss-release notes`); the shared workflow attests them and creates the draft. |
+| `verify` | every platform | Downloads the draft and checks it as a user would (`zeabur-oss-release verify-assets`, `verify-image`, `verify-chart`), then installs the published chart on Linux (`release-smoke.sh`) or runs `zeaburctl` on macOS. |
 
 Every signature and attestation names the shared workflow,
 `https://github.com/zeabur-oss/.github/.github/workflows/release.yml@…`, not this repository's
@@ -91,7 +91,7 @@ These are repository and organisation settings, not files; a maintainer sets the
 ## When a release run fails
 
 Never move a published tag and never replace a published asset or image tag:
-`scripts/release-publish.sh` refuses when the release, the image tag or the chart version
+`scripts/release.sh publish` refuses when the release, the image tag or the chart version
 already exists.
 
 - **Before `publish`** (CI, a build, a smoke test): nothing was published. Fix it on `main`; if

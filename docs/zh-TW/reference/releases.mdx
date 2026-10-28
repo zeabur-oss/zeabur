@@ -1,7 +1,7 @@
 ---
 title: 發行檔與驗證
 description: 依作業系統選擇 Zeabur 發行檔，驗證 checksum、簽章與建置來源後再執行。
-source: "a1e700d331bf"
+source: "3896a0a6cfe9"
 ---
 
 在 [GitHub Releases](https://github.com/zeabur-oss/zeabur/releases) 選好版本，下載對應的 archive、`SHA256SUMS` 和簽章。驗證時把簽署者限定為 zeabur-oss 共用的 release workflow，且是為本 repository 該版本 tag 執行的那一次，通過了才解壓縮、執行。
@@ -81,7 +81,21 @@ xattr -d com.apple.quarantine zeaburctl
 
 ## 驗證映像檔與 chart
 
-`digests.txt` 列出 image index、各平台映像檔和 chart 的完整 registry 參照。它也列在 `SHA256SUMS` 裡，先用上面的流程驗證它，再把裡面的 digest 交給 cosign：
+發行說明只寫這版改了什麼，不列 digest。`digests.txt` 每行一筆，列出各平台映像檔、image index 和 chart 的完整 registry 參照：
+
+```text
+linux/amd64  ghcr.io/zeabur-oss/zeabur@sha256:...
+linux/arm64  ghcr.io/zeabur-oss/zeabur@sha256:...
+index  ghcr.io/zeabur-oss/zeabur@sha256:...
+chart  ghcr.io/zeabur-oss/charts/zeabur@sha256:...
+```
+
+它也列在 `SHA256SUMS` 裡。下載到同一個目錄，先用上面的流程驗證，再把裡面的 digest 交給 cosign：
+
+```sh
+gh release download "v$version" --repo zeabur-oss/zeabur \
+  --dir "zeabur-$version" --pattern digests.txt
+```
 
 ```sh
 cosign verify \
