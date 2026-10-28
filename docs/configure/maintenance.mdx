@@ -26,7 +26,7 @@ If you’re moving data or changing a database schema, separately stop any progr
 
 Open the service’s **Networking** tab. In the target domain’s row, click **Maintenance and error pages for app.example.com**.
 
-![The service’s Networking tab, with the Maintenance and error pages button in the domain row](https://oss.zeabur.com/shots/zeabur/en/light/domain-pages-open.avif)
+![The service’s Networking tab, with the Maintenance and error pages button in the domain row](../images/shots/domain-pages-open.avif)
 
 </Step>
 <Step>
@@ -35,7 +35,7 @@ Open the service’s **Networking** tab. In the target domain’s row, click **M
 
 Turn on **Maintenance mode**. Keep the default HTML, or select **Maintenance** under **Page to edit** and edit the **HTML**.
 
-![The Maintenance and error pages panel for shop.example.com, with maintenance mode on and the maintenance page’s HTML displayed](https://oss.zeabur.com/shots/zeabur/en/light/domain-pages-maintenance.avif)
+![The Maintenance and error pages panel for shop.example.com, with maintenance mode on and the maintenance page’s HTML displayed](../images/shots/domain-pages-maintenance.avif)
 
 Each page must be smaller than 64 KiB. Every domain in the project uses the same set of pages. If you edit the maintenance page here, other domains in maintenance mode in the project will also show the new content.
 
@@ -48,7 +48,7 @@ If the project doesn’t have a page server yet, the top of the panel says **Thi
 
 Click **Add to changes** in the side panel. The domain row will show **Changed**. Then click **Review changes** at the bottom of the page, confirm the target domain and HTML, and apply. If the page server needs to be deployed, the list also includes its Deployment, Service, config file, and NetworkPolicy.
 
-![The review changes dialog, showing that shop.example.com will display a maintenance page](https://oss.zeabur.com/shots/zeabur/en/light/domain-pages-review.avif)
+![The review changes dialog, showing that shop.example.com will display a maintenance page](../images/shots/domain-pages-review.avif)
 
 All paths under this domain will route to the maintenance page. Other domains on the same Ingress aren’t affected. For an Ingress domain, Zeabur creates an additional Ingress with a name ending in `-maintenance`. Traefik gives it priority, and the original Ingress stays unchanged. For an HTTPRoute domain, Zeabur sets the original backends’ weights to 0 and adds the page server. Maintenance applies to the entire HTTPRoute. If the same HTTPRoute has other domains, Zeabur first moves this domain to its own route.
 
@@ -65,7 +65,7 @@ curl -i https://app.example.com/
 
 Replace `app.example.com` with your domain. The response status code is `503`, and the body is the maintenance page’s HTML. Back in the service’s **Networking** tab, the domain row shows **In maintenance**, and the service’s replicas are still running.
 
-![The domain row for shop.example.com marked Under maintenance](https://oss.zeabur.com/shots/zeabur/en/light/domain-maintenance-on.avif)
+![The domain row for shop.example.com marked Under maintenance](../images/shots/domain-maintenance-on.avif)
 
 </Step>
 </Steps>

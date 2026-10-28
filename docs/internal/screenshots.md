@@ -3,39 +3,38 @@
 Every screenshot comes from one manifest format and one script, `scripts/docs-shots.sh`, which
 takes them from the demo server with Chromium from nixpkgs. Each manifest is one image set:
 
-| Manifest                 | Images                                 | Where                                         |
-| ------------------------ | -------------------------------------- | --------------------------------------------- |
-| `docs/shots.yaml`        | The documentation, each locale         | `docs-shots-<version>.tar` of each release    |
-| `docs/readme-shots.yaml` | The README, English, 1×, at most 30 KB | `docs/images/<id>-<theme>.avif`               |
-| `docs/site-shots.yaml`   | The landing page at oss.zeabur.com     | `docs/images/site/<locale>/<theme>/<id>.avif` |
-| `docs/cover-shots.yaml`  | The plate of the README cover          | `../design-system/covers/zeabur`              |
+| Manifest                 | Images                                 | Where                                    |
+| ------------------------ | -------------------------------------- | ---------------------------------------- |
+| `docs/shots.yaml`        | The documentation and oss.zeabur.com   | `docs/[<locale>/]images/shots/<id>.avif` |
+| `docs/readme-shots.yaml` | The README, English, 1×, at most 30 KB | `docs/images/<id>-<theme>.avif`          |
+| `docs/cover-shots.yaml`  | The plate of the README cover          | `../design-system/covers/zeabur`         |
 
-The documentation's screenshots are not in git: the website downloads the tar for the version it
-shows. The others are.
+All of them are kept in git. Nothing in CI or the release takes them: run the script after
+changing a page a shot covers, and commit the images.
+
+Each locale's screenshots sit in its docs folder: `docs/images/shots` for English,
+`docs/zh-TW/images/shots` for Traditional Chinese. A page shows them by a relative path, which
+GitHub and the website both follow; from `docs/zh-TW/deploy/databases.mdx`:
+
+```md
+![The orders database's overview](../images/shots/database-overview.avif)
+```
 
 ## Take them
 
 ```sh
-nix develop -c scripts/docs-shots.sh                         # docs/shots.yaml into target/docs-shots
+nix develop -c scripts/docs-shots.sh                         # docs/shots.yaml into docs/[<locale>/]images/shots
 nix develop -c scripts/docs-shots.sh docs/readme-shots.yaml  # into docs/images
-nix develop -c scripts/docs-shots.sh web/e2e/shots/fixture.yaml target/docs-shots v0.1.0
+nix develop -c scripts/docs-shots.sh web/e2e/shots/fixture.yaml  # into target/docs-shots
 ```
 
 The script builds the web interface and the demo (`crates/zeabur-api/examples/demo.rs`), starts
 one demo server for each distinct `app` and `env`, and takes each shot in every locale (`en`,
 `zh-TW`, `zh-CN`) and the manifest's themes at twice the pixel density, with reduced motion. The
-themes are light only unless the manifest sets `themes`; `docs/shots.yaml` takes light and dark,
-and the site shows the one the reader's theme is in. A shot can list its own `themes`, and a shot
-that only one page uses can list fewer `locales`. It writes:
-
-```text
-<out>/<locale>/<theme>/<id>.avif
-<out>/manifest.json               every file and its size in bytes
-<out>/docs-shots-<version>.tar    both, when a version is given
-```
-
-Images already in `<out>` that the run does not take stay there, and `manifest.json` lists them
-too, so a run with a shorter manifest replaces only its own images.
+themes are light only unless the manifest sets `themes`. A shot can list its own `themes`, and a
+shot that only one page uses can list fewer `locales`. It writes `<out>/<locale>/<theme>/<id>.avif`.
+Images already in `<out>` that the run does not take stay there, unless the manifest sets
+`clean`.
 
 Each AVIF must be at most 150 KB, or the manifest's `budget`. The script lowers the AVIF quality in
 steps until each file fits; it names the files that still do not and fails, and `<out>` stays as it
@@ -59,6 +58,7 @@ fails, Playwright's trace is in `target/docs-shots-results`. The demo listens on
     - wait: '[role="alert"]'
   clip: main                    # optional: CSS selector to crop to; at least 24 px around it
   until: '#cluster-nodes'       # optional, with clip: the crop ends at the bottom of this element
+  blank: input                  # optional: text that changes on every run, left out of the image
   viewport: desktop             # desktop (1440×900), phone (390×844) or cover (544×544); default desktop
   locales: [en]                 # optional: en, zh-TW, zh-CN; default all three
   themes: [light]               # optional: light, dark; default the manifest's `themes`
@@ -91,38 +91,43 @@ variables outside `ZEABUR_DEMO_*`.
 
 ## Same input, same pixels
 
-Two runs on the same machine on the same day give the same files. Two limits:
+Two runs give the same files, so a run changes in git only the images whose pages changed:
 
-- The demo dates its objects relative to the moment it starts, so a page that shows a date
-  (for example "Created on Sep 26, 2026") changes from one day to the next.
-- Fonts render differently on macOS and Linux. The release takes the shots on Linux. There,
-  Chromium has only the fonts of the dev shell's `FONTCONFIG_FILE`: Noto Sans CJK for Chinese.
+- The demo and the browser take `ZEABUR_DEMO_NOW` as the time now, so dates stay put.
+- A value made at random, such as a new invitation's token, differs on every run: name what
+  shows it in `blank`.
+- A shot taken before its page settles differs too: end the steps with a `wait` for the state the
+  image shows, so a run that misses it fails instead.
+- Fonts render differently on macOS and Linux. Take the shots where CI runs, aarch64 Linux inside
+  `nix develop` (a CI runner or a Linux VM): there, Chromium, avifenc and the fonts all come from
+  the dev shell, and Chromium has only the fonts of its `FONTCONFIG_FILE`, Noto Sans CJK for
+  Chinese.
 
-## Image sets kept in git
+## Settings
 
-A manifest for images kept in git is a mapping: its settings, and the list of shots in `shots`.
+A manifest is a mapping: its settings, and the list of shots in `shots`.
 
 ```yaml
 out: docs/images                # the default <out>, from the repository's root
-file: '{id}-{theme}.avif'       # optional: the path in <out>; default {locale}/{theme}/{id}.avif
+file: '{id}-{theme}.avif'       # optional: the path in <out>; default {locale}/{theme}/{id}.avif;
+                                # {docs} is the locale's docs folder, empty for en, else <locale>/
 scale: 1                        # optional: pixels for each CSS pixel, 1 or 2; default 2
 budget: 30                      # optional: the largest AVIF in KB; default 150
-clean: true                     # optional: empty <out> first, when the set owns it
+clean: true                     # optional: empty each folder the run writes into, when the set owns it
 themes: [light, dark]           # optional: the themes of a shot that lists none; default [light]
 shots:
   - id: readme-home
     ...
 ```
 
-With `out`, the run writes only the images: no `manifest.json` and no tar. `file` must hold
-`{locale}` or `{theme}` when a shot has more than one of them. `docs/shots.yaml` is a mapping too,
-for its `themes`, but names no `out`.
+Without `out` the images go to `target/docs-shots`. `file` must hold `{locale}` or `{docs}` when a
+shot has more than one locale, and `{theme}` when it has more than one theme.
 
-- **README** (`docs/readme-shots.yaml`): one pixel for each CSS pixel, light and dark, English only,
-  at most 30 KB each. The fonts of macOS make some of them larger; take them on Linux.
-- **Landing page** (`docs/site-shots.yaml`): twice the pixel density, light and dark, in all three
+- **Docs and site** (`docs/shots.yaml`): twice the pixel density, light only, in all three
   locales. The landing shows them at most 1152 CSS px wide, so text stays sharp on Hi-DPI screens.
   `clean` removes images whose shot is gone.
+- **README** (`docs/readme-shots.yaml`): one pixel for each CSS pixel, light and dark, English only,
+  at most 30 KB each. The fonts of macOS make some of them larger; take them on Linux.
 - **Cover** (`docs/cover-shots.yaml`): the `cover` viewport is the plate of the README cover; the
   window keeps that size. It writes into the design-system checkout beside this one; render the
   cover there afterwards (its `covers/README.md`).

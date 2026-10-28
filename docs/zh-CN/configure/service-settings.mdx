@@ -40,7 +40,7 @@ source: "6cd0fc261787"
 | 中 | 0.25 核 | 256 MiB | 512 MiB |
 | 大 | 0.5 核 | 512 MiB | 1 GiB |
 
-![服务设置中的计算资源，包括副本数、CPU 和内存的预留量与上限，下方显示最大节点的资源](https://oss.zeabur.com/shots/zeabur/zh-CN/light/service-compute.avif)
+![服务设置中的计算资源，包括副本数、CPU 和内存的预留量与上限，下方显示最大节点的资源](../images/shots/service-compute.avif)
 
 </Step>
 <Step>
@@ -74,7 +74,7 @@ Job 只运行一次，不能通过 **计算资源** 修改，需要使用 YAML�
 
 **间隔（秒）** 表示多久检查一次，**失败次数** 表示连续失败几次才判定为失败。如果服务声明了端口，表单会显示 **HTTP，端口 8080** 这类按钮，点击即可填入路径 `/` 和对应端口。端口必须是容器声明过的，否则无法保存。
 
-![服务设置中的健康检查，就绪检查选择 HTTP GET，路径为 /healthz，另有存活检查和启动检查](https://oss.zeabur.com/shots/zeabur/zh-CN/light/service-health.avif)
+![服务设置中的健康检查，就绪检查选择 HTTP GET，路径为 /healthz，另有存活检查和启动检查](../images/shots/service-health.avif)
 
 修改后，点击页面底部的 **检查变更**，再应用变更。只有定时任务和 Job 没有健康检查。
 
@@ -101,7 +101,7 @@ containers:
 - **严格**：以非 root 用户运行，且无法提升权限。以 root 运行的镜像（例如 `nginx:latest`）无法启动，需要改用不需要 root 的版本，例如 `nginxinc/nginx-unprivileged`。Railpack 构建的镜像以用户 1000 运行，可以选择严格。Dockerfile 需要用数字指定非 root 用户，例如 `USER 1000`。
 - **兼容**：允许以 root 运行，但仍无法访问宿主机或提升权限。
 
-![服务设置中的安全性，当前选择兼容，下方说明允许以 root 运行但无法访问宿主机](https://oss.zeabur.com/shots/zeabur/zh-CN/light/service-security.avif)
+![服务设置中的安全性，当前选择兼容，下方说明允许以 root 运行但无法访问宿主机](../images/shots/service-security.avif)
 
 选择后会直接打开检查页面，确认并应用后，副本会替换为新的副本。从镜像创建服务时，Zeabur 会根据镜像配置的用户预先选择：用数字指定非 root 用户时选择严格，其他情况选择兼容。
 

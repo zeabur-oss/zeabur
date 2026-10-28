@@ -40,7 +40,7 @@ source: "6cd0fc261787"
 | 中 | 0.25 核心 | 256 MiB | 512 MiB |
 | 大 | 0.5 核心 | 512 MiB | 1 GiB |
 
-![服務設定的運算資源，有副本數、CPU 與記憶體的保留量和上限，下方寫出最大節點的資源](https://oss.zeabur.com/shots/zeabur/zh-TW/light/service-compute.avif)
+![服務設定的運算資源，有副本數、CPU 與記憶體的保留量和上限，下方寫出最大節點的資源](../images/shots/service-compute.avif)
 
 </Step>
 <Step>
@@ -74,7 +74,7 @@ Job 只執行一次，**運算資源** 不能改它，要用 YAML 修改。
 
 **間隔（秒）** 是多久檢查一次，**失敗次數** 是連續失敗幾次才算失敗。服務有宣告連接埠時，表單會出現 **HTTP，連接埠 8080** 這類按鈕，按一下就填好路徑 `/` 和那個連接埠。連接埠要是容器宣告過的，否則無法儲存。
 
-![服務設定的健康檢查，就緒檢查選 HTTP GET，路徑 /healthz，另有存活檢查和啟動檢查](https://oss.zeabur.com/shots/zeabur/zh-TW/light/service-health.avif)
+![服務設定的健康檢查，就緒檢查選 HTTP GET，路徑 /healthz，另有存活檢查和啟動檢查](../images/shots/service-health.avif)
 
 改好後，從頁面下方 **檢查變更** 並套用。只有排程工作和 Job 沒有健康檢查。
 
@@ -101,7 +101,7 @@ containers:
 - **嚴格**：以非 root 使用者執行，且無法提升權限。以 root 執行的映像檔（例如 `nginx:latest`）無法啟動，要改用不需要 root 的版本，例如 `nginxinc/nginx-unprivileged`。Railpack 建置的映像檔以使用者 1000 執行，可以用嚴格。Dockerfile 要用數字指定非 root 使用者，例如 `USER 1000`。
 - **相容**：允許以 root 執行，但仍無法存取主機或提升權限。
 
-![服務設定的安全性，目前選的是相容，下方說明允許以 root 執行但無法存取主機](https://oss.zeabur.com/shots/zeabur/zh-TW/light/service-security.avif)
+![服務設定的安全性，目前選的是相容，下方說明允許以 root 執行但無法存取主機](../images/shots/service-security.avif)
 
 選了之後會直接開啟檢查畫面，確認後套用，副本會換成新的。從映像檔建立服務時，Zeabur 依映像檔設定的使用者預先選好：以數字指定非 root 使用者時選嚴格，其他情況選相容。
 

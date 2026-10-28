@@ -55,7 +55,7 @@ ssh -L 8085:127.0.0.1:8085 root@203.0.113.10
 
 在“用哪一种 Kubernetes”中选标有“推荐”的那一项即可。
 
-![“用哪一种 Kubernetes”在 5.7 GiB 的服务器上推荐 K3s，RKE2 在下面](https://oss.zeabur.com/shots/zeabur/zh-CN/light/installer-distribution.avif)
+![“用哪一种 Kubernetes”在 5.7 GiB 的服务器上推荐 K3s，RKE2 在下面](../images/shots/installer-distribution.avif)
 
 | | K3s | RKE2 |
 | --- | --- | --- |
@@ -65,7 +65,7 @@ ssh -L 8085:127.0.0.1:8085 root@203.0.113.10
 
 服务器较小时，只有打算以后用三台服务器跑控制平面才选 RKE2。两种都会做同样的加固配置，参见[安全](../reference/security.mdx#installer-的主机与下载权限)。
 
-![“检查服务器”选了团队用和 K3s，下方是主机信息与检查结果](https://oss.zeabur.com/shots/zeabur/zh-CN/light/installer-host.avif)
+![“检查服务器”选了团队用和 K3s，下方是主机信息与检查结果](../images/shots/installer-host.avif)
 
 检查项包括管理员权限、systemd、时钟、Swap、为崩溃转储预留的内存、其他 Kubernetes、端口、磁盘空间和磁盘加密。先修正未通过的检查项，再点击“重新检查”。
 
@@ -80,7 +80,7 @@ ssh -L 8085:127.0.0.1:8085 root@203.0.113.10
 - “Zeabur”：大家访问 Zeabur 的地址，例如 `zeabur.example.com`。
 - “登录”：Zeabur Identity 的地址，例如 `login.example.com`。大家会在这里使用通行密钥登录。
 
-![“大家如何连接到 Zeabur”的证书与域名配置](https://oss.zeabur.com/shots/zeabur/zh-CN/light/installer-access.avif)
+![“大家如何连接到 Zeabur”的证书与域名配置](../images/shots/installer-access.avif)
 
 在“证书”中选择“公开域名”或“测试机”。服务器有公网地址时，默认是“公开域名”，两个域名会预先填好 `<地址>.sslip.io` 的名称。只有私有地址时（例如 `10.x`、`192.168.x` 或 Tailscale 的 `100.64.x`），默认是“测试机”。
 
@@ -107,7 +107,7 @@ ssh -L 8085:127.0.0.1:8085 root@203.0.113.10
 
 在“选择组件”中先选择“预设组合”，再根据需要勾选或取消勾选各个组件。
 
-![“选择组件”的预设组合、组件列表与内存估算](https://oss.zeabur.com/shots/zeabur/zh-CN/light/installer-components.avif)
+![“选择组件”的预设组合、组件列表与内存估算](../images/shots/installer-components.avif)
 
 | 预设组合 | 内容 |
 | --- | --- |
@@ -127,7 +127,7 @@ ssh -L 8085:127.0.0.1:8085 root@203.0.113.10
 
 在“确认”中核对地址、组件和内存估算，确认后点击“安装”。
 
-![“确认”显示安装摘要、警告与详细信息](https://oss.zeabur.com/shots/zeabur/zh-CN/light/installer-review.avif)
+![“确认”显示安装摘要、警告与详细信息](../images/shots/installer-review.avif)
 
 摘要会列出：
 
@@ -148,7 +148,7 @@ ssh -L 8085:127.0.0.1:8085 root@203.0.113.10
 
 “正在安装”会显示时间轴，整个过程约需 10 到 20 分钟。点击“显示日志”可以查看完整输出。
 
-![“正在安装”显示安装时间轴与进度](https://oss.zeabur.com/shots/zeabur/zh-CN/light/installer-install.avif)
+![“正在安装”显示安装时间轴与进度](../images/shots/installer-install.avif)
 
 时间轴依次列出包检查服务器、安装 Kubernetes（K3s 或 RKE2，附带版本）、Namespace 和连接规则、存储空间、各组件、证书颁发机构、Zeabur Identity、Zeabur 和收尾。证书颁发机构只会在测试机模式下安装。
 
@@ -162,7 +162,7 @@ ssh -L 8085:127.0.0.1:8085 root@203.0.113.10
 
 这个账号是管理员账号，只能使用通行密钥登录，拥有整个集群的完整权限。通行密钥保存在你注册它的电脑或手机上，建议再注册第二把。日常部署、查看日志等工作，可以到**成员**中为自己邀请一个普通账号来完成，参见[管理员账号和普通账号](../reference/permissions.mdx#管理员账号和普通账号)。
 
-![“Zeabur 已就绪”显示首位管理员的注册入口](https://oss.zeabur.com/shots/zeabur/zh-CN/light/installer-done.avif)
+![“Zeabur 已就绪”显示首位管理员的注册入口](../images/shots/installer-done.avif)
 
 <Callout type="warn">
 首位管理员的注册链接会创建管理员账号，谁先打开，谁就能完全控制集群。只将链接交给负责管理集群的人。链接只能使用一次，有效期为 24 小时。
@@ -186,7 +186,7 @@ sudo zeabur-installer setup-link
 
 看到“安装已停止”时，先查看页面指出的步骤，再阅读日志最后几行中的错误原因。可能的原因包括内存不足、服务器检查未通过或超时。
 
-![“安装已停止”显示停止的步骤与错误信息](https://oss.zeabur.com/shots/zeabur/zh-CN/light/installer-failed.avif)
+![“安装已停止”显示停止的步骤与错误信息](../images/shots/installer-failed.avif)
 
 修正后点击“重新安装”。installer 会从头开始，跳过已就绪的部分，不会移除任何内容。
 

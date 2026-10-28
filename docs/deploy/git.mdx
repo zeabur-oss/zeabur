@@ -32,7 +32,7 @@ Open **Add** → **Deploy from Git**. If your code is on GitHub, connect GitHub 
 
 If you're not using GitHub, select **Git URL** as the source and enter an HTTPS or SSH URL in **Repository**, such as `https://gitlab.com/acme/web`. If you enter the URL of a GitHub repository already available to the project, Zeabur still reads it through the GitHub App.
 
-![Deploy from GitHub with GitHub selected as the source, a searchable repository picker, and access through the cluster's GitHub App](https://oss.zeabur.com/shots/zeabur/en/light/git-github.avif)
+![Deploy from GitHub with GitHub selected as the source, a searchable repository picker, and access through the cluster's GitHub App](../images/shots/git-github.avif)
 
 Leave **Branch** empty to track the repository's default branch. To always track `main`, enter `main`.
 
@@ -43,7 +43,7 @@ Under **Build with**, choose:
 
 Under **More settings**, set **Root directory** to the folder to build, such as `apps/web`. When using Dockerfile, the path in the **Dockerfile** field is relative to this root directory. Leave it empty to use `Dockerfile`.
 
-![Deploy from Git form with Connect GitHub at the top, a repository URL entered, and Railpack selected, followed by the name, port, and repository access fields](https://oss.zeabur.com/shots/zeabur/en/light/git-form.avif)
+![Deploy from Git form with Connect GitHub at the top, a repository URL entered, and Railpack selected, followed by the name, port, and repository access fields](../images/shots/git-form.avif)
 
 </Step>
 <Step>
@@ -110,7 +110,7 @@ kubectl -n shop get deployment web -o jsonpath='{.spec.template.spec.containers[
 
 The Build's `READY` is `True`, `REVISION` is the commit used for the build, and the `IMAGE` column added by `-o wide` shows the latest image. Each build is a BuildRun. Its `PHASE` progresses through `Pending`, `Planning`, and `Building`, then ends at `Succeeded` or `Failed`. `REASON` shows why a build failed. When the Deployment's image changes from `:pending` to the tag pushed by the Build, Keel has deployed the new version.
 
-![The service's Builds tab, showing the latest image and build history](https://oss.zeabur.com/shots/zeabur/en/light/git-builds.avif)
+![The service's Builds tab, showing the latest image and build history](../images/shots/git-builds.avif)
 
 ## New commits and automatic deployment
 

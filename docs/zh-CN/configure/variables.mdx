@@ -12,7 +12,7 @@ source: "8f94417c841d"
 - 知道应用需要的变量名称和值，例如 `APP_URL` 或 `LOG_LEVEL`。这里配置的是容器运行时的环境变量。[从 Git 部署](../deploy/git.mdx)时使用的构建变量需要在构建配置中修改。
 - 密码或 API 密钥适合放在机密变量中。**直接设置** 的值会显示在服务配置里。共享变量选择 **Secret** 后，只有有权读取机密变量的人才能显示值。
 
-![服务 web 的变量选项卡](https://oss.zeabur.com/shots/zeabur/zh-CN/light/service-variables.avif)
+![服务 web 的变量选项卡](../images/shots/service-variables.avif)
 
 ## 修改这个服务的变量
 
@@ -23,7 +23,7 @@ source: "8f94417c841d"
 
 进入项目，选择服务，再打开 **变量** → **编辑**。在 **直接设置** 中修改名称或值，点击 **添加变量** 新增一行。有多个容器时，为新变量选择要读取它的容器。
 
-![正在编辑的环境变量：直接配置的每一行都能修改名称和值，下方有添加变量按钮](https://oss.zeabur.com/shots/zeabur/zh-CN/light/variables-edit.avif)
+![正在编辑的环境变量：直接配置的每一行都能修改名称和值，下方有添加变量按钮](../images/shots/variables-edit.avif)
 
 在名称栏粘贴多行 `NAME=value`，可以一次添加多个变量。只有一个容器时，也可以切换到 `.env` 编辑方式：
 

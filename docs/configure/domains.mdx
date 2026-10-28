@@ -12,7 +12,7 @@ In the service's **Networking** tab, under **Public domains**, click **Add domai
 - You have permission to change the project's domains. If Helm, Argo CD, or Flux manages the route, update the original values or Git repository instead.
 - The cluster has cert-manager and a working issuer installed so certificates can be issued and renewed automatically. Wildcard domains, such as `*.example.com`, need an issuer that supports DNS-01.
 
-![The web service's Networking tab, showing public domains and the private network](https://oss.zeabur.com/shots/zeabur/en/light/service-networking.avif)
+![The web service's Networking tab, showing public domains and the private network](../images/shots/service-networking.avif)
 
 ## Add a domain
 
@@ -23,7 +23,7 @@ In the service's **Networking** tab, under **Public domains**, click **Add domai
 
 Open the service's **Networking** tab. Under **Public domains**, click **Add domain** and enter `app.example.com`. Enter only the hostname, without `https://`, a port, or a path.
 
-![The Add domain field with app.example.com entered and a preview of the DNS records to add below it](https://oss.zeabur.com/shots/zeabur/en/light/domain-add.avif)
+![The Add domain field with app.example.com entered and a preview of the DNS records to add below it](../images/shots/domain-add.avif)
 
 If the cluster has multiple issuers, the form shows an **Issuer** field. Keep the default or choose another issuer. If the domain can't get a certificate, the change review warns that it'll use HTTP only.
 
@@ -36,7 +36,7 @@ If the cluster has a Gateway that accepts routes from this project, the form als
 
 Click **Add to changes** to add the domain to this service's draft. The cluster hasn't changed yet. Click **Review changes** at the bottom of the page, check the domain, forwarding destination, and certificate settings, then apply.
 
-![Reviewing changes to web before saving: app.example.com will connect to web over HTTPS](https://oss.zeabur.com/shots/zeabur/en/light/domain-review.avif)
+![Reviewing changes to web before saving: app.example.com will connect to web over HTTPS](../images/shots/domain-review.avif)
 
 The form has no port field, so check the service and port under **Sends to** during the review. If the service already has an Ingress, the new domain uses that Ingress and its existing backend. If it only has an HTTPRoute, the new domain uses that HTTPRoute. If it has neither, Zeabur creates an Ingress that forwards to the first port of the service's first Kubernetes Service. When you select a Gateway, the new domain uses the HTTPRoute on that Gateway that forwards to this service. If none exists, Zeabur creates one.
 

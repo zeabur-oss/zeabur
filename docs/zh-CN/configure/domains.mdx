@@ -13,7 +13,7 @@ source: "a3935343211b"
 - 有权限修改项目的域名。如果路由由 Helm、Argo CD 或 Flux 管理，需要回到原来的 values 或 Git 仓库修改。
 - 集群安装了 cert-manager 和可用的签发者，才能自动签发、续期证书。通配符域名（例如 `*.example.com`）需要使用支持 DNS-01 的签发者。
 
-![web 服务的网络选项卡，列出公开域名与私有网络](https://oss.zeabur.com/shots/zeabur/zh-CN/light/service-networking.avif)
+![web 服务的网络选项卡，列出公开域名与私有网络](../images/shots/service-networking.avif)
 
 ## 添加域名
 
@@ -24,7 +24,7 @@ source: "a3935343211b"
 
 进入服务 **网络**，在 **公开域名** 中点击 **添加域名**，输入 `app.example.com`。字段中只填写主机名，不加 `https://`、端口或路径。
 
-![公开域名的添加字段中填入 app.example.com，下方预先列出要添加的 DNS 记录](https://oss.zeabur.com/shots/zeabur/zh-CN/light/domain-add.avif)
+![公开域名的添加字段中填入 app.example.com，下方预先列出要添加的 DNS 记录](../images/shots/domain-add.avif)
 
 集群有多个签发者时，表单会显示 **签发者**，可以保留默认选项，也可以另选一个。如果这个域名无法获取证书，检查变更时会提示它仅支持 HTTP。
 
@@ -37,7 +37,7 @@ source: "a3935343211b"
 
 点击 **加入变更**，域名会先放入这个服务的草稿，集群还没有改动。点击页面底部的 **检查变更**，确认域名、转发目标和证书配置后应用。
 
-![保存前确认 web 的变更：app.example.com 会连接到 web，并使用 HTTPS](https://oss.zeabur.com/shots/zeabur/zh-CN/light/domain-review.avif)
+![保存前确认 web 的变更：app.example.com 会连接到 web，并使用 HTTPS](../images/shots/domain-review.avif)
 
 表单没有端口字段，因此检查时需要查看 **转发到** 的服务和端口。服务已有 Ingress 时，新域名会加到同一个 Ingress 上，沿用它的后端。只有 HTTPRoute 时，新域名会加到那条 HTTPRoute 上。两者都没有时，Zeabur 会创建新的 Ingress，转发到服务第一个 Kubernetes Service 的第一个端口。选择 Gateway 后，新域名会加到该 Gateway 上转发到这个服务的 HTTPRoute，没有就创建一条。
 

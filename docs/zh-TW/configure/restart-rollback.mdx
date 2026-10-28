@@ -20,7 +20,7 @@ source: "0f99e6d44da4"
 
 進入服務，按頁面上方的 **重新啟動**。檢查畫面的標題是 **重新啟動 web**，會寫出服務會不會中斷。
 
-![重新啟動 web 的檢查畫面，寫出 2 個副本會逐一替換、服務不會中斷，以及資源足夠](https://oss.zeabur.com/shots/zeabur/zh-TW/light/restart-review.avif)
+![重新啟動 web 的檢查畫面，寫出 2 個副本會逐一替換、服務不會中斷，以及資源足夠](../images/shots/restart-review.avif)
 
 </Step>
 <Step>
@@ -47,7 +47,7 @@ Job 和排程工作沒有 **重新啟動**。要再跑一次排程工作，用[�
 
 到服務 **部署紀錄**，在要回去的版本按 **比較**，看它和目前版本的 Pod template 差在哪裡。顯示 **兩個範本相同。** 時，回滾不會改變任何東西。
 
-![部署紀錄裡修訂版本 #2 的比較結果，紅綠對照出映像檔從 1.4.1 換成 1.4.2](https://oss.zeabur.com/shots/zeabur/zh-TW/light/release-compare.avif)
+![部署紀錄裡修訂版本 #2 的比較結果，紅綠對照出映像檔從 1.4.1 換成 1.4.2](../images/shots/release-compare.avif)
 
 </Step>
 <Step>
@@ -58,7 +58,7 @@ Job 和排程工作沒有 **重新啟動**。要再跑一次排程工作，用[�
 
 回滾只換回 Pod template，也就是映像檔、環境變數、資源和健康檢查這些設定。容器讀取的 ConfigMap 和 Secret 內容不會跟著回到舊值，檢查畫面也會提醒這一點。
 
-![將 web 回滾到 #2 的檢查畫面，提醒回滾不會改動設定檔和機密變數的內容](https://oss.zeabur.com/shots/zeabur/zh-TW/light/rollback-review.avif)
+![將 web 回滾到 #2 的檢查畫面，提醒回滾不會改動設定檔和機密變數的內容](../images/shots/rollback-review.avif)
 
 </Step>
 <Step>

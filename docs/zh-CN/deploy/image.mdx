@@ -35,7 +35,7 @@ Zeabur 会读取镜像声明的端口。确认 **端口** 与应用实际监听�
 
 要提供 HTTP 网站，开启 **公开域名**。如果管理员配置了应用域名，表单会推荐网址。未配置时，自行填写网址，并将 DNS 指向集群入口。表单还会显示当前使用的证书签发者，或注明仅支持 HTTP。详见[添加公开域名](../configure/domains.mdx)。
 
-![部署镜像表单，端口自动填入镜像声明的 8080，公开域名填入推荐的网址](https://oss.zeabur.com/shots/zeabur/zh-CN/light/image-form.avif)
+![部署镜像表单，端口自动填入镜像声明的 8080，公开域名填入推荐的网址](../images/shots/image-form.avif)
 
 </Step>
 <Step>
@@ -63,7 +63,7 @@ Zeabur 会读取镜像声明的端口。确认 **端口** 与应用实际监听�
 
 点击 **检查变更**。核对镜像、名称、端口和公开域名。新增卷时，还要检查容量和挂载路径。应用后会进入新服务。
 
-![部署 web 前的确认界面，列出要创建的 Deployment、Service 和 Ingress](https://oss.zeabur.com/shots/zeabur/zh-CN/light/image-review.avif)
+![部署 web 前的确认界面，列出要创建的 Deployment、Service 和 Ingress](../images/shots/image-review.avif)
 
 需要配置表单未提供的容器字段时，点击 **以 YAML 编辑**，表单会将当前配置带入创建页面。修改 YAML 后再次 **检查变更**，确认所有文档后创建。
 
@@ -74,7 +74,7 @@ Zeabur 会读取镜像声明的端口。确认 **端口** 与应用实际监听�
 
 在服务 **概览** 中确认副本就绪，再查看 **日志**，确认应用是否已启动。填写端口后，Zeabur 会为服务添加 TCP 就绪检查，副本能够接受连接后才会收到流量。
 
-![服务概览，显示副本状态和公开网址](https://oss.zeabur.com/shots/zeabur/zh-CN/light/service-overview.avif)
+![服务概览，显示副本状态和公开网址](../images/shots/service-overview.avif)
 
 如果有公开域名，到 **网络** 打开网址，确认应用能够响应。私有服务可以由集群内的其他服务通过 **私有网络** 中显示的地址访问。
 

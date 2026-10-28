@@ -13,7 +13,7 @@ To keep files uploaded to an application, open the service's **Settings** → **
 - For backups, the cluster must have K8up installed, and you'll need writable S3-compatible storage and access keys. An administrator can register an [S3 destination](../cluster/s3-destinations.mdx) so you can select it in the backup form.
 - When you upgrade the K8up Helm chart, Helm doesn't update the CRDs in `crds/`. After upgrading, run `kubectl apply` yourself to apply the new CRDs.
 
-![Storage and volume backup settings for the redis service](https://oss.zeabur.com/shots/zeabur/en/light/service-storage.avif)
+![Storage and volume backup settings for the redis service](../images/shots/service-storage.avif)
 
 ## Add a volume
 
@@ -26,7 +26,7 @@ Open the service's **Settings** → **Storage**. If there are no volumes, click 
 
 Enter a **Mount path** (such as `/data`) and **Size** (such as `5Gi`; the default is `1Gi`). The mount path must be absolute and must not duplicate an existing mount in this service.
 
-![A new volume row in Storage with mount path /data, size 5Gi, and status Added](https://oss.zeabur.com/shots/zeabur/en/light/volume-add.avif)
+![A new volume row in Storage with mount path /data, size 5Gi, and status Added](../images/shots/volume-add.avif)
 
 If the service has multiple containers, use **Mount in container** in the new volume's row to select a container. The review screen also shows the container name.
 

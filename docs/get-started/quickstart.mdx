@@ -54,7 +54,7 @@ Under “Check the server,” review the hostname, architecture, memory, and add
 
 Under “Kubernetes,” keep the option marked “Suggested.”
 
-![“Kubernetes” suggesting K3s on a 5.7 GiB server, with RKE2 below it](https://oss.zeabur.com/shots/zeabur/en/light/installer-distribution.avif)
+![“Kubernetes” suggesting K3s on a 5.7 GiB server, with RKE2 below it](../images/shots/installer-distribution.avif)
 
 | | K3s | RKE2 |
 | --- | --- | --- |
@@ -64,7 +64,7 @@ Under “Kubernetes,” keep the option marked “Suggested.”
 
 Choose RKE2 on a smaller server only if you plan to run the control plane on three servers. Both are installed with the same hardening; see [Security](../reference/security.mdx#installer-host-and-download-permissions).
 
-![“Check the server” with a team install and K3s chosen, host information and checks below](https://oss.zeabur.com/shots/zeabur/en/light/installer-host.avif)
+![“Check the server” with a team install and K3s chosen, host information and checks below](../images/shots/installer-host.avif)
 
 The installer checks admin rights, systemd, the clock, swap, memory reserved for crash dumps, other Kubernetes installations, ports, disk space, and disk encryption. Fix any failed checks, then click “Check again.”
 
@@ -79,7 +79,7 @@ Under “How will everyone connect to Zeabur?”, set two different domains:
 - “Zeabur”: the address everyone uses to open Zeabur, such as `zeabur.example.com`.
 - “Sign-in”: the address for Zeabur Identity, such as `login.example.com`. Everyone signs in here with a passkey.
 
-![Certificate and domain settings under “How will everyone connect to Zeabur?”](https://oss.zeabur.com/shots/zeabur/en/light/installer-access.avif)
+![Certificate and domain settings under “How will everyone connect to Zeabur?”](../images/shots/installer-access.avif)
 
 Under “Certificates,” select “Public domain” or “Test server.” If the server has a public address, “Public domain” is the default and both domains start as `<address>.sslip.io` names. If it has only private addresses (such as `10.x`, `192.168.x`, or Tailscale's `100.64.x`), “Test server” is the default.
 
@@ -106,7 +106,7 @@ This requires no DNS configuration. A certificate authority created on the serve
 
 Under “Choose components,” select a “Preset,” then select or clear individual components as needed.
 
-![“Choose components” showing presets, the component list, and a memory estimate](https://oss.zeabur.com/shots/zeabur/en/light/installer-components.avif)
+![“Choose components” showing presets, the component list, and a memory estimate](../images/shots/installer-components.avif)
 
 | Preset | Includes |
 | --- | --- |
@@ -126,7 +126,7 @@ The top of the page shows the number of selected components and estimated memory
 
 Under “Review,” check the addresses, components, and memory estimate, then click “Install.”
 
-![“Review” showing the installation summary, warnings, and details](https://oss.zeabur.com/shots/zeabur/en/light/installer-review.avif)
+![“Review” showing the installation summary, warnings, and details](../images/shots/installer-review.avif)
 
 The summary lists:
 
@@ -147,7 +147,7 @@ The “Install” button is disabled if any checks fail or the memory estimate i
 
 “Installing” shows a timeline. The full installation takes about 10 to 20 minutes. Click “Show logs” to see the full output.
 
-![“Installing” showing the installation timeline and progress](https://oss.zeabur.com/shots/zeabur/en/light/installer-install.avif)
+![“Installing” showing the installation timeline and progress](../images/shots/installer-install.avif)
 
 The timeline lists these steps in order: server checks, Kubernetes (K3s or RKE2, with its version), namespaces and connection rules, storage, individual components, the certificate authority, Zeabur Identity, Zeabur, and final steps. The certificate authority is installed only in test server mode.
 
@@ -161,7 +161,7 @@ Test server mode adds one step, and it comes first: under “1. Trust the certif
 
 This is an admin account. It can sign in only with a passkey and has full rights across the cluster. The passkey is saved on the computer or phone you register it on, so register a second one too. For everyday work such as deploying services and viewing logs, invite yourself to a regular account from **Members**. See [Admin accounts and regular accounts](../reference/permissions.mdx#admin-accounts-and-regular-accounts).
 
-![“Zeabur is ready” showing the registration entry point for the first administrator](https://oss.zeabur.com/shots/zeabur/en/light/installer-done.avif)
+![“Zeabur is ready” showing the registration entry point for the first administrator](../images/shots/installer-done.avif)
 
 <Callout type="warn">
 The first administrator's registration link creates an admin account. Whoever opens it first gets full control of the cluster, so share it only with the person who will administer the cluster. The link can be used once and expires after 24 hours.
@@ -185,7 +185,7 @@ When you're done, press Ctrl-C in the server terminal to stop the installer. K3s
 
 If “Installation stopped” appears, check the step shown on the page, then read the error in the last few lines of the logs. Possible causes include insufficient memory, failed server checks, or a timeout.
 
-![“Installation stopped” showing the failed step and error details](https://oss.zeabur.com/shots/zeabur/en/light/installer-failed.avif)
+![“Installation stopped” showing the failed step and error details](../images/shots/installer-failed.avif)
 
 Fix the issue, then click “Install again.” The installer starts from the beginning and skips parts that are already ready. It doesn't remove anything.
 

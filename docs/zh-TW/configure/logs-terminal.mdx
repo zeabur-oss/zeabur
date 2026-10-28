@@ -23,7 +23,7 @@ source: "a7ddbb2e9028"
 - **前一次執行** 顯示容器上次崩潰或重新啟動前的輸出，找崩潰原因時先看這裡。
 - **下載** 把目前的日誌存成檔案。
 
-![服務的日誌分頁，上方可切換副本，列出一個副本的輸出，並依錯誤、警告、資訊篩選](https://oss.zeabur.com/shots/zeabur/zh-TW/light/service-logs.avif)
+![服務的日誌分頁，上方可切換副本，列出一個副本的輸出，並依錯誤、警告、資訊篩選](../images/shots/service-logs.avif)
 
 副本換掉後，舊副本的日誌就從叢集消失了。要看已經替換的副本寫過什麼，用 **歷史紀錄**。
 
@@ -46,7 +46,7 @@ Kubernetes 只保留大約一小時內的事件。更早的問題要看日誌的
 
 叢集管理員在 Helm chart 開啟 `proxy.enabled` 後，專案的檢視者和開發者都看得到自己專案的 **歷史紀錄**。Zeabur Proxy 會先確認你是這個專案的成員，查詢也只拿得到這個專案的指標。沒開啟，或在設定裡改用其他儲存服務時，Zeabur 直接讀取儲存服務，能這樣讀的人看得到所有專案的指標，所以只有管理員看得到。
 
-![服務的用量分頁，上方是每個副本目前的 CPU 和記憶體，下方是歷史用量圖](https://oss.zeabur.com/shots/zeabur/zh-TW/light/service-usage.avif)
+![服務的用量分頁，上方是每個副本目前的 CPU 和記憶體，下方是歷史用量圖](../images/shots/service-usage.avif)
 
 用量長期超過保留量或接近上限時，到[調整副本、資源與健康檢查](./service-settings.mdx)調整 **運算資源**。
 
@@ -73,7 +73,7 @@ wget -qO- http://localhost:8080/healthz
 
 在這裡改的檔案只留在這個副本，副本換掉就消失。要保留的資料放在[磁碟區](./volumes.mdx)。
 
-![服務頁下方的終端機，標籤顯示已連線，已輸入 ls](https://oss.zeabur.com/shots/zeabur/zh-TW/light/terminal-connected.avif)
+![服務頁下方的終端機，標籤顯示已連線，已輸入 ls](../images/shots/terminal-connected.avif)
 
 </Step>
 </Steps>
@@ -84,7 +84,7 @@ wget -qO- http://localhost:8080/healthz
 
 distroless 這類精簡映像檔沒有 shell，終端機會說明這一點，並顯示 **開啟除錯終端機**。按下去會在同一個副本加上一個 busybox 除錯容器，名稱是 `zeabur-debug-` 開頭。它看得到應用程式正在執行的程式，也掛載同樣的磁碟區。
 
-![映像檔沒有 shell 時的終端機，說明這一點，並提供開啟除錯終端機的按鈕](https://oss.zeabur.com/shots/zeabur/zh-TW/light/terminal-no-shell.avif)
+![映像檔沒有 shell 時的終端機，說明這一點，並提供開啟除錯終端機的按鈕](../images/shots/terminal-no-shell.avif)
 
 <Callout type="warn">
 Kubernetes 無法提早移除除錯容器，它會一直留在副本裡，直到副本換成新的，例如重新啟動服務時。之後在同一個副本開終端機，會直接用這個除錯容器。

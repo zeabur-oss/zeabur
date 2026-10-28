@@ -8,10 +8,9 @@
 # CI only, from `scripts/release.sh publish`, inside `nix develop`; Docker is the runner's.
 #   scripts/release-publish.sh v0.1.1 artifacts published
 #
-# <artifacts> holds one directory per build (candidate-linux-amd64, candidate-darwin-arm64, …);
-# candidate-linux-amd64 also has the documentation screenshots. <out> receives notes.md,
-# assets/ with digests.txt and the chart, subjects.json (the image index and the chart, to attest)
-# and outputs.env (the installer's ZEABUR_PIN_ZEABUR_* values).
+# <artifacts> holds one directory per build (candidate-linux-amd64, candidate-darwin-arm64, …).
+# <out> receives notes.md, assets/ with digests.txt and the chart, subjects.json (the image index
+# and the chart, to attest) and outputs.env (the installer's ZEABUR_PIN_ZEABUR_* values).
 set -euo pipefail
 
 version="${1:?usage: release-publish.sh <vVERSION> <artifacts> <out>}"
@@ -62,8 +61,6 @@ for build in linux-amd64 linux-arm64 darwin-arm64; do
   [[ -f "$candidates/candidate-$build/zeaburctl-$version-$build.tar.gz" ]] ||
     { echo "missing the $build build" >&2; exit 1; }
 done
-[[ -f "$candidates/candidate-linux-amd64/docs-shots-$version.tar" ]] ||
-  { echo "missing the documentation screenshots" >&2; exit 1; }
 
 # The image: each platform's candidate by digest, then one index of exactly those two.
 refs=()

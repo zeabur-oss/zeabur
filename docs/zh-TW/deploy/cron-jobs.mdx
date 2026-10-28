@@ -41,7 +41,7 @@ source: "b10632ab6fc6"
 
 **時區** 預填瀏覽器的時區，建立時寫進 CronJob 的 `spec.timeZone`。例如要在台灣時間每天凌晨 03:00 執行，填入 `0 3 * * *`，並確認 **時區** 是 `Asia/Taipei`。要使用 UTC 就填 `Etc/UTC`。
 
-![新增排程工作的表單，指令 npm run cleanup，排程 0 3 * * * 下方換算成 Asia/Taipei 每天 03:00](https://oss.zeabur.com/shots/zeabur/zh-TW/light/cron-job-form.avif)
+![新增排程工作的表單，指令 npm run cleanup，排程 0 3 * * * 下方換算成 Asia/Taipei 每天 03:00](../images/shots/cron-job-form.avif)
 
 清空 **時區** 時，CronJob 不會設定 `spec.timeZone`，執行時間改依 kube-controller-manager 的時區，通常是 UTC，介面也按 UTC 顯示這種排程。
 
@@ -86,7 +86,7 @@ source: "b10632ab6fc6"
 
 在 **執行紀錄** 等待 **成功** 或 **失敗**。有讀取日誌權限且該次 Pod 仍存在時，按該列 **日誌** 查看輸出。再到應用程式確認結果，例如報表是否產生。
 
-![排程工作 nightly-report 的概覽與執行紀錄](https://oss.zeabur.com/shots/zeabur/zh-TW/light/cron-job.avif)
+![排程工作 nightly-report 的概覽與執行紀錄](../images/shots/cron-job.avif)
 
 ## 來源服務更新後，排程工作用哪個版本
 

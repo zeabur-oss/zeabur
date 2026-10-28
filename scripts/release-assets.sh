@@ -1,14 +1,13 @@
 #!/usr/bin/env bash
-# Makes the release assets from the candidates, compiling nothing: the archives, the chart, the
-# documentation screenshots and digests.txt that release-publish.sh wrote, and the checksums of all
-# of them, signed keyless (Sigstore). It completes the release notes. The workflow then attests
+# Makes the release assets from the candidates, compiling nothing: the archives, the chart and
+# digests.txt that release-publish.sh wrote, and the checksums of all of them, signed keyless
+# (Sigstore). It completes the release notes. The workflow then attests
 # the assets and creates the draft release (docs/internal/releasing.md).
 # CI only, from `scripts/release.sh assets`, inside `nix develop`.
 #   scripts/release-assets.sh v0.1.1 artifacts release
 #
-# <artifacts> holds one directory per build (candidate-linux-amd64, …; the documentation
-# screenshots are in candidate-linux-amd64), one per installer (finish-linux-amd64, …) and
-# published (release-publish.sh); <out> receives assets/ and notes.md.
+# <artifacts> holds one directory per build (candidate-linux-amd64, …), one per installer
+# (finish-linux-amd64, …) and published (release-publish.sh); <out> receives assets/ and notes.md.
 set -euo pipefail
 
 version="${1:?usage: release-assets.sh <vVERSION> <artifacts> <out>}"
@@ -26,7 +25,6 @@ files=(
   "$published/assets/digests.txt"
   "$published/assets/zeabur-$plain.tgz"
   "$candidates/candidate-darwin-arm64/zeaburctl-$version-darwin-arm64.tar.gz"
-  "$candidates/candidate-linux-amd64/docs-shots-$version.tar"
 )
 for arch in amd64 arm64; do
   files+=(
@@ -42,7 +40,7 @@ cp "${files[@]}" "$assets/"
 
 (
   cd "$assets"
-  sha256sum -- *.tar.gz *.tar *.tgz digests.txt >SHA256SUMS
+  sha256sum -- *.tar.gz *.tgz digests.txt >SHA256SUMS
   cosign sign-blob --yes --bundle SHA256SUMS.sigstore.json SHA256SUMS
 )
 

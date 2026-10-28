@@ -20,7 +20,7 @@ source: "72ea2d49995e"
 
 到 **專案** 頁，按 **新增專案**。**名稱** 填 `hello`，**顯示名稱** 可以留白，填了就會取代名稱顯示在畫面上。
 
-![新增專案視窗，名稱填了 hello](https://oss.zeabur.com/shots/zeabur/zh-TW/light/project-new.avif)
+![新增專案視窗，名稱填了 hello](../images/shots/project-new.avif)
 
 同名的 Namespace 已經存在時，表單會提示你改用既有的 Namespace，做法見[下一節](#把既有的-namespace-加進-zeabur)。
 
@@ -35,7 +35,7 @@ source: "72ea2d49995e"
 - `default` ServiceAccount 設成 `automountServiceAccountToken: false`，沒有指定 ServiceAccount 的副本不會拿到 Kubernetes API 的 token。
 - 叢集有標了 `zeabur.com/platform: "true"` 的 Namespace 時（用 Zeabur 安裝程式裝的叢集都有），還有 NetworkPolicy `zeabur-project`，其他專案的副本連不進來。
 
-![建立專案 hello 前的確認畫面，說明會建立的 Namespace 與安全性設定](https://oss.zeabur.com/shots/zeabur/zh-TW/light/project-new-review.avif)
+![建立專案 hello 前的確認畫面，說明會建立的 Namespace 與安全性設定](../images/shots/project-new-review.avif)
 
 確認後套用，畫面會進入新的專案。
 

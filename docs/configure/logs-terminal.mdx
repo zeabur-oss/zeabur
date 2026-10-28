@@ -22,7 +22,7 @@ Open the service's **Logs** tab to see output from one replica.
 - **Previous** shows output from before the container last crashed or restarted. Check here first when investigating a crash.
 - **Download** saves the current logs to a file.
 
-![The service's Logs tab, with a replica selector at the top, output from one replica, and filters for errors, warnings, and info](https://oss.zeabur.com/shots/zeabur/en/light/service-logs.avif)
+![The service's Logs tab, with a replica selector at the top, output from one replica, and filters for errors, warnings, and info](../images/shots/service-logs.avif)
 
 When a replica is replaced, its logs disappear from the cluster. Use **History** to read logs from replaced replicas.
 
@@ -45,7 +45,7 @@ Open the service's **Usage** tab:
 
 Once a cluster administrator enables `proxy.enabled` in the Helm chart, Viewers and Developers can see **History** for their own projects. Zeabur Proxy checks that you're a member of the project and limits queries to that project's metrics. If the proxy isn't enabled, or you select another storage service in settings, Zeabur reads the storage service directly. Anyone who can read it this way can see metrics for all projects, so only administrators have access.
 
-![The service's Usage tab, with current CPU and memory usage for each replica at the top and a historical usage chart below](https://oss.zeabur.com/shots/zeabur/en/light/service-usage.avif)
+![The service's Usage tab, with current CPU and memory usage for each replica at the top and a historical usage chart below](../images/shots/service-usage.avif)
 
 If usage consistently exceeds reserved resources or approaches the maximum, adjust **Compute** in [Adjust replicas, resources, and health checks](./service-settings.mdx).
 
@@ -72,7 +72,7 @@ wget -qO- http://localhost:8080/healthz
 
 Files you change here stay only in this replica and disappear when it's replaced. Store data you need to keep in a [volume](./volumes.mdx).
 
-![A terminal at the bottom of the service page, with a Connected label and ls entered](https://oss.zeabur.com/shots/zeabur/en/light/terminal-connected.avif)
+![A terminal at the bottom of the service page, with a Connected label and ls entered](../images/shots/terminal-connected.avif)
 
 </Step>
 </Steps>
@@ -83,7 +83,7 @@ The terminal closes automatically after 15 minutes without input or output. Clic
 
 Minimal images such as distroless don't have a shell. The terminal explains this and shows **Open debug terminal**. Clicking it adds a busybox debug container to the same replica, with a name starting with `zeabur-debug-`. It can see the application's running processes and mounts the same volumes.
 
-![The terminal explaining that the image has no shell, with a button to open a debug terminal](https://oss.zeabur.com/shots/zeabur/en/light/terminal-no-shell.avif)
+![The terminal explaining that the image has no shell, with a button to open a debug terminal](../images/shots/terminal-no-shell.avif)
 
 <Callout type="warn">
 Kubernetes can't remove a debug container before the replica is replaced. It stays in the replica until then, such as when you restart the service. Opening a terminal in the same replica again uses this debug container directly.

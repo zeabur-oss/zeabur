@@ -41,7 +41,7 @@ source: "b10632ab6fc6"
 
 **时区** 默认填入浏览器的时区，创建时写入 CronJob 的 `spec.timeZone`。例如，要在台湾时间每天凌晨 03:00 运行，填写 `0 3 * * *`，并确认 **时区** 为 `Asia/Taipei`。要使用 UTC，填写 `Etc/UTC`。
 
-![新增定时任务的表单，命令为 npm run cleanup，定时表达式 0 3 * * * 下方显示换算结果：Asia/Taipei 每天 03:00](https://oss.zeabur.com/shots/zeabur/zh-CN/light/cron-job-form.avif)
+![新增定时任务的表单，命令为 npm run cleanup，定时表达式 0 3 * * * 下方显示换算结果：Asia/Taipei 每天 03:00](../images/shots/cron-job-form.avif)
 
 清空 **时区** 时，CronJob 不会设置 `spec.timeZone`，运行时间改用 kube-controller-manager 的时区，通常是 UTC，界面也按 UTC 显示这类定时任务。
 
@@ -86,7 +86,7 @@ source: "b10632ab6fc6"
 
 在 **运行记录** 中等待 **成功** 或 **失败**。如果有读取日志的权限，且该次运行的副本仍然存在，点击该行的 **日志** 查看输出。再到应用中确认结果，例如报表是否已生成。
 
-![定时任务 nightly-report 的概览和运行记录](https://oss.zeabur.com/shots/zeabur/zh-CN/light/cron-job.avif)
+![定时任务 nightly-report 的概览和运行记录](../images/shots/cron-job.avif)
 
 ## 源服务更新后，定时任务使用哪个版本
 

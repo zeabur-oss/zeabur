@@ -40,7 +40,7 @@ In **Schedule**, enter five fields in this order: minute, hour, day of the month
 
 **Time zone** defaults to the browser’s time zone and is written to the CronJob’s `spec.timeZone` when you create it. To run a job every day at 03:00 Taiwan time, for example, enter `0 3 * * *` and confirm that **Time zone** is `Asia/Taipei`. For UTC, enter `Etc/UTC`.
 
-![Add scheduled job form with the command npm run cleanup and the schedule 0 3 * * *, shown below as every day at 03:00 in Asia/Taipei](https://oss.zeabur.com/shots/zeabur/en/light/cron-job-form.avif)
+![Add scheduled job form with the command npm run cleanup and the schedule 0 3 * * *, shown below as every day at 03:00 in Asia/Taipei](../images/shots/cron-job-form.avif)
 
 If you clear **Time zone**, the CronJob won’t set `spec.timeZone`. It will use the kube-controller-manager’s time zone, which is usually UTC. The interface also displays these schedules in UTC.
 
@@ -85,7 +85,7 @@ Open the scheduled job’s **Overview**, then click **Run now** under **Runs**. 
 
 Wait for **Succeeded** or **Failed** in **Runs**. If you have permission to read logs and the replica for that run still exists, click **Logs** in its row to view the output. Then check the result in the application, such as whether it generated the report.
 
-![Overview and run history for the nightly-report scheduled job](https://oss.zeabur.com/shots/zeabur/en/light/cron-job.avif)
+![Overview and run history for the nightly-report scheduled job](../images/shots/cron-job.avif)
 
 ## Which version runs after the source service updates
 

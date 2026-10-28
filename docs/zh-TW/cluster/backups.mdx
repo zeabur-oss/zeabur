@@ -37,7 +37,7 @@ source: "0cf131794fc4"
 
 手動輸入時填 **儲存貯體**、**存取金鑰 ID** 和 **私密存取金鑰**。用 AWS S3 時 **端點** 留白，R2、B2 或 MinIO 填它們的 S3 位址。**區域** 留白時是 `us-east-1`。**資料夾** 選填，可以讓這些備份和其他檔案分開。
 
-![備份存放位置的表單，選了 S3 目的地 r2-backups 並帶入端點和儲存貯體](https://oss.zeabur.com/shots/zeabur/zh-TW/light/backup-location-form.avif)
+![備份存放位置的表單，選了 S3 目的地 r2-backups 並帶入端點和儲存貯體](../images/shots/backup-location-form.avif)
 
 編輯既有設定時，兩個金鑰都留白就沿用目前的金鑰。要換就兩個一起填。
 
@@ -50,7 +50,7 @@ source: "0cf131794fc4"
 
 回到 **備份存放位置**，等 **狀態** 從 **尚未檢查** 變成 **可連線**。顯示 **無法連線** 時，先核對儲存貯體、端點和金鑰，再設定排程。
 
-![備份存放位置顯示儲存貯體、端點和可連線狀態](https://oss.zeabur.com/shots/zeabur/zh-TW/light/backup-location.avif)
+![備份存放位置顯示儲存貯體、端點和可連線狀態](../images/shots/backup-location.avif)
 
 </Step>
 </Steps>
@@ -60,13 +60,13 @@ source: "0cf131794fc4"
 1. 在 **排程** 選每天執行的 **時間**（UTC 整點）和 **保留天數**。新排程預設每天 03:00（UTC）、保留 7 天。保留天數可填 1 到 365。
 2. 在 **範圍** 選 **整個叢集**，或選 **選定的專案** 並至少勾一個專案。**整個叢集** 也包括之後新增的專案和 Namespace。
 
-   ![排程表單，每天 03:00（UTC）、保留 7 天、範圍是整個叢集](https://oss.zeabur.com/shots/zeabur/zh-TW/light/backup-schedule-form.avif)
+   ![排程表單，每天 03:00（UTC）、保留 7 天、範圍是整個叢集](../images/shots/backup-schedule-form.avif)
 
 3. 按 **檢查變更**，確認執行時間和範圍後套用。Zeabur 會建立或修改名為 `zeabur` 的 Velero Schedule，並開啟磁碟區檔案備份。
 4. 按 **立即備份**，檢查後套用。這次備份照剛設定的範圍和保留天數執行，不用等排程。
 5. 在 **備份紀錄** 找到這筆，等狀態從 **執行中** 變成 **成功**，再看紀錄列出的項目數和 **保留到** 的日期。
 
-   ![備份紀錄列出每次備份的狀態、項目數和保留期限](https://oss.zeabur.com/shots/zeabur/zh-TW/light/backup-list.avif)
+   ![備份紀錄列出每次備份的狀態、項目數和保留期限](../images/shots/backup-list.avif)
 
 在 Zeabur 以外建立的排程會標示 **在 Zeabur 以外設定**，要回到原本建立的地方修改。
 
@@ -87,9 +87,9 @@ source: "0cf131794fc4"
    - 原專案還在：**新專案名稱** 會帶入一個新名稱，可以改。
    - 原專案已經刪除：畫面會說明它會用原本的名稱還原。
 
-   ![還原表單，選了備份裡的專案，並帶入新專案名稱](https://oss.zeabur.com/shots/zeabur/zh-TW/light/backup-restore.avif)
+   ![還原表單，選了備份裡的專案，並帶入新專案名稱](../images/shots/backup-restore.avif)
 
-   ![還原表單，選了已刪除的專案 wiki，說明它會用原本的名稱還原](https://oss.zeabur.com/shots/zeabur/zh-TW/light/backup-restore-deleted.avif)
+   ![還原表單，選了已刪除的專案 wiki，說明它會用原本的名稱還原](../images/shots/backup-restore-deleted.avif)
 
 3. 按 **檢查變更**，確認內容。清單讀自備份本身，跟現在的專案無關：
    - 備份裡的網域不會跟著還原。Ingress、HTTPRoute 和 cert-manager 的憑證都不還原，網域在最後一步接回，憑證到時重新申請。
@@ -97,7 +97,7 @@ source: "0cf131794fc4"
    - 另存成新專案時，畫面會列出備份裡的服務和機密。寫著 `<服務>.<原專案>.svc` 的值還是連到原專案，還原後用 **改寫位址** 改掉。
    - 另存成新專案時，畫面會顯示節點資源夠不夠兩個專案同時執行。自動部署和 Git webhook 還是送到原專案。
 
-   ![檢查畫面，列出新專案、要改寫的服務位址和節點資源](https://oss.zeabur.com/shots/zeabur/zh-TW/light/backup-restore-plan.avif)
+   ![檢查畫面，列出新專案、要改寫的服務位址和節點資源](../images/shots/backup-restore-plan.avif)
 
    原專案還在時按 **從備份建立新專案**，已經刪除時按 **還原**。
 
@@ -125,7 +125,7 @@ Velero 會略過已經存在的同名物件。另存成新專案後，原專案�
 
 - 沒有其他專案在用：套用後 Velero 只還原這些路由，**還原紀錄** 會多一筆「網域接回」。cert-manager 會重新申請憑證。
 
-  ![接回網域的檢查畫面，會從備份把 blog.example.com 接回 blog](https://oss.zeabur.com/shots/zeabur/zh-TW/light/backup-attach.avif)
+  ![接回網域的檢查畫面，會從備份把 blog.example.com 接回 blog](../images/shots/backup-attach.avif)
 
 - 原專案還在用：這次不能套用。畫面會指出是哪個專案在用，例如原專案是 `blog` 時，按 **從 blog 移動網域**，把網域從 `blog` 移到新專案。
 

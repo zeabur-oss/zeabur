@@ -20,7 +20,7 @@ source: "0f99e6d44da4"
 
 进入服务，点击页面顶部的 **重启**。检查页面的标题是 **重启 web**，会说明服务是否会中断。
 
-![重启 web 的检查页面，说明 2 个副本会逐一替换、服务不会中断，且资源充足](https://oss.zeabur.com/shots/zeabur/zh-CN/light/restart-review.avif)
+![重启 web 的检查页面，说明 2 个副本会逐一替换、服务不会中断，且资源充足](../images/shots/restart-review.avif)
 
 </Step>
 <Step>
@@ -47,7 +47,7 @@ Job 和定时任务没有 **重启** 操作。要再次运行定时任务，使�
 
 到服务的 **部署记录**，在要回到的版本上点击 **比较**，查看它与当前版本的 Pod template 有哪些差异。如果显示 **两个模板相同。**，回滚不会改变任何内容。
 
-![部署记录中修订版本 #2 的比较结果，以红绿对照显示镜像从 1.4.1 更换为 1.4.2](https://oss.zeabur.com/shots/zeabur/zh-CN/light/release-compare.avif)
+![部署记录中修订版本 #2 的比较结果，以红绿对照显示镜像从 1.4.1 更换为 1.4.2](../images/shots/release-compare.avif)
 
 </Step>
 <Step>
@@ -58,7 +58,7 @@ Job 和定时任务没有 **重启** 操作。要再次运行定时任务，使�
 
 回滚只还原 Pod template，也就是镜像、环境变量、资源和健康检查等配置。容器读取的 ConfigMap 和 Secret 内容不会随之还原为旧值，检查页面也会提醒这一点。
 
-![将 web 回滚到 #2 的检查页面，提醒回滚不会修改配置文件和机密变量的内容](https://oss.zeabur.com/shots/zeabur/zh-CN/light/rollback-review.avif)
+![将 web 回滚到 #2 的检查页面，提醒回滚不会修改配置文件和机密变量的内容](../images/shots/rollback-review.avif)
 
 </Step>
 <Step>

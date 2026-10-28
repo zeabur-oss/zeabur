@@ -23,7 +23,7 @@ source: "a7ddbb2e9028"
 - **上一次运行** 显示容器上次崩溃或重启前的输出，排查崩溃原因时先看这里。
 - **下载** 将当前日志保存为文件。
 
-![服务的日志选项卡，顶部可切换副本，列出一个副本的输出，并按错误、警告、信息筛选](https://oss.zeabur.com/shots/zeabur/zh-CN/light/service-logs.avif)
+![服务的日志选项卡，顶部可切换副本，列出一个副本的输出，并按错误、警告、信息筛选](../images/shots/service-logs.avif)
 
 副本替换后，旧副本的日志就会从集群中消失。要查看已替换副本的日志，使用 **历史记录**。
 
@@ -46,7 +46,7 @@ Kubernetes 只保留大约一小时内的事件。排查更早的问题需要查
 
 集群管理员在 Helm chart 中开启 `proxy.enabled` 后，项目的查看者和开发者都能看到自己项目的 **历史记录**。Zeabur Proxy 会先确认你是该项目的成员，查询也只能获取该项目的指标。如果未开启，或在配置中改用其他存储服务，Zeabur 会直接读取存储服务。能直接读取的人可以看到所有项目的指标，因此只有管理员能查看。
 
-![服务的用量选项卡，上方是每个副本当前的 CPU 和内存用量，下方是历史用量图](https://oss.zeabur.com/shots/zeabur/zh-CN/light/service-usage.avif)
+![服务的用量选项卡，上方是每个副本当前的 CPU 和内存用量，下方是历史用量图](../images/shots/service-usage.avif)
 
 用量长期超过预留量或接近上限时，到[调整副本、资源和健康检查](./service-settings.mdx)调整 **计算资源**。
 
@@ -73,7 +73,7 @@ wget -qO- http://localhost:8080/healthz
 
 在这里修改的文件只保留在当前副本中，副本替换后就会消失。需要保留的数据应放在[卷](./volumes.mdx)中。
 
-![服务页面底部的终端，标签显示已连接，已输入 ls](https://oss.zeabur.com/shots/zeabur/zh-CN/light/terminal-connected.avif)
+![服务页面底部的终端，标签显示已连接，已输入 ls](../images/shots/terminal-connected.avif)
 
 </Step>
 </Steps>
@@ -84,7 +84,7 @@ wget -qO- http://localhost:8080/healthz
 
 distroless 这类精简镜像没有 shell，终端会说明这一点，并显示 **打开调试终端**。点击后会在同一个副本中添加一个 busybox 调试容器，名称以 `zeabur-debug-` 开头。它可以看到应用正在运行的进程，也会挂载相同的卷。
 
-![镜像没有 shell 时的终端，说明镜像不含 shell，并提供打开调试终端的按钮](https://oss.zeabur.com/shots/zeabur/zh-CN/light/terminal-no-shell.avif)
+![镜像没有 shell 时的终端，说明镜像不含 shell，并提供打开调试终端的按钮](../images/shots/terminal-no-shell.avif)
 
 <Callout type="warn">
 Kubernetes 无法提前移除调试容器，它会一直留在副本中，直到副本替换，例如重启服务时。之后在同一个副本中打开终端，会直接使用这个调试容器。

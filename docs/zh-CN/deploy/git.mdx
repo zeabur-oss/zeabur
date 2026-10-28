@@ -33,7 +33,7 @@ source: "57a598cda189"
 
 不使用 GitHub 时，将来源设为 **Git 地址**，在 **仓库** 中填写 HTTPS 或 SSH 地址，例如 `https://gitlab.com/acme/web`。如果填写的是已向项目开放的 GitHub 仓库地址，仍会通过 GitHub App 读取。
 
-![从 GitHub 部署，来源为 GitHub，通过搜索选择仓库，访问方式显示通过集群的 GitHub App 读取](https://oss.zeabur.com/shots/zeabur/zh-CN/light/git-github.avif)
+![从 GitHub 部署，来源为 GitHub，通过搜索选择仓库，访问方式显示通过集群的 GitHub App 读取](../images/shots/git-github.avif)
 
 **分支** 留空时会跟踪仓库的默认分支。要固定跟踪 `main`，就在这里填写 `main`。
 
@@ -44,7 +44,7 @@ source: "57a598cda189"
 
 在 **更多设置** 的 **根目录** 中指定要构建的文件夹，例如 `apps/web`。选择 Dockerfile 时，**Dockerfile** 字段中的路径相对于此根目录，留空则使用 `Dockerfile`。
 
-![从 Git 部署表单，上方为关联 GitHub，已填写仓库地址，构建方式为 Railpack，下方为名称、端口和仓库访问](https://oss.zeabur.com/shots/zeabur/zh-CN/light/git-form.avif)
+![从 Git 部署表单，上方为关联 GitHub，已填写仓库地址，构建方式为 Railpack，下方为名称、端口和仓库访问](../images/shots/git-form.avif)
 
 </Step>
 <Step>
@@ -111,7 +111,7 @@ kubectl -n shop get deployment web -o jsonpath='{.spec.template.spec.containers[
 
 Build 的 `READY` 为 `True`，`REVISION` 是此次构建使用的提交，`-o wide` 额外显示的 `IMAGE` 是最新镜像。每次构建对应一个 BuildRun，`PHASE` 依次经过 `Pending`、`Planning`、`Building`，最终为 `Succeeded` 或 `Failed`，失败原因在 `REASON` 中。Deployment 的镜像从 `:pending` 变为 Build 推送的 tag，表示 Keel 已部署新版本。
 
-![服务的构建标签页，列出最新镜像和构建记录](https://oss.zeabur.com/shots/zeabur/zh-CN/light/git-builds.avif)
+![服务的构建标签页，列出最新镜像和构建记录](../images/shots/git-builds.avif)
 
 ## 新提交与自动部署
 

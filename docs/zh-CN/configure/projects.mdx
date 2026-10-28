@@ -20,7 +20,7 @@ source: "72ea2d49995e"
 
 打开 **项目** 页，点击 **新建项目**。在 **名称** 中填写 `hello`，**显示名称** 可以留空；填写后，界面会显示它，而不是 Namespace 名称。
 
-![新建项目窗口，名称填为 hello](https://oss.zeabur.com/shots/zeabur/zh-CN/light/project-new.avif)
+![新建项目窗口，名称填为 hello](../images/shots/project-new.avif)
 
 如果同名的 Namespace 已经存在，表单会提示你改用已有的 Namespace，做法见[下一节](#将已有的-namespace-加入-zeabur)。
 
@@ -35,7 +35,7 @@ source: "72ea2d49995e"
 - `default` ServiceAccount 设为 `automountServiceAccountToken: false`，未指定 ServiceAccount 的副本不会获得 Kubernetes API 的令牌。
 - 如果集群中有带 `zeabur.com/platform: "true"` 标签的 Namespace（通过 Zeabur 安装程序安装的集群都有），还会创建 NetworkPolicy `zeabur-project`，阻止其他项目的副本连接进来。
 
-![创建项目 hello 前的确认页面，说明将创建的 Namespace 和安全配置](https://oss.zeabur.com/shots/zeabur/zh-CN/light/project-new-review.avif)
+![创建项目 hello 前的确认页面，说明将创建的 Namespace 和安全配置](../images/shots/project-new-review.avif)
 
 确认后应用，界面会进入新项目。
 

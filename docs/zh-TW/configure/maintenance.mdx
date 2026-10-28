@@ -27,7 +27,7 @@ source: "d6ab03fe54a8"
 
 進入服務 **網路**，在目標網域那一列按 **app.example.com 的維護與錯誤頁面**。
 
-![服務的網路分頁，網域列上的維護與錯誤頁面按鈕](https://oss.zeabur.com/shots/zeabur/zh-TW/light/domain-pages-open.avif)
+![服務的網路分頁，網域列上的維護與錯誤頁面按鈕](../images/shots/domain-pages-open.avif)
 
 </Step>
 <Step>
@@ -36,7 +36,7 @@ source: "d6ab03fe54a8"
 
 開啟 **維護模式**。保留預設 HTML，或在 **要編輯的頁面** 選 **維護**，修改 **HTML**。
 
-![shop.example.com 的維護與錯誤頁面面板，開啟了維護模式並顯示維護頁面的 HTML](https://oss.zeabur.com/shots/zeabur/zh-TW/light/domain-pages-maintenance.avif)
+![shop.example.com 的維護與錯誤頁面面板，開啟了維護模式並顯示維護頁面的 HTML](../images/shots/domain-pages-maintenance.avif)
 
 每個頁面要小於 64 KiB。專案的每個網域都用同一組頁面，所以在這裡改了維護頁面，專案裡其他進入維護的網域也會顯示新內容。
 
@@ -49,7 +49,7 @@ source: "d6ab03fe54a8"
 
 在側邊面板按 **加入變更**，網域列會標上 **已修改**。再從頁面下方按 **檢查變更**，確認目標網域和 HTML，然後套用。要部署頁面伺服器時，清單裡也會列出它的 Deployment、Service、ConfigMap 和 NetworkPolicy。
 
-![檢查變更的視窗，說明 shop.example.com 改為顯示維護頁面](https://oss.zeabur.com/shots/zeabur/zh-TW/light/domain-pages-review.avif)
+![檢查變更的視窗，說明 shop.example.com 改為顯示維護頁面](../images/shots/domain-pages-review.avif)
 
 這個網域底下的所有路徑都會轉到維護頁面，同一個 Ingress 的其他網域不受影響。Ingress 的網域會多一份名稱以 `-maintenance` 結尾的 Ingress，Traefik 優先用它，原本的 Ingress 不動。HTTPRoute 的網域會把原本後端的權重改成 0，再加上頁面伺服器。HTTPRoute 的維護作用在整條路由，同一條 HTTPRoute 還有其他網域時，這個網域會先移到自己的路由。
 
@@ -66,7 +66,7 @@ curl -i https://app.example.com/
 
 把 `app.example.com` 換成自己的網域。回應的狀態碼是 `503`，內容是維護頁面的 HTML。回到服務 **網路**，網域列會標上 **維護中**，服務的副本仍在執行。
 
-![網域列的 shop.example.com 標上維護中](https://oss.zeabur.com/shots/zeabur/zh-TW/light/domain-maintenance-on.avif)
+![網域列的 shop.example.com 標上維護中](../images/shots/domain-maintenance-on.avif)
 
 </Step>
 </Steps>

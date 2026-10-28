@@ -14,7 +14,7 @@ source: "e045aad16ea1"
 - 要備份的話，叢集要裝 K8up，並準備可寫入的 S3 相容儲存空間和存取金鑰。管理員可以先登錄 [S3 目的地](../cluster/s3-destinations.mdx)，備份表單就能直接選用。
 - 升級 K8up 的 Helm chart 時，Helm 不會更新 `crds/` 裡的 CRD，升級後要自己 `kubectl apply` 新版的 CRD。
 
-![服務 redis 的儲存空間與磁碟區備份設定](https://oss.zeabur.com/shots/zeabur/zh-TW/light/service-storage.avif)
+![服務 redis 的儲存空間與磁碟區備份設定](../images/shots/service-storage.avif)
 
 ## 新增磁碟區
 
@@ -27,7 +27,7 @@ source: "e045aad16ea1"
 
 輸入 **掛載路徑**（例如 `/data`）和 **大小**（例如 `5Gi`，預設 `1Gi`）。掛載路徑要是絕對路徑，也不能和這個服務已有的掛載重複。
 
-![儲存空間新增一列磁碟區，掛載路徑 /data、大小 5Gi，狀態標成新增](https://oss.zeabur.com/shots/zeabur/zh-TW/light/volume-add.avif)
+![儲存空間新增一列磁碟區，掛載路徑 /data、大小 5Gi，狀態標成新增](../images/shots/volume-add.avif)
 
 服務有多個容器時，在新磁碟區那一列的 **掛載到容器** 選擇要掛到哪個容器。檢查畫面也會寫出容器名稱。
 

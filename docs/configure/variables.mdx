@@ -11,7 +11,7 @@ Open the service's **Variables** tab and click **Edit**. When you're done, click
 - You know the variable names and values the app needs, such as `APP_URL` or `LOG_LEVEL`. These settings are environment variables for the container at runtime. For [Git deployments](../deploy/git.mdx), edit build variables in the build settings.
 - Store passwords and API keys in secrets. Values under **Set directly** appear in the service settings. When you choose **Secret** for shared variables, only people with permission to read secrets can reveal the values.
 
-![Variables tab for the web service](https://oss.zeabur.com/shots/zeabur/en/light/service-variables.avif)
+![Variables tab for the web service](../images/shots/service-variables.avif)
 
 ## Edit variables for this service
 
@@ -22,7 +22,7 @@ Open the service's **Variables** tab and click **Edit**. When you're done, click
 
 Open the project, select the service, then open **Variables** → **Edit**. Under **Set directly**, edit a name or value, or click **Add a variable** to add a row. If the service has multiple containers, choose which container should read the new variable.
 
-![Environment variable editor: each row under Set directly has an editable name and value, with Add variable below](https://oss.zeabur.com/shots/zeabur/en/light/variables-edit.avif)
+![Environment variable editor: each row under Set directly has an editable name and value, with Add variable below](../images/shots/variables-edit.avif)
 
 Paste multiple lines of `NAME=value` into the name field to add several variables at once. For a single container, you can also switch to the `.env` editor:
 

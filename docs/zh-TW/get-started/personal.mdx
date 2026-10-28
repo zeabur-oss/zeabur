@@ -45,23 +45,23 @@ installer 釘選 KubeSolo、helm-controller 和 kubectl 的版本，下載後核
 
 照[在一台伺服器安裝 Zeabur](quickstart.mdx#開啟安裝介面)開啟安裝介面。在「檢查伺服器」的「給誰用」選「自己用」，步驟會少掉「連線方式」。
 
-![「檢查伺服器」的「給誰用」選了「自己用」，上方只剩四個步驟](https://oss.zeabur.com/shots/zeabur/zh-TW/light/installer-personal-choose.avif)
+![「檢查伺服器」的「給誰用」選了「自己用」，上方只剩四個步驟](../images/shots/installer-personal-choose.avif)
 
 伺服器回報的記憶體不到 2400 MiB 時，「團隊用」是灰的，只能選「自己用」。
 
-![記憶體只有 1.5 GiB 的伺服器，「團隊用」是灰的，說明這台不夠](https://oss.zeabur.com/shots/zeabur/zh-TW/light/installer-personal-small.avif)
+![記憶體只有 1.5 GiB 的伺服器，「團隊用」是灰的，說明這台不夠](../images/shots/installer-personal-small.avif)
 
 先處理未通過的檢查項目。這台伺服器裝了 Docker 時，「Docker」會顯示需要修正，請先停止並移除 Docker，再按「重新檢查」。沒有處理完，到「確認」也不能按「安裝」。
 
-![「檢查伺服器」顯示 Docker 未通過，說明要先停止並移除 Docker](https://oss.zeabur.com/shots/zeabur/zh-TW/light/installer-personal-docker.avif)
+![「檢查伺服器」顯示 Docker 未通過，說明要先停止並移除 Docker](../images/shots/installer-personal-docker.avif)
 
 在「選擇元件」，Ingress 和憑證是預設的。要從 Git 或資料夾建置，勾選「Zeabur Builder」，zot 會跟它一起裝。
 
-![「選擇元件」勾選了 Zeabur Builder，上方顯示記憶體估算](https://oss.zeabur.com/shots/zeabur/zh-TW/light/installer-personal-components.avif)
+![「選擇元件」勾選了 Zeabur Builder，上方顯示記憶體估算](../images/shots/installer-personal-components.avif)
 
 記憶體不夠時，Zeabur Builder 是灰的，旁邊會寫需要多少。
 
-![記憶體 1.5 GiB 的伺服器上，Zeabur Builder 是灰的，旁邊寫著至少要 1,800 MiB](https://oss.zeabur.com/shots/zeabur/zh-TW/light/installer-personal-components-small.avif)
+![記憶體 1.5 GiB 的伺服器上，Zeabur Builder 是灰的，旁邊寫著至少要 1,800 MiB](../images/shots/installer-personal-components-small.avif)
 
 在「確認」核對內容後按「安裝」。
 
@@ -91,7 +91,7 @@ ssh <你>@<伺服器> sudo cat /etc/zeabur-installer/kubeconfig.yaml > ~/.kube/<
 KUBECONFIG=~/.kube/<名稱>.yaml zeaburctl ui --context <名稱>
 ```
 
-![「叢集已就緒」列出複製 kubeconfig 和打開 Zeabur 的兩行指令](https://oss.zeabur.com/shots/zeabur/zh-TW/light/installer-personal-done.avif)
+![「叢集已就緒」列出複製 kubeconfig 和打開 Zeabur 的兩行指令](../images/shots/installer-personal-done.avif)
 
 <Callout type="warn">
 這份 kubeconfig 可以控制整個叢集，請像 SSH 金鑰一樣自己保管，不要交給別人或放進 Git 儲存庫。

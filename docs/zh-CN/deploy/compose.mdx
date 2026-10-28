@@ -48,7 +48,7 @@ source: "6d5e029cac08"
 
 开启后，选项下方会逐项列出新服务与 Compose 服务的差异：版本、启动命令、端口、卷、账号密码变量和实例数。例如，卷这一行会显示新卷的大小，并提醒你新卷最初是空的。
 
-![读取后的服务列表：db 开启由 operator 管理的 PostgreSQL，下方列出与原服务的差异；web 会等 db 可以连接后再启动](https://oss.zeabur.com/shots/zeabur/zh-CN/light/compose-services.avif)
+![读取后的服务列表：db 开启由 operator 管理的 PostgreSQL，下方列出与原服务的差异；web 会等 db 可以连接后再启动](../images/shots/compose-services.avif)
 
 要继续使用原来的镜像，关闭这个选项。如果有两个或更多服务可以替换，上方的 **N 个都替换为 operator 管理的服务** 可以一次开启或关闭全部选项。缺少 operator、无法确认是否安装，或权限不足时，该服务会直接运行原镜像，界面会说明原因。
 
@@ -99,7 +99,7 @@ Compose 的 `ports` 不会直接开放节点的主机端口。对于需要对外
 
 到应用的 **变量** 中检查导入后的连接来源，再实际运行一次数据库读写或文件上传。网页能打开后，也要确认它读到的是迁移后的数据。
 
-![项目页列出导入后的各个服务](https://oss.zeabur.com/shots/zeabur/zh-CN/light/project-services.avif)
+![项目页列出导入后的各个服务](../images/shots/project-services.avif)
 
 使用 kubectl 确认时，普通服务的对象带有 `app.kubernetes.io/name: <服务名称>`；对于替换为 operator 管理的数据库，Zeabur 写入的数据库对象和机密变量带有 `zeabur.com/database: <名称>`。下面的 `db` 已替换为 PostgreSQL：
 

@@ -12,7 +12,7 @@ source: "f17da6de99a6"
 
 **首頁** 的 **需要你處理** 列出目前有問題的服務。同一個原因造成的問題會合成一組，例如 25 個服務都卡在同一個映像檔拉不下來。
 
-![首頁的需要你處理，依原因分成節點、叢集外部、設定、應用程式出錯等幾組，每項附日誌或事件按鈕](https://oss.zeabur.com/shots/zeabur/zh-TW/light/home-problems.avif)
+![首頁的需要你處理，依原因分成節點、叢集外部、設定、應用程式出錯等幾組，每項附日誌或事件按鈕](../images/shots/home-problems.avif)
 
 如果原因在叢集這一側，畫面會標成 **叢集**，寫出 **起因** 和 **影響** 的服務、網域和專案數。修好這個原因，這些服務就會一起恢復。Zeabur 會把下面幾種情況當成叢集的問題：
 
@@ -38,7 +38,7 @@ kubectl get deploy -A -l k8s-app=kube-dns
 
 服務有問題時，**概覽** 最上方會出現 **出了什麼問題**：一句話說原因，一句話說 **怎麼處理**，旁邊有 **開啟日誌**、**調整記憶體**、**健康檢查** 這類按鈕直接帶你去改。展開 **依據** 可以看到判斷用到的值，展開 **原始錯誤** 可以看到是哪個 **副本**、**結束碼**、重新啟動次數和容器的訊息。回報問題時，按 **複製診斷** 把全文貼上。
 
-![服務概覽的出了什麼問題，說明 worker 反覆崩潰，並附怎麼處理和開啟日誌、終端機按鈕](https://oss.zeabur.com/shots/zeabur/zh-TW/light/service-problem.avif)
+![服務概覽的出了什麼問題，說明 worker 反覆崩潰，並附怎麼處理和開啟日誌、終端機按鈕](../images/shots/service-problem.avif)
 
 Zeabur 讀的是 kubelet 回報的容器狀態、副本的排程狀態、工作負載的狀況和事件，會判斷這些情況：
 
@@ -84,7 +84,7 @@ kubectl -n shop get deploy -o custom-columns=NAME:.metadata.name,MEMORY:.spec.te
 
 **叢集** → **概覽** 的 **需要處理** 列出影響整個叢集的事，例如 Kubernetes 版本已終止支援、kubelet 版本超出支援的差距、節點記憶體或磁碟快滿、節點未就緒，以及已安裝的元件有新版本。沒有問題時顯示 **沒有需要處理的項目。**
 
-![叢集概覽的需要處理，列出 Kubernetes 版本即將終止支援，以及節點記憶體和磁碟快滿](https://oss.zeabur.com/shots/zeabur/zh-TW/light/cluster-attention.avif)
+![叢集概覽的需要處理，列出 Kubernetes 版本即將終止支援，以及節點記憶體和磁碟快滿](../images/shots/cluster-attention.avif)
 
 用 kubectl 查同樣的資料：
 
@@ -141,7 +141,7 @@ kubectl get clusterpolicyreport falco-cluster-policy-report -o yaml
 
 每一行只寫一個結論。網域的 DNS 紀錄或憑證還沒設好時，這一行會列出要新增的紀錄。叢集無法確認的網域，改寫你的瀏覽器連不連得到，叢集的結果收進 **顯示連線檢查**。
 
-![服務概覽的網路卡片，私有位址可連線，展開連線檢查後，每一步都通過並列出預期和實際](https://oss.zeabur.com/shots/zeabur/zh-TW/light/service-connectivity.avif)
+![服務概覽的網路卡片，私有位址可連線，展開連線檢查後，每一步都通過並列出預期和實際](../images/shots/service-connectivity.avif)
 
 ## 連線規則
 

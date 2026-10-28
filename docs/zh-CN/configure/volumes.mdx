@@ -14,7 +14,7 @@ source: "e045aad16ea1"
 - 要备份，集群需要安装 K8up，并准备可写入的 S3 兼容存储和访问密钥。管理员可以先登记 [S3 目标](../cluster/s3-destinations.mdx)，这样就能在备份表单中直接选择。
 - 升级 K8up 的 Helm chart 时，Helm 不会更新 `crds/` 中的 CRD，升级后需要自行用 `kubectl apply` 应用新版 CRD。
 
-![服务 redis 的存储空间与卷备份配置](https://oss.zeabur.com/shots/zeabur/zh-CN/light/service-storage.avif)
+![服务 redis 的存储空间与卷备份配置](../images/shots/service-storage.avif)
 
 ## 添加卷
 
@@ -27,7 +27,7 @@ source: "e045aad16ea1"
 
 输入 **挂载路径**（例如 `/data`）和 **大小**（例如 `5Gi`，默认 `1Gi`）。挂载路径必须是绝对路径，也不能与这个服务已有的挂载路径重复。
 
-![存储空间新增一行卷，挂载路径为 /data、大小为 5Gi，状态标为新增](https://oss.zeabur.com/shots/zeabur/zh-CN/light/volume-add.avif)
+![存储空间新增一行卷，挂载路径为 /data、大小为 5Gi，状态标为新增](../images/shots/volume-add.avif)
 
 服务有多个容器时，在新卷所在行的 **挂载到容器** 中选择要挂载的容器。检查页面也会显示容器名称。
 

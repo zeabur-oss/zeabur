@@ -100,7 +100,13 @@ async function isScrollArea(page: Page, selector: string) {
 // background with space added on each side where its own padding is under 24 px, and its own
 // rounded corners, so a dialog's backdrop does not show in them. With `until` the image ends at
 // the bottom of that element.
-async function cropped(page: Page, selector: string, until: string | undefined, path: string) {
+async function cropped(
+  page: Page,
+  selector: string,
+  until: string | undefined,
+  path: string,
+  blank: string | undefined,
+) {
   const element = page.locator(selector).first()
   const end = until ? await page.locator(until).first().boundingBox() : null
   const frame = await element.evaluate((el, end) => {
@@ -128,7 +134,7 @@ async function cropped(page: Page, selector: string, until: string | undefined, 
       bg,
     }
   }, end)
-  const options = { animations: "disabled", caret: "hide" } as const
+  const options = { animations: "disabled", caret: "hide", ...blanked(blank) } as const
   const shoot = (path?: string) =>
     end
       ? page.screenshot({ ...options, path, clip: frame.box })
@@ -145,6 +151,10 @@ async function cropped(page: Page, selector: string, until: string | undefined, 
   await sheet.locator("div").screenshot({ path })
   await sheet.close()
 }
+
+// Text that changes on every run, such as a new invitation's token, left out of the image.
+const blanked = (selector: string | undefined) =>
+  selector ? { style: `${selector} { color: transparent !important; }` } : {}
 
 function wanted(shot: Shot, project: string): boolean {
   const [locale, theme] = project.split("/") as [Locale, Theme]
@@ -173,8 +183,13 @@ for (const shot of readManifest(manifest).shots.filter((s) => serversOf(s).inclu
       await page.waitForLoadState("networkidle")
       await page.evaluate(() => document.fonts.ready)
       const path = `${out}/${info.project.name}/${shot.id}.png`
-      const options = { path, animations: "disabled", caret: "hide" } as const
-      if (shot.clip) await cropped(page, shot.clip, shot.until, path)
+      const options = {
+        path,
+        animations: "disabled",
+        caret: "hide",
+        ...blanked(shot.blank),
+      } as const
+      if (shot.clip) await cropped(page, shot.clip, shot.until, path, shot.blank)
       else await page.screenshot({ ...options, fullPage: !plate })
     })
   })

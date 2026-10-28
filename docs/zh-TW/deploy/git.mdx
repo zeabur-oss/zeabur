@@ -33,7 +33,7 @@ source: "57a598cda189"
 
 不用 GitHub 時，來源選 **Git 網址**，在 **儲存庫** 填入 HTTPS 或 SSH 網址，例如 `https://gitlab.com/acme/web`。填的是已開放給專案的 GitHub 儲存庫網址時，一樣透過 GitHub App 讀取。
 
-![從 GitHub 部署，來源是 GitHub，儲存庫用搜尋選擇，存取方式寫著透過叢集的 GitHub App 讀取](https://oss.zeabur.com/shots/zeabur/zh-TW/light/git-github.avif)
+![從 GitHub 部署，來源是 GitHub，儲存庫用搜尋選擇，存取方式寫著透過叢集的 GitHub App 讀取](../images/shots/git-github.avif)
 
 **分支** 留空會追蹤儲存庫的預設分支。要固定追蹤 `main`，就在這裡填 `main`。
 
@@ -44,7 +44,7 @@ source: "57a598cda189"
 
 在 **更多設定** 的 **根目錄** 指定要建置的資料夾，例如 `apps/web`。選擇 Dockerfile 時，**Dockerfile** 欄位的路徑從這個根目錄算起，留空使用 `Dockerfile`。
 
-![從 Git 部署表單，上方是連結 GitHub，填好儲存庫網址，建置方式為 Railpack，下方是名稱、連接埠與儲存庫存取](https://oss.zeabur.com/shots/zeabur/zh-TW/light/git-form.avif)
+![從 Git 部署表單，上方是連結 GitHub，填好儲存庫網址，建置方式為 Railpack，下方是名稱、連接埠與儲存庫存取](../images/shots/git-form.avif)
 
 </Step>
 <Step>
@@ -111,7 +111,7 @@ kubectl -n shop get deployment web -o jsonpath='{.spec.template.spec.containers[
 
 Build 的 `READY` 是 `True`，`REVISION` 是建置的提交，`-o wide` 多出的 `IMAGE` 是最新的映像檔。每次建置是一個 BuildRun，`PHASE` 依序經過 `Pending`、`Planning`、`Building`，最後是 `Succeeded` 或 `Failed`，失敗原因在 `REASON`。Deployment 的映像檔從 `:pending` 換成 Build 推送的 tag，表示 Keel 已經部署新版。
 
-![服務的建置分頁，列出最新映像檔和建置紀錄](https://oss.zeabur.com/shots/zeabur/zh-TW/light/git-builds.avif)
+![服務的建置分頁，列出最新映像檔和建置紀錄](../images/shots/git-builds.avif)
 
 ## 新提交與自動部署
 

@@ -47,7 +47,7 @@ When the cluster has the corresponding operator installed and you have permissio
 
 When this option is on, the differences between the new service and the Compose service appear below it: version, startup command, ports, volumes, username and password variables, and instance count. For example, the volume row shows the new volume's size and notes that it starts empty.
 
-![Service list after reading the files: db uses operator-managed PostgreSQL, with differences listed below; web waits until db is reachable before starting](https://oss.zeabur.com/shots/zeabur/en/light/compose-services.avif)
+![Service list after reading the files: db uses operator-managed PostgreSQL, with differences listed below; web waits until db is reachable before starting](../images/shots/compose-services.avif)
 
 To keep using the original image, turn this option off. When two or more services can be replaced, **Replace all N with operator-managed services** at the top turns the option on or off for all of them. If the operator is missing, its installation can't be verified, or you don't have enough permissions, the service runs the original image, and the interface explains why.
 
@@ -98,7 +98,7 @@ Return to the project and confirm that all expected services appear. Open each s
 
 Check the application's **Variables** to see where its connections point after import, then perform a database read and write or a file upload. Once the web page loads, also confirm that it's reading the migrated data.
 
-![Project page listing the imported services](https://oss.zeabur.com/shots/zeabur/en/light/project-services.avif)
+![Project page listing the imported services](../images/shots/project-services.avif)
 
 When checking with kubectl, regular service objects have the label `app.kubernetes.io/name: <service-name>`. For operator-managed databases, the database objects and secrets Zeabur creates have the label `zeabur.com/database: <name>`. In the example below, `db` was replaced with PostgreSQL:
 

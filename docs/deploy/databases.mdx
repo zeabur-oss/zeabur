@@ -41,7 +41,7 @@ Single-node clusters default to one instance. On multi-node clusters, MongoDB an
 
 With only one instance, no other instance can take over after a failure, and there's only one copy of the data on one volume. For fault tolerance, plan instance placement and storage locations as well as the instance count.
 
-![New PostgreSQL form with the name, version, instance count, and storage filled in, and a warning about using only one instance](https://oss.zeabur.com/shots/zeabur/en/light/database-form.avif)
+![New PostgreSQL form with the name, version, instance count, and storage filled in, and a warning about using only one instance](../images/shots/database-form.avif)
 
 </Step>
 <Step>
@@ -73,7 +73,7 @@ After applying the changes, open the database, wait for **Ready**, and check the
 </Step>
 </Steps>
 
-![Overview and connection details for the orders PostgreSQL database](https://oss.zeabur.com/shots/zeabur/en/light/database-overview.avif)
+![Overview and connection details for the orders PostgreSQL database](../images/shots/database-overview.avif)
 
 The database's **Connections** section shows an address inside the cluster. To configure an app manually, copy the **Host**, **Port**, **Database**, and **Username**. If you have permission to read secrets, select **Show** next to the password. Then write a test record from the app and read it back to verify the connection and permissions.
 

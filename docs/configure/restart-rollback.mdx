@@ -19,7 +19,7 @@ If a service is stuck, click **Restart** at the top of its page to replace its r
 
 Open the service and click **Restart** at the top of the page. The review screen is titled **Restart web** and states whether the service will be interrupted.
 
-![Restart web review screen showing that 2 replicas will be replaced one at a time without interrupting the service, with enough resources available](https://oss.zeabur.com/shots/zeabur/en/light/restart-review.avif)
+![Restart web review screen showing that 2 replicas will be replaced one at a time without interrupting the service, with enough resources available](../images/shots/restart-review.avif)
 
 </Step>
 <Step>
@@ -46,7 +46,7 @@ Each time you change the image or a setting in the pod template, **Deployments**
 
 Open the service's **Deployments** tab and click **Compare** on the version you want to return to. Review the differences between its pod template and the current one. If it says **The two templates are identical.**, rolling back won't change anything.
 
-![Comparison for revision #2 in Deployments, with red and green showing the image change from 1.4.1 to 1.4.2](https://oss.zeabur.com/shots/zeabur/en/light/release-compare.avif)
+![Comparison for revision #2 in Deployments, with red and green showing the image change from 1.4.1 to 1.4.2](../images/shots/release-compare.avif)
 
 </Step>
 <Step>
@@ -57,7 +57,7 @@ Click **Roll back** on that version. The review screen is titled **Roll back web
 
 Rollback restores only the pod template: settings such as the image, environment variables, resources, and health checks. It doesn't restore the previous contents of config files and secrets that the containers read. The review screen also notes this.
 
-![Roll back web to #2 review screen noting that rollback won't change the contents of config files and secrets](https://oss.zeabur.com/shots/zeabur/en/light/rollback-review.avif)
+![Roll back web to #2 review screen noting that rollback won't change the contents of config files and secrets](../images/shots/rollback-review.avif)
 
 </Step>
 <Step>

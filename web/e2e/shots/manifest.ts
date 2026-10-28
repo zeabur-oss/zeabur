@@ -22,6 +22,7 @@ export type Shot = {
   steps: Step[]
   clip?: string
   until?: string
+  blank?: string
   viewport: Viewport
   env: Record<string, string>
   locales: Locale[]
@@ -42,9 +43,8 @@ export const viewports = {
 }
 export type Viewport = keyof typeof viewports
 
-// A manifest that names `out` holds images kept in git: the run writes only the images, to
-// <out>/<file>. Without `out`, the run also writes manifest.json and the release's tar. `themes` is
-// the themes of a shot that lists none.
+// `out` is where the images are kept in git, at <out>/<file>; without it they go to
+// target/docs-shots. `themes` is the themes of a shot that lists none.
 export type Settings = {
   out?: string
   file: string
@@ -66,6 +66,7 @@ const shotKeys = [
   "steps",
   "clip",
   "until",
+  "blank",
   "viewport",
   "env",
   "locales",
@@ -128,7 +129,8 @@ function shot(value: unknown, index: number, defaultThemes: Theme[]): Shot {
   if (!isRecord(value)) throw new Error(`shot ${index}: expected a mapping`)
   const at = typeof value.id === "string" ? value.id : `shot ${index}`
   for (const key of Object.keys(value)) check(shotKeys.includes(key), `${at}: unknown key "${key}"`)
-  const { id, app = "zeabur", path, wait, clip, until, viewport = "desktop", steps = [] } = value
+  const { id, app = "zeabur", path, wait, clip, until, blank, viewport = "desktop" } = value
+  const { steps = [] } = value
   const { locales: shotLocales = Object.keys(locales), themes: shotThemes = defaultThemes } = value
   check(
     typeof id === "string" && /^[a-z0-9]+(-[a-z0-9]+)*$/.test(id),
@@ -140,6 +142,7 @@ function shot(value: unknown, index: number, defaultThemes: Theme[]): Shot {
   check(isSelector(clip), `${at}: clip must be a CSS selector`)
   check(isSelector(until), `${at}: until must be a CSS selector`)
   check(until === undefined || clip !== undefined, `${at}: until needs clip`)
+  check(isSelector(blank), `${at}: blank must be a CSS selector`)
   check(
     Object.keys(viewports).includes(viewport as string),
     `${at}: viewport must be ${Object.keys(viewports).join(", ")}`,
@@ -157,6 +160,7 @@ function shot(value: unknown, index: number, defaultThemes: Theme[]): Shot {
     steps: steps.map((s, i) => step(s, `${at}: step ${i + 1}`)),
     clip: clip as string | undefined,
     until: until as string | undefined,
+    blank: blank as string | undefined,
     viewport: viewport as Shot["viewport"],
     env: environment(value.env, at),
     locales: subset(shotLocales, Object.keys(locales) as Locale[], `${at}: locales`),
@@ -187,11 +191,14 @@ function fileName(file: unknown, shots: Shot[]): string {
   check(
     name.endsWith(".avif") &&
       name.includes("{id}") &&
-      !/[{}]/.test(name.replace(/\{(id|locale|theme)\}/g, "")),
-    "file must end in .avif and hold {id}; it may hold {locale} and {theme}",
+      !/[{}]/.test(name.replace(/\{(id|locale|docs|theme)\}/g, "")),
+    "file must end in .avif and hold {id}; it may hold {locale}, {docs} and {theme}",
   )
   for (const s of shots) {
-    check(name.includes("{locale}") || s.locales.length === 1, `${s.id}: file needs {locale}`)
+    check(
+      /\{(locale|docs)\}/.test(name) || s.locales.length === 1,
+      `${s.id}: file needs {locale} or {docs}`,
+    )
     check(name.includes("{theme}") || s.themes.length === 1, `${s.id}: file needs {theme}`)
   }
   return name

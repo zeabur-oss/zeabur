@@ -36,7 +36,7 @@ Under **Where backups go**, click **Set up** or **Edit**. If you've registered S
 
 For manual entry, fill in **Bucket**, **Access key ID**, and **Secret access key**. Leave **Endpoint** blank for AWS S3. For R2, B2, or MinIO, enter the provider's S3 address. **Region** defaults to `us-east-1` when left blank. **Folder** is optional and keeps these backups separate from other files.
 
-![Backup location form with the r2-backups S3 destination selected and its endpoint and bucket filled in](https://oss.zeabur.com/shots/zeabur/en/light/backup-location-form.avif)
+![Backup location form with the r2-backups S3 destination selected and its endpoint and bucket filled in](../images/shots/backup-location-form.avif)
 
 When editing an existing configuration, leave both key fields blank to keep the current keys. To replace them, fill in both fields.
 
@@ -49,7 +49,7 @@ Click **Review changes**, confirm the bucket, endpoint, and backup location and 
 
 Return to **Where backups go** and wait for **Status** to change from **Not checked yet** to **Reachable**. If it shows **Not reachable**, check the bucket, endpoint, and keys before setting a schedule.
 
-![Backup location showing the bucket, endpoint, and Reachable status](https://oss.zeabur.com/shots/zeabur/en/light/backup-location.avif)
+![Backup location showing the bucket, endpoint, and Reachable status](../images/shots/backup-location.avif)
 
 </Step>
 </Steps>
@@ -59,13 +59,13 @@ Return to **Where backups go** and wait for **Status** to change from **Not chec
 1. Under **Schedule**, choose the daily **Time** (on the hour, in UTC) and **Keep, in days**. New schedules default to 03:00 UTC daily with 7 days of retention. Retention can be 1 to 365 days.
 2. Under **Covers**, select **Whole cluster**, or select **Chosen projects** and choose at least one project. **Whole cluster** also includes projects and namespaces added later.
 
-   ![Schedule form set to 03:00 UTC daily, 7 days of retention, and the entire cluster](https://oss.zeabur.com/shots/zeabur/en/light/backup-schedule-form.avif)
+   ![Schedule form set to 03:00 UTC daily, 7 days of retention, and the entire cluster](../images/shots/backup-schedule-form.avif)
 
 3. Click **Review changes**, confirm the time and scope, then apply. Zeabur creates or updates a Velero Schedule named `zeabur` and enables volume file backups.
 4. Click **Back up now**, review the changes, then apply. This backup uses the scope and retention you just set without waiting for the schedule.
 5. Find the backup in **Backups**. Wait for its status to change from **Running** to **Succeeded**, then check the item count and **Retain until** date.
 
-   ![Backup history showing each backup's status, item count, and retention date](https://oss.zeabur.com/shots/zeabur/en/light/backup-list.avif)
+   ![Backup history showing each backup's status, item count, and retention date](../images/shots/backup-list.avif)
 
 Schedules created outside Zeabur are labeled **Configured outside Zeabur**. Edit them where they were originally created.
 
@@ -86,9 +86,9 @@ Restoring takes three steps: restore the project, check its services and data, t
    - If the original project still exists, **New project name** is filled in with a new name that you can change.
    - If the original project has been deleted, the form explains that it will restore under its original name.
 
-   ![Restore form with a project from the backup selected and a new project name filled in](https://oss.zeabur.com/shots/zeabur/en/light/backup-restore.avif)
+   ![Restore form with a project from the backup selected and a new project name filled in](../images/shots/backup-restore.avif)
 
-   ![Restore form with the deleted wiki project selected, explaining that it will restore under its original name](https://oss.zeabur.com/shots/zeabur/en/light/backup-restore-deleted.avif)
+   ![Restore form with the deleted wiki project selected, explaining that it will restore under its original name](../images/shots/backup-restore-deleted.avif)
 
 3. Click **Review changes** and check the details. The list comes from the backup itself, not the current project:
    - Domains in the backup won't be restored. Ingress, HTTPRoute, and cert-manager certificates are excluded. You'll reconnect domains in the last step, when cert-manager requests new certificates.
@@ -96,7 +96,7 @@ Restoring takes three steps: restore the project, check its services and data, t
    - When restoring to a new project, the page lists services and secrets from the backup. Values containing `<service>.<source-project>.svc` still point to the original project. Use **Rewrite addresses** after restoring to update them.
    - When restoring to a new project, the page shows whether the nodes have enough resources to run both projects at once. Auto-deployments and Git webhooks still target the original project.
 
-   ![Review showing the new project, service addresses to rewrite, and node resources](https://oss.zeabur.com/shots/zeabur/en/light/backup-restore-plan.avif)
+   ![Review showing the new project, service addresses to rewrite, and node resources](../images/shots/backup-restore-plan.avif)
 
    If the original project still exists, click **New project from backup**. If it has been deleted, click **Restore**.
 
@@ -124,7 +124,7 @@ Click **Bring domains back**. Zeabur reads the project's domains from the backup
 
 - If no other project is using them, applying the changes makes Velero restore only those routes. A “Domains reconnected” entry appears in **Restores**. cert-manager requests new certificates.
 
-  ![Review for reconnecting domains, restoring blog.example.com to blog from the backup](https://oss.zeabur.com/shots/zeabur/en/light/backup-attach.avif)
+  ![Review for reconnecting domains, restoring blog.example.com to blog from the backup](../images/shots/backup-attach.avif)
 
 - If the original project is still using them, you can't apply these changes. The page identifies the project using them. For example, if the original project is `blog`, click **Move domains from blog** to move the domains from `blog` to the new project.
 

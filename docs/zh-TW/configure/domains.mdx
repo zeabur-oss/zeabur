@@ -13,7 +13,7 @@ source: "a3935343211b"
 - 有權修改專案的網域。如果路由由 Helm、Argo CD 或 Flux 管理，要回到原本的 values 或 Git 儲存庫修改。
 - 叢集裝了 cert-manager 和可用的簽發者，憑證才會自動簽發、更新。萬用字元網域（例如 `*.example.com`）要用支援 DNS-01 的簽發者。
 
-![web 服務的網路分頁，列出公開網域與私有網路](https://oss.zeabur.com/shots/zeabur/zh-TW/light/service-networking.avif)
+![web 服務的網路分頁，列出公開網域與私有網路](../images/shots/service-networking.avif)
 
 ## 新增網域
 
@@ -24,7 +24,7 @@ source: "a3935343211b"
 
 進入服務 **網路**，在 **公開網域** 按 **新增網域**，輸入 `app.example.com`。欄位只填主機名稱，不加 `https://`、連接埠或路徑。
 
-![公開網域的新增欄位填入 app.example.com，下方預先列出要新增的 DNS 紀錄](https://oss.zeabur.com/shots/zeabur/zh-TW/light/domain-add.avif)
+![公開網域的新增欄位填入 app.example.com，下方預先列出要新增的 DNS 紀錄](../images/shots/domain-add.avif)
 
 叢集有多個簽發者時，表單會出現 **簽發者**，可以保留預設或改選另一個。如果這個網域拿不到憑證，檢查變更時會提示它只有 HTTP。
 
@@ -37,7 +37,7 @@ source: "a3935343211b"
 
 按 **加入變更**，網域會先放進這個服務的草稿，叢集還沒有改動。從頁面下方按 **檢查變更**，確認網域、轉送目標和憑證設定後套用。
 
-![儲存前確認 web 的變更：app.example.com 會連到 web，並使用 HTTPS](https://oss.zeabur.com/shots/zeabur/zh-TW/light/domain-review.avif)
+![儲存前確認 web 的變更：app.example.com 會連到 web，並使用 HTTPS](../images/shots/domain-review.avif)
 
 表單沒有連接埠欄位，所以要在檢查時看 **轉送到** 的服務和連接埠。服務已經有 Ingress 時，新網域加在同一個 Ingress 上，沿用它的後端。只有 HTTPRoute 時，新網域加在那條 HTTPRoute 上。都沒有時，Zeabur 建立新的 Ingress，轉送到服務第一個 Kubernetes Service 的第一個連接埠。選了 Gateway 時，新網域加在那個 Gateway 上轉送到這個服務的 HTTPRoute，沒有就建一條新的。
 

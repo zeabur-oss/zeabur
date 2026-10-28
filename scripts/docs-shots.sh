@@ -2,22 +2,16 @@
 # Takes the screenshots that a manifest declares (docs/internal/screenshots.md), from the demo
 # server (crates/zeabur-api/examples/demo.rs) or the installer's pages with captured responses, in
 # each locale and theme, as AVIF. Each docs/*shots.yaml is one image set. Run inside `nix develop`.
-#   scripts/docs-shots.sh [manifest] [out] [version]
-# <out> defaults to the manifest's `out`, else target/docs-shots. A manifest without `out` also
-# gives <out>/manifest.json and, with a version, docs-shots-<version>.tar, which holds both.
-# Images in <out> that this run does not take stay, unless the manifest sets `clean`.
+#   scripts/docs-shots.sh [manifest] [out]
+# <out> defaults to the manifest's `out`, else target/docs-shots. Images in <out> that this run
+# does not take stay, unless the manifest sets `clean`.
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
 manifest="$(realpath "${1:-$root/docs/shots.yaml}")"
-version="${3:-}"
 port="${ZEABUR_SHOTS_PORT:-18300}"
 # The demo server and the browser both take this as the time now, so dates are the same on every run.
 export ZEABUR_DEMO_NOW="${ZEABUR_DEMO_NOW:-2026-10-26T09:00:00Z}"
-if [[ -n "$version" && ! "$version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-  echo "expected a version like v0.0.2" >&2
-  exit 2
-fi
 work="$(mktemp -d)"
 server=""
 cleanup() {
@@ -31,10 +25,6 @@ settings="$(cd "$root/web" && bun e2e/shots/manifest.ts "$work/shots.json" "$man
 kept="$(jq -r '.out // ""' <<<"$settings")"
 file="$(jq -r .file <<<"$settings")"
 budget=$(($(jq -r .budget <<<"$settings") * 1024))
-if [[ -n "$kept" && -n "$version" ]]; then
-  echo "error: $manifest names its own out; only a manifest without one makes a release tar" >&2
-  exit 2
-fi
 out="${2:-${kept:+$root/$kept}}"
 out="${out:-$root/target/docs-shots}"
 mkdir -p "$out"
@@ -94,6 +84,10 @@ while IFS= read -r png; do
   IFS=/ read -r locale theme id <<<"${png#"$work/png/"}"
   id="${id%.png}"
   name="${file//\{locale\}/$locale}"
+  # {docs} is the locale's docs folder: empty for English, "<locale>/" for a translation.
+  docs="$locale/"
+  [[ "$locale" == en ]] && docs=""
+  name="${name//\{docs\}/$docs}"
   name="${name//\{theme\}/$theme}"
   name="${name//\{id\}/$id}"
   avif="$work/avif/$name"
@@ -113,31 +107,11 @@ if ((${#over[@]} > 0)); then
   exit 1
 fi
 
+# `clean` empties each folder the run writes into, so images whose shot is gone go too.
 if [[ "$(jq -r .clean <<<"$settings")" == true ]]; then
-  rm -rf "$out"
-  mkdir -p "$out"
+  (cd "$work/avif" && find . -name '*.avif' -exec dirname {} \; | sort -u) | while IFS= read -r dir; do
+    rm -rf "${out:?}/$dir"
+  done
 fi
 cp -R "$work/avif/." "$out/"
-if [[ -n "$kept" ]]; then
-  echo "$(find "$work/avif" -name '*.avif' | wc -l | tr -d ' ') images in $out"
-  exit 0
-fi
-
-# The manifest lists every image in <out>, also the ones that earlier runs took.
-mkdir -p "$out"/{en,zh-TW,zh-CN}
-(cd "$out" && find en zh-TW zh-CN -name '*.avif' | sort | while IFS= read -r avif; do
-  printf '%s\t%s\n' "$avif" "$(wc -c <"$avif" | tr -d ' ')"
-done) >"$work/sizes.tsv"
-jq -R -s 'split("\n") | map(select(. != "") | split("\t") | {path: .[0], bytes: (.[1] | tonumber)})
-  | {files: .}' "$work/sizes.tsv" >"$out/manifest.json"
-jq -r '.files | map(.bytes) | sort | "\(length) files: min \(.[0]) bytes, median \(.[length / 2 | floor]) bytes, max \(.[-1]) bytes"' \
-  "$out/manifest.json"
-
-if [[ -n "$version" ]]; then
-  (
-    cd "$out"
-    tar --sort=name --mtime=@0 --owner=0 --group=0 --numeric-owner \
-      -cf "docs-shots-$version.tar" manifest.json en zh-TW zh-CN
-  )
-  echo "$out/docs-shots-$version.tar"
-fi
+echo "$(find "$work/avif" -name '*.avif' | wc -l | tr -d ' ') images in $out"

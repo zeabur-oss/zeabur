@@ -48,7 +48,7 @@ source: "6d5e029cac08"
 
 開啟後，選項下方會逐項列出新服務和 Compose 服務不同的地方：版本、啟動指令、連接埠、磁碟區、帳號密碼變數與執行個體數。例如磁碟區那一行會寫出新磁碟區的大小，並提醒一開始是空的。
 
-![讀取後的服務清單：db 開啟由 operator 管理的 PostgreSQL，下方列出和原本不同的地方；web 會等 db 可以連線後才啟動](https://oss.zeabur.com/shots/zeabur/zh-TW/light/compose-services.avif)
+![讀取後的服務清單：db 開啟由 operator 管理的 PostgreSQL，下方列出和原本不同的地方；web 會等 db 可以連線後才啟動](../images/shots/compose-services.avif)
 
 要繼續用原本的映像檔，就關閉這個選項。有兩個以上的服務可以替換時，上方的 **N 個都換成 operator 管理的服務** 一次開啟或關閉全部。缺少 operator、無法確認是否安裝，或權限不足時，該服務會直接執行原映像檔，介面會寫出原因。
 
@@ -99,7 +99,7 @@ Compose 的 `ports` 不會直接開放節點的主機連接埠。在需要對外
 
 到應用程式的 **環境變數** 檢查匯入後的連線來源，再實際執行一次資料庫讀寫或檔案上傳。網頁能開啟後，也要確認它讀到的是搬移後的資料。
 
-![專案頁列出匯入後的各個服務](https://oss.zeabur.com/shots/zeabur/zh-TW/light/project-services.avif)
+![專案頁列出匯入後的各個服務](../images/shots/project-services.avif)
 
 用 kubectl 確認時，一般服務的物件帶有 `app.kubernetes.io/name: <服務名稱>`，換成 operator 管理的資料庫，Zeabur 寫的資料庫物件和機密帶有 `zeabur.com/database: <名稱>`。下面的 `db` 換成了 PostgreSQL：
 

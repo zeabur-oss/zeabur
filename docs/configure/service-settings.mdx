@@ -39,7 +39,7 @@ The **Size** you choose when creating a service from an image or Git sets the in
 | Medium | 0.25 cores | 256 MiB | 512 MiB |
 | Large | 0.5 cores | 512 MiB | 1 GiB |
 
-![Compute resources in service settings, showing the replica count, reserved and maximum CPU and memory, and the largest node's resources below](https://oss.zeabur.com/shots/zeabur/en/light/service-compute.avif)
+![Compute resources in service settings, showing the replica count, reserved and maximum CPU and memory, and the largest node's resources below](../images/shots/service-compute.avif)
 
 </Step>
 <Step>
@@ -73,7 +73,7 @@ For each check, set **Check** to **None**, **HTTP GET**, **TCP**, or **Command**
 
 **Every (s)** sets how often the check runs. **Failures** sets how many consecutive failures count as a failed check. If the service declares ports, the form shows buttons such as **HTTP, port 8080**. Select one to fill in the path `/` and that port. The port must be declared by the container, or you won't be able to save.
 
-![Health checks in service settings, with HTTP GET selected for the traffic check, the path set to /healthz, and separate restart and startup checks](https://oss.zeabur.com/shots/zeabur/en/light/service-health.avif)
+![Health checks in service settings, with HTTP GET selected for the traffic check, the path set to /healthz, and separate restart and startup checks](../images/shots/service-health.avif)
 
 After making changes, select **Review changes** at the bottom of the page and apply them. Only scheduled jobs and Jobs have no health checks.
 
@@ -100,7 +100,7 @@ Open the service's **Settings** → **Security** and choose what containers can 
 - **Strict**: Runs as a non-root user with no privilege escalation. Images that run as root, such as `nginx:latest`, won't start. Use a version that doesn't need root, such as `nginxinc/nginx-unprivileged`. Images built with Railpack run as user 1000 and can use Strict. In a Dockerfile, specify a non-root user with a numeric ID, such as `USER 1000`.
 - **Compatible**: Allows containers to run as root, but they still can't access the host or escalate privileges.
 
-![Security in service settings, with Compatible selected and a description stating that containers can run as root but can't access the host](https://oss.zeabur.com/shots/zeabur/en/light/service-security.avif)
+![Security in service settings, with Compatible selected and a description stating that containers can run as root but can't access the host](../images/shots/service-security.avif)
 
 Selecting an option opens the review screen directly. Review and apply the change to replace the replicas. When you create a service from an image, Zeabur selects an option based on the image's configured user: Strict for a numeric non-root user, or Compatible otherwise.
 

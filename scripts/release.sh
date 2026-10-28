@@ -132,14 +132,6 @@ case "$stage" in
         rm -rf "$installer"
       fi
     fi
-    # The documentation screenshots (docs/internal/screenshots.md), once; the website downloads
-    # them by version.
-    if [[ "$os-$arch" == linux-amd64 ]]; then
-      shots="$root/target/release-shots"
-      rm -rf "$shots"
-      "$scripts/docs-shots.sh" docs/shots.yaml "$shots" "$version"
-      mv "$shots/docs-shots-$version.tar" "$dist/"
-    fi
     ls -l "$dist"
     ;;
 

@@ -11,7 +11,7 @@ The sections below say where each screen is, what it reads, and how to query the
 
 **What needs you** on **Home** lists the services that currently have a problem. Problems with the same cause are grouped together, for example 25 services all stuck because the same image can't be pulled.
 
-![Needs you on Home, grouped by cause into node, outside the cluster, settings, errors in the app, and similar groups, with a logs or events button on each item](https://oss.zeabur.com/shots/zeabur/en/light/home-problems.avif)
+![Needs you on Home, grouped by cause into node, outside the cluster, settings, errors in the app, and similar groups, with a logs or events button on each item](../images/shots/home-problems.avif)
 
 If the cause is on the cluster side, the screen labels it **Cluster** and shows **Caused by** and **Affects**: how many services, domains, and projects are affected. Fix that cause and those services recover together. Zeabur treats these situations as cluster problems:
 
@@ -37,7 +37,7 @@ Which services are affected is computed by Zeabur matching Ingresses, nodes, and
 
 When a service has a problem, **What's wrong** appears at the top of **Overview**: one sentence for the cause, one sentence for **What to do**, and buttons such as **Open logs**, **Change memory**, and **Health checks** that take you straight to the change. Expand **Evidence** to see the values used for the decision. Expand **Raw error** to see which **Replica**, the **Exit code**, the restart count, and the container's message. When you report a problem, choose **Copy diagnosis** and paste the full text.
 
-![What's wrong on the service Overview, explaining that worker keeps crashing, with What to do and Open logs and Terminal buttons](https://oss.zeabur.com/shots/zeabur/en/light/service-problem.avif)
+![What's wrong on the service Overview, explaining that worker keeps crashing, with What to do and Open logs and Terminal buttons](../images/shots/service-problem.avif)
 
 Zeabur reads the container status kubelet reports, the replica's scheduling status, and the workload's conditions and events. It recognizes these cases:
 
@@ -85,7 +85,7 @@ kubectl -n shop get deploy -o custom-columns=NAME:.metadata.name,MEMORY:.spec.te
 
 **Needs attention** on **Cluster** → **Overview** lists things that affect the whole cluster, such as a Kubernetes version that is out of support, a kubelet version outside the supported skew, a node whose memory or disk is almost full, a node that isn't ready, and an installed component that has a new version. When nothing is wrong, it shows **Nothing needs attention.**
 
-![Needs attention on the cluster Overview, listing that the Kubernetes version is nearing end of support, and that node memory and disk are almost full](https://oss.zeabur.com/shots/zeabur/en/light/cluster-attention.avif)
+![Needs attention on the cluster Overview, listing that the Kubernetes version is nearing end of support, and that node memory and disk are almost full](../images/shots/cluster-attention.avif)
 
 Query the same data with kubectl:
 
@@ -142,7 +142,7 @@ A private address `<service>.<project>.svc.cluster.local` checks only the last t
 
 Each row shows one conclusion. When a domain's DNS record or certificate isn't set up, the row shows the record to add. When the cluster can't verify a domain, the row shows whether your browser reaches it, and the cluster's result moves under **Show connection checks**.
 
-![The Networking card on the service Overview, with the private address reachable. The connection check is expanded, every hop passes, and each hop lists expected and actual](https://oss.zeabur.com/shots/zeabur/en/light/service-connectivity.avif)
+![The Networking card on the service Overview, with the private address reachable. The connection check is expanded, every hop passes, and each hop lists expected and actual](../images/shots/service-connectivity.avif)
 
 ## Connection rules
 

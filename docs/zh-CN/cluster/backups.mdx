@@ -37,7 +37,7 @@ source: "0cf131794fc4"
 
 手动输入时填写 **存储桶**、**访问密钥 ID** 和 **私密访问密钥**。使用 AWS S3 时 **端点** 留空，R2、B2 或 MinIO 填写它们的 S3 地址。**区域** 留空时是 `us-east-1`。**文件夹** 可选，可以让这些备份和其他文件分开。
 
-![备份存放位置的表单，选了 S3 目标 r2-backups 并填入端点和存储桶](https://oss.zeabur.com/shots/zeabur/zh-CN/light/backup-location-form.avif)
+![备份存放位置的表单，选了 S3 目标 r2-backups 并填入端点和存储桶](../images/shots/backup-location-form.avif)
 
 编辑已有配置时，两个密钥都留空就沿用当前密钥。要换就两个一起填。
 
@@ -50,7 +50,7 @@ source: "0cf131794fc4"
 
 回到 **备份存放位置**，等 **状态** 从 **尚未检查** 变成 **可访问**。显示 **无法访问** 时，先核对存储桶、端点和密钥，再配置定时。
 
-![备份存放位置显示存储桶、端点和可访问状态](https://oss.zeabur.com/shots/zeabur/zh-CN/light/backup-location.avif)
+![备份存放位置显示存储桶、端点和可访问状态](../images/shots/backup-location.avif)
 
 </Step>
 </Steps>
@@ -60,13 +60,13 @@ source: "0cf131794fc4"
 1. 在 **定时** 选择每天执行的 **时间**（UTC 整点）和 **保留天数**。新定时默认每天 03:00（UTC）、保留 7 天。保留天数可填 1 到 365。
 2. 在 **范围** 选择 **整个集群**，或选择 **选定的项目** 并至少勾选一个项目。**整个集群** 也包括之后新增的项目和 Namespace。
 
-   ![定时表单，每天 03:00（UTC）、保留 7 天、范围是整个集群](https://oss.zeabur.com/shots/zeabur/zh-CN/light/backup-schedule-form.avif)
+   ![定时表单，每天 03:00（UTC）、保留 7 天、范围是整个集群](../images/shots/backup-schedule-form.avif)
 
 3. 点击 **检查变更**，确认执行时间和范围后应用。Zeabur 会创建或修改名为 `zeabur` 的 Velero Schedule，并开启卷文件备份。
 4. 点击 **立即备份**，检查后应用。这次备份按刚配置的范围和保留天数执行，不用等定时。
 5. 在 **备份记录** 找到这条，等状态从 **运行中** 变成 **成功**，再看记录列出的条目数和 **保留到** 的日期。
 
-   ![备份记录列出每次备份的状态、条目数和保留期限](https://oss.zeabur.com/shots/zeabur/zh-CN/light/backup-list.avif)
+   ![备份记录列出每次备份的状态、条目数和保留期限](../images/shots/backup-list.avif)
 
 在 Zeabur 以外创建的定时会标为 **在 Zeabur 以外配置**，要回到原来创建的地方修改。
 
@@ -87,9 +87,9 @@ source: "0cf131794fc4"
    - 原项目还在：**新项目名称** 会填入一个新名称，可以改。
    - 原项目已经删除：界面会说明使用原来的名称还原。
 
-   ![还原表单，选了备份里的项目，并填入新项目名称](https://oss.zeabur.com/shots/zeabur/zh-CN/light/backup-restore.avif)
+   ![还原表单，选了备份里的项目，并填入新项目名称](../images/shots/backup-restore.avif)
 
-   ![还原表单，选了已删除的项目 wiki，说明会用原来的名称还原](https://oss.zeabur.com/shots/zeabur/zh-CN/light/backup-restore-deleted.avif)
+   ![还原表单，选了已删除的项目 wiki，说明会用原来的名称还原](../images/shots/backup-restore-deleted.avif)
 
 3. 点击 **检查变更**，确认内容。清单来自备份本身，与当前项目无关：
    - 备份里的域名不会一起还原。Ingress、HTTPRoute 和 cert-manager 的证书都不还原，域名在最后一步接回，证书到时重新申请。
@@ -97,7 +97,7 @@ source: "0cf131794fc4"
    - 另存为新项目时，界面会列出备份里的服务和机密变量。写着 `<服务>.<原项目>.svc` 的值仍然连到原项目，还原后用 **改写地址** 改掉。
    - 另存为新项目时，界面会显示节点资源够不够两个项目同时运行。自动部署和 Git webhook 仍然送到原项目。
 
-   ![检查界面，列出新项目、要改写的服务地址和节点资源](https://oss.zeabur.com/shots/zeabur/zh-CN/light/backup-restore-plan.avif)
+   ![检查界面，列出新项目、要改写的服务地址和节点资源](../images/shots/backup-restore-plan.avif)
 
    原项目还在时点击 **从备份创建新项目**，已经删除时点击 **还原**。
 
@@ -125,7 +125,7 @@ Velero 会跳过已经存在的同名对象。另存为新项目后，原项目�
 
 - 没有其他项目在用：应用后 Velero 只还原这些路由，**还原记录** 会多一条“域名接回”。cert-manager 会重新申请证书。
 
-  ![接回域名的检查界面，会从备份把 blog.example.com 接回 blog](https://oss.zeabur.com/shots/zeabur/zh-CN/light/backup-attach.avif)
+  ![接回域名的检查界面，会从备份把 blog.example.com 接回 blog](../images/shots/backup-attach.avif)
 
 - 原项目还在用：这次不能应用。界面会指出哪个项目在用，例如原项目是 `blog` 时，点击 **从 blog 移动域名**，把域名从 `blog` 移到新项目。
 

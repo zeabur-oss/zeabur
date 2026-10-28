@@ -12,11 +12,11 @@ source: "5d17518ca7cb"
 
 打开**项目**，点击**新建项目**，在**名称**中填写 `hello`。这个名称也是 Kubernetes Namespace 的名称，创建后不能修改。
 
-![新建项目对话框，名称填写为 hello](https://oss.zeabur.com/shots/zeabur/zh-CN/light/project-new.avif)
+![新建项目对话框，名称填写为 hello](../images/shots/project-new.avif)
 
 点击**检查变更**，页面会列出 Zeabur 准备执行的操作：创建 `hello` Namespace，添加项目标签，并应用 Pod Security `baseline` 配置，允许容器以 root 运行，但禁止访问主机。确认无误后，点击**创建**。
 
-![创建项目 hello 前的确认页面，说明将创建的 Namespace 和安全配置](https://oss.zeabur.com/shots/zeabur/zh-CN/light/project-new-review.avif)
+![创建项目 hello 前的确认页面，说明将创建的 Namespace 和安全配置](../images/shots/project-new-review.avif)
 
 如果找不到**新建项目**，说明你的角色没有创建 Namespace 的权限。请管理员先创建项目并将你加入项目，再从下一步开始。
 
@@ -35,7 +35,7 @@ Zeabur 检测到 `nginx-unprivileged` 以用户 101 运行，会自动选择**�
 
 填写镜像后，表单会读取镜像声明的端口，通常会自动填入 `8080`。
 
-![部署镜像表单，已填写镜像、名称 web、读取到的端口 8080，并开启公开域名](https://oss.zeabur.com/shots/zeabur/zh-CN/light/image-form.avif)
+![部署镜像表单，已填写镜像、名称 web、读取到的端口 8080，并开启公开域名](../images/shots/image-form.avif)
 
 ## 检查变更，再应用
 
@@ -45,7 +45,7 @@ Zeabur 检测到 `nginx-unprivileged` 以用户 101 运行，会自动选择**�
 - `web` Service，将 `8080` 转发到容器
 - `web` Ingress，将你的域名指向 `web` Service
 
-![部署 web 前的确认页面，列出要创建的 Deployment、Service 和 Ingress](https://oss.zeabur.com/shots/zeabur/zh-CN/light/image-review.avif)
+![部署 web 前的确认页面，列出要创建的 Deployment、Service 和 Ingress](../images/shots/image-review.avif)
 
 此时集群中还没有创建任何新对象。如果发现域名填错了，返回表单修改。确认无误后再点击**创建**，Zeabur 会打开服务页面。
 
@@ -59,7 +59,7 @@ Zeabur 检测到 `nginx-unprivileged` 以用户 101 运行，会自动选择**�
 
 服务的**概览**页面如下，顶部标签页可切换到**日志**、**网络**、**环境变量**和**设置**：
 
-![web 服务的概览页，显示副本、镜像和标签页](https://oss.zeabur.com/shots/zeabur/zh-CN/light/service-overview.avif)
+![web 服务的概览页，显示副本、镜像和标签页](../images/shots/service-overview.avif)
 
 ## 确认结果
 

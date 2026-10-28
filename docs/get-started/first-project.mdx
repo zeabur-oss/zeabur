@@ -11,11 +11,11 @@ Before you start, you need a Zeabur installation you can sign in to and a domain
 
 Open **Projects**, click **New project**, and enter `hello` in **Name**. This also becomes the Kubernetes Namespace name and can't be changed after creation.
 
-![New project dialog with hello entered as the name](https://oss.zeabur.com/shots/zeabur/en/light/project-new.avif)
+![New project dialog with hello entered as the name](../images/shots/project-new.avif)
 
 Click **Review changes**. Zeabur lists what it will do: create the `hello` Namespace, add a project label, and apply Pod Security `baseline`, which lets containers run as root but blocks access to the host. If everything looks right, click **Create**.
 
-![Review screen for creating the hello project, showing the Namespace and security settings](https://oss.zeabur.com/shots/zeabur/en/light/project-new-review.avif)
+![Review screen for creating the hello project, showing the Namespace and security settings](../images/shots/project-new-review.avif)
 
 If you don't see **New project**, your role doesn't have permission to create namespaces. Ask an administrator to create a project and add you to it, then continue with the next step.
 
@@ -34,7 +34,7 @@ Zeabur detects that `nginx-unprivileged` runs as user 101 and automatically sele
 
 After you enter the image, the form reads its declared ports and should fill in `8080` automatically.
 
-![Image deployment form with the image, name web, detected port 8080, and public domain turned on](https://oss.zeabur.com/shots/zeabur/en/light/image-form.avif)
+![Image deployment form with the image, name web, detected port 8080, and public domain turned on](../images/shots/image-form.avif)
 
 ## Review changes, then apply
 
@@ -44,7 +44,7 @@ Click **Review changes**. Zeabur lists three objects to create:
 - A `web` Service that forwards `8080` to the container
 - A `web` Ingress that routes the domain to the `web` Service
 
-![Review screen for deploying web, listing the Deployment, Service, and Ingress to create](https://oss.zeabur.com/shots/zeabur/en/light/image-review.avif)
+![Review screen for deploying web, listing the Deployment, Service, and Ingress to create](../images/shots/image-review.avif)
 
 Nothing has been added to the cluster yet. If the domain is wrong, go back to the form and fix it. Once everything looks right, click **Create**. Zeabur takes you to the service page.
 
@@ -58,7 +58,7 @@ Go to **Logs** to see the access log from opening the page.
 
 The service's **Overview** tab looks like this. Use the tabs at the top to switch to **Logs**, **Networking**, **Variables**, and **Settings**:
 
-![Overview tab for the web service, showing replicas, the image, and navigation tabs](https://oss.zeabur.com/shots/zeabur/en/light/service-overview.avif)
+![Overview tab for the web service, showing replicas, the image, and navigation tabs](../images/shots/service-overview.avif)
 
 ## Verify the result
 

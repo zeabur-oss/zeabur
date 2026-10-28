@@ -19,7 +19,7 @@ A project is a Kubernetes namespace with the `zeabur.com/project: "true"` label.
 
 On the **Projects** page, click **New project**. Enter `hello` in **Name**. **Display name** is optional. If you enter one, it appears in the interface instead of the name.
 
-![New project dialog with hello entered as the name](https://oss.zeabur.com/shots/zeabur/en/light/project-new.avif)
+![New project dialog with hello entered as the name](../images/shots/project-new.avif)
 
 If a namespace with the same name already exists, the form prompts you to use the existing namespace instead. See the [next section](#add-an-existing-namespace-to-zeabur).
 
@@ -34,7 +34,7 @@ After you submit the form, the review screen lists the objects to create:
 - The `default` ServiceAccount with `automountServiceAccountToken: false`. Replicas that don't specify a ServiceAccount won't receive a Kubernetes API token.
 - If the cluster has a namespace labeled `zeabur.com/platform: "true"` (all clusters installed with the Zeabur installer do), NetworkPolicy `zeabur-project` blocks connections from replicas in other projects.
 
-![Review screen before creating project hello, showing the namespace and security settings to create](https://oss.zeabur.com/shots/zeabur/en/light/project-new-review.avif)
+![Review screen before creating project hello, showing the namespace and security settings to create](../images/shots/project-new-review.avif)
 
 Apply the changes after reviewing them. The new project opens.
 

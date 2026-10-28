@@ -55,7 +55,7 @@ ssh -L 8085:127.0.0.1:8085 root@203.0.113.10
 
 在「用哪一種 Kubernetes」選標著「建議」的那一個就好。
 
-![「用哪一種 Kubernetes」在 5.7 GiB 的伺服器上建議 K3s，RKE2 在下面](https://oss.zeabur.com/shots/zeabur/zh-TW/light/installer-distribution.avif)
+![「用哪一種 Kubernetes」在 5.7 GiB 的伺服器上建議 K3s，RKE2 在下面](../images/shots/installer-distribution.avif)
 
 | | K3s | RKE2 |
 | --- | --- | --- |
@@ -65,7 +65,7 @@ ssh -L 8085:127.0.0.1:8085 root@203.0.113.10
 
 小一點的伺服器，只有打算之後用三台伺服器跑控制平面時才選 RKE2。兩種都會做一樣的強化設定，見[安全性](../reference/security.mdx#installer-的主機與下載權限)。
 
-![「檢查伺服器」選了團隊用和 K3s，下方是主機資訊與檢查結果](https://oss.zeabur.com/shots/zeabur/zh-TW/light/installer-host.avif)
+![「檢查伺服器」選了團隊用和 K3s，下方是主機資訊與檢查結果](../images/shots/installer-host.avif)
 
 檢查項目包括管理員權限、systemd、時鐘、Swap、當機傾印保留的記憶體、其他 Kubernetes、連接埠、磁碟空間和磁碟加密。未通過的項目要先修正，修正後按「重新檢查」。
 
@@ -80,7 +80,7 @@ ssh -L 8085:127.0.0.1:8085 root@203.0.113.10
 - 「Zeabur」：大家開啟 Zeabur 的網址，例如 `zeabur.example.com`。
 - 「登入」：Zeabur Identity 的網址，例如 `login.example.com`。大家會在這裡用通行密鑰登入。
 
-![「大家怎麼連到 Zeabur」的憑證與網域設定](https://oss.zeabur.com/shots/zeabur/zh-TW/light/installer-access.avif)
+![「大家怎麼連到 Zeabur」的憑證與網域設定](../images/shots/installer-access.avif)
 
 在「憑證」選擇「公開網域」或「測試機」。伺服器有公開位址時，預設是「公開網域」，兩個網域會先填好 `<位址>.sslip.io` 的名稱。只有私有位址時（例如 `10.x`、`192.168.x` 或 Tailscale 的 `100.64.x`），預設是「測試機」。
 
@@ -107,7 +107,7 @@ ssh -L 8085:127.0.0.1:8085 root@203.0.113.10
 
 在「選擇元件」先選「預設組合」，再依需求勾選或取消個別元件。
 
-![「選擇元件」的預設組合、元件清單與記憶體估算](https://oss.zeabur.com/shots/zeabur/zh-TW/light/installer-components.avif)
+![「選擇元件」的預設組合、元件清單與記憶體估算](../images/shots/installer-components.avif)
 
 | 預設組合 | 內容 |
 | --- | --- |
@@ -127,7 +127,7 @@ ssh -L 8085:127.0.0.1:8085 root@203.0.113.10
 
 在「確認」核對網址、元件和記憶體估算，確認後按「安裝」。
 
-![「確認」顯示安裝摘要、警告與詳細資料](https://oss.zeabur.com/shots/zeabur/zh-TW/light/installer-review.avif)
+![「確認」顯示安裝摘要、警告與詳細資料](../images/shots/installer-review.avif)
 
 摘要會列出：
 
@@ -148,7 +148,7 @@ ssh -L 8085:127.0.0.1:8085 root@203.0.113.10
 
 「正在安裝」會顯示時間軸，整體約需 10 到 20 分鐘。按「顯示日誌」可以查看完整輸出。
 
-![「正在安裝」顯示安裝時間軸與進度](https://oss.zeabur.com/shots/zeabur/zh-TW/light/installer-install.avif)
+![「正在安裝」顯示安裝時間軸與進度](../images/shots/installer-install.avif)
 
 時間軸依序列出檢查伺服器、安裝 Kubernetes（K3s 或 RKE2，附上版本）、Namespace 和連線規則、儲存空間、各元件、憑證授權單位、Zeabur Identity、Zeabur 和收尾。憑證授權單位只會在測試機模式安裝。
 
@@ -162,7 +162,7 @@ ssh -L 8085:127.0.0.1:8085 root@203.0.113.10
 
 這個帳號是管理員帳號，只能用通行密鑰登入，有整個叢集的完整權限。通行密鑰存在你註冊它的電腦或手機上，建議再註冊第二把。日常部署、看日誌這類工作，可以到**成員**邀請自己一個一般帳號來做，見[管理員帳號和一般帳號](../reference/permissions.mdx#管理員帳號和一般帳號)。
 
-![「Zeabur 已就緒」顯示第一位管理員的註冊入口](https://oss.zeabur.com/shots/zeabur/zh-TW/light/installer-done.avif)
+![「Zeabur 已就緒」顯示第一位管理員的註冊入口](../images/shots/installer-done.avif)
 
 <Callout type="warn">
 第一位管理員的註冊連結會建立管理員帳號，誰先開啟，誰就能完整控制叢集，只交給要管理叢集的人。連結只能使用一次，24 小時內有效。
@@ -186,7 +186,7 @@ sudo zeabur-installer setup-link
 
 看到「安裝已停止」時，先查看頁面指出的步驟，再讀取日誌最後幾行的錯誤原因。可能原因包括記憶體不夠、伺服器檢查未通過或逾時。
 
-![「安裝已停止」顯示停止的步驟與錯誤資訊](https://oss.zeabur.com/shots/zeabur/zh-TW/light/installer-failed.avif)
+![「安裝已停止」顯示停止的步驟與錯誤資訊](../images/shots/installer-failed.avif)
 
 修正後按「再安裝一次」。installer 會從頭開始，略過已就緒的部分，不會移除任何東西。
 

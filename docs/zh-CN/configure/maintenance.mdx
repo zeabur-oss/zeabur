@@ -27,7 +27,7 @@ source: "d6ab03fe54a8"
 
 进入服务的 **网络** 标签页，在目标域名所在行点击 **app.example.com 的维护与错误页面**。
 
-![服务的网络标签页，域名行上的维护与错误页面按钮](https://oss.zeabur.com/shots/zeabur/zh-CN/light/domain-pages-open.avif)
+![服务的网络标签页，域名行上的维护与错误页面按钮](../images/shots/domain-pages-open.avif)
 
 </Step>
 <Step>
@@ -36,7 +36,7 @@ source: "d6ab03fe54a8"
 
 开启 **维护模式**。保留默认 HTML，或在 **要编辑的页面** 中选择 **维护**，修改 **HTML**。
 
-![shop.example.com 的维护与错误页面面板，已开启维护模式并显示维护页面的 HTML](https://oss.zeabur.com/shots/zeabur/zh-CN/light/domain-pages-maintenance.avif)
+![shop.example.com 的维护与错误页面面板，已开启维护模式并显示维护页面的 HTML](../images/shots/domain-pages-maintenance.avif)
 
 每个页面必须小于 64 KiB。项目中的所有域名共用同一组页面，因此在这里修改维护页面后，项目中其他处于维护状态的域名也会显示新内容。
 
@@ -49,7 +49,7 @@ source: "d6ab03fe54a8"
 
 在侧边面板点击 **加入变更**，域名行会标记为 **已修改**。再点击页面底部的 **检查变更**，确认目标域名和 HTML，然后应用。如果需要部署页面服务器，列表中也会列出它的 Deployment、Service、ConfigMap 和 NetworkPolicy。
 
-![检查变更窗口，说明 shop.example.com 将改为显示维护页面](https://oss.zeabur.com/shots/zeabur/zh-CN/light/domain-pages-review.avif)
+![检查变更窗口，说明 shop.example.com 将改为显示维护页面](../images/shots/domain-pages-review.avif)
 
 该域名下的所有路径都会转到维护页面，同一 Ingress 的其他域名不受影响。对于 Ingress 域名，会新增一个名称以 `-maintenance` 结尾的 Ingress，Traefik 优先使用它，原 Ingress 保持不变。对于 HTTPRoute 域名，会将原后端的权重改为 0，再添加页面服务器。HTTPRoute 的维护模式作用于整条路由；如果同一条 HTTPRoute 还有其他域名，会先将当前域名移到单独的路由。
 
@@ -66,7 +66,7 @@ curl -i https://app.example.com/
 
 将 `app.example.com` 替换为自己的域名。响应状态码应为 `503`，内容应为维护页面的 HTML。回到服务的 **网络** 标签页，域名行会标记为 **维护中**，服务副本仍在运行。
 
-![域名行中的 shop.example.com 标记为维护中](https://oss.zeabur.com/shots/zeabur/zh-CN/light/domain-maintenance-on.avif)
+![域名行中的 shop.example.com 标记为维护中](../images/shots/domain-maintenance-on.avif)
 
 </Step>
 </Steps>

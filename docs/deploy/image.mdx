@@ -34,7 +34,7 @@ For a background service that doesn't accept connections, leave **Port** empty. 
 
 To serve an HTTP website, turn on **Public domain**. If an administrator has configured an app domain, the form suggests an address. Otherwise, enter one and point its DNS to the cluster's entry point. The form also shows the current certificate issuer, or indicates that only HTTP is available. See [Add a public domain](../configure/domains.mdx).
 
-![Image deployment form with port 8080 from the image and a suggested public domain](https://oss.zeabur.com/shots/zeabur/en/light/image-form.avif)
+![Image deployment form with port 8080 from the image and a suggested public domain](../images/shots/image-form.avif)
 
 </Step>
 <Step>
@@ -62,7 +62,7 @@ A service with a mounted volume runs only one replica. During an update, the old
 
 Select **Review changes**. Check the image, name, port, and public domain. If you're adding a volume, also check its capacity and mount path. Applying the changes opens the new service.
 
-![Review screen before deploying web, listing the Deployment, Service, and Ingress to create](https://oss.zeabur.com/shots/zeabur/en/light/image-review.avif)
+![Review screen before deploying web, listing the Deployment, Service, and Ingress to create](../images/shots/image-review.avif)
 
 If you need container fields that aren't in the form, select **Edit as YAML**. The form carries the current settings over to the creation page. After editing the YAML, select **Review changes** again, check all documents, and create the objects.
 
@@ -73,7 +73,7 @@ If you need container fields that aren't in the form, select **Edit as YAML**. T
 
 In the service's **Overview**, check that the replica is ready, then check **Logs** to confirm the app has started. If you entered a port, Zeabur adds a TCP traffic check. The replica starts receiving traffic only after it can accept connections.
 
-![Service overview showing replica status and the public address](https://oss.zeabur.com/shots/zeabur/en/light/service-overview.avif)
+![Service overview showing replica status and the public address](../images/shots/service-overview.avif)
 
 If the service has a public domain, open its address from **Networking** and check that the app responds. For a private service, connect from another service in the cluster using the address under **Private network**.
 
