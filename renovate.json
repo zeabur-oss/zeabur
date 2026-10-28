@@ -1,6 +1,6 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "description": "Cargo crates, web/ packages (bun.lock), action digests (zeabur-oss/.github's reusable workflows included), the k3s test version and the Zeabur Identity release tag; schedule, sign-off and grouping come from the shared preset github>zeabur-oss/.github. Lock file maintenance updates flake.lock: the Rust nightly and the Zeabur Catalog commit that zeabur-catalog embeds. scripts/bump-rke2.sh updates the pinned RKE2 release and its digests.",
+  "description": "Cargo crates, web/ packages (bun.lock), action digests (zeabur-oss/.github's reusable workflows included), the k3s test version and the Zeabur Identity release tag; schedule, sign-off and grouping come from the shared preset github>zeabur-oss/.github. Lock file maintenance updates flake.lock: the Rust nightly and the Zeabur Catalog commit that zeabur-catalog embeds. scripts/bump-rke2.sh updates the pinned RKE2 release and its digests, scripts/bump-design-system.sh the design system checked in under vendor/.",
   "extends": [
     "github>zeabur-oss/.github"
   ],

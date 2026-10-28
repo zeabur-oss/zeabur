@@ -54,7 +54,10 @@ signs. `zeabur-catalog` embeds that bundle. To move the pin, run `nix flake upda
 an unpushed catalog, add `--override-input catalog git+file://$PWD/../catalog` to `nix develop`.
 A release checks the bundle against the catalog's signed release at that commit
 (`scripts/release-pins.sh`). The files vendored for the interface's styles are checked in
-[zeabur-oss/design-system](https://github.com/zeabur-oss/design-system).
+[zeabur-oss/design-system](https://github.com/zeabur-oss/design-system). That package itself is
+checked in here as `vendor/zeabur-design-system-<commit>.tgz`, packed from a commit of its
+repository, so that `bun ci` downloads nothing from GitHub; `scripts/bump-design-system.sh
+<commit>` moves it.
 
 Every CI job is a call to `scripts/ci.sh <job>` (`scripts/ci.sh --list` names them), which enters
 its dev shell itself; the workflow only checks out, installs Nix and restores caches. So a job runs
