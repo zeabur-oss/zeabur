@@ -1,13 +1,7 @@
 name: Release
 
-# A tag vX.Y.Z on a commit of main builds and smokes every platform, publishes
-# the image and the chart by digest, signs and attests them, builds the installers that pin them,
-# then leaves a draft release that a maintainer checks and publishes (docs/internal/releasing.md);
-# nothing here publishes it. Run by hand, it rehearses: the builds and their smoke tests, nothing
-# published. With verify_only it checks an existing draft again with this commit's scripts.
-#
-# The jobs are zeabur-oss/.github's shared release workflow; each stage is
-# `scripts/release.sh <stage>` in this repository.
+# Tag vX.Y.Z on main: the shared release builds, publishes and signs the image, chart and
+# installers, then leaves a draft (docs/internal/releasing.md). Manual run: rehearse.
 on:
   push:
     tags: ['v[0-9]+.[0-9]+.[0-9]+']
