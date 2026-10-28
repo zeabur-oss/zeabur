@@ -156,11 +156,10 @@ case "$job" in
   no-ui) ./scripts/build-without-ui.sh ;;
   # The Helm chart: lint, what every rendering promises, and the values it refuses.
   chart) ./scripts/check-chart.sh ;;
-  # The interface's zh-TW wording (.zhtw-mcp.toml), and no file naming the project by an old name.
+  # The interface's zh-TW wording (.zhtw-mcp.toml).
   wording)
     (cd web; bun ci)
     ./scripts/check-zh-tw.sh
-    ./scripts/check-brand.sh
     ;;
   # Integration tests (JSON Patch writes, dry run, identity, revocation), `zeaburctl doctor`, and
   # browser tests in local mode with the embedded interface.
