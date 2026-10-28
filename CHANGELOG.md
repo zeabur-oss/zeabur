@@ -6,7 +6,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Before 1.0.0, a
 minor or patch release may break the API.
 
-## [0.1.0] - 2026-10-28
+## [0.1.1] - 2026-10-28
+
+The first published release. 0.1.0 was never published: zeabur-oss withdrew it in every
+repository, so everything listed under 0.1.0 in
+[CHANGELOG.md](https://github.com/zeabur-oss/zeabur/blob/v0.1.1/CHANGELOG.md) ships first in
+0.1.1.
+
+### Changed
+
+- Releases are built, signed and attested by the shared release workflow of
+  [zeabur-oss/.github](https://github.com/zeabur-oss/.github). Every signature and attestation
+  names `https://github.com/zeabur-oss/.github/.github/workflows/release.yml@…` as its signer,
+  with `zeabur-oss/zeabur` and the release tag as the certificate's repository and ref; verify
+  with `--certificate-identity-regexp`, `--certificate-github-workflow-repository` and
+  `--certificate-github-workflow-ref` (cosign) or `--signer-workflow` and `--source-ref`
+  (`gh attestation verify`), as the Releases reference shows.
+- A release checks that the catalog and Zeabur Identity releases it pins were signed by that same
+  shared workflow.
+
+## [0.1.0] - 2026-10-28 [YANKED]
+
+Never published.
+
 
 ### Added
 
@@ -109,4 +131,4 @@ minor or patch release may break the API.
   seven-day minimum age for new crate and package releases, and a reviewed allowlist for
   shipped `unsafe` and native code.
 
-[0.1.0]: https://github.com/zeabur-oss/zeabur/releases/tag/v0.1.0
+[0.1.1]: https://github.com/zeabur-oss/zeabur/releases/tag/v0.1.1
