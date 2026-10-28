@@ -88,15 +88,12 @@ down() {
 # A checkout of `$2` (a commit) from `$3` (a Git URL) in `$1`, kept between runs for its build
 # cache. A server that refuses to send a single commit gets a fetch of its branches.
 checkout() { # $1 = directory, $2 = commit, $3 = URL
-  # A partial .git, such as one a CI cache of target/ restored, is no repository: git would then
-  # act on the enclosing one, this checkout, and force-check-out and clean it. Start over instead.
+  # A partial .git (e.g. from a CI cache) would make git act on the enclosing repository.
   if [[ -e "$1" && "$(git -C "$1" rev-parse --show-toplevel 2>/dev/null)" != "$(cd "$1" && pwd -P)" ]]; then
     rm -rf "$1"
   fi
   [[ -d "$1/.git" ]] || git init -q "$1"
   if ! git -C "$1" cat-file -e "$2^{commit}" 2>/dev/null; then
-    # A release tag is fetched as the local tag it names; fetching it bare would only set
-    # FETCH_HEAD, and the checkout below would not find it.
     local ref="$2"
     [[ "$2" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] && ref="+refs/tags/$2:refs/tags/$2"
     git -C "$1" fetch -q --depth 1 "$3" "$ref" 2>/dev/null ||
@@ -210,6 +207,7 @@ up() {
   # --- Chart ------------------------------------------------------------------------------------
   if [[ "$chart" == oci://* ]]; then
     rm -rf "$state/chart"
+    mkdir -p "$state/chart"
     helm pull "$chart" --destination "$state/chart"
     chart=$(echo "$state"/chart/*.tgz)
   fi
