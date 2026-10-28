@@ -15,30 +15,18 @@ export const adding = store<{ project: string; what: AddWhat } | null>(null)
 
 export const openAdd = (project: string, what: AddWhat) => adding.set({ project, what })
 
-// A form's objects handed to the YAML page: in sessionStorage, not the URL, as they may hold
-// variable values.
-const handoffKey = (project: string) => `zeabur.create.${project}`
+// A form's objects handed to the YAML page: kept in memory, not the URL or storage, as they may
+// hold variable values.
+let handoff: { project: string; yaml: string } | null = null
 
 export function handOff(project: string, yaml: string) {
-  try {
-    window.sessionStorage.setItem(handoffKey(project), yaml)
-  } catch {
-    // Storage unavailable: the YAML page opens with its template.
-  }
+  handoff = { project, yaml }
 }
 
 export function handedOff(project: string): string | null {
-  try {
-    return window.sessionStorage.getItem(handoffKey(project))
-  } catch {
-    return null
-  }
+  return handoff?.project === project ? handoff.yaml : null
 }
 
 export function dropHandoff(project: string) {
-  try {
-    window.sessionStorage.removeItem(handoffKey(project))
-  } catch {
-    // Nothing to drop.
-  }
+  if (handoff?.project === project) handoff = null
 }
