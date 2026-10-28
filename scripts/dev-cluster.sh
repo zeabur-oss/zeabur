@@ -95,8 +95,12 @@ checkout() { # $1 = directory, $2 = commit, $3 = URL
   fi
   [[ -d "$1/.git" ]] || git init -q "$1"
   if ! git -C "$1" cat-file -e "$2^{commit}" 2>/dev/null; then
-    git -C "$1" fetch -q --depth 1 "$3" "$2" 2>/dev/null ||
-      git -C "$1" fetch -q "$3" '+refs/heads/*:refs/remotes/origin/*'
+    # A release tag is fetched as the local tag it names; fetching it bare would only set
+    # FETCH_HEAD, and the checkout below would not find it.
+    local ref="$2"
+    [[ "$2" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] && ref="+refs/tags/$2:refs/tags/$2"
+    git -C "$1" fetch -q --depth 1 "$3" "$ref" 2>/dev/null ||
+      git -C "$1" fetch -q "$3" '+refs/heads/*:refs/remotes/origin/*' '+refs/tags/*:refs/tags/*'
   fi
   git -C "$1" -c advice.detachedHead=false checkout -q --force "$2"
   git -C "$1" clean -qfdx -e target
