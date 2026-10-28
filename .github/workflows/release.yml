@@ -37,7 +37,7 @@ jobs:
   release:
     needs: checks
     if: ${{ !cancelled() && (needs.checks.result == 'success' || inputs.verify_only) }}
-    uses: zeabur-oss/.github/.github/workflows/release.yml@9d500376d4e7202c9343656fb6b85dc2eba26dd3 # main
+    uses: zeabur-oss/.github/.github/workflows/release.yml@0badbf68744c7690d1b5b613071044bc12b002be # main
     permissions:
       contents: write
       packages: write
@@ -52,5 +52,8 @@ jobs:
         [{"os": "linux", "arch": "amd64", "runner": "ubuntu-26.04"},
          {"os": "linux", "arch": "arm64", "runner": "ubuntu-26.04-arm"},
          {"os": "darwin", "arch": "arm64", "runner": "macos-26"}]
-      # The installers pin the image and the chart that publish pushed.
+      # The installers pin the image and the chart that publish pushed; they run on Linux servers.
       finish: true
+      finish-platforms: >-
+        [{"os": "linux", "arch": "amd64", "runner": "ubuntu-26.04"},
+         {"os": "linux", "arch": "arm64", "runner": "ubuntu-26.04-arm"}]

@@ -156,13 +156,8 @@ case "$stage" in
     mkdir -p "$6"
     dist="$(cd "$6" && pwd)"
     cd "$root"
-    if [[ "$os" != linux ]]; then
-      # The installer installs on a Linux server only. The workflow keeps every platform's
-      # finish output, which may not be empty; release-assets.sh ships nothing from here.
-      echo "No installer for $os-$arch: zeabur-installer runs on Linux servers only." \
-        >"$dist/no-installer-$os-$arch.txt"
-      exit 0
-    fi
+    # The installer runs on Linux servers only; release.yml finishes on Linux only.
+    [[ "$os" == linux ]] || { echo "no installer for $os-$arch" >&2; exit 2; }
     # The catalog and Zeabur Identity releases, and the image and the chart that publish pushed.
     export_lines < <("$scripts/release-pins.sh")
     export_lines <"$artifacts/published/outputs.env"
