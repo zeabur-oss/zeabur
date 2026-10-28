@@ -35,10 +35,10 @@ function files(dir: string): string[] {
 }
 
 const index = readFileSync(join(dist, "index.html"), "utf8")
-for (const tag of index.match(/<script\b[^>]*>/g) ?? []) {
-  if (!/\bsrc=/.test(tag)) throw new Error(`index.html has an inline script: ${tag}`)
+for (const tag of index.match(/<script\b[^>]*>/gi) ?? []) {
+  if (!/\bsrc=/i.test(tag)) throw new Error(`index.html has an inline script: ${tag}`)
 }
-if (/<style\b|\sstyle=/.test(index)) throw new Error("index.html has an inline style")
+if (/<style\b|\sstyle=/i.test(index)) throw new Error("index.html has an inline style")
 
 const lines: string[] = []
 for (const file of files(dist)) {
