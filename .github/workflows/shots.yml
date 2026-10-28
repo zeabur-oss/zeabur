@@ -1,10 +1,9 @@
 name: Screenshots
 
 # Takes docs/shots.yaml again after a change on main that can move a screen, and opens one pull
-# request with the images that changed (docs/internal/screenshots.md). A GitHub App token
-# (`UPDATE_BOT_CLIENT_ID`, `UPDATE_BOT_PRIVATE_KEY`; contents and pull requests read/write) opens
-# it, because a pull request made with GITHUB_TOKEN does not start CI. GitHub signs the commit,
-# as main requires.
+# request with the images that changed (docs/internal/screenshots.md). The organization's GitHub
+# App (`ZEABUR_OSS_BOT_CLIENT_ID`, `ZEABUR_OSS_BOT_PRIVATE_KEY`) opens it, because a pull request
+# made with GITHUB_TOKEN does not start CI. GitHub signs the commit, as main requires.
 
 on:
   push:
@@ -50,8 +49,8 @@ jobs:
         if: steps.changed.outputs.changed
         id: app
         with:
-          client-id: ${{ vars.UPDATE_BOT_CLIENT_ID }}
-          private-key: ${{ secrets.UPDATE_BOT_PRIVATE_KEY }}
+          client-id: ${{ vars.ZEABUR_OSS_BOT_CLIENT_ID }}
+          private-key: ${{ secrets.ZEABUR_OSS_BOT_PRIVATE_KEY }}
           permission-contents: write
           permission-pull-requests: write
       # The commit's author must match its sign-off (the DCO check).
