@@ -24,9 +24,9 @@ packed=("$work"/pack/*.tgz)
 [[ ${#packed[@]} == 1 && -f "${packed[0]}" ]] || { echo "bun pm pack made no single archive" >&2; exit 1; }
 
 archive="zeabur-design-system-${commit:0:7}.tgz"
-mkdir -p "$root/vendor"
 git -C "$root" rm --quiet --ignore-unmatch 'vendor/zeabur-design-system-*.tgz'
 rm -f "$root"/vendor/zeabur-design-system-*.tgz
+mkdir -p "$root/vendor"
 install -m 0644 "${packed[0]}" "$root/vendor/$archive"
 
 for web in web crates/zeabur-installer/web; do
