@@ -143,7 +143,7 @@ catalog_install() { # $1 = <capability>/<id>, $2 = namespace to wait for, $@ = <
   local component="$1" namespace="$2" work
   shift 2
   work=$(mktemp -d)
-  cargo run -q --locked -p zeabur-catalog --example install -- "$component" single-node "$@" >"$work/install.sh"
+  cargo run -q --locked --manifest-path "$root/Cargo.toml" -p zeabur-catalog --example install -- "$component" single-node "$@" >"$work/install.sh"
   (cd "$work" && bash -euo pipefail install.sh)
   rm -rf "$work"
   platform "$namespace"
@@ -380,7 +380,7 @@ sources:
   zeaburImage: $zeabur_image
   zeaburChart: $chart
 EOF
-  cargo build -q --locked -p zeabur-installer
+  cargo build -q --locked --manifest-path "$root/Cargo.toml" -p zeabur-installer
   "$root/target/debug/zeabur-installer" --config "$state/install.yaml" manifests --cluster-name "$cluster" |
     kubectl apply --server-side --force-conflicts -f - >/dev/null
   # What only this cluster sets: Zeabur Proxy when its image is built here.
