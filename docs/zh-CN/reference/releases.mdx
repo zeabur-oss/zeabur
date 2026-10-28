@@ -103,7 +103,7 @@ cosign verify \
 
 ## 发布流程
 
-维护者推送 `v<version>` tag 后，release workflow（本仓库的 `release.yml`，它调用 `zeabur-oss/.github` 中共用的那个）会确认该 commit 在 `main` 上的 CI 已通过，构建 Linux 和 macOS 版本，运行冒烟测试，发布镜像和 chart，再通过 Sigstore keyless 为镜像、chart 和校验和清单签名，并为三者生成构建来源 attestation。
+维护者推送 `v<version>` tag 后，release workflow（本仓库的 `release.yml`，它调用 `zeabur-oss/.github` 中共用的那个）会构建 Linux 和 macOS 版本，运行冒烟测试，发布镜像和 chart，再通过 Sigstore keyless 为镜像、chart 和校验和清单签名，并为三者生成构建来源 attestation。
 
 Workflow 最后创建 GitHub release 草稿，维护者检查后才公开。只有 Releases 页面上能看到的版本才有可下载的文件。
 

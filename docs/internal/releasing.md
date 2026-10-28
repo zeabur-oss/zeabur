@@ -41,8 +41,7 @@ which release it is. `verify` gets these in `RELEASE_CERT_IDENTITY_REGEXP`,
    runs the three builds with their smoke tests and publishes nothing; the pins are
    not checked and no pinned installer is built.
 3. Before the first release only, see [Settings the workflow needs](#settings-the-workflow-needs).
-4. Wait for **CI** on `main` to pass for the merged commit: the release checks it and stops
-   otherwise. Tag the commit and push the tag:
+4. Check that **CI** passed on `main` for the merged commit, then tag it and push the tag:
 
    ```sh
    git fetch git@github.com:zeabur-oss/zeabur.git main

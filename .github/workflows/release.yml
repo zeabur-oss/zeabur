@@ -1,6 +1,6 @@
 name: Release
 
-# A tag vX.Y.Z, on a commit whose CI passed on main, builds and smokes every platform, publishes
+# A tag vX.Y.Z on a commit of main builds and smokes every platform, publishes
 # the image and the chart by digest, signs and attests them, builds the installers that pin them,
 # then leaves a draft release that a maintainer checks and publishes (docs/internal/releasing.md);
 # nothing here publishes it. Run by hand, it rehearses: the builds and their smoke tests, nothing
@@ -32,7 +32,6 @@ jobs:
   release:
     uses: zeabur-oss/.github/.github/workflows/release.yml@b3f7020362ae22142299b16a89fbd5467dccde0b # main
     permissions:
-      actions: read
       contents: write
       packages: write
       id-token: write

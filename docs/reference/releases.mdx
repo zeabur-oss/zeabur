@@ -102,7 +102,7 @@ Replace the placeholders in angle brackets with the values from `digests.txt`. F
 
 ## Release process
 
-When a maintainer pushes a `v<version>` tag, the release workflow (this repository's `release.yml`, which calls the shared one in `zeabur-oss/.github`) checks that CI passed for that commit on `main`, builds the Linux and macOS binaries, runs smoke tests, and publishes the image and chart. It then signs the image, chart, and checksum list with Sigstore keyless signing and generates build provenance attestations for all three.
+When a maintainer pushes a `v<version>` tag, the release workflow (this repository's `release.yml`, which calls the shared one in `zeabur-oss/.github`) builds the Linux and macOS binaries, runs smoke tests, and publishes the image and chart. It then signs the image, chart, and checksum list with Sigstore keyless signing and generates build provenance attestations for all three.
 
 The workflow finishes by creating a draft GitHub release. A maintainer checks the draft before publishing it. Downloadable files are available only for versions visible on the Releases page.
 
