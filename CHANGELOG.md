@@ -20,6 +20,9 @@ minor or patch release may break the API.
 - Zeabur Proxy's image, `ghcr.io/zeabur-oss/proxy`, is published, signed and attested with each
   release, and the chart pins it by digest. 0.1.1 did not publish it, so an installation with
   VictoriaMetrics or VictoriaLogs left `zeabur-proxy` unable to pull its image.
+- `zeabur-installer apply` moves the redirect URI of Zeabur's OAuth client to a changed
+  `access.zeabur`, as it already did the home URL. It kept the first host's, so signing in to
+  Zeabur at the new host failed with "This app's return address isn't registered".
 
 ## [0.1.1] - 2026-10-28
 
