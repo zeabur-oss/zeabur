@@ -73,7 +73,9 @@ pub fn failing(pod: &PodSummary, now: Option<Timestamp>) -> bool {
 /// It waits in `CrashLoopBackOff`; or it restarted at least twice (so its previous run was itself a
 /// restart), that run lasted less than ten minutes, and the current run is not running yet or
 /// started less than ten minutes before `now`. The exit code and readiness do not count,
-/// as they do not in the kubelet. Missing times count as short runs.
+/// as they do not in the kubelet. Missing times count as short runs. A container that has
+/// completed successfully, such as an init container that succeeded after failed attempts, is
+/// not restarted again.
 #[must_use]
 pub fn crash_looping(status: &ContainerStatusSummary, now: Option<Timestamp>) -> bool {
     if status
@@ -82,6 +84,9 @@ pub fn crash_looping(status: &ContainerStatusSummary, now: Option<Timestamp>) ->
         .is_some_and(|w| w.reason.as_deref() == Some("CrashLoopBackOff"))
     {
         return true;
+    }
+    if status.terminated.as_ref().is_some_and(|t| t.exit_code == 0) {
+        return false;
     }
     let Some(last) = &status.last_termination else {
         return false;
@@ -410,5 +415,28 @@ mod tests {
             message: None,
         });
         assert!(crash_looping(status, Some(now)));
+    }
+
+    #[test]
+    fn an_init_container_that_succeeded_after_failing_does_not_fail_its_pod() {
+        let (mut pod, now) = ready_after_run(3, SignedDuration::from_secs(5), SignedDuration::ZERO);
+        let status = &mut pod.container_statuses[0];
+        status.running_since = None;
+        status.terminated = Some(ContainerTermination {
+            reason: Some("Completed".to_owned()),
+            exit_code: 0,
+            started: Some(now.to_string()),
+            finished: Some(now.to_string()),
+            message: None,
+        });
+        assert_eq!(pod_health(&pod, Some(now)), Health::Ok);
+        let later = now.checked_add(SignedDuration::from_hours(1)).unwrap();
+        assert_eq!(pod_health(&pod, Some(later)), Health::Ok);
+        pod.container_statuses[0]
+            .terminated
+            .as_mut()
+            .unwrap()
+            .exit_code = 1;
+        assert_eq!(pod_health(&pod, Some(now)), Health::Fail);
     }
 }
