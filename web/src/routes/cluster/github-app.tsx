@@ -279,6 +279,13 @@ function AppLink({ app }: { app: Schemas["GitHubApp"]["app"] }) {
 /** Why no installation shows: GitHub did not answer, or the App is installed nowhere yet. */
 function InstallationsNote({ data }: { data: Schemas["GitHubApp"] }) {
   const t = useT()
+  if (data.apiUrlRefused)
+    return (
+      <Alert variant="warn">
+        <WarningIcon aria-hidden="true" />
+        <AlertDescription>{t("githubApp.apiUrlNotHttps")}</AlertDescription>
+      </Alert>
+    )
   if (data.installationsProblem)
     return (
       <Alert variant="warn">

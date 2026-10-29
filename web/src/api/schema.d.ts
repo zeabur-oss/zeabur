@@ -4881,6 +4881,8 @@ export interface components {
     }
     /** @description The cluster's GitHub App. */
     GitHubApp: {
+      /** @description The Secret's `api-url` is not an https URL, which is why the installations were not read. */
+      apiUrlRefused?: boolean
       app?: components["schemas"]["GitHubAppView"] | null
       /** @description Whether the person may make the App and grant its installations. */
       canChange: components["schemas"]["Permission"]

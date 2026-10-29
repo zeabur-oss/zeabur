@@ -443,4 +443,31 @@ mod tests {
             "{refused}"
         );
     }
+
+    #[tokio::test]
+    async fn an_http_api_url_in_the_secret_is_refused_as_builder_does() {
+        let (cluster, app, fake) = setup().await;
+        made(&app, &fake).await;
+        cluster.update(|s| {
+            s.secret_values
+                .get_mut("builder-system/github-app")
+                .unwrap()
+                .insert(
+                    "api-url".to_owned(),
+                    b"http://ghe.example.com/api/v3".to_vec(),
+                );
+        });
+        let (status, found) = send(&app, "GET", BASE, None).await;
+        assert_eq!(status, StatusCode::OK, "{found}");
+        assert_eq!(found["apiUrlRefused"], true, "{found}");
+        assert_eq!(
+            found["installationsProblem"], "`api-url` must be an https URL",
+            "{found}"
+        );
+        let body = json!({"installationId": INSTALLATION, "namespaces": ["shop"]});
+        let (status, refused) = send(&app, "POST", &format!("{BASE}/plan"), Some(&body)).await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{refused}");
+        assert_eq!(refused["detail"], "`api-url` must be an https URL");
+        assert_eq!(refused["summary"]["key"], "problem.summary.githubApiUrl");
+    }
 }

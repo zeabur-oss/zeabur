@@ -2740,6 +2740,7 @@ export const zhCN: Messages = {
   "githubApp.installations": "已安装的账号",
   "githubApp.noInstallations": "还没安装到任何账号。装到存放仓库的账号或组织，就能开始部署。",
   "githubApp.installationsProblem": "读不到 GitHub 上的安装情况。",
+  "githubApp.apiUrlNotHttps": "github-app Secret 里的 api-url 要是 https 地址。改好后刷新页面。",
   "githubApp.selection.all": "所有仓库",
   "githubApp.selection.selected": "指定的仓库",
   "githubApp.everyProject": "所有项目",
@@ -3255,6 +3256,8 @@ export const zhCN: Messages = {
   "sentence.problem.summary.too-many-requests": () => "集群正忙。",
   "sentence.problem.summary.github": (p) => `GitHub 没有正常响应：${p.detail}`,
   "sentence.problem.github.fix": () => "再试一次。一直失败的话，确认集群能连上 GitHub。",
+  "sentence.problem.summary.githubApiUrl": () => "GitHub App 的 api-url 要是 https 地址。",
+  "sentence.problem.githubApiUrl.fix": () => "把 github-app Secret 里的 api-url 改成 GitHub API 的 https 地址。",
   "sentence.problem.summary.unavailable": () => "连不上集群。",
   "sentence.problem.summary.internal": () => "Zeabur 内部发生错误。",
   "sentence.problem.summary.quota-exceeded": (p) =>

@@ -9335,6 +9335,11 @@ components:
       - webUrl
       - unreadable
       properties:
+        apiUrlRefused:
+          type: boolean
+          description: >-
+            The Secret's `api-url` is not an https URL, which is why the installations were
+            not read.
         app:
           oneOf:
           - $ref: "#/components/schemas/GitHubAppView"
