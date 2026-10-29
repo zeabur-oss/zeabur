@@ -78,7 +78,6 @@ pub(crate) fn run(config_path: &Path) -> Result<(), InstallError> {
         if !namespace.public {
             kubectl.apply_object(&plan::network_policy(&namespace.name, &nodes))?;
         }
-        kubectl.apply_object(&plan::default_service_account(&namespace.name))?;
     }
     kubectl.apply_object(&plan::servicelb_policy(distribution))?;
 

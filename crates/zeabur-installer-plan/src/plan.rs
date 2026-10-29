@@ -1266,21 +1266,6 @@ pub fn namespace_object(namespace: &Namespace) -> Value {
     json!({"apiVersion": "v1", "kind": "Namespace", "metadata": metadata})
 }
 
-/// The `default` `ServiceAccount` of a namespace, mounting no token.
-///
-/// A pod that names no account of its own reaches nothing in the API, as the CIS benchmark asks.
-/// Workloads that call the API run as accounts of their own.
-#[must_use]
-pub fn default_service_account(namespace: &str) -> Value {
-    json!({
-        "apiVersion": "v1",
-        "kind": "ServiceAccount",
-        "metadata": {"name": "default", "namespace": namespace,
-            "labels": {"app.kubernetes.io/managed-by": MANAGER}},
-        "automountServiceAccountToken": false,
-    })
-}
-
 /// Calico's annotations on a Node naming the addresses of its VXLAN interface.
 const CALICO_TUNNEL_ANNOTATIONS: [&str; 2] = [
     "projectcalico.org/IPv4VXLANTunnelAddr",
@@ -2011,14 +1996,6 @@ mod tests {
                 "baseline"
             );
         }
-    }
-
-    #[test]
-    fn default_service_accounts_mount_no_token() {
-        let account = default_service_account("traefik");
-        assert_eq!(account["metadata"]["name"], "default");
-        assert_eq!(account["metadata"]["namespace"], "traefik");
-        assert_eq!(account["automountServiceAccountToken"], false);
     }
 
     #[test]
