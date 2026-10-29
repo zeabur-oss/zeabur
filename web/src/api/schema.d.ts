@@ -4886,8 +4886,7 @@ export interface components {
       canChange: components["schemas"]["Permission"]
       /** @description The App's installations; absent when they could not be read. */
       installations?: components["schemas"]["GitHubInstallation"][] | null
-      /** @description Why the installations could not be read, in GitHub's or Zeabur's words. */
-      installationsProblem?: string | null
+      installationsProblem?: components["schemas"]["Problem"] | null
       /** @description Zeabur Builder's namespace, where the App is kept. */
       namespace: string
       /** @description What could not be read. */

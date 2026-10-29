@@ -44,6 +44,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use sha2::{Digest as _, Sha256};
 use utoipa::ToSchema;
+use zeabur_core::message::Message;
 use zeabur_core::problem::{Denied, Kind, MEDIA_TYPE as PROBLEM, Problem};
 use zeabur_kube::k8s_openapi::jiff::Timestamp;
 use zeabur_kube::{Cluster, ClusterExt as _, ObjectTarget, ResourceRef, WriteBody, WriteRequest};
@@ -89,9 +90,9 @@ pub struct GitHubApp {
     /// The App's installations; absent when they could not be read.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub installations: Option<Vec<GitHubInstallation>>,
-    /// Why the installations could not be read, in GitHub's or Zeabur's words.
+    /// Why the installations could not be read: the Secret is unusable, or GitHub did not answer.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub installations_problem: Option<String>,
+    pub installations_problem: Option<Problem>,
     /// Where people open GitHub, `https://github.com`.
     pub web_url: String,
     /// What could not be read.
@@ -322,7 +323,6 @@ fn problem(kind: Kind, detail: impl Into<String>) -> ApiError {
 }
 
 fn github_problem(error: &str) -> ApiError {
-    use zeabur_core::message::Message;
     let mut problem = Problem::new(Kind::Unavailable, format!("GitHub: {error}"));
     "GitHub did not answer as expected".clone_into(&mut problem.title);
     problem.summary = Message::new("problem.summary.github").with("detail", error);
@@ -401,6 +401,24 @@ fn dns_label(name: &str) -> bool {
         && !name.ends_with('-')
 }
 
+/// Builder's message for an `api-url` that is not https.
+const API_URL_NOT_HTTPS: &str = "`api-url` must be an https URL";
+
+/// Why the Secret's `api-url` is refused, in Builder's words. The address of Zeabur's own
+/// settings is the administrator's and is not checked.
+fn api_url_problem(api_url: &str, configured: &str) -> Option<&'static str> {
+    if api_url == configured {
+        return None;
+    }
+    match api_url.strip_prefix("https://") {
+        None => Some(API_URL_NOT_HTTPS),
+        Some(rest) if rest.split('/').next().is_none_or(str::is_empty) => {
+            Some("`api-url` has no host")
+        }
+        Some(_) => None,
+    }
+}
+
 /// The App's credentials from its Secret, read as the person: `(issuer, private key, API)`.
 async fn credentials(
     cluster: &dyn Cluster,
@@ -431,11 +449,20 @@ async fn credentials(
             format!("The Secret {SECRET} in {NAMESPACE} has no app-id or private-key."),
         ));
     };
-    Ok((
-        issuer,
-        key,
-        value("api-url").unwrap_or_else(|| default_api.to_owned()),
-    ))
+    let api = value("api-url").map(|v| v.trim_end_matches('/').to_owned());
+    if let Some(why) = api
+        .as_deref()
+        .and_then(|api| api_url_problem(api, default_api.trim_end_matches('/')))
+    {
+        let mut refused = Problem::new(Kind::Invalid, why);
+        refused.summary = Message::new("problem.summary.githubApiUrl");
+        refused.fix_for_occasion(
+            "Set `api-url` in the Secret to the https address of GitHub's API.",
+            Message::new("problem.githubApiUrl.fix"),
+        );
+        return Err(ApiError::from(refused));
+    }
+    Ok((issuer, key, api.unwrap_or_else(|| default_api.to_owned())))
 }
 
 fn client(state: &AppState) -> Result<&crate::images::https::Https, ApiError> {
@@ -501,7 +528,7 @@ pub(crate) async fn get(
     let (installations, installations_problem) = if app.is_some() {
         match listed(&state, cluster, grants.as_ref()).await {
             Ok(list) => (Some(list), None),
-            Err(why) => (None, Some(why)),
+            Err(why) => (None, Some(*why.0)),
         }
     } else {
         (None, None)
@@ -521,13 +548,15 @@ async fn listed(
     state: &AppState,
     cluster: &dyn Cluster,
     grants: Option<&Value>,
-) -> Result<Vec<GitHubInstallation>, String> {
-    let (issuer, key, api) = credentials(cluster, &state.settings.github.api_url)
+) -> Result<Vec<GitHubInstallation>, ApiError> {
+    let (issuer, key, api) = credentials(cluster, &state.settings.github.api_url).await?;
+    let http = client(state)?;
+    let jwt =
+        github::jwt(&issuer, &key, (state.clock)().as_second()).map_err(|e| github_problem(&e))?;
+    let found = GitHub { http, api: &api }
+        .installations(&jwt)
         .await
-        .map_err(|e| e.0.detail.clone())?;
-    let http = client(state).map_err(|e| e.0.detail.clone())?;
-    let jwt = github::jwt(&issuer, &key, (state.clock)().as_second())?;
-    let found = GitHub { http, api: &api }.installations(&jwt).await?;
+        .map_err(|e| github_problem(&e))?;
     Ok(found
         .into_iter()
         .map(|i| {
@@ -1285,6 +1314,24 @@ mod tests {
         elsewhere.redirect_url = "https://evil.example.com/settings/github-app".to_owned();
         assert!(manifest_problem(&elsewhere, host).is_some());
         assert!(manifest_problem(&request("http://hooks.example.com"), host).is_some());
+    }
+
+    #[test]
+    fn the_secrets_api_url_must_be_https_as_in_builder() {
+        let own = "http://127.0.0.1:9";
+        assert_eq!(
+            api_url_problem("http://ghe.example.com/api/v3", "https://api.github.com"),
+            Some("`api-url` must be an https URL")
+        );
+        assert_eq!(
+            api_url_problem("https:///api", "https://api.github.com"),
+            Some("`api-url` has no host")
+        );
+        assert_eq!(
+            api_url_problem("https://ghe.example.com/api/v3", "https://api.github.com"),
+            None
+        );
+        assert_eq!(api_url_problem(own, own), None);
     }
 
     #[test]
