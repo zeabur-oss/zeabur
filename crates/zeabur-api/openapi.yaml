@@ -7253,7 +7253,7 @@ components:
           type: integer
           format: int32
           description: How many times the kubelet restarted it.
-        runningSince:
+        startedAt:
           type:
           - string
           - "null"

@@ -96,7 +96,7 @@ pub fn crash_looping(status: &ContainerStatusSummary, now: Option<Timestamp>) ->
         (Some(started), Some(finished)) => finished.duration_since(started) < BACKOFF_RESET,
         _ => true,
     };
-    let current_run_short = match (parse(&status.running_since), now) {
+    let current_run_short = match (parse(&status.started_at), now) {
         (Some(since), Some(now)) => now.duration_since(since) < BACKOFF_RESET,
         (Some(_), None) => false,
         (None, _) => true,
@@ -360,7 +360,7 @@ mod tests {
             ready: true,
             restarts,
             waiting: None,
-            running_since: Some(since.to_string()),
+            started_at: Some(since.to_string()),
             terminated: None,
             last_termination: Some(ContainerTermination {
                 reason: Some("Error".to_owned()),
@@ -407,7 +407,7 @@ mod tests {
     fn a_container_waiting_in_back_off_is_a_crash_loop_whatever_it_exited_with() {
         let (mut pod, now) = ready_after_run(1, SignedDuration::from_secs(5), SignedDuration::ZERO);
         let status = &mut pod.container_statuses[0];
-        status.running_since = None;
+        status.started_at = None;
         status.last_termination.as_mut().unwrap().exit_code = 0;
         assert!(!crash_looping(status, Some(now)));
         status.waiting = Some(ContainerWaiting {
@@ -421,7 +421,7 @@ mod tests {
     fn an_init_container_that_succeeded_after_failing_does_not_fail_its_pod() {
         let (mut pod, now) = ready_after_run(3, SignedDuration::from_secs(5), SignedDuration::ZERO);
         let status = &mut pod.container_statuses[0];
-        status.running_since = None;
+        status.started_at = None;
         status.terminated = Some(ContainerTermination {
             reason: Some("Completed".to_owned()),
             exit_code: 0,

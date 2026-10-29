@@ -3771,7 +3771,7 @@ export interface components {
        */
       restarts: number
       /** @description When the current run started, in RFC 3339, when it is running. */
-      runningSince?: string | null
+      startedAt?: string | null
       terminated?: components["schemas"]["ContainerTermination"] | null
       waiting?: components["schemas"]["ContainerWaiting"] | null
     }

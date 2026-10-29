@@ -64,7 +64,7 @@ pub struct ContainerStatusSummary {
     pub waiting: Option<ContainerWaiting>,
     /// When the current run started, in RFC 3339, when it is running.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub running_since: Option<String>,
+    pub started_at: Option<String>,
     /// How it ended, when it is terminated now.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub terminated: Option<ContainerTermination>,

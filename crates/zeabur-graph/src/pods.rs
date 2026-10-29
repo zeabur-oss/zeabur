@@ -119,7 +119,7 @@ fn container_status(status: &ContainerStatus, init: bool) -> ContainerStatusSumm
                 reason: waiting.reason.clone(),
                 message: waiting.message.clone(),
             }),
-        running_since: state
+        started_at: state
             .and_then(|s| s.running.as_ref())
             .and_then(|running| running.started_at.as_ref())
             .map(|time| time.0.to_string()),
