@@ -4,7 +4,7 @@ description: 用一筆萬用字元紀錄讓所有產生網址連到叢集，並�
 source: "320eed08f87d"
 ---
 
-應用程式網域是產生網址共用的網域，只要替它設定一次萬用字元紀錄，之後每個新服務的網址都會解析到叢集。例如應用程式網域是 `apps.example.com`，就新增一筆 `*.apps.example.com` 的 A 紀錄，指向伺服器的 IPv4 位址。伺服器有 IPv6 位址的話，再加一筆 AAAA 紀錄。之後 `web-shop.apps.example.com` 這類新網址不用再新增紀錄。
+應用程式網域是產生網址共用的網域，只要替這個網域設定一次萬用字元紀錄，之後每個新服務的網址都會解析到叢集。例如應用程式網域是 `apps.example.com`，就新增一筆 `*.apps.example.com` 的 A 紀錄，指向伺服器的 IPv4 位址。伺服器有 IPv6 位址時，再加一筆 AAAA 紀錄。之後 `web-shop.apps.example.com` 這類新網址不用再新增紀錄。
 
 HTTPS 憑證由 Let's Encrypt 用 HTTP-01 驗證，每個網址各簽一張，所以網際網路要能連到伺服器的 TCP 80 連接埠。Zeabur 不會替你修改 DNS，紀錄要到自己的 DNS 供應商新增。
 
@@ -118,7 +118,7 @@ Gandi、Namecheap、HiNet 這類註冊商的 DNS 管理頁，欄位名稱各家�
 
 每個自訂網域各新增一筆 A 或 AAAA 紀錄，指向伺服器 IP。也可以新增 CNAME，指向應用程式網域底下的名稱，例如 `web-shop.apps.example.com`。服務**網路**分頁會列出這個網域要新增的紀錄，加網域的步驟見[加上公開網域與 HTTPS](./domains.mdx)。
 
-網域本身（例如 `example.com`）只能用 A 或 AAAA 紀錄，多數 DNS 供應商不允許在這裡用 CNAME。Cloudflare 例外，它會把網域本身的 CNAME 攤平成 A 紀錄（CNAME flattening）。在 Route 53 新增網域本身的紀錄時，**Record name** 留空，不要填 `@`。
+網域本身（例如 `example.com`）只能用 A 或 AAAA 紀錄，多數 DNS 供應商不允許在這裡用 CNAME。Cloudflare 例外，會把網域本身的 CNAME 攤平成 A 紀錄（CNAME flattening）。在 Route 53 新增網域本身的紀錄時，**Record name** 留空，不要填 `@`。
 
 ## 沒有自己的網域
 
@@ -134,7 +134,7 @@ web-shop.203-0-113-7.sslip.io
 
 DNS 紀錄在叢集外，Zeabur 不寫入任何物件，只讀兩樣東西來列出要新增的紀錄。
 
-應用程式網域：安裝時填的值是 Helm chart 的 `domains.suffixes`。在**叢集**頁改過的話，新的清單存在 Zeabur Namespace 的 ConfigMap `zeabur-settings`，鍵是 `domain-suffixes`，一行一個網域：
+應用程式網域：安裝時填的值是 Helm chart 的 `domains.suffixes`。在**叢集**頁改過之後，新的清單存在 Zeabur Namespace 的 ConfigMap `zeabur-settings`，鍵是 `domain-suffixes`，一行一個網域：
 
 ```sh
 kubectl -n zeabur get configmap zeabur-settings -o jsonpath='{.data.domain-suffixes}'

@@ -67,10 +67,10 @@ After editing a key or clicking **Add key**, submit the changes for review. When
 After you edit a config file or secret, environment variables in containers that are already running keep their old values. The change review lists services that need a restart and services that Reloader may restart automatically.
 
 - To handle restarts manually, click **Restart** for each service that needs the new values, then check that its replicas are ready.
-- To handle restarts automatically, open the service's **Settings** → **Compute**, enable **Restart when its config files or secrets change**, then review and apply. Stakater Reloader must be running in the cluster. Enabling the option alone won't restart services.
+- To handle restarts automatically, open the service's **Settings** → **Compute**, enable **Restart when its config files or secrets change**, then review and apply. Stakater Reloader must be running in the cluster. The option alone restarts nothing.
 - Once enabled, the service restarts when the source changes, whether you edit it in Zeabur or with another tool. If every service that reads the source has this option enabled, they'll restart together.
 
-**May still use the old value until restarted** means the source changed after a replica started. Expand the notice to see which replicas are affected. A completed Job won't run again because its source changed.
+**May still use the old value until restarted** means the source changed after a replica started. Expand the notice to see which replicas are affected. A completed Job doesn't run again when its source changes.
 
 ## Create shared variables and connect them to a service
 
@@ -236,6 +236,6 @@ For variables imported as a set, select **Stop reading** on the source row, then
 
 For a variable that reads a single key, select **Remove variable** next to the source, then review and apply. This removes only the variable from the service. The shared source and all its keys remain.
 
-To delete an entire set of shared variables, first confirm that **Used by** is empty in the project's **Settings** → **Shared variables**. Then open the corresponding ConfigMap or Secret in the project's **Objects**, click **Delete** under **YAML**, review, and apply. If a service still reads keys from this source, replicas started afterward won't be able to start because they can't find the source.
+To delete an entire set of shared variables, first confirm that **Used by** is empty in the project's **Settings** → **Shared variables**. Then open the corresponding ConfigMap or Secret in the project's **Objects**, click **Delete** under **YAML**, review, and apply. If a service still reads keys from this source, new replicas fail to start because they can't find the source.
 
 If the app's public URL changes, also check its [domains](./domains.mdx) and variables such as `APP_URL`. Use [maintenance mode](./maintenance.mdx) to handle visitor traffic during maintenance.

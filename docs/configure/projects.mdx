@@ -31,7 +31,7 @@ If a namespace with the same name already exists, the form prompts you to use th
 After you submit the form, the review screen lists the objects to create:
 
 - Namespace `hello`, with the project label and three Pod Security labels, all set to `baseline`. Services can run as root but can't access the host.
-- The `default` ServiceAccount with `automountServiceAccountToken: false`. Replicas that don't specify a ServiceAccount won't receive a Kubernetes API token.
+- The `default` ServiceAccount with `automountServiceAccountToken: false`. Replicas that don't specify a ServiceAccount don't receive a Kubernetes API token.
 - If the cluster has a namespace labeled `zeabur.com/platform: "true"` (all clusters installed with the Zeabur installer do), NetworkPolicy `zeabur-project` blocks connections from replicas in other projects.
 
 ![Review screen before creating project hello, showing the namespace and security settings to create](../images/shots/project-new-review.avif)

@@ -7,8 +7,8 @@ Open the service's **Networking** tab and configure two settings under **IP limi
 
 ## Before you start
 
-- Who can access domains: Domains must use an Ingress served by Traefik. Gateway domains (HTTPRoute) have no equivalent setting. If the service only has Gateway domains, the panel shows **Domains served through a Gateway can't be restricted here**.
-- Where it can connect: The cluster's network plugin must support NetworkPolicy. K3s's built-in controller supports it. If the plugin doesn't support it, Kubernetes can create the objects, but they won't block any connections.
+- Who can open its domains: Domains must use an Ingress served by Traefik. Gateway domains (HTTPRoute) have no equivalent setting. If the service only has Gateway domains, the panel shows **Domains served through a Gateway can't be restricted here**.
+- Where its replicas can connect: The cluster's network plugin must support NetworkPolicy; K3s's built-in controller does. If the plugin doesn't, Kubernetes still creates the objects, but they block nothing.
 - You need permission to modify the project's domains and NetworkPolicy objects. If Helm, Argo CD, or Flux manages the service, make changes in the original values or Git repository.
 - These settings are separate from **Isolate** in the project settings. Isolation controls whether other projects can connect to the project. IP restrictions apply to a single service and don't change the project's `zeabur-project` rules.
 
@@ -39,7 +39,7 @@ To remove the restriction, return to the same panel and turn off the setting. Ea
 
 ### The IP Traefik sees
 
-By default, Traefik checks the connection's source address. If the cluster's entry point changes that address, Traefik won't check the visitor's IP. The restriction may then block everyone or allow everyone.
+By default, Traefik checks the connection's source address. If the cluster's entry point changes that address, Traefik never sees the visitor's IP. The restriction may then block everyone or allow everyone.
 
 - For Traefik installed with the Zeabur installer, the Service's `externalTrafficPolicy` is `Local`. Requests sent to a node running Traefik retain the visitor's address. This setting comes from the Traefik template in Zeabur Catalog. Whether the address is preserved when ServiceLB forwards requests from other nodes hasn't been verified.
 - If a CDN, reverse proxy, or cloud load balancer sits in front of Traefik, Traefik sees its address. In that case, configure `ipStrategy` on the Middleware to read `X-Forwarded-For`, and configure Traefik's entry point to trust that proxy's addresses (`forwardedHeaders.trustedIPs`). Zeabur doesn't change these settings for you.
@@ -77,7 +77,7 @@ You can leave the list empty. With an empty list, the service can connect only t
 
 ### Review and apply
 
-Click **Review changes**. The review marks the risk as high because connections outside the list—including package updates and external API calls—will fail after you apply the changes. Review and apply the changes.
+Click **Review changes**. The review marks the risk as high: after you apply the changes, connections outside the list fail, including package updates and external API calls. Check the review, then apply.
 
 ![Reviewing restrictions on where web can connect, with a warning that web can connect only to listed IPs, services in the same project, and DNS](../images/shots/ip-limit-out-review.avif)
 

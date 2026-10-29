@@ -40,10 +40,10 @@ source: "7c41b28d8a45"
 
 ### Traefik 看到的 IP
 
-Traefik 預設用連線的來源位址比對。叢集的入口如果會改掉來源位址，比對的就不是訪客的 IP，限制會擋掉所有人，或放行所有人。
+Traefik 預設用連線的來源位址比對。叢集的入口會改掉來源位址時，比對的就不是訪客的 IP，限制會擋掉所有人，或放行所有人。
 
 - 用 Zeabur 安裝程式裝的 Traefik，Service 的 `externalTrafficPolicy` 是 `Local`，連到 Traefik 所在節點的請求會保留訪客的位址。這份設定來自 Zeabur Catalog 的 Traefik 範本。ServiceLB 把其他節點的請求轉過來時，位址是否保留，還沒有驗證。
-- 前面還有 CDN、反向代理或雲端負載平衡器時，Traefik 看到的是它們的位址。這時要在 Middleware 設定 `ipStrategy`，讀 `X-Forwarded-For`，也要讓 Traefik 的 entry point 信任那層代理的位址（`forwardedHeaders.trustedIPs`）。Zeabur 不會替你改這些設定。
+- 前面還有 CDN、反向代理或雲端負載平衡器時，Traefik 看到的是這些代理的位址。這時要在 Middleware 設定 `ipStrategy`，讀 `X-Forwarded-For`，也要讓 Traefik 的 entry point 信任那層代理的位址（`forwardedHeaders.trustedIPs`）。Zeabur 不會替你改這些設定。
 - 後續修改清單時，Zeabur 只改 `sourceRange`，你加在 Middleware 上的 `ipStrategy` 會保留。
 
 套用後，從允許和不允許的 IP 各連一次，確認結果。
@@ -97,18 +97,18 @@ spec:
 
 ## 用 kubectl 設定和移除
 
-兩種限制都是一般的 Kubernetes 物件，沒有 finalizer，也沒有依賴 Zeabur 的欄位。移除 Zeabur 之後，它們仍然有效。
+兩種限制都是一般的 Kubernetes 物件，沒有 finalizer，也沒有依賴 Zeabur 的欄位。移除 Zeabur 之後仍然有效。
 
-**誰能開啟網域**：每個 Ingress 會有一個 Middleware，名稱是 `<Ingress 名稱>-ip-allow`，它的 `ownerReferences` 指向 Ingress。Ingress 的 annotation `traefik.ingress.kubernetes.io/router.middlewares` 列出它。要移除，先從 annotation 拿掉 `<專案>-<Ingress 名稱>-ip-allow@kubernetescrd`，再刪 Middleware。先刪 Middleware 的話，Traefik 找不到它，網域會回 404。
+**誰能開啟網域**：每個 Ingress 會有一個 Middleware，名稱是 `<Ingress 名稱>-ip-allow`，`ownerReferences` 指向 Ingress，Ingress 的 annotation `traefik.ingress.kubernetes.io/router.middlewares` 會列出這個 Middleware。要移除，先從 annotation 拿掉 `<專案>-<Ingress 名稱>-ip-allow@kubernetescrd`，再刪 Middleware。要是先刪 Middleware，Traefik 會找不到，網域會回 404。
 
 ```sh
 kubectl -n shop annotate ingress api traefik.ingress.kubernetes.io/router.middlewares-
 kubectl -n shop delete middleware api-ip-allow
 ```
 
-上面的 annotation 指令會移除整個清單。如果 Ingress 還有轉址、密碼等其他中介層，改用 `kubectl edit`，只拿掉這一項。
+上面的 annotation 指令會移除整個清單。Ingress 還有轉址、密碼等其他中介層時，改用 `kubectl edit`，只拿掉這一項。
 
-**能連到哪裡**：NetworkPolicy 名稱是 `<服務名稱>-egress-limit`，`policyTypes` 只有 `Egress`。刪掉它，限制就解除：
+**能連到哪裡**：NetworkPolicy 名稱是 `<服務名稱>-egress-limit`，`policyTypes` 只有 `Egress`。刪掉這個 NetworkPolicy，限制就解除：
 
 ```sh
 kubectl -n shop delete networkpolicy api-egress-limit
@@ -118,6 +118,6 @@ kubectl -n shop delete networkpolicy api-egress-limit
 
 ## 限制和 Zeabur 其他功能的關係
 
-- 維護模式使用另一個 Ingress，它不帶這份限制，所有 IP 都看得到維護頁面。
+- 維護模式使用另一個 Ingress，不帶這份限制，所有 IP 都看得到維護頁面。
 - 搬移網域到獨立的 Ingress（更換憑證時會發生）前，要先停掉這個 Ingress 的 IP 限制。
-- 刪除服務時，檢查畫面會列出 NetworkPolicy，一起刪除。刪掉 Ingress 時，它擁有的 Middleware 會一起刪。
+- 刪除服務時，檢查畫面會列出 NetworkPolicy，一起刪除。刪掉 Ingress 時，Ingress 擁有的 Middleware 也會一起刪除。

@@ -29,7 +29,7 @@ source: "a7ddbb2e9028"
 
 ### 歷史紀錄
 
-**歷史紀錄**列出所有副本寫過的日誌，包含已經替換的副本。它讀的是日誌儲存服務，需要叢集管理員在 Zeabur 的 Helm chart 開啟 `proxy.enabled`。預設讀取 VictoriaLogs，位址設在 `proxy.logs.url`。用安裝器裝了 VictoriaLogs 就會自動開啟。叢集沒有 VictoriaLogs 時，把 `proxy.logs.enabled` 設為 false。沒開啟時，畫面寫**還沒有開啟日誌歷史紀錄**。
+**歷史紀錄**列出所有副本寫過的日誌，包含已經替換的副本。這裡讀的是日誌儲存服務，需要叢集管理員在 Zeabur 的 Helm chart 開啟 `proxy.enabled`。預設讀取 VictoriaLogs，位址設在 `proxy.logs.url`。用安裝器裝了 VictoriaLogs 就會自動開啟。叢集沒有 VictoriaLogs 時，把 `proxy.logs.enabled` 設為 false。沒開啟時，畫面寫**還沒有開啟日誌歷史紀錄**。
 
 ## 看事件
 
@@ -42,7 +42,7 @@ Kubernetes 只保留大約一小時內的事件。更早的問題要看日誌的
 到服務的**用量**分頁：
 
 - **目前用量**：每個副本的 CPU 和記憶體，和保留量、上限並列。快用到記憶體上限時會標**接近記憶體上限**，超過上限時容器會重新啟動。這需要叢集裝 metrics-server，沒裝時按**安裝**，看要在伺服器上執行的指令。
-- **歷史紀錄**：一段時間的用量圖，會標出 OOMKilled 和重新啟動的時間點。這需要相容 Prometheus 的指標儲存服務，例如 VictoriaMetrics 或 Prometheus。沒有時按**安裝 VictoriaMetrics**，已經有的話按**改用其他儲存服務**指定它的 Kubernetes Service。
+- **歷史紀錄**：一段時間的用量圖，會標出 OOMKilled 和重新啟動的時間點。這需要相容 Prometheus 的指標儲存服務，例如 VictoriaMetrics 或 Prometheus。沒有時按**安裝 VictoriaMetrics**，已經有時按**改用其他儲存服務**，指定這個儲存服務的 Kubernetes Service。
 
 叢集管理員在 Helm chart 開啟 `proxy.enabled` 後，專案的檢視者和開發者都看得到自己專案的**歷史紀錄**。Zeabur Proxy 會先確認你是這個專案的成員，查詢也只拿得到這個專案的指標。沒開啟，或在設定裡改用其他儲存服務時，Zeabur 直接讀取儲存服務，能這樣讀的人看得到所有專案的指標，所以只有管理員看得到。
 
@@ -82,12 +82,12 @@ wget -qO- http://localhost:8080/healthz
 
 ### 映像檔沒有 shell 時
 
-distroless 這類精簡映像檔沒有 shell，終端機會說明這一點，並顯示**開啟除錯終端機**。按下去會在同一個副本加上一個 busybox 除錯容器，名稱是 `zeabur-debug-` 開頭。它看得到應用程式正在執行的程式，也掛載同樣的磁碟區。
+distroless 這類精簡映像檔沒有 shell，終端機會說明這一點，並顯示**開啟除錯終端機**。按下去會在同一個副本加上一個 busybox 除錯容器，名稱是 `zeabur-debug-` 開頭。除錯容器看得到應用程式正在執行的程式，也掛載同樣的磁碟區。
 
 ![映像檔沒有 shell 時的終端機，說明這一點，並提供開啟除錯終端機的按鈕](../images/shots/terminal-no-shell.avif)
 
 <Callout type="warn">
-Kubernetes 無法提早移除除錯容器，它會一直留在副本裡，直到副本換成新的，例如重新啟動服務時。之後在同一個副本開終端機，會直接用這個除錯容器。
+Kubernetes 無法提早移除除錯容器。副本換成新的之前（例如重新啟動服務），除錯容器會一直留在副本裡。之後在同一個副本開終端機，會直接用這個除錯容器。
 </Callout>
 
 ### 沒有權限時
@@ -96,7 +96,7 @@ Kubernetes 無法提早移除除錯容器，它會一直留在副本裡，直到
 
 ## 瀏覽檔案
 
-到服務的**檔案**分頁，選**副本**和**容器**，就能瀏覽容器裡的檔案，**上傳**、**下載**、**新增資料夾**、**重新命名**或**刪除**。每個位置會標出它是哪一種：
+到服務的**檔案**分頁，選**副本**和**容器**，就能瀏覽容器裡的檔案，**上傳**、**下載**、**新增資料夾**、**重新命名**或**刪除**。每個位置會標出種類：
 
 | 種類 | 替換副本後 |
 | --- | --- |
@@ -111,9 +111,9 @@ Kubernetes 無法提早移除除錯容器，它會一直留在副本裡，直到
 
 要在瀏覽器裡用 kubectl 或 helm，從頁面下方的終端機區域或搜尋選**開啟 kubectl 終端機**。Zeabur 會在 `zeabur-terminals` Namespace 替你啟動一個暫時的容器，裡面的 kubectl 和 helm 以你的身分執行，用你自己的權限，預設在目前的專案。
 
-在專案以外的頁面（例如**叢集**頁）開啟時，開的是整個叢集的 kubectl 終端機，確認畫面標題是**開啟叢集的 kubectl 終端機**。它預設在 `default` Namespace，你有權限的 Namespace 都能操作。
+在專案以外的頁面（例如**叢集**頁）開啟時，開的是整個叢集的 kubectl 終端機，確認畫面標題是**開啟叢集的 kubectl 終端機**。預設在 `default` Namespace，你有權限的 Namespace 都能操作。
 
-這個容器最多執行 30 分鐘，最後一個終端機關閉 1 分鐘後就會刪除。其中的認證會過期，重新開啟終端機就換上新的。
+這個容器最多執行 30 分鐘，最後一個終端機關閉 1 分鐘後就會刪除。其中的認證資訊會過期，重新開啟終端機就會換上新的。
 
 ## 用 kubectl 做同樣的事
 
@@ -188,4 +188,4 @@ kubectl auth can-i create pods/exec -n demo --as=alice@example.com
 | **15 分鐘沒有輸入或輸出，已關閉。** | 按**重新連線**。 |
 | 終端機沒有回應，寫著要權限 | 把畫面上的 Role 和 RoleBinding 交給管理員套用。 |
 | **這個映像檔沒有 tar。** | 按**加入除錯容器**，從除錯容器讀取磁碟區。 |
-| 除錯容器一直留在副本裡 | Kubernetes 無法移除它。重新啟動服務，換上新的副本。 |
+| 除錯容器一直留在副本裡 | Kubernetes 無法移除除錯容器。重新啟動服務，換上新的副本。 |

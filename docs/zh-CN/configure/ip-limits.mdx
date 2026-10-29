@@ -9,8 +9,8 @@ source: "7c41b28d8a45"
 ## 开始前
 
 - 谁能访问域名：域名必须使用 Traefik 提供的 Ingress。Gateway 域名（HTTPRoute）没有对应的配置，服务只有 Gateway 域名时，面板会显示**通过 Gateway 的域名无法在这里限制**。
-- 能连接到哪里：集群的网络插件需要支持 NetworkPolicy。K3s 内置的控制器支持这一功能。如果插件不支持，仍然能创建对象，但不会阻止任何连接。
-- 需要有修改项目域名和 NetworkPolicy 的权限。如果服务由 Helm、Argo CD 或 Flux 管理，需要在原来的 values 或 Git 仓库中修改。
+- 能连到哪里：集群的网络插件需要支持 NetworkPolicy，K3s 内置的控制器就支持。插件不支持时，对象仍然能创建，但不会阻止任何连接。
+- 需要有修改项目域名和 NetworkPolicy 的权限。服务由 Helm、Argo CD 或 Flux 管理时，需要在原来的 values 或 Git 仓库中修改。
 - 这与项目设置中的**隔离**不同。隔离控制其他项目能否连接进来，IP 限制针对单个服务，不会修改项目的 `zeabur-project` 规则。
 
 ## 限制谁能访问域名
@@ -40,10 +40,10 @@ source: "7c41b28d8a45"
 
 ### Traefik 看到的 IP
 
-Traefik 默认使用连接的源地址进行匹配。如果集群入口会修改源地址，匹配的就不再是访客的 IP，限制可能会阻止所有人，也可能放行所有人。
+Traefik 默认按连接的源地址匹配。集群入口会修改源地址时，匹配的就不再是访客的 IP，限制可能会阻止所有人，也可能放行所有人。
 
 - 使用 Zeabur 安装程序安装的 Traefik，其 Service 的 `externalTrafficPolicy` 为 `Local`，连接到 Traefik 所在节点的请求会保留访客地址。这项配置来自 Zeabur Catalog 的 Traefik 模板。ServiceLB 从其他节点转发请求时是否保留地址，尚未验证。
-- 如果前面还有 CDN、反向代理或云负载均衡器，Traefik 看到的是它们的地址。这时需要在 Middleware 中配置 `ipStrategy`，读取 `X-Forwarded-For`，并让 Traefik 的 entry point 信任该层代理的地址（`forwardedHeaders.trustedIPs`）。Zeabur 不会替你修改这些配置。
+- 前面还有 CDN、反向代理或云负载均衡器时，Traefik 看到的是这些代理的地址。这时需要在 Middleware 中配置 `ipStrategy`，读取 `X-Forwarded-For`，并让 Traefik 的 entry point 信任该层代理的地址（`forwardedHeaders.trustedIPs`）。Zeabur 不会替你修改这些配置。
 - 后续修改列表时，Zeabur 只修改 `sourceRange`，你在 Middleware 上添加的 `ipStrategy` 会保留。
 
 应用后，分别从允许和不允许的 IP 连接一次，确认结果。
@@ -97,18 +97,18 @@ spec:
 
 ## 用 kubectl 配置和移除
 
-这两种限制都是普通的 Kubernetes 对象，没有 finalizer，也没有依赖 Zeabur 的字段。移除 Zeabur 后，它们仍然有效。
+这两种限制都是普通的 Kubernetes 对象，没有 finalizer，也没有依赖 Zeabur 的字段。移除 Zeabur 后仍然有效。
 
-**谁能打开域名**：每个 Ingress 都有一个 Middleware，名称为 `<Ingress 名称>-ip-allow`，其 `ownerReferences` 指向 Ingress。Ingress 的 annotation `traefik.ingress.kubernetes.io/router.middlewares` 中会列出它。要移除限制，先从 annotation 中移除 `<项目>-<Ingress 名称>-ip-allow@kubernetescrd`，再删除 Middleware。如果先删除 Middleware，Traefik 会找不到它，域名会返回 404。
+**谁能打开域名**：每个 Ingress 都有一个 Middleware，名称为 `<Ingress 名称>-ip-allow`，`ownerReferences` 指向 Ingress，Ingress 的 annotation `traefik.ingress.kubernetes.io/router.middlewares` 中会列出这个 Middleware。要移除限制，先从 annotation 中移除 `<项目>-<Ingress 名称>-ip-allow@kubernetescrd`，再删除 Middleware。要是先删除 Middleware，Traefik 会找不到，域名会返回 404。
 
 ```sh
 kubectl -n shop annotate ingress api traefik.ingress.kubernetes.io/router.middlewares-
 kubectl -n shop delete middleware api-ip-allow
 ```
 
-上面的 annotation 命令会移除整个列表。如果 Ingress 还有重定向、密码验证等其他中间件，改用 `kubectl edit`，只移除这一项。
+上面的 annotation 命令会移除整个列表。Ingress 还有重定向、密码验证等其他中间件时，改用 `kubectl edit`，只移除这一项。
 
-**能连到哪里**：NetworkPolicy 名称为 `<服务名称>-egress-limit`，`policyTypes` 只有 `Egress`。删除它即可解除限制：
+**能连到哪里**：NetworkPolicy 名称为 `<服务名称>-egress-limit`，`policyTypes` 只有 `Egress`。删除这个 NetworkPolicy 即可解除限制：
 
 ```sh
 kubectl -n shop delete networkpolicy api-egress-limit
@@ -120,4 +120,4 @@ kubectl -n shop delete networkpolicy api-egress-limit
 
 - 维护模式使用另一个 Ingress，不包含这份限制，所有 IP 都能看到维护页面。
 - 将域名迁移到独立的 Ingress（更换证书时会发生）之前，需要先关闭这个 Ingress 的 IP 限制。
-- 删除服务时，检查界面会列出 NetworkPolicy，一并删除。删除 Ingress 时，也会删除它所属的 Middleware。
+- 删除服务时，检查界面会列出 NetworkPolicy，一并删除。删除 Ingress 时，Ingress 拥有的 Middleware 也会一并删除。

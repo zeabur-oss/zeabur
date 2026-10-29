@@ -81,7 +81,7 @@ In the domain row, click **Certificate for app.example.com** to open the side pa
 
 ### Use an issuer with automatic renewal
 
-Select **From an issuer, renewed automatically**, choose an **Issuer**, and click **Add to changes**. Domains on the same Ingress share an issuer, so the other domains listed in the panel will also use this issuer after the change.
+Select **From an issuer, renewed automatically**, choose an **Issuer**, and click **Add to changes**. Domains on the same Ingress share an issuer, so the other domains listed in the panel also switch to this issuer.
 
 If a wildcard domain says it needs DNS-01, ask a cluster administrator to create an issuer by following the [next section](#create-an-issuer-for-wildcard-domains), then return to the domain and select it.
 
@@ -138,7 +138,7 @@ Select **My own certificate**, then paste the following or click **Upload file**
 - **Certificate (PEM)**: Put the site certificate first, followed by the intermediate certificates.
 - **Private key (PEM)**: Provide an unencrypted private key that matches the certificate.
 
-Click **Add to changes**, then review and apply from the bottom of the page. Zeabur checks the certificate's validity dates, domain names, and matching key, then stores the certificate and key in a secret. It won't show the key again. Your own certificate won't renew automatically. Upload a new one before it expires.
+Click **Add to changes**, then review and apply from the bottom of the page. Zeabur checks the certificate's validity dates, domain names, and matching key, then stores the certificate and key in a secret. Zeabur doesn't show the key again. Your own certificate doesn't renew automatically, so upload a new one before it expires.
 
 If other domains on the same Ingress are still requesting certificates from cert-manager, this domain moves to its own Ingress. The new Ingress keeps the original rules, class, labels, annotations, and error pages. The change review lists this move. If the original Ingress has a password, redirect, or maintenance mode configured, the domain can't move. The panel tells you which setting to turn off first.
 
@@ -166,7 +166,7 @@ In the domain row, click **Redirect or password for app.example.com**, turn on *
 First, confirm that all protected domains use HTTPS. Basic auth over HTTP sends sign-in credentials in plain text.
 </Callout>
 
-The password applies to the entire Ingress. If the panel lists domains such as `www.example.com` that share the same Ingress, they'll require the same username and password. After adding, reviewing, and applying the change, open the address in a private browsing window. Confirm that it prompts for a password and shows the service after you enter it.
+The password applies to the entire Ingress. If the panel lists domains such as `www.example.com` that share the same Ingress, they require the same username and password. After adding, reviewing, and applying the change, open the address in a private browsing window. Confirm that it prompts for a password and shows the service after you enter it.
 
 The cluster only stores the password's bcrypt hash. If you forget the password, you must replace it. If a password is already set, click **Change** to replace the username and password. Turn off **Ask for a password** and apply the change to remove password protection from this Ingress.
 

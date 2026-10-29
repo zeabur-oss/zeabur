@@ -28,7 +28,7 @@ source: "3a62f078606b"
 
 在**要建立的 YAML** 貼上一份或多份文件，文件之間用 `---` 分隔。不知道怎麼寫時，按**插入範例**，從**常用類型**、**自訂資源**或**其他可建立的類型**選一種，會插入那種物件的範本。
 
-下面這份建立一個 ConfigMap、一個讀取它的 Deployment 和一個 Service：
+下面這份建立一個 ConfigMap、一個讀取這個 ConfigMap 的 Deployment 和一個 Service：
 
 ```yaml
 apiVersion: v1
@@ -101,9 +101,9 @@ spec:
 - `namespace` 寫成別的專案。
 - 叢集沒有提供這種物件，例如沒裝 cert-manager 卻寫了 Certificate。
 - 同一個物件寫了兩次。
-- 已經有同名的物件。建立不會修改既有的物件，要改它請用**編輯**。
+- 已經有同名的物件。建立不會修改既有的物件，要修改請用**編輯**。
 
-**建立順序**列出實際的順序：先建立設定檔、機密變數、磁碟與 ServiceAccount，再建立 Service，然後是工作負載，最後是其他物件，讓工作負載啟動時讀得到它需要的東西。
+**建立順序**列出實際的順序：先建立設定檔、機密變數、磁碟與 ServiceAccount，再建立 Service，然後是工作負載，最後是其他物件，讓工作負載啟動時讀得到需要的物件。
 
 ![在 shop 建立物件的編輯器，貼上三份 YAML，右側的建立順序依序是 ConfigMap、Service、Deployment](../images/shots/objects-create.avif)
 
@@ -125,7 +125,7 @@ Kubernetes 無法一次復原多個物件。叢集拒絕其中一個時，前面
 
 專案的**物件**頁依種類列出 Namespace 裡的所有物件，用**篩選物件**依名稱找。由其他物件產生的會標**自動產生**和**由 Deployment 建立**這類來源，例如 Deployment 產生的 ReplicaSet 和 Pod。
 
-點一個物件，可以看它的狀態、**狀況**和 YAML。服務的 YAML 也可以從服務**設定**，把上方的切換從**設定**換到 **YAML**。
+點一個物件，可以看物件的狀態、**狀況**和 YAML。服務的 YAML 也可以從服務**設定**，把上方的切換從**設定**換到 **YAML**。
 
 機密變數的值在 YAML 裡顯示成 `(hidden)`。
 
@@ -136,7 +136,7 @@ Kubernetes 無法一次復原多個物件。叢集拒絕其中一個時，前面
 
 ### 編輯
 
-在 YAML 檢視按**編輯**。編輯器裡是目前叢集裡的設定，改了會照原樣寫入。機密變數的值留著 `(hidden)` 就不會變，要改就填入新值。
+在 YAML 檢視按**編輯**。編輯器裡是目前叢集裡的設定，改了會照原樣寫入。機密變數的值留著 `(hidden)` 就不會改變，要改就填入新值。
 
 </Step>
 <Step>
@@ -150,13 +150,13 @@ Kubernetes 無法一次復原多個物件。叢集拒絕其中一個時，前面
 
 Zeabur 只寫入你改的欄位，每一處都先確認叢集裡的值和你開始編輯時相同。編輯期間有人改了同一個物件，套用會失敗，要重新開啟再改一次。
 
-`status`、`resourceVersion`、`ownerReferences` 這類由叢集維護的欄位，改了也不會寫入。Pod、ReplicaSet 這類由其他物件產生的物件不能編輯或刪除，要改擁有它的物件。
+`status`、`resourceVersion`、`ownerReferences` 這類由叢集維護的欄位，改了也不會寫入。Pod、ReplicaSet 這類由其他物件產生的物件不能編輯或刪除，要修改產生這些物件的上層物件。
 
-改了用 `kubectl apply` 寫入的欄位時，檢查畫面會提醒**下次執行 kubectl apply 時會把 hello 的 …改回去**。這時也要更新你手上的 YAML 檔，不然下次 apply 又會蓋掉。
+改了用 `kubectl apply` 寫入的欄位時，檢查畫面會提醒**下次執行 kubectl apply 時會把 hello 的 …改回去**。這時也要更新你手上的 YAML 檔，否則下次 apply 又會覆蓋回去。
 
 ## 刪除物件
 
-在 YAML 檢視按**刪除**，檢查畫面會寫出刪除後的影響，確認後套用。刪除後無法復原。刪除工作負載時，它產生的 ReplicaSet 和 Pod 會一起刪掉。
+在 YAML 檢視按**刪除**，檢查畫面會寫出刪除後的影響，確認後套用。刪除後無法復原。刪除工作負載時，工作負載產生的 ReplicaSet 和 Pod 會一起刪除。
 
 ## 用 kubectl 做同樣的事
 
@@ -192,7 +192,7 @@ kubectl -n demo get deployment hello --show-managed-fields -o jsonpath='{.metada
 | **Namespace … 屬於整個叢集，Zeabur 只在專案內建立物件。** | 用 kubectl 建立，或請管理員處理。 |
 | **這個叢集沒有提供 Certificate（cert-manager.io/v1）。** | 先安裝提供這種物件的元件，或確認 `apiVersion` 有沒有打錯。 |
 | **已經有名為 hello 的 Deployment。建立不會修改既有的物件。** | 改用那個物件的**編輯**，或換一個名稱。 |
-| **已建立 1/3 個** | 看被拒絕的原因，選**刪除剛建立的 1 個**或**保留**後修正剩下的。 |
+| **已建立 1/3 個** | 看叢集拒絕的原因，選**刪除剛建立的 1 個**或**保留**後修正剩下的。 |
 | 編輯或刪除時說由 Helm、Argo CD 或 Flux 管理 | 回到那個工具的 values 或 Git 儲存庫修改。 |
-| **這類物件由 Kubernetes 自行管理，要修改請編輯擁有它的物件。** | 物件由其他物件產生，例如 Pod。改它的 Deployment。 |
-| 套用時說物件已經變了 | 編輯期間有人改了它。重新開啟 YAML，再改一次。 |
+| **這類物件由 Kubernetes 自行管理，要修改請編輯擁有它的物件。** | 物件由其他物件產生，例如 Pod。改 Pod 所屬的 Deployment。 |
+| 套用時說物件已經變了 | 編輯期間有人改了這個物件。重新開啟 YAML，再改一次。 |

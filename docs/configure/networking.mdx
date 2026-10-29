@@ -10,7 +10,7 @@ The service's **Networking** tab covers three things: **Private network** lists 
 ## Before you start
 
 - You need permission to modify services in the project. For services managed by Helm, Argo CD, or Flux, use that tool to expose ports or add rules instead.
-- Connection rules depend on the cluster's network plugin (CNI) to enforce them. K3s's built-in controller supports them. If the plugin doesn't, you can create rules, but they won't block any connections.
+- Connection rules depend on the cluster's network plugin (CNI) to enforce them. K3s's built-in controller supports them. If the plugin doesn't, you can still create rules, but they block nothing.
 - Exposing ports requires a load balancer. K3s's built-in ServiceLB and the RKE2 setup installed by the Zeabur installer both include one.
 
 ## Connect to other services with private addresses
@@ -82,7 +82,7 @@ Click **Add rule** and choose a type:
 Rules are additive. A common setup is to **Isolate this service** first, then add **Allow traffic from public domains** and the services that need to connect.
 
 <Callout type="warn">
-After isolation, the service's public domains won't be reachable until you add **Allow traffic from public domains**.
+After isolation, the service's public domains stay unreachable until you add **Allow traffic from public domains**.
 </Callout>
 
 To let an isolated service connect to an external API, add the address to **Where its replicas can connect** under **IP limits** on the same page. See [Restrict incoming and outgoing IP addresses](./ip-limits.mdx).

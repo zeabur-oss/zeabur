@@ -15,7 +15,7 @@ source: "d6ab03fe54a8"
 维护模式只改变当前域名的转发目标，服务本身继续运行。同一服务的其他域名、私有地址和对外端口仍能访问应用，定时任务也照常运行。
 
 <Callout type="warn">
-如果维护是为了迁移数据或修改表结构，需要另外停止会通过私有网络、其他域名或定时任务写入数据的程序，例如将 worker 的副本数设为 0。
+维护是为了迁移数据或修改表结构时，需要另外停止会通过私有网络、其他域名或定时任务写入数据的程序，例如将 worker 的副本数设为 0。
 </Callout>
 
 ## 开启维护模式
@@ -47,11 +47,11 @@ source: "d6ab03fe54a8"
 
 ### 检查并应用
 
-在侧边面板点击**加入变更**，域名行会标记为**已修改**。再点击页面底部的**检查变更**，确认目标域名和 HTML，然后应用。如果需要部署页面服务器，列表中也会列出它的 Deployment、Service、ConfigMap 和 NetworkPolicy。
+在侧边面板点击**加入变更**，域名行会标记为**已修改**。再点击页面底部的**检查变更**，确认目标域名和 HTML，然后应用。需要部署页面服务器时，列表中也会列出页面服务器的 Deployment、Service、ConfigMap 和 NetworkPolicy。
 
 ![检查变更窗口，说明 shop.example.com 将改为显示维护页面](../images/shots/domain-pages-review.avif)
 
-该域名下的所有路径都会转到维护页面，同一 Ingress 的其他域名不受影响。对于 Ingress 域名，会新增一个名称以 `-maintenance` 结尾的 Ingress，Traefik 优先使用它，原 Ingress 保持不变。对于 HTTPRoute 域名，会将原后端的权重改为 0，再添加页面服务器。HTTPRoute 的维护模式作用于整条路由；如果同一条 HTTPRoute 还有其他域名，会先将当前域名移到单独的路由。
+该域名下的所有路径都会转到维护页面，同一 Ingress 的其他域名不受影响。对于 Ingress 域名，会新增一个名称以 `-maintenance` 结尾的 Ingress，Traefik 会优先使用这个 Ingress，原 Ingress 保持不变。对于 HTTPRoute 域名，会将原后端的权重改为 0，再添加页面服务器。HTTPRoute 的维护模式作用于整条路由，同一条 HTTPRoute 还有其他域名时，会先将当前域名移到单独的路由。
 
 </Step>
 <Step>
@@ -71,7 +71,7 @@ curl -i https://app.example.com/
 </Step>
 </Steps>
 
-如果 Ingress 域名设置了[重定向或密码](./domains.mdx)，维护期间两者都不生效，访客无需输入密码就会直接看到维护页面。维护页面只包含你编写的 HTML，不会经过应用。如果 HTTPRoute 域名正在重定向，则无法开启维护模式，需要在目标域名开启，或先取消重定向。
+如果 Ingress 域名设置了[重定向或密码](./domains.mdx)，维护期间两者都不生效，访客无需输入密码就会直接看到维护页面。维护页面只包含你编写的 HTML，不会经过应用。HTTPRoute 域名正在重定向时无法开启维护模式，需要在目标域名开启，或先取消重定向。
 
 ## 维护完成后恢复流量
 
@@ -80,7 +80,7 @@ curl -i https://app.example.com/
 3. 在面板中点击**加入变更**，再点击页面底部的**检查变更**，确认域名会转回原服务，然后应用。
 4. 重新打开域名和子路径，确认应用正常响应，域名行不再显示**维护中**。
 
-关闭维护模式时，对于 Ingress 域名，会删除对应的 `-maintenance` Ingress；对于 HTTPRoute 域名，会移除页面服务器，并将权重为 0 的后端改回 1。原有规则始终保留在对象上，即使维护期间修改过规则，也会照常还原。删除原 Ingress 时，Kubernetes 会同时删除它的维护 Ingress。
+关闭维护模式时，对于 Ingress 域名，会删除对应的 `-maintenance` Ingress；对于 HTTPRoute 域名，会移除页面服务器，并将权重为 0 的后端改回 1。原有规则始终保留在对象上，即使维护期间修改过规则，也会照常还原。删除原 Ingress 时，Kubernetes 会同时删除对应的维护 Ingress。
 
 ## 显示自定义错误页面
 
@@ -102,7 +102,7 @@ HTML 保存在 ConfigMap 中，页面服务器每次收到请求都会读取挂�
 
 ## 页面服务器
 
-维护页面和错误页面由项目中的页面服务器提供，它来自 Zeabur Catalog 的 **Error pages** 模板：一个小型 nginx，HTML 保存在 ConfigMap `error-pages` 中。Zeabur 根据标签 `zeabur.com/page-server: "true"` 查找页面服务器，不依赖名称：
+维护页面和错误页面由项目中的页面服务器提供，页面服务器来自 Zeabur Catalog 的 **Error pages** 模板：一个小型 nginx，HTML 保存在 ConfigMap `error-pages` 中。Zeabur 根据标签 `zeabur.com/page-server: "true"` 查找页面服务器，不依赖名称：
 
 | 对象 | 必需内容 |
 | --- | --- |
@@ -117,7 +117,7 @@ HTML 保存在 ConfigMap 中，页面服务器每次收到请求都会读取挂�
 
 ### 开启维护模式（Ingress）
 
-新增一个 Ingress，名称为 `<服务>-<域名，点换成连字符>-maintenance`，将同一域名的所有路径转发到页面服务器的 `maintenance` 端口。`router.priority` 必须高于该域名的所有其他路由，Traefik 才会优先使用它。`ownerReferences` 指向原 Ingress，Zeabur 通过它识别维护用的 Ingress，因此先查询原 Ingress 的 `uid`：
+新增一个 Ingress，名称为 `<服务>-<域名，点换成连字符>-maintenance`，将同一域名的所有路径转发到页面服务器的 `maintenance` 端口。`router.priority` 必须高于该域名的所有其他路由，Traefik 才会优先使用。`ownerReferences` 指向原 Ingress，Zeabur 通过这个字段识别维护用的 Ingress，因此先查询原 Ingress 的 `uid`：
 
 ```sh
 kubectl -n demo get ingress web-app-example-com -o jsonpath='{.metadata.uid}'
@@ -205,7 +205,7 @@ spec:
     query: /{status}.html
 ```
 
-将 `8080` 替换为页面服务器 Service 上 `pages` 端口的端口号。再将它添加到 Ingress 的 `traefik.ingress.kubernetes.io/router.middlewares`，写为 `demo-web-app-example-com-error-pages@kubernetescrd`。如果已有其他 Middleware，用 `kubectl edit` 将它加入列表，重定向仍需排在第一位。
+将 `8080` 替换为页面服务器 Service 上 `pages` 端口的端口号。再将这个 Middleware 添加到 Ingress 的 `traefik.ingress.kubernetes.io/router.middlewares`，写为 `demo-web-app-example-com-error-pages@kubernetescrd`。已有其他 Middleware 时，用 `kubectl edit` 加入列表，重定向仍需排在第一位。
 
 要修改页面内容，直接编辑 ConfigMap `error-pages`：
 
@@ -247,5 +247,5 @@ curl -sI https://app.example.com/
 整个项目都不再需要这些页面时，先关闭每个域名的维护模式和错误页面，确认流量都已恢复，再到项目的**对象**页面删除 `error-pages` 的 Deployment、Service 和 NetworkPolicy，以及 ConfigMap `error-pages` 和 `error-pages-nginx`。对每个对象，在 **YAML** 中点击**删除**，检查后应用。
 
 <Callout type="warn">
-如果仍有域名处于维护状态或开启了错误页面，此时删除页面服务器，这些域名的访客会直接看到错误，无法看到你设置的页面。
+仍有域名处于维护状态或开启了错误页面时删除页面服务器，这些域名的访客会直接看到错误，无法看到你设置的页面。
 </Callout>

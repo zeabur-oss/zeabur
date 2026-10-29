@@ -71,7 +71,7 @@ For each check, set **Check** to **None**, **HTTP GET**, **TCP**, or **Command**
 - **TCP**: Enter a **Port**. The check passes if it can connect.
 - **Command**: Enter the **Commands** to run inside the container. An exit code of 0 passes.
 
-**Every (s)** sets how often the check runs. **Failures** sets how many consecutive failures count as a failed check. If the service declares ports, the form shows buttons such as **HTTP, port 8080**. Select one to fill in the path `/` and that port. The port must be declared by the container, or you won't be able to save.
+**Every (s)** sets how often the check runs. **Failures** sets how many consecutive failures count as a failed check. If the service declares ports, the form shows buttons such as **HTTP, port 8080**. Select one to fill in the path `/` and that port. You can save only a port the container declares.
 
 ![Health checks in service settings, with HTTP GET selected for the traffic check, the path set to /healthz, and separate restart and startup checks](../images/shots/service-health.avif)
 

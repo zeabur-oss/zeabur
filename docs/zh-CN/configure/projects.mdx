@@ -18,11 +18,11 @@ source: "72ea2d49995e"
 
 ### 填写名称
 
-打开**项目**页，点击**新建项目**。在**名称**中填写 `hello`，**显示名称**可以留空；填写后，界面会显示它，而不是 Namespace 名称。
+打开**项目**页，点击**新建项目**。在**名称**中填写 `hello`，**显示名称**可以留空；填写后，界面会用显示名称代替 Namespace 名称。
 
 ![新建项目窗口，名称填为 hello](../images/shots/project-new.avif)
 
-如果同名的 Namespace 已经存在，表单会提示你改用已有的 Namespace，做法见[下一节](#将已有的-namespace-加入-zeabur)。
+同名的 Namespace 已经存在时，表单会提示你改用已有的 Namespace，做法见[下一节](#将已有的-namespace-加入-zeabur)。
 
 </Step>
 <Step>
@@ -48,7 +48,7 @@ source: "72ea2d49995e"
 
 Zeabur 只会为 Namespace 添加 `zeabur.com/project: "true"` 标签，不会修改其中的对象、Pod Security 标签和 NetworkPolicy。
 
-如果不想再在 Zeabur 中看到它，打开项目**设置**的**危险区域**，点击**从 Zeabur 移除**。这只会移除项目标签，Namespace 及其中的所有内容都会保留。要连同内容一起删除，见[删除项目](./delete-project.mdx)。
+不想再在 Zeabur 中看到这个 Namespace 时，打开项目**设置**的**危险区域**，点击**从 Zeabur 移除**。这只会移除项目标签，Namespace 及其中的所有内容都会保留。要连同内容一起删除，见[删除项目](./delete-project.mdx)。
 
 ## 修改名称、描述和图标
 
@@ -196,8 +196,8 @@ kubectl -n demo get serviceaccount default -o jsonpath='{.automountServiceAccoun
 
 | 界面或结果 | 处理方法 |
 | --- | --- |
-| **已经有同名的 Namespace，可以改用已有的 Namespace。** | 换一个名称，或在**其他 Namespace** 中将它加入 Zeabur。 |
+| **已经有同名的 Namespace，可以改用已有的 Namespace。** | 换一个名称，或在**其他 Namespace** 中将那个 Namespace 加入 Zeabur。 |
 | 加入或移除项目时，集群返回 **Only an admin can change the namespace's labels** | 只有管理员能修改 Namespace 的标签，请管理员操作。 |
 | **这是 Kubernetes 为自身组件保留的 Namespace，不能作为项目。** | 以 `kube-` 开头的 Namespace 和节点终端使用的 `zeabur-node-shell` 都不能作为项目。 |
 | 创建项目时没有列出 `zeabur-project` | 集群中没有带 `zeabur.com/platform: "true"` 标签的 Namespace，Zeabur 无法判断 Ingress controller 在哪里，因此不会创建。请管理员为这些 Namespace 添加标签，再到**网络**点击**隔离**。 |
-| 隔离后公开域名无法打开 | Ingress controller 所在的 Namespace 没有 `zeabur.com/platform: "true"` 标签。为它添加标签，或在 `zeabur-project` 中添加一条允许它连接的规则。 |
+| 隔离后公开域名无法打开 | Ingress controller 所在的 Namespace 没有 `zeabur.com/platform: "true"` 标签。为那个 Namespace 添加标签，或在 `zeabur-project` 中添加一条允许连入的规则。 |

@@ -29,7 +29,7 @@ source: "a7ddbb2e9028"
 
 ### 历史记录
 
-**历史记录**列出所有副本写入的日志，包括已替换的副本。它从日志存储服务读取数据，需要集群管理员在 Zeabur 的 Helm chart 中开启 `proxy.enabled`。默认读取 VictoriaLogs，地址通过 `proxy.logs.url` 设置。通过安装器安装 VictoriaLogs 后会自动开启。如果集群没有 VictoriaLogs，将 `proxy.logs.enabled` 设为 false。未开启时，页面显示**还没有开启日志历史记录**。
+**历史记录**列出所有副本写入的日志，包括已替换的副本。这里从日志存储服务读取数据，需要集群管理员在 Zeabur 的 Helm chart 中开启 `proxy.enabled`。默认读取 VictoriaLogs，地址通过 `proxy.logs.url` 设置。通过安装器安装 VictoriaLogs 后会自动开启。集群没有 VictoriaLogs 时，将 `proxy.logs.enabled` 设为 false。未开启时，页面显示**还没有开启日志历史记录**。
 
 ## 查看事件
 
@@ -42,9 +42,9 @@ Kubernetes 只保留大约一小时内的事件。排查更早的问题需要查
 打开服务的**用量**选项卡：
 
 - **当前用量**：每个副本的 CPU 和内存用量，与预留量、上限并列显示。内存用量接近上限时会标记**接近内存上限**，超过上限时容器会重启。此功能需要集群安装 metrics-server，未安装时点击**安装**，查看需要在服务器上运行的命令。
-- **历史记录**：一段时间内的用量图，会标出 OOMKilled 和重启的时间点。此功能需要兼容 Prometheus 的指标存储服务，例如 VictoriaMetrics 或 Prometheus。如果没有，点击**安装 VictoriaMetrics**；如果已有，点击**改用其他存储服务**，指定它的 Kubernetes Service。
+- **历史记录**：一段时间内的用量图，会标出 OOMKilled 和重启的时间点。此功能需要兼容 Prometheus 的指标存储服务，例如 VictoriaMetrics 或 Prometheus。没有时点击**安装 VictoriaMetrics**；已有时点击**改用其他存储服务**，指定这个存储服务的 Kubernetes Service。
 
-集群管理员在 Helm chart 中开启 `proxy.enabled` 后，项目的查看者和开发者都能看到自己项目的**历史记录**。Zeabur Proxy 会先确认你是该项目的成员，查询也只能获取该项目的指标。如果未开启，或在配置中改用其他存储服务，Zeabur 会直接读取存储服务。能直接读取的人可以看到所有项目的指标，因此只有管理员能查看。
+集群管理员在 Helm chart 中开启 `proxy.enabled` 后，项目的查看者和开发者都能看到自己项目的**历史记录**。Zeabur Proxy 会先确认你是该项目的成员，查询也只能获取该项目的指标。未开启，或在配置中改用其他存储服务时，Zeabur 会直接读取存储服务，能直接读取的人可以看到所有项目的指标，因此只有管理员能查看。
 
 ![服务的用量选项卡，上方是每个副本当前的 CPU 和内存用量，下方是历史用量图](../images/shots/service-usage.avif)
 
@@ -82,12 +82,12 @@ wget -qO- http://localhost:8080/healthz
 
 ### 镜像没有 shell 时
 
-distroless 这类精简镜像没有 shell，终端会说明这一点，并显示**打开调试终端**。点击后会在同一个副本中添加一个 busybox 调试容器，名称以 `zeabur-debug-` 开头。它可以看到应用正在运行的进程，也会挂载相同的卷。
+distroless 这类精简镜像没有 shell，终端会说明这一点，并显示**打开调试终端**。点击后会在同一个副本中添加一个 busybox 调试容器，名称以 `zeabur-debug-` 开头。调试容器可以看到应用正在运行的进程，也会挂载相同的卷。
 
 ![镜像没有 shell 时的终端，说明镜像不含 shell，并提供打开调试终端的按钮](../images/shots/terminal-no-shell.avif)
 
 <Callout type="warn">
-Kubernetes 无法提前移除调试容器，它会一直留在副本中，直到副本替换，例如重启服务时。之后在同一个副本中打开终端，会直接使用这个调试容器。
+Kubernetes 无法提前移除调试容器。副本替换之前（例如重启服务），调试容器会一直留在副本中。之后在同一个副本中打开终端，会直接使用这个调试容器。
 </Callout>
 
 ### 没有权限时
@@ -105,13 +105,13 @@ Kubernetes 无法提前移除调试容器，它会一直留在副本中，直到
 | 镜像 | 修改只保留在当前容器中，重启后消失 |
 | 配置文件、机密变量 | 只读，需要到[环境变量](./variables.mdx)修改 |
 
-文件读写与 `kubectl cp` 一样，通过 `tar` 完成。如果镜像没有 `tar`，点击**加入调试容器**，改由调试容器读取卷，但无法读取镜像本身的文件。
+文件读写与 `kubectl cp` 一样，通过 `tar` 完成。镜像没有 `tar` 时，点击**加入调试容器**，改由调试容器读取卷，但无法读取镜像本身的文件。
 
 ## 打开 kubectl 终端
 
 要在浏览器中使用 kubectl 或 helm，在页面底部的终端区域或搜索中选择**打开 kubectl 终端**。Zeabur 会在 `zeabur-terminals` Namespace 中为你启动一个临时容器，其中的 kubectl 和 helm 以你的身份运行，使用你自己的权限，默认在当前项目中操作。
 
-在项目以外的页面（例如**集群**页面）打开时，会打开整个集群的 kubectl 终端，确认页面标题为**打开集群的 kubectl 终端**。它默认在 `default` Namespace 中操作，你有权限的 Namespace 都能操作。
+在项目以外的页面（例如**集群**页面）打开时，会打开整个集群的 kubectl 终端，确认页面标题为**打开集群的 kubectl 终端**。默认在 `default` Namespace 中操作，你有权限的 Namespace 都能操作。
 
 这个容器最多运行 30 分钟，最后一个终端关闭 1 分钟后就会删除。其中的凭证会过期，重新打开终端就会换上新的凭证。
 
@@ -188,4 +188,4 @@ kubectl auth can-i create pods/exec -n demo --as=alice@example.com
 | **15 分钟没有输入或输出，已关闭。** | 点击**重新连接**。 |
 | 终端没有响应，提示需要权限 | 将页面上的 Role 和 RoleBinding 交给管理员应用。 |
 | **这个镜像没有 tar。** | 点击**加入调试容器**，通过调试容器读取卷。 |
-| 调试容器一直留在副本中 | Kubernetes 无法移除它。重启服务，替换为新的副本。 |
+| 调试容器一直留在副本中 | Kubernetes 无法移除调试容器。重启服务，替换为新的副本。 |

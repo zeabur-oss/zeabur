@@ -8,7 +8,7 @@ source: "a3935343211b"
 
 ## 开始前
 
-- 服务有接收 HTTP 流量的端口，而且**私有网络**中能看到它的私有地址。域名会将请求转发到这个地址。如果没有，先按界面上的说明开放端口。
+- 服务有接收 HTTP 流量的端口，而且**私有网络**中能看到服务的私有地址，域名会将请求转发到这个地址。没有私有地址时，先按界面上的说明开放端口。
 - 有域名的 DNS 管理权限，或有人能代为修改 DNS。
 - 有权限修改项目的域名。如果路由由 Helm、Argo CD 或 Flux 管理，需要回到原来的 values 或 Git 仓库修改。
 - 集群安装了 cert-manager 和可用的签发者，才能自动签发、续期证书。通配符域名（例如 `*.example.com`）需要使用支持 DNS-01 的签发者。
@@ -26,7 +26,7 @@ source: "a3935343211b"
 
 ![公开域名的添加字段中填入 app.example.com，下方预先列出要添加的 DNS 记录](../images/shots/domain-add.avif)
 
-集群有多个签发者时，表单会显示**签发者**，可以保留默认选项，也可以另选一个。如果这个域名无法获取证书，检查变更时会提示它仅支持 HTTP。
+集群有多个签发者时，表单会显示**签发者**，可以保留默认选项，也可以另选一个。这个域名无法获取证书时，检查变更会提示域名仅支持 HTTP。
 
 集群中有 Gateway 接受这个项目的路由时，表单会多一个**路由**选项，默认是 **Ingress（默认）**，也可以选择某个 Gateway 的 listener，域名就会通过 HTTPRoute 挂到那个 Gateway 上。选择 Gateway 后，表单不再显示签发者，HTTPS 证书由 listener 提供。只有能读取集群 Gateway 的账号才能看到这个选项，看不到时请集群管理员协助。
 
@@ -39,7 +39,7 @@ source: "a3935343211b"
 
 ![保存前确认 web 的变更：app.example.com 会连接到 web，并使用 HTTPS](../images/shots/domain-review.avif)
 
-表单没有端口字段，因此检查时需要查看**转发到**的服务和端口。服务已有 Ingress 时，新域名会加到同一个 Ingress 上，沿用它的后端。只有 HTTPRoute 时，新域名会加到那条 HTTPRoute 上。两者都没有时，Zeabur 会创建新的 Ingress，转发到服务第一个 Kubernetes Service 的第一个端口。选择 Gateway 后，新域名会加到该 Gateway 上转发到这个服务的 HTTPRoute，没有就创建一条。
+表单没有端口字段，因此检查时需要查看**转发到**的服务和端口。服务已有 Ingress 时，新域名会加到同一个 Ingress 上，沿用原有的后端。只有 HTTPRoute 时，新域名会加到那条 HTTPRoute 上。两者都没有时，Zeabur 会创建新的 Ingress，转发到服务第一个 Kubernetes Service 的第一个端口。选择 Gateway 后，新域名会加到该 Gateway 上转发到这个服务的 HTTPRoute，没有就创建一条。
 
 </Step>
 <Step>
@@ -84,11 +84,11 @@ source: "a3935343211b"
 
 选择**由签发者签发，自动续期**，指定**签发者**，点击**加入变更**。同一个 Ingress 的域名共用一个签发者，因此修改后，面板列出的其他域名也会改由这个签发者签发。
 
-通配符域名显示需要 DNS-01 时，请集群管理员按[下一节](#创建通配符域名的签发者)创建签发者，再回到域名中选择它。
+通配符域名显示需要 DNS-01 时，请集群管理员按[下一节](#创建通配符域名的签发者)创建签发者，再回到域名中选择这个签发者。
 
 ### 创建通配符域名的签发者
 
-Let's Encrypt 只支持通过 DNS-01 验证签发通配符证书。集群管理员需要用 `kubectl` 创建 DNS-01 签发者，让 cert-manager 的 DNS-01 solver 使用 DNS 提供商的 API 令牌完成验证。令牌只存放在集群中的 Secret，Zeabur 不经手；**集群** → **概览**的**证书**只列出签发者和状态，不能添加。
+Let's Encrypt 只用 DNS-01 验证签发通配符证书。集群管理员需要用 `kubectl` 创建 DNS-01 签发者，让 cert-manager 的 DNS-01 solver 使用 DNS 提供商的 API 令牌完成验证。令牌只存放在集群中的 Secret，Zeabur 不经手；**集群** → **概览**的**证书**只列出签发者和状态，不能添加。
 
 以下以 Cloudflare 为例。先创建 API 令牌，将 DNS 编辑权限限制在要使用的那个 zone，再将下方的占位符替换为你的令牌：
 
@@ -99,7 +99,7 @@ kubectl -n cert-manager create secret generic cloudflare-dns \
 
 Secret 必须放在 `cert-manager` Namespace。`ClusterIssuer` 只会读取 cert-manager 配置的 *cluster resource namespace* 中的 Secret；这里使用的是 `cert-manager`。
 
-接着创建 `letsencrypt-dns` 签发者。将 `you@example.com` 替换为你的联系邮箱：
+接着创建 `letsencrypt-dns` 签发者，将 `you@example.com` 替换为你的联系邮箱：
 
 ```sh
 kubectl apply -f - <<'EOF'
@@ -128,9 +128,9 @@ EOF
 kubectl get clusterissuer letsencrypt-dns
 ```
 
-等 `READY` 显示 `True`，回到 Zeabur 的**集群** → **概览**的**证书**，就能看到 `letsencrypt-dns` 和它的就绪状态。配置通配符域名时，在**签发者**中选择 `letsencrypt-dns`。
+等 `READY` 显示 `True`，回到 Zeabur 的**集群** → **概览**的**证书**，就能看到 `letsencrypt-dns` 和就绪状态。配置通配符域名时，在**签发者**中选择 `letsencrypt-dns`。
 
-如果使用 Route 53、Cloud DNS、DigitalOcean 或 Azure DNS 等其他提供商，需要换成对应的 solver，并按照 [cert-manager 的 DNS-01 文档](https://cert-manager.io/docs/configuration/acme/dns01/)配置凭证与权限。
+使用 Route 53、Cloud DNS、DigitalOcean 或 Azure DNS 等其他提供商时，换成对应的 solver，再按照 [cert-manager 的 DNS-01 文档](https://cert-manager.io/docs/configuration/acme/dns01/)配置凭证与权限。
 
 ### 上传自己的证书
 
@@ -167,7 +167,7 @@ HTTPRoute 的重定向作用于整条路由。同一条 HTTPRoute 还有其他�
 先确认所有受保护的域名都有 HTTPS。HTTP 上的 Basic auth 会以明文传输登录信息。
 </Callout>
 
-密码作用于整个 Ingress。面板列出 `www.example.com` 这类共用同一个 Ingress 的域名时，它们也会要求输入同一组账号密码。加入变更、检查并应用后，用无痕窗口打开网址，确认会弹出密码提示，输入后能看到服务。
+密码作用于整个 Ingress。面板列出 `www.example.com` 这类共用同一个 Ingress 的域名时，这些域名也会要求输入同一组账号密码。加入变更、检查并应用后，用无痕窗口打开网址，确认会弹出密码提示，输入后能看到服务。
 
 集群只保存密码的 bcrypt 哈希值，忘记密码时只能更换。已有密码时，点击**更改**更换账号密码。关闭**要求输入密码**再应用，就会移除这个 Ingress 的密码。
 
@@ -216,7 +216,7 @@ spec:
 
 将 `letsencrypt` 替换为集群中签发者的名称，用 `kubectl get clusterissuer` 查询。服务已有 Ingress 时，Zeabur 会将新域名作为另一条 `rules` 加到同一个 Ingress，并在 `tls` 中添加一条记录。
 
-选择 Gateway 的域名对应一条 HTTPRoute，`parentRefs` 指向 Gateway 和它的 listener：
+选择 Gateway 的域名对应一条 HTTPRoute，`parentRefs` 指向 Gateway 和其中的 listener：
 
 ```yaml
 apiVersion: gateway.networking.k8s.io/v1
@@ -238,7 +238,7 @@ spec:
 
 ### 使用自己的证书
 
-自己的证书是一个 `kubernetes.io/tls` Secret，Ingress 的 `tls.secretName` 指向它。Zeabur 创建的 Secret 名称是 `<Ingress 名称>-cert`，`ownerReferences` 指向 Ingress。Ingress 只有这个域名时，用 kubectl 创建 Secret，再将 Ingress 改为读取它，并移除 cert-manager 的 annotation：
+自己的证书是一个 `kubernetes.io/tls` Secret，Ingress 的 `tls.secretName` 指向它。Zeabur 创建的 Secret 名称是 `<Ingress 名称>-cert`，`ownerReferences` 指向 Ingress。Ingress 只有这个域名时，用 kubectl 创建 Secret，再将 Ingress 改为读取这个 Secret，并移除 cert-manager 的 annotation：
 
 ```sh
 kubectl -n demo create secret tls web-app-example-com-cert --cert=fullchain.pem --key=privkey.pem
@@ -251,7 +251,7 @@ kubectl -n demo delete certificate web-app-example-com-tls
 
 ### 重定向和密码
 
-重定向和密码是 Traefik 的 Middleware，`ownerReferences` 指向 Ingress，删除 Ingress 时会一并删除。Ingress 的 annotation `traefik.ingress.kubernetes.io/router.middlewares` 按顺序列出它们，格式是 `<项目>-<Middleware 名称>@kubernetescrd`，以逗号分隔。重定向排在第一位，密码排在最后一位。
+重定向和密码是 Traefik 的 Middleware，`ownerReferences` 指向 Ingress，删除 Ingress 时会一并删除。Ingress 的 annotation `traefik.ingress.kubernetes.io/router.middlewares` 按顺序列出这些 Middleware，格式是 `<项目>-<Middleware 名称>@kubernetescrd`，以逗号分隔。重定向排在第一位，密码排在最后一位。
 
 重定向的名称是 `<Ingress 名称>-redirect-<来源域名，点换成连字符>`，只匹配来源域名，并保留路径。`permanent: true` 是 301，`false` 是 302：
 
@@ -294,11 +294,11 @@ kubectl -n demo annotate ingress web-app-example-com --overwrite \
   traefik.ingress.kubernetes.io/router.middlewares=demo-web-app-example-com-redirect-app-example-com@kubernetescrd,demo-web-app-example-com-basic-auth@kubernetescrd
 ```
 
-要取消重定向或密码，先从 annotation 移除对应项，再删除 Middleware（以及密码的 Secret）。如果顺序相反，Traefik 找不到 Middleware，域名会返回 404。
+要取消重定向或密码，先从 annotation 移除对应项，再删除 Middleware（以及密码的 Secret）。顺序反过来时，Traefik 找不到 Middleware，域名会返回 404。
 
 ### 移除域名
 
-Ingress 只剩这个域名时，删除整个 Ingress。它拥有的 Middleware、维护 Ingress 和自己上传的证书 Secret 会一并删除：
+Ingress 只剩这个域名时，删除整个 Ingress，这个 Ingress 拥有的 Middleware、维护 Ingress 和自己上传的证书 Secret 会一并删除：
 
 ```sh
 kubectl -n demo delete ingress web-app-example-com
@@ -333,7 +333,7 @@ curl -sI https://app.example.com/
 | 没有**添加域名** | 先查看**私有网络**中有没有私有地址，再确认你有修改域名的权限。 |
 | **指向别处** | 核对 DNS 记录和界面列出的目标。前面有 CDN 或代理时也会显示这个状态，此时需要确认 CDN 的源站指向集群。 |
 | DNS 正确，证书一直在签发或**证书签发失败** | 展开 **cert-manager 的消息**，核对签发者，以及验证所需的 DNS 记录或入口配置。 |
-| 没有重定向或密码按钮 | 域名由 Traefik 以外的 Ingress controller 提供，需要在它自己的配置中处理。 |
+| 没有重定向或密码按钮 | 域名由 Traefik 以外的 Ingress controller 提供，需要在那个 controller 自己的配置中处理。 |
 | 状态为**尚未确认**，或浏览器无法访问 | 依次核对 DNS、入口地址、服务是否就绪和连接规则。Zeabur 从集群内检查，结果可能与你的浏览器不同。 |
 
 要暂时阻止访客访问，同时保留域名和服务，使用[维护模式](./maintenance.mdx)。

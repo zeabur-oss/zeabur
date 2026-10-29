@@ -102,7 +102,7 @@ The editor lists **N issues** beside the YAML. Click an issue to jump to its lin
 - The same object defined twice.
 - An object with the same name already exists. Creating objects doesn't modify existing ones. Use **Edit** to change an existing object.
 
-**Created in this order** shows the order Zeabur will use: config files, secrets, disks, and ServiceAccounts first, then Services, workloads, and all other objects. This lets workloads read what they need when they start.
+**Created in this order** shows the order Zeabur uses: config files, secrets, disks, and ServiceAccounts first, then Services, workloads, and all other objects. This lets workloads read what they need when they start.
 
 ![Object editor for shop with three YAML documents and a creation order of ConfigMap, Service, and Deployment on the right](../images/shots/objects-create.avif)
 
@@ -142,7 +142,7 @@ Click **Edit** in the YAML view. The editor shows the current configuration in t
 
 ### Review and apply
 
-Click **Review changes**. The review screen shows which fields changed and whether the service will be interrupted. **Technical details** includes **YAML diff** and **Fields owned by**. Field owners lists who last wrote each field, such as `kubectl` or `helm`. Confirm the changes, then apply them.
+Click **Review changes**. The review screen shows which fields changed and whether the service will be interrupted. **Technical details** includes **YAML diff** and **Fields owned by**, which lists who last wrote each field, such as `kubectl` or `helm`. Confirm the changes, then apply them.
 
 </Step>
 </Steps>

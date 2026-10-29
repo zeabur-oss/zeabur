@@ -46,9 +46,9 @@ source: "72ea2d49995e"
 
 **專案**頁的**其他 Namespace** 列出還不是專案的 Namespace。在那一列打開選單，選**使用這個 Namespace**，檢查後套用。
 
-Zeabur 只替 Namespace 加上 `zeabur.com/project: "true"` 標籤，裡面的物件、Pod Security 標籤和 NetworkPolicy 都不會變。
+Zeabur 只替 Namespace 加上 `zeabur.com/project: "true"` 標籤，裡面的物件、Pod Security 標籤和 NetworkPolicy 都不會改變。
 
-不想再在 Zeabur 看到它時，到專案**設定**的**危險區域**按**從 Zeabur 移除**。這只會拿掉專案標籤，Namespace 和裡面的一切都會保留。要連同內容一起刪掉，見[刪除專案](./delete-project.mdx)。
+不想再在 Zeabur 看到這個 Namespace 時，到專案**設定**的**危險區域**按**從 Zeabur 移除**。這只會拿掉專案標籤，Namespace 和裡面的一切都會保留。要連同內容一起刪掉，見[刪除專案](./delete-project.mdx)。
 
 ## 修改名稱、描述和圖示
 
@@ -196,8 +196,8 @@ kubectl -n demo get serviceaccount default -o jsonpath='{.automountServiceAccoun
 
 | 畫面或結果 | 接著處理 |
 | --- | --- |
-| **已經有同名的 Namespace，可以改為使用既有的 Namespace。** | 換一個名稱，或到**其他 Namespace** 把它加進 Zeabur。 |
+| **已經有同名的 Namespace，可以改為使用既有的 Namespace。** | 換一個名稱，或到**其他 Namespace** 把那個 Namespace 加進 Zeabur。 |
 | 加入或移出專案時，叢集回覆 **Only an admin can change the namespace's labels** | 只有管理員能改 Namespace 的標籤，請管理員操作。 |
 | **這是 Kubernetes 留給自身元件的 Namespace，不能當作專案。** | `kube-` 開頭的 Namespace 和節點終端機用的 `zeabur-node-shell` 都不能當作專案。 |
 | 建立專案時沒有列出 `zeabur-project` | 叢集沒有標了 `zeabur.com/platform: "true"` 的 Namespace，Zeabur 分不出 Ingress controller 在哪裡，所以不建立。請管理員替這些 Namespace 加上標籤，再到**網路**按**隔離**。 |
-| 隔離後公開網域打不開 | Ingress controller 所在的 Namespace 沒有 `zeabur.com/platform: "true"` 標籤。替它加上標籤，或在 `zeabur-project` 加一條允許它的規則。 |
+| 隔離後公開網域打不開 | Ingress controller 所在的 Namespace 沒有 `zeabur.com/platform: "true"` 標籤。替那個 Namespace 加上標籤，或在 `zeabur-project` 加一條允許連入的規則。 |

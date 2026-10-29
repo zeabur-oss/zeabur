@@ -8,7 +8,7 @@ source: "a3935343211b"
 
 ## 開始前
 
-- 服務有接收 HTTP 流量的連接埠，而且**私有網路**看得到它的私有位址。網域會把請求轉送到這個位址。沒有的話，先照畫面上的說明開放連接埠。
+- 服務有接收 HTTP 流量的連接埠，而且**私有網路**看得到服務的私有位址，網域會把請求轉送到這個位址。沒有私有位址時，先照畫面上的說明開放連接埠。
 - 擁有網域的 DNS 管理權限，或有人能代為修改 DNS。
 - 有權修改專案的網域。如果路由由 Helm、Argo CD 或 Flux 管理，要回到原本的 values 或 Git 儲存庫修改。
 - 叢集裝了 cert-manager 和可用的簽發者，憑證才會自動簽發、更新。萬用字元網域（例如 `*.example.com`）要用支援 DNS-01 的簽發者。
@@ -26,7 +26,7 @@ source: "a3935343211b"
 
 ![公開網域的新增欄位填入 app.example.com，下方預先列出要新增的 DNS 紀錄](../images/shots/domain-add.avif)
 
-叢集有多個簽發者時，表單會出現**簽發者**，可以保留預設或改選另一個。如果這個網域拿不到憑證，檢查變更時會提示它只有 HTTP。
+叢集有多個簽發者時，表單會出現**簽發者**，可以保留預設或改選另一個。這個網域拿不到憑證時，檢查變更會提示網域只有 HTTP。
 
 叢集有 Gateway 接受這個專案的路由時，表單會多一個**路由**，預設是 **Ingress（預設）**，也可以選某個 Gateway 的 listener，網域就會用 HTTPRoute 掛在那個 Gateway 上。選了 Gateway 就不會出現簽發者，HTTPS 憑證由 listener 提供。只有能讀取叢集 Gateway 的帳號看得到這個選項，看不到時請叢集管理員幫忙。
 
@@ -39,7 +39,7 @@ source: "a3935343211b"
 
 ![儲存前確認 web 的變更：app.example.com 會連到 web，並使用 HTTPS](../images/shots/domain-review.avif)
 
-表單沒有連接埠欄位，所以要在檢查時看**轉送到**的服務和連接埠。服務已經有 Ingress 時，新網域加在同一個 Ingress 上，沿用它的後端。只有 HTTPRoute 時，新網域加在那條 HTTPRoute 上。都沒有時，Zeabur 建立新的 Ingress，轉送到服務第一個 Kubernetes Service 的第一個連接埠。選了 Gateway 時，新網域加在那個 Gateway 上轉送到這個服務的 HTTPRoute，沒有就建一條新的。
+表單沒有連接埠欄位，所以要在檢查時看**轉送到**的服務和連接埠。服務已經有 Ingress 時，新網域加在同一個 Ingress 上，沿用原本的後端。只有 HTTPRoute 時，新網域加在那條 HTTPRoute 上。都沒有時，Zeabur 建立新的 Ingress，轉送到服務第一個 Kubernetes Service 的第一個連接埠。選了 Gateway 時，新網域加在那個 Gateway 上轉送到這個服務的 HTTPRoute，沒有就建一條新的。
 
 </Step>
 <Step>
@@ -84,11 +84,11 @@ source: "a3935343211b"
 
 選**由簽發者簽發，自動更新**，指定**簽發者**，按**加入變更**。同一個 Ingress 的網域共用一個簽發者，所以改了以後，面板列出的其他網域也會改由這個簽發者簽發。
 
-萬用字元網域顯示需要 DNS-01 時，請叢集管理員照[下一節](#建立萬用字元網域的簽發者)建立簽發者，再回到網域選它。
+萬用字元網域顯示需要 DNS-01 時，請叢集管理員照[下一節](#建立萬用字元網域的簽發者)建立簽發者，再回到網域選擇這個簽發者。
 
 ### 建立萬用字元網域的簽發者
 
-Let's Encrypt 只支援透過 DNS-01 驗證簽發萬用字元憑證。叢集管理員需要用 `kubectl` 建立 DNS-01 簽發者，讓 cert-manager 的 DNS-01 solver 使用 DNS 供應商的 API token 完成驗證。Token 只放在叢集裡的 Secret，Zeabur 不經手；**叢集** → **概覽**的**憑證**只列出簽發者和狀態，不能新增。
+Let's Encrypt 只用 DNS-01 驗證簽發萬用字元憑證。叢集管理員需要用 `kubectl` 建立 DNS-01 簽發者，讓 cert-manager 的 DNS-01 solver 使用 DNS 供應商的 API token 完成驗證。Token 只放在叢集裡的 Secret，Zeabur 不經手；**叢集** → **概覽**的**憑證**只列出簽發者和狀態，不能新增。
 
 以下以 Cloudflare 為例。先建立 API token，將 DNS 編輯權限限制在要使用的那個 zone，再把下方的佔位符換成你的 token：
 
@@ -99,7 +99,7 @@ kubectl -n cert-manager create secret generic cloudflare-dns \
 
 Secret 必須放在 `cert-manager` namespace。`ClusterIssuer` 只會讀取 cert-manager 設定的 *cluster resource namespace* 裡的 Secret；這裡使用的是 `cert-manager`。
 
-接著建立 `letsencrypt-dns` 簽發者。請將 `you@example.com` 換成你的聯絡信箱：
+接著建立 `letsencrypt-dns` 簽發者，把 `you@example.com` 換成你的聯絡信箱：
 
 ```sh
 kubectl apply -f - <<'EOF'
@@ -128,9 +128,9 @@ EOF
 kubectl get clusterissuer letsencrypt-dns
 ```
 
-等 `READY` 顯示 `True`，回到 Zeabur 的**叢集** → **概覽**的**憑證**，就會看到 `letsencrypt-dns` 和它的就緒狀態。設定萬用字元網域時，在**簽發者**選擇 `letsencrypt-dns`。
+等 `READY` 顯示 `True`，回到 Zeabur 的**叢集** → **概覽**的**憑證**，就會看到 `letsencrypt-dns` 和就緒狀態。設定萬用字元網域時，在**簽發者**選擇 `letsencrypt-dns`。
 
-如果使用 Route 53、Cloud DNS、DigitalOcean 或 Azure DNS 等其他供應商，請換成對應的 solver，並依照 [cert-manager 的 DNS-01 文件](https://cert-manager.io/docs/configuration/acme/dns01/)設定憑證與權限。
+使用 Route 53、Cloud DNS、DigitalOcean 或 Azure DNS 等其他供應商時，換成對應的 solver，再依照 [cert-manager 的 DNS-01 文件](https://cert-manager.io/docs/configuration/acme/dns01/)設定憑證與權限。
 
 ### 上傳自己的憑證
 
@@ -151,7 +151,7 @@ kubectl get clusterissuer letsencrypt-dns
 
 只填目標主機名稱，例如 `www.example.com`。轉址後使用 HTTPS，路徑保留，`app.example.com/docs` 會轉到 `https://www.example.com/docs`。目標網域要先有自己的 DNS、路由與可用憑證。
 
-**轉址類型**可選**暫時（302）** 或**永久（301）**。瀏覽器會記住永久轉址，之後取消也會繼續轉，所以先用暫時轉址確認目標。
+**轉址類型**可選**暫時（302）** 或**永久（301）**。瀏覽器會記住永久轉址，之後取消也會繼續轉址，所以先用暫時轉址確認目標。
 
 按**加入變更**，從頁面下方檢查並套用，再開啟來源網域測試。轉址只對這個網域生效，同一個 Ingress 的其他網域照樣顯示原服務。萬用字元網域不能當轉址的來源或目標。
 
@@ -167,7 +167,7 @@ HTTPRoute 的轉址作用在整條路由。同一條 HTTPRoute 還有其他網�
 先確認受保護的所有網域都有 HTTPS。HTTP 上的 Basic auth 會把登入資訊以明文傳送。
 </Callout>
 
-密碼設在整個 Ingress 上。面板列出 `www.example.com` 這類共用同一個 Ingress 的網域時，它們也會要求同一組帳號密碼。加入變更、檢查並套用後，用無痕視窗開啟網址，確認會跳出密碼提示，輸入後能看到服務。
+密碼設在整個 Ingress 上。面板列出 `www.example.com` 這類共用同一個 Ingress 的網域時，這些網域也會要求同一組帳號密碼。加入變更、檢查並套用後，用無痕視窗開啟網址，確認會跳出密碼提示，輸入後能看到服務。
 
 叢集只保存密碼的 bcrypt 雜湊值，忘記密碼時只能換一組。已有密碼時按**變更**換帳號密碼。關閉**要求輸入密碼**再套用，就會拿掉這個 Ingress 的密碼。
 
@@ -216,7 +216,7 @@ spec:
 
 `letsencrypt` 換成叢集裡簽發者的名稱，用 `kubectl get clusterissuer` 查。服務已經有 Ingress 時，Zeabur 會把新網域加成同一個 Ingress 的另一條 `rules`，並在 `tls` 加一筆。
 
-選了 Gateway 的網域是一條 HTTPRoute，`parentRefs` 指向 Gateway 和它的 listener：
+選了 Gateway 的網域是一條 HTTPRoute，`parentRefs` 指向 Gateway 和其中的 listener：
 
 ```yaml
 apiVersion: gateway.networking.k8s.io/v1
@@ -238,7 +238,7 @@ spec:
 
 ### 使用自己的憑證
 
-自己的憑證是一個 `kubernetes.io/tls` Secret，Ingress 的 `tls.secretName` 指向它。Zeabur 建立的 Secret 名稱是 `<Ingress 名稱>-cert`，`ownerReferences` 指向 Ingress。Ingress 只有這個網域時，用 kubectl 建立 Secret，再把 Ingress 改成讀它，並拿掉 cert-manager 的 annotation：
+自己的憑證是一個 `kubernetes.io/tls` Secret，Ingress 的 `tls.secretName` 指向它。Zeabur 建立的 Secret 名稱是 `<Ingress 名稱>-cert`，`ownerReferences` 指向 Ingress。Ingress 只有這個網域時，用 kubectl 建立 Secret，再把 Ingress 改成讀取這個 Secret，並拿掉 cert-manager 的 annotation：
 
 ```sh
 kubectl -n demo create secret tls web-app-example-com-cert --cert=fullchain.pem --key=privkey.pem
@@ -251,7 +251,7 @@ kubectl -n demo delete certificate web-app-example-com-tls
 
 ### 轉址和密碼
 
-轉址和密碼是 Traefik 的 Middleware，`ownerReferences` 指向 Ingress，刪掉 Ingress 時一起刪除。Ingress 的 annotation `traefik.ingress.kubernetes.io/router.middlewares` 依序列出它們，格式是 `<專案>-<Middleware 名稱>@kubernetescrd`，以逗號分隔。轉址排第一個，密碼排最後一個。
+轉址和密碼是 Traefik 的 Middleware，`ownerReferences` 指向 Ingress，刪掉 Ingress 時一起刪除。Ingress 的 annotation `traefik.ingress.kubernetes.io/router.middlewares` 依序列出這些 Middleware，格式是 `<專案>-<Middleware 名稱>@kubernetescrd`，以逗號分隔。轉址排第一個，密碼排最後一個。
 
 轉址的名稱是 `<Ingress 名稱>-redirect-<來源網域，點換成破折號>`，只比對來源網域，保留路徑。`permanent: true` 是 301，`false` 是 302：
 
@@ -294,11 +294,11 @@ kubectl -n demo annotate ingress web-app-example-com --overwrite \
   traefik.ingress.kubernetes.io/router.middlewares=demo-web-app-example-com-redirect-app-example-com@kubernetescrd,demo-web-app-example-com-basic-auth@kubernetescrd
 ```
 
-要取消轉址或密碼，先從 annotation 拿掉那一項，再刪 Middleware（和密碼的 Secret）。順序相反的話，Traefik 找不到 Middleware，網域會回 404。
+要取消轉址或密碼，先從 annotation 拿掉那一項，再刪 Middleware（和密碼的 Secret）。順序反過來時，Traefik 找不到 Middleware，網域會回 404。
 
 ### 移除網域
 
-Ingress 只剩這個網域時，刪掉整個 Ingress。它擁有的 Middleware、維護 Ingress 和自己上傳的憑證 Secret 會一起刪除：
+Ingress 只剩這個網域時，刪掉整個 Ingress，這個 Ingress 擁有的 Middleware、維護 Ingress 和自己上傳的憑證 Secret 會一起刪除：
 
 ```sh
 kubectl -n demo delete ingress web-app-example-com
@@ -333,7 +333,7 @@ curl -sI https://app.example.com/
 | 沒有**新增網域** | 先看**私有網路**有沒有私有位址，再確認你有修改網域的權限。 |
 | **指向別處** | 核對 DNS 紀錄和畫面列出的目標。前面有 CDN 或代理時也會顯示這個狀態，這時要確認 CDN 的來源指到叢集。 |
 | DNS 正確，憑證一直在簽發或**憑證簽發失敗** | 展開 **cert-manager 的訊息**，核對簽發者，以及驗證要用的 DNS 紀錄或入口設定。 |
-| 沒有轉址或密碼按鈕 | 網域由 Traefik 以外的 Ingress controller 提供，要在它自己的設定處理。 |
+| 沒有轉址或密碼按鈕 | 網域由 Traefik 以外的 Ingress controller 提供，要在那個 controller 自己的設定處理。 |
 | 狀態**尚未確認**，或瀏覽器連不上 | 依序核對 DNS、入口位址、服務是否就緒和連線規則。Zeabur 從叢集裡檢查，結果可能和你的瀏覽器不同。 |
 
 要暫時擋住訪客、保留網域和服務，用[維護模式](./maintenance.mdx)。

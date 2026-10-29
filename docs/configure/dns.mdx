@@ -3,7 +3,7 @@ title: Configure DNS records
 description: Point all generated addresses to the cluster with one wildcard record, and add records in Cloudflare, Route 53, or your registrar's DNS.
 ---
 
-The application domain is the domain shared by generated addresses. Set up a wildcard record once, and every new service address will resolve to the cluster. For example, if the application domain is `apps.example.com`, add an A record for `*.apps.example.com` that points to the server's IPv4 address. If the server has an IPv6 address, add an AAAA record too. New addresses such as `web-shop.apps.example.com` won't need separate records.
+The application domain is the domain shared by generated addresses. Set up a wildcard record once, and every new service address resolves to the cluster. For example, if the application domain is `apps.example.com`, add an A record for `*.apps.example.com` that points to the server's IPv4 address. If the server has an IPv6 address, add an AAAA record too. New addresses such as `web-shop.apps.example.com` don't need records of their own.
 
 Let's Encrypt issues a separate HTTPS certificate for each address using HTTP-01 validation, so the server's TCP port 80 must be reachable from the internet. Zeabur doesn't change DNS records for you. Add them at your DNS provider.
 
@@ -127,7 +127,7 @@ If you didn't enter an application domain during installation and the server has
 web-shop.203-0-113-7.sslip.io
 ```
 
-These addresses include the server's IP address, and issued certificates also appear in public certificate transparency (CT) logs. All users share Let's Encrypt's issuance limits for `sslip.io`. If you hit a rate limit, certificate issuance will take longer, and cert-manager will retry automatically. Use your own domain for production services.
+These addresses include the server's IP address, and issued certificates also appear in public certificate transparency (CT) logs. All users share Let's Encrypt's issuance limits for `sslip.io`. If you hit a rate limit, the certificate takes longer to issue, and cert-manager retries on its own. Use your own domain for production services.
 
 ## Check the application domain and ingress address with kubectl
 

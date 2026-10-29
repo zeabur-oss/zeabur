@@ -6,7 +6,7 @@ source: "7aadf6e873a3"
 
 项目就是一个 Kubernetes Namespace。在项目**设置**的**危险区域**点击**删除项目**，Zeabur 会删掉这个 Namespace 和里面的服务、数据库、卷、配置与机密变量，效果和 `kubectl delete namespace` 一样。删除后无法恢复，只能从备份重建。
 
-只想让 Namespace 不再出现在 Zeabur，改用同一处的**从 Zeabur 移除**。它只去掉项目标签，什么都不删。
+只想让 Namespace 不再出现在 Zeabur，改用同一处的**从 Zeabur 移除**：只去掉项目标签，什么都不删除。
 
 ## 开始前
 
@@ -23,11 +23,11 @@ source: "7aadf6e873a3"
 点击**删除项目**后，检查页面分成两部分。**会一起删除**列出：
 
 - 服务的名称。
-- 每个数据库和它上次备份的时间。
+- 每个数据库和上次备份的时间。
 - 每个卷、上次备份的时间，以及数据会不会留下。卷的 PersistentVolume 配置为 `Retain` 时，数据会留在那个 PersistentVolume；配置为 `Delete` 时，数据跟着删除。读不到 PersistentVolume 时，Zeabur 改看 StorageClass 的 `reclaimPolicy`，两者都读不到就直接说不确定。
-- 你在这个项目打开过的工具 Pod。它们在 `zeabur-terminals`，Zeabur 会在 Namespace 删除后一并清掉。
+- 你在这个项目打开过的工具 Pod。这些 Pod 在 `zeabur-terminals` 里，Zeabur 会在 Namespace 删除后一并清掉。
 
-数据库或卷一天内没有成功的备份时，旁边会出现**先备份一次**。点击后会改为检查这次备份，应用后等备份跑完，再回来删除项目。这个按钮用的是数据库页面和卷备份原有的**立即备份**，只有已经配置好备份的数据库和卷才会出现。
+数据库或卷一天内没有成功的备份时，旁边会出现**先备份一次**。点击后会改为检查这次备份，应用后等备份完成，再回来删除项目。这个按钮用的是数据库页面和卷备份原有的**立即备份**，只有已经配置好备份的数据库和卷才会出现。
 
 </Step>
 <Step>
@@ -49,7 +49,7 @@ kubectl -n shop get secret data-redis-0-backup -o jsonpath='{.data.RESTIC_PASSWO
 
 ### 留意会重建的对象
 
-项目里有对象由 Helm、Argo CD 或 Flux 管理时，检查页面会提醒：删除后，这些工具可能会按它们的配置再创建一次。要先在工具那边移除这个应用，项目才不会重新出现。
+项目里有对象由 Helm、Argo CD 或 Flux 管理时，检查页面会提醒：删除后，这些工具可能会按自己的配置重新创建。要先在工具那边移除这个应用，项目才不会重新出现。
 
 </Step>
 <Step>
@@ -67,7 +67,7 @@ kubectl -n shop get secret data-redis-0-backup -o jsonpath='{.data.RESTIC_PASSWO
 
 Zeabur 用你的身份按顺序删除：
 
-1. 先删除数据库对象，例如 CloudNativePG 的 `Cluster`，让 operator 有机会按它的方式收尾。Zeabur 最多等一分钟，让数据库消失。operator 没有在运行时，它的收尾不会发生，项目会卡在删除中，项目页面会列出还没删掉的对象和它们的 finalizer。
+1. 先删除数据库对象，例如 CloudNativePG 的 `Cluster`，让 operator 有机会按自己的方式收尾。Zeabur 最多等一分钟，让数据库消失。operator 没有在运行时就无法收尾，项目会卡在删除中，项目页面会列出还没删掉的对象和各自的 finalizer。
 2. 再删除 Namespace，Kubernetes 接着删掉里面剩下的内容。
 3. 最后删掉你在这个项目打开的工具 Pod。
 
@@ -75,20 +75,20 @@ Zeabur 用你的身份按顺序删除：
 
 ## 项目一直删不掉
 
-Namespace 会等里面每个对象的 finalizer 都移除后才消失。加上 finalizer 的控制器会在清理完成后移除它；控制器没有在运行，对象就会一直留着。
+Namespace 会等里面每个对象的 finalizer 都移除后才消失。每个 finalizer 由当初加上的控制器在清理完成后移除；控制器没有在运行，对象就会一直留着。
 
-项目页会列出还带着 finalizer 的对象，以及查看它们的命令。以项目 `shop` 为例：
+项目页会列出还带着 finalizer 的对象，以及查看这些对象的命令。以项目 `shop` 为例：
 
 ```sh
 kubectl get namespace shop -o yaml
 kubectl get clusters.postgresql.cnpg.io orders -n shop -o yaml
 ```
 
-`status.conditions` 会写明还剩哪些资源、哪些 finalizer 在等。通常的处理方式是让对应的 operator 恢复运行，它做完清理就会自己移除 finalizer。Zeabur 不会替你移除 finalizer：直接移除会跳过清理，可能留下集群外的资源，例如云磁盘或 S3 里的文件。
+`status.conditions` 会写明还剩哪些资源、哪些 finalizer 在等。通常的处理方式是让对应的 operator 恢复运行，operator 清理完就会自己移除 finalizer。Zeabur 不会替你移除 finalizer：直接移除会跳过清理，可能留下集群外的资源，例如云磁盘或 S3 里的文件。
 
 ## 用同样的名称重建项目
 
-删掉项目后，如果要把同样的名称交给另一个团队，先等 70 分钟。
+删掉项目后，要把同样的名称交给另一个团队，先等 70 分钟。
 
 Zeabur Builder 推送镜像用的 registry 令牌，认的是仓库名称，也就是项目名称，不认 Namespace 的 UID。项目删掉后又有人用同样名称创建了项目，旧项目此前签发的令牌在到期前，仍然可以推送到新项目的仓库。构建用的令牌最长 70 分钟（默认构建时限 60 分钟，再加 10 分钟），上传源代码归档的令牌是 15 分钟。自己删掉再自己重建同一个项目，不用在意这件事。
 

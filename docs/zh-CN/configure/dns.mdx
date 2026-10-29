@@ -4,7 +4,7 @@ description: 用一条通配符记录让所有生成的网址指向集群，并�
 source: "320eed08f87d"
 ---
 
-应用域名是生成的网址共用的域名，只需为它配置一次通配符记录，之后每个新服务的网址都会解析到集群。例如，应用域名是 `apps.example.com`，就添加一条 `*.apps.example.com` 的 A 记录，指向服务器的 IPv4 地址。如果服务器有 IPv6 地址，再添加一条 AAAA 记录。之后，`web-shop.apps.example.com` 这类新网址就不需要再添加记录。
+应用域名是生成的网址共用的域名，只需为这个域名配置一次通配符记录，之后每个新服务的网址都会解析到集群。例如，应用域名是 `apps.example.com`，就添加一条 `*.apps.example.com` 的 A 记录，指向服务器的 IPv4 地址。如果服务器有 IPv6 地址，再添加一条 AAAA 记录。之后，`web-shop.apps.example.com` 这类新网址就不需要再添加记录。
 
 Let's Encrypt 通过 HTTP-01 验证签发 HTTPS 证书，每个网址单独签发一张，因此互联网必须能访问服务器的 TCP 80 端口。Zeabur 不会替你修改 DNS，需要到自己的 DNS 提供商处添加记录。
 
@@ -118,7 +118,7 @@ Gandi、Namecheap、HiNet 等注册商的 DNS 管理页面使用的字段名称�
 
 每个自定义域名分别添加一条 A 或 AAAA 记录，指向服务器 IP。也可以添加 CNAME，指向应用域名下的名称，例如 `web-shop.apps.example.com`。服务的**网络**选项卡会列出这个域名需要添加的记录，添加域名的步骤见[添加公开域名与 HTTPS](./domains.mdx)。
 
-域名本身（例如 `example.com`）只能使用 A 或 AAAA 记录，大多数 DNS 提供商不允许在这里使用 CNAME。Cloudflare 是个例外，它会将域名本身的 CNAME 展平为 A 记录（CNAME flattening）。在 Route 53 中为域名本身添加记录时，将 **Record name** 留空，不要填写 `@`。
+域名本身（例如 `example.com`）只能使用 A 或 AAAA 记录，大多数 DNS 提供商不允许在这里使用 CNAME。Cloudflare 是个例外，会将域名本身的 CNAME 展平为 A 记录（CNAME flattening）。在 Route 53 中为域名本身添加记录时，将 **Record name** 留空，不要填写 `@`。
 
 ## 没有自己的域名
 

@@ -15,7 +15,7 @@ source: "d6ab03fe54a8"
 維護模式只改這一個網域的轉送目標，服務本身繼續執行。同一個服務的其他網域、私有位址和對外連接埠照樣連得到應用程式，排程工作也照常執行。
 
 <Callout type="warn">
-如果維護是為了搬移資料或改資料表結構，要另外停掉會從私有網路、其他網域或排程工作寫入資料的程式，例如把 worker 的副本數調成 0。
+維護是為了搬移資料或改資料表結構時，要另外停掉會從私有網路、其他網域或排程工作寫入資料的程式，例如把 worker 的副本數調成 0。
 </Callout>
 
 ## 開啟維護模式
@@ -47,11 +47,11 @@ source: "d6ab03fe54a8"
 
 ### 檢查並套用
 
-在側邊面板按**加入變更**，網域列會標上**已修改**。再從頁面下方按**檢查變更**，確認目標網域和 HTML，然後套用。要部署頁面伺服器時，清單裡也會列出它的 Deployment、Service、ConfigMap 和 NetworkPolicy。
+在側邊面板按**加入變更**，網域列會標上**已修改**。再從頁面下方按**檢查變更**，確認目標網域和 HTML，然後套用。要部署頁面伺服器時，清單裡也會列出頁面伺服器的 Deployment、Service、ConfigMap 和 NetworkPolicy。
 
 ![檢查變更的視窗，說明 shop.example.com 改為顯示維護頁面](../images/shots/domain-pages-review.avif)
 
-這個網域底下的所有路徑都會轉到維護頁面，同一個 Ingress 的其他網域不受影響。Ingress 的網域會多一份名稱以 `-maintenance` 結尾的 Ingress，Traefik 優先用它，原本的 Ingress 不動。HTTPRoute 的網域會把原本後端的權重改成 0，再加上頁面伺服器。HTTPRoute 的維護作用在整條路由，同一條 HTTPRoute 還有其他網域時，這個網域會先移到自己的路由。
+這個網域底下的所有路徑都會轉到維護頁面，同一個 Ingress 的其他網域不受影響。Ingress 的網域會多一份名稱以 `-maintenance` 結尾的 Ingress，Traefik 會優先使用這份 Ingress，原本的 Ingress 保持不變。HTTPRoute 的網域會把原本後端的權重改成 0，再加上頁面伺服器。HTTPRoute 的維護作用在整條路由，同一條 HTTPRoute 還有其他網域時，這個網域會先移到自己的路由。
 
 </Step>
 <Step>
@@ -80,7 +80,7 @@ Ingress 的網域設了[轉址或密碼](./domains.mdx)時，維護期間兩者�
 3. 在面板按**加入變更**，從頁面下方按**檢查變更**，確認網域會轉回原本的服務，再套用。
 4. 重新開啟網域與子路徑，確認應用程式正常回應，網域列不再顯示**維護中**。
 
-關閉時，Ingress 的網域會刪掉那份 `-maintenance` Ingress，HTTPRoute 的網域會拿掉頁面伺服器，把權重 0 的後端改回 1。原本的規則一直留在物件上，維護期間改過規則也照樣還原。刪掉原本的 Ingress 時，Kubernetes 會連同它的維護 Ingress 一起刪除。
+關閉時，Ingress 的網域會刪掉那份 `-maintenance` Ingress，HTTPRoute 的網域會拿掉頁面伺服器，把權重 0 的後端改回 1。原本的規則一直留在物件上，維護期間改過規則也照樣還原。刪掉原本的 Ingress 時，Kubernetes 會連同對應的維護 Ingress 一起刪除。
 
 ## 顯示自訂錯誤頁面
 
@@ -102,7 +102,7 @@ HTML 存在 ConfigMap 裡，頁面伺服器每次請求都從掛載的檔案讀�
 
 ## 頁面伺服器
 
-維護頁和錯誤頁面由專案裡的頁面伺服器提供，它來自 Zeabur Catalog 的 **Error pages** 範本：一個小型 nginx，HTML 放在 ConfigMap `error-pages`。Zeabur 不看名稱，而是依標籤 `zeabur.com/page-server: "true"` 找到它：
+維護頁和錯誤頁面由專案裡的頁面伺服器提供，頁面伺服器來自 Zeabur Catalog 的 **Error pages** 範本：一個小型 nginx，HTML 放在 ConfigMap `error-pages`。Zeabur 依標籤 `zeabur.com/page-server: "true"` 找到頁面伺服器，不看名稱：
 
 | 物件 | 需要的內容 |
 | --- | --- |
@@ -117,7 +117,7 @@ HTML 存在 ConfigMap 裡，頁面伺服器每次請求都從掛載的檔案讀�
 
 ### 開啟維護模式（Ingress）
 
-新增一個 Ingress，名稱是 `<服務>-<網域，點換成破折號>-maintenance`，同一個網域的所有路徑都轉到頁面伺服器的 `maintenance` 連接埠。`router.priority` 要比這個網域其他路由都高，Traefik 才會優先用它。`ownerReferences` 指向原本的 Ingress，Zeabur 靠它認出這是維護用的 Ingress，所以先查原本 Ingress 的 `uid`：
+新增一個 Ingress，名稱是 `<服務>-<網域，點換成破折號>-maintenance`，同一個網域的所有路徑都轉到頁面伺服器的 `maintenance` 連接埠。`router.priority` 要比這個網域其他路由都高，Traefik 才會優先使用。`ownerReferences` 指向原本的 Ingress，Zeabur 靠這個欄位認出這是維護用的 Ingress，所以先查原本 Ingress 的 `uid`：
 
 ```sh
 kubectl -n demo get ingress web-app-example-com -o jsonpath='{.metadata.uid}'
@@ -205,7 +205,7 @@ spec:
     query: /{status}.html
 ```
 
-`8080` 換成頁面伺服器 Service 上 `pages` 連接埠的號碼。再把它加進 Ingress 的 `traefik.ingress.kubernetes.io/router.middlewares`，寫成 `demo-web-app-example-com-error-pages@kubernetescrd`。已有其他 Middleware 時，用 `kubectl edit` 加在清單裡，轉址仍要排第一個。
+`8080` 換成頁面伺服器 Service 上 `pages` 連接埠的號碼。再把這個 Middleware 加進 Ingress 的 `traefik.ingress.kubernetes.io/router.middlewares`，寫成 `demo-web-app-example-com-error-pages@kubernetescrd`。已有其他 Middleware 時，用 `kubectl edit` 加在清單裡，轉址仍要排第一個。
 
 要改頁面內容，直接改 ConfigMap `error-pages`：
 

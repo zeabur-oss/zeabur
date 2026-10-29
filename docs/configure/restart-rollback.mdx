@@ -26,7 +26,7 @@ Open the service and click **Restart** at the top of the page. The review screen
 
 ### Apply and wait for new replicas
 
-After you apply the change, Kubernetes replaces the replicas according to the service's update strategy. By default, a Deployment starts new replicas and waits for them to be ready before stopping the old ones. Services with only one replica or the `Recreate` strategy will have a brief interruption.
+After you apply the change, Kubernetes replaces the replicas according to the service's update strategy. By default, a Deployment starts new replicas and waits for them to be ready before stopping the old ones. Services with only one replica or the `Recreate` strategy are briefly interrupted.
 
 Check **Rollout** in **Overview** for the number of new replicas that are ready. The restart is complete when all new replicas are ready and the old ones are gone.
 

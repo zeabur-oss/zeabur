@@ -3,7 +3,7 @@ title: Delete a project
 description: Delete a project's namespace and everything in it. Check which data will remain before you confirm.
 ---
 
-A project is a Kubernetes namespace. In the **Danger zone** of a project's **Settings**, click **Delete project**. Zeabur deletes that namespace and everything in it: services, databases, volumes, settings, and secrets, as `kubectl delete namespace` does. It can't be undone; you can only bring the project back from a backup.
+A project is a Kubernetes namespace. In the **Danger zone** of a project's **Settings**, click **Delete project**. Zeabur deletes that namespace and everything in it: services, databases, volumes, settings, and secrets, as `kubectl delete namespace` does. Deletion can't be undone; only a backup brings the project back.
 
 To stop showing a namespace in Zeabur without deleting anything, use **Remove from Zeabur** in the same place. It removes the project label only.
 
@@ -66,7 +66,7 @@ Enter the project name at the bottom, or click the name in the prompt to fill it
 
 Zeabur deletes objects using your identity, in this order:
 
-1. The database objects, such as CloudNativePG's `Cluster`, so each operator has a chance to run its cleanup. Zeabur waits up to a minute for the databases to disappear. When an operator isn't running, its cleanup won't happen, and the project stays in deletion. The project page lists the remaining objects and their finalizers.
+1. The database objects, such as CloudNativePG's `Cluster`, so each operator has a chance to run its cleanup. Zeabur waits up to a minute for the databases to disappear. When an operator isn't running, its cleanup never happens and the project stays in deletion. The project page lists the remaining objects and their finalizers.
 2. The namespace. Kubernetes then deletes what's left in it.
 3. The tool replicas you opened for the project.
 
@@ -83,13 +83,13 @@ kubectl get namespace shop -o yaml
 kubectl get clusters.postgresql.cnpg.io orders -n shop -o yaml
 ```
 
-`status.conditions` says which resources remain and which finalizers are still pending. Usually, the fix is to get the corresponding operator running again. It removes its finalizer when cleanup is done. Zeabur doesn't remove finalizers for you: removing one directly skips cleanup and can leave resources outside the cluster, such as cloud disks or files in S3.
+`status.conditions` says which resources remain and which finalizers are still pending. Usually, the fix is to get the corresponding operator running again; it removes its finalizer when cleanup is done. Zeabur doesn't remove finalizers for you: removing one directly skips cleanup and can leave resources outside the cluster, such as cloud disks or files in S3.
 
 ## Create a project again with the same name
 
 If another team will use the name of a project you deleted, wait 70 minutes first.
 
-The registry token that Zeabur Builder uses to push images identifies the repository by name—the project name—not by the namespace UID. After a project is deleted and a project with the same name is created, a token issued for the old project can still push to the new project's repository until it expires. A build token lasts at most 70 minutes (the default build deadline of 60 minutes plus 10 minutes), and a token for uploading a source archive lasts 15 minutes. You don't need to wait if you're deleting and recreating your own project.
+The registry token that Zeabur Builder uses to push images identifies the repository by the project name, not by the namespace UID. After a project is deleted and a project with the same name is created, a token issued for the old project can still push to the new project's repository until it expires. A build token lasts at most 70 minutes (the default build deadline of 60 minutes plus 10 minutes), and a token for uploading a source archive lasts 15 minutes. You don't need to wait if you're deleting and recreating your own project.
 
 ## Restore a project from a backup
 
