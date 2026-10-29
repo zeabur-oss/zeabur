@@ -1,0 +1,4 @@
+description: A container that looped but has run for more than 10 minutes since is not a crash loop.
+operation: gaps.diagnose
+params:
+  now: "2026-10-29T03:05:00Z"

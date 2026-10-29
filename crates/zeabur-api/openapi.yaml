@@ -7253,6 +7253,11 @@ components:
           type: integer
           format: int32
           description: How many times the kubelet restarted it.
+        startedAt:
+          type:
+          - string
+          - "null"
+          description: When the current run started, in RFC 3339, when it is running.
         terminated:
           oneOf:
           - $ref: "#/components/schemas/ContainerTermination"

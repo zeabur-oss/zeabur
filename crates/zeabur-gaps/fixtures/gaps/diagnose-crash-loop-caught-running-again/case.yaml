@@ -1,0 +1,4 @@
+description: A container whose runs last seconds and that runs again for 35 seconds is still a crash loop.
+operation: gaps.diagnose
+params:
+  now: "2026-10-29T03:05:00Z"

@@ -1,0 +1,4 @@
+description: An init container that failed twice and then completed is no crash loop, an hour later as at once.
+operation: gaps.diagnose
+params:
+  now: "2026-10-29T04:05:00Z"

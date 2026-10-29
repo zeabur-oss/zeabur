@@ -1,0 +1,69 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  namespace: demo
+spec:
+  selector:
+    matchLabels:
+      app: web
+  template:
+    metadata:
+      labels:
+        app: web
+    spec:
+      initContainers:
+        - name: migrate
+          image: example/web:1.0
+      containers:
+        - name: web
+          image: example/web:1.0
+status:
+  replicas: 1
+  readyReplicas: 1
+  updatedReplicas: 1
+  availableReplicas: 1
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: web-1
+  namespace: demo
+  labels:
+    app: web
+spec:
+  initContainers:
+    - name: migrate
+      image: example/web:1.0
+  containers:
+    - name: web
+      image: example/web:1.0
+status:
+  phase: Running
+  initContainerStatuses:
+    - name: migrate
+      image: example/web:1.0
+      imageID: ""
+      ready: true
+      restartCount: 2
+      state:
+        terminated:
+          reason: Completed
+          exitCode: 0
+          startedAt: "2026-10-29T03:04:20Z"
+          finishedAt: "2026-10-29T03:04:25Z"
+      lastState:
+        terminated:
+          reason: Error
+          exitCode: 1
+          startedAt: "2026-10-29T03:04:00Z"
+          finishedAt: "2026-10-29T03:04:02Z"
+  containerStatuses:
+    - name: web
+      image: example/web:1.0
+      imageID: ""
+      ready: true
+      restartCount: 0
+      state:
+        running:
+          startedAt: "2026-10-29T03:04:26Z"
