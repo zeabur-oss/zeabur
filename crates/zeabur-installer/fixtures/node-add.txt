@@ -15,6 +15,7 @@ join:
   server: https://10.0.1.10:6443
   role: worker
   token: K10aa::abcdef.0123456789abcdef
+  nodeNames: [vps-1]
 EOF
 zeabur-installer plan    # what it installs, the distance to this server and warnings
 zeabur-installer apply   # installs K3s and waits until the node is Ready

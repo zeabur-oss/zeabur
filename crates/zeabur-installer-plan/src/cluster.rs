@@ -47,6 +47,8 @@ pub struct Layout {
     pub server_token_file: &'static str,
     /// The kubelet's credentials on any node; a node may read its own Node object with them.
     pub kubelet_kubeconfig: &'static str,
+    /// The kubelet's client certificate, whose subject names the node.
+    pub kubelet_cert: &'static str,
     /// The registry mirrors and their CAs, read when the distribution starts.
     pub registries_file: &'static str,
     /// The CA of zot's certificate. containerd reads it on each pull, so the first server writes
@@ -71,6 +73,7 @@ const K3S_LAYOUT: Layout = Layout {
     join_token_file: "/etc/rancher/k3s/zeabur-join-token",
     server_token_file: "/var/lib/rancher/k3s/server/token",
     kubelet_kubeconfig: "/var/lib/rancher/k3s/agent/kubelet.kubeconfig",
+    kubelet_cert: "/var/lib/rancher/k3s/agent/client-kubelet.crt",
     registries_file: "/etc/rancher/k3s/registries.yaml",
     zot_ca_file: "/etc/rancher/k3s/zot-ca.crt",
     sysctl_file: "/etc/sysctl.d/60-k3s-cis.conf",
@@ -88,6 +91,7 @@ const RKE2_LAYOUT: Layout = Layout {
     join_token_file: "/etc/rancher/rke2/zeabur-join-token",
     server_token_file: "/var/lib/rancher/rke2/server/token",
     kubelet_kubeconfig: "/var/lib/rancher/rke2/agent/kubelet.kubeconfig",
+    kubelet_cert: "/var/lib/rancher/rke2/agent/client-kubelet.crt",
     registries_file: "/etc/rancher/rke2/registries.yaml",
     zot_ca_file: "/etc/rancher/rke2/zot-ca.crt",
     sysctl_file: "/etc/sysctl.d/60-rke2-cis.conf",
@@ -353,6 +357,26 @@ impl Distribution {
             mode: 0o644,
             content: pem.to_owned(),
         }
+    }
+
+    /// The drop-in naming the node, so a later change of the host name does not register a
+    /// second node.
+    #[must_use]
+    pub fn node_name_file(self, name: &str) -> HostFile {
+        HostFile {
+            path: self.node_name_path(),
+            mode: 0o600,
+            content: format!("{HEADER}node-name: {name}\n"),
+        }
+    }
+
+    /// Where [`Self::node_name_file`] goes.
+    #[must_use]
+    pub fn node_name_path(self) -> String {
+        format!(
+            "{}/config.yaml.d/15-node-name.yaml",
+            self.layout().config_dir
+        )
     }
 
     /// The drop-in naming the addresses the node registers with, so it does not pick a temporary

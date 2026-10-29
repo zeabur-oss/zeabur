@@ -102,8 +102,11 @@
       "arch": "amd64",
       "hostname": "vps-1",
       "memoryMib": 5836,
-      "nodeIps": ["203.0.113.10"]
+      "nodeIps": ["203.0.113.10"],
+      "nodeName": null,
+      "randomHex": "3f9a2c"
     },
+    "nodeName": "vps-1",
     "helmController": {
       "images": [
         "rancher/helm-controller:v0.17.9@sha256:25a4fcbbf9fa8396ded332165e4497eb45e08a8f6677158c0f861a2d15982afc"
@@ -172,6 +175,6 @@
     "zotClusterIp": null,
     "removals": []
   },
-  "text": "KubeSolo v1.2.2 (Kubernetes 1.35, pinned), for one person, on vps-1 (amd64, 5836 MiB)\nhelm-controller  v0.17.9 (its image pinned by digest; the Jobs' image checked by digest after they run)\nNode address     203.0.113.10; the kubeconfig names it\n\nComponents\n  ingress/traefik            preset    23 MiB\n      manifests gateway-api-crds (1 URLs)\n      chart traefik 41.7.1\n  certificates/cert-manager  preset    51 MiB\n      chart cert-manager v1.21.2\n      manifests issuers\n\nStorage          local-path (KubeSolo's local-path), the default\nZeabur           none on the server: run `zeaburctl ui` on your computer\n\nMemory at idle   about 774 MiB of 5836 (KubeSolo 700, components 74)\nwarning: A personal install is for one person: whoever has the kubeconfig is cluster admin, and nothing isolates apps from each other (KubeSolo enforces no NetworkPolicy). For a team, install with K3s or RKE2 on a server with at least 4 GiB.\n",
+  "text": "KubeSolo v1.2.2 (Kubernetes 1.35, pinned), for one person, on vps-1 (amd64, 5836 MiB)\nNode name        vps-1\nhelm-controller  v0.17.9 (its image pinned by digest; the Jobs' image checked by digest after they run)\nNode address     203.0.113.10; the kubeconfig names it\n\nComponents\n  ingress/traefik            preset    23 MiB\n      manifests gateway-api-crds (1 URLs)\n      chart traefik 41.7.1\n  certificates/cert-manager  preset    51 MiB\n      chart cert-manager v1.21.2\n      manifests issuers\n\nStorage          local-path (KubeSolo's local-path), the default\nZeabur           none on the server: run `zeaburctl ui` on your computer\n\nMemory at idle   about 774 MiB of 5836 (KubeSolo 700, components 74)\nwarning: A personal install is for one person: whoever has the kubeconfig is cluster admin, and nothing isolates apps from each other (KubeSolo enforces no NetworkPolicy). For a team, install with K3s or RKE2 on a server with at least 4 GiB.\n",
   "yaml": "use: personal\nenable: []\ndisable: []\ninputs: {}\nsecretFiles: {}\nhost:\n  tlsSan: []\n  requireEncryptedDisk: false\nsources:\n  catalog: null\n"
 }

@@ -54,7 +54,7 @@ pub(crate) fn add(config_path: &Path, options: &AddOptions) -> Result<(), Instal
     }
     let layout = distribution.layout();
     let kubectl = Kubectl::admin(distribution);
-    let name = facts::read()?.hostname.to_ascii_lowercase();
+    let name = facts::read()?.own_node_name();
     let node = kubectl.get("node", &name, None)?.ok_or_else(|| {
         InstallError::Message(format!("this server's node {name} is not in the cluster"))
     })?;
@@ -104,6 +104,18 @@ pub(crate) fn add(config_path: &Path, options: &AddOptions) -> Result<(), Instal
         .get("customresourcedefinition", LONGHORN_CRD, None)?
         .is_some();
     let zot = zot_mirror(&kubectl, layout.zot_ca_file)?;
+    let node_names: Vec<String> = kubectl
+        .run(
+            &[
+                "get",
+                "nodes",
+                "--output=jsonpath={.items[*].metadata.name}",
+            ],
+            None,
+        )?
+        .split_whitespace()
+        .map(str::to_owned)
+        .collect();
     let text = instructions(&Instructions {
         distribution,
         server: &server,
@@ -113,6 +125,7 @@ pub(crate) fn add(config_path: &Path, options: &AddOptions) -> Result<(), Instal
         single_node,
         longhorn,
         zot: zot.as_ref().map(|(ip, ca)| (ip.as_str(), ca.as_str())),
+        node_names: &node_names,
     });
     out::line(text.trim_end());
     Ok(())
@@ -133,6 +146,8 @@ pub(crate) struct Instructions<'a> {
     pub(crate) longhorn: bool,
     /// zot's `ClusterIP` and CA, when the cluster runs it.
     pub(crate) zot: Option<(&'a str, &'a str)>,
+    /// The cluster's nodes, whose names the new node does not take.
+    pub(crate) node_names: &'a [String],
 }
 
 /// The text `node add` prints.
@@ -170,6 +185,7 @@ pub(crate) fn instructions(i: &Instructions<'_>) -> String {
         i.token,
         i.longhorn,
         i.zot,
+        i.node_names,
     ));
     push(&mut text, "");
     if let Some((expires, _)) = i.expiry {
@@ -235,12 +251,18 @@ pub(crate) fn commands(
     token: &str,
     longhorn: bool,
     zot: Option<(&str, &str)>,
+    node_names: &[String],
 ) -> String {
     let mut yaml = format!(
         "distribution: {}\njoin:\n  server: {server}\n  role: {}\n  token: {token}\n",
         distribution.id(),
         role.as_str()
     );
+    if !node_names.is_empty() {
+        for part in ["  nodeNames: [", &node_names.join(", "), "]\n"] {
+            yaml.push_str(part);
+        }
+    }
     if longhorn {
         yaml.push_str("  longhorn: true\n");
     }
@@ -439,6 +461,7 @@ mod tests {
             single_node: Some("/etc/zeabur-installer/config.yaml".to_owned()),
             longhorn: false,
             zot: None,
+            node_names: &["vps-1".to_owned()],
         });
         assert_eq!(text, include_str!("../fixtures/node-add.txt"));
     }
@@ -454,6 +477,7 @@ mod tests {
             single_node: None,
             longhorn: false,
             zot: None,
+            node_names: &["vps-1".to_owned()],
         });
         assert!(!text.contains("node sync"));
     }
@@ -467,6 +491,7 @@ mod tests {
             "K10aa::abcdef.0123456789abcdef",
             false,
             None,
+            &["vps-1".to_owned(), "vps-2".to_owned()],
         );
         assert_eq!(text, include_str!("../fixtures/node-add-worker.txt"));
         let yaml = text
@@ -476,7 +501,10 @@ mod tests {
             .unwrap();
         let hash = "a".repeat(64);
         let parsed = Document::parse(&yaml.replace("K10aa", &format!("K10{hash}"))).unwrap();
-        assert!(matches!(parsed, Document::Join(_)));
+        let Document::Join(parsed) = parsed else {
+            panic!("not a join: {yaml}");
+        };
+        assert_eq!(parsed.join.node_names, ["vps-1", "vps-2"]);
     }
 
     #[test]
@@ -489,6 +517,7 @@ mod tests {
             "K10aa::abcdef.0123456789abcdef",
             false,
             Some(("10.43.0.50", ca)),
+            &[],
         );
         let yaml = text
             .split_once("<<'EOF'\n")
@@ -517,6 +546,7 @@ mod tests {
             single_node: None,
             longhorn: true,
             zot: None,
+            node_names: &[],
         });
         assert!(text.contains("The cluster runs Longhorn"), "{text}");
         assert!(!text.contains("default local-path storage class"), "{text}");

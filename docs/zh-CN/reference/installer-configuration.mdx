@@ -1,7 +1,7 @@
 ---
 title: Installer 配置
 description: 查阅创建集群和加入节点所用的 YAML 字段、默认值及机密文件格式。
-source: "4e8df4d58d74"
+source: "53b0286930e6"
 ---
 
 将域名、组件选择和主机配置写入 YAML，运行 `zeabur-installer --config config.yaml plan`，先查看安装内容。文件默认位于 `/etc/zeabur-installer/config.yaml`。字段使用 camelCase；字段拼写错误或存在多余字段时，installer 会直接停止。
@@ -129,6 +129,9 @@ installer 一定会创建 `local-path`，数据存放在节点的 `/var/lib/zeab
 |---|---|
 | `host.tlsSan` | `[]`。Kubernetes API server 证书中额外添加的 DNS 名称或 IP 地址，仅用于 server |
 | `host.requireEncryptedDisk` | `false`。设为 `true` 时，如果根目录或数据目录不在加密设备上，`apply` 就会停止 |
+| `host.nodeName` | 主机名转为小写。主机名不能用作节点名称，或由 IP 地址组成（例如 `ip-10-0-0-5`）时，改用 `node-3f9a2c` 这类名称。installer 会将它写入 K3s 或 RKE2 的配置，以后主机名改了，节点名称也不会跟着变。只能使用小写字母、数字、`-` 和 `.` |
+
+节点装好后会一直使用当初的名称。再次运行 `apply` 会沿用它；如果 `host.nodeName` 填了其他名称，`apply` 会停止，因为 Kubernetes 会把它当成同一地址上的第二个节点。
 
 ### `sources`
 
@@ -178,6 +181,7 @@ host:
 | `secretFiles` | `{}`。与创建集群的文件相同，文件权限必须为 `0600` |
 | `host.tlsSan` | `[]`。自己的电脑使用其他地址或域名连接 API 时，将其添加到这里 |
 | `host.requireEncryptedDisk` | `false`。设为 `true` 时，如果 `/var/lib/kubesolo` 不在加密设备上，`apply` 就会停止 |
+| `host.nodeName` | 与创建集群时相同，写入 KubeSolo 的配置 |
 | `sources.catalog` | 选填。本地 Catalog `index.json`，替换固定的版本 |
 
 组件安装在 KubeSolo 内置的 `local-path` 存储类上，数据存放在 `/var/lib/kubesolo` 下。KubeSolo、helm-controller 和 kubectl 的版本由 installer 固定，没有可修改的字段。
@@ -197,8 +201,9 @@ host:
 | `join.tokenFile` | 与 `token` 二选一。权限为 `0600` 的令牌文件 |
 | `join.serverConfig` | `server` 必填，worker 不接受。原样复制 `node add --role server` 输出的 `disable` 和 `identity` |
 | `join.longhorn` | `false`。设为 `true` 时，在 K3s 或 RKE2 启动前安装好 Longhorn 所需的主机软件包 |
+| `join.nodeNames` | `[]`。集群中已有的节点名称，与 `node add` 打印的内容一致。新主机的名称已被使用时，节点会改用 `node-3f9a2c` 这类名称 |
 
-worker 不接受 `host.tlsSan`。`distribution` 和版本必须与集群一致。worker 的 bootstrap token 不能用于加入 server，需要使用 `node add --role server` 生成的配置。
+`host.nodeName` 的用法与创建集群时相同，但不能与 `join.nodeNames` 中的名称重复。worker 不接受 `host.tlsSan`。`distribution` 和版本必须与集群一致。worker 的 bootstrap token 不能用于加入 server，需要使用 `node add --role server` 生成的配置。
 
 ## 配置无法使用时
 
@@ -206,6 +211,7 @@ worker 不接受 `host.tlsSan`。`distribution` 和版本必须与集群一致�
 - 主机名无效：去掉 `https://` 和路径，`identity` 和 `zeabur` 必须使用不同名称。
 - 缺少必填 input：根据 `plan` 列出的组件和字段补充，再运行一次 `plan`。
 - K3s 设置了 `join.role: server`：K3s 只运行一台使用 SQLite 的服务器，只接受工作节点。要让控制平面在少一台服务器时继续运行，改为在三台服务器上安装 RKE2（`distribution: rke2`）。
+- `host.nodeName: this host is already node …`：这台主机之前用其他名称安装过。删除 `host.nodeName`，或改为消息中的名称。
 - 令牌文件权限不正确：在新主机上运行 `chmod 0600`。不要将包含令牌的配置文件放入 Git 仓库。
 
 修改配置文件后先运行 `plan`。要移除产品、清理主机文件，见[移除 Zeabur](../leave/uninstall.mdx)。

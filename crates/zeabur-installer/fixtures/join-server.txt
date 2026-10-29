@@ -1,6 +1,7 @@
 Join https://10.0.0.5:9345 as a server (control plane and etcd)
 RKE2 server <version> (pinned, checked against this installer's digests), CIS hardened, on vps-2 (amd64, 8192 MiB)
 Installs RKE2 only: Zeabur, Zeabur Identity and the catalog's components are already in the cluster.
+Node name        vps-2
 Node addresses   10.0.0.6, fd00::6 (temporary IPv6 addresses left out)
 
 Files
@@ -10,6 +11,7 @@ Files
   /etc/rancher/rke2/config.yaml.d/50-zeabur-identity.yaml
   /etc/rancher/rke2/zeabur-identity/authn.yaml
   /etc/rancher/rke2/config.yaml.d/10-join.yaml
+  /etc/rancher/rke2/config.yaml.d/15-node-name.yaml
   /etc/rancher/rke2/config.yaml.d/20-node-ip.yaml
   /etc/rancher/rke2/zeabur-join-token (the token, mode 0600)
 

@@ -9,6 +9,7 @@ import { StepPage } from "@/steps/frame"
 import { Alert, AlertDescription, AlertTitle } from "@zeabur/design-system/components/alert"
 import { Badge } from "@zeabur/design-system/components/badge"
 import { Button } from "@zeabur/design-system/components/button"
+import { Input } from "@zeabur/design-system/components/input"
 import { RadioGroup, RadioOption } from "@zeabur/design-system/components/radio"
 import {
   Collapsible,
@@ -83,6 +84,31 @@ function DistributionPanel({ wizard }: { wizard: Wizard }) {
   )
 }
 
+/** A Kubernetes node name, as `node_name::is_valid` checks it. */
+const nodeNamePattern = /^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$/
+
+function NodeName({ wizard }: { wizard: Wizard }) {
+  const t = useT()
+  const kept = Boolean(wizard.server.facts?.nodeName)
+  const value = wizard.active.host.nodeName ?? ""
+  return (
+    <div className="flex max-w-md flex-col gap-1.5">
+      <Input
+        value={value}
+        mono
+        autoComplete="off"
+        aria-label={t("host.nodeName")}
+        readOnly={kept}
+        aria-invalid={value !== "" && (value.length > 253 || !nodeNamePattern.test(value))}
+        onChange={(event) => wizard.setNodeName(event.target.value.trim().toLowerCase())}
+      />
+      <span className="text-xs text-tertiary">
+        {kept ? t("host.nodeNameKept") : t("host.nodeNameHint")}
+      </span>
+    </div>
+  )
+}
+
 export function HostStep({ wizard }: { wizard: Wizard }) {
   const t = useT()
   const { server } = wizard
@@ -149,6 +175,9 @@ export function HostStep({ wizard }: { wizard: Wizard }) {
         <Rows>
           <Row label={t("host.name")}>
             <span translate="no">{facts?.hostname ?? "—"}</span>
+          </Row>
+          <Row label={t("host.nodeName")}>
+            <NodeName wizard={wizard} />
           </Row>
           <Row label={t("host.arch")}>
             <span className="font-mono text-xs">{facts?.arch ?? "—"}</span>
