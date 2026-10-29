@@ -1118,6 +1118,43 @@ mod tests {
 
     use super::*;
 
+    /// The values written for a chart read back the same, whatever the strings look like.
+    #[test]
+    fn written_values_read_back_the_same() {
+        let strings = [
+            "yes",
+            "on",
+            "no",
+            "off",
+            "0123",
+            "1e3",
+            "1:20",
+            ":",
+            "#",
+            "a #b",
+            "a: b",
+            "true",
+            "null",
+            "~",
+            "",
+            "- x",
+            "2024-01-01",
+            " lead",
+            "trail ",
+            "multi\nline\n",
+            "\"q\"",
+            "'q'",
+        ];
+        let values = json!({
+            "list": strings,
+            "map": strings.iter().map(|s| ((*s).to_owned(), json!(s))).collect::<Map<_, _>>(),
+            "number": 123, "float": 1.5, "flag": true, "none": null,
+        });
+        let yaml = serde_saphyr::to_string(&values).unwrap();
+        let back: Value = serde_saphyr::from_str(&yaml).unwrap();
+        assert_eq!(back, values, "{yaml}");
+    }
+
     #[test]
     fn values_merge_like_helm_maps_merge_and_lists_replace() {
         let mut base = json!({"a": {"b": 1, "c": [1, 2]}, "d": "x"});

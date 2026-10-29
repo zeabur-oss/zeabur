@@ -593,6 +593,7 @@ mod tests {
     use std::collections::BTreeMap;
 
     use zeabur_installer_host::preflight::{Code, Topic};
+    use zeabur_installer_plan::config::PersonalConfig;
 
     use super::{ssh_host, velero_credentials};
 
@@ -635,5 +636,46 @@ mod tests {
             .filter(|key| !en.contains(&format!("\"{key}\":")))
             .collect();
         assert!(missing.is_empty(), "web/src/i18n/en.ts lacks {missing:?}");
+    }
+
+    /// The configuration the page writes reads back as the same configuration.
+    #[test]
+    fn a_written_configuration_reads_back_the_same() {
+        let strings = [
+            "yes",
+            "on",
+            "no",
+            "off",
+            "0123",
+            "1e3",
+            "1:20",
+            ":",
+            "#",
+            "a #b",
+            "a: b",
+            "true",
+            "null",
+            "~",
+            "",
+            "- x",
+            "2024-01-01",
+            " lead",
+            "trail ",
+            "multi\nline\n",
+            "\"q\"",
+            "'q'",
+        ];
+        let mut config = PersonalConfig::defaults();
+        config.enable = strings.iter().map(|s| (*s).to_owned()).collect();
+        config.inputs.insert(
+            "comp/id".to_owned(),
+            strings
+                .iter()
+                .map(|s| ((*s).to_owned(), serde_json::json!(s)))
+                .collect(),
+        );
+        let yaml = serde_saphyr::to_string(&config).unwrap();
+        let back: PersonalConfig = serde_saphyr::from_str(&yaml).unwrap();
+        assert_eq!(back, config, "{yaml}");
     }
 }
