@@ -6,7 +6,7 @@ source: "4ad7bec6c913"
 
 只移除 Zeabur 的 chart 或运行 `zeabur-installer uninstall zeabur`，现有服务会留在 Kubernetes，继续由原生控制器和 operator 运行。保留 ingress、证书、存储和备份等依赖组件后，就能改用 kubectl、Helm 或原来的 GitOps 工具管理服务。
 
-用 `zeaburctl ui` 在本地打开界面时，按 `Ctrl-C` 关闭即可。它不会在集群中安装任何东西，已应用的变更会留在集群中。
+用 `zeaburctl ui` 在本地打开界面时，按 `Ctrl-C` 关闭即可。`zeaburctl ui` 不会在集群中安装任何东西，已应用的变更会留在集群中。
 
 ## 移除前的准备
 
@@ -54,7 +54,7 @@ sudo /var/lib/rancher/rke2/bin/kubectl \
 | 项目的 `zeabur.com/project` 标签和显示信息 | 保留，不影响工作负载运行 |
 | 成员的 RoleBinding／ClusterRoleBinding | installer 移除时会一起删除。`helm uninstall` 会保留，需要自行删除 |
 | `zeabur-s3-destinations` | Chart 标记为保留的 Namespace，已登记的目标位置和密钥留在其中 |
-| Zeabur Identity | 只移除 Zeabur 时会保留，其用户和其他 OAuth client 继续留在原 Namespace |
+| Zeabur Identity | 只移除 Zeabur 时会保留，用户和其他 OAuth client 继续留在原 Namespace |
 
 备份使用的密钥已复制到各备份所在的 Namespace，运行时不会再读取 S3 目标位置列表。删除列表不会撤销这些密钥，也不会删除远程备份。
 
@@ -66,7 +66,7 @@ sudo /var/lib/rancher/rke2/bin/kubectl \
 
 ## 移除管理界面
 
-根据原安装方式选择一种流程。如果 Flux 或 Argo CD 仍在同步 Zeabur，先从其配置源中移除 Zeabur 安装项，再用原工具卸载，避免控制器重新创建它。
+根据原安装方式选择一种流程。如果 Flux 或 Argo CD 仍在同步 Zeabur，先从 Flux 或 Argo CD 的配置源中移除 Zeabur 安装项，再用原工具卸载，控制器才不会重新创建 Zeabur。
 
 ### Installer 安装
 
@@ -117,13 +117,13 @@ kubectl get storageclasses
 
 应用和卷都应仍在，公开网址和数据库连接的结果应与移除前相同。Zeabur 的网址不再提供界面，之后用 kubectl、Helm 或原来的 GitOps 工具调整配置。
 
-确认数据库和备份 operator 仍在，并在下一次按原定时间运行备份后查看结果。卸载 Zeabur chart 也会卸载其 Proxy。VictoriaLogs 本身会保留，但 Zeabur 的历史日志入口会消失。
+确认数据库和备份 operator 仍在，并在下一次按原定时间运行备份后查看结果。卸载 Zeabur chart 也会卸载 chart 中的 Proxy。VictoriaLogs 本身会保留，但 Zeabur 的历史日志入口会消失。
 
 ## 成员权限和准入策略
 
 卸载 Chart 会移除 `zeabur-member`、项目的聚合 ClusterRole、其规则集，以及 `zeabur-project-namespace` ValidatingAdmissionPolicy 和 binding。`zeabur-installer uninstall zeabur` 还会删除 Zeabur 创建的成员 binding。
 
-installer 添加的 `zeabur-system-hosts` 策略和 binding 会保留，Zeabur Identity 的域名会继续受到保护。删除 `zeabur` Namespace 后，它的 binding 找不到 Ingress，不再拦截任何路由。不再需要时，按 [Zeabur 和 Zeabur Identity 的域名](../reference/security.mdx#zeabur-和-zeabur-identity-的域名)删除或改为 `Warn`。
+installer 添加的 `zeabur-system-hosts` 策略和 binding 会保留，Zeabur Identity 的域名会继续受到保护。删除 `zeabur` Namespace 后，这个策略的 binding 找不到 Ingress，不再拦截任何路由。不再需要时，按 [Zeabur 和 Zeabur Identity 的域名](../reference/security.mdx#zeabur-和-zeabur-identity-的域名)删除或改为 `Warn`。
 
 如果仍需让成员访问集群，先用自己的 RBAC 配置接管，确认每个角色实际能读写的范围。如果替代角色保留 `patch namespaces`，也要保留同等的字段限制。移除 chart 策略后，仅靠 RBAC 无法将 patch 限定在显示名称、描述和图标上。现有的 Pod Security 和 NetworkPolicy 标签会保留。
 
@@ -153,24 +153,24 @@ kubectl get pods --all-namespaces -l zeabur.com/node-shell=true
 kubectl delete pod <pod-name> --namespace <namespace>
 ```
 
-tools 副本达到最长运行时间后会自行结束，但移除 Zeabur 后就没有组件负责删除这些对象。调试容器会一直保留，直到原副本被替换。仅为移除调试容器而重启应用会中断该副本，可以等下次部署时一起处理。
+tools 副本达到最长运行时间后会自行结束，但移除 Zeabur 后就没有组件负责删除这些对象。调试容器会保留到原副本替换为止。仅为移除调试容器而重启应用会中断该副本，可以等下次部署时一起处理。
 
 删除终端副本不会自动还原在节点终端中对主机所做的修改。
 
 ### S3 目标位置
 
-`zeabur-s3-destinations` 会保留已登记的目标位置和密钥。要继续管理备份，可以保留它。确定不再需要列表和原始凭证后，先查看对象，再删除此专用 Namespace：
+`zeabur-s3-destinations` 会保留已登记的目标位置和密钥。要继续管理备份，就保留这个 Namespace。确定不再需要列表和原始凭证后，先查看对象，再删除此专用 Namespace：
 
 ```sh
 kubectl get configmaps,secrets --namespace zeabur-s3-destinations
 kubectl delete namespace zeabur-s3-destinations
 ```
 
-这只会删除登记列表和其中的机密变量，不会删除远程 bucket、备份，也不会删除已复制到其他 Namespace 的机密变量。要撤销密钥，需到存储服务中停用它，并先更新仍在使用它的备份。
+这只会删除登记列表和其中的机密变量，不会删除远程 bucket、备份，也不会删除已复制到其他 Namespace 的机密变量。要撤销密钥，先更新仍在使用这个密钥的备份，再到存储服务中停用密钥。
 
 ## 同时移除 Zeabur Identity
 
-如果其他 client、用户 kubeconfig 或自动化仍在使用 Zeabur Identity，先保留它。将这些登录来源迁移到替代认证系统，确认不依赖 Identity 也能管理集群后，在一台服务器上运行：
+如果其他 client、用户 kubeconfig 或自动化仍在使用 Zeabur Identity，先保留 Identity。将这些登录来源迁移到替代认证系统，确认不依赖 Identity 也能管理集群后，在一台服务器上运行：
 
 ```sh
 sudo zeabur-installer uninstall identity
@@ -195,7 +195,7 @@ sudo zeabur-installer uninstall
 sudo zeabur-installer uninstall --purge
 ```
 
-K3s 或 RKE2 的脚本会移除 Kubernetes 及其数据，所有依赖它的工作负载都会停止。接下来的 `uninstall` 会列出 installer 残留文件，`--purge` 会清除下载缓存、本地 CA 副本、配置，以及 installer 为 Longhorn 写入的 module／multipath 配置文件。Longhorn 主机软件包会保留。
+K3s 或 RKE2 的脚本会移除 Kubernetes 和数据，所有依赖 Kubernetes 的工作负载都会停止。接下来的 `uninstall` 会列出 installer 残留文件，`--purge` 会清除下载缓存、本地 CA 副本、配置，以及 installer 为 Longhorn 写入的 module／multipath 配置文件。Longhorn 主机软件包会保留。
 
 `--purge` 不会删除 `/var/lib/zeabur/storage` 中的 local-path 数据和 `/var/lib/longhorn` 中的 replica 数据。即使保留原始数据目录，也仍需要对应的 PV／PVC 和存储系统信息，才能重新接入服务。确认已有可还原的备份后，再决定如何处理这些目录。
 
@@ -204,7 +204,7 @@ K3s 或 RKE2 的脚本会移除 Kubernetes 及其数据，所有依赖它的工�
 ## 移除未完成时
 
 - Zeabur 再次出现：检查 Flux、Argo CD、K3s/RKE2 HelmChart 或自动化中是否仍有安装来源。先移除来源，再用原管理工具卸载。
-- Namespace 卡在 `Terminating`：查看 Namespace 状态和残留对象的 finalizers，先恢复对应控制器或完成其清理，不要直接移除存储或数据库 finalizer。
+- Namespace 卡在 `Terminating`：查看 Namespace 状态和残留对象的 finalizers，先恢复对应的控制器，或让控制器完成清理，不要直接移除存储或数据库 finalizer。
 - 服务网址在移除后失效：对比 Ingress／HTTPRoute、ingress controller、Gateway、证书和后端副本，确认没有一起删除共同依赖的组件。
 - 成员无法操作，但服务正常：chart 的成员角色和 binding 已移除，按替代 RBAC 重新授权。
 

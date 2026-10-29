@@ -14,7 +14,7 @@ source: "6d5e029cac08"
 - 要将 PostgreSQL、MongoDB、MySQL、MariaDB、Redis／Valkey 或 MinIO 替换为 operator 管理的服务，先安装相应[组件](../cluster/components.mdx)。
 
 <Callout type="warn">
-导入不会迁移 Docker 主机上的数据。选择 operator 管理的数据库或对象存储时，会创建空的存储空间。普通服务的命名卷也会创建新的 PVC。正式切换前，先单独迁移数据，并确认应用能读到。
+导入不会迁移 Docker 主机上的数据。选择 operator 管理的数据库或对象存储时，会创建空的存储空间。普通服务的命名卷也会创建新的磁盘。正式切换前，先单独迁移数据，并确认应用能读到。
 </Callout>
 
 ## 读取并创建服务
@@ -97,7 +97,7 @@ Compose 的 `ports` 不会直接开放节点的主机端口。对于需要对外
 
 回到项目，确认预期的服务都已出现。依次打开各服务的**概览**和**日志**。数据库和对象存储刚创建时，需要等待 operator 创建实例和连接机密变量。
 
-到应用的**变量**中检查导入后的连接来源，再实际运行一次数据库读写或文件上传。网页能打开后，也要确认它读到的是迁移后的数据。
+到应用的**变量**中检查导入后的连接来源，再实际运行一次数据库读写或文件上传。网页能打开后，也要确认网页读到的是迁移后的数据。
 
 ![项目页列出导入后的各个服务](../images/shots/project-services.avif)
 
@@ -109,7 +109,7 @@ kubectl -n shop get clusters.postgresql.cnpg.io,secret -l zeabur.com/database=db
 kubectl -n shop get deployment web -o jsonpath='{.spec.template.spec.initContainers[*].name}'
 ```
 
-有 `depends_on` 的服务会多出 `wait-1`、`wait-2` 等初始化容器。它们用 `nc -z` 等待依赖服务的端口可以连接后才结束。
+有 `depends_on` 的服务会多出 `wait-1`、`wait-2` 等初始化容器。这些容器用 `nc -z` 等到依赖服务的端口可以连接后才结束。
 
 ## 用 kubectl 做同样的事
 
@@ -123,7 +123,7 @@ kubectl -n shop get deployment web -o jsonpath='{.spec.template.spec.initContain
 ## 常见失败与清理
 
 - 名称已存在：这个流程只创建对象。回到 Compose 修改服务名称并重新读取，或改用其他项目。
-- 某个服务没有创建：检查它是否只有 `build:`。为它指定可下载的镜像，或单独从 Git 部署。
+- 某个服务没有创建：检查它是否只有 `build:`。为这个服务指定可下载的镜像，或单独从 Git 部署。
 - 应用无法连接新数据库：检查无法改写的引用、改名后的主机和实际变量名称。可以在数据库的**连接**中使用**连接到服务**，详见[数据库](databases.mdx)。
 - 原来共享的文件不见了：导入的卷相互独立。检查原 Compose 是否通过多个服务共享同一个卷，重新安排存储方式并迁移文件。
 - 只创建了部分对象：Zeabur 按顺序创建对象，如果中途失败，已创建的对象会留在集群中。根据界面列出的结果补建或删除。

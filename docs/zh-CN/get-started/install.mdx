@@ -30,7 +30,7 @@ zeabur-identityctl client create zeabur \
   | kubectl apply -f -
 ```
 
-命令会在 stderr 显示一次 client secret。创建 Namespace 后，在 Bash 中交互式读取这个值，不将它放入命令参数：
+命令会在 stderr 显示一次 client secret。创建 Namespace 后，在 Bash 中交互式读取这个值，不放入命令参数：
 
 ```bash
 kubectl create namespace zeabur
@@ -40,7 +40,7 @@ printf %s "$CLIENT_SECRET" | kubectl -n zeabur create secret generic zeabur-oidc
 unset CLIENT_SECRET
 ```
 
-运行 `read` 后粘贴 client secret，再按 Enter。这个值不在命令参数中，同一台机器上的其他用户就无法从进程列表中看到它。chart 只记录机密变量的名称，实际值不会进入 Helm 的 release 记录。
+运行 `read` 后粘贴 client secret，再按 Enter。这个值不在命令参数中，同一台机器上的其他用户就无法从进程列表中看到。chart 只记录机密变量的名称，实际值不会进入 Helm 的 release 记录。
 
 ## 安装管理界面
 
@@ -62,7 +62,7 @@ kubectl -n zeabur rollout status deployment/zeabur
 
 `clusterName` 是界面显示的集群名称。`publicUrl` 要与客户端的 callback 域名一致。chart 会拒绝使用 HTTP 或包含路径的公开网址。
 
-这次安装会新增 Zeabur 的 Deployment、Service、Ingress、配置与计划密钥，以及项目成员使用的 ClusterRole 和 Namespace admission policy。chart 不会将成员角色绑定给任何人。登录后，管理员在**成员**中设置每个人的访问范围。
+这次安装会新增 Zeabur 的 Deployment、Service、Ingress、配置、签署检查变更的密钥，以及项目成员使用的 ClusterRole 和 Namespace admission policy。chart 不会将成员角色绑定给任何人。登录后，管理员在**成员**中设置每个人的访问范围。
 
 管理员使用管理员账号登录后，就有整个集群的权限，无需在 Zeabur 中另外配置。管理员账号、登录时间和**设置**页中的登录设置，见[权限](../reference/permissions.mdx#管理员账号和普通账号)。
 
@@ -72,9 +72,9 @@ kubectl -n zeabur rollout status deployment/zeabur
 
 ![“项目”页的“其他 Namespace”列出集群中尚未成为项目的 Namespace](../images/shots/existing-namespaces.avif)
 
-要将它固定列为项目，选择**使用这个 Namespace**，检查并应用。这只会添加项目标签，不会移动其中的 Deployment、Service 和数据。
+要将这个 Namespace 固定列为项目，选择**使用这个 Namespace**，检查并应用。这只会添加项目标签，不会移动其中的 Deployment、Service 和数据。
 
-如果能登录却看不到服务，先确认该用户的 Kubernetes 权限：Zeabur 使用登录者自己的令牌读取集群，它的 ServiceAccount 只能在 `zeabur-terminals` 中使用 kubectl 终端的副本。管理员可以在[成员](../cluster/members.mdx)中授予项目角色。
+如果能登录却看不到服务，先确认该用户的 Kubernetes 权限：Zeabur 使用登录者自己的令牌读取集群，Zeabur 自己的 ServiceAccount 只能在 `zeabur-terminals` 中使用 kubectl 终端的副本。管理员可以在[成员](../cluster/members.mdx)中授予项目角色。
 
 ## 让新服务有公开网址
 
@@ -90,7 +90,7 @@ helm upgrade zeabur oci://ghcr.io/zeabur-oss/charts/zeabur \
 
 之后部署 `shop` 项目的 `web` 时，表单会建议使用 `web-shop.apps.example.com`。可以用逗号分隔多个应用域名，默认使用第一个。之后也能在**集群**页的**域名**区域修改，那里会检查 DNS 记录并列出需要添加的记录，方法见[配置 DNS 记录](../configure/dns.mdx)。如果 `domains.suffixes` 留空，需要手动填写完整域名。如果 `domains.clusterIssuer` 留空，新服务的公开网址会使用 HTTP。
 
-这里仅指定服务使用的签发者名称。需要提前准备好 ClusterIssuer 和 DNS，Zeabur 不会根据这两个值创建它们。
+这里仅指定服务使用的签发者名称。需要提前准备好 ClusterIssuer 和 DNS，Zeabur 不会根据这两个值创建 ClusterIssuer 或 DNS 记录。
 
 ## 信任私有 CA
 
@@ -108,7 +108,7 @@ helm upgrade zeabur oci://ghcr.io/zeabur-oss/charts/zeabur \
 
 Zeabur 登录 Identity、读取镜像、读取对象存储中的备份、连接 GitHub 时，除了内置的 Mozilla CA，也会信任这些证书。Zeabur 只在启动时读取这个文件，修改配置文件后需要运行 `kubectl -n zeabur rollout restart deployment/zeabur`。
 
-`issuer.caBundle` 和 `builds.caBundle` 由 zeabur-installer 设置，分别指向签发 Identity 证书的本地 CA 和 Zot 的 CA。Zeabur 会同时信任它们和 `extraTrustedCA`，无需自行配置。
+`issuer.caBundle` 和 `builds.caBundle` 由 zeabur-installer 设置，分别指向签发 Identity 证书的本地 CA 和 Zot 的 CA。Zeabur 会同时信任这两个 CA 和 `extraTrustedCA`，无需自行配置。
 
 ## 常见失败
 

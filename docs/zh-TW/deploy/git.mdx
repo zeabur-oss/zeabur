@@ -8,10 +8,10 @@ source: "57a598cda189"
 
 ## 開始前
 
-- 已有專案，以及在專案建立服務、Kubernetes Service 和 Build 的權限。使用私有儲存庫或建置變數時，也需要建立機密的權限。
-- 叢集已安裝 Zeabur Builder 和 Keel。從元件目錄裝 Zeabur Builder 時，zot 會一起裝。缺少元件時，**新增**選單會在**從 Git 部署**下方寫出缺哪些，點下去會一次列出全部的安裝指令，見[檢視與安裝叢集元件](../cluster/components.mdx)。
-- 建置好的映像檔推到 Zeabur chart 的 `builds.registry`，預設是和 Zeabur Builder 一起裝的 Zot（`zot.zot.svc:5000`）。改用 Harbor 或外部 registry 時，管理員在 chart 設定 `builds.registry`，並讓 Builder 與節點能存取它。
-- 用安裝程式裝的 Zot 只讓 Builder、建置用的 Pod 和節點連進來。專案裡其他的 Pod 連不到 Zot，所以被入侵的應用程式拉不到別的專案的映像檔。
+- 已有專案，以及在專案建立服務、Kubernetes Service 和 Build 的權限。使用私有儲存庫或建置變數時，也需要建立機密變數的權限。
+- 叢集已安裝 Zeabur Builder 和 Keel。從元件目錄安裝 Zeabur Builder 時，zot 會一起安裝。缺少元件時，**新增**選單會在**從 Git 部署**下方寫出缺哪些，點下去會一次列出全部的安裝指令，見[檢視與安裝叢集元件](../cluster/components.mdx)。
+- 建置好的映像檔推到 Zeabur chart 的 `builds.registry`，預設是和 Zeabur Builder 一起裝的 Zot（`zot.zot.svc:5000`）。改用 Harbor 或外部 registry 時，管理員在 chart 設定 `builds.registry`，並讓 Builder 與節點能存取這個 registry。
+- 用安裝程式裝的 Zot 只讓 Builder、建置用的副本和節點連進來。專案裡其他的副本連不到 Zot，所以被入侵的應用程式拉不到別的專案的映像檔。
 - 準備應用程式實際監聽的連接埠。要公開網站，另備可指向叢集入口的網域。
 
 ## 建立服務
@@ -21,7 +21,7 @@ source: "57a598cda189"
 
 ### 選擇儲存庫和建置方式
 
-開啟**新增** → **從 Git 部署**。程式碼放在 GitHub 的話，先連結 GitHub，之後直接從清單挑儲存庫，私有的也不用另外設定金鑰：
+開啟**新增** → **從 Git 部署**。程式碼放在 GitHub 時，先連結 GitHub，之後直接從清單挑儲存庫，私有的也不用另外設定金鑰：
 
 - 專案已經連結 GitHub 時，**來源**預設是 **GitHub**。在**儲存庫**搜尋並選擇儲存庫即可。
 - 還沒連結時，**儲存庫**上方會出現一行**連結 GitHub**，按下去依情況帶你走下一步：
@@ -77,7 +77,7 @@ source: "57a598cda189"
 | **部署金鑰** | 按**建立部署金鑰**，複製**公開金鑰**，用旁邊的連結加入該儲存庫的部署金鑰，保留唯讀權限。 |
 | **存取權杖** | 填入能讀取儲存庫的**帳號**與**權杖**，透過 HTTPS 存取。GitHub 預填 `x-access-token`，GitLab 預填 `oauth2`。 |
 
-部署金鑰適用任何能用 SSH 連線的 Git 主機。Zeabur 內建 GitHub 和 GitLab 的主機金鑰，其他主機要先貼上它的主機金鑰：
+部署金鑰適用任何能用 SSH 連線的 Git 主機。Zeabur 內建 GitHub 和 GitLab 的主機金鑰，其他主機要先貼上主機金鑰：
 
 1. 在你的電腦執行表單列出的指令，例如 `ssh-keyscan -t ed25519,ecdsa -p 2222 git.example.com`。SSH 連接埠是 22 時沒有 `-p`。
 2. 把輸出貼到**主機金鑰（known_hosts）**，按**建立部署金鑰**。Zeabur Builder 只接受 Ed25519 和 ECDSA 金鑰。
@@ -90,9 +90,9 @@ source: "57a598cda189"
 
 ### 檢查並套用
 
-按**檢查變更**，核對服務名稱、公開網域、機密與 Build。
+按**檢查變更**，核對服務名稱、公開網域、機密變數與 Build。
 
-套用後，開啟服務的**建置**分頁，查看建置狀態與各次建置的**日誌**。第一次建置完成前，服務的映像檔標籤是 `pending`，還沒有可執行的版本。建置結束十分鐘後，建置的 Pod 和日誌會一起刪除。
+套用後，開啟服務的**建置**分頁，查看建置狀態與各次建置的**日誌**。第一次建置完成前，服務的映像檔標籤是 `pending`，還沒有可執行的版本。建置結束十分鐘後，建置用的副本和日誌會一起刪除。
 
 </Step>
 </Steps>
@@ -115,7 +115,7 @@ Build 的 `READY` 是 `True`，`REVISION` 是建置的提交，`-o wide` 多出�
 
 ## 新提交與自動部署
 
-Zeabur Builder 每分鐘檢查一次分支。有新的提交時，它建置新映像檔，完成後通知 Keel，由 Keel 把服務換成新映像檔。建置紀錄會標出每次建置的觸發原因，例如**新的提交**或**推送觸發**。Builder 怎麼偵測新提交、怎麼接 Git 主機的 webhook，見 [Zeabur Builder 文件](https://oss.zeabur.com/docs/builder/)。
+Zeabur Builder 每分鐘檢查一次分支。有新的提交時，Builder 會建置新映像檔，完成後通知 Keel，由 Keel 把服務換成新映像檔。建置紀錄會標出每次建置的觸發原因，例如**新的提交**或**推送觸發**。Builder 怎麼偵測新提交、怎麼接 Git 主機的 webhook，見 [Zeabur Builder 文件](https://oss.zeabur.com/docs/builder/)。
 
 服務**建置**分頁的**新建置完成後自動部署**預設開啟，控制的是建置完成後要不要馬上上線。
 
@@ -246,12 +246,12 @@ spec:
       url: http://keel.keel.svc.cluster.local:9300/v1/webhooks/native
 ```
 
-- `web-git` 只在私有儲存庫用存取權杖時需要，Build 用 `spec.source.credentialsRef` 指向它，標籤 `builder.zeabur.com/git-credentials: "true"` 讓 Zeabur Builder 讀得到。公開儲存庫拿掉這個機密和 `credentialsRef`。
+- `web-git` 只在私有儲存庫用存取權杖時需要，Build 用 `spec.source.credentialsRef` 指向它，標籤 `builder.zeabur.com/git-credentials: "true"` 讓 Zeabur Builder 讀得到。公開儲存庫拿掉這個機密變數和 `credentialsRef`。
 - `web-build-env` 和 Build 的 `spec.env` 只在有建置變數時需要。
 - Deployment 先用不存在的 `:pending` tag，第一次建置完成後由 Keel 換掉。`keel.sh/policy: force` 就是**新建置完成後自動部署**。
 - 用 Dockerfile 建置時，`builderRef` 改成 `dockerfile`，需要時在 `spec.source.git` 加 `contextDir` 和 `dockerfile`。`ref` 留空時，表單寫 `HEAD`，追蹤預設分支。
 
-改用部署金鑰時，自己產生金鑰，把公開金鑰加到儲存庫，再把私密金鑰和 `known_hosts` 放進 `kubernetes.io/ssh-auth` 機密。Build 的 `url` 改成 SSH 網址，例如 `git@github.com:acme/web.git`：
+改用部署金鑰時，自己產生金鑰，把公開金鑰加到儲存庫，再把私密金鑰和 `known_hosts` 放進 `kubernetes.io/ssh-auth` 機密變數。Build 的 `url` 改成 SSH 網址，例如 `git@github.com:acme/web.git`：
 
 ```sh
 ssh-keygen -t ed25519 -N '' -C web-deploy -f ./web-deploy
@@ -270,13 +270,13 @@ kubectl -n shop label secret web-git app.kubernetes.io/name=web builder.zeabur.c
 | 開啟**新建置完成後自動部署** | `kubectl -n shop annotate deployment web keel.sh/policy=force` |
 | **部署最新版** | `kubectl -n shop set image deployment/web web="$(kubectl -n shop get build web -o jsonpath='{.status.latestImage}')"` |
 
-移除 Zeabur 之後，Zeabur Builder 和 Keel 仍會繼續建置和部署，它們不需要 Zeabur。
+移除 Zeabur 之後，Zeabur Builder 和 Keel 仍會繼續建置和部署，這兩個元件不需要 Zeabur。
 
 ## 建置或部署停住時
 
 | 畫面上的情況 | 接著做 |
 | --- | --- |
-| **從 Git 部署**下方寫著**需要先安裝…** | 點它，照視窗列出的指令一次裝好。改用別的 registry 時，管理員在 Zeabur chart 設定 `builds.registry`，Zeabur Builder 改用它自己的 Helm chart 安裝，見 [Zeabur Builder 文件](https://oss.zeabur.com/docs/builder/)。 |
+| **從 Git 部署**下方寫著**需要先安裝…** | 點這行字，照視窗列出的指令一次裝好。改用別的 registry 時，管理員在 Zeabur chart 設定 `builds.registry`，改用 Zeabur Builder 自己的 Helm chart 安裝，見 [Zeabur Builder 文件](https://oss.zeabur.com/docs/builder/)。 |
 | 儲存庫存取遭拒 | 使用部署金鑰時，在**建置**按**顯示部署金鑰**，確認已加到正確的儲存庫。使用權杖時，檢查讀取範圍與有效期限。修正後**重新建置**。 |
 | 找不到分支或建置器 | 依建置頁的原因檢查儲存庫分支，以及叢集內對應的 Railpack 或 Dockerfile 建置器。 |
 | 建置成功，服務仍使用舊映像檔 | 檢查**新建置完成後自動部署**和 Keel 狀態，或按**部署最新版**手動套用。 |
@@ -284,6 +284,6 @@ kubectl -n shop label secret web-git app.kubernetes.io/name=web builder.zeabur.c
 
 ## 刪除服務
 
-在服務右上角的**更多**選**刪除服務**。檢查將刪除與保留的物件再套用。沒有其他服務使用同一個 Build 時，刪除流程也會刪除它。表單建立的 Git 認證機密，在沒有其他 Build 使用時才一起刪除。
+在服務右上角的**更多**選**刪除服務**。檢查將刪除與保留的物件再套用。沒有其他服務使用同一個 Build 時，刪除流程也會刪除這個 Build。表單建立、存放 Git 認證資訊的機密變數，在沒有其他 Build 使用時才一起刪除。
 
-若使用部署金鑰，另到 Git 主機移除這次加入的公開金鑰。若建立了專用權杖，也到 Git 主機撤銷它。
+若使用部署金鑰，另到 Git 主機移除這次加入的公開金鑰。若建立了專用權杖，也到 Git 主機撤銷權杖。

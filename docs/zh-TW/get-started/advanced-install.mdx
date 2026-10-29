@@ -27,7 +27,7 @@ access:
 
 把兩個網域換成你要使用的網域。公開網域模式的 DNS 和連接埠需求，見[快速開始的連線方式](quickstart.mdx#2-選擇連線方式)。
 
-未填 `enable` 和 `disable` 時安裝[預設元件](../reference/installer-configuration.mdx#元件選擇)，未填 `profile` 時使用 `single-node`，未填 `distribution` 時安裝 K3s。伺服器有 8 GiB 以上記憶體，或之後想用三台伺服器跑控制平面，就加上 `distribution: rke2`。
+未填 `enable` 和 `disable` 時安裝[預設元件](../reference/installer-configuration.mdx#元件選擇)，未填 `profile` 時使用 `single-node`，未填 `distribution` 時安裝 K3s。伺服器有 8 GiB 以上記憶體，或之後想用三台伺服器執行控制平面，就加上 `distribution: rke2`。
 
 測試機可以改用 `local` 模式：
 
@@ -79,7 +79,7 @@ sudo zeabur-installer plan --json
 sudo zeabur-installer apply
 ```
 
-`apply` 會先跑主機檢查。只要有一項失敗，就會在改動任何東西之前停下。
+`apply` 會先執行主機檢查。只要有一項失敗，就會在改動任何東西之前停下。
 
 通過檢查後，依序設定主機、安裝做好 CIS 強化的 K3s 或 RKE2、Namespace 和連線規則、儲存空間、選定的元件，再安裝 Zeabur Identity 和 Zeabur。
 
@@ -137,7 +137,7 @@ sudo zeabur-installer doctor
 | 遇到的情況 | 處理方式 |
 | --- | --- |
 | 連接埠被占用，例如還有其他 Kubernetes 在執行 | 先停掉占用的程式，或換乾淨的主機，再執行 `apply` |
-| `domain` 模式的憑證還沒核發 | 檢查兩個網域的 DNS，以及 TCP 80 連接埠能否從外部連到。修正後重跑 `apply` |
+| `domain` 模式的憑證還沒核發 | 檢查兩個網域的 DNS，以及 TCP 80 連接埠能否從外部連到。修正後重新執行 `apply` |
 | `local` 模式下，瀏覽器顯示憑證不受信任 | 把 `/var/lib/rancher/zeabur-installer/local-ca.crt` 匯入瀏覽器或系統的信任清單 |
 | 第一位管理員的註冊連結過期 | 在伺服器執行 `sudo zeabur-installer setup-link`，產生新的連結 |
 

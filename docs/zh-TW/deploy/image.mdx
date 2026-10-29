@@ -8,7 +8,7 @@ source: "cbed8a928dff"
 
 ## 開始前
 
-- 已有專案，以及在該專案建立服務的權限。公開網域、機密與磁碟區各有自己的權限，表單會依可用權限顯示選項。
+- 已有專案，以及在該專案建立服務的權限。公開網域、機密變數與磁碟區各有自己的權限，表單會依可用權限顯示選項。
 - 映像檔已推送到節點能存取的 registry，並提供節點架構對應的版本。
 - 知道應用程式實際監聽的連接埠。首次部署可先依[第一個專案](../get-started/first-project.mdx)走完公開映像檔的流程。
 - 要保存資料時，叢集已有可配置磁碟區的預設儲存類別。
@@ -29,7 +29,7 @@ source: "cbed8a928dff"
 
 ### 確認連接埠與網域
 
-Zeabur 會從映像檔讀取它宣告的連接埠。確認**連接埠**和應用程式真正監聽的號碼相同。映像檔宣告多個號碼時，依應用程式用途選擇。
+Zeabur 會讀取映像檔宣告的連接埠。確認**連接埠**和應用程式真正監聽的號碼相同。映像檔宣告多個號碼時，依應用程式用途選擇。
 
 不接受連線的背景服務，把**連接埠**留空。這時只建立 Deployment，沒有私有位址，也不能加公開網域。
 
@@ -45,11 +45,11 @@ Zeabur 會從映像檔讀取它宣告的連接埠。確認**連接埠**和應用
 | 設定 | 填寫方式與結果 |
 | --- | --- |
 | **環境變數** | 每行一個 `KEY=value`。應用程式靠 `PORT` 決定監聽位置時，在這裡自己加上 `PORT`。 |
-| **把值放在 Secret** `<名稱>-env` | 預設開啟，變數的值存進這個機密。沒有建立機密的權限時，變數會直接寫在 Deployment 裡，也不能使用私有 registry。這時不要在這裡填密碼。 |
+| **把值放在 Secret** `<名稱>-env` | 預設開啟，變數的值存進這個機密變數。沒有建立機密變數的權限時，變數會直接寫在 Deployment 裡，也不能使用私有 registry。這時不要在這裡填密碼。 |
 | **磁碟區** | 開啟後填入**掛載路徑**，例如 `/data`，以及**磁碟區大小**，例如 `5Gi`。建立的是新的空白磁碟區。 |
 | **規格** | 選擇**小**、**中**或**大**，欄位下方會列出 CPU 保留量、記憶體保留量與上限。 |
 | **副本數** | 可選 1 到 20，掛載磁碟區時固定為 1。 |
-| **私有 registry** | 開啟後填入 **Registry**、**帳號**、**密碼**，例如 registry 主機 `ghcr.io`。Zeabur 會建立映像檔下載用的機密。 |
+| **私有 registry** | 開啟後填入 **Registry**、**帳號**、**密碼**，例如 registry 主機 `ghcr.io`。Zeabur 會建立下載映像檔用的機密變數。 |
 | **安全性** | Zeabur 讀取映像檔的 `User`：數字 UID 不是 0（例如 `101`、`1000:1000`）時選**嚴格**；沒有指定使用者，或指定 `root`、`0`、`nginx` 這類使用者名稱時選**相容**。表單會說明原因，建立前仍能切換。 |
 
 <Callout type="warn">
@@ -72,7 +72,7 @@ Zeabur 會從映像檔讀取它宣告的連接埠。確認**連接埠**和應用
 
 ## 確認結果
 
-在服務**概覽**確認副本就緒，再看**日誌**是否已啟動應用程式。填了連接埠時，Zeabur 會替它加上 TCP 就緒檢查，副本能接受連線後才開始收到流量。
+在服務**概覽**確認副本就緒，再看**日誌**是否已啟動應用程式。填了連接埠時，Zeabur 會替服務加上 TCP 就緒檢查，副本能接受連線後才開始收到流量。
 
 ![服務概覽，顯示副本狀態與公開網址](../images/shots/service-overview.avif)
 
@@ -194,7 +194,7 @@ spec:
 - 多個連接埠：Service 的第一個連接埠叫 `http`，其他叫 `port-<號碼>`。
 - **把值放在 Secret** 關閉時，變數改寫在容器的 `env`，不建立 `web-env`。
 
-私有 registry 的帳密放在 `kubernetes.io/dockerconfigjson` 類型的機密，名稱是 `<服務名稱>-registry`，Deployment 用 `imagePullSecrets` 指向它：
+私有 registry 的帳密放在 `kubernetes.io/dockerconfigjson` 類型的機密變數，名稱是 `<服務名稱>-registry`，Deployment 用 `imagePullSecrets` 指向它：
 
 ```sh
 kubectl -n shop create secret docker-registry web-registry \
@@ -219,7 +219,7 @@ spec:
       storage: 5Gi
 ```
 
-掛載它時，Deployment 的 `spec.replicas` 固定為 `1`，並加上 `strategy: {type: Recreate}`，Pod 的 `volumes` 寫 `persistentVolumeClaim: {claimName: web-data}`，容器的 `volumeMounts` 寫 `mountPath: /data`。已經建立的服務，到[磁碟區](../configure/volumes.mdx)用表單加比較簡單。
+掛載這個磁碟時，Deployment 的 `spec.replicas` 固定為 `1`，並加上 `strategy: {type: Recreate}`，Pod 的 `volumes` 寫 `persistentVolumeClaim: {claimName: web-data}`，容器的 `volumeMounts` 寫 `mountPath: /data`。已經建立的服務，到[磁碟區](../configure/volumes.mdx)用表單加比較簡單。
 
 ## 常見失敗
 
@@ -235,7 +235,7 @@ spec:
 
 ## 刪除服務
 
-在服務右上角的**更多**選**刪除服務**。刪除流程會列出服務建立、且沒有其他服務使用的網路、機密與磁碟區。其他服務還在使用的物件會保留。
+在服務右上角的**更多**選**刪除服務**。刪除流程會列出服務建立、且沒有其他服務使用的網路、機密變數與磁碟區。其他服務還在使用的物件會保留。
 
 <Callout type="warn">
 刪除磁碟區可能連同檔案一起刪除，結果取決於底層磁碟的回收政策。套用前查看變更中列出的磁碟區與回收政策，先移出要保留的資料。

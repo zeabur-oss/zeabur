@@ -27,7 +27,7 @@ A new teammate has the **Viewer** role in `shop`. They can see services and thei
 
 Every time Zeabur reads from or writes to the cluster, it uses the signed-in user's identity. Kubernetes RBAC determines what that user can do. The **Viewer** role can't read logs or secrets, so Zeabur can't read them either. Zeabur has no cluster permissions of its own and can't grant anyone extra access.
 
-To give the new teammate access to logs, an administrator can open [Members](../cluster/members.mdx) and change their role to **Developer**. Administrators signed in with an admin account already have access to the entire cluster and won't encounter this restriction. See [Permissions](../reference/permissions.mdx) for what each role can do.
+To give the new teammate access to logs, an administrator can open [Members](../cluster/members.mdx) and change their role to **Developer**. Administrators signed in with an admin account already have access to the entire cluster and don't run into this. See [Permissions](../reference/permissions.mdx) for what each role can do.
 
 ## You decide to stop using Zeabur
 

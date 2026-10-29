@@ -73,7 +73,7 @@ Open `https://zeabur.example.com` and sign in with a passkey. Go to **Projects**
 
 To keep it listed as a project, select **Use this namespace**, then review and apply the change. This only adds a project label. It doesn't move the Deployments, Services, or data inside.
 
-If you can sign in but can't see services, check the user's Kubernetes rights first. Zeabur reads the cluster with the signed-in person's token. Its ServiceAccount can only use kubectl terminal replicas in `zeabur-terminals`. An admin can grant project roles on the [Members](../cluster/members.mdx) page.
+If you can sign in but can't see services, check the user's Kubernetes rights first. Zeabur reads the cluster with the signed-in person's token. Zeabur's own ServiceAccount can only use kubectl terminal replicas in `zeabur-terminals`. An admin can grant project roles on the [Members](../cluster/members.mdx) page.
 
 ## Give new services a public URL
 
@@ -87,7 +87,7 @@ helm upgrade zeabur oci://ghcr.io/zeabur-oss/charts/zeabur \
   --set domains.clusterIssuer=letsencrypt
 ```
 
-When you deploy `web` in the `shop` project, the form suggests `web-shop.apps.example.com`. You can list multiple application domains separated by commas; the first is the default. You can also change them later in the **Domains** section of the **Cluster** page, which checks DNS records and lists the records to add. See [Set up DNS records](../configure/dns.mdx). If `domains.suffixes` is empty, you must enter the full domain manually. If `domains.clusterIssuer` is empty, new services' public URLs use HTTP.
+When you deploy `web` in the `shop` project, the form suggests `web-shop.apps.example.com`. You can list multiple application domains separated by commas; the first is the default. You can also change them later in the **Domains** section of the **Cluster** page, which checks DNS records and lists the records to add. See [Set up DNS records](../configure/dns.mdx). If `domains.suffixes` is empty, enter the full domain by hand. If `domains.clusterIssuer` is empty, new services' public URLs use HTTP.
 
 These settings only name the issuer services should use. Prepare the ClusterIssuer and DNS first; Zeabur doesn't create them from these two values.
 
@@ -122,7 +122,7 @@ zeabur-installer sets `issuer.caBundle` and `builds.caBundle` to reference the l
 
 ## Manage the chart with GitOps
 
-Zeabur uses a key to sign reviewed changes. The chart creates that key on the first install and reads it back on subsequent `helm upgrade` runs. Argo CD and `helm template` generate manifests without connecting to the cluster, so they generate a new key each time. This invalidates changes that have been reviewed but not yet applied. For these tools, create a fixed key first, then set `planKey.existingSecret`:
+Zeabur uses a key to sign reviewed changes. The chart creates that key on the first install and reads it back on subsequent `helm upgrade` runs. Argo CD and `helm template` generate manifests without connecting to the cluster, so they generate a new key each time, and the new key invalidates changes you reviewed but haven't applied yet. For these tools, create a fixed key first, then set `planKey.existingSecret`:
 
 ```sh
 kubectl -n zeabur create secret generic zeabur-plan-key \
@@ -147,4 +147,4 @@ For K3s or RKE2 clusters, use the default `helmchart` format so the built-in hel
 helm uninstall zeabur --namespace zeabur
 ```
 
-Applications and the components that provide ingress, certificates, and storage stay in place. The member roles the chart created are removed with the release, so you'll need to manage members' rights separately. See [Remove Zeabur](../leave/uninstall.mdx) for the full list of what stays and the steps to migrate sign-in.
+Applications and the components that provide ingress, certificates, and storage stay in place. The member roles the chart created are removed with the release, so give members their rights another way. See [Remove Zeabur](../leave/uninstall.mdx) for the full list of what stays and the steps to migrate sign-in.

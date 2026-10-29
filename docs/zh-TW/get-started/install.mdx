@@ -30,7 +30,7 @@ zeabur-identityctl client create zeabur \
   | kubectl apply -f -
 ```
 
-指令會在 stderr 顯示一次 client secret。建立 Namespace 後，在 Bash 互動式讀入這個值，不把它放進指令參數：
+指令會在 stderr 顯示一次 client secret。建立 Namespace 後，在 Bash 互動式讀入這個值，不放進指令參數：
 
 ```bash
 kubectl create namespace zeabur
@@ -62,19 +62,19 @@ kubectl -n zeabur rollout status deployment/zeabur
 
 `clusterName` 是介面顯示的叢集名稱。`publicUrl` 要與用戶端的 callback 網域一致。chart 會拒絕 HTTP 或含路徑的公開網址。
 
-這次安裝會新增 Zeabur 的 Deployment、Service、Ingress、設定與計畫金鑰，以及專案成員使用的 ClusterRole 和 Namespace admission policy。chart 不會把成員角色綁給任何人。登入後由管理員在**成員**設定每個人的存取範圍。
+這次安裝會新增 Zeabur 的 Deployment、Service、Ingress、設定、簽署檢查變更的金鑰，以及專案成員使用的 ClusterRole 和 Namespace admission policy。chart 不會把成員角色綁給任何人。登入後由管理員在**成員**設定每個人的存取範圍。
 
 管理員用管理員帳號登入，就有整個叢集的權限，Zeabur 這邊不用另外設定。管理員帳號、登入時間和**設定**頁的登入設定，見[權限](../reference/permissions.mdx#管理員帳號和一般帳號)。
 
 ## 登入並確認現有服務
 
-開啟 `https://zeabur.example.com`，完成通行密鑰登入。進入**專案**，在**其他 Namespace**找到既有應用程式，開啟查看服務。
+開啟 `https://zeabur.example.com`，完成通行密鑰登入。進入**專案**，在**其他 Namespace** 裡找到既有應用程式，開啟查看服務。
 
 ![「專案」頁的「其他 Namespace」列出叢集裡還不是專案的 Namespace](../images/shots/existing-namespaces.avif)
 
-要把它固定列為專案，選擇**使用這個 Namespace**，檢查並套用。這只加上專案標籤，裡面的 Deployment、Service 與資料不會搬動。
+要把這個 Namespace 固定列為專案，選擇**使用這個 Namespace**，檢查並套用。這只加上專案標籤，裡面的 Deployment、Service 與資料不會搬動。
 
-能登入卻看不到服務時，先確認該使用者的 Kubernetes 權限：Zeabur 用登入者自己的 token 讀取叢集，它的 ServiceAccount 只能在 `zeabur-terminals` 使用 kubectl 終端機的 Pod。管理員可以在[成員](../cluster/members.mdx)授予專案角色。
+能登入卻看不到服務時，先確認該使用者的 Kubernetes 權限：Zeabur 用登入者自己的 token 讀取叢集，Zeabur 自己的 ServiceAccount 只能在 `zeabur-terminals` 使用 kubectl 終端機的 Pod。管理員可以在[成員](../cluster/members.mdx)授予專案角色。
 
 ## 讓新服務有公開網址
 
@@ -90,7 +90,7 @@ helm upgrade zeabur oci://ghcr.io/zeabur-oss/charts/zeabur \
 
 之後部署 `shop` 專案的 `web` 時，表單會建議 `web-shop.apps.example.com`。可以用逗號列出多個應用程式網域，預設用第一個。之後也能在**叢集**頁的**網域**區塊修改，那裡會檢查 DNS 紀錄並列出要新增的紀錄，做法見[設定 DNS 紀錄](../configure/dns.mdx)。留空 `domains.suffixes` 時需手填完整網域。留空 `domains.clusterIssuer` 時，新服務的公開網址使用 HTTP。
 
-這裡只指定服務使用的簽發者名稱。ClusterIssuer 與 DNS 要先備妥，Zeabur 不會從這兩個值建立它們。
+這裡只指定服務使用的簽發者名稱。ClusterIssuer 與 DNS 要先備妥，Zeabur 不會依這兩個值建立 ClusterIssuer 或 DNS 紀錄。
 
 ## 信任私有 CA
 
@@ -108,7 +108,7 @@ helm upgrade zeabur oci://ghcr.io/zeabur-oss/charts/zeabur \
 
 Zeabur 登入 Identity、讀取映像檔、讀取物件儲存裡的備份、連線 GitHub 時，除了內建的 Mozilla CA，也信任這些憑證。Zeabur 只在啟動時讀取這個檔案，修改 ConfigMap 後要執行 `kubectl -n zeabur rollout restart deployment/zeabur`。
 
-`issuer.caBundle` 和 `builds.caBundle` 由 zeabur-installer 設定，分別指向簽發 Identity 憑證的本機 CA 和 Zot 的 CA。Zeabur 會同時信任它們和 `extraTrustedCA`，不需要自己設定。
+`issuer.caBundle` 和 `builds.caBundle` 由 zeabur-installer 設定，分別指向簽發 Identity 憑證的本機 CA 和 Zot 的 CA。Zeabur 會同時信任這兩個 CA 和 `extraTrustedCA`，不需要自己設定。
 
 ## 常見失敗
 
@@ -119,7 +119,7 @@ Zeabur 登入 Identity、讀取映像檔、讀取物件儲存裡的備份、連�
 | Identity 使用私有 CA | 設定 `extraTrustedCA`，讓 Zeabur 信任簽發 Identity 憑證的 CA。見[信任私有 CA](#信任私有-ca)。 |
 | 登入後讀取遭拒 | 在 Identity 確認成員身分與群組，再核對目標 Namespace 的 RoleBinding。見[權限參考](../reference/permissions.mdx)。 |
 | 新服務就緒，但網址不通 | 核對應用程式網域的 DNS 與憑證。管理介面與應用程式用的是不同網域，要分別設定。 |
-| 升級後需要重新登入 | chart 只執行一個 Zeabur Pod，工作階段存在記憶體中，Pod 替換後要重新登入。 |
+| 升級後需要重新登入 | chart 只執行一個 Zeabur 副本，工作階段存在記憶體中，副本替換後要重新登入。 |
 
 ## 用 GitOps 管理 chart
 
@@ -134,7 +134,7 @@ kubectl -n zeabur create secret generic zeabur-plan-key \
 
 ## 安裝 Zeabur 需要的元件
 
-叢集不是用 zeabur-installer 裝的，Zeabur 的元件頁只會顯示狀態，不會替你安裝。用 [`zeaburctl components export`](../reference/zeaburctl.mdx#components-export) 印出元件的 manifest，再用 `kubectl` 套用，或提交到 GitOps 儲存庫：
+叢集不是用 zeabur-installer 安裝時，Zeabur 的元件頁只會顯示狀態，不會替你安裝。用 [`zeaburctl components export`](../reference/zeaburctl.mdx#components-export) 印出元件的 manifest，再用 `kubectl` 套用，或提交到 GitOps 儲存庫：
 
 ```sh
 zeaburctl components export certificates/cert-manager --format flux > cert-manager.yaml

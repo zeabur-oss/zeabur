@@ -8,13 +8,13 @@ source: "6d5e029cac08"
 
 ## 開始前
 
-- 準備 Compose 檔案，以及它使用的 `.env`、`env_file` 內容。Compose 檔案上限為 256 KiB，包含 1 到 50 個服務。
+- 準備 Compose 檔案，以及檔案用到的 `.env`、`env_file` 內容。Compose 檔案上限為 256 KiB，包含 1 到 50 個服務。
 - 每個要部署的服務都有已推送到 registry 的 `image`。只有 `build:` 的服務不會建立，改走[從 Git 部署](git.mdx)或先推送映像檔。
-- 已有專案與建立服務的權限。匯入磁碟區、機密、網域或 operator 管理的資料庫，也要有各自的建立權限。
+- 已有專案與建立服務的權限。匯入磁碟區、機密變數、網域或 operator 管理的資料庫，也要有各自的建立權限。
 - 若要把 PostgreSQL、MongoDB、MySQL、MariaDB、Redis／Valkey 或 MinIO 換成 operator 管理的服務，先安裝相應[元件](../cluster/components.mdx)。
 
 <Callout type="warn">
-匯入不會搬移 Docker 主機上的資料。選擇 operator 管理的資料庫或物件儲存時，會建立空白儲存空間。一般服務的命名磁碟區也會建立新的 PVC。正式切換前，先另外搬移資料並確認應用程式讀得到。
+匯入不會搬移 Docker 主機上的資料。選擇 operator 管理的資料庫或物件儲存時，會建立空白儲存空間。一般服務的命名磁碟區也會建立新的磁碟。正式切換前，先另外搬移資料並確認應用程式讀得到。
 </Callout>
 
 ## 讀取並建立服務
@@ -26,7 +26,7 @@ source: "6d5e029cac08"
 
 開啟**新增** → **Docker Compose**，在 **Compose 檔案**貼上 YAML，或按**上傳檔案**選取檔案，接著按**讀取檔案**。
 
-如果檔案有 `${NAME}` 等插值，但沒有對應的值，介面會要求 `.env` 內容。`env_file` 指向的檔案也會各自出現輸入欄位。貼上或上傳它們後，再按**讀取檔案**。
+如果檔案有 `${NAME}` 等插值，但沒有對應的值，介面會要求 `.env` 內容。`env_file` 指向的檔案也會各自出現輸入欄位。貼上或上傳這些檔案後，再按**讀取檔案**。
 
 缺少的插值會變成空字串，沒有提供的 `env_file` 變數會略過。先把這些值補齊，避免程式用空密碼或空位址啟動。同一個變數同時出現在 `env_file` 和 `environment` 時，使用 `environment` 的值。
 
@@ -68,7 +68,7 @@ Compose 的 `ports` 不會直接開放節點的主機連接埠。在需要對外
 
 ### 檢查並套用
 
-閱讀每個服務下面的掛載路徑、等待對象與略過欄位，再按**檢查變更**。確認服務數量、機密、磁碟區、資料庫與網域。
+閱讀每個服務下面的掛載路徑、等待對象與略過欄位，再按**檢查變更**。確認服務數量、機密變數、磁碟區、資料庫與網域。
 
 匯入的服務使用「相容」安全性，因為大多數 Compose 映像檔以 root 執行。
 
@@ -91,17 +91,17 @@ Compose 的 `ports` 不會直接開放節點的主機連接埠。在需要對外
 | `privileged`、`cap_add`、`devices`、`network_mode: host`、`pid: host` | 略過。需要主機裝置或主機權限的應用程式，要先處理這些相依條件再部署。 |
 | `build:` 同時有 `image` | 直接下載 `image`，略過本機建置。 |
 | 不符合名稱規則的服務名稱 | 轉成小寫字母、數字與連字號。檢查仍保留舊名稱的應用程式設定。 |
-| 一般服務的明文變數 | 有建立機密權限時，存到 `<服務名稱>-env` 機密。例如改寫後的 `S3_ENDPOINT` 也可能出現在這裡。 |
+| 一般服務的明文變數 | 有建立機密變數的權限時，存到 `<服務名稱>-env` 機密變數。例如改寫後的 `S3_ENDPOINT` 也可能出現在這裡。 |
 
 ## 確認結果
 
-回到專案，確認預期服務都出現。依序打開各服務的**概覽**與**日誌**。資料庫與物件儲存剛建立時，要等 operator 建立執行個體與連線機密。
+回到專案，確認預期服務都出現。依序打開各服務的**概覽**與**日誌**。資料庫與物件儲存剛建立時，要等 operator 建立執行個體與連線用的機密變數。
 
-到應用程式的**環境變數**檢查匯入後的連線來源，再實際執行一次資料庫讀寫或檔案上傳。網頁能開啟後，也要確認它讀到的是搬移後的資料。
+到應用程式的**環境變數**檢查匯入後的連線來源，再實際執行一次資料庫讀寫或檔案上傳。網頁能開啟後，也要確認網頁讀到的是搬移後的資料。
 
 ![專案頁列出匯入後的各個服務](../images/shots/project-services.avif)
 
-用 kubectl 確認時，一般服務的物件帶有 `app.kubernetes.io/name: <服務名稱>`，換成 operator 管理的資料庫，Zeabur 寫的資料庫物件和機密帶有 `zeabur.com/database: <名稱>`。下面的 `db` 換成了 PostgreSQL：
+用 kubectl 確認時，一般服務的物件帶有 `app.kubernetes.io/name: <服務名稱>`，換成 operator 管理的資料庫，Zeabur 寫的資料庫物件和機密變數帶有 `zeabur.com/database: <名稱>`。下面的 `db` 換成了 PostgreSQL：
 
 ```sh
 kubectl -n shop get deploy,svc,pvc,secret -l app.kubernetes.io/name=web
@@ -109,7 +109,7 @@ kubectl -n shop get clusters.postgresql.cnpg.io,secret -l zeabur.com/database=db
 kubectl -n shop get deployment web -o jsonpath='{.spec.template.spec.initContainers[*].name}'
 ```
 
-有 `depends_on` 的服務會多出 `wait-1`、`wait-2` 等初始化容器，它們用 `nc -z` 等相依服務的連接埠能連線才結束。
+有 `depends_on` 的服務會多出 `wait-1`、`wait-2` 等初始化容器，這些容器用 `nc -z` 等到相依服務的連接埠能連線才結束。
 
 ## 用 kubectl 做同樣的事
 
@@ -123,7 +123,7 @@ kubectl -n shop get deployment web -o jsonpath='{.spec.template.spec.initContain
 ## 常見失敗與清除
 
 - 名稱已存在：這個流程只建立物件。回到 Compose 修改服務名稱並重新讀取，或改用其他專案。
-- 某個服務沒有建立：檢查它是否只有 `build:`。替它指定可下載的映像檔，或另外從 Git 部署。
+- 某個服務沒有建立：檢查它是否只有 `build:`。為這個服務指定可下載的映像檔，或另外從 Git 部署。
 - 應用程式連不到新資料庫：檢查無法改寫的參照、改名後的主機與實際變數名稱。可在資料庫的**連線**使用**接到服務**，詳見[資料庫](databases.mdx)。
 - 原本共用的檔案不見了：匯入的磁碟區各自獨立。檢查原 Compose 是否靠多服務共用同一個磁碟區，重新安排儲存方式並搬移檔案。
 - 只建立了部分物件：Zeabur 依序建立物件，中途失敗時，已建立的物件會留在叢集。依畫面列出的結果補建或刪除。

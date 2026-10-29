@@ -31,7 +31,7 @@ source: "5d17518ca7cb"
 | **端口** | `8080` |
 | **公开域名** | 开启，使用推荐的网址或你准备的域名 |
 
-Zeabur 检测到 `nginx-unprivileged` 以用户 101 运行，会自动选择**严格**，表单会说明选择原因。这个镜像监听 `8080`。`nginx:latest` 也能运行，Zeabur 会为它选择**兼容**；创建前仍可自行切换。
+Zeabur 检测到 `nginx-unprivileged` 以用户 101 运行，会自动选择**严格**，表单会说明选择原因。这个镜像监听 `8080`。`nginx:latest` 也能运行，这时 Zeabur 会选择**兼容**；创建前仍可自行切换。
 
 填写镜像后，表单会读取镜像声明的端口，通常会自动填入 `8080`。
 
@@ -53,7 +53,7 @@ Zeabur 检测到 `nginx-unprivileged` 以用户 101 运行，会自动选择**�
 
 在服务的**概览**中等待副本变为 `1/1` **就绪**。然后到**网络**中点击域名，浏览器会显示 Nginx 欢迎页。
 
-如果域名下方显示**这个网址只有 HTTP**，说明集群尚未配置自动签发证书，请使用 `http://` 打开。要使用 HTTPS，请管理员配置 cert-manager 签发者。
+如果域名下方显示**这个网址只有 HTTP**，说明集群尚未配置自动签发证书，改用 `http://` 打开。要使用 HTTPS，请管理员配置 cert-manager 签发者。
 
 返回**日志**，可以看到刚才打开网页时留下的访问记录。
 
@@ -64,7 +64,7 @@ Zeabur 检测到 `nginx-unprivileged` 以用户 101 运行，会自动选择**�
 ## 确认结果
 
 - 服务的**概览**显示 `1/1` **就绪**，在浏览器中打开网址能看到 Nginx 欢迎页。
-- 使用 kubectl 也能看到刚才创建的三个对象，它们都带有标签 `app.kubernetes.io/name: web`：
+- 使用 kubectl 也能看到刚才创建的三个对象，都带有标签 `app.kubernetes.io/name: web`：
 
 ```sh
 kubectl get namespace hello --show-labels

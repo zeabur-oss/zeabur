@@ -6,13 +6,13 @@ source: "cfbc3e677752"
 
 在项目中选择**新增** → **上传文件夹**，将文件夹拖入虚线框，填写服务名称和端口，再点击**检查变更**。应用变更后，文件夹会立即上传，上传完成后开始首次构建。
 
-不需要 Git 仓库。浏览器将文件夹打包后，直接发送到集群中的 registry。Zeabur 不会保存它，也不会将它放入配置文件、机密变量或卷。
+不需要 Git 仓库。浏览器将文件夹打包后，直接发送到集群中的 registry。Zeabur 不会保存文件夹，也不会放入配置文件、机密变量或卷。
 
 ## 开始前
 
 - 条件与[从 Git 部署](./git.mdx)相同：已安装 Zeabur Builder 和 Keel，chart 已配置 `builds.registry`，你有在项目中创建服务和 Build 的权限。缺少组件时，**上传文件夹**下方会写出缺少哪些，点击后会列出安装命令。
 - Zeabur Builder 必须配置 `registry.tokenKey`，上传时才能获取有时效的令牌。未配置时，上传会停在 **Zeabur Builder 不允许上传**。
-- 你需要有读取项目中机密变量的权限。Zeabur Builder 将上传令牌写入 `<服务名称>-upload` 机密变量，Zeabur 使用你的权限读取它，不使用自身的权限。
+- 你需要有读取项目中机密变量的权限。Zeabur Builder 将上传令牌写入 `<服务名称>-upload` 机密变量，Zeabur 使用你的权限读取，不使用自身的权限。
 
 ## 创建服务
 
@@ -33,7 +33,7 @@ source: "cfbc3e677752"
 
 ![上传文件夹表单，虚线框支持拖入文件夹或压缩包，下方是名称、端口和构建方式](../images/shots/upload-form.avif)
 
-打包后的大小上限为 256 MiB，解压后的大小上限为 1 GiB。如果超出限制，虚线框会列出最大的几项，将它们加入 `.gitignore`（例如 `node_modules/`）后重新选择。
+打包后的大小上限为 256 MiB，解压后的大小上限为 1 GiB。如果超出限制，虚线框会列出最大的几项，将这些项加入 `.gitignore`（例如 `node_modules/`）后重新选择。
 
 </Step>
 <Step>
@@ -136,4 +136,4 @@ kubectl -n shop patch build site --type=merge \
 
 ## 删除服务
 
-删除服务时会一并删除它的 Build，Zeabur Builder 也会清理 registry 中该服务的上传内容。
+删除服务时会一并删除服务的 Build，Zeabur Builder 也会清理 registry 中该服务的上传内容。

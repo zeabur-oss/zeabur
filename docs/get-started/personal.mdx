@@ -32,7 +32,7 @@ When the server reports less than 2400 MiB of memory, the installer only accepts
 - At least 10 GiB of free space in `/var/lib/kubesolo`.
 - TCP ports 80, 443, 6443, 10250, and 10443 available.
 - No existing installation of RKE2, K3s, kubeadm, k0s, or MicroK8s.
-- Docker must not be installed or running. Docker drops forwarded packets by default, which prevents replicas from reaching external networks or obtaining certificates. The installer stops if it finds Docker (a binary, service, or socket) or a firewall forwarding policy set to DROP. Stop and remove Docker before installing.
+- Docker not installed or running. Docker drops forwarded packets by default, so replicas can't reach external networks or obtain certificates. The installer stops if it finds Docker (a binary, service, or socket) or a firewall forwarding policy set to DROP. Stop and remove Docker before installing.
 
 Your own computer needs [`zeaburctl`](../reference/zeaburctl.mdx) and must be able to reach the server on TCP port 6443.
 
@@ -40,7 +40,7 @@ The installer pins the versions of KubeSolo, helm-controller, and kubectl, and c
 
 ## Install with the web interface
 
-Follow [Install Zeabur on a server](quickstart.mdx#open-the-installer) to open the installer. In “Check server,” set “Who is it for” to “Just me.” This removes the “Connection method” step.
+Follow [Install Zeabur on a server](quickstart.mdx#open-the-installer) to open the installer. In “Check the server,” set “Who is it for” to “Just me.” This removes the “Access” step.
 
 ![“Just me” selected under “Who is it for” in “Check server,” with only four steps remaining at the top](../images/shots/installer-personal-choose.avif)
 
@@ -48,7 +48,7 @@ If the server reports less than 2400 MiB of memory, “A team” is disabled. On
 
 ![On a server with only 1.5 GiB of memory, “A team” is disabled with an explanation that the server doesn't have enough memory](../images/shots/installer-personal-small.avif)
 
-Fix any failed checks first. If Docker is installed on the server, the “Docker” check shows that it needs attention. Stop and remove Docker, then click “Check again.” Until all checks pass, you can't click “Install” in the “Confirm” step.
+Fix any failed checks first. If Docker is installed on the server, the “Docker” check shows that it needs attention. Stop and remove Docker, then click “Check again.” Until all checks pass, you can't click “Install” in the “Review” step.
 
 ![“Check server” shows a failed Docker check with instructions to stop and remove Docker first](../images/shots/installer-personal-docker.avif)
 
@@ -60,7 +60,7 @@ If there isn't enough memory, Zeabur Builder is disabled, with the required amou
 
 ![On a server with 1.5 GiB of memory, Zeabur Builder is disabled, with a note that at least 1,800 MiB is required](../images/shots/installer-personal-components-small.avif)
 
-Review the details in “Confirm,” then click “Install.”
+Check the details in “Review,” then click “Install.”
 
 ## Install with a config file
 
@@ -81,7 +81,7 @@ To build from Git or a folder, add `enable: [builds]`. The installer adds zot wi
 
 ## Open Zeabur on your own computer
 
-After installation, both “Cluster is ready” in the web interface and the terminal show two commands. Run them on your own computer, replacing `<server>` with the server address and `<name>` with the server's hostname:
+After installation, both “Your cluster is ready” in the web interface and the terminal show two commands. Run them on your own computer, replacing `<server>` with the server address and `<name>` with the server's hostname:
 
 ```sh
 ssh <user>@<server> sudo cat /etc/zeabur-installer/kubeconfig.yaml > ~/.kube/<name>.yaml

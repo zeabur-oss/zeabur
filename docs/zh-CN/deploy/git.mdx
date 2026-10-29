@@ -10,7 +10,7 @@ source: "57a598cda189"
 
 - 已有项目，并具备在项目中创建服务、Kubernetes Service 和 Build 的权限。使用私有仓库或构建变量时，还需要创建机密变量的权限。
 - 集群已安装 Zeabur Builder 和 Keel。从组件目录安装 Zeabur Builder 时，zot 会一并安装。缺少组件时，**新增**菜单会在**从 Git 部署**下方写出缺少哪些，点击后会一次列出全部安装命令，见[查看与安装集群组件](../cluster/components.mdx)。
-- 构建完成的镜像会推送到 Zeabur chart 的 `builds.registry`，默认是和 Zeabur Builder 一起安装的 Zot（`zot.zot.svc:5000`）。改用 Harbor 或外部 registry 时，管理员需要在 chart 中配置 `builds.registry`，并确保 Builder 和节点能访问它。
+- 构建完成的镜像会推送到 Zeabur chart 的 `builds.registry`，默认是和 Zeabur Builder 一起安装的 Zot（`zot.zot.svc:5000`）。改用 Harbor 或外部 registry 时，管理员需要在 chart 中配置 `builds.registry`，并确保 Builder 和节点能访问这个 registry。
 - 通过安装程序安装的 Zot 只允许 Builder、构建用的副本和节点连接。项目中的其他副本无法连接 Zot，因此遭入侵的应用无法拉取其他项目的镜像。
 - 准备好应用实际监听的端口。要公开网站，还需准备能指向集群入口的域名。
 
@@ -246,7 +246,7 @@ spec:
       url: http://keel.keel.svc.cluster.local:9300/v1/webhooks/native
 ```
 
-- `web-git` 仅在使用访问令牌读取私有仓库时需要，Build 通过 `spec.source.credentialsRef` 引用它，标签 `builder.zeabur.com/git-credentials: "true"` 让 Zeabur Builder 能读取它。公开仓库需移除此机密变量和 `credentialsRef`。
+- `web-git` 仅在使用访问令牌读取私有仓库时需要，Build 通过 `spec.source.credentialsRef` 引用它，标签 `builder.zeabur.com/git-credentials: "true"` 让 Zeabur Builder 能够读取。公开仓库需移除此机密变量和 `credentialsRef`。
 - `web-build-env` 和 Build 的 `spec.env` 仅在有构建变量时需要。
 - Deployment 先使用不存在的 `:pending` tag，首次构建完成后由 Keel 替换。`keel.sh/policy: force` 对应**新构建完成后自动部署**。
 - 使用 Dockerfile 构建时，将 `builderRef` 改为 `dockerfile`，按需在 `spec.source.git` 中添加 `contextDir` 和 `dockerfile`。`ref` 留空时，表单会写入 `HEAD`，跟踪默认分支。
@@ -270,13 +270,13 @@ kubectl -n shop label secret web-git app.kubernetes.io/name=web builder.zeabur.c
 | 开启**新构建完成后自动部署** | `kubectl -n shop annotate deployment web keel.sh/policy=force` |
 | **部署最新版** | `kubectl -n shop set image deployment/web web="$(kubectl -n shop get build web -o jsonpath='{.status.latestImage}')"` |
 
-移除 Zeabur 后，Zeabur Builder 和 Keel 仍会继续构建和部署，它们不依赖 Zeabur。
+移除 Zeabur 后，Zeabur Builder 和 Keel 仍会继续构建和部署，这两个组件不依赖 Zeabur。
 
 ## 构建或部署卡住时
 
 | 界面上的情况 | 下一步 |
 | --- | --- |
-| **从 Git 部署**下方写着**需要先安装…** | 点击它，按弹窗列出的命令一次装好。改用其他 registry 时，管理员在 Zeabur chart 中配置 `builds.registry`，Zeabur Builder 改用它自己的 Helm chart 安装，见 [Zeabur Builder 文档](https://oss.zeabur.com/docs/builder/)。 |
+| **从 Git 部署**下方写着**需要先安装…** | 点击这行字，按弹窗列出的命令一次装好。改用其他 registry 时，管理员在 Zeabur chart 中配置 `builds.registry`，改用 Zeabur Builder 自己的 Helm chart 安装，见 [Zeabur Builder 文档](https://oss.zeabur.com/docs/builder/)。 |
 | 仓库访问遭拒 | 使用部署密钥时，在**构建**中点击**显示部署密钥**，确认已将其添加到正确的仓库。使用令牌时，检查读取范围和有效期。修正后**重新构建**。 |
 | 找不到分支或构建器 | 根据构建页面显示的原因，检查仓库分支和集群中对应的 Railpack 或 Dockerfile 构建器。 |
 | 构建成功，服务仍使用旧镜像 | 检查**新构建完成后自动部署**和 Keel 状态，或点击**部署最新版**手动应用。 |

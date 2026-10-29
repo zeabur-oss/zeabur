@@ -21,7 +21,7 @@ source: "9ecbdbd6bd2b"
 
 个人版默认不安装 Zeabur Builder 和 zot（存放构建结果的镜像仓库），因此只能部署现成的容器镜像。要从 Git 或文件夹构建，安装时勾选 Zeabur Builder，zot 会一并安装。这两个组件需要额外使用约 300 MiB 内存，服务器内存不足 1800 MiB 时，安装程序不允许勾选。
 
-个人版也没有成员和权限。Zeabur Identity 签发的登录凭证，需要 kube-apiserver 用 `--authentication-config` 加载配置后才能识别，KubeSolo 目前没有开放这项配置（[portainer/kubesolo#231](https://github.com/portainer/kubesolo/issues/231)）。因此只能用服务器提供的 kubeconfig 连接，拿到它的人可以控制整个集群，不适合多人或多个团队共用。
+个人版也没有成员和权限。Zeabur Identity 签发的登录凭证，需要 kube-apiserver 用 `--authentication-config` 加载配置后才能识别，KubeSolo 目前没有开放这项配置（[portainer/kubesolo#231](https://github.com/portainer/kubesolo/issues/231)）。因此只能用服务器提供的 kubeconfig 连接，拿到这份 kubeconfig 的人可以控制整个集群，不适合多人或多个团队共用。
 
 服务器报告的内存低于 2400 MiB 时，installer 只接受个人使用模式。以后要供团队使用，无法直接升级，需要在 4 GiB 内存的服务器上重新用 K3s 或 RKE2 安装。
 
@@ -37,7 +37,7 @@ source: "9ecbdbd6bd2b"
 
 自己的电脑需要安装 [`zeaburctl`](../reference/zeaburctl.mdx)，并且能连接服务器的 TCP 6443 端口。
 
-installer 固定 KubeSolo、helm-controller 和 kubectl 的版本，下载后校验 SHA-256。helm-controller 的镜像用 digest 指定。安装组件的 Job 镜像只能指定标签，Job 运行结束后，installer 会校验它实际使用的 digest，不匹配就停止。
+installer 固定 KubeSolo、helm-controller 和 kubectl 的版本，下载后校验 SHA-256。helm-controller 的镜像用 digest 指定。安装组件的 Job 镜像只能指定标签，Job 运行结束后，installer 会校验 Job 实际使用的 digest，不匹配就停止。
 
 ## 用网页界面安装
 
@@ -53,7 +53,7 @@ installer 固定 KubeSolo、helm-controller 和 kubectl 的版本，下载后校
 
 ![“检查服务器”显示 Docker 检查未通过，提示需要先停止并移除 Docker](../images/shots/installer-personal-docker.avif)
 
-在“选择组件”中，Ingress 和证书默认选中。要从 Git 或文件夹构建，勾选“Zeabur Builder”，zot 会随它一并安装。
+在“选择组件”中，Ingress 和证书默认选中。要从 Git 或文件夹构建，勾选“Zeabur Builder”，zot 会一并安装。
 
 ![“选择组件”中勾选了 Zeabur Builder，上方显示内存估算](../images/shots/installer-personal-components.avif)
 
@@ -99,7 +99,7 @@ kubeconfig 中的 API 地址由服务器自行选择。如果自己的电脑需�
 
 ## 用 zeaburctl up 构建文件夹
 
-安装 Zeabur Builder 后，在自己的电脑上使用同一份 kubeconfig，上传文件夹进行构建：
+安装 Zeabur Builder 后，在自己的电脑上使用同一份 kubeconfig，上传文件夹构建：
 
 ```sh
 KUBECONFIG=~/.kube/<名称>.yaml zeaburctl up --context <名称> --project <项目> --service <服务>
@@ -126,7 +126,7 @@ installer 完成的操作也可以手动完成：按 [KubeSolo 的说明](https:
 sudo zeabur-installer doctor
 ```
 
-这会检查 KubeSolo、组件和默认存储类，也会提醒这台服务器没有隔离。安装了 Zeabur Builder 时，还会检查它是否正在运行，以及 containerd 信任的证书是否为 zot 当前使用的证书。退出码与团队版相同，见[检查安装结果](quickstart.mdx#检查安装结果)。
+这会检查 KubeSolo、组件和默认存储类，也会提醒这台服务器没有隔离。安装了 Zeabur Builder 时，还会检查 Zeabur Builder 是否正在运行，以及 containerd 信任的证书是否为 zot 当前使用的证书。退出码与团队版相同，见[检查安装结果](quickstart.mdx#检查安装结果)。
 
 ## 移除
 
