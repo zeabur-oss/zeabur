@@ -41,7 +41,7 @@ export const zhTW: Messages = {
   "dist.title": "用哪一種 Kubernetes",
   "dist.suggested": "建議",
   "dist.suggestK3s": (gib) =>
-    `這台有 ${gib} GiB 記憶體，建議用 K3s：最平衡。它本身用得少，留給應用程式的比較多。`,
+    `這台有 ${gib} GiB 記憶體，建議用 K3s：最平衡。K3s 本身用得少，留給應用程式的比較多。`,
   "dist.suggestRke2": (gib) =>
     `這台有 ${gib} GiB 記憶體，建議用 RKE2：最能擴充。之後可以用三台伺服器一起跑控制平面，壞一台也不會停。`,
   "dist.k3sHint": "最平衡。比 RKE2 省記憶體，之後可以加工作節點。",
@@ -55,8 +55,8 @@ export const zhTW: Messages = {
   "host.server": "這台伺服器",
   "host.name": "主機名稱",
   "host.nodeName": "節點名稱",
-  "host.nodeNameHint": "Kubernetes 用這個名字認這台伺服器，之後主機名稱改了也不會跟著變。",
-  "host.nodeNameKept": "這台已經用這個名字裝過了，所以不會改。",
+  "host.nodeNameHint": "Kubernetes 用這個名字認這台伺服器，之後主機名稱改了也不會跟著改變。",
+  "host.nodeNameKept": "這台已經用這個名字裝過了，所以不會更改。",
   "host.arch": "架構",
   "host.memory": "記憶體",
   "host.addresses": "位址",
@@ -102,7 +102,7 @@ export const zhTW: Messages = {
     `核心為當機傾印（kdump）保留了 ${mib} MiB 記憶體。用不到的話可以關掉，把記憶體還給系統：執行 sudo apt purge kdump-tools && sudo update-grub，然後重新開機。`,
   "code.others.none": () => "沒有發現。",
   "code.others.found": (...paths) =>
-    `發現其他 Kubernetes 發行版的檔案（${listZh("zh-TW", paths)}）。如果它還在執行，請先解除安裝。`,
+    `發現其他 Kubernetes 發行版的檔案（${listZh("zh-TW", paths)}）。如果那個發行版還在執行，請先解除安裝。`,
   "code.ports.free": (...ports) => `${listZh("zh-TW", ports)} 都沒有被占用。`,
   "code.ports.busy": (...ports) =>
     `連接埠 ${listZh("zh-TW", ports)} 已被占用。執行 ss -ltnp 可看到是誰占用。`,
@@ -117,10 +117,10 @@ export const zhTW: Messages = {
   "code.crypt.no": (path) =>
     `${path} 不在加密的磁碟上，磁碟區和資料庫的檔案以明文存放。一般 VPS 沒辦法事後加密，可以照常安裝。要放敏感資料的話，改選主機商有加密磁碟的方案；這項檢查看不到主機商做的加密。`,
   "code.crypt.unknown": (path) =>
-    `無法判斷 ${path} 是否加密。請執行 lsblk，看它底下有沒有 crypt 裝置。`,
+    `無法判斷 ${path} 是否加密。請執行 lsblk，看 ${path} 底下有沒有 crypt 裝置。`,
   "code.docker.none": () => "這台伺服器沒有 Docker。",
   "code.docker.found": (...found) =>
-    `這台伺服器裝了 Docker（${listZh("zh-TW", found)}）。它會讓 Pod 連不上網路，憑證也申請不到。請先停止並移除 Docker，再重新檢查。`,
+    `這台伺服器裝了 Docker（${listZh("zh-TW", found)}）。Docker 會讓 Pod 連不上網路，憑證也申請不到。請先停止並移除 Docker，再重新檢查。`,
   "code.docker.forwardDrop": () =>
     "防火牆擋住了轉送的流量，Pod 連不上網路，憑證也申請不到。通常是 Docker 或 ufw 設的，請移除或改掉，再重新檢查。",
   "code.prep.package.ok": (binary) => `已安裝 ${binary}。`,
@@ -137,20 +137,20 @@ export const zhTW: Messages = {
   "code.prep.service.toStart": (service, component) =>
     `${component} 需要 ${service} 保持執行，安裝時會一併啟動。`,
   "code.prep.service.stopped": (service, component) =>
-    `${component} 需要 ${service} 保持執行，但它已停止。請執行 zeabur-installer apply 啟動。`,
+    `${component} 需要 ${service} 保持執行，但 ${service} 已停止。請執行 zeabur-installer apply 啟動。`,
   "code.prep.multipath.toBlock": (component, file) =>
-    `multipathd 會搶走 ${component} 的磁碟，安裝時會寫入 ${file} 讓它避開。`,
+    `multipathd 會搶走 ${component} 的磁碟，安裝時會寫入 ${file}，讓 multipathd 避開。`,
   "code.prep.multipath.open": (component, file) =>
     `少了 ${file}，multipathd 可能搶走 ${component} 的磁碟。請執行 zeabur-installer apply 補上。`,
 
   "access.title": "大家怎麼連到 Zeabur",
-  "access.description": "Zeabur 和它的登入服務各需要一個指向這台伺服器的網域。",
+  "access.description": "Zeabur 和登入服務各需要一個指向這台伺服器的網域。",
   "access.mode": "憑證",
   "access.domain": "公開網域",
   "access.local": "測試機",
   "access.domainHint": "憑證由 Let's Encrypt 簽發，所以網際網路要能連到 80 和 443 埠。",
   "access.localHint":
-    "憑證由這台伺服器自建的憑證授權單位簽發，Zeabur、登入頁和應用程式的網域都一樣。最後一步可以下載它，匯入並信任後，瀏覽器就不會再出現警告。",
+    "憑證由這台伺服器自建的憑證授權單位簽發，Zeabur、登入頁和應用程式的網域都一樣。最後一步可以下載這個憑證授權單位的憑證，匯入並信任後，瀏覽器就不會再出現警告。",
   "access.names": "網域",
   "access.zeabur": "Zeabur",
   "access.zeaburHint": "開啟 Zeabur 用的網址。",
@@ -161,7 +161,7 @@ export const zhTW: Messages = {
     `${address}.sslip.io 底下的名稱不用設定 DNS 就會解析到 ${address}。`,
   "access.resolves": (addresses) => `指向這台伺服器（${addresses}）。`,
   "access.elsewhere": (addresses) =>
-    `指向 ${addresses}，不是這台伺服器的位址。如果那是它的公開位址就沒問題。`,
+    `指向 ${addresses}，不是這台伺服器的位址。如果那是這台伺服器的公開位址就沒問題。`,
   "access.unresolved": "目前還解析不到。請新增一筆指向這台伺服器的 DNS 紀錄。",
   "access.checking": "正在查詢…",
   "access.invalid": "只填網域，不要加 https:// 或路徑。",
@@ -194,7 +194,7 @@ export const zhTW: Messages = {
   "components.needed": "其他元件需要",
   "components.privileged": "特權",
   "components.privilegedHint":
-    "以主機權限執行，所以它的 Namespace 不套用 restricted Pod 安全等級。",
+    "以主機權限執行，所以這個元件的 Namespace 不套用 restricted Pod 安全等級。",
   "components.personalDescription":
     "預設會裝 Ingress 和憑證，要從 Git 或資料夾建置，再勾選 Zeabur Builder。元件需要的其他元件會一起加入。",
   "components.notPersonal": "自己用的版本沒有這個",
@@ -234,10 +234,10 @@ export const zhTW: Messages = {
     "S3 伺服器用這把金鑰加密每份備份（SSE-C），長度必須是 32 個字元。",
   "input.volume-backup/velero.file-backup": "備份磁碟區裡的檔案",
   "inputHelp.volume-backup/velero.file-backup":
-    "每個節點會多跑一個代理程式來複製磁碟區裡的檔案。它以 root 執行，可以存取主機。",
+    "每個節點會多跑一個代理程式來複製磁碟區裡的檔案。代理程式以 root 執行，可以存取主機。",
   "input.remote-access/tailscale-operator.oauth-client-id": "OAuth 用戶端 ID",
   "inputHelp.remote-access/tailscale-operator.oauth-client-id":
-    "到 Tailscale 管理主控台建立 OAuth 用戶端，給它 Devices Core、Auth Keys 和 Services 的寫入權限，標籤設為 tag:k8s-operator。Tailnet 政策裡要讓 tag:k8s-operator 擁有 tag:k8s。",
+    "到 Tailscale 管理主控台建立 OAuth 用戶端，給予 Devices Core、Auth Keys 和 Services 的寫入權限，標籤設為 tag:k8s-operator。Tailnet 政策裡要讓 tag:k8s-operator 擁有 tag:k8s。",
   "input.remote-access/tailscale-operator.oauth-client-secret": "OAuth 用戶端密鑰",
   "inputHelp.remote-access/tailscale-operator.oauth-client-secret": "同一個 OAuth 用戶端的密鑰。",
   "input.intrusion-prevention/crowdsec.bouncer-key": "Bouncer 金鑰",
@@ -335,7 +335,7 @@ export const zhTW: Messages = {
   "review.col.memory": "閒置時用量",
   "review.manifests": "YAML 檔案",
   "review.removing": "要移除的元件",
-  "review.removingHint": "helm-controller 會解除安裝它們的 chart。留下的東西之後可以手動刪除。",
+  "review.removingHint": "helm-controller 會解除安裝這些元件的 chart。留下的東西之後可以手動刪除。",
   "review.stays": (items) => `會留下：${listZh("zh-TW", items)}`,
   "review.stays.namespace": (namespace) => `Namespace ${namespace}`,
   "review.stays.crds": "CRD 和它們的物件",
@@ -343,8 +343,8 @@ export const zhTW: Messages = {
   "review.stays.manifests": (name) => `${name} 建立的物件`,
   "review.deletesCrds": (crds) => `會刪除這些 CRD 和它們的所有物件：${listZh("zh-TW", crds)}`,
   "review.inUse": (items) =>
-    `還有東西在用：${listZh("zh-TW", items)}。先移除它們，或保留這個元件。`,
-  "review.losesData": (name) => `移除 ${name}，連同它保存的資料一起刪除`,
+    `還有東西在用：${listZh("zh-TW", items)}。先移除這些項目，或保留這個元件。`,
+  "review.losesData": (name) => `移除 ${name}，連同保存的資料一起刪除`,
   "review.blockedRemoval": "有要移除的元件還在使用中，或還沒確認。",
 
   "memory.fits": "夠用",
@@ -367,7 +367,7 @@ export const zhTW: Messages = {
   "warning.domains.sslip": (suffix) =>
     `這台伺服器沒有公開位址，新服務不會有建議網址。可以把 ${suffix} 加成應用程式網域，網址只有這個網路裡連得到。`,
   "warning.local.dns": (identity, zeabur) =>
-    `${zeabur} 和 ${identity} 必須在 DNS 上解析到這台伺服器，瀏覽器和伺服器本身都要查得到。只改 hosts 檔不夠，Pod 不會讀它。`,
+    `${zeabur} 和 ${identity} 必須在 DNS 上解析到這台伺服器，瀏覽器和伺服器本身都要查得到。只改 hosts 檔不夠，Pod 不會讀取 hosts 檔。`,
   "warning.personal.isolation": () =>
     "自己用的版本只適合一個人。拿到 kubeconfig 的人可以控制整個叢集，應用程式之間也沒有隔離，因為 KubeSolo 不會執行網路規則。要給團隊用，請在 4 GiB 記憶體的伺服器上用 K3s 或 RKE2 安裝。",
   "warning.memory.personal.low": (host) =>
@@ -389,11 +389,11 @@ export const zhTW: Messages = {
   "warning.join.ports": () =>
     "節點之間要開放：連到伺服器的 TCP 9345 和 6443；所有節點之間的 TCP 10250、9099 和 UDP 8472（Canal VXLAN）；伺服器之間的 TCP 2379 到 2381。UDP 8472 不要對網際網路開放。",
   "warning.join.udp": () =>
-    "從這裡無法檢查 UDP 8472。如果它被擋住，不同節點上的 Pod 會連不到彼此。",
+    "從這裡無法檢查 UDP 8472。如果這個連接埠被擋住，不同節點上的 Pod 會連不到彼此。",
   "warning.join.servers.ha": () =>
     "控制平面要有三台以上的伺服器，少一台時才能繼續運作：etcd 需要過半數。只有兩台時，任一台停機整個叢集就會停擺，請再加一台。",
   "warning.join.storage.local": () =>
-    "預設 local-path 儲存類別建立的磁碟區只在建立它的節點上：使用它的 Pod 只能在那個節點執行，節點不在了，資料也跟著不在。",
+    "預設 local-path 儲存類別建立的磁碟區只在建立磁碟區的節點上：使用這種磁碟區的 Pod 只能在那個節點執行，節點不在了，資料也跟著不在。",
   "warning.join.token.unpinned": () =>
     "這個權杖沒有 CA 雜湊（K10<hash>::…），所以這台 VM 會信任在那個位址回應的任何伺服器。請照 node add 印出的權杖原樣使用。",
   "warning.join.server.unreachable": (server) =>
@@ -448,7 +448,7 @@ export const zhTW: Messages = {
   "done.personalDescription":
     "把 kubeconfig 複製到自己的電腦，再用 zeaburctl ui 打開 Zeabur。用完按 Ctrl-C 關掉安裝程式。",
   "done.personal": "在你的電腦上",
-  "done.personalHint": "先從這台伺服器複製 kubeconfig，再用它打開 Zeabur。",
+  "done.personalHint": "先從這台伺服器複製 kubeconfig，再用這份 kubeconfig 打開 Zeabur。",
   "done.personalKey": "kubeconfig 可以控制整個叢集，請像 SSH 金鑰一樣自己保管。",
   "done.setup": "第一位管理員",
   "done.setupHint": "這個連結只能用一次，24 小時內有效。",
@@ -465,7 +465,7 @@ export const zhTW: Messages = {
   "done.caStep": "1. 信任憑證授權單位",
   "done.setupStep": "2. 註冊第一位管理員",
   "done.caHint":
-    "Zeabur、登入頁和應用程式網域的憑證都由它簽發。請把它匯入系統或瀏覽器，並設為信任網站。信任之前，瀏覽器會對這些網站顯示警告，也註冊不了通行密鑰。",
+    "Zeabur、登入頁和應用程式網域的憑證都由這個憑證授權單位簽發。請把憑證匯入系統或瀏覽器，並設為信任網站。信任之前，瀏覽器會對這些網站顯示警告，也註冊不了通行密鑰。",
   "done.caDownload": "下載憑證",
   "done.noLink":
     "Zeabur 先前已經設定過，所以沒有產生新連結。需要時請執行 sudo zeabur-installer setup-link。",
