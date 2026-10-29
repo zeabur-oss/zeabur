@@ -70,7 +70,7 @@ at 0.1.1.
 
 ## Settings the workflow needs
 
-These are repository and organisation settings, not files; a maintainer sets them once.
+These are repository and organization settings, not files; a maintainer sets them once.
 
 - **Package visibility.** A public repository does not make its packages public. The first
   release run that pushes a package (`zeabur`, `proxy`, `charts/zeabur`) creates it on ghcr.io,

@@ -5,7 +5,7 @@
 
 # Zeabur
 
-**Deploy and run your services on your own Kubernetes, simply and securely.**
+**Simple, secure deployments on your own Kubernetes.**
 
 Zeabur is an open-source platform you host yourself. It runs in your cluster (or on your
 machine), shows the cluster as projects and services, explains what is wrong in plain words, and lets you
@@ -72,7 +72,7 @@ with your current kubeconfig context.
 - [`docs/`](docs/) holds the sources of the documentation; edit a page there and it is published
   to [oss.zeabur.com](https://oss.zeabur.com/docs/zeabur/).
 
-## Licence and credits
+## License and credits
 
 Apache-2.0. Contributions are accepted under the [Developer Certificate of Origin](DCO).
 
@@ -84,7 +84,7 @@ Third-party content in this repository:
   [kubernetes/website](https://github.com/kubernetes/website) `data/releases` (CC BY 4.0, The
   Kubernetes Authors).
 - Rendered manifests of upstream Helm charts in `fixtures/charts`, test input only, each under
-  its chart's licence (Apache-2.0 or MIT; listed in `fixtures/charts/README.md`).
+  its chart's license (Apache-2.0 or MIT; listed in `fixtures/charts/README.md`).
 
 The web interface is built with [@zeabur/design-system](https://github.com/zeabur-oss/design-system)
 (Apache-2.0), which contains shadcn/ui's components, theme and base styles (MIT), the Inter and

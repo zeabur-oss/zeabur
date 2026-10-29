@@ -106,7 +106,7 @@ Source text, not a CSS transform. Product, API and code names keep their exact c
 
 ## Names
 
-- **Zeabur** is the product, always capitalised. Its parts are **Zeabur Identity** (sign-in) and
+- **Zeabur** is the product, always capitalized. Its parts are **Zeabur Identity** (sign-in) and
   **Zeabur Catalog** (tested component versions and how to install them). In Chinese the names
   stay in Latin letters.
 - A *service* is what the reader deploys (服務／服务); `Service` is the Kubernetes kind. A
