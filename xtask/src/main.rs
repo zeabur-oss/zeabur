@@ -48,7 +48,7 @@ enum DevCluster {
     Down,
     /// Print cluster-scoped objects and namespace metadata.
     Snapshot,
-    /// Check out a pinned commit or release tag from <URL> in <DIR>.
+    /// Check out a pinned commit or release tag from `URL` in `DIR`.
     Checkout {
         dir: PathBuf,
         pin: String,
