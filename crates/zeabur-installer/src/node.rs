@@ -14,9 +14,10 @@ use zeabur_installer_host::kubectl::Kubectl;
 use zeabur_installer_host::token::{self, BootstrapToken};
 use zeabur_installer_plan::cluster::Distribution;
 use zeabur_installer_plan::config::{Document, Role};
-use zeabur_installer_plan::plan::{self, MANAGER};
+use zeabur_installer_plan::plan::{self, MANAGER, RegistryPlan};
 use zeabur_installer_plan::{PlanError, join};
 
+use crate::apply::STATE_CONFIGMAP;
 use crate::{InstallError, load, out};
 
 /// A CRD Longhorn installs; the cluster runs Longhorn when it exists.
@@ -103,7 +104,7 @@ pub(crate) fn add(config_path: &Path, options: &AddOptions) -> Result<(), Instal
     let longhorn = kubectl
         .get("customresourcedefinition", LONGHORN_CRD, None)?
         .is_some();
-    let zot = zot_mirror(&kubectl, layout.zot_ca_file)?;
+    let registry = registry_mirror(&kubectl, layout.registry_ca_file)?;
     let node_names: Vec<String> = kubectl
         .run(
             &[
@@ -124,7 +125,7 @@ pub(crate) fn add(config_path: &Path, options: &AddOptions) -> Result<(), Instal
         expiry: expiry.as_ref().map(|(e, id)| (e.as_str(), id.as_str())),
         single_node,
         longhorn,
-        zot: zot.as_ref().map(|(ip, ca)| (ip.as_str(), ca.as_str())),
+        registry: registry.as_ref(),
         node_names: &node_names,
     });
     out::line(text.trim_end());
@@ -144,10 +145,21 @@ pub(crate) struct Instructions<'a> {
     pub(crate) single_node: Option<String>,
     /// The cluster runs Longhorn, so the new node needs preparing for it.
     pub(crate) longhorn: bool,
-    /// zot's `ClusterIP` and CA, when the cluster runs it.
-    pub(crate) zot: Option<(&'a str, &'a str)>,
+    /// The in-cluster registry's mirror, when the cluster runs one.
+    pub(crate) registry: Option<&'a Mirror>,
     /// The cluster's nodes, whose names the new node does not take.
     pub(crate) node_names: &'a [String],
+}
+
+/// The in-cluster registry as a joining node reaches it.
+#[derive(Debug)]
+pub(crate) struct Mirror {
+    /// `<service>.<namespace>.svc:<port>`.
+    pub(crate) host: String,
+    /// Its Service's fixed `ClusterIP`.
+    pub(crate) cluster_ip: String,
+    /// The CA of its certificate, PEM.
+    pub(crate) ca: String,
 }
 
 /// The text `node add` prints.
@@ -184,7 +196,7 @@ pub(crate) fn instructions(i: &Instructions<'_>) -> String {
         i.role,
         i.token,
         i.longhorn,
-        i.zot,
+        i.registry,
         i.node_names,
     ));
     push(&mut text, "");
@@ -250,7 +262,7 @@ pub(crate) fn commands(
     role: Role,
     token: &str,
     longhorn: bool,
-    zot: Option<(&str, &str)>,
+    registry: Option<&Mirror>,
     node_names: &[String],
 ) -> String {
     let mut yaml = format!(
@@ -266,8 +278,19 @@ pub(crate) fn commands(
     if longhorn {
         yaml.push_str("  longhorn: true\n");
     }
-    if let Some((cluster_ip, ca)) = zot {
-        for part in ["  zot:\n    clusterIp: ", cluster_ip, "\n    ca: |\n"] {
+    if let Some(Mirror {
+        host,
+        cluster_ip,
+        ca,
+    }) = registry
+    {
+        for part in [
+            "  registry:\n    host: ",
+            host,
+            "\n    clusterIp: ",
+            cluster_ip,
+            "\n    ca: |\n",
+        ] {
             yaml.push_str(part);
         }
         for line in ca.lines() {
@@ -319,16 +342,25 @@ fn server_config(distribution: Distribution) -> (Vec<String>, bool) {
     (disable, identity)
 }
 
-/// zot's `ClusterIP` and the CA `apply` copied to this server, when the cluster runs it.
-fn zot_mirror(kubectl: &Kubectl, ca_file: &str) -> Result<Option<(String, String)>, InstallError> {
+/// The registry `apply` recorded and the CA it copied to this server, when the cluster runs one
+/// with a fixed `ClusterIP`.
+fn registry_mirror(kubectl: &Kubectl, ca_file: &str) -> Result<Option<Mirror>, InstallError> {
     let Ok(ca) = fs::read_to_string(ca_file) else {
         return Ok(None);
     };
-    Ok(kubectl
-        .get("service", "zot", Some("zot"))?
-        .and_then(|s| s.pointer("/spec/clusterIP")?.as_str().map(str::to_owned))
-        .filter(|ip| ip != "None")
-        .map(|ip| (ip, ca)))
+    let registry = kubectl
+        .get("configmap", STATE_CONFIGMAP, Some("kube-system"))?
+        .and_then(|state| {
+            let plan: Value = serde_json::from_str(state.pointer("/data/plan")?.as_str()?).ok()?;
+            serde_json::from_value::<RegistryPlan>(plan.get("registry")?.clone()).ok()
+        });
+    Ok(registry.and_then(|r| {
+        Some(Mirror {
+            host: r.host,
+            cluster_ip: r.cluster_ip?,
+            ca,
+        })
+    }))
 }
 
 fn internal_ip(node: &Value) -> Option<String> {
@@ -460,7 +492,7 @@ mod tests {
             expiry: Some(("2026-10-23T09:00:00Z", "abcdef")),
             single_node: Some("/etc/zeabur-installer/config.yaml".to_owned()),
             longhorn: false,
-            zot: None,
+            registry: None,
             node_names: &["vps-1".to_owned()],
         });
         assert_eq!(text, include_str!("../fixtures/node-add.txt"));
@@ -476,7 +508,7 @@ mod tests {
             expiry: None,
             single_node: None,
             longhorn: false,
-            zot: None,
+            registry: None,
             node_names: &["vps-1".to_owned()],
         });
         assert!(!text.contains("node sync"));
@@ -508,7 +540,7 @@ mod tests {
     }
 
     #[test]
-    fn a_cluster_with_zot_gives_the_new_node_its_mirror() {
+    fn a_cluster_with_a_registry_gives_the_new_node_its_mirror() {
         let ca = "-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----\n";
         let text = commands(
             Distribution::K3s,
@@ -516,7 +548,11 @@ mod tests {
             Role::Worker,
             "K10aa::abcdef.0123456789abcdef",
             false,
-            Some(("10.43.0.50", ca)),
+            Some(&Mirror {
+                host: "zot.zot.svc:5000".to_owned(),
+                cluster_ip: "10.43.0.50".to_owned(),
+                ca: ca.to_owned(),
+            }),
             &[],
         );
         let yaml = text
@@ -530,9 +566,10 @@ mod tests {
         else {
             panic!("not a join: {yaml}");
         };
-        let zot = config.join.zot.unwrap();
-        assert_eq!(zot.cluster_ip.to_string(), "10.43.0.50");
-        assert_eq!(zot.ca, ca);
+        let registry = config.join.registry.unwrap();
+        assert_eq!(registry.host, "zot.zot.svc:5000");
+        assert_eq!(registry.cluster_ip.to_string(), "10.43.0.50");
+        assert_eq!(registry.ca, ca);
     }
 
     #[test]
@@ -545,7 +582,7 @@ mod tests {
             expiry: Some(("2026-10-23T09:00:00Z", "abcdef")),
             single_node: None,
             longhorn: true,
-            zot: None,
+            registry: None,
             node_names: &[],
         });
         assert!(text.contains("The cluster runs Longhorn"), "{text}");

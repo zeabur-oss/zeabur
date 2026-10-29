@@ -1,7 +1,7 @@
 ---
 title: 用設定檔和指令安裝
 description: 把安裝選擇寫成 YAML，用 plan 檢查、apply 安裝，適合重複安裝和版本控制。
-source: "222c0b0ce548"
+source: "818ee6533682"
 ---
 
 把安裝選擇寫進 `/etc/zeabur-installer/config.yaml`，用 `plan` 查看計畫，再用 `apply` 安裝。這個方式適合把設定放進版本控制、在多台機器重複同樣的安裝，或透過自動化工具安裝。
@@ -27,7 +27,7 @@ access:
 
 把兩個網域換成你要使用的網域。公開網域模式的 DNS 和連接埠需求，見[快速開始的連線方式](quickstart.mdx#2-選擇連線方式)。
 
-未填 `preset` 時使用 `standard`，未填 `profile` 時使用 `single-node`，未填 `distribution` 時安裝 K3s。伺服器有 8 GiB 以上記憶體，或之後想用三台伺服器跑控制平面，就加上 `distribution: rke2`。
+未填 `enable` 和 `disable` 時安裝[預設元件](../reference/installer-configuration.mdx#元件選擇)，未填 `profile` 時使用 `single-node`，未填 `distribution` 時安裝 K3s。伺服器有 8 GiB 以上記憶體，或之後想用三台伺服器跑控制平面，就加上 `distribution: rke2`。
 
 測試機可以改用 `local` 模式：
 
@@ -69,7 +69,7 @@ sudo zeabur-installer plan --json
 
 `plan --json` 不會執行主機檢查。
 
-沒有設定檔時，`plan` 會用這台伺服器的位址產生 sslip.io 名稱，以 `standard` 組合提供參考。伺服器有公開位址時用 `domain` 模式，否則用 `local` 模式。執行 `apply` 前一定要建立設定檔。
+沒有設定檔時，`plan` 會用這台伺服器的位址產生 sslip.io 名稱，以預設元件提供參考。伺服器有公開位址時用 `domain` 模式，否則用 `local` 模式。執行 `apply` 前一定要建立設定檔。
 
 ## 執行安裝
 

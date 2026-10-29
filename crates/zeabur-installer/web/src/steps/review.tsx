@@ -40,7 +40,7 @@ import {
 /** Up to this many components read as a sentence; more become a table grouped by why. */
 const few = 7
 
-const whys = ["preset", "enabled", "dependency"] as const
+const whys = ["default", "enabled", "dependency"] as const
 
 export function ReviewStep({ wizard }: { wizard: Wizard }) {
   const t = useT()
@@ -138,7 +138,7 @@ export function ReviewStep({ wizard }: { wizard: Wizard }) {
             <Row label={t("review.components")}>
               <div className="flex flex-col gap-1">
                 <span>
-                  {personal ? t("use.personal") : t(`preset.${config.preset}`)}
+                  {personal ? t("use.personal") : t("use.team")}
                   {t("common.sep")}
                   {t("components.chosen", plan.components.length)}
                   {privileged ? (
@@ -441,7 +441,7 @@ function AfterInstall({ plan, catalog }: { plan: Plan; catalog: CatalogComponent
 function counts(t: Translate, plan: Plan): string[] {
   const n = (why: PlannedComponent["why"]) => plan.components.filter((c) => c.why === why).length
   return [
-    n("preset") ? t("review.fromPreset", n("preset")) : "",
+    n("default") ? t("review.byDefault", n("default")) : "",
     n("enabled") ? t("review.added", n("enabled")) : "",
     n("dependency") ? t("review.needed", n("dependency")) : "",
   ].filter(Boolean)

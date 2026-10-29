@@ -53,7 +53,11 @@ the catalog's `release` output there, the same `bundle.tar.gz` and `index.json` 
 signs. `zeabur-catalog` embeds that bundle. To move the pin, run `nix flake update catalog`; to try
 an unpushed catalog, add `--override-input catalog git+file://$PWD/../catalog` to `nix develop`.
 A release checks the bundle against the catalog's signed release at that commit
-(`scripts/release-pins.sh`). The files vendored for the interface's styles are checked in
+(`scripts/release-pins.sh`). Tests read the catalog at the pin too, so moving it goes in a pull
+request of its own, with no change in behaviour: `flake.lock`, the `fixtures/charts` corpus
+(`scripts/render-chart-corpus.sh`) and the files generated from the catalog
+(`ZEABUR_UPDATE_GOLDEN=1` and `ZEABUR_UPDATE_OPENAPI=1` with `cargo nextest run`, then
+`bun run gen:api` in `web/`). The files vendored for the interface's styles are checked in
 [zeabur-oss/design-system](https://github.com/zeabur-oss/design-system). That package itself is
 checked in here as `vendor/zeabur-design-system-<commit>.tgz`, packed from a commit of its
 repository, so that `bun ci` downloads nothing from GitHub; `scripts/bump-design-system.sh
@@ -285,7 +289,7 @@ the `ui` job. To check it by hand:
 `scripts/bump-rke2.sh <version>` rewrites both from the release's checksum lists. Review the
 diff, and run the catalog's tests on that Kubernetes minor before you move to it.
 
-`cargo nextest run --workspace` runs the planning code against a catalog `index.json` fixture and
+`cargo nextest run --workspace` runs the planning code against the pinned catalog's `index.json` and
 the host helpers against temporary directories. To run `apply`, use a disposable Linux VM with
 systemd, 4 GB of memory and nothing else installed: RKE2 takes over the machine. Never run it on
 a machine you need.

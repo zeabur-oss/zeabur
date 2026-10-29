@@ -374,9 +374,10 @@ pub fn plan(config: &JoinConfig, facts: &JoinFacts) -> Result<JoinPlan, PlanErro
     host_files.push(distribution.join_file(&join.server));
     host_files.push(distribution.node_name_file(&node_name));
     host_files.extend(distribution.node_ip_file(&facts.facts.node_ips));
-    if let Some(zot) = &join.zot {
-        host_files.push(distribution.registries_file(&zot.cluster_ip.to_string()));
-        host_files.push(distribution.zot_ca_file(&zot.ca));
+    if let Some(registry) = &join.registry {
+        host_files
+            .push(distribution.registries_file(&registry.host, &registry.cluster_ip.to_string()));
+        host_files.push(distribution.registry_ca_file(&registry.ca));
     }
 
     warnings.push(same_region());
@@ -454,7 +455,6 @@ mod tests {
                 host_hex: "a1b2c3".to_owned(),
                 memory_mib: 4096,
                 node_ips: vec!["10.0.0.6".to_owned(), "fd00::6".to_owned()],
-                node_prefix: None,
             },
             rtt_us: rtt_us.to_vec(),
             ports: vec![(9345, true), (6443, true), (10250, false)],
@@ -483,18 +483,20 @@ mod tests {
     }
 
     #[test]
-    fn a_node_joining_a_cluster_with_zot_pulls_from_it_through_the_mirror() {
+    fn a_node_joining_a_cluster_with_a_registry_pulls_from_it_through_the_mirror() {
         let ca = "-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----\n";
         let c = config(&format!(
-            "  zot:\n    clusterIp: 10.43.0.50\n    ca: |\n      {}\n",
+            "  registry:\n    host: zot.zot.svc:5000\n    clusterIp: 10.43.0.50\n    ca: |\n      {}\n",
             ca.trim_end().replace('\n', "\n      ")
         ));
         let p = plan(&c, &facts(&[500; 5])).unwrap();
         let rke2 = Distribution::Rke2;
-        assert!(p.host_files.contains(&rke2.registries_file("10.43.0.50")));
-        assert!(p.host_files.contains(&rke2.zot_ca_file(ca)));
-        let bad = "join:\n  server: https://10.0.0.5:9345\n  tokenFile: /etc/t\n  zot:\n    \
-                   clusterIp: 10.43.0.50\n    ca: not a certificate\n";
+        let registries = rke2.registries_file("zot.zot.svc:5000", "10.43.0.50");
+        assert!(registries.content.contains("https://10.43.0.50:5000"));
+        assert!(p.host_files.contains(&registries));
+        assert!(p.host_files.contains(&rke2.registry_ca_file(ca)));
+        let bad = "join:\n  server: https://10.0.0.5:9345\n  tokenFile: /etc/t\n  registry:\n    \
+                   host: zot.zot.svc:5000\n    clusterIp: 10.43.0.50\n    ca: not a certificate\n";
         assert!(Document::parse(bad).is_err());
     }
 

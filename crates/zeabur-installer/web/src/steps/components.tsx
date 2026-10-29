@@ -8,10 +8,9 @@ import {
   type CatalogComponent,
   type Config,
   type Input as CatalogInput,
-  type Preset,
 } from "@/api"
 import type { Wizard } from "@/app"
-import { Panel, Segmented } from "@/components/bits"
+import { Panel } from "@/components/bits"
 import { MemoryVerdict, memoryAdvice } from "@/components/memory"
 import { coded, named, useT, type Translate } from "@/i18n"
 import {
@@ -40,15 +39,12 @@ import { LoadingDots } from "@zeabur/design-system/components/spinner"
 import { Textarea } from "@zeabur/design-system/components/textarea"
 import { Tooltip } from "@zeabur/design-system/components/tooltip"
 
-const presets: Preset[] = ["minimal", "standard", "secure"]
-
 export function ComponentsStep({ wizard }: { wizard: Wizard }) {
   const t = useT()
-  const { config, planned } = wizard
+  const { planned } = wizard
   const choices = wizard.active
   const personal = wizard.use === "personal"
   const all = wizard.server.catalog?.components ?? []
-  // A personal install offers only what the catalog tests on KubeSolo.
   const offered = new Set(all.filter((c) => c.personal).map((c) => c.capability))
   const catalog = personal ? all.filter((c) => offered.has(c.capability)) : all
   const hostMib = wizard.server.facts?.memoryMib ?? Infinity
@@ -111,22 +107,6 @@ export function ComponentsStep({ wizard }: { wizard: Wizard }) {
         </>
       }
     >
-      {personal ? null : (
-        <Panel title={t("components.preset")}>
-          <div className="flex flex-col gap-3">
-            <Segmented<Preset>
-              label={t("components.preset")}
-              value={config.preset}
-              onChange={(preset) =>
-                wizard.setConfig({ ...config, preset, enable: [], disable: [] })
-              }
-              options={presets.map((value) => ({ value, label: t(`preset.${value}`) }))}
-            />
-            <p className="text-sm text-secondary">{t(`presetHint.${config.preset}`)}</p>
-          </div>
-        </Panel>
-      )}
-
       {planned && "error" in planned && !incomplete.length ? (
         <Alert variant="destructive">
           <AlertTitle>{t("common.error")}</AlertTitle>

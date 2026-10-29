@@ -5,7 +5,7 @@
 //! Unknown fields are ignored, because the index only changes `indexVersion` on incompatible
 //! changes.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -75,14 +75,68 @@ pub struct Component {
     /// How to find it in a cluster.
     #[serde(default)]
     pub detection: Detection,
+    /// What it serves other components and the installer.
+    #[serde(default)]
+    pub provides: Provides,
+    /// CRDs of [`Detection::crds`] whose objects it writes itself, so they are no one's data.
+    #[serde(default, rename = "internalCRDs")]
+    pub internal_crds: Vec<String>,
+    /// What it needs beyond its measured idle use.
+    #[serde(default)]
+    pub resources: Resources,
+    /// `NetworkPolicy` manifests that let its clients in, for installers that isolate
+    /// namespaces.
+    pub network_policies: Option<String>,
+}
+
+/// What a component serves.
+#[derive(Debug, Clone, Default, Deserialize)]
+pub struct Provides {
+    /// An OCI registry inside the cluster that nodes pull from.
+    pub registry: Option<Registry>,
+}
+
+/// What a component needs beyond its measured idle use.
+#[derive(Debug, Clone, Default, Deserialize)]
+pub struct Resources {
+    /// Memory it uses on top of its idle use while working, such as one build.
+    #[serde(rename = "workMemoryMiB")]
+    pub work_memory_mib: Option<u64>,
+}
+
+/// An in-cluster registry.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Registry {
+    /// `<service>.<namespace>.svc:<port>`, the name in its certificate and in image references.
+    pub host: String,
+    /// The Secret key with the CA its certificate chains to.
+    pub ca: SecretRef,
+}
+
+impl Registry {
+    /// The Service name and namespace in [`Registry::host`].
+    #[must_use]
+    pub fn service(&self) -> (&str, &str) {
+        let name = self.host.split(':').next().unwrap_or_default();
+        let mut parts = name.split('.');
+        (
+            parts.next().unwrap_or_default(),
+            parts.next().unwrap_or_default(),
+        )
+    }
 }
 
 /// The part of a component's `detection` the installer reads.
 #[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Detection {
     /// The CRDs it serves, as `<plural>.<group>`.
     #[serde(default)]
     pub crds: Vec<String>,
+    /// The CSI drivers of the `PersistentVolume`s it provides.
+    #[serde(default)]
+    pub csi_drivers: Vec<String>,
 }
 
 /// The part of a component's `metadata` the installer reads.
@@ -162,7 +216,8 @@ pub struct Input {
     pub path: Option<String>,
     /// Or a Secret key it is stored in.
     pub secret: Option<SecretRef>,
-    /// `random`: `generate_bytes` random bytes in `generate_encoding`.
+    /// `random`: `generate_bytes` random bytes in `generate_encoding`. `clusterIP`: a free
+    /// address in the Service CIDR, which the installer fills.
     pub generate: Option<String>,
     /// 64 when absent.
     pub generate_bytes: Option<usize>,
@@ -266,6 +321,18 @@ impl Index {
     pub fn component(&self, id: &str) -> Option<&Component> {
         self.components.iter().find(|c| c.id == id)
     }
+
+    /// The chosen component that serves the in-cluster registry.
+    #[must_use]
+    pub fn registry<'a>(
+        &'a self,
+        chosen: &BTreeSet<&str>,
+    ) -> Option<(&'a Component, &'a Registry)> {
+        self.components
+            .iter()
+            .filter(|c| chosen.contains(c.id.as_str()))
+            .find_map(|c| Some((c, c.provides.registry.as_ref()?)))
+    }
 }
 
 impl Component {
@@ -282,6 +349,22 @@ impl Component {
     #[must_use]
     pub fn supports(&self, distribution: &str) -> bool {
         self.distributions.is_empty() || self.distributions.iter().any(|d| d == distribution)
+    }
+
+    /// The input whose value the installer generates as a free Service address.
+    #[must_use]
+    pub fn cluster_ip_input(&self) -> Option<&Input> {
+        self.inputs
+            .iter()
+            .find(|i| i.generate.as_deref() == Some("clusterIP"))
+    }
+
+    /// The CRDs whose objects mean someone uses it: [`Detection::crds`] less its internal ones.
+    pub fn in_use_crds(&self) -> impl Iterator<Item = &String> {
+        self.detection
+            .crds
+            .iter()
+            .filter(|crd| !self.internal_crds.contains(crd))
     }
 
     /// The idle memory measured for a profile and architecture, on the newest Kubernetes measured.

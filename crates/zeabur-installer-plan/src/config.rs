@@ -20,13 +20,10 @@ pub struct Config {
     /// `team`, the default; `personal` makes a [`PersonalConfig`].
     #[serde(default, rename = "use", skip_serializing_if = "Use::is_team")]
     pub use_: Use,
-    /// Which components to install.
-    #[serde(default)]
-    pub preset: Preset,
-    /// Capabilities or component ids added to the preset.
+    /// Capabilities or component ids added to the defaults.
     #[serde(default)]
     pub enable: Vec<String>,
-    /// Capabilities or component ids taken out of the preset.
+    /// Capabilities or component ids taken out of the defaults.
     #[serde(default)]
     pub disable: Vec<String>,
     /// `single-node` or `multi-node`; one server is `single-node`.
@@ -169,20 +166,6 @@ impl PersonalConfig {
         }
         self.host.check()
     }
-}
-
-/// A named set of components.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize, Serialize)]
-#[serde(rename_all = "kebab-case")]
-pub enum Preset {
-    /// Ingress, certificates and metrics-server: what Zeabur needs to be reached and to show usage.
-    Minimal,
-    /// Everything the catalog recommends for the profile, with Zeabur Builder, Keel and
-    /// `CloudNativePG`.
-    #[default]
-    Standard,
-    /// `standard` with runtime detection, vulnerability scanning and intrusion prevention.
-    Secure,
 }
 
 /// How people reach the two web services.
@@ -341,18 +324,20 @@ pub struct Join {
     /// module before Kubernetes starts on it.
     #[serde(default)]
     pub longhorn: bool,
-    /// The cluster runs the catalog's zot, so this node pulls its images through a mirror, as
+    /// The cluster runs an in-cluster registry, so this node pulls its images through a mirror, as
     /// `node add` printed it.
-    pub zot: Option<ZotMirror>,
+    pub registry: Option<RegistryMirror>,
     /// The names of the cluster's nodes, as `node add` printed them; this node takes another.
     #[serde(default)]
     pub node_names: Vec<String>,
 }
 
-/// zot's fixed `ClusterIP` and the CA of its certificate.
+/// The in-cluster registry's host, fixed `ClusterIP` and the CA of its certificate.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct ZotMirror {
+pub struct RegistryMirror {
+    /// `<service>.<namespace>.svc:<port>`, as images name it.
+    pub host: String,
     /// Its Service's `ClusterIP`.
     pub cluster_ip: IpAddr,
     /// The CA, PEM.
@@ -368,7 +353,7 @@ impl std::fmt::Debug for Join {
             .field("token_file", &self.token_file)
             .field("server_config", &self.server_config)
             .field("longhorn", &self.longhorn)
-            .field("zot", &self.zot)
+            .field("registry", &self.registry)
             .field("node_names", &self.node_names)
             .finish()
     }
@@ -437,14 +422,14 @@ impl JoinConfig {
             return Err(PlanError::SecondServer);
         }
         server_address(&join.server, self.distribution.join_port())?;
-        if let Some(zot) = &join.zot
-            && !zot
+        if let Some(registry) = &join.registry
+            && !registry
                 .ca
                 .trim_start()
                 .starts_with("-----BEGIN CERTIFICATE-----")
         {
             return Err(PlanError::Config(
-                "join.zot.ca is not a PEM certificate: copy it from the output of `zeabur-installer node add`"
+                "join.registry.ca is not a PEM certificate: copy it from the output of `zeabur-installer node add`"
                     .to_owned(),
             ));
         }
@@ -620,7 +605,7 @@ const fn yes() -> bool {
 
 impl Config {
     /// The configuration used when there is no file: sslip.io names for the first public address,
-    /// else for the first address, with the standard preset. A public address gets Let's Encrypt
+    /// else for the first address, with the default components. A public address gets Let's Encrypt
     /// certificates; another address is a test machine with a local CA.
     #[must_use]
     pub fn defaults(addresses: &[String]) -> Option<Self> {
@@ -636,7 +621,6 @@ impl Config {
         let name = address.replace(':', "-");
         Some(Self {
             use_: Use::Team,
-            preset: Preset::default(),
             enable: Vec::new(),
             disable: Vec::new(),
             profile: single_node(),
@@ -769,7 +753,6 @@ mod tests {
     #[test]
     fn defaults() {
         let c = Config::parse(MINIMAL).unwrap();
-        assert_eq!(c.preset, Preset::Standard);
         assert_eq!(c.profile, "single-node");
         assert!(c.zeabur);
         assert!(c.access.invitations);
@@ -828,7 +811,7 @@ mod tests {
         };
         assert_eq!(c.enable, ["databases"]);
         assert!(Document::parse("use: personal\naccess: {mode: local}\n").is_err());
-        assert!(Document::parse("use: personal\npreset: secure\n").is_err());
+        assert!(Document::parse("use: personal\nprofile: multi-node\n").is_err());
         let team = format!("use: team\n{MINIMAL}");
         assert!(matches!(
             Document::parse(&team).unwrap(),

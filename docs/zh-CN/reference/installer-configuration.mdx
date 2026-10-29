@@ -1,7 +1,7 @@
 ---
 title: Installer 配置
 description: 查阅创建集群和加入节点所用的 YAML 字段、默认值及机密文件格式。
-source: "53b0286930e6"
+source: "1032006f1802"
 ---
 
 将域名、组件选择和主机配置写入 YAML，运行 `zeabur-installer --config config.yaml plan`，先查看安装内容。文件默认位于 `/etc/zeabur-installer/config.yaml`。字段使用 camelCase；字段拼写错误或存在多余字段时，installer 会直接停止。
@@ -13,7 +13,6 @@ source: "53b0286930e6"
 下面的示例使用自己的域名。两个 DNS 名称都要指向服务器，外部也要能访问端口 `80`，Let's Encrypt 才能完成 HTTP-01 验证。
 
 ```yaml title="/etc/zeabur-installer/config.yaml"
-preset: minimal
 profile: single-node
 access:
   mode: domain
@@ -32,10 +31,9 @@ host:
 | `use` | `team` | `team` 供团队使用。`personal` 改为个人使用，可用字段见[个人使用的文件](#个人使用的文件) |
 | `distribution` | `k3s` | `k3s` 或 `rke2`，见[`distribution` 与版本](#distribution-与版本) |
 | `access` | 必填 | 登录服务与 Zeabur 的域名和证书模式 |
-| `preset` | `standard` | `minimal`、`standard` 或 `secure` |
 | `profile` | `single-node` | `single-node` 或 `multi-node`，选择 Catalog 中对应的组件配置 |
-| `enable` | `[]` | 添加 capability 或完整组件 ID |
-| `disable` | `[]` | 排除 capability 或完整组件 ID |
+| `enable` | `[]` | 在[默认组件](#组件选择)之外添加的 capability 或完整组件 ID |
+| `disable` | `[]` | 从默认组件中排除的 capability 或完整组件 ID |
 | `allowDataLoss` | `[]` | 同意移除时一并删除数据的组件 ID，例如 `replicated-storage/longhorn` |
 | `zeabur` | `true` | 安装 Zeabur Identity 与 Zeabur。`false` 只安装 K3s/RKE2 与选定组件 |
 | `inputs` | `{}` | 按组件 ID 分组的普通输入值 |
@@ -62,9 +60,13 @@ host:
 
 ### 组件选择
 
-- `minimal`：ingress、证书和 metrics-server，即 Zeabur 能够连接和显示用量所需的组件。
-- `standard`：Catalog 为此 profile 推荐的所有组件，外加 `builds`（Zeabur Builder 和 zot）、`image-updates`（Keel）和 `databases/cloudnative-pg`，装完就能用镜像或 Git 部署，也能创建 PostgreSQL 数据库。Zeabur Builder 用有特权的 buildkitd 构建，逃出沙箱的构建可以接触到节点；不需要时在 `disable` 中添加 `builds`。
-- `secure`：在 `standard` 的基础上添加运行时检测、漏洞扫描和入侵防护。
+默认会安装 Catalog 为此 profile 推荐的所有组件，外加 `builds`（Zeabur Builder 和 zot）、`image-updates`（Keel）和 `databases/cloudnative-pg`，装完就能用镜像或 Git 部署，也能创建 PostgreSQL 数据库。Zeabur Builder 用有特权的 buildkitd 构建，逃出沙箱的构建可以接触到节点；不需要时在 `disable` 中添加 `builds`。Zeabur 需要 ingress、证书和 metrics-server 才能运行。
+
+需要运行时检测、漏洞扫描和入侵防护时，添加：
+
+```yaml
+enable: [runtime-security, vulnerability-scanning, intrusion-prevention]
+```
 
 `enable` 可以填写 capability（例如 `runtime-security`）或完整组件 ID（例如 `volume-backup/velero`），依赖的组件会一并添加。如果 `disable` 排除了其他组件依赖的组件，`plan` 会列出两者并停止。最终安装的组件、安装顺序和排除原因，见 `plan` 的输出。
 
@@ -79,9 +81,9 @@ inputs:
 
 Catalog 定义了每个组件有哪些 input 及其类型。缺少必填值时，`plan` 会指出需要补充的字段。
 
-installer 会自动填写 External Secrets 的 `kube-api-cidr`（节点地址所在的子网）和 Zeabur Builder 的 `cluster-ip`（zot 的固定地址）。要修改，在 `inputs` 中填写值即可。
+installer 会自动填写 Zeabur Builder 的 `cluster-ip`（zot 的固定地址）。要修改，在 `inputs` 中填写值即可。
 
-Velero 还接受 installer 自己的 `region` input，即存储桶的区域，默认 `us-east-1`。Cloudflare R2 要填 `auto`。网页界面会分别询问访问密钥 ID 和私密访问密钥，再自己生成 `credentials` 文件。
+Velero 的 `region` input 是存储桶的区域，默认 `us-east-1`。Cloudflare R2 要填 `auto`。网页界面会分别询问访问密钥 ID 和私密访问密钥，再自己生成 `credentials` 文件。
 
 ### `secretFiles`
 
@@ -170,7 +172,7 @@ host:
   tlsSan: [solo.example.com]
 ```
 
-同一份文件只能再添加下表中的字段，不接受 `preset`、`profile`、`access`、`zeabur`、`distribution`、`k3sVersion`、`rke2Version` 和 `join`。
+同一份文件只能再添加下表中的字段，不接受 `profile`、`access`、`zeabur`、`distribution`、`k3sVersion`、`rke2Version` 和 `join`。
 
 | 字段 | 默认值与用途 |
 |---|---|
@@ -188,7 +190,7 @@ host:
 
 ## 加入已有集群的文件
 
-顶层包含 `join` 时，installer 会将这台机器视为要加入集群的新节点，只安装 K3s 或 RKE2。同一份文件只能再添加 `distribution`、对应的版本字段（`k3sVersion` 或 `rke2Version`）、`host` 和 `sources.imageArchives`，不能添加 `preset`、`access` 等创建集群的字段。
+顶层包含 `join` 时，installer 会将这台机器视为要加入集群的新节点，只安装 K3s 或 RKE2。同一份文件只能再添加 `distribution`、对应的版本字段（`k3sVersion` 或 `rke2Version`）、`host` 和 `sources.imageArchives`，不能添加 `profile`、`access` 等创建集群的字段。
 
 在已有 server 上运行 `zeabur-installer node add`，获取完整 YAML，保存到新主机。文件已包含令牌和 server 配置，不需要自行拼装。
 

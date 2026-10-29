@@ -2,19 +2,19 @@ K3s v1.36.5+k3s1 (pinned, checked against this installer's digests), CIS hardene
 Node addresses   203.0.113.10 (temporary IPv6 addresses left out)
 
 Components
-  ingress/traefik                                  preset     23 MiB
+  ingress/traefik                                  default    23 MiB
       manifests gateway-api-crds (1 URLs)
       chart traefik 41.7.1
-  certificates/cert-manager                        preset     51 MiB
+  certificates/cert-manager                        default    51 MiB
       chart cert-manager v1.21.2
       manifests issuers
-  observability-operator/victoria-metrics-operator preset     20 MiB
+  observability-operator/victoria-metrics-operator default    20 MiB
       chart victoria-metrics-operator 0.68.1
-  logs/victoria-logs                               preset     38 MiB
+  logs/victoria-logs                               default    38 MiB
       manifests logs
-  metrics/metrics-server                           preset     17 MiB
+  metrics/metrics-server                           default    17 MiB
       chart metrics-server 3.14.0
-  metrics/victoria-metrics                         preset     207 MiB
+  metrics/victoria-metrics                         default    207 MiB
       chart vm 0.95.2
   node-updates/system-upgrade-controller           left out: runs on k3s only
 

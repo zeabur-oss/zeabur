@@ -35,8 +35,7 @@ import { StatusPill } from "@/components/status"
 import { buttonVariants } from "@zeabur/design-system/components/button"
 import { Skeleton } from "@zeabur/design-system/components/skeleton"
 import { Tooltip } from "@zeabur/design-system/components/tooltip"
-import { useI18n, useT } from "@/i18n"
-import { summaryOf } from "@/i18n/component-summaries"
+import { type Locale, useI18n, useT } from "@/i18n"
 import type { Icon } from "@/lib/icon"
 import { cn } from "@/lib/utils"
 import { componentsRole, Forbidden } from "@/routes/cluster/forbidden"
@@ -120,7 +119,7 @@ export function ComponentsPage() {
       (filter === "installed" && c.existing) ||
       (filter === "recommended" && !c.existing && c.suggestion === "recommended")) &&
     (!query ||
-      `${c.name} ${capLabel(c.name)} ${c.components.map((x) => `${x.displayName} ${summaryOf(c.name, x.id, x.description, locale) ?? x.description}`).join(" ")}`
+      `${c.name} ${capLabel(c.name)} ${c.components.map((x) => `${x.displayName} ${summaryOf(x, locale)}`).join(" ")}`
         .toLowerCase()
         .includes(query.toLowerCase()))
   const known = new Set(categories.flatMap((c) => c.names))
@@ -226,6 +225,10 @@ export function ComponentsPage() {
 
 /** This component itself, not another of its capability: metrics-server covers "metrics" without
  * VictoriaMetrics being installed. */
+/** What the component gives the cluster, in the catalogue's words for `locale`. */
+const summaryOf = (component: Schemas["Component"], locale: Locale) =>
+  component.summary[locale] ?? component.summary.en
+
 const isInstalled = (capability: Schemas["Capability"], component: Schemas["Component"]) =>
   capability.installations.some((i) => i.component === component.id)
 
@@ -276,8 +279,7 @@ function ComponentCard({
         <StateChip state={state} evidence={capability.evidence} />
       </div>
       <p className="line-clamp-3 type-body leading-normal text-muted-foreground">
-        {summaryOf(capability.name, component.id, component.description, locale) ??
-          component.description}
+        {summaryOf(component, locale)}
       </p>
       <div className="mt-auto flex min-h-8 items-center gap-2 pt-1">
         <span className="type-meta text-muted-foreground" translate="no">

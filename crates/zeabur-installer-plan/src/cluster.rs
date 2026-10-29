@@ -51,10 +51,10 @@ pub struct Layout {
     pub kubelet_cert: &'static str,
     /// The registry mirrors and their CAs, read when the distribution starts.
     pub registries_file: &'static str,
-    /// The CA of zot's certificate. containerd reads it on each pull, so the first server writes
-    /// it once cert-manager has issued it, without a restart; a joining node writes it before
-    /// starting.
-    pub zot_ca_file: &'static str,
+    /// The CA of the in-cluster registry's certificate. containerd reads it on each pull, so the
+    /// first server writes it once cert-manager has issued it, without a restart; a joining node
+    /// writes it before starting.
+    pub registry_ca_file: &'static str,
     /// The kernel parameters `protect-kernel-defaults` requires.
     pub sysctl_file: &'static str,
     /// The server's script that stops the distribution and removes it with its data.
@@ -75,7 +75,7 @@ const K3S_LAYOUT: Layout = Layout {
     kubelet_kubeconfig: "/var/lib/rancher/k3s/agent/kubelet.kubeconfig",
     kubelet_cert: "/var/lib/rancher/k3s/agent/client-kubelet.crt",
     registries_file: "/etc/rancher/k3s/registries.yaml",
-    zot_ca_file: "/etc/rancher/k3s/zot-ca.crt",
+    registry_ca_file: "/etc/rancher/k3s/registry-ca.crt",
     sysctl_file: "/etc/sysctl.d/60-k3s-cis.conf",
     uninstall_server: "/usr/local/bin/k3s-uninstall.sh",
     uninstall_agent: "/usr/local/bin/k3s-agent-uninstall.sh",
@@ -93,7 +93,7 @@ const RKE2_LAYOUT: Layout = Layout {
     kubelet_kubeconfig: "/var/lib/rancher/rke2/agent/kubelet.kubeconfig",
     kubelet_cert: "/var/lib/rancher/rke2/agent/client-kubelet.crt",
     registries_file: "/etc/rancher/rke2/registries.yaml",
-    zot_ca_file: "/etc/rancher/rke2/zot-ca.crt",
+    registry_ca_file: "/etc/rancher/rke2/registry-ca.crt",
     sysctl_file: "/etc/sysctl.d/60-rke2-cis.conf",
     uninstall_server: "/usr/local/bin/rke2-uninstall.sh",
     uninstall_agent: "/usr/local/bin/rke2-uninstall.sh",
@@ -192,12 +192,12 @@ impl Distribution {
     /// The distribution and its control plane at idle, containerd, kubelet and the network
     /// included.
     ///
-    /// RKE2: on a 4 GiB VM with the `standard` preset, `free` showed 2640 MiB used, about 500 of
+    /// RKE2: on a 4 GiB VM with the default components, `free` showed 2640 MiB used, about 500 of
     /// it the components. The rest is split by the process figures from that VM: kube-apiserver
     /// about 980, etcd 97, kube-controller-manager 92, canal 59, then kubelet, containerd and the
-    /// rest of RKE2. K3s runs the control plane in one process on `SQLite`. On the same VM and
-    /// preset, 10 minutes after a reboot, K3s with Calico used about 200 MiB less: `k3s server`
-    /// and containerd 1030 against 1210 for RKE2's processes.
+    /// rest of RKE2. K3s runs the control plane in one process on `SQLite`. On the same VM with the
+    /// same components, 10 minutes after a reboot, K3s with Calico used about 200 MiB less:
+    /// `k3s server` and containerd 1030 against 1210 for RKE2's processes.
     #[must_use]
     pub const fn idle_mib(self) -> u64 {
         match self {
@@ -332,28 +332,30 @@ impl Distribution {
         }
     }
 
-    /// The node's container runtime cannot resolve `zot.zot.svc`, so its images come from zot's
-    /// fixed `ClusterIP`, which kube-proxy routes on every node and zot's certificate names.
+    /// The node's container runtime cannot resolve the in-cluster registry's host, so its images
+    /// come from the registry's fixed `ClusterIP`, which kube-proxy routes on every node and the
+    /// registry's certificate names.
     #[must_use]
-    pub fn registries_file(self, cluster_ip: &str) -> HostFile {
+    pub fn registries_file(self, host: &str, cluster_ip: &str) -> HostFile {
         let layout = self.layout();
+        let port = host.rsplit_once(':').map_or("443", |(_, p)| p);
         HostFile {
             path: layout.registries_file.to_owned(),
             mode: 0o600,
             content: format!(
                 "# Written by zeabur-installer; `zeabur-installer doctor` compares it.\n\
-                 mirrors:\n  {ZOT_HOST}:\n    endpoint: [\"https://{cluster_ip}:5000\"]\n\
-                 configs:\n  \"{cluster_ip}:5000\":\n    tls:\n      ca_file: {}\n",
-                layout.zot_ca_file
+                 mirrors:\n  {host}:\n    endpoint: [\"https://{cluster_ip}:{port}\"]\n\
+                 configs:\n  \"{cluster_ip}:{port}\":\n    tls:\n      ca_file: {}\n",
+                layout.registry_ca_file
             ),
         }
     }
 
-    /// zot's CA on a joining node, copied from the server by `node add`.
+    /// The registry's CA on a joining node, copied from the server by `node add`.
     #[must_use]
-    pub fn zot_ca_file(self, pem: &str) -> HostFile {
+    pub fn registry_ca_file(self, pem: &str) -> HostFile {
         HostFile {
-            path: self.layout().zot_ca_file.to_owned(),
+            path: self.layout().registry_ca_file.to_owned(),
             mode: 0o644,
             content: pem.to_owned(),
         }
@@ -427,12 +429,12 @@ pub struct Options {
 /// The `ConfigMap` in `kube-system` holding the authentication configuration, for servers that
 /// join later.
 pub const AUTHN_CONFIGMAP: &str = "zeabur-identity-authn";
-/// The catalog's in-cluster registry, as Zeabur and Zeabur Builder name its images.
-pub const ZOT_HOST: &str = "zot.zot.svc:5000";
-/// The fixed `ClusterIP` of the catalog's zot (its `cluster-ip` input). Kubernetes keeps the low
-/// end of the Service CIDR (10.43.0.0/16 on K3s and RKE2) for fixed addresses, as `CoreDNS`'s
+/// The fixed `ClusterIP` the installer gives the in-cluster registry.
+///
+/// It fills the input that `provides.registry.clusterIPInput` names. Kubernetes keeps the low end
+/// of the Service CIDR (10.43.0.0/16 on K3s and RKE2) for fixed addresses, as `CoreDNS`'s
 /// 10.43.0.10.
-pub const ZOT_CLUSTER_IP: &str = "10.43.0.50";
+pub const REGISTRY_CLUSTER_IP: &str = "10.43.0.50";
 
 pub(crate) const HEADER: &str = "# Written by zeabur-installer; `zeabur-installer doctor` compares it.\n\
                       # Put your own settings in config.yaml.d/90-local.yaml instead of editing this file.\n";

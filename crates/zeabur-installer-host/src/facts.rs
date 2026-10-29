@@ -21,12 +21,6 @@ pub fn read() -> Result<Facts, HostError> {
         .map_err(HostError::io("/proc/sys/kernel/hostname"))?;
     let meminfo = fs::read_to_string("/proc/meminfo").map_err(HostError::io("/proc/meminfo"))?;
     let node_ips = node_ips();
-    let node_prefix = node_ips.first().and_then(|ip| {
-        host_addresses()
-            .iter()
-            .find(|a| &a.address == ip)
-            .and_then(|a| a.prefix)
-    });
     Ok(Facts {
         arch: arch(std::env::consts::ARCH).to_owned(),
         hostname: hostname.trim().to_owned(),
@@ -37,7 +31,6 @@ pub fn read() -> Result<Facts, HostError> {
             reason: "no MemTotal".to_owned(),
         })?,
         node_ips,
-        node_prefix,
     })
 }
 

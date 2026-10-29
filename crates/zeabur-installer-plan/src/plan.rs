@@ -5,12 +5,12 @@
 //! Secret key and where its value comes from.
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::net::{IpAddr, Ipv4Addr};
+use std::net::IpAddr;
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
-use crate::catalog::{Component, Encoding, Index, SecretRef};
+use crate::catalog::{Component, Encoding, Index, Input, SecretRef};
 use crate::cluster::{self, Distribution, HostFile};
 use crate::config::{AccessMode, Config};
 use crate::pins::{self, CALICO, K3S, K3s, RKE2};
@@ -35,45 +35,24 @@ pub const IDENTITY_NAMESPACE: &str = "zeabur-identity";
 pub const ZEABUR_NAMESPACE: &str = "zeabur";
 /// The `ClusterIssuer` of `local` access: a CA cert-manager makes on the server.
 pub const LOCAL_ISSUER: &str = "zeabur-local-ca";
-/// The catalog's Zeabur Builder, which brings zot: the in-cluster registry that nodes pull
-/// through a mirror to its fixed address.
-pub const BUILDER: &str = "builds/zeabur-builder";
-/// The label Zeabur Builder puts on the Pods of a build's Job.
-const BUILD_RUN_LABEL: &str = "builder.zeabur.com/buildrun";
-/// The ConfigMap in Zeabur's namespace with zot's CA, which Zeabur trusts to read its images.
+/// The ConfigMap in Zeabur's namespace with the registry's CA, which Zeabur trusts to read its
+/// images.
 pub const REGISTRY_CA_CONFIGMAP: &str = "zeabur-registry-ca";
 /// The catalog's log store, whose history Zeabur reads through Zeabur Proxy.
 const VICTORIA_LOGS: &str = "logs/victoria-logs";
 /// The catalog's metrics store, whose usage history Zeabur reads through Zeabur Proxy.
 const VICTORIA_METRICS: &str = "metrics/victoria-metrics";
-/// zot's input naming that address.
-const ZOT_CLUSTER_IP_INPUT: &str = "cluster-ip";
-/// The catalog's External Secrets Operator.
-const EXTERNAL_SECRETS: &str = "external-secrets/external-secrets";
-/// Its input naming the Kubernetes API server's addresses.
-const KUBE_API_CIDR_INPUT: &str = "kube-api-cidr";
+/// The catalog's cert-manager, whose `ClusterIssuer`s and Ingress annotations Zeabur and Zeabur
+/// Identity use.
+pub const CERT_MANAGER: &str = "certificates/cert-manager";
 /// The `ClusterIssuer` of `domain` access, shipped by the catalog's cert-manager component.
 pub const ACME_ISSUER: &str = "letsencrypt";
 /// From this much memory up, an interface suggests RKE2 over K3s: an 8 GiB server, less what the
 /// kernel and firmware keep. Below it, K3s leaves more of the host to the apps.
 pub const RKE2_SUGGESTED_MIB: u64 = 7 * 1024;
 
-/// Why components' pods need more than `restricted`: those the catalog does not mark privileged,
-/// and those whose reason is worth more than the catalog's flag.
-const PRIVILEGED: &[(&str, &str)] = &[
-    (
-        "metrics/victoria-metrics",
-        "node-exporter reads the host's /proc and /sys on the host network",
-    ),
-    (
-        storage::LONGHORN,
-        "its manager, CSI plugin and instance managers mount /dev and the kubelet's directory \
-         from the host and run iscsiadm and mount in the host's namespaces",
-    ),
-];
-
 /// Facts about the host, read by `apply` and passed in so planning stays free of I/O.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Facts {
     /// `amd64` or `arm64`.
@@ -88,8 +67,6 @@ pub struct Facts {
     pub memory_mib: u64,
     /// The addresses the node registers with (`node-ip`); empty leaves the choice to K3s or RKE2.
     pub node_ips: Vec<String>,
-    /// The prefix length of the first IPv4 node address on its interface.
-    pub node_prefix: Option<u8>,
 }
 
 impl Facts {
@@ -133,9 +110,8 @@ pub struct Plan {
     pub storage: Storage,
     /// What every node needs before the components' pods run on it.
     pub node_prep: Option<NodePrep>,
-    /// zot's fixed `ClusterIP`, when Zeabur Builder brings zot: nodes pull its images through a
-    /// mirror to it, checked against its CA.
-    pub zot_cluster_ip: Option<String>,
+    /// The in-cluster registry a chosen component serves.
+    pub registry: Option<RegistryPlan>,
     /// How the two web services get certificates.
     pub access: AccessMode,
     /// Zeabur Identity, when installed.
@@ -270,6 +246,24 @@ pub struct ComponentPlan {
     pub idle_memory_mib: Option<u64>,
     /// The catalog's one-line security summary.
     pub security: String,
+    /// The component's `NetworkPolicy` objects, labelled as the installer's, applied before its
+    /// releases.
+    pub network_policies: Vec<Value>,
+}
+
+/// An in-cluster registry that nodes pull from and Zeabur reads images from.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RegistryPlan {
+    /// The component that serves it.
+    pub component: String,
+    /// `<service>.<namespace>.svc:<port>`, as images name it.
+    pub host: String,
+    /// Its Service's fixed address: nodes cannot resolve the host, so they pull through a mirror
+    /// to it, checked against the CA. `None` when the component takes no fixed address.
+    pub cluster_ip: Option<String>,
+    /// The CA its certificate chains to.
+    pub ca: SecretRefPlan,
 }
 
 /// A Secret key and where its value comes from.
@@ -283,7 +277,7 @@ pub struct SecretPlan {
 }
 
 /// A Secret key, serialisable.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SecretRefPlan {
     /// Namespace.
     pub namespace: String,
@@ -396,6 +390,20 @@ pub struct Memory {
 ///
 /// When the selection fails, values do not parse or a required input is missing.
 pub fn plan(index: &Index, config: &Config, facts: &Facts) -> Result<Plan, PlanError> {
+    plan_with(index, config, facts, pins::PRODUCTS.as_ref())
+}
+
+/// [`plan`] with the given product releases in place of this build's.
+///
+/// # Errors
+///
+/// As [`plan`].
+pub fn plan_with(
+    index: &Index,
+    config: &Config,
+    facts: &Facts,
+    products: Option<&pins::Products>,
+) -> Result<Plan, PlanError> {
     let distribution = config.distribution;
     if facts.memory_mib < distribution.min_memory_mib() {
         return Err(PlanError::TeamMemory {
@@ -432,35 +440,29 @@ pub fn plan(index: &Index, config: &Config, facts: &Facts) -> Result<Plan, PlanE
     let choices = Choices {
         inputs: &config.inputs,
         secret_files: &config.secret_files,
-        facts,
     };
     let (components, mut namespaces) =
         components(index, &selection, &choices, profile, &facts.arch)?;
 
-    if !chosen.contains("certificates/cert-manager") && config.zeabur {
+    if !chosen.contains(CERT_MANAGER) && config.zeabur {
         return Err(PlanError::NeedsDisabled {
             component: "zeabur".to_owned(),
-            dependency: "certificates/cert-manager".to_owned(),
+            dependency: CERT_MANAGER.to_owned(),
         });
     }
 
-    let (identity, zeabur) = products(
+    let registry = registry(index, &config.inputs, &chosen);
+    let (identity, zeabur) = self::products(
         config,
         facts,
-        pins::PRODUCTS.as_ref(),
+        products,
         &chosen,
+        registry.as_ref(),
         &mut namespaces,
         &mut warnings,
     )?;
 
-    let zot_cluster_ip = zot_cluster_ip(index, &config.inputs, &chosen);
-    let host_files = server_files(
-        config,
-        &chosen,
-        facts,
-        &node_name,
-        zot_cluster_ip.as_deref(),
-    );
+    let host_files = server_files(config, &chosen, facts, &node_name, registry.as_ref());
 
     let memory = memory(distribution, &components, facts.memory_mib, &mut warnings);
 
@@ -477,7 +479,7 @@ pub fn plan(index: &Index, config: &Config, facts: &Facts) -> Result<Plan, PlanE
         left_out: selection.left_out,
         removals: Vec::new(),
         node_prep: storage::node_prep(chosen.iter().copied()),
-        zot_cluster_ip,
+        registry,
         access: config.access.mode,
         identity,
         zeabur,
@@ -565,6 +567,7 @@ fn products(
     facts: &Facts,
     pins: Option<&pins::Products>,
     chosen: &BTreeSet<&str>,
+    registry: Option<&RegistryPlan>,
     namespaces: &mut BTreeMap<String, Namespace>,
     warnings: &mut Vec<Warning>,
 ) -> Result<(Option<IdentityPlan>, Option<ZeaburPlan>), PlanError> {
@@ -654,7 +657,7 @@ fn products(
     let suffixes = suffixes(config, facts);
     warn_no_suffixes(config, facts, &suffixes, warnings);
     let mut values = zeabur_values(config, facts, tls_issuer, &zeabur_image, &suffixes);
-    chosen_values(chosen, &mut values);
+    chosen_values(chosen, registry, &mut values);
     Ok((
         Some(identity),
         Some(ZeaburPlan {
@@ -666,14 +669,17 @@ fn products(
 }
 
 /// The chart values that follow from the chosen components.
-fn chosen_values(chosen: &BTreeSet<&str>, values: &mut Value) {
+fn chosen_values(chosen: &BTreeSet<&str>, registry: Option<&RegistryPlan>, values: &mut Value) {
     let Some(map) = values.as_object_mut() else {
         return;
     };
-    if chosen.contains(BUILDER) {
+    if let Some(registry) = registry {
         map.insert(
             "builds".to_owned(),
-            json!({"caBundle": {"configMap": REGISTRY_CA_CONFIGMAP}}),
+            json!({
+                "registry": registry.host,
+                "caBundle": {"configMap": REGISTRY_CA_CONFIGMAP},
+            }),
         );
     }
     let logs = chosen.contains(VICTORIA_LOGS);
@@ -700,6 +706,7 @@ pub fn products_only(
         facts,
         pins::PRODUCTS.as_ref(),
         &BTreeSet::new(),
+        None,
         &mut BTreeMap::new(),
         &mut Vec::new(),
     )?;
@@ -830,48 +837,18 @@ pub(crate) fn cluster_plan(
 pub(crate) struct Choices<'a> {
     pub(crate) inputs: &'a BTreeMap<String, BTreeMap<String, Value>>,
     pub(crate) secret_files: &'a BTreeMap<String, BTreeMap<String, String>>,
-    pub(crate) facts: &'a Facts,
 }
 
-/// Whether the installer fills this input itself, so a front end need not ask for it.
+/// Whether the installer fills this input itself, so a front end need not ask for it: a free
+/// Service address.
 #[must_use]
-pub fn installer_fills(component: &str, input: &str) -> bool {
-    matches!(
-        (component, input),
-        (BUILDER, ZOT_CLUSTER_IP_INPUT) | (EXTERNAL_SECRETS, KUBE_API_CIDR_INPUT)
-    )
+pub fn installer_fills(input: &Input) -> bool {
+    input.generate.as_deref() == Some("clusterIP")
 }
-
-/// Inputs that the installer adds to a catalog component: (component, input, release, values
-/// path). The catalog sets a default at the path.
-const INSTALLER_INPUTS: &[(&str, &str, &str, &str)] = &[(
-    "volume-backup/velero",
-    "region",
-    "velero",
-    "configuration.backupStorageLocation.0.config.region",
-)];
 
 /// The value of an input the installer knows; a configured value wins over it.
-fn known_input(component: &str, input: &str, facts: &Facts) -> Option<Value> {
-    match (component, input) {
-        (BUILDER, ZOT_CLUSTER_IP_INPUT) => Some(json!(cluster::ZOT_CLUSTER_IP)),
-        (EXTERNAL_SECRETS, KUBE_API_CIDR_INPUT) => {
-            let ip = facts
-                .node_ips
-                .iter()
-                .find(|a| a.parse::<Ipv4Addr>().is_ok())?;
-            Some(json!(ipv4_network(ip, facts.node_prefix)?))
-        }
-        _ => None,
-    }
-}
-
-/// The IPv4 network of `address` as `network/prefix`; the address with `/32` without a prefix.
-fn ipv4_network(address: &str, prefix: Option<u8>) -> Option<String> {
-    let ip: Ipv4Addr = address.parse().ok()?;
-    let prefix = prefix.filter(|p| (1..=32).contains(p)).unwrap_or(32);
-    let mask = u32::MAX.checked_shl(32 - u32::from(prefix)).unwrap_or(0);
-    Some(format!("{}/{prefix}", Ipv4Addr::from(u32::from(ip) & mask)))
+fn known_input(input: &Input) -> Option<Value> {
+    installer_fills(input).then(|| json!(cluster::REGISTRY_CLUSTER_IP))
 }
 
 /// The chosen components and the namespaces their releases install into.
@@ -887,9 +864,13 @@ pub(crate) fn components(
         .iter()
         .map(|(id, _)| id.as_str())
         .collect();
-    // Longhorn first, so the volumes of the components after it find its class.
+    // Volume providers first, so the volumes of the components after them find their class.
     let mut ordered = selection.components.clone();
-    ordered.sort_by_key(|(id, _)| id != storage::LONGHORN);
+    ordered.sort_by_key(|(id, _)| {
+        index
+            .component(id)
+            .is_none_or(|c| c.detection.csi_drivers.is_empty())
+    });
     let mut components = Vec::new();
     let mut namespaces: BTreeMap<String, Namespace> = BTreeMap::new();
     for (id, why) in &ordered {
@@ -1024,7 +1005,7 @@ fn component_plan(
         id: id.to_owned(),
         display_name: component.metadata.name.clone(),
         why: match why {
-            Why::Preset => "preset",
+            Why::Default => "default",
             Why::Enabled => "enabled",
             Why::Dependency => "dependency",
         },
@@ -1043,7 +1024,33 @@ fn component_plan(
             .collect(),
         idle_memory_mib: component.idle_memory_mib(profile, arch),
         security: component.security.summary.clone(),
+        network_policies: network_policies(component)?,
     })
+}
+
+/// The component's `NetworkPolicy` objects, labelled as the installer's.
+fn network_policies(component: &Component) -> Result<Vec<Value>, PlanError> {
+    let Some(yaml) = &component.network_policies else {
+        return Ok(Vec::new());
+    };
+    let docs: Vec<Value> = serde_saphyr::from_multiple(yaml).map_err(|e| PlanError::Values {
+        what: format!("{} networkPolicies", component.id),
+        reason: e.to_string(),
+    })?;
+    Ok(docs
+        .into_iter()
+        .filter(|d| !d.is_null())
+        .map(|mut d| {
+            values::merge(
+                &mut d,
+                json!({"metadata": {
+                    "labels": {"app.kubernetes.io/managed-by": MANAGER},
+                    "annotations": {COMPONENT_ANNOTATION: component.id},
+                }}),
+            );
+            d
+        })
+        .collect())
 }
 
 /// The component's Secrets, and the values of its path inputs as (release, path, value).
@@ -1085,7 +1092,7 @@ fn inputs(component: &Component, choices: &Choices<'_>) -> Result<Inputs, PlanEr
                 .and_then(|g| g.get(&input.name))
                 .cloned()
                 .or_else(|| input.default.clone())
-                .or_else(|| known_input(id, &input.name, choices.facts));
+                .or_else(|| known_input(input));
             let release = input
                 .release
                 .clone()
@@ -1107,11 +1114,6 @@ fn inputs(component: &Component, choices: &Choices<'_>) -> Result<Inputs, PlanEr
             }
         }
     }
-    for (_, name, release, path) in INSTALLER_INPUTS.iter().filter(|(c, ..)| *c == id) {
-        if let Some(value) = given.and_then(|g| g.get(*name)) {
-            paths.push(((*release).to_owned(), (*path).to_owned(), value.clone()));
-        }
-    }
     Ok((secrets, paths))
 }
 
@@ -1128,16 +1130,10 @@ fn privileged(component: &Component, choices: &Choices<'_>) -> Option<String> {
             .unwrap_or(false);
         return agent.then(|| format!("{id}: its node agent mounts host paths and runs as root"));
     }
-    PRIVILEGED
-        .iter()
-        .find(|(c, _)| c == id)
-        .map(|(c, reason)| format!("{c}: {reason}"))
-        .or_else(|| {
-            component
-                .security
-                .privileged
-                .then(|| format!("{id} is privileged"))
-        })
+    component
+        .security
+        .privileged
+        .then(|| format!("{id}: {}", component.security.summary.trim()))
 }
 
 /// Why a component's namespaces need the `baseline` Pod Security level, if they do.
@@ -1156,7 +1152,7 @@ fn server_files(
     chosen: &BTreeSet<&str>,
     facts: &Facts,
     node_name: &str,
-    zot_cluster_ip: Option<&str>,
+    registry: Option<&RegistryPlan>,
 ) -> Vec<HostFile> {
     let distribution = config.distribution;
     let mut files = distribution.server_files(&cluster::Options {
@@ -1166,29 +1162,35 @@ fn server_files(
     });
     files.push(distribution.node_name_file(node_name));
     files.extend(distribution.node_ip_file(&facts.node_ips));
-    files.extend(zot_cluster_ip.map(|ip| distribution.registries_file(ip)));
+    files.extend(
+        registry
+            .and_then(|r| Some(distribution.registries_file(&r.host, r.cluster_ip.as_deref()?))),
+    );
     files
 }
 
-/// zot's fixed `ClusterIP`: the configured `cluster-ip` input, else [`cluster::ZOT_CLUSTER_IP`].
-/// `None` when Zeabur Builder is not chosen, or its catalog release takes no such input.
-pub(crate) fn zot_cluster_ip(
+/// The registry a chosen component serves, with its fixed `ClusterIP`: the configured input, else
+/// [`cluster::REGISTRY_CLUSTER_IP`].
+pub(crate) fn registry(
     index: &Index,
     inputs: &BTreeMap<String, BTreeMap<String, Value>>,
     chosen: &BTreeSet<&str>,
-) -> Option<String> {
-    let component = index
-        .component(BUILDER)
-        .filter(|_| chosen.contains(BUILDER))?;
-    let input = component
-        .inputs
-        .iter()
-        .find(|i| i.name == ZOT_CLUSTER_IP_INPUT)?;
-    let given = inputs
-        .get(BUILDER)
-        .and_then(|g| g.get(&input.name))
-        .and_then(Value::as_str);
-    Some(given.unwrap_or(cluster::ZOT_CLUSTER_IP).to_owned())
+) -> Option<RegistryPlan> {
+    let (component, registry) = index.registry(chosen)?;
+    let cluster_ip = component.cluster_ip_input().map(|input| {
+        inputs
+            .get(&component.id)
+            .and_then(|g| g.get(&input.name))
+            .and_then(Value::as_str)
+            .unwrap_or(cluster::REGISTRY_CLUSTER_IP)
+            .to_owned()
+    });
+    Some(RegistryPlan {
+        component: component.id.clone(),
+        host: registry.host.clone(),
+        cluster_ip,
+        ca: secret_ref(&registry.ca),
+    })
 }
 
 /// A `HelmChart` in `kube-system`, labelled as the installer's.
@@ -1327,7 +1329,7 @@ pub fn policy_sources(policy: &Value) -> BTreeSet<String> {
 ///
 /// Traffic comes in from its own pods, from the installer's other namespaces (labelled
 /// [`BASELINE_LABEL`]; the ingress and the metrics collectors among them) and from the other
-/// nodes (kube-apiserver calling webhooks, containerd pulling from zot).
+/// nodes (kube-apiserver calling webhooks, containerd pulling from the registry).
 #[must_use]
 pub fn network_policy(namespace: &str, node_addresses: &[String]) -> Value {
     let mut from = vec![
@@ -1351,47 +1353,6 @@ pub fn network_policy(namespace: &str, node_addresses: &[String]) -> Value {
             "labels": {"app.kubernetes.io/managed-by": MANAGER},
         },
         "spec": {"podSelector": {}, "policyTypes": ["Ingress"], "ingress": [{"from": from}]},
-    })
-}
-
-/// The `NetworkPolicy` that lets Zeabur Builder reach zot on its port.
-///
-/// The baseline policy of zot's namespace would refuse them: buildkitd pushes, the controller
-/// deletes the repositories of deleted Builds, and a build's Job in a project namespace fetches its
-/// archive source. Other pods in a project namespace cannot reach zot, so a compromised app cannot
-/// pull the images of other projects. Only an admin can set the project label on a Namespace. A
-/// person who can create Pods in a project namespace can set the build Job's label on a Pod.
-#[must_use]
-pub fn zot_builder_policy() -> Value {
-    json!({
-        "apiVersion": "networking.k8s.io/v1",
-        "kind": "NetworkPolicy",
-        "metadata": {
-            "name": "zeabur-installer-zot-builder",
-            "namespace": "zot",
-            "labels": {"app.kubernetes.io/managed-by": MANAGER},
-        },
-        "spec": {
-            "podSelector": {"matchLabels": {"app.kubernetes.io/name": "zot"}},
-            "policyTypes": ["Ingress"],
-            "ingress": [{
-                "from": [
-                    {
-                        "namespaceSelector": {"matchLabels": {"kubernetes.io/metadata.name": "builder-system"}},
-                        "podSelector": {"matchLabels": {"app.kubernetes.io/name": "buildkitd"}},
-                    },
-                    {
-                        "namespaceSelector": {"matchLabels": {"kubernetes.io/metadata.name": "builder-system"}},
-                        "podSelector": {"matchLabels": {"app.kubernetes.io/name": "zeabur-builder"}},
-                    },
-                    {
-                        "namespaceSelector": {"matchLabels": {"zeabur.com/project": "true"}},
-                        "podSelector": {"matchExpressions": [{"key": BUILD_RUN_LABEL, "operator": "Exists"}]},
-                    },
-                ],
-                "ports": [{"port": 5000, "protocol": "TCP"}],
-            }],
-        },
     })
 }
 
@@ -1583,7 +1544,7 @@ fn zeabur_values(
 mod tests {
     use super::*;
 
-    const INDEX: &str = include_str!("../fixtures/index.json");
+    const INDEX: &str = include_str!(concat!(env!("ZEABUR_CATALOG_RELEASE"), "/index.json"));
 
     fn config(extra: &str) -> Config {
         Config::parse(&format!(
@@ -1602,7 +1563,6 @@ mod tests {
             host_hex: "a1b2c3".to_owned(),
             memory_mib: 8192,
             node_ips: vec!["10.0.0.5".to_owned()],
-            node_prefix: Some(24),
         }
     }
 
@@ -1610,8 +1570,11 @@ mod tests {
         plan.components.iter().map(|c| c.id.as_str()).collect()
     }
 
+    const SECURE: &str =
+        "enable: [runtime-security, vulnerability-scanning, intrusion-prevention]\n";
+
     #[test]
-    fn standard_follows_the_catalog_and_leaves_out_components_of_another_distribution() {
+    fn defaults_follow_the_catalog_and_leave_out_components_of_another_distribution() {
         let mut index = Index::parse(INDEX.as_bytes()).unwrap();
         for component in &mut index.components {
             if component.id == "node-updates/system-upgrade-controller" {
@@ -1796,19 +1759,15 @@ mod tests {
     #[test]
     fn plans_are_deterministic() {
         let index = Index::parse(INDEX.as_bytes()).unwrap();
-        let a =
-            serde_json::to_string(&plan(&index, &config("preset: secure\n"), &facts()).unwrap())
-                .unwrap();
-        let b =
-            serde_json::to_string(&plan(&index, &config("preset: secure\n"), &facts()).unwrap())
-                .unwrap();
+        let a = serde_json::to_string(&plan(&index, &config(SECURE), &facts()).unwrap()).unwrap();
+        let b = serde_json::to_string(&plan(&index, &config(SECURE), &facts()).unwrap()).unwrap();
         assert_eq!(a, b);
     }
 
     #[test]
     fn crowdsec_contributes_to_traefik_and_generates_its_secrets() {
         let index = Index::parse(INDEX.as_bytes()).unwrap();
-        let plan = plan(&index, &config("preset: secure\n"), &facts()).unwrap();
+        let plan = plan(&index, &config(SECURE), &facts()).unwrap();
         let traefik = plan
             .components
             .iter()
@@ -1842,39 +1801,43 @@ mod tests {
     }
 
     #[test]
-    fn minimal_and_disabling_a_dependency() {
+    fn zeabur_needs_ingress_certificates_and_metrics_server() {
         let index = Index::parse(INDEX.as_bytes()).unwrap();
-        let p = plan(&index, &config("preset: minimal\n"), &facts()).unwrap();
         assert_eq!(
-            ids(&p),
-            [
-                "ingress/traefik",
-                "certificates/cert-manager",
-                "metrics/metrics-server"
-            ]
+            select::required(&index, "single-node"),
+            BTreeSet::from(
+                [
+                    "ingress/traefik",
+                    "certificates/cert-manager",
+                    "metrics/metrics-server"
+                ]
+                .map(str::to_owned)
+            )
         );
         let err = plan(&index, &config("disable: [ingress]\n"), &facts()).unwrap_err();
         assert!(matches!(err, PlanError::NeedsDisabled { .. }), "{err}");
     }
 
-    fn zot_values(plan: &Plan) -> String {
-        let zot = plan.components.iter().find(|c| c.id == BUILDER).unwrap();
-        zot.releases
+    fn registry_values(plan: &Plan) -> String {
+        let id = &plan.registry.as_ref().unwrap().component;
+        let component = plan.components.iter().find(|c| c.id == *id).unwrap();
+        component
+            .releases
             .iter()
-            .find_map(|release| match release {
+            .filter_map(|release| match release {
                 ReleasePlan::HelmChart { object, .. } => {
                     object["spec"]["valuesContent"].as_str().map(str::to_owned)
                 }
                 ReleasePlan::Manifests { .. } | ReleasePlan::Urls { .. } => None,
             })
-            .unwrap()
+            .collect()
     }
 
     #[test]
-    fn nodes_pull_from_builders_zot_through_its_fixed_address() {
+    fn nodes_pull_from_the_registry_through_its_fixed_address() {
         let index = Index::parse(INDEX.as_bytes()).unwrap();
         let without = plan(&index, &config("disable: [builds]\n"), &facts()).unwrap();
-        assert_eq!(without.zot_cluster_ip, None);
+        assert_eq!(without.registry, None);
         let k3s = Distribution::K3s;
         assert!(
             !without
@@ -1883,29 +1846,41 @@ mod tests {
         );
 
         let with = plan(&index, &config(""), &facts()).unwrap();
+        let registry = with.registry.clone().unwrap();
         assert_eq!(
-            with.zot_cluster_ip.as_deref(),
-            Some(cluster::ZOT_CLUSTER_IP)
+            registry.cluster_ip.as_deref(),
+            Some(cluster::REGISTRY_CLUSTER_IP)
         );
-        assert!(zot_values(&with).contains(r#""clusterIP":"10.43.0.50""#));
+        assert!(registry_values(&with).contains(r#""clusterIP":"10.43.0.50""#));
         let registries = with
             .host_files
             .iter()
             .find(|f| f.path == k3s.layout().registries_file)
             .unwrap();
-        assert_eq!(registries, &k3s.registries_file(cluster::ZOT_CLUSTER_IP));
+        assert_eq!(
+            registries,
+            &k3s.registries_file(&registry.host, cluster::REGISTRY_CLUSTER_IP)
+        );
+        assert!(registries.content.contains(&registry.host));
 
+        let input = index
+            .component(&registry.component)
+            .and_then(|c| Some(c.cluster_ip_input()?.name.clone()))
+            .unwrap();
         let chosen = plan(
             &index,
-            &config(
-                "inputs:\n  builds/zeabur-builder:\n    \
-                 cluster-ip: 10.43.7.7\n",
-            ),
+            &config(&format!(
+                "inputs:\n  {}:\n    {input}: 10.43.7.7\n",
+                registry.component
+            )),
             &facts(),
         )
         .unwrap();
-        assert_eq!(chosen.zot_cluster_ip.as_deref(), Some("10.43.7.7"));
-        assert!(zot_values(&chosen).contains(r#""clusterIP":"10.43.7.7""#));
+        assert_eq!(
+            chosen.registry.as_ref().unwrap().cluster_ip.as_deref(),
+            Some("10.43.7.7")
+        );
+        assert!(registry_values(&chosen).contains(r#""clusterIP":"10.43.7.7""#));
     }
 
     #[test]
@@ -2122,15 +2097,15 @@ mod tests {
     }
 
     #[test]
-    fn zeabur_trusts_zots_ca_only_when_builder_is_installed() {
+    fn zeabur_reads_images_from_the_registry_only_when_one_is_installed() {
         let index = Index::parse(INDEX.as_bytes()).unwrap();
         let without = plan(&index, &config("disable: [builds]\n"), &facts()).unwrap();
         assert!(without.zeabur.unwrap().values.get("builds").is_none());
         let with = plan(&index, &config(""), &facts()).unwrap();
-        assert_eq!(
-            with.zeabur.unwrap().values["builds"]["caBundle"]["configMap"],
-            REGISTRY_CA_CONFIGMAP
-        );
+        let host = with.registry.clone().unwrap().host;
+        let builds = &with.zeabur.unwrap().values["builds"];
+        assert_eq!(builds["registry"], host.as_str());
+        assert_eq!(builds["caBundle"]["configMap"], REGISTRY_CA_CONFIGMAP);
     }
 
     #[test]
@@ -2152,31 +2127,28 @@ mod tests {
     }
 
     #[test]
-    fn zot_admits_builder_and_build_jobs_on_its_port() {
-        let policy = zot_builder_policy();
-        let rule = &policy["spec"]["ingress"][0];
-        let builder = json!({"kubernetes.io/metadata.name": "builder-system"});
-        let from = rule["from"].as_array().unwrap();
-        for pods in ["buildkitd", "zeabur-builder"] {
-            assert!(
-                from.contains(&json!({
-                    "namespaceSelector": {"matchLabels": builder},
-                    "podSelector": {"matchLabels": {"app.kubernetes.io/name": pods}},
-                })),
-                "{pods}"
+    fn a_components_network_policies_are_the_installers_and_go_with_it() {
+        let index = Index::parse(INDEX.as_bytes()).unwrap();
+        let plan = plan(&index, &config(""), &facts()).unwrap();
+        let policies: Vec<&Value> = plan
+            .components
+            .iter()
+            .flat_map(|c| &c.network_policies)
+            .collect();
+        assert_ne!(policies, Vec::<&Value>::new());
+        for policy in policies {
+            assert_eq!(policy["kind"], "NetworkPolicy");
+            assert_eq!(
+                policy["metadata"]["labels"]["app.kubernetes.io/managed-by"],
+                MANAGER
             );
+            let id = policy["metadata"]["annotations"][COMPONENT_ANNOTATION]
+                .as_str()
+                .unwrap();
+            let component = index.component(id).unwrap();
+            let namespace = policy["metadata"]["namespace"].as_str().unwrap();
+            assert!(component.releases.iter().any(|r| r.namespace == namespace));
         }
-        assert!(from.contains(&json!({
-            "namespaceSelector": {"matchLabels": {"zeabur.com/project": "true"}},
-            "podSelector": {"matchExpressions": [{"key": BUILD_RUN_LABEL, "operator": "Exists"}]},
-        })));
-        assert!(
-            from.iter().all(|peer| peer.get("ipBlock").is_none()
-                && peer.get("namespaceSelector").is_some()
-                && peer.get("podSelector").is_some()),
-            "every peer names its namespaces and its pods"
-        );
-        assert_eq!(rule["ports"], json!([{"port": 5000, "protocol": "TCP"}]));
     }
 
     #[test]
@@ -2252,6 +2224,7 @@ mod tests {
                 &facts(),
                 pins,
                 &BTreeSet::new(),
+                None,
                 &mut BTreeMap::new(),
                 &mut Vec::new(),
             )
@@ -2311,7 +2284,7 @@ mod tests {
     }
 
     #[test]
-    fn the_standard_preset_fits_a_4_gib_server_without_a_warning() {
+    fn the_defaults_fit_a_4_gib_server_without_a_warning() {
         let index = Index::parse(INDEX.as_bytes()).unwrap();
         let mut host = facts();
         host.memory_mib = 3379;
@@ -2338,22 +2311,5 @@ mod tests {
             node_sources(&nodes),
             ["10.42.1.0", "10.42.8.64", "fd00:42:1::"]
         );
-    }
-
-    #[test]
-    fn ipv4_network_is_the_interface_subnet() {
-        assert_eq!(
-            ipv4_network("192.0.2.168", Some(24)).as_deref(),
-            Some("192.0.2.0/24")
-        );
-        assert_eq!(
-            ipv4_network("192.0.2.121", Some(20)).as_deref(),
-            Some("192.0.0.0/20")
-        );
-        assert_eq!(
-            ipv4_network("10.0.0.5", None).as_deref(),
-            Some("10.0.0.5/32")
-        );
-        assert_eq!(ipv4_network("fd00::6", Some(64)), None);
     }
 }

@@ -209,16 +209,7 @@ export const en = {
   // Components
   "components.title": "Choose components",
   "components.description":
-    "Start from a preset, then add or remove components. What a component needs is added with it.",
-  "components.preset": "Preset",
-  "preset.minimal": "Minimal",
-  "preset.standard": "Standard",
-  "preset.secure": "Hardened",
-  "presetHint.minimal": "Ingress, certificates and metrics-server: what Zeabur needs to run.",
-  "presetHint.standard":
-    "Everything the catalog recommends for one server, plus Zeabur Builder for Git builds, image updates and PostgreSQL.",
-  "presetHint.secure":
-    "Standard, plus runtime threat detection, vulnerability scanning and intrusion prevention.",
+    "The components installed by default are already checked. Add or remove any; what a component needs is added with it.",
   "components.chosen": (n: number) => `${plural(n, "component", "components")} chosen`,
   "components.needed": "Needed by another component",
   "components.privileged": "Privileged",
@@ -359,10 +350,10 @@ export const en = {
   "review.leftOut": "Left out",
   "review.leftOutItem": (name: string, reason: string) => `${name} (${reason})`,
   "review.privileged": (n: number) => `Privileged: ${n}`,
-  "review.fromPreset": (n: number) => `${n} from the preset`,
+  "review.byDefault": (n: number) => `${n} installed by default`,
   "review.added": (n: number) => `${n} added by you`,
   "review.needed": (n: number) => `${n} needed by other components`,
-  "review.group.preset": "From the preset",
+  "review.group.default": "Installed by default",
   "review.group.enabled": "Added by you",
   "review.group.dependency": "Needed by other components",
   "review.group.leftOut": "Left out",

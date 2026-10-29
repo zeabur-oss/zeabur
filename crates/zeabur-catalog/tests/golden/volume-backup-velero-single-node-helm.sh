@@ -19,11 +19,25 @@ cat > velero-values.yaml <<'ZEABUR_VALUES'
 # Pinned by digest; a tag alone can move.
 image:
   repository: docker.io/velero/velero
-  tag: v1.18.2@sha256:37396519f399536e5f01427d723565ae69294ec3fb5625cf1c87c09eaa9de16b
+  tag: v1.18.4@sha256:c89fb5b6d1fd6afd368e0f483e6f5555fd62851a1eada8ac5c72482e674ca17b
+# The chart sets no security context; the namespace enforces Pod Security restricted.
+# The image runs as the name cnb, so runAsNonRoot needs its numeric ids from /etc/passwd.
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1002
+  runAsGroup: 1000
+  seccompProfile: {type: RuntimeDefault}
+# Pod Security restricted requires both settings.
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  capabilities: {drop: [ALL]}
 initContainers:
   # AWS plugin covers any S3-compatible store; v1.14.x matches Velero 1.18.
   - name: velero-plugin-for-aws
     image: velero/velero-plugin-for-aws:v1.14.4@sha256:c85a7fa803569e3128c33e4f5766f84ab156c8d171c9f1dd2715581d45ce98fa
+    securityContext:
+      allowPrivilegeEscalation: false
+      capabilities: {drop: [ALL]}
     volumeMounts:
       - mountPath: /target
         name: plugins

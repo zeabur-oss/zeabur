@@ -38,6 +38,9 @@ pub struct Component {
     pub license: String,
     /// Why the catalogue chose it.
     pub description: String,
+    /// What it gives the cluster, in one sentence, by language tag (`en`, `zh-TW`, `zh-CN`);
+    /// `en` is always there.
+    pub summary: BTreeMap<String, String>,
     /// Whether the catalogue installs it by default, per profile (`single-node`, `multi-node`):
     /// `recommended` or `optional`.
     pub defaults: BTreeMap<String, String>,
@@ -131,8 +134,16 @@ struct File {
 struct Metadata {
     name: String,
     description: String,
+    summary: String,
+    #[serde(default)]
+    locales: BTreeMap<String, Summary>,
     license: String,
     homepage: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct Summary {
+    summary: String,
 }
 
 /// Why the catalogue could not be read.
@@ -166,6 +177,16 @@ pub fn catalogue() -> Result<Vec<Component>, CatalogueError> {
                 homepage: file.metadata.homepage,
                 license: file.metadata.license,
                 description: file.metadata.description.trim().to_owned(),
+                summary: {
+                    let mut summary: BTreeMap<String, String> = file
+                        .metadata
+                        .locales
+                        .into_iter()
+                        .map(|(lang, l)| (lang, l.summary.trim().to_owned()))
+                        .collect();
+                    summary.insert("en".to_owned(), file.metadata.summary.trim().to_owned());
+                    summary
+                },
                 defaults: file.defaults,
                 distributions: file.distributions,
                 tested_version: tested_version(&file.releases, &file.detection),

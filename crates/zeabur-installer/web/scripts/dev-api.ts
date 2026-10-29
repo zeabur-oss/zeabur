@@ -54,8 +54,12 @@ const log = (fail: boolean, personal: boolean) => {
 }
 
 const memoryMib = host === "small" ? 1536 : host === "medium" ? 3793 : 5836
-const buildsMinMib = 1800
-const builder = "builds/zeabur-builder"
+// The component a personal install offers only with enough memory, as the catalog says.
+const gated: { id: string; personalMinMemoryMib: number } = JSON.parse(
+  fixture("state.json"),
+).catalog.components.find((c: { personalMinMemoryMib: number | null }) => c.personalMinMemoryMib)
+const builder = gated.id
+const buildsMinMib = gated.personalMinMemoryMib
 
 // The captured server has 5836 MiB; the plan and the state follow ZEABUR_DEMO_HOST.
 function state(): string {

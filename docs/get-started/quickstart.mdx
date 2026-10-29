@@ -104,17 +104,13 @@ This requires no DNS configuration. A certificate authority created on the serve
 
 ## 3. Choose components
 
-Under “Choose components,” select a “Preset,” then select or clear individual components as needed.
+Under “Choose components,” the components installed by default are already selected. Select or clear individual components as needed.
 
-![“Choose components” showing presets, the component list, and a memory estimate](../images/shots/installer-components.avif)
+![“Choose components” showing the component list and a memory estimate](../images/shots/installer-components.avif)
 
-| Preset | Includes |
-| --- | --- |
-| “Minimal” | Ingress, certificates, and metrics-server |
-| “Standard” | The components the catalog recommends for a single server, plus Zeabur Builder (with zot), image updates (Keel), and PostgreSQL (CloudNativePG); this is the default |
-| “Hardened” | “Standard” plus runtime threat detection, vulnerability scanning, and intrusion prevention |
+By default, the installer installs the components the catalog recommends for a single server, plus Zeabur Builder (with zot), image updates (Keel), and PostgreSQL (CloudNativePG). For a more hardened server, also select runtime threat detection, vulnerability scanning, and intrusion prevention.
 
-With “Standard,” you can deploy apps from images or Git and create PostgreSQL databases right after installation. Zeabur Builder builds in a privileged buildkitd, so a build that escapes its sandbox reaches the node; give only admins access to the builder-system and zot namespaces. If you don't need Git deploys, clear Zeabur Builder in the component list.
+With the default components, you can deploy apps from images or Git and create PostgreSQL databases right after installation. Zeabur Builder builds in a privileged buildkitd, so a build that escapes its sandbox reaches the node; give only admins access to the builder-system and zot namespaces. If you don't need Git deploys, clear Zeabur Builder in the component list.
 
 Some components need settings before you can continue. For example, Velero asks for the S3 endpoint, bucket, region, and access keys, and the installer writes the credentials file Velero needs.
 

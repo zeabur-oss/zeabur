@@ -5,8 +5,8 @@ access:
   identity: login.example.com
   zeabur: zeabur.example.com
 
-# minimal | standard (default) | secure
-preset: standard
+# Added to the default components.
+enable: [runtime-security, vulnerability-scanning, intrusion-prevention]
 
 host:
   # Extra names for the Kubernetes API certificate, to reach it from your laptop.

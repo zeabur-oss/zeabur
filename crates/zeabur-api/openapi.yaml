@@ -6801,6 +6801,7 @@ components:
       - homepage
       - license
       - description
+      - summary
       - defaults
       - distributions
       properties:
@@ -6836,6 +6837,15 @@ components:
         license:
           type: string
           description: Its licence (SPDX).
+        summary:
+          type: object
+          description: |-
+            What it gives the cluster, in one sentence, by language tag (`en`, `zh-TW`, `zh-CN`);
+            `en` is always there.
+          additionalProperties:
+            type: string
+          propertyNames:
+            type: string
     ComponentUpgrade:
       type: string
       description: The installed version against the tested one. An open set.

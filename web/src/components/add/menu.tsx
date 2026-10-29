@@ -19,7 +19,7 @@ import { useT, type Translate } from "@/i18n"
 import { openAdd, type AddWhat } from "@/lib/adding"
 import { engineName, engineOperator, engines, type Engine } from "@/model/databases"
 import { gitNeeds } from "@/model/git-service"
-import { needed, OBJECT_STORAGE, type Needed } from "@/model/installer"
+import { needed, type Needed } from "@/model/installer"
 import type { Gate } from "@/model/rights"
 import { Button } from "@zeabur/design-system/components/button"
 import {
@@ -74,7 +74,7 @@ function useObjectStorageChoice(project: string | undefined, capabilities: Capab
   const gate = useGates(project)("changeObjectStorage")
   const state = useQuery({ ...objectStorageQuery(project ?? ""), enabled: !!project }).data?.state
   if (!gate.open || (state !== "installed" && state !== "not-installed")) return undefined
-  return { installed: state === "installed", operator: needed(OBJECT_STORAGE, capabilities) }
+  return { installed: state === "installed", operator: needed("object-storage", capabilities) }
 }
 
 /** "Deploy from Git": open, or closed by the person's role or by what the cluster lacks. */

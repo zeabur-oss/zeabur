@@ -12,7 +12,6 @@ The web interface saves its choices to this same file. For installation through 
 This example uses your own domains. Both DNS names must point to the server, and port `80` must be reachable from the internet so Let's Encrypt can complete HTTP-01 validation.
 
 ```yaml title="/etc/zeabur-installer/config.yaml"
-preset: minimal
 profile: single-node
 access:
   mode: domain
@@ -31,10 +30,9 @@ host:
 | `use` | `team` | `team` is for teams. Set `personal` for personal use; see [Configuration for personal use](#configuration-for-personal-use) for supported fields |
 | `distribution` | `k3s` | `k3s` or `rke2`. See [`distribution` and versions](#distribution-and-versions) |
 | `access` | Required | Domains and certificate mode for the sign-in service and Zeabur |
-| `preset` | `standard` | `minimal`, `standard`, or `secure` |
 | `profile` | `single-node` | `single-node` or `multi-node`; selects the Catalog's component settings for that profile |
-| `enable` | `[]` | Capabilities or full component IDs to add |
-| `disable` | `[]` | Capabilities or full component IDs to exclude |
+| `enable` | `[]` | Capabilities or full component IDs to add to the [default components](#component-selection) |
+| `disable` | `[]` | Capabilities or full component IDs to take out of the default components |
 | `allowDataLoss` | `[]` | Component IDs whose removal you're allowing to delete their data, such as `replicated-storage/longhorn` |
 | `zeabur` | `true` | Install Zeabur Identity and Zeabur. `false` installs only K3s/RKE2 and the selected components |
 | `inputs` | `{}` | Non-secret input values grouped by component ID |
@@ -61,9 +59,13 @@ Both the browser and the server must be able to resolve these two names. Replica
 
 ### Component selection
 
-- `minimal`: ingress, certificates, and metrics-server—the components Zeabur needs to be reachable and show resource usage.
-- `standard`: everything the Catalog recommends for this profile, plus `builds` (Zeabur Builder and zot), `image-updates` (Keel), and `databases/cloudnative-pg`, so you can deploy from images or Git and create PostgreSQL databases right after installation. Zeabur Builder builds in a privileged buildkitd, so a build that escapes its sandbox reaches the node; add `builds` to `disable` if you don't need it.
-- `secure`: `standard` plus runtime detection, vulnerability scanning, and intrusion prevention.
+By default, the installer installs everything the Catalog recommends for this profile, plus `builds` (Zeabur Builder and zot), `image-updates` (Keel), and `databases/cloudnative-pg`, so you can deploy from images or Git and create PostgreSQL databases right after installation. Zeabur Builder builds in a privileged buildkitd, so a build that escapes its sandbox reaches the node; add `builds` to `disable` if you don't need it. Zeabur needs ingress, certificates, and metrics-server to run.
+
+For runtime detection, vulnerability scanning, and intrusion prevention, add them:
+
+```yaml
+enable: [runtime-security, vulnerability-scanning, intrusion-prevention]
+```
 
 `enable` accepts capabilities, such as `runtime-security`, or full component IDs, such as `volume-backup/velero`. A component's dependencies are added with it. If `disable` excludes a component that another component needs, `plan` names both and stops. The `plan` output lists the final components, their installation order, and the reasons for exclusions.
 
@@ -78,9 +80,9 @@ inputs:
 
 The Catalog defines each component's inputs and their types. If a required value is missing, `plan` names the field to add.
 
-The installer fills in `kube-api-cidr` for External Secrets (the subnet containing the node address) and `cluster-ip` for Zeabur Builder (zot's fixed address). A value in `inputs` overrides it.
+The installer fills in `cluster-ip` for Zeabur Builder (zot's fixed address). A value in `inputs` overrides it.
 
-Velero also accepts the installer's own `region` input, the bucket's region. It defaults to `us-east-1`; Cloudflare R2 needs `auto`. The web interface asks for the access key ID and secret access key separately and writes the `credentials` file from them.
+Velero's `region` input is the bucket's region. It defaults to `us-east-1`; Cloudflare R2 needs `auto`. The web interface asks for the access key ID and secret access key separately and writes the `credentials` file from them.
 
 ### `secretFiles`
 
@@ -169,7 +171,7 @@ host:
   tlsSan: [solo.example.com]
 ```
 
-Only the fields in the table below can appear alongside it. `preset`, `profile`, `access`, `zeabur`, `distribution`, `k3sVersion`, `rke2Version`, and `join` aren't accepted.
+Only the fields in the table below can appear alongside it. `profile`, `access`, `zeabur`, `distribution`, `k3sVersion`, `rke2Version`, and `join` aren't accepted.
 
 | Field | Default and purpose |
 |---|---|
@@ -187,7 +189,7 @@ Components use KubeSolo's built-in `local-path` storage class, which stores data
 
 ## Configuration for joining an existing cluster
 
-A top-level `join` tells the installer to treat this machine as a new node joining an existing cluster and install only K3s or RKE2. Only `distribution`, the version field of that distribution (`k3sVersion` or `rke2Version`), `host`, and `sources.imageArchives` can appear alongside it. Fields for creating a cluster, such as `preset` and `access`, aren't accepted.
+A top-level `join` tells the installer to treat this machine as a new node joining an existing cluster and install only K3s or RKE2. Only `distribution`, the version field of that distribution (`k3sVersion` or `rke2Version`), `host`, and `sources.imageArchives` can appear alongside it. Fields for creating a cluster, such as `profile` and `access`, aren't accepted.
 
 Run `zeabur-installer node add` on an existing server to get the complete YAML, then save it on the new host. It includes the token and server settings, so you don't need to assemble them yourself.
 

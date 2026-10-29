@@ -2,8 +2,12 @@ import { describe, expect, test } from "bun:test"
 import { readFileSync } from "node:fs"
 import { resolve } from "node:path"
 
-import { completeLocales } from "@/i18n/component-summaries"
-import { templateSummaries, templateSummary, templateSummaryKey } from "@/i18n/template-summaries"
+import {
+  completeLocales,
+  templateSummaries,
+  templateSummary,
+  templateSummaryKey,
+} from "@/i18n/template-summaries"
 
 /** The embedded catalog's index.json; the Nix dev shell sets the directory. */
 const index = resolve(process.env.ZEABUR_CATALOG_RELEASE ?? "", "index.json")

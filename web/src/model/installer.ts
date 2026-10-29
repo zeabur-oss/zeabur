@@ -8,16 +8,16 @@ export interface Needed {
   name: string
 }
 
-/** Zeabur Builder, which brings zot. */
-export const BUILDER = "builds/zeabur-builder"
-export const KEEL = "image-updates/keel"
-export const OBJECT_STORAGE = "object-storage/seaweedfs-operator"
-
-/** `id` with the catalogue's name for it, else the last part of the id. */
+/** `id` with the catalogue's name for it, else the last part of the id. A bare capability becomes
+ * the component the catalogue offers for it: a recommended one, else the first. */
 export function needed(id: string, capabilities: Schemas["Capability"][] | undefined): Needed {
   const [capability = id, component] = id.split("/")
-  const found = capabilities
-    ?.find((c) => c.name === capability)
-    ?.components.find((c) => c.id === component)
-  return { id, name: found?.displayName ?? component ?? id }
+  const components = capabilities?.find((c) => c.name === capability)?.components ?? []
+  const found = component
+    ? components.find((c) => c.id === component)
+    : (components.find((c) => Object.values(c.defaults).includes("recommended")) ?? components[0])
+  return {
+    id: found ? `${capability}/${found.id}` : id,
+    name: found?.displayName ?? component ?? id,
+  }
 }

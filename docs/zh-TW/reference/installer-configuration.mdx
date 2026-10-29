@@ -1,7 +1,7 @@
 ---
 title: Installer 設定
 description: 查閱建立叢集與加入節點所用的 YAML 欄位、預設值及機密檔案格式。
-source: "53b0286930e6"
+source: "1032006f1802"
 ---
 
 把網域、元件選擇和主機設定寫進 YAML，執行 `zeabur-installer --config config.yaml plan` 先看安裝內容。檔案預設放在 `/etc/zeabur-installer/config.yaml`。欄位用 camelCase，拼錯或多出欄位時，installer 會直接停下。
@@ -13,7 +13,6 @@ source: "53b0286930e6"
 下面的例子用自己的網域。兩個 DNS 名稱都要指向伺服器，外部也要連得到連接埠 `80`，Let's Encrypt 才能完成 HTTP-01 驗證。
 
 ```yaml title="/etc/zeabur-installer/config.yaml"
-preset: minimal
 profile: single-node
 access:
   mode: domain
@@ -32,10 +31,9 @@ host:
 | `use` | `team` | `team` 是團隊用。`personal` 改成自己用，可用的欄位見[自己用的檔案](#自己用的檔案) |
 | `distribution` | `k3s` | `k3s` 或 `rke2`，見[`distribution` 與版本](#distribution-與版本) |
 | `access` | 必填 | 登入服務與 Zeabur 的網域和憑證模式 |
-| `preset` | `standard` | `minimal`、`standard` 或 `secure` |
 | `profile` | `single-node` | `single-node` 或 `multi-node`，選取 Catalog 對應的元件設定 |
-| `enable` | `[]` | 加入 capability 或完整元件 ID |
-| `disable` | `[]` | 排除 capability 或完整元件 ID |
+| `enable` | `[]` | 在[預設元件](#元件選擇)之外加入的 capability 或完整元件 ID |
+| `disable` | `[]` | 從預設元件排除的 capability 或完整元件 ID |
 | `allowDataLoss` | `[]` | 同意移除時連資料一起刪掉的元件 ID，例如 `replicated-storage/longhorn` |
 | `zeabur` | `true` | 安裝 Zeabur Identity 與 Zeabur。`false` 只安裝 K3s/RKE2 與選定元件 |
 | `inputs` | `{}` | 依元件 ID 分組的一般輸入值 |
@@ -62,9 +60,13 @@ host:
 
 ### 元件選擇
 
-- `minimal`：ingress、憑證和 metrics-server，也就是 Zeabur 能連線、能顯示用量所需的元件。
-- `standard`：Catalog 為這個 profile 建議的所有元件，再加上 `builds`（Zeabur Builder 和 zot）、`image-updates`（Keel）和 `databases/cloudnative-pg`，裝完就能用映像檔或 Git 部署，也能建立 PostgreSQL 資料庫。Zeabur Builder 用有特權的 buildkitd 建置，逃出沙箱的建置可以碰到節點；用不到時在 `disable` 加上 `builds`。
-- `secure`：`standard` 再加上執行期偵測、漏洞掃描和入侵防護。
+預設會安裝 Catalog 為這個 profile 建議的所有元件，再加上 `builds`（Zeabur Builder 和 zot）、`image-updates`（Keel）和 `databases/cloudnative-pg`，裝完就能用映像檔或 Git 部署，也能建立 PostgreSQL 資料庫。Zeabur Builder 用有特權的 buildkitd 建置，逃出沙箱的建置可以碰到節點；用不到時在 `disable` 加上 `builds`。Zeabur 要有 ingress、憑證和 metrics-server 才能執行。
+
+想要執行期偵測、漏洞掃描和入侵防護，就加上：
+
+```yaml
+enable: [runtime-security, vulnerability-scanning, intrusion-prevention]
+```
 
 `enable` 可以寫 capability（例如 `runtime-security`）或完整元件 ID（例如 `volume-backup/velero`），相依的元件會一起加入。`disable` 排除了另一個元件需要的元件時，`plan` 會列出兩者並停下。最後裝哪些元件、順序和排除原因，看 `plan` 的輸出。
 
@@ -79,9 +81,9 @@ inputs:
 
 每個元件有哪些 input、型別是什麼，由 Catalog 定義。少了必填值時，`plan` 會指出要補哪個欄位。
 
-External Secrets 的 `kube-api-cidr`（節點位址所在的子網路）和 Zeabur Builder 的 `cluster-ip`（zot 的固定位址），installer 會自己填。要改的話，在 `inputs` 寫上值即可。
+Zeabur Builder 的 `cluster-ip`（zot 的固定位址）由 installer 自己填。要改的話，在 `inputs` 寫上值即可。
 
-Velero 另外接受 installer 自己的 `region` input，也就是儲存貯體的區域，預設 `us-east-1`。Cloudflare R2 要寫 `auto`。網頁介面會分別詢問存取金鑰 ID 和私密存取金鑰，再自己組成 `credentials` 檔。
+Velero 的 `region` input 是儲存貯體的區域，預設 `us-east-1`。Cloudflare R2 要寫 `auto`。網頁介面會分別詢問存取金鑰 ID 和私密存取金鑰，再自己組成 `credentials` 檔。
 
 ### `secretFiles`
 
@@ -170,7 +172,7 @@ host:
   tlsSan: [solo.example.com]
 ```
 
-同一份檔案只能再放下表的欄位，`preset`、`profile`、`access`、`zeabur`、`distribution`、`k3sVersion`、`rke2Version` 和 `join` 都不接受。
+同一份檔案只能再放下表的欄位，`profile`、`access`、`zeabur`、`distribution`、`k3sVersion`、`rke2Version` 和 `join` 都不接受。
 
 | 欄位 | 預設與用途 |
 |---|---|
@@ -188,7 +190,7 @@ host:
 
 ## 加入既有叢集的檔案
 
-頂層有 `join` 時，installer 把這台機器當成要加入的新節點，只安裝 K3s 或 RKE2。同一份檔案只能再放 `distribution`、對應的版本欄位（`k3sVersion` 或 `rke2Version`）、`host` 和 `sources.imageArchives`，不能放 `preset`、`access` 這些建立叢集的欄位。
+頂層有 `join` 時，installer 把這台機器當成要加入的新節點，只安裝 K3s 或 RKE2。同一份檔案只能再放 `distribution`、對應的版本欄位（`k3sVersion` 或 `rke2Version`）、`host` 和 `sources.imageArchives`，不能放 `profile`、`access` 這些建立叢集的欄位。
 
 在既有 server 執行 `zeabur-installer node add` 取得完整 YAML，存到新主機。權杖和 server 設定都在裡面，不用自己拼。
 

@@ -16,10 +16,6 @@ const tight = 0.8
 /** Where leaving components out should bring a plan that is over or tight. */
 const aim: Record<Verdict, number> = { over: 0.9, tight, fits: 1 }
 
-/** What `minimal` installs (select.rs, `MINIMAL`); never suggested for leaving out. */
-const essential = (id: string) =>
-  id.startsWith("ingress/") || id.startsWith("certificates/") || id === "metrics/metrics-server"
-
 export function memoryFit(plan: Plan, catalog: CatalogComponent[]): Fit {
   const { clusterMib, componentsMib, hostMib } = plan.memory
   const used = clusterMib + componentsMib
@@ -48,8 +44,9 @@ function relief(components: PlannedComponent[], catalog: CatalogComponent[], nee
   const byId = new Map(catalog.map((c) => [c.id, c]))
   const needed = new Set(components.flatMap((c) => byId.get(c.id)?.needs ?? []))
   const mib = (c: PlannedComponent) => c.idleMemoryMib ?? 0
+  const essential = (c: PlannedComponent) => byId.get(c.id)?.required ?? false
   const candidates = components.filter(
-    (c) => c.why !== "dependency" && !needed.has(c.id) && !essential(c.id) && mib(c) > 0,
+    (c) => c.why !== "dependency" && !needed.has(c.id) && !essential(c) && mib(c) > 0,
   )
   const optional = (c: PlannedComponent) => byId.get(c.id)?.default === "optional"
   for (const pool of [candidates.filter(optional), candidates]) {

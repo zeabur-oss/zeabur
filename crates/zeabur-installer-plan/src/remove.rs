@@ -15,8 +15,7 @@ use std::collections::BTreeSet;
 use serde::Serialize;
 
 use crate::catalog::{Component, Index};
-use crate::cluster::ZOT_HOST;
-use crate::plan::{BUILDER, COMPONENT_ANNOTATION, ComponentPlan, MANAGER, Warning, warning};
+use crate::plan::{COMPONENT_ANNOTATION, ComponentPlan, MANAGER, Warning, warning};
 use crate::storage::LONGHORN;
 
 /// The leftover that means the chart's volumes stay.
@@ -28,10 +27,6 @@ const RELEASE_NAME: &str = "meta.helm.sh/release-name";
 const RELEASE_NAMESPACE: &str = "meta.helm.sh/release-namespace";
 /// The annotation with which `helm uninstall` keeps an object.
 const RESOURCE_POLICY: &str = "helm.sh/resource-policy";
-/// Components whose custom resources are their own output, not something that uses them.
-const OUTPUT_ONLY: &[&str] = &["vulnerability-scanning/trivy-operator"];
-/// Longhorn's CSI driver.
-const LONGHORN_DRIVER: &str = "driver.longhorn.io";
 /// The Longhorn setting its uninstall job reads; the job fails while it is `false`.
 const LONGHORN_CONFIRMATION: &str = "deleting-confirmation-flag";
 
@@ -75,6 +70,9 @@ pub struct Removal {
     pub confirmed: bool,
     /// `kubectl` arguments run before the `HelmChart` objects are deleted.
     pub prepare: Vec<Vec<String>>,
+    /// CRDs whose objects it writes itself, so they are not something that uses it.
+    #[serde(skip)]
+    pub internal_crds: Vec<String>,
 }
 
 impl Removal {
@@ -85,14 +83,12 @@ impl Removal {
             return;
         }
         self.leftovers.retain(|l| l != CRDS);
-        if !OUTPUT_ONLY.contains(&self.id.as_str()) {
-            for crd in &crds {
-                let check = InUse::Objects {
-                    resource: crd.clone(),
-                };
-                if !self.in_use.contains(&check) {
-                    self.in_use.push(check);
-                }
+        for crd in crds.iter().filter(|crd| !self.internal_crds.contains(crd)) {
+            let check = InUse::Objects {
+                resource: crd.clone(),
+            };
+            if !self.in_use.contains(&check) {
+                self.in_use.push(check);
             }
         }
         self.deleted_crds = crds;
@@ -262,29 +258,26 @@ fn removal(component: &Component, installed: &[Installed], allow_data_loss: &[St
             namespaces.push(release.namespace.clone());
         }
     }
-    let in_use = if id == LONGHORN {
-        vec![InUse::Volumes {
-            driver: LONGHORN_DRIVER.to_owned(),
-        }]
-    } else if OUTPUT_ONLY.contains(&id) {
-        Vec::new()
-    } else {
-        let mut in_use: Vec<InUse> = component
+    let mut in_use: Vec<InUse> = component
+        .in_use_crds()
+        .map(|crd| InUse::Objects {
+            resource: crd.clone(),
+        })
+        .collect();
+    in_use.extend(
+        component
             .detection
-            .crds
+            .csi_drivers
             .iter()
-            .map(|crd| InUse::Objects {
-                resource: crd.clone(),
-            })
-            .collect();
-        // Zeabur Builder's zot goes with it.
-        if id == BUILDER {
-            in_use.push(InUse::Images {
-                registry: ZOT_HOST.to_owned(),
-            });
-        }
-        in_use
-    };
+            .map(|driver| InUse::Volumes {
+                driver: driver.clone(),
+            }),
+    );
+    if let Some(registry) = &component.provides.registry {
+        in_use.push(InUse::Images {
+            registry: registry.host.clone(),
+        });
+    }
     let loses_data = component.persists_data && !component.leftovers.iter().any(|l| l == VOLUMES);
     let confirmed = allow_data_loss.iter().any(|a| a == id);
     let prepare = if id == LONGHORN && confirmed {
@@ -328,6 +321,7 @@ fn removal(component: &Component, installed: &[Installed], allow_data_loss: &[St
         loses_data,
         confirmed,
         prepare,
+        internal_crds: component.internal_crds.clone(),
     }
 }
 
@@ -339,7 +333,7 @@ mod tests {
     use crate::config::Config;
     use crate::plan::{Facts, plan};
 
-    const INDEX: &str = include_str!("../fixtures/index.json");
+    const INDEX: &str = include_str!(concat!(env!("ZEABUR_CATALOG_RELEASE"), "/index.json"));
 
     fn index() -> Index {
         Index::parse(INDEX.as_bytes()).unwrap()
@@ -359,7 +353,6 @@ mod tests {
             host_hex: "a1b2c3".to_owned(),
             memory_mib: 8192,
             node_ips: Vec::new(),
-            node_prefix: None,
         };
         plan(&index(), &config, &facts).unwrap().components
     }
@@ -414,18 +407,20 @@ mod tests {
 
     #[test]
     fn a_component_left_out_is_removed_before_what_it_needs() {
-        let before = planned("preset: minimal\nenable: [metrics/victoria-metrics]\n");
-        let after = planned("preset: minimal\n");
+        let before = planned("");
+        let after = planned("disable: [metrics/victoria-metrics, logs, observability-operator]\n");
         let (removals, _) = removals(&index(), &after, &installed(&before), "single-node", &[]);
         let ids: Vec<&str> = removals.iter().map(|r| r.id.as_str()).collect();
         assert_eq!(
-            ids,
-            [
-                "metrics/victoria-metrics",
-                "observability-operator/victoria-metrics-operator"
-            ]
+            ids.last(),
+            Some(&"observability-operator/victoria-metrics-operator"),
+            "{ids:?}"
         );
-        let metrics = &removals[0];
+        assert!(ids.contains(&"metrics/victoria-metrics"), "{ids:?}");
+        let metrics = removals
+            .iter()
+            .find(|r| r.id == "metrics/victoria-metrics")
+            .unwrap();
         assert_ne!(metrics.helm_charts, Vec::<String>::new());
         assert!(metrics.leftovers.iter().any(|l| l == VOLUMES));
         assert!(!metrics.loses_data);
@@ -441,12 +436,9 @@ mod tests {
         assert!(longhorn.loses_data);
         assert!(longhorn.refusal().unwrap().contains("allowDataLoss"));
         assert_eq!(longhorn.prepare, Vec::<Vec<String>>::new());
-        assert_eq!(
-            longhorn.in_use,
-            [InUse::Volumes {
-                driver: LONGHORN_DRIVER.to_owned()
-            }]
-        );
+        assert!(longhorn.in_use.contains(&InUse::Volumes {
+            driver: "driver.longhorn.io".to_owned()
+        }));
 
         let allowed = removals(
             &index(),
@@ -465,6 +457,22 @@ mod tests {
         );
         longhorn.used_by = vec!["PersistentVolume pvc-1 (claim shop/data)".to_owned()];
         assert!(longhorn.refusal().unwrap().contains("pvc-1"));
+    }
+
+    #[test]
+    fn reports_an_operator_writes_are_not_use() {
+        let before = planned("enable: [vulnerability-scanning]\n");
+        let after = planned("");
+        let removals = removals(&index(), &after, &installed(&before), "single-node", &[]).0;
+        let mut scanner = removals
+            .into_iter()
+            .find(|r| r.id == "vulnerability-scanning/trivy-operator")
+            .unwrap();
+        assert_eq!(scanner.in_use, []);
+        scanner.delete_crds(vec![
+            "vulnerabilityreports.aquasecurity.github.io".to_owned(),
+        ]);
+        assert_eq!(scanner.in_use, []);
     }
 
     #[test]
@@ -490,14 +498,17 @@ mod tests {
         let before = planned("");
         let after = planned("disable: [builds]\n");
         let removals = removals(&index(), &after, &installed(&before), "single-node", &[]).0;
-        let builder = removals.iter().find(|r| r.id == BUILDER).unwrap();
+        let builder = removals
+            .iter()
+            .find(|r| r.id == "builds/zeabur-builder")
+            .unwrap();
         assert_eq!(builder.helm_charts, ["zot", "builder"]);
         assert_eq!(builder.namespaces, ["zot", "builder-system"]);
         assert!(builder.in_use.contains(&InUse::Objects {
             resource: "builds.builder.zeabur.com".to_owned()
         }));
         assert!(builder.in_use.contains(&InUse::Images {
-            registry: ZOT_HOST.to_owned()
+            registry: "zot.zot.svc:5000".to_owned()
         }));
         assert!(!builder.loses_data);
     }

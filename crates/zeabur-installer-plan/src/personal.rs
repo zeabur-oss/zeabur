@@ -1,25 +1,25 @@
 //! The plan of a personal install: `KubeSolo`, the standalone helm-controller and the components.
 //!
-//! There is no Zeabur panel or Zeabur Identity. Zeabur Builder, with its zot, is an option. The
-//! person runs `zeaburctl ui` on their own computer with the admin kubeconfig. Nothing is isolated:
-//! `KubeSolo`'s bridge CNI enforces no `NetworkPolicy`, there is one admin and one node. The plan
-//! makes no network policies, and every object it makes is one `kubectl apply` can make and
-//! `kubectl delete` can remove without the installer.
+//! There is no Zeabur panel or Zeabur Identity. Zeabur Builder, with its registry, is an option.
+//! The person runs `zeaburctl ui` on their own computer with the admin kubeconfig. Nothing is
+//! isolated: `KubeSolo`'s bridge CNI enforces no `NetworkPolicy`, there is one admin and one node.
+//! The plan makes no network policies, and every object it makes is one `kubectl apply` can make
+//! and `kubectl delete` can remove without the installer.
 
 use std::collections::BTreeMap;
 
 use serde::Serialize;
 
-use crate::catalog::Index;
+use crate::catalog::{Component, Index};
 use crate::cluster::HostFile;
 use crate::config::PersonalConfig;
 use crate::pins::{HELM_CONTROLLER, KUBECTL, KUBESOLO};
 use crate::plan::{
-    Choices, ComponentPlan, Download, Facts, Memory, Namespace, Warning, components, idle_memory,
-    warning, zot_cluster_ip,
+    Choices, ComponentPlan, Download, Facts, Memory, Namespace, RegistryPlan, Warning, components,
+    idle_memory, registry, warning,
 };
 use crate::remove::Removal;
-use crate::select::{self, BUILD_CAPABILITIES, PERSONAL_DISTRIBUTION, PERSONAL_PROFILE};
+use crate::select::{self, PERSONAL_DISTRIBUTION, PERSONAL_PROFILE};
 use crate::storage::Storage;
 use crate::{PlanError, kubesolo};
 
@@ -29,9 +29,8 @@ pub const KUBESOLO_IDLE_MIB: u64 = 700;
 /// The least memory a personal install is planned for: a host with 1.5 GiB, less what the kernel
 /// and firmware keep.
 pub const MIN_MEMORY_MIB: u64 = 1400;
-/// The least memory for Zeabur Builder and zot: idle, and one small build. A 1.5 GiB host built
-/// one with 221 MiB to spare, so a 2 GiB host leaves room for an app next to it.
-pub const BUILDS_MIN_MEMORY_MIB: u64 = 1800;
+/// Memory left for an app while a component works on top of its idle use.
+pub const APP_ROOM_MIB: u64 = 600;
 
 /// The whole plan of a personal install.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -64,8 +63,9 @@ pub struct PersonalPlan {
     /// Installed components no longer planned; `apply` fills it from the cluster
     /// ([`crate::remove`]).
     pub removals: Vec<Removal>,
-    /// zot's fixed `ClusterIP`, when zot is installed: containerd pulls its images through it.
-    pub zot_cluster_ip: Option<String>,
+    /// The in-cluster registry, when a chosen component serves one: containerd pulls its images
+    /// through its fixed `ClusterIP`.
+    pub registry: Option<RegistryPlan>,
     /// The storage class: `KubeSolo`'s local-path.
     pub storage: Storage,
     /// Idle memory: `KubeSolo` plus the measured components.
@@ -116,41 +116,44 @@ fn helm_controller() -> HelmControllerPlan {
     }
 }
 
-/// Takes Zeabur Builder, with its zot, out of the selection on a host with too little memory.
-fn leave_out_builds(index: &Index, selection: &mut select::Selection, memory_mib: u64) {
-    if memory_mib >= BUILDS_MIN_MEMORY_MIB {
-        return;
-    }
+/// A component's idle memory on `KubeSolo`, else on a single node.
+fn idle_memory_mib(component: &Component, arch: &str) -> Option<u64> {
+    component
+        .idle_memory_mib(PERSONAL_DISTRIBUTION, arch)
+        .or_else(|| component.idle_memory_mib(PERSONAL_PROFILE, arch))
+}
+
+/// The least host memory a personal install needs for a component that uses memory on top of its
+/// idle use while working: `KubeSolo`, the component idle and at work, and room for an app.
+#[must_use]
+pub fn min_memory_mib(component: &Component, arch: &str) -> Option<u64> {
+    let work = component.resources.work_memory_mib?;
+    Some(KUBESOLO_IDLE_MIB + idle_memory_mib(component, arch).unwrap_or(0) + work + APP_ROOM_MIB)
+}
+
+/// Takes out of the selection the components that need more memory than the host has.
+fn leave_out_short_of_memory(index: &Index, selection: &mut select::Selection, facts: &Facts) {
+    let needs = |id: &str| {
+        index
+            .component(id)
+            .and_then(|c| min_memory_mib(c, &facts.arch))
+            .filter(|&mib| facts.memory_mib < mib)
+    };
     let (kept, dropped): (Vec<_>, Vec<_>) = std::mem::take(&mut selection.components)
         .into_iter()
-        .partition(|(id, _)| {
-            !index
-                .component(id)
-                .is_some_and(|c| BUILD_CAPABILITIES.contains(&c.capability.as_str()))
-        });
+        .partition(|(id, _)| needs(id).is_none());
     selection.components = kept;
     for (id, _) in dropped {
-        selection
-            .left_out
-            .insert(id, format!("needs {BUILDS_MIN_MEMORY_MIB} MiB of memory"));
+        if let Some(mib) = needs(&id) {
+            selection
+                .left_out
+                .insert(id, format!("needs {mib} MiB of memory"));
+        }
     }
 }
 
-/// Computes the plan of a personal install.
-///
-/// # Errors
-///
-/// When the architecture has no release, the selection fails or a required input is missing.
-pub fn plan(
-    index: &Index,
-    config: &PersonalConfig,
-    facts: &Facts,
-) -> Result<PersonalPlan, PlanError> {
-    let node_name = crate::node_name::choose(config.host.node_name.as_deref(), facts, &[])?;
-    let arch = facts.arch.as_str();
-    let no_release = || PlanError::Arch(arch.to_owned());
-    let archive = KUBESOLO.archive(arch).ok_or_else(no_release)?;
-    let kubectl = KUBECTL.binary(arch).ok_or_else(no_release)?;
+/// What a personal install warns about whatever is chosen.
+fn warnings(index: &Index) -> Vec<Warning> {
     let mut warnings = vec![warning(
         "personal.isolation",
         &[],
@@ -174,23 +177,38 @@ pub fn plan(
             ),
         ));
     }
+    warnings
+}
 
+/// Computes the plan of a personal install.
+///
+/// # Errors
+///
+/// When the architecture has no release, the selection fails or a required input is missing.
+pub fn plan(
+    index: &Index,
+    config: &PersonalConfig,
+    facts: &Facts,
+) -> Result<PersonalPlan, PlanError> {
+    let node_name = crate::node_name::choose(config.host.node_name.as_deref(), facts, &[])?;
+    let arch = facts.arch.as_str();
+    let no_release = || PlanError::Arch(arch.to_owned());
+    let archive = KUBESOLO.archive(arch).ok_or_else(no_release)?;
+    let kubectl = KUBECTL.binary(arch).ok_or_else(no_release)?;
+    let mut warnings = warnings(index);
     let mut selection = select::select_personal(index, config)?;
-    leave_out_builds(index, &mut selection, facts.memory_mib);
+    leave_out_short_of_memory(index, &mut selection, facts);
     let choices = Choices {
         inputs: &config.inputs,
         secret_files: &config.secret_files,
-        facts,
     };
     let (mut components, namespaces) =
         components(index, &selection, &choices, PERSONAL_PROFILE, arch)?;
     for plan in &mut components {
-        if let Some(mib) = index
+        plan.network_policies.clear();
+        plan.idle_memory_mib = index
             .component(&plan.id)
-            .and_then(|c| c.idle_memory_mib(PERSONAL_DISTRIBUTION, arch))
-        {
-            plan.idle_memory_mib = Some(mib);
-        }
+            .and_then(|c| idle_memory_mib(c, arch));
     }
 
     let memory = idle_memory(KUBESOLO_IDLE_MIB, &components, facts.memory_mib);
@@ -216,13 +234,18 @@ pub fn plan(
     }
 
     let chosen = components.iter().map(|c| c.id.as_str()).collect();
-    let zot_cluster_ip = zot_cluster_ip(index, &config.inputs, &chosen);
+    let registry = registry(index, &config.inputs, &chosen);
     let mut host_files = kubesolo::host_files(&kubesolo::Options {
         node_name: node_name.clone(),
         node_ip: facts.node_ips.first().cloned(),
         tls_san: config.host.tls_san.clone(),
     });
-    host_files.extend(zot_cluster_ip.as_deref().map(kubesolo::zot_hosts_file));
+    host_files.extend(registry.as_ref().and_then(|r| {
+        Some(kubesolo::registry_hosts_file(
+            &r.host,
+            r.cluster_ip.as_deref()?,
+        ))
+    }));
     Ok(PersonalPlan {
         use_: "personal",
         facts: facts.clone(),
@@ -240,7 +263,7 @@ pub fn plan(
         components,
         left_out: selection.left_out,
         removals: Vec::new(),
-        zot_cluster_ip,
+        registry,
         storage: Storage {
             default_class: kubesolo::LOCAL_PATH_CLASS.to_owned(),
             other_classes: Vec::new(),
@@ -255,7 +278,7 @@ mod tests {
     use super::*;
     use crate::plan::ReleasePlan;
 
-    const INDEX: &str = include_str!("../fixtures/index.json");
+    const INDEX: &str = include_str!(concat!(env!("ZEABUR_CATALOG_RELEASE"), "/index.json"));
 
     fn facts(memory_mib: u64) -> Facts {
         Facts {
@@ -265,7 +288,6 @@ mod tests {
             host_hex: "a1b2c3".to_owned(),
             memory_mib,
             node_ips: vec!["10.0.0.5".to_owned()],
-            node_prefix: None,
         }
     }
 
@@ -322,31 +344,26 @@ mod tests {
     }
 
     #[test]
-    fn builder_with_its_zot_is_an_option_that_needs_the_memory() {
+    fn a_registry_is_an_option_that_needs_the_memory() {
         let index = Index::parse(INDEX.as_bytes()).unwrap();
         let off = plan(&index, &config(""), &facts(4096)).unwrap();
-        assert!(!ids(&off).contains(&crate::plan::BUILDER) && off.zot_cluster_ip.is_none());
+        assert!(off.registry.is_none());
 
         let on = plan(&index, &config("enable: [builds]\n"), &facts(4096)).unwrap();
-        let chosen = ids(&on);
-        assert!(chosen.contains(&crate::plan::BUILDER), "{chosen:?}");
-        assert_eq!(on.zot_cluster_ip.as_deref(), Some("10.43.0.50"));
-        let hosts = on
-            .host_files
-            .iter()
-            .find(|f| f.path == kubesolo::ZOT_HOSTS_FILE)
-            .unwrap();
-        assert!(hosts.content.contains("https://10.43.0.50:5000"));
+        let registry = on.registry.as_ref().unwrap();
+        assert!(ids(&on).contains(&registry.component.as_str()));
+        let ip = registry.cluster_ip.as_deref().unwrap();
+        let hosts = kubesolo::registry_hosts_file(&registry.host, ip);
+        assert!(on.host_files.contains(&hosts));
+        assert!(hosts.content.contains(&format!("https://{ip}:")));
+        assert!(on.components.iter().all(|c| c.network_policies.is_empty()));
 
-        let small = plan(
-            &index,
-            &config("enable: [builds]\n"),
-            &facts(BUILDS_MIN_MEMORY_MIB - 1),
-        )
-        .unwrap();
-        assert!(!ids(&small).contains(&crate::plan::BUILDER));
-        assert!(small.left_out.contains_key(crate::plan::BUILDER));
-        assert!(small.zot_cluster_ip.is_none());
+        let builder = index.component(&registry.component).unwrap();
+        let needs = min_memory_mib(builder, "arm64").unwrap();
+        let small = plan(&index, &config("enable: [builds]\n"), &facts(needs - 1)).unwrap();
+        assert!(!ids(&small).contains(&registry.component.as_str()));
+        assert!(small.left_out.contains_key(&registry.component));
+        assert!(small.registry.is_none());
     }
 
     #[test]
