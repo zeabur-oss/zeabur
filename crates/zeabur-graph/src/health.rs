@@ -7,11 +7,10 @@
 //! 1. A pod that keeps failing makes the service fail: phase `Failed`; or not ready and not
 //!    succeeded, with a waiting or termination reason that means the container keeps failing
 //!    (`CrashLoopBackOff`, `ImagePullBackOff`, `OOMKilled`, … as `kubectl get pods` shows them);
-//!    or, with no reason given, five restarts or more; or, ready or not, a container that has
-//!    restarted three times or more and whose last run lasted less than ten minutes and ended with
-//!    a non-zero exit code less than ten minutes ago (see [`CRASH_WINDOW`]). While a Deployment's
-//!    update is under way or stuck and some replica is ready, the word is `RolloutStuck`: the
-//!    release before still serves, but the failing pod does not recover on its own.
+//!    or, ready or not, a container the kubelet backs off restarting (see [`crash_looping`]). While
+//!    a Deployment's update is under way or stuck and some replica is ready, the word is
+//!    `RolloutStuck`: the release before still serves, but the failing pod does not recover on its
+//!    own.
 //! 2. Otherwise the workload's [`Phase`] decides: `Failed` and `Degraded` (no replica ready) fail,
 //!    `Progressing` progresses (a Deployment past its progress deadline with a ready replica warns,
 //!    as `RolloutStuck`), and `Paused`, `Suspended`, `Completed` and `Unknown` are idle.
@@ -40,25 +39,9 @@ const FAILING_REASONS: [&str; 9] = [
     "Error",
 ];
 
-/// How long after a crash a container that runs again still counts as failing.
-///
-/// A crash-looping container is ready for a while between runs: the kubelet restarts it with an
-/// exponential back-off and resets the back-off only "if a container has executed for 10
-/// minutes without any problems" [k8s-container-restarts]. A pod that only reads ready in
-/// those moments would make its service flip between failing and healthy, so a crash counts
-/// for the same ten minutes.
-///
-/// The restart count never goes down, and the pod's status keeps only the last run, so that run
-/// must itself have been short: a container that ran for longer than the window before it
-/// crashed had its back-off reset, and one crash after a long run is an incident, not a loop,
-/// however many restarts it gathered before.
-///
-/// [k8s-container-restarts]: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#container-restarts
-const CRASH_WINDOW: SignedDuration = SignedDuration::from_mins(10);
-
-/// Restarts from which a recent crash makes a ready container fail: one crash is an incident,
-/// three are a loop.
-const CRASH_RESTARTS: i32 = 3;
+/// The kubelet resets a container's restart back-off after 600 s without a restart:
+/// <https://github.com/kubernetes/kubernetes/blob/master/pkg/kubelet/kubelet.go> (`crashLoopBackOff.HasExpiredFunc`).
+const BACKOFF_RESET: SignedDuration = SignedDuration::from_secs(600);
 
 /// Whether `pod` keeps failing (rule 1). `now` is when the pod was read; without it a ready pod
 /// never fails.
@@ -73,36 +56,47 @@ pub fn failing(pod: &PodSummary, now: Option<Timestamp>) -> bool {
     if pod
         .container_statuses
         .iter()
-        .any(|status| crashed_recently(status, now))
+        .any(|status| crash_looping(status, now))
     {
         return true;
     }
     if pod.ready {
         return false;
     }
-    pod.reason.as_deref().map_or(pod.restarts >= 5, |reason| {
-        FAILING_REASONS.contains(&reason)
-    })
+    pod.reason
+        .as_deref()
+        .is_some_and(|reason| FAILING_REASONS.contains(&reason))
 }
 
-/// Whether `status` restarted [`CRASH_RESTARTS`] times or more and its last run, shorter than
-/// [`CRASH_WINDOW`], ended with a non-zero exit code less than [`CRASH_WINDOW`] before `now`. A
-/// run with no start time never got going, so it was short.
-fn crashed_recently(status: &ContainerStatusSummary, now: Option<Timestamp>) -> bool {
+/// Whether the kubelet backs off restarting `status`.
+///
+/// It waits in `CrashLoopBackOff`; or it restarted at least twice (so its previous run was itself a
+/// restart), that run lasted less than ten minutes, and the current run is not running yet or
+/// started less than ten minutes before `now`. The exit code and readiness do not count,
+/// as they do not in the kubelet. Missing times count as short runs.
+#[must_use]
+pub fn crash_looping(status: &ContainerStatusSummary, now: Option<Timestamp>) -> bool {
+    if status
+        .waiting
+        .as_ref()
+        .is_some_and(|w| w.reason.as_deref() == Some("CrashLoopBackOff"))
+    {
+        return true;
+    }
     let Some(last) = &status.last_termination else {
         return false;
     };
     let parse = |time: &Option<String>| time.as_deref().and_then(|t| t.parse::<Timestamp>().ok());
-    let (started, finished) = (parse(&last.started), parse(&last.finished));
-    match (now, finished) {
-        (Some(now), Some(finished)) => {
-            status.restarts >= CRASH_RESTARTS
-                && last.exit_code != 0
-                && now.duration_since(finished) < CRASH_WINDOW
-                && started.is_none_or(|started| finished.duration_since(started) < CRASH_WINDOW)
-        }
-        _ => false,
-    }
+    let last_run_short = match (parse(&last.started), parse(&last.finished)) {
+        (Some(started), Some(finished)) => finished.duration_since(started) < BACKOFF_RESET,
+        _ => true,
+    };
+    let current_run_short = match (parse(&status.running_since), now) {
+        (Some(since), Some(now)) => now.duration_since(since) < BACKOFF_RESET,
+        (Some(_), None) => false,
+        (None, _) => true,
+    };
+    status.restarts >= 2 && last_run_short && current_run_short
 }
 
 /// The health of one pod, read at `now` (see [`failing`]).
@@ -144,7 +138,7 @@ pub fn status(
             reason: pod.reason.clone().or_else(|| {
                 pod.container_statuses
                     .iter()
-                    .filter(|status| crashed_recently(status, now))
+                    .filter(|status| crash_looping(status, now))
                     .find_map(|status| status.last_termination.as_ref()?.reason.clone())
             }),
             ..of(Health::Fail, word)
@@ -180,7 +174,9 @@ pub fn status(
 
 #[cfg(test)]
 mod tests {
-    use zeabur_model::{Classification, ContainerTermination, Origin, Provenance, Replicas};
+    use zeabur_model::{
+        Classification, ContainerTermination, ContainerWaiting, Origin, Provenance, Replicas,
+    };
 
     use super::*;
 
@@ -269,11 +265,9 @@ mod tests {
         let mut crashing = running(Some((2, 2)));
         crashing.pods = vec![pod("Running", false, 3, Some("CrashLoopBackOff"))];
         assert_eq!(health(&crashing), Fail);
-        // Not ready without a failing reason: only five restarts make it a failure.
-        crashing.pods = vec![pod("Running", false, 4, None)];
+        // Restarts alone, with no failing reason, do not make it a failure.
+        crashing.pods = vec![pod("Running", false, 9, None)];
         assert_eq!(health(&crashing), Ok);
-        crashing.pods = vec![pod("Running", false, 5, None)];
-        assert_eq!(health(&crashing), Fail);
         crashing.pods = vec![pod("Pending", false, 0, Some("ContainerCreating"))];
         assert_eq!(health(&crashing), Ok);
         crashing.pods = vec![pod("Succeeded", false, 9, Some("Error"))];
@@ -344,24 +338,16 @@ mod tests {
         );
     }
 
-    /// A ready pod whose container `y` restarted `restarts` times and last exited with
-    /// `exit_code`, `ago` before the time of reading, after a run of 30 seconds.
-    fn ready_after_crash(
-        restarts: i32,
-        exit_code: i32,
-        ago: SignedDuration,
-    ) -> (PodSummary, Timestamp) {
-        ready_after_run(restarts, exit_code, ago, SignedDuration::from_secs(30))
-    }
-
-    /// As [`ready_after_crash`], after a run that lasted `ran`.
+    /// A ready pod whose container `y` restarted `restarts` times; its previous run lasted
+    /// `previous` and ended 30 seconds before the current run started, `running` before `now`.
     fn ready_after_run(
         restarts: i32,
-        exit_code: i32,
-        ago: SignedDuration,
-        ran: SignedDuration,
+        previous: SignedDuration,
+        running: SignedDuration,
     ) -> (PodSummary, Timestamp) {
         let now: Timestamp = "2026-10-17T12:00:00Z".parse().unwrap();
+        let since = now.checked_sub(running).unwrap();
+        let finished = since.checked_sub(SignedDuration::from_secs(30)).unwrap();
         let mut ready = pod("Running", true, restarts, None);
         ready.container_statuses = vec![ContainerStatusSummary {
             name: "y".to_owned(),
@@ -369,12 +355,13 @@ mod tests {
             ready: true,
             restarts,
             waiting: None,
+            running_since: Some(since.to_string()),
             terminated: None,
             last_termination: Some(ContainerTermination {
                 reason: Some("Error".to_owned()),
-                exit_code,
-                started: Some(now.checked_sub(ago + ran).unwrap().to_string()),
-                finished: Some(now.checked_sub(ago).unwrap().to_string()),
+                exit_code: 1,
+                started: Some(finished.checked_sub(previous).unwrap().to_string()),
+                finished: Some(finished.to_string()),
                 message: None,
             }),
         }];
@@ -382,36 +369,46 @@ mod tests {
     }
 
     #[test]
-    fn a_ready_pod_fails_while_its_last_crash_is_recent() {
-        let fails = |restarts, exit_code, ago| {
-            let (pod, now) = ready_after_crash(restarts, exit_code, ago);
+    fn a_ready_pod_fails_while_the_kubelet_still_backs_off_its_container() {
+        let secs = SignedDuration::from_secs;
+        let fails = |restarts, previous, running| {
+            let (pod, now) = ready_after_run(restarts, previous, running);
             pod_health(&pod, Some(now)) == Health::Fail
         };
-        let minutes = |m: i64, s: i64| SignedDuration::from_mins(m) + SignedDuration::from_secs(s);
-        assert!(fails(3, 1, minutes(9, 59)));
-        assert!(!fails(3, 1, minutes(10, 1)));
-        assert!(!fails(2, 1, minutes(1, 0)));
-        assert!(fails(5, 137, minutes(1, 0)));
-        // A clean exit is not a crash.
-        assert!(!fails(3, 0, minutes(1, 0)));
-        // Restarts gathered long ago do not make one crash after a long run a loop.
-        let after_run = |ran| {
-            let (pod, now) = ready_after_run(3, 137, minutes(1, 0), ran);
-            pod_health(&pod, Some(now)) == Health::Fail
-        };
-        assert!(after_run(minutes(9, 59)));
-        assert!(!after_run(minutes(10, 1)));
-        assert!(!after_run(SignedDuration::from_hours(24 * 7)));
+        assert!(fails(4, secs(5), secs(35)));
+        assert!(fails(2, secs(5), secs(599)));
+        // The back-off resets after 600 seconds without a restart.
+        assert!(!fails(4, secs(5), secs(601)));
+        // The first restart is immediate, so it is no back-off.
+        assert!(!fails(1, secs(5), secs(35)));
+        // A previous run of 600 seconds or more reset the back-off, however many restarts before.
+        assert!(!fails(7, secs(601), secs(35)));
+        assert!(!fails(7, SignedDuration::from_hours(24 * 7), secs(35)));
+        assert!(fails(7, secs(599), secs(35)));
         // Without the time of reading the kubelet's reasons alone decide.
-        let (pod, _) = ready_after_crash(5, 1, minutes(1, 0));
+        let (pod, _) = ready_after_run(5, secs(5), secs(35));
         assert_eq!(pod_health(&pod, None), Health::Ok);
 
         let mut crashing = service(WorkloadKind::Deployment, Phase::Running, Some((1, 1)));
-        let (pod, now) = ready_after_crash(5, 1, minutes(2, 0));
+        let (pod, now) = ready_after_run(5, secs(5), secs(35));
         crashing.pods = vec![pod];
         let failing = status(&crashing.workload, &crashing.pods, Some(now));
         assert_eq!(failing.health, Health::Fail);
         assert_eq!(failing.word, StatusWord::Failing);
         assert_eq!(failing.reason.as_deref(), Some("Error"));
+    }
+
+    #[test]
+    fn a_container_waiting_in_back_off_is_a_crash_loop_whatever_it_exited_with() {
+        let (mut pod, now) = ready_after_run(1, SignedDuration::from_secs(5), SignedDuration::ZERO);
+        let status = &mut pod.container_statuses[0];
+        status.running_since = None;
+        status.last_termination.as_mut().unwrap().exit_code = 0;
+        assert!(!crash_looping(status, Some(now)));
+        status.waiting = Some(ContainerWaiting {
+            reason: Some("CrashLoopBackOff".to_owned()),
+            message: None,
+        });
+        assert!(crash_looping(status, Some(now)));
     }
 }

@@ -33,13 +33,14 @@ status:
     - name: worker
       image: example/worker:1.0
       imageID: ""
-      ready: true
+      ready: false
       restartCount: 3
       state:
-        running:
-          startedAt: "2026-10-15T11:59:05Z"
+        waiting:
+          reason: CrashLoopBackOff
       lastState:
         terminated:
           reason: Completed
           exitCode: 0
-          finishedAt: "2026-10-15T11:59:00Z"
+          startedAt: "2026-10-29T03:04:00Z"
+          finishedAt: "2026-10-29T03:04:01Z"

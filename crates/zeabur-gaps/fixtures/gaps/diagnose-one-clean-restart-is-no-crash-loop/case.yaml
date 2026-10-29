@@ -1,4 +1,0 @@
-description: A container restarted once after a clean exit (a node reboot) and ready now is not a crash loop.
-operation: gaps.diagnose
-params:
-  now: "2026-10-15T12:00:00Z"

@@ -1,0 +1,16 @@
+[
+  {
+    "kind": "crashLoop",
+    "container": "worker",
+    "pods": ["worker-1"],
+    "cause": {
+      "key": "diagnosis.crashLoop.cause.exitCode",
+      "params": {"container": "worker", "restarts": "4", "exitCode": "1", "reason": "Error"}
+    },
+    "why": {
+      "key": "diagnosis.crashLoop.why.backOff",
+      "params": {"container": "worker", "restarts": "4"}
+    },
+    "lastSeen": "2026-10-29T03:04:05Z"
+  }
+]

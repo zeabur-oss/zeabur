@@ -555,9 +555,8 @@ fn out_of_memory(
     );
 }
 
-/// A long-running container that keeps exiting: restarted at least once, and its previous run
-/// ended recently, or it is not ready, or it waits in `CrashLoopBackOff`. One restart of a
-/// container that is ready now is not a loop, and a clean exit needs two restarts or a back-off.
+/// A container the kubelet backs off restarting (see [`zeabur_graph::crash_looping`]); a single
+/// out-of-memory kill is reported on its own.
 fn crash_loop(
     found: &mut Found,
     service: &Service,
@@ -586,23 +585,23 @@ fn crash_loop(
         .as_ref()
         .is_some_and(|w| w.reason.as_deref() == Some("CrashLoopBackOff"));
     let when = parse(last.finished.as_deref());
-    if status.restarts < 1 || !(backing_off || !status.ready || recent(when, now)) {
+    if status.restarts < 1 {
         return;
     }
     if is_oom(last) {
-        out_of_memory(
-            found,
-            memory_limit(service, &status.name),
-            pod,
-            status,
-            "lastState.terminated",
-            last,
-        );
+        if backing_off || !status.ready || recent(when, now) {
+            out_of_memory(
+                found,
+                memory_limit(service, &status.name),
+                pod,
+                status,
+                "lastState.terminated",
+                last,
+            );
+        }
         return;
     }
-    let once_and_fine =
-        status.restarts < 2 && !backing_off && (last.exit_code == 0 || status.ready);
-    if once_and_fine {
+    if !zeabur_graph::crash_looping(status, now) {
         return;
     }
     let variant = exit_variant(last.exit_code);
@@ -615,8 +614,7 @@ fn crash_loop(
     }
     let fix = Message::new(exit_fix(variant, "diagnosis.crashLoop.fix.logs"))
         .with("container", &status.name);
-    // A clean exit is restarted too, without the waits growing a reason; every other exit is
-    // restarted with the kubelet's back-off [k8s-container-restarts].
+    // The kubelet backs off a clean exit too [k8s-container-restarts]; only the wording differs.
     let why = if variant == "exitsZero" {
         Message::new("diagnosis.crashLoop.why.exitsZero")
     } else {

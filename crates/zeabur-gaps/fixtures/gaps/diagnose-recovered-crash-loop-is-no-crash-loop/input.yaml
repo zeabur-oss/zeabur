@@ -39,12 +39,13 @@ status:
       image: example/worker:1.0
       imageID: ""
       ready: true
-      restartCount: 1
+      restartCount: 6
       state:
         running:
-          startedAt: "2026-10-15T11:59:05Z"
+          startedAt: "2026-10-29T02:40:40Z"
       lastState:
         terminated:
-          reason: Completed
-          exitCode: 0
-          finishedAt: "2026-10-15T11:59:00Z"
+          reason: Error
+          exitCode: 1
+          startedAt: "2026-10-29T02:39:30Z"
+          finishedAt: "2026-10-29T02:40:00Z"

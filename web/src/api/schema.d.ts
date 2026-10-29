@@ -3770,6 +3770,8 @@ export interface components {
        * @description How many times the kubelet restarted it.
        */
       restarts: number
+      /** @description When the current run started, in RFC 3339, when it is running. */
+      runningSince?: string | null
       terminated?: components["schemas"]["ContainerTermination"] | null
       waiting?: components["schemas"]["ContainerWaiting"] | null
     }
