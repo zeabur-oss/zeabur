@@ -15,6 +15,15 @@ metadata:
     pod-security.kubernetes.io/audit: privileged
 
 ---
+# Pods that name no account get no API token.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: default
+  namespace: local-path-storage
+automountServiceAccountToken: false
+
+---
 apiVersion: v1
 kind: ServiceAccount
 metadata:
