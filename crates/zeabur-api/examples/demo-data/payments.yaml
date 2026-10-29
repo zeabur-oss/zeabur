@@ -1,0 +1,360 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: now-28d
+  generation: 4
+  labels:
+    app.kubernetes.io/name: api
+    app.kubernetes.io/part-of: payments
+  name: api
+  namespace: payments
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: api
+  template:
+    metadata:
+      labels:
+        app: api
+    spec:
+      containers:
+        - env: []
+          image: ghcr.io/example/payments:5.0.1
+          name: api
+          ports:
+            - containerPort: 3000
+              name: http
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          resources:
+            limits:
+              memory: 256Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+status:
+  availableReplicas: 2
+  conditions:
+    - reason: ReplicaSetUpdated
+      status: "True"
+      type: Progressing
+  observedGeneration: 4
+  readyReplicas: 2
+  replicas: 3
+  updatedReplicas: 2
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: now-40d
+  generation: 3
+  labels:
+    app.kubernetes.io/name: webhooks
+    app.kubernetes.io/part-of: payments
+  name: webhooks
+  namespace: payments
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: webhooks
+  template:
+    metadata:
+      labels:
+        app: webhooks
+    spec:
+      containers:
+        - env: []
+          image: ghcr.io/example/payments:5.0.0
+          name: webhooks
+          ports:
+            - containerPort: 3000
+              name: http
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          resources:
+            limits:
+              memory: 256Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+status:
+  availableReplicas: 2
+  observedGeneration: 3
+  readyReplicas: 2
+  replicas: 2
+  updatedReplicas: 2
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  creationTimestamp: now-32d
+  labels:
+    app.kubernetes.io/component: database
+    app.kubernetes.io/name: db
+  name: db
+  namespace: payments
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: db
+  serviceName: db
+  template:
+    metadata:
+      labels:
+        app: db
+    spec:
+      containers:
+        - env: []
+          image: postgres:18
+          name: db
+          resources:
+            limits:
+              memory: 1Gi
+            requests:
+              cpu: 250m
+              memory: 512Mi
+          volumeMounts:
+            - mountPath: /data
+              name: data
+  volumeClaimTemplates:
+    - apiVersion: v1
+      kind: PersistentVolumeClaim
+      metadata:
+        name: data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 20Gi
+status:
+  readyReplicas: 1
+  replicas: 1
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-19h55m
+  labels:
+    app: api
+  name: api-6f5d4-a8b2c
+  namespace: payments
+  ownerReferences: []
+spec:
+  containers:
+    - image: example
+      name: api
+  nodeName: vps-3
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: api
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-20h4m
+  labels:
+    app: api
+  name: api-6f5d4-d4e6f
+  namespace: payments
+  ownerReferences: []
+spec:
+  containers:
+    - image: example
+      name: api
+  nodeName: vps-1
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: api
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-20h20m
+  labels:
+    app: api
+  name: api-6f5d4-g7h9j
+  namespace: payments
+  ownerReferences: []
+spec:
+  containers:
+    - image: example
+      name: api
+  nodeName: vps-1
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: api
+      ready: false
+      restartCount: 0
+      state:
+        waiting:
+          reason: ContainerCreating
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-1d5h33m
+  labels:
+    app: webhooks
+  name: webhooks-8c2e1-k5l7m
+  namespace: payments
+  ownerReferences: []
+spec:
+  containers:
+    - image: example
+      name: webhooks
+  nodeName: vps-3
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: webhooks
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-1d5h41m
+  labels:
+    app: webhooks
+  name: webhooks-8c2e1-n3p6q
+  namespace: payments
+  ownerReferences: []
+spec:
+  containers:
+    - image: example
+      name: webhooks
+  nodeName: vps-3
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: webhooks
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-5h21m
+  labels:
+    app: db
+  name: db-0
+  namespace: payments
+  ownerReferences:
+    - apiVersion: apps/v1
+      controller: true
+      kind: StatefulSet
+      name: db
+      uid: 00000000-0000-0000-0000-000000000000
+spec:
+  containers:
+    - image: example
+      name: db
+  nodeName: vps-3
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: db
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api
+  namespace: payments
+spec:
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+  selector:
+    app: api
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: webhooks
+  namespace: payments
+spec:
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+  selector:
+    app: webhooks
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: db
+  namespace: payments
+spec:
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432
+  selector:
+    app: db
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: api
+  namespace: payments
+spec:
+  rules:
+    - host: pay.example.com
+      http:
+        paths:
+          - backend:
+              service:
+                name: api
+                port:
+                  name: http
+            path: /
+            pathType: Prefix
+  tls:
+    - hosts:
+        - pay.example.com
+      secretName: api-tls
+status:
+  loadBalancer:
+    ingress:
+      - ip: 203.0.113.10

@@ -1,0 +1,357 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: now-28d
+  generation: 3
+  labels:
+    app.kubernetes.io/name: api
+    app.kubernetes.io/part-of: billing
+  name: api
+  namespace: billing
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: api
+  template:
+    metadata:
+      labels:
+        app: api
+    spec:
+      containers:
+        - env: []
+          image: ghcr.io/example/billing:3.2.0
+          name: api
+          ports:
+            - containerPort: 3000
+              name: http
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          resources:
+            limits:
+              memory: 256Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+status:
+  availableReplicas: 2
+  observedGeneration: 3
+  readyReplicas: 2
+  replicas: 2
+  updatedReplicas: 2
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  creationTimestamp: now-32d
+  labels:
+    app.kubernetes.io/component: database
+    app.kubernetes.io/name: db
+  name: db
+  namespace: billing
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: db
+  serviceName: db
+  template:
+    metadata:
+      labels:
+        app: db
+    spec:
+      containers:
+        - env: []
+          image: postgres:18
+          name: db
+          resources:
+            limits:
+              memory: 1Gi
+            requests:
+              cpu: 250m
+              memory: 512Mi
+          volumeMounts:
+            - mountPath: /data
+              name: data
+  volumeClaimTemplates:
+    - apiVersion: v1
+      kind: PersistentVolumeClaim
+      metadata:
+        name: data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 20Gi
+status:
+  readyReplicas: 1
+  replicas: 1
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  creationTimestamp: now-12d7h
+  name: invoice-run-29342880
+  namespace: billing
+  ownerReferences:
+    - apiVersion: batch/v1
+      controller: true
+      kind: CronJob
+      name: invoice-run
+      uid: 00000000-0000-0000-0000-000000000000
+spec:
+  backoffLimit: 0
+  template:
+    spec:
+      containers:
+        - image: ghcr.io/example/billing:3.2.0
+          name: invoice-run
+      restartPolicy: Never
+status:
+  conditions:
+    - message: Job has reached the specified backoff limit
+      reason: BackoffLimitExceeded
+      status: "True"
+      type: Failed
+  failed: 1
+  startTime: now-12d7h
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  annotations:
+    cronjob.kubernetes.io/instantiate: manual
+  creationTimestamp: now-12d23h45m
+  name: invoice-run-manual-1013091500
+  namespace: billing
+  ownerReferences:
+    - apiVersion: batch/v1
+      controller: true
+      kind: CronJob
+      name: invoice-run
+      uid: 00000000-0000-0000-0000-000000000000
+spec:
+  backoffLimit: 0
+  template:
+    spec:
+      containers:
+        - image: ghcr.io/example/billing:3.2.0
+          name: invoice-run
+      restartPolicy: Never
+status:
+  completionTime: now-12d23h43m48s
+  conditions:
+    - status: "True"
+      type: Complete
+  startTime: now-12d23h45m
+  succeeded: 1
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  labels:
+    zeabur.com/task-of: api
+  name: invoice-run
+  namespace: billing
+  uid: 00000000-0000-0000-0000-000000000000
+spec:
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+            - args:
+                - invoices
+                - --run
+              image: ghcr.io/example/billing:3.2.0
+              name: invoice-run
+          restartPolicy: Never
+  schedule: 0 2 * * *
+status:
+  lastScheduleTime: now-12d7h
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-20h31m
+  labels:
+    app: api
+  name: api-5b7d9-c3v8n
+  namespace: billing
+  ownerReferences: []
+spec:
+  containers:
+    - image: example
+      name: api
+  nodeName: vps-3
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: api
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-20h40m
+  labels:
+    app: api
+  name: api-5b7d9-m1x4q
+  namespace: billing
+  ownerReferences: []
+spec:
+  containers:
+    - image: example
+      name: api
+  nodeName: vps-1
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: api
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-5h21m
+  labels:
+    app: db
+  name: db-0
+  namespace: billing
+  ownerReferences:
+    - apiVersion: apps/v1
+      controller: true
+      kind: StatefulSet
+      name: db
+      uid: 00000000-0000-0000-0000-000000000000
+spec:
+  containers:
+    - image: example
+      name: db
+  nodeName: vps-3
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: db
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-1d11h19m
+  labels:
+    app: invoice-run
+  name: invoice-run-29342880-7xk2p
+  namespace: billing
+  ownerReferences:
+    - apiVersion: batch/v1
+      controller: true
+      kind: Job
+      name: invoice-run-29342880
+      uid: 00000000-0000-0000-0000-000000000000
+spec:
+  containers:
+    - image: example
+      name: invoice-run
+  nodeName: vps-3
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: invoice-run
+      ready: false
+      restartCount: 0
+      state:
+        terminated:
+          exitCode: 1
+          reason: Error
+  phase: Failed
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api
+  namespace: billing
+spec:
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+  selector:
+    app: api
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: db
+  namespace: billing
+spec:
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432
+  selector:
+    app: db
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: api
+  namespace: billing
+spec:
+  rules:
+    - host: billing.example.com
+      http:
+        paths:
+          - backend:
+              service:
+                name: api
+                port:
+                  name: http
+            path: /
+            pathType: Prefix
+  tls:
+    - hosts:
+        - billing.example.com
+      secretName: api-tls
+status:
+  loadBalancer:
+    ingress:
+      - ip: 203.0.113.10
+---
+apiVersion: events.k8s.io/v1
+kind: Event
+action: BackoffLimitExceeded
+deprecatedCount: 1
+eventTime: now-33m
+metadata:
+  name: i1
+  namespace: billing
+note: Job has reached the specified backoff limit
+reason: BackoffLimitExceeded
+regarding:
+  apiVersion: v1
+  kind: Job
+  name: invoice-run-29342880
+  namespace: billing
+reportingController: kubelet
+reportingInstance: node-1
+type: Warning

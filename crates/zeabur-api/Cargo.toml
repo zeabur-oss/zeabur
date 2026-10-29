@@ -47,6 +47,11 @@ tracing.workspace = true
 utoipa.workspace = true
 utoipa-axum.workspace = true
 
+[[example]]
+name = "demo"
+# The tests check that demo-data/ parses into Kubernetes types.
+test = true
+
 [dev-dependencies]
 # A fake GitHub's App key in the GitHub App tests.
 aws-lc-rs.workspace = true
