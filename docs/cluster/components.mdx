@@ -120,7 +120,7 @@ If the exported manifest starts with instructions to disable a built-in version,
 - RKE2: For metrics-server, add `rke2-metrics-server` to `disable` in `/etc/rancher/rke2/config.yaml`. For Traefik, set `ingress-controller: none` in the same file. Then restart `rke2-server`.
 
 <Callout type="warn">
-Disabling the built-in Traefik deletes its CRDs and all IngressRoute and Middleware objects. Ingress traffic will be interrupted until the replacement component starts. Disabling the built-in metrics-server makes the metrics API unavailable until the new version starts. Schedule the switch for a time when an interruption is acceptable.
+Disabling the built-in Traefik deletes its CRDs and all IngressRoute and Middleware objects. Ingress traffic stops until the replacement component starts. Disabling the built-in metrics-server makes the metrics API unavailable until the new version starts. Schedule the switch for a time when an interruption is acceptable.
 </Callout>
 
 ## Common failures

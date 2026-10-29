@@ -93,7 +93,7 @@ On RKE2, etcd needs a majority of servers to operate. To keep running with one s
 
 ### Reboot only
 
-Select **Stop scheduling** from the node menu. The node row will show that scheduling has stopped. This prevents new replicas from being scheduled on the node. Existing replicas stay where they are. If you're only rebooting, this is enough. You don't need to run `drain`.
+Select **Stop scheduling** from the node menu. The node row shows that scheduling has stopped, and no new replicas are scheduled on the node. Existing replicas stay where they are. If you're only rebooting, this is enough. You don't need to run `drain`.
 
 You can also click **Open kubectl terminal** next to the heading on Zeabur's **Cluster** page and run:
 
@@ -126,7 +126,7 @@ kubectl drain <node> --ignore-daemonsets --delete-emptydir-data
 - `--delete-emptydir-data` clears the `emptyDir` scratch data of evicted replicas.
 - Replicas using this node's `local-path` volumes are also evicted. Recreated replicas can't use these volumes on other nodes and remain `Pending` until the original node returns. `drain` doesn't delete the data. For these replicas, the result is the same as taking the node down directly: they must wait for it to return.
 
-If Zeabur itself runs on this node, the page will disconnect for about a minute during `drain`. Refresh the page and sign in again. The kubectl terminal will also disconnect, so you'll need to reopen it.
+If Zeabur itself runs on this node, the page disconnects for about a minute during `drain`. Refresh the page and sign in again. The kubectl terminal also disconnects; reopen it.
 
 Wait for `drain` to finish before taking the node down for maintenance.
 
@@ -169,7 +169,7 @@ Next, sign in to the removed VM and run these as `root`, using the uninstall scr
 zeabur-installer uninstall --purge
 ```
 
-**After deleting the Kubernetes node, you must also complete the uninstall on the VM.** Until you uninstall it, the VM will rejoin the cluster whenever `k3s-agent` or RKE2 restarts.
+**After deleting the Kubernetes node, you must also complete the uninstall on the VM.** Until you do, the VM rejoins the cluster whenever `k3s-agent` or RKE2 restarts.
 
 Volumes under `/var/lib/zeabur/storage` remain on the VM. Delete them manually only after confirming you no longer need the data.
 

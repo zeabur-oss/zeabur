@@ -13,7 +13,7 @@ source: "8bcee534d268"
 ## 开始之前
 
 - Zeabur 已安装在集群中。用 `zeaburctl ui` 在本机运行时，Zeabur 不保存配置，名称沿用 kubeconfig 中的集群名称，用量历史需要用 `--metrics-service` 指定。
-- 你有权限更新 Zeabur 所在 Namespace（默认为 `zeabur`）中的 ConfigMap `zeabur-settings`，首次配置时还需要有权限创建它。
+- 你有权限更新 Zeabur 所在 Namespace（默认为 `zeabur`）中的 ConfigMap `zeabur-settings`，首次配置时还需要有权限创建这个 ConfigMap。
 
 ## 修改集群名称
 
@@ -49,7 +49,7 @@ source: "8bcee534d268"
 | **没有权限** | 你没有权限通过 Kubernetes API 读取这个 Service。 |
 | **没有响应** | Service 存在，但没有响应 Prometheus API 查询。 |
 
-能直接读取存储服务的人可以看到所有项目的指标，因此只应向有权限查看整个集群的人开放。改用其他存储服务后，Zeabur Proxy 不会读取它，项目成员将看不到用量历史，只有能直接读取的人才能看到。点击**改回默认**，即可恢复安装时的配置。
+能直接读取存储服务的人可以看到所有项目的指标，因此只应向有权限查看整个集群的人开放。改用其他存储服务后，Zeabur Proxy 不会读取新的存储服务，项目成员将看不到用量历史，只有能直接读取的人才能看到。点击**改回默认**，即可恢复安装时的配置。
 
 ## 配置新服务的域名
 

@@ -19,7 +19,7 @@ source: "f17da6de99a6"
 | 起因 | 判断方式 | 影响范围 |
 | --- | --- | --- |
 | Ingress 控制器（Traefik 或 ingress-nginx）没有就绪的副本 | 带有 `app.kubernetes.io/name: traefik` 等 label 的工作负载需要副本，但没有任何副本就绪 | 这个 IngressClass 的所有域名 |
-| cert-manager 没有就绪的副本 | cert-manager 的控制器或 webhook 没有就绪的副本 | 向它申请证书的 Ingress，证书无法签发或续期 |
+| cert-manager 没有就绪的副本 | cert-manager 的控制器或 webhook 没有就绪的副本 | 向 cert-manager 申请证书的 Ingress，证书无法签发或续期 |
 | 集群 DNS 没有就绪的副本 | 带有 `k8s-app: kube-dns` 的工作负载 | 通过名称调用其他服务的服务 |
 | metrics-server 没有就绪的副本 | 带有 `app.kubernetes.io/name: metrics-server` 的工作负载 | 用量数据和自动扩缩停止 |
 | 节点未就绪或不再上报状态 | 节点的 `Ready` 状态为 `False` 或 `Unknown` | 在该节点上运行副本的服务 |
@@ -48,7 +48,7 @@ Zeabur 读取 kubelet 上报的容器状态、副本调度状态、工作负载�
 - 缺少机密变量或配置文件，或缺少其中的某个键，导致无法创建容器。
 - 没有节点具备足够资源，副本无法调度。
 - ResourceQuota 或 Pod Security 拒绝创建副本。
-- 有人通过名称连接此服务，但没有 Service 选中它的副本；Service 的 `targetPort` 与容器端口不符；Service 没有就绪的副本。
+- 有人通过名称连接此服务，但没有 Service 选中此服务的副本；Service 的 `targetPort` 与容器端口不符；Service 没有就绪的副本。
 
 只统计最近的失败：容器正常运行超过 10 分钟后，就不再列出此前的重启，与 kubelet 重置退避时间的规则一致。找不到已知原因时，页面会显示第一个未就绪的副本卡在哪里、最新一条事件，以及还有多少个副本正在提供服务。
 

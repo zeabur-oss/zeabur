@@ -8,7 +8,7 @@ source: "4120d54b32d6"
 
 ## 開始之前
 
-- 叢集裝了 Zeabur Builder，也就是有 `builder-system` Namespace。沒有的話，Zeabur 會說 Zeabur Builder 沒有安裝。
+- 叢集裝了 Zeabur Builder，也就是有 `builder-system` Namespace。沒有安裝時，Zeabur 會說 Zeabur Builder 沒有安裝。
 - 你能在 `builder-system` 寫入 Secret 和 ConfigMap，一般只有叢集管理員可以。
 - 你能在 GitHub 建立 App。要建在組織底下，你要是那個組織的擁有者。
 
@@ -25,7 +25,7 @@ source: "4120d54b32d6"
 | --- | --- |
 | **在 GitHub 上的名稱** | 預設是「Zeabur」加上叢集名稱，最多 34 個字元，不能和 GitHub 上其他 App 同名。 |
 | **組織** | 留空就建在你自己的帳號下。 |
-| **Webhook 網址** | `https://` 開頭。Zeabur Builder 有開 Webhook 接收器才需要填。沒填的話，Zeabur Builder 每分鐘去 GitHub 看一次有沒有新提交。 |
+| **Webhook 網址** | `https://` 開頭。Zeabur Builder 有開 Webhook 接收器才需要填。沒填時，Zeabur Builder 每分鐘去 GitHub 檢查一次有沒有新提交。 |
 
 ![建立 GitHub App 的表單，有在 GitHub 上的名稱、組織和 Webhook 網址，按前往 GitHub 繼續](../images/shots/github-app-create.avif)
 
@@ -34,18 +34,18 @@ source: "4120d54b32d6"
 
 ### 到 GitHub 建立後存回 Zeabur
 
-按**前往 GitHub**，在 GitHub 確認建立。這個 App 不公開，權限只有讀取儲存庫內容、寫入提交狀態。有填 Webhook 網址時，它也會收到 push 事件。
+按**前往 GitHub**，在 GitHub 確認建立。這個 App 不公開，權限只有讀取儲存庫內容、寫入提交狀態。填了 Webhook 網址時，App 也會收到 push 事件。
 
 GitHub 會把你帶回 Zeabur 的**完成 GitHub App 設定**。檢查要寫入的機密變數（私密金鑰不會顯示），按**儲存 GitHub App**。從按下**建立 GitHub App** 算起，一小時內要完成這一步。
 
-叢集已經有 App 時，新的會取代它。用舊 App 建置的服務，要等你把新 App 開放給它們的專案，才會再抓到新提交。
+叢集已經有 App 時，新 App 會取代舊的。用舊 App 建置的服務，要等你把新 App 開放給這些服務的專案，才會再抓到新提交。
 
 </Step>
 <Step>
 
 ### 安裝到放儲存庫的帳號
 
-按**安裝到 GitHub**，在 GitHub 選帳號或組織，再選**所有儲存庫**或指定的儲存庫。回到 Zeabur，**已安裝的帳號**會列出它。
+按**安裝到 GitHub**，在 GitHub 選帳號或組織，再選**所有儲存庫**或指定的儲存庫。回到 Zeabur，**已安裝的帳號**會列出這個帳號。
 
 ![叢集的 GitHub 分頁，已安裝的帳號 acme 和 bob，各寫出開放給哪些專案](../images/shots/github-app-installed.avif)
 
@@ -73,7 +73,7 @@ GitHub 會把你帶回 Zeabur 的**完成 GitHub App 設定**。檢查要寫入�
 
 ## 用 kubectl 做同樣的事
 
-Zeabur Builder 從 `builder-system` 的 Secret `github-app` 讀 App 的金鑰。這些值在 GitHub 的 App 設定頁都找得到，私密金鑰要在那裡產生並下載。用 GitHub Enterprise Server 時，再加一個 `api-url` 鍵，寫它的 API 網址。annotation 只是讓 Zeabur 連到 App 的頁面。
+Zeabur Builder 從 `builder-system` 的 Secret `github-app` 讀 App 的金鑰。這些值在 GitHub 的 App 設定頁都找得到，私密金鑰要在那裡產生並下載。用 GitHub Enterprise Server 時，再加一個 `api-url` 鍵，寫 Enterprise Server 的 API 網址。annotation 只是讓 Zeabur 連到 App 的頁面。
 
 ```yaml
 apiVersion: v1
@@ -106,7 +106,7 @@ data:
   "87654321": shop, blog
 ```
 
-Zeabur 另外會在每個開放的專案寫一個 ConfigMap `zeabur-github-app`（label `zeabur.com/github-app: "true"`），記下當時讀得到的儲存庫，讓沒有權限讀 `builder-system` 的成員也能挑儲存庫。Zeabur Builder 不讀它，用 kubectl 設定時可以不寫，只是畫面上的清單會是空的，要自己填儲存庫網址。
+Zeabur 另外會在每個開放的專案寫一個 ConfigMap `zeabur-github-app`（label `zeabur.com/github-app: "true"`），記下當時讀得到的儲存庫，讓沒有權限讀 `builder-system` 的成員也能挑儲存庫。Zeabur Builder 不讀這個 ConfigMap，用 kubectl 設定時可以不寫，只是畫面上的清單會是空的，要自己填儲存庫網址。
 
 服務的 Build 用 `spec.source.githubApp.installationId` 指定安裝：
 
@@ -137,7 +137,7 @@ spec:
 
 - **GitHub App** 區塊顯示 App 名稱和**在 GitHub 上開啟**，**已安裝的帳號**列出帳號和開放的專案。
 - `kubectl -n builder-system get secret github-app` 和 `kubectl -n builder-system get configmap github-app-installations -o yaml` 都找得到，ConfigMap 有你的安裝 ID。
-- 從私有儲存庫部署的服務，**建置**分頁的第一次建置成功。`kubectl -n shop get build web` 也看得到它的狀態。
+- 從私有儲存庫部署的服務，**建置**分頁的第一次建置成功。`kubectl -n shop get build web` 也看得到建置狀態。
 
 ## 遇到問題
 
@@ -160,4 +160,4 @@ kubectl -n builder-system delete configmap github-app-installations
 kubectl delete configmap -A -l zeabur.com/github-app=true
 ```
 
-用 App 建置的服務會留著，跑的是最後一次建置的映像檔，之後不會再建置新提交。要繼續建置，把它改成部署金鑰或存取權杖，見[從 Git 建置並部署服務](../deploy/git.mdx)。
+用 App 建置的服務會留著，執行的是最後一次建置的映像檔，之後不會再建置新提交。要繼續建置，把服務改用部署金鑰或存取權杖，見[從 Git 建置並部署服務](../deploy/git.mdx)。

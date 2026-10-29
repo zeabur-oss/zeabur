@@ -4,7 +4,7 @@ description: 查閱 zeabur-installer 的規劃、安裝、健康檢查、加入�
 source: "9c36b7d3c51e"
 ---
 
-先用 `plan` 看設定會建立什麼，再以 root 執行 `apply`。安裝中斷時，修正原因後用同一份設定重跑 `apply`，每個步驟會先看現況，只補上缺少或不同的部分。
+先用 `plan` 看設定會建立什麼，再以 root 執行 `apply`。安裝中斷時，修正原因後用同一份設定再執行一次 `apply`，每個步驟會先看現況，只補上缺少或不同的部分。
 
 用網頁介面安裝見[在一台伺服器安裝 Zeabur](../get-started/quickstart.mdx)，用設定檔和指令安裝見[用設定檔和指令安裝](../get-started/advanced-install.mdx)，YAML 欄位見 [Installer 設定](./installer-configuration.mdx)。已有 Kubernetes 叢集時，走[把 Zeabur 裝進既有叢集](../get-started/install.mdx)。
 
@@ -25,7 +25,7 @@ sudo zeabur-installer --config /etc/zeabur-installer/config.yaml plan
 sudo zeabur-installer --config /etc/zeabur-installer/config.yaml plan --json
 ```
 
-`plan` 讀取設定、Catalog 和主機資訊，列出 Kubernetes 的種類（K3s 或 RKE2）、元件、Namespace、主機檔案、儲存類別、記憶體估算和提醒，接著執行和 `apply` 相同的主機檢查，不會改動主機。有檢查未通過時，它會說 `apply` 會停下。加 `--json` 輸出 JSON，這時不跑主機檢查。
+`plan` 讀取設定、Catalog 和主機資訊，列出 Kubernetes 的種類（K3s 或 RKE2）、元件、Namespace、主機檔案、儲存類別、記憶體估算和提醒，接著執行和 `apply` 相同的主機檢查，不會改動主機。有檢查未通過時，`plan` 會說明 `apply` 會停下。加 `--json` 輸出 JSON，這時不執行主機檢查。
 
 沒有設定檔時，`plan` 用主機位址產生 `sslip.io` 名稱，搭配預設元件，讓你先看結果。主機有公開位址時用 `domain` 憑證模式（Let's Encrypt），只有私有、CGNAT 或 link-local 位址時用 `local`。`apply` 一定要有設定檔。
 
@@ -52,7 +52,7 @@ sudo zeabur-installer doctor
 
 完成後會印出 Zeabur 和 Zeabur Identity 的網址。開啟設定連結、新增通行密鑰，就能登入 Zeabur 看到叢集。`local` 模式要先讓瀏覽器信任 installer 產生的 CA。
 
-`apply` 會把 installer 管理的檔案改回它產生的內容。自己的設定寫在 `/etc/rancher/k3s/config.yaml.d/90-local.yaml`（K3s）或 `/etc/rancher/rke2/config.yaml.d/90-local.yaml`（RKE2），不要改 installer 產生的 `config.yaml`。
+`apply` 會把 installer 管理的檔案改回 installer 產生的內容。自己的設定寫在 `/etc/rancher/k3s/config.yaml.d/90-local.yaml`（K3s）或 `/etc/rancher/rke2/config.yaml.d/90-local.yaml`（RKE2），不要改 installer 產生的 `config.yaml`。
 
 ## `gui`
 
@@ -71,7 +71,7 @@ ssh -L 8085:127.0.0.1:8085 root@server.example.com
 開啟伺服器印出的完整連結。GUI 預設監聽 `127.0.0.1:8085`，用 `--listen <address:port>` 改位址。GUI 寫的是同一份設定檔，按下安裝時執行的也是同一個 `apply`。每一步的畫面見[在一台伺服器安裝 Zeabur](../get-started/quickstart.mdx)。
 
 <Callout type="warn">
-GUI 以 root 修改這台主機。讓它只監聽 loopback，透過 SSH tunnel 開啟。改成對外位址時，登入權杖和安裝設定會以明文 HTTP 傳送。
+GUI 以 root 修改這台主機。讓 GUI 只監聽 loopback，透過 SSH tunnel 開啟。改成對外位址時，登入權杖和安裝設定會以明文 HTTP 傳送。
 </Callout>
 
 安裝完成後按 `Ctrl-C` 關閉 GUI，K3s/RKE2 和裝好的服務繼續執行。
@@ -82,9 +82,9 @@ GUI 以 root 修改這台主機。讓它只監聽 loopback，透過 SSH tunnel �
 sudo zeabur-installer doctor
 ```
 
-在建立叢集的 server 上，`doctor` 檢查 K3s 或 RKE2 的 unit、API、安裝紀錄裡的元件、預設儲存類別、Zeabur 和 Zeabur Identity 的 Deployment、Zeabur Identity 的內部憑證、節點位址、基準網路政策、存下來的 Secret 有沒有加密，以及 `/var/lib/rancher` 有沒有加密。它比對的是上次 `apply` 的紀錄，改過的 YAML 要重跑 `apply` 才算數。
+在建立叢集的 server 上，`doctor` 檢查 K3s 或 RKE2 的 unit、API、安裝紀錄裡的元件、預設儲存類別、Zeabur 和 Zeabur Identity 的 Deployment、Zeabur Identity 的內部憑證、節點位址、基準網路政策、存下來的 Secret 有沒有加密，以及 `/var/lib/rancher` 有沒有加密。`doctor` 比對的是上次 `apply` 的紀錄，改過的 YAML 要再執行一次 `apply` 才算數。
 
-在加入既有叢集的節點上，它檢查自己的 `k3s-agent` 或 RKE2 unit、Node 是否就緒、到 server 的連線和延遲、磁碟加密。如果是 server，還會比對 Zeabur Identity 的驗證設定。
+在加入既有叢集的節點上，`doctor` 檢查這個節點的 `k3s-agent` 或 RKE2 unit、Node 是否就緒、到 server 的連線和延遲、磁碟加密。如果是 server，還會比對 Zeabur Identity 的驗證設定。
 
 | 結束碼 | 意義 |
 |---|---|
@@ -111,7 +111,7 @@ sudo zeabur-installer node add --role server --address 10.0.0.5
 | `--address` | 預設是這個節點的 `InternalIP`，新主機用這個位址連到這台 server |
 | `--ttl` | worker 權杖的有效期，預設 `1h`，可寫 `30m`、`1h` 等，最多 `24h` |
 
-`node add` 印出新 VM 要用的 join YAML 和指令。新 VM 要和這台在同一家主機商、同一個區域，可用區不同沒關係。worker 用會過期的 bootstrap token。server 用叢集的 server token，不會過期，`--ttl` 對它沒有作用。輸出內容等同密碼，存到新主機時權限設為 `0600`。
+`node add` 印出新 VM 要用的 join YAML 和指令。新 VM 要和這台在同一家主機商、同一個區域，可用區不同沒關係。worker 用會過期的 bootstrap token。server 用叢集的 server token，不會過期，`--ttl` 對 server 沒有作用。輸出內容等同密碼，存到新主機時權限設為 `0600`。
 
 新主機套用 join 設定後，在既有 server 執行：
 
@@ -119,13 +119,13 @@ sudo zeabur-installer node add --role server --address 10.0.0.5
 sudo zeabur-installer node sync
 ```
 
-`node sync` 讓 installer 建立的基準網路政策放行目前每個節點的流量，也就是每個節點 Pod 網段的第一個位址。新加入的 server 會自己同步。worker 加入後，一定要在 server 執行一次 `node sync`，在這之前網路政策會擋掉新節點的流量。`node add` 的輸出也會提醒這一步。網路和儲存的前提見[加入節點](../cluster/nodes.mdx)。
+`node sync` 讓 installer 建立的基準網路政策放行目前每個節點的流量，也就是每個節點 Pod 網段的第一個位址。新加入的 server 會自己同步。worker 加入後，一定要在 server 執行一次 `node sync`，執行之前，網路政策會擋掉新節點的流量。`node add` 的輸出也會提醒這一步。網路和儲存的前提見[加入節點](../cluster/nodes.mdx)。
 
 ## 移除元件
 
-元件只由 installer 安裝和移除。在 `gui` 的**元件**取消勾選，或從設定檔的 `enable` 拿掉它，預設就會裝的元件則加到 `disable`，再執行 `apply`。自己用的安裝也一樣。
+元件只由 installer 安裝和移除。在 `gui` 的**元件**取消勾選，或從設定檔的 `enable` 拿掉，預設就會裝的元件則加到 `disable`，再執行 `apply`。自己用的安裝也一樣。
 
-`plan` 會在「Removed」列出要移除的元件、會留下什麼，以及會刪掉哪些 CRD。`apply` 等叢集啟動後先移除元件，再建立 Namespace、儲存類別和其他元件。被別的元件需要的，會排在後面移除。每個元件，`apply` 刪除 `kube-system` 裡帶有 `app.kubernetes.io/managed-by: zeabur-installer` 標籤和 `installer.zeabur.com/component: <capability>/<id>` 註解的 `HelmChart`，等 helm-controller 的 `helm-delete-<chart>` Job 解除安裝完成。
+`plan` 會在「Removed」列出要移除的元件、會留下什麼，以及會刪掉哪些 CRD。`apply` 等叢集啟動後先移除元件，再建立 Namespace、儲存類別和其他元件。其他元件依賴的元件，會排在後面移除。每個元件，`apply` 刪除 `kube-system` 裡帶有 `app.kubernetes.io/managed-by: zeabur-installer` 標籤和 `installer.zeabur.com/component: <capability>/<id>` 註解的 `HelmChart`，等 helm-controller 的 `helm-delete-<chart>` Job 解除安裝完成。
 
 installer 只移除自己裝的元件。用 Helm、Flux 或 Argo CD 裝的沒有這個註解，會留著。Catalog 已經沒列的元件也會留著，`plan` 會提醒並給出 `kubectl delete` 指令。
 
@@ -139,15 +139,15 @@ Chart 放在 templates 裡的 CRD，解除安裝時會一起刪掉，叢集裡�
 | Longhorn | 還有 driver 是 `driver.longhorn.io` 的 PersistentVolume |
 | Zeabur Builder | zot 的 Namespace 以外，還有副本用 `zot.zot.svc:5000` 的映像檔 |
 
-先刪掉或搬走這些。Trivy Operator 的報告是它自己產生的，不算在內。
+先刪掉或搬走這些。Trivy Operator 的報告是 Trivy Operator 自己產生的，不算在內。
 
-解除安裝會刪掉元件保存的資料時，還要把元件 ID 寫進 `allowDataLoss`（`gui` 在**確認**用勾選框問）。Longhorn 寫了之後，`apply` 會把它的 `deleting-confirmation-flag` 設為 `true`，否則 Longhorn 不肯解除安裝；每個磁碟區的副本也會一起刪掉。
+解除安裝會刪掉元件保存的資料時，還要把元件 ID 寫進 `allowDataLoss`（`gui` 在**確認**用勾選框問）。Longhorn 寫了之後，`apply` 會把 Longhorn 的 `deleting-confirmation-flag` 設為 `true`，否則 Longhorn 不肯解除安裝；每個磁碟區的副本也會一起刪掉。
 
-留下的東西，確定用不到之後可以手動刪除：
+確定用不到留下的物件後，可以手動刪除：
 
 - 元件的 Namespace，連同裡面的 Secret 和工作負載的磁碟（PersistentVolumeClaim）：`kubectl delete namespace <namespace>`。先備份磁碟。
 - 解除安裝沒刪的 CRD（不在「會刪除這些 CRD」裡的）：`kubectl get crd -o name | grep <group>` 找出來再 `kubectl delete`。這會刪掉叢集裡所有這種物件。
-- installer 為它套用的 manifest，例如 Gateway API 的 CRD 或 cert-manager 的 issuer：`plan` 會列出名稱，用 `kubectl delete` 刪除。
+- installer 為元件套用的 manifest，例如 Gateway API 的 CRD 或 cert-manager 的 issuer：`plan` 會列出名稱，用 `kubectl delete` 刪除。
 - Catalog 列出的其他殘留，例如 Longhorn 的 `longhorn-static` 儲存類別：`kubectl delete storageclass longhorn-static`。
 
 這些步驟不靠 Zeabur 的 finalizer，Zeabur 移除後一樣能做。
@@ -160,11 +160,11 @@ sudo zeabur-installer uninstall zeabur
 
 只移除 Zeabur，K3s/RKE2、Zeabur Identity、Catalog 元件和應用程式都保留。`uninstall zeabur` 也會刪掉 Zeabur 為成員建立的 RoleBinding 和 ClusterRoleBinding。
 
-`uninstall identity` 會連 Zeabur Identity 一起移除，並清空 API server 對它的信任設定。執行前先依[移除 Zeabur](../leave/uninstall.mdx)準備其他登入方式。叢集有多台 server 時，其他 server 要各自執行一次 `sudo zeabur-installer apply` 才會停止信任 Zeabur Identity 的權杖，指令會列出這些 server。
+`uninstall identity` 會連 Zeabur Identity 一起移除，並清空 API server 對 Zeabur Identity 的信任設定。執行前先依[移除 Zeabur](../leave/uninstall.mdx)準備其他登入方式。叢集有多台 server 時，其他 server 要各自執行一次 `sudo zeabur-installer apply` 才會停止信任 Zeabur Identity 的權杖，指令會列出這些 server。
 
-在加入的節點上執行 `uninstall`，它只印出要依序執行的指令：drain、刪除 Node、執行 K3s 或 RKE2 的移除腳本、同步網路政策。這些步驟見[新增與維護節點](../cluster/nodes.mdx#移除節點)。
+在加入的節點上執行 `uninstall`，只會印出要依序執行的指令：drain、刪除 Node、執行 K3s 或 RKE2 的移除腳本、同步網路政策。這些步驟見[新增與維護節點](../cluster/nodes.mdx#移除節點)。
 
-K3s 或 RKE2 移除後，`uninstall --purge` 清掉 installer 的下載快取、本機 CA 副本和設定，磁碟區保留。`--purge` 不能和 `zeabur`、`identity` 一起用。要保留叢集，就不要執行 K3s 或 RKE2 的移除腳本或 `--purge`。
+K3s 或 RKE2 移除後，`uninstall --purge` 清掉 installer 的下載快取、本機的 CA 複本和設定，磁碟區保留。`--purge` 不能和 `zeabur`、`identity` 一起用。要保留叢集，就不要執行 K3s 或 RKE2 的移除腳本或 `--purge`。
 
 ### 自己用的安裝
 
@@ -172,9 +172,9 @@ K3s 或 RKE2 移除後，`uninstall --purge` 清掉 installer 的下載快取、
 
 ## 安裝中斷時
 
-- 主機檢查失敗：依輸出釋出連接埠或修正磁碟，再重跑 `plan`、`apply`。
+- 主機檢查失敗：依輸出釋出連接埠或修正磁碟，再執行一次 `plan`、`apply`。
 - Kubernetes 沒啟動：K3s 看 `sudo journalctl -u k3s`，worker 看 `k3s-agent`；RKE2 看 `sudo journalctl -u rke2-server`，worker 看 `rke2-agent`。
-- 元件卡在 Helm 安裝：`doctor` 會指出 `kube-system` 裡的 `helm-install-<name>` Job，看它的日誌。
+- 元件卡在 Helm 安裝：`doctor` 會指出 `kube-system` 裡的 `helm-install-<name>` Job，看這個 Job 的日誌。
 - 新節點就緒但部分系統服務連不到：先在 server 執行 `node sync`，再看 `doctor` 的網路政策檢查。
 
 要撤回安裝，依[移除流程](../leave/uninstall.mdx)選擇只移除 Zeabur，或整台測試機一起清掉。刪掉應用程式的 Namespace 不會移除 Zeabur，只會刪掉應用程式。

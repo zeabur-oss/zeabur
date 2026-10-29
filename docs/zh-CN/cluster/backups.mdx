@@ -19,7 +19,7 @@ source: "0cf131794fc4"
 ## 开始之前
 
 - 集群已安装 Velero。界面显示**备份需要 Velero** 时，点击**安装 Velero**，按照[安装组件](./components.mdx)装好。
-- 准备 S3 兼容的存储桶、端点和密钥，或先在同一页上方的 **S3 目的地**登记，见 [S3 目标](./s3-destinations.mdx)。
+- 准备 S3 兼容的存储桶、端点和密钥，或先在同一页上方的 **S3 目的地**登记，见 [S3 目的地](./s3-destinations.mdx)。
 - 你能在 Velero 的 Namespace 读取和创建备份位置、定时、备份、还原和 Secret。Zeabur Chart 的成员角色没有 Velero 的权限，通常要用管理员账号操作。
 
 <Callout type="warn">
@@ -33,9 +33,9 @@ source: "0cf131794fc4"
 
 ### 选择存储桶
 
-在**备份存放位置**点击**设置**或**编辑**。已登记 S3 目标时，**S3 目的地**菜单默认选中第一个，表单会填入它的位置和密钥。要自己填写，改选**手动输入**。
+在**备份存放位置**点击**设置**或**编辑**。已登记 S3 目的地时，**S3 目的地**菜单默认选中第一个，表单会填入这个目的地的位置和密钥。要自己填写，改选**手动输入**。
 
-手动输入时填写**存储桶**、**访问密钥 ID** 和**私密访问密钥**。使用 AWS S3 时**端点**留空，R2、B2 或 MinIO 填写它们的 S3 地址。**区域**留空时是 `us-east-1`。**文件夹**可选，可以让这些备份和其他文件分开。
+手动输入时填写**存储桶**、**访问密钥 ID** 和**私密访问密钥**。使用 AWS S3 时**端点**留空，R2、B2 或 MinIO 填写各自的 S3 地址。**区域**留空时是 `us-east-1`。**文件夹**可选，可以让这些备份和其他文件分开。
 
 ![备份存放位置的表单，选了 S3 目标 r2-backups 并填入端点和存储桶](../images/shots/backup-location-form.avif)
 
@@ -211,8 +211,8 @@ Velero 把 Kubernetes 对象原样放进备份，Secret 也在里面，值只是
 
 | Secret 与字段 | 用途 |
 |---|---|
-| `velero-repo-credentials` 的 `repository-password` | Kopia 在上传前用它加密卷里的文件。 |
-| `velero-backup-key` 的 `key`（32 个字符） | 存放位置配置 `customerKeyEncryptionSecret: velero-backup-key/key`，存储服务用它加密每个对象，包括对象清单和 Secret（SSE-C）。 |
+| `velero-repo-credentials` 的 `repository-password` | Kopia 在上传前用这个密码加密卷里的文件。 |
+| `velero-backup-key` 的 `key`（32 个字符） | 存放位置配置 `customerKeyEncryptionSecret: velero-backup-key/key`，存储服务用这把密钥加密每个对象，包括对象清单和 Secret（SSE-C）。 |
 
 在**集群** → **备份**新增存放位置时，Zeabur 也会配置 `customerKeyEncryptionSecret`。`velero-backup-key` 不存在就创建一把，已经有的不会更换。已有的存放位置保持原样，之前没有用密钥的备份仍然读得到。
 
@@ -221,7 +221,7 @@ SSE-C 每次请求都把密钥交给存储服务，由存储服务加密后再�
 ### 把密钥另存到集群外
 
 <Callout type="warn">
-这两把密钥也在它们加密的备份里。集群坏掉后少了它们，谁都读不了备份。安装 Velero 后，先存一份到密码管理工具或外部机密库。
+这两把密钥也在自己加密的备份里。集群坏掉后少了密钥，谁都读不了备份。安装 Velero 后，先存一份到密码管理工具或外部机密库。
 </Callout>
 
 ```sh
@@ -236,7 +236,7 @@ kubectl -n velero get secret velero-repo-credentials velero-backup-key -o yaml >
 
 ### 之前就安装了 Velero
 
-如果 Velero 不是从 Catalog 安装的，集群里可能没有 `velero-repo-credentials`。这时 Velero 会自己用公开的默认密码 `static-passw0rd` 创建它，而 Kopia 存储库会一直沿用创建时的密码。这种集群要把存放位置的**文件夹**换成新的，让 Kopia 用新密码创建存储库。在加入 SSE-C 之前做的备份不会加上加密，到期删除后就不留明文。
+如果 Velero 不是从 Catalog 安装的，集群里可能没有 `velero-repo-credentials`。这时 Velero 会自己用公开的默认密码 `static-passw0rd` 创建这个 Secret，而 Kopia 存储库会一直沿用创建时的密码。这种集群要把存放位置的**文件夹**换成新的，让 Kopia 用新密码创建存储库。加入 SSE-C 之前的备份没有加密，到期删除后就不留明文。
 
 ### 其他备份
 
@@ -245,7 +245,7 @@ kubectl -n velero get secret velero-repo-credentials velero-backup-key -o yaml >
 ## 常见失败
 
 - **无法访问**：核对存储桶、端点、区域和密钥，并查看位置下方 Velero 的消息。
-- 连接成功但备份失败，存储服务拒绝上传：确认它支持 SSE-C，端点也用 HTTPS，见[备份的加密](#备份的加密)。
+- 连接成功但备份失败，存储服务拒绝上传：确认存储服务支持 SSE-C，端点也用 HTTPS，见[备份的加密](#备份的加密)。
 - 没有**立即备份**：要先有 Zeabur 创建的定时，而定时要先有存放位置。
 - 还原按钮（**从备份创建新项目**、**还原已删除的项目**或**还原项目**）无法使用：你不能在 Velero 的 Namespace 创建 Restore。还原时 Velero 用自己的权限写入对象，所以只有管理员能还原，见[权限](../reference/permissions.mdx)。请管理员用管理员账号还原。
 - **部分失败**：有些对象或卷文件没有复制到，其余的已经保存。用 `velero backup describe <backup> --details` 查看失败的条目，处理后再备份一次。
@@ -257,4 +257,4 @@ kubectl -n velero get secret velero-repo-credentials velero-backup-key -o yaml >
 
 在**定时**点击**暂停**，检查后应用，之后就不会再备份。点击**恢复**恢复。已有的备份和存放位置都会保留，备份按各自的**保留到**日期到期。
 
-Zeabur 没有删除备份或定时的操作。要马上删掉，用 `velero backup delete` 或 `velero schedule delete`。移除 [S3 目标](./s3-destinations.mdx) 只会删掉目标本身，已经复制到 Velero 的密钥、定时和 S3 里的备份都会留下。
+Zeabur 没有删除备份或定时的操作。要马上删掉，用 `velero backup delete` 或 `velero schedule delete`。移除 [S3 目的地](./s3-destinations.mdx) 只会删掉目的地本身，已经复制到 Velero 的密钥、定时和 S3 里的备份都会留下。

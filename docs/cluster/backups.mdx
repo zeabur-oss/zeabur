@@ -19,7 +19,7 @@ The **Backups by kind of data** table on the page shows what backs up what:
 
 - Install Velero in the cluster. If the page shows **Backups need Velero**, click **Install Velero** and follow [Install components](./components.mdx).
 - Have an S3-compatible bucket, endpoint, and keys ready, or register them under **S3 destinations** at the top of the same page first. See [S3 destinations](./s3-destinations.mdx).
-- You must be able to read and create backup locations, schedules, backups, restores, and secrets in Velero's namespace. Member roles in the Zeabur Chart don't include Velero permissions, so you'll usually need an admin account.
+- You need permission to read and create backup locations, schedules, backups, restores, and secrets in Velero's namespace. Member roles in the Zeabur Chart don't include Velero permissions, so you'll usually need an admin account.
 
 <Callout type="warn">
 Store backups outside the cluster, such as in Cloudflare R2, Backblaze B2, or AWS S3. If you store them in the same cluster, losing the cluster also means losing the backups. The form warns you if the endpoint appears to be inside the cluster.

@@ -51,7 +51,7 @@ source: "c50381eff779"
 
 等管道不再標示**等待中**，在管道列按**傳送測試**，檢查要建立的測試用 Job，再按**傳送測試**。
 
-測試是一個最多執行兩分鐘的 Job，警示規則看到它後，會送一則測試警示到這個管道。畫面顯示已傳送後，大約一兩分鐘內，到接收位置確認有收到訊息。
+測試是一個最多執行兩分鐘的 Job，警示規則看到這個 Job 後，會送一則測試警示到這個管道。畫面顯示已傳送後，大約一兩分鐘內，到接收位置確認有收到訊息。
 
 ![管道列顯示接收位置和事件，旁邊有編輯和傳送測試](../images/shots/notify-channels.avif)
 
@@ -70,7 +70,7 @@ source: "c50381eff779"
 
 一個管道是兩個名為 `zeabur-notify-<名稱>` 的物件，都帶 label `zeabur.com/notification-channel: <名稱>`：Secret 放網址、權杖和密碼，`VMAlertmanagerConfig` 寫路由和接收設定。叢集的管道放在 `observability` Namespace，專案的管道放在專案自己的 Namespace。
 
-下面是專案 `shop` 的 Slack 管道，收當機重啟和部署失敗：
+下面是專案 `shop` 的 Slack 管道，收當機重新啟動和部署失敗：
 
 ```yaml
 apiVersion: v1
@@ -139,7 +139,7 @@ spec:
 | Webhook | `url`，`token` 選填 | `webhook_configs`，`url_secret` 指向 `url`；有權杖時加 `http_config.authorization`（`type: Bearer`，`credentials` 指向 `token`） |
 | ntfy | `url`，`token` 選填 | 同 Webhook。`url` 寫 `https://ntfy.sh/<主題>?template=alertmanager`，自架伺服器就換掉網域 |
 
-傳送測試是建立一個帶 `zeabur.com/notification-test: <名稱>` 的 Job。指標元件的警示規則看到它，就送出一則指名給這個管道的測試警示：
+傳送測試是建立一個帶 `zeabur.com/notification-test: <名稱>` 的 Job。指標元件的警示規則看到這個 Job，就送出一則指名給這個管道的測試警示：
 
 ```yaml
 apiVersion: batch/v1
@@ -185,7 +185,7 @@ kubectl -n shop delete vmalertmanagerconfig,secret zeabur-notify-ops
 
 ## 確認結果
 
-- 管道列不再顯示**等待中**，也沒有**被拒絕**。
+- 管道列不再顯示**等待中**或**被拒絕**。
 - `kubectl -n shop get vmalertmanagerconfig zeabur-notify-ops -o jsonpath='{.status.updateStatus}'` 印出 `operational`。印出 `failed` 時，把路徑換成 `{.status.reason}` 看原因。
 - 傳送測試後一兩分鐘內，接收位置收到一則測試訊息。
 
@@ -201,4 +201,4 @@ kubectl -n shop delete vmalertmanagerconfig,secret zeabur-notify-ops
 
 在管道的操作選單選**移除**，確認要刪除的管道和機密後按**移除管道**。之後的警示只會送到其他有勾選該事件的管道。
 
-測試用的 Job 結束五分鐘後，Kubernetes 會自動刪除它，不用另外清理。
+測試用的 Job 結束五分鐘後，Kubernetes 會自動刪除，不用另外清理。

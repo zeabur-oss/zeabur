@@ -47,7 +47,7 @@ Zeabur 通过 `kube-system` 中的 ConfigMap `zeabur-installer` 判断集群是�
 sudo zeabur-installer gui
 ```
 
-在自己的电脑上建立 SSH 隧道，再打开服务器输出的链接：
+在自己的电脑上创建 SSH 隧道，再打开服务器输出的链接：
 
 ```sh
 ssh -L 8085:127.0.0.1:8085 root@server.example.com
@@ -91,7 +91,7 @@ sudo zeabur-installer apply
 
 `plan` 和安装程序的**确认**页面会列出要移除的组件、会保留哪些内容，以及会一并删除的 CRD。遇到以下两种情况，`apply` 会停止，不做任何更改：
 
-- 仍有资源在使用该组件，例如仍有它的自定义资源（包括会一并删除的 CRD 对应的对象）、仍有 Longhorn 的卷，或仍有副本从 zot 拉取镜像。页面会列出这些资源，先删除或迁移它们。
+- 仍有资源在使用该组件，例如仍有该组件的自定义资源（包括会一并删除的 CRD 对应的对象）、仍有 Longhorn 的卷，或仍有副本从 zot 拉取镜像。页面会列出这些资源，先删除或迁移。
 - 移除组件会一并删除组件保存的数据，例如 Longhorn。先备份，再将组件 ID 写入配置文件的 `allowDataLoss`，或在**确认**页面勾选同意。
 
 移除后，组件的 Namespace 和卷会保留。有些 Chart 会一并删除 CRD 及其所有对象，其他 CRD 会保留。确认不再需要保留的资源后，如何手动删除，参见 [Installer 命令](../reference/installer.mdx#卸载组件)。

@@ -23,7 +23,7 @@ source: "75878e5654de"
 
 如果填写的是已有成员的用户名，这个链接会为该账号添加一把通行密钥，原有权限不变。
 
-只想邀请别人加入一个项目的话，打开该项目的**设置**，在**成员**中点击**邀请**。这个项目会预先勾选，角色是开发者。这一部分也会列出谁能打开这个项目。
+只想邀请别人加入一个项目时，打开该项目的**设置**，在**成员**中点击**邀请**。这个项目会预先勾选，角色是开发者。这一部分也会列出谁能打开这个项目。
 
 </Step>
 <Step>
@@ -157,7 +157,7 @@ kubectl -n zeabur-identity delete zbuser erin
 
 ## 常见失败
 
-- **没有安装 Zeabur Identity**：请集群管理员安装 Zeabur Identity，或使用它所在的 Namespace 启动 Zeabur。
+- **没有安装 Zeabur Identity**：请集群管理员安装 Zeabur Identity，或使用 Zeabur Identity 所在的 Namespace 启动 Zeabur。
 - 界面提示 Zeabur 不知道 Zeabur Identity 的网址：使用 `--issuer-url` 启动 Zeabur。
 - 界面提示 Zeabur Identity 目前不接受设置链接：使用 `--invitations` 运行 Zeabur Identity。
 - **安装 Zeabur 时未启用成员角色**：使用 `memberRoles.enabled=true` 升级 Chart，或将这位成员设为管理员。完整的权限对照见[权限](../reference/permissions.mdx)。

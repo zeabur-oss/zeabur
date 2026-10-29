@@ -23,7 +23,7 @@ source: "75878e5654de"
 
 如果填的是既有成員的使用者名稱，這個連結會在他的帳號新增一把通行密鑰，原本的權限不變。
 
-只想邀請別人加入一個專案的話，打開那個專案的**設定**，在**成員**按**邀請**。這個專案會先勾好，角色是開發者。這一區也會列出誰能開啟這個專案。
+只想邀請別人加入一個專案時，打開那個專案的**設定**，在**成員**按**邀請**。這個專案會先勾好，角色是開發者。這一區也會列出誰能開啟這個專案。
 
 </Step>
 <Step>
@@ -157,7 +157,7 @@ kubectl -n zeabur-identity delete zbuser erin
 
 ## 常見失敗
 
-- **沒有安裝 Zeabur Identity**：請叢集管理員安裝 Zeabur Identity，或以它所在的 Namespace 啟動 Zeabur。
+- **沒有安裝 Zeabur Identity**：請叢集管理員安裝 Zeabur Identity，或以 Zeabur Identity 所在的 Namespace 啟動 Zeabur。
 - 畫面說 Zeabur 不知道 Zeabur Identity 的網址：以 `--issuer-url` 啟動 Zeabur。
 - 畫面說 Zeabur Identity 目前不接受設定連結：以 `--invitations` 執行 Zeabur Identity。
 - **安裝 Zeabur 時沒有啟用成員角色**：以 `memberRoles.enabled=true` 升級 Chart，或把這位成員設為管理員。完整的權限對照見[權限](../reference/permissions.mdx)。

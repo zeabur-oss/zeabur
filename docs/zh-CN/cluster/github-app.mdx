@@ -4,7 +4,7 @@ description: 为集群创建 GitHub App 并向项目开放，成员就能直接�
 source: "4120d54b32d6"
 ---
 
-配置好集群的 GitHub App 后，项目成员新增服务时就能直接选择 GitHub 仓库，私有仓库也无需另加部署密钥或令牌。先在**集群** → **GitHub** 创建 App，将它安装到仓库所在的 GitHub 账号或组织，再向项目开放。也可以直接在项目的**从 Git 部署**中点击**连接 GitHub**，按页面提示逐步完成。
+配置好集群的 GitHub App 后，项目成员新增服务时就能直接选择 GitHub 仓库，私有仓库也无需另加部署密钥或令牌。先在**集群** → **GitHub** 创建 App，安装到仓库所在的 GitHub 账号或组织，再向项目开放。也可以直接在项目的**从 Git 部署**中点击**连接 GitHub**，按页面提示逐步完成。
 
 ## 开始之前
 
@@ -34,7 +34,7 @@ source: "4120d54b32d6"
 
 ### 在 GitHub 创建后保存到 Zeabur
 
-点击**前往 GitHub**，在 GitHub 确认创建。这个 App 不公开，权限仅限于读取仓库内容和写入提交状态。如果填写了 Webhook 地址，它也会接收 push 事件。
+点击**前往 GitHub**，在 GitHub 确认创建。这个 App 不公开，权限仅限于读取仓库内容和写入提交状态。如果填写了 Webhook 地址，App 也会接收 push 事件。
 
 GitHub 会带你返回 Zeabur 的**完成 GitHub App 配置**页面。检查要写入的机密变量（不会显示私钥），点击**保存 GitHub App**。从点击**创建 GitHub App** 起，必须在一小时内完成这一步。
 
@@ -73,7 +73,7 @@ GitHub 会带你返回 Zeabur 的**完成 GitHub App 配置**页面。检查要�
 
 ## 用 kubectl 完成相同配置
 
-Zeabur Builder 从 `builder-system` 中的 Secret `github-app` 读取 App 的密钥。这些值都能在 GitHub 的 App 设置页面找到，私钥需要在那里生成并下载。如果使用 GitHub Enterprise Server，再添加一个 `api-url` 键，填入它的 API 地址。annotation 仅用于让 Zeabur 链接到 App 页面。
+Zeabur Builder 从 `builder-system` 中的 Secret `github-app` 读取 App 的密钥。这些值都能在 GitHub 的 App 设置页面找到，私钥需要在那里生成并下载。如果使用 GitHub Enterprise Server，再添加一个 `api-url` 键，填入 Enterprise Server 的 API 地址。annotation 仅用于让 Zeabur 链接到 App 页面。
 
 ```yaml
 apiVersion: v1
@@ -106,7 +106,7 @@ data:
   "87654321": shop, blog
 ```
 
-Zeabur 还会在每个已开放的项目中写入一个 ConfigMap `zeabur-github-app`（label 为 `zeabur.com/github-app: "true"`），记录当时有权读取的仓库，让没有权限读取 `builder-system` 的成员也能选择仓库。Zeabur Builder 不读取它，用 kubectl 配置时可以不写，但页面上的列表会是空的，需要自行填写仓库地址。
+Zeabur 还会在每个已开放的项目中写入一个 ConfigMap `zeabur-github-app`（label 为 `zeabur.com/github-app: "true"`），记录当时有权读取的仓库，让没有权限读取 `builder-system` 的成员也能选择仓库。Zeabur Builder 不读取这个 ConfigMap，用 kubectl 配置时可以不写，但页面上的列表会是空的，需要自行填写仓库地址。
 
 服务的 Build 通过 `spec.source.githubApp.installationId` 指定安装实例：
 
@@ -137,7 +137,7 @@ spec:
 
 - **GitHub App** 区域显示 App 名称和**在 GitHub 上打开**，**已安装的账号**列出账号及向其开放的项目。
 - 运行 `kubectl -n builder-system get secret github-app` 和 `kubectl -n builder-system get configmap github-app-installations -o yaml` 都能找到相应对象，ConfigMap 中包含你的安装 ID。
-- 从私有仓库部署的服务，在**构建**选项卡中显示首次构建成功。运行 `kubectl -n shop get build web` 也能查看其状态。
+- 从私有仓库部署的服务，在**构建**选项卡中显示首次构建成功。运行 `kubectl -n shop get build web` 也能查看构建状态。
 
 ## 遇到问题
 
@@ -160,4 +160,4 @@ kubectl -n builder-system delete configmap github-app-installations
 kubectl delete configmap -A -l zeabur.com/github-app=true
 ```
 
-使用 App 构建的服务会保留，继续运行最后一次构建的镜像，以后不会再构建新提交。要继续构建，将其改为使用部署密钥或访问令牌，参见[从 Git 构建并部署服务](../deploy/git.mdx)。
+使用 App 构建的服务会保留，继续运行最后一次构建的镜像，以后不会再构建新提交。要继续构建，将服务改为使用部署密钥或访问令牌，参见[从 Git 构建并部署服务](../deploy/git.mdx)。

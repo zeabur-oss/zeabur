@@ -87,14 +87,14 @@ sudo zeabur-installer apply
 
 ## 移除元件
 
-已安裝的元件卡片上有**移除**，視窗會列出指令。在安裝程式的頁面取消勾選，或從設定檔的 `enable` 拿掉它，預設就會裝的元件則加到 `disable`，再執行 `apply`。
+已安裝的元件卡片上有**移除**，視窗會列出指令。在安裝程式的頁面取消勾選，或從設定檔的 `enable` 拿掉，預設就會裝的元件則加到 `disable`，再執行 `apply`。
 
 `plan` 和安裝程式的**確認**會列出要移除的元件、會留下什麼，以及會一起刪掉的 CRD。遇到下面兩種情況，`apply` 會停下，什麼都不改：
 
-- 還有東西在用這個元件，例如還有它的自訂資源（包括會一起刪掉的 CRD 的物件）、還有 Longhorn 的磁碟區，或還有副本從 zot 拉映像檔。畫面會列出是哪些，先刪掉或搬走。
+- 還有東西在用這個元件，例如還有這個元件的自訂資源（包括會一起刪掉的 CRD 的物件）、還有 Longhorn 的磁碟區，或還有副本從 zot 拉映像檔。畫面會列出是哪些，先刪掉或搬走。
 - 移除會連同元件保存的資料一起刪掉，例如 Longhorn。先備份，再把元件 ID 寫進設定檔的 `allowDataLoss`，或在**確認**勾選同意。
 
-移除後，元件的 Namespace 和磁碟區會留著。有些 Chart 會連 CRD 和它們的所有物件一起刪掉，其他 CRD 會留著。留下的東西確定用不到之後怎麼手動刪除，見 [Installer 指令](../reference/installer.mdx#移除元件)。
+移除後，元件的 Namespace 和磁碟區會留著。有些 Chart 會連 CRD 和它們的所有物件一起刪掉，其他 CRD 會留著。確定用不到留下的物件後，手動刪除的方法見 [Installer 指令](../reference/installer.mdx#移除元件)。
 
 zeabur-installer 只移除自己裝的元件。用 Helm、Flux 或 Argo CD 裝的，從原本的工具移除。
 
@@ -127,6 +127,6 @@ zeaburctl components export volume-backup/velero --format helm
 ## 常見失敗
 
 - 元件頁顯示權限不足：把畫面列出的缺少權限交給叢集管理員。
-- `apply` 說元件還在使用：照列出的物件處理，再重跑 `apply`。
+- `apply` 說元件還在使用：照列出的物件處理，再執行一次 `apply`。
 - `apply` 要你寫 `allowDataLoss`：先備份元件的資料，確定要刪再寫。
 - 裝完一直沒出現在**已安裝**：看 `kube-system` 裡 `helm-install-<名稱>` Job 的日誌，以及元件的工作負載有沒有啟動。

@@ -51,7 +51,7 @@ source: "c50381eff779"
 
 等渠道不再显示**等待中**，在渠道所在行点击**发送测试**，检查要创建的测试 Job，再点击**发送测试**。
 
-测试会创建一个运行时间不超过两分钟的 Job。告警规则检测到它后，会向该渠道发送一条测试告警。页面显示已发送后，大约一两分钟内，到接收位置确认是否收到消息。
+测试会创建一个运行时间不超过两分钟的 Job。告警规则检测到这个 Job 后，会向该渠道发送一条测试告警。页面显示已发送后，大约一两分钟内，到接收位置确认是否收到消息。
 
 ![渠道所在行显示接收位置和事件，旁边有编辑和发送测试按钮](../images/shots/notify-channels.avif)
 
@@ -139,7 +139,7 @@ spec:
 | Webhook | `url`，`token` 为选填项 | `webhook_configs`，`url_secret` 指向 `url`；使用令牌时添加 `http_config.authorization`（`type: Bearer`，`credentials` 指向 `token`） |
 | ntfy | `url`，`token` 为选填项 | 同 Webhook。`url` 填写 `https://ntfy.sh/<主题>?template=alertmanager`，使用自建服务器时替换域名 |
 
-发送测试会创建一个带有 `zeabur.com/notification-test: <名称>` 标签的 Job。指标组件的告警规则检测到它后，就会发送一条指定给该渠道的测试告警：
+发送测试会创建一个带有 `zeabur.com/notification-test: <名称>` 标签的 Job。指标组件的告警规则检测到这个 Job 后，就会发送一条指定给该渠道的测试告警：
 
 ```yaml
 apiVersion: batch/v1
@@ -201,4 +201,4 @@ kubectl -n shop delete vmalertmanagerconfig,secret zeabur-notify-ops
 
 在渠道的操作菜单中选择**移除**，确认要删除的渠道和机密变量后，点击**移除渠道**。后续告警只会发送到其他已勾选该事件的渠道。
 
-测试 Job 结束五分钟后，Kubernetes 会自动删除它，无需另行清理。
+测试 Job 结束五分钟后，Kubernetes 会自动删除，无需另行清理。

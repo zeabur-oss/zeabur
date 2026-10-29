@@ -4,9 +4,9 @@ description: 了解 Zeabur 如何從 Kubernetes 物件呈現專案、以使用�
 source: "faf843625478"
 ---
 
-Zeabur 顯示的內容讀自叢集裡的 Kubernetes 物件：用 kubectl 改了副本數，Zeabur 下次讀取就顯示新的數字。服務、網域、磁碟區和備份設定都存在 Kubernetes 物件裡，移除 Zeabur 後，原本的控制器照樣管理它們。
+Zeabur 顯示的內容讀自叢集裡的 Kubernetes 物件：用 kubectl 改了副本數，Zeabur 下次讀取就顯示新的數字。服務、網域、磁碟區和備份設定都存在 Kubernetes 物件裡，移除 Zeabur 後，原本的控制器照樣管理這些物件。
 
-實際操作的例子見 [Zeabur 如何管理服務](../get-started/how-it-works.mdx)。要移除 Zeabur 並保留工作負載和它們依賴的元件，見[移除 Zeabur](../leave/uninstall.mdx)。
+實際操作的例子見 [Zeabur 如何管理服務](../get-started/how-it-works.mdx)。要移除 Zeabur 並保留工作負載和所依賴的元件，見[移除 Zeabur](../leave/uninstall.mdx)。
 
 ## 請求從哪裡進入叢集
 
@@ -17,7 +17,7 @@ Zeabur 顯示的內容讀自叢集裡的 Kubernetes 物件：用 kubectl 改了�
 
 `zeabur` 同時提供 `/api` 下的 API 和網頁介面。Chart 建立的 ServiceAccount 沒有綁定任何 Role，Pod 也不掛載 ServiceAccount token，每一次讀寫都用登入者的權杖。
 
-Zeabur Identity 負責登入、通行密鑰和短效權杖。Zeabur 是它的 OAuth client，保存 client secret。kube-apiserver 要設定信任 Zeabur Identity 的 issuer，才會接受這些權杖。
+Zeabur Identity 負責登入、通行密鑰和短效權杖。Zeabur 是 Zeabur Identity 的 OAuth client，保存 client secret。kube-apiserver 要設定信任 Zeabur Identity 的 issuer，才會接受這些權杖。
 
 ## 專案與服務如何組成
 
@@ -38,11 +38,11 @@ Zeabur 沒有自己的資料庫。資料庫是 operator 的 CR，從 Git 部署�
 1. **檢查變更**讀取現況，算出要建立、修改或刪除哪些物件，以及會造成什麼影響。
 2. API 回傳一份變更權杖，以 AES-256-GCM 加密和驗證，裡面有使用者、群組、專案、請求、物件版本和期限。權杖 10 分鐘內有效。
 3. 確認套用時，瀏覽器只送回這份權杖。API 核對身分和期限，重讀物件、重新計算。有物件的版本變了，就要你重新檢查。
-4. 每一筆寫入先送 kube-apiserver dry run，全部通過才依序真正寫入。每筆寫入都帶著版本，刪除則帶前置條件，物件被別人改過就不會寫入。
+4. 每一筆寫入先送 kube-apiserver dry run，全部通過才依序真正寫入。每筆寫入都帶著版本，刪除則帶前置條件，物件已經有人改過，就不會寫入。
 
 一份變更可能修改多個物件，而 Kubernetes 沒有跨物件的交易。後面的寫入失敗時，前面寫成功的物件會留在叢集，錯誤訊息會列出已套用的項目。重新載入現況，再檢查下一份變更。
 
-Helm、Argo CD、Flux 管理的物件，Zeabur 只接受重新啟動，其他修改會拒絕，並指出要到 Helm values 或 Git 儲存庫修改。這樣下次同步時，不會有人的修改被蓋掉。
+Helm、Argo CD、Flux 管理的物件，Zeabur 只接受重新啟動，其他修改會拒絕，並指出要到 Helm values 或 Git 儲存庫修改。這樣下次同步時，才不會蓋掉任何人的修改。
 
 ## 移除介面後誰繼續工作
 

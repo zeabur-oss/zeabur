@@ -42,7 +42,7 @@ gh release download "v$version" --repo zeabur-oss/zeabur \
 
 `platform` 可以换成 `linux-amd64` 或 `linux-arm64`。下载 installer 时，把 `binary` 改成 `zeabur-installer`，并选择 Linux 平台。
 
-zeabur-oss 的每个版本都由 [zeabur-oss/.github](https://github.com/zeabur-oss/.github) 中共用的 release workflow 构建并签名，所以签名者是该 workflow（下面的 `signer`），证书上还记录了它为哪个仓库、哪个 tag 运行。进入下载目录，依次验证校验和清单的签名者、文件内容和构建来源：
+zeabur-oss 的每个版本都由 [zeabur-oss/.github](https://github.com/zeabur-oss/.github) 中共用的 release workflow 构建并签名，所以签名者是该 workflow（下面的 `signer`），证书上还记录了这次运行是为了哪个仓库、哪个 tag。进入下载目录，依次验证校验和清单的签名者、文件内容和构建来源：
 
 ```sh
 cd "zeabur-$version"
@@ -94,7 +94,7 @@ proxy index  ghcr.io/zeabur-oss/proxy@sha256:...
 chart  ghcr.io/zeabur-oss/charts/zeabur@sha256:...
 ```
 
-该文件也列在 `SHA256SUMS` 中。把它下载到同一个目录，先按上面的流程验证，再把其中的摘要交给 cosign：
+该文件也列在 `SHA256SUMS` 中。下载到同一个目录，先按上面的流程验证，再把其中的摘要交给 cosign：
 
 ```sh
 gh release download "v$version" --repo zeabur-oss/zeabur \
@@ -121,7 +121,7 @@ cosign verify \
 
 ## 发布流程
 
-维护者推送 `v<version>` tag 后，release workflow（本仓库的 `release.yml`，它调用 `zeabur-oss/.github` 中共用的那个）会构建 Linux 和 macOS 版本，运行冒烟测试，发布镜像和 chart，再通过 Sigstore keyless 为镜像、chart 和校验和清单签名，并为三者生成构建来源 attestation。
+维护者推送 `v<version>` tag 后，release workflow（本仓库的 `release.yml`，会调用 `zeabur-oss/.github` 中共用的那个）会构建 Linux 和 macOS 版本，运行冒烟测试，发布镜像和 chart，再通过 Sigstore keyless 为镜像、chart 和校验和清单签名，并为三者生成构建来源 attestation。
 
 Workflow 最后创建 GitHub release 草稿，维护者检查后才公开。只有 Releases 页面上能看到的版本才有可下载的文件。
 

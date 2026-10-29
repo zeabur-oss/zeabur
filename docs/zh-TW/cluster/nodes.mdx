@@ -23,7 +23,7 @@ source: "cdb7a13a9dd3"
 | 所有節點之間 | TCP 10250，UDP 4789（Calico VXLAN） | TCP 10250、9099，UDP 8472（Canal VXLAN） |
 | 伺服器之間 | 不用 | TCP 2379–2381 |
 
-UDP 連接埠只對叢集節點開放，不要對網際網路開放。Installer 的連線檢查測不到 UDP，如果它被擋住，不同節點上的副本會連不到彼此。
+UDP 連接埠只對叢集節點開放，不要對網際網路開放。Installer 的連線檢查測不到 UDP，防火牆擋住 UDP 時，不同節點上的副本會連不到彼此。
 
 ## 加入節點
 
@@ -42,16 +42,17 @@ sudo zeabur-installer node add --ttl 1h
 
 指令印出新 VM 要執行的內容：寫入 `/etc/zeabur-installer/config.yaml` 的設定，以及 `plan` 和 `apply`。輸出裡的權杖等同密碼，不要貼到公開的地方。
 
-加入工作節點用會過期的 bootstrap 權杖，`--ttl` 預設 1 小時，最長 24 小時。在 RKE2 要加入伺服器（控制平面），加上 `--role server`，用的是叢集的 server 權杖，不會過期。K3s 只跑一台用 SQLite 的伺服器，所以會拒絕 `--role server`。新 VM 連不到伺服器的內部位址時，用 `--address` 指定它連得到的位址。
+加入工作節點用會過期的 bootstrap 權杖，`--ttl` 預設 1 小時，最長 24 小時。在 RKE2 要加入伺服器（控制平面），加上 `--role server`，用的是叢集的 server 權杖，不會過期。K3s 只執行一台用 SQLite 的伺服器，所以會拒絕 `--role server`。新 VM 連不到伺服器的內部位址時，用 `--address` 指定新 VM 連得到的位址。
 
-叢集跑 Longhorn 或 zot 鏡像時，輸出會自動帶上對應的設定。設定檔還寫著 `profile: single-node` 時，輸出會提醒你改成 `multi-node` 並重新 `apply`。
+<!-- writing-allow: zh-term 「zot 鏡像」是登錄檔鏡像（mirror），不是映像檔 -->
+叢集執行 Longhorn 或 zot 鏡像時，輸出會自動帶上對應的設定。設定檔還寫著 `profile: single-node` 時，輸出會提醒你改成 `multi-node` 並重新 `apply`。
 
 </Step>
 <Step>
 
 ### 在新 VM 執行
 
-把安裝第一台伺服器用的 `zeabur-installer` 複製到新 VM，以 root 貼上上一步的輸出。它會寫好設定檔，再執行：
+把安裝第一台伺服器用的 `zeabur-installer` 複製到新 VM，以 root 貼上上一步的輸出。這段指令會寫好設定檔，再執行：
 
 ```sh
 zeabur-installer plan
@@ -73,7 +74,7 @@ sudo k3s kubectl get nodes -o wide
 sudo /var/lib/rancher/rke2/bin/kubectl --kubeconfig /etc/rancher/rke2/rke2.yaml get nodes -o wide
 ```
 
-`node sync` 把新節點的位址加進 Installer 建立的基準網路政策。新加入的伺服器會自己同步。工作節點加入後，一定要在伺服器手動執行一次，在這之前網路政策會擋掉新節點的流量。看到新節點 `Ready` 後，撤銷工作節點的權杖，把 `<ID>` 換成 `node add` 輸出最後一行裡的 ID：
+`node sync` 把新節點的位址加進 Installer 建立的基準網路政策。新加入的伺服器會自己同步。工作節點加入後，一定要在伺服器手動執行一次，執行之前，網路政策會擋掉新節點的流量。看到新節點 `Ready` 後，撤銷工作節點的權杖，把 `<ID>` 換成 `node add` 輸出最後一行裡的 ID：
 
 ```sh
 # K3s
@@ -88,13 +89,13 @@ sudo /var/lib/rancher/rke2/bin/kubectl --kubeconfig /etc/rancher/rke2/rke2.yaml 
 </Step>
 </Steps>
 
-RKE2 的 etcd 需要過半數的伺服器才能運作。要在少一台時繼續運作，至少要三台伺服器。只有兩台時，任一台停機整個叢集就會停擺。K3s 叢集只有一台伺服器，它停機時控制平面會停，等它回來才恢復。
+RKE2 的 etcd 需要過半數的伺服器才能運作。要在少一台時繼續運作，至少要三台伺服器。只有兩台時，任一台停機整個叢集就會停擺。K3s 叢集只有一台伺服器，這台停機時控制平面也會停止，伺服器回來後才會恢復。
 
 ## 讓節點停機維護
 
 ### 只是重開機
 
-在節點選單選**停止排程**，節點列就會標示已停止排程。這會阻止新的 Pod 排到這台節點，已經在跑的 Pod 會留在原處。只是要重開機，做到這一步就夠了，不需要執行 `drain`。
+在節點選單選**停止排程**，節點列就會標示已停止排程。這會阻止新的 Pod 排到這台節點，已經在執行的 Pod 會留在原處。只是要重開機，做到這一步就夠了，不需要執行 `drain`。
 
 也可以在 Zeabur **叢集**頁標題旁點**開啟 kubectl 終端機**，執行：
 
@@ -106,7 +107,7 @@ kubectl cordon <node>
 
 ### 要先移走副本再維護
 
-到 Zeabur **叢集**頁標題旁點**開啟 kubectl 終端機**，先列出這台節點上的 Pod，以及它們使用的 PVC：
+到 Zeabur **叢集**頁標題旁點**開啟 kubectl 終端機**，先列出這台節點上的 Pod，以及這些 Pod 使用的 PVC：
 
 ```sh
 kubectl get pods -A --field-selector spec.nodeName=<node> -o custom-columns=NS:.metadata.namespace,POD:.metadata.name,PVC:.spec.volumes[*].persistentVolumeClaim.claimName
@@ -122,12 +123,12 @@ kubectl drain <node> --ignore-daemonsets --delete-emptydir-data
 
 `drain` 會停止這台節點的排程，並驅逐 Pod，讓控制器在其他節點重新建立副本。DaemonSet 管理的 Pod 會留在原處。執行時請注意：
 
-- `drain` 會遵守 PodDisruptionBudget；被擋住時會一直重試，直到允許驅逐。
+- `drain` 會遵守 PodDisruptionBudget；預算不允許驅逐時，`drain` 會一直重試。
 - 遇到不屬於任何控制器的 Pod，`drain` 會停下來。這類 Pod 刪掉後不會自動啟動，確認可以刪除後，才在指令末尾加上 `--force`。
-- `--delete-emptydir-data` 會清空被驅逐 Pod 的 `emptyDir` 暫存資料。
-- 使用這台節點 `local-path` 磁碟區的 Pod 也會被驅逐。重新建立的 Pod 無法在其他節點使用這些磁碟區，會維持 `Pending`，直到原節點回來。資料不會因為 `drain` 遺失；對這些 Pod 來說，結果跟直接停機一樣，都得等這台節點恢復。
+- `--delete-emptydir-data` 會清空遭驅逐 Pod 的 `emptyDir` 暫存資料。
+- 使用這台節點 `local-path` 磁碟區的 Pod 也會一併驅逐。重新建立的 Pod 無法在其他節點使用這些磁碟區，原節點回來之前都會維持 `Pending`。資料不會因為 `drain` 遺失；對這些 Pod 來說，結果跟直接停機一樣，都得等這台節點恢復。
 
-如果 Zeabur 自己也跑在這台節點上，`drain` 時頁面會斷線約一分鐘。請重新整理頁面並重新登入；kubectl 終端機也會斷線，需要重新開啟。
+如果 Zeabur 自己也在這台節點上執行，`drain` 時頁面會斷線約一分鐘。重新整理頁面並重新登入；kubectl 終端機也會斷線，需要重新開啟。
 
 等 `drain` 完成後，再將節點停機維護。
 
@@ -153,7 +154,7 @@ kubectl uncordon <node>
 kubectl get nodes -l node-role.kubernetes.io/control-plane
 ```
 
-如果只剩一台控制節點，不要刪除它。移除後如果剩不到三台 server 節點，控制平面再少一台就無法運作。
+如果只剩一台控制節點，不要刪除。移除後如果剩不到三台 server 節點，控制平面再少一台就無法運作。
 
 `local-path` 磁碟區的資料只在這台 VM 上。節點移除後，使用這些磁碟區的 Pod 沒有地方可以啟動。依照「讓節點停機維護」的步驟檢查 Pod 與磁碟區，再執行 `drain`，完成後才刪除節點：
 
@@ -162,7 +163,7 @@ kubectl drain <node> --ignore-daemonsets --delete-emptydir-data
 kubectl delete node <node>
 ```
 
-接著登入被移除的那台 VM，以 `root` 執行叢集對應的移除腳本，再執行 `--purge`：
+接著登入移除的那台 VM，以 `root` 執行叢集對應的移除腳本，再執行 `--purge`：
 
 ```sh
 /usr/local/bin/k3s-agent-uninstall.sh   # K3s
@@ -198,6 +199,6 @@ sudo zeabur-installer node sync
 
 - 加入時連不到伺服器：確認新 VM 連得到 `node add` 印出的伺服器位址。K3s 要通 TCP 6443，RKE2 要通 TCP 9345 和 6443，上面表格的其他連接埠也要開。
 - 新節點已就緒，但不同節點上的服務連不到彼此：檢查 UDP 4789（K3s）或 8472（RKE2），以及網路政策是否已放行新節點。
-- `drain` 一直停著：它在等 PodDisruptionBudget 放行，或停在不屬於任何控制器的 Pod 上。用 `kubectl get pdb -A` 看哪個預算擋住了，處理後再執行一次。
-- 副本在新節點 `Pending`：它用的是舊節點的 `local-path` 磁碟區，要等舊節點回來。
+- `drain` 一直停著：`drain` 在等 PodDisruptionBudget 放行，或停在不屬於任何控制器的 Pod 上。用 `kubectl get pdb -A` 看哪個預算擋住了，處理後再執行一次。
+- 副本在新節點 `Pending`：副本用的是舊節點的 `local-path` 磁碟區，要等舊節點回來。
 - 終端機 Pod **無法啟動**：看該 Pod 的事件，常見原因是映像檔下載失敗。

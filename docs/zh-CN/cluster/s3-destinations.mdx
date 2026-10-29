@@ -4,13 +4,13 @@ description: 注册 S3 存储位置，供数据库、K8up 和 Velero 备份选�
 source: "93444605d69c"
 ---
 
-打开**集群** → **备份**，在上方的 **S3 目的地**点击**添加目的地**。注册一次后，数据库、卷和集群的备份表单都能直接选择它，不用每次重新填写端点和密钥。
+打开**集群** → **备份**，在上方的 **S3 目的地**点击**添加目的地**。注册一次后，数据库、卷和集群的备份表单都能直接选用，不用每次重新填写端点和密钥。
 
 尚未安装 Velero 也能注册目的地。目的地只是供表单选择的列表，定时和保留天数仍在各自的备份表单中设置。
 
 ## 获取 S3 存储桶
 
-还没有的话，Cloudflare R2 和 Backblaze B2 都提供兼容 S3 的存储。创建私有的存储桶，备份放在集群外面，集群出问题也还在。
+还没有存储桶时，Cloudflare R2 和 Backblaze B2 都提供兼容 S3 的存储。创建私有的存储桶，备份放在集群外面，集群出问题也还在。
 
 ### Cloudflare R2
 
@@ -61,7 +61,7 @@ source: "93444605d69c"
 
 点击**检查变更**，确认要写入的 ConfigMap 和 Secret（密钥不会显示），再应用变更。
 
-应用后，**S3 目的地**会列出名称、存储桶、文件夹和端点。列表不会检查连接，需要在备份表单中选择它并运行一次备份，才能确认端点和密钥是否正确。
+应用后，**S3 目的地**会列出名称、存储桶、文件夹和端点。列表不会检查连接，需要在备份表单中选用目的地并运行一次备份，才能确认端点和密钥是否正确。
 
 </Step>
 </Steps>
@@ -76,29 +76,29 @@ source: "93444605d69c"
 
 新的备份表单会在 **S3 目的地**菜单中默认选中第一个注册的目的地，也可以选择其他名称或**手动输入**。选择目的地后，表单会自动填入端点、存储桶、区域和文件夹，并隐藏密钥字段。应用前检查最终的文件夹路径，有些备份会在目的地的文件夹下再加一层。
 
-应用时，Zeabur 会将目的地的密钥复制到备份自己的 Secret 中。数据库和 K8up 的副本放在项目的 Namespace 中，Velero 的副本放在 Velero 的 Namespace 中。之后备份只读取这份副本，所以即使移除目的地或 Zeabur，备份也会照常运行。
+应用时，Zeabur 会将目的地的密钥复制到备份自己的 Secret 中。数据库和 K8up 的 Secret 放在项目的 Namespace 中，Velero 的放在 Velero 的 Namespace 中。之后备份只读取复制过去的密钥，所以即使移除目的地或 Zeabur，备份也会照常运行。
 
 ## 更换密钥
 
 在目的地所在行点击**编辑**。名称不能修改。两个密钥字段都留空时会沿用原密钥；要更换密钥，两项都要填写，再点击**检查变更**。
 
-检查页面会列出每份要同步更新的密钥副本，例如**更新 shop 中复制的密钥 …**。数据库、K8up 和 Velero 的副本都会在同一次应用中换成新密钥。
+检查页面会列出每份要同步更新的复制密钥，例如**更新 shop 中复制的密钥 …**。数据库、K8up 和 Velero 复制的密钥都会在同一次应用中换成新密钥。
 
 ![保存目的地前的检查页面，列出要同步更新的 shop 密钥副本](../images/shots/s3-destination-keys.avif)
 
-无法更新的副本也会列出原因，这些副本会继续使用旧密钥：
+无法更新的复制密钥会继续使用旧密钥，页面也会列出原因：
 
-- 你无权修改该副本。有权限的成员再次保存目的地后，该副本就会换成新密钥。
-- 副本没有标明密钥字段。
-- 你无权列出所有 Namespace 的 Secret，因此找不到其他位置的副本。
+- 你无权修改这份复制的密钥。有权限的成员再次保存目的地后，就会换成新密钥。
+- 复制的 Secret 没有标明密钥字段。
+- 你无权列出所有 Namespace 的 Secret，因此找不到其他位置复制的密钥。
 
 <Callout type="warn">
-在存储服务上撤销旧密钥前，先确认检查页面没有列出继续使用旧密钥的副本，并等待下一次备份成功。否则，这些备份会开始失败。
+在存储服务上撤销旧密钥前，先确认检查页面没有列出继续使用旧密钥的复制密钥，并等待下一次备份成功。否则，这些备份会开始失败。
 </Callout>
 
 ## 用 kubectl 完成相同操作
 
-一个目的地由 `zeabur-s3-destinations` Namespace 中两个同名的对象组成：ConfigMap 存放端点、存储桶、区域和文件夹，Secret 存放密钥。两个对象都要带有 label `zeabur.com/s3-destination: <名称>`，Zeabur 才会将它列入列表。`region` 和 `prefix` 没有值时可以省略。
+一个目的地由 `zeabur-s3-destinations` Namespace 中两个同名的对象组成：ConfigMap 存放端点、存储桶、区域和文件夹，Secret 存放密钥。两个对象都要带有 label `zeabur.com/s3-destination: <名称>`，Zeabur 才会列入列表。`region` 和 `prefix` 没有值时可以省略。
 
 ```yaml
 apiVersion: v1
@@ -127,7 +127,7 @@ stringData:
   AWS_SECRET_ACCESS_KEY: example-secret-key
 ```
 
-在备份表单中选择目的地后，写入项目的密钥副本如下。label 记录来源，annotation `zeabur.com/s3-destination-keys` 指明哪两个键存放访问密钥 ID 和秘密访问密钥，键名因备份类型而异。这个例子是 PostgreSQL 备份使用的 Secret：
+在备份表单中选择目的地后，写入项目的复制密钥如下。label 记录来源，annotation `zeabur.com/s3-destination-keys` 指明哪两个键存放访问密钥 ID 和秘密访问密钥，键名因备份类型而异。这个例子是 PostgreSQL 备份使用的 Secret：
 
 ```yaml
 apiVersion: v1
@@ -145,14 +145,14 @@ stringData:
   ACCESS_SECRET_KEY: example-secret-key
 ```
 
-自行更换密钥时，先修改目的地的 Secret，再找出每份副本，按照 annotation 中记录的键名逐一更新：
+自行更换密钥时，先修改目的地的 Secret，再找出每份复制的密钥，按照 annotation 中记录的键名逐一更新：
 
 ```sh
 kubectl get secret -A -l zeabur.com/s3-destination=r2-backups \
   -o custom-columns=NS:.metadata.namespace,NAME:.metadata.name,KEYS:.metadata.annotations.zeabur\.com/s3-destination-keys
 ```
 
-移除目的地就是删除这两个对象。副本不受影响：
+移除目的地就是删除这两个对象。复制出去的密钥不受影响：
 
 ```sh
 kubectl -n zeabur-s3-destinations delete configmap,secret r2-backups
@@ -162,7 +162,7 @@ kubectl -n zeabur-s3-destinations delete configmap,secret r2-backups
 
 - **集群** → **备份**的 **S3 目的地**列出名称、存储桶、文件夹和端点。
 - `kubectl -n zeabur-s3-destinations get configmap,secret -l zeabur.com/s3-destination` 列出每个目的地的 ConfigMap 和 Secret 各一个。
-- 应用备份配置后，上面的 `kubectl get secret -A -l zeabur.com/s3-destination=<名称>` 命令会多列出备份所在 Namespace 中的副本。
+- 应用备份配置后，上面的 `kubectl get secret -A -l zeabur.com/s3-destination=<名称>` 命令会多列出备份所在 Namespace 中复制的密钥。
 
 ## 常见问题
 
@@ -170,10 +170,10 @@ kubectl -n zeabur-s3-destinations delete configmap,secret r2-backups
 - 备份表单没有 **S3 目的地**菜单：尚未注册任何目的地。有权新增目的地的用户会看到提示，链接到这个区域。
 - 端点字段不能留空：注册目的地时必须填写完整的 S3 地址，AWS S3 也一样。
 - 目的地已保存，备份却失败：打开使用该目的地的备份页面，查看那次备份或存储位置的错误信息。
-- 更换目的地的密钥后，备份仍在使用旧密钥：该副本当时未能更新。请有权限的成员再次保存目的地。
+- 更换目的地的密钥后，备份仍在使用旧密钥：这份复制的密钥当时未能更新。请有权限的成员再次保存目的地。
 
 ## 移除目的地
 
 在目的地所在行点击**移除**，检查要删除的 ConfigMap 和 Secret 后确认。目的地会从列表和备份表单的菜单中消失。
 
-已经复制出去的密钥、备份定时设置和存储桶中的文件都会保留。要清理整组备份：先到每个使用它的位置停止定时备份、删除密钥副本，再到存储服务中删除这些备份文件。确认没有备份仍在使用这组密钥后，再到存储服务中撤销它。
+已经复制出去的密钥、备份定时设置和存储桶中的文件都会保留。要清理整组备份：先到每个使用这个目的地的位置停止定时备份、删除复制的密钥，再到存储服务中删除这些备份文件。确认没有备份仍在使用这组密钥后，再到存储服务中撤销密钥。

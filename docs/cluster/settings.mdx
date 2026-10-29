@@ -3,7 +3,7 @@ title: Change the cluster name, domains, and usage history
 description: Change the cluster name, usage history source, and sign-in settings in Settings, and domains for new services on the Cluster page. Each setting is stored in a config file.
 ---
 
-**Settings** in the sidebar holds settings shared across the cluster: **Cluster name**, **Usage history**, and **Sign-in**. The domains used for new service addresses are under **Cluster** → **Overview** → **Domains**. These settings are stored in config files. Anyone who can edit those config files can change the settings—usually a cluster administrator.
+**Settings** in the sidebar holds settings shared across the cluster: **Cluster name**, **Usage history**, and **Sign-in**. The domains used for new service addresses are under **Cluster** → **Overview** → **Domains**. These settings are stored in config files. Anyone who can edit those config files, usually a cluster administrator, can change the settings.
 
 The language and theme under **Preferences** are stored only in your browser and don't affect anyone else.
 
@@ -12,7 +12,7 @@ The language and theme under **Preferences** are stored only in your browser and
 ## Before you begin
 
 - Zeabur must be installed in the cluster. When you run `zeaburctl ui` on your computer, Zeabur doesn't save settings. It uses the cluster name from kubeconfig, and you must specify the usage history source with `--metrics-service`.
-- You must be able to update the `zeabur-settings` config file in the namespace where Zeabur is installed (`zeabur` by default). You also need permission to create it when saving settings for the first time.
+- You need permission to update the `zeabur-settings` config file in the namespace where Zeabur is installed (`zeabur` by default). You also need permission to create it when saving settings for the first time.
 
 ## Change the cluster name
 
@@ -48,7 +48,7 @@ Go to **Settings** → **Usage history** and enter the storage service's Kuberne
 | **No access** | You don't have permission to read this Service through the Kubernetes API. |
 | **Not responding** | The Service exists but doesn't respond to Prometheus API queries. |
 
-Anyone who can read the storage service directly can see metrics for all projects, so grant access only to people who can view the entire cluster. If you switch to another storage service, Zeabur Proxy won't read it. Project members will no longer see usage history; only people with direct read access will. Click **Use the default** to restore the installation setting.
+Anyone who can read the storage service directly can see metrics for all projects, so grant access only to people who can view the entire cluster. If you switch to another storage service, Zeabur Proxy won't read it. Project members no longer see usage history; only people with direct read access do. Click **Use the default** to restore the installation setting.
 
 ## Set domains for new services
 
