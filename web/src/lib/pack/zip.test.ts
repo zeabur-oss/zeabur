@@ -71,6 +71,17 @@ describe("a zip's modes and links", () => {
     expect(found.find((e) => e.name === "a.txt")?.mode).toBe("0000644")
   })
 
+  test("a link survives in a zip whose names are not UTF-8", async () => {
+    const bytes = new Uint8Array(
+      await zipOf({ "x/l~nk": ["d", LINK | 0o777], "x/d": ["", FILE] }).arrayBuffer(),
+    )
+    const name = strToU8("l~nk")
+    for (let at = 0; at + name.length <= bytes.length; at++)
+      if (name.every((b, i) => bytes[at + i] === b)) bytes[at + 1] = 0x8e
+    const files = await filesOfZip(new Blob([bytes]))
+    expect(files.find((f) => f.path === "l\u008enk")).toMatchObject({ link: "d" })
+  })
+
   test("a link target longer than a tar header holds survives", async () => {
     const target = `${"d/".repeat(60)}end`
     const files = await filesOfZip(zipOf({ "x/l": [target, LINK | 0o777], "x/d": ["", FILE] }))

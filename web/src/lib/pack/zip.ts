@@ -1,5 +1,5 @@
 // The files of a zip. Apart from source.ts so that the unzip code loads only for a zip.
-import { unzipSync } from "fflate"
+import { strFromU8, unzipSync } from "fflate"
 
 import { MAX_UNPACKED } from "@/lib/pack/limits"
 import { withoutRoot, type SourceFile } from "@/lib/pack/source"
@@ -46,9 +46,7 @@ function attributesOf(zip: Uint8Array): Map<string, Attributes> {
     if (next > zip.length) break
     if (view.getUint8(at + 5) === UNIX) {
       const utf8 = (view.getUint16(at + 8, true) & 0x800) !== 0
-      const name = new TextDecoder(utf8 ? "utf-8" : "latin1").decode(
-        zip.subarray(at + 46, at + 46 + nameLength),
-      )
+      const name = strFromU8(zip.subarray(at + 46, at + 46 + nameLength), !utf8)
       out.set(name, { mode: view.getUint32(at + 38, true) >>> 16 })
     }
     at = next
