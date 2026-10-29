@@ -25,7 +25,7 @@ use zeabur_installer_plan::catalog::{Default, Index};
 use zeabur_installer_plan::cluster::Distribution;
 use zeabur_installer_plan::config::{Config, Document, PersonalConfig};
 use zeabur_installer_plan::select::{BUILD_CAPABILITIES, PERSONAL, PERSONAL_DISTRIBUTION};
-use zeabur_installer_plan::{kubesolo, personal, plan};
+use zeabur_installer_plan::{kubesolo, node_name, personal, plan};
 
 use self::http::{Request, Response};
 use crate::{InstallError, apply, load, out, render};
@@ -216,9 +216,21 @@ impl Server {
         } else {
             "team"
         };
-        let team = team.or_else(|| Config::defaults(&addresses));
-        let personal = personal.unwrap_or_else(PersonalConfig::defaults);
+        let mut team = team.or_else(|| Config::defaults(&addresses));
+        let mut personal = personal.unwrap_or_else(PersonalConfig::defaults);
         let host = facts::read().ok();
+        if let Some(f) = &host {
+            // Written into the saved configuration, so apply uses the name the page showed.
+            for configured in team
+                .iter_mut()
+                .map(|c| &mut c.host.node_name)
+                .chain([&mut personal.host.node_name])
+            {
+                if let Ok(name) = node_name::choose(configured.as_deref(), f, &[]) {
+                    *configured = Some(name);
+                }
+            }
+        }
         let facts = host.as_ref().map_or(Value::Null, |f| json!(f));
         let checks: serde_json::Map<String, Value> = Distribution::ALL
             .into_iter()

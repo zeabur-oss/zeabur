@@ -1,7 +1,12 @@
 //! Facts about the host the plan depends on.
 
 use std::fs;
+use std::path::Path;
 
+use base64::Engine as _;
+use base64::engine::general_purpose::STANDARD;
+use zeabur_installer_plan::cluster::Distribution;
+use zeabur_installer_plan::kubesolo;
 use zeabur_installer_plan::plan::Facts;
 
 use crate::HostError;
@@ -25,6 +30,8 @@ pub fn read() -> Result<Facts, HostError> {
     Ok(Facts {
         arch: arch(std::env::consts::ARCH).to_owned(),
         hostname: hostname.trim().to_owned(),
+        node_name: installed_node_name(Path::new("/")),
+        host_hex: host_hex()?,
         memory_mib: memory_mib(&meminfo).ok_or_else(|| HostError::Parse {
             what: "/proc/meminfo".to_owned(),
             reason: "no MemTotal".to_owned(),
@@ -32,6 +39,77 @@ pub fn read() -> Result<Facts, HostError> {
         node_ips,
         node_prefix,
     })
+}
+
+/// Six hex digits of the machine id's hash, so `plan` and a later `apply` pick the same name;
+/// random without one.
+fn host_hex() -> Result<String, HostError> {
+    use sha2::{Digest as _, Sha256};
+    let hex = match fs::read_to_string("/etc/machine-id") {
+        Ok(id) if !id.trim().is_empty() => hex::encode(Sha256::digest(id.trim())),
+        _ => crate::files::random_hex()?,
+    };
+    Ok(hex.chars().take(6).collect())
+}
+
+/// The name K3s, RKE2 or `KubeSolo` already gives this node: the `node-name` of its
+/// configuration, else the subject of the kubelet's certificate. `root` prefixes every path.
+#[must_use]
+pub fn installed_node_name(root: &Path) -> Option<String> {
+    let at = |path: &str| root.join(path.trim_start_matches('/'));
+    let configured = Distribution::ALL.into_iter().find_map(|d| {
+        let dir = at(d.layout().config_dir);
+        let mut files = vec![dir.join("config.yaml")];
+        let mut drop_ins: Vec<_> = fs::read_dir(dir.join("config.yaml.d"))
+            .into_iter()
+            .flatten()
+            .flatten()
+            .map(|e| e.path())
+            .filter(|p| p.extension().is_some_and(|e| e == "yaml"))
+            .collect();
+        drop_ins.sort();
+        files.extend(drop_ins);
+        files
+            .iter()
+            .filter_map(|f| yaml_string(f, &["node-name"]))
+            .next_back()
+    });
+    configured
+        .or_else(|| yaml_string(&at(kubesolo::CONFIG_FILE), &["kubernetes", "nodeName"]))
+        .or_else(|| {
+            Distribution::ALL
+                .into_iter()
+                .map(|d| d.layout().kubelet_cert)
+                .chain([kubesolo::KUBELET_CERT])
+                .find_map(|cert| cert_node_name(&fs::read_to_string(at(cert)).ok()?))
+        })
+        .map(|name| name.trim().to_ascii_lowercase())
+        .filter(|name| !name.is_empty())
+}
+
+fn yaml_string(path: &Path, keys: &[&str]) -> Option<String> {
+    let value: serde_json::Value = serde_saphyr::from_str(&fs::read_to_string(path).ok()?).ok()?;
+    keys.iter()
+        .try_fold(&value, |v, k| v.get(k))?
+        .as_str()
+        .map(str::to_owned)
+}
+
+/// The node in a kubelet certificate's `system:node:<name>` subject.
+fn cert_node_name(pem: &str) -> Option<String> {
+    const PREFIX: &[u8] = b"system:node:";
+    let body: String = pem
+        .lines()
+        .skip_while(|l| !l.starts_with("-----BEGIN CERTIFICATE-----"))
+        .skip(1)
+        .take_while(|l| !l.starts_with("-----END"))
+        .collect();
+    let der = STANDARD.decode(body).ok()?;
+    let at = der.windows(PREFIX.len()).position(|w| w == PREFIX)?;
+    // The string's DER length byte comes just before it; node names fit its short form.
+    let len = usize::from(*der.get(at.checked_sub(1)?)?);
+    let name = der.get(at + PREFIX.len()..at + len)?;
+    String::from_utf8(name.to_vec()).ok()
 }
 
 /// A global address of the host, as `ip -o addr` shows it.
@@ -192,6 +270,66 @@ mod tests {
 2: enp0s5    inet6 fdb2:2c26:f4e4:0:9b2d:5a24:581b:f432/64 scope global temporary dynamic \\       valid_lft 172109sec preferred_lft 85390sec
 2: enp0s5    inet6 fdb2:2c26:f4e4:0:3ad8:c781:797:77a5/64 scope global dynamic mngtmpaddr noprefixroute \\       valid_lft 2591869sec preferred_lft 604669sec
 ";
+
+    fn write(root: &Path, path: &str, content: &str) {
+        let path = root.join(path.trim_start_matches('/'));
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(path, content).unwrap();
+    }
+
+    fn cert(subject: &str) -> String {
+        let mut der = vec![0x30, 0x00, 0x0C, u8::try_from(subject.len()).unwrap()];
+        der.extend(subject.as_bytes());
+        der.extend([0x30, 0x00]);
+        format!(
+            "-----BEGIN CERTIFICATE-----\n{}\n-----END CERTIFICATE-----\n",
+            STANDARD.encode(der)
+        )
+    }
+
+    #[test]
+    fn a_node_keeps_the_name_its_configuration_gives_it() {
+        let root = tempfile::tempdir().unwrap();
+        let root = root.path();
+        assert_eq!(installed_node_name(root), None);
+        write(
+            root,
+            "/etc/rancher/k3s/config.yaml",
+            "protect-kernel-defaults: true\n",
+        );
+        write(
+            root,
+            "/var/lib/rancher/k3s/agent/client-kubelet.crt",
+            &cert("system:node:Old-Host"),
+        );
+        assert_eq!(installed_node_name(root).as_deref(), Some("old-host"));
+        write(
+            root,
+            "/etc/rancher/k3s/config.yaml.d/15-node-name.yaml",
+            "node-name: vps-1\n",
+        );
+        assert_eq!(installed_node_name(root).as_deref(), Some("vps-1"));
+        write(
+            root,
+            "/etc/rancher/k3s/config.yaml.d/90-local.yaml",
+            "node-name: db-1\n",
+        );
+        assert_eq!(installed_node_name(root).as_deref(), Some("db-1"));
+    }
+
+    #[test]
+    fn kubesolo_keeps_its_name_too() {
+        let root = tempfile::tempdir().unwrap();
+        let root = root.path();
+        write(root, kubesolo::KUBELET_CERT, &cert("system:node:solo"));
+        assert_eq!(installed_node_name(root).as_deref(), Some("solo"));
+        write(
+            root,
+            kubesolo::CONFIG_FILE,
+            "kind: Config\nkubernetes:\n  nodeName: \"solo-2\"\n",
+        );
+        assert_eq!(installed_node_name(root).as_deref(), Some("solo-2"));
+    }
 
     #[test]
     fn node_ips_leave_temporary_addresses_out() {

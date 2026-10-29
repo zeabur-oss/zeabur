@@ -1,12 +1,14 @@
 Join https://10.0.0.5:6443 as a worker
 K3s agent <version> (pinned, checked against this installer's digests), CIS hardened, on vps-2 (amd64, 8192 MiB)
 Installs K3s only: Zeabur, Zeabur Identity and the catalog's components are already in the cluster.
+Node name        vps-2
 Node addresses   10.0.0.6, fd00::6 (temporary IPv6 addresses left out)
 
 Files
   /etc/sysctl.d/60-k3s-cis.conf
   /etc/rancher/k3s/config.yaml
   /etc/rancher/k3s/config.yaml.d/10-join.yaml
+  /etc/rancher/k3s/config.yaml.d/15-node-name.yaml
   /etc/rancher/k3s/config.yaml.d/20-node-ip.yaml
   /etc/rancher/k3s/zeabur-join-token (the token, mode 0600)
 

@@ -6,6 +6,7 @@ pub mod config;
 pub mod join;
 pub mod k3s;
 pub mod kubesolo;
+pub mod node_name;
 pub mod personal;
 pub mod pins;
 pub mod plan;

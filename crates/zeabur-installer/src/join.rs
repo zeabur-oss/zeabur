@@ -95,11 +95,6 @@ pub(crate) fn show_plan(config: &JoinConfig, json: bool) -> Result<(), InstallEr
     Ok(())
 }
 
-/// The node's name: K3s and RKE2 use the host name, in lower case.
-fn node_name(hostname: &str) -> String {
-    hostname.to_ascii_lowercase()
-}
-
 pub(crate) fn apply(config: &JoinConfig) -> Result<(), InstallError> {
     let (plan, token) = make_plan(config)?;
     out::line(render::join_plan(&plan).trim_end());
@@ -129,7 +124,7 @@ pub(crate) fn apply(config: &JoinConfig) -> Result<(), InstallError> {
         changed,
     })?;
 
-    let name = node_name(&plan.facts.hostname);
+    let name = plan.node_name.clone();
     out::step(&format!("Waiting for node {name} to be Ready"));
     let own = own_kubectl(distribution);
     kubectl::poll(
@@ -237,7 +232,7 @@ pub(crate) fn doctor(config: &JoinConfig) -> ExitCode {
     }
     results.push((Status::Pass, format!("{unit} is running")));
 
-    let name = facts::read().map_or_else(|_| String::new(), |f| node_name(&f.hostname));
+    let name = facts::read().map_or_else(|_| String::new(), |f| f.own_node_name());
     let own = own_kubectl(distribution);
     results.push(match node_ready(&own, &name, None) {
         Ok(true) => (Status::Pass, format!("node {name} is Ready")),
@@ -397,7 +392,7 @@ pub(crate) fn uninstall(config: &JoinConfig, path: &Path, purge: bool) -> Result
 
 /// How to take a joined node out of the cluster.
 fn take_out(config: &JoinConfig) -> InstallError {
-    let name = facts::read().map_or_else(|_| "<node>".to_owned(), |f| node_name(&f.hostname));
+    let name = facts::read().map_or_else(|_| "<node>".to_owned(), |f| f.own_node_name());
     let distribution = config.distribution;
     let layout = distribution.layout();
     let kubectl = format!(

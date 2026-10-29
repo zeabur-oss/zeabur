@@ -62,7 +62,7 @@ pub(crate) fn run(config_path: &Path) -> Result<(), InstallError> {
         files::set_modes(Path::new(k3s::TLS_DIR), ".crt", 0o600)?;
     }
     if started.is_some() {
-        let name = plan.facts.hostname.to_ascii_lowercase();
+        let name = plan.node_name.clone();
         kubectl::poll(
             Duration::from_mins(10),
             &format!("node {name} to be Ready"),

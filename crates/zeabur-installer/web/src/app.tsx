@@ -78,6 +78,8 @@ export interface Wizard {
   /** The configuration of the chosen kind, as `apply` gets it. */
   active: Config | PersonalConfig
   setChoices: (choices: Choices) => void
+  /** Sets `host.nodeName` in the configuration of the chosen kind. */
+  setNodeName: (name: string) => void
   steps: readonly Step[]
   secrets: Secrets
   planned: Planned | null
@@ -217,6 +219,10 @@ export function App() {
             use === "personal"
               ? setPersonal({ ...personal, ...choices })
               : setConfigState({ ...config, ...choices }),
+          setNodeName: (nodeName) =>
+            use === "personal"
+              ? setPersonal({ ...personal, host: { ...personal.host, nodeName } })
+              : setConfigState({ ...config, host: { ...config.host, nodeName } }),
           steps: shownSteps,
           secrets,
           planned,

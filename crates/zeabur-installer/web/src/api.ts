@@ -67,7 +67,7 @@ export interface Config {
   distribution: Distribution
   k3sVersion?: string | null
   rke2Version?: string | null
-  host: { tlsSan: string[]; requireEncryptedDisk: boolean }
+  host: { tlsSan: string[]; requireEncryptedDisk: boolean; nodeName?: string }
   sources: Record<string, unknown>
 }
 
@@ -82,12 +82,18 @@ export interface PersonalConfig {
   inputs: Record<string, Record<string, unknown>>
   secretFiles: Record<string, Record<string, string>>
   allowDataLoss?: string[]
-  host: { tlsSan: string[]; requireEncryptedDisk: boolean }
+  host: { tlsSan: string[]; requireEncryptedDisk: boolean; nodeName?: string }
   sources: Record<string, unknown>
 }
 
 export interface ServerState {
-  facts: { arch: string; hostname: string; memoryMib: number } | null
+  facts: {
+    arch: string
+    hostname: string
+    memoryMib: number
+    /** The name an earlier install gave this node; it cannot change. */
+    nodeName: string | null
+  } | null
   /** The checks for a team install on each distribution. */
   checks: Record<Distribution, Check[]>
   /** The checks for a personal install. */

@@ -676,7 +676,8 @@
     "enable": [],
     "host": {
       "requireEncryptedDisk": false,
-      "tlsSan": []
+      "tlsSan": [],
+      "nodeName": "vps-1"
     },
     "inputs": {},
     "preset": "standard",
@@ -701,14 +702,17 @@
     "arch": "amd64",
     "hostname": "vps-1",
     "memoryMib": 5836,
-    "nodeIps": ["203.0.113.10"]
+    "nodeIps": ["203.0.113.10"],
+    "nodeName": null,
+    "randomHex": "3f9a2c"
   },
   "personal": {
     "disable": [],
     "enable": [],
     "host": {
       "requireEncryptedDisk": false,
-      "tlsSan": []
+      "tlsSan": [],
+      "nodeName": "vps-1"
     },
     "inputs": {},
     "secretFiles": {},

@@ -17,7 +17,7 @@ use crate::pins::{self, CALICO, K3S, K3s, RKE2};
 use crate::remove::Removal;
 use crate::select::{self, Selection, Why};
 use crate::storage::{self, NodePrep, Storage};
-use crate::{PlanError, values};
+use crate::{PlanError, node_name, values};
 
 /// The label and field manager on everything the installer creates.
 pub const MANAGER: &str = "zeabur-installer";
@@ -80,6 +80,10 @@ pub struct Facts {
     pub arch: String,
     /// The host name; the default cluster name.
     pub hostname: String,
+    /// The name an earlier install gave this node in Kubernetes; a re-run keeps it.
+    pub node_name: Option<String>,
+    /// Six hexadecimal digits from the machine id, for a node name when the host name will not do.
+    pub host_hex: String,
     /// Memory in MiB.
     pub memory_mib: u64,
     /// The addresses the node registers with (`node-ip`); empty leaves the choice to K3s or RKE2.
@@ -88,12 +92,25 @@ pub struct Facts {
     pub node_prefix: Option<u8>,
 }
 
+impl Facts {
+    /// The name this host has as a node: [`Self::node_name`], else the host name in lower case,
+    /// as K3s, RKE2 and `KubeSolo` name a node they are not told the name of.
+    #[must_use]
+    pub fn own_node_name(&self) -> String {
+        self.node_name
+            .clone()
+            .unwrap_or_else(|| self.hostname.to_ascii_lowercase())
+    }
+}
+
 /// The whole plan.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Plan {
     /// Facts it was computed from.
     pub facts: Facts,
+    /// The node's name in Kubernetes, written into the distribution's configuration.
+    pub node_name: String,
     /// The Kubernetes release.
     pub cluster: ClusterPlan,
     /// Calico's manifest, applied once K3s's API answers; `None` on RKE2, which brings Canal.
@@ -387,6 +404,7 @@ pub fn plan(index: &Index, config: &Config, facts: &Facts) -> Result<Plan, PlanE
             have: facts.memory_mib,
         });
     }
+    let node_name = node_name::choose(config.host.node_name.as_deref(), facts, &[])?;
     let selection = select::select(index, config)?;
     let profile = config.profile.as_str();
     let chosen: BTreeSet<&str> = selection
@@ -436,13 +454,20 @@ pub fn plan(index: &Index, config: &Config, facts: &Facts) -> Result<Plan, PlanE
     )?;
 
     let zot_cluster_ip = zot_cluster_ip(index, &config.inputs, &chosen);
-    let host_files = server_files(config, &chosen, facts, zot_cluster_ip.as_deref());
+    let host_files = server_files(
+        config,
+        &chosen,
+        facts,
+        &node_name,
+        zot_cluster_ip.as_deref(),
+    );
 
     let memory = memory(distribution, &components, facts.memory_mib, &mut warnings);
 
     Ok(Plan {
         storage: storage_plan(&components, profile, &mut warnings),
         facts: facts.clone(),
+        node_name,
         cluster,
         calico: (distribution == Distribution::K3s).then(|| CALICO.manifest().into()),
         host_file_paths: host_files.iter().map(|f| f.path.clone()).collect(),
@@ -1130,6 +1155,7 @@ fn server_files(
     config: &Config,
     chosen: &BTreeSet<&str>,
     facts: &Facts,
+    node_name: &str,
     zot_cluster_ip: Option<&str>,
 ) -> Vec<HostFile> {
     let distribution = config.distribution;
@@ -1138,6 +1164,7 @@ fn server_files(
         disable: packaged_to_disable(distribution, chosen),
         identity: config.zeabur,
     });
+    files.push(distribution.node_name_file(node_name));
     files.extend(distribution.node_ip_file(&facts.node_ips));
     files.extend(zot_cluster_ip.map(|ip| distribution.registries_file(ip)));
     files
@@ -1571,6 +1598,8 @@ mod tests {
         Facts {
             arch: "arm64".to_owned(),
             hostname: "vps-1".to_owned(),
+            node_name: None,
+            host_hex: "a1b2c3".to_owned(),
             memory_mib: 8192,
             node_ips: vec!["10.0.0.5".to_owned()],
             node_prefix: Some(24),
@@ -1631,6 +1660,37 @@ mod tests {
         assert_eq!(plan.storage.default_class, "local-path");
         assert_eq!(plan.storage.other_classes, Vec::<String>::new());
         assert_eq!(plan.node_prep, None);
+    }
+
+    #[test]
+    fn the_server_is_named_in_its_k3s_configuration() {
+        let index = Index::parse(INDEX.as_bytes()).unwrap();
+        let named = |extra: &str, facts: &Facts| {
+            let plan = plan(&index, &config(extra), facts)?;
+            let file = plan
+                .host_files
+                .iter()
+                .find(|f| f.path == "/etc/rancher/k3s/config.yaml.d/15-node-name.yaml")
+                .unwrap();
+            let value: Value = serde_saphyr::from_str(&file.content).unwrap();
+            assert_eq!(value["node-name"], plan.node_name.as_str());
+            Ok::<_, PlanError>(plan.node_name)
+        };
+        assert_eq!(named("", &facts()).unwrap(), "vps-1");
+        assert_eq!(named("host: {nodeName: db-1}\n", &facts()).unwrap(), "db-1");
+        assert_eq!(named("host: {nodeName: \"on\"}\n", &facts()).unwrap(), "on");
+        assert_eq!(
+            named("host: {nodeName: \"001\"}\n", &facts()).unwrap(),
+            "001"
+        );
+        let mut cloud = facts();
+        cloud.hostname = "ip-10-0-0-5".to_owned();
+        assert_eq!(named("", &cloud).unwrap(), "node-a1b2c3");
+        let mut renamed = facts();
+        renamed.hostname = "10-0-0-5".to_owned();
+        renamed.node_name = Some("vps-1".to_owned());
+        assert_eq!(named("", &renamed).unwrap(), "vps-1");
+        assert!(named("host: {nodeName: db-1}\n", &renamed).is_err());
     }
 
     #[test]

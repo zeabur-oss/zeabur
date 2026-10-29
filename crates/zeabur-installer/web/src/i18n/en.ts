@@ -62,6 +62,10 @@ export const en = {
     "Nothing changes until you install. A failed check has to be fixed first; a warning is worth reading.",
   "host.server": "This server",
   "host.name": "Host name",
+  "host.nodeName": "Node name",
+  "host.nodeNameHint":
+    "Kubernetes knows this server by this name. It stays the same if the host name changes later.",
+  "host.nodeNameKept": "This server is already installed under this name, so it stays.",
   "host.arch": "Architecture",
   "host.memory": "Memory",
   "host.addresses": "Addresses",

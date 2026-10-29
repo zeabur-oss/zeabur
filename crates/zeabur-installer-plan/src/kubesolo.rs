@@ -20,6 +20,8 @@ pub const DATA_DIR: &str = "/var/lib/kubesolo";
 pub const CONFIG_FILE: &str = "/etc/kubesolo/config.yaml";
 /// The unit file.
 pub const UNIT_FILE: &str = "/etc/systemd/system/kubesolo.service";
+/// The kubelet's certificate, whose subject names the node.
+pub const KUBELET_CERT: &str = "/var/lib/kubesolo/pki/kubelet/kubelet.crt";
 /// The cluster-admin kubeconfig `KubeSolo` writes.
 pub const ADMIN_KUBECONFIG: &str = "/var/lib/kubesolo/pki/admin/admin.kubeconfig";
 /// The script the unit runs after `KubeSolo` starts; see [`host_files`].
@@ -77,6 +79,8 @@ pub fn zot_hosts_file(cluster_ip: &str) -> HostFile {
 /// What the configuration file sets.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Options {
+    /// The node's name, so a later change of the host name does not register a second node.
+    pub node_name: String,
     /// The address the node registers with and the kubeconfig names; `None` lets `KubeSolo`
     /// choose, preferring a private address.
     pub node_ip: Option<String>,
@@ -102,9 +106,12 @@ pub fn host_files(options: &Options) -> Vec<HostFile> {
     if let Some(ip) = &options.node_ip {
         lines.extend(["network:".to_owned(), format!("  nodeIP: {}", json!(ip))]);
     }
+    lines.extend([
+        "kubernetes:".to_owned(),
+        format!("  nodeName: {}", json!(options.node_name)),
+    ]);
     if !options.tls_san.is_empty() {
         lines.extend([
-            "kubernetes:".to_owned(),
             "  apiServer:".to_owned(),
             format!("    extraSANs: {}", json!(options.tls_san)),
         ]);
@@ -313,6 +320,7 @@ mod tests {
     #[test]
     fn the_config_names_the_address_and_certificate_names() {
         let files = host_files(&Options {
+            node_name: "solo".to_owned(),
             node_ip: Some("10.0.0.5".to_owned()),
             tls_san: vec!["solo.example.com".to_owned()],
         });
@@ -321,16 +329,19 @@ mod tests {
         let value: Value = serde_saphyr::from_str(&config.content).unwrap();
         assert_eq!(value["kind"], "Config");
         assert_eq!(value["network"]["nodeIP"], "10.0.0.5");
+        assert_eq!(value["kubernetes"]["nodeName"], "solo");
         assert_eq!(
             value["kubernetes"]["apiServer"]["extraSANs"],
             json!(["solo.example.com"])
         );
         let bare = host_files(&Options {
+            node_name: "solo".to_owned(),
             node_ip: None,
             tls_san: Vec::new(),
         });
         let value: Value = serde_saphyr::from_str(&bare[0].content).unwrap();
         assert!(value.get("network").is_none());
+        assert_eq!(value["kubernetes"], json!({"nodeName": "solo"}));
         let unit = files.iter().find(|f| f.path == UNIT_FILE).unwrap();
         assert!(
             unit.content

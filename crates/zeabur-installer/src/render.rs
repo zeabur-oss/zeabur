@@ -23,6 +23,7 @@ pub(crate) fn plan(plan: &Plan) -> String {
             plan.facts.memory_mib
         ),
     );
+    node_name(&mut s, &plan.node_name);
     node_addresses(&mut s, &plan.facts.node_ips);
     push(&mut s, "");
     components(&mut s, &plan.components, &plan.left_out);
@@ -185,6 +186,7 @@ pub(crate) fn personal_plan(plan: &PersonalPlan) -> String {
             plan.facts.memory_mib
         ),
     );
+    node_name(&mut s, &plan.node_name);
     push(
         &mut s,
         &format!(
@@ -263,6 +265,7 @@ pub(crate) fn join_plan(plan: &JoinPlan) -> String {
              already in the cluster."
         ),
     );
+    node_name(&mut s, &plan.node_name);
     node_addresses(&mut s, &plan.facts.node_ips);
     push(&mut s, "");
     push(&mut s, "Files");
@@ -376,6 +379,10 @@ const fn support(pinned: bool) -> &'static str {
 }
 
 /// The addresses the node registers with, which the network policies let in.
+fn node_name(s: &mut String, name: &str) {
+    push(s, &format!("Node name        {name}"));
+}
+
 fn node_addresses(s: &mut String, addresses: &[String]) {
     let text = if addresses.is_empty() {
         "chosen by Kubernetes: this host's addresses could not be read".to_owned()
@@ -409,6 +416,8 @@ mod tests {
             facts: Facts {
                 arch: "amd64".to_owned(),
                 hostname: "vps-2".to_owned(),
+                node_name: None,
+                host_hex: "a1b2c3".to_owned(),
                 memory_mib: 8192,
                 node_ips: vec!["10.0.0.6".to_owned(), "fd00::6".to_owned()],
                 node_prefix: None,

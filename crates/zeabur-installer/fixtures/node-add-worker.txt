@@ -5,6 +5,7 @@ join:
   server: https://10.0.0.5:9345
   role: worker
   token: K10aa::abcdef.0123456789abcdef
+  nodeNames: [vps-1, vps-2]
 EOF
 zeabur-installer plan    # what it installs, the distance to this server and warnings
 zeabur-installer apply   # installs RKE2 and waits until the node is Ready

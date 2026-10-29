@@ -42,6 +42,8 @@ pub struct PersonalPlan {
     pub use_: &'static str,
     /// Facts it was computed from.
     pub facts: Facts,
+    /// The node's name in Kubernetes, written into `KubeSolo`'s configuration.
+    pub node_name: String,
     /// The `KubeSolo` release.
     pub kubesolo: KubeSoloPlan,
     /// The standalone helm-controller.
@@ -144,13 +146,11 @@ pub fn plan(
     config: &PersonalConfig,
     facts: &Facts,
 ) -> Result<PersonalPlan, PlanError> {
+    let node_name = crate::node_name::choose(config.host.node_name.as_deref(), facts, &[])?;
     let arch = facts.arch.as_str();
-    let archive = KUBESOLO
-        .archive(arch)
-        .ok_or_else(|| PlanError::Arch(arch.to_owned()))?;
-    let kubectl = KUBECTL
-        .binary(arch)
-        .ok_or_else(|| PlanError::Arch(arch.to_owned()))?;
+    let no_release = || PlanError::Arch(arch.to_owned());
+    let archive = KUBESOLO.archive(arch).ok_or_else(no_release)?;
+    let kubectl = KUBECTL.binary(arch).ok_or_else(no_release)?;
     let mut warnings = vec![warning(
         "personal.isolation",
         &[],
@@ -218,6 +218,7 @@ pub fn plan(
     let chosen = components.iter().map(|c| c.id.as_str()).collect();
     let zot_cluster_ip = zot_cluster_ip(index, &config.inputs, &chosen);
     let mut host_files = kubesolo::host_files(&kubesolo::Options {
+        node_name: node_name.clone(),
         node_ip: facts.node_ips.first().cloned(),
         tls_san: config.host.tls_san.clone(),
     });
@@ -225,6 +226,7 @@ pub fn plan(
     Ok(PersonalPlan {
         use_: "personal",
         facts: facts.clone(),
+        node_name,
         kubesolo: KubeSoloPlan {
             version: KUBESOLO.version.to_owned(),
             kubernetes: KUBESOLO.kubernetes.to_owned(),
@@ -259,6 +261,8 @@ mod tests {
         Facts {
             arch: "arm64".to_owned(),
             hostname: "solo".to_owned(),
+            node_name: None,
+            host_hex: "a1b2c3".to_owned(),
             memory_mib,
             node_ips: vec!["10.0.0.5".to_owned()],
             node_prefix: None,
@@ -271,6 +275,27 @@ mod tests {
 
     fn ids(plan: &PersonalPlan) -> Vec<&str> {
         plan.components.iter().map(|c| c.id.as_str()).collect()
+    }
+
+    #[test]
+    fn kubesolo_is_told_the_node_name() {
+        let index = Index::parse(INDEX.as_bytes()).unwrap();
+        let name = |extra: &str, facts: &Facts| {
+            let plan = plan(&index, &config(extra), facts).unwrap();
+            let file = plan
+                .host_files
+                .iter()
+                .find(|f| f.path == kubesolo::CONFIG_FILE)
+                .unwrap();
+            let value: serde_json::Value = serde_saphyr::from_str(&file.content).unwrap();
+            value["kubernetes"]["nodeName"].as_str().unwrap().to_owned()
+        };
+        assert_eq!(name("", &facts(4096)), "solo");
+        assert_eq!(name("host: {nodeName: laptop}\n", &facts(4096)), "laptop");
+        let mut kept = facts(4096);
+        kept.hostname = "10-0-0-5".to_owned();
+        kept.node_name = Some("solo".to_owned());
+        assert_eq!(name("", &kept), "solo");
     }
 
     #[test]

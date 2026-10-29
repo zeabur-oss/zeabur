@@ -8,11 +8,11 @@
 
 use serde::Serialize;
 
-use crate::PlanError;
 use crate::cluster::{self, Distribution, HostFile};
 use crate::config::{JoinConfig, Role};
 use crate::plan::{ClusterPlan, Facts, Warning, cluster_plan, warning};
 use crate::storage::{self, NodePrep};
+use crate::{PlanError, node_name};
 
 /// Connections timed to the server's join port.
 pub const RTT_SAMPLES: usize = 5;
@@ -129,6 +129,8 @@ pub fn ms(us: u64) -> String {
 pub struct JoinPlan {
     /// Facts it was computed from.
     pub facts: Facts,
+    /// The node's name in Kubernetes, written into the distribution's configuration.
+    pub node_name: String,
     /// `worker` or `server`.
     pub role: Role,
     /// The URL it joins through.
@@ -336,9 +338,15 @@ fn standing_warnings(
 ///
 /// # Errors
 ///
-/// When the architecture has no release, or K3s is asked for a second server.
+/// When the architecture has no release, K3s is asked for a second server, or the node name
+/// cannot be used.
 pub fn plan(config: &JoinConfig, facts: &JoinFacts) -> Result<JoinPlan, PlanError> {
     let join = &config.join;
+    let node_name = node_name::choose(
+        config.host.node_name.as_deref(),
+        &facts.facts,
+        &join.node_names,
+    )?;
     let distribution = config.distribution;
     let mut warnings = Vec::new();
     let mut blockers = Vec::new();
@@ -364,6 +372,7 @@ pub fn plan(config: &JoinConfig, facts: &JoinFacts) -> Result<JoinPlan, PlanErro
         }
     };
     host_files.push(distribution.join_file(&join.server));
+    host_files.push(distribution.node_name_file(&node_name));
     host_files.extend(distribution.node_ip_file(&facts.facts.node_ips));
     if let Some(zot) = &join.zot {
         host_files.push(distribution.registries_file(&zot.cluster_ip.to_string()));
@@ -396,6 +405,7 @@ pub fn plan(config: &JoinConfig, facts: &JoinFacts) -> Result<JoinPlan, PlanErro
 
     Ok(JoinPlan {
         facts: facts.facts.clone(),
+        node_name,
         role: join.role,
         server: join.server.clone(),
         unit,
@@ -440,6 +450,8 @@ mod tests {
             facts: Facts {
                 arch: "amd64".to_owned(),
                 hostname: "vps-2".to_owned(),
+                node_name: None,
+                host_hex: "a1b2c3".to_owned(),
                 memory_mib: 4096,
                 node_ips: vec!["10.0.0.6".to_owned(), "fd00::6".to_owned()],
                 node_prefix: None,
@@ -496,6 +508,7 @@ mod tests {
                 "/etc/sysctl.d/60-rke2-cis.conf",
                 "/etc/rancher/rke2/config.yaml",
                 "/etc/rancher/rke2/config.yaml.d/10-join.yaml",
+                "/etc/rancher/rke2/config.yaml.d/15-node-name.yaml",
                 "/etc/rancher/rke2/config.yaml.d/20-node-ip.yaml",
             ]
         );
@@ -518,6 +531,33 @@ mod tests {
         assert_eq!(closed.values, ["10250", "10.0.0.5"]);
         let udp = p.ports.iter().find(|p| p.protocol == "udp").unwrap();
         assert_eq!(udp.open, None);
+    }
+
+    #[test]
+    fn a_joining_node_is_named_once_and_apart_from_the_other_nodes() {
+        let name_in = |p: &JoinPlan| {
+            let file = p
+                .host_files
+                .iter()
+                .find(|f| f.path.ends_with("15-node-name.yaml"))
+                .unwrap();
+            let value: serde_json::Value = serde_saphyr::from_str(&file.content).unwrap();
+            value["node-name"].as_str().unwrap().to_owned()
+        };
+        let p = plan(&config(""), &facts(&[500; 5])).unwrap();
+        assert_eq!(
+            (p.node_name.as_str(), name_in(&p).as_str()),
+            ("vps-2", "vps-2")
+        );
+        let taken = plan(&config("  nodeNames: [vps-1, vps-2]\n"), &facts(&[500; 5])).unwrap();
+        assert_eq!(name_in(&taken), "node-a1b2c3");
+        assert!(
+            plan(
+                &config("  nodeNames: [vps-1]\nhost: {nodeName: vps-1}\n"),
+                &facts(&[500; 5])
+            )
+            .is_err()
+        );
     }
 
     #[test]

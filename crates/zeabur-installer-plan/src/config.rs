@@ -167,7 +167,7 @@ impl PersonalConfig {
                     .to_owned(),
             ));
         }
-        Ok(())
+        self.host.check()
     }
 }
 
@@ -226,6 +226,18 @@ pub struct Host {
     /// Stop when the root or data directory is not on an encrypted device.
     #[serde(default)]
     pub require_encrypted_disk: bool,
+    /// The node's name in Kubernetes. Absent: the host name in lower case, unless it is made
+    /// from the host's address, then `node-<6 hex>`. Once installed, a node keeps its name.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub node_name: Option<String>,
+}
+
+impl Host {
+    fn check(&self) -> Result<(), PlanError> {
+        self.node_name
+            .as_deref()
+            .map_or(Ok(()), crate::node_name::check)
+    }
 }
 
 /// Development sources, used while a component has no published, pinned release.
@@ -332,6 +344,9 @@ pub struct Join {
     /// The cluster runs the catalog's zot, so this node pulls its images through a mirror, as
     /// `node add` printed it.
     pub zot: Option<ZotMirror>,
+    /// The names of the cluster's nodes, as `node add` printed them; this node takes another.
+    #[serde(default)]
+    pub node_names: Vec<String>,
 }
 
 /// zot's fixed `ClusterIP` and the CA of its certificate.
@@ -354,6 +369,7 @@ impl std::fmt::Debug for Join {
             .field("server_config", &self.server_config)
             .field("longhorn", &self.longhorn)
             .field("zot", &self.zot)
+            .field("node_names", &self.node_names)
             .finish()
     }
 }
@@ -466,7 +482,7 @@ impl JoinConfig {
                     .to_owned(),
             ));
         }
-        Ok(())
+        self.host.check()
     }
 }
 
@@ -702,7 +718,7 @@ impl Config {
                     .to_owned(),
             ));
         }
-        Ok(())
+        self.host.check()
     }
 
     /// The release chosen instead of the pinned one, for the distribution.
@@ -790,6 +806,16 @@ mod tests {
         let shared = MINIMAL.replace("zeabur.example.com", "login.example.com");
         assert!(Config::parse(&shared).is_err());
         assert!(Config::parse(&format!("{MINIMAL}typo: 1\n")).is_err());
+    }
+
+    #[test]
+    fn a_node_name_must_be_a_kubernetes_name() {
+        let named = Config::parse(&format!("{MINIMAL}host: {{nodeName: db-1}}\n")).unwrap();
+        assert_eq!(named.host.node_name.as_deref(), Some("db-1"));
+        assert!(Config::parse(&format!("{MINIMAL}host: {{nodeName: DB_1}}\n")).is_err());
+        assert!(PersonalConfig::parse("use: personal\nhost: {nodeName: -solo}\n").is_err());
+        assert!(join("host: {nodeName: Worker.1}\n").is_err());
+        assert!(join("host: {nodeName: worker-1}\n").is_ok());
     }
 
     #[test]

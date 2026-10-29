@@ -110,10 +110,7 @@ pub(crate) fn run() -> ExitCode {
         Err(e) => results.push((Status::Fail, format!("reading the install record: {e}"))),
     }
     if let Ok(host) = facts::read() {
-        results.push(crate::join::node_addresses(
-            &kubectl,
-            &host.hostname.to_ascii_lowercase(),
-        ));
+        results.push(crate::join::node_addresses(&kubectl, &host.own_node_name()));
     }
     results.push(policies(&kubectl));
     let encryption = match preflight::disk_encryption("/var/lib/rancher") {

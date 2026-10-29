@@ -1,7 +1,7 @@
 ---
 title: Installer 設定
 description: 查閱建立叢集與加入節點所用的 YAML 欄位、預設值及機密檔案格式。
-source: "4e8df4d58d74"
+source: "53b0286930e6"
 ---
 
 把網域、元件選擇和主機設定寫進 YAML，執行 `zeabur-installer --config config.yaml plan` 先看安裝內容。檔案預設放在 `/etc/zeabur-installer/config.yaml`。欄位用 camelCase，拼錯或多出欄位時，installer 會直接停下。
@@ -129,6 +129,9 @@ installer 一定會建立 `local-path`，資料放在節點的 `/var/lib/zeabur/
 |---|---|
 | `host.tlsSan` | `[]`。Kubernetes API server 憑證額外加入的 DNS 名稱或 IP 位址，只用於 server |
 | `host.requireEncryptedDisk` | `false`。設為 `true` 時，根目錄或資料目錄不在加密裝置上，`apply` 就停下 |
+| `host.nodeName` | 主機名稱轉小寫。主機名稱不能當節點名稱，或是由 IP 位址組成（例如 `ip-10-0-0-5`）時，改用 `node-3f9a2c` 這類名稱。installer 把它寫進 K3s 或 RKE2 的設定，之後主機名稱改了，節點名稱也不會跟著變。只能用小寫英文字母、數字、`-` 和 `.` |
+
+節點裝好後就固定用當初的名稱。再跑一次 `apply` 會沿用它；`host.nodeName` 填了別的名稱，`apply` 會停下，因為 Kubernetes 會把它當成同一個位址上的第二個節點。
 
 ### `sources`
 
@@ -178,6 +181,7 @@ host:
 | `secretFiles` | `{}`。和建立叢集的檔案一樣，檔案權限要是 `0600` |
 | `host.tlsSan` | `[]`。自己的電腦用別的位址或網域連 API 時，把它加在這裡 |
 | `host.requireEncryptedDisk` | `false`。設為 `true` 時，`/var/lib/kubesolo` 不在加密裝置上，`apply` 就停下 |
+| `host.nodeName` | 和建立叢集時一樣，寫進 KubeSolo 的設定 |
 | `sources.catalog` | 選填。本機的 Catalog `index.json`，取代釘選的版本 |
 
 元件裝在 KubeSolo 內建的 `local-path` 儲存類別，資料放在 `/var/lib/kubesolo` 底下。KubeSolo、helm-controller 和 kubectl 的版本由 installer 釘選，沒有欄位可以改。
@@ -197,8 +201,9 @@ host:
 | `join.tokenFile` | 和 `token` 擇一。權限 `0600` 的權杖檔案 |
 | `join.serverConfig` | `server` 必填，worker 不接受。照抄 `node add --role server` 印出的 `disable` 和 `identity` |
 | `join.longhorn` | `false`。`true` 時在 K3s 或 RKE2 啟動前先裝好 Longhorn 需要的主機套件 |
+| `join.nodeNames` | `[]`。叢集裡已有的節點名稱，照 `node add` 印出的內容。新主機的名稱已經有人用時，節點會改用 `node-3f9a2c` 這類名稱 |
 
-worker 不接受 `host.tlsSan`。`distribution` 和版本要和叢集一致。worker 的 bootstrap token 不能用來加入 server，要用 `node add --role server` 產生的設定。
+`host.nodeName` 用法和建立叢集時一樣，但不能和 `join.nodeNames` 裡的名稱重複。worker 不接受 `host.tlsSan`。`distribution` 和版本要和叢集一致。worker 的 bootstrap token 不能用來加入 server，要用 `node add --role server` 產生的設定。
 
 ## 設定無法使用時
 
@@ -206,6 +211,7 @@ worker 不接受 `host.tlsSan`。`distribution` 和版本要和叢集一致。wo
 - 主機名稱無效：拿掉 `https://` 和路徑，`identity` 和 `zeabur` 要用不同名稱。
 - 缺少必填 input：依 `plan` 列出的元件和欄位補上，再跑一次 `plan`。
 - K3s 設了 `join.role: server`：K3s 只跑一台用 SQLite 的伺服器，只收工作節點。要讓控制平面在少一台伺服器時繼續運作，改在三台伺服器上安裝 RKE2（`distribution: rke2`）。
+- `host.nodeName: this host is already node …`：這台主機之前用別的名稱裝過。拿掉 `host.nodeName`，或改成訊息裡的名稱。
 - 權杖檔案權限不對：在新主機執行 `chmod 0600`。含權杖的設定檔不要放進 Git 儲存庫。
 
 改完設定檔先跑 `plan`。要移除產品、清理主機檔案，見[移除 Zeabur](../leave/uninstall.mdx)。

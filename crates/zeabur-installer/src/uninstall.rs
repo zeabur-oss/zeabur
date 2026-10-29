@@ -107,7 +107,7 @@ fn other_servers(kubectl: &Kubectl) -> Result<Vec<String>, InstallError> {
         ],
         None,
     )?;
-    let own = facts::read()?.hostname.to_ascii_lowercase();
+    let own = facts::read()?.own_node_name();
     Ok(names
         .split_whitespace()
         .filter(|name| *name != own)
