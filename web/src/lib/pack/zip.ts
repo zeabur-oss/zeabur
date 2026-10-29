@@ -25,24 +25,30 @@ interface Attributes {
   mode: number
 }
 
+function endOfDirectory(view: DataView): number {
+  let end = view.byteLength - 22
+  while (end >= 0 && view.getUint32(end, true) !== 0x06054b50) end--
+  return end
+}
+
 /** The Unix modes in the zip's central directory, by entry name. Without them: empty. */
 function attributesOf(zip: Uint8Array): Map<string, Attributes> {
   const out = new Map<string, Attributes>()
   const view = new DataView(zip.buffer, zip.byteOffset, zip.byteLength)
-  let end = zip.length - 22
-  while (end >= 0 && view.getUint32(end, true) !== 0x06054b50) end--
+  const end = endOfDirectory(view)
   if (end < 0) return out
   let at = view.getUint32(end + 16, true)
   for (let n = view.getUint16(end + 10, true); n > 0; n--) {
     if (at + 46 > zip.length || view.getUint32(at, true) !== 0x02014b50) break
-    const flags = view.getUint16(at + 8, true)
     const nameLength = view.getUint16(at + 28, true)
     const next =
       at + 46 + nameLength + view.getUint16(at + 30, true) + view.getUint16(at + 32, true)
     if (next > zip.length) break
     if (view.getUint8(at + 5) === UNIX) {
-      const raw = zip.subarray(at + 46, at + 46 + nameLength)
-      const name = new TextDecoder(flags & 0x800 ? "utf-8" : "latin1").decode(raw)
+      const utf8 = (view.getUint16(at + 8, true) & 0x800) !== 0
+      const name = new TextDecoder(utf8 ? "utf-8" : "latin1").decode(
+        zip.subarray(at + 46, at + 46 + nameLength),
+      )
       out.set(name, { mode: view.getUint32(at + 38, true) >>> 16 })
     }
     at = next
