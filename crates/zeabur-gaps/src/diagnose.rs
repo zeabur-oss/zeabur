@@ -556,7 +556,8 @@ fn out_of_memory(
 }
 
 /// A long-running container that keeps exiting: restarted at least once, and its previous run
-/// ended recently, or it is not ready, or it waits in `CrashLoopBackOff`.
+/// ended recently, or it is not ready, or it waits in `CrashLoopBackOff`. One restart of a
+/// container that is ready now is not a loop, and a clean exit needs two restarts or a back-off.
 fn crash_loop(
     found: &mut Found,
     service: &Service,
@@ -597,6 +598,11 @@ fn crash_loop(
             "lastState.terminated",
             last,
         );
+        return;
+    }
+    let once_and_fine =
+        status.restarts < 2 && !backing_off && (last.exit_code == 0 || status.ready);
+    if once_and_fine {
         return;
     }
     let variant = exit_variant(last.exit_code);

@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker
+  namespace: demo
+spec:
+  selector:
+    matchLabels:
+      app: worker
+  template:
+    metadata:
+      labels:
+        app: worker
+    spec:
+      containers:
+        - name: worker
+          image: example/worker:1.0
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: worker-1
+  namespace: demo
+  labels:
+    app: worker
+spec:
+  containers:
+    - name: worker
+      image: example/worker:1.0
+status:
+  phase: Running
+  containerStatuses:
+    - name: worker
+      image: example/worker:1.0
+      imageID: ""
+      ready: true
+      restartCount: 3
+      state:
+        running:
+          startedAt: "2026-10-15T11:59:05Z"
+      lastState:
+        terminated:
+          reason: Completed
+          exitCode: 0
+          finishedAt: "2026-10-15T11:59:00Z"
