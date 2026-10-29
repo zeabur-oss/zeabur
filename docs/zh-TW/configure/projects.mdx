@@ -4,7 +4,7 @@ description: 建立專案、把既有的 Namespace 加進 Zeabur、修改專案�
 source: "72ea2d49995e"
 ---
 
-專案就是一個帶 `zeabur.com/project: "true"` 標籤的 Kubernetes Namespace。在 **專案** 頁按 **新增專案** 建立新的，或把叢集裡既有的 Namespace 加進來。專案的名稱、描述、圖示和網路隔離，都在專案 **設定** 修改。
+專案就是一個帶 `zeabur.com/project: "true"` 標籤的 Kubernetes Namespace。在**專案**頁按**新增專案**建立新的，或把叢集裡既有的 Namespace 加進來。專案的名稱、描述、圖示和網路隔離，都在專案**設定**修改。
 
 ## 開始前
 
@@ -18,7 +18,7 @@ source: "72ea2d49995e"
 
 ### 填入名稱
 
-到 **專案** 頁，按 **新增專案**。**名稱** 填 `hello`，**顯示名稱** 可以留白，填了就會取代名稱顯示在畫面上。
+到**專案**頁，按**新增專案**。**名稱**填 `hello`，**顯示名稱**可以留白，填了就會取代名稱顯示在畫面上。
 
 ![新增專案視窗，名稱填了 hello](../images/shots/project-new.avif)
 
@@ -44,32 +44,32 @@ source: "72ea2d49995e"
 
 ## 把既有的 Namespace 加進 Zeabur
 
-**專案** 頁的 **其他 Namespace** 列出還不是專案的 Namespace。在那一列打開選單，選 **使用這個 Namespace**，檢查後套用。
+**專案**頁的**其他 Namespace** 列出還不是專案的 Namespace。在那一列打開選單，選**使用這個 Namespace**，檢查後套用。
 
 Zeabur 只替 Namespace 加上 `zeabur.com/project: "true"` 標籤，裡面的物件、Pod Security 標籤和 NetworkPolicy 都不會變。
 
-不想再在 Zeabur 看到它時，到專案 **設定** 的 **危險區域** 按 **從 Zeabur 移除**。這只會拿掉專案標籤，Namespace 和裡面的一切都會保留。要連同內容一起刪掉，見[刪除專案](./delete-project.mdx)。
+不想再在 Zeabur 看到它時，到專案**設定**的**危險區域**按**從 Zeabur 移除**。這只會拿掉專案標籤，Namespace 和裡面的一切都會保留。要連同內容一起刪掉，見[刪除專案](./delete-project.mdx)。
 
 ## 修改名稱、描述和圖示
 
-到專案 **設定** 的 **基本資訊**：
+到專案**設定**的**基本資訊**：
 
 - **專案名稱**：取代 Namespace 名稱顯示，最多 64 個字元。
 - **描述**：專案的用途，顯示在名稱下方，最多 500 個字元。
-- **圖示**：按 **更換圖示** 從 16 個圖示選一個。
+- **圖示**：按**更換圖示**從 16 個圖示選一個。
 
-按 **儲存詳細資料**，檢查後套用。這三項存在 Namespace 的 annotation 上。專案的開發者可以改這三項，其他 label 和 annotation 只有管理員能改。
+按**儲存詳細資料**，檢查後套用。這三項存在 Namespace 的 annotation 上。專案的開發者可以改這三項，其他 label 和 annotation 只有管理員能改。
 
 ## 隔離其他專案
 
-到專案 **設定** 的 **網路**，**其他專案** 一列說明目前的狀態：
+到專案**設定**的**網路**，**其他專案**一列說明目前的狀態：
 
-- **叢集裡任何副本都連得到這個專案的服務。**：還沒有隔離。按 **隔離**，檢查後套用，Zeabur 會建立 NetworkPolicy `zeabur-project`。
+- **叢集裡任何副本都連得到這個專案的服務。**：還沒有隔離。按**隔離**，檢查後套用，Zeabur 會建立 NetworkPolicy `zeabur-project`。
 - **連不到這個專案的服務。專案內的服務和 Zeabur 元件不受影響。**：已經隔離。
 
 隔離後，專案內的副本互相連得到，標了 `zeabur.com/platform: "true"` 的 Namespace（例如 Traefik 和資料庫 operator 所在的 Namespace）和 `kube-system` 也連得到。
 
-要讓另一個專案連進來，按 **允許其他專案連入**，選擇專案，按 **允許**，檢查後套用。Zeabur 建立 NetworkPolicy `zeabur-allow-from-<那個專案>`，對方的所有副本都能連到這個專案的所有服務。要取消，在那一列按 **移除**。
+要讓另一個專案連進來，按**允許其他專案連入**，選擇專案，按**允許**，檢查後套用。Zeabur 建立 NetworkPolicy `zeabur-allow-from-<那個專案>`，對方的所有副本都能連到這個專案的所有服務。要取消，在那一列按**移除**。
 
 畫面上沒有取消隔離的按鈕，要用 kubectl 刪除 `zeabur-project`，見下一節。規則是否真的生效，取決於叢集的網路外掛（CNI）是否支援 NetworkPolicy。
 
@@ -116,7 +116,7 @@ kubectl annotate namespace demo --overwrite zeabur.com/display-name='Demo shop'
 
 ### 調整 Pod Security 等級
 
-Zeabur 沒有修改專案 Pod Security 等級的畫面，由管理員用 kubectl 改。改成 `restricted` 後，只有 **嚴格** 的服務能啟動：
+Zeabur 沒有修改專案 Pod Security 等級的畫面，由管理員用 kubectl 改。改成 `restricted` 後，只有**嚴格**的服務能啟動：
 
 ```sh
 kubectl label namespace demo --overwrite \
@@ -181,7 +181,7 @@ kubectl -n demo delete networkpolicy zeabur-project
 
 ## 確認結果
 
-**專案** 頁會列出這個專案，顯示你設定的名稱、描述和圖示。專案 **設定** 的 **網路** 寫出目前是否隔離，以及哪些專案能連進來。
+**專案**頁會列出這個專案，顯示你設定的名稱、描述和圖示。專案**設定**的**網路**寫出目前是否隔離，以及哪些專案能連進來。
 
 ```sh
 kubectl get namespace demo --show-labels
@@ -196,8 +196,8 @@ kubectl -n demo get serviceaccount default -o jsonpath='{.automountServiceAccoun
 
 | 畫面或結果 | 接著處理 |
 | --- | --- |
-| **已經有同名的 Namespace，可以改為使用既有的 Namespace。** | 換一個名稱，或到 **其他 Namespace** 把它加進 Zeabur。 |
+| **已經有同名的 Namespace，可以改為使用既有的 Namespace。** | 換一個名稱，或到**其他 Namespace** 把它加進 Zeabur。 |
 | 加入或移出專案時，叢集回覆 **Only an admin can change the namespace's labels** | 只有管理員能改 Namespace 的標籤，請管理員操作。 |
 | **這是 Kubernetes 留給自身元件的 Namespace，不能當作專案。** | `kube-` 開頭的 Namespace 和節點終端機用的 `zeabur-node-shell` 都不能當作專案。 |
-| 建立專案時沒有列出 `zeabur-project` | 叢集沒有標了 `zeabur.com/platform: "true"` 的 Namespace，Zeabur 分不出 Ingress controller 在哪裡，所以不建立。請管理員替這些 Namespace 加上標籤，再到 **網路** 按 **隔離**。 |
+| 建立專案時沒有列出 `zeabur-project` | 叢集沒有標了 `zeabur.com/platform: "true"` 的 Namespace，Zeabur 分不出 Ingress controller 在哪裡，所以不建立。請管理員替這些 Namespace 加上標籤，再到**網路**按**隔離**。 |
 | 隔離後公開網域打不開 | Ingress controller 所在的 Namespace 沒有 `zeabur.com/platform: "true"` 標籤。替它加上標籤，或在 `zeabur-project` 加一條允許它的規則。 |

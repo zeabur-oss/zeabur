@@ -123,7 +123,7 @@ sudo zeabur-installer node sync
 
 ## 卸载组件
 
-组件只能通过 installer 安装和卸载。在 `gui` 的 **组件** 中取消勾选，或从配置文件的 `enable` 中移除；默认安装的组件则添加到 `disable`，然后运行 `apply`。个人使用的安装也一样。
+组件只能通过 installer 安装和卸载。在 `gui` 的**组件**中取消勾选，或从配置文件的 `enable` 中移除；默认安装的组件则添加到 `disable`，然后运行 `apply`。个人使用的安装也一样。
 
 `plan` 会在“Removed”中列出要卸载的组件、会保留的内容，以及会删除的 CRD。`apply` 等待集群启动后，先卸载组件，再创建 Namespace、存储类和其他组件。如果其他组件依赖某个组件，就会将它排在后面卸载。对于每个组件，`apply` 会删除 `kube-system` 中带有 `app.kubernetes.io/managed-by: zeabur-installer` 标签和 `installer.zeabur.com/component: <capability>/<id>` 注解的 `HelmChart`，然后等待 helm-controller 的 `helm-delete-<chart>` Job 完成卸载。
 
@@ -141,7 +141,7 @@ Chart 放在 templates 中的 CRD 会在卸载时一并删除，集群中这些 
 
 先删除或迁移这些对象。Trivy Operator 的报告由它自行生成，不计入其中。
 
-如果卸载会删除组件保存的数据，还需要将组件 ID 写入 `allowDataLoss`（`gui` 会在 **确认** 中通过复选框询问）。将 Longhorn 写入后，`apply` 会把它的 `deleting-confirmation-flag` 设为 `true`，否则 Longhorn 会拒绝卸载；每个卷的副本也会一并删除。
+如果卸载会删除组件保存的数据，还需要将组件 ID 写入 `allowDataLoss`（`gui` 会在**确认**中通过复选框询问）。将 Longhorn 写入后，`apply` 会把它的 `deleting-confirmation-flag` 设为 `true`，否则 Longhorn 会拒绝卸载；每个卷的副本也会一并删除。
 
 确认不再需要保留的内容后，可以手动删除：
 

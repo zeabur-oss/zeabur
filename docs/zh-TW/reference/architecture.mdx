@@ -35,7 +35,7 @@ Zeabur 沒有自己的資料庫。資料庫是 operator 的 CR，從 Git 部署�
 
 ## 變更怎麼進入 Kubernetes
 
-1. **檢查變更** 讀取現況，算出要建立、修改或刪除哪些物件，以及會造成什麼影響。
+1. **檢查變更**讀取現況，算出要建立、修改或刪除哪些物件，以及會造成什麼影響。
 2. API 回傳一份變更權杖，以 AES-256-GCM 加密和驗證，裡面有使用者、群組、專案、請求、物件版本和期限。權杖 10 分鐘內有效。
 3. 確認套用時，瀏覽器只送回這份權杖。API 核對身分和期限，重讀物件、重新計算。有物件的版本變了，就要你重新檢查。
 4. 每一筆寫入先送 kube-apiserver dry run，全部通過才依序真正寫入。每筆寫入都帶著版本，刪除則帶前置條件，物件被別人改過就不會寫入。
@@ -62,7 +62,7 @@ Helm、Argo CD、Flux 管理的物件，Zeabur 只接受重新啟動，其他修
 
 即時 CPU 和記憶體用量來自 metrics-server。用量歷史、節點磁碟和磁碟區用量來自支援 Prometheus HTTP API 的 metrics store，Zeabur 以使用者的權限透過 Kubernetes Service proxy 查詢。啟用 Zeabur Proxy 時，用量歷史改由 Proxy 依專案權限查詢預設的 metrics store。
 
-**部署紀錄** 來自工作負載保留的修訂版本，時間和修改者來自事件、容器狀態和 `managedFields`。叢集清掉的修訂版本、超過保留期的事件，Zeabur 也讀不到。
+**部署紀錄**來自工作負載保留的修訂版本，時間和修改者來自事件、容器狀態和 `managedFields`。叢集清掉的修訂版本、超過保留期的事件，Zeabur 也讀不到。
 
 容器日誌預設來自 kubelet，只有副本這一次和上一次執行的內容。啟用 Zeabur Proxy 後，可以依專案權限讀取 VictoriaLogs 裡的歷史日誌。移除 chart 時 Proxy 一起移除，VictoriaLogs 裡的日誌不受影響。日誌收集器的 `includePodLabels: false` 在 operator v0.75.0 沒有作用，日誌仍會帶 `kubernetes.pod_labels.*`。
 
@@ -73,7 +73,7 @@ Helm、Argo CD、Flux 管理的物件，Zeabur 只接受重新啟動，其他修
 - 成員權限：Kubernetes 的 RoleBinding 和 ClusterRoleBinding。
 - 已登錄的 S3 目的地：`zeabur-s3-destinations` Namespace 裡的 ConfigMap 和 Secret。
 - kubectl 終端機的 tools Pod：`zeabur-terminals` Namespace，只有 Zeabur 的 ServiceAccount 能在裡面建立和使用 Pod。
-- 登入設定：Zeabur Identity 所在 Namespace 的 `zeabur-identity-settings` ConfigMap。**設定** 頁寫入，Zeabur Identity 讀取，見[登入設定](./permissions.mdx#登入設定)。
+- 登入設定：Zeabur Identity 所在 Namespace 的 `zeabur-identity-settings` ConfigMap。**設定**頁寫入，Zeabur Identity 讀取，見[登入設定](./permissions.mdx#登入設定)。
 - 登入工作階段：只在伺服器程序的記憶體裡，閒置太久（最多 1 小時）或登入滿 12 小時就結束，見[登入能維持多久](./permissions.mdx#登入能維持多久)。chart 用單一副本和 `Recreate` 策略，Zeabur 重新啟動後，每個人都要重新登入。
 
 終端機會用到短暫的 Pod 和記憶體裡的 kubeconfig，權限和存活時間見[安全性](./security.mdx#終端機)。

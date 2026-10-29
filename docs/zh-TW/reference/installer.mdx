@@ -123,7 +123,7 @@ sudo zeabur-installer node sync
 
 ## 移除元件
 
-元件只由 installer 安裝和移除。在 `gui` 的 **元件** 取消勾選，或從設定檔的 `enable` 拿掉它，預設就會裝的元件則加到 `disable`，再執行 `apply`。自己用的安裝也一樣。
+元件只由 installer 安裝和移除。在 `gui` 的**元件**取消勾選，或從設定檔的 `enable` 拿掉它，預設就會裝的元件則加到 `disable`，再執行 `apply`。自己用的安裝也一樣。
 
 `plan` 會在「Removed」列出要移除的元件、會留下什麼，以及會刪掉哪些 CRD。`apply` 等叢集啟動後先移除元件，再建立 Namespace、儲存類別和其他元件。被別的元件需要的，會排在後面移除。每個元件，`apply` 刪除 `kube-system` 裡帶有 `app.kubernetes.io/managed-by: zeabur-installer` 標籤和 `installer.zeabur.com/component: <capability>/<id>` 註解的 `HelmChart`，等 helm-controller 的 `helm-delete-<chart>` Job 解除安裝完成。
 
@@ -141,7 +141,7 @@ Chart 放在 templates 裡的 CRD，解除安裝時會一起刪掉，叢集裡�
 
 先刪掉或搬走這些。Trivy Operator 的報告是它自己產生的，不算在內。
 
-解除安裝會刪掉元件保存的資料時，還要把元件 ID 寫進 `allowDataLoss`（`gui` 在 **確認** 用勾選框問）。Longhorn 寫了之後，`apply` 會把它的 `deleting-confirmation-flag` 設為 `true`，否則 Longhorn 不肯解除安裝；每個磁碟區的副本也會一起刪掉。
+解除安裝會刪掉元件保存的資料時，還要把元件 ID 寫進 `allowDataLoss`（`gui` 在**確認**用勾選框問）。Longhorn 寫了之後，`apply` 會把它的 `deleting-confirmation-flag` 設為 `true`，否則 Longhorn 不肯解除安裝；每個磁碟區的副本也會一起刪掉。
 
 留下的東西，確定用不到之後可以手動刪除：
 

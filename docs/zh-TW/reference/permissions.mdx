@@ -37,7 +37,7 @@ source: "4d65535f6503"
 - 還原到原處會覆蓋整個磁碟區，備份之後新增的檔案會被刪除。
 - 能還原的人，就能讀取這個專案備份倉庫裡的所有備份。每個專案請用各自的備份路徑和密碼。
 
-叢集備份由 Velero 執行，還原時 Velero 用自己的權限（預設是 `cluster-admin`）把物件寫回 Restore 指定的 Namespace，包括 RoleBinding 和 Secret。RBAC 只能決定誰能建立 Restore，不能限制它寫進哪些 Namespace，所以成員角色沒有任何 `velero.io` 權限，還原只開放給管理員。沒有權限建立 Restore 的人，**還原** 按鈕無法使用。
+叢集備份由 Velero 執行，還原時 Velero 用自己的權限（預設是 `cluster-admin`）把物件寫回 Restore 指定的 Namespace，包括 RoleBinding 和 Secret。RBAC 只能決定誰能建立 Restore，不能限制它寫進哪些 Namespace，所以成員角色沒有任何 `velero.io` 權限，還原只開放給管理員。沒有權限建立 Restore 的人，**還原**按鈕無法使用。
 
 **管理員**用的是管理員帳號，登入後就有整個叢集的完整權限，不用再另外確認，見下方[管理員帳號和一般帳號](#管理員帳號和一般帳號)。介面依你實際擁有的 RBAC 規則顯示能做的操作，所以另外綁定的規則、管理員改過的 ClusterRole 都會反映出來。
 
@@ -59,7 +59,7 @@ Chart 本身不綁定任何人。管理員在 Zeabur 邀請或變更成員時，
 
 這些 binding 帶 `zeabur.com/member: <username>` 和 `app.kubernetes.io/managed-by: zeabur` 標籤。`zeabur-installer uninstall` 會一起刪掉它們。用 `helm uninstall` 移除時要自己刪，見[移除後的權限](../leave/uninstall.mdx#成員權限與准入政策)。
 
-關閉 `memberRoles.enabled` 時，chart 不建立這些角色和 Namespace 政策，邀請成員時只能選要不要給 **管理員**。
+關閉 `memberRoles.enabled` 時，chart 不建立這些角色和 Namespace 政策，邀請成員時只能選要不要給**管理員**。
 
 ## 專案 Namespace 的保護
 
@@ -87,7 +87,7 @@ zeabur.com/icon
 
 ## 管理員帳號和一般帳號
 
-Zeabur Identity 的帳號分成兩種。在 **成員** 把某人設為 **管理員**，他的帳號就會變成管理員帳號；拿掉 **管理員**，就改回一般帳號。
+Zeabur Identity 的帳號分成兩種。在**成員**把某人設為**管理員**，他的帳號就會變成管理員帳號；拿掉**管理員**，就改回一般帳號。
 
 | | 一般帳號 | 管理員帳號 |
 |---|---|---|
@@ -98,7 +98,7 @@ Zeabur Identity 的帳號分成兩種。在 **成員** 把某人設為 **管理�
 
 一般帳號權限不夠時，畫面會說需要更多權限，並列出缺少的規則。把它交給管理員，請他調整你的角色或幫你處理。
 
-把成員設為 **管理員** 後，他之後只能用通行密鑰登入，原本用 GitHub 或 Google 登入的工作階段會在下次換權杖時結束。
+把成員設為**管理員**後，他之後只能用通行密鑰登入，原本用 GitHub 或 Google 登入的工作階段會在下次換權杖時結束。
 
 第一位管理員來自安裝時的設定連結（`zeabur-installer setup-link`）。在命令列也能邀請管理員，或改變既有帳號的類型：
 
@@ -127,7 +127,7 @@ zeabur-identityctl account-type alice admin     # 改回一般帳號：regular
 
 ## 登入設定
 
-**設定** 頁的 **登入設定** 只影響管理員帳號，一般帳號不受影響。設定存在 Zeabur Identity 所在 Namespace 的 ConfigMap `zeabur-identity-settings`，Zeabur Identity 每次登入和換權杖時讀取，不用重新啟動。
+**設定**頁的**登入設定**只影響管理員帳號，一般帳號不受影響。設定存在 Zeabur Identity 所在 Namespace 的 ConfigMap `zeabur-identity-settings`，Zeabur Identity 每次登入和換權杖時讀取，不用重新啟動。
 
 | 設定 | ConfigMap 的鍵和值 | 預設 | 作用 |
 |---|---|---|---|
@@ -136,7 +136,7 @@ zeabur-identityctl account-type alice admin     # 改回一般帳號：regular
 
 安裝時不知道叢集是一個團隊在用還是多個團隊共用，所以一律從 1 小時開始。只有一個團隊的叢集，管理員通常就是唯一在用的人，閒置時間和一般帳號一樣。多個團隊共用叢集時，記得改成 15 分鐘。
 
-這兩項沒有 Helm value，因為 Zeabur Identity 不在 Zeabur 的 chart 裡。在 **設定** 頁改，或用 kubectl 改同一個 ConfigMap：
+這兩項沒有 Helm value，因為 Zeabur Identity 不在 Zeabur 的 chart 裡。在**設定**頁改，或用 kubectl 改同一個 ConfigMap：
 
 ```sh
 kubectl -n zeabur-identity create configmap zeabur-identity-settings --from-literal=teams=multiple

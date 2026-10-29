@@ -37,7 +37,7 @@ source: "4d65535f6503"
 - 还原到原位置会覆盖整个卷，备份后新增的文件会被删除。
 - 有还原权限的人能读取项目备份仓库中的所有备份。每个项目应使用独立的备份路径和密码。
 
-集群备份由 Velero 执行。还原时，Velero 用自己的权限（默认为 `cluster-admin`）将对象写回 Restore 指定的 Namespace，包括 RoleBinding 和 Secret。RBAC 只能决定谁能创建 Restore，不能限制它写入哪些 Namespace，因此成员角色没有任何 `velero.io` 权限，只有管理员能还原。没有创建 Restore 权限的人无法使用 **还原** 按钮。
+集群备份由 Velero 执行。还原时，Velero 用自己的权限（默认为 `cluster-admin`）将对象写回 Restore 指定的 Namespace，包括 RoleBinding 和 Secret。RBAC 只能决定谁能创建 Restore，不能限制它写入哪些 Namespace，因此成员角色没有任何 `velero.io` 权限，只有管理员能还原。没有创建 Restore 权限的人无法使用**还原**按钮。
 
 **管理员**使用管理员账号，登录后就有整个集群的完整权限，无需再次确认，见下方[管理员账号和普通账号](#管理员账号和普通账号)。界面根据你实际拥有的 RBAC 规则显示可执行的操作，因此额外绑定的规则、管理员修改过的 ClusterRole 都会反映在界面上。
 
@@ -59,7 +59,7 @@ Chart 本身不绑定任何人。管理员在 Zeabur 中邀请成员或变更成
 
 这些 binding 带有 `zeabur.com/member: <username>` 和 `app.kubernetes.io/managed-by: zeabur` 标签。`zeabur-installer uninstall` 会一并删除它们。使用 `helm uninstall` 卸载时需要自行删除，见[卸载后的权限](../leave/uninstall.mdx#成员权限和准入策略)。
 
-关闭 `memberRoles.enabled` 后，chart 不会创建这些角色和 Namespace 策略，邀请成员时只能选择是否授予 **管理员** 角色。
+关闭 `memberRoles.enabled` 后，chart 不会创建这些角色和 Namespace 策略，邀请成员时只能选择是否授予**管理员**角色。
 
 ## 项目 Namespace 的保护
 
@@ -87,7 +87,7 @@ zeabur.com/icon
 
 ## 管理员账号和普通账号
 
-Zeabur Identity 的账号分为两种。在 **成员** 中将某人设为 **管理员**，其账号就会变为管理员账号；移除 **管理员** 角色后，账号就会改回普通账号。
+Zeabur Identity 的账号分为两种。在**成员**中将某人设为**管理员**，其账号就会变为管理员账号；移除**管理员**角色后，账号就会改回普通账号。
 
 | | 普通账号 | 管理员账号 |
 |---|---|---|
@@ -98,7 +98,7 @@ Zeabur Identity 的账号分为两种。在 **成员** 中将某人设为 **管�
 
 普通账号权限不足时，界面会提示需要更多权限，并列出缺少的规则。将这些规则交给管理员，请他调整你的角色或代为处理。
 
-将成员设为 **管理员** 后，他之后只能用通行密钥登录，原先通过 GitHub 或 Google 登录的会话会在下次刷新令牌时结束。
+将成员设为**管理员**后，他之后只能用通行密钥登录，原先通过 GitHub 或 Google 登录的会话会在下次刷新令牌时结束。
 
 首位管理员通过安装时的配置链接创建（`zeabur-installer setup-link`）。也可以在命令行中邀请管理员，或更改已有账号的类型：
 
@@ -127,7 +127,7 @@ zeabur-identityctl account-type alice admin     # 改回普通账号：regular
 
 ## 登录设置
 
-**设置** 页的 **登录设置** 只影响管理员账号，不影响普通账号。配置保存在 Zeabur Identity 所在 Namespace 的 ConfigMap `zeabur-identity-settings` 中，Zeabur Identity 在每次登录和刷新令牌时读取，无需重启。
+**设置**页的**登录设置**只影响管理员账号，不影响普通账号。配置保存在 Zeabur Identity 所在 Namespace 的 ConfigMap `zeabur-identity-settings` 中，Zeabur Identity 在每次登录和刷新令牌时读取，无需重启。
 
 | 设置 | ConfigMap 的键和值 | 默认值 | 作用 |
 |---|---|---|---|
@@ -136,7 +136,7 @@ zeabur-identityctl account-type alice admin     # 改回普通账号：regular
 
 安装时无法确定集群是供一个团队使用，还是由多个团队共用，因此一律默认为 1 小时。只有一个团队使用集群时，管理员通常就是唯一的用户，闲置时间与普通账号相同。多个团队共用集群时，记得改为 15 分钟。
 
-这两项没有对应的 Helm value，因为 Zeabur Identity 不在 Zeabur 的 chart 中。在 **设置** 页修改，或用 kubectl 修改同一个 ConfigMap：
+这两项没有对应的 Helm value，因为 Zeabur Identity 不在 Zeabur 的 chart 中。在**设置**页修改，或用 kubectl 修改同一个 ConfigMap：
 
 ```sh
 kubectl -n zeabur-identity create configmap zeabur-identity-settings --from-literal=teams=multiple

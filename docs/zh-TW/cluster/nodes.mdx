@@ -4,7 +4,7 @@ description: 用 zeabur-installer 加入新節點，停止排程，用 kubectl �
 source: "cdb7a13a9dd3"
 ---
 
-到 **叢集** → **概覽** 的 **節點** 查看每台主機的狀況。要多一台主機執行服務，見[加入節點](#加入節點)。主機要停機維護時，在該節點的操作選單選 **停止排程**，需要移走副本時再用 kubectl 的 `drain`。
+到**叢集** → **概覽**的**節點**查看每台主機的狀況。要多一台主機執行服務，見[加入節點](#加入節點)。主機要停機維護時，在該節點的操作選單選**停止排程**，需要移走副本時再用 kubectl 的 `drain`。
 
 ![叢集概覽的節點清單](../images/shots/cluster-nodes.avif)
 
@@ -94,9 +94,9 @@ RKE2 的 etcd 需要過半數的伺服器才能運作。要在少一台時繼續
 
 ### 只是重開機
 
-在節點選單選 **停止排程**，節點列就會標示已停止排程。這會阻止新的 Pod 排到這台節點，已經在跑的 Pod 會留在原處。只是要重開機，做到這一步就夠了，不需要執行 `drain`。
+在節點選單選**停止排程**，節點列就會標示已停止排程。這會阻止新的 Pod 排到這台節點，已經在跑的 Pod 會留在原處。只是要重開機，做到這一步就夠了，不需要執行 `drain`。
 
-也可以在 Zeabur **叢集** 頁標題旁點 **開啟 kubectl 終端機**，執行：
+也可以在 Zeabur **叢集**頁標題旁點**開啟 kubectl 終端機**，執行：
 
 ```sh
 kubectl cordon <node>
@@ -106,7 +106,7 @@ kubectl cordon <node>
 
 ### 要先移走副本再維護
 
-到 Zeabur **叢集** 頁標題旁點 **開啟 kubectl 終端機**，先列出這台節點上的 Pod，以及它們使用的 PVC：
+到 Zeabur **叢集**頁標題旁點**開啟 kubectl 終端機**，先列出這台節點上的 Pod，以及它們使用的 PVC：
 
 ```sh
 kubectl get pods -A --field-selector spec.nodeName=<node> -o custom-columns=NS:.metadata.namespace,POD:.metadata.name,PVC:.spec.volumes[*].persistentVolumeClaim.claimName
@@ -133,9 +133,9 @@ kubectl drain <node> --ignore-daemonsets --delete-emptydir-data
 
 ## 恢復排程
 
-維護完成、節點恢復運作後，在節點選單選 **恢復排程**。
+維護完成、節點恢復運作後，在節點選單選**恢復排程**。
 
-也可以到 Zeabur **叢集** 頁標題旁點 **開啟 kubectl 終端機**，執行：
+也可以到 Zeabur **叢集**頁標題旁點**開啟 kubectl 終端機**，執行：
 
 ```sh
 kubectl uncordon <node>
@@ -147,7 +147,7 @@ kubectl uncordon <node>
 
 **不要移除叢集唯一的節點，也不要移除最後一台控制節點。**
 
-先到 Zeabur **叢集** 頁標題旁點 **開啟 kubectl 終端機**，確認控制節點數量：
+先到 Zeabur **叢集**頁標題旁點**開啟 kubectl 終端機**，確認控制節點數量：
 
 ```sh
 kubectl get nodes -l node-role.kubernetes.io/control-plane
@@ -184,15 +184,15 @@ sudo zeabur-installer node sync
 
 ## 開啟節點終端機
 
-**節點終端機** 會在主機上開一個完整的 root shell。用管理員帳號登入，在節點列按 **節點終端機**，看過要建立的終端機 Pod 和時限，再按 **開啟終端機**。
+**節點終端機**會在主機上開一個完整的 root shell。用管理員帳號登入，在節點列按**節點終端機**，看過要建立的終端機 Pod 和時限，再按**開啟終端機**。
 
 <Callout type="warn">
 節點終端機能動主機上所有的檔案、程序和網路介面。在裡面做的事不經過 Zeabur 和 Kubernetes 的權限檢查，也無法復原。
 </Callout>
 
-節點會記下一筆事件，寫明是誰在什麼時候開啟的。畫面顯示 **其他人也能進入這個終端機** 時，表示有角色綁定讓叢集管理員以外的人能在終端機所在的 Namespace 建立 Pod。移除列出的角色綁定後再重新檢查。
+節點會記下一筆事件，寫明是誰在什麼時候開啟的。畫面顯示**其他人也能進入這個終端機**時，表示有角色綁定讓叢集管理員以外的人能在終端機所在的 Namespace 建立 Pod。移除列出的角色綁定後再重新檢查。
 
-關閉終端機時，Zeabur 會移除終端機 Pod，Pod 最多保留 30 分鐘。如果 Pod 留了下來，在節點下方的終端機 Pod 清單按 **移除終端機 Pod**，檢查後確認。
+關閉終端機時，Zeabur 會移除終端機 Pod，Pod 最多保留 30 分鐘。如果 Pod 留了下來，在節點下方的終端機 Pod 清單按**移除終端機 Pod**，檢查後確認。
 
 ## 常見失敗
 

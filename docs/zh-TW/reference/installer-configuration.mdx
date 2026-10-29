@@ -51,7 +51,7 @@ host:
 | `mode` | 必填。`domain` 由 cert-manager 向 Let's Encrypt 申請憑證（HTTP-01）。`local` 在伺服器上建立私有 CA，只適合測試機 |
 | `identity` | 必填。Zeabur Identity 主機名稱，issuer 為 `https://<identity>` |
 | `zeabur` | 必填。Zeabur 主機名稱，必須與 `identity` 不同 |
-| `invitations` | `true`。是否接受 Zeabur **成員** 頁產生的設定連結。成員只由版本控制管理時關掉 |
+| `invitations` | `true`。是否接受 Zeabur **成員**頁產生的設定連結。成員只由版本控制管理時關掉 |
 | `suffixes` | 伺服器有公開位址時是 `<位址>.sslip.io`，例如 `203-0-113-7.sslip.io`，否則沒有。新服務的網址會建議在這些應用程式網域底下，預設用第一個，例如 `[apps.example.com]`。每個網域要一筆指向伺服器的萬用字元紀錄 `*.apps.example.com`，見[設定 DNS 紀錄](../configure/dns.mdx)。填 `[]` 表示不建議網址 |
 
 主機名稱不加 `https://`、連接埠或路徑，只用小寫英文字母、數字、連字號和點，至少兩段。每段最多 63 個字元、不能以連字號開頭或結尾，總長最多 253 個字元。

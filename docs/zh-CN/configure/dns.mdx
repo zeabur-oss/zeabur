@@ -21,7 +21,7 @@ Let's Encrypt 通过 HTTP-01 验证签发 HTTPS 证书，每个网址单独签�
 
 ## 在 Zeabur 查看要添加的记录
 
-打开 **集群** 页的 **域名** 区域，每个应用域名下都列出了要添加的记录，包括类型、名称和值，旁边有复制按钮，也会显示当前是否已解析到集群。到 DNS 提供商处添加记录后，回来点击 **重新检查**。
+打开**集群**页的**域名**区域，每个应用域名下都列出了要添加的记录，包括类型、名称和值，旁边有复制按钮，也会显示当前是否已解析到集群。到 DNS 提供商处添加记录后，回来点击**重新检查**。
 
 刚开始配置时，TTL 使用 300 秒，填错后修改能更快生效。确认无误后可以再延长。
 
@@ -58,14 +58,14 @@ Let's Encrypt 通过 HTTP-01 验证签发 HTTPS 证书，每个网址单独签�
 
 #### 保存并检查
 
-点击 **Save**，再回到 Zeabur 的 **域名** 区域，点击 **重新检查**。
+点击 **Save**，再回到 Zeabur 的**域名**区域，点击**重新检查**。
 
 </Step>
 </Steps>
 
 使用灰色云朵时，Let's Encrypt 会直接连接服务器完成 HTTP-01 验证，Zeabur 检查时也会查到服务器的地址。
 
-如果想开启橙色云朵（**Proxied**），让流量经过 Cloudflare，就将 Cloudflare 的 SSL/TLS 模式设为 **Full (strict)**。此时 DNS 返回 Cloudflare 地址，Zeabur 会将域名显示为 **指向别处**。
+如果想开启橙色云朵（**Proxied**），让流量经过 Cloudflare，就将 Cloudflare 的 SSL/TLS 模式设为 **Full (strict)**。此时 DNS 返回 Cloudflare 地址，Zeabur 会将域名显示为**指向别处**。
 
 ### Route 53
 
@@ -94,7 +94,7 @@ Let's Encrypt 通过 HTTP-01 验证签发 HTTPS 证书，每个网址单独签�
 
 #### 保存并检查
 
-点击 **Create records**，再回到 Zeabur 的 **域名** 区域，点击 **重新检查**。Route 53 通常会在一分钟内生效。
+点击 **Create records**，再回到 Zeabur 的**域名**区域，点击**重新检查**。Route 53 通常会在一分钟内生效。
 
 </Step>
 </Steps>
@@ -116,7 +116,7 @@ Gandi、Namecheap、HiNet 等注册商的 DNS 管理页面使用的字段名称�
 
 ## 自定义域名
 
-每个自定义域名分别添加一条 A 或 AAAA 记录，指向服务器 IP。也可以添加 CNAME，指向应用域名下的名称，例如 `web-shop.apps.example.com`。服务的 **网络** 选项卡会列出这个域名需要添加的记录，添加域名的步骤见[添加公开域名与 HTTPS](./domains.mdx)。
+每个自定义域名分别添加一条 A 或 AAAA 记录，指向服务器 IP。也可以添加 CNAME，指向应用域名下的名称，例如 `web-shop.apps.example.com`。服务的**网络**选项卡会列出这个域名需要添加的记录，添加域名的步骤见[添加公开域名与 HTTPS](./domains.mdx)。
 
 域名本身（例如 `example.com`）只能使用 A 或 AAAA 记录，大多数 DNS 提供商不允许在这里使用 CNAME。Cloudflare 是个例外，它会将域名本身的 CNAME 展平为 A 记录（CNAME flattening）。在 Route 53 中为域名本身添加记录时，将 **Record name** 留空，不要填写 `@`。
 
@@ -134,7 +134,7 @@ web-shop.203-0-113-7.sslip.io
 
 DNS 记录位于集群外，Zeabur 不会写入任何对象，只读取两项信息来列出需要添加的记录。
 
-应用域名：安装时填写的值是 Helm chart 的 `domains.suffixes`。如果在 **集群** 页修改过，新的列表会保存在 Zeabur Namespace 的配置文件 `zeabur-settings` 中，键为 `domain-suffixes`，每行一个域名：
+应用域名：安装时填写的值是 Helm chart 的 `domains.suffixes`。如果在**集群**页修改过，新的列表会保存在 Zeabur Namespace 的配置文件 `zeabur-settings` 中，键为 `domain-suffixes`，每行一个域名：
 
 ```sh
 kubectl -n zeabur get configmap zeabur-settings -o jsonpath='{.data.domain-suffixes}'
@@ -152,7 +152,7 @@ kubectl get ingress -A
 
 ## 确认结果
 
-**集群** 页的 **域名** 区域会显示每个应用域名当前是否已解析到集群，修改记录后点击 **重新检查**。在自己的电脑上用 `dig` 查询应用域名下的任意名称：
+**集群**页的**域名**区域会显示每个应用域名当前是否已解析到集群，修改记录后点击**重新检查**。在自己的电脑上用 `dig` 查询应用域名下的任意名称：
 
 ```sh
 dig +short anything.apps.example.com

@@ -31,7 +31,7 @@ source: "5d17518ca7cb"
 | **連接埠** | `8080` |
 | **公開網域** | 開啟，用建議的網址或你準備的網域 |
 
-Zeabur 讀出 `nginx-unprivileged` 以使用者 101 執行，會自動選 **嚴格**，表單會說明選擇原因。這個映像檔監聽 `8080`。`nginx:latest` 也能執行，Zeabur 會為它選 **相容**；建立前仍能自行切換。
+Zeabur 讀出 `nginx-unprivileged` 以使用者 101 執行，會自動選**嚴格**，表單會說明選擇原因。這個映像檔監聽 `8080`。`nginx:latest` 也能執行，Zeabur 會為它選**相容**；建立前仍能自行切換。
 
 填完映像檔後，表單會讀出映像檔宣告的連接埠，正常會自動帶入 `8080`。
 
@@ -63,7 +63,7 @@ Zeabur 讀出 `nginx-unprivileged` 以使用者 101 執行，會自動選 **嚴�
 
 ## 確認結果
 
-- 服務 **概覽** 顯示 `1/1` **就緒**，瀏覽器打開網址看到 Nginx 的歡迎頁。
+- 服務**概覽**顯示 `1/1` **就緒**，瀏覽器打開網址看到 Nginx 的歡迎頁。
 - 用 kubectl 也能看到剛才建立的三個物件，都帶 label `app.kubernetes.io/name: web`：
 
 ```sh
@@ -80,7 +80,7 @@ Namespace 帶 `zeabur.com/project=true`，Deployment 的 `READY` 是 `1/1`，Ing
 | 看到的狀況 | 先檢查 |
 | --- | --- |
 | 副本一直沒有就緒，事件寫著拉不到映像檔 | 映像檔名稱和版本有沒有打錯，節點能不能連到 Docker Hub |
-| 副本一直是 0，事件提到 Pod Security | 需要 root 的映像檔是否選了 **相容**；專案仍強制 `restricted` 時，請管理員把專案的 Pod Security 等級改為 `baseline` |
+| 副本一直是 0，事件提到 Pod Security | 需要 root 的映像檔是否選了**相容**；專案仍強制 `restricted` 時，請管理員把專案的 Pod Security 等級改為 `baseline` |
 | `1/1` 就緒，網址卻打不開 | DNS 有沒有指向叢集的入口，**連接埠**是不是 `8080` |
 | 按套用時出現**這份變更已過期** | 按**重新檢查**，看過新的差異再套用 |
 
