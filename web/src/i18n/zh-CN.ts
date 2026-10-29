@@ -2765,13 +2765,13 @@ export const zhCN: Messages = {
   "githubApp.return.action": "回到从 Git 部署",
   "s3d.title": "S3 目的地",
   "s3d.body":
-    "整个集群的备份表单都能选用这些存储空间。选用时会把密钥复制到项目，所以备份不依赖这份列表。在这里更换密钥时，会一并更新你有权限修改的副本。",
+    "整个集群的备份表单都能选用这些存储空间。选用时会把密钥复制到项目，所以备份不依赖这份列表。在这里更换密钥时，会一并更新你有权限修改的复制密钥。",
   "s3d.save": "保存目的地",
   "s3d.plan.copy": (name, namespace) => `更新 ${namespace} 中复制的密钥 ${name}`,
   "s3d.plan.keptDenied": (copies) =>
-    `你无权修改 ${copies}，这些副本会沿用旧密钥。等有权限的人再保存一次这个目的地，就会换成新密钥。`,
+    `你无权修改 ${copies}，这些复制的密钥会沿用旧密钥。等有权限的人再保存一次这个目的地，就会换成新密钥。`,
   "s3d.plan.keptUnknown": (copies) => `${copies} 没有标明密钥字段，所以会沿用旧密钥。`,
-  "s3d.plan.unsearched": "你无权列出所有 Namespace 的机密变量，其他地方的密钥副本会沿用旧密钥。",
+  "s3d.plan.unsearched": "你无权列出所有 Namespace 的机密变量，其他地方复制的密钥会沿用旧密钥。",
   "s3d.add": "添加目的地",
   "s3d.plan.save": (name) => `保存 S3 目的地 ${name}`,
   "s3d.plan.remove": (name) => `移除 S3 目的地 ${name}`,
@@ -2779,7 +2779,7 @@ export const zhCN: Messages = {
   "s3d.pick": "S3 目的地",
   "s3d.manual": "手动输入",
   "s3d.copied": (name) =>
-    `应用后，这里会使用 ${name} 密钥的副本。之后在 ${name} 更换密钥，这里也会跟着更换。`,
+    `应用后，这里会使用从 ${name} 复制的密钥。之后在 ${name} 更换密钥，这里也会跟着更换。`,
   "s3d.denied": (namespace) =>
     `你无权读取 ${namespace} 中的机密变量，无法复制这些目的地的密钥，请自行输入。`,
   "s3d.from": (name) => `密钥复制自 ${name}`,
