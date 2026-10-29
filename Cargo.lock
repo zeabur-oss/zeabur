@@ -2442,7 +2442,7 @@ name = "xtask"
 version = "0.1.1"
 dependencies = [
  "clap",
- "serde-saphyr",
+ "serde-saphyr 2.0.0",
  "serde_json",
  "sha2",
  "tempfile",
