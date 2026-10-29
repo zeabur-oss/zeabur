@@ -8,7 +8,8 @@
 # On Linux (native architecture only; Docker for the image):
 #   zeaburctl-<version>-linux-<arch>.tar.gz, zeabur-<version>-linux-<arch>.tar.gz: one static musl
 #     binary each, with LICENSE;
-#   image.tar: the image of Containerfile around that same `zeabur` binary (`docker image save`).
+#   image.tar: the image of Containerfile around that same `zeabur` binary (`docker image save`);
+#   proxy-image.tar: Zeabur Proxy's, of Containerfile.proxy around `zeabur-proxy`.
 # On macOS, arm64 only (Apple silicon):
 #   zeaburctl-<version>-darwin-arm64.tar.gz. The server only runs in a pod
 #   (`ClusterEndpoint::in_cluster`), so there is no macOS `zeabur`.
@@ -79,6 +80,7 @@ unset RUSTC_WRAPPER
 # compiled in (https://github.com/rust-secure-code/cargo-auditable).
 packages=()
 for binary in "${binaries[@]}"; do packages+=(-p "$binary"); done
+[[ "$os" == linux && -z "$installer" ]] && packages+=(-p zeabur-proxy)
 ZEABUR_UI_DIST="$root/web/dist" ZEABUR_INSTALLER_UI_DIST="$root/crates/zeabur-installer/web/dist" \
   cargo auditable build --release --locked --target "$target" \
   --target-dir "$target_dir" --manifest-path "$root/Cargo.toml" "${packages[@]}"
@@ -134,6 +136,15 @@ if [[ "$os" == linux && -z "$installer" ]]; then
   docker build --platform "linux/$arch" --network none --build-arg "SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH" \
     --file "$root/Containerfile" --tag "$image" "$context"
   docker image save --output "$output/image.tar" "$image"
+  echo "built $image (not published)"
+
+  context="$work/proxy-image"
+  install -D -m 0555 "$target_dir/$target/release/zeabur-proxy" "$context/zeabur-proxy"
+  touch -d "@$SOURCE_DATE_EPOCH" "$context/zeabur-proxy"
+  image="zeabur-proxy:release-$arch"
+  docker build --platform "linux/$arch" --network none --build-arg "SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH" \
+    --file "$root/Containerfile.proxy" --tag "$image" "$context"
+  docker image save --output "$output/proxy-image.tar" "$image"
   echo "built $image (not published)"
 fi
 ls -l "$output"
