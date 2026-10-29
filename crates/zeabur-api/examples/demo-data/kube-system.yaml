@@ -134,7 +134,7 @@ apiVersion: events.k8s.io/v1
 kind: Event
 action: NodeNotSchedulable
 deprecatedCount: 1
-eventTime: "2026-10-26T08:48:00.000000Z"
+eventTime: now-12m
 metadata:
   name: s1
   namespace: kube-system

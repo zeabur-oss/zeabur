@@ -1260,7 +1260,7 @@ apiVersion: events.k8s.io/v1
 kind: Event
 action: ScalingReplicaSet
 deprecatedCount: 1
-eventTime: "2026-10-26T08:26:00.000000Z"
+eventTime: now-34m
 metadata:
   name: e1
   namespace: shop
@@ -1279,7 +1279,7 @@ apiVersion: events.k8s.io/v1
 kind: Event
 action: BackOff
 deprecatedCount: 2
-eventTime: "2026-10-26T08:30:00.000000Z"
+eventTime: now-30m
 metadata:
   name: e2
   namespace: shop
@@ -1298,7 +1298,7 @@ apiVersion: events.k8s.io/v1
 kind: Event
 action: Pulled
 deprecatedCount: 1
-eventTime: "2026-10-26T08:37:00.000000Z"
+eventTime: now-23m
 metadata:
   name: e3
   namespace: shop
@@ -1317,7 +1317,7 @@ apiVersion: events.k8s.io/v1
 kind: Event
 action: BackOff
 deprecatedCount: 14
-eventTime: "2026-10-26T08:46:00.000000Z"
+eventTime: now-14m
 metadata:
   name: e4
   namespace: shop
@@ -1336,7 +1336,7 @@ apiVersion: events.k8s.io/v1
 kind: Event
 action: Unhealthy
 deprecatedCount: 9
-eventTime: "2026-10-26T08:47:00.000000Z"
+eventTime: now-13m
 metadata:
   name: e5
   namespace: shop
@@ -1355,7 +1355,7 @@ apiVersion: events.k8s.io/v1
 kind: Event
 action: SawCompletedJob
 deprecatedCount: 1
-eventTime: "2026-10-26T08:55:00.000000Z"
+eventTime: now-5m
 metadata:
   name: e6
   namespace: shop

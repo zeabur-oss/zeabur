@@ -922,7 +922,7 @@ apiVersion: events.k8s.io/v1
 kind: Event
 action: BackOff
 deprecatedCount: 541
-eventTime: "2026-10-26T08:58:00.000000Z"
+eventTime: now-2m
 metadata:
   name: l1
   namespace: lab
@@ -941,7 +941,7 @@ apiVersion: events.k8s.io/v1
 kind: Event
 action: FailedScheduling
 deprecatedCount: 119
-eventTime: "2026-10-26T08:55:00.000000Z"
+eventTime: now-5m
 metadata:
   name: l2
   namespace: lab

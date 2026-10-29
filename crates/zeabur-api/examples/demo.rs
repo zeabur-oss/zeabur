@@ -3345,19 +3345,29 @@ mod tests {
 
     #[test]
     fn times_follow_the_clock() {
-        let created = |now: &str| {
-            let data = DemoData::parse(&DEMO_DATA, now.parse().expect("a time"));
+        let load = |now: &str| DemoData::parse(&DEMO_DATA, now.parse().expect("a time"));
+        let earlier = load("2026-10-26T12:00:00Z");
+        let later = load("2026-10-27T12:00:00Z");
+        let created = |data: &DemoData| {
             data.nodes
-                .into_iter()
-                .next()
-                .and_then(|node| node.metadata.creation_timestamp)
+                .iter()
+                .find_map(|node| node.metadata.creation_timestamp.clone())
                 .expect("a node's creation time")
                 .0
         };
-        let earlier = created("2026-10-26T12:00:00Z");
-        let later = created("2026-10-27T12:00:00Z");
         assert_eq!(
-            later.duration_since(earlier),
+            created(&later).duration_since(created(&earlier)),
+            SignedDuration::from_hours(24)
+        );
+        let event_time = |data: &DemoData| {
+            data.events["shop"]
+                .iter()
+                .find_map(|event| event.event_time.clone())
+                .expect("an event's time")
+                .0
+        };
+        assert_eq!(
+            event_time(&later).duration_since(event_time(&earlier)),
             SignedDuration::from_hours(24)
         );
     }
