@@ -186,6 +186,10 @@ async fn fetch(source: Source<'_>, path: &str, encoded: &str) -> Result<Value, M
                     Missed::Failed(StoreState::Unavailable, None, error.to_string())
                 }),
                 404 => Err(Missed::NoProxyBackend),
+                // Every point would read samples from before the project's namespace.
+                400 if code(&answer.body).as_deref() == Some("before_namespace") => Ok(
+                    serde_json::json!({"status": "success", "data": {"resultType": "matrix", "result": []}}),
+                ),
                 502 => Err(Missed::ProxyBackendDown(detail(&answer.body))),
                 403 => {
                     let message = detail(&answer.body);
@@ -203,6 +207,15 @@ async fn fetch(source: Source<'_>, path: &str, encoded: &str) -> Result<Value, M
             }
         }
     }
+}
+
+/// The `code` of Zeabur Proxy's problem.
+fn code(body: &[u8]) -> Option<String> {
+    serde_json::from_slice::<Value>(body)
+        .ok()?
+        .get("code")?
+        .as_str()
+        .map(str::to_owned)
 }
 
 /// One range query; the values, or why there are none.

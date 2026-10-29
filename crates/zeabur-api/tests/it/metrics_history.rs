@@ -108,6 +108,13 @@ mod tests {
         }
     }
 
+    fn just_created(_: &str) -> ProxyAnswer {
+        json_answer(
+            400,
+            &json!({"code": "before_namespace", "detail": "the range ends before the namespace was created"}),
+        )
+    }
+
     fn no_metrics_backend(_: &str) -> ProxyAnswer {
         json_answer(404, &json!({"code": "unknown_backend"}))
     }
@@ -182,6 +189,17 @@ mod tests {
             "{asked:?}"
         );
         assert_eq!(store.inspect(|s| s.proxy_requests.len()), Some(0));
+    }
+
+    /// A project created moments ago, maybe under the name of a deleted one, has no history yet.
+    #[tokio::test]
+    async fn a_new_project_has_an_empty_history() {
+        let (app, ..) = app(just_created);
+        let (status, body) = send(&app, "GET", &history("shop"), None).await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        assert_eq!(body["state"], "available", "{body}");
+        assert_eq!(body["cpu"], json!([]));
+        assert_eq!(body["memory"], json!([]));
     }
 
     #[tokio::test]

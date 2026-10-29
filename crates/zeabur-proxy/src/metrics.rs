@@ -12,16 +12,20 @@
 //! Only the Prometheus query, range query, series, label names and label values APIs are served.
 //! Others, such as `export`, `federate`, `status/tsdb`, `metadata` or the vmalert ones, are not.
 //!
-//! The range is cut to start no earlier than the namespace's creation, as for logs. A range
-//! selector, a subquery or `offset` still reads samples before the start, so a namespace
-//! recreated under the same name may show the earlier one's usage near its creation. The
-//! namespace label, not the time, is what keeps other namespaces out.
+//! The namespace label keeps other namespaces out. It does not keep out an earlier namespace of
+//! the same name, so time does: VictoriaMetrics reads samples before a query's first point (a
+//! range selector, a subquery, `offset`; see [`crate::reach`]), and the first point is moved to
+//! after the namespace's creation by that much. A query whose reach cannot be bounded is refused.
+//! The series and label APIs find series by VictoriaMetrics' per-day index, which also holds a
+//! series active in the last hour of the day before. Their range starts on the second day after
+//! the creation (UTC).
 
 use http::Method;
 use k8s_openapi::jiff::{SignedDuration, Timestamp};
 
 use crate::logs::{forbidden_char, positive, time};
 use crate::namespace::Namespace;
+use crate::reach::reach;
 use crate::reject::Reject;
 use crate::rules::{Authorized, Backend, Scoped, Upstream};
 
@@ -39,6 +43,12 @@ pub const MAX_POINTS: i64 = 11_000;
 
 /// The longest label name accepted.
 const MAX_LABEL: usize = 128;
+
+/// The step of an instant query, sent with it: VictoriaMetrics' default when its flags are
+/// unset.
+pub const INSTANT_STEP: u32 = 300;
+
+const DAY: i64 = 86_400;
 
 const QUERY_PATH: &str = "/api/v1/query";
 const QUERY_RANGE_PATH: &str = "/api/v1/query_range";
@@ -97,6 +107,8 @@ pub struct MetricsQuery {
     pub step: Option<u32>,
     /// How many series, names or values.
     pub limit: Option<u32>,
+    /// For the two query endpoints, the seconds before a point the query reads samples from.
+    pub reach: i64,
 }
 
 impl Scoped for MetricsQuery {
@@ -229,6 +241,13 @@ impl Backend for Metrics {
             None => None,
             Some(limit) => Some(positive(&limit).ok_or(Reject::InvalidLimit)?),
         };
+        let reach = match (&endpoint, &query) {
+            (Endpoint::Query | Endpoint::QueryRange, Some(text)) => {
+                let step = i64::from(step.unwrap_or(INSTANT_STEP)).saturating_mul(1000);
+                reach(text, step)?.saturating_add(999) / 1000
+            }
+            _ => 0,
+        };
         Ok(MetricsQuery {
             endpoint,
             namespace,
@@ -239,12 +258,14 @@ impl Backend for Metrics {
             end,
             step,
             limit,
+            reach,
         })
     }
 
-    /// Times are cut to the namespace's creation and to now, a range to the longest span (a
-    /// range query's start moves by whole steps, so its points stay on the asked grid), and a
-    /// limit to the most allowed.
+    /// Times are cut to now, and to read no sample from before the namespace's creation: a
+    /// query's points start its reach after it, the series and label APIs on the second day
+    /// after it. A range is cut to the longest span (a range query's start moves by whole
+    /// steps, so its points stay on the asked grid), and a limit to the most allowed.
     fn build(
         authorized: &Authorized<MetricsQuery>,
         limits: &MetricsLimits,
@@ -258,21 +279,35 @@ impl Backend for Metrics {
             format!("{LABEL}={}", authorized.grant().namespace()),
         );
         let text = || query.query.clone().ok_or(Reject::InvalidQuery);
+        let first = match query.endpoint {
+            Endpoint::Query | Endpoint::QueryRange => {
+                created.saturating_add(query.reach).saturating_add(1)
+            }
+            Endpoint::Series | Endpoint::Labels | Endpoint::LabelValues(_) => created
+                .div_euclid(DAY)
+                .saturating_add(2)
+                .saturating_mul(DAY),
+        };
         if query.endpoint == Endpoint::Query {
             let at = query.time.map_or(now, Timestamp::as_second).min(now);
-            if at <= created {
+            if at < first {
                 return Err(Reject::BeforeNamespace);
             }
             return Ok(Upstream::new(
                 QUERY_PATH,
-                vec![("query", text()?), ("time", at.to_string()), filter],
+                vec![
+                    ("query", text()?),
+                    ("time", at.to_string()),
+                    ("step", INSTANT_STEP.to_string()),
+                    filter,
+                ],
             ));
         }
         let end = query.end.map_or(now, Timestamp::as_second).min(now);
-        if end <= created {
+        if end < first {
             return Err(Reject::BeforeNamespace);
         }
-        let earliest = end.saturating_sub(limits.max_span.as_secs()).max(created);
+        let earliest = end.saturating_sub(limits.max_span.as_secs()).max(first);
         let mut start = query.start.map_or_else(
             || end.saturating_sub(limits.default_span.as_secs()),
             Timestamp::as_second,
@@ -609,25 +644,68 @@ mod tests {
         assert_eq!(param(&upstream, "extra_label"), ["namespace=shop"]);
     }
 
+    /// The seconds before its first point `query` reads, at `step` seconds.
+    fn reach_of(query: &str, step: u32) -> i64 {
+        (reach(query, i64::from(step) * 1000).unwrap() + 999) / 1000
+    }
+
+    /// A namespace deleted and created again under the same name: no sample the query reads is
+    /// from before the creation, however far back it reaches.
     #[test]
-    fn times_start_when_the_namespace_was_created_and_stay_on_the_grid() {
-        let query = parse(RANGE, "namespace=shop&query=up&step=3600&start=1790800000").unwrap();
-        let upstream = build(query, "shop").unwrap();
-        let start: i64 = param(&upstream, "start")[0].parse().unwrap();
-        assert!(start >= CREATED);
-        assert_eq!((start - 1_790_800_000) % 3600, 0);
-        assert_eq!(param(&upstream, "end"), [NOW.to_string()]);
+    fn no_query_reads_a_sample_from_before_the_namespace() {
+        for query in [
+            "up",
+            "rate(up[1h])",
+            "up offset 2d",
+            "max_over_time(up[1d:1h])",
+        ] {
+            let asked = format!(
+                "namespace=shop&step=3600&start=1790800000&query={}",
+                form_urlencoded::byte_serialize(query.as_bytes()).collect::<String>()
+            );
+            let upstream = build(parse(RANGE, &asked).unwrap(), "shop").unwrap();
+            let start: i64 = param(&upstream, "start")[0].parse().unwrap();
+            assert!(start - reach_of(query, 3600) > CREATED, "{query}");
+            assert_eq!((start - 1_790_800_000) % 3600, 0, "{query}");
+            assert_eq!(param(&upstream, "end"), [NOW.to_string()]);
+        }
 
         let before = parse(RANGE, "namespace=shop&query=up&step=60&end=1790000000").unwrap();
         assert_eq!(build(before, "shop"), Err(Reject::BeforeNamespace));
+        let near = format!("namespace=shop&query=up&step=60&end={}", CREATED + 60);
+        assert_eq!(
+            build(parse(RANGE, &near).unwrap(), "shop"),
+            Err(Reject::BeforeNamespace)
+        );
+
         let instant = parse("/metrics/api/v1/query", "namespace=shop&query=up&time=1").unwrap();
         assert_eq!(build(instant, "shop"), Err(Reject::BeforeNamespace));
+        let reach = reach_of("up offset 1d", INSTANT_STEP);
+        for (time, read) in [(CREATED + reach, false), (CREATED + reach + 1, true)] {
+            let asked = format!("namespace=shop&query=up+offset+1d&time={time}");
+            let built = build(parse("/metrics/api/v1/query", &asked).unwrap(), "shop");
+            assert_eq!(built.is_ok(), read, "{time}");
+        }
         let later = parse(
             "/metrics/api/v1/query",
             "namespace=shop&query=up&time=1900000000",
         );
         let upstream = build(later.unwrap(), "shop").unwrap();
         assert_eq!(param(&upstream, "time"), [NOW.to_string()]);
+        assert_eq!(param(&upstream, "step"), [INSTANT_STEP.to_string()]);
+
+        let series = format!(
+            "namespace=shop&match%5B%5D=up&start={}&end={}",
+            CREATED + 1,
+            CREATED + 3 * DAY
+        );
+        let upstream = build(parse("/metrics/api/v1/series", &series).unwrap(), "shop").unwrap();
+        assert_eq!(param(&upstream, "start"), [(CREATED + 2 * DAY).to_string()]);
+        let labels = format!("namespace=shop&end={}", CREATED + DAY);
+        assert_eq!(
+            build(parse("/metrics/api/v1/labels", &labels).unwrap(), "shop"),
+            Err(Reject::BeforeNamespace)
+        );
 
         let dense = parse(RANGE, "namespace=shop&query=up&step=1&start=1792600000").unwrap();
         assert_eq!(build(dense, "shop"), Err(Reject::InvalidStep));
@@ -641,6 +719,9 @@ mod tests {
             Just("query=up".to_owned()),
             Just("query=x%7Bnamespace%3D%22b%22%7D".to_owned()),
             Just("query=x%5B1h%3A1m%5D+offset+1d".to_owned()),
+            Just("query=rate%28x%5B7d%5D%29+offset+2d".to_owned()),
+            Just("time=1790813000".to_owned()),
+            Just("start=1790812900".to_owned()),
             Just("match%5B%5D=%7B__name__%3D~%22.%2B%22%7D".to_owned()),
             Just("match%5B%5D=%7Bnamespace%3D%22b%22%7D".to_owned()),
             Just("extra_label=namespace%3Db".to_owned()),
@@ -707,6 +788,12 @@ mod tests {
                         .contains(&key.as_str()),
                     "{}", key
                 );
+            }
+            let value = |key: &str| decoded.iter().find(|(k, _)| k == key).map(|(_, v)| v.clone());
+            if let Some(text) = value("query") {
+                let first: i64 = value("start").or_else(|| value("time")).unwrap().parse().unwrap();
+                let step: u32 = value("step").unwrap().parse().unwrap();
+                prop_assert!(first - reach_of(&text, step) > CREATED);
             }
         }
     }

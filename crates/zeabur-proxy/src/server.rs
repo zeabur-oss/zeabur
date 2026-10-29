@@ -612,7 +612,7 @@ mod tests {
         let (url, _) = backend(422, "cannot parse query").await;
         let response = proxy(url, allowing(&["a"]), 1 << 20)
             .handle(get(
-                "/metrics/api/v1/query?namespace=a&query=sum(",
+                "/metrics/api/v1/query?namespace=a&query=no_such_function(up)",
                 Some("good"),
             ))
             .await;

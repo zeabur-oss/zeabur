@@ -6,6 +6,7 @@ mod audit;
 pub mod logs;
 pub mod metrics;
 pub mod namespace;
+pub mod reach;
 pub mod reject;
 pub mod rules;
 pub mod server;

@@ -18,7 +18,8 @@ never reach it.
 5. The namespace is read with the person's token for its `creationTimestamp`; not readable: 403.
 6. The backend's request is rebuilt from the parsed query alone, with the namespace filter
    (VictoriaLogs' `extra_stream_filters`, VictoriaMetrics' `extra_label=namespace=<namespace>`),
-   the time range cut to start no earlier than the namespace's creation, and the module's limits.
+   the time range cut so that no sample from before the namespace's creation is read, and the
+   module's limits.
    The original query string and headers are never sent on. A filter parameter in the request is
    refused, not merged.
 7. The answer is streamed back within a time and a size, with only `Content-Type` of its headers.
@@ -32,10 +33,24 @@ a query and a grant for the same namespace and resource make. The rules (`rules`
 
 The metrics module serves the Prometheus query, range query, series, label names and label values
 APIs, the ones VictoriaMetrics applies `extra_label` to. Export, federate, TSDB status, metadata
-and the vmalert APIs are refused. A range selector, subquery or `offset` reads samples before the
-range's start, so for metrics the cut at the namespace's creation is not a boundary: a namespace
-recreated under the same name may show the earlier one's usage. The namespace label is the
-boundary.
+and the vmalert APIs are refused.
+
+The namespace label keeps other namespaces out, but a namespace deleted and created again under
+the same name keeps its label. Time keeps the earlier one out:
+
+- A query reads samples before its first point: a range selector's window, a subquery's window
+  and step, an `offset`, and for each selector the step and 5 minutes more. The module bounds
+  that reach from the query itself (`reach`) and moves the first point to after the creation by
+  it. A query whose reach it cannot bound is refused with 400: `@`, `WITH`, comments, and windows
+  that are not duration literals (`[1i]`, `[$__interval]`, `[1.5h]`). The bound assumes
+  VictoriaMetrics' `-search.minStalenessInterval` and `-search.latencyOffset` are at most their
+  defaults (5 minutes, 30 s).
+- The series and label APIs find series by VictoriaMetrics' per-day index, and a series active in
+  the last hour of a day is also in the next day's. Their range starts at 00:00 UTC on the second
+  day after the creation; before that they answer 400 `before_namespace`.
+
+A query of a project created a few minutes ago therefore answers 400 `before_namespace`, and
+Zeabur shows an empty history.
 
 ## Deployment
 
