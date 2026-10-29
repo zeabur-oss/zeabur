@@ -262,7 +262,7 @@ mod tests {
             arch: "arm64".to_owned(),
             hostname: "solo".to_owned(),
             node_name: None,
-            random_hex: "a1b2c3".to_owned(),
+            host_hex: "a1b2c3".to_owned(),
             memory_mib,
             node_ips: vec!["10.0.0.5".to_owned()],
             node_prefix: None,

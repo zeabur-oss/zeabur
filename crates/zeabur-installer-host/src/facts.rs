@@ -31,7 +31,7 @@ pub fn read() -> Result<Facts, HostError> {
         arch: arch(std::env::consts::ARCH).to_owned(),
         hostname: hostname.trim().to_owned(),
         node_name: installed_node_name(Path::new("/")),
-        random_hex: crate::files::random_hex()?.chars().take(6).collect(),
+        host_hex: host_hex()?,
         memory_mib: memory_mib(&meminfo).ok_or_else(|| HostError::Parse {
             what: "/proc/meminfo".to_owned(),
             reason: "no MemTotal".to_owned(),
@@ -39,6 +39,17 @@ pub fn read() -> Result<Facts, HostError> {
         node_ips,
         node_prefix,
     })
+}
+
+/// Six hex digits of the machine id's hash, so `plan` and a later `apply` pick the same name;
+/// random without one.
+fn host_hex() -> Result<String, HostError> {
+    use sha2::{Digest as _, Sha256};
+    let hex = match fs::read_to_string("/etc/machine-id") {
+        Ok(id) if !id.trim().is_empty() => hex::encode(Sha256::digest(id.trim())),
+        _ => crate::files::random_hex()?,
+    };
+    Ok(hex.chars().take(6).collect())
 }
 
 /// The name K3s, RKE2 or `KubeSolo` already gives this node: the `node-name` of its

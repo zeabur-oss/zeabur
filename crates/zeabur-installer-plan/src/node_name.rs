@@ -101,7 +101,7 @@ pub fn choose(
     }
     Ok(from_hostname(&facts.hostname, &facts.node_ips)
         .filter(|name| !taken.contains(name))
-        .unwrap_or_else(|| format!("node-{}", facts.random_hex)))
+        .unwrap_or_else(|| format!("node-{}", facts.host_hex)))
 }
 
 #[cfg(test)]
@@ -113,7 +113,7 @@ mod tests {
             arch: "amd64".to_owned(),
             hostname: hostname.to_owned(),
             node_name: existing.map(str::to_owned),
-            random_hex: "a1b2c3".to_owned(),
+            host_hex: "a1b2c3".to_owned(),
             memory_mib: 4096,
             node_ips: vec!["10.211.55.189".to_owned(), "fd00::5".to_owned()],
             node_prefix: Some(24),

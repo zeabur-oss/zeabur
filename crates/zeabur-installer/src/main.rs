@@ -314,7 +314,7 @@ fn manifests(cli: &Cli, cluster_name: &str) -> Result<(), InstallError> {
         arch: facts::arch(std::env::consts::ARCH).to_owned(),
         hostname: cluster_name.to_owned(),
         node_name: None,
-        random_hex: String::new(),
+        host_hex: String::new(),
         memory_mib: 0,
         node_ips: Vec::new(),
         node_prefix: None,

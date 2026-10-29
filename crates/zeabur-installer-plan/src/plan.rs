@@ -82,8 +82,8 @@ pub struct Facts {
     pub hostname: String,
     /// The name an earlier install gave this node in Kubernetes; a re-run keeps it.
     pub node_name: Option<String>,
-    /// Six random hexadecimal digits, for a node name when the host name will not do.
-    pub random_hex: String,
+    /// Six hexadecimal digits from the machine id, for a node name when the host name will not do.
+    pub host_hex: String,
     /// Memory in MiB.
     pub memory_mib: u64,
     /// The addresses the node registers with (`node-ip`); empty leaves the choice to K3s or RKE2.
@@ -1599,7 +1599,7 @@ mod tests {
             arch: "arm64".to_owned(),
             hostname: "vps-1".to_owned(),
             node_name: None,
-            random_hex: "a1b2c3".to_owned(),
+            host_hex: "a1b2c3".to_owned(),
             memory_mib: 8192,
             node_ips: vec!["10.0.0.5".to_owned()],
             node_prefix: Some(24),
