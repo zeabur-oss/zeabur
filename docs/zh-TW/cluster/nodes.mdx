@@ -44,8 +44,7 @@ sudo zeabur-installer node add --ttl 1h
 
 加入工作節點用會過期的 bootstrap 權杖，`--ttl` 預設 1 小時，最長 24 小時。在 RKE2 要加入伺服器（控制平面），加上 `--role server`，用的是叢集的 server 權杖，不會過期。K3s 只執行一台用 SQLite 的伺服器，所以會拒絕 `--role server`。新 VM 連不到伺服器的內部位址時，用 `--address` 指定新 VM 連得到的位址。
 
-<!-- writing-allow: zh-term 「zot 鏡像」是登錄檔鏡像（mirror），不是映像檔 -->
-叢集執行 Longhorn 或 zot 鏡像時，輸出會自動帶上對應的設定。設定檔還寫著 `profile: single-node` 時，輸出會提醒你改成 `multi-node` 並重新 `apply`。
+叢集執行 Longhorn 或 zot 鏡像站時，輸出會自動帶上對應的設定。設定檔還寫著 `profile: single-node` 時，輸出會提醒你改成 `multi-node` 並重新 `apply`。
 
 </Step>
 <Step>
