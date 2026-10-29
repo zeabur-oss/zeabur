@@ -39,18 +39,21 @@ The namespace label keeps other namespaces out, but a namespace deleted and crea
 the same name keeps its label. Time keeps the earlier one out:
 
 - A query reads samples before its first point: a range selector's window, a subquery's window
-  and step, an `offset`, and for each selector the step and 5 minutes more. The module bounds
-  that reach from the query itself (`reach`) and moves the first point to after the creation by
-  it. A query whose reach it cannot bound is refused with 400: `@`, `WITH`, comments, and windows
-  that are not duration literals (`[1i]`, `[$__interval]`, `[1.5h]`). The bound assumes
-  VictoriaMetrics' `-search.minStalenessInterval` and `-search.latencyOffset` are at most their
-  defaults (5 minutes, 30 s).
+  and step, an `offset`, and for each selector and each subquery the step and 5 minutes more. The
+  module bounds that reach from the query's text (`reach`): every duration in it, plus three steps
+  and 5 minutes for each level a subquery may nest in (a subquery, or a function over a
+  parenthesis or an operator), plus two steps, 5 minutes and 30 s. It moves the first point to
+  after the creation by that much. A query whose reach it cannot bound is refused with 400: `@`,
+  `WITH`, comments, and durations that are not whole literals (`[1i]`, `[$__interval]`,
+  `[1.5h]`). The bound assumes VictoriaMetrics' `-search.minStalenessInterval` and
+  `-search.latencyOffset` are at most their defaults (5 minutes, 30 s).
 - The series and label APIs find series by VictoriaMetrics' per-day index, and a series active in
   the last hour of a day is also in the next day's. Their range starts at 00:00 UTC on the second
   day after the creation; before that they answer 400 `before_namespace`.
 
 A query of a project created a few minutes ago therefore answers 400 `before_namespace`, and
-Zeabur shows an empty history.
+Zeabur shows an empty history: for its first 8 minutes in the 1-hour view, 10 in the 6-hour view,
+21 in the 24-hour view and 1 h 36 min in the 7-day view.
 
 ## Deployment
 

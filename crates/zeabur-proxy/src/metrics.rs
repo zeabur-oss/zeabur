@@ -747,6 +747,33 @@ mod tests {
     }
 
     proptest! {
+        /// However far back a query reaches, the built request's first point is later than the
+        /// namespace's creation by more.
+        #[test]
+        fn no_query_reads_a_sample_from_before_the_namespace_whatever_it_is(
+            query in crate::reach::query(),
+            step in prop_oneof![Just(15_u32), Just(60), Just(300), Just(1800), 1_u32..7200],
+            start in CREATED - DAY..NOW,
+            instant in any::<bool>(),
+        ) {
+            let encoded: String = form_urlencoded::byte_serialize(query.as_bytes()).collect();
+            let (path, asked) = if instant {
+                ("/metrics/api/v1/query", format!("namespace=shop&query={encoded}&time={start}"))
+            } else {
+                (RANGE, format!("namespace=shop&query={encoded}&step={step}&start={start}"))
+            };
+            let Ok(upstream) = build(parse(path, &asked).unwrap(), "shop") else {
+                return Ok(());
+            };
+            let first: i64 = param(&upstream, if instant { "time" } else { "start" })[0]
+                .parse()
+                .unwrap();
+            let step = if instant { INSTANT_STEP } else { step };
+            prop_assert!(first - reach_of(&query, step) > CREATED, "{}", query);
+        }
+    }
+
+    proptest! {
         /// Whatever the request, the backend's request has exactly one namespace filter, equal
         /// to the namespace the grant is for, and no other filter or parameter of the person's.
         #[test]

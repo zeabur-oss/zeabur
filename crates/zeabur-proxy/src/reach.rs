@@ -1,21 +1,14 @@
-//! How far before its first point a metrics query reads samples.
+//! How far before its first point a metrics query may read samples, bounded from its text.
 //!
-//! VictoriaMetrics (v1.152.0, `app/vmselect/promql/eval.go`) reads samples before the time it
-//! evaluates: a range selector's window, a subquery's window and step, an `offset`, and for every
-//! selector and subquery the step and 5 minutes more (`maxSilenceInterval` while
-//! `-search.minStalenessInterval` is unset). A rollup function over an expression that is not a
-//! selector is an implicit subquery with the step as window and step. [`reach`] bounds the sum
-//! along the deepest path of the query and refuses what it cannot bound: `@`, `WITH`, comments,
-//! durations that are not literals, deeper nesting than [`MAX_DEPTH`].
-//!
-//! The lexer follows `MetricsQL`'s (`github.com/VictoriaMetrics/metricsql` v0.87.4) for strings,
-//! so a bracket or `offset` inside a string is never counted and one outside is never missed.
-//! Anything it does not know is refused.
+//! VictoriaMetrics reads samples before the time it evaluates: a range selector's window, a
+//! subquery's window and step, an `offset`, and for each selector and each subquery the step and
+//! 5 minutes more (`-search.minStalenessInterval` unset). A rollup function over an expression
+//! that is not a selector is a subquery too. [`reach`] adds every duration in the query, and the
+//! steps and 5 minutes once for each level a subquery may nest in, without telling rollup
+//! functions from others. It refuses what it cannot bound: `@`, `WITH`, comments, durations that
+//! are not whole literals.
 
 use crate::reject::Reject;
-
-/// The deepest nesting accepted.
-pub const MAX_DEPTH: usize = 32;
 
 /// `maxSilenceInterval`: VictoriaMetrics reads this much more before each selector and subquery.
 const SILENCE: i64 = 5 * 60 * 1000;
@@ -23,49 +16,63 @@ const SILENCE: i64 = 5 * 60 * 1000;
 /// `-search.latencyOffset`: VictoriaMetrics may move an instant query's time this much earlier.
 const LATENCY: i64 = 30 * 1000;
 
-/// `MetricsQL`'s aggregate functions: none reads samples itself.
+/// Aggregates, which read no samples themselves.
 const AGGREGATES: &[&str] = &[
-    "any",
     "avg",
     "bottomk",
-    "bottomk_avg",
-    "bottomk_last",
-    "bottomk_max",
-    "bottomk_median",
-    "bottomk_min",
     "count",
     "count_values",
-    "distinct",
-    "geomean",
     "group",
-    "histogram",
-    "limitk",
-    "mad",
     "max",
-    "median",
     "min",
-    "mode",
-    "outliers_iqr",
-    "outliers_mad",
-    "outliersk",
     "quantile",
-    "quantiles",
-    "share",
     "stddev",
     "stdvar",
     "sum",
-    "sum2",
     "topk",
-    "topk_avg",
-    "topk_last",
-    "topk_max",
-    "topk_median",
-    "topk_min",
-    "zscore",
 ];
 
 /// Binary operators that are words.
 const WORD_OPERATORS: &[&str] = &["and", "or", "unless", "if", "ifnot", "default", "atan2"];
+
+/// Words before a list of labels.
+const MODIFIERS: &[&str] = &[
+    "by",
+    "without",
+    "on",
+    "ignoring",
+    "group_left",
+    "group_right",
+];
+
+/// A parenthesis not yet closed.
+#[derive(Default)]
+struct Frame {
+    /// An aggregate's: never a subquery.
+    plain: bool,
+    /// Holds a parenthesis or a binary operator, so a rollup function over it is a subquery.
+    nested: bool,
+    /// The most subqueries nested in it.
+    depth: i64,
+    /// For a list of labels after an aggregate's `by`: the aggregate's parenthesis is next.
+    aggregate_next: bool,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Last {
+    Selector,
+    Aggregate,
+    /// `by`, `on` and the like; `aggregate` for an aggregate's `by` or `without` before its
+    /// parenthesis.
+    Modifier {
+        aggregate: bool,
+    },
+    /// The labels of an aggregate's `by` or `without`, before its parenthesis.
+    Labels,
+    /// A window or subquery.
+    Window,
+    Other,
+}
 
 /// The milliseconds before its first point that `query` may read samples from, when VictoriaMetrics
 /// evaluates it every `step` milliseconds (an instant query's step for one).
@@ -73,92 +80,186 @@ const WORD_OPERATORS: &[&str] = &["and", "or", "unless", "if", "ifnot", "default
 /// # Errors
 /// [`Reject::InvalidQuery`] when the query uses what this cannot bound, or is not `MetricsQL`.
 pub fn reach(query: &str, step: i64) -> Result<i64, Reject> {
-    let tokens = lex(query)?;
-    let mut parser = Parser { tokens, at: 0 };
-    let ast = parser.expr(0)?;
-    if parser.at != parser.tokens.len() {
+    let mut scan = Scan {
+        durations: 0,
+        steps: step.max(1),
+        subqueries: 0,
+        frames: vec![Frame {
+            plain: true,
+            ..Frame::default()
+        }],
+        braces: false,
+        last: Last::Other,
+    };
+    let mut i = 0;
+    while let Some(&b) = query.as_bytes().get(i) {
+        let rest = query.get(i..).ok_or(Reject::InvalidQuery)?;
+        i += scan.token(b, rest)?;
+    }
+    let [root] = scan.frames.as_slice() else {
+        return Err(Reject::InvalidQuery);
+    };
+    if scan.braces {
         return Err(Reject::InvalidQuery);
     }
-    Ok(eval(&ast, step)
-        .saturating_add(step)
+    let level = scan.steps.saturating_mul(3).saturating_add(SILENCE);
+    Ok(scan
+        .durations
+        .saturating_add(
+            root.depth
+                .saturating_add(scan.subqueries)
+                .saturating_mul(level),
+        )
+        .saturating_add(scan.steps.saturating_mul(2))
+        .saturating_add(SILENCE)
         .saturating_add(LATENCY))
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-enum Token<'a> {
-    Ident(&'a str),
-    Text,
-    Number(&'a str),
-    Punct(u8),
-    Op(&'a str),
-    /// `[window]` or `[window:step]`, in milliseconds; `subquery` when there is a `:`.
-    Window {
-        window: Option<i64>,
-        step: Option<i64>,
-        subquery: bool,
-    },
+struct Scan {
+    /// Every duration so far.
+    durations: i64,
+    /// The longest step: the query's or a subquery's.
+    steps: i64,
+    /// Windows and subqueries over what is not a selector.
+    subqueries: i64,
+    frames: Vec<Frame>,
+    /// Inside a selector's `{}`.
+    braces: bool,
+    last: Last,
 }
 
-fn lex(query: &str) -> Result<Vec<Token<'_>>, Reject> {
-    let bytes = query.as_bytes();
-    let mut tokens = Vec::new();
-    let mut i = 0;
-    while let Some(&b) = bytes.get(i) {
-        let rest = query.get(i..).ok_or(Reject::InvalidQuery)?;
-        let (token, len) = match b {
-            b' ' | b'\t' | b'\n' | 0x0B | 0x0C | b'\r' => {
-                i += 1;
-                continue;
+impl Scan {
+    /// Reads the token at the start of `rest`, whose first byte is `b`; its length.
+    fn token(&mut self, b: u8, rest: &str) -> Result<usize, Reject> {
+        let mut next = Last::Other;
+        let len = match b {
+            b' ' | b'\t' | b'\n' | 0x0B | 0x0C | b'\r' => return Ok(1),
+            b'"' | b'\'' | b'`' => string(rest)?,
+            b'{' if !self.braces => {
+                self.braces = true;
+                1
             }
-            b'{' | b'}' | b'(' | b')' | b',' => (Token::Punct(b), 1),
-            b'[' => {
+            b'}' if self.braces => {
+                self.braces = false;
+                next = Last::Selector;
+                1
+            }
+            b',' => 1,
+            b'(' if !self.braces => {
+                self.frame()?.nested = true;
+                let (plain, aggregate_next) = match self.last {
+                    Last::Aggregate | Last::Labels => (true, false),
+                    Last::Modifier { aggregate } => (false, aggregate),
+                    Last::Selector | Last::Window | Last::Other => (false, false),
+                };
+                self.frames.push(Frame {
+                    plain,
+                    aggregate_next,
+                    ..Frame::default()
+                });
+                1
+            }
+            b')' if !self.braces => {
+                let closed = self.frames.pop().ok_or(Reject::InvalidQuery)?;
+                let own = i64::from(closed.nested && !closed.plain);
+                let parent = self.frame()?;
+                parent.depth = parent.depth.max(closed.depth.saturating_add(own));
+                if closed.aggregate_next {
+                    next = Last::Labels;
+                }
+                1
+            }
+            b'[' if !self.braces => {
                 let end = rest.find(']').ok_or(Reject::InvalidQuery)?;
-                (
-                    window(rest.get(1..end).ok_or(Reject::InvalidQuery)?)?,
-                    end + 1,
-                )
+                self.window(rest.get(1..end).ok_or(Reject::InvalidQuery)?)?;
+                next = Last::Window;
+                end + 1
             }
-            b'"' | b'\'' | b'`' => (Token::Text, string(rest)?),
-            b'a'..=b'z' | b'A'..=b'Z' | b'_' | b':' => {
-                let len = rest
-                    .bytes()
-                    .take_while(|c| c.is_ascii_alphanumeric() || matches!(c, b'_' | b':' | b'.'))
-                    .count();
-                (
-                    Token::Ident(rest.get(..len).ok_or(Reject::InvalidQuery)?),
-                    len,
-                )
+            b'a'..=b'z' | b'A'..=b'Z' | b'_' | b':' => return self.word(rest),
+            b'0'..=b'9' | b'.' => rest
+                .bytes()
+                .take_while(|c| c.is_ascii_alphanumeric() || matches!(c, b'_' | b'.'))
+                .count(),
+            b'+' | b'-' | b'*' | b'/' | b'%' | b'^' | b'>' | b'<' | b'=' | b'!' | b'~' => {
+                if !self.braces {
+                    self.frame()?.nested = true;
+                }
+                1
             }
-            b'0'..=b'9' | b'.' => {
-                let len = rest
-                    .bytes()
-                    .take_while(|c| c.is_ascii_alphanumeric() || matches!(c, b'_' | b'.'))
-                    .count();
-                (
-                    Token::Number(rest.get(..len).ok_or(Reject::InvalidQuery)?),
-                    len,
-                )
-            }
-            _ => {
-                let len = ["==", "!=", ">=", "<=", "=~", "!~"]
-                    .iter()
-                    .find(|op| rest.starts_with(*op))
-                    .map(|op| op.len())
-                    .or_else(|| {
-                        matches!(
-                            b,
-                            b'+' | b'-' | b'*' | b'/' | b'%' | b'^' | b'>' | b'<' | b'='
-                        )
-                        .then_some(1)
-                    })
-                    .ok_or(Reject::InvalidQuery)?;
-                (Token::Op(rest.get(..len).ok_or(Reject::InvalidQuery)?), len)
-            }
+            _ => return Err(Reject::InvalidQuery),
         };
-        tokens.push(token);
-        i += len;
+        self.last = next;
+        Ok(len)
     }
-    Ok(tokens)
+
+    fn frame(&mut self) -> Result<&mut Frame, Reject> {
+        self.frames.last_mut().ok_or(Reject::InvalidQuery)
+    }
+
+    /// `[window]` or `[window:step]`, without the brackets.
+    fn window(&mut self, content: &str) -> Result<(), Reject> {
+        let (window, step) = match content.split_once(':') {
+            Some((window, step)) => (window.trim(), Some(step.trim())),
+            None => (content.trim(), None),
+        };
+        if !window.is_empty() {
+            self.durations = self.durations.saturating_add(duration(window)?);
+        } else if step.is_none() {
+            return Err(Reject::InvalidQuery);
+        }
+        if let Some(step) = step.filter(|s| !s.is_empty()) {
+            let step = duration(step)?;
+            self.durations = self.durations.saturating_add(step);
+            self.steps = self.steps.max(step);
+        }
+        if step.is_some() || self.last != Last::Selector {
+            self.subqueries = self.subqueries.saturating_add(1);
+        }
+        Ok(())
+    }
+
+    /// The word at the start of `rest`, with its duration for `offset`; their length.
+    fn word(&mut self, rest: &str) -> Result<usize, Reject> {
+        let len = rest
+            .bytes()
+            .take_while(|c| c.is_ascii_alphanumeric() || matches!(c, b'_' | b':' | b'.'))
+            .count();
+        let word = rest
+            .get(..len)
+            .ok_or(Reject::InvalidQuery)?
+            .to_ascii_lowercase();
+        let word = word.as_str();
+        let last = std::mem::replace(&mut self.last, Last::Other);
+        if self.braces {
+        } else if word == "with" {
+            return Err(Reject::InvalidQuery);
+        } else if word == "offset" {
+            if !matches!(last, Last::Selector | Last::Window) {
+                self.frame()?.nested = true;
+            }
+            let tail = rest.get(len..).ok_or(Reject::InvalidQuery)?;
+            let literal = tail.trim_start();
+            let literal = literal.strip_prefix('-').unwrap_or(literal).trim_start();
+            let digits = literal
+                .bytes()
+                .take_while(|c| c.is_ascii_alphanumeric() || *c == b'.')
+                .count();
+            let offset = duration(literal.get(..digits).ok_or(Reject::InvalidQuery)?)?;
+            self.durations = self.durations.saturating_add(offset);
+            return Ok(len + (tail.len() - literal.len()) + digits);
+        } else if WORD_OPERATORS.contains(&word) {
+            self.frame()?.nested = true;
+        } else if MODIFIERS.contains(&word) {
+            self.last = Last::Modifier {
+                aggregate: matches!(word, "by" | "without") && last == Last::Aggregate,
+            };
+        } else if AGGREGATES.contains(&word) {
+            self.last = Last::Aggregate;
+        } else if !matches!(word, "inf" | "nan" | "keep_metric_names") {
+            self.last = Last::Selector;
+        }
+        Ok(len)
+    }
 }
 
 /// The length of the string at the start of `s`, as `MetricsQL`'s `scanString` finds it: up to
@@ -183,30 +284,6 @@ fn string(s: &str) -> Result<usize, Reject> {
     }
 }
 
-fn window(content: &str) -> Result<Token<'static>, Reject> {
-    let (window, step, subquery) = match content.split_once(':') {
-        Some((window, step)) => (window.trim(), Some(step.trim()), true),
-        None => (content.trim(), None, false),
-    };
-    let window = if window.is_empty() {
-        None
-    } else {
-        Some(duration(window)?)
-    };
-    if window.is_none() && !subquery {
-        return Err(Reject::InvalidQuery);
-    }
-    let step = match step {
-        None | Some("") => None,
-        Some(step) => Some(duration(step)?),
-    };
-    Ok(Token::Window {
-        window,
-        step,
-        subquery,
-    })
-}
-
 /// A duration literal in milliseconds: whole seconds, or whole numbers each with `ms`, `s`, `m`,
 /// `h`, `d`, `w` or `y` (`1h30m`).
 fn duration(text: &str) -> Result<i64, Reject> {
@@ -218,6 +295,9 @@ fn duration(text: &str) -> Result<i64, Reject> {
     }
     let mut total: i64 = 0;
     let mut rest = text;
+    if rest.is_empty() {
+        return Err(Reject::InvalidQuery);
+    }
     while !rest.is_empty() {
         let digits = rest.bytes().take_while(u8::is_ascii_digit).count();
         let number: i64 = rest
@@ -246,300 +326,71 @@ fn duration(text: &str) -> Result<i64, Reject> {
     Ok(total)
 }
 
-#[derive(Debug)]
-enum Ast {
-    Scalar,
-    Selector,
-    /// Several expressions whose reach is the largest of theirs: operands, a union, arguments.
-    All(Vec<Self>),
-    Aggregate(Vec<Self>),
-    Call(Vec<Self>),
-    Window {
-        inner: Box<Self>,
-        window: Option<i64>,
-        step: Option<i64>,
-        subquery: bool,
-    },
-    Offset(Box<Self>, i64),
-}
-
-impl Ast {
-    /// Whether a rollup function reads this directly rather than through an implicit subquery.
-    fn is_series(&self) -> bool {
-        match self {
-            Self::Selector | Self::Window { .. } => true,
-            Self::Offset(inner, _) => inner.is_series(),
-            Self::Scalar | Self::All(_) | Self::Aggregate(_) | Self::Call(_) => false,
-        }
-    }
-}
-
-fn eval(ast: &Ast, step: i64) -> i64 {
-    match ast {
-        Ast::Scalar => 0,
-        Ast::Selector => step.saturating_add(SILENCE),
-        Ast::All(items) | Ast::Aggregate(items) => {
-            items.iter().map(|item| eval(item, step)).max().unwrap_or(0)
-        }
-        Ast::Call(args) => args
-            .iter()
-            .map(|arg| {
-                if matches!(arg, Ast::Scalar) {
-                    0
-                } else if arg.is_series() {
-                    eval(arg, step)
-                } else {
-                    eval(arg, step)
-                        .saturating_add(step.saturating_mul(3))
-                        .saturating_add(SILENCE)
-                }
-            })
-            .max()
-            .unwrap_or(0),
-        Ast::Window {
-            inner,
-            window,
-            step: own,
-            subquery,
-        } => {
-            if !subquery && matches!(**inner, Ast::Selector) {
-                return window.unwrap_or(0).max(step).saturating_add(SILENCE);
-            }
-            let inner_step = own.filter(|own| *own > 0).unwrap_or(step).max(1);
-            let window = window.unwrap_or(0).max(step).max(inner_step);
-            eval(inner, inner_step)
-                .saturating_add(window)
-                .saturating_add(inner_step.saturating_mul(2))
-                .saturating_add(SILENCE)
-        }
-        Ast::Offset(inner, offset) => eval(inner, step).saturating_add(*offset),
-    }
-}
-
-struct Parser<'a> {
-    tokens: Vec<Token<'a>>,
-    at: usize,
-}
-
-impl<'a> Parser<'a> {
-    fn peek(&self) -> Option<&Token<'a>> {
-        self.tokens.get(self.at)
-    }
-
-    fn peek_ident(&self) -> Option<String> {
-        match self.peek() {
-            Some(Token::Ident(name)) => Some(name.to_ascii_lowercase()),
-            _ => None,
-        }
-    }
-
-    fn next(&mut self) -> Result<Token<'a>, Reject> {
-        let token = self
-            .tokens
-            .get(self.at)
-            .cloned()
-            .ok_or(Reject::InvalidQuery)?;
-        self.at += 1;
-        Ok(token)
-    }
-
-    fn eat_punct(&mut self, punct: u8) -> bool {
-        if self.peek() == Some(&Token::Punct(punct)) {
-            self.at += 1;
-            true
-        } else {
-            false
-        }
-    }
-
-    fn expect_punct(&mut self, punct: u8) -> Result<(), Reject> {
-        if self.eat_punct(punct) {
-            Ok(())
-        } else {
-            Err(Reject::InvalidQuery)
-        }
-    }
-
-    fn eat_word(&mut self, words: &[&str]) -> bool {
-        if self
-            .peek_ident()
-            .is_some_and(|w| words.contains(&w.as_str()))
-        {
-            self.at += 1;
-            true
-        } else {
-            false
-        }
-    }
-
-    fn expr(&mut self, depth: usize) -> Result<Ast, Reject> {
-        if depth > MAX_DEPTH {
-            return Err(Reject::InvalidQuery);
-        }
-        let mut operands = vec![self.unary(depth)?];
-        while self.binary_operator() {
-            self.eat_word(&["bool"]);
-            if self.eat_word(&["on", "ignoring"]) {
-                self.labels()?;
-            }
-            if self.eat_word(&["group_left", "group_right"]) {
-                if self.peek() == Some(&Token::Punct(b'(')) {
-                    self.labels()?;
-                }
-                if self.eat_word(&["prefix"]) && self.next()? != Token::Text {
-                    return Err(Reject::InvalidQuery);
-                }
-            }
-            operands.push(self.unary(depth)?);
-        }
-        Ok(if operands.len() == 1 {
-            operands.pop().ok_or(Reject::InvalidQuery)?
-        } else {
-            Ast::All(operands)
-        })
-    }
-
-    fn binary_operator(&mut self) -> bool {
-        match self.peek() {
-            Some(Token::Op(op)) if !matches!(*op, "=" | "=~" | "!~") => {
-                self.at += 1;
-                true
-            }
-            _ => self.eat_word(WORD_OPERATORS),
-        }
-    }
-
-    fn unary(&mut self, depth: usize) -> Result<Ast, Reject> {
-        while matches!(self.peek(), Some(Token::Op("+" | "-"))) {
-            self.at += 1;
-        }
-        let mut ast = self.primary(depth)?;
-        loop {
-            if let Some(Token::Window {
-                window,
-                step,
-                subquery,
-            }) = self.peek().cloned()
-            {
-                self.at += 1;
-                ast = Ast::Window {
-                    inner: Box::new(ast),
-                    window,
-                    step,
-                    subquery,
-                };
-            } else if self.eat_word(&["offset"]) {
-                if matches!(self.peek(), Some(Token::Op("-"))) {
-                    self.at += 1;
-                }
-                let Token::Number(text) = self.next()? else {
-                    return Err(Reject::InvalidQuery);
-                };
-                ast = Ast::Offset(Box::new(ast), duration(text)?);
-            } else if !self.eat_word(&["keep_metric_names"]) {
-                return Ok(ast);
-            }
-        }
-    }
-
-    fn primary(&mut self, depth: usize) -> Result<Ast, Reject> {
-        match self.next()? {
-            Token::Number(_) | Token::Text => Ok(Ast::Scalar),
-            Token::Punct(b'(') => Ok(Ast::All(self.arguments(depth)?)),
-            Token::Punct(b'{') => {
-                self.matchers()?;
-                Ok(Ast::Selector)
-            }
-            Token::Ident(name) => {
-                let name = name.to_ascii_lowercase();
-                if matches!(name.as_str(), "offset" | "with" | "bool") {
-                    return Err(Reject::InvalidQuery);
-                }
-                let grouped = matches!(self.peek_ident().as_deref(), Some("by" | "without"));
-                let called = self.peek() == Some(&Token::Punct(b'('));
-                if AGGREGATES.contains(&name.as_str()) && (grouped || called) {
-                    if self.eat_word(&["by", "without"]) {
-                        self.labels()?;
-                    }
-                    self.expect_punct(b'(')?;
-                    let args = self.arguments(depth)?;
-                    if self.eat_word(&["by", "without"]) {
-                        self.labels()?;
-                    }
-                    if self.eat_word(&["limit"]) && !matches!(self.next()?, Token::Number(_)) {
-                        return Err(Reject::InvalidQuery);
-                    }
-                    return Ok(Ast::Aggregate(args));
-                }
-                if called {
-                    self.at += 1;
-                    return Ok(Ast::Call(self.arguments(depth)?));
-                }
-                if matches!(name.as_str(), "inf" | "nan") {
-                    return Ok(Ast::Scalar);
-                }
-                if self.eat_punct(b'{') {
-                    self.matchers()?;
-                }
-                Ok(Ast::Selector)
-            }
-            Token::Punct(_) | Token::Op(_) | Token::Window { .. } => Err(Reject::InvalidQuery),
-        }
-    }
-
-    /// Expressions separated by commas up to `)`; the `(` is already read.
-    fn arguments(&mut self, depth: usize) -> Result<Vec<Ast>, Reject> {
-        let mut args = Vec::new();
-        if self.eat_punct(b')') {
-            return Ok(args);
-        }
-        loop {
-            args.push(self.expr(depth + 1)?);
-            if self.eat_punct(b')') {
-                return Ok(args);
-            }
-            self.expect_punct(b',')?;
-        }
-    }
-
-    /// `(label, …)`.
-    fn labels(&mut self) -> Result<(), Reject> {
-        self.expect_punct(b'(')?;
-        loop {
-            match self.next()? {
-                Token::Punct(b')') => return Ok(()),
-                Token::Ident(_) | Token::Text => {}
-                Token::Number(_) | Token::Punct(_) | Token::Op(_) | Token::Window { .. } => {
-                    return Err(Reject::InvalidQuery);
-                }
-            }
-            if !self.eat_punct(b',') {
-                return self.expect_punct(b')');
-            }
-        }
-    }
-
-    /// `label op "value"`, separated by `,` or `or`, up to `}`; the `{` is already read.
-    fn matchers(&mut self) -> Result<(), Reject> {
-        loop {
-            match self.next()? {
-                Token::Punct(b'}') => return Ok(()),
-                Token::Ident(_) | Token::Text => {}
-                Token::Number(_) | Token::Punct(_) | Token::Op(_) | Token::Window { .. } => {
-                    return Err(Reject::InvalidQuery);
-                }
-            }
-            if let Some(Token::Op("=" | "!=" | "=~" | "!~")) = self.peek() {
-                self.at += 1;
-                if self.next()? != Token::Text {
-                    return Err(Reject::InvalidQuery);
-                }
-            }
-            if !self.eat_punct(b',') && !self.eat_word(&["or"]) {
-                return self.expect_punct(b'}');
-            }
-        }
-    }
+/// Queries of every shape [`reach`] bounds, for tests.
+#[cfg(test)]
+pub(crate) fn query() -> impl proptest::strategy::Strategy<Value = String> {
+    use proptest::prelude::*;
+    let duration = prop_oneof![
+        (0_u32..7200).prop_map(|n| format!("{n}s")),
+        (0_u32..600).prop_map(|n| format!("{n}m")),
+        (0_u32..72).prop_map(|n| format!("{n}h")),
+        (0_u32..9).prop_map(|n| format!("{n}d")),
+        (0_u32..7200).prop_map(|n| n.to_string()),
+        (0_u32..9, 0_u32..60).prop_map(|(h, m)| format!("{h}h{m}m")),
+        (0_u32..90_000).prop_map(|n| format!("{n}ms")),
+    ];
+    let selector = prop_oneof![
+        Just("up".to_owned()),
+        Just("x{a=\"b\",c!~\"d\"}".to_owned()),
+        Just("{__name__=\"up\" or a=\"[1y] offset 1y\"}".to_owned()),
+        Just("y{a='x[2y]', b=`(`}".to_owned()),
+    ];
+    let leaf = prop_oneof![
+        selector.clone(),
+        (selector, duration.clone()).prop_map(|(s, d)| format!("{s}[{d}]")),
+        Just("0.9".to_owned()),
+        Just("inf".to_owned()),
+        (0_u32..600).prop_map(|n| format!("0.9[{n}s]")),
+        Just("time()".to_owned()),
+    ];
+    leaf.prop_recursive(6, 48, 2, move |inner| {
+        let d = duration.clone();
+        prop_oneof![
+            (inner.clone(), d.clone(), prop::option::of(d.clone()))
+                .prop_map(|(e, w, s)| format!("({e})[{w}:{}]", s.unwrap_or_default())),
+            (inner.clone(), d.clone(), d.clone()).prop_map(|(e, w, s)| format!("{e}[{w}:{s}]")),
+            (inner.clone(), d.clone()).prop_map(|(e, w)| format!("({e})[{w}]")),
+            (inner.clone(), d.clone()).prop_map(|(e, w)| format!("{e}[{w}]")),
+            (inner.clone(), d.clone()).prop_map(|(e, w)| format!("{e} OFFSET {w}")),
+            inner.clone().prop_map(|e| format!("-{e}")),
+            inner.clone().prop_map(|e| format!("SUM BY (pod) ({e})")),
+            (inner.clone(), any::<bool>(), d).prop_map(|(e, minus, o)| format!(
+                "{e} offset {}{o}",
+                if minus { "-" } else { "" }
+            )),
+            (
+                prop::sample::select(vec!["rate", "max_over_time", "abs", "increase"]),
+                inner.clone()
+            )
+                .prop_map(|(f, e)| format!("{f}({e})")),
+            inner
+                .clone()
+                .prop_map(|e| format!("quantile_over_time(0.9, {e})")),
+            inner
+                .clone()
+                .prop_map(|e| format!("rate({e}) keep_metric_names")),
+            inner.clone().prop_map(|e| format!("sum({e})")),
+            inner.clone().prop_map(|e| format!("sum by (pod) ({e})")),
+            inner.clone().prop_map(|e| format!("max({e}) without (a)")),
+            inner.clone().prop_map(|e| format!("({e})")),
+            (inner.clone(), inner.clone()).prop_map(|(a, b)| format!("{a} + {b}")),
+            (inner.clone(), inner.clone()).prop_map(|(a, b)| format!("{a} and {b}")),
+            (inner.clone(), inner.clone())
+                .prop_map(|(a, b)| format!("{a} / on(a) group_left(b) {b}")),
+            inner.clone().prop_map(|e| format!("{e} > bool 0")),
+            (inner.clone(), inner).prop_map(|(a, b)| format!("({a}, {b})")),
+        ]
+    })
 }
 
 #[cfg(test)]
@@ -550,164 +401,99 @@ mod tests {
 
     const MINUTE: i64 = 60 * 1000;
     const STEP: i64 = MINUTE;
-    /// What every query adds: the step VictoriaMetrics may align the start down by, and its
-    /// latency offset.
-    const EDGE: i64 = STEP + LATENCY;
+    /// What every query reads: a selector's step and 5 minutes, the step its start may be aligned
+    /// down by, and the latency offset.
+    const BASE: i64 = 2 * STEP + SILENCE + LATENCY;
+    /// What each level a subquery may nest in adds.
+    const LEVEL: i64 = 3 * STEP + SILENCE;
 
-    /// The reach of each query at a 1-minute step, as VictoriaMetrics reads it.
     #[test]
-    fn reach_follows_how_victoriametrics_reads() {
+    fn reach_adds_every_duration_and_a_level_for_each_subquery() {
         let cases: &[(&str, &str, i64)] = &[
-            ("a bare selector", "up", STEP + SILENCE),
+            ("a bare selector", "up", BASE),
             (
                 "Zeabur's CPU query",
                 "sum by (pod) (rate(container_cpu_usage_seconds_total{namespace=\"a\",pod=~\"^web-[a-z0-9]{1,10}-[a-z0-9]{5}$\"}[120s]))",
-                2 * MINUTE + SILENCE,
+                BASE + 2 * MINUTE,
+            ),
+            ("an offset", "up offset 1d", BASE + 1440 * MINUTE),
+            ("a negative offset", "up offset -1h", BASE + 60 * MINUTE),
+            ("a combined duration", "rate(up[1h30m])", BASE + 90 * MINUTE),
+            ("seconds without a unit", "rate(up[300])", BASE + 5 * MINUTE),
+            (
+                "every duration, also in other operands",
+                "rate(up[1h]) + up offset 1h",
+                BASE + 120 * MINUTE,
             ),
             (
-                "a window shorter than the step",
-                "rate(up[30s])",
-                STEP + SILENCE,
-            ),
-            ("an offset", "up offset 1d", STEP + SILENCE + 1440 * MINUTE),
-            (
-                "a negative offset still counts",
-                "up offset -1h",
-                STEP + SILENCE + 60 * MINUTE,
-            ),
-            (
-                "a combined duration",
-                "rate(up[1h30m])",
-                90 * MINUTE + SILENCE,
-            ),
-            (
-                "seconds without a unit",
-                "rate(up[300])",
-                5 * MINUTE + SILENCE,
-            ),
-            (
-                "the deeper of two operands",
-                "up + rate(up[1h])",
-                60 * MINUTE + SILENCE,
-            ),
-            (
-                "a subquery",
+                "a subquery's window and step",
                 "max_over_time(rate(up[5m])[1h:10m])",
-                10 * MINUTE + SILENCE + 60 * MINUTE + 20 * MINUTE + SILENCE,
+                2 * 10 * MINUTE + SILENCE + LATENCY + 75 * MINUTE + 2 * (30 * MINUTE + SILENCE),
             ),
             (
-                "a subquery with the step inherited",
-                "max_over_time(up[1h:])",
-                STEP + SILENCE + 60 * MINUTE + 2 * STEP + SILENCE,
+                "a window over a parenthesis is a subquery",
+                "max_over_time((up)[1h])",
+                BASE + 60 * MINUTE + 2 * LEVEL,
             ),
-            (
-                "a zero subquery step is the step inherited",
-                "max_over_time(up[1h:0s])",
-                STEP + SILENCE + 60 * MINUTE + 2 * STEP + SILENCE,
-            ),
-            (
-                "an implicit subquery",
-                "rate(sum(up))",
-                STEP + SILENCE + 3 * STEP + SILENCE,
-            ),
-            (
-                "an offset on a subquery",
-                "max_over_time(up[1h:]) offset 1h",
-                STEP + SILENCE + 60 * MINUTE + 2 * STEP + SILENCE + 60 * MINUTE,
-            ),
-            (
-                "a scalar argument",
-                "quantile_over_time(0.9, up[1h])",
-                60 * MINUTE + SILENCE,
-            ),
+            ("a rollup over an expression", "rate(sum(up))", BASE + LEVEL),
+            ("nested expressions", "abs(abs(up + up))", BASE + 2 * LEVEL),
             (
                 "brackets and words in strings",
                 "up{a=\"[1y] offset 1y @ #\", b='x[2y]', c=`[3y]`}",
-                STEP + SILENCE,
+                BASE,
             ),
-            ("an escaped quote", r#"up{a="x\"[1y]"}"#, STEP + SILENCE),
+            ("an escaped quote", r#"up{a="x\"[1y]"}"#, BASE),
             (
                 "an escaped backslash ends the string",
                 r#"up{a="x\\"}[1y]"#,
-                365 * 1440 * MINUTE + SILENCE,
-            ),
-            (
-                "modifiers",
-                "sum(rate(up[5m])) by (a) limit 3 / on(a) group_left(b) prefix \"p_\" count without (c) (up) > bool 0",
-                5 * MINUTE + SILENCE,
-            ),
-            ("a union", "(up, rate(up[2h]))", 120 * MINUTE + SILENCE),
-            (
-                "a quoted metric name",
-                "{\"up\", a=\"b\" or c!~\"d\"}",
-                STEP + SILENCE,
+                BASE + 365 * 1440 * MINUTE,
             ),
         ];
         for (name, query, read) in cases {
-            assert_eq!(reach(query, STEP), Ok(read + EDGE), "{name}: {query}");
+            assert_eq!(reach(query, STEP), Ok(*read), "{name}: {query}");
         }
     }
 
-    /// What cannot be bounded is refused, not guessed.
     #[test]
     fn what_cannot_be_bounded_is_refused() {
-        let deep = format!(
-            "{}up{}",
-            "abs(".repeat(MAX_DEPTH + 2),
-            ")".repeat(MAX_DEPTH + 2)
-        );
         for query in [
             "up @ 1700000000",
-            "up @ end()",
             "rate(up[5m]) @ start()",
             "WITH (w = 5m) rate(up[w])",
-            "with (f(x) = x) f(up)",
             "rate(up[w])",
             "rate(up[1i])",
             "rate(up[$__interval])",
             "rate(up[1.5h])",
             "rate(up[1h-5m])",
-            "rate(up[5H])",
             "rate(up[])",
             "up offset w",
             "up offset 1.5h",
+            "up offset",
             "up # [1y]\n",
             "up\\x",
             "métrique",
             "up{a=\"b\"",
+            "up{a=(\"b\")}",
             "up[5m",
             "sum(up",
             "up )",
-            "offset",
-            deep.as_str(),
         ] {
             assert_eq!(reach(query, STEP), Err(Reject::InvalidQuery), "{query}");
         }
     }
 
     proptest! {
-        /// Nothing panics, and a query that is accepted reaches back at least a selector's read.
         #[test]
         fn never_panics(query in "[ -~]{0,200}") {
             if let Ok(read) = reach(&query, STEP) {
-                prop_assert!(read >= EDGE);
+                prop_assert!(read >= BASE);
             }
         }
 
-        /// Wrapping a query in a window, a subquery or an offset never makes it reach less.
+        /// Every generated query is bounded.
         #[test]
-        fn wrapping_never_reaches_less(
-            minutes in 1_i64..10_000,
-            inner in prop::sample::select(vec!["up", "rate(up[5m])", "sum(up)", "max_over_time(up[1h:5m])"]),
-            wrap in 0_usize..4,
-        ) {
-            let wrapped = match wrap {
-                0 => format!("({inner}) offset {minutes}m"),
-                1 => format!("max_over_time(({inner})[{minutes}m:])"),
-                2 => format!("rate({inner})"),
-                _ => format!("sum(({inner}) + up)"),
-            };
-            prop_assert!(reach(&wrapped, STEP)? >= reach(inner, STEP)?);
+        fn every_generated_query_is_bounded(query in query(), step in 1_i64..3_600_000) {
+            prop_assert!(reach(&query, step).is_ok(), "{}", query);
         }
     }
 }
