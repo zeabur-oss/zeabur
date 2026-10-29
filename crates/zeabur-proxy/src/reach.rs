@@ -305,7 +305,7 @@ fn eval(ast: &Ast, step: i64) -> i64 {
             if !subquery && matches!(**inner, Ast::Selector) {
                 return window.unwrap_or(0).max(step).saturating_add(SILENCE);
             }
-            let inner_step = own.unwrap_or(step).max(1);
+            let inner_step = own.filter(|own| *own > 0).unwrap_or(step).max(1);
             let window = window.unwrap_or(0).max(step).max(inner_step);
             eval(inner, inner_step)
                 .saturating_add(window)
@@ -598,6 +598,11 @@ mod tests {
             (
                 "a subquery with the step inherited",
                 "max_over_time(up[1h:])",
+                STEP + SILENCE + 60 * MINUTE + 2 * STEP + SILENCE,
+            ),
+            (
+                "a zero subquery step is the step inherited",
+                "max_over_time(up[1h:0s])",
                 STEP + SILENCE + 60 * MINUTE + 2 * STEP + SILENCE,
             ),
             (
