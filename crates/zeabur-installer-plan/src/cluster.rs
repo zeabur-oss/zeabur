@@ -366,7 +366,8 @@ impl Distribution {
         HostFile {
             path: self.node_name_path(),
             mode: 0o600,
-            content: format!("{HEADER}node-name: {name}\n"),
+            // Quoted, so names like `on` or `001` stay strings for K3s's YAML parser.
+            content: format!("{HEADER}node-name: {}\n", serde_json::json!(name)),
         }
     }
 

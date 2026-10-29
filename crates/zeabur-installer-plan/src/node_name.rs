@@ -72,6 +72,8 @@ fn has_ipv4(name: &str) -> bool {
 /// [`from_hostname`] takes it and no other node of the cluster (`taken`) has it, else
 /// `node-<6 hex>`.
 ///
+/// `-2`, `-3`… follow the generated name when another node has it.
+///
 /// # Errors
 ///
 /// When the configuration renames a node that already has a name, or names one another node
@@ -99,9 +101,20 @@ pub fn choose(
         }
         return Ok(name.to_owned());
     }
-    Ok(from_hostname(&facts.hostname, &facts.node_ips)
-        .filter(|name| !taken.contains(name))
-        .unwrap_or_else(|| format!("node-{}", facts.host_hex)))
+    if let Some(name) =
+        from_hostname(&facts.hostname, &facts.node_ips).filter(|name| !taken.contains(name))
+    {
+        return Ok(name);
+    }
+    let base = format!("node-{}", facts.host_hex);
+    let mut name = base.clone();
+    for n in 2.. {
+        if !taken.contains(&name) {
+            break;
+        }
+        name = format!("{base}-{n}");
+    }
+    Ok(name)
 }
 
 #[cfg(test)]
@@ -188,5 +201,10 @@ mod tests {
             "node-a1b2c3"
         );
         assert!(choose(Some("vps-1"), &facts("vps-2", None), &taken).is_err());
+        let taken = ["vps-1", "node-a1b2c3", "node-a1b2c3-2"].map(str::to_owned);
+        assert_eq!(
+            choose(None, &facts("vps-1", None), &taken).unwrap(),
+            "node-a1b2c3-3"
+        );
     }
 }

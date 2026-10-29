@@ -1678,6 +1678,11 @@ mod tests {
         };
         assert_eq!(named("", &facts()).unwrap(), "vps-1");
         assert_eq!(named("host: {nodeName: db-1}\n", &facts()).unwrap(), "db-1");
+        assert_eq!(named("host: {nodeName: \"on\"}\n", &facts()).unwrap(), "on");
+        assert_eq!(
+            named("host: {nodeName: \"001\"}\n", &facts()).unwrap(),
+            "001"
+        );
         let mut cloud = facts();
         cloud.hostname = "ip-10-0-0-5".to_owned();
         assert_eq!(named("", &cloud).unwrap(), "node-a1b2c3");
