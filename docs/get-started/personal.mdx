@@ -16,11 +16,9 @@ For personal use, the installer can install KubeSolo instead. The server runs on
 | Networking between projects | No isolation. KubeSolo doesn't enforce network policies | Isolated with network policies |
 | Nodes | This machine only | More nodes can be added |
 | Components | Ingress and certificates, with optional Zeabur Builder (includes zot) | All Catalog components |
-| Databases | Not available | Available |
+| Databases | Available | Available |
 
 The personal installation doesn't include Zeabur Builder or zot (the image registry that stores build results) by default, so it can only deploy existing container images. To build from Git or a folder, select Zeabur Builder during installation. The installer adds zot with it. These two components need about 300 MiB of additional memory. The installer won't let you select them if the machine has less than 1800 MiB of memory.
-
-Databases aren't available in the personal installation either. When KubeSolo creates a volume (PVC), it replaces all of the volume's original annotations with a single annotation of its own ([portainer/kubesolo#222](https://github.com/portainer/kubesolo/issues/222)). CloudNativePG uses one of those annotations, `cnpg.io/nodeSerial`, to track the order of database instances. Without it, setup stays stuck at “Setting up primary.” The KubeSolo fix is in [#228](https://github.com/portainer/kubesolo/pull/228). Once it's released, Zeabur will upgrade KubeSolo and make databases available for personal use. Until then, use the team installation or run a database on another machine.
 
 The personal installation also has no members or permissions. For kube-apiserver to recognize sign-in credentials issued by Zeabur Identity, it needs to load configuration through `--authentication-config`. KubeSolo doesn't currently expose this setting ([portainer/kubesolo#231](https://github.com/portainer/kubesolo/issues/231)). You can only connect with the kubeconfig from the server, and anyone who has it can control the entire cluster. This isn't suitable for sharing among multiple people or teams.
 
@@ -79,7 +77,7 @@ sudo zeabur-installer plan
 sudo zeabur-installer apply
 ```
 
-To build from Git or a folder, add `enable: [builds]`. The installer adds zot with it. For other fields, see [Installer configuration](../reference/installer-configuration.mdx#configuration-for-personal-use).
+To build from Git or a folder, add `enable: [builds]`. The installer adds zot with it. To use databases, add `enable: [databases]`. For other fields, see [Installer configuration](../reference/installer-configuration.mdx#configuration-for-personal-use).
 
 ## Open Zeabur on your own computer
 
@@ -118,7 +116,7 @@ After installation, you don't need to run the installer again. You can manage ev
 
 You can also do everything the installer does manually: install KubeSolo following the [KubeSolo instructions](https://github.com/portainer/kubesolo), run `kubectl apply` with the [helm-controller](https://github.com/k3s-io/helm-controller) release manifest, and create a `HelmChart` for each component. For a manual installation, you need two more changes to prevent `HelmChart` resources from reinstalling repeatedly:
 
-- KubeSolo's webhook overwrites a Job's `nodeSelector`. When helm-controller sees that the Job has changed, it deletes and recreates it. The installer configures systemd to run `/usr/local/libexec/zeabur-kubesolo-webhook` after each KubeSolo startup to remove Jobs from the rules in MutatingWebhookConfiguration `webhook.kubesolo.io`. This script uses kubectl to wait for the rules to appear, then watches them for one minute and removes Jobs again if KubeSolo rewrites the rules. It doesn't read system logs. The same webhook still assigns nodes to replicas and volumes.
+- KubeSolo's webhook adds the node to a Job's `nodeSelector`. When helm-controller sees that the Job has changed, it deletes and recreates it. The installer configures systemd to run `/usr/local/libexec/zeabur-kubesolo-webhook` after each KubeSolo startup to remove Jobs from the rules in MutatingWebhookConfiguration `webhook.kubesolo.io`. This script uses kubectl to wait for the rules to appear, then watches them for one minute and removes Jobs again if KubeSolo rewrites the rules. It doesn't read system logs. The same webhook still assigns nodes to replicas and volumes.
 - The klipper-helm version in the helm-controller release manifest is too old. It doesn't record the configuration hash after installation, so helm-controller keeps upgrading the same chart. The installer replaces `DEFAULT_JOB_IMAGE` with `rancher/klipper-helm:v0.13.3-build20261021`, which k3s uses with the same helm-controller version.
 
 ## Check the installation

@@ -95,10 +95,10 @@ const HEADER: &str = "# Written by zeabur-installer; `zeabur-installer doctor` c
 
 /// The configuration file, the webhook script and the unit, in the order to write them.
 ///
-/// `KubeSolo` v1.2.2's webhook sets a new Job's whole `nodeSelector` to the node, so
-/// `kubernetes.io/os` goes away. helm-controller then finds its Job changed and replaces it again
-/// and again, and no chart installs. The script takes Jobs out of the webhook's rules after each
-/// start. The same webhook still gives each Pod the node.
+/// `KubeSolo`'s webhook adds `kubernetes.io/hostname` to a new Job's `nodeSelector` (v1.2.3 keeps
+/// `kubernetes.io/os`; v1.2.2 replaced the whole selector). helm-controller still finds its Job
+/// changed and replaces it again and again, and no chart installs. The script takes Jobs out of
+/// the webhook's rules after each start. The same webhook still gives each Pod the node.
 #[must_use]
 pub fn host_files(options: &Options) -> Vec<HostFile> {
     let mut lines = vec![

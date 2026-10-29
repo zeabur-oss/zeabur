@@ -17,11 +17,9 @@ source: "9ecbdbd6bd2b"
 | 專案之間的網路 | 不隔離。KubeSolo 不執行網路政策 | 用網路政策隔離 |
 | 節點 | 只有這一台 | 可以再加入節點 |
 | 元件 | Ingress 和憑證，可以再勾選 Zeabur Builder（含 zot） | Catalog 的全部元件 |
-| 資料庫 | 不提供 | 有 |
+| 資料庫 | 有 | 有 |
 
 自己用的版本預設不裝 Zeabur Builder 和 zot（放建置結果的映像倉庫），所以只能部署現成的容器映像檔。要從 Git 或資料夾建置，安裝時勾選 Zeabur Builder，zot 會一起裝。這兩個要多用大約 300 MiB 記憶體，機器的記憶體不到 1800 MiB 時，安裝程式不讓你勾選。
-
-自己用的版本也不提供資料庫。KubeSolo 建立磁碟區（PVC）時，會把磁碟區原本的註解全部換掉，只留它自己加的那一個（[portainer/kubesolo#222](https://github.com/portainer/kubesolo/issues/222)）。CloudNativePG 用其中的 `cnpg.io/nodeSerial` 記錄資料庫的順序，少了它就一直卡在「Setting up primary」。KubeSolo 的修正在 [#228](https://github.com/portainer/kubesolo/pull/228)，發版後 Zeabur 會升級 KubeSolo，自己用的版本也會提供資料庫。在那之前要用資料庫，請用團隊用的版本，或在別的機器架資料庫。
 
 自己用的版本也沒有成員和權限。Zeabur Identity 發的登入憑證，要 kube-apiserver 用 `--authentication-config` 載入設定才會認得，KubeSolo 目前沒有開放這個設定（[portainer/kubesolo#231](https://github.com/portainer/kubesolo/issues/231)）。所以只能用伺服器給的 kubeconfig 連線，拿到它的人可以控制整個叢集，不適合讓多個人或多個團隊共用。
 
@@ -80,7 +78,7 @@ sudo zeabur-installer plan
 sudo zeabur-installer apply
 ```
 
-要從 Git 或資料夾建置，加上 `enable: [builds]`，zot 會一起裝。其他欄位見 [Installer 設定](../reference/installer-configuration.mdx#自己用的檔案)。
+要從 Git 或資料夾建置，加上 `enable: [builds]`，zot 會一起裝。要用資料庫，加上 `enable: [databases]`。其他欄位見 [Installer 設定](../reference/installer-configuration.mdx#自己用的檔案)。
 
 ## 在自己的電腦打開 Zeabur
 
@@ -119,7 +117,7 @@ KUBECONFIG=~/.kube/<名稱>.yaml zeaburctl up --context <名稱> --project <專�
 
 installer 做的事，手動也做得到：照 [KubeSolo 的說明](https://github.com/portainer/kubesolo)安裝 KubeSolo，`kubectl apply` [helm-controller](https://github.com/k3s-io/helm-controller) 的 release manifest，再為每個元件建立 `HelmChart`。手動做時要多改兩個地方，不然 `HelmChart` 會一直重裝：
 
-- KubeSolo 的 webhook 會蓋掉 Job 的 `nodeSelector`，helm-controller 看到 Job 被改過，就刪掉重建。installer 讓 systemd 在 KubeSolo 每次啟動後執行 `/usr/local/libexec/zeabur-kubesolo-webhook`，把 Job 從 MutatingWebhookConfiguration `webhook.kubesolo.io` 的規則拿掉。這個指令稿用 kubectl 等規則出現，並且盯一分鐘，KubeSolo 重寫規則就再拿掉一次，不看系統日誌。Pod 和磁碟區還是由同一個 webhook 指定節點。
+- KubeSolo 的 webhook 會在 Job 的 `nodeSelector` 加上節點，helm-controller 看到 Job 被改過，就刪掉重建。installer 讓 systemd 在 KubeSolo 每次啟動後執行 `/usr/local/libexec/zeabur-kubesolo-webhook`，把 Job 從 MutatingWebhookConfiguration `webhook.kubesolo.io` 的規則拿掉。這個指令稿用 kubectl 等規則出現，並且盯一分鐘，KubeSolo 重寫規則就再拿掉一次，不看系統日誌。Pod 和磁碟區還是由同一個 webhook 指定節點。
 - helm-controller release manifest 裡的 klipper-helm 版本太舊，裝完不會標記設定的雜湊值，helm-controller 會一直升級同一個 chart。installer 把 `DEFAULT_JOB_IMAGE` 換成 k3s 搭配同版 helm-controller 的 `rancher/klipper-helm:v0.13.3-build20261021`。
 
 ## 檢查安裝結果
