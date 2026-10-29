@@ -28,7 +28,7 @@ export const templateSummaries: Record<string, Summary> = {
   },
   "dify#23cbde4e": {
     en: "A platform for building LLM apps, with PostgreSQL, a queue, a code sandbox and S3 storage.",
-    "zh-TW": "打造 LLM 應用程式的平台，內含 PostgreSQL、佇列、程式碼沙箱和 S3 儲存空間。",
+    "zh-TW": "開發 LLM 應用程式的平台，內含 PostgreSQL、佇列、程式碼沙箱和 S3 儲存空間。",
     "zh-CN": "构建 LLM 应用的平台，内含 PostgreSQL、队列、代码沙箱和 S3 存储。",
   },
   "error-pages#1d5a87c8": {
