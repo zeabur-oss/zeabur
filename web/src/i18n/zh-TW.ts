@@ -3267,7 +3267,8 @@ export const zhTW: Messages = {
   "sentence.problem.summary.github": (p) => `GitHub 沒有正常回應：${p.detail}`,
   "sentence.problem.github.fix": () => "再試一次。一直失敗的話，確認叢集連得到 GitHub。",
   "sentence.problem.summary.githubApiUrl": () => "GitHub App 的 api-url 要是 https 網址。",
-  "sentence.problem.githubApiUrl.fix": () => "把 github-app Secret 裡的 api-url 改成 GitHub API 的 https 網址。",
+  "sentence.problem.githubApiUrl.fix": () =>
+    "把 github-app Secret 裡的 api-url 改成 GitHub API 的 https 網址。",
   "sentence.problem.summary.unavailable": () => "連不到叢集。",
   "sentence.problem.summary.internal": () => "Zeabur 內部發生錯誤。",
   "sentence.problem.summary.quota-exceeded": (p) =>
