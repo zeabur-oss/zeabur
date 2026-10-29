@@ -4,8 +4,10 @@
 //! access review allowed. VictoriaLogs applies extra filters to every subquery of a LogsQL query,
 //! so a pipe or a subquery cannot leave the namespace
 //! (<https://docs.victoriametrics.com/victorialogs/querying/#extra-filters>). The filter is on
-//! the stream field the collector sets from the pod's own metadata, which a log line cannot
-//! change (the catalog's VLAgent keeps fields parsed from a line out of the stream).
+//! the stream field the collector sets from the pod's own metadata. A pod's labels cannot set it:
+//! the collector names them `kubernetes.pod_labels.<label>`, and the catalog's VLAgent leaves
+//! them out. A JSON line can carry a field of that name; VictoriaLogs then refuses the line for
+//! repeating a stream field (`scripts/e2e-proxy.sh` checks both).
 
 use std::str::FromStr as _;
 

@@ -2,10 +2,10 @@
 # Zeabur Proxy against the real VictoriaLogs and VictoriaMetrics: a canary written in one namespace
 # never reaches a person whose rights are in another. Namespace B's name starts with A's. A reader with `view` in
 # A asks the proxy for B's marker in every way below, and none of its answers carries it; a reader
-# with `view` in B sees it, so the marker was there to leak. A pod in A that writes JSON naming B
-# never shows up in B, and a pod in A reaches neither VictoriaLogs nor the proxy. For metrics, a
-# pod in B named after B's marker is the canary: A's reader asks for B's series in every way below,
-# and no answer names that pod. The metrics part is skipped when the proxy serves no metrics store.
+# with `view` in B sees it, so the marker was there to leak. A pod in A that writes JSON naming B,
+# or carries labels named like B's stream fields, never shows up in B, and a pod in A reaches
+# neither VictoriaLogs nor the proxy. For metrics, a pod in B named after B's marker is the canary:
+# A's reader asks for B's series in every way below, and no answer names that pod. The metrics part is skipped when the proxy serves no metrics store.
 #
 # Needs a cluster where the chart runs with `proxy.enabled` and the catalog's logs capability
 # (VictoriaLogs, vlagent, its NetworkPolicy) is installed; KUBECONFIG points at it. Run inside
@@ -91,6 +91,10 @@ spec:
             sleep 2
           done
 EOF
+# A pod labelled with B's stream fields.
+kubectl -n "$a" run labelled --image=busybox:1.37 --restart=Never \
+  --labels="kubernetes.pod_namespace=$b,kubernetes.pod_name=writer,kubernetes.container_name=writer" \
+  --command -- sh -c "while true; do echo $spoof-labelled; sleep 2; done" >/dev/null
 for ns in "$a" "$b"; do
   kubectl -n "$ns" create serviceaccount reader >/dev/null
   kubectl -n "$ns" create rolebinding reader --clusterrole=view --serviceaccount="$ns:reader" >/dev/null
@@ -269,11 +273,14 @@ else
 fi
 
 # --- The spoofer's lines stay in A ------------------------------------------------------------------
+retry 60 "the labelled pod's line in A" holds "$token_a" "$a" "$spoof-labelled"
+! jq -e 'keys[] | select(startswith("kubernetes.pod_labels."))' "$work/body" >/dev/null ||
+  fail "the collector keeps pod labels: $(grep -m1 "$spoof-labelled" "$work/body")"
 sleep 10
 query "$token_b" "$b" "$spoof" >/dev/null
 [[ $(cat "$work/status") == 200 ]] || fail "B's reader, spoof: $(cat "$work/status")"
 ! grep -q "$spoof" "$work/body" || fail "a line written in A shows up in B: $(grep "$spoof" "$work/body" | head -3)"
-pass "the spoofer's lines do not show up in B"
+pass "the spoofer's and the labelled pod's lines do not show up in B; A's carry no pod labels"
 
 # --- A pod reaches neither VictoriaLogs nor the proxy -----------------------------------------------
 probe() { # namespace, name, labels, url
