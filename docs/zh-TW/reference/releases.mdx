@@ -14,13 +14,14 @@ source: "3896a0a6cfe9"
 | `zeabur` 伺服器 | `zeabur-v<version>-linux-<arch>.tar.gz` | Linux `amd64`、`arm64` |
 | `zeabur-installer` | `zeabur-installer-v<version>-linux-<arch>.tar.gz` | Linux `amd64`、`arm64` |
 | 多平台容器映像檔 | `ghcr.io/zeabur-oss/zeabur:<version>` | Linux `amd64`、`arm64` |
+| Zeabur Proxy 容器映像檔 | `ghcr.io/zeabur-oss/proxy:<version>` | Linux `amd64`、`arm64` |
 | Helm chart | `oci://ghcr.io/zeabur-oss/charts/zeabur`，也提供 `zeabur-<version>.tgz` | 安裝到 Kubernetes 叢集 |
-| 成品 digest | `digests.txt` | image index、各平台映像檔與 chart |
+| 成品 digest | `digests.txt` | 每個映像檔的 image index、各平台映像檔與 chart |
 | 檔案 checksum 與簽章 | `SHA256SUMS`、`SHA256SUMS.sigstore.json` | 同一份 release 的 assets |
 
 每個 archive 裡有執行檔和 `LICENSE`。macOS 只有 Apple silicon（`arm64`）版本，沒有 Intel Mac 版本。`zeabur` 和 installer 只在 Linux 執行，macOS 上只需要 `zeaburctl`。
 
-發行時，chart 的 `image.digest` 會釘在這次發布的 image index 上，用 chart 預設值安裝就會拿到同一份映像檔。Image tag 和 chart version 沒有開頭的 `v`，GitHub release tag 和 archive 檔名有。
+發行時，chart 的 `image.digest` 和 `proxy.image.digest` 會釘在這次發布的 image index 上，用 chart 預設值安裝就會拿到同一批映像檔。Image tag 和 chart version 沒有開頭的 `v`，GitHub release tag 和 archive 檔名有。
 
 ## 下載與驗證執行檔
 
@@ -81,12 +82,15 @@ xattr -d com.apple.quarantine zeaburctl
 
 ## 驗證映像檔與 chart
 
-發行說明只寫這版改了什麼，不列 digest。`digests.txt` 每行一筆，列出各平台映像檔、image index 和 chart 的完整 registry 參照：
+發行說明只寫這版改了什麼，不列 digest。`digests.txt` 每行一筆，列出各平台映像檔、image index 和 chart 的完整 registry 參照，Zeabur Proxy 的那幾行以 `proxy` 開頭：
 
 ```text
 linux/amd64  ghcr.io/zeabur-oss/zeabur@sha256:...
 linux/arm64  ghcr.io/zeabur-oss/zeabur@sha256:...
 index  ghcr.io/zeabur-oss/zeabur@sha256:...
+proxy linux/amd64  ghcr.io/zeabur-oss/proxy@sha256:...
+proxy linux/arm64  ghcr.io/zeabur-oss/proxy@sha256:...
+proxy index  ghcr.io/zeabur-oss/proxy@sha256:...
 chart  ghcr.io/zeabur-oss/charts/zeabur@sha256:...
 ```
 

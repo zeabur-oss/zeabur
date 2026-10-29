@@ -14,13 +14,14 @@ source: "3896a0a6cfe9"
 | `zeabur` 服务器 | `zeabur-v<version>-linux-<arch>.tar.gz` | Linux `amd64`、`arm64` |
 | `zeabur-installer` | `zeabur-installer-v<version>-linux-<arch>.tar.gz` | Linux `amd64`、`arm64` |
 | 多平台容器镜像 | `ghcr.io/zeabur-oss/zeabur:<version>` | Linux `amd64`、`arm64` |
+| Zeabur Proxy 容器镜像 | `ghcr.io/zeabur-oss/proxy:<version>` | Linux `amd64`、`arm64` |
 | Helm chart | `oci://ghcr.io/zeabur-oss/charts/zeabur`，也提供 `zeabur-<version>.tgz` | 安装到 Kubernetes 集群 |
-| 产物摘要 | `digests.txt` | 镜像索引、各平台镜像和 chart |
+| 产物摘要 | `digests.txt` | 每个镜像的索引、各平台镜像和 chart |
 | 文件校验和与签名 | `SHA256SUMS`、`SHA256SUMS.sigstore.json` | 同一 release 的附件 |
 
 每个压缩包都包含可执行文件和 `LICENSE`。macOS 只有 Apple silicon（`arm64`）版本，没有 Intel Mac 版本。`zeabur` 和 installer 只能在 Linux 上运行，macOS 上只需要 `zeaburctl`。
 
-发布时，chart 的 `image.digest` 会固定为本次发布的镜像索引，用 chart 默认值安装就会得到同一份镜像。镜像 tag 和 chart 版本号不带开头的 `v`，GitHub release tag 和压缩包文件名带有 `v`。
+发布时，chart 的 `image.digest` 和 `proxy.image.digest` 会固定为本次发布的镜像索引，用 chart 默认值安装就会得到同一批镜像。镜像 tag 和 chart 版本号不带开头的 `v`，GitHub release tag 和压缩包文件名带有 `v`。
 
 ## 下载与验证可执行文件
 
@@ -81,12 +82,15 @@ xattr -d com.apple.quarantine zeaburctl
 
 ## 验证镜像与 chart
 
-发行说明只写这一版改了什么，不列出摘要。`digests.txt` 每行一条，列出各平台镜像、镜像索引和 chart 的完整 registry 引用：
+发行说明只写这一版改了什么，不列出摘要。`digests.txt` 每行一条，列出各平台镜像、镜像索引和 chart 的完整 registry 引用，Zeabur Proxy 的几行以 `proxy` 开头：
 
 ```text
 linux/amd64  ghcr.io/zeabur-oss/zeabur@sha256:...
 linux/arm64  ghcr.io/zeabur-oss/zeabur@sha256:...
 index  ghcr.io/zeabur-oss/zeabur@sha256:...
+proxy linux/amd64  ghcr.io/zeabur-oss/proxy@sha256:...
+proxy linux/arm64  ghcr.io/zeabur-oss/proxy@sha256:...
+proxy index  ghcr.io/zeabur-oss/proxy@sha256:...
 chart  ghcr.io/zeabur-oss/charts/zeabur@sha256:...
 ```
 

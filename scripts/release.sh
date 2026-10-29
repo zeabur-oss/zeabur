@@ -12,8 +12,8 @@
 #   scripts/release.sh build   <version> <os> <arch> <dist>             build one platform and smoke
 #                                                                       it (release-build.sh,
 #                                                                       release-smoke.sh)
-#   scripts/release.sh publish <version> <artifacts> <published>        the image and the chart by
-#                                                                       digest, signed
+#   scripts/release.sh publish <version> <artifacts> <published>        the images and the chart
+#                                                                       by digest, signed
 #   scripts/release.sh finish  <version> <os> <arch> <artifacts> <dist> the installer, pinned to
 #                                                                       what publish pushed
 #   scripts/release.sh assets  <version> <artifacts> <release>          the assets, SHA256SUMS
@@ -79,12 +79,35 @@ for arch in amd64 arm64; do
   assets+=("zeabur-$version-linux-$arch.tar.gz" "zeabur-installer-$version-linux-$arch.tar.gz")
 done
 
-# The one reference digests.txt records for a kind: linux/amd64, linux/arm64, index or chart.
+# The images the release publishes, ghcr.io/<owner>/<name>, and their label in digests.txt: none
+# for Zeabur's, the name for the others. The chart may run no other image of the owner.
+images=(zeabur proxy)
+label() { if [[ "$1" != zeabur ]]; then echo "$1"; fi; }
+
+# The one reference digests.txt records for a kind: [<label> ]linux/amd64, linux/arm64, index, or
+# chart.
 recorded() { # $1 = digests.txt, $2 = kind
   local ref
-  ref="$(awk -v kind="$2" '$1 == kind { print $2 }' "$1")"
+  ref="$(awk -v kind="$2" '{ ref = $NF; $NF = ""; sub(/ +$/, "") } $0 == kind { print ref }' "$1")"
   [[ "$ref" =~ ^[^[:space:]@]+@sha256:[0-9a-f]{64}$ ]] || { echo "$1: no single $2 digest" >&2; return 1; }
   echo "$ref"
+}
+
+# Each image's index that digests.txt records, sorted as chart_images prints them.
+indexes() { # $1 = digests.txt
+  local name label
+  for name in "${images[@]}"; do
+    label="$(label "$name")"
+    recorded "$1" "${label:+$label }index" || return 1
+  done | sort -u
+}
+
+# Every image the chart runs, with each optional workload on.
+chart_images() { # $1 = chart directory, packaged chart or oci:// reference
+  helm template zeabur "$1" --set publicUrl=https://zeabur.example.com \
+    --set issuer.url=https://identity.example.com --set issuer.clientSecret.existingSecret=zeabur-oidc \
+    --set proxy.enabled=true |
+    yq eval-all --no-doc '.. | select(tag == "!!map" and has("image")) | .image' | sort -u
 }
 
 # KEY=value lines (release-pins.sh, published/outputs.env) into the environment, never evaluated.
@@ -117,6 +140,16 @@ case "$stage" in
     [[ "$(yq .info.version crates/zeabur-api/openapi.yaml)" == "$plain" ]] ||
       { echo "crates/zeabur-api/openapi.yaml is not at $plain" >&2; status=1; }
     zeabur-oss-release notes CHANGELOG.md "$version" >/dev/null || status=1
+    rendered="$(chart_images deploy/chart/zeabur)"
+    while read -r ref; do
+      repository="${ref%@*}"
+      repository="${repository%:*}"
+      name="${repository#ghcr.io/zeabur-oss/}"
+      if [[ "$repository" != "$name" && " ${images[*]} " != *" $name "* ]]; then
+        echo "the chart runs $ref, which the release does not publish" >&2
+        status=1
+      fi
+    done <<<"$rendered"
     exit "$status"
     ;;
 
@@ -158,7 +191,6 @@ case "$stage" in
     : "${GITHUB_REPOSITORY:?}" "${GITHUB_ACTOR:?}" "${GH_TOKEN:?}"
     owner="${GITHUB_REPOSITORY%%/*}"
     owner="${owner,,}"
-    image="ghcr.io/$owner/zeabur"
     charts="ghcr.io/$owner/charts"
     work="$(mktemp -d)"
     trap 'rm -rf "$work"' EXIT
@@ -176,7 +208,9 @@ case "$stage" in
     fi
     printf '%s' "$GH_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
     printf '%s' "$GH_TOKEN" | helm registry login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
-    for ref in "$image:$plain" "$charts/zeabur:$plain"; do
+    refs=("$charts/zeabur:$plain")
+    for name in "${images[@]}"; do refs+=("ghcr.io/$owner/$name:$plain"); done
+    for ref in "${refs[@]}"; do
       if skopeo inspect --raw --authfile "$DOCKER_CONFIG/config.json" "docker://$ref" >/dev/null 2>&1; then
         echo "$ref already exists; inspect it before trying again" >&2
         exit 1
@@ -188,20 +222,28 @@ case "$stage" in
     done
 
     rm -f "$out/digests.txt" "$out/subjects.json"
-    zeabur-oss-release push-image --repository "$image" --tag "$plain" \
-      --digests "$out/digests.txt" --subjects "$out/subjects.json" \
-      "linux/amd64=$candidates/candidate-linux-amd64/image.tar" \
-      "linux/arm64=$candidates/candidate-linux-arm64/image.tar"
-    index="$(recorded "$out/digests.txt" index)"
-    index="${index#*@}"
+    for name in "${images[@]}"; do
+      archive="image.tar"
+      [[ "$name" == zeabur ]] || archive="$name-image.tar"
+      zeabur-oss-release push-image --repository "ghcr.io/$owner/$name" --tag "$plain" \
+        --label "$(label "$name")" --digests "$out/digests.txt" --subjects "$out/subjects.json" \
+        "linux/amd64=$candidates/candidate-linux-amd64/$archive" \
+        "linux/arm64=$candidates/candidate-linux-arm64/$archive"
+    done
+    image="$(recorded "$out/digests.txt" index)"
+    index="${image#*@}"
+    proxy="$(recorded "$out/digests.txt" "proxy index")"
+    proxy="${proxy#*@}"
 
-    # The chart: the image pinned to that index, at the version of Chart.yaml (checked equal to
+    # The chart: each image pinned to its index, at the version of Chart.yaml (checked equal to
     # the release's by `check`).
     cp -R "$root/deploy/chart/zeabur" "$work/chart"
     # sed rather than `yq -i`, which would drop the blank lines between the documented values.
-    sed -i "s|^  digest: \"\"\$|  digest: \"$index\"|" "$work/chart/values.yaml"
-    INDEX="$index" yq -e '.image.digest == strenv(INDEX)' "$work/chart/values.yaml" >/dev/null ||
-      { echo "could not pin image.digest in values.yaml" >&2; exit 1; }
+    sed -i -e "s|^  digest: \"\"\$|  digest: \"$index\"|" \
+      -e "s|^    digest: \"\"\$|    digest: \"$proxy\"|" "$work/chart/values.yaml"
+    pinned="$(chart_images "$work/chart")"
+    [[ "$pinned" == "$(indexes "$out/digests.txt")" ]] ||
+      { echo "the chart runs $pinned, not the images just pushed" >&2; exit 1; }
     helm lint --strict "$work/chart" --set publicUrl=https://zeabur.example.com \
       --set issuer.url=https://identity.example.com --set issuer.clientSecret.existingSecret=zeabur-oidc
     helm package "$work/chart" --destination "$out"
@@ -210,7 +252,7 @@ case "$stage" in
 
     # What the installer pins (`finish`).
     {
-      echo "ZEABUR_PIN_ZEABUR_IMAGE=$image@$index"
+      echo "ZEABUR_PIN_ZEABUR_IMAGE=$image"
       echo "ZEABUR_PIN_ZEABUR_CHART_SHA256=$(sha256sum "$out/zeabur-$plain.tgz" | cut -d ' ' -f 1)"
     } >"$out/outputs.env"
     cat "$out/subjects.json" "$out/digests.txt"
@@ -273,12 +315,15 @@ case "$stage" in
     release=(--repository zeabur-oss/zeabur --version "$version")
 
     zeabur-oss-release verify-assets "${release[@]}" "$directory" "${assets[@]}"
-    zeabur-oss-release verify-image "${release[@]}" --digests "$directory/digests.txt" linux/amd64 linux/arm64
+    for name in "${images[@]}"; do
+      zeabur-oss-release verify-image "${release[@]}" --digests "$directory/digests.txt" \
+        --label "$(label "$name")" linux/amd64 linux/arm64
+    done
     zeabur-oss-release verify-chart "${release[@]}" --digests "$directory/digests.txt" "$directory/zeabur-$plain.tgz"
-    # The chart installs that image by default.
-    image="$(recorded "$directory/digests.txt" index)"
-    pinned="$(yq '.image.repository + "@" + .image.digest' <<<"$(helm show values "$directory/zeabur-$plain.tgz")")"
-    [[ "$pinned" == "$image" ]] || { echo "the chart installs $pinned, not $image" >&2; exit 1; }
+    # The chart runs those images and no other.
+    pinned="$(chart_images "$directory/zeabur-$plain.tgz")"
+    [[ "$pinned" == "$(indexes "$directory/digests.txt")" ]] ||
+      { echo "the chart runs $pinned, not the images in digests.txt" >&2; exit 1; }
 
     # The artifacts themselves: on Linux, the published chart on a disposable k3s cluster whose
     # node pulls the published image; on macOS, zeaburctl.

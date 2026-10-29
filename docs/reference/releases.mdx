@@ -13,13 +13,14 @@ Choose a version on [GitHub Releases](https://github.com/zeabur-oss/zeabur/relea
 | `zeabur` server | `zeabur-v<version>-linux-<arch>.tar.gz` | Linux `amd64` and `arm64` |
 | `zeabur-installer` | `zeabur-installer-v<version>-linux-<arch>.tar.gz` | Linux `amd64` and `arm64` |
 | Multi-platform container image | `ghcr.io/zeabur-oss/zeabur:<version>` | Linux `amd64` and `arm64` |
+| Zeabur Proxy's container image | `ghcr.io/zeabur-oss/proxy:<version>` | Linux `amd64` and `arm64` |
 | Helm chart | `oci://ghcr.io/zeabur-oss/charts/zeabur`; also available as `zeabur-<version>.tgz` | Install on a Kubernetes cluster |
-| Artifact digests | `digests.txt` | Image index, each platform's image, and the chart |
+| Artifact digests | `digests.txt` | Each image's index and platform images, and the chart |
 | File checksums and signature | `SHA256SUMS`, `SHA256SUMS.sigstore.json` | Assets from the same release |
 
 Every archive holds the binary and `LICENSE`. macOS builds are for Apple silicon (`arm64`) only; there's no Intel Mac build. `zeabur` and the installer run only on Linux. On macOS, you only need `zeaburctl`.
 
-At release time, the chart's `image.digest` is pinned to that release's image index. Installing with the chart's defaults gives you the same image. Image tags and chart versions have no leading `v`; GitHub release tags and archive filenames do.
+At release time, the chart's `image.digest` and `proxy.image.digest` are pinned to that release's image indexes. Installing with the chart's defaults gives you the same images. Image tags and chart versions have no leading `v`; GitHub release tags and archive filenames do.
 
 ## Download and verify binaries
 
@@ -80,12 +81,15 @@ xattr -d com.apple.quarantine zeaburctl
 
 ## Verify the image and chart
 
-The release notes say what changed; they don't list digests. `digests.txt` lists the full registry references for each platform's image, the image index, and the chart, one per line:
+The release notes say what changed; they don't list digests. `digests.txt` lists the full registry references for each image's platform images and index, and the chart, one per line; Zeabur Proxy's lines start with `proxy`:
 
 ```text
 linux/amd64  ghcr.io/zeabur-oss/zeabur@sha256:...
 linux/arm64  ghcr.io/zeabur-oss/zeabur@sha256:...
 index  ghcr.io/zeabur-oss/zeabur@sha256:...
+proxy linux/amd64  ghcr.io/zeabur-oss/proxy@sha256:...
+proxy linux/arm64  ghcr.io/zeabur-oss/proxy@sha256:...
+proxy index  ghcr.io/zeabur-oss/proxy@sha256:...
 chart  ghcr.io/zeabur-oss/charts/zeabur@sha256:...
 ```
 

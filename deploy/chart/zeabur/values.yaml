@@ -143,6 +143,7 @@ proxy:
     repository: ghcr.io/zeabur-oss/proxy
     # Defaults to the chart's appVersion. Ignored when digest is set.
     tag: ""
+    # A released chart sets it to the image index published with it, as image.digest.
     digest: ""
     pullPolicy: IfNotPresent
   logs:

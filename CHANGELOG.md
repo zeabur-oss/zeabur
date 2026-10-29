@@ -15,6 +15,12 @@ minor or patch release may break the API.
   [Releases](docs/reference/releases.mdx) shows.
 - The image is pushed by digest with no `candidate-*` tags left in GHCR.
 
+### Fixed
+
+- Zeabur Proxy's image, `ghcr.io/zeabur-oss/proxy`, is published, signed and attested with each
+  release, and the chart pins it by digest. 0.1.1 did not publish it, so an installation with
+  VictoriaMetrics or VictoriaLogs left `zeabur-proxy` unable to pull its image.
+
 ## [0.1.1] - 2026-10-28
 
 The first published release. 0.1.0 was never published: zeabur-oss withdrew it in every
