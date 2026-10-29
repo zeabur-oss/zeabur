@@ -2634,7 +2634,7 @@ export const zhCN: Messages = {
   "connect.badName": "只能使用英文字母、数字和 _，不能以数字开头。",
   "connect.extras": (names) => `同时添加 ${names}`,
   "connect.adds": "会添加的变量",
-  "connect.note.postgresql": (secret) => `值保留在机密变量 ${secret} 中，服务只引用这些密钥。`,
+  "connect.note.postgresql": (secret) => `值保留在机密变量 ${secret} 中，服务只引用这些值。`,
   "connect.note.url": (secret, url, password) =>
     `密码保留在机密变量 ${secret} 中。服务启动时，${url} 会从 ${password} 代入密码。`,
   "connect.taken": (name, service) => `${service} 已有 ${name}。`,

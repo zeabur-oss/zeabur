@@ -2641,7 +2641,7 @@ export const zhTW: Messages = {
   "connect.badName": "只能用英文字母、數字和 _，不能以數字開頭。",
   "connect.extras": (names) => `也加入 ${names}`,
   "connect.adds": "會加入的變數",
-  "connect.note.postgresql": (secret) => `值留在機密變數 ${secret}，服務只參照這些金鑰。`,
+  "connect.note.postgresql": (secret) => `值留在機密變數 ${secret}，服務只參照這些值。`,
   "connect.note.url": (secret, url, password) =>
     `密碼留在機密變數 ${secret}。服務啟動時，${url} 會從 ${password} 帶入密碼。`,
   "connect.taken": (name, service) => `${service} 已經有 ${name}。`,
