@@ -286,7 +286,7 @@ export const zhTW: Messages = {
   "node.networkUnavailable.fix": "檢查節點上的網路外掛。",
   "node.memoryFull": (n, node, share) =>
     n === 1 ? `${node}：記憶體已用 ${share}` : `${n} 個節點記憶體快滿了（最高 ${share}）`,
-  "node.memoryFull.warn": "記憶體用滿時，kubelet 會停掉副本來騰出記憶體。",
+  "node.memoryFull.warn": "記憶體用滿時，會停掉部分服務來騰出記憶體。",
   "node.memoryFull.fail": "服務隨時可能因為記憶體不足而停止。",
   "node.memoryFull.fix": "替最耗記憶體的服務設定記憶體上限、停掉用不到的服務，或加記憶體。",
   "node.diskFull": (n, node, share) =>
@@ -2641,7 +2641,7 @@ export const zhTW: Messages = {
   "connect.badName": "只能用英文字母、數字和 _，不能以數字開頭。",
   "connect.extras": (names) => `也加入 ${names}`,
   "connect.adds": "會加入的變數",
-  "connect.note.postgresql": (secret) => `值留在機密變數 ${secret}，服務只寫參照。`,
+  "connect.note.postgresql": (secret) => `值留在機密變數 ${secret}，服務只參照這些金鑰。`,
   "connect.note.url": (secret, url, password) =>
     `密碼留在機密變數 ${secret}。服務啟動時，${url} 會從 ${password} 帶入密碼。`,
   "connect.taken": (name, service) => `${service} 已經有 ${name}。`,
@@ -2658,7 +2658,7 @@ export const zhTW: Messages = {
   "connect.readBy": (services) => `已接到 ${services}。`,
   "connect.none": "還沒接到服務。",
   "connect.bucket": "儲存貯體",
-  "connect.note.s3": (secret) => `金鑰留在機密變數 ${secret}，服務只寫參照。`,
+  "connect.note.s3": (secret) => `金鑰留在機密變數 ${secret}，服務只參照這些金鑰。`,
   "connect.noKey": (store) =>
     `${store} 沒有 Zeabur 產生的存取金鑰，無法在這裡接到服務。在 Zeabur 建立的物件儲存都有。`,
   "s3.title": "物件儲存",

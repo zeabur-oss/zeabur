@@ -287,7 +287,7 @@ export const zhCN: Messages = {
   "node.networkUnavailable.fix": "检查节点上的网络插件。",
   "node.memoryFull": (n, node, share) =>
     n === 1 ? `${node}：内存已用 ${share}` : `${n} 个节点内存快满了（最高 ${share}）`,
-  "node.memoryFull.warn": "内存用满时，kubelet 会停掉副本来腾出内存。",
+  "node.memoryFull.warn": "内存用满时，会停掉部分服务来腾出内存。",
   "node.memoryFull.fail": "服务随时可能因为内存不足而停止。",
   "node.memoryFull.fix": "给最耗内存的服务设置内存上限、停掉用不到的服务，或加内存。",
   "node.diskFull": (n, node, share) =>
@@ -2634,7 +2634,7 @@ export const zhCN: Messages = {
   "connect.badName": "只能使用英文字母、数字和 _，不能以数字开头。",
   "connect.extras": (names) => `同时添加 ${names}`,
   "connect.adds": "会添加的变量",
-  "connect.note.postgresql": (secret) => `值保留在机密变量 ${secret} 中，服务只写引用。`,
+  "connect.note.postgresql": (secret) => `值保留在机密变量 ${secret} 中，服务只引用这些密钥。`,
   "connect.note.url": (secret, url, password) =>
     `密码保留在机密变量 ${secret} 中。服务启动时，${url} 会从 ${password} 代入密码。`,
   "connect.taken": (name, service) => `${service} 已有 ${name}。`,
@@ -2651,7 +2651,7 @@ export const zhCN: Messages = {
   "connect.readBy": (services) => `已连接到 ${services}。`,
   "connect.none": "尚未连接到服务。",
   "connect.bucket": "存储桶",
-  "connect.note.s3": (secret) => `密钥保存在机密变量 ${secret} 中，服务只写引用。`,
+  "connect.note.s3": (secret) => `密钥保存在机密变量 ${secret} 中，服务只引用这些密钥。`,
   "connect.noKey": (store) =>
     `${store} 没有 Zeabur 生成的访问密钥，无法在这里连接服务。在 Zeabur 创建的对象存储都有。`,
   "s3.title": "对象存储",
