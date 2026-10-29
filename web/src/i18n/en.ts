@@ -2992,7 +2992,6 @@ export const en = {
   "githubApp.installations": "Installed on",
   "githubApp.noInstallations":
     "Not installed on any account yet. Install it on the accounts or organizations that hold your repositories.",
-  "githubApp.installationsProblem": "Couldn't read the installations from GitHub.",
   "githubApp.selection.all": "All repositories",
   "githubApp.selection.selected": "Selected repositories",
   "githubApp.everyProject": "Every project",
@@ -3574,6 +3573,9 @@ export const en = {
   "sentence.problem.summary.github": (p: P) => `GitHub didn't answer as expected: ${p.detail}`,
   "sentence.problem.github.fix": () =>
     "Try again. If it keeps failing, check that the cluster can reach GitHub.",
+  "sentence.problem.summary.githubApiUrl": () => "The GitHub App's api-url must be an https URL.",
+  "sentence.problem.githubApiUrl.fix": () =>
+    "Set api-url in the github-app Secret to the https address of GitHub's API.",
   "sentence.problem.summary.unavailable": () => "The cluster can't be reached.",
   "sentence.problem.summary.internal": () => "Something went wrong in Zeabur.",
   "sentence.problem.summary.quota-exceeded": (p: P) =>

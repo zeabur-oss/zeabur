@@ -13,6 +13,7 @@ import { clusterQuery, projectsQuery } from "@/api/queries"
 import { FormField } from "@/components/form-field"
 import { GateTip, useHintGate } from "@/components/gate"
 import { GitHubAppPlanDialog } from "@/components/github-app-plan"
+import { Problem } from "@/components/problem"
 import { permission, Refused } from "@/components/refused"
 import { useT } from "@/i18n"
 import { openAdd } from "@/lib/adding"
@@ -279,16 +280,7 @@ function AppLink({ app }: { app: Schemas["GitHubApp"]["app"] }) {
 /** Why no installation shows: GitHub did not answer, or the App is installed nowhere yet. */
 function InstallationsNote({ data }: { data: Schemas["GitHubApp"] }) {
   const t = useT()
-  if (data.installationsProblem)
-    return (
-      <Alert variant="warn">
-        <WarningIcon aria-hidden="true" />
-        <AlertDescription>
-          {t("githubApp.installationsProblem")}
-          <span className="block type-mono text-muted-foreground">{data.installationsProblem}</span>
-        </AlertDescription>
-      </Alert>
-    )
+  if (data.installationsProblem) return <Problem problem={data.installationsProblem} />
   if (data.installations?.length === 0)
     return <p className="type-body">{t("githubApp.noInstallations")}</p>
   return null

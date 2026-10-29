@@ -1,0 +1,12 @@
+[
+  {
+    "kind": "outOfMemory",
+    "container": "worker",
+    "pods": ["worker-1"],
+    "cause": {"key": "diagnosis.outOfMemory.cause.noLimit", "params": {"container": "worker"}},
+    "fix": {
+      "key": "diagnosis.outOfMemory.fix.noLimit",
+      "params": {"container": "worker", "restarts": "1"}
+    }
+  }
+]

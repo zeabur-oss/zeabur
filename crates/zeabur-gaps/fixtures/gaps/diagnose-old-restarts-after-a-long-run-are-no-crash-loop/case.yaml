@@ -1,0 +1,4 @@
+description: A container with 7 old restarts whose previous run lasted days and runs ready is not a crash loop.
+operation: gaps.diagnose
+params:
+  now: "2026-10-29T03:05:00Z"

@@ -3770,6 +3770,8 @@ export interface components {
        * @description How many times the kubelet restarted it.
        */
       restarts: number
+      /** @description When the current run started, in RFC 3339, when it is running. */
+      startedAt?: string | null
       terminated?: components["schemas"]["ContainerTermination"] | null
       waiting?: components["schemas"]["ContainerWaiting"] | null
     }
@@ -4886,8 +4888,7 @@ export interface components {
       canChange: components["schemas"]["Permission"]
       /** @description The App's installations; absent when they could not be read. */
       installations?: components["schemas"]["GitHubInstallation"][] | null
-      /** @description Why the installations could not be read, in GitHub's or Zeabur's words. */
-      installationsProblem?: string | null
+      installationsProblem?: components["schemas"]["Problem"] | null
       /** @description Zeabur Builder's namespace, where the App is kept. */
       namespace: string
       /** @description What could not be read. */

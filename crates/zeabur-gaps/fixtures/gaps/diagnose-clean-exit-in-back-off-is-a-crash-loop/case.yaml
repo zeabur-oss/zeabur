@@ -1,0 +1,4 @@
+description: A container that exits with 0 and waits in CrashLoopBackOff is a crash loop.
+operation: gaps.diagnose
+params:
+  now: "2026-10-29T03:05:00Z"

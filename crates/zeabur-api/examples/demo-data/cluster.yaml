@@ -1,0 +1,126 @@
+apiVersion: v1
+kind: Node
+metadata:
+  creationTimestamp: now-210d
+  labels:
+    kubernetes.io/hostname: vps-1
+    node-role.kubernetes.io/control-plane: "true"
+    node-role.kubernetes.io/etcd: "true"
+  name: vps-1
+spec:
+  taints: []
+  unschedulable: false
+status:
+  allocatable:
+    cpu: "2"
+    memory: 1900Mi
+    pods: "110"
+  capacity:
+    cpu: "2"
+    memory: 2048Mi
+    pods: "110"
+  conditions:
+    - reason: KubeletReady
+      status: "True"
+      type: Ready
+    - status: "False"
+      type: MemoryPressure
+    - status: "False"
+      type: DiskPressure
+    - status: "False"
+      type: PIDPressure
+  nodeInfo:
+    architecture: arm64
+    bootID: ""
+    containerRuntimeVersion: containerd://2.1.4-k3s1
+    kernelVersion: 6.12.48+deb13-arm64
+    kubeProxyVersion: ""
+    kubeletVersion: v1.34.10+k3s1
+    machineID: ""
+    operatingSystem: linux
+    osImage: Debian GNU/Linux 13 (trixie)
+    systemUUID: ""
+---
+apiVersion: v1
+kind: Node
+metadata:
+  creationTimestamp: now-96d
+  labels:
+    kubernetes.io/hostname: vps-2
+  name: vps-2
+spec:
+  taints:
+    - effect: NoSchedule
+      key: node.kubernetes.io/unschedulable
+  unschedulable: true
+status:
+  allocatable:
+    cpu: "4"
+    memory: 7800Mi
+    pods: "110"
+  capacity:
+    cpu: "4"
+    memory: 8Gi
+    pods: "110"
+  conditions:
+    - reason: KubeletReady
+      status: "True"
+      type: Ready
+    - status: "False"
+      type: MemoryPressure
+    - status: "False"
+      type: DiskPressure
+    - status: "False"
+      type: PIDPressure
+  nodeInfo:
+    architecture: arm64
+    bootID: ""
+    containerRuntimeVersion: containerd://2.1.4-k3s1
+    kernelVersion: 6.12.48+deb13-arm64
+    kubeProxyVersion: ""
+    kubeletVersion: v1.34.10+k3s1
+    machineID: ""
+    operatingSystem: linux
+    osImage: Debian GNU/Linux 13 (trixie)
+    systemUUID: ""
+---
+apiVersion: v1
+kind: Node
+metadata:
+  creationTimestamp: now-31d
+  labels:
+    kubernetes.io/hostname: vps-3
+  name: vps-3
+spec:
+  taints: []
+  unschedulable: false
+status:
+  allocatable:
+    cpu: "4"
+    memory: 7800Mi
+    pods: "110"
+  capacity:
+    cpu: "4"
+    memory: 8Gi
+    pods: "110"
+  conditions:
+    - reason: KubeletReady
+      status: "True"
+      type: Ready
+    - status: "False"
+      type: MemoryPressure
+    - status: "False"
+      type: DiskPressure
+    - status: "False"
+      type: PIDPressure
+  nodeInfo:
+    architecture: arm64
+    bootID: ""
+    containerRuntimeVersion: containerd://2.1.4-k3s1
+    kernelVersion: 6.12.48+deb13-arm64
+    kubeProxyVersion: ""
+    kubeletVersion: v1.33.13+k3s1
+    machineID: ""
+    operatingSystem: linux
+    osImage: Debian GNU/Linux 13 (trixie)
+    systemUUID: ""

@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: worker
+  namespace: demo
+spec:
+  selector:
+    matchLabels:
+      app: worker
+  template:
+    metadata:
+      labels:
+        app: worker
+    spec:
+      containers:
+        - name: worker
+          image: example/worker:1.0
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: worker-1
+  namespace: demo
+  labels:
+    app: worker
+spec:
+  containers:
+    - name: worker
+      image: example/worker:1.0
+status:
+  phase: Running
+  containerStatuses:
+    - name: worker
+      image: example/worker:1.0
+      imageID: ""
+      ready: false
+      restartCount: 3
+      state:
+        waiting:
+          reason: CrashLoopBackOff
+      lastState:
+        terminated:
+          reason: Completed
+          exitCode: 0
+          startedAt: "2026-10-29T03:04:00Z"
+          finishedAt: "2026-10-29T03:04:01Z"
