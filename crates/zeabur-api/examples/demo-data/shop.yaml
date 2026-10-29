@@ -1,0 +1,1371 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    deployment.kubernetes.io/revision: "3"
+    reloader.stakater.com/auto: "true"
+  creationTimestamp: now-32d
+  generation: 3
+  labels:
+    app.kubernetes.io/name: web
+    app.kubernetes.io/part-of: shop
+  name: web
+  namespace: shop
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: web
+  template:
+    metadata:
+      labels:
+        app: web
+    spec:
+      containers:
+        - env:
+            - name: NODE_ENV
+              value: production
+            - name: API_URL
+              value: http://api.shop.svc.cluster.local:8080
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+          envFrom:
+            - configMapRef:
+                name: web-config
+            - configMapRef:
+                name: shared-config
+          image: ghcr.io/example/shop-web:1.4.2
+          name: web
+          ports:
+            - containerPort: 3000
+              name: http
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          resources:
+            limits:
+              memory: 256Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+status:
+  availableReplicas: 2
+  observedGeneration: 3
+  readyReplicas: 2
+  replicas: 2
+  updatedReplicas: 2
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: now-28d
+  generation: 3
+  labels:
+    app.kubernetes.io/name: api
+    app.kubernetes.io/part-of: shop
+  name: api
+  namespace: shop
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: api
+  template:
+    metadata:
+      labels:
+        app: api
+    spec:
+      containers:
+        - env:
+            - name: DATABASE_HOST
+              value: db
+            - name: DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  key: password
+                  name: db-credentials
+            - name: ORDERS_DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  key: uri
+                  name: orders-app
+            - name: REDIS_URL
+              value: redis://redis:6379/0
+            - name: LOG_LEVEL
+              value: info
+            - name: SENTRY_DSN
+              valueFrom:
+                secretKeyRef:
+                  key: SENTRY_DSN
+                  name: shared-keys
+          envFrom:
+            - configMapRef:
+                name: shared-config
+          image: ghcr.io/example/shop-api:2.11.0
+          name: api
+          ports:
+            - containerPort: 3000
+              name: http
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          resources:
+            limits:
+              memory: 256Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+status:
+  availableReplicas: 3
+  conditions:
+    - lastTransitionTime: now-50m
+      message: Deployment has minimum availability.
+      reason: MinimumReplicasAvailable
+      status: "True"
+      type: Available
+    - lastTransitionTime: now-52m
+      message: ReplicaSet "api-5f6b7" has successfully progressed.
+      reason: NewReplicaSetAvailable
+      status: "True"
+      type: Progressing
+  observedGeneration: 3
+  readyReplicas: 3
+  replicas: 3
+  updatedReplicas: 3
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: now-20d
+  generation: 3
+  labels:
+    app.kubernetes.io/name: worker
+    app.kubernetes.io/part-of: shop
+  name: worker
+  namespace: shop
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: worker
+  template:
+    metadata:
+      labels:
+        app: worker
+    spec:
+      containers:
+        - env:
+            - name: QUEUE_URL
+              value: redis://redis:6379/1
+            - name: DATABASE_HOST
+              value: db
+            - name: DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  key: password
+                  name: db-credentials
+          image: ghcr.io/example/shop-worker:2.11.0
+          name: worker
+          ports:
+            - containerPort: 3000
+              name: http
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          resources:
+            limits:
+              memory: 256Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+status:
+  availableReplicas: 1
+  observedGeneration: 3
+  readyReplicas: 1
+  replicas: 2
+  updatedReplicas: 2
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: now-61d
+  generation: 3
+  labels:
+    app.kubernetes.io/name: error-pages
+    app.kubernetes.io/part-of: shop
+  name: error-pages
+  namespace: shop
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: error-pages
+  template:
+    metadata:
+      labels:
+        app: error-pages
+    spec:
+      containers:
+        - env: []
+          image: docker.io/nginxinc/nginx-unprivileged:1.30.5-alpine-slim
+          name: error-pages
+          ports:
+            - containerPort: 3000
+              name: http
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          resources:
+            limits:
+              memory: 256Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+status:
+  availableReplicas: 1
+  observedGeneration: 3
+  readyReplicas: 1
+  replicas: 1
+  updatedReplicas: 1
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  creationTimestamp: now-32d
+  labels:
+    app.kubernetes.io/component: database
+    app.kubernetes.io/name: db
+  name: db
+  namespace: shop
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: db
+  serviceName: db
+  template:
+    metadata:
+      labels:
+        app: db
+    spec:
+      containers:
+        - env:
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  key: password
+                  name: db-credentials
+          image: postgres:18
+          name: db
+          resources:
+            limits:
+              memory: 1Gi
+            requests:
+              cpu: 250m
+              memory: 512Mi
+          volumeMounts:
+            - mountPath: /data
+              name: data
+        - env:
+            - name: BACKUP_SCHEDULE
+              value: 0 3 * * *
+            - name: BACKUP_DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  key: password
+                  name: db-credentials
+          envFrom:
+            - secretRef:
+                name: db-credentials
+          image: ghcr.io/example/backup-agent:1.4.0
+          name: backup-agent
+  volumeClaimTemplates:
+    - apiVersion: v1
+      kind: PersistentVolumeClaim
+      metadata:
+        name: data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 20Gi
+status:
+  readyReplicas: 1
+  replicas: 1
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  creationTimestamp: now-69d
+  labels:
+    app.kubernetes.io/component: database
+    app.kubernetes.io/name: redis
+  name: redis
+  namespace: shop
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+  serviceName: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+    spec:
+      containers:
+        - env: []
+          image: redis:8
+          name: redis
+          resources:
+            limits:
+              memory: 1Gi
+            requests:
+              cpu: 250m
+              memory: 512Mi
+          volumeMounts:
+            - mountPath: /data
+              name: data
+  volumeClaimTemplates:
+    - apiVersion: v1
+      kind: PersistentVolumeClaim
+      metadata:
+        name: data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 2Gi
+status:
+  readyReplicas: 1
+  replicas: 1
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: nightly-report
+  namespace: shop
+spec:
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+            - args:
+                - report
+                - --yesterday
+              env:
+                - name: DATABASE_HOST
+                  value: db
+                - name: DATABASE_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      key: password
+                      name: db-credentials
+              image: ghcr.io/example/shop-api:2.11.0
+              name: report
+          restartPolicy: OnFailure
+  schedule: 0 2 * * *
+status:
+  lastScheduleTime: now-12d7h
+  lastSuccessfulTime: now-12d6h56m48s
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-21h40m
+  labels:
+    app: web
+  name: web-7c9d8-abcde
+  namespace: shop
+  ownerReferences: []
+spec:
+  containers:
+    - image: example
+      name: web
+  nodeName: vps-1
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: web
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-1d10h12m
+  labels:
+    app: error-pages
+  name: error-pages-5d4f7-k2m9x
+  namespace: shop
+  ownerReferences: []
+spec:
+  containers:
+    - image: example
+      name: error-pages
+  nodeName: vps-1
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: error-pages
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-22h5m
+  labels:
+    app: web
+  name: web-7c9d8-fghij
+  namespace: shop
+  ownerReferences: []
+spec:
+  containers:
+    - image: example
+      name: web
+  nodeName: vps-3
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: web
+      ready: true
+      restartCount: 2
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-20h26m
+  labels:
+    app: api
+  name: api-5f6b7-k2m4p
+  namespace: shop
+  ownerReferences: []
+spec:
+  containers:
+    - image: example
+      name: api
+  nodeName: vps-1
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: api
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-20h43m
+  labels:
+    app: api
+  name: api-5f6b7-q8r1s
+  namespace: shop
+  ownerReferences: []
+spec:
+  containers:
+    - image: example
+      name: api
+  nodeName: vps-3
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: api
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-21h2m
+  labels:
+    app: api
+  name: api-5f6b7-x9z3t
+  namespace: shop
+  ownerReferences: []
+spec:
+  containers:
+    - image: example
+      name: api
+  nodeName: vps-1
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: api
+      ready: true
+      restartCount: 1
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-1d2h9m
+  labels:
+    app: worker
+  name: worker-84c2d-h7j6k
+  namespace: shop
+  ownerReferences: []
+spec:
+  containers:
+    - image: example
+      name: worker
+  nodeName: vps-3
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: worker
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-1d2h20m
+  labels:
+    app: worker
+  name: worker-84c2d-w2e5r
+  namespace: shop
+  ownerReferences: []
+spec:
+  containers:
+    - image: example
+      name: worker
+  nodeName: vps-1
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      lastState:
+        terminated:
+          exitCode: 2
+          finishedAt: now-1m
+          reason: Error
+          startedAt: now-2m
+      name: worker
+      ready: false
+      restartCount: 14
+      state:
+        waiting:
+          reason: CrashLoopBackOff
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-5h21m
+  labels:
+    app: db
+  name: db-0
+  namespace: shop
+  ownerReferences:
+    - apiVersion: apps/v1
+      controller: true
+      kind: StatefulSet
+      name: db
+      uid: 00000000-0000-0000-0000-000000000000
+spec:
+  containers:
+    - image: example
+      name: db
+  nodeName: vps-3
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: db
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-10h58m
+  labels:
+    app: redis
+  name: redis-0
+  namespace: shop
+  ownerReferences:
+    - apiVersion: apps/v1
+      controller: true
+      kind: StatefulSet
+      name: redis
+      uid: 00000000-0000-0000-0000-000000000000
+spec:
+  containers:
+    - image: example
+      name: redis
+  nodeName: vps-1
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: redis
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-2d20m
+  labels:
+    cnpg.io/cluster: orders
+    cnpg.io/instanceName: orders-1
+    cnpg.io/instanceRole: primary
+  name: orders-1
+  namespace: shop
+spec:
+  containers:
+    - image: example
+      name: postgres
+  nodeName: vps-1
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: postgres
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-2d20m
+  labels:
+    app.kubernetes.io/component: mongod
+    app.kubernetes.io/instance: sessions
+  name: sessions-rs0-0
+  namespace: shop
+spec:
+  containers:
+    - image: example
+      name: mongod
+  nodeName: vps-1
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: mongod
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-2d20m
+  labels:
+    app.kubernetes.io/component: mongod
+    app.kubernetes.io/instance: sessions
+  name: sessions-rs0-1
+  namespace: shop
+spec:
+  containers:
+    - image: example
+      name: mongod
+  nodeName: vps-1
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: mongod
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-2d20m
+  labels:
+    app.kubernetes.io/component: mongod
+    app.kubernetes.io/instance: sessions
+  name: sessions-rs0-2
+  namespace: shop
+spec:
+  containers:
+    - image: example
+      name: mongod
+  nodeName: vps-1
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: mongod
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web
+  namespace: shop
+spec:
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+  selector:
+    app: web
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api
+  namespace: shop
+spec:
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+  selector:
+    app: api
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: db
+  namespace: shop
+spec:
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432
+  selector:
+    app: db
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    zeabur.com/page-server: "true"
+  name: error-pages
+  namespace: shop
+spec:
+  ports:
+    - name: pages
+      port: 8080
+      targetPort: http
+    - name: maintenance
+      port: 8081
+      targetPort: http
+  selector:
+    app: error-pages
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  namespace: shop
+spec:
+  ports:
+    - name: redis
+      port: 6379
+      targetPort: 6379
+  selector:
+    app: redis
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app.kubernetes.io/name: redis
+  name: redis-public-6379
+  namespace: shop
+spec:
+  ports:
+    - name: redis
+      nodePort: 31379
+      port: 6379
+      protocol: TCP
+      targetPort: 6379
+  selector:
+    app: redis
+  type: LoadBalancer
+status:
+  loadBalancer:
+    ingress:
+      - ip: 203.0.113.10
+---
+apiVersion: v1
+kind: ConfigMap
+data:
+  502.html: <!doctype html><title>Shop</title><h1>Shop is not responding</h1>
+  503.html: <!doctype html><title>Shop</title><h1>Shop is not available right now</h1>
+  504.html: <!doctype html><title>Shop</title><h1>Shop took too long to respond</h1>
+  maintenance.html: <!doctype html><title>Shop</title><h1>Shop is under maintenance</h1><p>We will be back soon.</p>
+metadata:
+  labels:
+    zeabur.com/page-server: "true"
+  name: error-pages
+  namespace: shop
+---
+apiVersion: v1
+kind: ConfigMap
+data:
+  FEATURE_CHECKOUT_V2: "true"
+  LOG_LEVEL: info
+metadata:
+  name: web-config
+  namespace: shop
+---
+apiVersion: v1
+kind: ConfigMap
+data:
+  APP_URL: https://shop.example.com
+  TZ: Asia/Taipei
+metadata:
+  labels:
+    zeabur.com/shared-variables: "true"
+  name: shared-config
+  namespace: shop
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: data-db-0
+  namespace: shop
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 20Gi
+status:
+  capacity:
+    storage: 20Gi
+  phase: Bound
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  annotations:
+    k8up.io/backup: "true"
+  labels:
+    zeabur.com/backup-volume: data-redis-0
+  name: data-redis-0
+  namespace: shop
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
+status:
+  capacity:
+    storage: 2Gi
+  phase: Bound
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: old-uploads
+  namespace: shop
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+status:
+  capacity:
+    storage: 5Gi
+  phase: Bound
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt
+    traefik.ingress.kubernetes.io/router.middlewares: shop-web-redirect-www-shop-example-com@kubernetescrd,shop-web-error-pages@kubernetescrd
+  name: web
+  namespace: shop
+  uid: 0e9b1c44-6a43-4c55-9d0b-7f3f2a1d0001
+spec:
+  rules:
+    - host: shop.example.com
+      http:
+        paths:
+          - backend:
+              service:
+                name: web
+                port:
+                  name: http
+            path: /
+            pathType: Prefix
+    - host: www.shop.example.com
+      http:
+        paths:
+          - backend:
+              service:
+                name: web
+                port:
+                  name: http
+            path: /
+            pathType: Prefix
+  tls:
+    - hosts:
+        - shop.example.com
+        - www.shop.example.com
+      secretName: shop-tls
+status:
+  loadBalancer:
+    ingress:
+      - ip: 203.0.113.10
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt
+  name: api
+  namespace: shop
+  uid: 0e9b1c44-6a43-4c55-9d0b-7f3f2a1d0002
+spec:
+  rules:
+    - host: api.shop.example.com
+      http:
+        paths:
+          - backend:
+              service:
+                name: api
+                port:
+                  name: http
+            path: /
+            pathType: Prefix
+  tls:
+    - hosts:
+        - api.shop.example.com
+      secretName: api-tls
+status:
+  loadBalancer:
+    ingress:
+      - ip: 203.0.113.10
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    traefik.ingress.kubernetes.io/router.priority: "48"
+  name: api-api-shop-example-com-maintenance
+  namespace: shop
+  ownerReferences:
+    - apiVersion: networking.k8s.io/v1
+      kind: Ingress
+      name: api
+      uid: 0e9b1c44-6a43-4c55-9d0b-7f3f2a1d0002
+spec:
+  rules:
+    - host: api.shop.example.com
+      http:
+        paths:
+          - backend:
+              service:
+                name: error-pages
+                port:
+                  name: maintenance
+            path: /
+            pathType: Prefix
+  tls:
+    - hosts:
+        - api.shop.example.com
+      secretName: api-tls
+status:
+  loadBalancer:
+    ingress:
+      - ip: 203.0.113.10
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: db-credentials
+  namespace: shop
+type: Opaque
+data:
+  username: ""
+  password: ""
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  labels:
+    reconcile.external-secrets.io/managed: "true"
+  name: db
+  namespace: shop
+  ownerReferences:
+    - apiVersion: external-secrets.io/v1
+      controller: true
+      kind: ExternalSecret
+      name: db
+      uid: 6d2f1c58-3a7e-4b0d-9c41-8e5a7b2f0d11
+type: Opaque
+data:
+  key1: ""
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  labels:
+    zeabur.com/shared-variables: "true"
+  name: shared-keys
+  namespace: shop
+type: Opaque
+data:
+  SENTRY_DSN: ""
+  MAILER_TOKEN: ""
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: web-status
+  namespace: shop
+  resourceVersion: "2"
+spec:
+  hostnames:
+    - status.shop.example.com
+  parentRefs:
+    - name: public
+      namespace: gateway
+  rules:
+    - backendRefs:
+        - name: web
+          port: 80
+---
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  annotations:
+    deployment.kubernetes.io/revision: "1"
+  creationTimestamp: now-12d
+  name: web-6b5f9d7c8
+  namespace: shop
+  ownerReferences:
+    - apiVersion: apps/v1
+      controller: true
+      kind: Deployment
+      name: web
+      uid: 00000000-0000-0000-0000-000000000003
+spec:
+  replicas: 0
+  selector:
+    matchLabels:
+      app: web
+  template:
+    metadata:
+      labels:
+        app: web
+    spec:
+      containers:
+        - env:
+            - name: NODE_ENV
+              value: production
+            - name: API_URL
+              value: http://api.shop.svc.cluster.local:8080
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+          envFrom:
+            - configMapRef:
+                name: web-config
+            - configMapRef:
+                name: shared-config
+          image: ghcr.io/example/shop-web:1.3.9
+          name: web
+          ports:
+            - containerPort: 3000
+              name: http
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          resources:
+            limits:
+              memory: 256Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+status:
+  readyReplicas: 0
+  replicas: 0
+---
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  annotations:
+    deployment.kubernetes.io/revision: "2"
+  creationTimestamp: now-5d
+  name: web-5d7c8b6f4
+  namespace: shop
+  ownerReferences:
+    - apiVersion: apps/v1
+      controller: true
+      kind: Deployment
+      name: web
+      uid: 00000000-0000-0000-0000-000000000003
+spec:
+  replicas: 0
+  selector:
+    matchLabels:
+      app: web
+  template:
+    metadata:
+      labels:
+        app: web
+    spec:
+      containers:
+        - env:
+            - name: NODE_ENV
+              value: production
+            - name: API_URL
+              value: http://api.shop.svc.cluster.local:8080
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+          envFrom:
+            - configMapRef:
+                name: web-config
+            - configMapRef:
+                name: shared-config
+          image: ghcr.io/example/shop-web:1.4.1
+          name: web
+          ports:
+            - containerPort: 3000
+              name: http
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          resources:
+            limits:
+              memory: 256Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+status:
+  readyReplicas: 0
+  replicas: 0
+---
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  annotations:
+    deployment.kubernetes.io/revision: "3"
+  creationTimestamp: now-2d
+  name: web-7c9d8
+  namespace: shop
+  ownerReferences:
+    - apiVersion: apps/v1
+      controller: true
+      kind: Deployment
+      name: web
+      uid: 00000000-0000-0000-0000-000000000003
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: web
+  template:
+    metadata:
+      labels:
+        app: web
+    spec:
+      containers:
+        - env:
+            - name: NODE_ENV
+              value: production
+            - name: API_URL
+              value: http://api.shop.svc.cluster.local:8080
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+          envFrom:
+            - configMapRef:
+                name: web-config
+            - configMapRef:
+                name: shared-config
+          image: ghcr.io/example/shop-web:1.4.2
+          name: web
+          ports:
+            - containerPort: 3000
+              name: http
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          resources:
+            limits:
+              memory: 256Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+status:
+  readyReplicas: 2
+  replicas: 2
+---
+apiVersion: events.k8s.io/v1
+kind: Event
+action: ScalingReplicaSet
+deprecatedCount: 1
+eventTime: "2026-10-26T08:26:00.000000Z"
+metadata:
+  name: e1
+  namespace: shop
+note: Scaled up replica set api-5f6b7 to 3
+reason: ScalingReplicaSet
+regarding:
+  apiVersion: v1
+  kind: Deployment
+  name: api
+  namespace: shop
+reportingController: kubelet
+reportingInstance: node-1
+type: Normal
+---
+apiVersion: events.k8s.io/v1
+kind: Event
+action: BackOff
+deprecatedCount: 2
+eventTime: "2026-10-26T08:30:00.000000Z"
+metadata:
+  name: e2
+  namespace: shop
+note: Back-off restarting failed container web
+reason: BackOff
+regarding:
+  apiVersion: v1
+  kind: Pod
+  name: web-7c9d8-fghij
+  namespace: shop
+reportingController: kubelet
+reportingInstance: node-1
+type: Warning
+---
+apiVersion: events.k8s.io/v1
+kind: Event
+action: Pulled
+deprecatedCount: 1
+eventTime: "2026-10-26T08:37:00.000000Z"
+metadata:
+  name: e3
+  namespace: shop
+note: Container image ghcr.io/example/shop-api:2.11.0 already present
+reason: Pulled
+regarding:
+  apiVersion: v1
+  kind: Pod
+  name: api-5f6b7-x9z3t
+  namespace: shop
+reportingController: kubelet
+reportingInstance: node-1
+type: Normal
+---
+apiVersion: events.k8s.io/v1
+kind: Event
+action: BackOff
+deprecatedCount: 14
+eventTime: "2026-10-26T08:46:00.000000Z"
+metadata:
+  name: e4
+  namespace: shop
+note: Back-off restarting failed container worker
+reason: BackOff
+regarding:
+  apiVersion: v1
+  kind: Pod
+  name: worker-84c2d-w2e5r
+  namespace: shop
+reportingController: kubelet
+reportingInstance: node-1
+type: Warning
+---
+apiVersion: events.k8s.io/v1
+kind: Event
+action: Unhealthy
+deprecatedCount: 9
+eventTime: "2026-10-26T08:47:00.000000Z"
+metadata:
+  name: e5
+  namespace: shop
+note: 'Readiness probe failed: connection refused'
+reason: Unhealthy
+regarding:
+  apiVersion: v1
+  kind: Pod
+  name: worker-84c2d-w2e5r
+  namespace: shop
+reportingController: kubelet
+reportingInstance: node-1
+type: Warning
+---
+apiVersion: events.k8s.io/v1
+kind: Event
+action: SawCompletedJob
+deprecatedCount: 1
+eventTime: "2026-10-26T08:55:00.000000Z"
+metadata:
+  name: e6
+  namespace: shop
+note: 'Saw completed job: nightly-report-29342880'
+reason: SawCompletedJob
+regarding:
+  apiVersion: v1
+  kind: CronJob
+  name: nightly-report
+  namespace: shop
+reportingController: kubelet
+reportingInstance: node-1
+type: Normal

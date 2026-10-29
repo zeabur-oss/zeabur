@@ -1,0 +1,957 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: now-57d
+  generation: 3
+  labels:
+    app.kubernetes.io/name: talker
+    app.kubernetes.io/part-of: lab
+  name: talker
+  namespace: lab
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: talker
+  template:
+    metadata:
+      labels:
+        app: talker
+    spec:
+      containers:
+        - env:
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  key: uri
+                  name: pg-app
+          image: ghcr.io/example/talker:1.2.0
+          name: talker
+          ports:
+            - containerPort: 3000
+              name: http
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          resources:
+            limits:
+              memory: 256Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+status:
+  availableReplicas: 1
+  observedGeneration: 3
+  readyReplicas: 1
+  replicas: 1
+  updatedReplicas: 1
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: now-38d
+  generation: 3
+  labels:
+    app.kubernetes.io/name: crasher
+    app.kubernetes.io/part-of: lab
+  name: crasher
+  namespace: lab
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: crasher
+  template:
+    metadata:
+      labels:
+        app: crasher
+    spec:
+      containers:
+        - env: []
+          image: ghcr.io/example/crasher:0.1.0
+          name: crasher
+          ports:
+            - containerPort: 3000
+              name: http
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          resources:
+            limits:
+              memory: 256Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+status:
+  availableReplicas: 0
+  observedGeneration: 3
+  readyReplicas: 0
+  replicas: 1
+  updatedReplicas: 1
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: now-61d
+  generation: 3
+  labels:
+    app.kubernetes.io/name: editor
+    app.kubernetes.io/part-of: lab
+  name: editor
+  namespace: lab
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: editor
+  template:
+    metadata:
+      labels:
+        app: editor
+    spec:
+      containers:
+        - env:
+            - name: MONGOPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  key: app
+                  name: mongo-custom-user-secret
+          image: ghcr.io/example/editor:0.9.0
+          name: editor
+          ports:
+            - containerPort: 3000
+              name: http
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          resources:
+            limits:
+              memory: 256Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+          volumeMounts:
+            - mountPath: /data
+              name: data
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: editor-data
+status:
+  availableReplicas: 0
+  observedGeneration: 3
+  readyReplicas: 0
+  replicas: 1
+  updatedReplicas: 1
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: now-66d
+  generation: 3
+  labels:
+    app.kubernetes.io/name: hello
+    app.kubernetes.io/part-of: lab
+  name: hello
+  namespace: lab
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hello
+  template:
+    metadata:
+      labels:
+        app: hello
+    spec:
+      containers:
+        - env: []
+          image: nginx:1.29
+          name: hello
+          ports:
+            - containerPort: 3000
+              name: http
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          resources:
+            limits:
+              memory: 256Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+status:
+  availableReplicas: 1
+  observedGeneration: 3
+  readyReplicas: 1
+  replicas: 1
+  updatedReplicas: 1
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: now-44d
+  generation: 3
+  labels:
+    app.kubernetes.io/name: storefront
+    app.kubernetes.io/part-of: lab
+  name: storefront
+  namespace: lab
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: storefront
+  template:
+    metadata:
+      labels:
+        app: storefront
+    spec:
+      containers:
+        - env:
+            - name: MYSQLPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  key: password
+                  name: mysql-app
+            - name: DATABASE_URL
+              value: mysql://app:$(MYSQLPASSWORD)@moco-mysql-primary.lab.svc:3306/app
+          image: ghcr.io/example/storefront:1.0.0
+          name: storefront
+          ports:
+            - containerPort: 3000
+              name: http
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          resources:
+            limits:
+              memory: 256Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+status:
+  availableReplicas: 1
+  observedGeneration: 3
+  readyReplicas: 1
+  replicas: 1
+  updatedReplicas: 1
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  creationTimestamp: now-18d
+  labels:
+    app.kubernetes.io/component: mongod
+    app.kubernetes.io/instance: mongo
+    app.kubernetes.io/name: percona-server-mongodb
+    app.kubernetes.io/replset: rs0
+  name: mongo-rs0
+  namespace: lab
+  ownerReferences:
+    - apiVersion: psmdb.percona.com/v1
+      controller: true
+      kind: PerconaServerMongoDB
+      name: mongo
+      uid: 00000000-0000-0000-0000-000000000001
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mongo-rs0
+  serviceName: mongo-rs0
+  template:
+    metadata:
+      labels:
+        app: mongo-rs0
+    spec:
+      containers:
+        - image: percona/percona-server-mongodb:7.0.43-23
+          name: mongod
+          volumeMounts:
+            - mountPath: /data/db
+              name: mongod-data
+  volumeClaimTemplates:
+    - apiVersion: v1
+      kind: PersistentVolumeClaim
+      metadata:
+        name: mongod-data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 10Gi
+status:
+  readyReplicas: 1
+  replicas: 1
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-1d7h7m
+  labels:
+    app: talker
+  name: talker-7d9c6b5f4-k8m2p
+  namespace: lab
+  ownerReferences: []
+spec:
+  containers:
+    - image: example
+      name: talker
+  nodeName: vps-3
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: talker
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-1d9h47m
+  labels:
+    app: crasher
+  name: crasher-6949b848bd-mv6fd
+  namespace: lab
+  ownerReferences: []
+spec:
+  containers:
+    - image: example
+      name: crasher
+  nodeName: vps-3
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      lastState:
+        terminated:
+          exitCode: 2
+          finishedAt: now-1m
+          reason: Error
+          startedAt: now-2m
+      name: crasher
+      ready: false
+      restartCount: 541
+      state:
+        waiting:
+          reason: CrashLoopBackOff
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-1h58m
+  labels:
+    app: editor
+  name: editor-5c8d9f7b6-q2w3e
+  namespace: lab
+spec:
+  containers:
+    - image: ghcr.io/example/editor:0.9.0
+      name: editor
+status:
+  conditions:
+    - lastTransitionTime: now-1h58m
+      message: '0/1 nodes are available: persistentvolumeclaim "editor-data" not found. not found'
+      reason: Unschedulable
+      status: "False"
+      type: PodScheduled
+  phase: Pending
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-1d5h34m
+  labels:
+    app: hello
+  name: hello-5f7b8c9d6-x4z7c
+  namespace: lab
+  ownerReferences: []
+spec:
+  containers:
+    - image: example
+      name: hello
+  nodeName: vps-1
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: hello
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-16h29m
+  labels:
+    app: mongo-rs0
+  name: mongo-rs0-0
+  namespace: lab
+  ownerReferences:
+    - apiVersion: apps/v1
+      controller: true
+      kind: StatefulSet
+      name: mongo-rs0
+      uid: 00000000-0000-0000-0000-000000000000
+spec:
+  containers:
+    - image: example
+      name: mongo-rs0
+  nodeName: vps-3
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: mongod
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-1d15h21m
+  labels:
+    app: storefront
+  name: storefront-6d8f7c9b5-r4t6y
+  namespace: lab
+  ownerReferences: []
+spec:
+  containers:
+    - image: example
+      name: storefront
+  nodeName: vps-3
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: storefront
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-10h
+  labels:
+    app.kubernetes.io/instance: mysql
+    app.kubernetes.io/name: mysql
+  name: moco-mysql-0
+  namespace: lab
+  ownerReferences:
+    - apiVersion: moco.cybozu.com/v1beta2
+      controller: true
+      kind: MySQLCluster
+      name: mysql
+      uid: 00000000-0000-0000-0000-000000000001
+spec:
+  containers:
+    - image: example
+      name: mysqld
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: mysqld
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-10h
+  labels:
+    app.kubernetes.io/instance: mysql-restored-1022
+    app.kubernetes.io/name: mysql
+  name: moco-mysql-restored-1022-0
+  namespace: lab
+  ownerReferences:
+    - apiVersion: moco.cybozu.com/v1beta2
+      controller: true
+      kind: MySQLCluster
+      name: mysql-restored-1022
+      uid: 00000000-0000-0000-0000-000000000001
+spec:
+  containers:
+    - image: example
+      name: mysqld
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: mysqld
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-10h
+  labels:
+    app.kubernetes.io/instance: mariadb
+    app.kubernetes.io/name: mariadb
+  name: mariadb-0
+  namespace: lab
+  ownerReferences:
+    - apiVersion: k8s.mariadb.com/v1alpha1
+      controller: true
+      kind: MariaDB
+      name: mariadb
+      uid: 00000000-0000-0000-0000-000000000001
+spec:
+  containers:
+    - image: example
+      name: mariadb
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: mariadb
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-10h
+  labels:
+    app.kubernetes.io/instance: dragonfly
+    app.kubernetes.io/name: dragonfly
+    role: master
+  name: dragonfly-0
+  namespace: lab
+  ownerReferences:
+    - apiVersion: dragonflydb.io/v1alpha1
+      controller: true
+      kind: Dragonfly
+      name: dragonfly
+      uid: 00000000-0000-0000-0000-000000000001
+spec:
+  containers:
+    - image: example
+      name: dragonfly
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: dragonfly
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-10h
+  labels:
+    app.kubernetes.io/component: s3
+    app.kubernetes.io/instance: files
+    app.kubernetes.io/name: seaweedfs
+  name: files-s3-7d9f6c5b8-x2k4p
+  namespace: lab
+  ownerReferences:
+    - apiVersion: seaweed.seaweedfs.com/v1
+      controller: true
+      kind: Seaweed
+      name: files
+      uid: 00000000-0000-0000-0000-000000000001
+spec:
+  containers:
+    - image: example
+      name: s3
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: s3
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-49d
+  labels:
+    cnpg.io/cluster: pg
+    cnpg.io/instanceRole: primary
+  name: pg-1
+  namespace: lab
+  ownerReferences:
+    - apiVersion: postgresql.cnpg.io/v1
+      controller: true
+      kind: Cluster
+      name: pg
+      uid: 00000000-0000-0000-0000-000000000001
+spec:
+  containers:
+    - image: ghcr.io/cloudnative-pg/postgresql:17-standard-trixie
+      name: postgres
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: postgres
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: talker
+  namespace: lab
+spec:
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+  selector:
+    app: talker
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hello
+  namespace: lab
+spec:
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+  selector:
+    app: hello
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mongod-data-mongo-rs0-0
+  namespace: lab
+  ownerReferences: []
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+status:
+  capacity:
+    storage: 10Gi
+  phase: Bound
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pg-1
+  namespace: lab
+  ownerReferences:
+    - apiVersion: postgresql.cnpg.io/v1
+      controller: true
+      kind: Cluster
+      name: pg
+      uid: 00000000-0000-0000-0000-000000000001
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+status:
+  capacity:
+    storage: 5Gi
+  phase: Bound
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: hello
+  namespace: lab
+spec:
+  rules:
+    - host: hello.example.com
+      http:
+        paths:
+          - backend:
+              service:
+                name: hello
+                port:
+                  name: http
+            path: /
+            pathType: Prefix
+  tls:
+    - hosts:
+        - hello.example.com
+      secretName: hello-tls
+status:
+  loadBalancer:
+    ingress:
+      - ip: 203.0.113.10
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: pg-app
+  namespace: lab
+type: Opaque
+data:
+  key1: ""
+  key2: ""
+  key3: ""
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mongo-custom-user-secret
+  namespace: lab
+type: Opaque
+data:
+  key1: ""
+  key2: ""
+  key3: ""
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: moco-mysql
+  namespace: lab
+type: Opaque
+data:
+  key1: ""
+  key2: ""
+  key3: ""
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: moco-mysql-restored-1022
+  namespace: lab
+type: Opaque
+data:
+  key1: ""
+  key2: ""
+  key3: ""
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mysql-app
+  namespace: lab
+type: Opaque
+data:
+  key1: ""
+  key2: ""
+  key3: ""
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mariadb-app
+  namespace: lab
+type: Opaque
+data:
+  key1: ""
+  key2: ""
+  key3: ""
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: dragonfly-auth
+  namespace: lab
+type: Opaque
+data:
+  key1: ""
+  key2: ""
+  key3: ""
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: files-app
+  namespace: lab
+type: Opaque
+data:
+  key1: ""
+  key2: ""
+  key3: ""
+---
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  annotations:
+    deployment.kubernetes.io/revision: "1"
+  creationTimestamp: now-38d
+  name: crasher-6949b848bd
+  namespace: lab
+  ownerReferences:
+    - apiVersion: apps/v1
+      controller: true
+      kind: Deployment
+      name: crasher
+      uid: 00000000-0000-0000-0000-000000000002
+spec:
+  selector:
+    matchLabels:
+      app: crasher
+  template:
+    metadata:
+      labels:
+        app: crasher
+    spec:
+      containers:
+        - image: ghcr.io/example/crasher:0.1.0
+          name: crasher
+---
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  annotations:
+    deployment.kubernetes.io/revision: "1"
+  creationTimestamp: now-61d
+  name: editor-5c8d9f7b6
+  namespace: lab
+  ownerReferences:
+    - apiVersion: apps/v1
+      controller: true
+      kind: Deployment
+      name: editor
+      uid: 00000000-0000-0000-0000-000000000002
+spec:
+  selector:
+    matchLabels:
+      app: editor
+  template:
+    metadata:
+      labels:
+        app: editor
+    spec:
+      containers:
+        - image: ghcr.io/example/editor:0.9.0
+          name: editor
+---
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  annotations:
+    deployment.kubernetes.io/revision: "1"
+  creationTimestamp: now-57d
+  name: talker-7d9c6b5f4
+  namespace: lab
+  ownerReferences:
+    - apiVersion: apps/v1
+      controller: true
+      kind: Deployment
+      name: talker
+      uid: 00000000-0000-0000-0000-000000000002
+spec:
+  selector:
+    matchLabels:
+      app: talker
+  template:
+    metadata:
+      labels:
+        app: talker
+    spec:
+      containers:
+        - image: ghcr.io/example/talker:1.2.0
+          name: talker
+---
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  annotations:
+    deployment.kubernetes.io/revision: "1"
+  creationTimestamp: now-66d
+  name: hello-5f7b8c9d6
+  namespace: lab
+  ownerReferences:
+    - apiVersion: apps/v1
+      controller: true
+      kind: Deployment
+      name: hello
+      uid: 00000000-0000-0000-0000-000000000002
+spec:
+  selector:
+    matchLabels:
+      app: hello
+  template:
+    metadata:
+      labels:
+        app: hello
+    spec:
+      containers:
+        - image: nginx:1.29
+          name: hello
+---
+apiVersion: events.k8s.io/v1
+kind: Event
+action: BackOff
+deprecatedCount: 541
+eventTime: "2026-10-26T08:58:00.000000Z"
+metadata:
+  name: l1
+  namespace: lab
+note: Back-off restarting failed container crasher in pod crasher-6949b848bd-mv6fd_lab
+reason: BackOff
+regarding:
+  apiVersion: v1
+  kind: Pod
+  name: crasher-6949b848bd-mv6fd
+  namespace: lab
+reportingController: kubelet
+reportingInstance: node-1
+type: Warning
+---
+apiVersion: events.k8s.io/v1
+kind: Event
+action: FailedScheduling
+deprecatedCount: 119
+eventTime: "2026-10-26T08:55:00.000000Z"
+metadata:
+  name: l2
+  namespace: lab
+note: '0/1 nodes are available: persistentvolumeclaim "editor-data" not found. not found'
+reason: FailedScheduling
+regarding:
+  apiVersion: v1
+  kind: Pod
+  name: editor-5c8d9f7b6-q2w3e
+  namespace: lab
+reportingController: kubelet
+reportingInstance: node-1
+type: Warning

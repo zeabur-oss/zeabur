@@ -1,0 +1,205 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: now-34d
+  generation: 2
+  labels:
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: demo-gateway
+    app.kubernetes.io/part-of: edge
+    helm.sh/chart: gateway-1.4.0
+  name: demo-gateway
+  namespace: edge
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: demo-gateway
+  template:
+    metadata:
+      labels:
+        app: demo-gateway
+    spec:
+      containers:
+        - env: []
+          image: nginx:1.27-alpine
+          name: demo-gateway
+          ports:
+            - containerPort: 3000
+              name: http
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          resources:
+            limits:
+              memory: 256Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+status:
+  availableReplicas: 1
+  conditions:
+    - message: ReplicaSet "demo-gateway-7c9f8" has timed out progressing.
+      reason: ProgressDeadlineExceeded
+      status: "False"
+      type: Progressing
+  observedGeneration: 2
+  readyReplicas: 1
+  replicas: 2
+  unavailableReplicas: 1
+  updatedReplicas: 1
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: now-66d
+  generation: 3
+  labels:
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: demo-worker
+    app.kubernetes.io/part-of: edge
+    helm.sh/chart: gateway-1.4.0
+  name: demo-worker
+  namespace: edge
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: demo-worker
+  template:
+    metadata:
+      labels:
+        app: demo-worker
+    spec:
+      containers:
+        - env: []
+          image: ghcr.io/example/gateway-worker:1.4.0
+          name: demo-worker
+          ports:
+            - containerPort: 3000
+              name: http
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          resources:
+            limits:
+              memory: 256Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+status:
+  availableReplicas: 1
+  observedGeneration: 3
+  readyReplicas: 1
+  replicas: 1
+  updatedReplicas: 1
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-1d11h36m
+  labels:
+    app: demo-gateway
+  name: demo-gateway-5b6d4-q8w2e
+  namespace: edge
+  ownerReferences: []
+spec:
+  containers:
+    - image: example
+      name: demo-gateway
+  nodeName: vps-1
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: demo-gateway
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-1d11h54m
+  labels:
+    app: demo-gateway
+  name: demo-gateway-7c9f8-z3x5c
+  namespace: edge
+  ownerReferences: []
+spec:
+  containers:
+    - image: example
+      name: demo-gateway
+  nodeName: vps-1
+status:
+  containerStatuses:
+    - image: nginx:1.27-alpine
+      imageID: ""
+      name: demo-gateway
+      ready: false
+      restartCount: 0
+      state:
+        waiting:
+          reason: ContainerCreating
+  phase: Pending
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-1d9h43m
+  labels:
+    app: demo-worker
+  name: demo-worker-6a1b2-m4n6b
+  namespace: edge
+  ownerReferences: []
+spec:
+  containers:
+    - image: example
+      name: demo-worker
+  nodeName: vps-3
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: demo-worker
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: demo-gateway
+  namespace: edge
+spec:
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+  selector:
+    app: demo-gateway
+---
+apiVersion: events.k8s.io/v1
+kind: Event
+action: FailedAttachVolume
+deprecatedCount: 6
+eventTime: "2026-10-26T08:45:00.000000Z"
+metadata:
+  name: e1
+  namespace: edge
+note: 'Multi-Attach error for volume "pvc-3f1c": Volume is already used by pod demo-gateway-5b6d4-q8w2e'
+reason: FailedAttachVolume
+regarding:
+  apiVersion: v1
+  kind: Pod
+  name: demo-gateway-7c9f8-z3x5c
+  namespace: edge
+reportingController: kubelet
+reportingInstance: node-1
+type: Warning

@@ -1,7 +1,8 @@
 //! A development server: the API over an in-memory cluster holding a few example projects (one
 //! with a crash-looping worker, one whose image cannot be pulled, one with a failed CronJob run,
 //! one rolling out, a large healthy one and a small one), and the embedded web interface. Never
-//! shipped; for working on and trying the interface without a cluster.
+//! shipped; for working on and trying the interface without a cluster. The projects' objects are
+//! manifests in `demo-data/`; the clock, metrics, logs and backups are simulated here.
 //!
 //! ```sh
 //! scripts/build-ui.sh && ZEABUR_UI_DIST=$PWD/web/dist \
@@ -94,13 +95,9 @@ use sha2::{Digest as _, Sha256};
 use zeabur_api::access::{ClusterAccess, Handoff};
 use zeabur_api::images::registry::{Answer, Get, Transport};
 use zeabur_core::problem::Problem;
-use zeabur_kube::k8s_openapi::api::apps::v1::{DaemonSet, Deployment, ReplicaSet, StatefulSet};
-use zeabur_kube::k8s_openapi::api::batch::v1::{CronJob, Job};
-use zeabur_kube::k8s_openapi::api::core::v1::{
-    ConfigMap, Namespace, Node, PersistentVolumeClaim, Pod, Secret, Service,
-};
+use zeabur_kube::k8s_openapi::api::apps::v1::ReplicaSet;
+use zeabur_kube::k8s_openapi::api::core::v1::{Namespace, Node, Pod, Secret};
 use zeabur_kube::k8s_openapi::api::events::v1::Event;
-use zeabur_kube::k8s_openapi::api::networking::v1::Ingress;
 use zeabur_kube::k8s_openapi::api::storage::v1::StorageClass;
 use zeabur_kube::k8s_openapi::jiff::{SignedDuration, Timestamp};
 use zeabur_kube::memory::{MemoryCluster, State};
@@ -260,182 +257,8 @@ fn member_roles() -> Vec<DynamicObject> {
         .collect()
 }
 
-/// A Deployment in `shop` with one container, its selector `app=<name>`.
-fn deployment(name: &str, image: &str, replicas: i32, ready: i32, env: &Value) -> Deployment {
-    deployment_in("shop", name, image, replicas, ready, env)
-}
-
-/// A Deployment in `namespace` with one container, its selector `app=<name>`.
-fn deployment_in(
-    namespace: &str,
-    name: &str,
-    image: &str,
-    replicas: i32,
-    ready: i32,
-    env: &Value,
-) -> Deployment {
-    from(json!({
-        "metadata": {"name": name, "namespace": namespace, "generation": 3,
-            "creationTimestamp": created(name),
-            "labels": {"app.kubernetes.io/name": name, "app.kubernetes.io/part-of": namespace}},
-        "spec": {"replicas": replicas, "selector": {"matchLabels": {"app": name}},
-            "template": {"metadata": {"labels": {"app": name}}, "spec": {"containers": [{
-                "name": name, "image": image,
-                "ports": [{"name": "http", "containerPort": 3000}],
-                "env": env,
-                "resources": {"requests": {"cpu": "100m", "memory": "128Mi"}, "limits": {"memory": "256Mi"}},
-                "readinessProbe": {"httpGet": {"path": "/healthz", "port": "http"}}
-            }]}}},
-        "status": {"observedGeneration": 3, "replicas": replicas, "readyReplicas": ready,
-            "updatedReplicas": replicas, "availableReplicas": ready}
-    }))
-}
-
-/// A StatefulSet in `shop` with one data volume, its selector `app=<name>`.
-fn stateful_set(name: &str, image: &str, size: &str, env: &Value) -> StatefulSet {
-    stateful_set_in("shop", name, image, size, env)
-}
-
-/// A StatefulSet in `namespace` with one data volume, its selector `app=<name>`.
-fn stateful_set_in(
-    namespace: &str,
-    name: &str,
-    image: &str,
-    size: &str,
-    env: &Value,
-) -> StatefulSet {
-    from(json!({
-        "metadata": {"name": name, "namespace": namespace, "creationTimestamp": created(name),
-            "labels": {"app.kubernetes.io/name": name, "app.kubernetes.io/component": "database"}},
-        "spec": {"replicas": 1, "serviceName": name, "selector": {"matchLabels": {"app": name}},
-            "template": {"metadata": {"labels": {"app": name}}, "spec": {"containers": [{
-                "name": name, "image": image, "env": env,
-                "resources": {"requests": {"cpu": "250m", "memory": "512Mi"}, "limits": {"memory": "1Gi"}},
-                "volumeMounts": [{"name": "data", "mountPath": "/data"}]
-            }]}},
-            "volumeClaimTemplates": [{"metadata": {"name": "data"},
-                "spec": {"accessModes": ["ReadWriteOnce"], "resources": {"requests": {"storage": size}}}}]},
-        "status": {"replicas": 1, "readyReplicas": 1}
-    }))
-}
-
-/// A Pod of `app` in `shop`; `owner` is set for StatefulSet pods (Deployment pods match by
-/// selector). One that is not ready crash-loops.
-fn pod(name: &str, app: &str, ready: bool, restarts: i32, owner: Option<&str>) -> Pod {
-    let status = if ready {
-        running(app, restarts)
-    } else {
-        crash_looping(app, restarts)
-    };
-    pod_in(
-        "shop",
-        name,
-        app,
-        owner.map(|o| ("StatefulSet", o)),
-        &status,
-    )
-}
-
-/// A Pod of `app` in `namespace` with `status`; `owner` is `(kind, name)` for pods a StatefulSet
-/// or Job owns (Deployment pods match by selector).
-fn pod_in(
-    namespace: &str,
-    name: &str,
-    app: &str,
-    owner: Option<(&str, &str)>,
-    status: &Value,
-) -> Pod {
-    let owners = owner.map_or_else(
-        || json!([]),
-        |(kind, o)| {
-            let api = if kind == "Job" { "batch/v1" } else { "apps/v1" };
-            json!([{"apiVersion": api, "kind": kind, "name": o,
-                "uid": "00000000-0000-0000-0000-000000000000", "controller": true}])
-        },
-    );
-    // A node and an age that differ from pod to pod and stay the same from run to run.
-    let seed = name.bytes().map(i64::from).sum::<i64>();
-    let node = ["vps-1", "vps-3"]
-        .get(usize::try_from(seed % 2).unwrap_or_default())
-        .copied()
-        .unwrap_or("vps-1");
-    from(json!({
-        "metadata": {"name": name, "namespace": namespace, "labels": {"app": app},
-            "ownerReferences": owners, "creationTimestamp": minutes_ago(30 + seed % 4000)},
-        "spec": {"containers": [{"name": app, "image": "example"}], "nodeName": node},
-        "status": status
-    }))
-}
-
-/// A member of a database in `shop`, labelled as its operator labels it, with no workload.
-fn member(name: &str, container: &str, labels: &[(&str, &str)]) -> Pod {
-    let labels: serde_json::Map<String, Value> = labels
-        .iter()
-        .map(|(k, v)| ((*k).to_owned(), Value::from(*v)))
-        .collect();
-    from(json!({
-        "metadata": {"name": name, "namespace": "shop", "labels": labels,
-            "creationTimestamp": minutes_ago(2900)},
-        "spec": {"containers": [{"name": container, "image": "example"}], "nodeName": "vps-1"},
-        "status": running(container, 0)
-    }))
-}
-
-/// A running, ready pod's status.
-fn running(container: &str, restarts: i32) -> Value {
-    json!({"phase": "Running", "containerStatuses": [{"name": container, "ready": true,
-        "restartCount": restarts, "image": "example", "imageID": "", "state": {"running": {}}}]})
-}
-
-/// The status of a pod whose container waits for `reason`.
-fn waiting(container: &str, reason: &str, restarts: i32) -> Value {
-    json!({"phase": "Running", "containerStatuses": [{"name": container, "ready": false,
-        "restartCount": restarts, "image": "example", "imageID": "",
-        "state": {"waiting": {"reason": reason}}}]})
-}
-
-/// The status of a pod whose container waits in `CrashLoopBackOff`, its previous run in
-/// `lastState.terminated` as the kubelet reports it: exit code 2, a Go program's `panic`.
-fn crash_looping(container: &str, restarts: i32) -> Value {
-    json!({"phase": "Running", "containerStatuses": [{"name": container, "ready": false,
-        "restartCount": restarts, "image": "example", "imageID": "",
-        "state": {"waiting": {"reason": "CrashLoopBackOff"}},
-        "lastState": {"terminated": {"exitCode": 2, "reason": "Error",
-            "startedAt": minutes_ago(2), "finishedAt": minutes_ago(1)}}}]})
-}
-
-/// A Service in `shop` selecting `app=<name>`.
-fn service(name: &str, port: i32, port_name: &str) -> Service {
-    service_in("shop", name, port, port_name)
-}
-
-/// A Service in `namespace` selecting `app=<name>`. An `http` port sends to the container port
-/// `http` (3000) the Deployments here declare; the data stores declare none, so the others send
-/// to their own number.
-fn service_in(namespace: &str, name: &str, port: i32, port_name: &str) -> Service {
-    let target = if port_name == "http" {
-        json!("http")
-    } else {
-        json!(port)
-    };
-    from(json!({"metadata": {"name": name, "namespace": namespace},
-        "spec": {"selector": {"app": name},
-            "ports": [{"name": port_name, "port": port, "targetPort": target}]}}))
-}
-
 /// The address Traefik writes into every Ingress's status.
 const ENTRY: &str = "203.0.113.10";
-
-/// An Ingress in `namespace` routing `host` to the Service `backend`, with TLS.
-fn ingress(namespace: &str, host: &str, backend: &str) -> Ingress {
-    from(
-        json!({"metadata": {"name": backend, "namespace": namespace},
-        "spec": {"rules": [{"host": host, "http": {"paths": [{"path": "/", "pathType": "Prefix",
-            "backend": {"service": {"name": backend, "port": {"name": "http"}}}}]}}],
-            "tls": [{"hosts": [host], "secretName": format!("{backend}-tls")}]},
-        "status": {"loadBalancer": {"ingress": [{"ip": ENTRY}]}}}),
-    )
-}
 
 /// A cert-manager Certificate for the Secret `secret`, with `conditions`.
 fn certificate(namespace: &str, secret: &str, host: &str, conditions: &Value) -> DynamicObject {
@@ -521,380 +344,8 @@ fn dns() -> zeabur_api::resolve::Fixed {
     ))
 }
 
-/// The ReplicaSets behind `shop`'s `web`: two earlier releases and the current one, #3, whose pods
-/// are the ones `shop()` lists.
-fn web_releases() -> Vec<ReplicaSet> {
-    [
-        (
-            "6b5f9d7c8",
-            "1",
-            "ghcr.io/example/shop-web:1.3.9",
-            0,
-            12 * 24 * 60,
-        ),
-        (
-            "5d7c8b6f4",
-            "2",
-            "ghcr.io/example/shop-web:1.4.1",
-            0,
-            5 * 24 * 60,
-        ),
-        (
-            "7c9d8",
-            "3",
-            "ghcr.io/example/shop-web:1.4.2",
-            2,
-            2 * 24 * 60,
-        ),
-    ]
-    .into_iter()
-    .map(|(hash, revision, image, replicas, age)| {
-        from(json!({
-            "metadata": {"name": format!("web-{hash}"), "namespace": "shop",
-                "creationTimestamp": minutes_ago(age),
-                "annotations": {"deployment.kubernetes.io/revision": revision},
-                "ownerReferences": [{"apiVersion": "apps/v1", "kind": "Deployment",
-                    "name": "web", "uid": "00000000-0000-0000-0000-000000000003",
-                    "controller": true}]},
-            "spec": {"replicas": replicas, "selector": {"matchLabels": {"app": "web"}},
-                "template": {"metadata": {"labels": {"app": "web"}}, "spec": {"containers": [{
-                    "name": "web", "image": image,
-                    "ports": [{"name": "http", "containerPort": 3000}],
-                    "env": [
-                        {"name": "NODE_ENV", "value": "production"},
-                        {"name": "API_URL", "value": "http://api.shop.svc.cluster.local:8080"},
-                        {"name": "POD_NAME", "valueFrom": {"fieldRef": {"fieldPath": "metadata.name"}}}
-                    ],
-                    "envFrom": [
-                        {"configMapRef": {"name": "web-config"}},
-                        {"configMapRef": {"name": "shared-config"}}
-                    ],
-                    "resources": {"requests": {"cpu": "100m", "memory": "128Mi"},
-                        "limits": {"memory": "256Mi"}},
-                    "readinessProbe": {"httpGet": {"path": "/healthz", "port": "http"}}
-                }]}}},
-            "status": {"replicas": replicas, "readyReplicas": replicas}
-        }))
-    })
-    .collect()
-}
-
-fn shop() -> NamespaceObjects {
-    let secret = |name: &str, key: &str| json!({"secretKeyRef": {"name": name, "key": key}});
-    let web = deployment(
-        "web",
-        "ghcr.io/example/shop-web:1.4.2",
-        2,
-        2,
-        &json!([
-            {"name": "NODE_ENV", "value": "production"},
-            {"name": "API_URL", "value": "http://api.shop.svc.cluster.local:8080"},
-            {"name": "POD_NAME", "valueFrom": {"fieldRef": {"fieldPath": "metadata.name"}}}
-        ]),
-    );
-    let api = deployment(
-        "api",
-        "ghcr.io/example/shop-api:2.11.0",
-        3,
-        3,
-        &json!([
-            {"name": "DATABASE_HOST", "value": "db"},
-            {"name": "DATABASE_PASSWORD", "valueFrom": secret("db-credentials", "password")},
-            {"name": "ORDERS_DATABASE_URL", "valueFrom": secret("orders-app", "uri")},
-            {"name": "REDIS_URL", "value": "redis://redis:6379/0"},
-            {"name": "LOG_LEVEL", "value": "info"}
-        ]),
-    );
-    let worker = deployment(
-        "worker",
-        "ghcr.io/example/shop-worker:2.11.0",
-        2,
-        1,
-        &json!([
-            {"name": "QUEUE_URL", "value": "redis://redis:6379/1"},
-            {"name": "DATABASE_HOST", "value": "db"},
-            {"name": "DATABASE_PASSWORD", "valueFrom": secret("db-credentials", "password")}
-        ]),
-    );
-    let mut api = api;
-    if let Some(status) = api.status.as_mut() {
-        status.conditions = Some(from(json!([
-            {"type": "Available", "status": "True", "reason": "MinimumReplicasAvailable",
-                "message": "Deployment has minimum availability.",
-                "lastTransitionTime": minutes_ago(50)},
-            {"type": "Progressing", "status": "True", "reason": "NewReplicaSetAvailable",
-                "message": "ReplicaSet \"api-5f6b7\" has successfully progressed.",
-                "lastTransitionTime": minutes_ago(52)}
-        ])));
-    }
-    let mut web = web;
-    if let Some(container) = web
-        .spec
-        .as_mut()
-        .and_then(|s| s.template.spec.as_mut())
-        .and_then(|s| s.containers.first_mut())
-    {
-        container.env_from = Some(vec![
-            from(json!({"configMapRef": {"name": "web-config"}})),
-            from(json!({"configMapRef": {"name": "shared-config"}})),
-        ]);
-    }
-    if let Some(container) = api
-        .spec
-        .as_mut()
-        .and_then(|s| s.template.spec.as_mut())
-        .and_then(|s| s.containers.first_mut())
-    {
-        container.env_from = Some(vec![from(
-            json!({"configMapRef": {"name": "shared-config"}}),
-        )]);
-        container.env.get_or_insert_with(Vec::new).push(from(
-            json!({"name": "SENTRY_DSN", "valueFrom": secret("shared-keys", "SENTRY_DSN")}),
-        ));
-    }
-    web.metadata.annotations = Some(BTreeMap::from([
-        (
-            zeabur_model::ConfigReload::AUTO.to_owned(),
-            "true".to_owned(),
-        ),
-        (
-            "deployment.kubernetes.io/revision".to_owned(),
-            "3".to_owned(),
-        ),
-    ]));
-    let mut db = stateful_set(
-        "db",
-        "postgres:18",
-        "20Gi",
-        &json!([
-            {"name": "POSTGRES_PASSWORD", "valueFrom": secret("db-credentials", "password")}
-        ]),
-    );
-    if let Some(spec) = db.spec.as_mut().and_then(|s| s.template.spec.as_mut()) {
-        spec.containers.push(from(json!({
-            "name": "backup-agent",
-            "image": "ghcr.io/example/backup-agent:1.4.0",
-            "env": [
-                {"name": "BACKUP_SCHEDULE", "value": "0 3 * * *"},
-                {"name": "BACKUP_DATABASE_PASSWORD", "valueFrom": secret("db-credentials", "password")}
-            ],
-            "envFrom": [{"secretRef": {"name": "db-credentials"}}]
-        })));
-    }
-    let redis = stateful_set("redis", "redis:8", "2Gi", &json!([]));
-    let nightly: CronJob = from(json!({
-        "metadata": {"name": "nightly-report", "namespace": "shop"},
-        "spec": {"schedule": "0 2 * * *", "jobTemplate": {"spec": {"template": {"spec": {
-            "restartPolicy": "OnFailure",
-            "containers": [{"name": "report", "image": "ghcr.io/example/shop-api:2.11.0",
-                "args": ["report", "--yesterday"],
-                "env": [{"name": "DATABASE_HOST", "value": "db"},
-                        {"name": "DATABASE_PASSWORD", "valueFrom": secret("db-credentials", "password")}]}]}}}}},
-        "status": {"lastScheduleTime": "2026-10-14T02:00:00Z", "lastSuccessfulTime": "2026-10-14T02:03:12Z"}
-    }));
-    NamespaceObjects {
-        namespace: "shop".to_owned(),
-        deployments: vec![
-            web,
-            api,
-            worker,
-            deployment(
-                "error-pages",
-                "docker.io/nginxinc/nginx-unprivileged:1.30.5-alpine-slim",
-                1,
-                1,
-                &json!([]),
-            ),
-        ],
-        stateful_sets: vec![db, redis],
-        cron_jobs: vec![nightly],
-        pods: vec![
-            pod("web-7c9d8-abcde", "web", true, 0, None),
-            pod("error-pages-5d4f7-k2m9x", "error-pages", true, 0, None),
-            pod("web-7c9d8-fghij", "web", true, 2, None),
-            pod("api-5f6b7-k2m4p", "api", true, 0, None),
-            pod("api-5f6b7-q8r1s", "api", true, 0, None),
-            pod("api-5f6b7-x9z3t", "api", true, 1, None),
-            pod("worker-84c2d-h7j6k", "worker", true, 0, None),
-            pod("worker-84c2d-w2e5r", "worker", false, 14, None),
-            pod("db-0", "db", true, 0, Some("db")),
-            pod("redis-0", "redis", true, 0, Some("redis")),
-            member(
-                "orders-1",
-                "postgres",
-                &[
-                    ("cnpg.io/cluster", "orders"),
-                    ("cnpg.io/instanceName", "orders-1"),
-                    ("cnpg.io/instanceRole", "primary"),
-                ],
-            ),
-            member(
-                "sessions-rs0-0",
-                "mongod",
-                &[
-                    ("app.kubernetes.io/instance", "sessions"),
-                    ("app.kubernetes.io/component", "mongod"),
-                ],
-            ),
-            member(
-                "sessions-rs0-1",
-                "mongod",
-                &[
-                    ("app.kubernetes.io/instance", "sessions"),
-                    ("app.kubernetes.io/component", "mongod"),
-                ],
-            ),
-            member(
-                "sessions-rs0-2",
-                "mongod",
-                &[
-                    ("app.kubernetes.io/instance", "sessions"),
-                    ("app.kubernetes.io/component", "mongod"),
-                ],
-            ),
-        ],
-        services: vec![
-            service("web", 80, "http"),
-            service("api", 8080, "http"),
-            service("db", 5432, "postgres"),
-            from(
-                json!({"metadata": {"name": "error-pages", "namespace": "shop",
-                    "labels": {"zeabur.com/page-server": "true"}},
-                "spec": {"selector": {"app": "error-pages"}, "ports": [
-                    {"name": "pages", "port": 8080, "targetPort": "http"},
-                    {"name": "maintenance", "port": 8081, "targetPort": "http"}]}}),
-            ),
-            service("redis", 6379, "redis"),
-            from(
-                json!({"metadata": {"name": "redis-public-6379", "namespace": "shop",
-                    "labels": {"app.kubernetes.io/name": "redis"}},
-                "spec": {"type": "LoadBalancer", "selector": {"app": "redis"},
-                    "ports": [{"name": "redis", "port": 6379, "targetPort": 6379,
-                        "protocol": "TCP", "nodePort": 31379}]},
-                "status": {"loadBalancer": {"ingress": [{"ip": ENTRY}]}}}),
-            ),
-        ],
-        config_maps: vec![
-            from::<ConfigMap>(
-                json!({"metadata": {"name": "error-pages", "namespace": "shop",
-                    "labels": {"zeabur.com/page-server": "true"}},
-                "data": {
-                    "502.html": "<!doctype html><title>Shop</title><h1>Shop is not responding</h1>",
-                    "503.html": "<!doctype html><title>Shop</title><h1>Shop is not available right now</h1>",
-                    "504.html": "<!doctype html><title>Shop</title><h1>Shop took too long to respond</h1>",
-                    "maintenance.html": "<!doctype html><title>Shop</title><h1>Shop is under maintenance</h1><p>We will be back soon.</p>"}}),
-            ),
-            from::<ConfigMap>(
-                json!({"metadata": {"name": "web-config", "namespace": "shop"},
-                "data": {"LOG_LEVEL": "info", "FEATURE_CHECKOUT_V2": "true"}}),
-            ),
-            from::<ConfigMap>(
-                json!({"metadata": {"name": "shared-config", "namespace": "shop",
-                    "labels": {"zeabur.com/shared-variables": "true"}},
-                "data": {"APP_URL": "https://shop.example.com", "TZ": "Asia/Taipei"}}),
-            ),
-        ],
-        secrets: vec![
-            SecretSummary {
-                secret: Secret {
-                    metadata: from(json!({"name": "db-credentials", "namespace": "shop"})),
-                    type_: Some("Opaque".to_owned()),
-                    ..Secret::default()
-                },
-                key_count: 2,
-            },
-            // What the ExternalSecret `db` syncs from OpenBao.
-            SecretSummary {
-                secret: Secret {
-                    metadata: from(json!({"name": "db", "namespace": "shop",
-                        "labels": {"reconcile.external-secrets.io/managed": "true"},
-                        "ownerReferences": [{"apiVersion": "external-secrets.io/v1",
-                            "kind": "ExternalSecret", "name": "db",
-                            "uid": "6d2f1c58-3a7e-4b0d-9c41-8e5a7b2f0d11", "controller": true}]})),
-                    type_: Some("Opaque".to_owned()),
-                    ..Secret::default()
-                },
-                key_count: 1,
-            },
-            SecretSummary {
-                secret: Secret {
-                    metadata: from(json!({"name": "shared-keys", "namespace": "shop",
-                        "labels": {"zeabur.com/shared-variables": "true"}})),
-                    type_: Some("Opaque".to_owned()),
-                    ..Secret::default()
-                },
-                key_count: 2,
-            },
-        ],
-        persistent_volume_claims: vec![
-            from::<PersistentVolumeClaim>(
-                json!({"metadata": {"name": "data-db-0", "namespace": "shop"},
-                "spec": {"accessModes": ["ReadWriteOnce"], "resources": {"requests": {"storage": "20Gi"}}},
-                "status": {"phase": "Bound", "capacity": {"storage": "20Gi"}}}),
-            ),
-            from::<PersistentVolumeClaim>(
-                json!({"metadata": {"name": "data-redis-0", "namespace": "shop",
-                    "labels": {"zeabur.com/backup-volume": "data-redis-0"},
-                    "annotations": {"k8up.io/backup": "true"}},
-                "spec": {"accessModes": ["ReadWriteOnce"], "resources": {"requests": {"storage": "2Gi"}}},
-                "status": {"phase": "Bound", "capacity": {"storage": "2Gi"}}}),
-            ),
-            from::<PersistentVolumeClaim>(
-                json!({"metadata": {"name": "old-uploads", "namespace": "shop"},
-                "spec": {"accessModes": ["ReadWriteOnce"], "resources": {"requests": {"storage": "5Gi"}}},
-                "status": {"phase": "Bound", "capacity": {"storage": "5Gi"}}}),
-            ),
-        ],
-        ingresses: vec![
-            // www redirects to the apex, and both show the error pages, through Traefik
-            // middlewares.
-            from::<Ingress>(json!({"metadata": {"name": "web", "namespace": "shop",
-                    "uid": "0e9b1c44-6a43-4c55-9d0b-7f3f2a1d0001",
-                    "annotations": {"traefik.ingress.kubernetes.io/router.middlewares":
-                        "shop-web-redirect-www-shop-example-com@kubernetescrd,shop-web-error-pages@kubernetescrd",
-                        "cert-manager.io/cluster-issuer": "letsencrypt"}},
-                "spec": {"rules": [{"host": "shop.example.com", "http": {"paths": [{"path": "/", "pathType": "Prefix",
-                    "backend": {"service": {"name": "web", "port": {"name": "http"}}}}]}},
-                    {"host": "www.shop.example.com", "http": {"paths": [{"path": "/", "pathType": "Prefix",
-                    "backend": {"service": {"name": "web", "port": {"name": "http"}}}}]}}],
-                    "tls": [{"hosts": ["shop.example.com", "www.shop.example.com"], "secretName": "shop-tls"}]},
-                "status": {"loadBalancer": {"ingress": [{"ip": ENTRY}]}}})),
-            // The API shows the maintenance page, through an Ingress of its own that outranks it.
-            from::<Ingress>(json!({"metadata": {"name": "api", "namespace": "shop",
-                    "uid": "0e9b1c44-6a43-4c55-9d0b-7f3f2a1d0002",
-                    "annotations": {"cert-manager.io/cluster-issuer": "letsencrypt"}},
-                "spec": {"rules": [{"host": "api.shop.example.com", "http": {"paths": [{"path": "/", "pathType": "Prefix",
-                    "backend": {"service": {"name": "api", "port": {"name": "http"}}}}]}}],
-                    "tls": [{"hosts": ["api.shop.example.com"], "secretName": "api-tls"}]},
-                "status": {"loadBalancer": {"ingress": [{"ip": ENTRY}]}}})),
-            from::<Ingress>(
-                json!({"metadata": {"name": "api-api-shop-example-com-maintenance", "namespace": "shop",
-                    "ownerReferences": [{"apiVersion": "networking.k8s.io/v1", "kind": "Ingress",
-                        "name": "api", "uid": "0e9b1c44-6a43-4c55-9d0b-7f3f2a1d0002"}],
-                    "annotations": {"traefik.ingress.kubernetes.io/router.priority": "48"}},
-                "spec": {"rules": [{"host": "api.shop.example.com", "http": {"paths": [{"path": "/", "pathType": "Prefix",
-                    "backend": {"service": {"name": "error-pages", "port": {"name": "maintenance"}}}}]}}],
-                    "tls": [{"hosts": ["api.shop.example.com"], "secretName": "api-tls"}]},
-                "status": {"loadBalancer": {"ingress": [{"ip": ENTRY}]}}}),
-            ),
-        ],
-        // A Gateway API route: redirects and maintenance work, a password and error pages don't.
-        http_routes: vec![json!({
-            "apiVersion": "gateway.networking.k8s.io/v1", "kind": "HTTPRoute",
-            "metadata": {"name": "web-status", "namespace": "shop", "resourceVersion": "2"},
-            "spec": {"parentRefs": [{"name": "public", "namespace": "gateway"}],
-                "hostnames": ["status.shop.example.com"],
-                "rules": [{"backendRefs": [{"name": "web", "port": 80}]}]}
-        })],
-        ..NamespaceObjects::default()
-    }
-}
-
-/// A blog whose new image cannot be pulled, and its database.
 /// Blog's docs, deployed from Git: its first image is still being built
 /// (`ZEABUR_DEMO_BUILD_FAILED=1`: the build failed).
-const DOCS_IMAGE: &str = "zot.zot.svc:5000/blog/docs:a41c9e7";
-
 fn docs_build() -> [DynamicObject; 2] {
     let failed = std::env::var_os("ZEABUR_DEMO_BUILD_FAILED").is_some();
     let build = json!({
@@ -934,661 +385,143 @@ fn docs_build() -> [DynamicObject; 2] {
     ]
 }
 
-fn blog() -> NamespaceObjects {
-    let ns = "blog";
-    NamespaceObjects {
-        namespace: ns.to_owned(),
-        deployments: vec![
-            deployment_in(ns, "web", "ghcr.io/example/blog:2.4.1", 1, 0, &json!([])),
-            deployment_in(ns, "docs", DOCS_IMAGE, 1, 0, &json!([])),
-        ],
-        stateful_sets: vec![stateful_set_in(ns, "db", "postgres:18", "10Gi", &json!([]))],
-        pods: vec![
-            pod_in(
-                ns,
-                "web-6d5f9c7b8-p4k2z",
-                "web",
-                None,
-                &waiting("web", "ImagePullBackOff", 0),
-            ),
-            pod_in(
-                ns,
-                "db-0",
-                "db",
-                Some(("StatefulSet", "db")),
-                &running("db", 0),
-            ),
-            pod_in(
-                ns,
-                "docs-5b7c9d8f6-m2x4q",
-                "docs",
-                None,
-                &waiting("docs", "ImagePullBackOff", 0),
-            ),
-        ],
-        services: vec![
-            service_in(ns, "web", 80, "http"),
-            service_in(ns, "docs", 3000, "http"),
-            service_in(ns, "db", 5432, "postgres"),
-        ],
-        ingresses: vec![ingress(ns, "blog.example.com", "web")],
-        secrets: vec![SecretSummary {
-            secret: Secret {
-                metadata: from(json!({"name": "docs-build-env", "namespace": ns})),
-                type_: Some("Opaque".to_owned()),
-                ..Secret::default()
-            },
-            key_count: 1,
-        }],
-        ..NamespaceObjects::default()
-    }
+/// One namespace's hand-written objects in `demo-data/<namespace>.yaml`: a manifest each, split
+/// by `---`. A string `now`, `now-2d4h` or `now+30m` (units `d`, `h`, `m`, `s`) is a time
+/// relative to the demo clock. A Secret lists its keys under `data` with empty values; only the
+/// count is read.
+const DEMO_DATA: [(&str, &str); 11] = [
+    ("analytics", include_str!("demo-data/analytics.yaml")),
+    ("billing", include_str!("demo-data/billing.yaml")),
+    ("blog", include_str!("demo-data/blog.yaml")),
+    ("cert-manager", include_str!("demo-data/cert-manager.yaml")),
+    ("edge", include_str!("demo-data/edge.yaml")),
+    (
+        "internal-tools",
+        include_str!("demo-data/internal-tools.yaml"),
+    ),
+    ("kube-system", include_str!("demo-data/kube-system.yaml")),
+    ("lab", include_str!("demo-data/lab.yaml")),
+    ("payments", include_str!("demo-data/payments.yaml")),
+    ("shop", include_str!("demo-data/shop.yaml")),
+    ("", include_str!("demo-data/cluster.yaml")),
+];
+
+struct DemoData {
+    objects: Vec<NamespaceObjects>,
+    events: BTreeMap<String, Vec<Event>>,
+    replica_sets: BTreeMap<String, Vec<ReplicaSet>>,
+    nodes: Vec<Node>,
 }
 
-/// A lab like the one people try Zeabur with first: four services, one crash-looping and one
-/// waiting for a volume that does not exist, and a database of each engine with the pods,
-/// StatefulSet and volumes their operators make.
-fn lab() -> NamespaceObjects {
-    let ns = "lab";
-    let secret = |name: &str, key: &str| json!({"secretKeyRef": {"name": name, "key": key}});
-    let mut editor = deployment_in(
-        ns,
-        "editor",
-        "ghcr.io/example/editor:0.9.0",
-        1,
-        0,
-        &json!([{"name": "MONGOPASSWORD", "valueFrom": secret("mongo-custom-user-secret", "app")}]),
-    );
-    if let Some(spec) = editor.spec.as_mut().and_then(|s| s.template.spec.as_mut()) {
-        spec.volumes = Some(from(json!([{"name": "data",
-            "persistentVolumeClaim": {"claimName": "editor-data"}}])));
-        if let Some(container) = spec.containers.first_mut() {
-            container.volume_mounts = Some(from(json!([{"name": "data", "mountPath": "/data"}])));
-        }
+impl DemoData {
+    fn load() -> Self {
+        Self::parse(&DEMO_DATA, clock())
     }
-    let operated = |api: &str, kind: &str, name: &str| {
-        json!([{"apiVersion": api, "kind": kind, "name": name,
-            "uid": "00000000-0000-0000-0000-000000000001", "controller": true}])
-    };
-    let mongo: StatefulSet = from(json!({
-        "metadata": {"name": "mongo-rs0", "namespace": ns,
-            "creationTimestamp": created("mongo"),
-            "labels": {"app.kubernetes.io/name": "percona-server-mongodb",
-                "app.kubernetes.io/instance": "mongo",
-                "app.kubernetes.io/replset": "rs0", "app.kubernetes.io/component": "mongod"},
-            "ownerReferences": operated("psmdb.percona.com/v1", "PerconaServerMongoDB", "mongo")},
-        "spec": {"replicas": 1, "serviceName": "mongo-rs0",
-            "selector": {"matchLabels": {"app": "mongo-rs0"}},
-            "template": {"metadata": {"labels": {"app": "mongo-rs0"}}, "spec": {"containers": [{
-                "name": "mongod", "image": "percona/percona-server-mongodb:7.0.43-23",
-                "volumeMounts": [{"name": "mongod-data", "mountPath": "/data/db"}]
-            }]}},
-            "volumeClaimTemplates": [{"metadata": {"name": "mongod-data"},
-                "spec": {"accessModes": ["ReadWriteOnce"], "resources": {"requests": {"storage": "10Gi"}}}}]},
-        "status": {"replicas": 1, "readyReplicas": 1}
-    }));
-    let pending = json!({"phase": "Pending", "conditions": [{"type": "PodScheduled",
-        "status": "False", "reason": "Unschedulable", "lastTransitionTime": minutes_ago(118),
-        "message": "0/1 nodes are available: persistentvolumeclaim \"editor-data\" not found. not found"}]});
-    let claim = |name: &str, size: &str, owner: Value| {
-        from::<PersistentVolumeClaim>(json!({"metadata": {"name": name, "namespace": ns,
-                "ownerReferences": owner},
-            "spec": {"accessModes": ["ReadWriteOnce"], "resources": {"requests": {"storage": size}}},
-            "status": {"phase": "Bound", "capacity": {"storage": size}}}))
-    };
-    let member = |name: &str, labels: Value, owner: Value, container: &str| -> Pod {
-        from(json!({
-            "metadata": {"name": name, "namespace": ns, "labels": labels,
-                "ownerReferences": owner, "creationTimestamp": minutes_ago(600)},
-            "spec": {"containers": [{"name": container, "image": "example"}]},
-            "status": running(container, 0)
-        }))
-    };
-    NamespaceObjects {
-        namespace: ns.to_owned(),
-        deployments: vec![
-            deployment_in(
-                ns,
-                "talker",
-                "ghcr.io/example/talker:1.2.0",
-                1,
-                1,
-                &json!([{"name": "DATABASE_URL", "valueFrom": secret("pg-app", "uri")}]),
-            ),
-            deployment_in(
-                ns,
-                "crasher",
-                "ghcr.io/example/crasher:0.1.0",
-                1,
-                0,
-                &json!([]),
-            ),
-            editor,
-            deployment_in(ns, "hello", "nginx:1.29", 1, 1, &json!([])),
-            deployment_in(
-                ns,
-                "storefront",
-                "ghcr.io/example/storefront:1.0.0",
-                1,
-                1,
-                &json!([
-                    {"name": "MYSQLPASSWORD", "valueFrom": secret("mysql-app", "password")},
-                    {"name": "DATABASE_URL",
-                        "value": "mysql://app:$(MYSQLPASSWORD)@moco-mysql-primary.lab.svc:3306/app"}
-                ]),
-            ),
-        ],
-        stateful_sets: vec![mongo],
-        pods: vec![
-            pod_in(
-                ns,
-                "talker-7d9c6b5f4-k8m2p",
-                "talker",
-                None,
-                &running("talker", 0),
-            ),
-            pod_in(
-                ns,
-                "crasher-6949b848bd-mv6fd",
-                "crasher",
-                None,
-                &crash_looping("crasher", 541),
-            ),
-            from(json!({
-                "metadata": {"name": "editor-5c8d9f7b6-q2w3e", "namespace": ns,
-                    "labels": {"app": "editor"}, "creationTimestamp": minutes_ago(118)},
-                "spec": {"containers": [{"name": "editor", "image": "ghcr.io/example/editor:0.9.0"}]},
-                "status": pending
-            })),
-            pod_in(
-                ns,
-                "hello-5f7b8c9d6-x4z7c",
-                "hello",
-                None,
-                &running("hello", 0),
-            ),
-            pod_in(
-                ns,
-                "mongo-rs0-0",
-                "mongo-rs0",
-                Some(("StatefulSet", "mongo-rs0")),
-                &running("mongod", 0),
-            ),
-            pod_in(
-                ns,
-                "storefront-6d8f7c9b5-r4t6y",
-                "storefront",
-                None,
-                &running("storefront", 0),
-            ),
-            member(
-                "moco-mysql-0",
-                json!({"app.kubernetes.io/name": "mysql", "app.kubernetes.io/instance": "mysql"}),
-                operated("moco.cybozu.com/v1beta2", "MySQLCluster", "mysql"),
-                "mysqld",
-            ),
-            member(
-                "moco-mysql-restored-1022-0",
-                json!({"app.kubernetes.io/name": "mysql",
-                    "app.kubernetes.io/instance": "mysql-restored-1022"}),
-                operated(
-                    "moco.cybozu.com/v1beta2",
-                    "MySQLCluster",
-                    "mysql-restored-1022",
-                ),
-                "mysqld",
-            ),
-            member(
-                "mariadb-0",
-                json!({"app.kubernetes.io/name": "mariadb", "app.kubernetes.io/instance": "mariadb"}),
-                operated("k8s.mariadb.com/v1alpha1", "MariaDB", "mariadb"),
-                "mariadb",
-            ),
-            member(
-                "dragonfly-0",
-                json!({"app.kubernetes.io/name": "dragonfly",
-                    "app.kubernetes.io/instance": "dragonfly", "role": "master"}),
-                operated("dragonflydb.io/v1alpha1", "Dragonfly", "dragonfly"),
-                "dragonfly",
-            ),
-            member(
-                "files-s3-7d9f6c5b8-x2k4p",
-                json!({"app.kubernetes.io/name": "seaweedfs",
-                    "app.kubernetes.io/instance": "files", "app.kubernetes.io/component": "s3"}),
-                operated("seaweed.seaweedfs.com/v1", "Seaweed", "files"),
-                "s3",
-            ),
-            from(json!({
-                "metadata": {"name": "pg-1", "namespace": ns,
-                    "labels": {"cnpg.io/cluster": "pg", "cnpg.io/instanceRole": "primary"},
-                    "ownerReferences": operated("postgresql.cnpg.io/v1", "Cluster", "pg"),
-                    "creationTimestamp": created("pg")},
-                "spec": {"containers": [{"name": "postgres",
-                    "image": "ghcr.io/cloudnative-pg/postgresql:17-standard-trixie"}]},
-                "status": running("postgres", 0)
-            })),
-        ],
-        services: vec![
-            service_in(ns, "talker", 80, "http"),
-            service_in(ns, "hello", 80, "http"),
-        ],
-        secrets: [
-            "pg-app",
-            "mongo-custom-user-secret",
-            "moco-mysql",
-            "moco-mysql-restored-1022",
-            "mysql-app",
-            "mariadb-app",
-            "dragonfly-auth",
-            "files-app",
-        ]
-        .into_iter()
-        .map(|name| SecretSummary {
-            secret: Secret {
-                metadata: from(json!({"name": name, "namespace": ns})),
-                type_: Some("Opaque".to_owned()),
-                ..Secret::default()
-            },
-            key_count: 3,
-        })
-        .collect(),
-        persistent_volume_claims: vec![
-            claim("mongod-data-mongo-rs0-0", "10Gi", json!([])),
-            claim(
-                "pg-1",
-                "5Gi",
-                operated("postgresql.cnpg.io/v1", "Cluster", "pg"),
-            ),
-        ],
-        ingresses: vec![ingress(ns, "hello.example.com", "hello")],
-        ..NamespaceObjects::default()
-    }
-}
 
-/// Billing: an API, a database and a nightly CronJob whose last run failed.
-fn billing() -> NamespaceObjects {
-    let ns = "billing";
-    let run = "invoice-run-29342880";
-    let cron_job: CronJob = from(json!({
-        "metadata": {"name": "invoice-run", "namespace": ns,
-            "uid": "00000000-0000-0000-0000-000000000000",
-            "labels": {"zeabur.com/task-of": "api"}},
-        "spec": {"schedule": "0 2 * * *", "jobTemplate": {"spec": {"template": {"spec": {
-            "restartPolicy": "Never",
-            "containers": [{"name": "invoice-run", "image": "ghcr.io/example/billing:3.2.0",
-                "args": ["invoices", "--run"]}]}}}}},
-        "status": {"lastScheduleTime": "2026-10-14T02:00:00Z"}
-    }));
-    let job: Job = from(json!({
-        "metadata": {"name": run, "namespace": ns, "creationTimestamp": "2026-10-14T02:00:00Z",
-            "ownerReferences": [{"apiVersion": "batch/v1",
-            "kind": "CronJob", "name": "invoice-run",
-            "uid": "00000000-0000-0000-0000-000000000000", "controller": true}]},
-        "spec": {"backoffLimit": 0, "template": {"spec": {"restartPolicy": "Never",
-            "containers": [{"name": "invoice-run", "image": "ghcr.io/example/billing:3.2.0"}]}}},
-        "status": {"failed": 1, "startTime": "2026-10-14T02:00:00Z",
-            "conditions": [{"type": "Failed", "status": "True",
-            "reason": "BackoffLimitExceeded", "message": "Job has reached the specified backoff limit"}]}
-    }));
-    // A run started by hand the day before, which succeeded.
-    let manual: Job = from(json!({
-        "metadata": {"name": "invoice-run-manual-1013091500", "namespace": ns,
-            "creationTimestamp": "2026-10-13T09:15:00Z",
-            "annotations": {"cronjob.kubernetes.io/instantiate": "manual"},
-            "ownerReferences": [{"apiVersion": "batch/v1",
-            "kind": "CronJob", "name": "invoice-run",
-            "uid": "00000000-0000-0000-0000-000000000000", "controller": true}]},
-        "spec": {"backoffLimit": 0, "template": {"spec": {"restartPolicy": "Never",
-            "containers": [{"name": "invoice-run", "image": "ghcr.io/example/billing:3.2.0"}]}}},
-        "status": {"succeeded": 1, "startTime": "2026-10-13T09:15:00Z",
-            "completionTime": "2026-10-13T09:16:12Z",
-            "conditions": [{"type": "Complete", "status": "True"}]}
-    }));
-    let failed = json!({"phase": "Failed", "containerStatuses": [{"name": "invoice-run",
-        "ready": false, "restartCount": 0, "image": "example", "imageID": "",
-        "state": {"terminated": {"exitCode": 1, "reason": "Error"}}}]});
-    NamespaceObjects {
-        namespace: ns.to_owned(),
-        deployments: vec![deployment_in(
-            ns,
-            "api",
-            "ghcr.io/example/billing:3.2.0",
-            2,
-            2,
-            &json!([]),
-        )],
-        stateful_sets: vec![stateful_set_in(ns, "db", "postgres:18", "20Gi", &json!([]))],
-        cron_jobs: vec![cron_job],
-        jobs: vec![job, manual],
-        pods: vec![
-            pod_in(ns, "api-5b7d9-c3v8n", "api", None, &running("api", 0)),
-            pod_in(ns, "api-5b7d9-m1x4q", "api", None, &running("api", 0)),
-            pod_in(
-                ns,
-                "db-0",
-                "db",
-                Some(("StatefulSet", "db")),
-                &running("db", 0),
-            ),
-            pod_in(
-                ns,
-                &format!("{run}-7xk2p"),
-                "invoice-run",
-                Some(("Job", run)),
-                &failed,
-            ),
-        ],
-        services: vec![
-            service_in(ns, "api", 8080, "http"),
-            service_in(ns, "db", 5432, "postgres"),
-        ],
-        ingresses: vec![ingress(ns, "billing.example.com", "api")],
-        ..NamespaceObjects::default()
-    }
-}
-
-/// Payments, with a rollout of its API under way.
-fn payments() -> NamespaceObjects {
-    let ns = "payments";
-    let mut api = deployment_in(
-        ns,
-        "api",
-        "ghcr.io/example/payments:5.0.1",
-        3,
-        2,
-        &json!([]),
-    );
-    api.metadata.generation = Some(4);
-    api.status = Some(from(
-        json!({"observedGeneration": 4, "replicas": 3, "readyReplicas": 2,
-        "updatedReplicas": 2, "availableReplicas": 2,
-        "conditions": [{"type": "Progressing", "status": "True", "reason": "ReplicaSetUpdated"}]}),
-    ));
-    NamespaceObjects {
-        namespace: ns.to_owned(),
-        deployments: vec![
-            api,
-            deployment_in(
-                ns,
-                "webhooks",
-                "ghcr.io/example/payments:5.0.0",
-                2,
-                2,
-                &json!([]),
-            ),
-        ],
-        stateful_sets: vec![stateful_set_in(ns, "db", "postgres:18", "20Gi", &json!([]))],
-        pods: vec![
-            pod_in(ns, "api-6f5d4-a8b2c", "api", None, &running("api", 0)),
-            pod_in(ns, "api-6f5d4-d4e6f", "api", None, &running("api", 0)),
-            pod_in(
-                ns,
-                "api-6f5d4-g7h9j",
-                "api",
-                None,
-                &waiting("api", "ContainerCreating", 0),
-            ),
-            pod_in(
-                ns,
-                "webhooks-8c2e1-k5l7m",
-                "webhooks",
-                None,
-                &running("webhooks", 0),
-            ),
-            pod_in(
-                ns,
-                "webhooks-8c2e1-n3p6q",
-                "webhooks",
-                None,
-                &running("webhooks", 0),
-            ),
-            pod_in(
-                ns,
-                "db-0",
-                "db",
-                Some(("StatefulSet", "db")),
-                &running("db", 0),
-            ),
-        ],
-        services: vec![
-            service_in(ns, "api", 8080, "http"),
-            service_in(ns, "webhooks", 8080, "http"),
-            service_in(ns, "db", 5432, "postgres"),
-        ],
-        ingresses: vec![ingress(ns, "pay.example.com", "api")],
-        ..NamespaceObjects::default()
-    }
-}
-
-/// A large, healthy project: 42 small services, two stores and a dashboard behind a domain.
-fn analytics() -> NamespaceObjects {
-    let ns = "analytics";
-    let names = [
-        "dashboard",
-        "collector",
-        "ingest",
-        "enricher",
-        "sessionizer",
-        "geoip",
-        "useragent",
-        "dedupe",
-        "sampler",
-        "aggregator",
-        "rollup-hourly",
-        "rollup-daily",
-        "exporter",
-        "alerts",
-        "notifier",
-        "scheduler",
-        "query",
-        "query-cache",
-        "funnel",
-        "retention",
-        "cohorts",
-        "paths",
-        "heatmaps",
-        "replay",
-        "uploader",
-        "compactor",
-        "archiver",
-        "janitor",
-        "metrics",
-        "tracer",
-        "profiler",
-        "segmenter",
-        "attribution",
-        "experiments",
-        "flags",
-        "billing-sync",
-        "warehouse-sync",
-        "backfill",
-        "reindexer",
-        "snapshotter",
-        "audit",
-        "webhooks",
-    ];
-    let mut deployments = Vec::new();
-    let mut pods = Vec::new();
-    for (i, name) in names.iter().enumerate() {
-        let replicas = match i % 5 {
-            0 => 2,
-            3 => 3,
-            _ => 1,
+    fn parse(files: &[(&str, &str)], now: Timestamp) -> Self {
+        let mut data = Self {
+            objects: Vec::new(),
+            events: BTreeMap::new(),
+            replica_sets: BTreeMap::new(),
+            nodes: Vec::new(),
         };
-        deployments.push(deployment_in(
-            ns,
-            name,
-            &format!("ghcr.io/example/analytics-{name}:1.8.0"),
-            replicas,
-            replicas,
-            &json!([]),
-        ));
-        for r in 0..replicas {
-            pods.push(pod_in(
-                ns,
-                &format!("{name}-7d4c9-{i:02}{r}x"),
-                name,
-                None,
-                &running(name, 0),
-            ));
+        for (namespace, source) in files {
+            let mut objects = NamespaceObjects {
+                namespace: (*namespace).to_owned(),
+                ..NamespaceObjects::default()
+            };
+            for mut manifest in
+                serde_saphyr::from_multiple::<Value>(source).expect("valid demo-data YAML")
+            {
+                resolve_times(&mut manifest, now);
+                let kind = manifest
+                    .get("kind")
+                    .and_then(Value::as_str)
+                    .unwrap_or_default()
+                    .to_owned();
+                match kind.as_str() {
+                    "Deployment" => objects.deployments.push(from(manifest)),
+                    "StatefulSet" => objects.stateful_sets.push(from(manifest)),
+                    "DaemonSet" => objects.daemon_sets.push(from(manifest)),
+                    "Job" => objects.jobs.push(from(manifest)),
+                    "CronJob" => objects.cron_jobs.push(from(manifest)),
+                    "Pod" => objects.pods.push(from(manifest)),
+                    "Service" => objects.services.push(from(manifest)),
+                    "ConfigMap" => objects.config_maps.push(from(manifest)),
+                    "PersistentVolumeClaim" => {
+                        objects.persistent_volume_claims.push(from(manifest));
+                    }
+                    "Ingress" => objects.ingresses.push(from(manifest)),
+                    "HTTPRoute" => objects.http_routes.push(manifest),
+                    "Secret" => {
+                        let mut secret: Secret = from(manifest);
+                        let key_count = secret.data.take().map_or(0, |data| data.len());
+                        objects.secrets.push(SecretSummary { secret, key_count });
+                    }
+                    "ReplicaSet" => data
+                        .replica_sets
+                        .entry((*namespace).to_owned())
+                        .or_default()
+                        .push(from(manifest)),
+                    "Event" => data
+                        .events
+                        .entry((*namespace).to_owned())
+                        .or_default()
+                        .push(from(manifest)),
+                    "Node" => data.nodes.push(from(manifest)),
+                    other => unreachable!("demo-data/{namespace}.yaml: unknown kind {other}"),
+                }
+            }
+            if !namespace.is_empty() {
+                data.objects.push(objects);
+            }
         }
-    }
-    let stores = [
-        ("clickhouse", "clickhouse/clickhouse-server:25.8"),
-        ("redis", "redis:8"),
-        ("db", "postgres:18"),
-    ];
-    let mut stateful_sets = Vec::new();
-    for (name, image) in stores {
-        stateful_sets.push(stateful_set_in(ns, name, image, "50Gi", &json!([])));
-        pods.push(pod_in(
-            ns,
-            &format!("{name}-0"),
-            name,
-            Some(("StatefulSet", name)),
-            &running(name, 0),
-        ));
-    }
-    NamespaceObjects {
-        namespace: ns.to_owned(),
-        deployments,
-        stateful_sets,
-        pods,
-        services: vec![service_in(ns, "dashboard", 80, "http")],
-        ingresses: vec![ingress(ns, "stats.example.com", "dashboard")],
-        ..NamespaceObjects::default()
+        data
     }
 }
 
-/// Internal tools without a public domain.
-fn internal_tools() -> NamespaceObjects {
-    let ns = "internal-tools";
-    let tools = [
-        ("wiki", "ghcr.io/example/wiki:2.5.0"),
-        ("chat", "ghcr.io/example/chat:7.1.0"),
-        ("grafana", "grafana/grafana:12.2.0"),
-    ];
-    NamespaceObjects {
-        namespace: ns.to_owned(),
-        deployments: tools
-            .iter()
-            .map(|(name, image)| deployment_in(ns, name, image, 1, 1, &json!([])))
-            .collect(),
-        pods: tools
-            .iter()
-            .map(|(name, _)| {
-                pod_in(
-                    ns,
-                    &format!("{name}-5c6d7-r2s4t"),
-                    name,
-                    None,
-                    &running(name, 0),
-                )
-            })
-            .chain([pod_in(
-                ns,
-                "cadvisor-k7m2p",
-                "cadvisor",
-                Some(("DaemonSet", "cadvisor")),
-                &running("cadvisor", 1),
-            )])
-            .collect(),
-        services: tools
-            .iter()
-            .map(|(name, _)| service_in(ns, name, 80, "http"))
-            .collect(),
-        daemon_sets: vec![cadvisor(ns)],
-        ..NamespaceObjects::default()
+/// The time `text` names, if it is `now` with an optional signed offset.
+fn relative_time(text: &str, now: Timestamp) -> Option<String> {
+    let rest = text.strip_prefix("now")?;
+    if rest.is_empty() {
+        return Some(now.to_string());
     }
-}
-
-/// A chart's release: two Deployments Helm manages. The gateway's update is stuck past its
-/// deadline while the replica of the release before it still serves; the new one waits for its
-/// volume.
-fn edge() -> NamespaceObjects {
-    let ns = "edge";
-    let helm = |mut deployment: Deployment| {
-        let labels = deployment
-            .metadata
-            .labels
-            .get_or_insert_with(Default::default);
-        labels.insert("app.kubernetes.io/managed-by".to_owned(), "Helm".to_owned());
-        labels.insert("helm.sh/chart".to_owned(), "gateway-1.4.0".to_owned());
-        deployment
+    let (sign, mut rest) = match rest.strip_prefix('-') {
+        Some(rest) => (-1, rest),
+        None => (1, rest.strip_prefix('+')?),
     };
-    let mut gateway = helm(deployment_in(
-        ns,
-        "demo-gateway",
-        "nginx:1.27-alpine",
-        1,
-        1,
-        &json!([]),
-    ));
-    gateway.metadata.generation = Some(2);
-    gateway.status = Some(from(json!({"observedGeneration": 2, "replicas": 2,
-        "readyReplicas": 1, "updatedReplicas": 1, "availableReplicas": 1,
-        "unavailableReplicas": 1,
-        "conditions": [{"type": "Progressing", "status": "False",
-            "reason": "ProgressDeadlineExceeded",
-            "message": "ReplicaSet \"demo-gateway-7c9f8\" has timed out progressing."}]})));
-    let pending = json!({"phase": "Pending", "containerStatuses": [{"name": "demo-gateway",
-        "ready": false, "restartCount": 0, "image": "nginx:1.27-alpine", "imageID": "",
-        "state": {"waiting": {"reason": "ContainerCreating"}}}]});
-    NamespaceObjects {
-        namespace: ns.to_owned(),
-        deployments: vec![
-            gateway,
-            helm(deployment_in(
-                ns,
-                "demo-worker",
-                "ghcr.io/example/gateway-worker:1.4.0",
-                1,
-                1,
-                &json!([]),
-            )),
-        ],
-        pods: vec![
-            pod_in(
-                ns,
-                "demo-gateway-5b6d4-q8w2e",
-                "demo-gateway",
-                None,
-                &running("demo-gateway", 0),
-            ),
-            pod_in(
-                ns,
-                "demo-gateway-7c9f8-z3x5c",
-                "demo-gateway",
-                None,
-                &pending,
-            ),
-            pod_in(
-                ns,
-                "demo-worker-6a1b2-m4n6b",
-                "demo-worker",
-                None,
-                &running("demo-worker", 0),
-            ),
-        ],
-        services: vec![service_in(ns, "demo-gateway", 80, "http")],
-        ..NamespaceObjects::default()
+    let mut seconds = 0_i64;
+    while !rest.is_empty() {
+        let (count, tail) = rest.split_at(rest.find(|c: char| !c.is_ascii_digit())?);
+        let mut chars = tail.chars();
+        let unit = match chars.next()? {
+            'd' => 86_400,
+            'h' => 3_600,
+            'm' => 60,
+            's' => 1,
+            _ => return None,
+        };
+        seconds += count.parse::<i64>().ok()? * unit;
+        rest = chars.as_str();
     }
+    now.checked_add(SignedDuration::from_secs(sign * seconds))
+        .ok()
+        .map(|time| time.to_string())
 }
 
-/// cAdvisor as a DaemonSet with one ready pod, the shape most node agents have.
-fn cadvisor(namespace: &str) -> DaemonSet {
-    from(json!({
-        "metadata": {"name": "cadvisor", "namespace": namespace, "generation": 1,
-            "creationTimestamp": created("cadvisor"),
-            "labels": {"app.kubernetes.io/name": "cadvisor"}},
-        "spec": {"selector": {"matchLabels": {"app": "cadvisor"}},
-            "template": {"metadata": {"labels": {"app": "cadvisor"}}, "spec": {"containers": [{
-                "name": "cadvisor", "image": "ghcr.io/google/cadvisor:v0.60.5",
-                "ports": [{"name": "http", "containerPort": 8080}]
-            }]}}},
-        "status": {"observedGeneration": 1, "desiredNumberScheduled": 1,
-            "currentNumberScheduled": 1, "numberReady": 1, "updatedNumberScheduled": 1,
-            "numberAvailable": 1, "numberMisscheduled": 0}
-    }))
+fn resolve_times(value: &mut Value, now: Timestamp) {
+    match value {
+        Value::String(text) => {
+            if let Some(time) = relative_time(text, now) {
+                *text = time;
+            }
+        }
+        Value::Array(items) => items.iter_mut().for_each(|item| resolve_times(item, now)),
+        Value::Object(fields) => fields
+            .values_mut()
+            .for_each(|item| resolve_times(item, now)),
+        Value::Null | Value::Bool(_) | Value::Number(_) => {}
+    }
 }
 
 fn state() -> State {
@@ -1600,135 +533,6 @@ fn state() -> State {
         };
         from(json!({"metadata": {"name": name, "labels": labels}}))
     };
-    let event_in = |namespace: &str,
-                    name: &str,
-                    minute: u32,
-                    kind: &str,
-                    object: &str,
-                    kind_type: &str,
-                    reason: &str,
-                    note: &str,
-                    count: i32|
-     -> Event {
-        from(json!({
-            "metadata": {"name": name, "namespace": namespace},
-            // Relative to now, so they stay in the cluster overview's last hour.
-            "eventTime": minutes_ago(35 - i64::from(minute)),
-            "regarding": {"kind": kind, "name": object, "namespace": namespace, "apiVersion": "v1"},
-            "type": kind_type, "reason": reason, "note": note,
-            "reportingController": "kubelet", "reportingInstance": "node-1", "action": reason,
-            "deprecatedCount": count
-        }))
-    };
-    let event = |name: &str,
-                 minute: u32,
-                 kind: &str,
-                 object: &str,
-                 kind_type: &str,
-                 reason: &str,
-                 note: &str,
-                 count: i32| {
-        event_in(
-            "shop", name, minute, kind, object, kind_type, reason, note, count,
-        )
-    };
-    let blog_events = vec![
-        event_in(
-            "blog",
-            "b1",
-            23,
-            "Pod",
-            "web-6d5f9c7b8-p4k2z",
-            "Warning",
-            "Failed",
-            "Failed to pull image \"ghcr.io/example/blog:2.4.1\": not found",
-            8,
-        ),
-        event_in(
-            "blog",
-            "b2",
-            24,
-            "Pod",
-            "web-6d5f9c7b8-p4k2z",
-            "Warning",
-            "BackOff",
-            "Back-off pulling image \"ghcr.io/example/blog:2.4.1\"",
-            31,
-        ),
-    ];
-    let billing_events = vec![event_in(
-        "billing",
-        "i1",
-        2,
-        "Job",
-        "invoice-run-29342880",
-        "Warning",
-        "BackoffLimitExceeded",
-        "Job has reached the specified backoff limit",
-        1,
-    )];
-    let events = vec![
-        event(
-            "e1",
-            1,
-            "Deployment",
-            "api",
-            "Normal",
-            "ScalingReplicaSet",
-            "Scaled up replica set api-5f6b7 to 3",
-            1,
-        ),
-        event(
-            "e2",
-            5,
-            "Pod",
-            "web-7c9d8-fghij",
-            "Warning",
-            "BackOff",
-            "Back-off restarting failed container web",
-            2,
-        ),
-        event(
-            "e3",
-            12,
-            "Pod",
-            "api-5f6b7-x9z3t",
-            "Normal",
-            "Pulled",
-            "Container image ghcr.io/example/shop-api:2.11.0 already present",
-            1,
-        ),
-        event(
-            "e4",
-            21,
-            "Pod",
-            "worker-84c2d-w2e5r",
-            "Warning",
-            "BackOff",
-            "Back-off restarting failed container worker",
-            14,
-        ),
-        event(
-            "e5",
-            22,
-            "Pod",
-            "worker-84c2d-w2e5r",
-            "Warning",
-            "Unhealthy",
-            "Readiness probe failed: connection refused",
-            9,
-        ),
-        event(
-            "e6",
-            30,
-            "CronJob",
-            "nightly-report",
-            "Normal",
-            "SawCompletedJob",
-            "Saw completed job: nightly-report-29342880",
-            1,
-        ),
-    ];
     let mut facts = ClusterFacts {
         version: VERSION.to_owned(),
         nodes: Some(3),
@@ -1767,19 +571,9 @@ fn state() -> State {
             ]),
         ));
     }
+    let data = DemoData::load();
     let mut objects = BTreeMap::new();
-    for mut project in [
-        shop(),
-        blog(),
-        lab(),
-        billing(),
-        payments(),
-        analytics(),
-        internal_tools(),
-        edge(),
-        kube_system(),
-        cert_manager(),
-    ] {
+    for mut project in data.objects {
         place(&mut project.pods);
         objects.insert(project.namespace.clone(), project);
     }
@@ -1787,15 +581,6 @@ fn state() -> State {
     let live = pod_metrics(&pods);
     PODS.get_or_init(|| pods);
     let answer: zeabur_kube::memory::ProxyAnswer = store;
-    let system_events = vec![from::<Event>(json!({
-        "metadata": {"name": "s1", "namespace": "kube-system"},
-        "eventTime": minutes_ago(12),
-        "regarding": {"kind": "Node", "name": "vps-2", "apiVersion": "v1"},
-        "type": "Warning", "reason": "NodeNotSchedulable",
-        "note": "Node vps-2 status is now: NodeNotSchedulable",
-        "reportingController": "node-controller", "reportingInstance": "vps-1",
-        "action": "NodeNotSchedulable", "deprecatedCount": 1
-    }))];
     let log = (1..=40)
         .map(|i| {
             format!(
@@ -1823,82 +608,9 @@ fn state() -> State {
             namespace("kube-system", false),
         ],
         objects,
-        events: BTreeMap::from([
-            ("shop".to_owned(), events),
-            ("blog".to_owned(), blog_events),
-            (
-                "lab".to_owned(),
-                vec![
-                    event_in(
-                        "lab",
-                        "l1",
-                        33,
-                        "Pod",
-                        "crasher-6949b848bd-mv6fd",
-                        "Warning",
-                        "BackOff",
-                        "Back-off restarting failed container crasher in pod crasher-6949b848bd-mv6fd_lab",
-                        541,
-                    ),
-                    event_in(
-                        "lab",
-                        "l2",
-                        30,
-                        "Pod",
-                        "editor-5c8d9f7b6-q2w3e",
-                        "Warning",
-                        "FailedScheduling",
-                        "0/1 nodes are available: persistentvolumeclaim \"editor-data\" not found. not found",
-                        119,
-                    ),
-                ],
-            ),
-            ("billing".to_owned(), billing_events),
-            ("kube-system".to_owned(), system_events),
-            (
-                "edge".to_owned(),
-                vec![event_in(
-                    "edge",
-                    "e1",
-                    20,
-                    "Pod",
-                    "demo-gateway-7c9f8-z3x5c",
-                    "Warning",
-                    "FailedAttachVolume",
-                    "Multi-Attach error for volume \"pvc-3f1c\": Volume is already used by pod demo-gateway-5b6d4-q8w2e",
-                    6,
-                )],
-            ),
-        ]),
-        nodes: nodes(),
-        // Lab's releases, so its warnings and restarts reach Activity.
-        replica_sets: BTreeMap::from([
-            ("shop".to_owned(), web_releases()),
-            (
-            "lab".to_owned(),
-            [
-                ("crasher", "6949b848bd", "ghcr.io/example/crasher:0.1.0"),
-                ("editor", "5c8d9f7b6", "ghcr.io/example/editor:0.9.0"),
-                ("talker", "7d9c6b5f4", "ghcr.io/example/talker:1.2.0"),
-                ("hello", "5f7b8c9d6", "nginx:1.29"),
-            ]
-            .into_iter()
-            .map(|(name, hash, image)| {
-                from(json!({
-                    "metadata": {"name": format!("{name}-{hash}"), "namespace": "lab",
-                        "creationTimestamp": created(name),
-                        "annotations": {"deployment.kubernetes.io/revision": "1"},
-                        "ownerReferences": [{"apiVersion": "apps/v1", "kind": "Deployment",
-                            "name": name, "uid": "00000000-0000-0000-0000-000000000002",
-                            "controller": true}]},
-                    "spec": {"selector": {"matchLabels": {"app": name}},
-                        "template": {"metadata": {"labels": {"app": name}},
-                            "spec": {"containers": [{"name": name, "image": image}]}}}
-                }))
-            })
-            .collect(),
-        ),
-        ]),
+        events: data.events,
+        nodes: data.nodes,
+        replica_sets: data.replica_sets,
         // metrics-server and system-upgrade-controller, read through their modules; and
         // NetworkPolicy, so a ready-made policy shows among the objects and can be deleted; k3s's
         // HelmChart, which the components page reads.
@@ -3439,78 +2151,6 @@ fn disks(objects: &mut BTreeMap<String, NamespaceObjects>) -> Vec<Value> {
     series
 }
 
-/// Three nodes: a small control plane, a cordoned worker and a worker one minor behind.
-fn nodes() -> Vec<Node> {
-    let node = |name: &str,
-                roles: &[&str],
-                kubelet: &str,
-                cpu: &str,
-                memory: &str,
-                allocatable_memory: &str,
-                cordoned: bool,
-                age_days: i64|
-     -> Node {
-        let mut labels = serde_json::Map::new();
-        labels.insert("kubernetes.io/hostname".to_owned(), json!(name));
-        for role in roles {
-            labels.insert(format!("node-role.kubernetes.io/{role}"), json!("true"));
-        }
-        let created = clock()
-            .checked_sub(SignedDuration::from_hours(24 * age_days))
-            .unwrap_or_else(|_| clock())
-            .to_string();
-        let taints = if cordoned {
-            json!([{"key": "node.kubernetes.io/unschedulable", "effect": "NoSchedule"}])
-        } else {
-            json!([])
-        };
-        from(json!({
-            "metadata": {"name": name, "labels": labels, "creationTimestamp": created},
-            "spec": {"unschedulable": cordoned, "taints": taints},
-            "status": {
-                "capacity": {"cpu": cpu, "memory": memory, "pods": "110"},
-                "allocatable": {"cpu": cpu, "memory": allocatable_memory, "pods": "110"},
-                "conditions": [
-                    {"type": "Ready", "status": "True", "reason": "KubeletReady"},
-                    {"type": "MemoryPressure", "status": "False"},
-                    {"type": "DiskPressure", "status": "False"},
-                    {"type": "PIDPressure", "status": "False"}
-                ],
-                "nodeInfo": {
-                    "kubeletVersion": kubelet, "kubeProxyVersion": "",
-                    "osImage": "Debian GNU/Linux 13 (trixie)", "kernelVersion": "6.12.48+deb13-arm64",
-                    "architecture": "arm64", "operatingSystem": "linux",
-                    "containerRuntimeVersion": "containerd://2.1.4-k3s1",
-                    "machineID": "", "systemUUID": "", "bootID": ""
-                }
-            }
-        }))
-    };
-    vec![
-        node(
-            "vps-1",
-            &["control-plane", "etcd"],
-            VERSION,
-            "2",
-            "2048Mi",
-            "1900Mi",
-            false,
-            210,
-        ),
-        node("vps-2", &[], VERSION, "4", "8Gi", "7800Mi", true, 96),
-        node(
-            "vps-3",
-            &[],
-            "v1.33.13+k3s1",
-            "4",
-            "8Gi",
-            "7800Mi",
-            false,
-            31,
-        ),
-    ]
-}
-
 /// k3s's own pods in kube-system.
 /// The `ClusterIssuers`: `letsencrypt` answers HTTP-01 challenges through Traefik, and
 /// `letsencrypt-dns` answers DNS-01 challenges through Cloudflare, which wildcard domains need.
@@ -3538,51 +2178,6 @@ fn cluster_issuers() -> Vec<DynamicObject> {
                 {"name": "letsencrypt-dns-dns-credentials", "key": "api-token"}}}}),
         ),
     ]
-}
-
-/// cert-manager's controller, whose namespace holds the secrets of `ClusterIssuers`.
-fn cert_manager() -> NamespaceObjects {
-    NamespaceObjects {
-        namespace: "cert-manager".to_owned(),
-        deployments: vec![from(json!({
-            "metadata": {"name": "cert-manager", "namespace": "cert-manager",
-                "labels": {"app.kubernetes.io/name": "cert-manager"}},
-            "spec": {"selector": {"matchLabels": {"app": "cert-manager"}},
-                "template": {"metadata": {"labels": {"app": "cert-manager"}},
-                    "spec": {"containers": [{"name": "cert-manager-controller",
-                        "image": "quay.io/jetstack/cert-manager-controller:v1.21.2",
-                        "args": ["--v=2", "--cluster-resource-namespace=$(POD_NAMESPACE)"]}]}}}
-        }))],
-        ..NamespaceObjects::default()
-    }
-}
-
-fn kube_system() -> NamespaceObjects {
-    let pod = |name: &str, cpu: &str, memory: &str| -> Pod {
-        let replica_set = name.rsplit_once('-').map_or(name, |(set, _)| set);
-        let hash = replica_set.rsplit_once('-').map_or("", |(_, hash)| hash);
-        from(
-            json!({"metadata": {"name": name, "namespace": "kube-system",
-                "labels": {"app": name, "pod-template-hash": hash},
-                "ownerReferences": [{"apiVersion": "apps/v1", "kind": "ReplicaSet",
-                    "name": replica_set, "uid": "00000000-0000-0000-0000-000000000000",
-                    "controller": true}]},
-            "spec": {"containers": [{"name": "main", "image": "example",
-                "resources": {"requests": {"cpu": cpu, "memory": memory}}}]},
-            "status": {"phase": "Running", "containerStatuses": [{"name": "main", "ready": true,
-                "restartCount": 0, "image": "example", "imageID": "", "state": {"running": {}}}]}}),
-        )
-    };
-    NamespaceObjects {
-        namespace: "kube-system".to_owned(),
-        pods: vec![
-            pod("coredns-7b98449c4-x2kqp", "100m", "70Mi"),
-            pod("traefik-5c8f7d6b9-ltm4z", "100m", "128Mi"),
-            pod("metrics-server-6f4c6675d5-9hq2r", "100m", "70Mi"),
-            pod("local-path-provisioner-595dcfc56f-pk7jw", "50m", "64Mi"),
-        ],
-        ..NamespaceObjects::default()
-    }
 }
 
 /// Puts each pod on a node (control plane first) and gives the example pods the requests of
@@ -4699,4 +3294,71 @@ async fn main() -> std::io::Result<()> {
     let addr = std::env::var("ZEABUR_DEMO_ADDR").unwrap_or_else(|_| "127.0.0.1:8080".to_owned());
     let listener = tokio::net::TcpListener::bind(addr).await?;
     axum::serve(listener, app).await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn at_noon() -> Timestamp {
+        "2026-10-26T12:00:00Z".parse().expect("a time")
+    }
+
+    #[test]
+    fn relative_times_count_from_the_clock() {
+        let now = at_noon();
+        assert_eq!(
+            relative_time("now", now).as_deref(),
+            Some("2026-10-26T12:00:00Z")
+        );
+        assert_eq!(
+            relative_time("now-2d4h30m", now).as_deref(),
+            Some("2026-10-24T07:30:00Z")
+        );
+        assert_eq!(
+            relative_time("now+90s", now).as_deref(),
+            Some("2026-10-26T12:01:30Z")
+        );
+        assert_eq!(relative_time("nowhere", now), None);
+        assert_eq!(relative_time("now-3w", now), None);
+        assert_eq!(relative_time("2026-10-26T12:00:00Z", now), None);
+    }
+
+    #[test]
+    fn manifests_parse_into_kubernetes_types() {
+        let data = DemoData::parse(&DEMO_DATA, at_noon());
+        let shop = data
+            .objects
+            .iter()
+            .find(|objects| objects.namespace == "shop")
+            .expect("shop's objects");
+        assert!(
+            shop.deployments
+                .iter()
+                .any(|d| d.metadata.name.as_deref() == Some("web"))
+        );
+        assert!(shop.secrets.iter().any(|s| s.key_count > 0));
+        assert!(data.nodes.iter().any(|node| node.metadata.name.is_some()));
+        assert!(data.events.contains_key("shop"));
+        assert!(data.replica_sets.contains_key("shop"));
+    }
+
+    #[test]
+    fn times_follow_the_clock() {
+        let created = |now: &str| {
+            let data = DemoData::parse(&DEMO_DATA, now.parse().expect("a time"));
+            data.nodes
+                .into_iter()
+                .next()
+                .and_then(|node| node.metadata.creation_timestamp)
+                .expect("a node's creation time")
+                .0
+        };
+        let earlier = created("2026-10-26T12:00:00Z");
+        let later = created("2026-10-27T12:00:00Z");
+        assert_eq!(
+            later.duration_since(earlier),
+            SignedDuration::from_hours(24)
+        );
+    }
 }

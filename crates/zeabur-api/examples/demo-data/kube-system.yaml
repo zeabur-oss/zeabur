@@ -1,0 +1,149 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    app: coredns-7b98449c4-x2kqp
+    pod-template-hash: 7b98449c4
+  name: coredns-7b98449c4-x2kqp
+  namespace: kube-system
+  ownerReferences:
+    - apiVersion: apps/v1
+      controller: true
+      kind: ReplicaSet
+      name: coredns-7b98449c4
+      uid: 00000000-0000-0000-0000-000000000000
+spec:
+  containers:
+    - image: example
+      name: main
+      resources:
+        requests:
+          cpu: 100m
+          memory: 70Mi
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: main
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    app: traefik-5c8f7d6b9-ltm4z
+    pod-template-hash: 5c8f7d6b9
+  name: traefik-5c8f7d6b9-ltm4z
+  namespace: kube-system
+  ownerReferences:
+    - apiVersion: apps/v1
+      controller: true
+      kind: ReplicaSet
+      name: traefik-5c8f7d6b9
+      uid: 00000000-0000-0000-0000-000000000000
+spec:
+  containers:
+    - image: example
+      name: main
+      resources:
+        requests:
+          cpu: 100m
+          memory: 128Mi
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: main
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    app: metrics-server-6f4c6675d5-9hq2r
+    pod-template-hash: 6f4c6675d5
+  name: metrics-server-6f4c6675d5-9hq2r
+  namespace: kube-system
+  ownerReferences:
+    - apiVersion: apps/v1
+      controller: true
+      kind: ReplicaSet
+      name: metrics-server-6f4c6675d5
+      uid: 00000000-0000-0000-0000-000000000000
+spec:
+  containers:
+    - image: example
+      name: main
+      resources:
+        requests:
+          cpu: 100m
+          memory: 70Mi
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: main
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    app: local-path-provisioner-595dcfc56f-pk7jw
+    pod-template-hash: 595dcfc56f
+  name: local-path-provisioner-595dcfc56f-pk7jw
+  namespace: kube-system
+  ownerReferences:
+    - apiVersion: apps/v1
+      controller: true
+      kind: ReplicaSet
+      name: local-path-provisioner-595dcfc56f
+      uid: 00000000-0000-0000-0000-000000000000
+spec:
+  containers:
+    - image: example
+      name: main
+      resources:
+        requests:
+          cpu: 50m
+          memory: 64Mi
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: main
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: events.k8s.io/v1
+kind: Event
+action: NodeNotSchedulable
+deprecatedCount: 1
+eventTime: "2026-10-26T08:48:00.000000Z"
+metadata:
+  name: s1
+  namespace: kube-system
+note: 'Node vps-2 status is now: NodeNotSchedulable'
+reason: NodeNotSchedulable
+regarding:
+  apiVersion: v1
+  kind: Node
+  name: vps-2
+reportingController: node-controller
+reportingInstance: vps-1
+type: Warning

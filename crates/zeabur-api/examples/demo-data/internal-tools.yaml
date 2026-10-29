@@ -1,0 +1,308 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: now-30d
+  generation: 3
+  labels:
+    app.kubernetes.io/name: wiki
+    app.kubernetes.io/part-of: internal-tools
+  name: wiki
+  namespace: internal-tools
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: wiki
+  template:
+    metadata:
+      labels:
+        app: wiki
+    spec:
+      containers:
+        - env: []
+          image: ghcr.io/example/wiki:2.5.0
+          name: wiki
+          ports:
+            - containerPort: 3000
+              name: http
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          resources:
+            limits:
+              memory: 256Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+status:
+  availableReplicas: 1
+  observedGeneration: 3
+  readyReplicas: 1
+  replicas: 1
+  updatedReplicas: 1
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: now-70d
+  generation: 3
+  labels:
+    app.kubernetes.io/name: chat
+    app.kubernetes.io/part-of: internal-tools
+  name: chat
+  namespace: internal-tools
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: chat
+  template:
+    metadata:
+      labels:
+        app: chat
+    spec:
+      containers:
+        - env: []
+          image: ghcr.io/example/chat:7.1.0
+          name: chat
+          ports:
+            - containerPort: 3000
+              name: http
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          resources:
+            limits:
+              memory: 256Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+status:
+  availableReplicas: 1
+  observedGeneration: 3
+  readyReplicas: 1
+  replicas: 1
+  updatedReplicas: 1
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: now-14d
+  generation: 3
+  labels:
+    app.kubernetes.io/name: grafana
+    app.kubernetes.io/part-of: internal-tools
+  name: grafana
+  namespace: internal-tools
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: grafana
+  template:
+    metadata:
+      labels:
+        app: grafana
+    spec:
+      containers:
+        - env: []
+          image: grafana/grafana:12.2.0
+          name: grafana
+          ports:
+            - containerPort: 3000
+              name: http
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          resources:
+            limits:
+              memory: 256Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+status:
+  availableReplicas: 1
+  observedGeneration: 3
+  readyReplicas: 1
+  replicas: 1
+  updatedReplicas: 1
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  creationTimestamp: now-33d
+  generation: 1
+  labels:
+    app.kubernetes.io/name: cadvisor
+  name: cadvisor
+  namespace: internal-tools
+spec:
+  selector:
+    matchLabels:
+      app: cadvisor
+  template:
+    metadata:
+      labels:
+        app: cadvisor
+    spec:
+      containers:
+        - image: ghcr.io/google/cadvisor:v0.60.5
+          name: cadvisor
+          ports:
+            - containerPort: 8080
+              name: http
+status:
+  currentNumberScheduled: 1
+  desiredNumberScheduled: 1
+  numberAvailable: 1
+  numberMisscheduled: 0
+  numberReady: 1
+  observedGeneration: 1
+  updatedNumberScheduled: 1
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-22h44m
+  labels:
+    app: wiki
+  name: wiki-5c6d7-r2s4t
+  namespace: internal-tools
+  ownerReferences: []
+spec:
+  containers:
+    - image: example
+      name: wiki
+  nodeName: vps-1
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: wiki
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-22h24m
+  labels:
+    app: chat
+  name: chat-5c6d7-r2s4t
+  namespace: internal-tools
+  ownerReferences: []
+spec:
+  containers:
+    - image: example
+      name: chat
+  nodeName: vps-1
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: chat
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-1d3h28m
+  labels:
+    app: grafana
+  name: grafana-5c6d7-r2s4t
+  namespace: internal-tools
+  ownerReferences: []
+spec:
+  containers:
+    - image: example
+      name: grafana
+  nodeName: vps-1
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: grafana
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-22h47m
+  labels:
+    app: cadvisor
+  name: cadvisor-k7m2p
+  namespace: internal-tools
+  ownerReferences:
+    - apiVersion: apps/v1
+      controller: true
+      kind: DaemonSet
+      name: cadvisor
+      uid: 00000000-0000-0000-0000-000000000000
+spec:
+  containers:
+    - image: example
+      name: cadvisor
+  nodeName: vps-3
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: cadvisor
+      ready: true
+      restartCount: 1
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: wiki
+  namespace: internal-tools
+spec:
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+  selector:
+    app: wiki
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: chat
+  namespace: internal-tools
+spec:
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+  selector:
+    app: chat
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana
+  namespace: internal-tools
+spec:
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+  selector:
+    app: grafana

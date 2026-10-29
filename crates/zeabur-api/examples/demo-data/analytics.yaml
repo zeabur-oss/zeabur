@@ -1,0 +1,3795 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: now-50d
+  generation: 3
+  labels:
+    app.kubernetes.io/name: dashboard
+    app.kubernetes.io/part-of: analytics
+  name: dashboard
+  namespace: analytics
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: dashboard
+  template:
+    metadata:
+      labels:
+        app: dashboard
+    spec:
+      containers:
+        - env: []
+          image: ghcr.io/example/analytics-dashboard:1.8.0
+          name: dashboard
+          ports:
+            - containerPort: 3000
+              name: http
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          resources:
+            limits:
+              memory: 256Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+status:
+  availableReplicas: 2
+  observedGeneration: 3
+  readyReplicas: 2
+  replicas: 2
+  updatedReplicas: 2
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: now-21d
+  generation: 3
+  labels:
+    app.kubernetes.io/name: collector
+    app.kubernetes.io/part-of: analytics
+  name: collector
+  namespace: analytics
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: collector
+  template:
+    metadata:
+      labels:
+        app: collector
+    spec:
+      containers:
+        - env: []
+          image: ghcr.io/example/analytics-collector:1.8.0
+          name: collector
+          ports:
+            - containerPort: 3000
+              name: http
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          resources:
+            limits:
+              memory: 256Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+status:
+  availableReplicas: 1
+  observedGeneration: 3
+  readyReplicas: 1
+  replicas: 1
+  updatedReplicas: 1
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: now-64d
+  generation: 3
+  labels:
+    app.kubernetes.io/name: ingest
+    app.kubernetes.io/part-of: analytics
+  name: ingest
+  namespace: analytics
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ingest
+  template:
+    metadata:
+      labels:
+        app: ingest
+    spec:
+      containers:
+        - env: []
+          image: ghcr.io/example/analytics-ingest:1.8.0
+          name: ingest
+          ports:
+            - containerPort: 3000
+              name: http
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          resources:
+            limits:
+              memory: 256Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+status:
+  availableReplicas: 1
+  observedGeneration: 3
+  readyReplicas: 1
+  replicas: 1
+  updatedReplicas: 1
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: now-22d
+  generation: 3
+  labels:
+    app.kubernetes.io/name: enricher
+    app.kubernetes.io/part-of: analytics
+  name: enricher
+  namespace: analytics
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: enricher
+  template:
+    metadata:
+      labels:
+        app: enricher
+    spec:
+      containers:
+        - env: []
+          image: ghcr.io/example/analytics-enricher:1.8.0
+          name: enricher
+          ports:
+            - containerPort: 3000
+              name: http
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          resources:
+            limits:
+              memory: 256Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+status:
+  availableReplicas: 3
+  observedGeneration: 3
+  readyReplicas: 3
+  replicas: 3
+  updatedReplicas: 3
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: now-28d
+  generation: 3
+  labels:
+    app.kubernetes.io/name: sessionizer
+    app.kubernetes.io/part-of: analytics
+  name: sessionizer
+  namespace: analytics
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sessionizer
+  template:
+    metadata:
+      labels:
+        app: sessionizer
+    spec:
+      containers:
+        - env: []
+          image: ghcr.io/example/analytics-sessionizer:1.8.0
+          name: sessionizer
+          ports:
+            - containerPort: 3000
+              name: http
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          resources:
+            limits:
+              memory: 256Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+status:
+  availableReplicas: 1
+  observedGeneration: 3
+  readyReplicas: 1
+  replicas: 1
+  updatedReplicas: 1
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: now-66d
+  generation: 3
+  labels:
+    app.kubernetes.io/name: geoip
+    app.kubernetes.io/part-of: analytics
+  name: geoip
+  namespace: analytics
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: geoip
+  template:
+    metadata:
+      labels:
+        app: geoip
+    spec:
+      containers:
+        - env: []
+          image: ghcr.io/example/analytics-geoip:1.8.0
+          name: geoip
+          ports:
+            - containerPort: 3000
+              name: http
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          resources:
+            limits:
+              memory: 256Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+status:
+  availableReplicas: 2
+  observedGeneration: 3
+  readyReplicas: 2
+  replicas: 2
+  updatedReplicas: 2
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: now-28d
+  generation: 3
+  labels:
+    app.kubernetes.io/name: useragent
+    app.kubernetes.io/part-of: analytics
+  name: useragent
+  namespace: analytics
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: useragent
+  template:
+    metadata:
+      labels:
+        app: useragent
+    spec:
+      containers:
+        - env: []
+          image: ghcr.io/example/analytics-useragent:1.8.0
+          name: useragent
+          ports:
+            - containerPort: 3000
+              name: http
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          resources:
+            limits:
+              memory: 256Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+status:
+  availableReplicas: 1
+  observedGeneration: 3
+  readyReplicas: 1
+  replicas: 1
+  updatedReplicas: 1
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: now-45d
+  generation: 3
+  labels:
+    app.kubernetes.io/name: dedupe
+    app.kubernetes.io/part-of: analytics
+  name: dedupe
+  namespace: analytics
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dedupe
+  template:
+    metadata:
+      labels:
+        app: dedupe
+    spec:
+      containers:
+        - env: []
+          image: ghcr.io/example/analytics-dedupe:1.8.0
+          name: dedupe
+          ports:
+            - containerPort: 3000
+              name: http
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          resources:
+            limits:
+              memory: 256Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+status:
+  availableReplicas: 1
+  observedGeneration: 3
+  readyReplicas: 1
+  replicas: 1
+  updatedReplicas: 1
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: now-50d
+  generation: 3
+  labels:
+    app.kubernetes.io/name: sampler
+    app.kubernetes.io/part-of: analytics
+  name: sampler
+  namespace: analytics
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: sampler
+  template:
+    metadata:
+      labels:
+        app: sampler
+    spec:
+      containers:
+        - env: []
+          image: ghcr.io/example/analytics-sampler:1.8.0
+          name: sampler
+          ports:
+            - containerPort: 3000
+              name: http
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          resources:
+            limits:
+              memory: 256Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+status:
+  availableReplicas: 3
+  observedGeneration: 3
+  readyReplicas: 3
+  replicas: 3
+  updatedReplicas: 3
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: now-53d
+  generation: 3
+  labels:
+    app.kubernetes.io/name: aggregator
+    app.kubernetes.io/part-of: analytics
+  name: aggregator
+  namespace: analytics
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: aggregator
+  template:
+    metadata:
+      labels:
+        app: aggregator
+    spec:
+      containers:
+        - env: []
+          image: ghcr.io/example/analytics-aggregator:1.8.0
+          name: aggregator
+          ports:
+            - containerPort: 3000
+              name: http
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          resources:
+            limits:
+              memory: 256Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+status:
+  availableReplicas: 1
+  observedGeneration: 3
+  readyReplicas: 1
+  replicas: 1
+  updatedReplicas: 1
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: now-24d
+  generation: 3
+  labels:
+    app.kubernetes.io/name: rollup-hourly
+    app.kubernetes.io/part-of: analytics
+  name: rollup-hourly
+  namespace: analytics
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: rollup-hourly
+  template:
+    metadata:
+      labels:
+        app: rollup-hourly
+    spec:
+      containers:
+        - env: []
+          image: ghcr.io/example/analytics-rollup-hourly:1.8.0
+          name: rollup-hourly
+          ports:
+            - containerPort: 3000
+              name: http
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          resources:
+            limits:
+              memory: 256Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+status:
+  availableReplicas: 2
+  observedGeneration: 3
+  readyReplicas: 2
+  replicas: 2
+  updatedReplicas: 2
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: now-60d
+  generation: 3
+  labels:
+    app.kubernetes.io/name: rollup-daily
+    app.kubernetes.io/part-of: analytics
+  name: rollup-daily
+  namespace: analytics
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rollup-daily
+  template:
+    metadata:
+      labels:
+        app: rollup-daily
+    spec:
+      containers:
+        - env: []
+          image: ghcr.io/example/analytics-rollup-daily:1.8.0
+          name: rollup-daily
+          ports:
+            - containerPort: 3000
+              name: http
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          resources:
+            limits:
+              memory: 256Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+status:
+  availableReplicas: 1
+  observedGeneration: 3
+  readyReplicas: 1
+  replicas: 1
+  updatedReplicas: 1
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: now-63d
+  generation: 3
+  labels:
+    app.kubernetes.io/name: exporter
+    app.kubernetes.io/part-of: analytics
+  name: exporter
+  namespace: analytics
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: exporter
+  template:
+    metadata:
+      labels:
+        app: exporter
+    spec:
+      containers:
+        - env: []
+          image: ghcr.io/example/analytics-exporter:1.8.0
+          name: exporter
+          ports:
+            - containerPort: 3000
+              name: http
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          resources:
+            limits:
+              memory: 256Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+status:
+  availableReplicas: 1
+  observedGeneration: 3
+  readyReplicas: 1
+  replicas: 1
+  updatedReplicas: 1
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: now-65d
+  generation: 3
+  labels:
+    app.kubernetes.io/name: alerts
+    app.kubernetes.io/part-of: analytics
+  name: alerts
+  namespace: analytics
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: alerts
+  template:
+    metadata:
+      labels:
+        app: alerts
+    spec:
+      containers:
+        - env: []
+          image: ghcr.io/example/analytics-alerts:1.8.0
+          name: alerts
+          ports:
+            - containerPort: 3000
+              name: http
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          resources:
+            limits:
+              memory: 256Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+status:
+  availableReplicas: 3
+  observedGeneration: 3
+  readyReplicas: 3
+  replicas: 3
+  updatedReplicas: 3
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: now-38d
+  generation: 3
+  labels:
+    app.kubernetes.io/name: notifier
+    app.kubernetes.io/part-of: analytics
+  name: notifier
+  namespace: analytics
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: notifier
+  template:
+    metadata:
+      labels:
+        app: notifier
+    spec:
+      containers:
+        - env: []
+          image: ghcr.io/example/analytics-notifier:1.8.0
+          name: notifier
+          ports:
+            - containerPort: 3000
+              name: http
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          resources:
+            limits:
+              memory: 256Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+status:
+  availableReplicas: 1
+  observedGeneration: 3
+  readyReplicas: 1
+  replicas: 1
+  updatedReplicas: 1
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: now-73d
+  generation: 3
+  labels:
+    app.kubernetes.io/name: scheduler
+    app.kubernetes.io/part-of: analytics
+  name: scheduler
+  namespace: analytics
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: scheduler
+  template:
+    metadata:
+      labels:
+        app: scheduler
+    spec:
+      containers:
+        - env: []
+          image: ghcr.io/example/analytics-scheduler:1.8.0
+          name: scheduler
+          ports:
+            - containerPort: 3000
+              name: http
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          resources:
+            limits:
+              memory: 256Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+status:
+  availableReplicas: 2
+  observedGeneration: 3
+  readyReplicas: 2
+  replicas: 2
+  updatedReplicas: 2
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: now-40d
+  generation: 3
+  labels:
+    app.kubernetes.io/name: query
+    app.kubernetes.io/part-of: analytics
+  name: query
+  namespace: analytics
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: query
+  template:
+    metadata:
+      labels:
+        app: query
+    spec:
+      containers:
+        - env: []
+          image: ghcr.io/example/analytics-query:1.8.0
+          name: query
+          ports:
+            - containerPort: 3000
+              name: http
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          resources:
+            limits:
+              memory: 256Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+status:
+  availableReplicas: 1
+  observedGeneration: 3
+  readyReplicas: 1
+  replicas: 1
+  updatedReplicas: 1
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: now-45d
+  generation: 3
+  labels:
+    app.kubernetes.io/name: query-cache
+    app.kubernetes.io/part-of: analytics
+  name: query-cache
+  namespace: analytics
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: query-cache
+  template:
+    metadata:
+      labels:
+        app: query-cache
+    spec:
+      containers:
+        - env: []
+          image: ghcr.io/example/analytics-query-cache:1.8.0
+          name: query-cache
+          ports:
+            - containerPort: 3000
+              name: http
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          resources:
+            limits:
+              memory: 256Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+status:
+  availableReplicas: 1
+  observedGeneration: 3
+  readyReplicas: 1
+  replicas: 1
+  updatedReplicas: 1
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: now-62d
+  generation: 3
+  labels:
+    app.kubernetes.io/name: funnel
+    app.kubernetes.io/part-of: analytics
+  name: funnel
+  namespace: analytics
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: funnel
+  template:
+    metadata:
+      labels:
+        app: funnel
+    spec:
+      containers:
+        - env: []
+          image: ghcr.io/example/analytics-funnel:1.8.0
+          name: funnel
+          ports:
+            - containerPort: 3000
+              name: http
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          resources:
+            limits:
+              memory: 256Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+status:
+  availableReplicas: 3
+  observedGeneration: 3
+  readyReplicas: 3
+  replicas: 3
+  updatedReplicas: 3
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: now-38d
+  generation: 3
+  labels:
+    app.kubernetes.io/name: retention
+    app.kubernetes.io/part-of: analytics
+  name: retention
+  namespace: analytics
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: retention
+  template:
+    metadata:
+      labels:
+        app: retention
+    spec:
+      containers:
+        - env: []
+          image: ghcr.io/example/analytics-retention:1.8.0
+          name: retention
+          ports:
+            - containerPort: 3000
+              name: http
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          resources:
+            limits:
+              memory: 256Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+status:
+  availableReplicas: 1
+  observedGeneration: 3
+  readyReplicas: 1
+  replicas: 1
+  updatedReplicas: 1
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: now-64d
+  generation: 3
+  labels:
+    app.kubernetes.io/name: cohorts
+    app.kubernetes.io/part-of: analytics
+  name: cohorts
+  namespace: analytics
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: cohorts
+  template:
+    metadata:
+      labels:
+        app: cohorts
+    spec:
+      containers:
+        - env: []
+          image: ghcr.io/example/analytics-cohorts:1.8.0
+          name: cohorts
+          ports:
+            - containerPort: 3000
+              name: http
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          resources:
+            limits:
+              memory: 256Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+status:
+  availableReplicas: 2
+  observedGeneration: 3
+  readyReplicas: 2
+  replicas: 2
+  updatedReplicas: 2
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: now-18d
+  generation: 3
+  labels:
+    app.kubernetes.io/name: paths
+    app.kubernetes.io/part-of: analytics
+  name: paths
+  namespace: analytics
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: paths
+  template:
+    metadata:
+      labels:
+        app: paths
+    spec:
+      containers:
+        - env: []
+          image: ghcr.io/example/analytics-paths:1.8.0
+          name: paths
+          ports:
+            - containerPort: 3000
+              name: http
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          resources:
+            limits:
+              memory: 256Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+status:
+  availableReplicas: 1
+  observedGeneration: 3
+  readyReplicas: 1
+  replicas: 1
+  updatedReplicas: 1
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: now-25d
+  generation: 3
+  labels:
+    app.kubernetes.io/name: heatmaps
+    app.kubernetes.io/part-of: analytics
+  name: heatmaps
+  namespace: analytics
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: heatmaps
+  template:
+    metadata:
+      labels:
+        app: heatmaps
+    spec:
+      containers:
+        - env: []
+          image: ghcr.io/example/analytics-heatmaps:1.8.0
+          name: heatmaps
+          ports:
+            - containerPort: 3000
+              name: http
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          resources:
+            limits:
+              memory: 256Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+status:
+  availableReplicas: 1
+  observedGeneration: 3
+  readyReplicas: 1
+  replicas: 1
+  updatedReplicas: 1
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: now-67d
+  generation: 3
+  labels:
+    app.kubernetes.io/name: replay
+    app.kubernetes.io/part-of: analytics
+  name: replay
+  namespace: analytics
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: replay
+  template:
+    metadata:
+      labels:
+        app: replay
+    spec:
+      containers:
+        - env: []
+          image: ghcr.io/example/analytics-replay:1.8.0
+          name: replay
+          ports:
+            - containerPort: 3000
+              name: http
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          resources:
+            limits:
+              memory: 256Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+status:
+  availableReplicas: 3
+  observedGeneration: 3
+  readyReplicas: 3
+  replicas: 3
+  updatedReplicas: 3
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: now-34d
+  generation: 3
+  labels:
+    app.kubernetes.io/name: uploader
+    app.kubernetes.io/part-of: analytics
+  name: uploader
+  namespace: analytics
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: uploader
+  template:
+    metadata:
+      labels:
+        app: uploader
+    spec:
+      containers:
+        - env: []
+          image: ghcr.io/example/analytics-uploader:1.8.0
+          name: uploader
+          ports:
+            - containerPort: 3000
+              name: http
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          resources:
+            limits:
+              memory: 256Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+status:
+  availableReplicas: 1
+  observedGeneration: 3
+  readyReplicas: 1
+  replicas: 1
+  updatedReplicas: 1
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: now-22d
+  generation: 3
+  labels:
+    app.kubernetes.io/name: compactor
+    app.kubernetes.io/part-of: analytics
+  name: compactor
+  namespace: analytics
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: compactor
+  template:
+    metadata:
+      labels:
+        app: compactor
+    spec:
+      containers:
+        - env: []
+          image: ghcr.io/example/analytics-compactor:1.8.0
+          name: compactor
+          ports:
+            - containerPort: 3000
+              name: http
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          resources:
+            limits:
+              memory: 256Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+status:
+  availableReplicas: 2
+  observedGeneration: 3
+  readyReplicas: 2
+  replicas: 2
+  updatedReplicas: 2
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: now-26d
+  generation: 3
+  labels:
+    app.kubernetes.io/name: archiver
+    app.kubernetes.io/part-of: analytics
+  name: archiver
+  namespace: analytics
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: archiver
+  template:
+    metadata:
+      labels:
+        app: archiver
+    spec:
+      containers:
+        - env: []
+          image: ghcr.io/example/analytics-archiver:1.8.0
+          name: archiver
+          ports:
+            - containerPort: 3000
+              name: http
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          resources:
+            limits:
+              memory: 256Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+status:
+  availableReplicas: 1
+  observedGeneration: 3
+  readyReplicas: 1
+  replicas: 1
+  updatedReplicas: 1
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: now-53d
+  generation: 3
+  labels:
+    app.kubernetes.io/name: janitor
+    app.kubernetes.io/part-of: analytics
+  name: janitor
+  namespace: analytics
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: janitor
+  template:
+    metadata:
+      labels:
+        app: janitor
+    spec:
+      containers:
+        - env: []
+          image: ghcr.io/example/analytics-janitor:1.8.0
+          name: janitor
+          ports:
+            - containerPort: 3000
+              name: http
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          resources:
+            limits:
+              memory: 256Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+status:
+  availableReplicas: 1
+  observedGeneration: 3
+  readyReplicas: 1
+  replicas: 1
+  updatedReplicas: 1
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: now-53d
+  generation: 3
+  labels:
+    app.kubernetes.io/name: metrics
+    app.kubernetes.io/part-of: analytics
+  name: metrics
+  namespace: analytics
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: metrics
+  template:
+    metadata:
+      labels:
+        app: metrics
+    spec:
+      containers:
+        - env: []
+          image: ghcr.io/example/analytics-metrics:1.8.0
+          name: metrics
+          ports:
+            - containerPort: 3000
+              name: http
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          resources:
+            limits:
+              memory: 256Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+status:
+  availableReplicas: 3
+  observedGeneration: 3
+  readyReplicas: 3
+  replicas: 3
+  updatedReplicas: 3
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: now-55d
+  generation: 3
+  labels:
+    app.kubernetes.io/name: tracer
+    app.kubernetes.io/part-of: analytics
+  name: tracer
+  namespace: analytics
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: tracer
+  template:
+    metadata:
+      labels:
+        app: tracer
+    spec:
+      containers:
+        - env: []
+          image: ghcr.io/example/analytics-tracer:1.8.0
+          name: tracer
+          ports:
+            - containerPort: 3000
+              name: http
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          resources:
+            limits:
+              memory: 256Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+status:
+  availableReplicas: 1
+  observedGeneration: 3
+  readyReplicas: 1
+  replicas: 1
+  updatedReplicas: 1
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: now-41d
+  generation: 3
+  labels:
+    app.kubernetes.io/name: profiler
+    app.kubernetes.io/part-of: analytics
+  name: profiler
+  namespace: analytics
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: profiler
+  template:
+    metadata:
+      labels:
+        app: profiler
+    spec:
+      containers:
+        - env: []
+          image: ghcr.io/example/analytics-profiler:1.8.0
+          name: profiler
+          ports:
+            - containerPort: 3000
+              name: http
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          resources:
+            limits:
+              memory: 256Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+status:
+  availableReplicas: 2
+  observedGeneration: 3
+  readyReplicas: 2
+  replicas: 2
+  updatedReplicas: 2
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: now-24d
+  generation: 3
+  labels:
+    app.kubernetes.io/name: segmenter
+    app.kubernetes.io/part-of: analytics
+  name: segmenter
+  namespace: analytics
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: segmenter
+  template:
+    metadata:
+      labels:
+        app: segmenter
+    spec:
+      containers:
+        - env: []
+          image: ghcr.io/example/analytics-segmenter:1.8.0
+          name: segmenter
+          ports:
+            - containerPort: 3000
+              name: http
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          resources:
+            limits:
+              memory: 256Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+status:
+  availableReplicas: 1
+  observedGeneration: 3
+  readyReplicas: 1
+  replicas: 1
+  updatedReplicas: 1
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: now-19d
+  generation: 3
+  labels:
+    app.kubernetes.io/name: attribution
+    app.kubernetes.io/part-of: analytics
+  name: attribution
+  namespace: analytics
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: attribution
+  template:
+    metadata:
+      labels:
+        app: attribution
+    spec:
+      containers:
+        - env: []
+          image: ghcr.io/example/analytics-attribution:1.8.0
+          name: attribution
+          ports:
+            - containerPort: 3000
+              name: http
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          resources:
+            limits:
+              memory: 256Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+status:
+  availableReplicas: 1
+  observedGeneration: 3
+  readyReplicas: 1
+  replicas: 1
+  updatedReplicas: 1
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: now-18d
+  generation: 3
+  labels:
+    app.kubernetes.io/name: experiments
+    app.kubernetes.io/part-of: analytics
+  name: experiments
+  namespace: analytics
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: experiments
+  template:
+    metadata:
+      labels:
+        app: experiments
+    spec:
+      containers:
+        - env: []
+          image: ghcr.io/example/analytics-experiments:1.8.0
+          name: experiments
+          ports:
+            - containerPort: 3000
+              name: http
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          resources:
+            limits:
+              memory: 256Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+status:
+  availableReplicas: 3
+  observedGeneration: 3
+  readyReplicas: 3
+  replicas: 3
+  updatedReplicas: 3
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: now-59d
+  generation: 3
+  labels:
+    app.kubernetes.io/name: flags
+    app.kubernetes.io/part-of: analytics
+  name: flags
+  namespace: analytics
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: flags
+  template:
+    metadata:
+      labels:
+        app: flags
+    spec:
+      containers:
+        - env: []
+          image: ghcr.io/example/analytics-flags:1.8.0
+          name: flags
+          ports:
+            - containerPort: 3000
+              name: http
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          resources:
+            limits:
+              memory: 256Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+status:
+  availableReplicas: 1
+  observedGeneration: 3
+  readyReplicas: 1
+  replicas: 1
+  updatedReplicas: 1
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: now-41d
+  generation: 3
+  labels:
+    app.kubernetes.io/name: billing-sync
+    app.kubernetes.io/part-of: analytics
+  name: billing-sync
+  namespace: analytics
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: billing-sync
+  template:
+    metadata:
+      labels:
+        app: billing-sync
+    spec:
+      containers:
+        - env: []
+          image: ghcr.io/example/analytics-billing-sync:1.8.0
+          name: billing-sync
+          ports:
+            - containerPort: 3000
+              name: http
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          resources:
+            limits:
+              memory: 256Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+status:
+  availableReplicas: 2
+  observedGeneration: 3
+  readyReplicas: 2
+  replicas: 2
+  updatedReplicas: 2
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: now-43d
+  generation: 3
+  labels:
+    app.kubernetes.io/name: warehouse-sync
+    app.kubernetes.io/part-of: analytics
+  name: warehouse-sync
+  namespace: analytics
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: warehouse-sync
+  template:
+    metadata:
+      labels:
+        app: warehouse-sync
+    spec:
+      containers:
+        - env: []
+          image: ghcr.io/example/analytics-warehouse-sync:1.8.0
+          name: warehouse-sync
+          ports:
+            - containerPort: 3000
+              name: http
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          resources:
+            limits:
+              memory: 256Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+status:
+  availableReplicas: 1
+  observedGeneration: 3
+  readyReplicas: 1
+  replicas: 1
+  updatedReplicas: 1
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: now-58d
+  generation: 3
+  labels:
+    app.kubernetes.io/name: backfill
+    app.kubernetes.io/part-of: analytics
+  name: backfill
+  namespace: analytics
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: backfill
+  template:
+    metadata:
+      labels:
+        app: backfill
+    spec:
+      containers:
+        - env: []
+          image: ghcr.io/example/analytics-backfill:1.8.0
+          name: backfill
+          ports:
+            - containerPort: 3000
+              name: http
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          resources:
+            limits:
+              memory: 256Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+status:
+  availableReplicas: 1
+  observedGeneration: 3
+  readyReplicas: 1
+  replicas: 1
+  updatedReplicas: 1
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: now-20d
+  generation: 3
+  labels:
+    app.kubernetes.io/name: reindexer
+    app.kubernetes.io/part-of: analytics
+  name: reindexer
+  namespace: analytics
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: reindexer
+  template:
+    metadata:
+      labels:
+        app: reindexer
+    spec:
+      containers:
+        - env: []
+          image: ghcr.io/example/analytics-reindexer:1.8.0
+          name: reindexer
+          ports:
+            - containerPort: 3000
+              name: http
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          resources:
+            limits:
+              memory: 256Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+status:
+  availableReplicas: 3
+  observedGeneration: 3
+  readyReplicas: 3
+  replicas: 3
+  updatedReplicas: 3
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: now-25d
+  generation: 3
+  labels:
+    app.kubernetes.io/name: snapshotter
+    app.kubernetes.io/part-of: analytics
+  name: snapshotter
+  namespace: analytics
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: snapshotter
+  template:
+    metadata:
+      labels:
+        app: snapshotter
+    spec:
+      containers:
+        - env: []
+          image: ghcr.io/example/analytics-snapshotter:1.8.0
+          name: snapshotter
+          ports:
+            - containerPort: 3000
+              name: http
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          resources:
+            limits:
+              memory: 256Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+status:
+  availableReplicas: 1
+  observedGeneration: 3
+  readyReplicas: 1
+  replicas: 1
+  updatedReplicas: 1
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: now-69d
+  generation: 3
+  labels:
+    app.kubernetes.io/name: audit
+    app.kubernetes.io/part-of: analytics
+  name: audit
+  namespace: analytics
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: audit
+  template:
+    metadata:
+      labels:
+        app: audit
+    spec:
+      containers:
+        - env: []
+          image: ghcr.io/example/analytics-audit:1.8.0
+          name: audit
+          ports:
+            - containerPort: 3000
+              name: http
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          resources:
+            limits:
+              memory: 256Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+status:
+  availableReplicas: 2
+  observedGeneration: 3
+  readyReplicas: 2
+  replicas: 2
+  updatedReplicas: 2
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: now-40d
+  generation: 3
+  labels:
+    app.kubernetes.io/name: webhooks
+    app.kubernetes.io/part-of: analytics
+  name: webhooks
+  namespace: analytics
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: webhooks
+  template:
+    metadata:
+      labels:
+        app: webhooks
+    spec:
+      containers:
+        - env: []
+          image: ghcr.io/example/analytics-webhooks:1.8.0
+          name: webhooks
+          ports:
+            - containerPort: 3000
+              name: http
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+          resources:
+            limits:
+              memory: 256Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+status:
+  availableReplicas: 1
+  observedGeneration: 3
+  readyReplicas: 1
+  replicas: 1
+  updatedReplicas: 1
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  creationTimestamp: now-60d
+  labels:
+    app.kubernetes.io/component: database
+    app.kubernetes.io/name: clickhouse
+  name: clickhouse
+  namespace: analytics
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: clickhouse
+  serviceName: clickhouse
+  template:
+    metadata:
+      labels:
+        app: clickhouse
+    spec:
+      containers:
+        - env: []
+          image: clickhouse/clickhouse-server:25.8
+          name: clickhouse
+          resources:
+            limits:
+              memory: 1Gi
+            requests:
+              cpu: 250m
+              memory: 512Mi
+          volumeMounts:
+            - mountPath: /data
+              name: data
+  volumeClaimTemplates:
+    - apiVersion: v1
+      kind: PersistentVolumeClaim
+      metadata:
+        name: data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 50Gi
+status:
+  readyReplicas: 1
+  replicas: 1
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  creationTimestamp: now-69d
+  labels:
+    app.kubernetes.io/component: database
+    app.kubernetes.io/name: redis
+  name: redis
+  namespace: analytics
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+  serviceName: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+    spec:
+      containers:
+        - env: []
+          image: redis:8
+          name: redis
+          resources:
+            limits:
+              memory: 1Gi
+            requests:
+              cpu: 250m
+              memory: 512Mi
+          volumeMounts:
+            - mountPath: /data
+              name: data
+  volumeClaimTemplates:
+    - apiVersion: v1
+      kind: PersistentVolumeClaim
+      metadata:
+        name: data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 50Gi
+status:
+  readyReplicas: 1
+  replicas: 1
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  creationTimestamp: now-32d
+  labels:
+    app.kubernetes.io/component: database
+    app.kubernetes.io/name: db
+  name: db
+  namespace: analytics
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: db
+  serviceName: db
+  template:
+    metadata:
+      labels:
+        app: db
+    spec:
+      containers:
+        - env: []
+          image: postgres:18
+          name: db
+          resources:
+            limits:
+              memory: 1Gi
+            requests:
+              cpu: 250m
+              memory: 512Mi
+          volumeMounts:
+            - mountPath: /data
+              name: data
+  volumeClaimTemplates:
+    - apiVersion: v1
+      kind: PersistentVolumeClaim
+      metadata:
+        name: data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 50Gi
+status:
+  readyReplicas: 1
+  replicas: 1
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-1d4h3m
+  labels:
+    app: dashboard
+  name: dashboard-7d4c9-000x
+  namespace: analytics
+  ownerReferences: []
+spec:
+  containers:
+    - image: example
+      name: dashboard
+  nodeName: vps-3
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: dashboard
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-1d4h4m
+  labels:
+    app: dashboard
+  name: dashboard-7d4c9-001x
+  namespace: analytics
+  ownerReferences: []
+spec:
+  containers:
+    - image: example
+      name: dashboard
+  nodeName: vps-1
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: dashboard
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-1d4h35m
+  labels:
+    app: collector
+  name: collector-7d4c9-010x
+  namespace: analytics
+  ownerReferences: []
+spec:
+  containers:
+    - image: example
+      name: collector
+  nodeName: vps-3
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: collector
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-23h19m
+  labels:
+    app: ingest
+  name: ingest-7d4c9-020x
+  namespace: analytics
+  ownerReferences: []
+spec:
+  containers:
+    - image: example
+      name: ingest
+  nodeName: vps-3
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: ingest
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-1d2h38m
+  labels:
+    app: enricher
+  name: enricher-7d4c9-030x
+  namespace: analytics
+  ownerReferences: []
+spec:
+  containers:
+    - image: example
+      name: enricher
+  nodeName: vps-1
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: enricher
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-1d2h39m
+  labels:
+    app: enricher
+  name: enricher-7d4c9-031x
+  namespace: analytics
+  ownerReferences: []
+spec:
+  containers:
+    - image: example
+      name: enricher
+  nodeName: vps-3
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: enricher
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-1d2h40m
+  labels:
+    app: enricher
+  name: enricher-7d4c9-032x
+  namespace: analytics
+  ownerReferences: []
+spec:
+  containers:
+    - image: example
+      name: enricher
+  nodeName: vps-1
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: enricher
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-1d8h45m
+  labels:
+    app: sessionizer
+  name: sessionizer-7d4c9-040x
+  namespace: analytics
+  ownerReferences: []
+spec:
+  containers:
+    - image: example
+      name: sessionizer
+  nodeName: vps-3
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: sessionizer
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-21h24m
+  labels:
+    app: geoip
+  name: geoip-7d4c9-050x
+  namespace: analytics
+  ownerReferences: []
+spec:
+  containers:
+    - image: example
+      name: geoip
+  nodeName: vps-1
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: geoip
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-21h25m
+  labels:
+    app: geoip
+  name: geoip-7d4c9-051x
+  namespace: analytics
+  ownerReferences: []
+spec:
+  containers:
+    - image: example
+      name: geoip
+  nodeName: vps-3
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: geoip
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-1d4h47m
+  labels:
+    app: useragent
+  name: useragent-7d4c9-060x
+  namespace: analytics
+  ownerReferences: []
+spec:
+  containers:
+    - image: example
+      name: useragent
+  nodeName: vps-3
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: useragent
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-23h5m
+  labels:
+    app: dedupe
+  name: dedupe-7d4c9-070x
+  namespace: analytics
+  ownerReferences: []
+spec:
+  containers:
+    - image: example
+      name: dedupe
+  nodeName: vps-3
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: dedupe
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-1d1h11m
+  labels:
+    app: sampler
+  name: sampler-7d4c9-080x
+  namespace: analytics
+  ownerReferences: []
+spec:
+  containers:
+    - image: example
+      name: sampler
+  nodeName: vps-3
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: sampler
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-1d1h12m
+  labels:
+    app: sampler
+  name: sampler-7d4c9-081x
+  namespace: analytics
+  ownerReferences: []
+spec:
+  containers:
+    - image: example
+      name: sampler
+  nodeName: vps-1
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: sampler
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-1d1h13m
+  labels:
+    app: sampler
+  name: sampler-7d4c9-082x
+  namespace: analytics
+  ownerReferences: []
+spec:
+  containers:
+    - image: example
+      name: sampler
+  nodeName: vps-3
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: sampler
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-1d6h15m
+  labels:
+    app: aggregator
+  name: aggregator-7d4c9-090x
+  namespace: analytics
+  ownerReferences: []
+spec:
+  containers:
+    - image: example
+      name: aggregator
+  nodeName: vps-3
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: aggregator
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-1d11h38m
+  labels:
+    app: rollup-hourly
+  name: rollup-hourly-7d4c9-100x
+  namespace: analytics
+  ownerReferences: []
+spec:
+  containers:
+    - image: example
+      name: rollup-hourly
+  nodeName: vps-1
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: rollup-hourly
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-1d11h39m
+  labels:
+    app: rollup-hourly
+  name: rollup-hourly-7d4c9-101x
+  namespace: analytics
+  ownerReferences: []
+spec:
+  containers:
+    - image: example
+      name: rollup-hourly
+  nodeName: vps-3
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: rollup-hourly
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-1d9h15m
+  labels:
+    app: rollup-daily
+  name: rollup-daily-7d4c9-110x
+  namespace: analytics
+  ownerReferences: []
+spec:
+  containers:
+    - image: example
+      name: rollup-daily
+  nodeName: vps-3
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: rollup-daily
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-1d3h19m
+  labels:
+    app: exporter
+  name: exporter-7d4c9-120x
+  namespace: analytics
+  ownerReferences: []
+spec:
+  containers:
+    - image: example
+      name: exporter
+  nodeName: vps-3
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: exporter
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-23h22m
+  labels:
+    app: alerts
+  name: alerts-7d4c9-130x
+  namespace: analytics
+  ownerReferences: []
+spec:
+  containers:
+    - image: example
+      name: alerts
+  nodeName: vps-1
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: alerts
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-23h23m
+  labels:
+    app: alerts
+  name: alerts-7d4c9-131x
+  namespace: analytics
+  ownerReferences: []
+spec:
+  containers:
+    - image: example
+      name: alerts
+  nodeName: vps-3
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: alerts
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-23h24m
+  labels:
+    app: alerts
+  name: alerts-7d4c9-132x
+  namespace: analytics
+  ownerReferences: []
+spec:
+  containers:
+    - image: example
+      name: alerts
+  nodeName: vps-1
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: alerts
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-1d2h56m
+  labels:
+    app: notifier
+  name: notifier-7d4c9-140x
+  namespace: analytics
+  ownerReferences: []
+spec:
+  containers:
+    - image: example
+      name: notifier
+  nodeName: vps-1
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: notifier
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-1d4h32m
+  labels:
+    app: scheduler
+  name: scheduler-7d4c9-150x
+  namespace: analytics
+  ownerReferences: []
+spec:
+  containers:
+    - image: example
+      name: scheduler
+  nodeName: vps-1
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: scheduler
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-1d4h33m
+  labels:
+    app: scheduler
+  name: scheduler-7d4c9-151x
+  namespace: analytics
+  ownerReferences: []
+spec:
+  containers:
+    - image: example
+      name: scheduler
+  nodeName: vps-3
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: scheduler
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-22h
+  labels:
+    app: query
+  name: query-7d4c9-160x
+  namespace: analytics
+  ownerReferences: []
+spec:
+  containers:
+    - image: example
+      name: query
+  nodeName: vps-1
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: query
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-1d7h6m
+  labels:
+    app: query-cache
+  name: query-cache-7d4c9-170x
+  namespace: analytics
+  ownerReferences: []
+spec:
+  containers:
+    - image: example
+      name: query-cache
+  nodeName: vps-1
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: query-cache
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-23h24m
+  labels:
+    app: funnel
+  name: funnel-7d4c9-180x
+  namespace: analytics
+  ownerReferences: []
+spec:
+  containers:
+    - image: example
+      name: funnel
+  nodeName: vps-1
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: funnel
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-23h25m
+  labels:
+    app: funnel
+  name: funnel-7d4c9-181x
+  namespace: analytics
+  ownerReferences: []
+spec:
+  containers:
+    - image: example
+      name: funnel
+  nodeName: vps-3
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: funnel
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-23h26m
+  labels:
+    app: funnel
+  name: funnel-7d4c9-182x
+  namespace: analytics
+  ownerReferences: []
+spec:
+  containers:
+    - image: example
+      name: funnel
+  nodeName: vps-1
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: funnel
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-1d5h1m
+  labels:
+    app: retention
+  name: retention-7d4c9-190x
+  namespace: analytics
+  ownerReferences: []
+spec:
+  containers:
+    - image: example
+      name: retention
+  nodeName: vps-3
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: retention
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-1d1h19m
+  labels:
+    app: cohorts
+  name: cohorts-7d4c9-200x
+  namespace: analytics
+  ownerReferences: []
+spec:
+  containers:
+    - image: example
+      name: cohorts
+  nodeName: vps-3
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: cohorts
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-1d1h20m
+  labels:
+    app: cohorts
+  name: cohorts-7d4c9-201x
+  namespace: analytics
+  ownerReferences: []
+spec:
+  containers:
+    - image: example
+      name: cohorts
+  nodeName: vps-1
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: cohorts
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-21h34m
+  labels:
+    app: paths
+  name: paths-7d4c9-210x
+  namespace: analytics
+  ownerReferences: []
+spec:
+  containers:
+    - image: example
+      name: paths
+  nodeName: vps-1
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: paths
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-1d2h42m
+  labels:
+    app: heatmaps
+  name: heatmaps-7d4c9-220x
+  namespace: analytics
+  ownerReferences: []
+spec:
+  containers:
+    - image: example
+      name: heatmaps
+  nodeName: vps-1
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: heatmaps
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-23h25m
+  labels:
+    app: replay
+  name: replay-7d4c9-230x
+  namespace: analytics
+  ownerReferences: []
+spec:
+  containers:
+    - image: example
+      name: replay
+  nodeName: vps-3
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: replay
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-23h26m
+  labels:
+    app: replay
+  name: replay-7d4c9-231x
+  namespace: analytics
+  ownerReferences: []
+spec:
+  containers:
+    - image: example
+      name: replay
+  nodeName: vps-1
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: replay
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-23h27m
+  labels:
+    app: replay
+  name: replay-7d4c9-232x
+  namespace: analytics
+  ownerReferences: []
+spec:
+  containers:
+    - image: example
+      name: replay
+  nodeName: vps-3
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: replay
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-1d2h53m
+  labels:
+    app: uploader
+  name: uploader-7d4c9-240x
+  namespace: analytics
+  ownerReferences: []
+spec:
+  containers:
+    - image: example
+      name: uploader
+  nodeName: vps-3
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: uploader
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-1d4h42m
+  labels:
+    app: compactor
+  name: compactor-7d4c9-250x
+  namespace: analytics
+  ownerReferences: []
+spec:
+  containers:
+    - image: example
+      name: compactor
+  nodeName: vps-1
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: compactor
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-1d4h43m
+  labels:
+    app: compactor
+  name: compactor-7d4c9-251x
+  namespace: analytics
+  ownerReferences: []
+spec:
+  containers:
+    - image: example
+      name: compactor
+  nodeName: vps-3
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: compactor
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-1d2h47m
+  labels:
+    app: archiver
+  name: archiver-7d4c9-260x
+  namespace: analytics
+  ownerReferences: []
+spec:
+  containers:
+    - image: example
+      name: archiver
+  nodeName: vps-3
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: archiver
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-1d1h15m
+  labels:
+    app: janitor
+  name: janitor-7d4c9-270x
+  namespace: analytics
+  ownerReferences: []
+spec:
+  containers:
+    - image: example
+      name: janitor
+  nodeName: vps-3
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: janitor
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-1d1h16m
+  labels:
+    app: metrics
+  name: metrics-7d4c9-280x
+  namespace: analytics
+  ownerReferences: []
+spec:
+  containers:
+    - image: example
+      name: metrics
+  nodeName: vps-1
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: metrics
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-1d1h17m
+  labels:
+    app: metrics
+  name: metrics-7d4c9-281x
+  namespace: analytics
+  ownerReferences: []
+spec:
+  containers:
+    - image: example
+      name: metrics
+  nodeName: vps-3
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: metrics
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-1d1h18m
+  labels:
+    app: metrics
+  name: metrics-7d4c9-282x
+  namespace: analytics
+  ownerReferences: []
+spec:
+  containers:
+    - image: example
+      name: metrics
+  nodeName: vps-1
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: metrics
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-23h19m
+  labels:
+    app: tracer
+  name: tracer-7d4c9-290x
+  namespace: analytics
+  ownerReferences: []
+spec:
+  containers:
+    - image: example
+      name: tracer
+  nodeName: vps-3
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: tracer
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-1d2h57m
+  labels:
+    app: profiler
+  name: profiler-7d4c9-300x
+  namespace: analytics
+  ownerReferences: []
+spec:
+  containers:
+    - image: example
+      name: profiler
+  nodeName: vps-3
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: profiler
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-1d2h58m
+  labels:
+    app: profiler
+  name: profiler-7d4c9-301x
+  namespace: analytics
+  ownerReferences: []
+spec:
+  containers:
+    - image: example
+      name: profiler
+  nodeName: vps-1
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: profiler
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-1d4h41m
+  labels:
+    app: segmenter
+  name: segmenter-7d4c9-310x
+  namespace: analytics
+  ownerReferences: []
+spec:
+  containers:
+    - image: example
+      name: segmenter
+  nodeName: vps-3
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: segmenter
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-1d8h37m
+  labels:
+    app: attribution
+  name: attribution-7d4c9-320x
+  namespace: analytics
+  ownerReferences: []
+spec:
+  containers:
+    - image: example
+      name: attribution
+  nodeName: vps-3
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: attribution
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-1d8h37m
+  labels:
+    app: experiments
+  name: experiments-7d4c9-330x
+  namespace: analytics
+  ownerReferences: []
+spec:
+  containers:
+    - image: example
+      name: experiments
+  nodeName: vps-3
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: experiments
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-1d8h38m
+  labels:
+    app: experiments
+  name: experiments-7d4c9-331x
+  namespace: analytics
+  ownerReferences: []
+spec:
+  containers:
+    - image: example
+      name: experiments
+  nodeName: vps-1
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: experiments
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-1d8h39m
+  labels:
+    app: experiments
+  name: experiments-7d4c9-332x
+  namespace: analytics
+  ownerReferences: []
+spec:
+  containers:
+    - image: example
+      name: experiments
+  nodeName: vps-3
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: experiments
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-21h19m
+  labels:
+    app: flags
+  name: flags-7d4c9-340x
+  namespace: analytics
+  ownerReferences: []
+spec:
+  containers:
+    - image: example
+      name: flags
+  nodeName: vps-3
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: flags
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-1d9h2m
+  labels:
+    app: billing-sync
+  name: billing-sync-7d4c9-350x
+  namespace: analytics
+  ownerReferences: []
+spec:
+  containers:
+    - image: example
+      name: billing-sync
+  nodeName: vps-1
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: billing-sync
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-1d9h3m
+  labels:
+    app: billing-sync
+  name: billing-sync-7d4c9-351x
+  namespace: analytics
+  ownerReferences: []
+spec:
+  containers:
+    - image: example
+      name: billing-sync
+  nodeName: vps-3
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: billing-sync
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-1d13h5m
+  labels:
+    app: warehouse-sync
+  name: warehouse-sync-7d4c9-360x
+  namespace: analytics
+  ownerReferences: []
+spec:
+  containers:
+    - image: example
+      name: warehouse-sync
+  nodeName: vps-3
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: warehouse-sync
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-1d2h21m
+  labels:
+    app: backfill
+  name: backfill-7d4c9-370x
+  namespace: analytics
+  ownerReferences: []
+spec:
+  containers:
+    - image: example
+      name: backfill
+  nodeName: vps-3
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: backfill
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-1d4h44m
+  labels:
+    app: reindexer
+  name: reindexer-7d4c9-380x
+  namespace: analytics
+  ownerReferences: []
+spec:
+  containers:
+    - image: example
+      name: reindexer
+  nodeName: vps-1
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: reindexer
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-1d4h45m
+  labels:
+    app: reindexer
+  name: reindexer-7d4c9-381x
+  namespace: analytics
+  ownerReferences: []
+spec:
+  containers:
+    - image: example
+      name: reindexer
+  nodeName: vps-3
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: reindexer
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-1d4h46m
+  labels:
+    app: reindexer
+  name: reindexer-7d4c9-382x
+  namespace: analytics
+  ownerReferences: []
+spec:
+  containers:
+    - image: example
+      name: reindexer
+  nodeName: vps-1
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: reindexer
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-1d8h50m
+  labels:
+    app: snapshotter
+  name: snapshotter-7d4c9-390x
+  namespace: analytics
+  ownerReferences: []
+spec:
+  containers:
+    - image: example
+      name: snapshotter
+  nodeName: vps-1
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: snapshotter
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-21h26m
+  labels:
+    app: audit
+  name: audit-7d4c9-400x
+  namespace: analytics
+  ownerReferences: []
+spec:
+  containers:
+    - image: example
+      name: audit
+  nodeName: vps-1
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: audit
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-21h27m
+  labels:
+    app: audit
+  name: audit-7d4c9-401x
+  namespace: analytics
+  ownerReferences: []
+spec:
+  containers:
+    - image: example
+      name: audit
+  nodeName: vps-3
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: audit
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-1d2h58m
+  labels:
+    app: webhooks
+  name: webhooks-7d4c9-410x
+  namespace: analytics
+  ownerReferences: []
+spec:
+  containers:
+    - image: example
+      name: webhooks
+  nodeName: vps-1
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: webhooks
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-19h49m
+  labels:
+    app: clickhouse
+  name: clickhouse-0
+  namespace: analytics
+  ownerReferences:
+    - apiVersion: apps/v1
+      controller: true
+      kind: StatefulSet
+      name: clickhouse
+      uid: 00000000-0000-0000-0000-000000000000
+spec:
+  containers:
+    - image: example
+      name: clickhouse
+  nodeName: vps-3
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: clickhouse
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-10h58m
+  labels:
+    app: redis
+  name: redis-0
+  namespace: analytics
+  ownerReferences:
+    - apiVersion: apps/v1
+      controller: true
+      kind: StatefulSet
+      name: redis
+      uid: 00000000-0000-0000-0000-000000000000
+spec:
+  containers:
+    - image: example
+      name: redis
+  nodeName: vps-1
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: redis
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  creationTimestamp: now-5h21m
+  labels:
+    app: db
+  name: db-0
+  namespace: analytics
+  ownerReferences:
+    - apiVersion: apps/v1
+      controller: true
+      kind: StatefulSet
+      name: db
+      uid: 00000000-0000-0000-0000-000000000000
+spec:
+  containers:
+    - image: example
+      name: db
+  nodeName: vps-3
+status:
+  containerStatuses:
+    - image: example
+      imageID: ""
+      name: db
+      ready: true
+      restartCount: 0
+      state:
+        running: {}
+  phase: Running
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dashboard
+  namespace: analytics
+spec:
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+  selector:
+    app: dashboard
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: dashboard
+  namespace: analytics
+spec:
+  rules:
+    - host: stats.example.com
+      http:
+        paths:
+          - backend:
+              service:
+                name: dashboard
+                port:
+                  name: http
+            path: /
+            pathType: Prefix
+  tls:
+    - hosts:
+        - stats.example.com
+      secretName: dashboard-tls
+status:
+  loadBalancer:
+    ingress:
+      - ip: 203.0.113.10
