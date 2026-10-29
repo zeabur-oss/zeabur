@@ -59,7 +59,7 @@ l2_report() {
     echo "| Measure | Bytes |"
     echo "|---|---|"
     echo "| Image \`zeabur\` | $(docker image inspect --format '{{.Size}}' zeabur:dev 2>/dev/null || echo n/a) |"
-    echo "| Pod working set after 60 s idle | $(jq -r .pod_working_set_bytes "$measurements" 2>/dev/null || echo n/a) |"
+    echo "| Pod working set when idle | $(jq -r .pod_working_set_bytes "$measurements" 2>/dev/null || echo n/a) |"
   } >>"$GITHUB_STEP_SUMMARY"
 }
 
