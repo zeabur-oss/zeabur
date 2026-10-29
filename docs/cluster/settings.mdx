@@ -16,7 +16,7 @@ The language and theme under **Preferences** are stored only in your browser and
 
 ## Change the cluster name
 
-The cluster name appears in the sidebar and on every page to help distinguish between clusters. Changing it doesn't change the cluster itself.
+The cluster name appears in the sidebar and on every page so you can tell clusters apart. Changing it doesn't change the cluster itself.
 
 <Steps>
 <Step>
@@ -37,9 +37,9 @@ Click **Use the default name** to restore the `clusterName` set during installat
 
 ## Choose a usage history source
 
-Service and node **Usage** charts, along with disk usage, read data from a storage service that supports the Prometheus HTTP API. Zeabur reads it through the Kubernetes API using each person's own permissions. When Zeabur Proxy is enabled, the Proxy reads service usage history from the default storage service, and project members can see only their project's metrics.
+Service and node **Usage** charts and disk usage read data from a storage service that supports the Prometheus HTTP API. Zeabur reads it through the Kubernetes API with each person's own permissions. When Zeabur Proxy is enabled, the Proxy reads service usage history from the default storage service, and project members can see only their project's metrics.
 
-Go to **Settings** → **Usage history** and enter the storage service's Kubernetes Service in **History source**, using the format `namespace/name:port`. The default is VictoriaMetrics, which Zeabur recommends: `observability/vmsingle-vm-victoria-metrics-k8s-stack:8428`. After you click **Save**, **Status** shows:
+Go to **Settings** → **Usage history** and enter the storage service's Kubernetes Service in **History source**, in the format `namespace/name:port`. The default is VictoriaMetrics, which Zeabur recommends: `observability/vmsingle-vm-victoria-metrics-k8s-stack:8428`. After you click **Save**, **Status** shows:
 
 | Status | Meaning |
 | --- | --- |
@@ -48,7 +48,7 @@ Go to **Settings** → **Usage history** and enter the storage service's Kuberne
 | **No access** | You don't have permission to read this Service through the Kubernetes API. |
 | **Not responding** | The Service exists but doesn't respond to Prometheus API queries. |
 
-Anyone who can read the storage service directly can see metrics for all projects, so grant access only to people who can view the entire cluster. If you switch to another storage service, Zeabur Proxy won't read it. Project members no longer see usage history; only people with direct read access do. Click **Use the default** to restore the installation setting.
+Anyone who can read the storage service directly can see metrics for all projects, so grant access only to people who can view the entire cluster. If you switch to another storage service, Zeabur Proxy doesn't read it. Project members no longer see usage history; only people with direct read access do. Click **Use the default** to restore the installation setting.
 
 ## Set domains for new services
 
@@ -92,7 +92,7 @@ To restore a default, delete its key:
 kubectl -n zeabur patch configmap zeabur-settings --type json -p '[{"op":"remove","path":"/data/cluster-name"}]'
 ```
 
-The installation values come from the Chart's `clusterName`, `metricsStore.service`, and `domains.suffixes`. When you install with Installer, the domains come from `suffixes` in the config file. See [Installer configuration](../reference/installer-configuration.mdx).
+The installation values come from the Chart's `clusterName`, `metricsStore.service`, and `domains.suffixes`. When you install with zeabur-installer, the domains come from `suffixes` in the config file. See [Installer configuration](../reference/installer-configuration.mdx).
 
 ## Verify the changes
 

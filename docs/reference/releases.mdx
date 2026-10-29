@@ -3,7 +3,7 @@ title: Release files and verification
 description: Choose Zeabur release files for your operating system, then verify checksums, signatures, and build provenance before running them.
 ---
 
-Choose a version on [GitHub Releases](https://github.com/zeabur-oss/zeabur/releases), then download the matching archive, `SHA256SUMS`, and signature. When verifying, restrict the signer to the release workflow that zeabur-oss runs for every repository, running for this repository at that version's tag. Extract and run the files only after verification passes.
+Choose a version on [GitHub Releases](https://github.com/zeabur-oss/zeabur/releases), then download the matching archive, `SHA256SUMS`, and signature. When verifying, accept only the shared zeabur-oss release workflow as the signer, and only when it ran for this repository at that version's tag. Extract and run the files only after verification passes.
 
 ## Files and platforms
 
@@ -20,7 +20,7 @@ Choose a version on [GitHub Releases](https://github.com/zeabur-oss/zeabur/relea
 
 Every archive holds the binary and `LICENSE`. macOS builds are for Apple silicon (`arm64`) only; there's no Intel Mac build. `zeabur` and the installer run only on Linux. On macOS, you only need `zeaburctl`.
 
-At release time, the chart's `image.digest` and `proxy.image.digest` are pinned to that release's image indexes. Installing with the chart's defaults gives you the same images. Image tags and chart versions have no leading `v`; GitHub release tags and archive filenames do.
+At release time, the workflow pins the chart's `image.digest` and `proxy.image.digest` to that release's image indexes. Installing with the chart's defaults gives you the same images. Image tags and chart versions have no leading `v`; GitHub release tags and archive filenames do.
 
 ## Download and verify binaries
 
@@ -41,7 +41,7 @@ gh release download "v$version" --repo zeabur-oss/zeabur \
 
 You can set `platform` to `linux-amd64` or `linux-arm64`. To download the installer, set `binary` to `zeabur-installer` and choose a Linux platform.
 
-Every zeabur-oss release is built and signed by the shared release workflow in [zeabur-oss/.github](https://github.com/zeabur-oss/.github), so the signer is that workflow (`signer` below), and the certificate also names the repository and tag it ran for. Open the download directory, then verify the checksum list's signer, the file contents, and the build provenance in that order:
+The shared release workflow in [zeabur-oss/.github](https://github.com/zeabur-oss/.github) builds and signs every zeabur-oss release, so that workflow is the signer (`signer` below). The certificate also names the repository and tag it ran for. Open the download directory, then verify the checksum list's signer, the file contents, and the build provenance in that order:
 
 ```sh
 cd "zeabur-$version"
@@ -77,11 +77,11 @@ Files downloaded in a browser on macOS carry a quarantine flag. After verificati
 xattr -d com.apple.quarantine zeaburctl
 ```
 
-`gh release download` doesn't add this flag. The macOS build has a Sigstore signature but isn't notarized by Apple.
+`gh release download` doesn't add this flag. The macOS build has a Sigstore signature, but Apple hasn't notarized it.
 
 ## Verify the image and chart
 
-The release notes say what changed; they don't list digests. `digests.txt` lists the full registry references for each image's platform images and index, and the chart, one per line; Zeabur Proxy's lines start with `proxy`:
+The release notes say what changed; they don't list digests. `digests.txt` lists the full registry references for each image's platform images and index, and the chart, one per line. Zeabur Proxy's lines start with `proxy`:
 
 ```text
 linux/amd64  ghcr.io/zeabur-oss/zeabur@sha256:...
@@ -93,7 +93,7 @@ proxy index  ghcr.io/zeabur-oss/proxy@sha256:...
 chart  ghcr.io/zeabur-oss/charts/zeabur@sha256:...
 ```
 
-It's also listed in `SHA256SUMS`. Download it into the same directory, verify it with the steps above, then pass the digests it contains to cosign:
+`digests.txt` is also listed in `SHA256SUMS`. Download it into the same directory, verify it with the steps above, then pass the digests it contains to cosign:
 
 ```sh
 gh release download "v$version" --repo zeabur-oss/zeabur \

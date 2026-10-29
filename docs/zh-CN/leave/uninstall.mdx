@@ -199,7 +199,7 @@ K3s 或 RKE2 的脚本会移除 Kubernetes 和数据，所有依赖 Kubernetes �
 
 `--purge` 不会删除 `/var/lib/zeabur/storage` 中的 local-path 数据和 `/var/lib/longhorn` 中的 replica 数据。即使保留原始数据目录，也仍需要对应的 PV／PVC 和存储系统信息，才能重新接入服务。确认已有可还原的备份后，再决定如何处理这些目录。
 
-如果只需要移除一台已加入的节点，在节点的操作菜单中选择**移除节点**，见[添加和维护节点](../cluster/nodes.mdx#移除节点)。如果服务仍需使用该节点的 local-path 数据，不要直接让节点退出集群。
+只需要移除一台已加入的节点时，按[移除节点](../cluster/nodes.mdx#移除节点)的步骤，用 kubectl 迁移副本并删除节点，再到那台 VM 上卸载。如果服务仍需使用该节点的 local-path 数据，不要直接让节点退出集群。
 
 ## 移除未完成时
 

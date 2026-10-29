@@ -198,7 +198,7 @@ The K3s or RKE2 script removes Kubernetes and its data. All workloads that depen
 
 `--purge` doesn't delete local-path data in `/var/lib/zeabur/storage` or replica data in `/var/lib/longhorn`. Reattaching the original data directories to services also requires the corresponding PVs, disks, and storage system information. Confirm that you have backups you can restore before deciding what to do with these directories.
 
-To remove only a node that joined the cluster, choose **Remove node** from the node's action menu. See [Add and maintain nodes](../cluster/nodes.mdx#remove-a-node). Don't remove a node while services still need its local-path data.
+To remove only a node that joined the cluster, follow [Remove a node](../cluster/nodes.mdx#remove-a-node): drain and delete it with kubectl, then uninstall on that VM. Don't remove a node while services still need its local-path data.
 
 ## If removal doesn't finish
 

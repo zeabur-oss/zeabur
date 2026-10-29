@@ -39,7 +39,7 @@ Choose a type under **Send to** and enter its settings:
 
 Under **Events**, select at least one event, such as **Node not ready** or **Runtime security (Falco)**.
 
-Click **Review changes** and check the channel and the secret that will store the URL and token (its contents won't be shown). Then click **Add channel**.
+Click **Review changes** and check the channel and the secret that stores the URL and token (Zeabur doesn't show its contents). Then click **Add channel**.
 
 ![Add notification channel dialog with a Slack webhook URL and three event types selected](../images/shots/notify-channel-add.avif)
 
@@ -48,9 +48,9 @@ Click **Review changes** and check the channel and the secret that will store th
 
 ### Send a test
 
-Wait until the channel no longer shows **Waiting**. In the channel row, click **Send test**, review the test Job that will be created, and click **Send test** again.
+Wait until the channel no longer shows **Waiting**. In the channel row, click **Send test**, review the test Job Zeabur creates, and click **Send test** again.
 
-The test is a Job that runs for up to two minutes. When the alerting rules detect it, they send a test alert to this channel. After the page shows that the test was sent, check the destination for the message within about a minute or two.
+The test is a Job that runs for up to two minutes. When the alerting rules detect it, they send a test alert to this channel. After the page shows that the test was sent, the message reaches the destination within a minute or two.
 
 ![Channel row showing the destination and events, with Edit and Send test actions](../images/shots/notify-channels.avif)
 
@@ -194,10 +194,10 @@ kubectl -n shop delete vmalertmanagerconfig,secret zeabur-notify-ops
 - **Rejected**: The row shows the reason, such as an incomplete URL, a missing stored URL or token, or an SMTP server without a port. Click **Edit**, fix the settings, and save.
 - No test message arrives: Check the destination service's URL and token. If the page says Zeabur's alerting rules aren't installed, reinstall the metrics component.
 - You can add a channel but can't test it: Sending a test requires permission to create Jobs. Ask an administrator to check this permission.
-- **This wasn't created in Zeabur. Edit it where it was originally created**: Make the change in the original Helm or GitOps configuration.
+- **Made outside Zeabur. Change it where it was made.**: Make the change in the original Helm or GitOps configuration.
 
 ## Remove a channel
 
 Choose **Remove** from the channel's actions menu. Review the channel and secret to be deleted, then click **Remove channel**. Later alerts go only to the other channels that have the event selected.
 
-Kubernetes automatically deletes the test Job five minutes after it finishes. No manual cleanup is needed.
+Kubernetes deletes the test Job five minutes after it finishes, so you don't need to clean it up.

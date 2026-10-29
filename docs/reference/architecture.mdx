@@ -16,7 +16,7 @@ For a hands-on example, see [How Zeabur manages services](../get-started/how-it-
 
 `zeabur` serves both the API under `/api` and the web interface. The ServiceAccount created by the chart has no Role bindings, and replicas don't mount a ServiceAccount token. Every read and write uses the signed-in user's token.
 
-Zeabur Identity handles sign-in, passkeys, and short-lived tokens. Zeabur is its OAuth client and stores the client secret. kube-apiserver must be configured to trust Zeabur Identity's issuer before it accepts these tokens.
+Zeabur Identity handles sign-in, passkeys, and short-lived tokens. Zeabur is its OAuth client and stores the client secret. kube-apiserver accepts these tokens only after you configure it to trust Zeabur Identity's issuer.
 
 ## How projects and services are organized
 
@@ -37,9 +37,9 @@ Zeabur has no database of its own. Databases are operator CRs, deployments from 
 1. **Review changes** reads the current state, calculates which objects to create, update, or delete, and determines the impact.
 2. The API returns a change token, encrypted and authenticated with AES-256-GCM. It contains the user, groups, project, request, object versions, and expiration time. The token is valid for 10 minutes.
 3. When you confirm the changes, the browser sends back only this token. The API checks the identity and expiration time, rereads the objects, and recalculates the changes. If an object's version has changed, you must review the changes again.
-4. Each write first goes through a kube-apiserver dry run. Only after all dry runs pass does the API apply the writes in order. Each write includes the object's version, and each deletion includes preconditions, so it won't go through if someone else has changed the object.
+4. Each write first goes through a kube-apiserver dry run. Only after all dry runs pass does the API apply the writes in order. Each write includes the object's version, and each deletion includes preconditions, so neither goes through if someone else has changed the object.
 
-A set of changes may affect multiple objects, and Kubernetes has no cross-object transactions. If a later write fails, objects written successfully remain in the cluster. The error message lists the changes already applied. Reload the current state, then review the next set of changes.
+A set of changes can affect multiple objects, and Kubernetes has no cross-object transactions. If a later write fails, objects written successfully remain in the cluster. The error message lists the changes already applied. Reload the current state, then review the next set of changes.
 
 For objects managed by Helm, Argo CD, or Flux, Zeabur only accepts restarts. It rejects other changes and directs you to update the Helm values or Git repository. This prevents the next sync from overwriting someone's changes.
 
@@ -61,7 +61,7 @@ These components don't depend on Zeabur. When you remove Zeabur, keep the compon
 
 Live CPU and memory usage come from metrics-server. Usage history, node disk usage, and volume usage come from a metrics store that supports the Prometheus HTTP API. Zeabur queries it through the Kubernetes Service proxy with the user's permissions. When Zeabur Proxy is enabled, the Proxy queries usage history from the default metrics store based on project permissions instead.
 
-**Deployments** come from the revisions workloads retain. Timestamps and information about who made changes come from events, container statuses, and `managedFields`. Zeabur can't read revisions the cluster has deleted or events past their retention period.
+**Deployments** come from the revisions workloads retain. Timestamps and who made each change come from events, container statuses, and `managedFields`. Zeabur can't read revisions the cluster has deleted or events past their retention period.
 
 Container logs come from kubelet by default and cover only the replica's current and previous runs. With Zeabur Proxy enabled, users can read historical logs from VictoriaLogs based on project permissions. Removing the chart also removes the Proxy, but doesn't affect logs in VictoriaLogs. The log collector's `includePodLabels: false` setting has no effect in operator v0.75.0; logs still include `kubernetes.pod_labels.*`.
 
