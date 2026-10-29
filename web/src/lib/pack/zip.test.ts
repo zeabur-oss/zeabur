@@ -89,6 +89,13 @@ describe("a zip's modes and links", () => {
   })
 })
 
+describe("a zip's paths", () => {
+  test("a dot in a path does not hide the depth of a link", async () => {
+    const zip = zipOf({ "app/./l": ["../outside", LINK | 0o777], "app/file": ["x", FILE] })
+    await expect(filesOfZip(zip)).rejects.toMatchObject({ reason: "link" })
+  })
+})
+
 describe("linkStaysInside", () => {
   test("follows Zeabur Builder's rule", () => {
     expect(linkStaysInside("src/main.js", "index.js")).toBe(true)

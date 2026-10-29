@@ -91,8 +91,12 @@ export async function filesOfZip(zip: Blob): Promise<SourceFile[]> {
   const files = withoutRoot(
     Object.entries(found)
       .filter(([name]) => !name.startsWith("/") && !name.split("/").includes(".."))
-      .map(([path, data]): SourceFile => {
-        const mode = attributes.get(path)?.mode
+      .map(([name, data]): SourceFile => {
+        const mode = attributes.get(name)?.mode
+        const path = name
+          .split("/")
+          .filter((part) => part !== "" && part !== ".")
+          .join("/")
         if (mode !== undefined && (mode & FILE_TYPE) === SYMLINK)
           return { path, data: new Blob([]), link: new TextDecoder().decode(data) }
         return {
