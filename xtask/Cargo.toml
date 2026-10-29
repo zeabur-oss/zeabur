@@ -1,6 +1,6 @@
 [package]
 name = "xtask"
-description = "Development tasks for this repository, run as `cargo xtask` (dev-cluster.sh's checkouts of pinned repositories)"
+description = "Development tasks for this repository, run as `cargo xtask` (the development cluster and Zeabur Proxy's canary)"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -9,8 +9,13 @@ publish.workspace = true
 repository.workspace = true
 readme = "README.md"
 
-[dev-dependencies]
+[dependencies]
+serde_json.workspace = true
+sha2.workspace = true
 tempfile.workspace = true
+
+[dev-dependencies]
+serde-saphyr.workspace = true
 
 [lints]
 workspace = true
