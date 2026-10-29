@@ -26,12 +26,3 @@ pub(crate) fn write(text: &str) {
 pub(crate) fn error(message: &str) {
     eprintln!("xtask: {message}");
 }
-
-/// Writes text for the person at the terminal on standard error, as it is.
-#[expect(
-    clippy::print_stderr,
-    reason = "this module is the binary's terminal output"
-)]
-pub(crate) fn usage(text: &str) {
-    eprint!("{text}");
-}

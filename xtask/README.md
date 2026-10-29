@@ -3,7 +3,7 @@
 Development tasks for this repository, in the [cargo xtask](https://github.com/matklad/cargo-xtask)
 convention: `cargo xtask <task>` (an alias in `.cargo/config.toml`) builds and runs this crate.
 Nothing ships it. Git, Docker, k3d, kubectl, Helm, openssl, curl and Nix run as subprocesses;
-`cargo xtask` without arguments prints every task and option.
+`cargo xtask --help` prints every task, and `cargo xtask <task> --help` its options.
 
 ```sh
 # The development cluster (scripts/dev-cluster.sh, `nix run .#dev-cluster`): a k3d cluster with

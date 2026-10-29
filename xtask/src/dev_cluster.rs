@@ -31,29 +31,19 @@ const ZOT_CA: &str = "/etc/rancher/k3s/zot-ca.crt";
 const TOOLS: &[&str] = &["docker", "k3d", "kubectl", "helm", "openssl", "git", "curl"];
 
 /// What `up` installs besides the cluster.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, clap::ValueEnum)]
 pub(crate) enum Profile {
     /// Only the cluster, for the cluster tests of `crates/*/tests` and zeaburctl in local mode.
     Bare,
     /// Zeabur Identity and Zeabur.
+    #[default]
     Default,
-    /// Also CloudNativePG, the Percona Operator for MongoDB, Keel, zot, a test S3 and Zeabur
-    /// Builder.
+    /// Also CloudNativePG with the Barman Cloud plugin, the Percona Operator for `MongoDB`, Keel,
+    /// zot, a test S3 and Zeabur Builder.
     Full,
 }
 
 impl Profile {
-    fn parse(name: &str) -> Result<Self, String> {
-        match name {
-            "bare" => Ok(Self::Bare),
-            "default" => Ok(Self::Default),
-            "full" => Ok(Self::Full),
-            _ => Err(format!(
-                "--profile needs bare, default or full, not {name:?}"
-            )),
-        }
-    }
-
     const fn name(self) -> &'static str {
         match self {
             Self::Bare => "bare",
@@ -64,50 +54,26 @@ impl Profile {
 }
 
 /// The options of `up`.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, clap::Args)]
 pub(crate) struct Up {
+    /// What to install besides the cluster.
+    #[arg(long, value_enum, default_value_t)]
     pub(crate) profile: Profile,
-    /// A working tree of Zeabur Identity to build as it is, instead of the pinned commit.
+    /// Build Zeabur Identity from this working tree, as it is, instead of
+    /// `ZEABUR_IDENTITY_PINNED` fetched from `ZEABUR_IDENTITY_GIT`.
+    #[arg(long, value_name = "DIR", env = "ZEABUR_IDENTITY_SRC")]
     pub(crate) identity_src: Option<PathBuf>,
-    /// A working tree of Zeabur Builder to build as it is (full profile).
+    /// Build Zeabur Builder from this working tree, as it is (full profile), instead of
+    /// `ZEABUR_BUILDER_PINNED` fetched from `ZEABUR_BUILDER_GIT`.
+    #[arg(long, value_name = "DIR", env = "ZEABUR_BUILDER_SRC")]
     pub(crate) builder_src: Option<PathBuf>,
-    /// An image to run instead of one built from this checkout.
+    /// Run this Zeabur image (a local image is imported, any other is pulled) instead of one
+    /// built from this checkout; Zeabur Proxy stays off.
+    #[arg(long, value_name = "IMAGE", value_parser = clap::builder::NonEmptyStringValueParser::new())]
     pub(crate) zeabur_image: Option<String>,
-    /// A chart (directory, `.tgz` or `oci://`) instead of `deploy/chart/zeabur`.
+    /// Install this chart (directory, `.tgz` or `oci://`) instead of `deploy/chart/zeabur`.
+    #[arg(long, value_name = "CHART", value_parser = clap::builder::NonEmptyStringValueParser::new())]
     pub(crate) zeabur_chart: Option<String>,
-}
-
-impl Up {
-    /// Reads `up`'s arguments; `env` gives `ZEABUR_IDENTITY_SRC` and `ZEABUR_BUILDER_SRC`.
-    pub(crate) fn parse(
-        args: &[&str],
-        env: impl Fn(&str) -> Option<String>,
-    ) -> Result<Self, String> {
-        let from_env = |name| env(name).filter(|v| !v.is_empty()).map(PathBuf::from);
-        let mut up = Self {
-            profile: Profile::Default,
-            identity_src: from_env("ZEABUR_IDENTITY_SRC"),
-            builder_src: from_env("ZEABUR_BUILDER_SRC"),
-            zeabur_image: None,
-            zeabur_chart: None,
-        };
-        let mut args = args.iter();
-        while let Some(&flag) = args.next() {
-            let value = match args.next() {
-                Some(value) if !value.is_empty() => (*value).to_owned(),
-                _ => return Err(format!("{flag} needs a value")),
-            };
-            match flag {
-                "--profile" => up.profile = Profile::parse(&value)?,
-                "--identity-src" => up.identity_src = Some(value.into()),
-                "--builder-src" => up.builder_src = Some(value.into()),
-                "--zeabur-image" => up.zeabur_image = Some(value),
-                "--zeabur-chart" => up.zeabur_chart = Some(value),
-                _ => return Err(format!("unknown option {flag}")),
-            }
-        }
-        Ok(up)
-    }
 }
 
 /// This checkout and `target/dev-cluster`, and the commands that act on the cluster.
@@ -344,49 +310,48 @@ pub(crate) fn snapshot() -> Result<(), String> {
 mod tests {
     use std::path::PathBuf;
 
+    use clap::Parser;
+
     use super::{Profile, Up};
 
-    fn env(name: &str) -> Option<String> {
-        match name {
-            "ZEABUR_IDENTITY_SRC" => Some("../identity".to_owned()),
-            "ZEABUR_BUILDER_SRC" => Some(String::new()),
-            _ => None,
-        }
+    #[derive(Debug, Parser)]
+    struct Cli {
+        #[command(flatten)]
+        up: Up,
+    }
+
+    fn parse(args: &[&str]) -> Result<Up, clap::Error> {
+        Cli::try_parse_from(std::iter::once("up").chain(args.iter().copied())).map(|cli| cli.up)
     }
 
     #[test]
-    fn up_defaults_to_the_default_profile_and_reads_sources_from_the_environment() {
-        let up = Up::parse(&[], env).unwrap();
+    fn up_defaults_to_the_default_profile() {
+        let up = parse(&[]).unwrap();
         assert_eq!(up.profile, Profile::Default);
-        assert_eq!(up.identity_src, Some(PathBuf::from("../identity")));
-        assert_eq!(up.builder_src, None);
         assert_eq!(up.zeabur_chart, None);
     }
 
     #[test]
-    fn options_override_the_environment() {
-        let up = Up::parse(
-            &[
-                "--profile",
-                "full",
-                "--identity-src",
-                "/src/identity",
-                "--builder-src",
-                "b",
-                "--zeabur-image",
-                "ghcr.io/zeabur-oss/zeabur:0.1.1",
-                "--zeabur-chart",
-                "oci://ghcr.io/zeabur-oss/charts/zeabur",
-            ],
-            env,
-        )
+    fn up_takes_every_option() {
+        let up = parse(&[
+            "--profile",
+            "full",
+            "--identity-src",
+            "/src/identity",
+            "--builder-src",
+            "b",
+            "--zeabur-image",
+            "ghcr.io/zeabur-oss/zeabur:0.1.1",
+            "--zeabur-chart",
+            "oci://ghcr.io/zeabur-oss/charts/zeabur",
+        ])
         .unwrap();
         assert_eq!(
             up,
             Up {
                 profile: Profile::Full,
-                identity_src: Some("/src/identity".into()),
-                builder_src: Some("b".into()),
+                identity_src: Some(PathBuf::from("/src/identity")),
+                builder_src: Some(PathBuf::from("b")),
                 zeabur_image: Some("ghcr.io/zeabur-oss/zeabur:0.1.1".to_owned()),
                 zeabur_chart: Some("oci://ghcr.io/zeabur-oss/charts/zeabur".to_owned()),
             }
@@ -395,9 +360,10 @@ mod tests {
 
     #[test]
     fn up_refuses_unknown_profiles_options_and_missing_values() {
-        assert!(Up::parse(&["--profile", "huge"], env).is_err());
-        assert!(Up::parse(&["--profile"], env).is_err());
-        assert!(Up::parse(&["--identity-src", ""], env).is_err());
-        assert!(Up::parse(&["--fast", "yes"], env).is_err());
+        assert!(parse(&["--profile", "huge"]).is_err());
+        assert!(parse(&["--profile"]).is_err());
+        assert!(parse(&["--identity-src", ""]).is_err());
+        assert!(parse(&["--zeabur-image", ""]).is_err());
+        assert!(parse(&["--fast", "yes"]).is_err());
     }
 }
