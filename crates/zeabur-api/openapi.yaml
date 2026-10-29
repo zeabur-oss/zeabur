@@ -9335,11 +9335,6 @@ components:
       - webUrl
       - unreadable
       properties:
-        apiUrlRefused:
-          type: boolean
-          description: >-
-            The Secret's `api-url` is not an https URL, which is why the installations were
-            not read.
         app:
           oneOf:
           - $ref: "#/components/schemas/GitHubAppView"
@@ -9356,10 +9351,10 @@ components:
             $ref: "#/components/schemas/GitHubInstallation"
           description: The App's installations; absent when they could not be read.
         installationsProblem:
-          type:
-          - string
-          - "null"
-          description: Why the installations could not be read, in GitHub's or Zeabur's words.
+          oneOf:
+          - $ref: "#/components/schemas/Problem"
+            description: "Why the installations could not be read: the Secret is unusable, or GitHub did not answer."
+          - type: "null"
         namespace:
           type: string
           description: Zeabur Builder's namespace, where the App is kept.

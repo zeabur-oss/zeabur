@@ -2739,8 +2739,6 @@ export const zhCN: Messages = {
   "githubApp.pollsOnly": "没有 Webhook，由 Zeabur Builder 每分钟去 GitHub 检查一次。",
   "githubApp.installations": "已安装的账号",
   "githubApp.noInstallations": "还没安装到任何账号。装到存放仓库的账号或组织，就能开始部署。",
-  "githubApp.installationsProblem": "读不到 GitHub 上的安装情况。",
-  "githubApp.apiUrlNotHttps": "github-app Secret 里的 api-url 要是 https 地址。改好后刷新页面。",
   "githubApp.selection.all": "所有仓库",
   "githubApp.selection.selected": "指定的仓库",
   "githubApp.everyProject": "所有项目",

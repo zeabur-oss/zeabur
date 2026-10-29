@@ -90,12 +90,9 @@ pub struct GitHubApp {
     /// The App's installations; absent when they could not be read.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub installations: Option<Vec<GitHubInstallation>>,
-    /// Why the installations could not be read, in GitHub's or Zeabur's words.
+    /// Why the installations could not be read: the Secret is unusable, or GitHub did not answer.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub installations_problem: Option<String>,
-    /// The Secret's `api-url` is not an https URL, which is why the installations were not read.
-    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
-    pub api_url_refused: bool,
+    pub installations_problem: Option<Problem>,
     /// Where people open GitHub, `https://github.com`.
     pub web_url: String,
     /// What could not be read.
@@ -531,22 +528,17 @@ pub(crate) async fn get(
     let (installations, installations_problem) = if app.is_some() {
         match listed(&state, cluster, grants.as_ref()).await {
             Ok(list) => (Some(list), None),
-            Err(why) => (None, Some(why)),
+            Err(why) => (None, Some(*why.0)),
         }
     } else {
         (None, None)
     };
-    let api_url_refused = matches!(
-        installations_problem.as_deref(),
-        Some(API_URL_NOT_HTTPS | "`api-url` has no host")
-    );
     Ok(Json(GitHubApp {
         namespace: NAMESPACE.to_owned(),
         app,
         can_change,
         installations,
         installations_problem,
-        api_url_refused,
         web_url: state.settings.github.web_url.clone(),
         unreadable,
     }))
@@ -556,13 +548,15 @@ async fn listed(
     state: &AppState,
     cluster: &dyn Cluster,
     grants: Option<&Value>,
-) -> Result<Vec<GitHubInstallation>, String> {
-    let (issuer, key, api) = credentials(cluster, &state.settings.github.api_url)
+) -> Result<Vec<GitHubInstallation>, ApiError> {
+    let (issuer, key, api) = credentials(cluster, &state.settings.github.api_url).await?;
+    let http = client(state)?;
+    let jwt =
+        github::jwt(&issuer, &key, (state.clock)().as_second()).map_err(|e| github_problem(&e))?;
+    let found = GitHub { http, api: &api }
+        .installations(&jwt)
         .await
-        .map_err(|e| e.0.detail.clone())?;
-    let http = client(state).map_err(|e| e.0.detail.clone())?;
-    let jwt = github::jwt(&issuer, &key, (state.clock)().as_second())?;
-    let found = GitHub { http, api: &api }.installations(&jwt).await?;
+        .map_err(|e| github_problem(&e))?;
     Ok(found
         .into_iter()
         .map(|i| {

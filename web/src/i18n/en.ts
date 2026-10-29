@@ -2992,9 +2992,6 @@ export const en = {
   "githubApp.installations": "Installed on",
   "githubApp.noInstallations":
     "Not installed on any account yet. Install it on the accounts or organizations that hold your repositories.",
-  "githubApp.installationsProblem": "Couldn't read the installations from GitHub.",
-  "githubApp.apiUrlNotHttps":
-    "The api-url in the github-app Secret must be an https URL. Change it, then reload.",
   "githubApp.selection.all": "All repositories",
   "githubApp.selection.selected": "Selected repositories",
   "githubApp.everyProject": "Every project",

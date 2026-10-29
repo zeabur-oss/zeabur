@@ -2747,8 +2747,6 @@ export const zhTW: Messages = {
   "githubApp.pollsOnly": "沒有 Webhook，由 Zeabur Builder 每分鐘去 GitHub 檢查一次。",
   "githubApp.installations": "已安裝的帳號",
   "githubApp.noInstallations": "還沒安裝到任何帳號。裝到放儲存庫的帳號或組織，就能開始部署。",
-  "githubApp.installationsProblem": "讀不到 GitHub 上的安裝狀態。",
-  "githubApp.apiUrlNotHttps": "github-app Secret 裡的 api-url 要是 https 網址。改好後重新整理。",
   "githubApp.selection.all": "所有儲存庫",
   "githubApp.selection.selected": "指定的儲存庫",
   "githubApp.everyProject": "所有專案",

@@ -459,9 +459,13 @@ mod tests {
         });
         let (status, found) = send(&app, "GET", BASE, None).await;
         assert_eq!(status, StatusCode::OK, "{found}");
-        assert_eq!(found["apiUrlRefused"], true, "{found}");
+        let problem = &found["installationsProblem"];
         assert_eq!(
-            found["installationsProblem"], "`api-url` must be an https URL",
+            problem["detail"], "`api-url` must be an https URL",
+            "{found}"
+        );
+        assert_eq!(
+            problem["summary"]["key"], "problem.summary.githubApiUrl",
             "{found}"
         );
         let body = json!({"installationId": INSTALLATION, "namespaces": ["shop"]});
