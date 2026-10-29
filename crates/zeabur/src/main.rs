@@ -20,6 +20,9 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use clap::Parser;
+use tracing_subscriber::filter::{LevelFilter, Targets};
+use tracing_subscriber::layer::SubscriberExt as _;
+use tracing_subscriber::util::SubscriberInitExt as _;
 use zeabur_auth::client::{ClientConfig, OAuthClient};
 use zeabur_auth::flow::FlowKey;
 use zeabur_auth::passkey::PasskeyEndpoints;
@@ -39,9 +42,22 @@ const SWEEP: Duration = Duration::from_secs(60);
 /// the 30 s a pod gets by default before it is killed.
 const DRAIN: Duration = Duration::from_secs(10);
 
+/// Info and above, and nothing from kube-rs (targets `kube_client`, `kube_core` …). kube-rs logs
+/// response bodies, such as an admission message that quotes a Secret value or an object it
+/// cannot parse, at `WARN`, `DEBUG` and `TRACE`. Zeabur gets the same errors as values.
+fn log_filter() -> Targets {
+    Targets::new()
+        .with_default(LevelFilter::INFO)
+        .with_target("kube", LevelFilter::OFF)
+}
+
 fn main() -> ExitCode {
     let args = Args::parse();
-    tracing_subscriber::fmt().with_target(false).init();
+    tracing_subscriber::fmt()
+        .with_target(false)
+        .finish()
+        .with(log_filter())
+        .init();
     if let Err(error) = zeabur_core::secret::forbid_core_dumps() {
         tracing::warn!(event = "server.core_dumps", %error, "core dumps stay possible");
     }
@@ -245,7 +261,31 @@ async fn stop_signal() {
 
 #[cfg(test)]
 mod tests {
-    use super::listen;
+    use tracing::Level;
+
+    use super::{listen, log_filter};
+
+    /// kube-rs's own lines stay out at every level; Zeabur's info and warnings stay in, also
+    /// those of `zeabur_kube`, whose name contains `kube`.
+    #[test]
+    fn the_log_filter_drops_kube_rs() {
+        let filter = log_filter();
+        for (target, level, logged) in [
+            ("kube_client::client", Level::ERROR, false),
+            ("kube_client::client", Level::WARN, false),
+            ("kube_client::client", Level::DEBUG, false),
+            ("kube_core::response", Level::TRACE, false),
+            ("zeabur_kube", Level::WARN, true),
+            ("zeabur::server", Level::INFO, true),
+            ("zeabur::server", Level::DEBUG, false),
+        ] {
+            assert_eq!(
+                filter.would_enable(target, &level),
+                logged,
+                "{target} at {level}"
+            );
+        }
+    }
 
     /// The default listener takes IPv4 connections too, wherever it ends up listening.
     #[tokio::test]

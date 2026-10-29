@@ -12,6 +12,9 @@ use std::time::Duration;
 
 use clap::Parser;
 use k8s_openapi::jiff::SignedDuration;
+use tracing_subscriber::filter::{LevelFilter, Targets};
+use tracing_subscriber::layer::SubscriberExt as _;
+use tracing_subscriber::util::SubscriberInitExt as _;
 use zeabur_proxy::access::KubeReviewer;
 use zeabur_proxy::logs::LogsLimits;
 use zeabur_proxy::metrics::MetricsLimits;
@@ -72,9 +75,21 @@ struct Args {
 /// How long kube-apiserver may take to answer an access review.
 const REVIEW_TIMEOUT: Duration = Duration::from_secs(5);
 
+/// Info and above, and nothing from kube-rs, which logs response bodies at `WARN`, `DEBUG` and
+/// `TRACE`. The proxy depends on no workspace crate, so this is a copy of `zeabur`'s filter.
+fn log_filter() -> Targets {
+    Targets::new()
+        .with_default(LevelFilter::INFO)
+        .with_target("kube", LevelFilter::OFF)
+}
+
 fn main() -> ExitCode {
     let args = Args::parse();
-    tracing_subscriber::fmt().with_target(true).init();
+    tracing_subscriber::fmt()
+        .with_target(true)
+        .finish()
+        .with(log_filter())
+        .init();
     if let Err(error) = forbid_core_dumps() {
         tracing::warn!(%error, "core dumps stay possible");
     }
@@ -216,5 +231,29 @@ async fn stopped() {
     tokio::select! {
         _ = terminate.recv() => {}
         _ = tokio::signal::ctrl_c() => {}
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use tracing::Level;
+
+    use super::log_filter;
+
+    #[test]
+    fn the_log_filter_drops_kube_rs() {
+        let filter = log_filter();
+        for (target, level, logged) in [
+            ("kube_client::client", Level::WARN, false),
+            ("kube_client::client", Level::DEBUG, false),
+            ("zeabur_proxy::audit", Level::INFO, true),
+            ("zeabur_proxy::server", Level::DEBUG, false),
+        ] {
+            assert_eq!(
+                filter.would_enable(target, &level),
+                logged,
+                "{target} at {level}"
+            );
+        }
     }
 }
