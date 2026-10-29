@@ -53,10 +53,10 @@ sudo /var/lib/rancher/rke2/bin/kubectl \
 | Reloader、监控、告警、通知配置 | 各自保留，由原控制器继续运行 |
 | 项目的 `zeabur.com/project` 标签和显示信息 | 保留，不影响工作负载运行 |
 | 成员的 RoleBinding／ClusterRoleBinding | installer 移除时会一起删除。`helm uninstall` 会保留，需要自行删除 |
-| `zeabur-s3-destinations` | Chart 标记为保留的 Namespace，已登记的目标位置和密钥留在其中 |
+| `zeabur-s3-destinations` | Chart 标记为保留的 Namespace，已添加的目的地和密钥留在其中 |
 | Zeabur Identity | 只移除 Zeabur 时会保留，用户和其他 OAuth client 继续留在原 Namespace |
 
-备份使用的密钥已复制到各备份所在的 Namespace，运行时不会再读取 S3 目标位置列表。删除列表不会撤销这些密钥，也不会删除远程备份。
+备份使用的密钥已复制到各备份所在的 Namespace，运行时不会再读取 S3 目的地列表。删除列表不会撤销这些密钥，也不会删除远程备份。
 
 维护页和自定义错误页在项目内有自己的工作负载、Service 和配置。移除 Zeabur 不会把维护中的域名自动切回应用。需要恢复流量时，先按[维护模式](../configure/maintenance.mdx)完成切换。
 
@@ -115,7 +115,7 @@ kubectl get pods --namespace shop
 kubectl get storageclasses
 ```
 
-应用和卷都应仍在，公开网址和数据库连接的结果应与移除前相同。Zeabur 的网址不再提供界面，之后用 kubectl、Helm 或原来的 GitOps 工具调整配置。
+应用和卷都还在，公开网址和数据库连接的结果与移除前相同。Zeabur 的网址不再提供界面，之后用 kubectl、Helm 或原来的 GitOps 工具调整配置。
 
 确认数据库和备份 operator 仍在，并在下一次按原定时间运行备份后查看结果。卸载 Zeabur chart 也会卸载 chart 中的 Proxy。VictoriaLogs 本身会保留，但 Zeabur 的历史日志入口会消失。
 
@@ -136,7 +136,7 @@ kubectl delete rolebindings,clusterrolebindings --all-namespaces \
 
 保留 Identity 时，其他 client 或 kubeconfig 仍可能以 `zeabur:<username>` 身份登录，删除前先确认它们不再依赖这些 binding。
 
-## 清理临时工具和登记信息
+## 清理临时工具和目的地信息
 
 ### 终端对象
 
@@ -157,16 +157,16 @@ tools 副本达到最长运行时间后会自行结束，但移除 Zeabur 后就
 
 删除终端副本不会自动还原在节点终端中对主机所做的修改。
 
-### S3 目标位置
+### S3 目的地
 
-`zeabur-s3-destinations` 会保留已登记的目标位置和密钥。要继续管理备份，就保留这个 Namespace。确定不再需要列表和原始凭证后，先查看对象，再删除此专用 Namespace：
+`zeabur-s3-destinations` 会保留已添加的目的地和密钥。要继续管理备份，就保留这个 Namespace。确定不再需要列表和原始凭证后，先查看对象，再删除此专用 Namespace：
 
 ```sh
 kubectl get configmaps,secrets --namespace zeabur-s3-destinations
 kubectl delete namespace zeabur-s3-destinations
 ```
 
-这只会删除登记列表和其中的机密变量，不会删除远程 bucket、备份，也不会删除已复制到其他 Namespace 的机密变量。要撤销密钥，先更新仍在使用这个密钥的备份，再到存储服务中停用密钥。
+这只会删除目的地列表和其中的机密变量，不会删除远程 bucket、备份，也不会删除已复制到其他 Namespace 的机密变量。要撤销密钥，先更新仍在使用这个密钥的备份，再到存储服务中停用密钥。
 
 ## 同时移除 Zeabur Identity
 

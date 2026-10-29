@@ -4,7 +4,7 @@ description: 将安装选项写入 YAML，用 plan 检查、apply 安装，适�
 source: "818ee6533682"
 ---
 
-将安装选项写入 `/etc/zeabur-installer/config.yaml`，用 `plan` 查看安装计划，再用 `apply` 安装。这种方式适合将配置纳入版本控制、在多台机器上重复相同的安装，或通过自动化工具安装。
+将安装选项写入 `/etc/zeabur-installer/config.yaml`，用 `plan` 查看安装步骤，再用 `apply` 安装。这种方式适合将配置纳入版本控制、在多台机器上重复相同的安装，或通过自动化工具安装。
 
 [网页界面](quickstart.mdx)和命令读写同一份配置文件，安装的内容相同。你也可以在网页界面的“确认”步骤下载配置文件，再用命令安装。
 
@@ -42,7 +42,7 @@ access:
 
 所有字段见 [Installer 配置](../reference/installer-configuration.mdx)。`sources` 是可选字段，用于改用自行构建的 Catalog、镜像和 chart。未填写时使用 installer 固定的版本。
 
-## 查看安装计划
+## 查看安装步骤
 
 运行：
 

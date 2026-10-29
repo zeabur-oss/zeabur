@@ -12,7 +12,7 @@ Open the service's **Networking** tab and configure two settings under **IP limi
 - You need permission to modify the project's domains and NetworkPolicy objects. If Helm, Argo CD, or Flux manages the service, make changes in the original values or Git repository.
 - These settings are separate from **Isolate** in the project settings. Isolation controls whether other projects can connect to the project. IP restrictions apply to a single service and don't change the project's `zeabur-project` rules.
 
-## Restrict who can access domains
+## Restrict who can open a service's domains
 
 <Steps>
 <Step>
@@ -61,7 +61,7 @@ spec:
 
 For configuration options, see the Traefik [ipAllowList](https://doc.traefik.io/traefik/reference/routing-configuration/http/middlewares/ipallowlist/) documentation.
 
-## Restrict where a service can connect
+## Restrict where a service's replicas can connect
 
 <Steps>
 <Step>

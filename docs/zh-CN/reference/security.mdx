@@ -80,7 +80,7 @@ sudo zeabur-installer apply
 
 **检查变更**页面不显示 Secret 的值，要写入的机密会放在加密的变更令牌中，带到应用步骤。写入 ConfigMap 的值仍是明文，谁能读取由 RBAC 决定。
 
-已登记的 S3 目的地，连接信息保存在 ConfigMap 中，密钥保存在 Secret 中。Chart 允许所有已登录用户读取目的地列表，但不允许读取这些 Secret。备份选用目的地时，密钥会复制一份到备份所在的 Namespace。之后更换密钥时，[复制出去的密钥](../cluster/s3-destinations.mdx)也要一起更新。
+已添加的 S3 目的地，连接信息保存在 ConfigMap 中，密钥保存在 Secret 中。Chart 允许所有已登录用户读取目的地列表，但不允许读取这些 Secret。备份选用目的地时，密钥会复制一份到备份所在的 Namespace。之后更换密钥时，[复制出去的密钥](../cluster/s3-destinations.mdx)也要一起更新。
 
 ## 检查变更与应用
 

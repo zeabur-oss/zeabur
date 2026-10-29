@@ -111,7 +111,7 @@ ssh -L 8085:127.0.0.1:8085 root@203.0.113.10
 
 預設會安裝元件目錄建議單台伺服器裝的元件，再加上 Zeabur Builder（含 zot）、映像檔自動更新（Keel）和 PostgreSQL（CloudNativePG）。想讓伺服器更安全，可以再勾選執行期威脅偵測、弱點掃描和入侵防護。
 
-用預設元件，裝完就能用映像檔或 Git 部署應用程式，也能建立 PostgreSQL 資料庫。Zeabur Builder 用有特權的 buildkitd 建置，逃出沙箱的建置可以碰到節點，所以 builder-system 和 zot 這兩個 Namespace 只讓管理員存取。用不到 Git 部署時，在元件清單取消勾選 Zeabur Builder。
+用預設元件，裝完就能用映像檔或 Git 部署應用程式，也能建立 PostgreSQL 資料庫。Zeabur Builder 用有特權的 buildkitd 建置，逃出沙箱的建置可以碰到節點。installer 和 Zeabur 都不會在 builder-system 和 zot 這兩個 Namespace 給任何人權限，只有叢集管理員能存取；之後新增角色綁定時，也不要開放給其他人。用不到 Git 部署時，在元件清單取消勾選 Zeabur Builder。
 
 有些元件要先填設定才能繼續，例如 Velero 要填 S3 的端點、儲存貯體、區域和存取金鑰，installer 會自己組成 Velero 需要的憑證檔。
 
@@ -136,7 +136,7 @@ ssh -L 8085:127.0.0.1:8085 root@203.0.113.10
 
 先閱讀「安裝前請注意」中的警告。例如，測試機的網域也必須透過 DNS 解析到這台伺服器。只修改 hosts 檔不夠，副本不會讀取 hosts 檔。
 
-展開「詳細資料」可以查看 Chart 與版本、設定檔和完整計畫。按「下載」可存下 `config.yaml`。
+展開「詳細資料」可以查看 Chart 與版本、設定檔和完整安裝步驟。按「下載」可存下 `config.yaml`。
 
 有檢查未通過，或記憶體估算為「不夠用」時，「安裝」按鈕無法按下。修正問題或調整元件後再開始。
 

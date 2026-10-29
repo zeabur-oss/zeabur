@@ -94,7 +94,7 @@ RKE2 的 etcd 需要過半數的伺服器才能運作。要在少一台時繼續
 
 ### 只是重開機
 
-在節點選單選**停止排程**，節點列就會標示已停止排程。這會阻止新的 Pod 排到這台節點，已經在執行的 Pod 會留在原處。只是要重開機，做到這一步就夠了，不需要執行 `drain`。
+在節點選單選**停止排程**，節點列就會標示已停止排程。新的副本不會再排到這台節點，已經在執行的副本會留在原處。只是要重開機，做到這一步就夠了，不需要執行 `drain`。
 
 也可以在 Zeabur **叢集**頁標題旁點**開啟 kubectl 終端機**，執行：
 
@@ -106,13 +106,13 @@ kubectl cordon <node>
 
 ### 要先移走副本再維護
 
-到 Zeabur **叢集**頁標題旁點**開啟 kubectl 終端機**，先列出這台節點上的 Pod，以及這些 Pod 使用的 PVC：
+到 Zeabur **叢集**頁標題旁點**開啟 kubectl 終端機**，先列出這台節點上的副本，以及這些副本使用的 PVC：
 
 ```sh
 kubectl get pods -A --field-selector spec.nodeName=<node> -o custom-columns=NS:.metadata.namespace,POD:.metadata.name,PVC:.spec.volumes[*].persistentVolumeClaim.claimName
 ```
 
-對照清單中的 PVC，確認哪些使用這台節點的 `local-path` 磁碟區。這些磁碟區的資料只存在這台節點上，不會跟著 Pod 搬到其他節點。
+對照清單中的 PVC，確認哪些使用這台節點的 `local-path` 磁碟區。這些磁碟區的資料只存在這台節點上，不會跟著副本移到其他節點。
 
 確認後，執行：
 
@@ -120,12 +120,12 @@ kubectl get pods -A --field-selector spec.nodeName=<node> -o custom-columns=NS:.
 kubectl drain <node> --ignore-daemonsets --delete-emptydir-data
 ```
 
-`drain` 會停止這台節點的排程，並驅逐 Pod，讓控制器在其他節點重新建立副本。DaemonSet 管理的 Pod 會留在原處。執行時請注意：
+`drain` 會停止這台節點的排程，並驅逐副本，讓控制器在其他節點重新建立。DaemonSet 管理的副本會留在原處。執行時請注意：
 
 - `drain` 會遵守 PodDisruptionBudget；預算不允許驅逐時，`drain` 會一直重試。
-- 遇到不屬於任何控制器的 Pod，`drain` 會停下來。這類 Pod 刪掉後不會自動啟動，確認可以刪除後，才在指令末尾加上 `--force`。
-- `--delete-emptydir-data` 會清空遭驅逐 Pod 的 `emptyDir` 暫存資料。
-- 使用這台節點 `local-path` 磁碟區的 Pod 也會一併驅逐。重新建立的 Pod 無法在其他節點使用這些磁碟區，原節點回來之前都會維持 `Pending`。資料不會因為 `drain` 遺失；對這些 Pod 來說，結果跟直接停機一樣，都得等這台節點恢復。
+- 遇到不屬於任何控制器的副本，`drain` 會停下來。這類副本刪掉後不會自動啟動，確認可以刪除後，才在指令末尾加上 `--force`。
+- `--delete-emptydir-data` 會清空遭驅逐副本的 `emptyDir` 暫存資料。
+- 使用這台節點 `local-path` 磁碟區的副本也會一併驅逐。重新建立的副本無法在其他節點使用這些磁碟區，原節點回來之前都會維持 `Pending`。資料不會因為 `drain` 遺失；對這些副本來說，結果跟直接停機一樣，都得等這台節點恢復。
 
 如果 Zeabur 自己也在這台節點上執行，`drain` 時頁面會斷線約一分鐘。重新整理頁面並重新登入；kubectl 終端機也會斷線，需要重新開啟。
 
@@ -141,7 +141,7 @@ kubectl drain <node> --ignore-daemonsets --delete-emptydir-data
 kubectl uncordon <node>
 ```
 
-恢復排程後，新的 Pod 就能排到這台節點。
+恢復排程後，新的副本就能排到這台節點。
 
 ## 移除節點
 
@@ -155,7 +155,7 @@ kubectl get nodes -l node-role.kubernetes.io/control-plane
 
 如果只剩一台控制節點，不要刪除。移除後如果剩不到三台 server 節點，控制平面再少一台就無法運作。
 
-`local-path` 磁碟區的資料只在這台 VM 上。節點移除後，使用這些磁碟區的 Pod 沒有地方可以啟動。依照「讓節點停機維護」的步驟檢查 Pod 與磁碟區，再執行 `drain`，完成後才刪除節點：
+`local-path` 磁碟區的資料只在這台 VM 上。節點移除後，使用這些磁碟區的副本沒有地方可以啟動。依照「讓節點停機維護」的步驟檢查副本與磁碟區，再執行 `drain`，完成後才刪除節點：
 
 ```sh
 kubectl drain <node> --ignore-daemonsets --delete-emptydir-data
@@ -184,20 +184,20 @@ sudo zeabur-installer node sync
 
 ## 開啟節點終端機
 
-**節點終端機**會在主機上開一個完整的 root shell。用管理員帳號登入，在節點列按**節點終端機**，看過要建立的終端機 Pod 和時限，再按**開啟終端機**。
+**節點終端機**會在主機上開一個完整的 root shell。用管理員帳號登入，在節點列按**節點終端機**，看過要建立的終端機副本和時限，再按**開啟終端機**。
 
 <Callout type="warn">
 節點終端機能動主機上所有的檔案、程序和網路介面。在裡面做的事不經過 Zeabur 和 Kubernetes 的權限檢查，也無法復原。
 </Callout>
 
-節點會記下一筆事件，寫明是誰在什麼時候開啟的。畫面顯示**其他人也能進入這個終端機**時，表示有角色綁定讓叢集管理員以外的人能在終端機所在的 Namespace 建立 Pod。移除列出的角色綁定後再重新檢查。
+節點會記下一筆事件，寫明是誰在什麼時候開啟的。畫面顯示**其他人也能進入這個終端機**時，表示有角色綁定讓叢集管理員以外的人能在終端機所在的 Namespace 建立副本。移除列出的角色綁定後再重新檢查。
 
-關閉終端機時，Zeabur 會移除終端機 Pod，Pod 最多保留 30 分鐘。如果 Pod 留了下來，在節點下方的終端機 Pod 清單按**移除終端機 Pod**，檢查後確認。
+關閉終端機時，Zeabur 會移除終端機副本，副本最多保留 30 分鐘。如果副本留了下來，在節點下方的終端機副本清單按**移除終端機副本**，檢查後確認。
 
 ## 常見失敗
 
 - 加入時連不到伺服器：確認新 VM 連得到 `node add` 印出的伺服器位址。K3s 要通 TCP 6443，RKE2 要通 TCP 9345 和 6443，上面表格的其他連接埠也要開。
 - 新節點已就緒，但不同節點上的服務連不到彼此：檢查 UDP 4789（K3s）或 8472（RKE2），以及網路政策是否已放行新節點。
-- `drain` 一直停著：`drain` 在等 PodDisruptionBudget 放行，或停在不屬於任何控制器的 Pod 上。用 `kubectl get pdb -A` 看哪個預算擋住了，處理後再執行一次。
+- `drain` 一直停著：`drain` 在等 PodDisruptionBudget 放行，或停在不屬於任何控制器的副本上。用 `kubectl get pdb -A` 看哪個預算擋住了，處理後再執行一次。
 - 副本在新節點 `Pending`：副本用的是舊節點的 `local-path` 磁碟區，要等舊節點回來。
-- 終端機 Pod **無法啟動**：看該 Pod 的事件，常見原因是映像檔下載失敗。
+- 終端機副本**無法啟動**：看該副本的事件，常見原因是映像檔下載失敗。

@@ -71,7 +71,7 @@ Zeabur 没有自己的数据库。数据库是 operator 的 CR，从 Git 部署�
 - Chart 创建或指定的 Secret：OAuth client secret、变更令牌密钥，以及启用 Proxy 时的 TLS 证书。
 - 集群名称和 metrics store 配置：Zeabur 所在 Namespace 中的 `zeabur-settings` ConfigMap。
 - 成员权限：Kubernetes 的 RoleBinding 和 ClusterRoleBinding。
-- 已登记的 S3 目的地：`zeabur-s3-destinations` Namespace 中的 ConfigMap 和 Secret。
+- 已添加的 S3 目的地：`zeabur-s3-destinations` Namespace 中的 ConfigMap 和 Secret。
 - kubectl 终端的 tools Pod：位于 `zeabur-terminals` Namespace，只有 Zeabur 的 ServiceAccount 能在其中创建和使用 Pod。
 - 登录设置：Zeabur Identity 所在 Namespace 中的 `zeabur-identity-settings` ConfigMap。**设置**页面写入，Zeabur Identity 读取，见[登录设置](./permissions.mdx#登录设置)。
 - 登录会话：只保存在服务器进程的内存中，空闲过久（最多 1 小时）或登录满 12 小时后结束，见[登录能维持多久](./permissions.mdx#登录有效期)。chart 使用单副本和 `Recreate` 策略，Zeabur 重启后，所有人都需要重新登录。

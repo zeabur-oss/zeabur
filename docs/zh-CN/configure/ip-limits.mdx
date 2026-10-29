@@ -13,7 +13,7 @@ source: "7c41b28d8a45"
 - 需要有修改项目域名和 NetworkPolicy 的权限。服务由 Helm、Argo CD 或 Flux 管理时，需要在原来的 values 或 Git 仓库中修改。
 - 这与项目设置中的**隔离**不同。隔离控制其他项目能否连接进来，IP 限制针对单个服务，不会修改项目的 `zeabur-project` 规则。
 
-## 限制谁能访问域名
+## 限制谁能打开域名
 
 <Steps>
 <Step>
@@ -62,7 +62,7 @@ spec:
 
 配置项见 Traefik 的 [ipAllowList](https://doc.traefik.io/traefik/reference/routing-configuration/http/middlewares/ipallowlist/) 文档。
 
-## 限制服务能连接到哪里
+## 限制服务能连到哪里
 
 <Steps>
 <Step>

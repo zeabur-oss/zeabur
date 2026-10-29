@@ -10,9 +10,9 @@ source: "6a1b767cfd46"
 
 ## 登入與認證資訊
 
-叢集內的 Zeabur 透過 Zeabur Identity 登入，每個送到 Kubernetes 的請求都帶著使用者自己的權杖。Zeabur 的 ServiceAccount 沒有綁定任何 Role，Pod 也不掛載這個 ServiceAccount 的 token。登入工作階段只存在伺服器程序的記憶體裡，Zeabur 重新啟動後要重新登入。
+叢集內的 Zeabur 透過 Zeabur Identity 登入，每個送到 Kubernetes 的請求都帶著使用者自己的權杖。Zeabur 的 ServiceAccount 沒有綁定任何 Role，Zeabur 的副本也不掛載這個 ServiceAccount 的 token。登入工作階段只存在伺服器程序的記憶體裡，Zeabur 重新啟動後要重新登入。
 
-Zeabur 自己持有的機密只有 OAuth client secret 和變更權杖金鑰。Chart 只接受事先建立好的 client Secret，不接受把 client secret 寫成 Helm value。能讀 Zeabur Namespace 的 Secret，或能 exec 進 Zeabur Pod 的權限，只給管理員。
+Zeabur 自己持有的機密只有 OAuth client secret 和變更權杖金鑰。Chart 只接受事先建立好的 client Secret，不接受把 client secret 寫成 Helm value。能讀 Zeabur Namespace 的 Secret，或能 exec 進 Zeabur 副本的權限，只給管理員。
 
 管理員帳號只能用通行密鑰登入，登入後就有整個叢集的完整權限，中間沒有再確認的步驟，所以管理員的日常工作最好改用另一個一般帳號。工作階段閒置 1 小時後結束，管理員帳號可改成 15 分鐘，開啟 AAL3 時也是 15 分鐘；最長 12 小時。在這之前權杖會自動更新。帳號類型、時間和 AAL3 見[權限](./permissions.mdx#管理員帳號和一般帳號)。
 
@@ -120,9 +120,9 @@ Zeabur 的信任範圍是整個叢集：能登入的人都是可信任的使用�
 用 installer 安裝的叢集，平台元件所在的 Namespace 都有 `zeabur.com/platform: "true"` 標籤。叢集裡有這個標籤時，Zeabur 建立專案會寫入三個物件：
 
 - Namespace，帶 `zeabur.com/project` 標籤和 Pod Security 標籤。
-- ServiceAccount `default`，`automountServiceAccountToken: false`。沒指定 ServiceAccount 的 Pod 不會拿到 token；要呼叫 Kubernetes API 的工作負載要自己指定 ServiceAccount。
-- NetworkPolicy `zeabur-project`：專案裡每個 Pod 都只收以下來源的連線，往外的連線不限制。
-  - 同一個專案的 Pod。
+- ServiceAccount `default`，`automountServiceAccountToken: false`。沒指定 ServiceAccount 的副本不會拿到 token；要呼叫 Kubernetes API 的工作負載要自己指定 ServiceAccount。
+- NetworkPolicy `zeabur-project`：專案裡每個副本都只收以下來源的連線，往外的連線不限制。
+  - 同一個專案的副本。
   - 帶 `zeabur.com/platform: "true"` 的 Namespace，也就是 Ingress controller、指標收集和資料庫 operator 這些平台元件。
   - `kube-system`，k3s 的 Traefik 和 ServiceLB 在這裡。
 
@@ -156,7 +156,7 @@ NetworkPolicy 要叢集的網路外掛（CNI）支援才會生效。installer �
 
 ### 讓另一個專案連進來
 
-在專案的**設定** → **網路**選**允許其他專案連入**，或用 kubectl 加一個 NetworkPolicy。以下讓 `blog` 的所有 Pod 連到 `shop` 的所有服務：
+在專案的**設定** → **網路**選**允許其他專案連入**，或用 kubectl 加一個 NetworkPolicy。以下讓 `blog` 的所有副本連到 `shop` 的所有服務：
 
 ```yaml
 apiVersion: networking.k8s.io/v1
@@ -197,25 +197,25 @@ kubectl -n shop delete networkpolicy zeabur-allow-from-blog
 
 容器終端機用你自己的 `pods/exec` 權限，能讀到這個容器掛載的磁碟區、Secret 和 ServiceAccount token。
 
-沒有 shell 的容器，Zeabur 會加一個除錯容器。Pod 或容器有指定使用者時，除錯容器用同一個使用者執行，移除所有 capabilities，用 `targetContainerName` 共享目標容器的程序空間，並在相同路徑掛上目標容器的磁碟區。Kubernetes 不會移除 ephemeral container，關閉終端機後，Pod 替換之前除錯容器都會留在 Pod 裡。
+沒有 shell 的容器，Zeabur 會加一個除錯容器。副本或容器有指定使用者時，除錯容器用同一個使用者執行，移除所有 capabilities，用 `targetContainerName` 共享目標容器的程序空間，並在相同路徑掛上目標容器的磁碟區。Kubernetes 不會移除 ephemeral container，關閉終端機後，副本替換之前除錯容器都會留在副本裡。
 
 ### kubectl 終端機
 
-Zeabur 在短暫的 tools Pod 裡提供 `kubectl` 和 `helm`，使用登入者當下的權杖。專案的 kubectl 終端機從搜尋開啟，整個叢集的從**叢集**頁標題旁的**開啟 kubectl 終端機**開啟。kubeconfig 透過 exec 的標準輸入寫進記憶體型的 `emptyDir`，不會出現在 Pod spec、環境變數、ConfigMap 或 Secret 裡。
+Zeabur 在短暫的 tools 副本裡提供 `kubectl` 和 `helm`，使用登入者當下的權杖。專案的 kubectl 終端機從搜尋開啟，整個叢集的從**叢集**頁標題旁的**開啟 kubectl 終端機**開啟。kubeconfig 透過 exec 的標準輸入寫進記憶體型的 `emptyDir`，不會出現在 Pod spec、環境變數、ConfigMap 或 Secret 裡。
 
-所有 tools Pod 都放在 chart 建立的 `zeabur-terminals` Namespace（`terminal.namespace`），kubectl 預設在你開啟終端機的專案。Zeabur 先請 kube-apiserver 確認你能在專案的容器裡執行指令（整個叢集的則要是叢集管理員），再用 Zeabur 自己的 ServiceAccount 建立 Pod 並開啟終端機。
+所有 tools 副本都放在 chart 建立的 `zeabur-terminals` Namespace（`terminal.namespace`），kubectl 預設在你開啟終端機的專案。Zeabur 先請 kube-apiserver 確認你能在專案的容器裡執行指令（整個叢集的則要是叢集管理員），再用 Zeabur 自己的 ServiceAccount 建立副本並開啟終端機。
 
 <Callout type="warn">
-在權杖到期前，能讀到這份 kubeconfig 的只有 Zeabur 本身、叢集管理員，以及 Pod 所在節點的管理員。不要把 `zeabur-terminals` 的權限給其他人。
+在權杖到期前，能讀到這份 kubeconfig 的只有 Zeabur 本身、叢集管理員，以及副本所在節點的管理員。不要把 `zeabur-terminals` 的權限給其他人。
 </Callout>
 
-tools Pod 預設最多執行 30 分鐘。最後一個終端機關閉時，Zeabur 立刻刪掉 kubeconfig，60 秒後刪除 Pod。
+tools 副本預設最多執行 30 分鐘。最後一個終端機關閉時，Zeabur 立刻刪掉 kubeconfig，60 秒後刪除副本。
 
 ### 節點終端機
 
-**節點終端機**用 privileged Pod、host PID／network／IPC 和 `nsenter` 進入主機，取得完整的 root 權限，在裡面做的事不會經過**檢查變更**。
+**節點終端機**用 privileged 副本、host PID／network／IPC 和 `nsenter` 進入主機，取得完整的 root 權限，在裡面做的事不會經過**檢查變更**。
 
-節點終端機只給叢集管理員，Pod 放在專用的 privileged Namespace。只要有 RBAC binding 讓管理員和 Kubernetes 元件以外的人能在那裡建立 Pod 或執行指令，Zeabur 就拒絕開啟。每次開啟都會在節點上記一筆 Event，`kubectl describe node` 看得到誰在什麼時候開過。終端機關閉時 Zeabur 刪除 Pod。
+節點終端機只給叢集管理員，終端機副本放在專用的 privileged Namespace。只要有 RBAC binding 讓管理員和 Kubernetes 元件以外的人能在那裡建立副本或執行指令，Zeabur 就拒絕開啟。每次開啟都會在節點上記一筆 Event，`kubectl describe node` 看得到誰在什麼時候開過。終端機關閉時 Zeabur 刪除終端機副本。
 
 ## 指標與歷史日誌
 

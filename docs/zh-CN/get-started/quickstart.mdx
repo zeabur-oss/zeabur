@@ -111,7 +111,7 @@ ssh -L 8085:127.0.0.1:8085 root@203.0.113.10
 
 默认会安装组件目录建议在单台服务器上安装的组件，外加 Zeabur Builder（含 zot）、镜像自动更新（Keel）和 PostgreSQL（CloudNativePG）。想让服务器更安全，可以再勾选运行时威胁检测、漏洞扫描和入侵防护。
 
-使用默认组件，装完就能用镜像或 Git 部署应用，也能创建 PostgreSQL 数据库。Zeabur Builder 用有特权的 buildkitd 构建，逃出沙箱的构建可以接触到节点，因此 builder-system 和 zot 这两个 Namespace 只允许管理员访问。不需要从 Git 部署时，在组件列表中取消勾选 Zeabur Builder。
+使用默认组件，装完就能用镜像或 Git 部署应用，也能创建 PostgreSQL 数据库。Zeabur Builder 用有特权的 buildkitd 构建，逃出沙箱的构建可以接触到节点。installer 和 Zeabur 都不会在 builder-system 和 zot 这两个 Namespace 给任何人授权，只有集群管理员能访问；之后添加角色绑定时，也不要开放给其他人。不需要从 Git 部署时，在组件列表中取消勾选 Zeabur Builder。
 
 有些组件要先填写设置才能继续，例如 Velero 要填写 S3 的端点、存储桶、区域和访问密钥，installer 会自己生成 Velero 需要的凭据文件。
 
@@ -136,7 +136,7 @@ ssh -L 8085:127.0.0.1:8085 root@203.0.113.10
 
 先阅读“安装前请注意”中的警告。例如，测试机的域名也必须通过 DNS 解析到这台服务器。只修改 hosts 文件不够，副本不会读取 hosts 文件。
 
-展开“详细信息”可以查看 Chart 及其版本、配置文件和完整计划。点击“下载”可保存 `config.yaml`。
+展开“详细信息”可以查看 Chart 与版本、配置文件和完整安装步骤。点击“下载”可保存 `config.yaml`。
 
 如果有检查项未通过，或内存估算为“不够用”，“安装”按钮将不可用。修正问题或调整组件后再开始。
 
