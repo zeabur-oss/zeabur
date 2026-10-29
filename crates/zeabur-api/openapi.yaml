@@ -6802,7 +6802,6 @@ components:
       - license
       - description
       - summary
-      - summaryLocales
       - defaults
       - distributions
       properties:
@@ -6839,11 +6838,10 @@ components:
           type: string
           description: Its licence (SPDX).
         summary:
-          type: string
-          description: What it gives the cluster, in one sentence, in English.
-        summaryLocales:
           type: object
-          description: The summary in other languages (`zh-TW`, `zh-CN`).
+          description: |-
+            What it gives the cluster, in one sentence, by language tag (`en`, `zh-TW`, `zh-CN`);
+            `en` is always there.
           additionalProperties:
             type: string
           propertyNames:

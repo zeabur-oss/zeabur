@@ -227,7 +227,7 @@ export function ComponentsPage() {
  * VictoriaMetrics being installed. */
 /** What the component gives the cluster, in the catalogue's words for `locale`. */
 const summaryOf = (component: Schemas["Component"], locale: Locale) =>
-  component.summaryLocales[locale] ?? component.summary
+  component.summary[locale] ?? component.summary.en
 
 const isInstalled = (capability: Schemas["Capability"], component: Schemas["Component"]) =>
   capability.installations.some((i) => i.component === component.id)

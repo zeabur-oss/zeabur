@@ -3548,10 +3548,11 @@ export interface components {
       id: string
       /** @description Its licence (SPDX). */
       license: string
-      /** @description What it gives the cluster, in one sentence, in English. */
-      summary: string
-      /** @description The summary in other languages (`zh-TW`, `zh-CN`). */
-      summaryLocales: {
+      /**
+       * @description What it gives the cluster, in one sentence, by language tag (`en`, `zh-TW`, `zh-CN`);
+       *     `en` is always there.
+       */
+      summary: {
         [key: string]: string
       }
     }
