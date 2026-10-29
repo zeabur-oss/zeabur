@@ -48,6 +48,7 @@ export function useFolder() {
       }
     if (reason === "packed") return { phase: "failed", message: t("upload.problem.archivePacked") }
     if (reason === "bomb") return { phase: "failed", message: t("upload.problem.archiveBomb") }
+    if (reason === "link") return { phase: "failed", message: t("upload.problem.archiveLink") }
     if (reason === "invalid")
       return { phase: "failed", message: t("upload.problem.archiveInvalid") }
     return { phase: "failed", message: error instanceof Error ? error.message : String(error) }

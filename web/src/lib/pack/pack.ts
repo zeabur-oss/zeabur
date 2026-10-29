@@ -1,6 +1,6 @@
 // Packs a folder as the gzip tar Zeabur Builder builds (docs/archive-source.md in its repository):
 // what `.gitignore` and `.dockerignore` leave in, without `.git`. A browser does not tell a file's
-// mode, so a file that starts with `#!` is made executable.
+// mode, so a file that starts with `#!` is made executable; a zip's own modes and links are kept.
 import { excluder, isIgnoreFile, type IgnoreFile } from "@/lib/pack/ignore"
 import { MAX_PACKED, MAX_UNPACKED } from "@/lib/pack/limits"
 import type { SourceFile } from "@/lib/pack/source"
@@ -71,7 +71,8 @@ export async function pack(files: readonly SourceFile[]): Promise<Packed> {
     tarFiles.push({
       path: file.path,
       data: file.data,
-      executable: await startsWithShebang(file.data),
+      executable: file.executable ?? (await startsWithShebang(file.data)),
+      link: file.link,
     })
   const blob = await gzip(tarParts(tarFiles))
   if (blob.size > MAX_PACKED) throw new TooLarge("packed", largestEntries(kept))

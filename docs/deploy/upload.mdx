@@ -27,6 +27,7 @@ When packaging the folder:
 - Files excluded by `.gitignore` aren't uploaded. A `.gitignore` in a subfolder applies only within that folder. Only the top-level `.dockerignore` is read, and its patterns are relative to the top level, just as in Docker.
 - `.git` folders are never uploaded.
 - The browser can't read file permissions, so files that start with `#!` are marked as executable.
+- A `.zip` made on Linux or macOS keeps its permissions and symbolic links. A link that points outside the folder is refused.
 
 Once packaging finishes, the dashed box shows the file count, archive size, and number of excluded files.
 

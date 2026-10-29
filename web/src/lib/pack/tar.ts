@@ -1,5 +1,5 @@
-// A tar writer for Zeabur Builder's archive source: regular files and folders, with a PAX record
-// for a path that does not fit the 100 bytes of a header (POSIX.1-2001, "pax Interchange Format").
+// A tar writer for Zeabur Builder's archive source: regular files, symbolic links and folders, with a PAX
+// record for a path or link target that does not fit the 100 bytes of a header (POSIX.1-2001, "pax Interchange Format").
 const BLOCK = 512
 const encoder = new TextEncoder()
 
@@ -7,6 +7,8 @@ export interface TarFile {
   path: string
   data: Blob
   executable: boolean
+  /** The target when this is a symbolic link. */
+  link?: string
 }
 
 function octal(value: number, width: number): string {
@@ -15,7 +17,9 @@ function octal(value: number, width: number): string {
 
 type Bytes = Uint8Array<ArrayBuffer>
 
-function header(name: string, size: number, mode: number, type: "0" | "5" | "x"): Bytes {
+type Type = "0" | "2" | "5" | "x"
+
+function header(name: string, size: number, mode: number, type: Type, link = ""): Bytes {
   const block = new Uint8Array(BLOCK)
   const put = (text: string, at: number) => block.set(encoder.encode(text), at)
   put(name, 0)
@@ -26,6 +30,7 @@ function header(name: string, size: number, mode: number, type: "0" | "5" | "x")
   put(octal(0, 12), 136)
   put("        ", 148)
   put(type, 156)
+  put(link, 157)
   put("ustar\0" + "00", 257)
   const sum = block.reduce((total, byte) => total + byte, 0)
   put(octal(sum, 7) + " ", 148)
@@ -34,24 +39,35 @@ function header(name: string, size: number, mode: number, type: "0" | "5" | "x")
 
 const padding = (size: number): Bytes => new Uint8Array((BLOCK - (size % BLOCK)) % BLOCK)
 
-/** `<length> path=<path>\n`, where the length counts its own digits. */
-function paxRecord(path: string): Bytes {
-  const body = ` path=${path}\n`
+/** `<length> <key>=<value>\n`, where the length counts its own digits. */
+function paxRecord(key: string, value: string): Bytes {
+  const body = ` ${key}=${value}\n`
   const bytes = encoder.encode(body).length
   let length = bytes + String(bytes).length
   if (String(length).length !== String(bytes).length) length = bytes + String(length).length
   return encoder.encode(`${length}${body}`)
 }
 
-function entry(path: string, size: number, mode: number, type: "0" | "5"): Bytes[] {
+function entry(
+  path: string,
+  size: number,
+  mode: number,
+  type: "0" | "2" | "5",
+  link = "",
+): Bytes[] {
   const name = type === "5" ? `${path}/` : path
-  if (encoder.encode(name).length <= 100) return [header(name, size, mode, type)]
-  const record = paxRecord(path)
+  const long = encoder.encode(name).length > 100
+  const longLink = encoder.encode(link).length > 100
+  if (!long && !longLink) return [header(name, size, mode, type, link)]
+  const record = new Uint8Array([
+    ...(long ? paxRecord("path", path) : []),
+    ...(longLink ? paxRecord("linkpath", link) : []),
+  ])
   return [
     header("PaxHeader/entry", record.length, 0o644, "x"),
     record,
     padding(record.length),
-    header("long-name", size, mode, type),
+    header(long ? "long-name" : name, size, mode, type, longLink ? "long-link" : link),
   ]
 }
 
@@ -67,6 +83,10 @@ export function tarParts(files: readonly TarFile[]): BlobPart[] {
       if (folders.has(folder)) continue
       folders.add(folder)
       parts.push(...entry(folder, 0, 0o755, "5"))
+    }
+    if (file.link !== undefined) {
+      parts.push(...entry(file.path, 0, 0o777, "2", file.link))
+      continue
     }
     parts.push(...entry(file.path, file.data.size, file.executable ? 0o755 : 0o644, "0"))
     parts.push(file.data, padding(file.data.size))

@@ -2752,6 +2752,7 @@ export const en = {
   "upload.problem.unpacked": (largest: string) =>
     `The files add up to more than 1 GiB. Leave the largest out in .gitignore: ${largest}.`,
   "upload.problem.archiveInvalid": "Unable to read this archive.",
+  "upload.problem.archiveLink": "This archive has a link that points outside the folder.",
   "upload.problem.archivePacked": "The archive is over 256 MiB.",
   "upload.problem.archiveBomb": "The archive holds more than 1 GiB once unpacked.",
   "upload.moreSummary": "Folder to build, variables, build variables, size and security.",
