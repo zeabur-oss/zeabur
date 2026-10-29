@@ -1395,7 +1395,7 @@ export const en = {
   "plan.cancel": "Cancel",
   "plan.back": "Back",
   "plan.replan": "Review again",
-  "plan.replanned": "Something changed after you reviewed this. Please check it again.",
+  "plan.replanned": "Something changed after you reviewed this. Review it again.",
   "plan.replannedAdded": (names: string) => `New this time: ${names}`,
   "plan.replannedDropped": (names: string) => `No longer included: ${names}`,
   "plan.details": "Technical details",
@@ -3903,7 +3903,7 @@ export const en = {
     `${project} isn't available right now`,
   "domainPages.default.gatewayTimeout": (project: string) => `${project} took too long to respond`,
   "domainPages.default.later": "We'll be back soon.",
-  "domainPages.default.retry": "Please try again in a few minutes.",
+  "domainPages.default.retry": "Try again in a few minutes.",
   "ports.title": "Public ports",
   "ports.about":
     "Clients outside the cluster connect straight to a port, without a domain. For services that don't speak HTTP, such as a database.",
