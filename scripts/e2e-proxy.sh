@@ -212,17 +212,23 @@ metrics() { # token namespace endpoint [curl args]
 if [[ $(metrics "$token_a" "$a" labels) =~ ^(404|502)$ ]]; then
   echo "skip metrics: the proxy serves no metrics store ($(cat "$work/status"))"
 else
+  # A query starts once what it reads back from its first point is after the namespace's creation:
+  # for a bare selector at a 60 s step, about 8 minutes.
   in_store() { # token namespace marker: whether the namespace's series name the marker yet
-    [[ $(metrics "$1" "$2" query --data-urlencode "query=container_memory_working_set_bytes") == 200 ]] &&
+    local end
+    end=$(date +%s)
+    [[ $(metrics "$1" "$2" query_range --data-urlencode "query=container_memory_working_set_bytes" \
+      --data-urlencode "start=$((end - 120))" --data-urlencode "end=$end" --data-urlencode "step=60") == 200 ]] &&
       grep -q "$3" "$work/body"
   }
-  retry 240 "B's canary pod in the metrics store" in_store "$token_b" "$b" "$marker_b"
+  retry 720 "B's canary pod in the metrics store" in_store "$token_b" "$b" "$marker_b"
   retry 60 "A's writer in the metrics store" in_store "$token_a" "$a" '"writer"'
   pass "B's reader sees B's canary pod; A's reader sees A's writer"
-  [[ $(metrics "$token_a" "$a" "label/namespace/values") == 200 ]] &&
-    [[ $(jq -c .data "$work/body") == "[\"$a\"]" ]] ||
-    fail "A's namespace values: $(head -c 300 "$work/body")"
-  pass "A's reader sees only A among the namespaces"
+  # The series and label APIs start on the second UTC day after the creation.
+  if [[ $(metrics "$token_a" "$a" "label/namespace/values") != 400 ]] || ! grep -q before_namespace "$work/body"; then
+    fail "A's namespace values on its first day: $(cat "$work/status") $(head -c 300 "$work/body")"
+  fi
+  pass "A's label values wait for its second day (400)"
   now=$(date +%s)
   for q in \
     "container_memory_working_set_bytes" \
@@ -248,11 +254,11 @@ else
   done
   for match in "{__name__=~\".+\"}" "{namespace=\"$b\"}" "{pod=\"$marker_b\"}"; do
     metrics "$token_a" "$a" series --data-urlencode "match[]=$match" >/dev/null
-    clean "series $match" 200
+    clean "series $match" 400
     metrics "$token_a" "$a" labels --data-urlencode "match[]=$match" >/dev/null
-    clean "labels $match" 200
+    clean "labels $match" 400
     metrics "$token_a" "$a" "label/pod/values" --data-urlencode "match[]=$match" >/dev/null
-    clean "pod values $match" 200
+    clean "pod values $match" 400
   done
   refused "B's metrics" 403 GET "/metrics/api/v1/query?namespace=$b&query=up"
   refused "B's pod names" 403 GET "/metrics/api/v1/label/pod/values?namespace=$b"
