@@ -274,7 +274,7 @@ fn current_name<'a>(index: &Index, name: &'a str, warnings: &mut Vec<Warning>) -
                 &[name, new],
                 format!(
                     "disable: `{name}` is called `{new}` in this catalog; disabling `{new}`. \
-                     Write `{new}` in the configuration."
+                     Use `{new}` in the configuration file instead."
                 ),
             ));
             new
