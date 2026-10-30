@@ -19,6 +19,7 @@ publish = false
 [workspace.metadata.levels]
 zeabur-core = 1
 zeabur-model = 0
+zeabur-embed = 0
 zeabur-ui = 1
 zeabur-kube = 2
 zeabur-proxy = 1
@@ -73,6 +74,7 @@ zeabur-api = { path = "crates/zeabur-api" }
 zeabur-ui = { path = "crates/zeabur-ui" }
 zeabur-auth = { path = "crates/zeabur-auth" }
 zeabur-test-support = { path = "crates/zeabur-test-support" }
+zeabur-embed = { path = "crates/zeabur-embed" }
 zeabur-installer-plan = { path = "crates/zeabur-installer-plan" }
 zeabur-installer-host = { path = "crates/zeabur-installer-host" }
 
@@ -95,7 +97,7 @@ http-body = "1"
 http-body-util = "0.1"
 # The HTTP client stack kube-rs already ships, used directly for the OAuth client (zeabur-auth).
 bytes = "1"
-# Generate the embedded interface's file table (zeabur-ui's build script).
+# Generate the embedded interfaces' file tables (zeabur-embed and the build scripts using it).
 proc-macro2 = "1"
 quote = "1"
 # Decodes the embedded interface for a client without brotli (zeabur-ui); decoder only.

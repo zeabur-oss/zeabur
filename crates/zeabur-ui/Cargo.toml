@@ -17,6 +17,7 @@ brotli-decompressor.workspace = true
 [build-dependencies]
 proc-macro2.workspace = true
 quote.workspace = true
+zeabur-embed.workspace = true
 
 [dev-dependencies]
 zeabur-core.workspace = true

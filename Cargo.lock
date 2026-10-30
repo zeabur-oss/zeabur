@@ -2599,6 +2599,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "zeabur-embed"
+version = "0.1.1"
+dependencies = [
+ "proc-macro2",
+ "quote",
+]
+
+[[package]]
 name = "zeabur-gaps"
 version = "0.1.1"
 dependencies = [
@@ -2630,10 +2638,13 @@ dependencies = [
  "base64 0.23.1",
  "clap",
  "hex",
+ "proc-macro2",
+ "quote",
  "serde-saphyr 2.0.0",
  "serde_json",
  "tempfile",
  "thiserror",
+ "zeabur-embed",
  "zeabur-installer-host",
  "zeabur-installer-plan",
 ]
@@ -2791,6 +2802,7 @@ dependencies = [
  "quote",
  "tokio",
  "zeabur-core",
+ "zeabur-embed",
 ]
 
 [[package]]

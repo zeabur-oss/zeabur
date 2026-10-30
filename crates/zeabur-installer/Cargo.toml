@@ -19,6 +19,11 @@ serde-saphyr = { workspace = true, features = ["serialize"] }
 serde_json.workspace = true
 thiserror.workspace = true
 
+[build-dependencies]
+proc-macro2.workspace = true
+quote.workspace = true
+zeabur-embed.workspace = true
+
 [dev-dependencies]
 tempfile.workspace = true
 
