@@ -71,5 +71,6 @@ apply the formatting.
 
 Comments and rustdoc follow `zeabur-oss-standards`, section 1: only what the code cannot say.
 Behaviour that rests on a specification carries the constraint and the citation in rustdoc next
-to the code (`zeabur-oss-spec-work`); the reasons for the design go in the docs. Never cite
-something you have not read; write "not verified" instead.
+to the code (`zeabur-oss-spec-work`); the reasons for the design go in the docs. Cite only what
+you have read. A source you have not read is not cited at all; if it matters, note it in the
+internal docs or an issue.

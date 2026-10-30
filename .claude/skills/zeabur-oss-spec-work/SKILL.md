@@ -11,8 +11,9 @@ The repository's spec-work skill names its protocols, its cluster-test skill and
 1. **Read the source.** Find the exact section of the RFC, W3C or OIDF specification, KEP,
    Kubernetes documentation revision or upstream source the behaviour depends on. Note MUST and
    SHOULD (RFC 2119, RFC 8174). For prior art, read the other project's code at a pinned tag or
-   commit. Never cite something you have not read; if a fact cannot be verified, write "not
-   verified" instead of inventing a section number, URL, author or date.
+   commit. Cite only what you have read, and never invent a section number, URL, author or
+   date. A source you have not read is not cited at all; if it matters, note it in the internal
+   docs or an issue.
 2. **Cite the rule next to the code, decide in the docs.** In rustdoc: the constraint the code
    keeps (the spec rule or the invariant) and the citation as a markdown reference link; collect
    several sources in a `# References` section (IEEE-like: authors, title, venue, date,

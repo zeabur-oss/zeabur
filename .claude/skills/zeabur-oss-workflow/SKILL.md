@@ -68,6 +68,7 @@ maintainers'. A failed release run: `zeabur-oss-ci`.
 
 - English, plain words, decisions stated as facts about the design, not as history. How text
   reads, in every language: `zeabur-writing`.
-- Cite public sources only, and only what you have read; otherwise write "not verified".
+- Cite public sources only, and only what you have read. A source you have not read is not
+  cited at all; if it matters, note it in the internal docs or an issue.
 - No private notes, internal plans or names of people's decisions; no milestone code names.
 - A claim that a project does something better or safer has a test behind it.
