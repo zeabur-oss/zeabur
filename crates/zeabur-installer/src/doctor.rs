@@ -301,23 +301,21 @@ pub(crate) fn components(kubectl: &Kubectl, plan: &Value) -> Vec<(Status, String
 
 /// The catalog's health checks that fail, each with its advice and the wait that failed.
 fn failed_health(checks: &[Health], wait: impl Fn(&[&str]) -> bool) -> Vec<String> {
-    let mut failed = Vec::new();
-    for check in checks {
-        let timeout = format!("--timeout={}", check.timeout);
-        for mut args in check.waits() {
-            args.push(&timeout);
-            if !wait(&args) {
-                failed.push(format!(
+    checks
+        .iter()
+        .filter_map(|check| {
+            let timeout = format!("--timeout={}", check.timeout);
+            let args = check.args(&timeout);
+            (!wait(&args)).then(|| {
+                format!(
                     "{}: {} (kubectl wait {})",
                     check.name,
                     check.advice,
                     args.join(" ")
-                ));
-                break;
-            }
-        }
-    }
-    failed
+                )
+            })
+        })
+        .collect()
 }
 
 /// The Deployments and `DaemonSets` in a list that have fewer Pods available than they want, as
@@ -515,23 +513,25 @@ mod tests {
 
     #[test]
     fn a_failing_health_check_gives_the_catalogs_advice_and_its_wait() {
-        let check = Health {
-            name: "ready".to_owned(),
-            wait: vec![
-                "-n zot certificate/zot-tls --for=condition=Ready".to_owned(),
-                "-n zot statefulset/zot --for=jsonpath={.status.readyReplicas}=1".to_owned(),
-            ],
+        let check = |name: &str, target: &str| Health {
+            name: name.to_owned(),
+            wait: ["--for=condition=Ready", target, "-n", "longhorn-system"]
+                .map(str::to_owned)
+                .to_vec(),
             timeout: "45s".to_owned(),
-            advice: "Check the zot Pods.".to_owned(),
+            advice: "Add longhorn: true under join and run zeabur-installer apply.".to_owned(),
         };
-        let checks = [check];
+        let checks = [
+            check("manager", "deployment/manager"),
+            check("nodes-ready", "nodes.longhorn.io"),
+        ];
         assert_eq!(failed_health(&checks, |_| true), Vec::<String>::new());
-        let failed = failed_health(&checks, |args| !args.contains(&"statefulset/zot"));
+        let failed = failed_health(&checks, |args| !args.contains(&"nodes.longhorn.io"));
         assert_eq!(
             failed,
             [
-                "ready: Check the zot Pods. (kubectl wait -n zot statefulset/zot \
-              --for=jsonpath={.status.readyReplicas}=1 --timeout=45s)"
+                "nodes-ready: Add longhorn: true under join and run zeabur-installer apply. (kubectl \
+              wait --for=condition=Ready nodes.longhorn.io -n longhorn-system --timeout=45s)"
             ]
         );
     }

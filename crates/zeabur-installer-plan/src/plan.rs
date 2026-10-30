@@ -2020,7 +2020,14 @@ mod tests {
         let mut index = testing::index();
         let check = Health {
             name: "ready".to_owned(),
-            wait: vec!["-n traefik deployment/traefik --for=condition=Available".to_owned()],
+            wait: [
+                "--for=condition=Available",
+                "deployment/traefik",
+                "-n",
+                "traefik",
+            ]
+            .map(str::to_owned)
+            .to_vec(),
             timeout: "30s".to_owned(),
             advice: "Read the logs of traefik.".to_owned(),
         };

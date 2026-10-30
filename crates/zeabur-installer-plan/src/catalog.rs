@@ -283,23 +283,28 @@ pub struct Security {
     pub egress: Vec<String>,
 }
 
-/// One health check: `kubectl wait` on objects the component itself makes.
+/// One health check: a single `kubectl wait` that applies nothing.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 pub struct Health {
     /// Its name.
     pub name: String,
-    /// The arguments of one `kubectl wait` per entry, separated by spaces.
+    /// The arguments of the `kubectl wait`, one per item: a `--for=` condition and no `--timeout`.
     pub wait: Vec<String>,
-    /// How long each wait may take, as `kubectl wait --timeout` reads it.
+    /// How long the wait may take, as `kubectl wait --timeout` reads it.
     pub timeout: String,
     /// What to do when it fails, in one English sentence.
     pub advice: String,
 }
 
 impl Health {
-    /// The arguments of each `kubectl wait`, without a timeout.
-    pub fn waits(&self) -> impl Iterator<Item = Vec<&str>> {
-        self.wait.iter().map(|w| w.split_whitespace().collect())
+    /// The arguments of the `kubectl wait`, with `timeout` in place of the check's own.
+    #[must_use]
+    pub fn args<'a>(&'a self, timeout: &'a str) -> Vec<&'a str> {
+        self.wait
+            .iter()
+            .map(String::as_str)
+            .chain(std::iter::once(timeout))
+            .collect()
     }
 }
 

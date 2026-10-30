@@ -276,6 +276,7 @@ pub fn plan(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::catalog::Default;
     use crate::plan::ReleasePlan;
     use crate::testing;
 
@@ -402,16 +403,22 @@ mod tests {
     }
 
     #[test]
-    fn a_default_not_tested_on_kubesolo_is_left_out() {
+    fn the_defaults_are_what_the_catalog_recommends_and_tested_on_kubesolo() {
         let mut index = testing::index();
         for component in &mut index.components {
             if component.id == "ingress/traefik" {
                 component.tested_on.retain(|d| d != PERSONAL_DISTRIBUTION);
             }
+            if component.id == "config-reload/reloader" {
+                component.tested_on.push(PERSONAL_DISTRIBUTION.to_owned());
+                component
+                    .defaults
+                    .insert(PERSONAL_PROFILE.to_owned(), Default::Recommended);
+            }
         }
         let plan = plan(&index, &config("disable: [certificates]\n"), &facts(4096)).unwrap();
         assert!(!ids(&plan).contains(&"ingress/traefik"));
-        assert!(plan.left_out["ingress/traefik"].contains(PERSONAL_DISTRIBUTION));
+        assert!(ids(&plan).contains(&"config-reload/reloader"));
     }
 
     #[test]

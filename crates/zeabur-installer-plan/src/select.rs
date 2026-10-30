@@ -1,7 +1,8 @@
 //! Choosing components: the defaults, then `enable` and `disable`, then dependencies.
 //!
 //! A team install installs the catalog's recommended components for the profile and
-//! [`FEATURES`]; a personal install [`PERSONAL_DEFAULTS`]. Only components whose `testedOn` names
+//! [`FEATURES`]; a personal install the ones recommended for [`PERSONAL_PROFILE`]. Only components
+//! whose `testedOn` names
 //! the distribution are installed: a default one that is not is left out, and one the
 //! configuration or a dependency asks for stops the plan. Names are capabilities or component ids,
 //! so the catalog decides which component fills each one. The install order is the union of each
@@ -27,9 +28,6 @@ pub const FEATURES: &[&str] = &["builds", "image-updates", "databases/cloudnativ
 
 /// What Zeabur needs to run: HTTPS and usage numbers.
 pub const REQUIRED: &[&str] = &["ingress", "certificates", "metrics/metrics-server"];
-
-/// What a personal install installs unless told otherwise: HTTPS for the person's apps.
-pub const PERSONAL_DEFAULTS: &[&str] = &["ingress", "certificates"];
 
 /// The chosen components, in install order.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -75,8 +73,8 @@ pub fn select(index: &Index, config: &Config) -> Result<Selection, PlanError> {
     )
 }
 
-/// Chooses the components of a personal install: [`PERSONAL_DEFAULTS`], then `enable` and
-/// `disable`.
+/// Chooses the components of a personal install: those the catalog recommends for
+/// [`PERSONAL_PROFILE`] and tested on [`PERSONAL_DISTRIBUTION`], then `enable` and `disable`.
 ///
 /// # Errors
 ///
@@ -85,12 +83,14 @@ pub fn select_personal(index: &Index, config: &PersonalConfig) -> Result<Selecti
     choose(
         index,
         &Wanted {
-            base: resolve_all(
-                index,
-                PERSONAL_PROFILE,
-                PERSONAL_DISTRIBUTION,
-                PERSONAL_DEFAULTS,
-            )?,
+            base: recommended(index, PERSONAL_PROFILE)
+                .into_iter()
+                .filter(|id| {
+                    index
+                        .component(id)
+                        .is_some_and(|c| c.is_tested_on(PERSONAL_DISTRIBUTION))
+                })
+                .collect(),
             enable: &config.enable,
             disable: &config.disable,
             profile: PERSONAL_PROFILE,

@@ -15,7 +15,7 @@ pub const INDEX: &str = include_str!(concat!(env!("ZEABUR_CATALOG_RELEASE"), "/i
 ///
 /// A component without `testedOn` is tested on K3s and RKE2, and on `KubeSolo` when its
 /// capability is one the catalog's `KubeSolo` run installs, within its `distributions`. A
-/// component without `health` gets its `smoke` waits that need no test objects.
+/// component without `health` gets one check per `smoke` wait that needs no test objects.
 ///
 /// # Panics
 ///
@@ -45,18 +45,29 @@ pub fn index() -> Index {
             component["testedOn"] = json!(tested);
         }
         if component.get("health").is_none() {
+            let id = component["id"].as_str().unwrap_or_default().to_owned();
             let health: Vec<Value> = component["smoke"]
                 .as_array()
                 .into_iter()
                 .flatten()
-                .filter(|s| s.get("manifest").is_none() && s.get("wait").is_some())
-                .map(|s| {
-                    json!({
-                        "name": s["name"],
-                        "wait": s["wait"],
-                        "timeout": "60s",
-                        "advice": format!("Check {}.", component["id"].as_str().unwrap_or_default()),
-                    })
+                .filter(|s| s.get("manifest").is_none())
+                .flat_map(|s| {
+                    let name = s["name"].as_str().unwrap_or_default();
+                    s["wait"]
+                        .as_array()
+                        .into_iter()
+                        .flatten()
+                        .filter_map(Value::as_str)
+                        .enumerate()
+                        .map(|(i, line)| {
+                            json!({
+                                "name": format!("{name}-{i}"),
+                                "wait": line.split_whitespace().collect::<Vec<_>>(),
+                                "timeout": "60s",
+                                "advice": format!("Check {id}."),
+                            })
+                        })
+                        .collect::<Vec<_>>()
                 })
                 .collect();
             component["health"] = json!(health);

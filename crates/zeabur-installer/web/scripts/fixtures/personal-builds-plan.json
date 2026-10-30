@@ -7,9 +7,9 @@
         "health": [
           {
             "advice": "Check ingress/traefik.",
-            "name": "gateway-class-accepted",
+            "name": "gateway-class-accepted-0",
             "timeout": "60s",
-            "wait": ["gatewayclass/traefik --for=condition=Accepted"]
+            "wait": ["gatewayclass/traefik", "--for=condition=Accepted"]
           }
         ],
         "id": "ingress/traefik",
@@ -65,12 +65,15 @@
         "health": [
           {
             "advice": "Check certificates/cert-manager.",
-            "name": "acme-issuers",
+            "name": "acme-issuers-0",
             "timeout": "60s",
-            "wait": [
-              "clusterissuer/letsencrypt-staging --for=condition=Ready",
-              "clusterissuer/letsencrypt --for=condition=Ready"
-            ]
+            "wait": ["clusterissuer/letsencrypt-staging", "--for=condition=Ready"]
+          },
+          {
+            "advice": "Check certificates/cert-manager.",
+            "name": "acme-issuers-1",
+            "timeout": "60s",
+            "wait": ["clusterissuer/letsencrypt", "--for=condition=Ready"]
           }
         ],
         "id": "certificates/cert-manager",
@@ -122,21 +125,32 @@
         "health": [
           {
             "advice": "Check builds/zeabur-builder.",
-            "name": "ready",
+            "name": "ready-0",
+            "timeout": "60s",
+            "wait": ["-n", "zot", "certificate/zot-tls", "--for=condition=Ready"]
+          },
+          {
+            "advice": "Check builds/zeabur-builder.",
+            "name": "ready-1",
+            "timeout": "60s",
+            "wait": ["-n", "zot", "statefulset/zot", "--for=jsonpath={.status.readyReplicas}=1"]
+          },
+          {
+            "advice": "Check builds/zeabur-builder.",
+            "name": "builder-ready-0",
             "timeout": "60s",
             "wait": [
-              "-n zot certificate/zot-tls --for=condition=Ready",
-              "-n zot statefulset/zot --for=jsonpath={.status.readyReplicas}=1"
+              "-n",
+              "builder-system",
+              "deployment/zeabur-builder",
+              "--for=condition=Available"
             ]
           },
           {
             "advice": "Check builds/zeabur-builder.",
-            "name": "builder-ready",
+            "name": "builder-ready-1",
             "timeout": "60s",
-            "wait": [
-              "-n builder-system deployment/zeabur-builder --for=condition=Available",
-              "--for=condition=Established crd/builds.builder.zeabur.com"
-            ]
+            "wait": ["--for=condition=Established", "crd/builds.builder.zeabur.com"]
           }
         ],
         "id": "builds/zeabur-builder",

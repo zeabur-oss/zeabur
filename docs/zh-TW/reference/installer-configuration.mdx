@@ -181,7 +181,7 @@ host:
 
 | 欄位 | 預設與用途 |
 |---|---|
-| `enable` | `[]`。Ingress 和憑證是預設的，可以再加 Catalog 在 KubeSolo 上測過的元件，例如 `builds`（Zeabur Builder，會連 zot 一起裝，記憶體要 1800 MiB 以上）和 `databases`。其他元件會讓 `plan` 停下，並列出測過的 distribution |
+| `enable` | `[]`。預設安裝 Catalog 建議 `single-node` 使用、也在 KubeSolo 上測過的元件，例如 Ingress 和憑證。可以再加 Catalog 在 KubeSolo 上測過的元件，例如 `builds`（Zeabur Builder，會連 zot 一起裝，記憶體要 1800 MiB 以上）和 `databases`。其他元件會讓 `plan` 停下，並列出測過的 distribution |
 | `disable` | `[]`。排除 capability 或完整元件 ID |
 | `allowDataLoss` | `[]`。和建立叢集的檔案一樣 |
 | `inputs` | `{}`。和建立叢集的檔案一樣，依元件 ID 分組 |

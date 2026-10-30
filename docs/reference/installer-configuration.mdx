@@ -180,7 +180,7 @@ Only the fields in the table below can appear alongside it. `profile`, `access`,
 
 | Field | Default and purpose |
 |---|---|
-| `enable` | `[]`. Ingress and certificates come by default. You can add the components the Catalog has tested on KubeSolo, such as `builds` (Zeabur Builder, installed with zot, requires at least 1800 MiB of memory) and `databases`. For any other component, `plan` stops and names the distributions it was tested on |
+| `enable` | `[]`. By default, the installer installs the components the Catalog recommends for `single-node` and has tested on KubeSolo, such as ingress and certificates. You can add the components the Catalog has tested on KubeSolo, such as `builds` (Zeabur Builder, installed with zot, requires at least 1800 MiB of memory) and `databases`. For any other component, `plan` stops and names the distributions it was tested on |
 | `disable` | `[]`. Capabilities or full component IDs to exclude |
 | `allowDataLoss` | `[]`. Same as in the configuration for creating a cluster |
 | `inputs` | `{}`. Same as in the configuration for creating a cluster, grouped by component ID |
