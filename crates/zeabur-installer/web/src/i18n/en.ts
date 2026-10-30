@@ -377,7 +377,7 @@ export const en = {
   "review.changes.removed": "Removed",
   "review.changes.replaced": "Replaced",
   "review.changes.replaced.container-registry/zot":
-    "zot is replaced by Zeabur Builder, which runs zot itself. The images already pushed to zot stay. To keep zot as it is, add builds/zeabur-builder to disable in the configuration file.",
+    "zot is replaced by Zeabur Builder, which runs zot itself. Zeabur Builder deletes images under <project>/<name> paths that no build made, so images you pushed to zot yourself can disappear. To keep all of them, add builds/zeabur-builder to disable in the configuration file.",
   "review.changes.replacedNote": (from: string, to: string) =>
     `${from} is replaced by ${to}, which keeps the same release.`,
   "review.changes.charts": "Chart updates",

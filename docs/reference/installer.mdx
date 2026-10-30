@@ -67,7 +67,7 @@ When a newer installer than yours wrote the record, `apply` and `plan` stop and 
 
 When the Catalog renames a component, `disable` still takes the old ID and `plan` warns with the new one. `enable` with the old ID stops `plan` and `apply` with an error that names the new ID. `container-registry/zot` is now `builds/zeabur-builder`.
 
-If the record lists `container-registry/zot`, Zeabur Builder replaces it, and `plan` says so under "replaced". Zeabur Builder runs zot itself, in the same `zot` namespace with the same release, so `apply` upgrades that release instead of deleting it. The disk that holds the images already pushed to zot stays, and so do those images. `apply` then installs Zeabur Builder next to it. If you want to keep only zot, add `builds/zeabur-builder` to `disable`. `apply` then leaves zot running and warns that the Catalog no longer lists it.
+If the record lists `container-registry/zot`, Zeabur Builder replaces it, and `plan` says so under "replaced". Zeabur Builder runs zot itself, in the same `zot` namespace with the same release, so `apply` upgrades that release instead of deleting it. The disk that holds zot's images stays, but Zeabur Builder deletes images under `<project>/<name>` paths that no build made, so images you pushed to zot yourself can disappear ([zeabur-oss/builder#15](https://github.com/zeabur-oss/builder/issues/15)). To keep all of them, add `builds/zeabur-builder` to `disable`. `apply` then leaves zot running and warns that the Catalog no longer lists it.
 
 ## `gui`
 

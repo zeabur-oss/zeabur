@@ -212,7 +212,7 @@ impl Changes {
                 .components
                 .iter()
                 .filter(|id| !planned.contains(id.as_str()))
-                .filter(|id| !replaced.iter().any(|r| r.from == **id))
+                .filter(|id| !RENAMED.iter().any(|(from, _)| from == id))
                 .cloned()
                 .collect(),
             replaced,

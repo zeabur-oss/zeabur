@@ -349,7 +349,7 @@ export const zhCN: Messages = {
   "review.changes.removed": "移除",
   "review.changes.replaced": "取代",
   "review.changes.replaced.container-registry/zot":
-    "zot 由 Zeabur Builder 取代，Builder 会自己运行 zot，已经推送到 zot 的镜像会留着。想保持现在的 zot，在配置文件的 disable 里加上 builds/zeabur-builder。",
+    "zot 由 Zeabur Builder 取代，Builder 会自己运行 zot，但 Builder 会删掉 <project>/<name> 路径下不是它构建出来的镜像，你自己推到 zot 的镜像可能会消失。想全部留着，在配置文件的 disable 里加上 builds/zeabur-builder。",
   "review.changes.replacedNote": (from, to) => `${from} 由 ${to} 取代，沿用同一个 release。`,
   "review.changes.charts": "Chart 更新",
   "review.changes.offered": "这版目录新增的组件",

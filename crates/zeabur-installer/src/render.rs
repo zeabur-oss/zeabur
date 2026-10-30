@@ -192,8 +192,9 @@ pub(crate) fn changes(changes: Option<&Changes>, unit: &str) -> String {
 fn replaced_note(from: &str) -> &'static str {
     match from {
         "container-registry/zot" => {
-            "zot keeps running as part of Zeabur Builder; the images in it stay. \
-             To keep zot alone: disable: [builds/zeabur-builder]"
+            "zot keeps running as part of Zeabur Builder, but Builder deletes images under \
+             <project>/<name> paths that no build made (zeabur-oss/builder#15). To keep \
+             all images, disable: [builds/zeabur-builder]"
         }
         _ => "the new component takes over the old one's release",
     }
@@ -579,7 +580,7 @@ mod tests {
             "databases/old",
             "container-registry/zot",
             "replaced by builds/zeabur-builder",
-            "the images in it stay",
+            "deletes images under <project>/<name>",
             "chart traefik 42.1.2 -> 42.1.3",
             "to add it: enable: [databases/other]",
         ] {

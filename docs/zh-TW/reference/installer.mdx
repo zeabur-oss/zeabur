@@ -68,7 +68,7 @@ sudo zeabur-installer doctor
 
 Catalog 把元件改名後，`disable` 仍可以寫舊 ID，`plan` 會警告並寫出新 ID。`enable` 寫舊 ID 時，`plan` 和 `apply` 會停下，錯誤訊息會寫出新 ID。`container-registry/zot` 已改名為 `builds/zeabur-builder`。
 
-紀錄裡有 `container-registry/zot` 時，會由 Zeabur Builder 取代它，`plan` 會在「replaced」底下寫出來。Zeabur Builder 自己會執行 zot，用同一個 `zot` Namespace 和同一個 release，所以 `apply` 是升級這個 release，不是刪掉它。存放 zot 映像檔的磁碟和裡面已經推送的映像檔都會留著，`apply` 再接著安裝 Zeabur Builder。只想保留 zot 的話，把 `builds/zeabur-builder` 加進 `disable`，`apply` 就會讓 zot 繼續執行，並警告 Catalog 已經沒有這個元件。
+紀錄裡有 `container-registry/zot` 時，會由 Zeabur Builder 取代它，`plan` 會在「replaced」底下寫出來。Zeabur Builder 自己會執行 zot，用同一個 `zot` Namespace 和同一個 release，所以 `apply` 是升級這個 release，不是刪掉它。存放 zot 映像檔的磁碟會留著，但 Zeabur Builder 會刪掉 `<project>/<name>` 路徑下不是它建置出來的映像檔，你自己推到 zot 的映像檔可能會消失（[zeabur-oss/builder#15](https://github.com/zeabur-oss/builder/issues/15)）。想全部留著，把 `builds/zeabur-builder` 加進 `disable`，`apply` 就會讓 zot 繼續執行，並警告 Catalog 已經沒有這個元件。
 
 ## `gui`
 

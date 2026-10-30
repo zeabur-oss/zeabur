@@ -2504,7 +2504,7 @@ mod tests {
         assert!(!ids(&plan).contains(&"builds/zeabur-builder"));
         let changes = plan.changes.unwrap();
         assert_eq!(changes.replaced, []);
-        assert_eq!(changes.removed, ["container-registry/zot"]);
+        assert_eq!(changes.removed, Vec::<String>::new());
     }
 
     #[test]

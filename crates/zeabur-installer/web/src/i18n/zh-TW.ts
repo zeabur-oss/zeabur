@@ -349,7 +349,7 @@ export const zhTW: Messages = {
   "review.changes.removed": "移除",
   "review.changes.replaced": "取代",
   "review.changes.replaced.container-registry/zot":
-    "zot 由 Zeabur Builder 取代，Builder 會自己執行 zot，已經推送到 zot 的映像檔會留著。想維持現在的 zot，在設定檔的 disable 加上 builds/zeabur-builder。",
+    "zot 由 Zeabur Builder 取代，Builder 會自己執行 zot，但 Builder 會刪掉 <project>/<name> 路徑下不是它建置出來的映像檔，你自己推到 zot 的映像檔可能會消失。想全部留著，在設定檔的 disable 加上 builds/zeabur-builder。",
   "review.changes.replacedNote": (from, to) => `${from} 由 ${to} 取代，沿用同一個 release。`,
   "review.changes.charts": "Chart 更新",
   "review.changes.offered": "這版目錄新增的元件",
