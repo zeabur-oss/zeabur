@@ -11,7 +11,7 @@ use serde_json::{Value, json};
 use zeabur_installer_host::kubectl::{self, Kubectl};
 use zeabur_installer_host::preflight::{self, Node, Status};
 use zeabur_installer_host::{archive, cmd, download, facts, files, systemd};
-use zeabur_installer_plan::catalog::Index;
+use zeabur_installer_plan::catalog::{Health, Index};
 use zeabur_installer_plan::config::PersonalConfig;
 use zeabur_installer_plan::kubesolo::{
     ADMIN_KUBECONFIG, BINARY, DATA_DIR, KUBECTL, PERSONAL_KUBECONFIG, STATE_DIR, UNIT,
@@ -174,8 +174,7 @@ fn install(config: &PersonalConfig, report: &Reporter) -> Result<(), InstallErro
         out::step(&format!("{} ({})", component.display_name, component.id));
         crate::apply::secrets(&kubectl, component)?;
         crate::apply::releases(&kubectl, component)?;
-        for wait in &component.smoke {
-            let mut args: Vec<&str> = wait.iter().map(String::as_str).collect();
+        for mut args in component.health.iter().flat_map(Health::waits) {
             args.push("--timeout=5m");
             kubectl.wait(&args)?;
         }

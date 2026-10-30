@@ -70,6 +70,8 @@ enable: [runtime-security, vulnerability-scanning, intrusion-prevention]
 
 `enable` accepts capabilities, such as `runtime-security`, or full component IDs, such as `volume-backup/velero`. The installer adds a component's dependencies with it. If `disable` excludes a component that another component needs, `plan` names both and stops. The `plan` output lists the final components, their installation order, and the reasons for exclusions.
 
+The installer offers only components the Catalog has tested on your distribution (`testedOn` in the Catalog's `index.json`). A recommended component that wasn't tested there is left out, along with anything that needs it. If `enable` names one, or a component you enabled needs one, `plan` stops and names the distributions it was tested on.
+
 The next `apply` removes any component you take off the list. If removing a component also deletes its data, add it to `allowDataLoss` first. See [Remove a component](./installer.mdx#remove-components).
 
 ```yaml
@@ -178,7 +180,7 @@ Only the fields in the table below can appear alongside it. `profile`, `access`,
 
 | Field | Default and purpose |
 |---|---|
-| `enable` | `[]`. Ingress and certificates come by default. You can add only `builds` (Zeabur Builder, installed with zot, requires at least 1800 MiB of memory), `databases`, or component IDs under these capabilities |
+| `enable` | `[]`. Ingress and certificates come by default. You can add the components the Catalog has tested on KubeSolo, such as `builds` (Zeabur Builder, installed with zot, requires at least 1800 MiB of memory) and `databases`. For any other component, `plan` stops and names the distributions it was tested on |
 | `disable` | `[]`. Capabilities or full component IDs to exclude |
 | `allowDataLoss` | `[]`. Same as in the configuration for creating a cluster |
 | `inputs` | `{}`. Same as in the configuration for creating a cluster, grouped by component ID |

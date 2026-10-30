@@ -217,7 +217,9 @@ export const en = {
     "Runs with host access, so its namespace is exempt from the restricted Pod Security level.",
   "components.personalDescription":
     "Ingress and certificates come by default. Tick Zeabur Builder if you want to build apps from Git or a folder. What a component needs is added with it.",
-  "components.notPersonal": "Not in a personal install",
+  "components.untested": (distribution: string) => `Not tested on ${distribution}`,
+  "components.needsUntested": (component: string, distribution: string) =>
+    `Needs ${component}, which was not tested on ${distribution}`,
   "components.needsMemory": (mib: number) =>
     `Needs ${mib.toLocaleString("en")} MiB of memory to build apps, and this server has less`,
   "components.unsupported": (distribution: string) => `Not on ${distribution}`,

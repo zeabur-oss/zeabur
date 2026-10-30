@@ -27,14 +27,14 @@ export interface CatalogComponent {
   capability: string
   displayName: string
   default: "recommended" | "optional" | "unsupported"
-  /** Offered in a personal install. */
-  personal: boolean
   /** A personal install offers it only on a server with this much memory. */
   personalMinMemoryMib?: number | null
   /** Zeabur needs it to run, so it is never suggested for leaving out. */
   required: boolean
   /** Where it runs; empty when everywhere. */
   distributions: string[]
+  /** Where the catalog's CI installed it and passed; the installer offers it only there. */
+  testedOn: string[]
   /** The components installed before it because it needs them. */
   needs?: string[]
   /** Measured idle memory on this server's architecture. */
@@ -48,6 +48,15 @@ export interface CatalogComponent {
 export type Distribution = "k3s" | "rke2"
 
 export const distributionTitle: Record<Distribution, string> = { k3s: "K3s", rke2: "RKE2" }
+
+/** The Kubernetes of a personal install. */
+export const personalDistribution = "kubesolo"
+
+/** The name of any distribution the catalog names. */
+export const titleOf = (distribution: string) =>
+  distribution === personalDistribution
+    ? "KubeSolo"
+    : (distributionTitle[distribution as Distribution] ?? distribution)
 
 /** Whether a component runs on the distribution: an empty list means everywhere. */
 export const runsOn = (component: CatalogComponent, distribution: string) =>

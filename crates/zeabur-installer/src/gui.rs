@@ -32,8 +32,7 @@ use zeabur_installer_host::{facts, files, preflight, systemd};
 use zeabur_installer_plan::catalog::{Default, Index};
 use zeabur_installer_plan::cluster::Distribution;
 use zeabur_installer_plan::config::{Config, Document, PersonalConfig};
-use zeabur_installer_plan::select::{self, PERSONAL_CAPABILITIES, PERSONAL_DISTRIBUTION};
-use zeabur_installer_plan::{kubesolo, node_name, personal, plan};
+use zeabur_installer_plan::{kubesolo, node_name, personal, plan, select};
 use zeabur_ui::Asset;
 
 use crate::{InstallError, apply, load, out, render};
@@ -677,9 +676,8 @@ fn catalog_json(index: &Index, profile: &str, arch: &str) -> Value {
                     Default::Optional => "optional",
                     Default::Unsupported => "unsupported",
                 },
-                "personal": c.supports(PERSONAL_DISTRIBUTION)
-                    && PERSONAL_CAPABILITIES.contains(&c.capability.as_str()),
                 "distributions": c.distributions,
+                "testedOn": c.tested_on,
                 "personalMinMemoryMib": personal::min_memory_mib(c, arch),
                 "required": required.contains(&c.id),
                 "needs": c
@@ -715,7 +713,6 @@ mod tests {
 
     use serde_json::{Value, json};
     use zeabur_installer_host::preflight::{Code, Topic};
-    use zeabur_installer_plan::catalog::Index;
     use zeabur_installer_plan::config::{Config, PersonalConfig};
     use zeabur_installer_plan::plan::{self, Facts};
     use zeabur_installer_plan::{personal, pins};
@@ -1033,11 +1030,7 @@ mod tests {
     /// rewrites them, and `bun run fmt` in web/ formats them.
     #[test]
     fn the_web_fixtures_follow_the_catalog() {
-        let index = Index::parse(include_bytes!(concat!(
-            env!("ZEABUR_CATALOG_RELEASE"),
-            "/index.json"
-        )))
-        .unwrap();
+        let index = zeabur_installer_plan::testing::index();
         let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("web/scripts/fixtures");
         let read = |name: &str| -> Value {
             serde_json::from_str(&fs::read_to_string(dir.join(name)).unwrap()).unwrap()

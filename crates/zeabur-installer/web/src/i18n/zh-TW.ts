@@ -197,7 +197,9 @@ export const zhTW: Messages = {
     "以主機權限執行，所以這個元件的 Namespace 不套用 restricted Pod 安全等級。",
   "components.personalDescription":
     "預設會裝 Ingress 和憑證，要從 Git 或資料夾建置，再勾選 Zeabur Builder。元件需要的其他元件會一起加入。",
-  "components.notPersonal": "自己用的版本沒有這個",
+  "components.untested": (distribution) => `還沒在 ${distribution} 上測過`,
+  "components.needsUntested": (component, distribution) =>
+    `需要的 ${component} 還沒在 ${distribution} 上測過`,
   "components.needsMemory": (mib) =>
     `建置應用程式至少要 ${mib.toLocaleString("zh-TW")} MiB 記憶體，這台不夠`,
   "components.unsupported": (distribution) => `不支援 ${distribution}`,

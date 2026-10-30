@@ -9,6 +9,7 @@ use zeabur_installer_host::kubectl::Kubectl;
 use zeabur_installer_host::nodeprep::{self, Stage};
 use zeabur_installer_host::preflight::{self, Encryption, Status};
 use zeabur_installer_host::{facts, systemd};
+use zeabur_installer_plan::catalog::Health;
 use zeabur_installer_plan::cluster::Distribution;
 use zeabur_installer_plan::plan::{IDENTITY_NAMESPACE, ZEABUR_NAMESPACE};
 use zeabur_installer_plan::storage;
@@ -85,7 +86,6 @@ pub(crate) fn run() -> ExitCode {
                         .filter(|c| c.status != Status::Pass)
                         .map(|c| (c.status, c.detail)),
                 );
-                results.push(longhorn_nodes(&kubectl));
             }
             if plan.get("zeabur").is_some_and(|z| !z.is_null()) {
                 results.push(deployment(&kubectl, IDENTITY_NAMESPACE, "zeabur-identity"));
@@ -207,8 +207,8 @@ const fn rank(status: Status) -> u8 {
     }
 }
 
-/// Each component's `HelmCharts` installed, its Deployments and `DaemonSets` available and its
-/// smoke waits met.
+/// Each component's `HelmCharts` installed, its Deployments and `DaemonSets` available and the
+/// catalog's health checks in the install record met.
 pub(crate) fn components(kubectl: &Kubectl, plan: &Value) -> Vec<(Status, String)> {
     let mut results = Vec::new();
     for component in plan
@@ -279,30 +279,45 @@ pub(crate) fn components(kubectl: &Kubectl, plan: &Value) -> Vec<(Status, String
                 Err(e) => problems.push(format!("reading workloads in {ns}: {e}")),
             }
         }
-        for wait in component
-            .get("smoke")
-            .and_then(Value::as_array)
-            .into_iter()
-            .flatten()
-        {
-            let mut args: Vec<&str> = wait
-                .as_array()
-                .into_iter()
-                .flatten()
-                .filter_map(Value::as_str)
-                .collect();
-            args.push("--timeout=10s");
-            if kubectl.wait(&args).is_err() {
-                problems.push(format!("kubectl wait {} failed", args.join(" ")));
-            }
-        }
-        if problems.is_empty() {
+        let checks: Vec<Health> = component
+            .get("health")
+            .and_then(|h| serde_json::from_value(h.clone()).ok())
+            .unwrap_or_default();
+        let failed = failed_health(&checks, |args| kubectl.wait(args).is_ok());
+        if problems.is_empty() && failed.is_empty() {
             results.push((Status::Pass, id.to_owned()));
-        } else {
+        }
+        if !problems.is_empty() {
             results.push((Status::Fail, format!("{id}: {}", problems.join("; "))));
         }
+        results.extend(
+            failed
+                .into_iter()
+                .map(|failure| (Status::Fail, format!("{id}: {failure}"))),
+        );
     }
     results
+}
+
+/// The catalog's health checks that fail, each with its advice and the wait that failed.
+fn failed_health(checks: &[Health], wait: impl Fn(&[&str]) -> bool) -> Vec<String> {
+    let mut failed = Vec::new();
+    for check in checks {
+        let timeout = format!("--timeout={}", check.timeout);
+        for mut args in check.waits() {
+            args.push(&timeout);
+            if !wait(&args) {
+                failed.push(format!(
+                    "{}: {} (kubectl wait {})",
+                    check.name,
+                    check.advice,
+                    args.join(" ")
+                ));
+                break;
+            }
+        }
+    }
+    failed
 }
 
 /// The Deployments and `DaemonSets` in a list that have fewer Pods available than they want, as
@@ -377,40 +392,6 @@ pub(crate) fn default_class(kubectl: &Kubectl, plan: &Value) -> (Status, String)
                 defaults.join(" and ")
             ),
         ),
-    }
-}
-
-/// Longhorn's own checks of each node: packages, modules, disk space.
-fn longhorn_nodes(kubectl: &Kubectl) -> (Status, String) {
-    let nodes = kubectl
-        .run(
-            &[
-                "get",
-                "nodes.longhorn.io",
-                "--namespace=longhorn-system",
-                "--output=json",
-            ],
-            None,
-        )
-        .map_err(|e| e.to_string())
-        .and_then(|out| serde_json::from_str::<Value>(&out).map_err(|e| e.to_string()));
-    match nodes {
-        Ok(nodes) => {
-            let problems = storage::longhorn_node_problems(&nodes);
-            if problems.is_empty() {
-                (Status::Pass, "Longhorn finds every node ready".to_owned())
-            } else {
-                (
-                    Status::Warn,
-                    format!(
-                        "Longhorn: {}. On a node that joined without it, add longhorn: true \
-                         under join in its configuration and run zeabur-installer apply there",
-                        problems.join("; ")
-                    ),
-                )
-            }
-        }
-        Err(e) => (Status::Warn, format!("reading Longhorn's nodes: {e}")),
     }
 }
 
@@ -528,6 +509,29 @@ mod tests {
             [
                 "deployment/moco-controller has 0 of 2 Pods available",
                 "daemonset/agent has 2 of 3 Pods available"
+            ]
+        );
+    }
+
+    #[test]
+    fn a_failing_health_check_gives_the_catalogs_advice_and_its_wait() {
+        let check = Health {
+            name: "ready".to_owned(),
+            wait: vec![
+                "-n zot certificate/zot-tls --for=condition=Ready".to_owned(),
+                "-n zot statefulset/zot --for=jsonpath={.status.readyReplicas}=1".to_owned(),
+            ],
+            timeout: "45s".to_owned(),
+            advice: "Check the zot Pods.".to_owned(),
+        };
+        let checks = [check];
+        assert_eq!(failed_health(&checks, |_| true), Vec::<String>::new());
+        let failed = failed_health(&checks, |args| !args.contains(&"statefulset/zot"));
+        assert_eq!(
+            failed,
+            [
+                "ready: Check the zot Pods. (kubectl wait -n zot statefulset/zot \
+              --for=jsonpath={.status.readyReplicas}=1 --timeout=45s)"
             ]
         );
     }

@@ -133,49 +133,6 @@ pub fn default_classes(classes: &Value) -> Vec<String> {
         .collect()
 }
 
-/// Longhorn's checks of each node that failed, from `kubectl get nodes.longhorn.io -o json`:
-/// `<node>: <condition> (<message>)`.
-#[must_use]
-pub fn longhorn_node_problems(nodes: &Value) -> Vec<String> {
-    let mut problems = Vec::new();
-    for node in nodes
-        .get("items")
-        .and_then(Value::as_array)
-        .into_iter()
-        .flatten()
-    {
-        let name = node
-            .pointer("/metadata/name")
-            .and_then(Value::as_str)
-            .unwrap_or_default();
-        for condition in node
-            .pointer("/status/conditions")
-            .and_then(Value::as_array)
-            .into_iter()
-            .flatten()
-        {
-            if condition.get("status").and_then(Value::as_str) != Some("False") {
-                continue;
-            }
-            let kind = condition
-                .get("type")
-                .and_then(Value::as_str)
-                .unwrap_or_default();
-            let message = condition
-                .get("message")
-                .and_then(Value::as_str)
-                .unwrap_or_default()
-                .trim();
-            problems.push(if message.is_empty() {
-                format!("{name}: {kind}")
-            } else {
-                format!("{name}: {kind} ({message})")
-            });
-        }
-    }
-    problems
-}
-
 #[cfg(test)]
 mod tests {
     use serde_json::json;
@@ -211,25 +168,5 @@ mod tests {
         ]});
         assert_eq!(default_classes(&classes), ["longhorn"]);
         assert_eq!(default_classes(&json!({})), Vec::<String>::new());
-    }
-
-    #[test]
-    fn failed_longhorn_conditions_name_the_node() {
-        let nodes = json!({"items": [
-            {"metadata": {"name": "vps-1"}, "status": {"conditions": [
-                {"type": "Ready", "status": "True"},
-                {"type": "RequiredPackages", "status": "False", "message": "Missing packages: [nfs-common] "},
-            ]}},
-            {"metadata": {"name": "vps-2"}, "status": {"conditions": [
-                {"type": "Schedulable", "status": "False", "message": ""},
-            ]}},
-        ]});
-        assert_eq!(
-            longhorn_node_problems(&nodes),
-            [
-                "vps-1: RequiredPackages (Missing packages: [nfs-common])",
-                "vps-2: Schedulable"
-            ]
-        );
     }
 }

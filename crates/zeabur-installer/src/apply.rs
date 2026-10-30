@@ -12,7 +12,7 @@ use zeabur_installer_host::kubectl::{self, Kubectl};
 use zeabur_installer_host::nodeprep::{self, Stage};
 use zeabur_installer_host::preflight::{self, Status};
 use zeabur_installer_host::{archive, chart, cmd, download, facts, files, systemd};
-use zeabur_installer_plan::catalog::{Encoding, Index};
+use zeabur_installer_plan::catalog::{Encoding, Health, Index};
 use zeabur_installer_plan::cluster::{AUTHN_CONFIGMAP, Distribution, HostFile};
 use zeabur_installer_plan::config::{AccessMode, Config};
 use zeabur_installer_plan::k3s;
@@ -148,8 +148,7 @@ fn install_components(kubectl: &Kubectl, plan: &Plan) -> Result<(), InstallError
             kubectl.apply_object(policy)?;
         }
         releases(kubectl, component)?;
-        for wait in &component.smoke {
-            let mut args: Vec<&str> = wait.iter().map(String::as_str).collect();
+        for mut args in component.health.iter().flat_map(Health::waits) {
             args.push("--timeout=5m");
             kubectl.wait(&args)?;
         }

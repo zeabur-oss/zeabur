@@ -81,7 +81,9 @@ After installation, press `Ctrl-C` to close the GUI. K3s/RKE2 and the installed 
 sudo zeabur-installer doctor
 ```
 
-On the server that created the cluster, `doctor` checks the K3s or RKE2 unit, API, components in the installation record, default storage class, Zeabur and Zeabur Identity Deployments, Zeabur Identity's internal certificate, node addresses, baseline network policies, secret encryption, and encryption of `/var/lib/rancher`. It checks against the last `apply` record. If you change the YAML, run `apply` again for those changes to count.
+On the server that created the cluster, `doctor` checks the K3s or RKE2 unit, API, components in the installation record and their health checks, default storage class, Zeabur and Zeabur Identity Deployments, Zeabur Identity's internal certificate, node addresses, baseline network policies, secret encryption, and encryption of `/var/lib/rancher`. It checks against the last `apply` record. If you change the YAML, run `apply` again for those changes to count.
+
+Each component's health checks come from the Catalog release that `apply` used. When one fails, `doctor` prints the Catalog's advice and the `kubectl wait` command that failed, so you can run it again yourself.
 
 On a node that joined an existing cluster, it checks the local `k3s-agent` or RKE2 unit, whether the node is ready, connectivity and latency to the server, and disk encryption. On a server, it also compares Zeabur Identity's authentication configuration.
 
