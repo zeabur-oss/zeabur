@@ -657,7 +657,12 @@ fn products(
     let suffixes = suffixes(config, facts);
     warn_no_suffixes(config, facts, &suffixes, warnings);
     let mut values = zeabur_values(config, facts, tls_issuer, &zeabur_image, &suffixes);
-    chosen_values(chosen, registry, &mut values);
+    chosen_values(
+        chosen,
+        registry,
+        sources.proxy_image.as_deref(),
+        &mut values,
+    );
     Ok((
         Some(identity),
         Some(ZeaburPlan {
@@ -669,7 +674,12 @@ fn products(
 }
 
 /// The chart values that follow from the chosen components.
-fn chosen_values(chosen: &BTreeSet<&str>, registry: Option<&RegistryPlan>, values: &mut Value) {
+fn chosen_values(
+    chosen: &BTreeSet<&str>,
+    registry: Option<&RegistryPlan>,
+    proxy_image: Option<&str>,
+    values: &mut Value,
+) {
     let Some(map) = values.as_object_mut() else {
         return;
     };
@@ -684,10 +694,11 @@ fn chosen_values(chosen: &BTreeSet<&str>, registry: Option<&RegistryPlan>, value
     }
     let logs = chosen.contains(VICTORIA_LOGS);
     if logs || chosen.contains(VICTORIA_METRICS) {
-        map.insert(
-            "proxy".to_owned(),
-            json!({"enabled": true, "logs": {"enabled": logs}}),
-        );
+        let mut proxy = json!({"enabled": true, "logs": {"enabled": logs}});
+        if let (Some(image), Some(map)) = (proxy_image, proxy.as_object_mut()) {
+            map.insert("image".to_owned(), image_values(image));
+        }
+        map.insert("proxy".to_owned(), proxy);
     }
 }
 
@@ -1491,13 +1502,8 @@ pub fn is_public(address: &str) -> bool {
 }
 
 /// The chart values of docs/get-started/install.mdx, with the Secrets the installer creates.
-fn zeabur_values(
-    config: &Config,
-    facts: &Facts,
-    issuer: &str,
-    image: &str,
-    suffixes: &[String],
-) -> Value {
+/// The chart's `image` values for a reference: repository with a tag or a digest.
+fn image_values(image: &str) -> Value {
     let (repository, digest) = image
         .split_once('@')
         .map_or((image, None), |(r, d)| (r, Some(d)));
@@ -1505,15 +1511,23 @@ fn zeabur_values(
         (None, Some((r, t))) if !t.contains('/') => (r, Some(t)),
         _ => (repository, None),
     };
-    let mut image = json!({"repository": repository, "pullPolicy": "IfNotPresent"});
-    if let Some(map) = image.as_object_mut() {
-        if let Some(d) = digest {
-            map.insert("digest".to_owned(), json!(d));
-        }
-        if let Some(t) = tag {
-            map.insert("tag".to_owned(), json!(t));
-        }
+    // An empty digest clears the one a released chart pins, which the templates prefer to a tag.
+    let mut image = json!({"repository": repository, "digest": digest.unwrap_or_default(),
+                           "pullPolicy": "IfNotPresent"});
+    if let (Some(map), Some(t)) = (image.as_object_mut(), tag) {
+        map.insert("tag".to_owned(), json!(t));
     }
+    image
+}
+
+fn zeabur_values(
+    config: &Config,
+    facts: &Facts,
+    issuer: &str,
+    image: &str,
+    suffixes: &[String],
+) -> Value {
+    let image = image_values(image);
     let mut issuer_values =
         json!({"url": config.issuer(), "clientSecret": {"existingSecret": "zeabur-oidc"}});
     if config.access.mode == AccessMode::Local
@@ -2106,7 +2120,7 @@ mod tests {
         let values = &p.zeabur.unwrap().values;
         assert_eq!(
             values["image"],
-            json!({"repository": "zeabur", "tag": "dev", "pullPolicy": "IfNotPresent"})
+            json!({"repository": "zeabur", "tag": "dev", "digest": "", "pullPolicy": "IfNotPresent"})
         );
         assert_eq!(values["issuer"]["url"], "https://login.example.com");
         assert_eq!(
@@ -2138,6 +2152,37 @@ mod tests {
         assert_eq!(only_logs["proxy"]["logs"]["enabled"], true);
         let neither = values("disable: [logs/victoria-logs, metrics/victoria-metrics]\n");
         assert!(neither.get("proxy").is_none());
+    }
+
+    #[test]
+    fn proxy_image_source_replaces_the_charts_proxy_image() {
+        let index = Index::parse(INDEX.as_bytes()).unwrap();
+        let values = |extra: &str| {
+            plan(&index, &config(extra), &facts())
+                .unwrap()
+                .zeabur
+                .unwrap()
+                .values
+        };
+        assert!(values("")["proxy"].get("image").is_none());
+        let set = Config::parse(
+            "access: {mode: domain, identity: login.example.com, zeabur: zeabur.example.com}\n\
+             sources:\n  identityImage: i:1\n  identityctl: /tmp/ctl\n  zeaburImage: zeabur:dev\n  \
+             zeaburChart: /tmp/chart\n  proxyImage: registry.example.com/proxy@sha256:aa\n",
+        )
+        .unwrap();
+        let v = plan(&index, &set, &facts()).unwrap().zeabur.unwrap().values;
+        assert_eq!(
+            v["proxy"]["image"]["repository"],
+            "registry.example.com/proxy"
+        );
+        assert_eq!(v["proxy"]["image"]["digest"], "sha256:aa");
+        assert_eq!(v["image"]["repository"], "zeabur");
+        // A tag clears the digest a released chart pins, or the pinned image would run instead.
+        assert_eq!(
+            (&v["image"]["tag"], &v["image"]["digest"]),
+            (&json!("dev"), &json!(""))
+        );
     }
 
     #[test]
@@ -2299,7 +2344,7 @@ mod tests {
         );
         assert_eq!(
             zeabur.values["image"],
-            json!({"repository": "zeabur", "tag": "dev", "pullPolicy": "IfNotPresent"})
+            json!({"repository": "zeabur", "tag": "dev", "digest": "", "pullPolicy": "IfNotPresent"})
         );
 
         let Err(PlanError::Unpublished(keys)) = products(None) else {
