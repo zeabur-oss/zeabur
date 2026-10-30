@@ -170,7 +170,7 @@ kubectl delete node <node>
 zeabur-installer uninstall --purge
 ```
 
-**刪除 Kubernetes 節點後，還要完成 VM 上的解除安裝。** 在執行解除安裝前，只要 `k3s-agent` 或 RKE2 重新啟動，這台 VM 就會再次加入叢集。
+**刪除 Kubernetes 節點後，還要完成 VM 上的解除安裝**。在執行解除安裝前，只要 `k3s-agent` 或 RKE2 重新啟動，這台 VM 就會再次加入叢集。
 
 `/var/lib/zeabur/storage` 底下的磁碟區會留在 VM 上。確認不再需要這些資料後，再手動刪除。
 

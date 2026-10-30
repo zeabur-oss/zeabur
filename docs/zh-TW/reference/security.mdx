@@ -266,7 +266,7 @@ K3s 的資料存在 SQLite，沒有 etcd 快照。備份就是在 `k3s` 停止�
 
    把 `/root/k3s-db-backup` 和 `/var/lib/rancher/k3s/server/token` 複製到伺服器以外的地方，兩者分開放。
 
-2. 重複執行 `sudo k3s secrets-encrypt status`，直到 `Current Rotation Stage` 顯示 `reencrypt_finished`。
+2. 重複執行 `sudo k3s secrets-encrypt status`，等到 `Current Rotation Stage` 顯示 `reencrypt_finished` 再繼續。
 
 完整步驟見 [K3s 的 secrets-encrypt](https://docs.k3s.io/cli/secrets-encrypt)。
 
@@ -283,7 +283,7 @@ K3s 的資料存在 SQLite，沒有 etcd 快照。備份就是在 `k3s` 停止�
 
    `rotate-keys` 會產生新金鑰，並用新金鑰重新加密所有 Secret。
 
-2. 重複執行 `sudo rke2 secrets-encrypt status`，直到 `Current Rotation Stage` 顯示 `reencrypt_finished`。
+2. 重複執行 `sudo rke2 secrets-encrypt status`，等到 `Current Rotation Stage` 顯示 `reencrypt_finished` 再繼續。
 3. 有多台 server 時，逐台重新啟動每台 server，包括剛才那台。等指令結束再換下一台：
 
    ```sh
@@ -394,4 +394,4 @@ helm-controller 照上游的設定執行，ServiceAccount 有整個叢集的權�
 
 ## 私下回報漏洞
 
-透過 [GitHub 私密漏洞回報](https://github.com/zeabur-oss/zeabur/security/advisories/new) 提供版本或 commit、執行方式、Kubernetes 發行版和版本，以及重現步驟。Zeabur Identity 的漏洞送到 [Zeabur Identity 的私密回報](https://github.com/zeabur-oss/identity/security/advisories/new)。安全問題請不要開公開 issue、discussion 或 pull request。
+透過 [GitHub 私密漏洞回報](https://github.com/zeabur-oss/zeabur/security/advisories/new)提供版本或 commit、執行方式、Kubernetes 發行版和版本，以及重現步驟。Zeabur Identity 的漏洞送到 [Zeabur Identity 的私密回報](https://github.com/zeabur-oss/identity/security/advisories/new)。安全問題請不要開公開 issue、discussion 或 pull request。

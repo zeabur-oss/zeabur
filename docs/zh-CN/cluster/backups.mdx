@@ -257,4 +257,4 @@ kubectl -n velero get secret velero-repo-credentials velero-backup-key -o yaml >
 
 在**定时**点击**暂停**，检查后应用，之后就不会再备份。点击**恢复**恢复。已有的备份和存放位置都会保留，备份按各自的**保留到**日期到期。
 
-Zeabur 没有删除备份或定时的操作。要马上删掉，用 `velero backup delete` 或 `velero schedule delete`。移除 [S3 目的地](./s3-destinations.mdx) 只会删掉目的地本身，已经复制到 Velero 的密钥、定时和 S3 里的备份都会留下。
+Zeabur 没有删除备份或定时的操作。要马上删掉，用 `velero backup delete` 或 `velero schedule delete`。移除 [S3 目的地](./s3-destinations.mdx)只会删掉目的地本身，已经复制到 Velero 的密钥、定时和 S3 里的备份都会留下。

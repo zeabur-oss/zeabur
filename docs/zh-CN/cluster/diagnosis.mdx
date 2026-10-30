@@ -145,7 +145,7 @@ kubectl get clusterpolicyreport falco-cluster-policy-report -o yaml
 
 ## 连接规则
 
-服务**网络**选项卡的**连接规则**根据 NetworkPolicy 计算哪些服务**允许**、部分允许或禁止连接此服务，以及由哪条**规则**决定。没有规则选中此服务时，页面显示**没有规则应用到此服务，因此允许所有连接。** 添加和移除规则参见[私有网络与连接规则](../configure/networking.mdx)。
+服务**网络**选项卡的**连接规则**根据 NetworkPolicy 计算哪些服务**允许**、部分允许或禁止连接此服务，以及由哪条**规则**决定。没有规则选中此服务时，页面显示**没有规则应用到此服务，因此允许所有连接**。添加和移除规则参见[私有网络与连接规则](../configure/networking.mdx)。
 
 ```sh
 kubectl -n shop get networkpolicy

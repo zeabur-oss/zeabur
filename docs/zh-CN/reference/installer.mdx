@@ -160,7 +160,7 @@ sudo zeabur-installer uninstall zeabur
 
 只卸载 Zeabur，保留 K3s/RKE2、Zeabur Identity、Catalog 组件和应用。`uninstall zeabur` 还会删除 Zeabur 为成员创建的 RoleBinding 和 ClusterRoleBinding。
 
-`uninstall identity` 会一并卸载 Zeabur Identity，并清空 API server 对 Zeabur Identity 的信任配置。运行前，先按照[卸载 Zeabur](../leave/uninstall.mdx)准备其他登录方式。如果集群有多台 server，其他 server 需要各自运行一次 `sudo zeabur-installer apply`，才会停止信任 Zeabur Identity 的令牌，命令会列出这些 server。
+`uninstall identity` 会一并卸载 Zeabur Identity，并清空 API server 对 Zeabur Identity 的信任配置。运行前，先按照[卸载 Zeabur](../leave/uninstall.mdx) 准备其他登录方式。如果集群有多台 server，其他 server 需要各自运行一次 `sudo zeabur-installer apply`，才会停止信任 Zeabur Identity 的令牌，命令会列出这些 server。
 
 在加入集群的节点上运行 `uninstall`，只会输出需要依次运行的命令：drain、删除 Node、运行 K3s 或 RKE2 的卸载脚本、同步网络策略。这些步骤见[添加和维护节点](../cluster/nodes.mdx#移除节点)。
 

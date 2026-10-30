@@ -257,4 +257,4 @@ Velero 不是從 Catalog 安裝時，叢集裡可能沒有 `velero-repo-credenti
 
 在**排程**按**暫停**，檢查後套用，之後就不會再備份。按**繼續**恢復。已有的備份和存放位置都會保留，備份照各自的**保留到**日期到期。
 
-Zeabur 沒有刪除備份或排程的操作。要馬上刪掉，用 `velero backup delete` 或 `velero schedule delete`。移除 [S3 目的地](./s3-destinations.mdx) 只會刪掉目的地本身，已經複製到 Velero 的金鑰、排程和 S3 裡的備份都會留著。
+Zeabur 沒有刪除備份或排程的操作。要馬上刪掉，用 `velero backup delete` 或 `velero schedule delete`。移除 [S3 目的地](./s3-destinations.mdx)只會刪掉目的地本身，已經複製到 Velero 的金鑰、排程和 S3 裡的備份都會留著。
