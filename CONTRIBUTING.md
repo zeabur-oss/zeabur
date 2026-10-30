@@ -48,8 +48,8 @@ string after its key; `.zhtw-mcp.toml` holds the rules, the catalogue's chosen t
 for each rule or term it relaxes. Any warning fails the check. The term chosen for each concept
 and how each interface element reads are in [docs/internal/wording.md](docs/internal/wording.md);
 the general writing rules for all three locales are in the `zeabur-writing` skill
-(`.claude/skills/zeabur-writing/`, installed from
-[zeabur-oss/skills](https://github.com/zeabur-oss/skills) and pinned in `skills-lock.json`), and
+(`.claude/skills/zeabur-writing/`, copied from
+[zeabur-oss/skills](https://github.com/zeabur-oss/skills) by `.github/workflows/skills.yml`), and
 Vale checks docs and catalogs against them: `nix develop -c vale docs README.md web/src/i18n`
 (`.vale.ini`). A rule that is wrong for one passage is silenced there with a Vale comment that
 says why.
