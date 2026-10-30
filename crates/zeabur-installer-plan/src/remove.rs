@@ -353,6 +353,7 @@ mod tests {
             host_hex: "a1b2c3".to_owned(),
             memory_mib: 8192,
             node_ips: Vec::new(),
+            record: None,
         };
         plan(&index(), &config, &facts).unwrap().components
     }

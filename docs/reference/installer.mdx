@@ -53,6 +53,20 @@ When installation finishes, the installer prints the Zeabur and Zeabur Identity 
 
 `apply` restores installer-managed files to the content it generates. Put your own settings in `/etc/rancher/k3s/config.yaml.d/90-local.yaml` (K3s) or `/etc/rancher/rke2/config.yaml.d/90-local.yaml` (RKE2) instead of changing the installer's `config.yaml`.
 
+### On an installed server
+
+When the cluster has the installation record `kube-system/zeabur-installer`, `plan` starts with "Changes since the last apply" and names the installer version that wrote the record. A personal install works the same way. It lists:
+
+- The K3s, RKE2, or KubeSolo release when it changes, and the host files whose content changes. Either one makes `apply` restart `k3s`, `rke2-server`, or `kubesolo`: the Kubernetes API stops answering for about 10 seconds, and running apps keep serving.
+- Components that are added or removed, and charts whose version changes.
+- Components that are defaults in this Catalog but not in the record. `apply` doesn't install them. To add one, name it in `enable`, such as `enable: [builds/zeabur-builder]`, or check it in `gui`. Components that Zeabur needs (ingress, certificates, metrics-server) and components that a chosen component needs are still installed.
+
+`plan --json` has the same under `changes`, which is `null` on a first install. `gui` shows it on the review step, with the new components unchecked.
+
+`apply` and `plan` stop when the record was written by a newer installer than the one you run, and name the version to use instead. To go back to an older installer, restore a snapshot taken before the upgrade.
+
+When the Catalog renames a component, `disable` still takes the old ID and `plan` warns with the new one. `enable` with the old ID stops `plan` and `apply` with an error that names the new ID. `container-registry/zot` is now `builds/zeabur-builder`.
+
 ## `gui`
 
 Run on the server:

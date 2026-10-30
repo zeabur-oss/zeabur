@@ -14,6 +14,7 @@ use crate::catalog::{Component, Encoding, Index, Input, SecretRef};
 use crate::cluster::{self, Distribution, HostFile};
 use crate::config::{AccessMode, Config};
 use crate::pins::{self, CALICO, K3S, K3s, RKE2};
+use crate::record::{Changes, Record};
 use crate::remove::Removal;
 use crate::select::{self, Selection, Why};
 use crate::storage::{self, NodePrep, Storage};
@@ -67,6 +68,9 @@ pub struct Facts {
     pub memory_mib: u64,
     /// The addresses the node registers with (`node-ip`); empty leaves the choice to K3s or RKE2.
     pub node_ips: Vec<String>,
+    /// What an earlier `apply` recorded in the cluster.
+    #[serde(skip)]
+    pub record: Option<Record>,
 }
 
 impl Facts {
@@ -120,6 +124,8 @@ pub struct Plan {
     pub zeabur: Option<ZeaburPlan>,
     /// Idle memory: the distribution plus the measured components.
     pub memory: Memory,
+    /// What `apply` changes against the install record; `None` on a first install.
+    pub changes: Option<Changes>,
     /// Things to read before applying.
     pub warnings: Vec<Warning>,
 }
@@ -412,15 +418,18 @@ pub fn plan_with(
             have: facts.memory_mib,
         });
     }
+    if let Some(record) = &facts.record {
+        record.check_installer()?;
+    }
     let node_name = node_name::choose(config.host.node_name.as_deref(), facts, &[])?;
-    let selection = select::select(index, config)?;
+    let selection = select::select(index, config, facts.record.as_ref().map(|r| &r.components))?;
     let profile = config.profile.as_str();
     let chosen: BTreeSet<&str> = selection
         .components
         .iter()
         .map(|(id, _)| id.as_str())
         .collect();
-    let mut warnings = Vec::new();
+    let mut warnings = selection.warnings.clone();
 
     let cluster = cluster_plan(distribution, config.version(), &facts.arch, &mut warnings)?;
     let kubernetes = distribution.kubernetes();
@@ -465,6 +474,10 @@ pub fn plan_with(
     let host_files = server_files(config, &chosen, facts, &node_name, registry.as_ref());
 
     let memory = memory(distribution, &components, facts.memory_mib, &mut warnings);
+    let changes = facts
+        .record
+        .as_ref()
+        .map(|r| Changes::new(r, &components, &selection.offered, &cluster.version));
 
     Ok(Plan {
         storage: storage_plan(&components, profile, &mut warnings),
@@ -484,6 +497,7 @@ pub fn plan_with(
         identity,
         zeabur,
         memory,
+        changes,
         warnings,
     })
 }
@@ -1557,6 +1571,7 @@ fn zeabur_values(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::record;
 
     const INDEX: &str = include_str!(concat!(env!("ZEABUR_CATALOG_RELEASE"), "/index.json"));
 
@@ -1577,6 +1592,7 @@ mod tests {
             host_hex: "a1b2c3".to_owned(),
             memory_mib: 8192,
             node_ips: vec!["10.0.0.5".to_owned()],
+            record: None,
         }
     }
 
@@ -2399,6 +2415,145 @@ mod tests {
         assert_eq!(
             node_sources(&nodes),
             ["10.42.1.0", "10.42.8.64", "fd00:42:1::"]
+        );
+    }
+
+    /// The record an `apply` of `plan` writes, from an installer at `installer`, with the
+    /// components and chart versions an older catalog had.
+    fn recorded(plan: &Plan, installer: &str, edit: impl FnOnce(&mut Value)) -> Record {
+        let mut summary = json!(plan);
+        edit(&mut summary);
+        let components: Vec<&str> = summary["components"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|c| c["id"].as_str().unwrap())
+            .collect();
+        Record::from_data(&json!({
+            "installer": installer,
+            "version": "v1.0.0+k3s1",
+            "components": components.join(","),
+            "plan": summary.to_string(),
+        }))
+        .unwrap()
+    }
+
+    fn older_catalog(summary: &mut Value) {
+        let components = summary["components"].as_array_mut().unwrap();
+        components.retain(|c| c["id"] != "builds/zeabur-builder");
+        components.push(json!({"id": "container-registry/zot", "releases": []}));
+        for c in components
+            .iter_mut()
+            .filter(|c| c["id"] == "ingress/traefik")
+        {
+            for release in c["releases"].as_array_mut().unwrap() {
+                if release["name"] == "traefik" {
+                    release["object"]["spec"]["version"] = json!("0.0.1");
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn an_upgrade_says_what_changes_and_offers_new_defaults_without_installing_them() {
+        let index = Index::parse(INDEX.as_bytes()).unwrap();
+        let first = plan(&index, &config(""), &facts()).unwrap();
+        assert!(ids(&first).contains(&"builds/zeabur-builder"));
+        assert_eq!(first.changes, None);
+
+        let mut upgrade = facts();
+        upgrade.record = Some(recorded(&first, "0.0.1", older_catalog));
+        let plan = plan(&index, &config(""), &upgrade).unwrap();
+        assert!(!ids(&plan).contains(&"builds/zeabur-builder"));
+        let changes = plan.changes.unwrap();
+        assert_eq!(changes.offered, ["builds/zeabur-builder"]);
+        assert_eq!(changes.added, Vec::<String>::new());
+        assert_eq!(changes.removed, ["container-registry/zot"]);
+        let traefik = changes
+            .charts
+            .iter()
+            .find(|c| c.component == "ingress/traefik")
+            .unwrap();
+        assert_eq!(traefik.from, "0.0.1");
+        assert_eq!(
+            changes.version.as_ref().map(|v| v.from.as_str()),
+            Some("v1.0.0+k3s1")
+        );
+        assert!(changes.restart);
+
+        let chosen = plan_with(
+            &index,
+            &config("enable: [builds/zeabur-builder]\n"),
+            &upgrade,
+            None,
+        )
+        .unwrap();
+        assert!(ids(&chosen).contains(&"builds/zeabur-builder"));
+        let changes = chosen.changes.unwrap();
+        assert_eq!(changes.added, ["builds/zeabur-builder"]);
+        assert_eq!(changes.offered, Vec::<String>::new());
+    }
+
+    #[test]
+    fn a_rerun_with_the_same_catalog_changes_nothing() {
+        let index = Index::parse(INDEX.as_bytes()).unwrap();
+        let first = plan(&index, &config(""), &facts()).unwrap();
+        let mut again = facts();
+        let mut record = recorded(&first, record::INSTALLER_VERSION, |_| {});
+        record.version = Some(first.cluster.version.clone());
+        again.record = Some(record);
+        let plan = plan(&index, &config(""), &again).unwrap();
+        assert_eq!(ids(&plan), ids(&first));
+        let changes = plan.changes.unwrap();
+        assert!(changes.added.is_empty() && changes.removed.is_empty());
+        assert!(changes.charts.is_empty() && changes.offered.is_empty());
+        assert!(!changes.restart);
+    }
+
+    #[test]
+    fn a_record_from_a_newer_installer_stops_the_plan() {
+        let index = Index::parse(INDEX.as_bytes()).unwrap();
+        let first = plan(&index, &config(""), &facts()).unwrap();
+        let mut newer = facts();
+        newer.record = Some(recorded(&first, "999.0.0", |_| {}));
+        let error = plan(&index, &config(""), &newer).unwrap_err();
+        assert!(matches!(error, PlanError::NewerInstaller { .. }), "{error}");
+        assert!(
+            error
+                .to_string()
+                .contains("zeabur-installer 999.0.0 or newer")
+        );
+    }
+
+    #[test]
+    fn a_renamed_id_names_the_new_one() {
+        let index = Index::parse(INDEX.as_bytes()).unwrap();
+        let error = plan(
+            &index,
+            &config("enable: [container-registry/zot]\n"),
+            &facts(),
+        )
+        .unwrap_err();
+        assert!(
+            error.to_string().contains("`builds/zeabur-builder`"),
+            "{error}"
+        );
+
+        let plan = plan(
+            &index,
+            &config("disable: [container-registry/zot]\n"),
+            &facts(),
+        )
+        .unwrap();
+        assert!(!ids(&plan).contains(&"builds/zeabur-builder"));
+        let warning = plan
+            .warnings
+            .iter()
+            .find(|w| w.code == "config.renamed")
+            .unwrap();
+        assert_eq!(
+            warning.values,
+            ["container-registry/zot", "builds/zeabur-builder"]
         );
     }
 }

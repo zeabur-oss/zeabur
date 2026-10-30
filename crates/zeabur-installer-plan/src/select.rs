@@ -1,5 +1,8 @@
 //! Choosing components: the defaults, then `enable` and `disable`, then dependencies.
 //!
+//! On a server with an install record, a default that the record does not have is installed only
+//! when `enable` names it or a chosen component needs it.
+//!
 //! A team install installs the catalog's recommended components for the profile and
 //! [`FEATURES`]. Names are capabilities or component ids, so the catalog decides which component
 //! fills each one. The install order is the union of each chosen component's `installOrder`, taken
@@ -11,6 +14,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use crate::PlanError;
 use crate::catalog::{Default, Index};
 use crate::config::{Config, PersonalConfig};
+use crate::plan::{Warning, warning};
 
 /// The distribution of a personal install.
 pub const PERSONAL_DISTRIBUTION: &str = "kubesolo";
@@ -29,6 +33,18 @@ pub const REQUIRED: &[&str] = &["ingress", "certificates", "metrics/metrics-serv
 /// `config/kubernetes.yaml`).
 pub const PERSONAL_CAPABILITIES: &[&str] = &["ingress", "certificates", "builds", "databases"];
 
+/// Component ids the catalog renamed, old to new.
+pub const RENAMED: &[(&str, &str)] = &[("container-registry/zot", "builds/zeabur-builder")];
+
+/// The id a component the catalog renamed has now.
+#[must_use]
+pub fn renamed(old: &str) -> Option<&'static str> {
+    RENAMED
+        .iter()
+        .find(|(from, _)| *from == old)
+        .map(|(_, to)| *to)
+}
+
 /// The chosen components, in install order.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Selection {
@@ -37,6 +53,10 @@ pub struct Selection {
     /// Components the defaults or configuration named that this installer leaves out, with the
     /// reason.
     pub left_out: BTreeMap<String, String>,
+    /// Defaults that the install record does not have and that are not installed.
+    pub offered: Vec<String>,
+    /// About the configuration's names.
+    pub warnings: Vec<Warning>,
 }
 
 /// Why a component is installed.
@@ -50,12 +70,16 @@ pub enum Why {
     Dependency,
 }
 
-/// Chooses the components for a configuration.
+/// Chooses the components for a configuration, on a server whose install record has `installed`.
 ///
 /// # Errors
 ///
 /// When a name matches nothing, or a chosen component needs one that is disabled or unsupported.
-pub fn select(index: &Index, config: &Config) -> Result<Selection, PlanError> {
+pub fn select(
+    index: &Index,
+    config: &Config,
+    installed: Option<&BTreeSet<String>>,
+) -> Result<Selection, PlanError> {
     let profile = config.profile.as_str();
     let mut base = recommended(index, profile);
     base.extend(resolve_all(index, profile, FEATURES)?);
@@ -68,6 +92,7 @@ pub fn select(index: &Index, config: &Config) -> Result<Selection, PlanError> {
             profile,
             distribution: config.distribution.id(),
             offered: None,
+            installed,
         },
     )
 }
@@ -78,7 +103,11 @@ pub fn select(index: &Index, config: &Config) -> Result<Selection, PlanError> {
 /// # Errors
 ///
 /// As [`select`].
-pub fn select_personal(index: &Index, config: &PersonalConfig) -> Result<Selection, PlanError> {
+pub fn select_personal(
+    index: &Index,
+    config: &PersonalConfig,
+    installed: Option<&BTreeSet<String>>,
+) -> Result<Selection, PlanError> {
     choose(
         index,
         &Wanted {
@@ -88,6 +117,7 @@ pub fn select_personal(index: &Index, config: &PersonalConfig) -> Result<Selecti
             profile: PERSONAL_PROFILE,
             distribution: PERSONAL_DISTRIBUTION,
             offered: Some(PERSONAL_CAPABILITIES),
+            installed,
         },
     )
 }
@@ -100,6 +130,8 @@ struct Wanted<'a> {
     distribution: &'a str,
     /// Capabilities outside this list are left out of a personal install.
     offered: Option<&'a [&'a str]>,
+    /// The install record's components.
+    installed: Option<&'a BTreeSet<String>>,
 }
 
 fn choose(index: &Index, wanted: &Wanted<'_>) -> Result<Selection, PlanError> {
@@ -110,17 +142,26 @@ fn choose(index: &Index, wanted: &Wanted<'_>) -> Result<Selection, PlanError> {
         chosen.insert(id.clone(), Why::Default);
     }
     for name in wanted.enable {
-        chosen.insert(resolve(index, profile, name)?, Why::Enabled);
+        let id = resolve(index, profile, name).map_err(|e| match renamed(name) {
+            Some(new) if index.component(new).is_some() => PlanError::Renamed {
+                old: name.clone(),
+                new: new.to_owned(),
+            },
+            Some(_) | None => e,
+        })?;
+        chosen.insert(id, Why::Enabled);
     }
+    let mut warnings = Vec::new();
     let mut disabled = BTreeSet::new();
     for name in wanted.disable {
+        let name = current_name(index, name, &mut warnings);
         let matched: Vec<String> = chosen
             .keys()
             .filter(|id| matches(index, id, name))
             .cloned()
             .collect();
-        if matched.is_empty() && !index.components.iter().any(|c| matches(index, &c.id, name)) {
-            return Err(PlanError::Unknown(name.clone()));
+        if matched.is_empty() && !known(index, name) {
+            return Err(PlanError::Unknown(name.to_owned()));
         }
         for id in matched {
             chosen.remove(&id);
@@ -153,6 +194,7 @@ fn choose(index: &Index, wanted: &Wanted<'_>) -> Result<Selection, PlanError> {
     for id in &unusable {
         chosen.remove(id);
     }
+    let held = hold_back(index, profile, wanted.installed, &mut chosen);
 
     let mut order: Vec<(String, Why)> = Vec::new();
     for (id, why) in &chosen {
@@ -182,10 +224,63 @@ fn choose(index: &Index, wanted: &Wanted<'_>) -> Result<Selection, PlanError> {
             order.push((dep, why));
         }
     }
+    let offered = held
+        .into_iter()
+        .filter(|id| !order.iter().any(|(seen, _)| seen == id))
+        .collect();
     Ok(Selection {
         components: order,
         left_out,
+        offered,
+        warnings,
     })
+}
+
+/// Takes out of `chosen` the defaults that `installed` lacks, except what Zeabur needs, and
+/// returns them.
+fn hold_back(
+    index: &Index,
+    profile: &str,
+    installed: Option<&BTreeSet<String>>,
+    chosen: &mut BTreeMap<String, Why>,
+) -> Vec<String> {
+    let Some(installed) = installed else {
+        return Vec::new();
+    };
+    let required = required(index, profile);
+    let held: Vec<String> = chosen
+        .iter()
+        .filter(|(id, why)| {
+            **why == Why::Default && !installed.contains(*id) && !required.contains(*id)
+        })
+        .map(|(id, _)| id.clone())
+        .collect();
+    for id in &held {
+        chosen.remove(id);
+    }
+    held
+}
+
+fn known(index: &Index, name: &str) -> bool {
+    index.components.iter().any(|c| matches(index, &c.id, name))
+}
+
+/// `name`, or the id the catalog renamed it to, with a warning.
+fn current_name<'a>(index: &Index, name: &'a str, warnings: &mut Vec<Warning>) -> &'a str {
+    match renamed(name) {
+        Some(new) if !known(index, name) && known(index, new) => {
+            warnings.push(warning(
+                "config.renamed",
+                &[name, new],
+                format!(
+                    "disable: `{name}` is called `{new}` in this catalog; disabling `{new}`. \
+                     Write `{new}` in the configuration."
+                ),
+            ));
+            new
+        }
+        Some(_) | None => name,
+    }
 }
 
 /// What a personal install installs unless told otherwise: the components it offers that are

@@ -367,6 +367,17 @@ export const en = {
   "review.program.description":
     "Sends the version and how many people use Zeabur each day, so we know how many installations are in use and what to fix first. No names, domains or emails, and IP addresses aren't kept. You can turn it off any time.",
   "review.program.link": "See what is sent",
+  "review.changes": "Changes to this server",
+  "review.changes.recorded": (version: string) => `Last installed with zeabur-installer ${version}`,
+  "review.changes.none": "Nothing changes: the server already matches this configuration.",
+  "review.changes.version": (title: string, from: string, to: string) => `${title} ${from} → ${to}`,
+  "review.changes.restart": (title: string) =>
+    `${title} restarts. The Kubernetes API stops answering for about 10 seconds; apps keep running.`,
+  "review.changes.added": "Added",
+  "review.changes.removed": "Removed",
+  "review.changes.charts": "Chart updates",
+  "review.changes.offered": "New in this catalog",
+  "review.changes.offeredHint": "Not installed unless you choose it.",
   "review.removing": "Components to remove",
   "review.removingHint":
     "helm-controller uninstalls their charts. What stays can be deleted by hand later.",
@@ -433,6 +444,8 @@ export const en = {
     "Volumes on the default local-path storage class stay on the node that created them: a pod using one runs only on that node, and the data goes with the node.",
   "warning.join.token.unpinned": () =>
     "The token has no CA hash (K10<hash>::…), so this VM trusts whichever server answers at that address. Use the token exactly as node add printed it.",
+  "warning.config.renamed": (old: string, id: string) =>
+    `${old} is now called ${id} in this catalog, so ${id} is left out. Write ${id} in the configuration.`,
   "warning.join.server.unreachable": (server: string) =>
     `Cannot connect to ${server}. Check the address and that TCP 9345 is open from this VM.`,
 

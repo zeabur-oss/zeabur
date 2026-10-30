@@ -21,6 +21,7 @@ use zeabur_installer_plan::plan::{
     MANAGER, NAMESPACE_MANAGER, Plan, RegistryPlan, ReleasePlan, SecretRefPlan, SecretSource,
     Source, ZEABUR_NAMESPACE, ZeaburPlan,
 };
+use zeabur_installer_plan::record::Record;
 use zeabur_installer_plan::rke2::{ETCD_USER, PREFIX};
 use zeabur_installer_plan::storage::{self, NodePrep, Storage};
 use zeabur_telemetry::{InstallationId, Step};
@@ -72,6 +73,13 @@ fn install(config: &Config, reporter: &Reporter) -> Result<(), InstallError> {
     })?;
     kubectl.wait_ready(Duration::from_secs(600))?;
     files::set_modes(Path::new(distribution.layout().tls_dir), ".crt", 0o600)?;
+    let replanned = !running && read_record(&kubectl)?.is_some();
+    if replanned {
+        plan = make_plan(&index, config)?;
+        out::line(render::changes(plan.changes.as_ref(), distribution.server_unit()).trim_end());
+        out::line(render::removals(&plan.removals).trim_end());
+        remove::check(&plan.removals)?;
+    }
     if started.is_some() {
         let name = plan.node_name.clone();
         kubectl::poll(
@@ -80,7 +88,7 @@ fn install(config: &Config, reporter: &Reporter) -> Result<(), InstallError> {
             || crate::join::node_ready(&kubectl, &name, started).unwrap_or(false),
         )?;
     }
-    remove_components(&kubectl, &index, config, &mut plan, !running)?;
+    remove_components(&kubectl, &index, config, &mut plan, !running && !replanned)?;
 
     reporter.at(Step::ClusterSetup);
     out::step("Namespaces and network policies");
@@ -168,12 +176,23 @@ fn install_components(kubectl: &Kubectl, plan: &Plan) -> Result<(), InstallError
     Ok(())
 }
 
-/// The plan, with the removals read from the cluster when it runs.
+/// The plan, with the install record and the removals read from the cluster when it runs.
 pub(crate) fn make_plan(index: &Index, config: &Config) -> Result<Plan, InstallError> {
-    let mut plan = plan::plan(index, config, &facts::read()?)?;
     let kubectl = Kubectl::admin(config.distribution);
+    let running = systemd::is_active(config.distribution.server_unit());
+    let mut facts = facts::read()?;
+    if running {
+        facts.record = read_record(&kubectl)?;
+    }
+    let mut plan = plan::plan(index, config, &facts)?;
+    let authn = config.distribution.layout().authn_file;
+    if let Some(changes) = &mut plan.changes {
+        changes.set_host_files(changed_files(
+            plan.host_files.iter().filter(|f| f.path != authn),
+        ));
+    }
     plan.removals = remove::plan(
-        systemd::is_active(config.distribution.server_unit()).then_some(&kubectl),
+        running.then_some(&kubectl),
         index,
         &plan.components,
         &config.profile,
@@ -181,6 +200,21 @@ pub(crate) fn make_plan(index: &Index, config: &Config) -> Result<Plan, InstallE
         &mut plan.warnings,
     )?;
     Ok(plan)
+}
+
+/// The install record, when there is one.
+pub(crate) fn read_record(kubectl: &Kubectl) -> Result<Option<Record>, InstallError> {
+    Ok(kubectl
+        .get("configmap", STATE_CONFIGMAP, Some("kube-system"))?
+        .and_then(|state| Record::from_data(state.get("data")?)))
+}
+
+/// The paths of `files` whose content on this host differs.
+pub(crate) fn changed_files<'a>(files: impl Iterator<Item = &'a HostFile>) -> Vec<String> {
+    files
+        .filter(|f| fs::read(&f.path).ok().as_deref() != Some(f.content.as_bytes()))
+        .map(|f| f.path.clone())
+        .collect()
 }
 
 /// Removes the components the plan removes. With `read`, as when the cluster was stopped while

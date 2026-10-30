@@ -34,9 +34,17 @@ use crate::{InstallError, doctor, load, out, remove, render};
 /// The plan, with the removals read from the cluster when it runs.
 pub(crate) fn make_plan(config: &PersonalConfig) -> Result<PersonalPlan, InstallError> {
     let index = load::catalog(config.sources.catalog.as_deref(), STATE_DIR)?;
-    let mut plan = personal::plan(&index, config, &facts::read()?)?;
+    let running = systemd::is_active(UNIT);
+    let mut facts = facts::read()?;
+    if running {
+        facts.record = crate::apply::read_record(&kubectl())?;
+    }
+    let mut plan = personal::plan(&index, config, &facts)?;
+    if let Some(changes) = &mut plan.changes {
+        changes.set_host_files(crate::apply::changed_files(plan.host_files.iter()));
+    }
     plan.removals = removals(
-        systemd::is_active(UNIT),
+        running,
         &index,
         &plan.components,
         &config.allow_data_loss,
@@ -147,7 +155,12 @@ fn install(config: &PersonalConfig, report: &Reporter) -> Result<(), InstallErro
     }
 
     helm_controller(&kubectl, &plan)?;
-    if !running {
+    if !running && crate::apply::read_record(&kubectl)?.is_some() {
+        plan = make_plan(config)?;
+        out::line(render::changes(plan.changes.as_ref(), UNIT).trim_end());
+        out::line(render::removals(&plan.removals).trim_end());
+        remove::check(&plan.removals)?;
+    } else if !running {
         let index = load::catalog(config.sources.catalog.as_deref(), STATE_DIR)?;
         plan.removals = removals(
             true,

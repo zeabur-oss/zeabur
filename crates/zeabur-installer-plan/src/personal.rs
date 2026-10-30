@@ -18,6 +18,7 @@ use crate::plan::{
     Choices, ComponentPlan, Download, Facts, Memory, Namespace, RegistryPlan, Warning, components,
     idle_memory, registry, warning,
 };
+use crate::record::Changes;
 use crate::remove::Removal;
 use crate::select::{self, PERSONAL_DISTRIBUTION, PERSONAL_PROFILE};
 use crate::storage::Storage;
@@ -70,6 +71,8 @@ pub struct PersonalPlan {
     pub storage: Storage,
     /// Idle memory: `KubeSolo` plus the measured components.
     pub memory: Memory,
+    /// What `apply` changes against the install record; `None` on a first install.
+    pub changes: Option<Changes>,
     /// Things to read before applying.
     pub warnings: Vec<Warning>,
 }
@@ -190,13 +193,18 @@ pub fn plan(
     config: &PersonalConfig,
     facts: &Facts,
 ) -> Result<PersonalPlan, PlanError> {
+    if let Some(record) = &facts.record {
+        record.check_installer()?;
+    }
     let node_name = crate::node_name::choose(config.host.node_name.as_deref(), facts, &[])?;
     let arch = facts.arch.as_str();
     let no_release = || PlanError::Arch(arch.to_owned());
     let archive = KUBESOLO.archive(arch).ok_or_else(no_release)?;
     let kubectl = KUBECTL.binary(arch).ok_or_else(no_release)?;
     let mut warnings = warnings(index);
-    let mut selection = select::select_personal(index, config)?;
+    let mut selection =
+        select::select_personal(index, config, facts.record.as_ref().map(|r| &r.components))?;
+    warnings.extend(selection.warnings.clone());
     leave_out_short_of_memory(index, &mut selection, facts);
     let choices = Choices {
         inputs: &config.inputs,
@@ -246,6 +254,10 @@ pub fn plan(
             r.cluster_ip.as_deref()?,
         ))
     }));
+    let changes = facts
+        .record
+        .as_ref()
+        .map(|r| Changes::new(r, &components, &selection.offered, KUBESOLO.version));
     Ok(PersonalPlan {
         use_: "personal",
         facts: facts.clone(),
@@ -269,6 +281,7 @@ pub fn plan(
             other_classes: Vec::new(),
         },
         memory,
+        changes,
         warnings,
     })
 }
@@ -288,6 +301,7 @@ mod tests {
             host_hex: "a1b2c3".to_owned(),
             memory_mib,
             node_ips: vec!["10.0.0.5".to_owned()],
+            record: None,
         }
     }
 

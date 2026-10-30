@@ -339,6 +339,17 @@ export const zhCN: Messages = {
   "review.program.description":
     "发送版本和每天的使用人数，让我们知道有多少人在用、该先修哪里。不会发送名称、域名或邮箱，也不保存 IP。之后随时可以关闭。",
   "review.program.link": "查看会发送的内容",
+  "review.changes": "这台服务器会有的变动",
+  "review.changes.recorded": (version) => `上次用 zeabur-installer ${version} 安装`,
+  "review.changes.none": "没有变动：服务器已经符合这份配置。",
+  "review.changes.version": (title, from, to) => `${title} ${from} → ${to}`,
+  "review.changes.restart": (title) =>
+    `${title} 会重启。Kubernetes API 大约 10 秒连不上，应用会照常运行。`,
+  "review.changes.added": "新增",
+  "review.changes.removed": "移除",
+  "review.changes.charts": "Chart 更新",
+  "review.changes.offered": "这版目录新增的组件",
+  "review.changes.offeredHint": "勾选了才会安装。",
   "review.removing": "要移除的组件",
   "review.removingHint": "helm-controller 会卸载这些组件的 chart。留下的东西之后可以手动删除。",
   "review.stays": (items) => `会保留：${listZh("zh-CN", items)}`,
@@ -401,6 +412,8 @@ export const zhCN: Messages = {
     "默认 local-path 存储类创建的卷只在创建卷的节点上：使用这种卷的 Pod 只能在那个节点运行，节点没了，数据也跟着没了。",
   "warning.join.token.unpinned": () =>
     "这个令牌没有 CA 哈希（K10<hash>::…），所以这台 VM 会信任在那个地址响应的任何服务器。请原样使用 node add 打印的令牌。",
+  "warning.config.renamed": (old, id) =>
+    `${old} 在这版目录里改名为 ${id}，所以不会安装 ${id}。请把配置文件里的名称改成 ${id}。`,
   "warning.join.server.unreachable": (server) =>
     `连不上 ${server}。请检查地址，以及这台 VM 能否连到 TCP 9345。`,
 

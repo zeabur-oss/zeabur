@@ -31,6 +31,7 @@ pub fn read() -> Result<Facts, HostError> {
             reason: "no MemTotal".to_owned(),
         })?,
         node_ips,
+        record: None,
     })
 }
 
