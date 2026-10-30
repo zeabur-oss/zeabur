@@ -20,6 +20,7 @@ import { StatusPill } from "@/components/status"
 import { Button } from "@zeabur/design-system/components/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@zeabur/design-system/components/card"
 import { Drawer } from "@zeabur/design-system/components/drawer"
+import { Skeleton } from "@zeabur/design-system/components/skeleton"
 import { PageColumn } from "@zeabur/design-system/components/page-column"
 import { PageHeader } from "@zeabur/design-system/components/page-header"
 import { useT } from "@/i18n"
@@ -236,6 +237,13 @@ function Suggestions({ project, data }: { project: string; data: Project }) {
   const [open, setOpen] = useState(false)
   const gaps = useQuery(projectGapsQuery(project))
   const items = gaps.data?.items ?? []
+  if (gaps.isPending)
+    return (
+      <div aria-busy="true">
+        <span className="sr-only">{t("project.suggestionsLoading")}</span>
+        <Skeleton className="h-8 w-32" />
+      </div>
+    )
   if (items.length === 0) return null
   return (
     <>

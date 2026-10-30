@@ -4042,6 +4042,7 @@ export const en = {
   "project.viewMap": "Map",
   "project.viewList": "List",
   "project.suggestions": (n: number) => plural(n, "suggestion", "suggestions"),
+  "project.suggestionsLoading": "Looking for suggestions…",
   "project.suggestionsBody":
     "Settings these services run without. None of them stops a service now, but each makes a problem easier to catch or avoid.",
   "project.activity": "Activity",
