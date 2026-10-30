@@ -334,7 +334,7 @@ fn manifests(cli: &Cli, cluster_name: &str) -> Result<(), InstallError> {
     let list = serde_json::json!({
         "apiVersion": "v1",
         "kind": "List",
-        "items": [namespace, identity.ingress, apply::zeabur_helm_chart(&zeabur, None)?],
+        "items": [namespace, identity.ingress, apply::zeabur_helm_chart(&zeabur, None, apply::update_check(&config))?],
     });
     out::line(&list.to_string());
     Ok(())

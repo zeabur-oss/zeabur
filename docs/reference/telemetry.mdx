@@ -81,6 +81,7 @@ Zeabur and `zeaburctl` tell you when a newer version is out and how to upgrade. 
 
 **Turn it off.** Any one of these is enough.
 
+- In the installer, uncheck the box on the review page or set `updateCheck: false` in `/etc/zeabur-installer/config.yaml`. Running `apply` with `DO_NOT_TRACK=1` or `NO_UPDATE_NOTIFIER` set turns it off too.
 - With Helm, set `updateCheck.enabled=false`. The cluster page then only shows the version.
 - Set `DO_NOT_TRACK=1` in Zeabur's environment, or in yours for `zeaburctl`. It turns off the experience program too.
 - Set `NO_UPDATE_NOTIFIER` to any value in your environment for `zeaburctl`, including `zeaburctl ui`. It turns off only the update check.

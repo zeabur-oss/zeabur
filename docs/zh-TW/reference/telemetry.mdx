@@ -1,7 +1,7 @@
 ---
 title: 體驗計畫
 description: 加入體驗計畫後，Zeabur 和 installer 會傳送什麼、絕不傳送什麼；Zeabur 和 zeaburctl 怎麼檢查新版；以及怎麼分別關閉。
-source: "eed03adb2b3c"
+source: "92405c04daf8"
 ---
 
 體驗計畫會傳送版本和每天的使用人數，讓我們知道有多少人在用、該先修哪裡。用 installer 安裝時預設加入，可以在確認頁取消勾選；用 Helm 安裝時預設不加入，要自己開啟。
@@ -82,6 +82,7 @@ kubectl -n zeabur logs deployment/zeabur | grep telemetry
 
 **關閉。**以下任何一種都有效。
 
+- 用 installer 安裝時，在確認頁取消勾選，或在 `/etc/zeabur-installer/config.yaml` 設定 `updateCheck: false`。執行 `apply` 時設定了 `DO_NOT_TRACK=1` 或 `NO_UPDATE_NOTIFIER` 也會關閉。
 - 用 Helm 安裝時，設定 `updateCheck.enabled=false`。叢集頁就只顯示版本。
 - 在 Zeabur 的環境變數設定 `DO_NOT_TRACK=1`；`zeaburctl` 則看你自己的環境變數。這也會關閉體驗計畫。
 - 為 `zeaburctl`（包括 `zeaburctl ui`）在你的環境變數設定 `NO_UPDATE_NOTIFIER`，任何值都可以。這只關閉檢查更新。

@@ -13,9 +13,9 @@ minor or patch release may break the API.
 - The cluster page shows Zeabur's version and, from a daily check in the browser against
   GitHub's releases, whether a newer one is out, how to upgrade it the way it was installed, and
   whether the running version has known security problems. `zeaburctl` prints one line when a
-  newer version is out, at most once a day. Turn either off with the chart's
-  `updateCheck.enabled=false`, `DO_NOT_TRACK=1` or, for `zeaburctl`, `NO_UPDATE_NOTIFIER`
-  ([Update check](docs/reference/telemetry.mdx#update-check)).
+  newer version is out, at most once a day. Turn either off with the installer's
+  `updateCheck: false` or its review page checkbox, the chart's `updateCheck.enabled=false`,
+  `DO_NOT_TRACK=1` or `NO_UPDATE_NOTIFIER` ([Update check](docs/reference/telemetry.mdx#update-check)).
 - `GET /api/v1/cluster/zeabur`: Zeabur's version, whether the update check is on, and how Zeabur
   was installed.
 
