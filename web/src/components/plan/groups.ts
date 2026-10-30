@@ -9,10 +9,10 @@ import { partOrder } from "@/model/draft"
 import type { PodsOf } from "@/model/risk"
 import type { DraftPart } from "@/routes/search"
 
-type Change = Schemas["Change"]
-type WorkloadRef = Schemas["WorkloadRef"]
-type Plan = Pick<Schemas["PlanResponse"], "objects"> & {
-  preview?: Pick<Schemas["Preview"], "rollouts">
+type Change = Schemas.Change
+type WorkloadRef = Schemas.WorkloadRef
+type Plan = Pick<Schemas.PlanResponse, "objects"> & {
+  preview?: Pick<Schemas.Preview, "rollouts">
 }
 
 /** Up to this many edits, or changes, read as sentences. */
@@ -111,7 +111,7 @@ function slotOf(t: Translate, kind: string, path: string): Slot | undefined {
           return { ...entrySlot("storage", what, below), container }
         if (what === "resources") return resourceSlot(t, container, below, rest.join("."))
         const probe = /^(readiness|liveness|startup)Probe$/.exec(what)?.[1] as
-          | Schemas["ProbeKind"]
+          | Schemas.ProbeKind
           | undefined
         if (probe)
           return {
@@ -263,7 +263,7 @@ export function editGroups(t: Translate, plan: Pick<Plan, "objects">): EditGroup
     .map(({ group }) => group)
 }
 
-type Leaves = Map<string, Schemas["FieldChange"]>
+type Leaves = Map<string, Schemas.FieldChange>
 
 /** One row for an entry of a keyed list (`env[name=FOO]`): its value, or one row per other
  * field when it has no value (`valueFrom`, a mount's `readOnly`). */
@@ -291,7 +291,7 @@ function entryRows(entry: string, leaves: Leaves): FieldRow[] {
   return others.map(([leaf, change]) => leafRow(entry, leaf, change))
 }
 
-const leafRow = (entry: string, leaf: string, change: Schemas["FieldChange"]): FieldRow => ({
+const leafRow = (entry: string, leaf: string, change: Schemas.FieldChange): FieldRow => ({
   kind: kindOf(change.before, change.after),
   name: `${entry} ${leaf}`,
   before: change.before ?? undefined,

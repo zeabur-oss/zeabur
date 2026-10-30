@@ -332,7 +332,7 @@ async fn shell_pods(cluster: &dyn Cluster) -> Result<Vec<Value>, ApiError> {
 
 /// The node shell pods, oldest first; cluster administrators only.
 #[utoipa::path(get, path = "/api/v1/cluster/node-shells", tag = "cluster",
-    operation_id = "nodeShells",
+    operation_id = "getNodeShells",
     responses((status = 200, body = NodeShells),
               (status = 403, body = Problem, content_type = PROBLEM)))]
 pub(crate) async fn list(Person(cluster): Person) -> Result<Json<NodeShells>, ApiError> {
@@ -946,7 +946,7 @@ async fn apply_open(
 /// a node shell the person opened (`404`), one not running or already open in another terminal
 /// (`409`): one terminal per shell. When the terminal closes, Zeabur deletes the pod at once.
 #[utoipa::path(get, path = "/api/v1/cluster/node-shells/{pod}/terminal", tag = "cluster",
-    operation_id = "nodeShellTerminal",
+    operation_id = "openNodeShellTerminal",
     params(("pod" = String, Path)),
     responses((status = 101, description = "Switched to the terminal's WebSocket"),
               (status = 401, body = Problem, content_type = PROBLEM),

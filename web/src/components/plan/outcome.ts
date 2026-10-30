@@ -6,7 +6,8 @@
 // it, the kubectl terminal with `helm list` typed in.
 import { toast } from "sonner"
 
-import { api, toProblem, unwrap, type Schemas } from "@/api/client"
+import { toProblem, type Schemas } from "@/api/client"
+import * as zeabur from "@/api/zeabur"
 import { queryClient } from "@/api/queries"
 import { failureOf } from "@/components/plan/describe"
 import { markCreated } from "@/lib/created"
@@ -19,21 +20,11 @@ import { namespaceOps } from "@/model/project"
 const WITH_ACTION_MS = 10_000
 
 async function apply(project: string, token: string) {
-  return unwrap(
-    await api.POST("/api/v1/projects/{project}/apply", {
-      params: { path: { project } },
-      body: { token },
-    }),
-  )
+  return await zeabur.applyProject(project, { token })
 }
 
-async function planAndApply(project: string, changes: Schemas["Change"][]) {
-  const plan = unwrap(
-    await api.POST("/api/v1/projects/{project}/plan", {
-      params: { path: { project } },
-      body: { changes },
-    }),
-  )
+async function planAndApply(project: string, changes: Schemas.Change[]) {
+  const plan = await zeabur.planProject(project, { changes })
   return apply(project, plan.token)
 }
 
@@ -47,9 +38,7 @@ export interface Confirmed {
   view?: string
   /** The changes that take it back, from what the apply wrote, and their description for the
    * toast; planned and applied only when the person asks. */
-  undo?: (
-    applied: Schemas["Applied"][],
-  ) => { changes: Schemas["Change"][]; title: string } | undefined
+  undo?: (applied: Schemas.Applied[]) => { changes: Schemas.Change[]; title: string } | undefined
   navigate: (href: string) => void
   /** Opens the plan dialog for the same change again; with `reviewed`, after the apply was
    * refused because the project moved on. */
@@ -58,7 +47,7 @@ export interface Confirmed {
   reviewed?: Reviewed
   onApplied?: () => void
   /** The apply was refused after it created some of the objects. */
-  onPartial?: (problem: Schemas["Problem"]) => void
+  onPartial?: (problem: Schemas.Problem) => void
 }
 
 /** Applies a confirmed plan and reports the outcome in a toast. */
@@ -111,7 +100,7 @@ export async function carryOut(confirmed: Confirmed): Promise<void> {
 
 async function takeBack(
   project: string,
-  undo: Schemas["Change"][],
+  undo: Schemas.Change[],
   t: Translate,
   locale: Locale,
   title: string,

@@ -2,7 +2,7 @@ import { queryOptions, useQuery } from "@tanstack/react-query"
 import { Link } from "@tanstack/react-router"
 import { useEffect, useRef, type ReactNode } from "react"
 
-import { api, unwrap } from "@/api/client"
+import * as zeabur from "@/api/zeabur"
 import { FormField } from "@/components/form-field"
 import { useT } from "@/i18n"
 import type { Frequency, TargetProblem } from "@/model/databases"
@@ -16,8 +16,7 @@ type Field = Exclude<keyof S3, "destination">
 /** The cluster's S3 destinations, without their keys. */
 export const s3DestinationsQuery = queryOptions({
   queryKey: ["cluster", "s3-destinations"],
-  queryFn: async ({ signal }) =>
-    unwrap(await api.GET("/api/v1/cluster/s3-destinations", { signal })),
+  queryFn: async ({ signal }) => await zeabur.getS3Destinations({ signal }),
   retryOnMount: false,
 })
 

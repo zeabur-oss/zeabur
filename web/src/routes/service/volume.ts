@@ -9,7 +9,7 @@ export const accessModes = [
   "ReadWriteOncePod",
   "ReadWriteMany",
   "ReadOnlyMany",
-] as const satisfies readonly Schemas["AccessMode"][]
+] as const satisfies readonly Schemas.AccessMode[]
 
 /**
  * A DNS subdomain, the form of a claim's name:
@@ -24,7 +24,7 @@ export interface VolumeValues {
   size: string
   /** `null` while the person has not typed one: the field shows the default. */
   claimName: string | null
-  accessMode: Schemas["AccessMode"]
+  accessMode: Schemas.AccessMode
   /** Absent for the cluster's default. */
   storageClass?: string
 }
@@ -33,7 +33,7 @@ export interface VolumeValues {
 export const defaultClaimName = (workload: string, volume: string): string =>
   volume.trim() === "" ? "" : `${workload}-${volume.trim()}`
 
-export function volumeRequest(workload: string, values: VolumeValues): Schemas["VolumeRequest"] {
+export function volumeRequest(workload: string, values: VolumeValues): Schemas.VolumeRequest {
   const name = values.name.trim()
   const claimName = values.claimName?.trim()
   return {

@@ -26,10 +26,10 @@ import { Checkbox } from "@zeabur/design-system/components/checkbox"
 import { Label } from "@zeabur/design-system/components/label"
 import { Select } from "@zeabur/design-system/components/select"
 
-type Service = Schemas["Service"]
-type Mount = Schemas["Mount"]
-type Restores = Schemas["VolumeRestores"]
-type Restore = Schemas["VolumeRestore"]
+type Service = Schemas.Service
+type Mount = Schemas.Mount
+type Restores = Schemas.VolumeRestores
+type Restore = Schemas.VolumeRestore
 type Mode = "new" | "inPlace"
 type Template = Parameters<typeof restoreToNewVolume>[0]
 

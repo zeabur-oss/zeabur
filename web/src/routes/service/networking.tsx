@@ -99,8 +99,8 @@ export function NetworkingTab({
   services: Service[]
   network: Network
   /** Absent when it was not read. */
-  reachability?: Schemas["NetworkPolicyReachability"]
-  unreadable: Schemas["UnreadableView"][]
+  reachability?: Schemas.NetworkPolicyReachability
+  unreadable: Schemas.UnreadableView[]
 }) {
   const t = useT()
   const routes = publicRoutesOf(network, service)
@@ -118,7 +118,7 @@ export function NetworkingTab({
     routes.map((r) => r.ingress),
   )
   /** What the draft changes of a route's host: a domain edit, or its drawers' settings. */
-  const pendingOf = (route: PublicRoute): Schemas["Change"][] => {
+  const pendingOf = (route: PublicRoute): Schemas.Change[] => {
     if (!route.host) return []
     const edit = staged.edits.get(`${route.ingress}/${route.host}`)
     return edit ? [edit] : stagedSettings(draft?.changes ?? [], route.ingress, route.host)
@@ -129,15 +129,15 @@ export function NetworkingTab({
   const long = isLongList(routes.length, 10)
   const shown = plainFirst(long ? filterRoutes(routes, query) : routes)
   const lead = domainsLead(routes)
-  const undo = (changes: Schemas["Change"][]) => (
+  const undo = (changes: Schemas.Change[]) => (
     <Button variant="ghost" size="xs" onClick={() => draft?.unstage(changes)}>
       <ArrowCounterClockwiseIcon aria-hidden="true" data-icon="inline-start" />
       {t("vars.undo")}
     </Button>
   )
-  const routeOf = (route: PublicRoute): Schemas["RouteRef"] => ({
+  const routeOf = (route: PublicRoute): Schemas.RouteRef => ({
     kind: (routesOf(network, service).find((r) => r.name === route.ingress)?.origin.kind ??
-      "Ingress") as Schemas["RouteKind"],
+      "Ingress") as Schemas.RouteKind,
     name: route.ingress,
   })
   const canWrite = endpoints.length > 0 && !managed
@@ -648,7 +648,7 @@ function ExposeHint({ command }: { command?: string }) {
 
 // On an Ingress, redirects and passwords are Traefik middlewares, which only an Ingress that
 // Traefik serves can list. An HTTPRoute redirects with a filter.
-function withAccess(route?: Schemas["Route"]): Schemas["Route"] | undefined {
+function withAccess(route?: Schemas.Route): Schemas.Route | undefined {
   return route && (isGateway(route) || servedByTraefik(route)) ? route : undefined
 }
 
@@ -656,15 +656,15 @@ function withAccess(route?: Schemas["Route"]): Schemas["Route"] | undefined {
 const ingressesOf = (network: Network, service: Service) =>
   routesOf(network, service).filter((r) => !isGateway(r) && servedByTraefik(r))
 
-const isGateway = (route: Schemas["Route"]) => route.origin.kind === "HTTPRoute"
+const isGateway = (route: Schemas.Route) => route.origin.kind === "HTTPRoute"
 
-const servedByTraefik = (route: Schemas["Route"]) => !route.class || route.class.includes("traefik")
+const servedByTraefik = (route: Schemas.Route) => !route.class || route.class.includes("traefik")
 
 function routeFor(
   network: Network,
   service: Service,
   publicRoute: PublicRoute,
-): Schemas["Route"] | undefined {
+): Schemas.Route | undefined {
   return routesOf(network, service).find((r) => r.name === publicRoute.ingress)
 }
 
@@ -675,7 +675,7 @@ function lastHost(network: Network, service: Service, publicRoute: PublicRoute, 
 }
 
 /** Maintenance first: the domain does not reach the service. */
-function PagesMarks({ route, host }: { route?: Schemas["Route"]; host?: string | null }) {
+function PagesMarks({ route, host }: { route?: Schemas.Route; host?: string | null }) {
   const t = useT()
   if (!route) return null
   return (
@@ -698,7 +698,7 @@ function PagesMarks({ route, host }: { route?: Schemas["Route"]; host?: string |
   )
 }
 
-function AccessMarks({ route, host }: { route?: Schemas["Route"]; host?: string | null }) {
+function AccessMarks({ route, host }: { route?: Schemas.Route; host?: string | null }) {
   const t = useT()
   if (!route) return null
   return (
@@ -798,7 +798,7 @@ function CertificateButton({ route, host, ...rest }: RowDrawerProps) {
 }
 
 interface RowDrawerProps {
-  route?: Schemas["Route"]
+  route?: Schemas.Route
   host?: string | null
   managed?: string
   gate: Gate
@@ -858,7 +858,7 @@ function Managed({ tool, gate, children }: { tool?: string; gate: Gate; children
   )
 }
 
-type Choice = Pick<Schemas["AddDomainChange"], "certificate" | "parent">
+type Choice = Pick<Schemas.AddDomainChange, "certificate" | "parent">
 
 function HostForm({
   value,
@@ -1048,7 +1048,7 @@ function Table({
 
 /** A domain the draft adds, renames or removes, before it is applied. */
 /** A host the draft changes: renamed, removed, or with changed settings. */
-function PendingEdit({ edit, host }: { edit: Schemas["Change"]; host: string }) {
+function PendingEdit({ edit, host }: { edit: Schemas.Change; host: string }) {
   if (edit.op === "renameDomain")
     return <PendingHost host={edit.to} was={edit.from} state="changed" />
   if (edit.op === "removeDomain") return <PendingHost host={edit.hostname} state="removed" />
@@ -1103,7 +1103,7 @@ function Host({
   certificate,
 }: {
   route: PublicRoute
-  certificate?: Schemas["DomainCheck"]["certificate"]
+  certificate?: Schemas.DomainCheck["certificate"]
 }) {
   const t = useT()
   const issuing = route.https && certificate?.state === "issuing"
@@ -1187,7 +1187,7 @@ function ReachabilityFor({
   project: string
   service: Service
   services: Service[]
-  reachability: Schemas["NetworkPolicyReachability"]
+  reachability: Schemas.NetworkPolicyReachability
   plan: ReturnType<typeof usePlanner>["plan"]
 }) {
   const mine = reachability.services.find((s) => s.service === service.id)

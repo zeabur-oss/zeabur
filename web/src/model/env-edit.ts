@@ -58,15 +58,15 @@ export function problemsOf(
 /** The edits of each container that has any: removals first, then what is set. */
 export function changesOf(
   rows: readonly EnvRow[],
-): { container: string; changes: Schemas["EnvEdit"][] }[] {
+): { container: string; changes: Schemas.EnvEdit[] }[] {
   const containers = [...new Set(rows.map((row) => row.container))]
   return containers.flatMap((container) => {
     const own = rows.filter((row) => row.container === container)
-    const sets: Schemas["EnvEdit"][] = own
+    const sets: Schemas.EnvEdit[] = own
       .filter((row) => live(row) && rowState(row) !== "same")
       .map((row) => ({ name: row.name.trim(), op: "set", value: row.value }))
     const setNames = new Set(sets.map((edit) => edit.name))
-    const removes = own.flatMap((row): Schemas["EnvEdit"][] =>
+    const removes = own.flatMap((row): Schemas.EnvEdit[] =>
       row.was && (row.removed || row.name.trim() !== row.was.name) && !setNames.has(row.was.name)
         ? [{ name: row.was.name, op: "remove" }]
         : [],

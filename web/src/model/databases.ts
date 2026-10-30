@@ -27,9 +27,9 @@ import type { Translate } from "@/i18n"
 import { AWS_KEYS, keysSecret, needsKeys, type S3Target } from "@/model/s3-destinations"
 import type { Event, Health } from "@/model/service"
 
-export type Database = Schemas["Database"]
-export type Engine = Schemas["DatabaseEngine"]
-type Change = Schemas["Change"]
+export type Database = Schemas.Database
+export type Engine = Schemas.DatabaseEngine
+type Change = Schemas.Change
 type Manifest = Record<string, unknown>
 
 export const engines: Engine[] = ["postgresql", "mongodb", "mysql", "mariadb", "dragonfly"]
@@ -946,7 +946,7 @@ export function backUpNow(database: Database, now: Date): Change[] {
   ])
 }
 
-export const stateHealth: Record<Schemas["DatabaseState"], Health> = {
+export const stateHealth: Record<Schemas.DatabaseState, Health> = {
   ready: "ok",
   progressing: "progress",
   degraded: "warn",
@@ -1223,7 +1223,7 @@ export const MADE_KINDS = [
   "psmdb.percona.com/perconaservermongodbrestores",
 ]
 
-type ObjectKind = Schemas["ObjectKind"]
+type ObjectKind = Schemas.ObjectKind
 type Made = { resource: { group: string; version: string; resource: string }; name: string }
 
 /** Whether `value` holds the string `name` anywhere. */

@@ -13,15 +13,15 @@ const t = ((key: string, ...args: unknown[]) =>
   args.length > 0 ? `${key}(${args.map(show).join(", ")})` : key) as unknown as Translate
 const english = translator(en)
 
-type Plan = Pick<Schemas["PlanResponse"], "objects" | "impact" | "warnings"> & {
-  preview?: Schemas["Preview"]
+type Plan = Pick<Schemas.PlanResponse, "objects" | "impact" | "warnings"> & {
+  preview?: Schemas.Preview
 }
 const api = { kind: "Deployment", name: "api" } as const
 
 const object = (
   target: { kind: string; name: string },
-  changes: Schemas["FieldChange"][],
-  over: Partial<Schemas["PlannedObject"]> = {},
+  changes: Schemas.FieldChange[],
+  over: Partial<Schemas.PlannedObject> = {},
 ) =>
   ({
     target: { apiVersion: "apps/v1", plural: "deployments", ...target },
@@ -30,13 +30,13 @@ const object = (
     beforeYaml: "kind: x",
     write: { type: "patch", operations: [] },
     ...over,
-  }) as unknown as Schemas["PlannedObject"]
+  }) as unknown as Schemas.PlannedObject
 
 const env = (name: string, leaf: string) =>
   `spec.template.spec.containers[name=api].env[name=${name}].${leaf}`
 
 /** What the demo's planner answers for api: three variables, five replicas, new resources. */
-const apiChanges: Schemas["FieldChange"][] = [
+const apiChanges: Schemas.FieldChange[] = [
   { path: "spec.replicas", before: "3", after: "5" },
   { path: env("FOO", "name"), after: "FOO" },
   { path: env("FOO", "value"), after: "bar" },
@@ -56,7 +56,7 @@ const apiChanges: Schemas["FieldChange"][] = [
   { path: "spec.template.spec.containers[name=api].resources.requests.memory", before: "128Mi" },
 ]
 
-const preview = (over: Partial<Schemas["Preview"]> = {}): Schemas["Preview"] => ({
+const preview = (over: Partial<Schemas.Preview> = {}): Schemas.Preview => ({
   rollouts: [],
   databases: [],
   domains: [],
@@ -229,7 +229,7 @@ group("bounded", () => {
   })
 })
 
-const envEdit = (n: number): Schemas["Change"] => ({
+const envEdit = (n: number): Schemas.Change => ({
   op: "env",
   workload: api,
   changes: Array.from({ length: n }, (_, i) => ({ op: "set", name: `V${i}`, value: "x" })),

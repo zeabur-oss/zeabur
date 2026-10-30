@@ -5,8 +5,8 @@ import type { Schemas } from "@/api/client"
 import { healthRank, type Health } from "@/model/service"
 import { severity } from "@/model/severity"
 
-type NodeView = Schemas["NodeView"]
-type DiskUsage = Schemas["DiskUsage"]
+type NodeView = Schemas.NodeView
+type DiskUsage = Schemas.DiskUsage
 
 /** Share of allocatable reserved above which new pods may not fit. */
 export const TIGHT = 0.9

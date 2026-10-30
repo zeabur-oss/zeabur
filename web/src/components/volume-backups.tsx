@@ -35,8 +35,8 @@ import { Alert, AlertDescription } from "@zeabur/design-system/components/alert"
 import { Button } from "@zeabur/design-system/components/button"
 import { Input } from "@zeabur/design-system/components/input"
 
-type ProjectBackups = Schemas["ProjectBackups"]
-type Service = Schemas["Service"]
+type ProjectBackups = Schemas.ProjectBackups
+type Service = Schemas.Service
 
 const userNote = (t: Translate, user: BackupUser) =>
   user.root
@@ -60,7 +60,7 @@ export function VolumeBackups({
   service: Service
   claims: string[]
   /** Each claim's mount, for a new volume like it. */
-  mounts?: Record<string, Schemas["Mount"]>
+  mounts?: Record<string, Schemas.Mount>
 }) {
   const t = useT()
   const data = useBackups(project).data
@@ -141,7 +141,7 @@ function ClaimRow({
 }: {
   project: string
   data: ProjectBackups
-  coverage: Schemas["BackupCoverage"]
+  coverage: Schemas.BackupCoverage
   installed: boolean
   user: BackupUser
 }) {
@@ -183,7 +183,7 @@ function BackUpNow({
 }: {
   project: string
   claim: string
-  schedule: Schemas["BackupSchedule"]
+  schedule: Schemas.BackupSchedule
 }) {
   const t = useT()
   const planner = usePlanner(project)
@@ -218,7 +218,7 @@ function StopBackups({
 }: {
   project: string
   claim: string
-  schedule: Schemas["BackupSchedule"]
+  schedule: Schemas.BackupSchedule
 }) {
   const t = useT()
   const planner = usePlanner(project)

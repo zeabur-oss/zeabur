@@ -19,8 +19,8 @@ export interface TemplateRoom {
  * pods use and what they request, since the scheduler places pods by their requests.
  */
 export function templateRoom(
-  idle: Pick<Schemas["IdleUse"], "memoryBytes" | "cpuMillicores"> | null | undefined,
-  nodes: Schemas["NodeList"] | undefined,
+  idle: Pick<Schemas.IdleUse, "memoryBytes" | "cpuMillicores"> | null | undefined,
+  nodes: Schemas.NodeList | undefined,
 ): TemplateRoom | undefined {
   if (!idle || !nodes) return undefined
   const { allocatable, usage, requests } = nodes.totals

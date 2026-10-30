@@ -23,7 +23,7 @@ export function NewProjectButton({
   canCreate,
   taken,
 }: {
-  canCreate: Schemas["Permission"] | undefined
+  canCreate: Schemas.Permission | undefined
   taken: string[]
 }) {
   const t = useT()

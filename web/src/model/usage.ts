@@ -9,17 +9,17 @@
 import type { Schemas } from "@/api/client"
 import type { Pod, Service } from "@/model/service"
 
-export type ProjectUsage = Schemas["ProjectUsage"]
-export type ServiceHistory = Schemas["ServiceHistory"]
-export type Series = Schemas["PrometheusSeries"]
-export type Restart = Schemas["PrometheusRestart"]
+export type ProjectUsage = Schemas.ProjectUsage
+export type ServiceHistory = Schemas.ServiceHistory
+export type Series = Schemas.PrometheusSeries
+export type Restart = Schemas.PrometheusRestart
 
 export const ranges = [
   "1h",
   "6h",
   "24h",
   "7d",
-] as const satisfies readonly Schemas["PrometheusRange"][]
+] as const satisfies readonly Schemas.PrometheusRange[]
 export type Range = (typeof ranges)[number]
 
 export const splits = ["replica", "total"] as const

@@ -1,7 +1,7 @@
 // Rows this tab just created enter once; rows that load or poll in appear still.
 import type { Schemas } from "@/api/client"
 
-type Workload = Schemas["WorkloadRef"]
+type Workload = Schemas.WorkloadRef
 
 const FRESH_MS = 10_000
 const created = new Map<string, number>()
@@ -13,7 +13,7 @@ export const createdKey = {
     `volume:${workload.kind}/${workload.name}:${mountPath}`,
 }
 
-export function markCreated(changes: Schemas["Change"][], now = Date.now()) {
+export function markCreated(changes: Schemas.Change[], now = Date.now()) {
   for (const [key, at] of created) if (now - at > FRESH_MS) created.delete(key)
   for (const change of changes) {
     if (change.op === "env")

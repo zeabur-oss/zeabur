@@ -25,10 +25,10 @@ import {
   type ServiceVariable,
 } from "@/model/image-service"
 
-type Change = Schemas["Change"]
-export type Conversion = Schemas["Conversion"]
-export type ComposeService = Schemas["ComposeService"]
-type Counterpart = Schemas["Counterpart"]
+type Change = Schemas.Change
+export type Conversion = Schemas.Conversion
+export type ComposeService = Schemas.ComposeService
+type Counterpart = Schemas.Counterpart
 
 /** What an operator makes for a Compose service: a database engine, or object storage. */
 export type Managed = Engine | "objectStorage"
@@ -60,7 +60,7 @@ export type KeptReason = "notInstalled" | "unknown" | "role"
 /** For each service with a counterpart: what Zeabur can create, or why not. */
 export function managedOffer(
   service: ComposeService,
-  operators: Partial<Record<Managed, Schemas["ProviderState"]>>,
+  operators: Partial<Record<Managed, Schemas.ProviderState>>,
   mayCreate: (engine: Managed) => boolean,
 ): { engine: Managed } | { kept: KeptReason } | undefined {
   if (!service.counterpart || !service.image) return undefined
@@ -98,7 +98,7 @@ function managedForm(service: ComposeService, engine: Engine, nodes: number): Ne
   return { ...form, name: service.name, ...(version ? { version } : {}) }
 }
 
-type Variable = Schemas["ComposeVariable"]
+type Variable = Schemas.ComposeVariable
 type App = NonNullable<Connectable["app"]>
 const kept = (v: Variable): ServiceVariable[] => [{ name: v.name, value: v.value }]
 
@@ -128,7 +128,7 @@ const s3Url = (v: Variable, database: Connectable): ServiceVariable[] => [
 
 /** A variable rewritten for a database an operator makes, by what it holds. */
 const REWRITE: Record<
-  Schemas["Part"],
+  Schemas.Part,
   (v: Variable, database: Connectable, app: App) => ServiceVariable[]
 > = {
   url: (v, database) => (database.engine === "s3" ? s3Url : urlVariables)(v, database),
@@ -296,7 +296,7 @@ function imageService(
   service: ComposeService,
   choices: ComposeChoices,
   { project, domains, options }: ComposeContext,
-  variable: (v: Schemas["ComposeVariable"]) => ServiceVariable[],
+  variable: (v: Schemas.ComposeVariable) => ServiceVariable[],
 ): ImageService {
   const [port, ...morePorts] = options.port ? portsOf(service) : []
   const host = choices.published.get(service.name)

@@ -62,7 +62,7 @@ export function ProjectSettingsPage() {
   )
 }
 
-export function ProjectSettings({ namespace }: { namespace: Schemas["ProjectNamespace"] }) {
+export function ProjectSettings({ namespace }: { namespace: Schemas.ProjectNamespace }) {
   const t = useT()
   const [help, setHelp] = useState(false)
   const readOnly = !mayChange(namespace)
@@ -137,7 +137,7 @@ export function ProjectSettings({ namespace }: { namespace: Schemas["ProjectName
   )
 }
 
-function DangerZone({ namespace }: { namespace: Schemas["ProjectNamespace"] }) {
+function DangerZone({ namespace }: { namespace: Schemas.ProjectNamespace }) {
   const t = useT()
   if (!namespace.adopted || namespace.system || namespace.deleting) return null
   return (
@@ -194,7 +194,7 @@ function DetailsForm({
   namespace,
   readOnly,
 }: {
-  namespace: Schemas["ProjectNamespace"]
+  namespace: Schemas.ProjectNamespace
   readOnly: boolean
 }) {
   const t = useT()

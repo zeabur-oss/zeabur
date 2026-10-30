@@ -5,7 +5,7 @@ import { useQuery } from "@tanstack/react-query"
 import type { Schemas } from "@/api/client"
 import { projectsQuery } from "@/api/queries"
 
-export function useProjectSummary(name: string): Schemas["ProjectSummary"] | undefined {
+export function useProjectSummary(name: string): Schemas.ProjectSummary | undefined {
   return useQuery({
     ...projectsQuery,
     select: (list) => list.items.find((p) => p.name === name),

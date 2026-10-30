@@ -159,16 +159,16 @@ export const blocking = (found: Found) => found.code !== "rights"
 
 export interface Known {
   /** What `GET /creatable` answered; `undefined` while it loads. */
-  creatable?: Schemas["CreatableList"]
+  creatable?: Schemas.CreatableList
   /** `<group>/<resource>/<name>` of objects that exist, `core` for the core group. */
   existing?: ReadonlySet<string>
 }
 
 /** The kind a document names, as discovery serves it. */
 export function servedKind(
-  creatable: Schemas["CreatableList"] | undefined,
+  creatable: Schemas.CreatableList | undefined,
   document: YamlDocument,
-): Schemas["CreatableKind"] | undefined {
+): Schemas.CreatableKind | undefined {
   const group = groupOf(document.apiVersion)
   return creatable?.items.find((k) => k.group === group && k.kind === document.kind)
 }
@@ -228,6 +228,6 @@ export function check(documents: readonly YamlDocument[], project: string, known
 }
 
 /** The changes that create the documents, one per document, in written order. */
-export function creates(documents: readonly YamlDocument[]): Schemas["Change"][] {
+export function creates(documents: readonly YamlDocument[]): Schemas.Change[] {
   return documents.map((d) => ({ op: "create", yaml: d.text }))
 }

@@ -5,9 +5,9 @@ import type { Schemas } from "@/api/client"
 import type { Connectable } from "@/model/connect"
 import type { Event } from "@/model/service"
 
-export type ObjectStorage = Schemas["SeaweedObjectStorage"]
-export type Bucket = Schemas["SeaweedBucket"]
-type Change = Schemas["Change"]
+export type ObjectStorage = Schemas.SeaweedObjectStorage
+export type Bucket = Schemas.SeaweedBucket
+type Change = Schemas.Change
 
 const API_VERSION = "seaweed.seaweedfs.com/v1"
 const GROUP = "seaweed.seaweedfs.com"

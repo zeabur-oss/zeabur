@@ -32,7 +32,7 @@ export function ProjectData({
   children,
 }: {
   project: string
-  children: (data: Project, unreadable: Schemas["UnreadableView"][]) => ReactNode
+  children: (data: Project, unreadable: Schemas.UnreadableView[]) => ReactNode
 }) {
   const t = useT()
   const view = useQuery(projectQuery(project))

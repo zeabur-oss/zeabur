@@ -4,8 +4,8 @@ import * as z from "zod/mini"
 import type { Problem, Schemas } from "@/api/client"
 import { roleYaml } from "@/model/rbac"
 
-export type ServerFrame = Schemas["ServerFrame"]
-export type ClientFrame = Schemas["ClientFrame"]
+export type ServerFrame = Schemas.ServerFrame
+export type ClientFrame = Schemas.ClientFrame
 
 // Any other close without an `exit` or `error` frame first is a lost connection.
 const closeIdle = 4001
@@ -16,7 +16,7 @@ export type TerminalState =
   | {
       phase: "exited"
       code?: number
-      reason?: Schemas["ExitReason"]
+      reason?: Schemas.ExitReason
       message?: string
     }
   | { phase: "error"; problem: Problem }

@@ -4,26 +4,26 @@ import { createElement } from "react"
 import { renderToStaticMarkup } from "react-dom/server"
 
 import {
+  answer,
   ApiError,
   localProblem,
   retryAfterSeconds,
-  unwrap,
   type Problem as ProblemBody,
 } from "@/api/client"
 import { queryClient, retryDelay, retryRead } from "@/api/queries"
 import { Problem } from "@/components/problem"
 
-/** What `unwrap` gets from openapi-fetch for a refused request. */
+/** A refusal as Zeabur sends it: the problem as the body. */
 function refused(status: number, headers: Record<string, string> = {}, problem?: ProblemBody) {
-  return {
-    error: problem ?? localProblem(status, "refused"),
-    response: new Response(null, { status, headers }),
-  }
+  return new Response(JSON.stringify(problem ?? localProblem(status, "refused")), {
+    status,
+    headers: { "content-type": "application/problem+json", ...headers },
+  })
 }
 
-function caught(run: () => unknown): ApiError {
+async function caught(answered: Promise<unknown>): Promise<ApiError> {
   try {
-    run()
+    await answered
   } catch (error) {
     if (error instanceof ApiError) return error
     throw error
@@ -51,8 +51,8 @@ describe("Retry-After", () => {
     expect(retryAfterSeconds("-5", now)).toBeUndefined()
   })
 
-  test("a 429 or 503 carries the wait, the header first", () => {
-    expect(caught(() => unwrap(refused(429, { "Retry-After": "3" }))).retryAfter).toBe(3)
+  test("a 429 or 503 carries the wait, the header first", async () => {
+    expect((await caught(answer(refused(429, { "Retry-After": "3" })))).retryAfter).toBe(3)
     const status = {
       ...localProblem(503, "busy"),
       kubernetes: {
@@ -62,13 +62,13 @@ describe("Retry-After", () => {
         retryAfterSeconds: 7,
       },
     }
-    expect(caught(() => unwrap(refused(503, {}, status))).retryAfter).toBe(7)
-    expect(caught(() => unwrap(refused(503, { "Retry-After": "2" }, status))).retryAfter).toBe(2)
+    expect((await caught(answer(refused(503, {}, status)))).retryAfter).toBe(7)
+    expect((await caught(answer(refused(503, { "Retry-After": "2" }, status)))).retryAfter).toBe(2)
   })
 
-  test("other answers carry none", () => {
-    expect(caught(() => unwrap(refused(500, { "Retry-After": "3" }))).retryAfter).toBeUndefined()
-    expect(caught(() => unwrap(refused(404))).retryAfter).toBeUndefined()
+  test("other answers carry none", async () => {
+    expect((await caught(answer(refused(500, { "Retry-After": "3" })))).retryAfter).toBeUndefined()
+    expect((await caught(answer(refused(404)))).retryAfter).toBeUndefined()
   })
 })
 
@@ -113,7 +113,7 @@ describe("the query client", () => {
       queryKey: ["limited"],
       queryFn: () => {
         tries += 1
-        if (tries === 1) return unwrap<string>(refused(429, { "Retry-After": "3" }))
+        if (tries === 1) return answer<string>(refused(429, { "Retry-After": "3" }))
         return "ok"
       },
     })

@@ -4,15 +4,8 @@
 // that was left open can try again; nothing is kept once it is closed.
 import { toast } from "sonner"
 
-import {
-  api,
-  ApiError,
-  localProblem,
-  toProblem,
-  unwrap,
-  type Problem,
-  type Schemas,
-} from "@/api/client"
+import { ApiError, localProblem, toProblem, type Problem, type Schemas } from "@/api/client"
+import * as zeabur from "@/api/zeabur"
 import { buildsQuery, queryClient } from "@/api/queries"
 import { sendSource } from "@/api/source"
 import type { Translate } from "@/i18n"
@@ -73,19 +66,9 @@ export async function waitForToken(
   return false
 }
 
-async function planAndApply(project: string, changes: Schemas["Change"][]) {
-  const plan = unwrap(
-    await api.POST("/api/v1/projects/{project}/plan", {
-      params: { path: { project } },
-      body: { changes },
-    }),
-  )
-  unwrap(
-    await api.POST("/api/v1/projects/{project}/apply", {
-      params: { path: { project } },
-      body: { token: plan.token },
-    }),
-  )
+async function planAndApply(project: string, changes: Schemas.Change[]) {
+  const plan = await zeabur.planProject(project, { changes })
+  await zeabur.applyProject(project, { token: plan.token })
 }
 
 export interface UploadStart {
@@ -108,9 +91,7 @@ export async function startUpload({ project, build, blob, request: asked, t }: U
     running()
     if (!asked) await planAndApply(project, [{ op: "uploadToken", build, request }])
     const answered = await waitForToken(async () => {
-      const found = unwrap(
-        await api.GET("/api/v1/projects/{project}/builds", { params: { path: { project } } }),
-      )
+      const found = await zeabur.getProjectBuilds(project)
       return found.builds.find((b) => b.name === build)
     }, request)
     if (!answered)

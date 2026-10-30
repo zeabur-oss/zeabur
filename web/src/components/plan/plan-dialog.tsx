@@ -8,7 +8,8 @@ import CaretRightIcon from "~icons/ph/caret-right"
 import WarningFillIcon from "~icons/ph/warning-fill"
 import XIcon from "~icons/ph/x"
 
-import { api, toProblem, unwrap, type Problem as ProblemBody, type Schemas } from "@/api/client"
+import { toProblem, type Problem as ProblemBody, type Schemas } from "@/api/client"
+import * as zeabur from "@/api/zeabur"
 import { projectQuery } from "@/api/queries"
 import { LoadingRows } from "@/components/page"
 import {
@@ -99,19 +100,13 @@ function usePlan(
   const plan = useQuery({
     queryKey: ["plan", project, ask],
     queryFn: async ({ signal }) =>
-      unwrap(
-        await api.POST("/api/v1/projects/{project}/plan", {
-          params: { path: { project } },
-          body: { changes: ask.changes },
-          signal,
-        }),
-      ),
+      await zeabur.planProject(project, { changes: ask.changes }, { signal }),
     retry: false,
     staleTime: Infinity,
     gcTime: 0,
   })
   const document = useQuery({ ...projectQuery(project, { poll: false }), enabled: false })
-  const serviceOf = (workload: Schemas["WorkloadRef"]) =>
+  const serviceOf = (workload: Schemas.WorkloadRef) =>
     document.data?.services.find((s) => s.kind === workload.kind && s.name === workload.name)
   const podsOf: PodsOf = (workload) => serviceOf(workload)?.replicas ?? undefined
   const mountsOf: MountsOf = (workload) =>
@@ -436,7 +431,7 @@ function Readers({
 }: {
   project: string
   ask: PlanAsk
-  plan: Schemas["PlanResponse"]
+  plan: Schemas.PlanResponse
   reopen: (ask: PlanAsk) => void
   go: (href: string) => void
 }) {
@@ -444,7 +439,7 @@ function Readers({
   const waiting = plan.warnings.flatMap((w) => (w.code === "restartNeeded" ? w.workloads : []))
   const [one] = waiting
   if (!one || ask.changes.some((c) => c.op === "restart")) return null
-  const restarts = waiting.map((workload): Schemas["Change"] => ({ op: "restart", workload }))
+  const restarts = waiting.map((workload): Schemas.Change => ({ op: "restart", workload }))
   return (
     <div className="mt-3 flex flex-wrap items-center gap-2">
       <Button
@@ -472,7 +467,7 @@ function Readers({
 }
 
 /** Warnings the plain sentences already say. */
-const sentenced = new Set<Schemas["PlanWarning"]["code"]>([
+const sentenced = new Set<Schemas.PlanWarning["code"]>([
   "restartNeeded",
   "reloaderRestarts",
   "configNotRolledBack",
@@ -483,7 +478,7 @@ const sentenced = new Set<Schemas["PlanWarning"]["code"]>([
 ])
 
 /** A database open to the internet is worse than the other high risks. */
-function alertVariant(warnings: Schemas["PlanWarning"][]): "destructive" | "warn" {
+function alertVariant(warnings: Schemas.PlanWarning[]): "destructive" | "warn" {
   return warnings.some((w) => w.code === "publicPort" && w.dataStore) ? "destructive" : "warn"
 }
 
@@ -494,7 +489,7 @@ function PlanBody({
   description,
   alerted,
 }: {
-  plan: Schemas["PlanResponse"]
+  plan: Schemas.PlanResponse
   skipped?: Skipped[]
   notes?: string[]
   description: Description
@@ -591,7 +586,7 @@ function TypeNameLabel({ name, onFill }: { name: string; onFill: () => void }) {
 }
 
 /** The YAML of each object, or nothing when the plan writes none. */
-function plannedObjects(objects: Schemas["PlannedObject"][]) {
+function plannedObjects(objects: Schemas.PlannedObject[]) {
   if (objects.length === 0) return undefined
   return (
     <div className="flex flex-col gap-4">
@@ -606,7 +601,7 @@ function plannedObjects(objects: Schemas["PlannedObject"][]) {
   )
 }
 
-function PlannedObject({ object, named }: { object: Schemas["PlannedObject"]; named: boolean }) {
+function PlannedObject({ object, named }: { object: Schemas.PlannedObject; named: boolean }) {
   const t = useT()
   const before = object.beforeYaml ?? ""
   const after = object.afterYaml ?? ""
@@ -657,7 +652,7 @@ function noteText(t: Translate, note: ToolNote): Said {
     : { text: t("plan.toolPutBack", when, note.paths.join(", "), note.object) }
 }
 
-function names(t: Translate, workloads: Schemas["WorkloadRef"][]): string {
+function names(t: Translate, workloads: Schemas.WorkloadRef[]): string {
   return bounded(
     t,
     workloads.map((w) => w.name),
@@ -665,7 +660,7 @@ function names(t: Translate, workloads: Schemas["WorkloadRef"][]): string {
 }
 
 /** The warnings the plain sentences do not say; a project's deletion has its own section. */
-function warningsSaid(t: Translate, warnings: Schemas["PlanWarning"][]): Said[] {
+function warningsSaid(t: Translate, warnings: Schemas.PlanWarning[]): Said[] {
   return warnings.flatMap((w): Said[] => {
     if (sentenced.has(w.code) || w.code === "deletesProject") return []
     if (w.code === "recreated")
@@ -682,7 +677,7 @@ function warningsSaid(t: Translate, warnings: Schemas["PlanWarning"][]): Said[] 
 
 function warningText(
   t: Translate,
-  warning: Exclude<Schemas["PlanWarning"], { code: "recreated" | "deletesProject" }>,
+  warning: Exclude<Schemas.PlanWarning, { code: "recreated" | "deletesProject" }>,
 ): Said {
   switch (warning.code) {
     case "deletesDependents":
@@ -721,7 +716,7 @@ function warningText(
   }
 }
 
-function healthOf(warning: Schemas["PlanWarning"]): Said["health"] {
+function healthOf(warning: Schemas.PlanWarning): Said["health"] {
   switch (warning.code) {
     case "httpsCertificate":
       return "ok"
@@ -738,7 +733,7 @@ function healthOf(warning: Schemas["PlanWarning"]): Said["health"] {
 
 function staysSentence(
   t: Translate,
-  warning: Extract<Schemas["PlanWarning"], { code: "stays" }>,
+  warning: Extract<Schemas.PlanWarning, { code: "stays" }>,
 ): string {
   const object = `${kindName(t, warning.object.kind)} ${warning.object.name}`
   switch (warning.reason) {
@@ -762,7 +757,7 @@ function staysSentence(
 function warningSentence(
   t: Translate,
   warning: Exclude<
-    Schemas["PlanWarning"],
+    Schemas.PlanWarning,
     {
       code:
         | "deletesDependents"
@@ -838,7 +833,7 @@ function warningSentence(
 
 function httpOnlySentence(
   t: Translate,
-  warning: Extract<Schemas["PlanWarning"], { code: "httpOnly" }>,
+  warning: Extract<Schemas.PlanWarning, { code: "httpOnly" }>,
 ): string {
   switch (warning.reason) {
     case "certificatesElsewhere":
@@ -853,7 +848,7 @@ function httpOnlySentence(
 function routeWarning(
   t: Translate,
   warning: Extract<
-    Schemas["PlanWarning"],
+    Schemas.PlanWarning,
     {
       code: "ownCertificate" | "issuerShared" | "routeDeleted" | "domainMoved"
     }
@@ -888,7 +883,7 @@ function routeWarning(
 function accessWarning(
   t: Translate,
   warning: Extract<
-    Schemas["PlanWarning"],
+    Schemas.PlanWarning,
     {
       code:
         | "taskImageCopied"

@@ -97,11 +97,11 @@ spec:
 /** The kinds with a filled-in template, in the order offered. */
 const commonKinds = Object.keys(common)
 
-const apiVersionOf = (k: Pick<Schemas["CreatableKind"], "group" | "version">) =>
+const apiVersionOf = (k: Pick<Schemas.CreatableKind, "group" | "version">) =>
   k.group ? `${k.group}/${k.version}` : k.version
 
 /** A kind's template: filled in for the common kinds, else its skeleton. */
-export function templateOf(kind: Schemas["CreatableKind"]): string {
+export function templateOf(kind: Schemas.CreatableKind): string {
   if (!kind.group || kind.group === "apps" || kind.group === "batch") {
     const filled = common[kind.kind]
     if (filled) return filled
@@ -121,7 +121,7 @@ export function appended(existing: string, added: string): string {
 }
 
 /** The kinds to offer, grouped: common kinds, custom resources, and the rest the person may create. */
-export function offered(creatable: Schemas["CreatableList"] | undefined) {
+export function offered(creatable: Schemas.CreatableList | undefined) {
   const items = creatable?.items ?? []
   const fixed = items.filter(
     (k) => commonKinds.includes(k.kind) && ["", "apps", "batch"].includes(k.group),
@@ -130,7 +130,7 @@ export function offered(creatable: Schemas["CreatableList"] | undefined) {
   return {
     common: commonKinds
       .map((name) => fixed.find((k) => k.kind === name))
-      .filter((k): k is Schemas["CreatableKind"] => k !== undefined),
+      .filter((k): k is Schemas.CreatableKind => k !== undefined),
     custom: rest.filter((k) => k.custom),
     more: rest.filter((k) => !k.custom),
   }

@@ -11,7 +11,7 @@ const stored = z.object({
   /** When the cluster last answered (ms since the epoch). */
   at: z.optional(z.number()),
   cluster: z.optional(z.string()),
-  projects: z.optional(z.array(z.custom<Schemas["ProjectSummary"]>())),
+  projects: z.optional(z.array(z.custom<Schemas.ProjectSummary>())),
 })
 
 export type LastKnown = z.output<typeof stored>

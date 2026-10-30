@@ -32,7 +32,7 @@ export interface GitHubRepository {
 }
 
 /** Every repository a project may build, by name. */
-export const repositoriesOf = (data: Schemas["ProjectGitHubApp"] | undefined): GitHubRepository[] =>
+export const repositoriesOf = (data: Schemas.ProjectGitHubApp | undefined): GitHubRepository[] =>
   (data?.installations ?? [])
     .flatMap((i) => i.repositories.map((r) => ({ installationId: i.id, account: i.account, ...r })))
     .sort((a, b) => a.fullName.localeCompare(b.fullName))
@@ -46,11 +46,11 @@ export type ConnectStep =
   | { step: "ask" }
   | { step: "create" }
   | { step: "install"; installUrl: string }
-  | { step: "grant"; installations: Schemas["GitHubInstallation"][] }
+  | { step: "grant"; installations: Schemas.GitHubInstallation[] }
   | { step: "problem" }
 
 export function connectStep(
-  data: Schemas["GitHubApp"] | undefined,
+  data: Schemas.GitHubApp | undefined,
   project: string,
 ): ConnectStep | undefined {
   if (!data) return undefined

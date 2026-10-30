@@ -1,10 +1,10 @@
 import type { Problem, Schemas } from "@/api/client"
 import { isRefusal } from "@/model/problem"
 
-export type Member = Schemas["MemberView"]
-export type Passkey = Schemas["PasskeyView"]
-export type Invitation = Schemas["InvitationView"]
-export type SetupLinks = Schemas["SetupLinks"]
+export type Member = Schemas.MemberView
+export type Passkey = Schemas.PasskeyView
+export type Invitation = Schemas.InvitationView
+export type SetupLinks = Schemas.SetupLinks
 
 /** Above this many members the list is a table with a filter. */
 const TABLE_FROM = 11
@@ -100,8 +100,8 @@ export function memberName(member: Pick<Member, "username" | "displayName">): st
   return member.displayName?.trim() || member.username
 }
 
-export type ProjectRole = Schemas["ProjectRole"]
-export type ProjectGrant = Schemas["ProjectGrant"]
+export type ProjectRole = Schemas.ProjectRole
+export type ProjectGrant = Schemas.ProjectGrant
 
 /** Up to this many projects are named in a role; more become a count. */
 const NAMED_UP_TO = 3
@@ -222,7 +222,7 @@ export function accessGains(
   }
 }
 
-export type MemberWrite = Schemas["MemberWrite"]
+export type MemberWrite = Schemas.MemberWrite
 
 /** A planned write's object as the plan names it: the invitation's random name is made at apply. */
 export function writtenName(write: Pick<MemberWrite, "kind" | "name">): string {
@@ -253,7 +253,7 @@ export function canChangeAccess(
 /** Whether a refused project is one a Zeabur Identity member has no role in: they are told an
  * admin can give them one. An admin, or someone signed in with a kubeconfig, sees the refusal
  * and its rule instead. */
-export function lacksProjectRole(problem: Problem, whoami: Schemas["WhoAmI"] | undefined): boolean {
+export function lacksProjectRole(problem: Problem, whoami: Schemas.WhoAmI | undefined): boolean {
   if (!whoami?.username.startsWith("zeabur:")) return false
   if (whoami.groups.includes("zeabur:admins")) return false
   return isRefusal(problem)

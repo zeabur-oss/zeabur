@@ -3,13 +3,13 @@ import { describe, expect, test } from "bun:test"
 import type { Schemas } from "@/api/client"
 import { covers } from "@/components/plan/draft"
 
-const api = { kind: "Deployment", name: "api" } as Schemas["WorkloadRef"]
-const web = { kind: "Deployment", name: "web" } as Schemas["WorkloadRef"]
+const api = { kind: "Deployment", name: "api" } as Schemas.WorkloadRef
+const web = { kind: "Deployment", name: "web" } as Schemas.WorkloadRef
 
 describe("held edits", () => {
   test("stand in for staged changes of their ops and workload", () => {
     const scope = { ops: ["scale", "resources"], workload: api } as const
-    const covered = (change: Schemas["Change"]) => covers({ ...scope, ops: [...scope.ops] }, change)
+    const covered = (change: Schemas.Change) => covers({ ...scope, ops: [...scope.ops] }, change)
     expect(covered({ op: "scale", workload: api, replicas: 2 })).toBe(true)
     expect(covered({ op: "scale", workload: web, replicas: 2 })).toBe(false)
     expect(covered({ op: "env", workload: api, changes: [] })).toBe(false)
@@ -17,7 +17,7 @@ describe("held edits", () => {
 
   test("a probe form covers only its own probe", () => {
     const scope = { ops: ["probe" as const], workload: api, probe: "liveness" as const }
-    const probe = (kind: Schemas["ProbeKind"]): Schemas["Change"] => ({
+    const probe = (kind: Schemas.ProbeKind): Schemas.Change => ({
       op: "probe",
       workload: api,
       container: "api",

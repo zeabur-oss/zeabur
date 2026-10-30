@@ -47,7 +47,7 @@ export interface AddChoices {
   gates: { image: Gate; database: Gate }
 }
 
-type Capabilities = Schemas["Capability"][] | undefined
+type Capabilities = Schemas.Capability[] | undefined
 
 /** Engines whose operator is known to be installed or not. An operator whose databases can't be
  * read is left out. */

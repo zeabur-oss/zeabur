@@ -758,7 +758,7 @@ fn after_close(
 /// (`400`), or `create` on `pods/exec` in the project refused (`403`). The pod is deleted a minute
 /// (by default) after its last terminal closes.
 #[utoipa::path(get, path = "/api/v1/projects/{project}/tools/{name}/terminal", tag = "pods",
-    operation_id = "toolsTerminal",
+    operation_id = "openToolsTerminal",
     params(("project" = String, Path), ("name" = String, Path)),
     responses((status = 101, description = "Switched to the terminal's WebSocket"),
               (status = 401, body = Problem, content_type = PROBLEM),

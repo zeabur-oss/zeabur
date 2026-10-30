@@ -107,11 +107,11 @@ export function isUnchanged(was: Was, on: boolean, cidrs: string[]): boolean {
 /** The changes of a form: one for the pods, one for each Ingress that must change. */
 export function limitChanges(
   kind: Kind,
-  workload: Schemas["WorkloadRef"],
+  workload: Schemas.WorkloadRef,
   ingresses: readonly { name: string; limited: boolean }[],
   on: boolean,
   cidrs: string[],
-): Schemas["Change"][] {
+): Schemas.Change[] {
   const set = on ? cidrs : []
   if (kind === "out") return [{ op: "egressLimit", workload, enabled: on, cidrs: set }]
   return ingresses
@@ -127,7 +127,7 @@ export function limitChanges(
 /** What a limit of the plan does, in a sentence. */
 export function limitSentence(
   t: Translate,
-  change: Extract<Schemas["Change"], { op: "ipAllow" | "egressLimit" }>,
+  change: Extract<Schemas.Change, { op: "ipAllow" | "egressLimit" }>,
 ): string {
   const list = t("common.list", change.cidrs ?? [])
   if (change.op === "ipAllow")

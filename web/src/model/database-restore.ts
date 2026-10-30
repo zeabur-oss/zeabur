@@ -15,8 +15,8 @@ import {
   type Database,
 } from "@/model/databases"
 
-type Change = Schemas["Change"]
-type EnvEdit = Schemas["EnvEdit"]
+type Change = Schemas.Change
+type EnvEdit = Schemas.EnvEdit
 type Manifest = Record<string, unknown>
 
 /** A backup a new database can start from. */

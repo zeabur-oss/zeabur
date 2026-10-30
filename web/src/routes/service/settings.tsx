@@ -91,7 +91,7 @@ export function HealthChecksSection({
   )
 }
 
-type Change = Schemas["Change"]
+type Change = Schemas.Change
 type Amounts = {
   cpuRequest: string
   memoryRequest: string
@@ -114,14 +114,14 @@ function Compute({
   refused,
 }: {
   service: Service
-  workload: Schemas["WorkloadRef"]
+  workload: Schemas.WorkloadRef
   disabled: boolean
-  refused: Schemas["FieldCause"][]
+  refused: Schemas.FieldCause[]
 }) {
   const t = useT()
   const { cores, memory } = useQuantityFormat()
   const nodes = useQuery(nodesQuery)
-  const largest = nodes.data?.items.reduce<Schemas["Resources"] | undefined>(
+  const largest = nodes.data?.items.reduce<Schemas.Resources | undefined>(
     (best, node) =>
       !best || node.allocatable.memoryBytes > best.memoryBytes ? node.allocatable : best,
     undefined,
@@ -277,7 +277,7 @@ function Compute({
 }
 
 type ProbeValues = {
-  handler: Schemas["ProbeHandler"] | "none"
+  handler: Schemas.ProbeHandler | "none"
   path: string
   port: string
   command: string
@@ -312,7 +312,7 @@ const summaryHandler = {
 } as const
 
 /** The probe as the project document sums it up, for a workload with no release to read. */
-function summaryProbe(probe: Schemas["ProbeSummary"] | null | undefined): ProbeValues {
+function summaryProbe(probe: Schemas.ProbeSummary | null | undefined): ProbeValues {
   return {
     handler: probe ? summaryHandler[probe.handler] : "none",
     path: probe?.path ?? "",
@@ -365,7 +365,7 @@ function Probes({
   )
 }
 
-function probeRequest(value: ProbeValues): Schemas["ProbeRequest"] | null {
+function probeRequest(value: ProbeValues): Schemas.ProbeRequest | null {
   if (value.handler === "none") return null
   const number = (text: string) => (text.trim() === "" ? undefined : Number(text))
   return {
@@ -390,7 +390,7 @@ function ProbeForm({
   current: ProbeValues
   preset?: string
   disabled: boolean
-  workload: Schemas["WorkloadRef"]
+  workload: Schemas.WorkloadRef
   container: string
 }) {
   const t = useT()

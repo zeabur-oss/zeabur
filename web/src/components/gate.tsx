@@ -19,7 +19,7 @@ import {
   type Right,
 } from "@/model/rights"
 
-type Permission = Schemas["Permission"]
+type Permission = Schemas.Permission
 
 function useAsker() {
   return askerOf(useQuery(whoamiQuery).data)

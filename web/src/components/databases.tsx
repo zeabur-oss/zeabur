@@ -44,7 +44,7 @@ import { Select } from "@zeabur/design-system/components/select"
 export const useDatabases = (project: string) => useQuery(databasesQuery(project))
 
 /** Engines whose operator is installed and readable. */
-export const installedEngines = (data: Schemas["ProjectDatabases"]) =>
+export const installedEngines = (data: Schemas.ProjectDatabases) =>
   data.operators.filter((o) => o.state === "installed").map((o) => o.engine)
 
 export function DatabaseState({
@@ -108,7 +108,7 @@ export function DatabaseRow({ project, database }: { project: string; database: 
 }
 
 /** What keeps databases from being listed or created: no operator, or no right to read one. */
-export function OperatorNotes({ data }: { data: Schemas["ProjectDatabases"] }) {
+export function OperatorNotes({ data }: { data: Schemas.ProjectDatabases }) {
   const t = useT()
   const installed = data.operators.filter((o) => o.state === "installed")
   const refused = data.operators.filter((o) => o.state === "refused")
@@ -139,7 +139,7 @@ export function NewDatabaseButton({
   size = "xs",
 }: {
   project: string
-  data: Schemas["ProjectDatabases"]
+  data: Schemas.ProjectDatabases
   size?: "xs" | "sm"
 }) {
   const t = useT()

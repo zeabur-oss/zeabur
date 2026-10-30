@@ -28,7 +28,7 @@ import { PageColumn } from "@zeabur/design-system/components/page-column"
 import { PageHeader } from "@zeabur/design-system/components/page-header"
 import { Skeleton } from "@zeabur/design-system/components/skeleton"
 
-type Account = Schemas["AccountView"]
+type Account = Schemas.AccountView
 
 export function AccountPage() {
   const t = useT()

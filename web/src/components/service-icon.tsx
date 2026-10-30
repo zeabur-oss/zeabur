@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils"
 import type { Schemas } from "@/api/client"
 import { roleOf, type Role, type Service } from "@/model/service"
 
-const flavourIcons: Record<Schemas["DataStore"], Icon> = {
+const flavourIcons: Record<Schemas.DataStore, Icon> = {
   postgres: DatabaseIcon,
   mysql: DatabaseIcon,
   mongo: DatabaseIcon,

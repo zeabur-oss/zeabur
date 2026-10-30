@@ -1,8 +1,8 @@
 // A service's incoming connection rules as groups by outcome, exceptions first.
 import type { Schemas } from "@/api/client"
 
-type Access = Schemas["NetworkPolicyAccess"]
-type Reach = Schemas["NetworkPolicyService"]
+type Access = Schemas.NetworkPolicyAccess
+type Reach = Schemas.NetworkPolicyService
 
 export interface Peer {
   id: string

@@ -33,7 +33,7 @@ import { Checkbox } from "@zeabur/design-system/components/checkbox"
 import { Input } from "@zeabur/design-system/components/input"
 import { Label } from "@zeabur/design-system/components/label"
 
-type Installation = Schemas["GitHubInstallation"]
+type Installation = Schemas.GitHubInstallation
 
 const formBox = "flex flex-col gap-4 rounded-xl border border-main bg-card p-5"
 
@@ -77,15 +77,7 @@ function GitHubAppSection({ project }: { project?: string }) {
   )
 }
 
-function NoApp({
-  data,
-  gate,
-  project,
-}: {
-  data: Schemas["GitHubApp"]
-  gate: Gate
-  project?: string
-}) {
+function NoApp({ data, gate, project }: { data: Schemas.GitHubApp; gate: Gate; project?: string }) {
   const t = useT()
   const [creating, setCreating] = useState(gate.open && project !== undefined)
   if (data.unreadable.some((u) => u.resource === "secrets"))
@@ -208,7 +200,7 @@ function CreateForm({
   )
 }
 
-function AppDetails({ data, gate }: { data: Schemas["GitHubApp"]; gate: Gate }) {
+function AppDetails({ data, gate }: { data: Schemas.GitHubApp; gate: Gate }) {
   const t = useT()
   const [granting, setGranting] = useState<number>()
   const [grant, setGrant] = useState<{ installation: Installation; namespaces: string[] }>()
@@ -256,7 +248,7 @@ function AppDetails({ data, gate }: { data: Schemas["GitHubApp"]; gate: Gate }) 
   )
 }
 
-function AppLink({ app }: { app: Schemas["GitHubApp"]["app"] }) {
+function AppLink({ app }: { app: Schemas.GitHubApp["app"] }) {
   const t = useT()
   return (
     <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2">
@@ -278,7 +270,7 @@ function AppLink({ app }: { app: Schemas["GitHubApp"]["app"] }) {
 }
 
 /** Why no installation shows: GitHub did not answer, or the App is installed nowhere yet. */
-function InstallationsNote({ data }: { data: Schemas["GitHubApp"] }) {
+function InstallationsNote({ data }: { data: Schemas.GitHubApp }) {
   const t = useT()
   if (data.installationsProblem) return <Problem problem={data.installationsProblem} />
   if (data.installations?.length === 0)

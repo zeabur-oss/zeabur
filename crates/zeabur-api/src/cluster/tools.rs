@@ -197,7 +197,7 @@ async fn compute(
 /// The person's cluster tools pods, deleting those that are done with; cluster administrators
 /// only.
 #[utoipa::path(get, path = "/api/v1/cluster/tools", tag = "cluster",
-    operation_id = "clusterTools",
+    operation_id = "getClusterTools",
     responses((status = 200, body = ToolsStatus),
               (status = 403, body = Problem, content_type = PROBLEM)))]
 pub(crate) async fn status(
@@ -382,7 +382,7 @@ pub(crate) async fn delete(
 /// namespace `default`. Failures arrive as an `error` frame, as there, and `403` for
 /// anyone who may not do everything everywhere.
 #[utoipa::path(get, path = "/api/v1/cluster/tools/{name}/terminal", tag = "cluster",
-    operation_id = "clusterToolsTerminal",
+    operation_id = "openClusterToolsTerminal",
     params(("name" = String, Path)),
     responses((status = 101, description = "Switched to the terminal's WebSocket"),
               (status = 401, body = Problem, content_type = PROBLEM),

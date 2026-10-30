@@ -7,9 +7,9 @@ import type { Overview } from "@/model/overview"
 import { reasonWord, type Health, type ReasonWord, type Status } from "@/model/service"
 import { schedulingHealth, severity, troubleTone } from "@/model/severity"
 
-type Diagnosis = Schemas["Diagnosis"]
-type Route = Schemas["RouteTraceView"]
-type Pod = Pick<Schemas["PodSummary"], "name" | "created">
+type Diagnosis = Schemas.Diagnosis
+type Route = Schemas.RouteTraceView
+type Pod = Pick<Schemas.PodSummary, "name" | "created">
 
 /** What is wrong, in a few words. */
 export type Trouble =

@@ -27,7 +27,7 @@ import {
 import { chosenClass } from "@/model/storage"
 import { Alert, AlertDescription } from "@zeabur/design-system/components/alert"
 
-type Data = Schemas["ProjectObjectStorage"]
+type Data = Schemas.ProjectObjectStorage
 
 export const useObjectStorage = (project: string) => useQuery(objectStorageQuery(project))
 

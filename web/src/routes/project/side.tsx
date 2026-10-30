@@ -100,7 +100,7 @@ function Heading({
 
 const ACTIVITY_SHOWN = 12
 
-type Entry = Schemas["TimelineEntry"]
+type Entry = Schemas.TimelineEntry
 
 /** Who wrote it: the tool by name, or the field manager when no tool is known. */
 export const writerOf = (t: Translate, writer: Entry["writer"]) =>
@@ -137,7 +137,7 @@ export function Activity({
   project: string
   services: Service[]
   events: Event[]
-  unreadable: Schemas["UnreadableView"][]
+  unreadable: Schemas.UnreadableView[]
   framed?: boolean
   bare?: boolean
 }) {
@@ -534,7 +534,7 @@ export function Domains({
 }: {
   project: string
   data: Project
-  refused: Schemas["UnreadableView"][]
+  refused: Schemas.UnreadableView[]
   /** Every domain with a filter, without the heading: in a drawer. */
   bare?: boolean
 }) {
@@ -741,7 +741,7 @@ export function Storage({
 }: {
   project: string
   data: Project
-  refused: Schemas["UnreadableView"][]
+  refused: Schemas.UnreadableView[]
   /** Every volume with a filter, without the heading: in a drawer. */
   bare?: boolean
 }) {
@@ -1067,7 +1067,7 @@ export function SectionChips({
   project: string
   data: Project
   events: Event[]
-  unreadable: Schemas["UnreadableView"][]
+  unreadable: Schemas.UnreadableView[]
 }) {
   const t = useT()
   const [open, setOpen] = useState<

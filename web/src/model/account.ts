@@ -1,7 +1,7 @@
 import type { Schemas } from "@/api/client"
 
-export type ProjectAccess = Schemas["ProjectAccess"]
-export type ProjectRole = Schemas["AccountRole"]
+export type ProjectAccess = Schemas.ProjectAccess
+export type ProjectRole = Schemas.AccountRole
 
 /** Roles a person can hold, highest first. */
 export const roles = ["admin", "developer", "viewer"] as const satisfies readonly ProjectRole[]

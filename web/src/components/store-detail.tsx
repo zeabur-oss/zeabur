@@ -6,7 +6,8 @@ import EyeIcon from "~icons/ph/eye"
 import EyeSlashIcon from "~icons/ph/eye-slash"
 import PlusIcon from "~icons/ph/plus"
 
-import { api, toProblem, unwrap, type Problem as ProblemBody, type Schemas } from "@/api/client"
+import { toProblem, type Problem as ProblemBody, type Schemas } from "@/api/client"
+import * as zeabur from "@/api/zeabur"
 import { objectQuery, type ObjectAddress } from "@/api/queries"
 import { CopyText } from "@/components/copy-text"
 import { EventList } from "@/components/events"
@@ -93,18 +94,13 @@ export function useReveal(project: string, name: string) {
   const revealGate = useGate(project, "readSecrets")
   const [secret, setSecret] = useState<{
     pending?: boolean
-    values?: Schemas["RevealedSecret"]["values"]
+    values?: Schemas.RevealedSecret["values"]
     problem?: ProblemBody
   }>()
   const reveal = async () => {
     setSecret({ pending: true })
     try {
-      const answer = unwrap(
-        await api.POST("/api/v1/projects/{project}/secrets/{name}/reveal", {
-          params: { path: { project, name } },
-          cache: "no-store",
-        }),
-      )
+      const answer = await zeabur.revealSecret(project, name, { cache: "no-store" })
       setSecret({ values: answer.values })
     } catch (error) {
       setSecret({ problem: toProblem(error) })

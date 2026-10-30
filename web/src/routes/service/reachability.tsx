@@ -32,7 +32,7 @@ import {
 } from "@/model/reach"
 import type { Health, Service } from "@/model/service"
 
-type Access = Schemas["NetworkPolicyAccess"]
+type Access = Schemas.NetworkPolicyAccess
 
 const health: Record<Access, Health> = { allowed: "ok", limited: "warn", blocked: "fail" }
 
@@ -106,7 +106,7 @@ export function Reachability({
   project: string
   service: Service
   services: Service[]
-  reach: Schemas["NetworkPolicyService"]
+  reach: Schemas.NetworkPolicyService
   policies: string[]
   plan: (ask: PlanAsk) => void
 }) {

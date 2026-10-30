@@ -3,7 +3,7 @@
 import type { Schemas } from "@/api/client"
 import type { DraftPart } from "@/routes/search"
 
-type Change = Schemas["Change"]
+type Change = Schemas.Change
 
 const PARTS: Partial<Record<Change["op"], DraftPart>> = {
   env: "variables",
@@ -46,7 +46,7 @@ export const partOrder: DraftPart[] = [
 export const draftable = (changes: readonly Change[]) =>
   changes.length > 0 && changes.every((c) => partOf(c) !== undefined)
 
-const workloadKey = (w: Schemas["WorkloadRef"]) => `${w.kind}/${w.name}`
+const workloadKey = (w: Schemas.WorkloadRef) => `${w.kind}/${w.name}`
 
 type Keys = { [Op in Change["op"]]?: (change: Extract<Change, { op: Op }>) => string }
 
@@ -55,7 +55,7 @@ const hostKey = (change: { op: string; route: { name: string }; hostname: string
   `${change.op}:${change.route.name}/${change.hostname}`
 const routeKey = (change: { op: string; route: { name: string } }) =>
   `${change.op}:${change.route.name}`
-const mountKey = (change: { workload: Schemas["WorkloadRef"]; mountPath: string }) =>
+const mountKey = (change: { workload: Schemas.WorkloadRef; mountPath: string }) =>
   `mount:${workloadKey(change.workload)}:${change.mountPath}`
 
 /** Two changes with one key edit the same thing: the later one stands. */
@@ -138,7 +138,7 @@ export type DomainEdit =
  * `route/host`. */
 export function stagedDomains(
   changes: readonly Change[],
-  workload: Schemas["WorkloadRef"],
+  workload: Schemas.WorkloadRef,
   routes: readonly string[],
 ): { added: Extract<Change, { op: "addDomain" }>[]; edits: Map<string, DomainEdit> } {
   const added: Extract<Change, { op: "addDomain" }>[] = []

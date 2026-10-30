@@ -54,7 +54,7 @@ const YamlEditor = lazy(() =>
 
 const route = getRouteApi("/projects/$project/create")
 
-const deployment: Schemas["CreatableKind"] = {
+const deployment: Schemas.CreatableKind = {
   group: "apps",
   version: "v1",
   resource: "deployments",
@@ -119,7 +119,7 @@ export function CreatePage() {
   const [reviewed, setReviewed] = useState<string | undefined>(undefined)
   const [partial, setPartial] = useState<ProblemBody | undefined>(undefined)
   const toObjects = () => void navigate({ to: "/projects/$project/objects", params: { project } })
-  const lineAt = (at: Schemas["ProblemAt"]) => {
+  const lineAt = (at: Schemas.ProblemAt) => {
     const doc = docs[at.change]
     if (!doc) return undefined
     return at.line ? doc.line + at.line - 1 : lineOf(doc, at.field ?? undefined)
@@ -251,8 +251,8 @@ function Templates({
   creatable,
   onAdd,
 }: {
-  creatable: Schemas["CreatableList"] | undefined
-  onAdd: (kind: Schemas["CreatableKind"]) => void
+  creatable: Schemas.CreatableList | undefined
+  onAdd: (kind: Schemas.CreatableKind) => void
 }) {
   const t = useT()
   const groups = offered(creatable)
@@ -394,7 +394,7 @@ function Partial({
   problem: ProblemBody
   docs: YamlDocument[]
   onKeep: () => void
-  onDelete: (changes: Schemas["Change"][]) => void
+  onDelete: (changes: Schemas.Change[]) => void
 }) {
   const t = useT()
   const applied = problem.applied ?? []
@@ -403,7 +403,7 @@ function Partial({
   const created = (d: YamlDocument) => applied.some((a) => a.kind === d.kind && a.name === d.name)
   const deletes = applied
     .map((a) => deletionOf(a))
-    .filter((c): c is Schemas["Change"] => c !== undefined)
+    .filter((c): c is Schemas.Change => c !== undefined)
     .toReversed()
   return (
     <Dialog open onOpenChange={(open) => (open ? undefined : onKeep())}>

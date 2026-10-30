@@ -10,7 +10,7 @@ export interface Needed {
 
 /** `id` with the catalogue's name for it, else the last part of the id. A bare capability becomes
  * the component the catalogue offers for it: a recommended one, else the first. */
-export function needed(id: string, capabilities: Schemas["Capability"][] | undefined): Needed {
+export function needed(id: string, capabilities: Schemas.Capability[] | undefined): Needed {
   const [capability = id, component] = id.split("/")
   const components = capabilities?.find((c) => c.name === capability)?.components ?? []
   const found = component

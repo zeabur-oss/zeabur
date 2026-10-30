@@ -63,7 +63,7 @@ export function SettingsTab({
   project: string
   service: Service
   network: Network
-  unreadable: Schemas["UnreadableView"][]
+  unreadable: Schemas.UnreadableView[]
   mode?: ServiceMode
   onMode: (mode?: ServiceMode) => void
 }) {

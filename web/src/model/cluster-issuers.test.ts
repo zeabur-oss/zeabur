@@ -3,14 +3,14 @@ import { describe, expect, test } from "bun:test"
 import type { Schemas } from "@/api/client"
 import { canIssue, certificateNow, pemProblems, solverLabel } from "@/model/cluster-issuers"
 
-const route = (patch: Partial<Schemas["Route"]> = {}): Schemas["Route"] =>
+const route = (patch: Partial<Schemas.Route> = {}): Schemas.Route =>
   ({
     name: "shop",
     hostnames: ["shop.example.test"],
     backends: ["web"],
     origin: { kind: "Ingress", name: "shop" },
     ...patch,
-  }) as Schemas["Route"]
+  }) as Schemas.Route
 
 test("solvers read as people write them", () => {
   expect(solverLabel("http01")).toBe("HTTP-01")

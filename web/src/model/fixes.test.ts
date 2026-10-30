@@ -4,8 +4,8 @@ import type { Schemas } from "@/api/client"
 import type { Translate } from "@/i18n"
 import { fixLink, fixOf, fixTemplates } from "@/model/fixes"
 
-type Gap = Schemas["Gap"]
-type Project = Schemas["Project"]
+type Gap = Schemas.Gap
+type Project = Schemas.Project
 
 const t = ((key: string) => key) as unknown as Translate
 

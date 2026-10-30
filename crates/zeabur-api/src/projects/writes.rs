@@ -279,6 +279,7 @@ async fn compute_any(
 
 /// Computes the writes a change needs and returns them with a token; writes nothing.
 #[utoipa::path(post, path = "/api/v1/projects/{project}/plan", tag = "projects",
+    operation_id = "planProject",
     params(("project" = String, Path, description = "The project's namespace")),
     request_body = PlanRequest,
     responses((status = 200, body = PlanResponse),
@@ -389,6 +390,7 @@ pub(crate) fn token_problem(error: TokenError) -> ApiError {
 
 /// Carries out a plan by its token: checks it, dry-runs every write, then writes.
 #[utoipa::path(post, path = "/api/v1/projects/{project}/apply", tag = "projects",
+    operation_id = "applyProject",
     params(("project" = String, Path, description = "The project's namespace")),
     request_body = ApplyRequest,
     responses((status = 200, body = ApplyResponse),

@@ -3,9 +3,9 @@
 import type { Schemas } from "@/api/client"
 import { isWarning, type Event } from "@/model/service"
 
-type Diagnosis = Schemas["Diagnosis"]
-type Rollout = Schemas["RolloutProgress"]
-type Route = Schemas["RouteTraceView"]
+type Diagnosis = Schemas.Diagnosis
+type Rollout = Schemas.RolloutProgress
+type Route = Schemas.RouteTraceView
 
 /** A diagnosis that only follows from another one: no ready replica, because none starts. */
 const isConsequence = (d: Diagnosis) =>
@@ -172,7 +172,7 @@ export const eventWord = (reason: string | undefined): EventWord | undefined =>
     ? eventWords[reason as keyof typeof eventWords]
     : undefined
 
-type Gap = Schemas["Gap"]
+type Gap = Schemas.Gap
 
 /** A project's suggestions: each gap on its own, and one row for every service without a traffic check. */
 export type Suggestion =

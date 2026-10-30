@@ -19,10 +19,10 @@ import { limitSentence } from "@/model/ip-limits"
 import { isolates, undoOf, type AccessChange, type PodsOf, type Reason } from "@/model/risk"
 import { imageTag } from "@/model/service"
 
-type Change = Schemas["Change"]
-type WorkloadRef = Schemas["WorkloadRef"]
-type Plan = Pick<Schemas["PlanResponse"], "objects" | "impact" | "warnings"> & {
-  preview?: Schemas["Preview"]
+type Change = Schemas.Change
+type WorkloadRef = Schemas.WorkloadRef
+type Plan = Pick<Schemas.PlanResponse, "objects" | "impact" | "warnings"> & {
+  preview?: Schemas.Preview
 }
 
 const workloadKinds = new Set(["Deployment", "StatefulSet", "DaemonSet", "Job", "CronJob"])
@@ -73,10 +73,7 @@ const fieldsOf = (plan: Pick<Plan, "objects"> | undefined, kind: string, name: s
   plan?.objects.find((o) => o.target.kind === kind && o.target.name === name)?.changes ?? []
 
 /** Whether the plan's fields under an entry (`env[name=A]`, `data.A`) are all new. */
-function isNew(
-  fields: readonly Schemas["FieldChange"][],
-  under: (path: string) => boolean,
-): boolean {
+function isNew(fields: readonly Schemas.FieldChange[], under: (path: string) => boolean): boolean {
   const own = fields.filter((f) => under(f.path))
   return own.length > 0 && own.every((f) => f.before === undefined || f.before === null)
 }
@@ -375,8 +372,8 @@ function pagesSentence(t: Translate, change: PagesChange): string {
  * (https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/#configure-probes). */
 function probeSentence(
   t: Translate,
-  probe: Schemas["ProbeKind"],
-  set: Schemas["ProbeRequest"] | undefined,
+  probe: Schemas.ProbeKind,
+  set: Schemas.ProbeRequest | undefined,
 ): string {
   if (!set) return t(`confirm.probeRemoved.${probe}`)
   const port = String(set.port ?? "")
@@ -398,7 +395,7 @@ function resourcesSentence(
   t: Translate,
   requests: Record<string, string> = {},
   limits: Record<string, string> = {},
-  fields: readonly Schemas["FieldChange"][] = [],
+  fields: readonly Schemas.FieldChange[] = [],
 ): string {
   const labels: Record<string, [string, string]> = {
     cpu: [t("form.cpuRequest"), t("form.cpuLimit")],
@@ -704,7 +701,7 @@ function costOf(
 /** What happens when the new pods do not fit, and how to make room; undefined when they fit. */
 export function shortfall(
   t: Translate,
-  preview: Schemas["Preview"],
+  preview: Schemas.Preview,
 ): { cost: string; fix: string } | undefined {
   const { fit } = preview
   if (fit.status !== "blocked") return undefined
@@ -803,7 +800,7 @@ export function terminalLines(t: Translate, plan: Pick<Plan, "warnings">): strin
   })
 }
 
-function hasWarning(plan: Plan, code: Schemas["PlanWarning"]["code"]): boolean {
+function hasWarning(plan: Plan, code: Schemas.PlanWarning["code"]): boolean {
   return plan.warnings.some((w) => w.code === code)
 }
 
@@ -1002,7 +999,7 @@ export interface Failure {
 }
 
 /** Reads only the problem's typed members and keyed sentences, never its English wording. */
-export function failureOf(t: Translate, locale: Locale, problem: Schemas["Problem"]): Failure {
+export function failureOf(t: Translate, locale: Locale, problem: Schemas.Problem): Failure {
   // Refused because Helm, Argo CD or Flux would undo it (a 409): reviewing again cannot help.
   const tool = problem.managedBy
   if (tool)
@@ -1024,7 +1021,7 @@ export function failureOf(t: Translate, locale: Locale, problem: Schemas["Proble
  * (the default of a dynamically provisioned volume), and when an admin can still recover it. */
 export function claimDataSaid(
   t: Translate,
-  warning: Extract<Schemas["PlanWarning"], { code: "claimDataMayBeLost" }>,
+  warning: Extract<Schemas.PlanWarning, { code: "claimDataMayBeLost" }>,
 ): { text: string; kept: boolean } {
   switch (warning.reclaimPolicy) {
     case "Retain":

@@ -2,9 +2,9 @@ import type { Schemas } from "@/api/client"
 import type { Database, Engine, NewDatabase } from "@/model/databases"
 import type { Service } from "@/model/service"
 
-type Change = Schemas["Change"]
-type EnvEdit = Schemas["EnvEdit"]
-type Env = Schemas["EnvVar"]
+type Change = Schemas.Change
+type EnvEdit = Schemas.EnvEdit
+type Env = Schemas.EnvVar
 
 export type Target = Pick<Service, "kind" | "name" | "containers">
 /** What a service connects to: a database engine, or S3 object storage. */
@@ -221,7 +221,7 @@ export function connectChanges(
 }
 
 /** Workloads whose variables can be set; the database's own and other tools' are left out. */
-export function candidates(services: Service[], rights: Schemas["WorkloadPatch"][]): Service[] {
+export function candidates(services: Service[], rights: Schemas.WorkloadPatch[]): Service[] {
   return services.filter((s) => {
     if (s.dataStore || s.provenance.tool) return false
     const right = rights.find((r) => r.kind === s.kind)

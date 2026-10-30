@@ -1,9 +1,9 @@
 import type { Schemas } from "@/api/client"
 import type { Service } from "@/model/service"
 
-export type Build = Schemas["ZeaburBuilderBuild"]
-export type BuildRun = Schemas["ProjectBuildRun"]
-export type Builds = Schemas["ProjectBuilds"]
+export type Build = Schemas.ZeaburBuilderBuild
+export type BuildRun = Schemas.ProjectBuildRun
+export type Builds = Schemas.ProjectBuilds
 
 /** Where Zeabur tells Keel of new images: the catalog's Keel, by its Service. */
 export const KEEL_WEBHOOK = "http://keel.keel.svc.cluster.local:9300/v1/webhooks/native"
@@ -151,7 +151,7 @@ export function buildDeletions(
   service: Service,
   services: readonly Service[],
   builds: readonly Build[],
-): Schemas["Change"][] {
+): Schemas.Change[] {
   const others = services.filter((s) => s.kind !== service.kind || s.name !== service.name)
   const gone = [...new Set(builtContainers(service, builds).map((b) => b.build))].filter((build) =>
     others.every((s) => builtContainers(s, [build]).length === 0),

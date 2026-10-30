@@ -107,6 +107,7 @@ pub(crate) async fn ingress_class_facts(
 
 /// What a project is missing, by the built-in rules, each with its citations and fix.
 #[utoipa::path(get, path = "/api/v1/projects/{project}/gaps", tag = "projects",
+    operation_id = "listProjectGaps",
     params(("project" = String, Path, description = "The project's namespace")),
     responses((status = 200, body = GapList), (status = 403, body = Problem, content_type = PROBLEM)))]
 pub(crate) async fn project(
@@ -322,6 +323,7 @@ async fn namespace_facts(
 /// What the cluster itself is missing, apart from any project: an IngressClass served by a
 /// retired controller, and a project namespace without its NetworkPolicy.
 #[utoipa::path(get, path = "/api/v1/cluster/gaps", tag = "cluster",
+    operation_id = "listClusterGaps",
     responses((status = 200, body = GapList), (status = 403, body = Problem, content_type = PROBLEM)))]
 pub(crate) async fn cluster(Person(cluster): Person) -> Result<Json<GapList>, ApiError> {
     let cluster = cluster.as_ref();

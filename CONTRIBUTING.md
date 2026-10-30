@@ -30,7 +30,7 @@ cargo deny --locked check
 (cd web && bun ci && bun run fmt:check)
 ./scripts/check-ui-styles.sh && ./scripts/build-ui.sh   # build-ui.sh type-checks too (tsc -b)
 (cd web && bun run lint && bun run fallow dead-code --baseline fallow-baseline.json && bun run fallow audit --base main && bun run test && bun run gen:api)
-git diff --exit-code -- web/src/api/schema.d.ts     # the generated API types are up to date
+git diff --exit-code -- web/src/api/zeabur.ts        # the generated API client is up to date
 ./scripts/ui-budget.sh
 ZEABUR_UI_DIST="$PWD/web/dist" cargo build --release --locked -p zeabur -p zeaburctl
 ```

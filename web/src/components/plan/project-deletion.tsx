@@ -16,17 +16,17 @@ import { backUpNow, backUpNowSummary, canBackUpNow } from "@/model/databases"
 import { dataFate, projectDeletionOf, recentBackup } from "@/model/project-deletion"
 import { backUpVolumeNow, scheduleOf } from "@/model/volume-backups"
 
-type DeletesProject = Extract<Schemas["PlanWarning"], { code: "deletesProject" }>
-type Target = Schemas["BackupTarget"]
+type DeletesProject = Extract<Schemas.PlanWarning, { code: "deletesProject" }>
+type Target = Schemas.BackupTarget
 
-function coverageOf(data: Schemas["ProjectBackups"] | undefined, target: Target): Coverage {
+function coverageOf(data: Schemas.ProjectBackups | undefined, target: Target): Coverage {
   const found = data?.coverage.find(
     (c) => c.target.kind === target.kind && c.target.name === target.name,
   )
   return found ?? { target, scheduledBy: [] }
 }
 
-function fateText(t: Translate, volume: Schemas["VolumeDeletion"]): string {
+function fateText(t: Translate, volume: Schemas.VolumeDeletion): string {
   switch (dataFate(volume)) {
     case "deleted":
       return t("deletion.dataDeleted")
@@ -44,7 +44,7 @@ export function ProjectDeletion({
   reopen,
 }: {
   project: string
-  plan: Schemas["PlanResponse"]
+  plan: Schemas.PlanResponse
   reopen: (ask: PlanAsk) => void
 }) {
   const deletion = projectDeletionOf(plan.warnings)

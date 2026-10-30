@@ -127,8 +127,8 @@ export function Layers({
   /** Who must act, when it is not the reader, in place of "What to do". */
   fixLead?: string
   action?: ReactNode
-  evidence?: Schemas["Origin"][]
-  fields?: Schemas["FieldCause"][]
+  evidence?: Schemas.Origin[]
+  fields?: Schemas.FieldCause[]
   lastSeen?: string | null
   children?: ReactNode
 }) {
@@ -196,7 +196,7 @@ function Fold({
   )
 }
 
-function origin(o: Schemas["Origin"]): string {
+function origin(o: Schemas.Origin): string {
   return [`${o.kind}/${o.name}`, o.fieldPath].filter(Boolean).join(" ")
 }
 
@@ -204,8 +204,8 @@ function Evidence({
   evidence,
   fields,
 }: {
-  evidence: Schemas["Origin"][]
-  fields: Schemas["FieldCause"][]
+  evidence: Schemas.Origin[]
+  fields: Schemas.FieldCause[]
 }) {
   return (
     <dl className="grid grid-cols-pairs gap-x-4 gap-y-1 font-mono text-xs">

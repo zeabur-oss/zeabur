@@ -134,7 +134,7 @@ function Expiry({ left }: { left: number | undefined }) {
   )
 }
 
-export function PlanWrites({ writes }: { writes: Schemas["ShellWrite"][] }) {
+export function PlanWrites({ writes }: { writes: Schemas.ShellWrite[] }) {
   const t = useT()
   return (
     <DescribeYaml
@@ -267,7 +267,7 @@ export function Exposed({
   exposed,
 }: {
   namespace: string
-  exposed: Schemas["ShellExposure"][]
+  exposed: Schemas.ShellExposure[]
 }) {
   const t = useT()
   return (

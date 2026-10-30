@@ -729,7 +729,7 @@ form{border-color:#27272a;background:#18181b}button{color:#18181b;background:#fa
 /// The page that sends the manifest to GitHub: a form with one button, no script, whose policy
 /// lets forms go to GitHub only.
 #[utoipa::path(get, path = "/api/v1/cluster/github-app/form", tag = "cluster",
-    operation_id = "gitHubAppForm",
+    operation_id = "getGitHubAppForm",
     params(("state" = String, Query, description = "The state `manifest` answered")),
     responses((status = 200, content_type = "text/html", description = "The page"),
               (status = 400, content_type = "text/html", description = "The state is not valid")))]

@@ -34,8 +34,8 @@ import { SectionHeader } from "@zeabur/design-system/components/section-header"
 import { Select } from "@zeabur/design-system/components/select"
 import { Tooltip } from "@zeabur/design-system/components/tooltip"
 
-type Concurrency = Schemas["TaskConcurrency"]
-type Run = Schemas["TaskRun"]
+type Concurrency = Schemas.TaskConcurrency
+type Run = Schemas.TaskRun
 
 const NAME = /^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/
 const NAME_MAX = 52
@@ -100,7 +100,7 @@ export function TasksSection({ project, service }: { project: string; service: S
   )
 }
 
-function TaskWhen({ schedule }: { schedule: Schemas["TaskSchedule"] }) {
+function TaskWhen({ schedule }: { schedule: Schemas.TaskSchedule }) {
   const t = useT()
   return (
     <span className="flex flex-wrap items-center gap-x-2">
@@ -274,7 +274,7 @@ interface ScheduleValues {
   keepFailed: string
 }
 
-const valuesOf = (current: Schemas["TaskSchedule"]): ScheduleValues => ({
+const valuesOf = (current: Schemas.TaskSchedule): ScheduleValues => ({
   schedule: current.cron,
   zone: current.timeZone ?? "",
   command: current.command ?? "",
@@ -286,9 +286,9 @@ const valuesOf = (current: Schemas["TaskSchedule"]): ScheduleValues => ({
 /** The fields that differ from the CronJob, as one edit; `undefined` when none do. */
 function scheduleEdit(
   cronJob: string,
-  current: Schemas["TaskSchedule"],
+  current: Schemas.TaskSchedule,
   values: ScheduleValues,
-): Extract<Schemas["Change"], { op: "editTask" }> | undefined {
+): Extract<Schemas.Change, { op: "editTask" }> | undefined {
   const before = valuesOf(current)
   const trimmed = (key: keyof ScheduleValues) => values[key].trim()
   const changed = (key: keyof ScheduleValues) => trimmed(key) !== before[key]
@@ -311,7 +311,7 @@ function ScheduleForm({
   disabled,
 }: {
   cronJob: string
-  current: Schemas["TaskSchedule"]
+  current: Schemas.TaskSchedule
   disabled: boolean
 }) {
   const t = useT()

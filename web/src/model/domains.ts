@@ -23,7 +23,7 @@ export function filterRoutes(routes: PublicRoute[], query: string): PublicRoute[
   )
 }
 
-type DomainCheck = Schemas["DomainCheck"]
+type DomainCheck = Schemas.DomainCheck
 
 export interface DnsRecord {
   type: "A" | "AAAA" | "CNAME"

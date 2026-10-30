@@ -1,15 +1,15 @@
 import type { Schemas } from "@/api/client"
 
 /** A tool that writes its fields again from its own source. */
-export type Reapplier = Schemas["Tool"] | "kubectl"
+export type Reapplier = Schemas.Tool | "kubectl"
 
 export interface Skipped {
   name: string
-  tool: Schemas["Tool"]
+  tool: Schemas.Tool
 }
 
 export type ToolNote =
-  | { kind: "skipped"; tool: Schemas["Tool"]; names: string[] }
+  | { kind: "skipped"; tool: Schemas.Tool; names: string[] }
   | { kind: "putBack"; tool: Reapplier; object: string; paths: string[] }
 
 /**
@@ -27,11 +27,11 @@ export function reapplierOf(manager: string): Reapplier | undefined {
 
 /** What another tool does about a plan: the services it left out, the fields it will put back. */
 export function toolNotes(
-  plan: Pick<Schemas["PlanResponse"], "objects">,
+  plan: Pick<Schemas.PlanResponse, "objects">,
   skipped: Skipped[] = [],
 ): ToolNote[] {
   const notes: ToolNote[] = []
-  const byTool = new Map<Schemas["Tool"], string[]>()
+  const byTool = new Map<Schemas.Tool, string[]>()
   for (const s of skipped) byTool.set(s.tool, [...(byTool.get(s.tool) ?? []), s.name])
   for (const [tool, names] of byTool) notes.push({ kind: "skipped", tool, names })
   for (const object of plan.objects) {

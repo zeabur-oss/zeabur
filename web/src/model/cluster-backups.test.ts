@@ -17,7 +17,7 @@ import {
   verdict,
 } from "@/model/cluster-backups"
 
-const location = (patch: Partial<Schemas["VeleroLocation"]> = {}): Schemas["VeleroLocation"] => ({
+const location = (patch: Partial<Schemas.VeleroLocation> = {}): Schemas.VeleroLocation => ({
   name: "default",
   namespace: "velero",
   default: true,
@@ -27,7 +27,7 @@ const location = (patch: Partial<Schemas["VeleroLocation"]> = {}): Schemas["Vele
   ...patch,
 })
 
-const schedule = (patch: Partial<Schemas["VeleroSchedule"]> = {}): Schemas["VeleroSchedule"] => ({
+const schedule = (patch: Partial<Schemas.VeleroSchedule> = {}): Schemas.VeleroSchedule => ({
   name: "zeabur",
   namespace: "velero",
   cron: "0 3 * * *",
@@ -42,9 +42,9 @@ const schedule = (patch: Partial<Schemas["VeleroSchedule"]> = {}): Schemas["Vele
 })
 
 const backup = (
-  outcome: Schemas["BackupOutcome"],
+  outcome: Schemas.BackupOutcome,
   name = `zeabur-${outcome}`,
-): Schemas["VeleroBackup"] => ({
+): Schemas.VeleroBackup => ({
   name,
   namespaces: [],
   outcome,
@@ -52,7 +52,7 @@ const backup = (
   warnings: 0,
 })
 
-const data = (patch: Partial<Schemas["ClusterBackups"]> = {}): Schemas["ClusterBackups"] => ({
+const data = (patch: Partial<Schemas.ClusterBackups> = {}): Schemas.ClusterBackups => ({
   state: "installed",
   namespace: "velero",
   locations: [location()],
@@ -207,9 +207,9 @@ test("coverage and the last good backup", () => {
 
 test("the project's line comes from its own read of Velero", () => {
   const project = (
-    state: Schemas["ProviderState"],
-    row: Partial<Schemas["BackupCoverage"]> = {},
-  ): Schemas["ProjectBackups"] => ({
+    state: Schemas.ProviderState,
+    row: Partial<Schemas.BackupCoverage> = {},
+  ): Schemas.ProjectBackups => ({
     providers: [{ module: "velero", state }],
     coverage: [{ target: { kind: "namespace", name: "shop" }, scheduledBy: [], ...row }],
     runs: [],

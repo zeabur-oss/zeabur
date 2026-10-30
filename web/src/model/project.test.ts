@@ -28,8 +28,8 @@ const english: Translate = (key, ...args) => {
 
 const summary = (
   name: string,
-  more: Partial<Schemas["ProjectSummary"]> = {},
-): Schemas["ProjectSummary"] => ({
+  more: Partial<Schemas.ProjectSummary> = {},
+): Schemas.ProjectSummary => ({
   id: `projects/${name}`,
   origin: { apiVersion: "v1", kind: "Namespace", name },
   name,
@@ -143,8 +143,8 @@ describe("the projects list", () => {
   const summary = (
     name: string,
     failing: number,
-    extra: Partial<Schemas["ProjectSummary"]> = {},
-  ): Schemas["ProjectSummary"] => ({
+    extra: Partial<Schemas.ProjectSummary> = {},
+  ): Schemas.ProjectSummary => ({
     id: `projects/${name}`,
     name,
     adopted: true,
@@ -174,7 +174,7 @@ describe("the projects list", () => {
   })
 
   test("restarts add up over services, and are unknown without them", () => {
-    const service = (restarts: number) => ({ restarts }) as Schemas["ServiceSummary"]
+    const service = (restarts: number) => ({ restarts }) as Schemas.ServiceSummary
     expect(restartsIn(summary("shop", 0, { services: [service(2), service(3)] }))).toBe(5)
     expect(restartsIn(summary("shop", 0))).toBeUndefined()
   })

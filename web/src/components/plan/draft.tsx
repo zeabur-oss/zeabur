@@ -8,14 +8,14 @@ import type { DraftPart } from "@/routes/search"
 
 /** Which staged changes a form's edits stand in for: these ops, of this workload (and probe). */
 interface Scope {
-  ops: Schemas["Change"]["op"][]
-  workload: Schemas["WorkloadRef"]
-  probe?: Schemas["ProbeKind"]
+  ops: Schemas.Change["op"][]
+  workload: Schemas.WorkloadRef
+  probe?: Schemas.ProbeKind
 }
 
 /** A form's edits as typed, which stand in for the staged changes in its scope. */
 export interface Held {
-  changes: Schemas["Change"][]
+  changes: Schemas.Change[]
   scope: Scope
   /** Why they cannot be saved yet. */
   blocked?: string
@@ -25,7 +25,7 @@ export interface Held {
   notes?: string[]
 }
 
-export function covers(scope: Scope, change: Schemas["Change"]): boolean {
+export function covers(scope: Scope, change: Schemas.Change): boolean {
   if (!scope.ops.includes(change.op)) return false
   const workload = "workload" in change ? change.workload : undefined
   if (workload && (workload.kind !== scope.workload.kind || workload.name !== scope.workload.name))
@@ -34,7 +34,7 @@ export function covers(scope: Scope, change: Schemas["Change"]): boolean {
 }
 
 export interface Draft {
-  changes: Schemas["Change"][]
+  changes: Schemas.Change[]
   count: number
   parts: DraftPart[]
   /** Changes when the draft is applied or discarded, so forms start again from the cluster. */
@@ -42,7 +42,7 @@ export interface Draft {
   /** Whether the ask waited in the draft; otherwise the caller plans it at once. */
   stage: (ask: PlanAsk) => boolean
   /** Takes staged changes back out. */
-  unstage: (changes: Schemas["Change"][]) => void
+  unstage: (changes: Schemas.Change[]) => void
   discard: () => void
   applied: () => void
   /** Whether an editor is open. */
@@ -54,7 +54,7 @@ export interface Draft {
   /** Sets or clears one form's held edits; stable across renders. */
   hold: (key: string, held: Held | undefined) => void
   /** The staged changes with the held ones in place of those they cover. */
-  withHeld: () => Schemas["Change"][]
+  withHeld: () => Schemas.Change[]
 }
 
 const DraftContext = createContext<Draft | null>(null)
@@ -62,7 +62,7 @@ const DraftContext = createContext<Draft | null>(null)
 export const useDraft = () => useContext(DraftContext)
 
 export function useDraftState(): Draft {
-  const [changes, setChanges] = useState<Schemas["Change"][]>([])
+  const [changes, setChanges] = useState<Schemas.Change[]>([])
   const [generation, setGeneration] = useState(0)
   const [holds, setHolds] = useState<Record<string, Held>>({})
   const hold = useCallback(

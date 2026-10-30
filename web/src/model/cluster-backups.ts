@@ -4,10 +4,10 @@ import type { Schemas } from "@/api/client"
 import { type Destination, joinFolder } from "@/model/s3-destinations"
 import type { Health } from "@/model/service"
 
-type Data = Schemas["ClusterBackups"]
-type Backup = Schemas["VeleroBackup"]
-type Location = Schemas["VeleroLocation"]
-type Schedule = Schemas["VeleroSchedule"]
+type Data = Schemas.ClusterBackups
+type Backup = Schemas.VeleroBackup
+type Location = Schemas.VeleroLocation
+type Schedule = Schemas.VeleroSchedule
 
 export const VELERO_COMPONENT = "volume-backup/velero"
 export type Verdict =
@@ -62,7 +62,7 @@ export const verdictHealth: Record<Verdict["as"], Health> = {
   ok: "ok",
 }
 
-export const outcomeHealth: Record<Schemas["BackupOutcome"], Health> = {
+export const outcomeHealth: Record<Schemas.BackupOutcome, Health> = {
   succeeded: "ok",
   partiallyFailed: "warn",
   failed: "fail",
@@ -138,7 +138,7 @@ function keyProblems(form: LocationForm, editing: boolean): LocationProblem[] {
   return editing && Boolean(id) !== Boolean(secret) ? ["bothKeys"] : []
 }
 
-export function locationRequest(form: LocationForm): Schemas["BackupsPlanRequest"] {
+export function locationRequest(form: LocationForm): Schemas.BackupsPlanRequest {
   return {
     op: "location",
     bucket: form.bucket.trim(),
@@ -203,7 +203,7 @@ export function scheduleProblems(form: ScheduleForm): ScheduleProblem[] {
 export function scheduleRequest(
   form: ScheduleForm,
   current: Schedule | undefined,
-): Schemas["BackupsPlanRequest"] {
+): Schemas.BackupsPlanRequest {
   return {
     op: "schedule",
     cron:
@@ -235,11 +235,11 @@ export type ProjectCoverage =
   | { as: "noVelero" }
   | { as: "notCovered" }
   | { as: "waiting" }
-  | { as: "last"; at: string | undefined; outcome: Schemas["BackupOutcome"] }
+  | { as: "last"; at: string | undefined; outcome: Schemas.BackupOutcome }
 
 /** What Project → Settings says about the cluster's backups, from the project's own read;
  * nothing when Velero could not be read. */
-export function projectCoverage(data: Schemas["ProjectBackups"]): ProjectCoverage | undefined {
+export function projectCoverage(data: Schemas.ProjectBackups): ProjectCoverage | undefined {
   const velero = data.providers.find((p) => p.module === "velero")
   if (!velero || velero.state === "refused") return undefined
   if (velero.state === "not-installed") return { as: "noVelero" }

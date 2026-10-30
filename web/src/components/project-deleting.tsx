@@ -61,7 +61,7 @@ export function ProjectDeleting({ project, className }: { project: string; class
   )
 }
 
-function stateText(t: Translate, locale: string, state: Schemas["ProjectDeleting"]): string {
+function stateText(t: Translate, locale: string, state: Schemas.ProjectDeleting): string {
   const left = state.remaining.map((r) =>
     t("deleting.count", r.group ? `${r.resource}.${r.group}` : r.resource, r.count),
   )
@@ -75,7 +75,7 @@ function stateText(t: Translate, locale: string, state: Schemas["ProjectDeleting
     .join(t("common.gap"))
 }
 
-function HeldObjects({ project, held }: { project: string; held: Schemas["HeldObject"][] }) {
+function HeldObjects({ project, held }: { project: string; held: Schemas.HeldObject[] }) {
   const t = useT()
   return (
     <Collapsible>

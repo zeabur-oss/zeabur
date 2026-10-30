@@ -237,7 +237,7 @@ pub(crate) async fn create(
 /// The public key of the deploy key in Secret `name`, read as the person, for adding it to the
 /// Git host again. Only on the person's request: the Secret holds the private key too.
 #[utoipa::path(post, path = "/api/v1/projects/{project}/deploy-keys/{name}/public", tag = "projects",
-    operation_id = "deployKeyPublic",
+    operation_id = "revealDeployKey",
     params(("project" = String, Path, description = "The project's namespace"),
            ("name" = String, Path, description = "The Secret holding the key")),
     responses((status = 200, body = DeployKeyPublic),

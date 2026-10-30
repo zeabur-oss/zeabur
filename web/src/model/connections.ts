@@ -3,7 +3,7 @@ import { domainsOf, serviceId, type Project, type Service } from "@/model/servic
 
 export type Evidence =
   | { basis: "route"; host: string; ingress: string }
-  | Schemas["ConnectionEvidence"]
+  | Schemas.ConnectionEvidence
 
 export interface Edge {
   id: string
@@ -14,10 +14,10 @@ export interface Edge {
   inferred: boolean
   evidence: Evidence[]
   /** Absent when no NetworkPolicy was read. */
-  access?: Schemas["NetworkPolicyAccess"]
+  access?: Schemas.NetworkPolicyAccess
 }
 
-type Document = Project & { extensions?: Schemas["ProjectExtensions"] }
+type Document = Project & { extensions?: Schemas.ProjectExtensions }
 
 const domainNode = (host: string) => `domain:${host}`
 

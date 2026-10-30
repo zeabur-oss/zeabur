@@ -2,8 +2,8 @@
 // into a Secret of the project, so no backup reads the list.
 import type { Schemas } from "@/api/client"
 
-type Change = Schemas["Change"]
-export type Destination = Schemas["S3Destination"]
+type Change = Schemas.Change
+export type Destination = Schemas.S3Destination
 
 /** The fields a destination fills in a form. */
 export interface S3Target {
@@ -119,7 +119,7 @@ export function destinationProblems(
 
 export const saveRequest = (
   form: DestinationForm,
-): Extract<Schemas["S3DestinationsPlanRequest"], { op: "save" }> => ({
+): Extract<Schemas.S3DestinationsPlanRequest, { op: "save" }> => ({
   op: "save",
   name: form.name,
   endpoint: form.endpoint.trim(),

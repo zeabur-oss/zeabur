@@ -53,7 +53,7 @@ import { OtherNamespaces } from "@/routes/projects"
 import { PageHeader } from "@zeabur/design-system/components/page-header"
 import { PageColumn } from "@zeabur/design-system/components/page-column"
 
-type ProjectItem = Schemas["ProjectSummary"]
+type ProjectItem = Schemas.ProjectSummary
 
 const homeRoute = getRouteApi("/")
 

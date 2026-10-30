@@ -4,7 +4,7 @@
 import type { Schemas } from "@/api/client"
 import { templateSecurity, type Profile } from "@/model/pod-security"
 
-type Change = Schemas["Change"]
+type Change = Schemas.Change
 type Manifest = Record<string, unknown>
 
 export type ImageSize = "small" | "medium" | "large"
@@ -373,9 +373,9 @@ export const createImageService = (form: ImageService, domains: DomainSettings):
   }))
 
 /** What a person may create, by kind, as the creatable list hints; absent kinds are unknown. */
-export type Rights = (group: string, resource: string) => Schemas["ObjectAccess"]
+export type Rights = (group: string, resource: string) => Schemas.ObjectAccess
 
-export function rightsOf(list: Schemas["CreatableList"] | undefined): Rights {
+export function rightsOf(list: Schemas.CreatableList | undefined): Rights {
   return (group, resource) =>
     list?.items.find((k) => k.group === group && k.resource === resource)?.access ?? "unknown"
 }

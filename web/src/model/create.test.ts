@@ -23,7 +23,7 @@ spec:
   ports: [{port: 80}]
 `
 
-const creatable: Schemas["CreatableList"] = {
+const creatable: Schemas.CreatableList = {
   items: [
     {
       group: "apps",

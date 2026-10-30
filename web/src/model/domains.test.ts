@@ -79,7 +79,7 @@ describe("filterRoutes", () => {
   })
 })
 
-const check = (more: Partial<Schemas["DomainCheck"]> = {}): Schemas["DomainCheck"] => ({
+const check = (more: Partial<Schemas.DomainCheck> = {}): Schemas.DomainCheck => ({
   target: ["203.0.113.10"],
   dns: "missing",
   ...more,

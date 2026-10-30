@@ -14,7 +14,7 @@ import { Section } from "@/routes/cluster/section"
 const K8UP_COMPONENT = "volume-backup/k8up"
 
 /** Whether `id` (`volume-backup/k8up`) is installed; unknown when the person cannot read what is. */
-function installedOf(items: Schemas["Capability"][] | undefined, id: string) {
+function installedOf(items: Schemas.Capability[] | undefined, id: string) {
   if (!items) return undefined
   const [capability, component] = id.split("/")
   return items
@@ -22,7 +22,7 @@ function installedOf(items: Schemas["Capability"][] | undefined, id: string) {
     ?.installations.some((i) => i.component === component)
 }
 
-export function BackupCoverage({ data }: { data?: Schemas["ClusterBackups"] }) {
+export function BackupCoverage({ data }: { data?: Schemas.ClusterBackups }) {
   const t = useT()
   const items = useQuery({ ...capabilitiesQuery, retry: false }).data?.items
   const velero = data && data.state !== "not-installed" ? verdict(data) : undefined

@@ -18,7 +18,7 @@ import { serviceLink } from "@/lib/place"
 import { fixOf, type fixLink } from "@/model/fixes"
 import { suggestionsOf } from "@/model/overview"
 
-type Gap = Schemas["Gap"]
+type Gap = Schemas.Gap
 
 export function GapList({
   gaps,
@@ -28,7 +28,7 @@ export function GapList({
   gaps: Gap[]
   /** Absent for cluster gaps. */
   project?: string
-  document?: Schemas["Project"]
+  document?: Schemas.Project
 }) {
   const t = useT()
   const planner = usePlanner(project ?? "")

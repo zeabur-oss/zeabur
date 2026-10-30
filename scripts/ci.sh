@@ -143,7 +143,7 @@ case "$job" in
       bun run test
       bun run gen:api
     )
-    git diff --exit-code -- web/src/api/schema.d.ts
+    git diff --exit-code -- web/src/api/zeabur.ts
     ./scripts/build-installer-ui.sh
     (cd crates/zeabur-installer/web; bun run lint)
     (cd web; bun scripts/check-deprecated.ts . ../crates/zeabur-installer/web)

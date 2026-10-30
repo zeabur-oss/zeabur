@@ -2,9 +2,9 @@
 // meet (`restricted`, `baseline`). Mirrors crates/zeabur-plan/src/pod_security.rs.
 import type { Schemas } from "@/api/client"
 
-type Change = Schemas["Change"]
+type Change = Schemas.Change
 type Manifest = Record<string, unknown>
-export type Level = Schemas["PodSecurityLevel"]
+export type Level = Schemas.PodSecurityLevel
 export type Profile = Exclude<Level, "privileged">
 
 export const profiles: readonly Profile[] = ["restricted", "baseline"]
@@ -39,6 +39,6 @@ export function imageProfile(user: string | null | undefined): Profile {
 }
 
 /** The change that makes an existing workload `profile`. */
-export const profileChanges = (workload: Schemas["WorkloadRef"], profile: Profile): Change[] => [
+export const profileChanges = (workload: Schemas.WorkloadRef, profile: Profile): Change[] => [
   { op: "securityProfile", workload, profile },
 ]

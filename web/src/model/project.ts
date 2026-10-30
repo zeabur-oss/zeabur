@@ -2,7 +2,7 @@ import type { Schemas } from "@/api/client"
 import { roleYaml } from "@/model/rbac"
 import { countsHealth, healthRank } from "@/model/service"
 
-export type ProjectIconName = Schemas["ProjectIcon"]
+export type ProjectIconName = Schemas.ProjectIcon
 
 /** The project label (zeabur-core `LABEL_PROJECT`). */
 const PROJECT_LABEL = "zeabur.com/project"
@@ -28,7 +28,7 @@ export const projectIcons: readonly ProjectIconName[] = [
 ]
 
 export function projectTitle(
-  project: Pick<Schemas["ProjectSummary"], "name" | "displayName"> | undefined,
+  project: Pick<Schemas.ProjectSummary, "name" | "displayName"> | undefined,
   name: string,
 ): string {
   return project?.displayName ?? name
@@ -37,7 +37,7 @@ export function projectTitle(
 /** A project named in a sentence: its title, and its namespace beside it when the two differ, so
  * every project in one sentence is named the same way. */
 export function projectMention(
-  project: Pick<Schemas["ProjectSummary"], "name" | "displayName"> | undefined,
+  project: Pick<Schemas.ProjectSummary, "name" | "displayName"> | undefined,
   name: string,
 ): { title: string; namespace?: string } {
   const title = projectTitle(project, name)
@@ -45,7 +45,7 @@ export function projectMention(
 }
 
 export function otherNamespaces(
-  items: readonly Schemas["ProjectSummary"][],
+  items: readonly Schemas.ProjectSummary[],
   showSystem: boolean,
 ): { name: string; icon?: ProjectIconName | null; adoptable: boolean }[] {
   return items
@@ -54,16 +54,16 @@ export function otherNamespaces(
 }
 
 /** `unknown` offers it: the plan's dry run decides. */
-export const mayChange = (namespace: Pick<Schemas["ProjectNamespace"], "canChange">) =>
+export const mayChange = (namespace: Pick<Schemas.ProjectNamespace, "canChange">) =>
   namespace.canChange !== "denied"
 
-export const mayAdopt = (namespace: Pick<Schemas["ProjectNamespace"], "canAdopt">) =>
+export const mayAdopt = (namespace: Pick<Schemas.ProjectNamespace, "canAdopt">) =>
   namespace.canAdopt !== "denied"
 
 /** zeabur-model `kernel::MANAGE_VERB`: what the chart's admission policy asks for before a label change. */
 const MANAGE_VERB = "zeabur-manage"
 
-export const namespaceOps = new Set<Schemas["Change"]["op"]>([
+export const namespaceOps = new Set<Schemas.Change["op"]>([
   "adopt",
   "unadopt",
   "deleteProject",
@@ -113,7 +113,7 @@ export function patchRole(namespace: string, user: string, manage: boolean): str
   })
 }
 
-type ProjectSummary = Schemas["ProjectSummary"]
+type ProjectSummary = Schemas.ProjectSummary
 
 /** Restarts summed over its services; absent when its workloads were not read. */
 export const restartsIn = (project: ProjectSummary) =>

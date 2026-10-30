@@ -58,6 +58,7 @@ pub(crate) async fn get(Current(view): Current) -> Json<SessionView> {
 
 /// Who the cluster says you are.
 #[utoipa::path(get, path = "/api/v1/whoami", tag = "identity",
+    operation_id = "getWhoAmI",
     responses((status = 200, body = WhoAmI), (status = 401, body = Problem, content_type = PROBLEM)))]
 pub(crate) async fn whoami(Person(cluster): Person) -> Result<Json<WhoAmI>, ApiError> {
     let identity = cluster

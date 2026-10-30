@@ -1,7 +1,8 @@
 import { useMutation, useQuery } from "@tanstack/react-query"
 import { useEffect, useRef, useState } from "react"
 
-import { api, isStatus, unwrap } from "@/api/client"
+import { isStatus } from "@/api/client"
+import * as zeabur from "@/api/zeabur"
 import { clusterToolsQuery, deleteClusterTools } from "@/api/cluster-tools"
 import { databasesQuery, debugQuery, projectQuery, queryClient, toolsQuery } from "@/api/queries"
 import { ClusterToolsDialog } from "@/components/cluster-tools"
@@ -378,11 +379,7 @@ export function ToolsPods({
     mutationFn: async (name: string) => {
       if (project === undefined) return deleteClusterTools(name)
       try {
-        unwrap(
-          await api.DELETE("/api/v1/projects/{project}/tools/{name}", {
-            params: { path: { project, name } },
-          }),
-        )
+        await zeabur.deleteToolsPod(project, name)
       } catch (error) {
         // Already gone: deleted once its terminals closed, or at its deadline.
         if (!isStatus(error, 404)) throw error

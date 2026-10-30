@@ -44,7 +44,7 @@ export function MemberPlan({
   /** Back to the form; Cancel when there is none. */
   onBack?: () => void
   onClose: () => void
-  onApplied: (applied: Schemas["MemberApplied"]) => void
+  onApplied: (applied: Schemas.MemberApplied) => void
 }) {
   const t = useT()
   // Planning writes nothing, so it is a query.

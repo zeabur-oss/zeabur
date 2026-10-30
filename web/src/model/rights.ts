@@ -1,7 +1,7 @@
 import type { Schemas } from "@/api/client"
 
-export type ProjectRights = Schemas["ProjectRights"]
-export type ClusterRights = Schemas["ClusterRights"]
+export type ProjectRights = Schemas.ProjectRights
+export type ClusterRights = Schemas.ClusterRights
 /** Rights a page reads itself rather than from the project's or the cluster's review. */
 type PageRight =
   | "changeNotifications"
@@ -13,7 +13,7 @@ type PageRight =
   | "changeGitHubApp"
   | "restoreBackups"
 export type Right = keyof ProjectRights | keyof ClusterRights | PageRight
-type Permission = Schemas["Permission"]
+type Permission = Schemas.Permission
 
 /** The least product role that holds a right. */
 export type NeededRole = "developer" | "admin"
@@ -66,7 +66,7 @@ export interface Asker {
   member: boolean
 }
 
-export function askerOf(whoami: Pick<Schemas["WhoAmI"], "username"> | undefined): Asker {
+export function askerOf(whoami: Pick<Schemas.WhoAmI, "username"> | undefined): Asker {
   return { member: whoami?.username.startsWith("zeabur:") ?? false }
 }
 

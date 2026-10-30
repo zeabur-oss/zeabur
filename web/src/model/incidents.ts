@@ -1,8 +1,8 @@
 // Incidents grouped by what they need: 25 nodes that stopped reporting are one line with one fix.
 import type { Schemas } from "@/api/client"
 
-type Incident = Schemas["Incident"]
-type Affected = Schemas["AffectedService"]
+type Incident = Schemas.Incident
+type Affected = Schemas.AffectedService
 
 export const serviceKey = (s: { project: string; kind: string; name: string }) =>
   `${s.project}/${s.kind}/${s.name}`

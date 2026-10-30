@@ -1,7 +1,7 @@
 import type { Schemas } from "@/api/client"
 
 /** `namespace/name/listener` as the Select keeps it. */
-export function parentOf(value: string): Schemas["GatewayParent"] | undefined {
+export function parentOf(value: string): Schemas.GatewayParent | undefined {
   const [namespace, name, sectionName] = value.split("/")
   return namespace && name ? { namespace, name, sectionName } : undefined
 }
@@ -17,7 +17,7 @@ export function listenerServes(listener: string | undefined, host: string): bool
 
 /** The listeners, as `namespace/name/listener`, that accept a route from the project and can
  * serve `host`. */
-export function offered(gateways: Schemas["GatewayView"][], host: string): string[] {
+export function offered(gateways: Schemas.GatewayView[], host: string): string[] {
   return gateways.flatMap((g) =>
     g.listeners
       .filter((l) => listenerServes(l.hostname ?? undefined, host))

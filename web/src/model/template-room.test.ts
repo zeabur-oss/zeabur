@@ -6,19 +6,19 @@ import { templateRoom } from "@/model/template-room"
 const GiB = 2 ** 30
 const MiB = 2 ** 20
 
-const idle = (memoryBytes: number, cpuMillicores = 2): Schemas["IdleUse"] => ({
+const idle = (memoryBytes: number, cpuMillicores = 2): Schemas.IdleUse => ({
   memoryBytes,
   cpuMillicores,
   environment: "single-node-amd64-v1.36.4",
   measuredAt: "2026-10-24",
 })
 
-type Resources = Schemas["Resources"]
+type Resources = Schemas.Resources
 const nodes = (totals: {
   allocatable: Resources
   usage?: Resources
   requests?: Resources
-}): Schemas["NodeList"] => ({ totals }) as Schemas["NodeList"]
+}): Schemas.NodeList => ({ totals }) as Schemas.NodeList
 
 const allocatable = { memoryBytes: 8 * GiB, cpuMillicores: 4000 }
 

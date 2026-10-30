@@ -4,8 +4,8 @@
 import type { Schemas } from "@/api/client"
 import { isWarning, type Event } from "@/model/service"
 
-type Release = Schemas["WorkloadRelease"]
-export type TimelineEntry = Schemas["TimelineEntry"]
+type Release = Schemas.WorkloadRelease
+export type TimelineEntry = Schemas.TimelineEntry
 
 export type ChangeEntry =
   | { kind: "release"; at?: string; release: Release; entry?: TimelineEntry }
