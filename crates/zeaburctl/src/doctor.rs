@@ -9,9 +9,8 @@
 //! project endpoints and the identity from `GET /whoami`. A read the cluster refuses is skipped
 //! with the rule the API names in `denied`; it is not a failure.
 //!
-//! A personal installation (`use: personal` in the installer's record, or a `KubeSolo` version) has
-//! no Zeabur Identity and leaves out the observability components by design: the Zeabur Identity
-//! checks are skipped and missing components are findings, not warnings.
+//! On a personal installation (`use: personal` in the installer's record, or a `KubeSolo` version)
+//! the Zeabur Identity checks are skipped and missing components are findings, not warnings.
 //!
 //! Whether kube-apiserver trusts Zeabur Identity's issuer is in its `AuthenticationConfiguration`,
 //! a file on the control plane that no RBAC rule can read, so it is reported as not checked.
@@ -923,18 +922,18 @@ mod tests {
         assert_eq!(report.exit_code(), 1);
     }
 
-    /// A cluster without Zeabur Identity, with the installer's record saying `use`.
-    fn bare_cluster(version: &str, record: Option<&str>) -> MemoryCluster {
+    /// A cluster without Zeabur Identity, with the installer's record holding `data`.
+    fn bare_cluster(version: &str, record: Option<Value>) -> MemoryCluster {
         let cluster = cluster(version);
         cluster.update(|s| {
             s.namespaces.clear();
             s.served.clear();
             s.dynamic.clear();
             s.identity.username = "kubernetes-admin".to_owned();
-            if let Some(used) = record {
+            if let Some(data) = record {
                 let config_map = serde_json::from_value(json!({
                     "metadata": {"name": "zeabur-installer", "namespace": "kube-system"},
-                    "data": {"use": used},
+                    "data": data,
                 }))
                 .unwrap();
                 s.objects.insert(
@@ -952,7 +951,11 @@ mod tests {
 
     #[tokio::test]
     async fn a_personal_installation_skips_zeabur_identity_and_exits_0() {
-        let report = report(&bare_cluster("v1.36.5+k3s1", Some("personal"))).await;
+        let report = report(&bare_cluster(
+            "v1.35.7+kubesolo-v1.2.3",
+            Some(json!({"installer": "0.1.1", "use": "personal", "kubesolo": "v1.2.3"})),
+        ))
+        .await;
         for name in [
             "zeabur-identity-installed",
             "zeabur-identity-client",
@@ -963,7 +966,7 @@ mod tests {
         }
         let components = check(&report, "components");
         assert_eq!(components.status, Status::Ok);
-        assert_eq!(components.findings.len().min(1), 1);
+        assert_ne!(components.findings, Vec::<String>::new());
         assert!(
             components
                 .findings
@@ -984,8 +987,12 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn a_cluster_the_installer_set_up_for_servers_still_needs_zeabur_identity() {
-        let report = report(&bare_cluster("v1.36.5+k3s1", Some("server"))).await;
+    async fn a_team_installation_still_needs_zeabur_identity() {
+        let report = report(&bare_cluster(
+            "v1.36.5+k3s1",
+            Some(json!({"installer": "0.1.1", "distribution": "k3s"})),
+        ))
+        .await;
         assert_eq!(
             status(&report, "zeabur-identity-installed"),
             Status::Warning
