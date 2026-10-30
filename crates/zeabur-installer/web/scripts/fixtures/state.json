@@ -717,6 +717,7 @@
       "identityImage": null,
       "identityctl": null,
       "imageArchives": [],
+      "proxyImage": null,
       "zeaburChart": null,
       "zeaburImage": null
     },

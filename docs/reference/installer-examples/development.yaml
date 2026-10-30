@@ -11,4 +11,6 @@ sources:
   identityImage: docker.io/library/zeabur-identity:dev
   identityctl: /root/bin/zeabur-identityctl
   zeaburImage: docker.io/library/zeabur:dev
+  # Only needed with VictoriaLogs or VictoriaMetrics; unset, the chart's own image is used.
+  proxyImage: docker.io/library/zeabur-proxy:dev
   zeaburChart: /root/zeabur/deploy/chart/zeabur

@@ -146,6 +146,7 @@ sources:
   identityImage: registry.example.com/identity@sha256:<digest>
   identityctl: /root/releases/zeabur-identityctl
   zeaburImage: registry.example.com/zeabur@sha256:<digest>
+  proxyImage: registry.example.com/proxy@sha256:<digest>
   zeaburChart: /root/releases/zeabur-chart
 ```
 
@@ -156,6 +157,7 @@ sources:
 | `identityImage` | Zeabur Identity's image reference |
 | `identityctl` | A local `zeabur-identityctl` binary |
 | `zeaburImage` | Zeabur's image reference |
+| `proxyImage` | Zeabur Proxy's image reference. Optional: unset, the chart's own image is used |
 | `zeaburChart` | A Helm chart directory or a packaged `.tgz` |
 
 An archive removed from `imageArchives` is also removed from the K3s or RKE2 import directory on the next `apply`. This list contains archives already on the host. It has nothing to do with private registry access settings.

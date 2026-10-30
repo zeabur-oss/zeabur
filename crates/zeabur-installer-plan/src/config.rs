@@ -238,6 +238,8 @@ pub struct Sources {
     pub identityctl: Option<String>,
     /// Zeabur's image reference.
     pub zeabur_image: Option<String>,
+    /// Zeabur Proxy's image reference; the chart's own default when unset.
+    pub proxy_image: Option<String>,
     /// Zeabur's chart: a directory or a packaged `.tgz`.
     pub zeabur_chart: Option<String>,
 }

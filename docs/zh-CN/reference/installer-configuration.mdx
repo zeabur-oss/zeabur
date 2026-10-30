@@ -147,6 +147,7 @@ sources:
   identityImage: registry.example.com/identity@sha256:<digest>
   identityctl: /root/releases/zeabur-identityctl
   zeaburImage: registry.example.com/zeabur@sha256:<digest>
+  proxyImage: registry.example.com/proxy@sha256:<digest>
   zeaburChart: /root/releases/zeabur-chart
 ```
 
@@ -157,6 +158,7 @@ sources:
 | `identityImage` | Zeabur Identity 镜像引用 |
 | `identityctl` | 本地 `zeabur-identityctl` 可执行文件 |
 | `zeaburImage` | Zeabur 镜像引用 |
+| `proxyImage` | Zeabur Proxy 镜像引用。可不写，不写就用 chart 自带的镜像 |
 | `zeaburChart` | Helm chart 目录或打包好的 `.tgz` |
 
 从 `imageArchives` 中去掉的文件，下次 `apply` 时也会从 K3s 或 RKE2 的导入目录中移除。这份列表填写的是主机上已有的归档文件，与私有 registry 的访问配置无关。
