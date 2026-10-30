@@ -87,7 +87,7 @@ helm upgrade zeabur oci://ghcr.io/zeabur-oss/charts/zeabur \
   --set domains.clusterIssuer=letsencrypt
 ```
 
-`--reset-then-reuse-values` takes the new chart's defaults, including the image, and keeps the values you set. `--reuse-values` would keep the old chart's defaults, so the image wouldn't change.
+With `--reset-then-reuse-values`, Helm starts from the new chart's defaults, including the image, then applies the values you set. With `--reuse-values`, Helm also keeps the old chart's defaults, and the image stays on the old version.
 
 When you deploy `web` in the `shop` project, the form suggests `web-shop.apps.example.com`. You can list multiple application domains separated by commas; the first is the default. You can also change them later in the **Domains** section of the **Cluster** page, which checks DNS records and lists the records to add. See [Set up DNS records](../configure/dns.mdx). If `domains.suffixes` is empty, enter the full domain by hand. If `domains.clusterIssuer` is empty, new services' public URLs use HTTP.
 
