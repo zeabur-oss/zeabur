@@ -3,24 +3,24 @@ title: Experience program
 description: What Zeabur and its installer send when you join the experience program, what they never send, and how to turn it off.
 ---
 
-The experience program sends the version and how many people use Zeabur each day, so we know how many installations are in use and what to fix first. It's off unless you join: the installer's checkbox is checked by default and asks you at install time; with Helm you turn it on yourself.
+The experience program sends the version and how many people use Zeabur each day, so we know how many installations are in use and what to fix first. The installer joins by default, and you can uncheck the box on its review page. With Helm, Zeabur stays out until you turn it on.
 
 ## What is sent
 
-Zeabur sends one event about once an hour, and the installer sends one event when an install starts, finishes or fails. Each event carries a random installation ID, the properties below and nothing else. The ID is made once by the installer, or by you with `uuidgen`, and comes from nothing about your machine. The data is kept for 13 months.
+Zeabur sends one event about once an hour, and the installer sends one event when an install starts, finishes or fails. Each event carries a random installation ID, the properties below and nothing else. The installer makes the ID once, or you make it with `uuidgen`; nothing about your machine goes into it. The data is kept for 13 months.
 
 | Event | Sent by | When |
 |---|---|---|
-| `zeabur_day` | Zeabur | About once an hour while at least one person has used Zeabur that day |
+| `zeabur_day` | Zeabur | About once an hour on days someone uses Zeabur |
 | `install_started` | Installer | `apply` begins |
-| `install_finished` | Installer | `apply` ends well |
+| `install_finished` | Installer | `apply` succeeds |
 | `install_failed` | Installer | `apply` stops |
 
 | Property | Events | Values |
 |---|---|---|
 | `zeabur_version` | `zeabur_day` | Zeabur's version, such as `0.1.1` |
 | `day` | `zeabur_day` | The UTC date, such as `2026-10-30` |
-| `people` | `zeabur_day` | How many different people made an API request that day so far. Zeabur counts them in memory by a hash it keeps only until it restarts; it never sends a name or the hash |
+| `people` | `zeabur_day` | How many different people used Zeabur's web interface that day. After midnight UTC, Zeabur sends the previous day's total once more. It keeps a hash of each person in memory until the day ends or Zeabur restarts, and sends only the count |
 | `mode` | `zeabur_day` | `in-cluster` |
 | `installer_version` | the installer's events | The installer's version |
 | `profile` | the installer's events | `single-node`, `multi-node` or `personal` |
@@ -30,7 +30,7 @@ Zeabur sends one event about once an hour, and the installer sends one event whe
 | `$process_person_profile` | all | Always `false`: no person profile is made |
 | `$geoip_disable` | all | Always `true`: no location is looked up |
 
-Events go to PostHog (`us.i.posthog.com`) over HTTPS, one try with a short timeout. If it fails, nothing happens and nothing is retried. IP addresses aren't kept.
+Events go to PostHog (`us.i.posthog.com`) over HTTPS, one try with a short timeout. A failed request isn't retried and doesn't affect Zeabur or the install. PostHog doesn't keep IP addresses.
 
 ## What is never sent
 
@@ -40,9 +40,9 @@ Domains, host names, IP addresses, Git URLs, image or service names, project nam
 
 Any one of these is enough, and `DO_NOT_TRACK` wins over all the others.
 
-- **Anywhere:** set `DO_NOT_TRACK=1` in the environment of the installer or of Zeabur. Any value but empty or `0` counts.
-- **Installer:** uncheck the box in the web interface, run `zeabur-installer --no-telemetry apply`, or set `telemetry: false` in `/etc/zeabur-installer/config.yaml`.
-- **Helm:** set `telemetry.enabled=false` (the default), or leave `telemetry.installationId` out. The chart refuses `telemetry.enabled=true` without an ID.
+- Set `DO_NOT_TRACK=1` in the environment of the installer or of Zeabur. Any value but empty or `0` counts.
+- In the installer, uncheck the box on the review page, run `zeabur-installer --no-telemetry apply` (or `--no-telemetry gui`), or set `telemetry: false` in `/etc/zeabur-installer/config.yaml`.
+- With Helm, keep `telemetry.enabled=false`, the default. The chart refuses `telemetry.enabled=true` without an ID.
 
 To join with Helm, make an ID and pass it in:
 
@@ -57,7 +57,7 @@ The installer keeps its ID in `/etc/zeabur-installer/installation-id` (mode `060
 
 ## See what would be sent
 
-Set `ZEABUR_TELEMETRY=debug` and Zeabur or the installer prints the exact request body instead of sending it. For Zeabur, the line is in its log:
+Set `ZEABUR_TELEMETRY=debug` and Zeabur or the installer prints the exact request body instead of sending it. An install in debug mode leaves Zeabur out of the program. For Zeabur, the line is in its log:
 
 ```sh
 kubectl -n zeabur set env deployment/zeabur ZEABUR_TELEMETRY=debug

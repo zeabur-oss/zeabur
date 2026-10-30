@@ -1,18 +1,18 @@
 ---
 title: 體驗計畫
 description: 加入體驗計畫後，Zeabur 和 installer 會傳送什麼、絕不傳送什麼，以及怎麼關閉。
-source: "e711293237c0"
+source: "c56fe9a50e96"
 ---
 
-體驗計畫會傳送版本和每天的使用人數，讓我們知道有多少人在用、該先修哪裡。沒加入就不會傳：installer 的勾選框預設勾選，安裝時會讓你確認；用 Helm 安裝則要自己開啟。
+體驗計畫會傳送版本和每天的使用人數，讓我們知道有多少人在用、該先修哪裡。用 installer 安裝時預設加入，可以在確認頁取消勾選；用 Helm 安裝時預設不加入，要自己開啟。
 
 ## 會傳送什麼
 
-Zeabur 約每小時傳一筆事件，installer 在安裝開始、完成或失敗時各傳一筆。每筆事件只帶隨機的安裝代碼和下表的屬性，沒有別的。安裝代碼由 installer 產生一次，或由你用 `uuidgen` 產生，與你的機器無關。資料保留 13 個月。
+Zeabur 約每小時傳一筆事件，installer 在安裝開始、完成或失敗時各傳一筆。每筆事件只有隨機的安裝代碼和下表列出的屬性。安裝代碼由 installer 產生一次，或由你用 `uuidgen` 產生，不含任何機器的資訊。資料保留 13 個月。
 
 | 事件 | 由誰傳送 | 時機 |
 |---|---|---|
-| `zeabur_day` | Zeabur | 當天至少有一個人使用過 Zeabur 時，約每小時一次 |
+| `zeabur_day` | Zeabur | 有人使用的日子，約每小時一次 |
 | `install_started` | Installer | `apply` 開始 |
 | `install_finished` | Installer | `apply` 順利結束 |
 | `install_failed` | Installer | `apply` 中途停止 |
@@ -21,7 +21,7 @@ Zeabur 約每小時傳一筆事件，installer 在安裝開始、完成或失敗
 |---|---|---|
 | `zeabur_version` | `zeabur_day` | Zeabur 的版本，例如 `0.1.1` |
 | `day` | `zeabur_day` | UTC 日期，例如 `2026-10-30` |
-| `people` | `zeabur_day` | 當天到目前為止有多少不同的人發出過 API 請求。Zeabur 用只在記憶體裡、重新啟動就消失的雜湊來計算，不會傳送名稱或雜湊 |
+| `people` | `zeabur_day` | 當天用過 Zeabur 網頁介面的人數。過了 UTC 午夜，Zeabur 會再傳一次前一天的總人數。每個人的雜湊值只留在記憶體裡，換日或重新啟動就清除，不會傳送 |
 | `mode` | `zeabur_day` | `in-cluster` |
 | `installer_version` | installer 的事件 | Installer 的版本 |
 | `profile` | installer 的事件 | `single-node`、`multi-node` 或 `personal` |
@@ -31,19 +31,19 @@ Zeabur 約每小時傳一筆事件，installer 在安裝開始、完成或失敗
 | `$process_person_profile` | 全部 | 固定為 `false`：不建立個人檔案 |
 | `$geoip_disable` | 全部 | 固定為 `true`：不查詢所在位置 |
 
-事件透過 HTTPS 送到 PostHog（`us.i.posthog.com`），只試一次、逾時很短；失敗就算了，不會重試。不保存 IP。
+事件用 HTTPS 送到 PostHog（`us.i.posthog.com`），只試一次，逾時很短。傳送失敗時不會重試，也不影響 Zeabur 或安裝。PostHog 不保存 IP 位址。
 
 ## 絕不傳送
 
-網域、主機名稱、IP、Git URL、映像檔或服務名稱、專案名稱、Email、使用者名稱、日誌，以及叢集裡的內容。
+網域、主機名稱、IP 位址、Git URL、映像檔或服務名稱、專案名稱、Email、使用者名稱、日誌，以及叢集裡的內容。
 
 ## 關閉
 
 以下任何一種都有效，其中 `DO_NOT_TRACK` 優先於其他設定。
 
-- **任何情況：** 在 installer 或 Zeabur 的環境變數設定 `DO_NOT_TRACK=1`。空值和 `0` 以外的值都算。
-- **Installer：** 在網頁介面取消勾選，執行 `zeabur-installer --no-telemetry apply`，或在 `/etc/zeabur-installer/config.yaml` 寫 `telemetry: false`。
-- **Helm：** 設定 `telemetry.enabled=false`（預設），或不填 `telemetry.installationId`。chart 不接受沒有安裝代碼的 `telemetry.enabled=true`。
+- 在 installer 或 Zeabur 的環境變數設定 `DO_NOT_TRACK=1`。空值和 `0` 以外的值都算。
+- 在 installer 的確認頁取消勾選，執行 `zeabur-installer --no-telemetry apply`（或 `--no-telemetry gui`），或在 `/etc/zeabur-installer/config.yaml` 寫 `telemetry: false`。
+- 用 Helm 安裝時，維持預設的 `telemetry.enabled=false`。沒有安裝代碼時，chart 不接受 `telemetry.enabled=true`。
 
 用 Helm 加入時，先產生安裝代碼再帶進去：
 
@@ -56,9 +56,9 @@ helm upgrade <release> <chart> --reuse-values \
 
 Installer 把安裝代碼存在 `/etc/zeabur-installer/installation-id`（權限 `0600`），並交給 Zeabur 的 chart。
 
-## 查看會傳送的內容
+## 檢視會傳送的內容
 
-設定 `ZEABUR_TELEMETRY=debug`，Zeabur 或 installer 就會印出實際的請求內容，而不傳送。Zeabur 的內容在它的日誌裡：
+設定 `ZEABUR_TELEMETRY=debug`，Zeabur 或 installer 會印出實際的請求內容，但不會送出。用除錯模式安裝時，Zeabur 不會加入體驗計畫。Zeabur 會把內容寫在日誌裡：
 
 ```sh
 kubectl -n zeabur set env deployment/zeabur ZEABUR_TELEMETRY=debug

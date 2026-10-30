@@ -1,18 +1,18 @@
 ---
 title: 体验计划
 description: 加入体验计划后，Zeabur 和安装程序会发送什么、绝不发送什么，以及如何关闭。
-source: "e711293237c0"
+source: "c56fe9a50e96"
 ---
 
-体验计划会发送版本和每天的使用人数，让我们知道有多少人在用、该先修哪里。没加入就不会发送：安装程序的勾选框默认勾选，安装时会让你确认；用 Helm 安装则需要自己开启。
+体验计划会发送版本和每天的使用人数，让我们知道有多少人在用、该先修哪里。用安装程序安装时默认加入，可以在确认页取消勾选；用 Helm 安装时默认不加入，需要自己开启。
 
 ## 会发送什么
 
-Zeabur 约每小时发送一条事件，安装程序在安装开始、完成或失败时各发送一条。每条事件只带随机的安装代码和下表的属性，没有别的。安装代码由安装程序生成一次，或由你用 `uuidgen` 生成，与你的机器无关。数据保留 13 个月。
+Zeabur 约每小时发送一条事件，安装程序在安装开始、完成或失败时各发送一条。每条事件只带随机的安装代码和下表的属性，没有别的。安装代码由安装程序生成一次，或由你用 `uuidgen` 生成，不含任何机器的信息。数据保留 13 个月。
 
 | 事件 | 由谁发送 | 时机 |
 |---|---|---|
-| `zeabur_day` | Zeabur | 当天至少有一个人使用过 Zeabur 时，约每小时一次 |
+| `zeabur_day` | Zeabur | 有人使用的日子，约每小时一次 |
 | `install_started` | 安装程序 | `apply` 开始 |
 | `install_finished` | 安装程序 | `apply` 顺利结束 |
 | `install_failed` | 安装程序 | `apply` 中途停止 |
@@ -21,7 +21,7 @@ Zeabur 约每小时发送一条事件，安装程序在安装开始、完成或�
 |---|---|---|
 | `zeabur_version` | `zeabur_day` | Zeabur 的版本，例如 `0.1.1` |
 | `day` | `zeabur_day` | UTC 日期，例如 `2026-10-30` |
-| `people` | `zeabur_day` | 当天到目前为止有多少不同的人发出过 API 请求。Zeabur 用只保存在内存、重启后就消失的哈希来计算，不会发送名称或哈希 |
+| `people` | `zeabur_day` | 当天用过 Zeabur 网页界面的人数。过了 UTC 午夜，Zeabur 会再发送一次前一天的总人数。每个人的哈希值只保存在内存里，换日或重启后就清除，不会发送出去 |
 | `mode` | `zeabur_day` | `in-cluster` |
 | `installer_version` | 安装程序的事件 | 安装程序的版本 |
 | `profile` | 安装程序的事件 | `single-node`、`multi-node` 或 `personal` |
@@ -31,7 +31,7 @@ Zeabur 约每小时发送一条事件，安装程序在安装开始、完成或�
 | `$process_person_profile` | 全部 | 固定为 `false`：不创建个人档案 |
 | `$geoip_disable` | 全部 | 固定为 `true`：不查询所在位置 |
 
-事件通过 HTTPS 发送到 PostHog（`us.i.posthog.com`），只尝试一次、超时很短；失败就算了，不会重试。不保存 IP。
+事件通过 HTTPS 发送到 PostHog（`us.i.posthog.com`），只尝试一次，超时很短。发送失败时不会重试，也不影响 Zeabur 或安装。PostHog 不保存 IP 地址。
 
 ## 绝不发送
 
@@ -41,9 +41,9 @@ Zeabur 约每小时发送一条事件，安装程序在安装开始、完成或�
 
 以下任何一种都有效，其中 `DO_NOT_TRACK` 优先于其他设置。
 
-- **任何情况：** 在安装程序或 Zeabur 的环境变量中设置 `DO_NOT_TRACK=1`。空值和 `0` 以外的值都算。
-- **安装程序：** 在网页界面取消勾选，运行 `zeabur-installer --no-telemetry apply`，或在 `/etc/zeabur-installer/config.yaml` 中写 `telemetry: false`。
-- **Helm：** 设置 `telemetry.enabled=false`（默认），或不填 `telemetry.installationId`。chart 不接受没有安装代码的 `telemetry.enabled=true`。
+- 在安装程序或 Zeabur 的环境变量中设置 `DO_NOT_TRACK=1`。空值和 `0` 以外的值都算。
+- 在安装程序的确认页取消勾选，运行 `zeabur-installer --no-telemetry apply`（或 `--no-telemetry gui`），或在 `/etc/zeabur-installer/config.yaml` 中写 `telemetry: false`。
+- 用 Helm 安装时，保持默认的 `telemetry.enabled=false`。没有安装代码时，chart 不接受 `telemetry.enabled=true`。
 
 用 Helm 加入时，先生成安装代码再带进去：
 
@@ -58,7 +58,7 @@ helm upgrade <release> <chart> --reuse-values \
 
 ## 查看会发送的内容
 
-设置 `ZEABUR_TELEMETRY=debug`，Zeabur 或安装程序就会打印实际的请求内容，而不发送。Zeabur 的内容在它的日志里：
+设置 `ZEABUR_TELEMETRY=debug`，Zeabur 或安装程序会打印实际的请求内容，但不会发送。用调试模式安装时，Zeabur 不会加入体验计划。Zeabur 会把内容写在日志里：
 
 ```sh
 kubectl -n zeabur set env deployment/zeabur ZEABUR_TELEMETRY=debug

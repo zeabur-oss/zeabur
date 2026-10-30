@@ -23,8 +23,9 @@ Experience program (currently: off)
 
 When on, Zeabur sends the version and how many people use it each day to the
 Zeabur team, so we know how many installations are in use and what to fix
-first. Only a random installation ID; no names, domains or emails, and IP
-addresses aren't kept. Kept for 13 months.
+first. It carries a random installation ID and nothing about you: no names,
+domains or emails, and PostHog doesn't keep IP addresses. The data is kept for
+13 months.
 
 To turn it on, generate an installation ID first:
 
