@@ -1683,8 +1683,8 @@ mod tests {
         assert!(find(&get(&cluster, "/api/v1/projects/shop/gaps").await).is_none());
     }
 
-    #[tokio::test]
-    async fn the_served_description_is_the_committed_one() {
+    #[test]
+    fn the_committed_description_is_current() {
         let committed =
             std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/openapi.yaml"))
                 .unwrap_or_default();
@@ -1702,8 +1702,5 @@ mod tests {
             "crates/zeabur-api/openapi.yaml is stale; regenerate it with \
              ZEABUR_UPDATE_OPENAPI=1 cargo nextest run -p zeabur-api"
         );
-        let (status, _, body) = call(app(&cluster()), "GET", "/api/openapi.json").await;
-        assert_eq!(status, StatusCode::OK);
-        assert_eq!(json(&body)["openapi"], "3.1.0");
     }
 }

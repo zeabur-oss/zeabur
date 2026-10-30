@@ -52,15 +52,17 @@ Level 4: may depend on every layer below it.
 
 The OpenAPI document is generated from the handlers and committed as `openapi.yaml`; a test
 regenerates it and fails on any difference, so the document cannot drift from the server
-(`ZEABUR_UPDATE_OPENAPI=1 cargo nextest run -p zeabur-api` rewrites it). The server serves the
-same document as JSON at `/api/openapi.json`.
+(`ZEABUR_UPDATE_OPENAPI=1 cargo nextest run -p zeabur-api` rewrites it). The web interface
+generates its API types from it. The API is internal, so the server neither builds nor serves the
+document.
 
 The generator is utoipa with utoipa-axum [utoipa]. Handlers stay plain axum handlers; a
-`#[utoipa::path]` attribute and `#[derive(ToSchema)]` describe them, and
-`OpenApiRouter::routes(routes!(…))` registers the route and its description in one step, so a
-route cannot exist without its description. utoipa 6 emits OpenAPI 3.1.0 by default, and adds
-about fifteen crates over axum with no `unsafe` code in its own sources and no schemars, chrono
-or TLS stack.
+`#[utoipa::path]` attribute and `#[derive(ToSchema)]` describe them, and one list of handlers in
+`lib.rs` feeds both the server and the document, so a route cannot exist without its description.
+The server registers each handler from its path and methods only; the document is built from the
+same list with utoipa-axum's `OpenApiRouter`. utoipa 6 emits OpenAPI 3.1.0 by default, and adds
+about fifteen crates over axum with no `unsafe` code in its own sources and no schemars, chrono or
+TLS stack.
 
 The utoipa crates are pinned to exact versions and were reviewed before they were added: one
 owner and publisher for every release, crates.io archives identical to the tagged commits, no

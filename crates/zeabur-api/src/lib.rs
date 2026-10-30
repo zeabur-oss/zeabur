@@ -149,7 +149,6 @@ pub mod views;
 use std::sync::Arc;
 
 use axum::Router;
-use axum::routing::get;
 pub use error::ApiError;
 pub use handlers::AppState;
 pub use settings::Settings;
@@ -204,139 +203,192 @@ promised a stable `/api/v1`.",
 )]
 struct ApiDoc;
 
-fn routes() -> OpenApiRouter<AppState> {
-    let router = OpenApiRouter::with_openapi(ApiDoc::openapi())
-        .routes(routes!(identity::whoami))
-        .routes(routes!(identity::get));
-    remaining_routes(cluster_routes(router))
-}
-
-fn cluster_routes(router: OpenApiRouter<AppState>) -> OpenApiRouter<AppState> {
-    router
-        .routes(routes!(cluster::get))
-        .routes(routes!(cluster::capabilities))
-        .routes(routes!(cluster::backups::get))
-        .routes(routes!(cluster::backups::plan))
-        .routes(routes!(cluster::backups::apply))
-        .routes(routes!(cluster::backup_download::download))
-        .routes(routes!(cluster::restore_copy::deleted_projects))
-        .routes(routes!(cluster::issuers::get))
-        .routes(routes!(cluster::s3_destinations::get))
-        .routes(routes!(cluster::s3_destinations::plan))
-        .routes(routes!(cluster::s3_destinations::apply))
-        .routes(routes!(cluster::github_app::get))
-        .routes(routes!(cluster::github_app::manifest))
-        .routes(routes!(cluster::github_app::form))
-        .routes(routes!(cluster::github_app::conversion))
-        .routes(routes!(cluster::github_app::plan))
-        .routes(routes!(cluster::github_app::apply))
-        .routes(routes!(notifications::cluster_get))
-        .routes(routes!(notifications::cluster_plan))
-        .routes(routes!(notifications::cluster_apply))
-        .routes(routes!(cluster::config_reload::get))
-        .routes(routes!(cluster::templates::list))
-        .routes(routes!(cluster::templates::get))
-        .routes(routes!(cluster::node_shells::list))
-        .routes(routes!(cluster::node_shells::plan))
-        .routes(routes!(cluster::node_shells::apply))
-        .routes(routes!(cluster::node_shells::terminal))
-        .routes(routes!(cluster::tools::status))
-        .routes(routes!(cluster::tools::plan))
-        .routes(routes!(cluster::tools::apply))
-        .routes(routes!(cluster::tools::delete))
-        .routes(routes!(cluster::tools::terminal))
-        .routes(routes!(cluster::maintenance::plan))
-        .routes(routes!(cluster::maintenance::apply))
-        .routes(routes!(cluster::nodes))
-        .routes(routes!(cluster::usage::get))
-        .routes(routes!(cluster::health))
-        .routes(routes!(cluster::upgrades))
-        .routes(routes!(cluster::events))
-        .routes(routes!(alerts::cluster))
-        .routes(routes!(gaps::cluster))
-        .routes(routes!(incidents::cluster))
-}
-
-fn remaining_routes(router: OpenApiRouter<AppState>) -> OpenApiRouter<AppState> {
-    router
-        .routes(routes!(projects::list))
-        .routes(routes!(projects::get))
-        .routes(routes!(projects::namespace::get))
-        .routes(routes!(projects::gateways::list))
-        .routes(routes!(services::service))
-        .routes(routes!(gaps::project))
-        .routes(routes!(incidents::project))
-        .routes(routes!(resources::objects::list))
-        .routes(routes!(resources::objects::get))
-        .routes(routes!(resources::creatable::list))
-        .routes(routes!(resources::config::config_maps))
-        .routes(routes!(resources::config::reveal_secret))
-        .routes(routes!(projects::events::events))
-        .routes(routes!(pods::logs::logs))
-        .routes(routes!(pods::logs::follow_logs))
-        .routes(routes!(pods::exec::exec))
-        .routes(routes!(pods::debug::get))
-        .routes(routes!(pods::files::get))
-        .routes(routes!(pods::files::list, pods::files::delete))
-        .routes(routes!(pods::files::download, pods::files::upload))
-        .routes(routes!(pods::files::preview))
-        .routes(routes!(pods::files::make_folder))
-        .routes(routes!(pods::files::rename))
-        .routes(routes!(tools::status))
-        .routes(routes!(tools::delete))
-        .routes(routes!(tools::terminal))
-        .routes(routes!(services::releases::releases))
-        .routes(routes!(services::trace::trace))
-        .routes(routes!(timeline::service))
-        .routes(routes!(services::rollout::rollout))
-        .routes(routes!(services::runs::runs))
-        .routes(routes!(services::evidence::evidence))
-        .routes(routes!(timeline::project))
-        .routes(routes!(projects::writes::plan))
-        .routes(routes!(projects::writes::apply))
-        .routes(routes!(projects::writes::certificates::get))
-        .routes(routes!(projects::backups::get))
-        .routes(routes!(notifications::project_get))
-        .routes(routes!(notifications::project_plan))
-        .routes(routes!(notifications::project_apply))
-        .routes(routes!(alerts::project))
-        .routes(routes!(projects::databases::get))
-        .routes(routes!(projects::object_storage::get))
-        .routes(routes!(projects::database_export::export))
-        .routes(routes!(projects::volume_restores::get))
-        .routes(routes!(projects::builds::get))
-        .routes(routes!(projects::source_upload::upload))
-        .routes(routes!(projects::deploy_keys::create))
-        .routes(routes!(cluster::github_app::project))
-        .routes(routes!(images::inspect))
-        .routes(routes!(projects::compose::convert_compose))
-        .routes(routes!(projects::deploy_keys::public))
-        .routes(routes!(projects::network_policy::presets))
-        .routes(routes!(projects::usage::get))
-        .routes(routes!(projects::usage::volumes))
-        .routes(routes!(projects::storage::get))
-        .routes(routes!(services::history::get))
-        .routes(routes!(services::logs::history))
-        .routes(routes!(settings::store::get_setting, settings::store::set))
-        .routes(routes!(
+// The server registers each handler from the path and methods of its `#[utoipa::path]` and nothing
+// else. utoipa-axum's `routes!` also builds every operation and schema, so with it the server built
+// the whole document at start and kept all the schema code in the binary (#76). Only `openapi()`
+// builds the document now, for the test that writes `openapi.yaml`.
+//
+// `described!` names the struct `#[utoipa::path]` generates for a handler, `__path_<handler>`, the
+// way utoipa-axum's own `routes!` does; utoipa does not document that name. If a utoipa upgrade
+// changes it, `routes()` stops compiling: see how the new `utoipa_axum::routes!` reaches the
+// `utoipa::Path` impl and do the same in `described!`. Until then, `openapi_router()
+// .split_for_parts().0` is a working `routes()`, at the cost of the size and memory above.
+macro_rules! handlers {
+    ($then:ident) => {
+        $then! {
+            identity::whoami,
+            identity::get,
+            cluster::get,
+            cluster::capabilities,
+            cluster::backups::get,
+            cluster::backups::plan,
+            cluster::backups::apply,
+            cluster::backup_download::download,
+            cluster::restore_copy::deleted_projects,
+            cluster::issuers::get,
+            cluster::s3_destinations::get,
+            cluster::s3_destinations::plan,
+            cluster::s3_destinations::apply,
+            cluster::github_app::get,
+            cluster::github_app::manifest,
+            cluster::github_app::form,
+            cluster::github_app::conversion,
+            cluster::github_app::plan,
+            cluster::github_app::apply,
+            notifications::cluster_get,
+            notifications::cluster_plan,
+            notifications::cluster_apply,
+            cluster::config_reload::get,
+            cluster::templates::list,
+            cluster::templates::get,
+            cluster::node_shells::list,
+            cluster::node_shells::plan,
+            cluster::node_shells::apply,
+            cluster::node_shells::terminal,
+            cluster::tools::status,
+            cluster::tools::plan,
+            cluster::tools::apply,
+            cluster::tools::delete,
+            cluster::tools::terminal,
+            cluster::maintenance::plan,
+            cluster::maintenance::apply,
+            cluster::nodes,
+            cluster::usage::get,
+            cluster::health,
+            cluster::upgrades,
+            cluster::events,
+            alerts::cluster,
+            gaps::cluster,
+            incidents::cluster,
+            projects::list,
+            projects::get,
+            projects::namespace::get,
+            projects::gateways::list,
+            services::service,
+            gaps::project,
+            incidents::project,
+            resources::objects::list,
+            resources::objects::get,
+            resources::creatable::list,
+            resources::config::config_maps,
+            resources::config::reveal_secret,
+            projects::events::events,
+            pods::logs::logs,
+            pods::logs::follow_logs,
+            pods::exec::exec,
+            pods::debug::get,
+            pods::files::get,
+            pods::files::list,
+            pods::files::delete,
+            pods::files::download,
+            pods::files::upload,
+            pods::files::preview,
+            pods::files::make_folder,
+            pods::files::rename,
+            tools::status,
+            tools::delete,
+            tools::terminal,
+            services::releases::releases,
+            services::trace::trace,
+            timeline::service,
+            services::rollout::rollout,
+            services::runs::runs,
+            services::evidence::evidence,
+            timeline::project,
+            projects::writes::plan,
+            projects::writes::apply,
+            projects::writes::certificates::get,
+            projects::backups::get,
+            notifications::project_get,
+            notifications::project_plan,
+            notifications::project_apply,
+            alerts::project,
+            projects::databases::get,
+            projects::object_storage::get,
+            projects::database_export::export,
+            projects::volume_restores::get,
+            projects::builds::get,
+            projects::source_upload::upload,
+            projects::deploy_keys::create,
+            cluster::github_app::project,
+            images::inspect,
+            projects::compose::convert_compose,
+            projects::deploy_keys::public,
+            projects::network_policy::presets,
+            projects::usage::get,
+            projects::usage::volumes,
+            projects::storage::get,
+            services::history::get,
+            services::logs::history,
+            settings::store::get_setting,
+            settings::store::set,
             settings::cluster_name::get_setting,
-            settings::cluster_name::set
-        ))
-        .routes(routes!(
+            settings::cluster_name::set,
             settings::domains::get_setting,
-            settings::domains::set
-        ))
-        .routes(routes!(
+            settings::domains::set,
             settings::sign_in::get_setting,
-            settings::sign_in::set
-        ))
-        .routes(routes!(account::get))
-        .routes(routes!(members::handlers::list))
-        .routes(routes!(members::plan::plan))
-        .routes(routes!(members::plan::apply))
-        .routes(routes!(members::handlers::revoke_invitation))
-        .routes(routes!(members::handlers::setup_link))
-        .routes(routes!(members::handlers::remove_passkey))
+            settings::sign_in::set,
+            account::get,
+            members::handlers::list,
+            members::plan::plan,
+            members::plan::apply,
+            members::handlers::revoke_invitation,
+            members::handlers::setup_link,
+            members::handlers::remove_passkey,
+        }
+    };
+}
+
+macro_rules! described {
+    (@ [$($module:ident)*] $segment:ident :: $($rest:tt)+) => {
+        described!(@ [$($module)* $segment] $($rest)+)
+    };
+    (@ [$($module:ident)*] $handler:ident) => {
+        pastey::paste!($($module::)* [<__path_ $handler>])
+    };
+    ($($path:tt)+) => {
+        described!(@ [] $($path)+)
+    };
+}
+
+fn routes() -> Router<AppState> {
+    macro_rules! serve {
+        ($($($segment:ident)::+),+ $(,)?) => {{
+            let router = Router::new();
+            $(let router = route::<described!($($segment)::+), _, _>(router, $($segment)::+);)+
+            router
+        }};
+    }
+    handlers!(serve)
+}
+
+fn route<P, H, T>(router: Router<AppState>, handler: H) -> Router<AppState>
+where
+    P: utoipa::Path,
+    H: axum::handler::Handler<T, AppState>,
+    T: 'static,
+{
+    use utoipa_axum::PathItemExt;
+    let filter = P::methods()
+        .iter()
+        .map(PathItemExt::to_method_filter)
+        .reduce(axum::routing::MethodFilter::or);
+    match filter {
+        Some(filter) => router.route(&P::path(), axum::routing::on(filter, handler)),
+        None => router,
+    }
+}
+
+fn openapi_router() -> OpenApiRouter<AppState> {
+    macro_rules! describe {
+        ($($($segment:ident)::+),+ $(,)?) => {{
+            let router = OpenApiRouter::with_openapi(ApiDoc::openapi());
+            // One closure per handler keeps each description's stack frame apart.
+            $(let router = (|router: OpenApiRouter<AppState>| router.routes(routes!($($segment)::+)))(router);)+
+            router
+        }};
+    }
+    handlers!(describe)
 }
 
 /// The API, for `access`; mount it next to the web interface.
@@ -606,29 +658,15 @@ fn build_with(
         github,
         terminals,
     };
-    let (router, api) = routes().split_for_parts();
-    let spec = Arc::new(serde_json::to_string(&api).unwrap_or_default());
-    router
-        .route(
-            "/api/openapi.json",
-            get(move || {
-                let spec = Arc::clone(&spec);
-                async move {
-                    (
-                        [(axum::http::header::CONTENT_TYPE, "application/json")],
-                        spec.as_str().to_owned(),
-                    )
-                }
-            }),
-        )
+    routes()
         .route("/api/{*rest}", axum::routing::any(handlers::not_found))
         .layer(axum::middleware::from_fn(cache::no_store))
         .with_state(state)
 }
 
-/// The OpenAPI document. `crates/zeabur-api/openapi.yaml` is this, written as YAML by a test and
-/// committed; the server itself serves it as JSON at `/api/openapi.json`.
+/// The OpenAPI document. A test writes it to `crates/zeabur-api/openapi.yaml`, which is committed;
+/// the server does not serve it.
 #[must_use]
 pub fn openapi() -> utoipa::openapi::OpenApi {
-    routes().split_for_parts().1
+    openapi_router().split_for_parts().1
 }
