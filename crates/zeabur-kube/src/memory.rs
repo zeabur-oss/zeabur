@@ -1036,7 +1036,8 @@ impl Cluster for MemoryCluster {
         namespace: Option<&'a str>,
     ) -> Answer<'a, Option<Vec<DynamicObject>>> {
         Box::pin(async move {
-            // Not installed is known from discovery before any permission matters, as on a cluster.
+            // Not installed comes before any permission, as on a cluster, where discovery tells it
+            // from a refusal.
             if !self.lock()?.serves(&resource.api_version()) {
                 return Ok(None);
             }
