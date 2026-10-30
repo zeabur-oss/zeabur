@@ -55,6 +55,9 @@ pub struct Layout {
     /// first server writes it once cert-manager has issued it, without a restart; a joining node
     /// writes it before starting.
     pub registry_ca_file: &'static str,
+    /// The server's certificates and keys. The distribution writes the certificates 0644; the
+    /// CIS benchmark wants 0600.
+    pub tls_dir: &'static str,
     /// The kernel parameters `protect-kernel-defaults` requires.
     pub sysctl_file: &'static str,
     /// The server's script that stops the distribution and removes it with its data.
@@ -76,6 +79,7 @@ const K3S_LAYOUT: Layout = Layout {
     kubelet_cert: "/var/lib/rancher/k3s/agent/client-kubelet.crt",
     registries_file: "/etc/rancher/k3s/registries.yaml",
     registry_ca_file: "/etc/rancher/k3s/registry-ca.crt",
+    tls_dir: "/var/lib/rancher/k3s/server/tls",
     sysctl_file: "/etc/sysctl.d/60-k3s-cis.conf",
     uninstall_server: "/usr/local/bin/k3s-uninstall.sh",
     uninstall_agent: "/usr/local/bin/k3s-agent-uninstall.sh",
@@ -94,6 +98,7 @@ const RKE2_LAYOUT: Layout = Layout {
     kubelet_cert: "/var/lib/rancher/rke2/agent/client-kubelet.crt",
     registries_file: "/etc/rancher/rke2/registries.yaml",
     registry_ca_file: "/etc/rancher/rke2/registry-ca.crt",
+    tls_dir: "/var/lib/rancher/rke2/server/tls",
     sysctl_file: "/etc/sysctl.d/60-rke2-cis.conf",
     uninstall_server: "/usr/local/bin/rke2-uninstall.sh",
     uninstall_agent: "/usr/local/bin/rke2-uninstall.sh",
@@ -488,9 +493,14 @@ rules:
   - level: Metadata
 "#;
 
-/// The kubelet setting both distributions get: a fork bomb in one pod cannot take the node's
-/// process table.
-pub(crate) const KUBELET_ARGS: &str = "kubelet-arg:\n  - pod-max-pids=4096\n";
+/// The kubelet settings both distributions get: a fork bomb in one pod cannot take the node's
+/// process table, an idle exec or log stream closes after five minutes, and the port serves only
+/// the cipher suites the CIS benchmark allows.
+pub(crate) const KUBELET_ARGS: &str = "kubelet-arg:\n  - pod-max-pids=4096\n  \
+     - streaming-connection-idle-timeout=5m\n  - tls-cipher-suites=\
+TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,\
+TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,\
+TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305\n";
 
 /// A YAML list under `key`, or nothing when it is empty.
 pub(crate) fn yaml_list(out: &mut String, key: &str, items: &[String]) {

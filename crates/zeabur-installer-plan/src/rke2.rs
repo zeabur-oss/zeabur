@@ -138,6 +138,38 @@ mod tests {
     }
 
     #[test]
+    fn kubelet_serves_only_the_allowed_ciphers_and_closes_idle_streams() {
+        let options = Options {
+            tls_san: vec![],
+            disable: vec![],
+            identity: false,
+        };
+        let server = host_files(&options);
+        for content in [&server[2].content, &agent_files()[1].content] {
+            let parsed: serde_json::Value = serde_saphyr::from_str(content).unwrap();
+            let args: Vec<&str> = parsed["kubelet-arg"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .filter_map(|a| a.as_str())
+                .collect();
+            assert!(
+                args.contains(&"streaming-connection-idle-timeout=5m"),
+                "{args:?}"
+            );
+            let ciphers = args
+                .iter()
+                .find_map(|a| a.strip_prefix("tls-cipher-suites="))
+                .unwrap();
+            assert!(
+                ciphers.split(',').all(|c| c.contains("_ECDHE_")),
+                "{ciphers}"
+            );
+            assert!(ciphers.contains("TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256"));
+        }
+    }
+
+    #[test]
     fn config_parses_as_yaml() {
         let options = Options {
             tls_san: vec!["k8s.example.com".to_owned()],

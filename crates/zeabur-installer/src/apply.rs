@@ -57,10 +57,7 @@ pub(crate) fn run(config_path: &Path) -> Result<(), InstallError> {
         changed: false,
     })?;
     kubectl.wait_ready(Duration::from_secs(600))?;
-    if distribution == Distribution::K3s {
-        // RKE2 writes its server certificates 0600 itself; K3s writes them 0644.
-        files::set_modes(Path::new(k3s::TLS_DIR), ".crt", 0o600)?;
-    }
+    files::set_modes(Path::new(distribution.layout().tls_dir), ".crt", 0o600)?;
     if started.is_some() {
         let name = plan.node_name.clone();
         kubectl::poll(
@@ -1412,6 +1409,18 @@ mod tests {
         let plain = local_path_manifest(false);
         assert!(!plain.contains(&default));
         assert!(plain.contains(&format!("{}: \"false\"", storage::DEFAULT_CLASS_ANNOTATION)));
+    }
+
+    #[test]
+    fn local_path_namespace_mounts_no_default_token() {
+        let docs: Vec<Value> =
+            serde_saphyr::from_multiple(&local_path_manifest(true)).expect("valid manifest");
+        let default = docs
+            .iter()
+            .find(|d| d["kind"] == "ServiceAccount" && d["metadata"]["name"] == "default")
+            .expect("a default ServiceAccount");
+        assert_eq!(default["metadata"]["namespace"], "local-path-storage");
+        assert_eq!(default["automountServiceAccountToken"], false);
     }
 
     #[test]

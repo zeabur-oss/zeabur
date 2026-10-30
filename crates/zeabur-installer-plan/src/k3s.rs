@@ -22,17 +22,12 @@ use crate::plan::MANAGER;
 pub const BINARY: &str = "/usr/local/bin/k3s";
 /// The audit log's directory. Only root may read it, so K3s does not make it itself.
 pub const AUDIT_LOG_DIR: &str = "/var/lib/rancher/k3s/server/logs";
-/// The server's certificates; the CIS benchmark wants them mode 0600, and K3s writes 0644.
-pub const TLS_DIR: &str = "/var/lib/rancher/k3s/server/tls";
 /// Manifests K3s applies on every start and keeps applied.
 pub const MANIFESTS_DIR: &str = "/var/lib/rancher/k3s/server/manifests";
 /// The pod network: K3s's default cluster CIDR, which Calico's pool must match.
 pub const POD_CIDR: &str = "10.42.0.0/16";
 
 const K3S: Distribution = Distribution::K3s;
-
-/// The cipher suites the CIS benchmark allows on the kubelet's port.
-const KUBELET_CIPHERS: &str = "TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305";
 
 /// The files to write, in the order to write them.
 #[must_use]
@@ -88,15 +83,9 @@ pub fn agent_files() -> Vec<HostFile> {
         HostFile {
             path: format!("{}/config.yaml", K3S.layout().config_dir),
             mode: 0o600,
-            content: format!("{HEADER}protect-kernel-defaults: true\n{}", kubelet_args()),
+            content: format!("{HEADER}protect-kernel-defaults: true\n{KUBELET_ARGS}"),
         },
     ]
-}
-
-fn kubelet_args() -> String {
-    format!(
-        "{KUBELET_ARGS}  - streaming-connection-idle-timeout=5m\n  - tls-cipher-suites={KUBELET_CIPHERS}\n"
-    )
 }
 
 fn config(options: &Options) -> String {
@@ -120,7 +109,7 @@ fn config(options: &Options) -> String {
          kube-controller-manager-arg:\n  \
            - terminated-pod-gc-threshold=1000\n"
     );
-    out.push_str(&kubelet_args());
+    out.push_str(KUBELET_ARGS);
     // Traefik and local-path come from the Zeabur catalog and the installer; ServiceLB stays and
     // gives Traefik ports 80 and 443.
     let mut disable = vec!["traefik".to_owned(), "local-storage".to_owned()];
