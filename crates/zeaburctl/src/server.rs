@@ -184,7 +184,8 @@ fn cause(error: &(dyn std::error::Error + 'static)) -> String {
     source.to_string()
 }
 
-fn connector() -> Result<HttpsConnector<HttpConnector>, String> {
+/// HTTPS with the platform's roots, or plain HTTP.
+pub(crate) fn connector() -> Result<HttpsConnector<HttpConnector>, String> {
     let provider = Arc::new(rustls::crypto::aws_lc_rs::default_provider());
     let verifier =
         rustls_platform_verifier::Verifier::new_with_extra_roots(Vec::new(), Arc::clone(&provider))

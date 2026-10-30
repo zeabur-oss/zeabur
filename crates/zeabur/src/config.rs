@@ -137,6 +137,14 @@ pub(crate) struct Args {
     /// The random installation ID the program sends, a UUID. Needed with `--telemetry-enabled`.
     #[arg(long, env = "ZEABUR_INSTALLATION_ID", default_value = "")]
     pub(crate) installation_id: String,
+    /// Let the interface check GitHub's releases for a newer Zeabur, from the person's browser
+    /// (docs/reference/telemetry.mdx). `true` or `false`. `DO_NOT_TRACK` turns it off.
+    #[arg(long, env = "ZEABUR_UPDATE_CHECK", default_value_t = true, action = clap::ArgAction::Set)]
+    pub(crate) update_check: bool,
+    /// Zeabur's own Deployment in `--namespace`, read as the person to tell how Zeabur was
+    /// installed. Empty: not known.
+    #[arg(long, env = "ZEABUR_DEPLOYMENT", default_value = "")]
+    pub(crate) deployment: String,
 }
 
 /// The configuration, checked.
@@ -225,6 +233,10 @@ impl Args {
         );
         settings.identity.issuer = Some(issuer.to_string());
         settings.identity.project_roles = self.member_roles;
+        settings.update_check = self.update_check && !zeabur_telemetry::do_not_track();
+        if !self.deployment.is_empty() {
+            settings.deployment = Some(self.deployment.clone());
+        }
         if !self.account_url.is_empty() {
             settings.account_url = Some(
                 zeabur_auth::url::page_url(&self.account_url)
@@ -588,9 +600,17 @@ mod tests {
                     issuer: Some("https://identity.example.com".to_owned()),
                     ..zeabur_api::settings::IdentitySettings::default()
                 },
+                update_check: !zeabur_telemetry::do_not_track(),
                 ..zeabur_api::Settings::default()
             }
         );
+        let config = args(
+            &files,
+            &["--update-check", "false", "--deployment", "zeabur"],
+        )
+        .unwrap();
+        assert!(!config.settings.update_check);
+        assert_eq!(config.settings.deployment.as_deref(), Some("zeabur"));
         let config = args(
             &files,
             &["--account-url", "https://id.example.com/me?tab=keys"],

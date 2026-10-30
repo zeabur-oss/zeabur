@@ -1257,6 +1257,27 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/Problem"
+  /api/v1/cluster/zeabur:
+    get:
+      tags:
+      - cluster
+      summary: |-
+        Zeabur's version, whether the interface checks for a newer one, and how Zeabur was installed:
+        from its Deployment's marks (Helm, Argo CD, Flux) and, for a Helm release, zeabur-installer's
+        `HelmChart` of that name in `kube-system`. Both are read as the person; a refused read leaves
+        `installedBy` out.
+      operationId: getZeabur
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ZeaburVersion"
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
   /api/v1/members:
     get:
       tags:
@@ -9959,6 +9980,15 @@ components:
           - $ref: "#/components/schemas/RegistryLogin"
             description: Credentials typed in, used instead of `pullSecret`.
           - type: "null"
+    InstallMethod:
+      type: string
+      description: How Zeabur was installed, which says how to upgrade it.
+      enum:
+      - installer
+      - helm
+      - argo-cd
+      - flux
+      - zeaburctl
     InstallSource:
       type: string
       description: How a component was installed.
@@ -18356,6 +18386,24 @@ components:
           - string
           - "null"
           description: "`webhook`, `poll` or `manual`."
+    ZeaburVersion:
+      type: object
+      description: "Zeabur itself: its version, and what the interface needs to say how to upgrade it."
+      required:
+      - version
+      - updateCheck
+      properties:
+        installedBy:
+          oneOf:
+          - $ref: "#/components/schemas/InstallMethod"
+            description: How Zeabur was installed; absent when the person may not read what tells.
+          - type: "null"
+        updateCheck:
+          type: boolean
+          description: Whether the interface checks GitHub's releases for a newer version.
+        version:
+          type: string
+          description: Zeabur's version, such as `0.1.1`; in local mode, `zeaburctl`'s.
 tags:
 - name: identity
   description: Who you are and what you may do

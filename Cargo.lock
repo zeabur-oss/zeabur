@@ -3093,6 +3093,7 @@ dependencies = [
  "zeabur-catalog",
  "zeabur-core",
  "zeabur-kube",
+ "zeabur-telemetry",
  "zeabur-ui",
 ]
 

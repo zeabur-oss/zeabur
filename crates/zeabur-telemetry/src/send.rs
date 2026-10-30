@@ -23,6 +23,19 @@ const TIMEOUT: Duration = Duration::from_secs(5);
 /// Where the body goes in debug mode.
 pub type Show = Arc<dyn Fn(&str) + Send + Sync>;
 
+/// Whether `DO_NOT_TRACK` in the environment turns off tracking: Zeabur's experience program and
+/// its update checks.
+#[must_use]
+pub fn do_not_track() -> bool {
+    do_not_track_in(std::env::var("DO_NOT_TRACK").ok().as_deref())
+}
+
+/// Whether a `DO_NOT_TRACK` of `value` turns off tracking: set to anything but empty or `0`.
+#[must_use]
+pub fn do_not_track_in(value: Option<&str>) -> bool {
+    value.is_some_and(|v| !matches!(v.trim(), "" | "0"))
+}
+
 /// What a [`Sender`] does with an event.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Switch {
@@ -52,7 +65,7 @@ impl Switch {
     /// `debug`.
     #[must_use]
     pub fn resolve(enabled: bool, do_not_track: Option<&str>, telemetry: Option<&str>) -> Self {
-        if do_not_track.is_some_and(|v| !matches!(v.trim(), "" | "0")) || !enabled {
+        if do_not_track_in(do_not_track) || !enabled {
             return Self::Off;
         }
         match telemetry.map(|v| v.trim().to_ascii_lowercase()).as_deref() {

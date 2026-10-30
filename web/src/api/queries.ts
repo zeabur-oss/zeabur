@@ -198,6 +198,13 @@ export const recentWarningsQuery = queryOptions({
   refetchIntervalInBackground: false,
 })
 
+export const zeaburQuery = queryOptions({
+  queryKey: ["cluster", "zeabur"],
+  queryFn: async ({ signal }) => await zeabur.getZeabur({ signal }),
+  staleTime: Infinity,
+  retryOnMount: false,
+})
+
 export const clusterQuery = queryOptions({
   queryKey: ["cluster"],
   queryFn: async ({ signal }) => await zeabur.getCluster({ signal }),
