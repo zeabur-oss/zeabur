@@ -9,6 +9,10 @@
 //! project endpoints and the identity from `GET /whoami`. A read the cluster refuses is skipped
 //! with the rule the API names in `denied`; it is not a failure.
 //!
+//! A personal installation (`use: personal` in the installer's record, or a `KubeSolo` version) has
+//! no Zeabur Identity and leaves out the observability components by design: the Zeabur Identity
+//! checks are skipped and missing components are findings, not warnings.
+//!
 //! Whether kube-apiserver trusts Zeabur Identity's issuer is in its `AuthenticationConfiguration`,
 //! a file on the control plane that no RBAC rule can read, so it is reported as not checked.
 //!
@@ -41,6 +45,9 @@ const KUBERNETES_AUDIENCE: &str = "kubernetes";
 const ZEABUR_IDENTITY_USER_PREFIX: &str = "zeabur:";
 const ZEABUR_IDENTITY_GET_STARTED: &str =
     "https://github.com/zeabur-oss/identity/blob/main/docs/get-started.md";
+/// The ConfigMap where zeabur-installer records what it installed.
+const INSTALLER_RECORD: &str =
+    "/api/v1/projects/kube-system/objects/core/v1/configmaps/zeabur-installer";
 const VERSION_SKEW_POLICY: &str = "https://kubernetes.io/releases/version-skew-policy/";
 
 /// Options of `zeaburctl doctor`.
@@ -247,13 +254,15 @@ async fn examine(api: &InProcess) -> Result<Report, Value> {
     );
     let zeabur_identity_namespace =
         format!("/api/v1/projects/{ZEABUR_IDENTITY_NAMESPACE}/namespace");
-    let (upgrades, capabilities, gaps, kinds, namespace) = tokio::join!(
+    let (upgrades, capabilities, gaps, kinds, namespace, record) = tokio::join!(
         api.get("/api/v1/cluster/upgrades"),
         api.get("/api/v1/cluster/capabilities"),
         api.get("/api/v1/cluster/gaps"),
         api.get(&zeabur_identity_kinds),
         api.get(&zeabur_identity_namespace),
+        api.get(INSTALLER_RECORD),
     );
+    let personal = is_personal(&record, &upgrades);
     let client_kind = kinds.as_ref().ok().and_then(|list| {
         list.get("items")?
             .as_array()?
@@ -273,19 +282,60 @@ async fn examine(api: &InProcess) -> Result<Report, Value> {
         ),
         None => None,
     };
-    let installed = zeabur_identity_installed(&kinds, &namespace);
-    let identity = zeabur_identity_user(&whoami, installed.status == Status::Ok);
-    Ok(Report {
-        checks: vec![
-            cluster_version(&upgrades),
-            components(&capabilities),
-            cluster_gaps(&gaps),
+    let mut checks = vec![
+        cluster_version(&upgrades),
+        components(&capabilities, personal),
+        cluster_gaps(&gaps),
+    ];
+    if personal {
+        checks.extend(
+            [
+                "zeabur-identity-installed",
+                "zeabur-identity-client",
+                "zeabur-identity-user",
+                "zeabur-identity-issuer-trust",
+            ]
+            .map(personal_skipped),
+        );
+    } else {
+        let installed = zeabur_identity_installed(&kinds, &namespace);
+        let identity = zeabur_identity_user(&whoami, installed.status == Status::Ok);
+        checks.extend([
             installed,
             zeabur_identity_client(client.as_ref()),
             identity,
             zeabur_identity_issuer_trust(),
-        ],
+        ]);
+    }
+    Ok(Report { checks })
+}
+
+/// The installer's record says `use: personal`; when it cannot be read, a `KubeSolo` version
+/// says so.
+fn is_personal(record: &Result<Value, Value>, upgrades: &Result<Value, Value>) -> bool {
+    if let Ok(document) = record {
+        let object: Option<Value> = serde_saphyr::from_str(text(document, "yaml")).ok();
+        let used = object
+            .as_ref()
+            .and_then(|o| o.get("data")?.get("use")?.as_str());
+        if used.is_some() {
+            return used == Some("personal");
+        }
+    }
+    upgrades.as_ref().is_ok_and(|u| {
+        text(u, "kubernetesVersion")
+            .to_ascii_lowercase()
+            .contains("kubesolo")
     })
+}
+
+fn personal_skipped(name: &'static str) -> Check {
+    let mut check = Check::new(name);
+    check.status = Status::Skipped;
+    check
+        .findings
+        .push("skipped: a personal installation does not include Zeabur Identity".to_owned());
+    check
 }
 
 /// The version's severity and states, from `GET /cluster/upgrades`.
@@ -392,7 +442,7 @@ fn cluster_version(answer: &Result<Value, Value>) -> Check {
 
 /// Missing recommended components and installed ones behind the tested version, from
 /// `GET /cluster/capabilities`.
-fn components(answer: &Result<Value, Value>) -> Check {
+fn components(answer: &Result<Value, Value>, personal: bool) -> Check {
     const NAME: &str = "components";
     let capabilities = match answer {
         Ok(capabilities) => capabilities,
@@ -408,11 +458,18 @@ fn components(answer: &Result<Value, Value>) -> Check {
                 .iter()
                 .map(|c| text(c, "displayName"))
                 .collect();
-            check.raise(Status::Warning);
-            check.findings.push(format!(
-                "{name} is missing (recommended: {})",
-                choices.join(" or ")
-            ));
+            if personal {
+                check.findings.push(format!(
+                    "{name} is not part of a personal installation (optional: {})",
+                    choices.join(" or ")
+                ));
+            } else {
+                check.raise(Status::Warning);
+                check.findings.push(format!(
+                    "{name} is missing (recommended: {})",
+                    choices.join(" or ")
+                ));
+            }
         }
         for installation in list(capability, "installations") {
             if text(installation, "upgrade").starts_with("behind-") {
@@ -863,6 +920,77 @@ mod tests {
                 .all(|f| f.contains(" is missing (recommended: ")),
             "{components:#?}"
         );
+        assert_eq!(report.exit_code(), 1);
+    }
+
+    /// A cluster without Zeabur Identity, with the installer's record saying `use`.
+    fn bare_cluster(version: &str, record: Option<&str>) -> MemoryCluster {
+        let cluster = cluster(version);
+        cluster.update(|s| {
+            s.namespaces.clear();
+            s.served.clear();
+            s.dynamic.clear();
+            s.identity.username = "kubernetes-admin".to_owned();
+            if let Some(used) = record {
+                let config_map = serde_json::from_value(json!({
+                    "metadata": {"name": "zeabur-installer", "namespace": "kube-system"},
+                    "data": {"use": used},
+                }))
+                .unwrap();
+                s.objects.insert(
+                    "kube-system".to_owned(),
+                    zeabur_kube::NamespaceObjects {
+                        namespace: "kube-system".to_owned(),
+                        config_maps: vec![config_map],
+                        ..zeabur_kube::NamespaceObjects::default()
+                    },
+                );
+            }
+        });
+        cluster
+    }
+
+    #[tokio::test]
+    async fn a_personal_installation_skips_zeabur_identity_and_exits_0() {
+        let report = report(&bare_cluster("v1.36.5+k3s1", Some("personal"))).await;
+        for name in [
+            "zeabur-identity-installed",
+            "zeabur-identity-client",
+            "zeabur-identity-user",
+            "zeabur-identity-issuer-trust",
+        ] {
+            assert_eq!(status(&report, name), Status::Skipped, "{name}");
+        }
+        let components = check(&report, "components");
+        assert_eq!(components.status, Status::Ok);
+        assert_eq!(components.findings.len().min(1), 1);
+        assert!(
+            components
+                .findings
+                .iter()
+                .all(|f| f.contains(" is not part of a personal installation (optional: "))
+        );
+        assert_eq!(report.exit_code(), 0);
+    }
+
+    #[tokio::test]
+    async fn a_kubesolo_version_is_personal_when_the_record_cannot_be_read() {
+        let report = report(&bare_cluster("v1.34.1-kubesolo", None)).await;
+        assert_eq!(
+            status(&report, "zeabur-identity-installed"),
+            Status::Skipped
+        );
+        assert_eq!(status(&report, "components"), Status::Ok);
+    }
+
+    #[tokio::test]
+    async fn a_cluster_the_installer_set_up_for_servers_still_needs_zeabur_identity() {
+        let report = report(&bare_cluster("v1.36.5+k3s1", Some("server"))).await;
+        assert_eq!(
+            status(&report, "zeabur-identity-installed"),
+            Status::Warning
+        );
+        assert_eq!(status(&report, "components"), Status::Warning);
         assert_eq!(report.exit_code(), 1);
     }
 
