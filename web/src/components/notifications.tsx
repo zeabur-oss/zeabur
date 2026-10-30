@@ -61,9 +61,9 @@ import { Label } from "@zeabur/design-system/components/label"
 import { Menu, MenuContent, MenuItem, MenuTrigger } from "@zeabur/design-system/components/menu"
 import { Select } from "@zeabur/design-system/components/select"
 
-type Data = Schemas["Notifications"]
-type Channel = Schemas["AlertmanagerChannel"]
-type Request = Schemas["NotificationsPlanRequest"]
+type Data = Schemas.Notifications
+type Channel = Schemas.AlertmanagerChannel
+type Request = Schemas.NotificationsPlanRequest
 
 const GROUP = "operator.victoriametrics.com"
 const verdictHealth = { none: "idle", rejected: "fail", waiting: "idle", ok: "ok" } as const
@@ -576,16 +576,10 @@ function PlanDialog({
   )
 }
 
-function Planned({
-  request,
-  writes,
-}: {
-  request: Request
-  writes: Schemas["NotificationWrite"][]
-}) {
+function Planned({ request, writes }: { request: Request; writes: Schemas.NotificationWrite[] }) {
   const t = useT()
   if (writes.length === 0) return <p>{t("notify.plan.nothing")}</p>
-  const thing = (write: Schemas["NotificationWrite"]) =>
+  const thing = (write: Schemas.NotificationWrite) =>
     write.kind === "Secret"
       ? t("notify.thing.secret")
       : write.kind === "Job"

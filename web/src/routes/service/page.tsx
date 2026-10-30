@@ -107,7 +107,7 @@ const editing: readonly Page[] = ["networking", "variables", "settings"]
 
 const route = getRouteApi("/projects/$project/services/$kind/$name")
 
-const workloadResource: Record<Service["kind"], Schemas["ResourceRef"]> = {
+const workloadResource: Record<Service["kind"], Schemas.ResourceRef> = {
   Deployment: { group: "apps", version: "v1", resource: "deployments" },
   StatefulSet: { group: "apps", version: "v1", resource: "statefulsets" },
   DaemonSet: { group: "apps", version: "v1", resource: "daemonsets" },
@@ -150,8 +150,8 @@ function ServiceView({
   project: string
   service: Service
   data: Project & {
-    extensions?: Schemas["ProjectExtensions"]
-    unreadable: Schemas["UnreadableView"][]
+    extensions?: Schemas.ProjectExtensions
+    unreadable: Schemas.UnreadableView[]
   }
 }) {
   const t = useT()

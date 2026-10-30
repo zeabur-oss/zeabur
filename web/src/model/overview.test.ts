@@ -5,9 +5,9 @@ import { en } from "@/i18n/en"
 import { concreteFix, eventWord, explainedBy, overviewOf, suggestionsOf } from "@/model/overview"
 import type { Event } from "@/model/service"
 
-type Diagnosis = Schemas["Diagnosis"]
-type Rollout = Schemas["RolloutProgress"]
-type Route = Schemas["RouteTraceView"]
+type Diagnosis = Schemas.Diagnosis
+type Rollout = Schemas.RolloutProgress
+type Route = Schemas.RouteTraceView
 
 const diagnosis = (
   kind: Diagnosis["kind"],
@@ -29,7 +29,7 @@ const imagePull = diagnosis("imagePull", "notFound", {
 })
 const noReady = diagnosis("unreachable", "noReadyEndpoints")
 
-const hop = (step: Schemas["HopStep"], status: Schemas["HopStatus"]): Schemas["Hop"] => ({
+const hop = (step: Schemas.HopStep, status: Schemas.HopStatus): Schemas.Hop => ({
   step,
   status,
   message: { key: `trace.${step}` },
@@ -38,7 +38,7 @@ const hop = (step: Schemas["HopStep"], status: Schemas["HopStatus"]): Schemas["H
 const route = (
   kind: Route["kind"],
   address: string,
-  hops: Schemas["Hop"][],
+  hops: Schemas.Hop[],
   status: Route["status"] = hops.some((h) => h.status === "failed") ? "failed" : "ok",
 ): Route => ({ kind, address, hops, status, via: { kind: "Service", name: "web" } })
 
@@ -206,7 +206,7 @@ describe("a project's suggestions", () => {
       severity: "warning",
       subject: { kind, name },
       message: { key, params: { container } },
-    }) as unknown as Schemas["Gap"]
+    }) as unknown as Schemas.Gap
 
   test("services without a traffic check fold into one row after the others", () => {
     const backups = gap("gap.volumeWithoutBackup", "PersistentVolumeClaim", "data-db-0")

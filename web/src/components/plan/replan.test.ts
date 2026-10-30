@@ -9,7 +9,7 @@ const object = (kind: string, name: string, type: "patch" | "delete" = "delete")
     changes: [],
     owners: [],
     write: { type },
-  }) as unknown as Schemas["PlannedObject"]
+  }) as unknown as Schemas.PlannedObject
 
 const problem = (over: Partial<Problem>): Problem =>
   ({ kind: "conflict", title: "", status: 409, detail: "", ...over }) as Problem

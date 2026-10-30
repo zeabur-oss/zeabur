@@ -1,6 +1,6 @@
 import type { Schemas } from "@/api/client"
 
-type Issuer = Schemas["IssuerView"]
+type Issuer = Schemas.IssuerView
 
 /** A solver as people write it: `HTTP-01`, or `DNS-01 (<provider>)`. */
 export function solverLabel(solver: string): string {
@@ -18,7 +18,7 @@ export type CertificateNow =
   | { as: "secret"; secret: string }
   | { as: "none" }
 
-export function certificateNow(route: Schemas["Route"], host: string): CertificateNow {
+export function certificateNow(route: Schemas.Route, host: string): CertificateNow {
   const entry = route.tls?.find((t) => t.host === host)
   if (!entry) return { as: "none" }
   if (route.issuer) return { as: "issuer", issuer: route.issuer, secret: entry.secret ?? undefined }

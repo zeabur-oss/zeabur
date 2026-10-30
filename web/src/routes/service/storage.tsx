@@ -73,7 +73,7 @@ import {
 } from "@/model/volume-edit"
 import { accessModes } from "@/routes/service/volume"
 
-type Mount = Schemas["Mount"]
+type Mount = Schemas.Mount
 
 export function StorageTab({ project, service }: { project: string; service: Service }) {
   const t = useT()

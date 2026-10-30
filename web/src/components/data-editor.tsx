@@ -9,7 +9,8 @@ import TrashIcon from "~icons/ph/trash"
 import XIcon from "~icons/ph/x"
 
 import { ReviewWord } from "@/components/plan/draft"
-import { api, toProblem, unwrap, type Problem as ProblemBody, type Schemas } from "@/api/client"
+import { toProblem, type Problem as ProblemBody, type Schemas } from "@/api/client"
+import * as zeabur from "@/api/zeabur"
 import { configMapsQuery, objectQuery, projectQuery } from "@/api/queries"
 import { FormField } from "@/components/form-field"
 import { LoadingRows } from "@/components/page"
@@ -43,14 +44,14 @@ interface Draft {
 
 const blank: Draft = { edits: {}, added: [] }
 
-function changesOf({ edits, added }: Draft): Schemas["DataEdit"][] {
+function changesOf({ edits, added }: Draft): Schemas.DataEdit[] {
   return [
-    ...Object.entries(edits).map(([key, edit]): Schemas["DataEdit"] =>
+    ...Object.entries(edits).map(([key, edit]): Schemas.DataEdit =>
       edit.op === "set" ? { key, op: "set", value: edit.value } : { key, op: "remove" },
     ),
     ...added
       .filter((row) => row.key.trim())
-      .map((row): Schemas["DataEdit"] => ({ key: row.key.trim(), op: "set", value: row.value })),
+      .map((row): Schemas.DataEdit => ({ key: row.key.trim(), op: "set", value: row.value })),
   ]
 }
 
@@ -81,7 +82,7 @@ export function DataEditor({
   kind: Kind
   name: string
   highlight?: string
-  service?: Schemas["WorkloadRef"]
+  service?: Schemas.WorkloadRef
   onClose: () => void
 }) {
   const t = useT()
@@ -131,12 +132,7 @@ export function DataEditor({
   const reveal = async () => {
     setRevealing({ pending: true })
     try {
-      const answer = unwrap(
-        await api.POST("/api/v1/projects/{project}/secrets/{name}/reveal", {
-          params: { path: { project, name } },
-          cache: "no-store",
-        }),
-      )
+      const answer = await zeabur.revealSecret(project, name, { cache: "no-store" })
       setRevealed(Object.fromEntries(Object.entries(answer.values).map(([k, v]) => [k, v.value])))
       setRevealing({})
     } catch (failure) {

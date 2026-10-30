@@ -11,7 +11,7 @@ export function sendSource(
   blob: Blob,
   onProgress: (sent: number) => void,
 ) {
-  return new Promise<Schemas["UploadedSource"]>((resolve, reject) => {
+  return new Promise<Schemas.UploadedSource>((resolve, reject) => {
     const http = new XMLHttpRequest()
     http.open(
       "POST",
@@ -22,7 +22,7 @@ export function sendSource(
     http.upload.onprogress = (event) => onProgress(event.loaded)
     http.onload = () => {
       if (http.status >= 200 && http.status < 300)
-        return resolve(JSON.parse(http.responseText) as Schemas["UploadedSource"])
+        return resolve(JSON.parse(http.responseText) as Schemas.UploadedSource)
       let problem: Problem
       try {
         problem = JSON.parse(http.responseText) as Problem

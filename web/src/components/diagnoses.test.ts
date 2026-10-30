@@ -7,7 +7,7 @@ import { en } from "@/i18n/en"
 import { unknownRights } from "@/model/rights"
 import { reasonWord, statusOf, type Service } from "@/model/service"
 
-const withLogs = (readLogs: Schemas["Permission"]) => ({ can: { ...unknownRights(), readLogs } })
+const withLogs = (readLogs: Schemas.Permission) => ({ can: { ...unknownRights(), readLogs } })
 
 const diagnosis = (kind: Diagnosis["kind"], cause: string): Diagnosis => ({
   kind,
@@ -114,7 +114,7 @@ describe("the status's plain word", () => {
   })
 
   test("rests on the failing pod: running again after a recent crash, its restarts and last exit", () => {
-    const pod = (extra: Partial<Schemas["PodSummary"]>): Schemas["PodSummary"] => ({
+    const pod = (extra: Partial<Schemas.PodSummary>): Schemas.PodSummary => ({
       id: "projects/shop/pods/worker-1",
       name: "worker-1",
       containers: ["worker"],
@@ -133,7 +133,7 @@ describe("the status's plain word", () => {
       ],
       ...extra,
     })
-    const service = (p: Schemas["PodSummary"]) =>
+    const service = (p: Schemas.PodSummary) =>
       ({
         kind: "Deployment",
         name: "worker",

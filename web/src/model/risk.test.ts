@@ -18,7 +18,7 @@ import {
 } from "@/model/risk"
 import { forAll } from "@/test/property"
 
-type Change = Schemas["Change"]
+type Change = Schemas.Change
 
 const api = { kind: "Deployment", name: "api" } as const
 const pods =
@@ -167,7 +167,7 @@ describe("IP limits", () => {
     const limit: Change = { op: "egressLimit", workload: api, enabled: true, cidrs: [] }
     expect(weigh([limit], pods({})).reasons).toStrictEqual(["isolates"])
     expect(weigh([{ ...limit, enabled: false }], pods({})).risk).toBe("normal")
-    const route: Schemas["RouteRef"] = { kind: "Ingress", name: "web" }
+    const route: Schemas.RouteRef = { kind: "Ingress", name: "web" }
     expect(
       weigh([{ op: "ipAllow", route, enabled: true, cidrs: ["10.0.0.0/8"] }], pods({})),
     ).toStrictEqual({ risk: "normal", reasons: [] })
@@ -277,7 +277,7 @@ describe("destinationOf", () => {
           },
         },
       ],
-    } as unknown as Pick<Schemas["PlanResponse"], "objects">
+    } as unknown as Pick<Schemas.PlanResponse, "objects">
     expect(
       destinationOf(
         "shop",

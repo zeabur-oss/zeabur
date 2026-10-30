@@ -16,7 +16,7 @@ import { isRefusal } from "@/model/problem"
 /** `hint`: a permission hint said no before anything reached the cluster. */
 export type Refusal = Problem | "unreadable" | "hint"
 
-type Unreadable = Schemas["UnreadableView"]
+type Unreadable = Schemas.UnreadableView
 
 export { isRefusal }
 

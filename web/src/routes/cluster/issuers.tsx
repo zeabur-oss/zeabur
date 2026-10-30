@@ -11,7 +11,7 @@ import { Section } from "@/routes/cluster/section"
 import { Badge } from "@zeabur/design-system/components/badge"
 import { buttonVariants } from "@zeabur/design-system/components/button"
 
-type Data = Schemas["ClusterIssuers"]
+type Data = Schemas.ClusterIssuers
 
 const readyHealth = { ready: "ok", notReady: "fail", unknown: "idle" } as const
 

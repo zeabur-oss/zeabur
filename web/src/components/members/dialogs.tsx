@@ -330,7 +330,7 @@ export function LinksUnavailable({ links }: { links: SetupLinks }) {
 }
 
 /** Why a change is not offered: the cluster does not allow it. */
-export function ManageDenied({ hint, denied }: { hint: Schemas["Permission"]; denied: string }) {
+export function ManageDenied({ hint, denied }: { hint: Schemas.Permission; denied: string }) {
   if (hint !== "denied") return null
   return <p className="text-sm text-muted-foreground">{denied}</p>
 }

@@ -84,7 +84,7 @@ export function RecentNote() {
   return <p className="type-meta text-muted-foreground">{t("alerts.recent")}</p>
 }
 
-export function AlertsRefused({ data }: { data: Schemas["RuntimeAlerts"] }) {
+export function AlertsRefused({ data }: { data: Schemas.RuntimeAlerts }) {
   const t = useT()
   if (data.state !== "refused") return null
   return (

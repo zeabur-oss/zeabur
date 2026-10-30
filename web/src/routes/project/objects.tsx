@@ -39,7 +39,7 @@ const ObjectSheet = lazy(() =>
 
 const route = getRouteApi("/projects/$project/objects")
 
-type Kind = Schemas["ObjectKind"]
+type Kind = Schemas.ObjectKind
 
 type Row =
   | {
@@ -50,8 +50,8 @@ type Row =
       loading: boolean
       refused: boolean
     }
-  | { type: "object"; kind: Kind; object: Schemas["ObjectSummary"] }
-  | { type: "refused"; kind: Kind; refused: Schemas["UnreadableView"] }
+  | { type: "object"; kind: Kind; object: Schemas.ObjectSummary }
+  | { type: "refused"; kind: Kind; refused: Schemas.UnreadableView }
 
 const HEAD = 40
 const ITEM = 34
@@ -91,7 +91,7 @@ export function ObjectsPage() {
 
   const reads = [pinnedRead, scanned]
   const kinds = new Map<string, Kind>()
-  const unreadable = new Map<string, Schemas["UnreadableView"]>()
+  const unreadable = new Map<string, Schemas.UnreadableView>()
   for (const answer of [base, ...reads]) {
     for (const kind of answer.data?.items ?? [])
       if (kind.listed || !kinds.has(kindKey(kind))) kinds.set(kindKey(kind), kind)
@@ -183,7 +183,7 @@ function ObjectList({
   onOpen,
 }: {
   kinds: Kind[]
-  unreadable: Schemas["UnreadableView"][]
+  unreadable: Schemas.UnreadableView[]
   loading: Set<string>
   pins: string[]
   scanning: boolean

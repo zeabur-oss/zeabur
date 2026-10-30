@@ -36,8 +36,8 @@ import { NodeDialog, NodeMenu } from "@/routes/cluster/node-maintenance"
 import { Section } from "@/routes/cluster/section"
 import { Meter } from "@zeabur/design-system/components/meter"
 
-type Resources = Schemas["Resources"]
-type NodeView = Schemas["NodeView"]
+type Resources = Schemas.Resources
+type NodeView = Schemas.NodeView
 
 /** Above this many nodes the list gets a filter, a sort and a bound. */
 const LIST_AT = 7
@@ -249,8 +249,8 @@ function NodeList({
   metrics,
 }: {
   nodes: readonly NodeView[]
-  skew: readonly Schemas["NodeSkew"][]
-  metrics: Schemas["MetricsState"]
+  skew: readonly Schemas.NodeSkew[]
+  metrics: Schemas.MetricsState
 }) {
   const t = useT()
   const [query, setQuery] = useState("")
@@ -320,7 +320,7 @@ function NodeList({
   )
 }
 
-function Notes({ data }: { data: Schemas["NodeList"] }) {
+function Notes({ data }: { data: Schemas.NodeList }) {
   const t = useT()
   const lines: string[] = []
   if (data.metrics === "not-installed") lines.push(t("cluster.noMetrics"))
@@ -391,12 +391,12 @@ function NodeRow({
   metrics,
 }: {
   node: NodeView
-  skew?: Schemas["NodeSkew"]
-  metrics: Schemas["MetricsState"]
+  skew?: Schemas.NodeSkew
+  metrics: Schemas.MetricsState
 }) {
   const t = useT()
   const { cores, memory, percent } = useQuantityFormat()
-  const [action, setAction] = useState<Schemas["NodeAction"]>()
+  const [action, setAction] = useState<Schemas.NodeAction>()
   const gauge = (
     title: string,
     allocatable: number,

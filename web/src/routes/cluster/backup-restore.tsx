@@ -38,14 +38,14 @@ import { Alert, AlertDescription } from "@zeabur/design-system/components/alert"
 import { Button } from "@zeabur/design-system/components/button"
 import { Select } from "@zeabur/design-system/components/select"
 
-type Request = Schemas["BackupsPlanRequest"]
+type Request = Schemas.BackupsPlanRequest
 type OnPlan = (request: Request, title: string, action?: string) => void
-type Copy = Schemas["RestoreCopy"]
+type Copy = Schemas.RestoreCopy
 
 const NAMESPACE_MAX = 63
 
 /** The projects a backup can restore, with the deleted ones it holds marked as such. */
-function useChoices(backup: Schemas["VeleroBackup"]) {
+function useChoices(backup: Schemas.VeleroBackup) {
   const t = useT()
   const projects = useQuery(projectsQuery).data?.items ?? []
   const deleted = useQuery({
@@ -65,7 +65,7 @@ export function RestoreForm({
   onCancel,
   onPlan,
 }: {
-  backup: Schemas["VeleroBackup"]
+  backup: Schemas.VeleroBackup
   gate: Gate
   onCancel: () => void
   onPlan: OnPlan
@@ -170,7 +170,7 @@ function IntoField({
   )
 }
 
-function Room({ room }: { room: Schemas["RestoreRoom"] }) {
+function Room({ room }: { room: Schemas.RestoreRoom }) {
   const t = useT()
   const { memory, cpuRequest } = useQuantityFormat()
   const need = t("clusterBackups.copy.amount", cpuRequest(room.needCpu), memory(room.needMemory))
@@ -272,7 +272,7 @@ export function MoveFacts({
   from,
   to,
 }: {
-  plan: Schemas["BackupsPlan"]
+  plan: Schemas.BackupsPlan
   from: string
   to: string
 }) {
@@ -301,7 +301,7 @@ export function AttachFacts({
   to,
   onMove,
 }: {
-  plan: Schemas["BackupsPlan"]
+  plan: Schemas.BackupsPlan
   to: string
   onMove: (from: string) => void
 }) {
@@ -410,7 +410,7 @@ function CopyActions({
   gate,
   onPlan,
 }: {
-  restore: Schemas["VeleroRestore"]
+  restore: Schemas.VeleroRestore
   gate: Gate
   onPlan: OnPlan
 }) {
@@ -454,7 +454,7 @@ function CopyActions({
   )
 }
 
-function restoredWhat(t: Translate, r: Schemas["VeleroRestore"]): string {
+function restoredWhat(t: Translate, r: Schemas.VeleroRestore): string {
   if ((r.resources?.length ?? 0) > 0)
     return t("clusterBackups.domainsBack", r.into ?? r.namespaces[0] ?? "")
   if (r.into) return t("clusterBackups.restoredInto", r.namespaces[0] ?? "", r.into)
@@ -466,7 +466,7 @@ export function RestoreList({
   gate,
   onPlan,
 }: {
-  restores: Schemas["VeleroRestore"][]
+  restores: Schemas.VeleroRestore[]
   gate: Gate
   onPlan: OnPlan
 }) {

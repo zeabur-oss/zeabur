@@ -3,8 +3,8 @@ import { describe, expect, test } from "bun:test"
 import type { Schemas } from "@/api/client"
 import { reapplierOf, toolNotes } from "@/model/managed"
 
-const object = (name: string, owners: Schemas["PlanFieldOwners"][]) =>
-  ({ target: { kind: "Deployment", name }, owners }) as unknown as Schemas["PlannedObject"]
+const object = (name: string, owners: Schemas.PlanFieldOwners[]) =>
+  ({ target: { kind: "Deployment", name }, owners }) as unknown as Schemas.PlannedObject
 
 describe("toolNotes", () => {
   test("names the services a plan left out, by the tool that manages them", () => {

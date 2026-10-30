@@ -10,7 +10,7 @@ import {
   subjectName,
 } from "@/model/node-shell"
 
-const shell = (patch: Partial<Schemas["NodeShellView"]>): Schemas["NodeShellView"] => ({
+const shell = (patch: Partial<Schemas.NodeShellView>): Schemas.NodeShellView => ({
   name: "zeabur-node-shell-vps-1-a1b2c3",
   node: "vps-1",
   mine: true,

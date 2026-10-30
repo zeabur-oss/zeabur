@@ -4,7 +4,7 @@ import type { Schemas } from "@/api/client"
 import { namespaceQuery } from "@/api/queries"
 
 /** Logs are shown unless the project's rights say the person may not read them, as a Viewer. */
-export const logsReadable = (namespace?: Pick<Schemas["ProjectNamespace"], "can">) =>
+export const logsReadable = (namespace?: Pick<Schemas.ProjectNamespace, "can">) =>
   namespace?.can.readLogs !== "denied"
 
 export function useLogsReadable(project: string | undefined): boolean {

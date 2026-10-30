@@ -11,7 +11,7 @@ import {
   type VolumeRow,
 } from "@/model/volume-edit"
 
-const workload = { kind: "Deployment", name: "api" } as Schemas["WorkloadRef"]
+const workload = { kind: "Deployment", name: "api" } as Schemas.WorkloadRef
 
 const existing = (mountPath: string, size: string, claim = `api-${nameFromPath(mountPath)}`) =>
   ({

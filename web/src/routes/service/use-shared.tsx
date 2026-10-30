@@ -17,7 +17,7 @@ import { Select } from "@zeabur/design-system/components/select"
 type Kind = "ConfigMap" | "Secret"
 const VARIABLE = /^[A-Za-z_][A-Za-z0-9_]*$/
 
-type Container = Schemas["Service"]["containers"][number]
+type Container = Schemas.Service["containers"][number]
 
 /** The keys of a shared group, read only when one key is to be chosen. */
 function useKeys(project: string, kind: Kind, name: string, wanted: boolean): string[] {
@@ -47,7 +47,7 @@ function variableProblem(t: Translate, own: Container | undefined, variable: str
 interface Asked {
   mode: "all" | "one"
   own: Container | undefined
-  workload: Schemas["WorkloadRef"]
+  workload: Schemas.WorkloadRef
   container: string | undefined
   kind: Kind
   name: string
@@ -60,12 +60,12 @@ function planned(t: Translate, asked: Asked) {
   const { mode, own, workload, container, kind, name, variable, key } = asked
   if (mode === "all") {
     const problems = { group: groupProblem(t, own, kind, name), variable: undefined }
-    const change: Schemas["Change"] = { op: "envImport", workload, container, kind, name }
+    const change: Schemas.Change = { op: "envImport", workload, container, kind, name }
     return { problems, change: name && !problems.group ? change : undefined }
   }
   const problems = { group: undefined, variable: variableProblem(t, own, variable) }
   const valueFrom = kind === "Secret" ? { secretName: name, key } : { configMapName: name, key }
-  const change: Schemas["Change"] = {
+  const change: Schemas.Change = {
     op: "env",
     workload,
     container,
@@ -155,7 +155,7 @@ export default function UseSharedDrawer({
   )
 }
 
-type Group = Schemas["Resource"]
+type Group = Schemas.Resource
 
 const groupId = (group: Group | undefined) => (group ? `${group.kind}/${group.name}` : "")
 

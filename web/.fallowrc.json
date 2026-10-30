@@ -1,11 +1,12 @@
 {
   "$schema": "https://raw.githubusercontent.com/fallow-rs/fallow/v3.33.1/schema.json",
-  "entry": ["e2e/**/*.ts", "playwright*.config.ts", "scripts/*.ts"],
+  "entry": ["e2e/**/*.ts", "orval.config.ts", "playwright*.config.ts", "scripts/*.ts"],
   // unplugin-icons loads these by name; `~icons/…` is its virtual module.
   "ignoreDependencies": ["@svgr/plugin-jsx", "@iconify-json/ph", "~icons"],
-  // router.tsx loads each page with lazyRouteComponent(() => import(…), "<name>"), which fallow
-  // does not follow.
+  // zeabur.ts is generated, a function per operation. router.tsx loads each page with
+  // lazyRouteComponent(() => import(…), "<name>"), which fallow does not follow.
   "ignoreExports": [
+    { "file": "src/api/zeabur.ts", "exports": ["*"] },
     { "file": "src/routes/account.tsx", "exports": ["AccountPage"] },
     { "file": "src/routes/cluster/backups.tsx", "exports": ["BackupsPage"] },
     { "file": "src/routes/cluster/components.tsx", "exports": ["ComponentsPage"] },
@@ -28,14 +29,14 @@
   // Generated files, and the catalogs, which repeat the same keys in each language.
   "duplicates": {
     "ignore": [
-      "src/api/schema.d.ts",
+      "src/api/zeabur.ts",
       "src/i18n/server/**",
       "src/i18n/en.ts",
       "src/i18n/zh-CN.ts",
       "src/i18n/zh-TW.ts"
     ]
   },
-  "health": { "ignore": ["src/api/schema.d.ts", "src/i18n/server/**"] },
+  "health": { "ignore": ["src/api/zeabur.ts", "src/i18n/server/**"] },
   // Each layer imports only the layers below it.
   "boundaries": {
     "zones": [

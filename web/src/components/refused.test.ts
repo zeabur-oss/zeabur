@@ -29,7 +29,7 @@ function render(element: ReactElement): string {
   return renderToStaticMarkup(createElement(QueryClientProvider, { client }, element))
 }
 
-const unreadable = (resource: string): Schemas["UnreadableView"] => ({
+const unreadable = (resource: string): Schemas.UnreadableView => ({
   resource,
   kubernetes: { ...kubernetes, message: `${resource} is forbidden` },
 })

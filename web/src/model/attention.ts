@@ -1,7 +1,7 @@
 import type { Schemas } from "@/api/client"
 import { byHealth, healthRank, needsAttention, statusOf, type Service } from "@/model/service"
 
-type Diagnosis = Schemas["Diagnosis"]
+type Diagnosis = Schemas.Diagnosis
 type Sentence = Diagnosis["cause"]
 
 /** A cause's parameters that name the service itself; the rest (an image, a secret) is shared. */

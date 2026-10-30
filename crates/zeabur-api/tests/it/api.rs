@@ -1710,8 +1710,8 @@ mod tests {
         }
         assert!(
             committed == generated,
-            "crates/zeabur-api/openapi.yaml is stale; regenerate it and the web interface's \
-             types with cargo xtask openapi"
+            "crates/zeabur-api/openapi.yaml is stale; regenerate it and the web interface's API \
+             client with cargo xtask openapi"
         );
     }
 }

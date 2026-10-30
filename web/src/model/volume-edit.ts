@@ -3,7 +3,7 @@
 import type { Schemas } from "@/api/client"
 import { defaultClaimName, subdomain, volumeRequest } from "@/routes/service/volume"
 
-type Change = Schemas["Change"]
+type Change = Schemas.Change
 
 export interface VolumeRow {
   id: string
@@ -19,7 +19,7 @@ export interface VolumeRow {
   name: string | null
   /** An added row's claim name; `null` while it follows the volume name. */
   claimName: string | null
-  accessMode: Schemas["AccessMode"]
+  accessMode: Schemas.AccessMode
   /** An added row's StorageClass; absent for the cluster's default. */
   storageClass?: string
 }
@@ -124,7 +124,7 @@ export function problemsOf(
 
 /** Removals first, so an added or moved volume may take a freed path; then mounts, sizes and
  * new volumes. */
-export function changesOf(rows: readonly VolumeRow[], workload: Schemas["WorkloadRef"]): Change[] {
+export function changesOf(rows: readonly VolumeRow[], workload: Schemas.WorkloadRef): Change[] {
   const removes: Change[] = []
   const mounts: Change[] = []
   const sizes: Change[] = []

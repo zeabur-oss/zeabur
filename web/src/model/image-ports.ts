@@ -2,7 +2,7 @@
 // from the registry. The person's own value always wins.
 import type { Schemas } from "@/api/client"
 
-type Inspection = Schemas["ImageInspection"]
+type Inspection = Schemas.ImageInspection
 
 /** The TCP ports the image declares, lowest first. */
 export function tcpPorts(inspection: Inspection | undefined): number[] {
@@ -22,7 +22,7 @@ export type PortNote =
   | { kind: "read"; port: number }
   | { kind: "choose"; ports: number[] }
   | { kind: "differs"; ports: number[] }
-  | { kind: "unreadable"; reason: Schemas["UnreadableReason"]; detail?: string }
+  | { kind: "unreadable"; reason: Schemas.UnreadableReason; detail?: string }
 
 export function portNote(port: string, inspection: Inspection | undefined): PortNote | undefined {
   if (!inspection) return undefined

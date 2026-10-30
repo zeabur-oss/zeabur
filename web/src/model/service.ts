@@ -1,12 +1,12 @@
 import type { Schemas } from "@/api/client"
 
-export type Pod = Schemas["PodSummary"]
-export type Service = Schemas["Service"]
-export type Endpoint = Schemas["Endpoint"]
-export type Route = Schemas["Route"]
-export type Network = Pick<Schemas["Project"], "endpoints" | "routes">
-export type Event = Schemas["EventView"]
-export type Health = Schemas["Health"]
+export type Pod = Schemas.PodSummary
+export type Service = Schemas.Service
+export type Endpoint = Schemas.Endpoint
+export type Route = Schemas.Route
+export type Network = Pick<Schemas.Project, "endpoints" | "routes">
+export type Event = Schemas.EventView
+export type Health = Schemas.Health
 export type Role = "web" | "internal" | "worker" | "job" | "data"
 
 const roles: Role[] = ["web", "internal", "worker", "job", "data"]
@@ -14,7 +14,7 @@ const roles: Role[] = ["web", "internal", "worker", "job", "data"]
 export const serviceId = (service: { kind: string; name: string }) =>
   `${service.kind}/${service.name}`
 
-const workloadKinds: Schemas["WorkloadKind"][] = [
+const workloadKinds: Schemas.WorkloadKind[] = [
   "CronJob",
   "DaemonSet",
   "Deployment",
@@ -35,9 +35,9 @@ export function imageTag(image?: string | null): string {
   return colon >= 0 ? last.slice(colon + 1) : "latest"
 }
 
-export function volumesOf(service: Service): Schemas["Mount"][] {
+export function volumesOf(service: Service): Schemas.Mount[] {
   const seen = new Set<string>()
-  const out: Schemas["Mount"][] = []
+  const out: Schemas.Mount[] = []
   for (const container of service.containers) {
     for (const mount of container.mounts) {
       if (mount.kind !== "PersistentVolumeClaim") continue
@@ -50,8 +50,7 @@ export function volumesOf(service: Service): Schemas["Mount"][] {
   return out
 }
 
-export const claimOf = (mount: Schemas["Mount"]) =>
-  mount.object?.name ?? mount.claimName ?? mount.name
+export const claimOf = (mount: Schemas.Mount) => mount.object?.name ?? mount.claimName ?? mount.name
 
 export function roleOf(service: Service): Role {
   if (service.routeNames.length > 0) return "web"
@@ -107,7 +106,7 @@ export function worstPod(service: Pick<Service, "pods">): Pod | undefined {
 export const restartsOf = (service: Service) =>
   service.pods.reduce((sum, pod) => sum + pod.restarts, 0)
 
-type StatusWord = Schemas["StatusWord"]
+type StatusWord = Schemas.StatusWord
 
 export interface Status {
   health: Health
@@ -213,7 +212,7 @@ function hasReadinessCheck(service: Service): boolean {
 }
 
 /** Must agree with `worstHealth` over the same services. */
-export function countsHealth(counts: Schemas["ProjectHealth"]): Health {
+export function countsHealth(counts: Schemas.ProjectHealth): Health {
   if (counts.failing > 0) return "fail"
   if (counts.warning > 0) return "warn"
   if (counts.progressing > 0) return "progress"
@@ -342,7 +341,7 @@ export function groupServices(services: Service[]): ServiceGroup[] {
     .filter((group) => group.services.length > 0)
 }
 
-export type Project = Schemas["Project"]
+export type Project = Schemas.Project
 
 export interface ProjectSummary {
   services: number

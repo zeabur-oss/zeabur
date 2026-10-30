@@ -82,8 +82,8 @@ import { Label } from "@zeabur/design-system/components/label"
 import { RadioGroup, RadioOption } from "@zeabur/design-system/components/radio"
 import { Select } from "@zeabur/design-system/components/select"
 
-type Data = Schemas["ClusterBackups"]
-type Request = Schemas["BackupsPlanRequest"]
+type Data = Schemas.ClusterBackups
+type Request = Schemas.BackupsPlanRequest
 type OnPlan = (request: Request, title: string, action?: string) => void
 
 export const backupsRole: Role = {
@@ -566,7 +566,7 @@ function ScheduleEditor({
   onReview,
 }: {
   initial: ScheduleForm
-  current: Schemas["VeleroSchedule"] | undefined
+  current: Schemas.VeleroSchedule | undefined
   gate: Gate
   onCancel?: () => void
   onReview: (request: Request) => void
@@ -716,7 +716,7 @@ function BackupRow({
   gate,
   onPlan,
 }: {
-  backup: Schemas["VeleroBackup"]
+  backup: Schemas.VeleroBackup
   gate: Gate
   onPlan: OnPlan
 }) {
@@ -795,7 +795,7 @@ function useCheckedForm<F, P extends LocationProblem | ScheduleProblem>(
   return { form, set, setTried, problems, error }
 }
 
-function useBackupFacts(backup: Schemas["VeleroBackup"]) {
+function useBackupFacts(backup: Schemas.VeleroBackup) {
   const t = useT()
   const { locale } = useI18n()
   const scope = useScope()
@@ -810,7 +810,7 @@ function useBackupFacts(backup: Schemas["VeleroBackup"]) {
   ].filter(Boolean)
 }
 
-function BackupFailure({ backup }: { backup: Schemas["VeleroBackup"] }) {
+function BackupFailure({ backup }: { backup: Schemas.VeleroBackup }) {
   const t = useT()
   if (!backup.failure) return null
   return (
@@ -896,10 +896,10 @@ function PlanDialog({
   )
 }
 
-function Planned({ writes }: { writes: Schemas["BackupWrite"][] }) {
+function Planned({ writes }: { writes: Schemas.BackupWrite[] }) {
   const t = useT()
   if (writes.length === 0) return <p>{t("clusterBackups.plan.nothing")}</p>
-  const thing = (write: Schemas["BackupWrite"]) => {
+  const thing = (write: Schemas.BackupWrite) => {
     switch (write.kind) {
       case "Backup":
       case "Restore":

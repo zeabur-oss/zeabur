@@ -52,7 +52,7 @@ Level 4: may depend on every layer below it.
 
 The OpenAPI document is generated from the handlers and committed as `openapi.yaml`; a test
 regenerates it and fails on any difference, so the document cannot drift from the server
-(`cargo xtask openapi` rewrites it and the web interface's types, which are generated from it).
+(`cargo xtask openapi` rewrites it and the web interface's API client, which is generated from it).
 The API is internal, so the server neither builds nor serves the document.
 
 The generator is utoipa with utoipa-axum [utoipa]. Handlers stay plain axum handlers; a

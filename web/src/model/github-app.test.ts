@@ -58,7 +58,7 @@ const installation = (
   id: number,
   namespaces: string[],
   everyNamespace = false,
-): Schemas["GitHubInstallation"] => ({
+): Schemas.GitHubInstallation => ({
   id,
   account: `account-${id}`,
   accountType: "Organization",
@@ -68,7 +68,7 @@ const installation = (
   everyNamespace,
 })
 
-const cluster = (over: Partial<Schemas["GitHubApp"]>): Schemas["GitHubApp"] => ({
+const cluster = (over: Partial<Schemas.GitHubApp>): Schemas.GitHubApp => ({
   namespace: "builder-system",
   canChange: "allowed",
   webUrl: "https://github.com",
@@ -88,7 +88,7 @@ describe("connecting GitHub from the Git form", () => {
     expect(connectStep(cluster({ app: undefined, canChange: "denied" }), "shop")?.step).toBe("ask")
     const hidden = cluster({
       app: undefined,
-      unreadable: [{ resource: "secrets" } as Schemas["UnreadableView"]],
+      unreadable: [{ resource: "secrets" } as Schemas.UnreadableView],
     })
     expect(connectStep(hidden, "shop")?.step).toBe("ask")
   })

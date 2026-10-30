@@ -22,7 +22,7 @@ import { SectionHeader } from "@zeabur/design-system/components/section-header"
 
 const IpLimitsDrawer = lazy(() => import("@/routes/service/ip-limits-drawer"))
 
-type Route = Schemas["Route"]
+type Route = Schemas.Route
 
 const address = (group: string, version: string, resource: string, name: string) => ({
   group,
@@ -80,7 +80,7 @@ function useIncoming(project: string, ingresses: Route[]) {
 }
 
 /** The ranges of the pods' egress policy, once read. */
-function useOutgoing(project: string, service: Service, reach?: Schemas["NetworkPolicyService"]) {
+function useOutgoing(project: string, service: Service, reach?: Schemas.NetworkPolicyService) {
   const name = egressPolicyName(service.name)
   const ours = reach?.selectedBy.includes(name) ?? false
   const found = useQuery({
@@ -106,7 +106,7 @@ export function IpLimits({
   ingresses: Route[]
   /** Whether the service also has a domain on a Gateway, which cannot be limited. */
   gateway: boolean
-  reachability?: Schemas["NetworkPolicyService"]
+  reachability?: Schemas.NetworkPolicyService
 }) {
   const t = useT()
   const [editing, setEditing] = useState<Kind>()

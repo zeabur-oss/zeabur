@@ -11,9 +11,9 @@ import {
   stagedSettings,
 } from "@/model/draft"
 
-type Change = Schemas["Change"]
+type Change = Schemas.Change
 
-const workload = { kind: "Deployment", name: "api" } as Schemas["WorkloadRef"]
+const workload = { kind: "Deployment", name: "api" } as Schemas.WorkloadRef
 const env = (...pairs: [string, string][]): Change => ({
   op: "env",
   workload,
@@ -60,8 +60,8 @@ describe("draft", () => {
   })
 
   test("a workload's staged domains: those added, and edits of its routes' hosts", () => {
-    const other = { kind: "Deployment", name: "web" } as Schemas["WorkloadRef"]
-    const route = { kind: "Ingress", name: "api" } as Schemas["RouteRef"]
+    const other = { kind: "Deployment", name: "web" } as Schemas.WorkloadRef
+    const route = { kind: "Ingress", name: "api" } as Schemas.RouteRef
     const { added, edits } = stagedDomains(
       [
         { op: "addDomain", workload, hostname: "a.example.com" },
@@ -77,7 +77,7 @@ describe("draft", () => {
   })
 
   test("a domain's drawers wait in the draft, and a later setting replaces the earlier one", () => {
-    const route = { kind: "Ingress", name: "api" } as Schemas["RouteRef"]
+    const route = { kind: "Ingress", name: "api" } as Schemas.RouteRef
     const redirect = (to: string): Change => ({
       op: "redirect",
       route,

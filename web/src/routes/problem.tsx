@@ -15,7 +15,7 @@ const route = getRouteApi("/problems/$kind")
 const docs = "https://kubernetes.io/docs"
 
 /** Where Kubernetes documents the rule behind a kind, when it is the cluster's. */
-const references: Partial<Record<Schemas["Kind"], { title: string; href: string }[]>> = {
+const references: Partial<Record<Schemas.Kind, { title: string; href: string }[]>> = {
   unauthenticated: [
     { title: "Authenticating", href: `${docs}/reference/access-authn-authz/authentication/` },
   ],

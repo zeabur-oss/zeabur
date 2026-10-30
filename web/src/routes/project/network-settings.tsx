@@ -16,7 +16,7 @@ import { Select } from "@zeabur/design-system/components/select"
 const asObject = (object: object) => object as Record<string, never>
 
 type Planner = ReturnType<typeof usePlanner>
-type Allowed = Schemas["NetworkPolicyAllowedNamespace"]
+type Allowed = Schemas.NetworkPolicyAllowedNamespace
 
 /** Whether other projects can reach this one, and the projects let in. */
 export function NetworkSettings({ project }: { project: string }) {

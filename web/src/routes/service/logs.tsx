@@ -118,7 +118,7 @@ export function LogsTab({
   const chosen = container && containerNames.includes(container) ? container : containerNames[0]
   const [previous, setPrevious] = useState(false)
   const [history, setHistory] = useState(false)
-  const [range, setRange] = useState<Schemas["PrometheusRange"]>("1h")
+  const [range, setRange] = useState<Schemas.PrometheusRange>("1h")
   const [timestamps, setTimestamps] = useState(false)
   const [follow, setFollow] = useState(false)
   const [wrap, setWrap] = useState(false)
@@ -403,7 +403,7 @@ function History({
 }: {
   project: string
   service: Pick<Service, "kind" | "name">
-  range: Schemas["PrometheusRange"]
+  range: Schemas.PrometheusRange
   container: string | undefined
 } & ViewProps) {
   const t = useT()

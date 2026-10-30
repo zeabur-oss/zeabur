@@ -2,7 +2,7 @@ import type { Schemas } from "@/api/client"
 import type { Translate } from "@/i18n"
 
 /** Where the cluster's name comes from, in one short line. */
-export function nameSourceOf(cluster: Schemas["Cluster"], t: Translate): string {
+export function nameSourceOf(cluster: Schemas.Cluster, t: Translate): string {
   switch (cluster.nameSource) {
     case "setting":
       return t("shell.nameFrom.setting")

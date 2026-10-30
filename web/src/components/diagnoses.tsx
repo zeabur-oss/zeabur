@@ -22,7 +22,7 @@ import { troubleTone } from "@/model/severity"
 import { cn } from "@/lib/utils"
 import type { ServicePlace } from "@/routes/search"
 
-export type Diagnosis = Schemas["Diagnosis"]
+export type Diagnosis = Schemas.Diagnosis
 
 /** The cluster problem behind a symptom, which fixing the service itself does not cure. */
 function IncidentCause({ project, id }: { project: string; id: string }) {

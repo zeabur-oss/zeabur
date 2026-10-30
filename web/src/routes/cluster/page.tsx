@@ -176,7 +176,7 @@ function WarningsSection() {
   )
 }
 
-function WarningRow({ event }: { event: Schemas["EventView"] }) {
+function WarningRow({ event }: { event: Schemas.EventView }) {
   const t = useT()
   const namespace = event.origin.namespace ?? event.regarding?.namespace
   const object = event.regarding ? `${event.regarding.kind}/${event.regarding.name}` : ""

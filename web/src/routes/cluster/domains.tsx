@@ -7,7 +7,8 @@ import PencilSimpleIcon from "~icons/ph/pencil-simple"
 import PlusIcon from "~icons/ph/plus"
 import XIcon from "~icons/ph/x"
 
-import { api, unwrap, type Schemas } from "@/api/client"
+import { type Schemas } from "@/api/client"
+import * as zeabur from "@/api/zeabur"
 import { clusterQuery, domainsQuery, queryClient } from "@/api/queries"
 import { CheckAgain, Records } from "@/components/domain-setup"
 import { GateTip, useHintGate } from "@/components/gate"
@@ -20,8 +21,8 @@ import { Badge } from "@zeabur/design-system/components/badge"
 import { Button } from "@zeabur/design-system/components/button"
 import { Input } from "@zeabur/design-system/components/input"
 
-type Setting = Schemas["DomainsSetting"]
-type Suffix = Schemas["SuffixCheck"]
+type Setting = Schemas.DomainsSetting
+type Suffix = Schemas.SuffixCheck
 
 const health = {
   pointsHere: "ok",
@@ -43,8 +44,7 @@ export function DomainsSection() {
   const gate = useHintGate("changeDomainSuffixes", data?.canChange)
   const [editing, setEditing] = useState(false)
   const save = useMutation({
-    mutationFn: async (suffixes: string[] | null) =>
-      unwrap(await api.PUT("/api/v1/settings/domains", { body: { suffixes } })),
+    mutationFn: async (suffixes: string[] | null) => await zeabur.setDomains({ suffixes }),
     onSuccess: (next) => {
       queryClient.setQueryData(domainsQuery.queryKey, next)
       void queryClient.invalidateQueries({ queryKey: clusterQuery.queryKey, exact: true })

@@ -23,7 +23,7 @@ const t = ((key: string, ...args: unknown[]) =>
 
 const english = translator(en)
 
-type Plan = Pick<Schemas["PlanResponse"], "objects" | "impact" | "warnings">
+type Plan = Pick<Schemas.PlanResponse, "objects" | "impact" | "warnings">
 const api = { kind: "Deployment", name: "api" } as const
 const web = { kind: "Deployment", name: "web" } as const
 const worker = { kind: "Deployment", name: "worker" } as const
@@ -39,7 +39,7 @@ const templated = (name: string) =>
     owners: [],
     after: {},
     write: { type: "patch", operations: [] },
-  }) as unknown as Schemas["PlannedObject"]
+  }) as unknown as Schemas.PlannedObject
 
 const plan = (over: Partial<Plan> = {}): Plan => ({
   objects: [],
@@ -391,12 +391,12 @@ group("actionOf", () => {
         string,
         never
       >
-    const form: Schemas["Change"][] = [
+    const form: Schemas.Change[] = [
       { op: "create", object: object("a") },
       { op: "create", object: object("b") },
       { op: "deployKey", name: "c", key: "k" },
     ]
-    const yaml: Schemas["Change"][] = ["a", "b", "c"].map((name) => ({
+    const yaml: Schemas.Change[] = ["a", "b", "c"].map((name) => ({
       op: "create",
       yaml: `kind: ConfigMap\nmetadata:\n  name: ${name}\n`,
     }))
@@ -407,7 +407,7 @@ group("actionOf", () => {
   })
 
   test("several volume changes save the volumes, even of one kind", () => {
-    const add = (mountPath: string): Schemas["Change"] => ({
+    const add = (mountPath: string): Schemas.Change => ({
       op: "addVolume",
       workload: api,
       volume: { mountPath, size: "1Gi" },
@@ -433,10 +433,7 @@ group("replaced", () => {
 })
 
 group("failureOf", () => {
-  const problem = (
-    kind: Schemas["Kind"],
-    extra: Partial<Schemas["Problem"]> = {},
-  ): Schemas["Problem"] => ({
+  const problem = (kind: Schemas.Kind, extra: Partial<Schemas.Problem> = {}): Schemas.Problem => ({
     type: `/problems/${kind}`,
     title: "",
     status: 400,
@@ -606,14 +603,14 @@ group("terminals", () => {
 })
 
 group("pods that do not fit", () => {
-  type Rollout = Schemas["Rollout"]
+  type Rollout = Schemas.Rollout
   const roll = (name: string, over: Partial<Rollout> = {}): Rollout => ({
     workload: { kind: "Deployment", name },
     actions: ["roll"],
     downtime: false,
     ...over,
   })
-  const preview = (blockers: Schemas["Blocker"][], rollouts: Rollout[]): Schemas["Preview"] => ({
+  const preview = (blockers: Schemas.Blocker[], rollouts: Rollout[]): Schemas.Preview => ({
     databases: [],
     domains: [],
     dataLoss: [],
@@ -694,7 +691,7 @@ group("restartRuleApplies", () => {
       owners: [],
       after: {},
       write: { type: "create", object: {} },
-    } as unknown as Schemas["PlannedObject"]
+    } as unknown as Schemas.PlannedObject
     expect(replaced(plan({ objects: [created] }))).toStrictEqual([])
     expect(restartRuleApplies(plan({ objects: [created] }))).toBe(false)
   })
@@ -706,7 +703,7 @@ group("deploying from Git", () => {
     kind: "Deployment",
     metadata: { name: "site" },
   } as unknown as Record<string, never>
-  const changes: Schemas["Change"][] = [
+  const changes: Schemas.Change[] = [
     { op: "create", object: deployment },
     { op: "deployKey", name: "site-git", key: "k1.sealed" },
   ]
@@ -720,7 +717,7 @@ group("deploying from Git", () => {
 })
 
 group("deploying an uploaded folder", () => {
-  const changes: Schemas["Change"][] = [
+  const changes: Schemas.Change[] = [
     { op: "createUploadService", name: "site", request: "u1", method: "railpack" },
   ]
 
@@ -734,7 +731,7 @@ group("deploying an uploaded folder", () => {
 group("a deleted claim's data", () => {
   const warning = (
     reclaimPolicy?: string,
-  ): Extract<Schemas["PlanWarning"], { code: "claimDataMayBeLost" }> => ({
+  ): Extract<Schemas.PlanWarning, { code: "claimDataMayBeLost" }> => ({
     code: "claimDataMayBeLost",
     claim: "web-data",
     volume: reclaimPolicy ? "pvc-1" : undefined,

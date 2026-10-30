@@ -2,7 +2,7 @@
 import type { Schemas } from "@/api/client"
 import type { Health } from "@/model/service"
 
-type NodeShell = Schemas["NodeShellView"]
+type NodeShell = Schemas.NodeShellView
 
 /** Never a project's: only cluster administrators may create or exec pods in it. */
 export const NODE_SHELL_NAMESPACE = "zeabur-node-shell"
@@ -35,6 +35,6 @@ export function shellsOn(shells: readonly NodeShell[], node: string): NodeShell[
 export const enters = (shell: Pick<NodeShell, "mine" | "phase">) =>
   shell.mine && shell.phase === "running"
 
-export function subjectName(subject: Schemas["ShellSubject"]): string {
+export function subjectName(subject: Schemas.ShellSubject): string {
   return subject.namespace ? `${subject.namespace}/${subject.name}` : subject.name
 }

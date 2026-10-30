@@ -7,7 +7,8 @@ import DesktopIcon from "~icons/ph/desktop"
 import MoonIcon from "~icons/ph/moon"
 import SunIcon from "~icons/ph/sun"
 
-import { api, unwrap, type Schemas } from "@/api/client"
+import { type Schemas } from "@/api/client"
+import * as zeabur from "@/api/zeabur"
 import { accountQuery } from "@/api/members"
 import {
   capabilitiesQuery,
@@ -125,7 +126,7 @@ export function SettingsPage() {
   )
 }
 
-type NameSetting = Schemas["ClusterNameSetting"]
+type NameSetting = Schemas.ClusterNameSetting
 
 function ClusterNamePanel() {
   const t = useT()
@@ -148,13 +149,12 @@ function ClusterNamePanel() {
   )
 }
 
-function NameForm({ setting, cluster }: { setting: NameSetting; cluster: Schemas["Cluster"] }) {
+function NameForm({ setting, cluster }: { setting: NameSetting; cluster: Schemas.Cluster }) {
   const t = useT()
   const inputId = useId()
   const [draft, setDraft] = useState(cluster.name)
   const save = useMutation({
-    mutationFn: async (name: string | null) =>
-      unwrap(await api.PUT("/api/v1/settings/cluster-name", { body: { name } })),
+    mutationFn: async (name: string | null) => await zeabur.setClusterName({ name }),
     onSuccess: (next) => {
       queryClient.setQueryData(clusterNameQuery.queryKey, next)
       void queryClient.invalidateQueries({ queryKey: clusterQuery.queryKey, exact: true })
@@ -241,7 +241,7 @@ function NameForm({ setting, cluster }: { setting: NameSetting; cluster: Schemas
   )
 }
 
-type StoreSetting = Schemas["MetricsStoreSetting"]
+type StoreSetting = Schemas.MetricsStoreSetting
 
 const storeHealth = {
   available: "ok",
@@ -275,8 +275,7 @@ function StoreForm({ setting }: { setting: StoreSetting }) {
   const inputId = useId()
   const [draft, setDraft] = useState(setting.service)
   const save = useMutation({
-    mutationFn: async (service: string | null) =>
-      unwrap(await api.PUT("/api/v1/settings/metrics-store", { body: { service } })),
+    mutationFn: async (service: string | null) => await zeabur.setMetricsStore({ service }),
     onSuccess: (next) => {
       queryClient.setQueryData(metricsStoreQuery.queryKey, next)
       // Every history was read from the store this replaces.
@@ -393,7 +392,7 @@ function StoreForm({ setting }: { setting: StoreSetting }) {
   )
 }
 
-type SignInSetting = Schemas["SignInSetting"]
+type SignInSetting = Schemas.SignInSetting
 
 function SignInPanel() {
   const t = useT()
@@ -414,8 +413,7 @@ function SignInPanel() {
 function SignInForm({ setting }: { setting: SignInSetting }) {
   const t = useT()
   const save = useMutation({
-    mutationFn: async (body: Schemas["SignInChange"]) =>
-      unwrap(await api.PUT("/api/v1/settings/sign-in", { body })),
+    mutationFn: async (body: Schemas.SignInChange) => await zeabur.setSignInSetting(body),
     onSuccess: (next) => {
       queryClient.setQueryData(signInSettingQuery.queryKey, next)
       toast.success(t("settings.storeSaved"))
@@ -436,7 +434,7 @@ function SignInForm({ setting }: { setting: SignInSetting }) {
   )
 }
 
-type SignInSave = UseMutationResult<SignInSetting, Error, Schemas["SignInChange"]>
+type SignInSave = UseMutationResult<SignInSetting, Error, Schemas.SignInChange>
 type SignInRowProps = { setting: SignInSetting; editable: boolean; save: SignInSave }
 
 function TeamsRow({ setting, editable, save }: SignInRowProps) {

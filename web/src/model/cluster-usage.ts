@@ -3,8 +3,8 @@
 import type { Schemas } from "@/api/client"
 import { NEAR_LIMIT } from "@/model/usage"
 
-export type ClusterUsage = Schemas["ClusterUsage"]
-export type NamespaceUsage = Schemas["NamespaceUsage"]
+export type ClusterUsage = Schemas.ClusterUsage
+export type NamespaceUsage = Schemas.NamespaceUsage
 export type Resource = "cpu" | "memory"
 
 const field = { cpu: "cpuMillicores", memory: "memoryBytes" } as const

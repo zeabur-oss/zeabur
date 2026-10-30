@@ -22,8 +22,8 @@ import { checkUrl } from "@/model/browser-check"
 import { needsSetup } from "@/model/domains"
 import { severity } from "@/model/severity"
 
-type Route = Schemas["RouteTraceView"]
-type HopStatus = Schemas["HopStatus"]
+type Route = Schemas.RouteTraceView
+type HopStatus = Schemas.HopStatus
 
 const statusIcon = {
   ok: CheckCircleFillIcon,
@@ -57,7 +57,7 @@ export function RouteLine({
   /** Said in place of the verdict when the address only waits on a cause shown elsewhere. */
   waiting?: string
   /** The diagnosis's fix for the hop that fails. */
-  fix?: Schemas["Message"]
+  fix?: Schemas.Message
   /** Plans the change the API proposes for the hop that fails. */
   onFix?: () => void
 }) {

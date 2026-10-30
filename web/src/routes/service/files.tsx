@@ -21,14 +21,13 @@ import WarningFillIcon from "~icons/ph/warning-fill"
 import XIcon from "~icons/ph/x"
 
 import {
-  api,
   ApiError,
   localProblem,
   toProblem,
-  unwrap,
   type Problem as ProblemBody,
   type Schemas,
 } from "@/api/client"
+import * as zeabur from "@/api/zeabur"
 import { debugQuery, whoamiQuery } from "@/api/queries"
 import { REQUEST_HEADERS } from "@/auth/session"
 import { Ago, Hint } from "@/components/bits"
@@ -63,10 +62,10 @@ const DataEditor = lazy(() =>
   import("@/components/data-editor").then((m) => ({ default: m.DataEditor })),
 )
 
-type Files = Schemas["Files"]
-type Mount = Schemas["FileMount"]
-type Entry = Schemas["FileEntry"]
-type Kind = Schemas["FileMountKind"]
+type Files = Schemas.Files
+type Mount = Schemas.FileMount
+type Entry = Schemas.FileEntry
+type Kind = Schemas.FileMountKind
 
 /** Where the calls go: the pod, its container, and the debug container that reads for it. */
 interface Place {
@@ -93,13 +92,7 @@ const filesKey = (project: string, pod: string) => ["project", project, "files",
 const filesQuery = (project: string, pod: string, container: string) =>
   queryOptions({
     queryKey: [...filesKey(project, pod), container],
-    queryFn: async ({ signal }) =>
-      unwrap(
-        await api.GET("/api/v1/projects/{project}/pods/{pod}/files", {
-          params: { path: { project, pod }, query: { container } },
-          signal,
-        }),
-      ),
+    queryFn: async ({ signal }) => await zeabur.getFiles(project, pod, { container }, { signal }),
     staleTime: 0,
   })
 
@@ -107,14 +100,11 @@ const listQuery = (p: Place, path: string, filter: string) =>
   queryOptions({
     queryKey: [...filesKey(p.project, p.pod), p.container, p.via, "list", path, filter],
     queryFn: async ({ signal }) =>
-      unwrap(
-        await api.GET("/api/v1/projects/{project}/pods/{pod}/files/entries", {
-          params: {
-            path: { project: p.project, pod: p.pod },
-            query: { container: p.container, via: p.via, path, filter: filter || undefined },
-          },
-          signal,
-        }),
+      await zeabur.listFiles(
+        p.project,
+        p.pod,
+        { container: p.container, via: p.via, path, filter: filter || undefined },
+        { signal },
       ),
     staleTime: 5_000,
   })
@@ -123,14 +113,11 @@ const previewQuery = (p: Place, path: string) =>
   queryOptions({
     queryKey: [...filesKey(p.project, p.pod), p.container, p.via, "preview", path],
     queryFn: async ({ signal }) =>
-      unwrap(
-        await api.GET("/api/v1/projects/{project}/pods/{pod}/files/preview", {
-          params: {
-            path: { project: p.project, pod: p.pod },
-            query: { container: p.container, via: p.via, path },
-          },
-          signal,
-        }),
+      await zeabur.previewFile(
+        p.project,
+        p.pod,
+        { container: p.container, via: p.via, path },
+        { signal },
       ),
     staleTime: 0,
   })
@@ -692,7 +679,7 @@ function Folder({
   )
 }
 
-function Capped({ list, shown }: { list?: Schemas["FileList"]; shown: number }) {
+function Capped({ list, shown }: { list?: Schemas.FileList; shown: number }) {
   const t = useT()
   if (!list) return null
   return (
@@ -1095,11 +1082,6 @@ function Confirm({
   )
 }
 
-/** A write answers 204 with no body; only a failure has one. */
-function settle(result: { error?: unknown; response: Response }) {
-  if (!result.response.ok) unwrap({ ...result, data: undefined })
-}
-
 /** Runs a write once; keeps its problem for the dialog to show. */
 function useWrite(place: Place, onDone: () => void) {
   const refresh = useRefresh(place)
@@ -1160,13 +1142,13 @@ function FolderDialog({
       problem={problem}
       onClose={onClose}
       onConfirm={() =>
-        void run(async () =>
-          settle(
-            await api.POST("/api/v1/projects/{project}/pods/{pod}/files/folders", {
-              params: { path: { project: place.project, pod: place.pod } },
-              body: { container: place.container, via: place.via, path: join(folder, name) },
+        void run(
+          async () =>
+            await zeabur.makeFolder(place.project, place.pod, {
+              container: place.container,
+              via: place.via,
+              path: join(folder, name),
             }),
-          ),
         )
       }
     >
@@ -1211,13 +1193,14 @@ function RenameDialog({
       problem={problem}
       onClose={onClose}
       onConfirm={() =>
-        void run(async () =>
-          settle(
-            await api.POST("/api/v1/projects/{project}/pods/{pod}/files/moves", {
-              params: { path: { project: place.project, pod: place.pod } },
-              body: { container: place.container, via: place.via, path, name },
+        void run(
+          async () =>
+            await zeabur.renameFile(place.project, place.pod, {
+              container: place.container,
+              via: place.via,
+              path,
+              name,
             }),
-          ),
         )
       }
     >
@@ -1269,15 +1252,13 @@ function DeleteDialog({
       problem={problem}
       onClose={onClose}
       onConfirm={() =>
-        void run(async () =>
-          settle(
-            await api.DELETE("/api/v1/projects/{project}/pods/{pod}/files/entries", {
-              params: {
-                path: { project: place.project, pod: place.pod },
-                query: { container: place.container, via: place.via, path },
-              },
+        void run(
+          async () =>
+            await zeabur.deleteFile(place.project, place.pod, {
+              container: place.container,
+              via: place.via,
+              path,
             }),
-          ),
         )
       }
     >

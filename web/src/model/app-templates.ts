@@ -4,10 +4,10 @@
 import type { Schemas } from "@/api/client"
 import { hostProblem } from "@/model/image-service"
 
-type Change = Schemas["Change"]
-export type AppTemplate = Schemas["TemplateView"]
-export type TemplateInput = Schemas["TemplateInput"]
-export type TemplateRisk = Schemas["TemplateRisk"]
+type Change = Schemas.Change
+export type AppTemplate = Schemas.TemplateView
+export type TemplateInput = Schemas.TemplateInput
+export type TemplateRisk = Schemas.TemplateRisk
 
 /** The page server of the error pages, which a domain's settings deploy. */
 const ELSEWHERE = new Set(["error-pages"])
@@ -60,7 +60,7 @@ export function riskWords(risk: TemplateRisk, locale: string) {
 }
 
 /** Random bytes, encoded as the template asks. */
-export function generate({ bytes, encoding }: Schemas["Generated"]): string {
+export function generate({ bytes, encoding }: Schemas.Generated): string {
   const random = crypto.getRandomValues(new Uint8Array(bytes))
   if (encoding === "hex") return Array.from(random, (b) => b.toString(16).padStart(2, "0")).join("")
   return btoa(String.fromCharCode(...random))

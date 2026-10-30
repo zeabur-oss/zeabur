@@ -31,7 +31,7 @@ import { Skeleton } from "@zeabur/design-system/components/skeleton"
 import { Tabs, TabsList, TabsTrigger } from "@zeabur/design-system/components/tabs"
 import { Tooltip } from "@zeabur/design-system/components/tooltip"
 
-type ProjectItem = Schemas["ProjectSummary"]
+type ProjectItem = Schemas.ProjectSummary
 
 /** Fewest labels (`shop.example.com` before `api.shop.example.com`), then shortest, then by name. */
 function primaryDomain(document: Project): Domain | undefined {

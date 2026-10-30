@@ -3,7 +3,7 @@ import { describe, expect, test } from "bun:test"
 import type { Schemas } from "@/api/client"
 import { originOf } from "@/model/origin"
 
-const diagnosis = (fields: Partial<Schemas["Diagnosis"]>) =>
+const diagnosis = (fields: Partial<Schemas.Diagnosis>) =>
   ({ kind: "crashLoop", cause: { key: "diagnosis.crashLoop.cause.exitCode" }, ...fields }) as never
 
 describe("originOf", () => {

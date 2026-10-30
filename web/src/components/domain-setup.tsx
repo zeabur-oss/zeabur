@@ -24,7 +24,7 @@ import {
 import { Button } from "@zeabur/design-system/components/button"
 import { severity } from "@/model/severity"
 
-type DomainCheck = Schemas["DomainCheck"]
+type DomainCheck = Schemas.DomainCheck
 
 const configHealth = {
   valid: "ok",

@@ -17,8 +17,8 @@ import { useT } from "@/i18n"
 import { cn } from "@/lib/utils"
 import type { Health } from "@/model/service"
 
-type Outcome = Schemas["BackupOutcome"]
-export type Coverage = Schemas["BackupCoverage"]
+type Outcome = Schemas.BackupOutcome
+export type Coverage = Schemas.BackupCoverage
 
 const outcomeHealth: Record<Outcome, Health> = {
   succeeded: "ok",
@@ -87,7 +87,7 @@ export function CoverageRow({
   )
 }
 
-export function ProviderNotes({ data }: { data: Schemas["ProjectBackups"] }) {
+export function ProviderNotes({ data }: { data: Schemas.ProjectBackups }) {
   const t = useT()
   const installed = data.providers.filter((p) => p.state === "installed")
   const refused = data.providers.filter((p) => p.state === "refused")
@@ -111,7 +111,7 @@ export function ProviderNotes({ data }: { data: Schemas["ProjectBackups"] }) {
   )
 }
 
-export function BackupDetails({ data }: { data: Schemas["ProjectBackups"] }) {
+export function BackupDetails({ data }: { data: Schemas.ProjectBackups }) {
   const t = useT()
   if (data.schedules.length === 0 && data.runs.length === 0) return null
   return (
@@ -154,7 +154,7 @@ export function BackupDetails({ data }: { data: Schemas["ProjectBackups"] }) {
 }
 
 /** One backup run: its object, the provider and its message, and how it went. */
-export function RunRow({ run }: { run: Schemas["BackupRun"] }) {
+export function RunRow({ run }: { run: Schemas.BackupRun }) {
   const t = useT()
   return (
     <li className={row}>

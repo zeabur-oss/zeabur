@@ -15,8 +15,8 @@ import {
   CollapsibleTrigger,
 } from "@zeabur/design-system/components/collapsible"
 
-export type Incident = Schemas["Incident"]
-type Affected = Schemas["AffectedService"]
+export type Incident = Schemas.Incident
+type Affected = Schemas.AffectedService
 
 /** The services an incident takes down, as `project/Kind/name`. */
 export const takenDown = (incidents: readonly Incident[]) =>

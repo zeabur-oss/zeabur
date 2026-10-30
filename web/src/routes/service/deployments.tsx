@@ -45,7 +45,7 @@ import { activityTone, warningTone, warningVariant } from "@/model/severity"
 import { writerOf } from "@/routes/project/side"
 import { imageTag, isTask, statusOf, type Event, type Health, type Service } from "@/model/service"
 
-type Release = Schemas["WorkloadRelease"]
+type Release = Schemas.WorkloadRelease
 
 /** Row actions show on hover or focus where there is a pointer that hovers, always on touch. */
 const quiet = "pointer-fine:opacity-0 pointer-fine:focus-within:opacity-100"

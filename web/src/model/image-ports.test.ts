@@ -3,7 +3,7 @@ import { describe, expect, test } from "bun:test"
 import type { Schemas } from "@/api/client"
 import { portNote, shownPort, tcpPorts } from "@/model/image-ports"
 
-const read = (...ports: [number, string][]): Schemas["ImageInspection"] => ({
+const read = (...ports: [number, string][]): Schemas.ImageInspection => ({
   image: "nginx",
   platform: "linux/amd64",
   exposedPorts: ports.map(([port, protocol]) => ({ port, protocol })),

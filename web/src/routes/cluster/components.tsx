@@ -114,7 +114,7 @@ export function ComponentsPage() {
   const list = capabilities.data?.items ?? []
   const installed = list.filter((c) => c.existing).length
   const recommended = list.filter((c) => !c.existing && c.suggestion === "recommended").length
-  const keep = (c: Schemas["Capability"]) =>
+  const keep = (c: Schemas.Capability) =>
     (filter === "all" ||
       (filter === "installed" && c.existing) ||
       (filter === "recommended" && !c.existing && c.suggestion === "recommended")) &&
@@ -226,10 +226,10 @@ export function ComponentsPage() {
 /** This component itself, not another of its capability: metrics-server covers "metrics" without
  * VictoriaMetrics being installed. */
 /** What the component gives the cluster, in the catalogue's words for `locale`. */
-const summaryOf = (component: Schemas["Component"], locale: Locale) =>
+const summaryOf = (component: Schemas.Component, locale: Locale) =>
   component.summary[locale] ?? component.summary.en
 
-const isInstalled = (capability: Schemas["Capability"], component: Schemas["Component"]) =>
+const isInstalled = (capability: Schemas.Capability, component: Schemas.Component) =>
   capability.installations.some((i) => i.component === component.id)
 
 /** What a component incident names, as the catalogue's capability or `capability/component`. */
@@ -256,8 +256,8 @@ function ComponentCard({
   capability,
   component,
 }: {
-  capability: Schemas["Capability"]
-  component: Schemas["Component"]
+  capability: Schemas.Capability
+  component: Schemas.Component
 }) {
   const { t, locale } = useI18n()
   const capLabel = useCapabilityLabel()
@@ -352,7 +352,7 @@ function StateChip({ state, evidence }: { state: string; evidence: string[] }) {
   return <span className="shrink-0 type-meta text-muted-foreground">{t("settings.optional")}</span>
 }
 
-function UpgradeTag({ installation }: { installation: Schemas["Installation"] }) {
+function UpgradeTag({ installation }: { installation: Schemas.Installation }) {
   const t = useT()
   if (installation.managedBy)
     return (

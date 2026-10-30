@@ -51,7 +51,7 @@ export default function IpLimitsDrawer({
   project: string
   service: Service
   kind: Kind
-  ingresses: Schemas["Route"][]
+  ingresses: Schemas.Route[]
   was: Was
   onClose: () => void
 }) {

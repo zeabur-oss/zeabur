@@ -16,13 +16,13 @@ import { RadioGroup, RadioOption } from "@zeabur/design-system/components/radio"
 import { Select } from "@zeabur/design-system/components/select"
 
 type Source = "issuer" | "own"
-type Issuer = Schemas["IssuerView"]
+type Issuer = Schemas.IssuerView
 type Choice = ReturnType<typeof useChoice>
 
 const startIssuer = (now: CertificateNow, fallback?: string | null) =>
   now.as === "issuer" ? now.issuer : (fallback ?? "")
 
-function useChoice(route: Schemas["Route"], host: string) {
+function useChoice(route: Schemas.Route, host: string) {
   const now = certificateNow(route, host)
   const issuers = useQuery(clusterIssuersQuery).data
   const listed = issuers?.state === "installed" ? issuers.issuers : []
@@ -47,12 +47,12 @@ function useChoice(route: Schemas["Route"], host: string) {
 }
 
 /** Ingress-shim names one issuer for all of an Ingress's domains, so one of them can't leave. */
-const issuingOthers = (route: Schemas["Route"], others: string[]) =>
+const issuingOthers = (route: Schemas.Route, others: string[]) =>
   Boolean(route.issuer) && others.length > 0
 
 /** What keeps the domain on its Ingress, which it leaves for an own certificate. */
 function keptBy(
-  route: Schemas["Route"],
+  route: Schemas.Route,
   host: string,
 ): "password" | "redirect" | "maintenance" | undefined {
   if (route.basicAuth) return "password"
@@ -69,7 +69,7 @@ function sourceOf(
   c: Choice,
   host: string,
   blocked: boolean,
-): Schemas["CertificateSource"] | undefined {
+): Schemas.CertificateSource | undefined {
   if (c.source === "own") {
     const ok = !blocked && pemProblems(c.certificate, c.key).length === 0
     return ok ? { from: "own", certificate: c.certificate, key: c.key } : undefined
@@ -182,7 +182,7 @@ function OwnFields({
 }: {
   choice: Choice
   tried: boolean
-  route: Schemas["Route"]
+  route: Schemas.Route
   host: string
   others: string[]
 }) {

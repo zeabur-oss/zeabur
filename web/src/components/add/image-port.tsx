@@ -11,14 +11,14 @@ import { Button } from "@zeabur/design-system/components/button"
 const SETTLE_MS = 600
 
 /** The image's configuration, once the image (and its registry login) stops changing. */
-export function useImageInspection(project: string, request: Schemas["InspectRequest"]) {
+export function useImageInspection(project: string, request: Schemas.InspectRequest) {
   const key = JSON.stringify(request)
   const [settled, setSettled] = useState(key)
   useEffect(() => {
     const timer = setTimeout(() => setSettled(key), SETTLE_MS)
     return () => clearTimeout(timer)
   }, [key])
-  const body = JSON.parse(settled) as Schemas["InspectRequest"]
+  const body = JSON.parse(settled) as Schemas.InspectRequest
   return useQuery({
     ...imageInspectionQuery(project, body),
     enabled: imageProblem(body.image) === undefined,

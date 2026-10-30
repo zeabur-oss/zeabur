@@ -4,7 +4,7 @@ import type { Schemas } from "@/api/client"
 import { listenerServes, offered, parentOf } from "@/model/gateways"
 
 describe("gateways", () => {
-  const gateways: Schemas["GatewayView"][] = [
+  const gateways: Schemas.GatewayView[] = [
     {
       namespace: "gateway",
       name: "public",

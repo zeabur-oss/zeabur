@@ -127,7 +127,7 @@ export function SharedVariablesSection({ project }: { project: string }) {
   )
 }
 
-function UsedBy({ project, resource }: { project: string; resource: Schemas["Resource"] }) {
+function UsedBy({ project, resource }: { project: string; resource: Schemas.Resource }) {
   const t = useT()
   const owners = resource.attribution.owners
   if (owners.length === 0) return <span>{t("shared.unused")}</span>

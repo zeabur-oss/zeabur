@@ -12,10 +12,10 @@ import {
 } from "@/model/databases"
 import { AWS_KEYS, keysSecret } from "@/model/s3-destinations"
 
-type Change = Schemas["Change"]
-type ProjectBackups = Schemas["ProjectBackups"]
-type Schedule = Schemas["BackupSchedule"]
-type Service = Pick<Schemas["Service"], "runAs" | "podSecurity">
+type Change = Schemas.Change
+type ProjectBackups = Schemas.ProjectBackups
+type Schedule = Schemas.BackupSchedule
+type Service = Pick<Schemas.Service, "runAs" | "podSecurity">
 
 /** Who K8up's backup and prune pods run as: the service's own user. */
 export type BackupUser =
@@ -220,8 +220,8 @@ type Template = Record<string, unknown> & {
   metadata?: Record<string, unknown>
   spec?: Record<string, unknown>
 }
-type Mount = Pick<Schemas["Mount"], "accessModes" | "size" | "storageClass" | "volumeMode">
-type Workload = Schemas["WorkloadRef"]
+type Mount = Pick<Schemas.Mount, "accessModes" | "size" | "storageClass" | "volumeMode">
+type Workload = Schemas.WorkloadRef
 
 const LABEL_MAX = 63
 

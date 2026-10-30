@@ -28,10 +28,10 @@
 // again like any change.
 import type { Schemas } from "@/api/client"
 
-type Change = Schemas["Change"]
-type WorkloadRef = Schemas["WorkloadRef"]
-type Plan = Schemas["PlanResponse"]
-type Applied = Schemas["Applied"]
+type Change = Schemas.Change
+type WorkloadRef = Schemas.WorkloadRef
+type Plan = Schemas.PlanResponse
+type Applied = Schemas.Applied
 
 export type Risk = "low" | "normal" | "high"
 

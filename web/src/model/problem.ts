@@ -4,7 +4,7 @@ import type { Problem, Schemas } from "@/api/client"
 import { writeSentence, type Locale, type Translate } from "@/i18n"
 import { en } from "@/i18n/en"
 
-type Kind = Schemas["Kind"]
+type Kind = Schemas.Kind
 
 const kinds = [
   "bad-request",
@@ -89,7 +89,7 @@ export function problemText(t: Translate, locale: Locale, problem: Problem): Pro
 
 /** A cause about `path`, a field inside it, or the object it is in. */
 export function refusedField(
-  fields: readonly Schemas["FieldCause"][],
+  fields: readonly Schemas.FieldCause[],
   path: string,
 ): string | undefined {
   const within = (inner: string, outer: string) =>

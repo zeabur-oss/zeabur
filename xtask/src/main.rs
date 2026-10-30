@@ -38,7 +38,7 @@ enum Task {
     /// say where they run; `ZEABUR_PROXY_E2E_KEEP=1` keeps what it made.
     E2eProxy,
     /// Regenerate `crates/zeabur-api/openapi.yaml` from the handlers, then
-    /// `web/src/api/schema.d.ts` from it. Runs inside `nix develop`.
+    /// `web/src/api/zeabur.ts` from it. Runs inside `nix develop`.
     Openapi,
 }
 

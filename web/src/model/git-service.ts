@@ -13,8 +13,8 @@ import {
 } from "@/model/image-service"
 import type { Profile } from "@/model/pod-security"
 
-type Change = Schemas["Change"]
-type EnvEdit = Schemas["EnvEdit"]
+type Change = Schemas.Change
+type EnvEdit = Schemas.EnvEdit
 type Manifest = Record<string, unknown>
 
 export type BuildMethod = "railpack" | "dockerfile"
@@ -485,8 +485,8 @@ export function gitNeeds({
   capabilities,
   registry,
 }: {
-  builds: Schemas["ProjectBuilds"]["state"] | undefined
-  capabilities: Schemas["Capability"][] | undefined
+  builds: Schemas.ProjectBuilds["state"] | undefined
+  capabilities: Schemas.Capability[] | undefined
   /** `""` when Zeabur has no registry setting; `undefined` while unknown. */
   registry: string | undefined
 }): GitNeeds | undefined {

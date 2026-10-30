@@ -5,8 +5,8 @@ import type { Schemas } from "@/api/client"
 import { diskShare, fillHealth, VOLUME } from "@/model/node-health"
 import { claimOf, type Health, type Service } from "@/model/service"
 
-type VolumeUsage = Schemas["VolumeUsage"]
-type Mount = Schemas["Mount"]
+type VolumeUsage = Schemas.VolumeUsage
+type Mount = Schemas.Mount
 
 /** Each claim the service mounts once, with the container that mounts it. */
 export function claimMounts(service: Service): { container: string; mount: Mount }[] {
@@ -32,11 +32,11 @@ export interface VolumeFill {
   replicas: number
 }
 
-export type MissingReason = Exclude<Schemas["DiskState"], "available">
+export type MissingReason = Exclude<Schemas.DiskState, "available">
 
 /** Why some of `fills` are missing: the store's state, or that it holds nothing for them. */
 export function missingReason(
-  state: Schemas["DiskState"],
+  state: Schemas.DiskState,
   fills: readonly (VolumeFill | undefined)[],
 ): MissingReason | undefined {
   if (fills.every(Boolean)) return undefined

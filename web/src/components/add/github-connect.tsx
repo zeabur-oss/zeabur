@@ -16,7 +16,7 @@ import { connectStep, withProject, type ConnectStep } from "@/model/github-app"
 import { Button, buttonVariants } from "@zeabur/design-system/components/button"
 import { Menu, MenuContent, MenuItem, MenuTrigger } from "@zeabur/design-system/components/menu"
 
-type Installation = Schemas["GitHubInstallation"]
+type Installation = Schemas.GitHubInstallation
 
 export function GitHubConnect({ project }: { project: string }) {
   const t = useT()

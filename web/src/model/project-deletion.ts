@@ -2,8 +2,8 @@
 // preview and the project page show them.
 import type { Schemas } from "@/api/client"
 
-type Run = Schemas["BackupRun"]
-type Held = Schemas["HeldObject"]
+type Run = Schemas.BackupRun
+type Held = Schemas.HeldObject
 
 /** A backup this recent does not call for another before the project goes. */
 const RECENT_MS = 24 * 60 * 60 * 1000
@@ -11,7 +11,7 @@ const RECENT_MS = 24 * 60 * 60 * 1000
 /** What happens to a volume's data: `Retain` keeps the PersistentVolume, `Delete` deletes it. */
 export type DataFate = "deleted" | "kept" | "unknown"
 
-export function dataFate(volume: Schemas["VolumeDeletion"]): DataFate {
+export function dataFate(volume: Schemas.VolumeDeletion): DataFate {
   switch (volume.reclaimPolicy) {
     case "Delete":
       return "deleted"
@@ -31,8 +31,8 @@ export function recentBackup(run: Run | null | undefined, now = Date.now()): boo
 
 /** The deletion warning of a plan, when it deletes the project. */
 export function projectDeletionOf(
-  warnings: Schemas["PlanWarning"][],
-): Extract<Schemas["PlanWarning"], { code: "deletesProject" }> | undefined {
+  warnings: Schemas.PlanWarning[],
+): Extract<Schemas.PlanWarning, { code: "deletesProject" }> | undefined {
   for (const warning of warnings) {
     if (warning.code === "deletesProject") return warning
   }

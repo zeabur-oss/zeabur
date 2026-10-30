@@ -2,7 +2,8 @@ import { useMutation, useQuery } from "@tanstack/react-query"
 import { useState } from "react"
 import WarningIcon from "~icons/ph/warning"
 
-import { api, unwrap, type Schemas } from "@/api/client"
+import { type Schemas } from "@/api/client"
+import * as zeabur from "@/api/zeabur"
 import { queryClient } from "@/api/queries"
 import { PlanDiffs, PlanFrame } from "@/components/cluster-plan"
 import { FormField } from "@/components/form-field"
@@ -23,7 +24,7 @@ import { Alert, AlertDescription } from "@zeabur/design-system/components/alert"
 import { Button } from "@zeabur/design-system/components/button"
 import { Input } from "@zeabur/design-system/components/input"
 
-type Request = Schemas["S3DestinationsPlanRequest"]
+type Request = Schemas.S3DestinationsPlanRequest
 type Planned = { request: Request; title: string; destructive?: boolean }
 
 const refresh = () => {
@@ -241,17 +242,13 @@ function DestinationsPlan({ planned, onClose }: { planned: Planned; onClose: () 
   const t = useT()
   const plan = useQuery({
     queryKey: ["s3-destinations-plan", planned.request],
-    queryFn: async ({ signal }) =>
-      unwrap(
-        await api.POST("/api/v1/cluster/s3-destinations/plan", { body: planned.request, signal }),
-      ),
+    queryFn: async ({ signal }) => await zeabur.planS3Destinations(planned.request, { signal }),
     retry: false,
     staleTime: Infinity,
     gcTime: 0,
   })
   const apply = useMutation({
-    mutationFn: async (token: string) =>
-      unwrap(await api.POST("/api/v1/cluster/s3-destinations/apply", { body: { token } })),
+    mutationFn: async (token: string) => await zeabur.applyS3Destinations({ token }),
     onSuccess: () => {
       refresh()
       onClose()
@@ -292,9 +289,9 @@ function DestinationsPlan({ planned, onClose }: { planned: Planned; onClose: () 
 const S3D_NAMESPACE = "zeabur-s3-destinations"
 
 /** The copies that keep the old keys, and why. */
-function KeptCopies({ plan }: { plan: Schemas["S3DestinationsPlan"] }) {
+function KeptCopies({ plan }: { plan: Schemas.S3DestinationsPlan }) {
   const t = useT()
-  const names = (reason: Schemas["CopyKept"]) =>
+  const names = (reason: Schemas.CopyKept) =>
     plan.keptCopies.filter((c) => c.reason === reason).map((c) => `${c.namespace}/${c.name}`)
   const denied = names("denied")
   const unknown = names("unknownKeys")

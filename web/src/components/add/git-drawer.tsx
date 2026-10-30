@@ -3,7 +3,8 @@ import { useNavigate } from "@tanstack/react-router"
 import { useState } from "react"
 import ArrowSquareOutIcon from "~icons/ph/arrow-square-out"
 
-import { api, toProblem, unwrap } from "@/api/client"
+import { toProblem } from "@/api/client"
+import * as zeabur from "@/api/zeabur"
 import {
   MethodField,
   MoreSection,
@@ -258,12 +259,7 @@ function DeployKeyFields({
   const [knownHosts, setKnownHosts] = useState("")
   const makeKey = useMutation({
     mutationFn: async (gitHost: string) =>
-      unwrap(
-        await api.POST("/api/v1/projects/{project}/deploy-keys", {
-          params: { path: { project } },
-          body: { host: gitHost, ...(pinned ? {} : { knownHosts }) },
-        }),
-      ),
+      await zeabur.createDeployKey(project, { host: gitHost, ...(pinned ? {} : { knownHosts }) }),
     onSuccess: (key, gitHost) => onMade({ host: gitHost, ...key }),
   })
   return (

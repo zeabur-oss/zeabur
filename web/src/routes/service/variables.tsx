@@ -28,7 +28,8 @@ import PlusIcon from "~icons/ph/plus"
 import StackIcon from "~icons/ph/stack"
 import TrashIcon from "~icons/ph/trash"
 
-import { api, toProblem, unwrap, type Problem as ProblemBody, type Schemas } from "@/api/client"
+import { toProblem, type Problem as ProblemBody, type Schemas } from "@/api/client"
+import * as zeabur from "@/api/zeabur"
 import { configMapsQuery, databasesQuery, projectQuery } from "@/api/queries"
 import { CopyButton, Hint, ManagedTip, Segmented } from "@/components/bits"
 import { ConnectDrawer, useTargets } from "@/components/connect"
@@ -85,7 +86,7 @@ const DataEditor = lazy(() =>
   import("@/components/data-editor").then((m) => ({ default: m.DataEditor })),
 )
 
-type Revealed = Record<string, Schemas["SecretValue"]>
+type Revealed = Record<string, Schemas.SecretValue>
 
 interface SecretState {
   values?: Revealed
@@ -93,7 +94,7 @@ interface SecretState {
   problem?: ProblemBody
 }
 
-type Source = Schemas["ValueSource"]
+type Source = Schemas.ValueSource
 
 export function VariablesTab({
   project,
@@ -104,7 +105,7 @@ export function VariablesTab({
   project: string
   service: Service
   edges: Edge[]
-  refused: Schemas["UnreadableView"][]
+  refused: Schemas.UnreadableView[]
 }) {
   const t = useT()
   // Revealed values never go into the query cache or storage.
@@ -144,7 +145,7 @@ export function VariablesTab({
     targets.some((s) => s.kind === service.kind && s.name === service.name)
   const containers = service.containers
   const envIn = (container: string) => containers.find((c) => c.name === container)?.env ?? []
-  const databaseOf = (container: string, env: Schemas["EnvVar"]) =>
+  const databaseOf = (container: string, env: Schemas.EnvVar) =>
     databaseOfEnv(env, envIn(container), databases)
   const disconnector = usePlanner(project, undefined, true)
   const disconnectNote = (database: Database) =>
@@ -194,12 +195,7 @@ export function VariablesTab({
   const reveal = async (name: string) => {
     setSecrets((previous) => ({ ...previous, [name]: { pending: true } }))
     try {
-      const answer = unwrap(
-        await api.POST("/api/v1/projects/{project}/secrets/{name}/reveal", {
-          params: { path: { project, name } },
-          cache: "no-store",
-        }),
-      )
+      const answer = await zeabur.revealSecret(project, name, { cache: "no-store" })
       // Being let in once means the earlier refusals no longer hold.
       setSecrets((previous) => ({
         ...Object.fromEntries(
@@ -226,7 +222,7 @@ export function VariablesTab({
     for (const name of envSecrets) if (!secrets[name]?.values) void reveal(name)
   }
 
-  const valueOf = (env: Schemas["EnvVar"]): string | undefined => {
+  const valueOf = (env: Schemas.EnvVar): string | undefined => {
     const source = env.source
     if (source.kind === "Literal") return env.value ?? ""
     if (source.kind === "Secret" && source.name && source.key)
@@ -394,13 +390,13 @@ export function VariablesTab({
         ? t("vars.blocked", problems.size)
         : undefined
   const held = editing
-    ? containers.flatMap(({ name: container }): Schemas["Change"][] => {
+    ? containers.flatMap(({ name: container }): Schemas.Change[] => {
         const own = changesOf(effective).find((c) => c.container === container)?.changes ?? []
         const extra = disconnects
           .filter((d) => d.container === container)
           .flatMap((d) => d.names)
           .filter((n, i, all) => all.indexOf(n) === i && !own.some((e) => e.name === n))
-          .map((name): Schemas["EnvEdit"] => ({ op: "remove", name }))
+          .map((name): Schemas.EnvEdit => ({ op: "remove", name }))
         const changes = [...extra, ...own]
         return changes.length > 0 ? [{ op: "env", workload, container, changes }] : []
       })
@@ -478,7 +474,7 @@ export function VariablesTab({
     )
   }
 
-  const sourceRow = ({ container, env }: { container: string; env: Schemas["EnvVar"] }) => {
+  const sourceRow = ({ container, env }: { container: string; env: Schemas.EnvVar }) => {
     const value = valueOf(env)
     const secret = env.source.kind === "Secret" ? env.source.name : undefined
     const from = databaseOf(container, env)
@@ -572,7 +568,7 @@ export function VariablesTab({
     imported: i,
   }: {
     container: string
-    imported: Schemas["ImportedEnv"]
+    imported: Schemas.ImportedEnv
   }) => {
     const name = i.source.name ?? ""
     const secret = i.source.kind === "Secret" && name ? name : undefined
@@ -1080,14 +1076,14 @@ function StopImport({
   planner,
   workload,
 }: {
-  imported: Schemas["ImportedEnv"]
+  imported: Schemas.ImportedEnv
   container: string
   multi: boolean
   editing: boolean
   managed: string | undefined
   gate: Gate
   planner: ReturnType<typeof usePlanner>
-  workload: Schemas["WorkloadRef"]
+  workload: Schemas.WorkloadRef
 }) {
   const t = useT()
   const name = imported.source.name
@@ -1133,14 +1129,14 @@ function StopReference({
   planner,
   workload,
 }: {
-  env: Schemas["EnvVar"]
+  env: Schemas.EnvVar
   container: string
   multi: boolean
   editing: boolean
   managed: string | undefined
   gate: Gate
   planner: ReturnType<typeof usePlanner>
-  workload: Schemas["WorkloadRef"]
+  workload: Schemas.WorkloadRef
 }) {
   const t = useT()
   const source = env.source.name
@@ -1364,7 +1360,7 @@ function problemText(t: Translate, problem: RowProblem): string {
   return t(`vars.problem.${problem}`)
 }
 
-function PendingMark({ pending }: { pending: Schemas["PendingRestart"] }) {
+function PendingMark({ pending }: { pending: Schemas.PendingRestart }) {
   const t = useT()
   return (
     <Tooltip content={t("env.pendingRestartDetail", pending.pod)}>

@@ -8,8 +8,8 @@ import { useT, type Translate } from "@/i18n"
 import { useQuantityFormat } from "@/lib/quantity"
 import type { Health } from "@/model/service"
 
-type Preview = Schemas["Preview"]
-type Rollout = Schemas["Rollout"]
+type Preview = Schemas.Preview
+type Rollout = Schemas.Rollout
 
 const starts = (rollout: Rollout) => rollout.actions.every((a) => a === "start")
 const stops = (rollout: Rollout) => rollout.actions.every((a) => a === "stop")
@@ -114,7 +114,7 @@ export function PlanPreview({
   /** Deleted claims a plan warning already describes, with the volume's reclaim policy. */
   warnedClaims?: string[]
   /** Workloads the sentences already speak of; their plain roll is not said again. */
-  said?: readonly Schemas["WorkloadRef"][]
+  said?: readonly Schemas.WorkloadRef[]
   /** False where a table already says what happens to each service. */
   rollouts?: boolean
   /** False where the rows already list the removed fields. */

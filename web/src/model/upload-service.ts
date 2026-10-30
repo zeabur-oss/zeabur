@@ -5,7 +5,7 @@
 import type { Schemas } from "@/api/client"
 import { builtProblems, cleanPath, type BuiltService } from "@/model/git-service"
 
-type Change = Schemas["Change"]
+type Change = Schemas.Change
 
 /** `directory` is the folder inside the upload to build (empty: the whole upload). */
 export type UploadService = BuiltService

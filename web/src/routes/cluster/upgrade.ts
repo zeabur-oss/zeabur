@@ -15,7 +15,7 @@ export function useDate() {
 /** The one upgrade fact the cluster's header and the home page show: the most severe state,
  * worded. */
 export function useUpgradeBadge(
-  upgrades?: Schemas["Upgrades"],
+  upgrades?: Schemas.Upgrades,
 ): { health: Health; text: string } | null {
   const t = useT()
   const date = useDate()

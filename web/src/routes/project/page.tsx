@@ -108,7 +108,7 @@ function ProjectBody({
 }: {
   project: string
   data: Project
-  unreadable: Schemas["UnreadableView"][]
+  unreadable: Schemas.UnreadableView[]
 }) {
   const view = useView(project, data)
   const refused = refusedAmong(unreadable, refusedPlaces.services)
@@ -312,7 +312,7 @@ function MapView({
 }: {
   project: string
   data: Project
-  unreadable: Schemas["UnreadableView"][]
+  unreadable: Schemas.UnreadableView[]
 }) {
   const search = route.useSearch()
   const navigate = route.useNavigate()
@@ -360,7 +360,7 @@ function ListView({
 }: {
   project: string
   data: Project
-  unreadable: Schemas["UnreadableView"][]
+  unreadable: Schemas.UnreadableView[]
 }) {
   // After Back, Forward or a link, the filter box starts again from the URL.
   const entry = useHistoryIndex()

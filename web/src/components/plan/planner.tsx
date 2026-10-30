@@ -17,9 +17,9 @@ const PlanStep = lazy(() =>
 
 export interface PlanAsk {
   title: string
-  changes: Schemas["Change"][]
+  changes: Schemas.Change[]
   /** When the changes do not name it (a ConfigMap, a route, a policy). */
-  service?: Schemas["WorkloadRef"]
+  service?: Schemas.WorkloadRef
   /** Services the changes leave out because another tool manages them. */
   skipped?: Skipped[]
   /** Sentences the changes cannot say themselves. */
@@ -35,7 +35,7 @@ export interface PlanAsk {
 /** For a plan of objects written as YAML. */
 export interface PlanHooks {
   /** Where in the YAML a refusal points, in words. */
-  where?: (at: Schemas["ProblemAt"]) => string
+  where?: (at: Schemas.ProblemAt) => string
   /** An apply refused after it created some of the objects. */
   onPartial?: (problem: Problem) => void
 }

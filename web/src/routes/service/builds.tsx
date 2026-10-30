@@ -8,7 +8,8 @@ import GitBranchIcon from "~icons/ph/git-branch"
 import RocketLaunchIcon from "~icons/ph/rocket-launch"
 import UploadSimpleIcon from "~icons/ph/upload-simple"
 
-import { api, toProblem, unwrap } from "@/api/client"
+import { toProblem } from "@/api/client"
+import * as zeabur from "@/api/zeabur"
 import { buildsQuery, capabilitiesQuery, logsQuery } from "@/api/queries"
 import { Ago, CopyButton, Segmented } from "@/components/bits"
 import { InstallAlert } from "@/components/lazy-installer-sheet"
@@ -223,12 +224,7 @@ function Refused({
 }) {
   const t = useT()
   const show = useMutation({
-    mutationFn: async () =>
-      unwrap(
-        await api.POST("/api/v1/projects/{project}/deploy-keys/{name}/public", {
-          params: { path: { project, name: build.credentials ?? "" } },
-        }),
-      ),
+    mutationFn: async () => await zeabur.revealDeployKey(project, build.credentials ?? ""),
   })
   const repo = parseRepository(build.gitUrl ?? "")
   const keyPage = repo ? deployKeyPage(repo) : undefined

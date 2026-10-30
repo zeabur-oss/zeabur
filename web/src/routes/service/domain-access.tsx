@@ -17,7 +17,7 @@ import { RadioGroup, RadioOption } from "@zeabur/design-system/components/radio"
 import { Select } from "@zeabur/design-system/components/select"
 import { Switch } from "@zeabur/design-system/components/switch"
 
-type Change = Schemas["Change"]
+type Change = Schemas.Change
 
 const HOST = /^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)+$/
 
@@ -69,7 +69,7 @@ function userProblems(t: Translate, form: PasswordForm) {
 }
 
 /** The redirect Zeabur wrote for `host`, with its target once the Middleware loads. */
-function useExisting(project: string, route: Schemas["Route"], host: string) {
+function useExisting(project: string, route: Schemas.Route, host: string) {
   const redirect = route.redirects?.find((r) => r.host === host)
   const said = filterRedirect(redirect)
   const current = useQuery({
@@ -81,7 +81,7 @@ function useExisting(project: string, route: Schemas["Route"], host: string) {
 }
 
 /** An HTTPRoute's redirect is a filter of the route, which the document already has. */
-function filterRedirect(redirect: Schemas["RouteMiddleware"] | undefined) {
+function filterRedirect(redirect: Schemas.RouteMiddleware | undefined) {
   if (!redirect?.to) return undefined
   return { to: redirect.to, permanent: redirect.permanent ?? true }
 }
@@ -99,7 +99,7 @@ function resolved(form: RedirectForm, existing: Existing) {
 }
 
 function redirectChanges(
-  route: Schemas["RouteRef"],
+  route: Schemas.RouteRef,
   host: string,
   existing: Existing,
   next: { mode: Mode; to: string; permanent: boolean },
@@ -111,7 +111,7 @@ function redirectChanges(
 }
 
 function passwordChanges(
-  route: Schemas["RouteRef"],
+  route: Schemas.RouteRef,
   form: PasswordForm,
   protectedNow: boolean,
 ): Change[] {
@@ -136,7 +136,7 @@ function problemsOf(
 export interface DomainDrawerProps {
   project: string
   service: Service
-  route: Schemas["Route"]
+  route: Schemas.Route
   host: string
   /** The page's planner: on a service the changes wait in its draft. */
   plan: (ask: PlanAsk) => boolean
@@ -166,7 +166,7 @@ export default function DomainAccessDrawer({
   })
   const [tried, setTried] = useState(false)
   const gateway = route.origin.kind === "HTTPRoute"
-  const routeRef = { kind: route.origin.kind as Schemas["RouteKind"], name: route.name }
+  const routeRef = { kind: route.origin.kind as Schemas.RouteKind, name: route.name }
   const workload = { kind: service.kind, name: service.name }
   const others = route.hostnames.filter((h) => h !== host)
 

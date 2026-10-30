@@ -102,7 +102,7 @@ export function Events({
 }: {
   events: Event[]
   pod?: string
-  unreadable: Schemas["UnreadableView"][]
+  unreadable: Schemas.UnreadableView[]
   onPod: (pod?: string) => void
 }) {
   return (

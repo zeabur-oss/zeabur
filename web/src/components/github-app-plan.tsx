@@ -15,13 +15,13 @@ const warningText = {
   removesNamespaces: "githubApp.warning.removesNamespaces",
 } as const
 
-function writeLine(write: Schemas["GitHubAppWrite"], t: ReturnType<typeof useT>): string {
+function writeLine(write: Schemas.GitHubAppWrite, t: ReturnType<typeof useT>): string {
   if (write.kind === "Secret") return t("githubApp.plan.secret")
   if (write.name === "github-app-installations") return t("githubApp.plan.grants")
   return t("githubApp.plan.project", write.namespace)
 }
 
-function WriteList({ writes }: { writes: Schemas["GitHubAppWrite"][] }) {
+function WriteList({ writes }: { writes: Schemas.GitHubAppWrite[] }) {
   const t = useT()
   if (writes.length === 0) return <p>{t("clusterBackups.plan.nothing")}</p>
   return (

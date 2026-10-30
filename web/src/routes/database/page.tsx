@@ -115,7 +115,7 @@ const tabLabel = {
   settings: "tab.settings",
 } as const
 
-const outcomeHealth: Record<Schemas["BackupOutcome"], Health> = {
+const outcomeHealth: Record<Schemas.BackupOutcome, Health> = {
   succeeded: "ok",
   partiallyFailed: "warn",
   failed: "fail",

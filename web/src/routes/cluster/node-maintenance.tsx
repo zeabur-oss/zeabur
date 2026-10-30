@@ -17,8 +17,8 @@ import { useT } from "@/i18n"
 import { Button } from "@zeabur/design-system/components/button"
 import { Menu, MenuContent, MenuItem, MenuTrigger } from "@zeabur/design-system/components/menu"
 
-type NodeView = Schemas["NodeView"]
-type NodeAction = Schemas["NodeAction"]
+type NodeView = Schemas.NodeView
+type NodeAction = Schemas.NodeAction
 
 const refresh = () => {
   void queryClient.invalidateQueries({ queryKey: nodesQuery.queryKey })

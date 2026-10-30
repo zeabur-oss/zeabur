@@ -7,8 +7,8 @@ import type { Translate } from "@/i18n"
 import { databaseLink, serviceLink } from "@/lib/place"
 import { endpointsOf } from "@/model/service"
 
-type Gap = Schemas["Gap"]
-type Project = Schemas["Project"]
+type Gap = Schemas.Gap
+type Project = Schemas.Project
 type Service = Project["services"][number]
 
 /** Builds the plan that fixes a gap, or `undefined` when this gap's case needs a person. */

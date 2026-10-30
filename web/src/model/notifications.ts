@@ -1,8 +1,8 @@
 import type { Schemas } from "@/api/client"
 
-type Settings = Schemas["AlertmanagerChannelSettings"]
+type Settings = Schemas.AlertmanagerChannelSettings
 export type ChannelKind = Settings["kind"]
-export type Event = Schemas["AlertmanagerEvent"]
+export type Event = Schemas.AlertmanagerEvent
 
 /** Alerting comes with the metrics component. */
 export const METRICS_COMPONENT = "metrics/victoria-metrics"
@@ -97,7 +97,7 @@ export function missingInEdit(form: ChannelForm): Field[] {
 }
 
 /** The form of a channel to edit: its shown settings, the stored ones empty. */
-export function formOf(channel: Schemas["AlertmanagerChannel"]): ChannelForm {
+export function formOf(channel: Schemas.AlertmanagerChannel): ChannelForm {
   return {
     name: channel.name,
     kind: channel.kind as ChannelKind,
@@ -137,9 +137,9 @@ export type Verdict =
   | { as: "waiting"; count: number }
   | { as: "ok"; count: number }
 
-export function verdict(channels: Schemas["AlertmanagerChannel"][]): Verdict {
+export function verdict(channels: Schemas.AlertmanagerChannel[]): Verdict {
   if (channels.length === 0) return { as: "none" }
-  const count = (status: Schemas["AlertmanagerChannelStatus"]) =>
+  const count = (status: Schemas.AlertmanagerChannelStatus) =>
     channels.filter((c) => c.status === status).length
   if (count("rejected") > 0) return { as: "rejected", count: count("rejected") }
   if (count("active") === 0) return { as: "waiting", count: channels.length }

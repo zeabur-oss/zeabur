@@ -1,7 +1,7 @@
 import type { Schemas } from "@/api/client"
 import type { Health, Service } from "@/model/service"
 
-export type Alert = Schemas["FalcoAlert"]
+export type Alert = Schemas.FalcoAlert
 
 /** The names a workload's controller gives its pods; a gone pod still matches. */
 const suffix: Record<Service["kind"], string> = {

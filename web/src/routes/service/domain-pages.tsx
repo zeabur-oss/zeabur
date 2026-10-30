@@ -67,14 +67,14 @@ function useCurrentPages(project: string) {
 }
 
 /** The form, and the changes it asks for once the pages are known. */
-function usePagesForm(project: string, route: Schemas["Route"], host: string) {
+function usePagesForm(project: string, route: Schemas.Route, host: string) {
   const current = useCurrentPages(project)
   const was = {
     maintenance: route.maintenance?.includes(host) ?? false,
     errorPages: route.errorPages != null,
   }
   const [form, setForm] = useState<PagesForm>({ ...was, edited: {} })
-  const routeRef = { kind: route.origin.kind as Schemas["RouteKind"], name: route.name }
+  const routeRef = { kind: route.origin.kind as Schemas.RouteKind, name: route.name }
   const changes = current.ready
     ? pageChanges(
         routeRef,
@@ -109,7 +109,7 @@ export default function DomainPagesDrawer({
 }: {
   project: string
   service: Service
-  route: Schemas["Route"]
+  route: Schemas.Route
   host: string
   /** Traefik serves the Ingress, so it can show error pages. An HTTPRoute can't. */
   traefik: boolean
@@ -205,14 +205,14 @@ function useRoomSentence(id: string, enabled: boolean) {
   }
 }
 
-function maintenanceHint(t: Translate, service: Service, route: Schemas["Route"], host: string) {
+function maintenanceHint(t: Translate, service: Service, route: Schemas.Route, host: string) {
   const hint = t("domainPages.maintenanceHint", host, service.name)
   const others = route.hostnames.filter((h) => h !== host)
   if (route.origin.kind !== "HTTPRoute" || others.length === 0) return hint
   return t("common.sentences", [hint, t("domainPages.gatewayMoves", t("common.list", others))])
 }
 
-function errorPagesHint(t: Translate, service: Service, route: Schemas["Route"], host: string) {
+function errorPagesHint(t: Translate, service: Service, route: Schemas.Route, host: string) {
   const others = route.hostnames.filter((h) => h !== host)
   const shared = others.length > 0 ? ` ${t("domainPages.shared", t("common.list", others))}` : ""
   return `${t("domainPages.errorPagesHint", service.name)}${shared}`

@@ -6,8 +6,8 @@ import type { Overview } from "@/model/overview"
 import type { Status } from "@/model/service"
 import { verdictOf } from "@/model/verdict"
 
-type Route = Schemas["RouteTraceView"]
-type Diagnosis = Schemas["Diagnosis"]
+type Route = Schemas.RouteTraceView
+type Diagnosis = Schemas.Diagnosis
 
 const ready: Status = { health: "ok", word: "ready", ready: 2, desired: 2 }
 
@@ -23,7 +23,7 @@ const route = (
   via: { kind: "Ingress", name: "web" },
 })
 
-type DomainCheck = Schemas["DomainCheck"]
+type DomainCheck = Schemas.DomainCheck
 
 const withDomain = (r: Route, domain: DomainCheck): Route => ({ ...r, domain })
 

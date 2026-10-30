@@ -2,7 +2,8 @@ import { useMutation, useQuery } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
 import { useId, useState, type ReactNode } from "react"
 
-import { api, toProblem, unwrap } from "@/api/client"
+import { toProblem } from "@/api/client"
+import * as zeabur from "@/api/zeabur"
 import {
   clusterQuery,
   creatableQuery,
@@ -71,13 +72,7 @@ function useConversion(project: string, yaml: string, envFiles: Files) {
   const [read, setRead] = useState<{ conversion: Conversion; source: string }>()
   const source = JSON.stringify([yaml, envFiles])
   const convert = useMutation({
-    mutationFn: async () =>
-      unwrap(
-        await api.POST("/api/v1/projects/{project}/compose", {
-          params: { path: { project } },
-          body: { yaml, envFiles },
-        }),
-      ),
+    mutationFn: async () => await zeabur.convertCompose(project, { yaml, envFiles }),
     onSuccess: (conversion) => setRead({ conversion, source }),
   })
   return { convert, conversion: read?.conversion, stale: !!read && read.source !== source }

@@ -21,8 +21,8 @@ import {
 } from "@/model/severity"
 import { verdictOf } from "@/model/verdict"
 
-type Diagnosis = Schemas["Diagnosis"]
-type Route = Schemas["RouteTraceView"]
+type Diagnosis = Schemas.Diagnosis
+type Route = Schemas.RouteTraceView
 
 const now = Date.parse("2026-10-23T12:00:00Z")
 const ago = (ms: number) => new Date(now - ms).toISOString()
@@ -62,7 +62,7 @@ const toneOf = (
     now,
   }).tone
 
-const node = (more: Partial<Schemas["NodeView"]> = {}): Schemas["NodeView"] => ({
+const node = (more: Partial<Schemas.NodeView> = {}): Schemas.NodeView => ({
   id: "nodes/vps-1",
   name: "vps-1",
   allocatable: { cpuMillicores: 2000, memoryBytes: 2 ** 31, pods: 110 },

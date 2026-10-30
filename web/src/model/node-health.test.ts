@@ -16,7 +16,7 @@ import { missingReason, volumeFill } from "@/model/volume-use"
 
 const GiB = 2 ** 30
 
-const node = (name: string, more: Partial<Schemas["NodeView"]> = {}): Schemas["NodeView"] => ({
+const node = (name: string, more: Partial<Schemas.NodeView> = {}): Schemas.NodeView => ({
   id: `nodes/${name}`,
   name,
   allocatable: { cpuMillicores: 2000, memoryBytes: 2 * GiB, pods: 110 },
@@ -174,7 +174,7 @@ describe("nodes, worst first", () => {
   })
 
   test("a cordoned node says whether replicas are leaving, all are gone, or they stay", () => {
-    const kind = (more: Partial<Schemas["NodeView"]>) =>
+    const kind = (more: Partial<Schemas.NodeView>) =>
       nodeIssues(node("a", { cordoned: true, ...more })).map((i) => [i.kind, i.health])
     expect(kind({ movablePods: 3, leavingPods: 1 })).toEqual([["draining", "progress"]])
     expect(kind({ movablePods: 0, leavingPods: 0 })).toEqual([["maintenance", "idle"]])
@@ -188,7 +188,7 @@ describe("nodes, worst first", () => {
   })
 })
 
-const volume = (claim: string, capacity: number, available: number): Schemas["VolumeUsage"] => ({
+const volume = (claim: string, capacity: number, available: number): Schemas.VolumeUsage => ({
   claim,
   capacityBytes: capacity * GiB,
   availableBytes: available * GiB,
@@ -229,9 +229,9 @@ describe("a volume's fill", () => {
 
 const incident = (
   name: string,
-  more: Partial<Schemas["Incident"]> = {},
+  more: Partial<Schemas.Incident> = {},
   services: string[] = [],
-): Schemas["Incident"] => ({
+): Schemas.Incident => ({
   id: `incidents/node/${name}`,
   kind: "nodeNotReady",
   cause: { key: "incident.nodeNotReady.cause", params: { node: name, status: "Unknown" } },
@@ -244,7 +244,7 @@ const incident = (
   services: services.map((s) => {
     const [project = "", service = ""] = s.split("/")
     return { id: `${project}/Deployment/${service}`, project, kind: "Deployment", name: service }
-  }) as Schemas["AffectedService"][],
+  }) as Schemas.AffectedService[],
   ...more,
 })
 

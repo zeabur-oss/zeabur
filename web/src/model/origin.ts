@@ -2,10 +2,10 @@
 // one, its kind and cause.
 import type { Schemas } from "@/api/client"
 
-type Diagnosis = Schemas["Diagnosis"]
+type Diagnosis = Schemas.Diagnosis
 
-export type Origin = Schemas["FaultOrigin"]
-export type Fixer = Schemas["Fixer"] | "unknown"
+export type Origin = Schemas.FaultOrigin
+export type Fixer = Schemas.Fixer | "unknown"
 
 export interface ProblemOrigin {
   origin: Origin

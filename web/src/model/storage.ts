@@ -2,9 +2,9 @@
 // node it is kept on.
 import type { Schemas } from "@/api/client"
 
-export type StorageClass = Schemas["StorageClassView"]
-export type ProjectStorage = Schemas["ProjectStorage"]
-type ClaimStorage = Schemas["ClaimStorage"]
+export type StorageClass = Schemas.StorageClassView
+export type ProjectStorage = Schemas.ProjectStorage
+type ClaimStorage = Schemas.ClaimStorage
 
 /** The class a new volume gets when none is named. */
 const defaultClass = (storage: ProjectStorage | undefined): StorageClass | undefined =>

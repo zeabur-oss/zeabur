@@ -19,7 +19,7 @@ import {
 import { useT } from "@/i18n"
 import { Section } from "@/routes/cluster/section"
 
-type ClusterHealth = Schemas["ClusterHealth"]
+type ClusterHealth = Schemas.ClusterHealth
 
 export function HealthSection() {
   const t = useT()

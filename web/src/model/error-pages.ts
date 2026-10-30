@@ -1,6 +1,6 @@
 import type { Schemas } from "@/api/client"
 
-type Change = Schemas["Change"]
+type Change = Schemas.Change
 
 export const PAGE_KEYS = [
   "maintenance",
@@ -70,7 +70,7 @@ export interface PagesForm {
 
 /** What the form asks for, against what the route and the page server say now. */
 export function pageChanges(
-  route: Schemas["RouteRef"],
+  route: Schemas.RouteRef,
   host: string,
   was: {
     maintenance: boolean

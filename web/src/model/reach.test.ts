@@ -12,8 +12,8 @@ import {
   showsRules,
 } from "@/model/reach"
 
-type Reach = Schemas["NetworkPolicyService"]
-type Access = Schemas["NetworkPolicyAccess"]
+type Reach = Schemas.NetworkPolicyService
+type Access = Schemas.NetworkPolicyAccess
 
 const reach = (accesses: Access[], selectedBy = ["default-deny"]): Reach => ({
   service: "p/deployment/me",

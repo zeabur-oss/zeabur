@@ -1,10 +1,10 @@
 import { describe, test, expect } from "bun:test"
 
-import { ApiError, unwrap } from "@/api/client"
+import { answer, ApiError } from "@/api/client"
 import { IDLE_AFTER_MS, isBackground, signInHref } from "@/auth/session"
 
 describe("signing in again", () => {
-  test("a signed-out answer sends the browser to sign in once, back to this page", () => {
+  test("a signed-out answer sends the browser to sign in once, back to this page", async () => {
     const assigned: string[] = []
     const location = {
       pathname: "/projects/shop",
@@ -14,26 +14,27 @@ describe("signing in again", () => {
     }
     Object.assign(globalThis, { window: { location } })
     const signedOut = {
-      error: {
-        type: "/problems/signed-out",
-        title: "You are signed out",
-        status: 401,
-        detail: "Sign in to use Zeabur.",
-        fix: "Sign in again.",
-        kind: "signed-out",
-      },
-      response: new Response(null, { status: 401 }),
+      type: "/problems/signed-out",
+      title: "You are signed out",
+      status: 401,
+      detail: "Sign in to use Zeabur.",
+      fix: "Sign in again.",
+      kind: "signed-out",
     }
+    const answered = (problem: object) =>
+      answer(
+        new Response(JSON.stringify(problem), {
+          status: 401,
+          headers: { "content-type": "application/problem+json" },
+        }),
+      )
     // Every request on the page fails at once; the browser leaves once.
-    for (let i = 0; i < 3; i += 1) expect(() => unwrap(signedOut)).toThrow(ApiError)
+    for (let i = 0; i < 3; i += 1) await expect(answered(signedOut)).rejects.toThrow(ApiError)
     expect(assigned).toStrictEqual(["/auth/login?return=%2Fprojects%2Fshop"])
 
     // A credential the cluster refused is not a signed-out session.
-    const refused = {
-      ...signedOut,
-      error: { ...signedOut.error, kind: "unauthenticated", type: "/problems/unauthenticated" },
-    }
-    expect(() => unwrap(refused)).toThrow(ApiError)
+    const refused = { ...signedOut, kind: "unauthenticated", type: "/problems/unauthenticated" }
+    await expect(answered(refused)).rejects.toThrow(ApiError)
     expect(assigned.length).toBe(1)
   })
 

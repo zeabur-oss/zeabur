@@ -70,8 +70,8 @@ import { TaskRunsCard } from "@/routes/service/tasks"
 import { UsageGlance } from "@/routes/service/usage"
 
 type OnTab = (place: ServicePlace, pod?: string) => void
-type RolloutProgress = Schemas["RolloutProgress"]
-type ServiceTrace = Schemas["ServiceTrace"]
+type RolloutProgress = Schemas.RolloutProgress
+type ServiceTrace = Schemas.ServiceTrace
 
 /** Health first, then each cause once with what it takes down, then how the service is reached. */
 export function OverviewTab({
