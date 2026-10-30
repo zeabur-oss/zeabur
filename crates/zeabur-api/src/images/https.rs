@@ -19,7 +19,7 @@ use hyper_rustls::HttpsConnector;
 use hyper_util::client::legacy::Client;
 use hyper_util::client::legacy::connect::HttpConnector;
 use hyper_util::client::legacy::connect::dns::{GaiResolver, Name};
-use hyper_util::rt::TokioExecutor;
+use hyper_util::rt::{TokioExecutor, TokioTimer};
 use rustls::pki_types::CertificateDer;
 use rustls::pki_types::pem::PemObject as _;
 use secrecy::ExposeSecret as _;
@@ -28,6 +28,10 @@ use super::registry::{Answer, Get, Transport};
 
 /// How long one exchange may take, connection included.
 const DEADLINE: Duration = Duration::from_secs(5);
+/// How long a connection may sit unused in the pool.
+pub(crate) const IDLE: Duration = Duration::from_secs(30);
+/// How many unused connections the pool keeps per host.
+pub(crate) const IDLE_PER_HOST: usize = 2;
 
 /// Which addresses the client may connect to.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -54,18 +58,11 @@ impl std::fmt::Debug for Https {
 }
 
 impl Https {
-    /// A client that connects where `reach` allows, trusting the platform's roots and the
-    /// certificates of the PEM bundle `extra_ca`.
-    ///
-    /// # Errors
-    ///
-    /// When `extra_ca` is not a PEM certificate bundle, or TLS cannot be set up.
-    pub fn new(reach: Reach, extra_ca: Option<&[u8]>) -> Result<Self, String> {
-        let client = Client::builder(TokioExecutor::new())
-            .pool_idle_timeout(Duration::from_secs(30))
-            .pool_max_idle_per_host(2)
-            .build(connector(reach, extra_ca)?);
-        Ok(Self { client, reach })
+    /// A client that connects where `reach` allows, trusting what `tls` trusts.
+    #[must_use]
+    pub fn new(reach: Reach, tls: &Arc<rustls::ClientConfig>) -> Self {
+        let client = pooled(connector(reach, tls), IDLE);
+        Self { client, reach }
     }
 
     async fn send(&self, get: Get) -> Result<Answer, String> {
@@ -149,12 +146,16 @@ impl Https {
 /// The HTTPS connector, through the platform's trust roots, to the addresses `reach` allows.
 pub(crate) type Connector = HttpsConnector<HttpConnector<Guarded>>;
 
-/// A [`Connector`] that connects where `reach` allows and also trusts `extra_ca`, a PEM bundle.
+/// What a trust policy's clients share: its TLS configuration, or why there is none.
+pub type Tls = Result<Arc<rustls::ClientConfig>, String>;
+
+/// The TLS configuration for the platform's trust roots and the certificates of the PEM bundle
+/// `extra_ca`; one per trust policy, shared by its clients.
 ///
 /// # Errors
 ///
 /// When `extra_ca` is not a PEM certificate bundle, or TLS cannot be set up.
-pub(crate) fn connector(reach: Reach, extra_ca: Option<&[u8]>) -> Result<Connector, String> {
+pub fn tls(extra_ca: Option<&[u8]>) -> Tls {
     let provider = Arc::new(rustls::crypto::aws_lc_rs::default_provider());
     let extra = match extra_ca {
         Some(pem) => {
@@ -171,23 +172,38 @@ pub(crate) fn connector(reach: Reach, extra_ca: Option<&[u8]>) -> Result<Connect
     let verifier =
         rustls_platform_verifier::Verifier::new_with_extra_roots(extra, Arc::clone(&provider))
             .map_err(|e| e.to_string())?;
-    let tls = rustls::ClientConfig::builder_with_provider(provider)
-        .with_safe_default_protocol_versions()
-        .map_err(|e| e.to_string())?
-        .dangerous()
-        .with_custom_certificate_verifier(Arc::new(verifier))
-        .with_no_client_auth();
+    Ok(Arc::new(
+        rustls::ClientConfig::builder_with_provider(provider)
+            .with_safe_default_protocol_versions()
+            .map_err(|e| e.to_string())?
+            .dangerous()
+            .with_custom_certificate_verifier(Arc::new(verifier))
+            .with_no_client_auth(),
+    ))
+}
+
+/// A [`Connector`] that connects where `reach` allows and trusts what `tls` trusts.
+pub(crate) fn connector(reach: Reach, tls: &Arc<rustls::ClientConfig>) -> Connector {
     let mut http = HttpConnector::new_with_resolver(Guarded {
         inner: GaiResolver::new(),
         reach,
     });
     http.enforce_http(false);
     http.set_connect_timeout(Some(DEADLINE));
-    Ok(hyper_rustls::HttpsConnectorBuilder::new()
-        .with_tls_config(tls)
-        .https_or_http()
-        .enable_http1()
-        .wrap_connector(http))
+    HttpsConnector::from((http, Arc::clone(tls)))
+}
+
+/// A client over `connector` that closes a connection left unused for `idle`.
+pub(crate) fn pooled<B>(connector: Connector, idle: Duration) -> Client<Connector, B>
+where
+    B: axum::body::HttpBody + Send,
+    B::Data: Send,
+{
+    Client::builder(TokioExecutor::new())
+        .pool_timer(TokioTimer::new())
+        .pool_idle_timeout(idle)
+        .pool_max_idle_per_host(IDLE_PER_HOST)
+        .build(connector)
 }
 
 /// Refuses a URL that names an address `reach` does not allow.
@@ -316,15 +332,15 @@ mod tests {
 
     #[test]
     fn an_extra_ca_must_be_a_pem_certificate_bundle() {
-        let error = Https::new(Reach::Public, Some(b"not a certificate")).unwrap_err();
+        let error = tls(Some(b"not a certificate")).unwrap_err();
         assert!(error.contains("not a PEM certificate bundle"), "{error}");
-        assert!(Https::new(Reach::Public, Some(b"")).is_err());
-        assert!(Https::new(Reach::Public, None).is_ok());
+        assert!(tls(Some(b"")).is_err());
+        assert!(tls(None).is_ok());
     }
 
     #[tokio::test]
     async fn a_url_that_names_a_refused_address_is_not_sent() {
-        let client = Https::new(Reach::Public, None).unwrap();
+        let client = Https::new(Reach::Public, &tls(None).unwrap());
         let answer = client
             .get(Get {
                 url: "http://169.254.169.254/latest/meta-data/".to_owned(),
@@ -337,5 +353,54 @@ mod tests {
             answer.err().as_deref(),
             Some("Zeabur does not connect to 169.254.169.254")
         );
+    }
+
+    #[tokio::test]
+    async fn a_pooled_connection_is_closed_once_the_idle_timeout_passes() {
+        use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
+
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let url = format!("http://{}/", listener.local_addr().unwrap());
+        let server = tokio::spawn(async move {
+            let (mut socket, _) = listener.accept().await.unwrap();
+            let mut buffer = [0; 1024];
+            let _request = socket.read(&mut buffer).await.unwrap();
+            socket
+                .write_all(b"HTTP/1.1 200 OK\r\ncontent-length: 2\r\n\r\nok")
+                .await
+                .unwrap();
+            tokio::time::timeout(Duration::from_secs(5), socket.read(&mut buffer))
+                .await
+                .map(|read| read.unwrap())
+        });
+        let client = pooled(
+            connector(Reach::Any, &tls(None).unwrap()),
+            Duration::from_millis(100),
+        );
+        let request = Request::get(url).body(Full::<Bytes>::default()).unwrap();
+        let response = client.request(request).await.unwrap();
+        response.into_body().collect().await.unwrap();
+        assert_eq!(server.await.unwrap(), Ok(0), "the server saw the close");
+    }
+
+    async fn exchange_over_tls(extra_ca: Option<&str>) -> Result<u16, String> {
+        let address = zeabur_test_support::tls::serve().await;
+        let client = Https::new(Reach::Any, &tls(extra_ca.map(str::as_bytes)).unwrap());
+        let request = Request::get(format!("https://{address}/"))
+            .body(Full::default())
+            .unwrap();
+        client
+            .exchange(request, 1024)
+            .await
+            .map(|(status, _)| status)
+    }
+
+    #[tokio::test]
+    async fn a_certificate_is_trusted_only_under_the_trusted_ca_that_signed_it() {
+        use zeabur_test_support::tls::{ca_a, ca_b};
+
+        assert_eq!(exchange_over_tls(Some(ca_a())).await, Ok(200));
+        assert!(exchange_over_tls(Some(ca_b())).await.is_err());
+        assert!(exchange_over_tls(None).await.is_err());
     }
 }

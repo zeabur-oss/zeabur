@@ -21,9 +21,8 @@ use base64::engine::general_purpose::STANDARD;
 use bytes::Bytes;
 use http_body_util::Empty;
 use hyper_util::client::legacy::Client;
-use hyper_util::rt::TokioExecutor;
 
-use crate::images::https::{self, Connector, connector, describe, refuse_named};
+use crate::images::https::{self, Connector, IDLE, Tls, connector, describe, pooled, refuse_named};
 
 /// How long the store may take to start answering.
 const FIRST_BYTE: Duration = Duration::from_secs(30);
@@ -44,11 +43,13 @@ impl std::fmt::Debug for Fetcher {
 }
 
 impl Fetcher {
-    /// A client that connects where `reach` allows and also trusts `extra_ca`, a PEM bundle.
+    /// A client that connects where `reach` allows and trusts what `tls` trusts.
     #[must_use]
-    pub fn new(reach: https::Reach, extra_ca: Option<&[u8]>) -> Self {
-        let client =
-            connector(reach, extra_ca).map(|c| Client::builder(TokioExecutor::new()).build(c));
+    pub fn new(reach: https::Reach, tls: &Tls) -> Self {
+        let client = tls
+            .as_ref()
+            .map(|tls| pooled(connector(reach, tls), IDLE))
+            .map_err(Clone::clone);
         Self { client, reach }
     }
 
@@ -240,14 +241,17 @@ mod tests {
     /// refuses.
     #[tokio::test]
     async fn the_store_trusts_the_extra_ca_and_still_refuses_link_local_addresses() {
-        let broken = Fetcher::new(https::Reach::Public, Some(b"not a certificate"));
+        let broken = Fetcher::new(
+            https::Reach::Public,
+            &https::tls(Some(b"not a certificate")),
+        );
         let error = broken.get("https://s3.example.com/b/k", Vec::new()).await;
         assert!(
             error.as_ref().is_err_and(|e| e.contains("PEM")),
             "{:?}",
             error.map(|r| r.status())
         );
-        let store = Fetcher::new(https::Reach::Public, None);
+        let store = Fetcher::new(https::Reach::Public, &https::tls(None));
         let refused = store.get("https://169.254.169.254/b/k", Vec::new()).await;
         assert!(
             refused
@@ -256,5 +260,23 @@ mod tests {
             "{:?}",
             refused.map(|r| r.status())
         );
+    }
+
+    async fn fetch_over_tls(extra_ca: Option<&str>) -> Result<u16, String> {
+        let address = zeabur_test_support::tls::serve().await;
+        let store = Fetcher::new(https::Reach::Any, &https::tls(extra_ca.map(str::as_bytes)));
+        store
+            .get(&format!("https://{address}/b/k"), Vec::new())
+            .await
+            .map(|response| response.status().as_u16())
+    }
+
+    #[tokio::test]
+    async fn the_store_trusts_only_the_trusted_ca_that_signed_the_certificate() {
+        use zeabur_test_support::tls::{ca_a, ca_b};
+
+        assert_eq!(fetch_over_tls(Some(ca_a())).await, Ok(200));
+        assert!(fetch_over_tls(Some(ca_b())).await.is_err());
+        assert!(fetch_over_tls(None).await.is_err());
     }
 }

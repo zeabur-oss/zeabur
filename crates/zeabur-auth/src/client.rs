@@ -44,6 +44,7 @@
 //! [oidc-discovery]: https://openid.net/specs/openid-connect-discovery-1_0.html
 
 use std::fmt;
+use std::sync::Arc;
 
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD;
@@ -74,8 +75,9 @@ pub struct ClientConfig {
     pub client_id: String,
     /// The client secret.
     pub client_secret: SecretString,
-    /// Certificate authorities to trust for the issuer besides the platform's.
-    pub issuer_ca: ExtraRoots,
+    /// What to trust for the issuer: the platform's roots and the issuer CA
+    /// ([`ExtraRoots::client_config`]).
+    pub issuer_tls: Arc<rustls::ClientConfig>,
 }
 
 impl fmt::Debug for ClientConfig {
@@ -84,7 +86,6 @@ impl fmt::Debug for ClientConfig {
             .field("issuer", &self.issuer)
             .field("public_url", &self.public_url)
             .field("client_id", &self.client_id)
-            .field("issuer_ca", &self.issuer_ca)
             .finish_non_exhaustive()
     }
 }
@@ -202,7 +203,7 @@ impl OAuthClient {
     ///
     /// When TLS cannot be set up.
     pub fn new(config: ClientConfig) -> Result<Self, AuthError> {
-        let http = Http::new(config.issuer_ca).map_err(|e| AuthError::Invalid(e.to_string()))?;
+        let http = Http::new(&config.issuer_tls);
         Ok(Self {
             basic: basic(&config.client_id, &config.client_secret)?,
             redirect_uri: config.public_url.join(CALLBACK_PATH),
@@ -496,7 +497,7 @@ mod tests {
             public_url: BaseUrl::parse_root("http://127.0.0.1:8080").unwrap(),
             client_id: CLIENT_ID.to_owned(),
             client_secret: SecretString::from(secret.to_owned()),
-            issuer_ca: ExtraRoots::default(),
+            issuer_tls: ExtraRoots::default().client_config().unwrap(),
         })
         .unwrap()
     }

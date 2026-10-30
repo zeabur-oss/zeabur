@@ -30,7 +30,7 @@ use secrecy::{ExposeSecret as _, SecretString};
 use serde_json::json;
 use sha2::{Digest as _, Sha256};
 
-use crate::images::https::{Connector, Reach, connector, describe, refuse_named};
+use crate::images::https::{Connector, Reach, Tls, connector, describe, refuse_named};
 
 /// The largest compressed folder, as Zeabur Builder's download allows.
 pub(crate) const MAX_LAYER: u64 = 256 * 1024 * 1024;
@@ -130,13 +130,16 @@ struct Answer {
 }
 
 impl Pusher {
-    /// A client that connects where `reach` allows and also trusts `extra_ca`, a PEM bundle.
-    pub(crate) fn new(reach: Reach, extra_ca: Option<&[u8]>) -> Self {
-        let client = connector(reach, extra_ca).map(|connector| {
-            Client::builder(TokioExecutor::new())
-                .pool_max_idle_per_host(0)
-                .build(connector)
-        });
+    /// A client that connects where `reach` allows and trusts what `tls` trusts.
+    pub(crate) fn new(reach: Reach, tls: &Tls) -> Self {
+        let client = tls
+            .as_ref()
+            .map(|tls| {
+                Client::builder(TokioExecutor::new())
+                    .pool_max_idle_per_host(0)
+                    .build(connector(reach, tls))
+            })
+            .map_err(Clone::clone);
         Self { client, reach }
     }
 

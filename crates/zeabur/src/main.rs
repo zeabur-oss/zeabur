@@ -108,15 +108,15 @@ fn connect(endpoint: ClusterEndpoint) -> Bind<Connection> {
 
 async fn serve(args: &Args, config: Config) -> Result<(), String> {
     let endpoint = ClusterEndpoint::in_cluster().map_err(|e| e.to_string())?;
-    let passkeys = PasskeyEndpoints::new(&config.issuer, config.issuer_ca.clone())
-        .map_err(|e| e.to_string())?;
+    let issuer_tls = config.issuer_ca.client_config()?;
+    let passkeys = PasskeyEndpoints::new(&config.issuer, &issuer_tls);
     let oauth = Arc::new(
         OAuthClient::new(ClientConfig {
             issuer: config.issuer.clone(),
             public_url: config.public_url.clone(),
             client_id: config.client_id.clone(),
             client_secret: config.client_secret,
-            issuer_ca: config.issuer_ca,
+            issuer_tls,
         })
         .map_err(|e| e.to_string())?,
     );

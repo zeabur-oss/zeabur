@@ -358,7 +358,6 @@ pub fn router_with_key(
     sign_in: Arc<dyn account::SignInPage>,
     zeabur_proxy: Option<Arc<dyn services::proxy::ZeaburProxy>>,
 ) -> Router {
-    let images = inspector(images::https::Reach::Public, &settings);
     let terminals = tools::connect(&settings.terminal);
     build_with(
         access,
@@ -369,7 +368,7 @@ pub fn router_with_key(
         Arc::new(resolve::System),
         sign_in,
         zeabur_proxy,
-        images,
+        |tls| inspector(images::https::Reach::Public, tls),
         zeabur_catalog::template_idle,
         images::https::Reach::Public,
         terminals,
@@ -387,18 +386,15 @@ pub fn router_with_images(access: Arc<dyn ClusterAccess>, images: images::Inspec
         Arc::new(resolve::System),
         Arc::new(account::Fixed(None)),
         None,
-        Arc::new(images),
+        |_| Arc::new(images),
         zeabur_catalog::template_idle,
         images::https::Reach::Any,
         None,
     )
 }
 
-fn inspector(reach: images::https::Reach, settings: &Settings) -> Arc<images::Inspector> {
-    Arc::new(images::Inspector::connected(
-        reach,
-        settings.trusted_ca.as_deref(),
-    ))
+fn inspector(reach: images::https::Reach, tls: &images::https::Tls) -> Arc<images::Inspector> {
+    Arc::new(images::Inspector::connected(reach, tls))
 }
 
 /// [`router_at`], reaching Zeabur Proxy through `zeabur_proxy`; for tests.
@@ -416,7 +412,7 @@ pub fn router_with_zeabur_proxy(
         Arc::new(resolve::System),
         Arc::new(account::Fixed(None)),
         Some(zeabur_proxy),
-        inspector(images::https::Reach::Any, &Settings::default()),
+        |tls| inspector(images::https::Reach::Any, tls),
         zeabur_catalog::template_idle,
         images::https::Reach::Any,
         None,
@@ -441,7 +437,6 @@ pub fn router_with_terminals(
     settings: Settings,
     terminals: Arc<dyn zeabur_kube::Cluster>,
 ) -> Router {
-    let images = inspector(images::https::Reach::Any, &settings);
     build_with(
         access,
         zeabur_kube::k8s_openapi::jiff::Timestamp::now,
@@ -451,7 +446,7 @@ pub fn router_with_terminals(
         Arc::new(resolve::System),
         Arc::new(account::Fixed(None)),
         None,
-        images,
+        |tls| inspector(images::https::Reach::Any, tls),
         zeabur_catalog::template_idle,
         images::https::Reach::Any,
         Some(terminals),
@@ -502,7 +497,6 @@ pub fn router_with_settings_and_resolver(
     settings: Settings,
     resolver: Arc<dyn resolve::Resolve>,
 ) -> Router {
-    let images = inspector(images::https::Reach::Any, &settings);
     build_with(
         access,
         zeabur_kube::k8s_openapi::jiff::Timestamp::now,
@@ -512,7 +506,7 @@ pub fn router_with_settings_and_resolver(
         resolver,
         Arc::new(account::Fixed(None)),
         None,
-        images,
+        |tls| inspector(images::https::Reach::Any, tls),
         zeabur_catalog::template_idle,
         images::https::Reach::Any,
         None,
@@ -539,7 +533,7 @@ pub fn router_for_demo(
         resolver,
         Arc::new(account::Fixed(None)),
         None,
-        images,
+        |_| images,
         template_idle,
         images::https::Reach::Any,
         terminals,
@@ -553,7 +547,6 @@ fn build(
     terminal_idle: std::time::Duration,
     settings: Settings,
 ) -> Router {
-    let images = inspector(images::https::Reach::Any, &settings);
     build_with(
         access,
         clock,
@@ -563,7 +556,7 @@ fn build(
         Arc::new(resolve::System),
         Arc::new(account::Fixed(None)),
         None,
-        images,
+        |tls| inspector(images::https::Reach::Any, tls),
         zeabur_catalog::template_idle,
         images::https::Reach::Any,
         None,
@@ -583,14 +576,18 @@ fn build_with(
     resolver: Arc<dyn resolve::Resolve>,
     sign_in: Arc<dyn account::SignInPage>,
     zeabur_proxy: Option<Arc<dyn services::proxy::ZeaburProxy>>,
-    images: Arc<images::Inspector>,
+    images: impl FnOnce(&images::https::Tls) -> Arc<images::Inspector>,
     template_idle: fn(&str) -> Option<zeabur_catalog::IdleUse>,
     reach: images::https::Reach,
     terminals: Option<Arc<dyn zeabur_kube::Cluster>>,
 ) -> Router {
     let catalogue = Arc::new(zeabur_catalog::catalogue().unwrap_or_default());
-    let trusted_ca = settings.trusted_ca.clone();
-    let github = images::https::Https::new(reach, trusted_ca.as_deref()).ok();
+    let tls = images::https::tls(settings.trusted_ca.as_deref());
+    let images = images(&tls);
+    let github = tls
+        .as_ref()
+        .ok()
+        .map(|tls| images::https::Https::new(reach, tls));
     let state = AppState {
         access,
         catalogue,
@@ -603,14 +600,8 @@ fn build_with(
         tools: Arc::new(tools::Sessions::default()),
         sign_in,
         zeabur_proxy,
-        pusher: Arc::new(projects::oci_push::Pusher::new(
-            reach,
-            trusted_ca.as_deref(),
-        )),
-        store: Arc::new(cluster::object_store::Fetcher::new(
-            images.reach(),
-            trusted_ca.as_deref(),
-        )),
+        pusher: Arc::new(projects::oci_push::Pusher::new(reach, &tls)),
+        store: Arc::new(cluster::object_store::Fetcher::new(images.reach(), &tls)),
         images,
         github,
         terminals,
