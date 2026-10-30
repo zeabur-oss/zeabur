@@ -149,13 +149,12 @@ pub mod views;
 use std::sync::Arc;
 
 use axum::Router;
-use axum::routing::get;
+use axum::routing::{MethodRouter, get};
 pub use error::ApiError;
 pub use handlers::AppState;
 pub use settings::Settings;
 use utoipa::OpenApi;
-use utoipa_axum::router::OpenApiRouter;
-use utoipa_axum::routes;
+use utoipa_axum::router::{OpenApiRouter, UtoipaMethodRouter};
 
 use crate::access::ClusterAccess;
 use crate::plan_token::PlanKey;
@@ -204,14 +203,71 @@ promised a stable `/api/v1`.",
 )]
 struct ApiDoc;
 
-fn routes() -> OpenApiRouter<AppState> {
-    let router = OpenApiRouter::with_openapi(ApiDoc::openapi())
+/// A set of routes, registered in an [`OpenApiRouter`] for the document or in a plain [`Router`]
+/// for the server.
+trait Routes: Sized {
+    fn routes<D, P>(self, route: (D, P)) -> Self
+    where
+        D: FnOnce() -> UtoipaMethodRouter<AppState>,
+        P: FnOnce() -> (Vec<String>, MethodRouter<AppState>);
+}
+
+impl Routes for OpenApiRouter<AppState> {
+    fn routes<D, P>(self, (described, _): (D, P)) -> Self
+    where
+        D: FnOnce() -> UtoipaMethodRouter<AppState>,
+        P: FnOnce() -> (Vec<String>, MethodRouter<AppState>),
+    {
+        Self::routes(self, described())
+    }
+}
+
+impl Routes for Router<AppState> {
+    fn routes<D, P>(self, (_, plain): (D, P)) -> Self
+    where
+        D: FnOnce() -> UtoipaMethodRouter<AppState>,
+        P: FnOnce() -> (Vec<String>, MethodRouter<AppState>),
+    {
+        let (mut paths, methods) = plain();
+        paths.sort();
+        paths.dedup();
+        paths
+            .iter()
+            .fold(self, |router, path| router.route(path, methods.clone()))
+    }
+}
+
+/// The handlers' routes, as [`utoipa_axum::routes!`] and as their paths and methods alone.
+macro_rules! routes {
+    ($($($handler:ident)::+),+ $(,)?) => {
+        (
+            || utoipa_axum::routes!($($($handler)::+),+),
+            || {
+                use utoipa_axum::PathItemExt;
+                let mut paths = Vec::new();
+                let mut methods = MethodRouter::new();
+                $(
+                    paths.push(utoipa_axum::routes!(@path [path()] of $($handler)::+));
+                    methods = utoipa_axum::routes!(@path [methods()] of $($handler)::+)
+                        .iter()
+                        .fold(methods, |methods, method| {
+                            methods.on(method.to_method_filter(), $($handler)::+)
+                        });
+                )+
+                (paths, methods)
+            },
+        )
+    };
+}
+
+fn routes<R: Routes>(router: R) -> R {
+    let router = router
         .routes(routes!(identity::whoami))
         .routes(routes!(identity::get));
     remaining_routes(cluster_routes(router))
 }
 
-fn cluster_routes(router: OpenApiRouter<AppState>) -> OpenApiRouter<AppState> {
+fn cluster_routes<R: Routes>(router: R) -> R {
     router
         .routes(routes!(cluster::get))
         .routes(routes!(cluster::capabilities))
@@ -257,7 +313,7 @@ fn cluster_routes(router: OpenApiRouter<AppState>) -> OpenApiRouter<AppState> {
         .routes(routes!(incidents::cluster))
 }
 
-fn remaining_routes(router: OpenApiRouter<AppState>) -> OpenApiRouter<AppState> {
+fn remaining_routes<R: Routes>(router: R) -> R {
     router
         .routes(routes!(projects::list))
         .routes(routes!(projects::get))
@@ -615,19 +671,14 @@ fn build_with(
         github,
         terminals,
     };
-    let (router, api) = routes().split_for_parts();
-    let spec = Arc::new(serde_json::to_string(&api).unwrap_or_default());
-    router
+    routes(Router::new())
         .route(
             "/api/openapi.json",
-            get(move || {
-                let spec = Arc::clone(&spec);
-                async move {
-                    (
-                        [(axum::http::header::CONTENT_TYPE, "application/json")],
-                        spec.as_str().to_owned(),
-                    )
-                }
+            get(|| async {
+                (
+                    [(axum::http::header::CONTENT_TYPE, "application/json")],
+                    bytes::Bytes::from_static(OPENAPI_JSON),
+                )
             }),
         )
         .route("/api/{*rest}", axum::routing::any(handlers::not_found))
@@ -635,9 +686,14 @@ fn build_with(
         .with_state(state)
 }
 
-/// The OpenAPI document. `crates/zeabur-api/openapi.yaml` is this, written as YAML by a test and
-/// committed; the server itself serves it as JSON at `/api/openapi.json`.
+/// The committed `openapi.json`, which the server serves at `/api/openapi.json`.
+const OPENAPI_JSON: &[u8] = include_bytes!("../openapi.json");
+
+/// The OpenAPI document. `crates/zeabur-api/openapi.yaml` and `openapi.json` are this, written by a
+/// test and committed; the server serves the JSON at `/api/openapi.json` without building it.
 #[must_use]
 pub fn openapi() -> utoipa::openapi::OpenApi {
-    routes().split_for_parts().1
+    routes(OpenApiRouter::with_openapi(ApiDoc::openapi()))
+        .split_for_parts()
+        .1
 }

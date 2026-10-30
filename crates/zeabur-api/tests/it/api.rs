@@ -1685,25 +1685,26 @@ mod tests {
 
     #[tokio::test]
     async fn the_served_description_is_the_committed_one() {
-        let committed =
-            std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/openapi.yaml"))
-                .unwrap_or_default();
-        let generated = serde_saphyr::to_string(&zeabur_api::openapi()).unwrap();
+        let path = |file: &str| format!("{}/{file}", env!("CARGO_MANIFEST_DIR"));
+        let description = zeabur_api::openapi();
+        let yaml = serde_saphyr::to_string(&description).unwrap();
+        let compact = format!("{}\n", serde_json::to_string(&description).unwrap());
         if std::env::var_os("ZEABUR_UPDATE_OPENAPI").is_some() {
-            std::fs::write(
-                concat!(env!("CARGO_MANIFEST_DIR"), "/openapi.yaml"),
-                &generated,
-            )
-            .unwrap();
+            for (file, generated) in [("openapi.yaml", &yaml), ("openapi.json", &compact)] {
+                std::fs::write(path(file), generated).unwrap();
+            }
             return;
         }
-        assert!(
-            committed == generated,
-            "crates/zeabur-api/openapi.yaml is stale; regenerate it with \
-             ZEABUR_UPDATE_OPENAPI=1 cargo nextest run -p zeabur-api"
-        );
-        let (status, _, body) = call(app(&cluster()), "GET", "/api/openapi.json").await;
+        for (file, generated) in [("openapi.yaml", &yaml), ("openapi.json", &compact)] {
+            assert!(
+                std::fs::read_to_string(path(file)).unwrap_or_default() == *generated,
+                "crates/zeabur-api/{file} is stale; regenerate it with \
+                 ZEABUR_UPDATE_OPENAPI=1 cargo nextest run -p zeabur-api"
+            );
+        }
+        let (status, headers, body) = send(app(&cluster()), "GET", "/api/openapi.json", &[]).await;
         assert_eq!(status, StatusCode::OK);
-        assert_eq!(json(&body)["openapi"], "3.1.0");
+        assert_eq!(headers["content-type"], "application/json");
+        assert_eq!(json(&body), serde_json::to_value(&description).unwrap());
     }
 }
