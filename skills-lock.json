@@ -18,6 +18,62 @@
       "sourceType": "github",
       "skillPath": "skills/transitions-ui-generation/SKILL.md",
       "computedHash": "673170706a8635e97a1876e8e4ff179915a451b1b7ab88837e8e880a1a79ba07"
+    },
+    "zeabur-oss-ci": {
+      "source": "zeabur-oss/skills",
+      "ref": "ccec48a62e047a540c8f59efa671f7ad136784c6",
+      "sourceType": "github",
+      "skillPath": "skills/zeabur-oss-ci/SKILL.md",
+      "computedHash": "404d3dd395e3ff8d11769b7d27ed59cbfda7196eb016472c81f38aa36e011873"
+    },
+    "zeabur-oss-cluster-tests": {
+      "source": "zeabur-oss/skills",
+      "ref": "ccec48a62e047a540c8f59efa671f7ad136784c6",
+      "sourceType": "github",
+      "skillPath": "skills/zeabur-oss-cluster-tests/SKILL.md",
+      "computedHash": "760218f87adb0f8a145fad0903e827055ebeca6224ad73e9feb955174e9ce722"
+    },
+    "zeabur-oss-dependencies": {
+      "source": "zeabur-oss/skills",
+      "ref": "ccec48a62e047a540c8f59efa671f7ad136784c6",
+      "sourceType": "github",
+      "skillPath": "skills/zeabur-oss-dependencies/SKILL.md",
+      "computedHash": "c47dc51f5977e468be971fa8426dea10828b841e7b27e4dc580402eb223363bd"
+    },
+    "zeabur-oss-rust": {
+      "source": "zeabur-oss/skills",
+      "ref": "ccec48a62e047a540c8f59efa671f7ad136784c6",
+      "sourceType": "github",
+      "skillPath": "skills/zeabur-oss-rust/SKILL.md",
+      "computedHash": "18c103f7e78e37c37e5ee1e1d3ccc7d98688c4b44b80b1195ea268a9ddd8eb37"
+    },
+    "zeabur-oss-spec-work": {
+      "source": "zeabur-oss/skills",
+      "ref": "ccec48a62e047a540c8f59efa671f7ad136784c6",
+      "sourceType": "github",
+      "skillPath": "skills/zeabur-oss-spec-work/SKILL.md",
+      "computedHash": "c4f78e037b1691ae6ff4056d85eddb48afd20298d2d95208cf213eb249f9dd0b"
+    },
+    "zeabur-oss-standards": {
+      "source": "zeabur-oss/skills",
+      "ref": "ccec48a62e047a540c8f59efa671f7ad136784c6",
+      "sourceType": "github",
+      "skillPath": "skills/zeabur-oss-standards/SKILL.md",
+      "computedHash": "0e634bf26f12104d3c799dcc7ff1fe881dc8426a38398878e62112c54b6a8e45"
+    },
+    "zeabur-oss-workflow": {
+      "source": "zeabur-oss/skills",
+      "ref": "ccec48a62e047a540c8f59efa671f7ad136784c6",
+      "sourceType": "github",
+      "skillPath": "skills/zeabur-oss-workflow/SKILL.md",
+      "computedHash": "4071f7bce2c9f72ca0ca27d32c6f262f7c84d749b7773e31dda971cad930dce3"
+    },
+    "zeabur-writing": {
+      "source": "zeabur-oss/skills",
+      "ref": "ccec48a62e047a540c8f59efa671f7ad136784c6",
+      "sourceType": "github",
+      "skillPath": "skills/zeabur-writing/SKILL.md",
+      "computedHash": "93e138d2cc879da75f4a84b6924e75ab8e6d20d2d4b1e4babeae37c21358a767"
     }
   }
 }

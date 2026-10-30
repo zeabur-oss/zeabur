@@ -108,11 +108,32 @@
         "type": "github"
       }
     },
+    "oss-skills": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1793328219,
+        "narHash": "sha256-rWcCqdV8DN9fW8XmDpTqQBhHNtwKwrVAnLkOAih/QdY=",
+        "owner": "zeabur-oss",
+        "repo": "skills",
+        "rev": "9a264f88e426de2e73fbdfa01387aedb721bba02",
+        "type": "github"
+      },
+      "original": {
+        "owner": "zeabur-oss",
+        "repo": "skills",
+        "type": "github"
+      }
+    },
     "root": {
       "inputs": {
         "catalog": "catalog",
         "nixpkgs": "nixpkgs_2",
         "oss-release": "oss-release",
+        "oss-skills": "oss-skills",
         "rust-overlay": "rust-overlay",
         "zhtw-mcp": "zhtw-mcp"
       }

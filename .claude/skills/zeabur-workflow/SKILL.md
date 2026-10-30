@@ -1,58 +1,35 @@
 ---
 name: zeabur-workflow
-description: How work moves through the Zeabur repository — branches, commits, pull requests, merging, and issues (types, labels, which Zeabur repository an issue belongs in) — and the rules for text that lands in the repository or on GitHub. Use when opening a branch, committing, opening or merging a pull request, or filing an issue.
+description: How work moves through the Zeabur repository — branches, commits, pull requests, merging, releases and issues (types, labels, which Zeabur repository an issue belongs in) — and the rules for text that lands in the repository or on GitHub. Use when opening a branch, committing, opening or merging a pull request, or filing an issue.
 ---
 
 # Workflow
 
-## Branch, commit, pull request
-1. Branch from an up-to-date `main`: `git fetch && git switch -c <type>/<topic> origin/main`
-   (`fix/ci-image-check-pipefail`, `docs/…`, `feat/…`). One topic per branch.
-2. Commit with `git commit -s` (DCO; the `dco` job checks the `Signed-off-by` line) in
-   [Conventional Commits](https://www.conventionalcommits.org/) style: `fix(ci): …`,
-   `test(ui): …`, `feat(api)!: …` with a `BREAKING CHANGE:` footer. The subject says what changes
-   in plain words; the body says why. No tool- or session-specific trailers.
-3. Run the checks for what you touched (`zeabur-dev`, `zeabur-ui`), push, and open the pull
-   request with `gh pr create --base main`. The body: what was wrong or missing (link the failed
-   run or the issue), the cause and how it was shown, what changed. Name what was not verified.
-4. Wait for every check: `gh pr checks <n> --watch` returns once all have finished, non-zero if
-   any failed. Without `--watch` it only reports the current state and exits 8 while checks are
-   pending, so never merge on its answer alone. A red check is investigated (`zeabur-ci`), not
-   re-run until green.
-5. Pull requests are squash-merged (`gh pr merge <n> --squash`). The subject on main is the
-   commit's for a single commit and the pull request title otherwise, so keep both
-   Conventional Commits.
+Follow `zeabur-oss-workflow` (install: `npx skills add zeabur-oss/skills --skill
+zeabur-oss-workflow`; `skills-lock.json` pins it): branches, signed-off Conventional Commits,
+pull requests, `gh pr checks --watch`, squash merging, issues and the text rules. This skill adds
+what is Zeabur's own.
 
-A change to the plan or HTTP API shape (a field added, renamed or removed) needs the maintainers'
-agreement on the shape before it is built; propose it in an issue first.
+## Pull requests
+
+- Run the checks for what you touched (`zeabur-dev`, `zeabur-ui`). A red check: `zeabur-ci`.
+- A change to the plan or HTTP API shape (a field added, renamed or removed) needs the
+  maintainers' agreement on the shape before it is built; propose it in an issue first.
 
 ## Releases
+
 A maintainer releases: they bump the version (`Cargo.toml`, `Chart.yaml`, a `CHANGELOG.md`
 section), merge it, push the tag `v<version>`, check the draft release the workflow leaves and
-publish it by hand (`docs/internal/releasing.md`). Never push a tag, create, edit or publish a release,
-dispatch `release.yml` or change a repository or package setting yourself; prepare the pull
-request and name the step that is theirs. A change to `scripts/release.sh` or a `scripts/release-*.sh` is checked with
-`shellcheck` and `actionlint`, and on Linux by running `release-build.sh` and
+publish it by hand (`docs/internal/releasing.md`). A change to `scripts/release.sh` or a
+`scripts/release-*.sh` is checked with `shellcheck` and `actionlint`, and on Linux by running
+`release-build.sh` and
 `release-smoke.sh`; the macOS build runs on a Mac. A failed release run: `zeabur-ci`.
 
 ## Issues
-- **Where.** Zeabur itself: `zeabur-oss/zeabur`. A component in the catalogue (a chart, its
-  version, values, detection, security notes, its e2e): `zeabur-oss/catalog`; Zeabur
-  embeds its release bundle at the commit in `flake.lock` (`nix flake update catalog` moves it). Sign-in, tokens, passkeys: `zeabur-oss/identity`. When work spans repositories,
-  open one issue in each and link them both ways.
-- **Type.** Bug, Feature or Task (GitHub issue types; set with
-  `gh api -X PATCH repos/<owner>/<repo>/issues/<n> -f type=Feature`).
+
+- Zeabur embeds Zeabur Catalog's release bundle at the commit in `flake.lock`
+  (`nix flake update catalog` moves it), so a catalogue issue goes to `zeabur-oss/catalog` even
+  when it shows up in Zeabur.
 - **Labels.** `bug` or `enhancement`, plus the areas it touches: `area/ui`, `area/api`,
   `area/graph`, `area/diagnosis`, `area/cli`, `area/ci`; `performance`, `i18n`, `accessibility`,
-  `documentation`, `dependencies` where they apply. Check the current set with `gh label list`.
-- **Body.** Today (what happens now, with file paths), Proposal, Open questions, Done when.
-  Facts about an upstream project come from its README, chart or source at a named version;
-  render a chart (`helm template`) to state its RBAC rather than guessing. Dependencies between
-  issues: say "Depends on #n" and set it as blocked by
-  (`gh api -X POST repos/<owner>/<repo>/issues/<n>/dependencies/blocked_by -F issue_id=<id>`).
-
-## Text that lands in the repository or on GitHub
-- English, plain words, decisions stated as facts about the design, not as history.
-- Cite public sources only, and only what you have read; otherwise write "not verified".
-- No private notes, internal plans or names of people's decisions; no milestone code names.
-- A claim that Zeabur does something better or safer has a test behind it.
+  `documentation`, `dependencies` where they apply.

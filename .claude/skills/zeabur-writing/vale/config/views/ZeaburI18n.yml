@@ -1,0 +1,5 @@
+# The text of a TypeScript message catalogue: every string and template literal, without the
+# code around it. A key is a string too; keys are ASCII ids, so no rule fires on them.
+engine: tree-sitter
+scopes:
+  - expr: "(string_fragment) @text"

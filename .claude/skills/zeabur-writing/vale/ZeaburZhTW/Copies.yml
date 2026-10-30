@@ -1,0 +1,7 @@
+extends: existence
+message: "zh-TW 的 replica 是「副本」，copy 是「複本」：檢查「%s」用對了沒有"
+level: warning
+nonword: true
+tokens:
+  - '(?:一份|製作|保留|留一份)副本'
+  - '複本(?:數|未就緒|已就緒|重新啟動)'

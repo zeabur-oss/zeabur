@@ -45,8 +45,14 @@ The interface's zh-TW wording is checked with [zhtw-mcp](https://github.com/sysp
 a dev shell of its own (it builds from source; the pin and how to bump it are in `flake.nix`), as
 CI's `wording` job does: `nix develop .#zh -c ./scripts/check-zh-tw.sh`. `web/scripts/zh-tw-strings.ts` prints every zh-TW
 string after its key; `.zhtw-mcp.toml` holds the rules, the catalogue's chosen terms and the reason
-for each rule or term it relaxes. Any warning fails the check. How the interface's text reads in
-every locale, and the term chosen for each concept, is in [docs/internal/wording.md](docs/internal/wording.md).
+for each rule or term it relaxes. Any warning fails the check. The term chosen for each concept
+and how each interface element reads are in [docs/internal/wording.md](docs/internal/wording.md);
+the general writing rules for all three locales are in the `zeabur-writing` skill
+(`.claude/skills/zeabur-writing/`, installed from
+[zeabur-oss/skills](https://github.com/zeabur-oss/skills) and pinned in `skills-lock.json`), and
+Vale checks docs and catalogues against them: `nix develop -c vale docs README.md web/src/i18n`
+(`.vale.ini`). A rule that is wrong for one passage is silenced there with a Vale comment that
+says why.
 
 Zeabur Catalog comes in as a flake input: `flake.lock` pins its commit, and the dev shell builds
 the catalog's `release` output there, the same `bundle.tar.gz` and `index.json` that its release
@@ -69,12 +75,14 @@ the same on any Linux machine with Nix, and Docker for the cluster jobs: `script
 `scripts/ci-local.sh [job…]` runs several (all by default), each in its own copy of the checkout,
 and prints one result line per job; use a disposable machine or VM for the cluster jobs.
 
-A comment says what the code cannot: a quirk and its cause, a workaround, or the specification
-section, RFC or issue behind behaviour that must not change (rustdoc cites it as the crates do).
-Usually one line; no design rationale, history, measurements or restatements of the code.
-Never cite something you have not read; write "not verified" instead. Every claim that Zeabur
-does something better or safer is backed by a test, not only by documentation. Documentation is
-written in English.
+A comment says only what the code cannot: a constraint that is not visible, a quirk and its
+cause, a workaround, or the specification section, RFC or issue behind behaviour that must not
+change (rustdoc cites it as the crates do). Usually one line; no design rationale, history,
+measurements or restatements of the code. Decisions and their reasons go in `docs/internal/`.
+Cite only what you have read; a source you have not read is not cited at all, and if it matters
+it goes in `docs/internal/` or an issue. Every claim that Zeabur does something better or safer
+is backed by a test, not only by documentation. Comments and rustdoc are written in English. The docs and interface strings come in en, zh-TW and zh-CN: write
+first in any of them, and change all three in the same pull request.
 
 ## Toolchain
 

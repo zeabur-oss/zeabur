@@ -1,0 +1,7 @@
+extends: existence
+message: "「%s」是英文語序：把條件或時間放到結果前面（…，直到恢復 → 恢復之前，…）"
+level: warning
+nonword: true
+tokens:
+  - '[，,]\s*直到'
+  - '[，,]\s*(?:以)?(?:確保|确保)'

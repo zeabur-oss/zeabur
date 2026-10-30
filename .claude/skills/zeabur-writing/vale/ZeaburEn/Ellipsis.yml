@@ -1,0 +1,6 @@
+extends: existence
+message: "Use one … character, not three periods"
+level: error
+nonword: true
+tokens:
+  - '(?<!\.)\.\.\.(?!\.)'

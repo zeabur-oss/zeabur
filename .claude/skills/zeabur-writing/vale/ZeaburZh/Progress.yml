@@ -1,0 +1,6 @@
+extends: existence
+message: "進度用「正在…」（儲存中… → 正在儲存…）"
+level: error
+nonword: true
+tokens:
+  - '\p{Han}{2}中(?:…|\.\.\.)'

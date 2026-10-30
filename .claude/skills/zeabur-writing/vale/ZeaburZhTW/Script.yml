@@ -1,0 +1,6 @@
+extends: existence
+message: "zh-TW 裡有簡體字「%s」"
+level: error
+nonword: true
+tokens:
+  - '[们个这来时说会为与对开关无过还发动点网设预资档从当让专丛体实务级机盘脑据择么请错误选项页签检视储区块连线缩应]'

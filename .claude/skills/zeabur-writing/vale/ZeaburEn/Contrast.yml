@@ -1,0 +1,8 @@
+extends: existence
+message: "Manufactured contrast: state the point"
+level: error
+ignorecase: true
+nonword: true
+tokens:
+  - '\bnot (?:just|only|merely)\b[^.]{0,80}\bbut\b'
+  - '\b(?:it''s|it is|this is|this isn''t) not\b[^.]{0,60}[,;—]\s*(?:it''s|it is|but)\b'

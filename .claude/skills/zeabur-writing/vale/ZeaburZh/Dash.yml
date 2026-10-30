@@ -1,0 +1,9 @@
+extends: existence
+message: "中文破折號是「——」，而且少用"
+level: error
+nonword: true
+tokens:
+  # A lone — with no Han text beside it is an empty value, not a dash.
+  - '(?<=\p{Han}\s?)—(?!—)'
+  - '(?<!—)—(?=\s?\p{Han})'
+  - '\p{Han}\s?--\s?\p{Han}'

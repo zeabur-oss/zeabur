@@ -1,0 +1,24 @@
+extends: script
+message: "中文與行內程式碼之間加半形空格"
+level: error
+scope: raw
+script: |
+  text := import("text")
+
+  s := scope
+  fences := text.re_find("(?ms)^ *(?:```|~~~).*?^ *(?:```|~~~)|^\n(?:(?: {4}|\t)[^\n]*(?:\n|$))+", s, -1)
+  if !is_undefined(fences) {
+    out := ""
+    last := 0
+    for m in fences {
+      out += s[last:m[0].begin] + text.repeat("#", m[0].end - m[0].begin)
+      last = m[0].end
+    }
+    s = out + s[last:]
+  }
+
+  matches := []
+  found := text.re_find("\\p{Han}`[^`\n]+`|`[^`\n]+`\\p{Han}", s, -1)
+  if !is_undefined(found) {
+    for m in found { matches = append(matches, {begin: m[0].begin, end: m[0].end}) }
+  }

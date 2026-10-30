@@ -7,9 +7,9 @@ description: Change Zeabur's web interface (web/: React, TanStack, shadcn/ui on 
 
 - **Where things are.** Sources: `web/src` (routes in `router.tsx`). Components (shadcn/ui on
   Base UI with Zeabur's variants), theme, tokens and fonts come from `@zeabur/design-system`
-  (github.com/zeabur-oss/design-system, a Git dependency pinned to a commit in `web/package.json`;
+  (github.com/zeabur-oss/design-system, checked in as `vendor/zeabur-design-system-<commit>.tgz`;
   import `@zeabur/design-system/components/<name>`; preview in its Storybook). Change a
-  component or token there, then move the pin (`bun add 'github:zeabur-oss/design-system#<commit>'`).
+  component or token there, then move the pin (`scripts/bump-design-system.sh <commit>`).
   `web/src/styles/app.css` imports it and adds only this interface's layout tokens. Dark mode
   follows the operating system (`src/theme.ts` sets shadcn's `.dark` class; pass its `useTheme()`
   to the design system's `Toaster`). Embedding and serving: `crates/zeabur-ui`.

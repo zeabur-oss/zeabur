@@ -1,0 +1,8 @@
+extends: existence
+message: "'%s' is filler: cut it or say the point"
+level: error
+ignorecase: true
+tokens:
+  - 'it(?:''s| is) (?:worth noting|important to note)'
+  - 'in today''s|in conclusion|needless to say|at the end of the day'
+  - 'when it comes to|in order to|due to the fact that'

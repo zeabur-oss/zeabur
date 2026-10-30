@@ -1,33 +1,13 @@
-# When a release run fails
+# When a Zeabur release run fails
 
-Read `docs/internal/releasing.md` ("When a release run fails"), `.github/workflows/release.yml`, the
-shared workflow it calls (zeabur-oss/.github) and the `scripts/release*.sh` it runs first: they are the recovery path. Never push or move a tag,
-publish a release, dispatch the workflow or change a package's settings yourself; those are the
-maintainers'. Propose the command or the setting instead.
+Start with `zeabur-oss-ci`'s RELEASE-RECOVERY.md (what was published stays; access failures)
+and `docs/internal/releasing.md` ("When a release run fails"). These are Zeabur's own cases.
 
-## Keep what was published
+## A private package in `verify`
 
-Once `publish` succeeded, the image, the chart and the draft's assets are signed by the shared
-workflow (`https://github.com/zeabur-oss/.github/.github/workflows/release.yml@…`) for
-`zeabur-oss/zeabur` at `refs/tags/v<version>`. Do not rebuild, re-sign, overwrite or delete
-them to make a check pass: `scripts/release.sh publish` refuses an existing release, image tag or
-chart version on purpose. Fix the check on `main`, then a maintainer runs
-`gh workflow run release.yml --ref main -f version=v<version> -F verify_only=true`, which takes
-the scripts from `main` and the Nix shell from the tag. Re-running the failed run reuses its old
-workflow file and permissions and picks up no fix.
-
-## Tell the access failures apart
-
-- **`release not found` on `gh release download`** for a draft that exists: the token cannot see
-  drafts. GitHub shows a draft only to a token that can push, so `verify` has
-  `contents: write`. Check the job's permissions; never publish the draft to get past it.
-- **`unauthorized` or `denied` pulling from ghcr.io** in `verify`, or `ErrImagePull` in the
-  smoke cluster: the package is private. A public repository does not make its packages public,
-  and the first run creates `zeabur` and `charts/zeabur` private. `scripts/release.sh verify` uses an
-  empty registry configuration on purpose, so a login cannot hide this.
-- **`gh attestation verify` finds nothing**: the `attest` jobs (image and chart) or the
-  attestation step of `release` (assets) did not run or failed; read that job's log. An image tag or a chart version that exists without attestations
-  is a failed publish, not a verification bug.
+The first run creates `zeabur` and `charts/zeabur` private on ghcr.io. `scripts/release.sh
+verify` uses an empty registry configuration on purpose, so a login cannot hide a private package.
+`scripts/release.sh publish` refuses an existing release, image tag or chart version on purpose.
 
 ## An image import that reports success
 

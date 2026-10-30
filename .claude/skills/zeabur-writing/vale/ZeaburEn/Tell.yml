@@ -1,0 +1,11 @@
+extends: existence
+message: "'%s' is an AI-tell word: say the concrete thing"
+level: error
+ignorecase: true
+tokens:
+  - 'delve[sd]?|delving|tapestry|seamless(?:ly)?|robust'
+  - 'leverag(?:e|es|ed|ing)|utiliz(?:e|es|ed|ing)|empower(?:s|ed|ing)?'
+  - 'unlock(?:s|ed|ing)? the|elevate[sd]?|streamline[sd]?|cutting-edge|game-?changer'
+  - 'testament to|in the realm of|navigat(?:e|ing) the (?:complex|landscape)|landscape of'
+  - 'embark|meticulous(?:ly)?|showcas(?:e|es|ed|ing)|underscor(?:e|es|ed|ing)|boasts?'
+  - 'pivotal|crucial|comprehensive|holistic|myriad|plethora'

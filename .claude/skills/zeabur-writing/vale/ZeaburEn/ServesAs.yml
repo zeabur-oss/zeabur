@@ -1,0 +1,9 @@
+extends: substitution
+message: "Use '%s' instead of '%s'"
+level: error
+ignorecase: true
+swap:
+  serves as: is
+  serve as: are
+  stands as: is
+  stand as: are

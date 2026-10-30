@@ -1,0 +1,6 @@
+extends: existence
+message: "中文句號用「。」：「%s」"
+level: error
+nonword: true
+tokens:
+  - '\p{Han}\.(?=\s|$|\p{Han}|["」])'

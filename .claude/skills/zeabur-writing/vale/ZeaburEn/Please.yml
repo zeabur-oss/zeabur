@@ -1,0 +1,7 @@
+extends: existence
+message: "Drop '%s' in docs and interface text"
+level: error
+ignorecase: true
+tokens:
+  - please|simply|easily|oops
+  - we're sorry

@@ -1,0 +1,8 @@
+extends: existence
+message: "中文裡用全形標點（，；：！？（））：「%s」"
+level: error
+nonword: true
+tokens:
+  - '\p{Han}[,;!?]|[,;:!?]\p{Han}'
+  - '\p{Han}:(?!//)'
+  - '\p{Han}\s?\([^()]*\p{Han}[^()]*\)|\([^()]*\p{Han}[^()]*\)\s?\p{Han}'

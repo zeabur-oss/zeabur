@@ -1,0 +1,6 @@
+extends: existence
+message: "zh-TW 用「」，內層用『』"
+level: error
+nonword: true
+tokens:
+  - '[“”]'

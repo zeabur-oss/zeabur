@@ -1,0 +1,6 @@
+extends: existence
+message: "「%s」常是填充：對設定進行驗證 → 驗證設定。拿掉後名詞會黏在一起時就留著（上传文件夹进行构建）"
+level: warning
+nonword: true
+tokens:
+  - '(?:進行|进行)(?!中)'

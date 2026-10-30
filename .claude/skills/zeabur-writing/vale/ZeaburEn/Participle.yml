@@ -1,0 +1,7 @@
+extends: existence
+message: "Participle tail '%s': make it its own sentence or cut it"
+level: error
+ignorecase: true
+nonword: true
+tokens:
+  - ',\s(?:ensuring|highlighting|underscoring|showcasing|reflecting|emphasizing|fostering|enabling|allowing you|making it (?:easy|easier|possible))\b'

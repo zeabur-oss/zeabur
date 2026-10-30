@@ -1,0 +1,6 @@
+extends: occurrence
+message: "Two or more em dashes in one sentence: use commas, parentheses or a second sentence"
+level: error
+scope: sentence
+max: 1
+token: '—'
