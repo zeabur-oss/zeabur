@@ -13,7 +13,7 @@ use http_body_util::{BodyExt as _, Empty, Limited};
 use hyper_rustls::HttpsConnector;
 use hyper_util::client::legacy::Client;
 use hyper_util::client::legacy::connect::HttpConnector;
-use hyper_util::rt::TokioExecutor;
+use hyper_util::rt::{TokioExecutor, TokioTimer};
 use rustls::pki_types::CertificateDer;
 use rustls::pki_types::pem::PemObject as _;
 use zeabur_api::services::proxy::{ProxyAnswer, ZeaburProxy};
@@ -73,6 +73,7 @@ impl Proxy {
             .enable_http1()
             .wrap_connector(http);
         let client = Client::builder(TokioExecutor::new())
+            .pool_timer(TokioTimer::new())
             .pool_idle_timeout(Duration::from_secs(30))
             .build(connector);
         Ok(Self {

@@ -19,7 +19,7 @@ use hyper_rustls::HttpsConnector;
 use hyper_util::client::legacy::Client;
 use hyper_util::client::legacy::connect::HttpConnector;
 use hyper_util::client::legacy::connect::dns::{GaiResolver, Name};
-use hyper_util::rt::TokioExecutor;
+use hyper_util::rt::{TokioExecutor, TokioTimer};
 use rustls::pki_types::CertificateDer;
 use rustls::pki_types::pem::PemObject as _;
 use secrecy::ExposeSecret as _;
@@ -28,6 +28,10 @@ use super::registry::{Answer, Get, Transport};
 
 /// How long one exchange may take, connection included.
 const DEADLINE: Duration = Duration::from_secs(5);
+/// How long a connection may sit unused in the pool.
+pub(crate) const IDLE: Duration = Duration::from_secs(30);
+/// How many unused connections the pool keeps per host.
+pub(crate) const IDLE_PER_HOST: usize = 2;
 
 /// Which addresses the client may connect to.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -61,10 +65,7 @@ impl Https {
     ///
     /// When `extra_ca` is not a PEM certificate bundle, or TLS cannot be set up.
     pub fn new(reach: Reach, extra_ca: Option<&[u8]>) -> Result<Self, String> {
-        let client = Client::builder(TokioExecutor::new())
-            .pool_idle_timeout(Duration::from_secs(30))
-            .pool_max_idle_per_host(2)
-            .build(connector(reach, extra_ca)?);
+        let client = pooled(connector(reach, extra_ca)?, IDLE);
         Ok(Self { client, reach })
     }
 
@@ -188,6 +189,19 @@ pub(crate) fn connector(reach: Reach, extra_ca: Option<&[u8]>) -> Result<Connect
         .https_or_http()
         .enable_http1()
         .wrap_connector(http))
+}
+
+/// A client over `connector` that closes a connection left unused for `idle`.
+pub(crate) fn pooled<B>(connector: Connector, idle: Duration) -> Client<Connector, B>
+where
+    B: axum::body::HttpBody + Send,
+    B::Data: Send,
+{
+    Client::builder(TokioExecutor::new())
+        .pool_timer(TokioTimer::new())
+        .pool_idle_timeout(idle)
+        .pool_max_idle_per_host(IDLE_PER_HOST)
+        .build(connector)
 }
 
 /// Refuses a URL that names an address `reach` does not allow.
@@ -337,5 +351,33 @@ mod tests {
             answer.err().as_deref(),
             Some("Zeabur does not connect to 169.254.169.254")
         );
+    }
+
+    #[tokio::test]
+    async fn a_pooled_connection_is_closed_once_the_idle_timeout_passes() {
+        use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
+
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let url = format!("http://{}/", listener.local_addr().unwrap());
+        let server = tokio::spawn(async move {
+            let (mut socket, _) = listener.accept().await.unwrap();
+            let mut buffer = [0; 1024];
+            let _request = socket.read(&mut buffer).await.unwrap();
+            socket
+                .write_all(b"HTTP/1.1 200 OK\r\ncontent-length: 2\r\n\r\nok")
+                .await
+                .unwrap();
+            tokio::time::timeout(Duration::from_secs(5), socket.read(&mut buffer))
+                .await
+                .map(|read| read.unwrap())
+        });
+        let client = pooled(
+            connector(Reach::Any, None).unwrap(),
+            Duration::from_millis(100),
+        );
+        let request = Request::get(url).body(Full::<Bytes>::default()).unwrap();
+        let response = client.request(request).await.unwrap();
+        response.into_body().collect().await.unwrap();
+        assert_eq!(server.await.unwrap(), Ok(0), "the server saw the close");
     }
 }

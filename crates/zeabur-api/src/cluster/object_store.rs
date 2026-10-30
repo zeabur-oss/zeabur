@@ -21,9 +21,8 @@ use base64::engine::general_purpose::STANDARD;
 use bytes::Bytes;
 use http_body_util::Empty;
 use hyper_util::client::legacy::Client;
-use hyper_util::rt::TokioExecutor;
 
-use crate::images::https::{self, Connector, connector, describe, refuse_named};
+use crate::images::https::{self, Connector, IDLE, connector, describe, pooled, refuse_named};
 
 /// How long the store may take to start answering.
 const FIRST_BYTE: Duration = Duration::from_secs(30);
@@ -47,8 +46,7 @@ impl Fetcher {
     /// A client that connects where `reach` allows and also trusts `extra_ca`, a PEM bundle.
     #[must_use]
     pub fn new(reach: https::Reach, extra_ca: Option<&[u8]>) -> Self {
-        let client =
-            connector(reach, extra_ca).map(|c| Client::builder(TokioExecutor::new()).build(c));
+        let client = connector(reach, extra_ca).map(|c| pooled(c, IDLE));
         Self { client, reach }
     }
 
