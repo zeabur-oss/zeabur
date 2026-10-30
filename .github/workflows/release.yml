@@ -45,7 +45,7 @@ jobs:
         [{"os": "linux", "arch": "amd64", "runner": "ubuntu-26.04"},
          {"os": "linux", "arch": "arm64", "runner": "ubuntu-26.04-arm"}]
       # zeaburctl for macOS signed with the Developer ID and notarized (docs/internal/releasing.md).
-      signing-environment: macos-signing
+      signing-environment: apple-signing
     secrets:
       APPLE_CERTIFICATE_P12: ${{ secrets.APPLE_CERTIFICATE_P12 }}
       APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}

@@ -11,7 +11,7 @@ stage as `scripts/release.sh <stage>` in this repository's Nix dev shell:
 |---|---|---|
 | `check` | once | The tag is a SemVer version (`zeabur-oss-release version`) and the version of every crate, `Cargo.lock`, the chart (`version`, `appVersion`), `web/package.json`, the installer's `package.json` and `openapi.yaml`, and `CHANGELOG.md` has the section of its normal version. Every `ghcr.io/zeabur-oss` image the chart runs is one the release publishes. |
 | `build` | Linux amd64 and arm64, macOS arm64 | On a tag, the catalog and Zeabur Identity pins resolve (`release-pins.sh`). Builds the platform (`release-build.sh`; on Linux also Zeabur's and Zeabur Proxy's images), then on Linux smokes the archive, the chart and the image on a k3s cluster with Zeabur Identity at `ZEABUR_IDENTITY_PINNED` (`release-smoke.sh`). A rehearsal also builds a development installer on Linux, which it does not keep. |
-| `sign` | macOS arm64, after `build` | Signs `zeaburctl` with the Developer ID and notarizes it, in the `macos-signing` environment, on `main` and tags only. Without the certificate it leaves the build as it is and warns. |
+| `sign` | macOS arm64, after `build` | Signs `zeaburctl` with the Developer ID and notarizes it, in the `apple-signing` environment, on `main` and tags only. Without the certificate it leaves the build as it is and warns. |
 | `publish` | once, tag only | Pushes the images `zeabur` and `proxy`, then the chart with both pinned by digest, and signs them (`zeabur-oss-release push-image`, `push-chart`); stops when the chart would run any other image; writes `published/subjects.json`, which the shared workflow attests, and `published/outputs.env`, the installer's pins of Zeabur's image and the chart. |
 | `finish` | every platform, tag only | Builds `zeabur-installer` on Linux, pinned to the catalog, Zeabur Identity and what `publish` pushed. macOS has no installer and leaves only a note, which no asset includes. |
 | `assets` | once, tag only | Makes the assets, the signed `SHA256SUMS` (`zeabur-oss-release checksums`) and the notes from `CHANGELOG.md` with a link to the documentation (`zeabur-oss-release notes`); the shared workflow attests them and creates the draft. |
@@ -91,7 +91,7 @@ These are repository and organization settings, not files; a maintainer sets the
 - **Tags.** A ruleset that lets only maintainers create, move or delete `v*` tags.
 - **Immutable releases** (repository settings → **Releases**): once published, a release's tag
   and assets cannot be changed. A draft stays editable until then.
-- **macOS signing.** An environment `macos-signing` whose deployment branches are `main` and
+- **macOS signing.** An environment `apple-signing` whose deployment branches are `main` and
   `v*` tags, with these secrets (zeabur#87):
   - `APPLE_CERTIFICATE_P12`: the Developer ID Application certificate with its private key,
     exported from Keychain Access as `.p12`, then `base64 -i certificate.p12`.
