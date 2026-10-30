@@ -2517,6 +2517,7 @@ export const zhCN: Messages = {
   "upload.problem.unpacked": (largest) =>
     `文件加起来超过 1 GiB。请在 .gitignore 排除最大的几项：${largest}。`,
   "upload.problem.archiveInvalid": "无法读取这个压缩包。",
+  "upload.problem.archiveLink": "这个压缩包里有链接指到文件夹外面。",
   "upload.problem.archivePacked": "压缩包超过 256 MiB。",
   "upload.problem.archiveBomb": "压缩包解压后超过 1 GiB。",
   "upload.moreSummary": "要构建的文件夹、环境变量、构建变量、规格和安全性。",

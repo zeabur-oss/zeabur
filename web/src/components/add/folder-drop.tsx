@@ -26,6 +26,13 @@ type FolderState =
   | { phase: "ready"; packed: Packed; name: string }
   | { phase: "failed"; message: string }
 
+const ARCHIVE_PROBLEMS = {
+  packed: "upload.problem.archivePacked",
+  bomb: "upload.problem.archiveBomb",
+  link: "upload.problem.archiveLink",
+  invalid: "upload.problem.archiveInvalid",
+} as const
+
 /** The folder a person gives, read and packed as soon as they give it. */
 export function useFolder() {
   const t = useT()
@@ -46,10 +53,8 @@ export function useFolder() {
           ),
         ),
       }
-    if (reason === "packed") return { phase: "failed", message: t("upload.problem.archivePacked") }
-    if (reason === "bomb") return { phase: "failed", message: t("upload.problem.archiveBomb") }
-    if (reason === "invalid")
-      return { phase: "failed", message: t("upload.problem.archiveInvalid") }
+    const key = ARCHIVE_PROBLEMS[reason as keyof typeof ARCHIVE_PROBLEMS]
+    if (key) return { phase: "failed", message: t(key) }
     return { phase: "failed", message: error instanceof Error ? error.message : String(error) }
   }
   const take = async (files: () => Promise<SourceFile[]>, name: string) => {

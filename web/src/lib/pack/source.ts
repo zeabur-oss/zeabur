@@ -3,6 +3,10 @@ export interface SourceFile {
   /** Relative to the folder, with `/`. */
   path: string
   data: Blob
+  /** From the file's mode when the source tells one (a zip made on Unix); else the content decides. */
+  executable?: boolean
+  /** The target when this is a symbolic link, which has no data. */
+  link?: string
 }
 
 /** Files of the folder named by the first path segment, without that segment. */

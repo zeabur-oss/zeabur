@@ -2522,6 +2522,7 @@ export const zhTW: Messages = {
   "upload.problem.unpacked": (largest) =>
     `檔案加起來超過 1 GiB。請在 .gitignore 排除最大的幾項：${largest}。`,
   "upload.problem.archiveInvalid": "無法讀取這個壓縮檔。",
+  "upload.problem.archiveLink": "這個壓縮檔裡有連結指到資料夾外面。",
   "upload.problem.archivePacked": "壓縮檔超過 256 MiB。",
   "upload.problem.archiveBomb": "壓縮檔解壓縮後超過 1 GiB。",
   "upload.moreSummary": "要建置的資料夾、環境變數、建置變數、規格和安全性。",
