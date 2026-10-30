@@ -677,7 +677,15 @@ pub(crate) fn releases(kubectl: &Kubectl, component: &ComponentPlan) -> Result<(
                 object,
                 digest,
             } => match digest {
-                Some(digest) => helm_chart(kubectl, name, &checked_chart(object, digest)?)?,
+                Some(digest) => {
+                    let (object, archive) = checked_chart(object, digest)?;
+                    // Helm never updates a chart's `crds/` after the first install.
+                    let crds = archive::chart_crds(&archive)?;
+                    if !crds.is_empty() {
+                        kubectl.apply(&crds)?;
+                    }
+                    helm_chart(kubectl, name, &object)?;
+                }
                 None => helm_chart(kubectl, name, object)?,
             },
             ReleasePlan::Manifests {
@@ -724,10 +732,10 @@ pub(crate) fn releases(kubectl: &Kubectl, component: &ComponentPlan) -> Result<(
 }
 
 /// `object` with the chart downloaded and checked against `digest` in `chartContent`, which
-/// helm-controller installs instead of fetching `chart` itself [helm-controller].
+/// helm-controller installs instead of fetching `chart` itself [helm-controller], and the archive.
 ///
 /// [helm-controller]: https://docs.rke2.io/helm#helmchart-field-definitions
-fn checked_chart(object: &Value, digest: &str) -> Result<Value, InstallError> {
+fn checked_chart(object: &Value, digest: &str) -> Result<(Value, Vec<u8>), InstallError> {
     let field = |key: &str| {
         object
             .pointer(&format!("/spec/{key}"))
@@ -747,9 +755,9 @@ fn checked_chart(object: &Value, digest: &str) -> Result<Value, InstallError> {
         for key in ["chart", "repo", "version"] {
             spec.remove(key);
         }
-        spec.insert("chartContent".to_owned(), json!(STANDARD.encode(chart)));
+        spec.insert("chartContent".to_owned(), json!(STANDARD.encode(&chart)));
     }
-    Ok(object)
+    Ok((object, chart))
 }
 
 /// Applies a `HelmChart` and waits for helm-controller's `helm upgrade --install` job, so running

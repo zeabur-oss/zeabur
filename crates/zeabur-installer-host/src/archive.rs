@@ -1,6 +1,7 @@
 //! Unpacking the RKE2 tarball.
 
 use std::fs::File;
+use std::io::Read as _;
 use std::path::Path;
 
 use flate2::Compression;
@@ -37,10 +38,84 @@ pub fn pack_chart(dir: &Path, name: &str) -> Result<Vec<u8>, HostError> {
         .map_err(HostError::io(dir))
 }
 
+/// The CRDs Helm installs once and never updates, as one multi-document YAML.
+///
+/// They are the YAML and JSON files in the `crds/` directories of a packaged chart and of its
+/// subcharts, unpacked or packaged as `charts/*.tgz`, in path order; empty when there are none.
+///
+/// # Errors
+///
+/// When the archive cannot be read.
+pub fn chart_crds(archive: &[u8]) -> Result<Vec<u8>, HostError> {
+    let mut files = Vec::new();
+    collect_crds(archive, "", &mut files)?;
+    files.sort();
+    Ok(files
+        .into_iter()
+        .map(|(_, text)| text)
+        .collect::<Vec<_>>()
+        .join("\n---\n")
+        .into_bytes())
+}
+
+fn collect_crds(
+    archive: &[u8],
+    prefix: &str,
+    files: &mut Vec<(String, String)>,
+) -> Result<(), HostError> {
+    let io = |e: std::io::Error| HostError::Parse {
+        what: "chart archive".to_owned(),
+        reason: e.to_string(),
+    };
+    let mut tar = tar::Archive::new(GzDecoder::new(archive));
+    for entry in tar.entries().map_err(io)? {
+        let mut entry = entry.map_err(io)?;
+        if !entry.header().entry_type().is_file() {
+            continue;
+        }
+        let path = entry.path().map_err(io)?.to_string_lossy().into_owned();
+        match chart_file(&path) {
+            Some(ChartFile::Crd) => {
+                let mut text = String::new();
+                entry.read_to_string(&mut text).map_err(io)?;
+                files.push((format!("{prefix}{path}"), text));
+            }
+            Some(ChartFile::Subchart) => {
+                let mut bytes = Vec::new();
+                entry.read_to_end(&mut bytes).map_err(io)?;
+                collect_crds(&bytes, &format!("{prefix}{path}/"), files)?;
+            }
+            None => {}
+        }
+    }
+    Ok(())
+}
+
+enum ChartFile {
+    Crd,
+    Subchart,
+}
+
+/// `<chart>/(charts/<subchart>/)*crds/**/<file>.yaml|yml|json` is a CRD and
+/// `<chart>/(charts/<subchart>/)*charts/<file>.tgz` a packaged subchart.
+fn chart_file(path: &str) -> Option<ChartFile> {
+    let mut parts: Vec<&str> = path.split('/').collect();
+    let extension = Path::new(parts.pop()?).extension()?.to_str()?;
+    let mut rest = parts.iter().skip(1);
+    loop {
+        match (rest.next(), rest.len()) {
+            (Some(&"charts"), 0) if extension == "tgz" => return Some(ChartFile::Subchart),
+            (Some(&"charts"), _) if rest.next().is_some() => {}
+            (Some(&"crds"), _) if ["yaml", "yml", "json"].contains(&extension) => {
+                return Some(ChartFile::Crd);
+            }
+            _ => return None,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use std::io::Read as _;
-
     use super::*;
 
     #[test]
@@ -57,5 +132,40 @@ mod tests {
             names.push(entry.path().unwrap().display().to_string());
         }
         assert!(names.contains(&"zeabur/Chart.yaml".to_owned()), "{names:?}");
+    }
+
+    #[test]
+    fn crds_come_from_the_chart_and_its_unpacked_and_packaged_subcharts() {
+        let dir = tempfile::tempdir().unwrap();
+        for (path, text) in [
+            ("Chart.yaml", "name: c\n"),
+            ("crds/a.yaml", "kind: A\n"),
+            ("crds/notes.txt", "not a manifest\n"),
+            ("templates/crds/t.yaml", "kind: Templated\n"),
+            ("charts/sub/crds/b.yaml", "kind: B\n"),
+            ("crds/v1/nested.yaml", "kind: Nested\n"),
+        ] {
+            let path = dir.path().join(path);
+            std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+            std::fs::write(path, text).unwrap();
+        }
+        let packaged = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(packaged.path().join("crds")).unwrap();
+        std::fs::write(packaged.path().join("crds/p.yaml"), "kind: P\n").unwrap();
+        std::fs::write(
+            dir.path().join("charts/dep-1.0.0.tgz"),
+            pack_chart(packaged.path(), "dep").unwrap(),
+        )
+        .unwrap();
+        let bytes = pack_chart(dir.path(), "c").unwrap();
+        let crds = String::from_utf8(chart_crds(&bytes).unwrap()).unwrap();
+        assert_eq!(
+            crds,
+            "kind: P\n\n---\nkind: B\n\n---\nkind: A\n\n---\nkind: Nested\n"
+        );
+        let bare = tempfile::tempdir().unwrap();
+        std::fs::write(bare.path().join("Chart.yaml"), "name: c\n").unwrap();
+        let bytes = pack_chart(bare.path(), "c").unwrap();
+        assert_eq!(chart_crds(&bytes).unwrap(), b"");
     }
 }
