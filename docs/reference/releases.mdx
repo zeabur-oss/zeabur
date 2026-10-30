@@ -18,7 +18,7 @@ Choose a version on [GitHub Releases](https://github.com/zeabur-oss/zeabur/relea
 | Artifact digests | `digests.txt` | Each image's index and platform images, and the chart |
 | File checksums and signature | `SHA256SUMS`, `SHA256SUMS.sigstore.json` | Assets from the same release |
 
-Every archive holds the binary and `LICENSE`. macOS builds are for Apple silicon (`arm64`) only; there's no Intel Mac build. `zeabur` and the installer run only on Linux. On macOS, you only need `zeaburctl`.
+Every archive holds the binary and `LICENSE`. macOS builds are for Apple silicon (`arm64`) only; there's no Intel Mac build. `zeabur` and the installer run only on Linux. On macOS, you only need `zeaburctl`. On Windows, run the Linux `zeaburctl` in WSL.
 
 At release time, the workflow pins the chart's `image.digest` and `proxy.image.digest` to that release's image indexes. Installing with the chart's defaults gives you the same images. Image tags and chart versions have no leading `v`; GitHub release tags and archive filenames do.
 

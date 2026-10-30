@@ -19,7 +19,7 @@ source: "3896a0a6cfe9"
 | 产物摘要 | `digests.txt` | 每个镜像的索引、各平台镜像和 chart |
 | 文件校验和与签名 | `SHA256SUMS`、`SHA256SUMS.sigstore.json` | 同一 release 的附件 |
 
-每个压缩包都包含可执行文件和 `LICENSE`。macOS 只有 Apple silicon（`arm64`）版本，没有 Intel Mac 版本。`zeabur` 和 installer 只能在 Linux 上运行，macOS 上只需要 `zeaburctl`。
+每个压缩包都包含可执行文件和 `LICENSE`。macOS 只有 Apple silicon（`arm64`）版本，没有 Intel Mac 版本。`zeabur` 和 installer 只能在 Linux 上运行，macOS 上只需要 `zeaburctl`。Windows 请在 WSL 中使用 Linux 版的 `zeaburctl`。
 
 发布时，chart 的 `image.digest` 和 `proxy.image.digest` 会固定为本次发布的镜像索引，用 chart 默认值安装就会得到同一批镜像。镜像 tag 和 chart 版本号不带开头的 `v`，GitHub release tag 和压缩包文件名带有 `v`。
 

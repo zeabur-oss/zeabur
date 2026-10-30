@@ -35,7 +35,7 @@ source: "9ecbdbd6bd2b"
 - 未安装 RKE2、K3s、kubeadm、k0s 或 MicroK8s。
 - 未安装 Docker，也没有运行 Docker。Docker 默认会丢弃转发的数据包，导致副本无法连接外部网络，也无法申请证书。installer 检测到 Docker（可执行文件、服务、socket），或防火墙转发策略为 DROP 时会停止，请先停止并移除 Docker 再安装。
 
-自己的电脑需要安装 [`zeaburctl`](../reference/zeaburctl.mdx)，并且能连接服务器的 TCP 6443 端口。
+自己的电脑需要安装 [`zeaburctl`](../reference/zeaburctl.mdx)，并且能连接服务器的 TCP 6443 端口。Windows 请在 WSL 中使用 Linux 版的 `zeaburctl`。
 
 installer 固定 KubeSolo、helm-controller 和 kubectl 的版本，下载后校验 SHA-256。helm-controller 的镜像用 digest 指定。安装组件的 Job 镜像只能指定标签，Job 运行结束后，installer 会校验 Job 实际使用的 digest，不匹配就停止。
 

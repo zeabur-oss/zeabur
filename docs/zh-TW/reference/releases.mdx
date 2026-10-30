@@ -19,7 +19,7 @@ source: "3896a0a6cfe9"
 | 成品 digest | `digests.txt` | 每個映像檔的 image index、各平台映像檔與 chart |
 | 檔案 checksum 與簽章 | `SHA256SUMS`、`SHA256SUMS.sigstore.json` | 同一份 release 的 assets |
 
-每個 archive 裡有執行檔和 `LICENSE`。macOS 只有 Apple silicon（`arm64`）版本，沒有 Intel Mac 版本。`zeabur` 和 installer 只在 Linux 執行，macOS 上只需要 `zeaburctl`。
+每個 archive 裡有執行檔和 `LICENSE`。macOS 只有 Apple silicon（`arm64`）版本，沒有 Intel Mac 版本。`zeabur` 和 installer 只在 Linux 執行，macOS 上只需要 `zeaburctl`。Windows 請在 WSL 裡用 Linux 版的 `zeaburctl`。
 
 發行時，chart 的 `image.digest` 和 `proxy.image.digest` 會釘在這次發布的 image index 上，用 chart 預設值安裝就會拿到同一批映像檔。Image tag 和 chart version 沒有開頭的 `v`，GitHub release tag 和 archive 檔名有。
 
