@@ -10,8 +10,12 @@ use crate::event::{Event, InstallationId};
 
 /// `PostHog`'s batch endpoint.
 pub const ENDPOINT: &str = "https://us.i.posthog.com/batch/";
-/// The `PostHog` project key. Empty: nothing is sent.
-pub const PROJECT_KEY: &str = "phc_vaD7y2TFb7RnJYXSVv7ybEiGwSK3GUMrYPPv43bpuR5A";
+/// The `PostHog` project key, `ZEABUR_TELEMETRY_KEY` at build time: only release builds have it
+/// (docs/internal/releasing.md). Empty: nothing is sent.
+pub const PROJECT_KEY: &str = match option_env!("ZEABUR_TELEMETRY_KEY") {
+    Some(key) => key,
+    None => "",
+};
 
 /// How long the whole request may take.
 const TIMEOUT: Duration = Duration::from_secs(5);
