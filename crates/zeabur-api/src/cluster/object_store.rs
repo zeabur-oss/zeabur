@@ -273,10 +273,10 @@ mod tests {
 
     #[tokio::test]
     async fn the_store_trusts_only_the_trusted_ca_that_signed_the_certificate() {
-        use zeabur_test_support::tls::{CA_A, CA_B};
+        use zeabur_test_support::tls::{ca_a, ca_b};
 
-        assert_eq!(fetch_over_tls(Some(CA_A)).await, Ok(200));
-        assert!(fetch_over_tls(Some(CA_B)).await.is_err());
+        assert_eq!(fetch_over_tls(Some(ca_a())).await, Ok(200));
+        assert!(fetch_over_tls(Some(ca_b())).await.is_err());
         assert!(fetch_over_tls(None).await.is_err());
     }
 }

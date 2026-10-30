@@ -196,11 +196,11 @@ mod tests {
 
     #[tokio::test]
     async fn a_certificate_is_trusted_only_under_the_issuer_ca_that_signed_it() {
-        use zeabur_test_support::tls::{CA_A, CA_B};
+        use zeabur_test_support::tls::{ca_a, ca_b};
 
-        let signer = ExtraRoots::from_pem(CA_A.as_bytes()).unwrap();
+        let signer = ExtraRoots::from_pem(ca_a().as_bytes()).unwrap();
         assert_eq!(get_over_tls(&signer).await, Ok(StatusCode::OK));
-        let other = ExtraRoots::from_pem(CA_B.as_bytes()).unwrap();
+        let other = ExtraRoots::from_pem(ca_b().as_bytes()).unwrap();
         assert!(get_over_tls(&other).await.is_err());
         assert!(get_over_tls(&ExtraRoots::default()).await.is_err());
     }

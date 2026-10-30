@@ -397,10 +397,10 @@ mod tests {
 
     #[tokio::test]
     async fn a_certificate_is_trusted_only_under_the_trusted_ca_that_signed_it() {
-        use zeabur_test_support::tls::{CA_A, CA_B};
+        use zeabur_test_support::tls::{ca_a, ca_b};
 
-        assert_eq!(exchange_over_tls(Some(CA_A)).await, Ok(200));
-        assert!(exchange_over_tls(Some(CA_B)).await.is_err());
+        assert_eq!(exchange_over_tls(Some(ca_a())).await, Ok(200));
+        assert!(exchange_over_tls(Some(ca_b())).await.is_err());
         assert!(exchange_over_tls(None).await.is_err());
     }
 }
