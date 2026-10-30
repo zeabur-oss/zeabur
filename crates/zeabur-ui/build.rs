@@ -55,9 +55,9 @@ fn placeholder_table() -> String {
     let index = manifest_dir.join("placeholder/index.html");
     format!(
         "/// What this binary embeds.\npub const KIND: EmbeddedKind = EmbeddedKind::Placeholder;\n\
-         pub(crate) static ASSETS: &[Asset] = &[Asset {{ path: \"index.html\", \
+         pub(crate) static ASSETS: [Asset; 1] = [Asset {{ path: \"index.html\", \
          content_type: \"text/html; charset=utf-8\", etag: \"\\\"placeholder\\\"\", \
-         immutable: false, len: {}, identity: Some(include_bytes!({:?})), brotli: None }}];\n",
+         immutable: false, len: {}, identity: Some(include_bytes!({:?})), brotli: None, decoded: Decoded::new() }}];\n",
         grouped(fs::metadata(&index).map_or(0, |m| m.len())),
         index.display().to_string()
     )
@@ -70,10 +70,8 @@ fn dist_table(dist: &Path) -> Result<String, String> {
     println!("cargo::rerun-if-changed={}", manifest.display());
     let text = fs::read_to_string(&manifest)
         .map_err(|e| format!("cannot read {}: {e}", manifest.display()))?;
-    let mut code = String::from(
-        "/// What this binary embeds.\npub const KIND: EmbeddedKind = EmbeddedKind::Dist;\n\
-         pub(crate) static ASSETS: &[Asset] = &[\n",
-    );
+    let mut code = String::new();
+    let mut count = 0_usize;
     let mut has_index = false;
     for (number, line) in text.lines().enumerate().filter(|(_, l)| !l.is_empty()) {
         let fields: Vec<&str> = line.split('\t').collect();
@@ -104,6 +102,7 @@ fn dist_table(dist: &Path) -> Result<String, String> {
             other => return Err(format!("manifest.tsv line {}: cache {other:?}", number + 1)),
         };
         has_index |= path == "index.html";
+        count += 1;
         let short = sha256.get(..32).unwrap_or(sha256);
         let file = |suffix: &str| -> Result<(PathBuf, String), String> {
             let full = dist.join(format!("{path}{suffix}"));
@@ -138,7 +137,8 @@ fn dist_table(dist: &Path) -> Result<String, String> {
         writeln!(
             code,
             "    Asset {{ path: {path:?}, content_type: {content_type:?}, etag: {etag:?}, \
-             immutable: {immutable}, len: {len}, identity: {identity}, brotli: {brotli} }},",
+             immutable: {immutable}, len: {len}, identity: {identity}, brotli: {brotli}, \
+             decoded: Decoded::new() }},",
             etag = format!("\"{short}\""),
             len = grouped(len),
         )
@@ -148,5 +148,8 @@ fn dist_table(dist: &Path) -> Result<String, String> {
         return Err("manifest.tsv has no index.html".to_owned());
     }
     code.push_str("];\n");
-    Ok(code)
+    Ok(format!(
+        "/// What this binary embeds.\npub const KIND: EmbeddedKind = EmbeddedKind::Dist;\n\
+         pub(crate) static ASSETS: [Asset; {count}] = [\n{code}"
+    ))
 }

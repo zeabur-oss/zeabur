@@ -25,7 +25,7 @@ Like Tauri, which stores brotli only and decompresses on request [tauri-utils], 
 only the brotli encoding of a file under `assets/` that has one: the unencoded copies were about
 14% of the binary. `index.html` keeps both, as it is a few KB and `curl` and probes ask for it,
 and files without an encoding (fonts) keep the file itself. The server never compresses at run
-time; a client without brotli gets the file decoded as it is sent.
+time; a client without brotli gets the file decoded on request.
 
 ## Serving
 
@@ -38,11 +38,13 @@ time; a client without brotli gets the file decoded as it is sent.
   §13.1.2). Each content coding is a separate representation with its own tag.
 - **Encoding.** Brotli when `Accept-Encoding` allows it, otherwise the file itself; `Vary:
   Accept-Encoding` on files that have an encoding. A client with `br` gets the stored bytes. A
-  client without it gets the file decoded in 16 KiB chunks as the response is written
-  ([`brotli-decompressor`], pure Rust), never the whole file in memory, with the same
+  client without it gets the file decoded ([`brotli-decompressor`], pure Rust) on its first
+  request and kept, so each file is decoded at most once and the copies never exceed the
+  unencoded size of the interface, however many clients ask. The decoded file has the same
   `Content-Type` and `Cache-Control` and the entity tag of the file itself. Its length is recorded
-  when the table is generated, so `HEAD` reports it without decoding. Browsers send `br` over
-  HTTPS and to `localhost`, so the decoder serves `curl` and similar clients. Precompressing at the highest quality beats on-the-fly compression by a
+  when the table is generated, so `HEAD` reports it without decoding. Browsers send `br` only
+  over HTTPS, and Chrome and Firefox also to `localhost`; Safari does not, so `zeaburctl ui` in
+  Safari takes this path. Precompressing at the highest quality beats on-the-fly compression by a
   proxy (and local mode has none); zstd at level 19 is about 5% larger than brotli 11 for the
   same JavaScript bundle and saves nothing for files compressed ahead of time.
 - **Single-page fallback.** An unknown path is a client-side route and gets `index.html`. Two
