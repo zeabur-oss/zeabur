@@ -13,7 +13,6 @@
 //! [velero-download]: https://velero.io/docs/v1.17/api-types/downloadrequest/
 //! [s3-ssec]: https://docs.aws.amazon.com/AmazonS3/latest/userguide/ServerSideEncryptionCustomerKeys.html
 
-use std::sync::Arc;
 use std::time::Duration;
 
 use axum::http::{self, HeaderName, HeaderValue, Request, Response};
@@ -23,7 +22,7 @@ use bytes::Bytes;
 use http_body_util::Empty;
 use hyper_util::client::legacy::Client;
 
-use crate::images::https::{self, Connector, IDLE, connector, describe, pooled, refuse_named};
+use crate::images::https::{self, Connector, IDLE, Tls, connector, describe, pooled, refuse_named};
 
 /// How long the store may take to start answering.
 const FIRST_BYTE: Duration = Duration::from_secs(30);
@@ -46,7 +45,7 @@ impl std::fmt::Debug for Fetcher {
 impl Fetcher {
     /// A client that connects where `reach` allows and trusts what `tls` trusts.
     #[must_use]
-    pub fn new(reach: https::Reach, tls: &Result<Arc<rustls::ClientConfig>, String>) -> Self {
+    pub fn new(reach: https::Reach, tls: &Tls) -> Self {
         let client = tls
             .as_ref()
             .map(|tls| pooled(connector(reach, tls), IDLE))
@@ -261,5 +260,23 @@ mod tests {
             "{:?}",
             refused.map(|r| r.status())
         );
+    }
+
+    async fn fetch_over_tls(extra_ca: Option<&str>) -> Result<u16, String> {
+        let address = zeabur_test_support::tls::serve().await;
+        let store = Fetcher::new(https::Reach::Any, &https::tls(extra_ca.map(str::as_bytes)));
+        store
+            .get(&format!("https://{address}/b/k"), Vec::new())
+            .await
+            .map(|response| response.status().as_u16())
+    }
+
+    #[tokio::test]
+    async fn the_store_trusts_only_the_trusted_ca_that_signed_the_certificate() {
+        use zeabur_test_support::tls::{CA_A, CA_B};
+
+        assert_eq!(fetch_over_tls(Some(CA_A)).await, Ok(200));
+        assert!(fetch_over_tls(Some(CA_B)).await.is_err());
+        assert!(fetch_over_tls(None).await.is_err());
     }
 }

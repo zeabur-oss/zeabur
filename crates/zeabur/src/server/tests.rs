@@ -91,7 +91,7 @@ impl Rig {
                 public_url: public.clone(),
                 client_id: CLIENT_ID.to_owned(),
                 client_secret: SecretString::from(CLIENT_SECRET.to_owned()),
-                issuer_ca: ExtraRoots::default(),
+                issuer_tls: ExtraRoots::default().client_config().unwrap(),
             })
             .unwrap(),
         );

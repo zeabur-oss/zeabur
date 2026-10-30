@@ -50,8 +50,6 @@ pub struct Inspector {
     kept: Mutex<HashMap<String, (Instant, Inspected)>>,
     /// Which addresses the server may connect to.
     reach: https::Reach,
-    /// What the registry client trusts, shared with the server's other clients of that policy.
-    tls: Option<Arc<rustls::ClientConfig>>,
 }
 
 impl std::fmt::Debug for Inspector {
@@ -71,13 +69,7 @@ impl Inspector {
             insecure,
             kept: Mutex::new(HashMap::new()),
             reach: https::Reach::Any,
-            tls: None,
         }
-    }
-
-    /// What the registry client trusts, when it is connected.
-    pub(crate) const fn tls(&self) -> Option<&Arc<rustls::ClientConfig>> {
-        self.tls.as_ref()
     }
 
     /// Which addresses the server may connect to.
@@ -100,7 +92,6 @@ impl Inspector {
         }
         Self {
             reach,
-            tls: tls.as_ref().ok().map(Arc::clone),
             ..Self::new(transport, insecure)
         }
     }

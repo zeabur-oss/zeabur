@@ -146,13 +146,16 @@ impl Https {
 /// The HTTPS connector, through the platform's trust roots, to the addresses `reach` allows.
 pub(crate) type Connector = HttpsConnector<HttpConnector<Guarded>>;
 
+/// What a trust policy's clients share: its TLS configuration, or why there is none.
+pub type Tls = Result<Arc<rustls::ClientConfig>, String>;
+
 /// The TLS configuration for the platform's trust roots and the certificates of the PEM bundle
 /// `extra_ca`; one per trust policy, shared by its clients.
 ///
 /// # Errors
 ///
 /// When `extra_ca` is not a PEM certificate bundle, or TLS cannot be set up.
-pub fn tls(extra_ca: Option<&[u8]>) -> Result<Arc<rustls::ClientConfig>, String> {
+pub fn tls(extra_ca: Option<&[u8]>) -> Tls {
     let provider = Arc::new(rustls::crypto::aws_lc_rs::default_provider());
     let extra = match extra_ca {
         Some(pem) => {
@@ -378,5 +381,26 @@ mod tests {
         let response = client.request(request).await.unwrap();
         response.into_body().collect().await.unwrap();
         assert_eq!(server.await.unwrap(), Ok(0), "the server saw the close");
+    }
+
+    async fn exchange_over_tls(extra_ca: Option<&str>) -> Result<u16, String> {
+        let address = zeabur_test_support::tls::serve().await;
+        let client = Https::new(Reach::Any, &tls(extra_ca.map(str::as_bytes)).unwrap());
+        let request = Request::get(format!("https://{address}/"))
+            .body(Full::default())
+            .unwrap();
+        client
+            .exchange(request, 1024)
+            .await
+            .map(|(status, _)| status)
+    }
+
+    #[tokio::test]
+    async fn a_certificate_is_trusted_only_under_the_trusted_ca_that_signed_it() {
+        use zeabur_test_support::tls::{CA_A, CA_B};
+
+        assert_eq!(exchange_over_tls(Some(CA_A)).await, Ok(200));
+        assert!(exchange_over_tls(Some(CA_B)).await.is_err());
+        assert!(exchange_over_tls(None).await.is_err());
     }
 }

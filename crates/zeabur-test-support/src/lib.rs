@@ -4,3 +4,5 @@
 pub mod fixtures;
 #[cfg(feature = "sandbox")]
 pub mod sandbox;
+#[cfg(feature = "tls")]
+pub mod tls;

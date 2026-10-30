@@ -37,3 +37,4 @@ tracing.workspace = true
 [dev-dependencies]
 axum.workspace = true
 tokio.workspace = true
+zeabur-test-support = { workspace = true, features = ["tls"] }

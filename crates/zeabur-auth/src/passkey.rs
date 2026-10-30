@@ -7,6 +7,7 @@
 //!
 //! [passkey-endpoints]: https://www.w3.org/TR/passkey-endpoints-1/
 
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use bytes::Bytes;
@@ -15,7 +16,7 @@ use http_body_util::Full;
 use serde::Deserialize;
 use tokio::sync::Mutex;
 
-use crate::client::{AuthError, ExtraRoots};
+use crate::client::AuthError;
 use crate::http::Http;
 use crate::url::{BaseUrl, page_url};
 
@@ -49,26 +50,23 @@ impl std::fmt::Debug for PasskeyEndpoints {
 }
 
 impl PasskeyEndpoints {
-    /// The endpoints of `issuer`, trusting `extra` besides the platform's roots.
-    ///
-    /// # Errors
-    ///
-    /// When TLS cannot be set up.
-    pub fn new(issuer: &BaseUrl, extra: &ExtraRoots) -> Result<Self, AuthError> {
-        Self::with_deadline(issuer, extra, DEADLINE)
+    /// The endpoints of `issuer`, trusting what `tls` trusts.
+    #[must_use]
+    pub fn new(issuer: &BaseUrl, tls: &Arc<rustls::ClientConfig>) -> Self {
+        Self::with_deadline(issuer, tls, DEADLINE)
     }
 
     fn with_deadline(
         issuer: &BaseUrl,
-        extra: &ExtraRoots,
+        tls: &Arc<rustls::ClientConfig>,
         deadline: Duration,
-    ) -> Result<Self, AuthError> {
-        Ok(Self {
+    ) -> Self {
+        Self {
             url: format!("{}/.well-known/passkey-endpoints", issuer.origin()),
-            http: Http::new(extra).map_err(|e| AuthError::Invalid(e.to_string()))?,
+            http: Http::new(tls),
             deadline,
             kept: Mutex::new(None),
-        })
+        }
     }
 
     /// The `manage` URL, when the issuer names a secure one.
@@ -125,6 +123,7 @@ mod tests {
     use axum::routing::get;
 
     use super::*;
+    use crate::http::ExtraRoots;
 
     async fn issuer(
         answer: &'static str,
@@ -150,8 +149,11 @@ mod tests {
     }
 
     fn endpoints(issuer: &BaseUrl) -> PasskeyEndpoints {
-        PasskeyEndpoints::with_deadline(issuer, &ExtraRoots::default(), Duration::from_millis(500))
-            .unwrap()
+        PasskeyEndpoints::with_deadline(
+            issuer,
+            &ExtraRoots::default().client_config().unwrap(),
+            Duration::from_millis(500),
+        )
     }
 
     #[tokio::test]

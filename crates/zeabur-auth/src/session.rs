@@ -406,7 +406,7 @@ mod tests {
                     public_url: BaseUrl::parse_root("http://127.0.0.1:8080").unwrap(),
                     client_id: CLIENT_ID.to_owned(),
                     client_secret: SecretString::from(CLIENT_SECRET.to_owned()),
-                    issuer_ca: ExtraRoots::default(),
+                    issuer_tls: ExtraRoots::default().client_config().unwrap(),
                 })
                 .unwrap(),
             );

@@ -56,7 +56,7 @@ test = true
 # A fake GitHub's App key in the GitHub App tests.
 aws-lc-rs.workspace = true
 zeabur-kube = { workspace = true, features = ["memory"] }
-zeabur-test-support = { workspace = true, features = ["sandbox"] }
+zeabur-test-support = { workspace = true, features = ["sandbox", "tls"] }
 zeabur-ui.workspace = true
 http-body-util.workspace = true
 tokio-tungstenite.workspace = true

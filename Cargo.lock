@@ -2541,6 +2541,7 @@ dependencies = [
  "tokio",
  "tracing",
  "zeabur-core",
+ "zeabur-test-support",
 ]
 
 [[package]]
@@ -2747,11 +2748,13 @@ name = "zeabur-test-support"
 version = "0.1.1"
 dependencies = [
  "kube",
+ "rustls",
  "serde",
  "serde-saphyr 2.0.0",
  "serde_json",
  "thiserror",
  "tokio",
+ "tokio-rustls",
  "zeabur-core",
  "zeabur-kube",
 ]

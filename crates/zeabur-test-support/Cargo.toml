@@ -1,6 +1,6 @@
 [package]
 name = "zeabur-test-support"
-description = "zeabur: test helpers (the fixture loader, the cluster tests' sandbox)"
+description = "zeabur: test helpers (the fixture loader, the cluster tests' sandbox, a loopback HTTPS server)"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -19,12 +19,21 @@ sandbox = [
   "dep:tokio",
 ]
 
+# A loopback HTTPS server with fixed certificates (testdata/tls/).
+tls = [
+  "dep:rustls",
+  "dep:tokio",
+  "dep:tokio-rustls",
+]
+
 [dependencies]
 zeabur-core = { workspace = true, optional = true }
 zeabur-kube = { workspace = true, optional = true }
 kube = { workspace = true, optional = true }
+rustls = { workspace = true, optional = true }
 serde.workspace = true
 serde-saphyr.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
 tokio = { workspace = true, optional = true }
+tokio-rustls = { workspace = true, optional = true }
