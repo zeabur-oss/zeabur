@@ -186,6 +186,7 @@ mod tests {
             assert!(value.is_object(), "{}", file.path);
         }
         assert!(files[2].content.contains("tls-san:\n  - k8s.example.com\n"));
+        assert!(files[2].content.contains("enable-servicelb: true\n"));
     }
 
     #[test]
