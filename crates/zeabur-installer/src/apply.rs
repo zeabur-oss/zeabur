@@ -7,7 +7,7 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use base64::Engine as _;
 use base64::engine::general_purpose::{STANDARD, URL_SAFE_NO_PAD};
-use serde_json::{Value, json};
+use serde_json::{Map, Value, json};
 use zeabur_installer_host::kubectl::{self, Kubectl};
 use zeabur_installer_host::nodeprep::{self, Stage};
 use zeabur_installer_host::preflight::{self, Status};
@@ -1147,8 +1147,8 @@ fn oauth_client(kubectl: &Kubectl, plan: &Plan, url: &str) -> Result<(), Install
     )?;
     let secret = kubectl.get("secret", "zeabur-oidc", Some(ZEABUR_NAMESPACE))?;
     let home = format!("{url}/");
+    let redirect = format!("{url}/auth/callback");
     if client.is_none() || secret.is_none() {
-        let redirect = format!("{url}/auth/callback");
         let created = identityctl(
             kubectl,
             plan,
@@ -1178,13 +1178,10 @@ fn oauth_client(kubectl: &Kubectl, plan: &Plan, url: &str) -> Result<(), Install
             client_secret.trim().as_bytes().to_vec(),
         )]);
         kubectl.apply_object(&kubectl::secret(ZEABUR_NAMESPACE, "zeabur-oidc", &data))?;
-    } else if client
+    } else if let Some(patch) = client
         .as_ref()
-        .and_then(|c| c.pointer("/spec/homeUrl"))
-        .and_then(Value::as_str)
-        != Some(home.as_str())
+        .and_then(|c| oauth_client_patch(c, &home, &redirect))
     {
-        // Clients made before Zeabur Identity knew home URLs are left out of its list of apps.
         kubectl.run(
             &[
                 "patch",
@@ -1194,12 +1191,28 @@ fn oauth_client(kubectl: &Kubectl, plan: &Plan, url: &str) -> Result<(), Install
                 IDENTITY_NAMESPACE,
                 "--type=merge",
                 "--patch",
-                &json!({ "spec": { "homeUrl": home } }).to_string(),
+                &patch.to_string(),
             ],
             None,
         )?;
     }
     Ok(())
+}
+
+/// The merge patch that gives an existing client Zeabur's home URL and Zeabur's callback as its
+/// only redirect URI, or `None` when it has both.
+fn oauth_client_patch(client: &Value, home: &str, redirect: &str) -> Option<Value> {
+    let mut spec = Map::new();
+    if client.pointer("/spec/homeUrl").and_then(Value::as_str) != Some(home) {
+        // Clients made before Zeabur Identity knew home URLs are left out of its list of apps.
+        spec.insert("homeUrl".to_owned(), json!(home));
+    }
+    let redirects = json!([redirect]);
+    if client.pointer("/spec/redirectUris") != Some(&redirects) {
+        // A client registered for an earlier `access.zeabur` sends sign-ins back there (#63).
+        spec.insert("redirectUris".to_owned(), redirects);
+    }
+    (!spec.is_empty()).then(|| json!({ "spec": spec }))
 }
 
 /// A packaged chart, or a chart directory packed the way `helm package` lays it out.
@@ -1415,6 +1428,35 @@ mod tests {
         assert!(is_plan_key(&[b'a'; 64]));
         assert!(!is_plan_key(&[b'a'; 128]));
         assert!(!is_plan_key(&[b'g'; 64]));
+    }
+
+    #[test]
+    fn oauth_client_follows_a_new_access_host() {
+        let home = "https://zeabur.example.com/";
+        let redirect = "https://zeabur.example.com/auth/callback";
+        let current = json!({"spec": {"homeUrl": home, "redirectUris": [redirect]}});
+        assert_eq!(oauth_client_patch(&current, home, redirect), None);
+        let moved = json!({"spec": {
+            "homeUrl": "https://zeabur.203-0-113-7.sslip.io/",
+            "redirectUris": ["https://zeabur.203-0-113-7.sslip.io/auth/callback"],
+        }});
+        assert_eq!(
+            oauth_client_patch(&moved, home, redirect),
+            Some(json!({"spec": {"homeUrl": home, "redirectUris": [redirect]}}))
+        );
+        let before_home_urls = json!({"spec": {"redirectUris": [redirect]}});
+        assert_eq!(
+            oauth_client_patch(&before_home_urls, home, redirect),
+            Some(json!({"spec": {"homeUrl": home}}))
+        );
+        let both = json!({"spec": {
+            "homeUrl": home,
+            "redirectUris": ["https://zeabur.203-0-113-7.sslip.io/auth/callback", redirect],
+        }});
+        assert_eq!(
+            oauth_client_patch(&both, home, redirect),
+            Some(json!({"spec": {"redirectUris": [redirect]}}))
+        );
     }
 
     #[test]

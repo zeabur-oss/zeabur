@@ -17,7 +17,7 @@ use zeabur_kube::k8s_openapi::api::authentication::v1::{TokenRequest, TokenReque
 use zeabur_kube::k8s_openapi::api::authorization::v1::{
     ResourceAttributes, SubjectAccessReview, SubjectAccessReviewSpec,
 };
-use zeabur_kube::k8s_openapi::api::core::v1::{Namespace, ServiceAccount};
+use zeabur_kube::k8s_openapi::api::core::v1::{ConfigMap, Namespace, ServiceAccount};
 use zeabur_kube::k8s_openapi::api::rbac::v1::{ClusterRole, ClusterRoleBinding, Role, RoleBinding};
 use zeabur_kube::{ClusterEndpoint, UserClient, UserToken};
 
@@ -40,6 +40,29 @@ impl std::fmt::Debug for Sandbox {
             .field("namespace", &self.namespace)
             .finish_non_exhaustive()
     }
+}
+
+/// Waits until the namespace holds `kube-root-ca.crt`. Its publisher writes it a moment after the
+/// namespace is created, and a `ResourceQuota` made before then never counts it.
+#[expect(
+    clippy::expect_used,
+    clippy::panic,
+    reason = "a test cannot go on without its sandbox"
+)]
+async fn root_ca(admin: &Client, namespace: &str) {
+    let config_maps = Api::<ConfigMap>::namespaced(admin.clone(), namespace);
+    for _ in 0..240 {
+        if config_maps
+            .get_opt("kube-root-ca.crt")
+            .await
+            .expect("read kube-root-ca.crt")
+            .is_some()
+        {
+            return;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(250)).await;
+    }
+    panic!("kube-root-ca.crt never appeared in {namespace}");
 }
 
 /// Waits until the RBAC authorizer allows the person the first of `rules`. It reads Roles and
@@ -144,6 +167,7 @@ impl Sandbox {
         )
         .await;
         bound(&admin, &namespace, &rules).await;
+        root_ca(&admin, &namespace).await;
         let request = TokenRequest {
             spec: TokenRequestSpec {
                 audiences: vec![],

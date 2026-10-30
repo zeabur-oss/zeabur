@@ -62,7 +62,7 @@ Arrows point from a crate to what it may depend on (transitive edges omitted).
 | 0 | [`zeabur-installer-plan`](../../crates/zeabur-installer-plan) | the installer's configuration, component selection and install plan; no I/O |
 | 1 | [`zeabur-installer-host`](../../crates/zeabur-installer-host) | what the installer does to a host: facts, preflight, downloads, files, systemd, `kubectl` |
 | 5 | [`zeabur-installer`](../../crates/zeabur-installer) | **binary**: installs RKE2, Zeabur Identity and Zeabur on a server ([guide](../get-started/quickstart.md)) |
-| 7 | [`xtask`](../../xtask) | **binary**, not shipped: development tasks run as `cargo xtask` (`dev-cluster.sh`'s checkouts of pinned repositories) |
+| 7 | [`xtask`](../../xtask) | **binary**, not shipped: development tasks run as `cargo xtask`: the development cluster (`scripts/dev-cluster.sh`) and Zeabur Proxy's canary (`scripts/e2e-proxy.sh`) |
 
 Every crate has a README that is also its crate-level documentation (`cargo doc --open`).
 

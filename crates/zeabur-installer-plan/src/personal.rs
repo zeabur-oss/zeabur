@@ -377,6 +377,13 @@ mod tests {
     }
 
     #[test]
+    fn databases_can_be_added_to_a_personal_install() {
+        let index = Index::parse(INDEX.as_bytes()).unwrap();
+        let plan = plan(&index, &config("enable: [databases]\n"), &facts(4096)).unwrap();
+        assert!(ids(&plan).contains(&"databases/cloudnative-pg"));
+    }
+
+    #[test]
     fn components_that_leave_out_kubesolo_are_left_out() {
         let mut index = Index::parse(INDEX.as_bytes()).unwrap();
         for component in &mut index.components {

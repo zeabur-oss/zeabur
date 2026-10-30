@@ -1,6 +1,7 @@
 //! Prints the Helm commands that install a catalogue component, as `zeaburctl components export
 //! --format helm` does, with each `<input>=<value>` given filling that input's placeholder.
-//! `scripts/dev-cluster.sh` runs them:
+//! The development cluster (`cargo xtask dev-cluster`, `xtask/src/dev_cluster/catalog.rs`) runs
+//! them:
 //!
 //! ```sh
 //! cargo run -q -p zeabur-catalog --example install -- image-updates/keel single-node | bash

@@ -25,9 +25,9 @@ pub const FEATURES: &[&str] = &["builds", "image-updates", "databases/cloudnativ
 /// What Zeabur needs to run: HTTPS and usage numbers.
 pub const REQUIRED: &[&str] = &["ingress", "certificates", "metrics/metrics-server"];
 
-/// What a personal install offers. Not `databases`: `KubeSolo`'s webhook replaces the annotations
-/// of every PVC, which stops `CloudNativePG`.
-pub const PERSONAL_CAPABILITIES: &[&str] = &["ingress", "certificates", "builds"];
+/// What a personal install offers: the capabilities the catalog tests on `KubeSolo` (catalog
+/// `config/kubernetes.yaml`).
+pub const PERSONAL_CAPABILITIES: &[&str] = &["ingress", "certificates", "builds", "databases"];
 
 /// The chosen components, in install order.
 #[derive(Debug, Clone, PartialEq, Eq)]

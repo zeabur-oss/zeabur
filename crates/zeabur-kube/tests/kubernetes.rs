@@ -237,9 +237,7 @@ mod tests {
             )
             .await
             .expect("quota");
-        // Quota admission refuses everything until the quota controller has filled the status, and
-        // counts `kube-root-ca.crt` only once its publisher has written it into the new namespace:
-        // wait until the one ConfigMap is counted.
+        // Quota admission refuses everything until the quota controller has filled the status.
         let deadline = Instant::now() + Duration::from_secs(60);
         while quotas
             .get("objects")
