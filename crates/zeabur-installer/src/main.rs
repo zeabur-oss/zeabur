@@ -201,7 +201,7 @@ fn main() -> ExitCode {
             },
             None,
         ) => apply::new_setup_link(&cli.config, username, valid_for, *reset),
-        (Command::Gui { listen }, None) => gui::run(&cli.config, *listen),
+        (Command::Gui { listen }, None) => gui::run(&cli.config, *listen, cli.no_telemetry),
         (Command::Doctor, None) => return doctor::run(),
         (
             Command::Uninstall {
@@ -264,7 +264,7 @@ fn personal(cli: &Cli, config: &zeabur_installer_plan::config::PersonalConfig) -
         Command::Doctor => return personal::doctor(config),
         Command::Plan { json } => personal::show_plan(config, *json),
         Command::Apply => personal::apply(config, &cli.config, cli.no_telemetry),
-        Command::Gui { listen } => gui::run(&cli.config, *listen),
+        Command::Gui { listen } => gui::run(&cli.config, *listen, cli.no_telemetry),
         Command::Uninstall { .. } => {
             out::line(&personal::uninstall_text());
             Ok(())

@@ -367,32 +367,24 @@ fn info_of(map: k8s_openapi::api::core::v1::ConfigMap) -> ZeaburInfo {
     }
 }
 
-/// The string claim `name` of `token`, a JWT. The signature is not checked here; kube-apiserver
-/// checks it.
+/// Whether `token` is a JWT whose `iss` is `issuer`. The signature is not checked here;
+/// kube-apiserver checks it.
 #[must_use]
-pub fn claim(token: &str, name: &str) -> Option<String> {
+pub fn issued_by(token: &str, issuer: &str) -> bool {
     use base64::Engine as _;
     let mut parts = token.split('.');
     let (Some(_header), Some(payload), Some(_signature), None) =
         (parts.next(), parts.next(), parts.next(), parts.next())
     else {
-        return None;
+        return false;
     };
-    let payload = base64::engine::general_purpose::URL_SAFE_NO_PAD
-        .decode(payload)
-        .ok()?;
+    let Ok(payload) = base64::engine::general_purpose::URL_SAFE_NO_PAD.decode(payload) else {
+        return false;
+    };
     serde_json::from_slice::<serde_json::Value>(&payload)
-        .ok()?
-        .get(name)?
-        .as_str()
-        .map(str::to_owned)
-}
-
-/// Whether `token` is a JWT whose `iss` is `issuer`. The signature is not checked here;
-/// kube-apiserver checks it.
-#[must_use]
-pub fn issued_by(token: &str, issuer: &str) -> bool {
-    claim(token, "iss").is_some_and(|iss| iss.trim_end_matches('/') == issuer.trim_end_matches('/'))
+        .ok()
+        .and_then(|claims| claims.get("iss")?.as_str().map(str::to_owned))
+        .is_some_and(|iss| iss.trim_end_matches('/') == issuer.trim_end_matches('/'))
 }
 
 /// The namespace every signed-in person may read, as kubeadm's cluster-info lives in.

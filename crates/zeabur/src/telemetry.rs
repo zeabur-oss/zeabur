@@ -26,6 +26,8 @@ struct State {
     key: [u8; 32],
     day: Day,
     seen: HashSet<[u8; 32]>,
+    /// The day before, until it is reported: people who came after its last report.
+    finished: Option<(Day, usize)>,
 }
 
 impl Daily {
@@ -39,6 +41,7 @@ impl Daily {
                     key,
                     day: Day::from_unix(0),
                     seen: HashSet::new(),
+                    finished: None,
                 })
             });
         Self { state }
@@ -54,21 +57,28 @@ impl Daily {
         state.seen.insert(crypto::sha256(&input));
     }
 
-    /// The count for the day of `now`, or `None` when nobody used the API that day.
-    pub(crate) fn today(&self, now: i64) -> Option<ZeaburDay> {
-        let mut state = self
-            .state
-            .as_ref()?
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner);
+    /// What to report at `now`: the day before's final count if it has not gone out yet, then
+    /// the day of `now`'s count so far. Days nobody used the API are left out.
+    pub(crate) fn reports(&self, now: i64) -> Vec<ZeaburDay> {
+        let Some(state) = &self.state else {
+            return Vec::new();
+        };
+        let mut state = state.lock().unwrap_or_else(PoisonError::into_inner);
         state.roll(now);
-        let people = u32::try_from(state.seen.len()).unwrap_or(u32::MAX);
-        (people > 0).then_some(ZeaburDay {
-            zeabur_version: env!("CARGO_PKG_VERSION"),
-            day: state.day,
-            people,
-            mode: Mode::InCluster,
-        })
+        let today = (state.day, state.seen.len());
+        state
+            .finished
+            .take()
+            .into_iter()
+            .chain([today])
+            .filter(|&(_, people)| people > 0)
+            .map(|(day, people)| ZeaburDay {
+                zeabur_version: env!("CARGO_PKG_VERSION"),
+                day,
+                people: u32::try_from(people).unwrap_or(u32::MAX),
+                mode: Mode::InCluster,
+            })
+            .collect()
     }
 }
 
@@ -77,6 +87,9 @@ impl State {
     fn roll(&mut self, now: i64) {
         let day = Day::from_unix(now);
         if day != self.day {
+            if !self.seen.is_empty() {
+                self.finished = Some((self.day, self.seen.len()));
+            }
             self.day = day;
             self.seen.clear();
         }
@@ -123,14 +136,15 @@ impl Telemetry {
             let mut every = tokio::time::interval_at(tokio::time::Instant::now() + FIRST, EVERY);
             loop {
                 every.tick().await;
-                let Some(day) = self.daily.today(clock()) else {
-                    continue;
-                };
-                let (sender, id) = (Arc::clone(&self.sender), id.clone());
-                drop(
-                    tokio::task::spawn_blocking(move || sender.send(&id, &Event::ZeaburDay(day)))
+                for day in self.daily.reports(clock()) {
+                    let (sender, id) = (Arc::clone(&self.sender), id.clone());
+                    drop(
+                        tokio::task::spawn_blocking(move || {
+                            sender.send(&id, &Event::ZeaburDay(day));
+                        })
                         .await,
-                );
+                    );
+                }
             }
         });
     }
@@ -150,7 +164,7 @@ mod tests {
             daily.record("alice", NOW + offset);
         }
         daily.record("bob", NOW + 10);
-        assert_eq!(daily.today(NOW + 20).unwrap().people, 2);
+        assert_eq!(people(&daily, NOW + 20), [2]);
     }
 
     #[test]
@@ -158,17 +172,44 @@ mod tests {
         let daily = Daily::new(true);
         let midnight = NOW - NOW.rem_euclid(DAY) + DAY;
         daily.record("alice", midnight - 1);
-        assert_eq!(daily.today(midnight - 1).unwrap().people, 1);
-        assert!(daily.today(midnight).is_none());
+        assert_eq!(people(&daily, midnight - 1), [1]);
+        assert_eq!(people(&daily, midnight), [1]);
+        assert_eq!(people(&daily, midnight), Vec::<u32>::new());
         daily.record("alice", midnight);
         daily.record("bob", midnight + 5);
-        assert_eq!(daily.today(midnight + 6).unwrap().people, 2);
+        assert_eq!(people(&daily, midnight + 6), [2]);
+    }
+
+    #[test]
+    fn people_after_the_last_report_of_a_day_are_reported_the_next_day() {
+        let daily = Daily::new(true);
+        let midnight = NOW - NOW.rem_euclid(DAY) + DAY;
+        daily.record("alice", midnight - 120);
+        assert_eq!(people(&daily, midnight - 100), [1]);
+        daily.record("bob", midnight - 30);
+        daily.record("carol", midnight + 10);
+        let reports = daily.reports(midnight + 60);
+        assert_eq!(
+            reports
+                .iter()
+                .map(|r| (r.day, r.people))
+                .collect::<Vec<_>>(),
+            [
+                (Day::from_unix(midnight - 1), 2),
+                (Day::from_unix(midnight), 1)
+            ]
+        );
+        assert_eq!(people(&daily, midnight + 120), [1]);
     }
 
     #[test]
     fn nothing_is_counted_when_the_program_is_off() {
         let daily = Daily::new(false);
         daily.record("alice", NOW);
-        assert!(daily.today(NOW).is_none());
+        assert_eq!(people(&daily, NOW), Vec::<u32>::new());
+    }
+
+    fn people(daily: &Daily, now: i64) -> Vec<u32> {
+        daily.reports(now).iter().map(|r| r.people).collect()
     }
 }

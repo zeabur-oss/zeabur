@@ -20,6 +20,7 @@ pub(crate) struct Reporter {
     on: Option<(Sender, InstallationId)>,
     install: Install,
     step: Cell<zeabur_telemetry::Step>,
+    switch: Switch,
 }
 
 impl Reporter {
@@ -47,14 +48,18 @@ impl Reporter {
             on,
             install,
             step: Cell::new(zeabur_telemetry::Step::Plan),
+            switch,
         };
         reporter.send(&Event::InstallStarted(reporter.install.clone()));
         reporter
     }
 
-    /// The ID, when the program is on: Zeabur's chart gets it too.
+    /// The ID for Zeabur's chart, when the program sends: a debug run leaves the server out.
     pub(crate) fn id(&self) -> Option<&InstallationId> {
-        self.on.as_ref().map(|(_, id)| id)
+        self.on
+            .as_ref()
+            .filter(|_| self.switch == Switch::On)
+            .map(|(_, id)| id)
     }
 
     /// Notes that the install reached `step`.
@@ -205,6 +210,17 @@ mod tests {
             .permissions()
             .mode();
         assert_eq!(mode & 0o777, 0o600);
+    }
+
+    #[test]
+    fn only_a_run_that_sends_joins_the_server() {
+        let dir = tempfile::tempdir().unwrap();
+        let config = dir.path().join("config.yaml");
+        let shown = Arc::default();
+        let debug = Reporter::start_with(Switch::Debug, &config, install(), collecting(&shown));
+        assert!(debug.id().is_none());
+        let on = Reporter::start_with(Switch::On, &config, install(), collecting(&shown));
+        assert_eq!(on.id(), installation_id(&config).as_ref());
     }
 
     #[test]

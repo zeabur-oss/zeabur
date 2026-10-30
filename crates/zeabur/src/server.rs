@@ -244,10 +244,7 @@ async fn session(State(auth): State<Arc<Auth>>, mut request: Request, next: Next
     } else {
         bearer(request.headers())
             .filter(|token| zeabur_kube::issued_by(token.expose_secret(), auth.issuer.as_str()))
-            .and_then(|token| {
-                person = zeabur_kube::claim(token.expose_secret(), "sub");
-                (auth.connect)(token).ok().map(Signed::Token)
-            })
+            .and_then(|token| (auth.connect)(token).ok().map(Signed::Token))
     };
     if let Some(person) = person {
         auth.active.record(&person, (auth.clock)());
