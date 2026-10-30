@@ -23,6 +23,9 @@ minor or patch release may break the API.
 - `zeabur-installer apply` moves the redirect URI of Zeabur's OAuth client to a changed
   `access.zeabur`, as it already did the home URL. It kept the first host's, so signing in to
   Zeabur at the new host failed with "This app's return address isn't registered".
+- `zeabur-installer apply` updates the CRDs a chart keeps in `crds/`, which Helm installs only on
+  the first install, and leaves CRDs a chart makes from its templates to Helm. Upgrading an
+  installation with the VictoriaMetrics operator no longer stops on a field conflict over its CRDs.
 
 ## [0.1.1] - 2026-10-28
 
