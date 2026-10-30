@@ -1,7 +1,7 @@
 name: Release
 
-# Tag vX.Y.Z or vX.Y.Z-<pre-release> on main: the shared release builds, publishes and signs the image, chart and
-# installers, then leaves a draft (docs/internal/releasing.md). Manual run: rehearse.
+# Tag vX.Y.Z or vX.Y.Z-<pre-release> on main: the shared release builds, publishes and signs the
+# image, chart and installers, then leaves a draft (docs/internal/releasing.md). Manual run: rehearse.
 on:
   push:
     tags: ['v[0-9]*']
