@@ -138,7 +138,6 @@ async fn serve(args: &Args, config: Config) -> Result<(), String> {
     }
     let connect = connect(endpoint);
     let clock = clock();
-    let telemetry = telemetry::Telemetry::new(args.telemetry_enabled, &args.installation_id);
     let sessions = Arc::new(Sessions::new(
         Arc::clone(&oauth),
         Arc::clone(&connect),
@@ -153,7 +152,10 @@ async fn serve(args: &Args, config: Config) -> Result<(), String> {
         connect,
         flow_key: FlowKey::random().map_err(|e| e.to_string())?,
         clock: Arc::clone(&clock),
-        active: Arc::clone(&telemetry.daily),
+        telemetry: Arc::new(telemetry::Telemetry::new(
+            args.telemetry_enabled,
+            &args.installation_id,
+        )),
     });
     let zeabur_proxy = config.proxy.map(|proxy| {
         let proxy: Arc<dyn zeabur_api::services::proxy::ZeaburProxy> = Arc::new(proxy);
@@ -175,8 +177,6 @@ async fn serve(args: &Args, config: Config) -> Result<(), String> {
             tracing::debug!(event = "session.sweep", sessions = left, "swept sessions");
         }
     });
-
-    telemetry.spawn(clock);
 
     let (listener, address) = listen(args.listen).await?;
     tracing::info!(event = "server.listening", %address, "listening");

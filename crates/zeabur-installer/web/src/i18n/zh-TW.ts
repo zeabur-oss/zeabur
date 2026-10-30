@@ -337,7 +337,7 @@ export const zhTW: Messages = {
   "review.program": "體驗計畫",
   "review.program.label": "加入體驗計畫，協助改進 Zeabur",
   "review.program.description":
-    "定期傳送版本和每天的使用人數，讓我們知道有多少人在用、該先修哪裡。不會傳名稱、網域或 Email，也不保存 IP。之後隨時可以關閉。",
+    "傳送版本和每天的使用人數，讓我們知道有多少人在用、該先修哪裡。不會傳名稱、網域或 Email，也不保存 IP。之後隨時可以關閉。",
   "review.program.link": "檢視會傳送的內容",
   "review.removing": "要移除的元件",
   "review.removingHint": "helm-controller 會解除安裝這些元件的 chart。留下的東西之後可以手動刪除。",

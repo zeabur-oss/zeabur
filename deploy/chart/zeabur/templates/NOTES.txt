@@ -19,23 +19,18 @@ Zeabur gives members their rights with RoleBindings and ClusterRoleBindings it m
 
 {{- if not .Values.telemetry.enabled }}
 
-Experience program (currently: off)
+Help us improve Zeabur: join the experience program
 
-When on, Zeabur sends the version and how many people use it each day to the
-Zeabur team, so we know how many installations are in use and what to fix
-first. It carries a random installation ID and nothing about you: no names,
-domains or emails, and PostHog doesn't keep IP addresses. The data is kept for
-13 months.
+Out of the box, Zeabur sends nothing, so we can't tell whether anyone runs it
+or which fixes matter most. Joining sends one event a day for each person who
+uses this install, with the version and a random ID. It never says who they
+are: no names, domains or emails, and PostHog doesn't keep IP addresses.
 
-To turn it on, generate an installation ID first:
+Join with one command:
 
-  uuidgen | tr 'A-Z' 'a-z'
-
-Then pass it in (replace <installation-id> with the value above):
-
-  helm upgrade {{ .Release.Name }} <chart> --reuse-values \
+  helm upgrade {{ .Release.Name }} oci://ghcr.io/zeabur-oss/charts/zeabur --reuse-values \
     --set telemetry.enabled=true \
-    --set telemetry.installationId=<installation-id>
+    --set telemetry.installationId=$(uuidgen | tr 'A-Z' 'a-z')
 
 What is sent: https://oss.zeabur.com/docs/zeabur/reference/telemetry/
 {{- end }}

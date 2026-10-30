@@ -157,15 +157,13 @@ pub enum ErrorCode {
     Other,
 }
 
-/// Zeabur's count of active people for one day.
+/// Someone used Zeabur for the first time in a UTC day. It names nobody.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-pub struct ZeaburDay {
+pub struct ZeaburActive {
     /// The version of Zeabur.
     pub zeabur_version: &'static str,
-    /// The UTC day counted.
+    /// The UTC day.
     pub day: Day,
-    /// How many different people made an API request that day, so far.
-    pub people: u32,
     /// How Zeabur runs.
     pub mode: Mode,
 }
@@ -196,8 +194,8 @@ pub struct Failure {
 /// Everything that can be sent.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Event {
-    /// Zeabur's count of active people for a day.
-    ZeaburDay(ZeaburDay),
+    /// Someone used Zeabur for the first time in a day.
+    ZeaburActive(ZeaburActive),
     /// An install began.
     InstallStarted(Install),
     /// An install ended well.
@@ -211,7 +209,7 @@ impl Event {
     #[must_use]
     pub const fn name(&self) -> &'static str {
         match self {
-            Self::ZeaburDay(_) => "zeabur_day",
+            Self::ZeaburActive(_) => "zeabur_active",
             Self::InstallStarted(_) => "install_started",
             Self::InstallFinished(_) => "install_finished",
             Self::InstallFailed(_) => "install_failed",
@@ -221,7 +219,7 @@ impl Event {
     /// The event's own properties.
     fn properties(&self) -> Value {
         let value = match self {
-            Self::ZeaburDay(day) => serde_json::to_value(day),
+            Self::ZeaburActive(active) => serde_json::to_value(active),
             Self::InstallStarted(install) | Self::InstallFinished(install) => {
                 serde_json::to_value(install)
             }

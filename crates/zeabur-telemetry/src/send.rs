@@ -149,7 +149,7 @@ mod tests {
 
     use super::*;
     use crate::event::{
-        Day, Distribution, ErrorCode, Failure, Install, Mode, Profile, Step, ZeaburDay,
+        Day, Distribution, ErrorCode, Failure, Install, Mode, Profile, Step, ZeaburActive,
     };
 
     /// A receiver on a free port that records each request body.
@@ -219,10 +219,9 @@ mod tests {
 
     fn events() -> Vec<Event> {
         vec![
-            Event::ZeaburDay(ZeaburDay {
+            Event::ZeaburActive(ZeaburActive {
                 zeabur_version: "0.1.0",
                 day: Day::from_unix(1_800_000_000),
-                people: 3,
                 mode: Mode::InCluster,
             }),
             Event::InstallStarted(install()),
@@ -314,7 +313,6 @@ mod tests {
         let allowed: &[&str] = &[
             "zeabur_version",
             "day",
-            "people",
             "mode",
             "installer_version",
             "profile",

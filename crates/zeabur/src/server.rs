@@ -55,7 +55,7 @@ use zeabur_kube::k8s_openapi::jiff::Timestamp;
 use zeabur_kube::{Cluster, UserToken};
 
 use crate::pages::{self, SignInProblem};
-use crate::telemetry::Daily;
+use crate::telemetry::Telemetry;
 
 /// The header the interface sends on a request it makes on its own while nobody uses the page.
 pub(crate) const BACKGROUND: &str = "x-zeabur-background";
@@ -84,8 +84,8 @@ pub(crate) struct Auth {
     pub(crate) connect: Bind<Connection>,
     pub(crate) flow_key: FlowKey,
     pub(crate) clock: Clock,
-    /// Counts who used the API today, for the experience program.
-    pub(crate) active: Arc<Daily>,
+    /// Notes who used Zeabur today, for the experience program.
+    pub(crate) telemetry: Arc<Telemetry>,
 }
 
 impl std::fmt::Debug for Auth {
@@ -247,7 +247,7 @@ async fn session(State(auth): State<Arc<Auth>>, mut request: Request, next: Next
             .and_then(|token| (auth.connect)(token).ok().map(Signed::Token))
     };
     if let Some(person) = person {
-        auth.active.record(&person, (auth.clock)());
+        auth.telemetry.saw(&person, (auth.clock)());
     }
     if let Some(signed) = signed {
         request.extensions_mut().insert(signed);

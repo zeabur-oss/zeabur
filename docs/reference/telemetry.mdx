@@ -7,21 +7,20 @@ The experience program sends the version and how many people use Zeabur each day
 
 ## What is sent
 
-Zeabur sends one event about once an hour, and the installer sends one event when an install starts, finishes or fails. Each event carries a random installation ID, the properties below and nothing else. The installer makes the ID once, or you make it with `uuidgen`; nothing about your machine goes into it. The data is kept for 13 months.
+Zeabur sends one event the first time each person uses it in a UTC day, and the installer sends one event when an install starts, finishes or fails. Each event carries a random installation ID, the properties below and nothing else. The installer makes the ID once, or you make it with `uuidgen`; nothing about your machine goes into it. The data is kept for 13 months.
 
 | Event | Sent by | When |
 |---|---|---|
-| `zeabur_day` | Zeabur | About once an hour on days someone uses Zeabur |
+| `zeabur_active` | Zeabur | The first time each person uses Zeabur's web interface in a UTC day |
 | `install_started` | Installer | `apply` begins |
 | `install_finished` | Installer | `apply` succeeds |
 | `install_failed` | Installer | `apply` stops |
 
 | Property | Events | Values |
 |---|---|---|
-| `zeabur_version` | `zeabur_day` | Zeabur's version, such as `0.1.1` |
-| `day` | `zeabur_day` | The UTC date, such as `2026-10-30` |
-| `people` | `zeabur_day` | How many different people used Zeabur's web interface that day. After midnight UTC, Zeabur sends the previous day's total once more. It keeps a hash of each person in memory until the day ends or Zeabur restarts, and sends only the count |
-| `mode` | `zeabur_day` | `in-cluster` |
+| `zeabur_version` | `zeabur_active` | Zeabur's version, such as `0.1.1` |
+| `day` | `zeabur_active` | The UTC date, such as `2026-10-30` |
+| `mode` | `zeabur_active` | `in-cluster` |
 | `installer_version` | the installer's events | The installer's version |
 | `profile` | the installer's events | `single-node`, `multi-node` or `personal` |
 | `distribution` | the installer's events | `k3s`, `rke2` or `kube-solo` |
@@ -29,6 +28,8 @@ Zeabur sends one event about once an hour, and the installer sends one event whe
 | `error` | `install_failed` | `config`, `plan`, `io`, `command`, `download`, `digest`, `parse` or `other`; never a message |
 | `$process_person_profile` | all | Always `false`: no person profile is made |
 | `$geoip_disable` | all | Always `true`: no location is looked up |
+
+The event doesn't say who the person is. To tell people apart within a day, Zeabur keeps a hash of each one in memory and forgets it when the day ends or Zeabur restarts, so someone may be counted twice on a day Zeabur restarts.
 
 Events go to PostHog (`us.i.posthog.com`) over HTTPS, one try with a short timeout. A failed request isn't retried and doesn't affect Zeabur or the install. PostHog doesn't keep IP addresses.
 
@@ -44,13 +45,12 @@ Any one of these is enough, and `DO_NOT_TRACK` wins over all the others.
 - In the installer, uncheck the box on the review page, run `zeabur-installer --no-telemetry apply` (or `--no-telemetry gui`), or set `telemetry: false` in `/etc/zeabur-installer/config.yaml`.
 - With Helm, keep `telemetry.enabled=false`, the default. The chart refuses `telemetry.enabled=true` without an ID.
 
-To join with Helm, make an ID and pass it in:
+To join with Helm, pass in a new ID:
 
 ```sh
-uuidgen | tr 'A-Z' 'a-z'
-helm upgrade <release> <chart> --reuse-values \
+helm upgrade <release> oci://ghcr.io/zeabur-oss/charts/zeabur --reuse-values \
   --set telemetry.enabled=true \
-  --set telemetry.installationId=<installation-id>
+  --set telemetry.installationId=$(uuidgen | tr 'A-Z' 'a-z')
 ```
 
 The installer keeps its ID in `/etc/zeabur-installer/installation-id` (mode `0600`) and gives it to Zeabur's chart.

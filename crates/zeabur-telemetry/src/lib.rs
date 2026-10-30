@@ -5,6 +5,6 @@ mod send;
 
 pub use event::{
     Day, Distribution, ErrorCode, Event, Failure, Install, InstallationId, Mode, Profile, Step,
-    ZeaburDay,
+    ZeaburActive,
 };
 pub use send::{ENDPOINT, PROJECT_KEY, Sender, Show, Switch};

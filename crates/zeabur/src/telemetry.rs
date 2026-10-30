@@ -1,23 +1,17 @@
-//! The experience program (docs/reference/telemetry.mdx): counts the people who used the API
-//! today, and about once an hour reports the count.
+//! The experience program (docs/reference/telemetry.mdx): one event the first time each person
+//! uses Zeabur's web interface in a UTC day.
 
 use std::collections::HashSet;
 use std::sync::{Arc, Mutex, PoisonError};
-use std::time::Duration;
 
-use zeabur_auth::session::Clock;
 use zeabur_core::crypto;
-use zeabur_telemetry::{Day, Event, InstallationId, Mode, Sender, Switch, ZeaburDay};
+use zeabur_telemetry::{Day, Event, InstallationId, Mode, Sender, Switch, ZeaburActive};
 
-/// Until the first report, then between reports.
-const FIRST: Duration = Duration::from_mins(1);
-const EVERY: Duration = Duration::from_hours(1);
-
-/// The people who used the API in the current UTC day, kept as hashes in memory only. A
-/// restart forgets them.
+/// The people seen in the current UTC day, kept as hashes in memory only. A restart forgets
+/// them.
 #[derive(Debug)]
-pub(crate) struct Daily {
-    state: Option<Mutex<State>>,
+struct Daily {
+    state: Mutex<State>,
 }
 
 #[derive(Debug)]
@@ -26,81 +20,37 @@ struct State {
     key: [u8; 32],
     day: Day,
     seen: HashSet<[u8; 32]>,
-    /// The day before, until it is reported: people who came after its last report.
-    finished: Option<(Day, usize)>,
 }
 
 impl Daily {
-    /// Counts when `on`; otherwise [`record`](Self::record) does nothing.
-    pub(crate) fn new(on: bool) -> Self {
-        let state = on
-            .then(|| crypto::random::<32>().ok())
-            .flatten()
-            .map(|key| {
-                Mutex::new(State {
-                    key,
-                    day: Day::from_unix(0),
-                    seen: HashSet::new(),
-                    finished: None,
-                })
-            });
-        Self { state }
+    fn new(key: [u8; 32]) -> Self {
+        Self {
+            state: Mutex::new(State {
+                key,
+                day: Day::from_unix(0),
+                seen: HashSet::new(),
+            }),
+        }
     }
 
-    /// Notes that `person` used the API at `now` (Unix seconds).
-    pub(crate) fn record(&self, person: &str, now: i64) {
-        let Some(state) = &self.state else { return };
-        let mut state = state.lock().unwrap_or_else(PoisonError::into_inner);
-        state.roll(now);
+    /// The day of `now` (Unix seconds) when it is the first time `person` is seen in it.
+    fn first(&self, person: &str, now: i64) -> Option<Day> {
+        let mut state = self.state.lock().unwrap_or_else(PoisonError::into_inner);
+        let day = Day::from_unix(now);
+        if day != state.day {
+            state.day = day;
+            state.seen.clear();
+        }
         let mut input = state.key.to_vec();
         input.extend_from_slice(person.as_bytes());
-        state.seen.insert(crypto::sha256(&input));
-    }
-
-    /// What to report at `now`: the day before's final count if it has not gone out yet, then
-    /// the day of `now`'s count so far. Days nobody used the API are left out.
-    pub(crate) fn reports(&self, now: i64) -> Vec<ZeaburDay> {
-        let Some(state) = &self.state else {
-            return Vec::new();
-        };
-        let mut state = state.lock().unwrap_or_else(PoisonError::into_inner);
-        state.roll(now);
-        let today = (state.day, state.seen.len());
-        state
-            .finished
-            .take()
-            .into_iter()
-            .chain([today])
-            .filter(|&(_, people)| people > 0)
-            .map(|(day, people)| ZeaburDay {
-                zeabur_version: env!("CARGO_PKG_VERSION"),
-                day,
-                people: u32::try_from(people).unwrap_or(u32::MAX),
-                mode: Mode::InCluster,
-            })
-            .collect()
-    }
-}
-
-impl State {
-    /// Starts a new set when `now` is in another day.
-    fn roll(&mut self, now: i64) {
-        let day = Day::from_unix(now);
-        if day != self.day {
-            if !self.seen.is_empty() {
-                self.finished = Some((self.day, self.seen.len()));
-            }
-            self.day = day;
-            self.seen.clear();
-        }
+        let hash = crypto::sha256(&input);
+        state.seen.insert(hash).then_some(day)
     }
 }
 
 /// The program as the server runs it.
 pub(crate) struct Telemetry {
-    pub(crate) daily: Arc<Daily>,
-    sender: Arc<Sender>,
-    id: Option<InstallationId>,
+    on: Option<(Daily, Arc<Sender>, InstallationId)>,
 }
 
 impl Telemetry {
@@ -120,33 +70,48 @@ impl Telemetry {
         };
         let show: zeabur_telemetry::Show =
             Arc::new(|body| tracing::info!(event = "telemetry.debug", %body, "would send"));
-        Self {
-            daily: Arc::new(Daily::new(switch != Switch::Off)),
-            sender: Arc::new(Sender::new(switch, show)),
-            id,
-        }
+        let sender = Sender::new(switch, show);
+        let on = id.filter(|_| sender.active()).and_then(|id| {
+            Some((
+                Daily::new(crypto::random::<32>().ok()?),
+                Arc::new(sender),
+                id,
+            ))
+        });
+        Self { on }
     }
 
-    /// Reports the day's count in the background, if the program is on.
-    pub(crate) fn spawn(self, clock: Clock) {
-        let Some(id) = self.id.filter(|_| self.sender.active()) else {
+    #[cfg(test)]
+    pub(crate) const fn off() -> Self {
+        Self { on: None }
+    }
+
+    /// Notes that `person` used Zeabur at `now` (Unix seconds), and sends an event in the
+    /// background the first time in a day.
+    pub(crate) fn saw(&self, person: &str, now: i64) {
+        let Some((daily, sender, id)) = &self.on else {
             return;
         };
-        tokio::spawn(async move {
-            let mut every = tokio::time::interval_at(tokio::time::Instant::now() + FIRST, EVERY);
-            loop {
-                every.tick().await;
-                for day in self.daily.reports(clock()) {
-                    let (sender, id) = (Arc::clone(&self.sender), id.clone());
-                    drop(
-                        tokio::task::spawn_blocking(move || {
-                            sender.send(&id, &Event::ZeaburDay(day));
-                        })
-                        .await,
-                    );
-                }
-            }
+        let Some(day) = daily.first(person, now) else {
+            return;
+        };
+        let event = Event::ZeaburActive(ZeaburActive {
+            zeabur_version: env!("CARGO_PKG_VERSION"),
+            day,
+            mode: Mode::InCluster,
         });
+        let (sender, id) = (Arc::clone(sender), id.clone());
+        drop(tokio::task::spawn_blocking(move || {
+            sender.send(&id, &event);
+        }));
+    }
+}
+
+impl std::fmt::Debug for Telemetry {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Telemetry")
+            .field("on", &self.on.is_some())
+            .finish()
     }
 }
 
@@ -157,59 +122,33 @@ mod tests {
     const DAY: i64 = 86_400;
     const NOW: i64 = 1_800_000_000;
 
+    fn daily() -> Daily {
+        Daily::new([7; 32])
+    }
+
     #[test]
-    fn one_person_counts_once_however_often() {
-        let daily = Daily::new(true);
-        for offset in 0..5 {
-            daily.record("alice", NOW + offset);
-        }
-        daily.record("bob", NOW + 10);
-        assert_eq!(people(&daily, NOW + 20), [2]);
+    fn a_person_is_reported_once_a_day() {
+        let daily = daily();
+        assert_eq!(daily.first("alice", NOW), Some(Day::from_unix(NOW)));
+        assert_eq!(daily.first("alice", NOW + 5), None);
+        assert_eq!(daily.first("bob", NOW + 10), Some(Day::from_unix(NOW)));
     }
 
     #[test]
     fn a_new_utc_day_starts_again() {
-        let daily = Daily::new(true);
+        let daily = daily();
         let midnight = NOW - NOW.rem_euclid(DAY) + DAY;
-        daily.record("alice", midnight - 1);
-        assert_eq!(people(&daily, midnight - 1), [1]);
-        assert_eq!(people(&daily, midnight), [1]);
-        assert_eq!(people(&daily, midnight), Vec::<u32>::new());
-        daily.record("alice", midnight);
-        daily.record("bob", midnight + 5);
-        assert_eq!(people(&daily, midnight + 6), [2]);
-    }
-
-    #[test]
-    fn people_after_the_last_report_of_a_day_are_reported_the_next_day() {
-        let daily = Daily::new(true);
-        let midnight = NOW - NOW.rem_euclid(DAY) + DAY;
-        daily.record("alice", midnight - 120);
-        assert_eq!(people(&daily, midnight - 100), [1]);
-        daily.record("bob", midnight - 30);
-        daily.record("carol", midnight + 10);
-        let reports = daily.reports(midnight + 60);
+        assert!(daily.first("alice", midnight - 1).is_some());
         assert_eq!(
-            reports
-                .iter()
-                .map(|r| (r.day, r.people))
-                .collect::<Vec<_>>(),
-            [
-                (Day::from_unix(midnight - 1), 2),
-                (Day::from_unix(midnight), 1)
-            ]
+            daily.first("alice", midnight),
+            Some(Day::from_unix(midnight))
         );
-        assert_eq!(people(&daily, midnight + 120), [1]);
     }
 
     #[test]
     fn nothing_is_counted_when_the_program_is_off() {
-        let daily = Daily::new(false);
-        daily.record("alice", NOW);
-        assert_eq!(people(&daily, NOW), Vec::<u32>::new());
-    }
-
-    fn people(daily: &Daily, now: i64) -> Vec<u32> {
-        daily.reports(now).iter().map(|r| r.people).collect()
+        let id = "8f14e45f-ceea-467a-9575-0123456789ab";
+        assert!(Telemetry::new(false, id).on.is_none());
+        assert!(Telemetry::new(true, "not-a-uuid").on.is_none());
     }
 }
