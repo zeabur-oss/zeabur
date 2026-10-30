@@ -1,6 +1,6 @@
 extends: existence
-message: "「%s」是防禦性說明：刪掉，或把限制寫進它影響的情境"
-level: error
+message: "「%s」多半是在替文字辯護：刪掉，或改寫成事實"
+level: warning
 nonword: true
 tokens:
-  - '不代表|並不保證|并不保证|不保證|不保证|不宣稱|不宣称|並不意味|并不意味'
+  - '不代表|不宣稱|不宣称|並不意味|并不意味'
