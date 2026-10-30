@@ -41,7 +41,7 @@ export const zhCN: Messages = {
   "dist.title": "用哪一种 Kubernetes",
   "dist.suggested": "推荐",
   "dist.suggestK3s": (gib) =>
-    `这台有 ${gib} GiB 内存，推荐用 K3s：最平衡。它本身用得少，留给应用的比较多。`,
+    `这台有 ${gib} GiB 内存，推荐用 K3s：最平衡。K3s 本身用得少，留给应用的比较多。`,
   "dist.suggestRke2": (gib) =>
     `这台有 ${gib} GiB 内存，推荐用 RKE2：最能扩展。之后可以用三台服务器一起跑控制平面，坏一台也不会停。`,
   "dist.k3sHint": "最平衡。比 RKE2 省内存，之后可以加工作节点。",
@@ -55,8 +55,8 @@ export const zhCN: Messages = {
   "host.server": "这台服务器",
   "host.name": "主机名",
   "host.nodeName": "节点名称",
-  "host.nodeNameHint": "Kubernetes 用这个名字识别这台服务器，以后主机名改了也不会跟着变。",
-  "host.nodeNameKept": "这台已经用这个名字装过了，所以不会改。",
+  "host.nodeNameHint": "Kubernetes 用这个名字识别这台服务器，以后主机名改了也不会跟着改变。",
+  "host.nodeNameKept": "这台已经用这个名字装过了，所以不会更改。",
   "host.arch": "架构",
   "host.memory": "内存",
   "host.addresses": "地址",
@@ -102,7 +102,7 @@ export const zhCN: Messages = {
     `内核为崩溃转储（kdump）保留了 ${mib} MiB 内存。用不到的话可以关掉，把内存还给系统：运行 sudo apt purge kdump-tools && sudo update-grub，然后重启。`,
   "code.others.none": () => "未发现。",
   "code.others.found": (...paths) =>
-    `发现其他 Kubernetes 发行版的文件（${listZh("zh-CN", paths)}）。如果它还在运行，请先卸载。`,
+    `发现其他 Kubernetes 发行版的文件（${listZh("zh-CN", paths)}）。如果那个发行版还在运行，请先卸载。`,
   "code.ports.free": (...ports) => `${listZh("zh-CN", ports)} 均未被占用。`,
   "code.ports.busy": (...ports) =>
     `端口 ${listZh("zh-CN", ports)} 已被占用。运行 ss -ltnp 查看占用者。`,
@@ -117,10 +117,10 @@ export const zhCN: Messages = {
   "code.crypt.no": (path) =>
     `${path} 不在加密的磁盘上，卷和数据库的文件以明文存放。一般 VPS 无法事后加密，可以照常安装。要存放敏感数据的话，改选服务商提供加密磁盘的方案；这项检查看不到服务商做的加密。`,
   "code.crypt.unknown": (path) =>
-    `无法判断 ${path} 是否加密。请运行 lsblk，查看它下面有没有 crypt 设备。`,
+    `无法判断 ${path} 是否加密。请运行 lsblk，查看 ${path} 下面有没有 crypt 设备。`,
   "code.docker.none": () => "这台服务器没有 Docker。",
   "code.docker.found": (...found) =>
-    `这台服务器装了 Docker（${listZh("zh-CN", found)}）。它会让 Pod 连不上网络，证书也申请不到。请先停止并移除 Docker，再重新检查。`,
+    `这台服务器装了 Docker（${listZh("zh-CN", found)}）。Docker 会让 Pod 连不上网络，证书也申请不到。请先停止并移除 Docker，再重新检查。`,
   "code.docker.forwardDrop": () =>
     "防火墙挡住了转发的流量，Pod 连不上网络，证书也申请不到。通常是 Docker 或 ufw 设的，请移除或改掉，再重新检查。",
   "code.prep.package.ok": (binary) => `已安装 ${binary}。`,
@@ -137,20 +137,20 @@ export const zhCN: Messages = {
   "code.prep.service.toStart": (service, component) =>
     `${component} 需要 ${service} 保持运行，安装时会一并启动。`,
   "code.prep.service.stopped": (service, component) =>
-    `${component} 需要 ${service} 保持运行，但它已停止。请运行 zeabur-installer apply 启动。`,
+    `${component} 需要 ${service} 保持运行，但 ${service} 已停止。请运行 zeabur-installer apply 启动。`,
   "code.prep.multipath.toBlock": (component, file) =>
-    `multipathd 会占用 ${component} 的磁盘，安装时会写入 ${file} 让它避开。`,
+    `multipathd 会占用 ${component} 的磁盘，安装时会写入 ${file}，让 multipathd 避开。`,
   "code.prep.multipath.open": (component, file) =>
     `缺少 ${file}，multipathd 可能占用 ${component} 的磁盘。请运行 zeabur-installer apply 补上。`,
 
   "access.title": "如何访问 Zeabur",
-  "access.description": "Zeabur 和它的登录服务各需要一个指向这台服务器的域名。",
+  "access.description": "Zeabur 和登录服务各需要一个指向这台服务器的域名。",
   "access.mode": "证书",
   "access.domain": "公开域名",
   "access.local": "测试机",
   "access.domainHint": "证书由 Let's Encrypt 签发，因此互联网需要能访问 80 和 443 端口。",
   "access.localHint":
-    "证书由这台服务器自建的证书颁发机构签发，Zeabur、登录页和应用的域名都一样。最后一步可以下载它，导入并信任后，浏览器就不会再出现警告。",
+    "证书由这台服务器自建的证书颁发机构签发，Zeabur、登录页和应用的域名都一样。最后一步可以下载这个证书颁发机构的证书，导入并信任后，浏览器就不会再出现警告。",
   "access.names": "域名",
   "access.zeabur": "Zeabur",
   "access.zeaburHint": "打开 Zeabur 用的地址。",
@@ -161,7 +161,7 @@ export const zhCN: Messages = {
     `${address}.sslip.io 下的名称无需配置 DNS 即可解析到 ${address}。`,
   "access.resolves": (addresses) => `指向这台服务器（${addresses}）。`,
   "access.elsewhere": (addresses) =>
-    `指向 ${addresses}，不是这台服务器的地址。如果那是它的公网地址则没有问题。`,
+    `指向 ${addresses}，不是这台服务器的地址。如果那是这台服务器的公网地址就没有问题。`,
   "access.unresolved": "暂时无法解析。请添加一条指向这台服务器的 DNS 记录。",
   "access.checking": "正在查询…",
   "access.invalid": "只填写域名，不要带 https:// 或路径。",
@@ -194,7 +194,7 @@ export const zhCN: Messages = {
   "components.needed": "其他组件需要",
   "components.privileged": "特权",
   "components.privilegedHint":
-    "以主机权限运行，因此它的 Namespace 不适用 restricted Pod 安全级别。",
+    "以主机权限运行，所以这个组件的 Namespace 不适用 restricted Pod 安全级别。",
   "components.personalDescription":
     "默认会装 Ingress 和证书，要从 Git 或文件夹构建，再勾选 Zeabur Builder。组件依赖的其他组件会一并加入。",
   "components.notPersonal": "自己用的版本没有这个",
@@ -234,10 +234,10 @@ export const zhCN: Messages = {
     "S3 服务器用这个密钥加密每份备份（SSE-C），长度必须是 32 个字符。",
   "input.volume-backup/velero.file-backup": "备份卷里的文件",
   "inputHelp.volume-backup/velero.file-backup":
-    "每个节点会多运行一个代理程序来复制卷里的文件。它以 root 运行，可以访问主机。",
+    "每个节点会多运行一个代理程序来复制卷里的文件。代理程序以 root 运行，可以访问主机。",
   "input.remote-access/tailscale-operator.oauth-client-id": "OAuth 客户端 ID",
   "inputHelp.remote-access/tailscale-operator.oauth-client-id":
-    "在 Tailscale 管理控制台创建 OAuth 客户端，给它 Devices Core、Auth Keys 和 Services 的写入权限，标签设为 tag:k8s-operator。Tailnet 策略里要让 tag:k8s-operator 拥有 tag:k8s。",
+    "在 Tailscale 管理控制台创建 OAuth 客户端，授予 Devices Core、Auth Keys 和 Services 的写入权限，标签设为 tag:k8s-operator。Tailnet 策略里要让 tag:k8s-operator 拥有 tag:k8s。",
   "input.remote-access/tailscale-operator.oauth-client-secret": "OAuth 客户端密钥",
   "inputHelp.remote-access/tailscale-operator.oauth-client-secret": "同一个 OAuth 客户端的密钥。",
   "input.intrusion-prevention/crowdsec.bouncer-key": "Bouncer 密钥",
@@ -335,7 +335,7 @@ export const zhCN: Messages = {
   "review.col.memory": "空闲时用量",
   "review.manifests": "YAML 文件",
   "review.removing": "要移除的组件",
-  "review.removingHint": "helm-controller 会卸载它们的 chart。留下的东西之后可以手动删除。",
+  "review.removingHint": "helm-controller 会卸载这些组件的 chart。留下的东西之后可以手动删除。",
   "review.stays": (items) => `会保留：${listZh("zh-CN", items)}`,
   "review.stays.namespace": (namespace) => `Namespace ${namespace}`,
   "review.stays.crds": "CRD 和它们的对象",
@@ -343,8 +343,8 @@ export const zhCN: Messages = {
   "review.stays.manifests": (name) => `${name} 创建的对象`,
   "review.deletesCrds": (crds) => `会删除这些 CRD 和它们的所有对象：${listZh("zh-CN", crds)}`,
   "review.inUse": (items) =>
-    `还有东西在用：${listZh("zh-CN", items)}。先移除它们，或保留这个组件。`,
-  "review.losesData": (name) => `移除 ${name}，连同它保存的数据一起删除`,
+    `还有东西在用：${listZh("zh-CN", items)}。先移除这些项目，或保留这个组件。`,
+  "review.losesData": (name) => `移除 ${name}，连同保存的数据一起删除`,
   "review.blockedRemoval": "有要移除的组件还在使用中，或还没确认。",
 
   "memory.fits": "够用",
@@ -367,7 +367,7 @@ export const zhCN: Messages = {
   "warning.domains.sslip": (suffix) =>
     `这台服务器没有公网地址，新服务不会有建议网址。可以把 ${suffix} 加成应用域名，网址只有这个网络里能访问。`,
   "warning.local.dns": (identity, zeabur) =>
-    `${zeabur} 和 ${identity} 必须在 DNS 上解析到这台服务器，浏览器和服务器本身都要查得到。只改 hosts 文件不够，Pod 不会读取它。`,
+    `${zeabur} 和 ${identity} 必须在 DNS 上解析到这台服务器，浏览器和服务器本身都要查得到。只改 hosts 文件不够，Pod 不会读取 hosts 文件。`,
   "warning.personal.isolation": () =>
     "自己用的版本只适合一个人。拿到 kubeconfig 的人可以控制整个集群，应用之间也没有隔离，因为 KubeSolo 不会执行网络规则。要给团队用，请在 4 GiB 内存的服务器上用 K3s 或 RKE2 安装。",
   "warning.memory.personal.low": (host) =>
@@ -389,11 +389,11 @@ export const zhCN: Messages = {
   "warning.join.ports": () =>
     "节点之间需要放行：到服务器的 TCP 9345 和 6443；所有节点之间的 TCP 10250、9099 和 UDP 8472（Canal VXLAN）；服务器之间的 TCP 2379 到 2381。UDP 8472 不要对公网开放。",
   "warning.join.udp": () =>
-    "无法从这里检查 UDP 8472。如果它被拦截，不同节点上的 Pod 会互相连不上。",
+    "无法从这里检查 UDP 8472。如果这个端口被拦截，不同节点上的 Pod 会互相连不上。",
   "warning.join.servers.ha": () =>
     "控制平面要有三台以上的服务器，少一台时才能继续运行：etcd 需要过半数。只有两台时，任一台宕机整个集群就会停摆，请再加一台。",
   "warning.join.storage.local": () =>
-    "默认 local-path 存储类创建的卷只在创建它的节点上：使用它的 Pod 只能在那个节点运行，节点没了，数据也跟着没了。",
+    "默认 local-path 存储类创建的卷只在创建卷的节点上：使用这种卷的 Pod 只能在那个节点运行，节点没了，数据也跟着没了。",
   "warning.join.token.unpinned": () =>
     "这个令牌没有 CA 哈希（K10<hash>::…），所以这台 VM 会信任在那个地址响应的任何服务器。请原样使用 node add 打印的令牌。",
   "warning.join.server.unreachable": (server) =>
@@ -448,7 +448,7 @@ export const zhCN: Messages = {
   "done.personalDescription":
     "把 kubeconfig 复制到自己的电脑，再用 zeaburctl ui 打开 Zeabur。用完按 Ctrl-C 关掉安装程序。",
   "done.personal": "在你的电脑上",
-  "done.personalHint": "先从这台服务器复制 kubeconfig，再用它打开 Zeabur。",
+  "done.personalHint": "先从这台服务器复制 kubeconfig，再用这份 kubeconfig 打开 Zeabur。",
   "done.personalKey": "kubeconfig 可以控制整个集群，请像 SSH 密钥一样自己保管。",
   "done.setup": "第一位管理员",
   "done.setupHint": "此链接只能使用一次，24 小时内有效。",
@@ -465,7 +465,7 @@ export const zhCN: Messages = {
   "done.caStep": "1. 信任证书颁发机构",
   "done.setupStep": "2. 注册第一位管理员",
   "done.caHint":
-    "Zeabur、登录页和应用域名的证书都由它签发。请把它导入系统或浏览器，并设为信任网站。信任之前，浏览器会对这些网站显示警告，也无法注册通行密钥。",
+    "Zeabur、登录页和应用域名的证书都由这个证书颁发机构签发。请把证书导入系统或浏览器，并设为信任网站。信任之前，浏览器会对这些网站显示警告，也无法注册通行密钥。",
   "done.caDownload": "下载证书",
   "done.noLink":
     "Zeabur 之前已经设置过，因此没有生成新链接。需要时请运行 sudo zeabur-installer setup-link。",
