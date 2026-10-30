@@ -2787,6 +2787,8 @@ version = "0.1.1"
 dependencies = [
  "axum",
  "brotli-decompressor",
+ "proc-macro2",
+ "quote",
  "tokio",
  "zeabur-core",
 ]

@@ -14,6 +14,10 @@ workspace = true
 axum.workspace = true
 brotli-decompressor.workspace = true
 
+[build-dependencies]
+proc-macro2.workspace = true
+quote.workspace = true
+
 [dev-dependencies]
 zeabur-core.workspace = true
 tokio.workspace = true

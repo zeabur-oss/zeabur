@@ -95,6 +95,9 @@ http-body = "1"
 http-body-util = "0.1"
 # The HTTP client stack kube-rs already ships, used directly for the OAuth client (zeabur-auth).
 bytes = "1"
+# Generate the embedded interface's file table (zeabur-ui's build script).
+proc-macro2 = "1"
+quote = "1"
 # Decodes the embedded interface for a client without brotli (zeabur-ui); decoder only.
 brotli-decompressor = { version = "6.1", default-features = false, features = ["std"] }
 hyper = { version = "1", default-features = false }
