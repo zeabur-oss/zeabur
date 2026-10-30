@@ -48,7 +48,7 @@ The register is plain written Chinese, as in a good manual: everyday words, full
   | 使用者手上的權杖仍可使用，直到到期，最長為 10 分鐘。 | 使用者手上的權杖到期前仍可使用，最長 10 分鐘。 |
   | 資料會一起刪除，如果叢集設定成保留，管理員還能救回 | 資料會一起刪除；叢集設定成保留時，管理員還能救回 |
   | 這份變更只在幾分鐘內有效，確保套用時仍符合叢集目前的狀態。 | 這份變更幾分鐘後就會過期，套用的內容才會和叢集現況一致。 |
-- **The verb itself, not 進行／作出／予以 + noun.** 進行驗證 → 驗證；上传文件夹进行构建 → 上传文件夹构建；按源地址进行匹配 → 按源地址匹配.
+- **The verb itself, not 進行／作出／予以 + noun.** 對設定進行驗證 → 驗證設定；作出決定 → 決定. Keep 進行 when dropping it glues two nouns together: 「上传文件夹进行构建」 stays, because 「上传文件夹构建」 reads as 文件夹构建.
 - **One 時 per clause.** 「Zeabur 只在物件還是你檢查時的版本時寫入變更」 → 「物件和你檢查時的版本相同，Zeabur 才會寫入變更」.
 - **Break 的 chains and long pre-modifiers** into a clause: 「副本的重新啟動會導致連線的中斷」 → 「副本重新啟動後，連線會中斷」.
 - **Calques to rewrite:** 當…的時候 → …時；最…之一 → say it plainly；作為一個 → 是；透過 for a method → 用、在；關於／對於 at the start of a sentence → drop it.
