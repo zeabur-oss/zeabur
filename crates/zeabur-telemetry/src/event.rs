@@ -8,7 +8,9 @@ use serde_json::{Map, Value, json};
 pub struct InstallationId(String);
 
 impl InstallationId {
-    /// A version 4 UUID made from 16 random bytes.
+    /// A version 4 UUID made from 16 random bytes: version 4 in the high bits of octet 6 and
+    /// variant `10` in octet 8, as RFC 9562 §5.4 (<https://www.rfc-editor.org/rfc/rfc9562#section-5.4>)
+    /// lays out. The bytes should come from a CSPRNG (§6.9).
     #[must_use]
     pub fn from_random(mut bytes: [u8; 16]) -> Self {
         bytes[6] = (bytes[6] & 0x0F) | 0x40;
@@ -24,7 +26,7 @@ impl InstallationId {
         Self(text)
     }
 
-    /// Reads a UUID in its canonical form, in lower or upper case.
+    /// Reads a UUID in the hex-and-dash form of RFC 9562 §4, in any case.
     #[must_use]
     pub fn parse(text: &str) -> Option<Self> {
         let text = text.trim();
