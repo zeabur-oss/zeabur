@@ -206,10 +206,9 @@ case "$stage" in
     # Apple's tools, not the Nix shell's: its codesign is sigtool's, and its DEVELOPER_DIR and
     # SDKROOT point xcrun at a bare SDK without notarytool.
     apple() { env -u DEVELOPER_DIR -u SDKROOT "$@"; }
-    keychains="$(apple /usr/bin/security list-keychains -d user | tr -d '"')"
+    mapfile -t keychains < <(apple /usr/bin/security list-keychains -d user | sed -e 's/^ *"//' -e 's/"$//')
     restore() {
-      # shellcheck disable=SC2086
-      apple /usr/bin/security list-keychains -d user -s $keychains
+      apple /usr/bin/security list-keychains -d user -s "${keychains[@]}"
       apple /usr/bin/security delete-keychain "$keychain" 2>/dev/null || true
       rm -rf "$work"
     }
@@ -222,8 +221,7 @@ case "$stage" in
     apple /usr/bin/security create-keychain -p "$password" "$keychain"
     apple /usr/bin/security set-keychain-settings -lut 3600 "$keychain"
     apple /usr/bin/security unlock-keychain -p "$password" "$keychain"
-    # shellcheck disable=SC2086
-    apple /usr/bin/security list-keychains -d user -s "$keychain" $keychains
+    apple /usr/bin/security list-keychains -d user -s "$keychain" "${keychains[@]}"
     base64 --decode <<<"$APPLE_CERTIFICATE_P12" >"$work/certificate.p12"
     apple /usr/bin/security import "$work/certificate.p12" -k "$keychain" \
       -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
