@@ -1,10 +1,10 @@
 name: Release
 
-# Tag vX.Y.Z on main: the shared release builds, publishes and signs the image, chart and
+# Tag vX.Y.Z or vX.Y.Z-<pre-release> on main: the shared release builds, publishes and signs the image, chart and
 # installers, then leaves a draft (docs/internal/releasing.md). Manual run: rehearse.
 on:
   push:
-    tags: ['v[0-9]+.[0-9]+.[0-9]+']
+    tags: ['v[0-9]*']
   workflow_dispatch:
     inputs:
       version:
@@ -24,7 +24,7 @@ concurrency:
 
 jobs:
   release:
-    uses: zeabur-oss/.github/.github/workflows/release.yml@7fed58a3b47a0e751d4511d23bcf92cd09aaf3a5 # main
+    uses: zeabur-oss/.github/.github/workflows/release.yml@9a1863f91c2f8253ec3c970b6c91b3fd01a9a69f # main
     permissions:
       contents: write
       packages: write

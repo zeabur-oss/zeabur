@@ -55,8 +55,8 @@ EOF
 
 stage="${1:-}"
 version="${2:-}"
-[[ "$version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || usage
-plain="${version#v}"
+[[ -n "$version" ]] || usage
+plain="$(zeabur-oss-release version "$version" | sed -n 's/^plain=//p')" || usage
 
 # The platform of the arguments, which must be the machine's: every build is native.
 platform() { # $1 = os, $2 = arch
@@ -168,7 +168,7 @@ case "$stage" in
     # signed, and its installer installs the pinned Zeabur Identity release: both pins must
     # resolve before anything is built. A rehearsal builds whatever the pins name.
     if [[ "${GITHUB_EVENT_NAME:-}" == push ]]; then
-      "$scripts/release-pins.sh" >/dev/null
+      "$scripts/release-pins.sh" "$version" >/dev/null
     fi
     "$scripts/release-build.sh" "$version" "$arch" "$dist"
     if [[ "$os" == linux ]]; then
@@ -345,7 +345,7 @@ case "$stage" in
     # The installer runs on Linux servers only; release.yml finishes on Linux only.
     [[ "$os" == linux ]] || { echo "no installer for $os-$arch" >&2; exit 2; }
     # The catalog and Zeabur Identity releases, and the image and the chart that publish pushed.
-    export_lines < <("$scripts/release-pins.sh")
+    export_lines < <("$scripts/release-pins.sh" "$version")
     export_lines <"$artifacts/published/outputs.env"
     "$scripts/release-build.sh" "$version" "$arch" "$dist" installer
     ;;
