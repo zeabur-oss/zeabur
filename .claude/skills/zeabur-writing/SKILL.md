@@ -27,13 +27,7 @@ When revising someone's text, change the fewest sentences that fix a real proble
 
 The [`vale/`](vale) directory is a Vale style. It catches what a pattern can: punctuation width, spacing between Han and Latin text, quotes, Traditional or Simplified characters in the wrong locale, cross-strait terms, padding verbs, AI-tell words, and paragraphs with several 被 or 它. Rhythm, word order and hedging still need reading.
 
-Setup, once per repo:
-
-1. Install the skill (`npx skills add zeabur-oss/skills --skill zeabur-writing`).
-2. Copy [`vale/vale.ini`](vale/vale.ini) to `.vale.ini` at the repo root and set `StylesPath` to the installed `vale` directory.
-3. Put Vale in the dev shell. `.mdx` files also need `mdx2vast`, which nixpkgs does not have; this repo's flake builds it (`packages.mdx2vast`).
-
-Then run `vale <files>`. A file's language comes from its path: `zh-TW` or `zh-CN` anywhere in it selects the Chinese rules, anything else is English. Add a section to `.vale.ini` for files named otherwise.
+Run `vale <files>` in the repo's dev shell. A file's language comes from its path: `zh-TW` or `zh-CN` anywhere in it selects the Chinese rules, anything else is English. Add a section to `.vale.ini` for files named otherwise.
 
 **Interface strings** in TypeScript catalogues (`i18n/en.ts`, `i18n/zh-TW.ts`, `i18n/zh-CN.ts`) go through the `ZeaburI18n` view: Vale reads every string and template literal and skips the code, so `${n} 個服務` is checked as two pieces of text around the placeholder. Comments in a catalogue are not checked.
 

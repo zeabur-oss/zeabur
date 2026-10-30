@@ -53,15 +53,15 @@ The register is plain written Chinese, as in a good manual: everyday words, full
 - **Break 的 chains and long pre-modifiers** into a clause: 「副本的重新啟動會導致連線的中斷」 → 「副本重新啟動後，連線會中斷」.
 - **Calques to rewrite:** 當…的時候 → …時；最…之一 → say it plainly；作為一個 → 是；透過 for a method → 用、在；關於／對於 at the start of a sentence → drop it.
 
-## Say the fact, not the hedge
+## Say it directly
 
-- **No defensive 不保證／不代表／不宣稱.** Keep a limit only when it changes what the reader does, and put it inside the case it affects, as a positive fact.
+- **Say how sure, in everyday words.** For an outcome: 「不一定能」「通常可以」. 「可能失敗」 reads as likely to fail; use it only when failure is likely. For a commitment the project does not make: 「不保證」, with its subject (「我們不保證…」). 「不代表」「不宣稱」 usually defend the text against a misreading: delete them, or state the fact.
 
   | Before | After |
   |---|---|
+  | 這是從你自己的網路檢查，不代表所有人都連得到。 | 這是從你的網路檢查的結果，其他網路不一定連得到。 |
+  | alpha 版之間沒有轉換機制，升級或回復都可能失敗。 | 我們不保證 alpha 版之間能升級或回復。 |
   | 這份對照表不代表 Zeabur Identity 已取得 OpenID 認證。 | （刪掉；或寫事實：Zeabur Identity 還沒有申請 OpenID 認證。） |
-  | ### 目前不保證的事 ／ 不保證能順利升級或回復 | ### 升級前先知道 ／ alpha 版之間沒有轉換機制，升級或回復都可能失敗 |
-  | 這是從你自己的網路檢查，不代表所有人都連得到。 | 這是從你的網路檢查的結果，其他網路可能連不到。 |
 - **No 「不是 X，而是 Y」, 「不只是 X，更是 Y」.** Say Y. A contrast stays only when the contrast is the information.
 
 ## Punctuation
