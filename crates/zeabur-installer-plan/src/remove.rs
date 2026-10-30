@@ -428,7 +428,12 @@ mod tests {
         found.retain(|chart| chart.component == "container-registry/zot");
         let (left, warnings) = removals(&index(), &without, &found, "single-node", &[]);
         assert_eq!(left, []);
-        assert_eq!(warnings.len(), 1, "{warnings:?}");
+        assert!(
+            warnings
+                .iter()
+                .any(|w| w.code == "remove.unknown" && w.values.contains(&"zot".to_owned())),
+            "{warnings:?}"
+        );
     }
 
     #[test]
