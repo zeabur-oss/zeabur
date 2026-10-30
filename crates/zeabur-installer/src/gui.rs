@@ -28,7 +28,6 @@ use axum::middleware::{self, Next};
 use axum::response::Response;
 use axum::routing::get;
 use serde_json::{Value, json};
-use tower::ServiceExt as _;
 use zeabur_installer_host::{facts, files, preflight, systemd};
 use zeabur_installer_plan::catalog::{Default, Index};
 use zeabur_installer_plan::cluster::Distribution;
@@ -46,13 +45,9 @@ mod embedded {
 }
 
 const COOKIE: &str = "zeabur_installer";
-/// The most connections the page serves at a time. The server closes other connections.
-const MAX_CONNECTIONS: usize = 16;
-/// The most bytes of a request's head.
-const MAX_HEADER: usize = 16 * 1024;
 /// The most bytes of a request's body.
 const MAX_BODY: usize = 1024 * 1024;
-/// How long a client may take to send a request's head, and then its body.
+/// How long a client may take to send a request's body.
 const READ_WAIT: Duration = Duration::from_secs(30);
 /// The most lines of `apply` output a job keeps. The job drops the oldest lines first.
 const MAX_LINES: usize = 10_000;
@@ -127,39 +122,9 @@ pub(crate) fn run(config_path: &Path, listen: SocketAddr) -> Result<(), InstallE
         out::err("warning: the page is served over plain HTTP; anyone on the path can read it.");
     }
     out::line("Stop with Ctrl-C once the install has finished.");
-    runtime.block_on(serve(listener, app(server, &embedded::ASSETS)))
-}
-
-/// Serves `app` on `listener`, one request per connection and at most [`MAX_CONNECTIONS`]
-/// connections at a time.
-async fn serve(listener: tokio::net::TcpListener, app: Router) -> ! {
-    let connections = Arc::new(tokio::sync::Semaphore::new(MAX_CONNECTIONS));
-    loop {
-        let Ok((stream, _)) = listener.accept().await else {
-            continue;
-        };
-        // Dropping the stream closes the connection.
-        let Ok(permit) = Arc::clone(&connections).try_acquire_owned() else {
-            continue;
-        };
-        let app = app.clone();
-        tokio::spawn(async move {
-            let service = hyper::service::service_fn(move |request: Request<_>| {
-                app.clone().oneshot(request.map(Body::new))
-            });
-            let mut http = hyper::server::conn::http1::Builder::new();
-            http.timer(hyper_util::rt::TokioTimer::new())
-                .header_read_timeout(READ_WAIT)
-                .max_buf_size(MAX_HEADER)
-                .keep_alive(false);
-            // The browser may have gone; nothing to do about it.
-            drop(
-                http.serve_connection(hyper_util::rt::TokioIo::new(stream), service)
-                    .await,
-            );
-            drop(permit);
-        });
-    }
+    runtime
+        .block_on(async { axum::serve(listener, app(server, &embedded::ASSETS)).await })
+        .map_err(message)
 }
 
 /// The page's API and files, behind the token and the `Host` check.
@@ -753,16 +718,14 @@ mod tests {
     mod server {
         use std::path::PathBuf;
         use std::sync::Arc;
-        use std::time::Duration;
 
         use axum::body::{Body, to_bytes};
         use axum::http::{Request, StatusCode};
         use axum::response::Response;
-        use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
         use tower::ServiceExt as _;
         use zeabur_ui::{Asset, Decoded};
 
-        use super::super::{CSP, MAX_BODY, MAX_CONNECTIONS, Server, app, serve};
+        use super::super::{CSP, MAX_BODY, Server, app};
 
         const TOKEN: &str = "0123456789abcdef0123456789abcdef";
         const COOKIE: &str = "zeabur_installer=0123456789abcdef0123456789abcdef";
@@ -1024,41 +987,6 @@ mod tests {
                     .skip(1)
                     .all(|tag| tag.starts_with(" type=\"module\" src=")),
                 "web/index.html has an inline script"
-            );
-        }
-
-        #[tokio::test]
-        async fn connections_beyond_the_limit_are_closed() {
-            let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
-            let address = listener.local_addr().unwrap();
-            tokio::spawn(async move { serve(listener, app(server(false), &ASSETS)).await });
-
-            let mut held = Vec::new();
-            for _ in 0..MAX_CONNECTIONS {
-                held.push(tokio::net::TcpStream::connect(address).await.unwrap());
-            }
-            let mut extra = tokio::net::TcpStream::connect(address).await.unwrap();
-            let mut answer = Vec::new();
-            let read = tokio::time::timeout(Duration::from_secs(5), extra.read_to_end(&mut answer))
-                .await
-                .unwrap();
-            assert!(read.is_err() || answer.is_empty(), "{answer:?}");
-
-            let mut first = held.swap_remove(0);
-            first
-                .write_all(b"GET /api/state HTTP/1.1\r\nhost: x\r\n\r\n")
-                .await
-                .unwrap();
-            let mut answer = Vec::new();
-            tokio::time::timeout(Duration::from_secs(5), first.read_to_end(&mut answer))
-                .await
-                .unwrap()
-                .unwrap();
-            let answer = String::from_utf8_lossy(&answer);
-            assert!(answer.starts_with("HTTP/1.1 403"), "{answer}");
-            assert!(
-                answer.to_ascii_lowercase().contains("connection: close"),
-                "{answer}"
             );
         }
     }

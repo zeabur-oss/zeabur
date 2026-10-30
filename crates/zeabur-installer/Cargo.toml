@@ -16,8 +16,6 @@ zeabur-installer-plan.workspace = true
 zeabur-ui.workspace = true
 axum.workspace = true
 form_urlencoded.workspace = true
-hyper = { workspace = true, features = ["server", "http1"] }
-hyper-util.workspace = true
 tokio.workspace = true
 tower.workspace = true
 base64.workspace = true

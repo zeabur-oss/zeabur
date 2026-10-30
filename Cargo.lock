@@ -2878,8 +2878,6 @@ dependencies = [
  "clap",
  "form_urlencoded",
  "hex",
- "hyper",
- "hyper-util",
  "serde-saphyr 2.0.0",
  "serde_json",
  "tempfile",
