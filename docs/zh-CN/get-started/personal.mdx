@@ -99,7 +99,12 @@ kubeconfig 中的 API 地址由服务器自行选择。如果自己的电脑需�
 
 ## 用 zeaburctl up 构建文件夹
 
-安装 Zeabur Builder 后，在自己的电脑上使用同一份 kubeconfig，上传文件夹构建：
+{/* Without 进行 the verb reads as part of a noun. */}
+{/* vale ZeaburZh.Pad = NO */}
+
+安装 Zeabur Builder 后，在自己的电脑上使用同一份 kubeconfig，上传文件夹进行构建：
+
+{/* vale ZeaburZh.Pad = YES */}
 
 ```sh
 KUBECONFIG=~/.kube/<名称>.yaml zeaburctl up --context <名称> --project <项目> --service <服务>
