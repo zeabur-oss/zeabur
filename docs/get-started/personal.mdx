@@ -34,7 +34,7 @@ When the server reports less than 2400 MiB of memory, the installer only accepts
 - No existing installation of RKE2, K3s, kubeadm, k0s, or MicroK8s.
 - Docker not installed or running. Docker drops forwarded packets by default, so replicas can't reach external networks or obtain certificates. The installer stops if it finds Docker (a binary, service, or socket) or a firewall forwarding policy set to DROP. Stop and remove Docker before installing.
 
-Your own computer needs [`zeaburctl`](../reference/zeaburctl.mdx) and must be able to reach the server on TCP port 6443.
+Your own computer needs [`zeaburctl`](../reference/zeaburctl.mdx) and must be able to reach the server on TCP port 6443. On Windows, run the Linux `zeaburctl` in WSL.
 
 The installer pins the versions of KubeSolo, helm-controller, and kubectl, and checks their SHA-256 hashes after downloading them. It specifies the helm-controller image by digest. Images for component installation Jobs can only be specified by tag, so the installer checks the digest each Job actually used after it finishes and stops if it doesn't match.
 
