@@ -82,10 +82,12 @@ Prepare an application domain, such as `apps.example.com`. Point the DNS record 
 ```sh
 helm upgrade zeabur oci://ghcr.io/zeabur-oss/charts/zeabur \
   --version <version> \
-  --namespace zeabur --reuse-values \
+  --namespace zeabur --reset-then-reuse-values \
   --set 'domains.suffixes={apps.example.com}' \
   --set domains.clusterIssuer=letsencrypt
 ```
+
+`--reset-then-reuse-values` takes the new chart's defaults, including the image, and keeps the values you set. `--reuse-values` would keep the old chart's defaults, so the image wouldn't change.
 
 When you deploy `web` in the `shop` project, the form suggests `web-shop.apps.example.com`. You can list multiple application domains separated by commas; the first is the default. You can also change them later in the **Domains** section of the **Cluster** page, which checks DNS records and lists the records to add. See [Set up DNS records](../configure/dns.mdx). If `domains.suffixes` is empty, enter the full domain by hand. If `domains.clusterIssuer` is empty, new services' public URLs use HTTP.
 
@@ -99,7 +101,7 @@ If Zeabur Identity, a registry, object storage, or GitHub Enterprise uses a cert
 kubectl -n zeabur create configmap corp-ca --from-file=ca.crt=corp-ca.pem
 helm upgrade zeabur oci://ghcr.io/zeabur-oss/charts/zeabur \
   --version <version> \
-  --namespace zeabur --reuse-values \
+  --namespace zeabur --reset-then-reuse-values \
   --set extraTrustedCA.configMap=corp-ca
 ```
 
