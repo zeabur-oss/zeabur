@@ -80,6 +80,7 @@ const HEALTH_CONCURRENCY: usize = 8;
 
 /// The projects you may see, with the health of the adopted ones.
 #[utoipa::path(get, path = "/api/v1/projects", tag = "projects",
+    operation_id = "listProjects",
     responses((status = 200, body = ProjectList), (status = 403, body = Problem, content_type = PROBLEM)))]
 pub(crate) async fn list(Person(cluster): Person) -> Result<Json<ProjectList>, ApiError> {
     let namespaces = cluster.namespaces().await.map_err(|e| {
@@ -299,6 +300,7 @@ pub(crate) async fn read(cluster: &dyn Cluster, project: &str) -> Result<Project
 
 /// A project's services, the resources they use, and how they relate: the project document.
 #[utoipa::path(get, path = "/api/v1/projects/{project}", tag = "projects",
+    operation_id = "getProject",
     params(("project" = String, Path, description = "The project's namespace")),
     responses((status = 200, body = ProjectDocument), (status = 403, body = Problem, content_type = PROBLEM)))]
 pub(crate) async fn get(

@@ -23,6 +23,7 @@ use crate::views::ServiceDocument;
 /// One service (workload) of a project, cut from the project document: for deep links and scripts.
 /// The web interface reads the project document instead.
 #[utoipa::path(get, path = "/api/v1/projects/{project}/services/{kind}/{name}", tag = "services",
+    operation_id = "getService",
     params(("project" = String, Path),
            ("kind" = String, Path, description = "deployment, statefulset, daemonset, job or cronjob; any case"),
            ("name" = String, Path)),

@@ -16,6 +16,7 @@ use crate::views::{ConfigMapList, ConfigMapView, RevealedSecret, SecretValue};
 
 /// The ConfigMaps of a project, in full, sorted by name. Lists ConfigMaps only.
 #[utoipa::path(get, path = "/api/v1/projects/{project}/configmaps", tag = "resources",
+    operation_id = "listConfigMaps",
     params(("project" = String, Path)),
     responses((status = 200, body = ConfigMapList), (status = 403, body = Problem, content_type = PROBLEM)))]
 pub(crate) async fn config_maps(
@@ -51,6 +52,7 @@ pub(crate) async fn config_maps(
 /// A Secret's values. A `POST`, so that it is always a deliberate action and never prefetched;
 /// the response is never cached, and nothing in Zeabur logs or keeps it.
 #[utoipa::path(post, path = "/api/v1/projects/{project}/secrets/{name}/reveal", tag = "resources",
+    operation_id = "revealSecret",
     params(("project" = String, Path), ("name" = String, Path)),
     responses((status = 200, body = RevealedSecret), (status = 403, body = Problem, content_type = PROBLEM)))]
 pub(crate) async fn reveal_secret(

@@ -108,6 +108,7 @@ fn log_problem(error: ClusterError, what: &str, project: &str, pod: &str) -> Api
 /// A snapshot of a container's log. A log the kubelet cannot give (the container has not
 /// started, has not restarted, or is gone) is a `log-unavailable` problem, never a log line.
 #[utoipa::path(get, path = "/api/v1/projects/{project}/pods/{pod}/logs", tag = "pods",
+    operation_id = "getPodLogs",
     params(("project" = String, Path), ("pod" = String, Path), LogQuery),
     responses((status = 200, body = LogSnapshot), (status = 403, body = Problem, content_type = PROBLEM),
               (status = 404, description = "The pod does not exist, or the log asked for cannot be read (`log-unavailable`)", body = Problem, content_type = PROBLEM)))]
@@ -131,6 +132,7 @@ pub(crate) async fn logs(
 /// A container's log as it is written, as Server-Sent Events: one `data` line per log line; an
 /// `error` event with a problem (JSON) when the stream fails, after which it ends.
 #[utoipa::path(get, path = "/api/v1/projects/{project}/pods/{pod}/logs/follow", tag = "pods",
+    operation_id = "followPodLogs",
     params(("project" = String, Path), ("pod" = String, Path), LogQuery),
     responses((status = 200, content_type = "text/event-stream", body = String),
               (status = 403, body = Problem, content_type = PROBLEM),

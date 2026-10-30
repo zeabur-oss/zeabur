@@ -242,7 +242,7 @@ export interface paths {
      * What the cluster itself is missing, apart from any project: an IngressClass served by a
      *     retired controller, and a project namespace without its NetworkPolicy.
      */
-    get: operations["cluster"]
+    get: operations["listClusterGaps"]
     put?: never
     post?: never
     delete?: never
@@ -320,7 +320,7 @@ export interface paths {
      * The page that sends the manifest to GitHub: a form with one button, no script, whose policy
      *     lets forms go to GitHub only.
      */
-    get: operations["gitHubAppForm"]
+    get: operations["getGitHubAppForm"]
     put?: never
     post?: never
     delete?: never
@@ -437,7 +437,7 @@ export interface paths {
       cookie?: never
     }
     /** The node shell pods, oldest first; cluster administrators only. */
-    get: operations["nodeShells"]
+    get: operations["getNodeShells"]
     put?: never
     post?: never
     delete?: never
@@ -504,7 +504,7 @@ export interface paths {
      *     a node shell the person opened (`404`), one not running or already open in another terminal
      *     (`409`): one terminal per shell. When the terminal closes, Zeabur deletes the pod at once.
      */
-    get: operations["nodeShellTerminal"]
+    get: operations["openNodeShellTerminal"]
     put?: never
     post?: never
     delete?: never
@@ -739,7 +739,7 @@ export interface paths {
      * The person's cluster tools pods, deleting those that are done with; cluster administrators
      *     only.
      */
-    get: operations["clusterTools"]
+    get: operations["getClusterTools"]
     put?: never
     post?: never
     delete?: never
@@ -820,7 +820,7 @@ export interface paths {
      *     namespace `default`. Failures arrive as an `error` frame, as there, and `403` for
      *     anyone who may not do everything everywhere.
      */
-    get: operations["clusterToolsTerminal"]
+    get: operations["openClusterToolsTerminal"]
     put?: never
     post?: never
     delete?: never
@@ -993,7 +993,7 @@ export interface paths {
       cookie?: never
     }
     /** The projects you may see, with the health of the adopted ones. */
-    get: operations["list"]
+    get: operations["listProjects"]
     put?: never
     post?: never
     delete?: never
@@ -1010,7 +1010,7 @@ export interface paths {
       cookie?: never
     }
     /** A project's services, the resources they use, and how they relate: the project document. */
-    get: operations["get"]
+    get: operations["getProject"]
     put?: never
     post?: never
     delete?: never
@@ -1046,7 +1046,7 @@ export interface paths {
     get?: never
     put?: never
     /** Carries out a plan by its token: checks it, dry-runs every write, then writes. */
-    post: operations["apply"]
+    post: operations["applyProject"]
     delete?: never
     options?: never
     head?: never
@@ -1157,7 +1157,7 @@ export interface paths {
       cookie?: never
     }
     /** The ConfigMaps of a project, in full, sorted by name. Lists ConfigMaps only. */
-    get: operations["config_maps"]
+    get: operations["listConfigMaps"]
     put?: never
     post?: never
     delete?: never
@@ -1257,7 +1257,7 @@ export interface paths {
      * The public key of the deploy key in Secret `name`, read as the person, for adding it to the
      *     Git host again. Only on the person's request: the Secret holds the private key too.
      */
-    post: operations["deployKeyPublic"]
+    post: operations["revealDeployKey"]
     delete?: never
     options?: never
     head?: never
@@ -1276,7 +1276,7 @@ export interface paths {
      * @description Ordered by when they last happened, newest first (events that say nothing about when last),
      *     then by name. `totalSize` counts every event that matched, also those past the limit.
      */
-    get: operations["events"]
+    get: operations["listProjectEvents"]
     put?: never
     post?: never
     delete?: never
@@ -1293,7 +1293,7 @@ export interface paths {
       cookie?: never
     }
     /** What a project is missing, by the built-in rules, each with its citations and fix. */
-    get: operations["project"]
+    get: operations["listProjectGaps"]
     put?: never
     post?: never
     delete?: never
@@ -1548,7 +1548,7 @@ export interface paths {
     get?: never
     put?: never
     /** Computes the writes a change needs and returns them with a token; writes nothing. */
-    post: operations["plan"]
+    post: operations["planProject"]
     delete?: never
     options?: never
     head?: never
@@ -1595,7 +1595,7 @@ export interface paths {
      *     a byte either way. A handshake
      *     from another origin is refused with `403`.
      */
-    get: operations["exec"]
+    get: operations["openPodTerminal"]
     put?: never
     post?: never
     delete?: never
@@ -1736,7 +1736,7 @@ export interface paths {
      * A snapshot of a container's log. A log the kubelet cannot give (the container has not
      *     started, has not restarted, or is gone) is a `log-unavailable` problem, never a log line.
      */
-    get: operations["logs"]
+    get: operations["getPodLogs"]
     put?: never
     post?: never
     delete?: never
@@ -1756,7 +1756,7 @@ export interface paths {
      * A container's log as it is written, as Server-Sent Events: one `data` line per log line; an
      *     `error` event with a problem (JSON) when the stream fails, after which it ends.
      */
-    get: operations["follow_logs"]
+    get: operations["followPodLogs"]
     put?: never
     post?: never
     delete?: never
@@ -1778,7 +1778,7 @@ export interface paths {
      * A Secret's values. A `POST`, so that it is always a deliberate action and never prefetched;
      *     the response is never cached, and nothing in Zeabur logs or keeps it.
      */
-    post: operations["reveal_secret"]
+    post: operations["revealSecret"]
     delete?: never
     options?: never
     head?: never
@@ -1796,7 +1796,7 @@ export interface paths {
      * One service (workload) of a project, cut from the project document: for deep links and scripts.
      *     The web interface reads the project document instead.
      */
-    get: operations["service"]
+    get: operations["getService"]
     put?: never
     post?: never
     delete?: never
@@ -1817,7 +1817,7 @@ export interface paths {
      *     problems, the way to it hop by hop, recent events, the end of each restarted container's
      *     previous log, and its objects with variable values hidden. Never a Secret.
      */
-    get: operations["serviceEvidence"]
+    get: operations["getServiceEvidence"]
     put?: never
     post?: never
     delete?: never
@@ -1886,7 +1886,7 @@ export interface paths {
      * The releases of a service's workload, newest first, each with its pod template; one is
      *     `current`. A rollback is a plan (`rollback` change).
      */
-    get: operations["releases"]
+    get: operations["listServiceReleases"]
     put?: never
     post?: never
     delete?: never
@@ -1907,7 +1907,7 @@ export interface paths {
      *     not, and whether it is done, progressing, or stuck (with the reason and the plan that rolls
      *     back). Poll it while `status` is `progressing`.
      */
-    get: operations["serviceRollout"]
+    get: operations["getServiceRollout"]
     put?: never
     post?: never
     delete?: never
@@ -1924,7 +1924,7 @@ export interface paths {
       cookie?: never
     }
     /** A CronJob's runs, newest first. */
-    get: operations["taskRuns"]
+    get: operations["listTaskRuns"]
     put?: never
     post?: never
     delete?: never
@@ -1944,7 +1944,7 @@ export interface paths {
      * What changed in one service and what went wrong, newest first, each release that runs now with
      *     the plan that returns to the one before it.
      */
-    get: operations["serviceTimeline"]
+    get: operations["getServiceTimeline"]
     put?: never
     post?: never
     delete?: never
@@ -2006,7 +2006,7 @@ export interface paths {
      * What changed in a project and what went wrong, newest first: releases, each field manager's
      *     last write, warnings folded by reason and containers that stopped, for every workload.
      */
-    get: operations["projectTimeline"]
+    get: operations["getProjectTimeline"]
     put?: never
     post?: never
     delete?: never
@@ -2068,7 +2068,7 @@ export interface paths {
      *     (`400`), or `create` on `pods/exec` in the project refused (`403`). The pod is deleted a minute
      *     (by default) after its last terminal closes.
      */
-    get: operations["toolsTerminal"]
+    get: operations["openToolsTerminal"]
     put?: never
     post?: never
     delete?: never
@@ -2271,7 +2271,7 @@ export interface paths {
       cookie?: never
     }
     /** Who the cluster says you are. */
-    get: operations["whoami"]
+    get: operations["getWhoAmI"]
     put?: never
     post?: never
     delete?: never
@@ -9932,7 +9932,7 @@ export interface operations {
       }
     }
   }
-  cluster: {
+  listClusterGaps: {
     parameters: {
       query?: never
       header?: never
@@ -10088,7 +10088,7 @@ export interface operations {
       }
     }
   }
-  gitHubAppForm: {
+  getGitHubAppForm: {
     parameters: {
       query: {
         /** @description The state `manifest` answered */
@@ -10287,7 +10287,7 @@ export interface operations {
       }
     }
   }
-  nodeShells: {
+  getNodeShells: {
     parameters: {
       query?: never
       header?: never
@@ -10408,7 +10408,7 @@ export interface operations {
       }
     }
   }
-  nodeShellTerminal: {
+  openNodeShellTerminal: {
     parameters: {
       query?: never
       header?: never
@@ -10878,7 +10878,7 @@ export interface operations {
       }
     }
   }
-  clusterTools: {
+  getClusterTools: {
     parameters: {
       query?: never
       header?: never
@@ -11039,7 +11039,7 @@ export interface operations {
       }
     }
   }
-  clusterToolsTerminal: {
+  openClusterToolsTerminal: {
     parameters: {
       query?: never
       header?: never
@@ -11398,7 +11398,7 @@ export interface operations {
       }
     }
   }
-  list: {
+  listProjects: {
     parameters: {
       query?: never
       header?: never
@@ -11425,7 +11425,7 @@ export interface operations {
       }
     }
   }
-  get: {
+  getProject: {
     parameters: {
       query?: never
       header?: never
@@ -11485,7 +11485,7 @@ export interface operations {
       }
     }
   }
-  apply: {
+  applyProject: {
     parameters: {
       query?: never
       header?: never
@@ -11753,7 +11753,7 @@ export interface operations {
       }
     }
   }
-  config_maps: {
+  listConfigMaps: {
     parameters: {
       query?: never
       header?: never
@@ -11926,7 +11926,7 @@ export interface operations {
       }
     }
   }
-  deployKeyPublic: {
+  revealDeployKey: {
     parameters: {
       query?: never
       header?: never
@@ -11974,7 +11974,7 @@ export interface operations {
       }
     }
   }
-  events: {
+  listProjectEvents: {
     parameters: {
       query?: {
         /**
@@ -12023,7 +12023,7 @@ export interface operations {
       }
     }
   }
-  project: {
+  listProjectGaps: {
     parameters: {
       query?: never
       header?: never
@@ -12505,7 +12505,7 @@ export interface operations {
       }
     }
   }
-  plan: {
+  planProject: {
     parameters: {
       query?: never
       header?: never
@@ -12604,7 +12604,7 @@ export interface operations {
       }
     }
   }
-  exec: {
+  openPodTerminal: {
     parameters: {
       query?: {
         /**
@@ -13108,7 +13108,7 @@ export interface operations {
       }
     }
   }
-  logs: {
+  getPodLogs: {
     parameters: {
       query?: {
         /** @description The container; required when the pod has several. */
@@ -13158,7 +13158,7 @@ export interface operations {
       }
     }
   }
-  follow_logs: {
+  followPodLogs: {
     parameters: {
       query?: {
         /** @description The container; required when the pod has several. */
@@ -13208,7 +13208,7 @@ export interface operations {
       }
     }
   }
-  reveal_secret: {
+  revealSecret: {
     parameters: {
       query?: never
       header?: never
@@ -13238,7 +13238,7 @@ export interface operations {
       }
     }
   }
-  service: {
+  getService: {
     parameters: {
       query?: never
       header?: never
@@ -13270,7 +13270,7 @@ export interface operations {
       }
     }
   }
-  serviceEvidence: {
+  getServiceEvidence: {
     parameters: {
       query?: never
       header?: never
@@ -13378,7 +13378,7 @@ export interface operations {
       }
     }
   }
-  releases: {
+  listServiceReleases: {
     parameters: {
       query?: never
       header?: never
@@ -13410,7 +13410,7 @@ export interface operations {
       }
     }
   }
-  serviceRollout: {
+  getServiceRollout: {
     parameters: {
       query?: never
       header?: never
@@ -13450,7 +13450,7 @@ export interface operations {
       }
     }
   }
-  taskRuns: {
+  listTaskRuns: {
     parameters: {
       query?: never
       header?: never
@@ -13482,7 +13482,7 @@ export interface operations {
       }
     }
   }
-  serviceTimeline: {
+  getServiceTimeline: {
     parameters: {
       query?: never
       header?: never
@@ -13576,7 +13576,7 @@ export interface operations {
       }
     }
   }
-  projectTimeline: {
+  getProjectTimeline: {
     parameters: {
       query?: never
       header?: never
@@ -13680,7 +13680,7 @@ export interface operations {
       }
     }
   }
-  toolsTerminal: {
+  openToolsTerminal: {
     parameters: {
       query?: never
       header?: never
@@ -14124,7 +14124,7 @@ export interface operations {
       }
     }
   }
-  whoami: {
+  getWhoAmI: {
     parameters: {
       query?: never
       header?: never

@@ -1427,22 +1427,33 @@ mod tests {
     }
 
     #[test]
-    fn every_operation_has_its_own_id() {
-        // Generated clients key operations by id: two handlers both named `get` would make one
-        // path's answer typed as the other's.
+    fn every_operation_has_its_own_verb_first_id() {
+        // The web client's functions are named after these, so a handler's own name (`get`,
+        // `list`) must never become one, and two handlers sharing an id would type one path's
+        // answer as the other's.
+        const VERBS: &[&str] = &[
+            "apply", "convert", "create", "delete", "download", "export", "follow", "get",
+            "inspect", "list", "make", "open", "plan", "preview", "remove", "rename", "reveal",
+            "revoke", "set", "start", "trace", "upload",
+        ];
         let description = serde_json::to_value(zeabur_api::openapi()).unwrap();
-        let mut ids = Vec::new();
-        for item in description["paths"].as_object().unwrap().values() {
-            for operation in item.as_object().unwrap().values() {
-                if let Some(id) = operation.get("operationId").and_then(Value::as_str) {
-                    ids.push(id.to_owned());
-                }
+        let mut seen = std::collections::BTreeSet::new();
+        for (path, item) in description["paths"].as_object().unwrap() {
+            for (method, operation) in item.as_object().unwrap() {
+                let Some(id) = operation.get("operationId").and_then(Value::as_str) else {
+                    continue;
+                };
+                let verb = id
+                    .split(|c: char| c.is_ascii_uppercase())
+                    .next()
+                    .unwrap_or_default();
+                assert!(
+                    VERBS.contains(&verb) && id.chars().all(|c| c.is_ascii_alphanumeric()),
+                    "{method} {path}: operationId {id} is not a verb in camelCase"
+                );
+                assert!(seen.insert(id), "operationId {id} is used twice");
             }
         }
-        let count = ids.len();
-        ids.sort();
-        ids.dedup();
-        assert_eq!(ids.len(), count, "duplicate operationId among {ids:?}");
     }
 
     /// Every schema an answer uses is in the description as that type describes it.

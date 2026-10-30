@@ -370,7 +370,7 @@ pub(crate) async fn bundle(
 /// problems, the way to it hop by hop, recent events, the end of each restarted container's
 /// previous log, and its objects with variable values hidden. Never a Secret.
 #[utoipa::path(get, path = "/api/v1/projects/{project}/services/{kind}/{name}/evidence", tag = "services",
-    operation_id = "serviceEvidence",
+    operation_id = "getServiceEvidence",
     params(("project" = String, Path),
            ("kind" = String, Path, description = "deployment, statefulset, daemonset, job or cronjob; any case"),
            ("name" = String, Path)),

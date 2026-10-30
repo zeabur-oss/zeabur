@@ -305,7 +305,7 @@ pub(crate) fn progress(
 /// not, and whether it is done, progressing, or stuck (with the reason and the plan that rolls
 /// back). Poll it while `status` is `progressing`.
 #[utoipa::path(get, path = "/api/v1/projects/{project}/services/{kind}/{name}/rollout", tag = "services",
-    operation_id = "serviceRollout",
+    operation_id = "getServiceRollout",
     params(("project" = String, Path),
            ("kind" = String, Path, description = "deployment, statefulset or daemonset; any case"),
            ("name" = String, Path)),

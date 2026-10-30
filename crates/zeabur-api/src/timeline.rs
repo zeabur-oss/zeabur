@@ -563,7 +563,7 @@ pub(crate) async fn history(
 /// What changed in a project and what went wrong, newest first: releases, each field manager's
 /// last write, warnings folded by reason and containers that stopped, for every workload.
 #[utoipa::path(get, path = "/api/v1/projects/{project}/timeline", tag = "projects",
-    operation_id = "projectTimeline",
+    operation_id = "getProjectTimeline",
     params(("project" = String, Path, description = "The project's namespace")),
     responses((status = 200, body = Timeline), (status = 403, body = Problem, content_type = PROBLEM)))]
 pub(crate) async fn project(
@@ -595,7 +595,7 @@ pub(crate) async fn project(
 /// What changed in one service and what went wrong, newest first, each release that runs now with
 /// the plan that returns to the one before it.
 #[utoipa::path(get, path = "/api/v1/projects/{project}/services/{kind}/{name}/timeline", tag = "services",
-    operation_id = "serviceTimeline",
+    operation_id = "getServiceTimeline",
     params(("project" = String, Path),
            ("kind" = String, Path, description = "deployment, statefulset, daemonset, job or cronjob; any case"),
            ("name" = String, Path)),

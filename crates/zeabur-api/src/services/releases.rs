@@ -25,6 +25,7 @@ pub struct ReleaseList {
 /// The releases of a service's workload, newest first, each with its pod template; one is
 /// `current`. A rollback is a plan (`rollback` change).
 #[utoipa::path(get, path = "/api/v1/projects/{project}/services/{kind}/{name}/releases", tag = "services",
+    operation_id = "listServiceReleases",
     params(("project" = String, Path),
            ("kind" = String, Path, description = "deployment, statefulset, daemonset, job or cronjob; any case"),
            ("name" = String, Path)),

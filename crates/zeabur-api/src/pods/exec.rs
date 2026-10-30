@@ -295,6 +295,7 @@ where
 /// a byte either way. A handshake
 /// from another origin is refused with `403`.
 #[utoipa::path(get, path = "/api/v1/projects/{project}/pods/{pod}/exec", tag = "pods",
+    operation_id = "openPodTerminal",
     params(("project" = String, Path), ("pod" = String, Path), ExecParams),
     responses((status = 101, description = "Switched to the terminal's WebSocket"),
               (status = 401, body = Problem, content_type = "application/problem+json"),
