@@ -19,6 +19,9 @@ cargo xtask dev-cluster snapshot   # cluster-scoped objects and namespace metada
 # ZEABUR_PROXY_E2E_KEEP=1.
 cargo xtask e2e-proxy
 
+# crates/zeabur-api/openapi.yaml from the handlers, then web/src/api/schema.d.ts from it.
+cargo xtask openapi
+
 # A checkout of a pinned commit or release tag (vX.Y.Z) from <url> in <dir>, kept between runs
 # for its build cache; untracked files other than target/ are removed.
 cargo xtask dev-cluster checkout <dir> <pin> <url>

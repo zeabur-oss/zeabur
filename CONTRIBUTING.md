@@ -62,8 +62,8 @@ A release checks the bundle against the catalog's signed release at that commit
 (`scripts/release-pins.sh`). Tests read the catalog at the pin too, so moving it goes in a pull
 request of its own, with no change in behaviour: `flake.lock`, the `fixtures/charts` corpus
 (`scripts/render-chart-corpus.sh`) and the files generated from the catalog
-(`ZEABUR_UPDATE_GOLDEN=1` and `ZEABUR_UPDATE_OPENAPI=1` with `cargo nextest run`, then
-`bun run gen:api` in `web/`). The files vendored for the interface's styles are checked in
+(`ZEABUR_UPDATE_GOLDEN=1 cargo nextest run`, then `cargo xtask openapi`). The files vendored for
+the interface's styles are checked in
 [zeabur-oss/design-system](https://github.com/zeabur-oss/design-system). That package itself is
 checked in here as `vendor/zeabur-design-system-<commit>.tgz`, packed from a commit of its
 repository, so that `bun ci` downloads nothing from GitHub; `scripts/bump-design-system.sh

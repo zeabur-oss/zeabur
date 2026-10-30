@@ -52,9 +52,8 @@ Level 4: may depend on every layer below it.
 
 The OpenAPI document is generated from the handlers and committed as `openapi.yaml`; a test
 regenerates it and fails on any difference, so the document cannot drift from the server
-(`ZEABUR_UPDATE_OPENAPI=1 cargo nextest run -p zeabur-api` rewrites it). The web interface
-generates its API types from it. The API is internal, so the server neither builds nor serves the
-document.
+(`cargo xtask openapi` rewrites it and the web interface's types, which are generated from it).
+The API is internal, so the server neither builds nor serves the document.
 
 The generator is utoipa with utoipa-axum [utoipa]. Handlers stay plain axum handlers; a
 `#[utoipa::path]` attribute and `#[derive(ToSchema)]` describe them, and one list of handlers in
