@@ -1511,14 +1511,11 @@ fn image_values(image: &str) -> Value {
         (None, Some((r, t))) if !t.contains('/') => (r, Some(t)),
         _ => (repository, None),
     };
-    let mut image = json!({"repository": repository, "pullPolicy": "IfNotPresent"});
-    if let Some(map) = image.as_object_mut() {
-        if let Some(d) = digest {
-            map.insert("digest".to_owned(), json!(d));
-        }
-        if let Some(t) = tag {
-            map.insert("tag".to_owned(), json!(t));
-        }
+    // An empty digest clears the one a released chart pins, which the templates prefer to a tag.
+    let mut image = json!({"repository": repository, "digest": digest.unwrap_or_default(),
+                           "pullPolicy": "IfNotPresent"});
+    if let (Some(map), Some(t)) = (image.as_object_mut(), tag) {
+        map.insert("tag".to_owned(), json!(t));
     }
     image
 }
@@ -2079,7 +2076,7 @@ mod tests {
         let values = &p.zeabur.unwrap().values;
         assert_eq!(
             values["image"],
-            json!({"repository": "zeabur", "tag": "dev", "pullPolicy": "IfNotPresent"})
+            json!({"repository": "zeabur", "tag": "dev", "digest": "", "pullPolicy": "IfNotPresent"})
         );
         assert_eq!(values["issuer"]["url"], "https://login.example.com");
         assert_eq!(
@@ -2137,6 +2134,11 @@ mod tests {
         );
         assert_eq!(v["proxy"]["image"]["digest"], "sha256:aa");
         assert_eq!(v["image"]["repository"], "zeabur");
+        // A tag clears the digest a released chart pins, or the pinned image would run instead.
+        assert_eq!(
+            (&v["image"]["tag"], &v["image"]["digest"]),
+            (&json!("dev"), &json!(""))
+        );
     }
 
     #[test]
@@ -2298,7 +2300,7 @@ mod tests {
         );
         assert_eq!(
             zeabur.values["image"],
-            json!({"repository": "zeabur", "tag": "dev", "pullPolicy": "IfNotPresent"})
+            json!({"repository": "zeabur", "tag": "dev", "digest": "", "pullPolicy": "IfNotPresent"})
         );
 
         let Err(PlanError::Unpublished(keys)) = products(None) else {
