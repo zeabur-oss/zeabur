@@ -13,6 +13,7 @@
 //! [velero-download]: https://velero.io/docs/v1.17/api-types/downloadrequest/
 //! [s3-ssec]: https://docs.aws.amazon.com/AmazonS3/latest/userguide/ServerSideEncryptionCustomerKeys.html
 
+use std::sync::Arc;
 use std::time::Duration;
 
 use axum::http::{self, HeaderName, HeaderValue, Request, Response};
@@ -43,10 +44,13 @@ impl std::fmt::Debug for Fetcher {
 }
 
 impl Fetcher {
-    /// A client that connects where `reach` allows and also trusts `extra_ca`, a PEM bundle.
+    /// A client that connects where `reach` allows and trusts what `tls` trusts.
     #[must_use]
-    pub fn new(reach: https::Reach, extra_ca: Option<&[u8]>) -> Self {
-        let client = connector(reach, extra_ca).map(|c| pooled(c, IDLE));
+    pub fn new(reach: https::Reach, tls: &Result<Arc<rustls::ClientConfig>, String>) -> Self {
+        let client = tls
+            .as_ref()
+            .map(|tls| pooled(connector(reach, tls), IDLE))
+            .map_err(Clone::clone);
         Self { client, reach }
     }
 
@@ -238,14 +242,17 @@ mod tests {
     /// refuses.
     #[tokio::test]
     async fn the_store_trusts_the_extra_ca_and_still_refuses_link_local_addresses() {
-        let broken = Fetcher::new(https::Reach::Public, Some(b"not a certificate"));
+        let broken = Fetcher::new(
+            https::Reach::Public,
+            &https::tls(Some(b"not a certificate")),
+        );
         let error = broken.get("https://s3.example.com/b/k", Vec::new()).await;
         assert!(
             error.as_ref().is_err_and(|e| e.contains("PEM")),
             "{:?}",
             error.map(|r| r.status())
         );
-        let store = Fetcher::new(https::Reach::Public, None);
+        let store = Fetcher::new(https::Reach::Public, &https::tls(None));
         let refused = store.get("https://169.254.169.254/b/k", Vec::new()).await;
         assert!(
             refused

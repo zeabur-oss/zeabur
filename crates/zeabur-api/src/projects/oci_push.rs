@@ -130,13 +130,16 @@ struct Answer {
 }
 
 impl Pusher {
-    /// A client that connects where `reach` allows and also trusts `extra_ca`, a PEM bundle.
-    pub(crate) fn new(reach: Reach, extra_ca: Option<&[u8]>) -> Self {
-        let client = connector(reach, extra_ca).map(|connector| {
-            Client::builder(TokioExecutor::new())
-                .pool_max_idle_per_host(0)
-                .build(connector)
-        });
+    /// A client that connects where `reach` allows and trusts what `tls` trusts.
+    pub(crate) fn new(reach: Reach, tls: &Result<Arc<rustls::ClientConfig>, String>) -> Self {
+        let client = tls
+            .as_ref()
+            .map(|tls| {
+                Client::builder(TokioExecutor::new())
+                    .pool_max_idle_per_host(0)
+                    .build(connector(reach, tls))
+            })
+            .map_err(Clone::clone);
         Self { client, reach }
     }
 

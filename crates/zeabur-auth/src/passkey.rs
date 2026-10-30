@@ -54,13 +54,13 @@ impl PasskeyEndpoints {
     /// # Errors
     ///
     /// When TLS cannot be set up.
-    pub fn new(issuer: &BaseUrl, extra: ExtraRoots) -> Result<Self, AuthError> {
+    pub fn new(issuer: &BaseUrl, extra: &ExtraRoots) -> Result<Self, AuthError> {
         Self::with_deadline(issuer, extra, DEADLINE)
     }
 
     fn with_deadline(
         issuer: &BaseUrl,
-        extra: ExtraRoots,
+        extra: &ExtraRoots,
         deadline: Duration,
     ) -> Result<Self, AuthError> {
         Ok(Self {
@@ -150,7 +150,7 @@ mod tests {
     }
 
     fn endpoints(issuer: &BaseUrl) -> PasskeyEndpoints {
-        PasskeyEndpoints::with_deadline(issuer, ExtraRoots::default(), Duration::from_millis(500))
+        PasskeyEndpoints::with_deadline(issuer, &ExtraRoots::default(), Duration::from_millis(500))
             .unwrap()
     }
 

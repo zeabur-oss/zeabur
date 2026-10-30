@@ -202,7 +202,7 @@ impl OAuthClient {
     ///
     /// When TLS cannot be set up.
     pub fn new(config: ClientConfig) -> Result<Self, AuthError> {
-        let http = Http::new(config.issuer_ca).map_err(|e| AuthError::Invalid(e.to_string()))?;
+        let http = Http::new(&config.issuer_ca).map_err(|e| AuthError::Invalid(e.to_string()))?;
         Ok(Self {
             basic: basic(&config.client_id, &config.client_secret)?,
             redirect_uri: config.public_url.join(CALLBACK_PATH),

@@ -397,7 +397,7 @@ pub fn router_with_images(access: Arc<dyn ClusterAccess>, images: images::Inspec
 fn inspector(reach: images::https::Reach, settings: &Settings) -> Arc<images::Inspector> {
     Arc::new(images::Inspector::connected(
         reach,
-        settings.trusted_ca.as_deref(),
+        &images::https::tls(settings.trusted_ca.as_deref()),
     ))
 }
 
@@ -589,8 +589,14 @@ fn build_with(
     terminals: Option<Arc<dyn zeabur_kube::Cluster>>,
 ) -> Router {
     let catalogue = Arc::new(zeabur_catalog::catalogue().unwrap_or_default());
-    let trusted_ca = settings.trusted_ca.clone();
-    let github = images::https::Https::new(reach, trusted_ca.as_deref()).ok();
+    let tls = images.tls().map_or_else(
+        || images::https::tls(settings.trusted_ca.as_deref()),
+        |tls| Ok(Arc::clone(tls)),
+    );
+    let github = tls
+        .as_ref()
+        .ok()
+        .map(|tls| images::https::Https::new(reach, tls));
     let state = AppState {
         access,
         catalogue,
@@ -603,14 +609,8 @@ fn build_with(
         tools: Arc::new(tools::Sessions::default()),
         sign_in,
         zeabur_proxy,
-        pusher: Arc::new(projects::oci_push::Pusher::new(
-            reach,
-            trusted_ca.as_deref(),
-        )),
-        store: Arc::new(cluster::object_store::Fetcher::new(
-            images.reach(),
-            trusted_ca.as_deref(),
-        )),
+        pusher: Arc::new(projects::oci_push::Pusher::new(reach, &tls)),
+        store: Arc::new(cluster::object_store::Fetcher::new(images.reach(), &tls)),
         images,
         github,
         terminals,

@@ -58,15 +58,11 @@ impl std::fmt::Debug for Https {
 }
 
 impl Https {
-    /// A client that connects where `reach` allows, trusting the platform's roots and the
-    /// certificates of the PEM bundle `extra_ca`.
-    ///
-    /// # Errors
-    ///
-    /// When `extra_ca` is not a PEM certificate bundle, or TLS cannot be set up.
-    pub fn new(reach: Reach, extra_ca: Option<&[u8]>) -> Result<Self, String> {
-        let client = pooled(connector(reach, extra_ca)?, IDLE);
-        Ok(Self { client, reach })
+    /// A client that connects where `reach` allows, trusting what `tls` trusts.
+    #[must_use]
+    pub fn new(reach: Reach, tls: &Arc<rustls::ClientConfig>) -> Self {
+        let client = pooled(connector(reach, tls), IDLE);
+        Self { client, reach }
     }
 
     async fn send(&self, get: Get) -> Result<Answer, String> {
@@ -150,12 +146,13 @@ impl Https {
 /// The HTTPS connector, through the platform's trust roots, to the addresses `reach` allows.
 pub(crate) type Connector = HttpsConnector<HttpConnector<Guarded>>;
 
-/// A [`Connector`] that connects where `reach` allows and also trusts `extra_ca`, a PEM bundle.
+/// The TLS configuration for the platform's trust roots and the certificates of the PEM bundle
+/// `extra_ca`; one per trust policy, shared by its clients.
 ///
 /// # Errors
 ///
 /// When `extra_ca` is not a PEM certificate bundle, or TLS cannot be set up.
-pub(crate) fn connector(reach: Reach, extra_ca: Option<&[u8]>) -> Result<Connector, String> {
+pub fn tls(extra_ca: Option<&[u8]>) -> Result<Arc<rustls::ClientConfig>, String> {
     let provider = Arc::new(rustls::crypto::aws_lc_rs::default_provider());
     let extra = match extra_ca {
         Some(pem) => {
@@ -172,23 +169,25 @@ pub(crate) fn connector(reach: Reach, extra_ca: Option<&[u8]>) -> Result<Connect
     let verifier =
         rustls_platform_verifier::Verifier::new_with_extra_roots(extra, Arc::clone(&provider))
             .map_err(|e| e.to_string())?;
-    let tls = rustls::ClientConfig::builder_with_provider(provider)
-        .with_safe_default_protocol_versions()
-        .map_err(|e| e.to_string())?
-        .dangerous()
-        .with_custom_certificate_verifier(Arc::new(verifier))
-        .with_no_client_auth();
+    Ok(Arc::new(
+        rustls::ClientConfig::builder_with_provider(provider)
+            .with_safe_default_protocol_versions()
+            .map_err(|e| e.to_string())?
+            .dangerous()
+            .with_custom_certificate_verifier(Arc::new(verifier))
+            .with_no_client_auth(),
+    ))
+}
+
+/// A [`Connector`] that connects where `reach` allows and trusts what `tls` trusts.
+pub(crate) fn connector(reach: Reach, tls: &Arc<rustls::ClientConfig>) -> Connector {
     let mut http = HttpConnector::new_with_resolver(Guarded {
         inner: GaiResolver::new(),
         reach,
     });
     http.enforce_http(false);
     http.set_connect_timeout(Some(DEADLINE));
-    Ok(hyper_rustls::HttpsConnectorBuilder::new()
-        .with_tls_config(tls)
-        .https_or_http()
-        .enable_http1()
-        .wrap_connector(http))
+    HttpsConnector::from((http, Arc::clone(tls)))
 }
 
 /// A client over `connector` that closes a connection left unused for `idle`.
@@ -330,15 +329,15 @@ mod tests {
 
     #[test]
     fn an_extra_ca_must_be_a_pem_certificate_bundle() {
-        let error = Https::new(Reach::Public, Some(b"not a certificate")).unwrap_err();
+        let error = tls(Some(b"not a certificate")).unwrap_err();
         assert!(error.contains("not a PEM certificate bundle"), "{error}");
-        assert!(Https::new(Reach::Public, Some(b"")).is_err());
-        assert!(Https::new(Reach::Public, None).is_ok());
+        assert!(tls(Some(b"")).is_err());
+        assert!(tls(None).is_ok());
     }
 
     #[tokio::test]
     async fn a_url_that_names_a_refused_address_is_not_sent() {
-        let client = Https::new(Reach::Public, None).unwrap();
+        let client = Https::new(Reach::Public, &tls(None).unwrap());
         let answer = client
             .get(Get {
                 url: "http://169.254.169.254/latest/meta-data/".to_owned(),
@@ -372,7 +371,7 @@ mod tests {
                 .map(|read| read.unwrap())
         });
         let client = pooled(
-            connector(Reach::Any, None).unwrap(),
+            connector(Reach::Any, &tls(None).unwrap()),
             Duration::from_millis(100),
         );
         let request = Request::get(url).body(Full::<Bytes>::default()).unwrap();
