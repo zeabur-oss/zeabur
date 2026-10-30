@@ -4,18 +4,18 @@ description: 讓網域在維護期間顯示 503 頁面，並為服務的 502、5
 source: "d6ab03fe54a8"
 ---
 
-在服務 **網路** 的網域列，開啟 **維護與錯誤頁面**，打開 **維護模式**，加入變更後檢查並套用。該網域的訪客會看到維護頁面與 HTTP 503，原本的服務仍繼續執行。完成維護後，從同一處關閉，流量就會回到原本的後端。
+在服務**網路**的網域列，開啟**維護與錯誤頁面**，打開**維護模式**，加入變更後檢查並套用。該網域的訪客會看到維護頁面與 HTTP 503，原本的服務仍繼續執行。完成維護後，從同一處關閉，流量就會回到原本的後端。
 
 ## 開始前
 
 - 服務有[公開網域](./domains.mdx)。Ingress 和 HTTPRoute 提供的網域都能開維護模式。
 - 有權修改路由。專案還沒有[頁面伺服器](#頁面伺服器)時，也要有權建立 Deployment、Service、ConfigMap 和 NetworkPolicy。
-- 自訂錯誤頁面需要 Traefik 提供的 Ingress。HTTPRoute 和其他 Ingress controller 的網域可以開維護模式，但面板裡沒有 **顯示錯誤頁面**。
+- 自訂錯誤頁面需要 Traefik 提供的 Ingress。HTTPRoute 和其他 Ingress controller 的網域可以開維護模式，但面板裡沒有**顯示錯誤頁面**。
 
 維護模式只改這一個網域的轉送目標，服務本身繼續執行。同一個服務的其他網域、私有位址和對外連接埠照樣連得到應用程式，排程工作也照常執行。
 
 <Callout type="warn">
-如果維護是為了搬移資料或改資料表結構，要另外停掉會從私有網路、其他網域或排程工作寫入資料的程式，例如把 worker 的副本數調成 0。
+維護是為了搬移資料或改資料表結構時，要另外停掉會從私有網路、其他網域或排程工作寫入資料的程式，例如把 worker 的副本數調成 0。
 </Callout>
 
 ## 開啟維護模式
@@ -25,7 +25,7 @@ source: "d6ab03fe54a8"
 
 ### 選擇要維護的網域
 
-進入服務 **網路**，在目標網域那一列按 **app.example.com 的維護與錯誤頁面**。
+進入服務**網路**，在目標網域那一列按 **app.example.com 的維護與錯誤頁面**。
 
 ![服務的網路分頁，網域列上的維護與錯誤頁面按鈕](../images/shots/domain-pages-open.avif)
 
@@ -34,24 +34,24 @@ source: "d6ab03fe54a8"
 
 ### 設定訪客看到的頁面
 
-開啟 **維護模式**。保留預設 HTML，或在 **要編輯的頁面** 選 **維護**，修改 **HTML**。
+開啟**維護模式**。保留預設 HTML，或在**要編輯的頁面**選**維護**，修改 **HTML**。
 
 ![shop.example.com 的維護與錯誤頁面面板，開啟了維護模式並顯示維護頁面的 HTML](../images/shots/domain-pages-maintenance.avif)
 
 每個頁面要小於 64 KiB。專案的每個網域都用同一組頁面，所以在這裡改了維護頁面，專案裡其他進入維護的網域也會顯示新內容。
 
-專案還沒有頁面伺服器時，面板上方會寫 **這個專案還沒有頁面伺服器**。照常往下做，檢查變更時會一併把 Zeabur Catalog 的 **Error pages** 範本部署到專案，並寫入維護、502、503、504 四份預設頁面。只改維護頁面時，其他三份保留預設內容。
+專案還沒有頁面伺服器時，面板上方會寫**這個專案還沒有頁面伺服器**。照常往下做，檢查變更時會一併把 Zeabur Catalog 的 **Error pages** 範本部署到專案，並寫入維護、502、503、504 四份預設頁面。只改維護頁面時，其他三份保留預設內容。
 
 </Step>
 <Step>
 
 ### 檢查並套用
 
-在側邊面板按 **加入變更**，網域列會標上 **已修改**。再從頁面下方按 **檢查變更**，確認目標網域和 HTML，然後套用。要部署頁面伺服器時，清單裡也會列出它的 Deployment、Service、ConfigMap 和 NetworkPolicy。
+在側邊面板按**加入變更**，網域列會標上**已修改**。再從頁面下方按**檢查變更**，確認目標網域和 HTML，然後套用。要部署頁面伺服器時，清單裡也會列出頁面伺服器的 Deployment、Service、ConfigMap 和 NetworkPolicy。
 
 ![檢查變更的視窗，說明 shop.example.com 改為顯示維護頁面](../images/shots/domain-pages-review.avif)
 
-這個網域底下的所有路徑都會轉到維護頁面，同一個 Ingress 的其他網域不受影響。Ingress 的網域會多一份名稱以 `-maintenance` 結尾的 Ingress，Traefik 優先用它，原本的 Ingress 不動。HTTPRoute 的網域會把原本後端的權重改成 0，再加上頁面伺服器。HTTPRoute 的維護作用在整條路由，同一條 HTTPRoute 還有其他網域時，這個網域會先移到自己的路由。
+這個網域底下的所有路徑都會轉到維護頁面，同一個 Ingress 的其他網域不受影響。Ingress 的網域會多一份名稱以 `-maintenance` 結尾的 Ingress，Traefik 會優先使用這份 Ingress，原本的 Ingress 保持不變。HTTPRoute 的網域會把原本後端的權重改成 0，再加上頁面伺服器。HTTPRoute 的維護作用在整條路由，同一條 HTTPRoute 還有其他網域時，這個網域會先移到自己的路由。
 
 </Step>
 <Step>
@@ -64,7 +64,7 @@ source: "d6ab03fe54a8"
 curl -i https://app.example.com/
 ```
 
-把 `app.example.com` 換成自己的網域。回應的狀態碼是 `503`，內容是維護頁面的 HTML。回到服務 **網路**，網域列會標上 **維護中**，服務的副本仍在執行。
+把 `app.example.com` 換成自己的網域。回應的狀態碼是 `503`，內容是維護頁面的 HTML。回到服務**網路**，網域列會標上**維護中**，服務的副本仍在執行。
 
 ![網域列的 shop.example.com 標上維護中](../images/shots/domain-maintenance-on.avif)
 
@@ -76,15 +76,15 @@ Ingress 的網域設了[轉址或密碼](./domains.mdx)時，維護期間兩者�
 ## 完成維護後恢復流量
 
 1. 確認應用程式已準備好接收流量，所需的[環境變數](./variables.mdx)與[磁碟區](./volumes.mdx)都正確。
-2. 回到同一網域的 **維護與錯誤頁面**，關閉 **維護模式**。
-3. 在面板按 **加入變更**，從頁面下方按 **檢查變更**，確認網域會轉回原本的服務，再套用。
-4. 重新開啟網域與子路徑，確認應用程式正常回應，網域列不再顯示 **維護中**。
+2. 回到同一網域的**維護與錯誤頁面**，關閉**維護模式**。
+3. 在面板按**加入變更**，從頁面下方按**檢查變更**，確認網域會轉回原本的服務，再套用。
+4. 重新開啟網域與子路徑，確認應用程式正常回應，網域列不再顯示**維護中**。
 
-關閉時，Ingress 的網域會刪掉那份 `-maintenance` Ingress，HTTPRoute 的網域會拿掉頁面伺服器，把權重 0 的後端改回 1。原本的規則一直留在物件上，維護期間改過規則也照樣還原。刪掉原本的 Ingress 時，Kubernetes 會連同它的維護 Ingress 一起刪除。
+關閉時，Ingress 的網域會刪掉那份 `-maintenance` Ingress，HTTPRoute 的網域會拿掉頁面伺服器，把權重 0 的後端改回 1。原本的規則一直留在物件上，維護期間改過規則也照樣還原。刪掉原本的 Ingress 時，Kubernetes 會連同對應的維護 Ingress 一起刪除。
 
 ## 顯示自訂錯誤頁面
 
-在 Traefik Ingress 網域的 **維護與錯誤頁面** 開啟 **顯示錯誤頁面**，再分別選擇以下頁面修改 **HTML**：
+在 Traefik Ingress 網域的**維護與錯誤頁面**開啟**顯示錯誤頁面**，再分別選擇以下頁面修改 **HTML**：
 
 | 頁面 | 提供內容的檔案 |
 | --- | --- |
@@ -92,7 +92,7 @@ Ingress 的網域設了[轉址或密碼](./domains.mdx)時，維護期間兩者�
 | **503 服務無法使用** | `503.html` |
 | **504 閘道逾時** | `504.html` |
 
-按面板中的 **加入變更**，再從頁面下方檢查並套用。之後服務回應 502、503 或 504 時，Traefik 會改送專案的錯誤頁面。要看實際效果，可以拿一個會回這些狀態碼的測試服務試，不必停掉正式服務。
+按面板中的**加入變更**，再從頁面下方檢查並套用。之後服務回應 502、503 或 504 時，Traefik 會改送專案的錯誤頁面。要看實際效果，可以拿一個會回這些狀態碼的測試服務試，不必停掉正式服務。
 
 這個開關作用在整個 Ingress 上，面板會列出一起受影響的其他網域。頁面 HTML 則是整個專案共用。從 `app.example.com` 改了 502 頁面，其他開啟錯誤頁面的網域也會顯示新內容。
 
@@ -102,7 +102,7 @@ HTML 存在 ConfigMap 裡，頁面伺服器每次請求都從掛載的檔案讀�
 
 ## 頁面伺服器
 
-維護頁和錯誤頁面由專案裡的頁面伺服器提供，它來自 Zeabur Catalog 的 **Error pages** 範本：一個小型 nginx，HTML 放在 ConfigMap `error-pages`。Zeabur 不看名稱，而是依標籤 `zeabur.com/page-server: "true"` 找到它：
+維護頁和錯誤頁面由專案裡的頁面伺服器提供，頁面伺服器來自 Zeabur Catalog 的 **Error pages** 範本：一個小型 nginx，HTML 放在 ConfigMap `error-pages`。Zeabur 依標籤 `zeabur.com/page-server: "true"` 找到頁面伺服器，不看名稱：
 
 | 物件 | 需要的內容 |
 | --- | --- |
@@ -117,7 +117,7 @@ HTML 存在 ConfigMap 裡，頁面伺服器每次請求都從掛載的檔案讀�
 
 ### 開啟維護模式（Ingress）
 
-新增一個 Ingress，名稱是 `<服務>-<網域，點換成破折號>-maintenance`，同一個網域的所有路徑都轉到頁面伺服器的 `maintenance` 連接埠。`router.priority` 要比這個網域其他路由都高，Traefik 才會優先用它。`ownerReferences` 指向原本的 Ingress，Zeabur 靠它認出這是維護用的 Ingress，所以先查原本 Ingress 的 `uid`：
+新增一個 Ingress，名稱是 `<服務>-<網域，點換成破折號>-maintenance`，同一個網域的所有路徑都轉到頁面伺服器的 `maintenance` 連接埠。`router.priority` 要比這個網域其他路由都高，Traefik 才會優先使用。`ownerReferences` 指向原本的 Ingress，Zeabur 靠這個欄位認出這是維護用的 Ingress，所以先查原本 Ingress 的 `uid`：
 
 ```sh
 kubectl -n demo get ingress web-app-example-com -o jsonpath='{.metadata.uid}'
@@ -205,7 +205,7 @@ spec:
     query: /{status}.html
 ```
 
-`8080` 換成頁面伺服器 Service 上 `pages` 連接埠的號碼。再把它加進 Ingress 的 `traefik.ingress.kubernetes.io/router.middlewares`，寫成 `demo-web-app-example-com-error-pages@kubernetescrd`。已有其他 Middleware 時，用 `kubectl edit` 加在清單裡，轉址仍要排第一個。
+`8080` 換成頁面伺服器 Service 上 `pages` 連接埠的號碼。再把這個 Middleware 加進 Ingress 的 `traefik.ingress.kubernetes.io/router.middlewares`，寫成 `demo-web-app-example-com-error-pages@kubernetescrd`。已有其他 Middleware 時，用 `kubectl edit` 加在清單裡，轉址仍要排第一個。
 
 要改頁面內容，直接改 ConfigMap `error-pages`：
 
@@ -215,7 +215,7 @@ kubectl -n demo edit configmap error-pages
 
 ## 確認結果
 
-在服務 **網路**，維護中的網域列會標上 **維護中**。面板裡 **維護模式** 和 **顯示錯誤頁面** 的開關會反映叢集裡的設定，用 kubectl 開啟的也一樣。
+在服務**網路**，維護中的網域列會標上**維護中**。面板裡**維護模式**和**顯示錯誤頁面**的開關會反映叢集裡的設定，用 kubectl 開啟的也一樣。
 
 用 kubectl 確認物件，再從叢集外看回應：
 
@@ -233,18 +233,18 @@ curl -sI https://app.example.com/
 | 畫面或結果 | 接著處理 |
 | --- | --- |
 | 維護與錯誤頁面按鈕無法按 | 確認你有修改路由的權限，以及路由沒有標示由其他工具管理。 |
-| 套用後仍看到應用程式 | 確認開啟的網址就是切到維護的網域，並看前面有沒有 CDN 或代理快取。回到 **網路** 看網域列有沒有 **維護中**。 |
+| 套用後仍看到應用程式 | 確認開啟的網址就是切到維護的網域，並看前面有沒有 CDN 或代理快取。回到**網路**看網域列有沒有**維護中**。 |
 | 維護頁面本身打不開 | 查看專案裡 `error-pages` 的副本和事件，並確認 NetworkPolicy `error-pages` 允許叢集的 Ingress controller 連線。 |
 | 檢查變更說專案有多個頁面伺服器 | 只留一個 Service 帶 `zeabur.com/page-server` 標籤，其他的拿掉標籤。 |
 | 頁面還是舊的 HTML | 等掛載檔案更新後再重新整理。 |
 | HTTPRoute 的網域無法開維護模式，說路由依權重分流 | 路由的後端權重不全是 1。用 kubectl 把流量切到頁面伺服器，或先把權重改回 1。 |
-| 沒有 **顯示錯誤頁面** | 網域不是由 Traefik 提供，要用該 Ingress controller 自己的錯誤頁面設定。 |
+| 沒有**顯示錯誤頁面** | 網域不是由 Traefik 提供，要用該 Ingress controller 自己的錯誤頁面設定。 |
 
 ## 停用與清除頁面伺服器
 
-關閉 **維護模式** 會讓網域轉回原本的服務。關閉 **顯示錯誤頁面** 會拿掉該 Ingress 的錯誤頁面規則。頁面伺服器和 HTML 都會留著，之後可以直接再用。
+關閉**維護模式**會讓網域轉回原本的服務。關閉**顯示錯誤頁面**會拿掉該 Ingress 的錯誤頁面規則。頁面伺服器和 HTML 都會留著，之後可以直接再用。
 
-整個專案都不再需要這些頁面時，先關掉每個網域的維護模式和錯誤頁面，確認流量都恢復了，再到專案 **物件** 刪除 `error-pages` 的 Deployment、Service 和 NetworkPolicy，以及 ConfigMap `error-pages` 和 `error-pages-nginx`。每個物件在 **YAML** 按 **刪除**，檢查後套用。
+整個專案都不再需要這些頁面時，先關掉每個網域的維護模式和錯誤頁面，確認流量都恢復了，再到專案**物件**刪除 `error-pages` 的 Deployment、Service 和 NetworkPolicy，以及 ConfigMap `error-pages` 和 `error-pages-nginx`。每個物件在 **YAML** 按**刪除**，檢查後套用。
 
 <Callout type="warn">
 還有網域在維護或開著錯誤頁面時刪掉頁面伺服器，這些網域的訪客會直接看到錯誤，看不到你的頁面。

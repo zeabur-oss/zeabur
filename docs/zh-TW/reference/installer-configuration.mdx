@@ -51,12 +51,12 @@ host:
 | `mode` | 必填。`domain` 由 cert-manager 向 Let's Encrypt 申請憑證（HTTP-01）。`local` 在伺服器上建立私有 CA，只適合測試機 |
 | `identity` | 必填。Zeabur Identity 主機名稱，issuer 為 `https://<identity>` |
 | `zeabur` | 必填。Zeabur 主機名稱，必須與 `identity` 不同 |
-| `invitations` | `true`。是否接受 Zeabur **成員** 頁產生的設定連結。成員只由版本控制管理時關掉 |
+| `invitations` | `true`。是否接受 Zeabur **成員**頁產生的設定連結。成員只由版本控制管理時關掉 |
 | `suffixes` | 伺服器有公開位址時是 `<位址>.sslip.io`，例如 `203-0-113-7.sslip.io`，否則沒有。新服務的網址會建議在這些應用程式網域底下，預設用第一個，例如 `[apps.example.com]`。每個網域要一筆指向伺服器的萬用字元紀錄 `*.apps.example.com`，見[設定 DNS 紀錄](../configure/dns.mdx)。填 `[]` 表示不建議網址 |
 
 主機名稱不加 `https://`、連接埠或路徑，只用小寫英文字母、數字、連字號和點，至少兩段。每段最多 63 個字元、不能以連字號開頭或結尾，總長最多 253 個字元。
 
-瀏覽器和伺服器都要能解析這兩個名稱。Pod 透過 DNS 解析，主機 `/etc/hosts` 裡的設定 Pod 看不到。`local` 模式的 CA 憑證在 `/var/lib/rancher/zeabur-installer/local-ca.crt`，匯入使用者電腦的信任儲存區後，瀏覽器才會信任這兩個網址。
+瀏覽器和伺服器都要能解析這兩個名稱。Pod 用 DNS 解析，看不到主機 `/etc/hosts` 裡的設定。`local` 模式的 CA 憑證在 `/var/lib/rancher/zeabur-installer/local-ca.crt`，匯入使用者電腦的信任儲存區後，瀏覽器才會信任這兩個網址。
 
 ### 元件選擇
 
@@ -70,7 +70,7 @@ enable: [runtime-security, vulnerability-scanning, intrusion-prevention]
 
 `enable` 可以寫 capability（例如 `runtime-security`）或完整元件 ID（例如 `volume-backup/velero`），相依的元件會一起加入。`disable` 排除了另一個元件需要的元件時，`plan` 會列出兩者並停下。最後裝哪些元件、順序和排除原因，看 `plan` 的輸出。
 
-已經裝好的元件從清單拿掉後，下次 `apply` 會移除它。移除會連資料一起刪掉的元件，要先寫進 `allowDataLoss`，見[移除元件](./installer.mdx#移除元件)。
+已經裝好的元件從清單拿掉後，下次 `apply` 會移除這個元件。移除會連資料一起刪掉的元件，要先寫進 `allowDataLoss`，見[移除元件](./installer.mdx#移除元件)。
 
 ```yaml
 inputs:
@@ -81,7 +81,7 @@ inputs:
 
 每個元件有哪些 input、型別是什麼，由 Catalog 定義。少了必填值時，`plan` 會指出要補哪個欄位。
 
-Zeabur Builder 的 `cluster-ip`（zot 的固定位址）由 installer 自己填。要改的話，在 `inputs` 寫上值即可。
+Zeabur Builder 的 `cluster-ip`（zot 的固定位址）由 installer 自己填。要修改時，在 `inputs` 寫上值即可。
 
 Velero 的 `region` input 是儲存貯體的區域，預設 `us-east-1`。Cloudflare R2 要寫 `auto`。網頁介面會分別詢問存取金鑰 ID 和私密存取金鑰，再自己組成 `credentials` 檔。
 
@@ -99,7 +99,7 @@ secretFiles:
 sudo chmod 0600 /root/secrets/velero-credentials
 ```
 
-檔案內容依元件 input 的格式填寫，installer 會用它建立元件需要的 Secret。機密值放在檔案裡，不要寫進 `inputs`。Catalog 標為 `generate: random` 的機密如果沒指定檔案，第一次 `apply` 時自動產生，之後沿用。
+檔案內容依元件 input 的格式填寫，installer 會用這些檔案建立元件需要的 Secret。機密值放在檔案裡，不要寫進 `inputs`。Catalog 標為 `generate: random` 的機密如果沒指定檔案，第一次 `apply` 時自動產生，之後沿用。
 
 ### 儲存類別
 
@@ -107,17 +107,17 @@ installer 一定會建立 `local-path`，資料放在節點的 `/var/lib/zeabur/
 
 - `local-path` 的磁碟區留在原本的節點，換預設類別不會搬移既有資料。
 - Longhorn 成為預設時，installer 原本設為預設的 `local-path` 會改成一般類別。
-- 叢集已有別的預設類別時，installer 保留它。如果這次要把 Longhorn 設為預設，`apply` 會停下，先拿掉原本類別的預設註解再重跑。
+- 叢集已有別的預設類別時，installer 保留原本的預設類別。如果這次要把 Longhorn 設為預設，`apply` 會停下，先拿掉原本類別的預設註解再執行一次。
 
-選了 Longhorn 時，`apply` 會在這台主機安裝 iSCSI initiator 和 NFS client、載入 `iscsi_tcp`、啟動 `iscsid`。每個跑 Longhorn 的節點都要有這些，見[加入節點](../cluster/nodes.mdx)。
+選了 Longhorn 時，`apply` 會在這台主機安裝 iSCSI initiator 和 NFS client、載入 `iscsi_tcp`、啟動 `iscsid`。每個執行 Longhorn 的節點都要有這些，見[加入節點](../cluster/nodes.mdx)。
 
 ### `distribution` 與版本
 
-不填 `distribution` 就裝 K3s。伺服器有 8 GiB 以上記憶體，或之後想用三台伺服器跑控制平面，就設成 `rke2`。
+不填 `distribution` 就裝 K3s。伺服器有 8 GiB 以上記憶體，或之後想用三台伺服器執行控制平面，就設成 `rke2`。
 
 | 欄位 | 預設與用途 |
 |---|---|
-| `distribution` | `k3s`。K3s 比較省記憶體，只跑一台伺服器，可以再加工作節點。`rke2` 可以加工作節點和伺服器，三台伺服器時壞一台控制平面也不會停 |
+| `distribution` | `k3s`。K3s 比較省記憶體，只執行一台伺服器，可以再加工作節點。`rke2` 可以加工作節點和伺服器，三台伺服器時壞一台控制平面也不會停 |
 | `k3sVersion` | installer 釘選的版本。要換 K3s 版本時填，例如 `v1.37.1+k3s1`。只能搭配 `distribution: k3s` |
 | `rke2Version` | installer 釘選的版本。要換 RKE2 版本時填，例如 `v1.37.1+rke2r1`。只能搭配 `distribution: rke2` |
 
@@ -131,13 +131,13 @@ installer 一定會建立 `local-path`，資料放在節點的 `/var/lib/zeabur/
 |---|---|
 | `host.tlsSan` | `[]`。Kubernetes API server 憑證額外加入的 DNS 名稱或 IP 位址，只用於 server |
 | `host.requireEncryptedDisk` | `false`。設為 `true` 時，根目錄或資料目錄不在加密裝置上，`apply` 就停下 |
-| `host.nodeName` | 主機名稱轉小寫。主機名稱不能當節點名稱，或是由 IP 位址組成（例如 `ip-10-0-0-5`）時，改用 `node-3f9a2c` 這類名稱。installer 把它寫進 K3s 或 RKE2 的設定，之後主機名稱改了，節點名稱也不會跟著變。只能用小寫英文字母、數字、`-` 和 `.` |
+| `host.nodeName` | 主機名稱轉小寫。主機名稱不能當節點名稱，或是由 IP 位址組成（例如 `ip-10-0-0-5`）時，改用 `node-3f9a2c` 這類名稱。installer 把這個名稱寫進 K3s 或 RKE2 的設定，之後主機名稱改了，節點名稱也不會跟著改變。只能用小寫英文字母、數字、`-` 和 `.` |
 
-節點裝好後就固定用當初的名稱。再跑一次 `apply` 會沿用它；`host.nodeName` 填了別的名稱，`apply` 會停下，因為 Kubernetes 會把它當成同一個位址上的第二個節點。
+節點裝好後就固定用當初的名稱。再執行一次 `apply` 會沿用原本的名稱；`host.nodeName` 填了別的名稱，`apply` 會停下，因為 Kubernetes 會把新名稱當成同一個位址上的第二個節點。
 
 ### `sources`
 
-發行版的 installer 不需要 `sources`。它釘選了 Zeabur Catalog、Zeabur Identity 和 Zeabur 的版本，下載到 `/var/lib/rancher/zeabur-installer/downloads`，並用編譯進 installer 的 SHA-256 核對。
+發行版的 installer 不需要 `sources`，installer 已經釘選了 Zeabur Catalog、Zeabur Identity 和 Zeabur 的版本，下載到 `/var/lib/rancher/zeabur-installer/downloads`，並用編譯進 installer 的 SHA-256 核對。
 
 `sources` 用來改裝自己建置的版本，通常是開發測試。只寫要換的欄位，其他照用釘選的版本。自己編譯的開發版 installer 沒有釘選任何版本，所以 `catalog`、`identityImage`、`identityctl`、`zeaburImage`、`zeaburChart` 都要寫，少了哪個 `plan` 會列出來。路徑換成實際準備好的檔案：
 
@@ -181,7 +181,7 @@ host:
 | `allowDataLoss` | `[]`。和建立叢集的檔案一樣 |
 | `inputs` | `{}`。和建立叢集的檔案一樣，依元件 ID 分組 |
 | `secretFiles` | `{}`。和建立叢集的檔案一樣，檔案權限要是 `0600` |
-| `host.tlsSan` | `[]`。自己的電腦用別的位址或網域連 API 時，把它加在這裡 |
+| `host.tlsSan` | `[]`。自己的電腦用別的位址或網域連 API 時，把位址或網域加在這裡 |
 | `host.requireEncryptedDisk` | `false`。設為 `true` 時，`/var/lib/kubesolo` 不在加密裝置上，`apply` 就停下 |
 | `host.nodeName` | 和建立叢集時一樣，寫進 KubeSolo 的設定 |
 | `sources.catalog` | 選填。本機的 Catalog `index.json`，取代釘選的版本 |
@@ -211,9 +211,9 @@ host:
 
 - unknown field：檢查欄位大小寫，刪掉拼錯或放錯層級的 key。
 - 主機名稱無效：拿掉 `https://` 和路徑，`identity` 和 `zeabur` 要用不同名稱。
-- 缺少必填 input：依 `plan` 列出的元件和欄位補上，再跑一次 `plan`。
-- K3s 設了 `join.role: server`：K3s 只跑一台用 SQLite 的伺服器，只收工作節點。要讓控制平面在少一台伺服器時繼續運作，改在三台伺服器上安裝 RKE2（`distribution: rke2`）。
+- 缺少必填 input：依 `plan` 列出的元件和欄位補上，再執行一次 `plan`。
+- K3s 設了 `join.role: server`：K3s 只執行一台用 SQLite 的伺服器，只收工作節點。要讓控制平面在少一台伺服器時繼續運作，改在三台伺服器上安裝 RKE2（`distribution: rke2`）。
 - `host.nodeName: this host is already node …`：這台主機之前用別的名稱裝過。拿掉 `host.nodeName`，或改成訊息裡的名稱。
 - 權杖檔案權限不對：在新主機執行 `chmod 0600`。含權杖的設定檔不要放進 Git 儲存庫。
 
-改完設定檔先跑 `plan`。要移除產品、清理主機檔案，見[移除 Zeabur](../leave/uninstall.mdx)。
+改完設定檔先執行 `plan`。要移除產品、清理主機檔案，見[移除 Zeabur](../leave/uninstall.mdx)。

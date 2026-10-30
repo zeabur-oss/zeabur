@@ -43,7 +43,7 @@ Use **Storage class** to choose where to store the data. Each option shows wheth
 
 Leave this unset to use the cluster's default storage class. If you choose a class that doesn't support expansion, allocate enough capacity up front.
 
-To customize names, expand **Advanced** and edit **Name**, **PVC name**, and **Access mode**. This form always creates a new disk. The cluster will reject a disk name that's already in use.
+To customize names, expand **Advanced** and edit **Name**, **PVC name**, and **Access mode**. This form always creates a new disk. The cluster rejects a disk name that's already in use.
 
 </Step>
 <Step>
@@ -61,7 +61,7 @@ Adding or changing a mount updates the replica template. Continuously running se
 
 Wait for the volume's status to show **Ready** and for the service's replicas to be ready. Upload a file through the application, then **Restart** the service and check that the file is still there.
 
-Each volume row shows its storage class, which node holds the data, whether it supports expansion, and whether the data will remain after you delete the volume. Usage also appears if the cluster collects kubelet volume metrics. To find the disk's name, its backing PersistentVolume, and its access mode, open the project's **Objects** page or use kubectl.
+Each volume row shows its storage class, which node holds the data, whether it supports expansion, and whether the data remains after you delete the volume. Usage also appears if the cluster collects kubelet volume metrics. To find the disk's name, its backing PersistentVolume, and its access mode, open the project's **Objects** page or use kubectl.
 
 </Step>
 </Steps>
@@ -90,7 +90,7 @@ Under the service's **Settings** → **Storage**, find the volume in **Backups**
 
 ### Set the S3 destination and retention rules
 
-The top of the form shows which user will run the backup. By default, it follows the service's user:
+The top of the form shows which user runs the backup. By default, it follows the service's user:
 
 - If the service specifies a non-root user, the backup uses the same user.
 - If the service specifies root, or doesn't specify a user and its security isn't **Strict**, the backup runs as root so it can read every file.
@@ -361,7 +361,7 @@ The disk's `STATUS` should be `Bound`, and `CAPACITY` shows its current size. Ex
 
 | What you see | What to do next |
 | --- | --- |
-| The volume stays at **Waiting for storage** | Check the replica and disk events, and confirm that the storage class is available. If the volume's row says **Kept on the node its first replica runs on**, the volume won't be created until the replica is scheduled on a node. |
+| The volume stays at **Waiting for storage** | Check the replica and disk events, and confirm that the storage class is available. If the volume's row says **Kept on the node its first replica runs on**, the volume is created only after the replica is scheduled on a node. |
 | A replica can't start after moving to another node | Check whether the volume is tied to a specific node. Data on a local disk doesn't move to the new node with the replica. |
 | Multiple replicas can't mount the volume at the same time | The Deployment's replicas share one disk. With the ReadWriteOnce access mode, only replicas on the same node can mount it. Switch to a storage class and access mode that support multiple nodes. |
 | **This volume name exceeds 63 characters. K8up can't select it with a label.** | Zeabur uses the disk's name as a label value to select the volume. If the name is too long, you can't configure backups here. Ask an administrator to write a K8up Schedule separately. |

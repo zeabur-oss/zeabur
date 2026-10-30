@@ -31,7 +31,7 @@ For steps to assign member roles, see [Members](../cluster/members.mdx). When yo
 
 Operations marked "Yes" must still pass ResourceQuota, Pod Security, admission policies, and the component's own checks. Creating databases and backups requires the corresponding operators. The roles already include these operators' resources, so you don't need to change the roles after installing them.
 
-Developers can restore volumes in their own projects. The role only adds permission to create and delete `restores.k8up.io` in that namespace. Before using it, note two things:
+Developers can restore volumes in their own projects. The role only adds permission to create and delete `restores.k8up.io` in that namespace. Before you use it:
 
 - Restoring in place overwrites the entire volume and deletes files added after the backup.
 - Anyone who can restore can read every backup in the project's backup repository. Use a separate backup path and password for each project.
@@ -146,9 +146,9 @@ If the config file or a key is missing, Zeabur Identity uses the default.
 
 ### Require device-bound passkeys (AAL3)
 
-With AAL3 enabled, admin accounts can only use passkeys that don't sync to other devices, such as security keys or passkeys stored on a single device. Synced passkeys stored in services such as iCloud Keychain or Google Password Manager are rejected at sign-in. The interface explains that the passkey syncs and that admin accounts require a security key or a passkey stored on a single device. Anyone already signed in with a synced passkey is signed out at the next token refresh.
+With AAL3 enabled, admin accounts can only use passkeys that don't sync to other devices, such as security keys or passkeys stored on a single device. Zeabur Identity rejects synced passkeys stored in services such as iCloud Keychain or Google Password Manager at sign-in. The interface explains that the passkey syncs and that admin accounts require a security key or a passkey stored on a single device. Anyone already signed in with a synced passkey is signed out at the next token refresh.
 
-Before enabling AAL3, make sure every admin has a device-bound passkey. Zeabur won't let you enable it without one yourself, to prevent you from locking yourself out. Other admins without one won't be able to sign in after you enable it. Use `sudo zeabur-installer setup-link --username <admin> --reset` to generate a new link so they can register a security key. For steps to check each passkey, see [AAL3 for admins](https://oss.zeabur.com/docs/identity/managing-users#aal3-for-admins) in the Zeabur Identity docs.
+Before enabling AAL3, make sure every admin has a device-bound passkey. Zeabur won't let you enable it until you have one yourself, so you can't lock yourself out. Other admins without one won't be able to sign in after you enable it. Use `sudo zeabur-installer setup-link --username <admin> --reset` to generate a new link so they can register a security key. For steps to check each passkey, see [AAL3 for admins](https://oss.zeabur.com/docs/identity/managing-users#aal3-for-admins) in the Zeabur Identity docs.
 
 ## Using kubectl
 

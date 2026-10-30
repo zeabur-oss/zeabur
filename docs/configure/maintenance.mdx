@@ -3,7 +3,7 @@ title: Show maintenance and error pages
 description: Show a 503 page on a domain during maintenance, and set custom HTML for a service’s 502, 503, and 504 responses.
 ---
 
-In the service’s **Networking** tab, open **Maintenance and error pages** from the domain row, turn on **Maintenance mode**, add the changes, then review and apply them. Visitors to that domain will see the maintenance page with HTTP 503. The original service keeps running. When maintenance is complete, turn it off in the same panel to send traffic back to the original backend.
+In the service’s **Networking** tab, open **Maintenance and error pages** from the domain row, turn on **Maintenance mode**, add the changes, then review and apply them. Visitors to that domain see the maintenance page with HTTP 503. The original service keeps running. When maintenance is complete, turn it off in the same panel to send traffic back to the original backend.
 
 ## Before you begin
 
@@ -37,7 +37,7 @@ Turn on **Maintenance mode**. Keep the default HTML, or select **Maintenance** u
 
 ![The Maintenance and error pages panel for shop.example.com, with maintenance mode on and the maintenance page’s HTML displayed](../images/shots/domain-pages-maintenance.avif)
 
-Each page must be smaller than 64 KiB. Every domain in the project uses the same set of pages. If you edit the maintenance page here, other domains in maintenance mode in the project will also show the new content.
+Each page must be smaller than 64 KiB. Every domain in the project uses the same set of pages. If you edit the maintenance page here, other domains in maintenance mode in the project also show the new content.
 
 If the project doesn’t have a page server yet, the top of the panel says **This project has no page server yet**. Continue as usual. When you review the changes, they’ll also include deploying the **Error pages** template from Zeabur Catalog to the project, with four default pages: maintenance, 502, 503, and 504. If you edit only the maintenance page, the other three keep their default content.
 
@@ -46,11 +46,11 @@ If the project doesn’t have a page server yet, the top of the panel says **Thi
 
 ### Review and apply
 
-Click **Add to changes** in the side panel. The domain row will show **Changed**. Then click **Review changes** at the bottom of the page, confirm the target domain and HTML, and apply. If the page server needs to be deployed, the list also includes its Deployment, Service, config file, and NetworkPolicy.
+Click **Add to changes** in the side panel. The domain row shows **Changed**. Then click **Review changes** at the bottom of the page, confirm the target domain and HTML, and apply. If the page server needs to be deployed, the list also includes its Deployment, Service, config file, and NetworkPolicy.
 
 ![The review changes dialog, showing that shop.example.com will display a maintenance page](../images/shots/domain-pages-review.avif)
 
-All paths under this domain will route to the maintenance page. Other domains on the same Ingress aren’t affected. For an Ingress domain, Zeabur creates an additional Ingress with a name ending in `-maintenance`. Traefik gives it priority, and the original Ingress stays unchanged. For an HTTPRoute domain, Zeabur sets the original backends’ weights to 0 and adds the page server. Maintenance applies to the entire HTTPRoute. If the same HTTPRoute has other domains, Zeabur first moves this domain to its own route.
+All paths under this domain route to the maintenance page. Other domains on the same Ingress aren’t affected. For an Ingress domain, Zeabur creates an additional Ingress with a name ending in `-maintenance`. Traefik gives it priority, and the original Ingress stays unchanged. For an HTTPRoute domain, Zeabur sets the original backends’ weights to 0 and adds the page server. Maintenance applies to the entire HTTPRoute. If the same HTTPRoute has other domains, Zeabur first moves this domain to its own route.
 
 </Step>
 <Step>
@@ -91,9 +91,9 @@ Open **Maintenance and error pages** for a Traefik Ingress domain and turn on **
 | **503 Service unavailable** | `503.html` |
 | **504 Gateway timeout** | `504.html` |
 
-Click **Add to changes** in the panel, then review and apply from the bottom of the page. When the service returns 502, 503, or 504, Traefik will send the project’s error page instead. To check the result, use a test service that returns these status codes. You don’t need to stop the production service.
+Click **Add to changes** in the panel, then review and apply from the bottom of the page. When the service returns 502, 503, or 504, Traefik sends the project’s error page instead. To check the result, use a test service that returns these status codes. You don’t need to stop the production service.
 
-This setting applies to the entire Ingress. The panel lists the other domains it affects. The page HTML is shared across the project. If you edit the 502 page from `app.example.com`, other domains with error pages turned on will also show the new content.
+This setting applies to the entire Ingress. The panel lists the other domains it affects. The page HTML is shared across the project. If you edit the 502 page from `app.example.com`, other domains with error pages turned on also show the new content.
 
 If one domain on an Ingress is under maintenance, the other domains still show the custom 502, 503, and 504 pages.
 
@@ -108,7 +108,7 @@ The project’s page server serves maintenance and error pages. It comes from th
 | Service | Has this label; the `pages` port serves pages by filename, and the `maintenance` port returns the maintenance page with 503 for every request |
 | Config file | Has this label and the keys `502.html`, `503.html`, `504.html`, and `maintenance.html` |
 
-A project can have only one Service with this label. You can also deploy the template with `kubectl` or use another server that meets the requirements above. Zeabur will recognize it. These are standard Kubernetes objects and work without Zeabur.
+A project can have only one Service with this label. You can also deploy the template with `kubectl` or use another server that meets the requirements above; Zeabur recognizes it too. These are standard Kubernetes objects and work without Zeabur.
 
 ## Do the same with kubectl
 
@@ -246,5 +246,5 @@ Turning off **Maintenance mode** routes the domain back to the original service.
 When the project no longer needs these pages, first turn off maintenance mode and error pages for every domain and confirm that traffic is restored. Then open the project’s **Objects** page and delete the `error-pages` Deployment, Service, and NetworkPolicy, along with the `error-pages` and `error-pages-nginx` config files. For each object, click **Delete** under **YAML**, then review and apply.
 
 <Callout type="warn">
-If you delete the page server while any domains are still under maintenance or have error pages turned on, visitors to those domains will see errors instead of your pages.
+If you delete the page server while any domains are still under maintenance or have error pages turned on, visitors to those domains see errors instead of your pages.
 </Callout>

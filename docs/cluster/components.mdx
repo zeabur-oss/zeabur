@@ -9,7 +9,7 @@ Open **Cluster** → **Components**. **Installed** lists detected components, an
 
 ## Before you begin
 
-- To detect installed components, the components page needs permission to read CRDs and IngressClasses across the cluster, as well as workloads in every namespace.
+- To detect installed components, the components page needs permission to read CRDs and IngressClasses across the cluster and workloads in every namespace.
 - To install or remove components, you need root access to the server where zeabur-installer originally ran.
 - If you didn't install the cluster with zeabur-installer, see [Install with your own tools](#install-with-your-own-tools).
 
@@ -28,7 +28,7 @@ If a feature such as backups or notifications already works, but its component c
 
 ### View the commands to run
 
-Click **Install** on a component card to open a dialog with the commands to run on the server. When the **Add** menu, a template, a build setting or database backups need a missing component, **How to install** opens the same dialog. It lists every component that action lacks at once, and you can copy the `enable` list as is.
+Click **Install** on a component card to open a dialog with the commands to run on the server. When the **Add** menu, a template, a build setting or database backups need a missing component, **How to install** opens the same dialog. It lists every component that action is missing, so you can copy the `enable` list as is.
 
 Zeabur checks the ConfigMap `zeabur-installer` in `kube-system` to tell whether zeabur-installer set up the cluster. If it isn't there, the dialog only shows the `zeaburctl components export` command. If Zeabur can't read it, the dialog shows both.
 
@@ -88,12 +88,12 @@ Return to **Cluster** → **Components**. The component and its version should a
 
 Click **Remove** on an installed component's card to open a dialog with the commands. Clear its checkbox on the installer page, or remove it from `enable` in the config file. For components installed by default, add them to `disable` instead. Then run `apply`.
 
-`plan` and the installer's **Review** page list the components to remove, what will remain, and any CRDs that will also be deleted. In either of the following cases, `apply` stops without making changes:
+`plan` and the installer's **Review** page list the components to remove, what stays, and any CRDs that are deleted along with them. In either of the following cases, `apply` stops without making changes:
 
 - Something still uses the component. For example, custom resources still exist (including objects of CRDs that will also be deleted), Longhorn volumes remain, or replicas still pull images from zot. The installer lists these resources. Delete or move them first.
-- Removing the component will also delete the data it stores, as with Longhorn. Back up the data first, then add the component ID to `allowDataLoss` in the config file or select the consent checkbox under **Review**.
+- Removing the component also deletes the data it stores, as with Longhorn. Back up the data first, then add the component ID to `allowDataLoss` in the config file or select the consent checkbox under **Review**.
 
-After removal, the component's namespace and volumes remain. Some Charts also delete CRDs and all their objects; other CRDs remain. Once you're sure you no longer need these resources, see [Installer commands](../reference/installer.mdx#remove-components) for manual deletion instructions.
+After removal, the component's namespace and volumes remain. Some Charts also delete CRDs and all their objects; other CRDs remain. Once you're sure you no longer need these resources, follow [Installer commands](../reference/installer.mdx#remove-components) to delete them by hand.
 
 zeabur-installer only removes components it installed. If you installed a component with Helm, Flux, or Argo CD, remove it with the same tool.
 
@@ -120,7 +120,7 @@ If the exported manifest starts with instructions to disable a built-in version,
 - RKE2: For metrics-server, add `rke2-metrics-server` to `disable` in `/etc/rancher/rke2/config.yaml`. For Traefik, set `ingress-controller: none` in the same file. Then restart `rke2-server`.
 
 <Callout type="warn">
-Disabling the built-in Traefik deletes its CRDs and all IngressRoute and Middleware objects. Ingress traffic will be interrupted until the replacement component starts. Disabling the built-in metrics-server makes the metrics API unavailable until the new version starts. Schedule the switch for a time when an interruption is acceptable.
+Disabling the built-in Traefik deletes its CRDs and all IngressRoute and Middleware objects. Ingress traffic stops until the replacement component starts. Disabling the built-in metrics-server makes the metrics API unavailable until the new version starts. Schedule the switch for a time when an interruption is acceptable.
 </Callout>
 
 ## Common failures

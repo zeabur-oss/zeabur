@@ -89,7 +89,7 @@ The database's **Connections** section shows an address inside the cluster. To c
 CloudNativePG (PostgreSQL) writes backup files to the bucket in plaintext. Use a bucket with server-side encryption enabled, or enable encryption in the storage service's settings, and restrict who can read the bucket.
 </Callout>
 
-When you use a shared destination, applying the changes copies its keys to the project. If an administrator later changes the shared destination's keys, this copy won't update automatically.
+When you use a shared destination, applying the changes copies its keys to the project. If an administrator later changes the shared destination's keys, the project's copy doesn't update automatically.
 
 | Engine | Retention | Back up now | Restore source |
 | --- | --- | --- | --- |
@@ -136,7 +136,7 @@ This action only rewrites the service environment variables listed in the change
 </Steps>
 
 <Callout type="warn">
-After switching to the restored copy, services read data as it was at the time of the backup. Before switching, stop or coordinate writes and handle data added since the backup. Switching connections and updating environment variables also replaces the affected services' replicas.
+After switching to the restored database, services read data as it was at the time of the backup. Before switching, stop or coordinate writes and handle data added since the backup. Switching connections and updating environment variables also replaces the affected services' replicas.
 </Callout>
 
 The original database keeps running. After checking the switch and deciding what to retain, remove any databases you no longer need.

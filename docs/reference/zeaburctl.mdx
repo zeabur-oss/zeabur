@@ -71,7 +71,7 @@ The JSON output has a top-level `checks` array. Each item has `name`, `status`, 
 
 When results differ, critical issues take precedence over warnings, which take precedence over checks that couldn't run. `skipped` doesn't affect the exit code. Monitoring tools need to read `checks` separately to find out which checks were skipped.
 
-Whether kube-apiserver trusts the Zeabur Identity issuer is defined in the control plane's `AuthenticationConfiguration` file. RBAC can't read this file, so this check is marked as skipped. To check it on the host, use [`zeabur-installer doctor`](./installer.mdx).
+Whether kube-apiserver trusts the Zeabur Identity issuer is defined in the control plane's `AuthenticationConfiguration` file. RBAC can't read this file, so `zeaburctl doctor` marks this check as skipped. To check it on the host, use [`zeabur-installer doctor`](./installer.mdx).
 
 ## `up`
 
@@ -118,7 +118,7 @@ If the service doesn't exist, the command asks for confirmation before creating 
 
 In scripts or CI, the command doesn't prompt. You must specify the project and service with `--project` and `--service`. If the service doesn't exist, the command creates it without requiring `--yes`.
 
-A new service has the same contents as one created with **Upload folder** in the web interface, including a Build and Deployment. If you pass `--port`, the command also creates a Kubernetes Service and sets the `PORT` environment variable. Without a port, the service doesn't accept connections. The default build method is `railpack`; use `--method dockerfile` to use a Dockerfile instead.
+A new service has the same contents as one created with **Upload a folder** in the web interface, including a Build and Deployment. If you pass `--port`, the command also creates a Kubernetes Service and sets the `PORT` environment variable. Without a port, the service doesn't accept connections. The default build method is `railpack`; use `--method dockerfile` to use a Dockerfile instead.
 
 If the service already exists, the command keeps its build settings. If the service builds from Git, the command rejects the upload without changing anything.
 
@@ -126,7 +126,7 @@ If the service already exists, the command keeps its build settings. If the serv
 
 Packaging follows the same rules as [web uploads](../deploy/upload.mdx). It skips files excluded by `.gitignore` and `.dockerignore`, as well as `.git`. The limits are 256 MiB compressed and 1 GiB extracted.
 
-The command sends a `tar.gz` archive, preserving executable permissions and symbolic links that point within the uploaded folder.
+The command sends a `tar.gz` archive. It keeps executable permissions, and symbolic links that point inside the uploaded folder.
 
 The upload has three steps, in order:
 

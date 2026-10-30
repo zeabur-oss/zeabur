@@ -3,7 +3,7 @@ title: Security
 description: Permissions and data boundaries for sign-in, secrets, applying changes, terminals, and the installer.
 ---
 
-Before assigning a coworker the **Developer** role, check which secrets and ServiceAccounts are in the project: developers can access all of them. Opening a **Node terminal** gives full root access to the host. Zeabur follows Kubernetes identity and admission rules. Each section below describes the scope of access for a feature.
+Before assigning a coworker the **Developer** role, check which secrets and ServiceAccounts are in the project: developers can access all of them. Opening a **Node terminal** gives full root access to the host. Zeabur follows Kubernetes identity and admission rules.
 
 For role details, see [Permissions](./permissions.mdx). For installation settings, see [Install on an existing cluster](../get-started/install.mdx) and [Installer configuration](./installer-configuration.mdx).
 
@@ -43,10 +43,10 @@ From the time you delete `zeabur-identity-internal-tls` until `apply` finishes, 
 
 `zeaburctl ui` uses the kubeconfig of the user who starts it to operate the cluster. It listens only on a random port on `127.0.0.1` and applies these checks:
 
-- The `Host` header must be `127.0.0.1` or `localhost` with that port, blocking DNS rebinding.
+- The `Host` header must be `127.0.0.1` or `localhost` with that port. This blocks DNS rebinding.
 - The random token in the launch link can be exchanged for a session cookie only once.
 - The cookie uses `HttpOnly` and `SameSite=Strict`.
-- Requests that make changes must also pass a same-origin check that includes the port and carry a header sent by the Zeabur web interface.
+- Requests that make changes must also pass a same-origin check, including the port, and carry a header that the Zeabur web interface sends.
 
 ## Put the dashboard behind a VPN
 
@@ -77,9 +77,9 @@ Some connections must stay open:
 
 Anyone who can read secrets, including through `list secrets`, can see their values. **Viewer** users can't read secrets or logs. **Developer** users can read and write secrets, read logs, and run commands in containers. Logs, config files, and environment variables written directly into workloads may also contain sensitive data written by applications.
 
-The **Review changes** screen doesn't display secret values. Secrets to be written are carried to the apply step in an encrypted change token. Values written to config files remain in plain text. RBAC controls who can read them.
+The **Review changes** screen doesn't display secret values. The encrypted change token carries secrets to the apply step. Values written to config files remain in plain text. RBAC controls who can read them.
 
-For registered S3 destinations, connection details are stored in config files, and keys are stored in secrets. The chart lets all signed-in users read the destination list, but not those secrets. When a backup uses a destination, a copy of its keys is placed in the backup's namespace. If you rotate the keys later, update the [existing copies](../cluster/s3-destinations.mdx) as well.
+For registered S3 destinations, Zeabur stores connection details in config files and keys in secrets. The chart lets all signed-in users read the destination list, but not those secrets. When a backup uses a destination, Zeabur copies its keys into the backup's namespace. If you rotate the keys later, update the [existing copies](../cluster/s3-destinations.mdx) as well.
 
 ## Review and apply changes
 
@@ -97,7 +97,7 @@ When you add a Docker image service, Zeabur reads the image's `User`. It selects
 
 Switching an existing service between **Strict** and **Compatible** affects only that service. It doesn't change namespace labels or require admin rights. Applying the change replaces the service's replicas. The chart's `zeabur-project-namespace` policy still prevents developers from changing namespace labels, including any Pod Security labels.
 
-Projects that an administrator has explicitly set to `restricted` still reject root containers. Service settings display: “This project only allows Strict services. Compatible services can't start. Ask an administrator to change the project's Pod Security level to baseline.” An administrator must run this once for each affected project's namespace:
+Projects that an administrator has explicitly set to `restricted` still reject root containers. Service settings display: “This project allows only Strict services, so a Compatible one won't start. Ask an admin to set the project's Pod Security level to baseline.” An administrator must run this once for each affected project's namespace:
 
 ```sh
 kubectl label namespace <ns> \
@@ -119,7 +119,7 @@ Zeabur's trust boundary is the entire cluster: everyone who can sign in is a tru
 In clusters installed with the installer, namespaces containing platform components have the label `zeabur.com/platform: "true"`. When this label exists in the cluster, Zeabur writes three objects when creating a project:
 
 - A Namespace with the `zeabur.com/project` label and Pod Security labels.
-- A ServiceAccount named `default`, with `automountServiceAccountToken: false`. Replicas that don't specify a ServiceAccount won't receive a token. Workloads that need to call the Kubernetes API must specify their own ServiceAccount.
+- A ServiceAccount named `default`, with `automountServiceAccountToken: false`. Replicas that don't specify a ServiceAccount don't receive a token. Workloads that need to call the Kubernetes API must specify their own ServiceAccount.
 - A NetworkPolicy named `zeabur-project`: every replica in the project accepts connections only from the following sources. Outgoing connections aren't restricted.
   - Replicas in the same project.
   - Namespaces labeled `zeabur.com/platform: "true"`, which contain platform components such as the Ingress controller, metrics collection, and database operators.
@@ -143,15 +143,15 @@ spec:
             matchLabels: {kubernetes.io/metadata.name: kube-system}
 ```
 
-Health checks from the kubelet on the same node don't need a rule. Traffic through public domains, NodePort, and LoadBalancer also continues to arrive as usual.
+Health checks from the kubelet on the same node don't need a rule. Traffic through public domains, NodePort, and LoadBalancer still arrives as usual.
 
-If no namespace in the cluster has this label, such as when you run `zeaburctl ui` directly on an existing cluster, Zeabur can't identify platform namespaces. It doesn't write a connection rule, to avoid blocking the Ingress controller. To enable this, first label the namespaces containing platform components:
+If no namespace in the cluster has this label, such as when you run `zeaburctl ui` directly on an existing cluster, Zeabur can't identify platform namespaces. It doesn't write a connection rule, because that rule would block the Ingress controller. To enable isolation, first label the namespaces containing platform components:
 
 ```sh
 kubectl label namespace traefik cert-manager zeabur.com/platform=true
 ```
 
-Connection rules only take effect if the cluster's network plugin (CNI) supports them. The installer's K3s uses Calico and its RKE2 uses Canal; both do, as does the kube-router built into a plain K3s. KubeSolo's bridge CNI doesn't, so creating rules won't block any connections.
+Connection rules take effect only if the cluster's network plugin (CNI) supports them. The installer's K3s uses Calico and its RKE2 uses Canal; both do, as does the kube-router built into a plain K3s. KubeSolo's bridge CNI doesn't, so creating rules won't block any connections.
 
 ### Allow connections from another project
 
@@ -178,13 +178,13 @@ Connection rules can only allow traffic, not deny it, and rules from multiple Ne
 kubectl -n shop delete networkpolicy zeabur-allow-from-blog
 ```
 
-Existing connections may not close immediately. They may remain until the connection ends or the service restarts.
+Existing connections can stay open until they end or the service restarts.
 
 ### Existing projects
 
 Projects created before this feature don't have `zeabur-project`. The `cluster-gaps` check in `zeaburctl doctor` lists these projects, and suggestions on the project page offer an **Isolate** change. You can also apply the YAML above directly with kubectl.
 
-**Developer** users can modify or delete connection rules in their own projects. Deleting `zeabur-project` only opens their own project to other projects. `zeaburctl doctor` will continue to flag it.
+**Developer** users can modify or delete connection rules in their own projects. Deleting `zeabur-project` only opens their own project to other projects. `zeaburctl doctor` keeps flagging it.
 
 ### Domains across projects
 
@@ -200,7 +200,7 @@ For containers without a shell, Zeabur adds a debug container. If the replica or
 
 ### kubectl terminal
 
-Zeabur provides `kubectl` and `helm` in a temporary tools replica, using the signed-in user's current token. Open a project's kubectl terminal from search. For a cluster-wide terminal, select **Open kubectl terminal** beside the title on the **Cluster** page. The kubeconfig is written through exec's standard input to an in-memory `emptyDir`. It doesn't appear in the replica's spec, environment variables, config files, or secrets.
+Zeabur provides `kubectl` and `helm` in a temporary tools replica. Both use the signed-in user's current token. Open a project's kubectl terminal from search. For a cluster-wide terminal, select **Open kubectl terminal** beside the title on the **Cluster** page. Zeabur writes the kubeconfig through exec's standard input to an in-memory `emptyDir`. It doesn't appear in the replica's spec, environment variables, config files, or secrets.
 
 All tools replicas run in the chart-created `zeabur-terminals` namespace (`terminal.namespace`). kubectl defaults to the project where you opened the terminal. Zeabur first asks kube-apiserver to confirm that you can run commands in the project's containers. A cluster-wide terminal requires a cluster administrator. Zeabur then uses its own ServiceAccount to create the replica and open the terminal.
 
@@ -222,7 +222,7 @@ Anyone who can query a metrics store through `services/proxy` can also query met
 
 When Zeabur Proxy is enabled, it reads usage history from the default metrics store. Users must have `get metrics.proxy.zeabur.com` in the namespace. Each query also includes VictoriaMetrics' `extra_label=namespace=<Namespace>`, so it only returns series from that namespace. The Proxy exposes only the query, range query, series, label names, and label values APIs. It rejects export, federate, and TSDB status requests.
 
-When Zeabur Proxy is enabled, users must have `get logs.proxy.zeabur.com` in a namespace to read its historical logs, and queries are limited to that namespace. The chart disables the Proxy by default. The installer enables it when VictoriaLogs or VictoriaMetrics is installed. Without VictoriaLogs, `proxy.logs.enabled` is set to false, and the Proxy only provides usage history. Direct access to VictoriaLogs bypasses these checks and must be restricted separately.
+When Zeabur Proxy is enabled, users must have `get logs.proxy.zeabur.com` in a namespace to read its historical logs, and queries are limited to that namespace. The chart disables the Proxy by default. The installer enables it when VictoriaLogs or VictoriaMetrics is installed. Without VictoriaLogs, `proxy.logs.enabled` is set to false, and the Proxy only provides usage history. Direct access to VictoriaLogs bypasses these checks, so restrict it separately.
 
 ## Secret encryption and access logs
 
@@ -230,7 +230,7 @@ When Zeabur Proxy is enabled, users must have `get logs.proxy.zeabur.com` in a n
 
 K3s and RKE2 always encrypt secrets using AES-CBC (`aescbc`), in SQLite on K3s and in etcd on RKE2. If someone copies the database, an etcd snapshot uploaded to S3, or the data directory, they only see encrypted secret values unless they also have the key and server token. Values start with `k8s:enc:aescbc:v1:<key-name>:`.
 
-The keys are stored on each server, with permissions `0600`, on the same disk as the data:
+Each server stores the keys with permissions `0600`, on the same disk as the data:
 
 - K3s: `/var/lib/rancher/k3s/server/cred/encryption-config.json`
 - RKE2: `/var/lib/rancher/rke2/server/cred/encryption-config.json`
@@ -309,10 +309,11 @@ The installer writes the audit policy with permissions `0600`, and K3s or RKE2 u
 |---|---|---|
 | Policy | `/etc/rancher/k3s/audit-policy.yaml` | `/etc/rancher/rke2/audit-policy.yaml` |
 | Log | `/var/lib/rancher/k3s/server/logs/audit.log` | `/var/lib/rancher/rke2/server/logs/audit.log` |
- Entries contain only request metadata, not request or response bodies.
 
-- **Secrets**: Every request from everyone, including nodes, is recorded: `get`, `list`, `watch`, `create`, `update`, `patch`, and `delete`. Each entry includes the user, the identity impersonated with `--as`, groups, source IP, user agent, operation, namespace, and name.
-- **Other resources**: Only creates, updates, and deletes by people and workloads are recorded. Reads, Events, Leases, token reviews, access reviews, health checks, and requests from nodes, the API server, controller manager, scheduler, and kube-proxy aren't recorded.
+Entries contain only request metadata, not request or response bodies.
+
+- **Secrets**: The log records every request from everyone, including nodes: `get`, `list`, `watch`, `create`, `update`, `patch`, and `delete`. Each entry includes the user, the identity impersonated with `--as`, groups, source IP, user agent, operation, namespace, and name.
+- **Other resources**: The log records only creates, updates, and deletes by people and workloads. It skips reads, Events, Leases, token reviews, access reviews, health checks, and requests from nodes, the API server, controller manager, scheduler, and kube-proxy.
 
 Both rotate the file at 100 MB, keep at most 10 old files, and retain them for at most 30 days. A single RKE2 server with little activity writes about 13 to 23 KB every 5 minutes, or less than 7 MB a day. To store logs elsewhere, collect this file with a log collection tool.
 
@@ -324,9 +325,9 @@ Developers can create Ingress and HTTPRoute objects in their projects. Without r
 - It doesn't use a wildcard domain covering those domains. For example, if Zeabur uses `zeabur.example.com`, the policy blocks `*.example.com`.
 - Every Ingress rule specifies a `host`, and every HTTPRoute has at least one `hostnames` entry. A route without a domain accepts requests for every domain, including Zeabur's.
 
-The policy reads Ingress objects directly from these two namespaces. It doesn't need updating when Zeabur or Zeabur Identity changes domains. Namespaces created by the installer, labeled `zeabur.com/platform: "true"`, can omit domains, but still can't use Zeabur's or Zeabur Identity's domains. Updates that only change labels or annotations without changing `spec` aren't checked. The policy also applies to administrators.
+The policy reads Ingress objects directly from these two namespaces. It doesn't need updating when Zeabur or Zeabur Identity changes domains. Namespaces created by the installer, labeled `zeabur.com/platform: "true"`, can omit domains, but still can't use Zeabur's or Zeabur Identity's domains. The policy doesn't check updates that change only labels or annotations and leave `spec` alone. The policy also applies to administrators.
 
-The policy only checks writes. Routes that existed before installation remain. Use this command to find Ingress objects that use Zeabur's domains or don't specify a domain, then address them manually:
+The policy only checks writes. Routes that existed before installation remain. Use this command to find Ingress objects that use Zeabur's domains or don't specify a domain, then fix them by hand:
 
 ```sh
 kubectl get ingress --all-namespaces \
@@ -368,9 +369,9 @@ Change `zeabur-system-hosts-zeabur-identity` the same way.
 
 The installer runs as root to write K3s or RKE2 configuration and systemd units and adjust kernel parameters. On RKE2, it also creates the `etcd` user. If you select Longhorn, it also installs host packages. The GUI uses plain HTTP. Keep it listening only on loopback and connect through an SSH tunnel.
 
-The default K3s or RKE2 version is verified against a SHA-256 digest compiled into the installer. Trust comes from the installer's own signature. If you specify another `k3sVersion` or `rke2Version`, verification can only use the checksum list on that release's page. Files, images, and charts specified through `sources` aren't pinned. Before using them, verify the source as described in [Releases and verification](./releases.mdx).
+The installer verifies the default K3s or RKE2 version against a SHA-256 digest compiled into it. Trust comes from the installer's own signature. If you specify another `k3sVersion` or `rke2Version`, verification can only use the checksum list on that release's page. Files, images, and charts specified through `sources` aren't pinned. Before using them, verify the source as described in [Releases and verification](./releases.mdx).
 
-The installer downloads component charts and manifests and compares them with the SHA-256 values in Zeabur Catalog. A mismatch stops installation. Verified charts are embedded directly in `HelmChart`, so helm-controller doesn't download them again. Component images are also specified by digest in Zeabur Catalog, so upstream changes to the contents of a tag won't change what gets installed.
+The installer downloads component charts and manifests and compares them with the SHA-256 values in Zeabur Catalog. A mismatch stops installation. The installer embeds verified charts directly in `HelmChart`, so helm-controller doesn't download them again. Component images are also specified by digest in Zeabur Catalog, so upstream changes to the contents of a tag won't change what gets installed.
 
 K3s and RKE2 get the same CIS hardening and encrypt stored secrets. See [Secret encryption and access logs](#secret-encryption-and-access-logs). RKE2 uses its own CIS profile. On K3s, the installer applies the settings from the [K3s CIS hardening guide](https://docs.k3s.io/security/hardening-guide):
 
@@ -383,7 +384,7 @@ K3s and RKE2 get the same CIS hardening and encrypt stored secrets. See [Secret 
 
 Calico, instead of flannel, enforces NetworkPolicy on K3s.
 
-Host disk encryption is checked separately. With `host.requireEncryptedDisk: true`, installation won't proceed on an unencrypted disk.
+The installer checks host disk encryption separately. With `host.requireEncryptedDisk: true`, installation won't proceed on an unencrypted disk.
 
 ### Personal installations
 

@@ -99,7 +99,7 @@ secretFiles:
 sudo chmod 0600 /root/secrets/velero-credentials
 ```
 
-文件内容按组件 input 的格式填写，installer 会用它创建组件所需的机密变量。机密值放在文件中，不要写入 `inputs`。对于 Catalog 标为 `generate: random` 的机密，如果没有指定文件，首次 `apply` 时会自动生成，之后继续沿用。
+文件内容按组件 input 的格式填写，installer 会用这些文件创建组件所需的机密变量。机密值放在文件中，不要写入 `inputs`。对于 Catalog 标为 `generate: random` 的机密，如果没有指定文件，首次 `apply` 时会自动生成，之后继续沿用。
 
 ### 存储类
 
@@ -107,13 +107,13 @@ installer 一定会创建 `local-path`，数据存放在节点的 `/var/lib/zeab
 
 - `local-path` 的卷保留在原节点上，更改默认存储类不会迁移已有数据。
 - Longhorn 成为默认存储类时，installer 原先设为默认的 `local-path` 会改为普通存储类。
-- 集群已有其他默认存储类时，installer 会保留它。如果本次要将 Longhorn 设为默认，`apply` 会停止，需要先删除原存储类的默认注解，再重新运行。
+- 集群已有其他默认存储类时，installer 会保留原来的默认存储类。如果本次要将 Longhorn 设为默认，`apply` 会停止，需要先删除原存储类的默认注解，再重新运行。
 
 选择 Longhorn 后，`apply` 会在这台主机上安装 iSCSI initiator 和 NFS client、加载 `iscsi_tcp`、启动 `iscsid`。每个运行 Longhorn 的节点都需要这些，见[加入节点](../cluster/nodes.mdx)。
 
 ### `distribution` 与版本
 
-不填写 `distribution` 就安装 K3s。服务器有 8 GiB 及以上内存，或以后想用三台服务器跑控制平面，就设为 `rke2`。
+不填写 `distribution` 就安装 K3s。服务器有 8 GiB 及以上内存，或以后想用三台服务器运行控制平面，就设为 `rke2`。
 
 | 字段 | 默认值与用途 |
 |---|---|
@@ -131,13 +131,13 @@ installer 一定会创建 `local-path`，数据存放在节点的 `/var/lib/zeab
 |---|---|
 | `host.tlsSan` | `[]`。Kubernetes API server 证书中额外添加的 DNS 名称或 IP 地址，仅用于 server |
 | `host.requireEncryptedDisk` | `false`。设为 `true` 时，如果根目录或数据目录不在加密设备上，`apply` 就会停止 |
-| `host.nodeName` | 主机名转为小写。主机名不能用作节点名称，或由 IP 地址组成（例如 `ip-10-0-0-5`）时，改用 `node-3f9a2c` 这类名称。installer 会将它写入 K3s 或 RKE2 的配置，以后主机名改了，节点名称也不会跟着变。只能使用小写字母、数字、`-` 和 `.` |
+| `host.nodeName` | 主机名转为小写。主机名不能用作节点名称，或由 IP 地址组成（例如 `ip-10-0-0-5`）时，改用 `node-3f9a2c` 这类名称。installer 会将这个名称写入 K3s 或 RKE2 的配置，以后主机名改了，节点名称也不会跟着改变。只能使用小写字母、数字、`-` 和 `.` |
 
-节点装好后会一直使用当初的名称。再次运行 `apply` 会沿用它；如果 `host.nodeName` 填了其他名称，`apply` 会停止，因为 Kubernetes 会把它当成同一地址上的第二个节点。
+节点装好后会一直使用当初的名称。再次运行 `apply` 会沿用原来的名称；如果 `host.nodeName` 填了其他名称，`apply` 会停止，因为 Kubernetes 会把新名称当成同一地址上的第二个节点。
 
 ### `sources`
 
-正式发行的 installer 不需要 `sources`。它固定了 Zeabur Catalog、Zeabur Identity 和 Zeabur 的版本，下载到 `/var/lib/rancher/zeabur-installer/downloads`，并使用编译进 installer 的 SHA-256 校验。
+正式发行的 installer 不需要 `sources`，installer 已经固定了 Zeabur Catalog、Zeabur Identity 和 Zeabur 的版本，下载到 `/var/lib/rancher/zeabur-installer/downloads`，并使用编译进 installer 的 SHA-256 校验。
 
 `sources` 用于改装自行构建的版本，通常用于开发测试。只填写需要替换的字段，其他字段继续使用固定的版本。自行编译的开发版 installer 没有固定任何版本，因此必须填写 `catalog`、`identityImage`、`identityctl`、`zeaburImage` 和 `zeaburChart`，`plan` 会列出缺少的字段。将路径替换为实际准备好的文件：
 
@@ -181,7 +181,7 @@ host:
 | `allowDataLoss` | `[]`。与创建集群的文件相同 |
 | `inputs` | `{}`。与创建集群的文件相同，按组件 ID 分组 |
 | `secretFiles` | `{}`。与创建集群的文件相同，文件权限必须为 `0600` |
-| `host.tlsSan` | `[]`。自己的电脑使用其他地址或域名连接 API 时，将其添加到这里 |
+| `host.tlsSan` | `[]`。自己的电脑使用其他地址或域名连接 API 时，将地址或域名添加到这里 |
 | `host.requireEncryptedDisk` | `false`。设为 `true` 时，如果 `/var/lib/kubesolo` 不在加密设备上，`apply` 就会停止 |
 | `host.nodeName` | 与创建集群时相同，写入 KubeSolo 的配置 |
 | `sources.catalog` | 选填。本地 Catalog `index.json`，替换固定的版本 |

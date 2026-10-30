@@ -51,7 +51,7 @@ When this option is on, the differences between the new service and the Compose 
 
 To keep using the original image, turn this option off. When two or more services can be replaced, **Replace all N with operator-managed services** at the top turns the option on or off for all of them. If the operator is missing, its installation can't be verified, or you don't have enough permissions, the service runs the original image, and the interface explains why.
 
-When you choose an operator-managed service, recognizable connection strings, hosts, usernames, passwords, and database names in other services are rewritten to use the new service's connection settings. References that can't be rewritten keep their original values, with a prompt to check them after import.
+When you choose an operator-managed service, Zeabur rewrites recognizable connection strings, hosts, usernames, passwords, and database names in other services to use the new service's connection settings. References that can't be rewritten keep their original values, with a prompt to check them after import.
 
 </Step>
 <Step>
@@ -60,7 +60,7 @@ When you choose an operator-managed service, recognizable connection strings, ho
 
 Compose `ports` don't directly expose host ports on nodes. For regular services that need to serve HTTP publicly, turn on **Public domain** and confirm the suggested domain or enter one.
 
-For example, `"3000:3000"` keeps the container's TCP port `3000` but doesn't expose the host's port `3000` publicly. **Public domain** is off by default. DNS and HTTPS still need to be configured as described in [Public domains](../configure/domains.mdx).
+For example, `"3000:3000"` keeps the container's TCP port `3000` but doesn't expose the host's port `3000` publicly. **Public domain** is off by default. Set up DNS and HTTPS as described in [Public domains](../configure/domains.mdx).
 
 </Step>
 <Step>
@@ -83,7 +83,7 @@ If you change the Compose or variable file contents, click **Read file** again b
 | `entrypoint`, `command` | Regular image-based services keep the container command and arguments. For operator-managed services, the operator controls startup. For example, Redis's `redis-server --appendonly yes` isn't carried over to Dragonfly. |
 | Data service `ports` | After replacement with an operator-managed service, connections use the new service's private network. MinIO's port `9000` and management interface port `9001` aren't carried over. Applications connect to the SeaweedFS S3 endpoint instead. |
 | Named volumes | Each mount in each service gets its own 1 GiB volume. Existing data isn't migrated. Services that shared a volume with the same name get separate volumes. Whether you can expand capacity later depends on the storage class. |
-| Host paths, Docker socket | Not mounted. Config files or data previously provided through host directories must be placed in volumes or config files separately. |
+| Host paths, Docker socket | Not mounted. Put config files or data that came from host directories into volumes or config files. |
 | `depends_on` | Before starting, waits for the dependent services' TCP ports to accept connections. Dependencies without a recognizable port aren't included in the wait. |
 | `healthcheck` | Skips the original check and uses a TCP connection to the first port as the traffic check. You can adjust it in **Settings** after import. |
 | UDP ports | Skipped. Kubernetes Services created by the import use TCP only. |
@@ -112,7 +112,7 @@ Services with `depends_on` get additional init containers named `wait-1`, `wait-
 
 ## Do the same with kubectl
 
-Compose files are converted to services only in the interface. Zeabur doesn't store the Compose file, and there's no corresponding object in the cluster. The conversion produces regular Kubernetes objects, just like those created manually:
+Zeabur converts Compose files to services in the interface only. It doesn't store the Compose file, and nothing in the cluster corresponds to it. The conversion produces regular Kubernetes objects, just like those created manually:
 
 - Regular services: the same YAML as [Deploy a container image](./image.mdx#do-the-same-with-kubectl), with security fixed to **Compatible**.
 - Databases and object storage: the same YAML as [Databases](./databases.mdx#do-the-same-with-kubectl) and [Object storage](./object-storage.mdx#do-the-same-with-kubectl).

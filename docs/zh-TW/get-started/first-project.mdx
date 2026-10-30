@@ -10,7 +10,7 @@ source: "5d17518ca7cb"
 
 ## 建立專案
 
-打開**專案**，按**新增專案**，**名稱**填 `hello`。這個名稱也會是 Kubernetes Namespace 的名稱，建立後不能改。
+打開**專案**，按**新增專案**，**名稱**填 `hello`。這個名稱也會是 Kubernetes Namespace 的名稱，建立後不能修改。
 
 ![新增專案視窗，名稱填了 hello](../images/shots/project-new.avif)
 
@@ -22,7 +22,7 @@ source: "5d17518ca7cb"
 
 ## 部署 Nginx
 
-在 `hello` 專案裡按**新增**，選**Docker 映像檔**：
+在 `hello` 專案裡按**新增**，選 **Docker 映像檔**：
 
 | 欄位 | 填入 |
 | --- | --- |
@@ -31,7 +31,7 @@ source: "5d17518ca7cb"
 | **連接埠** | `8080` |
 | **公開網域** | 開啟，用建議的網址或你準備的網域 |
 
-Zeabur 讀出 `nginx-unprivileged` 以使用者 101 執行，會自動選 **嚴格**，表單會說明選擇原因。這個映像檔監聽 `8080`。`nginx:latest` 也能執行，Zeabur 會為它選 **相容**；建立前仍能自行切換。
+Zeabur 讀出 `nginx-unprivileged` 以使用者 101 執行，會自動選**嚴格**，表單會說明選擇原因。這個映像檔監聽 `8080`。`nginx:latest` 也能執行，這時 Zeabur 會選**相容**；建立前仍能自行切換。
 
 填完映像檔後，表單會讀出映像檔宣告的連接埠，正常會自動帶入 `8080`。
 
@@ -53,7 +53,7 @@ Zeabur 讀出 `nginx-unprivileged` 以使用者 101 執行，會自動選 **嚴�
 
 在服務的**概覽**等副本變成 `1/1` **就緒**。接著到**網路**點開網域，瀏覽器會出現 Nginx 的歡迎頁。
 
-如果網域下方寫著**這個網址只有 HTTP**，表示叢集還沒有設定自動簽發憑證，請用 `http://` 開啟。要 HTTPS，請管理員設定 cert-manager 簽發者。
+如果網域下方寫著**這個網址只有 HTTP**，表示叢集還沒有設定自動簽發憑證，改用 `http://` 開啟。要 HTTPS，請管理員設定 cert-manager 簽發者。
 
 回到**日誌**，可以看到剛才那次開啟網頁留下的存取紀錄。
 
@@ -63,7 +63,7 @@ Zeabur 讀出 `nginx-unprivileged` 以使用者 101 執行，會自動選 **嚴�
 
 ## 確認結果
 
-- 服務 **概覽** 顯示 `1/1` **就緒**，瀏覽器打開網址看到 Nginx 的歡迎頁。
+- 服務**概覽**顯示 `1/1` **就緒**，瀏覽器打開網址看到 Nginx 的歡迎頁。
 - 用 kubectl 也能看到剛才建立的三個物件，都帶 label `app.kubernetes.io/name: web`：
 
 ```sh
@@ -80,7 +80,7 @@ Namespace 帶 `zeabur.com/project=true`，Deployment 的 `READY` 是 `1/1`，Ing
 | 看到的狀況 | 先檢查 |
 | --- | --- |
 | 副本一直沒有就緒，事件寫著拉不到映像檔 | 映像檔名稱和版本有沒有打錯，節點能不能連到 Docker Hub |
-| 副本一直是 0，事件提到 Pod Security | 需要 root 的映像檔是否選了 **相容**；專案仍強制 `restricted` 時，請管理員把專案的 Pod Security 等級改為 `baseline` |
+| 副本一直是 0，事件提到 Pod Security | 需要 root 的映像檔是否選了**相容**；專案仍強制 `restricted` 時，請管理員把專案的 Pod Security 等級改為 `baseline` |
 | `1/1` 就緒，網址卻打不開 | DNS 有沒有指向叢集的入口，**連接埠**是不是 `8080` |
 | 按套用時出現**這份變更已過期** | 按**重新檢查**，看過新的差異再套用 |
 

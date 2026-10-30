@@ -7,7 +7,7 @@ Open **Members**, click **Invite**, select the projects the person can access, a
 
 ## Before you begin
 
-- The cluster must have Zeabur Identity installed and running with `--invitations` for setup links to work.
+- Setup links need Zeabur Identity installed in the cluster and running with `--invitations`.
 - You must be signed in to Zeabur with an admin account. Changes to members update users in Zeabur Identity and role bindings in Kubernetes.
 - Project roles require the chart's `memberRoles.enabled` setting, which is on by default. When it's off, the invitation form only lets you choose whether to grant **Admin** rights.
 
@@ -18,11 +18,11 @@ Open **Members**, click **Invite**, select the projects the person can access, a
 
 ### Enter account details
 
-In **Members**, click **Invite**. Enter a **Username**. **Display name** is optional. Usernames can contain only lowercase letters, numbers, `-`, and `.`, with a maximum of 63 characters.
+In **Members**, click **Invite**. Enter a **Username**. **Display name** is optional. Usernames can contain only lowercase letters, numbers, `-`, and `.`, up to 63 characters.
 
 If you enter an existing member's username, the link adds a passkey to their account without changing their permissions.
 
-To invite someone to one project, open the project's **Settings** and click **Invite** under **Members**. That project is already selected, with the Developer role. The section also lists who can open the project.
+To invite someone to one project, open the project's **Settings** and click **Invite someone to this project** under **Members**. That project is already selected, with the Developer role. The section also lists who can open the project.
 
 </Step>
 <Step>
@@ -42,7 +42,7 @@ A member can have different roles in different projects. Members with no project
 
 The list shows projects only. To give a role in another namespace, click **Also show N namespaces that aren't projects** below it.
 
-![Invite member dialog with Specific projects selected, blog set to Viewer, and shop set to Developer](../images/shots/members-invite.avif)
+![Invite member dialog with Chosen projects selected, blog set to Viewer, and shop set to Developer](../images/shots/members-invite.avif)
 
 </Step>
 <Step>
@@ -68,13 +68,13 @@ Whoever opens the setup link first can add a passkey to the account and sign in.
 
 ## Change permissions or handle a lost device
 
-Select **Change access** from the member's action menu, adjust their projects and roles, click **Review changes**, and then click **Save access**. Permissions take effect immediately, but any terminals the person already has open remain active until they're closed.
+Select **Change access** from the member's action menu, adjust their projects and roles, click **Review changes**, and then click **Save access**. Permissions take effect immediately. Terminals the person already has open stay active until they're closed.
 
 Changing a member to **Admin** makes their account an admin account. They can then sign in only with passkeys, and sessions signed in through GitHub or Google end. Removing **Admin** changes the account back to a regular account.
 
 To add a backup device for a member, select **New setup link**. This link expires in 24 hours and can only be used once. Existing passkeys and sessions stay active.
 
-If a device is lost or stolen, select **Reset after a lost device**, select **Also remove their passkeys, linked accounts, and sessions**, and click **Reset and create link**. No one can sign in to the account until the person opens the new link.
+If a device is lost or stolen, select **Reset after a lost device**, select **Also remove their passkeys, linked accounts and sessions, for a lost or stolen device**, and click **Reset and create link**. No one can sign in to the account until the person opens the new link.
 
 ## Do the same with kubectl
 
@@ -159,7 +159,7 @@ For other options, such as granting permissions through groups or disabling acco
 - **Zeabur Identity isn't installed**: Ask a cluster administrator to install Zeabur Identity, or start Zeabur in the namespace where Zeabur Identity is installed.
 - The interface says Zeabur doesn't know the Zeabur Identity URL: Start Zeabur with `--issuer-url`.
 - The interface says Zeabur Identity isn't accepting setup links: Run Zeabur Identity with `--invitations`.
-- **Member roles weren't enabled when Zeabur was installed**: Upgrade the chart with `memberRoles.enabled=true`, or make the member an admin. See [Permissions](../reference/permissions.mdx) for the full permissions table.
+- **Zeabur was installed without the member roles**: Upgrade the chart with `memberRoles.enabled=true`, or make the member an admin. See [Permissions](../reference/permissions.mdx) for the full permissions table.
 - You can't change your own permissions, reset your own account, or remove yourself: Ask another administrator to do it. You can add a backup passkey from the account page.
 - The changes have expired: Click **Review changes** again.
 
@@ -167,4 +167,4 @@ For other options, such as granting permissions through groups or disabling acco
 
 First, revoke unused links under **Pending setup links**. To stop a member from signing in, select **Remove member** from their action menu and confirm the removal.
 
-Removing a member deletes their passkeys, linked accounts, sessions, setup links, and role bindings created by Zeabur. Projects and services stay intact. Role bindings that weren't created by Zeabur but name `zeabur:<username>` also remain. An administrator must review those separately.
+Removing a member deletes their passkeys, linked accounts, sessions, setup links, and role bindings created by Zeabur. Projects and services stay intact. Role bindings that Zeabur didn't create but that name `zeabur:<username>` also remain. An administrator must review those separately.

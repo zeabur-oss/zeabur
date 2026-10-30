@@ -4,7 +4,7 @@ description: 创建项目、将已有的 Namespace 加入 Zeabur、修改项目�
 source: "72ea2d49995e"
 ---
 
-项目就是带有 `zeabur.com/project: "true"` 标签的 Kubernetes Namespace。在 **项目** 页点击 **新建项目** 创建项目，或将集群中已有的 Namespace 加入 Zeabur。项目的名称、描述、图标和网络隔离都在项目 **设置** 中修改。
+项目就是带有 `zeabur.com/project: "true"` 标签的 Kubernetes Namespace。在**项目**页点击**新建项目**创建项目，或将集群中已有的 Namespace 加入 Zeabur。项目的名称、描述、图标和网络隔离都在项目**设置**中修改。
 
 ## 开始前
 
@@ -18,11 +18,11 @@ source: "72ea2d49995e"
 
 ### 填写名称
 
-打开 **项目** 页，点击 **新建项目**。在 **名称** 中填写 `hello`，**显示名称** 可以留空；填写后，界面会显示它，而不是 Namespace 名称。
+打开**项目**页，点击**新建项目**。在**名称**中填写 `hello`，**显示名称**可以留空；填写后，界面会用显示名称代替 Namespace 名称。
 
 ![新建项目窗口，名称填为 hello](../images/shots/project-new.avif)
 
-如果同名的 Namespace 已经存在，表单会提示你改用已有的 Namespace，做法见[下一节](#将已有的-namespace-加入-zeabur)。
+同名的 Namespace 已经存在时，表单会提示你改用已有的 Namespace，做法见[下一节](#将已有的-namespace-加入-zeabur)。
 
 </Step>
 <Step>
@@ -44,32 +44,32 @@ source: "72ea2d49995e"
 
 ## 将已有的 Namespace 加入 Zeabur
 
-**项目** 页的 **其他 Namespace** 会列出尚未作为项目的 Namespace。在对应行打开菜单，选择 **使用这个 Namespace**，检查后应用。
+**项目**页的**其他 Namespace** 会列出尚未作为项目的 Namespace。在对应行打开菜单，选择**使用这个 Namespace**，检查后应用。
 
 Zeabur 只会为 Namespace 添加 `zeabur.com/project: "true"` 标签，不会修改其中的对象、Pod Security 标签和 NetworkPolicy。
 
-如果不想再在 Zeabur 中看到它，打开项目 **设置** 的 **危险区域**，点击 **从 Zeabur 移除**。这只会移除项目标签，Namespace 及其中的所有内容都会保留。要连同内容一起删除，见[删除项目](./delete-project.mdx)。
+不想再在 Zeabur 中看到这个 Namespace 时，打开项目**设置**的**危险区域**，点击**从 Zeabur 移除**。这只会移除项目标签，Namespace 及其中的所有内容都会保留。要连同内容一起删除，见[删除项目](./delete-project.mdx)。
 
 ## 修改名称、描述和图标
 
-打开项目 **设置** 的 **基本信息**：
+打开项目**设置**的**基本信息**：
 
 - **项目名称**：代替 Namespace 名称显示，最多 64 个字符。
 - **描述**：说明项目用途，显示在名称下方，最多 500 个字符。
-- **图标**：点击 **更换图标**，从 16 个图标中选择一个。
+- **图标**：点击**更换图标**，从 16 个图标中选择一个。
 
-点击 **保存详细信息**，检查后应用。这三项保存在 Namespace 的 annotation 中。项目的开发者可以修改这三项，其他 label 和 annotation 只有管理员能修改。
+点击**保存详细信息**，检查后应用。这三项保存在 Namespace 的 annotation 中。项目的开发者可以修改这三项，其他 label 和 annotation 只有管理员能修改。
 
 ## 隔离其他项目
 
-打开项目 **设置** 的 **网络**，**其他项目** 一行会说明当前状态：
+打开项目**设置**的**网络**，**其他项目**一行会说明当前状态：
 
-- **集群中的任何副本都能连接到这个项目的服务。**：尚未隔离。点击 **隔离**，检查后应用，Zeabur 会创建 NetworkPolicy `zeabur-project`。
+- **集群中的任何副本都能连接到这个项目的服务。**：尚未隔离。点击**隔离**，检查后应用，Zeabur 会创建 NetworkPolicy `zeabur-project`。
 - **无法连接到这个项目的服务。项目内的服务和 Zeabur 组件不受影响。**：已经隔离。
 
 隔离后，项目内的副本仍能相互连接，带有 `zeabur.com/platform: "true"` 标签的 Namespace（例如 Traefik 和数据库 operator 所在的 Namespace）以及 `kube-system` 也能连接进来。
 
-要允许另一个项目连接进来，点击 **允许其他项目连入**，选择项目，点击 **允许**，检查后应用。Zeabur 会创建 NetworkPolicy `zeabur-allow-from-<那个项目>`，对方的所有副本都能连接到这个项目的所有服务。要取消，在对应行点击 **移除**。
+要允许另一个项目连接进来，点击**允许其他项目连入**，选择项目，点击**允许**，检查后应用。Zeabur 会创建 NetworkPolicy `zeabur-allow-from-<那个项目>`，对方的所有副本都能连接到这个项目的所有服务。要取消，在对应行点击**移除**。
 
 界面没有取消隔离的按钮，需要用 kubectl 删除 `zeabur-project`，见下一节。规则是否真正生效，取决于集群的网络插件（CNI）是否支持 NetworkPolicy。
 
@@ -116,7 +116,7 @@ kubectl annotate namespace demo --overwrite zeabur.com/display-name='Demo shop'
 
 ### 调整 Pod Security 级别
 
-Zeabur 没有修改项目 Pod Security 级别的界面，需要由管理员用 kubectl 修改。改为 `restricted` 后，只有 **严格** 的服务能启动：
+Zeabur 没有修改项目 Pod Security 级别的界面，需要由管理员用 kubectl 修改。改为 `restricted` 后，只有**严格**的服务能启动：
 
 ```sh
 kubectl label namespace demo --overwrite \
@@ -181,7 +181,7 @@ kubectl -n demo delete networkpolicy zeabur-project
 
 ## 确认结果
 
-**项目** 页会列出这个项目，并显示你设置的名称、描述和图标。项目 **设置** 的 **网络** 会显示当前是否隔离，以及哪些项目能连接进来。
+**项目**页会列出这个项目，并显示你设置的名称、描述和图标。项目**设置**的**网络**会显示当前是否隔离，以及哪些项目能连接进来。
 
 ```sh
 kubectl get namespace demo --show-labels
@@ -196,8 +196,8 @@ kubectl -n demo get serviceaccount default -o jsonpath='{.automountServiceAccoun
 
 | 界面或结果 | 处理方法 |
 | --- | --- |
-| **已经有同名的 Namespace，可以改用已有的 Namespace。** | 换一个名称，或在 **其他 Namespace** 中将它加入 Zeabur。 |
+| **已经有同名的 Namespace，可以改用已有的 Namespace。** | 换一个名称，或在**其他 Namespace** 中将那个 Namespace 加入 Zeabur。 |
 | 加入或移除项目时，集群返回 **Only an admin can change the namespace's labels** | 只有管理员能修改 Namespace 的标签，请管理员操作。 |
 | **这是 Kubernetes 为自身组件保留的 Namespace，不能作为项目。** | 以 `kube-` 开头的 Namespace 和节点终端使用的 `zeabur-node-shell` 都不能作为项目。 |
-| 创建项目时没有列出 `zeabur-project` | 集群中没有带 `zeabur.com/platform: "true"` 标签的 Namespace，Zeabur 无法判断 Ingress controller 在哪里，因此不会创建。请管理员为这些 Namespace 添加标签，再到 **网络** 点击 **隔离**。 |
-| 隔离后公开域名无法打开 | Ingress controller 所在的 Namespace 没有 `zeabur.com/platform: "true"` 标签。为它添加标签，或在 `zeabur-project` 中添加一条允许它连接的规则。 |
+| 创建项目时没有列出 `zeabur-project` | 集群中没有带 `zeabur.com/platform: "true"` 标签的 Namespace，Zeabur 无法判断 Ingress controller 在哪里，因此不会创建。请管理员为这些 Namespace 添加标签，再到**网络**点击**隔离**。 |
+| 隔离后公开域名无法打开 | Ingress controller 所在的 Namespace 没有 `zeabur.com/platform: "true"` 标签。为那个 Namespace 添加标签，或在 `zeabur-project` 中添加一条允许连入的规则。 |

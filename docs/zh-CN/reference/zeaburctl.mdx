@@ -99,7 +99,7 @@ zeaburctl up [文件夹] [--project <项目>] [--service <服务>]
 
 本机模式还需要满足以下条件：
 
-- 集群已安装 Zeabur Builder。如果尚未安装，命令会在上传前停止。[个人使用的安装](../get-started/personal.mdx)默认不安装 Zeabur Builder，需要勾选后才会安装；未安装时请改用镜像部署。
+- 集群已安装 Zeabur Builder。如果尚未安装，命令会在上传前停止。[个人使用的安装](../get-started/personal.mdx)默认不安装 Zeabur Builder，需要勾选后才会安装；未安装时改用镜像部署。
 - 能连接 registry。如果 registry 位于集群中（例如 `zot.zot.svc:5000`），命令会通过 Kubernetes API 自动转发端口，类似 `kubectl port-forward`。你需要在 registry 所在的 Namespace 中拥有 `get services`、`list endpointslices` 和 `create pods/portforward` 权限，还需要能读取 registry 证书的 CA 配置文件。管理员拥有这些权限，项目的开发者没有。
 - 集群中有 `zeabur-info`。命令从这里获取 registry 的地址。如果集群中没有 Zeabur 服务器，命令无法创建新服务，也不会自动转发端口。
 

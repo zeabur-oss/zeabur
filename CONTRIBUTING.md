@@ -50,7 +50,7 @@ and how each interface element reads are in [docs/internal/wording.md](docs/inte
 the general writing rules for all three locales are in the `zeabur-writing` skill
 (`.claude/skills/zeabur-writing/`, installed from
 [zeabur-oss/skills](https://github.com/zeabur-oss/skills) and pinned in `skills-lock.json`), and
-Vale checks docs and catalogues against them: `nix develop -c vale docs README.md web/src/i18n`
+Vale checks docs and catalogs against them: `nix develop -c vale docs README.md web/src/i18n`
 (`.vale.ini`). A rule that is wrong for one passage is silenced there with a Vale comment that
 says why.
 

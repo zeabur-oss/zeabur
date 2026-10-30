@@ -80,11 +80,11 @@ kube-apiserver 是否信任 Zeabur Identity 的 issuer，寫在控制平面的 `
 zeaburctl up [資料夾] [--project <專案>] [--service <服務>]
 ```
 
-把資料夾上傳到叢集，開始建置。資料夾省略時用目前的資料夾。如果服務還不存在，指令會建立它。專案必須已存在，指令不會建立專案。
+把資料夾上傳到叢集，開始建置。資料夾省略時用目前的資料夾。如果服務還不存在，指令會建立服務。專案必須已存在，指令不會建立專案。
 
-指令從叢集的 `kube-public` 命名空間裡的 `zeabur-info` ConfigMap 讀到 Zeabur 的網址和 Zeabur Identity 的位址，不用另外設定。登入叢集的人都能讀這個 ConfigMap，沒登入的人讀不到。要改用別的網址時，加上 `--server`，或設定環境變數 `ZEABUR_SERVER`。
+指令從叢集 `kube-public` Namespace 裡的 `zeabur-info` ConfigMap 讀到 Zeabur 的網址和 Zeabur Identity 的位址，不用另外設定。登入叢集的人都能讀這個 ConfigMap，沒登入的人讀不到。要改用別的網址時，加上 `--server`，或設定環境變數 `ZEABUR_SERVER`。
 
-指令和網頁用同一組 API 和同樣的變更計畫，你不需要知道 registry 的位址。
+指令和網頁用同一組 API，變更也一樣先檢查再套用，你不需要知道 registry 的位址。
 
 ### 伺服器模式與本機模式
 
@@ -93,14 +93,14 @@ zeaburctl up [資料夾] [--project <專案>] [--service <服務>]
 | 模式 | 什麼時候用 | 資料夾怎麼送 |
 |---|---|---|
 | 伺服器模式 | kubeconfig 用 Zeabur Identity 的權杖登入，而且叢集有 `zeabur-info` | 交給叢集裡的 Zeabur，由 Zeabur 推到 registry |
-| 本機模式 | 其他情況，例如安裝程式給的管理員 kubeconfig、雲端服務的權杖、ServiceAccount 權杖，或叢集裡沒有 Zeabur 伺服器 | 和 `zeaburctl ui` 一樣，在你的電腦上跑同樣的步驟，再從這台電腦推到 registry |
+| 本機模式 | 其他情況，例如安裝程式給的管理員 kubeconfig、雲端服務的權杖、ServiceAccount 權杖，或叢集裡沒有 Zeabur 伺服器 | 和 `zeaburctl ui` 一樣，在你的電腦上執行同樣的步驟，再從這台電腦推到 registry |
 
 本機模式用你 kubeconfig 的憑證直接連 Kubernetes API，憑證不會送到別的地方。拿安裝程式給的管理員 kubeconfig，就能直接執行 `up`，不用另外設定。
 
 本機模式還需要：
 
-- 叢集裝了 Zeabur Builder。沒裝時，指令在上傳前就會停下來。[自己用的安裝](../get-started/personal.mdx)預設沒有 Zeabur Builder，要勾選才會裝；沒裝時請改用映像檔部署。
-- 連得到 registry。registry 在叢集裡時（例如 `zot.zot.svc:5000`），指令會透過 Kubernetes API 自動轉發連接埠，就像 `kubectl port-forward`。你要在 registry 的命名空間有 `get services`、`list endpointslices` 和 `create pods/portforward` 權限，也要能讀 registry 憑證的 CA ConfigMap。管理員都有這些權限，專案的 Developer 沒有。
+- 叢集裝了 Zeabur Builder。沒裝時，指令在上傳前就會停下來。[自己用的安裝](../get-started/personal.mdx)預設沒有 Zeabur Builder，要勾選才會裝；沒裝時改用映像檔部署。
+- 連得到 registry。registry 在叢集裡時（例如 `zot.zot.svc:5000`），指令會經由 Kubernetes API 自動轉發連接埠，就像 `kubectl port-forward`。你要在 registry 的 Namespace 有 `get services`、`list endpointslices` 和 `create pods/portforward` 權限，也要能讀 registry 憑證的 CA ConfigMap。管理員都有這些權限，專案的 Developer 沒有。
 - 叢集有 `zeabur-info`。指令從這裡知道 registry 在哪裡。叢集裡沒有 Zeabur 伺服器時，指令不能建立新服務，也不會自動轉發連接埠。
 
 ### 登入與權限
@@ -131,11 +131,11 @@ zeaburctl up [資料夾] [--project <專案>] [--service <服務>]
 
 上傳依序分成三步：
 
-1. 向 Build 要上傳權杖。這是一個變更計畫，直接套用。
+1. 向 Build 要上傳權杖。這是一份變更，直接套用。
 2. 把壓縮檔推到 registry。伺服器模式由 Zeabur 推，本機模式由這台電腦推。
-3. 把 digest 寫進 Build，開始建置。這也是變更計畫，直接套用。
+3. 把 digest 寫進 Build，開始建置。這也是一份變更，直接套用。
 
-這些變更計畫和網頁用的一樣。執行指令就是你對套用的確認，指令不會再詢問。如果要建立新服務，建立服務的變更計畫就已包含上傳權杖的要求。
+這些變更和網頁上的一樣。執行指令就是你對套用的確認，指令不會再詢問。如果要建立新服務，建立服務的那份變更就已包含上傳權杖的要求。
 
 ### 選項
 
@@ -162,7 +162,7 @@ zeaburctl components export <capability>/<id>... [--format helmchart|helm|flux|a
 | `--format` | `helmchart`：K3s/RKE2 的 `HelmChart`，由 helm-controller 安裝。`helm`：`helm upgrade --install` 指令。`flux`：Flux 的來源和 `HelmRelease`。`argocd`：Argo CD 的 `Application` |
 | `--profile` | `single-node`。`multi-node` 改用 Catalog 給多節點的設定值 |
 
-元件要填的值會留成 `<名稱>`，先換成實際的值。元件需要存取主機時，內容會先把它的 Namespace 設為 `privileged`。K3s 或 RKE2 內建同一種元件時，內容開頭會說怎麼先停用內建版本。
+元件要填的值會留成 `<名稱>`，先換成實際的值。元件需要存取主機時，內容會先把元件的 Namespace 設為 `privileged`。K3s 或 RKE2 內建同一種元件時，內容開頭會說怎麼先停用內建版本。
 
 ```sh
 zeaburctl components export volume-backup/velero > velero.yaml

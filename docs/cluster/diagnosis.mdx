@@ -31,11 +31,11 @@ kubectl get deploy,daemonset -A -l app.kubernetes.io/name=traefik
 kubectl get deploy -A -l k8s-app=kube-dns
 ```
 
-Which services are affected is computed by Zeabur matching Ingresses, nodes, and services. kubectl has no command that returns it directly.
+Zeabur works out which services are affected by matching Ingresses, nodes, and services. kubectl has no command that returns it directly.
 
 ## What's wrong on a service
 
-When a service has a problem, **What's wrong** appears at the top of **Overview**: one sentence for the cause, one sentence for **What to do**, and buttons such as **Open logs**, **Change memory**, and **Health checks** that take you straight to the change. Expand **Evidence** to see the values used for the decision. Expand **Raw error** to see which **Replica**, the **Exit code**, the restart count, and the container's message. When you report a problem, choose **Copy diagnosis** and paste the full text.
+When a service has a problem, **What's wrong** appears at the top of **Overview**: one sentence for the cause, one sentence for **What to do**, and buttons such as **Open logs**, **Change memory**, and **Health checks** that take you straight to the change. Expand **Evidence** to see the values behind the decision. Expand **Raw error** to see the **Replica**, the **Exit code**, the restart count, and the container's message. When you report a problem, choose **Copy diagnosis** and paste the full text.
 
 ![What's wrong on the service Overview, explaining that worker keeps crashing, with What to do and Open logs and Terminal buttons](../images/shots/service-problem.avif)
 
@@ -49,7 +49,7 @@ Zeabur reads the container status kubelet reports, the replica's scheduling stat
 - ResourceQuota or Pod Security refuses to create the replica.
 - A caller reaches this service by name, but no Service selects its replicas; the Service's `targetPort` isn't the container's port; the Service has no ready replica.
 
-Only recent failures count: once a container has been running normally for 10 minutes or longer, earlier restarts are no longer listed, the same rule kubelet uses when it resets backoff.
+Only recent failures count. Once a container has run normally for 10 minutes or longer, earlier restarts drop off the list. kubelet uses the same rule when it resets backoff.
 
 When Zeabur finds no known cause, the screen states where the first not-ready replica is stuck, the latest event, and how many replicas are still in service.
 
@@ -95,11 +95,11 @@ kubectl get nodes -o wide
 kubectl describe node <node-name>
 ```
 
-`describe node`'s `Conditions` includes `MemoryPressure`, `DiskPressure`, and `Ready`. Version support windows and new component versions come from Zeabur comparing against Zeabur Catalog. kubectl has no matching command.
+`describe node`'s `Conditions` includes `MemoryPressure`, `DiskPressure`, and `Ready`. Zeabur works out version support windows and new component versions by comparing against Zeabur Catalog. kubectl has no matching command.
 
 ## Warnings in the last hour
 
-**Warnings in the last hour** on **Cluster** → **Overview** lists the cluster's own `Warning` events: events with no Namespace, events about nodes, and events in Namespaces that start with `kube-`, such as `kube-system`. Project events aren't here. They're on the **Warnings** and **Events** tabs of the service **Overview**. When there are too many events, Zeabur reads only the latest 5,000, and the screen says **Only the latest 5,000 events were read.**
+**Warnings in the last hour** on **Cluster** → **Overview** lists the cluster's own `Warning` events: events with no Namespace, events about nodes, and events in Namespaces that start with `kube-`, such as `kube-system`. Project events aren't here. They're on the **Warnings** and **Events** tabs of the service **Overview**. When there are too many events, Zeabur reads only the latest 5,000, and the screen says **Only the newest 5,000 events were read.**
 
 ```sh
 kubectl get events -A --field-selector type=Warning,involvedObject.kind=Node
@@ -110,9 +110,9 @@ Kubernetes keeps events for one hour by default. kubectl can't retrieve earlier 
 
 ## Runtime alerts (Falco)
 
-After Falco is installed, Falco writes an alert when it sees suspicious behavior, such as a shell opened in a container or a sensitive file read. **Runtime alerts** on the service **Overview** lists alerts for this service's replicas. The project page shows them too. Alerts that belong to no Namespace, such as a process on the node itself, appear under **Node alerts** on **Cluster** → **Overview**. When there are no alerts, that section doesn't appear.
+Once installed, Falco writes an alert when it sees suspicious behavior, such as a shell opened in a container or a sensitive file read. **Runtime alerts** on the service **Overview** lists alerts for this service's replicas. The project page shows them too. Alerts that belong to no Namespace, such as a process on the node itself, appear under **Node alerts** on **Cluster** → **Overview**. When there are no alerts, that section doesn't appear.
 
-Alerts are stored in the `PolicyReport` falcosidekick writes: alerts that have a Namespace go in that Namespace's `falco-policy-report`, and the rest go in the `ClusterPolicyReport` `falco-cluster-policy-report`. Falco installed from Zeabur Catalog keeps only the latest 100 alerts in each report, so this list is recent alerts, not every alert.
+Alerts are stored in the `PolicyReport` falcosidekick writes: alerts that have a Namespace go in that Namespace's `falco-policy-report`, and the rest go in the `ClusterPolicyReport` `falco-cluster-policy-report`. Falco installed from Zeabur Catalog keeps only the latest 100 alerts in each report, so the list shows only recent alerts.
 
 ```sh
 kubectl -n shop get policyreport falco-policy-report -o yaml
@@ -138,7 +138,7 @@ The **Networking** card on the service **Overview** has one row for each domain 
 | **Port** | The Service's `targetPort` is the container's port | `kubectl -n shop get svc web -o yaml` |
 | **Ready replicas** | At least one replica is ready | `kubectl -n shop get pods -l app.kubernetes.io/name=web` |
 
-A private address `<service>.<project>.svc.cluster.local` checks only the last three hops. Whether the program listens on `0.0.0.0` instead of `127.0.0.1` is visible only from inside the container, and this check doesn't cover it. When DNS finds nothing, or finds a different address, the row says **Not verified from inside the cluster**. A CDN or proxy in front, or DNS inside the cluster that differs from what is seen outside, both produce that result.
+A private address `<service>.<project>.svc.cluster.local` checks only the last three hops. This check doesn't cover whether the program listens on `0.0.0.0` instead of `127.0.0.1`, which is visible only from inside the container. When DNS finds nothing, or finds a different address, the row says **Not verified from inside the cluster**. A CDN or proxy in front of the domain produces that result, and so does DNS inside the cluster that answers differently from DNS outside.
 
 Each row shows one conclusion. When a domain's DNS record or certificate isn't set up, the row shows the record to add. When the cluster can't verify a domain, the row shows whether your browser reaches it, and the cluster's result moves under **Show connection checks**.
 
@@ -146,14 +146,14 @@ Each row shows one conclusion. When a domain's DNS record or certificate isn't s
 
 ## Connection rules
 
-**Connection rules** on the service **Networking** tab uses NetworkPolicy to determine which services are **Allowed**, partially allowed, or blocked from connecting to this service, and which **Rule** decides that. When no rule selects this service, the screen says **No rule applies to this service, so all connections are allowed.** To add or remove rules, see [Private network and connection rules](../configure/networking.mdx).
+**Connection rules** on the service **Networking** tab reads NetworkPolicy to show which services are **Allowed**, partially allowed, or blocked from connecting to this service, and which **Rule** decides that. When no rule selects this service, the screen says **No rule applies to this service, so every connection is allowed.** To add or remove rules, see [Private network and connection rules](../configure/networking.mdx).
 
 ```sh
 kubectl -n shop get networkpolicy
 kubectl -n shop describe networkpolicy <name>
 ```
 
-`describe` lists the replicas each rule selects and the sources it allows. Combining the rules into which service can connect to which service is computed by Zeabur. kubectl has no matching command.
+`describe` lists the replicas each rule selects and the sources it allows. Zeabur combines the rules to work out which service can connect to which. kubectl has no matching command.
 
 ## Confirm the result
 

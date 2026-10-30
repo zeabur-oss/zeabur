@@ -4,7 +4,7 @@ description: 只有自己要用時，用 KubeSolo 在 1.5 GiB 記憶體的機器
 source: "9ecbdbd6bd2b"
 ---
 
-只有自己要用時，installer 可以改裝 KubeSolo。伺服器上只有 Kubernetes 和元件，不跑 Zeabur 面板和 Zeabur Identity。要用 Zeabur 時，在自己的電腦執行 `zeaburctl ui`，用伺服器給你的 kubeconfig 連線。
+只有自己要用時，installer 可以改裝 KubeSolo。伺服器上只有 Kubernetes 和元件，不執行 Zeabur 面板和 Zeabur Identity。要用 Zeabur 時，在自己的電腦執行 `zeaburctl ui`，用伺服器給你的 kubeconfig 連線。
 
 ## 自己用和團隊用差在哪
 
@@ -19,9 +19,9 @@ source: "9ecbdbd6bd2b"
 | 元件 | Ingress 和憑證，可以再勾選 Zeabur Builder（含 zot） | Catalog 的全部元件 |
 | 資料庫 | 有 | 有 |
 
-自己用的版本預設不裝 Zeabur Builder 和 zot（放建置結果的映像倉庫），所以只能部署現成的容器映像檔。要從 Git 或資料夾建置，安裝時勾選 Zeabur Builder，zot 會一起裝。這兩個要多用大約 300 MiB 記憶體，機器的記憶體不到 1800 MiB 時，安裝程式不讓你勾選。
+自己用的版本預設不裝 Zeabur Builder 和 zot（放建置結果的映像倉庫），所以只能部署現成的容器映像檔。要從 Git 或資料夾建置，安裝時勾選 Zeabur Builder，zot 會一起安裝。這兩個要多用大約 300 MiB 記憶體，機器的記憶體不到 1800 MiB 時，安裝程式不讓你勾選。
 
-自己用的版本也沒有成員和權限。Zeabur Identity 發的登入憑證，要 kube-apiserver 用 `--authentication-config` 載入設定才會認得，KubeSolo 目前沒有開放這個設定（[portainer/kubesolo#231](https://github.com/portainer/kubesolo/issues/231)）。所以只能用伺服器給的 kubeconfig 連線，拿到它的人可以控制整個叢集，不適合讓多個人或多個團隊共用。
+自己用的版本也沒有成員和權限。Zeabur Identity 發的登入憑證，要 kube-apiserver 用 `--authentication-config` 載入設定才會認得，KubeSolo 目前沒有開放這個設定（[portainer/kubesolo#231](https://github.com/portainer/kubesolo/issues/231)）。所以只能用伺服器給的 kubeconfig 連線，拿到這份 kubeconfig 的人可以控制整個叢集，不適合讓多個人或多個團隊共用。
 
 伺服器回報的記憶體低於 2400 MiB 時，installer 只接受自己用。之後要給團隊用，沒有辦法直接升級，要在 4 GiB 記憶體的伺服器上重新用 K3s 或 RKE2 安裝。
 
@@ -31,17 +31,17 @@ source: "9ecbdbd6bd2b"
 - 具備 root 權限。
 - 記憶體至少 1.5 GiB。
 - `/var/lib/kubesolo` 至少有 10 GiB 可用空間。
-- TCP 連接埠 80、443、6443、10250、10443 沒有被占用。
+- TCP 連接埠 80、443、6443、10250、10443 沒有其他程式占用。
 - 沒有安裝 RKE2、K3s、kubeadm、k0s 或 MicroK8s。
-- 沒有安裝 Docker，也沒有在跑。Docker 會把轉送的封包預設丟掉，Pod 就連不到外面，也申請不到憑證。installer 發現 Docker（執行檔、服務、socket），或防火牆轉送政策是 DROP 時會停下來，請先停止並移除 Docker 再安裝。
+- 沒有安裝或執行 Docker。Docker 預設會丟掉轉送的封包，副本就連不到外面，也申請不到憑證。installer 發現 Docker（執行檔、服務、socket），或防火牆轉送政策是 DROP 時會停下來，請先停止並移除 Docker 再安裝。
 
 自己的電腦要有 [`zeaburctl`](../reference/zeaburctl.mdx)，而且連得到伺服器的 TCP 6443。
 
-installer 釘選 KubeSolo、helm-controller 和 kubectl 的版本，下載後核對 SHA-256。helm-controller 的映像檔用 digest 指定。安裝元件的 Job 映像檔只能寫標籤，Job 跑完後 installer 會核對它實際用的 digest，不對就停下。
+installer 釘選 KubeSolo、helm-controller 和 kubectl 的版本，下載後核對 SHA-256。helm-controller 的映像檔用 digest 指定。安裝元件的 Job 映像檔只能寫標籤，Job 執行完後，installer 會核對 Job 實際用的 digest，不對就停下。
 
 ## 用網頁介面安裝
 
-照[在一台伺服器安裝 Zeabur](quickstart.mdx#開啟安裝介面)開啟安裝介面。在「檢查伺服器」的「給誰用」選「自己用」，步驟會少掉「連線方式」。
+照[在一台伺服器安裝 Zeabur](quickstart.mdx#開啟安裝介面) 開啟安裝介面。在「檢查伺服器」的「給誰用」選「自己用」，步驟會少掉「連線方式」。
 
 ![「檢查伺服器」的「給誰用」選了「自己用」，上方只剩四個步驟](../images/shots/installer-personal-choose.avif)
 
@@ -53,7 +53,7 @@ installer 釘選 KubeSolo、helm-controller 和 kubectl 的版本，下載後核
 
 ![「檢查伺服器」顯示 Docker 未通過，說明要先停止並移除 Docker](../images/shots/installer-personal-docker.avif)
 
-在「選擇元件」，Ingress 和憑證是預設的。要從 Git 或資料夾建置，勾選「Zeabur Builder」，zot 會跟它一起裝。
+在「選擇元件」，Ingress 和憑證是預設的。要從 Git 或資料夾建置，勾選「Zeabur Builder」，zot 會一起安裝。
 
 ![「選擇元件」勾選了 Zeabur Builder，上方顯示記憶體估算](../images/shots/installer-personal-components.avif)
 
@@ -71,14 +71,14 @@ installer 釘選 KubeSolo、helm-controller 和 kubectl 的版本，下載後核
 use: personal
 ```
 
-先看計畫，再安裝：
+先看安裝步驟，再安裝：
 
 ```sh
 sudo zeabur-installer plan
 sudo zeabur-installer apply
 ```
 
-要從 Git 或資料夾建置，加上 `enable: [builds]`，zot 會一起裝。要用資料庫，加上 `enable: [databases]`。其他欄位見 [Installer 設定](../reference/installer-configuration.mdx#自己用的檔案)。
+要從 Git 或資料夾建置，加上 `enable: [builds]`，zot 會一起安裝。要用資料庫，加上 `enable: [databases]`。其他欄位見 [Installer 設定](../reference/installer-configuration.mdx#自己用的檔案)。
 
 ## 在自己的電腦打開 Zeabur
 
@@ -99,17 +99,17 @@ kubeconfig 裡的 API 位址是伺服器自己選的位址。自己的電腦要�
 
 ## 用 zeaburctl up 建置資料夾
 
-裝了 Zeabur Builder 之後，在自己的電腦用同一份 kubeconfig，把資料夾丟上去建置：
+裝了 Zeabur Builder 之後，在自己的電腦用同一份 kubeconfig，上傳資料夾建置：
 
 ```sh
 KUBECONFIG=~/.kube/<名稱>.yaml zeaburctl up --context <名稱> --project <專案> --service <服務>
 ```
 
-資料夾經由連接埠轉送送進伺服器上的 zot，建置在伺服器上跑，結果放回 zot，節點從 zot 拉映像檔。installer 會把 zot 的憑證交給節點的 containerd，並把 zot 的位址和憑證寫進 `kube-public` 的 ConfigMap `zeabur-info`，`zeaburctl` 從那裡讀。沒勾選 Zeabur Builder 時，`zeaburctl up` 會說叢集沒有 Builder，什麼也不上傳。
+資料夾經由連接埠轉送送進伺服器上的 zot，伺服器執行建置後把結果放回 zot，節點從 zot 拉映像檔。installer 會把 zot 的憑證交給節點的 containerd，並把 zot 的位址和憑證寫進 `kube-public` 的 ConfigMap `zeabur-info`，`zeaburctl` 從那裡讀。沒勾選 Zeabur Builder 時，`zeaburctl up` 會說叢集沒有 Builder，什麼也不上傳。
 
 ## 不用 installer 也能管理
 
-安裝完成後，installer 就不用再跑。叢集裡的東西都能用 kubectl 管理：
+安裝完成後，就不用再執行 installer。叢集裡的東西都能用 kubectl 管理：
 
 - KubeSolo 是 systemd 服務 `kubesolo`，設定在 `/etc/kubesolo/config.yaml`，日誌用 `journalctl -u kubesolo` 查看。
 - 每個元件是 `kube-system` 裡的一個 `HelmChart`，由 helm-controller 安裝。用 `kubectl get helmcharts -n kube-system` 列出，改設定就改 `HelmChart`。
@@ -117,7 +117,7 @@ KUBECONFIG=~/.kube/<名稱>.yaml zeaburctl up --context <名稱> --project <專�
 
 installer 做的事，手動也做得到：照 [KubeSolo 的說明](https://github.com/portainer/kubesolo)安裝 KubeSolo，`kubectl apply` [helm-controller](https://github.com/k3s-io/helm-controller) 的 release manifest，再為每個元件建立 `HelmChart`。手動做時要多改兩個地方，不然 `HelmChart` 會一直重裝：
 
-- KubeSolo 的 webhook 會在 Job 的 `nodeSelector` 加上節點，helm-controller 看到 Job 被改過，就刪掉重建。installer 讓 systemd 在 KubeSolo 每次啟動後執行 `/usr/local/libexec/zeabur-kubesolo-webhook`，把 Job 從 MutatingWebhookConfiguration `webhook.kubesolo.io` 的規則拿掉。這個指令稿用 kubectl 等規則出現，並且盯一分鐘，KubeSolo 重寫規則就再拿掉一次，不看系統日誌。Pod 和磁碟區還是由同一個 webhook 指定節點。
+- KubeSolo 的 webhook 會在 Job 的 `nodeSelector` 加上節點，helm-controller 看到 Job 被改過，就刪掉重建。installer 讓 systemd 在 KubeSolo 每次啟動後執行 `/usr/local/libexec/zeabur-kubesolo-webhook`，把 Job 從 MutatingWebhookConfiguration `webhook.kubesolo.io` 的規則拿掉。這個指令稿用 kubectl 等規則出現，並持續監看一分鐘，KubeSolo 重寫規則就再拿掉一次，不看系統日誌。副本和磁碟區還是由同一個 webhook 指定節點。
 - helm-controller release manifest 裡的 klipper-helm 版本太舊，裝完不會標記設定的雜湊值，helm-controller 會一直升級同一個 chart。installer 把 `DEFAULT_JOB_IMAGE` 換成 k3s 搭配同版 helm-controller 的 `rancher/klipper-helm:v0.13.3-build20261021`。
 
 ## 檢查安裝結果
@@ -126,11 +126,11 @@ installer 做的事，手動也做得到：照 [KubeSolo 的說明](https://gith
 sudo zeabur-installer doctor
 ```
 
-這會檢查 KubeSolo、元件和預設儲存類別，也會提醒這台機器沒有隔離。裝了 Zeabur Builder 時，還會檢查它有沒有在跑，以及 containerd 信任的是不是 zot 現在用的憑證。結束碼和團隊用的一樣，見[檢查安裝結果](quickstart.mdx#檢查安裝結果)。
+這會檢查 KubeSolo、元件和預設儲存類別，也會提醒這台機器沒有隔離。裝了 Zeabur Builder 時，還會檢查 Zeabur Builder 是否在執行，以及 containerd 信任的是不是 zot 現在用的憑證。結束碼和團隊用的一樣，見[檢查安裝結果](quickstart.mdx#檢查安裝結果)。
 
 ## 移除
 
-`sudo zeabur-installer uninstall` 不會刪東西，只印出移除指令。要連應用程式和磁碟區一起刪掉，依序執行：
+`sudo zeabur-installer uninstall` 不會刪除任何東西，只印出移除指令。要連應用程式和磁碟區一起刪掉，依序執行：
 
 ```sh
 sudo systemctl disable --now kubesolo
@@ -139,7 +139,7 @@ sudo systemctl daemon-reload
 sudo reboot
 ```
 
-停掉服務後，容器和它們的掛載點還在，要重新開機才會清掉。開機後再刪掉資料：
+停掉服務後，容器和掛載點還在，要重新開機才會清掉。開機後再刪掉資料：
 
 ```sh
 sudo rm -rf /var/lib/kubesolo /etc/kubesolo /var/lib/zeabur-installer /etc/zeabur-installer

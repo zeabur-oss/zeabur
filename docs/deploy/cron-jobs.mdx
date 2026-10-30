@@ -22,7 +22,7 @@ Open the application service, go to **Settings** → **Scheduled tasks**, and cl
 
 In **Command**, enter a command available in the image, such as an existing `npm run cleanup` script. The job uses the source container’s working directory. All programs and files the command needs must exist in the image or a mounted volume.
 
-If the service has multiple regular containers, use **Container to copy** to select the one that contains the command. Each scheduled job copies only one container. The source service’s other containers won’t start with it.
+If the service has multiple regular containers, use **Container to copy** to select the one that contains the command. Each scheduled job copies only one container. The source service’s other containers don’t start with it.
 
 </Step>
 <Step>
@@ -42,7 +42,7 @@ In **Schedule**, enter five fields in this order: minute, hour, day of the month
 
 ![Add scheduled job form with the command npm run cleanup and the schedule 0 3 * * *, shown below as every day at 03:00 in Asia/Taipei](../images/shots/cron-job-form.avif)
 
-If you clear **Time zone**, the CronJob won’t set `spec.timeZone`. It will use the kube-controller-manager’s time zone, which is usually UTC. The interface also displays these schedules in UTC.
+If you clear **Time zone**, the CronJob doesn’t set `spec.timeZone` and uses the kube-controller-manager’s time zone, which is usually UTC. The interface also displays these schedules in UTC.
 
 </Step>
 <Step>
@@ -66,7 +66,7 @@ Set **Successful runs to keep** and **Failed runs to keep** to a value from 0 to
 
 ### Review and apply
 
-Click **Review changes**, check the source service, container, image, command, schedule, time zone, and concurrency policy, then apply the changes. Creating a scheduled job won’t restart the source service.
+Click **Review changes**, check the source service, container, image, command, schedule, time zone, and concurrency policy, then apply the changes. Creating a scheduled job doesn’t restart the source service.
 
 After you create the job, open it from the source service’s **Scheduled tasks** list or the project’s service list.
 
@@ -93,7 +93,7 @@ When you create a scheduled job, it copies the source container’s image, envir
 
 If the source service later changes its image, the scheduled job still uses the image copied when it was created. To update the job too, open the scheduled job’s **Settings**, switch to **YAML**, click **Edit**, update `image` for the corresponding container in `spec.jobTemplate.spec.template.spec.containers`, then click **Review changes**.
 
-Plaintext environment variable values are also copies made at creation time. References to secrets or config files still point to the original objects and read their current values each time a new container starts. When changing a shared object, include scheduled jobs when assessing its impact.
+Plaintext environment variable values are also copies made at creation time. References to secrets or config files still point to the original objects and read their current values each time a new container starts. Before you change a shared object, remember that scheduled jobs use it too.
 
 <Callout type="warn">
 Volume mounts point to the same disk (PVC). The scheduled job doesn’t get a copy of the data. The source service and job may modify the same files at the same time. A volume that can only mount on a single node may also leave the scheduled job waiting for a mount. Confirm that the storage and command can handle this shared use.

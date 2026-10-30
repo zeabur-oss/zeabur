@@ -86,7 +86,7 @@ Minimal images such as distroless don't have a shell. The terminal explains this
 ![The terminal explaining that the image has no shell, with a button to open a debug terminal](../images/shots/terminal-no-shell.avif)
 
 <Callout type="warn">
-Kubernetes can't remove a debug container before the replica is replaced. It stays in the replica until then, such as when you restart the service. Opening a terminal in the same replica again uses this debug container directly.
+Kubernetes can't remove a debug container early. It stays in the replica until the replica is replaced, for example when you restart the service. A terminal you open later in the same replica uses this debug container.
 </Callout>
 
 ### When you don't have permission

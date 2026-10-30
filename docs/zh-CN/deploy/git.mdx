@@ -4,13 +4,13 @@ description: 连接 Git 仓库、完成首次构建，并选择新镜像何时�
 source: "57a598cda189"
 ---
 
-在项目中选择 **新增** → **从 Git 部署**，填写仓库和应用的端口，再点击 **检查变更**。应用变更后，Zeabur Builder 开始构建。首个镜像构建完成并部署后，服务才会启动。
+在项目中选择**新增** → **从 Git 部署**，填写仓库和应用的端口，再点击**检查变更**。应用变更后，Zeabur Builder 开始构建。首个镜像构建完成并部署后，服务才会启动。
 
 ## 开始前
 
 - 已有项目，并具备在项目中创建服务、Kubernetes Service 和 Build 的权限。使用私有仓库或构建变量时，还需要创建机密变量的权限。
-- 集群已安装 Zeabur Builder 和 Keel。从组件目录安装 Zeabur Builder 时，zot 会一并安装。缺少组件时，**新增** 菜单会在 **从 Git 部署** 下方写出缺少哪些，点击后会一次列出全部安装命令，见[查看与安装集群组件](../cluster/components.mdx)。
-- 构建完成的镜像会推送到 Zeabur chart 的 `builds.registry`，默认是和 Zeabur Builder 一起安装的 Zot（`zot.zot.svc:5000`）。改用 Harbor 或外部 registry 时，管理员需要在 chart 中配置 `builds.registry`，并确保 Builder 和节点能访问它。
+- 集群已安装 Zeabur Builder 和 Keel。从组件目录安装 Zeabur Builder 时，zot 会一并安装。缺少组件时，**新增**菜单会在**从 Git 部署**下方写出缺少哪些，点击后会一次列出全部安装命令，见[查看与安装集群组件](../cluster/components.mdx)。
+- 构建完成的镜像会推送到 Zeabur chart 的 `builds.registry`，默认是和 Zeabur Builder 一起安装的 Zot（`zot.zot.svc:5000`）。改用 Harbor 或外部 registry 时，管理员需要在 chart 中配置 `builds.registry`，并确保 Builder 和节点能访问这个 registry。
 - 通过安装程序安装的 Zot 只允许 Builder、构建用的副本和节点连接。项目中的其他副本无法连接 Zot，因此遭入侵的应用无法拉取其他项目的镜像。
 - 准备好应用实际监听的端口。要公开网站，还需准备能指向集群入口的域名。
 
@@ -21,28 +21,28 @@ source: "57a598cda189"
 
 ### 选择仓库和构建方式
 
-打开 **新增** → **从 Git 部署**。如果代码托管在 GitHub，先关联 GitHub，之后直接从列表选择仓库，私有仓库也不需要单独配置密钥：
+打开**新增** → **从 Git 部署**。如果代码托管在 GitHub，先关联 GitHub，之后直接从列表选择仓库，私有仓库也不需要单独配置密钥：
 
-- 项目已关联 GitHub 时，**来源** 默认为 **GitHub**。在 **仓库** 中搜索并选择仓库即可。
-- 尚未关联时，**仓库** 上方会显示 **连接 GitHub**。点击后，根据当前情况进入下一步：
-  - 集群还没有 GitHub App：前往 **集群** → **GitHub** 创建 App，方法见[用 GitHub App 部署私有仓库](../cluster/github-app.mdx)。创建后点击 **回到从 Git 部署**。
+- 项目已关联 GitHub 时，**来源**默认为 **GitHub**。在**仓库**中搜索并选择仓库即可。
+- 尚未关联时，**仓库**上方会显示**连接 GitHub**。点击后，根据当前情况进入下一步：
+  - 集群还没有 GitHub App：前往**集群** → **GitHub** 创建 App，方法见[用 GitHub App 部署私有仓库](../cluster/github-app.mdx)。创建后点击**回到从 Git 部署**。
   - App 尚未安装到仓库所属的账号：在 GitHub 选择账号和仓库并安装，返回此标签页后，页面会自动更新。
-  - App 已安装，但尚未向此项目开放：检查变更后点击 **应用**，即可向当前项目开放此账号。有多个账号时，先从菜单选择账号。
+  - App 已安装，但尚未向此项目开放：检查变更后点击**应用**，即可向当前项目开放此账号。有多个账号时，先从菜单选择账号。
 
   应用变更后，表单会切换为 GitHub 仓库列表。这些步骤需要修改 `builder-system` 中的机密变量和配置文件，通常只有集群管理员有此权限；其他成员会看到“请集群管理员向此项目开放 GitHub”。
 
-不使用 GitHub 时，将来源设为 **Git 地址**，在 **仓库** 中填写 HTTPS 或 SSH 地址，例如 `https://gitlab.com/acme/web`。如果填写的是已向项目开放的 GitHub 仓库地址，仍会通过 GitHub App 读取。
+不使用 GitHub 时，将来源设为 **Git 地址**，在**仓库**中填写 HTTPS 或 SSH 地址，例如 `https://gitlab.com/acme/web`。如果填写的是已向项目开放的 GitHub 仓库地址，仍会通过 GitHub App 读取。
 
 ![从 GitHub 部署，来源为 GitHub，通过搜索选择仓库，访问方式显示通过集群的 GitHub App 读取](../images/shots/git-github.avif)
 
-**分支** 留空时会跟踪仓库的默认分支。要固定跟踪 `main`，就在这里填写 `main`。
+**分支**留空时会跟踪仓库的默认分支。要固定跟踪 `main`，就在这里填写 `main`。
 
-在 **构建方式** 中选择：
+在**构建方式**中选择：
 
 - **Railpack**：由构建器识别应用使用的语言。
 - **Dockerfile**：使用仓库中的 Dockerfile。
 
-在 **更多设置** 的 **根目录** 中指定要构建的文件夹，例如 `apps/web`。选择 Dockerfile 时，**Dockerfile** 字段中的路径相对于此根目录，留空则使用 `Dockerfile`。
+在**更多设置**的**根目录**中指定要构建的文件夹，例如 `apps/web`。选择 Dockerfile 时，**Dockerfile** 字段中的路径相对于此根目录，留空则使用 `Dockerfile`。
 
 ![从 Git 部署表单，上方为关联 GitHub，已填写仓库地址，构建方式为 Railpack，下方为名称、端口和仓库访问](../images/shots/git-form.avif)
 
@@ -51,36 +51,36 @@ source: "57a598cda189"
 
 ### 配置运行方式
 
-确认 **名称**，并填写 **端口**。例如，程序监听 `8080`，这里就填写 `8080`。Zeabur 还会添加 `PORT=8080`。如果已自行配置 `PORT`，则以你的值为准。
+确认**名称**，并填写**端口**。例如，程序监听 `8080`，这里就填写 `8080`。Zeabur 还会添加 `PORT=8080`。如果已自行配置 `PORT`，则以你的值为准。
 
-如果后台服务不接受连接，将 **端口** 留空。要对外开放网站，开启 **公开域名** 并确认域名。DNS 和 HTTPS 的配置见[添加公开域名](../configure/domains.mdx)。
+如果后台服务不接受连接，将**端口**留空。要对外开放网站，开启**公开域名**并确认域名。DNS 和 HTTPS 的配置见[添加公开域名](../configure/domains.mdx)。
 
-在 **更多设置** 中分别填写：
+在**更多设置**中分别填写：
 
 - **环境变量**：容器运行时读取，每行一个 `KEY=value`。
 - **构建变量**：仅在构建阶段使用，例如下载私有包的令牌。变量值通过 BuildKit secret 传入，不会留在镜像中。Dockerfile 使用 `RUN --mount=type=secret,id=KEY` 读取。
 - **规格**：服务运行时的 CPU 和内存。
-- **安全性**：Railpack 镜像以 UID 1000 运行，默认选择 **严格**；Dockerfile 默认选择 **兼容**。创建前仍可切换。使用 Dockerfile 构建并选择严格模式时，需要用数字 UID 指定非 root 用户，例如 `USER 1000`。
+- **安全性**：Railpack 镜像以 UID 1000 运行，默认选择**严格**；Dockerfile 默认选择**兼容**。创建前仍可切换。使用 Dockerfile 构建并选择严格模式时，需要用数字 UID 指定非 root 用户，例如 `USER 1000`。
 
 </Step>
 <Step>
 
 ### 不使用 GitHub 时，允许读取私有仓库
 
-从 GitHub 列表选择仓库后，**仓库访问** 会显示“通过集群的 GitHub App 读取，无需单独配置。”，可跳过此步。
+从 GitHub 列表选择仓库后，**仓库访问**会显示“通过集群的 GitHub App 读取，无需单独配置。”，可跳过此步。
 
-使用 **Git 地址** 时，在 **仓库访问** 中选择适合该仓库的方式：
+使用 **Git 地址**时，在**仓库访问**中选择适合该仓库的方式：
 
 | 选项 | 操作 |
 | --- | --- |
 | **公开仓库** | 不添加凭证。 |
-| **部署密钥** | 点击 **创建部署密钥**，复制 **公钥**，通过旁边的链接将其添加到该仓库的部署密钥中，保留只读权限。 |
-| **访问令牌** | 填写能读取仓库的 **用户名** 和 **令牌**，通过 HTTPS 访问。GitHub 预填 `x-access-token`，GitLab 预填 `oauth2`。 |
+| **部署密钥** | 点击**创建部署密钥**，复制**公钥**，通过旁边的链接将其添加到该仓库的部署密钥中，保留只读权限。 |
+| **访问令牌** | 填写能读取仓库的**用户名**和**令牌**，通过 HTTPS 访问。GitHub 预填 `x-access-token`，GitLab 预填 `oauth2`。 |
 
 部署密钥适用于任何支持 SSH 连接的 Git 主机。Zeabur 内置了 GitHub 和 GitLab 的主机密钥，其他主机需要先粘贴其主机密钥：
 
 1. 在你的电脑上运行表单列出的命令，例如 `ssh-keyscan -t ed25519,ecdsa -p 2222 git.example.com`。SSH 端口为 22 时不带 `-p`。
-2. 将输出粘贴到 **主机密变量钥（known_hosts）**，点击 **创建部署密钥**。Zeabur Builder 仅接受 Ed25519 和 ECDSA 密钥。
+2. 将输出粘贴到**主机密变量钥（known_hosts）**，点击**创建部署密钥**。Zeabur Builder 仅接受 Ed25519 和 ECDSA 密钥。
 3. 表单会列出每个主机密钥的指纹，例如 `SHA256:+DiY3wvvV6TuJJhbpZisF/zLDA0zPMSvHdkr4UvCOqU`。将其与 Git 主机管理员公布的指纹对照，或请管理员在主机上运行 `ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub`。确认指纹一致后，再将公钥添加到仓库。
 
 仓库地址使用 HTTPS 时，Zeabur 会改用 `git@主机:路径.git` 连接。如果 SSH 端口不是 22，或用户不是 `git`，直接填写 SSH 地址，例如 `ssh://git@git.example.com:2222/acme/site.git`。
@@ -90,16 +90,16 @@ source: "57a598cda189"
 
 ### 检查并应用
 
-点击 **检查变更**，核对服务名称、公开域名、机密变量和 Build。
+点击**检查变更**，核对服务名称、公开域名、机密变量和 Build。
 
-应用变更后，打开服务的 **构建** 标签页，查看构建状态和每次构建的 **日志**。首次构建完成前，服务的镜像标签为 `pending`，还没有可运行的版本。构建结束十分钟后，构建用的副本和日志会一起删除。
+应用变更后，打开服务的**构建**标签页，查看构建状态和每次构建的**日志**。首次构建完成前，服务的镜像标签为 `pending`，还没有可运行的版本。构建结束十分钟后，构建用的副本和日志会一起删除。
 
 </Step>
 </Steps>
 
 ## 确认结果
 
-在 **构建** 中确认已有成功构建的镜像，再到 **概览** 确认服务就绪。如果开启了公开域名，到 **网络** 打开网址，确认能看到应用。
+在**构建**中确认已有成功构建的镜像，再到**概览**确认服务就绪。如果开启了公开域名，到**网络**打开网址，确认能看到应用。
 
 使用 kubectl 查看 Build 和每次构建：
 
@@ -117,11 +117,11 @@ Build 的 `READY` 为 `True`，`REVISION` 是此次构建使用的提交，`-o w
 
 Zeabur Builder 每分钟检查一次分支。有新提交时，Builder 会构建新镜像，完成后通知 Keel，由 Keel 将服务切换到新镜像。构建记录会标明每次构建的触发原因，例如**新的提交**或**推送触发**。Builder 如何检测新提交、如何接入 Git 主机的 webhook，见 [Zeabur Builder 文档](https://oss.zeabur.com/docs/builder/)。
 
-服务 **构建** 标签页的 **新构建完成后自动部署** 默认开启，用于控制构建完成后是否立即上线。
+服务**构建**标签页的**新构建完成后自动部署**默认开启，用于控制构建完成后是否立即上线。
 
-要立即构建一次，在 **构建** 中点击 **重新构建**，检查变更后应用。Builder 会使用分支的最新提交。如果想先确认构建结果再上线，关闭 **新构建完成后自动部署**，构建成功后点击 **部署最新版**，检查并应用镜像变更。
+要立即构建一次，在**构建**中点击**重新构建**，检查变更后应用。Builder 会使用分支的最新提交。如果想先确认构建结果再上线，关闭**新构建完成后自动部署**，构建成功后点击**部署最新版**，检查并应用镜像变更。
 
-要修改构建文件夹、Dockerfile 或构建变量，到服务 **设置** 的 **构建** 中修改，下次构建时生效。
+要修改构建文件夹、Dockerfile 或构建变量，到服务**设置**的**构建**中修改，下次构建时生效。
 
 ## 用 kubectl 完成相同操作
 
@@ -246,9 +246,9 @@ spec:
       url: http://keel.keel.svc.cluster.local:9300/v1/webhooks/native
 ```
 
-- `web-git` 仅在使用访问令牌读取私有仓库时需要，Build 通过 `spec.source.credentialsRef` 引用它，标签 `builder.zeabur.com/git-credentials: "true"` 让 Zeabur Builder 能读取它。公开仓库需移除此机密变量和 `credentialsRef`。
+- `web-git` 仅在使用访问令牌读取私有仓库时需要，Build 通过 `spec.source.credentialsRef` 引用它，标签 `builder.zeabur.com/git-credentials: "true"` 让 Zeabur Builder 能够读取。公开仓库需移除此机密变量和 `credentialsRef`。
 - `web-build-env` 和 Build 的 `spec.env` 仅在有构建变量时需要。
-- Deployment 先使用不存在的 `:pending` tag，首次构建完成后由 Keel 替换。`keel.sh/policy: force` 对应 **新构建完成后自动部署**。
+- Deployment 先使用不存在的 `:pending` tag，首次构建完成后由 Keel 替换。`keel.sh/policy: force` 对应**新构建完成后自动部署**。
 - 使用 Dockerfile 构建时，将 `builderRef` 改为 `dockerfile`，按需在 `spec.source.git` 中添加 `contextDir` 和 `dockerfile`。`ref` 留空时，表单会写入 `HEAD`，跟踪默认分支。
 
 改用部署密钥时，自行生成密钥，将公钥添加到仓库，再将私钥和 `known_hosts` 放入 `kubernetes.io/ssh-auth` 机密变量。将 Build 的 `url` 改为 SSH 地址，例如 `git@github.com:acme/web.git`：
@@ -266,24 +266,24 @@ kubectl -n shop label secret web-git app.kubernetes.io/name=web builder.zeabur.c
 | 界面操作 | kubectl |
 | --- | --- |
 | **重新构建** | `kubectl -n shop annotate build web --overwrite builder.zeabur.com/rebuild="$(date -u +%Y-%m-%dT%H:%M:%SZ)"` |
-| 关闭 **新构建完成后自动部署** | `kubectl -n shop annotate deployment web keel.sh/policy-` |
-| 开启 **新构建完成后自动部署** | `kubectl -n shop annotate deployment web keel.sh/policy=force` |
+| 关闭**新构建完成后自动部署** | `kubectl -n shop annotate deployment web keel.sh/policy-` |
+| 开启**新构建完成后自动部署** | `kubectl -n shop annotate deployment web keel.sh/policy=force` |
 | **部署最新版** | `kubectl -n shop set image deployment/web web="$(kubectl -n shop get build web -o jsonpath='{.status.latestImage}')"` |
 
-移除 Zeabur 后，Zeabur Builder 和 Keel 仍会继续构建和部署，它们不依赖 Zeabur。
+移除 Zeabur 后，Zeabur Builder 和 Keel 仍会继续构建和部署，这两个组件不依赖 Zeabur。
 
 ## 构建或部署卡住时
 
 | 界面上的情况 | 下一步 |
 | --- | --- |
-| **从 Git 部署** 下方写着 **需要先安装…** | 点击它，按弹窗列出的命令一次装好。改用其他 registry 时，管理员在 Zeabur chart 中配置 `builds.registry`，Zeabur Builder 改用它自己的 Helm chart 安装，见 [Zeabur Builder 文档](https://oss.zeabur.com/docs/builder/)。 |
-| 仓库访问遭拒 | 使用部署密钥时，在 **构建** 中点击 **显示部署密钥**，确认已将其添加到正确的仓库。使用令牌时，检查读取范围和有效期。修正后 **重新构建**。 |
+| **从 Git 部署**下方写着**需要先安装…** | 点击这行字，按弹窗列出的命令一次装好。改用其他 registry 时，管理员在 Zeabur chart 中配置 `builds.registry`，改用 Zeabur Builder 自己的 Helm chart 安装，见 [Zeabur Builder 文档](https://oss.zeabur.com/docs/builder/)。 |
+| 仓库访问遭拒 | 使用部署密钥时，在**构建**中点击**显示部署密钥**，确认已将其添加到正确的仓库。使用令牌时，检查读取范围和有效期。修正后**重新构建**。 |
 | 找不到分支或构建器 | 根据构建页面显示的原因，检查仓库分支和集群中对应的 Railpack 或 Dockerfile 构建器。 |
-| 构建成功，服务仍使用旧镜像 | 检查 **新构建完成后自动部署** 和 Keel 状态，或点击 **部署最新版** 手动应用。 |
-| 容器启动后无响应 | 查看服务 **日志**，确认程序监听的端口与表单一致，再查看 **网络** 中的连接检查。 |
+| 构建成功，服务仍使用旧镜像 | 检查**新构建完成后自动部署**和 Keel 状态，或点击**部署最新版**手动应用。 |
+| 容器启动后无响应 | 查看服务**日志**，确认程序监听的端口与表单一致，再查看**网络**中的连接检查。 |
 
 ## 删除服务
 
-在服务右上角的 **更多** 中选择 **删除服务**。检查将要删除和保留的对象后再应用。如果没有其他服务使用同一个 Build，删除流程也会将其删除。表单创建的 Git 凭证机密变量，只有在没有其他 Build 使用时才会一并删除。
+在服务右上角的**更多**中选择**删除服务**。检查将要删除和保留的对象后再应用。如果没有其他服务使用同一个 Build，删除流程也会将其删除。表单创建的 Git 凭证机密变量，只有在没有其他 Build 使用时才会一并删除。
 
 如果使用部署密钥，还需到 Git 主机移除本次添加的公钥。如果创建了专用令牌，也需到 Git 主机撤销该令牌。

@@ -4,12 +4,12 @@ description: 從 Zeabur Catalog 的範本挑一個應用程式，填好網域和
 source: "b23e63cd471e"
 ---
 
-在專案選擇 **新增** → **應用程式範本**，挑一個應用程式，填好網域和必要欄位，按 **檢查變更** 後套用。範本來自這個 Zeabur 版本內建的 [Zeabur Catalog](https://github.com/zeabur-oss/catalog)，部署時不會連到外部下載範本。
+在專案選擇**新增** → **應用程式範本**，挑一個應用程式，填好網域和必要欄位，按**檢查變更**後套用。範本來自這個 Zeabur 版本內建的 [Zeabur Catalog](https://github.com/zeabur-oss/catalog)，部署時不會連到外部下載範本。
 
 ## 開始前
 
 - 已有專案，並有建立服務的權限。範本的物件用你自己的權限建立，權限不夠的物件會在檢查變更時列出。
-- 範本需要的元件已經安裝，例如用 PostgreSQL 的範本需要 CloudNativePG。清單會在範本下方寫出 **需要先安裝…**。
+- 範本需要的元件已經安裝，例如用 PostgreSQL 的範本需要 CloudNativePG。清單會在範本下方寫出**需要先安裝…**。
 - 範本要公開網域時，準備一個指向叢集 Ingress 的網域。需要 HTTPS 的範本，Zeabur 要先指定憑證簽發者。
 
 ## 部署範本
@@ -19,7 +19,7 @@ source: "b23e63cd471e"
 
 ### 挑選應用程式
 
-開啟 **新增** → **應用程式範本**。每個範本會寫出它的用途，以及需要多少 CPU 和記憶體。叢集剩下的記憶體或 CPU 不夠時，範本下方會提醒。可以在上方輸入名稱篩選。
+開啟**新增** → **應用程式範本**。每個範本會寫出用途，以及需要多少 CPU 和記憶體。叢集剩下的記憶體或 CPU 不夠時，範本下方會提醒。可以在上方輸入名稱篩選。
 
 ![應用程式範本清單，篩選 n8n 後列出三個範本，每個寫出用途以及需要的 CPU 和記憶體](../images/shots/template-list.avif)
 
@@ -28,7 +28,7 @@ source: "b23e63cd471e"
 
 ### 安裝缺少的元件
 
-範本需要的元件還沒安裝時，表單上方會寫出缺的所有元件，並附上 **安裝方式** 按鈕。按下後會一次列出這些元件的安裝指令，照[檢視與安裝叢集元件](../cluster/components.mdx)的步驟安裝，再回來部署。缺少元件時，**檢查變更** 不會繼續。
+範本需要的元件還沒安裝時，表單上方會寫出缺的所有元件，並附上**安裝方式**按鈕。按下後會一次列出這些元件的安裝指令，照[檢視與安裝叢集元件](../cluster/components.mdx)的步驟安裝，再回來部署。缺少元件時，**檢查變更**不會繼續。
 
 </Step>
 <Step>
@@ -37,9 +37,9 @@ source: "b23e63cd471e"
 
 - **公開網域**：預設用範本名稱和專案名稱組成，可以改成自己的網域。
 - **部署前要知道的事**：範本作者列出的已知風險和處理方式，預設收合，展開才看得到內容，目前只有英文。部署前先看一遍，例如首次啟動前誰能建立管理員帳號。
-- 其他欄位：名稱和說明會跟著介面語言顯示。標示 **選填** 的欄位可以留空。
+- 其他欄位：名稱和說明會跟著介面語言顯示。標示**選填**的欄位可以留空。
 
-密碼和金鑰會在你的瀏覽器產生，存進範本指定的機密，例如 Miniflux 的 `miniflux-secrets`。部署後，在用到這些值的服務的 **環境變數** 裡可以顯示它們。
+密碼和金鑰會在你的瀏覽器產生，存進範本指定的機密變數，例如 Miniflux 的 `miniflux-secrets`。部署後，在用到這些值的服務的**環境變數**裡可以顯示這些值。
 
 ![部署 Miniflux 的表單，有公開網域欄位，下方說明密碼會存進機密變數 miniflux-secrets](../images/shots/template-form.avif)
 
@@ -48,18 +48,18 @@ source: "b23e63cd471e"
 
 ### 檢查並套用
 
-按 **檢查變更**，確認要建立的物件後套用。**會啟動的服務** 會列出範本的服務、資料庫和網域，下方寫出尖峰時要用多少 CPU 和記憶體。同一個範本在這個專案已經部署過時，畫面會寫出已經存在的物件，要先刪掉它們，或改部署到別的專案。範本的物件都建立在這個專案的命名空間。
+按**檢查變更**，確認要建立的物件後套用。**會啟動的服務**會列出範本的服務、資料庫和網域，下方寫出尖峰時要用多少 CPU 和記憶體。同一個範本在這個專案已經部署過時，畫面會寫出已經存在的物件，要先刪除這些物件，或改部署到別的專案。範本的物件都建立在這個專案的 Namespace。
 
-![部署 Miniflux 的檢查畫面，列出會建立的機密、服務、資料庫和網域，以及資源是否足夠](../images/shots/template-review.avif)
+![部署 Miniflux 的檢查畫面，列出會建立的機密變數、服務、資料庫和網域，以及資源是否足夠](../images/shots/template-review.avif)
 
 </Step>
 </Steps>
 
 ## 確認結果
 
-套用後，範本的服務和資料庫會出現在專案裡。打開各服務的 **概覽**，等副本就緒，再打開範本的公開網域，確認看到應用程式的頁面。
+套用後，範本的服務和資料庫會出現在專案裡。打開各服務的**概覽**，等副本就緒，再打開範本的公開網域，確認看到應用程式的頁面。
 
-範本的每個物件，以及產生的密碼機密，都帶有三個標籤：`app.kubernetes.io/instance` 和 `templates.zeabur.com/template` 是範本 ID，`app.kubernetes.io/version` 是應用程式版本。用 kubectl 列出這次部署的物件：
+範本的每個物件，以及存放產生密碼的機密變數，都帶有三個標籤：`app.kubernetes.io/instance` 和 `templates.zeabur.com/template` 是範本 ID，`app.kubernetes.io/version` 是應用程式版本。用 kubectl 列出這次部署的物件：
 
 ```sh
 kubectl -n shop get deploy,statefulset,svc,ingress,pvc,secret -l app.kubernetes.io/instance=miniflux
@@ -71,7 +71,7 @@ kubectl -n shop get deploy,statefulset,svc,ingress,pvc,secret -l app.kubernetes.
 
 Zeabur 用內建的 [Zeabur Catalog](https://github.com/zeabur-oss/catalog) 把範本轉成 YAML。轉換在 Zeabur 裡做，沒有對應的叢集物件，但你可以用 Catalog 的 `catalog` 指令得到同樣的 YAML，再用 kubectl 套用。
 
-先查 Zeabur 用的 Catalog 版本：到 **設定** 的 **關於**，**Zeabur Catalog** 那一列是它的提交。在 Catalog 的原始碼切到這個提交，進入 `nix develop` 後執行：
+先查 Zeabur 用的 Catalog 版本：到**設定**的**關於**，**Zeabur Catalog** 那一列是 Catalog 的提交。在 Catalog 的原始碼切到這個提交，進入 `nix develop` 後執行：
 
 ```sh
 umask 077
@@ -82,7 +82,7 @@ kubectl -n shop apply -f secrets.json
 kubectl -n shop apply -f plan.yaml
 ```
 
-- `template inputs` 產生範本要的密碼和金鑰，每次執行都是新的值，只執行一次，之後升級沿用同一份機密。`secrets.json` 不要放進版本控制。
+- `template inputs` 產生範本要的密碼和金鑰，每次執行都是新的值，只執行一次，之後升級沿用同一份機密變數。`secrets.json` 不要放進版本控制。
 - 範本有要你填的欄位時，把值寫成 JSON 物件，例如 Dify 的 `{"storageRegion":"us-east-1", ...}`，用 `-values inputs.json` 傳入。欄位名稱在範本的 `template.yaml` 的 `inputs`。
 - 範本 `requires` 列出的元件要先裝好。
 
@@ -96,9 +96,9 @@ kubectl -n shop delete all,ingress,pvc,secret,configmap,networkpolicy -l app.kub
 
 ## 網路規則
 
-範本不會擋下整個專案的流量。誰能連進專案裡的 Pod，由專案的 `zeabur-project` 決定，見[安全性](../reference/security.mdx)。連出去的連線不擋，應用程式可以連到模型服務、Webhook、郵件伺服器和備份用的 S3。
+範本不會擋下整個專案的流量。誰能連進專案裡的副本，由專案的 `zeabur-project` 決定，見[安全性](../reference/security.mdx)。連出去的連線不擋，應用程式可以連到模型服務、Webhook、郵件伺服器和備份用的 S3。
 
-想限制某個應用程式往外連，自己加一個 NetworkPolicy。下面的例子讓 Umami 只能查 DNS 和連它的資料庫：
+想限制某個應用程式往外連，自己加一個 NetworkPolicy。下面的例子讓 Umami 只能查詢 DNS 和連到自己的資料庫：
 
 ```yaml
 apiVersion: networking.k8s.io/v1
@@ -130,10 +130,10 @@ spec:
     - {protocol: TCP, port: 5432}
 ```
 
-用 `kubectl apply -n <專案的命名空間> -f umami-egress.yaml` 套用。`podSelector` 只選應用程式的 Pod，不要選到資料庫：資料庫要連 Kubernetes API 和備份用的 S3，擋掉後資料庫會停擺，備份也會失敗。
+用 `kubectl apply -n <專案的命名空間> -f umami-egress.yaml` 套用。`podSelector` 只選應用程式的副本，不要選到資料庫：資料庫要連 Kubernetes API 和備份用的 S3，擋掉後資料庫會停擺，備份也會失敗。
 
 ## 常見失敗
 
-- 名稱已存在：範本使用固定的物件名稱。同一個專案已經部署過同一個範本，或有同名的機密時，檢查變更會列出衝突。改在另一個專案部署。
-- 欄位格式不符：欄位下方會寫出它要的格式，照格式修改後再檢查。
-- 檢查變更說叢集不支援某種物件：範本需要的元件還沒裝好，或還在啟動。到 **元件** 頁面確認狀態。
+- 名稱已存在：範本使用固定的物件名稱。同一個專案已經部署過同一個範本，或有同名的機密變數時，檢查變更會列出衝突。改在另一個專案部署。
+- 欄位格式不符：欄位下方會寫出需要的格式，照格式修改後再檢查。
+- 檢查變更說叢集不支援某種物件：範本需要的元件還沒裝好，或還在啟動。到**元件**頁面確認狀態。

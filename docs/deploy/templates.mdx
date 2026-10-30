@@ -9,7 +9,7 @@ In a project, select **Add** → **App template**, choose an application, enter 
 
 - You need an existing project and permission to create services. Zeabur creates template objects with your own permissions. Review changes lists any objects you don't have permission to create.
 - Install the components the template requires. For example, templates that use PostgreSQL need CloudNativePG. The template list shows **Install first…** below each template that requires components.
-- If the template needs a public domain, prepare a domain that points to the cluster's ingress. For templates that require HTTPS, a certificate issuer must be configured in Zeabur first.
+- If the template needs a public domain, prepare a domain that points to the cluster's ingress. For templates that require HTTPS, configure a certificate issuer in Zeabur first.
 
 ## Deploy a template
 
@@ -27,7 +27,7 @@ Open **Add** → **App template**. Each template describes what it's for and how
 
 ### Install missing components
 
-If a required component isn't installed, every missing component is named above the form with a **How to install** button. Click it to see the install commands for all of them at once. Follow the steps in [Check and install cluster components](../cluster/components.mdx), then return to deploy the template. **Review changes** won't proceed while components are missing.
+If a required component isn't installed, every missing component is named above the form with a **How to install** button. Click it to see the install commands for all of them at once. Follow the steps in [View and install cluster components](../cluster/components.mdx), then return to deploy the template. **Review changes** doesn't continue while components are missing.
 
 </Step>
 <Step>
@@ -35,7 +35,7 @@ If a required component isn't installed, every missing component is named above 
 ### Enter a domain and field values
 
 - **Public domain**: Defaults to a combination of the template name and project name. You can change it to your own domain.
-- **Before you deploy**: Known risks and how to address them, listed by the template author. This section is collapsed by default; expand it to read the content, which is currently available only in English. Read it before deploying—for example, to check who can create an admin account before the first startup.
+- **Before you deploy**: Known risks and how to address them, listed by the template author. This section is collapsed by default; expand it to read the content, which is currently available only in English. Read it before deploying, for example to check who can create an admin account before the first startup.
 - Other fields: Names and descriptions match the interface language. Fields marked **Optional** can be left blank.
 
 Passwords and keys are generated in your browser and stored in the secret specified by the template, such as `miniflux-secrets` for Miniflux. After deployment, you can reveal them in **Variables** for a service that uses them.

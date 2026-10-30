@@ -32,12 +32,12 @@ source: "4d65535f6503"
 
 標示「可」的操作仍要通過 ResourceQuota、Pod Security、admission policy 和元件自己的檢查。資料庫和備份要先裝好對應的 operator 才能建立。角色已經先列好這些 operator 的資源，裝好後不用改角色。
 
-開發者可以在自己的專案裡還原磁碟區，角色只多了該 Namespace 內 `restores.k8up.io` 的建立與刪除權限。使用前請注意兩件事：
+開發者可以在自己的專案裡還原磁碟區，角色只多了該 Namespace 內 `restores.k8up.io` 的建立與刪除權限。使用前注意兩件事：
 
-- 還原到原處會覆蓋整個磁碟區，備份之後新增的檔案會被刪除。
-- 能還原的人，就能讀取這個專案備份倉庫裡的所有備份。每個專案請用各自的備份路徑和密碼。
+- 還原到原處會覆蓋整個磁碟區，備份之後新增的檔案都會刪掉。
+- 能還原的人，就能讀取這個專案備份倉庫裡的所有備份。每個專案用各自的備份路徑和密碼。
 
-叢集備份由 Velero 執行，還原時 Velero 用自己的權限（預設是 `cluster-admin`）把物件寫回 Restore 指定的 Namespace，包括 RoleBinding 和 Secret。RBAC 只能決定誰能建立 Restore，不能限制它寫進哪些 Namespace，所以成員角色沒有任何 `velero.io` 權限，還原只開放給管理員。沒有權限建立 Restore 的人，**還原** 按鈕無法使用。
+叢集備份由 Velero 執行，還原時 Velero 用自己的權限（預設是 `cluster-admin`）把物件寫回 Restore 指定的 Namespace，包括 RoleBinding 和 Secret。RBAC 只能決定誰能建立 Restore，不能限制 Velero 寫進哪些 Namespace，所以成員角色沒有任何 `velero.io` 權限，還原只開放給管理員。沒有權限建立 Restore 的人，**還原**按鈕無法使用。
 
 **管理員**用的是管理員帳號，登入後就有整個叢集的完整權限，不用再另外確認，見下方[管理員帳號和一般帳號](#管理員帳號和一般帳號)。介面依你實際擁有的 RBAC 規則顯示能做的操作，所以另外綁定的規則、管理員改過的 ClusterRole 都會反映出來。
 
@@ -48,7 +48,7 @@ Chart 的 `memberRoles.enabled` 預設是 `true`，會建立：
 - `zeabur-member`：讀取節點、Namespace、StorageClass，以及知道名稱的 PersistentVolume。每位成員都看得到所有 Namespace 的名稱和 annotations，所以專案描述裡不要放機密。
 - `zeabur-project-viewer`、`zeabur-project-developer`：專案角色，用 `zeabur.com/aggregate-to-<role>` 標籤聚合規則。
 - `zeabur-project-viewer-rules`、`zeabur-project-developer-rules`、`zeabur-project-builds-read`、`zeabur-project-builds-write`：上面兩個角色實際的 verb 和 resource。檢視者看得到建置，開發者還能從 Git 部署和重新建置。
-- `zeabur-project-namespace` ValidatingAdmissionPolicy 和它的 binding：限制開發者能改 Namespace 的哪些欄位，需要 Kubernetes 1.30 以上。
+- `zeabur-project-namespace` ValidatingAdmissionPolicy 和對應的 binding：限制開發者能改 Namespace 的哪些欄位，需要 Kubernetes 1.30 以上。
 
 Chart 本身不綁定任何人。管理員在 Zeabur 邀請或變更成員時，Zeabur 用管理員的權限建立：
 
@@ -57,9 +57,9 @@ Chart 本身不綁定任何人。管理員在 Zeabur 邀請或變更成員時，
 | `ClusterRoleBinding zeabur-member-<username>` | 綁定 `zeabur-member` 給 `zeabur:<username>` |
 | 各專案中的 `RoleBinding zeabur-member-<username>` | 綁定該專案的 developer 或 viewer 角色給同一位使用者 |
 
-這些 binding 帶 `zeabur.com/member: <username>` 和 `app.kubernetes.io/managed-by: zeabur` 標籤。`zeabur-installer uninstall` 會一起刪掉它們。用 `helm uninstall` 移除時要自己刪，見[移除後的權限](../leave/uninstall.mdx#成員權限與准入政策)。
+這些 binding 帶 `zeabur.com/member: <username>` 和 `app.kubernetes.io/managed-by: zeabur` 標籤。`zeabur-installer uninstall` 會一起刪掉這些 binding。用 `helm uninstall` 移除時要自己刪，見[移除後的權限](../leave/uninstall.mdx#成員權限與准入政策)。
 
-關閉 `memberRoles.enabled` 時，chart 不建立這些角色和 Namespace 政策，邀請成員時只能選要不要給 **管理員**。
+關閉 `memberRoles.enabled` 時，chart 不建立這些角色和 Namespace 政策，邀請成員時只能選要不要給**管理員**。
 
 ## 專案 Namespace 的保護
 
@@ -87,7 +87,7 @@ zeabur.com/icon
 
 ## 管理員帳號和一般帳號
 
-Zeabur Identity 的帳號分成兩種。在 **成員** 把某人設為 **管理員**，他的帳號就會變成管理員帳號；拿掉 **管理員**，就改回一般帳號。
+Zeabur Identity 的帳號分成兩種。在**成員**把某人設為**管理員**，他的帳號就會變成管理員帳號；拿掉**管理員**，就改回一般帳號。
 
 | | 一般帳號 | 管理員帳號 |
 |---|---|---|
@@ -96,9 +96,9 @@ Zeabur Identity 的帳號分成兩種。在 **成員** 把某人設為 **管理�
 
 管理員帳號登入後就能做任何事，中間沒有再確認的步驟。所以管理員最好另外有一個一般帳號處理日常工作，只有要改叢集、管理成員時才用管理員帳號登入。要更嚴格，可以開啟下方的 [AAL3](#只接受不會同步的通行密鑰aal3)。
 
-一般帳號權限不夠時，畫面會說需要更多權限，並列出缺少的規則。把它交給管理員，請他調整你的角色或幫你處理。
+一般帳號權限不夠時，畫面會說需要更多權限，並列出缺少的規則。把這份清單交給管理員，請他調整你的角色或幫你處理。
 
-把成員設為 **管理員** 後，他之後只能用通行密鑰登入，原本用 GitHub 或 Google 登入的工作階段會在下次換權杖時結束。
+把成員設為**管理員**後，他之後只能用通行密鑰登入，原本用 GitHub 或 Google 登入的工作階段會在下次換權杖時結束。
 
 第一位管理員來自安裝時的設定連結（`zeabur-installer setup-link`）。在命令列也能邀請管理員，或改變既有帳號的類型：
 
@@ -119,7 +119,7 @@ zeabur-identityctl account-type alice admin     # 改回一般帳號：regular
 | 管理員帳號，預設 | 5 分鐘 | 1 小時 | 登入後 12 小時 |
 | 管理員帳號，改成 15 分鐘或開啟 AAL3 | 5 分鐘 | 15 分鐘 | 登入後 12 小時 |
 
-權杖到期時 Zeabur 會自己換新的，不用再按通行密鑰。12 小時從用通行密鑰、GitHub 或 Google 登入那一刻算起，換權杖不會延長。Zeabur 網頁的閒置上限是 1 小時，Zeabur Identity 給的時間比較短時就照它的。
+權杖到期時 Zeabur 會自己換新的，不用再按通行密鑰。12 小時從用通行密鑰、GitHub 或 Google 登入那一刻算起，換權杖不會延長。Zeabur 網頁的閒置上限是 1 小時，Zeabur Identity 給的時間比較短時，就照 Zeabur Identity 的時間。
 
 開著頁面不操作不算在用。超過 60 秒沒有操作，頁面自動更新狀態的請求就不算活動，閒置時間照算。
 
@@ -127,7 +127,7 @@ zeabur-identityctl account-type alice admin     # 改回一般帳號：regular
 
 ## 登入設定
 
-**設定** 頁的 **登入設定** 只影響管理員帳號，一般帳號不受影響。設定存在 Zeabur Identity 所在 Namespace 的 ConfigMap `zeabur-identity-settings`，Zeabur Identity 每次登入和換權杖時讀取，不用重新啟動。
+**設定**頁的**登入設定**只影響管理員帳號，一般帳號不受影響。設定存在 Zeabur Identity 所在 Namespace 的 ConfigMap `zeabur-identity-settings`，Zeabur Identity 每次登入和換權杖時讀取，不用重新啟動。
 
 | 設定 | ConfigMap 的鍵和值 | 預設 | 作用 |
 |---|---|---|---|
@@ -136,7 +136,7 @@ zeabur-identityctl account-type alice admin     # 改回一般帳號：regular
 
 安裝時不知道叢集是一個團隊在用還是多個團隊共用，所以一律從 1 小時開始。只有一個團隊的叢集，管理員通常就是唯一在用的人，閒置時間和一般帳號一樣。多個團隊共用叢集時，記得改成 15 分鐘。
 
-這兩項沒有 Helm value，因為 Zeabur Identity 不在 Zeabur 的 chart 裡。在 **設定** 頁改，或用 kubectl 改同一個 ConfigMap：
+這兩項沒有 Helm value，因為 Zeabur Identity 不在 Zeabur 的 chart 裡。在**設定**頁改，或用 kubectl 改同一個 ConfigMap：
 
 ```sh
 kubectl -n zeabur-identity create configmap zeabur-identity-settings --from-literal=teams=multiple
@@ -147,15 +147,15 @@ kubectl -n zeabur-identity patch configmap zeabur-identity-settings --type merge
 
 ### 只接受不會同步的通行密鑰（AAL3）
 
-開啟 AAL3 後，管理員帳號只能用不會同步到其他裝置的通行密鑰，例如安全金鑰，或只存在一台裝置上的通行密鑰。存在 iCloud 鑰匙圈、Google 密碼管理工具這類會同步的通行密鑰，登入時會被拒絕，畫面會直接說這把通行密鑰會同步、管理員帳號要用安全金鑰或只存在一台裝置上的通行密鑰。已經用會同步的通行密鑰登入的人，下次換權杖時就會被登出。
+開啟 AAL3 後，管理員帳號只能用不會同步到其他裝置的通行密鑰，例如安全金鑰，或只存在一台裝置上的通行密鑰。存在 iCloud 鑰匙圈、Google 密碼管理工具這類會同步的通行密鑰，登入時 Zeabur Identity 會拒絕，畫面會直接說這把通行密鑰會同步、管理員帳號要用安全金鑰或只存在一台裝置上的通行密鑰。已經用會同步的通行密鑰登入的人，下次換權杖時就會登出。
 
-開啟前，先確認每位管理員都有不會同步的通行密鑰。你自己沒有的話，Zeabur 不會讓你開啟，避免把自己鎖在外面。其他沒有的管理員開啟後就登不進來，要用 `sudo zeabur-installer setup-link --username <管理員> --reset` 產生新連結，讓他註冊安全金鑰。檢查每把通行密鑰的方式見 Zeabur Identity 的 [AAL3 for admins](https://oss.zeabur.com/docs/identity/managing-users#aal3-for-admins)。
+開啟前，先確認每位管理員都有不會同步的通行密鑰。你自己沒有時，Zeabur 不會讓你開啟，避免把自己鎖在外面。其他沒有的管理員開啟後就登不進來，要用 `sudo zeabur-installer setup-link --username <管理員> --reset` 產生新連結，讓他註冊安全金鑰。檢查每把通行密鑰的方式見 Zeabur Identity 的 [AAL3 for admins](https://oss.zeabur.com/docs/identity/managing-users#aal3-for-admins)。
 
 ## 用 kubectl 操作
 
 管理員帳號和一般帳號的 kubeconfig 都是一般的 kubelogin（`oidc-login`）context，靠 refresh token 換新權杖，直接下 kubectl 指令就好，不會每幾分鐘要你按一次通行密鑰。期限和上面的表一樣。
 
-kubelogin 預設把 refresh token 存在 `~/.kube/cache/oidc-login`。不想把它留在磁碟上，在 context 的 exec 參數加上：
+kubelogin 預設把 refresh token 存在 `~/.kube/cache/oidc-login`。不想把 refresh token 留在磁碟上，在 context 的 exec 參數加上：
 
 - `--token-cache-storage=keyring`：存進作業系統的鑰匙圈。
 - `--token-cache-storage=none`：什麼都不存，每個 kubectl 指令都會開登入頁。
@@ -174,4 +174,4 @@ kubectl auth can-i create pods/exec --namespace shop
 kubectl auth can-i patch deployments.apps --namespace shop
 ```
 
-Zeabur 用 `SelfSubjectRulesReview` 判斷介面上該顯示哪些操作。被政策或用量上限拒絕時，要修正政策指出的條件。管理員帳號也一樣要通過 admission policy。
+Zeabur 用 `SelfSubjectRulesReview` 判斷介面上該顯示哪些操作。請求遭政策或用量上限拒絕時，要修正政策指出的條件。管理員帳號也一樣要通過 admission policy。

@@ -59,17 +59,17 @@ Both the browser and the server must be able to resolve these two names. Replica
 
 ### Component selection
 
-By default, the installer installs everything the Catalog recommends for this profile, plus `builds` (Zeabur Builder and zot), `image-updates` (Keel), and `databases/cloudnative-pg`, so you can deploy from images or Git and create PostgreSQL databases right after installation. Zeabur Builder builds in a privileged buildkitd, so a build that escapes its sandbox reaches the node; add `builds` to `disable` if you don't need it. Zeabur needs ingress, certificates, and metrics-server to run.
+By default, the installer installs everything the Catalog recommends for this profile, plus `builds` (Zeabur Builder and zot), `image-updates` (Keel), and `databases/cloudnative-pg`, so you can deploy from images or Git and create PostgreSQL databases right after installation. Zeabur Builder builds in a privileged buildkitd, so a build that escapes its sandbox reaches the node. If you don't need it, add `builds` to `disable`. Zeabur needs ingress, certificates, and metrics-server to run.
 
-For runtime detection, vulnerability scanning, and intrusion prevention, add them:
+To add runtime detection, vulnerability scanning, and intrusion prevention, enable them:
 
 ```yaml
 enable: [runtime-security, vulnerability-scanning, intrusion-prevention]
 ```
 
-`enable` accepts capabilities, such as `runtime-security`, or full component IDs, such as `volume-backup/velero`. A component's dependencies are added with it. If `disable` excludes a component that another component needs, `plan` names both and stops. The `plan` output lists the final components, their installation order, and the reasons for exclusions.
+`enable` accepts capabilities, such as `runtime-security`, or full component IDs, such as `volume-backup/velero`. The installer adds a component's dependencies with it. If `disable` excludes a component that another component needs, `plan` names both and stops. The `plan` output lists the final components, their installation order, and the reasons for exclusions.
 
-A component removed from the list is removed by the next `apply`. If removing a component also deletes its data, add it to `allowDataLoss` first. See [Remove a component](./installer.mdx#remove-components).
+The next `apply` removes any component you take off the list. If removing a component also deletes its data, add it to `allowDataLoss` first. See [Remove a component](./installer.mdx#remove-components).
 
 ```yaml
 inputs:
@@ -98,7 +98,7 @@ secretFiles:
 sudo chmod 0600 /root/secrets/velero-credentials
 ```
 
-Use the format the component's input requires for the file contents. The installer uses the file to create the secret the component needs. Keep secret values in files, not in `inputs`. If a secret the Catalog marks `generate: random` has no file specified, the first `apply` generates it, and later runs reuse it.
+Write the file in the format the component's input requires. The installer uses the file to create the secret the component needs. Keep secret values in files, not in `inputs`. If a secret the Catalog marks `generate: random` has no file specified, the first `apply` generates it, and later runs reuse it.
 
 ### Storage classes
 
@@ -122,7 +122,7 @@ Leave `distribution` out to install K3s. Set `rke2` for a server with 8 GiB of m
 
 Setting the version field of the other distribution stops the installer, for example: `rke2Version applies to distribution: rke2; this one is k3s (set k3sVersion)`.
 
-Downloads for the default version are checked against digests compiled into the installer. Downloads for another version can only be checked against that release's own checksum list. `plan` marks the version as unsupported, and it may not match the Kubernetes versions the Catalog has tested.
+The installer checks downloads for the default version against digests compiled into it. For another version, it can check downloads only against that release's own checksum list. `plan` marks the version as unsupported, and it may not match the Kubernetes versions the Catalog has tested.
 
 ### `host`
 
@@ -130,7 +130,7 @@ Downloads for the default version are checked against digests compiled into the 
 |---|---|
 | `host.tlsSan` | `[]`. Extra DNS names or IP addresses for the Kubernetes API server's certificate. Servers only |
 | `host.requireEncryptedDisk` | `false`. When `true`, `apply` stops if the root directory or data directory isn't on an encrypted device |
-| `host.nodeName` | The host name in lowercase. If the host name isn't a valid node name or is made from the IP address, such as `ip-10-0-0-5`, a name like `node-3f9a2c`. The installer writes it into the K3s or RKE2 configuration, so the node keeps its name when the host name changes. Use lowercase letters, digits, `-`, and `.` |
+| `host.nodeName` | The host name in lowercase. If the host name isn't a valid node name or is made from the IP address, such as `ip-10-0-0-5`, the installer generates a name like `node-3f9a2c`. The installer writes it into the K3s or RKE2 configuration, so the node keeps its name when the host name changes. Use lowercase letters, digits, `-`, and `.` |
 
 A node keeps the name it was installed with. Running `apply` again reuses it, and a different `host.nodeName` stops `apply`: Kubernetes would see a second node at the same address.
 
@@ -185,7 +185,7 @@ Only the fields in the table below can appear alongside it. `profile`, `access`,
 | `host.nodeName` | Same as in the configuration for creating a cluster. Written into KubeSolo's configuration |
 | `sources.catalog` | Optional. A local Catalog `index.json` to replace the pinned version |
 
-Components use KubeSolo's built-in `local-path` storage class, which stores data under `/var/lib/kubesolo`. KubeSolo, helm-controller, and kubectl are pinned by the installer; no field changes their versions.
+Components use KubeSolo's built-in `local-path` storage class, which stores data under `/var/lib/kubesolo`. The installer pins KubeSolo, helm-controller, and kubectl; no field changes their versions.
 
 ## Configuration for joining an existing cluster
 
@@ -204,7 +204,7 @@ Run `zeabur-installer node add` on an existing server to get the complete YAML, 
 | `join.longhorn` | `false`. When `true`, installs the host packages Longhorn needs before K3s or RKE2 starts |
 | `join.nodeNames` | `[]`. The cluster's node names, as `node add` prints them. If the new host's name is among them, the node gets a name like `node-3f9a2c` |
 
-`host.nodeName` works as when creating a cluster, and can't be one of `join.nodeNames`. Workers don't accept `host.tlsSan`. `distribution` and the version must match the cluster. A worker bootstrap token can't be used to join a server; use the configuration generated by `node add --role server`.
+`host.nodeName` works as when creating a cluster, and can't be one of `join.nodeNames`. Workers don't accept `host.tlsSan`. `distribution` and the version must match the cluster. A server can't join with a worker bootstrap token; use the configuration generated by `node add --role server`.
 
 ## Troubleshoot configuration issues
 

@@ -106,7 +106,7 @@ Source text, not a CSS transform. Product, API and code names keep their exact c
 
 ## Names
 
-- **Zeabur** is the product, always capitalised. Its parts are **Zeabur Identity** (sign-in) and
+- **Zeabur** is the product, always capitalized. Its parts are **Zeabur Identity** (sign-in) and
   **Zeabur Catalog** (tested component versions and how to install them). In Chinese the names
   stay in Latin letters.
 - A *service* is what the reader deploys (服務／服务); `Service` is the Kubernetes kind. A
@@ -181,6 +181,7 @@ why. Add a row before introducing a new concept.
 | roll back | 回滾 | 回滚 | |
 | apply a change | 套用 | 应用 | |
 | review changes (a plan, as the API and docs keep calling it) | 檢查變更 | 检查变更 | Never 計畫／计划 on screen: it reads as a schedule. Expired: 這份變更已過期 |
+| installer plan (what `zeabur-installer plan` prints; the review's Full plan) | 安裝步驟 | 安装步骤 | As the installer's own 完整安裝步驟／完整安装步骤; never 計畫／计划. The command itself stays `plan` <!-- writing-allow: zh-punct (English notes quote Chinese terms) --> |
 | run a command | 執行 | 运行 | |
 | use an existing namespace (show it as a project) | 使用既有的 Namespace | 使用已有的 Namespace | A namespace's own row says 使用這個 Namespace; the API and zeaburctl keep adopt |
 | remove from Zeabur | 移除 | 移除 | |

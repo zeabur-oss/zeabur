@@ -4,7 +4,7 @@ description: 用 zeabur-installer 添加新节点，停止调度，用 kubectl �
 source: "cdb7a13a9dd3"
 ---
 
-在 **集群** → **概览** 的 **节点** 中查看各台主机的状态。要增加一台主机运行服务，见[添加节点](#添加节点)。主机需要停机维护时，在该节点的操作菜单中选择 **停止调度**，需要迁移副本时再用 kubectl 的 `drain`。
+在**集群** → **概览**的**节点**中查看各台主机的状态。要增加一台主机运行服务，见[添加节点](#添加节点)。主机需要停机维护时，在该节点的操作菜单中选择**停止调度**，需要迁移副本时再用 kubectl 的 `drain`。
 
 ![集群概览中的节点列表](../images/shots/cluster-nodes.avif)
 
@@ -42,7 +42,7 @@ sudo zeabur-installer node add --ttl 1h
 
 命令会输出需要在新 VM 上运行的内容：写入 `/etc/zeabur-installer/config.yaml` 的配置，以及 `plan` 和 `apply`。输出中的令牌等同于密码，不要粘贴到公开场合。
 
-添加工作节点使用会过期的 bootstrap 令牌，`--ttl` 默认为 1 小时，最长 24 小时。在 RKE2 上要添加服务器（控制平面），加上 `--role server`，使用集群的 server 令牌，该令牌不会过期。K3s 只运行一台使用 SQLite 的服务器，因此会拒绝 `--role server`。如果新 VM 无法连接服务器的内部地址，用 `--address` 指定它能访问的地址。
+添加工作节点使用会过期的 bootstrap 令牌，`--ttl` 默认为 1 小时，最长 24 小时。在 RKE2 上要添加服务器（控制平面），加上 `--role server`，使用集群的 server 令牌，该令牌不会过期。K3s 只运行一台使用 SQLite 的服务器，因此会拒绝 `--role server`。如果新 VM 无法连接服务器的内部地址，用 `--address` 指定新 VM 能访问的地址。
 
 集群运行 Longhorn 或 zot 镜像时，输出会自动包含相应配置。如果配置文件中仍是 `profile: single-node`，输出会提醒你改为 `multi-node` 并重新运行 `apply`。
 
@@ -88,15 +88,15 @@ sudo /var/lib/rancher/rke2/bin/kubectl --kubeconfig /etc/rancher/rke2/rke2.yaml 
 </Step>
 </Steps>
 
-RKE2 的 etcd 需要过半数的服务器才能运行。要在少一台服务器时继续运行，至少需要三台服务器。如果只有两台，任意一台停机都会导致整个集群停止运行。K3s 集群只有一台服务器，它停机时控制平面会停止，等它恢复后才能继续。
+RKE2 的 etcd 需要过半数的服务器才能运行。要在少一台服务器时继续运行，至少需要三台服务器。如果只有两台，任意一台停机都会导致整个集群停止运行。K3s 集群只有一台服务器，这台服务器停机时控制平面也会停止，恢复后才能继续运行。
 
 ## 节点停机维护
 
 ### 只需重启
 
-在节点菜单中选择 **停止调度**，节点行就会标记为已停止调度。这会阻止新的副本调度到该节点，已经运行的副本会留在原处。如果只是重启，做到这一步就够了，不需要运行 `drain`。
+在节点菜单中选择**停止调度**，节点行就会标记为已停止调度。这会阻止新的副本调度到该节点，已经运行的副本会留在原处。如果只是重启，做到这一步就够了，不需要运行 `drain`。
 
-也可以在 Zeabur **集群** 页面标题旁点击 **打开 kubectl 终端**，运行：
+也可以在 Zeabur **集群**页面标题旁点击**打开 kubectl 终端**，运行：
 
 ```sh
 kubectl cordon <node>
@@ -106,7 +106,7 @@ kubectl cordon <node>
 
 ### 先迁移副本再维护
 
-在 Zeabur **集群** 页面标题旁点击 **打开 kubectl 终端**，先列出该节点上的副本及其使用的 PVC：
+在 Zeabur **集群**页面标题旁点击**打开 kubectl 终端**，先列出该节点上的副本及其使用的 PVC：
 
 ```sh
 kubectl get pods -A --field-selector spec.nodeName=<node> -o custom-columns=NS:.metadata.namespace,POD:.metadata.name,PVC:.spec.volumes[*].persistentVolumeClaim.claimName
@@ -122,10 +122,10 @@ kubectl drain <node> --ignore-daemonsets --delete-emptydir-data
 
 `drain` 会停止该节点的调度，并驱逐副本，让控制器在其他节点重新创建副本。DaemonSet 管理的副本会留在原处。运行时注意：
 
-- `drain` 会遵守 PodDisruptionBudget；如果不允许驱逐，会一直重试，直到允许驱逐。
+- `drain` 会遵守 PodDisruptionBudget；预算不允许驱逐时，`drain` 会一直重试。
 - 遇到不属于任何控制器的副本，`drain` 会停止。这类副本删除后不会自动启动，确认可以删除后，再在命令末尾加上 `--force`。
 - `--delete-emptydir-data` 会清空所驱逐副本的 `emptyDir` 临时数据。
-- 使用该节点 `local-path` 卷的副本也会遭到驱逐。重新创建的副本无法在其他节点使用这些卷，会保持 `Pending` 状态，直到原节点恢复运行。`drain` 不会导致数据丢失；对这些副本来说，结果与直接停机相同，都需要等待该节点恢复运行。
+- 使用该节点 `local-path` 卷的副本也会遭到驱逐。重新创建的副本无法在其他节点使用这些卷，原节点恢复运行之前会一直处于 `Pending` 状态。`drain` 不会导致数据丢失；对这些副本来说，结果与直接停机相同，都需要等待该节点恢复运行。
 
 如果 Zeabur 本身也运行在该节点上，`drain` 期间页面会断开连接约一分钟。刷新页面并重新登录；kubectl 终端也会断开连接，需要重新打开。
 
@@ -133,9 +133,9 @@ kubectl drain <node> --ignore-daemonsets --delete-emptydir-data
 
 ## 恢复调度
 
-维护完成、节点恢复运行后，在节点菜单中选择 **恢复调度**。
+维护完成、节点恢复运行后，在节点菜单中选择**恢复调度**。
 
-也可以在 Zeabur **集群** 页面标题旁点击 **打开 kubectl 终端**，运行：
+也可以在 Zeabur **集群**页面标题旁点击**打开 kubectl 终端**，运行：
 
 ```sh
 kubectl uncordon <node>
@@ -147,13 +147,13 @@ kubectl uncordon <node>
 
 **不要移除集群中唯一的节点，也不要移除最后一台控制节点。**
 
-先在 Zeabur **集群** 页面标题旁点击 **打开 kubectl 终端**，确认控制节点数量：
+先在 Zeabur **集群**页面标题旁点击**打开 kubectl 终端**，确认控制节点数量：
 
 ```sh
 kubectl get nodes -l node-role.kubernetes.io/control-plane
 ```
 
-如果只剩一台控制节点，不要删除它。如果移除后剩余的 server 节点不足三台，控制平面再少一台就无法运行。
+如果只剩一台控制节点，不要删除。如果移除后剩余的 server 节点不足三台，控制平面再少一台就无法运行。
 
 `local-path` 卷的数据只保存在该 VM 上。移除节点后，使用这些卷的副本将无处启动。按照“节点停机维护”的步骤检查副本与卷，再运行 `drain`，完成后才删除节点：
 
@@ -170,7 +170,7 @@ kubectl delete node <node>
 zeabur-installer uninstall --purge
 ```
 
-**删除 Kubernetes 节点后，还需要完成 VM 上的卸载。** 在卸载前，只要 `k3s-agent` 或 RKE2 重启，该 VM 就会再次加入集群。
+**删除 Kubernetes 节点后，还需要完成 VM 上的卸载**。在卸载前，只要 `k3s-agent` 或 RKE2 重启，该 VM 就会再次加入集群。
 
 `/var/lib/zeabur/storage` 下的卷会保留在 VM 上。确认不再需要这些数据后，再手动删除。
 
@@ -184,20 +184,20 @@ sudo zeabur-installer node sync
 
 ## 打开节点终端
 
-**节点终端** 会在主机上打开一个具有完整 root 权限的 shell。用管理员账号登录，在节点行点击 **节点终端**，查看即将创建的终端副本和时限，再点击 **打开终端**。
+**节点终端**会在主机上打开一个具有完整 root 权限的 shell。用管理员账号登录，在节点行点击**节点终端**，查看即将创建的终端副本和时限，再点击**打开终端**。
 
 <Callout type="warn">
 节点终端可以修改主机上的所有文件、进程和网络接口。在终端中执行的操作不经过 Zeabur 和 Kubernetes 的权限检查，也无法撤销。
 </Callout>
 
-节点会记录一条事件，注明谁在什么时间打开了终端。如果界面显示 **其他人也能进入这个终端**，说明有角色绑定允许集群管理员以外的人在终端所在的 Namespace 中创建副本。移除列出的角色绑定后，再重新检查。
+节点会记录一条事件，注明谁在什么时间打开了终端。如果界面显示**其他人也能进入这个终端**，说明有角色绑定允许集群管理员以外的人在终端所在的 Namespace 中创建副本。移除列出的角色绑定后，再重新检查。
 
-关闭终端时，Zeabur 会移除终端副本，副本最多保留 30 分钟。如果副本仍然存在，在节点下方的终端副本列表中点击 **移除终端副本**，检查后确认。
+关闭终端时，Zeabur 会移除终端副本，副本最多保留 30 分钟。如果副本仍然存在，在节点下方的终端副本列表中点击**移除终端副本**，检查后确认。
 
 ## 常见问题
 
 - 加入时无法连接服务器：确认新 VM 能访问 `node add` 输出的服务器地址。K3s 需要 TCP 6443，RKE2 需要 TCP 9345 和 6443，上表中的其他端口也要开放。
 - 新节点已就绪，但不同节点上的服务无法互相连接：检查 UDP 4789（K3s）或 8472（RKE2），以及网络策略是否已放行新节点。
-- `drain` 一直没有进展：它在等待 PodDisruptionBudget 放行，或停在不属于任何控制器的副本上。用 `kubectl get pdb -A` 查看哪个预算阻止了驱逐，处理后再运行一次。
-- 副本在新节点上处于 `Pending` 状态：它使用的是旧节点的 `local-path` 卷，需要等待旧节点恢复运行。
-- 终端副本 **无法启动**：查看该副本的事件，常见原因是镜像下载失败。
+- `drain` 一直没有进展：`drain` 在等待 PodDisruptionBudget 放行，或停在不属于任何控制器的副本上。用 `kubectl get pdb -A` 查看哪个预算阻止了驱逐，处理后再运行一次。
+- 副本在新节点上处于 `Pending` 状态：副本使用的是旧节点的 `local-path` 卷，需要等待旧节点恢复运行。
+- 终端副本**无法启动**：查看该副本的事件，常见原因是镜像下载失败。

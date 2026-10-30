@@ -4,21 +4,21 @@ description: 了解登入、機密、變更套用、終端機與 installer 的�
 source: "6a1b767cfd46"
 ---
 
-把同事設為 **開發者** 之前，先檢查專案裡有哪些 Secret 和 ServiceAccount：開發者都拿得到。開啟 **節點終端機** 等於取得整台主機的 root。Zeabur 沿用 Kubernetes 的身分和准入規則，下面依功能說明每一種存取的範圍。
+把同事設為**開發者**之前，先檢查專案裡有哪些 Secret 和 ServiceAccount：開發者都拿得到。開啟**節點終端機**等於取得整台主機的 root。Zeabur 沿用 Kubernetes 的身分和准入規則，下面依功能說明每一種存取的範圍。
 
 角色對照見[權限](./permissions.mdx)，安裝設定見[在既有叢集安裝](../get-started/install.mdx)和 [installer 設定](./installer-configuration.mdx)。
 
 ## 登入與認證資訊
 
-叢集內的 Zeabur 透過 Zeabur Identity 登入，每個送到 Kubernetes 的請求都帶著使用者自己的權杖。Zeabur 的 ServiceAccount 沒有綁定任何 Role，Pod 也不掛載它的 token。登入工作階段只存在伺服器程序的記憶體裡，Zeabur 重新啟動後要重新登入。
+叢集內的 Zeabur 透過 Zeabur Identity 登入，每個送到 Kubernetes 的請求都帶著使用者自己的權杖。Zeabur 的 ServiceAccount 沒有綁定任何 Role，Zeabur 的副本也不掛載這個 ServiceAccount 的 token。登入工作階段只存在伺服器程序的記憶體裡，Zeabur 重新啟動後要重新登入。
 
-Zeabur 自己持有的機密只有 OAuth client secret 和變更權杖金鑰。Chart 只接受事先建立好的 client Secret，不接受把 client secret 寫成 Helm value。能讀 Zeabur Namespace 的 Secret，或能 exec 進 Zeabur Pod 的權限，只給管理員。
+Zeabur 自己持有的機密只有 OAuth client secret 和變更權杖金鑰。Chart 只接受事先建立好的 client Secret，不接受把 client secret 寫成 Helm value。能讀 Zeabur Namespace 的 Secret，或能 exec 進 Zeabur 副本的權限，只給管理員。
 
 管理員帳號只能用通行密鑰登入，登入後就有整個叢集的完整權限，中間沒有再確認的步驟，所以管理員的日常工作最好改用另一個一般帳號。工作階段閒置 1 小時後結束，管理員帳號可改成 15 分鐘，開啟 AAL3 時也是 15 分鐘；最長 12 小時。在這之前權杖會自動更新。帳號類型、時間和 AAL3 見[權限](./permissions.mdx#管理員帳號和一般帳號)。
 
 ### Zeabur Identity 的內部憑證
 
-API server 從叢集內部連到 Zeabur Identity，取得驗證權杖用的公開金鑰。這條連線的憑證由 cert-manager 簽發，預設 90 天，到期前 30 天自動續期，不用重跑 `apply`。API server 只信任一個效期 10 年的根 CA，續期時根 CA 不變，API server 的設定也不用改。
+API server 從叢集內部連到 Zeabur Identity，取得驗證權杖用的公開金鑰。這條連線的憑證由 cert-manager 簽發，預設 90 天，到期前 30 天自動續期，不用再執行 `apply`。API server 只信任一個效期 10 年的根 CA，續期時根 CA 不變，API server 的設定也不用改。
 
 用叢集管理員的 kubeconfig 檢查，兩張憑證的 `READY` 都要是 `True`。`sudo zeabur-installer doctor` 也會檢查：
 
@@ -76,9 +76,9 @@ sudo zeabur-installer apply
 
 ## Secret 與一般設定
 
-能讀 Secret（包括 `list secrets`）就看得到它的值。**檢視者** 讀不到 Secret 和日誌，**開發者** 可以讀寫 Secret、讀日誌、在容器裡執行指令。日誌、ConfigMap 和工作負載裡直接寫的環境變數，也可能有應用程式寫出的敏感資料。
+能讀 Secret（包括 `list secrets`）就看得到 Secret 的值。**檢視者**讀不到 Secret 和日誌，**開發者**可以讀寫 Secret、讀日誌、在容器裡執行指令。日誌、ConfigMap 和工作負載裡直接寫的環境變數，也可能有應用程式寫出的敏感資料。
 
-**檢查變更** 畫面不顯示 Secret 的值，要寫入的機密放在加密的變更權杖裡帶到套用步驟。寫進 ConfigMap 的值仍是明文，誰能讀它由 RBAC 決定。
+**檢查變更**畫面不顯示 Secret 的值，要寫入的機密放在加密的變更權杖裡帶到套用步驟。寫進 ConfigMap 的值仍是明文，誰能讀 ConfigMap 由 RBAC 決定。
 
 已登錄的 S3 目的地，連線資訊放在 ConfigMap，金鑰放在 Secret。Chart 讓所有登入的人讀得到目的地清單，但讀不到那些 Secret。備份選用目的地時，金鑰會複製一份到備份所在的 Namespace。之後換金鑰，[已複製的副本](../cluster/s3-destinations.mdx)也要一起更新。
 
@@ -86,17 +86,17 @@ sudo zeabur-installer apply
 
 變更權杖以 AES-256-GCM 加密和驗證，綁定使用者名稱、群組、專案、請求和物件版本，10 分鐘內有效。換掉金鑰後，還沒套用的權杖都會失效。`zeaburctl ui` 每次啟動都產生新金鑰。
 
-套用前，Zeabur 重讀物件、核對版本，並以使用者當下的權限 dry-run 每一筆寫入。正式寫入時帶著 `resourceVersion` 或刪除前置條件，物件在這段時間被改過就不會寫入。
+套用前，Zeabur 重讀物件、核對版本，並以使用者當下的權限 dry-run 每一筆寫入。正式寫入時帶著 `resourceVersion` 或刪除前置條件，這段時間有人改過物件，就不會寫入。
 
-多個物件依序寫入，後面失敗時，前面寫成功的會留在叢集。依錯誤訊息列出的已套用項目確認現況，再重新 **檢查變更**。
+多個物件依序寫入，後面失敗時，前面寫成功的會留在叢集。依錯誤訊息列出的已套用項目確認現況，再重新**檢查變更**。
 
 ## 服務的安全性
 
-新專案的 Pod Security `enforce`、`audit`、`warn` 都是 `baseline`，開發者可以直接部署需要 root 的映像檔。服務設為 **嚴格** 時，以非 root 執行、不能提升權限、移除所有 capabilities，並使用 `RuntimeDefault` seccomp profile。
+新專案的 Pod Security `enforce`、`audit`、`warn` 都是 `baseline`，開發者可以直接部署需要 root 的映像檔。服務設為**嚴格**時，以非 root 執行、不能提升權限、移除所有 capabilities，並使用 `RuntimeDefault` seccomp profile。
 
-新增 Docker 映像檔服務時，Zeabur 會讀取映像檔的 `User`。數字 UID 不是 0（例如 `101`、`1000:1000`）時選 **嚴格**；沒有指定使用者，或指定 `root`、`0`、`nginx` 這類使用者名稱時選 **相容**。表單會說明選擇原因，建立前仍能切換。從 Git 部署時，Railpack 映像檔以 UID 1000 執行，預設選 **嚴格**；Dockerfile 預設選 **相容**，也能自行切換。Compose 匯入的服務使用 **相容**。
+新增 Docker 映像檔服務時，Zeabur 會讀取映像檔的 `User`。數字 UID 不是 0（例如 `101`、`1000:1000`）時選**嚴格**；沒有指定使用者，或指定 `root`、`0`、`nginx` 這類使用者名稱時選**相容**。表單會說明選擇原因，建立前仍能切換。從 Git 部署時，Railpack 映像檔以 UID 1000 執行，預設選**嚴格**；Dockerfile 預設選**相容**，也能自行切換。Compose 匯入的服務使用**相容**。
 
-既有服務切換 **嚴格** 或 **相容** 時，變更只影響該服務，不改 Namespace 標籤，也不需要管理員權限。套用後服務副本會替換。Chart 的 `zeabur-project-namespace` 政策仍禁止開發者修改 Namespace 標籤，包括任何 Pod Security 標籤。
+既有服務切換**嚴格**或**相容**時，變更只影響該服務，不改 Namespace 標籤，也不需要管理員權限。套用後服務副本會替換。Chart 的 `zeabur-project-namespace` 政策仍禁止開發者修改 Namespace 標籤，包括任何 Pod Security 標籤。
 
 管理員刻意設為 `restricted` 的專案仍會拒絕 root 容器。服務設定會顯示「這個專案只允許『嚴格』的服務，『相容』的服務無法啟動。請管理員把專案的 Pod Security 等級改為 baseline。」管理員對這些專案的 Namespace 各執行一次：
 
@@ -113,16 +113,16 @@ Pod Security 不管網路，專案之間的連線見下一節。
 
 ## 專案之間的網路
 
-Zeabur 的信任範圍是整個叢集：能登入的人都是可信任的使用者，Zeabur 沒有團隊的概念。要把彼此不信任的人分開，請分成不同的叢集。專案之間的網路隔離是為了減少意外：一個服務出問題或被入侵時，不會直接連到別的專案。
+Zeabur 的信任範圍是整個叢集：能登入的人都是可信任的使用者，Zeabur 沒有團隊的概念。要把彼此不信任的人分開，就分成不同的叢集。專案之間的網路隔離是為了減少意外：一個服務出問題或被入侵時，不會直接連到別的專案。
 
 ### 新專案裡有什麼
 
 用 installer 安裝的叢集，平台元件所在的 Namespace 都有 `zeabur.com/platform: "true"` 標籤。叢集裡有這個標籤時，Zeabur 建立專案會寫入三個物件：
 
 - Namespace，帶 `zeabur.com/project` 標籤和 Pod Security 標籤。
-- ServiceAccount `default`，`automountServiceAccountToken: false`。沒指定 ServiceAccount 的 Pod 不會拿到 token；要呼叫 Kubernetes API 的工作負載請自己指定 ServiceAccount。
-- NetworkPolicy `zeabur-project`：專案裡每個 Pod 都只收以下來源的連線，往外的連線不限制。
-  - 同一個專案的 Pod。
+- ServiceAccount `default`，`automountServiceAccountToken: false`。沒指定 ServiceAccount 的副本不會拿到 token；要呼叫 Kubernetes API 的工作負載要自己指定 ServiceAccount。
+- NetworkPolicy `zeabur-project`：專案裡每個副本都只收以下來源的連線，往外的連線不限制。
+  - 同一個專案的副本。
   - 帶 `zeabur.com/platform: "true"` 的 Namespace，也就是 Ingress controller、指標收集和資料庫 operator 這些平台元件。
   - `kube-system`，k3s 的 Traefik 和 ServiceLB 在這裡。
 
@@ -156,7 +156,7 @@ NetworkPolicy 要叢集的網路外掛（CNI）支援才會生效。installer �
 
 ### 讓另一個專案連進來
 
-在專案的 **設定** → **網路** 選 **允許其他專案連入**，或用 kubectl 加一個 NetworkPolicy。以下讓 `blog` 的所有 Pod 連到 `shop` 的所有服務：
+在專案的**設定** → **網路**選**允許其他專案連入**，或用 kubectl 加一個 NetworkPolicy。以下讓 `blog` 的所有副本連到 `shop` 的所有服務：
 
 ```yaml
 apiVersion: networking.k8s.io/v1
@@ -173,7 +173,7 @@ spec:
             matchLabels: {kubernetes.io/metadata.name: blog}
 ```
 
-NetworkPolicy 只能允許、不能拒絕，多個 NetworkPolicy 的規則會疊加，所以這個物件只會多開放 `blog`，不會影響 `zeabur-project`。要收回，刪掉它即可：
+NetworkPolicy 只能允許、不能拒絕，多個 NetworkPolicy 的規則會疊加，所以這個物件只會多開放 `blog`，不會影響 `zeabur-project`。要收回，刪掉這個物件即可：
 
 ```sh
 kubectl -n shop delete networkpolicy zeabur-allow-from-blog
@@ -183,13 +183,13 @@ kubectl -n shop delete networkpolicy zeabur-allow-from-blog
 
 ### 既有的專案
 
-這項功能之前建立的專案沒有 `zeabur-project`。`zeaburctl doctor` 的 `cluster-gaps` 會列出這些專案，專案頁的建議也會提供 **隔離** 的變更。也可以直接用 kubectl 套用上面的 YAML。
+這項功能之前建立的專案沒有 `zeabur-project`。`zeaburctl doctor` 的 `cluster-gaps` 會列出這些專案，專案頁的建議也會提供**隔離**的變更。也可以直接用 kubectl 套用上面的 YAML。
 
-**開發者** 可以修改或刪除自己專案的 NetworkPolicy。刪掉 `zeabur-project` 只會讓自己的專案對其他專案開放，`zeaburctl doctor` 會繼續提醒。
+**開發者**可以修改或刪除自己專案的 NetworkPolicy。刪掉 `zeabur-project` 只會讓自己的專案對其他專案開放，`zeaburctl doctor` 會繼續提醒。
 
 ### 專案之間的網域
 
-同一個叢集裡，專案之間不會互相保護網域。兩個專案可以設定同一個網域，Traefik 會把這些路由合併，請求可能送到另一個專案的服務。需要分開的團隊，請使用不同的叢集。
+同一個叢集裡，專案之間不會互相保護網域。兩個專案可以設定同一個網域，Traefik 會把這些路由合併，請求可能送到另一個專案的服務。需要分開的團隊，就使用不同的叢集。
 
 ## 終端機
 
@@ -197,33 +197,33 @@ kubectl -n shop delete networkpolicy zeabur-allow-from-blog
 
 容器終端機用你自己的 `pods/exec` 權限，能讀到這個容器掛載的磁碟區、Secret 和 ServiceAccount token。
 
-沒有 shell 的容器，Zeabur 會加一個除錯容器。Pod 或容器有指定使用者時，除錯容器用同一個使用者執行。它移除所有 capabilities，透過 `targetContainerName` 共享目標容器的程序空間，並在相同路徑掛上目標容器的磁碟區。Kubernetes 不會移除 ephemeral container，關閉終端機後它仍留在 Pod 裡，直到 Pod 被替換。
+沒有 shell 的容器，Zeabur 會加一個除錯容器。副本或容器有指定使用者時，除錯容器用同一個使用者執行，移除所有 capabilities，用 `targetContainerName` 共享目標容器的程序空間，並在相同路徑掛上目標容器的磁碟區。Kubernetes 不會移除 ephemeral container，關閉終端機後，副本替換之前除錯容器都會留在副本裡。
 
 ### kubectl 終端機
 
-Zeabur 在短暫的 tools Pod 裡提供 `kubectl` 和 `helm`，使用登入者當下的權杖。專案的 kubectl 終端機從搜尋開啟，整個叢集的從 **叢集** 頁標題旁的 **開啟 kubectl 終端機** 開啟。kubeconfig 透過 exec 的標準輸入寫進記憶體型的 `emptyDir`，不會出現在 Pod spec、環境變數、ConfigMap 或 Secret 裡。
+Zeabur 在短暫的 tools 副本裡提供 `kubectl` 和 `helm`，使用登入者當下的權杖。專案的 kubectl 終端機從搜尋開啟，整個叢集的從**叢集**頁標題旁的**開啟 kubectl 終端機**開啟。kubeconfig 透過 exec 的標準輸入寫進記憶體型的 `emptyDir`，不會出現在 Pod spec、環境變數、ConfigMap 或 Secret 裡。
 
-所有 tools Pod 都放在 chart 建立的 `zeabur-terminals` Namespace（`terminal.namespace`），kubectl 預設在你開啟它的專案。Zeabur 先請 kube-apiserver 確認你能在專案的容器裡執行指令（整個叢集的則要是叢集管理員），再用 Zeabur 自己的 ServiceAccount 建立 Pod 並開啟終端機。
+所有 tools 副本都放在 chart 建立的 `zeabur-terminals` Namespace（`terminal.namespace`），kubectl 預設在你開啟終端機的專案。Zeabur 先請 kube-apiserver 確認你能在專案的容器裡執行指令（整個叢集的則要是叢集管理員），再用 Zeabur 自己的 ServiceAccount 建立副本並開啟終端機。
 
 <Callout type="warn">
-在權杖到期前，能讀到這份 kubeconfig 的只有 Zeabur 本身、叢集管理員，以及 Pod 所在節點的管理員。不要把 `zeabur-terminals` 的權限給其他人。
+在權杖到期前，能讀到這份 kubeconfig 的只有 Zeabur 本身、叢集管理員，以及副本所在節點的管理員。不要把 `zeabur-terminals` 的權限給其他人。
 </Callout>
 
-tools Pod 預設最多執行 30 分鐘。最後一個終端機關閉時，Zeabur 立刻刪掉 kubeconfig，60 秒後刪除 Pod。
+tools 副本預設最多執行 30 分鐘。最後一個終端機關閉時，Zeabur 立刻刪掉 kubeconfig，60 秒後刪除副本。
 
 ### 節點終端機
 
-**節點終端機** 用 privileged Pod、host PID／network／IPC 和 `nsenter` 進入主機，取得完整的 root 權限，在裡面做的事不會經過 **檢查變更**。
+**節點終端機**用 privileged 副本、host PID／network／IPC 和 `nsenter` 進入主機，取得完整的 root 權限，在裡面做的事不會經過**檢查變更**。
 
-節點終端機只給叢集管理員，Pod 放在專用的 privileged Namespace。只要有 RBAC binding 讓管理員和 Kubernetes 元件以外的人能在那裡建立 Pod 或執行指令，Zeabur 就拒絕開啟。每次開啟都會在節點上記一筆 Event，`kubectl describe node` 看得到誰在什麼時候開過。終端機關閉時 Zeabur 刪除 Pod。
+節點終端機只給叢集管理員，終端機副本放在專用的 privileged Namespace。只要有 RBAC binding 讓管理員和 Kubernetes 元件以外的人能在那裡建立副本或執行指令，Zeabur 就拒絕開啟。每次開啟都會在節點上記一筆 Event，`kubectl describe node` 看得到誰在什麼時候開過。終端機關閉時 Zeabur 刪除終端機副本。
 
 ## 指標與歷史日誌
 
 能透過 `services/proxy` 查詢 metrics store 的人，也查得到同一個 metrics store 裡其他專案的指標。
 
-Zeabur Proxy 啟用後，用量歷史改由它讀取預設的 metrics store。使用者要能在該 Namespace `get metrics.proxy.zeabur.com`，每個查詢也會加上 VictoriaMetrics 的 `extra_label=namespace=<Namespace>`，所以只拿得到這個 Namespace 的 series。Proxy 只開放查詢、範圍查詢、series、label 名稱和 label 值這幾個 API，匯出、federate 和 TSDB 狀態都拒絕。
+Zeabur Proxy 啟用後，用量歷史改由 Proxy 讀取預設的 metrics store。使用者要能在該 Namespace `get metrics.proxy.zeabur.com`，每個查詢也會加上 VictoriaMetrics 的 `extra_label=namespace=<Namespace>`，所以只拿得到這個 Namespace 的 series。Proxy 只開放查詢、範圍查詢、series、label 名稱和 label 值這幾個 API，匯出、federate 和 TSDB 狀態都拒絕。
 
-Zeabur Proxy 啟用後（chart 預設關閉，安裝器在裝了 VictoriaLogs 或 VictoriaMetrics 時會打開；沒裝 VictoriaLogs 時，`proxy.logs.enabled` 設為 false，Proxy 只提供用量歷史），使用者要能在該 Namespace `get logs.proxy.zeabur.com`，才讀得到它的歷史日誌，查詢也只限於這個 Namespace。VictoriaLogs 本身如果能直接連線，就能繞過這層檢查，要另外限制。
+Zeabur Proxy 啟用後（chart 預設關閉，安裝器在裝了 VictoriaLogs 或 VictoriaMetrics 時會打開；沒裝 VictoriaLogs 時，`proxy.logs.enabled` 設為 false，Proxy 只提供用量歷史），使用者要能在該 Namespace `get logs.proxy.zeabur.com`，才讀得到這個 Namespace 的歷史日誌，查詢也只限於這個 Namespace。VictoriaLogs 本身如果能直接連線，就能繞過這層檢查，要另外限制。
 
 ## 機密的加密與存取紀錄
 
@@ -266,7 +266,7 @@ K3s 的資料存在 SQLite，沒有 etcd 快照。備份就是在 `k3s` 停止�
 
    把 `/root/k3s-db-backup` 和 `/var/lib/rancher/k3s/server/token` 複製到伺服器以外的地方，兩者分開放。
 
-2. 重複執行 `sudo k3s secrets-encrypt status`，直到 `Current Rotation Stage` 顯示 `reencrypt_finished`。
+2. 重複執行 `sudo k3s secrets-encrypt status`，等到 `Current Rotation Stage` 顯示 `reencrypt_finished` 再繼續。
 
 完整步驟見 [K3s 的 secrets-encrypt](https://docs.k3s.io/cli/secrets-encrypt)。
 
@@ -281,9 +281,9 @@ K3s 的資料存在 SQLite，沒有 etcd 快照。備份就是在 `k3s` 停止�
    sudo rke2 secrets-encrypt rotate-keys
    ```
 
-   `rotate-keys` 會產生新金鑰，並用它重新加密所有 Secret。
+   `rotate-keys` 會產生新金鑰，並用新金鑰重新加密所有 Secret。
 
-2. 重複執行 `sudo rke2 secrets-encrypt status`，直到 `Current Rotation Stage` 顯示 `reencrypt_finished`。
+2. 重複執行 `sudo rke2 secrets-encrypt status`，等到 `Current Rotation Stage` 顯示 `reencrypt_finished` 再繼續。
 3. 有多台 server 時，逐台重新啟動每台 server，包括剛才那台。等指令結束再換下一台：
 
    ```sh
@@ -304,7 +304,7 @@ sudo grep '"resource":"secrets"' /var/lib/rancher/k3s/server/logs/audit.log \
 
 RKE2 把路徑裡的 `k3s` 換成 `rke2`。`watch` 開始時記一筆 `ResponseStarted`，結束時才有 `ResponseComplete`。一次 `list` 或 `watch` 整個 Namespace 的 Secret 時，紀錄裡沒有名稱，要拿掉名稱那一行，改用 Namespace 篩選。
 
-installer 寫入稽核政策（權限 `0600`），K3s 或 RKE2 依它在每台 server 上記錄，只有 root 能讀。
+installer 寫入稽核政策（權限 `0600`），K3s 或 RKE2 依這份政策在每台 server 上記錄，只有 root 能讀。
 
 | | K3s | RKE2 |
 |---|---|---|
@@ -367,13 +367,13 @@ kubectl patch validatingadmissionpolicybinding zeabur-system-hosts-zeabur \
 
 ## Installer 的主機與下載權限
 
-installer 以 root 寫入 K3s 或 RKE2 的設定和 systemd unit、調整 kernel 參數。用 RKE2 時還會建立 `etcd` 使用者。選了 Longhorn 時還會安裝主機套件。GUI 以明文 HTTP 提供，讓它只監聽 loopback，透過 SSH tunnel 連線。
+installer 以 root 寫入 K3s 或 RKE2 的設定和 systemd unit、調整 kernel 參數。用 RKE2 時還會建立 `etcd` 使用者。選了 Longhorn 時還會安裝主機套件。GUI 以明文 HTTP 提供，讓 GUI 只監聽 loopback，經由 SSH tunnel 連線。
 
 預設的 K3s 或 RKE2 版本用編譯進 installer 的 SHA-256 digest 驗證，信任來自 installer 本身的簽章。指定其他 `k3sVersion` 或 `rke2Version` 時，只能用該 release 頁面上的 checksum 清單驗證。`sources` 指定的檔案、映像檔和 chart 不在釘選範圍內，使用前先依[發行檔與驗證](./releases.mdx)確認來源。
 
 Catalog 元件的 chart 和 manifest 檔，installer 會先下載，跟 Catalog 寫的 SHA-256 比對，不一樣就停止安裝。比對過的 chart 直接放進 `HelmChart`，helm-controller 不會再自己下載一次。元件的映像檔在 Catalog 裡也用 digest 指定，上游換掉同一個 tag 的內容也不會裝到。
 
-K3s 和 RKE2 都做一樣的 CIS 強化，也都加密存下來的 Secret，見[機密的加密與存取紀錄](#機密的加密與存取紀錄)。RKE2 用它自己的 CIS profile；K3s 則由 installer 照 [K3s 的 CIS 強化指南](https://docs.k3s.io/security/hardening-guide)設定：
+K3s 和 RKE2 都做一樣的 CIS 強化，也都加密存下來的 Secret，見[機密的加密與存取紀錄](#機密的加密與存取紀錄)。RKE2 用自己的 CIS profile；K3s 則由 installer 照 [K3s 的 CIS 強化指南](https://docs.k3s.io/security/hardening-guide)設定：
 
 - CIS 要求的 kernel 參數，用 `protect-kernel-defaults` 強制檢查。
 - 開啟 `NodeRestriction` 和 `EventRateLimit` 准入外掛。沒有自己標籤的 Namespace 預設 Pod Security `restricted`，`kube-system` 除外。
@@ -382,16 +382,16 @@ K3s 和 RKE2 都做一樣的 CIS 強化，也都加密存下來的 Secret，見[
 - `kube-system`、`kube-public`、`default` 三個 Namespace 加上 NetworkPolicy，只讓同一個 Namespace 的副本連進來，CoreDNS 則所有副本都連得到；預設 ServiceAccount 不掛載權杖。
 - 管理員 kubeconfig 和 TLS 憑證只有 root 能讀。
 
-K3s 改用 Calico 取代 flannel，由它執行 NetworkPolicy。
+K3s 改用 Calico 取代 flannel，由 Calico 執行 NetworkPolicy。
 
 主機磁碟有沒有加密另外檢查。設 `host.requireEncryptedDisk: true` 時，沒加密就不安裝。
 
 ### 自己用的安裝
 
-自己用的安裝跑在 KubeSolo 上，沒有上面這些保護。拿到 `/etc/zeabur-installer/kubeconfig.yaml` 的人可以控制整個叢集。KubeSolo 不執行網路政策，Zeabur 為專案建立的網路政策不會生效，專案之間也就沒有隔離。KubeSolo 把資料存在 SQLite，installer 不替 Secret 另外加密，也不套用 CIS profile。這樣的安裝只適合一個人用，見[自己用：在小機器上安裝](../get-started/personal.mdx)。
+自己用的安裝在 KubeSolo 上執行，沒有上面這些保護。拿到 `/etc/zeabur-installer/kubeconfig.yaml` 的人可以控制整個叢集。KubeSolo 不執行網路政策，Zeabur 為專案建立的網路政策不會生效，專案之間也就沒有隔離。KubeSolo 把資料存在 SQLite，installer 不替 Secret 另外加密，也不套用 CIS profile。這樣的安裝只適合一個人用，見[自己用：在小機器上安裝](../get-started/personal.mdx)。
 
-helm-controller 照上游的設定執行，它的 ServiceAccount 有整個叢集的權限，安裝元件的 Job 也用同一個身分。
+helm-controller 照上游的設定執行，ServiceAccount 有整個叢集的權限，安裝元件的 Job 也用同一個身分。
 
 ## 私下回報漏洞
 
-透過 [GitHub 私密漏洞回報](https://github.com/zeabur-oss/zeabur/security/advisories/new) 提供版本或 commit、執行方式、Kubernetes 發行版和版本，以及重現步驟。Zeabur Identity 的漏洞送到 [Zeabur Identity 的私密回報](https://github.com/zeabur-oss/identity/security/advisories/new)。安全問題請不要開公開 issue、discussion 或 pull request。
+透過 [GitHub 私密漏洞回報](https://github.com/zeabur-oss/zeabur/security/advisories/new)提供版本或 commit、執行方式、Kubernetes 發行版和版本，以及重現步驟。Zeabur Identity 的漏洞送到 [Zeabur Identity 的私密回報](https://github.com/zeabur-oss/identity/security/advisories/new)。安全問題請不要開公開 issue、discussion 或 pull request。

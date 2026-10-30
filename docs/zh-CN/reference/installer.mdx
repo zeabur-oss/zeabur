@@ -25,7 +25,7 @@ sudo zeabur-installer --config /etc/zeabur-installer/config.yaml plan
 sudo zeabur-installer --config /etc/zeabur-installer/config.yaml plan --json
 ```
 
-`plan` 读取配置、Catalog 和主机信息，列出 Kubernetes 的类型（K3s 或 RKE2）、组件、Namespace、主机文件、存储类、内存估算和提醒，然后运行与 `apply` 相同的主机检查，不会修改主机。如果有检查未通过，它会提示 `apply` 将停止。添加 `--json` 可输出 JSON，此时不运行主机检查。
+`plan` 读取配置、Catalog 和主机信息，列出 Kubernetes 的类型（K3s 或 RKE2）、组件、Namespace、主机文件、存储类、内存估算和提醒，然后运行与 `apply` 相同的主机检查，不会修改主机。如果有检查未通过，`plan` 会提示 `apply` 将停止。添加 `--json` 可输出 JSON，此时不运行主机检查。
 
 没有配置文件时，`plan` 会根据主机地址生成 `sslip.io` 名称，搭配默认组件，让你先查看结果。主机有公网地址时使用 `domain` 证书模式（Let's Encrypt），只有私有、CGNAT 或 link-local 地址时使用 `local`。`apply` 必须有配置文件。
 
@@ -45,14 +45,14 @@ sudo zeabur-installer doctor
 1. 为选定的组件准备主机软件包，例如 Longhorn 需要的 iSCSI 和 NFS client。
 2. 写入 K3s 或 RKE2 的配置、CIS 要求的 kernel 参数，以及审计策略。审计记录只包含请求的 metadata，会记录每次 Secret 请求，见[机密变量的加密与访问记录](./security.mdx#机密的加密与访问记录)。
 3. 将 K3s 或 RKE2 下载到 `/var/lib/rancher/zeabur-installer/downloads`，用 installer 固定的 SHA-256 校验，启动 `k3s` 或 `rke2-server`，等待 API 和节点就绪。
-4. 创建组件的 Namespace、基准 NetworkPolicy 和存储类。CIS 在 `kube-system` 中的默认策略会阻止外部流量访问 ServiceLB。如果节点上没有 Traefik，从该节点进入的请求就无法到达 Traefik，因此 installer 会额外添加 `kube-system/zeabur-installer-servicelb`，仅允许外部流量进入 ServiceLB 的 Pod。
+4. 创建组件的 Namespace、基准 NetworkPolicy 和存储类。CIS 在 `kube-system` 中的默认策略会阻止外部流量访问 ServiceLB。如果节点上没有 Traefik，从该节点进入的请求就无法到达 Traefik，因此 installer 会额外添加 `kube-system/zeabur-installer-servicelb`，仅允许外部流量进入 ServiceLB 的副本。
 5. 按 Catalog 顺序安装组件并等待就绪。每个 chart 和 manifest 文件都会先下载，如果 SHA-256 与 Catalog 中的值不同，就会停止。
 6. 如果配置了 `zeabur: true`，先添加 `zeabur-system-hosts` 准入策略，禁止项目使用 Zeabur 和 Zeabur Identity 的域名，见[Zeabur 和 Zeabur Identity 的域名](./security.mdx#zeabur-和-zeabur-identity-的域名)。然后安装 Zeabur Identity、让 API server 信任它、注册 OAuth client，最后安装 Zeabur。API server 连接 Zeabur Identity 所用的证书由 cert-manager 自动续期，见[Zeabur Identity 的内部证书](./security.mdx#zeabur-identity-的内部证书)。
 7. 首次安装时，输出首位管理员的设置链接（24 小时内有效，只能使用一次），并将安装记录写入 `kube-system/zeabur-installer` ConfigMap。
 
 完成后会输出 Zeabur 和 Zeabur Identity 的网址。打开设置链接、添加通行密钥后，就能登录 Zeabur 查看集群。`local` 模式需要先让浏览器信任 installer 生成的 CA。
 
-`apply` 会将 installer 管理的文件改回它生成的内容。自定义配置应写在 `/etc/rancher/k3s/config.yaml.d/90-local.yaml`（K3s）或 `/etc/rancher/rke2/config.yaml.d/90-local.yaml`（RKE2）中，不要修改 installer 生成的 `config.yaml`。
+`apply` 会将 installer 管理的文件改回 installer 生成的内容。自定义配置应写在 `/etc/rancher/k3s/config.yaml.d/90-local.yaml`（K3s）或 `/etc/rancher/rke2/config.yaml.d/90-local.yaml`（RKE2）中，不要修改 installer 生成的 `config.yaml`。
 
 ## `gui`
 
@@ -62,7 +62,7 @@ sudo zeabur-installer doctor
 sudo zeabur-installer gui
 ```
 
-在自己的电脑上建立 SSH 隧道：
+在自己的电脑上创建 SSH 隧道：
 
 ```sh
 ssh -L 8085:127.0.0.1:8085 root@server.example.com
@@ -71,7 +71,7 @@ ssh -L 8085:127.0.0.1:8085 root@server.example.com
 打开服务器输出的完整链接。GUI 默认监听 `127.0.0.1:8085`，使用 `--listen <address:port>` 修改地址。GUI 写入的是同一份配置文件，点击安装时运行的也是同一个 `apply`。各步骤的界面见[在一台服务器上安装 Zeabur](../get-started/quickstart.mdx)。
 
 <Callout type="warn">
-GUI 以 root 权限修改这台主机。让它只监听 loopback，通过 SSH 隧道访问。如果改为对外地址，登录令牌和安装配置会通过明文 HTTP 传输。
+GUI 以 root 权限修改这台主机。让 GUI 只监听 loopback，通过 SSH 隧道访问。如果改为对外地址，登录令牌和安装配置会通过明文 HTTP 传输。
 </Callout>
 
 安装完成后，按 `Ctrl-C` 关闭 GUI，K3s/RKE2 和已安装的服务会继续运行。
@@ -82,9 +82,9 @@ GUI 以 root 权限修改这台主机。让它只监听 loopback，通过 SSH �
 sudo zeabur-installer doctor
 ```
 
-在创建集群的 server 上，`doctor` 检查 K3s 或 RKE2 的 unit、API、安装记录中的组件、默认存储类、Zeabur 和 Zeabur Identity 的 Deployment、Zeabur Identity 的内部证书、节点地址、基准网络策略、存储的 Secret 是否加密，以及 `/var/lib/rancher` 是否加密。它依据上次 `apply` 的记录进行比对；修改 YAML 后，需要重新运行 `apply` 才会生效。
+在创建集群的 server 上，`doctor` 检查 K3s 或 RKE2 的 unit、API、安装记录中的组件、默认存储类、Zeabur 和 Zeabur Identity 的 Deployment、Zeabur Identity 的内部证书、节点地址、基准网络策略、存储的 Secret 是否加密，以及 `/var/lib/rancher` 是否加密。`doctor` 依据上次 `apply` 的记录进行比对；修改 YAML 后，需要重新运行 `apply` 才会生效。
 
-在加入已有集群的节点上，它检查本机的 `k3s-agent` 或 RKE2 unit、Node 是否就绪、到 server 的连接和延迟，以及磁盘加密。如果节点是 server，还会比对 Zeabur Identity 的认证配置。
+在加入已有集群的节点上，`doctor` 检查本机的 `k3s-agent` 或 RKE2 unit、Node 是否就绪、到 server 的连接和延迟，以及磁盘加密。如果节点是 server，还会比对 Zeabur Identity 的认证配置。
 
 | 退出码 | 含义 |
 |---|---|
@@ -111,7 +111,7 @@ sudo zeabur-installer node add --role server --address 10.0.0.5
 | `--address` | 默认为当前节点的 `InternalIP`，新主机使用此地址连接这台 server |
 | `--ttl` | worker 令牌的有效期，默认为 `1h`，可填写 `30m`、`1h` 等，最长 `24h` |
 
-`node add` 输出新 VM 需要使用的 join YAML 和命令。新 VM 必须与当前主机位于同一家云服务商的同一区域，可以位于不同可用区。worker 使用会过期的 bootstrap token。server 使用集群的 server token，不会过期，`--ttl` 对它无效。输出内容等同于密码，保存到新主机时，应将权限设为 `0600`。
+`node add` 输出新 VM 需要使用的 join YAML 和命令。新 VM 必须与当前主机位于同一家云服务商的同一区域，可以位于不同可用区。worker 使用会过期的 bootstrap token。server 使用集群的 server token，不会过期，`--ttl` 对 server 无效。输出内容等同于密码，保存到新主机时，应将权限设为 `0600`。
 
 新主机应用 join 配置后，在已有 server 上运行：
 
@@ -123,9 +123,9 @@ sudo zeabur-installer node sync
 
 ## 卸载组件
 
-组件只能通过 installer 安装和卸载。在 `gui` 的 **组件** 中取消勾选，或从配置文件的 `enable` 中移除；默认安装的组件则添加到 `disable`，然后运行 `apply`。个人使用的安装也一样。
+组件只能通过 installer 安装和卸载。在 `gui` 的**组件**中取消勾选，或从配置文件的 `enable` 中移除；默认安装的组件则添加到 `disable`，然后运行 `apply`。个人使用的安装也一样。
 
-`plan` 会在“Removed”中列出要卸载的组件、会保留的内容，以及会删除的 CRD。`apply` 等待集群启动后，先卸载组件，再创建 Namespace、存储类和其他组件。如果其他组件依赖某个组件，就会将它排在后面卸载。对于每个组件，`apply` 会删除 `kube-system` 中带有 `app.kubernetes.io/managed-by: zeabur-installer` 标签和 `installer.zeabur.com/component: <capability>/<id>` 注解的 `HelmChart`，然后等待 helm-controller 的 `helm-delete-<chart>` Job 完成卸载。
+`plan` 会在“Removed”中列出要卸载的组件、会保留的内容，以及会删除的 CRD。`apply` 等待集群启动后，先卸载组件，再创建 Namespace、存储类和其他组件。其他组件依赖的组件会排在后面卸载。对于每个组件，`apply` 会删除 `kube-system` 中带有 `app.kubernetes.io/managed-by: zeabur-installer` 标签和 `installer.zeabur.com/component: <capability>/<id>` 注解的 `HelmChart`，然后等待 helm-controller 的 `helm-delete-<chart>` Job 完成卸载。
 
 installer 只卸载自己安装的组件。通过 Helm、Flux 或 Argo CD 安装的组件没有这个注解，会保留。Catalog 中已不再列出的组件也会保留，`plan` 会提醒并给出 `kubectl delete` 命令。
 
@@ -139,9 +139,9 @@ Chart 放在 templates 中的 CRD 会在卸载时一并删除，集群中这些 
 | Longhorn | 仍有 driver 为 `driver.longhorn.io` 的 PersistentVolume |
 | Zeabur Builder | 在 zot 的 Namespace 之外，仍有副本使用 `zot.zot.svc:5000` 的镜像 |
 
-先删除或迁移这些对象。Trivy Operator 的报告由它自行生成，不计入其中。
+先删除或迁移这些对象。Trivy Operator 的报告由 Trivy Operator 自行生成，不计入其中。
 
-如果卸载会删除组件保存的数据，还需要将组件 ID 写入 `allowDataLoss`（`gui` 会在 **确认** 中通过复选框询问）。将 Longhorn 写入后，`apply` 会把它的 `deleting-confirmation-flag` 设为 `true`，否则 Longhorn 会拒绝卸载；每个卷的副本也会一并删除。
+如果卸载会删除组件保存的数据，还需要将组件 ID 写入 `allowDataLoss`（`gui` 会在**确认**中通过复选框询问）。将 Longhorn 写入后，`apply` 会把 Longhorn 的 `deleting-confirmation-flag` 设为 `true`，否则 Longhorn 会拒绝卸载；每个卷的副本也会一并删除。
 
 确认不再需要保留的内容后，可以手动删除：
 
@@ -160,11 +160,11 @@ sudo zeabur-installer uninstall zeabur
 
 只卸载 Zeabur，保留 K3s/RKE2、Zeabur Identity、Catalog 组件和应用。`uninstall zeabur` 还会删除 Zeabur 为成员创建的 RoleBinding 和 ClusterRoleBinding。
 
-`uninstall identity` 会一并卸载 Zeabur Identity，并清空 API server 对它的信任配置。运行前，先按照[卸载 Zeabur](../leave/uninstall.mdx)准备其他登录方式。如果集群有多台 server，其他 server 需要各自运行一次 `sudo zeabur-installer apply`，才会停止信任 Zeabur Identity 的令牌，命令会列出这些 server。
+`uninstall identity` 会一并卸载 Zeabur Identity，并清空 API server 对 Zeabur Identity 的信任配置。运行前，先按照[卸载 Zeabur](../leave/uninstall.mdx) 准备其他登录方式。如果集群有多台 server，其他 server 需要各自运行一次 `sudo zeabur-installer apply`，才会停止信任 Zeabur Identity 的令牌，命令会列出这些 server。
 
-在加入集群的节点上运行 `uninstall`，它只会输出需要依次运行的命令：drain、删除 Node、运行 K3s 或 RKE2 的卸载脚本、同步网络策略。这些步骤见[添加和维护节点](../cluster/nodes.mdx#移除节点)。
+在加入集群的节点上运行 `uninstall`，只会输出需要依次运行的命令：drain、删除 Node、运行 K3s 或 RKE2 的卸载脚本、同步网络策略。这些步骤见[添加和维护节点](../cluster/nodes.mdx#移除节点)。
 
-卸载 K3s 或 RKE2 后，`uninstall --purge` 会清除 installer 的下载缓存、本地 CA 副本和配置，保留卷。`--purge` 不能与 `zeabur`、`identity` 一起使用。要保留集群，就不要运行 K3s 或 RKE2 的卸载脚本或 `--purge`。
+卸载 K3s 或 RKE2 后，`uninstall --purge` 会清除 installer 的下载缓存、本地保存的 CA 证书和配置，保留卷。`--purge` 不能与 `zeabur`、`identity` 一起使用。要保留集群，就不要运行 K3s 或 RKE2 的卸载脚本或 `--purge`。
 
 ### 个人使用的安装
 
@@ -174,7 +174,7 @@ sudo zeabur-installer uninstall zeabur
 
 - 主机检查失败：根据输出释放端口或修复磁盘，再重新运行 `plan`、`apply`。
 - Kubernetes 未启动：K3s 查看 `sudo journalctl -u k3s`，worker 查看 `k3s-agent`；RKE2 查看 `sudo journalctl -u rke2-server`，worker 查看 `rke2-agent`。
-- 组件卡在 Helm 安装阶段：`doctor` 会指出 `kube-system` 中的 `helm-install-<name>` Job，查看它的日志。
+- 组件卡在 Helm 安装阶段：`doctor` 会指出 `kube-system` 中的 `helm-install-<name>` Job，查看这个 Job 的日志。
 - 新节点已就绪，但部分系统服务无法连接：先在 server 上运行 `node sync`，再查看 `doctor` 的网络策略检查。
 
 要撤销安装，按照[卸载流程](../leave/uninstall.mdx)选择只卸载 Zeabur，或清理整台测试机。删除应用的 Namespace 不会卸载 Zeabur，只会删除应用。

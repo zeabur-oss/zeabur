@@ -4,9 +4,9 @@ description: 刪除專案的 Namespace 和裡面的所有東西，先看清楚�
 source: "7aadf6e873a3"
 ---
 
-專案就是一個 Kubernetes Namespace。在專案 **設定** 的 **危險區域** 按 **刪除專案**，Zeabur 會刪掉這個 Namespace 和裡面的服務、資料庫、磁碟區、設定與機密，效果和 `kubectl delete namespace` 一樣。刪除後無法復原，只能從備份建立回來。
+專案就是一個 Kubernetes Namespace。在專案**設定**的**危險區域**按**刪除專案**，Zeabur 會刪掉這個 Namespace 和裡面的服務、資料庫、磁碟區、設定與機密，效果和 `kubectl delete namespace` 一樣。刪除後無法復原，只能從備份建立回來。
 
-只想讓 Namespace 不再出現在 Zeabur，改用同一處的 **從 Zeabur 移除**，它只拿掉專案標籤，什麼都不刪。
+只想讓 Namespace 不再出現在 Zeabur，改用同一處的**從 Zeabur 移除**：只拿掉專案標籤，什麼都不刪除。
 
 ## 開始前
 
@@ -20,21 +20,21 @@ source: "7aadf6e873a3"
 
 ### 看哪些會一起刪除
 
-按 **刪除專案** 後，檢查畫面分成兩部分。**會一起刪除** 列出：
+按**刪除專案**後，檢查畫面分成兩部分。**會一起刪除**列出：
 
 - 服務的名稱。
-- 每個資料庫和它上次備份的時間。
+- 每個資料庫和上次備份的時間。
 - 每個磁碟區、上次備份的時間，以及資料會不會留下。磁碟區的 PersistentVolume 設定 `Retain` 時，資料會留在那個 PersistentVolume；設定 `Delete` 時，資料跟著刪除。讀不到 PersistentVolume 時，Zeabur 改看 StorageClass 的 `reclaimPolicy`，兩者都讀不到就直接說不確定。
-- 你在這個專案開過的工具 Pod。它們在 `zeabur-terminals`，Zeabur 會在 Namespace 刪除後一併清掉。
+- 你在這個專案開過的工具 Pod。這些 Pod 在 `zeabur-terminals` 裡，Zeabur 會在 Namespace 刪除後一併清掉。
 
-資料庫或磁碟區一天內沒有成功的備份時，旁邊會出現 **先備份一次**。按下去會改成檢查這次備份，套用後等備份跑完，再回來刪除專案。這個按鈕用的是資料庫頁和磁碟區備份原本的 **立即備份**，只有已經設定好備份的資料庫和磁碟區會出現。
+資料庫或磁碟區一天內沒有成功的備份時，旁邊會出現**先備份一次**。按下去會改成檢查這次備份，套用後等備份完成，再回來刪除專案。這個按鈕用的是資料庫頁和磁碟區備份原本的**立即備份**，只有已經設定好備份的資料庫和磁碟區會出現。
 
 </Step>
 <Step>
 
 ### 看哪些會留下
 
-**會留下** 列出 S3 裡的備份，以及專案以外的東西，例如其他專案和叢集設定。
+**會留下**列出 S3 裡的備份，以及專案以外的東西，例如其他專案和叢集設定。
 
 K8up 的磁碟區備份還原時要用 restic 密碼，這個密碼存在專案裡的 Secret（例如 `data-redis-0-backup`），會跟專案一起刪除。之後還想還原磁碟區，刪除前先另存：
 
@@ -49,14 +49,14 @@ kubectl -n shop get secret data-redis-0-backup -o jsonpath='{.data.RESTIC_PASSWO
 
 ### 留意會重建的物件
 
-專案裡有物件由 Helm、Argo CD 或 Flux 管理時，檢查畫面會提醒：刪除後，這些工具可能會照它們的設定再建一次。要先在工具那邊移除這個應用程式，專案才不會又長回來。
+專案裡有物件由 Helm、Argo CD 或 Flux 管理時，檢查畫面會提醒：刪除後，這些工具可能會照自己的設定重建。要先在工具那邊移除這個應用程式，專案才不會再次出現。
 
 </Step>
 <Step>
 
 ### 輸入專案名稱並刪除
 
-在下方輸入專案名稱，也可以點提示裡的專案名稱自動填入，再按 **刪除專案**。
+在下方輸入專案名稱，也可以點提示裡的專案名稱自動填入，再按**刪除專案**。
 
 ![刪除專案 blog 的確認畫面，列出會一起刪除的服務和會留下的備份，並已輸入專案名稱](../images/shots/project-delete-review.avif)
 
@@ -67,34 +67,34 @@ kubectl -n shop get secret data-redis-0-backup -o jsonpath='{.data.RESTIC_PASSWO
 
 Zeabur 用你的身分照順序刪除：
 
-1. 先刪資料庫物件，例如 CloudNativePG 的 `Cluster`，讓 operator 有機會照它的方式收尾。Zeabur 最多等一分鐘讓資料庫消失。operator 沒有在執行時，它的收尾不會發生，專案會卡在刪除中，專案頁面會列出還沒刪掉的物件和它們的 finalizer。
+1. 先刪資料庫物件，例如 CloudNativePG 的 `Cluster`，讓 operator 有機會照自己的方式收尾。Zeabur 最多等一分鐘讓資料庫消失。operator 沒有在執行時就無法收尾，專案會卡在刪除中，專案頁面會列出還沒刪掉的物件和各自的 finalizer。
 2. 再刪 Namespace，Kubernetes 接著刪掉裡面剩下的東西。
 3. 最後刪掉你在這個專案開的工具 Pod。
 
-刪除期間，專案列表會標 **正在刪除…**，專案頁上方會說明還剩什麼。通常一兩分鐘就會消失。
+刪除期間，專案列表會標**正在刪除…**，專案頁上方會說明還剩什麼。通常一兩分鐘就會消失。
 
 ## 專案一直刪不掉
 
-Namespace 會等裡面每個物件的 finalizer 都移除才消失。finalizer 由加上它的控制器在清理完後移除；控制器沒在執行，物件就會一直留著。
+Namespace 會等裡面每個物件的 finalizer 都移除才消失。每個 finalizer 由當初加上的控制器在清理完後移除；控制器沒在執行，物件就會一直留著。
 
-專案頁會列出還帶著 finalizer 的物件，以及檢視它們的指令。以專案 `shop` 為例：
+專案頁會列出還帶著 finalizer 的物件，以及檢視這些物件的指令。以專案 `shop` 為例：
 
 ```sh
 kubectl get namespace shop -o yaml
 kubectl get clusters.postgresql.cnpg.io orders -n shop -o yaml
 ```
 
-`status.conditions` 會寫出還剩哪些資源、哪些 finalizer 在等。通常的處理方式是讓對應的 operator 恢復執行，它做完清理就會自己移除 finalizer。Zeabur 不會替你移除 finalizer：直接移除會跳過清理，可能留下叢集外的資源，例如雲端磁碟或 S3 裡的檔案。
+`status.conditions` 會寫出還剩哪些資源、哪些 finalizer 在等。通常的處理方式是讓對應的 operator 恢復執行，operator 清理完就會自己移除 finalizer。Zeabur 不會替你移除 finalizer：直接移除會跳過清理，可能留下叢集外的資源，例如雲端磁碟或 S3 裡的檔案。
 
 ## 用同樣的名稱重建專案
 
-刪掉專案後，如果要把同樣的名稱交給另一個團隊，先等 70 分鐘。
+刪掉專案後，要把同樣的名稱交給另一個團隊，先等 70 分鐘。
 
 Zeabur Builder 推送映像檔用的 registry 權杖，認的是儲存庫名稱，也就是專案名稱，不認 Namespace 的 UID。專案刪掉後又有人用同樣名稱建了專案，舊專案先前簽發的權杖在到期前，仍然可以推送到新專案的儲存庫。建置用的權杖最長 70 分鐘（預設建置時限 60 分鐘，再加 10 分鐘），上傳原始碼封存檔的權杖是 15 分鐘。自己刪掉再自己重建同一個專案，不用在意這件事。
 
 ## 從備份找回專案
 
-到 **叢集** → **備份**，在 **備份紀錄** 選刪除前的備份，按 **還原已刪除的專案**（原專案還在時按鈕是 **從備份建立新專案**），步驟見[備份叢集並從備份還原](../cluster/backups.mdx#從備份還原)。
+到**叢集** → **備份**，在**備份紀錄**選刪除前的備份，按**還原已刪除的專案**（原專案還在時按鈕是**從備份建立新專案**），步驟見[備份叢集並從備份還原](../cluster/backups.mdx#從備份還原)。
 
 資料庫和磁碟區自己的 S3 備份也還在，可以在新專案裡[還原成新資料庫](../deploy/databases.mdx#還原成新資料庫並切換服務)或[從備份還原檔案](./volumes.mdx#從備份還原檔案)。
 

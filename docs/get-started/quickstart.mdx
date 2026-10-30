@@ -68,13 +68,13 @@ Choose RKE2 on a smaller server only if you plan to run the control plane on thr
 
 The installer checks admin rights, systemd, the clock, swap, memory reserved for crash dumps, other Kubernetes installations, ports, disk space, and disk encryption. Fix any failed checks, then click “Check again.”
 
-Warnings don't block installation. For example, the installer warns if the disk isn't encrypted: secrets are encrypted, but files in volumes and databases aren't. Most VPS plans can't encrypt the system disk afterwards, so you can continue. For sensitive data, choose a plan whose provider encrypts disks. The installer can't see encryption the provider does underneath, so the warning stays.
+Warnings don't block installation. For example, the installer warns if the disk isn't encrypted: secrets are encrypted, but files in volumes and databases aren't. Most VPS plans can't encrypt the system disk afterward, so you can continue. For sensitive data, choose a plan whose provider encrypts disks. The installer can't see encryption the provider does underneath, so the warning stays.
 
 The footer explains that the installer saves your choices to `/etc/zeabur-installer/config.yaml`.
 
 ## 2. Choose how to connect
 
-Under “How will everyone connect to Zeabur?”, set two different domains:
+Under “How people reach Zeabur,” set two different domains:
 
 - “Zeabur”: the address everyone uses to open Zeabur, such as `zeabur.example.com`.
 - “Sign-in”: the address for Zeabur Identity, such as `login.example.com`. Everyone signs in here with a passkey.
@@ -100,7 +100,7 @@ For testing, select “Test server,” then click “Use sslip.io domains” to 
 - `zeabur.<address>.sslip.io`
 - `login.<address>.sslip.io`
 
-This requires no DNS configuration. A certificate authority created on the server issues the certificates. Zeabur, sign-in, and your apps' domains all use certificates from this authority, so after installation you must import it into your browser or operating system and trust it before you can register a passkey.
+This requires no DNS configuration. A certificate authority created on the server issues the certificates. Zeabur, sign-in, and your apps' domains all use certificates from this authority, so after installation, import it into your browser or operating system and trust it before you register a passkey.
 
 ## 3. Choose components
 
@@ -110,7 +110,7 @@ Under “Choose components,” the components installed by default are already s
 
 By default, the installer installs the components the catalog recommends for a single server, plus Zeabur Builder (with zot), image updates (Keel), and PostgreSQL (CloudNativePG). For a more hardened server, also select runtime threat detection, vulnerability scanning, and intrusion prevention.
 
-With the default components, you can deploy apps from images or Git and create PostgreSQL databases right after installation. Zeabur Builder builds in a privileged buildkitd, so a build that escapes its sandbox reaches the node; give only admins access to the builder-system and zot namespaces. If you don't need Git deploys, clear Zeabur Builder in the component list.
+With the default components, you can deploy apps from images or Git and create PostgreSQL databases right after installation. Zeabur Builder builds in a privileged buildkitd, so a build that escapes its sandbox reaches the node. Neither the installer nor Zeabur grants anyone rights in the builder-system and zot namespaces, so only cluster administrators can access them. Keep it that way when you add role bindings. If you don't need Git deploys, clear Zeabur Builder in the component list.
 
 Some components need settings before you can continue. For example, Velero asks for the S3 endpoint, bucket, region, and access keys, and the installer writes the credentials file Velero needs.
 
@@ -151,7 +151,7 @@ Closing the page doesn't interrupt installation. Reopen the link with the token 
 
 ## Register the first administrator
 
-When “Zeabur is ready” appears, click “Register passkey” under “First administrator.” After registration, click “Open Zeabur” to sign in.
+When “Zeabur is ready” appears, click “Register a passkey” under “First administrator.” After registration, click “Open Zeabur” to sign in.
 
 Test server mode adds one step, and it comes first: under “1. Trust the certificate authority,” click “Download certificate,” import the certificate into your browser or operating system, and trust it for websites. Then register the passkey under “2. Register the first administrator.” Until the certificate is trusted, the browser shows a warning and passkey registration fails. Your apps' domains use this certificate authority too, so other computers that open them must import it as well.
 

@@ -37,16 +37,16 @@ sudo zeabur-installer --config /etc/zeabur-installer/config.yaml apply
 sudo zeabur-installer doctor
 ```
 
-Requires Linux, systemd, and root access. The installer first checks the host, ports, disk, and clock synchronization. A failed check stops the run before anything is written. An unsynchronized clock only produces a warning. The installer also warns when the kernel reserves memory for crash dumps (kdump) and provides a command to turn it off. A K3s server needs `80`, `443`, `6443`, and `10250`, and an RKE2 server also needs `9345`. A worker needs only `80`, `443`, and `10250`. ServiceLB uses `80` and `443` on every node.
+Requires Linux, systemd, and root access. The installer first checks the host, ports, disk, and clock synchronization. A failed check stops the run before anything is written. An unsynchronized clock only produces a warning. The installer also warns when the kernel reserves memory for crash dumps (kdump) and prints a command to turn it off. A K3s server needs `80`, `443`, `6443`, and `10250`, and an RKE2 server also needs `9345`. A worker needs only `80`, `443`, and `10250`. ServiceLB uses `80` and `443` on every node.
 
 To create a cluster, the installer runs these steps in order:
 
 1. Prepares host packages for the selected components, such as the iSCSI and NFS clients Longhorn needs.
 2. Writes the K3s or RKE2 configuration, kernel parameters required by CIS, and audit policy. The audit log keeps only request metadata and records every request for a secret. See [Secret encryption and access logs](./security.mdx#secret-encryption-and-access-logs).
 3. Downloads K3s or RKE2 to `/var/lib/rancher/zeabur-installer/downloads`, verifies it against the SHA-256 pinned by the installer, starts `k3s` or `rke2-server`, and waits for the API and node to be ready.
-4. Creates the components' namespaces, baseline NetworkPolicies, and storage classes. The default CIS policy in `kube-system` blocks outside traffic to ServiceLB. On a node without Traefik, incoming requests can't reach Traefik. The installer adds `kube-system/zeabur-installer-servicelb` to allow outside traffic into ServiceLB replicas only.
+4. Creates the components' namespaces, baseline NetworkPolicies, and storage classes. The default CIS policy in `kube-system` blocks outside traffic to ServiceLB. Requests that arrive at a node without Traefik then can't reach Traefik, so the installer adds `kube-system/zeabur-installer-servicelb` to allow outside traffic into ServiceLB replicas only.
 5. Installs components in Catalog order and waits for them to be ready. It downloads each chart and manifest file first and stops if its SHA-256 doesn't match the Catalog.
-6. With `zeabur: true`, adds the `zeabur-system-hosts` admission policy first to prevent projects from using Zeabur's and Zeabur Identity's domains. See [Zeabur's and Zeabur Identity's domains](./security.mdx#domains-for-zeabur-and-zeabur-identity). It then installs Zeabur Identity, configures the API server to trust it, registers the OAuth client, and installs Zeabur. cert-manager automatically renews the certificate the API server uses to connect to Zeabur Identity. See [Zeabur Identity's internal certificate](./security.mdx#zeabur-identitys-internal-certificate).
+6. With `zeabur: true`, adds the `zeabur-system-hosts` admission policy first so projects can't use Zeabur's and Zeabur Identity's domains. See [Zeabur's and Zeabur Identity's domains](./security.mdx#domains-for-zeabur-and-zeabur-identity). It then installs Zeabur Identity, configures the API server to trust it, registers the OAuth client, and installs Zeabur. cert-manager automatically renews the certificate the API server uses to connect to Zeabur Identity. See [Zeabur Identity's internal certificate](./security.mdx#zeabur-identitys-internal-certificate).
 7. On the first install, prints a one-time setup link for the first admin, valid for 24 hours, and writes the installation record to the `kube-system/zeabur-installer` config file.
 
 When installation finishes, the installer prints the Zeabur and Zeabur Identity URLs. Open the setup link and add a passkey to sign in to Zeabur and view the cluster. In `local` mode, first configure the browser to trust the CA the installer generated.
@@ -140,7 +140,7 @@ Uninstalling deletes the CRDs that the chart puts in its templates, along with e
 
 Delete or move those first. Trivy Operator's reports are its own output, so they don't count.
 
-When uninstalling will delete a component's stored data, you must also add its component ID to `allowDataLoss` (`gui` asks with a checkbox under **Confirm**). For Longhorn, `apply` then sets its `deleting-confirmation-flag` to `true`; otherwise, Longhorn refuses to uninstall. This also deletes every volume's replicas.
+When uninstalling will delete a component's stored data, you must also add its component ID to `allowDataLoss` (`gui` asks with a checkbox under **Review**). For Longhorn, `apply` then sets its `deleting-confirmation-flag` to `true`; otherwise, Longhorn refuses to uninstall. This also deletes every volume's replicas.
 
 Once you're sure nothing needs the remaining resources, you can delete them manually:
 

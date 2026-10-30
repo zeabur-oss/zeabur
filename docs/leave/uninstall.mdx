@@ -5,7 +5,7 @@ description: Remove the Zeabur management interface while keeping applications, 
 
 If you remove only the Zeabur chart or run `zeabur-installer uninstall zeabur`, existing services stay in Kubernetes and keep running under native controllers and operators. Keep dependencies such as ingress, certificates, storage, and backups, then manage services with kubectl, Helm, or your existing GitOps tools.
 
-If you opened the interface locally with `zeaburctl ui`, press `Ctrl-C` to close it. It doesn't install anything in the cluster. Changes you've applied stay in the cluster.
+If you opened the interface locally with `zeaburctl ui`, press `Ctrl-C` to close it. `zeaburctl ui` doesn't install anything in the cluster. Changes you've applied stay in the cluster.
 
 ## Before you remove Zeabur
 
@@ -114,7 +114,7 @@ kubectl get pods --namespace shop
 kubectl get storageclasses
 ```
 
-Applications and volumes should still be in place, and public URLs and database connections should work as they did before removal. The Zeabur URL no longer serves the interface. Use kubectl, Helm, or your existing GitOps tools to change settings from now on.
+Applications and volumes are still in place, and public URLs and database connections work as they did before removal. The Zeabur URL no longer serves the interface. Use kubectl, Helm, or your existing GitOps tools to change settings from now on.
 
 Check that database and backup operators are still running, then check backup results after the next scheduled run. Uninstalling the Zeabur chart also uninstalls its Proxy. VictoriaLogs stays in place, but the Zeabur entry point for historical logs is gone.
 
@@ -165,7 +165,7 @@ kubectl get configmaps,secrets --namespace zeabur-s3-destinations
 kubectl delete namespace zeabur-s3-destinations
 ```
 
-This deletes only the registration list and its secrets. It doesn't delete remote buckets, backups, or secrets already copied to other namespaces. To revoke a key, disable it in the storage service separately, after updating any backups that still use it.
+This deletes only the registration list and its secrets. It doesn't delete remote buckets, backups, or secrets already copied to other namespaces. To revoke a key, first update any backups that still use it, then disable it in the storage service.
 
 ## Remove Zeabur Identity as well
 
@@ -198,7 +198,7 @@ The K3s or RKE2 script removes Kubernetes and its data. All workloads that depen
 
 `--purge` doesn't delete local-path data in `/var/lib/zeabur/storage` or replica data in `/var/lib/longhorn`. Reattaching the original data directories to services also requires the corresponding PVs, disks, and storage system information. Confirm that you have backups you can restore before deciding what to do with these directories.
 
-To remove only a node that joined the cluster, choose **Remove node** from the node's action menu. See [Add and maintain nodes](../cluster/nodes.mdx#remove-a-node). Don't remove a node while services still need its local-path data.
+To remove only a node that joined the cluster, follow [Remove a node](../cluster/nodes.mdx#remove-a-node): drain and delete it with kubectl, then uninstall on that VM. Don't remove a node while services still need its local-path data.
 
 ## If removal doesn't finish
 

@@ -4,7 +4,7 @@ description: 了解 Zeabur 如何从 Kubernetes 对象呈现项目、以用户�
 source: "faf843625478"
 ---
 
-Zeabur 显示的内容来自集群中的 Kubernetes 对象：用 kubectl 修改副本数后，Zeabur 下次读取时就会显示新的数值。服务、域名、卷和备份配置都保存在 Kubernetes 对象中。移除 Zeabur 后，原有控制器仍会管理它们。
+Zeabur 显示的内容来自集群中的 Kubernetes 对象：用 kubectl 修改副本数后，Zeabur 下次读取时就会显示新的数值。服务、域名、卷和备份配置都保存在 Kubernetes 对象中。移除 Zeabur 后，原有控制器仍会管理这些对象。
 
 实际操作示例见 [Zeabur 如何管理服务](../get-started/how-it-works.mdx)。要移除 Zeabur 并保留工作负载及其依赖的组件，见[移除 Zeabur](../leave/uninstall.mdx)。
 
@@ -17,7 +17,7 @@ Zeabur 显示的内容来自集群中的 Kubernetes 对象：用 kubectl 修改�
 
 `zeabur` 同时提供 `/api` 下的 API 和网页界面。Chart 创建的 ServiceAccount 没有绑定任何 Role，Pod 也不挂载 ServiceAccount token，每次读写都使用登录用户的令牌。
 
-Zeabur Identity 负责登录、通行密钥和短期令牌。Zeabur 是它的 OAuth client，保存 client secret。kube-apiserver 必须配置信任 Zeabur Identity 的 issuer，才会接受这些令牌。
+Zeabur Identity 负责登录、通行密钥和短期令牌。Zeabur 是 Zeabur Identity 的 OAuth client，保存 client secret。kube-apiserver 必须配置信任 Zeabur Identity 的 issuer，才会接受这些令牌。
 
 ## 项目与服务如何组成
 
@@ -35,7 +35,7 @@ Zeabur 没有自己的数据库。数据库是 operator 的 CR，从 Git 部署�
 
 ## 变更如何进入 Kubernetes
 
-1. **检查变更** 读取当前状态，计算需要创建、修改或删除哪些对象，以及会产生什么影响。
+1. **检查变更**读取当前状态，计算需要创建、修改或删除哪些对象，以及会产生什么影响。
 2. API 返回一份变更令牌，使用 AES-256-GCM 加密和验证，其中包含用户、组、项目、请求、对象版本和有效期。令牌在 10 分钟内有效。
 3. 确认应用时，浏览器只发回这份令牌。API 核对身份和有效期，重新读取对象并计算。如果对象版本发生变化，就会要求你重新检查。
 4. 每次写入都先提交给 kube-apiserver 执行 dry run，全部通过后才依次实际写入。每次写入都带有版本，删除则带有前置条件；如果其他人修改了对象，就不会写入。
@@ -62,7 +62,7 @@ Zeabur 没有自己的数据库。数据库是 operator 的 CR，从 Git 部署�
 
 实时 CPU 和内存用量来自 metrics-server。历史用量、节点磁盘和卷用量来自支持 Prometheus HTTP API 的 metrics store，Zeabur 以用户权限通过 Kubernetes Service proxy 查询。启用 Zeabur Proxy 后，历史用量改由 Proxy 根据项目权限查询默认的 metrics store。
 
-**部署记录** 来自工作负载保留的修订版本，时间和修改者来自事件、容器状态和 `managedFields`。集群已清理的修订版本、超过保留期的事件，Zeabur 也无法读取。
+**部署记录**来自工作负载保留的修订版本，时间和修改者来自事件、容器状态和 `managedFields`。集群已清理的修订版本、超过保留期的事件，Zeabur 也无法读取。
 
 容器日志默认来自 kubelet，只包含副本本次和上次运行的内容。启用 Zeabur Proxy 后，可以根据项目权限读取 VictoriaLogs 中的历史日志。移除 chart 时会一并移除 Proxy，VictoriaLogs 中的日志不受影响。日志收集器的 `includePodLabels: false` 在 operator v0.75.0 中不起作用，日志仍会带有 `kubernetes.pod_labels.*`。
 
@@ -71,9 +71,9 @@ Zeabur 没有自己的数据库。数据库是 operator 的 CR，从 Git 部署�
 - Chart 创建或指定的 Secret：OAuth client secret、变更令牌密钥，以及启用 Proxy 时的 TLS 证书。
 - 集群名称和 metrics store 配置：Zeabur 所在 Namespace 中的 `zeabur-settings` ConfigMap。
 - 成员权限：Kubernetes 的 RoleBinding 和 ClusterRoleBinding。
-- 已登记的 S3 目标：`zeabur-s3-destinations` Namespace 中的 ConfigMap 和 Secret。
+- 已添加的 S3 目的地：`zeabur-s3-destinations` Namespace 中的 ConfigMap 和 Secret。
 - kubectl 终端的 tools Pod：位于 `zeabur-terminals` Namespace，只有 Zeabur 的 ServiceAccount 能在其中创建和使用 Pod。
-- 登录设置：Zeabur Identity 所在 Namespace 中的 `zeabur-identity-settings` ConfigMap。**设置** 页面写入，Zeabur Identity 读取，见[登录设置](./permissions.mdx#登录设置)。
+- 登录设置：Zeabur Identity 所在 Namespace 中的 `zeabur-identity-settings` ConfigMap。**设置**页面写入，Zeabur Identity 读取，见[登录设置](./permissions.mdx#登录设置)。
 - 登录会话：只保存在服务器进程的内存中，空闲过久（最多 1 小时）或登录满 12 小时后结束，见[登录能维持多久](./permissions.mdx#登录有效期)。chart 使用单副本和 `Recreate` 策略，Zeabur 重启后，所有人都需要重新登录。
 
 终端会用到临时 Pod 和内存中的 kubeconfig，权限和存活时间见[安全性](./security.mdx#终端)。

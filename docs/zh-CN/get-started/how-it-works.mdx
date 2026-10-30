@@ -8,11 +8,11 @@ Zeabur 没有自己的数据库。你在 Zeabur 看到的项目、服务、域�
 
 ## 已经用 Helm 部署的服务
 
-假设 `shop` 这个 Namespace 是同事半年前用 Helm 安装的。打开 Zeabur 的**项目**，在**其他 Namespace** 中找到它，点进去，服务、域名、环境变量都已经在里面，不需要导入。
+假设 `shop` 这个 Namespace 是同事半年前用 Helm 安装的。打开 Zeabur 的**项目**，在**其他 Namespace** 中找到 `shop`，点进去，服务、域名、环境变量都已经在里面，不需要导入。
 
-要把它作为项目管理，点击**使用这个 Namespace**。Zeabur 只会给 Namespace 添加一个标签，不会移动里面的任何内容。
+要把这个 Namespace 作为项目管理，点击**使用这个 Namespace**。Zeabur 只会给 Namespace 添加一个标签，不会移动里面的任何内容。
 
-接下来，你可能想直接在 Zeabur 调高副本数。Zeabur 会阻止这次修改，提示这个服务由 Helm 管理：即使这次修改成功，下次 `helm upgrade` 也会覆盖它。要修改副本数，就去改 Helm values。重启不会改动配置，所以仍然可以操作。Argo CD 和 Flux 管理的服务也一样。
+接下来，你可能想直接在 Zeabur 调高副本数。Zeabur 会阻止这次修改，提示这个服务由 Helm 管理：即使这次修改成功，下次 `helm upgrade` 也会覆盖回去。要修改副本数，就去改 Helm values。重启不会改动配置，所以仍然可以操作。Argo CD 和 Flux 管理的服务也一样。
 
 ## 检查完，同事又改了一次
 
@@ -34,6 +34,6 @@ Zeabur 没有自己的数据库。你在 Zeabur 看到的项目、服务、域�
 
 服务本来就是 Kubernetes 对象，所以移除 Zeabur 后，Deployment、Service、Ingress、环境变量和卷都还在原来的 Namespace 中，网站照常响应。
 
-消失的是 Zeabur 的管理界面，以及 Zeabur 安装的成员角色。原本依靠这些角色登录集群的同事，需要先通过其他方式获取权限。数据库 operator、Ingress controller、cert-manager 这些组件也要保留，服务仍然依赖它们。
+消失的是 Zeabur 的管理界面，以及 Zeabur 安装的成员角色。原本依靠这些角色登录集群的同事，需要先通过其他方式获取权限。数据库 operator、Ingress controller、cert-manager 这些组件也要保留，服务仍然依赖这些组件。
 
 完整的移除步骤和需要保留的组件清单，见[移除 Zeabur](../leave/uninstall.mdx)。

@@ -10,7 +10,7 @@ Go to **Cluster** → **Overview** → **Nodes** to check each host's status. To
 ## Before you begin
 
 - `zeabur-installer node add` works on K3s and RKE2 clusters that Zeabur Installer created. On K3s you can add workers only. On RKE2 you can add workers and servers, and three servers keep the control plane running when one goes down. For other clusters, use the tool you originally installed them with.
-- Prepare a new VM with root access and the same `zeabur-installer` binary used to install the first server.
+- Prepare a new VM with root access and the same `zeabur-installer` binary that installed the first server.
 - Keep all nodes with the same hosting provider in the same region. Different availability zones within that region are fine. Across providers or regions, latency slows down etcd, the Kubernetes API, and storage.
 - Stopping and resuming scheduling requires permission to modify Node objects. Run `drain` and `delete node` in the kubectl terminal with your own permissions. Opening a node terminal requires an admin account.
 
@@ -41,7 +41,7 @@ sudo zeabur-installer node add --ttl 1h
 
 The command prints what to run on the new VM: the configuration to write to `/etc/zeabur-installer/config.yaml`, followed by `plan` and `apply`. Treat the token in the output like a password. Don't post it publicly.
 
-Worker nodes join with an expiring bootstrap token. `--ttl` defaults to 1 hour, with a maximum of 24 hours. On RKE2, include `--role server` to add a server (control plane). This uses the cluster's server token, which doesn't expire. K3s refuses `--role server` because it runs one server with SQLite. If the new VM can't reach the server's private address, use `--address` to specify an address it can reach.
+Worker nodes join with an expiring bootstrap token. `--ttl` defaults to 1 hour and can be at most 24 hours. On RKE2, include `--role server` to add a server (control plane). This uses the cluster's server token, which doesn't expire. K3s refuses `--role server` because it runs one server with SQLite. If the new VM can't reach the server's private address, use `--address` to specify an address it can reach.
 
 If the cluster runs Longhorn or a zot mirror, the output automatically includes the corresponding configuration. If the config file still has `profile: single-node`, the output reminds you to change it to `multi-node` and run `apply` again.
 
@@ -50,7 +50,7 @@ If the cluster runs Longhorn or a zot mirror, the output automatically includes 
 
 ### Run on the new VM
 
-Copy the `zeabur-installer` binary used to install the first server to the new VM. As root, paste the output from the previous step. It writes the config file, then runs:
+Copy the `zeabur-installer` binary that installed the first server to the new VM. As root, paste the output from the previous step. It writes the config file, then runs:
 
 ```sh
 zeabur-installer plan
@@ -72,7 +72,7 @@ sudo k3s kubectl get nodes -o wide
 sudo /var/lib/rancher/rke2/bin/kubectl --kubeconfig /etc/rancher/rke2/rke2.yaml get nodes -o wide
 ```
 
-`node sync` adds the new node's addresses to the baseline network policies created by Installer. Newly joined servers sync automatically. After a worker node joins, you must run this command manually on a server. Until then, network policies block traffic from the new node. Once the new node shows `Ready`, revoke the worker node's token. Replace `<ID>` with the ID from the last line of the `node add` output:
+`node sync` adds the new node's addresses to the baseline network policies that the installer created. Newly joined servers sync automatically. After a worker node joins, you must run this command manually on a server. Until then, network policies block traffic from the new node. Once the new node shows `Ready`, revoke the worker node's token. Replace `<ID>` with the ID from the last line of the `node add` output:
 
 ```sh
 # K3s
@@ -82,7 +82,7 @@ sudo /var/lib/rancher/rke2/bin/kubectl --kubeconfig /etc/rancher/rke2/rke2.yaml 
   -n kube-system delete secret bootstrap-token-<ID>
 ```
 
-This doesn't affect nodes that have already joined. The token can no longer be used to join the cluster.
+Nodes that have already joined aren't affected, and no new node can join with this token.
 
 </Step>
 </Steps>
@@ -93,7 +93,7 @@ On RKE2, etcd needs a majority of servers to operate. To keep running with one s
 
 ### Reboot only
 
-Select **Stop scheduling** from the node menu. The node row will show that scheduling has stopped. This prevents new replicas from being scheduled on the node. Existing replicas stay where they are. If you're only rebooting, this is enough. You don't need to run `drain`.
+Select **Stop scheduling** from the node menu. The node row shows that scheduling has stopped, and no new replicas are scheduled on the node. Existing replicas stay where they are. If you're only rebooting, this is enough. You don't need to run `drain`.
 
 You can also click **Open kubectl terminal** next to the heading on Zeabur's **Cluster** page and run:
 
@@ -111,7 +111,7 @@ Click **Open kubectl terminal** next to the heading on Zeabur's **Cluster** page
 kubectl get pods -A --field-selector spec.nodeName=<node> -o custom-columns=NS:.metadata.namespace,POD:.metadata.name,PVC:.spec.volumes[*].persistentVolumeClaim.claimName
 ```
 
-Check the disks in the list to identify which use `local-path` volumes on this node. The data in these volumes exists only on this node. It won't move to another node with the replica.
+In the list, find the disks that use `local-path` volumes on this node. Their data exists only on this node and doesn't move with the replica.
 
 After checking, run:
 
@@ -122,11 +122,11 @@ kubectl drain <node> --ignore-daemonsets --delete-emptydir-data
 `drain` stops scheduling on the node and evicts replicas so their controllers can recreate them on other nodes. Replicas managed by DaemonSet stay where they are. Keep the following in mind:
 
 - `drain` respects PodDisruptionBudget. If eviction is blocked, it keeps retrying until eviction is allowed.
-- `drain` stops when it encounters a replica that isn't managed by a controller. These replicas won't restart automatically after deletion. Add `--force` to the end of the command only after confirming they're safe to delete.
+- `drain` stops when it encounters a replica that isn't managed by a controller. Once deleted, these replicas don't come back. Add `--force` to the end of the command only after confirming they're safe to delete.
 - `--delete-emptydir-data` clears the `emptyDir` scratch data of evicted replicas.
 - Replicas using this node's `local-path` volumes are also evicted. Recreated replicas can't use these volumes on other nodes and remain `Pending` until the original node returns. `drain` doesn't delete the data. For these replicas, the result is the same as taking the node down directly: they must wait for it to return.
 
-If Zeabur itself runs on this node, the page will disconnect for about a minute during `drain`. Refresh the page and sign in again. The kubectl terminal will also disconnect, so you'll need to reopen it.
+If Zeabur itself runs on this node, the page disconnects for about a minute during `drain`. Refresh the page and sign in again. The kubectl terminal also disconnects; reopen it.
 
 Wait for `drain` to finish before taking the node down for maintenance.
 
@@ -152,16 +152,16 @@ First, click **Open kubectl terminal** next to the heading on Zeabur's **Cluster
 kubectl get nodes -l node-role.kubernetes.io/control-plane
 ```
 
-If only one control plane node remains, don't delete it. If removal leaves fewer than three server nodes, losing one more will stop the control plane.
+If only one control plane node remains, don't delete it. If removal leaves fewer than three server nodes, losing one more stops the control plane.
 
-Data in `local-path` volumes exists only on this VM. After you remove the node, replicas using these volumes have nowhere to start. Follow the steps in “Take a node down for maintenance” to check replicas and volumes, then run `drain`. Delete the node only after it finishes:
+Data in `local-path` volumes exists only on this VM. After you remove the node, replicas using these volumes have nowhere to start. Follow [Move replicas before maintenance](#move-replicas-before-maintenance) to check replicas and volumes, then run `drain`. Delete the node only after it finishes:
 
 ```sh
 kubectl drain <node> --ignore-daemonsets --delete-emptydir-data
 kubectl delete node <node>
 ```
 
-Next, sign in to the removed VM and run these as `root`, using the uninstall script for the cluster's distribution:
+Next, sign in to the removed VM and run these as `root`, with the uninstall script for the cluster's distribution:
 
 ```sh
 /usr/local/bin/k3s-agent-uninstall.sh   # K3s
@@ -169,11 +169,11 @@ Next, sign in to the removed VM and run these as `root`, using the uninstall scr
 zeabur-installer uninstall --purge
 ```
 
-**After deleting the Kubernetes node, you must also complete the uninstall on the VM.** Until you uninstall it, the VM will rejoin the cluster whenever `k3s-agent` or RKE2 restarts.
+**After deleting the Kubernetes node, you must also complete the uninstall on the VM.** Until you do, the VM rejoins the cluster whenever `k3s-agent` or RKE2 restarts.
 
 Volumes under `/var/lib/zeabur/storage` remain on the VM. Delete them manually only after confirming you no longer need the data.
 
-Finally, return to the server where you run Zeabur Installer and run:
+Finally, return to the server where you run zeabur-installer and run:
 
 ```sh
 sudo zeabur-installer node sync
@@ -191,7 +191,7 @@ The node terminal can modify every file, process, and network interface on the h
 
 The node records an event with who opened the terminal and when. If the screen shows **Others could enter this terminal**, role bindings allow people other than cluster administrators to create replicas in the terminal's namespace. Remove the listed role bindings, then check again.
 
-When you close the terminal, Zeabur removes the terminal replica. Terminal replicas are kept for at most 30 minutes. If one remains, click **Remove terminal replica** in the terminal replica list below the node, review the change, and confirm.
+When you close the terminal, Zeabur removes the terminal replica. A terminal replica lasts at most 30 minutes. If one remains, click **Remove terminal replica** in the terminal replica list below the node, review the change, and confirm.
 
 ## Common failures
 

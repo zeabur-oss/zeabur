@@ -45,7 +45,7 @@
     nodes: 添加与维护节点
     components: 查看和安装集群组件
     external-secrets: 从外部机密库同步机密变量
-    s3-destinations: 注册共享的 S3 备份目的地
+    s3-destinations: 添加共享的 S3 备份目的地
     diagnosis: 看懂状态、警告与诊断
 - group: reference
   label: 参考
