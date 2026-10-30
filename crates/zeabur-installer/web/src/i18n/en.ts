@@ -445,7 +445,7 @@ export const en = {
   "warning.join.token.unpinned": () =>
     "The token has no CA hash (K10<hash>::…), so this VM trusts whichever server answers at that address. Use the token exactly as node add printed it.",
   "warning.config.renamed": (old: string, id: string) =>
-    `${old} is now called ${id} in this catalog, so ${id} is left out. Write ${id} in the configuration.`,
+    `${old} is now called ${id} in this catalog, so ${id} is left out. Use ${id} in the configuration file instead.`,
   "warning.join.server.unreachable": (server: string) =>
     `Cannot connect to ${server}. Check the address and that TCP 9345 is open from this VM.`,
 

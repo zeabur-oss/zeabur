@@ -63,7 +63,7 @@ When the cluster has the installation record `kube-system/zeabur-installer`, `pl
 
 `plan --json` has the same under `changes`, which is `null` on a first install. `gui` shows it on the review step, with the new components unchecked.
 
-`apply` and `plan` stop when the record was written by a newer installer than the one you run, and name the version to use instead. To go back to an older installer, restore a snapshot taken before the upgrade.
+When a newer installer than yours wrote the record, `apply` and `plan` stop and name the version to use instead. To go back to an older installer, restore a snapshot taken before the upgrade.
 
 When the Catalog renames a component, `disable` still takes the old ID and `plan` warns with the new one. `enable` with the old ID stops `plan` and `apply` with an error that names the new ID. `container-registry/zot` is now `builds/zeabur-builder`.
 

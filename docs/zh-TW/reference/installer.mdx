@@ -58,13 +58,13 @@ sudo zeabur-installer doctor
 
 叢集裡有安裝紀錄 `kube-system/zeabur-installer` 時，`plan` 開頭會先列出「Changes since the last apply」，並寫出上次是哪一版 installer 寫的紀錄。自己用的安裝也一樣。這一段會列出：
 
-- K3s、RKE2 或 KubeSolo 換版本時的新舊版本，以及內容會變的主機檔案。只要有其中一項，`apply` 就會重新啟動 `k3s`、`rke2-server` 或 `kubesolo`：Kubernetes API 大約 10 秒連不上，正在跑的應用程式照常服務。
+- K3s、RKE2 或 KubeSolo 換版本時的新舊版本，以及內容會變的主機檔案。只要有其中一項，`apply` 就會重新啟動 `k3s`、`rke2-server` 或 `kubesolo`：Kubernetes API 大約 10 秒連不上，正在執行的應用程式照常提供服務。
 - 新增和移除的元件，以及換版本的 chart。
-- 這版 Catalog 預設安裝、但紀錄裡沒有的元件。`apply` 不會安裝它們。要裝的話，寫進 `enable`，例如 `enable: [builds/zeabur-builder]`，或在 `gui` 裡勾選。Zeabur 需要的元件（ingress、certificates、metrics-server）和已選元件需要的元件，還是會安裝。
+- 這版 Catalog 預設安裝、但紀錄裡沒有的元件。`apply` 不會安裝它們。要安裝其中一個，把它寫進 `enable`，例如 `enable: [builds/zeabur-builder]`，或在 `gui` 裡勾選。Zeabur 需要的元件（ingress、certificates、metrics-server）和已選元件需要的元件，還是會安裝。
 
-`plan --json` 的 `changes` 欄位有同樣的內容，第一次安裝時是 `null`。`gui` 在確認步驟顯示這些變動，新元件預設不勾選。
+`plan --json` 把同樣的內容放在 `changes` 欄位，第一次安裝時是 `null`。`gui` 在確認步驟顯示這些變動，新元件預設不勾選。
 
-如果紀錄是比目前更新的 installer 寫的，`apply` 和 `plan` 都會停下，並說要改用哪一版。要退回舊版 installer，請還原升級前的快照。
+你執行的 installer 比紀錄上的版本舊，`apply` 和 `plan` 就會停下，並寫出要改用哪一版。要退回舊版 installer，請還原升級前的快照。
 
 Catalog 把元件改名後，`disable` 仍可以寫舊 ID，`plan` 會警告並寫出新 ID。`enable` 寫舊 ID 時，`plan` 和 `apply` 會停下，錯誤訊息會寫出新 ID。`container-registry/zot` 已改名為 `builds/zeabur-builder`。
 
