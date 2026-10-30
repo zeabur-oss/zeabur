@@ -56,10 +56,10 @@ from the server (`ZEABUR_UPDATE_OPENAPI=1 cargo nextest run -p zeabur-api` rewri
 server never builds the document: it serves the committed `openapi.json` at `/api/openapi.json`.
 
 The generator is utoipa with utoipa-axum [utoipa]. Handlers stay plain axum handlers; a
-`#[utoipa::path]` attribute and `#[derive(ToSchema)]` describe them, and one list of
-`routes!(…)` registers every route, so a route cannot exist without its description. The test
-builds that list into utoipa-axum's `OpenApiRouter` for the document; the server builds it into a
-plain axum `Router` from each handler's path and methods alone. utoipa 6 emits OpenAPI 3.1.0 by
+`#[utoipa::path]` attribute and `#[derive(ToSchema)]` describe them, and one route table in
+`lib.rs` states each route's method, path and handler once. The server registers the table in a
+plain axum `Router`; the test builds it into utoipa-axum's `OpenApiRouter` for the document, and
+fails when a path in the table differs from its `#[utoipa::path]`. utoipa 6 emits OpenAPI 3.1.0 by
 default, and adds about fifteen crates over axum with no `unsafe` code in its own sources and no
 schemars, chrono or TLS stack.
 

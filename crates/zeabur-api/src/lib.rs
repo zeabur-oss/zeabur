@@ -149,12 +149,12 @@ pub mod views;
 use std::sync::Arc;
 
 use axum::Router;
-use axum::routing::{MethodRouter, get};
+use axum::routing::get;
 pub use error::ApiError;
 pub use handlers::AppState;
 pub use settings::Settings;
 use utoipa::OpenApi;
-use utoipa_axum::router::{OpenApiRouter, UtoipaMethodRouter};
+use utoipa_axum::router::OpenApiRouter;
 
 use crate::access::ClusterAccess;
 use crate::plan_token::PlanKey;
@@ -203,196 +203,150 @@ promised a stable `/api/v1`.",
 )]
 struct ApiDoc;
 
-/// A set of routes, registered in an [`OpenApiRouter`] for the document or in a plain [`Router`]
-/// for the server.
-trait Routes: Sized {
-    fn routes<D, P>(self, route: (D, P)) -> Self
-    where
-        D: FnOnce() -> UtoipaMethodRouter<AppState>,
-        P: FnOnce() -> (Vec<String>, MethodRouter<AppState>);
-}
+/// Every route once: its method, its path and its handler. The server's [`Router`] registers them
+/// with axum, and [`openapi`] builds the document from the same handlers; a test checks that the
+/// two agree on method and path.
+macro_rules! route_table {
+    ($($method:ident $path:literal => $($handler:ident)::+,)+) => {
+        fn routes() -> Router<AppState> {
+            Router::new()$(.route($path, axum::routing::$method($($handler)::+)))+
+        }
 
-impl Routes for OpenApiRouter<AppState> {
-    fn routes<D, P>(self, (described, _): (D, P)) -> Self
-    where
-        D: FnOnce() -> UtoipaMethodRouter<AppState>,
-        P: FnOnce() -> (Vec<String>, MethodRouter<AppState>),
-    {
-        Self::routes(self, described())
-    }
-}
+        /// The OpenAPI document. `crates/zeabur-api/openapi.yaml` and `openapi.json` are this,
+        /// written by a test and committed; the server serves the JSON without building it.
+        #[must_use]
+        pub fn openapi() -> utoipa::openapi::OpenApi {
+            OpenApiRouter::<AppState>::with_openapi(ApiDoc::openapi())
+                $(.routes(utoipa_axum::routes!($($handler)::+)))+
+                .split_for_parts()
+                .1
+        }
 
-impl Routes for Router<AppState> {
-    fn routes<D, P>(self, (_, plain): (D, P)) -> Self
-    where
-        D: FnOnce() -> UtoipaMethodRouter<AppState>,
-        P: FnOnce() -> (Vec<String>, MethodRouter<AppState>),
-    {
-        let (mut paths, methods) = plain();
-        paths.sort();
-        paths.dedup();
-        paths
-            .iter()
-            .fold(self, |router, path| router.route(path, methods.clone()))
-    }
-}
-
-/// The handlers' routes, as [`utoipa_axum::routes!`] and as their paths and methods alone.
-macro_rules! routes {
-    ($($($handler:ident)::+),+ $(,)?) => {
-        (
-            || utoipa_axum::routes!($($($handler)::+),+),
-            || {
-                use utoipa_axum::PathItemExt;
-                let mut paths = Vec::new();
-                let mut methods = MethodRouter::new();
-                $(
-                    paths.push(utoipa_axum::routes!(@path [path()] of $($handler)::+));
-                    methods = utoipa_axum::routes!(@path [methods()] of $($handler)::+)
-                        .iter()
-                        .fold(methods, |methods, method| {
-                            methods.on(method.to_method_filter(), $($handler)::+)
-                        });
-                )+
-                (paths, methods)
-            },
-        )
+        #[cfg(test)]
+        const ROUTES: &[(&str, &str)] = &[$((stringify!($method), $path)),+];
     };
 }
 
-fn routes<R: Routes>(router: R) -> R {
-    let router = router
-        .routes(routes!(identity::whoami))
-        .routes(routes!(identity::get));
-    remaining_routes(cluster_routes(router))
-}
-
-fn cluster_routes<R: Routes>(router: R) -> R {
-    router
-        .routes(routes!(cluster::get))
-        .routes(routes!(cluster::capabilities))
-        .routes(routes!(cluster::backups::get))
-        .routes(routes!(cluster::backups::plan))
-        .routes(routes!(cluster::backups::apply))
-        .routes(routes!(cluster::backup_download::download))
-        .routes(routes!(cluster::restore_copy::deleted_projects))
-        .routes(routes!(cluster::issuers::get))
-        .routes(routes!(cluster::s3_destinations::get))
-        .routes(routes!(cluster::s3_destinations::plan))
-        .routes(routes!(cluster::s3_destinations::apply))
-        .routes(routes!(cluster::github_app::get))
-        .routes(routes!(cluster::github_app::manifest))
-        .routes(routes!(cluster::github_app::form))
-        .routes(routes!(cluster::github_app::conversion))
-        .routes(routes!(cluster::github_app::plan))
-        .routes(routes!(cluster::github_app::apply))
-        .routes(routes!(notifications::cluster_get))
-        .routes(routes!(notifications::cluster_plan))
-        .routes(routes!(notifications::cluster_apply))
-        .routes(routes!(cluster::config_reload::get))
-        .routes(routes!(cluster::templates::list))
-        .routes(routes!(cluster::templates::get))
-        .routes(routes!(cluster::node_shells::list))
-        .routes(routes!(cluster::node_shells::plan))
-        .routes(routes!(cluster::node_shells::apply))
-        .routes(routes!(cluster::node_shells::terminal))
-        .routes(routes!(cluster::tools::status))
-        .routes(routes!(cluster::tools::plan))
-        .routes(routes!(cluster::tools::apply))
-        .routes(routes!(cluster::tools::delete))
-        .routes(routes!(cluster::tools::terminal))
-        .routes(routes!(cluster::maintenance::plan))
-        .routes(routes!(cluster::maintenance::apply))
-        .routes(routes!(cluster::nodes))
-        .routes(routes!(cluster::usage::get))
-        .routes(routes!(cluster::health))
-        .routes(routes!(cluster::upgrades))
-        .routes(routes!(cluster::events))
-        .routes(routes!(alerts::cluster))
-        .routes(routes!(gaps::cluster))
-        .routes(routes!(incidents::cluster))
-}
-
-fn remaining_routes<R: Routes>(router: R) -> R {
-    router
-        .routes(routes!(projects::list))
-        .routes(routes!(projects::get))
-        .routes(routes!(projects::namespace::get))
-        .routes(routes!(projects::gateways::list))
-        .routes(routes!(services::service))
-        .routes(routes!(gaps::project))
-        .routes(routes!(incidents::project))
-        .routes(routes!(resources::objects::list))
-        .routes(routes!(resources::objects::get))
-        .routes(routes!(resources::creatable::list))
-        .routes(routes!(resources::config::config_maps))
-        .routes(routes!(resources::config::reveal_secret))
-        .routes(routes!(projects::events::events))
-        .routes(routes!(pods::logs::logs))
-        .routes(routes!(pods::logs::follow_logs))
-        .routes(routes!(pods::exec::exec))
-        .routes(routes!(pods::debug::get))
-        .routes(routes!(pods::files::get))
-        .routes(routes!(pods::files::list, pods::files::delete))
-        .routes(routes!(pods::files::download, pods::files::upload))
-        .routes(routes!(pods::files::preview))
-        .routes(routes!(pods::files::make_folder))
-        .routes(routes!(pods::files::rename))
-        .routes(routes!(tools::status))
-        .routes(routes!(tools::delete))
-        .routes(routes!(tools::terminal))
-        .routes(routes!(services::releases::releases))
-        .routes(routes!(services::trace::trace))
-        .routes(routes!(timeline::service))
-        .routes(routes!(services::rollout::rollout))
-        .routes(routes!(services::runs::runs))
-        .routes(routes!(services::evidence::evidence))
-        .routes(routes!(timeline::project))
-        .routes(routes!(projects::writes::plan))
-        .routes(routes!(projects::writes::apply))
-        .routes(routes!(projects::writes::certificates::get))
-        .routes(routes!(projects::backups::get))
-        .routes(routes!(notifications::project_get))
-        .routes(routes!(notifications::project_plan))
-        .routes(routes!(notifications::project_apply))
-        .routes(routes!(alerts::project))
-        .routes(routes!(projects::databases::get))
-        .routes(routes!(projects::object_storage::get))
-        .routes(routes!(projects::database_export::export))
-        .routes(routes!(projects::volume_restores::get))
-        .routes(routes!(projects::builds::get))
-        .routes(routes!(projects::source_upload::upload))
-        .routes(routes!(projects::deploy_keys::create))
-        .routes(routes!(cluster::github_app::project))
-        .routes(routes!(images::inspect))
-        .routes(routes!(projects::compose::convert_compose))
-        .routes(routes!(projects::deploy_keys::public))
-        .routes(routes!(projects::network_policy::presets))
-        .routes(routes!(projects::usage::get))
-        .routes(routes!(projects::usage::volumes))
-        .routes(routes!(projects::storage::get))
-        .routes(routes!(services::history::get))
-        .routes(routes!(services::logs::history))
-        .routes(routes!(settings::store::get_setting, settings::store::set))
-        .routes(routes!(
-            settings::cluster_name::get_setting,
-            settings::cluster_name::set
-        ))
-        .routes(routes!(
-            settings::domains::get_setting,
-            settings::domains::set
-        ))
-        .routes(routes!(
-            settings::sign_in::get_setting,
-            settings::sign_in::set
-        ))
-        .routes(routes!(account::get))
-        .routes(routes!(members::handlers::list))
-        .routes(routes!(members::plan::plan))
-        .routes(routes!(members::plan::apply))
-        .routes(routes!(members::handlers::revoke_invitation))
-        .routes(routes!(members::handlers::setup_link))
-        .routes(routes!(members::handlers::remove_passkey))
+route_table! {
+    get "/api/v1/whoami" => identity::whoami,
+    get "/api/v1/session" => identity::get,
+    get "/api/v1/cluster" => cluster::get,
+    get "/api/v1/cluster/capabilities" => cluster::capabilities,
+    get "/api/v1/cluster/backups" => cluster::backups::get,
+    post "/api/v1/cluster/backups/plan" => cluster::backups::plan,
+    post "/api/v1/cluster/backups/apply" => cluster::backups::apply,
+    get "/api/v1/cluster/backups/{backup}/download" => cluster::backup_download::download,
+    get "/api/v1/cluster/backups/{backup}/deleted-projects" => cluster::restore_copy::deleted_projects,
+    get "/api/v1/cluster/issuers" => cluster::issuers::get,
+    get "/api/v1/cluster/s3-destinations" => cluster::s3_destinations::get,
+    post "/api/v1/cluster/s3-destinations/plan" => cluster::s3_destinations::plan,
+    post "/api/v1/cluster/s3-destinations/apply" => cluster::s3_destinations::apply,
+    get "/api/v1/cluster/github-app" => cluster::github_app::get,
+    post "/api/v1/cluster/github-app/manifest" => cluster::github_app::manifest,
+    get "/api/v1/cluster/github-app/form" => cluster::github_app::form,
+    post "/api/v1/cluster/github-app/conversion" => cluster::github_app::conversion,
+    post "/api/v1/cluster/github-app/plan" => cluster::github_app::plan,
+    post "/api/v1/cluster/github-app/apply" => cluster::github_app::apply,
+    get "/api/v1/cluster/notifications" => notifications::cluster_get,
+    post "/api/v1/cluster/notifications/plan" => notifications::cluster_plan,
+    post "/api/v1/cluster/notifications/apply" => notifications::cluster_apply,
+    get "/api/v1/cluster/config-reload" => cluster::config_reload::get,
+    get "/api/v1/cluster/templates" => cluster::templates::list,
+    get "/api/v1/cluster/templates/{template}" => cluster::templates::get,
+    get "/api/v1/cluster/node-shells" => cluster::node_shells::list,
+    post "/api/v1/cluster/node-shells/plan" => cluster::node_shells::plan,
+    post "/api/v1/cluster/node-shells/apply" => cluster::node_shells::apply,
+    get "/api/v1/cluster/node-shells/{pod}/terminal" => cluster::node_shells::terminal,
+    get "/api/v1/cluster/tools" => cluster::tools::status,
+    post "/api/v1/cluster/tools/plan" => cluster::tools::plan,
+    post "/api/v1/cluster/tools/apply" => cluster::tools::apply,
+    delete "/api/v1/cluster/tools/{name}" => cluster::tools::delete,
+    get "/api/v1/cluster/tools/{name}/terminal" => cluster::tools::terminal,
+    post "/api/v1/cluster/nodes/{node}/maintenance/plan" => cluster::maintenance::plan,
+    post "/api/v1/cluster/nodes/{node}/maintenance/apply" => cluster::maintenance::apply,
+    get "/api/v1/cluster/nodes" => cluster::nodes,
+    get "/api/v1/cluster/usage" => cluster::usage::get,
+    get "/api/v1/cluster/health" => cluster::health,
+    get "/api/v1/cluster/upgrades" => cluster::upgrades,
+    get "/api/v1/cluster/events" => cluster::events,
+    get "/api/v1/cluster/alerts" => alerts::cluster,
+    get "/api/v1/cluster/gaps" => gaps::cluster,
+    get "/api/v1/cluster/incidents" => incidents::cluster,
+    get "/api/v1/projects" => projects::list,
+    get "/api/v1/projects/{project}" => projects::get,
+    get "/api/v1/projects/{project}/namespace" => projects::namespace::get,
+    get "/api/v1/projects/{project}/gateways" => projects::gateways::list,
+    get "/api/v1/projects/{project}/services/{kind}/{name}" => services::service,
+    get "/api/v1/projects/{project}/gaps" => gaps::project,
+    get "/api/v1/projects/{project}/incidents" => incidents::project,
+    get "/api/v1/projects/{project}/objects" => resources::objects::list,
+    get "/api/v1/projects/{project}/objects/{group}/{version}/{resource}/{name}" => resources::objects::get,
+    get "/api/v1/projects/{project}/creatable" => resources::creatable::list,
+    get "/api/v1/projects/{project}/configmaps" => resources::config::config_maps,
+    post "/api/v1/projects/{project}/secrets/{name}/reveal" => resources::config::reveal_secret,
+    get "/api/v1/projects/{project}/events" => projects::events::events,
+    get "/api/v1/projects/{project}/pods/{pod}/logs" => pods::logs::logs,
+    get "/api/v1/projects/{project}/pods/{pod}/logs/follow" => pods::logs::follow_logs,
+    get "/api/v1/projects/{project}/pods/{pod}/exec" => pods::exec::exec,
+    get "/api/v1/projects/{project}/pods/{pod}/debug" => pods::debug::get,
+    get "/api/v1/projects/{project}/pods/{pod}/files" => pods::files::get,
+    get "/api/v1/projects/{project}/pods/{pod}/files/entries" => pods::files::list,
+    delete "/api/v1/projects/{project}/pods/{pod}/files/entries" => pods::files::delete,
+    get "/api/v1/projects/{project}/pods/{pod}/files/content" => pods::files::download,
+    put "/api/v1/projects/{project}/pods/{pod}/files/content" => pods::files::upload,
+    get "/api/v1/projects/{project}/pods/{pod}/files/preview" => pods::files::preview,
+    post "/api/v1/projects/{project}/pods/{pod}/files/folders" => pods::files::make_folder,
+    post "/api/v1/projects/{project}/pods/{pod}/files/moves" => pods::files::rename,
+    get "/api/v1/projects/{project}/tools" => tools::status,
+    delete "/api/v1/projects/{project}/tools/{name}" => tools::delete,
+    get "/api/v1/projects/{project}/tools/{name}/terminal" => tools::terminal,
+    get "/api/v1/projects/{project}/services/{kind}/{name}/releases" => services::releases::releases,
+    get "/api/v1/projects/{project}/services/{kind}/{name}/trace" => services::trace::trace,
+    get "/api/v1/projects/{project}/services/{kind}/{name}/timeline" => timeline::service,
+    get "/api/v1/projects/{project}/services/{kind}/{name}/rollout" => services::rollout::rollout,
+    get "/api/v1/projects/{project}/services/{kind}/{name}/runs" => services::runs::runs,
+    get "/api/v1/projects/{project}/services/{kind}/{name}/evidence" => services::evidence::evidence,
+    get "/api/v1/projects/{project}/timeline" => timeline::project,
+    post "/api/v1/projects/{project}/plan" => projects::writes::plan,
+    post "/api/v1/projects/{project}/apply" => projects::writes::apply,
+    get "/api/v1/projects/{project}/certificates/{secret}" => projects::writes::certificates::get,
+    get "/api/v1/projects/{project}/backups" => projects::backups::get,
+    get "/api/v1/projects/{project}/notifications" => notifications::project_get,
+    post "/api/v1/projects/{project}/notifications/plan" => notifications::project_plan,
+    post "/api/v1/projects/{project}/notifications/apply" => notifications::project_apply,
+    get "/api/v1/projects/{project}/alerts" => alerts::project,
+    get "/api/v1/projects/{project}/databases" => projects::databases::get,
+    get "/api/v1/projects/{project}/object-storage" => projects::object_storage::get,
+    get "/api/v1/projects/{project}/databases/{engine}/{name}/export" => projects::database_export::export,
+    get "/api/v1/projects/{project}/volumes/{claim}/restores" => projects::volume_restores::get,
+    get "/api/v1/projects/{project}/builds" => projects::builds::get,
+    post "/api/v1/projects/{project}/builds/{build}/source" => projects::source_upload::upload,
+    post "/api/v1/projects/{project}/deploy-keys" => projects::deploy_keys::create,
+    get "/api/v1/projects/{project}/github-app" => cluster::github_app::project,
+    post "/api/v1/projects/{project}/images/inspect" => images::inspect,
+    post "/api/v1/projects/{project}/compose" => projects::compose::convert_compose,
+    post "/api/v1/projects/{project}/deploy-keys/{name}/public" => projects::deploy_keys::public,
+    get "/api/v1/projects/{project}/network-policy/presets" => projects::network_policy::presets,
+    get "/api/v1/projects/{project}/usage" => projects::usage::get,
+    get "/api/v1/projects/{project}/volumes" => projects::usage::volumes,
+    get "/api/v1/projects/{project}/storage" => projects::storage::get,
+    get "/api/v1/projects/{project}/services/{kind}/{name}/history" => services::history::get,
+    get "/api/v1/projects/{project}/services/{kind}/{name}/logs/history" => services::logs::history,
+    get "/api/v1/settings/metrics-store" => settings::store::get_setting,
+    put "/api/v1/settings/metrics-store" => settings::store::set,
+    get "/api/v1/settings/cluster-name" => settings::cluster_name::get_setting,
+    put "/api/v1/settings/cluster-name" => settings::cluster_name::set,
+    get "/api/v1/settings/domains" => settings::domains::get_setting,
+    put "/api/v1/settings/domains" => settings::domains::set,
+    get "/api/v1/settings/sign-in" => settings::sign_in::get_setting,
+    put "/api/v1/settings/sign-in" => settings::sign_in::set,
+    get "/api/v1/account" => account::get,
+    get "/api/v1/members" => members::handlers::list,
+    post "/api/v1/members/plan" => members::plan::plan,
+    post "/api/v1/members/apply" => members::plan::apply,
+    delete "/api/v1/members/invitations/{name}" => members::handlers::revoke_invitation,
+    post "/api/v1/members/{username}/setup-links" => members::handlers::setup_link,
+    delete "/api/v1/members/{username}/credentials/{id}" => members::handlers::remove_passkey,
 }
 
 /// The API, for `access`; mount it next to the web interface.
@@ -671,7 +625,7 @@ fn build_with(
         github,
         terminals,
     };
-    routes(Router::new())
+    routes()
         .route(
             "/api/openapi.json",
             get(|| async {
@@ -689,11 +643,30 @@ fn build_with(
 /// The committed `openapi.json`, which the server serves at `/api/openapi.json`.
 const OPENAPI_JSON: &[u8] = include_bytes!("../openapi.json");
 
-/// The OpenAPI document. `crates/zeabur-api/openapi.yaml` and `openapi.json` are this, written by a
-/// test and committed; the server serves the JSON at `/api/openapi.json` without building it.
-#[must_use]
-pub fn openapi() -> utoipa::openapi::OpenApi {
-    routes(OpenApiRouter::with_openapi(ApiDoc::openapi()))
-        .split_for_parts()
-        .1
+#[cfg(test)]
+mod tests {
+    use std::collections::BTreeSet;
+
+    use super::*;
+
+    #[test]
+    fn the_routes_are_the_ones_the_document_describes() {
+        let document = serde_json::to_value(openapi()).unwrap();
+        let described: BTreeSet<(String, String)> = document["paths"]
+            .as_object()
+            .unwrap()
+            .iter()
+            .flat_map(|(path, item)| {
+                item.as_object()
+                    .unwrap()
+                    .keys()
+                    .map(|method| (method.clone(), path.clone()))
+            })
+            .collect();
+        let served: BTreeSet<(String, String)> = ROUTES
+            .iter()
+            .map(|(method, path)| ((*method).to_owned(), (*path).to_owned()))
+            .collect();
+        assert_eq!(served, described);
+    }
 }
