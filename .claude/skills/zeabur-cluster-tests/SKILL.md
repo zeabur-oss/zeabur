@@ -24,7 +24,8 @@ nix run .#dev-cluster -- up [--profile bare|full] [--identity-src ../identity]
 export KUBECONFIG=$PWD/target/dev-cluster/kubeconfig   # never your normal context
 nix run .#dev-cluster -- down
 ```
-`scripts/dev-cluster.sh` is the one cluster setup: the `kubernetes` and `kubernetes-l2` jobs,
+`scripts/dev-cluster.sh` (`cargo xtask dev-cluster`, `xtask/src/dev_cluster.rs`) is the one
+cluster setup: the `kubernetes` and `kubernetes-l2` jobs,
 `e2e-l2.sh` and `release-smoke.sh` all use it. It installs Zeabur Identity (built from
 `ZEABUR_IDENTITY_PINNED`, fetched from `ZEABUR_IDENTITY_GIT`, or from `--identity-src`) and Zeabur
 from `zeabur-installer manifests` (the installer's own HelmChart and values; a `HelmChartConfig`
