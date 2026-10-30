@@ -9,7 +9,7 @@ stage as `scripts/release.sh <stage>` in this repository's Nix dev shell:
 
 | Stage | Where | Does |
 |---|---|---|
-| `check` | once | The tag is the version of every crate, `Cargo.lock`, the chart (`version`, `appVersion`), `web/package.json`, the installer's `package.json` and `openapi.yaml`, and `CHANGELOG.md` has its section. Every `ghcr.io/zeabur-oss` image the chart runs is one the release publishes. |
+| `check` | once | The tag is the version of every crate, `Cargo.lock`, the chart (`version`, `appVersion`), `web/package.json`, the installer's `package.json`, `openapi.yaml` and `openapi.json`, and `CHANGELOG.md` has its section. Every `ghcr.io/zeabur-oss` image the chart runs is one the release publishes. |
 | `build` | Linux amd64 and arm64, macOS arm64 | On a tag, the catalog and Zeabur Identity pins resolve (`release-pins.sh`). Builds the platform (`release-build.sh`; on Linux also Zeabur's and Zeabur Proxy's images), then on Linux smokes the archive, the chart and the image on a k3s cluster with Zeabur Identity at `ZEABUR_IDENTITY_PINNED` (`release-smoke.sh`). A rehearsal also builds a development installer on Linux, which it does not keep. |
 | `publish` | once, tag only | Pushes the images `zeabur` and `proxy`, then the chart with both pinned by digest, and signs them (`zeabur-oss-release push-image`, `push-chart`); stops when the chart would run any other image; writes `published/subjects.json`, which the shared workflow attests, and `published/outputs.env`, the installer's pins of Zeabur's image and the chart. |
 | `finish` | every platform, tag only | Builds `zeabur-installer` on Linux, pinned to the catalog, Zeabur Identity and what `publish` pushed. macOS has no installer and leaves only a note, which no asset includes. |
@@ -27,8 +27,8 @@ which release it is. `verify` gets these in `RELEASE_CERT_IDENTITY_REGEXP`,
 1. On a branch, set the version in `Cargo.toml` (`[workspace.package]`, then
    `nix develop -c cargo update --workspace` for `Cargo.lock`), in
    `deploy/chart/zeabur/Chart.yaml` (`version` and `appVersion`), `web/package.json`,
-   `crates/zeabur-installer/web/package.json` and `crates/zeabur-api/openapi.yaml` (`info.version`;
-   the API test regenerates it), all without the `v`; `nix develop -c scripts/release.sh check
+   `crates/zeabur-installer/web/package.json` and `crates/zeabur-api/openapi.yaml` and `openapi.json` (`info.version`;
+   the API test regenerates both), all without the `v`; `nix develop -c scripts/release.sh check
    v<version>` checks them. Rename
    `## [Unreleased]` in `CHANGELOG.md` to `## [<version>] - <date>` and add its link at the end;
    that section becomes the release notes. The catalog commit in `flake.lock` and the

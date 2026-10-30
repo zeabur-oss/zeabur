@@ -139,6 +139,8 @@ case "$stage" in
     done
     [[ "$(yq .info.version crates/zeabur-api/openapi.yaml)" == "$plain" ]] ||
       { echo "crates/zeabur-api/openapi.yaml is not at $plain" >&2; status=1; }
+    [[ "$(jq -r .info.version crates/zeabur-api/openapi.json)" == "$plain" ]] ||
+      { echo "crates/zeabur-api/openapi.json is not at $plain" >&2; status=1; }
     zeabur-oss-release notes CHANGELOG.md "$version" >/dev/null || status=1
     rendered="$(chart_images deploy/chart/zeabur)"
     while read -r ref; do
