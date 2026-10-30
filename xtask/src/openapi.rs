@@ -1,4 +1,4 @@
-//! The API's description and the web interface's API client made from it: `zeabur-api`'s test writes
+//! The API's description and the web client made from it: `zeabur-api`'s test writes
 //! `crates/zeabur-api/openapi.yaml` when `ZEABUR_UPDATE_OPENAPI` is set, and `bun run gen:api`
 //! turns it into `web/src/api/zeabur.ts`. CI fails when either file is stale.
 
