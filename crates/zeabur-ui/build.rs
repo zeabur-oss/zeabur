@@ -34,6 +34,18 @@ fn main() {
     }
 }
 
+fn grouped(n: u64) -> String {
+    let digits = n.to_string();
+    let mut out = String::new();
+    for (i, c) in digits.chars().enumerate() {
+        if i > 0 && (digits.len() - i) % 3 == 0 {
+            out.push('_');
+        }
+        out.push(c);
+    }
+    out
+}
+
 fn compile_error(message: &str) -> String {
     format!("compile_error!({message:?});\n")
 }
@@ -45,7 +57,8 @@ fn placeholder_table() -> String {
         "/// What this binary embeds.\npub const KIND: EmbeddedKind = EmbeddedKind::Placeholder;\n\
          pub(crate) static ASSETS: &[Asset] = &[Asset {{ path: \"index.html\", \
          content_type: \"text/html; charset=utf-8\", etag: \"\\\"placeholder\\\"\", \
-         immutable: false, identity: include_bytes!({:?}), brotli: None }}];\n",
+         immutable: false, len: {}, identity: Some(include_bytes!({:?})), brotli: None }}];\n",
+        grouped(fs::metadata(&index).map_or(0, |m| m.len())),
         index.display().to_string()
     )
 }
@@ -92,17 +105,29 @@ fn dist_table(dist: &Path) -> Result<String, String> {
         };
         has_index |= path == "index.html";
         let short = sha256.get(..32).unwrap_or(sha256);
-        let file = |suffix: &str| -> Result<String, String> {
+        let file = |suffix: &str| -> Result<(PathBuf, String), String> {
             let full = dist.join(format!("{path}{suffix}"));
             if !full.is_file() {
                 return Err(format!("{} is listed but missing", full.display()));
             }
             println!("cargo::rerun-if-changed={}", full.display());
-            Ok(format!("include_bytes!({:?})", full.display().to_string()))
+            let include = format!("include_bytes!({:?})", full.display().to_string());
+            Ok((full, include))
         };
-        let brotli = match encodings {
-            "br" => format!("Some({})", file(".br")?),
-            "-" => "None".to_owned(),
+        let (original, original_include) = file("")?;
+        let len = fs::metadata(&original)
+            .map_err(|e| format!("cannot read {}: {e}", original.display()))?
+            .len();
+        let (brotli, identity) = match encodings {
+            "br" => (
+                format!("Some({})", file(".br")?.1),
+                if path.starts_with("assets/") {
+                    "None".to_owned()
+                } else {
+                    format!("Some({original_include})")
+                },
+            ),
+            "-" => ("None".to_owned(), format!("Some({original_include})")),
             other => {
                 return Err(format!(
                     "manifest.tsv line {}: encodings {other:?}",
@@ -113,9 +138,9 @@ fn dist_table(dist: &Path) -> Result<String, String> {
         writeln!(
             code,
             "    Asset {{ path: {path:?}, content_type: {content_type:?}, etag: {etag:?}, \
-             immutable: {immutable}, identity: {identity}, brotli: {brotli} }},",
+             immutable: {immutable}, len: {len}, identity: {identity}, brotli: {brotli} }},",
             etag = format!("\"{short}\""),
-            identity = file("")?,
+            len = grouped(len),
         )
         .map_err(|e| e.to_string())?;
     }

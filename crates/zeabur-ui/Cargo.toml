@@ -12,6 +12,8 @@ workspace = true
 
 [dependencies]
 axum.workspace = true
+brotli-decompressor.workspace = true
+futures-util.workspace = true
 
 [dev-dependencies]
 zeabur-core.workspace = true
