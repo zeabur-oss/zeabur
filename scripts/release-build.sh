@@ -29,10 +29,7 @@ version="$1"
 arch="$2"
 root="$(cd "$(dirname "$0")/.." && pwd)"
 : "${IN_NIX_SHELL:?run inside nix develop}"
-if [[ ! "$version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-  echo "expected a version like v0.0.2" >&2
-  exit 2
-fi
+zeabur-oss-release version "$version" >/dev/null || exit 2
 # mkShell sets SOURCE_DATE_EPOCH to 1980; the commit's time replaces it.
 SOURCE_DATE_EPOCH="$(git -C "$root" show -s --format=%ct HEAD)"
 export SOURCE_DATE_EPOCH

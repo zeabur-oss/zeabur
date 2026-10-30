@@ -4,33 +4,54 @@
 # tag (or a commit that carries one) in ZEABUR_IDENTITY_PINNED. Each value comes from a checksum
 # list that the product's release signed, and cosign checks that signature first. The catalog files this build embeds (ZEABUR_CATALOG_RELEASE) must match that
 # list. release-build.sh compiles the pins into the installer (`scripts/release.sh finish`). Run
-# inside `nix develop`.
-#   scripts/release-pins.sh
+# inside `nix develop`. A normal release pins normal releases only; a pre-release (v0.1.2-beta.1)
+# may pin pre-releases too, and still takes a normal tag over a pre-release on the same commit.
+#   scripts/release-pins.sh <vVERSION>
 set -euo pipefail
 
+[[ $# == 1 ]] || { echo "usage: release-pins.sh <vVERSION>" >&2; exit 2; }
 root="$(cd "$(dirname "$0")/.." && pwd)"
 : "${IN_NIX_SHELL:?run inside nix develop}"
+prerelease="$(zeabur-oss-release version "$1" | sed -n 's/^prerelease=//p')"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 
+# Whether a tag is a release tag this release may pin: a normal release pins normal tags only.
+pinnable() { # $1 = tag
+  local pre
+  pre="$(zeabur-oss-release version "$1" 2>/dev/null | sed -n 's/^prerelease=//p')"
+  [[ -n "$pre" && ( "$pre" == false || "$prerelease" == true ) ]]
+}
+
 # Prints the one release tag of a pin: the pin itself when it is a release tag that exists, else
-# the one release tag on the commit.
+# the one release tag on the commit; a normal tag wins over a pre-release tag there.
 tag_at() { # $1 = repository, $2 = release tag or commit
-  local tags
-  if [[ "$2" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+  local tags tag normal=() pre=()
+  if zeabur-oss-release version "$2" >/dev/null 2>&1; then
+    pinnable "$2" || { echo "zeabur-oss/$1 $2 is a pre-release, which a normal release does not pin" >&2; return 1; }
     git ls-remote --exit-code --tags "https://github.com/zeabur-oss/$1" "refs/tags/$2" >/dev/null ||
       { echo "zeabur-oss/$1 has no release tag $2" >&2; return 1; }
     echo "$2"
     return
   fi
   tags="$(git ls-remote --tags "https://github.com/zeabur-oss/$1" |
-    awk -v c="$2" '$1 == c { sub("^refs/tags/", "", $2); sub("\\^\\{\\}$", "", $2); print $2 }' |
-    { grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' || true; } | sort -u)"
-  if [[ -z "$tags" || "$tags" == *$'\n'* ]]; then
+    awk -v c="$2" '$1 == c { sub("^refs/tags/", "", $2); sub("\\^\\{\\}$", "", $2); print $2 }' | sort -u)"
+  while read -r tag; do
+    pinnable "$tag" || continue
+    if [[ "$(zeabur-oss-release version "$tag" | sed -n 's/^prerelease=//p')" == false ]]; then
+      normal+=("$tag")
+    else
+      pre+=("$tag")
+    fi
+  done <<<"$tags"
+  if [[ ${#normal[@]} == 1 ]]; then
+    echo "${normal[0]}"
+  elif [[ ${#normal[@]} == 0 && ${#pre[@]} == 1 ]]; then
+    echo "${pre[0]}"
+  else
     echo "zeabur-oss/$1 $2 has no single release tag: tag it, or move the pin" >&2
     return 1
   fi
-  echo "$tags"
 }
 catalog="$(tag_at catalog "$ZEABUR_CATALOG_COMMIT")"
 identity="$(tag_at identity "$(tr -d '[:space:]' <"$root/ZEABUR_IDENTITY_PINNED")")"

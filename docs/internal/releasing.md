@@ -9,7 +9,7 @@ stage as `scripts/release.sh <stage>` in this repository's Nix dev shell:
 
 | Stage | Where | Does |
 |---|---|---|
-| `check` | once | The tag is the version of every crate, `Cargo.lock`, the chart (`version`, `appVersion`), `web/package.json`, the installer's `package.json` and `openapi.yaml`, and `CHANGELOG.md` has its section. Every `ghcr.io/zeabur-oss` image the chart runs is one the release publishes. |
+| `check` | once | The tag is a SemVer version (`zeabur-oss-release version`) and the version of every crate, `Cargo.lock`, the chart (`version`, `appVersion`), `web/package.json`, the installer's `package.json` and `openapi.yaml`, and `CHANGELOG.md` has the section of its normal version. Every `ghcr.io/zeabur-oss` image the chart runs is one the release publishes. |
 | `build` | Linux amd64 and arm64, macOS arm64 | On a tag, the catalog and Zeabur Identity pins resolve (`release-pins.sh`). Builds the platform (`release-build.sh`; on Linux also Zeabur's and Zeabur Proxy's images), then on Linux smokes the archive, the chart and the image on a k3s cluster with Zeabur Identity at `ZEABUR_IDENTITY_PINNED` (`release-smoke.sh`). A rehearsal also builds a development installer on Linux, which it does not keep. |
 | `sign` | macOS arm64, after `build` | Signs `zeaburctl` with the Developer ID and notarizes it, in the `macos-signing` environment, on `main` and tags only. Without the certificate it leaves the build as it is and warns. |
 | `publish` | once, tag only | Pushes the images `zeabur` and `proxy`, then the chart with both pinned by digest, and signs them (`zeabur-oss-release push-image`, `push-chart`); stops when the chart would run any other image; writes `published/subjects.json`, which the shared workflow attests, and `published/outputs.env`, the installer's pins of Zeabur's image and the chart. |
@@ -22,6 +22,16 @@ Every signature and attestation names the shared workflow,
 file; the certificate's repository (`zeabur-oss/zeabur`) and ref (`refs/tags/v<version>`) say
 which release it is. `verify` gets these in `RELEASE_CERT_IDENTITY_REGEXP`,
 `RELEASE_SIGNER_WORKFLOW`, `RELEASE_SOURCE_REPOSITORY` and `RELEASE_SOURCE_REF`.
+
+## Pre-releases
+
+A tag with a pre-release part (`v0.1.2-beta.1`, `v1.0.0-rc.1`) is a
+[SemVer 2.0.0](https://semver.org/spec/v2.0.0.html) pre-release: a GitHub pre-release, never
+latest. Build metadata (`+...`) is refused. Tag it on `main` like any release. The manifests carry
+the full version (`0.1.2-beta.1`), and `CHANGELOG.md` has no section of its own for it: it reads
+`## [0.1.2]`. A normal release pins only normal releases of the catalog and Zeabur Identity; a
+pre-release may pin pre-releases too, and a commit tagged both resolves to the normal tag for a
+normal release. Anything that picks the newest version compares by SemVer §11, not `sort -V`.
 
 ## Publish a release
 
