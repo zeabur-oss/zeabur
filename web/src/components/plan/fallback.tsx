@@ -2,6 +2,7 @@
 // Its own module, so the shell carries this and not the planner.
 import { lazy, Suspense, useSyncExternalStore } from "react"
 
+import { PlanDialogPending } from "@/components/plan/pending"
 import type { PlanAsk } from "@/components/plan/planner"
 import type { Reviewed } from "@/components/plan/replan"
 
@@ -51,7 +52,7 @@ export function PlanFallback() {
   const open = useSyncExternalStore(fallback.subscribe, fallback.get)
   if (!open) return null
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<PlanDialogPending title={open.ask.title} onClose={fallback.close} />}>
       <PlanDialog
         key={open.attempt}
         project={open.project}

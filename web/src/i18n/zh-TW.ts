@@ -43,6 +43,7 @@ export const zhTW: Messages = {
   "shell.renameCluster": "在設定中重新命名",
   "shell.cluster": "叢集",
   "shell.search": "搜尋",
+  "shell.opening": "正在開啟頁面…",
   "shell.jumpTo": "前往…",
   "shell.menu": "選單",
   "shell.findProject": "尋找專案",
