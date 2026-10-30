@@ -1160,23 +1160,23 @@ kind = "unsafe"
 reason = "Grows the stack for recursive parsing in pest"
 approved = "2026-10-28"
 
-# --- Web interface: decoding the embedded brotli files for clients without brotli (zeabur-ui). Pending a maintainer's review.
+# --- Web interface: decoding the embedded brotli files for clients without brotli (zeabur-ui).
 # The `unsafe` lines sit behind the crates' `unsafe` and `ffi-api` features, which are off; the default build is `forbid(unsafe_code)`.
 
 [[crate]]
 name = "brotli-decompressor"
 kind = "unsafe"
 reason = "Brotli decoding of the embedded interface; unsafe code is behind features that are off"
-approved = "pending"
+approved = "2026-10-30"
 
 [[crate]]
 name = "alloc-stdlib"
 kind = "unsafe"
 reason = "Allocator of brotli-decompressor; unsafe code is behind a feature that is off"
-approved = "pending"
+approved = "2026-10-30"
 
 [[crate]]
 name = "alloc-no-stdlib"
 kind = "unsafe"
 reason = "Allocator interface of brotli-decompressor; unsafe code is behind a feature that is off"
-approved = "pending"
+approved = "2026-10-30"
