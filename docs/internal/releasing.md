@@ -11,10 +11,11 @@ stage as `scripts/release.sh <stage>` in this repository's Nix dev shell:
 |---|---|---|
 | `check` | once | The tag is the version of every crate, `Cargo.lock`, the chart (`version`, `appVersion`), `web/package.json`, the installer's `package.json` and `openapi.yaml`, and `CHANGELOG.md` has its section. Every `ghcr.io/zeabur-oss` image the chart runs is one the release publishes. |
 | `build` | Linux amd64 and arm64, macOS arm64 | On a tag, the catalog and Zeabur Identity pins resolve (`release-pins.sh`). Builds the platform (`release-build.sh`; on Linux also Zeabur's and Zeabur Proxy's images), then on Linux smokes the archive, the chart and the image on a k3s cluster with Zeabur Identity at `ZEABUR_IDENTITY_PINNED` (`release-smoke.sh`). A rehearsal also builds a development installer on Linux, which it does not keep. |
+| `sign` | macOS arm64, after `build` | Signs `zeaburctl` with the Developer ID and notarizes it, in the `macos-signing` environment, on `main` and tags only. Without the certificate it leaves the build as it is and warns. |
 | `publish` | once, tag only | Pushes the images `zeabur` and `proxy`, then the chart with both pinned by digest, and signs them (`zeabur-oss-release push-image`, `push-chart`); stops when the chart would run any other image; writes `published/subjects.json`, which the shared workflow attests, and `published/outputs.env`, the installer's pins of Zeabur's image and the chart. |
 | `finish` | every platform, tag only | Builds `zeabur-installer` on Linux, pinned to the catalog, Zeabur Identity and what `publish` pushed. macOS has no installer and leaves only a note, which no asset includes. |
 | `assets` | once, tag only | Makes the assets, the signed `SHA256SUMS` (`zeabur-oss-release checksums`) and the notes from `CHANGELOG.md` with a link to the documentation (`zeabur-oss-release notes`); the shared workflow attests them and creates the draft. |
-| `verify` | every platform | Downloads the draft and checks it as a user would (`zeabur-oss-release verify-assets`, `verify-image` for each image, `verify-chart`), checks that the chart runs exactly the images in `digests.txt`, then installs the published chart on Linux (`release-smoke.sh`) or runs `zeaburctl` on macOS. |
+| `verify` | every platform | Downloads the draft and checks it as a user would (`zeabur-oss-release verify-assets`, `verify-image` for each image, `verify-chart`), checks that the chart runs exactly the images in `digests.txt`, then installs the published chart on Linux (`release-smoke.sh`) or runs `zeaburctl` on macOS, where a Developer ID signature must be notarized (`spctl`). |
 
 Every signature and attestation names the shared workflow,
 `https://github.com/zeabur-oss/.github/.github/workflows/release.yml@…`, not this repository's
@@ -80,6 +81,16 @@ These are repository and organization settings, not files; a maintainer sets the
 - **Tags.** A ruleset that lets only maintainers create, move or delete `v*` tags.
 - **Immutable releases** (repository settings → **Releases**): once published, a release's tag
   and assets cannot be changed. A draft stays editable until then.
+- **macOS signing.** An environment `macos-signing` whose deployment branches are `main` and
+  `v*` tags, with these secrets (zeabur#87):
+  - `APPLE_CERTIFICATE_P12`: the Developer ID Application certificate with its private key,
+    exported from Keychain Access as `.p12`, then `base64 -i certificate.p12`.
+  - `APPLE_CERTIFICATE_PASSWORD`: the password it was exported with.
+  - `APPLE_API_KEY_P8`, `APPLE_API_KEY_ID`, `APPLE_API_ISSUER_ID`: an App Store Connect API key
+    with the Developer role (**Users and Access → Integrations**): the `.p8` file's text, its key
+    ID and the issuer ID.
+
+  Without them, releases go on with `zeaburctl` signed ad hoc only.
 - **Workflow permissions** can stay read-only by default: the caller grants the shared
   workflow `contents: write`, `packages: write`, `id-token: write` and `attestations: write`,
   and each of its jobs asks for what it needs. `publish` has `packages: write` and

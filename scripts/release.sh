@@ -12,6 +12,9 @@
 #   scripts/release.sh build   <version> <os> <arch> <dist>             build one platform and smoke
 #                                                                       it (release-build.sh,
 #                                                                       release-smoke.sh)
+#   scripts/release.sh sign    <version> <os> <arch> <dist>             macOS: zeaburctl signed
+#                                                                       with the Developer ID and
+#                                                                       notarized (zeabur#87)
 #   scripts/release.sh publish <version> <artifacts> <published>        the images and the chart
 #                                                                       by digest, signed
 #   scripts/release.sh finish  <version> <os> <arch> <artifacts> <dist> the installer, pinned to
@@ -41,6 +44,7 @@ usage() {
   cat >&2 <<'EOF'
 usage: scripts/release.sh check   <vVERSION>
        scripts/release.sh build   <vVERSION> <os> <arch> <dist>
+       scripts/release.sh sign    <vVERSION> <os> <arch> <dist>
        scripts/release.sh publish <vVERSION> <artifacts> <published>
        scripts/release.sh finish  <vVERSION> <os> <arch> <artifacts> <dist>
        scripts/release.sh assets  <vVERSION> <artifacts> <release>
@@ -181,6 +185,78 @@ case "$stage" in
       fi
     fi
     ls -l "$dist"
+    ;;
+
+  sign)
+    [[ $# == 5 ]] || usage
+    os="$3" arch="$4"
+    platform "$os" "$arch"
+    [[ "$os" == darwin ]] || { echo "only the macOS build is signed" >&2; exit 2; }
+    dist="$(cd "$5" && pwd)"
+    # The shared workflow passes the secrets only on main and tags. Without them zeaburctl keeps
+    # the linker's ad hoc signature, and the release goes on.
+    if [[ -z "${APPLE_CERTIFICATE_P12:-}" ]]; then
+      echo "::warning::no Developer ID certificate: zeaburctl is not signed or notarized"
+      exit 0
+    fi
+    : "${APPLE_CERTIFICATE_PASSWORD:?}" "${APPLE_API_KEY_P8:?}" "${APPLE_API_KEY_ID:?}" "${APPLE_API_ISSUER_ID:?}"
+    archive="$dist/zeaburctl-$version-$os-$arch.tar.gz"
+    work="$(mktemp -d)"
+    keychain="$work/signing.keychain-db"
+    # Apple's tools, not the Nix shell's: its codesign is sigtool's, and its DEVELOPER_DIR and
+    # SDKROOT point xcrun at a bare SDK without notarytool.
+    apple() { env -u DEVELOPER_DIR -u SDKROOT "$@"; }
+    mapfile -t keychains < <(apple /usr/bin/security list-keychains -d user | sed -e 's/^ *"//' -e 's/"$//')
+    restore() {
+      apple /usr/bin/security list-keychains -d user -s "${keychains[@]}"
+      apple /usr/bin/security delete-keychain "$keychain" 2>/dev/null || true
+      rm -rf "$work"
+    }
+    trap restore EXIT
+    mkdir "$work/zeaburctl"
+    tar -xzf "$archive" -C "$work/zeaburctl"
+    file="$work/zeaburctl/zeaburctl"
+
+    password="$(/usr/bin/uuidgen)"
+    apple /usr/bin/security create-keychain -p "$password" "$keychain"
+    apple /usr/bin/security set-keychain-settings -lut 3600 "$keychain"
+    apple /usr/bin/security unlock-keychain -p "$password" "$keychain"
+    apple /usr/bin/security list-keychains -d user -s "$keychain" "${keychains[@]}"
+    base64 --decode <<<"$APPLE_CERTIFICATE_P12" >"$work/certificate.p12"
+    apple /usr/bin/security import "$work/certificate.p12" -k "$keychain" \
+      -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+    apple /usr/bin/security set-key-partition-list -S apple-tool:,apple:,codesign: -s \
+      -k "$password" "$keychain" >/dev/null
+    identity="$(apple /usr/bin/security find-identity -v -p codesigning "$keychain" |
+      awk '/"Developer ID Application: / { print $2; exit }')"
+    [[ -n "$identity" ]] || { echo "the certificate is not a Developer ID Application one" >&2; exit 1; }
+    # The hardened runtime and a secure timestamp, which notarization requires.
+    apple /usr/bin/codesign --force --options runtime --timestamp --keychain "$keychain" \
+      --sign "$identity" "$file"
+    apple /usr/bin/codesign --verify --strict --verbose=2 "$file"
+
+    # A bare executable cannot carry the ticket; Gatekeeper looks it up online.
+    printf '%s\n' "$APPLE_API_KEY_P8" >"$work/key.p8"
+    apple /usr/bin/ditto -c -k --keepParent "$file" "$work/zeaburctl.zip"
+    result="$(apple /usr/bin/xcrun notarytool submit "$work/zeaburctl.zip" --key "$work/key.p8" \
+      --key-id "$APPLE_API_KEY_ID" --issuer "$APPLE_API_ISSUER_ID" --wait --timeout 30m \
+      --output-format json)" || true
+    if [[ "$(jq -r '.status // empty' <<<"$result" 2>/dev/null || true)" != Accepted ]]; then
+      echo "notarization: $result" >&2
+      id="$(jq -r '.id // empty' <<<"$result" 2>/dev/null || true)"
+      if [[ -n "$id" ]]; then
+        apple /usr/bin/xcrun notarytool log "$id" --key "$work/key.p8" \
+          --key-id "$APPLE_API_KEY_ID" --issuer "$APPLE_API_ISSUER_ID" >&2 || true
+      fi
+      exit 1
+    fi
+    "$file" --version
+
+    # The archive again, as release-build.sh makes it.
+    SOURCE_DATE_EPOCH="$(git -C "$root" show -s --format=%ct HEAD)"
+    tar --format=ustar --sort=name --mtime="@$SOURCE_DATE_EPOCH" \
+      --owner=0 --group=0 --numeric-owner -C "$work/zeaburctl" -cf - LICENSE zeaburctl |
+      gzip -n -9 >"$archive"
     ;;
 
   publish)
@@ -333,6 +409,16 @@ case "$stage" in
       tar -xOzf "$directory/zeaburctl-$version-$3-$4.tar.gz" zeaburctl >"$work/zeaburctl"
       chmod 0755 "$work/zeaburctl"
       said="$("$work/zeaburctl" --version)"
+      # Signed with a Developer ID only when the release had the certificate (`sign`); then
+      # Gatekeeper must accept it as notarized.
+      if /usr/bin/codesign -dvv "$work/zeaburctl" 2>&1 | grep -q '^Authority=Developer ID Application: '; then
+        assessment="$(/usr/sbin/spctl --assess -vvv --type open --context context:primary-signature \
+          "$work/zeaburctl" 2>&1)" || { echo "$assessment" >&2; exit 1; }
+        [[ "$assessment" == *'source=Notarized Developer ID'* ]] ||
+          { echo "zeaburctl is not notarized: $assessment" >&2; exit 1; }
+      else
+        echo "zeaburctl is not signed with a Developer ID"
+      fi
       [[ "$said" == "zeaburctl $plain" ]] || { echo "zeaburctl says '$said'" >&2; exit 1; }
     fi
     echo "release $version verified on $3-$4"

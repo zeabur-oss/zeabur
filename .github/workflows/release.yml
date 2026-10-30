@@ -24,7 +24,7 @@ concurrency:
 
 jobs:
   release:
-    uses: zeabur-oss/.github/.github/workflows/release.yml@7d6a88c38a442a28ea31397854a188699798731a # main
+    uses: zeabur-oss/.github/.github/workflows/release.yml@7fed58a3b47a0e751d4511d23bcf92cd09aaf3a5 # main
     permissions:
       contents: write
       packages: write
@@ -44,3 +44,11 @@ jobs:
       finish-platforms: >-
         [{"os": "linux", "arch": "amd64", "runner": "ubuntu-26.04"},
          {"os": "linux", "arch": "arm64", "runner": "ubuntu-26.04-arm"}]
+      # zeaburctl for macOS signed with the Developer ID and notarized (docs/internal/releasing.md).
+      signing-environment: macos-signing
+    secrets:
+      APPLE_CERTIFICATE_P12: ${{ secrets.APPLE_CERTIFICATE_P12 }}
+      APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+      APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
+      APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+      APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
