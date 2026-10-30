@@ -49,7 +49,7 @@ Arrows point from a crate to what it may depend on (transitive edges omitted).
 | 1 | [`zeabur-core`](../../crates/zeabur-core) | error categories, request guards, cryptography |
 | 0 | [`zeabur-model`](../../crates/zeabur-model) | the projected view clients see (projects, services, endpoints, routes, sources), the names and quantities shared with Kubernetes (`kernel`), conventions of Helm, Argo CD, Flux, operators and Gateway API (`adapters`) |
 | 0 | [`zeabur-embed`](../../crates/zeabur-embed) | **build-dependency**: reading a built interface's `manifest.tsv` into the table `zeabur-ui` and `zeabur-installer` embed |
-| 1 | [`zeabur-ui`](../../crates/zeabur-ui) | embedding and serving the web interface |
+| 1 | [`zeabur-ui`](../../crates/zeabur-ui) | embedding and serving the web interface; with its `interface` feature off, only the serving (the installer's page) |
 | 2 | [`zeabur-kube`](../../crates/zeabur-kube) | how a request reaches kube-apiserver, always as the person |
 | 2 | [`zeabur-auth`](../../crates/zeabur-auth) | signing in through Zeabur Identity (OAuth client), sessions, cross-site checks |
 | 2 | [`zeabur-graph`](../../crates/zeabur-graph) | the projection rules (pure functions, tested with `fixtures/`) |
@@ -71,7 +71,9 @@ Every crate has a README that is also its crate-level documentation (`cargo doc 
 
 The interface's sources live in [`web/`](../../web) (React, TanStack Router and Query, shadcn/ui on
 Base UI with its own theme, Phosphor icons). Its build output is not committed:
-`scripts/build-ui.sh` builds it, and `zeabur-ui` embeds it when `ZEABUR_UI_DIST` points at it.
+`scripts/build-ui.sh` builds it, and `zeabur-ui` (with its `interface` feature, which the binaries'
+`ui` feature turns on) embeds it when `ZEABUR_UI_DIST` points at it. `zeabur-installer` serves its
+own page with `zeabur-ui` and leaves Zeabur's interface out.
 `cargo build --no-default-features` builds the API alone with Cargo only.
 
 ## Fixtures

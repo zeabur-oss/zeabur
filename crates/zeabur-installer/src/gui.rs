@@ -4,59 +4,68 @@
 //! It listens on the loopback address and is reached through `ssh -L`, so nothing new is exposed.
 //! The page writes the same configuration file the command line reads and runs `apply` as a child
 //! process, so both paths install exactly the same thing. A random token in the printed link
-//! becomes a `SameSite=Strict` cookie; every API call needs it, and requests with a `Host` other
+//! becomes a `SameSite=Strict` cookie; every request needs it, and requests with a `Host` other
 //! than the loopback address are refused, which also stops DNS rebinding.
-
-mod http;
+//!
+//! The page's files are served by `zeabur_ui`, as Zeabur serves its own; the API answers are never
+//! stored.
 
 use std::collections::{BTreeMap, VecDeque};
 use std::fs;
 use std::io::{self, BufRead as _, BufReader, Read};
-use std::net::{SocketAddr, TcpListener, ToSocketAddrs as _};
+use std::net::{SocketAddr, ToSocketAddrs as _};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, PoisonError};
 use std::thread::{self, JoinHandle};
+use std::time::Duration;
 
+use axum::Router;
+use axum::body::{Body, Bytes};
+use axum::extract::{Request, State};
+use axum::http::{HeaderMap, HeaderValue, Method, StatusCode, header};
+use axum::middleware::{self, Next};
+use axum::response::Response;
+use axum::routing::get;
 use serde_json::{Value, json};
+use tower::ServiceExt as _;
 use zeabur_installer_host::{facts, files, preflight, systemd};
 use zeabur_installer_plan::catalog::{Default, Index};
 use zeabur_installer_plan::cluster::Distribution;
 use zeabur_installer_plan::config::{Config, Document, PersonalConfig};
 use zeabur_installer_plan::select::{self, PERSONAL_CAPABILITIES, PERSONAL_DISTRIBUTION};
 use zeabur_installer_plan::{kubesolo, node_name, personal, plan};
+use zeabur_ui::Asset;
 
-use self::http::{Request, Response};
 use crate::{InstallError, apply, load, out, render};
 
-/// A file of the web interface (`web/`), embedded by `build.rs`.
-pub(crate) struct Asset {
-    path: &'static str,
-    content_type: &'static str,
-    #[expect(
-        dead_code,
-        reason = "build.rs writes it; every response here is no-store"
-    )]
-    etag: &'static str,
-    #[expect(
-        dead_code,
-        reason = "build.rs writes it; every response here is no-store"
-    )]
-    immutable: bool,
-    identity: &'static [u8],
-    brotli: Option<&'static [u8]>,
+/// The files of the web interface (`web/`), embedded by `build.rs`.
+mod embedded {
+    use zeabur_ui::{Asset, Decoded};
+    include!(concat!(env!("OUT_DIR"), "/embedded.rs"));
 }
-
-include!(concat!(env!("OUT_DIR"), "/embedded.rs"));
 
 const COOKIE: &str = "zeabur_installer";
 /// The most connections the page serves at a time. The server closes other connections.
 const MAX_CONNECTIONS: usize = 16;
+/// The most bytes of a request's head.
+const MAX_HEADER: usize = 16 * 1024;
+/// The most bytes of a request's body.
+const MAX_BODY: usize = 1024 * 1024;
+/// How long a client may take to send a request's head, and then its body.
+const READ_WAIT: Duration = Duration::from_secs(30);
 /// The most lines of `apply` output a job keeps. The job drops the oldest lines first.
 const MAX_LINES: usize = 10_000;
 /// The most bytes a job keeps of one line.
 const MAX_LINE: usize = 4096;
+
+/// Content Security Policy of every response, in place of the one `zeabur_ui` gives Zeabur's
+/// interface: the page talks to this server only. Base UI adds a `<style>` element at run time
+/// (hiding scroll bars), hence `'unsafe-inline'` for styles; scripts stay limited to this origin,
+/// and the build emits no inline script.
+const CSP: &str = "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; \
+img-src 'self'; font-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'self'; \
+frame-ancestors 'none'; require-trusted-types-for 'script'; trusted-types 'none'";
 
 #[derive(Debug, Default)]
 struct Job {
@@ -77,11 +86,16 @@ struct Server {
 }
 
 pub(crate) fn run(config_path: &Path, listen: SocketAddr) -> Result<(), InstallError> {
-    let listener =
-        TcpListener::bind(listen).map_err(|e| InstallError::Message(format!("{listen}: {e}")))?;
-    let token = files::random_hex()?.chars().take(32).collect::<String>();
+    let message = |e: io::Error| InstallError::Message(e.to_string());
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .map_err(message)?;
+    let listener = runtime
+        .block_on(tokio::net::TcpListener::bind(listen))
+        .map_err(|e| InstallError::Message(format!("{listen}: {e}")))?;
     let server = Arc::new(Server {
-        token,
+        token: files::random_hex()?.chars().take(32).collect(),
         port: listen.port(),
         loopback: listen.ip().is_loopback(),
         config_path: config_path.to_owned(),
@@ -113,80 +127,221 @@ pub(crate) fn run(config_path: &Path, listen: SocketAddr) -> Result<(), InstallE
         out::err("warning: the page is served over plain HTTP; anyone on the path can read it.");
     }
     out::line("Stop with Ctrl-C once the install has finished.");
-    let active = Arc::new(AtomicUsize::new(0));
-    for stream in listener.incoming().flatten() {
-        if active.fetch_add(1, Ordering::AcqRel) >= MAX_CONNECTIONS {
-            active.fetch_sub(1, Ordering::AcqRel);
+    runtime.block_on(serve(listener, app(server, &embedded::ASSETS)))
+}
+
+/// Serves `app` on `listener`, one request per connection and at most [`MAX_CONNECTIONS`]
+/// connections at a time.
+async fn serve(listener: tokio::net::TcpListener, app: Router) -> ! {
+    let connections = Arc::new(tokio::sync::Semaphore::new(MAX_CONNECTIONS));
+    loop {
+        let Ok((stream, _)) = listener.accept().await else {
             continue;
-        }
-        let server = Arc::clone(&server);
-        let active = Arc::clone(&active);
-        thread::spawn(move || {
-            let response = http::read(&stream).map_or_else(
-                || Response::new(400, "text/plain", "bad request"),
-                |request| server.handle(&request),
+        };
+        // Dropping the stream closes the connection.
+        let Ok(permit) = Arc::clone(&connections).try_acquire_owned() else {
+            continue;
+        };
+        let app = app.clone();
+        tokio::spawn(async move {
+            let service = hyper::service::service_fn(move |request: Request<_>| {
+                app.clone().oneshot(request.map(Body::new))
+            });
+            let mut http = hyper::server::conn::http1::Builder::new();
+            http.timer(hyper_util::rt::TokioTimer::new())
+                .header_read_timeout(READ_WAIT)
+                .max_buf_size(MAX_HEADER)
+                .keep_alive(false);
+            // The browser may have gone; nothing to do about it.
+            drop(
+                http.serve_connection(hyper_util::rt::TokioIo::new(stream), service)
+                    .await,
             );
-            http::write(&stream, &response);
-            active.fetch_sub(1, Ordering::AcqRel);
+            drop(permit);
         });
     }
-    Ok(())
+}
+
+/// The page's API and files, behind the token and the `Host` check.
+fn app(server: Arc<Server>, assets: &'static [Asset]) -> Router {
+    Router::new()
+        .route("/api/state", get(state))
+        .route("/api/resolve", get(resolve))
+        .route("/api/plan", axum::routing::post(plan))
+        .route("/api/apply", get(progress).post(apply))
+        .route("/api/local-ca.crt", get(local_ca))
+        .fallback_service(zeabur_ui::router_for(assets))
+        .layer(middleware::from_fn_with_state(Arc::clone(&server), gate))
+        .layer(middleware::map_response(harden))
+        .with_state(server)
+}
+
+async fn gate(State(server): State<Arc<Server>>, request: Request, next: Next) -> Response {
+    let headers = request.headers();
+    let host = headers.get(header::HOST).and_then(|v| v.to_str().ok());
+    if server.loopback && !server.allowed_host(host.unwrap_or_default()) {
+        return text(StatusCode::FORBIDDEN, "this page answers on 127.0.0.1 only");
+    }
+    let query = request.uri().query().unwrap_or_default();
+    if request.method() == Method::GET
+        && request.uri().path() == "/"
+        && let Some(token) = query_param(query, "token")
+    {
+        if !server.token_matches(Some(&token)) {
+            return text(
+                StatusCode::FORBIDDEN,
+                "this link is not valid; use the one printed in the terminal",
+            );
+        }
+        let mut response = text(StatusCode::FOUND, "");
+        let h = response.headers_mut();
+        h.insert(header::LOCATION, HeaderValue::from_static("/"));
+        if let Ok(cookie) = HeaderValue::from_str(&format!(
+            "{COOKIE}={}; HttpOnly; SameSite=Strict; Path=/",
+            server.token
+        )) {
+            h.insert(header::SET_COOKIE, cookie);
+        }
+        return response;
+    }
+    if !server.token_matches(cookie(headers, COOKIE)) {
+        return text(
+            StatusCode::FORBIDDEN,
+            "open the link printed in the terminal",
+        );
+    }
+    if request.method() == Method::POST
+        && headers.get(header::CONTENT_TYPE) != Some(&HeaderValue::from_static("application/json"))
+    {
+        return text(StatusCode::BAD_REQUEST, "JSON only");
+    }
+    next.run(request).await
+}
+
+/// API answers are never stored; the page's files keep `zeabur_ui`'s caching.
+async fn harden(mut response: Response) -> Response {
+    let h = response.headers_mut();
+    h.insert(
+        header::CONTENT_SECURITY_POLICY,
+        HeaderValue::from_static(CSP),
+    );
+    for (name, value) in [
+        (header::CACHE_CONTROL, "no-store"),
+        (header::X_CONTENT_TYPE_OPTIONS, "nosniff"),
+        (header::REFERRER_POLICY, "no-referrer"),
+    ] {
+        h.entry(name).or_insert(HeaderValue::from_static(value));
+    }
+    response
+}
+
+async fn state(State(server): State<Arc<Server>>) -> Response {
+    blocking(move || server.state()).await
+}
+
+async fn resolve(request: Request) -> Response {
+    let name = query_param(request.uri().query().unwrap_or_default(), "name").unwrap_or_default();
+    blocking(move || resolve_name(&name)).await
+}
+
+async fn plan(State(server): State<Arc<Server>>, body: Body) -> Response {
+    match read_body(body).await {
+        Ok(body) => blocking(move || server.plan(&body)).await,
+        Err((status, why)) => text(status, why),
+    }
+}
+
+async fn apply(State(server): State<Arc<Server>>, body: Body) -> Response {
+    match read_body(body).await {
+        Ok(body) => blocking(move || server.apply(&body)).await,
+        Err((status, why)) => text(status, why),
+    }
+}
+
+async fn progress(State(server): State<Arc<Server>>, request: Request) -> Response {
+    let from = query_param(request.uri().query().unwrap_or_default(), "from")
+        .and_then(|f| f.parse().ok())
+        .unwrap_or(0);
+    server.progress(from)
+}
+
+async fn local_ca() -> Response {
+    blocking(|| {
+        fs::read(Path::new(apply::STATE_DIR).join("local-ca.crt")).map_or_else(
+            |_| text(StatusCode::NOT_FOUND, "no local CA yet"),
+            |pem| {
+                let mut response = Response::new(Body::from(pem));
+                let h = response.headers_mut();
+                h.insert(
+                    header::CONTENT_TYPE,
+                    HeaderValue::from_static("application/x-x509-ca-cert"),
+                );
+                h.insert(
+                    header::CONTENT_DISPOSITION,
+                    HeaderValue::from_static("attachment; filename=\"zeabur-local-ca.crt\""),
+                );
+                response
+            },
+        )
+    })
+    .await
+}
+
+/// Runs `answer` where it may block: it reads files, runs checks and resolves names.
+async fn blocking(answer: impl FnOnce() -> Response + Send + 'static) -> Response {
+    tokio::task::spawn_blocking(answer)
+        .await
+        .unwrap_or_else(|_| text(StatusCode::INTERNAL_SERVER_ERROR, "the request failed"))
+}
+
+/// The body, up to [`MAX_BODY`] bytes and [`READ_WAIT`] long.
+async fn read_body(body: Body) -> Result<Bytes, (StatusCode, &'static str)> {
+    match tokio::time::timeout(READ_WAIT, axum::body::to_bytes(body, MAX_BODY)).await {
+        Ok(Ok(body)) => Ok(body),
+        Ok(Err(_)) => Err((StatusCode::PAYLOAD_TOO_LARGE, "the request is over 1 MiB")),
+        Err(_) => Err((StatusCode::REQUEST_TIMEOUT, "the request took too long")),
+    }
+}
+
+fn text(status: StatusCode, body: &'static str) -> Response {
+    let mut response = Response::new(Body::from(body));
+    *response.status_mut() = status;
+    response.headers_mut().insert(
+        header::CONTENT_TYPE,
+        HeaderValue::from_static("text/plain; charset=utf-8"),
+    );
+    response
+}
+
+fn json_response(status: StatusCode, value: &Value) -> Response {
+    let mut response = Response::new(Body::from(value.to_string()));
+    *response.status_mut() = status;
+    response.headers_mut().insert(
+        header::CONTENT_TYPE,
+        HeaderValue::from_static("application/json"),
+    );
+    response
+}
+
+fn query_param(query: &str, name: &str) -> Option<String> {
+    form_urlencoded::parse(query.as_bytes())
+        .find(|(k, _)| k == name)
+        .map(|(_, v)| v.into_owned())
+}
+
+fn cookie<'a>(headers: &'a HeaderMap, name: &str) -> Option<&'a str> {
+    headers
+        .get_all(header::COOKIE)
+        .iter()
+        .filter_map(|v| v.to_str().ok())
+        .flat_map(|v| v.split(';'))
+        .find_map(|pair| {
+            let (k, v) = pair.trim().split_once('=')?;
+            (k == name).then_some(v)
+        })
 }
 
 impl Server {
-    fn handle(&self, request: &Request) -> Response {
-        if self.loopback && !self.allowed_host(request.header("host").unwrap_or_default()) {
-            return Response::new(403, "text/plain", "this page answers on 127.0.0.1 only");
-        }
-        if request.method == "GET" && request.path == "/" && request.query_param("token").is_some()
-        {
-            if !self.token_matches(request.query_param("token")) {
-                return Response::new(
-                    403,
-                    "text/plain",
-                    "this link is not valid; use the one printed in the terminal",
-                );
-            }
-            return Response::new(302, "text/plain", "")
-                .with_header("Location", "/".to_owned())
-                .with_header(
-                    "Set-Cookie",
-                    format!("{COOKIE}={}; HttpOnly; SameSite=Strict; Path=/", self.token),
-                );
-        }
-        if !self.token_matches(request.cookie(COOKIE)) {
-            return Response::new(403, "text/plain", "open the link printed in the terminal");
-        }
-        if request.method == "POST" && request.header("content-type") != Some("application/json") {
-            return Response::new(400, "text/plain", "JSON only");
-        }
-        match (request.method.as_str(), request.path.as_str()) {
-            ("GET", "/api/state") => self.state(),
-            ("GET", "/api/resolve") => resolve(request.query_param("name").unwrap_or_default()),
-            ("POST", "/api/plan") => self.plan(&request.body),
-            ("POST", "/api/apply") => self.apply(&request.body),
-            ("GET", "/api/apply") => self.progress(
-                request
-                    .query_param("from")
-                    .and_then(|f| f.parse().ok())
-                    .unwrap_or(0),
-            ),
-            ("GET", "/api/local-ca.crt") => {
-                fs::read(Path::new(apply::STATE_DIR).join("local-ca.crt")).map_or_else(
-                    |_| Response::new(404, "text/plain", "no local CA yet"),
-                    |pem| {
-                        Response::new(200, "application/x-x509-ca-cert", pem).with_header(
-                            "Content-Disposition",
-                            "attachment; filename=\"zeabur-local-ca.crt\"".to_owned(),
-                        )
-                    },
-                )
-            }
-            ("GET", path) if !path.starts_with("/api/") => asset(request, path),
-            _ => Response::new(404, "text/plain", "not found"),
-        }
-    }
-
     fn allowed_host(&self, host: &str) -> bool {
         host == format!("127.0.0.1:{}", self.port) || host == format!("localhost:{}", self.port)
     }
@@ -274,8 +429,8 @@ impl Server {
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
             .running;
-        Response::json(
-            200,
+        json_response(
+            StatusCode::OK,
             &json!({
                 "facts": facts,
                 "checks": checks,
@@ -353,10 +508,11 @@ impl Server {
             Ok((plan, text, config.yaml()?))
         });
         match planned {
-            Ok((plan, text, yaml)) => {
-                Response::json(200, &json!({"plan": plan, "text": text, "yaml": yaml}))
-            }
-            Err(e) => Response::json(200, &json!({"error": e.to_string()})),
+            Ok((plan, text, yaml)) => json_response(
+                StatusCode::OK,
+                &json!({"plan": plan, "text": text, "yaml": yaml}),
+            ),
+            Err(e) => json_response(StatusCode::OK, &json!({"error": e.to_string()})),
         }
     }
 
@@ -367,7 +523,10 @@ impl Server {
     fn apply(&self, body: &[u8]) -> Response {
         let mut job = self.job.lock().unwrap_or_else(PoisonError::into_inner);
         if job.running {
-            return Response::json(409, &json!({"error": "an install is already running"}));
+            return json_response(
+                StatusCode::CONFLICT,
+                &json!({"error": "an install is already running"}),
+            );
         }
         let started = self.config(body).and_then(|(config, secrets)| {
             for (path, value) in &secrets {
@@ -391,7 +550,7 @@ impl Server {
         });
         let (mut child, reader) = match started {
             Ok(started) => started,
-            Err(e) => return Response::json(200, &json!({"error": e.to_string()})),
+            Err(e) => return json_response(StatusCode::OK, &json!({"error": e.to_string()})),
         };
         *job = Job {
             running: true,
@@ -406,15 +565,15 @@ impl Server {
             job.running = false;
             job.code = Some(code);
         });
-        Response::json(200, &json!({"started": true}))
+        json_response(StatusCode::OK, &json!({"started": true}))
     }
 
     fn progress(&self, from: usize) -> Response {
         let job = self.job.lock().unwrap_or_else(PoisonError::into_inner);
         let skip = from.saturating_sub(job.dropped);
         let lines: Vec<&String> = job.lines.iter().skip(skip).collect();
-        Response::json(
-            200,
+        json_response(
+            StatusCode::OK,
             &json!({"lines": lines, "next": job.dropped + skip + lines.len(), "running": job.running, "code": job.code}),
         )
     }
@@ -559,33 +718,12 @@ fn catalog_json(index: &Index, profile: &str, arch: &str) -> Value {
     json!({"components": components})
 }
 
-fn resolve(name: &str) -> Response {
+fn resolve_name(name: &str) -> Response {
     let found: Vec<String> = (name, 443).to_socket_addrs().map_or_else(
         |_| Vec::new(),
         |addrs| addrs.map(|a| a.ip().to_string()).collect(),
     );
-    Response::json(200, &json!({"name": name, "addresses": found}))
-}
-
-fn asset(request: &Request, path: &str) -> Response {
-    let wanted = match path.trim_start_matches('/') {
-        "" => "index.html",
-        other => other,
-    };
-    let Some(found) = ASSETS.iter().find(|a| a.path == wanted) else {
-        return Response::new(404, "text/plain", "not found");
-    };
-    let accepts_br = request
-        .header("accept-encoding")
-        .is_some_and(|v| v.split(',').any(|e| e.trim().starts_with("br")));
-    found.brotli.filter(|_| accepts_br).map_or_else(
-        || Response::new(200, found.content_type, found.identity),
-        |br| {
-            Response::new(200, found.content_type, br)
-                .with_header("Content-Encoding", "br".to_owned())
-                .with_header("Vary", "Accept-Encoding".to_owned())
-        },
-    )
+    json_response(StatusCode::OK, &json!({"name": name, "addresses": found}))
 }
 
 #[cfg(test)]
@@ -603,6 +741,316 @@ mod tests {
 
     use super::{catalog_json, ssh_host, velero_credentials};
     use crate::render;
+
+    mod server {
+        use std::path::PathBuf;
+        use std::sync::Arc;
+        use std::time::Duration;
+
+        use axum::body::{Body, to_bytes};
+        use axum::http::{Request, StatusCode};
+        use axum::response::Response;
+        use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
+        use tower::ServiceExt as _;
+        use zeabur_ui::{Asset, Decoded};
+
+        use super::super::{CSP, MAX_BODY, MAX_CONNECTIONS, Server, app, serve};
+
+        const TOKEN: &str = "0123456789abcdef0123456789abcdef";
+        const COOKIE: &str = "zeabur_installer=0123456789abcdef0123456789abcdef";
+        const HOST: &str = "127.0.0.1:8085";
+
+        /// `console.log(1)` in brotli.
+        const SCRIPT_BR: &[u8] = &[
+            0x8B, 0x06, 0x80, 0x63, 0x6F, 0x6E, 0x73, 0x6F, 0x6C, 0x65, 0x2E, 0x6C, 0x6F, 0x67,
+            0x28, 0x31, 0x29, 0x03,
+        ];
+
+        static ASSETS: [Asset; 2] = [
+            Asset {
+                path: "index.html",
+                content_type: "text/html; charset=utf-8",
+                etag: "\"aaaa\"",
+                immutable: false,
+                len: 18,
+                identity: Some(b"<html>index</html>"),
+                brotli: Some(b"BR-INDEX"),
+                decoded: Decoded::new(),
+            },
+            Asset {
+                path: "assets/index-3f2a.js",
+                content_type: "text/javascript; charset=utf-8",
+                etag: "\"bbbb\"",
+                immutable: true,
+                len: 14,
+                identity: None,
+                brotli: Some(SCRIPT_BR),
+                decoded: Decoded::new(),
+            },
+        ];
+
+        fn server(loopback: bool) -> Arc<Server> {
+            Arc::new(Server {
+                token: TOKEN.to_owned(),
+                port: 8085,
+                loopback,
+                config_path: PathBuf::from("/nonexistent/zeabur-installer.yaml"),
+                job: Arc::default(),
+            })
+        }
+
+        async fn send(
+            loopback: bool,
+            method: &str,
+            uri: &str,
+            headers: &[(&str, &str)],
+            body: impl Into<Body>,
+        ) -> Response {
+            let mut request = Request::builder().method(method).uri(uri);
+            for (name, value) in headers {
+                request = request.header(*name, *value);
+            }
+            app(server(loopback), &ASSETS)
+                .oneshot(request.body(body.into()).unwrap())
+                .await
+                .unwrap()
+        }
+
+        async fn get(uri: &str, headers: &[(&str, &str)]) -> Response {
+            send(true, "GET", uri, headers, Body::empty()).await
+        }
+
+        fn header<'a>(response: &'a Response, name: &str) -> Option<&'a str> {
+            response.headers().get(name).and_then(|v| v.to_str().ok())
+        }
+
+        async fn body(response: Response) -> Vec<u8> {
+            to_bytes(response.into_body(), usize::MAX)
+                .await
+                .unwrap()
+                .to_vec()
+        }
+
+        #[tokio::test]
+        async fn the_printed_link_becomes_a_strict_cookie() {
+            let response = get(&format!("/?token={TOKEN}"), &[("host", HOST)]).await;
+            assert_eq!(response.status(), StatusCode::FOUND);
+            assert_eq!(header(&response, "location"), Some("/"));
+            assert_eq!(
+                header(&response, "set-cookie"),
+                Some(format!("{COOKIE}; HttpOnly; SameSite=Strict; Path=/").as_str())
+            );
+
+            let response = get("/", &[("host", HOST), ("cookie", COOKIE)]).await;
+            assert_eq!(response.status(), StatusCode::OK);
+            assert_eq!(body(response).await, b"<html>index</html>");
+        }
+
+        #[tokio::test]
+        async fn a_link_with_another_token_is_refused() {
+            for token in ["", "0123", &TOKEN.replace('0', "1")] {
+                let response = get(&format!("/?token={token}"), &[("host", HOST)]).await;
+                assert_eq!(response.status(), StatusCode::FORBIDDEN, "{token}");
+                assert_eq!(header(&response, "set-cookie"), None);
+            }
+        }
+
+        #[tokio::test]
+        async fn nothing_is_served_without_the_cookie() {
+            let wrong = format!("zeabur_installer={}", TOKEN.replace('a', "b"));
+            for path in ["/", "/assets/index-3f2a.js", "/api/state", "/api/apply"] {
+                for cookie in [None, Some(wrong.as_str()), Some("other=x")] {
+                    let mut headers = vec![("host", HOST)];
+                    headers.extend(cookie.map(|c| ("cookie", c)));
+                    let response = get(path, &headers).await;
+                    assert_eq!(
+                        response.status(),
+                        StatusCode::FORBIDDEN,
+                        "{path} {cookie:?}"
+                    );
+                }
+            }
+            let response = get(
+                "/api/apply",
+                &[("host", HOST), ("cookie", &format!("theme=dark; {COOKIE}"))],
+            )
+            .await;
+            assert_eq!(response.status(), StatusCode::OK);
+        }
+
+        #[tokio::test]
+        async fn a_host_other_than_the_loopback_address_is_refused() {
+            for host in [
+                None,
+                Some("evil.example:8085"),
+                Some("127.0.0.1:9999"),
+                Some("127.0.0.1"),
+            ] {
+                let mut headers = vec![("cookie", COOKIE)];
+                headers.extend(host.map(|h| ("host", h)));
+                let response = get("/", &headers).await;
+                assert_eq!(response.status(), StatusCode::FORBIDDEN, "{host:?}");
+                let response = get(&format!("/?token={TOKEN}"), &headers[1..]).await;
+                assert_eq!(response.status(), StatusCode::FORBIDDEN, "{host:?}");
+            }
+            let response = get("/", &[("host", "localhost:8085"), ("cookie", COOKIE)]).await;
+            assert_eq!(response.status(), StatusCode::OK);
+        }
+
+        #[tokio::test]
+        async fn a_server_on_another_address_takes_any_host() {
+            let response = send(
+                false,
+                "GET",
+                "/",
+                &[("host", "203.0.113.7:8085"), ("cookie", COOKIE)],
+                Body::empty(),
+            )
+            .await;
+            assert_eq!(response.status(), StatusCode::OK);
+        }
+
+        #[tokio::test]
+        async fn a_post_must_be_json() {
+            let response = send(
+                true,
+                "POST",
+                "/api/plan",
+                &[
+                    ("host", HOST),
+                    ("cookie", COOKIE),
+                    ("content-type", "text/plain"),
+                ],
+                "{}",
+            )
+            .await;
+            assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+        }
+
+        #[tokio::test]
+        async fn a_body_over_1_mib_is_refused() {
+            let headers = [
+                ("host", HOST),
+                ("cookie", COOKIE),
+                ("content-type", "application/json"),
+            ];
+            let mut at_limit = vec![b' '; MAX_BODY - 2];
+            at_limit.extend_from_slice(b"{}");
+            let response = send(true, "POST", "/api/plan", &headers, at_limit).await;
+            assert_eq!(response.status(), StatusCode::OK);
+            let answer: serde_json::Value = serde_json::from_slice(&body(response).await).unwrap();
+            assert!(answer["error"].is_string(), "{answer}");
+
+            for path in ["/api/plan", "/api/apply"] {
+                let response = send(true, "POST", path, &headers, vec![b' '; MAX_BODY + 1]).await;
+                assert_eq!(response.status(), StatusCode::PAYLOAD_TOO_LARGE, "{path}");
+            }
+        }
+
+        #[tokio::test]
+        async fn brotli_only_to_a_client_that_accepts_it() {
+            let page = [("host", HOST), ("cookie", COOKIE)];
+            for accept in ["br", "gzip, br", "br;q=0.5"] {
+                let response = get("/", &[page[0], page[1], ("accept-encoding", accept)]).await;
+                assert_eq!(
+                    header(&response, "content-encoding"),
+                    Some("br"),
+                    "{accept}"
+                );
+                assert_eq!(body(response).await, b"BR-INDEX");
+            }
+            for accept in [None, Some("gzip"), Some("br;q=0"), Some("gzip, br;q=0")] {
+                let mut headers = page.to_vec();
+                headers.extend(accept.map(|a| ("accept-encoding", a)));
+                let response = get("/", &headers).await;
+                assert_eq!(header(&response, "content-encoding"), None, "{accept:?}");
+                assert_eq!(body(response).await, b"<html>index</html>");
+                let response = get("/assets/index-3f2a.js", &headers).await;
+                assert_eq!(header(&response, "content-encoding"), None, "{accept:?}");
+                assert_eq!(body(response).await, b"console.log(1)");
+            }
+        }
+
+        #[tokio::test]
+        async fn api_answers_are_never_stored_and_page_files_are_cached() {
+            let headers = [("host", HOST), ("cookie", COOKIE)];
+            for path in ["/api/apply", "/api/nothing"] {
+                let response = get(path, &headers).await;
+                assert_eq!(
+                    header(&response, "cache-control"),
+                    Some("no-store"),
+                    "{path}"
+                );
+                assert_eq!(header(&response, "x-content-type-options"), Some("nosniff"));
+                assert_eq!(header(&response, "referrer-policy"), Some("no-referrer"));
+                assert_eq!(header(&response, "content-security-policy"), Some(CSP));
+            }
+            let refused = get("/", &[("host", HOST)]).await;
+            assert_eq!(header(&refused, "cache-control"), Some("no-store"));
+
+            let response = get("/", &headers).await;
+            assert_eq!(header(&response, "cache-control"), Some("no-cache"));
+            assert_eq!(header(&response, "etag"), Some("\"aaaa\""));
+            assert_eq!(header(&response, "content-security-policy"), Some(CSP));
+            assert_eq!(header(&response, "x-frame-options"), Some("DENY"));
+
+            let response = get("/assets/index-3f2a.js", &headers).await;
+            assert_eq!(
+                header(&response, "cache-control"),
+                Some("public, max-age=31536000, immutable")
+            );
+        }
+
+        /// Scripts load from this origin only, so the page may carry no inline script.
+        #[test]
+        fn the_page_needs_nothing_the_policy_refuses() {
+            assert!(CSP.contains("script-src 'self';"), "{CSP}");
+            let index = include_str!("../web/index.html");
+            assert!(!index.contains("<style"), "web/index.html");
+            assert!(
+                index
+                    .split("<script")
+                    .skip(1)
+                    .all(|tag| tag.starts_with(" type=\"module\" src=")),
+                "web/index.html has an inline script"
+            );
+        }
+
+        #[tokio::test]
+        async fn connections_beyond_the_limit_are_closed() {
+            let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let address = listener.local_addr().unwrap();
+            tokio::spawn(async move { serve(listener, app(server(false), &ASSETS)).await });
+
+            let mut held = Vec::new();
+            for _ in 0..MAX_CONNECTIONS {
+                held.push(tokio::net::TcpStream::connect(address).await.unwrap());
+            }
+            let mut extra = tokio::net::TcpStream::connect(address).await.unwrap();
+            let mut answer = Vec::new();
+            let read = tokio::time::timeout(Duration::from_secs(5), extra.read_to_end(&mut answer))
+                .await
+                .unwrap();
+            assert!(read.is_err() || answer.is_empty(), "{answer:?}");
+
+            let mut first = held.swap_remove(0);
+            first
+                .write_all(b"GET /api/state HTTP/1.1\r\nhost: x\r\n\r\n")
+                .await
+                .unwrap();
+            let mut answer = Vec::new();
+            tokio::time::timeout(Duration::from_secs(5), first.read_to_end(&mut answer))
+                .await
+                .unwrap()
+                .unwrap();
+            let answer = String::from_utf8_lossy(&answer);
+            assert!(answer.starts_with("HTTP/1.1 403"), "{answer}");
+            assert!(
+                answer.to_ascii_lowercase().contains("connection: close"),
+                "{answer}"
+            );
+        }
+    }
 
     #[test]
     fn velero_gets_a_credentials_file_from_two_keys() {

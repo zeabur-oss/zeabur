@@ -19,7 +19,7 @@ zeabur-model = { workspace = true, features = ["openapi"] }
 zeabur-modules.workspace = true
 zeabur-plan = { workspace = true, features = ["openapi"] }
 zeabur-catalog.workspace = true
-axum.workspace = true
+axum = { workspace = true, features = ["ws", "tracing"] }
 base64.workspace = true
 bytes.workspace = true
 # Reads a Velero backup's list of objects and its archive (`cluster::backup_download`).
@@ -57,7 +57,7 @@ test = true
 aws-lc-rs.workspace = true
 zeabur-kube = { workspace = true, features = ["memory"] }
 zeabur-test-support = { workspace = true, features = ["sandbox", "tls"] }
-zeabur-ui.workspace = true
+zeabur-ui = { workspace = true, features = ["interface"] }
 http-body-util.workspace = true
 tokio-tungstenite.workspace = true
 # YAML output of the OpenAPI document, for the committed copy only.

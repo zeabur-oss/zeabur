@@ -149,7 +149,7 @@ case "$job" in
     (cd web; bun scripts/check-deprecated.ts . ../crates/zeabur-installer/web)
     ./scripts/ui-budget.sh
     ZEABUR_UI_DIST="$root/web/dist" cargo build --release --locked -p zeabur -p zeaburctl
-    ZEABUR_UI_DIST="$root/web/dist" cargo nextest run --release --locked -p zeabur-ui
+    ZEABUR_UI_DIST="$root/web/dist" cargo nextest run --release --locked -p zeabur-ui --features interface
     (cd web; bun run fallow health --report-only --top 10; bun run fallow dupes --summary)
     ;;
   # The API-only build needs no JavaScript toolchain: bun is taken off PATH.

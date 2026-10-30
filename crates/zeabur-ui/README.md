@@ -4,8 +4,12 @@ The web interface, embedded in the binary, and the handler that serves it.
 
 ## Place in the workspace
 
-Level 1: no workspace dependency. The `ui` feature of the binaries pulls it in; building with
-`--no-default-features` leaves it out and needs no JavaScript toolchain.
+Level 1: no workspace dependency. The `ui` feature of the binaries pulls it in with this crate's
+`interface` feature, which embeds Zeabur's interface; building with `--no-default-features`
+leaves it out and needs no JavaScript toolchain.
+
+Without `interface`, the crate embeds nothing and needs no `ZEABUR_UI_DIST`: it serves a table
+another crate embeds with [`router_for`]. `zeabur-installer` serves its `gui` page that way.
 
 ## Embedding
 
@@ -15,9 +19,9 @@ The interface (React, in `web/`) is built before Cargo runs, and its output is n
 1. `scripts/build-ui.sh` runs Vite, then `web/scripts/postbuild.ts` writes a brotli encoding
    (quality 11) of every compressible file and `manifest.tsv`: path, MIME type, SHA-256, cache
    class and whether a brotli encoding exists. It fails if `index.html` carries an inline script or style.
-2. `build.rs` reads only the directory named by `ZEABUR_UI_DIST` and generates a table of
-   `include_bytes!` entries from the manifest. It runs no JavaScript tool and makes no network
-   request. Without `ZEABUR_UI_DIST`, a debug build embeds a one-page placeholder and a release
+2. With `interface`, `build.rs` reads only the directory named by `ZEABUR_UI_DIST` and
+   generates a table of `include_bytes!` entries from the manifest. It runs no JavaScript tool
+   and makes no network request. Without `ZEABUR_UI_DIST`, a debug build embeds a one-page placeholder and a release
    build stops with `compile_error!`, so a release binary cannot ship without its interface by
    accident.
 

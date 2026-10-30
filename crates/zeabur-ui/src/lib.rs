@@ -8,11 +8,13 @@ use axum::body::{Body, Bytes};
 use axum::http::{HeaderMap, HeaderValue, Method, Request, StatusCode, header};
 use axum::response::Response;
 
+#[cfg(feature = "interface")]
 mod embedded {
     use super::{Asset, Decoded, EmbeddedKind};
     include!(concat!(env!("OUT_DIR"), "/embedded.rs"));
 }
 
+#[cfg(feature = "interface")]
 pub use embedded::KIND;
 
 /// Content Security Policy for the interface's HTML.
@@ -49,6 +51,7 @@ const REVALIDATE: &str = "no-cache";
 const DECODE_BUFFER: usize = 16 * 1024;
 
 /// What this binary embeds.
+#[cfg(feature = "interface")]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EmbeddedKind {
     /// The built interface from `ZEABUR_UI_DIST`.
@@ -111,6 +114,7 @@ impl Default for Decoded {
 }
 
 /// The embedded files.
+#[cfg(feature = "interface")]
 #[must_use]
 pub fn assets() -> &'static [Asset] {
     &embedded::ASSETS
@@ -119,6 +123,7 @@ pub fn assets() -> &'static [Asset] {
 /// A router that serves the embedded interface for every path it receives.
 ///
 /// Mount it as the fallback of the application router, after the API routes.
+#[cfg(feature = "interface")]
 pub fn router() -> Router {
     router_for(assets())
 }
@@ -137,6 +142,7 @@ pub fn router_for(assets: &'static [Asset]) -> Router {
 
 /// Whether `path` is a page of the interface: a client-side route answered with `index.html`,
 /// not a file, an API path or a missing build output.
+#[cfg(feature = "interface")]
 #[must_use]
 pub fn is_page(path: &str) -> bool {
     is_page_in(assets(), path)
@@ -683,6 +689,7 @@ mod tests {
 
     /// CI builds with `ZEABUR_UI_DIST` set: the binary must then carry the built interface, with
     /// its encodings, and not the placeholder.
+    #[cfg(feature = "interface")]
     #[test]
     fn a_build_with_a_dist_embeds_it() {
         if option_env!("ZEABUR_UI_DIST").is_some_and(|d| !d.is_empty()) {

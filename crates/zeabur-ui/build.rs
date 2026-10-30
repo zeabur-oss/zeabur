@@ -1,12 +1,15 @@
-//! Generates the table of embedded web-interface files from `ZEABUR_UI_DIST`, which
-//! `scripts/build-ui.sh` fills ([`zeabur_embed`]). Files under `assets/` with a brotli encoding
-//! keep only that encoding.
+//! With the `interface` feature, generates the table of Zeabur's web-interface files from
+//! `ZEABUR_UI_DIST`, which `scripts/build-ui.sh` fills ([`zeabur_embed`]). Without it, the crate
+//! only serves a table another crate embeds, and needs no `ZEABUR_UI_DIST`.
 
 use proc_macro2::TokenStream;
 use quote::quote;
-use zeabur_embed::{Entry, Kind, grouped, include};
+use zeabur_embed::{Entry, Kind};
 
 fn main() {
+    if std::env::var_os("CARGO_FEATURE_INTERFACE").is_none() {
+        return;
+    }
     zeabur_embed::generate(
         "ZEABUR_UI_DIST",
         "run scripts/build-ui.sh and set ZEABUR_UI_DIST to its output directory, or build \
@@ -20,35 +23,10 @@ fn table(kind: Kind, entries: &[Entry]) -> TokenStream {
         Kind::Dist => quote!(Dist),
         Kind::Placeholder => quote!(Placeholder),
     };
-    let count = proc_macro2::Literal::usize_unsuffixed(entries.len());
-    let assets = entries.iter().map(|entry| {
-        let Entry {
-            path,
-            content_type,
-            etag,
-            immutable,
-            ..
-        } = entry;
-        let len = grouped(entry.len);
-        let brotli_only = entry.brotli.is_some() && path.starts_with("assets/");
-        let identity = include((!brotli_only).then_some(entry.file.as_str()));
-        let brotli = include(entry.brotli.as_deref());
-        quote! {
-            Asset {
-                path: #path,
-                content_type: #content_type,
-                etag: #etag,
-                immutable: #immutable,
-                len: #len,
-                identity: #identity,
-                brotli: #brotli,
-                decoded: Decoded::new(),
-            }
-        }
-    });
+    let assets = zeabur_embed::assets(entries);
     quote! {
         /// What this binary embeds.
         pub const KIND: EmbeddedKind = EmbeddedKind::#kind;
-        pub(crate) static ASSETS: [Asset; #count] = [#(#assets),*];
+        #assets
     }
 }

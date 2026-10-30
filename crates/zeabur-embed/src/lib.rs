@@ -58,16 +58,52 @@ pub fn generate(var: &str, missing: &str, table: impl Fn(Kind, &[Entry]) -> Toke
     }
 }
 
-/// `Some(include_bytes!(file))`, or `None`.
+/// `static ASSETS: [Asset; N]` of `entries`.
+///
+/// The crate that includes it brings `zeabur_ui::{Asset, Decoded}` into scope. A file under
+/// `assets/` with a brotli encoding keeps only that encoding; `zeabur_ui` decodes it for a client
+/// without brotli.
 #[must_use]
-pub fn include(file: Option<&str>) -> TokenStream {
+pub fn assets(entries: &[Entry]) -> TokenStream {
+    let count = Literal::usize_unsuffixed(entries.len());
+    let assets = entries.iter().map(|entry| {
+        let Entry {
+            path,
+            content_type,
+            etag,
+            immutable,
+            ..
+        } = entry;
+        let len = grouped(entry.len);
+        let brotli_only = entry.brotli.is_some() && path.starts_with("assets/");
+        let identity = include((!brotli_only).then_some(entry.file.as_str()));
+        let brotli = include(entry.brotli.as_deref());
+        quote! {
+            Asset {
+                path: #path,
+                content_type: #content_type,
+                etag: #etag,
+                immutable: #immutable,
+                len: #len,
+                identity: #identity,
+                brotli: #brotli,
+                decoded: Decoded::new(),
+            }
+        }
+    });
+    quote! {
+        pub(crate) static ASSETS: [Asset; #count] = [#(#assets),*];
+    }
+}
+
+/// `Some(include_bytes!(file))`, or `None`.
+fn include(file: Option<&str>) -> TokenStream {
     file.map_or_else(|| quote!(None), |file| quote!(Some(include_bytes!(#file))))
 }
 
 /// `n` as a literal with `_` between groups of three digits, as clippy wants it in the crate
 /// that includes the table.
-#[must_use]
-pub fn grouped(n: u64) -> Literal {
+fn grouped(n: u64) -> Literal {
     let digits = n.to_string();
     let mut grouped = String::new();
     for (i, c) in digits.chars().enumerate() {

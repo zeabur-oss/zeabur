@@ -12,7 +12,7 @@ workspace = true
 
 [features]
 default = ["ui"]
-ui = ["dep:zeabur-ui"]
+ui = ["dep:zeabur-ui", "zeabur-ui/interface"]
 
 [dependencies]
 zeabur-api.workspace = true
