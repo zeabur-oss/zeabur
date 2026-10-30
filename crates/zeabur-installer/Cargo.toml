@@ -12,6 +12,7 @@ readme = "../../docs/get-started/quickstart.mdx"
 [dependencies]
 zeabur-installer-host.workspace = true
 zeabur-installer-plan.workspace = true
+zeabur-telemetry.workspace = true
 # zeabur-ui serves the `gui` page; without its `interface` feature, Zeabur's own interface stays out.
 zeabur-ui.workspace = true
 axum.workspace = true

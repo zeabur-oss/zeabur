@@ -24,7 +24,7 @@ concurrency:
 
 jobs:
   release:
-    uses: zeabur-oss/.github/.github/workflows/release.yml@9a1863f91c2f8253ec3c970b6c91b3fd01a9a69f # main
+    uses: zeabur-oss/.github/.github/workflows/release.yml@0953aff4b4c68db0cd0358eb72607c63c06d0f05 # main
     permissions:
       contents: write
       packages: write
@@ -34,6 +34,8 @@ jobs:
       name: zeabur
       version: ${{ inputs.version }}
       verify-only: ${{ inputs.verify_only == true }}
+      # The experience program's PostHog key (docs/internal/releasing.md).
+      telemetry-key: ${{ vars.POSTHOG_KEY }}
       # zeaburctl for macOS on Apple silicon; the server, its image and the installer are Linux only.
       platforms: >-
         [{"os": "linux", "arch": "amd64", "runner": "ubuntu-26.04"},

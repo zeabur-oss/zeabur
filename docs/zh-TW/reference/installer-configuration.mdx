@@ -36,6 +36,7 @@ host:
 | `disable` | `[]` | 從預設元件排除的 capability 或完整元件 ID |
 | `allowDataLoss` | `[]` | 同意移除時連資料一起刪掉的元件 ID，例如 `replicated-storage/longhorn` |
 | `zeabur` | `true` | 安裝 Zeabur Identity 與 Zeabur。`false` 只安裝 K3s/RKE2 與選定元件 |
+| `telemetry` | `true` | 加入[體驗計畫](./telemetry.mdx)。`--no-telemetry` 和 `DO_NOT_TRACK=1` 可在該次執行時關閉 |
 | `inputs` | `{}` | 依元件 ID 分組的一般輸入值 |
 | `secretFiles` | `{}` | 依元件 ID 分組的機密檔案路徑 |
 | `k3sVersion`、`rke2Version` | installer 釘選版本 | 覆寫 K3s 或 RKE2 的版本 |

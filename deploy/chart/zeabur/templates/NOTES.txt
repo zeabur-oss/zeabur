@@ -16,3 +16,21 @@ Zeabur gives members their rights with RoleBindings and ClusterRoleBindings it m
   kubectl delete rolebindings,clusterrolebindings --all-namespaces \
     -l app.kubernetes.io/managed-by=zeabur,zeabur.com/member
 {{- end }}
+
+{{- if not .Values.telemetry.enabled }}
+
+Help us improve Zeabur: join the experience program
+
+Out of the box, Zeabur sends nothing, so we can't tell whether anyone runs it
+or which fixes matter most. Joining sends one event a day for each person who
+uses this install, with the version and a random ID. It never says who they
+are: no names, domains or emails, and PostHog doesn't keep IP addresses.
+
+Join with one command:
+
+  helm upgrade {{ .Release.Name }} oci://ghcr.io/zeabur-oss/charts/zeabur --reuse-values \
+    --set telemetry.enabled=true \
+    --set telemetry.installationId=$(uuidgen | tr 'A-Z' 'a-z')
+
+What is sent: https://oss.zeabur.com/docs/zeabur/reference/telemetry/
+{{- end }}

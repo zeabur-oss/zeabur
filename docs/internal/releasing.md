@@ -101,6 +101,9 @@ These are repository and organization settings, not files; a maintainer sets the
     ID and the issuer ID.
 
   Without them, releases go on with `zeaburctl` signed ad hoc only.
+- **Telemetry key.** A repository variable `POSTHOG_KEY`, the PostHog project key of the
+  experience program (docs/reference/telemetry.mdx). Tag builds compile it in as
+  `ZEABUR_TELEMETRY_KEY`; every other build, local ones included, has none and sends nothing.
 - **Workflow permissions** can stay read-only by default: the caller grants the shared
   workflow `contents: write`, `packages: write`, `id-token: write` and `attestations: write`,
   and each of its jobs asks for what it needs. `publish` has `packages: write` and

@@ -57,6 +57,7 @@
     architecture: 架构
     releases: 发行文件与验证
     security: 安全性
+    telemetry: 体验计划
 - group: leave
   label: 移除 Zeabur
   pages:

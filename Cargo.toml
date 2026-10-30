@@ -20,6 +20,7 @@ publish = false
 zeabur-core = 1
 zeabur-model = 0
 zeabur-embed = 0
+zeabur-telemetry = 0
 zeabur-ui = 1
 zeabur-kube = 2
 zeabur-proxy = 1
@@ -75,6 +76,7 @@ zeabur-ui = { path = "crates/zeabur-ui" }
 zeabur-auth = { path = "crates/zeabur-auth" }
 zeabur-test-support = { path = "crates/zeabur-test-support" }
 zeabur-embed = { path = "crates/zeabur-embed" }
+zeabur-telemetry = { path = "crates/zeabur-telemetry" }
 zeabur-installer-plan = { path = "crates/zeabur-installer-plan" }
 zeabur-installer-host = { path = "crates/zeabur-installer-host" }
 

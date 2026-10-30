@@ -151,6 +151,20 @@
         "required": ["configMap", "secret"]
       }
     },
+    "telemetry": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "installationId": {
+          "description": "A UUID, such as the output of uuidgen in lower case.",
+          "type": "string",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})?$"
+        }
+      },
+      "if": { "properties": { "enabled": { "const": true } }, "required": ["enabled"] },
+      "then": { "properties": { "installationId": { "minLength": 36 } }, "required": ["installationId"] }
+    },
     "memberRoles": {
       "type": "object",
       "additionalProperties": false,

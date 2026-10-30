@@ -362,6 +362,11 @@ export const en = {
   "review.col.version": "Version",
   "review.col.memory": "Idle memory",
   "review.manifests": "Manifests",
+  "review.program": "Experience program",
+  "review.program.label": "Join the experience program to help improve Zeabur",
+  "review.program.description":
+    "Sends the version and how many people use Zeabur each day, so we know how many installations are in use and what to fix first. No names, domains or emails, and IP addresses aren't kept. You can turn it off any time.",
+  "review.program.link": "See what is sent",
   "review.removing": "Components to remove",
   "review.removingHint":
     "helm-controller uninstalls their charts. What stays can be deleted by hand later.",

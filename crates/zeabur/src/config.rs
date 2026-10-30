@@ -130,6 +130,13 @@ pub(crate) struct Args {
     /// ones trusted for it. Required with `--proxy-url`.
     #[arg(long, env = "ZEABUR_PROXY_CA_FILE")]
     pub(crate) proxy_ca_file: Option<PathBuf>,
+    /// Join the experience program (docs/reference/telemetry.mdx). As an environment variable,
+    /// `true` or `false`. `DO_NOT_TRACK` turns it off.
+    #[arg(long, env = "ZEABUR_TELEMETRY_ENABLED")]
+    pub(crate) telemetry_enabled: bool,
+    /// The random installation ID the program sends, a UUID. Needed with `--telemetry-enabled`.
+    #[arg(long, env = "ZEABUR_INSTALLATION_ID", default_value = "")]
+    pub(crate) installation_id: String,
 }
 
 /// The configuration, checked.

@@ -77,10 +77,16 @@ struct Server {
     port: u16,
     loopback: bool,
     config_path: PathBuf,
+    /// `--no-telemetry`, passed on to `apply`.
+    no_telemetry: bool,
     job: Arc<Mutex<Job>>,
 }
 
-pub(crate) fn run(config_path: &Path, listen: SocketAddr) -> Result<(), InstallError> {
+pub(crate) fn run(
+    config_path: &Path,
+    listen: SocketAddr,
+    no_telemetry: bool,
+) -> Result<(), InstallError> {
     let message = |e: io::Error| InstallError::Message(e.to_string());
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
@@ -94,6 +100,7 @@ pub(crate) fn run(config_path: &Path, listen: SocketAddr) -> Result<(), InstallE
         port: listen.port(),
         loopback: listen.ip().is_loopback(),
         config_path: config_path.to_owned(),
+        no_telemetry,
         job: Arc::default(),
     });
     let host = if server.loopback {
@@ -513,6 +520,7 @@ impl Server {
             let child = Command::new(exe)
                 .arg("--config")
                 .arg(&self.config_path)
+                .args(self.no_telemetry.then_some("--no-telemetry"))
                 .arg("apply")
                 .stdin(Stdio::null())
                 .stdout(writer.try_clone().map_err(message)?)
@@ -766,6 +774,7 @@ mod tests {
                 port: 8085,
                 loopback,
                 config_path: PathBuf::from("/nonexistent/zeabur-installer.yaml"),
+                no_telemetry: false,
                 job: Arc::default(),
             })
         }

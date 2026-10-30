@@ -20,6 +20,7 @@ zeabur-auth.workspace = true
 zeabur-core.workspace = true
 zeabur-kube.workspace = true
 zeabur-plan.workspace = true
+zeabur-telemetry.workspace = true
 zeabur-ui = { workspace = true, optional = true }
 axum.workspace = true
 bytes.workspace = true

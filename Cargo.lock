@@ -2734,6 +2734,7 @@ dependencies = [
  "zeabur-core",
  "zeabur-kube",
  "zeabur-plan",
+ "zeabur-telemetry",
  "zeabur-ui",
 ]
 
@@ -2888,6 +2889,7 @@ dependencies = [
  "zeabur-embed",
  "zeabur-installer-host",
  "zeabur-installer-plan",
+ "zeabur-telemetry",
  "zeabur-ui",
 ]
 
@@ -3018,6 +3020,17 @@ dependencies = [
  "tower",
  "tracing",
  "tracing-subscriber",
+]
+
+[[package]]
+name = "zeabur-telemetry"
+version = "0.1.1"
+dependencies = [
+ "rustls",
+ "serde",
+ "serde_json",
+ "tracing",
+ "ureq",
 ]
 
 [[package]]

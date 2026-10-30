@@ -135,6 +135,12 @@ spec:
             - name: ZEABUR_ACCOUNT_URL
               value: {{ . | quote }}
             {{- end }}
+            {{- if .Values.telemetry.enabled }}
+            - name: ZEABUR_TELEMETRY_ENABLED
+              value: "true"
+            - name: ZEABUR_INSTALLATION_ID
+              value: {{ required "telemetry.installationId is required with telemetry.enabled" .Values.telemetry.installationId | quote }}
+            {{- end }}
             {{- if .Values.proxy.enabled }}
             - name: ZEABUR_PROXY_URL
               value: "https://{{ include "zeabur.proxyName" . }}.{{ .Release.Namespace }}.svc"

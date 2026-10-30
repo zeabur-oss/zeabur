@@ -14,6 +14,7 @@ mod output;
 mod pages;
 mod proxy;
 mod server;
+mod telemetry;
 
 use std::process::ExitCode;
 use std::sync::Arc;
@@ -150,7 +151,11 @@ async fn serve(args: &Args, config: Config) -> Result<(), String> {
         sessions: Arc::clone(&sessions),
         connect,
         flow_key: FlowKey::random().map_err(|e| e.to_string())?,
-        clock,
+        clock: Arc::clone(&clock),
+        telemetry: Arc::new(telemetry::Telemetry::new(
+            args.telemetry_enabled,
+            &args.installation_id,
+        )),
     });
     let zeabur_proxy = config.proxy.map(|proxy| {
         let proxy: Arc<dyn zeabur_api::services::proxy::ZeaburProxy> = Arc::new(proxy);

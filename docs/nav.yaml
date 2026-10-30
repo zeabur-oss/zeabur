@@ -15,7 +15,7 @@
   pages: [settings, members, github-app, notifications, backups, nodes, components, external-secrets, s3-destinations, diagnosis]
 - group: reference
   label: Reference
-  pages: [zeaburctl, installer-configuration, installer, permissions, architecture, releases, security]
+  pages: [zeaburctl, installer-configuration, installer, permissions, architecture, releases, security, telemetry]
 - group: leave
   label: Leave Zeabur
   pages: [uninstall]
