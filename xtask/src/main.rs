@@ -3,6 +3,7 @@
 mod checkout;
 mod dev_cluster;
 mod e2e_proxy;
+mod openapi;
 mod output;
 mod process;
 
@@ -36,6 +37,9 @@ enum Task {
     /// KUBECONFIG pointing at it. `ZEABUR_NAMESPACE`, `ZEABUR_PROXY_SERVICE` and `ZEABUR_LOGS_URL`
     /// say where they run; `ZEABUR_PROXY_E2E_KEEP=1` keeps what it made.
     E2eProxy,
+    /// Regenerate `crates/zeabur-api/openapi.yaml` from the handlers, then
+    /// `web/src/api/schema.d.ts` from it. Runs inside `nix develop`.
+    Openapi,
 }
 
 #[derive(Debug, PartialEq, Eq, Subcommand)]
@@ -66,6 +70,7 @@ impl Task {
                 checkout::Pin::parse(&pin).and_then(|pin| checkout::checkout(&dir, &pin, &url))
             }
             Self::E2eProxy => e2e_proxy::run(),
+            Self::Openapi => openapi::generate(),
         }
     }
 }

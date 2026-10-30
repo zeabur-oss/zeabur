@@ -53,7 +53,7 @@ environment; on a VM, snapshot its clean state and restore it after every run (s
 ## API
 - Handlers live in `zeabur-api`, described with `#[utoipa::path]`, registered with `routes!`.
   After changing one, regenerate the committed description:
-  `ZEABUR_UPDATE_OPENAPI=1 nix develop -c cargo nextest run -p zeabur-api`.
+  `nix develop -c cargo xtask openapi` (also regenerates `web/src/api/schema.d.ts`).
 - Every response item carries its `origin` (`zeabur_model::Origin`); errors are
   `zeabur_core::problem::Problem`. Gets return the resource itself, lists
   `{items}` with every item; event lists take a `limit` and add `totalSize`. Every answer is
