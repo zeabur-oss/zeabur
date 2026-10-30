@@ -194,7 +194,8 @@ fn choose(index: &Index, wanted: &Wanted<'_>) -> Result<Selection, PlanError> {
     for id in &unusable {
         chosen.remove(id);
     }
-    let held = hold_back(index, profile, wanted.installed, &mut chosen);
+    let taken_over = under_new_names(wanted.installed);
+    let held = hold_back(index, profile, taken_over.as_ref(), &mut chosen);
 
     let mut order: Vec<(String, Why)> = Vec::new();
     for (id, why) in &chosen {
@@ -234,6 +235,19 @@ fn choose(index: &Index, wanted: &Wanted<'_>) -> Result<Selection, PlanError> {
         offered,
         warnings,
     })
+}
+
+/// The install record's components, with each renamed one also under its new id: a server that
+/// has `container-registry/zot` has `builds/zeabur-builder`, which keeps the same zot release.
+#[must_use]
+pub fn under_new_names(installed: Option<&BTreeSet<String>>) -> Option<BTreeSet<String>> {
+    let mut all = installed?.clone();
+    for (old, new) in RENAMED {
+        if all.contains(*old) {
+            all.insert((*new).to_owned());
+        }
+    }
+    Some(all)
 }
 
 /// Takes out of `chosen` the defaults that `installed` lacks, except what Zeabur needs, and

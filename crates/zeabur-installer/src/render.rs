@@ -162,6 +162,10 @@ pub(crate) fn changes(changes: Option<&Changes>, unit: &str) -> String {
     for id in &c.removed {
         push(&mut s, &format!("  {id:<48} removed"));
     }
+    for r in &c.replaced {
+        push(&mut s, &format!("  {:<48} replaced by {}", r.from, r.to));
+        push(&mut s, &format!("      {}", replaced_note(&r.from)));
+    }
     for chart in &c.charts {
         push(
             &mut s,
@@ -182,6 +186,17 @@ pub(crate) fn changes(changes: Option<&Changes>, unit: &str) -> String {
     }
     push(&mut s, "");
     s
+}
+
+/// What happens to the data of a component that its replacement takes over.
+fn replaced_note(from: &str) -> &'static str {
+    match from {
+        "container-registry/zot" => {
+            "zot keeps running as part of Zeabur Builder; the images in it stay. \
+             To keep zot alone: disable: [builds/zeabur-builder]"
+        }
+        _ => "the new component takes over the old one's release",
+    }
 }
 
 /// The components `apply` removes and what stays of them; empty when there are none.
@@ -538,14 +553,18 @@ mod tests {
         let mut changes = Changes {
             installer: "0.1.1".to_owned(),
             added: vec!["databases/cloudnative-pg".to_owned()],
-            removed: vec!["container-registry/zot".to_owned()],
+            removed: vec!["databases/old".to_owned()],
+            replaced: vec![zeabur_installer_plan::record::Replaced {
+                from: "container-registry/zot".to_owned(),
+                to: "builds/zeabur-builder".to_owned(),
+            }],
             charts: vec![ChartChange {
                 component: "ingress/traefik".to_owned(),
                 release: "traefik".to_owned(),
                 from: "42.1.2".to_owned(),
                 to: "42.1.3".to_owned(),
             }],
-            offered: vec!["builds/zeabur-builder".to_owned()],
+            offered: vec!["databases/other".to_owned()],
             version: None,
             host_files: Vec::new(),
             restart: false,
@@ -557,9 +576,12 @@ mod tests {
             "/etc/rancher/k3s/registries.yaml",
             "restarts k3s",
             "databases/cloudnative-pg",
+            "databases/old",
             "container-registry/zot",
+            "replaced by builds/zeabur-builder",
+            "the images in it stay",
             "chart traefik 42.1.2 -> 42.1.3",
-            "to add it: enable: [builds/zeabur-builder]",
+            "to add it: enable: [databases/other]",
         ] {
             assert!(text.contains(line), "{line} in\n{text}");
         }
@@ -567,6 +589,7 @@ mod tests {
         let same = Changes {
             added: Vec::new(),
             removed: Vec::new(),
+            replaced: Vec::new(),
             charts: Vec::new(),
             offered: Vec::new(),
             version: Some(VersionChange {

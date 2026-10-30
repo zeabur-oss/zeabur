@@ -347,6 +347,10 @@ export const zhCN: Messages = {
     `${title} 会重启。Kubernetes API 大约 10 秒连不上，应用会照常运行。`,
   "review.changes.added": "新增",
   "review.changes.removed": "移除",
+  "review.changes.replaced": "取代",
+  "review.changes.replaced.container-registry/zot":
+    "zot 由 Zeabur Builder 取代，Builder 会自己运行 zot，已经推送到 zot 的镜像会留着。想保持现在的 zot，在配置文件的 disable 里加上 builds/zeabur-builder。",
+  "review.changes.replacedNote": (from, to) => `${from} 由 ${to} 取代，沿用同一个 release。`,
   "review.changes.charts": "Chart 更新",
   "review.changes.offered": "这版目录新增的组件",
   "review.changes.offeredHint": "勾选了才会安装。",

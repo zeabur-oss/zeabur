@@ -375,6 +375,11 @@ export const en = {
     `${title} restarts. The Kubernetes API stops answering for about 10 seconds; apps keep running.`,
   "review.changes.added": "Added",
   "review.changes.removed": "Removed",
+  "review.changes.replaced": "Replaced",
+  "review.changes.replaced.container-registry/zot":
+    "zot is replaced by Zeabur Builder, which runs zot itself. The images already pushed to zot stay. To keep zot as it is, add builds/zeabur-builder to disable in the configuration file.",
+  "review.changes.replacedNote": (from: string, to: string) =>
+    `${from} is replaced by ${to}, which keeps the same release.`,
   "review.changes.charts": "Chart updates",
   "review.changes.offered": "New in this catalog",
   "review.changes.offeredHint": "Not installed unless you choose it.",

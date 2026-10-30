@@ -59,14 +59,16 @@ sudo zeabur-installer doctor
 集群里有安装记录 `kube-system/zeabur-installer` 时，`plan` 开头会先列出“Changes since the last apply”，并写明上次是哪一版 installer 写的记录。个人使用的安装也一样。这一部分会列出：
 
 - K3s、RKE2 或 KubeSolo 换版本时的新旧版本，以及内容会变的主机文件。只要有其中一项，`apply` 就会重启 `k3s`、`rke2-server` 或 `kubesolo`：Kubernetes API 大约 10 秒连不上，正在运行的应用照常提供服务。
-- 新增和卸载的组件，以及换版本的 chart。
-- 这版 Catalog 默认安装、但记录里没有的组件。`apply` 不会安装它们。要安装其中一个，把它写进 `enable`，例如 `enable: [builds/zeabur-builder]`，或在 `gui` 里勾选。Zeabur 需要的组件（ingress、certificates、metrics-server）和已选组件依赖的组件，仍然会安装。
+- 新增和卸载的组件、被其他组件取代的组件，以及换版本的 chart。
+- 这版 Catalog 默认安装、但记录里没有的组件。`apply` 不会安装它们。要安装其中一个，把它写进 `enable`，或在 `gui` 里勾选。Zeabur 需要的组件（ingress、certificates、metrics-server）和已选组件依赖的组件，仍然会安装。
 
 `plan --json` 把同样的内容放在 `changes` 字段，首次安装时为 `null`。`gui` 在确认步骤显示这些变动，新组件默认不勾选。
 
 你运行的 installer 比记录里的版本旧，`apply` 和 `plan` 就会停下，并说明要改用哪一版。要退回旧版 installer，请恢复升级前的快照。
 
 Catalog 给组件改名后，`disable` 仍然可以写旧 ID，`plan` 会给出警告并写明新 ID。`enable` 写旧 ID 时，`plan` 和 `apply` 会停下，错误信息里会写明新 ID。`container-registry/zot` 已改名为 `builds/zeabur-builder`。
+
+记录里有 `container-registry/zot` 时，会由 Zeabur Builder 取代它，`plan` 会在“replaced”下面写出来。Zeabur Builder 自己会运行 zot，用同一个 `zot` Namespace 和同一个 release，所以 `apply` 是升级这个 release，而不是删掉它。存放 zot 镜像的磁盘和里面已经推送的镜像都会留着，`apply` 再接着安装 Zeabur Builder。只想保留 zot 的话，把 `builds/zeabur-builder` 加进 `disable`，`apply` 就会让 zot 继续运行，并警告 Catalog 已经没有这个组件。
 
 ## `gui`
 

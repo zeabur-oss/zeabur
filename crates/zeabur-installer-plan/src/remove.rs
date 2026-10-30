@@ -210,6 +210,7 @@ pub fn removals(
         .iter()
         .map(|i| i.component.as_str())
         .filter(|id| !planned.contains(id))
+        .filter(|id| !crate::select::renamed(id).is_some_and(|new| planned.contains(new)))
         .collect();
     let mut warnings = Vec::new();
     let mut order: Vec<&Component> = Vec::new();
@@ -404,6 +405,30 @@ mod tests {
         let (removals, warnings) = removals(&index(), &now, &installed(&now), "single-node", &[]);
         assert_eq!(removals, []);
         assert_eq!(warnings, []);
+    }
+
+    #[test]
+    fn zot_is_not_removed_while_builder_takes_over_its_release() {
+        let now = planned("");
+        assert!(
+            now.iter().any(|c| c.id == "builds/zeabur-builder"),
+            "builder is planned"
+        );
+        let mut found = installed(&now);
+        for chart in &mut found {
+            if chart.component == "builds/zeabur-builder" && chart.chart == "zot" {
+                chart.component = "container-registry/zot".to_owned();
+            }
+        }
+        let (kept, warnings) = removals(&index(), &now, &found, "single-node", &[]);
+        assert_eq!(kept, []);
+        assert_eq!(warnings, []);
+
+        let without = planned("disable: [builds/zeabur-builder]\n");
+        found.retain(|chart| chart.component == "container-registry/zot");
+        let (left, warnings) = removals(&index(), &without, &found, "single-node", &[]);
+        assert_eq!(left, []);
+        assert_eq!(warnings.len(), 1, "{warnings:?}");
     }
 
     #[test]

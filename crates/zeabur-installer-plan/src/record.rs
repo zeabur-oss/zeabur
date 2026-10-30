@@ -9,6 +9,7 @@ use serde_json::Value;
 
 use crate::PlanError;
 use crate::plan::{ComponentPlan, ReleasePlan};
+use crate::select::RENAMED;
 
 /// This installer's version.
 pub const INSTALLER_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -101,6 +102,8 @@ pub struct Changes {
     pub added: Vec<String>,
     /// Recorded components it no longer plans.
     pub removed: Vec<String>,
+    /// Recorded components the catalog renamed, which the new component takes over.
+    pub replaced: Vec<Replaced>,
     /// Charts whose version changes.
     pub charts: Vec<ChartChange>,
     /// Default components of this catalog that the record does not have and `enable` does not
@@ -112,6 +115,15 @@ pub struct Changes {
     pub host_files: Vec<String>,
     /// `apply` restarts K3s, RKE2 or `KubeSolo`.
     pub restart: bool,
+}
+
+/// A recorded component that the component with its new id takes over.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct Replaced {
+    /// The id in the record.
+    pub from: String,
+    /// The id in the catalog.
+    pub to: String,
 }
 
 /// A chart whose version changes.
@@ -147,6 +159,18 @@ impl Changes {
         version: &str,
     ) -> Self {
         let planned: BTreeSet<&str> = components.iter().map(|c| c.id.as_str()).collect();
+        let replaced: Vec<Replaced> = RENAMED
+            .iter()
+            .filter(|(from, to)| {
+                record.components.contains(*from)
+                    && !record.components.contains(*to)
+                    && planned.contains(to)
+            })
+            .map(|(from, to)| Replaced {
+                from: (*from).to_owned(),
+                to: (*to).to_owned(),
+            })
+            .collect();
         let mut charts = Vec::new();
         for component in components {
             for release in &component.releases {
@@ -181,14 +205,17 @@ impl Changes {
             added: components
                 .iter()
                 .filter(|c| !record.components.contains(&c.id))
+                .filter(|c| !replaced.iter().any(|r| r.to == c.id))
                 .map(|c| c.id.clone())
                 .collect(),
             removed: record
                 .components
                 .iter()
                 .filter(|id| !planned.contains(id.as_str()))
+                .filter(|id| !replaced.iter().any(|r| r.from == **id))
                 .cloned()
                 .collect(),
+            replaced,
             charts,
             offered: offered.to_vec(),
             restart: version.is_some(),

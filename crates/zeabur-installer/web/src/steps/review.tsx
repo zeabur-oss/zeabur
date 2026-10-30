@@ -376,6 +376,7 @@ function ChangesPanel({
     !changes.restart &&
     !changes.added.length &&
     !changes.removed.length &&
+    !changes.replaced.length &&
     !changes.charts.length &&
     !changes.offered.length
   return (
@@ -418,6 +419,21 @@ function ChangesPanel({
           {changes.removed.length ? (
             <Row label={t("review.changes.removed")}>
               {t("common.list", changes.removed.map(name))}
+            </Row>
+          ) : null}
+          {changes.replaced.length ? (
+            <Row label={t("review.changes.replaced")}>
+              <div className="flex min-w-0 flex-col gap-2">
+                {changes.replaced.map((r) => (
+                  <span key={r.from}>
+                    {named(
+                      t,
+                      `review.changes.replaced.${r.from}`,
+                      t("review.changes.replacedNote", name(r.from), name(r.to)),
+                    )}
+                  </span>
+                ))}
+              </div>
             </Row>
           ) : null}
           {changes.charts.length ? (

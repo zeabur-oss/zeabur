@@ -161,6 +161,8 @@ export interface Changes {
   installer: string
   added: string[]
   removed: string[]
+  /** Recorded components the catalog renamed; the new one takes over the old one's release. */
+  replaced: { from: string; to: string }[]
   charts: { component: string; release: string; from: string; to: string }[]
   /** New defaults of this catalog that apply leaves out unless chosen. */
   offered: string[]

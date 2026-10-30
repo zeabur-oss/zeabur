@@ -2455,7 +2455,7 @@ mod tests {
     }
 
     #[test]
-    fn an_upgrade_says_what_changes_and_offers_new_defaults_without_installing_them() {
+    fn an_upgrade_replaces_zot_with_builder_and_says_what_else_changes() {
         let index = Index::parse(INDEX.as_bytes()).unwrap();
         let first = plan(&index, &config(""), &facts()).unwrap();
         assert!(ids(&first).contains(&"builds/zeabur-builder"));
@@ -2464,11 +2464,18 @@ mod tests {
         let mut upgrade = facts();
         upgrade.record = Some(recorded(&first, "0.0.1", older_catalog));
         let plan = plan(&index, &config(""), &upgrade).unwrap();
-        assert!(!ids(&plan).contains(&"builds/zeabur-builder"));
+        assert!(ids(&plan).contains(&"builds/zeabur-builder"));
         let changes = plan.changes.unwrap();
-        assert_eq!(changes.offered, ["builds/zeabur-builder"]);
+        assert_eq!(changes.offered, Vec::<String>::new());
         assert_eq!(changes.added, Vec::<String>::new());
-        assert_eq!(changes.removed, ["container-registry/zot"]);
+        assert_eq!(changes.removed, Vec::<String>::new());
+        assert_eq!(
+            changes.replaced,
+            [record::Replaced {
+                from: "container-registry/zot".to_owned(),
+                to: "builds/zeabur-builder".to_owned(),
+            }]
+        );
         let traefik = changes
             .charts
             .iter()
@@ -2480,6 +2487,38 @@ mod tests {
             Some("v1.0.0+k3s1")
         );
         assert!(changes.restart);
+    }
+
+    #[test]
+    fn disabling_builder_keeps_the_old_zot_out_of_the_replacement() {
+        let index = Index::parse(INDEX.as_bytes()).unwrap();
+        let first = plan(&index, &config(""), &facts()).unwrap();
+        let mut upgrade = facts();
+        upgrade.record = Some(recorded(&first, "0.0.1", older_catalog));
+        let plan = plan(
+            &index,
+            &config("disable: [builds/zeabur-builder]\n"),
+            &upgrade,
+        )
+        .unwrap();
+        assert!(!ids(&plan).contains(&"builds/zeabur-builder"));
+        let changes = plan.changes.unwrap();
+        assert_eq!(changes.replaced, []);
+        assert_eq!(changes.removed, ["container-registry/zot"]);
+    }
+
+    #[test]
+    fn a_new_default_the_record_lacks_is_offered_without_installing_it() {
+        let index = Index::parse(INDEX.as_bytes()).unwrap();
+        let first = plan(&index, &config(""), &facts()).unwrap();
+        let mut upgrade = facts();
+        upgrade.record = Some(recorded(&first, "0.0.1", |summary| {
+            let components = summary["components"].as_array_mut().unwrap();
+            components.retain(|c| c["id"] != "builds/zeabur-builder");
+        }));
+        let plan = plan(&index, &config(""), &upgrade).unwrap();
+        assert!(!ids(&plan).contains(&"builds/zeabur-builder"));
+        assert_eq!(plan.changes.unwrap().offered, ["builds/zeabur-builder"]);
 
         let chosen = plan_with(
             &index,

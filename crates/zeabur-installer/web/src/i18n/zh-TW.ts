@@ -347,6 +347,10 @@ export const zhTW: Messages = {
     `${title} 會重新啟動。Kubernetes API 大約 10 秒連不上，應用程式會照常運作。`,
   "review.changes.added": "新增",
   "review.changes.removed": "移除",
+  "review.changes.replaced": "取代",
+  "review.changes.replaced.container-registry/zot":
+    "zot 由 Zeabur Builder 取代，Builder 會自己執行 zot，已經推送到 zot 的映像檔會留著。想維持現在的 zot，在設定檔的 disable 加上 builds/zeabur-builder。",
+  "review.changes.replacedNote": (from, to) => `${from} 由 ${to} 取代，沿用同一個 release。`,
   "review.changes.charts": "Chart 更新",
   "review.changes.offered": "這版目錄新增的元件",
   "review.changes.offeredHint": "勾選才會安裝。",
