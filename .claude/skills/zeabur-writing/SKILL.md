@@ -1,6 +1,6 @@
 ---
 name: zeabur-writing
-description: Write or review text people read in any zeabur-oss repo, in English, zh-TW or zh-CN. Use for docs (.md/.mdx), interface strings and i18n catalogues, translations between the three languages, READMEs, CLI output, error messages, and PR or issue text. Includes a Vale style that checks punctuation, spacing, cross-strait terms and wording tells.
+description: Write or review text people read in any zeabur-oss repo, in English, zh-TW or zh-CN. Use for docs (.md/.mdx), landing and product page copy, interface strings and i18n catalogues, translations between the three languages, READMEs, CLI output, error messages, and PR or issue text. Includes a Vale style that checks punctuation, spacing, cross-strait terms and wording tells.
 ---
 
 # Zeabur writing
@@ -16,8 +16,9 @@ Each repo keeps its own term list (zeabur: `docs/internal/wording.md`). Read it 
    - Chinese, both locales: [`zh.md`](zh.md)
    - English: [`en.md`](en.md)
    - Labels, buttons, errors, empty states, placeholders: also [`ui-strings.md`](ui-strings.md)
+   - Landing, product and release pages: also [`landing-copy.md`](landing-copy.md)
 3. **Write every other locale as its own text.** Each one reads naturally on its own, as if it had been written first. zh-TW and zh-CN each use their own terms; neither is a character conversion of the other. English is natural US English, and Chinese keeps Chinese word order. All three state the same facts, limits and conditions, and change together in the same pull request. Done when each string makes sense read alone, without the other languages beside it.
-4. **Sweep for AI tells** with [`ai-tells.md`](ai-tells.md). Code comments and visuals follow the `no-ai-flavour` skill; a narrative article (blog post, launch note) also follows `story-writing`.
+4. **Sweep for AI tells** with [`ai-tells.md`](ai-tells.md). Code comments and visuals follow the `no-ai-flavour` skill; a blog post, launch note or technical article also follows `story-writing`.
 5. **Check** with Vale (below) and the repo's own checks (zeabur: `scripts/check-zh-tw.sh`), then review with [`review-checklist.md`](review-checklist.md). Done when Vale reports no errors, each warning is fixed or judged wrong for that sentence, and every item of the checklist holds.
 
 When revising someone's text, change the fewest sentences that fix a real problem and report each change as before → after.
