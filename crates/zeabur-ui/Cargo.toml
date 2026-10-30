@@ -25,5 +25,6 @@ quote.workspace = true
 zeabur-embed.workspace = true
 
 [dev-dependencies]
+tower.workspace = true
 zeabur-core.workspace = true
 tokio.workspace = true

@@ -9,7 +9,8 @@ Level 1: no workspace dependency. The `ui` feature of the binaries pulls it in w
 leaves it out and needs no JavaScript toolchain.
 
 Without `interface`, the crate embeds nothing and needs no `ZEABUR_UI_DIST`: it serves a table
-another crate embeds with [`router_for`]. `zeabur-installer` serves its `gui` page that way.
+another crate embeds with [`router_for`] and that crate's own Content Security Policy.
+`zeabur-installer` serves its `gui` page that way.
 
 ## Embedding
 
@@ -55,9 +56,12 @@ time; a client without brotli gets the file decoded on request.
   exceptions return `404` as RFC 9457 Problem Details: paths under `/api` (an unknown API route
   is never a page) and missing files under `assets/` (a stale script reference should fail
   loudly, not receive HTML).
-- **Content Security Policy.** [`CSP`]: everything from this origin, no inline script, no
-  framing, Trusted Types with no policy. Inline styles are allowed, as Sonner and CodeMirror add
-  `<style>` elements at run time (see [`CSP`]). Vite's module-preload polyfill is turned off
+- **Content Security Policy.** The caller passes the policy to [`router_for`] and [`respond`],
+  which send it with the HTML; every page also gets `X-Frame-Options`, `Referrer-Policy`,
+  `Cross-Origin-Opener-Policy` and `Permissions-Policy`. Zeabur's binaries pass [`CSP`]:
+  everything from this origin, no inline script, no framing, Trusted Types with no policy.
+  Inline styles are allowed, as Sonner and CodeMirror add `<style>` elements at run time (see
+  [`CSP`]). Vite's module-preload polyfill is turned off
   (`build.modulePreload.polyfill: false`); it is bundled into the entry script rather than
   inlined [vite-build], but every supported browser implements `modulepreload`, so it would only
   add code and a `fetch`.

@@ -59,8 +59,8 @@ const MAX_LINES: usize = 10_000;
 /// The most bytes a job keeps of one line.
 const MAX_LINE: usize = 4096;
 
-/// Content Security Policy of every response, in place of the one `zeabur_ui` gives Zeabur's
-/// interface: the page talks to this server only. Base UI adds a `<style>` element at run time
+/// Content Security Policy of the page, in place of [`zeabur_ui::CSP`] for Zeabur's interface:
+/// the page talks to this server only. Base UI adds a `<style>` element at run time
 /// (hiding scroll bars), hence `'unsafe-inline'` for styles; scripts stay limited to this origin,
 /// and the build emits no inline script.
 const CSP: &str = "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; \
@@ -170,17 +170,29 @@ fn app(server: Arc<Server>, assets: &'static [Asset]) -> Router {
         .route("/api/plan", axum::routing::post(plan))
         .route("/api/apply", get(progress).post(apply))
         .route("/api/local-ca.crt", get(local_ca))
-        .fallback_service(zeabur_ui::router_for(assets))
+        .route_layer(middleware::map_response(async |r: Response| api_headers(r)))
+        .fallback_service(zeabur_ui::router_for(assets, CSP))
         .layer(middleware::from_fn_with_state(Arc::clone(&server), gate))
-        .layer(middleware::map_response(harden))
         .with_state(server)
 }
 
 async fn gate(State(server): State<Arc<Server>>, request: Request, next: Next) -> Response {
+    match refuse(&server, &request) {
+        Some(answer) => api_headers(answer),
+        None => next.run(request).await,
+    }
+}
+
+/// The answer to a request that does not reach the page or the API: the wrong `Host`, the link
+/// with the token, no cookie, or a POST that is not JSON.
+fn refuse(server: &Server, request: &Request) -> Option<Response> {
     let headers = request.headers();
     let host = headers.get(header::HOST).and_then(|v| v.to_str().ok());
     if server.loopback && !server.allowed_host(host.unwrap_or_default()) {
-        return text(StatusCode::FORBIDDEN, "this page answers on 127.0.0.1 only");
+        return Some(text(
+            StatusCode::FORBIDDEN,
+            "this page answers on 127.0.0.1 only",
+        ));
     }
     let query = request.uri().query().unwrap_or_default();
     if request.method() == Method::GET
@@ -188,10 +200,10 @@ async fn gate(State(server): State<Arc<Server>>, request: Request, next: Next) -
         && let Some(token) = query_param(query, "token")
     {
         if !server.token_matches(Some(&token)) {
-            return text(
+            return Some(text(
                 StatusCode::FORBIDDEN,
                 "this link is not valid; use the one printed in the terminal",
-            );
+            ));
         }
         let mut response = text(StatusCode::FOUND, "");
         let h = response.headers_mut();
@@ -202,35 +214,31 @@ async fn gate(State(server): State<Arc<Server>>, request: Request, next: Next) -
         )) {
             h.insert(header::SET_COOKIE, cookie);
         }
-        return response;
+        return Some(response);
     }
     if !server.token_matches(cookie(headers, COOKIE)) {
-        return text(
+        return Some(text(
             StatusCode::FORBIDDEN,
             "open the link printed in the terminal",
-        );
+        ));
     }
     if request.method() == Method::POST
         && headers.get(header::CONTENT_TYPE) != Some(&HeaderValue::from_static("application/json"))
     {
-        return text(StatusCode::BAD_REQUEST, "JSON only");
+        return Some(text(StatusCode::BAD_REQUEST, "JSON only"));
     }
-    next.run(request).await
+    None
 }
 
-/// API answers are never stored; the page's files keep `zeabur_ui`'s caching.
-async fn harden(mut response: Response) -> Response {
+/// API answers and refusals are never stored; the page's files carry `zeabur_ui`'s headers.
+fn api_headers(mut response: Response) -> Response {
     let h = response.headers_mut();
-    h.insert(
-        header::CONTENT_SECURITY_POLICY,
-        HeaderValue::from_static(CSP),
-    );
     for (name, value) in [
         (header::CACHE_CONTROL, "no-store"),
         (header::X_CONTENT_TYPE_OPTIONS, "nosniff"),
         (header::REFERRER_POLICY, "no-referrer"),
     ] {
-        h.entry(name).or_insert(HeaderValue::from_static(value));
+        h.insert(name, HeaderValue::from_static(value));
     }
     response
 }
@@ -972,19 +980,13 @@ mod tests {
         }
 
         #[tokio::test]
-        async fn api_answers_are_never_stored_and_page_files_are_cached() {
+        async fn api_answers_are_never_stored_and_the_page_has_the_installer_policy() {
             let headers = [("host", HOST), ("cookie", COOKIE)];
-            for path in ["/api/apply", "/api/nothing"] {
-                let response = get(path, &headers).await;
-                assert_eq!(
-                    header(&response, "cache-control"),
-                    Some("no-store"),
-                    "{path}"
-                );
-                assert_eq!(header(&response, "x-content-type-options"), Some("nosniff"));
-                assert_eq!(header(&response, "referrer-policy"), Some("no-referrer"));
-                assert_eq!(header(&response, "content-security-policy"), Some(CSP));
-            }
+            let response = get("/api/apply", &headers).await;
+            assert_eq!(header(&response, "cache-control"), Some("no-store"));
+            assert_eq!(header(&response, "x-content-type-options"), Some("nosniff"));
+            assert_eq!(header(&response, "referrer-policy"), Some("no-referrer"));
+            assert_eq!(header(&response, "content-security-policy"), None);
             let refused = get("/", &[("host", HOST)]).await;
             assert_eq!(header(&refused, "cache-control"), Some("no-store"));
 
@@ -993,6 +995,15 @@ mod tests {
             assert_eq!(header(&response, "etag"), Some("\"aaaa\""));
             assert_eq!(header(&response, "content-security-policy"), Some(CSP));
             assert_eq!(header(&response, "x-frame-options"), Some("DENY"));
+            assert_eq!(header(&response, "referrer-policy"), Some("no-referrer"));
+            assert_eq!(
+                header(&response, "cross-origin-opener-policy"),
+                Some("same-origin")
+            );
+            assert_eq!(
+                header(&response, "permissions-policy"),
+                Some("camera=(), microphone=(), geolocation=()")
+            );
 
             let response = get("/assets/index-3f2a.js", &headers).await;
             assert_eq!(
