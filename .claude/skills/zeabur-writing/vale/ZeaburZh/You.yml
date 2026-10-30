@@ -1,0 +1,6 @@
+extends: existence
+message: "用「你」，不用「您」"
+level: error
+nonword: true
+tokens:
+  - '您'

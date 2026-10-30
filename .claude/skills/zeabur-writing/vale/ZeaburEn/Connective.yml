@@ -1,0 +1,7 @@
+extends: existence
+message: "Drop '%s': order the sentences so the link is plain"
+level: error
+scope: sentence
+nonword: true
+tokens:
+  - '^(?:Additionally|Furthermore|Moreover|Notably|Importantly),'

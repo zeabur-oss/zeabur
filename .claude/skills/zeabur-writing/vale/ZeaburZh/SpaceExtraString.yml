@@ -1,0 +1,9 @@
+# For message catalogues. Markdown uses SpaceExtra, which reads the markup.
+extends: existence
+message: "中文字之間、全形標點旁不加空格：「%s」"
+level: error
+nonword: true
+tokens:
+  - '\p{Han} +\p{Han}'
+  - '[\p{Han}A-Za-z0-9] +[，。、：；！？」』）]'
+  - '[，。、：；！？「『（] +[^\s|*]'

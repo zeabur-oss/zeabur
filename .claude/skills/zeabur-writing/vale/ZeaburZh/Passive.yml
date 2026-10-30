@@ -1,0 +1,6 @@
+extends: occurrence
+message: "一段裡有好幾個「被」：改成主動句，或直接拿掉「被」"
+level: warning
+scope: text
+max: 1
+token: '被'

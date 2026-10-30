@@ -5,23 +5,15 @@ description: Implement or change a security- or protocol-relevant behaviour in Z
 
 # Specification-driven work
 
-1. **Read the source.** Find the exact section of the RFC, KEP, Kubernetes documentation
-   revision or upstream source the behaviour depends on. Note MUST/SHOULD (RFC 2119, RFC 8174).
-   For prior art, read the other project's code at a pinned tag or commit. Never cite something
-   you have not read; if a fact cannot be verified, write "not verified" instead of inventing a
-   section number, URL, author or date.
-2. **Decide and write it down where the code is.** In the module's rustdoc: what it does, the
-   invariant, why (the threat or the spec rule), and the citation as a markdown reference link;
-   collect several sources in a `# References` section (IEEE-like: authors, title, venue, date,
-   URL/DOI). State decisions as facts about the design, not as history.
-3. **Fail closed.** Ambiguous answers, unknown inputs and races are errors or explicit outcomes,
-   never silent success. A plan is applied only against the resource versions it was computed
-   from; anything changed in between is refused.
-4. **Test the attack, not just the happy path.** Tampered plan tokens, replays, concurrent
-   applies (64 tasks behind a barrier, exactly one wins), cross-site requests, expired tokens,
-   revoked permissions, privilege boundaries (Zeabur's own service account must never gain a
-   right its users lack, apart from pods in the terminal namespace after an access review of the
-   person; no `impersonate`). Use the real kube-apiserver for anything RBAC or
-   admission related (`zeabur-cluster-tests`).
-5. **Never leak a Secret's value.** Values are read only on an explicit "show" request, never
+Follow `zeabur-oss-spec-work` (install: `npx skills add zeabur-oss/skills --skill
+zeabur-oss-spec-work`; `skills-lock.json` pins it): read the source, cite it in rustdoc, fail
+closed, test the attack. In Zeabur also:
+
+1. **Plans.** A plan is applied only against the resource versions it was computed from;
+   anything changed in between is refused. Test tampered plan tokens, replays and concurrent
+   applies.
+2. **Zeabur's own rights.** Zeabur's service account never gains a right its users lack, apart
+   from pods in the terminal namespace after an access review of the person; no `impersonate`.
+   Cluster tests: `zeabur-cluster-tests`.
+3. **Never leak a Secret's value.** Values are read only on an explicit "show" request, never
    cached, never logged. Test it.

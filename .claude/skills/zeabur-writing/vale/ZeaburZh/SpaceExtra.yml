@@ -1,0 +1,42 @@
+# Reads the Markdown source: Vale's text scope puts a space before bold and links.
+extends: script
+message: "中文字之間、全形標點旁不加空格，粗體和連結旁也一樣"
+level: error
+scope: raw
+script: |
+  text := import("text")
+
+  // Same-length filler keeps the offsets; "#" is neither Han, Latin nor a space.
+  mask := func(s, pattern, group) {
+    found := text.re_find(pattern, s, -1)
+    if is_undefined(found) { return s }
+    out := ""
+    last := 0
+    for m in found {
+      g := m[group]
+      out += s[last:g.begin] + text.repeat("#", g.end - g.begin)
+      last = g.end
+    }
+    return out + s[last:]
+  }
+
+  s := scope
+  s = mask(s, "(?ms)^ *(?:```|~~~).*?^ *(?:```|~~~)|^\n(?:(?: {4}|\t)[^\n]*(?:\n|$))+", 0)
+  s = mask(s, "(?s)<!--.*?-->|\\{/\\*.*?\\*/\\}", 0)
+  s = mask(s, "`[^`\n]+`", 0)
+  s = mask(s, "\\]\\(([^)\n]*)\\)", 1)
+
+  markup := "(?:\\*{1,2}|_{1,2}|\\[|\\]\\(#*\\)|\\]|<[^<>\n]*>)?"
+  patterns := [
+    "\\p{Han}" + markup + " +" + markup + "\\p{Han}",
+    "[\\p{Han}A-Za-z0-9]" + markup + " +" + markup + "[，。、：；！？」』）]",
+    "[，。、：；！？「『（]" + markup + " +" + markup + "[^\\s|*#<]"
+  ]
+
+  matches := []
+  for p in patterns {
+    found := text.re_find(p, s, -1)
+    if !is_undefined(found) {
+      for m in found { matches = append(matches, {begin: m[0].begin, end: m[0].end}) }
+    }
+  }

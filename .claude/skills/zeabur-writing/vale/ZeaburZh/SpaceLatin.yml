@@ -1,0 +1,6 @@
+extends: existence
+message: "中文與英文、數字之間加半形空格：「%s」"
+level: error
+nonword: true
+tokens:
+  - '\p{Han}[A-Za-z0-9]|[A-Za-z0-9]\p{Han}'

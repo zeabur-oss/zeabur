@@ -1,0 +1,6 @@
+extends: existence
+message: "zh-CN 的“副本”也指 replica：“%s”说的是复制品时，改成“复制一份…”"
+level: warning
+nonword: true
+tokens:
+  - '(?:一份|制作|保留|密钥的|文件的|配置的|数据的)副本'

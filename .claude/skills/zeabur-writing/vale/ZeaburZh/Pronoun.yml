@@ -1,0 +1,6 @@
+extends: occurrence
+message: "一段裡有好幾個「它」：主語沒換就省略，換了就寫出名稱"
+level: warning
+scope: text
+max: 2
+token: '它'

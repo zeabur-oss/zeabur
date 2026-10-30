@@ -1,0 +1,6 @@
+extends: existence
+message: "zh-CN 里有繁体字“%s”"
+level: error
+nonword: true
+tokens:
+  - '[們個這來時說會為與對開關無過還發後動點網設預資檔從當讓專叢體實務級機盤腦據擇裡麼請錯誤選項頁籤檢視儲區塊連線縮應]'

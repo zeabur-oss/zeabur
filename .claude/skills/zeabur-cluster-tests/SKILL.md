@@ -5,18 +5,11 @@ description: Run Zeabur's Kubernetes integration and end-to-end tests on a dispo
 
 # Cluster tests
 
-The cluster tests are `#[ignore]`d and need a disposable cluster where you are cluster admin.
-Run Docker/k3d on a Linux machine or VM, not on a workstation you care about; sync the working
-tree there with `rsync -a --delete --exclude target --exclude node_modules --exclude web/dist
-./ host:zeabur/` and run the commands below inside `nix develop` on that machine.
-
-**On a VM, snapshot its clean state and restore it after every run.** The tests run in the VM's
-own environment, not a fresh container: what one run leaves (clusters, images, volumes, build
-output, `node_modules`, tools installed by hand) can make the next pass where a fresh GitHub
-runner fails. Take the snapshot once Nix and Docker are installed (after one `nix develop`, so
-the store is warm, if you like), and restore it before the next run (`virsh snapshot-revert`,
-`prlctl snapshot-switch`, or your hypervisor's equivalent). A pull request's GitHub checks
-remain the answer.
+Follow `zeabur-oss-cluster-tests` (install: `npx skills add zeabur-oss/skills --skill
+zeabur-oss-cluster-tests`; `skills-lock.json` pins it): a disposable cluster on a Linux machine
+or VM, a snapshot restored after every run, assertions through a person, and the common failures.
+Sync with `rsync -a --delete --exclude target --exclude node_modules --exclude web/dist ./
+host:zeabur/`.
 
 ## Cluster
 ```sh
@@ -64,13 +57,8 @@ cargo nextest run --locked --run-ignored only -E 'binary(kubernetes)'   # every 
 
 ## Writing one
 - Start from `zeabur_test_support::sandbox::Sandbox::new(prefix, rules)` (dev-dependency with the
-  `sandbox` feature): the admin context only prepares a fresh namespace, a service account
-  standing in for a person, its Role of `rules` and RoleBinding, and a token from the
-  TokenRequest API. Every assertion goes through the person (`user()`, `user_api()`), never
-  through the admin client (`admin_api()`).
-- Test the boundary, not only the happy path: a namespace outside the person's rights is `403`;
-  deleting their RoleBinding makes the very next request `403`; another field manager's field is
-  a `409` without force.
+  `sandbox` feature). It prepares the namespace, the person's service account, Role, RoleBinding
+  and token. Assert through `user()` and `user_api()`, never through `admin_api()`.
 - Dropping the sandbox deletes its namespace, and the cluster-scoped roles named with
   `delete_cluster_role`, even when the test fails.
 
@@ -90,11 +78,7 @@ in every one of these states, not only the first:
 Wait on `restartCount` (as `e2e-ui.sh` does), and read both logs until one has the line.
 
 ## What to check when something fails
-- **`403` where you expected success**: `kubectl auth can-i --as system:serviceaccount:<ns>:alice
-  <verb> <resource> -n <ns>`. WebSocket exec needs `create` on `pods/exec`, not only `get`.
-- **The exec test times out**: the pod's image was not imported or pulled; `kubectl describe pod
-  shell -n <ns>`.
-- **It fails on GitHub but not here**: see `zeabur-ci` (reading the job's log, reproducing with
-  `scripts/ci-local.sh`, timing and `pipefail` pitfalls).
+- **The exec test times out**: busybox was not imported; `kubectl describe pod shell -n <ns>`.
+- **It fails on GitHub but not here**: `zeabur-ci`.
 
 Clean up with `nix run .#dev-cluster -- down`.

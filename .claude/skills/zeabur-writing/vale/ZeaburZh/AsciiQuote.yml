@@ -1,0 +1,6 @@
+extends: existence
+message: "中文引號用全形（zh-TW「」，zh-CN “”）"
+level: error
+nonword: true
+tokens:
+  - '\p{Han}"|"\p{Han}'

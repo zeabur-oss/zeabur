@@ -1,0 +1,6 @@
+extends: existence
+message: "zh-CN 用“”，内层用‘’"
+level: error
+nonword: true
+tokens:
+  - '[「」『』]'

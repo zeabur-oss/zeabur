@@ -24,6 +24,11 @@
       url = "github:zeabur-oss/.github";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    # mdx2vast, which Vale needs for .mdx files (.vale.ini, the zeabur-writing skill's style).
+    oss-skills = {
+      url = "github:zeabur-oss/skills";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs =
@@ -90,6 +95,9 @@
               jq
               shellcheck
               actionlint
+              # Docs and interface strings (.vale.ini)
+              vale
+              inputs.oss-skills.packages.${system}.mdx2vast
 
               # Web interface (web/: dependencies come from bun.lock)
               bun

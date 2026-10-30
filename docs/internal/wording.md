@@ -1,28 +1,17 @@
 # Wording
 
-How the interface's text reads in English, Traditional Chinese (Taiwan) and Simplified Chinese.
-It covers `web/src/i18n/` (English is the source; `zh-TW.ts` and `zh-CN.ts` are typed against
-it), the English messages the API sends with a problem, the sign-in pages `zeabur` serves, and
-`zeaburctl`'s output. *What* a sentence says comes from what people see on the page, not how
-Zeabur works inside; this guide is about *how* it reads.
+Zeabur's own wording: the term chosen for each concept, how each kind of interface element reads,
+and the rules that come from Zeabur's screens. It covers `web/src/i18n/` (`en.ts` defines the keys;
+`zh-TW.ts` and `zh-CN.ts` are typed against it), the English messages the API sends with a
+problem, the sign-in pages `zeabur` serves, `zeaburctl`'s output and the docs.
 
-The reader is a developer or a small team deploying apps on their own cluster. Apple's writing
-guidance is the primary voice; Google and Microsoft fill gaps; for Chinese, Chinese-specific
-sources come first [A1][A6][G2][M1][M4][M5]. Linters and style scores point at text worth
-rereading; they do not decide it.
+The general rules for English, zh-TW and zh-CN (sentence order, plain words, punctuation, spacing,
+AI tells) are in the `zeabur-writing` skill, `.claude/skills/zeabur-writing/`. Where the two
+differ, a term or convention here wins.
 
-## All three locales
+## Zeabur's rules
 
-1. **Lead with the fact or the action.** No sentence that announces the page or restates its
-   label ("This page shows…", "Here you can…").
-2. **Name the doer.** "The cluster rejects this change", not "This change will be rejected".
-   Passive only when the actor is unknown or does not matter.
-3. **No "we", few possessives.** "Unable to load services", not "We couldn't load your
-   services". Keep "your" where it tells the reader's thing from another ("your own rights").
-4. **Errors say what failed, on which object, and what to do next**, with the actual value and
-   limit: "Choose a name with at most 63 characters", not "Invalid name". Do not guess a cause,
-   echo a secret, blame, apologise or add "Oops".
-5. **Alert titles describe the situation; buttons name the result.** Never "Error" as a title;
+1. **Alert titles describe the situation; buttons name the result.** Never "Error" as a title;
    "Delete disk" / "Cancel", not "OK" / "Yes". Body text only when it adds a consequence; do not
    explain the buttons. The button that applies a review follows one rule, whether a form, YAML,
    a drawer or the draft asked: one kind of change takes its verb ("Restart 3 services", "Save
@@ -30,32 +19,22 @@ rereading; they do not decide it.
    one ("Create 3 objects"); several kinds together say "Apply 4 changes". A form whose objects
    are only the means (database backups) says the change in its own words and takes its own verb
    ("Set up backups"), not the object edits.
-6. **Limits where they bite.** Warn only before an uncommon or irreversible action, and state the
+2. **Limits where they bite.** Warn only before an uncommon or irreversible action, and state the
    real consequence. Whether deleting a disk deletes data depends on its reclaim policy; say what
    is known.
-7. **Empty states say what would appear and how to get it**, with a button or link where one
+3. **Empty states say what would appear and how to get it**, with a button or link where one
    exists; never a bare "None." (see "Empty states"). Nothing the reader needs may live only in
    text that disappears once the list fills.
-8. **A setting's label says what "on" does.** Link to a setting rather than describe where it is.
-9. **Ordinary words.** Reread *just, simply, easy, please, in order to, desired, via, leverage,
-   allows you to*, and needless *there is* / *you can*; keep one only when it carries meaning.
-10. **No manufactured structure.** A contrast ("not X but Y", 「不是…而是…」) only when the
-    contrast is the information; three items only when there are three; no closing summary.
-11. **One term per concept**, from the term list below. Four kinds people meet every day have a
-    plain word and use it everywhere on screen: Pod is *replica* (副本), PersistentVolumeClaim is
-    *disk* (磁碟), Secret is *secret* (機密變數), ConfigMap is *config file* (設定檔). The kind
-    name appears only where a reader needs it for `kubectl`: in YAML, on the Objects page
-    and as a secondary label beside the plain word (the Objects page, an object's title), never
-    in a heading or a sentence. Other kinds and fields (Deployment, selector, `replicas`) stay as
-    they are and may repeat. Interpolations, numbers, defaults and code stay exact.
-
-### English
-
-Natural US English (*catalog*, not *catalogue*), contractions where they fit, serial comma.
-Reread inflated words (*delve, underscore, showcase, highlight, crucial, comprehensive, robust,
-seamless, pivotal, notably, additionally*), participle tails (", ensuring…"), *serves as* for
-*is*, and nominalisations ("performs validation of" → "validates") [R3][R5]. These are review
-flags, not bans.
+4. **A setting's label says what "on" does.** Link to a setting rather than describe where it is.
+5. **One term per concept**, from the term list below. Four kinds people meet every day have a
+   plain word and use it everywhere on screen: Pod is *replica* (副本), PersistentVolumeClaim is
+   *disk* (磁碟), Secret is *secret* (機密變數), ConfigMap is *config file* (設定檔). The kind
+   name appears only where a reader needs it for `kubectl`: in YAML, on the Objects page
+   and as a secondary label beside the plain word (the Objects page, an object's title), never
+   in a heading or a sentence. Other kinds and fields (Deployment, selector, `replicas`) stay as
+   they are and may repeat. Interpolations, numbers, defaults and code stay exact.
+6. **Errors never echo a secret**, and they keep the raw cause (details, copy) out of the
+   headline.
 
 ### Empty states
 
@@ -99,29 +78,13 @@ place to say what the feature is for and how to start [A1][N1].
 
 ## Chinese
 
-Write each locale for its readers; translate intent and conditions, not English word order.
-zh-TW and zh-CN are two editorial passes, not a character conversion.
-
-12. **Active voice instead of 被**, with the agent when known: 「叢集會拒絕這個變更」. With no
-    agent, drop 被: 「檔案會自動儲存」. Keep 被 for a real adverse event (a token was stolen) and
-    where dropping it would change who acts.
-13. **Plain verbs.** 「驗證設定」, not 「對設定進行驗證」; 「是」「有」, not 「作為」「擁有」.
-    Drop 「有關」「關於」「們」「一個」 when they add nothing.
-14. **An event or clause as subject; break 的 chains and long pre-modifiers.** 「副本重新啟動後，
-    連線會中斷」, not 「副本的重新啟動會導致連線的中斷」.
-15. **Chinese order.** Condition first (「如果…，…」), one idea per sentence; no copied pairs
-    (因為…所以, 當…的時候), no 「最…之一」「值得注意的是」「這意味著」. 「；」 is allowed where it
-    makes the relation clearer; split the sentence when it does not.
-16. **Fixed patterns.** Failure 「無法…」／「无法…」; missing 「找不到…」; recommendation
-    「建議…」／「建议…」; progress 「正在儲存…」／「正在保存…」, not 「儲存中…」.
-17. **Pronouns.** Omit them where the meaning survives; otherwise 你 in both locales, never 您.
-    請／请 only in a full sentence that asks the reader to act, and not on every one of those;
-    never in a button, label or title.
-18. **Vocabulary and punctuation.** zh-TW: Taiwan terms, full-width punctuation, 「」 (nested
-    『』), a half-width space between CJK and Latin letters or digits. zh-CN: mainland terms,
-    “” (nested ‘’), the same spacing, 「如果」 for 「倘若」, 「要」 for 「若要」.
-    `scripts/check-zh-tw.sh` checks zh-TW vocabulary and punctuation; take a suggestion only when
-    it fits the technical meaning.
+- `zh-TW.ts` and `zh-CN.ts` are two editorial passes, not a character conversion.
+- Use `common.colon` instead of a literal colon. A placeholder that may hold Chinese or Latin
+  text takes its space from `latinStart` / `latinEnd` (`web/src/i18n/zh-TW.ts`), never a
+  hard-coded one.
+- `scripts/check-zh-tw.sh` checks zh-TW interface vocabulary and punctuation;
+  Vale (`.vale.ini`) checks docs and all three catalogues. Take a suggestion only when it
+  fits the technical meaning.
 
 ## Element conventions
 
@@ -151,7 +114,7 @@ Source text, not a CSS transform. Product, API and code names keep their exact c
   (副本), and so is every other Pod, the cluster's own counts included.
 - Other Kubernetes kinds stay in Latin letters in Chinese, Namespace included, as Zeabur's hosted
   dashboard writes it; in English running text they are lower case unless the kind itself is
-  meant (`the Namespace shop`). The four kinds of rule 11 are the exception;
+  meant (`the Namespace shop`). The four kinds of rule 5 are the exception;
   `web/src/i18n/kind-name.ts` gives the plain word for a kind in code.
 
 ## Terms
@@ -274,40 +237,20 @@ key. A new key needs a function in each file and a fixture or code in `zeabur-mo
 it; `bun test` fails when a key those crates send has no words. A parameter that may be absent
 is read as `p.name ?? ""`. Test a branch that is easy to get wrong in `web/src/i18n/server.test.ts`.
 
-## Examples
-
-| Before | After | Why |
-|---|---|---|
-| This page allows you to perform inspection of your services. | Inspect services. | Action first; no restated label or nominalisation |
-| This change will be rejected by the cluster. | The cluster rejects this change. | Name the doer |
-| We couldn't load your services. | Unable to load services. | No "we"; no needless possessive |
-| Invalid name. | Choose a name with at most 63 characters. | The real limit |
-| 這個變更會被叢集拒絕。 | 叢集會拒絕這個變更。 | 主動語態 |
-| 對設定進行驗證 | 驗證設定 | 直接用動詞 |
-| 您可以在此處查看您的服務。 | 檢視服務 | 不用代名詞與頁面說明 |
-| 儲存中… | 正在儲存… | 固定的進度句型 |
-| 倘若您希望查看您的服务，请前往服务页面。 | 要查看服务，打开服务页面。 | 去掉公文腔；能放連結就放連結 |
-
 ## Review
 
 Read changed text on the rendered page, in every locale, at desktop and narrow widths: wrapping,
 truncation, mixed CJK and Latin, buttons that overflow. Check that the three locales state the
-same facts, limits and conditions. `bun run typecheck`, `bun run test` and
-`scripts/check-zh-tw.sh` must pass; a passing check is not the review.
+same facts, limits and conditions. `bun run typecheck`, `bun run test`,
+`vale` and `scripts/check-zh-tw.sh` must pass; a passing check is not the
+review.
 
 ## Sources
 
 - [A1] Apple, "Writing," *Human Interface Guidelines*. https://developer.apple.com/design/human-interface-guidelines/writing
-- [A6] K. Coon and J. Bush, "Writing for interfaces," WWDC22, session 10037. https://developer.apple.com/videos/play/wwdc2022/10037/
 - [F1] Microsoft, "Content design," *Fluent 2 Design System*. https://fluent2.microsoft.design/content-design
-- [G2] Google, "Highlights," *Google developer documentation style guide*. https://developers.google.com/style/highlights
-- [M1] Microsoft, "Top 10 tips for Microsoft style and voice." https://learn.microsoft.com/en-us/style-guide/top-10-tips-style-voice
 - [M2] Microsoft, "Use technical terms carefully," *Microsoft Writing Style Guide*. https://learn.microsoft.com/en-us/style-guide/word-choice/use-technical-terms-carefully
-- [M4] Microsoft, *Chinese (Traditional) Localization Style Guide*, 2024. https://download.microsoft.com/download/2/9/3/293e6d41-ba40-451b-a41e-94bdb6242ae3/zho-twn-StyleGuide.pdf
-- [M5] Microsoft, *Chinese (Simplified) Localization Style Guide*, 2024. https://download.microsoft.com/download/1/5/9/159cb91c-b61b-4385-97ca-80ccc7ff1fa0/zho-chn-StyleGuide.pdf
 - [N1] "Designing Empty States in Complex Applications," Nielsen Norman Group. https://www.nngroup.com/articles/empty-state-interface-design/
 - [N2] "Plain Language Is for Everyone, Even Experts," Nielsen Norman Group. https://www.nngroup.com/articles/plain-language-experts/
 - [N3] "Tooltip Guidelines," Nielsen Norman Group. https://www.nngroup.com/articles/tooltip-guidelines/
-- [R3] A. Reinhart et al., "Do LLMs write like humans?," *PNAS* 122(8), 2025. https://pmc.ncbi.nlm.nih.gov/articles/PMC11874169/
-- [R5] WikiProject AI Cleanup, "Wikipedia:Signs of AI writing." https://en.wikipedia.org/wiki/Wikipedia:Signs_of_AI_writing
 - [U1] GOV.UK, "Clear language," *Writing to GOV.UK standards*. https://guidance.publishing.service.gov.uk/writing-to-gov-uk-standards/writing-guidelines/clear-language/

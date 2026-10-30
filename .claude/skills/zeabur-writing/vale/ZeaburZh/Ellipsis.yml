@@ -1,0 +1,6 @@
+extends: existence
+message: "刪節號用「…」（介面）或「……」（文章）"
+level: error
+nonword: true
+tokens:
+  - '(?<=\p{Han}[^\n]{0,40})\.\.\.|\.\.\.(?=[^\n]{0,40}\p{Han})'

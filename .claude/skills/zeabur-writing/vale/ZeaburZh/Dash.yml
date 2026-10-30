@@ -1,0 +1,7 @@
+extends: existence
+message: "中文破折號是「——」，而且少用"
+level: error
+nonword: true
+tokens:
+  - '(?<!—)—(?!—)'
+  - '\p{Han}\s?--\s?\p{Han}'
