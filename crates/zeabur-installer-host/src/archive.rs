@@ -96,7 +96,7 @@ enum ChartFile {
     Subchart,
 }
 
-/// `<chart>/(charts/<subchart>/)*crds/<file>.yaml|yml|json` is a CRD and
+/// `<chart>/(charts/<subchart>/)*crds/**/<file>.yaml|yml|json` is a CRD and
 /// `<chart>/(charts/<subchart>/)*charts/<file>.tgz` a packaged subchart.
 fn chart_file(path: &str) -> Option<ChartFile> {
     let mut parts: Vec<&str> = path.split('/').collect();
@@ -106,7 +106,7 @@ fn chart_file(path: &str) -> Option<ChartFile> {
         match (rest.next(), rest.len()) {
             (Some(&"charts"), 0) if extension == "tgz" => return Some(ChartFile::Subchart),
             (Some(&"charts"), _) if rest.next().is_some() => {}
-            (Some(&"crds"), 0) if ["yaml", "yml", "json"].contains(&extension) => {
+            (Some(&"crds"), _) if ["yaml", "yml", "json"].contains(&extension) => {
                 return Some(ChartFile::Crd);
             }
             _ => return None,
@@ -143,6 +143,7 @@ mod tests {
             ("crds/notes.txt", "not a manifest\n"),
             ("templates/crds/t.yaml", "kind: Templated\n"),
             ("charts/sub/crds/b.yaml", "kind: B\n"),
+            ("crds/v1/nested.yaml", "kind: Nested\n"),
         ] {
             let path = dir.path().join(path);
             std::fs::create_dir_all(path.parent().unwrap()).unwrap();
@@ -158,7 +159,10 @@ mod tests {
         .unwrap();
         let bytes = pack_chart(dir.path(), "c").unwrap();
         let crds = String::from_utf8(chart_crds(&bytes).unwrap()).unwrap();
-        assert_eq!(crds, "kind: P\n\n---\nkind: B\n\n---\nkind: A\n");
+        assert_eq!(
+            crds,
+            "kind: P\n\n---\nkind: B\n\n---\nkind: A\n\n---\nkind: Nested\n"
+        );
         let bare = tempfile::tempdir().unwrap();
         std::fs::write(bare.path().join("Chart.yaml"), "name: c\n").unwrap();
         let bytes = pack_chart(bare.path(), "c").unwrap();
