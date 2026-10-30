@@ -10,6 +10,11 @@ publish.workspace = true
 [lints]
 workspace = true
 
+[features]
+# Zeabur's own web interface (`ZEABUR_UI_DIST`), with `router`, `assets` and `is_page`. Without it,
+# the crate serves only a table another crate embeds (the installer's page).
+interface = []
+
 [dependencies]
 axum.workspace = true
 brotli-decompressor.workspace = true
@@ -20,5 +25,6 @@ quote.workspace = true
 zeabur-embed.workspace = true
 
 [dev-dependencies]
+tower.workspace = true
 zeabur-core.workspace = true
 tokio.workspace = true

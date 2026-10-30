@@ -2873,18 +2873,21 @@ dependencies = [
 name = "zeabur-installer"
 version = "0.1.1"
 dependencies = [
+ "axum",
  "base64 0.23.1",
  "clap",
+ "form_urlencoded",
  "hex",
- "proc-macro2",
- "quote",
  "serde-saphyr 2.0.0",
  "serde_json",
  "tempfile",
  "thiserror",
+ "tokio",
+ "tower",
  "zeabur-embed",
  "zeabur-installer-host",
  "zeabur-installer-plan",
+ "zeabur-ui",
 ]
 
 [[package]]
@@ -3043,6 +3046,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "tokio",
+ "tower",
  "zeabur-core",
  "zeabur-embed",
 ]

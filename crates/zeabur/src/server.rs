@@ -132,9 +132,11 @@ pub(crate) fn app(
         .with_state(Arc::clone(auth));
     let guarded = api.merge(sign_in);
     #[cfg(feature = "ui")]
-    let guarded = guarded.fallback_service(zeabur_ui::router().layer(
-        axum::middleware::from_fn_with_state(Arc::clone(auth), sign_in_first),
-    ));
+    let guarded = guarded.fallback_service(
+        zeabur_ui::router_for(zeabur_ui::assets(), zeabur_ui::CSP).layer(
+            axum::middleware::from_fn_with_state(Arc::clone(auth), sign_in_first),
+        ),
+    );
     let guarded = guarded.layer(axum::middleware::from_fn_with_state(
         Arc::clone(auth),
         check,

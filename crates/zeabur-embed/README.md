@@ -5,7 +5,8 @@ The build-script side of embedding a built web interface, shared by `zeabur-ui` 
 
 [`generate`] reads the directory named by an environment variable, which a `scripts/build-*ui.sh`
 fills with the built interface, its brotli encodings and `manifest.tsv`, and writes the table
-the crate's own `table` function makes from its [`Entry`]s to `OUT_DIR/embedded.rs`. It runs no
+the crate's own `table` function makes from its [`Entry`]s to `OUT_DIR/embedded.rs`; [`assets`]
+makes the `zeabur_ui::Asset` entries both crates serve. It runs no
 JavaScript tool and makes no network request, so `cargo build` stays hermetic.
 
 Without the variable, a debug build embeds the crate's `placeholder/index.html` and a release

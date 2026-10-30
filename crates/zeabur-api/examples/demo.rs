@@ -3289,7 +3289,7 @@ async fn main() -> std::io::Result<()> {
         template_idle,
         terminals,
     )
-    .fallback_service(zeabur_ui::router());
+    .fallback_service(zeabur_ui::router_for(zeabur_ui::assets(), zeabur_ui::CSP));
     // Another port when 8080 is taken: ZEABUR_DEMO_ADDR=127.0.0.1:8090.
     let addr = std::env::var("ZEABUR_DEMO_ADDR").unwrap_or_else(|_| "127.0.0.1:8080".to_owned());
     let listener = tokio::net::TcpListener::bind(addr).await?;

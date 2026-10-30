@@ -88,7 +88,8 @@ fn app(cluster: UserClient, settings: zeabur_api::Settings) -> Router {
     let router =
         zeabur_api::router_with_settings(Arc::new(SingleCluster(Arc::new(cluster))), settings);
     #[cfg(feature = "ui")]
-    let router = router.fallback_service(zeabur_ui::router());
+    let router =
+        router.fallback_service(zeabur_ui::router_for(zeabur_ui::assets(), zeabur_ui::CSP));
     router
 }
 

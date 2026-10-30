@@ -84,7 +84,8 @@ aws-lc-rs = { version = "1.18", default-features = false, features = ["aws-lc-sy
 base64 = { version = "0.23", default-features = false, features = ["alloc"] }
 # The htpasswd hash of a basic auth password (zeabur-plan); Traefik reads bcrypt.
 bcrypt = { version = "0.19", default-features = false, features = ["alloc"] }
-axum = { version = "0.8", default-features = false, features = ["http1", "tokio", "tracing", "json", "ws"] }
+# `ws` and `tracing` are added where they are used (zeabur-api), so the installer's page leaves them out.
+axum = { version = "0.8", default-features = false, features = ["http1", "tokio", "json"] }
 clap = { version = "4", default-features = false, features = ["std", "derive", "env", "help", "usage", "error-context"] }
 # Unpacking the RKE2 release and packing a local chart (zeabur-installer-host), and reading
 # Velero backups (zeabur-api).

@@ -8,11 +8,13 @@ use axum::body::{Body, Bytes};
 use axum::http::{HeaderMap, HeaderValue, Method, Request, StatusCode, header};
 use axum::response::Response;
 
+#[cfg(feature = "interface")]
 mod embedded {
     use super::{Asset, Decoded, EmbeddedKind};
     include!(concat!(env!("OUT_DIR"), "/embedded.rs"));
 }
 
+#[cfg(feature = "interface")]
 pub use embedded::KIND;
 
 /// Content Security Policy for the interface's HTML.
@@ -49,6 +51,7 @@ const REVALIDATE: &str = "no-cache";
 const DECODE_BUFFER: usize = 16 * 1024;
 
 /// What this binary embeds.
+#[cfg(feature = "interface")]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EmbeddedKind {
     /// The built interface from `ZEABUR_UI_DIST`.
@@ -111,23 +114,21 @@ impl Default for Decoded {
 }
 
 /// The embedded files.
+#[cfg(feature = "interface")]
 #[must_use]
 pub fn assets() -> &'static [Asset] {
     &embedded::ASSETS
 }
 
-/// A router that serves the embedded interface for every path it receives.
+/// A router that serves `assets` for every path it receives, with `csp` as the HTML's
+/// `Content-Security-Policy`: [`CSP`] for Zeabur's interface ([`assets`]).
 ///
 /// Mount it as the fallback of the application router, after the API routes.
-pub fn router() -> Router {
-    router_for(assets())
-}
-
-/// A router that serves `assets`; [`router`] with the embedded files.
-pub fn router_for(assets: &'static [Asset]) -> Router {
+pub fn router_for(assets: &'static [Asset], csp: &'static str) -> Router {
     Router::new().fallback(move |request: Request<Body>| async move {
         respond(
             assets,
+            csp,
             request.method(),
             request.uri().path(),
             request.headers(),
@@ -137,6 +138,7 @@ pub fn router_for(assets: &'static [Asset]) -> Router {
 
 /// Whether `path` is a page of the interface: a client-side route answered with `index.html`,
 /// not a file, an API path or a missing build output.
+#[cfg(feature = "interface")]
 #[must_use]
 pub fn is_page(path: &str) -> bool {
     is_page_in(assets(), path)
@@ -160,8 +162,15 @@ pub fn is_page_in(assets: &[Asset], path: &str) -> bool {
 ///   the build, and an HTML page in place of a missing script would only hide the error.
 /// - Brotli when `Accept-Encoding` allows it and the file has an encoding; otherwise the file
 ///   itself, decoded when only the encoding is embedded.
+/// - HTML gets `csp` as its `Content-Security-Policy`.
 #[must_use]
-pub fn respond(assets: &[Asset], method: &Method, path: &str, headers: &HeaderMap) -> Response {
+pub fn respond(
+    assets: &[Asset],
+    csp: &'static str,
+    method: &Method,
+    path: &str,
+    headers: &HeaderMap,
+) -> Response {
     if method != Method::GET && method != Method::HEAD {
         return status(StatusCode::METHOD_NOT_ALLOWED, |h| {
             h.insert(header::ALLOW, HeaderValue::from_static("GET, HEAD"));
@@ -222,7 +231,10 @@ pub fn respond(assets: &[Asset], method: &Method, path: &str, headers: &HeaderMa
     if method == Method::HEAD && !not_modified {
         h.insert(header::CONTENT_LENGTH, HeaderValue::from(length));
     }
-    harden(h, asset.content_type.starts_with("text/html"));
+    harden(
+        h,
+        asset.content_type.starts_with("text/html").then_some(csp),
+    );
     response
 }
 
@@ -306,15 +318,16 @@ fn if_none_match(headers: &HeaderMap, etag: &str) -> bool {
         .any(|tag| tag == "*" || tag.trim_start_matches("W/") == etag)
 }
 
-fn harden(headers: &mut HeaderMap, html: bool) {
+/// `csp` is the policy of an HTML page, `None` for other files.
+fn harden(headers: &mut HeaderMap, csp: Option<&'static str>) {
     insert(headers, header::X_CONTENT_TYPE_OPTIONS, "nosniff");
     insert(
         headers,
         header::HeaderName::from_static("cross-origin-resource-policy"),
         "same-origin",
     );
-    if html {
-        insert(headers, header::CONTENT_SECURITY_POLICY, CSP);
+    if let Some(csp) = csp {
+        insert(headers, header::CONTENT_SECURITY_POLICY, csp);
         insert(headers, header::X_FRAME_OPTIONS, "DENY");
         insert(headers, header::REFERRER_POLICY, "no-referrer");
         insert(
@@ -360,6 +373,7 @@ fn status(code: StatusCode, headers: impl FnOnce(&mut HeaderMap)) -> Response {
 #[cfg(test)]
 mod tests {
     use axum::body::to_bytes;
+    use tower::ServiceExt as _;
 
     use super::*;
 
@@ -431,7 +445,7 @@ mod tests {
         for (name, value) in headers {
             map.append(*name, HeaderValue::from_static(value));
         }
-        respond(&TEST_ASSETS, &Method::GET, path, &map)
+        respond(&TEST_ASSETS, CSP, &Method::GET, path, &map)
     }
 
     async fn body(response: Response) -> Vec<u8> {
@@ -606,6 +620,7 @@ mod tests {
         };
         let response = respond(
             std::slice::from_ref(&CORRUPT),
+            CSP,
             &Method::GET,
             "/assets/corrupt-0000.js",
             &HeaderMap::new(),
@@ -620,7 +635,7 @@ mod tests {
             if let Some(accept) = accept {
                 map.insert(header::ACCEPT_ENCODING, HeaderValue::from_static(accept));
             }
-            respond(&TEST_ASSETS, &Method::HEAD, path, &map)
+            respond(&TEST_ASSETS, CSP, &Method::HEAD, path, &map)
         };
 
         let response = head("/assets/big-9c1d.js", None);
@@ -669,20 +684,50 @@ mod tests {
 
     #[tokio::test]
     async fn head_has_headers_without_a_body() {
-        let response = respond(&TEST_ASSETS, &Method::HEAD, "/", &HeaderMap::new());
+        let response = respond(&TEST_ASSETS, CSP, &Method::HEAD, "/", &HeaderMap::new());
         assert_eq!(header(&response, "content-length"), Some("18"));
         assert_eq!(body(response).await, b"");
     }
 
+    #[tokio::test]
+    async fn html_gets_the_policy_it_is_served_with() {
+        const OTHER: &str = "default-src 'none'; frame-ancestors 'none'";
+        let response = router_for(&TEST_ASSETS, OTHER)
+            .oneshot(Request::get("/").body(Body::empty()).unwrap())
+            .await
+            .unwrap();
+        assert_eq!(header(&response, "content-security-policy"), Some(OTHER));
+        assert_eq!(header(&response, "x-frame-options"), Some("DENY"));
+        assert_eq!(header(&response, "referrer-policy"), Some("no-referrer"));
+        assert_eq!(
+            header(&response, "cross-origin-opener-policy"),
+            Some("same-origin")
+        );
+
+        let response = respond(
+            &TEST_ASSETS,
+            OTHER,
+            &Method::GET,
+            "/assets/font-77ab.woff2",
+            &HeaderMap::new(),
+        );
+        assert_eq!(header(&response, "content-security-policy"), None);
+        assert_eq!(
+            header(&response, "cross-origin-resource-policy"),
+            Some("same-origin")
+        );
+    }
+
     #[test]
     fn other_methods_are_refused() {
-        let response = respond(&TEST_ASSETS, &Method::POST, "/", &HeaderMap::new());
+        let response = respond(&TEST_ASSETS, CSP, &Method::POST, "/", &HeaderMap::new());
         assert_eq!(response.status(), StatusCode::METHOD_NOT_ALLOWED);
         assert_eq!(header(&response, "allow"), Some("GET, HEAD"));
     }
 
     /// CI builds with `ZEABUR_UI_DIST` set: the binary must then carry the built interface, with
     /// its encodings, and not the placeholder.
+    #[cfg(feature = "interface")]
     #[test]
     fn a_build_with_a_dist_embeds_it() {
         if option_env!("ZEABUR_UI_DIST").is_some_and(|d| !d.is_empty()) {

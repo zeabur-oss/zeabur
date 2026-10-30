@@ -12,6 +12,12 @@ readme = "../../docs/get-started/quickstart.mdx"
 [dependencies]
 zeabur-installer-host.workspace = true
 zeabur-installer-plan.workspace = true
+# zeabur-ui serves the `gui` page; without its `interface` feature, Zeabur's own interface stays out.
+zeabur-ui.workspace = true
+axum.workspace = true
+form_urlencoded.workspace = true
+tokio.workspace = true
+tower.workspace = true
 base64.workspace = true
 clap.workspace = true
 hex.workspace = true
@@ -20,8 +26,6 @@ serde_json.workspace = true
 thiserror.workspace = true
 
 [build-dependencies]
-proc-macro2.workspace = true
-quote.workspace = true
 zeabur-embed.workspace = true
 
 [dev-dependencies]
