@@ -2753,6 +2753,7 @@ dependencies = [
  "hyper-rustls",
  "hyper-util",
  "kube",
+ "pastey",
  "rustls",
  "rustls-platform-verifier",
  "secrecy",

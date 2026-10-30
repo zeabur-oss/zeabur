@@ -31,6 +31,7 @@ http-body-util.workspace = true
 # The registry client of `images`: the HTTPS stack kube-rs already ships.
 hyper-rustls.workspace = true
 hyper-util.workspace = true
+pastey.workspace = true
 rustls.workspace = true
 rustls-platform-verifier.workspace = true
 serde.workspace = true
