@@ -1741,6 +1741,50 @@ mod tests {
         assert!(codes.contains(&"storage.longhorn.replicas"));
     }
 
+    fn traefik_values(plan: &Plan) -> Value {
+        let component = plan.components.iter().find(|c| c.id == "ingress/traefik");
+        let release = component.unwrap().releases.iter().find_map(|r| {
+            if let ReleasePlan::HelmChart { name, object, .. } = r {
+                (name == "traefik").then_some(object)
+            } else {
+                None
+            }
+        });
+        serde_json::from_str(release.unwrap()["spec"]["valuesContent"].as_str().unwrap()).unwrap()
+    }
+
+    // ServiceLB lists only nodes with a ready Traefik pod under `Local`, and forwards without
+    // source NAT: https://github.com/k3s-io/k3s/blob/master/pkg/cloudprovider/servicelb.go
+    #[test]
+    fn traefik_keeps_client_addresses_behind_servicelb_on_k3s_and_rke2() {
+        let index = Index::parse(INDEX.as_bytes()).unwrap();
+        for distribution in ["k3s", "rke2"] {
+            for profile in ["single-node", "multi-node"] {
+                let extra = format!("distribution: {distribution}\nprofile: {profile}\n");
+                let values = traefik_values(&plan(&index, &config(&extra), &facts()).unwrap());
+                assert_eq!(
+                    values["service"]["spec"]["externalTrafficPolicy"], "Local",
+                    "{distribution} {profile}"
+                );
+            }
+            let extra = format!("distribution: {distribution}\nprofile: multi-node\n");
+            let values = traefik_values(&plan(&index, &config(&extra), &facts()).unwrap());
+            assert_eq!(values["deployment"]["kind"], "DaemonSet", "{distribution}");
+            let tolerated: Vec<&str> = values["tolerations"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|t| t["key"].as_str().unwrap())
+                .collect();
+            for key in [
+                "node-role.kubernetes.io/control-plane",
+                "CriticalAddonsOnly",
+            ] {
+                assert!(tolerated.contains(&key), "{distribution}: {key}");
+            }
+        }
+    }
+
     #[test]
     fn longhorn_on_one_node_leaves_local_path_the_default() {
         let index = Index::parse(INDEX.as_bytes()).unwrap();
