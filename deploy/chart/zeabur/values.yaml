@@ -220,6 +220,12 @@ resources:
   limits:
     memory: 128Mi
 
+# The experience program (docs/reference/telemetry.mdx). Off by default. installationId: a random
+# UUID you make, such as `uuidgen | tr A-Z a-z`; required when enabled. DO_NOT_TRACK=1 turns it off.
+telemetry:
+  enabled: false
+  installationId: ""
+
 podAnnotations: {}
 podLabels: {}
 nodeSelector: {}

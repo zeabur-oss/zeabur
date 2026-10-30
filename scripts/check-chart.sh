@@ -259,8 +259,18 @@ refuse "a tools resource Zeabur does not set" --set terminal.toolsResources.limi
 refuse "an image digest without its algorithm" --set image.digest="$(printf '%064d' 0)"
 refuse "a logs URL with https or a path" --set proxy.logs.url=https://vl.example.test:9428/select
 refuse "metrics through the proxy from a named port" --set proxy.enabled=true --set metricsStore.service=monitoring/prometheus:web
+refuse "the experience program without an installation ID" --set telemetry.enabled=true
+refuse "an installation ID that is not a UUID" --set telemetry.enabled=true --set telemetry.installationId=machine-1
+refuse "an installation ID that is not a UUID" --set telemetry.installationId=machine-1
 refuse "an apiServer address that is not a CIDR" --set 'proxy.apiServer[0]=kubernetes.default'
 if render >/dev/null 2>&1; then fail "accepted no values at all"; fi
+
+# The experience program is off unless it is turned on with an installation ID.
+env='select(.kind == "Deployment" and .metadata.name == "zeabur") | .spec.template.spec.containers[0].env[]'
+id=0a1b2c3d-0000-4000-8000-000000000000
+expect telemetry "$(render -f "$chart/ci/minimal-values.yaml")" "[$env | select(.name == \"ZEABUR_TELEMETRY_ENABLED\" or .name == \"ZEABUR_INSTALLATION_ID\")] | length" 0
+expect telemetry "$(render -f "$chart/ci/minimal-values.yaml" --set telemetry.enabled=true --set telemetry.installationId=$id)" \
+  "[$env | select(.name == \"ZEABUR_TELEMETRY_ENABLED\" or .name == \"ZEABUR_INSTALLATION_ID\") | .value] | join(\",\")" "true,$id"
 
 if ((failures > 0)); then
   echo "$failures chart check(s) failed" >&2

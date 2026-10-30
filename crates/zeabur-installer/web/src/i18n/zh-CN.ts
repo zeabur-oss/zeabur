@@ -334,6 +334,11 @@ export const zhCN: Messages = {
   "review.col.version": "版本",
   "review.col.memory": "空闲时用量",
   "review.manifests": "YAML 文件",
+  "review.program": "体验计划",
+  "review.program.label": "加入体验计划，帮助改进 Zeabur",
+  "review.program.description":
+    "定期发送版本和每天的使用人数，让我们知道有多少人在用、该先修哪里。不会发送名称、域名或邮箱，也不保存 IP。之后随时可以关闭。",
+  "review.program.link": "查看会发送的内容",
   "review.removing": "要移除的组件",
   "review.removingHint": "helm-controller 会卸载这些组件的 chart。留下的东西之后可以手动删除。",
   "review.stays": (items) => `会保留：${listZh("zh-CN", items)}`,

@@ -11,6 +11,7 @@ mod out;
 mod personal;
 mod remove;
 mod render;
+mod telemetry;
 mod uninstall;
 
 use std::net::SocketAddr;
@@ -37,6 +38,9 @@ struct Cli {
         default_value = "/etc/zeabur-installer/config.yaml"
     )]
     config: PathBuf,
+    /// Do not join the experience program for this run (<https://oss.zeabur.com/docs/zeabur/reference/telemetry/>).
+    #[arg(long, global = true)]
+    no_telemetry: bool,
     /// The command to run.
     #[command(subcommand)]
     command: Command,
@@ -187,7 +191,7 @@ fn main() -> ExitCode {
             cli.config.display()
         ))),
         (Command::Plan { json }, None) => show_plan(&cli, *json),
-        (Command::Apply, None) => apply::run(&cli.config),
+        (Command::Apply, None) => apply::run(&cli.config, cli.no_telemetry),
         (Command::Manifests { cluster_name }, None) => manifests(&cli, cluster_name),
         (
             Command::SetupLink {
@@ -259,7 +263,7 @@ fn personal(cli: &Cli, config: &zeabur_installer_plan::config::PersonalConfig) -
     finish(match &cli.command {
         Command::Doctor => return personal::doctor(config),
         Command::Plan { json } => personal::show_plan(config, *json),
-        Command::Apply => personal::apply(config),
+        Command::Apply => personal::apply(config, &cli.config, cli.no_telemetry),
         Command::Gui { listen } => gui::run(&cli.config, *listen),
         Command::Uninstall { .. } => {
             out::line(&personal::uninstall_text());
@@ -330,7 +334,7 @@ fn manifests(cli: &Cli, cluster_name: &str) -> Result<(), InstallError> {
     let list = serde_json::json!({
         "apiVersion": "v1",
         "kind": "List",
-        "items": [namespace, identity.ingress, apply::zeabur_helm_chart(&zeabur)?],
+        "items": [namespace, identity.ingress, apply::zeabur_helm_chart(&zeabur, None)?],
     });
     out::line(&list.to_string());
     Ok(())

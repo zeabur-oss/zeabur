@@ -23,7 +23,9 @@ use zeabur_installer_plan::plan::{
 };
 use zeabur_installer_plan::rke2::{ETCD_USER, PREFIX};
 use zeabur_installer_plan::storage::{self, NodePrep, Storage};
+use zeabur_telemetry::{InstallationId, Step};
 
+use crate::telemetry::{self, Reporter};
 use crate::{InstallError, load, out, remove, render};
 
 /// Downloads and the local CA's copy.
@@ -32,22 +34,34 @@ pub(crate) const STATE_DIR: &str = "/var/lib/rancher/zeabur-installer";
 pub(crate) const STATE_CONFIGMAP: &str = "zeabur-installer";
 const RELOADS_METRIC: &str = "apiserver_authentication_config_controller_automatic_reloads_total";
 
-pub(crate) fn run(config_path: &Path) -> Result<(), InstallError> {
+pub(crate) fn run(config_path: &Path, no_telemetry: bool) -> Result<(), InstallError> {
     let config = load::config(config_path)?;
+    let reporter = Reporter::start(
+        config.telemetry && !no_telemetry,
+        config_path,
+        telemetry::team(&config),
+    );
+    reporter.end(install(&config, &reporter))
+}
+
+fn install(config: &Config, reporter: &Reporter) -> Result<(), InstallError> {
     let index = load::catalog(config.sources.catalog.as_deref(), STATE_DIR)?;
     let distribution = config.distribution;
     let running = systemd::is_active(distribution.server_unit());
-    let mut plan = make_plan(&index, &config)?;
+    let mut plan = make_plan(&index, config)?;
     out::line(render::plan(&plan).trim_end());
     remove::check(&plan.removals)?;
+    reporter.at(Step::Preflight);
     check_host(
         preflight::Node::Server(distribution),
         config.host.require_encrypted_disk,
         plan.node_prep.as_ref(),
     )?;
+    reporter.at(Step::NodePrep);
     prepare_node(plan.node_prep.as_ref())?;
 
     let kubectl = Kubectl::admin(distribution);
+    reporter.at(Step::Cluster);
     let started = install_cluster(&ClusterInstall {
         cluster: &plan.cluster,
         calico: plan.calico.as_ref(),
@@ -66,8 +80,9 @@ pub(crate) fn run(config_path: &Path) -> Result<(), InstallError> {
             || crate::join::node_ready(&kubectl, &name, started).unwrap_or(false),
         )?;
     }
-    remove_components(&kubectl, &index, &config, &mut plan, !running)?;
+    remove_components(&kubectl, &index, config, &mut plan, !running)?;
 
+    reporter.at(Step::ClusterSetup);
     out::step("Namespaces and network policies");
     let nodes = node_addresses(&kubectl)?;
     for namespace in &plan.namespaces {
@@ -83,6 +98,7 @@ pub(crate) fn run(config_path: &Path) -> Result<(), InstallError> {
 
     storage(&kubectl, &plan.storage)?;
 
+    reporter.at(Step::Components);
     install_components(&kubectl, &plan)?;
 
     let mut report = Vec::new();
@@ -93,14 +109,17 @@ pub(crate) fn run(config_path: &Path) -> Result<(), InstallError> {
             local_ca(&kubectl, &plan)?;
         }
         system_hosts(&kubectl)?;
+        reporter.at(Step::Identity);
         identity(&kubectl, &plan)?;
-        zeabur(&kubectl, &plan, &config)?;
+        reporter.at(Step::Zeabur);
+        zeabur(&kubectl, &plan, config, reporter.id())?;
         if !link_issued {
             report.push(setup_link(&kubectl, &plan)?);
             link_issued = true;
         }
         report.extend(certificates(&kubectl, &plan));
     }
+    reporter.at(Step::Record);
     record(&kubectl, &plan, link_issued)?;
 
     out::step("Done");
@@ -1065,7 +1084,12 @@ fn successful_reloads(metrics: &str) -> u64 {
         .sum()
 }
 
-fn zeabur(kubectl: &Kubectl, plan: &Plan, config: &Config) -> Result<(), InstallError> {
+fn zeabur(
+    kubectl: &Kubectl,
+    plan: &Plan,
+    config: &Config,
+    telemetry: Option<&InstallationId>,
+) -> Result<(), InstallError> {
     let Some(zeabur) = &plan.zeabur else {
         return Ok(());
     };
@@ -1106,7 +1130,7 @@ fn zeabur(kubectl: &Kubectl, plan: &Plan, config: &Config) -> Result<(), Install
         }))?;
     }
 
-    helm_chart(kubectl, "zeabur", &zeabur_helm_chart(zeabur)?)?;
+    helm_chart(kubectl, "zeabur", &zeabur_helm_chart(zeabur, telemetry)?)?;
     kubectl.wait(&[
         "--namespace",
         ZEABUR_NAMESPACE,
@@ -1117,8 +1141,19 @@ fn zeabur(kubectl: &Kubectl, plan: &Plan, config: &Config) -> Result<(), Install
     Ok(())
 }
 
-/// The `HelmChart` that installs Zeabur's chart with the planned values.
-pub(crate) fn zeabur_helm_chart(zeabur: &ZeaburPlan) -> Result<Value, InstallError> {
+/// The `HelmChart` that installs Zeabur's chart with the planned values, and the experience
+/// program's when `telemetry` has the installation ID.
+pub(crate) fn zeabur_helm_chart(
+    zeabur: &ZeaburPlan,
+    telemetry: Option<&InstallationId>,
+) -> Result<Value, InstallError> {
+    let mut values = zeabur.values.clone();
+    if let (Some(id), Some(map)) = (telemetry, values.as_object_mut()) {
+        map.insert(
+            "telemetry".to_owned(),
+            json!({"enabled": true, "installationId": id.as_str()}),
+        );
+    }
     let chart = match &zeabur.chart {
         Source::Local(path) => chart_content(path)?,
         Source::Pinned(d) => {
@@ -1139,7 +1174,7 @@ pub(crate) fn zeabur_helm_chart(zeabur: &ZeaburPlan) -> Result<Value, InstallErr
             "chartContent": STANDARD.encode(chart),
             "targetNamespace": ZEABUR_NAMESPACE,
             "createNamespace": false,
-            "valuesContent": zeabur.values.to_string(),
+            "valuesContent": values.to_string(),
             "failurePolicy": "abort",
             "timeout": "10m0s",
         },

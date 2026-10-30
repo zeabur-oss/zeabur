@@ -16,3 +16,25 @@ Zeabur gives members their rights with RoleBindings and ClusterRoleBindings it m
   kubectl delete rolebindings,clusterrolebindings --all-namespaces \
     -l app.kubernetes.io/managed-by=zeabur,zeabur.com/member
 {{- end }}
+
+{{- if not .Values.telemetry.enabled }}
+
+Experience program (currently: off)
+
+When on, Zeabur sends the version and how many people use it each day to the
+Zeabur team, so we know how many installations are in use and what to fix
+first. Only a random installation ID; no names, domains or emails, and IP
+addresses aren't kept. Kept for 13 months.
+
+To turn it on, generate an installation ID first:
+
+  uuidgen | tr 'A-Z' 'a-z'
+
+Then pass it in (replace <installation-id> with the value above):
+
+  helm upgrade {{ .Release.Name }} <chart> --reuse-values \
+    --set telemetry.enabled=true \
+    --set telemetry.installationId=<installation-id>
+
+What is sent: https://oss.zeabur.com/docs/zeabur/reference/telemetry/
+{{- end }}

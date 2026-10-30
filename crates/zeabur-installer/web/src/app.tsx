@@ -80,6 +80,8 @@ export interface Wizard {
   setChoices: (choices: Choices) => void
   /** Sets `host.nodeName` in the configuration of the chosen kind. */
   setNodeName: (name: string) => void
+  /** Joins or leaves the experience program in the configuration of the chosen kind. */
+  setTelemetry: (on: boolean) => void
   steps: readonly Step[]
   secrets: Secrets
   planned: Planned | null
@@ -223,6 +225,10 @@ export function App() {
             use === "personal"
               ? setPersonal({ ...personal, host: { ...personal.host, nodeName } })
               : setConfigState({ ...config, host: { ...config.host, nodeName } }),
+          setTelemetry: (telemetry) =>
+            use === "personal"
+              ? setPersonal({ ...personal, telemetry })
+              : setConfigState({ ...config, telemetry }),
           steps: shownSteps,
           secrets,
           planned,

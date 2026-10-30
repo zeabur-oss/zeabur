@@ -247,6 +247,31 @@ export function ReviewStep({ wizard }: { wizard: Wizard }) {
         </Panel>
       ) : null}
 
+      <Panel title={t("review.program")}>
+        <div className="flex items-start gap-3">
+          <Checkbox
+            id="telemetry"
+            className="mt-0.5"
+            checked={wizard.active.telemetry !== false}
+            onCheckedChange={wizard.setTelemetry}
+          />
+          <div className="flex min-w-0 flex-col gap-1">
+            <label htmlFor="telemetry" className="text-sm font-medium text-main">
+              {t("review.program.label")}
+            </label>
+            <span className="text-sm text-secondary">{t("review.program.description")}</span>
+            <a
+              href="https://oss.zeabur.com/docs/zeabur/reference/telemetry/"
+              target="_blank"
+              rel="noreferrer"
+              className={buttonVariants({ variant: "link", size: "sm" })}
+            >
+              {t("review.program.link")}
+            </a>
+          </div>
+        </div>
+      </Panel>
+
       {warnings.length ? (
         <Alert variant="warn">
           <WarningIcon aria-hidden="true" />

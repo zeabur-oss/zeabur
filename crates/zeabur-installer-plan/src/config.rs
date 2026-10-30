@@ -47,6 +47,10 @@ pub struct Config {
     /// `replicated-storage/longhorn`.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub allow_data_loss: Vec<String>,
+    /// Join the experience program (docs/reference/telemetry.mdx). `DO_NOT_TRACK` and
+    /// `--no-telemetry` turn it off whatever this says.
+    #[serde(default = "yes", skip_serializing_if = "is_true")]
+    pub telemetry: bool,
     /// An RKE2 release other than the pinned one, such as `v1.37.1+rke2r1`. Its downloads are
     /// checked only against the release's own checksum list, so the plan warns that it is
     /// unsupported.
@@ -108,6 +112,10 @@ pub struct PersonalConfig {
     /// `replicated-storage/longhorn`.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub allow_data_loss: Vec<String>,
+    /// Join the experience program (docs/reference/telemetry.mdx). `DO_NOT_TRACK` and
+    /// `--no-telemetry` turn it off whatever this says.
+    #[serde(default = "yes", skip_serializing_if = "is_true")]
+    pub telemetry: bool,
     /// Host settings.
     #[serde(default)]
     pub host: Host,
@@ -135,6 +143,7 @@ impl PersonalConfig {
             inputs: BTreeMap::new(),
             secret_files: BTreeMap::new(),
             allow_data_loss: Vec::new(),
+            telemetry: true,
             host: Host::default(),
             sources: PersonalSources::default(),
         }
@@ -601,6 +610,14 @@ fn single_node() -> String {
     "single-node".to_owned()
 }
 
+#[expect(
+    clippy::trivially_copy_pass_by_ref,
+    reason = "serde's skip_serializing_if passes a reference"
+)]
+const fn is_true(value: &bool) -> bool {
+    *value
+}
+
 const fn yes() -> bool {
     true
 }
@@ -637,6 +654,7 @@ impl Config {
             inputs: BTreeMap::new(),
             secret_files: BTreeMap::new(),
             allow_data_loss: Vec::new(),
+            telemetry: true,
             distribution: Distribution::default(),
             rke2_version: None,
             k3s_version: None,

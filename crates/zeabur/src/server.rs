@@ -55,6 +55,7 @@ use zeabur_kube::k8s_openapi::jiff::Timestamp;
 use zeabur_kube::{Cluster, UserToken};
 
 use crate::pages::{self, SignInProblem};
+use crate::telemetry::Daily;
 
 /// The header the interface sends on a request it makes on its own while nobody uses the page.
 pub(crate) const BACKGROUND: &str = "x-zeabur-background";
@@ -83,6 +84,8 @@ pub(crate) struct Auth {
     pub(crate) connect: Bind<Connection>,
     pub(crate) flow_key: FlowKey,
     pub(crate) clock: Clock,
+    /// Counts who used the API today, for the experience program.
+    pub(crate) active: Arc<Daily>,
 }
 
 impl std::fmt::Debug for Auth {
@@ -221,6 +224,7 @@ fn navigation(headers: &HeaderMap) -> bool {
 /// Finds the session of an API request (renewing its token when due) and hands it to
 /// [`SessionAccess`] through the request's extensions.
 async fn session(State(auth): State<Arc<Auth>>, mut request: Request, next: Next) -> Response {
+    let mut person = None;
     let signed = if let Some(id) = cookie::get(request.headers(), cookie::SESSION) {
         let activity = if request.headers().contains_key(BACKGROUND) {
             Activity::Background
@@ -228,15 +232,26 @@ async fn session(State(auth): State<Arc<Auth>>, mut request: Request, next: Next
             Activity::Person
         };
         match auth.sessions.current(id, activity).await {
-            Lookup::Active(credentials) => Some(Signed::In(credentials)),
+            Lookup::Active(credentials) => {
+                if activity == Activity::Person {
+                    person = Some(credentials.username.clone());
+                }
+                Some(Signed::In(credentials))
+            }
             Lookup::IssuerUnavailable => Some(Signed::IssuerDown),
             Lookup::SignedOut => None,
         }
     } else {
         bearer(request.headers())
             .filter(|token| zeabur_kube::issued_by(token.expose_secret(), auth.issuer.as_str()))
-            .and_then(|token| (auth.connect)(token).ok().map(Signed::Token))
+            .and_then(|token| {
+                person = zeabur_kube::claim(token.expose_secret(), "sub");
+                (auth.connect)(token).ok().map(Signed::Token)
+            })
     };
+    if let Some(person) = person {
+        auth.active.record(&person, (auth.clock)());
+    }
     if let Some(signed) = signed {
         request.extensions_mut().insert(signed);
     }

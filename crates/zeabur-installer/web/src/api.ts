@@ -64,6 +64,8 @@ export interface Config {
   secretFiles: Record<string, Record<string, string>>
   /** Components apply may remove although that deletes the data they keep. */
   allowDataLoss?: string[]
+  /** The experience program; on unless `false`. */
+  telemetry?: boolean
   distribution: Distribution
   k3sVersion?: string | null
   rke2Version?: string | null
@@ -82,6 +84,7 @@ export interface PersonalConfig {
   inputs: Record<string, Record<string, unknown>>
   secretFiles: Record<string, Record<string, string>>
   allowDataLoss?: string[]
+  telemetry?: boolean
   host: { tlsSan: string[]; requireEncryptedDisk: boolean; nodeName?: string }
   sources: Record<string, unknown>
 }

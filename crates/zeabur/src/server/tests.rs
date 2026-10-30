@@ -128,6 +128,7 @@ impl Rig {
             connect,
             flow_key: FlowKey::random().unwrap(),
             clock,
+            active: Arc::new(crate::telemetry::Daily::new(false)),
         });
         Self {
             issuer,

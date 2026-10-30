@@ -25,8 +25,10 @@ use zeabur_installer_plan::plan::{
 };
 use zeabur_installer_plan::remove::Removal;
 use zeabur_installer_plan::select::PERSONAL_PROFILE;
+use zeabur_telemetry::Step;
 
 use crate::apply::STATE_CONFIGMAP;
+use crate::telemetry::{self, Reporter};
 use crate::{InstallError, doctor, load, out, remove, render};
 
 /// The plan, with the removals read from the cluster when it runs.
@@ -103,17 +105,32 @@ fn kubectl() -> Kubectl {
     Kubectl::new(KUBECTL, ADMIN_KUBECONFIG)
 }
 
-pub(crate) fn apply(config: &PersonalConfig) -> Result<(), InstallError> {
+pub(crate) fn apply(
+    config: &PersonalConfig,
+    config_path: &Path,
+    no_telemetry: bool,
+) -> Result<(), InstallError> {
+    let report = Reporter::start(
+        config.telemetry && !no_telemetry,
+        config_path,
+        telemetry::personal(),
+    );
+    report.end(install(config, &report))
+}
+
+fn install(config: &PersonalConfig, report: &Reporter) -> Result<(), InstallError> {
     let mut plan = make_plan(config)?;
     let running = systemd::is_active(UNIT);
     out::line(render::personal_plan(&plan).trim_end());
     remove::check(&plan.removals)?;
+    report.at(Step::Preflight);
     if show_checks(config) {
         return Err(InstallError::Message(
             "the host is not ready; fix what failed and run apply again".to_owned(),
         ));
     }
 
+    report.at(Step::Cluster);
     install_kubesolo(&plan)?;
     let kubectl = kubectl();
     kubectl.wait_ready(Duration::from_mins(10))?;
@@ -144,6 +161,7 @@ pub(crate) fn apply(config: &PersonalConfig) -> Result<(), InstallError> {
     }
     remove::run(&kubectl, &plan.removals)?;
 
+    report.at(Step::ClusterSetup);
     out::step("Namespaces");
     for namespace in &plan.namespaces {
         kubectl.apply_as(
@@ -151,6 +169,7 @@ pub(crate) fn apply(config: &PersonalConfig) -> Result<(), InstallError> {
             plan::namespace_object(namespace).to_string().as_bytes(),
         )?;
     }
+    report.at(Step::Components);
     for component in &plan.components {
         out::step(&format!("{} ({})", component.display_name, component.id));
         crate::apply::secrets(&kubectl, component)?;
@@ -181,6 +200,7 @@ pub(crate) fn apply(config: &PersonalConfig) -> Result<(), InstallError> {
             wrong.join("\n  ")
         )));
     }
+    report.at(Step::Record);
     record(&kubectl, &plan)?;
     let name = plan.facts.hostname.to_ascii_lowercase();
     write_kubeconfig(&name)?;

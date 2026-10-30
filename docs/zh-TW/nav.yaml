@@ -57,6 +57,7 @@
     architecture: 架構
     releases: 發行檔與驗證
     security: 安全性
+    telemetry: 體驗計畫
 - group: leave
   label: 移除 Zeabur
   pages:

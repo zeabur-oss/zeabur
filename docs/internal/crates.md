@@ -49,6 +49,7 @@ Arrows point from a crate to what it may depend on (transitive edges omitted).
 | 1 | [`zeabur-core`](../../crates/zeabur-core) | error categories, request guards, cryptography |
 | 0 | [`zeabur-model`](../../crates/zeabur-model) | the projected view clients see (projects, services, endpoints, routes, sources), the names and quantities shared with Kubernetes (`kernel`), conventions of Helm, Argo CD, Flux, operators and Gateway API (`adapters`) |
 | 0 | [`zeabur-embed`](../../crates/zeabur-embed) | **build-dependency**: reading a built interface's `manifest.tsv` into the table `zeabur-ui` and `zeabur-installer` embed |
+| 0 | [`zeabur-telemetry`](../../crates/zeabur-telemetry) | the usage data Zeabur and the installer may send (types with no free text) and the one sender |
 | 1 | [`zeabur-ui`](../../crates/zeabur-ui) | embedding and serving the web interface; with its `interface` feature off, only the serving (the installer's page) |
 | 2 | [`zeabur-kube`](../../crates/zeabur-kube) | how a request reaches kube-apiserver, always as the person |
 | 2 | [`zeabur-auth`](../../crates/zeabur-auth) | signing in through Zeabur Identity (OAuth client), sessions, cross-site checks |

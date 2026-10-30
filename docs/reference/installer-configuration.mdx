@@ -35,6 +35,7 @@ host:
 | `disable` | `[]` | Capabilities or full component IDs to take out of the default components |
 | `allowDataLoss` | `[]` | Component IDs whose removal you're allowing to delete their data, such as `replicated-storage/longhorn` |
 | `zeabur` | `true` | Install Zeabur Identity and Zeabur. `false` installs only K3s/RKE2 and the selected components |
+| `telemetry` | `true` | Join the [experience program](./telemetry.mdx). `--no-telemetry` and `DO_NOT_TRACK=1` turn it off for a run |
 | `inputs` | `{}` | Non-secret input values grouped by component ID |
 | `secretFiles` | `{}` | Secret file paths grouped by component ID |
 | `k3sVersion`, `rke2Version` | Versions pinned by the installer | Override the K3s or RKE2 version |
