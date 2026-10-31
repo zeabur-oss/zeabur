@@ -24,18 +24,32 @@ async function hold(page: Page, match: (url: URL) => boolean) {
   return release
 }
 
-// Home has read the project itself; its namespace is read when the page opens, and the page waits
-// for it.
-const projectNamespace = (url: URL) => url.pathname === `/api/v1/projects/${namespace}/namespace`
+// The project page waits for its events, which Home never reads. Home can already hold the
+// project and its namespace: a problem row reads the namespace to offer its logs.
+const projectEvents = (url: URL) => url.pathname === `/api/v1/projects/${namespace}/events`
 const planChunk = (url: URL) => /\/assets\/plan-dialog-[^/]*\.js$/.test(url.pathname)
 
+// The router swaps the old page for the route's skeleton after its pending delay (1 s), so what
+// stood under the bar is read when the bar appears, not by a later assertion.
 async function navigateWhileHeld(page: Page) {
   await page.goto("/")
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible()
-  const release = await hold(page, projectNamespace)
+  const release = await hold(page, projectEvents)
+  await page.evaluate(() => {
+    const w = window as unknown as { underBar?: string | null }
+    const observer = new MutationObserver(() => {
+      if (!document.querySelector('[role="progressbar"]')) return
+      w.underBar = document.querySelector("main h1")?.textContent ?? null
+      observer.disconnect()
+    })
+    observer.observe(document.body, { childList: true, subtree: true })
+  })
   await page.getByRole("link", { name: namespace }).first().click()
   return release
 }
+
+const underBar = (page: Page) =>
+  page.evaluate(() => (window as unknown as { underBar?: string | null }).underBar)
 
 async function saveWhileHeld(page: Page) {
   const release = await hold(page, planChunk)
@@ -52,7 +66,7 @@ test("a navigation shows progress before the page's data arrives, and keeps the 
 }) => {
   const release = await navigateWhileHeld(page)
   await expect(page.getByRole("progressbar", { name: "Opening the page…" })).toBeVisible()
-  await expect(page.getByRole("region", { name: "What needs you" })).toBeVisible()
+  expect(await underBar(page)).toBe("Home")
   release()
   await expect(page).toHaveURL((url) => url.pathname.startsWith(project))
   await expect(page.getByRole("progressbar")).toHaveCount(0)
