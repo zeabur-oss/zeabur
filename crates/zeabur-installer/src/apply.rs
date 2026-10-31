@@ -186,14 +186,23 @@ pub(crate) fn make_plan(index: &Index, config: &Config) -> Result<Plan, InstallE
         facts.record = read_record(&kubectl)?;
     }
     let mut plan = plan::plan(index, config, &facts)?;
-    let authn = config.distribution.layout().authn_file;
-    if let Some(changes) = &mut plan.changes {
-        let mut files = changed_files(plan.host_files.iter().filter(|f| f.path != authn));
-        files.extend(changed_archives(
-            Path::new(config.distribution.layout().images_dir),
-            &config.sources.image_archives,
-        )?);
-        changes.set_host_files(files);
+    if plan.changes.is_some() {
+        let mut pending = pending(&ClusterInstall {
+            cluster: &plan.cluster,
+            calico: plan.calico.as_ref(),
+            files: &plan.host_files,
+            image_archives: &config.sources.image_archives,
+            server: true,
+            changed: false,
+        })?;
+        if let Some(changes) = &mut plan.changes {
+            // A new release is shown as such, not as its binary.
+            if changes.version.is_some() {
+                let binary = release_binary(config.distribution).display().to_string();
+                pending.retain(|path| *path != binary);
+            }
+            changes.set_host_files(pending);
+        }
     }
     plan.removals = remove::plan(
         running.then_some(&kubectl),
@@ -340,20 +349,37 @@ pub(crate) fn prepare_node(prep: Option<&NodePrep>) -> Result<(), InstallError> 
     }
 }
 
-/// Installs the release when another version or no unit is there. Returns whether it did.
-fn install_release(cluster: &ClusterPlan, server: bool, unit: &str) -> Result<bool, InstallError> {
-    let distribution = cluster.distribution;
-    let binary = match distribution {
+/// The binary of K3s or RKE2.
+fn release_binary(distribution: Distribution) -> PathBuf {
+    match distribution {
         Distribution::K3s => PathBuf::from(k3s::BINARY),
         Distribution::Rke2 => Path::new(PREFIX).join("bin/rke2"),
-    };
+    }
+}
+
+/// What `install_release` would install: the binary when it is not the planned release, or the
+/// K3s unit when it is missing.
+fn release_pending(cluster: &ClusterPlan, unit: &str) -> Option<String> {
+    let binary = release_binary(cluster.distribution);
     let installed = cmd::run(&binary, &["--version"], None).unwrap_or_default();
     // `install.sh` writes the K3s unit; RKE2's comes in its tarball.
-    let no_unit = distribution == Distribution::K3s
-        && !Path::new(&format!("/etc/systemd/system/{unit}.service")).exists();
-    if installed.contains(&cluster.version) && !no_unit {
-        return Ok(false);
+    let unit_file = format!("/etc/systemd/system/{unit}.service");
+    if !installed.contains(&cluster.version) {
+        Some(binary.display().to_string())
+    } else if cluster.distribution == Distribution::K3s && !Path::new(&unit_file).exists() {
+        Some(unit_file)
+    } else {
+        None
     }
+}
+
+/// Installs the release when another version or no unit is there.
+fn install_release(cluster: &ClusterPlan, server: bool, unit: &str) -> Result<(), InstallError> {
+    if release_pending(cluster, unit).is_none() {
+        return Ok(());
+    }
+    let distribution = cluster.distribution;
+    let binary = release_binary(distribution);
     let dir = PathBuf::from(STATE_DIR)
         .join("downloads")
         .join(&cluster.version);
@@ -384,7 +410,7 @@ fn install_release(cluster: &ClusterPlan, server: bool, unit: &str) -> Result<bo
         }
     }
     systemd::daemon_reload()?;
-    Ok(true)
+    Ok(())
 }
 
 /// What `install_cluster` installs: a first server, a joining server or an agent.
@@ -400,30 +426,59 @@ pub(crate) struct ClusterInstall<'a> {
     pub(crate) changed: bool,
 }
 
-/// Installs K3s or RKE2 and starts or restarts it as needed. Returns when it did, in seconds since
-/// the Unix epoch, taken just before; a Ready condition older than that is the old kubelet's.
+impl ClusterInstall<'_> {
+    const fn unit(&self) -> &'static str {
+        if self.server {
+            self.cluster.distribution.server_unit()
+        } else {
+            self.cluster.distribution.agent_unit()
+        }
+    }
+
+    /// The host files it writes. The issuer configuration belongs to a later step, so it is
+    /// written only when there is none.
+    fn files(&self) -> impl Iterator<Item = &HostFile> {
+        let authn = self.cluster.distribution.layout().authn_file;
+        self.files
+            .iter()
+            .filter(move |f| f.path != authn || !Path::new(&f.path).exists())
+    }
+}
+
+/// The paths `install_cluster` would write; a running cluster restarts when there is one.
+pub(crate) fn pending(install: &ClusterInstall<'_>) -> Result<Vec<String>, InstallError> {
+    let layout = install.cluster.distribution.layout();
+    let mut paths = changed_files(install.files());
+    if let Some(calico) = install.calico {
+        let path = calico_path();
+        if calico_differs(&pinned_path(calico), &path)? {
+            paths.push(path.display().to_string());
+        }
+    }
+    paths.extend(release_pending(install.cluster, install.unit()));
+    paths.extend(changed_archives(
+        Path::new(layout.images_dir),
+        install.image_archives,
+    )?);
+    Ok(paths)
+}
+
+/// Installs K3s or RKE2 and starts it, or restarts it when `pending` finds a change. Returns when
+/// it did, in seconds since the Unix epoch, taken just before; a Ready condition older than that is
+/// the old kubelet's.
 pub(crate) fn install_cluster(install: &ClusterInstall<'_>) -> Result<Option<u64>, InstallError> {
     let cluster = install.cluster;
     let distribution = cluster.distribution;
     let layout = distribution.layout();
-    let unit = if install.server {
-        distribution.server_unit()
-    } else {
-        distribution.agent_unit()
-    };
+    let unit = install.unit();
     out::step(&format!(
         "{} {} ({unit})",
         distribution.title(),
         cluster.version
     ));
-    let mut changed = install.changed;
-    for file in install.files {
-        let path = Path::new(&file.path);
-        // The issuer configuration belongs to a later step; only make sure one exists.
-        if file.path == layout.authn_file && path.exists() {
-            continue;
-        }
-        changed |= files::write(path, file.mode, file.content.as_bytes())?;
+    let changed = install.changed || !pending(install)?.is_empty();
+    for file in install.files() {
+        files::write(Path::new(&file.path), file.mode, file.content.as_bytes())?;
     }
     cmd::run(
         "sysctl",
@@ -443,10 +498,10 @@ pub(crate) fn install_cluster(install: &ClusterInstall<'_>) -> Result<Option<u64
         Distribution::K3s | Distribution::Rke2 => {}
     }
     if let Some(calico) = install.calico {
-        changed |= calico_manifest(calico)?;
+        calico_manifest(calico)?;
     }
-    changed |= install_release(cluster, install.server, unit)?;
-    changed |= image_archives(Path::new(layout.images_dir), install.image_archives)?;
+    install_release(cluster, install.server, unit)?;
+    image_archives(Path::new(layout.images_dir), install.image_archives)?;
 
     let now = || {
         SystemTime::now()
@@ -494,10 +549,23 @@ fn fetch_release(cluster: &ClusterPlan, dir: &Path) -> Result<(), InstallError> 
     Ok(())
 }
 
-/// Writes Calico's manifest, set for K3s, where K3s applies it on start. Returns whether it
-/// changed.
-fn calico_manifest(calico: &Download) -> Result<bool, InstallError> {
-    let path = Path::new(k3s::MANIFESTS_DIR).join("zeabur-calico.yaml");
+/// Where K3s reads Calico's manifest, which it applies on start.
+fn calico_path() -> PathBuf {
+    Path::new(k3s::MANIFESTS_DIR).join("zeabur-calico.yaml")
+}
+
+/// Whether the manifest at `path` is not the one `calico_manifest` writes from the pinned
+/// `source`. Without the pinned copy it cannot tell, so it says it is.
+fn calico_differs(source: &Path, path: &Path) -> Result<bool, InstallError> {
+    let Ok(manifest) = fs::read_to_string(source) else {
+        return Ok(true);
+    };
+    Ok(fs::read_to_string(path).ok() != Some(k3s::calico_manifest(&manifest)?))
+}
+
+/// Writes Calico's manifest, set for K3s.
+fn calico_manifest(calico: &Download) -> Result<(), InstallError> {
+    let path = calico_path();
     let source = pinned_path(calico);
     if !source.exists() || !path.exists() {
         out::err(&format!("    {}", calico.url));
@@ -509,11 +577,8 @@ fn calico_manifest(calico: &Download) -> Result<bool, InstallError> {
         )?;
     }
     let manifest = fs::read_to_string(&source).map_err(|e| InstallError::Message(e.to_string()))?;
-    Ok(files::write(
-        &path,
-        0o600,
-        k3s::calico_manifest(&manifest)?.as_bytes(),
-    )?)
+    files::write(&path, 0o600, k3s::calico_manifest(&manifest)?.as_bytes())?;
+    Ok(())
 }
 
 /// The name prefix of the archives the installer copies into the image directory, so it can
@@ -550,13 +615,13 @@ pub(crate) fn changed_archives(
 }
 
 /// Copies `sources.imageArchives` into the image directory and removes the ones it copied that
-/// are no longer listed. Returns whether an archive was copied.
+/// are no longer listed.
 ///
 /// K3s and RKE2 import every archive there each time they start, replacing the tags it holds, so an
 /// archive left behind would bring an old image back over a newer one. With `.cache.json` in the
 /// directory it imports an archive again only when the file changes (k3s
 /// `pkg/agent/containerd/watcher.go`); a changed one is imported at once, without a restart.
-fn image_archives(dir: &Path, sources: &[String]) -> Result<bool, InstallError> {
+fn image_archives(dir: &Path, sources: &[String]) -> Result<(), InstallError> {
     let io = |path: &Path| {
         let path = path.display().to_string();
         move |e: std::io::Error| InstallError::Message(format!("{path}: {e}"))
@@ -566,7 +631,6 @@ fn image_archives(dir: &Path, sources: &[String]) -> Result<bool, InstallError> 
     if !cache.exists() {
         files::write(&cache, 0o644, b"")?;
     }
-    let mut changed = false;
     let mut names = Vec::new();
     for archive in sources {
         let source = Path::new(archive);
@@ -577,7 +641,6 @@ fn image_archives(dir: &Path, sources: &[String]) -> Result<bool, InstallError> 
             fs::copy(source, &partial).map_err(io(source))?;
             fs::rename(&partial, &dest).map_err(io(&dest))?;
             out::err(&format!("    {archive} copied to {}", dest.display()));
-            changed = true;
         }
         names.push(name);
     }
@@ -597,7 +660,7 @@ fn image_archives(dir: &Path, sources: &[String]) -> Result<bool, InstallError> 
         let path = dir.join(name);
         whole_second_mtime(&path).map_err(io(&path))?;
     }
-    Ok(changed)
+    Ok(())
 }
 
 /// Drops the fraction of a second from a file's modification time. The import cache keeps whole
@@ -1484,7 +1547,7 @@ mod tests {
             changed_archives(&images, &sources).unwrap(),
             [copy.display().to_string()]
         );
-        assert!(image_archives(&images, &sources).unwrap());
+        image_archives(&images, &sources).unwrap();
         assert_eq!(
             changed_archives(&images, &sources).unwrap(),
             Vec::<String>::new()
@@ -1492,6 +1555,32 @@ mod tests {
 
         fs::write(&source, b"two").unwrap();
         assert_eq!(changed_archives(&images, &sources).unwrap().len(), 1);
+    }
+
+    #[test]
+    fn a_missing_or_edited_calico_manifest_is_a_change() {
+        let dir = tempfile::tempdir().unwrap();
+        let source = dir.path().join("calico.yaml");
+        let path = dir.path().join("zeabur-calico.yaml");
+        assert!(calico_differs(&source, &path).unwrap());
+
+        let images: Vec<String> = zeabur_installer_plan::pins::CALICO
+            .images
+            .iter()
+            .map(|(tag, _)| format!("          image: {tag}\n"))
+            .collect();
+        let manifest = format!(
+            "{}            # - name: CALICO_IPV4POOL_CIDR\n            #   value: \"192.168.0.0/16\"\n",
+            images.concat()
+        );
+        fs::write(&source, &manifest).unwrap();
+        assert!(calico_differs(&source, &path).unwrap());
+
+        fs::write(&path, k3s::calico_manifest(&manifest).unwrap()).unwrap();
+        assert!(!calico_differs(&source, &path).unwrap());
+
+        fs::write(&path, "edited").unwrap();
+        assert!(calico_differs(&source, &path).unwrap());
     }
 
     #[test]
