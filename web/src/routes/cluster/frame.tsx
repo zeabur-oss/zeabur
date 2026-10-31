@@ -10,7 +10,7 @@ import { Tabs, TabsList, TabsTrigger } from "@zeabur/design-system/components/ta
 import { useT } from "@/i18n"
 import { Forbidden, overviewRole } from "@/routes/cluster/forbidden"
 import { useUpgradeBadge } from "@/routes/cluster/upgrade"
-import { ZeaburUpdateLine, ZeaburVersionBadges } from "@/routes/cluster/zeabur-version"
+import { ZeaburVersionBadges } from "@/routes/cluster/zeabur-version"
 import { PageHeader } from "@zeabur/design-system/components/page-header"
 import { PageColumn } from "@zeabur/design-system/components/page-column"
 
@@ -102,7 +102,6 @@ function Heading() {
           : undefined
       }
     >
-      <ZeaburUpdateLine />
       {plansRefused ? (
         <Forbidden
           what={t("cluster.whatUpgrades")}

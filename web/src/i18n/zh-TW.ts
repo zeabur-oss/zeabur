@@ -220,9 +220,9 @@ export const zhTW: Messages = {
   "home.noServices": "還沒有服務",
 
   "update.securityBadge": "安全性更新",
-  "update.out": (product, version) => `${product} ${version} 已推出。`,
-  "update.security": (product, version) => `${product} ${version} 有已知的安全性問題。`,
-  "update.fixedIn": "修正版本",
+  "update.out": (product, version) => `${product} ${version} 已推出`,
+  "update.security": (product, version) => `${product} ${version} 有已知的安全性問題`,
+  "update.fixedIn": (versions) => `已在 ${versions} 修正。`,
   "update.notes": "發行說明",
   "update.guide": "升級方式",
   "update.download": "下載",

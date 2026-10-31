@@ -224,10 +224,10 @@ export const en = {
 
   // Zeabur's own updates
   "update.securityBadge": "Security update",
-  "update.out": (product: string, version: string) => `${product} ${version} is out.`,
+  "update.out": (product: string, version: string) => `${product} ${version} is out`,
   "update.security": (product: string, version: string) =>
-    `${product} ${version} has known security problems.`,
-  "update.fixedIn": "Fixed in",
+    `${product} ${version} has known security problems`,
+  "update.fixedIn": (versions: string) => `Fixed in ${versions}.`,
   "update.notes": "Release notes",
   "update.guide": "How to upgrade",
   "update.download": "Download",

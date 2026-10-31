@@ -5,17 +5,21 @@
 import { useQuery } from "@tanstack/react-query"
 import { Link } from "@tanstack/react-router"
 import type { ReactNode } from "react"
+import ArrowSquareOutIcon from "~icons/ph/arrow-square-out"
 import CaretRightIcon from "~icons/ph/caret-right"
 
-import { isStatus, isUnreachable } from "@/api/client"
+import { isStatus, isUnreachable, type Schemas } from "@/api/client"
 import { capabilitiesQuery, nodesQuery, upgradesQuery } from "@/api/queries"
 import { StatusDot } from "@/components/status"
 import { buttonVariants } from "@zeabur/design-system/components/button"
-import { useT } from "@/i18n"
+import { useI18n, useT, type Locale } from "@/i18n"
+import { docsUrl } from "@/lib/docs"
 import { useQuantityFormat } from "@/lib/quantity"
 import { groupIssues, isProblem, nodeIssues, type IssueGroup } from "@/model/node-health"
 import { healthRank, type Health } from "@/model/service"
 import { useDate } from "@/routes/cluster/upgrade"
+import type { Newer } from "@/model/update-check"
+import { HOW, OutLink, useNewer } from "@/routes/cluster/zeabur-version"
 import {
   Collapsible,
   CollapsibleContent,
@@ -35,6 +39,8 @@ export interface ClusterItem {
   nodes: string[]
   /** It takes services down, or is about to; else it only limits what comes next. */
   problem: boolean
+  /** Home lists it although it takes nothing down, because someone has to act. */
+  lift?: boolean
 }
 
 export interface Attention {
@@ -93,6 +99,101 @@ export function useIssueText() {
   }
 }
 
+/** A newer Zeabur release: how to upgrade the way it was installed, and for a security
+ * release the versions that fix the running one. */
+type Translate = ReturnType<typeof useT>
+
+function UpdateLinks({ newer, guide }: { newer: Newer; guide: string }) {
+  const t = useT()
+  return (
+    <span className="flex flex-col items-end gap-2 sm:flex-row sm:items-center sm:gap-3">
+      {newer.security.length > 0 ? null : (
+        <OutLink href={newer.latest.url}>{t("update.notes")}</OutLink>
+      )}
+      <a
+        href={guide}
+        target="_blank"
+        rel="noreferrer"
+        className={buttonVariants({ variant: "outline", size: "sm" })}
+      >
+        {t("update.guide")}
+        <ArrowSquareOutIcon aria-hidden="true" />
+        <span className="sr-only">{t("common.newTab")}</span>
+      </a>
+    </span>
+  )
+}
+
+export function updateItem(
+  t: Translate,
+  locale: Locale,
+  zeabur: Schemas.ZeaburVersion,
+  newer: Newer,
+): ClusterItem {
+  const by = zeabur.installedBy ?? undefined
+  const local = by === "zeaburctl"
+  const product = local ? "zeaburctl" : "Zeabur"
+  const security = newer.security.length > 0
+  const guide = docsUrl(locale, local ? "reference/releases" : "get-started/upgrade")
+  return {
+    key: "zeabur-update",
+    health: security ? "fail" : "warn",
+    text: security
+      ? t("update.security", product, zeabur.version)
+      : t("update.out", product, newer.latest.version),
+    detail: t("common.sentences", [
+      security
+        ? t("update.fixedIn", newer.security.map((r) => `v${r.version}`).join(t("common.sep")))
+        : undefined,
+      by ? t(HOW[by]) : undefined,
+    ]),
+    link: <UpdateLinks newer={newer} guide={guide} />,
+    nodes: [],
+    problem: false,
+    lift: security,
+  }
+}
+
+/** Components older than the tested version, one item for all of them. */
+export function componentsBehind(
+  capabilities: { items: { installations: Schemas.Installation[] }[] } | undefined,
+  t: Translate,
+): ClusterItem | undefined {
+  const behind = (capabilities?.items.flatMap((c) => c.installations) ?? []).filter(
+    (i) => i.upgrade === "behind-major" || i.upgrade === "behind-minor",
+  )
+  if (behind.length === 0) return undefined
+  return {
+    key: "components-behind",
+    health: "warn",
+    text:
+      behind.length === 1
+        ? t(
+            "cluster.attComponent",
+            behind[0]?.displayName ?? "",
+            behind[0]?.version ?? "",
+            behind[0]?.tested ?? "",
+          )
+        : t("cluster.attComponents", behind.length),
+    detail: t("common.sentences", [t("cluster.attComponent.why"), t("cluster.attComponent.fix")]),
+    members:
+      behind.length > 1
+        ? behind.map((i) => ({
+            key: i.component,
+            label: i.displayName,
+            note: t("cluster.versionOf", i.version ?? "", i.tested ?? ""),
+          }))
+        : undefined,
+    link: (
+      <Link to="/cluster/components" className={buttonVariants({ variant: "outline", size: "sm" })}>
+        {t("settings.components")}
+      </Link>
+    ),
+    nodes: [],
+    problem: false,
+  }
+}
+
 export function useAttention(): Attention {
   const t = useT()
   const date = useDate()
@@ -104,6 +205,9 @@ export function useAttention(): Attention {
   const upgrades = upgradesRead.data
   const nodes = nodesRead.data
   const capabilities = capabilitiesRead.data
+  const { locale } = useI18n()
+  const { zeabur, newer } = useNewer()
+  const update = zeabur && newer ? updateItem(t, locale, zeabur, newer) : undefined
   const items: ClusterItem[] = []
   const minor = upgrades?.minor ?? ""
   const eol = upgrades?.release?.endOfLife
@@ -171,42 +275,9 @@ export function useAttention(): Attention {
       problem: group.issues.some(isProblem),
     })
   }
-  const behind = (capabilities?.items.flatMap((c) => c.installations) ?? []).filter(
-    (i) => i.upgrade === "behind-major" || i.upgrade === "behind-minor",
-  )
-  if (behind.length > 0)
-    items.push({
-      key: "components-behind",
-      health: "warn",
-      text:
-        behind.length === 1
-          ? t(
-              "cluster.attComponent",
-              behind[0]?.displayName ?? "",
-              behind[0]?.version ?? "",
-              behind[0]?.tested ?? "",
-            )
-          : t("cluster.attComponents", behind.length),
-      detail: t("common.sentences", [t("cluster.attComponent.why"), t("cluster.attComponent.fix")]),
-      members:
-        behind.length > 1
-          ? behind.map((i) => ({
-              key: i.component,
-              label: i.displayName,
-              note: t("cluster.versionOf", i.version ?? "", i.tested ?? ""),
-            }))
-          : undefined,
-      link: (
-        <Link
-          to="/cluster/components"
-          className={buttonVariants({ variant: "outline", size: "sm" })}
-        >
-          {t("settings.components")}
-        </Link>
-      ),
-      nodes: [],
-      problem: false,
-    })
+  const behind = componentsBehind(capabilities, t)
+  if (behind) items.push(behind)
+  if (update) items.unshift(update)
   const answered = (read: { isSuccess: boolean }) => read.isSuccess
   const reads = [upgradesRead, nodesRead, capabilitiesRead]
   return {

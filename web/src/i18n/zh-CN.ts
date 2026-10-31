@@ -221,9 +221,9 @@ export const zhCN: Messages = {
   "home.noServices": "还没有服务",
 
   "update.securityBadge": "安全更新",
-  "update.out": (product, version) => `${product} ${version} 已发布。`,
-  "update.security": (product, version) => `${product} ${version} 有已知的安全问题。`,
-  "update.fixedIn": "修复版本",
+  "update.out": (product, version) => `${product} ${version} 已发布`,
+  "update.security": (product, version) => `${product} ${version} 有已知的安全问题`,
+  "update.fixedIn": (versions) => `已在 ${versions} 修复。`,
   "update.notes": "发布说明",
   "update.guide": "升级方法",
   "update.download": "下载",
