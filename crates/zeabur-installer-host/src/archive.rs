@@ -48,22 +48,21 @@ pub fn pack_chart(dir: &Path, name: &str) -> Result<Vec<u8>, HostError> {
 /// subcharts Helm enables with `values` (the `valuesContent` the chart is installed with), unpacked
 /// or packaged as `charts/*.tgz`, in path order; empty when there are none. A subchart is left
 /// out, with its own subcharts, as Helm leaves it out [helm-deps]: by the first of its
-/// `condition` paths that holds a boolean, or else when its `tags` are all false.
+/// `condition` paths that holds a boolean, or else when its `tags` are all false, both read from
+/// the values Helm's `CoalesceValues` builds, with every subchart's defaults under its name.
 ///
 /// [helm-crds]: https://helm.sh/docs/chart_best_practices/custom_resource_definitions/
 /// [helm-deps]: https://github.com/helm/helm/blob/v4.1.4/pkg/chart/v2/util/dependencies.go
 ///
 /// # Errors
 ///
-/// When the archive, a `Chart.yaml` or a `values.yaml` cannot be read.
+/// When the archive, a `Chart.yaml` or a `values.yaml` cannot be read, or a subchart's name holds
+/// a value that is not a table, which Helm refuses too.
 pub fn chart_crds(archive: &[u8], values: &Value) -> Result<Vec<u8>, HostError> {
     let chart = read_chart(archive, "")?;
-    let tags = coalesce(values, &chart.values)
-        .get("tags")
-        .cloned()
-        .unwrap_or(Value::Null);
+    let user = values.as_object().cloned().unwrap_or_default();
     let mut files = Vec::new();
-    enabled_crds(&chart, values, &tags, &mut files);
+    collect(&chart, &user, "", &mut files)?;
     files.sort();
     files.dedup();
     Ok(files
@@ -76,7 +75,7 @@ pub fn chart_crds(archive: &[u8], values: &Value) -> Result<Vec<u8>, HostError> 
 
 struct Chart {
     name: String,
-    dependencies: Vec<Dependency>,
+    dependencies: Option<Vec<Dependency>>,
     values: Value,
     crds: Vec<(String, String)>,
     subcharts: Vec<Self>,
@@ -85,8 +84,7 @@ struct Chart {
 #[derive(Deserialize)]
 struct Metadata {
     name: String,
-    #[serde(default)]
-    dependencies: Vec<Dependency>,
+    dependencies: Option<Vec<Dependency>>,
 }
 
 #[derive(Deserialize)]
@@ -206,43 +204,94 @@ fn build_chart(files: BTreeMap<String, Vec<u8>>, path: &str) -> Result<Chart, Ho
     })
 }
 
-/// Adds the `crds/` files of `chart` and of the subcharts Helm keeps with `user` values.
-fn enabled_crds(chart: &Chart, user: &Value, tags: &Value, out: &mut Vec<(String, String)>) {
-    let values = coalesce_defaults(chart, user);
+type Map = serde_json::Map<String, Value>;
+
+/// Adds the `crds/` files of `chart` and of its subcharts Helm keeps: `processDependencyEnabled`,
+/// where `v` is the values of the whole tree and `path` leads to `chart` in them.
+fn collect(
+    chart: &Chart,
+    v: &Map,
+    path: &str,
+    out: &mut Vec<(String, String)>,
+) -> Result<(), HostError> {
+    out.extend(chart.crds.iter().cloned());
+    let Some(dependencies) = &chart.dependencies else {
+        for sub in &chart.subcharts {
+            collect_all(sub, out);
+        }
+        return Ok(());
+    };
+    let mut values = v.clone();
+    coalesce(chart, &mut values, true)?;
+    let off: Vec<&str> = dependencies
+        .iter()
+        .filter(|d| !enabled(d, &values, path))
+        .map(Dependency::key)
+        .collect();
+    for (sub, key) in subcharts(chart, true) {
+        if !off.contains(&key.as_str()) {
+            collect(sub, &values, &format!("{path}{key}."), out)?;
+        }
+    }
+    Ok(())
+}
+
+fn collect_all(chart: &Chart, out: &mut Vec<(String, String)>) {
     out.extend(chart.crds.iter().cloned());
     for sub in &chart.subcharts {
-        let mut listed = false;
-        for dependency in chart.dependencies.iter().filter(|d| d.name == sub.name) {
-            listed = true;
-            if enabled(dependency, &values, tags) {
-                let key = dependency.alias.as_deref().unwrap_or(&dependency.name);
-                enabled_crds(sub, values.get(key).unwrap_or(&Value::Null), tags, out);
-            }
-        }
-        if !listed {
-            enabled_crds(
-                sub,
-                values.get(&sub.name).unwrap_or(&Value::Null),
-                tags,
-                out,
-            );
-        }
+        collect_all(sub, out);
     }
 }
 
-/// Helm's `processDependencyTags` and then `processDependencyConditions`.
-fn enabled(dependency: &Dependency, values: &Value, tags: &Value) -> bool {
-    let set: Vec<bool> = dependency
-        .tags
+impl Dependency {
+    fn key(&self) -> &str {
+        self.alias
+            .as_deref()
+            .filter(|a| !a.is_empty())
+            .unwrap_or(&self.name)
+    }
+}
+
+/// The subcharts as Helm names them: by alias once `processDependencyEnabled` has run on `chart`
+/// (`aliased`), and by their own name before.
+fn subcharts(chart: &Chart, aliased: bool) -> Vec<(&Chart, String)> {
+    let listed = chart.dependencies.as_deref().unwrap_or_default();
+    let mut out: Vec<_> = chart
+        .subcharts
         .iter()
-        .filter_map(|t| tags.get(t).and_then(Value::as_bool))
+        .filter(|s| !aliased || !listed.iter().any(|d| d.name == s.name))
+        .map(|s| (s, s.name.clone()))
         .collect();
-    let mut on = set.contains(&true) || set.is_empty();
+    if aliased {
+        for dependency in listed {
+            if let Some(sub) = chart.subcharts.iter().find(|s| s.name == dependency.name) {
+                out.push((sub, dependency.key().to_owned()));
+            }
+        }
+    }
+    out
+}
+
+/// Helm's `processDependencyTags` and then `processDependencyConditions`.
+fn enabled(dependency: &Dependency, values: &Map, path: &str) -> bool {
+    let tags = values.get("tags").and_then(Value::as_object);
+    let (mut has_true, mut has_false) = (false, false);
+    for tag in &dependency.tags {
+        match tags.and_then(|t| t.get(tag)).and_then(Value::as_bool) {
+            Some(true) => has_true = true,
+            Some(false) => has_false = true,
+            None => {}
+        }
+    }
+    let mut on = has_true || !has_false;
     let condition = dependency.condition.as_deref().unwrap_or("").trim();
-    for path in condition.split(',').filter(|p| !p.is_empty()) {
-        let found = path
-            .split('.')
-            .try_fold(values, |v, key| v.get(key))
+    for condition in condition.split(',').filter(|c| !c.is_empty()) {
+        let path = format!("{path}{condition}");
+        let mut keys = path.split('.');
+        let found = keys
+            .next()
+            .and_then(|first| values.get(first))
+            .and_then(|first| keys.try_fold(first, |v, key| v.get(key)))
             .and_then(Value::as_bool);
         if let Some(b) = found {
             on = b;
@@ -252,57 +301,116 @@ fn enabled(dependency: &Dependency, values: &Value, tags: &Value) -> bool {
     on
 }
 
-/// The values of `chart` for `user` as Helm's `CoalesceValues` builds them before it evaluates
-/// conditions: the chart's own defaults, and under each subchart's name (its alias when
-/// `dependencies` gives one) that subchart's defaults, recursively, enabled or not.
-fn coalesce_defaults(chart: &Chart, user: &Value) -> Value {
-    let mut values = coalesce(user, &chart.values);
-    let Value::Object(map) = &mut values else {
-        return values;
-    };
-    for sub in &chart.subcharts {
-        let mut keys: Vec<&str> = chart
-            .dependencies
-            .iter()
-            .filter(|d| d.name == sub.name)
-            .map(|d| d.alias.as_deref().unwrap_or(&d.name))
-            .collect();
-        if keys.is_empty() {
-            keys.push(&sub.name);
-        }
-        for key in keys {
-            let scope = match map.get(key) {
-                None | Some(Value::Null) => Value::Object(serde_json::Map::new()),
-                Some(v @ Value::Object(_)) => v.clone(),
-                Some(_) => continue,
-            };
-            map.insert(key.to_owned(), coalesce_defaults(sub, &scope));
-        }
-    }
-    values
+fn mismatch(chart: &Chart, key: &str) -> HostError {
+    parse_error(
+        &format!("values of {}", chart.name),
+        &format!("type mismatch on {key}: not a table"),
+    )
 }
 
-/// `user` over `defaults` as Helm coalesces values: maps merge, other values replace, and `null`
-/// removes a default.
-fn coalesce(user: &Value, defaults: &Value) -> Value {
-    match (user, defaults) {
-        (Value::Object(user), Value::Object(defaults)) => {
-            let mut out = defaults.clone();
-            for (key, value) in user {
-                if value.is_null() {
-                    out.remove(key);
-                } else {
-                    let merged = out
-                        .get(key)
-                        .map_or_else(|| value.clone(), |d| coalesce(value, d));
-                    out.insert(key.clone(), merged);
+/// Helm's `coalesce`: the defaults of `chart` under `dest`, and under each subchart's key the
+/// subchart's, recursively. A chart's own subcharts are known by alias only in `aliased`.
+fn coalesce(chart: &Chart, dest: &mut Map, aliased: bool) -> Result<(), HostError> {
+    let subs = subcharts(chart, aliased);
+    coalesce_values(&chart.values, dest, |key| {
+        subs.iter().any(|(_, k)| k == key)
+    });
+    for (sub, key) in subs {
+        let mut table = match dest.remove(&key) {
+            None => Map::new(),
+            Some(Value::Object(table)) => table,
+            Some(_) => return Err(mismatch(chart, &key)),
+        };
+        coalesce_globals(&mut table, dest);
+        coalesce(sub, &mut table, false)?;
+        dest.insert(key, Value::Object(table));
+    }
+    Ok(())
+}
+
+/// Helm's `coalesceValues`: `dest` wins over the chart's `defaults`, and a `null` in `dest` removes
+/// the default's key.
+fn coalesce_values(defaults: &Value, dest: &mut Map, is_subchart: impl Fn(&str) -> bool) {
+    let Some(defaults) = defaults.as_object() else {
+        return;
+    };
+    for (key, default) in defaults {
+        match dest.get_mut(key) {
+            None => {
+                dest.insert(key.clone(), default.clone());
+            }
+            Some(Value::Null) => {
+                dest.remove(key);
+            }
+            Some(Value::Object(table)) => {
+                if let Value::Object(default) = default {
+                    coalesce_tables(table, default.clone(), is_subchart(key));
                 }
             }
-            Value::Object(out)
+            Some(_) => {}
         }
-        (Value::Null, defaults) => defaults.clone(),
-        (user, _) => user.clone(),
     }
+}
+
+/// Helm's `coalesceTablesFullKey`: `src` under `dst`. Merging, unlike coalescing, keeps a `null`.
+fn coalesce_tables(dst: &mut Map, mut src: Map, merge: bool) {
+    let originally_set: Vec<String> = src
+        .iter()
+        .filter(|(_, v)| !v.is_null())
+        .map(|(k, _)| k.clone())
+        .collect();
+    for (key, value) in dst.iter() {
+        if value.is_null() {
+            src.insert(key.clone(), Value::Null);
+        }
+    }
+    for (key, value) in src {
+        match dst.get_mut(&key) {
+            Some(Value::Null) if !merge && originally_set.contains(&key) => {
+                dst.remove(&key);
+            }
+            None => {
+                dst.insert(key, value);
+            }
+            Some(Value::Object(table)) => {
+                if let Value::Object(value) = value {
+                    coalesce_tables(table, value, merge);
+                }
+            }
+            Some(_) => {}
+        }
+    }
+}
+
+/// Helm's `coalesceGlobals`: the parent's `global` flows into the subchart's `table`, and wins
+/// over its non-table values; for tables the subchart's own entries win.
+fn coalesce_globals(table: &mut Map, parent: &Map) {
+    let own = match table.get("global") {
+        None => Map::new(),
+        Some(Value::Object(own)) => own.clone(),
+        Some(_) => return,
+    };
+    let Some(from) = (match parent.get("global") {
+        None => Some(Map::new()),
+        Some(Value::Object(from)) => Some(from.clone()),
+        Some(_) => None,
+    }) else {
+        return;
+    };
+    let mut global = own;
+    for (key, value) in from {
+        match (value, global.get(&key)) {
+            (Value::Object(mut value), Some(Value::Object(own))) => {
+                coalesce_tables(&mut value, own.clone(), true);
+                global.insert(key, Value::Object(value));
+            }
+            (Value::Object(_), Some(_)) | (_, Some(Value::Object(_))) => {}
+            (value, _) => {
+                global.insert(key, value);
+            }
+        }
+    }
+    table.insert("global".to_owned(), Value::Object(global));
 }
 
 #[cfg(test)]
@@ -336,8 +444,7 @@ mod tests {
     }
 
     fn crds(dir: &tempfile::TempDir, name: &str, values: &Value) -> String {
-        let bytes = pack_chart(dir.path(), name).unwrap();
-        String::from_utf8(chart_crds(&bytes, values).unwrap()).unwrap()
+        crds_for(dir, name, values).unwrap()
     }
 
     #[test]
@@ -444,5 +551,95 @@ mod tests {
         assert_eq!(crds(&dir, "c", &Value::Null), "kind: I\n\n---\nkind: S\n");
         let off = serde_json::json!({"sub": {"enabled": false}});
         assert_eq!(crds(&dir, "c", &off), "kind: I\n");
+    }
+
+    fn crds_for(dir: &tempfile::TempDir, name: &str, values: &Value) -> Result<String, HostError> {
+        let bytes = pack_chart(dir.path(), name)?;
+        chart_crds(&bytes, values).map(|b| String::from_utf8_lossy(&b).into_owned())
+    }
+
+    #[test]
+    fn a_parents_globals_reach_the_condition_of_a_subchart() {
+        let dir = chart(&[
+            (
+                "Chart.yaml",
+                "name: c\ndependencies:\n  - name: sub\n    condition: sub.global.enabled\n",
+            ),
+            ("values.yaml", "global:\n  enabled: true\n"),
+            ("charts/sub/Chart.yaml", "name: sub\n"),
+            ("charts/sub/values.yaml", "global:\n  enabled: false\n"),
+            ("charts/sub/crds/s.yaml", "kind: S\n"),
+        ]);
+        assert_eq!(crds(&dir, "c", &Value::Null), "kind: S\n");
+        let own = serde_json::json!({"sub": {"global": {"enabled": false}}});
+        assert_eq!(crds(&dir, "c", &own), "kind: S\n");
+        let off = serde_json::json!({"global": {"enabled": false}});
+        assert_eq!(crds(&dir, "c", &off), "");
+    }
+
+    #[test]
+    fn null_removes_a_default_and_the_next_condition_decides() {
+        let dir = chart(&[
+            (
+                "Chart.yaml",
+                "name: c\ndependencies:\n  - name: sub\n    condition: sub.enabled,sub.fallback\n",
+            ),
+            ("charts/sub/Chart.yaml", "name: sub\n"),
+            ("charts/sub/values.yaml", "enabled: false\nfallback: true\n"),
+            ("charts/sub/crds/s.yaml", "kind: S\n"),
+        ]);
+        assert_eq!(crds(&dir, "c", &Value::Null), "");
+        let removed = serde_json::json!({"sub": {"enabled": null}});
+        assert_eq!(crds(&dir, "c", &removed), "kind: S\n");
+    }
+
+    #[test]
+    fn a_subchart_name_holding_no_table_is_refused_as_helm_does() {
+        let dir = chart(&[
+            ("Chart.yaml", "name: c\ndependencies:\n  - name: sub\n"),
+            ("charts/sub/Chart.yaml", "name: sub\n"),
+        ]);
+        let null = serde_json::json!({"sub": null});
+        let error = crds_for(&dir, "c", &null).unwrap_err().to_string();
+        assert!(error.contains('c') && error.contains("sub"), "{error}");
+        let scalar = serde_json::json!({"sub": 1});
+        assert!(crds_for(&dir, "c", &scalar).is_err());
+    }
+
+    /// Helm coalesces a subchart's own subcharts under their names, not their aliases, before it
+    /// reads their conditions, so the default of an aliased sub-subchart is not seen.
+    #[test]
+    fn the_defaults_of_an_aliased_sub_subchart_are_not_seen() {
+        let dir = chart(&[
+            ("Chart.yaml", "name: c\ndependencies:\n  - name: mid\n"),
+            (
+                "charts/mid/Chart.yaml",
+                "name: mid\ndependencies:\n  - name: leaf\n    alias: x\n    condition: x.on\n",
+            ),
+            ("charts/mid/charts/leaf/Chart.yaml", "name: leaf\n"),
+            ("charts/mid/charts/leaf/values.yaml", "on: false\n"),
+            ("charts/mid/charts/leaf/crds/l.yaml", "kind: L\n"),
+        ]);
+        assert_eq!(crds(&dir, "c", &Value::Null), "kind: L\n");
+        let off = serde_json::json!({"mid": {"x": {"on": false}}});
+        assert_eq!(crds(&dir, "c", &off), "");
+    }
+
+    #[test]
+    fn an_alias_scopes_the_subchart_defaults() {
+        let dir = chart(&[
+            (
+                "Chart.yaml",
+                "name: c\ndependencies:\n  - name: sub\n    alias: extra\n    condition: extra.enabled\n",
+            ),
+            ("charts/sub/Chart.yaml", "name: sub\n"),
+            ("charts/sub/values.yaml", "enabled: false\n"),
+            ("charts/sub/crds/s.yaml", "kind: S\n"),
+        ]);
+        assert_eq!(crds(&dir, "c", &Value::Null), "");
+        let on = serde_json::json!({"extra": {"enabled": true}});
+        assert_eq!(crds(&dir, "c", &on), "kind: S\n");
+        let by_name = serde_json::json!({"sub": {"enabled": true}});
+        assert_eq!(crds(&dir, "c", &by_name), "");
     }
 }
