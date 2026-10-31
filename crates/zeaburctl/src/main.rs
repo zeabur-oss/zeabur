@@ -11,6 +11,7 @@ mod pack;
 mod server;
 mod ui;
 mod up;
+mod update;
 
 use std::process::ExitCode;
 
@@ -53,10 +54,15 @@ fn main() -> ExitCode {
     if let Err(error) = zeabur_core::secret::forbid_core_dumps() {
         output::error(&format!("core dumps stay possible: {error}"));
     }
-    match args.command {
+    let check = update::Check::start();
+    let code = match args.command {
         Command::Ui(ui_args) => ui::run(&ui_args),
         Command::Doctor(doctor_args) => doctor::run(&doctor_args),
         Command::Up(up_args) => up::run(&up_args),
         Command::Components(components_args) => components::run(&components_args),
+    };
+    if let Some(check) = check {
+        check.finish();
     }
+    code
 }

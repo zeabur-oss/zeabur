@@ -1,6 +1,6 @@
 ---
 title: Experience program
-description: What Zeabur and its installer send when you join the experience program, what they never send, and how to turn it off.
+description: What Zeabur and its installer send when you join the experience program, what they never send, how Zeabur and zeaburctl check for a newer version, and how to turn each off.
 ---
 
 The experience program sends the version and how many people use Zeabur each day, so we know how many installations are in use and what to fix first. The installer joins by default, and you can uncheck the box on its review page. With Helm, Zeabur stays out until you turn it on.
@@ -65,3 +65,23 @@ kubectl -n zeabur logs deployment/zeabur | grep telemetry
 ```
 
 `ZEABUR_TELEMETRY=off` turns it off like `DO_NOT_TRACK` does.
+
+## Update check
+
+Zeabur and `zeaburctl` tell you when a newer version is out and how to upgrade. Nothing upgrades on its own. This check is separate from the experience program and on by default.
+
+**What is checked.** Both read `https://api.github.com/repos/zeabur-oss/zeabur/releases` and leave out drafts. They leave out pre-releases too, unless you run one. If the newest of the rest is newer than yours, you see its version, a link to its release notes and how to upgrade. If any newer release that is not a pre-release has a `### Security` section in its notes, you see that your version has known security problems, with links to those releases.
+
+**Where it runs.**
+
+- The cluster page always shows `Zeabur v<version>`. Each signed-in person's browser checks once a day and keeps the answer. The Zeabur server makes no request to GitHub. The upgrade steps match how Zeabur was installed, with zeabur-installer, Helm, Argo CD or Flux. Under `zeaburctl ui`, the page shows `zeaburctl`'s own version and how to update it.
+- `zeaburctl` checks at most once every 24 hours, when any command runs. The check runs beside the command and never slows it down. If it hasn't finished when the command ends, `zeaburctl` drops it. When a newer version is out, `zeaburctl` prints one line to stderr. It keeps the time of the last check in `$XDG_CACHE_HOME/zeaburctl`. Without `XDG_CACHE_HOME`, that's `~/Library/Caches/zeaburctl` on macOS and `~/.cache/zeaburctl` elsewhere. It doesn't check when stderr isn't a terminal or when `CI` is set.
+
+**What is sent.** A plain request to GitHub with no ID, cookie or token. GitHub sees the IP address it comes from. For the cluster page, GitHub also sees your Zeabur's address in the `Origin` header. The browser doesn't send the referrer. `zeaburctl` sends `zeaburctl/<version>` as its user agent.
+
+**Turn it off.** Any one of these is enough.
+
+- In the installer, uncheck the box on the review page or set `updateCheck: false` in `/etc/zeabur-installer/config.yaml`. Running `apply` with `DO_NOT_TRACK=1` or `NO_UPDATE_NOTIFIER` set turns it off too.
+- With Helm, set `updateCheck.enabled=false`. The cluster page then only shows the version.
+- Set `DO_NOT_TRACK=1` in Zeabur's environment, or in yours for `zeaburctl`. It turns off the experience program too.
+- Set `NO_UPDATE_NOTIFIER` to any value in your environment for `zeaburctl`, including `zeaburctl ui`. It turns off only the update check.

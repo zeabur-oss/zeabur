@@ -339,6 +339,11 @@ export const zhTW: Messages = {
   "review.program.description":
     "傳送版本和每天的使用人數，讓我們知道有多少人在用、該先修哪裡。不會傳名稱、網域或 Email，也不保存 IP。之後隨時可以關閉。",
   "review.program.link": "檢視會傳送的內容",
+  "review.updateCheck": "檢查更新",
+  "review.updateCheck.label": "有新版時在 Zeabur 叢集頁提醒",
+  "review.updateCheck.description":
+    "每位登入者的瀏覽器每天會向 GitHub 取得一次 Zeabur 的發行清單，不帶任何 ID。GitHub 看得到瀏覽器的 IP 和你的 Zeabur 網址。Zeabur 不會自動升級。",
+  "review.updateCheck.link": "運作方式",
   "review.removing": "要移除的元件",
   "review.removingHint": "helm-controller 會解除安裝這些元件的 chart。留下的東西之後可以手動刪除。",
   "review.stays": (items) => `會留下：${listZh("zh-TW", items)}`,

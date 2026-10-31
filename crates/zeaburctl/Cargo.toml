@@ -19,6 +19,7 @@ zeabur-api.workspace = true
 zeabur-catalog.workspace = true
 zeabur-core.workspace = true
 zeabur-kube.workspace = true
+zeabur-telemetry.workspace = true
 zeabur-ui = { workspace = true, optional = true }
 axum.workspace = true
 bytes.workspace = true

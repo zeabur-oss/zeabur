@@ -45,3 +45,4 @@ mod trace;
 mod usage;
 mod volume_restores;
 mod writes;
+mod zeabur_version;

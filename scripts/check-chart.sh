@@ -129,7 +129,15 @@ for values in "$chart"/ci/*-values.yaml; do
   done
   # ZEABUR_MEMBER_ROLES is parsed as a bool: exactly true or false.
   expect "$name" "$out" "$container | .env[] | select(.name == \"ZEABUR_MEMBER_ROLES\") | .value | test(\"^(true|false)$\")" true
+  expect "$name" "$out" "$container | .env[] | select(.name == \"ZEABUR_UPDATE_CHECK\") | .value | test(\"^(true|false)$\")" true
 done
+
+# The update check is on unless turned off, and Zeabur knows its own Deployment's name.
+update_env='select(.kind == "Deployment" and .metadata.name == "zeabur") | .spec.template.spec.containers[0].env[] | select(.name == "ZEABUR_UPDATE_CHECK") | .value'
+expect minimal "$(render -f "$chart/ci/minimal-values.yaml")" "$update_env" true
+expect "updateCheck=false" "$(render -f "$chart/ci/minimal-values.yaml" --set updateCheck.enabled=false)" "$update_env" false
+expect minimal "$(render -f "$chart/ci/minimal-values.yaml")" \
+  'select(.kind == "Deployment" and .metadata.name == "zeabur") | .spec.template.spec.containers[0].env[] | select(.name == "ZEABUR_DEPLOYMENT") | .value' zeabur
 
 # The plan key: generated when no Secret is named, else the named one is mounted.
 out=$(render -f "$chart/ci/minimal-values.yaml")

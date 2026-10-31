@@ -339,6 +339,11 @@ export const zhCN: Messages = {
   "review.program.description":
     "发送版本和每天的使用人数，让我们知道有多少人在用、该先修哪里。不会发送名称、域名或邮箱，也不保存 IP。之后随时可以关闭。",
   "review.program.link": "查看会发送的内容",
+  "review.updateCheck": "检查更新",
+  "review.updateCheck.label": "有新版本时在 Zeabur 集群页提醒",
+  "review.updateCheck.description":
+    "每位登录者的浏览器每天会向 GitHub 获取一次 Zeabur 的发行列表，不带任何 ID。GitHub 能看到浏览器的 IP 和你的 Zeabur 网址。Zeabur 不会自动升级。",
+  "review.updateCheck.link": "工作方式",
   "review.removing": "要移除的组件",
   "review.removingHint": "helm-controller 会卸载这些组件的 chart。留下的东西之后可以手动删除。",
   "review.stays": (items) => `会保留：${listZh("zh-CN", items)}`,

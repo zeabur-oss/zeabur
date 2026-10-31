@@ -42,7 +42,10 @@ normal release. Anything that picks the newest version compares by SemVer §11, 
    the API test regenerates it), all without the `v`; `nix develop -c scripts/release.sh check
    v<version>` checks them. Rename
    `## [Unreleased]` in `CHANGELOG.md` to `## [<version>] - <date>` and add its link at the end;
-   that section becomes the release notes. The catalog commit in `flake.lock` and the
+   that section becomes the release notes. A release that fixes a vulnerability lists it under
+   a heading written exactly `### Security`. The update check in the interface and in `zeaburctl`
+   looks for that heading to tell people their version has known security problems, as
+   docs/reference/telemetry.mdx describes. The catalog commit in `flake.lock` and the
    Zeabur Identity release tag in `ZEABUR_IDENTITY_PINNED` are what the release embeds and
    installs: the catalog commit must carry a published release tag and the Identity tag must
    exist, each release with its signed checksum list, or the release stops

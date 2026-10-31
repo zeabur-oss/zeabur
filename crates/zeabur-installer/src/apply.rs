@@ -1130,7 +1130,11 @@ fn zeabur(
         }))?;
     }
 
-    helm_chart(kubectl, "zeabur", &zeabur_helm_chart(zeabur, telemetry)?)?;
+    helm_chart(
+        kubectl,
+        "zeabur",
+        &zeabur_helm_chart(zeabur, telemetry, update_check(config))?,
+    )?;
     kubectl.wait(&[
         "--namespace",
         ZEABUR_NAMESPACE,
@@ -1141,18 +1145,35 @@ fn zeabur(
     Ok(())
 }
 
-/// The `HelmChart` that installs Zeabur's chart with the planned values, and the experience
-/// program's when `telemetry` has the installation ID.
+/// `updateCheck` from the configuration, off under `DO_NOT_TRACK` or `NO_UPDATE_NOTIFIER`.
+pub(crate) fn update_check(config: &Config) -> bool {
+    update_check_in(
+        config.update_check,
+        std::env::var("DO_NOT_TRACK").ok().as_deref(),
+        std::env::var_os("NO_UPDATE_NOTIFIER").is_some(),
+    )
+}
+
+fn update_check_in(on: bool, do_not_track: Option<&str>, no_update_notifier: bool) -> bool {
+    on && !no_update_notifier && !zeabur_telemetry::do_not_track_in(do_not_track)
+}
+
+/// The `HelmChart` that installs Zeabur's chart with the planned values, the update check's
+/// switch, and the experience program's values when `telemetry` has the installation ID.
 pub(crate) fn zeabur_helm_chart(
     zeabur: &ZeaburPlan,
     telemetry: Option<&InstallationId>,
+    update_check: bool,
 ) -> Result<Value, InstallError> {
     let mut values = zeabur.values.clone();
-    if let (Some(id), Some(map)) = (telemetry, values.as_object_mut()) {
-        map.insert(
-            "telemetry".to_owned(),
-            json!({"enabled": true, "installationId": id.as_str()}),
-        );
+    if let Some(map) = values.as_object_mut() {
+        map.insert("updateCheck".to_owned(), json!({"enabled": update_check}));
+        if let Some(id) = telemetry {
+            map.insert(
+                "telemetry".to_owned(),
+                json!({"enabled": true, "installationId": id.as_str()}),
+            );
+        }
     }
     let chart = match &zeabur.chart {
         Source::Local(path) => chart_content(path)?,
@@ -1430,6 +1451,34 @@ mod tests {
         assert_eq!(encode(&[0xFB, 0xFF], Encoding::Hex), "fbff");
         assert_eq!(encode(&[0xFB, 0xFF], Encoding::Base64url), "-_8");
         assert_eq!(encode(&[0; 24], Encoding::Base64url).len(), 32);
+    }
+
+    #[test]
+    fn update_check_follows_the_config_unless_the_environment_says_no() {
+        assert!(update_check_in(true, None, false));
+        assert!(update_check_in(true, Some("0"), false));
+        assert!(!update_check_in(false, None, false));
+        assert!(!update_check_in(true, Some("1"), false));
+        assert!(!update_check_in(true, None, true));
+    }
+
+    #[test]
+    fn zeabur_helm_chart_writes_the_update_check_switch() {
+        let dir = tempfile::tempdir().unwrap();
+        let chart = dir.path().join("zeabur.tgz");
+        fs::write(&chart, b"chart").unwrap();
+        let zeabur = ZeaburPlan {
+            url: "https://zeabur.example.com".to_owned(),
+            chart: Source::Local(chart.to_string_lossy().into_owned()),
+            values: json!({"updateCheck": {"enabled": true}, "replicas": 1}),
+        };
+        for on in [true, false] {
+            let object = zeabur_helm_chart(&zeabur, None, on).unwrap();
+            let values: Value =
+                serde_json::from_str(object["spec"]["valuesContent"].as_str().unwrap()).unwrap();
+            assert_eq!(values["updateCheck"]["enabled"], on);
+            assert_eq!(values["replicas"], 1);
+        }
     }
 
     #[test]

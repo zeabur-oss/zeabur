@@ -198,6 +198,18 @@ export const recentWarningsQuery = queryOptions({
   refetchIntervalInBackground: false,
 })
 
+/** How often an open page reads the running version again, so an upgrade or a changed
+ * `updateCheck` reaches it without a reload. */
+export const ZEABUR_EVERY = 60 * 60_000
+
+export const zeaburQuery = queryOptions({
+  queryKey: ["cluster", "zeabur"],
+  queryFn: async ({ signal }) => await zeabur.getZeabur({ signal }),
+  staleTime: ZEABUR_EVERY,
+  refetchInterval: ZEABUR_EVERY,
+  retryOnMount: false,
+})
+
 export const clusterQuery = queryOptions({
   queryKey: ["cluster"],
   queryFn: async ({ signal }) => await zeabur.getCluster({ signal }),

@@ -367,6 +367,11 @@ export const en = {
   "review.program.description":
     "Sends the version and how many people use Zeabur each day, so we know how many installations are in use and what to fix first. No names, domains or emails, and IP addresses aren't kept. You can turn it off any time.",
   "review.program.link": "See what is sent",
+  "review.updateCheck": "Update check",
+  "review.updateCheck.label": "Show on Zeabur's cluster page when a newer version is out",
+  "review.updateCheck.description":
+    "Once a day, each signed-in person's browser fetches the list of Zeabur releases from GitHub, without any ID. GitHub sees the browser's IP address and your Zeabur's address. Nothing upgrades on its own.",
+  "review.updateCheck.link": "How it works",
   "review.removing": "Components to remove",
   "review.removingHint":
     "helm-controller uninstalls their charts. What stays can be deleted by hand later.",
