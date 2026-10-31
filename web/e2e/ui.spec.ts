@@ -411,8 +411,11 @@ test("a Secret's values appear only when revealed; they and the log filter stay 
   await expect(panel).toContainText(secretValue)
   await column.getByRole("link", { name: new RegExp(`^${failing}\\b`) }).click()
   await expect(page).toHaveURL(new RegExp(`/services/Deployment/${failing}\\?.*tab=variables`))
+  // The URL changes before the page does; leaving early would return to the page still shown.
+  await expect(page.getByRole("heading", { level: 1, name: failing })).toBeVisible()
   await column.getByRole("link", { name: new RegExp(`^${healthy}\\b`) }).click()
   await expect(page).toHaveURL(new RegExp(`/services/Deployment/${healthy}\\?.*tab=variables`))
+  await expect(page.getByRole("heading", { level: 1, name: healthy })).toBeVisible()
   await expect(panel).not.toContainText(secretValue)
 })
 
