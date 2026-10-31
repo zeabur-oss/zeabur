@@ -24,10 +24,13 @@
 import {
   Failure,
   absent,
+  pinDigest,
   pushChart,
   pushImage,
   readDigests,
   recorded,
+  sha256,
+  sums,
   verifyChart,
   verifyImage,
 } from "@zeabur-oss/release";
@@ -44,19 +47,19 @@ const chartDir = join(root, "deploy/chart/zeabur");
 $.cwd(root);
 
 // The images, ghcr.io/<owner>/<name>, with their label in digests.txt (none for Zeabur's), the
-// archive build leaves and the values.yaml line of their digest.
+// archive build leaves and the key path of their digest in values.yaml.
 const images = [
   {
     name: "zeabur",
     label: "",
     tar: "image.tar",
-    digest: /^( {2}digest: )""$/m,
+    values: ["image"],
   },
   {
     name: "proxy",
     label: "proxy",
     tar: "proxy-image.tar",
-    digest: /^( {4}digest: )""$/m,
+    values: ["proxy", "image"],
   },
 ];
 const builds = ["linux-amd64", "linux-arm64", "darwin-arm64"];
@@ -98,21 +101,9 @@ async function scratch(): Promise<{
   };
 }
 
-async function sha256(file: string): Promise<string> {
-  const hasher = new Bun.CryptoHasher("sha256");
-  for await (const chunk of Bun.file(file).stream()) hasher.update(chunk);
-  return hasher.digest("hex");
-}
-
-// The one digest a checksum list (`<sha256>  <file>`) has for a file.
-function listed(list: string, file: string): string {
-  const found = list
-    .split("\n")
-    .map((line) => /^([0-9a-f]{64}) [ *](.+)$/.exec(line))
-    .filter((m) => m?.[2] === file);
-  if (found.length !== 1)
-    throw new Failure(`no single digest of ${file} in its list`);
-  return found[0]![1];
+// The digest a checksum list has for a file.
+function listed(list: Map<string, string>, file: string): string {
+  return list.get(file) ?? fail(`no digest of ${file} in its list`);
 }
 
 // Every release asset and the artifact it comes from.
@@ -183,18 +174,18 @@ async function pins(version: Version): Promise<Record<string, string>> {
   };
 
   // Each catalog file this build embeds is one the catalog's release lists.
-  const catalogList = await Bun.file(
-    await signedList("catalog", catalog, "SHA256SUMS"),
-  ).text();
+  const catalogList = sums(
+    await Bun.file(await signedList("catalog", catalog, "SHA256SUMS")).text(),
+  );
   const local = env("ZEABUR_CATALOG_RELEASE");
   for (const file of await readdir(local))
     if ((await sha256(join(local, file))) !== listed(catalogList, file))
       throw new Failure(
         `${file} of ZEABUR_CATALOG_RELEASE is not the one zeabur-oss/catalog ${catalog} released`,
       );
-  const identityList = await Bun.file(
-    await signedList("identity", identity, "SHA256SUMS"),
-  ).text();
+  const identityList = sums(
+    await Bun.file(await signedList("identity", identity, "SHA256SUMS")).text(),
+  );
   const digests = await download("identity", identity, "digests.txt");
   if ((await sha256(digests)) !== listed(identityList, "digests.txt"))
     throw new Failure("digests.txt does not match SHA256SUMS");
@@ -407,10 +398,9 @@ async function publish(version: Version, artifacts: string, out: string) {
   await rm(join(out, "digests.txt"), { force: true });
   await rm(join(out, "subjects.json"), { force: true });
   const valuesFile = join(chart, "values.yaml");
-  // A text edit of each `digest: ""`, so the comments and blank lines of values.yaml stay.
   let values = await Bun.file(valuesFile).text();
   const indexes: string[] = [];
-  for (const { name, label, tar, digest } of images) {
+  for (const { name, label, tar, values: key } of images) {
     const index = await pushImage(
       out,
       label,
@@ -421,7 +411,7 @@ async function publish(version: Version, artifacts: string, out: string) {
       },
     );
     indexes.push(index.toString());
-    values = values.replace(digest, `$1"${index.digest}"`);
+    values = pinDigest(values, key, index.digest);
   }
   await Bun.write(valuesFile, values);
   // The chart runs each image pinned to its index, and no other.
