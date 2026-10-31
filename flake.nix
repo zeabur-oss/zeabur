@@ -2,10 +2,10 @@
   description = "zeabur development environment";
 
   inputs = {
-    nixpkgs.url = "https://flakehub.com/f/NixOS/nixpkgs/0.1"; # unstable Nixpkgs
+    nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
     # Rust toolchains. The locked revision sets the nightly (overlays.default).
     rust-overlay = {
-      url = "https://flakehub.com/f/oxalica/rust-overlay/0.1";
+      url = "github:oxalica/rust-overlay";
       inputs.nixpkgs.follows = "nixpkgs";
     };
     # The zh-TW wording check (scripts/check-zh-tw.sh, `nix develop .#zh`). Upstream has no
