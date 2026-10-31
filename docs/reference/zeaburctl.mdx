@@ -71,6 +71,8 @@ The JSON output has a top-level `checks` array. Each item has `name`, `status`, 
 
 When results differ, critical issues take precedence over warnings, which take precedence over checks that couldn't run. `skipped` doesn't affect the exit code. Monitoring tools need to read `checks` separately to find out which checks were skipped.
 
+On a cluster without the Zeabur dashboard, `zeaburctl doctor` skips the Zeabur Identity checks, because only the dashboard needs Zeabur Identity. A [personal installation](../get-started/personal.mdx) has no dashboard, and neither does a cluster you only open with `zeaburctl ui`. doctor looks for a Deployment labeled `app.kubernetes.io/name=zeabur` in the projects you can see. If it can't read the namespaces or a project's Deployments, it runs the checks anyway.
+
 Whether kube-apiserver trusts the Zeabur Identity issuer is defined in the control plane's `AuthenticationConfiguration` file. RBAC can't read this file, so `zeaburctl doctor` marks this check as skipped. To check it on the host, use [`zeabur-installer doctor`](./installer.mdx).
 
 ## `up`

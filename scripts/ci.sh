@@ -63,7 +63,8 @@ l2_report() {
   } >>"$GITHUB_STEP_SUMMARY"
 }
 
-# As k3d's cluster admin, without Zeabur Identity: nothing critical and every check runs; the exit code is
+# As k3d's cluster admin, with no Zeabur dashboard and no Zeabur Identity: nothing critical, the Identity
+# checks skipped; the exit code is
 # the most serious status in the JSON (crates/zeaburctl/README.md).
 check_doctor() {
   cargo build --locked -p zeaburctl --no-default-features
@@ -78,7 +79,7 @@ check_doctor() {
     and all(.checks[]; (.status | IN("ok", "warning", "critical", "skipped", "error"))
       and (.findings | type == "array") and (.fix == null or (.fix | type == "string")))
     and (status("components") | IN("ok", "warning"))
-    and status("zeabur-identity-installed") == "warning"
+    and status("zeabur-identity-installed") == "skipped"
     and status("zeabur-identity-client") == "skipped"
     and status("zeabur-identity-user") == "skipped"
   ' target/doctor.json

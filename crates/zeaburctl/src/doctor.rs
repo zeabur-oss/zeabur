@@ -9,6 +9,10 @@
 //! project endpoints and the identity from `GET /whoami`. A read the cluster refuses is skipped
 //! with the rule the API names in `denied`; it is not a failure.
 //!
+//! Only the Zeabur dashboard running in the cluster signs people in through Zeabur Identity. When
+//! the projects the person can see hold no Deployment with the chart's selector label, the Zeabur
+//! Identity checks are skipped; when that cannot be read, they run.
+//!
 //! Whether kube-apiserver trusts Zeabur Identity's issuer is in its `AuthenticationConfiguration`,
 //! a file on the control plane that no RBAC rule can read, so it is reported as not checked.
 //!
@@ -23,6 +27,7 @@
 
 use std::process::ExitCode;
 
+use futures_util::StreamExt as _;
 use serde::Serialize;
 use serde_json::Value;
 
@@ -41,6 +46,10 @@ const KUBERNETES_AUDIENCE: &str = "kubernetes";
 const ZEABUR_IDENTITY_USER_PREFIX: &str = "zeabur:";
 const ZEABUR_IDENTITY_GET_STARTED: &str =
     "https://github.com/zeabur-oss/identity/blob/main/docs/get-started.md";
+/// The chart's selector label on the Zeabur dashboard's Deployment (`deploy/chart/zeabur`).
+const ZEABUR_DASHBOARD_LABEL: &str = "app.kubernetes.io/name=zeabur";
+/// Projects read at once while looking for the Zeabur dashboard.
+const PROJECT_READS: usize = 8;
 const VERSION_SKEW_POLICY: &str = "https://kubernetes.io/releases/version-skew-policy/";
 
 /// Options of `zeaburctl doctor`.
@@ -247,12 +256,13 @@ async fn examine(api: &InProcess) -> Result<Report, Value> {
     );
     let zeabur_identity_namespace =
         format!("/api/v1/projects/{ZEABUR_IDENTITY_NAMESPACE}/namespace");
-    let (upgrades, capabilities, gaps, kinds, namespace) = tokio::join!(
+    let (upgrades, capabilities, gaps, kinds, namespace, dashboard) = tokio::join!(
         api.get("/api/v1/cluster/upgrades"),
         api.get("/api/v1/cluster/capabilities"),
         api.get("/api/v1/cluster/gaps"),
         api.get(&zeabur_identity_kinds),
         api.get(&zeabur_identity_namespace),
+        zeabur_dashboard(api),
     );
     let client_kind = kinds.as_ref().ok().and_then(|list| {
         list.get("items")?
@@ -273,19 +283,82 @@ async fn examine(api: &InProcess) -> Result<Report, Value> {
         ),
         None => None,
     };
-    let installed = zeabur_identity_installed(&kinds, &namespace);
-    let identity = zeabur_identity_user(&whoami, installed.status == Status::Ok);
-    Ok(Report {
-        checks: vec![
-            cluster_version(&upgrades),
-            components(&capabilities),
-            cluster_gaps(&gaps),
+    let mut checks = vec![
+        cluster_version(&upgrades),
+        components(&capabilities),
+        cluster_gaps(&gaps),
+    ];
+    if dashboard == Some(false) {
+        checks.extend(
+            [
+                "zeabur-identity-installed",
+                "zeabur-identity-client",
+                "zeabur-identity-user",
+                "zeabur-identity-issuer-trust",
+            ]
+            .map(without_zeabur_dashboard),
+        );
+    } else {
+        let installed = zeabur_identity_installed(&kinds, &namespace);
+        let identity = zeabur_identity_user(&whoami, installed.status == Status::Ok);
+        checks.extend([
             installed,
             zeabur_identity_client(client.as_ref()),
             identity,
             zeabur_identity_issuer_trust(),
-        ],
-    })
+        ]);
+    }
+    Ok(Report { checks })
+}
+
+/// Whether the Zeabur dashboard runs in a project the person can see; `None` when a project or
+/// its Deployments cannot be read and none of the others has it.
+async fn zeabur_dashboard(api: &InProcess) -> Option<bool> {
+    let projects = api.get("/api/v1/projects").await.ok()?;
+    let names: Vec<String> = list(&projects, "items")
+        .iter()
+        .map(|p| text(p, "name").to_owned())
+        .collect();
+    let mut reads = futures_util::stream::iter(names)
+        .map(|name| async move {
+            let answer = api
+                .get(&format!(
+                    "/api/v1/projects/{name}/objects?kinds=apps/deployments&label={ZEABUR_DASHBOARD_LABEL}"
+                ))
+                .await;
+            has_zeabur_dashboard(&answer)
+        })
+        .buffer_unordered(PROJECT_READS);
+    let mut seen = Some(false);
+    while let Some(found) = reads.next().await {
+        match found {
+            Some(true) => return Some(true),
+            None => seen = None,
+            Some(false) => {}
+        }
+    }
+    seen
+}
+
+/// A project's Deployments with the Zeabur dashboard's label, from `GET /projects/{p}/objects`.
+fn has_zeabur_dashboard(answer: &Result<Value, Value>) -> Option<bool> {
+    let objects = answer.as_ref().ok()?;
+    let deployments = list(objects, "items")
+        .iter()
+        .find(|k| text(k, "group") == "apps" && text(k, "resource") == "deployments")?;
+    (deployments.get("listed") == Some(&Value::Bool(true)))
+        .then(|| !list(deployments, "items").is_empty())
+}
+
+fn without_zeabur_dashboard(name: &'static str) -> Check {
+    let mut check = Check::new(name);
+    check.status = Status::Skipped;
+    check.findings.push(
+        "skipped: Zeabur Identity is only for the Zeabur dashboard, which no project you can see \
+         runs"
+            .to_owned(),
+    );
+    check
 }
 
 /// The version's severity and states, from `GET /cluster/upgrades`.
@@ -753,11 +826,18 @@ mod tests {
         }))
     }
 
-    /// A cluster at `version`, with Zeabur Identity installed and Zeabur registered at it, as
-    /// `zeabur:alice`.
+    /// A cluster at `version`, with the Zeabur dashboard in `zeabur`, Zeabur Identity installed
+    /// and Zeabur registered at it, as `zeabur:alice`.
     fn cluster(version: &str) -> MemoryCluster {
-        let namespace: Namespace =
-            serde_json::from_value(json!({"metadata": {"name": "zeabur-identity"}})).unwrap();
+        let namespace = |name: &str| -> Namespace {
+            serde_json::from_value(json!({"metadata": {"name": name}})).unwrap()
+        };
+        let dashboard = serde_json::from_value(json!({
+            "metadata": {"name": "zeabur", "namespace": "zeabur", "labels": {
+                "app.kubernetes.io/name": "zeabur", "app.kubernetes.io/instance": "zeabur",
+            }},
+        }))
+        .unwrap();
         let identity_resource = |resource: &str, kind: &str| {
             ServedResource::readable(ZEABUR_IDENTITY_GROUP, "v1alpha1", resource, kind, true)
         };
@@ -766,7 +846,16 @@ mod tests {
                 username: "zeabur:alice".to_owned(),
                 groups: vec!["zeabur:admins".to_owned()],
             },
-            namespaces: vec![namespace],
+            namespaces: vec![namespace("zeabur-identity"), namespace("zeabur")],
+            objects: [(
+                "zeabur".to_owned(),
+                zeabur_kube::NamespaceObjects {
+                    namespace: "zeabur".to_owned(),
+                    deployments: vec![dashboard],
+                    ..zeabur_kube::NamespaceObjects::default()
+                },
+            )]
+            .into(),
             served: vec![
                 identity_resource("oauthclients", "OAuthClient"),
                 identity_resource("users", "User"),
@@ -795,6 +884,14 @@ mod tests {
 
     fn status(report: &Report, name: &str) -> Status {
         check(report, name).status
+    }
+
+    /// Zeabur Identity's objects gone: its kinds, the `OAuthClient` and its namespace.
+    fn without_zeabur_identity(s: &mut State) {
+        s.served.clear();
+        s.dynamic.clear();
+        s.namespaces
+            .retain(|n| n.metadata.name.as_deref() != Some(ZEABUR_IDENTITY_NAMESPACE));
     }
 
     fn refuse_capabilities(cluster: &MemoryCluster) {
@@ -864,6 +961,62 @@ mod tests {
             "{components:#?}"
         );
         assert_eq!(report.exit_code(), 1);
+    }
+
+    #[tokio::test]
+    async fn a_cluster_without_the_zeabur_dashboard_skips_zeabur_identity() {
+        let cluster = cluster("v1.36.5+k3s1");
+        refuse_capabilities(&cluster);
+        cluster.update(|s| {
+            without_zeabur_identity(s);
+            s.objects.clear();
+            s.identity.username = "kubernetes-admin".to_owned();
+        });
+        let report = report(&cluster).await;
+        for name in [
+            "zeabur-identity-installed",
+            "zeabur-identity-client",
+            "zeabur-identity-user",
+            "zeabur-identity-issuer-trust",
+        ] {
+            let check = check(&report, name);
+            assert_eq!(check.status, Status::Skipped, "{name}");
+            assert_eq!(
+                check.findings,
+                [
+                    "skipped: Zeabur Identity is only for the Zeabur dashboard, which no project \
+                     you can see runs"
+                ],
+                "{name}"
+            );
+        }
+        assert_eq!(report.exit_code(), 0);
+    }
+
+    /// Whoever cannot read every project cannot tell the dashboard is absent: the checks run as
+    /// on a cluster that has it.
+    #[tokio::test]
+    async fn zeabur_identity_is_checked_when_the_zeabur_dashboard_cannot_be_looked_for() {
+        let cluster = cluster("v1.36.5+k3s1");
+        cluster.update(|s| {
+            without_zeabur_identity(s);
+            s.objects.clear();
+            s.forbidden_in_namespaces
+                .insert("deployments.apps".to_owned());
+        });
+        assert_eq!(
+            status(&report(&cluster).await, "zeabur-identity-installed"),
+            Status::Warning
+        );
+
+        cluster.update(|s| {
+            s.forbidden_in_namespaces.clear();
+            s.forbidden_namespaces.insert("zeabur".to_owned());
+        });
+        assert_eq!(
+            status(&report(&cluster).await, "zeabur-identity-installed"),
+            Status::Warning
+        );
     }
 
     #[tokio::test]
@@ -939,11 +1092,7 @@ mod tests {
     #[tokio::test]
     async fn a_missing_or_misconfigured_zeabur_identity_is_named() {
         let absent = cluster("v1.36.5+k3s1");
-        absent.update(|s| {
-            s.served.clear();
-            s.dynamic.clear();
-            s.namespaces.clear();
-        });
+        absent.update(without_zeabur_identity);
         let without = report(&absent).await;
         assert_eq!(
             status(&without, "zeabur-identity-installed"),
@@ -1024,9 +1173,7 @@ mod tests {
         let cluster = cluster("v1.36.5+k3s1");
         cluster.update(|s| {
             s.identity.username = "kubernetes-admin".to_owned();
-            s.served.clear();
-            s.dynamic.clear();
-            s.namespaces.clear();
+            without_zeabur_identity(s);
         });
         let report = report(&cluster).await;
         assert_eq!(
