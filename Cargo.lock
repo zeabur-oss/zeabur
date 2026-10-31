@@ -3073,6 +3073,7 @@ dependencies = [
  "bytes",
  "clap",
  "flate2",
+ "futures-util",
  "http",
  "http-body-util",
  "hyper-rustls",

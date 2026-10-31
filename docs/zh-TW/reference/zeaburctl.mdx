@@ -72,7 +72,7 @@ JSON 最外層是 `checks` 陣列，每一項有 `name`、`status`、`findings` 
 
 多種結果同時出現時，依嚴重問題、警告、無法執行的順序決定結束碼。`skipped` 不影響結束碼，監控程式要另外讀 `checks` 才知道哪些項目沒檢查。
 
-[自己用](../get-started/personal.mdx)的安裝沒有 Zeabur Identity，也不裝日誌、指標這類元件。`zeaburctl doctor` 從 installer 的紀錄（`use: personal`）或 KubeSolo 叢集認出這種安裝後，會跳過 Zeabur Identity 的檢查，沒裝的元件只列出來，不算警告，所以狀態正常時結束碼是 `0`。
+只有在叢集裡執行的 Zeabur 面板需要 Zeabur Identity。[自己用](../get-started/personal.mdx)的安裝不執行 Zeabur 面板，只用 `zeaburctl ui` 打開的叢集也一樣。你看得到的專案裡都沒有帶 `app.kubernetes.io/name=zeabur` label 的 Deployment 時，`zeaburctl doctor` 會跳過 Zeabur Identity 的檢查。讀不到 Namespace 或某個專案的 Deployment 時，無法判斷，所以照樣檢查。
 
 kube-apiserver 是否信任 Zeabur Identity 的 issuer，寫在控制平面的 `AuthenticationConfiguration` 檔案裡，RBAC 讀不到，所以這一項會標示未檢查。要在主機上檢查，用 [`zeabur-installer doctor`](./installer.mdx)。
 
