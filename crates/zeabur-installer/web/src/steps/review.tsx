@@ -452,7 +452,8 @@ function ChangesPanel({
                   <span key={`${c.component}/${c.release}`}>
                     {name(c.component)}
                     <span className="ml-2 font-mono text-xs text-secondary">
-                      {c.release} {c.from} → {c.to}
+                      {c.release} {c.from === c.to ? c.to : `${c.from} → ${c.to}`}
+                      {c.values ? ` · ${t("review.changes.values")}` : ""}
                     </span>
                   </span>
                 ))}
