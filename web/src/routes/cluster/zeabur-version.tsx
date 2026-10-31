@@ -6,14 +6,14 @@ import { zeaburQuery } from "@/api/queries"
 import { StatusPill } from "@/components/status"
 import { useT } from "@/i18n"
 import { load, save } from "@/lib/stores"
-import { findNewer, updateCheckQuery, type Newer } from "@/model/update-check"
+import { newerFor, updateCheckQuery, type Newer } from "@/model/update-check"
 
 export function useNewer(): { zeabur?: Schemas.ZeaburVersion; newer?: Newer } {
   const zeabur = useQuery(zeaburQuery).data
   const checked = useQuery(
     updateCheckQuery((url, init) => fetch(url, init), { load, save }, zeabur?.updateCheck === true),
   ).data
-  return { zeabur, newer: zeabur && checked ? findNewer(checked, zeabur.version) : undefined }
+  return { zeabur, newer: newerFor(zeabur, checked) }
 }
 
 /** "Zeabur v0.1.1", and a pill when a newer release is out. */

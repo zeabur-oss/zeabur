@@ -107,6 +107,14 @@ export function findNewer(releases: Release[], running: string): Newer | undefin
   return { latest, security: newer.filter((r) => r.security && !r.prerelease) }
 }
 
+/** `findNewer` for a cluster that has update checking on; cached releases say nothing once it is off. */
+export function newerFor(
+  zeabur: { version: string; updateCheck: boolean } | undefined,
+  checked: Release[] | undefined,
+): Newer | undefined {
+  return zeabur?.updateCheck && checked ? findNewer(checked, zeabur.version) : undefined
+}
+
 function due(cached: Cached | undefined, now: number): boolean {
   return !cached || now < cached.checkedAt || now - cached.checkedAt >= CHECK_EVERY
 }

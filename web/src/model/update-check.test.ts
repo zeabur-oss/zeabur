@@ -5,6 +5,7 @@ import {
   RELEASES_URL,
   compareVersions,
   findNewer,
+  newerFor,
   publishedReleases,
   parseVersion,
   releases,
@@ -97,6 +98,14 @@ describe("finding a newer release", () => {
     ])
     expect(findNewer(list, "0.1.0")?.security.map((r) => r.version)).toEqual(["0.2.0"])
     expect(findNewer(list, "0.2.0")?.security).toEqual([])
+  })
+})
+
+describe("a cluster that opts out of update checks", () => {
+  test("hears of nothing from releases cached before it opted out", () => {
+    const list = publishedReleases([github("v0.2.0")])
+    expect(newerFor({ version: "0.1.0", updateCheck: true }, list)?.latest.version).toBe("0.2.0")
+    expect(newerFor({ version: "0.1.0", updateCheck: false }, list)).toBeUndefined()
   })
 })
 
