@@ -19,9 +19,9 @@
     # catalog's `release` output builds there, and a release build checks that bundle against the
     # signed release at that commit (scripts/release.ts).
     catalog.url = "github:zeabur-oss/catalog";
-    # Bun's own release binaries; Nixpkgs is behind, and bun fmt and bun check are newer.
-    nix-bun = {
-      url = "github:zeabur-oss/nix-bun";
+    # The base shell of every zeabur-oss repository: Bun, the release tools and the shared linters.
+    oss = {
+      url = "github:zeabur-oss/.github";
       inputs.nixpkgs.follows = "nixpkgs";
     };
     # mdx2vast, which Vale needs for .mdx files (.vale.ini, the zeabur-writing skill's style).
@@ -50,7 +50,6 @@
               inherit system;
               overlays = [
                 inputs.rust-overlay.overlays.default
-                inputs.nix-bun.overlays.default
                 inputs.self.overlays.default
               ];
             };
@@ -81,6 +80,7 @@
         { pkgs, system }:
         {
           default = pkgs.mkShell {
+            inputsFrom = [ inputs.oss.devShells.${system}.base ];
             packages = with pkgs; [
               rustToolchain
 
@@ -93,15 +93,11 @@
               cargo-mutants
               # Zeabur Proxy's parser fuzz target (crates/zeabur-proxy/fuzz)
               cargo-fuzz
-              jq
-              shellcheck
-              actionlint
               # Docs and interface strings (.vale.ini)
               vale
               inputs.oss-skills.packages.${system}.mdx2vast
 
-              # Web interface (web/: dependencies come from bun.lock) and scripts/release.ts
-              bun
+              # Web interface (web/: dependencies come from bun.lock)
               brotli
               # Documentation screenshots (scripts/docs-shots.sh)
               libavif
@@ -112,16 +108,8 @@
 
               # The Helm chart (deploy/chart/zeabur, scripts/check-chart.sh) and the in-cluster
               # development cluster (scripts/dev-cluster.sh: a CA and certificates for its host names)
-              kubernetes-helm
               yq-go
               openssl
-
-              # Releases: scripts/release.ts and @zeabur-oss/release (package.json) call these
-              crane
-              cosign
-              gh
-
-              self.formatter.${system}
             ];
 
             env = {
@@ -164,10 +152,8 @@
           # Only for the zh-TW wording check: zhtw-mcp builds from source, so it stays out of the
           # default shell that every other CI job enters.
           zh = pkgs.mkShell {
-            packages = [
-              pkgs.bun
-              inputs.zhtw-mcp.packages.${system}.zhtw-mcp
-            ];
+            inputsFrom = [ inputs.oss.devShells.${system}.base ];
+            packages = [ inputs.zhtw-mcp.packages.${system}.zhtw-mcp ];
           };
         }
       );

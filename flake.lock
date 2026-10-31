@@ -61,6 +61,7 @@
     "nix-bun": {
       "inputs": {
         "nixpkgs": [
+          "oss",
           "nixpkgs"
         ]
       },
@@ -110,6 +111,27 @@
         "type": "github"
       }
     },
+    "oss": {
+      "inputs": {
+        "nix-bun": "nix-bun",
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1793473979,
+        "narHash": "sha256-VDgEferySOE2eYq0bo3bbAKZGJu6lo+vB08fk9g0c2M=",
+        "owner": "zeabur-oss",
+        "repo": ".github",
+        "rev": "bc2fba94d807c947f554f3b75be5623d86473067",
+        "type": "github"
+      },
+      "original": {
+        "owner": "zeabur-oss",
+        "repo": ".github",
+        "type": "github"
+      }
+    },
     "oss-skills": {
       "inputs": {
         "nixpkgs": [
@@ -133,8 +155,8 @@
     "root": {
       "inputs": {
         "catalog": "catalog",
-        "nix-bun": "nix-bun",
         "nixpkgs": "nixpkgs_2",
+        "oss": "oss",
         "oss-skills": "oss-skills",
         "rust-overlay": "rust-overlay",
         "zhtw-mcp": "zhtw-mcp"
