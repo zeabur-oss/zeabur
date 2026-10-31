@@ -34,7 +34,7 @@ pub enum PlanError {
     #[error("`{0}` is not a capability or component in this catalog")]
     Unknown(String),
     /// `enable` names a component id the catalog renamed.
-    #[error("`{old}` is called `{new}` in this catalog; write `{new}` in `enable`")]
+    #[error("`{old}` is now `{new}` in this catalog. Write `{new}` in `enable` instead")]
     Renamed {
         /// The id in the configuration.
         old: String,
@@ -43,8 +43,9 @@ pub enum PlanError {
     },
     /// The install record was written by a newer installer.
     #[error(
-        "this server was installed with zeabur-installer {recorded}, and this one is {own}; use \
-         zeabur-installer {recorded} or newer (https://github.com/zeabur-oss/zeabur/releases)"
+        "this server was installed with zeabur-installer {recorded}, which is newer than this one \
+         ({own}). Use zeabur-installer {recorded} or newer: \
+         https://github.com/zeabur-oss/zeabur/releases"
     )]
     NewerInstaller {
         /// The recorded version.

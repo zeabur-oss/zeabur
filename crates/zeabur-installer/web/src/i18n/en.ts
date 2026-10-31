@@ -369,22 +369,22 @@ export const en = {
   "review.program.link": "See what is sent",
   "review.changes": "Changes to this server",
   "review.changes.recorded": (version: string) => `Last installed with zeabur-installer ${version}`,
-  "review.changes.none": "Nothing changes: the server already matches this configuration.",
+  "review.changes.none": "Nothing changes. The server already matches this configuration.",
   "review.changes.version": (title: string, from: string, to: string) => `${title} ${from} → ${to}`,
   "review.changes.restart": (title: string) =>
-    `${title} restarts. The Kubernetes API stops answering for about 10 seconds; apps keep running.`,
+    `${title} restarts. The Kubernetes API stops answering for about 10 seconds. Apps keep running.`,
   "review.changes.added": "Added",
   "review.changes.removed": "Removed",
   "review.changes.kept": "No longer updated",
-  "review.changes.keptHint": "Apply doesn't remove these. What they installed keeps running.",
+  "review.changes.keptHint": "These stay installed. What they set up keeps running.",
   "review.changes.replaced": "Replaced",
   "review.changes.replaced.container-registry/zot":
-    "zot is replaced by Zeabur Builder, which runs zot itself. Zeabur Builder deletes images under <project>/<name> paths that no build made, so images you pushed to zot yourself can disappear. To keep all of them, add builds/zeabur-builder to disable in the configuration file.",
+    "Zeabur Builder takes over zot. It deletes images under <project>/<name> paths that no build made, so images you pushed to zot yourself can disappear. To keep every image, uncheck Zeabur Builder on the Components step.",
   "review.changes.replacedNote": (from: string, to: string) =>
-    `${from} is replaced by ${to}, which keeps the same release.`,
+    `${to} replaces ${from} and takes over what it installed.`,
   "review.changes.charts": "Chart updates",
   "review.changes.offered": "New in this catalog",
-  "review.changes.offeredHint": "Not installed unless you choose it.",
+  "review.changes.offeredHint": "Installed only if you check it.",
   "review.removing": "Components to remove",
   "review.removingHint":
     "helm-controller uninstalls their charts. What stays can be deleted by hand later.",
@@ -452,7 +452,7 @@ export const en = {
   "warning.join.token.unpinned": () =>
     "The token has no CA hash (K10<hash>::…), so this VM trusts whichever server answers at that address. Use the token exactly as node add printed it.",
   "warning.config.renamed": (old: string, id: string) =>
-    `${old} is now called ${id} in this catalog, so ${id} is left out. Use ${id} in the configuration file instead.`,
+    `${old} is now ${id} in this catalog, so ${id} is not installed. Write ${id} in the configuration file instead.`,
   "warning.join.server.unreachable": (server: string) =>
     `Cannot connect to ${server}. Check the address and that TCP 9345 is open from this VM.`,
 

@@ -151,8 +151,8 @@ pub(crate) fn changes(changes: Option<&Changes>, unit: &str) -> String {
         push(
             &mut s,
             &format!(
-                "  restarts {unit}: the Kubernetes API stops answering for about 10 seconds; \
-                 running apps keep serving"
+                "  restarts {unit}. The Kubernetes API stops answering for about 10 seconds. \
+                 Running apps keep serving."
             ),
         );
     }
@@ -165,7 +165,7 @@ pub(crate) fn changes(changes: Option<&Changes>, unit: &str) -> String {
     for id in &c.kept {
         push(
             &mut s,
-            &format!("  {id:<48} not removed; keeps running without updates"),
+            &format!("  {id:<48} not removed, no longer updated"),
         );
     }
     for r in &c.replaced {
@@ -184,7 +184,7 @@ pub(crate) fn changes(changes: Option<&Changes>, unit: &str) -> String {
     for id in &c.offered {
         push(
             &mut s,
-            &format!("  {id:<48} new default, not installed; to add it: enable: [{id}]"),
+            &format!("  {id:<48} new default, not installed. To add it: enable: [{id}]"),
         );
     }
     if s.len() == before {
@@ -198,11 +198,10 @@ pub(crate) fn changes(changes: Option<&Changes>, unit: &str) -> String {
 fn replaced_note(from: &str) -> &'static str {
     match from {
         "container-registry/zot" => {
-            "zot keeps running as part of Zeabur Builder, but Builder deletes images under \
-             <project>/<name> paths that no build made (zeabur-oss/builder#15). To keep \
-             all images, disable: [builds/zeabur-builder]"
+            "Zeabur Builder takes over zot. It deletes images under <project>/<name> paths that \
+             no build made. To keep every image: disable: [builds/zeabur-builder]"
         }
-        _ => "the new component takes over the old one's release",
+        _ => "the new component takes over what the old one installed",
     }
 }
 
@@ -587,12 +586,12 @@ mod tests {
             "databases/cloudnative-pg",
             "databases/old",
             "node-updates/system-upgrade-controller",
-            "not removed; keeps running without updates",
+            "not removed, no longer updated",
             "container-registry/zot",
             "replaced by builds/zeabur-builder",
             "deletes images under <project>/<name>",
             "chart traefik 42.1.2 -> 42.1.3",
-            "to add it: enable: [databases/other]",
+            "To add it: enable: [databases/other]",
         ] {
             assert!(text.contains(line), "{line} in\n{text}");
         }

@@ -287,8 +287,8 @@ fn current_name<'a>(index: &Index, name: &'a str, warnings: &mut Vec<Warning>) -
                 "config.renamed",
                 &[name, new],
                 format!(
-                    "disable: `{name}` is called `{new}` in this catalog; disabling `{new}`. \
-                     Use `{new}` in the configuration file instead."
+                    "disable: `{name}` is now `{new}` in this catalog, so `{new}` is not installed. \
+                     Write `{new}` in the configuration file instead."
                 ),
             ));
             new
