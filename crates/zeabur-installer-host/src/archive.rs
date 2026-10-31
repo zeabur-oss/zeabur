@@ -222,8 +222,7 @@ fn merge_maps(base: Value, next: Value) -> Value {
             }
             Value::Object(a)
         }
-        (Value::Null, next) => next,
-        (_, next @ Value::Object(_)) => next,
+        (Value::Null, next) | (_, next @ Value::Object(_)) => next,
         (base, _) => base,
     }
 }
