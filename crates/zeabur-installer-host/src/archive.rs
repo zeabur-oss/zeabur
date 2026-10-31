@@ -180,6 +180,9 @@ fn build_chart(files: BTreeMap<String, Vec<u8>>, path: &str) -> Result<Chart, Ho
         } else if rel.starts_with("crds/") && manifest(&rel) {
             crds.push((format!("{path}{rel}"), text()));
         } else if let Some(rest) = rel.strip_prefix("charts/") {
+            if rest.starts_with(['.', '_']) {
+                continue;
+            }
             match rest.split_once('/') {
                 Some((dir, inner)) => {
                     unpacked
@@ -222,8 +225,7 @@ fn merge_maps(base: Value, next: Value) -> Value {
             }
             Value::Object(a)
         }
-        (Value::Null, next) | (_, next @ Value::Object(_)) => next,
-        (base, _) => base,
+        (_, next) => next,
     }
 }
 
@@ -491,6 +493,25 @@ mod tests {
         );
         let bare = chart(&[("Chart.yaml", "name: c\n")]);
         assert_eq!(crds(&bare, "c", &Value::Null), "");
+    }
+
+    #[test]
+    fn a_later_document_overrides_scalars_and_reserved_subchart_directories_are_skipped() {
+        let dir = chart(&[
+            (
+                "Chart.yaml",
+                "name: c\ndependencies:\n  - name: sub\n    condition: sub.enabled\n",
+            ),
+            (
+                "values.yaml",
+                "sub:\n  enabled: false\n---\nsub:\n  enabled: true\n",
+            ),
+            ("charts/sub/Chart.yaml", "name: sub\n"),
+            ("charts/sub/crds/s.yaml", "kind: S\n"),
+            ("charts/.cache/info.yaml", "note: auxiliary\n"),
+            ("charts/_tmp/info.yaml", "note: auxiliary\n"),
+        ]);
+        assert_eq!(crds(&dir, "c", &Value::Null), "kind: S\n");
     }
 
     #[test]
