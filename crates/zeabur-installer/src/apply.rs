@@ -839,8 +839,15 @@ pub(crate) fn releases(kubectl: &Kubectl, component: &ComponentPlan) -> Result<(
             } => match digest {
                 Some(digest) => {
                     let (object, archive) = checked_chart(object, digest)?;
-                    // Helm never updates a chart's `crds/` after the first install.
-                    let crds = archive::chart_crds(&archive)?;
+                    // Helm installs a chart's `crds/` on the first install only.
+                    let values = object
+                        .pointer("/spec/valuesContent")
+                        .and_then(Value::as_str)
+                        .map(serde_json::from_str)
+                        .transpose()
+                        .map_err(|e| InstallError::Message(format!("{name} values: {e}")))?
+                        .unwrap_or(Value::Null);
+                    let crds = archive::chart_crds(&archive, &values)?;
                     if !crds.is_empty() {
                         kubectl.apply(&crds)?;
                     }
