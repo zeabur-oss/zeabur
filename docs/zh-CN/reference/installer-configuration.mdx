@@ -37,7 +37,7 @@ host:
 | `allowDataLoss` | `[]` | 同意移除时一并删除数据的组件 ID，例如 `replicated-storage/longhorn` |
 | `zeabur` | `true` | 安装 Zeabur Identity 与 Zeabur。`false` 只安装 K3s/RKE2 与选定组件 |
 | `telemetry` | `true` | 加入[体验计划](./telemetry.mdx)。`--no-telemetry` 和 `DO_NOT_TRACK=1` 可在该次运行时关闭 |
-| `updateCheck` | `true` | 有新版本时在集群页提醒（[检查更新](./telemetry.mdx#检查更新)）。运行 `apply` 时设置了 `DO_NOT_TRACK=1` 或 `NO_UPDATE_NOTIFIER` 就会关闭 |
+| `updateCheck` | `true` | 有新版本时在集群页提醒，做法见[检查更新](./telemetry.mdx#检查更新)。运行 `apply` 时设置了 `DO_NOT_TRACK=1` 或 `NO_UPDATE_NOTIFIER`，就会关闭 |
 | `inputs` | `{}` | 按组件 ID 分组的普通输入值 |
 | `secretFiles` | `{}` | 按组件 ID 分组的机密文件路径 |
 | `k3sVersion`、`rke2Version` | installer 固定的版本 | 覆盖 K3s 或 RKE2 的版本 |

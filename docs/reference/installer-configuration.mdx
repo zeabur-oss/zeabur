@@ -36,7 +36,7 @@ host:
 | `allowDataLoss` | `[]` | Component IDs whose removal you're allowing to delete their data, such as `replicated-storage/longhorn` |
 | `zeabur` | `true` | Install Zeabur Identity and Zeabur. `false` installs only K3s/RKE2 and the selected components |
 | `telemetry` | `true` | Join the [experience program](./telemetry.mdx). `--no-telemetry` and `DO_NOT_TRACK=1` turn it off for a run |
-| `updateCheck` | `true` | Let the cluster page say when a newer version is out ([Update check](./telemetry.mdx#update-check)). `DO_NOT_TRACK=1` or `NO_UPDATE_NOTIFIER` set when you run `apply` turns it off |
+| `updateCheck` | `true` | Show on the cluster page when a newer version is out, as [Update check](./telemetry.mdx#update-check) describes. Running `apply` with `DO_NOT_TRACK=1` or `NO_UPDATE_NOTIFIER` set turns it off |
 | `inputs` | `{}` | Non-secret input values grouped by component ID |
 | `secretFiles` | `{}` | Secret file paths grouped by component ID |
 | `k3sVersion`, `rke2Version` | Versions pinned by the installer | Override the K3s or RKE2 version |

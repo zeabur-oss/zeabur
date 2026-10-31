@@ -70,14 +70,14 @@ kubectl -n zeabur logs deployment/zeabur | grep telemetry
 
 Zeabur and `zeaburctl` tell you when a newer version is out and how to upgrade. Nothing upgrades on its own. This check is separate from the experience program and on by default.
 
-**What is checked.** Both read `https://api.github.com/repos/zeabur-oss/zeabur/releases` and leave out drafts and pre-releases. If the newest of the rest is newer than yours, you see its version, a link to its release notes and how to upgrade. If any newer release has a `### Security` section in its notes, you're told your version has known security problems, with links to those releases.
+**What is checked.** Both read `https://api.github.com/repos/zeabur-oss/zeabur/releases` and leave out drafts and pre-releases. If the newest of the rest is newer than yours, you see its version, a link to its release notes and how to upgrade. If any newer release has a `### Security` section in its notes, you see that your version has known security problems, with links to those releases.
 
 **Where it runs.**
 
-- The cluster page always shows `Zeabur v<version>`. The browser of each person signed in checks once a day and keeps the answer in that browser. The Zeabur server makes no request to GitHub. The upgrade steps follow how Zeabur was installed: zeabur-installer, Helm, Argo CD, Flux, or `zeaburctl ui`, where the version is `zeaburctl`'s own.
-- `zeaburctl` checks at most once every 24 hours, when any command runs. The check runs beside the command and never slows it down; if it hasn't finished when the command ends, it's dropped. When a newer version is out, `zeaburctl` prints one line to stderr. It keeps the time of the last check in your cache folder (`$XDG_CACHE_HOME/zeaburctl`, else `~/Library/Caches/zeaburctl` on macOS or `~/.cache/zeaburctl`). It doesn't check when stderr isn't a terminal or when `CI` is set.
+- The cluster page always shows `Zeabur v<version>`. Each signed-in person's browser checks once a day and keeps the answer. The Zeabur server makes no request to GitHub. The upgrade steps match how Zeabur was installed, with zeabur-installer, Helm, Argo CD or Flux. Under `zeaburctl ui`, the page shows `zeaburctl`'s own version and how to update it.
+- `zeaburctl` checks at most once every 24 hours, when any command runs. The check runs beside the command and never slows it down. If it hasn't finished when the command ends, `zeaburctl` drops it. When a newer version is out, `zeaburctl` prints one line to stderr. It keeps the time of the last check in `$XDG_CACHE_HOME/zeaburctl`. Without `XDG_CACHE_HOME`, that's `~/Library/Caches/zeaburctl` on macOS and `~/.cache/zeaburctl` elsewhere. It doesn't check when stderr isn't a terminal or when `CI` is set.
 
-**What is sent.** A plain request to GitHub with no ID, cookie or token. GitHub sees the IP address it comes from. For the cluster page, GitHub also sees your Zeabur's address in the `Origin` header; the referrer isn't sent. `zeaburctl` sends `zeaburctl/<version>` as its user agent.
+**What is sent.** A plain request to GitHub with no ID, cookie or token. GitHub sees the IP address it comes from. For the cluster page, GitHub also sees your Zeabur's address in the `Origin` header. The browser doesn't send the referrer. `zeaburctl` sends `zeaburctl/<version>` as its user agent.
 
 **Turn it off.** Any one of these is enough.
 
