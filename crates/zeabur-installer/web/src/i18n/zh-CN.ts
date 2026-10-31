@@ -359,6 +359,7 @@ export const zhCN: Messages = {
     "Zeabur Builder 会接管 zot，并删除 <project>/<name> 路径下不是构建产生的镜像，包括你自己推送上去的。要保留所有镜像，请在“组件”步骤取消勾选 Zeabur Builder。",
   "review.changes.replacedNote": (from, to) => `${to} 会取代 ${from}，接管原来装好的内容。`,
   "review.changes.charts": "Chart 更新",
+  "review.changes.values": "设置有变更",
   "review.changes.offered": "这版目录新增的组件",
   "review.changes.offeredHint": "勾选了才会安装。",
   "review.removing": "要移除的组件",

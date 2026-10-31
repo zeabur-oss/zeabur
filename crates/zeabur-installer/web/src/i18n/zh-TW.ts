@@ -359,6 +359,7 @@ export const zhTW: Messages = {
     "Zeabur Builder 會接手 zot，並刪除 <project>/<name> 路徑下不是建置產生的映像檔，包括你自己推上去的。要保留所有映像檔，請在「元件」步驟取消勾選 Zeabur Builder。",
   "review.changes.replacedNote": (from, to) => `${to} 會取代 ${from}，接手原本裝好的內容。`,
   "review.changes.charts": "Chart 更新",
+  "review.changes.values": "設定有變更",
   "review.changes.offered": "這版目錄新增的元件",
   "review.changes.offeredHint": "勾選才會安裝。",
   "review.removing": "要移除的元件",

@@ -388,6 +388,7 @@ export const en = {
   "review.changes.replacedNote": (from: string, to: string) =>
     `${to} replaces ${from} and takes over what it installed.`,
   "review.changes.charts": "Chart updates",
+  "review.changes.values": "values changed",
   "review.changes.offered": "New in this catalog",
   "review.changes.offeredHint": "Installed only if you check it.",
   "review.removing": "Components to remove",

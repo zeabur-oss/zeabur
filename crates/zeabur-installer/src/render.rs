@@ -173,11 +173,17 @@ pub(crate) fn changes(changes: Option<&Changes>, unit: &str) -> String {
         push(&mut s, &format!("      {}", replaced_note(&r.from)));
     }
     for chart in &c.charts {
+        let version = if chart.from == chart.to {
+            chart.to.clone()
+        } else {
+            format!("{} -> {}", chart.from, chart.to)
+        };
+        let values = if chart.values { ", values changed" } else { "" };
         push(
             &mut s,
             &format!(
-                "  {:<48} chart {} {} -> {}",
-                chart.component, chart.release, chart.from, chart.to
+                "  {:<48} chart {} {version}{values}",
+                chart.component, chart.release
             ),
         );
     }
@@ -571,6 +577,7 @@ mod tests {
                 release: "traefik".to_owned(),
                 from: "42.1.2".to_owned(),
                 to: "42.1.3".to_owned(),
+                values: false,
             }],
             offered: vec!["databases/other".to_owned()],
             version: None,

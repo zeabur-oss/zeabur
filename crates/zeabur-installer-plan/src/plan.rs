@@ -2619,6 +2619,33 @@ mod tests {
     }
 
     #[test]
+    fn a_changed_chart_value_is_reported_with_the_same_versions() {
+        let index = Index::parse(INDEX.as_bytes()).unwrap();
+        let first = plan(&index, &config(""), &facts()).unwrap();
+        let mut again = facts();
+        let mut record = recorded(&first, record::INSTALLER_VERSION, |summary| {
+            for c in summary["components"].as_array_mut().unwrap() {
+                for release in c["releases"].as_array_mut().unwrap() {
+                    if release["name"] == "traefik" {
+                        release["object"]["spec"]["valuesContent"] = json!("{}");
+                    }
+                }
+            }
+        });
+        record.version = Some(first.cluster.version);
+        again.record = Some(record);
+        let plan = plan(&index, &config(""), &again).unwrap();
+        let changes = plan.changes.unwrap();
+        let traefik = changes
+            .charts
+            .iter()
+            .find(|c| c.release == "traefik")
+            .unwrap();
+        assert_eq!(traefik.from, traefik.to);
+        assert!(traefik.values);
+    }
+
+    #[test]
     fn a_record_from_a_newer_installer_stops_the_plan() {
         let index = Index::parse(INDEX.as_bytes()).unwrap();
         let first = plan(&index, &config(""), &facts()).unwrap();

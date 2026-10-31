@@ -30,6 +30,8 @@ pub struct Record {
     pub version: Option<String>,
     /// Chart versions by component and release name.
     pub charts: BTreeMap<(String, String), String>,
+    /// The `valuesContent` of each chart by component and release name.
+    pub values: BTreeMap<(String, String), String>,
     /// The components with a `HelmChart` release, which `apply` uninstalls when they leave.
     pub helm: BTreeSet<String>,
 }
@@ -48,6 +50,7 @@ impl Record {
             .and_then(|p| serde_json::from_str(p).ok())
             .unwrap_or_default();
         let mut charts = BTreeMap::new();
+        let mut values = BTreeMap::new();
         let mut helm = BTreeSet::new();
         for component in plan
             .get("components")
@@ -74,6 +77,12 @@ impl Record {
                         .and_then(Value::as_str),
                 ) {
                     charts.insert((id.to_owned(), name.to_owned()), version.to_owned());
+                    if let Some(content) = release
+                        .pointer("/object/spec/valuesContent")
+                        .and_then(Value::as_str)
+                    {
+                        values.insert((id.to_owned(), name.to_owned()), content.to_owned());
+                    }
                 }
             }
         }
@@ -84,6 +93,7 @@ impl Record {
                 .or_else(|| text("kubesolo"))
                 .map(str::to_owned),
             charts,
+            values,
             helm,
         })
     }
@@ -128,7 +138,7 @@ pub struct Changes {
     pub kept: Vec<String>,
     /// Recorded components the catalog renamed, which the new component takes over.
     pub replaced: Vec<Replaced>,
-    /// Charts whose version changes.
+    /// Charts whose version or values change.
     pub charts: Vec<ChartChange>,
     /// Default components of this catalog that the record does not have and `enable` does not
     /// name; `apply` leaves them out.
@@ -150,7 +160,7 @@ pub struct Replaced {
     pub to: String,
 }
 
-/// A chart whose version changes.
+/// A chart whose version or values change.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ChartChange {
@@ -162,6 +172,8 @@ pub struct ChartChange {
     pub from: String,
     /// The planned version.
     pub to: String,
+    /// The values change too.
+    pub values: bool,
 }
 
 /// A release that changes.
@@ -206,16 +218,25 @@ impl Changes {
                     continue;
                 };
                 let key = (component.id.clone(), name.clone());
-                if let (Some(from), Some(to)) = (
-                    record.charts.get(&key),
-                    object.pointer("/spec/version").and_then(Value::as_str),
-                ) && from != to
-                {
+                let Some(from) = record.charts.get(&key) else {
+                    continue;
+                };
+                let Some(to) = object.pointer("/spec/version").and_then(Value::as_str) else {
+                    continue;
+                };
+                let values_changed = record.values.get(&key).is_some_and(|recorded| {
+                    object
+                        .pointer("/spec/valuesContent")
+                        .and_then(Value::as_str)
+                        .is_some_and(|planned| planned != recorded)
+                });
+                if from != to || values_changed {
                     charts.push(ChartChange {
                         component: component.id.clone(),
                         release: name.clone(),
                         from: from.clone(),
                         to: to.to_owned(),
+                        values: values_changed,
                     });
                 }
             }
@@ -341,6 +362,7 @@ mod tests {
             components: BTreeSet::new(),
             version: None,
             charts: BTreeMap::new(),
+            values: BTreeMap::new(),
             helm: BTreeSet::new(),
         };
         let error = record.check_installer().unwrap_err().to_string();
