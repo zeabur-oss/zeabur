@@ -30,6 +30,7 @@ thiserror.workspace = true
 zeabur-embed.workspace = true
 
 [dev-dependencies]
+zeabur-installer-plan = { workspace = true, features = ["testing"] }
 tempfile.workspace = true
 
 [lints]

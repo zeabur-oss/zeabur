@@ -22,11 +22,11 @@
           }
         ],
         "needs": ["ingress/traefik", "certificates/cert-manager"],
-        "personal": true,
         "personalMinMemoryMib": 1850,
         "privileged": true,
         "required": false,
-        "security": "Zeabur Builder: a ClusterRole that manages Builds, BuildRuns and Jobs in every namespace; reads Pods and Namespaces; reads, creates, updates and deletes Secrets in every namespace (the Git credentials Builds name, and the copies it puts in build namespaces), and reads the zot token signer. Runs one privileged buildkitd per building namespace in its own namespace, with a user namespace and an egress policy. An admission policy limits the Jobs and StatefulSets it can create. zot: no RBAC, a ServiceAccount without roles; serves the OCI registry API over TLS on port 5000 inside the cluster.\n"
+        "security": "Zeabur Builder: a ClusterRole that manages Builds, BuildRuns and Jobs in every namespace; reads Pods and Namespaces; reads, creates, updates and deletes Secrets in every namespace (the Git credentials Builds name, and the copies it puts in build namespaces), and reads the zot token signer. Runs one privileged buildkitd per building namespace in its own namespace, with a user namespace and an egress policy. An admission policy limits the Jobs and StatefulSets it can create. zot: no RBAC, a ServiceAccount without roles; serves the OCI registry API over TLS on port 5000 inside the cluster.\n",
+        "testedOn": ["k3s", "rke2", "kubesolo"]
       },
       {
         "capability": "certificates",
@@ -37,11 +37,11 @@
         "idleMemoryMib": 51,
         "inputs": [],
         "needs": ["ingress/traefik"],
-        "personal": true,
         "personalMinMemoryMib": null,
         "privileged": false,
         "required": true,
-        "security": "Writes Secrets in all namespaces and manages webhook CA bundles."
+        "security": "Writes Secrets in all namespaces and manages webhook CA bundles.",
+        "testedOn": ["k3s", "rke2", "kubesolo"]
       },
       {
         "capability": "config-reload",
@@ -52,11 +52,11 @@
         "idleMemoryMib": 9,
         "inputs": [],
         "needs": [],
-        "personal": false,
         "personalMinMemoryMib": null,
         "privileged": false,
         "required": false,
-        "security": "ClusterRole: reads, lists and watches every Secret and ConfigMap; reads, updates and patches Deployments, StatefulSets and DaemonSets; creates Events. Role in its namespace: lists, reads, watches, creates and updates every ConfigMap there, not only its own, and on multi-node the leader-election Lease.\n"
+        "security": "ClusterRole: reads, lists and watches every Secret and ConfigMap; reads, updates and patches Deployments, StatefulSets and DaemonSets; creates Events. Role in its namespace: lists, reads, watches, creates and updates every ConfigMap there, not only its own, and on multi-node the leader-election Lease.\n",
+        "testedOn": ["k3s", "rke2"]
       },
       {
         "capability": "databases",
@@ -67,11 +67,11 @@
         "idleMemoryMib": 31,
         "inputs": [],
         "needs": ["ingress/traefik", "certificates/cert-manager"],
-        "personal": true,
         "personalMinMemoryMib": null,
         "privileged": false,
         "required": false,
-        "security": "Manages pods, Services, Secrets and PVCs for Clusters in every namespace."
+        "security": "Manages pods, Services, Secrets and PVCs for Clusters in every namespace.",
+        "testedOn": ["k3s", "rke2", "kubesolo"]
       },
       {
         "capability": "databases",
@@ -82,11 +82,11 @@
         "idleMemoryMib": 19,
         "inputs": [],
         "needs": [],
-        "personal": true,
         "personalMinMemoryMib": null,
         "privileged": false,
         "required": false,
-        "security": "Manages pods, StatefulSets, Services and PDBs for Dragonfly objects in every namespace."
+        "security": "Manages pods, StatefulSets, Services and PDBs for Dragonfly objects in every namespace.",
+        "testedOn": ["k3s", "rke2", "kubesolo"]
       },
       {
         "capability": "databases",
@@ -97,11 +97,11 @@
         "idleMemoryMib": 37,
         "inputs": [],
         "needs": ["ingress/traefik", "certificates/cert-manager"],
-        "personal": true,
         "personalMinMemoryMib": null,
         "privileged": false,
         "required": false,
-        "security": "Manages pods, Services, Secrets, PVCs, Jobs and RBAC for MariaDB objects in every namespace."
+        "security": "Manages pods, Services, Secrets, PVCs, Jobs and RBAC for MariaDB objects in every namespace.",
+        "testedOn": ["k3s", "rke2", "kubesolo"]
       },
       {
         "capability": "databases",
@@ -112,11 +112,11 @@
         "idleMemoryMib": 20,
         "inputs": [],
         "needs": ["ingress/traefik", "certificates/cert-manager"],
-        "personal": true,
         "personalMinMemoryMib": null,
         "privileged": false,
         "required": false,
-        "security": "Manages pods, StatefulSets, Services, Secrets, PVCs, CronJobs, Jobs and Roles for MySQLClusters in every namespace, and copies certificates into them.\n"
+        "security": "Manages pods, StatefulSets, Services, Secrets, PVCs, CronJobs, Jobs and Roles for MySQLClusters in every namespace, and copies certificates into them.\n",
+        "testedOn": ["k3s", "rke2", "kubesolo"]
       },
       {
         "capability": "databases",
@@ -127,11 +127,11 @@
         "idleMemoryMib": 18,
         "inputs": [],
         "needs": [],
-        "personal": true,
         "personalMinMemoryMib": null,
         "privileged": false,
         "required": false,
-        "security": "Manages pods, Services, Secrets and PVCs for MongoDB clusters in every namespace."
+        "security": "Manages pods, Services, Secrets and PVCs for MongoDB clusters in every namespace.",
+        "testedOn": ["k3s", "rke2", "kubesolo"]
       },
       {
         "capability": "event-autoscaling",
@@ -142,11 +142,11 @@
         "idleMemoryMib": 69,
         "inputs": [],
         "needs": [],
-        "personal": false,
         "personalMinMemoryMib": null,
         "privileged": false,
         "required": false,
-        "security": "Reads scale targets and trigger secrets cluster-wide; serves the external metrics API."
+        "security": "Reads scale targets and trigger secrets cluster-wide; serves the external metrics API.",
+        "testedOn": ["k3s", "rke2"]
       },
       {
         "capability": "event-autoscaling",
@@ -157,11 +157,11 @@
         "idleMemoryMib": 34,
         "inputs": [],
         "needs": ["event-autoscaling/keda"],
-        "personal": false,
         "personalMinMemoryMib": null,
         "privileged": false,
         "required": false,
-        "security": "Reads HTTPScaledObjects, Services and EndpointSlices cluster-wide; creates ScaledObjects."
+        "security": "Reads HTTPScaledObjects, Services and EndpointSlices cluster-wide; creates ScaledObjects.",
+        "testedOn": ["k3s", "rke2"]
       },
       {
         "capability": "external-secrets",
@@ -172,11 +172,11 @@
         "idleMemoryMib": 53,
         "inputs": [],
         "needs": ["ingress/traefik", "certificates/cert-manager"],
-        "personal": false,
         "personalMinMemoryMib": null,
         "privileged": false,
         "required": false,
-        "security": "ClusterRole: reads, creates, updates and deletes Secrets in every namespace; creates ServiceAccount tokens in every namespace (for SecretStores that authenticate as a ServiceAccount); reads ConfigMaps, ServiceAccounts and its own CRDs; reads and updates Namespaces; creates Events. The webhook has no RBAC. The chart aggregates read access to its CRDs into view, and write access into edit and admin.\n"
+        "security": "ClusterRole: reads, creates, updates and deletes Secrets in every namespace; creates ServiceAccount tokens in every namespace (for SecretStores that authenticate as a ServiceAccount); reads ConfigMaps, ServiceAccounts and its own CRDs; reads and updates Namespaces; creates Events. The webhook has no RBAC. The chart aggregates read access to its CRDs into view, and write access into edit and admin.\n",
+        "testedOn": ["k3s", "rke2"]
       },
       {
         "capability": "image-updates",
@@ -187,11 +187,11 @@
         "idleMemoryMib": 15,
         "inputs": [],
         "needs": [],
-        "personal": false,
         "personalMinMemoryMib": null,
         "privileged": false,
         "required": false,
-        "security": "ClusterRole: reads, lists and watches every Secret (registry credentials of tracked workloads), Namespace and Node; reads, updates and deletes Pods, ReplicaSets, ReplicationControllers, Deployments, StatefulSets, DaemonSets, Jobs and CronJobs in every namespace.\n"
+        "security": "ClusterRole: reads, lists and watches every Secret (registry credentials of tracked workloads), Namespace and Node; reads, updates and deletes Pods, ReplicaSets, ReplicationControllers, Deployments, StatefulSets, DaemonSets, Jobs and CronJobs in every namespace.\n",
+        "testedOn": ["k3s", "rke2"]
       },
       {
         "capability": "ingress",
@@ -202,11 +202,11 @@
         "idleMemoryMib": 23,
         "inputs": [],
         "needs": [],
-        "personal": true,
         "personalMinMemoryMib": null,
         "privileged": false,
         "required": true,
-        "security": "Reads Services, Secrets and routes cluster-wide; writes route status."
+        "security": "Reads Services, Secrets and routes cluster-wide; writes route status.",
+        "testedOn": ["k3s", "rke2", "kubesolo"]
       },
       {
         "capability": "intrusion-prevention",
@@ -245,11 +245,11 @@
           }
         ],
         "needs": ["ingress/traefik"],
-        "personal": false,
         "personalMinMemoryMib": null,
         "privileged": true,
         "required": false,
-        "security": "The agent reads node log files read-only and makes no API writes."
+        "security": "The agent reads node log files read-only and makes no API writes.",
+        "testedOn": ["k3s", "rke2"]
       },
       {
         "capability": "logs",
@@ -264,11 +264,11 @@
           "certificates/cert-manager",
           "observability-operator/victoria-metrics-operator"
         ],
-        "personal": false,
         "personalMinMemoryMib": null,
         "privileged": true,
         "required": false,
-        "security": "The collector reads pod metadata and node log files."
+        "security": "The collector reads pod metadata and node log files.",
+        "testedOn": ["k3s", "rke2"]
       },
       {
         "capability": "metrics",
@@ -279,11 +279,11 @@
         "idleMemoryMib": 17,
         "inputs": [],
         "needs": [],
-        "personal": false,
         "personalMinMemoryMib": null,
         "privileged": false,
         "required": true,
-        "security": "Reads kubelet metrics; registers an aggregated API."
+        "security": "Reads kubelet metrics; registers an aggregated API.",
+        "testedOn": ["k3s", "rke2"]
       },
       {
         "capability": "metrics",
@@ -298,11 +298,11 @@
           "certificates/cert-manager",
           "observability-operator/victoria-metrics-operator"
         ],
-        "personal": false,
         "personalMinMemoryMib": null,
         "privileged": true,
         "required": false,
-        "security": "Manages VictoriaMetrics objects, scrapes pods in all namespaces, and reads builds, databases, backups and certificates in all namespaces for alerts. node-exporter reads the host's /proc and /sys on the host network.\n"
+        "security": "Manages VictoriaMetrics objects, scrapes pods in all namespaces, and reads builds, databases, backups and certificates in all namespaces for alerts. node-exporter reads the host's /proc and /sys on the host network.\n",
+        "testedOn": ["k3s", "rke2"]
       },
       {
         "capability": "node-updates",
@@ -313,11 +313,11 @@
         "idleMemoryMib": 12,
         "inputs": [],
         "needs": [],
-        "personal": false,
         "personalMinMemoryMib": null,
         "privileged": true,
         "required": false,
-        "security": "Cordons and drains nodes, and creates privileged Jobs that run Plan images on the host."
+        "security": "Cordons and drains nodes, and creates privileged Jobs that run Plan images on the host.",
+        "testedOn": ["k3s", "rke2"]
       },
       {
         "capability": "object-storage",
@@ -328,11 +328,11 @@
         "idleMemoryMib": 26,
         "inputs": [],
         "needs": ["ingress/traefik", "certificates/cert-manager"],
-        "personal": false,
         "personalMinMemoryMib": null,
         "privileged": false,
         "required": false,
-        "security": "Manages pods, StatefulSets, Services, Secrets, PVCs, Jobs and Ingresses for Seaweed objects in every namespace, and calls each cluster's admin API.\n"
+        "security": "Manages pods, StatefulSets, Services, Secrets, PVCs, Jobs and Ingresses for Seaweed objects in every namespace, and calls each cluster's admin API.\n",
+        "testedOn": ["k3s", "rke2"]
       },
       {
         "capability": "observability-operator",
@@ -343,11 +343,11 @@
         "idleMemoryMib": 20,
         "inputs": [],
         "needs": ["ingress/traefik", "certificates/cert-manager"],
-        "personal": false,
         "personalMinMemoryMib": null,
         "privileged": false,
         "required": false,
-        "security": "Manages VictoriaMetrics and VictoriaLogs objects and their workloads in all namespaces. It can read every Secret, create pods in any namespace, and create ClusterRoles and bindings, so its token equals cluster-admin.\n"
+        "security": "Manages VictoriaMetrics and VictoriaLogs objects and their workloads in all namespaces. It can read every Secret, create pods in any namespace, and create ClusterRoles and bindings, so its token equals cluster-admin.\n",
+        "testedOn": ["k3s", "rke2"]
       },
       {
         "capability": "remote-access",
@@ -377,11 +377,11 @@
           }
         ],
         "needs": [],
-        "personal": false,
         "personalMinMemoryMib": null,
         "privileged": true,
         "required": false,
-        "security": "Creates, updates and deletes Services and Ingresses (and their status) in every namespace; reads nodes and EndpointSlices; manages ValidatingAdmissionPolicies and their bindings. In its own namespace it manages Secrets, ConfigMaps, ServiceAccounts, StatefulSets, Deployments, Roles and RoleBindings. Installs eight CRDs (connectors, dnsconfigs, peerrelays, proxyclasses, proxygrouppolicies, proxygroups, recorders, tailnets) and the IngressClass tailscale.\n"
+        "security": "Creates, updates and deletes Services and Ingresses (and their status) in every namespace; reads nodes and EndpointSlices; manages ValidatingAdmissionPolicies and their bindings. In its own namespace it manages Secrets, ConfigMaps, ServiceAccounts, StatefulSets, Deployments, Roles and RoleBindings. Installs eight CRDs (connectors, dnsconfigs, peerrelays, proxyclasses, proxygrouppolicies, proxygroups, recorders, tailnets) and the IngressClass tailscale.\n",
+        "testedOn": ["k3s", "rke2"]
       },
       {
         "capability": "replicated-storage",
@@ -392,11 +392,11 @@
         "idleMemoryMib": 155,
         "inputs": [],
         "needs": [],
-        "personal": false,
         "personalMinMemoryMib": null,
         "privileged": true,
         "required": false,
-        "security": "Privileged pods on every node: they mount /dev, /proc, /boot, /etc and /var/lib/longhorn from the host, run iscsiadm and mount in the host's namespaces, and manage pods, PVs and storage classes cluster-wide. The chart binds the longhorn-support-bundle ServiceAccount to cluster-admin; only support bundle pods mount its token.\n"
+        "security": "Privileged pods on every node: they mount /dev, /proc, /boot, /etc and /var/lib/longhorn from the host, run iscsiadm and mount in the host's namespaces, and manage pods, PVs and storage classes cluster-wide. The chart binds the longhorn-support-bundle ServiceAccount to cluster-admin; only support bundle pods mount its token.\n",
+        "testedOn": ["k3s", "rke2"]
       },
       {
         "capability": "resource-recommendations",
@@ -407,11 +407,11 @@
         "idleMemoryMib": 17,
         "inputs": [],
         "needs": ["metrics/metrics-server"],
-        "personal": false,
         "personalMinMemoryMib": null,
         "privileged": false,
         "required": false,
-        "security": "Reads pods, workloads and metrics in all namespaces; writes VPA status."
+        "security": "Reads pods, workloads and metrics in all namespaces; writes VPA status.",
+        "testedOn": ["k3s", "rke2"]
       },
       {
         "capability": "runtime-security",
@@ -422,11 +422,11 @@
         "idleMemoryMib": 53,
         "inputs": [],
         "needs": [],
-        "personal": false,
         "personalMinMemoryMib": null,
         "privileged": true,
         "required": false,
-        "security": "Reads pod and node metadata to enrich alerts; falcosidekick writes PolicyReports in every namespace.\n"
+        "security": "Reads pod and node metadata to enrich alerts; falcosidekick writes PolicyReports in every namespace.\n",
+        "testedOn": ["k3s", "rke2"]
       },
       {
         "capability": "uptime-probes",
@@ -442,11 +442,11 @@
           "observability-operator/victoria-metrics-operator",
           "metrics/victoria-metrics"
         ],
-        "personal": false,
         "personalMinMemoryMib": null,
         "privileged": false,
         "required": false,
-        "security": "Has no API access and only makes outbound probes."
+        "security": "Has no API access and only makes outbound probes.",
+        "testedOn": ["k3s", "rke2"]
       },
       {
         "capability": "volume-backup",
@@ -457,11 +457,11 @@
         "idleMemoryMib": 11,
         "inputs": [],
         "needs": [],
-        "personal": false,
         "personalMinMemoryMib": null,
         "privileged": false,
         "required": false,
-        "security": "Watches K8up objects cluster-wide; backup Jobs mount PVCs in their own namespace."
+        "security": "Watches K8up objects cluster-wide; backup Jobs mount PVCs in their own namespace.",
+        "testedOn": ["k3s", "rke2"]
       },
       {
         "capability": "volume-backup",
@@ -536,11 +536,11 @@
           }
         ],
         "needs": [],
-        "personal": false,
         "personalMinMemoryMib": null,
         "privileged": false,
         "required": false,
-        "security": "Bound to cluster-admin; reads and restores every object. By default no Pod is privileged and the velero namespace needs only the baseline Pod Security level. With the file-backup input, a root node agent on every node holds the same token, mounts host paths and needs the privileged level.\n"
+        "security": "Bound to cluster-admin; reads and restores every object. By default no Pod is privileged and the velero namespace needs only the baseline Pod Security level. With the file-backup input, a root node agent on every node holds the same token, mounts host paths and needs the privileged level.\n",
+        "testedOn": ["k3s", "rke2"]
       },
       {
         "capability": "vulnerability-scanning",
@@ -551,11 +551,11 @@
         "idleMemoryMib": 125,
         "inputs": [],
         "needs": [],
-        "personal": false,
         "personalMinMemoryMib": null,
         "privileged": false,
         "required": false,
-        "security": "Reads workloads cluster-wide, runs scan Jobs and writes reports next to workloads."
+        "security": "Reads workloads cluster-wide, runs scan Jobs and writes reports next to workloads.",
+        "testedOn": ["k3s", "rke2"]
       }
     ]
   },

@@ -82,7 +82,9 @@ GUI 以 root 权限修改这台主机。让 GUI 只监听 loopback，通过 SSH 
 sudo zeabur-installer doctor
 ```
 
-在创建集群的 server 上，`doctor` 检查 K3s 或 RKE2 的 unit、API、安装记录中的组件、默认存储类、Zeabur 和 Zeabur Identity 的 Deployment、Zeabur Identity 的内部证书、节点地址、基准网络策略、存储的 Secret 是否加密，以及 `/var/lib/rancher` 是否加密。`doctor` 依据上次 `apply` 的记录进行比对；修改 YAML 后，需要重新运行 `apply` 才会生效。
+在创建集群的 server 上，`doctor` 检查 K3s 或 RKE2 的 unit、API、安装记录中的组件及其健康检查、默认存储类、Zeabur 和 Zeabur Identity 的 Deployment、Zeabur Identity 的内部证书、节点地址、基准网络策略、存储的 Secret 是否加密，以及 `/var/lib/rancher` 是否加密。`doctor` 依据上次 `apply` 的记录进行比对；修改 YAML 后，需要重新运行 `apply` 才会生效。
+
+每个组件的健康检查，来自 `apply` 当时使用的 Catalog 版本。检查未通过时，`doctor` 会打印 Catalog 的建议和它运行的 `kubectl wait` 命令。要再检查一次，自己运行这条命令即可。
 
 在加入已有集群的节点上，`doctor` 检查本机的 `k3s-agent` 或 RKE2 unit、Node 是否就绪、到 server 的连接和延迟，以及磁盘加密。如果节点是 server，还会比对 Zeabur Identity 的认证配置。
 

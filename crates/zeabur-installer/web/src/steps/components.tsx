@@ -3,8 +3,9 @@ import CaretDownIcon from "~icons/ph/caret-down"
 import CaretRightIcon from "~icons/ph/caret-right"
 
 import {
-  distributionTitle,
+  personalDistribution,
   runsOn,
+  titleOf,
   type CatalogComponent,
   type Config,
   type Input as CatalogInput,
@@ -44,9 +45,10 @@ export function ComponentsStep({ wizard }: { wizard: Wizard }) {
   const { planned } = wizard
   const choices = wizard.active
   const personal = wizard.use === "personal"
-  const all = wizard.server.catalog?.components ?? []
-  const offered = new Set(all.filter((c) => c.personal).map((c) => c.capability))
-  const catalog = personal ? all.filter((c) => offered.has(c.capability)) : all
+  const distribution = personal ? personalDistribution : wizard.config.distribution
+  const catalog = (wizard.server.catalog?.components ?? []).filter((c) =>
+    c.testedOn.includes(distribution),
+  )
   const hostMib = wizard.server.facts?.memoryMib ?? Infinity
   const tooSmall = (c: CatalogComponent) => personal && hostMib < (c.personalMinMemoryMib ?? 0)
   const plan = planned && "plan" in planned ? planned.plan : null
@@ -141,12 +143,9 @@ export function ComponentsStep({ wizard }: { wizard: Wizard }) {
                 mib={component.idleMemoryMib ?? measured.get(component.id) ?? null}
                 leftOut={plan?.leftOut[component.id]}
                 onToggle={(on) => toggle(component.id, on)}
-                supported={
-                  personal
-                    ? component.personal === true && !tooSmall(component)
-                    : runsOn(component, wizard.config.distribution)
-                }
+                supported={runsOn(component, distribution) && !tooSmall(component)}
                 tooSmall={tooSmall(component)}
+                distribution={distribution}
                 wizard={wizard}
               />
             ))}
@@ -159,7 +158,11 @@ export function ComponentsStep({ wizard }: { wizard: Wizard }) {
 
 /** The plan's reason for leaving a component out, in the words the components page uses. */
 export function leftOutReason(t: Translate, reason: string): string {
-  if (reason === "not part of a personal install") return t("components.notPersonal")
+  const needsUntested = /^needs (.+), not tested on (.+)$/.exec(reason)
+  if (needsUntested)
+    return t("components.needsUntested", needsUntested[1]!, titleOf(needsUntested[2]!))
+  const untested = /^not tested on (.+)$/.exec(reason)
+  if (untested) return t("components.untested", titleOf(untested[1]!))
   const memory = /^needs (\d+) MiB of memory$/.exec(reason)
   if (memory) return t("components.needsMemory", Number(memory[1]))
   const only = /^runs on (.+) only$/.exec(reason)
@@ -178,6 +181,7 @@ function ComponentRow({
   onToggle,
   supported,
   tooSmall,
+  distribution,
   wizard,
 }: {
   component: CatalogComponent
@@ -188,6 +192,7 @@ function ComponentRow({
   onToggle: (on: boolean) => void
   supported: boolean
   tooSmall: boolean
+  distribution: string
   wizard: Wizard
 }) {
   const t = useT()
@@ -206,7 +211,7 @@ function ComponentRow({
       ? t("components.runsOn", t("common.list", component.distributions))
       : leftOut
         ? leftOutReason(t, leftOut)
-        : t("components.unsupported", distributionTitle[wizard.config.distribution])
+        : t("components.unsupported", titleOf(distribution))
   return (
     <div className="px-5 py-2">
       <Collapsible className="flex flex-col">
