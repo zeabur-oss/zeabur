@@ -355,6 +355,7 @@ mod tests {
             memory_mib: 8192,
             node_ips: Vec::new(),
             record: None,
+            installer: None,
         };
         plan(&index(), &config, &facts).unwrap().components
     }

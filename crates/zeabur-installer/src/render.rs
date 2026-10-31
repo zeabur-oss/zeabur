@@ -162,6 +162,12 @@ pub(crate) fn changes(changes: Option<&Changes>, unit: &str) -> String {
     for id in &c.removed {
         push(&mut s, &format!("  {id:<48} removed"));
     }
+    for id in &c.kept {
+        push(
+            &mut s,
+            &format!("  {id:<48} not removed; keeps running without updates"),
+        );
+    }
     for r in &c.replaced {
         push(&mut s, &format!("  {:<48} replaced by {}", r.from, r.to));
         push(&mut s, &format!("      {}", replaced_note(&r.from)));
@@ -502,6 +508,7 @@ mod tests {
                 memory_mib: 8192,
                 node_ips: vec!["10.0.0.6".to_owned(), "fd00::6".to_owned()],
                 record: None,
+                installer: None,
             },
             rtt_us: rtt_us.to_vec(),
             ports: vec![
@@ -555,6 +562,7 @@ mod tests {
             installer: "0.1.1".to_owned(),
             added: vec!["databases/cloudnative-pg".to_owned()],
             removed: vec!["databases/old".to_owned()],
+            kept: vec!["node-updates/system-upgrade-controller".to_owned()],
             replaced: vec![zeabur_installer_plan::record::Replaced {
                 from: "container-registry/zot".to_owned(),
                 to: "builds/zeabur-builder".to_owned(),
@@ -578,6 +586,8 @@ mod tests {
             "restarts k3s",
             "databases/cloudnative-pg",
             "databases/old",
+            "node-updates/system-upgrade-controller",
+            "not removed; keeps running without updates",
             "container-registry/zot",
             "replaced by builds/zeabur-builder",
             "deletes images under <project>/<name>",
@@ -590,6 +600,7 @@ mod tests {
         let same = Changes {
             added: Vec::new(),
             removed: Vec::new(),
+            kept: Vec::new(),
             replaced: Vec::new(),
             charts: Vec::new(),
             offered: Vec::new(),

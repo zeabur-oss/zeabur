@@ -60,6 +60,7 @@ sudo zeabur-installer doctor
 
 - K3s、RKE2 或 KubeSolo 換版本時的新舊版本，以及內容會變的主機檔案。只要有其中一項，`apply` 就會重新啟動 `k3s`、`rke2-server` 或 `kubesolo`：Kubernetes API 大約 10 秒連不上，正在執行的應用程式照常提供服務。
 - 新增和移除的元件、被其他元件取代的元件，以及換版本的 chart。
+- 不再安裝、但沒有 chart 可以解除安裝的元件，例如 `node-updates/system-upgrade-controller`。`apply` 不會移除它們，它們裝的東西會繼續執行，只是不再更新。
 - 這版 Catalog 預設安裝、但紀錄裡沒有的元件。`apply` 不會安裝它們。要安裝其中一個，把它寫進 `enable`，或在 `gui` 裡勾選。Zeabur 需要的元件（ingress、certificates、metrics-server）和已選元件需要的元件，還是會安裝。
 
 `plan --json` 把同樣的內容放在 `changes` 欄位，第一次安裝時是 `null`。`gui` 在確認步驟顯示這些變動，新元件預設不勾選。

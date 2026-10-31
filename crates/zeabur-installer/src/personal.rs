@@ -36,6 +36,7 @@ pub(crate) fn make_plan(config: &PersonalConfig) -> Result<PersonalPlan, Install
     let index = load::catalog(config.sources.catalog.as_deref(), STATE_DIR)?;
     let running = systemd::is_active(UNIT);
     let mut facts = facts::read()?;
+    facts.installer = crate::apply::kept_installer(Path::new(STATE_DIR));
     if running {
         facts.record = crate::apply::read_record(&kubectl())?;
     }
@@ -390,7 +391,7 @@ fn record(kubectl: &Kubectl, plan: &PersonalPlan) -> Result<(), InstallError> {
             "plan": summary,
         },
     }))?;
-    Ok(())
+    crate::apply::keep_installer(Path::new(STATE_DIR))
 }
 
 /// Writes the kubeconfig for the person's computer, readable by root only.

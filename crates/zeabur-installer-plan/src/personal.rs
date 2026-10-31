@@ -193,9 +193,7 @@ pub fn plan(
     config: &PersonalConfig,
     facts: &Facts,
 ) -> Result<PersonalPlan, PlanError> {
-    if let Some(record) = &facts.record {
-        record.check_installer()?;
-    }
+    facts.check_installer()?;
     let node_name = crate::node_name::choose(config.host.node_name.as_deref(), facts, &[])?;
     let arch = facts.arch.as_str();
     let no_release = || PlanError::Arch(arch.to_owned());
@@ -302,6 +300,7 @@ mod tests {
             memory_mib,
             node_ips: vec!["10.0.0.5".to_owned()],
             record: None,
+            installer: None,
         }
     }
 
@@ -311,6 +310,19 @@ mod tests {
 
     fn ids(plan: &PersonalPlan) -> Vec<&str> {
         plan.components.iter().map(|c| c.id.as_str()).collect()
+    }
+
+    #[test]
+    fn a_stopped_kubesolo_last_applied_by_a_newer_installer_is_left_alone() {
+        let index = Index::parse(INDEX.as_bytes()).unwrap();
+        let stopped = Facts {
+            installer: Some("99.0.0".to_owned()),
+            ..facts(8192)
+        };
+        assert!(matches!(
+            plan(&index, &config(""), &stopped),
+            Err(PlanError::NewerInstaller { recorded, .. }) if recorded == "99.0.0"
+        ));
     }
 
     #[test]

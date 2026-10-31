@@ -14,6 +14,10 @@ use crate::select::RENAMED;
 /// This installer's version.
 pub const INSTALLER_VERSION: &str = env!("CARGO_PKG_VERSION");
 
+/// The file in the installer's state directory that keeps the version of the installer that last
+/// applied, for when the cluster is stopped and its record cannot be read.
+pub const INSTALLER_FILE: &str = "installer-version";
+
 /// What an earlier `apply` recorded.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Record {
@@ -25,6 +29,8 @@ pub struct Record {
     pub version: Option<String>,
     /// Chart versions by component and release name.
     pub charts: BTreeMap<(String, String), String>,
+    /// The components with a `HelmChart` release, which `apply` uninstalls when they leave.
+    pub helm: BTreeSet<String>,
 }
 
 impl Record {
@@ -41,6 +47,7 @@ impl Record {
             .and_then(|p| serde_json::from_str(p).ok())
             .unwrap_or_default();
         let mut charts = BTreeMap::new();
+        let mut helm = BTreeSet::new();
         for component in plan
             .get("components")
             .and_then(Value::as_array)
@@ -56,6 +63,9 @@ impl Record {
                 .into_iter()
                 .flatten()
             {
+                if release.get("kind").and_then(Value::as_str) == Some("helmChart") {
+                    helm.insert(id.to_owned());
+                }
                 if let (Some(name), Some(version)) = (
                     release.get("name").and_then(Value::as_str),
                     release
@@ -73,6 +83,7 @@ impl Record {
                 .or_else(|| text("kubesolo"))
                 .map(str::to_owned),
             charts,
+            helm,
         })
     }
 
@@ -82,14 +93,23 @@ impl Record {
     ///
     /// [`PlanError::NewerInstaller`].
     pub fn check_installer(&self) -> Result<(), PlanError> {
-        if precedence(&self.installer, INSTALLER_VERSION) == Some(Ordering::Greater) {
-            return Err(PlanError::NewerInstaller {
-                recorded: self.installer.clone(),
-                own: INSTALLER_VERSION.to_owned(),
-            });
-        }
-        Ok(())
+        check_installer(&self.installer)
     }
+}
+
+/// Stops when `recorded` is newer than this installer.
+///
+/// # Errors
+///
+/// [`PlanError::NewerInstaller`].
+pub fn check_installer(recorded: &str) -> Result<(), PlanError> {
+    if precedence(recorded, INSTALLER_VERSION) == Some(Ordering::Greater) {
+        return Err(PlanError::NewerInstaller {
+            recorded: recorded.to_owned(),
+            own: INSTALLER_VERSION.to_owned(),
+        });
+    }
+    Ok(())
 }
 
 /// What `apply` changes against the record.
@@ -100,8 +120,11 @@ pub struct Changes {
     pub installer: String,
     /// Components it installs that the record does not have.
     pub added: Vec<String>,
-    /// Recorded components it no longer plans.
+    /// Recorded components it no longer plans and uninstalls.
     pub removed: Vec<String>,
+    /// Recorded components it no longer plans that have no chart to uninstall; what they
+    /// installed keeps running.
+    pub kept: Vec<String>,
     /// Recorded components the catalog renamed, which the new component takes over.
     pub replaced: Vec<Replaced>,
     /// Charts whose version changes.
@@ -192,6 +215,13 @@ impl Changes {
                 }
             }
         }
+        let (removed, kept) = record
+            .components
+            .iter()
+            .filter(|id| !planned.contains(id.as_str()))
+            .filter(|id| !RENAMED.iter().any(|(from, _)| from == id))
+            .cloned()
+            .partition(|id| record.helm.contains(id));
         let version = record
             .version
             .as_ref()
@@ -208,13 +238,8 @@ impl Changes {
                 .filter(|c| !replaced.iter().any(|r| r.to == c.id))
                 .map(|c| c.id.clone())
                 .collect(),
-            removed: record
-                .components
-                .iter()
-                .filter(|id| !planned.contains(id.as_str()))
-                .filter(|id| !RENAMED.iter().any(|(from, _)| from == id))
-                .cloned()
-                .collect(),
+            removed,
+            kept,
             replaced,
             charts,
             offered: offered.to_vec(),
@@ -311,6 +336,7 @@ mod tests {
             components: BTreeSet::new(),
             version: None,
             charts: BTreeMap::new(),
+            helm: BTreeSet::new(),
         };
         let error = record.check_installer().unwrap_err().to_string();
         assert!(

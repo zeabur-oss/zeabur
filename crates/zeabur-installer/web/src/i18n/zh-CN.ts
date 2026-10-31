@@ -347,6 +347,8 @@ export const zhCN: Messages = {
     `${title} 会重启。Kubernetes API 大约 10 秒连不上，应用会照常运行。`,
   "review.changes.added": "新增",
   "review.changes.removed": "移除",
+  "review.changes.kept": "不再更新",
+  "review.changes.keptHint": "apply 不会移除这些组件，它们装的东西会继续运行。",
   "review.changes.replaced": "取代",
   "review.changes.replaced.container-registry/zot":
     "zot 由 Zeabur Builder 取代，Builder 会自己运行 zot，但 Builder 会删掉 <project>/<name> 路径下不是它构建出来的镜像，你自己推到 zot 的镜像可能会消失。想全部留着，在配置文件的 disable 里加上 builds/zeabur-builder。",

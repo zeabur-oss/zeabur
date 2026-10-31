@@ -347,6 +347,8 @@ export const zhTW: Messages = {
     `${title} 會重新啟動。Kubernetes API 大約 10 秒連不上，應用程式會照常運作。`,
   "review.changes.added": "新增",
   "review.changes.removed": "移除",
+  "review.changes.kept": "不再更新",
+  "review.changes.keptHint": "apply 不會移除這些元件，它們裝的東西會繼續執行。",
   "review.changes.replaced": "取代",
   "review.changes.replaced.container-registry/zot":
     "zot 由 Zeabur Builder 取代，Builder 會自己執行 zot，但 Builder 會刪掉 <project>/<name> 路徑下不是它建置出來的映像檔，你自己推到 zot 的映像檔可能會消失。想全部留著，在設定檔的 disable 加上 builds/zeabur-builder。",

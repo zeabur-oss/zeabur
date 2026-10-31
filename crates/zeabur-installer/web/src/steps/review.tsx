@@ -376,6 +376,7 @@ function ChangesPanel({
     !changes.restart &&
     !changes.added.length &&
     !changes.removed.length &&
+    !changes.kept.length &&
     !changes.replaced.length &&
     !changes.charts.length &&
     !changes.offered.length
@@ -419,6 +420,14 @@ function ChangesPanel({
           {changes.removed.length ? (
             <Row label={t("review.changes.removed")}>
               {t("common.list", changes.removed.map(name))}
+            </Row>
+          ) : null}
+          {changes.kept.length ? (
+            <Row label={t("review.changes.kept")}>
+              <div className="flex min-w-0 flex-col gap-1">
+                <span>{t("common.list", changes.kept.map(name))}</span>
+                <span className="text-xs text-secondary">{t("review.changes.keptHint")}</span>
+              </div>
             </Row>
           ) : null}
           {changes.replaced.length ? (

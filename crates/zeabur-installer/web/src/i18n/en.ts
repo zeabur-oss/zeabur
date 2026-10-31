@@ -375,6 +375,8 @@ export const en = {
     `${title} restarts. The Kubernetes API stops answering for about 10 seconds; apps keep running.`,
   "review.changes.added": "Added",
   "review.changes.removed": "Removed",
+  "review.changes.kept": "No longer updated",
+  "review.changes.keptHint": "Apply doesn't remove these. What they installed keeps running.",
   "review.changes.replaced": "Replaced",
   "review.changes.replaced.container-registry/zot":
     "zot is replaced by Zeabur Builder, which runs zot itself. Zeabur Builder deletes images under <project>/<name> paths that no build made, so images you pushed to zot yourself can disappear. To keep all of them, add builds/zeabur-builder to disable in the configuration file.",

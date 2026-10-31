@@ -32,6 +32,7 @@ pub fn read() -> Result<Facts, HostError> {
         })?,
         node_ips,
         record: None,
+        installer: None,
     })
 }
 

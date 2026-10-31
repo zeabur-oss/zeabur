@@ -21,7 +21,7 @@ use zeabur_installer_plan::plan::{
     MANAGER, NAMESPACE_MANAGER, Plan, RegistryPlan, ReleasePlan, SecretRefPlan, SecretSource,
     Source, ZEABUR_NAMESPACE, ZeaburPlan,
 };
-use zeabur_installer_plan::record::Record;
+use zeabur_installer_plan::record::{INSTALLER_FILE, INSTALLER_VERSION, Record};
 use zeabur_installer_plan::rke2::{ETCD_USER, PREFIX};
 use zeabur_installer_plan::storage::{self, NodePrep, Storage};
 use zeabur_telemetry::{InstallationId, Step};
@@ -181,6 +181,7 @@ pub(crate) fn make_plan(index: &Index, config: &Config) -> Result<Plan, InstallE
     let kubectl = Kubectl::admin(config.distribution);
     let running = systemd::is_active(config.distribution.server_unit());
     let mut facts = facts::read()?;
+    facts.installer = kept_installer(Path::new(STATE_DIR));
     if running {
         facts.record = read_record(&kubectl)?;
     }
@@ -207,6 +208,22 @@ pub(crate) fn read_record(kubectl: &Kubectl) -> Result<Option<Record>, InstallEr
     Ok(kubectl
         .get("configmap", STATE_CONFIGMAP, Some("kube-system"))?
         .and_then(|state| Record::from_data(state.get("data")?)))
+}
+
+/// The version of the installer that last applied, kept in `state_dir`.
+pub(crate) fn kept_installer(state_dir: &Path) -> Option<String> {
+    let version = fs::read_to_string(state_dir.join(INSTALLER_FILE)).ok()?;
+    Some(version.trim().to_owned()).filter(|v| !v.is_empty())
+}
+
+/// Keeps this installer's version in `state_dir`, where a stopped cluster's next `apply` reads it.
+pub(crate) fn keep_installer(state_dir: &Path) -> Result<(), InstallError> {
+    files::write(
+        &state_dir.join(INSTALLER_FILE),
+        0o644,
+        format!("{INSTALLER_VERSION}\n").as_bytes(),
+    )?;
+    Ok(())
 }
 
 /// The paths of `files` whose content on this host differs.
@@ -1421,11 +1438,22 @@ fn record(kubectl: &Kubectl, plan: &Plan, link_issued: bool) -> Result<(), Insta
             "setupLinkIssued": if link_issued { "true" } else { "false" },
         },
     }))?;
-    Ok(())
+    keep_installer(Path::new(STATE_DIR))
 }
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn the_kept_installer_version_is_the_one_that_last_applied() {
+        let dir = tempfile::tempdir().unwrap();
+        assert_eq!(kept_installer(dir.path()), None);
+        keep_installer(dir.path()).unwrap();
+        assert_eq!(
+            kept_installer(dir.path()).as_deref(),
+            Some(INSTALLER_VERSION)
+        );
+    }
+
     #[test]
     fn setup_link_passes_user_lifetime_and_reset_to_identityctl() {
         assert_eq!(

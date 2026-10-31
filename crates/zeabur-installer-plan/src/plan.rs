@@ -71,6 +71,9 @@ pub struct Facts {
     /// What an earlier `apply` recorded in the cluster.
     #[serde(skip)]
     pub record: Option<Record>,
+    /// The version of the installer that last applied, as kept on the host.
+    #[serde(skip)]
+    pub installer: Option<String>,
 }
 
 impl Facts {
@@ -81,6 +84,20 @@ impl Facts {
         self.node_name
             .clone()
             .unwrap_or_else(|| self.hostname.to_ascii_lowercase())
+    }
+
+    /// Stops when a newer installer applied, as the record or the host says.
+    ///
+    /// # Errors
+    ///
+    /// [`PlanError::NewerInstaller`].
+    pub fn check_installer(&self) -> Result<(), PlanError> {
+        if let Some(record) = &self.record {
+            record.check_installer()?;
+        }
+        self.installer
+            .as_deref()
+            .map_or(Ok(()), crate::record::check_installer)
     }
 }
 
@@ -418,9 +435,7 @@ pub fn plan_with(
             have: facts.memory_mib,
         });
     }
-    if let Some(record) = &facts.record {
-        record.check_installer()?;
-    }
+    facts.check_installer()?;
     let node_name = node_name::choose(config.host.node_name.as_deref(), facts, &[])?;
     let selection = select::select(index, config, facts.record.as_ref().map(|r| &r.components))?;
     let profile = config.profile.as_str();
@@ -1593,6 +1608,7 @@ mod tests {
             memory_mib: 8192,
             node_ips: vec!["10.0.0.5".to_owned()],
             record: None,
+            installer: None,
         }
     }
 
@@ -1602,6 +1618,24 @@ mod tests {
 
     const SECURE: &str =
         "enable: [runtime-security, vulnerability-scanning, intrusion-prevention]\n";
+
+    #[test]
+    fn a_stopped_cluster_last_applied_by_a_newer_installer_is_left_alone() {
+        let index = Index::parse(INDEX.as_bytes()).unwrap();
+        let stopped = Facts {
+            installer: Some("99.0.0".to_owned()),
+            ..facts()
+        };
+        assert!(matches!(
+            plan(&index, &config(""), &stopped),
+            Err(PlanError::NewerInstaller { recorded, .. }) if recorded == "99.0.0"
+        ));
+        let own = Facts {
+            installer: Some(record::INSTALLER_VERSION.to_owned()),
+            ..facts()
+        };
+        plan(&index, &config(""), &own).unwrap();
+    }
 
     #[test]
     fn defaults_follow_the_catalog_and_leave_out_components_of_another_distribution() {
@@ -2505,6 +2539,23 @@ mod tests {
         let changes = plan.changes.unwrap();
         assert_eq!(changes.replaced, []);
         assert_eq!(changes.removed, Vec::<String>::new());
+    }
+
+    #[test]
+    fn a_left_out_component_without_a_chart_is_kept_not_removed() {
+        let index = Index::parse(INDEX.as_bytes()).unwrap();
+        let first = plan(&index, &config(""), &facts()).unwrap();
+        let mut upgrade = facts();
+        upgrade.record = Some(recorded(&first, "0.0.1", |_| {}));
+        let plan = plan(
+            &index,
+            &config("disable: [node-updates/system-upgrade-controller, builds/zeabur-builder]\n"),
+            &upgrade,
+        )
+        .unwrap();
+        let changes = plan.changes.unwrap();
+        assert_eq!(changes.removed, ["builds/zeabur-builder"]);
+        assert_eq!(changes.kept, ["node-updates/system-upgrade-controller"]);
     }
 
     #[test]
