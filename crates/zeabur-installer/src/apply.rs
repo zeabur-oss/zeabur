@@ -188,9 +188,12 @@ pub(crate) fn make_plan(index: &Index, config: &Config) -> Result<Plan, InstallE
     let mut plan = plan::plan(index, config, &facts)?;
     let authn = config.distribution.layout().authn_file;
     if let Some(changes) = &mut plan.changes {
-        changes.set_host_files(changed_files(
-            plan.host_files.iter().filter(|f| f.path != authn),
-        ));
+        let mut files = changed_files(plan.host_files.iter().filter(|f| f.path != authn));
+        files.extend(changed_archives(
+            Path::new(config.distribution.layout().images_dir),
+            &config.sources.image_archives,
+        )?);
+        changes.set_host_files(files);
     }
     plan.removals = remove::plan(
         running.then_some(&kubectl),
@@ -517,6 +520,35 @@ fn calico_manifest(calico: &Download) -> Result<bool, InstallError> {
 /// tell its own from the release's and from those put there by hand.
 const ARCHIVE_PREFIX: &str = "zeabur-installer-";
 
+/// The file name of an archive in `sources.imageArchives` and where the installer keeps its copy.
+fn archive_copy(dir: &Path, archive: &str) -> Result<(String, PathBuf), InstallError> {
+    let name = Path::new(archive)
+        .file_name()
+        .ok_or_else(|| InstallError::Message(format!("{archive}: not a file")))?
+        .to_string_lossy()
+        .into_owned();
+    let dest = dir.join(format!("{ARCHIVE_PREFIX}{name}"));
+    Ok((name, dest))
+}
+
+/// The copies in `dir` that `image_archives` would write: those of listed archives that are new or
+/// differ.
+pub(crate) fn changed_archives(
+    dir: &Path,
+    sources: &[String],
+) -> Result<Vec<String>, InstallError> {
+    let mut changed = Vec::new();
+    for archive in sources {
+        let (_, dest) = archive_copy(dir, archive)?;
+        if download::sha256_file(Path::new(archive))?
+            != download::sha256_file(&dest).unwrap_or_default()
+        {
+            changed.push(dest.display().to_string());
+        }
+    }
+    Ok(changed)
+}
+
 /// Copies `sources.imageArchives` into the image directory and removes the ones it copied that
 /// are no longer listed. Returns whether an archive was copied.
 ///
@@ -538,12 +570,7 @@ fn image_archives(dir: &Path, sources: &[String]) -> Result<bool, InstallError> 
     let mut names = Vec::new();
     for archive in sources {
         let source = Path::new(archive);
-        let name = source
-            .file_name()
-            .ok_or_else(|| InstallError::Message(format!("{archive}: not a file")))?
-            .to_string_lossy()
-            .into_owned();
-        let dest = dir.join(format!("{ARCHIVE_PREFIX}{name}"));
+        let (name, dest) = archive_copy(dir, archive)?;
         if download::sha256_file(source)? != download::sha256_file(&dest).unwrap_or_default() {
             // A `.partial` file is not imported, so half an archive is never read.
             let partial = dir.join(format!(".{ARCHIVE_PREFIX}{name}.partial"));
@@ -1443,6 +1470,27 @@ fn record(kubectl: &Kubectl, plan: &Plan, link_issued: bool) -> Result<(), Insta
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn a_new_or_changed_image_archive_is_a_change_but_a_copied_one_is_not() {
+        let dir = tempfile::tempdir().unwrap();
+        let images = dir.path().join("images");
+        fs::create_dir(&images).unwrap();
+        let source = dir.path().join("app.tar");
+        fs::write(&source, b"one").unwrap();
+        let sources = [source.display().to_string()];
+        let copy = images.join(format!("{ARCHIVE_PREFIX}app.tar"));
+
+        assert_eq!(
+            changed_archives(&images, &sources).unwrap(),
+            [copy.display().to_string()]
+        );
+        assert!(image_archives(&images, &sources).unwrap());
+        assert!(changed_archives(&images, &sources).unwrap().is_empty());
+
+        fs::write(&source, b"two").unwrap();
+        assert_eq!(changed_archives(&images, &sources).unwrap().len(), 1);
+    }
+
     #[test]
     fn the_kept_installer_version_is_the_one_that_last_applied() {
         let dir = tempfile::tempdir().unwrap();
