@@ -208,7 +208,7 @@ fn build_chart(files: BTreeMap<String, Vec<u8>>, path: &str) -> Result<Chart, Ho
 
 /// Adds the `crds/` files of `chart` and of the subcharts Helm keeps with `user` values.
 fn enabled_crds(chart: &Chart, user: &Value, tags: &Value, out: &mut Vec<(String, String)>) {
-    let values = coalesce(user, &chart.values);
+    let values = coalesce_defaults(chart, user);
     out.extend(chart.crds.iter().cloned());
     for sub in &chart.subcharts {
         let mut listed = false;
@@ -250,6 +250,36 @@ fn enabled(dependency: &Dependency, values: &Value, tags: &Value) -> bool {
         }
     }
     on
+}
+
+/// The values of `chart` for `user` as Helm's `CoalesceValues` builds them before it evaluates
+/// conditions: the chart's own defaults, and under each subchart's name (its alias when
+/// `dependencies` gives one) that subchart's defaults, recursively, enabled or not.
+fn coalesce_defaults(chart: &Chart, user: &Value) -> Value {
+    let mut values = coalesce(user, &chart.values);
+    let Value::Object(map) = &mut values else {
+        return values;
+    };
+    for sub in &chart.subcharts {
+        let mut keys: Vec<&str> = chart
+            .dependencies
+            .iter()
+            .filter(|d| d.name == sub.name)
+            .map(|d| d.alias.as_deref().unwrap_or(&d.name))
+            .collect();
+        if keys.is_empty() {
+            keys.push(&sub.name);
+        }
+        for key in keys {
+            let scope = match map.get(key) {
+                None | Some(Value::Null) => Value::Object(serde_json::Map::new()),
+                Some(v @ Value::Object(_)) => v.clone(),
+                Some(_) => continue,
+            };
+            map.insert(key.to_owned(), coalesce_defaults(sub, &scope));
+        }
+    }
+    values
 }
 
 /// `user` over `defaults` as Helm coalesces values: maps merge, other values replace, and `null`
@@ -390,5 +420,29 @@ mod tests {
         assert_eq!(crds(&dir, "c", &condition), "kind: S\n");
         let both = serde_json::json!({"tags": {"extras": true}, "extra": {"enabled": false}});
         assert_eq!(crds(&dir, "c", &both), "");
+    }
+
+    #[test]
+    fn conditions_see_the_defaults_of_the_subcharts() {
+        let dir = chart(&[
+            (
+                "Chart.yaml",
+                "name: c\ndependencies:\n  - name: sub\n    tags: [extras]\n    condition: sub.enabled\n  - name: other\n    condition: other.inner.on\n",
+            ),
+            ("values.yaml", "tags:\n  extras: false\n"),
+            ("charts/sub/Chart.yaml", "name: sub\n"),
+            ("charts/sub/values.yaml", "enabled: true\n"),
+            ("charts/sub/crds/s.yaml", "kind: S\n"),
+            (
+                "charts/other/Chart.yaml",
+                "name: other\ndependencies:\n  - name: inner\n    condition: inner.on\n",
+            ),
+            ("charts/other/charts/inner/Chart.yaml", "name: inner\n"),
+            ("charts/other/charts/inner/values.yaml", "on: true\n"),
+            ("charts/other/charts/inner/crds/i.yaml", "kind: I\n"),
+        ]);
+        assert_eq!(crds(&dir, "c", &Value::Null), "kind: I\n\n---\nkind: S\n");
+        let off = serde_json::json!({"sub": {"enabled": false}});
+        assert_eq!(crds(&dir, "c", &off), "kind: I\n");
     }
 }
