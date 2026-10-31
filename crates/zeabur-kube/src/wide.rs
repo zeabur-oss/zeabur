@@ -264,8 +264,9 @@ pub(crate) async fn cluster_events(
 /// kube-apiserver authorizes a request before it looks the resource up, so listing a resource
 /// whose API is not installed answers `403`, not `404`, to someone without the permission
 /// [authz]. Discovery is readable by every authenticated person through the default
-/// `system:discovery` role [discovery-rbac], so asking it first tells "not installed" apart from
-/// "not allowed".
+/// `system:discovery` role [discovery-rbac], so asking it when a read is refused tells "not
+/// installed" apart from "not allowed"; a `get` that answers `404` asks it too, as the object or
+/// the API may be missing.
 ///
 /// [authz]: https://kubernetes.io/docs/reference/access-authn-authz/authorization/
 /// [discovery-rbac]: https://kubernetes.io/docs/reference/access-authn-authz/rbac/#discovery-roles

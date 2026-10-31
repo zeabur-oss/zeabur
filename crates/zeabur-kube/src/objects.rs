@@ -7,9 +7,11 @@
 //!
 //! kube-apiserver authorizes a request before it looks the resource up, so reading a resource
 //! whose API is not installed answers `403`, not `404`, to someone without the permission
-//! [authz]. Every read here asks discovery first, which every authenticated person may read
-//! through the default `system:discovery` role [discovery-rbac]: a group version that is not
-//! served is reported as not installed (`Ok(None)`), and only a served one can be refused.
+//! [authz]. Every read here goes first, and only a refusal (and, for a single object, a `404`)
+//! asks discovery, which every authenticated person may read through the default
+//! `system:discovery` role [discovery-rbac]: a group version that is not served is reported as
+//! not installed (`Ok(None)`), and only a served one is refused. A read that succeeds costs one
+//! round trip.
 //!
 //! # Secret values stay here
 //!
@@ -254,14 +256,37 @@ fn absent<T>(error: kube::Error) -> Result<Option<T>, ClusterError> {
     }
 }
 
+/// [`absent`], and `Ok(None)` for a refusal when discovery says the API is not installed.
+async fn absent_or_not_installed<T>(
+    client: &kube::Client,
+    resource: &ResourceRef,
+    error: kube::Error,
+) -> Result<Option<T>, ClusterError> {
+    match ClusterError::from(error) {
+        error if error.is_not_found() => Ok(None),
+        error if error.is_refused() => not_installed(client, resource, error).await,
+        other => Err(other),
+    }
+}
+
+/// `Ok(None)` when discovery says the API of `resource` is not installed, `error` otherwise.
+async fn not_installed<T>(
+    client: &kube::Client,
+    resource: &ResourceRef,
+    error: ClusterError,
+) -> Result<Option<T>, ClusterError> {
+    if serves(client, &resource.api_version()).await? == Some(false) {
+        Ok(None)
+    } else {
+        Err(error)
+    }
+}
+
 pub(crate) async fn list_objects(
     client: &kube::Client,
     resource: &ResourceRef,
     namespace: Option<&str>,
 ) -> Result<Option<Vec<DynamicObject>>, ClusterError> {
-    if serves(client, &resource.api_version()).await? == Some(false) {
-        return Ok(None);
-    }
     match api(client, resource, namespace)
         .list(&ListParams::default())
         .await
@@ -273,7 +298,7 @@ pub(crate) async fn list_objects(
             }
             Ok(Some(items))
         }
-        Err(error) => absent(error),
+        Err(error) => absent_or_not_installed(client, resource, error).await,
     }
 }
 
@@ -321,9 +346,6 @@ pub(crate) async fn list_metadata(
     resource: &ResourceRef,
     namespace: Option<&str>,
 ) -> Result<Option<Vec<ObjectMeta>>, ClusterError> {
-    if serves(client, &resource.api_version()).await? == Some(false) {
-        return Ok(None);
-    }
     match api(client, resource, namespace)
         .list_metadata(&ListParams::default())
         .await
@@ -338,7 +360,7 @@ pub(crate) async fn list_metadata(
                 })
                 .collect(),
         )),
-        Err(error) => absent(error),
+        Err(error) => absent_or_not_installed(client, resource, error).await,
     }
 }
 
@@ -536,12 +558,18 @@ pub(crate) async fn get_object(
     namespace: Option<&str>,
     name: &str,
 ) -> Result<Option<DynamicObject>, ClusterError> {
-    if serves(client, &resource.api_version()).await? == Some(false) {
-        return Ok(None);
+    match api(client, resource, namespace).get(name).await {
+        Ok(mut object) => {
+            hide_secret_values(resource, &mut object);
+            Ok(Some(object))
+        }
+        Err(error) => match ClusterError::from(error) {
+            error if error.is_refused() || error.is_not_found() => {
+                not_installed(client, resource, error).await
+            }
+            other => Err(other),
+        },
     }
-    let mut object = api(client, resource, namespace).get(name).await?;
-    hide_secret_values(resource, &mut object);
-    Ok(Some(object))
 }
 
 #[cfg(test)]
