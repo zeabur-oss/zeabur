@@ -43,6 +43,7 @@ export const zhCN: Messages = {
   "shell.renameCluster": "在设置中重命名",
   "shell.cluster": "集群",
   "shell.search": "搜索",
+  "shell.opening": "正在打开页面…",
   "shell.jumpTo": "跳转到…",
   "shell.menu": "菜单",
   "shell.findProject": "查找项目",
