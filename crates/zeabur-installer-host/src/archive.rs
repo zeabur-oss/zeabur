@@ -304,7 +304,7 @@ fn enabled(dependency: &Dependency, values: &Map, path: &str) -> bool {
 fn mismatch(chart: &Chart, key: &str) -> HostError {
     parse_error(
         &format!("values of {}", chart.name),
-        &format!("type mismatch on {key}: not a table"),
+        &format!("{key} must be a map"),
     )
 }
 
