@@ -83,10 +83,12 @@ kubectl -n zeabur rollout status deployment/zeabur
 ```sh
 helm upgrade zeabur oci://ghcr.io/zeabur-oss/charts/zeabur \
   --version <version> \
-  --namespace zeabur --reuse-values \
+  --namespace zeabur --reset-then-reuse-values \
   --set 'domains.suffixes={apps.example.com}' \
   --set domains.clusterIssuer=letsencrypt
 ```
+
+加上 `--reset-then-reuse-values`，Helm 會先套用新版 chart 的預設值（包含映像檔），再套回你設定過的值。改用 `--reuse-values` 時，Helm 連舊版 chart 的預設值也一起保留，映像檔就停在舊版。
 
 之後部署 `shop` 專案的 `web` 時，表單會建議 `web-shop.apps.example.com`。可以用逗號列出多個應用程式網域，預設用第一個。之後也能在**叢集**頁的**網域**區塊修改，那裡會檢查 DNS 紀錄並列出要新增的紀錄，做法見[設定 DNS 紀錄](../configure/dns.mdx)。留空 `domains.suffixes` 時需手填完整網域。留空 `domains.clusterIssuer` 時，新服務的公開網址使用 HTTP。
 
@@ -100,7 +102,7 @@ Zeabur Identity、Registry、物件儲存或 GitHub Enterprise 使用私有 CA �
 kubectl -n zeabur create configmap corp-ca --from-file=ca.crt=corp-ca.pem
 helm upgrade zeabur oci://ghcr.io/zeabur-oss/charts/zeabur \
   --version <version> \
-  --namespace zeabur --reuse-values \
+  --namespace zeabur --reset-then-reuse-values \
   --set extraTrustedCA.configMap=corp-ca
 ```
 
