@@ -17,11 +17,17 @@
     };
     # Zeabur Catalog. flake.lock pins its commit: zeabur-catalog embeds the bundle that the
     # catalog's `release` output builds there, and a release build checks that bundle against the
-    # signed release at that commit (scripts/release-pins.sh).
+    # signed release at that commit (scripts/release.ts).
     catalog.url = "github:zeabur-oss/catalog";
-    # zeabur-oss-release (scripts/release.sh) and zeabur-oss-unsafe-report (scripts/ci.sh).
-    oss-release = {
+    # zeabur-oss-unsafe-report (scripts/ci.sh).
+    oss-ci = {
       url = "github:zeabur-oss/.github";
+      inputs.nixpkgs.follows = "nixpkgs";
+      inputs.nix-bun.follows = "nix-bun";
+    };
+    # Bun's own release binaries; Nixpkgs is behind, and bun fmt and bun check are newer.
+    nix-bun = {
+      url = "github:zeabur-oss/nix-bun";
       inputs.nixpkgs.follows = "nixpkgs";
     };
     # mdx2vast, which Vale needs for .mdx files (.vale.ini, the zeabur-writing skill's style).
@@ -50,6 +56,7 @@
               inherit system;
               overlays = [
                 inputs.rust-overlay.overlays.default
+                inputs.nix-bun.overlays.default
                 inputs.self.overlays.default
               ];
             };
@@ -99,7 +106,7 @@
               vale
               inputs.oss-skills.packages.${system}.mdx2vast
 
-              # Web interface (web/: dependencies come from bun.lock)
+              # Web interface (web/: dependencies come from bun.lock) and scripts/release.ts
               bun
               brotli
               # Documentation screenshots (scripts/docs-shots.sh)
@@ -115,12 +122,11 @@
               yq-go
               openssl
 
-              # Releases (scripts/release.sh, scripts/release-*.sh)
-              inputs.oss-release.packages.${system}.zeabur-oss-release
-              inputs.oss-release.packages.${system}.zeabur-oss-unsafe-report
+              # Releases: scripts/release.ts and @zeabur-oss/release (package.json) call these
+              crane
               cosign
-              skopeo
               gh
+              inputs.oss-ci.packages.${system}.zeabur-oss-unsafe-report
 
               self.formatter.${system}
             ];

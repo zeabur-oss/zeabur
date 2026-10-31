@@ -110,6 +110,10 @@ case "$job" in
     actionlint
     (cd web; bun ci; bun run fmt:check)
     (cd crates/zeabur-installer/web; bun ci; bun run fmt:check)
+    bun install --frozen-lockfile
+    bun fmt --check scripts/*.ts
+    bun check scripts/
+    bun test scripts/
     ;;
   clippy) cargo lint ;;
   docs) cargo doc --workspace --no-deps --document-private-items --locked ;;

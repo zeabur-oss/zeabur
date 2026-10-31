@@ -3,7 +3,7 @@
 # chart installed on the development cluster (scripts/dev-cluster.sh). With an image (a local
 # candidate from release-build.sh), the chart runs exactly that image, imported into the node;
 # without one, the node pulls the image the chart names, as an installation would
-# (`release.sh verify`). Run inside `nix develop` on Linux amd64 or arm64 with Docker; it uses port
+# (`release.ts verify`). Run inside `nix develop` on Linux amd64 or arm64 with Docker; it uses port
 # 443 and never touches the caller's kubeconfig.
 #   scripts/release-smoke.sh dist/zeaburctl-v0.0.2-linux-arm64.tar.gz deploy/chart/zeabur zeabur:release-arm64
 #   scripts/release-smoke.sh zeaburctl-v0.0.2-linux-arm64.tar.gz oci://ghcr.io/zeabur-oss/charts/zeabur@sha256:…
