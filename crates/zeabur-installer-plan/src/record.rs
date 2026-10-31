@@ -8,6 +8,7 @@ use serde::Serialize;
 use serde_json::Value;
 
 use crate::PlanError;
+use crate::catalog::Index;
 use crate::plan::{ComponentPlan, ReleasePlan};
 use crate::select::RENAMED;
 
@@ -174,9 +175,13 @@ pub struct VersionChange {
 
 impl Changes {
     /// The changes of a plan with `components`, `offered` left out and the `version` release.
+    ///
+    /// A left-out component counts as removed only when `apply` uninstalls it: it has a chart and
+    /// `index` still knows it, as [`crate::remove::removals`] requires.
     #[must_use]
     pub fn new(
         record: &Record,
+        index: &Index,
         components: &[ComponentPlan],
         offered: &[String],
         version: &str,
@@ -219,9 +224,9 @@ impl Changes {
             .components
             .iter()
             .filter(|id| !planned.contains(id.as_str()))
-            .filter(|id| !RENAMED.iter().any(|(from, _)| from == id))
+            .filter(|id| !crate::select::renamed(id).is_some_and(|new| planned.contains(new)))
             .cloned()
-            .partition(|id| record.helm.contains(id));
+            .partition(|id| record.helm.contains(id) && index.component(id).is_some());
         let version = record
             .version
             .as_ref()

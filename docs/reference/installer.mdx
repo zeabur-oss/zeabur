@@ -62,12 +62,12 @@ When the cluster has the install record `kube-system/zeabur-installer`, `plan` s
 - Components added or removed
 - Components that another component replaces
 - Charts that move to a new version
-- Components you no longer install that have no chart to uninstall, such as `node-updates/system-upgrade-controller`
+- Components you no longer install that `apply` leaves running: those with no chart to uninstall, such as `node-updates/system-upgrade-controller`, and those this Catalog no longer has
 - Components this Catalog installs by default that the server doesn't have yet
 
 When the release or a host file changes, `apply` restarts `k3s`, `rke2-server`, or `kubesolo`. The Kubernetes API stops answering for about 10 seconds. Running apps keep serving.
 
-`apply` doesn't remove a component that has no chart. What it installed keeps running but gets no more updates.
+`apply` doesn't remove a component that has no chart or that this Catalog no longer has. What it installed keeps running but gets no more updates. For a component the Catalog dropped, `plan` prints the `kubectl` command that removes it.
 
 `apply` doesn't install the new defaults. To add one, name it in `enable` or check it in `gui`. Components Zeabur needs (ingress, certificates, metrics-server) and components that a chosen component needs are installed anyway.
 

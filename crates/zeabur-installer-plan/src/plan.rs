@@ -492,7 +492,7 @@ pub fn plan_with(
     let changes = facts
         .record
         .as_ref()
-        .map(|r| Changes::new(r, &components, &selection.offered, &cluster.version));
+        .map(|r| Changes::new(r, index, &components, &selection.offered, &cluster.version));
 
     Ok(Plan {
         storage: storage_plan(&components, profile, &mut warnings),
@@ -2539,6 +2539,24 @@ mod tests {
         let changes = plan.changes.unwrap();
         assert_eq!(changes.replaced, []);
         assert_eq!(changes.removed, Vec::<String>::new());
+        assert_eq!(changes.kept, ["container-registry/zot"]);
+    }
+
+    #[test]
+    fn a_charted_component_the_catalog_dropped_is_kept_not_removed() {
+        let index = Index::parse(INDEX.as_bytes()).unwrap();
+        let first = plan(&index, &config(""), &facts()).unwrap();
+        let mut upgrade = facts();
+        upgrade.record = Some(recorded(&first, "0.0.1", |summary| {
+            summary["components"].as_array_mut().unwrap().push(json!({
+                "id": "legacy/gone",
+                "releases": [{"kind": "helmChart", "name": "gone"}],
+            }));
+        }));
+        let plan = plan(&index, &config(""), &upgrade).unwrap();
+        let changes = plan.changes.unwrap();
+        assert_eq!(changes.removed, Vec::<String>::new());
+        assert_eq!(changes.kept, ["legacy/gone"]);
     }
 
     #[test]

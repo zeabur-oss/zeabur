@@ -63,12 +63,12 @@ sudo zeabur-installer doctor
 - 新增和移除的组件
 - 改由其他组件取代的组件
 - 换版本的 chart
-- 不再安装、但没有 chart 可以卸载的组件，例如 `node-updates/system-upgrade-controller`
+- 不再安装、但 `apply` 会保留的组件：没有 chart 可以卸载的组件（例如 `node-updates/system-upgrade-controller`），以及这版 Catalog 已经没有的组件
 - 这版 Catalog 默认安装、但服务器上还没有的组件
 
 版本或主机文件有改动时，`apply` 会重启 `k3s`、`rke2-server` 或 `kubesolo`。Kubernetes API 大约 10 秒连不上，正在运行的应用照常提供服务。
 
-没有 chart 的组件，`apply` 不会移除。这些组件装好的东西会继续运行，只是不再更新。
+没有 chart 或这版 Catalog 已经没有的组件，`apply` 不会移除。这些组件装好的内容会继续运行，只是不再更新。Catalog 去掉的组件，`plan` 会打印移除用的 `kubectl` 命令。
 
 新的默认组件，`apply` 不会自动安装。要安装其中一个，把它写进 `enable`，或在 `gui` 里勾选。Zeabur 需要的组件（ingress、certificates、metrics-server），以及你选的组件依赖的组件，仍然会安装。
 
