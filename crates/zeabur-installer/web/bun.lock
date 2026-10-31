@@ -6,7 +6,7 @@
       "name": "zeabur-installer-web",
       "dependencies": {
         "@base-ui/react": "1.9.0",
-        "@zeabur/design-system": "file:../../../vendor/zeabur-design-system-43ade36.tgz",
+        "@zeabur/design-system": "file:../../../vendor/zeabur-design-system-e1953e5.tgz",
         "class-variance-authority": "0.7.1",
         "cn": "0.5.0",
         "react": "19.3.1",
@@ -394,7 +394,7 @@
 
     "@vitejs/plugin-react": ["@vitejs/plugin-react@6.1.2", "", { "dependencies": { "@rolldown/pluginutils": "^1.0.1" }, "peerDependencies": { "@rolldown/plugin-babel": "^0.1.7 || ^0.2.0", "babel-plugin-react-compiler": "^1.0.0", "oxc-transform-react": "^0.152.0", "vite": "^8.0.0" }, "optionalPeers": ["@rolldown/plugin-babel", "babel-plugin-react-compiler", "oxc-transform-react"] }, "sha512-fhJNGUdscQa4HkI0xFxwonWyhnVReCPDbXI7FH7jmzpnVCrFQI7PRrhWecO263610vOrs9tr2Y4xcf8uAdFxbw=="],
 
-    "@zeabur/design-system": ["@zeabur/design-system@../../../vendor/zeabur-design-system-43ade36.tgz", { "peerDependencies": { "@base-ui/react": "^1.8.0", "class-variance-authority": "^0.7.1", "cn": "^0.4.0", "react": "^19.3.0", "react-dom": "^19.3.0", "recharts": "^3.8.0", "sonner": "^2.0.8", "tailwindcss": "^4.3.0" }, "optionalPeers": ["recharts", "sonner"] }, "sha512-WrYpK8FMxPaaDNhSMeE+xe96uBNF7xSvlNowVVgCi8JxyMg3fQABPW76AZT76Ls64SgdfGBY2NnGi51dICLETQ=="],
+    "@zeabur/design-system": ["@zeabur/design-system@../../../vendor/zeabur-design-system-e1953e5.tgz", { "peerDependencies": { "@base-ui/react": "^1.8.0", "class-variance-authority": "^0.7.1", "cn": "^0.4.0", "react": "^19.3.0", "react-dom": "^19.3.0", "recharts": "^3.8.0", "sonner": "^2.0.8", "tailwindcss": "^4.3.0" }, "optionalPeers": ["recharts", "sonner"] }, "sha512-h5bohdqsmWV3JiwgLEX2q0Om+/Yh4xt7G9oPIdrGMw9yp/6gQbl4vXb/RqIB6QFkPIg1g5rhPvQrHPeB/qtfgA=="],
 
     "acorn": ["acorn@8.19.0", "", { "bin": { "acorn": "bin/acorn" } }, "sha512-oJlA3XiRm7Cyk6qFD2Jn8ak9B7jSy0qy00ADO3+8dpT0LSjFihQYv4C02LFCSYJV3Q37xYwwRy5m+IpIiUzqWw=="],
 

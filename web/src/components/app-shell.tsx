@@ -4,6 +4,7 @@ import ListIcon from "~icons/ph/list"
 import MagnifyingGlassIcon from "~icons/ph/magnifying-glass"
 import XIcon from "~icons/ph/x"
 
+import { RouteProgress } from "@/components/shell/route-progress"
 import { PlanFallback } from "@/components/plan/fallback"
 import { CommandPalette } from "@/components/shell/command-palette"
 import { DockSlot } from "@/components/shell/dock-slot"
@@ -58,6 +59,7 @@ export function AppShell() {
         </a>
         <FrameSidebar>{nav}</FrameSidebar>
         <FramePanel>
+          <RouteProgress />
           <PhoneBar />
           <main
             ref={content}

@@ -28,7 +28,7 @@
     "@tanstack/react-virtual": "3.14.21",
     "@xterm/addon-fit": "0.11.0",
     "@xterm/xterm": "6.0.0",
-    "@zeabur/design-system": "file:../vendor/zeabur-design-system-43ade36.tgz",
+    "@zeabur/design-system": "file:../vendor/zeabur-design-system-e1953e5.tgz",
     "class-variance-authority": "0.7.1",
     "cn": "0.5.0",
     "fflate": "0.8.3",

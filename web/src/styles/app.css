@@ -32,6 +32,15 @@
   --height-frame: max(60vh, 420px);
   /* A sticky table head's rule, which a collapsed border would leave behind. */
   --shadow-rule: inset 0 -1px 0 var(--color-border);
+  --animate-route-progress: route-progress 1.2s ease-in-out infinite;
+  @keyframes route-progress {
+    from {
+      translate: -100% 0;
+    }
+    to {
+      translate: 300% 0;
+    }
+  }
 }
 
 @utility flex-main {
