@@ -43,6 +43,7 @@ pub(crate) fn make_plan(config: &PersonalConfig) -> Result<PersonalPlan, Install
     let mut plan = personal::plan(&index, config, &facts)?;
     if let Some(changes) = &mut plan.changes {
         changes.set_host_files(crate::apply::changed_files(plan.host_files.iter()));
+        changes.restart |= binary_outdated(Path::new(BINARY), &plan.kubesolo.version);
     }
     plan.removals = removals(
         running,
@@ -316,8 +317,7 @@ fn install_kubesolo(plan: &PersonalPlan) -> Result<(), InstallError> {
     for file in &plan.host_files {
         changed |= files::write(Path::new(&file.path), file.mode, file.content.as_bytes())?;
     }
-    let installed = cmd::run(BINARY, &["--version"], None).unwrap_or_default();
-    if !installed.contains(&plan.kubesolo.version) {
+    if binary_outdated(Path::new(BINARY), &plan.kubesolo.version) {
         let download = &plan.kubesolo.download;
         let dir = PathBuf::from(STATE_DIR)
             .join("downloads")
@@ -352,6 +352,13 @@ fn install_kubesolo(plan: &PersonalPlan) -> Result<(), InstallError> {
         systemd::restart(UNIT)?;
     }
     Ok(())
+}
+
+/// Whether the binary at `path` is missing or does not report `version`.
+fn binary_outdated(path: &Path, version: &str) -> bool {
+    !cmd::run(path, &["--version"], None)
+        .unwrap_or_default()
+        .contains(version)
 }
 
 fn io(path: &Path) -> impl Fn(std::io::Error) -> InstallError {
@@ -564,6 +571,23 @@ pub(crate) fn uninstall_text() -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn fake_binary(dir: &Path, reports: &str) -> PathBuf {
+        let path = dir.join("kubesolo");
+        fs::write(&path, format!("#!/bin/sh\necho {reports}\n")).unwrap();
+        fs::set_permissions(&path, Permissions::from_mode(0o755)).unwrap();
+        path
+    }
+
+    #[test]
+    fn a_missing_or_other_release_of_the_binary_is_outdated() {
+        let dir = tempfile::tempdir().unwrap();
+        assert!(binary_outdated(&dir.path().join("kubesolo"), "v1.2.3"));
+        let old = fake_binary(dir.path(), "kubesolo v1.2.2");
+        assert!(binary_outdated(&old, "v1.2.3"));
+        let current = fake_binary(dir.path(), "kubesolo v1.2.3");
+        assert!(!binary_outdated(&current, "v1.2.3"));
+    }
 
     #[test]
     fn the_last_words_say_how_to_reach_the_cluster() {
