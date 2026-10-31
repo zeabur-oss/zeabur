@@ -46,7 +46,7 @@ sudo zeabur-installer doctor
 2. 寫入 K3s 或 RKE2 的設定、CIS 要求的 kernel 參數，以及稽核政策。稽核紀錄只有請求的 metadata，記下每個 Secret 請求，見[機密的加密與存取紀錄](./security.mdx#機密的加密與存取紀錄)。
 3. 下載 K3s 或 RKE2 到 `/var/lib/rancher/zeabur-installer/downloads`，用 installer 釘選的 SHA-256 核對，啟動 `k3s` 或 `rke2-server`，等待 API 與節點就緒。
 4. 建立元件的 Namespace、基準 NetworkPolicy 和儲存類別。CIS 在 `kube-system` 的預設政策會擋掉外部連到 ServiceLB 的流量。節點上沒有 Traefik 時，從這個節點進來的請求會到不了 Traefik，所以 installer 另外加上 `kube-system/zeabur-installer-servicelb`，只讓外部流量進 ServiceLB 的副本。
-5. 依 Catalog 順序安裝元件並等待就緒。每個 chart 和 manifest 檔都先下載，跟 Catalog 寫的 SHA-256 不一樣就停下。裝每個 chart 之前，會先用 server-side apply 套用 chart 的 `crds/` 資料夾裡的 CRD，所以升級時 CRD 會跟著 chart 更新（Helm 只在第一次安裝時才套用）。installer 不會刪除 CRD。
+5. 依 Catalog 順序安裝元件並等待就緒。每個 chart 和 manifest 檔都先下載，跟 Catalog 寫的 SHA-256 不一樣就停下。Helm 只在第一次安裝時套用 chart `crds/` 資料夾裡的 CRD，所以 installer 在安裝每個 chart 之前，會先用 server-side apply 套用這些 CRD，升級時 CRD 才會跟著 chart 更新。套用的是 chart 本身和 values 啟用的子 chart 裡的 `crds/`。chart 用範本產生的 CRD 由 Helm 升級，installer 不會套用。installer 也不會刪除 CRD。
 6. `zeabur: true` 時，先加上 `zeabur-system-hosts` 准入政策，不讓專案用 Zeabur 和 Zeabur Identity 的網域，見[Zeabur 和 Zeabur Identity 的網域](./security.mdx#zeabur-和-zeabur-identity-的網域)。再安裝 Zeabur Identity、讓 API server 信任它、註冊 OAuth client，最後安裝 Zeabur。API server 連 Zeabur Identity 用的憑證由 cert-manager 自動續期，見[Zeabur Identity 的內部憑證](./security.mdx#zeabur-identity-的內部憑證)。
 7. 第一次安裝時印出第一位管理員的設定連結（24 小時內有效、只能用一次），並把安裝紀錄寫到 `kube-system/zeabur-installer` ConfigMap。
 
