@@ -21,7 +21,6 @@ serde-saphyr.workspace = true
 sha2.workspace = true
 tar.workspace = true
 thiserror.workspace = true
-regex.workspace = true
 ureq.workspace = true
 
 [dev-dependencies]

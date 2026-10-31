@@ -1,6 +1,6 @@
 //! Unpacking the RKE2 tarball, and packing and reading charts.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs::File;
 use std::io::Read as _;
 use std::path::Path;
@@ -12,8 +12,6 @@ use serde::Deserialize;
 use serde_json::Value;
 
 use crate::HostError;
-
-mod version;
 
 /// Unpacks a `.tar.gz` into `dest`, keeping modes. Entries leaving `dest` are refused by `tar`.
 ///
@@ -51,8 +49,7 @@ pub fn pack_chart(dir: &Path, name: &str) -> Result<Vec<u8>, HostError> {
 /// or packaged as `charts/*.tgz`, in path order; empty when there are none. A subchart is left
 /// out, with its own subcharts, as Helm leaves it out [helm-deps]: by the first of its
 /// `condition` paths that holds a boolean, or else when its `tags` are all false, both read from
-/// the values Helm's `CoalesceValues` builds, with every subchart's defaults under its name. A
-/// subchart answers to the dependency that names it and whose version constraint it meets.
+/// the values Helm's `CoalesceValues` builds, with every subchart's defaults under its name.
 ///
 /// [helm-crds]: https://helm.sh/docs/chart_best_practices/custom_resource_definitions/
 /// [helm-deps]: https://github.com/helm/helm/blob/v4.1.4/pkg/chart/v2/util/dependencies.go
@@ -60,7 +57,8 @@ pub fn pack_chart(dir: &Path, name: &str) -> Result<Vec<u8>, HostError> {
 /// # Errors
 ///
 /// When the archive, a `Chart.yaml` or a `values.yaml` cannot be read, or a subchart's name holds
-/// a value that is not a table, which Helm refuses too.
+/// a value that is not a table, which Helm refuses too, or when a chart packs two subcharts of
+/// one name, whose versions Helm would tell apart by the dependencies' version constraints.
 pub fn chart_crds(archive: &[u8], values: &Value) -> Result<Vec<u8>, HostError> {
     let chart = read_chart(archive, "")?;
     let user = values.as_object().cloned().unwrap_or_default();
@@ -78,7 +76,6 @@ pub fn chart_crds(archive: &[u8], values: &Value) -> Result<Vec<u8>, HostError> 
 
 struct Chart {
     name: String,
-    version: String,
     dependencies: Option<Vec<Dependency>>,
     values: Value,
     crds: Vec<(String, String)>,
@@ -88,16 +85,12 @@ struct Chart {
 #[derive(Deserialize)]
 struct Metadata {
     name: String,
-    #[serde(default)]
-    version: String,
     dependencies: Option<Vec<Dependency>>,
 }
 
 #[derive(Deserialize)]
 struct Dependency {
     name: String,
-    #[serde(default)]
-    version: String,
     #[serde(default)]
     alias: Option<String>,
     #[serde(default)]
@@ -209,9 +202,17 @@ fn build_chart(files: BTreeMap<String, Vec<u8>>, path: &str) -> Result<Chart, Ho
         subcharts.push(build_chart(files, &format!("{path}charts/{dir}/"))?);
     }
     let metadata = metadata.ok_or_else(|| parse_error(path, &"no Chart.yaml"))?;
+    let mut names = BTreeSet::new();
+    for sub in &subcharts {
+        if !names.insert(sub.name.as_str()) {
+            return Err(parse_error(
+                path,
+                &format!("more than one subchart is named {}", sub.name),
+            ));
+        }
+    }
     Ok(Chart {
         name: metadata.name,
-        version: metadata.version,
         dependencies: metadata.dependencies,
         values,
         crds,
@@ -282,11 +283,6 @@ impl Dependency {
             .filter(|a| !a.is_empty())
             .unwrap_or(&self.name)
     }
-
-    /// Whether `chart` is this dependency: Helm matches the name and the version constraint.
-    fn matches(&self, chart: &Chart) -> bool {
-        self.name == chart.name && version::compatible(&self.version, &chart.version)
-    }
 }
 
 /// The subcharts as Helm names them: by alias once `processDependencyEnabled` has run on `chart`
@@ -296,12 +292,12 @@ fn subcharts(chart: &Chart, aliased: bool) -> Vec<(&Chart, String)> {
     let mut out: Vec<_> = chart
         .subcharts
         .iter()
-        .filter(|s| !aliased || !listed.iter().any(|d| d.matches(s)))
+        .filter(|s| !aliased || !listed.iter().any(|d| d.name == s.name))
         .map(|s| (s, s.name.clone()))
         .collect();
     if aliased {
         for dependency in listed {
-            if let Some(sub) = chart.subcharts.iter().find(|s| dependency.matches(s)) {
+            if let Some(sub) = chart.subcharts.iter().find(|s| s.name == dependency.name) {
                 out.push((sub, dependency.key().to_owned()));
             }
         }
@@ -457,11 +453,7 @@ mod tests {
     #[test]
     fn charts_pack_under_their_name() {
         let dir = tempfile::tempdir().unwrap();
-        std::fs::write(
-            dir.path().join("Chart.yaml"),
-            "name: zeabur\nversion: 1.0.0\n",
-        )
-        .unwrap();
+        std::fs::write(dir.path().join("Chart.yaml"), "name: zeabur\n").unwrap();
         let bytes = pack_chart(dir.path(), "zeabur").unwrap();
         let mut archive = tar::Archive::new(GzDecoder::new(bytes.as_slice()));
         let mut names = Vec::new();
@@ -491,18 +483,15 @@ mod tests {
     #[test]
     fn crds_come_from_the_chart_and_its_unpacked_and_packaged_subcharts() {
         let dir = chart(&[
-            ("Chart.yaml", "name: c\nversion: 1.0.0\n"),
+            ("Chart.yaml", "name: c\n"),
             ("crds/a.yaml", "kind: A\n"),
             ("crds/notes.txt", "not a manifest\n"),
             ("templates/crds/t.yaml", "kind: Templated\n"),
-            ("charts/sub/Chart.yaml", "name: sub\nversion: 1.0.0\n"),
+            ("charts/sub/Chart.yaml", "name: sub\n"),
             ("charts/sub/crds/b.yaml", "kind: B\n"),
             ("crds/v1/nested.yaml", "kind: Nested\n"),
         ]);
-        let packaged = chart(&[
-            ("Chart.yaml", "name: dep\nversion: 1.0.0\n"),
-            ("crds/p.yaml", "kind: P\n"),
-        ]);
+        let packaged = chart(&[("Chart.yaml", "name: dep\n"), ("crds/p.yaml", "kind: P\n")]);
         std::fs::write(
             dir.path().join("charts/dep-1.0.0.tgz"),
             pack_chart(packaged.path(), "dep").unwrap(),
@@ -512,7 +501,7 @@ mod tests {
             crds(&dir, "c", &Value::Null),
             "kind: P\n\n---\nkind: B\n\n---\nkind: A\n\n---\nkind: Nested\n"
         );
-        let bare = chart(&[("Chart.yaml", "name: c\nversion: 1.0.0\n")]);
+        let bare = chart(&[("Chart.yaml", "name: c\n")]);
         assert_eq!(crds(&bare, "c", &Value::Null), "");
     }
 
@@ -521,13 +510,13 @@ mod tests {
         let dir = chart(&[
             (
                 "Chart.yaml",
-                "name: c\nversion: 1.0.0\ndependencies:\n  - name: sub\n    version: ^1\n    condition: sub.enabled\n",
+                "name: c\ndependencies:\n  - name: sub\n    condition: sub.enabled\n",
             ),
             (
                 "values.yaml",
                 "sub:\n  enabled: false\n---\nsub:\n  enabled: true\n",
             ),
-            ("charts/sub/Chart.yaml", "name: sub\nversion: 1.0.0\n"),
+            ("charts/sub/Chart.yaml", "name: sub\n"),
             ("charts/sub/crds/s.yaml", "kind: S\n"),
             ("charts/.cache/info.yaml", "note: auxiliary\n"),
             ("charts/_tmp/info.yaml", "note: auxiliary\n"),
@@ -540,13 +529,13 @@ mod tests {
         let dir = chart(&[
             (
                 "Chart.yaml",
-                "name: c\nversion: 1.0.0\ndependencies:\n  - name: sub\n    version: ^1\n    condition: sub.enabled\n",
+                "name: c\ndependencies:\n  - name: sub\n    condition: sub.enabled\n",
             ),
             (
                 "values.yaml",
                 "sub:\n  other: 1\n---\nsub:\n  enabled: true\n",
             ),
-            ("charts/sub/Chart.yaml", "name: sub\nversion: 1.0.0\n"),
+            ("charts/sub/Chart.yaml", "name: sub\n"),
             ("charts/sub/crds/s.yaml", "kind: S\n"),
         ]);
         assert_eq!(crds(&dir, "c", &Value::Null), "kind: S\n");
@@ -559,11 +548,11 @@ mod tests {
         let operator = chart(&[
             (
                 "Chart.yaml",
-                "name: operator\nversion: 1.0.0\ndependencies:\n  - name: crds\n    version: ^1\n    condition: crds.plain\n",
+                "name: operator\ndependencies:\n  - name: crds\n    condition: crds.plain\n",
             ),
             ("values.yaml", "crds:\n  plain: false\n"),
             ("templates/crd.yaml", "kind: Templated\n"),
-            ("charts/crds/Chart.yaml", "name: crds\nversion: 1.0.0\n"),
+            ("charts/crds/Chart.yaml", "name: crds\n"),
             ("charts/crds/crds/crd.yaml", "kind: Plain\n"),
         ]);
         assert_eq!(crds(&operator, "operator", &Value::Null), "");
@@ -573,7 +562,7 @@ mod tests {
         let stack = chart(&[
             (
                 "Chart.yaml",
-                "name: stack\nversion: 1.0.0\ndependencies:\n  - name: operator\n    version: ^1\n    condition: operator.enabled\n",
+                "name: stack\ndependencies:\n  - name: operator\n    condition: operator.enabled\n",
             ),
             ("values.yaml", "operator:\n  enabled: true\n"),
         ]);
@@ -594,10 +583,10 @@ mod tests {
         let dir = chart(&[
             (
                 "Chart.yaml",
-                "name: c\nversion: 1.0.0\ndependencies:\n  - name: sub\n    version: ^1\n    alias: extra\n    tags: [extras]\n    condition: extra.enabled,other.enabled\n",
+                "name: c\ndependencies:\n  - name: sub\n    alias: extra\n    tags: [extras]\n    condition: extra.enabled,other.enabled\n",
             ),
             ("values.yaml", "tags:\n  extras: false\n"),
-            ("charts/sub/Chart.yaml", "name: sub\nversion: 1.0.0\n"),
+            ("charts/sub/Chart.yaml", "name: sub\n"),
             ("charts/sub/crds/s.yaml", "kind: S\n"),
         ]);
         assert_eq!(crds(&dir, "c", &Value::Null), "");
@@ -614,20 +603,17 @@ mod tests {
         let dir = chart(&[
             (
                 "Chart.yaml",
-                "name: c\nversion: 1.0.0\ndependencies:\n  - name: sub\n    version: ^1\n    tags: [extras]\n    condition: sub.enabled\n  - name: other\n    version: ^1\n    condition: other.inner.on\n",
+                "name: c\ndependencies:\n  - name: sub\n    tags: [extras]\n    condition: sub.enabled\n  - name: other\n    condition: other.inner.on\n",
             ),
             ("values.yaml", "tags:\n  extras: false\n"),
-            ("charts/sub/Chart.yaml", "name: sub\nversion: 1.0.0\n"),
+            ("charts/sub/Chart.yaml", "name: sub\n"),
             ("charts/sub/values.yaml", "enabled: true\n"),
             ("charts/sub/crds/s.yaml", "kind: S\n"),
             (
                 "charts/other/Chart.yaml",
-                "name: other\nversion: 1.0.0\ndependencies:\n  - name: inner\n    version: ^1\n    condition: inner.on\n",
+                "name: other\ndependencies:\n  - name: inner\n    condition: inner.on\n",
             ),
-            (
-                "charts/other/charts/inner/Chart.yaml",
-                "name: inner\nversion: 1.0.0\n",
-            ),
+            ("charts/other/charts/inner/Chart.yaml", "name: inner\n"),
             ("charts/other/charts/inner/values.yaml", "on: true\n"),
             ("charts/other/charts/inner/crds/i.yaml", "kind: I\n"),
         ]);
@@ -646,10 +632,10 @@ mod tests {
         let dir = chart(&[
             (
                 "Chart.yaml",
-                "name: c\nversion: 1.0.0\ndependencies:\n  - name: sub\n    version: ^1\n    condition: sub.global.enabled\n",
+                "name: c\ndependencies:\n  - name: sub\n    condition: sub.global.enabled\n",
             ),
             ("values.yaml", "global:\n  enabled: true\n"),
-            ("charts/sub/Chart.yaml", "name: sub\nversion: 1.0.0\n"),
+            ("charts/sub/Chart.yaml", "name: sub\n"),
             ("charts/sub/values.yaml", "global:\n  enabled: false\n"),
             ("charts/sub/crds/s.yaml", "kind: S\n"),
         ]);
@@ -665,9 +651,9 @@ mod tests {
         let dir = chart(&[
             (
                 "Chart.yaml",
-                "name: c\nversion: 1.0.0\ndependencies:\n  - name: sub\n    version: ^1\n    condition: sub.enabled,sub.fallback\n",
+                "name: c\ndependencies:\n  - name: sub\n    condition: sub.enabled,sub.fallback\n",
             ),
-            ("charts/sub/Chart.yaml", "name: sub\nversion: 1.0.0\n"),
+            ("charts/sub/Chart.yaml", "name: sub\n"),
             ("charts/sub/values.yaml", "enabled: false\nfallback: true\n"),
             ("charts/sub/crds/s.yaml", "kind: S\n"),
         ]);
@@ -677,13 +663,24 @@ mod tests {
     }
 
     #[test]
-    fn a_subchart_name_holding_no_table_is_refused_as_helm_does() {
+    fn two_subcharts_of_one_name_are_refused() {
         let dir = chart(&[
             (
                 "Chart.yaml",
-                "name: c\nversion: 1.0.0\ndependencies:\n  - name: sub\n    version: ^1\n",
+                "name: c\ndependencies:\n  - name: sub\n    version: ~1.0.0\n    alias: old\n  - name: sub\n    version: \">= 2.0.0\"\n    alias: new\n",
             ),
-            ("charts/sub/Chart.yaml", "name: sub\nversion: 1.0.0\n"),
+            ("charts/sub-1/Chart.yaml", "name: sub\nversion: 1.0.3\n"),
+            ("charts/sub-2/Chart.yaml", "name: sub\nversion: 2.1.0\n"),
+        ]);
+        let error = crds_for(&dir, "c", &Value::Null).unwrap_err().to_string();
+        assert!(error.contains("sub"), "{error}");
+    }
+
+    #[test]
+    fn a_subchart_name_holding_no_table_is_refused_as_helm_does() {
+        let dir = chart(&[
+            ("Chart.yaml", "name: c\ndependencies:\n  - name: sub\n"),
+            ("charts/sub/Chart.yaml", "name: sub\n"),
         ]);
         let null = serde_json::json!({"sub": null});
         let error = crds_for(&dir, "c", &null).unwrap_err().to_string();
@@ -697,18 +694,12 @@ mod tests {
     #[test]
     fn the_defaults_of_an_aliased_sub_subchart_are_not_seen() {
         let dir = chart(&[
-            (
-                "Chart.yaml",
-                "name: c\nversion: 1.0.0\ndependencies:\n  - name: mid\n    version: ^1\n",
-            ),
+            ("Chart.yaml", "name: c\ndependencies:\n  - name: mid\n"),
             (
                 "charts/mid/Chart.yaml",
-                "name: mid\nversion: 1.0.0\ndependencies:\n  - name: leaf\n    version: ^1\n    alias: x\n    condition: x.on\n",
+                "name: mid\ndependencies:\n  - name: leaf\n    alias: x\n    condition: x.on\n",
             ),
-            (
-                "charts/mid/charts/leaf/Chart.yaml",
-                "name: leaf\nversion: 1.0.0\n",
-            ),
+            ("charts/mid/charts/leaf/Chart.yaml", "name: leaf\n"),
             ("charts/mid/charts/leaf/values.yaml", "on: false\n"),
             ("charts/mid/charts/leaf/crds/l.yaml", "kind: L\n"),
         ]);
@@ -718,34 +709,13 @@ mod tests {
     }
 
     #[test]
-    fn aliases_of_one_chart_pick_the_version_their_constraint_names() {
-        let dir = chart(&[
-            (
-                "Chart.yaml",
-                "name: c\nversion: 1.0.0\ndependencies:\n  - name: sub\n    version: ~1.0.0\n    alias: old\n    condition: old.enabled\n  - name: sub\n    version: \">= 2.0.0\"\n    alias: new\n    condition: new.enabled\n",
-            ),
-            (
-                "values.yaml",
-                "old:\n  enabled: false\nnew:\n  enabled: true\n",
-            ),
-            ("charts/sub-1/Chart.yaml", "name: sub\nversion: 1.0.3\n"),
-            ("charts/sub-1/crds/s.yaml", "kind: V1\n"),
-            ("charts/sub-2/Chart.yaml", "name: sub\nversion: 2.1.0\n"),
-            ("charts/sub-2/crds/s.yaml", "kind: V2\n"),
-        ]);
-        assert_eq!(crds(&dir, "c", &Value::Null), "kind: V2\n");
-        let flipped = serde_json::json!({"old": {"enabled": true}, "new": {"enabled": false}});
-        assert_eq!(crds(&dir, "c", &flipped), "kind: V1\n");
-    }
-
-    #[test]
     fn an_alias_scopes_the_subchart_defaults() {
         let dir = chart(&[
             (
                 "Chart.yaml",
-                "name: c\nversion: 1.0.0\ndependencies:\n  - name: sub\n    version: ^1\n    alias: extra\n    condition: extra.enabled\n",
+                "name: c\ndependencies:\n  - name: sub\n    alias: extra\n    condition: extra.enabled\n",
             ),
-            ("charts/sub/Chart.yaml", "name: sub\nversion: 1.0.0\n"),
+            ("charts/sub/Chart.yaml", "name: sub\n"),
             ("charts/sub/values.yaml", "enabled: false\n"),
             ("charts/sub/crds/s.yaml", "kind: S\n"),
         ]);

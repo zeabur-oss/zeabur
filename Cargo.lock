@@ -2900,7 +2900,6 @@ dependencies = [
  "base64 0.23.1",
  "flate2",
  "hex",
- "regex",
  "rustls",
  "serde",
  "serde-saphyr 2.0.0",
