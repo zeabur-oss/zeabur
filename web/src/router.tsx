@@ -164,11 +164,8 @@ const projectRoute = createRoute({
   // Incidents and suggestions are slow to read, so the loader starts them and waits only for the
   // project. The suggestions keep their place in the header; an incident adds a row when it arrives.
   loader: ({ params }) => {
-    void queryClient.prefetchQuery({
-      ...projectIncidentsQuery(params.project),
-      staleTime: "static",
-    })
-    void queryClient.prefetchQuery({ ...projectGapsQuery(params.project), staleTime: "static" })
+    ensure(projectIncidentsQuery(params.project)).catch(() => undefined)
+    ensure(projectGapsQuery(params.project)).catch(() => undefined)
     return load(loadProject(params.project))
   },
   remountDeps: ({ params }) => params.project,
