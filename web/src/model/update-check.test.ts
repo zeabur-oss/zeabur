@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test"
+import { describe, expect, setSystemTime, test } from "bun:test"
 
 import {
   CHECK_EVERY,
@@ -8,6 +8,7 @@ import {
   normalReleases,
   parseVersion,
   releases,
+  updateCheckQuery,
   type Release,
 } from "@/model/update-check"
 
@@ -128,5 +129,29 @@ describe("checking once a day", () => {
     const storage = memory({ "zeabur.updateCheck": "{not json" })
     const list = await releases(ok, storage, 0)
     expect(list.map((r) => r.version)).toEqual(["0.2.0"])
+  })
+})
+
+describe("a page left open", () => {
+  test("polls daily, and each poll asks GitHub only once the day's cache has expired", async () => {
+    const storage = memory()
+    let requests = 0
+    const fetcher = async () => {
+      requests++
+      return { ok: true, json: async () => [github("v1.0.0")] } as Response
+    }
+    const options = updateCheckQuery(fetcher, storage, true)
+    expect(options.refetchInterval).toBe(CHECK_EVERY)
+    const poll = async () => await (options.queryFn as () => Promise<Release[]>)()
+    try {
+      await poll()
+      await poll()
+      expect(requests).toBe(1)
+      setSystemTime(new Date(Date.now() + CHECK_EVERY + 1))
+      await poll()
+      expect(requests).toBe(2)
+    } finally {
+      setSystemTime()
+    }
   })
 })

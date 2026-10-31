@@ -7,18 +7,13 @@ import { StatusPill } from "@/components/status"
 import { useI18n, useT } from "@/i18n"
 import { docsUrl } from "@/lib/docs"
 import { load, save } from "@/lib/stores"
-import { findNewer, releases, type Newer, type Release } from "@/model/update-check"
+import { findNewer, updateCheckQuery, type Newer, type Release } from "@/model/update-check"
 
 function useNewer(): { zeabur?: Schemas.ZeaburVersion; newer?: Newer } {
   const zeabur = useQuery(zeaburQuery).data
-  const checked = useQuery({
-    queryKey: ["update-check"],
-    queryFn: async () =>
-      await releases((url, init) => fetch(url, init), { load, save }, Date.now()),
-    enabled: zeabur?.updateCheck === true,
-    staleTime: Infinity,
-    retry: false,
-  }).data
+  const checked = useQuery(
+    updateCheckQuery((url, init) => fetch(url, init), { load, save }, zeabur?.updateCheck === true),
+  ).data
   return { zeabur, newer: zeabur && checked ? findNewer(checked, zeabur.version) : undefined }
 }
 

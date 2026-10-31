@@ -1,6 +1,8 @@
 /** The update check: once a day this browser reads Zeabur's releases from GitHub and compares
  * the newest normal one with the running version. Zeabur's server makes no request. */
 
+import { queryOptions } from "@tanstack/react-query"
+
 export const RELEASES_URL = "https://api.github.com/repos/zeabur-oss/zeabur/releases"
 export const CHECK_EVERY = 24 * 60 * 60_000
 const CHECK_TIMEOUT = 10_000
@@ -147,4 +149,17 @@ export async function releases(fetcher: Fetch, storage: Storage, now: number): P
   }
   storage.save(CACHE_KEY, JSON.stringify({ checkedAt: now, releases: fresh } satisfies Cached))
   return fresh
+}
+
+/** The releases as a query that asks again every day, so a page left open still reaches the
+ * cache's expiry; `releases` itself decides whether that is a request. */
+export function updateCheckQuery(fetcher: Fetch, storage: Storage, enabled: boolean) {
+  return queryOptions({
+    queryKey: ["update-check"],
+    queryFn: async () => await releases(fetcher, storage, Date.now()),
+    enabled,
+    staleTime: Infinity,
+    refetchInterval: CHECK_EVERY,
+    retry: false,
+  })
 }
