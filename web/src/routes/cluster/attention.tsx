@@ -107,7 +107,13 @@ function UpdateLinks({ newer, guide }: { newer: Newer; guide: string }) {
   const t = useT()
   return (
     <span className="flex flex-col items-end gap-2 sm:flex-row sm:items-center sm:gap-3">
-      {newer.security.length > 0 ? null : (
+      {newer.security.length > 0 ? (
+        newer.security.map((release) => (
+          <OutLink key={release.version} href={release.url}>
+            {t("update.notesOf", release.version)}
+          </OutLink>
+        ))
+      ) : (
         <OutLink href={newer.latest.url}>{t("update.notes")}</OutLink>
       )}
       <a

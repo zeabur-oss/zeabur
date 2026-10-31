@@ -225,6 +225,7 @@ export const zhCN: Messages = {
   "update.security": (product, version) => `${product} ${version} 有已知的安全问题`,
   "update.fixedIn": (versions) => `已在 ${versions} 修复。`,
   "update.notes": "发布说明",
+  "update.notesOf": (version) => `v${version} 发布说明`,
   "update.guide": "升级方法",
   "update.download": "下载",
   "update.how.installer": "下载新版 zeabur-installer，用原来的配置运行 plan 和 apply。",

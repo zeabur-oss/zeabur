@@ -1,4 +1,6 @@
 import { describe, expect, test } from "bun:test"
+import { createElement, Fragment } from "react"
+import { renderToStaticMarkup } from "react-dom/server"
 
 import { translator } from "@/i18n"
 import { en } from "@/i18n/en"
@@ -9,6 +11,7 @@ const t = translator(en)
 const release = (version: string): Release => ({
   version,
   url: `https://example.test/${version}`,
+  prerelease: false,
   security: false,
 })
 const running = { version: "0.1.1", updateCheck: true, installedBy: "helm" } as const
@@ -31,6 +34,15 @@ describe("updateItem", () => {
     expect(item.detail).toContain("Fixed in v0.1.3, v0.1.2.")
     expect(item.detail).toContain("helm upgrade")
     expect(item.lift).toBe(true)
+  })
+
+  test("a security release links the notes of each release that fixes it", () => {
+    const fixes = [release("0.1.3"), release("0.1.2")]
+    const item = updateItem(t, "en", running, { latest: release("0.2.0"), security: fixes })
+    const html = renderToStaticMarkup(createElement(Fragment, null, item.link))
+    expect(html).toContain('href="https://example.test/0.1.3"')
+    expect(html).toContain('href="https://example.test/0.1.2"')
+    expect(html).toContain("v0.1.2 release notes")
   })
 
   test("zeaburctl is named as itself and has no install step beyond its own", () => {

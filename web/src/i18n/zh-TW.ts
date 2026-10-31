@@ -224,6 +224,7 @@ export const zhTW: Messages = {
   "update.security": (product, version) => `${product} ${version} 有已知的安全性問題`,
   "update.fixedIn": (versions) => `已在 ${versions} 修正。`,
   "update.notes": "發行說明",
+  "update.notesOf": (version) => `v${version} 發行說明`,
   "update.guide": "升級方式",
   "update.download": "下載",
   "update.how.installer": "下載新版 zeabur-installer，用原本的設定執行 plan 和 apply。",

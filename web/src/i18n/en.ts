@@ -229,6 +229,7 @@ export const en = {
     `${product} ${version} has known security problems`,
   "update.fixedIn": (versions: string) => `Fixed in ${versions}.`,
   "update.notes": "Release notes",
+  "update.notesOf": (version: string) => `v${version} release notes`,
   "update.guide": "How to upgrade",
   "update.download": "Download",
   "update.how.installer":
