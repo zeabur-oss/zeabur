@@ -3695,6 +3695,7 @@ export const zhTW: Messages = {
   "project.viewMap": "架構圖",
   "project.viewList": "清單",
   "project.suggestions": (n) => `${n} 項建議`,
+  "project.suggestionsLoading": "正在找建議…",
   "project.suggestionsBody":
     "這些服務還缺少的設定。現在不補也不會讓服務停止，但補上之後，比較容易提早發現或避開問題。",
   "project.activity": "動態",

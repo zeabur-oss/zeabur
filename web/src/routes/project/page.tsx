@@ -20,6 +20,7 @@ import { StatusPill } from "@/components/status"
 import { Button } from "@zeabur/design-system/components/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@zeabur/design-system/components/card"
 import { Drawer } from "@zeabur/design-system/components/drawer"
+import { Skeleton } from "@zeabur/design-system/components/skeleton"
 import { PageColumn } from "@zeabur/design-system/components/page-column"
 import { PageHeader } from "@zeabur/design-system/components/page-header"
 import { useT } from "@/i18n"
@@ -27,7 +28,7 @@ import { useHistoryIndex, useLocationText } from "@/lib/history"
 import { PHONE, useMedia, WIDE } from "@/lib/media"
 import { useProjectSummary } from "@/lib/project-name"
 import { projectView } from "@/lib/stores"
-import { groupProblems } from "@/model/attention"
+import { groupProblems, type ProblemGroup } from "@/model/attention"
 import { mapReadable } from "@/model/layout"
 import { suggestionsOf } from "@/model/overview"
 import { projectTitle } from "@/model/project"
@@ -236,6 +237,13 @@ function Suggestions({ project, data }: { project: string; data: Project }) {
   const [open, setOpen] = useState(false)
   const gaps = useQuery(projectGapsQuery(project))
   const items = gaps.data?.items ?? []
+  if (gaps.isPending)
+    return (
+      <div aria-busy="true">
+        <span className="sr-only">{t("project.suggestionsLoading")}</span>
+        <Skeleton className="h-8 w-32" />
+      </div>
+    )
   if (items.length === 0) return null
   return (
     <>
@@ -260,16 +268,24 @@ function Suggestions({ project, data }: { project: string; data: Project }) {
 }
 
 function Problems({ project, services }: { project: string; services: Service[] }) {
-  const t = useT()
-  const phone = useMedia(PHONE)
-  const [all, setAll] = useState(false)
   const incidents = useQuery(projectIncidentsQuery(project)).data?.items ?? []
   const down = takenDown(incidents)
   const groups = groupProblems(services.filter((s) => !isTakenDown(down, project, s)))
-  const broken = groups.reduce((sum, g) => sum + g.services.length, 0)
   if (groups.length === 0 && incidents.length === 0) return null
-  const limit = phone ? PROBLEMS_SHOWN_PHONE : PROBLEMS_SHOWN
-  const shown = all || groups.length <= limit + 1 ? groups : groups.slice(0, limit)
+  return <ProblemsCard project={project} incidents={incidents} groups={groups} />
+}
+
+function ProblemsCard({
+  project,
+  incidents,
+  groups,
+}: {
+  project: string
+  incidents: Schemas.Incident[]
+  groups: ProblemGroup[]
+}) {
+  const t = useT()
+  const broken = groups.reduce((sum, g) => sum + g.services.length, 0)
   return (
     <section aria-labelledby="project-problems">
       <Card variant="list">
@@ -284,24 +300,45 @@ function Problems({ project, services }: { project: string; services: Service[] 
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <ul className="flex flex-col">
-            {incidents.map((incident) => (
-              <IncidentRow key={incident.id} incident={incident} showProject={false} />
-            ))}
-            {shown.map((group) => (
-              <ProblemGroupRow key={group.key} project={project} group={group} />
-            ))}
-          </ul>
-          {shown.length < groups.length || all ? (
-            <div className="border-t border-rule px-2 py-1.5">
-              <Button variant="ghost" size="xs" onClick={() => setAll(!all)}>
-                {all ? t("services.showFewer") : t("services.showAll", groups.length)}
-              </Button>
-            </div>
-          ) : null}
+          <ProblemList project={project} incidents={incidents} groups={groups} />
         </CardContent>
       </Card>
     </section>
+  )
+}
+
+function ProblemList({
+  project,
+  incidents,
+  groups,
+}: {
+  project: string
+  incidents: Schemas.Incident[]
+  groups: ProblemGroup[]
+}) {
+  const t = useT()
+  const phone = useMedia(PHONE)
+  const [all, setAll] = useState(false)
+  const limit = phone ? PROBLEMS_SHOWN_PHONE : PROBLEMS_SHOWN
+  const shown = all || groups.length <= limit + 1 ? groups : groups.slice(0, limit)
+  return (
+    <>
+      <ul className="flex flex-col">
+        {incidents.map((incident) => (
+          <IncidentRow key={incident.id} incident={incident} showProject={false} />
+        ))}
+        {shown.map((group) => (
+          <ProblemGroupRow key={group.key} project={project} group={group} />
+        ))}
+      </ul>
+      {shown.length < groups.length || all ? (
+        <div className="border-t border-rule px-2 py-1.5">
+          <Button variant="ghost" size="xs" onClick={() => setAll(!all)}>
+            {all ? t("services.showFewer") : t("services.showAll", groups.length)}
+          </Button>
+        </div>
+      ) : null}
+    </>
   )
 }
 

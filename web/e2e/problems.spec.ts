@@ -174,3 +174,23 @@ test("each problem type has a page that explains its rule", async ({ page }) => 
   await page.goto("/problems/no-such-kind")
   await expect(page.getByText("This page doesn't exist")).toBeVisible()
 })
+
+test("the project page shows its services while the suggestions are still being read", async ({
+  page,
+}) => {
+  let release = () => {}
+  const held = new Promise<void>((resolve) => (release = resolve))
+  await page.route(/\/api\/v1\/projects\/[^/]+\/gaps$/, async (route) => {
+    await held
+    await route.continue()
+  })
+  await page.goto(`${project}?view=list`)
+  const services = page
+    .getByRole("table", { name: "Services" })
+    .or(page.getByRole("list", { name: "Services" }))
+  await expect(services).toBeVisible()
+  const waiting = page.locator("main header").first().getByText("Looking for suggestions…")
+  await expect(waiting).toBeVisible()
+  release()
+  await expect(waiting).toHaveCount(0)
+})
