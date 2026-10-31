@@ -13,7 +13,7 @@ export function RoutePending() {
   const t = useT()
   return (
     <PageColumn className="my-6">
-      <LoadingRows label={t("common.loading")} rows={6} />
+      <LoadingRows label={t("common.loading")} rows={6} delay="none" />
     </PageColumn>
   )
 }

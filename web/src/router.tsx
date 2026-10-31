@@ -161,13 +161,13 @@ const projectRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/projects/$project",
   validateSearch: projectSearch,
-  // Incidents and suggestions add to the header and the top of the page, so they are read first.
-  loader: ({ params }) =>
-    load(
-      loadProject(params.project),
-      ensure(projectIncidentsQuery(params.project)),
-      ensure(projectGapsQuery(params.project)),
-    ),
+  // Incidents and suggestions are slow to read, so the loader starts them and waits only for the
+  // project. The suggestions keep their place in the header; an incident adds a row when it arrives.
+  loader: ({ params }) => {
+    ensure(projectIncidentsQuery(params.project)).catch(() => undefined)
+    ensure(projectGapsQuery(params.project)).catch(() => undefined)
+    return load(loadProject(params.project))
+  },
   remountDeps: ({ params }) => params.project,
   component: lazyRouteComponent(() => import("@/routes/project/page"), "ProjectPage"),
 })

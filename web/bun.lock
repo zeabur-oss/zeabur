@@ -18,7 +18,7 @@
         "@tanstack/react-virtual": "3.14.21",
         "@xterm/addon-fit": "0.11.0",
         "@xterm/xterm": "6.0.0",
-        "@zeabur/design-system": "file:../vendor/zeabur-design-system-43ade36.tgz",
+        "@zeabur/design-system": "file:../vendor/zeabur-design-system-e1953e5.tgz",
         "class-variance-authority": "0.7.1",
         "cn": "0.5.0",
         "fflate": "0.8.3",
@@ -595,7 +595,7 @@
 
     "@xterm/xterm": ["@xterm/xterm@6.0.0", "", {}, "sha512-TQwDdQGtwwDt+2cgKDLn0IRaSxYu1tSUjgKarSDkUM0ZNiSRXFpjxEsvc/Zgc5kq5omJ+V0a8/kIM2WD3sMOYg=="],
 
-    "@zeabur/design-system": ["@zeabur/design-system@../vendor/zeabur-design-system-43ade36.tgz", { "peerDependencies": { "@base-ui/react": "^1.8.0", "class-variance-authority": "^0.7.1", "cn": "^0.4.0", "react": "^19.3.0", "react-dom": "^19.3.0", "recharts": "^3.8.0", "sonner": "^2.0.8", "tailwindcss": "^4.3.0" }, "optionalPeers": ["recharts", "sonner"] }, "sha512-WrYpK8FMxPaaDNhSMeE+xe96uBNF7xSvlNowVVgCi8JxyMg3fQABPW76AZT76Ls64SgdfGBY2NnGi51dICLETQ=="],
+    "@zeabur/design-system": ["@zeabur/design-system@../vendor/zeabur-design-system-e1953e5.tgz", { "peerDependencies": { "@base-ui/react": "^1.8.0", "class-variance-authority": "^0.7.1", "cn": "^0.4.0", "react": "^19.3.0", "react-dom": "^19.3.0", "recharts": "^3.8.0", "sonner": "^2.0.8", "tailwindcss": "^4.3.0" }, "optionalPeers": ["recharts", "sonner"] }, "sha512-h5bohdqsmWV3JiwgLEX2q0Om+/Yh4xt7G9oPIdrGMw9yp/6gQbl4vXb/RqIB6QFkPIg1g5rhPvQrHPeB/qtfgA=="],
 
     "acorn": ["acorn@8.19.0", "", { "bin": { "acorn": "bin/acorn" } }, "sha512-oJlA3XiRm7Cyk6qFD2Jn8ak9B7jSy0qy00ADO3+8dpT0LSjFihQYv4C02LFCSYJV3Q37xYwwRy5m+IpIiUzqWw=="],
 

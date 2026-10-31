@@ -156,6 +156,78 @@ mod tests {
         }
     }
 
+    /// A read goes first and discovery only explains a refusal or a `get` that answers `404`:
+    /// an API that is not installed is `None` whether or not the person may read it, and a
+    /// refusal of an installed one stays a refusal.
+    #[tokio::test]
+    #[ignore = "needs a disposable cluster"]
+    async fn a_refusal_is_told_from_an_api_that_is_not_installed() {
+        let mut role = rules();
+        role.as_array_mut().expect("rules").push(json!({
+            "apiGroups": ["gone.example.com"], "resources": ["things"], "verbs": ["get", "list"]
+        }));
+        let sandbox = Sandbox::new("zeabur-absent", role).await;
+        let user = sandbox.user();
+        let namespace = Some(sandbox.namespace());
+        let allowed = ResourceRef::new("gone.example.com", "v1", "things", "Thing");
+        let forbidden = ResourceRef::new("absent.example.com", "v1", "things", "Thing");
+        let secrets = ResourceRef::new("", "v1", "secrets", "Secret");
+        let config_maps = ResourceRef::new("", "v1", "configmaps", "ConfigMap");
+
+        // Allowed but not installed: kube-apiserver answers 404.
+        assert!(
+            user.list_objects(&allowed, namespace)
+                .await
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            user.list_metadata(&allowed, namespace)
+                .await
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            user.get_object(&allowed, namespace, "a")
+                .await
+                .unwrap()
+                .is_none()
+        );
+        // Not allowed and not installed: kube-apiserver answers 403, discovery says 404.
+        assert!(
+            user.list_objects(&forbidden, namespace)
+                .await
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            user.list_metadata(&forbidden, namespace)
+                .await
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            user.get_object(&forbidden, namespace, "a")
+                .await
+                .unwrap()
+                .is_none()
+        );
+        // Not allowed and installed: the refusal stays.
+        let refused = user.list_objects(&secrets, namespace).await;
+        assert_eq!(refused.unwrap_err().code(), Some(403));
+        let refused = user.get_object(&secrets, namespace, "a").await;
+        assert_eq!(refused.unwrap_err().code(), Some(403));
+        // Allowed and installed: a missing object is a 404, not an absent API.
+        let missing = user.get_object(&config_maps, namespace, "nope").await;
+        assert_eq!(missing.unwrap_err().code(), Some(404));
+        assert!(
+            user.list_objects(&config_maps, namespace)
+                .await
+                .unwrap()
+                .is_some()
+        );
+    }
+
     #[tokio::test]
     #[ignore = "needs a disposable cluster"]
     async fn a_json_patch_writes_as_zeabur_and_its_tests_refuse_a_stale_plan() {

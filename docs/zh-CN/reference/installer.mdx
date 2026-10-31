@@ -54,6 +54,32 @@ sudo zeabur-installer doctor
 
 `apply` 会将 installer 管理的文件改回 installer 生成的内容。自定义配置应写在 `/etc/rancher/k3s/config.yaml.d/90-local.yaml`（K3s）或 `/etc/rancher/rke2/config.yaml.d/90-local.yaml`（RKE2）中，不要修改 installer 生成的 `config.yaml`。
 
+### 已经安装过的服务器
+
+集群里有安装记录 `kube-system/zeabur-installer` 时，`plan` 会先打印 `Changes since the last apply`，写明上次安装用的 installer 版本，再列出这次 `apply` 会改动的地方。个人安装也会显示。列出的项目有：
+
+- K3s、RKE2 或 KubeSolo 的新版本
+- 内容会改动的主机文件
+- 新增和移除的组件
+- 改由其他组件取代的组件
+- 换版本的 chart
+- 不再安装、但 `apply` 会保留的组件：没有 chart 可以卸载的组件（例如 `node-updates/system-upgrade-controller`），以及这版 Catalog 已经没有的组件
+- 这版 Catalog 默认安装、但服务器上还没有的组件
+
+版本或主机文件有改动时，`apply` 会重启 `k3s`、`rke2-server` 或 `kubesolo`。Kubernetes API 大约 10 秒连不上，正在运行的应用照常提供服务。
+
+没有 chart 或这版 Catalog 已经没有的组件，`apply` 不会移除。这些组件装好的内容会继续运行，只是不再更新。Catalog 去掉的组件，`plan` 会打印移除用的 `kubectl` 命令。
+
+新的默认组件，`apply` 不会自动安装。要安装其中一个，把它写进 `enable`，或在 `gui` 里勾选。Zeabur 需要的组件（ingress、certificates、metrics-server），以及你选的组件依赖的组件，仍然会安装。
+
+`plan --json` 把同样的内容放在 `changes` 字段，首次安装时这个字段为 `null`。`gui` 在确认步骤显示这些改动，新组件默认不勾选。
+
+记录是较新版的 installer 写的时候，`plan` 和 `apply` 会停下，并写明要改用哪一版。要退回旧版 installer，请还原升级前的快照。
+
+Catalog 给组件改名后，`disable` 写旧 ID 仍然有效，`plan` 会给出警告并写明新 ID。`enable` 写旧 ID 时，`plan` 和 `apply` 会停下，错误信息会写明新 ID。`container-registry/zot` 现在叫 `builds/zeabur-builder`。
+
+装过 `container-registry/zot` 的服务器，`apply` 会改装 Zeabur Builder，`plan` 会显示 `replaced by builds/zeabur-builder`。Zeabur Builder 会接管正在运行的 zot，存放镜像的磁盘也会保留。不过 Zeabur Builder 会删除 `<project>/<name>` 路径下不是构建产生的镜像，你自己推送到 zot 的镜像可能会消失。要保留所有镜像，把 `builds/zeabur-builder` 加进 `disable`。这样 `apply` 会让 zot 继续运行，并警告这版 Catalog 已经没有这个组件。
+
 ## `gui`
 
 在服务器上运行：

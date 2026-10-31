@@ -59,7 +59,8 @@ export function QuickLook({
     return () => window.removeEventListener("keydown", onKey)
   }, [onClose])
 
-  useEffect(() => presence.ref.current?.focus(), [presence.ref])
+  // It slides in from beyond the edge; Safari would scroll the map to bring it into view.
+  useEffect(() => presence.ref.current?.focus({ preventScroll: true }), [presence.ref])
 
   const row = (edge: Edge, direction: "in" | "out") => {
     const otherId = direction === "out" ? edge.to : edge.from

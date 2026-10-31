@@ -372,6 +372,24 @@ export const en = {
   "review.updateCheck.description":
     "Once a day, each signed-in person's browser fetches the list of Zeabur releases from GitHub, without any ID. GitHub sees the browser's IP address and your Zeabur's address. Nothing upgrades on its own.",
   "review.updateCheck.link": "How it works",
+  "review.changes": "Changes to this server",
+  "review.changes.recorded": (version: string) => `Last installed with zeabur-installer ${version}`,
+  "review.changes.none": "Nothing changes. The server already matches this configuration.",
+  "review.changes.version": (title: string, from: string, to: string) => `${title} ${from} → ${to}`,
+  "review.changes.restart": (title: string) =>
+    `${title} restarts. The Kubernetes API stops answering for about 10 seconds. Apps keep running.`,
+  "review.changes.added": "Added",
+  "review.changes.removed": "Removed",
+  "review.changes.kept": "No longer updated",
+  "review.changes.keptHint": "These stay installed. What they set up keeps running.",
+  "review.changes.replaced": "Replaced",
+  "review.changes.replaced.container-registry/zot":
+    "Zeabur Builder takes over zot and deletes images under <project>/<name> paths that no build made, including any you pushed there yourself. To keep every image, uncheck Zeabur Builder on the Components step.",
+  "review.changes.replacedNote": (from: string, to: string) =>
+    `${to} replaces ${from} and takes over what it installed.`,
+  "review.changes.charts": "Chart updates",
+  "review.changes.offered": "New in this catalog",
+  "review.changes.offeredHint": "Installed only if you check it.",
   "review.removing": "Components to remove",
   "review.removingHint":
     "helm-controller uninstalls their charts. What stays can be deleted by hand later.",
@@ -438,6 +456,10 @@ export const en = {
     "Volumes on the default local-path storage class stay on the node that created them: a pod using one runs only on that node, and the data goes with the node.",
   "warning.join.token.unpinned": () =>
     "The token has no CA hash (K10<hash>::…), so this VM trusts whichever server answers at that address. Use the token exactly as node add printed it.",
+  "warning.config.renamed": (old: string, id: string) =>
+    `The configuration file disables ${old}, which this catalog calls ${id}, so ${id} is not installed. Write ${id} in the configuration file instead.`,
+  "warning.remove.unknown": (id: string, charts: string) =>
+    `${id} is installed but not in this catalog, so apply leaves it in place. To remove it, run kubectl -n kube-system delete helmchart ${charts}`,
   "warning.join.server.unreachable": (server: string) =>
     `Cannot connect to ${server}. Check the address and that TCP 9345 is open from this VM.`,
 

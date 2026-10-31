@@ -18,6 +18,7 @@ use crate::plan::{
     Choices, ComponentPlan, Download, Facts, Memory, Namespace, RegistryPlan, Warning, components,
     idle_memory, registry, warning,
 };
+use crate::record::Changes;
 use crate::remove::Removal;
 use crate::select::{self, PERSONAL_DISTRIBUTION, PERSONAL_PROFILE};
 use crate::storage::Storage;
@@ -70,6 +71,8 @@ pub struct PersonalPlan {
     pub storage: Storage,
     /// Idle memory: `KubeSolo` plus the measured components.
     pub memory: Memory,
+    /// What `apply` changes against the install record; `None` on a first install.
+    pub changes: Option<Changes>,
     /// Things to read before applying.
     pub warnings: Vec<Warning>,
 }
@@ -190,13 +193,16 @@ pub fn plan(
     config: &PersonalConfig,
     facts: &Facts,
 ) -> Result<PersonalPlan, PlanError> {
+    facts.check_installer()?;
     let node_name = crate::node_name::choose(config.host.node_name.as_deref(), facts, &[])?;
     let arch = facts.arch.as_str();
     let no_release = || PlanError::Arch(arch.to_owned());
     let archive = KUBESOLO.archive(arch).ok_or_else(no_release)?;
     let kubectl = KUBECTL.binary(arch).ok_or_else(no_release)?;
     let mut warnings = warnings(index);
-    let mut selection = select::select_personal(index, config)?;
+    let mut selection =
+        select::select_personal(index, config, facts.record.as_ref().map(|r| &r.components))?;
+    warnings.extend(selection.warnings.clone());
     leave_out_short_of_memory(index, &mut selection, facts);
     let choices = Choices {
         inputs: &config.inputs,
@@ -246,6 +252,10 @@ pub fn plan(
             r.cluster_ip.as_deref()?,
         ))
     }));
+    let changes = facts
+        .record
+        .as_ref()
+        .map(|r| Changes::new(r, index, &components, &selection.offered, KUBESOLO.version));
     Ok(PersonalPlan {
         use_: "personal",
         facts: facts.clone(),
@@ -269,6 +279,7 @@ pub fn plan(
             other_classes: Vec::new(),
         },
         memory,
+        changes,
         warnings,
     })
 }
@@ -288,6 +299,8 @@ mod tests {
             host_hex: "a1b2c3".to_owned(),
             memory_mib,
             node_ips: vec!["10.0.0.5".to_owned()],
+            record: None,
+            installer: None,
         }
     }
 
@@ -297,6 +310,19 @@ mod tests {
 
     fn ids(plan: &PersonalPlan) -> Vec<&str> {
         plan.components.iter().map(|c| c.id.as_str()).collect()
+    }
+
+    #[test]
+    fn a_stopped_kubesolo_last_applied_by_a_newer_installer_is_left_alone() {
+        let index = Index::parse(INDEX.as_bytes()).unwrap();
+        let stopped = Facts {
+            installer: Some("99.0.0".to_owned()),
+            ..facts(8192)
+        };
+        assert!(matches!(
+            plan(&index, &config(""), &stopped),
+            Err(PlanError::NewerInstaller { recorded, .. }) if recorded == "99.0.0"
+        ));
     }
 
     #[test]

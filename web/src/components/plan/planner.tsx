@@ -5,6 +5,7 @@ import { lazy, Suspense, useEffect, useRef, useState } from "react"
 import type { Problem, Schemas } from "@/api/client"
 import { useDraft } from "@/components/plan/draft"
 import { fallback, next, type Open } from "@/components/plan/fallback"
+import { PlanDialogPending, PlanStepPending, usePreloadPlan } from "@/components/plan/pending"
 import type { Reviewed } from "@/components/plan/replan"
 import type { Skipped } from "@/model/managed"
 
@@ -48,6 +49,7 @@ export function usePlanner(
   hooks: PlanHooks = {},
 ) {
   const draft = useDraft()
+  usePreloadPlan()
   const [open, setOpen] = useState<Open | null>(null)
   const [refusal, setRefusal] = useState<Problem | undefined>(undefined)
   const mounted = useRef(false)
@@ -70,7 +72,7 @@ export function usePlanner(
   const reopen = (ask: PlanAsk, reviewed?: Reviewed) =>
     mounted.current ? show(ask, reviewed) : fallback.open(project, ask, reviewed)
   const dialog = open ? (
-    <Suspense fallback={null}>
+    <Suspense fallback={<PlanDialogPending title={open.ask.title} onClose={() => setOpen(null)} />}>
       <PlanDialog
         key={open.attempt}
         project={project}
@@ -92,6 +94,7 @@ export function usePlanner(
 export function usePlanStep(project: string, onDone: () => void, onApplied?: () => void) {
   const [open, setOpen] = useState<Open | null>(null)
   const [refusal, setRefusal] = useState<Problem | undefined>(undefined)
+  usePreloadPlan()
   const [footer, setFooter] = useState<HTMLElement | null>(null)
   const mounted = useRef(false)
   useEffect(() => {
@@ -108,7 +111,7 @@ export function usePlanStep(project: string, onDone: () => void, onApplied?: () 
   const reopen = (ask: PlanAsk, reviewed?: Reviewed) =>
     mounted.current ? show(ask, reviewed) : fallback.open(project, ask, reviewed)
   const view = open ? (
-    <Suspense fallback={null}>
+    <Suspense fallback={<PlanStepPending />}>
       <PlanStep
         key={open.attempt}
         project={project}

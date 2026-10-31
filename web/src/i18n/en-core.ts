@@ -13,6 +13,7 @@ export const core = {
   "shell.renameCluster": "Rename in Settings",
   "shell.cluster": "Cluster",
   "shell.search": "Search",
+  "shell.opening": "Opening the page…",
   "shell.jumpTo": "Jump to…",
   "shell.menu": "Menu",
   "shell.manage": "Manage",

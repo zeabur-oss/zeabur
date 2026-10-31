@@ -72,6 +72,8 @@ JSON 最外层是 `checks` 数组，每一项都有 `name`、`status`、`finding
 
 同时出现多种结果时，按严重问题、警告、无法运行的顺序决定退出码。`skipped` 不影响退出码，监控程序需要另外读取 `checks`，才能知道哪些项目未检查。
 
+集群中没有 Zeabur 面板时，`zeaburctl doctor` 会跳过 Zeabur Identity 的检查，因为只有面板需要 Zeabur Identity。[个人使用](../get-started/personal.mdx)的安装没有面板，只用 `zeaburctl ui` 打开的集群也没有。doctor 会在你能看到的项目中，查找带有 `app.kubernetes.io/name=zeabur` label 的 Deployment。读不到 Namespace 或某个项目的 Deployment 时，就照常检查。
+
 kube-apiserver 是否信任 Zeabur Identity 的 issuer，记录在控制平面的 `AuthenticationConfiguration` 文件中，RBAC 无法读取，因此这一项会标记为未检查。要在主机上检查，使用 [`zeabur-installer doctor`](./installer.mdx)。
 
 ## `up`

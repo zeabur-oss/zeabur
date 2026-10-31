@@ -43,6 +43,7 @@ export const zhCN: Messages = {
   "shell.renameCluster": "在设置中重命名",
   "shell.cluster": "集群",
   "shell.search": "搜索",
+  "shell.opening": "正在打开页面…",
   "shell.jumpTo": "跳转到…",
   "shell.menu": "菜单",
   "shell.findProject": "查找项目",
@@ -3697,6 +3698,7 @@ export const zhCN: Messages = {
   "project.viewMap": "架构图",
   "project.viewList": "列表",
   "project.suggestions": (n) => `${n} 项建议`,
+  "project.suggestionsLoading": "正在查找建议…",
   "project.suggestionsBody":
     "这些服务还缺少的配置。现在不补也不会让服务停止，但补上之后，更容易提前发现或避开问题。",
   "project.activity": "动态",
