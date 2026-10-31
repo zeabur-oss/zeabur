@@ -339,19 +339,19 @@ export const zhTW: Messages = {
   "review.program.description":
     "傳送版本和每天的使用人數，讓我們知道有多少人在用、該先修哪裡。不會傳名稱、網域或 Email，也不保存 IP。之後隨時可以關閉。",
   "review.program.link": "檢視會傳送的內容",
-  "review.changes": "這台伺服器會有的變動",
+  "review.changes": "這台伺服器的變更",
   "review.changes.recorded": (version) => `上次用 zeabur-installer ${version} 安裝`,
-  "review.changes.none": "沒有變動，伺服器已經符合這份設定。",
+  "review.changes.none": "沒有變更，伺服器已經符合這份設定。",
   "review.changes.version": (title, from, to) => `${title} ${from} → ${to}`,
   "review.changes.restart": (title) =>
     `${title} 會重新啟動。Kubernetes API 大約 10 秒連不上，應用程式會照常運作。`,
   "review.changes.added": "新增",
   "review.changes.removed": "移除",
   "review.changes.kept": "不再更新",
-  "review.changes.keptHint": "這些元件不會移除，已經裝好的東西會繼續執行。",
+  "review.changes.keptHint": "這些元件不會移除，原本裝好的內容會繼續執行。",
   "review.changes.replaced": "換成新元件",
   "review.changes.replaced.container-registry/zot":
-    "Zeabur Builder 會接手 zot，並刪除 <project>/<name> 路徑下不是建置產生的映像檔，你自己推上 zot 的映像檔可能會消失。要保留所有映像檔，請在「元件」步驟取消勾選 Zeabur Builder。",
+    "Zeabur Builder 會接手 zot，並刪除 <project>/<name> 路徑下不是建置產生的映像檔，包括你自己推上去的。要保留所有映像檔，請在「元件」步驟取消勾選 Zeabur Builder。",
   "review.changes.replacedNote": (from, to) => `${to} 會取代 ${from}，接手原本裝好的內容。`,
   "review.changes.charts": "Chart 更新",
   "review.changes.offered": "這版目錄新增的元件",
@@ -419,9 +419,9 @@ export const zhTW: Messages = {
   "warning.join.token.unpinned": () =>
     "這個權杖沒有 CA 雜湊（K10<hash>::…），所以這台 VM 會信任在那個位址回應的任何伺服器。請照 node add 印出的權杖原樣使用。",
   "warning.config.renamed": (old, id) =>
-    `${old} 在這版目錄改名為 ${id}，所以不會安裝 ${id}。請把設定檔裡的名稱改成 ${id}。`,
+    `設定檔停用的 ${old} 在這版目錄改名為 ${id}，所以不會安裝 ${id}。請把設定檔裡的名稱改成 ${id}。`,
   "warning.remove.unknown": (id, charts) =>
-    `${id} 已經裝好，但不在這版目錄裡，所以 apply 不會動它。要移除的話，執行 kubectl -n kube-system delete helmchart ${charts}`,
+    `${id} 已經安裝，但不在這版目錄裡，apply 會原樣保留。要移除時，執行 kubectl -n kube-system delete helmchart ${charts}`,
   "warning.join.server.unreachable": (server) =>
     `連不到 ${server}。請檢查位址，以及這台 VM 能不能連到 TCP 9345。`,
 

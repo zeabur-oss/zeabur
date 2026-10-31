@@ -379,7 +379,7 @@ export const en = {
   "review.changes.keptHint": "These stay installed. What they set up keeps running.",
   "review.changes.replaced": "Replaced",
   "review.changes.replaced.container-registry/zot":
-    "Zeabur Builder takes over zot. It deletes images under <project>/<name> paths that no build made, so images you pushed to zot yourself can disappear. To keep every image, uncheck Zeabur Builder on the Components step.",
+    "Zeabur Builder takes over zot and deletes images under <project>/<name> paths that no build made, including any you pushed there yourself. To keep every image, uncheck Zeabur Builder on the Components step.",
   "review.changes.replacedNote": (from: string, to: string) =>
     `${to} replaces ${from} and takes over what it installed.`,
   "review.changes.charts": "Chart updates",
@@ -452,9 +452,9 @@ export const en = {
   "warning.join.token.unpinned": () =>
     "The token has no CA hash (K10<hash>::…), so this VM trusts whichever server answers at that address. Use the token exactly as node add printed it.",
   "warning.config.renamed": (old: string, id: string) =>
-    `${old} is now ${id} in this catalog, so ${id} is not installed. Write ${id} in the configuration file instead.`,
+    `The configuration file disables ${old}, which this catalog calls ${id}, so ${id} is not installed. Write ${id} in the configuration file instead.`,
   "warning.remove.unknown": (id: string, charts: string) =>
-    `${id} is installed but not in this catalog, so apply leaves it. To remove it: kubectl -n kube-system delete helmchart ${charts}`,
+    `${id} is installed but not in this catalog, so apply leaves it in place. To remove it, run kubectl -n kube-system delete helmchart ${charts}`,
   "warning.join.server.unreachable": (server: string) =>
     `Cannot connect to ${server}. Check the address and that TCP 9345 is open from this VM.`,
 

@@ -198,7 +198,7 @@ pub(crate) fn changes(changes: Option<&Changes>, unit: &str) -> String {
 fn replaced_note(from: &str) -> &'static str {
     match from {
         "container-registry/zot" => {
-            "Zeabur Builder takes over zot. It deletes images under <project>/<name> paths that \
+            "Zeabur Builder takes over zot and deletes images under <project>/<name> paths that \
              no build made. To keep every image: disable: [builds/zeabur-builder]"
         }
         _ => "the new component takes over what the old one installed",
