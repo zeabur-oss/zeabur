@@ -354,8 +354,8 @@ fn without_zeabur_dashboard(name: &'static str) -> Check {
     let mut check = Check::new(name);
     check.status = Status::Skipped;
     check.findings.push(
-        "skipped: the Zeabur dashboard is not installed in this cluster, so Zeabur Identity is not \
-         needed"
+        "skipped: Zeabur Identity is only for the Zeabur dashboard, which no project you can see \
+         runs"
             .to_owned(),
     );
     check
@@ -984,8 +984,8 @@ mod tests {
             assert_eq!(
                 check.findings,
                 [
-                    "skipped: the Zeabur dashboard is not installed in this cluster, so Zeabur \
-                     Identity is not needed"
+                    "skipped: Zeabur Identity is only for the Zeabur dashboard, which no project \
+                     you can see runs"
                 ],
                 "{name}"
             );
