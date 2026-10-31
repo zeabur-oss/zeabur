@@ -420,6 +420,8 @@ export const zhCN: Messages = {
     "这个令牌没有 CA 哈希（K10<hash>::…），所以这台 VM 会信任在那个地址响应的任何服务器。请原样使用 node add 打印的令牌。",
   "warning.config.renamed": (old, id) =>
     `${old} 在这版目录里改名为 ${id}，所以不会安装 ${id}。请把配置文件里的名称改成 ${id}。`,
+  "warning.remove.unknown": (id, charts) =>
+    `${id} 已经装好，但不在这版目录里，所以 apply 不会动它。要移除的话，运行 kubectl -n kube-system delete helmchart ${charts}`,
   "warning.join.server.unreachable": (server) =>
     `连不上 ${server}。请检查地址，以及这台 VM 能否连到 TCP 9345。`,
 

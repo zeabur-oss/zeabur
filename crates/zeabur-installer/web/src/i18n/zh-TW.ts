@@ -420,6 +420,8 @@ export const zhTW: Messages = {
     "這個權杖沒有 CA 雜湊（K10<hash>::…），所以這台 VM 會信任在那個位址回應的任何伺服器。請照 node add 印出的權杖原樣使用。",
   "warning.config.renamed": (old, id) =>
     `${old} 在這版目錄改名為 ${id}，所以不會安裝 ${id}。請把設定檔裡的名稱改成 ${id}。`,
+  "warning.remove.unknown": (id, charts) =>
+    `${id} 已經裝好，但不在這版目錄裡，所以 apply 不會動它。要移除的話，執行 kubectl -n kube-system delete helmchart ${charts}`,
   "warning.join.server.unreachable": (server) =>
     `連不到 ${server}。請檢查位址，以及這台 VM 能不能連到 TCP 9345。`,
 

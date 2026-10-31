@@ -453,6 +453,8 @@ export const en = {
     "The token has no CA hash (K10<hash>::…), so this VM trusts whichever server answers at that address. Use the token exactly as node add printed it.",
   "warning.config.renamed": (old: string, id: string) =>
     `${old} is now ${id} in this catalog, so ${id} is not installed. Write ${id} in the configuration file instead.`,
+  "warning.remove.unknown": (id: string, charts: string) =>
+    `${id} is installed but not in this catalog, so apply leaves it. To remove it: kubectl -n kube-system delete helmchart ${charts}`,
   "warning.join.server.unreachable": (server: string) =>
     `Cannot connect to ${server}. Check the address and that TCP 9345 is open from this VM.`,
 
