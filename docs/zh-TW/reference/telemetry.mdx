@@ -1,7 +1,7 @@
 ---
 title: 體驗計畫
 description: 加入體驗計畫後，Zeabur 和 installer 會傳送什麼、絕不傳送什麼；Zeabur 和 zeaburctl 怎麼檢查新版；以及怎麼分別關閉。
-source: "9b1804b314e7"
+source: "0fd6101882a5"
 ---
 
 體驗計畫會傳送版本和每天的使用人數，讓我們知道有多少人在用、該先修哪裡。用 installer 安裝時預設加入，可以在確認頁取消勾選；用 Helm 安裝時預設不加入，要自己開啟。
@@ -71,7 +71,7 @@ kubectl -n zeabur logs deployment/zeabur | grep telemetry
 
 有新版時，Zeabur 和 `zeaburctl` 會提醒你，並說明怎麼升級，但不會自動升級。檢查更新和體驗計畫各自獨立，預設開啟。
 
-**檢查什麼。**兩者都讀取 `https://api.github.com/repos/zeabur-oss/zeabur/releases`，略過草稿和預先發行版本。剩下的版本中最新的一個比你的版本新時，會顯示它的版本、發行說明連結和升級方式。只要有任何一個較新的版本在說明裡有 `### Security` 段落，就會告訴你目前的版本有已知的安全性問題，並附上那些版本的連結。
+**檢查什麼。**兩者都讀取 `https://api.github.com/repos/zeabur-oss/zeabur/releases`，略過草稿。除非你正在用預先發行版本，否則也會略過預先發行版本。剩下的版本中最新的一個比你的版本新時，會顯示它的版本、發行說明連結和升級方式。只要有任何一個較新的正式版本在說明裡有 `### Security` 段落，就會告訴你目前的版本有已知的安全性問題，並附上那些版本的連結。
 
 **在哪裡執行。**
 

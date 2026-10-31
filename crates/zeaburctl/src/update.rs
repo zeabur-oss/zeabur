@@ -87,7 +87,7 @@ impl Check {
             if let Some(releases) = &releases {
                 let cache = Cache {
                     checked_at: now,
-                    latest: latest(releases).map(|(version, _)| version.to_string()),
+                    latest: latest(releases, false).map(|(version, _)| version.to_string()),
                 };
                 drop(cache.write(&path));
             }
@@ -191,7 +191,12 @@ struct Release {
 impl Release {
     /// Its version, for a published release that is not a pre-release.
     fn normal(&self) -> Option<Version> {
-        if self.draft || self.prerelease {
+        self.version(false)
+    }
+
+    /// Its version, for a published release; a pre-release only when `pre` allows it.
+    fn version(&self, pre: bool) -> Option<Version> {
+        if self.draft || (self.prerelease && !pre) {
             return None;
         }
         Version::parse(&self.tag_name)
@@ -205,10 +210,10 @@ impl Release {
     }
 }
 
-fn latest(releases: &[Release]) -> Option<(Version, &Release)> {
+fn latest(releases: &[Release], pre: bool) -> Option<(Version, &Release)> {
     releases
         .iter()
-        .filter_map(|r| Some((r.normal()?, r)))
+        .filter_map(|r| Some((r.version(pre)?, r)))
         .max_by(|a, b| a.0.cmp(&b.0))
 }
 
@@ -237,11 +242,12 @@ impl Newer {
     }
 }
 
-/// The newest normal release when it is newer than `running`; `None` without one, or when
-/// `running` is not a version.
+/// The newest normal release when it is newer than `running`, or the newest pre-release when
+/// `running` is one; `None` without one, or when `running` is not a version. Only normal
+/// releases mark the running version insecure.
 fn newer(releases: &[Release], running: &str) -> Option<Newer> {
     let running = Version::parse(running)?;
-    let (latest, _) = latest(releases)?;
+    let (latest, _) = latest(releases, !running.pre.is_empty())?;
     if latest <= running {
         return None;
     }
@@ -396,6 +402,20 @@ mod tests {
         assert_eq!(newer(&releases, "0.3.0"), None);
         assert_eq!(newer(&[release("v0.1.1-beta.1", "")], "0.1.0"), None);
         assert_eq!(newer(&[], "0.1.0"), None);
+    }
+
+    #[test]
+    fn someone_on_a_pre_release_hears_of_newer_pre_releases() {
+        let releases = [
+            release("v0.2.0-rc.2", "### Security\n- In a pre-release"),
+            release("v0.1.1", ""),
+        ];
+        let found = newer(&releases, "0.2.0-rc.1").unwrap();
+        assert_eq!(found.latest, "0.2.0-rc.2");
+        assert!(!found.security);
+        assert_eq!(newer(&releases, "0.1.1"), None);
+        let out = [release("v0.2.0", ""), release("v0.2.0-rc.2", "")];
+        assert_eq!(newer(&out, "0.2.0-rc.1").unwrap().latest, "0.2.0");
     }
 
     #[test]

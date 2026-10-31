@@ -8,10 +8,11 @@ export const CHECK_EVERY = 24 * 60 * 60_000
 const CHECK_TIMEOUT = 10_000
 const CACHE_KEY = "zeabur.updateCheck"
 
-/** A normal release: neither a draft nor a pre-release. */
+/** A published release. */
 export interface Release {
   version: string
   url: string
+  prerelease: boolean
   /** Its notes have a `### Security` section: it fixes vulnerabilities. */
   security: boolean
 }
@@ -68,13 +69,13 @@ export function compareVersions(a: Version, b: Version): number {
   return a.pre.length - b.pre.length
 }
 
-/** The normal releases in GitHub's answer, with the tag's `v` dropped. */
-export function normalReleases(answer: unknown): Release[] {
+/** The published releases in GitHub's answer, with the tag's `v` dropped. */
+export function publishedReleases(answer: unknown): Release[] {
   if (!Array.isArray(answer)) return []
   return answer.flatMap((item: unknown) => {
     if (typeof item !== "object" || item === null) return []
     const r = item as Record<string, unknown>
-    if (r.draft === true || r.prerelease === true) return []
+    if (r.draft === true) return []
     if (typeof r.tag_name !== "string" || typeof r.html_url !== "string") return []
     const version = r.tag_name.replace(/^v/, "")
     if (!parseVersion(version)) return []
@@ -83,25 +84,27 @@ export function normalReleases(answer: unknown): Release[] {
       {
         version,
         url: r.html_url,
+        prerelease: r.prerelease === true,
         security: body.split(/\r?\n/).some((line) => line.trim() === "### Security"),
       },
     ]
   })
 }
 
-/** The newest release when it is newer than `running`, with the newer ones that fix
- * vulnerabilities; nothing without one. */
+/** The newest normal release when it is newer than `running`, or the newest pre-release when
+ * `running` is one, with the newer normal ones that fix vulnerabilities; nothing without one. */
 export function findNewer(releases: Release[], running: string): Newer | undefined {
   const current = parseVersion(running)
   if (!current) return undefined
   const newer = releases
+    .filter((release) => !release.prerelease || current.pre.length > 0)
     .map((release) => ({ release, version: parseVersion(release.version)! }))
     .filter((r) => compareVersions(r.version, current) > 0)
     .sort((a, b) => compareVersions(b.version, a.version))
     .map((r) => r.release)
   const latest = newer[0]
   if (!latest) return undefined
-  return { latest, security: newer.filter((r) => r.security) }
+  return { latest, security: newer.filter((r) => r.security && !r.prerelease) }
 }
 
 function due(cached: Cached | undefined, now: number): boolean {
@@ -141,7 +144,7 @@ export async function releases(fetcher: Fetch, storage: Storage, now: number): P
       referrerPolicy: "no-referrer",
       signal: controller.signal,
     })
-    if (response.ok) fresh = normalReleases(await response.json())
+    if (response.ok) fresh = publishedReleases(await response.json())
   } catch {
     // Offline or blocked: the last answer stands.
   } finally {

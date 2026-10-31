@@ -5,7 +5,7 @@ import {
   RELEASES_URL,
   compareVersions,
   findNewer,
-  normalReleases,
+  publishedReleases,
   parseVersion,
   releases,
   updateCheckQuery,
@@ -57,7 +57,7 @@ describe("versions", () => {
 
 describe("finding a newer release", () => {
   test("only normal releases count, and the newest of them is the latest", () => {
-    const list = normalReleases([
+    const list = publishedReleases([
       github("v0.3.0-beta.1"),
       github("v0.4.0", "", { draft: true }),
       github("v0.1.2"),
@@ -65,18 +65,31 @@ describe("finding a newer release", () => {
     ])
     expect(findNewer(list, "0.1.1")?.latest.version).toBe("0.2.0")
     expect(findNewer(list, "0.2.0")).toBeUndefined()
-    expect(findNewer(normalReleases([github("v0.1.1-beta.1")]), "0.1.0")).toBeUndefined()
+    expect(findNewer(publishedReleases([github("v0.1.1-beta.1")]), "0.1.0")).toBeUndefined()
     expect(findNewer([], "0.1.0")).toBeUndefined()
   })
 
+  test("someone on a pre-release hears of newer pre-releases", () => {
+    const list = publishedReleases([
+      github("v0.2.0-rc.2", "### Security\n- In a pre-release"),
+      github("v0.1.1"),
+    ])
+    const found = findNewer(list, "0.2.0-rc.1")
+    expect(found?.latest.version).toBe("0.2.0-rc.2")
+    expect(found?.security).toEqual([])
+    expect(findNewer(list, "0.1.1")).toBeUndefined()
+    const released = publishedReleases([github("v0.2.0"), github("v0.2.0-rc.2")])
+    expect(findNewer(released, "0.2.0-rc.1")?.latest.version).toBe("0.2.0")
+  })
+
   test("a pre-release is behind its normal release", () => {
-    expect(findNewer(normalReleases([github("v0.1.1")]), "0.1.1-beta.2")?.latest.version).toBe(
+    expect(findNewer(publishedReleases([github("v0.1.1")]), "0.1.1-beta.2")?.latest.version).toBe(
       "0.1.1",
     )
   })
 
   test("names the newer releases with a Security section, not older ones", () => {
-    const list = normalReleases([
+    const list = publishedReleases([
       github("v0.3.0", "### Added\n- Things"),
       github("v0.2.0", "## 0.2.0\r\n\r\n### Security\r\n- Fixed a hole"),
       github("v0.1.0", "### Security\n- Older"),

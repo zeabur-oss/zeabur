@@ -70,7 +70,7 @@ kubectl -n zeabur logs deployment/zeabur | grep telemetry
 
 Zeabur and `zeaburctl` tell you when a newer version is out and how to upgrade. Nothing upgrades on its own. This check is separate from the experience program and on by default.
 
-**What is checked.** Both read `https://api.github.com/repos/zeabur-oss/zeabur/releases` and leave out drafts and pre-releases. If the newest of the rest is newer than yours, you see its version, a link to its release notes and how to upgrade. If any newer release has a `### Security` section in its notes, you see that your version has known security problems, with links to those releases.
+**What is checked.** Both read `https://api.github.com/repos/zeabur-oss/zeabur/releases` and leave out drafts. They leave out pre-releases too, unless you run one. If the newest of the rest is newer than yours, you see its version, a link to its release notes and how to upgrade. If any newer release that is not a pre-release has a `### Security` section in its notes, you see that your version has known security problems, with links to those releases.
 
 **Where it runs.**
 
