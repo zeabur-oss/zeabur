@@ -1485,7 +1485,10 @@ mod tests {
             [copy.display().to_string()]
         );
         assert!(image_archives(&images, &sources).unwrap());
-        assert!(changed_archives(&images, &sources).unwrap().is_empty());
+        assert_eq!(
+            changed_archives(&images, &sources).unwrap(),
+            Vec::<String>::new()
+        );
 
         fs::write(&source, b"two").unwrap();
         assert_eq!(changed_archives(&images, &sources).unwrap().len(), 1);
