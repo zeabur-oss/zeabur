@@ -2,8 +2,10 @@
 
 use zeabur_installer_plan::config::{AccessMode, Role};
 use zeabur_installer_plan::join::{self, JoinPlan};
+use zeabur_installer_plan::kubesolo;
 use zeabur_installer_plan::personal::PersonalPlan;
 use zeabur_installer_plan::plan::{ComponentPlan, Plan, ReleasePlan};
+use zeabur_installer_plan::record::Changes;
 use zeabur_installer_plan::remove::Removal;
 use zeabur_installer_plan::storage::NodePrep;
 
@@ -26,6 +28,10 @@ pub(crate) fn plan(plan: &Plan) -> String {
     node_name(&mut s, &plan.node_name);
     node_addresses(&mut s, &plan.facts.node_ips);
     push(&mut s, "");
+    s.push_str(&changes(
+        plan.changes.as_ref(),
+        cluster.distribution.server_unit(),
+    ));
     components(&mut s, &plan.components, &plan.left_out);
     push(&mut s, "");
     s.push_str(&removals(&plan.removals));
@@ -120,6 +126,85 @@ fn components(
     }
 }
 
+/// What `apply` changes against the install record that `unit`'s cluster holds; empty on a first
+/// install.
+pub(crate) fn changes(changes: Option<&Changes>, unit: &str) -> String {
+    let mut s = String::new();
+    let Some(c) = changes else {
+        return s;
+    };
+    push(
+        &mut s,
+        &format!(
+            "Changes since the last apply (by zeabur-installer {})",
+            c.installer
+        ),
+    );
+    let before = s.len();
+    if let Some(v) = &c.version {
+        push(&mut s, &format!("  {unit:<48} {} -> {}", v.from, v.to));
+    }
+    for path in &c.host_files {
+        push(&mut s, &format!("  {path:<48} changes"));
+    }
+    if c.restart {
+        push(
+            &mut s,
+            &format!(
+                "  restarts {unit}. The Kubernetes API stops answering for about 10 seconds. \
+                 Running apps keep serving."
+            ),
+        );
+    }
+    for id in &c.added {
+        push(&mut s, &format!("  {id:<48} added"));
+    }
+    for id in &c.removed {
+        push(&mut s, &format!("  {id:<48} removed"));
+    }
+    for id in &c.kept {
+        push(
+            &mut s,
+            &format!("  {id:<48} not removed, no longer updated"),
+        );
+    }
+    for r in &c.replaced {
+        push(&mut s, &format!("  {:<48} replaced by {}", r.from, r.to));
+        push(&mut s, &format!("      {}", replaced_note(&r.from)));
+    }
+    for chart in &c.charts {
+        push(
+            &mut s,
+            &format!(
+                "  {:<48} chart {} {} -> {}",
+                chart.component, chart.release, chart.from, chart.to
+            ),
+        );
+    }
+    for id in &c.offered {
+        push(
+            &mut s,
+            &format!("  {id:<48} new default, not installed. To add it: enable: [{id}]"),
+        );
+    }
+    if s.len() == before {
+        push(&mut s, "  nothing");
+    }
+    push(&mut s, "");
+    s
+}
+
+/// What happens to the data of a component that its replacement takes over.
+fn replaced_note(from: &str) -> &'static str {
+    match from {
+        "container-registry/zot" => {
+            "Zeabur Builder takes over zot and deletes images under <project>/<name> paths that \
+             no build made. To keep every image: disable: [builds/zeabur-builder]"
+        }
+        _ => "the new component takes over what the old one installed",
+    }
+}
+
 /// The components `apply` removes and what stays of them; empty when there are none.
 pub(crate) fn removals(removals: &[Removal]) -> String {
     let mut s = String::new();
@@ -200,6 +285,7 @@ pub(crate) fn personal_plan(plan: &PersonalPlan) -> String {
     );
     push(&mut s, &format!("Node address     {address}"));
     push(&mut s, "");
+    s.push_str(&changes(plan.changes.as_ref(), kubesolo::UNIT));
     components(&mut s, &plan.components, &plan.left_out);
     push(&mut s, "");
     s.push_str(&removals(&plan.removals));
@@ -420,6 +506,8 @@ mod tests {
                 host_hex: "a1b2c3".to_owned(),
                 memory_mib: 8192,
                 node_ips: vec!["10.0.0.6".to_owned(), "fd00::6".to_owned()],
+                record: None,
+                installer: None,
             },
             rtt_us: rtt_us.to_vec(),
             ports: vec![
@@ -464,5 +552,67 @@ mod tests {
         let text = join_plan(&p);
         assert!(text.contains("Distance         the server did not answer"));
         assert!(text.contains("error: Cannot connect to https://10.0.0.5:6443."));
+    }
+
+    #[test]
+    fn an_upgrade_names_what_changes_and_how_to_add_a_new_default() {
+        use zeabur_installer_plan::record::{ChartChange, VersionChange};
+        let mut changes = Changes {
+            installer: "0.1.1".to_owned(),
+            added: vec!["databases/cloudnative-pg".to_owned()],
+            removed: vec!["databases/old".to_owned()],
+            kept: vec!["node-updates/system-upgrade-controller".to_owned()],
+            replaced: vec![zeabur_installer_plan::record::Replaced {
+                from: "container-registry/zot".to_owned(),
+                to: "builds/zeabur-builder".to_owned(),
+            }],
+            charts: vec![ChartChange {
+                component: "ingress/traefik".to_owned(),
+                release: "traefik".to_owned(),
+                from: "42.1.2".to_owned(),
+                to: "42.1.3".to_owned(),
+            }],
+            offered: vec!["databases/other".to_owned()],
+            version: None,
+            host_files: Vec::new(),
+            restart: false,
+        };
+        changes.set_host_files(vec!["/etc/rancher/k3s/registries.yaml".to_owned()]);
+        let text = super::changes(Some(&changes), "k3s");
+        assert!(text.starts_with("Changes since the last apply (by zeabur-installer 0.1.1)\n"));
+        for line in [
+            "/etc/rancher/k3s/registries.yaml",
+            "restarts k3s",
+            "databases/cloudnative-pg",
+            "databases/old",
+            "node-updates/system-upgrade-controller",
+            "not removed, no longer updated",
+            "container-registry/zot",
+            "replaced by builds/zeabur-builder",
+            "deletes images under <project>/<name>",
+            "chart traefik 42.1.2 -> 42.1.3",
+            "To add it: enable: [databases/other]",
+        ] {
+            assert!(text.contains(line), "{line} in\n{text}");
+        }
+
+        let same = Changes {
+            added: Vec::new(),
+            removed: Vec::new(),
+            kept: Vec::new(),
+            replaced: Vec::new(),
+            charts: Vec::new(),
+            offered: Vec::new(),
+            version: Some(VersionChange {
+                from: "v1.2.2".to_owned(),
+                to: "v1.2.3".to_owned(),
+            }),
+            host_files: Vec::new(),
+            restart: true,
+            ..changes
+        };
+        let text = super::changes(Some(&same), "kubesolo");
+        assert!(text.contains("v1.2.2 -> v1.2.3") && text.contains("restarts kubesolo"));
+        assert_eq!(super::changes(None, "k3s"), "");
     }
 }
