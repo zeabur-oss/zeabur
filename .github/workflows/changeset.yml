@@ -1,0 +1,12 @@
+name: Changeset
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened, labeled, unlabeled]
+
+permissions:
+  contents: read
+
+jobs:
+  changeset:
+    uses: zeabur-oss/.github/.github/workflows/changeset.yml@a0e7fee556f7d2e9bebfea0de11b4391a427fea7 # main

@@ -1,19 +1,6 @@
 # Changelog
 
-All notable changes to Zeabur. Versions follow [Semantic Versioning](https://semver.org/); before 1.0.0, a minor or patch release may break the API.
-
-## Unreleased
-
-### Changed
-
-- Release notes are the changelog section and a link to the documentation. The digests of the image, each platform's image and the chart are in the signed `digests.txt` asset, as [Releases](docs/reference/releases.mdx) shows.
-- The image is pushed by digest with no `candidate-*` tags left in GHCR.
-- A release tag may carry a SemVer pre-release part (`v0.1.2-beta.1`). Such a release is a GitHub pre-release, never the latest, and has its own section here.
-
-### Fixed
-
-- Zeabur Proxy's image, `ghcr.io/zeabur-oss/proxy`, is published, signed and attested with each release, and the chart pins it by digest. 0.1.1 did not publish it, so an installation with VictoriaMetrics or VictoriaLogs left `zeabur-proxy` unable to pull its image.
-- `zeabur-installer apply` moves the redirect URI of Zeabur's OAuth client to a changed `access.zeabur`, as it already did the home URL. It kept the first host's, so signing in to Zeabur at the new host failed with "This app's return address isn't registered".
+All notable changes to Zeabur. Versions follow [Semantic Versioning](https://semver.org/); before 1.0.0, a minor or patch release may break the API. Each section comes from the change files in `.changeset/` (CONTRIBUTING.md, "Releases").
 
 ## 0.1.1 (2026-10-28)
 

@@ -4,6 +4,8 @@
 // and verifies; the workflow itself checks the CHANGELOG.md section, signs SHA256SUMS and writes
 // the notes. This script keeps what is Zeabur's own.
 //
+//   bump    <version>                                 after knope set Cargo.toml: Cargo.lock, the
+//                                                     chart, the web packages and the API document
 //   check   <version>                                 the version is the manifests', and the chart
 //                                                     runs only images the release publishes
 //   build   <version> <os> <arch> <dist>              build one platform (release-build.sh), smoke
@@ -204,6 +206,49 @@ async function pins(version: Version): Promise<Record<string, string>> {
     ZEABUR_PIN_IDENTITYCTL_AMD64_SHA256: ctl("amd64"),
     ZEABUR_PIN_IDENTITYCTL_ARM64_SHA256: ctl("arm64"),
   };
+}
+
+// knope (knope.toml) has set [workspace.package] in Cargo.toml; the workspace's crates in
+// Cargo.lock, the chart, the web packages and the API document (openapi.yaml and the client
+// generated from it) follow.
+async function bump(version: Version) {
+  const plain = version.plain;
+  const metadata =
+    await $`cargo metadata --manifest-path ${join(root, "Cargo.toml")} --no-deps --format-version 1`.json();
+  const edit = async (file: string, change: (text: string) => string) => {
+    const path = join(root, file);
+    const text = await Bun.file(path).text();
+    const changed = change(text);
+    if (changed === text && !text.includes(plain))
+      fail(`${file} has no version to set`);
+    await Bun.write(path, changed);
+  };
+  await edit("Cargo.lock", (lock) => {
+    for (const { name } of metadata.packages as { name: string }[]) {
+      const entry = new RegExp(`(\nname = "${name}"\nversion = )"[^"]*"`);
+      if (!entry.test(lock)) fail(`Cargo.lock has no package ${name}`);
+      lock = lock.replace(entry, `$1"${plain}"`);
+    }
+    return lock;
+  });
+  await edit("deploy/chart/zeabur/Chart.yaml", (chart) =>
+    chart
+      .replace(/^version: .*$/m, `version: ${plain}`)
+      .replace(/^appVersion: .*$/m, `appVersion: "${plain}"`),
+  );
+  for (const manifest of [
+    "web/package.json",
+    "crates/zeabur-installer/web/package.json",
+  ])
+    await edit(manifest, (text) =>
+      text.replace(/^(  "version": )"[^"]*"/m, `$1"${plain}"`),
+    );
+  await edit("crates/zeabur-api/openapi.yaml", (text) =>
+    text.replace(/^(  version: )"[^"]*"/m, `$1"${plain}"`),
+  );
+  await edit("web/src/api/zeabur.ts", (text) =>
+    text.replace(/^( \* OpenAPI spec version: ).*$/m, `$1${plain}`),
+  );
 }
 
 async function check(version: Version) {
@@ -545,7 +590,7 @@ async function verify(
 
 const [stage, tag, ...rest] = process.argv.slice(2);
 const usage =
-  "usage: bun scripts/release.ts check|build|sign|publish|finish|assets|verify <version> ... (see the script's header)";
+  "usage: bun scripts/release.ts bump|check|build|sign|publish|finish|assets|verify <version> ... (see the script's header)";
 if (!tag) fail(usage);
 const version =
   parseVersion(tag) ??
@@ -553,7 +598,8 @@ const version =
 const perPlatform = ["build", "sign", "finish", "verify"].includes(stage ?? "");
 const args = rest.map((a, i) => (perPlatform && i < 2 ? a : resolve(a)));
 try {
-  if (stage === "check" && args.length === 0) await check(version);
+  if (stage === "bump" && args.length === 0) await bump(version);
+  else if (stage === "check" && args.length === 0) await check(version);
   else if (stage === "build" && args.length === 3)
     await build(version, args[0]!, args[1]!, args[2]!);
   else if (stage === "sign" && args.length === 3)

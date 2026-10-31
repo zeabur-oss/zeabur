@@ -1,0 +1,29 @@
+name: Release pull request
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version instead of the one the change files give (v0.2.0); empty for theirs"
+        default: ""
+      prerelease:
+        description: "Pre-release label (rc, beta) for vX.Y.Z-<label>.N; empty for a normal release"
+        default: ""
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-pr-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release-pr:
+    uses: zeabur-oss/.github/.github/workflows/release-pr.yml@a0e7fee556f7d2e9bebfea0de11b4391a427fea7 # main
+    with:
+      version: ${{ inputs.version }}
+      prerelease: ${{ inputs.prerelease }}
+    secrets:
+      private-key: ${{ secrets.ZEABUR_OSS_BOT_PRIVATE_KEY }}
