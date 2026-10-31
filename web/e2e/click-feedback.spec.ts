@@ -72,6 +72,25 @@ test("a navigation shows progress before the page's data arrives, and keeps the 
   await expect(page.getByRole("progressbar")).toHaveCount(0)
 })
 
+test("the skeleton that replaces the old page shows at once", async ({ page }) => {
+  const release = await navigateWhileHeld(page)
+  await page.evaluate(() => {
+    const w = window as unknown as { skeleton?: number }
+    const observer = new MutationObserver(() => {
+      const row = document.querySelector("main output > div")
+      if (!row) return
+      observer.disconnect()
+      // Before its own 300 ms delay ends, a skeleton that waited for it is still transparent.
+      setTimeout(() => (w.skeleton = Number(getComputedStyle(row).opacity)), 100)
+    })
+    observer.observe(document.body, { childList: true, subtree: true })
+  })
+  await expect
+    .poll(() => page.evaluate(() => (window as unknown as { skeleton?: number }).skeleton))
+    .toBeGreaterThan(0)
+  release()
+})
+
 test("a navigation the data answers at once shows no progress", async ({ page }) => {
   await page.goto("/")
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible()

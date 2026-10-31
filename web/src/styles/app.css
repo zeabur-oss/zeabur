@@ -43,6 +43,11 @@
   }
 }
 
+/* Skeletons that take a page's place: the router has already waited, so they wait no more. */
+@utility skeleton-now {
+  --animate-skeleton:
+    skeleton-in 150ms ease-out backwards, skeleton-pulse 1.4s ease-in-out 150ms infinite;
+}
 @utility flex-main {
   flex: 999 1 35rem;
 }
