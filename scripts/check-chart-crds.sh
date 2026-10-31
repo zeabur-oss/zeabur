@@ -52,6 +52,7 @@ SHIM
 chmod +x "$shim/helm"
 
 # Its exit status also covers kubeconform, which is not this check's concern.
+# shellcheck disable=SC2016 # expanded by the inner shell
 (cd "$src" && CALLS=$calls SHIM=$shim nix develop -c bash -c \
   'REAL_HELM=$(command -v helm) PATH=$SHIM:$PATH exec go run ./tools/cmd/catalog render -out "$0"' \
   "$work/render") >"$work/render.log" 2>&1 || tail -n 5 "$work/render.log" >&2
@@ -81,6 +82,7 @@ for dir in "$calls"/call.*; do
     <(helm "${with[@]}" | ids) \
     <(helm "${with[@]}" --include-crds | ids))
   if ((${#files[@]})); then
+    # shellcheck disable=SC2016 # yq variable, not shell
     yq eval-all -o=json '. as $i ireduce ({}; . * $i)' "${files[@]}" >"$dir/values.json"
   else
     echo '{}' >"$dir/values.json"

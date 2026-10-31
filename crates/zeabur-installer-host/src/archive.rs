@@ -171,9 +171,12 @@ fn build_chart(files: BTreeMap<String, Vec<u8>>, path: &str) -> Result<Chart, Ho
                 .map_err(|e| parse_error(&format!("{path}Chart.yaml"), &e))?;
             metadata = Some(parsed);
         } else if rel == "values.yaml" {
-            let parsed: Option<Value> = serde_saphyr::from_str(&text())
+            let documents: Vec<Option<Value>> = serde_saphyr::from_multiple(&text())
                 .map_err(|e| parse_error(&format!("{path}values.yaml"), &e))?;
-            values = parsed.unwrap_or(Value::Null);
+            values = documents
+                .into_iter()
+                .flatten()
+                .fold(Value::Null, merge_maps);
         } else if rel.starts_with("crds/") && manifest(&rel) {
             crds.push((format!("{path}{rel}"), text()));
         } else if let Some(rest) = rel.strip_prefix("charts/") {
@@ -205,6 +208,25 @@ fn build_chart(files: BTreeMap<String, Vec<u8>>, path: &str) -> Result<Chart, Ho
 }
 
 type Map = serde_json::Map<String, Value>;
+
+/// Helm's `MergeMaps` for the documents of a `values.yaml`: later keys win, tables merge.
+fn merge_maps(base: Value, next: Value) -> Value {
+    match (base, next) {
+        (Value::Object(mut a), Value::Object(b)) => {
+            for (k, v) in b {
+                let merged = match a.remove(&k) {
+                    Some(old) => merge_maps(old, v),
+                    None => v,
+                };
+                a.insert(k, merged);
+            }
+            Value::Object(a)
+        }
+        (Value::Null, next) => next,
+        (_, next @ Value::Object(_)) => next,
+        (base, _) => base,
+    }
+}
 
 /// Adds the `crds/` files of `chart` and of its subcharts Helm keeps: `processDependencyEnabled`,
 /// where `v` is the values of the whole tree and `path` leads to `chart` in them.
@@ -470,6 +492,23 @@ mod tests {
         );
         let bare = chart(&[("Chart.yaml", "name: c\n")]);
         assert_eq!(crds(&bare, "c", &Value::Null), "");
+    }
+
+    #[test]
+    fn every_document_of_a_values_file_counts() {
+        let dir = chart(&[
+            (
+                "Chart.yaml",
+                "name: c\ndependencies:\n  - name: sub\n    condition: sub.enabled\n",
+            ),
+            (
+                "values.yaml",
+                "sub:\n  other: 1\n---\nsub:\n  enabled: true\n",
+            ),
+            ("charts/sub/Chart.yaml", "name: sub\n"),
+            ("charts/sub/crds/s.yaml", "kind: S\n"),
+        ]);
+        assert_eq!(crds(&dir, "c", &Value::Null), "kind: S\n");
     }
 
     /// The VictoriaMetrics operator's layout: CRDs rendered from templates by default, and a
