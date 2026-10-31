@@ -226,10 +226,10 @@ export const zhTW: Messages = {
   "update.notes": "發行說明",
   "update.guide": "升級方式",
   "update.download": "下載",
-  "update.how.installer": "用新版 zeabur-installer 以相同設定執行 plan 和 apply。",
+  "update.how.installer": "下載新版 zeabur-installer，用原本的設定執行 plan 和 apply。",
   "update.how.helm": "用新版 chart 執行 helm upgrade。",
-  "update.how.argoCd": "在 Argo CD 的 Application 改用新版 chart。",
-  "update.how.flux": "在 Flux 的 HelmRelease 改用新版 chart。",
+  "update.how.argoCd": "把 Argo CD Application 裡的 chart 改成新版本。",
+  "update.how.flux": "把 Flux HelmRelease 裡的 chart 改成新版本。",
   "update.how.zeaburctl": "更新 zeaburctl 後，重新執行 zeaburctl ui。",
 
   "cluster.title": "叢集",

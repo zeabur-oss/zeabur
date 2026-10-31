@@ -232,7 +232,7 @@ export const en = {
   "update.guide": "How to upgrade",
   "update.download": "Download",
   "update.how.installer":
-    "Run the newer zeabur-installer's plan and apply with the same configuration.",
+    "Download the new zeabur-installer, then run plan and apply with the same configuration.",
   "update.how.helm": "Run helm upgrade with the new chart version.",
   "update.how.argoCd": "Change the chart version in your Argo CD Application.",
   "update.how.flux": "Change the chart version in your Flux HelmRelease.",

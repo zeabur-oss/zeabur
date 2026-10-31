@@ -370,7 +370,7 @@ export const en = {
   "review.updateCheck": "Update check",
   "review.updateCheck.label": "Show on Zeabur's cluster page when a newer version is out",
   "review.updateCheck.description":
-    "Once a day, the browser of each person signed in asks GitHub for the list of Zeabur releases, with no ID. GitHub sees the IP address and your Zeabur's address. Nothing upgrades on its own.",
+    "Once a day, each signed-in person's browser fetches the list of Zeabur releases from GitHub, without any ID. GitHub sees the browser's IP address and your Zeabur's address. Nothing upgrades on its own.",
   "review.updateCheck.link": "How it works",
   "review.removing": "Components to remove",
   "review.removingHint":

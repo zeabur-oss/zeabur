@@ -227,10 +227,10 @@ export const zhCN: Messages = {
   "update.notes": "发布说明",
   "update.guide": "升级方法",
   "update.download": "下载",
-  "update.how.installer": "用新版 zeabur-installer 以相同配置运行 plan 和 apply。",
+  "update.how.installer": "下载新版 zeabur-installer，用原来的配置运行 plan 和 apply。",
   "update.how.helm": "用新版 chart 运行 helm upgrade。",
-  "update.how.argoCd": "在 Argo CD 的 Application 里改用新版 chart。",
-  "update.how.flux": "在 Flux 的 HelmRelease 里改用新版 chart。",
+  "update.how.argoCd": "把 Argo CD Application 里的 chart 改成新版本。",
+  "update.how.flux": "把 Flux HelmRelease 里的 chart 改成新版本。",
   "update.how.zeaburctl": "更新 zeaburctl 后，重新运行 zeaburctl ui。",
 
   "cluster.title": "集群",

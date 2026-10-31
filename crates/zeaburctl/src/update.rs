@@ -225,12 +225,12 @@ impl Newer {
     fn notice(&self, running: &str) -> String {
         if self.security {
             format!(
-                "zeaburctl {running} has known security problems, fixed in {}. Update: {DOWNLOAD}",
+                "zeaburctl {running} has known security problems. Update to {} from {DOWNLOAD}",
                 self.latest
             )
         } else {
             format!(
-                "zeaburctl {} is out (you have {running}). Update: {DOWNLOAD}",
+                "zeaburctl {} is out, and you have {running}. Download it from {DOWNLOAD}",
                 self.latest
             )
         }
