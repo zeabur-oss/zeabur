@@ -108,29 +108,6 @@
         "url": "https://flakehub.com/f/NixOS/nixpkgs/0.1"
       }
     },
-    "oss-ci": {
-      "inputs": {
-        "nix-bun": [
-          "nix-bun"
-        ],
-        "nixpkgs": [
-          "nixpkgs"
-        ]
-      },
-      "locked": {
-        "lastModified": 1793470437,
-        "narHash": "sha256-Tv9/zJ2f9rR5hep/vfBNf9yY04flJzeeCIy6AyjDz8M=",
-        "owner": "zeabur-oss",
-        "repo": ".github",
-        "rev": "2c928dab4097ea4dc082ed48802b97835d5035c7",
-        "type": "github"
-      },
-      "original": {
-        "owner": "zeabur-oss",
-        "repo": ".github",
-        "type": "github"
-      }
-    },
     "oss-skills": {
       "inputs": {
         "nixpkgs": [
@@ -156,7 +133,6 @@
         "catalog": "catalog",
         "nix-bun": "nix-bun",
         "nixpkgs": "nixpkgs_2",
-        "oss-ci": "oss-ci",
         "oss-skills": "oss-skills",
         "rust-overlay": "rust-overlay",
         "zhtw-mcp": "zhtw-mcp"

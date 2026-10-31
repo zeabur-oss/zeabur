@@ -120,8 +120,9 @@ case "$job" in
   test) cargo nextest run --workspace --all-features --locked --no-tests=warn ;;
   cargo-deny) cargo deny --locked check ;;
   unsafe-report)
+    bun install --frozen-lockfile
     status=0
-    zeabur-oss-unsafe-report zeabur zeaburctl zeabur-proxy zeabur-installer || status=$?
+    node_modules/.bin/zeabur-oss-unsafe-report zeabur zeaburctl zeabur-proxy zeabur-installer || status=$?
     keep target/unsafe-report.md
     exit "$status"
     ;;

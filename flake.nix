@@ -19,12 +19,6 @@
     # catalog's `release` output builds there, and a release build checks that bundle against the
     # signed release at that commit (scripts/release.ts).
     catalog.url = "github:zeabur-oss/catalog";
-    # zeabur-oss-unsafe-report (scripts/ci.sh).
-    oss-ci = {
-      url = "github:zeabur-oss/.github";
-      inputs.nixpkgs.follows = "nixpkgs";
-      inputs.nix-bun.follows = "nix-bun";
-    };
     # Bun's own release binaries; Nixpkgs is behind, and bun fmt and bun check are newer.
     nix-bun = {
       url = "github:zeabur-oss/nix-bun";
@@ -126,7 +120,6 @@
               crane
               cosign
               gh
-              inputs.oss-ci.packages.${system}.zeabur-oss-unsafe-report
 
               self.formatter.${system}
             ];
