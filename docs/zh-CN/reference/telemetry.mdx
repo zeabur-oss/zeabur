@@ -1,7 +1,7 @@
 ---
 title: 体验计划
-description: 加入体验计划后，Zeabur 和安装程序会发送什么、绝不发送什么，以及如何关闭。
-source: "0ceab195a59a"
+description: 加入体验计划后，Zeabur 和安装程序会发送什么、绝不发送什么；Zeabur 和 zeaburctl 如何检查新版本；以及如何分别关闭。
+source: "0fd6101882a5"
 ---
 
 体验计划会发送版本和每天的使用人数，让我们知道有多少人在用、该先修哪里。用安装程序安装时默认加入，可以在确认页取消勾选；用 Helm 安装时默认不加入，需要自己开启。
@@ -66,3 +66,23 @@ kubectl -n zeabur logs deployment/zeabur | grep telemetry
 ```
 
 `ZEABUR_TELEMETRY=off` 的效果和 `DO_NOT_TRACK` 一样。
+
+## 检查更新
+
+有新版本时，Zeabur 和 `zeaburctl` 会提醒你，并说明如何升级，但不会自动升级。检查更新和体验计划各自独立，默认开启。
+
+**检查什么。**两者都读取 `https://api.github.com/repos/zeabur-oss/zeabur/releases`，跳过草稿。除非你正在用预发布版本，否则也会跳过预发布版本。其余版本中最新的那个比你的版本新时，会显示它的版本、发布说明链接和升级方法。只要有任何一个更新的正式版本在说明里有 `### Security` 小节，就会告诉你当前版本有已知的安全问题，并附上这些版本的链接。
+
+**在哪里运行。**
+
+- 集群页始终显示 `Zeabur v<版本>`。每位登录者的浏览器每天检查一次，结果保存在该浏览器里。Zeabur 服务器不会访问 GitHub。显示的升级方法取决于 Zeabur 的安装方式，分为 zeabur-installer、Helm、Argo CD 和 Flux。用 `zeaburctl ui` 打开时，页面显示的是 `zeaburctl` 自己的版本和更新方法。
+- `zeaburctl` 每 24 小时最多检查一次，由任意命令触发。检查与命令同时运行，不会拖慢命令。命令结束时还没查完，就直接放弃。有新版本时，`zeaburctl` 会在 stderr 输出一行。上次检查的时间保存在 `$XDG_CACHE_HOME/zeaburctl`。未设置 `XDG_CACHE_HOME` 时，macOS 保存在 `~/Library/Caches/zeaburctl`，其他系统保存在 `~/.cache/zeaburctl`。stderr 不是终端，或设置了 `CI` 时，不会检查。
+
+**会发送什么。**一个普通的 GitHub 请求，不带任何 ID、Cookie 或令牌。GitHub 会看到请求来自哪个 IP 地址。集群页的请求还会让 GitHub 从 `Origin` 请求头看到你的 Zeabur 地址。浏览器不会发送 referrer。`zeaburctl` 的 user agent 是 `zeaburctl/<版本>`。
+
+**关闭。**以下任意一种都有效。
+
+- 用安装程序安装时，在确认页取消勾选，或在 `/etc/zeabur-installer/config.yaml` 中设置 `updateCheck: false`。运行 `apply` 时设置了 `DO_NOT_TRACK=1` 或 `NO_UPDATE_NOTIFIER` 也会关闭。
+- 用 Helm 安装时，设置 `updateCheck.enabled=false`。集群页就只显示版本。
+- 在 Zeabur 的环境变量中设置 `DO_NOT_TRACK=1`。`zeaburctl` 则是在你自己的环境变量中设置。这也会关闭体验计划。
+- 为 `zeaburctl`（包括 `zeaburctl ui`）在你的环境变量中设置 `NO_UPDATE_NOTIFIER`，任意值都可以。这只关闭检查更新。

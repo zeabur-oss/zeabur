@@ -81,6 +81,35 @@ pub struct Cluster {
     pub can: crate::projects::rights::ClusterRights,
 }
 
+/// Zeabur itself: its version, and what the interface needs to say how to upgrade it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ZeaburVersion {
+    /// Zeabur's version, such as `0.1.1`; in local mode, `zeaburctl`'s.
+    pub version: String,
+    /// Whether the interface checks GitHub's releases for a newer version.
+    pub update_check: bool,
+    /// How Zeabur was installed; absent when the person may not read what tells.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub installed_by: Option<InstallMethod>,
+}
+
+/// How Zeabur was installed, which says how to upgrade it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum InstallMethod {
+    /// zeabur-installer, through its `HelmChart` in `kube-system`.
+    Installer,
+    /// A Helm release.
+    Helm,
+    /// An Argo CD Application.
+    ArgoCd,
+    /// A Flux `Kustomization` or `HelmRelease`.
+    Flux,
+    /// `zeaburctl ui` on a person's computer.
+    Zeaburctl,
+}
+
 /// The API server's readiness, from the replica that answered (see `crate::cluster::health`).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]

@@ -222,6 +222,23 @@ export const en = {
   "home.noEventsPermission": "You cannot list the cluster's events.",
   "home.noServices": "No services yet",
 
+  // Zeabur's own updates
+  "update.securityBadge": "Security update",
+  "update.out": (product: string, version: string) => `${product} ${version} is out`,
+  "update.security": (product: string, version: string) =>
+    `${product} ${version} has known security problems`,
+  "update.fixedIn": (versions: string) => `Fixed in ${versions}.`,
+  "update.notes": "Release notes",
+  "update.notesOf": (version: string) => `v${version} release notes`,
+  "update.guide": "How to upgrade",
+  "update.download": "Download",
+  "update.how.installer":
+    "Download the new zeabur-installer, then run plan and apply with the same configuration.",
+  "update.how.helm": "Run helm upgrade with the new chart version.",
+  "update.how.argoCd": "Change the chart version in your Argo CD Application.",
+  "update.how.flux": "Change the chart version in your Flux HelmRelease.",
+  "update.how.zeaburctl": "Update zeaburctl and run zeaburctl ui again.",
+
   // Cluster
   "cluster.title": "Cluster",
   "cluster.tabs": "Cluster pages",

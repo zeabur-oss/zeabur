@@ -339,6 +339,11 @@ export const zhTW: Messages = {
   "review.program.description":
     "傳送版本和每天的使用人數，讓我們知道有多少人在用、該先修哪裡。不會傳名稱、網域或 Email，也不保存 IP。之後隨時可以關閉。",
   "review.program.link": "檢視會傳送的內容",
+  "review.updateCheck": "檢查更新",
+  "review.updateCheck.label": "有新版時在 Zeabur 叢集頁提醒",
+  "review.updateCheck.description":
+    "每位登入者的瀏覽器每天會向 GitHub 取得一次 Zeabur 的發行清單，不帶任何 ID。GitHub 看得到瀏覽器的 IP 和你的 Zeabur 網址。Zeabur 不會自動升級。",
+  "review.updateCheck.link": "運作方式",
   "review.changes": "這台伺服器的變更",
   "review.changes.recorded": (version) => `上次用 zeabur-installer ${version} 安裝`,
   "review.changes.none": "沒有變更，伺服器已經符合這份設定。",

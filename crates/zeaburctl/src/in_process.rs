@@ -16,9 +16,13 @@ use zeabur_kube::UserClient;
 const MAX_BODY: usize = 64 * 1024 * 1024;
 
 /// The settings of Zeabur on this machine: the metrics store `--metrics-service` names, or the
-/// default. It keeps no settings of its own (no namespace), so they cannot be changed in it.
+/// default. It keeps no settings of its own (no namespace), so they cannot be changed in it. The
+/// interface checks for a newer zeaburctl unless the environment turns update checks off.
 pub(crate) fn settings(metrics_service: Option<&str>) -> Result<zeabur_api::Settings, String> {
-    let mut settings = zeabur_api::Settings::default();
+    let mut settings = zeabur_api::Settings {
+        update_check: crate::update::allowed(),
+        ..zeabur_api::Settings::default()
+    };
     if let Some(service) = metrics_service.filter(|s| !s.is_empty()) {
         settings.metrics_store = zeabur_api::settings::parse_service_port(service)
             .map_err(|e| format!("--metrics-service: {e}"))?;

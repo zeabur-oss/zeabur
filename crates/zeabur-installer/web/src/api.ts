@@ -66,6 +66,8 @@ export interface Config {
   allowDataLoss?: string[]
   /** The experience program; on unless `false`. */
   telemetry?: boolean
+  /** The Zeabur panel's update check; on unless `false`. */
+  updateCheck?: boolean
   distribution: Distribution
   k3sVersion?: string | null
   rke2Version?: string | null
