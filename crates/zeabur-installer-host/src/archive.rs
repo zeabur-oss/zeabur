@@ -172,8 +172,12 @@ fn build_chart(files: BTreeMap<String, Vec<u8>>, path: &str) -> Result<Chart, Ho
                 .map_err(|e| parse_error(&format!("{path}Chart.yaml"), &e))?;
             metadata = Some(parsed);
         } else if rel == "values.yaml" {
-            let documents: Vec<Option<Value>> = serde_saphyr::from_multiple(&text())
-                .map_err(|e| parse_error(&format!("{path}values.yaml"), &e))?;
+            let options = serde_saphyr::options! {
+                duplicate_keys: serde_saphyr::DuplicateKeyPolicy::LastWins,
+            };
+            let documents: Vec<Option<Value>> =
+                serde_saphyr::from_multiple_with_options(&text(), options)
+                    .map_err(|e| parse_error(&format!("{path}values.yaml"), &e))?;
             values = documents
                 .into_iter()
                 .flatten()
@@ -660,6 +664,20 @@ mod tests {
         assert_eq!(crds(&dir, "c", &Value::Null), "");
         let removed = serde_json::json!({"sub": {"enabled": null}});
         assert_eq!(crds(&dir, "c", &removed), "kind: S\n");
+    }
+
+    #[test]
+    fn a_repeated_values_key_keeps_its_last_value_as_helm_does() {
+        let dir = chart(&[
+            (
+                "Chart.yaml",
+                "name: c\ndependencies:\n  - name: sub\n    condition: sub.enabled\n",
+            ),
+            ("values.yaml", "sub:\n  enabled: false\n  enabled: true\n"),
+            ("charts/sub/Chart.yaml", "name: sub\n"),
+            ("charts/sub/crds/s.yaml", "kind: S\n"),
+        ]);
+        assert_eq!(crds(&dir, "c", &Value::Null), "kind: S\n");
     }
 
     #[test]
