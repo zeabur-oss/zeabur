@@ -71,7 +71,7 @@ enable: [runtime-security, vulnerability-scanning, intrusion-prevention]
 
 `enable` 可以填写 capability（例如 `runtime-security`）或完整组件 ID（例如 `volume-backup/velero`），依赖的组件会一并添加。如果 `disable` 排除了其他组件依赖的组件，`plan` 会列出两者并停止。最终安装的组件、安装顺序和排除原因，见 `plan` 的输出。
 
-installer 只提供 Catalog 在你所选 distribution 上测试过的组件（Catalog `index.json` 中的 `testedOn`）。推荐安装但未在此测试过的组件不会安装，依赖该组件的其他组件也一样。如果 `enable` 填写了未测试过的组件，或添加的组件依赖未测试过的组件，`plan` 会停止，并列出测试过的 distribution。
+installer 只提供 Catalog 在你的 distribution 上测试过的组件。每个组件测试过哪些 distribution，列在 Catalog `index.json` 的 `testedOn` 中。推荐安装、但没在你的 distribution 上测试过的组件不会安装，依赖这个组件的其他组件也一样。如果 `enable` 填写了没测试过的组件，或你添加的组件依赖没测试过的组件，`plan` 会停止，并列出 Catalog 测试过的 distribution。
 
 从列表中去掉已安装的组件后，下次 `apply` 会将其移除。如果移除组件会一并删除数据，需要先将组件写入 `allowDataLoss`，见[移除组件](./installer.mdx#卸载组件)。
 
@@ -181,7 +181,7 @@ host:
 
 | 字段 | 默认值与用途 |
 |---|---|
-| `enable` | `[]`。默认安装 Catalog 推荐 `single-node` 使用、且在 KubeSolo 上测试过的组件，例如 Ingress 和证书。可以再添加 Catalog 在 KubeSolo 上测试过的组件，例如 `builds`（Zeabur Builder，会一并安装 zot，内存需要 1800 MiB 以上）和 `databases`。其他组件会让 `plan` 停止，并列出测试过的 distribution |
+| `enable` | `[]`。个人安装会安装 Catalog 推荐 `single-node` 使用、且在 KubeSolo 上测试过的组件，例如 Ingress 和证书。可以再添加其他在 KubeSolo 上测试过的组件，例如 `builds` 和 `databases`。`builds` 是 Zeabur Builder，会一并安装 zot，内存需要 1800 MiB 以上。没在 KubeSolo 上测试过的组件会让 `plan` 停止，并列出 Catalog 测试过的 distribution |
 | `disable` | `[]`。排除 capability 或完整组件 ID |
 | `allowDataLoss` | `[]`。与创建集群的文件相同 |
 | `inputs` | `{}`。与创建集群的文件相同，按组件 ID 分组 |

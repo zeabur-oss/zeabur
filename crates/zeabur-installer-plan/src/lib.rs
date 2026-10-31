@@ -44,7 +44,7 @@ pub enum PlanError {
     },
     /// A component the configuration names, or one it needs, was not tested on the distribution.
     #[error(
-        "{component} was not tested on {distribution}; {}",
+        "{component} was not tested on {distribution}. {}",
         tested_where(.tested_on)
     )]
     Untested {
@@ -114,8 +114,8 @@ pub enum PlanError {
 
 fn tested_where(tested_on: &[String]) -> String {
     if tested_on.is_empty() {
-        "the catalog has not tested it anywhere".to_owned()
+        "The catalog has not tested it anywhere".to_owned()
     } else {
-        format!("the catalog tested it on {}", tested_on.join(", "))
+        format!("The catalog tested it on {}", tested_on.join(", "))
     }
 }

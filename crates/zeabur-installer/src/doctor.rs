@@ -308,7 +308,7 @@ fn failed_health(checks: &[Health], wait: impl Fn(&[&str]) -> bool) -> Vec<Strin
             let args = check.args(&timeout);
             (!wait(&args)).then(|| {
                 format!(
-                    "{}: {} (kubectl wait {})",
+                    "{}: {} To check again: kubectl wait {}",
                     check.name,
                     check.advice,
                     args.join(" ")
@@ -530,8 +530,9 @@ mod tests {
         assert_eq!(
             failed,
             [
-                "nodes-ready: Add longhorn: true under join and run zeabur-installer apply. (kubectl \
-              wait --for=condition=Ready nodes.longhorn.io -n longhorn-system --timeout=45s)"
+                "nodes-ready: Add longhorn: true under join and run zeabur-installer apply. To check \
+              again: kubectl wait --for=condition=Ready nodes.longhorn.io -n longhorn-system \
+              --timeout=45s"
             ]
         );
     }
