@@ -16822,6 +16822,7 @@ components:
       - id
       - name
       - description
+      - tagline
       - license
       - homepage
       - version
@@ -16903,6 +16904,18 @@ components:
         summaryLocales:
           type: object
           description: The summary in other languages (`zh-TW`, `zh-CN`).
+          additionalProperties:
+            type: string
+          propertyNames:
+            type: string
+        tagline:
+          type: string
+          description: |-
+            What the application is, in one sentence, in English: the catalogue's `summary`, else
+            its description.
+        taglineLocales:
+          type: object
+          description: The tagline in other languages (`zh-TW`, `zh-CN`).
           additionalProperties:
             type: string
           propertyNames:

@@ -10,7 +10,6 @@ import { InstallAlert } from "@/components/lazy-installer-sheet"
 import { PlanDrawer } from "@/components/plan/plan-drawer"
 import { usePlanStep, type PlanStepState } from "@/components/plan/planner"
 import { useI18n, useT, type Translate } from "@/i18n"
-import { templateSummary } from "@/i18n/template-summaries"
 import { useQuantityFormat } from "@/lib/quantity"
 import {
   deployProblems,
@@ -24,6 +23,7 @@ import {
   inputWords,
   riskWords,
   summaryWords,
+  taglineWords,
   templateChanges,
   type AppTemplate,
   type TemplateInput,
@@ -74,11 +74,7 @@ export function TemplateDrawer({ project, onClose }: { project: string; onClose:
       step={planner}
       onClose={onClose}
       title={picked ? t("add.templateDeploy", picked.name) : t("add.templatesTitle")}
-      description={
-        picked
-          ? templateSummary(picked.id, picked.description, locale)
-          : t("add.templatesBody", project)
-      }
+      description={picked ? taglineWords(picked, locale) : t("add.templatesBody", project)}
       footer={footer}
     >
       {picked ? (
@@ -158,9 +154,7 @@ function TemplateRow({
         <span className="text-sm font-medium text-main" translate="no">
           {template.name}
         </span>
-        <span className="type-body text-secondary">
-          {templateSummary(template.id, template.description, locale)}
-        </span>
+        <span className="type-body text-secondary">{taglineWords(template, locale)}</span>
         <span className="type-meta text-muted-foreground">
           {t(
             "add.templateNeeds",

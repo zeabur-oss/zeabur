@@ -13,6 +13,7 @@ import {
   riskWords,
   startValues,
   summaryWords,
+  taglineWords,
   templateChanges,
   type AppTemplate,
   type TemplateInput,
@@ -54,6 +55,7 @@ const template = (patch: Partial<AppTemplate>): AppTemplate => ({
   id: "miniflux",
   name: "Miniflux",
   description: "Miniflux feed reader over HTTPS.",
+  tagline: "An RSS reader.",
   license: "Apache-2.0",
   homepage: "https://miniflux.app/",
   version: "2.2.0",
@@ -153,7 +155,7 @@ describe("app templates", () => {
     expect(startValues(template({ inputs: [email] }))).toEqual({ adminEmail: "" })
   })
 
-  test("security words are shown in the reader's language, else in English", () => {
+  test("a template's words are shown in the reader's language, else in English", () => {
     const risk = {
       risk: "Open to all.",
       mitigation: "Add a policy.",
@@ -176,6 +178,9 @@ describe("app templates", () => {
     expect(summaryWords(said, "zh-TW")).toEqual({ text: "受限執行。", english: false })
     expect(summaryWords(said, "en")).toEqual({ text: "Runs restricted.", english: true })
     expect(summaryWords(template({ summary: "" }), "en")).toBeUndefined()
+    const ghost = template({ tagline: "A blog.", taglineLocales: { "zh-TW": "部落格。" } })
+    expect(taglineWords(ghost, "zh-TW")).toBe("部落格。")
+    expect(taglineWords(ghost, "zh-CN")).toBe("A blog.")
   })
 
   test("generated values sharing a Secret go in one create, before the template", () => {

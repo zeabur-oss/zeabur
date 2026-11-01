@@ -43,6 +43,10 @@ export function inputWords(input: TemplateInput, locale: string) {
   }
 }
 
+/** What the application is, in `locale`, else in English. */
+export const taglineWords = (template: AppTemplate, locale: string) =>
+  template.taglineLocales?.[locale] ?? template.tagline
+
 /** The security summary in `locale`, else in English; `undefined` when the template has none. */
 export function summaryWords(template: AppTemplate, locale: string) {
   const text = template.summaryLocales?.[locale] ?? template.summary

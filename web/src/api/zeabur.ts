@@ -9470,6 +9470,11 @@ export type TemplateViewLabels = { [key: string]: string }
 export type TemplateViewSummaryLocales = { [key: string]: string }
 
 /**
+ * The tagline in other languages (`zh-TW`, `zh-CN`).
+ */
+export type TemplateViewTaglineLocales = { [key: string]: string }
+
+/**
  * A template of Zeabur Catalog.
  */
 export type TemplateView = {
@@ -9510,6 +9515,13 @@ export type TemplateView = {
   summary: string
   /** The summary in other languages (`zh-TW`, `zh-CN`). */
   summaryLocales?: TemplateViewSummaryLocales
+  /**
+   * What the application is, in one sentence, in English: the catalogue's `summary`, else
+   * its description.
+   */
+  tagline: string
+  /** The tagline in other languages (`zh-TW`, `zh-CN`). */
+  taglineLocales?: TemplateViewTaglineLocales
   /** The application's version (`2.2.0`). */
   version: string
 }
