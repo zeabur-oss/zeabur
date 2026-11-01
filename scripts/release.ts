@@ -215,40 +215,43 @@ async function bump(version: Version) {
   const plain = version.plain;
   const metadata =
     await $`cargo metadata --manifest-path ${join(root, "Cargo.toml")} --no-deps --format-version 1`.json();
-  const edit = async (file: string, change: (text: string) => string) => {
+  // Each pattern must match: a file that no longer has the line stops the bump.
+  const edit = async (file: string, ...sets: [RegExp, string][]) => {
     const path = join(root, file);
-    const text = await Bun.file(path).text();
-    const changed = change(text);
-    if (changed === text && !text.includes(plain))
-      fail(`${file} has no version to set`);
-    await Bun.write(path, changed);
-  };
-  await edit("Cargo.lock", (lock) => {
-    for (const { name } of metadata.packages as { name: string }[]) {
-      const entry = new RegExp(`(\nname = "${name}"\nversion = )"[^"]*"`);
-      if (!entry.test(lock)) fail(`Cargo.lock has no package ${name}`);
-      lock = lock.replace(entry, `$1"${plain}"`);
+    let text = await Bun.file(path).text();
+    for (const [pattern, to] of sets) {
+      if (!pattern.test(text)) fail(`${file} has no ${pattern} to set`);
+      text = text.replace(pattern, to);
     }
-    return lock;
-  });
-  await edit("deploy/chart/zeabur/Chart.yaml", (chart) =>
-    chart
-      .replace(/^version: .*$/m, `version: ${plain}`)
-      .replace(/^appVersion: .*$/m, `appVersion: "${plain}"`),
+    await Bun.write(path, text);
+  };
+  await edit(
+    "Cargo.lock",
+    ...(metadata.packages as { name: string }[]).map(
+      ({ name }): [RegExp, string] => [
+        new RegExp(`(\nname = "${name}"\nversion = )"[^"]*"`),
+        `$1"${plain}"`,
+      ],
+    ),
+  );
+  await edit(
+    "deploy/chart/zeabur/Chart.yaml",
+    [/^version: .*$/m, `version: ${plain}`],
+    [/^appVersion: .*$/m, `appVersion: "${plain}"`],
   );
   for (const manifest of [
     "web/package.json",
     "crates/zeabur-installer/web/package.json",
   ])
-    await edit(manifest, (text) =>
-      text.replace(/^(  "version": )"[^"]*"/m, `$1"${plain}"`),
-    );
-  await edit("crates/zeabur-api/openapi.yaml", (text) =>
-    text.replace(/^(  version: )"[^"]*"/m, `$1"${plain}"`),
-  );
-  await edit("web/src/api/zeabur.ts", (text) =>
-    text.replace(/^( \* OpenAPI spec version: ).*$/m, `$1${plain}`),
-  );
+    await edit(manifest, [/^(  "version": )"[^"]*"/m, `$1"${plain}"`]);
+  await edit("crates/zeabur-api/openapi.yaml", [
+    /^(  version: )"[^"]*"/m,
+    `$1"${plain}"`,
+  ]);
+  await edit("web/src/api/zeabur.ts", [
+    /^( \* OpenAPI spec version: ).*$/m,
+    `$1${plain}`,
+  ]);
 }
 
 async function check(version: Version) {
@@ -283,6 +286,13 @@ async function check(version: Version) {
   if (String(api) !== plain)
     problems.push(
       `crates/zeabur-api/openapi.yaml has version ${api}, not ${plain}`,
+    );
+  const client = (
+    await Bun.file(join(root, "web/src/api/zeabur.ts")).text()
+  ).match(/^ \* OpenAPI spec version: (.*)$/m)?.[1];
+  if (client !== plain)
+    problems.push(
+      `web/src/api/zeabur.ts has OpenAPI spec version ${client}, not ${plain}`,
     );
   for (const ref of (await chartImages(chartDir)).split(", ")) {
     const repository = ref.split("@")[0]!.replace(/:[^:/]+$/, "");

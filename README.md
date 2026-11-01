@@ -17,7 +17,7 @@ than you have, and keeps no state of its own: no database, no custom resources.
 configuring and operating the cluster, and leaving Zeabur, in English,
 [繁體中文](https://oss.zeabur.com/zh-TW/docs/zeabur/) and [简体中文](https://oss.zeabur.com/zh-CN/docs/zeabur/).
 
-> **Status: pre-alpha (0.1.1).** The API may still change, and it has been tried on few
+> **Status: pre-alpha.** The API may still change, and it has been tried on few
 > clusters. Do not point it at a cluster you cannot afford to break.
 
 <table>

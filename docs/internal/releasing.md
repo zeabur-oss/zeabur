@@ -61,6 +61,8 @@ not `sort -V`.
    `ZEABUR_IDENTITY_PINNED` are what the release embeds and installs: the catalog commit must
    carry a published release tag and the Identity tag must exist, each release with its signed
    `SHA256SUMS`, or the release stops. Renovate moves the Identity tag only to newer release tags.
+   The release reads the Identity release's `digests.txt`, which Identity publishes from v0.1.2
+   on: release Identity before the next Zeabur release and move the pin to it.
 2. Rehearse: **Actions → Release → Run workflow** on `release/next` with the version, `v<version>`. It
    runs the three builds with their smoke tests and publishes nothing; the pins are
    not checked and no pinned installer is built.

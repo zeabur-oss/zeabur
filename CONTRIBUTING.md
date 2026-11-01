@@ -104,8 +104,9 @@ default: patch
 # Zeabur Proxy's image is published with each release
 ```
 
-Choose the level by the effect on users: `major` when they have to change something (`minor`
-before 1.0), `minor` for something new, `patch` for a fix, `security` for a fixed vulnerability (listed under
+Choose the level by the effect on users: `major` when they have to change something, `minor` for
+something new, `patch` for a fix (before 1.0, a `major` change makes the next minor
+version, such as 0.2.0 after 0.1.2, and a `minor` change the next patch), `security` for a fixed vulnerability (listed under
 `### Security`, which the update check looks for, and released as a patch). A change only to CI or tooling needs
 none; label the pull request `changelog: none` when its title is `feat`, `fix` or `perf` and users
 see no difference. The Changeset check enforces this. Keep each paragraph on one line: the section
