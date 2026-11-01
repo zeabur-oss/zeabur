@@ -369,10 +369,7 @@ async fn a_page_opened_without_a_session_goes_to_zeabur_identity_first() {
             .as_deref(),
         Some("/projects/shop?tab=logs")
     );
-    assert_eq!(
-        open_page(&rig, "/", &page).await.as_deref(),
-        Some("/")
-    );
+    assert_eq!(open_page(&rig, "/", &page).await.as_deref(), Some("/"));
     // Without Fetch Metadata, `Accept` tells a page load apart.
     let old_browser = [
         HOST,
