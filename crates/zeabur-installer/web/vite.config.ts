@@ -11,7 +11,10 @@ const designSystem = "/node_modules/@zeabur-oss/design-system/"
 
 // The design system's imports, pre-bundled by name: some reach CommonJS the browser cannot load
 // (`use-sync-external-store/shim`).
-const designSystemSources = resolve(import.meta.dirname, "node_modules/@zeabur-oss/design-system/src")
+const designSystemSources = resolve(
+  import.meta.dirname,
+  "node_modules/@zeabur-oss/design-system/src",
+)
 const designSystemImports = [
   ...new Set(
     readdirSync(designSystemSources, { recursive: true, encoding: "utf8" })
