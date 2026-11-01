@@ -6821,7 +6821,6 @@ components:
       - displayName
       - homepage
       - license
-      - description
       - summary
       - defaults
       - distributions
@@ -6838,9 +6837,6 @@ components:
             type: string
           propertyNames:
             type: string
-        description:
-          type: string
-          description: Why the catalogue chose it.
         displayName:
           type: string
           description: Human-readable name.
@@ -16821,7 +16817,6 @@ components:
       required:
       - id
       - name
-      - description
       - tagline
       - license
       - homepage
@@ -16836,9 +16831,6 @@ components:
       - needsDomain
       - needsClusterIssuer
       properties:
-        description:
-          type: string
-          description: The catalogue's description, in English, for operators.
         homepage:
           type: string
           description: The application's home page.
@@ -16910,9 +16902,7 @@ components:
             type: string
         tagline:
           type: string
-          description: |-
-            What the application is, in one sentence, in English: the catalogue's `summary`, else
-            its description.
+          description: "What the application is, in one sentence, in English: the catalogue's `summary`."
         taglineLocales:
           type: object
           description: The tagline in other languages (`zh-TW`, `zh-CN`).

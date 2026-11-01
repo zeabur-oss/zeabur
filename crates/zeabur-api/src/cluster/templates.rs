@@ -30,10 +30,7 @@ pub struct TemplateView {
     pub id: String,
     /// The application's name (`Miniflux`).
     pub name: String,
-    /// The catalogue's description, in English, for operators.
-    pub description: String,
-    /// What the application is, in one sentence, in English: the catalogue's `summary`, else
-    /// its description.
+    /// What the application is, in one sentence, in English: the catalogue's `summary`.
     pub tagline: String,
     /// The tagline in other languages (`zh-TW`, `zh-CN`).
     #[serde(skip_serializing_if = "BTreeMap::is_empty")]
@@ -178,7 +175,6 @@ fn view(
         idle: (state.template_idle)(&template.id),
         id: template.id,
         name: template.name,
-        description: template.description,
         tagline: template.tagline,
         tagline_locales: template.tagline_locales,
         license: template.license,
@@ -265,7 +261,6 @@ mod tests {
             display_name: id.to_owned(),
             homepage: String::new(),
             license: String::new(),
-            description: String::new(),
             summary: BTreeMap::new(),
             defaults: BTreeMap::new(),
             distributions: Vec::new(),
