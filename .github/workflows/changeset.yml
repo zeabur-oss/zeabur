@@ -9,4 +9,4 @@ permissions:
 
 jobs:
   changeset:
-    uses: zeabur-oss/.github/.github/workflows/changeset.yml@2ff52ccf5624b0d4ddd24174afd9f2ad1e252d38 # main
+    uses: zeabur-oss/.github/.github/workflows/changeset.yml@9f67bcbecd22239636877a838d7359278a0e765e # main
