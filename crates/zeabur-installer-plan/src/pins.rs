@@ -177,7 +177,7 @@ impl Calico {
 
 /// The releases that a release build pins.
 ///
-/// `scripts/release-pins.sh` reads their signed checksum lists, and the release workflow passes
+/// `scripts/release.ts` reads their signed checksum lists, and the release workflow passes
 /// the digests to the compiler. A development build pins none of them, so its configuration names
 /// each one in `sources`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

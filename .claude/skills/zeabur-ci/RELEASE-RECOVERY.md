@@ -5,9 +5,9 @@ and `docs/internal/releasing.md` ("When a release run fails"). These are Zeabur'
 
 ## A private package in `verify`
 
-The first run creates `zeabur` and `charts/zeabur` private on ghcr.io. `scripts/release.sh
+The first run creates `zeabur` and `charts/zeabur` private on ghcr.io. `scripts/release.ts
 verify` uses an empty registry configuration on purpose, so a login cannot hide a private package.
-`scripts/release.sh publish` refuses an existing release, image tag or chart version on purpose.
+`scripts/release.ts publish` refuses an existing release, image tag or chart version on purpose.
 
 ## An image import that reports success
 

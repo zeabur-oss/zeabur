@@ -2,10 +2,10 @@
   description = "zeabur development environment";
 
   inputs = {
-    nixpkgs.url = "https://flakehub.com/f/NixOS/nixpkgs/0.1"; # unstable Nixpkgs
+    nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
     # Rust toolchains. The locked revision sets the nightly (overlays.default).
     rust-overlay = {
-      url = "https://flakehub.com/f/oxalica/rust-overlay/0.1";
+      url = "github:oxalica/rust-overlay";
       inputs.nixpkgs.follows = "nixpkgs";
     };
     # The zh-TW wording check (scripts/check-zh-tw.sh, `nix develop .#zh`). Upstream has no
@@ -17,10 +17,10 @@
     };
     # Zeabur Catalog. flake.lock pins its commit: zeabur-catalog embeds the bundle that the
     # catalog's `release` output builds there, and a release build checks that bundle against the
-    # signed release at that commit (scripts/release-pins.sh).
+    # signed release at that commit (scripts/release.ts).
     catalog.url = "github:zeabur-oss/catalog";
-    # zeabur-oss-release (scripts/release.sh) and zeabur-oss-unsafe-report (scripts/ci.sh).
-    oss-release = {
+    # The base shell of every zeabur-oss repository: Bun, the release tools and the shared linters.
+    oss = {
       url = "github:zeabur-oss/.github";
       inputs.nixpkgs.follows = "nixpkgs";
     };
@@ -80,6 +80,7 @@
         { pkgs, system }:
         {
           default = pkgs.mkShell {
+            inputsFrom = [ inputs.oss.devShells.${system}.base ];
             packages = with pkgs; [
               rustToolchain
 
@@ -92,15 +93,11 @@
               cargo-mutants
               # Zeabur Proxy's parser fuzz target (crates/zeabur-proxy/fuzz)
               cargo-fuzz
-              jq
-              shellcheck
-              actionlint
               # Docs and interface strings (.vale.ini)
               vale
               inputs.oss-skills.packages.${system}.mdx2vast
 
               # Web interface (web/: dependencies come from bun.lock)
-              bun
               brotli
               # Documentation screenshots (scripts/docs-shots.sh)
               libavif
@@ -111,18 +108,8 @@
 
               # The Helm chart (deploy/chart/zeabur, scripts/check-chart.sh) and the in-cluster
               # development cluster (scripts/dev-cluster.sh: a CA and certificates for its host names)
-              kubernetes-helm
               yq-go
               openssl
-
-              # Releases (scripts/release.sh, scripts/release-*.sh)
-              inputs.oss-release.packages.${system}.zeabur-oss-release
-              inputs.oss-release.packages.${system}.zeabur-oss-unsafe-report
-              cosign
-              skopeo
-              gh
-
-              self.formatter.${system}
             ];
 
             env = {
@@ -165,10 +152,8 @@
           # Only for the zh-TW wording check: zhtw-mcp builds from source, so it stays out of the
           # default shell that every other CI job enters.
           zh = pkgs.mkShell {
-            packages = [
-              pkgs.bun
-              inputs.zhtw-mcp.packages.${system}.zhtw-mcp
-            ];
+            inputsFrom = [ inputs.oss.devShells.${system}.base ];
+            packages = [ inputs.zhtw-mcp.packages.${system}.zhtw-mcp ];
           };
         }
       );

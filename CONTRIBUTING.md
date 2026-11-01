@@ -19,6 +19,7 @@ Run what CI runs (the jobs of `scripts/ci.sh` that need no cluster), inside `nix
 
 ```sh
 cargo fmt --all --check && nixfmt --check flake.nix && shellcheck scripts/*.sh && actionlint
+bun install --frozen-lockfile && bun fmt --check scripts/*.ts && bun check scripts/ && bun test scripts/
 cargo lint                                   # clippy, all targets and features, -D warnings
 RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --document-private-items --locked
 cargo nextest run --workspace --all-features --locked
@@ -59,7 +60,7 @@ the catalog's `release` output there, the same `bundle.tar.gz` and `index.json` 
 signs. `zeabur-catalog` embeds that bundle. To move the pin, run `nix flake update catalog`; to try
 an unpushed catalog, add `--override-input catalog git+file://$PWD/../catalog` to `nix develop`.
 A release checks the bundle against the catalog's signed release at that commit
-(`scripts/release-pins.sh`). Tests read the catalog at the pin too, so moving it goes in a pull
+(`scripts/release.ts`). Tests read the catalog at the pin too, so moving it goes in a pull
 request of its own, with no change in behaviour: `flake.lock`, the `fixtures/charts` corpus
 (`scripts/render-chart-corpus.sh`) and the files generated from the catalog
 (`ZEABUR_UPDATE_GOLDEN=1 cargo nextest run`, then `cargo xtask openapi`). The files vendored for
@@ -83,6 +84,16 @@ Cite only what you have read; a source you have not read is not cited at all, an
 it goes in `docs/internal/` or an issue. Every claim that Zeabur does something better or safer
 is backed by a test, not only by documentation. Comments and rustdoc are written in English. The docs and interface strings come in en, zh-TW and zh-CN: write
 first in any of them, and change all three in the same pull request.
+
+## Releases
+
+The release workflow is the shared one of
+[zeabur-oss/.github](https://github.com/zeabur-oss/.github); its stages are `bun scripts/release.ts
+check|build|sign|publish|finish|assets|verify`, and
+[docs/internal/releasing.md](docs/internal/releasing.md) has the steps. `bun scripts/release.ts
+check v<version>` checks the manifests before a release. If a draft's verify job fails because of
+the check itself, fix the check and run `verify` again from a checkout, as [Fix the check and
+verify again](docs/internal/releasing.md#fix-the-check-and-verify-again) shows.
 
 ## Toolchain
 

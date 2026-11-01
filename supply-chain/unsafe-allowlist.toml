@@ -36,7 +36,6 @@ kind = "unsafe"
 reason = "Cryptography"
 approved = "2026-10-28"
 
-
 # --- Async runtime and OS I/O: tokio and the system-call layer beneath it. No safe-only alternative exists for an async network service.
 [[crate]]
 name = "tokio"
@@ -152,7 +151,6 @@ kind = "unsafe"
 reason = "Async runtime and OS I/O"
 approved = "2026-10-28"
 
-
 # --- HTTP server stack under axum.
 [[crate]]
 name = "hyper"
@@ -220,7 +218,6 @@ kind = "unsafe"
 reason = "HTTP server stack under axum"
 approved = "2026-10-28"
 
-
 # --- Serialization.
 [[crate]]
 name = "serde"
@@ -251,7 +248,6 @@ name = "zmij"
 kind = "unsafe"
 reason = "Serialization"
 approved = "2026-10-28"
-
 
 # --- Logging.
 [[crate]]
@@ -284,7 +280,6 @@ kind = "unsafe"
 reason = "Logging"
 approved = "2026-10-28"
 
-
 # --- Command line.
 [[crate]]
 name = "clap_lex"
@@ -297,7 +292,6 @@ name = "anstyle"
 kind = "unsafe"
 reason = "Command line"
 approved = "2026-10-28"
-
 
 # --- Build time only: compiles aws-lc's C code or expands macros; runs on the build machine, not in the binary.
 [[crate]]
@@ -374,25 +368,7 @@ reason = "Kubernetes client"
 approved = "2026-10-28"
 
 [[crate]]
-name = "allocator-api2"
-kind = "unsafe"
-reason = "Kubernetes client"
-approved = "2026-10-28"
-
-[[crate]]
 name = "arraydeque"
-kind = "unsafe"
-reason = "Kubernetes client"
-approved = "2026-10-28"
-
-[[crate]]
-name = "async-stream"
-kind = "unsafe"
-reason = "Kubernetes client"
-approved = "2026-10-28"
-
-[[crate]]
-name = "backon"
 kind = "unsafe"
 reason = "Kubernetes client"
 approved = "2026-10-28"
@@ -410,12 +386,6 @@ reason = "Kubernetes client"
 approved = "2026-10-28"
 
 [[crate]]
-name = "dyn-clone"
-kind = "unsafe"
-reason = "Kubernetes client"
-approved = "2026-10-28"
-
-[[crate]]
 name = "either"
 kind = "unsafe"
 reason = "Kubernetes client"
@@ -423,30 +393,6 @@ approved = "2026-10-28"
 
 [[crate]]
 name = "encoding_rs"
-kind = "unsafe"
-reason = "Kubernetes client"
-approved = "2026-10-28"
-
-[[crate]]
-name = "enum-ordinalize"
-kind = "unsafe"
-reason = "Kubernetes client"
-approved = "2026-10-28"
-
-[[crate]]
-name = "event-listener"
-kind = "unsafe"
-reason = "Kubernetes client"
-approved = "2026-10-28"
-
-[[crate]]
-name = "event-listener-strategy"
-kind = "unsafe"
-reason = "Kubernetes client"
-approved = "2026-10-28"
-
-[[crate]]
-name = "foldhash"
 kind = "unsafe"
 reason = "Kubernetes client"
 approved = "2026-10-28"
@@ -476,12 +422,6 @@ reason = "Kubernetes client"
 approved = "2026-10-28"
 
 [[crate]]
-name = "hostname"
-kind = "unsafe"
-reason = "Kubernetes client"
-approved = "2026-10-28"
-
-[[crate]]
 name = "jiff"
 kind = "unsafe"
 reason = "Kubernetes client"
@@ -494,12 +434,6 @@ reason = "Kubernetes client"
 approved = "2026-10-28"
 
 [[crate]]
-name = "jsonptr"
-kind = "unsafe"
-reason = "Kubernetes client"
-approved = "2026-10-28"
-
-[[crate]]
 name = "k8s-openapi"
 kind = "native"
 reason = "Kubernetes client"
@@ -507,12 +441,6 @@ approved = "2026-10-28"
 
 [[crate]]
 name = "k8s-openapi"
-kind = "unsafe"
-reason = "Kubernetes client"
-approved = "2026-10-28"
-
-[[crate]]
-name = "lock_api"
 kind = "unsafe"
 reason = "Kubernetes client"
 approved = "2026-10-28"
@@ -537,30 +465,6 @@ approved = "2026-10-28"
 
 [[crate]]
 name = "ordered-float"
-kind = "unsafe"
-reason = "Kubernetes client"
-approved = "2026-10-28"
-
-[[crate]]
-name = "parking_lot"
-kind = "unsafe"
-reason = "Kubernetes client"
-approved = "2026-10-28"
-
-[[crate]]
-name = "parking_lot_core"
-kind = "unsafe"
-reason = "Kubernetes client"
-approved = "2026-10-28"
-
-[[crate]]
-name = "pin-project"
-kind = "unsafe"
-reason = "Kubernetes client"
-approved = "2026-10-28"
-
-[[crate]]
-name = "ref-cast"
 kind = "unsafe"
 reason = "Kubernetes client"
 approved = "2026-10-28"
@@ -649,14 +553,7 @@ kind = "unsafe"
 reason = "Kubernetes client"
 approved = "2026-10-28"
 
-
 # --- Build time only: procedural macros and build helpers of the Kubernetes client; they run on the build machine, not in the binary
-[[crate]]
-name = "async-stream-impl"
-kind = "unsafe"
-reason = "Build time only"
-approved = "2026-10-28"
-
 [[crate]]
 name = "core_detect"
 kind = "unsafe"
@@ -664,25 +561,7 @@ reason = "Build time only"
 approved = "2026-10-28"
 
 [[crate]]
-name = "darling_core"
-kind = "unsafe"
-reason = "Build time only"
-approved = "2026-10-28"
-
-[[crate]]
 name = "derive_more-impl"
-kind = "unsafe"
-reason = "Build time only"
-approved = "2026-10-28"
-
-[[crate]]
-name = "educe"
-kind = "unsafe"
-reason = "Build time only"
-approved = "2026-10-28"
-
-[[crate]]
-name = "enum-ordinalize-derive"
 kind = "unsafe"
 reason = "Build time only"
 approved = "2026-10-28"
@@ -700,18 +579,6 @@ reason = "Build time only"
 approved = "2026-10-28"
 
 [[crate]]
-name = "pin-project-internal"
-kind = "unsafe"
-reason = "Build time only"
-approved = "2026-10-28"
-
-[[crate]]
-name = "ref-cast-impl"
-kind = "unsafe"
-reason = "Build time only"
-approved = "2026-10-28"
-
-[[crate]]
 name = "rustversion"
 kind = "unsafe"
 reason = "Build time only"
@@ -719,37 +586,7 @@ approved = "2026-10-28"
 
 # --- WebAuthn relying party (webauthn-rs 0.6) and its RustCrypto, CBOR, URL and time dependencies
 [[crate]]
-name = "aes"
-kind = "unsafe"
-reason = "WebAuthn relying party"
-approved = "2026-10-28"
-
-[[crate]]
-name = "argon2"
-kind = "unsafe"
-reason = "WebAuthn relying party"
-approved = "2026-10-28"
-
-[[crate]]
-name = "base16ct"
-kind = "unsafe"
-reason = "WebAuthn relying party"
-approved = "2026-10-28"
-
-[[crate]]
 name = "base64"
-kind = "unsafe"
-reason = "WebAuthn relying party"
-approved = "2026-10-28"
-
-[[crate]]
-name = "base64ct"
-kind = "unsafe"
-reason = "WebAuthn relying party"
-approved = "2026-10-28"
-
-[[crate]]
-name = "blake2"
 kind = "unsafe"
 reason = "WebAuthn relying party"
 approved = "2026-10-28"
@@ -761,25 +598,7 @@ reason = "WebAuthn relying party"
 approved = "2026-10-28"
 
 [[crate]]
-name = "block-padding"
-kind = "unsafe"
-reason = "WebAuthn relying party"
-approved = "2026-10-28"
-
-[[crate]]
-name = "cipher"
-kind = "unsafe"
-reason = "WebAuthn relying party"
-approved = "2026-10-28"
-
-[[crate]]
 name = "cpufeatures"
-kind = "unsafe"
-reason = "WebAuthn relying party"
-approved = "2026-10-28"
-
-[[crate]]
-name = "crypto-bigint"
 kind = "unsafe"
 reason = "WebAuthn relying party"
 approved = "2026-10-28"
@@ -791,25 +610,7 @@ reason = "WebAuthn relying party"
 approved = "2026-10-28"
 
 [[crate]]
-name = "deranged"
-kind = "unsafe"
-reason = "WebAuthn relying party"
-approved = "2026-10-28"
-
-[[crate]]
-name = "flagset"
-kind = "unsafe"
-reason = "WebAuthn relying party"
-approved = "2026-10-28"
-
-[[crate]]
 name = "generic-array"
-kind = "unsafe"
-reason = "WebAuthn relying party"
-approved = "2026-10-28"
-
-[[crate]]
-name = "half"
 kind = "unsafe"
 reason = "WebAuthn relying party"
 approved = "2026-10-28"
@@ -821,85 +622,7 @@ reason = "WebAuthn relying party"
 approved = "2026-10-28"
 
 [[crate]]
-name = "icu_collections"
-kind = "unsafe"
-reason = "WebAuthn relying party"
-approved = "2026-10-28"
-
-[[crate]]
-name = "icu_locale_core"
-kind = "unsafe"
-reason = "WebAuthn relying party"
-approved = "2026-10-28"
-
-[[crate]]
-name = "icu_normalizer"
-kind = "unsafe"
-reason = "WebAuthn relying party"
-approved = "2026-10-28"
-
-[[crate]]
-name = "icu_provider"
-kind = "unsafe"
-reason = "WebAuthn relying party"
-approved = "2026-10-28"
-
-[[crate]]
-name = "idna"
-kind = "unsafe"
-reason = "WebAuthn relying party"
-approved = "2026-10-28"
-
-[[crate]]
 name = "inout"
-kind = "unsafe"
-reason = "WebAuthn relying party"
-approved = "2026-10-28"
-
-[[crate]]
-name = "libm"
-kind = "unsafe"
-reason = "WebAuthn relying party"
-approved = "2026-10-28"
-
-[[crate]]
-name = "litemap"
-kind = "unsafe"
-reason = "WebAuthn relying party"
-approved = "2026-10-28"
-
-[[crate]]
-name = "num-bigint"
-kind = "unsafe"
-reason = "WebAuthn relying party"
-approved = "2026-10-28"
-
-[[crate]]
-name = "num-bigint-dig"
-kind = "unsafe"
-reason = "WebAuthn relying party"
-approved = "2026-10-28"
-
-[[crate]]
-name = "pem-rfc7468"
-kind = "unsafe"
-reason = "WebAuthn relying party"
-approved = "2026-10-28"
-
-[[crate]]
-name = "polyval"
-kind = "unsafe"
-reason = "WebAuthn relying party"
-approved = "2026-10-28"
-
-[[crate]]
-name = "potential_utf"
-kind = "unsafe"
-reason = "WebAuthn relying party"
-approved = "2026-10-28"
-
-[[crate]]
-name = "powerfmt"
 kind = "unsafe"
 reason = "WebAuthn relying party"
 approved = "2026-10-28"
@@ -917,24 +640,6 @@ reason = "WebAuthn relying party"
 approved = "2026-10-28"
 
 [[crate]]
-name = "rand_chacha"
-kind = "unsafe"
-reason = "WebAuthn relying party"
-approved = "2026-10-28"
-
-[[crate]]
-name = "rand_core"
-kind = "unsafe"
-reason = "WebAuthn relying party"
-approved = "2026-10-28"
-
-[[crate]]
-name = "serde_with"
-kind = "unsafe"
-reason = "WebAuthn relying party"
-approved = "2026-10-28"
-
-[[crate]]
 name = "sha1"
 kind = "unsafe"
 reason = "WebAuthn relying party"
@@ -944,147 +649,6 @@ approved = "2026-10-28"
 name = "sha2"
 kind = "unsafe"
 reason = "WebAuthn relying party"
-approved = "2026-10-28"
-
-[[crate]]
-name = "spin"
-kind = "unsafe"
-reason = "WebAuthn relying party"
-approved = "2026-10-28"
-
-[[crate]]
-name = "stable_deref_trait"
-kind = "unsafe"
-reason = "WebAuthn relying party"
-approved = "2026-10-28"
-
-[[crate]]
-name = "time"
-kind = "unsafe"
-reason = "WebAuthn relying party"
-approved = "2026-10-28"
-
-[[crate]]
-name = "tinystr"
-kind = "unsafe"
-reason = "WebAuthn relying party"
-approved = "2026-10-28"
-
-[[crate]]
-name = "universal-hash"
-kind = "unsafe"
-reason = "WebAuthn relying party"
-approved = "2026-10-28"
-
-[[crate]]
-name = "url"
-kind = "unsafe"
-reason = "WebAuthn relying party"
-approved = "2026-10-28"
-
-[[crate]]
-name = "utf8_iter"
-kind = "unsafe"
-reason = "WebAuthn relying party"
-approved = "2026-10-28"
-
-[[crate]]
-name = "uuid"
-kind = "unsafe"
-reason = "WebAuthn relying party"
-approved = "2026-10-28"
-
-[[crate]]
-name = "writeable"
-kind = "unsafe"
-reason = "WebAuthn relying party"
-approved = "2026-10-28"
-
-[[crate]]
-name = "yoke"
-kind = "unsafe"
-reason = "WebAuthn relying party"
-approved = "2026-10-28"
-
-[[crate]]
-name = "zerotrie"
-kind = "unsafe"
-reason = "WebAuthn relying party"
-approved = "2026-10-28"
-
-[[crate]]
-name = "zerovec"
-kind = "unsafe"
-reason = "WebAuthn relying party"
-approved = "2026-10-28"
-
-
-# --- Build time only: procedural macros and parsers used while compiling the WebAuthn stack
-[[crate]]
-name = "minimal-lexical"
-kind = "unsafe"
-reason = "Build time only: procedural macros and parsers used while compiling the WebAuthn stack"
-approved = "2026-10-28"
-
-[[crate]]
-name = "nom"
-kind = "unsafe"
-reason = "Build time only: procedural macros and parsers used while compiling the WebAuthn stack"
-approved = "2026-10-28"
-
-[[crate]]
-name = "synstructure"
-kind = "unsafe"
-reason = "Build time only: procedural macros and parsers used while compiling the WebAuthn stack"
-approved = "2026-10-28"
-
-[[crate]]
-name = "time-macros"
-kind = "unsafe"
-reason = "Build time only: procedural macros and parsers used while compiling the WebAuthn stack"
-approved = "2026-10-28"
-
-[[crate]]
-name = "yoke-derive"
-kind = "unsafe"
-reason = "Build time only: procedural macros and parsers used while compiling the WebAuthn stack"
-approved = "2026-10-28"
-
-[[crate]]
-name = "zerocopy-derive"
-kind = "unsafe"
-reason = "Build time only: procedural macros and parsers used while compiling the WebAuthn stack"
-approved = "2026-10-28"
-
-[[crate]]
-name = "zerovec-derive"
-kind = "unsafe"
-reason = "Build time only: procedural macros and parsers used while compiling the WebAuthn stack"
-approved = "2026-10-28"
-
-# --- Sign-in page templates (askama).
-[[crate]]
-name = "askama"
-kind = "unsafe"
-reason = "Runtime HTML escaping. 5 sites: transmutes between str and its ASCII-only wrapper type, and from_utf8_unchecked on JSON-filter output built from str (the JSON filter is unused here)"
-approved = "2026-10-28"
-
-[[crate]]
-name = "askama_derive"
-kind = "unsafe"
-reason = "Build time only (inside the template proc macro). Same ASCII-wrapper transmutes; generated-code strings that contain the word unsafe are for filter arguments Zeabur Identity does not define"
-approved = "2026-10-28"
-
-[[crate]]
-name = "askama_parser"
-kind = "unsafe"
-reason = "Build time only (template parser in the proc macro). ASCII-wrapper transmutes and one lifetime extension of the parsed source, scoped to its owner"
-approved = "2026-10-28"
-
-[[crate]]
-name = "winnow"
-kind = "unsafe"
-reason = "Build time only (parser combinators under askama_parser). Unchecked slicing at offsets the parser has already validated"
 approved = "2026-10-28"
 
 # --- OpenAPI description (utoipa).

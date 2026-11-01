@@ -8,12 +8,8 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to rehearse or verify, as in Cargo.toml (v0.1.1); a rehearsal never publishes'
+        description: 'Version to rehearse, as in Cargo.toml (v0.1.1); a rehearsal never publishes'
         required: true
-      verify_only:
-        description: 'Verify the existing draft release of this version; build and publish nothing'
-        type: boolean
-        default: false
 
 permissions:
   contents: read
@@ -24,16 +20,16 @@ concurrency:
 
 jobs:
   release:
-    uses: zeabur-oss/.github/.github/workflows/release.yml@0953aff4b4c68db0cd0358eb72607c63c06d0f05 # main
+    uses: zeabur-oss/.github/.github/workflows/release.yml@bc2fba94d807c947f554f3b75be5623d86473067 # main
     permissions:
       contents: write
       packages: write
       id-token: write
       attestations: write
     with:
-      name: zeabur
+      name: Zeabur
+      docs: https://oss.zeabur.com/docs/zeabur/
       version: ${{ inputs.version }}
-      verify-only: ${{ inputs.verify_only == true }}
       # The experience program's PostHog key (docs/internal/releasing.md).
       telemetry-key: ${{ vars.POSTHOG_KEY }}
       # zeaburctl for macOS on Apple silicon; the server, its image and the installer are Linux only.

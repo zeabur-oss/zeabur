@@ -110,14 +110,19 @@ case "$job" in
     actionlint
     (cd web; bun ci; bun run fmt:check)
     (cd crates/zeabur-installer/web; bun ci; bun run fmt:check)
+    bun install --frozen-lockfile
+    bun fmt --check scripts/*.ts
+    bun check scripts/
+    bun test scripts/
     ;;
   clippy) cargo lint ;;
   docs) cargo doc --workspace --no-deps --document-private-items --locked ;;
   test) cargo nextest run --workspace --all-features --locked --no-tests=warn ;;
   cargo-deny) cargo deny --locked check ;;
   unsafe-report)
+    bun install --frozen-lockfile
     status=0
-    zeabur-oss-unsafe-report zeabur zeaburctl zeabur-proxy zeabur-installer || status=$?
+    node_modules/.bin/zeabur-oss-unsafe-report zeabur zeaburctl zeabur-proxy zeabur-installer || status=$?
     keep target/unsafe-report.md
     exit "$status"
     ;;

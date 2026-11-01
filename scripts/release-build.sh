@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Builds one platform's release candidates; publishes nothing. `scripts/release.sh build` runs it
+# Builds one platform's release candidates; publishes nothing. `bun scripts/release.ts build` runs it
 # on a runner of each platform, then smokes what it built (release-smoke.sh) before anything is
-# published (`release.sh publish`). Run inside `nix develop`, from a git checkout: archive
+# published (`release.ts publish`). Run inside `nix develop`, from a git checkout: archive
 # entries carry the commit's time (SOURCE_DATE_EPOCH), not the build's.
 #   scripts/release-build.sh v0.0.2 arm64 dist
 #
@@ -15,9 +15,9 @@
 #   (`ClusterEndpoint::in_cluster`), so there is no macOS `zeabur`.
 #
 # With `installer` (Linux only): zeabur-installer-<version>-linux-<arch>.tar.gz. The installer pins
-# the image and the chart that `release.sh publish` published, so `scripts/release.sh finish` builds
-# it after that step. It compiles in the ZEABUR_PIN_* variables (release-pins.sh): all of them, or none for a
-# development build.
+# the image and the chart that `release.ts publish` published, so `release.ts finish` builds it
+# after that step. It compiles in the ZEABUR_PIN_* variables (`release.ts finish`): all of them, or
+# none for a development build.
 #   scripts/release-build.sh v0.0.2 arm64 dist installer
 set -euo pipefail
 
@@ -29,7 +29,8 @@ version="$1"
 arch="$2"
 root="$(cd "$(dirname "$0")/.." && pwd)"
 : "${IN_NIX_SHELL:?run inside nix develop}"
-zeabur-oss-release version "$version" >/dev/null || exit 2
+[[ "$version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]] ||
+  { echo "$version is not vX.Y.Z or vX.Y.Z-<pre-release>" >&2; exit 2; }
 # mkShell sets SOURCE_DATE_EPOCH to 1980; the commit's time replaces it.
 SOURCE_DATE_EPOCH="$(git -C "$root" show -s --format=%ct HEAD)"
 export SOURCE_DATE_EPOCH

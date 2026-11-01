@@ -18,12 +18,12 @@ browser tests in local mode) and `kubernetes-l2` (Zeabur and Zeabur Identity in 
 `scripts/e2e-l2.sh`), both on `scripts/dev-cluster.sh`. What each cluster job runs is in
 `zeabur-cluster-tests`.
 
-`.github/workflows/release.yml` runs on a `vX.Y.Z` tag: all of `ci.yml` (`workflow_call`), then
-zeabur-oss/.github's shared release workflow, each stage `scripts/release.sh <stage>`: `build`
+`.github/workflows/release.yml` runs on a `vX.Y.Z` or `vX.Y.Z-<pre-release>` tag: zeabur-oss/.github's
+shared release workflow, each stage `bun scripts/release.ts <stage>`: `build`
 (Linux amd64/arm64, macOS arm64: `scripts/release-build.sh`, then `scripts/release-smoke.sh` on
-Linux and the docs screenshots on Linux amd64), `publish`, `attest`, `finish` (the installers),
+Linux), `sign` (macOS), `publish`, `attest`, `finish` (the installers),
 `release` (`assets`, the draft release) and `verify` (on the draft's assets);
-`zeabur-oss-release` from zeabur-oss/.github pushes, signs and verifies. A failed release run:
+`@zeabur-oss/release` (`package.json`) pushes, signs and verifies. A failed release run:
 `zeabur-oss-ci`'s RELEASE-RECOVERY.md, then [RELEASE-RECOVERY.md](RELEASE-RECOVERY.md) here.
 
 ## Reading a failure

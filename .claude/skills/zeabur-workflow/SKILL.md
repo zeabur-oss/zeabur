@@ -20,10 +20,9 @@ what is Zeabur's own.
 
 A maintainer releases: they bump the version (`Cargo.toml`, `Chart.yaml`, a `CHANGELOG.md`
 section), merge it, push the tag `v<version>`, check the draft release the workflow leaves and
-publish it by hand (`docs/internal/releasing.md`). A change to `scripts/release.sh` or a
-`scripts/release-*.sh` is checked with `shellcheck` and `actionlint`, and on Linux by running
-`release-build.sh` and
-`release-smoke.sh`; the macOS build runs on a Mac. A failed release run: `zeabur-ci`.
+publish it by hand (`docs/internal/releasing.md`). A change to `scripts/release.ts` is checked with `bun check scripts/` and `bun test scripts/`, a
+`scripts/release-*.sh` with `shellcheck`, the workflow with `actionlint`, and on Linux by running
+`release-build.sh` and `release-smoke.sh`; the macOS build runs on a Mac. A failed release run: `zeabur-ci`.
 
 ## Issues
 
