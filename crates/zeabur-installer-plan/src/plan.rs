@@ -1578,7 +1578,7 @@ fn zeabur_values(
 mod tests {
     use super::*;
     use crate::record;
-    use crate::testing::{self, INDEX};
+    const INDEX: &str = include_str!(concat!(env!("ZEABUR_CATALOG_RELEASE"), "/index.json"));
 
     fn config(extra: &str) -> Config {
         Config::parse(&format!(
@@ -1606,6 +1606,22 @@ mod tests {
         plan.components.iter().map(|c| c.id.as_str()).collect()
     }
 
+    /// The `HelmChart` object of the release named `name`.
+    fn chart<'a>(component: &'a ComponentPlan, name: &str) -> &'a Value {
+        component
+            .releases
+            .iter()
+            .find_map(|r| match r {
+                ReleasePlan::HelmChart {
+                    name: n, object, ..
+                } if n == name => Some(object),
+                ReleasePlan::HelmChart { .. }
+                | ReleasePlan::Manifests { .. }
+                | ReleasePlan::Urls { .. } => None,
+            })
+            .unwrap()
+    }
+
     const SECURE: &str =
         "enable: [runtime-security, vulnerability-scanning, intrusion-prevention]\n";
 
@@ -1629,7 +1645,7 @@ mod tests {
 
     #[test]
     fn defaults_follow_the_catalog_and_leave_out_components_of_another_distribution() {
-        let mut index = testing::index();
+        let mut index = Index::parse(INDEX.as_bytes()).unwrap();
         for component in &mut index.components {
             if component.id == "node-updates/system-upgrade-controller" {
                 component.distributions = vec!["rke2".to_owned()];
@@ -1681,7 +1697,7 @@ mod tests {
 
     #[test]
     fn the_server_is_named_in_its_k3s_configuration() {
-        let index = testing::index();
+        let index = Index::parse(INDEX.as_bytes()).unwrap();
         let named = |extra: &str, facts: &Facts| {
             let plan = plan(&index, &config(extra), facts)?;
             let file = plan
@@ -1712,7 +1728,7 @@ mod tests {
 
     #[test]
     fn velero_needs_the_privileged_level_only_for_its_node_agent() {
-        let index = testing::index();
+        let index = Index::parse(INDEX.as_bytes()).unwrap();
         let level = |extra: &str| {
             let plan = plan(
                 &index,
@@ -1735,7 +1751,7 @@ mod tests {
 
     #[test]
     fn velero_takes_the_buckets_region() {
-        let index = testing::index();
+        let index = Index::parse(INDEX.as_bytes()).unwrap();
         let values = |extra: &str| {
             let plan = plan(
                 &index,
@@ -1752,9 +1768,7 @@ mod tests {
                 .iter()
                 .find(|c| c.id == "volume-backup/velero")
                 .unwrap();
-            let ReleasePlan::HelmChart { object, .. } = &velero.releases[0] else {
-                panic!("velero is a chart")
-            };
+            let object = chart(velero, "velero");
             let content = object["spec"]["valuesContent"].as_str().unwrap();
             serde_saphyr::from_str::<Value>(content).unwrap()["configuration"]
                 ["backupStorageLocation"][0]["config"]["region"]
@@ -1766,7 +1780,7 @@ mod tests {
 
     #[test]
     fn k8up_namespace_gets_the_baseline_level() {
-        let index = testing::index();
+        let index = Index::parse(INDEX.as_bytes()).unwrap();
         let plan = plan(&index, &config("enable: [volume-backup/k8up]\n"), &facts()).unwrap();
         let k8up = plan
             .namespaces
@@ -1778,7 +1792,7 @@ mod tests {
 
     #[test]
     fn multi_node_makes_longhorn_the_default_and_installs_it_first() {
-        let index = testing::index();
+        let index = Index::parse(INDEX.as_bytes()).unwrap();
         let plan = plan(&index, &config("profile: multi-node\n"), &facts()).unwrap();
         assert_eq!(ids(&plan)[0], storage::LONGHORN);
         assert_eq!(plan.storage.default_class, "longhorn");
@@ -1811,7 +1825,7 @@ mod tests {
     // source NAT: https://github.com/k3s-io/k3s/blob/master/pkg/cloudprovider/servicelb.go
     #[test]
     fn traefik_keeps_client_addresses_behind_servicelb_on_k3s_and_rke2() {
-        let index = testing::index();
+        let index = Index::parse(INDEX.as_bytes()).unwrap();
         for distribution in ["k3s", "rke2"] {
             for profile in ["single-node", "multi-node"] {
                 let extra = format!("distribution: {distribution}\nprofile: {profile}\n");
@@ -1841,7 +1855,7 @@ mod tests {
 
     #[test]
     fn longhorn_on_one_node_leaves_local_path_the_default() {
-        let index = testing::index();
+        let index = Index::parse(INDEX.as_bytes()).unwrap();
         let plan = plan(&index, &config("enable: [replicated-storage]\n"), &facts()).unwrap();
         assert!(ids(&plan).contains(&storage::LONGHORN));
         assert_eq!(plan.storage.default_class, "local-path");
@@ -1856,7 +1870,7 @@ mod tests {
 
     #[test]
     fn plans_are_deterministic() {
-        let index = testing::index();
+        let index = Index::parse(INDEX.as_bytes()).unwrap();
         let a = serde_json::to_string(&plan(&index, &config(SECURE), &facts()).unwrap()).unwrap();
         let b = serde_json::to_string(&plan(&index, &config(SECURE), &facts()).unwrap()).unwrap();
         assert_eq!(a, b);
@@ -1864,7 +1878,7 @@ mod tests {
 
     #[test]
     fn crowdsec_contributes_to_traefik_and_generates_its_secrets() {
-        let index = testing::index();
+        let index = Index::parse(INDEX.as_bytes()).unwrap();
         let plan = plan(&index, &config(SECURE), &facts()).unwrap();
         let traefik = plan
             .components
@@ -1872,9 +1886,7 @@ mod tests {
             .find(|c| c.id == "ingress/traefik")
             .unwrap();
         assert_eq!(traefik.contributed_by, ["intrusion-prevention/crowdsec"]);
-        let ReleasePlan::HelmChart { object, .. } = &traefik.releases[1] else {
-            panic!()
-        };
+        let object = chart(traefik, "traefik");
         let values = object["spec"]["valuesContent"].as_str().unwrap();
         assert!(values.contains("crowdsec-bouncer@kubernetescrd"));
         let crowdsec = plan
@@ -1900,7 +1912,7 @@ mod tests {
 
     #[test]
     fn zeabur_needs_ingress_certificates_and_metrics_server() {
-        let index = testing::index();
+        let index = Index::parse(INDEX.as_bytes()).unwrap();
         assert_eq!(
             select::required(&index, "single-node"),
             BTreeSet::from(
@@ -1933,7 +1945,7 @@ mod tests {
 
     #[test]
     fn nodes_pull_from_the_registry_through_its_fixed_address() {
-        let index = testing::index();
+        let index = Index::parse(INDEX.as_bytes()).unwrap();
         let without = plan(&index, &config("disable: [builds]\n"), &facts()).unwrap();
         assert_eq!(without.registry, None);
         let k3s = Distribution::K3s;
@@ -1983,7 +1995,7 @@ mod tests {
 
     #[test]
     fn required_inputs_name_the_line_to_add() {
-        let index = testing::index();
+        let index = Index::parse(INDEX.as_bytes()).unwrap();
         let err = plan(
             &index,
             &config("enable: [volume-backup/velero]\n"),
@@ -2007,9 +2019,7 @@ mod tests {
             .iter()
             .find(|c| c.id == "volume-backup/velero")
             .unwrap();
-        let ReleasePlan::HelmChart { object, .. } = &velero.releases[0] else {
-            panic!()
-        };
+        let object = chart(velero, "velero");
         assert!(
             object["spec"]["valuesContent"]
                 .as_str()
@@ -2020,7 +2030,7 @@ mod tests {
 
     #[test]
     fn another_release_is_a_warning_not_an_error() {
-        let index = testing::index();
+        let index = Index::parse(INDEX.as_bytes()).unwrap();
         for extra in [
             "distribution: rke2\nrke2Version: v1.37.1+rke2r1\n",
             "k3sVersion: v1.37.1+k3s1\n",
@@ -2044,7 +2054,7 @@ mod tests {
 
     #[test]
     fn k3s_comes_with_its_binary_images_and_pinned_install_script() {
-        let index = testing::index();
+        let index = Index::parse(INDEX.as_bytes()).unwrap();
         let p = plan(&index, &config(""), &facts()).unwrap();
         let files: Vec<&str> = p.cluster.downloads().map(|d| d.file.as_str()).collect();
         assert_eq!(
@@ -2067,7 +2077,7 @@ mod tests {
 
     #[test]
     fn the_record_carries_the_catalog_health_checks() {
-        let mut index = testing::index();
+        let mut index = Index::parse(INDEX.as_bytes()).unwrap();
         let check = Health {
             name: "ready".to_owned(),
             wait: [
@@ -2117,7 +2127,7 @@ mod tests {
 
     #[test]
     fn a_default_component_not_tested_on_the_distribution_is_left_out() {
-        let mut index = testing::index();
+        let mut index = Index::parse(INDEX.as_bytes()).unwrap();
         untested_on(&mut index, "image-updates/keel", "rke2");
         let rke2 = plan(&index, &config("distribution: rke2\n"), &facts()).unwrap();
         assert!(!ids(&rke2).contains(&"image-updates/keel"));
@@ -2128,7 +2138,7 @@ mod tests {
 
     #[test]
     fn asking_for_a_component_not_tested_on_the_distribution_stops_the_plan() {
-        let mut index = testing::index();
+        let mut index = Index::parse(INDEX.as_bytes()).unwrap();
         untested_on(&mut index, "volume-backup/k8up", "k3s");
         let err = plan(&index, &config("enable: [volume-backup/k8up]\n"), &facts()).unwrap_err();
         let text = err.to_string();
@@ -2150,7 +2160,7 @@ mod tests {
 
     #[test]
     fn a_capability_is_filled_by_a_provider_tested_on_the_distribution() {
-        let mut index = testing::index();
+        let mut index = Index::parse(INDEX.as_bytes()).unwrap();
         untested_on(&mut index, "databases/cloudnative-pg", "k3s");
         let p = plan(&index, &config("enable: [databases]\n"), &facts()).unwrap();
         assert!(!ids(&p).contains(&"databases/cloudnative-pg"));
@@ -2159,7 +2169,7 @@ mod tests {
 
     #[test]
     fn a_dependency_not_tested_on_the_distribution_leaves_out_defaults_and_stops_what_was_asked() {
-        let mut index = testing::index();
+        let mut index = Index::parse(INDEX.as_bytes()).unwrap();
         let operator = "observability-operator/victoria-metrics-operator";
         untested_on(&mut index, operator, "k3s");
         let p = plan(&index, &config(""), &facts()).unwrap();
@@ -2237,7 +2247,7 @@ mod tests {
 
     #[test]
     fn products_only_are_what_the_plan_installs() {
-        let index = testing::index();
+        let index = Index::parse(INDEX.as_bytes()).unwrap();
         let none = "disable: [logs/victoria-logs, metrics/victoria-metrics, builds]\n";
         let p = plan(&index, &config(none), &facts()).unwrap();
         assert_eq!(
@@ -2248,7 +2258,7 @@ mod tests {
 
     #[test]
     fn zeabur_values_match_the_chart() {
-        let index = testing::index();
+        let index = Index::parse(INDEX.as_bytes()).unwrap();
         let p = plan(&index, &config(""), &facts()).unwrap();
         let values = &p.zeabur.unwrap().values;
         assert_eq!(
@@ -2266,7 +2276,7 @@ mod tests {
 
     #[test]
     fn zeabur_reads_history_through_its_proxy_when_a_store_is_installed() {
-        let index = testing::index();
+        let index = Index::parse(INDEX.as_bytes()).unwrap();
         let values = |disable: &str| {
             plan(&index, &config(disable), &facts())
                 .unwrap()
@@ -2289,7 +2299,7 @@ mod tests {
 
     #[test]
     fn proxy_image_source_replaces_the_charts_proxy_image() {
-        let index = testing::index();
+        let index = Index::parse(INDEX.as_bytes()).unwrap();
         let values = |extra: &str| {
             plan(&index, &config(extra), &facts())
                 .unwrap()
@@ -2320,7 +2330,7 @@ mod tests {
 
     #[test]
     fn zeabur_reads_images_from_the_registry_only_when_one_is_installed() {
-        let index = testing::index();
+        let index = Index::parse(INDEX.as_bytes()).unwrap();
         let without = plan(&index, &config("disable: [builds]\n"), &facts()).unwrap();
         assert!(without.zeabur.unwrap().values.get("builds").is_none());
         let with = plan(&index, &config(""), &facts()).unwrap();
@@ -2350,7 +2360,7 @@ mod tests {
 
     #[test]
     fn a_components_network_policies_are_the_installers_and_go_with_it() {
-        let index = testing::index();
+        let index = Index::parse(INDEX.as_bytes()).unwrap();
         let plan = plan(&index, &config(""), &facts()).unwrap();
         let policies: Vec<&Value> = plan
             .components
@@ -2375,7 +2385,7 @@ mod tests {
 
     #[test]
     fn suffixes_default_to_sslip_for_a_public_address() {
-        let index = testing::index();
+        let index = Index::parse(INDEX.as_bytes()).unwrap();
         let mut public = facts();
         public.node_ips = vec!["203.0.114.7".to_owned(), "2a01:4f8::1".to_owned()];
         let p = plan(&index, &config(""), &public).unwrap();
@@ -2488,7 +2498,7 @@ mod tests {
 
     #[test]
     fn a_team_install_needs_the_least_memory() {
-        let index = testing::index();
+        let index = Index::parse(INDEX.as_bytes()).unwrap();
         for (distribution, extra) in [
             (Distribution::K3s, ""),
             (Distribution::Rke2, "distribution: rke2\n"),
@@ -2507,7 +2517,7 @@ mod tests {
 
     #[test]
     fn the_defaults_fit_a_4_gib_server_without_a_warning() {
-        let index = testing::index();
+        let index = Index::parse(INDEX.as_bytes()).unwrap();
         let mut host = facts();
         host.memory_mib = 3379;
         for extra in ["", "distribution: rke2\n"] {

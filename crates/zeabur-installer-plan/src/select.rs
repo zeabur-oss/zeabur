@@ -151,7 +151,6 @@ fn choose(index: &Index, wanted: &Wanted<'_>) -> Result<Selection, PlanError> {
     let profile = wanted.profile;
     let distribution = wanted.distribution;
     let mut chosen: BTreeMap<String, Why> = BTreeMap::new();
-    let mut left_out = BTreeMap::new();
     for id in &wanted.base {
         chosen.insert(id.clone(), Why::Default);
     }
@@ -183,31 +182,7 @@ fn choose(index: &Index, wanted: &Wanted<'_>) -> Result<Selection, PlanError> {
         }
     }
 
-    let mut unusable = Vec::new();
-    for (id, why) in &chosen {
-        let Some(component) = index.component(id) else {
-            continue;
-        };
-        if !component.supports(distribution) {
-            left_out.insert(
-                id.clone(),
-                format!("runs on {} only", component.distributions.join(", ")),
-            );
-        } else if component.default_for(profile) == Default::Unsupported {
-            left_out.insert(id.clone(), format!("unsupported on {profile}"));
-        } else if !component.is_tested_on(distribution) {
-            if *why == Why::Enabled {
-                return Err(untested(component, distribution));
-            }
-            left_out.insert(id.clone(), format!("not tested on {distribution}"));
-        } else {
-            continue;
-        }
-        unusable.push(id.clone());
-    }
-    for id in &unusable {
-        chosen.remove(id);
-    }
+    let mut left_out = leave_out_unusable(index, profile, distribution, &mut chosen)?;
     let taken_over = under_new_names(wanted.installed);
     let held = hold_back(index, profile, taken_over.as_ref(), &mut chosen);
 
@@ -267,6 +242,43 @@ fn choose(index: &Index, wanted: &Wanted<'_>) -> Result<Selection, PlanError> {
         offered,
         warnings,
     })
+}
+
+/// Takes out of `chosen` the components that cannot run on the distribution or profile, or that
+/// were not tested on the distribution, and returns them with the reason.
+fn leave_out_unusable(
+    index: &Index,
+    profile: &str,
+    distribution: &str,
+    chosen: &mut BTreeMap<String, Why>,
+) -> Result<BTreeMap<String, String>, PlanError> {
+    let mut left_out = BTreeMap::new();
+    let mut unusable = Vec::new();
+    for (id, why) in chosen.iter() {
+        let Some(component) = index.component(id) else {
+            continue;
+        };
+        if !component.supports(distribution) {
+            left_out.insert(
+                id.clone(),
+                format!("runs on {} only", component.distributions.join(", ")),
+            );
+        } else if component.default_for(profile) == Default::Unsupported {
+            left_out.insert(id.clone(), format!("unsupported on {profile}"));
+        } else if !component.is_tested_on(distribution) {
+            if *why == Why::Enabled {
+                return Err(untested(component, distribution));
+            }
+            left_out.insert(id.clone(), format!("not tested on {distribution}"));
+        } else {
+            continue;
+        }
+        unusable.push(id.clone());
+    }
+    for id in &unusable {
+        chosen.remove(id);
+    }
+    Ok(left_out)
 }
 
 /// The install record's components, with each renamed one also under its new id: a server that

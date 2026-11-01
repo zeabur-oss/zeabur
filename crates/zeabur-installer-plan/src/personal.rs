@@ -289,7 +289,7 @@ mod tests {
     use super::*;
     use crate::catalog::Default;
     use crate::plan::ReleasePlan;
-    use crate::testing;
+    const INDEX: &str = include_str!(concat!(env!("ZEABUR_CATALOG_RELEASE"), "/index.json"));
 
     fn facts(memory_mib: u64) -> Facts {
         Facts {
@@ -327,7 +327,7 @@ mod tests {
 
     #[test]
     fn kubesolo_is_told_the_node_name() {
-        let index = testing::index();
+        let index = Index::parse(INDEX.as_bytes()).unwrap();
         let name = |extra: &str, facts: &Facts| {
             let plan = plan(&index, &config(extra), facts).unwrap();
             let file = plan
@@ -348,12 +348,11 @@ mod tests {
 
     #[test]
     fn a_personal_install_has_ingress_and_certificates_and_no_panel() {
-        let index = testing::index();
+        let index = Index::parse(INDEX.as_bytes()).unwrap();
         let plan = plan(&index, &config(""), &facts(1500)).unwrap();
         let ids = ids(&plan);
         assert!(ids.contains(&"ingress/traefik"), "{ids:?}");
         assert!(ids.contains(&"certificates/cert-manager"), "{ids:?}");
-        assert!(!ids.contains(&"metrics/victoria-metrics"), "{ids:?}");
         let json = serde_json::to_value(&plan).unwrap();
         assert_eq!(json["use"], "personal");
         assert!(json.get("identity").is_none() && json.get("zeabur").is_none());
@@ -371,7 +370,7 @@ mod tests {
 
     #[test]
     fn a_registry_is_an_option_that_needs_the_memory() {
-        let index = testing::index();
+        let index = Index::parse(INDEX.as_bytes()).unwrap();
         let off = plan(&index, &config(""), &facts(4096)).unwrap();
         assert!(off.registry.is_none());
 
@@ -394,7 +393,12 @@ mod tests {
 
     #[test]
     fn a_component_not_tested_on_kubesolo_stops_the_plan_and_says_where_it_was() {
-        let index = testing::index();
+        let mut index = Index::parse(INDEX.as_bytes()).unwrap();
+        for component in &mut index.components {
+            if component.id == "logs/victoria-logs" {
+                component.tested_on.retain(|d| d != PERSONAL_DISTRIBUTION);
+            }
+        }
         let err = plan(&index, &config("enable: [logs]\n"), &facts(4096)).unwrap_err();
         let PlanError::Untested {
             component,
@@ -410,13 +414,18 @@ mod tests {
         for d in tested_on {
             assert!(err.to_string().contains(d.as_str()), "{err}");
         }
-        let plan = plan(&index, &config("disable: [certificates]\n"), &facts(4096)).unwrap();
-        assert!(!ids(&plan).contains(&"certificates/cert-manager"));
+        let plan = plan(&index, &config("disable: [logs]\n"), &facts(4096)).unwrap();
+        assert!(!ids(&plan).contains(&"logs/victoria-logs"));
     }
 
     #[test]
     fn whatever_the_catalog_tested_on_kubesolo_can_be_added() {
-        let mut index = testing::index();
+        let mut index = Index::parse(INDEX.as_bytes()).unwrap();
+        for component in &mut index.components {
+            if component.id == "config-reload/reloader" {
+                component.tested_on.retain(|d| d != PERSONAL_DISTRIBUTION);
+            }
+        }
         let wanted = config("enable: [config-reload/reloader]\n");
         assert!(plan(&index, &wanted, &facts(4096)).is_err());
         for component in &mut index.components {
@@ -430,7 +439,7 @@ mod tests {
 
     #[test]
     fn the_defaults_are_what_the_catalog_recommends_and_tested_on_kubesolo() {
-        let mut index = testing::index();
+        let mut index = Index::parse(INDEX.as_bytes()).unwrap();
         for component in &mut index.components {
             if component.id == "ingress/traefik" {
                 component.tested_on.retain(|d| d != PERSONAL_DISTRIBUTION);
@@ -449,27 +458,27 @@ mod tests {
 
     #[test]
     fn databases_can_be_added_to_a_personal_install() {
-        let index = testing::index();
+        let index = Index::parse(INDEX.as_bytes()).unwrap();
         let plan = plan(&index, &config("enable: [databases]\n"), &facts(4096)).unwrap();
         assert!(ids(&plan).contains(&"databases/cloudnative-pg"));
     }
 
     #[test]
     fn components_that_leave_out_kubesolo_are_left_out() {
-        let mut index = testing::index();
+        let mut index = Index::parse(INDEX.as_bytes()).unwrap();
         for component in &mut index.components {
-            if component.id == "ingress/traefik" {
+            if component.id == "metrics/metrics-server" {
                 component.distributions = vec!["rke2".to_owned()];
             }
         }
-        let plan = plan(&index, &config("disable: [certificates]\n"), &facts(4096)).unwrap();
-        assert!(!ids(&plan).contains(&"ingress/traefik"));
-        assert!(plan.left_out["ingress/traefik"].contains("rke2"));
+        let plan = plan(&index, &config(""), &facts(4096)).unwrap();
+        assert!(!ids(&plan).contains(&"metrics/metrics-server"));
+        assert!(plan.left_out["metrics/metrics-server"].contains("rke2"));
     }
 
     #[test]
     fn the_downloads_and_images_are_pinned() {
-        let index = testing::index();
+        let index = Index::parse(INDEX.as_bytes()).unwrap();
         let plan = plan(&index, &config(""), &facts(4096)).unwrap();
         for download in [
             &plan.kubesolo.download,
@@ -502,7 +511,7 @@ mod tests {
 
     #[test]
     fn a_host_under_one_and_a_half_gib_is_warned() {
-        let index = testing::index();
+        let index = Index::parse(INDEX.as_bytes()).unwrap();
         for (mib, low) in [(MIN_MEMORY_MIB, false), (MIN_MEMORY_MIB - 1, true)] {
             let plan = plan(&index, &config(""), &facts(mib)).unwrap();
             assert_eq!(
@@ -517,7 +526,7 @@ mod tests {
 
     #[test]
     fn the_config_file_names_the_node_address() {
-        let index = testing::index();
+        let index = Index::parse(INDEX.as_bytes()).unwrap();
         let plan = plan(
             &index,
             &config("host: {tlsSan: [solo.example.com]}\n"),

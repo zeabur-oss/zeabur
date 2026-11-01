@@ -9,10 +9,6 @@ publish.workspace = true
 repository.workspace = true
 readme = "README.md"
 
-[features]
-# The pinned catalog release with the fields it lacks filled in, for tests.
-testing = []
-
 [dependencies]
 serde.workspace = true
 serde-saphyr.workspace = true

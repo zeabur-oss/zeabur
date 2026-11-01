@@ -713,6 +713,7 @@ mod tests {
 
     use serde_json::{Value, json};
     use zeabur_installer_host::preflight::{Code, Topic};
+    use zeabur_installer_plan::catalog::Index;
     use zeabur_installer_plan::config::{Config, PersonalConfig};
     use zeabur_installer_plan::plan::{self, Facts};
     use zeabur_installer_plan::{personal, pins};
@@ -1030,7 +1031,11 @@ mod tests {
     /// rewrites them, and `bun run fmt` in web/ formats them.
     #[test]
     fn the_web_fixtures_follow_the_catalog() {
-        let index = zeabur_installer_plan::testing::index();
+        let index = Index::parse(include_bytes!(concat!(
+            env!("ZEABUR_CATALOG_RELEASE"),
+            "/index.json"
+        )))
+        .unwrap();
         let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("web/scripts/fixtures");
         let read = |name: &str| -> Value {
             serde_json::from_str(&fs::read_to_string(dir.join(name)).unwrap()).unwrap()

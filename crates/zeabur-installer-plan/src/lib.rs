@@ -15,8 +15,6 @@ pub mod remove;
 pub mod rke2;
 pub mod select;
 pub mod storage;
-#[cfg(any(test, feature = "testing"))]
-pub mod testing;
 pub mod values;
 
 /// Why a plan cannot be made.

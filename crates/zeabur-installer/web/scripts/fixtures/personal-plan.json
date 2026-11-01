@@ -7,16 +7,35 @@
         "displayName": "Traefik Proxy",
         "health": [
           {
-            "advice": "Check ingress/traefik.",
-            "name": "gateway-class-accepted-0",
+            "advice": "No route is served until Traefik runs. Check its pods with kubectl -n traefik get pods.",
+            "name": "controller",
             "timeout": "60s",
-            "wait": ["gatewayclass/traefik", "--for=condition=Accepted"]
+            "wait": [
+              "--for=condition=Ready",
+              "pod",
+              "-l",
+              "app.kubernetes.io/name=traefik",
+              "-n",
+              "traefik"
+            ]
+          },
+          {
+            "advice": "Traefik hasn't accepted its GatewayClass. Read the reason with kubectl describe gatewayclass traefik.",
+            "name": "gateway-class-accepted",
+            "timeout": "60s",
+            "wait": ["--for=condition=Accepted", "gatewayclass/traefik"]
           }
         ],
         "id": "ingress/traefik",
-        "idleMemoryMib": 22,
+        "idleMemoryMib": 23,
         "networkPolicies": [],
         "releases": [
+          {
+            "kind": "manifests",
+            "name": "default-account-traefik",
+            "namespace": "traefik",
+            "yaml": "apiVersion: v1\nkind: ServiceAccount\nmetadata:\n  name: default\n  namespace: traefik\nautomountServiceAccountToken: false\n"
+          },
           {
             "digests": ["sha256:356c2b8e286a964dc20995435659ad1095386329974793af10bbfe3eff977fe5"],
             "kind": "urls",
@@ -65,22 +84,29 @@
         "displayName": "cert-manager",
         "health": [
           {
-            "advice": "Check certificates/cert-manager.",
-            "name": "acme-issuers-0",
+            "advice": "No certificate is issued or renewed until cert-manager runs. Check its pods with kubectl -n cert-manager get pods.",
+            "name": "controllers",
             "timeout": "60s",
-            "wait": ["clusterissuer/letsencrypt-staging", "--for=condition=Ready"]
-          },
-          {
-            "advice": "Check certificates/cert-manager.",
-            "name": "acme-issuers-1",
-            "timeout": "60s",
-            "wait": ["clusterissuer/letsencrypt", "--for=condition=Ready"]
+            "wait": [
+              "--for=condition=Available",
+              "deployment/cert-manager",
+              "deployment/cert-manager-webhook",
+              "deployment/cert-manager-cainjector",
+              "-n",
+              "cert-manager"
+            ]
           }
         ],
         "id": "certificates/cert-manager",
-        "idleMemoryMib": 54,
+        "idleMemoryMib": 56,
         "networkPolicies": [],
         "releases": [
+          {
+            "kind": "manifests",
+            "name": "default-account-cert-manager",
+            "namespace": "cert-manager",
+            "yaml": "apiVersion: v1\nkind: ServiceAccount\nmetadata:\n  name: default\n  namespace: cert-manager\nautomountServiceAccountToken: false\n"
+          },
           {
             "digest": "sha256:e482675aec32862d323a9218293ff7de81192337998615e4378c56498473f240",
             "kind": "helmChart",
@@ -118,6 +144,180 @@
         ],
         "secrets": [],
         "security": "Writes Secrets in all namespaces and manages webhook CA bundles.",
+        "why": "default"
+      },
+      {
+        "contributedBy": [],
+        "displayName": "VictoriaMetrics operator",
+        "health": [],
+        "id": "observability-operator/victoria-metrics-operator",
+        "idleMemoryMib": 21,
+        "networkPolicies": [],
+        "releases": [
+          {
+            "kind": "manifests",
+            "name": "default-account-observability",
+            "namespace": "observability",
+            "yaml": "apiVersion: v1\nkind: ServiceAccount\nmetadata:\n  name: default\n  namespace: observability\nautomountServiceAccountToken: false\n"
+          },
+          {
+            "digest": "sha256:1817be5446c975a306e404d6b605eafc45dbe6512a64d25b80d72f458fa4664a",
+            "kind": "helmChart",
+            "name": "victoria-metrics-operator",
+            "object": {
+              "apiVersion": "helm.cattle.io/v1",
+              "kind": "HelmChart",
+              "metadata": {
+                "annotations": {
+                  "installer.zeabur.com/component": "observability-operator/victoria-metrics-operator"
+                },
+                "labels": {
+                  "app.kubernetes.io/managed-by": "zeabur-installer"
+                },
+                "name": "victoria-metrics-operator",
+                "namespace": "kube-system"
+              },
+              "spec": {
+                "chart": "oci://ghcr.io/victoriametrics/helm-charts/victoria-metrics-operator",
+                "createNamespace": false,
+                "failurePolicy": "abort",
+                "targetNamespace": "observability",
+                "timeout": "10m0s",
+                "valuesContent": "{\"admissionWebhooks\":{\"certManager\":{\"enabled\":true}},\"crds\":{\"cleanup\":{\"enabled\":true,\"image\":{\"repository\":\"registry.k8s.io/kubectl\",\"tag\":\"v1.36.0@sha256:63e5e76b746bb8b891a94968d380736c035e768dab0d56ddad1f50c750a4be39\"}}},\"image\":{\"repository\":\"victoriametrics/operator\",\"tag\":\"v0.75.1@sha256:97162bf8320b296f0361099f0290b9e035a3369e4022c5c42ca4a8146deca981\"},\"resources\":{\"limits\":{\"memory\":\"256Mi\"},\"requests\":{\"cpu\":\"10m\",\"memory\":\"48Mi\"}},\"securityContext\":{\"runAsNonRoot\":true,\"runAsUser\":65534,\"seccompProfile\":{\"type\":\"RuntimeDefault\"}}}",
+                "version": "0.68.1"
+              }
+            }
+          }
+        ],
+        "secrets": [],
+        "security": "Manages VictoriaMetrics and VictoriaLogs objects and their workloads in all namespaces. It can read every Secret, create pods in any namespace, and create ClusterRoles and bindings, so its token equals cluster-admin.\n",
+        "why": "default"
+      },
+      {
+        "contributedBy": [],
+        "displayName": "VictoriaLogs",
+        "health": [],
+        "id": "logs/victoria-logs",
+        "idleMemoryMib": 20,
+        "networkPolicies": [],
+        "releases": [
+          {
+            "kind": "manifests",
+            "name": "default-account-observability",
+            "namespace": "observability",
+            "yaml": "apiVersion: v1\nkind: ServiceAccount\nmetadata:\n  name: default\n  namespace: observability\nautomountServiceAccountToken: false\n"
+          },
+          {
+            "kind": "manifests",
+            "name": "logs",
+            "namespace": "observability",
+            "yaml": "# The log store.\napiVersion: operator.victoriametrics.com/v1\nkind: VLSingle\nmetadata:\n  name: victoria-logs\n  namespace: observability\nspec:\n  # Two weeks, or less when the volume reaches 8GiB of its 10Gi.\n  retentionPeriod: 14d\n  retentionMaxDiskSpaceUsageBytes: 8GiB\n  storage:\n    resources:\n      requests: {storage: 10Gi}\n  resources:\n    requests: {cpu: 50m, memory: 64Mi}\n    limits: {memory: 1Gi}\n---\n# One collector per node, reading container logs.\napiVersion: operator.victoriametrics.com/v1\nkind: VLAgent\nmetadata:\n  name: collector\n  namespace: observability\nspec:\n  k8sCollector:\n    enabled: true\n  # Namespace, pod and container suffice; labels add cardinality. The\n  # operator (v0.75.0) passes no flag for k8sCollector.includePodLabels:\n  # false, and vlagent's default is true.\n  extraArgs:\n    kubernetesCollector.includePodLabels: \"false\"\n  remoteWrite:\n    - url: http://vlsingle-victoria-logs.observability.svc:9428/internal/insert\n  resources:\n    requests: {cpu: 20m, memory: 32Mi}\n    limits: {memory: 256Mi}\n---\n# Only the collector, the metrics stack's vmagent (the operator's scrape of\n# /metrics) and Zeabur Proxy in the zeabur namespace reach the log store.\napiVersion: networking.k8s.io/v1\nkind: NetworkPolicy\nmetadata:\n  name: victoria-logs\n  namespace: observability\nspec:\n  podSelector:\n    matchLabels: {app.kubernetes.io/name: vlsingle, app.kubernetes.io/instance: victoria-logs}\n  policyTypes: [Ingress]\n  ingress:\n    - ports: [{port: 9428, protocol: TCP}]\n      from:\n        - podSelector:\n            matchLabels: {app.kubernetes.io/name: vlagent, app.kubernetes.io/instance: collector}\n        - podSelector:\n            matchLabels: {app.kubernetes.io/name: vmagent}\n        # Both selectors: anyone can label a pod in their own namespace.\n        - namespaceSelector:\n            matchLabels: {kubernetes.io/metadata.name: zeabur}\n          podSelector:\n            matchLabels: {app.kubernetes.io/name: zeabur-proxy}\n"
+          }
+        ],
+        "secrets": [],
+        "security": "The collector reads pod metadata and node log files.",
+        "why": "default"
+      },
+      {
+        "contributedBy": [],
+        "displayName": "Kubernetes Metrics Server",
+        "health": [
+          {
+            "advice": "The metrics API doesn't answer, so kubectl top and autoscaling have no data. Check the metrics-server pod with kubectl -n kube-system get pods.",
+            "name": "metrics-api",
+            "timeout": "60s",
+            "wait": ["--for=condition=Available", "apiservice/v1beta1.metrics.k8s.io"]
+          }
+        ],
+        "id": "metrics/metrics-server",
+        "idleMemoryMib": 17,
+        "networkPolicies": [],
+        "releases": [
+          {
+            "digest": "sha256:c2ca1185c01e6e7f53dd1b7d131f0c9b3fa50e003ed068b784563a1b5a3422a1",
+            "kind": "helmChart",
+            "name": "metrics-server",
+            "object": {
+              "apiVersion": "helm.cattle.io/v1",
+              "kind": "HelmChart",
+              "metadata": {
+                "annotations": {
+                  "installer.zeabur.com/component": "metrics/metrics-server"
+                },
+                "labels": {
+                  "app.kubernetes.io/managed-by": "zeabur-installer"
+                },
+                "name": "metrics-server",
+                "namespace": "kube-system"
+              },
+              "spec": {
+                "chart": "metrics-server",
+                "createNamespace": false,
+                "failurePolicy": "abort",
+                "repo": "https://kubernetes-sigs.github.io/metrics-server",
+                "targetNamespace": "kube-system",
+                "timeout": "10m0s",
+                "valuesContent": "{\"args\":[\"--metric-resolution=15s\"],\"image\":{\"repository\":\"registry.k8s.io/metrics-server/metrics-server\",\"tag\":\"v0.9.0@sha256:d9862115e7c7881280d3d75ca26bda8ffc0fc213315979575bf23ce9826205c0\"},\"resources\":{\"limits\":{\"memory\":\"128Mi\"},\"requests\":{\"cpu\":\"20m\",\"memory\":\"48Mi\"}}}",
+                "version": "3.14.0"
+              }
+            }
+          }
+        ],
+        "secrets": [],
+        "security": "Reads kubelet metrics; registers an aggregated API.",
+        "why": "default"
+      },
+      {
+        "contributedBy": [],
+        "displayName": "VictoriaMetrics (k8s stack)",
+        "health": [],
+        "id": "metrics/victoria-metrics",
+        "idleMemoryMib": 270,
+        "networkPolicies": [],
+        "releases": [
+          {
+            "kind": "manifests",
+            "name": "default-account-observability",
+            "namespace": "observability",
+            "yaml": "apiVersion: v1\nkind: ServiceAccount\nmetadata:\n  name: default\n  namespace: observability\nautomountServiceAccountToken: false\n"
+          },
+          {
+            "digest": "sha256:5f3e783289f25f6498a9f0f66a8d1b2aa54256df48452863f449bc36dae0ee39",
+            "kind": "helmChart",
+            "name": "vm",
+            "object": {
+              "apiVersion": "helm.cattle.io/v1",
+              "kind": "HelmChart",
+              "metadata": {
+                "annotations": {
+                  "installer.zeabur.com/component": "metrics/victoria-metrics"
+                },
+                "labels": {
+                  "app.kubernetes.io/managed-by": "zeabur-installer"
+                },
+                "name": "vm",
+                "namespace": "kube-system"
+              },
+              "spec": {
+                "chart": "oci://ghcr.io/victoriametrics/helm-charts/victoria-metrics-k8s-stack",
+                "createNamespace": false,
+                "failurePolicy": "abort",
+                "targetNamespace": "observability",
+                "timeout": "10m0s",
+                "valuesContent": "{\"alertmanager\":{\"spec\":{\"arbitraryFSAccessThroughSMs\":{\"deny\":true},\"disableNamespaceMatcher\":false,\"resources\":{\"limits\":{\"memory\":\"128Mi\"},\"requests\":{\"cpu\":\"10m\",\"memory\":\"32Mi\"}}}},\"defaultDashboards\":{\"enabled\":false},\"grafana\":{\"enabled\":false},\"kube-state-metrics\":{\"collectors\":[\"pods\",\"replicasets\",\"deployments\",\"statefulsets\",\"daemonsets\",\"jobs\",\"cronjobs\",\"nodes\",\"persistentvolumeclaims\",\"namespaces\"],\"customResourceState\":{\"config\":{\"kind\":\"CustomResourceStateMetrics\",\"spec\":{\"resources\":[{\"groupVersionKind\":{\"group\":\"builder.zeabur.com\",\"kind\":\"BuildRun\",\"version\":\"v1alpha1\"},\"labelsFromPath\":{\"build\":[\"spec\",\"buildRef\"],\"buildrun\":[\"metadata\",\"name\"],\"namespace\":[\"metadata\",\"namespace\"],\"phase\":[\"status\",\"phase\"],\"reason\":[\"status\",\"reason\"]},\"metricNamePrefix\":\"zeabur_builder_buildrun\",\"metrics\":[{\"each\":{\"gauge\":{\"path\":[\"status\",\"completionTime\"]},\"type\":\"Gauge\"},\"errorLogV\":5,\"help\":\"When the BuildRun finished; absent while it runs.\",\"name\":\"completion_time\"}]},{\"groupVersionKind\":{\"group\":\"postgresql.cnpg.io\",\"kind\":\"Cluster\",\"version\":\"v1\"},\"labelsFromPath\":{\"cluster\":[\"metadata\",\"name\"],\"namespace\":[\"metadata\",\"namespace\"]},\"metricNamePrefix\":\"zeabur_cnpg_cluster\",\"metrics\":[{\"each\":{\"info\":{\"labelsFromPath\":{\"phase\":[\"status\",\"phase\"]}},\"type\":\"Info\"},\"help\":\"The CloudNativePG cluster's phase.\",\"name\":\"phase\"}]},{\"groupVersionKind\":{\"group\":\"postgresql.cnpg.io\",\"kind\":\"Backup\",\"version\":\"v1\"},\"labelsFromPath\":{\"backup\":[\"metadata\",\"name\"],\"cluster\":[\"spec\",\"cluster\",\"name\"],\"namespace\":[\"metadata\",\"namespace\"],\"phase\":[\"status\",\"phase\"]},\"metricNamePrefix\":\"zeabur_cnpg_backup\",\"metrics\":[{\"each\":{\"gauge\":{\"path\":[\"metadata\",\"creationTimestamp\"]},\"type\":\"Gauge\"},\"help\":\"When the Backup was created, by its phase.\",\"name\":\"created\"}]},{\"groupVersionKind\":{\"group\":\"psmdb.percona.com\",\"kind\":\"PerconaServerMongoDB\",\"version\":\"v1\"},\"labelsFromPath\":{\"cluster\":[\"metadata\",\"name\"],\"namespace\":[\"metadata\",\"namespace\"]},\"metricNamePrefix\":\"zeabur_psmdb\",\"metrics\":[{\"each\":{\"info\":{\"labelsFromPath\":{\"state\":[\"status\",\"state\"]}},\"type\":\"Info\"},\"help\":\"The MongoDB cluster's state.\",\"name\":\"state\"}]},{\"groupVersionKind\":{\"group\":\"psmdb.percona.com\",\"kind\":\"PerconaServerMongoDBBackup\",\"version\":\"v1\"},\"labelsFromPath\":{\"backup\":[\"metadata\",\"name\"],\"cluster\":[\"spec\",\"clusterName\"],\"namespace\":[\"metadata\",\"namespace\"],\"state\":[\"status\",\"state\"]},\"metricNamePrefix\":\"zeabur_psmdb_backup\",\"metrics\":[{\"each\":{\"gauge\":{\"path\":[\"metadata\",\"creationTimestamp\"]},\"type\":\"Gauge\"},\"help\":\"When the backup was created, by its state.\",\"name\":\"created\"}]},{\"groupVersionKind\":{\"group\":\"k8up.io\",\"kind\":\"Backup\",\"version\":\"v1\"},\"labelsFromPath\":{\"backup\":[\"metadata\",\"name\"],\"namespace\":[\"metadata\",\"namespace\"]},\"metricNamePrefix\":\"zeabur_k8up_backup\",\"metrics\":[{\"each\":{\"gauge\":{\"labelsFromPath\":{\"reason\":[\"reason\"],\"type\":[\"type\"]},\"path\":[\"status\",\"conditions\"],\"valueFrom\":[\"lastTransitionTime\"]},\"type\":\"Gauge\"},\"help\":\"When each condition of the Backup last changed, by type and reason.\",\"name\":\"condition_time\"}]},{\"groupVersionKind\":{\"group\":\"velero.io\",\"kind\":\"Backup\",\"version\":\"v1\"},\"labelsFromPath\":{\"backup\":[\"metadata\",\"name\"],\"namespace\":[\"metadata\",\"namespace\"],\"phase\":[\"status\",\"phase\"]},\"metricNamePrefix\":\"zeabur_velero_backup\",\"metrics\":[{\"each\":{\"gauge\":{\"path\":[\"metadata\",\"creationTimestamp\"]},\"type\":\"Gauge\"},\"help\":\"When the Velero backup was created, by its phase.\",\"name\":\"created\"}]},{\"groupVersionKind\":{\"group\":\"cert-manager.io\",\"kind\":\"Certificate\",\"version\":\"v1\"},\"labelsFromPath\":{\"certificate\":[\"metadata\",\"name\"],\"namespace\":[\"metadata\",\"namespace\"]},\"metricNamePrefix\":\"zeabur_certmanager_certificate\",\"metrics\":[{\"each\":{\"gauge\":{\"path\":[\"status\",\"notAfter\"]},\"type\":\"Gauge\"},\"errorLogV\":5,\"help\":\"When the issued certificate expires.\",\"name\":\"not_after\"},{\"each\":{\"gauge\":{\"labelsFromPath\":{\"type\":[\"type\"]},\"path\":[\"status\",\"conditions\"],\"valueFrom\":[\"status\"]},\"type\":\"Gauge\"},\"help\":\"The Certificate's conditions, 1 when true.\",\"name\":\"condition\"}]}]}},\"enabled\":true},\"enabled\":true,\"image\":{\"registry\":\"registry.k8s.io\",\"repository\":\"kube-state-metrics/kube-state-metrics\",\"tag\":\"v2.20.0@sha256:42cfe3723a5f058171c627537fb57a3ea0f26e4380fa18555a95cb1a1b4cfc5b\"},\"metricLabelsAllowlist\":[\"pods=[app.kubernetes.io/name,app.kubernetes.io/component]\",\"jobs=[zeabur.com/notification-test]\",\"namespaces=[zeabur.com/project]\"],\"rbac\":{\"extraRules\":[{\"apiGroups\":[\"builder.zeabur.com\"],\"resources\":[\"buildruns\"],\"verbs\":[\"list\",\"watch\"]},{\"apiGroups\":[\"postgresql.cnpg.io\"],\"resources\":[\"clusters\",\"backups\"],\"verbs\":[\"list\",\"watch\"]},{\"apiGroups\":[\"psmdb.percona.com\"],\"resources\":[\"perconaservermongodbs\",\"perconaservermongodbbackups\"],\"verbs\":[\"list\",\"watch\"]},{\"apiGroups\":[\"k8up.io\"],\"resources\":[\"backups\"],\"verbs\":[\"list\",\"watch\"]},{\"apiGroups\":[\"velero.io\"],\"resources\":[\"backups\"],\"verbs\":[\"list\",\"watch\"]},{\"apiGroups\":[\"cert-manager.io\"],\"resources\":[\"certificates\"],\"verbs\":[\"list\",\"watch\"]}]},\"vmScrape\":{\"spec\":{\"endpoints\":[{\"honorLabels\":true,\"metricRelabelConfigs\":[{\"action\":\"labeldrop\",\"regex\":\"(uid|container_id|image_id)\"},{\"action\":\"drop\",\"if\":\"{__name__=\\\"zeabur_cnpg_backup_created\\\", phase=\\\"completed\\\"}\"},{\"action\":\"drop\",\"if\":\"{__name__=\\\"zeabur_psmdb_backup_created\\\", state=\\\"ready\\\"}\"}],\"port\":\"http\"}]}}},\"kubeApiServer\":{\"enabled\":false},\"kubeControllerManager\":{\"enabled\":false},\"kubeEtcd\":{\"enabled\":false},\"kubeScheduler\":{\"enabled\":false},\"kubelet\":{\"vmScrape\":{\"spec\":{\"metricRelabelConfigs\":[{\"action\":\"labeldrop\",\"regex\":\"(uid)\"},{\"action\":\"labeldrop\",\"regex\":\"(id|name)\"},{\"action\":\"drop\",\"regex\":\".+_bucket|(apiserver|etcd|kine|rest_client|workqueue|scheduler|authentication|authorization|aggregator|admission|watch_cache|storage)_.+\",\"source_labels\":[\"__name__\"]}]}}},\"prometheus-node-exporter\":{\"enabled\":true,\"extraArgs\":[\"--collector.disable-defaults\",\"--collector.filesystem\",\"--collector.cpu\",\"--collector.meminfo\",\"--collector.loadavg\",\"--collector.vmstat\",\"--collector.diskstats\",\"--collector.netdev\",\"--collector.netclass\",\"--collector.filefd\",\"--collector.conntrack\",\"--collector.timex\",\"--collector.mdadm\",\"--collector.bonding\",\"--collector.textfile\",\"--collector.filesystem.mount-points-exclude=^/(dev|proc|sys|run/containerd/.+|run/k3s/.+|var/lib/docker/.+|var/lib/kubelet/.+)($|/)\",\"--collector.filesystem.fs-types-exclude=^(autofs|binfmt_misc|bpf|cgroup2?|configfs|debugfs|devpts|devtmpfs|fusectl|hugetlbfs|iso9660|mqueue|nsfs|overlay|proc|procfs|pstore|rpc_pipefs|securityfs|selinuxfs|squashfs|erofs|sysfs|tracefs)$\"],\"image\":{\"registry\":\"quay.io\",\"repository\":\"prometheus/node-exporter\",\"tag\":\"v1.12.1@sha256:1b4e4438faca4dd7e001dd445d161a4a2091b0fededa84093b3a8dfeae1f1be0\"},\"resources\":{\"limits\":{\"memory\":\"64Mi\"},\"requests\":{\"cpu\":\"10m\",\"memory\":\"16Mi\"}},\"version\":\"1.12.1\"},\"syncJob\":{\"image\":{\"repository\":\"ghcr.io/victoriametrics/sync-job\",\"tag\":\"v0.0.17@sha256:b6f233532a85cda65e645264d24f995e5ee97f88b60610643f01f170516f444b\"}},\"victoria-metrics-operator\":{\"enabled\":false},\"vmagent\":{\"spec\":{\"resources\":{\"limits\":{\"memory\":\"256Mi\"},\"requests\":{\"cpu\":\"20m\",\"memory\":\"64Mi\"}},\"scrapeInterval\":\"30s\"}},\"vmalert\":{\"spec\":{\"resources\":{\"limits\":{\"memory\":\"128Mi\"},\"requests\":{\"cpu\":\"10m\",\"memory\":\"32Mi\"}}}},\"vmsingle\":{\"spec\":{\"resources\":{\"limits\":{\"memory\":\"512Mi\"},\"requests\":{\"cpu\":\"50m\",\"memory\":\"128Mi\"}},\"retentionPeriod\":\"7d\",\"storage\":{\"resources\":{\"requests\":{\"storage\":\"5Gi\"}}}}}}",
+                "version": "0.96.0"
+              }
+            }
+          },
+          {
+            "kind": "manifests",
+            "name": "notifications",
+            "namespace": "observability",
+            "yaml": "apiVersion: operator.victoriametrics.com/v1beta1\nkind: VMRule\nmetadata:\n  name: zeabur-notifications\n  namespace: observability\nspec:\n  groups:\n    - name: zeabur-project\n      interval: 30s\n      rules:\n        - alert: ZeaburBuildFailed\n          expr: |\n            max by (namespace, build, buildrun, reason) (\n              zeabur_builder_buildrun_completion_time{phase=\"Failed\"}\n            ) > time() - 900\n            and on (namespace) kube_namespace_labels{label_zeabur_com_project!=\"\"}\n          labels: {zeabur_event: build-failed, zeabur_kind: event, severity: warning}\n          annotations:\n            summary: \"Build {{ $labels.build }} failed ({{ $labels.reason }}).\"\n            description: \"BuildRun {{ $labels.buildrun }} in {{ $labels.namespace }} failed with reason {{ $labels.reason }}.\"\n        - alert: ZeaburBuildSucceeded\n          expr: |\n            max by (namespace, build, buildrun) (\n              zeabur_builder_buildrun_completion_time{phase=\"Succeeded\"}\n            ) > time() - 900\n            and on (namespace) kube_namespace_labels{label_zeabur_com_project!=\"\"}\n          labels: {zeabur_event: build-succeeded, zeabur_kind: event, severity: info}\n          annotations:\n            summary: \"Build {{ $labels.build }} succeeded.\"\n            description: \"BuildRun {{ $labels.buildrun }} in {{ $labels.namespace }} succeeded.\"\n        # The Deployment controller gives up on a rollout after\n        # progressDeadlineSeconds (600 by default).\n        - alert: ZeaburDeployFailed\n          expr: |\n            max by (namespace, deployment) (\n              kube_deployment_status_condition{condition=\"Progressing\", status=\"false\"}\n            ) == 1\n            and on (namespace) kube_namespace_labels{label_zeabur_com_project!=\"\"}\n          labels: {zeabur_event: deploy-failed, zeabur_kind: state, severity: warning}\n          annotations:\n            summary: \"Deployment of {{ $labels.deployment }} failed.\"\n            description: \"The rollout of {{ $labels.deployment }} in {{ $labels.namespace }} passed its progress deadline.\"\n        # A rollout makes a new ReplicaSet. It succeeded when the\n        # Deployment then runs only up-to-date, available replicas. A\n        # rollback to an earlier ReplicaSet does not count.\n        - alert: ZeaburDeploySucceeded\n          expr: |\n            max by (namespace, deployment) (\n              label_replace(\n                (time() - kube_replicaset_created < 1800)\n                * on (namespace, replicaset) group_left (owner_name)\n                kube_replicaset_owner{owner_kind=\"Deployment\"},\n                \"deployment\", \"$1\", \"owner_name\", \"(.+)\"\n              )\n            )\n            and on (namespace, deployment) (kube_deployment_status_observed_generation == kube_deployment_metadata_generation)\n            and on (namespace, deployment) (kube_deployment_status_replicas_updated == kube_deployment_spec_replicas)\n            and on (namespace, deployment) (kube_deployment_status_replicas_available == kube_deployment_spec_replicas)\n            and on (namespace, deployment) (kube_deployment_status_replicas == kube_deployment_spec_replicas)\n            and on (namespace, deployment) (kube_deployment_spec_replicas > 0)\n            and on (namespace) kube_namespace_labels{label_zeabur_com_project!=\"\"}\n          labels: {zeabur_event: deploy-succeeded, zeabur_kind: event, severity: info}\n          annotations:\n            summary: \"{{ $labels.deployment }} is deployed.\"\n            description: \"All replicas of {{ $labels.deployment }} in {{ $labels.namespace }} run the new version.\"\n        - alert: ZeaburCrashLooping\n          expr: |\n            max by (namespace, pod, container) (\n              kube_pod_container_status_waiting_reason{reason=\"CrashLoopBackOff\"}\n            ) == 1\n            and on (namespace) kube_namespace_labels{label_zeabur_com_project!=\"\"}\n          for: 5m\n          labels: {zeabur_event: crash-loop, zeabur_kind: state, severity: warning}\n          annotations:\n            summary: \"{{ $labels.pod }} keeps crashing.\"\n            description: \"Container {{ $labels.container }} of {{ $labels.pod }} in {{ $labels.namespace }} has been in CrashLoopBackOff for 5 minutes.\"\n        - alert: ZeaburOutOfMemory\n          expr: |\n            max by (namespace, pod, container) (\n              kube_pod_container_status_last_terminated_reason{reason=\"OOMKilled\"}\n            ) == 1\n            and on (namespace, pod, container) (\n              max by (namespace, pod, container) (increase(kube_pod_container_status_restarts_total[10m])) > 0\n            )\n            and on (namespace) kube_namespace_labels{label_zeabur_com_project!=\"\"}\n          labels: {zeabur_event: out-of-memory, zeabur_kind: event, severity: warning}\n          annotations:\n            summary: \"{{ $labels.pod }} ran out of memory.\"\n            description: \"Container {{ $labels.container }} of {{ $labels.pod }} in {{ $labels.namespace }} used its memory limit and restarted.\"\n        # Without the phase in the grouping, a move from one unhealthy\n        # phase to another does not restart the 15 minutes.\n        - alert: ZeaburPostgresUnhealthy\n          expr: |\n            max by (namespace, cluster) (\n              zeabur_cnpg_cluster_phase{phase!=\"Cluster in healthy state\"}\n            ) == 1\n            and on (namespace) kube_namespace_labels{label_zeabur_com_project!=\"\"}\n          for: 15m\n          labels: {zeabur_event: database-unhealthy, zeabur_kind: state, severity: critical}\n          annotations:\n            summary: \"PostgreSQL {{ $labels.cluster }} is not healthy.\"\n            description: \"PostgreSQL cluster {{ $labels.cluster }} in {{ $labels.namespace }} has not been healthy for 15 minutes.\"\n        - alert: ZeaburMongoDBUnhealthy\n          expr: |\n            max by (namespace, cluster) (zeabur_psmdb_state{state=\"error\"}) == 1\n            and on (namespace) kube_namespace_labels{label_zeabur_com_project!=\"\"}\n          for: 10m\n          labels: {zeabur_event: database-unhealthy, zeabur_kind: state, severity: critical}\n          annotations:\n            summary: \"MongoDB {{ $labels.cluster }} is in error.\"\n            description: \"MongoDB cluster {{ $labels.cluster }} in {{ $labels.namespace }} has been in error for 10 minutes.\"\n        - alert: ZeaburPostgresBackupFailed\n          expr: |\n            max by (namespace, cluster, backup) (\n              zeabur_cnpg_backup_created{phase=~\"failed|walArchivingFailing\"}\n            ) > time() - 21600\n            and on (namespace) kube_namespace_labels{label_zeabur_com_project!=\"\"}\n          labels: {zeabur_event: backup-failed, zeabur_kind: event, severity: critical}\n          annotations:\n            summary: \"Backup {{ $labels.backup }} of PostgreSQL {{ $labels.cluster }} failed.\"\n            description: \"Backup {{ $labels.backup }} in {{ $labels.namespace }} failed.\"\n        - alert: ZeaburMongoDBBackupFailed\n          expr: |\n            max by (namespace, cluster, backup) (\n              zeabur_psmdb_backup_created{state=~\"error|rejected\"}\n            ) > time() - 21600\n            and on (namespace) kube_namespace_labels{label_zeabur_com_project!=\"\"}\n          labels: {zeabur_event: backup-failed, zeabur_kind: event, severity: critical}\n          annotations:\n            summary: \"Backup {{ $labels.backup }} of MongoDB {{ $labels.cluster }} failed.\"\n            description: \"Backup {{ $labels.backup }} in {{ $labels.namespace }} failed.\"\n        - alert: ZeaburVolumeBackupFailed\n          expr: |\n            max by (namespace, backup) (\n              zeabur_k8up_backup_condition_time{type=\"Completed\", reason=\"Failed\"}\n            ) > time() - 21600\n            and on (namespace) kube_namespace_labels{label_zeabur_com_project!=\"\"}\n          labels: {zeabur_event: backup-failed, zeabur_kind: event, severity: critical}\n          annotations:\n            summary: \"Volume backup {{ $labels.backup }} failed.\"\n            description: \"K8up backup {{ $labels.backup }} in {{ $labels.namespace }} failed.\"\n        # Volumes on local-path report no usage; this covers the others.\n        - alert: ZeaburVolumeAlmostFull\n          expr: |\n            max by (namespace, persistentvolumeclaim) (\n              kubelet_volume_stats_available_bytes / kubelet_volume_stats_capacity_bytes\n            ) < 0.1\n            and on (namespace) kube_namespace_labels{label_zeabur_com_project!=\"\"}\n          for: 10m\n          labels: {zeabur_event: volume-almost-full, zeabur_kind: state, severity: warning}\n          annotations:\n            summary: \"Volume {{ $labels.persistentvolumeclaim }} is almost full.\"\n            description: \"Less than 10% of volume {{ $labels.persistentvolumeclaim }} in {{ $labels.namespace }} is free.\"\n        # cert-manager renews 30 days before expiry, so 14 days left\n        # means renewal keeps failing.\n        - alert: ZeaburCertificateExpiring\n          expr: |\n            max by (namespace, certificate) (zeabur_certmanager_certificate_not_after) - time() < 14 * 86400\n            and on (namespace) kube_namespace_labels{label_zeabur_com_project!=\"\"}\n          labels: {zeabur_event: certificate, zeabur_kind: state, severity: warning}\n          annotations:\n            summary: \"Certificate {{ $labels.certificate }} expires soon.\"\n            description: \"Certificate {{ $labels.certificate }} in {{ $labels.namespace }} expires in less than 14 days and was not renewed.\"\n        - alert: ZeaburCertificateNotReady\n          expr: |\n            max by (namespace, certificate) (zeabur_certmanager_certificate_condition{type=\"Ready\"}) == 0\n            and on (namespace) kube_namespace_labels{label_zeabur_com_project!=\"\"}\n          for: 1h\n          labels: {zeabur_event: certificate, zeabur_kind: state, severity: warning}\n          annotations:\n            summary: \"Certificate {{ $labels.certificate }} is not ready.\"\n            description: \"Certificate {{ $labels.certificate }} in {{ $labels.namespace }} has not been issued for an hour.\"\n        # Zeabur creates a short-lived Job with this label to test a\n        # channel. The namespace comes from the Job, so a person can\n        # only test the channels of a namespace where they create Jobs.\n        - alert: ZeaburNotificationTest\n          expr: |\n            label_replace(\n              max by (namespace, label_zeabur_com_notification_test) (\n                kube_job_labels{label_zeabur_com_notification_test!=\"\"}\n              ),\n              \"zeabur_channel\", \"$1\", \"label_zeabur_com_notification_test\", \"(.+)\"\n            )\n          labels: {zeabur_event: test, zeabur_kind: event, severity: info}\n          annotations:\n            summary: \"Test notification from Zeabur.\"\n            description: \"This channel receives notifications from {{ $labels.namespace }}.\"\n    - name: zeabur-cluster\n      interval: 30s\n      # The cluster's channels are in observability.\n      labels: {namespace: observability}\n      rules:\n        - alert: ZeaburNodeNotReady\n          expr: |\n            max by (node) (kube_node_status_condition{condition=\"Ready\", status=\"true\"}) == 0\n          for: 5m\n          labels: {zeabur_event: node-not-ready, zeabur_kind: state, severity: critical}\n          annotations:\n            summary: \"Node {{ $labels.node }} is not ready.\"\n            description: \"Node {{ $labels.node }} has not been ready for 5 minutes.\"\n        - alert: ZeaburNodeDiskAlmostFull\n          expr: |\n            max by (instance, mountpoint) (\n              node_filesystem_avail_bytes{fstype!~\"tmpfs|ramfs\"} / node_filesystem_size_bytes{fstype!~\"tmpfs|ramfs\"}\n            ) < 0.1\n          for: 10m\n          labels: {zeabur_event: volume-almost-full, zeabur_kind: state, severity: warning}\n          annotations:\n            summary: \"Disk {{ $labels.mountpoint }} on {{ $labels.instance }} is almost full.\"\n            description: \"Less than 10% of {{ $labels.mountpoint }} on {{ $labels.instance }} is free.\"\n        - alert: ZeaburSystemCrashLooping\n          expr: |\n            label_move(\n              max by (namespace, pod, container) (\n                kube_pod_container_status_waiting_reason{reason=\"CrashLoopBackOff\"}\n              ) == 1\n              unless on (namespace) kube_namespace_labels{label_zeabur_com_project!=\"\"},\n              \"namespace\", \"object_namespace\"\n            )\n          for: 5m\n          labels: {zeabur_event: crash-loop, zeabur_kind: state, severity: critical}\n          annotations:\n            summary: \"System pod {{ $labels.pod }} keeps crashing.\"\n            description: \"Container {{ $labels.container }} of {{ $labels.pod }} in {{ $labels.object_namespace }} has been in CrashLoopBackOff for 5 minutes.\"\n        - alert: ZeaburSystemVolumeAlmostFull\n          expr: |\n            label_move(\n              max by (namespace, persistentvolumeclaim) (\n                kubelet_volume_stats_available_bytes / kubelet_volume_stats_capacity_bytes\n              ) < 0.1\n              unless on (namespace) kube_namespace_labels{label_zeabur_com_project!=\"\"},\n              \"namespace\", \"object_namespace\"\n            )\n          for: 10m\n          labels: {zeabur_event: volume-almost-full, zeabur_kind: state, severity: warning}\n          annotations:\n            summary: \"Volume {{ $labels.persistentvolumeclaim }} is almost full.\"\n            description: \"Less than 10% of volume {{ $labels.persistentvolumeclaim }} in {{ $labels.object_namespace }} is free.\"\n        - alert: ZeaburSystemCertificateExpiring\n          expr: |\n            label_move(\n              max by (namespace, certificate) (zeabur_certmanager_certificate_not_after) - time() < 14 * 86400\n              unless on (namespace) kube_namespace_labels{label_zeabur_com_project!=\"\"},\n              \"namespace\", \"object_namespace\"\n            )\n          labels: {zeabur_event: certificate, zeabur_kind: state, severity: warning}\n          annotations:\n            summary: \"Certificate {{ $labels.certificate }} expires soon.\"\n            description: \"Certificate {{ $labels.certificate }} in {{ $labels.object_namespace }} expires in less than 14 days and was not renewed.\"\n        - alert: ZeaburClusterBackupFailed\n          expr: |\n            label_move(\n              max by (namespace, backup) (\n                zeabur_velero_backup_created{phase=~\"Failed|PartiallyFailed|FailedValidation\"}\n              ) > time() - 21600,\n              \"namespace\", \"object_namespace\"\n            )\n          labels: {zeabur_event: backup-failed, zeabur_kind: event, severity: critical}\n          annotations:\n            summary: \"Cluster backup {{ $labels.backup }} failed.\"\n            description: \"Velero backup {{ $labels.backup }} did not complete.\"\n---\n# Only the alert senders and the scraper reach Alertmanager. Without\n# this, any pod could post alerts with another project's namespace, or\n# silence them. kubectl port-forward does not pass through\n# NetworkPolicies, so it still works.\napiVersion: networking.k8s.io/v1\nkind: NetworkPolicy\nmetadata:\n  name: vmalertmanager-senders-only\n  namespace: observability\nspec:\n  podSelector:\n    matchLabels: {app.kubernetes.io/name: vmalertmanager}\n  policyTypes: [Ingress]\n  ingress:\n    - from:\n        - podSelector:\n            matchLabels: {app.kubernetes.io/name: vmalert}\n      ports:\n        - {port: 9093, protocol: TCP}\n    - from:\n        - namespaceSelector:\n            matchLabels: {kubernetes.io/metadata.name: falco}\n          podSelector:\n            matchLabels: {app.kubernetes.io/name: falcosidekick}\n      ports:\n        - {port: 9093, protocol: TCP}\n    - from:\n        - podSelector:\n            matchLabels: {app.kubernetes.io/name: vmagent}\n      ports:\n        - {port: 9093, protocol: TCP}\n        - {port: 8435, protocol: TCP}\n    # Replicas gossip silences and notification state.\n    - from:\n        - podSelector:\n            matchLabels: {app.kubernetes.io/name: vmalertmanager}\n      ports:\n        - {port: 9094, protocol: TCP}\n        - {port: 9094, protocol: UDP}\n"
+          }
+        ],
+        "secrets": [],
+        "security": "Manages VictoriaMetrics objects, scrapes pods in all namespaces, and reads builds, databases, backups and certificates in all namespaces for alerts. node-exporter reads the host's /proc and /sys on the host network.\n",
         "why": "default"
       }
     ],
@@ -164,7 +364,7 @@
     "leftOut": {},
     "memory": {
       "clusterMib": 700,
-      "componentsMib": 76,
+      "componentsMib": 407,
       "hostMib": 5836,
       "unmeasured": 0
     },
@@ -173,6 +373,12 @@
         "baseline": null,
         "name": "cert-manager",
         "privileged": null,
+        "public": false
+      },
+      {
+        "baseline": null,
+        "name": "observability",
+        "privileged": "logs/victoria-logs: The collector reads pod metadata and node log files.",
         "public": false
       },
       {
@@ -198,6 +404,6 @@
       }
     ]
   },
-  "text": "KubeSolo v1.2.3 (Kubernetes 1.35, pinned), for one person, on vps-1 (amd64, 5836 MiB)\nNode name        vps-1\nhelm-controller  v0.17.9 (its image pinned by digest; the Jobs' image checked by digest after they run)\nNode address     203.0.113.10; the kubeconfig names it\n\nComponents\n  ingress/traefik                                  default    22 MiB\n      manifests gateway-api-crds (1 URLs)\n      chart traefik 42.1.3\n  certificates/cert-manager                        default    54 MiB\n      chart cert-manager v1.21.3\n      manifests issuers\n\nStorage          local-path (KubeSolo's local-path), the default\nZeabur           none on the server: run `zeaburctl ui` on your computer\n\nMemory at idle   about 776 MiB of 5836 (KubeSolo 700, components 76)\nwarning: A personal install is for one person: whoever has the kubeconfig is cluster admin, and nothing isolates apps from each other (KubeSolo enforces no NetworkPolicy). For a team, install with K3s or RKE2 on a server with 4 GiB.\n",
+  "text": "KubeSolo v1.2.3 (Kubernetes 1.35, pinned), for one person, on vps-1 (amd64, 5836 MiB)\nNode name        vps-1\nhelm-controller  v0.17.9 (its image pinned by digest; the Jobs' image checked by digest after they run)\nNode address     203.0.113.10; the kubeconfig names it\n\nComponents\n  ingress/traefik                                  default    23 MiB\n      manifests default-account-traefik\n      manifests gateway-api-crds (1 URLs)\n      chart traefik 42.1.3\n  certificates/cert-manager                        default    56 MiB\n      manifests default-account-cert-manager\n      chart cert-manager v1.21.3\n      manifests issuers\n  observability-operator/victoria-metrics-operator default    21 MiB\n      manifests default-account-observability\n      chart victoria-metrics-operator 0.68.1\n  logs/victoria-logs                               default    20 MiB\n      manifests default-account-observability\n      manifests logs\n  metrics/metrics-server                           default    17 MiB\n      chart metrics-server 3.14.0\n  metrics/victoria-metrics                         default    270 MiB\n      manifests default-account-observability\n      chart vm 0.96.0\n      manifests notifications\n\nStorage          local-path (KubeSolo's local-path), the default\nZeabur           none on the server: run `zeaburctl ui` on your computer\n\nMemory at idle   about 1107 MiB of 5836 (KubeSolo 700, components 407)\nwarning: A personal install is for one person: whoever has the kubeconfig is cluster admin, and nothing isolates apps from each other (KubeSolo enforces no NetworkPolicy). For a team, install with K3s or RKE2 on a server with 4 GiB.\n",
   "yaml": "use: personal\nenable: []\ndisable: []\ninputs: {}\nsecretFiles: {}\nhost:\n  tlsSan: []\n  requireEncryptedDisk: false\nsources:\n  catalog: null\n"
 }

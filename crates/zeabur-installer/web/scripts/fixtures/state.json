@@ -34,7 +34,7 @@
         "displayName": "cert-manager",
         "distributions": [],
         "id": "certificates/cert-manager",
-        "idleMemoryMib": 51,
+        "idleMemoryMib": 54,
         "inputs": [],
         "needs": ["ingress/traefik"],
         "personalMinMemoryMib": null,
@@ -56,7 +56,7 @@
         "privileged": false,
         "required": false,
         "security": "ClusterRole: reads, lists and watches every Secret and ConfigMap; reads, updates and patches Deployments, StatefulSets and DaemonSets; creates Events. Role in its namespace: lists, reads, watches, creates and updates every ConfigMap there, not only its own, and on multi-node the leader-election Lease.\n",
-        "testedOn": ["k3s", "rke2"]
+        "testedOn": ["k3s", "rke2", "kubesolo"]
       },
       {
         "capability": "databases",
@@ -64,7 +64,7 @@
         "displayName": "CloudNativePG",
         "distributions": [],
         "id": "databases/cloudnative-pg",
-        "idleMemoryMib": 31,
+        "idleMemoryMib": 32,
         "inputs": [],
         "needs": ["ingress/traefik", "certificates/cert-manager"],
         "personalMinMemoryMib": null,
@@ -79,7 +79,7 @@
         "displayName": "Dragonfly Operator",
         "distributions": [],
         "id": "databases/dragonfly-operator",
-        "idleMemoryMib": 19,
+        "idleMemoryMib": 20,
         "inputs": [],
         "needs": [],
         "personalMinMemoryMib": null,
@@ -94,7 +94,7 @@
         "displayName": "MariaDB Operator",
         "distributions": [],
         "id": "databases/mariadb-operator",
-        "idleMemoryMib": 37,
+        "idleMemoryMib": 38,
         "inputs": [],
         "needs": ["ingress/traefik", "certificates/cert-manager"],
         "personalMinMemoryMib": null,
@@ -146,7 +146,7 @@
         "privileged": false,
         "required": false,
         "security": "Reads scale targets and trigger secrets cluster-wide; serves the external metrics API.",
-        "testedOn": ["k3s", "rke2"]
+        "testedOn": ["k3s", "rke2", "kubesolo"]
       },
       {
         "capability": "event-autoscaling",
@@ -154,14 +154,14 @@
         "displayName": "KEDA HTTP Add-on",
         "distributions": [],
         "id": "event-autoscaling/keda-http-add-on",
-        "idleMemoryMib": 34,
+        "idleMemoryMib": 33,
         "inputs": [],
         "needs": ["event-autoscaling/keda"],
         "personalMinMemoryMib": null,
         "privileged": false,
         "required": false,
         "security": "Reads HTTPScaledObjects, Services and EndpointSlices cluster-wide; creates ScaledObjects.",
-        "testedOn": ["k3s", "rke2"]
+        "testedOn": ["k3s", "rke2", "kubesolo"]
       },
       {
         "capability": "external-secrets",
@@ -169,14 +169,14 @@
         "displayName": "External Secrets Operator",
         "distributions": [],
         "id": "external-secrets/external-secrets",
-        "idleMemoryMib": 53,
+        "idleMemoryMib": 55,
         "inputs": [],
         "needs": ["ingress/traefik", "certificates/cert-manager"],
         "personalMinMemoryMib": null,
         "privileged": false,
         "required": false,
         "security": "ClusterRole: reads, creates, updates and deletes Secrets in every namespace; creates ServiceAccount tokens in every namespace (for SecretStores that authenticate as a ServiceAccount); reads ConfigMaps, ServiceAccounts and its own CRDs; reads and updates Namespaces; creates Events. The webhook has no RBAC. The chart aggregates read access to its CRDs into view, and write access into edit and admin.\n",
-        "testedOn": ["k3s", "rke2"]
+        "testedOn": ["k3s", "rke2", "kubesolo"]
       },
       {
         "capability": "image-updates",
@@ -191,7 +191,7 @@
         "privileged": false,
         "required": false,
         "security": "ClusterRole: reads, lists and watches every Secret (registry credentials of tracked workloads), Namespace and Node; reads, updates and deletes Pods, ReplicaSets, ReplicationControllers, Deployments, StatefulSets, DaemonSets, Jobs and CronJobs in every namespace.\n",
-        "testedOn": ["k3s", "rke2"]
+        "testedOn": ["k3s", "rke2", "kubesolo"]
       },
       {
         "capability": "ingress",
@@ -199,7 +199,7 @@
         "displayName": "Traefik Proxy",
         "distributions": [],
         "id": "ingress/traefik",
-        "idleMemoryMib": 23,
+        "idleMemoryMib": 22,
         "inputs": [],
         "needs": [],
         "personalMinMemoryMib": null,
@@ -214,7 +214,7 @@
         "displayName": "CrowdSec",
         "distributions": [],
         "id": "intrusion-prevention/crowdsec",
-        "idleMemoryMib": 76,
+        "idleMemoryMib": 74,
         "inputs": [
           {
             "default": null,
@@ -249,7 +249,7 @@
         "privileged": true,
         "required": false,
         "security": "The agent reads node log files read-only and makes no API writes.",
-        "testedOn": ["k3s", "rke2"]
+        "testedOn": ["k3s", "rke2", "kubesolo"]
       },
       {
         "capability": "logs",
@@ -257,7 +257,7 @@
         "displayName": "VictoriaLogs",
         "distributions": [],
         "id": "logs/victoria-logs",
-        "idleMemoryMib": 38,
+        "idleMemoryMib": 30,
         "inputs": [],
         "needs": [
           "ingress/traefik",
@@ -268,7 +268,7 @@
         "privileged": true,
         "required": false,
         "security": "The collector reads pod metadata and node log files.",
-        "testedOn": ["k3s", "rke2"]
+        "testedOn": ["k3s", "rke2", "kubesolo"]
       },
       {
         "capability": "metrics",
@@ -283,7 +283,7 @@
         "privileged": false,
         "required": true,
         "security": "Reads kubelet metrics; registers an aggregated API.",
-        "testedOn": ["k3s", "rke2"]
+        "testedOn": ["k3s", "rke2", "kubesolo"]
       },
       {
         "capability": "metrics",
@@ -291,7 +291,7 @@
         "displayName": "VictoriaMetrics (k8s stack)",
         "distributions": [],
         "id": "metrics/victoria-metrics",
-        "idleMemoryMib": 207,
+        "idleMemoryMib": 246,
         "inputs": [],
         "needs": [
           "ingress/traefik",
@@ -302,7 +302,7 @@
         "privileged": true,
         "required": false,
         "security": "Manages VictoriaMetrics objects, scrapes pods in all namespaces, and reads builds, databases, backups and certificates in all namespaces for alerts. node-exporter reads the host's /proc and /sys on the host network.\n",
-        "testedOn": ["k3s", "rke2"]
+        "testedOn": ["k3s", "rke2", "kubesolo"]
       },
       {
         "capability": "node-updates",
@@ -310,7 +310,7 @@
         "displayName": "System Upgrade Controller",
         "distributions": ["k3s", "rke2"],
         "id": "node-updates/system-upgrade-controller",
-        "idleMemoryMib": 12,
+        "idleMemoryMib": 11,
         "inputs": [],
         "needs": [],
         "personalMinMemoryMib": null,
@@ -325,14 +325,14 @@
         "displayName": "SeaweedFS Operator",
         "distributions": [],
         "id": "object-storage/seaweedfs-operator",
-        "idleMemoryMib": 26,
+        "idleMemoryMib": 27,
         "inputs": [],
         "needs": ["ingress/traefik", "certificates/cert-manager"],
         "personalMinMemoryMib": null,
         "privileged": false,
         "required": false,
         "security": "Manages pods, StatefulSets, Services, Secrets, PVCs, Jobs and Ingresses for Seaweed objects in every namespace, and calls each cluster's admin API.\n",
-        "testedOn": ["k3s", "rke2"]
+        "testedOn": ["k3s", "rke2", "kubesolo"]
       },
       {
         "capability": "observability-operator",
@@ -340,14 +340,14 @@
         "displayName": "VictoriaMetrics operator",
         "distributions": [],
         "id": "observability-operator/victoria-metrics-operator",
-        "idleMemoryMib": 20,
+        "idleMemoryMib": 19,
         "inputs": [],
         "needs": ["ingress/traefik", "certificates/cert-manager"],
         "personalMinMemoryMib": null,
         "privileged": false,
         "required": false,
         "security": "Manages VictoriaMetrics and VictoriaLogs objects and their workloads in all namespaces. It can read every Secret, create pods in any namespace, and create ClusterRoles and bindings, so its token equals cluster-admin.\n",
-        "testedOn": ["k3s", "rke2"]
+        "testedOn": ["k3s", "rke2", "kubesolo"]
       },
       {
         "capability": "remote-access",
@@ -381,15 +381,15 @@
         "privileged": true,
         "required": false,
         "security": "Creates, updates and deletes Services and Ingresses (and their status) in every namespace; reads nodes and EndpointSlices; manages ValidatingAdmissionPolicies and their bindings. In its own namespace it manages Secrets, ConfigMaps, ServiceAccounts, StatefulSets, Deployments, Roles and RoleBindings. Installs eight CRDs (connectors, dnsconfigs, peerrelays, proxyclasses, proxygrouppolicies, proxygroups, recorders, tailnets) and the IngressClass tailscale.\n",
-        "testedOn": ["k3s", "rke2"]
+        "testedOn": []
       },
       {
         "capability": "replicated-storage",
         "default": "optional",
         "displayName": "Longhorn",
-        "distributions": [],
+        "distributions": ["k3s", "rke2", "k0s", "microk8s", "kubeadm"],
         "id": "replicated-storage/longhorn",
-        "idleMemoryMib": 155,
+        "idleMemoryMib": 151,
         "inputs": [],
         "needs": [],
         "personalMinMemoryMib": null,
@@ -404,14 +404,14 @@
         "displayName": "Vertical Pod Autoscaler (recommender only)",
         "distributions": [],
         "id": "resource-recommendations/vertical-pod-autoscaler",
-        "idleMemoryMib": 17,
+        "idleMemoryMib": 18,
         "inputs": [],
         "needs": ["metrics/metrics-server"],
         "personalMinMemoryMib": null,
         "privileged": false,
         "required": false,
         "security": "Reads pods, workloads and metrics in all namespaces; writes VPA status.",
-        "testedOn": ["k3s", "rke2"]
+        "testedOn": ["k3s", "rke2", "kubesolo"]
       },
       {
         "capability": "runtime-security",
@@ -419,14 +419,14 @@
         "displayName": "Falco",
         "distributions": [],
         "id": "runtime-security/falco",
-        "idleMemoryMib": 53,
+        "idleMemoryMib": 67,
         "inputs": [],
         "needs": [],
         "personalMinMemoryMib": null,
         "privileged": true,
         "required": false,
         "security": "Reads pod and node metadata to enrich alerts; falcosidekick writes PolicyReports in every namespace.\n",
-        "testedOn": ["k3s", "rke2"]
+        "testedOn": ["k3s", "rke2", "kubesolo"]
       },
       {
         "capability": "uptime-probes",
@@ -446,7 +446,7 @@
         "privileged": false,
         "required": false,
         "security": "Has no API access and only makes outbound probes.",
-        "testedOn": ["k3s", "rke2"]
+        "testedOn": ["k3s", "rke2", "kubesolo"]
       },
       {
         "capability": "volume-backup",
@@ -454,14 +454,14 @@
         "displayName": "K8up",
         "distributions": [],
         "id": "volume-backup/k8up",
-        "idleMemoryMib": 11,
+        "idleMemoryMib": 10,
         "inputs": [],
         "needs": [],
         "personalMinMemoryMib": null,
         "privileged": false,
         "required": false,
         "security": "Watches K8up objects cluster-wide; backup Jobs mount PVCs in their own namespace.",
-        "testedOn": ["k3s", "rke2"]
+        "testedOn": ["k3s", "rke2", "kubesolo"]
       },
       {
         "capability": "volume-backup",
@@ -469,7 +469,7 @@
         "displayName": "Velero",
         "distributions": [],
         "id": "volume-backup/velero",
-        "idleMemoryMib": 38,
+        "idleMemoryMib": 22,
         "inputs": [
           {
             "default": null,
@@ -540,7 +540,7 @@
         "privileged": false,
         "required": false,
         "security": "Bound to cluster-admin; reads and restores every object. By default no Pod is privileged and the velero namespace needs only the baseline Pod Security level. With the file-backup input, a root node agent on every node holds the same token, mounts host paths and needs the privileged level.\n",
-        "testedOn": ["k3s", "rke2"]
+        "testedOn": ["k3s", "rke2", "kubesolo"]
       },
       {
         "capability": "vulnerability-scanning",
@@ -548,14 +548,14 @@
         "displayName": "Trivy Operator",
         "distributions": [],
         "id": "vulnerability-scanning/trivy-operator",
-        "idleMemoryMib": 125,
+        "idleMemoryMib": 121,
         "inputs": [],
         "needs": [],
         "personalMinMemoryMib": null,
         "privileged": false,
         "required": false,
         "security": "Reads workloads cluster-wide, runs scan Jobs and writes reports next to workloads.",
-        "testedOn": ["k3s", "rke2"]
+        "testedOn": ["k3s", "rke2", "kubesolo"]
       }
     ]
   },

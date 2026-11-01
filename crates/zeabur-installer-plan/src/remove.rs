@@ -333,10 +333,10 @@ mod tests {
     use super::*;
     use crate::config::Config;
     use crate::plan::{Facts, plan};
-    use crate::testing;
+    const INDEX: &str = include_str!(concat!(env!("ZEABUR_CATALOG_RELEASE"), "/index.json"));
 
     fn index() -> Index {
-        testing::index()
+        Index::parse(INDEX.as_bytes()).unwrap()
     }
 
     fn planned(extra: &str) -> Vec<ComponentPlan> {
