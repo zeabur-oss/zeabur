@@ -4,8 +4,8 @@ description: >-
   Zeabur's in-cluster server: the web interface and API, signing people in through Zeabur Identity and
   acting with their own credentials.
 type: application
-version: 0.1.1
-appVersion: "0.1.1"
+version: 0.1.2-beta.0
+appVersion: "0.1.2-beta.0"
 home: https://github.com/zeabur-oss/zeabur
 sources:
   - https://github.com/zeabur-oss/zeabur

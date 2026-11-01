@@ -13,7 +13,7 @@
  * **Errors.** The problem `kind` and `reason` are open enumerations: expect new values, treat an unknown `kind` by its HTTP status and ignore an unknown `reason`. `429` and `503` carry kube-apiserver's `Retry-After` when it gave one.
  *
  * **Compatibility.** The embedded web interface ships with the API; other clients are not yet promised a stable `/api/v1`.
- * OpenAPI spec version: 0.1.1
+ * OpenAPI spec version: 0.1.2-beta.0
  */
 import { zeaburFetch } from "./client"
 /**
