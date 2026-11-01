@@ -26,7 +26,7 @@ const REPOSITORY_ENV: &[&str] = &[
 pub(crate) enum Pin {
     /// A full commit id in hex (SHA-1 or SHA-256).
     Commit(String),
-    /// A release tag, `vX.Y.Z`.
+    /// A release tag, `vX.Y.Z` or `vX.Y.Z-<pre-release>`.
     Tag(String),
 }
 
@@ -70,13 +70,28 @@ impl fmt::Display for Pin {
     }
 }
 
+// SemVer 2.0.0 §2 and §9: numbers without leading zeros; build metadata is refused, as in
+// scripts/versions.ts.
 fn is_release_tag(pin: &str) -> bool {
+    let number = |part: &str| {
+        !part.is_empty()
+            && part.bytes().all(|b| b.is_ascii_digit())
+            && (part == "0" || !part.starts_with('0'))
+    };
+    let identifier = |part: &str| {
+        !part.is_empty()
+            && part.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-')
+            && (!part.bytes().all(|b| b.is_ascii_digit()) || number(part))
+    };
     pin.strip_prefix('v').is_some_and(|version| {
-        let parts: Vec<&str> = version.split('.').collect();
+        let (core, pre) = match version.split_once('-') {
+            Some((core, pre)) => (core, Some(pre)),
+            None => (version, None),
+        };
+        let parts: Vec<&str> = core.split('.').collect();
         parts.len() == 3
-            && parts
-                .iter()
-                .all(|part| !part.is_empty() && part.bytes().all(|b| b.is_ascii_digit()))
+            && parts.iter().all(|part| number(part))
+            && pre.is_none_or(|pre| pre.split('.').all(identifier))
     })
 }
 
@@ -431,11 +446,18 @@ mod tests {
             Ok(Pin::Commit(id.to_ascii_lowercase()))
         );
         assert_eq!(Pin::parse(" v0.1.1\n"), Ok(Pin::Tag("v0.1.1".to_owned())));
+        for tag in ["v0.1.2-beta.0", "v1.0.0-rc.1", "v0.1.2-x-1.alpha"] {
+            assert_eq!(Pin::parse(tag), Ok(Pin::Tag(tag.to_owned())));
+        }
         for pin in [
             "main",
             "8ad652b",
             "v0.1",
-            "v0.1.1-rc.1",
+            "v01.1.1",
+            "v0.1.1-",
+            "v0.1.1-beta..1",
+            "v0.1.1-beta.01",
+            "v0.1.1+build.1",
             "-v0.1.1",
             "--upload-pack=x",
             "",
