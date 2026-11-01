@@ -219,7 +219,7 @@ export const en = {
     "Ingress and certificates come by default. Tick Zeabur Builder if you want to build apps from Git or a folder. What a component needs is added with it.",
   "components.notPersonal": "Not in a personal install",
   "components.needsMemory": (mib: number) =>
-    `Needs ${mib.toLocaleString("en")} MiB of memory to build apps, and this server has less`,
+    `Needs ${mib.toLocaleString("en")} MiB of memory, and this server has less`,
   "components.unsupported": (distribution: string) => `Not on ${distribution}`,
   "components.runsOn": (where: string) => `Runs on ${where} only`,
   "components.unsupportedOn": (profile: string) => `Not supported on ${profile}`,
