@@ -187,8 +187,9 @@ pub(crate) fn import(dev: &DevCluster, images: &[String]) -> Result<(), String> 
         })
 }
 
-/// The repository and tag of a reference such as `ghcr.io:443/a/b:tag`.
+/// The repository and tag of a reference such as `ghcr.io:443/a/b:tag`, without its `@sha256:…`.
 pub(crate) fn split_tag(image: &str) -> (&str, Option<&str>) {
+    let image = image.split_once('@').map_or(image, |(name, _)| name);
     match image.rsplit_once(':') {
         Some((repository, tag)) if !tag.contains('/') => (repository, Some(tag)),
         _ => (image, None),
@@ -267,6 +268,19 @@ localhost:5000/tool                     v1                  4a2b3c4d5e6f7       
         assert_eq!(
             split_tag("localhost:5000/tool"),
             ("localhost:5000/tool", None)
+        );
+    }
+
+    #[test]
+    fn a_digest_is_not_a_tag() {
+        let digest = "sha256:0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+        assert_eq!(
+            split_tag(&format!("ghcr.io/zeabur-oss/zeabur@{digest}")),
+            ("ghcr.io/zeabur-oss/zeabur", None)
+        );
+        assert_eq!(
+            split_tag(&format!("localhost:5000/tool:v1@{digest}")),
+            ("localhost:5000/tool", Some("v1"))
         );
     }
 
