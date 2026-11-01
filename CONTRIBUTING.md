@@ -105,7 +105,8 @@ default: patch
 ```
 
 Choose the level by the effect on users: `major` when they have to change something (`minor`
-before 1.0), `minor` for something new, `patch` for a fix. A change only to CI or tooling needs
+before 1.0), `minor` for something new, `patch` for a fix, `security` for a fixed vulnerability (listed under
+`### Security`, which the update check looks for, and released as a patch). A change only to CI or tooling needs
 none; label the pull request `changelog: none` when its title is `feat`, `fix` or `perf` and users
 see no difference. The Changeset check enforces this. Keep each paragraph on one line: the section
 becomes the release body as it is.
