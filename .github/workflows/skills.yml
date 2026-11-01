@@ -1,11 +1,13 @@
 name: Skills
 
-# Installs the shared skills of skills-lock.json again from their sources and opens a pull request
-# with what changed, in the shared workflow of zeabur-oss/.github. Monday morning in Asia/Taipei,
-# with Renovate.
+# Copies the shared skills in .claude/skills again from zeabur-oss/skills and opens a pull request
+# with what changed, in the shared workflow of zeabur-oss/.github: after each change to a skill
+# there (its Skills dispatch sends zeabur-oss-skills), and Monday morning in Asia/Taipei.
 on:
   schedule:
     - cron: '0 17 * * 0'
+  repository_dispatch:
+    types: [zeabur-oss-skills]
   workflow_dispatch:
 
 permissions:
