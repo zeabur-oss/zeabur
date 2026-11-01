@@ -36,8 +36,6 @@ pub struct Component {
     pub homepage: String,
     /// Its licence (SPDX).
     pub license: String,
-    /// Why the catalogue chose it.
-    pub description: String,
     /// What it gives the cluster, in one sentence, by language tag (`en`, `zh-TW`, `zh-CN`);
     /// `en` is always there.
     pub summary: BTreeMap<String, String>,
@@ -133,7 +131,6 @@ struct File {
 #[derive(Debug, Deserialize)]
 struct Metadata {
     name: String,
-    description: String,
     summary: String,
     #[serde(default)]
     locales: BTreeMap<String, Summary>,
@@ -176,7 +173,6 @@ pub fn catalogue() -> Result<Vec<Component>, CatalogueError> {
                 display_name: file.metadata.name,
                 homepage: file.metadata.homepage,
                 license: file.metadata.license,
-                description: file.metadata.description.trim().to_owned(),
                 summary: {
                     let mut summary: BTreeMap<String, String> = file
                         .metadata
