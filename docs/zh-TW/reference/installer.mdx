@@ -108,7 +108,9 @@ GUI 以 root 修改這台主機。讓 GUI 只監聽 loopback，透過 SSH tunnel
 sudo zeabur-installer doctor
 ```
 
-在建立叢集的 server 上，`doctor` 檢查 K3s 或 RKE2 的 unit、API、安裝紀錄裡的元件、預設儲存類別、Zeabur 和 Zeabur Identity 的 Deployment、Zeabur Identity 的內部憑證、節點位址、基準網路政策、存下來的 Secret 有沒有加密，以及 `/var/lib/rancher` 有沒有加密。`doctor` 比對的是上次 `apply` 的紀錄，改過的 YAML 要再執行一次 `apply` 才算數。
+在建立叢集的 server 上，`doctor` 檢查 K3s 或 RKE2 的 unit、API、安裝紀錄裡的元件及健康檢查、預設儲存類別、Zeabur 和 Zeabur Identity 的 Deployment、Zeabur Identity 的內部憑證、節點位址、基準網路政策、存下來的 Secret 有沒有加密，以及 `/var/lib/rancher` 有沒有加密。`doctor` 比對的是上次 `apply` 的紀錄，改過的 YAML 要再執行一次 `apply` 才算數。
+
+每個元件的健康檢查，來自 `apply` 當時使用的 Catalog 版本。檢查未通過時，`doctor` 會印出 Catalog 的建議和它執行的 `kubectl wait` 指令。要再檢查一次，自己執行這個指令就好。
 
 在加入既有叢集的節點上，`doctor` 檢查這個節點的 `k3s-agent` 或 RKE2 unit、Node 是否就緒、到 server 的連線和延遲、磁碟加密。如果是 server，還會比對 Zeabur Identity 的驗證設定。
 

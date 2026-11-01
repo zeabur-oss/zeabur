@@ -197,7 +197,9 @@ export const zhCN: Messages = {
     "以主机权限运行，所以这个组件的 Namespace 不适用 restricted Pod 安全级别。",
   "components.personalDescription":
     "默认会装 Ingress 和证书，要从 Git 或文件夹构建，再勾选 Zeabur Builder。组件依赖的其他组件会一并加入。",
-  "components.notPersonal": "自己用的版本没有这个",
+  "components.untested": (distribution) => `还没在 ${distribution} 上测试过`,
+  "components.needsUntested": (component, distribution) =>
+    `需要的 ${component} 还没在 ${distribution} 上测试过`,
   "components.needsMemory": (mib) => `至少要 ${mib.toLocaleString("zh-CN")} MiB 内存，这台不够`,
   "components.unsupported": (distribution) => `不支持 ${distribution}`,
   "components.runsOn": (where) => `仅能在 ${where} 上运行`,
@@ -425,6 +427,10 @@ export const zhCN: Messages = {
     "这个令牌没有 CA 哈希（K10<hash>::…），所以这台 VM 会信任在那个地址响应的任何服务器。请原样使用 node add 打印的令牌。",
   "warning.config.renamed": (old, id) =>
     `配置文件停用的 ${old} 在这版目录里改名为 ${id}，所以不会安装 ${id}。请把配置文件里的名称改成 ${id}。`,
+  "warning.config.untested": (id, distribution) =>
+    `${id} 没在 ${distribution} 上测试过。配置文件要求安装它，或要求安装依赖它的组件，所以照样安装。`,
+  "warning.config.runsOn": (id, only) => `${id} 只能在 ${only} 上运行，所以不会安装。`,
+  "warning.config.unsupportedOn": (id, profile) => `${id} 不支持 ${profile}，所以不会安装。`,
   "warning.remove.unknown": (id, charts) =>
     `${id} 已经安装，但不在这版目录里，apply 会原样保留。要移除时，运行 kubectl -n kube-system delete helmchart ${charts}`,
   "warning.join.server.unreachable": (server) =>

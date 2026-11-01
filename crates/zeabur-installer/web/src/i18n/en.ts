@@ -217,7 +217,9 @@ export const en = {
     "Runs with host access, so its namespace is exempt from the restricted Pod Security level.",
   "components.personalDescription":
     "Ingress and certificates come by default. Tick Zeabur Builder if you want to build apps from Git or a folder. What a component needs is added with it.",
-  "components.notPersonal": "Not in a personal install",
+  "components.untested": (distribution: string) => `Not tested on ${distribution}`,
+  "components.needsUntested": (component: string, distribution: string) =>
+    `Needs ${component}, which was not tested on ${distribution}`,
   "components.needsMemory": (mib: number) =>
     `Needs ${mib.toLocaleString("en")} MiB of memory, and this server has less`,
   "components.unsupported": (distribution: string) => `Not on ${distribution}`,
@@ -459,6 +461,12 @@ export const en = {
     "The token has no CA hash (K10<hash>::…), so this VM trusts whichever server answers at that address. Use the token exactly as node add printed it.",
   "warning.config.renamed": (old: string, id: string) =>
     `The configuration file disables ${old}, which this catalog calls ${id}, so ${id} is not installed. Write ${id} in the configuration file instead.`,
+  "warning.config.untested": (id: string, distribution: string) =>
+    `${id} wasn't tested on ${distribution}. It's installed because the configuration file asks for it or for a component that needs it.`,
+  "warning.config.runsOn": (id: string, only: string) =>
+    `${id} runs on ${only} only, so it isn't installed.`,
+  "warning.config.unsupportedOn": (id: string, profile: string) =>
+    `${id} doesn't support ${profile}, so it isn't installed.`,
   "warning.remove.unknown": (id: string, charts: string) =>
     `${id} is installed but not in this catalog, so apply leaves it in place. To remove it, run kubectl -n kube-system delete helmchart ${charts}`,
   "warning.join.server.unreachable": (server: string) =>

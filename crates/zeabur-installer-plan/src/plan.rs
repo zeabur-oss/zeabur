@@ -10,7 +10,7 @@ use std::net::IpAddr;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
-use crate::catalog::{Component, Encoding, Index, Input, SecretRef};
+use crate::catalog::{Component, Encoding, Health, Index, Input, SecretRef};
 use crate::cluster::{self, Distribution, HostFile};
 use crate::config::{AccessMode, Config};
 use crate::pins::{self, CALICO, K3S, K3s, RKE2};
@@ -262,9 +262,9 @@ pub struct ComponentPlan {
     pub releases: Vec<ReleasePlan>,
     /// Components whose values it receives.
     pub contributed_by: Vec<String>,
-    /// `kubectl wait` arguments that prove it works, one wait per entry. Only the catalog's tests
-    /// that check the installed component itself; those creating test objects are for its CI.
-    pub smoke: Vec<Vec<String>>,
+    /// The catalog's health checks, which `apply` waits for and `doctor` runs from the install
+    /// record.
+    pub health: Vec<Health>,
     /// Measured idle memory.
     pub idle_memory_mib: Option<u64>,
     /// The catalog's one-line security summary.
@@ -1052,16 +1052,7 @@ fn component_plan(
         secrets,
         releases,
         contributed_by: contributors.iter().map(|c| c.id.clone()).collect(),
-        smoke: component
-            .smoke
-            .iter()
-            .filter(|s| s.manifest.is_none())
-            .flat_map(|s| {
-                s.wait
-                    .iter()
-                    .map(|w| w.split_whitespace().map(str::to_owned).collect())
-            })
-            .collect(),
+        health: component.health.clone(),
         idle_memory_mib: component.idle_memory_mib(profile, arch),
         security: component.security.summary.clone(),
         network_policies: network_policies(component)?,
@@ -1587,7 +1578,6 @@ fn zeabur_values(
 mod tests {
     use super::*;
     use crate::record;
-
     const INDEX: &str = include_str!(concat!(env!("ZEABUR_CATALOG_RELEASE"), "/index.json"));
 
     fn config(extra: &str) -> Config {
@@ -1614,6 +1604,22 @@ mod tests {
 
     fn ids(plan: &Plan) -> Vec<&str> {
         plan.components.iter().map(|c| c.id.as_str()).collect()
+    }
+
+    /// The `HelmChart` object of the release named `name`.
+    fn chart<'a>(component: &'a ComponentPlan, name: &str) -> &'a Value {
+        component
+            .releases
+            .iter()
+            .find_map(|r| match r {
+                ReleasePlan::HelmChart {
+                    name: n, object, ..
+                } if n == name => Some(object),
+                ReleasePlan::HelmChart { .. }
+                | ReleasePlan::Manifests { .. }
+                | ReleasePlan::Urls { .. } => None,
+            })
+            .unwrap()
     }
 
     const SECURE: &str =
@@ -1762,9 +1768,7 @@ mod tests {
                 .iter()
                 .find(|c| c.id == "volume-backup/velero")
                 .unwrap();
-            let ReleasePlan::HelmChart { object, .. } = &velero.releases[0] else {
-                panic!("velero is a chart")
-            };
+            let object = chart(velero, "velero");
             let content = object["spec"]["valuesContent"].as_str().unwrap();
             serde_saphyr::from_str::<Value>(content).unwrap()["configuration"]
                 ["backupStorageLocation"][0]["config"]["region"]
@@ -1882,9 +1886,7 @@ mod tests {
             .find(|c| c.id == "ingress/traefik")
             .unwrap();
         assert_eq!(traefik.contributed_by, ["intrusion-prevention/crowdsec"]);
-        let ReleasePlan::HelmChart { object, .. } = &traefik.releases[1] else {
-            panic!()
-        };
+        let object = chart(traefik, "traefik");
         let values = object["spec"]["valuesContent"].as_str().unwrap();
         assert!(values.contains("crowdsec-bouncer@kubernetescrd"));
         let crowdsec = plan
@@ -2017,9 +2019,7 @@ mod tests {
             .iter()
             .find(|c| c.id == "volume-backup/velero")
             .unwrap();
-        let ReleasePlan::HelmChart { object, .. } = &velero.releases[0] else {
-            panic!()
-        };
+        let object = chart(velero, "velero");
         assert!(
             object["spec"]["valuesContent"]
                 .as_str()
@@ -2076,16 +2076,111 @@ mod tests {
     }
 
     #[test]
-    fn smoke_tests_that_make_objects_are_left_to_ci() {
-        let index = Index::parse(INDEX.as_bytes()).unwrap();
+    fn the_record_carries_the_catalog_health_checks() {
+        let mut index = Index::parse(INDEX.as_bytes()).unwrap();
+        let check = Health {
+            name: "ready".to_owned(),
+            wait: [
+                "--for=condition=Available",
+                "deployment/traefik",
+                "-n",
+                "traefik",
+            ]
+            .map(str::to_owned)
+            .to_vec(),
+            timeout: "30s".to_owned(),
+            advice: "Read the logs of traefik.".to_owned(),
+        };
+        for component in &mut index.components {
+            if component.id == "ingress/traefik" {
+                component.health = vec![check.clone()];
+            }
+        }
         let p = plan(&index, &config(""), &facts()).unwrap();
-        let smoke: Vec<&Vec<String>> = p.components.iter().flat_map(|c| &c.smoke).collect();
-        assert_ne!(smoke.len(), 0);
-        assert!(
-            smoke
+        let traefik = p
+            .components
+            .iter()
+            .find(|c| c.id == "ingress/traefik")
+            .unwrap();
+        assert_eq!(traefik.health, [check]);
+        let record: Value = serde_json::to_value(&p).unwrap();
+        let back: Vec<Health> = serde_json::from_value(
+            record["components"]
+                .as_array()
+                .unwrap()
                 .iter()
-                .all(|w| !w.iter().any(|a| a == "catalog-smoke")),
-            "{smoke:?}"
+                .find(|c| c["id"] == "ingress/traefik")
+                .unwrap()["health"]
+                .clone(),
+        )
+        .unwrap();
+        assert_eq!(back, traefik.health);
+    }
+
+    fn untested_on(index: &mut Index, id: &str, distribution: &str) {
+        for component in &mut index.components {
+            if component.id == id {
+                component.tested_on.retain(|d| d != distribution);
+            }
+        }
+    }
+
+    #[test]
+    fn a_default_component_not_tested_on_the_distribution_is_left_out() {
+        let mut index = Index::parse(INDEX.as_bytes()).unwrap();
+        untested_on(&mut index, "image-updates/keel", "rke2");
+        let rke2 = plan(&index, &config("distribution: rke2\n"), &facts()).unwrap();
+        assert!(!ids(&rke2).contains(&"image-updates/keel"));
+        assert_eq!(rke2.left_out["image-updates/keel"], "not tested on rke2");
+        let k3s = plan(&index, &config(""), &facts()).unwrap();
+        assert!(ids(&k3s).contains(&"image-updates/keel"));
+    }
+
+    #[test]
+    fn asking_for_a_component_not_tested_on_the_distribution_installs_it_with_a_warning() {
+        let mut index = Index::parse(INDEX.as_bytes()).unwrap();
+        untested_on(&mut index, "volume-backup/k8up", "k3s");
+        let p = plan(&index, &config("enable: [volume-backup/k8up]\n"), &facts()).unwrap();
+        assert!(ids(&p).contains(&"volume-backup/k8up"));
+        assert!(
+            p.warnings
+                .iter()
+                .any(|w| w.code == "config.untested" && w.values == ["volume-backup/k8up", "k3s"])
+        );
+        let rke2 = plan(
+            &index,
+            &config("distribution: rke2\nenable: [volume-backup/k8up]\n"),
+            &facts(),
+        )
+        .unwrap();
+        assert!(!rke2.warnings.iter().any(|w| w.code == "config.untested"));
+    }
+
+    #[test]
+    fn a_capability_is_filled_by_a_provider_tested_on_the_distribution() {
+        let mut index = Index::parse(INDEX.as_bytes()).unwrap();
+        untested_on(&mut index, "databases/cloudnative-pg", "k3s");
+        let p = plan(&index, &config("enable: [databases]\n"), &facts()).unwrap();
+        assert!(!ids(&p).contains(&"databases/cloudnative-pg"));
+        assert!(ids(&p).iter().any(|id| id.starts_with("databases/")));
+    }
+
+    #[test]
+    fn a_dependency_not_tested_on_the_distribution_leaves_out_defaults_but_not_what_was_asked() {
+        let mut index = Index::parse(INDEX.as_bytes()).unwrap();
+        let operator = "observability-operator/victoria-metrics-operator";
+        untested_on(&mut index, operator, "k3s");
+        let p = plan(&index, &config(""), &facts()).unwrap();
+        assert!(!ids(&p).contains(&"logs/victoria-logs"));
+        assert!(p.left_out["logs/victoria-logs"].contains(operator));
+        let asked = plan(&index, &config("enable: [logs/victoria-logs]\n"), &facts()).unwrap();
+        assert!(ids(&asked).contains(&"logs/victoria-logs"));
+        assert!(ids(&asked).contains(&operator));
+        assert!(
+            asked
+                .warnings
+                .iter()
+                .any(|w| w.code == "config.untested" && w.values == [operator, "k3s"])
         );
     }
 

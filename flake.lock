@@ -3,14 +3,15 @@
     "catalog": {
       "inputs": {
         "flake-utils": "flake-utils",
-        "nixpkgs": "nixpkgs"
+        "nixpkgs": "nixpkgs",
+        "oss": "oss"
       },
       "locked": {
-        "lastModified": 1793249181,
-        "narHash": "sha256-FXkwWil/hXjXRDBkruoqQ1rtXjgLmjzaq9om3Bt3OqM=",
+        "lastModified": 1793539537,
+        "narHash": "sha256-X1il23clS/xpa9RGV6Ml71Z28UrgIJ59dyegC2U4Sxc=",
         "owner": "zeabur-oss",
         "repo": "catalog",
-        "rev": "c322b3924c0ffd3e26eefb2de5c25fc9d93c5bbb",
+        "rev": "fd29f62e0538769a94622bfda3b0d6b90cf97ff4",
         "type": "github"
       },
       "original": {
@@ -59,6 +60,28 @@
       }
     },
     "nix-bun": {
+      "inputs": {
+        "nixpkgs": [
+          "catalog",
+          "oss",
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1793455789,
+        "narHash": "sha256-E9NBwcMeAn8r1QFGzsY6hmMpR/Jmjg17cgLys9H0/8U=",
+        "owner": "zeabur-oss",
+        "repo": "nix-bun",
+        "rev": "8cc67ab1d93ab5c5ccd8a04c1dcaad205e93e180",
+        "type": "github"
+      },
+      "original": {
+        "owner": "zeabur-oss",
+        "repo": "nix-bun",
+        "type": "github"
+      }
+    },
+    "nix-bun_2": {
       "inputs": {
         "nixpkgs": [
           "oss",
@@ -115,6 +138,7 @@
       "inputs": {
         "nix-bun": "nix-bun",
         "nixpkgs": [
+          "catalog",
           "nixpkgs"
         ]
       },
@@ -152,11 +176,32 @@
         "type": "github"
       }
     },
+    "oss_2": {
+      "inputs": {
+        "nix-bun": "nix-bun_2",
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1793512709,
+        "narHash": "sha256-sENgn3uKUbxCkaHkerJ/UYUtgrdOJwxAL1Rh65EPZ98=",
+        "owner": "zeabur-oss",
+        "repo": ".github",
+        "rev": "9f67bcbecd22239636877a838d7359278a0e765e",
+        "type": "github"
+      },
+      "original": {
+        "owner": "zeabur-oss",
+        "repo": ".github",
+        "type": "github"
+      }
+    },
     "root": {
       "inputs": {
         "catalog": "catalog",
         "nixpkgs": "nixpkgs_2",
-        "oss": "oss",
+        "oss": "oss_2",
         "oss-skills": "oss-skills",
         "rust-overlay": "rust-overlay",
         "zhtw-mcp": "zhtw-mcp"

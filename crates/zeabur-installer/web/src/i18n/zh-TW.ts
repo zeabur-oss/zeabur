@@ -197,7 +197,9 @@ export const zhTW: Messages = {
     "以主機權限執行，所以這個元件的 Namespace 不套用 restricted Pod 安全等級。",
   "components.personalDescription":
     "預設會裝 Ingress 和憑證，要從 Git 或資料夾建置，再勾選 Zeabur Builder。元件需要的其他元件會一起加入。",
-  "components.notPersonal": "自己用的版本沒有這個",
+  "components.untested": (distribution) => `還沒在 ${distribution} 上測試過`,
+  "components.needsUntested": (component, distribution) =>
+    `需要的 ${component} 還沒在 ${distribution} 上測試過`,
   "components.needsMemory": (mib) => `至少要 ${mib.toLocaleString("zh-TW")} MiB 記憶體，這台不夠`,
   "components.unsupported": (distribution) => `不支援 ${distribution}`,
   "components.runsOn": (where) => `只能在 ${where} 上執行`,
@@ -425,6 +427,10 @@ export const zhTW: Messages = {
     "這個權杖沒有 CA 雜湊（K10<hash>::…），所以這台 VM 會信任在那個位址回應的任何伺服器。請照 node add 印出的權杖原樣使用。",
   "warning.config.renamed": (old, id) =>
     `設定檔停用的 ${old} 在這版目錄改名為 ${id}，所以不會安裝 ${id}。請把設定檔裡的名稱改成 ${id}。`,
+  "warning.config.untested": (id, distribution) =>
+    `${id} 沒在 ${distribution} 上測試過。設定檔要求安裝它，或要求安裝需要它的元件，所以照樣安裝。`,
+  "warning.config.runsOn": (id, only) => `${id} 只能在 ${only} 上執行，所以不會安裝。`,
+  "warning.config.unsupportedOn": (id, profile) => `${id} 不支援 ${profile}，所以不會安裝。`,
   "warning.remove.unknown": (id, charts) =>
     `${id} 已經安裝，但不在這版目錄裡，apply 會原樣保留。要移除時，執行 kubectl -n kube-system delete helmchart ${charts}`,
   "warning.join.server.unreachable": (server) =>

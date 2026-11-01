@@ -287,8 +287,8 @@ pub fn plan(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::catalog::Default;
     use crate::plan::ReleasePlan;
-
     const INDEX: &str = include_str!(concat!(env!("ZEABUR_CATALOG_RELEASE"), "/index.json"));
 
     fn facts(memory_mib: u64) -> Facts {
@@ -353,7 +353,6 @@ mod tests {
         let ids = ids(&plan);
         assert!(ids.contains(&"ingress/traefik"), "{ids:?}");
         assert!(ids.contains(&"certificates/cert-manager"), "{ids:?}");
-        assert!(!ids.contains(&"metrics/victoria-metrics"), "{ids:?}");
         let json = serde_json::to_value(&plan).unwrap();
         assert_eq!(json["use"], "personal");
         assert!(json.get("identity").is_none() && json.get("zeabur").is_none());
@@ -393,13 +392,38 @@ mod tests {
     }
 
     #[test]
-    fn only_the_capabilities_tested_on_kubesolo_can_be_added() {
-        let index = Index::parse(INDEX.as_bytes()).unwrap();
-        let plan = plan(&index, &config("enable: [logs]\n"), &facts(4096)).unwrap();
-        assert!(!ids(&plan).contains(&"logs/victoria-logs"));
-        assert!(plan.left_out.contains_key("logs/victoria-logs"));
-        let plan = super::plan(&index, &config("disable: [certificates]\n"), &facts(4096)).unwrap();
-        assert!(!ids(&plan).contains(&"certificates/cert-manager"));
+    fn a_component_not_tested_on_kubesolo_is_installed_when_asked_with_a_warning() {
+        let mut index = Index::parse(INDEX.as_bytes()).unwrap();
+        for component in &mut index.components {
+            if component.id == "logs/victoria-logs" {
+                component.tested_on.retain(|d| d != PERSONAL_DISTRIBUTION);
+            }
+        }
+        let asked = plan(&index, &config("enable: [logs]\n"), &facts(4096)).unwrap();
+        assert!(ids(&asked).contains(&"logs/victoria-logs"));
+        assert!(asked.warnings.iter().any(|w| w.code == "config.untested"
+            && w.values == ["logs/victoria-logs", PERSONAL_DISTRIBUTION]));
+        let default = plan(&index, &config(""), &facts(4096)).unwrap();
+        assert!(!ids(&default).contains(&"logs/victoria-logs"));
+    }
+
+    #[test]
+    fn the_defaults_are_what_the_catalog_recommends_and_tested_on_kubesolo() {
+        let mut index = Index::parse(INDEX.as_bytes()).unwrap();
+        for component in &mut index.components {
+            if component.id == "ingress/traefik" {
+                component.tested_on.retain(|d| d != PERSONAL_DISTRIBUTION);
+            }
+            if component.id == "config-reload/reloader" {
+                component.tested_on.push(PERSONAL_DISTRIBUTION.to_owned());
+                component
+                    .defaults
+                    .insert(PERSONAL_PROFILE.to_owned(), Default::Recommended);
+            }
+        }
+        let plan = plan(&index, &config("disable: [certificates]\n"), &facts(4096)).unwrap();
+        assert!(!ids(&plan).contains(&"ingress/traefik"));
+        assert!(ids(&plan).contains(&"config-reload/reloader"));
     }
 
     #[test]
@@ -413,13 +437,13 @@ mod tests {
     fn components_that_leave_out_kubesolo_are_left_out() {
         let mut index = Index::parse(INDEX.as_bytes()).unwrap();
         for component in &mut index.components {
-            if component.id == "ingress/traefik" {
+            if component.id == "metrics/metrics-server" {
                 component.distributions = vec!["rke2".to_owned()];
             }
         }
-        let plan = plan(&index, &config("disable: [certificates]\n"), &facts(4096)).unwrap();
-        assert!(!ids(&plan).contains(&"ingress/traefik"));
-        assert!(plan.left_out["ingress/traefik"].contains("rke2"));
+        let plan = plan(&index, &config(""), &facts(4096)).unwrap();
+        assert!(!ids(&plan).contains(&"metrics/metrics-server"));
+        assert!(plan.left_out["metrics/metrics-server"].contains("rke2"));
     }
 
     #[test]

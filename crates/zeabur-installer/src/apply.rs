@@ -156,10 +156,8 @@ fn install_components(kubectl: &Kubectl, plan: &Plan) -> Result<(), InstallError
             kubectl.apply_object(policy)?;
         }
         releases(kubectl, component)?;
-        for wait in &component.smoke {
-            let mut args: Vec<&str> = wait.iter().map(String::as_str).collect();
-            args.push("--timeout=5m");
-            kubectl.wait(&args)?;
+        for check in &component.health {
+            kubectl.wait(&check.args("--timeout=5m"))?;
         }
         if let Some(registry) = plan
             .registry

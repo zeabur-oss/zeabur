@@ -72,6 +72,8 @@ enable: [runtime-security, vulnerability-scanning, intrusion-prevention]
 
 `enable` 可以寫 capability（例如 `runtime-security`）或完整元件 ID（例如 `volume-backup/velero`），相依的元件會一起加入。`disable` 排除了另一個元件需要的元件時，`plan` 會列出兩者並停下。最後裝哪些元件、順序和排除原因，看 `plan` 的輸出。
 
+installer 只提供 Catalog 在你的 distribution 上測試過的元件。每個元件測試過哪些 distribution，列在 Catalog `index.json` 的 `testedOn`。建議安裝、但沒在你的 distribution 上測試過的元件不會安裝，需要這個元件的其他元件也一樣。`enable` 寫了沒測試過的元件，或你加入的元件需要沒測試過的元件時，`plan` 照樣安裝，並警告它沒在這裡測試過。
+
 已經裝好的元件從清單拿掉後，下次 `apply` 會移除這個元件。移除會連資料一起刪掉的元件，要先寫進 `allowDataLoss`，見[移除元件](./installer.mdx#移除元件)。
 
 ```yaml
@@ -180,7 +182,7 @@ host:
 
 | 欄位 | 預設與用途 |
 |---|---|
-| `enable` | `[]`。Ingress 和憑證是預設的，只能再加 `builds`（Zeabur Builder，會連 zot 一起裝，記憶體要 1800 MiB 以上）、`databases`，或這幾個 capability 底下的元件 ID |
+| `enable` | `[]`。個人安裝會裝 Catalog 建議 `single-node` 使用、也在 KubeSolo 上測試過的元件，例如 Ingress 和憑證。可以再加其他在 KubeSolo 上測試過的元件，例如 `builds` 和 `databases`。`builds` 是 Zeabur Builder，會連 zot 一起安裝，記憶體要 1800 MiB 以上。沒在 KubeSolo 上測試過的元件照樣安裝，並顯示警告 |
 | `disable` | `[]`。排除 capability 或完整元件 ID |
 | `allowDataLoss` | `[]`。和建立叢集的檔案一樣 |
 | `inputs` | `{}`。和建立叢集的檔案一樣，依元件 ID 分組 |
