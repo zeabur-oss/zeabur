@@ -279,10 +279,19 @@ pub(crate) fn components(kubectl: &Kubectl, plan: &Value) -> Vec<(Status, String
                 Err(e) => problems.push(format!("reading workloads in {ns}: {e}")),
             }
         }
-        let checks: Vec<Health> = component
+        let Some(checks) = component
             .get("health")
-            .and_then(|h| serde_json::from_value(h.clone()).ok())
-            .unwrap_or_default();
+            .and_then(|h| serde_json::from_value::<Vec<Health>>(h.clone()).ok())
+        else {
+            results.push((
+                Status::Warn,
+                format!(
+                    "{id}: the install record has no health checks, because an older \
+                     zeabur-installer wrote it. Run `zeabur-installer apply` to record them."
+                ),
+            ));
+            continue;
+        };
         let failed = failed_health(&checks, |args| kubectl.wait(args).is_ok());
         if problems.is_empty() && failed.is_empty() {
             results.push((Status::Pass, id.to_owned()));

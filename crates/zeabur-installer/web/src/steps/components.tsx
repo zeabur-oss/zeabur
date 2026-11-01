@@ -46,9 +46,13 @@ export function ComponentsStep({ wizard }: { wizard: Wizard }) {
   const choices = wizard.active
   const personal = wizard.use === "personal"
   const distribution = personal ? personalDistribution : wizard.config.distribution
-  const catalog = (wizard.server.catalog?.components ?? []).filter((c) =>
-    c.testedOn.includes(distribution),
-  )
+  const all = wizard.server.catalog?.components ?? []
+  // An untested component stays listed while the configuration asks for it, so it can be removed.
+  const asked = (c: CatalogComponent) =>
+    choices.enable.includes(c.id) ||
+    (choices.enable.includes(c.capability) &&
+      !all.some((o) => o.capability === c.capability && o.testedOn.includes(distribution)))
+  const catalog = all.filter((c) => c.testedOn.includes(distribution) || asked(c))
   const hostMib = wizard.server.facts?.memoryMib ?? Infinity
   const tooSmall = (c: CatalogComponent) => personal && hostMib < (c.personalMinMemoryMib ?? 0)
   const plan = planned && "plan" in planned ? planned.plan : null
@@ -66,7 +70,8 @@ export function ComponentsStep({ wizard }: { wizard: Wizard }) {
     groups.set(component.capability, [...(groups.get(component.capability) ?? []), component])
   }
   const toggle = (id: string, on: boolean) => {
-    const enable = choices.enable.filter((x) => x !== id)
+    const capability = all.find((c) => c.id === id)?.capability
+    const enable = choices.enable.filter((x) => x !== id && (on || x !== capability))
     const disable = choices.disable.filter((x) => x !== id)
     wizard.setChoices({
       enable: on ? [...enable, id] : enable,
