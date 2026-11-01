@@ -1,0 +1,28 @@
+# Change files in .changeset/ and release pull requests (CONTRIBUTING.md, "Releases").
+[package]
+versioned_files = [
+  { path = "Cargo.toml", regex = '\[workspace\.package\]\nversion = "(?<version>[^"]+)"' },
+]
+changelog = "CHANGELOG.md"
+# The update check looks for ### Security in the release notes (docs/reference/telemetry.mdx).
+extra_changelog_sections = [{ name = "Security", types = ["security"] }]
+
+[changes]
+ignore_conventional_commits = true
+
+[[workflows]]
+name = "prepare-release"
+
+[[workflows.steps]]
+type = "PrepareRelease"
+
+[[workflows.steps]]
+type = "Command"
+command = "bun scripts/release.ts bump v$version"
+variables = { "$version" = "Version" }
+
+[[workflows]]
+name = "document-change"
+
+[[workflows.steps]]
+type = "CreateChangeFile"

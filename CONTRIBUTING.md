@@ -89,10 +89,35 @@ first in any of them, and change all three in the same pull request.
 
 The release workflow is the shared one of
 [zeabur-oss/.github](https://github.com/zeabur-oss/.github); its stages are `bun scripts/release.ts
-check|build|sign|publish|finish|assets|verify`, and
-[docs/internal/releasing.md](docs/internal/releasing.md) has the steps. `bun scripts/release.ts
-check v<version>` checks the manifests before a release. If a draft's verify job fails because of
-the check itself, fix the check and run `verify` again from a checkout, as [Fix the check and
+bump|check|build|sign|publish|finish|assets|verify`, and
+[docs/internal/releasing.md](docs/internal/releasing.md) has the steps.
+
+A pull request that changes what users of Zeabur, `zeaburctl`, the installer or the chart see adds
+a change file. `nix develop -c knope document-change` asks for its level and summary and writes it
+to `.changeset/`; add paragraphs under the summary when it needs them:
+
+```md
+---
+default: patch
+---
+
+# Zeabur Proxy's image is published with each release
+```
+
+Choose the level by the effect on users: `major` when they have to change something, `minor` for
+something new, `patch` for a fix (before 1.0, a `major` change makes the next minor
+version, such as 0.2.0 after 0.1.2, and a `minor` change the next patch), `security` for a fixed vulnerability (listed under
+`### Security`, which the update check looks for, and released as a patch). A change only to CI or tooling needs
+none; label the pull request `changelog: none` when its title is `feat`, `fix` or `perf` and users
+see no difference. The Changeset check enforces this. Keep each paragraph on one line: the section
+becomes the release body as it is.
+
+To release, run the Release pull request workflow, with `prerelease: rc` for a release candidate.
+knope turns the change files into the next `CHANGELOG.md` section and sets `Cargo.toml`;
+`bun scripts/release.ts bump` sets `Cargo.lock`, the chart and the web packages and regenerates
+the API document, and zeabur-oss-bot opens `chore(release): vX.Y.Z`. Merging it tags the merge
+commit and starts the release. If a draft's verify job fails because of the check itself, fix the
+check and run `verify` again from a checkout, as [Fix the check and
 verify again](docs/internal/releasing.md#fix-the-check-and-verify-again) shows.
 
 ## Toolchain

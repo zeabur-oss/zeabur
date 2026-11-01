@@ -4,6 +4,8 @@
 // and verifies; the workflow itself checks the CHANGELOG.md section, signs SHA256SUMS and writes
 // the notes. This script keeps what is Zeabur's own.
 //
+//   bump    <version>                                 after knope set Cargo.toml: Cargo.lock, the
+//                                                     chart, the web packages and the API document
 //   check   <version>                                 the version is the manifests', and the chart
 //                                                     runs only images the release publishes
 //   build   <version> <os> <arch> <dist>              build one platform (release-build.sh), smoke
@@ -206,6 +208,47 @@ async function pins(version: Version): Promise<Record<string, string>> {
   };
 }
 
+// knope (knope.toml) has set [workspace.package] in Cargo.toml; the workspace's crates in
+// Cargo.lock, the chart and the web packages follow, and `cargo xtask openapi` regenerates
+// openapi.yaml and the client from it.
+async function bump(version: Version) {
+  const plain = version.plain;
+  const metadata =
+    await $`cargo metadata --manifest-path ${join(root, "Cargo.toml")} --no-deps --format-version 1`.json();
+  // Each pattern must match: a file that no longer has the line stops the bump.
+  const edit = async (file: string, ...sets: [RegExp, string][]) => {
+    const path = join(root, file);
+    let text = await Bun.file(path).text();
+    for (const [pattern, to] of sets) {
+      if (!pattern.test(text)) fail(`${file} has no ${pattern} to set`);
+      text = text.replace(pattern, to);
+    }
+    await Bun.write(path, text);
+  };
+  await edit(
+    "Cargo.lock",
+    ...(metadata.packages as { name: string }[]).map(
+      ({ name }): [RegExp, string] => [
+        new RegExp(`(\nname = "${name}"\nversion = )"[^"]*"`),
+        `$1"${plain}"`,
+      ],
+    ),
+  );
+  await edit(
+    "deploy/chart/zeabur/Chart.yaml",
+    [/^version: .*$/m, `version: ${plain}`],
+    [/^appVersion: .*$/m, `appVersion: "${plain}"`],
+  );
+  for (const manifest of [
+    "web/package.json",
+    "crates/zeabur-installer/web/package.json",
+  ])
+    await edit(manifest, [/^(  "version": )"[^"]*"/m, `$1"${plain}"`]);
+  // Both take the version from CARGO_PKG_VERSION; the release job has only the root's packages.
+  await $`bun ci`.cwd(join(root, "web"));
+  await $`cargo xtask openapi`.cwd(root);
+}
+
 async function check(version: Version) {
   const plain = version.plain;
   const problems: string[] = [];
@@ -238,6 +281,13 @@ async function check(version: Version) {
   if (String(api) !== plain)
     problems.push(
       `crates/zeabur-api/openapi.yaml has version ${api}, not ${plain}`,
+    );
+  const client = (
+    await Bun.file(join(root, "web/src/api/zeabur.ts")).text()
+  ).match(/^ \* OpenAPI spec version: (.*)$/m)?.[1];
+  if (client !== plain)
+    problems.push(
+      `web/src/api/zeabur.ts has OpenAPI spec version ${client}, not ${plain}`,
     );
   for (const ref of (await chartImages(chartDir)).split(", ")) {
     const repository = ref.split("@")[0]!.replace(/:[^:/]+$/, "");
@@ -545,7 +595,7 @@ async function verify(
 
 const [stage, tag, ...rest] = process.argv.slice(2);
 const usage =
-  "usage: bun scripts/release.ts check|build|sign|publish|finish|assets|verify <version> ... (see the script's header)";
+  "usage: bun scripts/release.ts bump|check|build|sign|publish|finish|assets|verify <version> ... (see the script's header)";
 if (!tag) fail(usage);
 const version =
   parseVersion(tag) ??
@@ -553,7 +603,8 @@ const version =
 const perPlatform = ["build", "sign", "finish", "verify"].includes(stage ?? "");
 const args = rest.map((a, i) => (perPlatform && i < 2 ? a : resolve(a)));
 try {
-  if (stage === "check" && args.length === 0) await check(version);
+  if (stage === "bump" && args.length === 0) await bump(version);
+  else if (stage === "check" && args.length === 0) await check(version);
   else if (stage === "build" && args.length === 3)
     await build(version, args[0]!, args[1]!, args[2]!);
   else if (stage === "sign" && args.length === 3)

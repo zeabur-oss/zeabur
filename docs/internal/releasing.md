@@ -12,6 +12,7 @@ notes and verifies the assets.
 
 | Stage | Where | Does |
 |---|---|---|
+| `bump` | once, in the release pull request | After knope set `Cargo.toml`, sets `Cargo.lock`'s workspace crates, the chart (`version`, `appVersion`), `web/package.json` and the installer's `package.json`, then regenerates `openapi.yaml` and `web/src/api/zeabur.ts` with `cargo xtask openapi`. |
 | `check` | once | The tag is SemVer without build metadata, and the version of every crate, `Cargo.lock`, the chart (`version`, `appVersion`), `web/package.json`, the installer's `package.json` and `openapi.yaml`. Every `ghcr.io/zeabur-oss` image the chart runs is one the release publishes. |
 | `build` | Linux amd64 and arm64, macOS arm64 | On a tag, the catalog and Zeabur Identity pins resolve. Builds the platform (`release-build.sh`; on Linux also Zeabur's and Zeabur Proxy's images), then on Linux smokes the archive, the chart and the image on a k3s cluster with Zeabur Identity at `ZEABUR_IDENTITY_PINNED` (`release-smoke.sh`). A rehearsal also builds a development installer on Linux, which it does not keep. |
 | `sign` | macOS arm64, after `build` | Signs `zeaburctl` with the Developer ID and notarizes it, in the `apple-signing` environment, on `main` and tags only. Without the certificate it leaves the build as it is and warns. |
@@ -36,7 +37,7 @@ which release it is. `verify` gets these in `RELEASE_CERT_IDENTITY_REGEXP`,
 A tag with a pre-release part (`v0.1.2-beta.1`, `v1.0.0-rc.1`) is a
 [SemVer 2.0.0](https://semver.org/spec/v2.0.0.html) pre-release: a GitHub pre-release, never
 latest. Any other tag, `v0.*` included, is a normal release. Build metadata (`+...`) is refused.
-Tag it on `main` like any release. The manifests carry the full version (`0.1.2-beta.1`), and
+Release it from `main` like any release, with `prerelease: beta`. The manifests carry the full version (`0.1.2-beta.1`), and
 `CHANGELOG.md` has a section of its own for it, `## 0.1.2-beta.1 (2026-11-01)`. A normal release
 pins only normal releases of the catalog and Zeabur Identity; a pre-release may pin pre-releases
 too. On a commit tagged both `v0.1.2-beta.1` and `v0.1.2`, the pin is `v0.1.2`; of several tags of
@@ -45,36 +46,29 @@ not `sort -V`.
 
 ## Publish a release
 
-1. On a branch, set the version in `Cargo.toml` (`[workspace.package]`, then
-   `nix develop -c cargo update --workspace` for `Cargo.lock`), in
-   `deploy/chart/zeabur/Chart.yaml` (`version` and `appVersion`), `web/package.json`,
-   `crates/zeabur-installer/web/package.json` and `crates/zeabur-api/openapi.yaml` (`info.version`;
-   the API test regenerates it), all without the `v`; `nix develop -c bun scripts/release.ts check
-   v<version>` checks them. Rename `## Unreleased` in `CHANGELOG.md` to
-   `## <version> (<date>)`; that section becomes the release notes as it is, so keep each
-   paragraph and list item on one line. A release that fixes a vulnerability lists it under a heading
-   written exactly `### Security`. The update check in the interface and in `zeaburctl` looks for
-   that heading to tell people their version has known security problems, as
-   docs/reference/telemetry.mdx describes. The catalog commit in `flake.lock` and the
-   Zeabur Identity release tag in `ZEABUR_IDENTITY_PINNED` are what the release embeds and
-   installs: the catalog commit must carry a published release tag and the Identity tag must
-   exist, each release with its signed `SHA256SUMS`, or the release stops. Renovate moves the
-   Identity tag only to newer release tags. The release reads the Identity release's `digests.txt`,
-   which Identity publishes from v0.1.2 on: release Identity before the next Zeabur release and
-   move the pin to it.
-   Merge the pull request to `main`.
-2. Rehearse: **Actions → Release → Run workflow** on `main` with the version, `v<version>`. It
+1. Run **Actions → Release pull request → Run workflow** on `main`. Leave `version` empty to take
+   the one the change files give (before 1.0, `minor` is a patch bump), or give `v<version>`;
+   `prerelease: rc` makes `vX.Y.Z-rc.N`. knope turns the change files in `.changeset/` into the
+   `## <version> (<date>)` section of `CHANGELOG.md` and sets `Cargo.toml`; `bump` sets the other
+   manifests, `check` confirms them, and zeabur-oss-bot opens `chore(release): v<version>` from
+   `release/next`. That section becomes the release notes as it is, so keep each paragraph and
+   list item on one line, and edit `CHANGELOG.md` on that branch if it should read differently.
+   A change file for a fixed vulnerability says `default: security`, which knope lists under
+   `### Security` and releases as a patch. The update check in the interface and in `zeaburctl`
+   looks for that heading to tell people their version has known security problems, as
+   docs/reference/telemetry.mdx describes.
+   The catalog commit in `flake.lock` and the Zeabur Identity release tag in
+   `ZEABUR_IDENTITY_PINNED` are what the release embeds and installs: the catalog commit must
+   carry a published release tag and the Identity tag must exist, each release with its signed
+   `SHA256SUMS`, or the release stops. Renovate moves the Identity tag only to newer release tags.
+   The release reads the Identity release's `digests.txt`, which Identity publishes from v0.1.2
+   on: release Identity before the next Zeabur release and move the pin to it.
+2. Rehearse: **Actions → Release → Run workflow** on `release/next` with the version, `v<version>`. It
    runs the three builds with their smoke tests and publishes nothing; the pins are
    not checked and no pinned installer is built.
 3. Before the first release only, see [Settings the workflow needs](#settings-the-workflow-needs).
-4. Check that **CI** passed on `main` for the merged commit, then tag it and push the tag:
-
-   ```sh
-   git fetch git@github.com:zeabur-oss/zeabur.git main
-   git tag -s v0.1.1 -m v0.1.1 <commit on main>
-   git push git@github.com:zeabur-oss/zeabur.git v0.1.1
-   ```
-
+4. Once **CI** has passed on the release pull request, merge it. zeabur-oss-bot tags the merge
+   commit `v<version>`, which starts the **Release** run.
 5. Watch the **Release** run. When it succeeds, the images and the chart are in the registry (their
    tags are public while the release is still a draft) and the draft release has every asset.
    The `verify` jobs have downloaded the draft's assets on fresh runners, checked every
@@ -102,7 +96,8 @@ These are repository and organization settings, not files; a maintainer sets the
   private by default, so its `verify` jobs fail: they pull without a login on purpose. Make the package public
   (package settings → **Change visibility**) and confirm that the repository has write access
   under **Manage Actions access**, then verify again as below.
-- **Tags.** A ruleset that lets only maintainers create, move or delete `v*` tags.
+- **Tags.** A ruleset that lets zeabur-oss-bot create `v*` tags while nobody may move or delete them.
+- **Labels.** `changelog: none`.
 - **Immutable releases** (repository settings → **Releases**): once published, a release's tag
   and assets cannot be changed. A draft stays editable until then.
 - **macOS signing.** An environment `apple-signing` whose deployment branches are `main` and
