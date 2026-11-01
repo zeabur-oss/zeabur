@@ -53,6 +53,10 @@ not `sort -V`.
    manifests, `check` confirms them, and zeabur-oss-bot opens `chore(release): v<version>` from
    `release/next`. That section becomes the release notes as it is, so keep each paragraph and
    list item on one line, and edit `CHANGELOG.md` on that branch if it should read differently.
+   A change file for a fixed vulnerability says `default: security`, which knope lists under
+   `### Security` and releases as a patch. The update check in the interface and in `zeaburctl`
+   looks for that heading to tell people their version has known security problems, as
+   docs/reference/telemetry.mdx describes.
    The catalog commit in `flake.lock` and the Zeabur Identity release tag in
    `ZEABUR_IDENTITY_PINNED` are what the release embeds and installs: the catalog commit must
    carry a published release tag and the Identity tag must exist, each release with its signed

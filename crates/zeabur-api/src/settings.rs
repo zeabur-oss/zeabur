@@ -85,6 +85,12 @@ pub struct Settings {
     /// when that is not the host the upload Secret names: the port-forward of `zeaburctl up` in
     /// local mode.
     pub upload_address: Option<String>,
+    /// Zeabur's own Deployment in `namespace` (`ZEABUR_DEPLOYMENT`), read to tell how Zeabur was
+    /// installed; `None`: not known.
+    pub deployment: Option<String>,
+    /// Whether the interface checks GitHub once a day for a newer release: the chart's
+    /// `updateCheck.enabled`, off under `DO_NOT_TRACK`.
+    pub update_check: bool,
 }
 
 /// The GitHub the cluster's GitHub App is made on: github.com by default.
@@ -174,6 +180,8 @@ impl Default for Settings {
             trusted_ca: None,
             github: GitHubSettings::default(),
             upload_address: None,
+            deployment: None,
+            update_check: false,
         }
     }
 }

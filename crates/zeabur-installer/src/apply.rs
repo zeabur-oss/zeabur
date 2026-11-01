@@ -21,6 +21,7 @@ use zeabur_installer_plan::plan::{
     MANAGER, NAMESPACE_MANAGER, Plan, RegistryPlan, ReleasePlan, SecretRefPlan, SecretSource,
     Source, ZEABUR_NAMESPACE, ZeaburPlan,
 };
+use zeabur_installer_plan::record::{INSTALLER_FILE, INSTALLER_VERSION, Record};
 use zeabur_installer_plan::rke2::{ETCD_USER, PREFIX};
 use zeabur_installer_plan::storage::{self, NodePrep, Storage};
 use zeabur_telemetry::{InstallationId, Step};
@@ -72,6 +73,13 @@ fn install(config: &Config, reporter: &Reporter) -> Result<(), InstallError> {
     })?;
     kubectl.wait_ready(Duration::from_secs(600))?;
     files::set_modes(Path::new(distribution.layout().tls_dir), ".crt", 0o600)?;
+    let replanned = !running && read_record(&kubectl)?.is_some();
+    if replanned {
+        plan = make_plan(&index, config)?;
+        out::line(render::changes(plan.changes.as_ref(), distribution.server_unit()).trim_end());
+        out::line(render::removals(&plan.removals).trim_end());
+        remove::check(&plan.removals)?;
+    }
     if started.is_some() {
         let name = plan.node_name.clone();
         kubectl::poll(
@@ -80,7 +88,7 @@ fn install(config: &Config, reporter: &Reporter) -> Result<(), InstallError> {
             || crate::join::node_ready(&kubectl, &name, started).unwrap_or(false),
         )?;
     }
-    remove_components(&kubectl, &index, config, &mut plan, !running)?;
+    remove_components(&kubectl, &index, config, &mut plan, !running && !replanned)?;
 
     reporter.at(Step::ClusterSetup);
     out::step("Namespaces and network policies");
@@ -168,12 +176,36 @@ fn install_components(kubectl: &Kubectl, plan: &Plan) -> Result<(), InstallError
     Ok(())
 }
 
-/// The plan, with the removals read from the cluster when it runs.
+/// The plan, with the install record and the removals read from the cluster when it runs.
 pub(crate) fn make_plan(index: &Index, config: &Config) -> Result<Plan, InstallError> {
-    let mut plan = plan::plan(index, config, &facts::read()?)?;
     let kubectl = Kubectl::admin(config.distribution);
+    let running = systemd::is_active(config.distribution.server_unit());
+    let mut facts = facts::read()?;
+    facts.installer = kept_installer(Path::new(STATE_DIR));
+    if running {
+        facts.record = read_record(&kubectl)?;
+    }
+    let mut plan = plan::plan(index, config, &facts)?;
+    if plan.changes.is_some() {
+        let mut pending = pending(&ClusterInstall {
+            cluster: &plan.cluster,
+            calico: plan.calico.as_ref(),
+            files: &plan.host_files,
+            image_archives: &config.sources.image_archives,
+            server: true,
+            changed: false,
+        })?;
+        if let Some(changes) = &mut plan.changes {
+            // A new release is shown as such, not as its binary.
+            if changes.version.is_some() {
+                let binary = release_binary(config.distribution).display().to_string();
+                pending.retain(|path| *path != binary);
+            }
+            changes.set_host_files(pending);
+        }
+    }
     plan.removals = remove::plan(
-        systemd::is_active(config.distribution.server_unit()).then_some(&kubectl),
+        running.then_some(&kubectl),
         index,
         &plan.components,
         &config.profile,
@@ -181,6 +213,37 @@ pub(crate) fn make_plan(index: &Index, config: &Config) -> Result<Plan, InstallE
         &mut plan.warnings,
     )?;
     Ok(plan)
+}
+
+/// The install record, when there is one.
+pub(crate) fn read_record(kubectl: &Kubectl) -> Result<Option<Record>, InstallError> {
+    Ok(kubectl
+        .get("configmap", STATE_CONFIGMAP, Some("kube-system"))?
+        .and_then(|state| Record::from_data(state.get("data")?)))
+}
+
+/// The version of the installer that last applied, kept in `state_dir`.
+pub(crate) fn kept_installer(state_dir: &Path) -> Option<String> {
+    let version = fs::read_to_string(state_dir.join(INSTALLER_FILE)).ok()?;
+    Some(version.trim().to_owned()).filter(|v| !v.is_empty())
+}
+
+/// Keeps this installer's version in `state_dir`, where a stopped cluster's next `apply` reads it.
+pub(crate) fn keep_installer(state_dir: &Path) -> Result<(), InstallError> {
+    files::write(
+        &state_dir.join(INSTALLER_FILE),
+        0o644,
+        format!("{INSTALLER_VERSION}\n").as_bytes(),
+    )?;
+    Ok(())
+}
+
+/// The paths of `files` whose content on this host differs.
+pub(crate) fn changed_files<'a>(files: impl Iterator<Item = &'a HostFile>) -> Vec<String> {
+    files
+        .filter(|f| fs::read(&f.path).ok().as_deref() != Some(f.content.as_bytes()))
+        .map(|f| f.path.clone())
+        .collect()
 }
 
 /// Removes the components the plan removes. With `read`, as when the cluster was stopped while
@@ -286,20 +349,37 @@ pub(crate) fn prepare_node(prep: Option<&NodePrep>) -> Result<(), InstallError> 
     }
 }
 
-/// Installs the release when another version or no unit is there. Returns whether it did.
-fn install_release(cluster: &ClusterPlan, server: bool, unit: &str) -> Result<bool, InstallError> {
-    let distribution = cluster.distribution;
-    let binary = match distribution {
+/// The binary of K3s or RKE2.
+fn release_binary(distribution: Distribution) -> PathBuf {
+    match distribution {
         Distribution::K3s => PathBuf::from(k3s::BINARY),
         Distribution::Rke2 => Path::new(PREFIX).join("bin/rke2"),
-    };
+    }
+}
+
+/// What `install_release` would install: the binary when it is not the planned release, or the
+/// K3s unit when it is missing.
+fn release_pending(cluster: &ClusterPlan, unit: &str) -> Option<String> {
+    let binary = release_binary(cluster.distribution);
     let installed = cmd::run(&binary, &["--version"], None).unwrap_or_default();
     // `install.sh` writes the K3s unit; RKE2's comes in its tarball.
-    let no_unit = distribution == Distribution::K3s
-        && !Path::new(&format!("/etc/systemd/system/{unit}.service")).exists();
-    if installed.contains(&cluster.version) && !no_unit {
-        return Ok(false);
+    let unit_file = format!("/etc/systemd/system/{unit}.service");
+    if !installed.contains(&cluster.version) {
+        Some(binary.display().to_string())
+    } else if cluster.distribution == Distribution::K3s && !Path::new(&unit_file).exists() {
+        Some(unit_file)
+    } else {
+        None
     }
+}
+
+/// Installs the release when another version or no unit is there.
+fn install_release(cluster: &ClusterPlan, server: bool, unit: &str) -> Result<(), InstallError> {
+    if release_pending(cluster, unit).is_none() {
+        return Ok(());
+    }
+    let distribution = cluster.distribution;
+    let binary = release_binary(distribution);
     let dir = PathBuf::from(STATE_DIR)
         .join("downloads")
         .join(&cluster.version);
@@ -330,7 +410,7 @@ fn install_release(cluster: &ClusterPlan, server: bool, unit: &str) -> Result<bo
         }
     }
     systemd::daemon_reload()?;
-    Ok(true)
+    Ok(())
 }
 
 /// What `install_cluster` installs: a first server, a joining server or an agent.
@@ -346,30 +426,59 @@ pub(crate) struct ClusterInstall<'a> {
     pub(crate) changed: bool,
 }
 
-/// Installs K3s or RKE2 and starts or restarts it as needed. Returns when it did, in seconds since
-/// the Unix epoch, taken just before; a Ready condition older than that is the old kubelet's.
+impl ClusterInstall<'_> {
+    const fn unit(&self) -> &'static str {
+        if self.server {
+            self.cluster.distribution.server_unit()
+        } else {
+            self.cluster.distribution.agent_unit()
+        }
+    }
+
+    /// The host files it writes. The issuer configuration belongs to a later step, so it is
+    /// written only when there is none.
+    fn files(&self) -> impl Iterator<Item = &HostFile> {
+        let authn = self.cluster.distribution.layout().authn_file;
+        self.files
+            .iter()
+            .filter(move |f| f.path != authn || !Path::new(&f.path).exists())
+    }
+}
+
+/// The paths `install_cluster` would write; a running cluster restarts when there is one.
+pub(crate) fn pending(install: &ClusterInstall<'_>) -> Result<Vec<String>, InstallError> {
+    let layout = install.cluster.distribution.layout();
+    let mut paths = changed_files(install.files());
+    if let Some(calico) = install.calico {
+        let path = calico_path();
+        if calico_differs(&pinned_path(calico), &path)? {
+            paths.push(path.display().to_string());
+        }
+    }
+    paths.extend(release_pending(install.cluster, install.unit()));
+    paths.extend(changed_archives(
+        Path::new(layout.images_dir),
+        install.image_archives,
+    )?);
+    Ok(paths)
+}
+
+/// Installs K3s or RKE2 and starts it, or restarts it when `pending` finds a change. Returns when
+/// it did, in seconds since the Unix epoch, taken just before; a Ready condition older than that is
+/// the old kubelet's.
 pub(crate) fn install_cluster(install: &ClusterInstall<'_>) -> Result<Option<u64>, InstallError> {
     let cluster = install.cluster;
     let distribution = cluster.distribution;
     let layout = distribution.layout();
-    let unit = if install.server {
-        distribution.server_unit()
-    } else {
-        distribution.agent_unit()
-    };
+    let unit = install.unit();
     out::step(&format!(
         "{} {} ({unit})",
         distribution.title(),
         cluster.version
     ));
-    let mut changed = install.changed;
-    for file in install.files {
-        let path = Path::new(&file.path);
-        // The issuer configuration belongs to a later step; only make sure one exists.
-        if file.path == layout.authn_file && path.exists() {
-            continue;
-        }
-        changed |= files::write(path, file.mode, file.content.as_bytes())?;
+    let changed = install.changed || !pending(install)?.is_empty();
+    for file in install.files() {
+        files::write(Path::new(&file.path), file.mode, file.content.as_bytes())?;
     }
     cmd::run(
         "sysctl",
@@ -389,10 +498,10 @@ pub(crate) fn install_cluster(install: &ClusterInstall<'_>) -> Result<Option<u64
         Distribution::K3s | Distribution::Rke2 => {}
     }
     if let Some(calico) = install.calico {
-        changed |= calico_manifest(calico)?;
+        calico_manifest(calico)?;
     }
-    changed |= install_release(cluster, install.server, unit)?;
-    changed |= image_archives(Path::new(layout.images_dir), install.image_archives)?;
+    install_release(cluster, install.server, unit)?;
+    image_archives(Path::new(layout.images_dir), install.image_archives)?;
 
     let now = || {
         SystemTime::now()
@@ -440,10 +549,23 @@ fn fetch_release(cluster: &ClusterPlan, dir: &Path) -> Result<(), InstallError> 
     Ok(())
 }
 
-/// Writes Calico's manifest, set for K3s, where K3s applies it on start. Returns whether it
-/// changed.
-fn calico_manifest(calico: &Download) -> Result<bool, InstallError> {
-    let path = Path::new(k3s::MANIFESTS_DIR).join("zeabur-calico.yaml");
+/// Where K3s reads Calico's manifest, which it applies on start.
+fn calico_path() -> PathBuf {
+    Path::new(k3s::MANIFESTS_DIR).join("zeabur-calico.yaml")
+}
+
+/// Whether the manifest at `path` is not the one `calico_manifest` writes from the pinned
+/// `source`. Without the pinned copy it cannot tell, so it says it is.
+fn calico_differs(source: &Path, path: &Path) -> Result<bool, InstallError> {
+    let Ok(manifest) = fs::read_to_string(source) else {
+        return Ok(true);
+    };
+    Ok(fs::read_to_string(path).ok() != Some(k3s::calico_manifest(&manifest)?))
+}
+
+/// Writes Calico's manifest, set for K3s.
+fn calico_manifest(calico: &Download) -> Result<(), InstallError> {
+    let path = calico_path();
     let source = pinned_path(calico);
     if !source.exists() || !path.exists() {
         out::err(&format!("    {}", calico.url));
@@ -455,25 +577,51 @@ fn calico_manifest(calico: &Download) -> Result<bool, InstallError> {
         )?;
     }
     let manifest = fs::read_to_string(&source).map_err(|e| InstallError::Message(e.to_string()))?;
-    Ok(files::write(
-        &path,
-        0o600,
-        k3s::calico_manifest(&manifest)?.as_bytes(),
-    )?)
+    files::write(&path, 0o600, k3s::calico_manifest(&manifest)?.as_bytes())?;
+    Ok(())
 }
 
 /// The name prefix of the archives the installer copies into the image directory, so it can
 /// tell its own from the release's and from those put there by hand.
 const ARCHIVE_PREFIX: &str = "zeabur-installer-";
 
+/// The file name of an archive in `sources.imageArchives` and where the installer keeps its copy.
+fn archive_copy(dir: &Path, archive: &str) -> Result<(String, PathBuf), InstallError> {
+    let name = Path::new(archive)
+        .file_name()
+        .ok_or_else(|| InstallError::Message(format!("{archive}: not a file")))?
+        .to_string_lossy()
+        .into_owned();
+    let dest = dir.join(format!("{ARCHIVE_PREFIX}{name}"));
+    Ok((name, dest))
+}
+
+/// The copies in `dir` that `image_archives` would write: those of listed archives that are new or
+/// differ.
+pub(crate) fn changed_archives(
+    dir: &Path,
+    sources: &[String],
+) -> Result<Vec<String>, InstallError> {
+    let mut changed = Vec::new();
+    for archive in sources {
+        let (_, dest) = archive_copy(dir, archive)?;
+        if download::sha256_file(Path::new(archive))?
+            != download::sha256_file(&dest).unwrap_or_default()
+        {
+            changed.push(dest.display().to_string());
+        }
+    }
+    Ok(changed)
+}
+
 /// Copies `sources.imageArchives` into the image directory and removes the ones it copied that
-/// are no longer listed. Returns whether an archive was copied.
+/// are no longer listed.
 ///
 /// K3s and RKE2 import every archive there each time they start, replacing the tags it holds, so an
 /// archive left behind would bring an old image back over a newer one. With `.cache.json` in the
 /// directory it imports an archive again only when the file changes (k3s
 /// `pkg/agent/containerd/watcher.go`); a changed one is imported at once, without a restart.
-fn image_archives(dir: &Path, sources: &[String]) -> Result<bool, InstallError> {
+fn image_archives(dir: &Path, sources: &[String]) -> Result<(), InstallError> {
     let io = |path: &Path| {
         let path = path.display().to_string();
         move |e: std::io::Error| InstallError::Message(format!("{path}: {e}"))
@@ -483,23 +631,16 @@ fn image_archives(dir: &Path, sources: &[String]) -> Result<bool, InstallError> 
     if !cache.exists() {
         files::write(&cache, 0o644, b"")?;
     }
-    let mut changed = false;
     let mut names = Vec::new();
     for archive in sources {
         let source = Path::new(archive);
-        let name = source
-            .file_name()
-            .ok_or_else(|| InstallError::Message(format!("{archive}: not a file")))?
-            .to_string_lossy()
-            .into_owned();
-        let dest = dir.join(format!("{ARCHIVE_PREFIX}{name}"));
+        let (name, dest) = archive_copy(dir, archive)?;
         if download::sha256_file(source)? != download::sha256_file(&dest).unwrap_or_default() {
             // A `.partial` file is not imported, so half an archive is never read.
             let partial = dir.join(format!(".{ARCHIVE_PREFIX}{name}.partial"));
             fs::copy(source, &partial).map_err(io(source))?;
             fs::rename(&partial, &dest).map_err(io(&dest))?;
             out::err(&format!("    {archive} copied to {}", dest.display()));
-            changed = true;
         }
         names.push(name);
     }
@@ -519,7 +660,7 @@ fn image_archives(dir: &Path, sources: &[String]) -> Result<bool, InstallError> 
         let path = dir.join(name);
         whole_second_mtime(&path).map_err(io(&path))?;
     }
-    Ok(changed)
+    Ok(())
 }
 
 /// Drops the fraction of a second from a file's modification time. The import cache keeps whole
@@ -698,8 +839,15 @@ pub(crate) fn releases(kubectl: &Kubectl, component: &ComponentPlan) -> Result<(
             } => match digest {
                 Some(digest) => {
                     let (object, archive) = checked_chart(object, digest)?;
-                    // Helm never updates a chart's `crds/` after the first install.
-                    let crds = archive::chart_crds(&archive)?;
+                    // Helm installs a chart's `crds/` on the first install only.
+                    let values = object
+                        .pointer("/spec/valuesContent")
+                        .and_then(Value::as_str)
+                        .map(serde_json::from_str)
+                        .transpose()
+                        .map_err(|e| InstallError::Message(format!("{name} values: {e}")))?
+                        .unwrap_or(Value::Null);
+                    let crds = archive::chart_crds(&archive, &values)?;
                     if !crds.is_empty() {
                         kubectl.apply(&crds)?;
                     }
@@ -1130,7 +1278,11 @@ fn zeabur(
         }))?;
     }
 
-    helm_chart(kubectl, "zeabur", &zeabur_helm_chart(zeabur, telemetry)?)?;
+    helm_chart(
+        kubectl,
+        "zeabur",
+        &zeabur_helm_chart(zeabur, telemetry, update_check(config))?,
+    )?;
     kubectl.wait(&[
         "--namespace",
         ZEABUR_NAMESPACE,
@@ -1141,18 +1293,35 @@ fn zeabur(
     Ok(())
 }
 
-/// The `HelmChart` that installs Zeabur's chart with the planned values, and the experience
-/// program's when `telemetry` has the installation ID.
+/// `updateCheck` from the configuration, off under `DO_NOT_TRACK` or `NO_UPDATE_NOTIFIER`.
+pub(crate) fn update_check(config: &Config) -> bool {
+    update_check_in(
+        config.update_check,
+        std::env::var("DO_NOT_TRACK").ok().as_deref(),
+        std::env::var_os("NO_UPDATE_NOTIFIER").is_some(),
+    )
+}
+
+fn update_check_in(on: bool, do_not_track: Option<&str>, no_update_notifier: bool) -> bool {
+    on && !no_update_notifier && !zeabur_telemetry::do_not_track_in(do_not_track)
+}
+
+/// The `HelmChart` that installs Zeabur's chart with the planned values, the update check's
+/// switch, and the experience program's values when `telemetry` has the installation ID.
 pub(crate) fn zeabur_helm_chart(
     zeabur: &ZeaburPlan,
     telemetry: Option<&InstallationId>,
+    update_check: bool,
 ) -> Result<Value, InstallError> {
     let mut values = zeabur.values.clone();
-    if let (Some(id), Some(map)) = (telemetry, values.as_object_mut()) {
-        map.insert(
-            "telemetry".to_owned(),
-            json!({"enabled": true, "installationId": id.as_str()}),
-        );
+    if let Some(map) = values.as_object_mut() {
+        map.insert("updateCheck".to_owned(), json!({"enabled": update_check}));
+        if let Some(id) = telemetry {
+            map.insert(
+                "telemetry".to_owned(),
+                json!({"enabled": true, "installationId": id.as_str()}),
+            );
+        }
     }
     let chart = match &zeabur.chart {
         Source::Local(path) => chart_content(path)?,
@@ -1387,11 +1556,72 @@ fn record(kubectl: &Kubectl, plan: &Plan, link_issued: bool) -> Result<(), Insta
             "setupLinkIssued": if link_issued { "true" } else { "false" },
         },
     }))?;
-    Ok(())
+    keep_installer(Path::new(STATE_DIR))
 }
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn a_new_or_changed_image_archive_is_a_change_but_a_copied_one_is_not() {
+        let dir = tempfile::tempdir().unwrap();
+        let images = dir.path().join("images");
+        fs::create_dir(&images).unwrap();
+        let source = dir.path().join("app.tar");
+        fs::write(&source, b"one").unwrap();
+        let sources = [source.display().to_string()];
+        let copy = images.join(format!("{ARCHIVE_PREFIX}app.tar"));
+
+        assert_eq!(
+            changed_archives(&images, &sources).unwrap(),
+            [copy.display().to_string()]
+        );
+        image_archives(&images, &sources).unwrap();
+        assert_eq!(
+            changed_archives(&images, &sources).unwrap(),
+            Vec::<String>::new()
+        );
+
+        fs::write(&source, b"two").unwrap();
+        assert_eq!(changed_archives(&images, &sources).unwrap().len(), 1);
+    }
+
+    #[test]
+    fn a_missing_or_edited_calico_manifest_is_a_change() {
+        let dir = tempfile::tempdir().unwrap();
+        let source = dir.path().join("calico.yaml");
+        let path = dir.path().join("zeabur-calico.yaml");
+        assert!(calico_differs(&source, &path).unwrap());
+
+        let images: Vec<String> = zeabur_installer_plan::pins::CALICO
+            .images
+            .iter()
+            .map(|(tag, _)| format!("          image: {tag}\n"))
+            .collect();
+        let manifest = format!(
+            "{}            # - name: CALICO_IPV4POOL_CIDR\n            #   value: \"192.168.0.0/16\"\n",
+            images.concat()
+        );
+        fs::write(&source, &manifest).unwrap();
+        assert!(calico_differs(&source, &path).unwrap());
+
+        fs::write(&path, k3s::calico_manifest(&manifest).unwrap()).unwrap();
+        assert!(!calico_differs(&source, &path).unwrap());
+
+        fs::write(&path, "edited").unwrap();
+        assert!(calico_differs(&source, &path).unwrap());
+    }
+
+    #[test]
+    fn the_kept_installer_version_is_the_one_that_last_applied() {
+        let dir = tempfile::tempdir().unwrap();
+        assert_eq!(kept_installer(dir.path()), None);
+        keep_installer(dir.path()).unwrap();
+        assert_eq!(
+            kept_installer(dir.path()).as_deref(),
+            Some(INSTALLER_VERSION)
+        );
+    }
+
     #[test]
     fn setup_link_passes_user_lifetime_and_reset_to_identityctl() {
         assert_eq!(
@@ -1430,6 +1660,34 @@ mod tests {
         assert_eq!(encode(&[0xFB, 0xFF], Encoding::Hex), "fbff");
         assert_eq!(encode(&[0xFB, 0xFF], Encoding::Base64url), "-_8");
         assert_eq!(encode(&[0; 24], Encoding::Base64url).len(), 32);
+    }
+
+    #[test]
+    fn update_check_follows_the_config_unless_the_environment_says_no() {
+        assert!(update_check_in(true, None, false));
+        assert!(update_check_in(true, Some("0"), false));
+        assert!(!update_check_in(false, None, false));
+        assert!(!update_check_in(true, Some("1"), false));
+        assert!(!update_check_in(true, None, true));
+    }
+
+    #[test]
+    fn zeabur_helm_chart_writes_the_update_check_switch() {
+        let dir = tempfile::tempdir().unwrap();
+        let chart = dir.path().join("zeabur.tgz");
+        fs::write(&chart, b"chart").unwrap();
+        let zeabur = ZeaburPlan {
+            url: "https://zeabur.example.com".to_owned(),
+            chart: Source::Local(chart.to_string_lossy().into_owned()),
+            values: json!({"updateCheck": {"enabled": true}, "replicas": 1}),
+        };
+        for on in [true, false] {
+            let object = zeabur_helm_chart(&zeabur, None, on).unwrap();
+            let values: Value =
+                serde_json::from_str(object["spec"]["valuesContent"].as_str().unwrap()).unwrap();
+            assert_eq!(values["updateCheck"]["enabled"], on);
+            assert_eq!(values["replicas"], 1);
+        }
     }
 
     #[test]

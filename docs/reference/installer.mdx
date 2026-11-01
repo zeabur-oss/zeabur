@@ -45,13 +45,39 @@ To create a cluster, the installer runs these steps in order:
 2. Writes the K3s or RKE2 configuration, kernel parameters required by CIS, and audit policy. The audit log keeps only request metadata and records every request for a secret. See [Secret encryption and access logs](./security.mdx#secret-encryption-and-access-logs).
 3. Downloads K3s or RKE2 to `/var/lib/rancher/zeabur-installer/downloads`, verifies it against the SHA-256 pinned by the installer, starts `k3s` or `rke2-server`, and waits for the API and node to be ready.
 4. Creates the components' namespaces, baseline NetworkPolicies, and storage classes. The default CIS policy in `kube-system` blocks outside traffic to ServiceLB. Requests that arrive at a node without Traefik then can't reach Traefik, so the installer adds `kube-system/zeabur-installer-servicelb` to allow outside traffic into ServiceLB replicas only.
-5. Installs components in Catalog order and waits for them to be ready. It downloads each chart and manifest file first and stops if its SHA-256 doesn't match the Catalog. Before each chart, it applies the CRDs in the chart's `crds/` folder with server-side apply, so CRDs follow the chart on upgrade (Helm applies them only on first install). It never deletes CRDs.
+5. Installs components in Catalog order and waits for them to be ready. It downloads each chart and manifest file first and stops if its SHA-256 doesn't match the Catalog. Helm applies the CRDs in a chart's `crds/` folder only on the first install. So before each chart, the installer applies them with server-side apply, and they follow the chart on upgrade. This covers the chart's own `crds/` and those of the subcharts its values turn on. Helm upgrades the CRDs a chart makes from its templates, so the installer leaves those alone. The installer never deletes CRDs.
 6. With `zeabur: true`, adds the `zeabur-system-hosts` admission policy first so projects can't use Zeabur's and Zeabur Identity's domains. See [Zeabur's and Zeabur Identity's domains](./security.mdx#domains-for-zeabur-and-zeabur-identity). It then installs Zeabur Identity, configures the API server to trust it, registers the OAuth client, and installs Zeabur. cert-manager automatically renews the certificate the API server uses to connect to Zeabur Identity. See [Zeabur Identity's internal certificate](./security.mdx#zeabur-identitys-internal-certificate).
 7. On the first install, prints a one-time setup link for the first admin, valid for 24 hours, and writes the installation record to the `kube-system/zeabur-installer` config file.
 
 When installation finishes, the installer prints the Zeabur and Zeabur Identity URLs. Open the setup link and add a passkey to sign in to Zeabur and view the cluster. In `local` mode, first configure the browser to trust the CA the installer generated.
 
 `apply` restores installer-managed files to the content it generates. Put your own settings in `/etc/rancher/k3s/config.yaml.d/90-local.yaml` (K3s) or `/etc/rancher/rke2/config.yaml.d/90-local.yaml` (RKE2) instead of changing the installer's `config.yaml`.
+
+### On an installed server
+
+When the cluster has the install record `kube-system/zeabur-installer`, `plan` starts with `Changes since the last apply`. This part names the installer version that wrote the record and lists what `apply` changes. A personal install shows it too. It lists:
+
+- The new K3s, RKE2, or KubeSolo release
+- Host files whose content changes
+- Components added or removed
+- Components that another component replaces
+- Charts that move to a new version
+- Components you no longer install that `apply` leaves running: those with no chart to uninstall, such as `node-updates/system-upgrade-controller`, and those this Catalog no longer has
+- Components this Catalog installs by default that the server doesn't have yet
+
+When the release or a host file changes, `apply` restarts `k3s`, `rke2-server`, or `kubesolo`. The Kubernetes API stops answering for about 10 seconds. Running apps keep serving.
+
+`apply` doesn't remove a component that has no chart or that this Catalog no longer has. What it installed keeps running but gets no more updates. For a component the Catalog dropped, `plan` prints the `kubectl` command that removes it.
+
+`apply` doesn't install the new defaults. To add one, name it in `enable` or check it in `gui`. Components Zeabur needs (ingress, certificates, metrics-server) and components that a chosen component needs are installed anyway.
+
+`plan --json` has the same list under `changes`, which is `null` on a first install. `gui` shows it on the review step, with the new components unchecked.
+
+If a newer installer wrote the record, `plan` and `apply` stop and name the version to use. To go back to an older installer, restore a snapshot taken before the upgrade.
+
+When the Catalog renames a component, `disable` still accepts the old ID, and `plan` warns with the new one. With the old ID in `enable`, `plan` and `apply` stop with an error that names the new ID. `container-registry/zot` is now `builds/zeabur-builder`.
+
+On a server that has `container-registry/zot`, `apply` installs Zeabur Builder in its place, and `plan` shows `replaced by builds/zeabur-builder`. Zeabur Builder takes over the running zot, and the disk with zot's images stays. Zeabur Builder deletes images under `<project>/<name>` paths that no build made, so images you pushed to zot yourself can disappear. To keep every image, add `builds/zeabur-builder` to `disable`. `apply` then leaves zot running and warns that the Catalog no longer lists it.
 
 ## `gui`
 

@@ -339,6 +339,29 @@ export const zhTW: Messages = {
   "review.program.description":
     "傳送版本和每天的使用人數，讓我們知道有多少人在用、該先修哪裡。不會傳名稱、網域或 Email，也不保存 IP。之後隨時可以關閉。",
   "review.program.link": "檢視會傳送的內容",
+  "review.updateCheck": "檢查更新",
+  "review.updateCheck.label": "有新版時在 Zeabur 叢集頁提醒",
+  "review.updateCheck.description":
+    "每位登入者的瀏覽器每天會向 GitHub 取得一次 Zeabur 的發行清單，不帶任何 ID。GitHub 看得到瀏覽器的 IP 和你的 Zeabur 網址。Zeabur 不會自動升級。",
+  "review.updateCheck.link": "運作方式",
+  "review.changes": "這台伺服器的變更",
+  "review.changes.recorded": (version) => `上次用 zeabur-installer ${version} 安裝`,
+  "review.changes.none": "沒有變更，伺服器已經符合這份設定。",
+  "review.changes.version": (title, from, to) => `${title} ${from} → ${to}`,
+  "review.changes.restart": (title) =>
+    `${title} 會重新啟動。Kubernetes API 大約 10 秒連不上，應用程式會照常運作。`,
+  "review.changes.added": "新增",
+  "review.changes.removed": "移除",
+  "review.changes.kept": "不再更新",
+  "review.changes.keptHint": "這些元件不會移除，原本裝好的內容會繼續執行。",
+  "review.changes.replaced": "換成新元件",
+  "review.changes.replaced.container-registry/zot":
+    "Zeabur Builder 會接手 zot，並刪除 <project>/<name> 路徑下不是建置產生的映像檔，包括你自己推上去的。要保留所有映像檔，請在「元件」步驟取消勾選 Zeabur Builder。",
+  "review.changes.replacedNote": (from, to) => `${to} 會取代 ${from}，接手原本裝好的內容。`,
+  "review.changes.charts": "Chart 更新",
+  "review.changes.values": "設定有變更",
+  "review.changes.offered": "這版目錄新增的元件",
+  "review.changes.offeredHint": "勾選才會安裝。",
   "review.removing": "要移除的元件",
   "review.removingHint": "helm-controller 會解除安裝這些元件的 chart。留下的東西之後可以手動刪除。",
   "review.stays": (items) => `會留下：${listZh("zh-TW", items)}`,
@@ -401,6 +424,10 @@ export const zhTW: Messages = {
     "預設 local-path 儲存類別建立的磁碟區只在建立磁碟區的節點上：使用這種磁碟區的 Pod 只能在那個節點執行，節點不在了，資料也跟著不在。",
   "warning.join.token.unpinned": () =>
     "這個權杖沒有 CA 雜湊（K10<hash>::…），所以這台 VM 會信任在那個位址回應的任何伺服器。請照 node add 印出的權杖原樣使用。",
+  "warning.config.renamed": (old, id) =>
+    `設定檔停用的 ${old} 在這版目錄改名為 ${id}，所以不會安裝 ${id}。請把設定檔裡的名稱改成 ${id}。`,
+  "warning.remove.unknown": (id, charts) =>
+    `${id} 已經安裝，但不在這版目錄裡，apply 會原樣保留。要移除時，執行 kubectl -n kube-system delete helmchart ${charts}`,
   "warning.join.server.unreachable": (server) =>
     `連不到 ${server}。請檢查位址，以及這台 VM 能不能連到 TCP 9345。`,
 

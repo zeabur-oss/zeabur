@@ -219,6 +219,7 @@ macro_rules! handlers {
             identity::whoami,
             identity::get,
             cluster::get,
+            cluster::zeabur::get,
             cluster::capabilities,
             cluster::backups::get,
             cluster::backups::plan,

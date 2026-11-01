@@ -4,6 +4,8 @@ versioned_files = [
   { path = "Cargo.toml", regex = '\[workspace\.package\]\nversion = "(?<version>[^"]+)"' },
 ]
 changelog = "CHANGELOG.md"
+# The update check looks for ### Security in the release notes (docs/reference/telemetry.mdx).
+extra_changelog_sections = [{ name = "Security", types = ["security"] }]
 
 [changes]
 ignore_conventional_commits = true

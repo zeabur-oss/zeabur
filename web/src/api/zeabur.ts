@@ -6092,6 +6092,19 @@ export type InspectRequest = {
 }
 
 /**
+ * How Zeabur was installed, which says how to upgrade it.
+ */
+export type InstallMethod = (typeof InstallMethod)[keyof typeof InstallMethod]
+
+export const InstallMethod = {
+  installer: "installer",
+  helm: "helm",
+  "argo-cd": "argo-cd",
+  flux: "flux",
+  zeaburctl: "zeaburctl",
+} as const
+
+/**
  * A pending one-time setup link. Its token is not kept anywhere: it can be revoked, not shown
  * again.
  */
@@ -9893,6 +9906,17 @@ export type WorkloadReleaseList = {
   items: WorkloadRelease[]
 }
 
+/**
+ * Zeabur itself: its version, and what the interface needs to say how to upgrade it.
+ */
+export type ZeaburVersion = {
+  installedBy?: InstallMethod | null
+  /** Whether the interface checks GitHub's releases for a newer version. */
+  updateCheck: boolean
+  /** Zeabur's version, such as `0.1.1`; in local mode, `zeaburctl`'s. */
+  version: string
+}
+
 export type ListClusterEventsParams = {
   /**
    * Only events of this type: `Normal` or `Warning` (any case).
@@ -11309,6 +11333,25 @@ export const getClusterUsage = async (
   options?: Parameters<typeof zeaburFetch>[1],
 ): Promise<ClusterUsage> => {
   return zeaburFetch<ClusterUsage>(getGetClusterUsageUrl(), {
+    ...options,
+    method: "GET",
+  })
+}
+
+export const getGetZeaburUrl = () => {
+  return `/api/v1/cluster/zeabur`
+}
+
+/**
+ * @summary Zeabur's version, whether the interface checks for a newer one, and how Zeabur was installed:
+from its Deployment's marks (Helm, Argo CD, Flux) and, for a Helm release, zeabur-installer's
+`HelmChart` of that name in `kube-system`. Both are read as the person; a refused read leaves
+`installedBy` out.
+ */
+export const getZeabur = async (
+  options?: Parameters<typeof zeaburFetch>[1],
+): Promise<ZeaburVersion> => {
+  return zeaburFetch<ZeaburVersion>(getGetZeaburUrl(), {
     ...options,
     method: "GET",
   })

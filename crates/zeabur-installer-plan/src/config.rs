@@ -51,6 +51,11 @@ pub struct Config {
     /// `--no-telemetry` turn it off whatever this says.
     #[serde(default = "yes", skip_serializing_if = "is_true")]
     pub telemetry: bool,
+    /// Let the Zeabur panel ask GitHub whether a newer release is out
+    /// (docs/reference/telemetry.mdx). `DO_NOT_TRACK` and `NO_UPDATE_NOTIFIER` turn it off
+    /// whatever this says.
+    #[serde(default = "yes", skip_serializing_if = "is_true")]
+    pub update_check: bool,
     /// An RKE2 release other than the pinned one, such as `v1.37.1+rke2r1`. Its downloads are
     /// checked only against the release's own checksum list, so the plan warns that it is
     /// unsupported.
@@ -655,6 +660,7 @@ impl Config {
             secret_files: BTreeMap::new(),
             allow_data_loss: Vec::new(),
             telemetry: true,
+            update_check: true,
             distribution: Distribution::default(),
             rke2_version: None,
             k3s_version: None,
