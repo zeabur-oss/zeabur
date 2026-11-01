@@ -36,7 +36,7 @@ export default defineConfig({
     react({
       // The compiler skips node_modules on its own too, unless `sources` names the files.
       compiler: { sources: [resolve(import.meta.dirname, "src") + "/", designSystem] },
-      exclude: /\/node_modules\/(?!@zeabur\/design-system\/)/,
+      exclude: /\/node_modules\/(?!@zeabur-oss\/design-system\/)/,
     }),
     tailwindcss(),
     Icons({ scale: 1, compiler: "jsx", jsx: "react" }),
