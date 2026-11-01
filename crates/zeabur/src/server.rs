@@ -8,7 +8,7 @@
 //! | `GET /auth/callback` | where Zeabur Identity sends the browser back after signing in |
 //! | `POST /auth/logout` | ends the session and revokes its refresh token at Zeabur Identity |
 //! | `/api/…` | the API (`zeabur_api`), as the person the session belongs to |
-//! | anything else | the web interface; a page opened without a session goes to `/auth/login` first |
+//! | anything else | the web interface; a page opened without a session goes to Zeabur Identity first |
 //!
 //! Every request but the health check passes [`zeabur_core::guard`] first: its `Host` must be
 //! the public URL's, and a request that changes something must come from Zeabur's own page.
@@ -38,6 +38,8 @@ use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use secrecy::ExposeSecret as _;
+use tower_http::compression::CompressionLayer;
+use tower_http::compression::predicate::{Predicate, SizeAbove};
 use zeabur_api::ApiError;
 use zeabur_api::access::{ClusterAccess, Handoff};
 use zeabur_api::account::SignInPage;
@@ -125,9 +127,12 @@ pub(crate) fn app(
     let access = Arc::new(SessionAccess {
         origin: auth.public.origin(),
     });
-    let api = zeabur_api::router_with_key(access, plan_key, settings, sign_in, zeabur_proxy).layer(
-        axum::middleware::from_fn_with_state(Arc::clone(auth), session),
-    );
+    let api = zeabur_api::router_with_key(access, plan_key, settings, sign_in, zeabur_proxy)
+        .layer(axum::middleware::from_fn_with_state(
+            Arc::clone(auth),
+            session,
+        ))
+        .layer(compression());
     let sign_in = Router::new()
         .route("/auth/login", get(login))
         .route("/auth/callback", get(callback))
@@ -147,6 +152,26 @@ pub(crate) fn app(
     Router::new()
         .route("/api/healthz", get(|| async { "ok" }))
         .merge(guarded)
+}
+
+/// Gzips the API's JSON from a kilobyte up, which a browser far away gets in fewer round trips.
+/// Streams (logs, files, database dumps) go out as they are written.
+fn compression() -> CompressionLayer<impl Predicate> {
+    CompressionLayer::new().compress_when(SizeAbove::new(1024).and(json))
+}
+
+fn json(
+    _: StatusCode,
+    _: axum::http::Version,
+    headers: &HeaderMap,
+    _: &axum::http::Extensions,
+) -> bool {
+    headers
+        .get(header::CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok())
+        .is_some_and(|kind| {
+            kind.starts_with("application/json") || kind.starts_with("application/problem+json")
+        })
 }
 
 fn problem(kind: Kind, detail: &str) -> Response {
@@ -171,10 +196,10 @@ async fn check(State(auth): State<Arc<Auth>>, request: Request, next: Next) -> R
     }
 }
 
-/// Sends a browser that opens a page without a session straight to `/auth/login`, so it does
-/// not load the interface only for its script to leave for Zeabur Identity. Anything but a
-/// top-level navigation (scripts, files, the API) is served as before; the interface still sends
-/// the browser to sign in when the API answers `signed-out`.
+/// Sends a browser that opens a page without a session straight to Zeabur Identity, as
+/// `/auth/login` would, so it does not load the interface only for its script to leave. Anything
+/// but a top-level navigation (scripts, files, the API) is served as before; the interface still
+/// sends the browser to sign in when the API answers `signed-out`.
 #[cfg(feature = "ui")]
 async fn sign_in_first(State(auth): State<Arc<Auth>>, request: Request, next: Next) -> Response {
     if request.method() != axum::http::Method::GET
@@ -199,12 +224,7 @@ async fn sign_in_first(State(auth): State<Arc<Auth>>, request: Request, next: Ne
             .path_and_query()
             .map(axum::http::uri::PathAndQuery::as_str),
     );
-    if back == "/" {
-        redirect("/auth/login", &[])
-    } else {
-        let back: String = form_urlencoded::byte_serialize(back.as_bytes()).collect();
-        redirect(&format!("/auth/login?return={back}"), &[])
-    }
+    start(&auth, request.headers(), back).await
 }
 
 /// Whether the browser is loading a document to show, by Fetch Metadata or, from a browser
