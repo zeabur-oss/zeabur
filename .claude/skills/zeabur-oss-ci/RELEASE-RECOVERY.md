@@ -2,7 +2,7 @@
 
 Read the repository's release notes for maintainers (zeabur: `docs/internal/releasing.md`), its
 `.github/workflows/release.yml`, the shared workflow it calls (zeabur-oss/.github) and the
-`scripts/release*.sh` it runs: they are the recovery path. Never push or move a tag, publish a
+`scripts/release.ts` it runs: they are the recovery path. Never push or move a tag, publish a
 release, dispatch the workflow or change a package's settings yourself; those are the
 maintainers'. Propose the command or the setting instead.
 
@@ -11,11 +11,11 @@ maintainers'. Propose the command or the setting instead.
 Once `publish` succeeded, the images, charts and the draft's assets are signed by the shared
 workflow (`https://github.com/zeabur-oss/.github/.github/workflows/release.yml@…`) for
 `zeabur-oss/<repo>` at `refs/tags/v<version>`. Do not rebuild, re-sign, overwrite or delete
-them to make a check pass (zeabur's `scripts/release.sh publish` refuses an existing release,
-image tag or chart version on purpose). Fix the check on `main`, then a maintainer runs
-`gh workflow run release.yml --ref main -f version=v<version> -F verify_only=true`, which takes
-the scripts from `main` and the Nix shell from the tag. Re-running the failed run reuses its old
-workflow file and permissions and picks up no fix.
+them to make a check pass (`scripts/release.ts publish` refuses an existing release, image tag
+or chart version on purpose). Fix the check on `main`, then a maintainer runs
+`bun scripts/release.ts verify` again by hand from a checkout of `main`, on each platform whose
+`verify` failed, as the release notes for maintainers show. Re-running the failed run reuses its
+old workflow file and picks up no fix.
 
 ## Tell the access failures apart
 
