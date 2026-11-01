@@ -7,9 +7,9 @@ import { GateTip, useGate } from "@/components/gate"
 import type { usePlanner } from "@/components/plan/planner"
 import { useT } from "@/i18n"
 import type { Endpoint, Service } from "@/model/service"
-import { Badge } from "@zeabur/design-system/components/badge"
-import { Button } from "@zeabur/design-system/components/button"
-import { SectionHeader } from "@zeabur/design-system/components/section-header"
+import { Badge } from "@zeabur-oss/design-system/components/badge"
+import { Button } from "@zeabur-oss/design-system/components/button"
+import { SectionHeader } from "@zeabur-oss/design-system/components/section-header"
 
 const OpenPort = lazy(() => import("@/routes/service/open-port"))
 

@@ -6,16 +6,16 @@ import { fits, type Wizard } from "@/app"
 import { Panel, Row, Rows, StatusDot, StatusPill, type Health } from "@/components/bits"
 import { coded, useT } from "@/i18n"
 import { StepPage } from "@/steps/frame"
-import { Alert, AlertDescription, AlertTitle } from "@zeabur/design-system/components/alert"
-import { Badge } from "@zeabur/design-system/components/badge"
-import { Button } from "@zeabur/design-system/components/button"
-import { Input } from "@zeabur/design-system/components/input"
-import { RadioGroup, RadioOption } from "@zeabur/design-system/components/radio"
+import { Alert, AlertDescription, AlertTitle } from "@zeabur-oss/design-system/components/alert"
+import { Badge } from "@zeabur-oss/design-system/components/badge"
+import { Button } from "@zeabur-oss/design-system/components/button"
+import { Input } from "@zeabur-oss/design-system/components/input"
+import { RadioGroup, RadioOption } from "@zeabur-oss/design-system/components/radio"
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from "@zeabur/design-system/components/collapsible"
+} from "@zeabur-oss/design-system/components/collapsible"
 
 const health: Record<string, Health> = { pass: "ok", warn: "warn", fail: "fail" }
 const order: Record<Check["status"], number> = { fail: 0, warn: 1, pass: 2 }

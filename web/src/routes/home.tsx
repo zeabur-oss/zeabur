@@ -21,13 +21,13 @@ import { groupIncidents, type IncidentGroup } from "@/model/incidents"
 import { ProblemRow } from "@/components/problem-row"
 import { StatusDot, StatusPill } from "@/components/status"
 import { UnreachableBanner, useReachability } from "@/components/unreachable"
-import { Card, CardContent, CardHeader, CardTitle } from "@zeabur/design-system/components/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@zeabur-oss/design-system/components/card"
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from "@zeabur/design-system/components/collapsible"
-import { Skeleton } from "@zeabur/design-system/components/skeleton"
+} from "@zeabur-oss/design-system/components/collapsible"
+import { Skeleton } from "@zeabur-oss/design-system/components/skeleton"
 import { useT } from "@/i18n"
 import { kindName } from "@/i18n/kind-name"
 import { lastKnown, rememberKnown } from "@/lib/last-known"
@@ -50,8 +50,8 @@ import { AttentionRow, useAttention, type ClusterItem } from "@/routes/cluster/a
 import { Forbidden, overviewRole } from "@/routes/cluster/forbidden"
 import { useUpgradeBadge } from "@/routes/cluster/upgrade"
 import { OtherNamespaces } from "@/routes/projects"
-import { PageHeader } from "@zeabur/design-system/components/page-header"
-import { PageColumn } from "@zeabur/design-system/components/page-column"
+import { PageHeader } from "@zeabur-oss/design-system/components/page-header"
+import { PageColumn } from "@zeabur-oss/design-system/components/page-column"
 
 type ProjectItem = Schemas.ProjectSummary
 

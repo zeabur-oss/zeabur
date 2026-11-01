@@ -24,7 +24,6 @@ zeabur-oss-dependencies`; `skills-lock.json` pins it). This skill adds what is Z
 - Icons are Phosphor's, from `@iconify-json/ph` (built in by unplugin-icons with its JSX compiler,
   `@svgr/core` + `@svgr/plugin-jsx`; all dev dependencies). Components come from the shadcn
   registry (`bunx --bun shadcn@latest add <component>`), on Base UI.
-- `@zeabur/design-system` is checked in as `vendor/zeabur-design-system-<commit>.tgz`, so that
-  `bun ci` downloads nothing from GitHub; `scripts/bump-design-system.sh <commit>` moves it.
+- `@zeabur-oss/design-system` comes from npm at an exact version, which Renovate moves.
 - Check the first-load size after adding a runtime package: `./scripts/build-ui.sh &&
   ./scripts/ui-budget.sh`.

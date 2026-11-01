@@ -8,9 +8,9 @@ import { usePlanner } from "@/components/plan/planner"
 import { useT } from "@/i18n"
 import type { Gate } from "@/model/rights"
 import { allowFrom, networkPolicies, projectPolicy } from "@/model/isolation"
-import { Button } from "@zeabur/design-system/components/button"
-import { Card, CardRow, SectionLabel } from "@zeabur/design-system/components/card"
-import { Select } from "@zeabur/design-system/components/select"
+import { Button } from "@zeabur-oss/design-system/components/button"
+import { Card, CardRow, SectionLabel } from "@zeabur-oss/design-system/components/card"
+import { Select } from "@zeabur-oss/design-system/components/select"
 
 // A plan's `create` takes any object.
 const asObject = (object: object) => object as Record<string, never>

@@ -1,5 +1,5 @@
 @import "tailwindcss";
-@import "@zeabur/design-system";
+@import "@zeabur-oss/design-system";
 
 /* Until src/theme.ts picks a class, the page follows the system, so a dark one never starts white.
    A stored choice that differs from the system applies once the script runs. */

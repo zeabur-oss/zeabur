@@ -17,9 +17,9 @@ import { StatusPill } from "@/components/status"
 import { useT } from "@/i18n"
 import { recordsFor, sslipSuffix } from "@/model/domains"
 import { Section } from "@/routes/cluster/section"
-import { Badge } from "@zeabur/design-system/components/badge"
-import { Button } from "@zeabur/design-system/components/button"
-import { Input } from "@zeabur/design-system/components/input"
+import { Badge } from "@zeabur-oss/design-system/components/badge"
+import { Button } from "@zeabur-oss/design-system/components/button"
+import { Input } from "@zeabur-oss/design-system/components/input"
 
 type Setting = Schemas.DomainsSetting
 type Suffix = Schemas.SuffixCheck

@@ -9,13 +9,13 @@ import { CopyButton } from "@/components/bits"
 import { BrowserCheckLine } from "@/components/browser-check"
 import { DomainSetup, DomainState } from "@/components/domain-setup"
 import { StatusDot } from "@/components/status"
-import { Badge } from "@zeabur/design-system/components/badge"
-import { Button } from "@zeabur/design-system/components/button"
+import { Badge } from "@zeabur-oss/design-system/components/badge"
+import { Button } from "@zeabur-oss/design-system/components/button"
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from "@zeabur/design-system/components/collapsible"
+} from "@zeabur-oss/design-system/components/collapsible"
 import { useSentence, useT } from "@/i18n"
 import { cn } from "@/lib/utils"
 import { checkUrl } from "@/model/browser-check"

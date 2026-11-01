@@ -1,4 +1,4 @@
-import { Select } from "@zeabur/design-system/components/select"
+import { Select } from "@zeabur-oss/design-system/components/select"
 
 import { SizeDetail } from "@/components/amount-input"
 import { FormField } from "@/components/form-field"

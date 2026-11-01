@@ -5,7 +5,7 @@ import { clusterToolsQuery } from "@/api/cluster-tools"
 import { useClusterAdmin } from "@/components/gate"
 import { useT } from "@/i18n"
 import { openClusterKubectl } from "@/lib/dock"
-import { Button } from "@zeabur/design-system/components/button"
+import { Button } from "@zeabur-oss/design-system/components/button"
 
 /** Opens the cluster's kubectl terminal. Absent on the person's computer, and to anyone who is not
  * a cluster administrator. */

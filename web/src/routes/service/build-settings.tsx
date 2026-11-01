@@ -13,10 +13,10 @@ import {
   pathProblem,
 } from "@/model/git-service"
 import { parseEnv } from "@/model/image-service"
-import { Button } from "@zeabur/design-system/components/button"
-import { Input } from "@zeabur/design-system/components/input"
-import { SectionHeader } from "@zeabur/design-system/components/section-header"
-import { Textarea } from "@zeabur/design-system/components/textarea"
+import { Button } from "@zeabur-oss/design-system/components/button"
+import { Input } from "@zeabur-oss/design-system/components/input"
+import { SectionHeader } from "@zeabur-oss/design-system/components/section-header"
+import { Textarea } from "@zeabur-oss/design-system/components/textarea"
 
 /** The directory, Dockerfile and build variables of each `Build` that makes the service's
  * images. */

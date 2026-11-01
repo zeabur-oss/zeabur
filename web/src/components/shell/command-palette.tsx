@@ -2,7 +2,7 @@
 // first page load.
 import { lazy, Suspense, useEffect } from "react"
 
-import { Dialog, DialogContent, DialogTitle } from "@zeabur/design-system/components/dialog"
+import { Dialog, DialogContent, DialogTitle } from "@zeabur-oss/design-system/components/dialog"
 import { useT } from "@/i18n"
 import { palette } from "@/lib/stores"
 

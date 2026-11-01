@@ -6,12 +6,12 @@ import WrenchIcon from "~icons/ph/wrench"
 import type { Schemas } from "@/api/client"
 import { usePlanner } from "@/components/plan/planner"
 import { StatusPill } from "@/components/status"
-import { Button, buttonVariants } from "@zeabur/design-system/components/button"
+import { Button, buttonVariants } from "@zeabur-oss/design-system/components/button"
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from "@zeabur/design-system/components/collapsible"
+} from "@zeabur-oss/design-system/components/collapsible"
 import { useSentence, useT } from "@/i18n"
 import { cn } from "@/lib/utils"
 import { serviceLink } from "@/lib/place"

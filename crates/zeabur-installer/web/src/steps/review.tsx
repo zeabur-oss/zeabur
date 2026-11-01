@@ -20,15 +20,15 @@ import { cn } from "@/lib/utils"
 import { leftOutReason } from "@/steps/components"
 import { StepPage } from "@/steps/frame"
 import { CheckRow } from "@/steps/host"
-import { Alert, AlertDescription, AlertTitle } from "@zeabur/design-system/components/alert"
-import { Badge } from "@zeabur/design-system/components/badge"
-import { Button, buttonVariants } from "@zeabur/design-system/components/button"
-import { Checkbox } from "@zeabur/design-system/components/checkbox"
+import { Alert, AlertDescription, AlertTitle } from "@zeabur-oss/design-system/components/alert"
+import { Badge } from "@zeabur-oss/design-system/components/badge"
+import { Button, buttonVariants } from "@zeabur-oss/design-system/components/button"
+import { Checkbox } from "@zeabur-oss/design-system/components/checkbox"
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from "@zeabur/design-system/components/collapsible"
+} from "@zeabur-oss/design-system/components/collapsible"
 import {
   Table,
   TableBody,
@@ -36,7 +36,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@zeabur/design-system/components/table"
+} from "@zeabur-oss/design-system/components/table"
 
 /** Up to this many components read as a sentence; more become a table grouped by why. */
 const few = 7

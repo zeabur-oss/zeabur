@@ -13,7 +13,7 @@
   },
   "dependencies": {
     "@base-ui/react": "1.9.0",
-    "@zeabur/design-system": "file:../../../vendor/zeabur-design-system-e1953e5.tgz",
+    "@zeabur-oss/design-system": "0.1.2",
     "class-variance-authority": "0.7.1",
     "cn": "0.5.0",
     "react": "19.3.1",

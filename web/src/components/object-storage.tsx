@@ -25,7 +25,7 @@ import {
   type ObjectStorage,
 } from "@/model/object-storage"
 import { chosenClass } from "@/model/storage"
-import { Alert, AlertDescription } from "@zeabur/design-system/components/alert"
+import { Alert, AlertDescription } from "@zeabur-oss/design-system/components/alert"
 
 type Data = Schemas.ProjectObjectStorage
 

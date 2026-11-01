@@ -7,7 +7,7 @@ import { lazy, Suspense } from "react"
 
 import { LoadingRows } from "@/components/page"
 import { useT } from "@/i18n"
-import { PageColumn } from "@zeabur/design-system/components/page-column"
+import { PageColumn } from "@zeabur-oss/design-system/components/page-column"
 
 export function RoutePending() {
   const t = useT()

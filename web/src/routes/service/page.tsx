@@ -29,25 +29,25 @@ import { Problem } from "@/components/problem"
 import { refusedAmong, refusedElsewhere, RefusedSome } from "@/components/refused"
 import { ServiceIcon } from "@/components/service-icon"
 import { ServiceStatus } from "@/components/status"
-import { Button } from "@zeabur/design-system/components/button"
+import { Button } from "@zeabur-oss/design-system/components/button"
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogTitle,
-} from "@zeabur/design-system/components/dialog"
-import { DraftBar } from "@zeabur/design-system/components/draft-bar"
-import { PageColumn } from "@zeabur/design-system/components/page-column"
-import { usePresence } from "@zeabur/design-system/components/presence"
+} from "@zeabur-oss/design-system/components/dialog"
+import { DraftBar } from "@zeabur-oss/design-system/components/draft-bar"
+import { PageColumn } from "@zeabur-oss/design-system/components/page-column"
+import { usePresence } from "@zeabur-oss/design-system/components/presence"
 import {
   Menu,
   MenuContent,
   MenuItem,
   MenuSeparator,
   MenuTrigger,
-} from "@zeabur/design-system/components/menu"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@zeabur/design-system/components/tabs"
-import { Tooltip } from "@zeabur/design-system/components/tooltip"
+} from "@zeabur-oss/design-system/components/menu"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@zeabur-oss/design-system/components/tabs"
+import { Tooltip } from "@zeabur-oss/design-system/components/tooltip"
 import { useI18n, useT, writeSentence } from "@/i18n"
 import type { Icon } from "@/lib/icon"
 import { formatDate } from "@/lib/format"

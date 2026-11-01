@@ -4,13 +4,13 @@ import XIcon from "~icons/ph/x"
 
 import { capabilitiesQuery } from "@/api/queries"
 import { CopyButton } from "@/components/bits"
-import { Button } from "@zeabur/design-system/components/button"
+import { Button } from "@zeabur-oss/design-system/components/button"
 import {
   Dialog,
   DialogClose,
   DialogContent,
   DialogTitle,
-} from "@zeabur/design-system/components/dialog"
+} from "@zeabur-oss/design-system/components/dialog"
 import { useT } from "@/i18n"
 import type { Needed } from "@/model/installer"
 

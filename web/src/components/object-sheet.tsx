@@ -9,14 +9,14 @@ import { DescribeYaml } from "@/components/describe-yaml"
 import { ObjectOverview } from "@/components/object-overview"
 import { LoadingRows } from "@/components/page"
 import { Problem } from "@/components/problem"
-import { Badge } from "@zeabur/design-system/components/badge"
-import { Button } from "@zeabur/design-system/components/button"
+import { Badge } from "@zeabur-oss/design-system/components/badge"
+import { Button } from "@zeabur-oss/design-system/components/button"
 import {
   Dialog,
   DialogClose,
   DialogContent,
   DialogTitle,
-} from "@zeabur/design-system/components/dialog"
+} from "@zeabur-oss/design-system/components/dialog"
 import { YamlView } from "@/components/yaml-view"
 import { useT } from "@/i18n"
 import { kindName } from "@/i18n/kind-name"

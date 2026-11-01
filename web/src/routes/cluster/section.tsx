@@ -5,7 +5,7 @@ import type { ReactNode, Ref } from "react"
 import { GateTip } from "@/components/gate"
 import { useT } from "@/i18n"
 import type { Gate } from "@/model/rights"
-import { Button } from "@zeabur/design-system/components/button"
+import { Button } from "@zeabur-oss/design-system/components/button"
 
 export function Section({
   id,

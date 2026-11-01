@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query"
 import { useParams } from "@tanstack/react-router"
-import { MenuItem } from "@zeabur/design-system/components/menu"
-import { Tooltip } from "@zeabur/design-system/components/tooltip"
+import { MenuItem } from "@zeabur-oss/design-system/components/menu"
+import { Tooltip } from "@zeabur-oss/design-system/components/tooltip"
 import { cloneElement, type ReactElement, type ReactNode } from "react"
 import LockSimpleIcon from "~icons/ph/lock-simple"
 

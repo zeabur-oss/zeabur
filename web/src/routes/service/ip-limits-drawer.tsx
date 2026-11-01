@@ -15,9 +15,9 @@ import {
   type Was,
 } from "@/model/ip-limits"
 import type { Service } from "@/model/service"
-import { Label } from "@zeabur/design-system/components/label"
-import { Switch } from "@zeabur/design-system/components/switch"
-import { Textarea } from "@zeabur/design-system/components/textarea"
+import { Label } from "@zeabur-oss/design-system/components/label"
+import { Switch } from "@zeabur-oss/design-system/components/switch"
+import { Textarea } from "@zeabur-oss/design-system/components/textarea"
 
 /** The drawer's words for one of the two limits. */
 function wordsOf(t: Translate, kind: Kind, name: string) {

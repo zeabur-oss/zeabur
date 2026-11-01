@@ -1,6 +1,6 @@
 import type { ReactNode } from "react"
 
-import { PageHeader } from "@zeabur/design-system/components/page-header"
+import { PageHeader } from "@zeabur-oss/design-system/components/page-header"
 
 /** A step's title, what it is for, its sections, and the buttons that move between steps. */
 export function StepPage({

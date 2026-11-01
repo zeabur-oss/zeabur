@@ -8,9 +8,9 @@ import { InviteDialog } from "@/components/members/dialogs"
 import { GateTip, useHintGate } from "@/components/gate"
 import { useT } from "@/i18n"
 import { linkState, memberName, projectPeople } from "@/model/members"
-import { Avatar } from "@zeabur/design-system/components/avatar"
-import { Button, buttonVariants } from "@zeabur/design-system/components/button"
-import { Card, CardRow, SectionLabel } from "@zeabur/design-system/components/card"
+import { Avatar } from "@zeabur-oss/design-system/components/avatar"
+import { Button, buttonVariants } from "@zeabur-oss/design-system/components/button"
+import { Card, CardRow, SectionLabel } from "@zeabur-oss/design-system/components/card"
 
 const SHOWN = 7
 

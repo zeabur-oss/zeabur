@@ -19,17 +19,17 @@ import { usePlanner } from "@/components/plan/planner"
 import { FormField } from "@/components/form-field"
 import { Problem } from "@/components/problem"
 import { UploadFolderDrawer, UploadProgress } from "@/components/upload-folder"
-import { Alert, AlertDescription } from "@zeabur/design-system/components/alert"
-import { Button } from "@zeabur/design-system/components/button"
-import { CopyInput } from "@zeabur/design-system/components/copy-input"
+import { Alert, AlertDescription } from "@zeabur-oss/design-system/components/alert"
+import { Button } from "@zeabur-oss/design-system/components/button"
+import { CopyInput } from "@zeabur-oss/design-system/components/copy-input"
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from "@zeabur/design-system/components/collapsible"
-import { Empty, EmptyDescription, EmptyHeader } from "@zeabur/design-system/components/empty"
-import { SectionHeader } from "@zeabur/design-system/components/section-header"
-import { Skeleton } from "@zeabur/design-system/components/skeleton"
+} from "@zeabur-oss/design-system/components/collapsible"
+import { Empty, EmptyDescription, EmptyHeader } from "@zeabur-oss/design-system/components/empty"
+import { SectionHeader } from "@zeabur-oss/design-system/components/section-header"
+import { Skeleton } from "@zeabur-oss/design-system/components/skeleton"
 import {
   SummaryCard,
   SummaryCardActions,
@@ -39,10 +39,10 @@ import {
   SummaryCardSince,
   SummaryCardStatus,
   SummaryCardWord,
-} from "@zeabur/design-system/components/summary-card"
-import { Switch } from "@zeabur/design-system/components/switch"
-import { Timeline, TimelineItem } from "@zeabur/design-system/components/timeline"
-import { Tooltip } from "@zeabur/design-system/components/tooltip"
+} from "@zeabur-oss/design-system/components/summary-card"
+import { Switch } from "@zeabur-oss/design-system/components/switch"
+import { Timeline, TimelineItem } from "@zeabur-oss/design-system/components/timeline"
+import { Tooltip } from "@zeabur-oss/design-system/components/tooltip"
 import { useI18n, useT } from "@/i18n"
 import { formatAgo } from "@/lib/format"
 import {

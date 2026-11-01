@@ -21,11 +21,11 @@ import {
   type NameProblem,
 } from "@/model/connect"
 import type { Service } from "@/model/service"
-import { Button } from "@zeabur/design-system/components/button"
-import { Checkbox } from "@zeabur/design-system/components/checkbox"
-import { Input } from "@zeabur/design-system/components/input"
-import { Label } from "@zeabur/design-system/components/label"
-import { Select } from "@zeabur/design-system/components/select"
+import { Button } from "@zeabur-oss/design-system/components/button"
+import { Checkbox } from "@zeabur-oss/design-system/components/checkbox"
+import { Input } from "@zeabur-oss/design-system/components/input"
+import { Label } from "@zeabur-oss/design-system/components/label"
+import { Select } from "@zeabur-oss/design-system/components/select"
 
 export interface Choice {
   /** `kind/name` of each service picked. */

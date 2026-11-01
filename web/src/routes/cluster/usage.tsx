@@ -32,13 +32,13 @@ import { serviceId } from "@/model/service"
 import { hasUsage, serviceUsage } from "@/model/usage"
 import { Forbidden, overviewRole } from "@/routes/cluster/forbidden"
 import { Section } from "@/routes/cluster/section"
-import { Button } from "@zeabur/design-system/components/button"
+import { Button } from "@zeabur-oss/design-system/components/button"
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from "@zeabur/design-system/components/collapsible"
-import { Meter } from "@zeabur/design-system/components/meter"
+} from "@zeabur-oss/design-system/components/collapsible"
+import { Meter } from "@zeabur-oss/design-system/components/meter"
 
 const ROWS_SHOWN = 8
 const SERVICES_SHOWN = 5

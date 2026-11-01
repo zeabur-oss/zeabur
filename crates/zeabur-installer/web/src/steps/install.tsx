@@ -9,15 +9,15 @@ import type { Wizard } from "@/app"
 import { Code, Panel, Row, Rows, StatusPill } from "@/components/bits"
 import { useT, type Translate } from "@/i18n"
 import { StepPage } from "@/steps/frame"
-import { Alert, AlertDescription, AlertTitle } from "@zeabur/design-system/components/alert"
-import { Button, buttonVariants } from "@zeabur/design-system/components/button"
+import { Alert, AlertDescription, AlertTitle } from "@zeabur-oss/design-system/components/alert"
+import { Button, buttonVariants } from "@zeabur-oss/design-system/components/button"
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from "@zeabur/design-system/components/collapsible"
-import { CopyInput } from "@zeabur/design-system/components/copy-input"
-import { Timeline, TimelineItem } from "@zeabur/design-system/components/timeline"
+} from "@zeabur-oss/design-system/components/collapsible"
+import { CopyInput } from "@zeabur-oss/design-system/components/copy-input"
+import { Timeline, TimelineItem } from "@zeabur-oss/design-system/components/timeline"
 
 interface Phase {
   title: string

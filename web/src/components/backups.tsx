@@ -12,7 +12,7 @@ import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from "@zeabur/design-system/components/collapsible"
+} from "@zeabur-oss/design-system/components/collapsible"
 import { useT } from "@/i18n"
 import { cn } from "@/lib/utils"
 import type { Health } from "@/model/service"

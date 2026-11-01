@@ -6,7 +6,7 @@ import type { Schemas } from "@/api/client"
 import { applyGitHubApp, refreshGitHubApp, type GitHubAppPlan } from "@/api/github-app"
 import { PlanDiffs, PlanFrame } from "@/components/cluster-plan"
 import { useT } from "@/i18n"
-import { Alert, AlertDescription } from "@zeabur/design-system/components/alert"
+import { Alert, AlertDescription } from "@zeabur-oss/design-system/components/alert"
 
 const warningText = {
   replacesApp: "githubApp.warning.replacesApp",

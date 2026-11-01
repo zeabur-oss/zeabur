@@ -1,15 +1,15 @@
 ---
 name: zeabur-ui
-description: Change Zeabur's web interface (web/: React, TanStack, shadcn/ui on Base UI, Phosphor) and its embedding (crates/zeabur-ui) while keeping the strict CSP, size budgets and the design system's tokens (@zeabur/design-system). Use for any change under web/ or crates/zeabur-ui.
+description: Change Zeabur's web interface (web/: React, TanStack, shadcn/ui on Base UI, Phosphor) and its embedding (crates/zeabur-ui) while keeping the strict CSP, size budgets and the design system's tokens (@zeabur-oss/design-system). Use for any change under web/ or crates/zeabur-ui.
 ---
 
 # Web interface
 
 - **Where things are.** Sources: `web/src` (routes in `router.tsx`). Components (shadcn/ui on
-  Base UI with Zeabur's variants), theme, tokens and fonts come from `@zeabur/design-system`
-  (github.com/zeabur-oss/design-system, checked in as `vendor/zeabur-design-system-<commit>.tgz`;
-  import `@zeabur/design-system/components/<name>`; preview in its Storybook). Change a
-  component or token there, then move the pin (`scripts/bump-design-system.sh <commit>`).
+  Base UI with Zeabur's variants), theme, tokens and fonts come from `@zeabur-oss/design-system`
+  (github.com/zeabur-oss/design-system, from npm; import
+  `@zeabur-oss/design-system/components/<name>`; preview in its Storybook). Change a component or
+  token there, release it, then move the version in `web/package.json`.
   `web/src/styles/app.css` imports it and adds only this interface's layout tokens. Dark mode
   follows the operating system (`src/theme.ts` sets shadcn's `.dark` class; pass its `useTheme()`
   to the design system's `Toaster`). Embedding and serving: `crates/zeabur-ui`.

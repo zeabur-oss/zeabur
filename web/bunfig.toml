@@ -2,6 +2,8 @@
 # Do not resolve package versions published less than seven days ago (the same delay as Cargo's
 # `global-min-publish-age`). No `trustedDependencies`: no package runs install scripts.
 minimumReleaseAge = 604800
+# Our own package, published from zeabur-oss/design-system's version tags.
+minimumReleaseAgeExcludes = ["@zeabur-oss/design-system"]
 exact = true
 
 [test]

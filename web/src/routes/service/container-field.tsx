@@ -1,6 +1,6 @@
 import { FormField } from "@/components/form-field"
 import { useT } from "@/i18n"
-import { Select } from "@zeabur/design-system/components/select"
+import { Select } from "@zeabur-oss/design-system/components/select"
 
 /** The container to change, asked only of a service with more than one. */
 export function ContainerField({

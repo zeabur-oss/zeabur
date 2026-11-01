@@ -11,8 +11,8 @@ import {
   VolumeUse,
   VolumeUseMissing,
 } from "@/components/volume-use"
-import { Skeleton } from "@zeabur/design-system/components/skeleton"
-import { Tooltip } from "@zeabur/design-system/components/tooltip"
+import { Skeleton } from "@zeabur-oss/design-system/components/skeleton"
+import { Tooltip } from "@zeabur-oss/design-system/components/tooltip"
 import { useT } from "@/i18n"
 import { useQuantityFormat as useFormat } from "@/lib/quantity"
 import { cn } from "@/lib/utils"
@@ -36,8 +36,8 @@ import {
   type ServiceHistory,
 } from "@/model/usage"
 import type { Guide } from "@/routes/service/history-chart"
-import { Meter } from "@zeabur/design-system/components/meter"
-import { SummaryCardAside } from "@zeabur/design-system/components/summary-card"
+import { Meter } from "@zeabur-oss/design-system/components/meter"
+import { SummaryCardAside } from "@zeabur-oss/design-system/components/summary-card"
 import { useStorage } from "@/components/storage-class"
 import { canGrow } from "@/model/storage"
 

@@ -20,7 +20,7 @@ import { projectsQuery } from "@/api/queries"
 import { useT } from "@/i18n"
 import { writeCounts, writtenName, type MemberWrite } from "@/model/members"
 import { projectMention } from "@/model/project"
-import { Button } from "@zeabur/design-system/components/button"
+import { Button } from "@zeabur-oss/design-system/components/button"
 
 /** A change to the members as its plan: what it does in words first, the objects it writes behind
  * Technical details, and the button that applies exactly that. */

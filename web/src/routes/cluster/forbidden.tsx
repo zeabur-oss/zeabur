@@ -7,7 +7,7 @@ import WarningIcon from "~icons/ph/warning"
 import { toProblem } from "@/api/client"
 import { whoamiQuery } from "@/api/queries"
 import { permission, Refused } from "@/components/refused"
-import { Button } from "@zeabur/design-system/components/button"
+import { Button } from "@zeabur-oss/design-system/components/button"
 import { useT } from "@/i18n"
 import { roleYaml } from "@/model/rbac"
 

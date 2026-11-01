@@ -21,7 +21,7 @@ import {
   type TerminalEvent,
   type TerminalState,
 } from "@/model/terminal"
-import { Button } from "@zeabur/design-system/components/button"
+import { Button } from "@zeabur-oss/design-system/components/button"
 
 /**
  * One terminal: its screen lives as long as the tab, and a reconnect opens a new connection on the

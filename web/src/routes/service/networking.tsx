@@ -29,7 +29,7 @@ import { usePlanner, type PlanAsk } from "@/components/plan/planner"
 import { refusedAmong, RefusedKinds } from "@/components/refused"
 import { FilterField } from "@/components/filter-field"
 import { FormField } from "@/components/form-field"
-import { Button } from "@zeabur/design-system/components/button"
+import { Button } from "@zeabur-oss/design-system/components/button"
 import {
   Empty,
   EmptyContent,
@@ -37,11 +37,11 @@ import {
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
-} from "@zeabur/design-system/components/empty"
-import { Input } from "@zeabur/design-system/components/input"
-import { Select } from "@zeabur/design-system/components/select"
-import { SectionHeader } from "@zeabur/design-system/components/section-header"
-import { Tooltip } from "@zeabur/design-system/components/tooltip"
+} from "@zeabur-oss/design-system/components/empty"
+import { Input } from "@zeabur-oss/design-system/components/input"
+import { Select } from "@zeabur-oss/design-system/components/select"
+import { SectionHeader } from "@zeabur-oss/design-system/components/section-header"
+import { Tooltip } from "@zeabur-oss/design-system/components/tooltip"
 import { useT } from "@/i18n"
 import { createdKey, entrance } from "@/lib/created"
 import { cn } from "@/lib/utils"

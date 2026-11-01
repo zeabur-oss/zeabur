@@ -13,8 +13,8 @@ import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from "@zeabur/design-system/components/collapsible"
-import { TableContainer } from "@zeabur/design-system/components/table"
+} from "@zeabur-oss/design-system/components/collapsible"
+import { TableContainer } from "@zeabur-oss/design-system/components/table"
 import { useT, type Translate } from "@/i18n"
 import { cn } from "@/lib/utils"
 

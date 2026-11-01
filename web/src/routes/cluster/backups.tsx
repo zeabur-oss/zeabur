@@ -65,9 +65,9 @@ import { ClusterFrame } from "@/routes/cluster/frame"
 import { Forbidden, type Role } from "@/routes/cluster/forbidden"
 import { S3DestinationsSection } from "@/routes/cluster/s3-destinations"
 import { FormButtons, Section } from "@/routes/cluster/section"
-import { Alert, AlertDescription } from "@zeabur/design-system/components/alert"
-import { Button, buttonVariants } from "@zeabur/design-system/components/button"
-import { Checkbox } from "@zeabur/design-system/components/checkbox"
+import { Alert, AlertDescription } from "@zeabur-oss/design-system/components/alert"
+import { Button, buttonVariants } from "@zeabur-oss/design-system/components/button"
+import { Checkbox } from "@zeabur-oss/design-system/components/checkbox"
 import {
   Empty,
   EmptyContent,
@@ -75,12 +75,12 @@ import {
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
-} from "@zeabur/design-system/components/empty"
-import { Illustration } from "@zeabur/design-system/components/illustration"
-import { Input } from "@zeabur/design-system/components/input"
-import { Label } from "@zeabur/design-system/components/label"
-import { RadioGroup, RadioOption } from "@zeabur/design-system/components/radio"
-import { Select } from "@zeabur/design-system/components/select"
+} from "@zeabur-oss/design-system/components/empty"
+import { Illustration } from "@zeabur-oss/design-system/components/illustration"
+import { Input } from "@zeabur-oss/design-system/components/input"
+import { Label } from "@zeabur-oss/design-system/components/label"
+import { RadioGroup, RadioOption } from "@zeabur-oss/design-system/components/radio"
+import { Select } from "@zeabur-oss/design-system/components/select"
 
 type Data = Schemas.ClusterBackups
 type Request = Schemas.BackupsPlanRequest

@@ -22,13 +22,13 @@ import {
   type ProjectRole,
 } from "@/model/members"
 import { projectTitle } from "@/model/project"
-import { Button } from "@zeabur/design-system/components/button"
-import { Checkbox } from "@zeabur/design-system/components/checkbox"
-import { Input } from "@zeabur/design-system/components/input"
-import { Label } from "@zeabur/design-system/components/label"
-import { RadioGroup, RadioOption } from "@zeabur/design-system/components/radio"
-import { Select } from "@zeabur/design-system/components/select"
-import { Skeleton } from "@zeabur/design-system/components/skeleton"
+import { Button } from "@zeabur-oss/design-system/components/button"
+import { Checkbox } from "@zeabur-oss/design-system/components/checkbox"
+import { Input } from "@zeabur-oss/design-system/components/input"
+import { Label } from "@zeabur-oss/design-system/components/label"
+import { RadioGroup, RadioOption } from "@zeabur-oss/design-system/components/radio"
+import { Select } from "@zeabur-oss/design-system/components/select"
+import { Skeleton } from "@zeabur-oss/design-system/components/skeleton"
 
 export type Chosen = ReadonlyMap<string, ProjectRole>
 

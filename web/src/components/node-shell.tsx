@@ -22,13 +22,13 @@ import { StatusDot } from "@/components/status"
 import { useT } from "@/i18n"
 import { openNodeShell } from "@/lib/dock"
 import { enters, shellHealth, shellsOn, shellWord } from "@/model/node-shell"
-import { Button } from "@zeabur/design-system/components/button"
+import { Button } from "@zeabur-oss/design-system/components/button"
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from "@zeabur/design-system/components/collapsible"
-import { Tooltip } from "@zeabur/design-system/components/tooltip"
+} from "@zeabur-oss/design-system/components/collapsible"
+import { Tooltip } from "@zeabur-oss/design-system/components/tooltip"
 
 /** A node row's root shell: the action, then the shell pods on the node. */
 export function NodeShells({ node }: { node: string }) {

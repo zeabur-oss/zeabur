@@ -10,12 +10,12 @@ import type { PlanAsk } from "@/components/plan/planner"
 import { useT } from "@/i18n"
 import type { Translate } from "@/i18n"
 import type { Service } from "@/model/service"
-import { Button } from "@zeabur/design-system/components/button"
-import { Input } from "@zeabur/design-system/components/input"
-import { Label } from "@zeabur/design-system/components/label"
-import { RadioGroup, RadioOption } from "@zeabur/design-system/components/radio"
-import { Select } from "@zeabur/design-system/components/select"
-import { Switch } from "@zeabur/design-system/components/switch"
+import { Button } from "@zeabur-oss/design-system/components/button"
+import { Input } from "@zeabur-oss/design-system/components/input"
+import { Label } from "@zeabur-oss/design-system/components/label"
+import { RadioGroup, RadioOption } from "@zeabur-oss/design-system/components/radio"
+import { Select } from "@zeabur-oss/design-system/components/select"
+import { Switch } from "@zeabur-oss/design-system/components/switch"
 
 type Change = Schemas.Change
 

@@ -19,11 +19,11 @@ import {
   type Member,
   type SetupLinks,
 } from "@/model/members"
-import { Button } from "@zeabur/design-system/components/button"
-import { Checkbox } from "@zeabur/design-system/components/checkbox"
-import { CopyInput } from "@zeabur/design-system/components/copy-input"
-import { Input } from "@zeabur/design-system/components/input"
-import { Label } from "@zeabur/design-system/components/label"
+import { Button } from "@zeabur-oss/design-system/components/button"
+import { Checkbox } from "@zeabur-oss/design-system/components/checkbox"
+import { CopyInput } from "@zeabur-oss/design-system/components/copy-input"
+import { Input } from "@zeabur-oss/design-system/components/input"
+import { Label } from "@zeabur-oss/design-system/components/label"
 
 /** A confirmation: the consequence first when there is one, the button naming the action. */
 export function ConfirmDialog({

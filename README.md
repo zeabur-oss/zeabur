@@ -86,7 +86,7 @@ Third-party content in this repository:
 - Rendered manifests of upstream Helm charts in `fixtures/charts`, test input only, each under
   its chart's license (Apache-2.0 or MIT; listed in `fixtures/charts/README.md`).
 
-The web interface is built with [@zeabur/design-system](https://github.com/zeabur-oss/design-system)
+The web interface is built with [@zeabur-oss/design-system](https://github.com/zeabur-oss/design-system)
 (Apache-2.0), which contains shadcn/ui's components, theme and base styles (MIT), the Inter and
 JetBrains Mono fonts (SIL Open Font License 1.1) and the Zeabur logo; its README lists their
 notices. The built interface, embedded in the binary and the image, includes those fonts and

@@ -1,8 +1,8 @@
 import type { ReactNode } from "react"
 
-import { Badge } from "@zeabur/design-system/components/badge"
-import { SwapText } from "@zeabur/design-system/components/swap-text"
-import { Tooltip } from "@zeabur/design-system/components/tooltip"
+import { Badge } from "@zeabur-oss/design-system/components/badge"
+import { SwapText } from "@zeabur-oss/design-system/components/swap-text"
+import { Tooltip } from "@zeabur-oss/design-system/components/tooltip"
 import { useI18n, useT, type Translate } from "@/i18n"
 import { formatAgo } from "@/lib/format"
 import { cn } from "@/lib/utils"

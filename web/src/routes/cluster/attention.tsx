@@ -11,7 +11,7 @@ import CaretRightIcon from "~icons/ph/caret-right"
 import { isStatus, isUnreachable, type Schemas } from "@/api/client"
 import { capabilitiesQuery, nodesQuery, upgradesQuery } from "@/api/queries"
 import { StatusDot } from "@/components/status"
-import { buttonVariants } from "@zeabur/design-system/components/button"
+import { buttonVariants } from "@zeabur-oss/design-system/components/button"
 import { useI18n, useT, type Locale } from "@/i18n"
 import { docsUrl } from "@/lib/docs"
 import { useQuantityFormat } from "@/lib/quantity"
@@ -24,7 +24,7 @@ import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from "@zeabur/design-system/components/collapsible"
+} from "@zeabur-oss/design-system/components/collapsible"
 
 export interface ClusterItem {
   key: string

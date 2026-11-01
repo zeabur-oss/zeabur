@@ -18,8 +18,8 @@ import { YamlView } from "@/components/yaml-view"
 import { useT } from "@/i18n"
 import type { Gate } from "@/model/rights"
 import { isWarning, type Event } from "@/model/service"
-import { Button } from "@zeabur/design-system/components/button"
-import { Container } from "@zeabur/design-system/components/container"
+import { Button } from "@zeabur-oss/design-system/components/button"
+import { Container } from "@zeabur-oss/design-system/components/container"
 
 export function Warnings({ events, onEvents }: { events: Event[]; onEvents: () => void }) {
   const t = useT()

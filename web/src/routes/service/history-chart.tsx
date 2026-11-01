@@ -7,7 +7,7 @@ import {
   ChartTooltip,
   ChartTooltipContent,
   type ChartConfig,
-} from "@zeabur/design-system/components/chart"
+} from "@zeabur-oss/design-system/components/chart"
 import { useI18n, useT } from "@/i18n"
 import { colours, type Restart, type Series } from "@/model/usage"
 

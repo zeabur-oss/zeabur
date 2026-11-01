@@ -5,7 +5,7 @@ import { useRef, type ReactNode } from "react"
 
 import { Ago } from "@/components/bits"
 import { StatusDot } from "@/components/status"
-import { Term } from "@zeabur/design-system/components/term"
+import { Term } from "@zeabur-oss/design-system/components/term"
 import { useT } from "@/i18n"
 import { cn } from "@/lib/utils"
 import { eventWord } from "@/model/overview"

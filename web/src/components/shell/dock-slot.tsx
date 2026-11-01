@@ -4,8 +4,8 @@ import TerminalWindowIcon from "~icons/ph/terminal-window"
 import { useT } from "@/i18n"
 import { dock, dockShortcut, isDockShortcut, toggleDock } from "@/lib/dock"
 import { mobileNav } from "@/lib/stores"
-import { Kbd } from "@zeabur/design-system/components/kbd"
-import { SidebarItem } from "@zeabur/design-system/components/sidebar"
+import { Kbd } from "@zeabur-oss/design-system/components/kbd"
+import { SidebarItem } from "@zeabur-oss/design-system/components/sidebar"
 
 const load = () => import("@/components/dock/terminal-dock")
 // Lazy: xterm.js stays out of the first page load (scripts/ui-budget.sh).

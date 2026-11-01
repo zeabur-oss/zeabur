@@ -13,24 +13,24 @@ import { Problem } from "@/components/problem"
 import { StatusPill } from "@/components/status"
 import { YamlDiff } from "@/components/yaml"
 import { releasesQuery, serviceTimelineQuery } from "@/api/queries"
-import { Badge } from "@zeabur/design-system/components/badge"
-import { Button } from "@zeabur/design-system/components/button"
+import { Badge } from "@zeabur-oss/design-system/components/badge"
+import { Button } from "@zeabur-oss/design-system/components/button"
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from "@zeabur/design-system/components/collapsible"
+} from "@zeabur-oss/design-system/components/collapsible"
 import {
   Empty,
   EmptyDescription,
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
-} from "@zeabur/design-system/components/empty"
-import { Illustration } from "@zeabur/design-system/components/illustration"
-import { SectionHeader } from "@zeabur/design-system/components/section-header"
-import { Timeline, TimelineItem } from "@zeabur/design-system/components/timeline"
-import { Tooltip } from "@zeabur/design-system/components/tooltip"
+} from "@zeabur-oss/design-system/components/empty"
+import { Illustration } from "@zeabur-oss/design-system/components/illustration"
+import { SectionHeader } from "@zeabur-oss/design-system/components/section-header"
+import { Timeline, TimelineItem } from "@zeabur-oss/design-system/components/timeline"
+import { Tooltip } from "@zeabur-oss/design-system/components/tooltip"
 import { useSentence, useT } from "@/i18n"
 import { cn } from "@/lib/utils"
 import {

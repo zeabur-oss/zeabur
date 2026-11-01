@@ -40,12 +40,12 @@ import {
   type GitService,
 } from "@/model/git-service"
 import { nameFromImage } from "@/model/image-service"
-import { Alert, AlertDescription } from "@zeabur/design-system/components/alert"
-import { Button } from "@zeabur/design-system/components/button"
-import { CopyInput } from "@zeabur/design-system/components/copy-input"
-import { Input } from "@zeabur/design-system/components/input"
-import { RadioGroup, RadioOption } from "@zeabur/design-system/components/radio"
-import { Textarea } from "@zeabur/design-system/components/textarea"
+import { Alert, AlertDescription } from "@zeabur-oss/design-system/components/alert"
+import { Button } from "@zeabur-oss/design-system/components/button"
+import { CopyInput } from "@zeabur-oss/design-system/components/copy-input"
+import { Input } from "@zeabur-oss/design-system/components/input"
+import { RadioGroup, RadioOption } from "@zeabur-oss/design-system/components/radio"
+import { Textarea } from "@zeabur-oss/design-system/components/textarea"
 
 interface DeployKey {
   host: string

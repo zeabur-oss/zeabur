@@ -1,7 +1,7 @@
 import { preloadPalette } from "@/components/shell/command-palette"
 import { useT } from "@/i18n"
 import { mobileNav, palette } from "@/lib/stores"
-import { SidebarSearch } from "@zeabur/design-system/components/sidebar"
+import { SidebarSearch } from "@zeabur-oss/design-system/components/sidebar"
 
 const mac = typeof navigator !== "undefined" && /Mac|iPhone|iPad|iPod/.test(navigator.platform)
 
