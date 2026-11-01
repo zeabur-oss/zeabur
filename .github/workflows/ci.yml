@@ -17,10 +17,10 @@ concurrency:
 
 jobs:
   ci:
-    uses: zeabur-oss/.github/.github/workflows/ci.yml@7d6a88c38a442a28ea31397854a188699798731a # main
+    uses: zeabur-oss/.github/.github/workflows/ci.yml@3d106187b96a11dcc2b1c3024c95400a074de1a1 # main
     with:
       rust-cache: true
       # `fallow audit` in the ui job compares HEAD with HEAD^.
       fetch-depth: 2
   dco:
-    uses: zeabur-oss/.github/.github/workflows/dco.yml@7d6a88c38a442a28ea31397854a188699798731a # main
+    uses: zeabur-oss/.github/.github/workflows/dco.yml@3d106187b96a11dcc2b1c3024c95400a074de1a1 # main
