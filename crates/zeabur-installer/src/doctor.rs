@@ -279,10 +279,10 @@ pub(crate) fn components(kubectl: &Kubectl, plan: &Value) -> Vec<(Status, String
                 Err(e) => problems.push(format!("reading workloads in {ns}: {e}")),
             }
         }
-        let Some(checks) = component
+        let checks = component
             .get("health")
-            .and_then(|h| serde_json::from_value::<Vec<Health>>(h.clone()).ok())
-        else {
+            .and_then(|h| serde_json::from_value::<Vec<Health>>(h.clone()).ok());
+        if checks.is_none() {
             results.push((
                 Status::Warn,
                 format!(
@@ -290,10 +290,11 @@ pub(crate) fn components(kubectl: &Kubectl, plan: &Value) -> Vec<(Status, String
                      zeabur-installer wrote it. Run `zeabur-installer apply` to record them."
                 ),
             ));
-            continue;
-        };
-        let failed = failed_health(&checks, |args| kubectl.wait(args).is_ok());
-        if problems.is_empty() && failed.is_empty() {
+        }
+        let failed = failed_health(checks.as_deref().unwrap_or_default(), |args| {
+            kubectl.wait(args).is_ok()
+        });
+        if checks.is_some() && problems.is_empty() && failed.is_empty() {
             results.push((Status::Pass, id.to_owned()));
         }
         if !problems.is_empty() {

@@ -392,49 +392,19 @@ mod tests {
     }
 
     #[test]
-    fn a_component_not_tested_on_kubesolo_stops_the_plan_and_says_where_it_was() {
+    fn a_component_not_tested_on_kubesolo_is_installed_when_asked_with_a_warning() {
         let mut index = Index::parse(INDEX.as_bytes()).unwrap();
         for component in &mut index.components {
             if component.id == "logs/victoria-logs" {
                 component.tested_on.retain(|d| d != PERSONAL_DISTRIBUTION);
             }
         }
-        let err = plan(&index, &config("enable: [logs]\n"), &facts(4096)).unwrap_err();
-        let PlanError::Untested {
-            component,
-            distribution,
-            tested_on,
-        } = &err
-        else {
-            panic!("{err}");
-        };
-        assert_eq!(component, "logs/victoria-logs");
-        assert_eq!(distribution, PERSONAL_DISTRIBUTION);
-        assert!(!tested_on.iter().any(|d| d == PERSONAL_DISTRIBUTION));
-        for d in tested_on {
-            assert!(err.to_string().contains(d.as_str()), "{err}");
-        }
-        let plan = plan(&index, &config("disable: [logs]\n"), &facts(4096)).unwrap();
-        assert!(!ids(&plan).contains(&"logs/victoria-logs"));
-    }
-
-    #[test]
-    fn whatever_the_catalog_tested_on_kubesolo_can_be_added() {
-        let mut index = Index::parse(INDEX.as_bytes()).unwrap();
-        for component in &mut index.components {
-            if component.id == "config-reload/reloader" {
-                component.tested_on.retain(|d| d != PERSONAL_DISTRIBUTION);
-            }
-        }
-        let wanted = config("enable: [config-reload/reloader]\n");
-        assert!(plan(&index, &wanted, &facts(4096)).is_err());
-        for component in &mut index.components {
-            if component.id == "config-reload/reloader" {
-                component.tested_on.push(PERSONAL_DISTRIBUTION.to_owned());
-            }
-        }
-        let plan = plan(&index, &wanted, &facts(4096)).unwrap();
-        assert!(ids(&plan).contains(&"config-reload/reloader"));
+        let asked = plan(&index, &config("enable: [logs]\n"), &facts(4096)).unwrap();
+        assert!(ids(&asked).contains(&"logs/victoria-logs"));
+        assert!(asked.warnings.iter().any(|w| w.code == "config.untested"
+            && w.values == ["logs/victoria-logs", PERSONAL_DISTRIBUTION]));
+        let default = plan(&index, &config(""), &facts(4096)).unwrap();
+        assert!(!ids(&default).contains(&"logs/victoria-logs"));
     }
 
     #[test]

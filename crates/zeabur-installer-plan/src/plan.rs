@@ -2137,25 +2137,23 @@ mod tests {
     }
 
     #[test]
-    fn asking_for_a_component_not_tested_on_the_distribution_stops_the_plan() {
+    fn asking_for_a_component_not_tested_on_the_distribution_installs_it_with_a_warning() {
         let mut index = Index::parse(INDEX.as_bytes()).unwrap();
         untested_on(&mut index, "volume-backup/k8up", "k3s");
-        let err = plan(&index, &config("enable: [volume-backup/k8up]\n"), &facts()).unwrap_err();
-        let text = err.to_string();
+        let p = plan(&index, &config("enable: [volume-backup/k8up]\n"), &facts()).unwrap();
+        assert!(ids(&p).contains(&"volume-backup/k8up"));
         assert!(
-            matches!(&err, PlanError::Untested { component, distribution, .. }
-                if component == "volume-backup/k8up" && distribution == "k3s"),
-            "{text}"
+            p.warnings
+                .iter()
+                .any(|w| w.code == "config.untested" && w.values == ["volume-backup/k8up", "k3s"])
         );
-        assert!(text.contains("rke2"), "{text}");
-        assert!(
-            plan(
-                &index,
-                &config("distribution: rke2\nenable: [volume-backup/k8up]\n"),
-                &facts()
-            )
-            .is_ok()
-        );
+        let rke2 = plan(
+            &index,
+            &config("distribution: rke2\nenable: [volume-backup/k8up]\n"),
+            &facts(),
+        )
+        .unwrap();
+        assert!(!rke2.warnings.iter().any(|w| w.code == "config.untested"));
     }
 
     #[test]
@@ -2168,17 +2166,21 @@ mod tests {
     }
 
     #[test]
-    fn a_dependency_not_tested_on_the_distribution_leaves_out_defaults_and_stops_what_was_asked() {
+    fn a_dependency_not_tested_on_the_distribution_leaves_out_defaults_but_not_what_was_asked() {
         let mut index = Index::parse(INDEX.as_bytes()).unwrap();
         let operator = "observability-operator/victoria-metrics-operator";
         untested_on(&mut index, operator, "k3s");
         let p = plan(&index, &config(""), &facts()).unwrap();
         assert!(!ids(&p).contains(&"logs/victoria-logs"));
         assert!(p.left_out["logs/victoria-logs"].contains(operator));
-        let err = plan(&index, &config("enable: [logs/victoria-logs]\n"), &facts()).unwrap_err();
+        let asked = plan(&index, &config("enable: [logs/victoria-logs]\n"), &facts()).unwrap();
+        assert!(ids(&asked).contains(&"logs/victoria-logs"));
+        assert!(ids(&asked).contains(&operator));
         assert!(
-            matches!(&err, PlanError::Untested { component, .. } if component == operator),
-            "{err}"
+            asked
+                .warnings
+                .iter()
+                .any(|w| w.code == "config.untested" && w.values == [operator, "k3s"])
         );
     }
 

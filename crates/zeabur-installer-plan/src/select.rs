@@ -16,7 +16,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::PlanError;
-use crate::catalog::{Component, Default, Index};
+use crate::catalog::{Default, Index};
 use crate::config::{Config, PersonalConfig};
 use crate::plan::{Warning, warning};
 
@@ -139,12 +139,15 @@ struct Wanted<'a> {
     installed: Option<&'a BTreeSet<String>>,
 }
 
-fn untested(component: &Component, distribution: &str) -> PlanError {
-    PlanError::Untested {
-        component: component.id.clone(),
-        distribution: distribution.to_owned(),
-        tested_on: component.tested_on.clone(),
-    }
+fn untested(id: &str, distribution: &str) -> Warning {
+    warning(
+        "config.untested",
+        &[id, distribution],
+        format!(
+            "{id} was not tested on {distribution}. It is installed because the configuration \
+             enables it or a component it enables needs it."
+        ),
+    )
 }
 
 fn choose(index: &Index, wanted: &Wanted<'_>) -> Result<Selection, PlanError> {
@@ -182,7 +185,7 @@ fn choose(index: &Index, wanted: &Wanted<'_>) -> Result<Selection, PlanError> {
         }
     }
 
-    let mut left_out = leave_out_unusable(index, profile, distribution, &mut chosen)?;
+    let mut left_out = leave_out_unusable(index, profile, distribution, &mut chosen, &mut warnings);
     let taken_over = under_new_names(wanted.installed);
     let held = hold_back(index, profile, taken_over.as_ref(), &mut chosen);
 
@@ -196,27 +199,26 @@ fn choose(index: &Index, wanted: &Wanted<'_>) -> Result<Selection, PlanError> {
             .get(profile)
             .cloned()
             .unwrap_or_else(|| vec![id.clone()]);
-        if let Some(dep) = chain.iter().find(|dep| {
-            !disabled.contains(*dep)
-                && index
-                    .component(dep)
-                    .is_some_and(|c| !c.is_tested_on(distribution))
-        }) {
-            if *why == Why::Default {
-                left_out.insert(
-                    id.clone(),
-                    format!("needs {dep}, not tested on {distribution}"),
-                );
-                continue;
-            }
-            return Err(index.component(dep).map_or_else(
-                || PlanError::Unknown(dep.clone()),
-                |c| untested(c, distribution),
-            ));
+        if *why == Why::Default
+            && let Some(dep) = chain.iter().find(|dep| {
+                !disabled.contains(*dep)
+                    && index
+                        .component(dep)
+                        .is_some_and(|c| !c.is_tested_on(distribution))
+            })
+        {
+            left_out.insert(
+                id.clone(),
+                format!("needs {dep}, not tested on {distribution}"),
+            );
+            continue;
         }
         for dep in chain {
             if order.iter().any(|(seen, _)| *seen == dep) {
                 continue;
+            }
+            if *why == Why::Enabled && !disabled.contains(&dep) {
+                take_untested(index, wanted, &dep, &mut left_out, &mut warnings);
             }
             if disabled.contains(&dep) || left_out.contains_key(&dep) {
                 return Err(PlanError::NeedsDisabled {
@@ -244,30 +246,72 @@ fn choose(index: &Index, wanted: &Wanted<'_>) -> Result<Selection, PlanError> {
     })
 }
 
-/// Takes out of `chosen` the components that cannot run on the distribution or profile, or that
-/// were not tested on the distribution, and returns them with the reason.
+/// Puts back a dependency of an enabled component that was left out only because it was not tested
+/// on the distribution, with a warning.
+fn take_untested(
+    index: &Index,
+    wanted: &Wanted<'_>,
+    dep: &str,
+    left_out: &mut BTreeMap<String, String>,
+    warnings: &mut Vec<Warning>,
+) {
+    let usable_untested = index.component(dep).is_some_and(|c| {
+        c.supports(wanted.distribution)
+            && c.default_for(wanted.profile) != Default::Unsupported
+            && !c.is_tested_on(wanted.distribution)
+    });
+    if !usable_untested {
+        return;
+    }
+    left_out.remove(dep);
+    if !warnings
+        .iter()
+        .any(|w| w.code == "config.untested" && w.values.first().is_some_and(|v| v == dep))
+    {
+        warnings.push(untested(dep, wanted.distribution));
+    }
+}
+
+/// Takes out of `chosen` the components that cannot run on the distribution or profile, and the
+/// defaults that were not tested on the distribution, and returns them with the reason. An enabled
+/// component that was not tested stays, with a warning.
 fn leave_out_unusable(
     index: &Index,
     profile: &str,
     distribution: &str,
     chosen: &mut BTreeMap<String, Why>,
-) -> Result<BTreeMap<String, String>, PlanError> {
+    warnings: &mut Vec<Warning>,
+) -> BTreeMap<String, String> {
     let mut left_out = BTreeMap::new();
     let mut unusable = Vec::new();
     for (id, why) in chosen.iter() {
         let Some(component) = index.component(id) else {
             continue;
         };
+        let enabled = *why == Why::Enabled;
         if !component.supports(distribution) {
-            left_out.insert(
-                id.clone(),
-                format!("runs on {} only", component.distributions.join(", ")),
-            );
+            let only = component.distributions.join(", ");
+            if enabled {
+                warnings.push(warning(
+                    "config.runsOn",
+                    &[id, &only],
+                    format!("The configuration enables {id}, which runs on {only} only, so it is not installed."),
+                ));
+            }
+            left_out.insert(id.clone(), format!("runs on {only} only"));
         } else if component.default_for(profile) == Default::Unsupported {
+            if enabled {
+                warnings.push(warning(
+                    "config.unsupportedOn",
+                    &[id, profile],
+                    format!("The configuration enables {id}, which is unsupported on {profile}, so it is not installed."),
+                ));
+            }
             left_out.insert(id.clone(), format!("unsupported on {profile}"));
         } else if !component.is_tested_on(distribution) {
-            if *why == Why::Enabled {
-                return Err(untested(component, distribution));
+            if enabled {
+                warnings.push(untested(id, distribution));
+                continue;
             }
             left_out.insert(id.clone(), format!("not tested on {distribution}"));
         } else {
@@ -278,7 +322,7 @@ fn leave_out_unusable(
     for id in &unusable {
         chosen.remove(id);
     }
-    Ok(left_out)
+    left_out
 }
 
 /// The install record's components, with each renamed one also under its new id: a server that
