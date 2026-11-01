@@ -744,3 +744,23 @@ name = "alloc-no-stdlib"
 kind = "unsafe"
 reason = "Allocator interface of brotli-decompressor; unsafe code is behind a feature that is off"
 approved = "2026-10-30"
+
+# --- Server: gzipping the API's JSON (tower-http's compression layer).
+
+[[crate]]
+name = "async-compression"
+kind = "unsafe"
+reason = "gzip of API answers; marks output buffers initialised after the codec wrote them"
+approved = "2026-11-01"
+
+[[crate]]
+name = "compression-codecs"
+kind = "unsafe"
+reason = "gzip of API answers; marks output buffers initialised after the codec wrote them"
+approved = "2026-11-01"
+
+[[crate]]
+name = "compression-core"
+kind = "unsafe"
+reason = "gzip of API answers; the uninitialised-buffer type the codecs write into"
+approved = "2026-11-01"

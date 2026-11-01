@@ -324,14 +324,30 @@ const NAVIGATE: [(&str, &str); 2] = [
     ("sec-fetch-dest", "document"),
 ];
 
-/// Where a page opened as `headers` goes, if the server sends it elsewhere.
+/// Where a page opened as `headers` comes back to after signing in, if the server sends it to
+/// Zeabur Identity first.
 #[cfg(feature = "ui")]
 async fn open_page(rig: &Rig, uri: &str, headers: &[(&str, &str)]) -> Option<String> {
     let response = rig.send(Method::GET, uri, headers).await;
     match response.status() {
         StatusCode::SEE_OTHER => {
             assert_eq!(response.headers()[header::CACHE_CONTROL], "no-store");
-            Some(location(&response).to_owned())
+            assert!(
+                location(&response).starts_with(&format!("{}/authorize?", rig.issuer.url())),
+                "{uri}: {}",
+                location(&response)
+            );
+            let flow = cookie_pair(&response, "__Host-zeabur-signin");
+            let answer = rig.issuer.approve(location(&response), "alice");
+            let back = rig
+                .send(
+                    Method::GET,
+                    &format!("/auth/callback?{answer}"),
+                    &[HOST, ("cookie", &flow)],
+                )
+                .await;
+            assert_eq!(back.status(), StatusCode::SEE_OTHER, "{uri}");
+            Some(location(&back).to_owned())
         }
         StatusCode::OK => {
             let kind = response.headers()[header::CONTENT_TYPE].to_str().unwrap();
@@ -344,19 +360,16 @@ async fn open_page(rig: &Rig, uri: &str, headers: &[(&str, &str)]) -> Option<Str
 
 #[cfg(feature = "ui")]
 #[tokio::test]
-async fn a_page_opened_without_a_session_goes_to_sign_in_first() {
+async fn a_page_opened_without_a_session_goes_to_zeabur_identity_first() {
     let rig = Rig::new().await;
     let page = [HOST, NAVIGATE[0], NAVIGATE[1]];
     assert_eq!(
         open_page(&rig, "/projects/shop?tab=logs", &page)
             .await
             .as_deref(),
-        Some("/auth/login?return=%2Fprojects%2Fshop%3Ftab%3Dlogs")
+        Some("/projects/shop?tab=logs")
     );
-    assert_eq!(
-        open_page(&rig, "/", &page).await.as_deref(),
-        Some("/auth/login")
-    );
+    assert_eq!(open_page(&rig, "/", &page).await.as_deref(), Some("/"));
     // Without Fetch Metadata, `Accept` tells a page load apart.
     let old_browser = [
         HOST,
@@ -366,12 +379,12 @@ async fn a_page_opened_without_a_session_goes_to_sign_in_first() {
         open_page(&rig, "/projects/shop", &old_browser)
             .await
             .as_deref(),
-        Some("/auth/login?return=%2Fprojects%2Fshop")
+        Some("/projects/shop")
     );
     let ended = [HOST, NAVIGATE[0], ("cookie", "__Host-zeabur=guess")];
     assert_eq!(
         open_page(&rig, "/projects/shop", &ended).await.as_deref(),
-        Some("/auth/login?return=%2Fprojects%2Fshop")
+        Some("/projects/shop")
     );
 
     // Not a page load: served as before, and the API still answers `signed-out`.
@@ -402,7 +415,7 @@ async fn the_return_path_never_leaves_this_server() {
     for uri in ["//attacker.example/", "//attacker.example/projects"] {
         assert_eq!(
             open_page(&rig, uri, &page).await.as_deref(),
-            Some("/auth/login"),
+            Some("/"),
             "{uri}"
         );
     }
@@ -411,14 +424,14 @@ async fn the_return_path_never_leaves_this_server() {
         open_page(&rig, "http://attacker.example/projects", &page)
             .await
             .as_deref(),
-        Some("/auth/login?return=%2Fprojects")
+        Some("/projects")
     );
     // Encoded, a backslash stays part of a path on this server.
     assert_eq!(
         open_page(&rig, "/%5Cattacker.example", &page)
             .await
             .as_deref(),
-        Some("/auth/login?return=%2F%255Cattacker.example")
+        Some("/%5Cattacker.example")
     );
 }
 
@@ -862,4 +875,45 @@ fn every_request_goes_with_the_session_token() {
     let handoff = access.handoff(&parts).unwrap();
     assert_eq!(handoff.token.secret().expose_secret(), "alice:1");
     assert_eq!(handoff.expires_at.as_second(), NOW + 600);
+}
+
+#[tokio::test]
+async fn the_api_gzips_json_but_not_streams_or_small_answers() {
+    let big = "x".repeat(4096);
+    let app = Router::new()
+        .route(
+            "/json",
+            axum::routing::get({
+                let big = big.clone();
+                move || async move { axum::Json(json!({ "big": big })) }
+            }),
+        )
+        .route(
+            "/small",
+            axum::routing::get(|| async { axum::Json(json!({ "ok": true })) }),
+        )
+        .route(
+            "/stream",
+            axum::routing::get(move || async move {
+                ([(header::CONTENT_TYPE, "text/event-stream")], big)
+            }),
+        )
+        .layer(super::compression());
+    let encoding = |path: &'static str| {
+        let app = app.clone();
+        async move {
+            let request = Request::get(path)
+                .header(header::ACCEPT_ENCODING, "gzip, br")
+                .body(Body::empty())
+                .unwrap();
+            let response = app.oneshot(request).await.unwrap();
+            response
+                .headers()
+                .get(header::CONTENT_ENCODING)
+                .map(|v| v.to_str().unwrap().to_owned())
+        }
+    };
+    assert_eq!(encoding("/json").await.as_deref(), Some("gzip"));
+    assert_eq!(encoding("/small").await, None);
+    assert_eq!(encoding("/stream").await, None);
 }

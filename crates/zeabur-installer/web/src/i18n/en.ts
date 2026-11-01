@@ -221,7 +221,7 @@ export const en = {
   "components.needsUntested": (component: string, distribution: string) =>
     `Needs ${component}, which was not tested on ${distribution}`,
   "components.needsMemory": (mib: number) =>
-    `Needs ${mib.toLocaleString("en")} MiB of memory to build apps, and this server has less`,
+    `Needs ${mib.toLocaleString("en")} MiB of memory, and this server has less`,
   "components.unsupported": (distribution: string) => `Not on ${distribution}`,
   "components.runsOn": (where: string) => `Runs on ${where} only`,
   "components.unsupportedOn": (profile: string) => `Not supported on ${profile}`,

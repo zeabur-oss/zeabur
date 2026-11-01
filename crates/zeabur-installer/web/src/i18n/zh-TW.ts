@@ -200,8 +200,7 @@ export const zhTW: Messages = {
   "components.untested": (distribution) => `還沒在 ${distribution} 上測試過`,
   "components.needsUntested": (component, distribution) =>
     `需要的 ${component} 還沒在 ${distribution} 上測試過`,
-  "components.needsMemory": (mib) =>
-    `建置應用程式至少要 ${mib.toLocaleString("zh-TW")} MiB 記憶體，這台不夠`,
+  "components.needsMemory": (mib) => `至少要 ${mib.toLocaleString("zh-TW")} MiB 記憶體，這台不夠`,
   "components.unsupported": (distribution) => `不支援 ${distribution}`,
   "components.runsOn": (where) => `只能在 ${where} 上執行`,
   "components.unsupportedOn": (profile) => `不支援 ${profile}`,

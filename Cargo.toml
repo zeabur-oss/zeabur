@@ -138,7 +138,7 @@ tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "signal
 tokio-tungstenite = { version = "0.30", default-features = false, features = ["connect"] }
 tower = { version = "0.5", default-features = false, features = ["util"] }
 # The request tracing of kube-rs's default client (zeabur-kube).
-tower-http = { version = "0.7", default-features = false, features = ["trace"] }
+tower-http = { version = "0.7", default-features = false, features = ["trace", "compression-gzip"] }
 tracing = "0.1"
 # OpenAPI from the code. Reviewed 2026-10-28 (zeabur-api README): no `yaml` feature (it pulls a
 # c2rust libyaml); the spec is written with serde-saphyr. Never enable `config`.

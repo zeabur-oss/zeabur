@@ -200,8 +200,7 @@ export const zhCN: Messages = {
   "components.untested": (distribution) => `还没在 ${distribution} 上测试过`,
   "components.needsUntested": (component, distribution) =>
     `需要的 ${component} 还没在 ${distribution} 上测试过`,
-  "components.needsMemory": (mib) =>
-    `构建应用至少要 ${mib.toLocaleString("zh-CN")} MiB 内存，这台不够`,
+  "components.needsMemory": (mib) => `至少要 ${mib.toLocaleString("zh-CN")} MiB 内存，这台不够`,
   "components.unsupported": (distribution) => `不支持 ${distribution}`,
   "components.runsOn": (where) => `仅能在 ${where} 上运行`,
   "components.unsupportedOn": (profile) => `不支持 ${profile}`,
