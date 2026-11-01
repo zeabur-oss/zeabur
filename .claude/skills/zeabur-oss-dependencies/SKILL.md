@@ -3,6 +3,8 @@ name: zeabur-oss-dependencies
 description: The supply-chain policy every zeabur-oss repository shares for Rust crates and Bun packages — OSI licences, aws-lc-rs as the only crypto backend, a seven-day publish age, unsafe and native-code review, no install scripts, committed lock files, Git-pinned design system, fallow through bunx. Use whenever Cargo.toml, Cargo.lock, deny.toml, a package.json, a bun.lock, bunfig.toml or flake.nix changes in any zeabur-oss repository.
 ---
 
+<!-- Edit this in zeabur-oss/skills (skills/zeabur-oss-dependencies/SKILL.md); the weekly skills sync overwrites the copy in other repositories. -->
+
 # Zeabur OSS dependencies
 
 The repository's dependencies skill names its shipped binaries, its frontend directory and its
@@ -48,13 +50,11 @@ exceptions. Run every command inside `nix develop`.
   the blocked ones.
 - Commit `package.json` and `bun.lock` together; CI installs with `bun ci`, which fails if they
   disagree.
-- `@zeabur-oss/design-system` is pinned to a commit of its repository: a Git dependency
-  (`github:zeabur-oss/design-system#<commit>`, moved with
-  `bun add 'github:zeabur-oss/design-system#<commit>'`) or a tarball packed from that commit and
-  checked in under `vendor/`; the repository's skill says which. To try an unpublished
-  design-system commit, point it at a local tarball (the design system's `design-system-change`
-  skill) and `bun install`; never commit `package.json` or `bun.lock` with a path outside the
-  repository.
+- `@zeabur-oss/design-system` comes from npm at an exact version, published from the design
+  system's version tags; Renovate moves it, and `bunfig.toml` exempts it from the minimum release
+  age. To try an unpublished design-system commit, point it at a local tarball (the design
+  system's `design-system-change` skill) and `bun install`; never commit `package.json` or
+  `bun.lock` with a path outside the repository.
 - fallow is not in nixpkgs. It runs as `bunx fallow@<version>` from the `fallow` script in
   `package.json`. Its platform packages ship a prebuilt Rust binary (npm provenance; the wrapper
   checks its signature before it runs) and run no install scripts. Bump it to a release at least

@@ -1,3 +1,5 @@
+<!-- Edit this in zeabur-oss/skills (skills/zeabur-writing/en.md); the weekly skills sync overwrites the copy in other repositories. -->
+
 # English
 
 <!-- This file quotes the patterns it describes. -->

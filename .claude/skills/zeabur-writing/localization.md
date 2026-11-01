@@ -1,3 +1,5 @@
+<!-- Edit this in zeabur-oss/skills (skills/zeabur-writing/localization.md); the weekly skills sync overwrites the copy in other repositories. -->
+
 # Localization practice
 
 <!-- The sources quote the words they ban. -->

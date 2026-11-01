@@ -1,3 +1,5 @@
+<!-- Edit this in zeabur-oss/skills (skills/zeabur-writing/ui-strings.md); the weekly skills sync overwrites the copy in other repositories. -->
+
 # Interface strings
 
 <!-- This file quotes the patterns it describes. -->

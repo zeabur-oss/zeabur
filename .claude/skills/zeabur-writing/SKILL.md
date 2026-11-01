@@ -3,6 +3,8 @@ name: zeabur-writing
 description: Write or review text people read in any zeabur-oss repo, in English, zh-TW or zh-CN. Use for docs (.md/.mdx), landing and product page copy, interface strings and i18n catalogues, translations between the three languages, READMEs, CLI output, error messages, and PR or issue text. Includes a Vale style that checks punctuation, spacing, cross-strait terms and wording tells.
 ---
 
+<!-- Edit this in zeabur-oss/skills (skills/zeabur-writing/SKILL.md); the weekly skills sync overwrites the copy in other repositories. -->
+
 # Zeabur writing
 
 Text should read like a careful person wrote it in that language: plain words, the reader's task first, natural rhythm. Translation-ese (歐化), filler and defensive hedging are the failures to fix.

@@ -1,3 +1,5 @@
+<!-- Edit this in zeabur-oss/skills (skills/zeabur-oss-standards/STANDARDS.md); the weekly skills sync overwrites the copy in other repositories. -->
+
 # Engineering standards
 
 Four checks for every change. Each item is a fail condition a reviewer can point at. The

@@ -1,3 +1,5 @@
+<!-- Edit this in zeabur-oss/skills (skills/zeabur-writing/ai-tells.md); the weekly skills sync overwrites the copy in other repositories. -->
+
 # AI tells
 
 <!-- This file quotes the patterns it describes. -->
