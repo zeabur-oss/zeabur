@@ -1,8 +1,12 @@
 name: Pins
 
 # Moves every pin of zeabur-oss/.github to the newest commit of its main and opens a pull request,
-# in the shared workflow of zeabur-oss/.github. Its main sends the event after each push.
+# in the shared workflow of zeabur-oss/.github: when its main sends the event after each push, and
+# Monday morning in Asia/Taipei, which catches an event that never arrived. Renovate leaves these
+# pins alone.
 on:
+  schedule:
+    - cron: '0 17 * * 0'
   repository_dispatch:
     types: [zeabur-oss-github]
   workflow_dispatch:
