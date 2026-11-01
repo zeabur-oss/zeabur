@@ -1026,9 +1026,9 @@ mod tests {
         assert_eq!(ssh_host(&[], Some("vps-1")), "vps-1");
     }
 
-    /// The captured responses that `bun run dev` answers with follow the pinned catalog. After a
-    /// catalog bump, `ZEABUR_UPDATE_GOLDEN=1 cargo nextest run -p zeabur-installer fixtures`
-    /// rewrites them, and `bun run fmt` in web/ formats them.
+    /// The responses that `bun run dev` answers with, built from the seeds in web/scripts/fixtures
+    /// and the pinned catalog. `ZEABUR_WEB_FIXTURES` names the directory they are written to
+    /// (web/scripts/fixtures.ts); without it they go to a temporary one.
     #[test]
     fn the_web_fixtures_follow_the_catalog() {
         let index = Index::parse(include_bytes!(concat!(
@@ -1036,11 +1036,11 @@ mod tests {
             "/index.json"
         )))
         .unwrap();
-        let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("web/scripts/fixtures");
+        let seeds = Path::new(env!("CARGO_MANIFEST_DIR")).join("web/scripts/fixtures");
         let read = |name: &str| -> Value {
-            serde_json::from_str(&fs::read_to_string(dir.join(name)).unwrap()).unwrap()
+            serde_json::from_str(&fs::read_to_string(seeds.join(name)).unwrap()).unwrap()
         };
-        let mut expected = BTreeMap::new();
+        let mut written = BTreeMap::new();
 
         let mut state = read("state.json");
         state["catalog"] = catalog_json(
@@ -1048,7 +1048,7 @@ mod tests {
             state["config"]["profile"].as_str().unwrap(),
             state["facts"]["arch"].as_str().unwrap(),
         );
-        expected.insert("state.json", state);
+        written.insert("state.json", state);
 
         let mut team = read("plan.json");
         let config = Config::parse(team["yaml"].as_str().unwrap()).unwrap();
@@ -1075,7 +1075,7 @@ mod tests {
         let plan = plan::plan_with(&index, &config, &facts, Some(&products)).unwrap();
         team["text"] = json!(render::plan(&plan));
         team["plan"] = json!(plan);
-        expected.insert("plan.json", team);
+        written.insert("plan.json", team);
 
         for name in ["personal-plan.json", "personal-builds-plan.json"] {
             let mut fixture = read(name);
@@ -1084,24 +1084,16 @@ mod tests {
             let plan = personal::plan(&index, &config, &facts).unwrap();
             fixture["text"] = json!(render::personal_plan(&plan));
             fixture["plan"] = json!(plan);
-            expected.insert(name, fixture);
+            written.insert(name, fixture);
         }
 
-        let update = std::env::var_os("ZEABUR_UPDATE_GOLDEN").is_some();
-        let mut drifted = Vec::new();
-        for (name, value) in expected {
-            if update {
-                let text = serde_json::to_string_pretty(&value).unwrap() + "\n";
-                fs::write(dir.join(name), text).unwrap();
-            } else if read(name) != value {
-                drifted.push(name);
-            }
+        let temporary = tempfile::tempdir().unwrap();
+        let out = std::env::var_os("ZEABUR_WEB_FIXTURES")
+            .map_or_else(|| temporary.path().to_owned(), std::path::PathBuf::from);
+        for (name, value) in written {
+            let text = serde_json::to_string_pretty(&value).unwrap() + "\n";
+            fs::write(out.join(name), text).unwrap();
         }
-        assert!(
-            drifted.is_empty(),
-            "{drifted:?} differ from what this catalog gives: ZEABUR_UPDATE_GOLDEN=1 cargo nextest \
-             run -p zeabur-installer fixtures, then bun run fmt in crates/zeabur-installer/web"
-        );
     }
 
     /// zh-TW and zh-CN are typed against English, so TypeScript rejects a key missing there.

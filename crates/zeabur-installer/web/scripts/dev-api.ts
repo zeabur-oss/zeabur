@@ -1,6 +1,7 @@
 // The API for `bun run dev`. With INSTALLER_GUI (the address of a running `zeabur-installer gui`,
 // tunnelled here) and INSTALLER_TOKEN (its printed token), reads go to that server, so the pages
-// show a real host and catalog; without them, the captured responses in fixtures/ answer.
+// show a real host and catalog; without them, responses built from fixtures/ and the pinned
+// catalog answer.
 // Installing is always simulated: the log replays fixtures/apply.log (INSTALLER_FAIL=1, or an
 // `installer_fail=1` cookie, stops it partway), so nothing changes on the server.
 // `vite preview` serves the built pages with the same API, for scripts/docs-shots.sh. There,
@@ -12,9 +13,14 @@ import { readFileSync } from "node:fs"
 import type { IncomingMessage, ServerResponse } from "node:http"
 import { resolve } from "node:path"
 import type { Connect, Plugin } from "vite"
+import { writeFixtures } from "./fixtures.ts"
 
+// The logs are written by hand. The JSON responses are the Rust planner's output for the pinned
+// catalog, written to .generated/ from the seeds in fixtures/ (scripts/fixtures.ts).
 const fixtures = resolve(import.meta.dirname, "fixtures")
-const fixture = (name: string) => readFileSync(resolve(fixtures, name), "utf8")
+export const generated = resolve(import.meta.dirname, ".generated")
+const fixture = (name: string) =>
+  readFileSync(resolve(name.endsWith(".json") ? generated : fixtures, name), "utf8")
 const backend = process.env.INSTALLER_GUI
 const demo = process.env.ZEABUR_DEMO_INSTALL
 const host = process.env.ZEABUR_DEMO_HOST
@@ -55,11 +61,10 @@ const log = (fail: boolean, personal: boolean) => {
 
 const memoryMib = host === "small" ? 1536 : host === "medium" ? 3793 : 5836
 // The component a personal install offers only with enough memory, as the catalog says.
-const gated: { id: string; personalMinMemoryMib: number } = JSON.parse(
-  fixture("state.json"),
-).catalog.components.find((c: { personalMinMemoryMib: number | null }) => c.personalMinMemoryMib)
-const builder = gated.id
-const buildsMinMib = gated.personalMinMemoryMib
+const gated = (): { id: string; personalMinMemoryMib: number } =>
+  JSON.parse(fixture("state.json")).catalog.components.find(
+    (c: { personalMinMemoryMib: number | null }) => c.personalMinMemoryMib,
+  )
 
 // The captured server has 5836 MiB; the plan and the state follow ZEABUR_DEMO_HOST.
 function state(): string {
@@ -83,6 +88,7 @@ function state(): string {
 }
 
 function personalPlan(body: string): string {
+  const { id: builder, personalMinMemoryMib: buildsMinMib } = gated()
   const config = JSON.parse(body || "{}").config ?? {}
   const wanted =
     (config.enable ?? []).includes(builder) &&
@@ -171,6 +177,12 @@ const middleware: Connect.NextHandleFunction = (request, response, next) => {
 
 export const devApi: Plugin = {
   name: "installer-dev-api",
-  configureServer: (server) => void server.middlewares.use(middleware),
-  configurePreviewServer: (server) => void server.middlewares.use(middleware),
+  configureServer: (server) => {
+    if (!backend) writeFixtures(generated)
+    server.middlewares.use(middleware)
+  },
+  configurePreviewServer: (server) => {
+    if (!backend) writeFixtures(generated)
+    server.middlewares.use(middleware)
+  },
 }

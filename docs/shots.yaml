@@ -1,5 +1,5 @@
 # Screenshots the docs use, taken from the in-memory demo (crates/zeabur-api/examples/demo.rs),
-# or with `app: installer` from the installer's pages and captured responses
+# or with `app: installer` from the installer's pages and responses built from the pinned catalog
 # (crates/zeabur-installer/web/scripts/dev-api.ts).
 # Kept in git in each locale's docs folder, light only: docs/images/shots/<id>.avif for English,
 # docs/zh-TW/images/shots/<id>.avif for a translation. The run replaces those folders:
