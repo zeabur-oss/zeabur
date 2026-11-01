@@ -437,7 +437,7 @@ pub fn plan_with(
     }
     facts.check_installer()?;
     let node_name = node_name::choose(config.host.node_name.as_deref(), facts, &[])?;
-    let selection = select::select(index, config, facts.record.as_ref().map(|r| &r.components))?;
+    let selection = select::select(index, config)?;
     let profile = config.profile.as_str();
     let chosen: BTreeSet<&str> = selection
         .components
@@ -492,7 +492,13 @@ pub fn plan_with(
     let changes = facts
         .record
         .as_ref()
-        .map(|r| Changes::new(r, index, &components, &selection.offered, &cluster.version));
+        .map(|r| Changes::new(r, index, &components, &cluster.version));
+    warnings.extend(
+        facts
+            .record
+            .as_ref()
+            .and_then(|r| crate::record::builder_deletes_images(r, &components)),
+    );
 
     Ok(Plan {
         storage: storage_plan(&components, profile, &mut warnings),
@@ -1911,19 +1917,8 @@ mod tests {
     }
 
     #[test]
-    fn zeabur_needs_ingress_certificates_and_metrics_server() {
+    fn disabling_ingress_stops_the_plan() {
         let index = Index::parse(INDEX.as_bytes()).unwrap();
-        assert_eq!(
-            select::required(&index, "single-node"),
-            BTreeSet::from(
-                [
-                    "ingress/traefik",
-                    "certificates/cert-manager",
-                    "metrics/metrics-server"
-                ]
-                .map(str::to_owned)
-            )
-        );
         let err = plan(&index, &config("disable: [ingress]\n"), &facts()).unwrap_err();
         assert!(matches!(err, PlanError::NeedsDisabled { .. }), "{err}");
     }
@@ -2584,27 +2579,19 @@ mod tests {
     }
 
     #[test]
-    fn an_upgrade_replaces_zot_with_builder_and_says_what_else_changes() {
+    fn an_old_id_in_the_record_is_removed_and_the_new_default_added() {
         let index = Index::parse(INDEX.as_bytes()).unwrap();
         let first = plan(&index, &config(""), &facts()).unwrap();
-        assert!(ids(&first).contains(&"builds/zeabur-builder"));
         assert_eq!(first.changes, None);
 
         let mut upgrade = facts();
         upgrade.record = Some(recorded(&first, "0.0.1", older_catalog));
         let plan = plan(&index, &config(""), &upgrade).unwrap();
         assert!(ids(&plan).contains(&"builds/zeabur-builder"));
+        assert!(!ids(&plan).contains(&"container-registry/zot"));
         let changes = plan.changes.unwrap();
-        assert_eq!(changes.offered, Vec::<String>::new());
-        assert_eq!(changes.added, Vec::<String>::new());
-        assert_eq!(changes.removed, Vec::<String>::new());
-        assert_eq!(
-            changes.replaced,
-            [record::Replaced {
-                from: "container-registry/zot".to_owned(),
-                to: "builds/zeabur-builder".to_owned(),
-            }]
-        );
+        assert_eq!(changes.added, ["builds/zeabur-builder"]);
+        assert_eq!(changes.removed, ["container-registry/zot"]);
         let traefik = changes
             .charts
             .iter()
@@ -2619,7 +2606,26 @@ mod tests {
     }
 
     #[test]
-    fn disabling_builder_keeps_the_old_zot_out_of_the_replacement() {
+    fn installing_builder_on_a_zot_server_warns_that_it_deletes_images() {
+        let index = Index::parse(INDEX.as_bytes()).unwrap();
+        let first = plan(&index, &config(""), &facts()).unwrap();
+        let deletes = |p: &Plan| p.warnings.iter().any(|w| w.code == "builder.deletesImages");
+        assert!(!deletes(&first));
+
+        let mut upgrade = facts();
+        upgrade.record = Some(recorded(&first, "0.0.1", older_catalog));
+        assert!(deletes(&plan(&index, &config(""), &upgrade).unwrap()));
+        let kept = plan(
+            &index,
+            &config("disable: [builds/zeabur-builder]\n"),
+            &upgrade,
+        )
+        .unwrap();
+        assert!(!deletes(&kept));
+    }
+
+    #[test]
+    fn with_builder_disabled_the_old_zot_is_kept() {
         let index = Index::parse(INDEX.as_bytes()).unwrap();
         let first = plan(&index, &config(""), &facts()).unwrap();
         let mut upgrade = facts();
@@ -2630,9 +2636,7 @@ mod tests {
             &upgrade,
         )
         .unwrap();
-        assert!(!ids(&plan).contains(&"builds/zeabur-builder"));
         let changes = plan.changes.unwrap();
-        assert_eq!(changes.replaced, []);
         assert_eq!(changes.removed, Vec::<String>::new());
         assert_eq!(changes.kept, ["container-registry/zot"]);
     }
@@ -2672,7 +2676,7 @@ mod tests {
     }
 
     #[test]
-    fn a_new_default_the_record_lacks_is_offered_without_installing_it() {
+    fn a_default_the_install_record_lacks_is_installed() {
         let index = Index::parse(INDEX.as_bytes()).unwrap();
         let first = plan(&index, &config(""), &facts()).unwrap();
         let mut upgrade = facts();
@@ -2681,20 +2685,8 @@ mod tests {
             components.retain(|c| c["id"] != "builds/zeabur-builder");
         }));
         let plan = plan(&index, &config(""), &upgrade).unwrap();
-        assert!(!ids(&plan).contains(&"builds/zeabur-builder"));
-        assert_eq!(plan.changes.unwrap().offered, ["builds/zeabur-builder"]);
-
-        let chosen = plan_with(
-            &index,
-            &config("enable: [builds/zeabur-builder]\n"),
-            &upgrade,
-            None,
-        )
-        .unwrap();
-        assert!(ids(&chosen).contains(&"builds/zeabur-builder"));
-        let changes = chosen.changes.unwrap();
-        assert_eq!(changes.added, ["builds/zeabur-builder"]);
-        assert_eq!(changes.offered, Vec::<String>::new());
+        assert!(ids(&plan).contains(&"builds/zeabur-builder"));
+        assert_eq!(plan.changes.unwrap().added, ["builds/zeabur-builder"]);
     }
 
     #[test]
@@ -2709,7 +2701,7 @@ mod tests {
         assert_eq!(ids(&plan), ids(&first));
         let changes = plan.changes.unwrap();
         assert!(changes.added.is_empty() && changes.removed.is_empty());
-        assert!(changes.charts.is_empty() && changes.offered.is_empty());
+        assert_eq!(changes.charts, []);
         assert!(!changes.restart);
     }
 
@@ -2756,34 +2748,20 @@ mod tests {
     }
 
     #[test]
-    fn a_renamed_id_names_the_new_one() {
+    fn an_old_id_in_enable_or_disable_stops_the_plan_and_names_the_new_id() {
         let index = Index::parse(INDEX.as_bytes()).unwrap();
-        let error = plan(
-            &index,
-            &config("enable: [container-registry/zot]\n"),
-            &facts(),
-        )
-        .unwrap_err();
-        assert!(
-            error.to_string().contains("`builds/zeabur-builder`"),
-            "{error}"
-        );
-
-        let plan = plan(
-            &index,
-            &config("disable: [container-registry/zot]\n"),
-            &facts(),
-        )
-        .unwrap();
-        assert!(!ids(&plan).contains(&"builds/zeabur-builder"));
-        let warning = plan
-            .warnings
-            .iter()
-            .find(|w| w.code == "config.renamed")
-            .unwrap();
-        assert_eq!(
-            warning.values,
-            ["container-registry/zot", "builds/zeabur-builder"]
-        );
+        for field in ["enable", "disable"] {
+            let error = plan(
+                &index,
+                &config(&format!("{field}: [container-registry/zot]\n")),
+                &facts(),
+            )
+            .unwrap_err();
+            assert!(matches!(error, PlanError::Renamed { .. }), "{error}");
+            assert!(
+                error.to_string().contains("`builds/zeabur-builder`"),
+                "{error}"
+            );
+        }
     }
 }

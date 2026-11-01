@@ -200,8 +200,7 @@ pub fn plan(
     let archive = KUBESOLO.archive(arch).ok_or_else(no_release)?;
     let kubectl = KUBECTL.binary(arch).ok_or_else(no_release)?;
     let mut warnings = warnings(index);
-    let mut selection =
-        select::select_personal(index, config, facts.record.as_ref().map(|r| &r.components))?;
+    let mut selection = select::select_personal(index, config)?;
     warnings.extend(selection.warnings.clone());
     leave_out_short_of_memory(index, &mut selection, facts);
     let choices = Choices {
@@ -255,7 +254,13 @@ pub fn plan(
     let changes = facts
         .record
         .as_ref()
-        .map(|r| Changes::new(r, index, &components, &selection.offered, KUBESOLO.version));
+        .map(|r| Changes::new(r, index, &components, KUBESOLO.version));
+    warnings.extend(
+        facts
+            .record
+            .as_ref()
+            .and_then(|r| crate::record::builder_deletes_images(r, &components)),
+    );
     Ok(PersonalPlan {
         use_: "personal",
         facts: facts.clone(),

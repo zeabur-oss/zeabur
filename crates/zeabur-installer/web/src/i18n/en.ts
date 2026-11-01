@@ -384,15 +384,8 @@ export const en = {
   "review.changes.removed": "Removed",
   "review.changes.kept": "No longer updated",
   "review.changes.keptHint": "These stay installed. What they set up keeps running.",
-  "review.changes.replaced": "Replaced",
-  "review.changes.replaced.container-registry/zot":
-    "Zeabur Builder takes over zot and deletes images under <project>/<name> paths that no build made, including any you pushed there yourself. To keep every image, uncheck Zeabur Builder on the Components step.",
-  "review.changes.replacedNote": (from: string, to: string) =>
-    `${to} replaces ${from} and takes over what it installed.`,
   "review.changes.charts": "Chart updates",
   "review.changes.values": "values changed",
-  "review.changes.offered": "New in this catalog",
-  "review.changes.offeredHint": "Installed only if you check it.",
   "review.removing": "Components to remove",
   "review.removingHint":
     "helm-controller uninstalls their charts. What stays can be deleted by hand later.",
@@ -459,8 +452,8 @@ export const en = {
     "Volumes on the default local-path storage class stay on the node that created them: a pod using one runs only on that node, and the data goes with the node.",
   "warning.join.token.unpinned": () =>
     "The token has no CA hash (K10<hash>::…), so this VM trusts whichever server answers at that address. Use the token exactly as node add printed it.",
-  "warning.config.renamed": (old: string, id: string) =>
-    `The configuration file disables ${old}, which this catalog calls ${id}, so ${id} is not installed. Write ${id} in the configuration file instead.`,
+  "warning.builder.deletesImages": () =>
+    "Zeabur Builder takes over zot and deletes images under <project>/<name> paths that no build made, including any you pushed there yourself. To keep every image, uncheck Zeabur Builder on the Components step.",
   "warning.config.untested": (id: string, distribution: string) =>
     `${id} wasn't tested on ${distribution}. It's installed because the configuration file asks for it or for a component that needs it.`,
   "warning.config.runsOn": (id: string, only: string) =>

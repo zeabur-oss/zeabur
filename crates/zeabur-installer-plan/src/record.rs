@@ -9,8 +9,7 @@ use serde_json::Value;
 
 use crate::PlanError;
 use crate::catalog::Index;
-use crate::plan::{ComponentPlan, ReleasePlan};
-use crate::select::RENAMED;
+use crate::plan::{ComponentPlan, ReleasePlan, Warning, warning};
 
 /// This installer's version.
 pub const INSTALLER_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -131,33 +130,20 @@ pub struct Changes {
     pub installer: String,
     /// Components it installs that the record does not have.
     pub added: Vec<String>,
-    /// Recorded components it no longer plans and uninstalls.
+    /// Recorded components it no longer plans and uninstalls, and old ids whose new component it
+    /// installs.
     pub removed: Vec<String>,
     /// Recorded components it no longer plans that have no chart to uninstall; what they
     /// installed keeps running.
     pub kept: Vec<String>,
-    /// Recorded components the catalog renamed, which the new component takes over.
-    pub replaced: Vec<Replaced>,
     /// Charts whose version or values change.
     pub charts: Vec<ChartChange>,
-    /// Default components of this catalog that the record does not have and `enable` does not
-    /// name; `apply` leaves them out.
-    pub offered: Vec<String>,
     /// The K3s, RKE2 or `KubeSolo` release, when it changes.
     pub version: Option<VersionChange>,
     /// Host files whose content changes; `apply` fills it.
     pub host_files: Vec<String>,
     /// `apply` restarts K3s, RKE2 or `KubeSolo`.
     pub restart: bool,
-}
-
-/// A recorded component that the component with its new id takes over.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-pub struct Replaced {
-    /// The id in the record.
-    pub from: String,
-    /// The id in the catalog.
-    pub to: String,
 }
 
 /// A chart whose version or values change.
@@ -186,7 +172,7 @@ pub struct VersionChange {
 }
 
 impl Changes {
-    /// The changes of a plan with `components`, `offered` left out and the `version` release.
+    /// The changes of a plan with `components` and the `version` release.
     ///
     /// A left-out component counts as removed only when `apply` uninstalls it: it has a chart and
     /// `index` still knows it, as [`crate::remove::removals`] requires.
@@ -195,22 +181,9 @@ impl Changes {
         record: &Record,
         index: &Index,
         components: &[ComponentPlan],
-        offered: &[String],
         version: &str,
     ) -> Self {
         let planned: BTreeSet<&str> = components.iter().map(|c| c.id.as_str()).collect();
-        let replaced: Vec<Replaced> = RENAMED
-            .iter()
-            .filter(|(from, to)| {
-                record.components.contains(*from)
-                    && !record.components.contains(*to)
-                    && planned.contains(to)
-            })
-            .map(|(from, to)| Replaced {
-                from: (*from).to_owned(),
-                to: (*to).to_owned(),
-            })
-            .collect();
         let mut charts = Vec::new();
         for component in components {
             for release in &component.releases {
@@ -245,9 +218,11 @@ impl Changes {
             .components
             .iter()
             .filter(|id| !planned.contains(id.as_str()))
-            .filter(|id| !crate::select::renamed(id).is_some_and(|new| planned.contains(new)))
             .cloned()
-            .partition(|id| record.helm.contains(id) && index.component(id).is_some());
+            .partition(|id| {
+                record.helm.contains(id) && index.component(id).is_some()
+                    || crate::select::renamed(id).is_some_and(|new| planned.contains(new))
+            });
         let version = record
             .version
             .as_ref()
@@ -261,14 +236,11 @@ impl Changes {
             added: components
                 .iter()
                 .filter(|c| !record.components.contains(&c.id))
-                .filter(|c| !replaced.iter().any(|r| r.to == c.id))
                 .map(|c| c.id.clone())
                 .collect(),
             removed,
             kept,
-            replaced,
             charts,
-            offered: offered.to_vec(),
             restart: version.is_some(),
             version,
             host_files: Vec::new(),
@@ -280,6 +252,26 @@ impl Changes {
         self.restart = self.version.is_some() || !paths.is_empty();
         self.host_files = paths;
     }
+}
+
+/// Warns that Zeabur Builder deletes images when `apply` installs it on a server that has zot.
+#[must_use]
+pub fn builder_deletes_images(record: &Record, components: &[ComponentPlan]) -> Option<Warning> {
+    const ZOT: &str = "container-registry/zot";
+    const BUILDER: &str = "builds/zeabur-builder";
+    (record.components.contains(ZOT)
+        && !record.components.contains(BUILDER)
+        && components.iter().any(|c| c.id == BUILDER))
+    .then(|| {
+        warning(
+            "builder.deletesImages",
+            &[],
+            "Zeabur Builder takes over zot and deletes images under <project>/<name> paths that \
+             no build made, including any you pushed there yourself. To keep every image: \
+             disable: [builds/zeabur-builder]"
+                .to_owned(),
+        )
+    })
 }
 
 /// The precedence of two versions as Semantic Versioning 2.0.0 orders them

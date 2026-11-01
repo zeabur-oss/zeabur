@@ -124,17 +124,6 @@ export function ReviewStep({ wizard }: { wizard: Wizard }) {
             plan.use === "personal" ? "KubeSolo" : distributionTitle[plan.cluster.distribution]
           }
           name={(id) => byId.get(id)?.displayName ?? id}
-          enabled={wizard.active.enable}
-          onEnable={(id, on) => {
-            const { enable, disable, inputs, allowDataLoss } = wizard.active
-            const others = enable.filter((x) => x !== id)
-            wizard.setChoices({
-              enable: on ? [...others, id] : others,
-              disable,
-              inputs,
-              allowDataLoss,
-            })
-          }}
         />
       ) : null}
 
@@ -388,14 +377,10 @@ function ChangesPanel({
   changes,
   title,
   name,
-  enabled,
-  onEnable,
 }: {
   changes: Changes
   title: string
   name: (id: string) => string
-  enabled: string[]
-  onEnable: (id: string, on: boolean) => void
 }) {
   const t = useT()
   const none =
@@ -404,9 +389,7 @@ function ChangesPanel({
     !changes.added.length &&
     !changes.removed.length &&
     !changes.kept.length &&
-    !changes.replaced.length &&
-    !changes.charts.length &&
-    !changes.offered.length
+    !changes.charts.length
   return (
     <Panel
       title={t("review.changes")}
@@ -457,21 +440,6 @@ function ChangesPanel({
               </div>
             </Row>
           ) : null}
-          {changes.replaced.length ? (
-            <Row label={t("review.changes.replaced")}>
-              <div className="flex min-w-0 flex-col gap-2">
-                {changes.replaced.map((r) => (
-                  <span key={r.from}>
-                    {named(
-                      t,
-                      `review.changes.replaced.${r.from}`,
-                      t("review.changes.replacedNote", name(r.from), name(r.to)),
-                    )}
-                  </span>
-                ))}
-              </div>
-            </Row>
-          ) : null}
           {changes.charts.length ? (
             <Row label={t("review.changes.charts")}>
               <div className="flex min-w-0 flex-col gap-1">
@@ -482,23 +450,6 @@ function ChangesPanel({
                       {c.release} {c.from === c.to ? c.to : `${c.from} → ${c.to}`}
                       {c.values ? ` · ${t("review.changes.values")}` : ""}
                     </span>
-                  </span>
-                ))}
-              </div>
-            </Row>
-          ) : null}
-          {changes.offered.length ? (
-            <Row label={t("review.changes.offered")}>
-              <div className="flex min-w-0 flex-col gap-2">
-                <span className="text-xs text-secondary">{t("review.changes.offeredHint")}</span>
-                {changes.offered.map((id) => (
-                  <span key={id} className="flex items-center gap-2">
-                    <Checkbox
-                      id={`offer-${id}`}
-                      checked={enabled.includes(id)}
-                      onCheckedChange={(on) => onEnable(id, on)}
-                    />
-                    <label htmlFor={`offer-${id}`}>{name(id)}</label>
                   </span>
                 ))}
               </div>

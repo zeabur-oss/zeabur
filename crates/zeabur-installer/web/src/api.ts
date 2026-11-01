@@ -174,11 +174,7 @@ export interface Changes {
   removed: string[]
   /** Left out, but with no chart to uninstall: what they installed keeps running. */
   kept: string[]
-  /** Recorded components the catalog renamed; the new one takes over the old one's release. */
-  replaced: { from: string; to: string }[]
   charts: { component: string; release: string; from: string; to: string; values: boolean }[]
-  /** New defaults of this catalog that apply leaves out unless chosen. */
-  offered: string[]
   version: { from: string; to: string } | null
   hostFiles: string[]
   /** Apply restarts K3s, RKE2 or KubeSolo. */

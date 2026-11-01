@@ -355,14 +355,8 @@ export const zhCN: Messages = {
   "review.changes.removed": "移除",
   "review.changes.kept": "不再更新",
   "review.changes.keptHint": "这些组件不会移除，原来装好的内容会继续运行。",
-  "review.changes.replaced": "换成新组件",
-  "review.changes.replaced.container-registry/zot":
-    "Zeabur Builder 会接管 zot，并删除 <project>/<name> 路径下不是构建产生的镜像，包括你自己推送上去的。要保留所有镜像，请在“组件”步骤取消勾选 Zeabur Builder。",
-  "review.changes.replacedNote": (from, to) => `${to} 会取代 ${from}，接管原来装好的内容。`,
   "review.changes.charts": "Chart 更新",
   "review.changes.values": "设置有变更",
-  "review.changes.offered": "这版目录新增的组件",
-  "review.changes.offeredHint": "勾选了才会安装。",
   "review.removing": "要移除的组件",
   "review.removingHint": "helm-controller 会卸载这些组件的 chart。留下的东西之后可以手动删除。",
   "review.stays": (items) => `会保留：${listZh("zh-CN", items)}`,
@@ -425,8 +419,8 @@ export const zhCN: Messages = {
     "默认 local-path 存储类创建的卷只在创建卷的节点上：使用这种卷的 Pod 只能在那个节点运行，节点没了，数据也跟着没了。",
   "warning.join.token.unpinned": () =>
     "这个令牌没有 CA 哈希（K10<hash>::…），所以这台 VM 会信任在那个地址响应的任何服务器。请原样使用 node add 打印的令牌。",
-  "warning.config.renamed": (old, id) =>
-    `配置文件停用的 ${old} 在这版目录里改名为 ${id}，所以不会安装 ${id}。请把配置文件里的名称改成 ${id}。`,
+  "warning.builder.deletesImages": () =>
+    "Zeabur Builder 会接管 zot，并删除 <project>/<name> 路径下不是构建产生的镜像，包括你自己推送上去的。要保留所有镜像，请在“组件”步骤取消勾选 Zeabur Builder。",
   "warning.config.untested": (id, distribution) =>
     `${id} 没在 ${distribution} 上测试过。配置文件要求安装它，或要求安装依赖它的组件，所以照样安装。`,
   "warning.config.runsOn": (id, only) => `${id} 只能在 ${only} 上运行，所以不会安装。`,

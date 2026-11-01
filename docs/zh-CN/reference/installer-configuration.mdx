@@ -70,7 +70,7 @@ host:
 enable: [runtime-security, vulnerability-scanning, intrusion-prevention]
 ```
 
-`enable` 可以填写 capability（例如 `runtime-security`）或完整组件 ID（例如 `volume-backup/velero`），依赖的组件会一并添加。如果 `disable` 排除了其他组件依赖的组件，`plan` 会列出两者并停止。最终安装的组件、安装顺序和排除原因，见 `plan` 的输出。
+`enable` 可以填写 capability（例如 `runtime-security`）或完整组件 ID（例如 `volume-backup/velero`），依赖的组件会一并添加。如果 `disable` 排除了其他组件依赖的组件，`plan` 会列出两者并停止。最终安装的组件、安装顺序和排除原因，见 `plan` 的输出。Catalog 给组件改名后，`enable` 或 `disable` 写旧 ID 时，`plan` 会停止，错误信息会写明新 ID。
 
 installer 只提供 Catalog 在你的 distribution 上测试过的组件。每个组件测试过哪些 distribution，列在 Catalog `index.json` 的 `testedOn` 中。推荐安装、但没在你的 distribution 上测试过的组件不会安装，依赖这个组件的其他组件也一样。如果 `enable` 填写了没测试过的组件，或你添加的组件依赖没测试过的组件，`plan` 照样安装，并警告它没在这里测试过。
 
