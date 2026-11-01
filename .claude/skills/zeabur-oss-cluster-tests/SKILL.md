@@ -3,6 +3,8 @@ name: zeabur-oss-cluster-tests
 description: Where and how any zeabur-oss repository runs its Kubernetes integration and end-to-end tests (a disposable k3d, k3s or kind cluster on a Linux machine or VM, its own kubeconfig, a VM snapshot restored after every run), and how to write and debug a cluster test. Use before running or writing a test that needs a cluster or Docker, or when one fails.
 ---
 
+<!-- Edit this in zeabur-oss/skills (skills/zeabur-oss-cluster-tests/SKILL.md); the weekly skills sync overwrites the copy in other repositories. -->
+
 # Zeabur OSS cluster tests
 
 The repository's cluster-test skill (or its `CONTRIBUTING.md`) has the cluster script, the test

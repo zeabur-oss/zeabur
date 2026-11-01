@@ -3,6 +3,8 @@ name: zeabur-oss-ci
 description: How CI works in every zeabur-oss repository (the shared workflows of zeabur-oss/.github calling scripts/ci.sh) and how to investigate a failed or flaky CI or release run — read the job's log, find the cause, reproduce it on a Linux machine sized like the runner, and fix the test or the code rather than retrying. Use when a check on a pull request or on main fails, a test passes and fails without a change, a release run fails, or when adding a CI job.
 ---
 
+<!-- Edit this in zeabur-oss/skills (skills/zeabur-oss-ci/SKILL.md); the weekly skills sync overwrites the copy in other repositories. -->
+
 # Zeabur OSS CI
 
 ## How it is wired
@@ -24,7 +26,7 @@ The contract of `scripts/ci.sh` (zeabur-oss/.github `README.md`):
 A new check is a new job in `scripts/ci.sh`, not a new workflow step.
 
 `.github/workflows/release.yml` runs on a `vX.Y.Z` tag: all of `ci.yml` (`workflow_call`), then
-the shared release workflow, each stage `scripts/release.sh <stage>`. For a failed release run,
+the shared release workflow, each stage `bun scripts/release.ts <stage>`. For a failed release run,
 read [RELEASE-RECOVERY.md](RELEASE-RECOVERY.md) before changing permissions, packages or
 artifacts.
 

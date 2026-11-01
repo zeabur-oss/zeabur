@@ -3,6 +3,8 @@ name: zeabur-oss-rust
 description: The Rust conventions every zeabur-oss Rust workspace shares (zeabur, identity, builder) — the Nix-pinned nightly, a flat crates/ workspace with downward levels, workspace dependencies, the lint set (no unsafe, no panics on input, #[expect] with a reason, exhaustive matches in security logic, output modules), rustdoc and the checks CI runs. Use before changing any Rust, Cargo or rustfmt/clippy configuration in a zeabur-oss repository.
 ---
 
+<!-- Edit this in zeabur-oss/skills (skills/zeabur-oss-rust/SKILL.md); the weekly skills sync overwrites the copy in other repositories. -->
+
 # Zeabur OSS Rust
 
 The repository's dev skill has its crate table, binaries, extra checks and generated files.

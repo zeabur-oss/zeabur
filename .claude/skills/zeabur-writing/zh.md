@@ -1,3 +1,5 @@
+<!-- Edit this in zeabur-oss/skills (skills/zeabur-writing/zh.md); the weekly skills sync overwrites the copy in other repositories. -->
+
 # Chinese (zh-TW and zh-CN)
 
 <!-- This file quotes the patterns it describes. -->

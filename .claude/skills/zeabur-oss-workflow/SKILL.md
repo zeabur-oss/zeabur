@@ -3,6 +3,8 @@ name: zeabur-oss-workflow
 description: How work moves through every zeabur-oss repository — branches, signed-off Conventional Commits, pull requests, waiting for checks, squash merging, releases (the maintainers' steps), issues (which repository, type, labels, body) and the rules for text that lands in a repository or on GitHub. Use when opening a branch, committing, opening or merging a pull request, preparing a release, or filing an issue in any zeabur-oss repository.
 ---
 
+<!-- Edit this in zeabur-oss/skills (skills/zeabur-oss-workflow/SKILL.md); the weekly skills sync overwrites the copy in other repositories. -->
+
 # Zeabur OSS workflow
 
 The repository's own skill (`<repo>-dev`, `<repo>-workflow`) names its checks, labels and release

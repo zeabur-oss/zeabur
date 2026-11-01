@@ -1,3 +1,5 @@
+<!-- Edit this in zeabur-oss/skills (skills/zeabur-writing/landing-copy.md); the weekly skills sync overwrites the copy in other repositories. -->
+
 # Landing and product pages
 
 Copy on a landing page, a product page or a release page has one job: say what the product does

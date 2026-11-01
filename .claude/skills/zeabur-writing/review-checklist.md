@@ -1,3 +1,5 @@
+<!-- Edit this in zeabur-oss/skills (skills/zeabur-writing/review-checklist.md); the weekly skills sync overwrites the copy in other repositories. -->
+
 # Review checklist
 
 Work through every item for every changed string or paragraph. The review is done when each item holds; a clean Vale run alone is not the review.
