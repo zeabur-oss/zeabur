@@ -16,7 +16,7 @@ info:
   license:
     name: Apache-2.0
     identifier: Apache-2.0
-  version: "0.1.1"
+  version: 0.1.2-beta.0
 paths:
   /api/v1/account:
     get:

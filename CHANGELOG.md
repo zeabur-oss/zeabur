@@ -2,6 +2,54 @@
 
 All notable changes to Zeabur. Versions follow [Semantic Versioning](https://semver.org/); before 1.0.0, a minor or patch release may break the API. Each section comes from the change files in `.changeset/` (CONTRIBUTING.md, "Releases").
 
+## 0.1.2-beta.0 (2026-11-01)
+
+### Features
+
+#### `zeabur-installer` installs only components the catalog tested on the server's distribution
+
+`plan` leaves out a default component that was not tested on K3s, RKE2 or KubeSolo, and installs one the configuration asks for with a warning. `doctor` and `apply` run the health checks the catalog ships with each component, and `doctor` prints the catalog's advice when one fails.
+
+#### A release tag may carry a SemVer pre-release part (`v0.1.2-beta.1`)
+
+Such a release is a GitHub pre-release, never the latest, and has its own section here.
+
+#### Zeabur and `zeaburctl` tell people when a newer version is out
+
+The cluster page shows Zeabur's version. Once a day, the browser checks GitHub's releases. When a newer one is out, the page says so and shows how to upgrade for the way Zeabur was installed. It also says when the running version has known security problems. `zeaburctl` prints one line when a newer version is out, at most once a day. Turn the update check off with the installer's review page checkbox or `updateCheck: false`, the chart's `updateCheck.enabled=false`, `DO_NOT_TRACK=1` or `NO_UPDATE_NOTIFIER`. See [Update check](docs/reference/telemetry.mdx#update-check). `GET /api/v1/cluster/zeabur` returns Zeabur's version, whether the update check is on, and how Zeabur was installed.
+
+### Fixes
+
+- The image is pushed by digest with no `candidate-*` tags left in GHCR
+
+#### Upgrading an installation that has the VictoriaMetrics operator no longer stops on a field conflict over its CRDs
+
+`zeabur-installer apply` now applies only the `crds/` folders Helm would install, and leaves CRDs a chart makes from its templates to Helm.
+
+#### Signing in from far away takes one redirect less
+
+A page opened without a session goes straight to Zeabur Identity instead of through `/auth/login` first. The API gzips JSON answers from a kilobyte up.
+
+#### Zeabur Identity v0.1.2-beta.0
+
+A release installs it in place of v0.1.1. It stores the sign-in pages' styles and scripts brotli-compressed, and its image is pushed by digest without `candidate-*` tags ([its release notes](https://github.com/zeabur-oss/identity/releases/tag/v0.1.2-beta.0)).
+
+#### The installer's components page no longer says a component left out for memory is about building apps
+
+Any component a personal install leaves out because the server has too little memory now reads "Needs N MiB of memory, and this server has less".
+
+#### `zeabur-installer apply` moves the redirect URI of Zeabur's OAuth client
+
+It follows a changed `access.zeabur`, as it already did the home URL. It kept the first host's, so signing in to Zeabur at the new host failed with "This app's return address isn't registered".
+
+#### Zeabur Proxy's image is published with each release
+
+`ghcr.io/zeabur-oss/proxy` is signed and attested with each release, and the chart pins it by digest. 0.1.1 did not publish it, so an installation with VictoriaMetrics or VictoriaLogs left `zeabur-proxy` unable to pull its image.
+
+#### Release notes are the changelog section and a link to the documentation
+
+The digests of the image, each platform's image and the chart are in the signed `digests.txt` asset, as [Releases](docs/reference/releases.mdx) shows.
+
 ## 0.1.1 (2026-10-28)
 
 The first published release. 0.1.0 was never published: zeabur-oss withdrew it in every repository, so everything listed under 0.1.0 in [CHANGELOG.md](https://github.com/zeabur-oss/zeabur/blob/v0.1.1/CHANGELOG.md) ships first in 0.1.1.

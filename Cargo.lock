@@ -2725,7 +2725,7 @@ dependencies = [
 
 [[package]]
 name = "xtask"
-version = "0.1.1"
+version = "0.1.2-beta.0"
 dependencies = [
  "clap",
  "serde-saphyr 2.0.0",
@@ -2746,7 +2746,7 @@ dependencies = [
 
 [[package]]
 name = "zeabur"
-version = "0.1.1"
+version = "0.1.2-beta.0"
 dependencies = [
  "axum",
  "base64 0.23.1",
@@ -2775,7 +2775,7 @@ dependencies = [
 
 [[package]]
 name = "zeabur-api"
-version = "0.1.1"
+version = "0.1.2-beta.0"
 dependencies = [
  "aws-lc-rs",
  "axum",
@@ -2820,7 +2820,7 @@ dependencies = [
 
 [[package]]
 name = "zeabur-auth"
-version = "0.1.1"
+version = "0.1.2-beta.0"
 dependencies = [
  "axum",
  "base64 0.23.1",
@@ -2845,7 +2845,7 @@ dependencies = [
 
 [[package]]
 name = "zeabur-catalog"
-version = "0.1.1"
+version = "0.1.2-beta.0"
 dependencies = [
  "flate2",
  "regex",
@@ -2860,7 +2860,7 @@ dependencies = [
 
 [[package]]
 name = "zeabur-core"
-version = "0.1.1"
+version = "0.1.2-beta.0"
 dependencies = [
  "aws-lc-rs",
  "base64 0.23.1",
@@ -2875,7 +2875,7 @@ dependencies = [
 
 [[package]]
 name = "zeabur-embed"
-version = "0.1.1"
+version = "0.1.2-beta.0"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2883,7 +2883,7 @@ dependencies = [
 
 [[package]]
 name = "zeabur-gaps"
-version = "0.1.1"
+version = "0.1.2-beta.0"
 dependencies = [
  "k8s-openapi",
  "serde-saphyr 2.0.0",
@@ -2895,7 +2895,7 @@ dependencies = [
 
 [[package]]
 name = "zeabur-graph"
-version = "0.1.1"
+version = "0.1.2-beta.0"
 dependencies = [
  "k8s-openapi",
  "proptest",
@@ -2908,7 +2908,7 @@ dependencies = [
 
 [[package]]
 name = "zeabur-installer"
-version = "0.1.1"
+version = "0.1.2-beta.0"
 dependencies = [
  "axum",
  "base64 0.23.1",
@@ -2930,7 +2930,7 @@ dependencies = [
 
 [[package]]
 name = "zeabur-installer-host"
-version = "0.1.1"
+version = "0.1.2-beta.0"
 dependencies = [
  "base64 0.23.1",
  "flate2",
@@ -2949,7 +2949,7 @@ dependencies = [
 
 [[package]]
 name = "zeabur-installer-plan"
-version = "0.1.1"
+version = "0.1.2-beta.0"
 dependencies = [
  "serde",
  "serde-saphyr 2.0.0",
@@ -2959,7 +2959,7 @@ dependencies = [
 
 [[package]]
 name = "zeabur-kube"
-version = "0.1.1"
+version = "0.1.2-beta.0"
 dependencies = [
  "base64 0.23.1",
  "futures-util",
@@ -2985,7 +2985,7 @@ dependencies = [
 
 [[package]]
 name = "zeabur-model"
-version = "0.1.1"
+version = "0.1.2-beta.0"
 dependencies = [
  "k8s-openapi",
  "serde",
@@ -2997,7 +2997,7 @@ dependencies = [
 
 [[package]]
 name = "zeabur-modules"
-version = "0.1.1"
+version = "0.1.2-beta.0"
 dependencies = [
  "k8s-openapi",
  "serde",
@@ -3011,7 +3011,7 @@ dependencies = [
 
 [[package]]
 name = "zeabur-plan"
-version = "0.1.1"
+version = "0.1.2-beta.0"
 dependencies = [
  "base64 0.23.1",
  "bcrypt",
@@ -3030,7 +3030,7 @@ dependencies = [
 
 [[package]]
 name = "zeabur-proxy"
-version = "0.1.1"
+version = "0.1.2-beta.0"
 dependencies = [
  "bytes",
  "clap",
@@ -3059,7 +3059,7 @@ dependencies = [
 
 [[package]]
 name = "zeabur-telemetry"
-version = "0.1.1"
+version = "0.1.2-beta.0"
 dependencies = [
  "rustls",
  "serde",
@@ -3070,7 +3070,7 @@ dependencies = [
 
 [[package]]
 name = "zeabur-test-support"
-version = "0.1.1"
+version = "0.1.2-beta.0"
 dependencies = [
  "kube",
  "rcgen",
@@ -3088,7 +3088,7 @@ dependencies = [
 
 [[package]]
 name = "zeabur-ui"
-version = "0.1.1"
+version = "0.1.2-beta.0"
 dependencies = [
  "axum",
  "brotli-decompressor",
@@ -3102,7 +3102,7 @@ dependencies = [
 
 [[package]]
 name = "zeaburctl"
-version = "0.1.1"
+version = "0.1.2-beta.0"
 dependencies = [
  "axum",
  "bytes",
