@@ -62,6 +62,9 @@ async fn pod(sandbox: &Sandbox, name: &str, image: &str, command: Option<Value>,
     if let Some(command) = command {
         container["command"] = command;
     }
+    if let Some(probe) = extra.get("readinessProbe") {
+        container["readinessProbe"] = probe.clone();
+    }
     let mut volumes = vec![json!({"name": "data", "persistentVolumeClaim": {"claimName": name}})];
     if let Some(more) = extra["volumes"].as_array() {
         volumes.extend(more.iter().cloned());
@@ -160,8 +163,11 @@ async fn a_claims_files_are_listed_and_come_back_byte_for_byte() {
         "store",
         "busybox:1.37",
         Some(json!(["sh", "-c", script])),
+        // Ready once the script has made its last entry, so the listing finds every one.
         json!({"volumes": [{"name": "db", "secret": {"secretName": "db"}}],
-               "volumeMounts": [{"name": "db", "mountPath": "/run/secrets/db"}]}),
+               "volumeMounts": [{"name": "db", "mountPath": "/run/secrets/db"}],
+               "readinessProbe": {"exec": {"command": ["test", "-L", "/data/shortcut"]},
+                                  "periodSeconds": 1}}),
     )
     .await;
     let app = app(&sandbox);
