@@ -10,6 +10,7 @@ pub mod node_name;
 pub mod personal;
 pub mod pins;
 pub mod plan;
+pub mod record;
 pub mod remove;
 pub mod rke2;
 pub mod select;
@@ -32,6 +33,26 @@ pub enum PlanError {
     /// A capability or component name matches nothing in the catalog.
     #[error("`{0}` is not a capability or component in this catalog")]
     Unknown(String),
+    /// `enable` names a component id the catalog renamed.
+    #[error("`{old}` is now `{new}` in this catalog. Write `{new}` in `enable` instead")]
+    Renamed {
+        /// The id in the configuration.
+        old: String,
+        /// The id in the catalog.
+        new: String,
+    },
+    /// The install record was written by a newer installer.
+    #[error(
+        "this server was installed with zeabur-installer {recorded}, which is newer than this one \
+         ({own}). Use zeabur-installer {recorded} or newer: \
+         https://github.com/zeabur-oss/zeabur/releases"
+    )]
+    NewerInstaller {
+        /// The recorded version.
+        recorded: String,
+        /// This installer's version.
+        own: String,
+    },
     /// A chosen component needs one that is disabled or cannot be installed.
     #[error("{component} needs {dependency}, which is disabled or not supported here")]
     NeedsDisabled {

@@ -7,4 +7,4 @@ pub use event::{
     Day, Distribution, ErrorCode, Event, Failure, Install, InstallationId, Mode, Profile, Step,
     ZeaburActive,
 };
-pub use send::{ENDPOINT, PROJECT_KEY, Sender, Show, Switch};
+pub use send::{ENDPOINT, PROJECT_KEY, Sender, Show, Switch, do_not_track, do_not_track_in};

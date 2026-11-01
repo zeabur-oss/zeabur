@@ -6,6 +6,7 @@
       "sha256": "5aa751a909fdf761b58e97953ec92173018115b3ae405f4c9dfc475f54bf737f",
       "url": "https://raw.githubusercontent.com/projectcalico/calico/v3.32.2/manifests/calico-vxlan.yaml"
     },
+    "changes": null,
     "cluster": {
       "checksums": null,
       "distribution": "k3s",

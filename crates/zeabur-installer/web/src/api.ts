@@ -66,6 +66,8 @@ export interface Config {
   allowDataLoss?: string[]
   /** The experience program; on unless `false`. */
   telemetry?: boolean
+  /** The Zeabur panel's update check; on unless `false`. */
+  updateCheck?: boolean
   distribution: Distribution
   k3sVersion?: string | null
   rke2Version?: string | null
@@ -155,8 +157,29 @@ export interface Removal {
   confirmed: boolean
 }
 
+/** What apply changes against the install record of an earlier apply. */
+export interface Changes {
+  /** The installer version that wrote the record. */
+  installer: string
+  added: string[]
+  removed: string[]
+  /** Left out, but with no chart to uninstall: what they installed keeps running. */
+  kept: string[]
+  /** Recorded components the catalog renamed; the new one takes over the old one's release. */
+  replaced: { from: string; to: string }[]
+  charts: { component: string; release: string; from: string; to: string; values: boolean }[]
+  /** New defaults of this catalog that apply leaves out unless chosen. */
+  offered: string[]
+  version: { from: string; to: string } | null
+  hostFiles: string[]
+  /** Apply restarts K3s, RKE2 or KubeSolo. */
+  restart: boolean
+}
+
 interface PlanBase {
   components: PlannedComponent[]
+  /** Null on a first install. */
+  changes: Changes | null
   leftOut: Record<string, string>
   removals: Removal[]
   /** The distribution itself (K3s, RKE2 or KubeSolo), then the measured components. */

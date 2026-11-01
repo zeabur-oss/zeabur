@@ -165,6 +165,11 @@
       "if": { "properties": { "enabled": { "const": true } }, "required": ["enabled"] },
       "then": { "properties": { "installationId": { "minLength": 36 } }, "required": ["installationId"] }
     },
+    "updateCheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": { "enabled": { "type": "boolean" } }
+    },
     "memberRoles": {
       "type": "object",
       "additionalProperties": false,

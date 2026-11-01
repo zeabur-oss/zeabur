@@ -6,6 +6,7 @@ import WarningIcon from "~icons/ph/warning"
 import {
   distributionTitle,
   type CatalogComponent,
+  type Changes,
   type Plan,
   type PlannedComponent,
   type Removal,
@@ -114,6 +115,27 @@ export function ReviewStep({ wizard }: { wizard: Wizard }) {
           <AlertTitle>{t("common.error")}</AlertTitle>
           <AlertDescription>{planned.error}</AlertDescription>
         </Alert>
+      ) : null}
+
+      {plan?.changes ? (
+        <ChangesPanel
+          changes={plan.changes}
+          title={
+            plan.use === "personal" ? "KubeSolo" : distributionTitle[plan.cluster.distribution]
+          }
+          name={(id) => byId.get(id)?.displayName ?? id}
+          enabled={wizard.active.enable}
+          onEnable={(id, on) => {
+            const { enable, disable, inputs, allowDataLoss } = wizard.active
+            const others = enable.filter((x) => x !== id)
+            wizard.setChoices({
+              enable: on ? [...others, id] : others,
+              disable,
+              inputs,
+              allowDataLoss,
+            })
+          }}
+        />
       ) : null}
 
       {plan && fit ? (
@@ -272,6 +294,33 @@ export function ReviewStep({ wizard }: { wizard: Wizard }) {
         </div>
       </Panel>
 
+      {!personal && config.zeabur ? (
+        <Panel title={t("review.updateCheck")}>
+          <div className="flex items-start gap-3">
+            <Checkbox
+              id="update-check"
+              className="mt-0.5"
+              checked={config.updateCheck !== false}
+              onCheckedChange={(updateCheck) => wizard.setConfig({ ...config, updateCheck })}
+            />
+            <div className="flex min-w-0 flex-col gap-1">
+              <label htmlFor="update-check" className="text-sm font-medium text-main">
+                {t("review.updateCheck.label")}
+              </label>
+              <span className="text-sm text-secondary">{t("review.updateCheck.description")}</span>
+              <a
+                href="https://oss.zeabur.com/docs/zeabur/reference/telemetry/#update-check"
+                target="_blank"
+                rel="noreferrer"
+                className={buttonVariants({ variant: "link", size: "sm" })}
+              >
+                {t("review.updateCheck.link")}
+              </a>
+            </div>
+          </div>
+        </Panel>
+      ) : null}
+
       {warnings.length ? (
         <Alert variant="warn">
           <WarningIcon aria-hidden="true" />
@@ -332,6 +381,132 @@ export function ReviewStep({ wizard }: { wizard: Wizard }) {
         </Panel>
       ) : null}
     </StepPage>
+  )
+}
+
+function ChangesPanel({
+  changes,
+  title,
+  name,
+  enabled,
+  onEnable,
+}: {
+  changes: Changes
+  title: string
+  name: (id: string) => string
+  enabled: string[]
+  onEnable: (id: string, on: boolean) => void
+}) {
+  const t = useT()
+  const none =
+    !changes.version &&
+    !changes.restart &&
+    !changes.added.length &&
+    !changes.removed.length &&
+    !changes.kept.length &&
+    !changes.replaced.length &&
+    !changes.charts.length &&
+    !changes.offered.length
+  return (
+    <Panel
+      title={t("review.changes")}
+      action={
+        <span className="text-xs text-secondary">
+          {t("review.changes.recorded", changes.installer)}
+        </span>
+      }
+    >
+      {none ? (
+        <p className="text-sm text-secondary">{t("review.changes.none")}</p>
+      ) : (
+        <Rows>
+          {changes.version || changes.restart ? (
+            <Row label={t("review.kubernetes")}>
+              <div className="flex min-w-0 flex-col gap-1">
+                {changes.version ? (
+                  <span>
+                    {t("review.changes.version", title, changes.version.from, changes.version.to)}
+                  </span>
+                ) : null}
+                {changes.restart ? (
+                  <span className="text-xs text-warn-strong">
+                    {t("review.changes.restart", title)}
+                  </span>
+                ) : null}
+                {changes.hostFiles.length ? (
+                  <span className="font-mono text-xs break-all text-secondary">
+                    {changes.hostFiles.join(", ")}
+                  </span>
+                ) : null}
+              </div>
+            </Row>
+          ) : null}
+          {changes.added.length ? (
+            <Row label={t("review.changes.added")}>{t("common.list", changes.added.map(name))}</Row>
+          ) : null}
+          {changes.removed.length ? (
+            <Row label={t("review.changes.removed")}>
+              {t("common.list", changes.removed.map(name))}
+            </Row>
+          ) : null}
+          {changes.kept.length ? (
+            <Row label={t("review.changes.kept")}>
+              <div className="flex min-w-0 flex-col gap-1">
+                <span>{t("common.list", changes.kept.map(name))}</span>
+                <span className="text-xs text-secondary">{t("review.changes.keptHint")}</span>
+              </div>
+            </Row>
+          ) : null}
+          {changes.replaced.length ? (
+            <Row label={t("review.changes.replaced")}>
+              <div className="flex min-w-0 flex-col gap-2">
+                {changes.replaced.map((r) => (
+                  <span key={r.from}>
+                    {named(
+                      t,
+                      `review.changes.replaced.${r.from}`,
+                      t("review.changes.replacedNote", name(r.from), name(r.to)),
+                    )}
+                  </span>
+                ))}
+              </div>
+            </Row>
+          ) : null}
+          {changes.charts.length ? (
+            <Row label={t("review.changes.charts")}>
+              <div className="flex min-w-0 flex-col gap-1">
+                {changes.charts.map((c) => (
+                  <span key={`${c.component}/${c.release}`}>
+                    {name(c.component)}
+                    <span className="ml-2 font-mono text-xs text-secondary">
+                      {c.release} {c.from === c.to ? c.to : `${c.from} → ${c.to}`}
+                      {c.values ? ` · ${t("review.changes.values")}` : ""}
+                    </span>
+                  </span>
+                ))}
+              </div>
+            </Row>
+          ) : null}
+          {changes.offered.length ? (
+            <Row label={t("review.changes.offered")}>
+              <div className="flex min-w-0 flex-col gap-2">
+                <span className="text-xs text-secondary">{t("review.changes.offeredHint")}</span>
+                {changes.offered.map((id) => (
+                  <span key={id} className="flex items-center gap-2">
+                    <Checkbox
+                      id={`offer-${id}`}
+                      checked={enabled.includes(id)}
+                      onCheckedChange={(on) => onEnable(id, on)}
+                    />
+                    <label htmlFor={`offer-${id}`}>{name(id)}</label>
+                  </span>
+                ))}
+              </div>
+            </Row>
+          ) : null}
+        </Rows>
+      )}
+    </Panel>
   )
 }
 

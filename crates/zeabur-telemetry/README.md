@@ -9,3 +9,6 @@ A [`Sender`] sends nothing unless its [`Switch`] is `On`. `DO_NOT_TRACK` (any va
 `0`) turns it off whatever else is set; `ZEABUR_TELEMETRY=off` does too, and
 `ZEABUR_TELEMETRY=debug` hands the exact request body to a callback instead of sending it. A
 send is one try with a short timeout; a failure is a debug log line and nothing else.
+
+[`do_not_track`] is the one reading of `DO_NOT_TRACK`; the update checks of the interface and
+`zeaburctl` use it too.

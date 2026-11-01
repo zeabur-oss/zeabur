@@ -169,7 +169,8 @@ interface Problems {
   /** Still reading the documents of the projects in trouble. */
   pending: boolean
   incidents: IncidentGroup[]
-  /** Nodes down, full or under pressure, by outcome, that no incident above explains. */
+  /** Nodes down, full or under pressure, by outcome, that no incident above explains, and a
+   * known vulnerability in Zeabur itself. */
   nodes: ClusterItem[]
   /** Cluster warnings that take nothing down yet: a count and a link. */
   notices: number
@@ -225,7 +226,7 @@ function useProblems(adopted: ProjectItem[]): Problems {
   const open = attention.items.filter(
     (i) => (i.health === "fail" || i.health === "warn") && !explained(i),
   )
-  const nodes = open.filter((i) => i.problem)
+  const nodes = open.filter((i) => i.problem || i.lift)
   const groups = groupIncidents(incidents)
   const listed = byOrigin.flatMap((g) => g.items)
   const health: Health =
@@ -363,7 +364,7 @@ function ProblemsSection({ problems }: { problems: Problems }) {
         </Group>
       ) : null}
       {problems.nodes.length > 0 ? (
-        <Group title={t("cluster.nodes")} count={problems.nodes.length}>
+        <Group title={t("cluster.title")} count={problems.nodes.length}>
           {problems.nodes.map((item) => (
             <AttentionRow key={item.key} item={item} inset />
           ))}

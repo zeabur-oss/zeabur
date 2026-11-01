@@ -9,6 +9,7 @@
 //! | Endpoint | Reads (as the person) | Needs |
 //! |---|---|---|
 //! | `GET /cluster` | `/version` | nothing: every signed-in person (`system:public-info-viewer`) |
+//! | `GET /cluster/zeabur` | Zeabur's Deployment; zeabur-installer's `HelmChart` in `kube-system` | nothing; without them, how Zeabur was installed is not known |
 //! | `GET /cluster/upgrades` | `/version`; nodes and Plans when allowed | nothing; nodes and Plans add skew and progress |
 //! | `GET /cluster/nodes` | nodes; pods, node metrics and the metrics store when allowed | `list nodes`; `list pods` (all namespaces) for requests; `list nodes.metrics.k8s.io` for usage; `get` on the metrics store's `services/proxy` for disks |
 //! | `GET /cluster/usage` | pods, all namespaces; pod metrics and namespaces when allowed | `list pods` (all namespaces); `list pods.metrics.k8s.io` for usage; `list namespaces` to tell projects apart (see [`usage`]) |
@@ -66,6 +67,7 @@ pub mod s3_destinations;
 pub mod templates;
 pub mod tools;
 pub mod usage;
+pub(crate) mod zeabur;
 
 use std::collections::BTreeMap;
 
