@@ -114,10 +114,10 @@ becomes the release body as it is.
 
 To release, run the Release pull request workflow, with `prerelease: rc` for a release candidate.
 knope turns the change files into the next `CHANGELOG.md` section and sets `Cargo.toml`;
-`bun scripts/release.ts bump` sets `Cargo.lock`, the chart, the web packages and the API document,
-and zeabur-oss-bot opens `chore(release): vX.Y.Z`. Merging it tags the merge commit and starts the
-release. If a draft's verify job fails because of the check itself, fix the check and run `verify`
-again from a checkout, as [Fix the check and
+`bun scripts/release.ts bump` sets `Cargo.lock`, the chart and the web packages and regenerates
+the API document, and zeabur-oss-bot opens `chore(release): vX.Y.Z`. Merging it tags the merge
+commit and starts the release. If a draft's verify job fails because of the check itself, fix the
+check and run `verify` again from a checkout, as [Fix the check and
 verify again](docs/internal/releasing.md#fix-the-check-and-verify-again) shows.
 
 ## Toolchain

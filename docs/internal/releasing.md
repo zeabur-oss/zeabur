@@ -12,7 +12,7 @@ notes and verifies the assets.
 
 | Stage | Where | Does |
 |---|---|---|
-| `bump` | once, in the release pull request | After knope set `Cargo.toml`, sets `Cargo.lock`'s workspace crates, the chart (`version`, `appVersion`), `web/package.json`, the installer's `package.json`, `openapi.yaml` and the generated `web/src/api/zeabur.ts`. |
+| `bump` | once, in the release pull request | After knope set `Cargo.toml`, sets `Cargo.lock`'s workspace crates, the chart (`version`, `appVersion`), `web/package.json` and the installer's `package.json`, then regenerates `openapi.yaml` and `web/src/api/zeabur.ts` with `cargo xtask openapi`. |
 | `check` | once | The tag is SemVer without build metadata, and the version of every crate, `Cargo.lock`, the chart (`version`, `appVersion`), `web/package.json`, the installer's `package.json` and `openapi.yaml`. Every `ghcr.io/zeabur-oss` image the chart runs is one the release publishes. |
 | `build` | Linux amd64 and arm64, macOS arm64 | On a tag, the catalog and Zeabur Identity pins resolve. Builds the platform (`release-build.sh`; on Linux also Zeabur's and Zeabur Proxy's images), then on Linux smokes the archive, the chart and the image on a k3s cluster with Zeabur Identity at `ZEABUR_IDENTITY_PINNED` (`release-smoke.sh`). A rehearsal also builds a development installer on Linux, which it does not keep. |
 | `sign` | macOS arm64, after `build` | Signs `zeaburctl` with the Developer ID and notarizes it, in the `apple-signing` environment, on `main` and tags only. Without the certificate it leaves the build as it is and warns. |

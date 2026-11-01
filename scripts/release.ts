@@ -209,8 +209,8 @@ async function pins(version: Version): Promise<Record<string, string>> {
 }
 
 // knope (knope.toml) has set [workspace.package] in Cargo.toml; the workspace's crates in
-// Cargo.lock, the chart, the web packages and the API document (openapi.yaml and the client
-// generated from it) follow.
+// Cargo.lock, the chart and the web packages follow, and `cargo xtask openapi` regenerates
+// openapi.yaml and the client from it.
 async function bump(version: Version) {
   const plain = version.plain;
   const metadata =
@@ -244,14 +244,9 @@ async function bump(version: Version) {
     "crates/zeabur-installer/web/package.json",
   ])
     await edit(manifest, [/^(  "version": )"[^"]*"/m, `$1"${plain}"`]);
-  await edit("crates/zeabur-api/openapi.yaml", [
-    /^(  version: )"[^"]*"/m,
-    `$1"${plain}"`,
-  ]);
-  await edit("web/src/api/zeabur.ts", [
-    /^( \* OpenAPI spec version: ).*$/m,
-    `$1${plain}`,
-  ]);
+  // Both take the version from CARGO_PKG_VERSION; the release job has only the root's packages.
+  await $`bun ci`.cwd(join(root, "web"));
+  await $`cargo xtask openapi`.cwd(root);
 }
 
 async function check(version: Version) {
