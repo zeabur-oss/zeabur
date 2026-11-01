@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { readFileSync } from "node:fs"
+import { readdirSync, readFileSync } from "node:fs"
 import { resolve } from "node:path"
 
 import {
@@ -36,6 +36,30 @@ const catalogInputs = (
   }
 ).templates.flatMap((t) => (t.inputs ?? []).map((input) => ({ template: t.id, input })))
 
+/** The words cases of the catalog's `conformance/template/`; the Nix dev shell sets the directory. */
+const cases = resolve(process.env.ZEABUR_CATALOG ?? "", "conformance/template")
+
+type Words = { label: string; description: string }
+type Risk = { risk: string; mitigation: string }
+
+interface WordsCase {
+  language: string
+  template: {
+    security?: {
+      summary: string
+      locales?: Record<string, { summary: string }>
+      risks?: (Risk & { locales: Record<string, Risk> })[]
+    }
+    inputs?: (Words & { name: string; locales: Record<string, Words> })[]
+  }
+  want: { summary?: string; risks?: Risk[]; inputs?: Record<string, Words> }
+}
+
+const words = () =>
+  readdirSync(cases)
+    .map((file) => [file, Bun.YAML.parse(readFileSync(resolve(cases, file), "utf8"))] as const)
+    .filter((entry): entry is readonly [string, WordsCase] => "language" in (entry[1] as object))
+
 const input = (patch: Partial<TemplateInput> & { name: string }): TemplateInput => ({
   description: "",
   pattern: ".*",
@@ -70,6 +94,26 @@ const template = (patch: Partial<AppTemplate>): AppTemplate => ({
   needsClusterIssuer: false,
   ...patch,
 })
+
+const shownWords = (c: WordsCase) => {
+  const security = c.template.security
+  const shown = template({
+    summary: security?.summary ?? "",
+    summaryLocales: Object.fromEntries(
+      Object.entries(security?.locales ?? {}).map(([lang, l]) => [lang, l.summary]),
+    ),
+    risks: security?.risks ?? [],
+    inputs: (c.template.inputs ?? []).map((i) => input(i)),
+  })
+  return {
+    summary: summaryWords(shown, c.language)?.text,
+    risks: shown.risks.map((r) => {
+      const { risk, mitigation } = riskWords(r, c.language)
+      return { risk, mitigation }
+    }),
+    inputs: Object.fromEntries(shown.inputs.map((i) => [i.name, inputWords(i, c.language)])),
+  }
+}
 
 describe("app templates", () => {
   test("a generated value matches its input's pattern in every template", () => {
@@ -136,51 +180,33 @@ describe("app templates", () => {
     expect(deployProblems(template({}), {}, "", null).blocked).toBe(false)
   })
 
-  test("an input is shown in the reader's language, else in English", () => {
-    const email = input({
-      name: "adminEmail",
-      label: "Admin email",
-      description: "The first account's email.",
-      locales: { "zh-TW": { label: "管理員電子郵件", description: "第一個帳號的電子郵件。" } },
-    })
-    expect(inputWords(email, "zh-TW")).toEqual({
-      label: "管理員電子郵件",
-      description: "第一個帳號的電子郵件。",
-    })
-    expect(inputWords(email, "zh-CN")).toEqual({
-      label: "Admin email",
-      description: "The first account's email.",
-    })
-    expect(inputWords(input({ name: "token" }), "en").label).toBe("token")
-    expect(startValues(template({ inputs: [email] }))).toEqual({ adminEmail: "" })
+  test("words are shown as the catalog's cases want", () => {
+    const cases = words()
+    expect(cases).not.toBeEmpty()
+    for (const [file, c] of cases) {
+      expect({ file, ...shownWords(c) }).toEqual({
+        file,
+        summary: c.want.summary,
+        risks: c.want.risks ?? [],
+        inputs: c.want.inputs ?? {},
+      })
+    }
   })
 
-  test("a template's words are shown in the reader's language, else in English", () => {
-    const risk = {
-      risk: "Open to all.",
-      mitigation: "Add a policy.",
-      locales: { "zh-TW": { risk: "對所有人開放。", mitigation: "加上政策。" } },
-    }
-    expect(riskWords(risk, "zh-TW")).toEqual({
-      risk: "對所有人開放。",
-      mitigation: "加上政策。",
-      english: false,
-    })
-    expect(riskWords(risk, "zh-CN")).toEqual({
-      risk: "Open to all.",
-      mitigation: "Add a policy.",
-      english: true,
-    })
-    const said = template({
-      summary: "Runs restricted.",
-      summaryLocales: { "zh-TW": "受限執行。" },
-    })
-    expect(summaryWords(said, "zh-TW")).toEqual({ text: "受限執行。", english: false })
-    expect(summaryWords(said, "en")).toEqual({ text: "Runs restricted.", english: true })
+  test("an input without a label is shown by its name, and an empty summary not at all", () => {
+    expect(inputWords(input({ name: "token" }), "en").label).toBe("token")
     expect(summaryWords(template({ summary: "" }), "en")).toBeUndefined()
+  })
+
+  test("a template's tagline is shown in the reader's language, else in English", () => {
     const ghost = template({ tagline: "A blog.", taglineLocales: { "zh-TW": "部落格。" } })
     expect(taglineWords(ghost, "zh-TW")).toBe("部落格。")
     expect(taglineWords(ghost, "zh-CN")).toBe("A blog.")
+  })
+
+  test("the form starts with every shown input empty", () => {
+    const email = input({ name: "adminEmail", label: "Admin email" })
+    expect(startValues(template({ inputs: [email] }))).toEqual({ adminEmail: "" })
   })
 
   test("generated values sharing a Secret go in one create, before the template", () => {
