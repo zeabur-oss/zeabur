@@ -5,6 +5,14 @@
       {
         "contributedBy": [],
         "displayName": "Traefik Proxy",
+        "health": [
+          {
+            "advice": "Check ingress/traefik.",
+            "name": "gateway-class-accepted-0",
+            "timeout": "60s",
+            "wait": ["gatewayclass/traefik", "--for=condition=Accepted"]
+          }
+        ],
         "id": "ingress/traefik",
         "idleMemoryMib": 22,
         "networkPolicies": [],
@@ -50,12 +58,25 @@
         ],
         "secrets": [],
         "security": "Reads Services, Secrets and routes cluster-wide; writes route status.",
-        "smoke": [["gatewayclass/traefik", "--for=condition=Accepted"]],
         "why": "default"
       },
       {
         "contributedBy": [],
         "displayName": "cert-manager",
+        "health": [
+          {
+            "advice": "Check certificates/cert-manager.",
+            "name": "acme-issuers-0",
+            "timeout": "60s",
+            "wait": ["clusterissuer/letsencrypt-staging", "--for=condition=Ready"]
+          },
+          {
+            "advice": "Check certificates/cert-manager.",
+            "name": "acme-issuers-1",
+            "timeout": "60s",
+            "wait": ["clusterissuer/letsencrypt", "--for=condition=Ready"]
+          }
+        ],
         "id": "certificates/cert-manager",
         "idleMemoryMib": 54,
         "networkPolicies": [],
@@ -97,15 +118,42 @@
         ],
         "secrets": [],
         "security": "Writes Secrets in all namespaces and manages webhook CA bundles.",
-        "smoke": [
-          ["clusterissuer/letsencrypt-staging", "--for=condition=Ready"],
-          ["clusterissuer/letsencrypt", "--for=condition=Ready"]
-        ],
         "why": "default"
       },
       {
         "contributedBy": [],
         "displayName": "Zeabur Builder",
+        "health": [
+          {
+            "advice": "Check builds/zeabur-builder.",
+            "name": "ready-0",
+            "timeout": "60s",
+            "wait": ["-n", "zot", "certificate/zot-tls", "--for=condition=Ready"]
+          },
+          {
+            "advice": "Check builds/zeabur-builder.",
+            "name": "ready-1",
+            "timeout": "60s",
+            "wait": ["-n", "zot", "statefulset/zot", "--for=jsonpath={.status.readyReplicas}=1"]
+          },
+          {
+            "advice": "Check builds/zeabur-builder.",
+            "name": "builder-ready-0",
+            "timeout": "60s",
+            "wait": [
+              "-n",
+              "builder-system",
+              "deployment/zeabur-builder",
+              "--for=condition=Available"
+            ]
+          },
+          {
+            "advice": "Check builds/zeabur-builder.",
+            "name": "builder-ready-1",
+            "timeout": "60s",
+            "wait": ["--for=condition=Established", "crd/builds.builder.zeabur.com"]
+          }
+        ],
         "id": "builds/zeabur-builder",
         "idleMemoryMib": 50,
         "networkPolicies": [],
@@ -176,12 +224,6 @@
         ],
         "secrets": [],
         "security": "Zeabur Builder: a ClusterRole that manages Builds, BuildRuns and Jobs in every namespace; reads Pods and Namespaces; reads, creates, updates and deletes Secrets in every namespace (the Git credentials Builds name, and the copies it puts in build namespaces), and reads the zot token signer. Runs one privileged buildkitd per building namespace in its own namespace, with a user namespace and an egress policy. An admission policy limits the Jobs and StatefulSets it can create. zot: no RBAC, a ServiceAccount without roles; serves the OCI registry API over TLS on port 5000 inside the cluster.\n",
-        "smoke": [
-          ["-n", "zot", "certificate/zot-tls", "--for=condition=Ready"],
-          ["-n", "zot", "statefulset/zot", "--for=jsonpath={.status.readyReplicas}=1"],
-          ["-n", "builder-system", "deployment/zeabur-builder", "--for=condition=Available"],
-          ["--for=condition=Established", "crd/builds.builder.zeabur.com"]
-        ],
         "why": "enabled"
       }
     ],

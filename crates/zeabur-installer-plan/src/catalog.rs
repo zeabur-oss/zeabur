@@ -46,6 +46,8 @@ pub struct Component {
     /// Distributions it works on; empty means any.
     #[serde(default)]
     pub distributions: Vec<String>,
+    /// Distributions the catalog's CI installed it on and passed: `k3s`, `rke2`, `kubesolo`.
+    pub tested_on: Vec<String>,
     /// Releases installed in this order.
     pub releases: Vec<Release>,
     /// Values asked for or generated before installing.
@@ -56,9 +58,9 @@ pub struct Component {
     pub contributes: Vec<Contribution>,
     /// What the component can reach and change.
     pub security: Security,
-    /// Checks that it works after installing.
+    /// Checks that it works once installed, which `apply` waits for and `doctor` runs.
     #[serde(default)]
-    pub smoke: Vec<Smoke>,
+    pub health: Vec<Health>,
     /// The components to install first, then this one, per profile.
     #[serde(default)]
     pub install_order: BTreeMap<String, Vec<String>>,
@@ -281,16 +283,29 @@ pub struct Security {
     pub egress: Vec<String>,
 }
 
-/// One smoke check.
-#[derive(Debug, Clone, Deserialize)]
-pub struct Smoke {
+/// One health check: a single `kubectl wait` that applies nothing.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+pub struct Health {
     /// Its name.
     pub name: String,
-    /// Objects the catalog's CI creates for the test; the installer skips such tests.
-    pub manifest: Option<String>,
-    /// `kubectl wait` arguments.
-    #[serde(default)]
+    /// The arguments of the `kubectl wait`, one per item: a `--for=` condition and no `--timeout`.
     pub wait: Vec<String>,
+    /// How long the wait may take, as `kubectl wait --timeout` reads it.
+    pub timeout: String,
+    /// What to do when it fails, in one English sentence.
+    pub advice: String,
+}
+
+impl Health {
+    /// The arguments of the `kubectl wait`, with `timeout` in place of the check's own.
+    #[must_use]
+    pub fn args<'a>(&'a self, timeout: &'a str) -> Vec<&'a str> {
+        self.wait
+            .iter()
+            .map(String::as_str)
+            .chain(std::iter::once(timeout))
+            .collect()
+    }
 }
 
 /// Idle use measured in CI.
@@ -349,6 +364,12 @@ impl Component {
     #[must_use]
     pub fn supports(&self, distribution: &str) -> bool {
         self.distributions.is_empty() || self.distributions.iter().any(|d| d == distribution)
+    }
+
+    /// Whether the catalog's CI passed with it on a distribution.
+    #[must_use]
+    pub fn is_tested_on(&self, distribution: &str) -> bool {
+        self.tested_on.iter().any(|d| d == distribution)
     }
 
     /// The input whose value the installer generates as a free Service address.

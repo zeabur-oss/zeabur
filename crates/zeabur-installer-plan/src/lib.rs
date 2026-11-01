@@ -15,6 +15,8 @@ pub mod remove;
 pub mod rke2;
 pub mod select;
 pub mod storage;
+#[cfg(any(test, feature = "testing"))]
+pub mod testing;
 pub mod values;
 
 /// Why a plan cannot be made.
@@ -60,6 +62,19 @@ pub enum PlanError {
         component: String,
         /// What it needs.
         dependency: String,
+    },
+    /// A component the configuration names, or one it needs, was not tested on the distribution.
+    #[error(
+        "{component} was not tested on {distribution}. {}",
+        tested_where(.tested_on)
+    )]
+    Untested {
+        /// The component.
+        component: String,
+        /// The distribution of the install.
+        distribution: String,
+        /// Where the catalog tested it.
+        tested_on: Vec<String>,
     },
     /// A required input has no value.
     #[error("{component} needs the input `{input}`; add it to the configuration:\n  {hint}")]
@@ -116,4 +131,12 @@ pub enum PlanError {
          on three servers"
     )]
     SecondServer,
+}
+
+fn tested_where(tested_on: &[String]) -> String {
+    if tested_on.is_empty() {
+        "The catalog has not tested it anywhere".to_owned()
+    } else {
+        format!("The catalog tested it on {}", tested_on.join(", "))
+    }
 }

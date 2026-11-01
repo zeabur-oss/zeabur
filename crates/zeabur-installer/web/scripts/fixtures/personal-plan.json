@@ -5,6 +5,14 @@
       {
         "contributedBy": [],
         "displayName": "Traefik Proxy",
+        "health": [
+          {
+            "advice": "Check ingress/traefik.",
+            "name": "gateway-class-accepted-0",
+            "timeout": "60s",
+            "wait": ["gatewayclass/traefik", "--for=condition=Accepted"]
+          }
+        ],
         "id": "ingress/traefik",
         "idleMemoryMib": 22,
         "networkPolicies": [],
@@ -50,12 +58,25 @@
         ],
         "secrets": [],
         "security": "Reads Services, Secrets and routes cluster-wide; writes route status.",
-        "smoke": [["gatewayclass/traefik", "--for=condition=Accepted"]],
         "why": "default"
       },
       {
         "contributedBy": [],
         "displayName": "cert-manager",
+        "health": [
+          {
+            "advice": "Check certificates/cert-manager.",
+            "name": "acme-issuers-0",
+            "timeout": "60s",
+            "wait": ["clusterissuer/letsencrypt-staging", "--for=condition=Ready"]
+          },
+          {
+            "advice": "Check certificates/cert-manager.",
+            "name": "acme-issuers-1",
+            "timeout": "60s",
+            "wait": ["clusterissuer/letsencrypt", "--for=condition=Ready"]
+          }
+        ],
         "id": "certificates/cert-manager",
         "idleMemoryMib": 54,
         "networkPolicies": [],
@@ -97,10 +118,6 @@
         ],
         "secrets": [],
         "security": "Writes Secrets in all namespaces and manages webhook CA bundles.",
-        "smoke": [
-          ["clusterissuer/letsencrypt-staging", "--for=condition=Ready"],
-          ["clusterissuer/letsencrypt", "--for=condition=Ready"]
-        ],
         "why": "default"
       }
     ],
