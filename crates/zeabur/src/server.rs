@@ -38,6 +38,8 @@ use axum::middleware::Next;
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use secrecy::ExposeSecret as _;
+use tower_http::compression::CompressionLayer;
+use tower_http::compression::predicate::{Predicate, SizeAbove};
 use zeabur_api::ApiError;
 use zeabur_api::access::{ClusterAccess, Handoff};
 use zeabur_api::account::SignInPage;
@@ -125,9 +127,12 @@ pub(crate) fn app(
     let access = Arc::new(SessionAccess {
         origin: auth.public.origin(),
     });
-    let api = zeabur_api::router_with_key(access, plan_key, settings, sign_in, zeabur_proxy).layer(
-        axum::middleware::from_fn_with_state(Arc::clone(auth), session),
-    );
+    let api = zeabur_api::router_with_key(access, plan_key, settings, sign_in, zeabur_proxy)
+        .layer(axum::middleware::from_fn_with_state(
+            Arc::clone(auth),
+            session,
+        ))
+        .layer(compression());
     let sign_in = Router::new()
         .route("/auth/login", get(login))
         .route("/auth/callback", get(callback))
@@ -147,6 +152,26 @@ pub(crate) fn app(
     Router::new()
         .route("/api/healthz", get(|| async { "ok" }))
         .merge(guarded)
+}
+
+/// Gzips the API's JSON from a kilobyte up, which a browser far away gets in fewer round trips.
+/// Streams (logs, files, database dumps) go out as they are written.
+fn compression() -> CompressionLayer<impl Predicate> {
+    CompressionLayer::new().compress_when(SizeAbove::new(1024).and(json))
+}
+
+fn json(
+    _: StatusCode,
+    _: axum::http::Version,
+    headers: &HeaderMap,
+    _: &axum::http::Extensions,
+) -> bool {
+    headers
+        .get(header::CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok())
+        .is_some_and(|kind| {
+            kind.starts_with("application/json") || kind.starts_with("application/problem+json")
+        })
 }
 
 fn problem(kind: Kind, detail: &str) -> Response {

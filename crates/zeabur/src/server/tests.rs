@@ -879,3 +879,44 @@ fn every_request_goes_with_the_session_token() {
     assert_eq!(handoff.token.secret().expose_secret(), "alice:1");
     assert_eq!(handoff.expires_at.as_second(), NOW + 600);
 }
+
+#[tokio::test]
+async fn the_api_gzips_json_but_not_streams_or_small_answers() {
+    let big = "x".repeat(4096);
+    let app = Router::new()
+        .route(
+            "/json",
+            axum::routing::get({
+                let big = big.clone();
+                move || async move { axum::Json(json!({ "big": big })) }
+            }),
+        )
+        .route(
+            "/small",
+            axum::routing::get(|| async { axum::Json(json!({ "ok": true })) }),
+        )
+        .route(
+            "/stream",
+            axum::routing::get(move || async move {
+                ([(header::CONTENT_TYPE, "text/event-stream")], big)
+            }),
+        )
+        .layer(super::compression());
+    let encoding = |path: &'static str| {
+        let app = app.clone();
+        async move {
+            let request = Request::get(path)
+                .header(header::ACCEPT_ENCODING, "gzip, br")
+                .body(Body::empty())
+                .unwrap();
+            let response = app.oneshot(request).await.unwrap();
+            response
+                .headers()
+                .get(header::CONTENT_ENCODING)
+                .map(|v| v.to_str().unwrap().to_owned())
+        }
+    };
+    assert_eq!(encoding("/json").await.as_deref(), Some("gzip"));
+    assert_eq!(encoding("/small").await, None);
+    assert_eq!(encoding("/stream").await, None);
+}
