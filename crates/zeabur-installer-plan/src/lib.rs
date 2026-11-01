@@ -33,7 +33,7 @@ pub enum PlanError {
     /// A capability or component name matches nothing in the catalog.
     #[error("`{0}` is not a capability or component in this catalog")]
     Unknown(String),
-    /// `enable` or `disable` names a component id the catalog renamed.
+    /// `enable` or `disable` names a component id that another component replaces.
     #[error("`{old}` is now `{new}` in this catalog. Write `{new}` in the configuration instead")]
     Renamed {
         /// The id in the configuration.

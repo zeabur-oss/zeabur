@@ -210,7 +210,11 @@ pub fn removals(
         .iter()
         .map(|i| i.component.as_str())
         .filter(|id| !planned.contains(id))
-        .filter(|id| !crate::select::renamed(id).is_some_and(|new| planned.contains(new)))
+        .filter(|id| {
+            !index
+                .replacement_of(id)
+                .is_some_and(|new| planned.contains(new))
+        })
         .collect();
     let mut warnings = Vec::new();
     let mut order: Vec<&Component> = Vec::new();

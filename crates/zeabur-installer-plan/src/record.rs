@@ -221,7 +221,9 @@ impl Changes {
             .cloned()
             .partition(|id| {
                 record.helm.contains(id) && index.component(id).is_some()
-                    || crate::select::renamed(id).is_some_and(|new| planned.contains(new))
+                    || index
+                        .replacement_of(id)
+                        .is_some_and(|new| planned.contains(new))
             });
         let version = record
             .version
