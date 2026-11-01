@@ -14,7 +14,7 @@ import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from "@zeabur/design-system/components/collapsible"
+} from "@zeabur-oss/design-system/components/collapsible"
 import { useT } from "@/i18n"
 import { conditionHealth, statusParts, toYaml, type Condition } from "@/model/object-status"
 

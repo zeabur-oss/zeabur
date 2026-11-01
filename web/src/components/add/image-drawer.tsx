@@ -36,15 +36,15 @@ import {
   type ImageService,
 } from "@/model/image-service"
 import { imageProfile, type Profile } from "@/model/pod-security"
-import { Button } from "@zeabur/design-system/components/button"
+import { Button } from "@zeabur-oss/design-system/components/button"
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from "@zeabur/design-system/components/collapsible"
-import { Input } from "@zeabur/design-system/components/input"
-import { Select } from "@zeabur/design-system/components/select"
-import { Textarea } from "@zeabur/design-system/components/textarea"
+} from "@zeabur-oss/design-system/components/collapsible"
+import { Input } from "@zeabur-oss/design-system/components/input"
+import { Select } from "@zeabur-oss/design-system/components/select"
+import { Textarea } from "@zeabur-oss/design-system/components/textarea"
 
 const MOUNT_PATH = /^\/\S*$/
 const MAX_REPLICAS = 20

@@ -11,9 +11,9 @@ import { useI18n, useT } from "@/i18n"
 import { formatDate } from "@/lib/format"
 import { canIssue, certificateNow, pemProblems, type CertificateNow } from "@/model/cluster-issuers"
 import type { DomainDrawerProps } from "@/routes/service/domain-access"
-import { Input } from "@zeabur/design-system/components/input"
-import { RadioGroup, RadioOption } from "@zeabur/design-system/components/radio"
-import { Select } from "@zeabur/design-system/components/select"
+import { Input } from "@zeabur-oss/design-system/components/input"
+import { RadioGroup, RadioOption } from "@zeabur-oss/design-system/components/radio"
+import { Select } from "@zeabur-oss/design-system/components/select"
 
 type Source = "issuer" | "own"
 type Issuer = Schemas.IssuerView

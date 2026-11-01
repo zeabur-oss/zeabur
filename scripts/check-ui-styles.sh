@@ -55,7 +55,7 @@ while IFS= read -r hit; do
 done < <(grep -rnE --include='*.ts' --include='*.tsx' --include='*.css' "$pattern" web/src || true)
 
 # App code and catalogues: everything under web/src but the generated API types. The components
-# and styles are in @zeabur/design-system.
+# and styles are in @zeabur-oss/design-system.
 sources() {
   grep -rnE --include='*.ts' --include='*.tsx' "$1" web/src --exclude=zeabur.ts || true
 }

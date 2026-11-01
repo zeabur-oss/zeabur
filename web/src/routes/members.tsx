@@ -45,27 +45,27 @@ import {
   type Invitation,
   type Member,
 } from "@/model/members"
-import { Avatar } from "@zeabur/design-system/components/avatar"
-import { Button } from "@zeabur/design-system/components/button"
+import { Avatar } from "@zeabur-oss/design-system/components/avatar"
+import { Button } from "@zeabur-oss/design-system/components/button"
 import {
   Dialog,
   DialogClose,
   DialogContent,
   DialogTitle,
-} from "@zeabur/design-system/components/dialog"
+} from "@zeabur-oss/design-system/components/dialog"
 import {
   Empty,
   EmptyDescription,
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
-} from "@zeabur/design-system/components/empty"
-import { Illustration } from "@zeabur/design-system/components/illustration"
-import { Menu, MenuContent, MenuTrigger } from "@zeabur/design-system/components/menu"
-import { PageColumn } from "@zeabur/design-system/components/page-column"
-import { PageHeader } from "@zeabur/design-system/components/page-header"
-import { Skeleton } from "@zeabur/design-system/components/skeleton"
-import { Tooltip } from "@zeabur/design-system/components/tooltip"
+} from "@zeabur-oss/design-system/components/empty"
+import { Illustration } from "@zeabur-oss/design-system/components/illustration"
+import { Menu, MenuContent, MenuTrigger } from "@zeabur-oss/design-system/components/menu"
+import { PageColumn } from "@zeabur-oss/design-system/components/page-column"
+import { PageHeader } from "@zeabur-oss/design-system/components/page-header"
+import { Skeleton } from "@zeabur-oss/design-system/components/skeleton"
+import { Tooltip } from "@zeabur-oss/design-system/components/tooltip"
 import type { Gate } from "@/model/rights"
 
 const open: Gate = { open: true }

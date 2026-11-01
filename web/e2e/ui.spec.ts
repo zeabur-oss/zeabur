@@ -91,7 +91,7 @@ test("Home names the failing service across projects and lists the project", asy
 test("a popup pressed before its code arrives opens when it does, by click and by key", async ({
   page,
 }) => {
-  // Holds back the popups' code (@zeabur/design-system's popup.tsx) until `release`.
+  // Holds back the popups' code (@zeabur-oss/design-system's popup.tsx) until `release`.
   const hold = async () => {
     let release = () => {}
     const held = new Promise<void>((resolve) => (release = resolve))

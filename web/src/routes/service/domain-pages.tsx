@@ -24,11 +24,11 @@ import {
 import { projectTitle } from "@/model/project"
 import type { Service } from "@/model/service"
 import { templateRoom } from "@/model/template-room"
-import { Alert, AlertDescription, AlertTitle } from "@zeabur/design-system/components/alert"
-import { Label } from "@zeabur/design-system/components/label"
-import { Select } from "@zeabur/design-system/components/select"
-import { Switch } from "@zeabur/design-system/components/switch"
-import { Textarea } from "@zeabur/design-system/components/textarea"
+import { Alert, AlertDescription, AlertTitle } from "@zeabur-oss/design-system/components/alert"
+import { Label } from "@zeabur-oss/design-system/components/label"
+import { Select } from "@zeabur-oss/design-system/components/select"
+import { Switch } from "@zeabur-oss/design-system/components/switch"
+import { Textarea } from "@zeabur-oss/design-system/components/textarea"
 
 function defaults(t: Translate, project: string): Pages {
   const page = (heading: string, line: string) =>

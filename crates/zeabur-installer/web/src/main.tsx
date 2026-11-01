@@ -5,7 +5,7 @@ import { App } from "@/app"
 import { I18nProvider, prepareI18n } from "@/i18n"
 import "@/styles/app.css"
 import { followSystemTheme } from "@/theme"
-import { TooltipProvider } from "@zeabur/design-system/components/tooltip"
+import { TooltipProvider } from "@zeabur-oss/design-system/components/tooltip"
 
 followSystemTheme()
 

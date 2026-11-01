@@ -9,14 +9,14 @@ import { FormField } from "@/components/form-field"
 import { usePlanner } from "@/components/plan/planner"
 import { useT } from "@/i18n"
 import { DISPLAY_NAME_MAX, newProjectProblem } from "@/model/project"
-import { Button } from "@zeabur/design-system/components/button"
+import { Button } from "@zeabur-oss/design-system/components/button"
 import {
   Dialog,
   DialogClose,
   DialogContent,
   DialogTitle,
-} from "@zeabur/design-system/components/dialog"
-import { Input } from "@zeabur/design-system/components/input"
+} from "@zeabur-oss/design-system/components/dialog"
+import { Input } from "@zeabur-oss/design-system/components/input"
 
 /** "New project", for those who may create namespaces. */
 export function NewProjectButton({

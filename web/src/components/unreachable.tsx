@@ -15,8 +15,8 @@ import {
   AlertAction,
   AlertDescription,
   AlertTitle,
-} from "@zeabur/design-system/components/alert"
-import { Button } from "@zeabur/design-system/components/button"
+} from "@zeabur-oss/design-system/components/alert"
+import { Button } from "@zeabur-oss/design-system/components/button"
 
 const RETRY = 15_000
 

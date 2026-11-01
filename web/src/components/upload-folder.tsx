@@ -5,9 +5,9 @@ import { FormDrawer } from "@/components/plan/plan-drawer"
 import { useI18n, useT } from "@/i18n"
 import { formatSize } from "@/lib/format"
 import { retryUpload, startUpload, useUpload } from "@/model/upload"
-import { Alert, AlertAction, AlertDescription } from "@zeabur/design-system/components/alert"
-import { Button } from "@zeabur/design-system/components/button"
-import { Meter } from "@zeabur/design-system/components/meter"
+import { Alert, AlertAction, AlertDescription } from "@zeabur-oss/design-system/components/alert"
+import { Button } from "@zeabur-oss/design-system/components/button"
+import { Meter } from "@zeabur-oss/design-system/components/meter"
 
 /** Where an upload to the Build is: asking for permission, sending, starting the build, or why
  * it stopped. */

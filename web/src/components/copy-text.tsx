@@ -2,7 +2,7 @@ import { useState } from "react"
 import CheckIcon from "~icons/ph/check"
 import CopyIcon from "~icons/ph/copy"
 
-import { Button } from "@zeabur/design-system/components/button"
+import { Button } from "@zeabur-oss/design-system/components/button"
 import { useT } from "@/i18n"
 
 /** A labelled button that copies text made when it is pressed. */

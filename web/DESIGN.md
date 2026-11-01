@@ -1,7 +1,7 @@
 # Zeabur interface design
 
 Rules for the web interface. Components, tokens and fonts come from
-[@zeabur/design-system](https://github.com/zeabur-oss/design-system) (its README lists the tokens;
+[@zeabur-oss/design-system](https://github.com/zeabur-oss/design-system) (its README lists the tokens;
 preview them in its Storybook). Build from its components and their variants rather than
 look-alikes; `src/styles/app.css` imports it and adds only this interface's layout tokens.
 
@@ -64,7 +64,7 @@ the design system's components by their import (`componentImports` in `.oxlintrc
   properties, read by classes (`left-(--x)`, `translate-y-(--slide-y)`, `h-(--bar)`).
 - **Design system components only** (`no-restricted-imports`): no `@base-ui/react`, Radix,
   Headless UI or Motion imports in app code; a missing component is added to the design system.
-- **Guarded motion** (`zeabur/no-unguarded-motion`, from `@zeabur/design-system/lint`):
+- **Guarded motion** (`zeabur/no-unguarded-motion`, from `@zeabur-oss/design-system/lint`):
   `transition-transform`, `transition-all`, `animate-spin` and the like are written `motion-safe:`,
   or the motion is a design-system utility.
 - **Static classes** (`require-static-classes`): a component's `className` is literal strings or

@@ -8,12 +8,12 @@ import TrashIcon from "~icons/ph/trash"
 import type { Schemas } from "@/api/client"
 import { namespaceQuery } from "@/api/queries"
 import { YamlBlock } from "@/components/yaml"
-import { Alert, AlertDescription, AlertTitle } from "@zeabur/design-system/components/alert"
+import { Alert, AlertDescription, AlertTitle } from "@zeabur-oss/design-system/components/alert"
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from "@zeabur/design-system/components/collapsible"
+} from "@zeabur-oss/design-system/components/collapsible"
 import { useI18n, useT, type Translate } from "@/i18n"
 import { formatAgo } from "@/lib/format"
 import { cn } from "@/lib/utils"

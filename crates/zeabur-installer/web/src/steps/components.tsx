@@ -24,20 +24,20 @@ import {
 } from "@/lib/inputs"
 import { memoryFit } from "@/lib/memory"
 import { StepPage } from "@/steps/frame"
-import { Alert, AlertDescription, AlertTitle } from "@zeabur/design-system/components/alert"
-import { Badge } from "@zeabur/design-system/components/badge"
-import { Button } from "@zeabur/design-system/components/button"
-import { Checkbox } from "@zeabur/design-system/components/checkbox"
+import { Alert, AlertDescription, AlertTitle } from "@zeabur-oss/design-system/components/alert"
+import { Badge } from "@zeabur-oss/design-system/components/badge"
+import { Button } from "@zeabur-oss/design-system/components/button"
+import { Checkbox } from "@zeabur-oss/design-system/components/checkbox"
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from "@zeabur/design-system/components/collapsible"
-import { Field, FieldDescription, FieldLabel } from "@zeabur/design-system/components/field"
-import { Input } from "@zeabur/design-system/components/input"
-import { LoadingDots } from "@zeabur/design-system/components/spinner"
-import { Textarea } from "@zeabur/design-system/components/textarea"
-import { Tooltip } from "@zeabur/design-system/components/tooltip"
+} from "@zeabur-oss/design-system/components/collapsible"
+import { Field, FieldDescription, FieldLabel } from "@zeabur-oss/design-system/components/field"
+import { Input } from "@zeabur-oss/design-system/components/input"
+import { LoadingDots } from "@zeabur-oss/design-system/components/spinner"
+import { Textarea } from "@zeabur-oss/design-system/components/textarea"
+import { Tooltip } from "@zeabur-oss/design-system/components/tooltip"
 
 export function ComponentsStep({ wizard }: { wizard: Wizard }) {
   const t = useT()

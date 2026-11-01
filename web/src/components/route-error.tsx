@@ -1,9 +1,9 @@
 import type { ErrorComponentProps } from "@tanstack/react-router"
 
 import { Problem } from "@/components/problem"
-import { Button } from "@zeabur/design-system/components/button"
+import { Button } from "@zeabur-oss/design-system/components/button"
 import { useT } from "@/i18n"
-import { Illustration } from "@zeabur/design-system/components/illustration"
+import { Illustration } from "@zeabur-oss/design-system/components/illustration"
 
 export function RouteErrorView({ error, reset }: ErrorComponentProps) {
   const t = useT()

@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router"
 
 import { useLogsReadable } from "@/api/logs-access"
-import { Tooltip } from "@zeabur/design-system/components/tooltip"
+import { Tooltip } from "@zeabur-oss/design-system/components/tooltip"
 import { useT } from "@/i18n"
 import { podLogsLink } from "@/lib/place"
 import { cn } from "@/lib/utils"

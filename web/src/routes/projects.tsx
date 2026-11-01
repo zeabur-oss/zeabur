@@ -21,14 +21,14 @@ import {
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
-} from "@zeabur/design-system/components/empty"
-import { Button } from "@zeabur/design-system/components/button"
-import { Illustration } from "@zeabur/design-system/components/illustration"
-import { Label } from "@zeabur/design-system/components/label"
-import { PageHeader } from "@zeabur/design-system/components/page-header"
-import { Skeleton } from "@zeabur/design-system/components/skeleton"
-import { Switch } from "@zeabur/design-system/components/switch"
-import { PageColumn } from "@zeabur/design-system/components/page-column"
+} from "@zeabur-oss/design-system/components/empty"
+import { Button } from "@zeabur-oss/design-system/components/button"
+import { Illustration } from "@zeabur-oss/design-system/components/illustration"
+import { Label } from "@zeabur-oss/design-system/components/label"
+import { PageHeader } from "@zeabur-oss/design-system/components/page-header"
+import { Skeleton } from "@zeabur-oss/design-system/components/skeleton"
+import { Switch } from "@zeabur-oss/design-system/components/switch"
+import { PageColumn } from "@zeabur-oss/design-system/components/page-column"
 
 const route = getRouteApi("/projects")
 

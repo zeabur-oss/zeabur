@@ -26,9 +26,9 @@ import {
 } from "@/model/databases"
 import type { ServiceMode } from "@/routes/search"
 import { ModeSwitch } from "@/routes/service/views"
-import { Button } from "@zeabur/design-system/components/button"
-import { SectionHeader } from "@zeabur/design-system/components/section-header"
-import { Select } from "@zeabur/design-system/components/select"
+import { Button } from "@zeabur-oss/design-system/components/button"
+import { SectionHeader } from "@zeabur-oss/design-system/components/section-header"
+import { Select } from "@zeabur-oss/design-system/components/select"
 
 const parts = ["compute", "storage"] as const
 

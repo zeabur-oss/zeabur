@@ -34,9 +34,9 @@ import {
 import { deletionOf } from "@/model/risk"
 import { dropHandoff, handedOff } from "@/lib/adding"
 import { appended, offered, templateOf } from "@/model/templates"
-import { Alert, AlertDescription } from "@zeabur/design-system/components/alert"
-import { Button, buttonVariants } from "@zeabur/design-system/components/button"
-import { Dialog, DialogContent, DialogTitle } from "@zeabur/design-system/components/dialog"
+import { Alert, AlertDescription } from "@zeabur-oss/design-system/components/alert"
+import { Button, buttonVariants } from "@zeabur-oss/design-system/components/button"
+import { Dialog, DialogContent, DialogTitle } from "@zeabur-oss/design-system/components/dialog"
 import {
   Menu,
   MenuContent,
@@ -44,9 +44,9 @@ import {
   MenuLabel,
   MenuSeparator,
   MenuTrigger,
-} from "@zeabur/design-system/components/menu"
-import { PageColumn } from "@zeabur/design-system/components/page-column"
-import { PageHeader } from "@zeabur/design-system/components/page-header"
+} from "@zeabur-oss/design-system/components/menu"
+import { PageColumn } from "@zeabur-oss/design-system/components/page-column"
+import { PageHeader } from "@zeabur-oss/design-system/components/page-header"
 
 const YamlEditor = lazy(() =>
   import("@/components/yaml-editor").then((m) => ({ default: m.YamlEditor })),

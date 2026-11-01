@@ -3,7 +3,7 @@ import CaretRightIcon from "~icons/ph/caret-right"
 
 import { useT } from "@/i18n"
 import { cn } from "@/lib/utils"
-import { Button } from "@zeabur/design-system/components/button"
+import { Button } from "@zeabur-oss/design-system/components/button"
 
 /** The tabs, with a button to scroll on while some of them are out of view. */
 export function TabRow({ children }: { children: ReactNode }) {

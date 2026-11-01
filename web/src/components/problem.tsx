@@ -5,12 +5,12 @@ import WarningCircleIcon from "~icons/ph/warning-circle"
 import { ApiError, toProblem, type Problem as ProblemBody, type Schemas } from "@/api/client"
 import { Ago } from "@/components/bits"
 import { isRefusal, permission, Refused } from "@/components/refused"
-import { Alert, AlertDescription, AlertTitle } from "@zeabur/design-system/components/alert"
+import { Alert, AlertDescription, AlertTitle } from "@zeabur-oss/design-system/components/alert"
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from "@zeabur/design-system/components/collapsible"
+} from "@zeabur-oss/design-system/components/collapsible"
 import { useI18n, useT } from "@/i18n"
 import { isKind, problemText } from "@/model/problem"
 

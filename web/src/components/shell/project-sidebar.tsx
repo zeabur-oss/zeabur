@@ -52,9 +52,9 @@ import {
   SidebarItem,
   SidebarMenu,
   SidebarSection,
-} from "@zeabur/design-system/components/sidebar"
-import { Skeleton } from "@zeabur/design-system/components/skeleton"
-import { Tooltip } from "@zeabur/design-system/components/tooltip"
+} from "@zeabur-oss/design-system/components/sidebar"
+import { Skeleton } from "@zeabur-oss/design-system/components/skeleton"
+import { Tooltip } from "@zeabur-oss/design-system/components/tooltip"
 
 const roleKube: Record<string, string> = {
   web: "Ingress",

@@ -7,8 +7,8 @@ import { FormField } from "@/components/form-field"
 import { useT } from "@/i18n"
 import type { Frequency, TargetProblem } from "@/model/databases"
 import { type Destination, fromDestination, manual, type S3Target } from "@/model/s3-destinations"
-import { Input } from "@zeabur/design-system/components/input"
-import { Select } from "@zeabur/design-system/components/select"
+import { Input } from "@zeabur-oss/design-system/components/input"
+import { Select } from "@zeabur-oss/design-system/components/select"
 
 type S3 = S3Target
 type Field = Exclude<keyof S3, "destination">

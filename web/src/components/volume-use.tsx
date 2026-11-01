@@ -7,7 +7,7 @@ import { useQuantityFormat } from "@/lib/quantity"
 import { cn } from "@/lib/utils"
 import type { Service } from "@/model/service"
 import { missingReason, volumeFill, type MissingReason, type VolumeFill } from "@/model/volume-use"
-import { Meter } from "@zeabur/design-system/components/meter"
+import { Meter } from "@zeabur-oss/design-system/components/meter"
 
 const tone = { ok: "ok", warn: "warn", fail: "over", progress: "ok", idle: "muted" } as const
 

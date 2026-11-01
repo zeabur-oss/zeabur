@@ -2,8 +2,8 @@ import type { ReactNode } from "react"
 
 import type { PlanStepState } from "@/components/plan/planner"
 import { useT } from "@/i18n"
-import { Button } from "@zeabur/design-system/components/button"
-import { Drawer } from "@zeabur/design-system/components/drawer"
+import { Button } from "@zeabur-oss/design-system/components/button"
+import { Drawer } from "@zeabur-oss/design-system/components/drawer"
 
 /** A form in a drawer whose plan is the drawer's second step, with Back to the form. */
 export function PlanDrawer({

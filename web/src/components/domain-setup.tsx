@@ -8,7 +8,7 @@ import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from "@zeabur/design-system/components/collapsible"
+} from "@zeabur-oss/design-system/components/collapsible"
 import { useI18n, useT } from "@/i18n"
 import { formatDate } from "@/lib/format"
 import { cn } from "@/lib/utils"
@@ -21,7 +21,7 @@ import {
   wildcardFor,
   type DnsRecord,
 } from "@/model/domains"
-import { Button } from "@zeabur/design-system/components/button"
+import { Button } from "@zeabur-oss/design-system/components/button"
 import { severity } from "@/model/severity"
 
 type DomainCheck = Schemas.DomainCheck

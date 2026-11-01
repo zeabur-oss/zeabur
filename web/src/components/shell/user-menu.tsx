@@ -17,7 +17,7 @@ import { lastKnown } from "@/lib/last-known"
 import { nameSourceOf } from "@/lib/cluster-name"
 import { personOf } from "@/lib/identity"
 import { setTheme, useTheme, type ThemeChoice } from "@/theme"
-import { Avatar } from "@zeabur/design-system/components/avatar"
+import { Avatar } from "@zeabur-oss/design-system/components/avatar"
 import {
   Menu,
   MenuContent,
@@ -25,8 +25,8 @@ import {
   MenuLabel,
   MenuSeparator,
   MenuTrigger,
-} from "@zeabur/design-system/components/menu"
-import { ContextChip } from "@zeabur/design-system/components/context-chip"
+} from "@zeabur-oss/design-system/components/menu"
+import { ContextChip } from "@zeabur-oss/design-system/components/context-chip"
 
 const themes: { value: ThemeChoice; icon: typeof SunIcon }[] = [
   { value: "system", icon: DesktopIcon },

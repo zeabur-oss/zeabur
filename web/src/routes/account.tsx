@@ -20,13 +20,13 @@ import {
   roles,
   type ProjectAccess,
 } from "@/model/account"
-import { Alert, AlertDescription } from "@zeabur/design-system/components/alert"
-import { Badge } from "@zeabur/design-system/components/badge"
-import { buttonVariants } from "@zeabur/design-system/components/button"
-import { Empty, EmptyHeader, EmptyTitle } from "@zeabur/design-system/components/empty"
-import { PageColumn } from "@zeabur/design-system/components/page-column"
-import { PageHeader } from "@zeabur/design-system/components/page-header"
-import { Skeleton } from "@zeabur/design-system/components/skeleton"
+import { Alert, AlertDescription } from "@zeabur-oss/design-system/components/alert"
+import { Badge } from "@zeabur-oss/design-system/components/badge"
+import { buttonVariants } from "@zeabur-oss/design-system/components/button"
+import { Empty, EmptyHeader, EmptyTitle } from "@zeabur-oss/design-system/components/empty"
+import { PageColumn } from "@zeabur-oss/design-system/components/page-column"
+import { PageHeader } from "@zeabur-oss/design-system/components/page-header"
+import { Skeleton } from "@zeabur-oss/design-system/components/skeleton"
 
 type Account = Schemas.AccountView
 

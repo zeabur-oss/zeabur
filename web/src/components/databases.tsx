@@ -16,7 +16,7 @@ import { StorageClassField, StorageSizeField, useStorage } from "@/components/st
 import { useGate } from "@/components/gate"
 import { OpenButton } from "@/components/store-detail"
 import { useT } from "@/i18n"
-import { Tooltip } from "@zeabur/design-system/components/tooltip"
+import { Tooltip } from "@zeabur-oss/design-system/components/tooltip"
 import { databaseLink } from "@/lib/place"
 import { engineVersion } from "@/model/database-parts"
 import { pendingDatabase } from "@/model/connect"
@@ -38,8 +38,8 @@ import {
   type Engine,
   type NewDatabase,
 } from "@/model/databases"
-import { Alert, AlertDescription } from "@zeabur/design-system/components/alert"
-import { Select } from "@zeabur/design-system/components/select"
+import { Alert, AlertDescription } from "@zeabur-oss/design-system/components/alert"
+import { Select } from "@zeabur-oss/design-system/components/select"
 
 export const useDatabases = (project: string) => useQuery(databasesQuery(project))
 

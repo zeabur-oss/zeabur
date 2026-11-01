@@ -9,7 +9,7 @@ import { Problem } from "@/components/problem"
 import { useT } from "@/i18n"
 import type { DockTab } from "@/lib/dock"
 import { NODE_SHELL_NAMESPACE, nodeShellUrl } from "@/model/node-shell"
-import { Button } from "@zeabur/design-system/components/button"
+import { Button } from "@zeabur-oss/design-system/components/button"
 
 type NodeShellTabProps = {
   tab: Extract<DockTab, { kind: "node" }>

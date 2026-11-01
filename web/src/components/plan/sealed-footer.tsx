@@ -2,7 +2,7 @@ import type { ReactNode } from "react"
 
 import { COUNTDOWN_FROM_SECONDS, clock } from "@/components/plan/expiry"
 import { useT } from "@/i18n"
-import { Button } from "@zeabur/design-system/components/button"
+import { Button } from "@zeabur-oss/design-system/components/button"
 
 /** The footer of a dialog that applies a sealed plan: the way back, the time left once it runs
  * short, and the confirm button, or Plan again once the plan expired. */

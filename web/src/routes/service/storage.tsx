@@ -29,12 +29,12 @@ import { useGate } from "@/components/gate"
 import { useDraft, useHold } from "@/components/plan/draft"
 import { usePlanner } from "@/components/plan/planner"
 import { StatusPill } from "@/components/status"
-import { Button } from "@zeabur/design-system/components/button"
+import { Button } from "@zeabur-oss/design-system/components/button"
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from "@zeabur/design-system/components/collapsible"
+} from "@zeabur-oss/design-system/components/collapsible"
 import {
   Empty,
   EmptyContent,
@@ -42,11 +42,11 @@ import {
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
-} from "@zeabur/design-system/components/empty"
-import { Input } from "@zeabur/design-system/components/input"
-import { SectionHeader } from "@zeabur/design-system/components/section-header"
-import { Select } from "@zeabur/design-system/components/select"
-import { Switch } from "@zeabur/design-system/components/switch"
+} from "@zeabur-oss/design-system/components/empty"
+import { Input } from "@zeabur-oss/design-system/components/input"
+import { SectionHeader } from "@zeabur-oss/design-system/components/section-header"
+import { Select } from "@zeabur-oss/design-system/components/select"
+import { Switch } from "@zeabur-oss/design-system/components/switch"
 import { ContainerField } from "@/routes/service/container-field"
 import { useT, type Translate } from "@/i18n"
 import { createdKey, entrance } from "@/lib/created"

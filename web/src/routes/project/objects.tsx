@@ -17,7 +17,7 @@ import { UpdatedAt } from "@/components/freshness"
 import { LoadingRows } from "@/components/page"
 import { Problem } from "@/components/problem"
 import { permission, Refused, RefusedSome } from "@/components/refused"
-import { Button, buttonVariants } from "@zeabur/design-system/components/button"
+import { Button, buttonVariants } from "@zeabur-oss/design-system/components/button"
 import { useT } from "@/i18n"
 import { kindName } from "@/i18n/kind-name"
 import { parseObjectKey } from "@/lib/objects"
@@ -29,9 +29,9 @@ import {
   EmptyDescription,
   EmptyHeader,
   EmptyMedia,
-} from "@zeabur/design-system/components/empty"
-import { Illustration } from "@zeabur/design-system/components/illustration"
-import { PageColumn } from "@zeabur/design-system/components/page-column"
+} from "@zeabur-oss/design-system/components/empty"
+import { Illustration } from "@zeabur-oss/design-system/components/illustration"
+import { PageColumn } from "@zeabur-oss/design-system/components/page-column"
 
 const ObjectSheet = lazy(() =>
   import("@/components/object-sheet").then((m) => ({ default: m.ObjectSheet })),

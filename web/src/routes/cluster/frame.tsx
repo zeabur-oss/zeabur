@@ -6,13 +6,13 @@ import { clusterQuery, upgradesQuery } from "@/api/queries"
 import { OpenClusterKubectl } from "@/components/dock/open-in-terminal"
 import { StatusPill } from "@/components/status"
 import { UnreachableBanner, useReachability } from "@/components/unreachable"
-import { Tabs, TabsList, TabsTrigger } from "@zeabur/design-system/components/tabs"
+import { Tabs, TabsList, TabsTrigger } from "@zeabur-oss/design-system/components/tabs"
 import { useT } from "@/i18n"
 import { Forbidden, overviewRole } from "@/routes/cluster/forbidden"
 import { useUpgradeBadge } from "@/routes/cluster/upgrade"
 import { ZeaburVersionBadges } from "@/routes/cluster/zeabur-version"
-import { PageHeader } from "@zeabur/design-system/components/page-header"
-import { PageColumn } from "@zeabur/design-system/components/page-column"
+import { PageHeader } from "@zeabur-oss/design-system/components/page-header"
+import { PageColumn } from "@zeabur-oss/design-system/components/page-column"
 
 const paths = {
   overview: "/cluster",

@@ -6,7 +6,7 @@ import { imageInspectionQuery } from "@/api/queries"
 import { useT } from "@/i18n"
 import { imageProblem } from "@/model/image-service"
 import type { PortNote } from "@/model/image-ports"
-import { Button } from "@zeabur/design-system/components/button"
+import { Button } from "@zeabur-oss/design-system/components/button"
 
 const SETTLE_MS = 600
 

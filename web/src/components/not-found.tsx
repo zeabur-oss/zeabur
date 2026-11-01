@@ -1,15 +1,15 @@
 import { Link } from "@tanstack/react-router"
-import { buttonVariants } from "@zeabur/design-system/components/button"
+import { buttonVariants } from "@zeabur-oss/design-system/components/button"
 import {
   Empty,
   EmptyContent,
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
-} from "@zeabur/design-system/components/empty"
+} from "@zeabur-oss/design-system/components/empty"
 import { useT } from "@/i18n"
 import { cn } from "@/lib/utils"
-import { Illustration } from "@zeabur/design-system/components/illustration"
+import { Illustration } from "@zeabur-oss/design-system/components/illustration"
 
 export function NotFound() {
   const t = useT()

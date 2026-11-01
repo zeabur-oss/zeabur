@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query"
-import { Select } from "@zeabur/design-system/components/select"
+import { Select } from "@zeabur-oss/design-system/components/select"
 
 import { namespaceQuery } from "@/api/queries"
 import { FormField } from "@/components/form-field"

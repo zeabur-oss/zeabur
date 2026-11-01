@@ -10,9 +10,9 @@ import { Panel, Segmented } from "@/components/bits"
 import { useT } from "@/i18n"
 import { StepPage } from "@/steps/frame"
 import { hostName, isPublic, SuffixesPanel, suffixesValid } from "@/steps/suffixes"
-import { Button } from "@zeabur/design-system/components/button"
-import { Field, FieldDescription, FieldLabel } from "@zeabur/design-system/components/field"
-import { Input } from "@zeabur/design-system/components/input"
+import { Button } from "@zeabur-oss/design-system/components/button"
+import { Field, FieldDescription, FieldLabel } from "@zeabur-oss/design-system/components/field"
+import { Input } from "@zeabur-oss/design-system/components/input"
 
 export function AccessStep({ wizard }: { wizard: Wizard }) {
   const t = useT()

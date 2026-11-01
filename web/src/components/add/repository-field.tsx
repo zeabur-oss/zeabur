@@ -17,8 +17,8 @@ import {
   ComboboxInput,
   ComboboxItem,
   ComboboxList,
-} from "@zeabur/design-system/components/combobox"
-import { Input } from "@zeabur/design-system/components/input"
+} from "@zeabur-oss/design-system/components/combobox"
+import { Input } from "@zeabur-oss/design-system/components/input"
 
 type Source = "github" | "url"
 

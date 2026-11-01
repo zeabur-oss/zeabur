@@ -15,15 +15,15 @@ import { AlertList, AlertsRefused, RecentNote } from "@/components/alerts"
 import { Ago, Segmented } from "@/components/bits"
 import { refusedAmong, RefusedKinds } from "@/components/refused"
 import { StatusDot, StatusPill } from "@/components/status"
-import { Button } from "@zeabur/design-system/components/button"
+import { Button } from "@zeabur-oss/design-system/components/button"
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from "@zeabur/design-system/components/collapsible"
-import { Drawer } from "@zeabur/design-system/components/drawer"
-import { Timeline, TimelineItem } from "@zeabur/design-system/components/timeline"
-import { Tooltip } from "@zeabur/design-system/components/tooltip"
+} from "@zeabur-oss/design-system/components/collapsible"
+import { Drawer } from "@zeabur-oss/design-system/components/drawer"
+import { Timeline, TimelineItem } from "@zeabur-oss/design-system/components/timeline"
+import { Tooltip } from "@zeabur-oss/design-system/components/tooltip"
 import {
   BackupDetails,
   CoverageRow,
@@ -67,7 +67,7 @@ import { folded, serviceOf, type Alert } from "@/model/alerts"
 import { activityTone, warningTone, warningVariant } from "@/model/severity"
 import { refusedPlaces } from "@/routes/project/data"
 import { FilterBox } from "@/routes/project/filter-box"
-import { MeterStack, meterPartTone } from "@zeabur/design-system/components/meter"
+import { MeterStack, meterPartTone } from "@zeabur-oss/design-system/components/meter"
 
 /** Rows a side block lists before it says "Show all". */
 const SIDE_ROWS = 5

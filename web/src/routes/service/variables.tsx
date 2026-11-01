@@ -39,8 +39,8 @@ import { useDraft, useHold } from "@/components/plan/draft"
 import { usePlanner } from "@/components/plan/planner"
 import { Problem } from "@/components/problem"
 import { isRefusal, Refused, RefusedKinds } from "@/components/refused"
-import { Alert, AlertDescription } from "@zeabur/design-system/components/alert"
-import { Button } from "@zeabur/design-system/components/button"
+import { Alert, AlertDescription } from "@zeabur-oss/design-system/components/alert"
+import { Button } from "@zeabur-oss/design-system/components/button"
 import {
   Empty,
   EmptyContent,
@@ -48,14 +48,14 @@ import {
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
-} from "@zeabur/design-system/components/empty"
-import { Input } from "@zeabur/design-system/components/input"
-import { Menu, MenuContent, MenuTrigger } from "@zeabur/design-system/components/menu"
-import { SectionHeader } from "@zeabur/design-system/components/section-header"
-import { Select } from "@zeabur/design-system/components/select"
-import { Spinner } from "@zeabur/design-system/components/spinner"
-import { Textarea } from "@zeabur/design-system/components/textarea"
-import { Tooltip } from "@zeabur/design-system/components/tooltip"
+} from "@zeabur-oss/design-system/components/empty"
+import { Input } from "@zeabur-oss/design-system/components/input"
+import { Menu, MenuContent, MenuTrigger } from "@zeabur-oss/design-system/components/menu"
+import { SectionHeader } from "@zeabur-oss/design-system/components/section-header"
+import { Select } from "@zeabur-oss/design-system/components/select"
+import { Spinner } from "@zeabur-oss/design-system/components/spinner"
+import { Textarea } from "@zeabur-oss/design-system/components/textarea"
+import { Tooltip } from "@zeabur-oss/design-system/components/tooltip"
 import { useT, type Translate } from "@/i18n"
 import { createdKey, entrance } from "@/lib/created"
 import { databaseLink } from "@/lib/place"

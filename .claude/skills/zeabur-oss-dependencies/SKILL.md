@@ -48,7 +48,7 @@ exceptions. Run every command inside `nix develop`.
   the blocked ones.
 - Commit `package.json` and `bun.lock` together; CI installs with `bun ci`, which fails if they
   disagree.
-- `@zeabur/design-system` is pinned to a commit of its repository: a Git dependency
+- `@zeabur-oss/design-system` is pinned to a commit of its repository: a Git dependency
   (`github:zeabur-oss/design-system#<commit>`, moved with
   `bun add 'github:zeabur-oss/design-system#<commit>'`) or a tarball packed from that commit and
   checked in under `vendor/`; the repository's skill says which. To try an unpublished

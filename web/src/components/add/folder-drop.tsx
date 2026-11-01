@@ -16,9 +16,9 @@ import {
 } from "@/lib/pack/source"
 import { cn } from "@/lib/utils"
 import type { Packed } from "@/lib/pack/pack"
-import { Alert, AlertDescription } from "@zeabur/design-system/components/alert"
-import { Button } from "@zeabur/design-system/components/button"
-import { Spinner } from "@zeabur/design-system/components/spinner"
+import { Alert, AlertDescription } from "@zeabur-oss/design-system/components/alert"
+import { Button } from "@zeabur-oss/design-system/components/button"
+import { Spinner } from "@zeabur-oss/design-system/components/spinner"
 
 type FolderState =
   | { phase: "empty" }

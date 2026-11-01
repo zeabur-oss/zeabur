@@ -2,8 +2,8 @@ import type { ReactNode } from "react"
 
 import { useT } from "@/i18n"
 import type { ProjectEntry } from "@/lib/place"
-import { PageColumn } from "@zeabur/design-system/components/page-column"
-import { PageHeader } from "@zeabur/design-system/components/page-header"
+import { PageColumn } from "@zeabur-oss/design-system/components/page-column"
+import { PageHeader } from "@zeabur-oss/design-system/components/page-header"
 
 export function ProjectHeader({
   entry,

@@ -65,10 +65,8 @@ request of its own, with no change in behaviour: `flake.lock`, the `fixtures/cha
 (`scripts/render-chart-corpus.sh`) and the files generated from the catalog
 (`ZEABUR_UPDATE_GOLDEN=1 cargo nextest run`, then `cargo xtask openapi`). The files vendored for
 the interface's styles are checked in
-[zeabur-oss/design-system](https://github.com/zeabur-oss/design-system). That package itself is
-checked in here as `vendor/zeabur-design-system-<commit>.tgz`, packed from a commit of its
-repository, so that `bun ci` downloads nothing from GitHub; `scripts/bump-design-system.sh
-<commit>` moves it.
+[zeabur-oss/design-system](https://github.com/zeabur-oss/design-system), which publishes
+`@zeabur-oss/design-system` to npm; Renovate moves its version.
 
 Every CI job is a call to `scripts/ci.sh <job>` (`scripts/ci.sh --list` names them), which enters
 its dev shell itself; the workflow only checks out, installs Nix and restores caches. So a job runs

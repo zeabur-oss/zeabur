@@ -11,7 +11,7 @@ import { evidenceQuery, projectIncidentsQuery, queryClient } from "@/api/queries
 import { CopyText } from "@/components/copy-text"
 import { fixLead, originSentence } from "@/components/origin"
 import { Layers, Raw, type RawRow } from "@/components/problem"
-import { Button, buttonVariants } from "@zeabur/design-system/components/button"
+import { Button, buttonVariants } from "@zeabur-oss/design-system/components/button"
 import { useSentence, useT, writeSentence, type Sentence, type Translate } from "@/i18n"
 import { openShell } from "@/lib/dock"
 import { serviceLink } from "@/lib/place"

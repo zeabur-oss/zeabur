@@ -11,7 +11,7 @@ import { ContextMenu } from "@/components/shell/user-menu"
 import { useT } from "@/i18n"
 import type { Icon } from "@/lib/icon"
 import { usePlace } from "@/lib/place"
-import { Logo } from "@zeabur/design-system/components/brand"
+import { Logo } from "@zeabur-oss/design-system/components/brand"
 import {
   Sidebar as SidebarRoot,
   SidebarContent,
@@ -20,7 +20,7 @@ import {
   SidebarHeader,
   SidebarItem,
   SidebarSection,
-} from "@zeabur/design-system/components/sidebar"
+} from "@zeabur-oss/design-system/components/sidebar"
 
 type Destination = "/" | "/cluster" | "/projects" | "/members" | "/settings"
 

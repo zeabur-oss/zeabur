@@ -6,9 +6,9 @@ import { PlanDrawer } from "@/components/plan/plan-drawer"
 import { usePlanStep } from "@/components/plan/planner"
 import { useT } from "@/i18n"
 import type { Endpoint, Service } from "@/model/service"
-import { Alert, AlertDescription, AlertTitle } from "@zeabur/design-system/components/alert"
-import { Button } from "@zeabur/design-system/components/button"
-import { Select } from "@zeabur/design-system/components/select"
+import { Alert, AlertDescription, AlertTitle } from "@zeabur-oss/design-system/components/alert"
+import { Button } from "@zeabur-oss/design-system/components/button"
+import { Select } from "@zeabur-oss/design-system/components/select"
 
 /** Open one port of a service's Service to the internet with a `LoadBalancer` Service. */
 export default function OpenPortDrawer({

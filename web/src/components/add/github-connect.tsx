@@ -13,8 +13,8 @@ import { GitHubAppPlanDialog } from "@/components/github-app-plan"
 import { useT } from "@/i18n"
 import { adding } from "@/lib/adding"
 import { connectStep, withProject, type ConnectStep } from "@/model/github-app"
-import { Button, buttonVariants } from "@zeabur/design-system/components/button"
-import { Menu, MenuContent, MenuItem, MenuTrigger } from "@zeabur/design-system/components/menu"
+import { Button, buttonVariants } from "@zeabur-oss/design-system/components/button"
+import { Menu, MenuContent, MenuItem, MenuTrigger } from "@zeabur-oss/design-system/components/menu"
 
 type Installation = Schemas.GitHubInstallation
 

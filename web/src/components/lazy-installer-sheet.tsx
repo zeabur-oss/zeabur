@@ -2,8 +2,8 @@ import { lazy, Suspense, useState, type ComponentProps, type ReactNode } from "r
 
 import { useT } from "@/i18n"
 import type { Needed } from "@/model/installer"
-import { Alert, AlertDescription, AlertTitle } from "@zeabur/design-system/components/alert"
-import { Button } from "@zeabur/design-system/components/button"
+import { Alert, AlertDescription, AlertTitle } from "@zeabur-oss/design-system/components/alert"
+import { Button } from "@zeabur-oss/design-system/components/button"
 
 const Sheet = lazy(() =>
   import("@/components/installer-sheet").then((m) => ({ default: m.InstallerSheet })),

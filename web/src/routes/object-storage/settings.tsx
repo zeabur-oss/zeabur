@@ -12,8 +12,8 @@ import { storageProblem } from "@/model/databases"
 import { growObjectStorage, storeAddress, type ObjectStorage } from "@/model/object-storage"
 import type { ServiceMode } from "@/routes/search"
 import { ModeSwitch } from "@/routes/service/views"
-import { Button } from "@zeabur/design-system/components/button"
-import { SectionHeader } from "@zeabur/design-system/components/section-header"
+import { Button } from "@zeabur-oss/design-system/components/button"
+import { SectionHeader } from "@zeabur-oss/design-system/components/section-header"
 
 /** The volume servers' disk; or, in its YAML view, the operator's object. */
 export function ObjectStorageSettings({

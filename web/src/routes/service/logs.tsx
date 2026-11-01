@@ -21,11 +21,15 @@ import { Ago, Histogram } from "@/components/bits"
 import { Problem } from "@/components/problem"
 import { Refused } from "@/components/refused"
 import { StatusDot } from "@/components/status"
-import { Button } from "@zeabur/design-system/components/button"
-import { Popover, PopoverContent, PopoverTrigger } from "@zeabur/design-system/components/popover"
-import { Skeleton } from "@zeabur/design-system/components/skeleton"
-import { Spinner } from "@zeabur/design-system/components/spinner"
-import { Toggle } from "@zeabur/design-system/components/toggle"
+import { Button } from "@zeabur-oss/design-system/components/button"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@zeabur-oss/design-system/components/popover"
+import { Skeleton } from "@zeabur-oss/design-system/components/skeleton"
+import { Spinner } from "@zeabur-oss/design-system/components/spinner"
+import { Toggle } from "@zeabur-oss/design-system/components/toggle"
 import { useI18n, useT } from "@/i18n"
 import { parseAnsi } from "@/lib/ansi"
 import { cn } from "@/lib/utils"
@@ -39,9 +43,9 @@ import {
   EmptyHeader,
   EmptyMedia,
   EmptyTitle,
-} from "@zeabur/design-system/components/empty"
-import { Illustration } from "@zeabur/design-system/components/illustration"
-import { Select } from "@zeabur/design-system/components/select"
+} from "@zeabur-oss/design-system/components/empty"
+import { Illustration } from "@zeabur-oss/design-system/components/illustration"
+import { Select } from "@zeabur-oss/design-system/components/select"
 
 type Severity = "error" | "warn" | "info" | "debug"
 

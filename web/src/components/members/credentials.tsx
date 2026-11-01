@@ -10,8 +10,8 @@ import { ConfirmDialog } from "@/components/members/dialogs"
 import { useI18n, useT } from "@/i18n"
 import { formatDate } from "@/lib/format"
 import { memberName, passkeyKept, type Member, type Passkey } from "@/model/members"
-import { Button } from "@zeabur/design-system/components/button"
-import { Tooltip } from "@zeabur/design-system/components/tooltip"
+import { Button } from "@zeabur-oss/design-system/components/button"
+import { Tooltip } from "@zeabur-oss/design-system/components/tooltip"
 
 type Linked = Member["linked"][number]
 

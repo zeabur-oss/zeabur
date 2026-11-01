@@ -14,8 +14,8 @@ import { YamlBlock, YamlDiff } from "@/components/yaml"
 import { useT } from "@/i18n"
 import { kindName } from "@/i18n/kind-name"
 import { subjectName } from "@/model/node-shell"
-import { Alert, AlertDescription, AlertTitle } from "@zeabur/design-system/components/alert"
-import { Button } from "@zeabur/design-system/components/button"
+import { Alert, AlertDescription, AlertTitle } from "@zeabur-oss/design-system/components/alert"
+import { Button } from "@zeabur-oss/design-system/components/button"
 
 /** A plan dialog: planning, then what the plan does, and a footer that applies it. */
 export function PlanFrame<P extends { expiresAt: string; token?: string | null }>({

@@ -4,8 +4,8 @@ import { useEffect } from "react"
 
 import { LoadingRows } from "@/components/page"
 import { useT } from "@/i18n"
-import { Button } from "@zeabur/design-system/components/button"
-import { Dialog, DialogContent, DialogTitle } from "@zeabur/design-system/components/dialog"
+import { Button } from "@zeabur-oss/design-system/components/button"
+import { Dialog, DialogContent, DialogTitle } from "@zeabur-oss/design-system/components/dialog"
 
 export function PlanDialogPending({ title, onClose }: { title: string; onClose: () => void }) {
   const t = useT()

@@ -14,16 +14,16 @@ import { adding } from "@/lib/adding"
 import { usePlace } from "@/lib/place"
 import { mobileNav, palette } from "@/lib/stores"
 import { useTheme } from "@/theme"
-import { Logo } from "@zeabur/design-system/components/brand"
-import { Button } from "@zeabur/design-system/components/button"
-import { Dialog, DialogContent, DialogTitle } from "@zeabur/design-system/components/dialog"
-import { AppFrame, FramePanel, FrameSidebar } from "@zeabur/design-system/components/frame"
-import { usePageTransition } from "@zeabur/design-system/components/page-transition"
-import { TooltipProvider } from "@zeabur/design-system/components/tooltip"
+import { Logo } from "@zeabur-oss/design-system/components/brand"
+import { Button } from "@zeabur-oss/design-system/components/button"
+import { Dialog, DialogContent, DialogTitle } from "@zeabur-oss/design-system/components/dialog"
+import { AppFrame, FramePanel, FrameSidebar } from "@zeabur-oss/design-system/components/frame"
+import { usePageTransition } from "@zeabur-oss/design-system/components/page-transition"
+import { TooltipProvider } from "@zeabur-oss/design-system/components/tooltip"
 
 // Lazy: Sonner stays out of the first page load (scripts/ui-budget.sh).
 const Toaster = lazy(() =>
-  import("@zeabur/design-system/components/sonner").then((m) => ({ default: m.Toaster })),
+  import("@zeabur-oss/design-system/components/sonner").then((m) => ({ default: m.Toaster })),
 )
 // Only project pages show the project sidebar, with its "New" menu and the services' states.
 const ProjectSidebar = lazy(() =>

@@ -1,8 +1,8 @@
 import { useLayoutEffect, useRef, useState, type ReactNode } from "react"
 import CheckIcon from "~icons/ph/check"
 
-import { Badge } from "@zeabur/design-system/components/badge"
-import { ToggleGroup, ToggleGroupItem } from "@zeabur/design-system/components/toggle-group"
+import { Badge } from "@zeabur-oss/design-system/components/badge"
+import { ToggleGroup, ToggleGroupItem } from "@zeabur-oss/design-system/components/toggle-group"
 import { cn } from "@/lib/utils"
 
 export type Health = "ok" | "progress" | "warn" | "fail" | "idle"

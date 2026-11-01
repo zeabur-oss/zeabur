@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query"
-import { SectionHeader } from "@zeabur/design-system/components/section-header"
+import { SectionHeader } from "@zeabur-oss/design-system/components/section-header"
 
 import { buildsQuery } from "@/api/queries"
 import { GateNote, useGate } from "@/components/gate"
