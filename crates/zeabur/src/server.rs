@@ -8,7 +8,7 @@
 //! | `GET /auth/callback` | where Zeabur Identity sends the browser back after signing in |
 //! | `POST /auth/logout` | ends the session and revokes its refresh token at Zeabur Identity |
 //! | `/api/…` | the API (`zeabur_api`), as the person the session belongs to |
-//! | anything else | the web interface; a page opened without a session goes to `/auth/login` first |
+//! | anything else | the web interface; a page opened without a session goes to Zeabur Identity first |
 //!
 //! Every request but the health check passes [`zeabur_core::guard`] first: its `Host` must be
 //! the public URL's, and a request that changes something must come from Zeabur's own page.
@@ -171,10 +171,10 @@ async fn check(State(auth): State<Arc<Auth>>, request: Request, next: Next) -> R
     }
 }
 
-/// Sends a browser that opens a page without a session straight to `/auth/login`, so it does
-/// not load the interface only for its script to leave for Zeabur Identity. Anything but a
-/// top-level navigation (scripts, files, the API) is served as before; the interface still sends
-/// the browser to sign in when the API answers `signed-out`.
+/// Sends a browser that opens a page without a session straight to Zeabur Identity, as
+/// `/auth/login` would, so it does not load the interface only for its script to leave. Anything
+/// but a top-level navigation (scripts, files, the API) is served as before; the interface still
+/// sends the browser to sign in when the API answers `signed-out`.
 #[cfg(feature = "ui")]
 async fn sign_in_first(State(auth): State<Arc<Auth>>, request: Request, next: Next) -> Response {
     if request.method() != axum::http::Method::GET
@@ -199,12 +199,7 @@ async fn sign_in_first(State(auth): State<Arc<Auth>>, request: Request, next: Ne
             .path_and_query()
             .map(axum::http::uri::PathAndQuery::as_str),
     );
-    if back == "/" {
-        redirect("/auth/login", &[])
-    } else {
-        let back: String = form_urlencoded::byte_serialize(back.as_bytes()).collect();
-        redirect(&format!("/auth/login?return={back}"), &[])
-    }
+    start(&auth, request.headers(), back).await
 }
 
 /// Whether the browser is loading a document to show, by Fetch Metadata or, from a browser
