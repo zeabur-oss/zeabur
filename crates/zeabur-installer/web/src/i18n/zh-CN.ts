@@ -198,8 +198,7 @@ export const zhCN: Messages = {
   "components.personalDescription":
     "默认会装 Ingress 和证书，要从 Git 或文件夹构建，再勾选 Zeabur Builder。组件依赖的其他组件会一并加入。",
   "components.notPersonal": "自己用的版本没有这个",
-  "components.needsMemory": (mib) =>
-    `构建应用至少要 ${mib.toLocaleString("zh-CN")} MiB 内存，这台不够`,
+  "components.needsMemory": (mib) => `至少要 ${mib.toLocaleString("zh-CN")} MiB 内存，这台不够`,
   "components.unsupported": (distribution) => `不支持 ${distribution}`,
   "components.runsOn": (where) => `仅能在 ${where} 上运行`,
   "components.unsupportedOn": (profile) => `不支持 ${profile}`,

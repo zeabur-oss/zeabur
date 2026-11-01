@@ -198,8 +198,7 @@ export const zhTW: Messages = {
   "components.personalDescription":
     "預設會裝 Ingress 和憑證，要從 Git 或資料夾建置，再勾選 Zeabur Builder。元件需要的其他元件會一起加入。",
   "components.notPersonal": "自己用的版本沒有這個",
-  "components.needsMemory": (mib) =>
-    `建置應用程式至少要 ${mib.toLocaleString("zh-TW")} MiB 記憶體，這台不夠`,
+  "components.needsMemory": (mib) => `至少要 ${mib.toLocaleString("zh-TW")} MiB 記憶體，這台不夠`,
   "components.unsupported": (distribution) => `不支援 ${distribution}`,
   "components.runsOn": (where) => `只能在 ${where} 上執行`,
   "components.unsupportedOn": (profile) => `不支援 ${profile}`,
