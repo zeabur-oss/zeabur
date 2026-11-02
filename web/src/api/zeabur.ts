@@ -1004,8 +1004,6 @@ export type Component = {
    * `recommended` or `optional`.
    */
   defaults: ComponentDefaults
-  /** Why the catalogue chose it. */
-  description: string
   /** Human-readable name. */
   displayName: string
   /** The distributions it supports (`k3s`, …); empty means all. */
@@ -9478,8 +9476,6 @@ export type TemplateViewTaglineLocales = { [key: string]: string }
  * A template of Zeabur Catalog.
  */
 export type TemplateView = {
-  /** The catalogue's description, in English, for operators. */
-  description: string
   /** The application's home page. */
   homepage: string
   /** Its id (`miniflux`). */
@@ -9515,10 +9511,7 @@ export type TemplateView = {
   summary: string
   /** The summary in other languages (`zh-TW`, `zh-CN`). */
   summaryLocales?: TemplateViewSummaryLocales
-  /**
-   * What the application is, in one sentence, in English: the catalogue's `summary`, else
-   * its description.
-   */
+  /** What the application is, in one sentence, in English: the catalogue's `summary`. */
   tagline: string
   /** The tagline in other languages (`zh-TW`, `zh-CN`). */
   taglineLocales?: TemplateViewTaglineLocales

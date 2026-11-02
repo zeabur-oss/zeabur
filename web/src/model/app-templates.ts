@@ -16,11 +16,13 @@ const ELSEWHERE = new Set(["error-pages"])
 export const listed = (items: readonly AppTemplate[]) =>
   items.filter((t) => !ELSEWHERE.has(t.id)).sort((a, b) => a.name.localeCompare(b.name))
 
-/** Templates whose name, id or description holds `query`, ignoring case. */
-export function filterTemplates(items: readonly AppTemplate[], query: string) {
+/** Templates whose name, id or tagline holds `query`, ignoring case. */
+export function filterTemplates(items: readonly AppTemplate[], query: string, locale: string) {
   const q = query.trim().toLowerCase()
   if (!q) return [...items]
-  return items.filter((t) => [t.name, t.id, t.description].some((s) => s.toLowerCase().includes(q)))
+  return items.filter((t) =>
+    [t.name, t.id, taglineWords(t, locale)].some((s) => s.toLowerCase().includes(q)),
+  )
 }
 
 /** The components the template needs that the cluster does not serve. */

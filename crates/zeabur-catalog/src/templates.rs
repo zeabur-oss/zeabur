@@ -35,10 +35,7 @@ pub struct Template {
     /// `app.kubernetes.io/instance` and `templates.zeabur.com/template` (its id) and
     /// `app.kubernetes.io/version`.
     pub labels: BTreeMap<String, String>,
-    /// The catalogue's description, in English, for operators.
-    pub description: String,
-    /// What the application is, in one sentence, in English: the catalogue's `summary`, else
-    /// its description.
+    /// What the application is, in one sentence, in English: the catalogue's `summary`.
     pub tagline: String,
     /// The tagline in other languages (`zh-TW`, `zh-CN`).
     #[serde(skip_serializing_if = "BTreeMap::is_empty")]
@@ -286,7 +283,6 @@ struct FileSummary {
 struct FileMetadata {
     name: String,
     version: String,
-    description: String,
     #[serde(default)]
     summary: String,
     #[serde(default)]
@@ -432,19 +428,13 @@ fn read(id: &str, file: &str, manifests: &str) -> Result<Template, RenderError> 
         name: file.metadata.name,
         version: file.metadata.version.clone(),
         labels,
-        tagline: if file.metadata.summary.trim().is_empty() {
-            file.metadata.description.trim()
-        } else {
-            file.metadata.summary.trim()
-        }
-        .to_owned(),
+        tagline: file.metadata.summary.trim().to_owned(),
         tagline_locales: file
             .metadata
             .locales
             .into_iter()
             .map(|(lang, l)| (lang, l.summary.trim().to_owned()))
             .collect(),
-        description: file.metadata.description.trim().to_owned(),
         license: file.metadata.license,
         homepage: file.metadata.homepage,
         requires: file.requires,
