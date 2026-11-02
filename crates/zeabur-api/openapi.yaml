@@ -18226,6 +18226,15 @@ components:
           items:
             $ref: "#/components/schemas/ZeaburBuilderEnv"
           description: The build variables, by name. A literal value is left out.
+        exposedPorts:
+          type:
+          - array
+          - "null"
+          items:
+            type: string
+          description: |-
+            The ports that image declares, `3000/tcp` each (`status.exposedPorts`); none when it
+            declares none.
         gitRef:
           type:
           - string

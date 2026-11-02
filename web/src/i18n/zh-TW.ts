@@ -973,6 +973,8 @@ export const zhTW: Messages = {
   "net.addPrivate": "新增私有位址",
   "net.privatePort": "連接埠",
   "net.privatePortHint": "應用程式監聽的連接埠。",
+  "net.imageDeclares": (_n, ports) => `映像檔宣告了連接埠 ${ports}。`,
+  "net.addImagePort": (port) => `用連接埠 ${port} 新增私有位址`,
   "net.privateWillBe": (address) => `其他服務會用 ${address} 連到它。`,
   "net.privateAlso": (ports) => `容器宣告的其他連接埠也會一起加上：${ports}。`,
   "net.alsoDomain": "同時加上公開網域",

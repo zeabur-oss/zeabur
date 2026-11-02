@@ -1,7 +1,9 @@
 import { describe, expect, test } from "bun:test"
 
+import type { Build } from "@/model/builds"
 import {
   exposeCommand,
+  imagePorts,
   exposureOf,
   likelyPort,
   privateAddress,
@@ -179,5 +181,43 @@ describe("the kubectl command", () => {
       ].join("\n"),
     )
     expect(exposeCommand(workload("DaemonSet"), { app: "web" })).toContain("port: <port>")
+  })
+})
+
+describe("the ports the image of a Build declares", () => {
+  const built = (exposedPorts?: string[]): Build =>
+    ({ name: "web", repository: "zot.zot.svc:5000/shop/web", exposedPorts }) as unknown as Build
+  const running = (fields: object = {}) =>
+    workload("Deployment", {
+      containers: [container({ image: "zot.zot.svc:5000/shop/web:main-1-aaaaaaa", ...fields })],
+    })
+
+  test("are suggested when the service does not use them yet, TCP only", () => {
+    expect(imagePorts(running(), [built(["3000/tcp", "53/udp"])])).toStrictEqual([3000])
+    expect(imagePorts(running(), [built(["8080", "3000/TCP"])])).toStrictEqual([3000, 8080])
+  })
+
+  test("are left out when a container declares them or a Service has them", () => {
+    const declared = running({ ports: [{ port: 3000 }] })
+    expect(imagePorts(declared, [built(["3000/tcp", "9000/tcp"])])).toStrictEqual([9000])
+    const endpoint = { ports: [{ port: 9000 }] } as never
+    expect(imagePorts(declared, [built(["3000/tcp", "9000/tcp"])], [endpoint])).toStrictEqual([])
+  })
+
+  test("are none when the image declares none or no Build made the image", () => {
+    expect(imagePorts(running(), [built()])).toStrictEqual([])
+    expect(imagePorts(running(), [])).toStrictEqual([])
+    const other = { ...built(["3000/tcp"]), repository: "zot.zot.svc:5000/shop/api" } as Build
+    expect(imagePorts(running(), [other])).toStrictEqual([])
+  })
+
+  test("ignore an init container's image", () => {
+    const service = workload("Deployment", {
+      containers: [
+        container({ name: "setup", init: true, image: "zot.zot.svc:5000/shop/web:main-1-aaaaaaa" }),
+        container({ image: "busybox" }),
+      ],
+    })
+    expect(imagePorts(service, [built(["3000/tcp"])])).toStrictEqual([])
   })
 })

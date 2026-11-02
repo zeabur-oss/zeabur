@@ -2,6 +2,7 @@
 // selecting its pods by its `matchLabels`, with every port its containers declare.
 import type { Schemas } from "@/api/client"
 import { toYaml } from "@/lib/yaml-out"
+import { builtContainers, type Build } from "@/model/builds"
 import type { Service } from "@/model/service"
 
 /** The port in {@link exposeCommand} when the port is not known. */
@@ -46,6 +47,30 @@ export function likelyPort(service: Service): number | undefined {
     if (named) return named.port
   }
   return declaredPorts(service).find((p) => !p.protocol)?.port
+}
+
+/** The TCP ports the Builds of the service's images last built declare (`EXPOSE`) that the
+ * service does not use yet: none of its containers declares them and no Service has them. */
+export function imagePorts(
+  service: Service,
+  builds: readonly Build[],
+  endpoints: readonly Schemas.Endpoint[] = [],
+): number[] {
+  const used = new Set([
+    ...declaredPorts(service).map((p) => p.port),
+    ...endpoints.flatMap((e) => e.ports.map((p) => p.port)),
+  ])
+  const running = new Set(service.containers.filter((c) => !c.init).map((c) => c.name))
+  const declared = builtContainers(service, builds)
+    .filter((b) => running.has(b.container))
+    .flatMap((b) => b.build.exposedPorts ?? [])
+    .flatMap((spec) => {
+      const [port, protocol = "tcp"] = spec.split("/")
+      return protocol.toLowerCase() === "tcp" && /^\d+$/.test(port ?? "") ? [Number(port)] : []
+    })
+  return [...new Set(declared)]
+    .filter((port) => isPort(port) && !used.has(port))
+    .sort((a, b) => a - b)
 }
 
 export const isPort = (port: number) => Number.isInteger(port) && port >= 1 && port <= 65535
