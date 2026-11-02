@@ -1,9 +1,8 @@
-import { RouterProvider } from "@tanstack/react-router"
 import { StrictMode } from "react"
 import { createRoot } from "react-dom/client"
 
+import { App } from "@/app"
 import { I18nProvider, prepareI18n } from "@/i18n"
-import { router } from "@/router"
 import "@/styles/app.css"
 import { followSystemTheme } from "@/theme"
 import { TooltipProvider } from "@zeabur-oss/design-system/components/tooltip"
@@ -18,7 +17,7 @@ if (root) {
       <StrictMode>
         <I18nProvider>
           <TooltipProvider>
-            <RouterProvider router={router} />
+            <App />
           </TooltipProvider>
         </I18nProvider>
       </StrictMode>,

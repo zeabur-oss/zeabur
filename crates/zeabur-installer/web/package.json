@@ -13,7 +13,6 @@
   },
   "dependencies": {
     "@base-ui/react": "1.9.0",
-    "@tanstack/react-router": "1.170.46",
     "@zeabur-oss/design-system": "0.1.2",
     "class-variance-authority": "0.7.1",
     "cn": "0.5.0",
