@@ -81,7 +81,7 @@ export const dockerfileAt = (directory: string, dockerfile: string) =>
 
 /** The first port a Dockerfile's last stage `EXPOSE`s, with `ARG` and `ENV` values filled in; a
  * port that cannot be worked out is skipped, and none is an empty string. */
-export function exposedPort(text: string): string {
+export function exposedPort(text = ""): string {
   const lines = text.replace(/\\\r?\n/g, " ").split(/\r?\n/)
   const vars = new Map<string, string>()
   let ports: string[] = []

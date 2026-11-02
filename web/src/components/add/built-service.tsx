@@ -2,7 +2,7 @@
 // Build makes. The hook keeps the form and what is derived from it; the pieces draw a field each,
 // so each drawer lays them out around its own source.
 import { useQuery } from "@tanstack/react-query"
-import { useEffect, useId, useState, type ReactNode } from "react"
+import { useId, useState, type ReactNode } from "react"
 import CaretRightIcon from "~icons/ph/caret-right"
 
 import { clusterQuery, creatableQuery } from "@/api/queries"
@@ -102,8 +102,8 @@ export function useBuiltForm<F extends BuiltForm>(
   project: string,
   initial: () => F,
   suggested: (form: F, taken: string[]) => string,
-  /** The file at a path of the repository or folder, when the form can read it. */
-  readFile?: (path: string) => Blob | undefined,
+  /** The text of the file at a path of the repository or folder, when the form can read it. */
+  readFile?: (path: string) => string | undefined,
 ) {
   const cluster = useQuery(clusterQuery).data
   const domains = cluster?.domains ?? {}
@@ -126,24 +126,14 @@ export function useBuiltForm<F extends BuiltForm>(
     set(patch)
   }
   const dockerfile = readFile?.(dockerfileAt(form.directory, form.dockerfile))
-  const [exposed, setExposed] = useState("")
-  useEffect(() => {
-    let current = true
-    setExposed("")
-    void dockerfile?.text().then((text) => {
-      if (current) setExposed(exposedPort(text))
-    })
-    return () => {
-      current = false
-    }
-  }, [dockerfile])
+  const exposed = exposedPort(dockerfile)
   const parsedEnv = parseEnv(env)
   const parsedBuildEnv = parseEnv(buildEnv)
   const derived = resolveBuilt(form, choices, {
     project,
     suggested: suggested(form, taken),
     exposed,
-    dockerfileFound: !!dockerfile,
+    dockerfileFound: dockerfile !== undefined,
     options,
     suffix: domains.suffixes?.[0],
     env: parsedEnv,
@@ -166,7 +156,7 @@ export function useBuiltForm<F extends BuiltForm>(
     badBuildEnv: parsedBuildEnv.bad,
     typeName: (name: string) => typed("named", { name } as Partial<F>),
     chooseMethod: (method: BuildMethod) => typed("methoded", { method } as Partial<F>),
-    found: !!dockerfile && !choices.methoded,
+    found: dockerfile !== undefined && !choices.methoded,
     typePort: (port: string) => typed("ported", { port } as Partial<F>),
     typeHost: (host: string) => typed("hosted", { host } as Partial<F>),
     chooseSecurity: (security: F["security"]) => typed("securitySet", { security } as Partial<F>),
