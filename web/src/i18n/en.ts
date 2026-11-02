@@ -2678,6 +2678,8 @@ export const en = {
     "Builds the Dockerfile in the root directory. Name another file under More settings.",
   "add.gitPortHint":
     "The port the app listens on, also passed as PORT. Leave empty for a background service.",
+  "add.railpackPortHint":
+    "Railpack apps listen on PORT, which Zeabur sets to this port. Leave empty for a background service.",
   "add.access": "Repository access",
   "add.access.public": "Public repository",
   "add.access.deployKey": "Deploy key",

@@ -478,7 +478,7 @@ export function BuiltPort({ built, problems }: { built: BuiltFormState; problems
     <PortField
       value={built.form.port}
       onChange={(port) => built.set({ port })}
-      hint={t("add.gitPortHint")}
+      hint={t(built.form.method === "railpack" ? "add.railpackPortHint" : "add.gitPortHint")}
       error={built.shown(problems.port, () => t("add.problem.port.invalid"))}
     />
   )

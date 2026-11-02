@@ -3,7 +3,12 @@
 // created with a token request, which Zeabur Builder answers; the folder goes up after that
 // (upload.ts).
 import type { Schemas } from "@/api/client"
-import { builtProblems, cleanPath, type BuiltService } from "@/model/git-service"
+import {
+  builtProblems,
+  cleanPath,
+  DEFAULT_BUILT_PORT,
+  type BuiltService,
+} from "@/model/git-service"
 
 type Change = Schemas.Change
 
@@ -16,8 +21,8 @@ export const newUploadService = (): UploadService => ({
   dockerfile: "",
   buildVariables: [],
   name: "",
-  port: "",
-  publicUrl: false,
+  port: DEFAULT_BUILT_PORT,
+  publicUrl: true,
   host: "",
   variables: [],
   size: "small",

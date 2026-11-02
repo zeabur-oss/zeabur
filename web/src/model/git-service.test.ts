@@ -35,6 +35,7 @@ const form = (patch: Partial<GitService>): GitService => ({
   url: "https://github.com/acme/site",
   name: "site",
   port: "3000",
+  publicUrl: false,
   ...patch,
 })
 
@@ -257,6 +258,17 @@ describe("the objects", () => {
     expect(deployment.object.spec.template.spec.securityContext).toEqual({
       seccompProfile: { type: "RuntimeDefault" },
     })
+  })
+
+  test("a new Git service listens on 8080 with a public URL, and a cleared port stays a background service", () => {
+    const fresh = { ...newGitService(), url: "https://github.com/acme/site", name: "site" }
+    const objects = gitObjects({ ...fresh, host: "site.example.com" }, "shop", "zot:5000", {})
+    expect(find(objects, "Service").spec.ports[0].port).toBe(8080)
+    expect(find(objects, "Secret").stringData).toEqual({ PORT: "8080" })
+    expect(find(objects, "Ingress").spec.rules[0].host).toBe("site.example.com")
+
+    const background = gitObjects({ ...fresh, port: "", publicUrl: false }, "shop", "zot:5000", {})
+    expect(background.some((o) => ["Service", "Ingress"].includes((o as Object).kind))).toBe(false)
   })
 
   test("a public domain adds an Ingress", () => {

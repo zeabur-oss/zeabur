@@ -62,6 +62,9 @@ export interface GitService extends Pick<
   installationId?: number
 }
 
+/** What Railpack's apps listen on once Zeabur sets `PORT`; the form starts with it. */
+export const DEFAULT_BUILT_PORT = "8080"
+
 export const newGitService = (): GitService => ({
   url: "",
   branch: "",
@@ -73,8 +76,8 @@ export const newGitService = (): GitService => ({
   username: "",
   token: "",
   name: "",
-  port: "",
-  publicUrl: false,
+  port: DEFAULT_BUILT_PORT,
+  publicUrl: true,
   host: "",
   variables: [],
   size: "small",
