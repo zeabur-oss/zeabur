@@ -2,6 +2,27 @@
   "objects": [
     {
       "target": {
+        "apiVersion": "v1",
+        "kind": "ServiceAccount",
+        "plural": "serviceaccounts",
+        "name": "mysql-backup"
+      },
+      "resourceVersion": null,
+      "before": null,
+      "write": {
+        "type": "create",
+        "body": {
+          "apiVersion": "v1",
+          "kind": "ServiceAccount",
+          "metadata": {
+            "name": "mysql-backup",
+            "namespace": "demo"
+          }
+        }
+      }
+    },
+    {
+      "target": {
         "apiVersion": "batch/v1",
         "kind": "Job",
         "plural": "jobs",
