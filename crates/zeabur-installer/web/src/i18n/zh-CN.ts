@@ -410,7 +410,7 @@ export const zhCN: Messages = {
   "warning.memory.tight": (idle, host, distribution) =>
     `空闲时，系统、${distribution} 和组件约使用 ${mib(idle)}，这台服务器共有 ${mib(host)}。`,
   "warning.memory.belowMinimum": (host, needs, distribution) =>
-    `这台服务器有 ${mib(host)} 内存，现在用 ${distribution} 装这些组件需要 ${mib(needs)}，有些 pod 可能跑不起来。关掉 crash kernel 预留的内存（kdump）可以多出一些。`,
+    `这台服务器有 ${mib(host)} 内存，用 ${distribution} 装这些组件需要 ${mib(needs)}，有些副本可能跑不起来。用不到崩溃转储（kdump）的话，可以关掉它把内存还给系统，或者换一台内存更大的服务器。`,
   "warning.cluster.unsupported": (distribution, version) =>
     `此安装程序不支持 ${distribution} ${version}：下载的文件只能用该版本自带的校验和验证。`,
   "warning.join.sameRegion": () =>

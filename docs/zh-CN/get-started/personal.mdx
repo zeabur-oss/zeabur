@@ -23,7 +23,14 @@ source: "9ecbdbd6bd2b"
 
 个人版也没有成员和权限。Zeabur Identity 签发的登录凭证，需要 kube-apiserver 用 `--authentication-config` 加载配置后才能识别，KubeSolo 目前没有开放这项配置（[portainer/kubesolo#231](https://github.com/portainer/kubesolo/issues/231)）。因此只能用服务器提供的 kubeconfig 连接，拿到这份 kubeconfig 的人可以控制整个集群，不适合多人或多个团队共用。
 
-服务器报告的内存低于 3200 MiB 时，installer 只接受个人使用模式。以后要供团队使用，无法直接升级，需要重新安装：用 K3s 的话，服务器报告的内存要有 3200 MiB 以上；用 RKE2 的话要有 4000 MiB 以上。要装 Zeabur Builder 的话，两种都要再多 500 MiB，留给一次构建，所以 K3s 要 3700 MiB。服务器如果预留了内存给 crash kernel（kdump），报告的内存会少掉这一块；关掉之后，4 GB 的服务器约报告 3900 MiB，够用 K3s 装 Zeabur Builder。
+服务器报告的内存不足 3200 MiB 时，安装程序只接受个人使用。以后要供团队使用，无法直接升级，需要重新安装，服务器报告的内存至少要有：
+
+| | 不装 Zeabur Builder | 装 Zeabur Builder |
+|---|---|---|
+| K3s | 3200 MiB | 3700 MiB |
+| RKE2 | 4000 MiB | 4500 MiB |
+
+Zeabur Builder 多出的 500 MiB 是留给一次构建的。内核为崩溃转储（kdump）保留的内存不计入报告的内存，用不到的话可以关掉，安装程序检查服务器时会给出命令。4 GB 的服务器关掉之后约报告 3900 MiB，装得下 K3s 和 Zeabur Builder。
 
 ## 先准备服务器
 

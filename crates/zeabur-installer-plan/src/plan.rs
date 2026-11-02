@@ -475,9 +475,10 @@ fn below_minimum(
             "memory.belowMinimum",
             &[&host_mib.to_string(), &needs.to_string(), title],
             format!(
-                "This server has {host_mib} MiB of memory, less than the {needs} MiB a team install \
-                 on {title} with these components now needs, so some pods may not schedule. \
-                 Turning off the crash kernel reserve (kdump) frees memory."
+                "This server has {host_mib} MiB of memory, and a team install on {title} with these \
+                 components needs {needs} MiB, so some replicas may not start. If you don't need \
+                 the crash kernel (kdump), turn it off to give its memory back, or move to a \
+                 server with more memory."
             ),
         )
     })

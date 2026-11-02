@@ -411,7 +411,7 @@ export const zhTW: Messages = {
   "warning.memory.tight": (idle, host, distribution) =>
     `閒置時，系統、${distribution} 和元件約使用 ${mib(idle)}，這台伺服器共有 ${mib(host)}。`,
   "warning.memory.belowMinimum": (host, needs, distribution) =>
-    `這台伺服器有 ${mib(host)} 記憶體，現在用 ${distribution} 裝這些元件要 ${mib(needs)}，有些 pod 可能跑不起來。關掉 crash kernel 預留的記憶體（kdump）可以多出一些。`,
+    `這台伺服器有 ${mib(host)} 記憶體，用 ${distribution} 裝這些元件要 ${mib(needs)}，有些副本可能跑不起來。用不到當機傾印（kdump）的話，可以關掉它把記憶體還給系統，或換一台記憶體更大的伺服器。`,
   "warning.cluster.unsupported": (distribution, version) =>
     `這個安裝程式不支援 ${distribution} ${version}：下載的檔案只能用該版本自己附的檢查碼驗證。`,
   "warning.join.sameRegion": () =>
