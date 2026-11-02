@@ -468,8 +468,19 @@ pub fn plan_with(
         inputs: &config.inputs,
         secret_files: &config.secret_files,
     };
-    let (components, mut namespaces) =
+    let (mut components, mut namespaces) =
         components(index, &selection, &choices, profile, &facts.arch)?;
+    // On one node the catalog's measurement on the distribution itself is closer than kind's.
+    if profile == "single-node" {
+        for plan in &mut components {
+            if let Some(mib) = index
+                .component(&plan.id)
+                .and_then(|c| c.idle_memory_mib(distribution.id(), &facts.arch))
+            {
+                plan.idle_memory_mib = Some(mib);
+            }
+        }
+    }
 
     if !chosen.contains(CERT_MANAGER) && config.zeabur {
         return Err(PlanError::NeedsDisabled {
@@ -2484,6 +2495,29 @@ mod tests {
             let idle = plan.memory.cluster_mib + plan.memory.components_mib;
             assert!(idle < host.memory_mib * 4 / 5, "{idle} MiB");
             assert!(plan.warnings.iter().all(|w| w.code != "memory.tight"));
+        }
+    }
+
+    #[test]
+    fn a_single_node_install_counts_what_the_catalog_measured_on_its_distribution() {
+        let index = Index::parse(INDEX.as_bytes()).unwrap();
+        let logs = index.component("logs/victoria-logs").unwrap();
+        for distribution in Distribution::ALL {
+            let config = config(&format!(
+                "distribution: {}\nenable: [logs/victoria-logs]\n",
+                distribution.id()
+            ));
+            let plan = plan(&index, &config, &facts()).unwrap();
+            let planned = plan
+                .components
+                .iter()
+                .find(|c| c.id == "logs/victoria-logs");
+            assert_eq!(
+                planned.and_then(|c| c.idle_memory_mib),
+                logs.idle_memory_mib(distribution.id(), "arm64"),
+                "{}",
+                distribution.id()
+            );
         }
     }
 
