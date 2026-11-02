@@ -48,6 +48,9 @@ pub struct Component {
     pub distributions: Vec<String>,
     /// Distributions the catalog's CI installed it on and passed: `k3s`, `rke2`, `kubesolo`.
     pub tested_on: Vec<String>,
+    /// Ids of components that this one replaces.
+    #[serde(default)]
+    pub replaces: Vec<String>,
     /// Releases installed in this order.
     pub releases: Vec<Release>,
     /// Values asked for or generated before installing.
@@ -329,6 +332,15 @@ impl Index {
             return Err(PlanError::IndexVersion(index.index_version));
         }
         Ok(index)
+    }
+
+    /// The id of the component that replaces `old`.
+    #[must_use]
+    pub fn replacement_of(&self, old: &str) -> Option<&str> {
+        self.components
+            .iter()
+            .find(|c| c.replaces.iter().any(|id| id == old))
+            .map(|c| c.id.as_str())
     }
 
     /// The component with this id.

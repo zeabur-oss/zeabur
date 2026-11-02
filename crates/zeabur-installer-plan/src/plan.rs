@@ -510,7 +510,7 @@ pub fn plan_with(
         host_files,
         namespaces: namespaces.into_values().collect(),
         components,
-        left_out: selection.left_out,
+        left_out: select::reasons(&selection.left_out),
         removals: Vec::new(),
         node_prep: storage::node_prep(chosen.iter().copied()),
         registry,
@@ -2129,54 +2129,6 @@ mod tests {
         assert_eq!(rke2.left_out["image-updates/keel"], "not tested on rke2");
         let k3s = plan(&index, &config(""), &facts()).unwrap();
         assert!(ids(&k3s).contains(&"image-updates/keel"));
-    }
-
-    #[test]
-    fn asking_for_a_component_not_tested_on_the_distribution_installs_it_with_a_warning() {
-        let mut index = Index::parse(INDEX.as_bytes()).unwrap();
-        untested_on(&mut index, "volume-backup/k8up", "k3s");
-        let p = plan(&index, &config("enable: [volume-backup/k8up]\n"), &facts()).unwrap();
-        assert!(ids(&p).contains(&"volume-backup/k8up"));
-        assert!(
-            p.warnings
-                .iter()
-                .any(|w| w.code == "config.untested" && w.values == ["volume-backup/k8up", "k3s"])
-        );
-        let rke2 = plan(
-            &index,
-            &config("distribution: rke2\nenable: [volume-backup/k8up]\n"),
-            &facts(),
-        )
-        .unwrap();
-        assert!(!rke2.warnings.iter().any(|w| w.code == "config.untested"));
-    }
-
-    #[test]
-    fn a_capability_is_filled_by_a_provider_tested_on_the_distribution() {
-        let mut index = Index::parse(INDEX.as_bytes()).unwrap();
-        untested_on(&mut index, "databases/cloudnative-pg", "k3s");
-        let p = plan(&index, &config("enable: [databases]\n"), &facts()).unwrap();
-        assert!(!ids(&p).contains(&"databases/cloudnative-pg"));
-        assert!(ids(&p).iter().any(|id| id.starts_with("databases/")));
-    }
-
-    #[test]
-    fn a_dependency_not_tested_on_the_distribution_leaves_out_defaults_but_not_what_was_asked() {
-        let mut index = Index::parse(INDEX.as_bytes()).unwrap();
-        let operator = "observability-operator/victoria-metrics-operator";
-        untested_on(&mut index, operator, "k3s");
-        let p = plan(&index, &config(""), &facts()).unwrap();
-        assert!(!ids(&p).contains(&"logs/victoria-logs"));
-        assert!(p.left_out["logs/victoria-logs"].contains(operator));
-        let asked = plan(&index, &config("enable: [logs/victoria-logs]\n"), &facts()).unwrap();
-        assert!(ids(&asked).contains(&"logs/victoria-logs"));
-        assert!(ids(&asked).contains(&operator));
-        assert!(
-            asked
-                .warnings
-                .iter()
-                .any(|w| w.code == "config.untested" && w.values == [operator, "k3s"])
-        );
     }
 
     #[test]

@@ -134,8 +134,14 @@ pub fn min_memory_mib(component: &Component, arch: &str) -> Option<u64> {
     Some(KUBESOLO_IDLE_MIB + idle_memory_mib(component, arch).unwrap_or(0) + work + APP_ROOM_MIB)
 }
 
-/// Takes out of the selection the components that need more memory than the host has.
-fn leave_out_short_of_memory(index: &Index, selection: &mut select::Selection, facts: &Facts) {
+/// Takes out of the selection the components that need more memory than the host has, and adds
+/// them to `left_out`.
+fn leave_out_short_of_memory(
+    index: &Index,
+    selection: &mut select::Selection,
+    left_out: &mut BTreeMap<String, String>,
+    facts: &Facts,
+) {
     let needs = |id: &str| {
         index
             .component(id)
@@ -148,9 +154,7 @@ fn leave_out_short_of_memory(index: &Index, selection: &mut select::Selection, f
     selection.components = kept;
     for (id, _) in dropped {
         if let Some(mib) = needs(&id) {
-            selection
-                .left_out
-                .insert(id, format!("needs {mib} MiB of memory"));
+            left_out.insert(id, format!("needs {mib} MiB of memory"));
         }
     }
 }
@@ -202,7 +206,8 @@ pub fn plan(
     let mut warnings = warnings(index);
     let mut selection = select::select_personal(index, config)?;
     warnings.extend(selection.warnings.clone());
-    leave_out_short_of_memory(index, &mut selection, facts);
+    let mut left_out = select::reasons(&selection.left_out);
+    leave_out_short_of_memory(index, &mut selection, &mut left_out, facts);
     let choices = Choices {
         inputs: &config.inputs,
         secret_files: &config.secret_files,
@@ -276,7 +281,7 @@ pub fn plan(
         host_files,
         namespaces: namespaces.into_values().collect(),
         components,
-        left_out: selection.left_out,
+        left_out,
         removals: Vec::new(),
         registry,
         storage: Storage {

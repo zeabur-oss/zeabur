@@ -4,8 +4,8 @@
 //! A team install installs the catalog's recommended components for the profile and
 //! [`FEATURES`]; a personal install the ones recommended for [`PERSONAL_PROFILE`]. Only components
 //! whose `testedOn` names
-//! the distribution are installed: a default one that is not is left out, and one the
-//! configuration or a dependency asks for stops the plan. Names are capabilities or component ids,
+//! the distribution are installed by default: a default one that is not is left out, and one the
+//! configuration enables is installed with a warning. Names are capabilities or component ids,
 //! so the catalog decides which component fills each one. The install order is the union of each
 //! chosen component's `installOrder`, taken in id order: every list already places a component
 //! after its dependencies, so the union does too, and the result never depends on the order of
@@ -31,18 +31,6 @@ pub const FEATURES: &[&str] = &["builds", "image-updates", "databases/cloudnativ
 /// What Zeabur needs to run: HTTPS and usage numbers. `gui` never suggests leaving them out.
 pub const REQUIRED: &[&str] = &["ingress", "certificates", "metrics/metrics-server"];
 
-/// Component ids the catalog renamed, old to new. The configuration must use the new id.
-pub const RENAMED: &[(&str, &str)] = &[("container-registry/zot", "builds/zeabur-builder")];
-
-/// The id a component the catalog renamed has now.
-#[must_use]
-pub fn renamed(old: &str) -> Option<&'static str> {
-    RENAMED
-        .iter()
-        .find(|(from, _)| *from == old)
-        .map(|(_, to)| *to)
-}
-
 /// The chosen components, in install order.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Selection {
@@ -50,9 +38,56 @@ pub struct Selection {
     pub components: Vec<(String, Why)>,
     /// Components the defaults or configuration named that this installer leaves out, with the
     /// reason.
-    pub left_out: BTreeMap<String, String>,
+    pub left_out: BTreeMap<String, LeftOut>,
     /// About the configuration's names.
     pub warnings: Vec<Warning>,
+}
+
+/// Why a component is left out. Its text is what the plan shows.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum LeftOut {
+    /// It runs only on these distributions.
+    Distributions(Vec<String>),
+    /// Its `defaults` is `unsupported` on the profile.
+    Unsupported {
+        /// The profile.
+        profile: String,
+    },
+    /// A default that was not tested on the distribution.
+    Untested {
+        /// The distribution.
+        distribution: String,
+    },
+    /// A default that needs a component not tested on the distribution.
+    NeedsUntested {
+        /// The component it needs.
+        dependency: String,
+        /// The distribution.
+        distribution: String,
+    },
+}
+
+impl std::fmt::Display for LeftOut {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Distributions(only) => write!(f, "runs on {} only", only.join(", ")),
+            Self::Unsupported { profile } => write!(f, "unsupported on {profile}"),
+            Self::Untested { distribution } => write!(f, "not tested on {distribution}"),
+            Self::NeedsUntested {
+                dependency,
+                distribution,
+            } => write!(f, "needs {dependency}, not tested on {distribution}"),
+        }
+    }
+}
+
+/// The reasons as the plan shows them.
+#[must_use]
+pub fn reasons(left_out: &BTreeMap<String, LeftOut>) -> BTreeMap<String, String> {
+    left_out
+        .iter()
+        .map(|(id, reason)| (id.clone(), reason.to_string()))
+        .collect()
 }
 
 /// Why a component is installed.
@@ -70,18 +105,15 @@ pub enum Why {
 ///
 /// # Errors
 ///
-/// When a name matches nothing or is an old id of a renamed component, a named component was not
-/// tested on the distribution, or a chosen component needs one that is disabled, unsupported or
-/// untested.
+/// When a name matches nothing or is an id that a component replaces, or a chosen component
+/// needs one that is disabled or left out.
 pub fn select(index: &Index, config: &Config) -> Result<Selection, PlanError> {
     let profile = config.profile.as_str();
     let distribution = config.distribution.id();
-    let mut base = recommended(index, profile);
-    base.extend(resolve_all(index, profile, distribution, FEATURES)?);
     choose(
         index,
         &Wanted {
-            base,
+            base: team_base(index, profile, distribution, FEATURES)?,
             enable: &config.enable,
             disable: &config.disable,
             profile,
@@ -116,6 +148,18 @@ pub fn select_personal(index: &Index, config: &PersonalConfig) -> Result<Selecti
     )
 }
 
+/// The recommended components for the profile and the `add` names.
+fn team_base(
+    index: &Index,
+    profile: &str,
+    distribution: &str,
+    add: &[&str],
+) -> Result<Vec<String>, PlanError> {
+    let mut base = recommended(index, profile);
+    base.extend(resolve_all(index, profile, distribution, add)?);
+    Ok(base)
+}
+
 struct Wanted<'a> {
     base: Vec<String>,
     enable: &'a [String],
@@ -143,7 +187,7 @@ fn choose(index: &Index, wanted: &Wanted<'_>) -> Result<Selection, PlanError> {
         chosen.insert(id.clone(), Why::Default);
     }
     for name in wanted.enable.iter().chain(wanted.disable) {
-        check_renamed(index, name)?;
+        check_replaced(index, name)?;
     }
     for name in wanted.enable {
         chosen.insert(resolve(index, profile, distribution, name)?, Why::Enabled);
@@ -188,7 +232,10 @@ fn choose(index: &Index, wanted: &Wanted<'_>) -> Result<Selection, PlanError> {
         {
             left_out.insert(
                 id.clone(),
-                format!("needs {dep}, not tested on {distribution}"),
+                LeftOut::NeedsUntested {
+                    dependency: dep.clone(),
+                    distribution: distribution.to_owned(),
+                },
             );
             continue;
         }
@@ -226,7 +273,7 @@ fn take_untested(
     index: &Index,
     wanted: &Wanted<'_>,
     dep: &str,
-    left_out: &mut BTreeMap<String, String>,
+    left_out: &mut BTreeMap<String, LeftOut>,
     warnings: &mut Vec<Warning>,
 ) {
     let usable_untested = index.component(dep).is_some_and(|c| {
@@ -255,7 +302,7 @@ fn leave_out_unusable(
     distribution: &str,
     chosen: &mut BTreeMap<String, Why>,
     warnings: &mut Vec<Warning>,
-) -> BTreeMap<String, String> {
+) -> BTreeMap<String, LeftOut> {
     let mut left_out = BTreeMap::new();
     let mut unusable = Vec::new();
     for (id, why) in chosen.iter() {
@@ -272,7 +319,10 @@ fn leave_out_unusable(
                     format!("The configuration enables {id}, which runs on {only} only, so it is not installed."),
                 ));
             }
-            left_out.insert(id.clone(), format!("runs on {only} only"));
+            left_out.insert(
+                id.clone(),
+                LeftOut::Distributions(component.distributions.clone()),
+            );
         } else if component.default_for(profile) == Default::Unsupported {
             if enabled {
                 warnings.push(warning(
@@ -281,13 +331,23 @@ fn leave_out_unusable(
                     format!("The configuration enables {id}, which is unsupported on {profile}, so it is not installed."),
                 ));
             }
-            left_out.insert(id.clone(), format!("unsupported on {profile}"));
+            left_out.insert(
+                id.clone(),
+                LeftOut::Unsupported {
+                    profile: profile.to_owned(),
+                },
+            );
         } else if !component.is_tested_on(distribution) {
             if enabled {
                 warnings.push(untested(id, distribution));
                 continue;
             }
-            left_out.insert(id.clone(), format!("not tested on {distribution}"));
+            left_out.insert(
+                id.clone(),
+                LeftOut::Untested {
+                    distribution: distribution.to_owned(),
+                },
+            );
         } else {
             continue;
         }
@@ -303,15 +363,14 @@ fn known(index: &Index, name: &str) -> bool {
     index.components.iter().any(|c| matches(index, &c.id, name))
 }
 
-/// Stops when `name` is an id the catalog renamed and the catalog has the new one.
-fn check_renamed(index: &Index, name: &str) -> Result<(), PlanError> {
-    match renamed(name) {
-        Some(new) if !known(index, name) && known(index, new) => Err(PlanError::Renamed {
+/// Stops when a component replaces `name`.
+fn check_replaced(index: &Index, name: &str) -> Result<(), PlanError> {
+    index.replacement_of(name).map_or(Ok(()), |new| {
+        Err(PlanError::Renamed {
             old: name.to_owned(),
             new: new.to_owned(),
-        }),
-        Some(_) | None => Ok(()),
-    }
+        })
+    })
 }
 
 fn recommended(index: &Index, profile: &str) -> Vec<String> {
@@ -379,4 +438,192 @@ fn resolve(
 
 fn matches(index: &Index, id: &str, name: &str) -> bool {
     id == name || index.component(id).is_some_and(|c| c.capability == name)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::fs;
+    use std::path::Path;
+
+    use serde_json::{Value, json};
+
+    use super::*;
+
+    const CASES: &str = concat!(env!("ZEABUR_CATALOG"), "/conformance/select");
+
+    fn names(value: &Value) -> Vec<&str> {
+        value.as_array().map_or_else(Vec::new, |names| {
+            names.iter().filter_map(Value::as_str).collect()
+        })
+    }
+
+    fn owned(value: &Value) -> Vec<String> {
+        names(value).into_iter().map(str::to_owned).collect()
+    }
+
+    fn index_of(case: &Value) -> Index {
+        let components: Vec<Value> = case["components"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|c| {
+                let id = c["id"].as_str().unwrap();
+                let mut component = c.clone();
+                component["capability"] = json!(id.split('/').next().unwrap());
+                component["metadata"] = json!({"name": id});
+                component["releases"] = json!([]);
+                component["security"] = json!({"summary": ""});
+                component
+            })
+            .collect();
+        let index = json!({
+            "indexVersion": 2,
+            "profiles": ["single-node", "multi-node"],
+            "components": components,
+        });
+        Index::parse(index.to_string().as_bytes()).unwrap()
+    }
+
+    fn selected(case: &Value) -> Result<Selection, PlanError> {
+        let index = index_of(case);
+        let config = &case["config"];
+        let profile = config["profile"].as_str().unwrap();
+        let distribution = config["distribution"].as_str().unwrap();
+        choose(
+            &index,
+            &Wanted {
+                base: team_base(&index, profile, distribution, &names(&config["add"]))?,
+                enable: &owned(&config["enable"]),
+                disable: &owned(&config["disable"]),
+                profile,
+                distribution,
+            },
+        )
+    }
+
+    fn reason(left_out: &LeftOut) -> Value {
+        match left_out {
+            LeftOut::Distributions(distributions) => {
+                json!({"reason": "distributions", "distributions": distributions})
+            }
+            LeftOut::Unsupported { profile } => {
+                json!({"reason": "unsupported", "profile": profile})
+            }
+            LeftOut::Untested { distribution } => {
+                json!({"reason": "untested", "distribution": distribution})
+            }
+            LeftOut::NeedsUntested {
+                dependency,
+                distribution,
+            } => {
+                json!({"reason": "needs-untested", "dependency": dependency, "distribution": distribution})
+            }
+        }
+    }
+
+    fn case_warning(warning: &Warning) -> Value {
+        match (warning.code, warning.values.as_slice()) {
+            ("config.untested", [component, distribution]) => {
+                json!({"kind": "untested", "component": component, "distribution": distribution})
+            }
+            ("config.runsOn" | "config.unsupportedOn", [component, _]) => {
+                json!({"kind": "left-out", "component": component})
+            }
+            _ => json!({"unexpected": warning.code, "values": warning.values}),
+        }
+    }
+
+    /// `want` with its warnings in a fixed order, since a case lists them in any order.
+    fn sorted_warnings(mut want: Value) -> Value {
+        if let Some(warnings) = want.get_mut("warnings").and_then(Value::as_array_mut) {
+            warnings.sort_by_key(Value::to_string);
+        }
+        want
+    }
+
+    #[expect(
+        clippy::wildcard_enum_match_arm,
+        reason = "a case can only expect the three selection errors"
+    )]
+    fn outcome(result: Result<Selection, PlanError>) -> Value {
+        let selection = match result {
+            Ok(selection) => selection,
+            Err(error) => {
+                let error = match error {
+                    PlanError::Unknown(name) => json!({"kind": "unknown", "name": name}),
+                    PlanError::Renamed { old, new } => {
+                        json!({"kind": "replaced", "old": old, "new": new})
+                    }
+                    PlanError::NeedsDisabled {
+                        component,
+                        dependency,
+                    } => {
+                        json!({"kind": "needs-disabled", "component": component, "dependency": dependency})
+                    }
+                    other => json!({"unexpected": other.to_string()}),
+                };
+                return json!({"error": error});
+            }
+        };
+        let mut out = serde_json::Map::new();
+        if !selection.components.is_empty() {
+            let components: Vec<Value> = selection
+                .components
+                .iter()
+                .map(|(id, why)| {
+                    let why = match why {
+                        Why::Default => "default",
+                        Why::Enabled => "enabled",
+                        Why::Dependency => "dependency",
+                    };
+                    json!({"id": id, "why": why})
+                })
+                .collect();
+            out.insert("components".to_owned(), json!(components));
+        }
+        if !selection.left_out.is_empty() {
+            let left_out: serde_json::Map<String, Value> = selection
+                .left_out
+                .iter()
+                .map(|(id, left_out)| (id.clone(), reason(left_out)))
+                .collect();
+            out.insert("leftOut".to_owned(), Value::Object(left_out));
+        }
+        if !selection.warnings.is_empty() {
+            let warnings: Vec<Value> = selection.warnings.iter().map(case_warning).collect();
+            out.insert("warnings".to_owned(), json!(warnings));
+        }
+        sorted_warnings(Value::Object(out))
+    }
+
+    #[test]
+    fn the_catalogs_selection_cases_pass() {
+        let mut files: Vec<_> = fs::read_dir(Path::new(CASES))
+            .unwrap()
+            .map(|entry| entry.unwrap().path())
+            .filter(|path| path.extension().is_some_and(|ext| ext == "yaml"))
+            .collect();
+        files.sort();
+        assert!(!files.is_empty(), "no cases in {CASES}");
+        let mut failures = Vec::new();
+        for file in &files {
+            let name = file.file_name().unwrap().to_string_lossy();
+            let case: Value = match serde_saphyr::from_str(&fs::read_to_string(file).unwrap()) {
+                Ok(case) => case,
+                Err(error) => {
+                    failures.push(format!("{name}: {error}"));
+                    continue;
+                }
+            };
+            let got = outcome(selected(&case));
+            let want = sorted_warnings(case["want"].clone());
+            if got != want {
+                failures.push(format!(
+                    "{name}: {}\n  got  {got}\n  want {want}",
+                    case["description"].as_str().unwrap_or_default().trim(),
+                ));
+            }
+        }
+        assert!(failures.is_empty(), "\n{}", failures.join("\n"));
+    }
 }
