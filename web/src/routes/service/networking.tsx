@@ -209,9 +209,7 @@ export function NetworkingTab({
                 service={service}
                 managed={managed}
                 offerDomain
-                onApplied={(domain) => {
-                  if (domain) setAdding("")
-                }}
+                onDomain={() => setAdding("")}
               />
             )}
           </EmptyHeader>
@@ -568,10 +566,8 @@ export function NetworkingTab({
                       project={project}
                       service={service}
                       managed={managed}
-                      offerDomain={listed === 0 && adding === undefined}
-                      onApplied={(domain) => {
-                        if (domain) setAdding("")
-                      }}
+                      offerDomain={nothingYet(listed, adding)}
+                      onDomain={() => setAdding("")}
                     />
                   </EmptyHeader>
                 </Empty>
@@ -667,41 +663,95 @@ function portNumber(endpoints: Endpoint[], route: PublicRoute): string {
   return named ? String(named.port) : port
 }
 
+function DomainOffer({ checked, onChange }: { checked: boolean; onChange: (on: boolean) => void }) {
+  const t = useT()
+  return (
+    <div className="flex items-center gap-2">
+      <Checkbox
+        id="net-private-domain"
+        checked={checked}
+        onCheckedChange={(on) => onChange(on === true)}
+      />
+      <Label htmlFor="net-private-domain">{t("net.alsoDomain")}</Label>
+    </div>
+  )
+}
+
+function KubectlInstead({ command }: { command: string }) {
+  const t = useT()
+  return (
+    <Collapsible>
+      <CollapsibleTrigger variant="disclosure">
+        <CaretRightIcon aria-hidden="true" />
+        {t("net.kubectlInstead")}
+      </CollapsibleTrigger>
+      <CollapsibleContent>
+        <div className="relative mt-2 min-w-0 rounded-lg border bg-muted/30">
+          <CopyButton value={command} className="absolute top-2 right-2" />
+          <pre
+            className="overflow-x-auto py-3 pr-12 pl-3 font-mono text-xs leading-5 whitespace-pre-wrap"
+            translate="no"
+          >
+            {command}
+          </pre>
+        </div>
+        {command.includes(PORT_PLACEHOLDER) ? (
+          <p className="mt-1.5 type-meta text-muted-foreground">
+            {t("net.exposePort", PORT_PLACEHOLDER)}
+          </p>
+        ) : null}
+      </CollapsibleContent>
+    </Collapsible>
+  )
+}
+
+function nothingYet(listed: number, adding: string | undefined) {
+  return listed === 0 && adding === undefined
+}
+
 /** A Service for a workload with none, planned as a Create; the kubectl command behind a
  * disclosure. */
-function PrivateAddressForm({
-  project,
-  service,
-  managed,
-  offerDomain,
-  onApplied,
-}: {
+function PrivateAddressForm(props: PrivateAddressProps) {
+  const t = useT()
+  const exposure = exposureOf(props.service)
+  if (exposure.can) return <PrivateAddressFields {...props} selector={exposure.selector} />
+  return exposure.why === "expressions" ? (
+    <p className="mt-2 type-meta text-muted-foreground">{t("net.privateExpressions")}</p>
+  ) : null
+}
+
+type PrivateAddressProps = {
   project: string
   service: Service
   managed?: string
   /** Offer to go on to add a domain once it has the address. */
   offerDomain: boolean
-  /** Once applied, with whether to go on to add a domain. */
-  onApplied: (domain: boolean) => void
-}) {
+  /** Called once applied, when the person asked to go on to add a domain. */
+  onDomain: () => void
+}
+
+function PrivateAddressFields({
+  project,
+  service,
+  managed,
+  offerDomain,
+  onDomain,
+  selector,
+}: PrivateAddressProps & { selector: Record<string, string> }) {
   const t = useT()
-  const exposure = exposureOf(service)
   const [port, setPort] = useState(() => String(likelyPort(service) ?? ""))
   const [domain, setDomain] = useState(false)
-  const planner = usePlanner(project, () => onApplied(offerDomain && domain))
+  const planner = usePlanner(project, () => {
+    if (offerDomain && domain) onDomain()
+  })
   const creatable = useQuery(creatableQuery(project)).data
   const gate = useHintGate("createServices", rightsOf(creatable)("", "services"))
-  if (!exposure.can) {
-    return exposure.why === "expressions" ? (
-      <p className="mt-2 type-meta text-muted-foreground">{t("net.privateExpressions")}</p>
-    ) : null
-  }
   const number = Number(port)
   const valid = port.trim() !== "" && isPort(number)
   const others = declaredPorts(service)
     .filter((p) => p.port !== number || p.protocol)
     .map((p) => (p.protocol ? `${p.port}/${p.protocol}` : String(p.port)))
-  const command = exposeCommand(service, exposure.selector, valid ? number : undefined)
+  const command = exposeCommand(service, selector, valid ? number : undefined)
   return (
     <>
       <form
@@ -715,7 +765,7 @@ function PrivateAddressForm({
             changes: [
               {
                 op: "create",
-                object: privateService(service, exposure.selector, number) as unknown as Record<
+                object: privateService(service, selector, number) as unknown as Record<
                   string,
                   never
                 >,
@@ -748,38 +798,8 @@ function PrivateAddressForm({
             : t("net.privatePortHint")}
           {valid && others.length > 0 ? ` ${t("net.privateAlso", others.join(", "))}` : null}
         </p>
-        {offerDomain ? (
-          <div className="flex items-center gap-2">
-            <Checkbox
-              id="net-private-domain"
-              checked={domain}
-              onCheckedChange={(on) => setDomain(on === true)}
-            />
-            <Label htmlFor="net-private-domain">{t("net.alsoDomain")}</Label>
-          </div>
-        ) : null}
-        <Collapsible>
-          <CollapsibleTrigger variant="disclosure">
-            <CaretRightIcon aria-hidden="true" />
-            {t("net.kubectlInstead")}
-          </CollapsibleTrigger>
-          <CollapsibleContent>
-            <div className="relative mt-2 min-w-0 rounded-lg border bg-muted/30">
-              <CopyButton value={command} className="absolute top-2 right-2" />
-              <pre
-                className="overflow-x-auto py-3 pr-12 pl-3 font-mono text-xs leading-5 whitespace-pre-wrap"
-                translate="no"
-              >
-                {command}
-              </pre>
-            </div>
-            {command.includes(PORT_PLACEHOLDER) ? (
-              <p className="mt-1.5 type-meta text-muted-foreground">
-                {t("net.exposePort", PORT_PLACEHOLDER)}
-              </p>
-            ) : null}
-          </CollapsibleContent>
-        </Collapsible>
+        {offerDomain ? <DomainOffer checked={domain} onChange={setDomain} /> : null}
+        <KubectlInstead command={command} />
       </form>
       {planner.dialog}
     </>

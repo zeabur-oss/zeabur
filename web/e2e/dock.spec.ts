@@ -188,10 +188,11 @@ test("the kubectl terminal opens through a review the first time and reuses its 
 test("a command on a page is text to copy; the cluster page opens the cluster's kubectl terminal", async ({
   page,
 }) => {
-  // crasher has no Service, so its Networking tab shows the command that adds one.
+  // crasher has no Service, so its Networking tab offers to add one, with the command behind a disclosure.
   await page.goto(`${project}/services/Deployment/${failing}?tab=networking`)
   const panel = page.getByRole("tabpanel", { name: "Networking" })
   const command = new RegExp(`^kubectl -n ${namespace} expose deployment ${failing} --port=\\S+$`)
+  await panel.getByRole("button", { name: "Use kubectl instead" }).click()
   await expect(panel.getByText(command)).toBeVisible()
   await expect(panel.getByRole("button", { name: "Copy" })).toBeVisible()
   await expect(panel.getByRole("button", { name: /terminal/ })).toHaveCount(0)
