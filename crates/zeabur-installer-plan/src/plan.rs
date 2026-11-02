@@ -419,12 +419,25 @@ pub fn min_memory_mib(component: &Component, distribution: Distribution) -> Opti
 }
 
 /// The selection without the components one build or other work would not fit beside, and the
-/// reasons for all it leaves out.
+/// reasons for all it leaves out. A component already installed stays.
+///
+/// # Errors
+///
+/// When a new install does not fit the server, or the selection fails.
 fn select_fitting(
     index: &Index,
     config: &Config,
     facts: &Facts,
 ) -> Result<(Selection, BTreeMap<String, String>), PlanError> {
+    let distribution = config.distribution;
+    // An install that is already running is upgraded with a warning instead.
+    if facts.record.is_none() && facts.memory_mib < distribution.min_memory_mib() {
+        return Err(PlanError::TeamMemory {
+            distribution,
+            min: distribution.min_memory_mib(),
+            have: facts.memory_mib,
+        });
+    }
     let mut selection = select::select(index, config)?;
     let mut left_out = select::reasons(&selection.left_out);
     crate::personal::leave_out_short_of_memory(
@@ -432,9 +445,42 @@ fn select_fitting(
         &mut selection,
         &mut left_out,
         facts.memory_mib,
-        |c| min_memory_mib(c, config.distribution),
+        |c| {
+            let installed = facts
+                .record
+                .as_ref()
+                .is_some_and(|r| r.components.contains(&c.id));
+            min_memory_mib(c, config.distribution).filter(|_| !installed)
+        },
     );
     Ok((selection, left_out))
+}
+
+/// When an upgrade keeps the server below what a team install with these components now needs.
+fn below_minimum(
+    index: &Index,
+    selection: &Selection,
+    distribution: Distribution,
+    host_mib: u64,
+) -> Option<Warning> {
+    let needs = selection
+        .components
+        .iter()
+        .filter_map(|(id, _)| index.component(id))
+        .filter_map(|c| min_memory_mib(c, distribution))
+        .fold(distribution.min_memory_mib(), u64::max);
+    let title = distribution.title();
+    (host_mib < needs).then(|| {
+        warning(
+            "memory.belowMinimum",
+            &[&host_mib.to_string(), &needs.to_string(), title],
+            format!(
+                "This server has {host_mib} MiB of memory, less than the {needs} MiB a team install \
+                 on {title} with these components now needs, so some pods may not schedule. \
+                 Turning off the crash kernel reserve (kdump) frees memory."
+            ),
+        )
+    })
 }
 
 /// Computes the plan.
@@ -458,13 +504,6 @@ pub fn plan_with(
     products: Option<&pins::Products>,
 ) -> Result<Plan, PlanError> {
     let distribution = config.distribution;
-    if facts.memory_mib < distribution.min_memory_mib() {
-        return Err(PlanError::TeamMemory {
-            distribution,
-            min: distribution.min_memory_mib(),
-            have: facts.memory_mib,
-        });
-    }
     facts.check_installer()?;
     let node_name = node_name::choose(config.host.node_name.as_deref(), facts, &[])?;
     let (selection, left_out) = select_fitting(index, config, facts)?;
@@ -475,6 +514,12 @@ pub fn plan_with(
         .map(|(id, _)| id.as_str())
         .collect();
     let mut warnings = selection.warnings.clone();
+    warnings.extend(below_minimum(
+        index,
+        &selection,
+        distribution,
+        facts.memory_mib,
+    ));
 
     let cluster = cluster_plan(distribution, config.version(), &facts.arch, &mut warnings)?;
     let kubernetes = distribution.kubernetes();
@@ -2677,6 +2722,29 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn an_upgrade_below_the_minimum_keeps_what_runs_and_warns() {
+        let index = Index::parse(INDEX.as_bytes()).unwrap();
+        let config = config("enable: [builds/zeabur-builder]\n");
+        let first = plan(&index, &config, &facts()).unwrap();
+        let mut small = facts();
+        small.memory_mib = 2882;
+        assert!(matches!(
+            plan(&index, &config, &small),
+            Err(PlanError::TeamMemory { .. })
+        ));
+
+        small.record = Some(recorded(&first, "0.1.1", |_| {}));
+        let upgrade = plan(&index, &config, &small).unwrap();
+        assert!(ids(&upgrade).contains(&"builds/zeabur-builder"));
+        let warning = upgrade
+            .warnings
+            .iter()
+            .find(|w| w.code == "memory.belowMinimum")
+            .unwrap();
+        assert!(warning.text.contains("kdump"), "{}", warning.text);
     }
 
     #[test]
