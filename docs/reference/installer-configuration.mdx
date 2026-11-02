@@ -69,7 +69,7 @@ To add runtime detection, vulnerability scanning, and intrusion prevention, enab
 enable: [runtime-security, vulnerability-scanning, intrusion-prevention]
 ```
 
-`enable` accepts capabilities, such as `runtime-security`, or full component IDs, such as `volume-backup/velero`. The installer adds a component's dependencies with it. If `disable` excludes a component that another component needs, `plan` names both and stops. The `plan` output lists the final components, their installation order, and the reasons for exclusions.
+`enable` accepts capabilities, such as `runtime-security`, or full component IDs, such as `volume-backup/velero`. The installer adds a component's dependencies with it. If `disable` excludes a component that another component needs, `plan` names both and stops. The `plan` output lists the final components, their installation order, and the reasons for exclusions. When the Catalog renames a component, an old ID in `enable` or `disable` stops `plan` with an error that names the new ID.
 
 The installer offers only components the Catalog has tested on your distribution. Each component lists them under `testedOn` in the Catalog's `index.json`. A recommended component that wasn't tested on your distribution is left out, and so is anything that needs it. If `enable` names an untested component, or a component you enabled needs one, `plan` installs it and warns that it wasn't tested there.
 

@@ -168,10 +168,6 @@ pub(crate) fn changes(changes: Option<&Changes>, unit: &str) -> String {
             &format!("  {id:<48} not removed, no longer updated"),
         );
     }
-    for r in &c.replaced {
-        push(&mut s, &format!("  {:<48} replaced by {}", r.from, r.to));
-        push(&mut s, &format!("      {}", replaced_note(&r.from)));
-    }
     for chart in &c.charts {
         let version = if chart.from == chart.to {
             chart.to.clone()
@@ -187,28 +183,11 @@ pub(crate) fn changes(changes: Option<&Changes>, unit: &str) -> String {
             ),
         );
     }
-    for id in &c.offered {
-        push(
-            &mut s,
-            &format!("  {id:<48} new default, not installed. To add it: enable: [{id}]"),
-        );
-    }
     if s.len() == before {
         push(&mut s, "  nothing");
     }
     push(&mut s, "");
     s
-}
-
-/// What happens to the data of a component that its replacement takes over.
-fn replaced_note(from: &str) -> &'static str {
-    match from {
-        "container-registry/zot" => {
-            "Zeabur Builder takes over zot and deletes images under <project>/<name> paths that \
-             no build made. To keep every image: disable: [builds/zeabur-builder]"
-        }
-        _ => "the new component takes over what the old one installed",
-    }
 }
 
 /// The components `apply` removes and what stays of them; empty when there are none.
@@ -561,17 +540,13 @@ mod tests {
     }
 
     #[test]
-    fn an_upgrade_names_what_changes_and_how_to_add_a_new_default() {
+    fn an_upgrade_names_what_changes() {
         use zeabur_installer_plan::record::{ChartChange, VersionChange};
         let mut changes = Changes {
             installer: "0.1.1".to_owned(),
             added: vec!["databases/cloudnative-pg".to_owned()],
             removed: vec!["databases/old".to_owned()],
             kept: vec!["node-updates/system-upgrade-controller".to_owned()],
-            replaced: vec![zeabur_installer_plan::record::Replaced {
-                from: "container-registry/zot".to_owned(),
-                to: "builds/zeabur-builder".to_owned(),
-            }],
             charts: vec![ChartChange {
                 component: "ingress/traefik".to_owned(),
                 release: "traefik".to_owned(),
@@ -579,7 +554,6 @@ mod tests {
                 to: "42.1.3".to_owned(),
                 values: false,
             }],
-            offered: vec!["databases/other".to_owned()],
             version: None,
             host_files: Vec::new(),
             restart: false,
@@ -594,11 +568,7 @@ mod tests {
             "databases/old",
             "node-updates/system-upgrade-controller",
             "not removed, no longer updated",
-            "container-registry/zot",
-            "replaced by builds/zeabur-builder",
-            "deletes images under <project>/<name>",
             "chart traefik 42.1.2 -> 42.1.3",
-            "To add it: enable: [databases/other]",
         ] {
             assert!(text.contains(line), "{line} in\n{text}");
         }
@@ -607,9 +577,7 @@ mod tests {
             added: Vec::new(),
             removed: Vec::new(),
             kept: Vec::new(),
-            replaced: Vec::new(),
             charts: Vec::new(),
-            offered: Vec::new(),
             version: Some(VersionChange {
                 from: "v1.2.2".to_owned(),
                 to: "v1.2.3".to_owned(),

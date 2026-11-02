@@ -1,7 +1,5 @@
-//! Choosing components: the defaults, then `enable` and `disable`, then dependencies.
-//!
-//! On a server with an install record, a default that the record does not have is installed only
-//! when `enable` names it or a chosen component needs it.
+//! Choosing components: the defaults, then `enable` and `disable`, then dependencies. The
+//! install record does not change the choice.
 //!
 //! A team install installs the catalog's recommended components for the profile and
 //! [`FEATURES`]; a personal install the ones recommended for [`PERSONAL_PROFILE`]. Only components
@@ -30,10 +28,10 @@ pub const PERSONAL_PROFILE: &str = "single-node";
 /// Git, and PostgreSQL databases.
 pub const FEATURES: &[&str] = &["builds", "image-updates", "databases/cloudnative-pg"];
 
-/// What Zeabur needs to run: HTTPS and usage numbers.
+/// What Zeabur needs to run: HTTPS and usage numbers. `gui` never suggests leaving them out.
 pub const REQUIRED: &[&str] = &["ingress", "certificates", "metrics/metrics-server"];
 
-/// Component ids the catalog renamed, old to new.
+/// Component ids the catalog renamed, old to new. The configuration must use the new id.
 pub const RENAMED: &[(&str, &str)] = &[("container-registry/zot", "builds/zeabur-builder")];
 
 /// The id a component the catalog renamed has now.
@@ -53,8 +51,6 @@ pub struct Selection {
     /// Components the defaults or configuration named that this installer leaves out, with the
     /// reason.
     pub left_out: BTreeMap<String, String>,
-    /// Defaults that the install record does not have and that are not installed.
-    pub offered: Vec<String>,
     /// About the configuration's names.
     pub warnings: Vec<Warning>,
 }
@@ -70,17 +66,14 @@ pub enum Why {
     Dependency,
 }
 
-/// Chooses the components for a configuration, on a server whose install record has `installed`.
+/// Chooses the components for a configuration.
 ///
 /// # Errors
 ///
-/// When a name matches nothing, a named component was not tested on the distribution, or a chosen
-/// component needs one that is disabled, unsupported or untested.
-pub fn select(
-    index: &Index,
-    config: &Config,
-    installed: Option<&BTreeSet<String>>,
-) -> Result<Selection, PlanError> {
+/// When a name matches nothing or is an old id of a renamed component, a named component was not
+/// tested on the distribution, or a chosen component needs one that is disabled, unsupported or
+/// untested.
+pub fn select(index: &Index, config: &Config) -> Result<Selection, PlanError> {
     let profile = config.profile.as_str();
     let distribution = config.distribution.id();
     let mut base = recommended(index, profile);
@@ -93,7 +86,6 @@ pub fn select(
             disable: &config.disable,
             profile,
             distribution,
-            installed,
         },
     )
 }
@@ -104,11 +96,7 @@ pub fn select(
 /// # Errors
 ///
 /// As [`select`].
-pub fn select_personal(
-    index: &Index,
-    config: &PersonalConfig,
-    installed: Option<&BTreeSet<String>>,
-) -> Result<Selection, PlanError> {
+pub fn select_personal(index: &Index, config: &PersonalConfig) -> Result<Selection, PlanError> {
     choose(
         index,
         &Wanted {
@@ -124,7 +112,6 @@ pub fn select_personal(
             disable: &config.disable,
             profile: PERSONAL_PROFILE,
             distribution: PERSONAL_DISTRIBUTION,
-            installed,
         },
     )
 }
@@ -135,8 +122,6 @@ struct Wanted<'a> {
     disable: &'a [String],
     profile: &'a str,
     distribution: &'a str,
-    /// The install record's components.
-    installed: Option<&'a BTreeSet<String>>,
 }
 
 fn untested(id: &str, distribution: &str) -> Warning {
@@ -157,20 +142,16 @@ fn choose(index: &Index, wanted: &Wanted<'_>) -> Result<Selection, PlanError> {
     for id in &wanted.base {
         chosen.insert(id.clone(), Why::Default);
     }
+    for name in wanted.enable.iter().chain(wanted.disable) {
+        check_renamed(index, name)?;
+    }
     for name in wanted.enable {
-        let id = resolve(index, profile, distribution, name).map_err(|e| match renamed(name) {
-            Some(new) if index.component(new).is_some() => PlanError::Renamed {
-                old: name.clone(),
-                new: new.to_owned(),
-            },
-            Some(_) | None => e,
-        })?;
-        chosen.insert(id, Why::Enabled);
+        chosen.insert(resolve(index, profile, distribution, name)?, Why::Enabled);
     }
     let mut warnings = Vec::new();
     let mut disabled = BTreeSet::new();
     for name in wanted.disable {
-        let name = current_name(index, name, &mut warnings);
+        let name = name.as_str();
         let matched: Vec<String> = chosen
             .keys()
             .filter(|id| matches(index, id, name))
@@ -186,8 +167,6 @@ fn choose(index: &Index, wanted: &Wanted<'_>) -> Result<Selection, PlanError> {
     }
 
     let mut left_out = leave_out_unusable(index, profile, distribution, &mut chosen, &mut warnings);
-    let taken_over = under_new_names(wanted.installed);
-    let held = hold_back(index, profile, taken_over.as_ref(), &mut chosen);
 
     let mut order: Vec<(String, Why)> = Vec::new();
     for (id, why) in &chosen {
@@ -234,14 +213,9 @@ fn choose(index: &Index, wanted: &Wanted<'_>) -> Result<Selection, PlanError> {
             order.push((dep, why));
         }
     }
-    let offered = held
-        .into_iter()
-        .filter(|id| !order.iter().any(|(seen, _)| seen == id))
-        .collect();
     Ok(Selection {
         components: order,
         left_out,
-        offered,
         warnings,
     })
 }
@@ -325,63 +299,18 @@ fn leave_out_unusable(
     left_out
 }
 
-/// The install record's components, with each renamed one also under its new id: a server that
-/// has `container-registry/zot` has `builds/zeabur-builder`, which keeps the same zot release.
-#[must_use]
-pub fn under_new_names(installed: Option<&BTreeSet<String>>) -> Option<BTreeSet<String>> {
-    let mut all = installed?.clone();
-    for (old, new) in RENAMED {
-        if all.contains(*old) {
-            all.insert((*new).to_owned());
-        }
-    }
-    Some(all)
-}
-
-/// Takes out of `chosen` the defaults that `installed` lacks, except what Zeabur needs, and
-/// returns them.
-fn hold_back(
-    index: &Index,
-    profile: &str,
-    installed: Option<&BTreeSet<String>>,
-    chosen: &mut BTreeMap<String, Why>,
-) -> Vec<String> {
-    let Some(installed) = installed else {
-        return Vec::new();
-    };
-    let required = required(index, profile);
-    let held: Vec<String> = chosen
-        .iter()
-        .filter(|(id, why)| {
-            **why == Why::Default && !installed.contains(*id) && !required.contains(*id)
-        })
-        .map(|(id, _)| id.clone())
-        .collect();
-    for id in &held {
-        chosen.remove(id);
-    }
-    held
-}
-
 fn known(index: &Index, name: &str) -> bool {
     index.components.iter().any(|c| matches(index, &c.id, name))
 }
 
-/// `name`, or the id the catalog renamed it to, with a warning.
-fn current_name<'a>(index: &Index, name: &'a str, warnings: &mut Vec<Warning>) -> &'a str {
+/// Stops when `name` is an id the catalog renamed and the catalog has the new one.
+fn check_renamed(index: &Index, name: &str) -> Result<(), PlanError> {
     match renamed(name) {
-        Some(new) if !known(index, name) && known(index, new) => {
-            warnings.push(warning(
-                "config.renamed",
-                &[name, new],
-                format!(
-                    "disable: `{name}` is now `{new}` in this catalog, so `{new}` is not installed. \
-                     Write `{new}` in the configuration file instead."
-                ),
-            ));
-            new
-        }
-        Some(_) | None => name,
+        Some(new) if !known(index, name) && known(index, new) => Err(PlanError::Renamed {
+            old: name.to_owned(),
+            new: new.to_owned(),
+        }),
+        Some(_) | None => Ok(()),
     }
 }
 

@@ -355,14 +355,8 @@ export const zhTW: Messages = {
   "review.changes.removed": "移除",
   "review.changes.kept": "不再更新",
   "review.changes.keptHint": "這些元件不會移除，原本裝好的內容會繼續執行。",
-  "review.changes.replaced": "換成新元件",
-  "review.changes.replaced.container-registry/zot":
-    "Zeabur Builder 會接手 zot，並刪除 <project>/<name> 路徑下不是建置產生的映像檔，包括你自己推上去的。要保留所有映像檔，請在「元件」步驟取消勾選 Zeabur Builder。",
-  "review.changes.replacedNote": (from, to) => `${to} 會取代 ${from}，接手原本裝好的內容。`,
   "review.changes.charts": "Chart 更新",
   "review.changes.values": "設定有變更",
-  "review.changes.offered": "這版目錄新增的元件",
-  "review.changes.offeredHint": "勾選才會安裝。",
   "review.removing": "要移除的元件",
   "review.removingHint": "helm-controller 會解除安裝這些元件的 chart。留下的東西之後可以手動刪除。",
   "review.stays": (items) => `會留下：${listZh("zh-TW", items)}`,
@@ -425,8 +419,8 @@ export const zhTW: Messages = {
     "預設 local-path 儲存類別建立的磁碟區只在建立磁碟區的節點上：使用這種磁碟區的 Pod 只能在那個節點執行，節點不在了，資料也跟著不在。",
   "warning.join.token.unpinned": () =>
     "這個權杖沒有 CA 雜湊（K10<hash>::…），所以這台 VM 會信任在那個位址回應的任何伺服器。請照 node add 印出的權杖原樣使用。",
-  "warning.config.renamed": (old, id) =>
-    `設定檔停用的 ${old} 在這版目錄改名為 ${id}，所以不會安裝 ${id}。請把設定檔裡的名稱改成 ${id}。`,
+  "warning.builder.deletesImages": () =>
+    "Zeabur Builder 會接手 zot，並刪除 <project>/<name> 路徑下不是建置產生的映像檔，包括你自己推上去的。要保留所有映像檔，請在「元件」步驟取消勾選 Zeabur Builder。",
   "warning.config.untested": (id, distribution) =>
     `${id} 沒在 ${distribution} 上測試過。設定檔要求安裝它，或要求安裝需要它的元件，所以照樣安裝。`,
   "warning.config.runsOn": (id, only) => `${id} 只能在 ${only} 上執行，所以不會安裝。`,

@@ -70,7 +70,7 @@ host:
 enable: [runtime-security, vulnerability-scanning, intrusion-prevention]
 ```
 
-`enable` 可以寫 capability（例如 `runtime-security`）或完整元件 ID（例如 `volume-backup/velero`），相依的元件會一起加入。`disable` 排除了另一個元件需要的元件時，`plan` 會列出兩者並停下。最後裝哪些元件、順序和排除原因，看 `plan` 的輸出。
+`enable` 可以寫 capability（例如 `runtime-security`）或完整元件 ID（例如 `volume-backup/velero`），相依的元件會一起加入。`disable` 排除了另一個元件需要的元件時，`plan` 會列出兩者並停下。最後裝哪些元件、順序和排除原因，看 `plan` 的輸出。Catalog 把元件改名後，`enable` 或 `disable` 寫舊 ID 時，`plan` 會停下，錯誤訊息會寫出新 ID。
 
 installer 只提供 Catalog 在你的 distribution 上測試過的元件。每個元件測試過哪些 distribution，列在 Catalog `index.json` 的 `testedOn`。建議安裝、但沒在你的 distribution 上測試過的元件不會安裝，需要這個元件的其他元件也一樣。`enable` 寫了沒測試過的元件，或你加入的元件需要沒測試過的元件時，`plan` 照樣安裝，並警告它沒在這裡測試過。
 
