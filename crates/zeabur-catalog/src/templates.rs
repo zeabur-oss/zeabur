@@ -44,6 +44,12 @@ pub struct Template {
     pub labels: BTreeMap<String, String>,
     /// The catalogue's description, in English, for operators.
     pub description: String,
+    /// What the application is, in one sentence, in English: the catalogue's `summary`, else
+    /// its description.
+    pub tagline: String,
+    /// The tagline in other languages (`zh-TW`, `zh-CN`).
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    pub tagline_locales: BTreeMap<String, String>,
     /// The licence of the application and its images (SPDX).
     pub license: String,
     /// The application's home page.
@@ -288,6 +294,10 @@ struct FileMetadata {
     name: String,
     version: String,
     description: String,
+    #[serde(default)]
+    summary: String,
+    #[serde(default)]
+    locales: BTreeMap<String, FileSummary>,
     license: String,
     homepage: String,
 }
@@ -429,6 +439,18 @@ fn read(id: &str, file: &str, manifests: &str) -> Result<Template, RenderError> 
         name: file.metadata.name,
         version: file.metadata.version.clone(),
         labels,
+        tagline: if file.metadata.summary.trim().is_empty() {
+            file.metadata.description.trim()
+        } else {
+            file.metadata.summary.trim()
+        }
+        .to_owned(),
+        tagline_locales: file
+            .metadata
+            .locales
+            .into_iter()
+            .map(|(lang, l)| (lang, l.summary.trim().to_owned()))
+            .collect(),
         description: file.metadata.description.trim().to_owned(),
         license: file.metadata.license,
         homepage: file.metadata.homepage,
@@ -1040,6 +1062,17 @@ mod tests {
                 let words = &risk.locales[lang];
                 assert_ne!(words.risk, "");
                 assert_ne!(words.mitigation, "");
+            }
+        }
+    }
+
+    #[test]
+    fn every_template_has_a_tagline_in_each_language() {
+        for template in templates().unwrap() {
+            let id = &template.id;
+            for lang in ["zh-TW", "zh-CN"] {
+                let tagline = template.tagline_locales.get(lang).map(String::as_str);
+                assert!(tagline.is_some_and(|t| !t.is_empty()), "{id} {lang}");
             }
         }
     }

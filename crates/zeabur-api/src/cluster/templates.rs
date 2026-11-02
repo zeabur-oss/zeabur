@@ -33,6 +33,12 @@ pub struct TemplateView {
     pub name: String,
     /// The catalogue's description, in English, for operators.
     pub description: String,
+    /// What the application is, in one sentence, in English: the catalogue's `summary`, else
+    /// its description.
+    pub tagline: String,
+    /// The tagline in other languages (`zh-TW`, `zh-CN`).
+    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    pub tagline_locales: BTreeMap<String, String>,
     /// The licence of the application and its images (SPDX).
     pub license: String,
     /// The application's home page.
@@ -174,6 +180,8 @@ fn view(
         id: template.id,
         name: template.name,
         description: template.description,
+        tagline: template.tagline,
+        tagline_locales: template.tagline_locales,
         license: template.license,
         homepage: template.homepage,
         version: template.version,
