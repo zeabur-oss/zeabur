@@ -4,10 +4,11 @@
 //! # As a database
 //!
 //! A `Dragonfly` runs the StatefulSet of its name, whose pods the operator labels with
-//! `app.kubernetes.io/name: dragonfly`, `app.kubernetes.io/instance: <name>`, and `role: master`
-//! or `role: replica`. Clients connect through the Service of its name on port 6379, which sends
-//! them to the master. `status.phase` is `Ready`, `Configuring`, `RollingUpdate` or
-//! `ResourcesCreated` [df-api]. `spec.authentication.passwordFromSecret` names the password.
+//! `app: <name>`, `app.kubernetes.io/name: dragonfly`, and `role: master` or `role: replica`;
+//! there is no `app.kubernetes.io/instance`. Clients connect through the Service of its name on
+//! port 6379, which sends them to the master. `status.phase` is `Ready`, `Configuring`,
+//! `RollingUpdate` or `ResourcesCreated` [df-api]. `spec.authentication.passwordFromSecret` names
+//! the password.
 //!
 //! # Backups
 //!
@@ -202,6 +203,31 @@ mod tests {
 
     fn object(value: Value) -> DynamicObject {
         serde_json::from_value(value).unwrap()
+    }
+
+    #[test]
+    fn its_pods_carry_the_operators_labels() {
+        let db = database(
+            "shop",
+            &object(serde_json::json!({
+                "apiVersion": "dragonflydb.io/v1alpha1", "kind": "Dragonfly",
+                "metadata": {"name": "cache", "namespace": "shop"}, "spec": {}
+            })),
+        );
+        let labels = |app: &str, name: &str| {
+            [
+                ("app", app),
+                ("app.kubernetes.io/name", name),
+                ("app.kubernetes.io/part-of", app),
+                ("role", "master"),
+            ]
+            .iter()
+            .map(|(k, v)| ((*k).to_owned(), (*v).to_owned()))
+            .collect()
+        };
+        assert!(db.is_member(&labels("cache", "dragonfly")));
+        assert!(!db.is_member(&labels("other", "dragonfly")));
+        assert!(!db.is_member(&labels("cache", "mariadb")));
     }
 
     #[test]

@@ -24,8 +24,10 @@ import {
   newDatabase,
   newPassword,
   presetOf,
+  dragonflyArgs,
   presetResources,
   reshapeDatabase,
+  sizePresets,
   rseqNote,
   shellCommand,
   storageProblem,
@@ -651,6 +653,41 @@ describe("MySQL, MariaDB and Dragonfly", () => {
       storage: { s3: { bucket: "backups", prefix: "db", region: "eu", tls: { enabled: true } } },
       ...backupPods,
     })
+  })
+
+  test("every Dragonfly preset gets threads and maxmemory that fit its limits", () => {
+    for (const size of sizePresets) {
+      const form = { ...newDatabase("dragonfly", 1), size }
+      const spec = objects(createDatabase(form, () => "pw"))[1]?.spec
+      const threads = Number(
+        spec.args.find((a: string) => a.startsWith("--proactor_threads="))?.split("=")[1],
+      )
+      const maxmemory = Number(
+        spec.args.find((a: string) => a.startsWith("--maxmemory="))?.match(/\d+/)?.[0],
+      )
+      expect(maxmemory).toBe(threads * 256)
+      expect(spec.args).toContain("--version_check=false")
+      expect(maxmemory).toBeLessThan(parseInt(presetResources.dragonfly[size].limits.memory))
+    }
+  })
+
+  test("a Dragonfly without a CPU limit gets threads from its memory", () => {
+    expect(dragonflyArgs({ memory: "1Gi" })).toContain("--proactor_threads=3")
+    expect(dragonflyArgs({ memory: "300Mi" })).toContain("--proactor_threads=1")
+  })
+
+  test("resizing a Dragonfly recomputes its threads and keeps other flags", () => {
+    const cache = as("dragonfly", "Dragonfly", "dragonflies", {
+      args: ["--proactor_threads=1", "--maxmemory=256mb", "--cluster_mode=emulated"],
+    })
+    const [edit] = reshapeDatabase(cache, { members: 1, size: "large", storage: "2Gi" })
+    const spec = edit?.op === "edit" ? JSON.parse(edit.yaml).spec : {}
+    expect(spec.args).toEqual([
+      "--cluster_mode=emulated",
+      "--proactor_threads=4",
+      "--maxmemory=1024mb",
+      "--version_check=false",
+    ])
   })
 
   test("Dragonfly snapshots to the bucket with the endpoint as its flags", () => {
