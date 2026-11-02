@@ -79,15 +79,10 @@ pub struct InstallText {
     pub text: String,
 }
 
-/// What a component's RBAC and network access amount to, from the catalogue.
+/// How privileged a component is, from the catalogue.
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Security {
-    /// What its RBAC lets it do.
-    pub summary: String,
-    /// It has cluster-scoped RBAC.
-    #[serde(default)]
-    pub cluster_wide: bool,
     /// It runs privileged.
     #[serde(default)]
     pub privileged: bool,
@@ -98,31 +93,6 @@ pub struct Security {
         skip_serializing_if = "Option::is_none"
     )]
     pub level: Option<String>,
-    /// Hosts it connects to.
-    #[serde(default)]
-    pub egress: Vec<String>,
-    /// External credentials: `optional` or `required`; absent means none.
-    #[serde(default)]
-    pub credentials: Option<String>,
-    /// What the credentials are for.
-    #[serde(default)]
-    pub credentials_note: Option<String>,
-    /// Who may use its custom resources: `namespaced` or `admin-only`; absent means tenants never
-    /// do.
-    #[serde(default)]
-    pub tenants: Option<String>,
-    /// Known risks and how to contain them.
-    #[serde(default)]
-    pub risks: Vec<Risk>,
-}
-
-/// A known risk of a component.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
-pub struct Risk {
-    /// The risk.
-    pub risk: String,
-    /// How to contain it.
-    pub mitigation: String,
 }
 
 /// A value the install needs from the person, or generates.
@@ -190,6 +160,7 @@ struct File {
     releases: Vec<Release>,
     #[serde(default)]
     contributes: Vec<Contribution>,
+    #[serde(default)]
     security: Security,
     #[serde(default)]
     detection: Detection,

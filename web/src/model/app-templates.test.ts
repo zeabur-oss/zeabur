@@ -19,8 +19,8 @@ import {
   type TemplateInput,
 } from "@/model/app-templates"
 
-/** The embedded catalog's index.json; the Nix dev shell sets the directory. */
-const index = resolve(process.env.ZEABUR_CATALOG_RELEASE ?? "", "index.json")
+/** The catalog's templates; the Nix dev shell sets the directory. */
+const templates = resolve(process.env.ZEABUR_CATALOG ?? "", "templates")
 
 interface CatalogInput {
   name: string
@@ -30,11 +30,12 @@ interface CatalogInput {
   validation?: { pattern?: string }
 }
 
-const catalogInputs = (
-  JSON.parse(readFileSync(index, "utf8")) as {
-    templates: { id: string; inputs?: CatalogInput[] }[]
+const catalogInputs = readdirSync(templates).flatMap((id) => {
+  const file = Bun.YAML.parse(readFileSync(resolve(templates, id, "template.yaml"), "utf8")) as {
+    inputs?: CatalogInput[]
   }
-).templates.flatMap((t) => (t.inputs ?? []).map((input) => ({ template: t.id, input })))
+  return (file.inputs ?? []).map((input) => ({ template: id, input }))
+})
 
 /** The words cases of the catalog's `conformance/template/`; the Nix dev shell sets the directory. */
 const cases = resolve(process.env.ZEABUR_CATALOG ?? "", "conformance/template")
@@ -78,7 +79,6 @@ const password = (name: string, secret: string, key: string) =>
 const template = (patch: Partial<AppTemplate>): AppTemplate => ({
   id: "miniflux",
   name: "Miniflux",
-  description: "Miniflux feed reader over HTTPS.",
   tagline: "An RSS reader.",
   license: "Apache-2.0",
   homepage: "https://miniflux.app/",
@@ -266,13 +266,13 @@ describe("app templates", () => {
     expect<unknown>(changes).toEqual([{ op: "template", template: "miniflux", inputs: {} }])
   })
 
-  test("the list leaves out the page server and filters by name or description", () => {
+  test("the list leaves out the page server and filters by name or tagline", () => {
     const items = [
-      template({ id: "umami", name: "Umami", description: "Web analytics" }),
+      template({ id: "umami", name: "Umami", tagline: "Web analytics" }),
       template({ id: "error-pages", name: "Error pages" }),
-      template({ id: "ghost", name: "Ghost", description: "Publishing" }),
+      template({ id: "ghost", name: "Ghost", tagline: "Publishing" }),
     ]
     expect(listed(items).map((t) => t.id)).toEqual(["ghost", "umami"])
-    expect(filterTemplates(listed(items), "ANALYTICS").map((t) => t.id)).toEqual(["umami"])
+    expect(filterTemplates(listed(items), "ANALYTICS", "en").map((t) => t.id)).toEqual(["umami"])
   })
 })

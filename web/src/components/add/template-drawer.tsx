@@ -100,8 +100,9 @@ function useRoom(template: AppTemplate) {
 
 function TemplateList({ items, onPick }: { items: AppTemplate[]; onPick: (id: string) => void }) {
   const t = useT()
+  const { locale } = useI18n()
   const [query, setQuery] = useState("")
-  const shown = filterTemplates(items, query)
+  const shown = filterTemplates(items, query, locale)
   return (
     <div className="flex flex-col gap-3">
       <Input
