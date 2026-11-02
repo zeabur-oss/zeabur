@@ -2516,7 +2516,7 @@ mod tests {
             (
                 "distribution: rke2\n",
                 "/etc/rancher/rke2/config.yaml",
-                "kube-reserved=memory=500Mi",
+                "kube-reserved=memory=502Mi",
             ),
         ] {
             let plan = plan(&index, &config(extra), &facts()).unwrap();

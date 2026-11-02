@@ -14,7 +14,8 @@
 //! overrides it cleanly.
 
 use crate::cluster::{
-    AUDIT_POLICY, Distribution, EMPTY_AUTHN, HEADER, HostFile, Options, yaml_list,
+    AUDIT_POLICY, Distribution, EMPTY_AUTHN, HEADER, HostFile, Options, control_plane_requests,
+    yaml_list,
 };
 
 /// Where the tarball installs.
@@ -85,13 +86,7 @@ fn config(options: &Options) -> String {
          audit-policy-file: /etc/rancher/rke2/audit-policy.yaml\n",
     );
     out.push_str(&RKE2.kubelet_args(true));
-    // RKE2 asks for 512Mi for etcd and 256Mi for kube-controller-manager, which idle near 100Mi,
-    // out of what the reserves leave to pods.
-    out.push_str(
-        "control-plane-resource-requests:\n  \
-           - etcd-memory=256Mi\n  \
-           - kube-controller-manager-memory=128Mi\n",
-    );
+    out.push_str(&control_plane_requests());
     yaml_list(&mut out, "disable", &options.disable);
     yaml_list(&mut out, "tls-san", &options.tls_san);
     out
