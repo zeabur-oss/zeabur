@@ -76,7 +76,7 @@ export function privateService(service: Service, selector: Record<string, string
   return {
     apiVersion: "v1",
     kind: "Service",
-    metadata: { name: service.name },
+    metadata: { name: service.name, labels: { "app.kubernetes.io/name": service.name } },
     spec: { type: "ClusterIP", selector, ports: portsOf(service, port) },
   }
 }

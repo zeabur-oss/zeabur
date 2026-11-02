@@ -23,7 +23,7 @@ const container = (fields: object) => ({ name: "app", ...fields })
 
 describe("a private address for a service with none", () => {
   test.each(["Deployment", "StatefulSet", "DaemonSet"])(
-    "is a ClusterIP Service named like the %s, selecting its pods by matchLabels",
+    "is a ClusterIP Service named and labelled like the %s, so deleting the service deletes it",
     (kind) => {
       const service = workload(kind)
       const exposure = exposureOf(service)
@@ -31,7 +31,7 @@ describe("a private address for a service with none", () => {
       expect(privateService(service, exposure.selector, 8080)).toStrictEqual({
         apiVersion: "v1",
         kind: "Service",
-        metadata: { name: "web" },
+        metadata: { name: "web", labels: { "app.kubernetes.io/name": "web" } },
         spec: {
           type: "ClusterIP",
           selector: { app: "web" },
@@ -141,6 +141,8 @@ describe("the kubectl command", () => {
         "kind: Service",
         "metadata:",
         "  name: web",
+        "  labels:",
+        "    app.kubernetes.io/name: web",
         "spec:",
         "  type: ClusterIP",
         "  selector:",
