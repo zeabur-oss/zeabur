@@ -139,6 +139,15 @@ export function hostProblem(host: string): "empty" | "invalid" | undefined {
 export const suggestedHost = (service: string, project: string, suffix?: string | null) =>
   suffix && service ? `${service}-${project}.${suffix}` : ""
 
+/** The name a built service gets before the person types one: from the repository or folder,
+ * else `web`. */
+export const builtName = (source: string, taken: readonly string[]) =>
+  nameFromImage(source || "web", taken)
+
+/** What the host field shows while it is empty: the shape `suggestedHost` gives. */
+export const hostPlaceholder = (project: string, suffix?: string | null) =>
+  suffix ? `<name>-${project}.${suffix}` : "web.example.com"
+
 /** `KEY=value` lines as pasted from a `.env` file; the lines that are not, from 1. */
 export function parseEnv(text: string): { variables: ServiceVariable[]; bad: number[] } {
   const variables: ServiceVariable[] = []

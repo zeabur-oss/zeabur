@@ -39,7 +39,7 @@ import {
   type Access,
   type GitService,
 } from "@/model/git-service"
-import { nameFromImage } from "@/model/image-service"
+import { builtName } from "@/model/image-service"
 import { Alert, AlertDescription } from "@zeabur-oss/design-system/components/alert"
 import { Button } from "@zeabur-oss/design-system/components/button"
 import { CopyInput } from "@zeabur-oss/design-system/components/copy-input"
@@ -63,7 +63,7 @@ export function GitDrawer({ project, onClose }: { project: string; onClose: () =
   const fromGitHub = github.source === "github"
   const built = useBuiltForm<GitService>(project, newGitService, (f, taken) => {
     const repo = parseRepository(repositoryUrl(github, f.url))
-    return repo ? nameFromImage(repo.path.split("/").at(-1) ?? "", taken) : ""
+    return builtName(repo?.path.split("/").at(-1) ?? "", taken)
   })
   const { form, set, shown, options, name, domains, registry } = built
   const [userSet, setUserSet] = useState(false)

@@ -1,8 +1,10 @@
 import { describe, expect, test } from "bun:test"
 
 import {
+  builtName,
   createImageService,
   hasTag,
+  hostPlaceholder,
   hostProblem,
   imageObjects,
   imageOptions,
@@ -56,6 +58,20 @@ describe("names", () => {
     expect(hostProblem("https://web.example.com")).toBe("invalid")
     expect(suggestedHost("web", "shop", "apps.example.com")).toBe("web-shop.apps.example.com")
     expect(suggestedHost("web", "shop", undefined)).toBe("")
+  })
+
+  test("a built service is named after its source, else web, so the host shows from the start", () => {
+    expect(builtName("", [])).toBe("web")
+    expect(builtName("", ["web"])).toBe("web-2")
+    expect(builtName("blog", [])).toBe("blog")
+    expect(suggestedHost(builtName("", []), "shop", "apps.example.com")).toBe(
+      "web-shop.apps.example.com",
+    )
+  })
+
+  test("an empty host field shows the shape the suffix gives, or the example without one", () => {
+    expect(hostPlaceholder("shop", "apps.example.com")).toBe("<name>-shop.apps.example.com")
+    expect(hostPlaceholder("shop", undefined)).toBe("web.example.com")
   })
 })
 

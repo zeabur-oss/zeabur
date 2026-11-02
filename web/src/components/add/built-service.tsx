@@ -18,7 +18,13 @@ import {
   type BuiltService,
   type GitService,
 } from "@/model/git-service"
-import { imageOptions, parseEnv, rightsOf, suggestedHost } from "@/model/image-service"
+import {
+  hostPlaceholder,
+  imageOptions,
+  parseEnv,
+  rightsOf,
+  suggestedHost,
+} from "@/model/image-service"
 import type { Profile } from "@/model/pod-security"
 import type { FieldProblem } from "@/model/image-service"
 import {
@@ -247,6 +253,7 @@ export function Toggle({
 
 /** "Public URL": the switch and, when on, the host; nothing for a service with no port. */
 export function PublicUrlFields({
+  project,
   port,
   canPublish,
   on,
@@ -256,6 +263,7 @@ export function PublicUrlFields({
   domains,
   error,
 }: {
+  project: string
   port: string
   canPublish: boolean
   on: boolean
@@ -289,7 +297,7 @@ export function PublicUrlFields({
             size="sm"
             mono
             value={host}
-            placeholder={domains.suffixes?.length ? undefined : "web.example.com"}
+            placeholder={hostPlaceholder(project, domains.suffixes?.[0])}
             autoComplete="off"
             spellCheck={false}
             onChange={(event) => onHost(event.target.value.trim())}
@@ -481,6 +489,7 @@ export function BuiltPublicUrl({ built, problems }: { built: BuiltFormState; pro
   const t = useT()
   return (
     <PublicUrlFields
+      project={built.project}
       port={built.port}
       canPublish={built.options.publicUrl}
       on={built.form.publicUrl}
