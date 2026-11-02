@@ -1048,6 +1048,11 @@ mod tests {
             state["config"]["profile"].as_str().unwrap(),
             state["facts"]["arch"].as_str().unwrap(),
         );
+        state["teamMinMemoryMib"] = super::Distribution::ALL
+            .into_iter()
+            .map(|d| (d.id().to_owned(), json!(d.min_memory_mib())))
+            .collect();
+        state["rke2SuggestedMib"] = json!(plan::RKE2_SUGGESTED_MIB);
         written.insert("state.json", state);
 
         let mut team = read("plan.json");
