@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react"
+import { Navigate, Outlet, useLocation, useNavigate, useSearch } from "@tanstack/react-router"
+import { createContext, use as useContext, useEffect, useState } from "react"
 import DesktopIcon from "~icons/ph/desktop"
 import MoonIcon from "~icons/ph/moon"
 import SunIcon from "~icons/ph/sun"
@@ -17,12 +18,6 @@ import {
 } from "@/api"
 import { Steps } from "@/components/bits"
 import { localeNames, locales, useI18n, useT } from "@/i18n"
-import { AccessStep } from "@/steps/access"
-import { ComponentsStep } from "@/steps/components"
-import { SettingsStep } from "@/steps/settings"
-import { HostStep } from "@/steps/host"
-import { InstallStep } from "@/steps/install"
-import { ReviewStep } from "@/steps/review"
 import { setTheme, useTheme, type ThemeChoice } from "@/theme"
 import { Alert, AlertDescription, AlertTitle } from "@zeabur-oss/design-system/components/alert"
 import { Logo } from "@zeabur-oss/design-system/components/brand"
@@ -42,6 +37,9 @@ const personalSteps: readonly Step[] = steps.filter((s) => s !== "access")
 const teamMinMemoryMib: Record<Distribution, number> = { k3s: 2400, rke2: 2600 }
 /** From this much memory RKE2 is suggested (`RKE2_SUGGESTED_MIB`). */
 const rke2SuggestedMib = 7 * 1024
+
+/** The page of each step; the kind of install is `?use=`. */
+export const stepPath = (step: Step) => (step === "host" ? "/" : (`/${step}` as const))
 
 const memoryOf = (server: ServerState | null) => server?.facts?.memoryMib ?? Infinity
 
@@ -97,20 +95,54 @@ export interface Wizard {
   install: () => void
 }
 
+const WizardContext = createContext<Wizard | null>(null)
+
+/** The wizard of the page around the step; steps render only once it has loaded. */
+export const useWizard = () => useContext(WizardContext)!
+
+/** The choices so far, kept for this tab so a reload does not lose them. Secrets are left out
+ * and asked again. */
+const saved = "zeabur-installer.choices"
+interface Saved {
+  config: Config | null
+  personal: PersonalConfig
+}
+
+const restore = (): Saved | null => {
+  try {
+    const value = window.sessionStorage.getItem(saved)
+    return value ? (JSON.parse(value) as Saved) : null
+  } catch {
+    return null
+  }
+}
+
+const keep = (choices: Saved | null) => {
+  try {
+    if (choices) window.sessionStorage.setItem(saved, JSON.stringify(choices))
+    else window.sessionStorage.removeItem(saved)
+  } catch {
+    // A page without storage starts over on reload.
+  }
+}
+
 const idle: Progress = { lines: [], next: 0, running: false, code: null }
 
-export function App() {
+/** Everything the steps share, around the page of the current step. */
+export function WizardPage() {
   const t = useT()
+  const navigate = useNavigate()
+  const pathname = useLocation({ select: (l) => l.pathname })
+  const linkedUse = useSearch({ strict: false, select: (s) => s.use })
   const [server, setServer] = useState<ServerState | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
-  const [config, setConfigState] = useState<Config | null>(null)
-  const [personal, setPersonal] = useState<PersonalConfig>(emptyPersonal)
-  const [use, setUseState] = useState<Use | null>(null)
+  const [restored] = useState(restore)
+  const [config, setConfigState] = useState<Config | null>(restored?.config ?? null)
+  const [personal, setPersonal] = useState<PersonalConfig>(restored?.personal ?? emptyPersonal)
   const [secrets, setSecrets] = useState<Secrets>({})
   const [planned, setPlanned] = useState<Planned | null>(null)
   const [shown, setShown] = useState<Plan | null>(null)
   const [planning, setPlanning] = useState(false)
-  const [step, setStep] = useState<Step>("host")
   const [progress, setProgress] = useState<Progress>(idle)
 
   const load = () => {
@@ -127,13 +159,9 @@ export function App() {
         )
         if (state.personal)
           setPersonal((current) => (current === emptyPersonal ? state.personal! : current))
-        const teamFits = fits(state, "k3s") || fits(state, "rke2")
-        setUseState(
-          (current) => current ?? (state.use === "personal" || !teamFits ? "personal" : "team"),
-        )
         if (state.applying) {
-          setStep("install")
           setProgress({ ...idle, running: true })
+          void navigate({ to: "/install", search: (s) => s, replace: true })
         }
       },
       (error: unknown) => setLoadError(String(error)),
@@ -141,6 +169,12 @@ export function App() {
   }
   useEffect(load, [])
 
+  const teamFits = fits(server, "k3s") || fits(server, "rke2")
+  const use: Use | null = !server
+    ? null
+    : linkedUse === "personal" || !teamFits
+      ? "personal"
+      : (linkedUse ?? (server.use === "personal" ? "personal" : "team"))
   const active = use === "personal" ? personal : config
 
   // Every change is planned by the server, so the pages show exactly what `apply` would do.
@@ -169,6 +203,10 @@ export function App() {
     }
   }, [active, secrets, server?.catalog])
 
+  useEffect(() => {
+    if (config) keep({ config, personal })
+  }, [config, personal])
+
   // The log, read while the install runs.
   useEffect(() => {
     if (!progress.running) return
@@ -181,10 +219,7 @@ export function App() {
     return () => clearTimeout(timer)
   }, [progress])
 
-  const go = (next: Step) => {
-    setStep(next)
-    window.scrollTo(0, 0)
-  }
+  const go = (next: Step) => void navigate({ to: stepPath(next), search: (s) => s })
 
   const install = () => {
     if (!active) return
@@ -194,6 +229,7 @@ export function App() {
           setPlanned({ error: result.error })
           return
         }
+        keep(null)
         setProgress({ ...idle, running: true })
         go("install")
       },
@@ -201,8 +237,15 @@ export function App() {
     )
   }
 
-  const teamFits = fits(server, "k3s") || fits(server, "rke2")
   const shownSteps = use === "personal" ? personalSteps : steps
+  // A linked install page shows nothing until an install has started.
+  const started = progress.running || progress.code !== null
+  const step = steps.find((s) => stepPath(s) === pathname) ?? "host"
+  const current = !shownSteps.includes(step)
+    ? "host"
+    : step === "install" && !started
+      ? "review"
+      : step
   const wizard: Wizard | null =
     server && config && use && active
       ? {
@@ -212,7 +255,7 @@ export function App() {
           suggested: suggested(server),
           setUse: (next) => {
             if (next === "team" && !teamFits) return
-            setUseState(next)
+            void navigate({ to: ".", search: (s) => ({ ...s, use: next }), replace: true })
             setShown(null)
           },
           config,
@@ -254,9 +297,9 @@ export function App() {
       <main className="flex-1 px-4 md:px-8">
         <PageColumn width="content" gap="md" className="my-6 md:my-10">
           <Steps
-            label={t("step.of", shownSteps.indexOf(step) + 1, shownSteps.length)}
+            label={t("step.of", shownSteps.indexOf(current) + 1, shownSteps.length)}
             steps={shownSteps.map((s) => t(`step.${s}`))}
-            current={shownSteps.indexOf(step)}
+            current={shownSteps.indexOf(current)}
           />
           {loadError ? (
             <Alert variant="destructive">
@@ -268,18 +311,12 @@ export function App() {
               <LoadingDots />
               {t("common.loading")}
             </div>
-          ) : step === "host" ? (
-            <HostStep wizard={wizard} />
-          ) : step === "access" ? (
-            <AccessStep wizard={wizard} />
-          ) : step === "components" ? (
-            <ComponentsStep wizard={wizard} />
-          ) : step === "settings" ? (
-            <SettingsStep wizard={wizard} />
-          ) : step === "review" ? (
-            <ReviewStep wizard={wizard} />
+          ) : current !== step ? (
+            <Navigate to={stepPath(current)} search={(s) => s} replace />
           ) : (
-            <InstallStep wizard={wizard} />
+            <WizardContext value={wizard}>
+              <Outlet />
+            </WizardContext>
           )}
         </PageColumn>
       </main>
