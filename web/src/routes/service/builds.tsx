@@ -299,34 +299,11 @@ function Summary({
   const failure =
     problem?.message ?? (build.ready === "False" && !failedRun ? build.message : undefined)
   const refused = refusedCredentials(build, latest)
-  const deployGate = useHereGate("changeServices")
-  const rebuildGate = useHereGate("build")
   const waiting = build.awaitingUpload && !build.latestImage
-  const deployButton = (
-    <Button
-      variant={current === false ? "default" : "outline"}
-      size="sm"
-      disabled={!build.latestImage || current === true || !!managed}
-      onClick={onDeploy}
-    >
-      <RocketLaunchIcon aria-hidden="true" data-icon="inline-start" />
-      {t("builds.deploy")}
-    </Button>
-  )
   return (
     <SummaryCard aria-label={t("builds.status", build.name)}>
       <SummaryCardMain>
-        <SummaryCardStatus
-          tone={
-            problem
-              ? problem.lasting
-                ? "fail"
-                : "progress"
-              : latest
-                ? tones[runTone(latest)]
-                : "idle"
-          }
-        >
+        <SummaryCardStatus tone={summaryTone(problem, latest)}>
           <SummaryCardWord>{statusWord(t, { waiting, problem, latest })}</SummaryCardWord>
         </SummaryCardStatus>
         {since ? (
@@ -339,70 +316,151 @@ function Summary({
             ? t("builds.waitingUpload", service.name)
             : currentWords(t, service, build, current)}
         </p>
-        {failure ? (
-          <p
-            className={`mt-1 max-w-prose text-sm break-words ${(problem && !problem.lasting) || refused ? "text-secondary" : "text-fail-strong"}`}
-            lang="en"
-            translate="no"
-          >
-            {failure}
-          </p>
-        ) : failedRun ? (
-          <FailedRun run={failedRun} />
-        ) : null}
+        <Failure problem={problem} failure={failure} failedRun={failedRun} refused={!!refused} />
         {refused ? <Refused project={project} build={build} kind={refused} /> : null}
         <UploadProgress project={project} build={build.name} />
         {build.suspended ? (
           <p className="mt-1 text-sm text-warn-strong">{t("builds.suspended")}</p>
         ) : null}
-        <SummaryCardFacts>
-          <SourceFact build={build} branch={branch} />
-          {build.latestImage ? (
-            <SummaryCardFact label={t("builds.image")}>
-              <CubeIcon aria-hidden="true" />
-              <span className="truncate font-mono" title={build.latestImage} translate="no">
-                {imageTag(build.latestImage)}
-              </span>
-              <CopyButton value={build.latestImage} />
-            </SummaryCardFact>
-          ) : null}
-          {several ? (
-            <SummaryCardFact label={t("builds.container")}>
-              <span className="truncate font-mono" translate="no">
-                {built.container}
-              </span>
-            </SummaryCardFact>
-          ) : null}
-          {build.builder ? (
-            <SummaryCardFact label={t("builds.builder")}>
-              <span className="truncate font-mono" translate="no">
-                {build.builder}
-              </span>
-            </SummaryCardFact>
-          ) : null}
-        </SummaryCardFacts>
-        <SummaryCardActions>
-          {managed ? (
-            <Tooltip content={t("builds.managedDeploy", managed)}>
-              <span>{deployButton}</span>
-            </Tooltip>
-          ) : (
-            <GateTip gate={deployGate}>{deployButton}</GateTip>
-          )}
-          {build.archive ? (
-            <UploadAction project={project} build={build.name} primary={waiting} />
-          ) : null}
-          {waiting ? null : (
-            <GateTip gate={rebuildGate}>
-              <Button variant="outline" size="sm" onClick={onRebuild}>
-                <ArrowClockwiseIcon aria-hidden="true" data-icon="inline-start" />
-                {t("builds.rebuild")}
-              </Button>
-            </GateTip>
-          )}
-        </SummaryCardActions>
+        <SummaryFacts built={built} branch={branch} several={several} />
+        <SummaryActions
+          project={project}
+          build={build}
+          current={current}
+          managed={managed}
+          waiting={!!waiting}
+          onDeploy={onDeploy}
+          onRebuild={onRebuild}
+        />
       </SummaryCardMain>
     </SummaryCard>
+  )
+}
+
+function SummaryActions({
+  project,
+  build,
+  current,
+  managed,
+  waiting,
+  onDeploy,
+  onRebuild,
+}: {
+  project: string
+  build: Build
+  current: boolean | undefined
+  managed?: string
+  waiting: boolean
+  onDeploy: () => void
+  onRebuild: () => void
+}) {
+  const t = useT()
+  const deployGate = useHereGate("changeServices")
+  const rebuildGate = useHereGate("build")
+  const deployButton = (
+    <Button
+      variant={current === false ? "default" : "outline"}
+      size="sm"
+      disabled={!build.latestImage || current === true || !!managed}
+      onClick={onDeploy}
+    >
+      <RocketLaunchIcon aria-hidden="true" data-icon="inline-start" />
+      {t("builds.deploy")}
+    </Button>
+  )
+  return (
+    <SummaryCardActions>
+      {managed ? (
+        <Tooltip content={t("builds.managedDeploy", managed)}>
+          <span>{deployButton}</span>
+        </Tooltip>
+      ) : (
+        <GateTip gate={deployGate}>{deployButton}</GateTip>
+      )}
+      {build.archive ? (
+        <UploadAction project={project} build={build.name} primary={waiting} />
+      ) : null}
+      {waiting ? null : (
+        <GateTip gate={rebuildGate}>
+          <Button variant="outline" size="sm" onClick={onRebuild}>
+            <ArrowClockwiseIcon aria-hidden="true" data-icon="inline-start" />
+            {t("builds.rebuild")}
+          </Button>
+        </GateTip>
+      )}
+    </SummaryCardActions>
+  )
+}
+
+function summaryTone(problem: ReturnType<typeof buildProblem>, latest?: BuildRun) {
+  if (problem) return problem.lasting ? "fail" : "progress"
+  return latest ? tones[runTone(latest)] : "idle"
+}
+
+function Failure({
+  problem,
+  failure,
+  failedRun,
+  refused,
+}: {
+  problem: ReturnType<typeof buildProblem>
+  failure?: string | null
+  failedRun?: BuildRun
+  refused: boolean
+}) {
+  if (failure) {
+    const quiet = (problem && !problem.lasting) || refused
+    return (
+      <p
+        className={`mt-1 max-w-prose text-sm break-words ${quiet ? "text-secondary" : "text-fail-strong"}`}
+        lang="en"
+        translate="no"
+      >
+        {failure}
+      </p>
+    )
+  }
+  return failedRun ? <FailedRun run={failedRun} /> : null
+}
+
+function SummaryFacts({
+  built,
+  branch,
+  several,
+}: {
+  built: Built
+  branch: string | undefined
+  several: boolean
+}) {
+  const t = useT()
+  const { build } = built
+  return (
+    <SummaryCardFacts>
+      <SourceFact build={build} branch={branch} />
+      {build.latestImage ? (
+        <SummaryCardFact label={t("builds.image")}>
+          <CubeIcon aria-hidden="true" />
+          <span className="truncate font-mono" title={build.latestImage} translate="no">
+            {imageTag(build.latestImage)}
+          </span>
+          <CopyButton value={build.latestImage} />
+        </SummaryCardFact>
+      ) : null}
+      {several ? (
+        <SummaryCardFact label={t("builds.container")}>
+          <span className="truncate font-mono" translate="no">
+            {built.container}
+          </span>
+        </SummaryCardFact>
+      ) : null}
+      {build.builder ? (
+        <SummaryCardFact label={t("builds.builder")}>
+          <span className="truncate font-mono" translate="no">
+            {build.builder}
+          </span>
+        </SummaryCardFact>
+      ) : null}
+    </SummaryCardFacts>
   )
 }
 
