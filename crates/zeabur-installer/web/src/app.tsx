@@ -19,6 +19,7 @@ import { Steps } from "@/components/bits"
 import { localeNames, locales, useI18n, useT } from "@/i18n"
 import { AccessStep } from "@/steps/access"
 import { ComponentsStep } from "@/steps/components"
+import { SettingsStep } from "@/steps/settings"
 import { HostStep } from "@/steps/host"
 import { InstallStep } from "@/steps/install"
 import { ReviewStep } from "@/steps/review"
@@ -31,7 +32,7 @@ import { Select } from "@zeabur-oss/design-system/components/select"
 import { LoadingDots } from "@zeabur-oss/design-system/components/spinner"
 import { Tooltip } from "@zeabur-oss/design-system/components/tooltip"
 
-const steps = ["host", "access", "components", "review", "install"] as const
+const steps = ["host", "access", "components", "settings", "review", "install"] as const
 export type Step = (typeof steps)[number]
 /** A personal install has no Zeabur panel, so nothing to reach it by. */
 const personalSteps: readonly Step[] = steps.filter((s) => s !== "access")
@@ -273,6 +274,8 @@ export function App() {
             <AccessStep wizard={wizard} />
           ) : step === "components" ? (
             <ComponentsStep wizard={wizard} />
+          ) : step === "settings" ? (
+            <SettingsStep wizard={wizard} />
           ) : step === "review" ? (
             <ReviewStep wizard={wizard} />
           ) : (

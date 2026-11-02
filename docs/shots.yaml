@@ -56,12 +56,14 @@ shots:
     - click: '[data-testid="step-next"] button:last-child'
     - click: '[data-testid="step-next"] button:last-child'
     - click: '[data-testid="step-next"] button:last-child'
+    - click: '[data-testid="step-next"] button:last-child'
     - wait: '[role="alert"]'
 # Stopped before Zeabur: the folded timeline then shows five items.
 - id: installer-install
   app: installer
   path: /
   steps:
+    - click: '[data-testid="step-next"] button:last-child'
     - click: '[data-testid="step-next"] button:last-child'
     - click: '[data-testid="step-next"] button:last-child'
     - click: '[data-testid="step-next"] button:last-child'
@@ -73,6 +75,7 @@ shots:
   app: installer
   path: /
   steps:
+    - click: '[data-testid="step-next"] button:last-child'
     - click: '[data-testid="step-next"] button:last-child'
     - click: '[data-testid="step-next"] button:last-child'
     - click: '[data-testid="step-next"] button:last-child'
