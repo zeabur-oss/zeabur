@@ -57,11 +57,18 @@ while IFS= read -r line; do
     env "${vars[@]}" ZEABUR_DEMO_ADDR="127.0.0.1:$port" "$demo" >"$work/demo.log" 2>&1 &
   fi
   server=$!
-  for _ in $(seq 1 100); do
-    if (exec 3<>"/dev/tcp/127.0.0.1/$port") 2>/dev/null; then break; fi
+  # The installer's server first builds and runs a cargo test to write its fixtures
+  # (scripts/fixtures.ts), so a cold run takes minutes.
+  listening=""
+  for _ in $(seq 1 6000); do
+    if (exec 3<>"/dev/tcp/127.0.0.1/$port") 2>/dev/null; then
+      listening=1
+      break
+    fi
+    kill -0 "$server" 2>/dev/null || break
     sleep 0.1
   done
-  if ! kill -0 "$server" 2>/dev/null; then
+  if [[ -z "$listening" ]]; then
     echo "error: the demo server did not start ($line):" >&2
     cat "$work/demo.log" >&2
     exit 1
