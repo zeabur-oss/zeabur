@@ -11,7 +11,7 @@
 #   path: /projects/shop        # route in the demo UI
 #   wait: '[data-testid="services-table"]'   # optional selector to wait for
 #   steps:                      # optional; selectors only, never visible text
-#     - click: '[data-testid="deploy-button"]'   # or fill, hover, press, wait
+#     - click: '[data-testid="deploy-button"]'   # or fill, hover, press, wait, repeat
 #   clip: main                  # optional selector to crop to; at least 24 px around it
 #   until: '#cluster-nodes'     # optional, with clip: the crop ends at the bottom of this element
 #   blank: input                # optional selector whose text changes every run; it is left out
@@ -39,32 +39,31 @@ shots:
   app: installer
   path: /
   steps:
-    - click: '[data-testid="step-next"] button:last-child'
+    - repeat: '[data-testid="step-next"] button:last-child'
+      until: 'main[data-step="access"]'
     - wait: '[data-slot="field"] .text-ok-strong'
     - wait: '[data-slot="field"] ~ [data-slot="field"] .text-ok-strong'
 - id: installer-components
   app: installer
   path: /
   steps:
-    - click: '[data-testid="step-next"] button:last-child'
-    - click: '[data-testid="step-next"] button:last-child'
+    - repeat: '[data-testid="step-next"] button:last-child'
+      until: 'main[data-step="components"]'
     - wait: '[data-slot="checkbox"][data-checked]'
 - id: installer-review
   app: installer
   path: /
   steps:
-    - click: '[data-testid="step-next"] button:last-child'
-    - click: '[data-testid="step-next"] button:last-child'
-    - click: '[data-testid="step-next"] button:last-child'
+    - repeat: '[data-testid="step-next"] button:last-child'
+      until: 'main[data-step="review"]'
     - wait: '[role="alert"]'
 # Stopped before Zeabur: the folded timeline then shows five items.
 - id: installer-install
   app: installer
   path: /
   steps:
-    - click: '[data-testid="step-next"] button:last-child'
-    - click: '[data-testid="step-next"] button:last-child'
-    - click: '[data-testid="step-next"] button:last-child'
+    - repeat: '[data-testid="step-next"] button:last-child'
+      until: 'main[data-step="review"]'
     - click: '[data-testid="step-next"] button:last-child'
     - wait: '[data-slot="timeline-item"]:nth-of-type(5)'
   env:
@@ -73,9 +72,8 @@ shots:
   app: installer
   path: /
   steps:
-    - click: '[data-testid="step-next"] button:last-child'
-    - click: '[data-testid="step-next"] button:last-child'
-    - click: '[data-testid="step-next"] button:last-child'
+    - repeat: '[data-testid="step-next"] button:last-child'
+      until: 'main[data-step="review"]'
     - click: '[data-testid="step-next"] button:last-child'
     - wait: '[data-slot="copy-input"]'
   env:
@@ -84,9 +82,8 @@ shots:
   app: installer
   path: /
   steps:
-    - click: '[data-testid="step-next"] button:last-child'
-    - click: '[data-testid="step-next"] button:last-child'
-    - click: '[data-testid="step-next"] button:last-child'
+    - repeat: '[data-testid="step-next"] button:last-child'
+      until: 'main[data-step="review"]'
     - click: '[data-testid="step-next"] button:last-child'
     - wait: '[data-slot="timeline-item"]'
     - wait: '[role="alert"]'
@@ -119,14 +116,16 @@ shots:
   path: /
   steps:
     - click: '[data-slot="radio-option"]'
-    - click: '[data-testid="step-next"] button:last-child'
+    - repeat: '[data-testid="step-next"] button:last-child'
+      until: 'main[data-step="components"]'
     - click: '[data-slot="checkbox"]:not([data-checked]):not([data-disabled])'
     - wait: '[data-slot="checkbox"][data-disabled][data-checked]'
 - id: installer-personal-components-small
   app: installer
   path: /
   steps:
-    - click: '[data-testid="step-next"] button:last-child'
+    - repeat: '[data-testid="step-next"] button:last-child'
+      until: 'main[data-step="components"]'
     - wait: '[data-slot="checkbox"][data-checked]'
   env:
     ZEABUR_DEMO_HOST: small
@@ -135,8 +134,8 @@ shots:
   path: /
   steps:
     - click: '[data-slot="radio-option"]'
-    - click: '[data-testid="step-next"] button:last-child'
-    - click: '[data-testid="step-next"] button:last-child'
+    - repeat: '[data-testid="step-next"] button:last-child'
+      until: 'main[data-step="review"]'
     - click: '[data-testid="step-next"] button:last-child'
     - wait: '[data-slot="copy-input"]'
   env:
@@ -788,10 +787,9 @@ shots:
   app: installer
   path: /
   steps:
-  - click: '[data-testid="step-next"] button:last-child'
-  - click: '[data-testid="step-next"] button:last-child'
-  - click: '[data-testid="step-next"] button:last-child'
-  - wait: '[role="alert"]'
+    - repeat: '[data-testid="step-next"] button:last-child'
+      until: 'main[data-step="review"]'
+    - wait: '[role="alert"]'
 # Change NODE_ENV, save, and open the technical details of the review.
 - id: change-review
   path: /projects/shop/services/Deployment/web?tab=variables

@@ -107,7 +107,7 @@ export function ComponentsStep({ wizard }: { wizard: Wizard }) {
           ) : null}
           <Button
             disabled={!plan || wizard.planning || incomplete.length > 0}
-            onClick={() => wizard.go("review")}
+            onClick={() => wizard.go("settings")}
           >
             {t("common.continue")}
           </Button>

@@ -20,6 +20,8 @@ export const en = {
   "common.sentences": (parts: string[]) => parts.filter(Boolean).join(" "),
   "common.back": "Back",
   "common.continue": "Continue",
+  "common.on": "On",
+  "common.off": "Off",
   "common.retry": "Try again",
   "common.loading": "Loading…",
   "common.copy": "Copy",
@@ -32,6 +34,7 @@ export const en = {
   "step.host": "Server",
   "step.access": "Access",
   "step.components": "Components",
+  "step.settings": "Options",
   "step.review": "Review",
   "step.install": "Install",
   "step.of": (n: number, total: number) => `Step ${n} of ${total}`,
@@ -298,6 +301,9 @@ export const en = {
   "capability.replicated-storage": "Replicated storage",
 
   // Review
+  "settings.title": "Options",
+  "settings.description": "How Zeabur runs on this server.",
+  "review.change": "Change",
   "review.title": "Review",
   "review.description": (path: string) =>
     `This is what will be installed. The configuration is saved to ${path}, so the same install can be repeated from the command line.`,

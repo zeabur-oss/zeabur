@@ -16,6 +16,8 @@ export const zhCN: Messages = {
   "common.sentences": (parts) => parts.filter(Boolean).join(""),
   "common.back": "上一步",
   "common.continue": "继续",
+  "common.on": "开启",
+  "common.off": "关闭",
   "common.retry": "重试",
   "common.loading": "正在加载…",
   "common.copy": "复制",
@@ -28,6 +30,7 @@ export const zhCN: Messages = {
   "step.host": "服务器",
   "step.access": "访问方式",
   "step.components": "组件",
+  "step.settings": "选项",
   "step.review": "确认",
   "step.install": "安装",
   "step.of": (n, total) => `第 ${n} 步，共 ${total} 步`,
@@ -273,6 +276,9 @@ export const zhCN: Messages = {
   "capability.object-storage": "对象存储",
   "capability.replicated-storage": "复制式存储",
 
+  "settings.title": "选项",
+  "settings.description": "决定 Zeabur 在这台服务器上怎么运行。",
+  "review.change": "更改",
   "review.title": "确认",
   "review.description": (path) =>
     `以下是将要安装的内容。配置会保存到 ${path}，之后也可以在命令行重复同样的安装。`,

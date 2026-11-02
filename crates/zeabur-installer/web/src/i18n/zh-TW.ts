@@ -16,6 +16,8 @@ export const zhTW: Messages = {
   "common.sentences": (parts) => parts.filter(Boolean).join(""),
   "common.back": "上一步",
   "common.continue": "繼續",
+  "common.on": "開啟",
+  "common.off": "關閉",
   "common.retry": "再試一次",
   "common.loading": "正在載入…",
   "common.copy": "複製",
@@ -28,6 +30,7 @@ export const zhTW: Messages = {
   "step.host": "伺服器",
   "step.access": "連線方式",
   "step.components": "元件",
+  "step.settings": "選項",
   "step.review": "確認",
   "step.install": "安裝",
   "step.of": (n, total) => `第 ${n} 步，共 ${total} 步`,
@@ -273,6 +276,9 @@ export const zhTW: Messages = {
   "capability.object-storage": "物件儲存",
   "capability.replicated-storage": "複製式儲存",
 
+  "settings.title": "選項",
+  "settings.description": "決定 Zeabur 在這台伺服器上怎麼運作。",
+  "review.change": "變更",
   "review.title": "確認",
   "review.description": (path) =>
     `以下是要安裝的內容。設定會存到 ${path}，之後也能在命令列重跑同樣的安裝。`,

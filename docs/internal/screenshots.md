@@ -57,6 +57,8 @@ fails, Playwright's trace is in `target/docs-shots-results`. The demo listens on
     - hover: 'a[href="/projects/shop/settings"]'
     - press: Escape
     - wait: '[role="alert"]'
+    - repeat: '[data-testid="step-next"] button:last-child'   # clicked until `until` shows
+      until: 'main[data-step="review"]'
   clip: main                    # optional: CSS selector to crop to; at least 24 px around it
   until: '#cluster-nodes'       # optional, with clip: the crop ends at the bottom of this element
   blank: input                  # optional: text that changes on every run, left out of the image
@@ -87,7 +89,7 @@ preview` and the captured responses in `crates/zeabur-installer/web/scripts/dev-
 `ZEABUR_DEMO_INSTALL` shows the install as `running`, `done` or `fail` at once.
 
 The script checks the manifest before it builds anything: unknown keys, ids that are not
-kebab-case or not unique, steps other than `click`, `fill`, `hover`, `press` and `wait`, an unknown `app`, and `env`
+kebab-case or not unique, steps other than `click`, `fill`, `hover`, `press`, `wait` and `repeat`, an unknown `app`, and `env`
 variables outside `ZEABUR_DEMO_*`.
 
 ## Same input, same pixels

@@ -10,6 +10,7 @@ export type Step =
   | { hover: string }
   | { press: string }
   | { wait: string }
+  | { repeat: string; until: string }
 
 export const apps = ["zeabur", "installer"] as const
 export type App = (typeof apps)[number]
@@ -79,6 +80,7 @@ const stepKeys: Record<string, string[]> = {
   hover: ["hover"],
   press: ["press"],
   wait: ["wait"],
+  repeat: ["repeat", "until"],
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

@@ -81,7 +81,7 @@ export function ReviewStep({ wizard }: { wizard: Wizard }) {
       title={t("review.title")}
       description={t("review.description", server.configPath)}
       back={
-        <Button variant="outline" onClick={() => wizard.go("components")}>
+        <Button variant="outline" onClick={() => wizard.go("settings")}>
           {t("common.back")}
         </Button>
       }
@@ -227,6 +227,20 @@ export function ReviewStep({ wizard }: { wizard: Wizard }) {
                 )}
               </Row>
             ) : null}
+            <Row label={t("review.program")}>
+              <ConsentValue
+                on={wizard.active.telemetry !== false}
+                onChange={() => wizard.go("settings")}
+              />
+            </Row>
+            {!personal && config.zeabur ? (
+              <Row label={t("review.updateCheck")}>
+                <ConsentValue
+                  on={config.updateCheck !== false}
+                  onChange={() => wizard.go("settings")}
+                />
+              </Row>
+            ) : null}
             <Row label={t("review.time")}>{t("review.timeValue")}</Row>
           </Rows>
         </Panel>
@@ -255,58 +269,6 @@ export function ReviewStep({ wizard }: { wizard: Wizard }) {
               }}
             />
           ))}
-        </Panel>
-      ) : null}
-
-      <Panel title={t("review.program")}>
-        <div className="flex items-start gap-3">
-          <Checkbox
-            id="telemetry"
-            className="mt-0.5"
-            checked={wizard.active.telemetry !== false}
-            onCheckedChange={wizard.setTelemetry}
-          />
-          <div className="flex min-w-0 flex-col gap-1">
-            <label htmlFor="telemetry" className="text-sm font-medium text-main">
-              {t("review.program.label")}
-            </label>
-            <span className="text-sm text-secondary">{t("review.program.description")}</span>
-            <a
-              href="https://oss.zeabur.com/docs/zeabur/reference/telemetry/"
-              target="_blank"
-              rel="noreferrer"
-              className={buttonVariants({ variant: "link", size: "sm" })}
-            >
-              {t("review.program.link")}
-            </a>
-          </div>
-        </div>
-      </Panel>
-
-      {!personal && config.zeabur ? (
-        <Panel title={t("review.updateCheck")}>
-          <div className="flex items-start gap-3">
-            <Checkbox
-              id="update-check"
-              className="mt-0.5"
-              checked={config.updateCheck !== false}
-              onCheckedChange={(updateCheck) => wizard.setConfig({ ...config, updateCheck })}
-            />
-            <div className="flex min-w-0 flex-col gap-1">
-              <label htmlFor="update-check" className="text-sm font-medium text-main">
-                {t("review.updateCheck.label")}
-              </label>
-              <span className="text-sm text-secondary">{t("review.updateCheck.description")}</span>
-              <a
-                href="https://oss.zeabur.com/docs/zeabur/reference/telemetry/#update-check"
-                target="_blank"
-                rel="noreferrer"
-                className={buttonVariants({ variant: "link", size: "sm" })}
-              >
-                {t("review.updateCheck.link")}
-              </a>
-            </div>
-          </div>
         </Panel>
       ) : null}
 
@@ -370,6 +332,18 @@ export function ReviewStep({ wizard }: { wizard: Wizard }) {
         </Panel>
       ) : null}
     </StepPage>
+  )
+}
+
+function ConsentValue({ on, onChange }: { on: boolean; onChange: () => void }) {
+  const t = useT()
+  return (
+    <span className="flex flex-wrap items-baseline gap-x-3">
+      {t(on ? "common.on" : "common.off")}
+      <Button variant="link" size="sm" onClick={onChange}>
+        {t("review.change")}
+      </Button>
+    </span>
   )
 }
 
