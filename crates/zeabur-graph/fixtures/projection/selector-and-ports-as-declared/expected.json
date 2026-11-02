@@ -1,0 +1,11 @@
+{
+  "selector": { "matchLabels": { "app": "db", "tier": "data" }, "expressions": null },
+  "ports": {
+    "setup": [],
+    "db": [
+      { "name": "sql", "port": 5432, "protocol": null },
+      { "name": null, "port": 5353, "protocol": "UDP" }
+    ],
+    "metrics": [{ "name": null, "port": 9187, "protocol": null }]
+  }
+}

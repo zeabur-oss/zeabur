@@ -1,0 +1,2 @@
+description: A StatefulSet's matchLabels and every container's declared ports are projected; TCP, the default, is left out.
+operation: projection.selectorAndPorts

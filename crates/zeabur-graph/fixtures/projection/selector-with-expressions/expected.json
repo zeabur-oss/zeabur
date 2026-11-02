@@ -1,0 +1,4 @@
+{
+  "selector": { "matchLabels": { "app": "agent" }, "expressions": true },
+  "ports": { "agent": [] }
+}

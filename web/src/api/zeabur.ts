@@ -3966,6 +3966,24 @@ export type Mount = {
 }
 
 /**
+ * A port a container declares (`containerPort`).
+ */
+export type ContainerPort = {
+  /**
+   * The port's name, which a Service's `targetPort` or a probe can use.
+   * @nullable
+   */
+  name?: string | null
+  /** The port number. */
+  port: number
+  /**
+   * `TCP`, `UDP` or `SCTP`; absent for the default, `TCP`.
+   * @nullable
+   */
+  protocol?: string | null
+}
+
+/**
  * A probe's handler.
  */
 export type ContainerProbeHandler =
@@ -4072,6 +4090,8 @@ export type Container = {
   name: string
   /** The container in its workload. */
   origin: Origin
+  /** The ports it declares, in order. */
+  ports?: ContainerPort[]
   probes?: Probes | null
   resources?: ContainerResources | null
 }
@@ -7808,6 +7828,21 @@ export type RunAs = {
 }
 
 /**
+ * `matchLabels`.
+ */
+export type WorkloadSelectorMatchLabels = { [key: string]: string }
+
+/**
+ * A workload's pod selector, as a Kubernetes Service can repeat it.
+ */
+export type WorkloadSelector = {
+  /** It also has `matchExpressions`, which a Service's selector cannot say. */
+  expressions?: boolean
+  /** `matchLabels`. */
+  matchLabels: WorkloadSelectorMatchLabels
+}
+
+/**
  * What a service is doing, in one word for a person. An open set: clients must show an unknown
  * value by its [`Health`].
  */
@@ -7876,6 +7911,7 @@ export type Service = WorkloadSummary & {
    */
   routeNames: string[]
   runAs?: RunAs | null
+  selector?: WorkloadSelector | null
   /** Its health and the word for it, from the workload and its pods. */
   status: ServiceStatus
 }

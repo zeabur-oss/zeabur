@@ -1,5 +1,7 @@
 //! A project: one namespace, seen as services.
 
+use std::collections::BTreeMap;
+
 use serde::{Deserialize, Serialize};
 
 use crate::attribution::{Attribution, WorkloadRef};
@@ -177,11 +179,27 @@ pub struct Service {
     /// The user and groups its pods run as; absent when its template sets none.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub run_as: Option<crate::RunAs>,
+    /// How a Deployment, StatefulSet or DaemonSet selects its pods (`spec.selector`); absent
+    /// for a Job or CronJob.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub selector: Option<WorkloadSelector>,
     /// What is going wrong with it, in plain words, sorted by kind then container. The
     /// projection leaves this empty: diagnoses need the namespace's events and the time of the
     /// read, so the API fills it in when it serves the project document.
     #[serde(default)]
     pub diagnoses: Vec<crate::Diagnosis>,
+}
+
+/// A workload's pod selector, as a Kubernetes Service can repeat it.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[serde(rename_all = "camelCase")]
+pub struct WorkloadSelector {
+    /// `matchLabels`.
+    pub match_labels: BTreeMap<String, String>,
+    /// It also has `matchExpressions`, which a Service's selector cannot say.
+    #[serde(default, skip_serializing_if = "crate::is_false")]
+    pub expressions: bool,
 }
 
 /// The kinds of resource attributed to workloads.

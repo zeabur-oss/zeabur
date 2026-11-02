@@ -33,8 +33,26 @@ pub struct Container {
     /// Its liveness, readiness and startup probes; absent when it sets none.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub probes: Option<Probes>,
+    /// The ports it declares, in order.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub ports: Vec<ContainerPort>,
     /// The container in its workload.
     pub origin: Origin,
+}
+
+/// A port a container declares (`containerPort`).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[serde(rename_all = "camelCase")]
+pub struct ContainerPort {
+    /// The port's name, which a Service's `targetPort` or a probe can use.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    /// The port number.
+    pub port: i32,
+    /// `TCP`, `UDP` or `SCTP`; absent for the default, `TCP`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub protocol: Option<String>,
 }
 
 /// A container's probes [k8s-probes].

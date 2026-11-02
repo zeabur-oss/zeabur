@@ -13,7 +13,7 @@ use zeabur_model::adapters::{Conventions, LABEL_SHARED_VARIABLES, error_pages, t
 use zeabur_model::{
     Attribution, Container, ContainerResources, Endpoint, NamespaceAttribution, Origin, PageServer,
     ProbeHandler, ProbeSummary, Probes, Project, Provenance, Quantities, Resource, ResourceKind,
-    Route, RouteMiddleware, RouteRule, RouteTls, Service, WorkloadRef,
+    Route, RouteMiddleware, RouteRule, RouteTls, Service, WorkloadRef, WorkloadSelector,
 };
 
 use crate::attribution::{attribution_of, ingress_backends, relations_of};
@@ -562,6 +562,7 @@ fn service(
                 mounts: mounts_in(&index.objects, attribution, workload, name)?,
                 resources: view.resources.and_then(container_resources),
                 probes: probes(view.probes),
+                ports: view.ports.iter().map(container_port).collect(),
                 origin: workload.origin(view.path(workload)),
             })
         })
@@ -586,10 +587,26 @@ fn service(
             .and_then(zeabur_model::ConfigReload::from_annotations),
         pod_security: workload.pod_spec().map(crate::pod_security::level),
         run_as: workload.pod_spec().and_then(crate::pod_security::run_as),
+        selector: workload.selector().map(|selector| WorkloadSelector {
+            match_labels: selector.match_labels.clone().unwrap_or_default(),
+            expressions: selector
+                .match_expressions
+                .as_ref()
+                .is_some_and(|e| !e.is_empty()),
+        }),
         diagnoses: Vec::new(),
     };
     service.data_store = data_store(&service);
     service
+}
+
+/// A declared port, without the default protocol.
+fn container_port(port: &k8s_openapi::api::core::v1::ContainerPort) -> zeabur_model::ContainerPort {
+    zeabur_model::ContainerPort {
+        name: port.name.clone(),
+        port: port.container_port,
+        protocol: port.protocol.clone().filter(|p| p != "TCP"),
+    }
 }
 
 /// A container's requests and limits for CPU and memory, as written; `None` when it sets

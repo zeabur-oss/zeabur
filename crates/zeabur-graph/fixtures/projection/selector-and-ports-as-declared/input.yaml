@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: db
+  namespace: demo
+spec:
+  serviceName: db
+  selector:
+    matchLabels:
+      app: db
+      tier: data
+  template:
+    metadata:
+      labels:
+        app: db
+        tier: data
+    spec:
+      initContainers:
+        - name: setup
+          image: example/setup:1.0
+      containers:
+        - name: db
+          image: example/db:1.0
+          ports:
+            - name: sql
+              containerPort: 5432
+              protocol: TCP
+            - containerPort: 5353
+              protocol: UDP
+        - name: metrics
+          image: example/exporter:1.0
+          ports:
+            - containerPort: 9187
