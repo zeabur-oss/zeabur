@@ -253,12 +253,26 @@ impl Distribution {
         OS_IDLE_MIB + self.idle_mib() + ZEABUR_IDLE_MIB
     }
 
-    /// The least memory a team install needs: the idle base, Traefik and cert-manager, and
-    /// 250 MiB of headroom, rounded up to a hundred. A server with 4 GiB passes with either,
-    /// also when a crash kernel reserve takes 512 MiB of it.
+    /// The least memory a team install needs.
+    ///
+    /// K3s: the idle base, Traefik and cert-manager, and 250 MiB of headroom, rounded up to a
+    /// hundred. A server with 4 GiB passes, also when a crash kernel reserve takes 512 MiB of it.
+    ///
+    /// RKE2: what pods may use, after the reserves and the hard eviction threshold, must hold the
+    /// memory requests of the static pods, `CoreDNS`, the default components and one build.
+    /// The static pods ask for 1792 MiB: kube-apiserver 1024, etcd 256 and
+    /// kube-controller-manager 128 as configured here, kube-scheduler, kube-proxy and
+    /// cloud-controller-manager 128 each. rke2-coredns and its autoscaler ask for 144. The
+    /// catalog's default components, with Zeabur and Identity, ask for 920 on one node, and a
+    /// build's buildkitd for 256. With 350 + 500 reserved and 200 for eviction:
+    /// 1792 + 144 + 920 + 256 + 350 + 500 + 200 = 4162, rounded up to a hundred. A 4 GiB server,
+    /// which reports about 3800, falls short.
     #[must_use]
     pub const fn min_memory_mib(self) -> u64 {
-        (self.base_idle_mib() + MINIMAL_AND_HEADROOM_MIB).div_ceil(100) * 100
+        match self {
+            Self::K3s => (self.base_idle_mib() + MINIMAL_AND_HEADROOM_MIB).div_ceil(100) * 100,
+            Self::Rke2 => 4200,
+        }
     }
 
     /// The label `ServiceLB` puts on its pods.
@@ -563,11 +577,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn k3s_needs_less_memory_than_rke2_and_both_fit_4_gib_with_a_crash_kernel() {
-        assert!(Distribution::K3s.min_memory_mib() < Distribution::Rke2.min_memory_mib());
-        for d in Distribution::ALL {
-            assert!(d.min_memory_mib() <= 3379, "{d:?}");
-        }
+    fn k3s_fits_4_gib_with_a_crash_kernel_and_rke2_needs_more_than_4_gib() {
+        assert!(Distribution::K3s.min_memory_mib() <= 3379);
+        assert!(Distribution::Rke2.min_memory_mib() > 3800);
     }
 
     #[test]

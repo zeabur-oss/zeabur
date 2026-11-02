@@ -2472,16 +2472,36 @@ mod tests {
     }
 
     #[test]
-    fn the_defaults_fit_a_4_gib_server_without_a_warning() {
+    fn the_defaults_fit_the_smallest_servers_without_a_warning() {
         let index = Index::parse(INDEX.as_bytes()).unwrap();
-        let mut host = facts();
-        host.memory_mib = 3379;
-        for extra in ["", "distribution: rke2\n"] {
+        for (extra, memory_mib) in [
+            ("", 3379),
+            ("distribution: rke2\n", Distribution::Rke2.min_memory_mib()),
+        ] {
+            let mut host = facts();
+            host.memory_mib = memory_mib;
             let plan = plan(&index, &config(extra), &host).unwrap();
             let idle = plan.memory.cluster_mib + plan.memory.components_mib;
             assert!(idle < host.memory_mib * 4 / 5, "{idle} MiB");
             assert!(plan.warnings.iter().all(|w| w.code != "memory.tight"));
         }
+    }
+
+    #[test]
+    fn rke2_is_refused_on_a_4_gib_server_and_k3s_is_not() {
+        let index = Index::parse(INDEX.as_bytes()).unwrap();
+        let mut host = facts();
+        host.memory_mib = 3793;
+        assert!(plan(&index, &config(""), &host).is_ok());
+        let Err(PlanError::TeamMemory {
+            distribution, have, ..
+        }) = plan(&index, &config("distribution: rke2\n"), &host)
+        else {
+            panic!("RKE2 on {} MiB", host.memory_mib);
+        };
+        assert_eq!((distribution, have), (Distribution::Rke2, 3793));
+        host.memory_mib = 4200;
+        assert!(plan(&index, &config("distribution: rke2\n"), &host).is_ok());
     }
 
     #[test]

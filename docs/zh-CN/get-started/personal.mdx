@@ -23,7 +23,7 @@ source: "9ecbdbd6bd2b"
 
 个人版也没有成员和权限。Zeabur Identity 签发的登录凭证，需要 kube-apiserver 用 `--authentication-config` 加载配置后才能识别，KubeSolo 目前没有开放这项配置（[portainer/kubesolo#231](https://github.com/portainer/kubesolo/issues/231)）。因此只能用服务器提供的 kubeconfig 连接，拿到这份 kubeconfig 的人可以控制整个集群，不适合多人或多个团队共用。
 
-服务器报告的内存低于 2400 MiB 时，installer 只接受个人使用模式。以后要供团队使用，无法直接升级，需要在 4 GiB 内存的服务器上重新用 K3s 或 RKE2 安装。
+服务器报告的内存低于 2400 MiB 时，installer 只接受个人使用模式。以后要供团队使用，无法直接升级，需要在 4 GiB 内存的服务器上重新用 K3s 安装；用 RKE2 的话，服务器报告的内存要有 4200 MiB 以上。
 
 ## 先准备服务器
 
