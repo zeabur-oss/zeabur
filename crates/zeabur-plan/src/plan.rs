@@ -71,8 +71,9 @@ use crate::rules::{
 /// - a database and its backups: CloudNativePG's `Cluster`, `ScheduledBackup` and `Backup`, the
 ///   Barman Cloud plugin's `ObjectStore`, the Percona Operator for MongoDB's `PerconaServerMongoDB`
 ///   and `PerconaServerMongoDBBackup`, MOCO's `MySQLCluster` and `BackupPolicy`, mariadb-operator's
-///   `MariaDB` and `Backup`, the Dragonfly Operator's `Dragonfly`, and the Secret holding the
-///   backup bucket's access keys or the database's passwords;
+///   `MariaDB` and `Backup`, the Dragonfly Operator's `Dragonfly`, the Secret holding the
+///   backup bucket's access keys or the database's passwords, and the ServiceAccount MOCO's backup
+///   and restore Jobs run as;
 /// - object storage: the `SeaweedFS` Operator's `Seaweed`, `Bucket`, and the `S3Identity`,
 ///   `S3Credentials`, `S3Policy` and `S3PolicyBinding` that give services an access key;
 /// - a restore into a new database: Percona's `PerconaServerMongoDBRestore` (the other operators
@@ -93,6 +94,7 @@ pub const CREATABLE: &[(&str, &str, &str)] = &[
     ("v1", "ConfigMap", "configmaps"),
     ("v1", "Secret", "secrets"),
     ("v1", "PersistentVolumeClaim", "persistentvolumeclaims"),
+    ("v1", "ServiceAccount", "serviceaccounts"),
     ("v1", "Service", "services"),
     ("apps/v1", "Deployment", "deployments"),
     ("batch/v1", "Job", "jobs"),
