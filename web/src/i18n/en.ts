@@ -2676,7 +2676,7 @@ export const en = {
     "Detects the language and builds without a Dockerfile. Pick Dockerfile if the repository has one.",
   "add.methodHint.dockerfile":
     "Builds the Dockerfile in the root directory. Name another file under More settings.",
-  "add.dockerfilePortHint": "From the Dockerfile's EXPOSE. Leave empty for a background service.",
+  "add.dockerfilePortHint": "The port the app listens on. Leave empty for a background service.",
   "add.railpackPortHint":
     "Railpack apps listen on PORT, which Zeabur sets to this port. Leave empty for a background service.",
   "add.access": "Repository access",

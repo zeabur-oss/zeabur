@@ -441,10 +441,9 @@ describe("the Dockerfile's path", () => {
 })
 
 describe("the port of a method", () => {
-  test("Railpack starts at 8080; a Dockerfile starts at its EXPOSE, or at no network", () => {
-    expect(defaultPort("railpack", "3000")).toBe("8080")
-    expect(defaultPort("dockerfile", "3000")).toBe("3000")
-    expect(defaultPort("dockerfile", "")).toBe("")
+  test("Railpack starts at 8080; a Dockerfile starts with no network", () => {
+    expect(defaultPort("railpack")).toBe("8080")
+    expect(defaultPort("dockerfile")).toBe("")
   })
 })
 

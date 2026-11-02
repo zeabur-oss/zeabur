@@ -72,8 +72,8 @@ export const derivedMethod = (chosen: boolean, method: BuildMethod, dockerfileFo
 
 /** The port a service listens on before the person types one: Railpack's, or the Dockerfile's
  * `EXPOSE` (none: no network). */
-export const defaultPort = (method: BuildMethod, exposed: string) =>
-  method === "railpack" ? DEFAULT_BUILT_PORT : exposed
+export const defaultPort = (method: BuildMethod) =>
+  method === "railpack" ? DEFAULT_BUILT_PORT : ""
 
 /** Where the Dockerfile is in the repository or folder: `dockerfile` is relative to `directory`. */
 export const dockerfileAt = (directory: string, dockerfile: string) =>

@@ -21,7 +21,6 @@ import {
   type BuiltService,
   type GitService,
 } from "@/model/git-service"
-import { exposedPort } from "@/model/dockerfile"
 import {
   hostPlaceholder,
   imageOptions,
@@ -65,7 +64,6 @@ function resolveBuilt<F extends BuiltForm>(
   context: {
     project: string
     suggested: string
-    exposed: string
     dockerfileFound: boolean
     options: ReturnType<typeof imageOptions>
     suffix: string | undefined
@@ -75,7 +73,7 @@ function resolveBuilt<F extends BuiltForm>(
 ) {
   const name = choices.named ? form.name : context.suggested
   const method = derivedMethod(choices.methoded, form.method, context.dockerfileFound)
-  const portText = choices.ported ? form.port : defaultPort(method, context.exposed)
+  const portText = choices.ported ? form.port : defaultPort(method)
   const port = context.options.port ? portText.trim() : ""
   const publicUrl = context.options.publicUrl && port !== "" && form.publicUrl
   const host = choices.hosted ? form.host : suggestedHost(name, context.project, context.suffix)
@@ -102,8 +100,8 @@ export function useBuiltForm<F extends BuiltForm>(
   project: string,
   initial: () => F,
   suggested: (form: F, taken: string[]) => string,
-  /** The text of the file at a path of the repository or folder, when the form can read it. */
-  readFile?: (path: string) => string | undefined,
+  /** Whether the repository or folder has a file at a path, when the form can tell. */
+  hasFile: (path: string) => boolean = () => false,
 ) {
   const cluster = useQuery(clusterQuery).data
   const domains = cluster?.domains ?? {}
@@ -125,15 +123,13 @@ export function useBuiltForm<F extends BuiltForm>(
     setChoices((c) => ({ ...c, [choice]: true }))
     set(patch)
   }
-  const dockerfile = readFile?.(dockerfileAt(form.directory, form.dockerfile))
-  const exposed = exposedPort(dockerfile)
+  const dockerfileFound = hasFile(dockerfileAt(form.directory, form.dockerfile))
   const parsedEnv = parseEnv(env)
   const parsedBuildEnv = parseEnv(buildEnv)
   const derived = resolveBuilt(form, choices, {
     project,
     suggested: suggested(form, taken),
-    exposed,
-    dockerfileFound: dockerfile !== undefined,
+    dockerfileFound,
     options,
     suffix: domains.suffixes?.[0],
     env: parsedEnv,
@@ -156,7 +152,7 @@ export function useBuiltForm<F extends BuiltForm>(
     badBuildEnv: parsedBuildEnv.bad,
     typeName: (name: string) => typed("named", { name } as Partial<F>),
     chooseMethod: (method: BuildMethod) => typed("methoded", { method } as Partial<F>),
-    found: dockerfile !== undefined && !choices.methoded,
+    found: dockerfileFound && !choices.methoded,
     typePort: (port: string) => typed("ported", { port } as Partial<F>),
     typeHost: (host: string) => typed("hosted", { host } as Partial<F>),
     chooseSecurity: (security: F["security"]) => typed("securitySet", { security } as Partial<F>),

@@ -23,7 +23,7 @@ import { Spinner } from "@zeabur-oss/design-system/components/spinner"
 type FolderState =
   | { phase: "empty" }
   | { phase: "reading" }
-  | { phase: "ready"; packed: Packed; name: string; dockerfiles: Map<string, string> }
+  | { phase: "ready"; packed: Packed; name: string; dockerfiles: Set<string> }
   | { phase: "failed"; message: string }
 
 const ARCHIVE_PROBLEMS = {
@@ -66,7 +66,7 @@ export function useFolder() {
       setState(
         packed.files === 0
           ? { phase: "failed", message: t("upload.problem.empty") }
-          : { phase: "ready", packed, name, dockerfiles: await dockerfilesOf(found) },
+          : { phase: "ready", packed, name, dockerfiles: dockerfilesOf(found) },
       )
     } catch (error) {
       setState(fail(error))
@@ -82,7 +82,7 @@ export function useFolder() {
       setState(
         packed.files === 0
           ? { phase: "failed", message: t("upload.problem.empty") }
-          : { phase: "ready", packed, name, dockerfiles: new Map() },
+          : { phase: "ready", packed, name, dockerfiles: new Set() },
       )
     } catch (error) {
       setState(fail(error))
@@ -108,18 +108,9 @@ export function useFolder() {
   }
 }
 
-/** The text of a folder's Dockerfiles, small enough to read for their `EXPOSE`. */
-const dockerfilesOf = async (files: readonly SourceFile[]) =>
-  new Map(
-    await Promise.all(
-      files
-        .filter(
-          (f) =>
-            !f.link && f.data.size <= 256 * 1024 && /(^|\/)[^/]*dockerfile[^/]*$/i.test(f.path),
-        )
-        .map(async (f) => [f.path, await f.data.text()] as const),
-    ),
-  )
+/** The paths of a folder's Dockerfiles. */
+const dockerfilesOf = (files: readonly SourceFile[]) =>
+  new Set(files.filter((f) => /(^|\/)[^/]*dockerfile[^/]*$/i.test(f.path)).map((f) => f.path))
 
 const withoutArchive = (name: string) => name.replace(/\.(zip|tar\.gz|tgz)$/i, "")
 

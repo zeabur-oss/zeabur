@@ -2450,7 +2450,7 @@ export const zhCN: Messages = {
   "add.methodHint.railpack":
     "自动识别语言，不需要 Dockerfile。仓库里有 Dockerfile 时，请改选 Dockerfile。",
   "add.methodHint.dockerfile": "用根目录里的 Dockerfile 构建。其他文件可在“更多设置”指定。",
-  "add.dockerfilePortHint": "取自 Dockerfile 的 EXPOSE。留空表示不接受连接，例如后台服务。",
+  "add.dockerfilePortHint": "应用程序监听的端口。留空表示不接受连接，例如后台服务。",
   "add.railpackPortHint":
     "Railpack 构建的应用会监听 PORT，Zeabur 会把它设成这个端口。留空表示不接受连接，例如后台服务。",
   "add.access": "仓库访问",

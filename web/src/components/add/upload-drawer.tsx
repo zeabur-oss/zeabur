@@ -36,7 +36,7 @@ export function UploadDrawer({ project, onClose }: { project: string; onClose: (
     project,
     newUploadService,
     (_, taken) => builtName(ready?.name.toLowerCase() ?? "", taken),
-    (path) => ready?.dockerfiles.get(path),
+    (path) => ready?.dockerfiles.has(path) ?? false,
   )
   const { name } = built
   const problems = uploadProblems(built.resolved, {
