@@ -14,6 +14,9 @@ import {
   buildOptionsChanges,
   buildOptionsOf,
   buildProfile,
+  defaultPort,
+  dockerfileAt,
+  exposedPort,
   createGitService,
   deployKeyHost,
   deployKeyPage,
@@ -425,5 +428,42 @@ describe("the Builds tab", () => {
     expect(buildProblem(failed, run("Failed"))).toEqual(problem)
     expect(buildProblem(failed, run("Building"))).toBeUndefined()
     expect(buildProblem(build({}), undefined)).toBeUndefined()
+  })
+})
+
+describe("the port a Dockerfile exposes", () => {
+  test("is the first TCP port of the last stage, from `8080/tcp`, lists and ranges", () => {
+    expect(exposedPort("FROM node\nEXPOSE 3000")).toBe("3000")
+    expect(exposedPort("FROM node\nexpose 8080/tcp 9090")).toBe("8080")
+    expect(exposedPort("FROM node\nEXPOSE 53/udp 8443/tcp")).toBe("8443")
+    expect(exposedPort("FROM node\nEXPOSE 8000-8010")).toBe("8000")
+    expect(exposedPort("FROM golang AS build\nEXPOSE 1111\nFROM alpine\nEXPOSE 2222")).toBe("2222")
+    expect(exposedPort("FROM golang AS build\nEXPOSE 1111\nFROM alpine\nCMD x")).toBe("")
+  })
+
+  test("fills in ARG and ENV, and skips what it cannot work out", () => {
+    expect(exposedPort("ARG PORT=4000\nFROM node\nEXPOSE $PORT")).toBe("4000")
+    expect(exposedPort("FROM node\nENV APP_PORT 5000\nEXPOSE ${APP_PORT}")).toBe("5000")
+    expect(exposedPort('FROM node\nENV A=1 B="6000"\nEXPOSE $B')).toBe("6000")
+    expect(exposedPort("FROM node\nEXPOSE ${PORT:-7000}")).toBe("7000")
+    expect(exposedPort("FROM node\nARG PORT\nEXPOSE $PORT")).toBe("")
+    expect(exposedPort("FROM node\nARG PORT\nEXPOSE $PORT 9000")).toBe("9000")
+    expect(exposedPort("FROM node\nEXPOSE 70000")).toBe("")
+    expect(exposedPort("FROM node\n# EXPOSE 3000\nEXPOSE \\\n  3100")).toBe("3100")
+  })
+
+  test("is found at the Dockerfile's path inside the directory", () => {
+    expect(dockerfileAt("", "")).toBe("Dockerfile")
+    expect(dockerfileAt("./apps/web/", "docker/Dockerfile.prod")).toBe(
+      "apps/web/docker/Dockerfile.prod",
+    )
+  })
+})
+
+describe("the port of a method", () => {
+  test("Railpack starts at 8080; a Dockerfile starts at its EXPOSE, or at no network", () => {
+    expect(defaultPort("railpack", "3000")).toBe("8080")
+    expect(defaultPort("dockerfile", "3000")).toBe("3000")
+    expect(defaultPort("dockerfile", "")).toBe("")
   })
 })

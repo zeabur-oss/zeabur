@@ -2,7 +2,7 @@
 // Build makes. The hook keeps the form and what is derived from it; the pieces draw a field each,
 // so each drawer lays them out around its own source.
 import { useQuery } from "@tanstack/react-query"
-import { useId, useState, type ReactNode } from "react"
+import { useEffect, useId, useState, type ReactNode } from "react"
 import CaretRightIcon from "~icons/ph/caret-right"
 
 import { clusterQuery, creatableQuery } from "@/api/queries"
@@ -14,6 +14,9 @@ import { useT } from "@/i18n"
 import {
   buildMethods,
   buildProfile,
+  defaultPort,
+  dockerfileAt,
+  exposedPort,
   type BuildMethod,
   type BuiltService,
   type GitService,
@@ -48,6 +51,7 @@ export type Shown = (problem: unknown, text: () => string) => string[]
 
 interface Choices {
   named: boolean
+  ported: boolean
   hosted: boolean
   securitySet: boolean
 }
@@ -59,6 +63,7 @@ function resolveBuilt<F extends BuiltForm>(
   context: {
     project: string
     suggested: string
+    exposed: string
     options: ReturnType<typeof imageOptions>
     suffix: string | undefined
     env: ReturnType<typeof parseEnv>
@@ -66,7 +71,8 @@ function resolveBuilt<F extends BuiltForm>(
   },
 ) {
   const name = choices.named ? form.name : context.suggested
-  const port = context.options.port ? form.port.trim() : ""
+  const portText = choices.ported ? form.port : defaultPort(form.method, context.exposed)
+  const port = context.options.port ? portText.trim() : ""
   const publicUrl = context.options.publicUrl && port !== "" && form.publicUrl
   const host = choices.hosted ? form.host : suggestedHost(name, context.project, context.suffix)
   const security = choices.securitySet ? form.security : buildProfile(form.method)
@@ -83,7 +89,7 @@ function resolveBuilt<F extends BuiltForm>(
     ),
     security,
   }
-  return { name, port, publicUrl, host, security, resolved }
+  return { name, port, portText, publicUrl, host, security, resolved }
 }
 
 /** `suggested` gives the name until the person types one, from the form and the names taken. */
@@ -91,6 +97,8 @@ export function useBuiltForm<F extends BuiltForm>(
   project: string,
   initial: () => F,
   suggested: (form: F, taken: string[]) => string,
+  /** The file at a path of the repository or folder, when the form can read it. */
+  readFile?: (path: string) => Blob | undefined,
 ) {
   const cluster = useQuery(clusterQuery).data
   const domains = cluster?.domains ?? {}
@@ -101,6 +109,7 @@ export function useBuiltForm<F extends BuiltForm>(
   const [buildEnv, setBuildEnv] = useState("")
   const [choices, setChoices] = useState<Choices>({
     named: false,
+    ported: false,
     hosted: false,
     securitySet: false,
   })
@@ -110,11 +119,24 @@ export function useBuiltForm<F extends BuiltForm>(
     setChoices((c) => ({ ...c, [choice]: true }))
     set(patch)
   }
+  const dockerfile = readFile?.(dockerfileAt(form.directory, form.dockerfile))
+  const [exposed, setExposed] = useState("")
+  useEffect(() => {
+    let current = true
+    setExposed("")
+    void dockerfile?.text().then((text) => {
+      if (current) setExposed(exposedPort(text))
+    })
+    return () => {
+      current = false
+    }
+  }, [dockerfile])
   const parsedEnv = parseEnv(env)
   const parsedBuildEnv = parseEnv(buildEnv)
   const derived = resolveBuilt(form, choices, {
     project,
     suggested: suggested(form, taken),
+    exposed,
     options,
     suffix: domains.suffixes?.[0],
     env: parsedEnv,
@@ -136,6 +158,7 @@ export function useBuiltForm<F extends BuiltForm>(
     badEnv: parsedEnv.bad,
     badBuildEnv: parsedBuildEnv.bad,
     typeName: (name: string) => typed("named", { name } as Partial<F>),
+    typePort: (port: string) => typed("ported", { port } as Partial<F>),
     typeHost: (host: string) => typed("hosted", { host } as Partial<F>),
     chooseSecurity: (security: F["security"]) => typed("securitySet", { security } as Partial<F>),
     tried,
@@ -476,9 +499,9 @@ export function BuiltPort({ built, problems }: { built: BuiltFormState; problems
   if (!built.options.port) return null
   return (
     <PortField
-      value={built.form.port}
-      onChange={(port) => built.set({ port })}
-      hint={t(built.form.method === "railpack" ? "add.railpackPortHint" : "add.gitPortHint")}
+      value={built.portText}
+      onChange={built.typePort}
+      hint={t(built.form.method === "railpack" ? "add.railpackPortHint" : "add.dockerfilePortHint")}
       error={built.shown(problems.port, () => t("add.problem.port.invalid"))}
     />
   )

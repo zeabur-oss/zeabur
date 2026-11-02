@@ -65,6 +65,68 @@ export interface GitService extends Pick<
 /** What Railpack's apps listen on once Zeabur sets `PORT`; the form starts with it. */
 export const DEFAULT_BUILT_PORT = "8080"
 
+/** The port a service listens on before the person types one: Railpack's, or the Dockerfile's
+ * `EXPOSE` (none: no network). */
+export const defaultPort = (method: BuildMethod, exposed: string) =>
+  method === "railpack" ? DEFAULT_BUILT_PORT : exposed
+
+/** Where the Dockerfile is in the repository or folder: `dockerfile` is relative to `directory`. */
+export const dockerfileAt = (directory: string, dockerfile: string) =>
+  [cleanPath(directory), cleanPath(dockerfile) || "Dockerfile"].filter(Boolean).join("/")
+
+/** The first port a Dockerfile's last stage `EXPOSE`s, with `ARG` and `ENV` values filled in; a
+ * port that cannot be worked out is skipped, and none is an empty string. */
+export function exposedPort(text: string): string {
+  const lines = text.replace(/\\\r?\n/g, " ").split(/\r?\n/)
+  const vars = new Map<string, string>()
+  let ports: string[] = []
+  const fill = (word: string) =>
+    word.replace(
+      /\$(?:\{([A-Za-z_]\w*)(?::?-([^}]*))?\}|([A-Za-z_]\w*))/g,
+      (_, a, d, b) => vars.get(a ?? b) ?? d ?? "\0",
+    )
+  const define = (rest: string, keyValue: boolean) => {
+    const pairs = keyValue
+      ? (rest.match(/[A-Za-z_]\w*=(?:"[^"]*"|'[^']*'|\S*)/g) ?? [])
+      : [rest.replace(/\s+/, "=")]
+    for (const pair of pairs) {
+      const at = pair.indexOf("=")
+      if (at < 1) continue
+      const value = fill(pair.slice(at + 1).replace(/^(["'])(.*)\1$/, "$2"))
+      if (!value.includes("\0")) vars.set(pair.slice(0, at), value)
+    }
+  }
+  for (const raw of lines) {
+    const line = raw.trim()
+    const [word = "", ...tail] = line.split(/\s+/)
+    const rest = tail.join(" ")
+    switch (word.toUpperCase()) {
+      case "FROM":
+        ports = []
+        break
+      case "ARG":
+        define(rest, true)
+        break
+      case "ENV":
+        define(rest, /^[A-Za-z_]\w*=/.test(rest))
+        break
+      case "EXPOSE":
+        for (const token of tail) {
+          const [number = "", protocol = "tcp"] = fill(token).split("/")
+          const first = number.split("-")[0] ?? ""
+          if (
+            protocol.toLowerCase() === "tcp" &&
+            /^\d{1,5}$/.test(first) &&
+            portProblem(first) === undefined
+          )
+            ports.push(String(Number(first)))
+        }
+        break
+    }
+  }
+  return ports[0] ?? ""
+}
+
 export const newGitService = (): GitService => ({
   url: "",
   branch: "",

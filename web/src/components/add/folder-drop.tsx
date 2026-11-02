@@ -23,7 +23,7 @@ import { Spinner } from "@zeabur-oss/design-system/components/spinner"
 type FolderState =
   | { phase: "empty" }
   | { phase: "reading" }
-  | { phase: "ready"; packed: Packed; name: string }
+  | { phase: "ready"; packed: Packed; name: string; dockerfiles: Map<string, Blob> }
   | { phase: "failed"; message: string }
 
 const ARCHIVE_PROBLEMS = {
@@ -66,7 +66,7 @@ export function useFolder() {
       setState(
         packed.files === 0
           ? { phase: "failed", message: t("upload.problem.empty") }
-          : { phase: "ready", packed, name },
+          : { phase: "ready", packed, name, dockerfiles: dockerfilesOf(found) },
       )
     } catch (error) {
       setState(fail(error))
@@ -82,7 +82,7 @@ export function useFolder() {
       setState(
         packed.files === 0
           ? { phase: "failed", message: t("upload.problem.empty") }
-          : { phase: "ready", packed, name },
+          : { phase: "ready", packed, name, dockerfiles: new Map() },
       )
     } catch (error) {
       setState(fail(error))
@@ -107,6 +107,16 @@ export function useFolder() {
     clear: () => setState({ phase: "empty" }),
   }
 }
+
+/** The Dockerfiles of a folder, small enough to read for their `EXPOSE`. */
+const dockerfilesOf = (files: readonly SourceFile[]) =>
+  new Map(
+    files
+      .filter(
+        (f) => !f.link && f.data.size <= 256 * 1024 && /(^|\/)[^/]*dockerfile[^/]*$/i.test(f.path),
+      )
+      .map((f) => [f.path, f.data]),
+  )
 
 const withoutArchive = (name: string) => name.replace(/\.(zip|tar\.gz|tgz)$/i, "")
 

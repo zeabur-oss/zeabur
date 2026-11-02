@@ -2455,7 +2455,7 @@ export const zhTW: Messages = {
   "add.methodHint.railpack":
     "自動判斷語言，不需要 Dockerfile。儲存庫裡有 Dockerfile 時，請改選 Dockerfile。",
   "add.methodHint.dockerfile": "用根目錄裡的 Dockerfile 建置。其他檔案可在「更多設定」指定。",
-  "add.gitPortHint": "應用程式監聽的連接埠，也會放進 PORT。留空表示不接受連線，例如背景服務。",
+  "add.dockerfilePortHint": "取自 Dockerfile 的 EXPOSE。留空表示不接受連線，例如背景服務。",
   "add.railpackPortHint":
     "Railpack 建置的應用程式會監聽 PORT，Zeabur 會把它設成這個連接埠。留空表示不接受連線，例如背景服務。",
   "add.access": "儲存庫存取",

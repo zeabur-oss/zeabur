@@ -32,8 +32,11 @@ export function UploadDrawer({ project, onClose }: { project: string; onClose: (
   const folder = useFolder()
   const [request] = useState(newRequest)
   const ready = folder.state.phase === "ready" ? folder.state : undefined
-  const built = useBuiltForm<UploadService>(project, newUploadService, (_, taken) =>
-    builtName(ready?.name.toLowerCase() ?? "", taken),
+  const built = useBuiltForm<UploadService>(
+    project,
+    newUploadService,
+    (_, taken) => builtName(ready?.name.toLowerCase() ?? "", taken),
+    (path) => ready?.dockerfiles.get(path),
   )
   const { name } = built
   const problems = uploadProblems(built.resolved, {
