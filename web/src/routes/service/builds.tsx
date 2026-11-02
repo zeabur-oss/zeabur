@@ -53,6 +53,7 @@ import {
   durationOf,
   KEEL_WEBHOOK,
   keelPolicy,
+  reasonKey,
   refusedCredentials,
   runsLatest,
   runsOf,
@@ -294,7 +295,9 @@ function Summary({
   const since = latest?.started ?? latest?.created
   const problem = buildProblem(build, latest)
   const branch = branchOf(build)
-  const failure = problem?.message ?? (build.ready === "False" ? build.message : undefined)
+  const failedRun = !problem && latest?.phase === "Failed" ? latest : undefined
+  const failure =
+    problem?.message ?? (build.ready === "False" && !failedRun ? build.message : undefined)
   const refused = refusedCredentials(build, latest)
   const deployGate = useHereGate("changeServices")
   const rebuildGate = useHereGate("build")
@@ -344,14 +347,8 @@ function Summary({
           >
             {failure}
           </p>
-        ) : latest?.phase === "Failed" && latest.message ? (
-          <p
-            className="mt-1 max-w-prose text-sm break-words text-fail-strong"
-            lang="en"
-            translate="no"
-          >
-            {latest.message}
-          </p>
+        ) : failedRun ? (
+          <FailedRun run={failedRun} />
         ) : null}
         {refused ? <Refused project={project} build={build} kind={refused} /> : null}
         <UploadProgress project={project} build={build.name} />
@@ -406,6 +403,33 @@ function Summary({
         </SummaryCardActions>
       </SummaryCardMain>
     </SummaryCard>
+  )
+}
+
+/** Why a run failed in a sentence, with the builder's own message behind Details. */
+function FailedRun({ run }: { run: BuildRun }) {
+  const t = useT()
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="mt-1 flex max-w-prose flex-col items-start gap-1">
+      <p className="text-sm text-fail-strong">{t(reasonKey(run.reason))}</p>
+      {run.message ? (
+        <Collapsible open={open} onOpenChange={setOpen} className="w-full">
+          <CollapsibleTrigger render={<Button variant="ghost" size="xs" className="-ml-2" />}>
+            {t(open ? "builds.hideDetails" : "builds.details")}
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <pre
+              className="mt-1 max-h-96 overflow-auto rounded-lg border border-main bg-muted p-3 font-mono text-xs leading-5 break-words whitespace-pre-wrap text-main"
+              lang="en"
+              translate="no"
+            >
+              {run.message}
+            </pre>
+          </CollapsibleContent>
+        </Collapsible>
+      ) : null}
+    </div>
   )
 }
 
@@ -608,7 +632,11 @@ function RunLogs({ project, run }: { project: string; run: BuildRun }) {
           ) : (
             <p className="mt-2 text-sm text-secondary">
               {run.message ? (
-                <span className="mb-2 block font-mono text-xs break-words" lang="en" translate="no">
+                <span
+                  className="mb-2 block font-mono text-xs break-words whitespace-pre-wrap"
+                  lang="en"
+                  translate="no"
+                >
                   {run.message}
                 </span>
               ) : null}

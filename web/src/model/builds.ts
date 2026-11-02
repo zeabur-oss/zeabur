@@ -182,3 +182,23 @@ export function failureText(build: Build | undefined, run: BuildRun | undefined)
     (text) => !!text,
   )
 }
+
+const REASON_KEYS = {
+  PlanFailed: "builds.reason.PlanFailed",
+  SourceFailed: "builds.reason.SourceFailed",
+  RegistryCredentialsMissing: "builds.reason.RegistryCredentialsMissing",
+  Timeout: "builds.reason.Timeout",
+  BuildFailed: "builds.reason.BuildFailed",
+  InfraError: "builds.reason.InfraError",
+  QuotaExceeded: "builds.reason.QuotaExceeded",
+  BuildkitdStarting: "builds.reason.BuildkitdStarting",
+  Cancelled: "builds.reason.Cancelled",
+  OutOfMemory: "builds.reason.OutOfMemory",
+} as const
+
+type ReasonKey = (typeof REASON_KEYS)[keyof typeof REASON_KEYS] | "builds.reason.other"
+
+/** The message key that says in a sentence why a run waited or failed; one for the rest. */
+export function reasonKey(reason: string | null | undefined): ReasonKey {
+  return REASON_KEYS[reason as keyof typeof REASON_KEYS] ?? "builds.reason.other"
+}
