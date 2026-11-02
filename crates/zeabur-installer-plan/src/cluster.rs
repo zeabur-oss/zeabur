@@ -129,8 +129,6 @@ const RKE2_STATIC_PODS_REQUEST_MIB: u64 =
 const RKE2_COREDNS_REQUEST_MIB: u64 = 144;
 /// The memory requests of the catalog's default components with Zeabur and Identity, on one node.
 const DEFAULT_COMPONENTS_REQUEST_MIB: u64 = 920;
-/// What buildkitd asks for per build (`buildkitd.resources.requests` in the builder's chart).
-const BUILD_REQUEST_MIB: u64 = 256;
 
 impl Distribution {
     /// Every distribution, in the order an interface lists them.
@@ -286,24 +284,29 @@ impl Distribution {
     /// hundred. A server with 4 GiB passes, also when a crash kernel reserve takes 512 MiB of it.
     ///
     /// RKE2: the scheduler places a pod only where its memory request fits in what pods may use,
-    /// so that must hold the requests of the static pods, `CoreDNS`, the default components and
-    /// one build, on top of the reserves and the hard eviction threshold. It comes to 4164,
-    /// rounded up to a hundred; a 4 GiB server, which reports about 3800, falls short.
+    /// so that must hold the requests of the static pods, `CoreDNS` and the default components, on
+    /// top of the reserves and the hard eviction threshold. It comes to 3908, rounded up to a
+    /// hundred.
     #[must_use]
     pub const fn min_memory_mib(self) -> u64 {
-        match self {
-            Self::K3s => (self.base_idle_mib() + MINIMAL_AND_HEADROOM_MIB).div_ceil(100) * 100,
+        self.min_memory_at_work_mib(0)
+    }
+
+    /// [`Self::min_memory_mib`] with a component that uses `work_mib` more while working, such as
+    /// the builder in a build (`resources.workMemoryMiB` in the catalog).
+    #[must_use]
+    pub const fn min_memory_at_work_mib(self, work_mib: u64) -> u64 {
+        let idle = match self {
+            Self::K3s => self.base_idle_mib() + MINIMAL_AND_HEADROOM_MIB,
             Self::Rke2 => {
-                (RKE2_STATIC_PODS_REQUEST_MIB
+                RKE2_STATIC_PODS_REQUEST_MIB
                     + RKE2_COREDNS_REQUEST_MIB
                     + DEFAULT_COMPONENTS_REQUEST_MIB
-                    + BUILD_REQUEST_MIB
                     + self.reserved_mib()
-                    + EVICTION_HARD_MIB)
-                    .div_ceil(100)
-                    * 100
+                    + EVICTION_HARD_MIB
             }
-        }
+        };
+        (idle + work_mib).div_ceil(100) * 100
     }
 
     /// The label `ServiceLB` puts on its pods.
@@ -625,7 +628,7 @@ mod tests {
     #[test]
     // docs/*/get-started/personal.mdx
     fn the_rke2_minimum_is_the_one_the_docs_give() {
-        assert_eq!(Distribution::Rke2.min_memory_mib(), 4200);
+        assert_eq!(Distribution::Rke2.min_memory_mib(), 4000);
     }
 
     #[test]

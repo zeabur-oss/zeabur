@@ -29,6 +29,8 @@ export interface CatalogComponent {
   default: "recommended" | "optional" | "unsupported"
   /** A personal install offers it only on a server with this much memory. */
   personalMinMemoryMib?: number | null
+  /** A team install offers it only on a server with this much memory, by distribution. */
+  teamMinMemoryMib?: Partial<Record<Distribution, number>>
   /** Zeabur needs it to run, so it is never suggested for leaving out. */
   required: boolean
   /** Where it runs; empty when everywhere. */

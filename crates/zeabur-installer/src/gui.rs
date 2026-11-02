@@ -679,6 +679,10 @@ fn catalog_json(index: &Index, profile: &str, arch: &str) -> Value {
                 "distributions": c.distributions,
                 "testedOn": c.tested_on,
                 "personalMinMemoryMib": personal::min_memory_mib(c, arch),
+                "teamMinMemoryMib": Distribution::ALL
+                    .into_iter()
+                    .filter_map(|d| Some((d.id(), plan::min_memory_mib(c, d)?)))
+                    .collect::<BTreeMap<_, _>>(),
                 "required": required.contains(&c.id),
                 "needs": c
                     .install_order

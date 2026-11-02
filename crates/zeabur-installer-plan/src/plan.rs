@@ -410,6 +410,33 @@ pub struct Memory {
     pub reserved_mib: Option<u64>,
 }
 
+/// The least memory a team install on `distribution` needs for a component that uses memory on
+/// top of its idle use while working.
+#[must_use]
+pub fn min_memory_mib(component: &Component, distribution: Distribution) -> Option<u64> {
+    let work = component.resources.work_memory_mib?;
+    Some(distribution.min_memory_at_work_mib(work))
+}
+
+/// The selection without the components one build or other work would not fit beside, and the
+/// reasons for all it leaves out.
+fn select_fitting(
+    index: &Index,
+    config: &Config,
+    facts: &Facts,
+) -> Result<(Selection, BTreeMap<String, String>), PlanError> {
+    let mut selection = select::select(index, config)?;
+    let mut left_out = select::reasons(&selection.left_out);
+    crate::personal::leave_out_short_of_memory(
+        index,
+        &mut selection,
+        &mut left_out,
+        facts.memory_mib,
+        |c| min_memory_mib(c, config.distribution),
+    );
+    Ok((selection, left_out))
+}
+
 /// Computes the plan.
 ///
 /// # Errors
@@ -440,7 +467,7 @@ pub fn plan_with(
     }
     facts.check_installer()?;
     let node_name = node_name::choose(config.host.node_name.as_deref(), facts, &[])?;
-    let selection = select::select(index, config)?;
+    let (selection, left_out) = select_fitting(index, config, facts)?;
     let profile = config.profile.as_str();
     let chosen: BTreeSet<&str> = selection
         .components
@@ -524,7 +551,7 @@ pub fn plan_with(
         host_files,
         namespaces: namespaces.into_values().collect(),
         components,
-        left_out: select::reasons(&selection.left_out),
+        left_out,
         removals: Vec::new(),
         node_prep: storage::node_prep(chosen.iter().copied()),
         registry,
@@ -2536,6 +2563,31 @@ mod tests {
         assert_eq!((distribution, have), (Distribution::Rke2, 3793));
         host.memory_mib = 4200;
         assert!(plan(&index, &config("distribution: rke2\n"), &host).is_ok());
+    }
+
+    #[test]
+    fn the_builder_is_left_out_where_one_build_would_not_fit() {
+        let index = Index::parse(INDEX.as_bytes()).unwrap();
+        let builder = index.component("builds/zeabur-builder").unwrap();
+        for distribution in Distribution::ALL {
+            let config = config(&format!(
+                "distribution: {}\nenable: [builds/zeabur-builder]\n",
+                distribution.id()
+            ));
+            let needs = min_memory_mib(builder, distribution).unwrap();
+            assert!(needs > distribution.min_memory_mib());
+            let mut host = facts();
+            host.memory_mib = needs - 1;
+            let short = plan(&index, &config, &host).unwrap();
+            assert_eq!(
+                short.left_out["builds/zeabur-builder"],
+                format!("needs {needs} MiB of memory")
+            );
+            assert!(!ids(&short).contains(&"builds/zeabur-builder"));
+            host.memory_mib = needs;
+            let enough = plan(&index, &config, &host).unwrap();
+            assert!(ids(&enough).contains(&"builds/zeabur-builder"));
+        }
     }
 
     #[test]

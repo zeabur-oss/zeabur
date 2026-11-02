@@ -23,7 +23,7 @@ source: "9ecbdbd6bd2b"
 
 自己用的版本也沒有成員和權限。Zeabur Identity 發的登入憑證，要 kube-apiserver 用 `--authentication-config` 載入設定才會認得，KubeSolo 目前沒有開放這個設定（[portainer/kubesolo#231](https://github.com/portainer/kubesolo/issues/231)）。所以只能用伺服器給的 kubeconfig 連線，拿到這份 kubeconfig 的人可以控制整個叢集，不適合讓多個人或多個團隊共用。
 
-伺服器回報的記憶體低於 2400 MiB 時，installer 只接受自己用。之後要給團隊用，沒有辦法直接升級，要在 4 GiB 記憶體的伺服器上重新用 K3s 安裝；用 RKE2 的話，伺服器回報的記憶體要有 4200 MiB 以上。
+伺服器回報的記憶體低於 2400 MiB 時，installer 只接受自己用。之後要給團隊用，沒有辦法直接升級，要在 4 GiB 記憶體的伺服器上重新用 K3s 安裝；用 RKE2 的話，伺服器回報的記憶體要有 4000 MiB 以上。要裝 Zeabur Builder 的話，兩種都要再多 500 MiB，留給一次建置。
 
 ## 先準備機器
 
