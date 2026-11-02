@@ -85,7 +85,7 @@ export const sizePresets: SizePreset[] = ["small", "medium", "large"]
 
 interface Resources {
   requests: { cpu: string; memory: string }
-  limits: { memory: string }
+  limits: { cpu?: string; memory: string }
 }
 
 /** Per member. MongoDB's cache takes half of memory less 1 GiB, at least 256 MiB, so it starts
@@ -112,10 +112,48 @@ export const presetResources: Record<Engine, Record<SizePreset, Resources>> = {
     large: { requests: { cpu: "1", memory: "2Gi" }, limits: { memory: "2Gi" } },
   },
   dragonfly: {
-    small: { requests: { cpu: "100m", memory: "256Mi" }, limits: { memory: "512Mi" } },
-    medium: { requests: { cpu: "500m", memory: "1Gi" }, limits: { memory: "1Gi" } },
-    large: { requests: { cpu: "1", memory: "2Gi" }, limits: { memory: "2Gi" } },
+    small: { requests: { cpu: "100m", memory: "128Mi" }, limits: { cpu: "1", memory: "384Mi" } },
+    medium: { requests: { cpu: "500m", memory: "256Mi" }, limits: { cpu: "2", memory: "768Mi" } },
+    large: { requests: { cpu: "1", memory: "512Mi" }, limits: { cpu: "4", memory: "1280Mi" } },
   },
+}
+
+const MIB = 1024 * 1024
+const UNITS: Record<string, number> = { Ki: 1024, Mi: MIB, Gi: 1024 * MIB, K: 1e3, M: 1e6, G: 1e9 }
+
+const bytes = (quantity: string): number => {
+  const m = /^(\d+(?:\.\d+)?)(Ki|Mi|Gi|K|M|G)?$/.exec(quantity)
+  return m ? Number(m[1]) * (UNITS[m[2] ?? ""] ?? 1) : 0
+}
+
+const cores = (quantity: string): number =>
+  quantity.endsWith("m") ? Number(quantity.slice(0, -1)) / 1000 : Number(quantity)
+
+/** Dragonfly runs a thread per CPU of its limit, else per CPU of the node, and each thread needs
+ * 256 MiB of `maxmemory`. So the threads and `maxmemory` follow the limits instead of the node:
+ * the CPU limit sets the threads (the flag is ignored then), else the memory limit holds 80% of
+ * 256 MiB each. https://github.com/dragonflydb/dragonfly/blob/main/src/server/dfly_main.cc */
+export function dragonflyArgs(limits: Resources["limits"]): string[] {
+  const cpu = limits.cpu ? cores(limits.cpu) : 0
+  const threads =
+    cpu > 0 ? Math.ceil(cpu) : Math.max(1, Math.floor((0.8 * bytes(limits.memory)) / (256 * MIB)))
+  return [
+    `--proactor_threads=${threads}`,
+    `--maxmemory=${threads * 256}mb`,
+    "--version_check=false",
+  ]
+}
+
+const DRAGONFLY_OWN = ["--proactor_threads=", "--maxmemory=", "--version_check="]
+
+/** `args` with the flags Zeabur sets from the size replaced and the others kept. */
+function withDragonflyArgs(args: unknown, limits: Resources["limits"]): string[] {
+  return [
+    ...((args as string[] | undefined) ?? []).filter(
+      (arg) => !DRAGONFLY_OWN.some((own) => arg.startsWith(own)),
+    ),
+    ...dragonflyArgs(limits),
+  ]
 }
 
 /** The preset whose numbers the database asks for, if any. */
@@ -430,6 +468,7 @@ const BUILD: Record<Engine, Build> = {
         image,
         replicas: form.members,
         resources,
+        args: dragonflyArgs(resources.limits),
         authentication: { passwordFromSecret: { name: `${form.name}-auth`, key: "password" } },
         // Snapshots on a volume each hour; Dragonfly also saves one when it stops.
         snapshot: {
@@ -1169,7 +1208,10 @@ const RESHAPE: Record<Engine, (shaping: Reshaping) => void> = {
   },
   dragonfly: ({ spec, members, resources }) => {
     spec.replicas = members
-    if (resources) spec.resources = resources
+    if (resources) {
+      spec.resources = resources
+      spec.args = withDragonflyArgs(spec.args, resources.limits)
+    }
   },
 }
 
