@@ -1,17 +1,10 @@
 //! The templates of Zeabur Catalog: what each one asks for, and its objects for one namespace.
 //!
-//! A template's `manifests.yaml` allows field substitution only. Zeabur Catalog renders it with
-//! the fields `.Namespace`, `.Domain`, `.ClusterIssuer` and `.Inputs.<name>` [catalog-render]. This
-//! module reads `{{ <field> }}` and refuses every other action, so a template that needs more
-//! fails the tests of this crate. The catalogue refuses them too.
+//! Rendering follows [the catalogue's rules for clients][template-clients], and the tests run the
+//! catalogue's cases in `conformance/template/`. `manifests.yaml` allows field substitution only.
+//! This module reads `{{ <field> }}` and refuses every other action.
 //!
-//! The checks before rendering are the catalogue's own: a namespace is a DNS label, a domain is a
-//! DNS name and not an IP address, a generated input is never given, a required input is given,
-//! each value matches its whole pattern, and an unknown input is refused. An input that is not
-//! given takes its `default`, or is empty. A template with a `services[].domains` entry needs the
-//! domain and the issuer. The names of the inputs and the Secret keys are unique.
-//!
-//! [catalog-render]: https://github.com/zeabur-oss/catalog/blob/main/tools/internal/templates/render.go
+//! [template-clients]: https://github.com/zeabur-oss/catalog/blob/main/docs/reference/template-clients.mdx
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::net::IpAddr;
@@ -504,9 +497,18 @@ fn read(id: &str, file: &str, manifests: &str) -> Result<Template, RenderError> 
 /// when the template does not read.
 pub fn render(id: &str, options: &RenderOptions<'_>) -> Result<Vec<Value>, RenderError> {
     let (id, file, manifests) = find(id)?;
+    render_file(id, file, manifests, options)
+}
+
+fn render_file(
+    id: &str,
+    file: &str,
+    manifests: &str,
+    options: &RenderOptions<'_>,
+) -> Result<Vec<Value>, RenderError> {
     let template = read(id, file, manifests)?;
     let broken = |detail: String| RenderError::Broken {
-        template: (*id).to_owned(),
+        template: id.to_owned(),
         detail,
     };
     check(&template, options)?;
@@ -911,7 +913,7 @@ mod tests {
     }
 
     #[test]
-    fn checks_the_namespace_domain_and_issuer_a_deploy_gives() {
+    fn refuses_an_unknown_template_and_a_domain_that_ends_the_yaml_string() {
         let miniflux = template("miniflux").unwrap();
         assert!(miniflux.needs_domain && miniflux.needs_cluster_issuer);
         let ok = BTreeMap::new();
@@ -925,30 +927,6 @@ mod tests {
         let cases: &[(&str, RenderOptions<'_>, &str)] = &[
             ("no such template", options, "unknown_template"),
             (
-                "namespace",
-                RenderOptions {
-                    namespace: "Shop",
-                    ..options
-                },
-                "invalid_namespace",
-            ),
-            (
-                "no domain",
-                RenderOptions {
-                    domain: None,
-                    ..options
-                },
-                "domain_required",
-            ),
-            (
-                "an IP address",
-                RenderOptions {
-                    domain: Some("10.0.0.1"),
-                    ..options
-                },
-                "invalid_domain",
-            ),
-            (
                 "a domain that ends the YAML string",
                 RenderOptions {
                     domain: Some("a.example.com'\nkind: Secret"),
@@ -956,74 +934,8 @@ mod tests {
                 },
                 "invalid_domain",
             ),
-            (
-                "no issuer",
-                RenderOptions {
-                    cluster_issuer: None,
-                    ..options
-                },
-                "cluster_issuer_required",
-            ),
         ];
         assert_codes("miniflux", cases);
-    }
-
-    #[test]
-    fn checks_the_inputs_a_deploy_gives() {
-        let ok = given(&[("adminEmail", "me@example.com")]);
-        let options = RenderOptions {
-            namespace: "shop",
-            domain: Some("blog.example.com"),
-            cluster_issuer: Some("letsencrypt"),
-            inputs: &ok,
-        };
-        assert!(render("wordpress", &options).is_ok());
-        let wrong_email = given(&[("adminEmail", "me")]);
-        let generated = given(&[("adminEmail", "me@example.com"), ("adminPassword", "x")]);
-        let unknown = given(&[("adminEmail", "me@example.com"), ("other", "x")]);
-        let none = BTreeMap::new();
-        let cases: &[(&str, RenderOptions<'_>, &str)] = &[
-            (
-                "pattern",
-                RenderOptions {
-                    inputs: &wrong_email,
-                    ..options
-                },
-                "input_invalid",
-            ),
-            (
-                "generated",
-                RenderOptions {
-                    inputs: &generated,
-                    ..options
-                },
-                "input_generated",
-            ),
-            (
-                "unknown",
-                RenderOptions {
-                    inputs: &unknown,
-                    ..options
-                },
-                "input_unknown",
-            ),
-            (
-                "missing",
-                RenderOptions {
-                    inputs: &none,
-                    ..options
-                },
-                "input_required",
-            ),
-        ];
-        assert_codes("wordpress", cases);
-    }
-
-    fn given(pairs: &[(&str, &str)]) -> BTreeMap<String, String> {
-        pairs
-            .iter()
-            .map(|(k, v)| ((*k).to_owned(), (*v).to_owned()))
-            .collect()
     }
 
     /// Each case renders `template`, or a template that does not exist, and fails with its code.
@@ -1040,6 +952,78 @@ mod tests {
                 "{name}"
             );
         }
+    }
+
+    /// The case code of a refused render, with the input it names.
+    fn case_error(error: &RenderError) -> Value {
+        let (code, input) = match error {
+            RenderError::Namespace(_) => ("invalid-namespace", None),
+            RenderError::Domain(_) => ("invalid-domain", None),
+            RenderError::ClusterIssuer(_) => ("invalid-cluster-issuer", None),
+            RenderError::NoDomain => ("needs-domain", None),
+            RenderError::NoClusterIssuer => ("needs-cluster-issuer", None),
+            RenderError::Generated(input) => ("generated-input", Some(input)),
+            RenderError::Missing(input) => ("missing-input", Some(input)),
+            RenderError::Pattern(input) => ("pattern", Some(input)),
+            RenderError::UnknownInput(input) => ("unknown-input", Some(input)),
+            RenderError::UnknownTemplate(_) | RenderError::Broken { .. } => {
+                return json!({"unexpected": error.to_string()});
+            }
+        };
+        input.map_or_else(
+            || json!({"code": code}),
+            |input| json!({"code": code, "input": input}),
+        )
+    }
+
+    /// Runs each render case of the catalogue's `conformance/template/`.
+    #[test]
+    fn renders_as_the_catalogue_cases_want() {
+        const CASES: &str = concat!(env!("ZEABUR_CATALOG"), "/conformance/template");
+        let mut ran = false;
+        for entry in std::fs::read_dir(CASES).unwrap() {
+            let path = entry.unwrap().path();
+            let case: Value =
+                serde_saphyr::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+            let Some(manifests) = case["manifests"].as_str() else {
+                continue;
+            };
+            ran = true;
+            let id = case["id"].as_str().unwrap();
+            // The case has only the fields rendering reads; `read` needs the others too.
+            let mut file = case["template"].clone();
+            for (key, value) in [
+                ("name", id),
+                ("description", "d"),
+                ("license", "MIT"),
+                ("homepage", "https://example.com"),
+            ] {
+                file["metadata"][key] = json!(value);
+            }
+            for input in file["inputs"].as_array_mut().into_iter().flatten() {
+                input["description"] = json!("d");
+            }
+            let options = &case["options"];
+            let inputs: BTreeMap<String, String> =
+                serde_json::from_value(options["inputs"].clone()).unwrap_or_default();
+            let got = render_file(
+                id,
+                &file.to_string(),
+                manifests,
+                &RenderOptions {
+                    namespace: options["namespace"].as_str().unwrap(),
+                    domain: options["domain"].as_str(),
+                    cluster_issuer: options["clusterIssuer"].as_str(),
+                    inputs: &inputs,
+                },
+            );
+            let got = match got {
+                Ok(objects) => json!({"objects": objects}),
+                Err(error) => json!({"error": case_error(&error)}),
+            };
+            assert_eq!(got, case["want"], "{}", path.display());
+        }
+        assert!(ran, "no render cases in {CASES}");
     }
 
     #[test]

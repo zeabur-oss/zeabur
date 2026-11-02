@@ -3,10 +3,9 @@
 //! For each one: what it asks for, what it requests, whether the components it needs are there,
 //! and what its pods use when idle ([`zeabur_catalog::measured`]).
 //!
-//! A component is *installed* when kube-apiserver serves one of the CustomResourceDefinitions the
-//! catalogue detects it by, and *missing* when it serves none of them. Discovery is readable by
-//! every signed-in person, so a person who cannot read the whole cluster gets the same answer as
-//! an administrator. A component without such a rule, or a refused discovery, is *unknown*.
+//! Whether a component is there follows [the catalogue's rules for clients][template-clients].
+//!
+//! [template-clients]: https://github.com/zeabur-oss/catalog/blob/main/docs/reference/template-clients.mdx
 
 use std::collections::BTreeMap;
 
@@ -241,32 +240,95 @@ fn is_served(served: &[ServedResource], crd: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeMap;
+    use std::fs;
+
+    use serde_json::{Value, json};
+    use zeabur_catalog::Detection;
+
     use super::*;
 
+    const CASES: &str = concat!(env!("ZEABUR_CATALOG"), "/conformance/template");
+
+    fn component(case: &Value) -> Component {
+        let id = case["id"].as_str().unwrap();
+        let (capability, name) = id.split_once('/').unwrap();
+        let crds = case["detection"]["crds"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .map(|crd| crd.as_str().unwrap().to_owned())
+            .collect();
+        Component {
+            id: name.to_owned(),
+            capability: capability.to_owned(),
+            display_name: id.to_owned(),
+            homepage: String::new(),
+            license: String::new(),
+            description: String::new(),
+            summary: BTreeMap::new(),
+            defaults: BTreeMap::new(),
+            distributions: Vec::new(),
+            detection: Detection {
+                crds,
+                ..Detection::default()
+            },
+            tested_version: None,
+        }
+    }
+
+    /// Runs each requires case of the catalogue's `conformance/template/`.
     #[test]
-    fn a_component_is_there_when_one_of_its_crds_is_served() {
+    fn finds_what_a_template_requires_as_the_catalogue_cases_want() {
+        let mut ran = false;
+        for entry in fs::read_dir(CASES).unwrap() {
+            let path = entry.unwrap().path();
+            let case: Value = serde_saphyr::from_str(&fs::read_to_string(&path).unwrap()).unwrap();
+            let Some(requires) = case["requires"].as_array() else {
+                continue;
+            };
+            ran = true;
+            let catalogue: Vec<Component> = case["components"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(component)
+                .collect();
+            let served: Option<Vec<ServedResource>> = case.get("served").map(|served| {
+                served
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|r| {
+                        let resource = r["resource"].as_str().unwrap();
+                        ServedResource::readable(
+                            r["group"].as_str().unwrap(),
+                            "v1",
+                            resource,
+                            resource,
+                            true,
+                        )
+                    })
+                    .collect()
+            });
+            let got: serde_json::Map<String, Value> = requires
+                .iter()
+                .map(|name| {
+                    let name = name.as_str().unwrap();
+                    let state = requirement(&catalogue, name, served.as_deref()).state;
+                    (name.to_owned(), json!(state))
+                })
+                .collect();
+            assert_eq!(Value::Object(got), case["want"], "{}", path.display());
+        }
+        assert!(ran, "no requires cases in {CASES}");
+    }
+
+    #[test]
+    fn names_the_component_a_template_requires() {
         let catalogue = zeabur_catalog::catalogue().unwrap();
-        let cnpg =
-            ServedResource::readable("postgresql.cnpg.io", "v1", "clusters", "Cluster", true);
-        let state = |wanted: &str, served: Option<&[ServedResource]>| {
-            requirement(&catalogue, wanted, served).state
-        };
-        let with = [cnpg];
         assert_eq!(
-            state("databases/cloudnative-pg", Some(&with)),
-            RequirementState::Installed
-        );
-        assert_eq!(
-            state("databases/percona-mongodb", Some(&with)),
-            RequirementState::Missing
-        );
-        assert_eq!(state("databases", Some(&with)), RequirementState::Installed);
-        assert_eq!(
-            state("databases/cloudnative-pg", None),
-            RequirementState::Unknown
-        );
-        assert_eq!(
-            requirement(&catalogue, "databases/cloudnative-pg", Some(&with)).name,
+            requirement(&catalogue, "databases/cloudnative-pg", None).name,
             "CloudNativePG"
         );
     }
