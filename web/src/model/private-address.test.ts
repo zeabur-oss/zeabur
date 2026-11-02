@@ -62,6 +62,25 @@ describe("a private address for a service with none", () => {
     ])
   })
 
+  test("names a port apart from the names the containers declare", () => {
+    const service = workload("Deployment", {
+      containers: [
+        container({
+          ports: [
+            { port: 8080 },
+            { name: "port-8080", port: 9090 },
+            { name: "port-8080-2", port: 9091 },
+          ],
+        }),
+      ],
+    })
+    expect(privateService(service, { app: "web" }, 8080).spec.ports.map((p) => p.name)).toEqual([
+      "port-8080-3",
+      "port-8080",
+      "port-8080-2",
+    ])
+  })
+
   test("adds a typed port the containers do not declare", () => {
     const service = workload("Deployment", { containers: [container({ ports: [{ port: 80 }] })] })
     expect(privateService(service, { app: "web" }, 3000).spec.ports.map((p) => p.port)).toEqual([

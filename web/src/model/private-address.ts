@@ -55,10 +55,17 @@ function portsOf(service: Service, port: number) {
   const declared = declaredPorts(service)
   const first = declared.find((p) => p.port === port && !p.protocol) ?? { port }
   const all = [first, ...declared.filter((p) => p !== first)]
+  const taken = new Set(all.flatMap((p) => p.name ?? []))
+  const nameOf = (p: Schemas.ContainerPort) => {
+    if (p.name) return p.name
+    const base = `${p.protocol?.toLowerCase() ?? "port"}-${p.port}`
+    let name = base
+    for (let n = 2; taken.has(name); n++) name = `${base}-${n}`
+    taken.add(name)
+    return name
+  }
   return all.map((p) => ({
-    ...(all.length > 1
-      ? { name: p.name ?? `${p.protocol?.toLowerCase() ?? "port"}-${p.port}` }
-      : {}),
+    ...(all.length > 1 ? { name: nameOf(p) } : {}),
     port: p.port,
     targetPort: p.port,
     ...(p.protocol ? { protocol: p.protocol } : {}),
