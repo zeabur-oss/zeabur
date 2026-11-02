@@ -544,8 +544,9 @@ kind: Pod
 metadata:
   creationTimestamp: now-10h
   labels:
-    app.kubernetes.io/instance: dragonfly
+    app: dragonfly
     app.kubernetes.io/name: dragonfly
+    app.kubernetes.io/part-of: dragonfly
     role: master
   name: dragonfly-0
   namespace: lab

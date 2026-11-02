@@ -285,7 +285,10 @@ impl Database {
             }
             Engine::Mysql => labelled(labels, "mysql", &self.name),
             Engine::Mariadb => labelled(labels, "mariadb", &self.name),
-            Engine::Dragonfly => labelled(labels, "dragonfly", &self.name),
+            Engine::Dragonfly => {
+                label("app") == Some(&self.name)
+                    && label("app.kubernetes.io/name") == Some("dragonfly")
+            }
         }
     }
 }

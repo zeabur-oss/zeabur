@@ -107,12 +107,12 @@ mod tests {
             pod(
                 "cache-0",
                 &json!({"app.kubernetes.io/name": "dragonfly",
-                "app.kubernetes.io/instance": "cache", "role": "replica"}),
+                "app": "cache", "app.kubernetes.io/part-of": "cache", "role": "replica"}),
             ),
             pod(
                 "cache-1",
                 &json!({"app.kubernetes.io/name": "dragonfly",
-                "app.kubernetes.io/instance": "cache", "role": "master"}),
+                "app": "cache", "app.kubernetes.io/part-of": "cache", "role": "master"}),
             ),
         ];
         MemoryCluster::new(State {
