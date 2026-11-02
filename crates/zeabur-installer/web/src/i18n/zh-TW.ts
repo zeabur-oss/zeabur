@@ -278,6 +278,11 @@ export const zhTW: Messages = {
 
   "settings.title": "選項",
   "settings.description": "決定 Zeabur 在這台伺服器上怎麼運作。",
+  "settings.reserve": "系統記憶體",
+  "settings.reserve.value": (mib, distribution) =>
+    `保留 ${mib.toLocaleString("zh-TW")} MiB 給作業系統和 ${distribution}`,
+  "settings.reserve.hint":
+    "應用程式和建置都用不到這部分。記憶體快不夠時會先停掉建置，伺服器才不會當掉。",
   "review.change": "變更",
   "review.title": "確認",
   "review.description": (path) =>

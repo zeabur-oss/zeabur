@@ -13,7 +13,7 @@ use serde_json::{Value, json};
 
 use crate::PlanError;
 use crate::cluster::{
-    AUDIT_POLICY, Distribution, EMPTY_AUTHN, HEADER, HostFile, KUBELET_ARGS, Options, yaml_list,
+    AUDIT_POLICY, Distribution, EMPTY_AUTHN, HEADER, HostFile, Options, yaml_list,
 };
 use crate::pins::CALICO;
 use crate::plan::MANAGER;
@@ -83,7 +83,10 @@ pub fn agent_files() -> Vec<HostFile> {
         HostFile {
             path: format!("{}/config.yaml", K3S.layout().config_dir),
             mode: 0o600,
-            content: format!("{HEADER}protect-kernel-defaults: true\n{KUBELET_ARGS}"),
+            content: format!(
+                "{HEADER}protect-kernel-defaults: true\n{}",
+                K3S.kubelet_args(false)
+            ),
         },
     ]
 }
@@ -109,7 +112,7 @@ fn config(options: &Options) -> String {
          kube-controller-manager-arg:\n  \
            - terminated-pod-gc-threshold=1000\n"
     );
-    out.push_str(KUBELET_ARGS);
+    out.push_str(&K3S.kubelet_args(true));
     // Traefik and local-path come from the Zeabur catalog and the installer; ServiceLB stays and
     // gives Traefik ports 80 and 443.
     let mut disable = vec!["traefik".to_owned(), "local-storage".to_owned()];
@@ -378,6 +381,14 @@ mod tests {
                 .as_array()
                 .unwrap()
                 .contains(&json!("pod-max-pids=4096"))
+        );
+        let args = config["kubelet-arg"].as_array().unwrap();
+        assert!(args.contains(&json!("system-reserved=memory=350Mi")));
+        assert!(args.contains(&json!("eviction-soft=memory.available<400Mi")));
+        assert!(
+            !args
+                .iter()
+                .any(|a| a.as_str().unwrap().starts_with("kube-reserved="))
         );
         assert!(config.get("secrets-encryption").is_none());
         assert!(config.get("kube-apiserver-arg").is_none());

@@ -303,6 +303,11 @@ export const en = {
   // Review
   "settings.title": "Options",
   "settings.description": "How Zeabur runs on this server.",
+  "settings.reserve": "Memory for the system",
+  "settings.reserve.value": (mib: number, distribution: string) =>
+    `${mib.toLocaleString("en")} MiB kept for the OS and ${distribution}`,
+  "settings.reserve.hint":
+    "Apps and builds can't use it. When memory runs low, a build is stopped first, so the server keeps running.",
   "review.change": "Change",
   "review.title": "Review",
   "review.description": (path: string) =>

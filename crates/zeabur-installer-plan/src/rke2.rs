@@ -14,7 +14,7 @@
 //! overrides it cleanly.
 
 use crate::cluster::{
-    AUDIT_POLICY, Distribution, EMPTY_AUTHN, HEADER, HostFile, KUBELET_ARGS, Options, yaml_list,
+    AUDIT_POLICY, Distribution, EMPTY_AUTHN, HEADER, HostFile, Options, yaml_list,
 };
 
 /// Where the tarball installs.
@@ -69,7 +69,7 @@ pub fn agent_files() -> Vec<HostFile> {
         HostFile {
             path: format!("{}/config.yaml", RKE2.layout().config_dir),
             mode: 0o600,
-            content: format!("{HEADER}profile: cis\n{KUBELET_ARGS}"),
+            content: format!("{HEADER}profile: cis\n{}", RKE2.kubelet_args(false)),
         },
     ]
 }
@@ -84,7 +84,14 @@ fn config(options: &Options) -> String {
          enable-servicelb: true\n\
          audit-policy-file: /etc/rancher/rke2/audit-policy.yaml\n",
     );
-    out.push_str(KUBELET_ARGS);
+    out.push_str(&RKE2.kubelet_args(true));
+    // RKE2 asks for 512Mi for etcd and 256Mi for kube-controller-manager, which idle near 100Mi,
+    // out of what the reserves leave to pods.
+    out.push_str(
+        "control-plane-resource-requests:\n  \
+           - etcd-memory=256Mi\n  \
+           - kube-controller-manager-memory=128Mi\n",
+    );
     yaml_list(&mut out, "disable", &options.disable);
     yaml_list(&mut out, "tls-san", &options.tls_san);
     out
@@ -201,5 +208,29 @@ mod tests {
         assert!(agent[1].content.contains("profile: cis\n"));
         assert!(agent[1].content.contains("pod-max-pids=4096"));
         assert!(!agent[1].content.contains("audit-policy-file"));
+    }
+
+    #[test]
+    fn workers_reserve_the_os_and_servers_also_ask_less_for_etcd() {
+        let server = host_files(&Options {
+            tls_san: vec![],
+            disable: vec![],
+            identity: false,
+        });
+        let server: serde_json::Value = serde_saphyr::from_str(&server[2].content).unwrap();
+        assert_eq!(
+            server["control-plane-resource-requests"],
+            serde_json::json!(["etcd-memory=256Mi", "kube-controller-manager-memory=128Mi"])
+        );
+        let agent: serde_json::Value = serde_saphyr::from_str(&agent_files()[1].content).unwrap();
+        let args = agent["kubelet-arg"].as_array().unwrap();
+        assert!(args.contains(&serde_json::json!("system-reserved=memory=350Mi")));
+        assert!(args.contains(&serde_json::json!("eviction-hard=memory.available<200Mi")));
+        assert!(
+            !args
+                .iter()
+                .any(|a| a.as_str().unwrap().starts_with("kube-reserved="))
+        );
+        assert!(agent.get("control-plane-resource-requests").is_none());
     }
 }

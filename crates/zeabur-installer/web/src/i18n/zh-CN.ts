@@ -278,6 +278,10 @@ export const zhCN: Messages = {
 
   "settings.title": "选项",
   "settings.description": "决定 Zeabur 在这台服务器上怎么运行。",
+  "settings.reserve": "系统内存",
+  "settings.reserve.value": (mib, distribution) =>
+    `为操作系统和 ${distribution} 保留 ${mib.toLocaleString("zh-CN")} MiB`,
+  "settings.reserve.hint": "应用和构建都用不到这部分。内存快不够时会先停掉构建，服务器就不会宕机。",
   "review.change": "更改",
   "review.title": "确认",
   "review.description": (path) =>

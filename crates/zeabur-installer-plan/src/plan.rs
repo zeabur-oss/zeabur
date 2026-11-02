@@ -405,6 +405,9 @@ pub struct Memory {
     pub unmeasured: usize,
     /// The host's memory.
     pub host_mib: u64,
+    /// What the kubelet keeps from pods on K3s and RKE2; none on `KubeSolo`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reserved_mib: Option<u64>,
 }
 
 /// Computes the plan.
@@ -766,7 +769,10 @@ fn memory(
     host_mib: u64,
     warnings: &mut Vec<Warning>,
 ) -> Memory {
-    let memory = idle_memory(distribution.base_idle_mib(), components, host_mib);
+    let memory = Memory {
+        reserved_mib: Some(distribution.reserved_mib()),
+        ..idle_memory(distribution.base_idle_mib(), components, host_mib)
+    };
     let idle = memory.cluster_mib + memory.components_mib;
     if idle > host_mib * 4 / 5 {
         let title = distribution.title();
@@ -788,6 +794,7 @@ pub(crate) fn idle_memory(cluster_mib: u64, components: &[ComponentPlan], host_m
             .filter(|c| c.idle_memory_mib.is_none())
             .count(),
         host_mib,
+        reserved_mib: None,
     }
 }
 
@@ -2474,6 +2481,42 @@ mod tests {
             let idle = plan.memory.cluster_mib + plan.memory.components_mib;
             assert!(idle < host.memory_mib * 4 / 5, "{idle} MiB");
             assert!(plan.warnings.iter().all(|w| w.code != "memory.tight"));
+        }
+    }
+
+    #[test]
+    fn the_kubelet_keeps_memory_from_pods_and_evicts_before_it_runs_out() {
+        let index = Index::parse(INDEX.as_bytes()).unwrap();
+        for (extra, path, kube_reserved) in [
+            (
+                "",
+                "/etc/rancher/k3s/config.yaml",
+                "kube-reserved=memory=1530Mi",
+            ),
+            (
+                "distribution: rke2\n",
+                "/etc/rancher/rke2/config.yaml",
+                "kube-reserved=memory=500Mi",
+            ),
+        ] {
+            let plan = plan(&index, &config(extra), &facts()).unwrap();
+            let file = plan.host_files.iter().find(|f| f.path == path).unwrap();
+            let value: Value = serde_saphyr::from_str(&file.content).unwrap();
+            let args = value["kubelet-arg"].as_array().unwrap();
+            for arg in [
+                "system-reserved=memory=350Mi",
+                kube_reserved,
+                "eviction-hard=memory.available<200Mi",
+                "eviction-soft=memory.available<400Mi",
+                "eviction-soft-grace-period=memory.available=30s",
+                "pod-max-pids=4096",
+            ] {
+                assert!(args.contains(&json!(arg)), "{path}: {arg}");
+            }
+            assert_eq!(
+                plan.memory.reserved_mib,
+                Some(plan.cluster.distribution.reserved_mib())
+            );
         }
     }
 

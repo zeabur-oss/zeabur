@@ -211,6 +211,41 @@ impl Distribution {
         }
     }
 
+    /// The memory the kubelet keeps from pods on a server for the distribution (`kube-reserved`).
+    /// K3s runs the control plane in its own process: all of [`Self::idle_mib`]. RKE2 runs it in
+    /// static pods, whose requests already count against what pods may use: what is left of
+    /// [`Self::idle_mib`] without kube-apiserver, etcd, kube-controller-manager and canal.
+    #[must_use]
+    pub const fn kube_reserved_mib(self) -> u64 {
+        match self {
+            Self::K3s => self.idle_mib(),
+            Self::Rke2 => 500,
+        }
+    }
+
+    /// The memory pods cannot use on a server: the OS and [`Self::kube_reserved_mib`].
+    #[must_use]
+    pub const fn reserved_mib(self) -> u64 {
+        OS_IDLE_MIB + self.kube_reserved_mib()
+    }
+
+    /// The kubelet's arguments. With the reserves, the pods' cgroup ends short of the OS and the
+    /// distribution, so memory running out kills or evicts a pod, a build first, and not
+    /// `k3s-server`. A worker has no control plane and reserves only the OS.
+    pub(crate) fn kubelet_args(self, server: bool) -> String {
+        let kube_reserved = if server {
+            format!("  - kube-reserved=memory={}Mi\n", self.kube_reserved_mib())
+        } else {
+            String::new()
+        };
+        format!(
+            "{KUBELET_ARGS}  - system-reserved=memory={OS_IDLE_MIB}Mi\n{kube_reserved}  \
+             - eviction-hard=memory.available<{EVICTION_HARD_MIB}Mi\n  \
+             - eviction-soft=memory.available<{EVICTION_SOFT_MIB}Mi\n  \
+             - eviction-soft-grace-period=memory.available=30s\n"
+        )
+    }
+
     /// What a team host uses at idle before any catalog component: the OS, the distribution, and
     /// Zeabur with Identity.
     #[must_use]
@@ -493,14 +528,21 @@ rules:
   - level: Metadata
 "#;
 
-/// The kubelet settings both distributions get: a fork bomb in one pod cannot take the node's
-/// process table, an idle exec or log stream closes after five minutes, and the port serves only
-/// the cipher suites the CIS benchmark allows.
-pub(crate) const KUBELET_ARGS: &str = "kubelet-arg:\n  - pod-max-pids=4096\n  \
+/// The kubelet settings every node gets: a fork bomb in one pod cannot take the node's process
+/// table, an idle exec or log stream closes after five minutes, and the port serves only the cipher
+/// suites the CIS benchmark allows.
+const KUBELET_ARGS: &str = "kubelet-arg:\n  - pod-max-pids=4096\n  \
      - streaming-connection-idle-timeout=5m\n  - tls-cipher-suites=\
 TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,\
 TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,\
 TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305\n";
+
+/// Below this much available memory the kubelet evicts at once. Twice its default of 100Mi, so it
+/// evicts before the kernel has to kill.
+const EVICTION_HARD_MIB: u64 = 200;
+/// Below this much for 30 seconds the kubelet evicts too, which catches memory that grows slowly
+/// before it reaches the hard threshold.
+const EVICTION_SOFT_MIB: u64 = 400;
 
 /// A YAML list under `key`, or nothing when it is empty.
 pub(crate) fn yaml_list(out: &mut String, key: &str, items: &[String]) {
