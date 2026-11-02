@@ -25,7 +25,7 @@ These addresses only work inside the cluster. They aren't reachable from the int
 
 A background service that only makes outgoing connections doesn't need a private address. To let other services or a public domain connect to it, enter the port the app listens on and click **Add a private address**. The port is filled in from the traffic check or the port the container declares, when there is one. To go on to add a domain once the address exists, select **Also give it a public domain**.
 
-Zeabur creates a ClusterIP Service named like the service, as `kubectl expose` does: it selects the pods by the workload's `matchLabels` and carries every port the containers declare. A workload that also selects its pods with `matchExpressions` can't get one this way, since a Service can't repeat them.
+Zeabur creates a ClusterIP Service named like the service, as `kubectl expose` does: it selects the service's replicas by its `matchLabels` and carries every port the containers declare. A service that also selects its replicas with `matchExpressions` can't get one this way, since a Service can't repeat them.
 
 To run it yourself, open **Use kubectl instead**. For a Deployment with one port, it's a `kubectl expose` command, for example:
 

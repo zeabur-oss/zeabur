@@ -961,7 +961,7 @@ export const zhTW: Messages = {
   "net.alsoDomain": "同時加上公開網域",
   "net.kubectlInstead": "改用 kubectl",
   "net.privateExpressions":
-    "它用 matchExpressions 挑選 Pod，Kubernetes Service 沒辦法這樣挑。要新增私有位址，請自己套用一個 selector 對得上 Pod 標籤的 Service。",
+    "它用 matchExpressions 挑選副本，Kubernetes Service 沒辦法這樣挑。要新增私有位址，請自己套用一個 selector 對得上副本標籤的 Service。",
   "net.exposePort": (placeholder) => `把 ${placeholder} 換成應用程式監聽的連接埠。`,
   "net.noneTitle": (name) => `${name} 無法接收連線`,
   "net.noneBody":

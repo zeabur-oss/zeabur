@@ -24,11 +24,11 @@ source: "b047c089d5d1"
 
 ### 服務沒有私有位址時
 
-只會主動往外連的背景服務不需要私有位址。要讓其他服務或公開網域連進來，填上應用程式監聽的連接埠，按 **新增私有位址**。就緒檢查或容器有宣告連接埠時，會先幫你填好。勾選 **同時加上公開網域**，位址建好後會接著新增網域。
+只會主動往外連的背景服務不需要私有位址。要讓其他服務或公開網域連進來，填上應用程式監聽的連接埠，按**新增私有位址**。就緒檢查或容器有宣告連接埠時，會先幫你填好。勾選**同時加上公開網域**，位址建好後會接著新增網域。
 
-Zeabur 會像 `kubectl expose` 一樣，建立和服務同名的 ClusterIP Service：用工作負載的 `matchLabels` 挑選 Pod，並帶上容器宣告的每個連接埠。工作負載還用 `matchExpressions` 挑選 Pod 時，Service 沒辦法照抄，就不能這樣新增。
+Zeabur 會像 `kubectl expose` 一樣，建立和服務同名的 ClusterIP Service：用服務的 `matchLabels` 挑選副本，並帶上容器宣告的每個連接埠。服務還用 `matchExpressions` 挑選副本時，Service 沒辦法照抄，就不能這樣新增。
 
-想自己執行的話，打開 **改用 kubectl**。只有一個連接埠的 Deployment 會是 `kubectl expose` 指令，例如：
+想自己執行的話，打開**改用 kubectl**。只有一個連接埠的 Deployment 會是 `kubectl expose` 指令，例如：
 
 ```sh
 kubectl -n demo expose deployment web --port=8080
@@ -262,7 +262,7 @@ kubectl -n demo run probe --rm -it --restart=Never --image=busybox:1.37 -- wget 
 
 | 畫面或結果 | 接著處理 |
 | --- | --- |
-| **web 沒有私有位址** | 按 **新增私有位址**，或執行 **改用 kubectl** 裡的指令。 |
+| **web 沒有私有位址** | 按**新增私有位址**，或執行**改用 kubectl** 裡的指令。 |
 | 一直顯示**正在等負載平衡器分配位址** | 節點上這個連接埠已經有別的服務在用，或叢集沒有負載平衡器。換一個連接埠，或請管理員確認 ServiceLB。 |
 | 開放連接埠時回覆已有服務開放同一個連接埠 | 同專案已經開放了這個連接埠號碼，先關閉那一個。 |
 | 隔離後公開網域逾時 | 加上**允許來自公開網域的流量**。 |

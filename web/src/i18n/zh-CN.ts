@@ -959,7 +959,7 @@ export const zhCN: Messages = {
   "net.alsoDomain": "同时添加公开域名",
   "net.kubectlInstead": "改用 kubectl",
   "net.privateExpressions":
-    "它用 matchExpressions 选择 Pod，Kubernetes Service 没法这样选。要添加私有地址，请自己应用一个 selector 能匹配 Pod 标签的 Service。",
+    "它用 matchExpressions 选择副本，Kubernetes Service 没法这样选。要添加私有地址，请自己应用一个 selector 能匹配副本标签的 Service。",
   "net.exposePort": (placeholder) => `把 ${placeholder} 换成应用监听的端口。`,
   "net.noneTitle": (name) => `${name} 无法接收连接`,
   "net.noneBody":

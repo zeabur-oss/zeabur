@@ -1034,7 +1034,7 @@ export const en = {
   "net.alsoDomain": "Also give it a public domain",
   "net.kubectlInstead": "Use kubectl instead",
   "net.privateExpressions":
-    "It picks its pods with matchExpressions, which a Kubernetes Service can't. To add a private address, apply a Service whose selector matches its pod labels.",
+    "It picks its replicas with matchExpressions, which a Kubernetes Service can't. To add a private address, apply a Service whose selector matches its replicas' labels.",
   "net.exposePort": (placeholder: string) =>
     `Replace ${placeholder} with the port your app listens on.`,
   "net.noneTitle": (name: string) => `${name} can't receive connections`,

@@ -794,9 +794,11 @@ function PrivateAddressFields({
         </div>
         <p className="type-meta text-muted-foreground">
           {valid
-            ? t("net.privateWillBe", privateAddress(service, number))
+            ? t("common.sentences", [
+                t("net.privateWillBe", privateAddress(service, number)),
+                others.length > 0 ? t("net.privateAlso", t("common.list", others)) : undefined,
+              ])
             : t("net.privatePortHint")}
-          {valid && others.length > 0 ? ` ${t("net.privateAlso", others.join(", "))}` : null}
         </p>
         {offerDomain ? <DomainOffer checked={domain} onChange={setDomain} /> : null}
         <KubectlInstead command={command} />
