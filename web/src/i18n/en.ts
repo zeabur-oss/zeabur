@@ -2775,6 +2775,7 @@ export const en = {
   "upload.problem.archiveBomb": "The archive holds more than 1 GiB once unpacked.",
   "upload.moreSummary": "Folder to build, variables, build variables, size and security.",
   "upload.directoryHint": "The folder to build inside the upload. Empty: the whole upload.",
+  "upload.methodHint.found": "Found a Dockerfile in the folder.",
   "upload.methodHint.railpack":
     "Detects the language and builds without a Dockerfile. Pick Dockerfile if the folder has one.",
   "upload.methodHint.dockerfile":

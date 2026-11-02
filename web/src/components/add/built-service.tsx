@@ -15,6 +15,7 @@ import {
   buildMethods,
   buildProfile,
   defaultPort,
+  derivedMethod,
   dockerfileAt,
   exposedPort,
   type BuildMethod,
@@ -51,6 +52,7 @@ export type Shown = (problem: unknown, text: () => string) => string[]
 
 interface Choices {
   named: boolean
+  methoded: boolean
   ported: boolean
   hosted: boolean
   securitySet: boolean
@@ -64,6 +66,7 @@ function resolveBuilt<F extends BuiltForm>(
     project: string
     suggested: string
     exposed: string
+    dockerfileFound: boolean
     options: ReturnType<typeof imageOptions>
     suffix: string | undefined
     env: ReturnType<typeof parseEnv>
@@ -71,25 +74,27 @@ function resolveBuilt<F extends BuiltForm>(
   },
 ) {
   const name = choices.named ? form.name : context.suggested
-  const portText = choices.ported ? form.port : defaultPort(form.method, context.exposed)
+  const method = derivedMethod(choices.methoded, form.method, context.dockerfileFound)
+  const portText = choices.ported ? form.port : defaultPort(method, context.exposed)
   const port = context.options.port ? portText.trim() : ""
   const publicUrl = context.options.publicUrl && port !== "" && form.publicUrl
   const host = choices.hosted ? form.host : suggestedHost(name, context.project, context.suffix)
-  const security = choices.securitySet ? form.security : buildProfile(form.method)
+  const security = choices.securitySet ? form.security : buildProfile(method)
   const resolved: F = {
     ...form,
+    method,
     name,
     port,
     publicUrl,
     host,
     variables: context.env.variables,
-    dockerfile: form.method === "dockerfile" ? form.dockerfile : "",
+    dockerfile: method === "dockerfile" ? form.dockerfile : "",
     buildVariables: context.buildEnv.variables.flatMap((v) =>
       "value" in v ? [{ name: v.name, value: v.value }] : [],
     ),
     security,
   }
-  return { name, port, portText, publicUrl, host, security, resolved }
+  return { name, method, port, portText, publicUrl, host, security, resolved }
 }
 
 /** `suggested` gives the name until the person types one, from the form and the names taken. */
@@ -109,6 +114,7 @@ export function useBuiltForm<F extends BuiltForm>(
   const [buildEnv, setBuildEnv] = useState("")
   const [choices, setChoices] = useState<Choices>({
     named: false,
+    methoded: false,
     ported: false,
     hosted: false,
     securitySet: false,
@@ -137,6 +143,7 @@ export function useBuiltForm<F extends BuiltForm>(
     project,
     suggested: suggested(form, taken),
     exposed,
+    dockerfileFound: !!dockerfile,
     options,
     suffix: domains.suffixes?.[0],
     env: parsedEnv,
@@ -158,6 +165,8 @@ export function useBuiltForm<F extends BuiltForm>(
     badEnv: parsedEnv.bad,
     badBuildEnv: parsedBuildEnv.bad,
     typeName: (name: string) => typed("named", { name } as Partial<F>),
+    chooseMethod: (method: BuildMethod) => typed("methoded", { method } as Partial<F>),
+    found: !!dockerfile && !choices.methoded,
     typePort: (port: string) => typed("ported", { port } as Partial<F>),
     typeHost: (host: string) => typed("hosted", { host } as Partial<F>),
     chooseSecurity: (security: F["security"]) => typed("securitySet", { security } as Partial<F>),
@@ -212,16 +221,22 @@ export function MethodField({
   source: "git" | "upload"
 }) {
   const t = useT()
-  const method = built.form.method
+  const method = built.method
   return (
     <FormField
       label={t("add.field.method")}
-      hint={t(source === "upload" ? `upload.methodHint.${method}` : `add.methodHint.${method}`)}
+      hint={t(
+        source === "upload"
+          ? built.found
+            ? "upload.methodHint.found"
+            : `upload.methodHint.${method}`
+          : `add.methodHint.${method}`,
+      )}
     >
       <Select
         size="sm"
-        value={built.form.method}
-        onValueChange={(method) => built.set({ method: method as BuildMethod })}
+        value={built.method}
+        onValueChange={(method) => built.chooseMethod(method as BuildMethod)}
         items={buildMethods.map((m) => ({ value: m, label: t(`add.method.${m}`) }))}
       />
     </FormField>
@@ -361,7 +376,7 @@ export function MoreSection({
         <MoreFields
           project={built.project}
           source={source}
-          form={built.form}
+          form={{ ...built.form, method: built.method }}
           set={built.set}
           security={built.security}
           onSecurity={built.chooseSecurity}
@@ -501,7 +516,7 @@ export function BuiltPort({ built, problems }: { built: BuiltFormState; problems
     <PortField
       value={built.portText}
       onChange={built.typePort}
-      hint={t(built.form.method === "railpack" ? "add.railpackPortHint" : "add.dockerfilePortHint")}
+      hint={t(built.method === "railpack" ? "add.railpackPortHint" : "add.dockerfilePortHint")}
       error={built.shown(problems.port, () => t("add.problem.port.invalid"))}
     />
   )

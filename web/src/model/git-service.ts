@@ -65,6 +65,11 @@ export interface GitService extends Pick<
 /** What Railpack's apps listen on once Zeabur sets `PORT`; the form starts with it. */
 export const DEFAULT_BUILT_PORT = "8080"
 
+/** The method the form builds with: the person's once they choose, else Dockerfile when the
+ * folder has one at the path. */
+export const derivedMethod = (chosen: boolean, method: BuildMethod, dockerfileFound: boolean) =>
+  chosen ? method : dockerfileFound ? "dockerfile" : "railpack"
+
 /** The port a service listens on before the person types one: Railpack's, or the Dockerfile's
  * `EXPOSE` (none: no network). */
 export const defaultPort = (method: BuildMethod, exposed: string) =>

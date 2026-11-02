@@ -2544,6 +2544,7 @@ export const zhTW: Messages = {
   "upload.problem.archiveBomb": "壓縮檔解壓縮後超過 1 GiB。",
   "upload.moreSummary": "要建置的資料夾、環境變數、建置變數、規格和安全性。",
   "upload.directoryHint": "要建置上傳內容裡的哪個資料夾。留空：整份上傳內容。",
+  "upload.methodHint.found": "資料夾裡有 Dockerfile。",
   "upload.methodHint.railpack":
     "自動判斷語言，不需要 Dockerfile。資料夾裡有 Dockerfile 時，請改選 Dockerfile。",
   "upload.methodHint.dockerfile":

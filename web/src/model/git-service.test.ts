@@ -15,6 +15,7 @@ import {
   buildOptionsOf,
   buildProfile,
   defaultPort,
+  derivedMethod,
   dockerfileAt,
   exposedPort,
   createGitService,
@@ -465,5 +466,14 @@ describe("the port of a method", () => {
     expect(defaultPort("railpack", "3000")).toBe("8080")
     expect(defaultPort("dockerfile", "3000")).toBe("3000")
     expect(defaultPort("dockerfile", "")).toBe("")
+  })
+})
+
+describe("the method of a folder", () => {
+  test("is Dockerfile when the folder has one, until the person chooses", () => {
+    expect(derivedMethod(false, "railpack", true)).toBe("dockerfile")
+    expect(derivedMethod(false, "railpack", false)).toBe("railpack")
+    expect(derivedMethod(true, "railpack", true)).toBe("railpack")
+    expect(derivedMethod(true, "dockerfile", false)).toBe("dockerfile")
   })
 })
