@@ -260,18 +260,18 @@ export function ServicesTable({
                     </td>
                     {live ? (
                       <>
-                        <td className="px-3 py-2 text-right tabular-nums">
+                        <td className="px-3 py-2 text-right whitespace-nowrap tabular-nums">
                           {measuring ? (
                             <Skeleton className="ml-auto h-4 w-10" />
                           ) : used?.cpu !== undefined ? (
                             f.cpu(used.cpu)
                           ) : (
-                            "—"
+                            <span className="text-xs text-muted-foreground">—</span>
                           )}
                         </td>
                         <td
                           className={cn(
-                            "px-3 py-2 text-right tabular-nums",
+                            "px-3 py-2 text-right whitespace-nowrap tabular-nums",
                             used?.nearLimit && "font-medium text-warn-strong",
                           )}
                         >
@@ -280,7 +280,7 @@ export function ServicesTable({
                           ) : used?.memory !== undefined ? (
                             f.memory(used.memory)
                           ) : (
-                            "—"
+                            <span className="text-xs text-muted-foreground">—</span>
                           )}
                           {used?.nearLimit ? (
                             <span className="sr-only">{` ${t("usage.note.nearLimit")}`}</span>

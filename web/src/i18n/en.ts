@@ -753,6 +753,26 @@ export const en = {
     seconds < 60 ? `took ${seconds} s` : `took ${Math.floor(seconds / 60)} min ${seconds % 60} s`,
   "builds.logs": "Logs",
   "builds.hideLogs": "Hide logs",
+  "builds.details": "Details",
+  "builds.hideDetails": "Hide details",
+  "builds.reason.PlanFailed":
+    "Zeabur couldn't tell how to build this. Upload the project's source, or add a Dockerfile to it.",
+  "builds.reason.SourceFailed":
+    "Zeabur couldn't get the source. Check the repository address, the branch and the access, then build again.",
+  "builds.reason.RegistryCredentialsMissing":
+    "The builder can't sign in to the image registry. Ask whoever runs this cluster to restore the registry credentials.",
+  "builds.reason.Timeout":
+    "The build ran out of time. Build again, and if it keeps running out of time, make the build smaller.",
+  "builds.reason.BuildFailed":
+    "The build stopped with an error. Open the details to see which step.",
+  "builds.reason.InfraError": "The build was interrupted partway. Build again.",
+  "builds.reason.QuotaExceeded":
+    "This project is already building as much as it may. This build starts when another one finishes.",
+  "builds.reason.BuildkitdStarting": "The build engine is starting. This build begins shortly.",
+  "builds.reason.OutOfMemory":
+    "The build ran out of memory. Ask whoever runs the cluster to give builds more memory, or make the build smaller.",
+  "builds.reason.Cancelled": "A newer build replaced this one, or someone cancelled it.",
+  "builds.reason.other": "The build failed. Open the details to see why.",
   "builds.step": "Step",
   "builds.logsGone":
     "Logs are deleted with the build's replica, ten minutes after the build finishes.",

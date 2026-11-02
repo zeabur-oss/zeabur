@@ -6,6 +6,7 @@ import {
   builtContainers,
   durationOf,
   failureText,
+  reasonKey,
   refusedCredentials,
   repositoryOf,
   runsLatest,
@@ -185,5 +186,16 @@ describe("failureText", () => {
     expect(failureText(build({ message: "build said" }), run)).toBe("run said")
     expect(failureText(build({ reason: "BuildReason" }), undefined)).toBe("BuildReason")
     expect(failureText(undefined, undefined)).toBeUndefined()
+  })
+})
+
+describe("reasonKey", () => {
+  test("a reason the builder reports gets its own sentence", () => {
+    expect(reasonKey("PlanFailed")).toBe("builds.reason.PlanFailed")
+  })
+
+  test("a reason Zeabur does not know shares one sentence", () => {
+    expect(reasonKey("SomethingNew")).toBe("builds.reason.other")
+    expect(reasonKey(undefined)).toBe("builds.reason.other")
   })
 })

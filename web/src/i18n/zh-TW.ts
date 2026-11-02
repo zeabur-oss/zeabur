@@ -707,6 +707,23 @@ export const zhTW: Messages = {
     seconds < 60 ? `花了 ${seconds} 秒` : `花了 ${Math.floor(seconds / 60)} 分 ${seconds % 60} 秒`,
   "builds.logs": "日誌",
   "builds.hideLogs": "收起日誌",
+  "builds.details": "詳細資料",
+  "builds.hideDetails": "收起詳細資料",
+  "builds.reason.PlanFailed":
+    "Zeabur 看不出這個專案要怎麼建置。請上傳專案的原始程式碼，或在裡面加一份 Dockerfile。",
+  "builds.reason.SourceFailed":
+    "Zeabur 拿不到原始程式碼。確認儲存庫位址、分支和存取權限都沒問題，再建置一次。",
+  "builds.reason.RegistryCredentialsMissing":
+    "建置器登入不了映像檔倉庫。請叢集的管理員補上倉庫的憑證。",
+  "builds.reason.Timeout": "建置花太久，被中止了。再建置一次；還是逾時的話，把建置的內容縮小。",
+  "builds.reason.BuildFailed": "建置中途出錯。展開詳細資料看是哪一步。",
+  "builds.reason.InfraError": "建置做到一半被中斷了。再建置一次。",
+  "builds.reason.QuotaExceeded": "這個專案同時建置的數量已滿。其他建置結束後，這個會自動開始。",
+  "builds.reason.BuildkitdStarting": "建置引擎正在啟動，稍後會自動開始建置。",
+  "builds.reason.OutOfMemory":
+    "建置用完了記憶體。請叢集的管理員給建置更多記憶體，或把建置的內容縮小。",
+  "builds.reason.Cancelled": "這次建置被較新的建置取代，或被人取消了。",
+  "builds.reason.other": "建置失敗。展開詳細資料看原因。",
   "builds.step": "步驟",
   "builds.logsGone": "建置結束十分鐘後，副本和日誌會一起刪除。",
   "builds.noLogsYet": "這個步驟還沒開始。",

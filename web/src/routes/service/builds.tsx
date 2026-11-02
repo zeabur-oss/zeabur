@@ -9,6 +9,7 @@ import RocketLaunchIcon from "~icons/ph/rocket-launch"
 import UploadSimpleIcon from "~icons/ph/upload-simple"
 
 import { toProblem } from "@/api/client"
+import { cn } from "@/lib/utils"
 import * as zeabur from "@/api/zeabur"
 import { buildsQuery, capabilitiesQuery, logsQuery } from "@/api/queries"
 import { Ago, CopyButton, Segmented } from "@/components/bits"
@@ -53,6 +54,7 @@ import {
   durationOf,
   KEEL_WEBHOOK,
   keelPolicy,
+  reasonKey,
   refusedCredentials,
   runsLatest,
   runsOf,
@@ -294,36 +296,15 @@ function Summary({
   const since = latest?.started ?? latest?.created
   const problem = buildProblem(build, latest)
   const branch = branchOf(build)
-  const failure = problem?.message ?? (build.ready === "False" ? build.message : undefined)
+  const failedRun = !problem && latest?.phase === "Failed" ? latest : undefined
+  const failure =
+    problem?.message ?? (build.ready === "False" && !failedRun ? build.message : undefined)
   const refused = refusedCredentials(build, latest)
-  const deployGate = useHereGate("changeServices")
-  const rebuildGate = useHereGate("build")
   const waiting = build.awaitingUpload && !build.latestImage
-  const deployButton = (
-    <Button
-      variant={current === false ? "default" : "outline"}
-      size="sm"
-      disabled={!build.latestImage || current === true || !!managed}
-      onClick={onDeploy}
-    >
-      <RocketLaunchIcon aria-hidden="true" data-icon="inline-start" />
-      {t("builds.deploy")}
-    </Button>
-  )
   return (
     <SummaryCard aria-label={t("builds.status", build.name)}>
       <SummaryCardMain>
-        <SummaryCardStatus
-          tone={
-            problem
-              ? problem.lasting
-                ? "fail"
-                : "progress"
-              : latest
-                ? tones[runTone(latest)]
-                : "idle"
-          }
-        >
+        <SummaryCardStatus tone={summaryTone(problem, latest)}>
           <SummaryCardWord>{statusWord(t, { waiting, problem, latest })}</SummaryCardWord>
         </SummaryCardStatus>
         {since ? (
@@ -336,76 +317,181 @@ function Summary({
             ? t("builds.waitingUpload", service.name)
             : currentWords(t, service, build, current)}
         </p>
-        {failure ? (
-          <p
-            className={`mt-1 max-w-prose text-sm break-words ${(problem && !problem.lasting) || refused ? "text-secondary" : "text-fail-strong"}`}
-            lang="en"
-            translate="no"
-          >
-            {failure}
-          </p>
-        ) : latest?.phase === "Failed" && latest.message ? (
-          <p
-            className="mt-1 max-w-prose text-sm break-words text-fail-strong"
-            lang="en"
-            translate="no"
-          >
-            {latest.message}
-          </p>
-        ) : null}
+        <Failure problem={problem} failure={failure} failedRun={failedRun} refused={!!refused} />
         {refused ? <Refused project={project} build={build} kind={refused} /> : null}
         <UploadProgress project={project} build={build.name} />
         {build.suspended ? (
           <p className="mt-1 text-sm text-warn-strong">{t("builds.suspended")}</p>
         ) : null}
-        <SummaryCardFacts>
-          <SourceFact build={build} branch={branch} />
-          {build.latestImage ? (
-            <SummaryCardFact label={t("builds.image")}>
-              <CubeIcon aria-hidden="true" />
-              <span className="truncate font-mono" title={build.latestImage} translate="no">
-                {imageTag(build.latestImage)}
-              </span>
-              <CopyButton value={build.latestImage} />
-            </SummaryCardFact>
-          ) : null}
-          {several ? (
-            <SummaryCardFact label={t("builds.container")}>
-              <span className="truncate font-mono" translate="no">
-                {built.container}
-              </span>
-            </SummaryCardFact>
-          ) : null}
-          {build.builder ? (
-            <SummaryCardFact label={t("builds.builder")}>
-              <span className="truncate font-mono" translate="no">
-                {build.builder}
-              </span>
-            </SummaryCardFact>
-          ) : null}
-        </SummaryCardFacts>
-        <SummaryCardActions>
-          {managed ? (
-            <Tooltip content={t("builds.managedDeploy", managed)}>
-              <span>{deployButton}</span>
-            </Tooltip>
-          ) : (
-            <GateTip gate={deployGate}>{deployButton}</GateTip>
-          )}
-          {build.archive ? (
-            <UploadAction project={project} build={build.name} primary={waiting} />
-          ) : null}
-          {waiting ? null : (
-            <GateTip gate={rebuildGate}>
-              <Button variant="outline" size="sm" onClick={onRebuild}>
-                <ArrowClockwiseIcon aria-hidden="true" data-icon="inline-start" />
-                {t("builds.rebuild")}
-              </Button>
-            </GateTip>
-          )}
-        </SummaryCardActions>
+        <SummaryFacts built={built} branch={branch} several={several} />
+        <SummaryActions
+          project={project}
+          build={build}
+          current={current}
+          managed={managed}
+          waiting={!!waiting}
+          onDeploy={onDeploy}
+          onRebuild={onRebuild}
+        />
       </SummaryCardMain>
     </SummaryCard>
+  )
+}
+
+function SummaryActions({
+  project,
+  build,
+  current,
+  managed,
+  waiting,
+  onDeploy,
+  onRebuild,
+}: {
+  project: string
+  build: Build
+  current: boolean | undefined
+  managed?: string
+  waiting: boolean
+  onDeploy: () => void
+  onRebuild: () => void
+}) {
+  const t = useT()
+  const deployGate = useHereGate("changeServices")
+  const rebuildGate = useHereGate("build")
+  const deployButton = (
+    <Button
+      variant={current === false ? "default" : "outline"}
+      size="sm"
+      disabled={!build.latestImage || current === true || !!managed}
+      onClick={onDeploy}
+    >
+      <RocketLaunchIcon aria-hidden="true" data-icon="inline-start" />
+      {t("builds.deploy")}
+    </Button>
+  )
+  return (
+    <SummaryCardActions>
+      {managed ? (
+        <Tooltip content={t("builds.managedDeploy", managed)}>
+          <span>{deployButton}</span>
+        </Tooltip>
+      ) : (
+        <GateTip gate={deployGate}>{deployButton}</GateTip>
+      )}
+      {build.archive ? (
+        <UploadAction project={project} build={build.name} primary={waiting} />
+      ) : null}
+      {waiting ? null : (
+        <GateTip gate={rebuildGate}>
+          <Button variant="outline" size="sm" onClick={onRebuild}>
+            <ArrowClockwiseIcon aria-hidden="true" data-icon="inline-start" />
+            {t("builds.rebuild")}
+          </Button>
+        </GateTip>
+      )}
+    </SummaryCardActions>
+  )
+}
+
+function summaryTone(problem: ReturnType<typeof buildProblem>, latest?: BuildRun) {
+  if (problem) return problem.lasting ? "fail" : "progress"
+  return latest ? tones[runTone(latest)] : "idle"
+}
+
+function Failure({
+  problem,
+  failure,
+  failedRun,
+  refused,
+}: {
+  problem: ReturnType<typeof buildProblem>
+  failure?: string | null
+  failedRun?: BuildRun
+  refused: boolean
+}) {
+  if (failure) {
+    const quiet = (problem && !problem.lasting) || refused
+    return (
+      <p
+        className={cn(
+          "mt-1 max-w-prose text-sm break-words",
+          quiet ? "text-secondary" : "text-fail-strong",
+        )}
+        lang="en"
+        translate="no"
+      >
+        {failure}
+      </p>
+    )
+  }
+  return failedRun ? <FailedRun run={failedRun} /> : null
+}
+
+function SummaryFacts({
+  built,
+  branch,
+  several,
+}: {
+  built: Built
+  branch: string | undefined
+  several: boolean
+}) {
+  const t = useT()
+  const { build } = built
+  return (
+    <SummaryCardFacts>
+      <SourceFact build={build} branch={branch} />
+      {build.latestImage ? (
+        <SummaryCardFact label={t("builds.image")}>
+          <CubeIcon aria-hidden="true" />
+          <span className="truncate font-mono" title={build.latestImage} translate="no">
+            {imageTag(build.latestImage)}
+          </span>
+          <CopyButton value={build.latestImage} />
+        </SummaryCardFact>
+      ) : null}
+      {several ? (
+        <SummaryCardFact label={t("builds.container")}>
+          <span className="truncate font-mono" translate="no">
+            {built.container}
+          </span>
+        </SummaryCardFact>
+      ) : null}
+      {build.builder ? (
+        <SummaryCardFact label={t("builds.builder")}>
+          <span className="truncate font-mono" translate="no">
+            {build.builder}
+          </span>
+        </SummaryCardFact>
+      ) : null}
+    </SummaryCardFacts>
+  )
+}
+
+/** Why a run failed in a sentence, with the builder's own message behind Details. */
+function FailedRun({ run }: { run: BuildRun }) {
+  const t = useT()
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="mt-1 flex max-w-prose flex-col items-start gap-1">
+      <p className="text-sm text-fail-strong">{t(reasonKey(run.reason))}</p>
+      {run.message ? (
+        <Collapsible open={open} onOpenChange={setOpen} className="w-full">
+          <CollapsibleTrigger render={<Button variant="ghost" size="xs" className="-ml-2" />}>
+            {t(open ? "builds.hideDetails" : "builds.details")}
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <pre
+              className="mt-1 max-h-96 overflow-auto rounded-lg border border-main bg-muted p-3 font-mono text-xs leading-5 break-words whitespace-pre-wrap text-main"
+              lang="en"
+              translate="no"
+            >
+              {run.message}
+            </pre>
+          </CollapsibleContent>
+        </Collapsible>
+      ) : null}
+    </div>
   )
 }
 
@@ -608,7 +694,11 @@ function RunLogs({ project, run }: { project: string; run: BuildRun }) {
           ) : (
             <p className="mt-2 text-sm text-secondary">
               {run.message ? (
-                <span className="mb-2 block font-mono text-xs break-words" lang="en" translate="no">
+                <span
+                  className="mb-2 block font-mono text-xs break-words whitespace-pre-wrap"
+                  lang="en"
+                  translate="no"
+                >
                   {run.message}
                 </span>
               ) : null}

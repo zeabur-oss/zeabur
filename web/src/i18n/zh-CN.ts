@@ -706,6 +706,22 @@ export const zhCN: Messages = {
     seconds < 60 ? `用了 ${seconds} 秒` : `用了 ${Math.floor(seconds / 60)} 分 ${seconds % 60} 秒`,
   "builds.logs": "日志",
   "builds.hideLogs": "收起日志",
+  "builds.details": "详细信息",
+  "builds.hideDetails": "收起详细信息",
+  "builds.reason.PlanFailed":
+    "Zeabur 看不出这个项目要怎么构建。请上传项目的源码，或在里面加一份 Dockerfile。",
+  "builds.reason.SourceFailed":
+    "Zeabur 拿不到源码。确认仓库地址、分支和访问权限都没问题，再重新构建。",
+  "builds.reason.RegistryCredentialsMissing":
+    "构建器登录不了镜像仓库。请管理这个集群的人补上仓库的凭据。",
+  "builds.reason.Timeout": "构建用时太长，被中止了。重新构建一次；还是超时的话，把构建的内容缩小。",
+  "builds.reason.BuildFailed": "构建中途出错。展开详细信息看是哪一步。",
+  "builds.reason.InfraError": "构建做到一半被中断了。重新构建一次。",
+  "builds.reason.QuotaExceeded": "这个项目同时构建的数量已满。其他构建结束后，这个会自动开始。",
+  "builds.reason.BuildkitdStarting": "构建引擎正在启动，稍后会自动开始构建。",
+  "builds.reason.OutOfMemory": "构建用完了内存。请集群的管理员给构建更多内存，或把构建的内容缩小。",
+  "builds.reason.Cancelled": "这次构建被较新的构建取代，或被人取消了。",
+  "builds.reason.other": "构建失败。展开详细信息看原因。",
   "builds.step": "步骤",
   "builds.logsGone": "构建结束十分钟后，副本和日志会一起删除。",
   "builds.noLogsYet": "这个步骤还没开始。",
