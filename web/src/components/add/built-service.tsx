@@ -17,11 +17,11 @@ import {
   defaultPort,
   derivedMethod,
   dockerfileAt,
-  exposedPort,
   type BuildMethod,
   type BuiltService,
   type GitService,
 } from "@/model/git-service"
+import { exposedPort } from "@/model/dockerfile"
 import {
   hostPlaceholder,
   imageOptions,
