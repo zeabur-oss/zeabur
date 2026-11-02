@@ -2,8 +2,8 @@
 default: patch
 ---
 
-# RKE2 needs a server that reports at least 4000 MiB of memory, and Zeabur Builder 500 MiB more
+# A team install needs 3200 MiB on K3s and 4000 MiB on RKE2, and Zeabur Builder 500 MiB more
 
-With the memory kept for the system, RKE2's control plane and the default components no longer fit a 4 GiB server, so the installer refuses RKE2 below 4000 MiB and the Server step greys it out, instead of leaving pods Pending after the install. K3s still fits 4 GiB.
+The minimums now count what the scheduler counts: the memory requests of the distribution's own pods and the default components, on top of the memory kept for the system and the eviction threshold. Below them pods stayed Pending after the install. A 4 GiB server still fits K3s, also with a 512 MiB crash kernel reserve, and the Server step greys RKE2 out on it.
 
-On K3s and RKE2 the installer adds the catalog's `workMemoryMiB` of Zeabur Builder, the memory of one build, to that minimum, and leaves the builder out on a server below it, as a personal install already does.
+On K3s and RKE2 the installer adds the catalog's `workMemoryMiB` of Zeabur Builder, the memory of one build, to that minimum, and leaves the builder out on a server below it, as a personal install already does. So a 4 GiB server with a crash kernel reserve installs K3s without the builder.

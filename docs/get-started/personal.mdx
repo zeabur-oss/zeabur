@@ -22,7 +22,7 @@ The personal installation doesn't include Zeabur Builder or zot (the image regis
 
 The personal installation also has no members or permissions. For kube-apiserver to recognize sign-in credentials issued by Zeabur Identity, it needs to load configuration through `--authentication-config`. KubeSolo doesn't currently expose this setting ([portainer/kubesolo#231](https://github.com/portainer/kubesolo/issues/231)). You can only connect with the kubeconfig from the server, and anyone who has it can control the entire cluster. This isn't suitable for sharing among multiple people or teams.
 
-When the server reports less than 2400 MiB of memory, the installer only accepts personal use. There's no direct upgrade path to team use. To switch later, reinstall with K3s on a server with 4 GiB of memory, or with RKE2 on one that reports at least 4000 MiB. Zeabur Builder needs 500 MiB more on either, for one build.
+When the server reports less than 3200 MiB of memory, the installer only accepts personal use. There's no direct upgrade path to team use. To switch later, reinstall with K3s on a server that reports at least 3200 MiB, or with RKE2 on one that reports at least 4000 MiB. Zeabur Builder needs 500 MiB more on either, for one build, so it needs 3700 MiB on K3s.
 
 ## Prepare the machine
 
@@ -44,7 +44,7 @@ Follow [Install Zeabur on a server](quickstart.mdx#open-the-installer) to open t
 
 ![“Just me” selected under “Who is it for” in “Check server,” with only four steps remaining at the top](../images/shots/installer-personal-choose.avif)
 
-If the server reports less than 2400 MiB of memory, “A team” is disabled. Only “Just me” is available.
+If the server reports less than 3200 MiB of memory, “A team” is disabled. Only “Just me” is available.
 
 ![On a server with only 1.5 GiB of memory, “A team” is disabled with an explanation that the server doesn't have enough memory](../images/shots/installer-personal-small.avif)
 

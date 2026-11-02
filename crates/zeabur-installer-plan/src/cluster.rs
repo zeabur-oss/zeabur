@@ -108,8 +108,6 @@ const RKE2_LAYOUT: Layout = Layout {
 const OS_IDLE_MIB: u64 = 350;
 /// Zeabur and Identity at idle.
 const ZEABUR_IDLE_MIB: u64 = 60;
-/// Traefik and cert-manager, what `minimal` installs, and room to spare.
-const MINIMAL_AND_HEADROOM_MIB: u64 = 150 + 250;
 
 // What the RKE2 control plane's processes used at idle on a 4 GiB VM (`Distribution::idle_mib`).
 const RKE2_APISERVER_IDLE_MIB: u64 = 980;
@@ -127,8 +125,11 @@ const RKE2_STATIC_PODS_REQUEST_MIB: u64 =
     1024 + RKE2_ETCD_REQUEST_MIB + RKE2_CONTROLLER_MANAGER_REQUEST_MIB + 3 * 128;
 /// rke2-coredns and its autoscaler.
 const RKE2_COREDNS_REQUEST_MIB: u64 = 144;
-/// The memory requests of the catalog's default components with Zeabur and Identity, on one node.
-const DEFAULT_COMPONENTS_REQUEST_MIB: u64 = 920;
+/// K3s's `CoreDNS`. Calico asks for no memory.
+const K3S_COREDNS_REQUEST_MIB: u64 = 70;
+/// The memory requests of the catalog's default components with Zeabur and Identity, on one node,
+/// as K3s ran them on a VM.
+const DEFAULT_COMPONENTS_REQUEST_MIB: u64 = 995;
 
 impl Distribution {
     /// Every distribution, in the order an interface lists them.
@@ -280,13 +281,11 @@ impl Distribution {
 
     /// The least memory a team install needs.
     ///
-    /// K3s: the idle base, Traefik and cert-manager, and 250 MiB of headroom, rounded up to a
-    /// hundred. A server with 4 GiB passes, also when a crash kernel reserve takes 512 MiB of it.
-    ///
-    /// RKE2: the scheduler places a pod only where its memory request fits in what pods may use,
-    /// so that must hold the requests of the static pods, `CoreDNS` and the default components, on
-    /// top of the reserves and the hard eviction threshold. It comes to 3908, rounded up to a
-    /// hundred.
+    /// The scheduler places a pod only where its memory request fits in what pods may use, so that
+    /// must hold the requests of the distribution's own pods (RKE2's static pods and `CoreDNS`,
+    /// K3s's `CoreDNS`) and of the default components, on top of the reserves and the hard
+    /// eviction threshold, rounded up to a hundred. K3s comes to 3200, which a 4 GiB server passes
+    /// also when a crash kernel reserve takes 512 MiB of it; RKE2 comes to 4000.
     #[must_use]
     pub const fn min_memory_mib(self) -> u64 {
         self.min_memory_at_work_mib(0)
@@ -296,17 +295,17 @@ impl Distribution {
     /// the builder in a build (`resources.workMemoryMiB` in the catalog).
     #[must_use]
     pub const fn min_memory_at_work_mib(self, work_mib: u64) -> u64 {
-        let idle = match self {
-            Self::K3s => self.base_idle_mib() + MINIMAL_AND_HEADROOM_MIB,
-            Self::Rke2 => {
-                RKE2_STATIC_PODS_REQUEST_MIB
-                    + RKE2_COREDNS_REQUEST_MIB
-                    + DEFAULT_COMPONENTS_REQUEST_MIB
-                    + self.reserved_mib()
-                    + EVICTION_HARD_MIB
-            }
+        let own_pods = match self {
+            Self::K3s => K3S_COREDNS_REQUEST_MIB,
+            Self::Rke2 => RKE2_STATIC_PODS_REQUEST_MIB + RKE2_COREDNS_REQUEST_MIB,
         };
-        (idle + work_mib).div_ceil(100) * 100
+        (own_pods
+            + DEFAULT_COMPONENTS_REQUEST_MIB
+            + self.reserved_mib()
+            + EVICTION_HARD_MIB
+            + work_mib)
+            .div_ceil(100)
+            * 100
     }
 
     /// The label `ServiceLB` puts on its pods.
@@ -620,14 +619,17 @@ mod tests {
     use super::*;
 
     #[test]
-    fn k3s_fits_4_gib_with_a_crash_kernel_and_rke2_needs_more_than_4_gib() {
+    fn k3s_fits_4_gib_with_a_crash_kernel_but_not_a_build_and_rke2_needs_more_than_4_gib() {
         assert!(Distribution::K3s.min_memory_mib() <= 3379);
+        // The builder's workMemoryMiB in the catalog.
+        assert!(Distribution::K3s.min_memory_at_work_mib(500) > 3379);
         assert!(Distribution::Rke2.min_memory_mib() > 3800);
     }
 
     #[test]
     // docs/*/get-started/personal.mdx
-    fn the_rke2_minimum_is_the_one_the_docs_give() {
+    fn the_minimums_are_the_ones_the_docs_give() {
+        assert_eq!(Distribution::K3s.min_memory_mib(), 3200);
         assert_eq!(Distribution::Rke2.min_memory_mib(), 4000);
     }
 
