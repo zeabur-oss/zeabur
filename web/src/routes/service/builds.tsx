@@ -9,6 +9,7 @@ import RocketLaunchIcon from "~icons/ph/rocket-launch"
 import UploadSimpleIcon from "~icons/ph/upload-simple"
 
 import { toProblem } from "@/api/client"
+import { cn } from "@/lib/utils"
 import * as zeabur from "@/api/zeabur"
 import { buildsQuery, capabilitiesQuery, logsQuery } from "@/api/queries"
 import { Ago, CopyButton, Segmented } from "@/components/bits"
@@ -412,7 +413,10 @@ function Failure({
     const quiet = (problem && !problem.lasting) || refused
     return (
       <p
-        className={`mt-1 max-w-prose text-sm break-words ${quiet ? "text-secondary" : "text-fail-strong"}`}
+        className={cn(
+          "mt-1 max-w-prose text-sm break-words",
+          quiet ? "text-secondary" : "text-fail-strong",
+        )}
         lang="en"
         translate="no"
       >
