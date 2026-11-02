@@ -23,7 +23,16 @@ async function run(page: Page, step: Step) {
   else if ("fill" in step) await page.locator(step.fill).first().fill(step.value)
   else if ("hover" in step) await page.locator(step.hover).first().hover()
   else if ("wait" in step) await page.locator(step.wait).first().waitFor()
+  else if ("repeat" in step) await repeat(page, step.repeat, step.until)
   else await page.keyboard.press(step.press)
+}
+
+// Clicks `click` until `until` shows, so a flow need not count the pages before it.
+async function repeat(page: Page, click: string, until: string) {
+  for (let i = 0; !(await page.locator(until).first().isVisible()); i++) {
+    if (i === 10) throw new Error(`${until} did not show after ${i} clicks of ${click}`)
+    await page.locator(click).first().click()
+  }
 }
 
 async function settle(page: Page) {

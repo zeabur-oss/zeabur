@@ -251,7 +251,7 @@ export function App() {
   return (
     <div className="flex min-h-dvh flex-col bg-surface-page">
       <TopBar />
-      <main className="flex-1 px-4 md:px-8">
+      <main data-step={step} className="flex-1 px-4 md:px-8">
         <PageColumn width="content" gap="md" className="my-6 md:my-10">
           <Steps
             label={t("step.of", shownSteps.indexOf(step) + 1, shownSteps.length)}
