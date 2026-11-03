@@ -10002,6 +10002,28 @@ export type WorkloadReleaseList = {
 }
 
 /**
+ * A published release.
+ */
+export type ZeaburRelease = {
+  /** GitHub marks it a pre-release. */
+  prerelease: boolean
+  /** Its notes have a `### Security` section: it fixes vulnerabilities. */
+  security: boolean
+  /** Its page on GitHub, with the release notes. */
+  url: string
+  /** The tag without its `v`, such as `0.1.2`. */
+  version: string
+}
+
+/**
+ * Zeabur's published releases on GitHub, as the server read them last.
+ */
+export type ZeaburReleaseList = {
+  /** In GitHub's order, newest first; empty while the update check is off. */
+  items: ZeaburRelease[]
+}
+
+/**
  * Zeabur itself: its version, and what the interface needs to say how to upgrade it.
  */
 export type ZeaburVersion = {
@@ -11447,6 +11469,23 @@ export const getZeabur = async (
   options?: Parameters<typeof zeaburFetch>[1],
 ): Promise<ZeaburVersion> => {
   return zeaburFetch<ZeaburVersion>(getGetZeaburUrl(), {
+    ...options,
+    method: "GET",
+  })
+}
+
+export const getGetZeaburReleasesUrl = () => {
+  return `/api/v1/cluster/zeabur/releases`
+}
+
+/**
+ * @summary Zeabur's published releases, newest first. An empty list while the update check is off, which
+asks GitHub nothing.
+ */
+export const getZeaburReleases = async (
+  options?: Parameters<typeof zeaburFetch>[1],
+): Promise<ZeaburReleaseList> => {
+  return zeaburFetch<ZeaburReleaseList>(getGetZeaburReleasesUrl(), {
     ...options,
     method: "GET",
   })

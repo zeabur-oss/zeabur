@@ -1278,6 +1278,31 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/Problem"
+  /api/v1/cluster/zeabur/releases:
+    get:
+      tags:
+      - cluster
+      summary: |-
+        Zeabur's published releases, newest first. An empty list while the update check is off, which
+        asks GitHub nothing.
+      operationId: getZeaburReleases
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ZeaburReleaseList"
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "503":
+          description: GitHub has not answered since the server started
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
   /api/v1/members:
     get:
       tags:
@@ -18515,6 +18540,38 @@ components:
           - string
           - "null"
           description: "`webhook`, `poll` or `manual`."
+    ZeaburRelease:
+      type: object
+      description: A published release.
+      required:
+      - version
+      - url
+      - prerelease
+      - security
+      properties:
+        prerelease:
+          type: boolean
+          description: GitHub marks it a pre-release.
+        security:
+          type: boolean
+          description: "Its notes have a `### Security` section: it fixes vulnerabilities."
+        url:
+          type: string
+          description: Its page on GitHub, with the release notes.
+        version:
+          type: string
+          description: The tag without its `v`, such as `0.1.2`.
+    ZeaburReleaseList:
+      type: object
+      description: Zeabur's published releases on GitHub, as the server read them last.
+      required:
+      - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ZeaburRelease"
+          description: In GitHub's order, newest first; empty while the update check is off.
     ZeaburVersion:
       type: object
       description: "Zeabur itself: its version, and what the interface needs to say how to upgrade it."

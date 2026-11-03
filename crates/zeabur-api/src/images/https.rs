@@ -121,6 +121,16 @@ impl Https {
         request: Request<Full<Bytes>>,
         limit: usize,
     ) -> Result<(u16, Vec<u8>), String> {
+        let (status, _, body) = self.exchange_with_headers(request, limit).await?;
+        Ok((status, body))
+    }
+
+    /// [`Self::exchange`], with the answer's headers.
+    pub(crate) async fn exchange_with_headers(
+        &self,
+        request: Request<Full<Bytes>>,
+        limit: usize,
+    ) -> Result<(u16, http::HeaderMap, Vec<u8>), String> {
         refuse_named(self.reach, request.uri())?;
         let exchange = async {
             let response = self
@@ -129,13 +139,14 @@ impl Https {
                 .await
                 .map_err(|e| describe(&e))?;
             let status = response.status().as_u16();
+            let headers = response.headers().clone();
             let body = Limited::new(response.into_body(), limit)
                 .collect()
                 .await
                 .map_err(|e| e.to_string())?
                 .to_bytes()
                 .to_vec();
-            Ok((status, body))
+            Ok((status, headers, body))
         };
         tokio::time::timeout(DEADLINE, exchange)
             .await

@@ -226,9 +226,8 @@ telemetry:
   enabled: false
   installationId: ""
 
-# The update check (docs/reference/telemetry.mdx): once a day, the interface asks GitHub from the
-# person's browser whether a newer Zeabur is out and says how to upgrade. Zeabur itself makes no
-# request. DO_NOT_TRACK=1 turns it off too.
+# The update check (docs/reference/telemetry.mdx): at most once an hour, Zeabur asks GitHub whether
+# a newer Zeabur is out, and the interface says how to upgrade. DO_NOT_TRACK=1 turns it off too.
 updateCheck:
   enabled: true
 

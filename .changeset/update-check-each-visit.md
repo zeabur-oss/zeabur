@@ -4,7 +4,7 @@ default: patch
 
 # Zeabur checks for a newer version each time a page opens, and zeaburctl no longer misses it
 
-The cluster page used to ask GitHub once a day, and a failed request stopped the check for the rest of that day. Now each time a page opens, it shows the answer it kept and asks again in the background, and asks hourly while it stays open. If GitHub can't be reached, the last answer stays.
+The cluster page used to ask GitHub from each browser once a day, and a failed request stopped the check for the rest of that day. Now the Zeabur server asks GitHub at most once an hour and keeps the answer, and each page reads it when it opens and hourly while it stays open. People behind one office address no longer share GitHub's limit of 60 requests an hour, and browsers no longer contact GitHub.
 
 `zeaburctl` dropped the answer when a command ended before GitHub replied, and then waited a day to ask again, so quick commands never showed a notice. It now keeps the answer for the next command, asks again at most once an hour, and names the same version at most once a day.
 

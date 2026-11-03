@@ -87,11 +87,33 @@ pub struct Cluster {
 pub struct ZeaburVersion {
     /// Zeabur's version, such as `0.1.1`; in local mode, `zeaburctl`'s.
     pub version: String,
-    /// Whether the interface checks GitHub's releases for a newer version.
+    /// Whether the interface compares it with GitHub's releases (`GET /cluster/zeabur/releases`).
     pub update_check: bool,
     /// How Zeabur was installed; absent when the person may not read what tells.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub installed_by: Option<InstallMethod>,
+}
+
+/// Zeabur's published releases on GitHub, as the server read them last.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ZeaburReleaseList {
+    /// In GitHub's order, newest first; empty while the update check is off.
+    pub items: Vec<ZeaburRelease>,
+}
+
+/// A published release.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ZeaburRelease {
+    /// The tag without its `v`, such as `0.1.2`.
+    pub version: String,
+    /// Its page on GitHub, with the release notes.
+    pub url: String,
+    /// GitHub marks it a pre-release.
+    pub prerelease: bool,
+    /// Its notes have a `### Security` section: it fixes vulnerabilities.
+    pub security: bool,
 }
 
 /// How Zeabur was installed, which says how to upgrade it.

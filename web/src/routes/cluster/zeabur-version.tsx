@@ -18,8 +18,7 @@ import {
 } from "@zeabur-oss/design-system/components/dialog"
 import { useI18n, useT } from "@/i18n"
 import { docsUrl } from "@/lib/docs"
-import { load, save } from "@/lib/stores"
-import { newerFor, updateCheckQuery, type Newer } from "@/model/update-check"
+import { newerFor, releasesQuery, type Newer } from "@/model/update-check"
 
 export function useNewer(): {
   zeabur?: Schemas.ZeaburVersion
@@ -27,9 +26,7 @@ export function useNewer(): {
   checked?: boolean
 } {
   const zeabur = useQuery(zeaburQuery).data
-  const checked = useQuery(
-    updateCheckQuery((url, init) => fetch(url, init), { load, save }, zeabur?.updateCheck === true),
-  ).data
+  const checked = useQuery(releasesQuery(zeabur?.updateCheck === true)).data
   return { zeabur, newer: newerFor(zeabur, checked), checked: checked !== undefined }
 }
 
