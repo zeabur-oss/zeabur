@@ -220,15 +220,8 @@ spec:
                   name: mysql-app
             - name: DATABASE_URL
               value: mysql://app:$(MYSQLPASSWORD)@moco-mysql-primary.lab.svc:3306/app
-          image: ghcr.io/example/storefront:1.0.0
+          image: zot.zot.svc:5000/lab/storefront:main-12-c81e4a0
           name: storefront
-          ports:
-            - containerPort: 3000
-              name: http
-          readinessProbe:
-            httpGet:
-              path: /healthz
-              port: http
           resources:
             limits:
               memory: 256Mi

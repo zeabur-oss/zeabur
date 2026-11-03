@@ -385,6 +385,23 @@ fn docs_build() -> [DynamicObject; 2] {
     ]
 }
 
+/// Lab's storefront, built from its Dockerfile, whose image declares a port the service has no
+/// address for yet.
+fn storefront_build() -> DynamicObject {
+    serde_json::from_value(json!({
+        "apiVersion": "builder.zeabur.com/v1alpha1", "kind": "Build",
+        "metadata": {"name": "storefront", "namespace": "lab"},
+        "spec": {"builderRef": "dockerfile",
+            "source": {"git": {"url": "https://github.com/example/storefront.git", "ref": "main"}},
+            "output": {"image": "zot.zot.svc:5000/lab/storefront"}},
+        "status": {"latestImage": "zot.zot.svc:5000/lab/storefront:main-12-c81e4a0",
+            "exposedPorts": ["3000/tcp"],
+            "conditions": [{"type": "SourceReady", "status": "True", "reason": "Git"},
+                {"type": "Ready", "status": "True", "reason": "Succeeded"}]}
+    }))
+    .expect("a Build")
+}
+
 /// One namespace's hand-written objects in `demo-data/<namespace>.yaml`: a manifest each, split
 /// by `---`. A string `now`, `now-2d4h` or `now+30m` (units `d`, `h`, `m`, `s`) is a time
 /// relative to the demo clock. A Secret lists its keys under `data` with empty values; only the
@@ -1107,6 +1124,7 @@ fn state() -> State {
         .into_iter()
         .chain(live)
         .chain(docs_build())
+        .chain([storefront_build()])
         .chain(people())
         .chain(member_roles())
         .chain(velero())
