@@ -40,9 +40,9 @@ prometheus:
   enabled: true
   servicemonitor:
     enabled: false
-# Idles at 20-40Mi; small requests fit a 2 GB node.
+# Idles near 39Mi; small requests fit a 2 GB node.
 resources:
-  requests: {cpu: 10m, memory: 32Mi}
+  requests: {cpu: 10m, memory: 56Mi}
   limits: {memory: 128Mi}
 webhook:
   # Same sizing as the controller.
@@ -50,9 +50,9 @@ webhook:
     requests: {cpu: 10m, memory: 24Mi}
     limits: {memory: 64Mi}
 cainjector:
-  # Caches watched Secrets; the limit bounds it.
+  # Caches watched Secrets; idles near 33Mi, and the limit bounds it.
   resources:
-    requests: {cpu: 10m, memory: 32Mi}
+    requests: {cpu: 10m, memory: 48Mi}
     limits: {memory: 128Mi}
 startupapicheck:
   # Short-lived post-install Job.
