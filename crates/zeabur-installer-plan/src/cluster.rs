@@ -621,8 +621,10 @@ TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305\n";
 /// Below this much available memory the kubelet evicts at once. Twice its default of 100Mi, so it
 /// evicts before the kernel has to kill.
 const EVICTION_HARD_MIB: u64 = 200;
-/// K3s's own disk thresholds, which RKE2 shares. The flag replaces the whole map, and a
-/// threshold it leaves out is zero.
+/// The disk thresholds K3s sets in its kubelet configuration, which RKE2 runs as its agent
+/// (<https://github.com/k3s-io/k3s/blob/3acf8db8f2096ae0ea34f4b4ce1048e6472b89be/pkg/daemons/agent/agent.go#L192-L195>).
+/// The flag replaces the whole map, and a threshold it leaves out is zero
+/// (<https://kubernetes.io/docs/concepts/scheduling-eviction/node-pressure-eviction/#hard-eviction-thresholds>).
 const DISK_EVICTION_HARD: &str = "nodefs.available<5%,imagefs.available<5%";
 /// Below this much for 30 seconds the kubelet evicts too, which catches memory that grows slowly
 /// before it reaches the hard threshold.
