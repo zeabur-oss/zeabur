@@ -220,7 +220,9 @@ mod tests {
         let agent: serde_json::Value = serde_saphyr::from_str(&agent_files()[1].content).unwrap();
         let args = agent["kubelet-arg"].as_array().unwrap();
         assert!(args.contains(&serde_json::json!("system-reserved=memory=350Mi")));
-        assert!(args.contains(&serde_json::json!("eviction-hard=memory.available<200Mi")));
+        assert!(args.contains(&serde_json::json!(
+            "eviction-hard=memory.available<200Mi,nodefs.available<5%,imagefs.available<5%"
+        )));
         assert!(
             !args
                 .iter()

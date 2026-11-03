@@ -299,7 +299,7 @@ impl Distribution {
         };
         format!(
             "{KUBELET_ARGS}  - system-reserved=memory={OS_IDLE_MIB}Mi\n{kube_reserved}  \
-             - eviction-hard=memory.available<{EVICTION_HARD_MIB}Mi\n  \
+             - eviction-hard=memory.available<{EVICTION_HARD_MIB}Mi,{DISK_EVICTION_HARD}\n  \
              - eviction-soft=memory.available<{EVICTION_SOFT_MIB}Mi\n  \
              - eviction-soft-grace-period=memory.available=30s\n"
         )
@@ -621,6 +621,9 @@ TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305\n";
 /// Below this much available memory the kubelet evicts at once. Twice its default of 100Mi, so it
 /// evicts before the kernel has to kill.
 const EVICTION_HARD_MIB: u64 = 200;
+/// K3s's own disk thresholds, which RKE2 shares. The flag replaces the whole map, and a
+/// threshold it leaves out is zero.
+const DISK_EVICTION_HARD: &str = "nodefs.available<5%,imagefs.available<5%";
 /// Below this much for 30 seconds the kubelet evicts too, which catches memory that grows slowly
 /// before it reaches the hard threshold.
 const EVICTION_SOFT_MIB: u64 = 400;
@@ -659,6 +662,26 @@ mod tests {
         // The builder's workMemoryMiB in the catalog.
         assert!(Distribution::K3s.min_memory_at_work_mib(500) > 3900);
         assert!(Distribution::Rke2.min_memory_mib() > 3900);
+    }
+
+    #[test]
+    fn the_memory_threshold_keeps_the_disk_thresholds_k3s_sets() {
+        for distribution in Distribution::ALL {
+            for server in [true, false] {
+                let args = distribution.kubelet_args(server);
+                let hard = args
+                    .lines()
+                    .find_map(|l| l.trim().strip_prefix("- eviction-hard="))
+                    .unwrap();
+                for threshold in [
+                    "memory.available<",
+                    "nodefs.available<5%",
+                    "imagefs.available<5%",
+                ] {
+                    assert!(hard.contains(threshold), "{distribution:?}: {hard}");
+                }
+            }
+        }
     }
 
     #[test]

@@ -379,9 +379,17 @@ impl Server {
                 (d.id().to_owned(), json!(checks))
             })
             .collect();
+        // A running install is upgraded below the minimum with a warning, as the plan allows.
         let min_memory: serde_json::Map<String, Value> = Distribution::ALL
             .into_iter()
-            .map(|d| (d.id().to_owned(), json!(d.min_memory_mib())))
+            .map(|d| {
+                let min = if systemd::is_active(d.server_unit()) {
+                    0
+                } else {
+                    d.min_memory_mib()
+                };
+                (d.id().to_owned(), json!(min))
+            })
             .collect();
         let personal_checks = preflight::run(preflight::Options {
             cluster_running: systemd::is_active(kubesolo::UNIT),

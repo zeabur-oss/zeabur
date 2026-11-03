@@ -2658,7 +2658,7 @@ mod tests {
             for arg in [
                 "system-reserved=memory=350Mi",
                 kube_reserved,
-                "eviction-hard=memory.available<200Mi",
+                "eviction-hard=memory.available<200Mi,nodefs.available<5%,imagefs.available<5%",
                 "eviction-soft=memory.available<400Mi",
                 "eviction-soft-grace-period=memory.available=30s",
                 "pod-max-pids=4096",
