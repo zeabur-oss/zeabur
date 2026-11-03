@@ -235,6 +235,7 @@ mod tests {
             Event::ZeaburActive(ZeaburActive {
                 zeabur_version: "0.1.0",
                 day: Day::from_unix(1_800_000_000),
+                person: "0123456789abcdef0123456789abcdef".to_owned(),
                 mode: Mode::InCluster,
             }),
             Event::InstallStarted(install()),
@@ -326,6 +327,7 @@ mod tests {
         let allowed: &[&str] = &[
             "zeabur_version",
             "day",
+            "person",
             "mode",
             "installer_version",
             "profile",

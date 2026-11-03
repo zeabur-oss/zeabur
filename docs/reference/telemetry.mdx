@@ -20,6 +20,7 @@ Zeabur sends one event the first time each person uses it in a UTC day, and the 
 |---|---|---|
 | `zeabur_version` | `zeabur_active` | Zeabur's version, such as `0.1.1` |
 | `day` | `zeabur_active` | The UTC date, such as `2026-10-30` |
+| `person` | `zeabur_active` | 32 hexadecimal digits that tell people apart within one installation and one day |
 | `mode` | `zeabur_active` | `in-cluster` |
 | `installer_version` | the installer's events | The installer's version |
 | `profile` | the installer's events | `single-node`, `multi-node` or `personal` |
@@ -29,7 +30,7 @@ Zeabur sends one event the first time each person uses it in a UTC day, and the 
 | `$process_person_profile` | all | Always `false`: no person profile is made |
 | `$geoip_disable` | all | Always `true`: no location is looked up |
 
-The event doesn't say who the person is. To tell people apart within a day, Zeabur keeps a hash of each one in memory and forgets it when the day ends or Zeabur restarts, so someone may be counted twice on a day Zeabur restarts.
+The event doesn't say who the person is. `person` is a keyed hash of the user name and the day. The key is derived from Zeabur's plan key, which stays in the cluster's Secret and is never sent, so we can't work out the user name from it. The same person gets the same `person` all day, even after Zeabur restarts, and a different one the next day, so their days can't be linked.
 
 Events go to PostHog (`us.i.posthog.com`) over HTTPS, one try with a short timeout. A failed request isn't retried and doesn't affect Zeabur or the install. PostHog doesn't keep IP addresses.
 

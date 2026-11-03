@@ -155,6 +155,7 @@ async fn serve(args: &Args, config: Config) -> Result<(), String> {
         telemetry: Arc::new(telemetry::Telemetry::new(
             args.telemetry_enabled,
             &args.installation_id,
+            config.plan_key.derive("zeabur telemetry person"),
         )),
     });
     let zeabur_proxy = config.proxy.map(|proxy| {
