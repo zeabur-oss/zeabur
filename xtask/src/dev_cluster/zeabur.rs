@@ -77,12 +77,13 @@ pub(crate) fn install(dev: &DevCluster, install: &Install<'_>) -> Result<(), Str
         .arg(&install_yaml)
         .args(["manifests", "--cluster-name", cluster::NAME])
         .read()?;
+    // The values come first: k3s restarts the chart's install Job when the values change.
+    let values = chart_values(install.profile == Profile::Full, install.proxy_image);
+    dev.apply(helm_chart_config(&values).to_string())?;
     dev.kubectl()
         .args(["apply", "--server-side", "--force-conflicts", "-f", "-"])
         .input(manifests)
         .quiet()?;
-    let values = chart_values(install.profile == Profile::Full, install.proxy_image);
-    dev.apply(helm_chart_config(&values).to_string())?;
 
     let image = install.zeabur_image;
     let waited = wait_for(
