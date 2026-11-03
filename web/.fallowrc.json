@@ -26,9 +26,13 @@
     { "file": "src/routes/service/page.tsx", "exports": ["ServicePage"] },
     { "file": "src/routes/settings.tsx", "exports": ["SettingsPage"] }
   ],
-  // Generated files, and the catalogs, which repeat the same keys in each language.
+  // Generated files, the catalogs, which repeat the same keys in each language, and the shots,
+  // each a few steps of the same kind.
   "duplicates": {
     "ignore": [
+      "e2e/shots/cover.ts",
+      "e2e/shots/docs.ts",
+      "e2e/shots/readme.ts",
       "src/api/zeabur.ts",
       "src/i18n/server/**",
       "src/i18n/en.ts",

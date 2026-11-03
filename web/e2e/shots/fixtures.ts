@@ -205,19 +205,22 @@ async function fitWindow(page: Page, selector = "html") {
   // since the crop adds its own space. A drawer's body keeps its own bottom padding above the
   // footer.
   const content = await element.evaluate((el, inner) => {
+    const painted = (e: Element) => {
+      const s = getComputedStyle(e)
+      const marks = [
+        e.childElementCount === 0,
+        s.backgroundColor !== "rgba(0, 0, 0, 0)",
+        s.backgroundImage !== "none",
+        parseFloat(s.borderBottomWidth) > 0,
+        s.boxShadow !== "none",
+      ]
+      return s.visibility !== "hidden" && marks.some(Boolean)
+    }
     const top = el.getBoundingClientRect().top - el.scrollTop
     let bottom = 0
     for (const e of el.querySelectorAll("*")) {
       const r = e.getBoundingClientRect()
-      if (r.width <= 1 || r.height <= 1) continue
-      const s = getComputedStyle(e)
-      const painted =
-        e.childElementCount === 0 ||
-        s.backgroundColor !== "rgba(0, 0, 0, 0)" ||
-        s.backgroundImage !== "none" ||
-        parseFloat(s.borderBottomWidth) > 0 ||
-        s.boxShadow !== "none"
-      if (painted && s.visibility !== "hidden") bottom = Math.max(bottom, r.bottom - top)
+      if (r.width > 1 && r.height > 1 && painted(e)) bottom = Math.max(bottom, r.bottom - top)
     }
     const padding = inner ? parseFloat(getComputedStyle(el).paddingBottom) : 0
     return Math.ceil(bottom + padding)
