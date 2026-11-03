@@ -3,6 +3,14 @@
 Start with `zeabur-oss-ci`'s RELEASE-RECOVERY.md (what was published stays; access failures)
 and `docs/internal/releasing.md` ("When a release run fails"). These are Zeabur's own cases.
 
+## A pin without a release tag
+
+`check` or `build` says `zeabur-oss/catalog <commit> has no release tag that a pre-release can
+pin: tag it, or move the pin`. After a tag, that version is spent. Release the catalog (or Zeabur
+Identity) first, move `flake.lock` or `ZEABUR_IDENTITY_PINNED` to that release in a pull request,
+then release the next version. A normal release pins only normal releases, so a beta catalog
+stops it too.
+
 ## A private package in `verify`
 
 The first run creates `zeabur` and `charts/zeabur` private on ghcr.io. `scripts/release.ts

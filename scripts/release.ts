@@ -6,8 +6,9 @@
 //
 //   bump    <version>                                 after knope set Cargo.toml: Cargo.lock, the
 //                                                     chart, the web packages and the API document
-//   check   <version>                                 the version is the manifests', and the chart
-//                                                     runs only images the release publishes
+//   check   <version>                                 the version is the manifests', the chart runs
+//                                                     only images the release publishes, and the
+//                                                     catalog and Identity pins carry release tags
 //   build   <version> <os> <arch> <dist>              build one platform (release-build.sh), smoke
 //                                                     it on k3s on Linux (release-smoke.sh)
 //   sign    <version> <os> <arch> <dist>              macOS: zeaburctl signed with the Developer ID
@@ -142,12 +143,9 @@ async function chartImages(chart: string): Promise<string> {
   return [...found].sort().join(", ");
 }
 
-// The catalog and Zeabur Identity releases that zeabur-installer installs, as ZEABUR_PIN_*
-// values. The catalog is the commit in flake.lock, Zeabur Identity the release tag (or a commit
-// that carries one) in ZEABUR_IDENTITY_PINNED. Each value comes from the SHA256SUMS that the
-// product's release signed, and cosign checks that signature first.
-async function pins(version: Version): Promise<Record<string, string>> {
-  const work = (await scratch()).dir;
+// The release tags of the catalog and Zeabur Identity that this version pins: the catalog commit
+// in flake.lock and the release tag (or a commit that carries one) in ZEABUR_IDENTITY_PINNED.
+async function pinTags(version: Version) {
   const tagOf = async (repository: string, pin: string) =>
     pinTag(
       `zeabur-oss/${repository}`,
@@ -155,11 +153,21 @@ async function pins(version: Version): Promise<Record<string, string>> {
       pin,
       await $`git ls-remote --tags https://github.com/zeabur-oss/${repository}`.text(),
     );
-  const catalog = await tagOf("catalog", env("ZEABUR_CATALOG_COMMIT"));
-  const identity = await tagOf(
-    "identity",
-    (await Bun.file(join(root, "ZEABUR_IDENTITY_PINNED")).text()).trim(),
-  );
+  return {
+    catalog: await tagOf("catalog", env("ZEABUR_CATALOG_COMMIT")),
+    identity: await tagOf(
+      "identity",
+      (await Bun.file(join(root, "ZEABUR_IDENTITY_PINNED")).text()).trim(),
+    ),
+  };
+}
+
+// The catalog and Zeabur Identity releases that zeabur-installer installs, as ZEABUR_PIN_*
+// values. Each value comes from the SHA256SUMS that the product's release signed, and cosign
+// checks that signature first.
+async function pins(version: Version): Promise<Record<string, string>> {
+  const work = (await scratch()).dir;
+  const { catalog, identity } = await pinTags(version);
 
   const download = async (repository: string, tag: string, file: string) => {
     const to = join(work, repository, file);
@@ -296,6 +304,13 @@ async function check(version: Version) {
       problems.push(
         `the chart runs ${ref}, which the release does not publish`,
       );
+  }
+  // The release PR is opened only when the pins resolve, not after its tag fails to build.
+  try {
+    await pinTags(version);
+  } catch (e) {
+    if (!(e instanceof Failure)) throw e;
+    problems.push(e.message);
   }
   if (problems.length) fail(problems.join("\n"));
 }
