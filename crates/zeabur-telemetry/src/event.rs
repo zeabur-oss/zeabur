@@ -56,6 +56,12 @@ impl Day {
     pub const fn from_unix(seconds: i64) -> Self {
         Self(seconds.div_euclid(86_400))
     }
+
+    /// Days since 1970-01-01.
+    #[must_use]
+    pub const fn since_epoch(self) -> i64 {
+        self.0
+    }
 }
 
 impl Serialize for Day {
@@ -164,6 +170,9 @@ pub struct ZeaburActive {
     pub zeabur_version: &'static str,
     /// The UTC day.
     pub day: Day,
+    /// Tells people apart within this installation and day, and nowhere else: 32 hexadecimal
+    /// digits under a key that never leaves the installation.
+    pub person: String,
     /// How Zeabur runs.
     pub mode: Mode,
 }

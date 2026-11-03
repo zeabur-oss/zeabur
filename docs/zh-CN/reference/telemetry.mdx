@@ -21,6 +21,7 @@ source: "0fd6101882a5"
 |---|---|---|
 | `zeabur_version` | `zeabur_active` | Zeabur 的版本，例如 `0.1.1` |
 | `day` | `zeabur_active` | UTC 日期，例如 `2026-10-30` |
+| `person` | `zeabur_active` | 32 位十六进制数字，只在同一个安装、同一天里区分不同的人 |
 | `mode` | `zeabur_active` | `in-cluster` |
 | `installer_version` | 安装程序的事件 | 安装程序的版本 |
 | `profile` | 安装程序的事件 | `single-node`、`multi-node` 或 `personal` |
@@ -30,7 +31,7 @@ source: "0fd6101882a5"
 | `$process_person_profile` | 全部 | 固定为 `false`：不创建个人档案 |
 | `$geoip_disable` | 全部 | 固定为 `true`：不查询所在位置 |
 
-事件不会说明是谁。为了区分同一天里的不同人，Zeabur 在内存里保存每个人的哈希值，换日或重启后就清除；所以 Zeabur 重启的那天，同一个人可能被算两次。
+事件不会说明是谁。`person` 是用密钥算出的用户名加日期的哈希值。密钥从 Zeabur 的 plan key 派生，保存在集群的 Secret 里，从不发送，所以我们无法从哈希值反推用户名。同一个人一整天的 `person` 都一样，Zeabur 重启也不变；第二天就换成另一个，所以不同天无法关联起来。
 
 事件通过 HTTPS 发送到 PostHog（`us.i.posthog.com`），只尝试一次，超时很短。发送失败时不会重试，也不影响 Zeabur 或安装。PostHog 不保存 IP 地址。
 

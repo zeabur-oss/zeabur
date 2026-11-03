@@ -20,7 +20,7 @@ use std::fmt;
 
 use base64::Engine as _;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
-use zeabur_core::crypto::{RandomError, open, random, seal};
+use zeabur_core::crypto::{RandomError, hmac_sha256, open, random, seal};
 pub use zeabur_plan::token::{Claims, LIFETIME_SECONDS};
 
 const PREFIX: &str = "v2.";
@@ -49,6 +49,12 @@ impl PlanKey {
     #[must_use]
     pub const fn from_bytes(bytes: [u8; 32]) -> Self {
         Self(bytes)
+    }
+
+    /// A separate key for `purpose`, so the plan key itself is used only for plans.
+    #[must_use]
+    pub fn derive(&self, purpose: &str) -> [u8; 32] {
+        hmac_sha256(&self.0, purpose.as_bytes())
     }
 }
 
