@@ -18,7 +18,7 @@ import {
 } from "@zeabur-oss/design-system/components/dialog"
 import { useI18n, useT } from "@/i18n"
 import { docsUrl } from "@/lib/docs"
-import { newerFor, releasesQuery, type Newer } from "@/model/update-check"
+import { updateQuery, type Newer } from "@/model/update-check"
 
 export function useNewer(): {
   zeabur?: Schemas.ZeaburVersion
@@ -26,8 +26,10 @@ export function useNewer(): {
   checked?: boolean
 } {
   const zeabur = useQuery(zeaburQuery).data
-  const checked = useQuery(releasesQuery(zeabur?.updateCheck === true)).data
-  return { zeabur, newer: newerFor(zeabur, checked), checked: checked !== undefined }
+  const on = zeabur?.updateCheck === true
+  const update = useQuery(updateQuery(on)).data
+  // A cached answer says nothing once the check is turned off.
+  return { zeabur, newer: (on && update?.newer) || undefined, checked: on && update !== undefined }
 }
 
 /** "Zeabur v0.1.1", and a pill when a newer release is out. */

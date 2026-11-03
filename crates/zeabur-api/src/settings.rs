@@ -88,7 +88,7 @@ pub struct Settings {
     /// Zeabur's own Deployment in `namespace` (`ZEABUR_DEPLOYMENT`), read to tell how Zeabur was
     /// installed; `None`: not known.
     pub deployment: Option<String>,
-    /// Whether Zeabur checks GitHub for a newer release (see [`crate::cluster::releases`]): the
+    /// Whether Zeabur checks GitHub for a newer release (see [`crate::cluster::update`]): the
     /// chart's `updateCheck.enabled`, off under `DO_NOT_TRACK`.
     pub update_check: bool,
 }

@@ -87,19 +87,32 @@ pub struct Cluster {
 pub struct ZeaburVersion {
     /// Zeabur's version, such as `0.1.1`; in local mode, `zeaburctl`'s.
     pub version: String,
-    /// Whether the interface compares it with GitHub's releases (`GET /cluster/zeabur/releases`).
+    /// Whether the interface compares it with GitHub's releases (`GET /cluster/zeabur/update`).
     pub update_check: bool,
     /// How Zeabur was installed; absent when the person may not read what tells.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub installed_by: Option<InstallMethod>,
 }
 
-/// Zeabur's published releases on GitHub, as the server read them last.
+/// Whether a newer Zeabur than [`ZeaburVersion::version`] is out, from GitHub's releases as the
+/// server read them last.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
-pub struct ZeaburReleaseList {
-    /// In GitHub's order, newest first; empty while the update check is off.
-    pub items: Vec<ZeaburRelease>,
+pub struct ZeaburUpdate {
+    /// Absent when none is out, or while the update check is off.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub newer: Option<ZeaburNewer>,
+}
+
+/// A newer release than the running one.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ZeaburNewer {
+    /// The newest normal release, or the newest pre-release when the running version is one.
+    pub latest: ZeaburRelease,
+    /// The newer normal releases that fix vulnerabilities, newest first: the running version has
+    /// them.
+    pub security: Vec<ZeaburRelease>,
 }
 
 /// A published release.

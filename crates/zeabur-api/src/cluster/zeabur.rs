@@ -1,6 +1,6 @@
 //! Zeabur's own version and how it was installed, for the interface's update check.
 //!
-//! The releases it is compared with come from [`super::releases`].
+//! [`super::update`] compares it with the releases on GitHub.
 
 use axum::Json;
 use axum::extract::State;

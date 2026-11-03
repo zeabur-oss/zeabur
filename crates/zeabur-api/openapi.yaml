@@ -1278,20 +1278,20 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/Problem"
-  /api/v1/cluster/zeabur/releases:
+  /api/v1/cluster/zeabur/update:
     get:
       tags:
       - cluster
       summary: |-
-        Zeabur's published releases, newest first. An empty list while the update check is off, which
-        asks GitHub nothing.
-      operationId: getZeaburReleases
+        Whether a newer release than the running Zeabur is out. While the update check is off, the
+        answer is that none is, and GitHub is not asked.
+      operationId: getZeaburUpdate
       responses:
         "200":
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ZeaburReleaseList"
+                $ref: "#/components/schemas/ZeaburUpdate"
         "401":
           content:
             application/problem+json:
@@ -18540,6 +18540,25 @@ components:
           - string
           - "null"
           description: "`webhook`, `poll` or `manual`."
+    ZeaburNewer:
+      type: object
+      description: A newer release than the running one.
+      required:
+      - latest
+      - security
+      properties:
+        latest:
+          $ref: "#/components/schemas/ZeaburRelease"
+          description: >-
+            The newest normal release, or the newest pre-release when the running version
+            is one.
+        security:
+          type: array
+          items:
+            $ref: "#/components/schemas/ZeaburRelease"
+          description: |-
+            The newer normal releases that fix vulnerabilities, newest first: the running version has
+            them.
     ZeaburRelease:
       type: object
       description: A published release.
@@ -18561,17 +18580,17 @@ components:
         version:
           type: string
           description: The tag without its `v`, such as `0.1.2`.
-    ZeaburReleaseList:
+    ZeaburUpdate:
       type: object
-      description: Zeabur's published releases on GitHub, as the server read them last.
-      required:
-      - items
+      description: |-
+        Whether a newer Zeabur than [`ZeaburVersion::version`] is out, from GitHub's releases as the
+        server read them last.
       properties:
-        items:
-          type: array
-          items:
-            $ref: "#/components/schemas/ZeaburRelease"
-          description: In GitHub's order, newest first; empty while the update check is off.
+        newer:
+          oneOf:
+          - $ref: "#/components/schemas/ZeaburNewer"
+            description: Absent when none is out, or while the update check is off.
+          - type: "null"
     ZeaburVersion:
       type: object
       description: "Zeabur itself: its version, and what the interface needs to say how to upgrade it."
@@ -18586,7 +18605,9 @@ components:
           - type: "null"
         updateCheck:
           type: boolean
-          description: Whether the interface checks GitHub's releases for a newer version.
+          description: >-
+            Whether the interface compares it with GitHub's releases (`GET
+            /cluster/zeabur/update`).
         version:
           type: string
           description: Zeabur's version, such as `0.1.1`; in local mode, `zeaburctl`'s.

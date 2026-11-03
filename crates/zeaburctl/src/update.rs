@@ -1,38 +1,28 @@
-//! The update check (docs/reference/telemetry.mdx, "Update check"): each command asks GitHub for
+//! The update check (docs/reference/telemetry.mdx, "Update check"). Each command asks GitHub for
 //! the releases on a thread of its own while it runs, and prints one line when they name a newer
 //! `zeaburctl`. At its end the command waits at most [`GRACE`] for the answer.
 //!
-//! Without a token GitHub answers 60 requests an hour from one address [gh-limit]. A token in
-//! `GH_TOKEN` or `GITHUB_TOKEN`, the variables `gh` reads, makes the requests count against its
-//! own limit, and the line says so when the limit of the address is used up.
+//! Without a token GitHub answers 60 requests an hour from one address [gh-limit]. With a token in
+//! `GH_TOKEN` or `GITHUB_TOKEN`, the variables `gh` reads, the requests count against the token's
+//! own limit. The line says so when the limit of the address is used up.
 //!
 //! [gh-limit]: https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api#primary-rate-limit-for-unauthenticated-users
 
-use std::cmp::Ordering;
 use std::ffi::OsString;
 use std::io::IsTerminal as _;
 use std::sync::mpsc::{self, Receiver};
 use std::time::Duration;
 
-use bytes::Bytes;
-use http::{HeaderValue, Request, StatusCode, header};
-use http_body_util::{BodyExt as _, Empty, Limited};
-use hyper_util::client::legacy::Client;
-use hyper_util::rt::TokioExecutor;
-use serde::Deserialize;
+use zeabur_api::images::https::{Https, Reach, tls};
+use zeabur_api::releases::{self, Answer, RELEASES_URL};
+use zeabur_api::views::ZeaburNewer;
 
 use crate::output;
 
-/// Zeabur's releases, newest first; one page is enough.
-const RELEASES: &str = "https://api.github.com/repos/zeabur-oss/zeabur/releases";
 /// Where to download and verify a release.
 const DOWNLOAD: &str = "https://oss.zeabur.com/docs/zeabur/reference/releases/";
-/// How long a check may take.
-const TIMEOUT: Duration = Duration::from_secs(5);
 /// How long a command that has ended waits for the answer.
 const GRACE: Duration = Duration::from_secs(1);
-/// The largest answer read.
-const MAX_BODY: usize = 8 * 1024 * 1024;
 /// The running version.
 const RUNNING: &str = env!("CARGO_PKG_VERSION");
 /// The line printed when GitHub's limit for the address is used up.
@@ -56,7 +46,7 @@ fn wanted(env: &dyn Fn(&str) -> Option<OsString>, terminal: bool) -> bool {
     terminal && env("CI").is_none() && allowed_in(env)
 }
 
-/// `GH_TOKEN`, else `GITHUB_TOKEN`; an empty one is none.
+/// `GH_TOKEN`, else `GITHUB_TOKEN`. An empty one counts as none.
 fn token(env: &dyn Fn(&str) -> Option<OsString>) -> Option<String> {
     ["GH_TOKEN", "GITHUB_TOKEN"].iter().find_map(|name| {
         env(name)
@@ -68,16 +58,7 @@ fn token(env: &dyn Fn(&str) -> Option<OsString>) -> Option<String> {
 /// A check under way.
 #[derive(Debug)]
 pub(crate) struct Check {
-    answer: Receiver<Answer>,
-}
-
-/// What GitHub answered.
-#[derive(Debug)]
-enum Answer {
-    Releases(Vec<Known>),
-    /// The address, or the token, has no requests left this hour.
-    Limited,
-    Failed,
+    notice: Receiver<Option<String>>,
 }
 
 impl Check {
@@ -87,14 +68,14 @@ impl Check {
         if !wanted(&env, std::io::stderr().is_terminal()) {
             return None;
         }
-        Some(Self::start_at(RELEASES, token(&env)))
+        Some(Self::start_at(RELEASES_URL, token(&env)))
     }
 
     fn start_at(url: &str, token: Option<String>) -> Self {
         let (send, receive) = mpsc::channel();
         let url = url.to_owned();
         std::thread::spawn(move || drop(send.send(fetch(&url, token.as_deref()))));
-        Self { answer: receive }
+        Self { notice: receive }
     }
 
     /// Prints the notice once the answer comes, waiting at most [`GRACE`].
@@ -105,238 +86,41 @@ impl Check {
     }
 
     fn notice(self, grace: Duration) -> Option<String> {
-        match self.answer.recv_timeout(grace).ok()? {
-            Answer::Releases(releases) => newer(&releases, RUNNING).map(|n| n.notice(RUNNING)),
-            Answer::Limited => Some(LIMITED.to_owned()),
-            Answer::Failed => None,
-        }
+        self.notice.recv_timeout(grace).ok().flatten()
     }
 }
 
-fn fetch(url: &str, token: Option<&str>) -> Answer {
-    let Ok(runtime) = tokio::runtime::Builder::new_current_thread()
+/// The line to print for GitHub's answer, if any. A failure says nothing.
+fn fetch(url: &str, token: Option<&str>) -> Option<String> {
+    let tls = tls(None).ok()?;
+    let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
-    else {
-        return Answer::Failed;
-    };
-    runtime.block_on(async {
-        let exchange = async {
-            let client =
-                Client::builder(TokioExecutor::new()).build(crate::server::connector().ok()?);
-            let mut request = Request::get(url)
-                .header(header::USER_AGENT, format!("zeaburctl/{RUNNING}"))
-                .header(header::ACCEPT, "application/vnd.github+json");
-            if let Some(token) = token {
-                let mut value = HeaderValue::from_str(&format!("Bearer {token}")).ok()?;
-                value.set_sensitive(true);
-                request = request.header(header::AUTHORIZATION, value);
-            }
-            let response = client
-                .request(request.body(Empty::<Bytes>::new()).ok()?)
-                .await
-                .ok()?;
-            let used_up = response
-                .headers()
-                .get("x-ratelimit-remaining")
-                .is_some_and(|v| v == "0");
-            let status = response.status();
-            // GitHub refuses a used-up limit with 403 or 429 [gh-limit].
-            if used_up
-                && (status == StatusCode::FORBIDDEN || status == StatusCode::TOO_MANY_REQUESTS)
-            {
-                return Some(Answer::Limited);
-            }
-            if !status.is_success() {
-                return None;
-            }
-            let body = Limited::new(response.into_body(), MAX_BODY)
-                .collect()
-                .await
-                .ok()?
-                .to_bytes();
-            let releases: Vec<Release> = serde_json::from_slice(&body).ok()?;
-            Some(Answer::Releases(known(&releases)))
-        };
-        tokio::time::timeout(TIMEOUT, exchange)
-            .await
-            .ok()
-            .flatten()
-            .unwrap_or(Answer::Failed)
-    })
-}
-
-/// A release as GitHub's API lists it.
-#[derive(Debug, Clone, Deserialize)]
-struct Release {
-    tag_name: String,
-    #[serde(default)]
-    draft: bool,
-    #[serde(default)]
-    prerelease: bool,
-    #[serde(default)]
-    body: Option<String>,
-}
-
-impl Release {
-    /// Its notes have a `### Security` section, the changelog's heading for fixed vulnerabilities.
-    fn fixes_security(&self) -> bool {
-        self.body
-            .as_deref()
-            .is_some_and(|body| body.lines().any(|line| line.trim() == "### Security"))
-    }
-}
-
-/// A published release.
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct Known {
-    tag: String,
-    prerelease: bool,
-    security: bool,
-}
-
-impl Known {
-    fn version(&self, pre: bool) -> Option<Version> {
-        if self.prerelease && !pre {
-            return None;
-        }
-        Version::parse(&self.tag)
-    }
-}
-
-/// The published releases in GitHub's answer.
-fn known(releases: &[Release]) -> Vec<Known> {
-    releases
-        .iter()
-        .filter(|r| !r.draft)
-        .map(|r| Known {
-            tag: r.tag_name.clone(),
-            prerelease: r.prerelease,
-            security: r.fixes_security(),
+        .ok()?;
+    let answer = runtime
+        .block_on(async {
+            let http = Https::new(Reach::Any, &tls);
+            let agent = format!("zeaburctl/{RUNNING}");
+            releases::ask(&http, url, &agent, None, token).await
         })
-        .collect()
-}
-
-/// A newer release than the running one.
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct Newer {
-    /// The newest, such as `0.2.0`.
-    latest: String,
-    /// A newer release fixes vulnerabilities, so the running version has them.
-    security: bool,
-}
-
-impl Newer {
-    fn notice(&self, running: &str) -> String {
-        if self.security {
-            format!(
-                "zeaburctl {running} has known security problems. Update to {} from {DOWNLOAD}",
-                self.latest
-            )
-        } else {
-            format!(
-                "zeaburctl {} is out, and you have {running}. Download it from {DOWNLOAD}",
-                self.latest
-            )
+        .ok()?;
+    match answer {
+        Answer::Releases { releases, .. } => {
+            releases::newer(&releases, RUNNING).map(|newer| notice(&newer, RUNNING))
         }
+        Answer::Refused { used_up: true, .. } => Some(LIMITED.to_owned()),
+        Answer::NotModified | Answer::Refused { .. } => None,
     }
 }
 
-/// The newest normal release when it is newer than `running`, or the newest pre-release when
-/// `running` is one; `None` without one, or when `running` is not a version. Only normal
-/// releases mark the running version insecure.
-fn newer(releases: &[Known], running: &str) -> Option<Newer> {
-    let running = Version::parse(running)?;
-    let latest = releases
-        .iter()
-        .filter_map(|r| r.version(!running.pre.is_empty()))
-        .max()?;
-    if latest <= running {
-        return None;
-    }
-    let security = releases
-        .iter()
-        .any(|r| r.security && r.version(false).is_some_and(|v| v > running));
-    Some(Newer {
-        latest: latest.to_string(),
-        security,
-    })
-}
-
-/// A Semantic Versioning 2.0.0 version; build metadata is dropped, as it takes no part in
-/// precedence.
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct Version {
-    core: [u64; 3],
-    pre: Vec<String>,
-    text: String,
-}
-
-impl Version {
-    /// `1.2.3`, `v1.2.3-beta.1` or `1.2.3+build`.
-    fn parse(tag: &str) -> Option<Self> {
-        let text = tag.strip_prefix('v').unwrap_or(tag);
-        let text = text.split_once('+').map_or(text, |(version, _)| version);
-        let (core, pre) = text
-            .split_once('-')
-            .map_or((text, None), |(core, pre)| (core, Some(pre)));
-        let mut parts = core.split('.').map(|p| p.parse::<u64>().ok());
-        let core = [parts.next()??, parts.next()??, parts.next()??];
-        if parts.next().is_some() {
-            return None;
-        }
-        let pre: Vec<String> =
-            pre.map_or_else(Vec::new, |pre| pre.split('.').map(str::to_owned).collect());
-        if pre.iter().any(String::is_empty) {
-            return None;
-        }
-        Some(Self {
-            core,
-            pre,
-            text: text.to_owned(),
-        })
-    }
-}
-
-impl std::fmt::Display for Version {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&self.text)
-    }
-}
-
-impl Ord for Version {
-    /// [SemVer 2.0.0, section 11]: a pre-release comes before its normal version; identifiers
-    /// compare numerically when both are numbers, else as ASCII, and numbers come first.
-    ///
-    /// [SemVer 2.0.0, section 11]: https://semver.org/spec/v2.0.0.html#spec-item-11
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.core
-            .cmp(&other.core)
-            .then_with(|| match (self.pre.is_empty(), other.pre.is_empty()) {
-                (true, true) => Ordering::Equal,
-                (true, false) => Ordering::Greater,
-                (false, true) => Ordering::Less,
-                (false, false) => {
-                    for (a, b) in self.pre.iter().zip(&other.pre) {
-                        let order = match (a.parse::<u64>(), b.parse::<u64>()) {
-                            (Ok(a), Ok(b)) => a.cmp(&b),
-                            (Ok(_), Err(_)) => Ordering::Less,
-                            (Err(_), Ok(_)) => Ordering::Greater,
-                            (Err(_), Err(_)) => a.cmp(b),
-                        };
-                        if order != Ordering::Equal {
-                            return order;
-                        }
-                    }
-                    self.pre.len().cmp(&other.pre.len())
-                }
-            })
-    }
-}
-
-impl PartialOrd for Version {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
+fn notice(newer: &ZeaburNewer, running: &str) -> String {
+    let latest = &newer.latest.version;
+    if newer.security.is_empty() {
+        format!("zeaburctl {latest} is out, and you have {running}. Download it from {DOWNLOAD}")
+    } else {
+        format!(
+            "zeaburctl {running} has known security problems. Update to {latest} from {DOWNLOAD}"
+        )
     }
 }
 
@@ -347,122 +131,34 @@ mod tests {
     use std::net::TcpListener;
     use std::time::Instant;
 
+    use zeabur_api::views::ZeaburRelease;
+
     use super::*;
-
-    fn release(tag: &str, body: &str) -> Release {
-        Release {
-            tag_name: tag.to_owned(),
-            draft: false,
-            prerelease: tag.contains('-'),
-            body: Some(body.to_owned()),
-        }
-    }
-
-    fn v(text: &str) -> Version {
-        Version::parse(text).unwrap()
-    }
-
-    #[test]
-    fn versions_follow_semver_precedence() {
-        let ordered = [
-            "1.0.0-alpha",
-            "1.0.0-alpha.1",
-            "1.0.0-alpha.beta",
-            "1.0.0-beta",
-            "1.0.0-beta.2",
-            "1.0.0-beta.11",
-            "1.0.0-rc.1",
-            "1.0.0",
-            "1.0.1",
-            "1.1.0",
-            "1.10.0",
-            "2.0.0",
-        ];
-        for pair in ordered.windows(2) {
-            assert!(v(pair[0]) < v(pair[1]), "{} < {}", pair[0], pair[1]);
-        }
-        assert_eq!(v("v1.2.3").cmp(&v("1.2.3+build.5")), Ordering::Equal);
-        for bad in ["1.2", "1.2.3.4", "x.1.2", "1.2.3-", "1.2.3-a..b", ""] {
-            assert!(Version::parse(bad).is_none(), "{bad}");
-        }
-    }
-
-    #[test]
-    fn the_newest_normal_release_counts_and_drafts_and_pre_releases_do_not() {
-        let mut draft = release("v0.4.0", "");
-        draft.draft = true;
-        let releases = [
-            release("v0.3.0-beta.1", ""),
-            draft,
-            release("v0.1.2", ""),
-            release("v0.2.0", ""),
-        ];
-        let found = newer(&known(&releases), "0.1.1").unwrap();
-        assert_eq!(found.latest, "0.2.0");
-        assert!(!found.security);
-        assert_eq!(newer(&known(&releases), "0.2.0"), None);
-        assert_eq!(newer(&known(&releases), "0.3.0"), None);
-        assert_eq!(
-            newer(&known(&[release("v0.1.1-beta.1", "")]), "0.1.0"),
-            None
-        );
-        assert_eq!(newer(&[], "0.1.0"), None);
-    }
-
-    #[test]
-    fn someone_on_a_pre_release_hears_of_newer_pre_releases() {
-        let releases = [
-            release("v0.2.0-rc.2", "### Security\n- In a pre-release"),
-            release("v0.1.1", ""),
-        ];
-        let found = newer(&known(&releases), "0.2.0-rc.1").unwrap();
-        assert_eq!(found.latest, "0.2.0-rc.2");
-        assert!(!found.security);
-        assert_eq!(newer(&known(&releases), "0.1.1"), None);
-        let out = [release("v0.2.0", ""), release("v0.2.0-rc.2", "")];
-        assert_eq!(newer(&known(&out), "0.2.0-rc.1").unwrap().latest, "0.2.0");
-    }
-
-    #[test]
-    fn a_pre_release_is_behind_its_normal_release() {
-        let found = newer(&known(&[release("v0.1.1", "")]), "0.1.1-beta.2").unwrap();
-        assert_eq!(found.latest, "0.1.1");
-    }
-
-    #[test]
-    fn a_security_section_in_any_newer_release_marks_the_running_version() {
-        let releases = [
-            release("v0.3.0", "### Added\n- Things"),
-            release("v0.2.0", "## 0.2.0\n\n### Security\n\n- Fixed a hole"),
-            release("v0.1.0", "### Security\n- Older"),
-        ];
-        assert!(newer(&known(&releases), "0.1.0").unwrap().security);
-        assert!(!newer(&known(&releases), "0.2.0").unwrap().security);
-        let mentioned = [release(
-            "v0.2.0",
-            "Security fixes are listed below.\n#### Security",
-        )];
-        assert!(!newer(&known(&mentioned), "0.1.0").unwrap().security);
-    }
 
     #[test]
     fn the_notice_is_one_line_that_says_what_to_do() {
-        let plain = Newer {
-            latest: "0.2.0".to_owned(),
-            security: false,
+        let release = |security| ZeaburRelease {
+            version: "0.2.0".to_owned(),
+            url: String::new(),
+            prerelease: false,
+            security,
         };
-        let security = Newer {
-            security: true,
-            ..plain.clone()
+        let plain = ZeaburNewer {
+            latest: release(false),
+            security: Vec::new(),
         };
-        for notice in [plain.notice("0.1.1"), security.notice("0.1.1")] {
+        let security = ZeaburNewer {
+            latest: release(true),
+            security: vec![release(true)],
+        };
+        for notice in [notice(&plain, "0.1.1"), notice(&security, "0.1.1")] {
             assert!(!notice.contains('\n'));
             assert!(
                 notice.contains("0.2.0") && notice.contains(DOWNLOAD),
                 "{notice}"
             );
         }
-        assert!(security.notice("0.1.1").contains("security"));
+        assert!(notice(&security, "0.1.1").contains("security"));
     }
 
     #[test]
@@ -515,7 +211,7 @@ mod tests {
         (format!("http://{address}/releases"), requests)
     }
 
-    const RELEASES_JSON: &str = r####"[{"tag_name":"v99.0.0","draft":false,"prerelease":false,"body":"### Security\n- x"}]"####;
+    const RELEASES_JSON: &str = r####"[{"tag_name":"v99.0.0","html_url":"https://example.test/99","body":"### Security\n- x"}]"####;
     const WAIT: Duration = Duration::from_secs(10);
 
     #[test]
