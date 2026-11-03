@@ -150,7 +150,10 @@ export function ComponentsStep({ wizard }: { wizard: Wizard }) {
                 mib={component.idleMemoryMib ?? measured.get(component.id) ?? null}
                 leftOut={plan?.leftOut[component.id]}
                 onToggle={(on) => toggle(component.id, on)}
-                supported={runsOn(component, distribution) && !tooSmall(component)}
+                // Memory gates ticking a component, never unticking one already chosen.
+                supported={
+                  runsOn(component, distribution) && (!tooSmall(component) || chosen(component.id))
+                }
                 needsMib={tooSmall(component) ? minMemoryMib(component) : null}
                 distribution={distribution}
                 wizard={wizard}
