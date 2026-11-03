@@ -7,11 +7,11 @@
         "oss": "oss"
       },
       "locked": {
-        "lastModified": 1793632479,
-        "narHash": "sha256-0myna4nIo/tZo8BaWzeVjW4sePIi9peemuA+33QPdrI=",
+        "lastModified": 1793679580,
+        "narHash": "sha256-YasPg/eYYH1Qkfq9OZuyx5osFA6MHrXgmg7HhWBXhAk=",
         "owner": "zeabur-oss",
         "repo": "catalog",
-        "rev": "40ce2d2d72b8ebb1e24cf335849feb912457e2d4",
+        "rev": "c951f5987dc061ea2fec34f2531c6a011046fb2c",
         "type": "github"
       },
       "original": {
@@ -143,11 +143,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1793525159,
-        "narHash": "sha256-PiRLl4iyndUYW5xusL+sHI0a8qY7uXs8G4sWN1vFm7s=",
+        "lastModified": 1793633888,
+        "narHash": "sha256-sU+MYwhvoOk1qX1itJ/y/6qPRBkxUe2OMmTZOiaRwYs=",
         "owner": "zeabur-oss",
         "repo": ".github",
-        "rev": "0c71bf4017582c7cabe03d79842254694964a385",
+        "rev": "6ab106525ce16169ab0ecfebe4b0248e096797fa",
         "type": "github"
       },
       "original": {
@@ -163,11 +163,11 @@
         ]
       },
       "locked": {
-        "lastModified": 1793328219,
-        "narHash": "sha256-rWcCqdV8DN9fW8XmDpTqQBhHNtwKwrVAnLkOAih/QdY=",
+        "lastModified": 1793633868,
+        "narHash": "sha256-qODxdDNXxZWg3vnVU1aIGy/7lqTLacwewp9SGqDqOBA=",
         "owner": "zeabur-oss",
         "repo": "skills",
-        "rev": "9a264f88e426de2e73fbdfa01387aedb721bba02",
+        "rev": "0d35b57004c8082ff6f612d91096d608c03f70c1",
         "type": "github"
       },
       "original": {

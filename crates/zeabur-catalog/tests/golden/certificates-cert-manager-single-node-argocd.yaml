@@ -36,7 +36,7 @@ spec:
               memory: 128Mi
             requests:
               cpu: 10m
-              memory: 32Mi
+              memory: 48Mi
         config:
           apiVersion: controller.config.cert-manager.io/v1alpha1
           enableGatewayAPI: true
@@ -57,7 +57,7 @@ spec:
             memory: 128Mi
           requests:
             cpu: 10m
-            memory: 32Mi
+            memory: 56Mi
         startupapicheck:
           image:
             repository: quay.io/jetstack/cert-manager-startupapicheck

@@ -19,8 +19,8 @@ args:
 ZEABUR_VALUES
 cat > metrics-server-single-node.yaml <<'ZEABUR_VALUES'
 resources:
-  # The chart's 200Mi request is sized for 100+ nodes.
-  requests: {cpu: 20m, memory: 48Mi}
+  # Idles near 25Mi; the chart's 200Mi request is sized for 100+ nodes.
+  requests: {cpu: 20m, memory: 32Mi}
   limits: {memory: 128Mi}
 ZEABUR_VALUES
 helm upgrade --install metrics-server metrics-server \
