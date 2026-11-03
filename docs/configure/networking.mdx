@@ -23,13 +23,17 @@ These addresses only work inside the cluster. They aren't reachable from the int
 
 ### When a service has no private address
 
-A background service that only makes outgoing connections doesn't need a private address. To let other services or a public domain connect to it, create a Service first. **Private network** shows a command you can copy, for example:
+A background service that only makes outgoing connections doesn't need a private address. To let other services or a public domain connect to it, enter the port the app listens on and click **Add a private address**. The port is filled in from the traffic check or the port the container declares, when there is one. To go on to add a domain once the address exists, select **Also give it a public domain**.
+
+Zeabur creates a ClusterIP Service named like the service, as `kubectl expose` does: it selects the service's replicas by its `matchLabels` and carries every port the containers declare. A service that also selects its replicas with `matchExpressions` can't get one this way, since a Service can't repeat them.
+
+To run it yourself, open **Use kubectl instead**. For a Deployment with one port, it's a `kubectl expose` command, for example:
 
 ```sh
 kubectl -n demo expose deployment web --port=8080
 ```
 
-If the traffic check uses a numeric port, the command includes that port. Otherwise, it uses `--port=<port>`. Replace `<port>` with the port the app listens on before running it.
+`kubectl expose` doesn't take a StatefulSet or DaemonSet, so for those it's the Service as YAML for `kubectl apply`.
 
 ## Expose a port to the internet
 
@@ -257,8 +261,7 @@ In the `TYPE` column of `get service`, private addresses use `ClusterIP`, and pu
 
 | What you see | What to do next |
 | --- | --- |
-| **web has no private address** | Run the `kubectl expose` command shown in the interface, or apply the Service above. |
-| `kubectl expose` returns `couldn't find port via --port flag or introspection` | The container doesn't declare a port. Add the port the app listens on after `--port=`. |
+| **web has no private address** | Click **Add a private address**, or run the command under **Use kubectl instead**. |
 | **Waiting for the load balancer to assign an address** doesn't go away | Another service is already using that port on the node, or the cluster has no load balancer. Choose another port, or ask an administrator to check ServiceLB. |
 | Exposing a port returns a message that another service already exposes the same port | That port number is already exposed in the same project. Close the existing one first. |
 | Public domains time out after isolation | Add **Allow traffic from public domains**. |

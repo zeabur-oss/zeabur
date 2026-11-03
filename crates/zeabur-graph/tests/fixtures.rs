@@ -109,6 +109,15 @@ mod tests {
                     .unwrap();
                 to_value(container.resources).unwrap()
             }
+            "projection.selectorAndPorts" => {
+                let service = project(&snapshot).services.remove(0);
+                let ports: BTreeMap<_, _> = service
+                    .containers
+                    .into_iter()
+                    .map(|container| (container.name, container.ports))
+                    .collect();
+                json!({ "selector": service.selector, "ports": ports })
+            }
             "projection.routes" => {
                 let projected = project(&snapshot);
                 let routes: Vec<_> = projected.routes_of(&projected.services[0]).collect();

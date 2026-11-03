@@ -7219,6 +7219,11 @@ components:
         origin:
           $ref: "#/components/schemas/Origin"
           description: The container in its workload.
+        ports:
+          type: array
+          items:
+            $ref: "#/components/schemas/ContainerPort"
+          description: The ports it declares, in order.
         probes:
           oneOf:
           - $ref: "#/components/schemas/Probes"
@@ -7229,6 +7234,26 @@ components:
           - $ref: "#/components/schemas/ContainerResources"
             description: The CPU and memory it requests and is limited to; absent when it sets neither.
           - type: "null"
+    ContainerPort:
+      type: object
+      description: A port a container declares (`containerPort`).
+      required:
+      - port
+      properties:
+        name:
+          type:
+          - string
+          - "null"
+          description: The port's name, which a Service's `targetPort` or a probe can use.
+        port:
+          type: integer
+          format: int32
+          description: The port number.
+        protocol:
+          type:
+          - string
+          - "null"
+          description: "`TCP`, `UDP` or `SCTP`; absent for the default, `TCP`."
     ContainerProbeHandler:
       type: string
       description: A probe's handler.
@@ -15935,6 +15960,13 @@ components:
             - $ref: "#/components/schemas/RunAs"
               description: The user and groups its pods run as; absent when its template sets none.
             - type: "null"
+          selector:
+            oneOf:
+            - $ref: "#/components/schemas/WorkloadSelector"
+              description: |-
+                How a Deployment, StatefulSet or DaemonSet selects its pods (`spec.selector`); absent
+                for a Job or CronJob.
+            - type: "null"
           status:
             $ref: "#/components/schemas/ServiceStatus"
             description: Its health and the word for it, from the workload and its pods.
@@ -18056,6 +18088,22 @@ components:
           type: integer
           format: int32
           description: All.
+    WorkloadSelector:
+      type: object
+      description: A workload's pod selector, as a Kubernetes Service can repeat it.
+      required:
+      - matchLabels
+      properties:
+        expressions:
+          type: boolean
+          description: It also has `matchExpressions`, which a Service's selector cannot say.
+        matchLabels:
+          type: object
+          description: "`matchLabels`."
+          additionalProperties:
+            type: string
+          propertyNames:
+            type: string
     WorkloadSummary:
       allOf:
       - $ref: "#/components/schemas/Classification"

@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: agent
+  namespace: demo
+spec:
+  selector:
+    matchLabels:
+      app: agent
+    matchExpressions:
+      - key: track
+        operator: In
+        values: [stable]
+  template:
+    metadata:
+      labels:
+        app: agent
+        track: stable
+    spec:
+      containers:
+        - name: agent
+          image: example/agent:1.0

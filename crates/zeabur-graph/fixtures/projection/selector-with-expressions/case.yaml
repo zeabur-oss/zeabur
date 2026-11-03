@@ -1,0 +1,2 @@
+description: A selector with matchExpressions is marked, since a Service's selector cannot say them.
+operation: projection.selectorAndPorts

@@ -6,6 +6,7 @@ import ArrowBendUpRightIcon from "~icons/ph/arrow-bend-up-right"
 import ArrowRightIcon from "~icons/ph/arrow-right"
 import ArrowSquareOutIcon from "~icons/ph/arrow-square-out"
 import CaretDownIcon from "~icons/ph/caret-down"
+import CaretRightIcon from "~icons/ph/caret-right"
 import ClockIcon from "~icons/ph/clock"
 import CertificateIcon from "~icons/ph/certificate"
 import GlobeIcon from "~icons/ph/globe"
@@ -19,9 +20,15 @@ import PlusIcon from "~icons/ph/plus"
 import SlidersHorizontalIcon from "~icons/ph/sliders-horizontal"
 import TrashIcon from "~icons/ph/trash"
 
-import { clusterIssuersQuery, clusterQuery, projectGatewaysQuery, traceQuery } from "@/api/queries"
+import {
+  clusterIssuersQuery,
+  clusterQuery,
+  creatableQuery,
+  projectGatewaysQuery,
+  traceQuery,
+} from "@/api/queries"
 import { DnsHint, DomainSetup, DomainState } from "@/components/domain-setup"
-import { GateTip, useGate } from "@/components/gate"
+import { GateTip, useGate, useHintGate } from "@/components/gate"
 import { ReviewWord, useDraft } from "@/components/plan/draft"
 import type { Schemas } from "@/api/client"
 import { CopyButton } from "@/components/bits"
@@ -30,6 +37,12 @@ import { refusedAmong, RefusedKinds } from "@/components/refused"
 import { FilterField } from "@/components/filter-field"
 import { FormField } from "@/components/form-field"
 import { Button } from "@zeabur-oss/design-system/components/button"
+import { Checkbox } from "@zeabur-oss/design-system/components/checkbox"
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@zeabur-oss/design-system/components/collapsible"
 import {
   Empty,
   EmptyContent,
@@ -39,6 +52,7 @@ import {
   EmptyTitle,
 } from "@zeabur-oss/design-system/components/empty"
 import { Input } from "@zeabur-oss/design-system/components/input"
+import { Label } from "@zeabur-oss/design-system/components/label"
 import { Select } from "@zeabur-oss/design-system/components/select"
 import { SectionHeader } from "@zeabur-oss/design-system/components/section-header"
 import { Tooltip } from "@zeabur-oss/design-system/components/tooltip"
@@ -53,9 +67,7 @@ import { offered, parentOf } from "@/model/gateways"
 import { isLongList } from "@/model/lists"
 import {
   endpointsOf,
-  exposeCommand,
   hostUrl,
-  PORT_PLACEHOLDER,
   publicRoutesOf,
   routesOf,
   type Endpoint,
@@ -63,6 +75,17 @@ import {
   type PublicRoute,
   type Service,
 } from "@/model/service"
+import {
+  declaredPorts,
+  exposeCommand,
+  exposureOf,
+  isPort,
+  likelyPort,
+  PORT_PLACEHOLDER,
+  privateAddress,
+  privateService,
+} from "@/model/private-address"
+import { rightsOf } from "@/model/image-service"
 import { refusedPlaces } from "@/routes/project/data"
 import { IpLimits } from "@/routes/service/ip-limits"
 import { PublicPorts } from "@/routes/service/public-ports"
@@ -165,7 +188,6 @@ export function NetworkingTab({
     adding === undefined &&
     refusedRoutes.length === 0 &&
     refusedEndpoints.length === 0
-  const expose = exposeCommand(service)
 
   return (
     <div className="flex flex-col gap-8">
@@ -181,7 +203,15 @@ export function NetworkingTab({
             <EmptyDescription>
               {scheduled ? t("net.scheduledBody") : t("net.noneBody")}
             </EmptyDescription>
-            {scheduled ? null : <ExposeHint command={expose} />}
+            {scheduled ? null : (
+              <PrivateAddressForm
+                project={project}
+                service={service}
+                managed={managed}
+                offerDomain
+                onDomain={() => setAdding("")}
+              />
+            )}
           </EmptyHeader>
         </Empty>
       ) : (
@@ -532,7 +562,13 @@ export function NetworkingTab({
                   <EmptyHeader>
                     <EmptyTitle>{t("net.privateEmpty", service.name)}</EmptyTitle>
                     <EmptyDescription>{t("net.privateEmptyBody")}</EmptyDescription>
-                    <ExposeHint command={expose} />
+                    <PrivateAddressForm
+                      project={project}
+                      service={service}
+                      managed={managed}
+                      offerDomain={nothingYet(listed, adding)}
+                      onDomain={() => setAdding("")}
+                    />
                   </EmptyHeader>
                 </Empty>
               )
@@ -627,22 +663,148 @@ function portNumber(endpoints: Endpoint[], route: PublicRoute): string {
   return named ? String(named.port) : port
 }
 
-function ExposeHint({ command }: { command?: string }) {
+function DomainOffer({ checked, onChange }: { checked: boolean; onChange: (on: boolean) => void }) {
   const t = useT()
-  if (!command) return null
   return (
-    <div className="mt-2 flex w-full flex-col gap-1.5">
-      <span className="type-meta text-muted-foreground">
-        {t("net.exposeHint")}
-        {command.endsWith(PORT_PLACEHOLDER) ? ` ${t("net.exposePort", PORT_PLACEHOLDER)}` : null}
-      </span>
-      <span className="flex max-w-full min-w-0 items-center gap-1 self-start rounded-md bg-muted px-2 py-1">
-        <code className="min-w-0 font-mono text-xs break-all" translate="no">
-          {command}
-        </code>
-        <CopyButton value={command} />
-      </span>
+    <div className="flex items-center gap-2">
+      <Checkbox
+        id="net-private-domain"
+        checked={checked}
+        onCheckedChange={(on) => onChange(on === true)}
+      />
+      <Label htmlFor="net-private-domain">{t("net.alsoDomain")}</Label>
     </div>
+  )
+}
+
+function KubectlInstead({ command }: { command: string }) {
+  const t = useT()
+  return (
+    <Collapsible>
+      <CollapsibleTrigger variant="disclosure">
+        <CaretRightIcon aria-hidden="true" />
+        {t("net.kubectlInstead")}
+      </CollapsibleTrigger>
+      <CollapsibleContent>
+        <div className="relative mt-2 min-w-0 rounded-lg border bg-muted/30">
+          <CopyButton value={command} className="absolute top-2 right-2" />
+          <pre
+            className="overflow-x-auto py-3 pr-12 pl-3 font-mono text-xs leading-5 whitespace-pre-wrap"
+            translate="no"
+          >
+            {command}
+          </pre>
+        </div>
+        {command.includes(PORT_PLACEHOLDER) ? (
+          <p className="mt-1.5 type-meta text-muted-foreground">
+            {t("net.exposePort", PORT_PLACEHOLDER)}
+          </p>
+        ) : null}
+      </CollapsibleContent>
+    </Collapsible>
+  )
+}
+
+function nothingYet(listed: number, adding: string | undefined) {
+  return listed === 0 && adding === undefined
+}
+
+/** A Service for a workload with none, planned as a Create; the kubectl command behind a
+ * disclosure. */
+function PrivateAddressForm(props: PrivateAddressProps) {
+  const t = useT()
+  const exposure = exposureOf(props.service)
+  if (exposure.can) return <PrivateAddressFields {...props} selector={exposure.selector} />
+  return exposure.why === "expressions" ? (
+    <p className="mt-2 type-meta text-muted-foreground">{t("net.privateExpressions")}</p>
+  ) : null
+}
+
+type PrivateAddressProps = {
+  project: string
+  service: Service
+  managed?: string
+  /** Offer to go on to add a domain once it has the address. */
+  offerDomain: boolean
+  /** Called once applied, when the person asked to go on to add a domain. */
+  onDomain: () => void
+}
+
+function PrivateAddressFields({
+  project,
+  service,
+  managed,
+  offerDomain,
+  onDomain,
+  selector,
+}: PrivateAddressProps & { selector: Record<string, string> }) {
+  const t = useT()
+  const [port, setPort] = useState(() => String(likelyPort(service) ?? ""))
+  const [domain, setDomain] = useState(false)
+  const planner = usePlanner(project, () => {
+    if (offerDomain && domain) onDomain()
+  })
+  const creatable = useQuery(creatableQuery(project)).data
+  const gate = useHintGate("createServices", rightsOf(creatable)("", "services"))
+  const number = Number(port)
+  const valid = port.trim() !== "" && isPort(number)
+  const others = declaredPorts(service)
+    .filter((p) => p.port !== number || p.protocol)
+    .map((p) => (p.protocol ? `${p.port}/${p.protocol}` : String(p.port)))
+  const command = exposeCommand(service, selector, valid ? number : undefined)
+  return (
+    <>
+      <form
+        className="mt-3 flex w-full flex-col gap-3"
+        onSubmit={(event) => {
+          event.preventDefault()
+          if (!valid) return
+          planner.plan({
+            title: t("title.addPrivate", service.name),
+            service: { kind: service.kind, name: service.name },
+            changes: [
+              {
+                op: "create",
+                object: privateService(service, selector, number) as unknown as Record<
+                  string,
+                  never
+                >,
+              },
+            ],
+            notes: [t("net.privateWillBe", privateAddress(service, number))],
+          })
+        }}
+      >
+        <div className="flex flex-wrap items-end gap-2">
+          <FormField label={t("net.privatePort")} className="w-28">
+            <Input
+              size="sm"
+              mono
+              inputMode="numeric"
+              placeholder="8080"
+              value={port}
+              onChange={(event) => setPort(event.target.value.trim())}
+            />
+          </FormField>
+          <Managed tool={managed} gate={gate}>
+            <Button type="submit" size="xs" disabled={!valid || managed !== undefined}>
+              {t("net.addPrivate")}
+            </Button>
+          </Managed>
+        </div>
+        <p className="type-meta text-muted-foreground">
+          {valid
+            ? t("common.sentences", [
+                t("net.privateWillBe", privateAddress(service, number)),
+                others.length > 0 ? t("net.privateAlso", t("common.list", others)) : undefined,
+              ])
+            : t("net.privatePortHint")}
+        </p>
+        {offerDomain ? <DomainOffer checked={domain} onChange={setDomain} /> : null}
+        <KubectlInstead command={command} />
+      </form>
+      {planner.dialog}
+    </>
   )
 }
 

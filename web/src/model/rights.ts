@@ -12,6 +12,7 @@ type PageRight =
   | "changeS3Destinations"
   | "changeGitHubApp"
   | "restoreBackups"
+  | "createServices"
 export type Right = keyof ProjectRights | keyof ClusterRights | PageRight
 type Permission = Schemas.Permission
 
@@ -27,6 +28,7 @@ const rules: Record<Right, { role: NeededRole; rule: string }> = {
   changeSecrets: { role: "developer", rule: "patch secrets" },
   changeConfig: { role: "developer", rule: "patch configmaps" },
   changeDomains: { role: "developer", rule: "create ingresses.networking.k8s.io" },
+  createServices: { role: "developer", rule: "create services" },
   changeStorage: { role: "developer", rule: "create persistentvolumeclaims" },
   changeDatabases: { role: "developer", rule: "create clusters.postgresql.cnpg.io" },
   changeObjectStorage: { role: "developer", rule: "create seaweeds.seaweed.seaweedfs.com" },
@@ -109,6 +111,7 @@ const notProject: Record<Exclude<Right, keyof ProjectRights>, true> = {
   changeS3Destinations: true,
   changeGitHubApp: true,
   restoreBackups: true,
+  createServices: true,
 }
 
 const workloads = ["deployments", "statefulsets", "daemonsets"]

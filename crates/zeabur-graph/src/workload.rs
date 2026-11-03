@@ -3,10 +3,10 @@
 use k8s_openapi::api::apps::v1::{DaemonSet, Deployment, StatefulSet};
 use k8s_openapi::api::batch::v1::{CronJob, Job};
 use k8s_openapi::api::core::v1::{
-    Container, EnvFromSource, EnvVar, PodSpec, PodTemplateSpec, Probe, ResourceRequirements,
-    VolumeMount,
+    Container, ContainerPort, EnvFromSource, EnvVar, PodSpec, PodTemplateSpec, Probe,
+    ResourceRequirements, VolumeMount,
 };
-use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
+use k8s_openapi::apimachinery::pkg::apis::meta::v1::{LabelSelector, ObjectMeta};
 use zeabur_model::adapters::Conventions;
 use zeabur_model::adapters::group::{
     DATABASES_GROUP, OPERATORS_GROUP, explicit_group_with, resolve_group_with,
@@ -91,6 +91,17 @@ impl<'a> Workload<'a> {
         }
     }
 
+    /// The pod selector of a Deployment, StatefulSet or DaemonSet.
+    #[must_use]
+    pub fn selector(self) -> Option<&'a LabelSelector> {
+        match self {
+            Self::DaemonSet(object) => object.spec.as_ref().map(|spec| &spec.selector),
+            Self::Deployment(object) => object.spec.as_ref().map(|spec| &spec.selector),
+            Self::StatefulSet(object) => object.spec.as_ref().map(|spec| &spec.selector),
+            Self::CronJob(_) | Self::Job(_) => None,
+        }
+    }
+
     /// The pod spec of the template.
     #[must_use]
     pub fn pod_spec(self) -> Option<&'a PodSpec> {
@@ -160,6 +171,7 @@ pub(crate) struct ContainerView<'a> {
     pub(crate) env_from: &'a [EnvFromSource],
     pub(crate) volume_mounts: &'a [VolumeMount],
     pub(crate) resources: Option<&'a ResourceRequirements>,
+    pub(crate) ports: &'a [ContainerPort],
     /// Liveness, readiness and startup, in that order.
     pub(crate) probes: [Option<&'a Probe>; 3],
 }
@@ -174,6 +186,7 @@ impl ContainerView<'_> {
             env_from: container.env_from.as_deref().unwrap_or_default(),
             volume_mounts: container.volume_mounts.as_deref().unwrap_or_default(),
             resources: container.resources.as_ref(),
+            ports: container.ports.as_deref().unwrap_or_default(),
             probes: [
                 container.liveness_probe.as_ref(),
                 container.readiness_probe.as_ref(),
@@ -221,8 +234,9 @@ pub(crate) fn containers(spec: &PodSpec) -> impl Iterator<Item = ContainerView<'
             env: container.env.as_deref().unwrap_or_default(),
             env_from: container.env_from.as_deref().unwrap_or_default(),
             volume_mounts: container.volume_mounts.as_deref().unwrap_or_default(),
-            // Ephemeral containers may not set resources or probes.
+            // Ephemeral containers may not set resources, ports or probes.
             resources: None,
+            ports: &[],
             probes: [None; 3],
         });
     init.chain(regular).chain(ephemeral)

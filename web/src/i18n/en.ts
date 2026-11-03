@@ -1045,7 +1045,16 @@ export const en = {
   "net.anyPort": "The only port",
   "net.fullForm": "From another project",
   "net.forwardsTo": (port: string) => `Forwarded to the container's port ${port}`,
-  "net.exposeHint": "To add one, apply a Kubernetes Service or run this command.",
+  "net.addPrivate": "Add a private address",
+  "net.privatePort": "Port",
+  "net.privatePortHint": "The port your app listens on.",
+  "net.privateWillBe": (address: string) => `Other services will reach it at ${address}.`,
+  "net.privateAlso": (ports: string) =>
+    `It also gets the other ports its containers declare: ${ports}.`,
+  "net.alsoDomain": "Also give it a public domain",
+  "net.kubectlInstead": "Use kubectl instead",
+  "net.privateExpressions":
+    "It picks its replicas with matchExpressions, which a Kubernetes Service can't. To add a private address, apply a Service whose selector matches its replicas' labels.",
   "net.exposePort": (placeholder: string) =>
     `Replace ${placeholder} with the port your app listens on.`,
   "net.noneTitle": (name: string) => `${name} can't receive connections`,
@@ -1832,6 +1841,7 @@ export const en = {
   "title.autoUpdateOn": (service: string) => `Auto-deploy ${service}`,
   "title.autoUpdateOff": (service: string) => `Stop auto-deploying ${service}`,
   "title.addDomain": (host: string) => `Add ${host}`,
+  "title.addPrivate": (name: string) => `Add a private address to ${name}`,
   "title.renameDomain": (from: string, to: string) => `${from} → ${to}`,
   "title.removeDomain": (host: string) => `Remove ${host}`,
   "yaml.edit": "Edit",

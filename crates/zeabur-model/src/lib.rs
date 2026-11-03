@@ -23,8 +23,8 @@ mod workload;
 
 pub use attribution::{Attribution, NamespaceAttribution, Ownership, WorkloadRef};
 pub use container::{
-    Container, ContainerResources, EnvVar, ImportedEnv, Mount, MountCategory, PendingRestart,
-    ProbeHandler, ProbeSummary, Probes, Quantities, ReadOnlyReason,
+    Container, ContainerPort, ContainerResources, EnvVar, ImportedEnv, Mount, MountCategory,
+    PendingRestart, ProbeHandler, ProbeSummary, Probes, Quantities, ReadOnlyReason,
 };
 pub use details::{DESCRIPTION_MAX, DISPLAY_NAME_MAX, ProjectDetails, ProjectIcon};
 pub use diagnosis::{
@@ -44,7 +44,7 @@ pub use network::{
 pub use pod_security::{PodSecurityLevel, RunAs};
 pub use project::{
     Connection, ConnectionEvidence, DataStore, PageServer, Project, Relation, RelationKind,
-    Resource, ResourceKind, Service,
+    Resource, ResourceKind, Service, WorkloadSelector,
 };
 pub use provenance::{Provenance, Tool};
 pub use reload::ConfigReload;

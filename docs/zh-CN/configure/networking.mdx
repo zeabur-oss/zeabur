@@ -24,13 +24,17 @@ source: "b047c089d5d1"
 
 ### 服务没有私有地址时
 
-只主动向外连接的后台服务不需要私有地址。要让其他服务或公开域名连进来，先创建 Service。**私有网络**会显示可复制的命令，例如：
+只主动向外连接的后台服务不需要私有地址。要让其他服务或公开域名连进来，填上应用监听的端口，点击**添加私有地址**。就绪检查或容器声明了端口时，会先帮你填好。勾选**同时添加公开域名**，地址建好后会接着添加域名。
+
+Zeabur 会像 `kubectl expose` 一样，创建与服务同名的 ClusterIP Service：用服务的 `matchLabels` 选择副本，并带上容器声明的每个端口。服务还用 `matchExpressions` 选择副本时，Service 无法照搬，就不能这样添加。
+
+想自己运行的话，展开**改用 kubectl**。只有一个端口的 Deployment 会是 `kubectl expose` 命令，例如：
 
 ```sh
 kubectl -n demo expose deployment web --port=8080
 ```
 
-就绪检查使用数字端口时，命令会直接带上该端口。否则命令会显示 `--port=<port>`，运行前将 `<port>` 替换为应用监听的端口。
+`kubectl expose` 不接受 StatefulSet 和 DaemonSet，这两种会改为给 `kubectl apply` 用的 Service YAML。
 
 ## 将端口开放到互联网
 
@@ -258,8 +262,7 @@ kubectl -n demo run probe --rm -it --restart=Never --image=busybox:1.37 -- wget 
 
 | 界面或结果 | 处理方法 |
 | --- | --- |
-| **web 没有私有地址** | 运行界面上的 `kubectl expose` 命令，或应用上面的 Service。 |
-| `kubectl expose` 返回 `couldn't find port via --port flag or introspection` | 容器没有声明端口。在 `--port=` 后填写应用监听的端口。 |
+| **web 没有私有地址** | 点击**添加私有地址**，或运行**改用 kubectl** 里的命令。 |
 | 一直显示**正在等待负载均衡器分配地址** | 节点上的这个端口已有其他服务占用，或集群没有负载均衡器。更换端口，或请管理员检查 ServiceLB。 |
 | 开放端口时提示已有服务开放了相同端口 | 同一项目内已经开放了这个端口号，先关闭已有的对外端口。 |
 | 隔离后访问公开域名超时 | 添加**允许来自公开域名的流量**。 |
