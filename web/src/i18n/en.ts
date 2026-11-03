@@ -231,6 +231,9 @@ export const en = {
   "update.notes": "Release notes",
   "update.notesOf": (version: string) => `v${version} release notes`,
   "update.guide": "How to upgrade",
+  "update.guideFull": "Full upgrade guide",
+  "update.current": (version: string) => `You have v${version}.`,
+  "update.upToDate": "Up to date",
   "update.download": "Download",
   "update.how.installer":
     "Download the new zeabur-installer, then run plan and apply with the same configuration.",
@@ -1173,6 +1176,7 @@ export const en = {
   "settings.user": "Signed in as",
   "settings.groups": "Groups",
   "settings.kubernetesVersion": "Kubernetes",
+  "settings.zeabur": "Zeabur",
   "settings.catalogueCommit": "Zeabur Catalog",
   "settings.components": "Components",
   "settings.filter": "Filter",

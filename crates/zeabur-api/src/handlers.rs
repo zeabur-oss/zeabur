@@ -42,6 +42,8 @@ pub struct AppState {
     pub images: Arc<crate::images::Inspector>,
     /// The client of GitHub's API; `None` when TLS could not be set up.
     pub github: Option<crate::images::https::Https>,
+    /// Zeabur's releases as GitHub listed them last (see [`crate::cluster::update`]).
+    pub releases: Arc<crate::cluster::update::Releases>,
     /// Pushes uploaded folders to the registry (see [`crate::projects::source_upload`]).
     pub pusher: Arc<crate::projects::oci_push::Pusher>,
     /// Reads backups from their buckets (see [`crate::cluster::object_store`]).

@@ -1,0 +1,78 @@
+---
+title: 升级 Zeabur
+description: 查看当前的 Zeabur 版本，按安装方式用 zeabur-installer、Helm、Argo CD、Flux 或 zeaburctl 升级，并在升级后确认新版本。
+source: "82ee238dac12"
+---
+
+先看你是怎么安装的，再按对应的小节升级。升级不会自动发生，Zeabur 只会告诉你有新版本。
+
+## 查看版本
+
+集群页面始终显示 `Zeabur v<版本>`。有新版本时，页面会出现通知，附上新版的版本号和发行说明链接。“设置”›“关于”也会显示版本。在这两个地方点击“升级方法”，都会按你的安装方式列出步骤，附上可以复制的命令和这一页的链接。
+
+用 `zeaburctl ui` 打开时，页面显示的是 `zeaburctl` 自己的版本。检查更新的细节，以及怎么关掉通知，见[检查更新](../reference/telemetry.mdx#检查更新)。
+
+## 升级前
+
+- 到 [GitHub Releases](https://github.com/zeabur-oss/zeabur/releases) 阅读要升级的版本的发行说明。
+- 先给服务器或集群留一份快照。需要退回旧版时，只能还原升级前的快照，见[退回旧版](#退回旧版)。
+- 项目的数据另外用 Velero 备份，见[备份集群并从备份还原](../cluster/backups.mdx)。
+
+## 用 zeabur-installer 升级
+
+团队使用和个人使用的做法相同。
+
+1. 到[发行文件与验证](../reference/releases.mdx)下载新版的 `zeabur-installer-v<版本>-linux-<架构>.tar.gz`，验证后解压。
+2. 用同一份配置文件预览变更：
+
+   ```sh
+   sudo zeabur-installer plan
+   ```
+
+   集群里有安装记录时，`plan` 的开头是 `Changes since the last apply`，列出会升级的 K3s、RKE2 或 KubeSolo 版本、会改的主机文件、新增或移除的组件，以及要换版的 chart。
+3. 确认后应用：
+
+   ```sh
+   sudo zeabur-installer apply
+   ```
+
+K3s、RKE2 或 KubeSolo 的版本或主机文件有变时，`apply` 会重启 `k3s`、`rke2-server` 或 `kubesolo`。Kubernetes API 约有 10 秒不响应，运行中的应用照常服务。
+
+每版 installer 固定一个 K3s、RKE2 或 KubeSolo 版本，由 `apply` 安装。Kubernetes 只能这样升级：用其他方式升级（例如 System Upgrade Controller 的 Plan），下次 `apply` 会装回 installer 固定的版本。
+
+服务器内存低于新版对团队使用的最低要求时，已在运行的安装仍会升级，`plan` 会显示警告，并保留现有的组件。
+
+## 用 Helm 升级
+
+把 `<版本>` 换成要升级的版本：
+
+```sh
+helm upgrade zeabur oci://ghcr.io/zeabur-oss/charts/zeabur \
+  --version <版本> \
+  --namespace zeabur --reset-then-reuse-values
+kubectl -n zeabur rollout status deployment/zeabur
+```
+
+`--reset-then-reuse-values` 会先采用新版 chart 的默认值，包括镜像，再应用你之前设置的值。用 `--reuse-values` 的话，镜像会停在旧版。
+
+## 用 Argo CD 升级
+
+把 Argo CD Application 里的 chart 版本改成新版，再同步。Argo CD 不连集群就生成 manifest，所以要事先创建固定的签名密钥并设置 `planKey.existingSecret`，做法见[用 GitOps 管理 chart](install.mdx#用-gitops-管理-chart)。
+
+## 用 Flux 升级
+
+把 Flux HelmRelease 里的 chart 版本改成新版，提交后等 Flux 同步。
+
+## 用 zeaburctl ui 升级
+
+Zeabur 运行在你自己的电脑上，没有服务器要升级。到[发行文件与验证](../reference/releases.mdx)下载新版 `zeaburctl`，验证后替换旧文件，再运行一次 `zeaburctl ui`。
+
+## 升级后
+
+- Zeabur 的副本换新后，所有人都要重新登录。chart 只运行一个副本，会话保存在内存里。
+- 运行 `zeabur-installer --version` 或 `zeaburctl --version`，或打开集群页面，确认版本。
+- Helm、Argo CD 和 Flux 可以运行 `kubectl -n zeabur rollout status deployment/zeabur`，等新的副本就绪。
+
+## 退回旧版
+
+要退回旧版 installer，还原升级前的快照。较新版的 installer 写过安装记录后，旧版的 `plan` 和 `apply` 会停下，并写明要改用哪一版，见 [Installer 命令](../reference/installer.mdx#已经安装过的服务器)。

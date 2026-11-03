@@ -6,6 +6,7 @@ import { translator } from "@/i18n"
 import { en } from "@/i18n/en"
 import type { Release } from "@/model/update-check"
 import { componentsBehind, updateItem } from "@/routes/cluster/attention"
+import { upgradeCommands } from "@/routes/cluster/zeabur-version"
 
 const t = translator(en)
 const release = (version: string): Release => ({
@@ -18,7 +19,7 @@ const running = { version: "0.1.1", updateCheck: true, installedBy: "helm" } as 
 
 describe("updateItem", () => {
   test("a normal release is a warning that stays off Home", () => {
-    const item = updateItem(t, "en", running, { latest: release("0.2.0"), security: [] })
+    const item = updateItem(t, running, { latest: release("0.2.0"), security: [] })
     expect(item.health).toBe("warn")
     expect(item.text).toBe("Zeabur 0.2.0 is out")
     expect(item.detail).toBe("Run helm upgrade with the new chart version.")
@@ -28,7 +29,7 @@ describe("updateItem", () => {
 
   test("a security release fails, names the fixed versions and goes to Home", () => {
     const fixes = [release("0.1.3"), release("0.1.2")]
-    const item = updateItem(t, "en", running, { latest: release("0.2.0"), security: fixes })
+    const item = updateItem(t, running, { latest: release("0.2.0"), security: fixes })
     expect(item.health).toBe("fail")
     expect(item.text).toBe("Zeabur 0.1.1 has known security problems")
     expect(item.detail).toContain("Fixed in v0.1.3, v0.1.2.")
@@ -38,7 +39,7 @@ describe("updateItem", () => {
 
   test("a security release links the notes of each release that fixes it", () => {
     const fixes = [release("0.1.3"), release("0.1.2")]
-    const item = updateItem(t, "en", running, { latest: release("0.2.0"), security: fixes })
+    const item = updateItem(t, running, { latest: release("0.2.0"), security: fixes })
     const html = renderToStaticMarkup(createElement(Fragment, null, item.link))
     expect(html).toContain('href="https://example.test/0.1.3"')
     expect(html).toContain('href="https://example.test/0.1.2"')
@@ -47,7 +48,7 @@ describe("updateItem", () => {
 
   test("zeaburctl is named as itself and has no install step beyond its own", () => {
     const local = { ...running, installedBy: "zeaburctl" } as const
-    const item = updateItem(t, "en", local, { latest: release("0.2.0"), security: [] })
+    const item = updateItem(t, local, { latest: release("0.2.0"), security: [] })
     expect(item.text).toBe("zeaburctl 0.2.0 is out")
     expect(item.detail).toBe("Update zeaburctl and run zeaburctl ui again.")
   })
@@ -55,7 +56,6 @@ describe("updateItem", () => {
   test("an unknown install method leaves out the install step", () => {
     const item = updateItem(
       t,
-      "en",
       { version: "0.1.1", updateCheck: true },
       {
         latest: release("0.2.0"),
@@ -70,5 +70,14 @@ describe("componentsBehind", () => {
   test("nothing behind is no item", () => {
     expect(componentsBehind({ items: [{ installations: [] }] }, t)).toBeUndefined()
     expect(componentsBehind(undefined, t)).toBeUndefined()
+  })
+})
+
+describe("upgradeCommands", () => {
+  test("give the installer's and Helm's steps, the latter to the new version", () => {
+    expect(upgradeCommands("installer", "0.2.0")[0]).toContain("zeabur-installer apply")
+    expect(upgradeCommands("helm", "0.2.0")[0]).toContain("--version 0.2.0")
+    for (const by of ["argo-cd", "flux", "zeaburctl", undefined] as const)
+      expect(upgradeCommands(by, "0.2.0")).toEqual([])
   })
 })

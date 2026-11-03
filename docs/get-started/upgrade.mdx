@@ -1,0 +1,77 @@
+---
+title: Upgrade Zeabur
+description: See which Zeabur version you run, upgrade with zeabur-installer, Helm, Argo CD, Flux or zeaburctl, and confirm the new version afterwards.
+---
+
+Find how you installed Zeabur, then follow that section. Nothing upgrades on its own. Zeabur only tells you when a newer version is out.
+
+## See your version
+
+The cluster page always shows `Zeabur v<version>`. When a newer version is out, a notice appears with its version and a link to the release notes. **Settings** › **About** shows the version too. In either place, **How to upgrade** opens the steps for how you installed Zeabur, with the commands to copy and a link to this page.
+
+Under `zeaburctl ui`, the page shows `zeaburctl`'s own version. For the details of the check and how to turn the notice off, see [Update check](../reference/telemetry.mdx#update-check).
+
+## Before you upgrade
+
+- Read the release notes for the version you're moving to on [GitHub Releases](https://github.com/zeabur-oss/zeabur/releases).
+- Take a snapshot of the server or cluster. To go back to an older version, you can only restore a snapshot taken before the upgrade. See [Go back](#go-back).
+- Back up project data separately with Velero. See [Back up a cluster and restore from a backup](../cluster/backups.mdx).
+
+## Upgrade with zeabur-installer
+
+Team and personal installs work the same way.
+
+1. Download the new `zeabur-installer-v<version>-linux-<arch>.tar.gz` from [Release files and verification](../reference/releases.mdx), verify it, and extract it.
+2. Preview the changes with the same configuration file:
+
+   ```sh
+   sudo zeabur-installer plan
+   ```
+
+   When the cluster has an install record, `plan` starts with `Changes since the last apply`. It lists the new K3s, RKE2 or KubeSolo release, host files that change, components added or removed, and charts that move to a new version.
+3. Apply them:
+
+   ```sh
+   sudo zeabur-installer apply
+   ```
+
+When the K3s, RKE2 or KubeSolo release or a host file changes, `apply` restarts `k3s`, `rke2-server` or `kubesolo`. The Kubernetes API stops answering for about 10 seconds. Running apps keep serving.
+
+Each installer pins one K3s, RKE2 or KubeSolo release, and `apply` installs it. Upgrade Kubernetes only this way: if something else upgrades it, such as a System Upgrade Controller Plan, the next `apply` puts the pinned release back.
+
+If the server has less memory than a team install now needs, an install that already runs is still upgraded. `plan` shows a warning, and the components it has stay.
+
+## Upgrade with Helm
+
+Replace `<version>` with the version you're moving to:
+
+```sh
+helm upgrade zeabur oci://ghcr.io/zeabur-oss/charts/zeabur \
+  --version <version> \
+  --namespace zeabur --reset-then-reuse-values
+kubectl -n zeabur rollout status deployment/zeabur
+```
+
+With `--reset-then-reuse-values`, Helm starts from the new chart's defaults, including the image, then applies the values you set. With `--reuse-values`, the image stays on the old version.
+
+## Upgrade with Argo CD
+
+Change the chart version in your Argo CD Application, then sync. Argo CD generates manifests without connecting to the cluster, so create a fixed signing key beforehand and set `planKey.existingSecret`. See [Manage the chart with GitOps](install.mdx#manage-the-chart-with-gitops).
+
+## Upgrade with Flux
+
+Change the chart version in your Flux HelmRelease, commit it, and wait for Flux to sync.
+
+## Upgrade with zeaburctl ui
+
+Zeabur runs on your own computer, so there is no server to upgrade. Download the new `zeaburctl` from [Release files and verification](../reference/releases.mdx), verify it, replace the old file, and run `zeaburctl ui` again.
+
+## After you upgrade
+
+- Everyone signs in again once the Zeabur replica is replaced. The chart runs one replica, and sessions live in its memory.
+- Run `zeabur-installer --version` or `zeaburctl --version`, or open the cluster page, to confirm the version.
+- With Helm, Argo CD or Flux, run `kubectl -n zeabur rollout status deployment/zeabur` to wait for the new replica.
+
+## Go back
+
+To go back to an older installer, restore a snapshot taken before the upgrade. Once a newer installer has written the install record, an older one stops at `plan` and `apply` and names the version to use. See [Installer commands](../reference/installer.mdx#on-an-installed-server).

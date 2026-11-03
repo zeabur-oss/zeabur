@@ -10002,11 +10002,46 @@ export type WorkloadReleaseList = {
 }
 
 /**
+ * A published release.
+ */
+export type ZeaburRelease = {
+  /** GitHub marks it a pre-release. */
+  prerelease: boolean
+  /** Its notes have a `### Security` section: it fixes vulnerabilities. */
+  security: boolean
+  /** Its page on GitHub, with the release notes. */
+  url: string
+  /** The tag without its `v`, such as `0.1.2`. */
+  version: string
+}
+
+/**
+ * A newer release than the running one.
+ */
+export type ZeaburNewer = {
+  /** The newest normal release, or the newest pre-release when the running version is one. */
+  latest: ZeaburRelease
+  /**
+   * The newer normal releases that fix vulnerabilities, newest first: the running version has
+   * them.
+   */
+  security: ZeaburRelease[]
+}
+
+/**
+ * Whether a newer Zeabur than [`ZeaburVersion::version`] is out, from GitHub's releases as the
+ * server read them last.
+ */
+export type ZeaburUpdate = {
+  newer?: ZeaburNewer | null
+}
+
+/**
  * Zeabur itself: its version, and what the interface needs to say how to upgrade it.
  */
 export type ZeaburVersion = {
   installedBy?: InstallMethod | null
-  /** Whether the interface checks GitHub's releases for a newer version. */
+  /** Whether the interface compares it with GitHub's releases (`GET /cluster/zeabur/update`). */
   updateCheck: boolean
   /** Zeabur's version, such as `0.1.1`; in local mode, `zeaburctl`'s. */
   version: string
@@ -11447,6 +11482,23 @@ export const getZeabur = async (
   options?: Parameters<typeof zeaburFetch>[1],
 ): Promise<ZeaburVersion> => {
   return zeaburFetch<ZeaburVersion>(getGetZeaburUrl(), {
+    ...options,
+    method: "GET",
+  })
+}
+
+export const getGetZeaburUpdateUrl = () => {
+  return `/api/v1/cluster/zeabur/update`
+}
+
+/**
+ * @summary Whether a newer release than the running Zeabur is out. While the update check is off, the
+answer is that none is, and GitHub is not asked.
+ */
+export const getZeaburUpdate = async (
+  options?: Parameters<typeof zeaburFetch>[1],
+): Promise<ZeaburUpdate> => {
+  return zeaburFetch<ZeaburUpdate>(getGetZeaburUpdateUrl(), {
     ...options,
     method: "GET",
   })

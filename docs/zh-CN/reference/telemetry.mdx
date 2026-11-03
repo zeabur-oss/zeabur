@@ -1,7 +1,7 @@
 ---
 title: 体验计划
 description: 加入体验计划后，Zeabur 和安装程序会发送什么、绝不发送什么；Zeabur 和 zeaburctl 如何检查新版本；以及如何分别关闭。
-source: "0fd6101882a5"
+source: "0239d29c3a48"
 ---
 
 体验计划会发送版本和每天的使用人数，让我们知道有多少人在用、该先修哪里。用安装程序安装时默认加入，可以在确认页取消勾选；用 Helm 安装时默认不加入，需要自己开启。
@@ -76,12 +76,13 @@ kubectl -n zeabur logs deployment/zeabur | grep telemetry
 
 **在哪里运行。**
 
-- 集群页始终显示 `Zeabur v<版本>`。每位登录者的浏览器每天检查一次，结果保存在该浏览器里。Zeabur 服务器不会访问 GitHub。显示的升级方法取决于 Zeabur 的安装方式，分为 zeabur-installer、Helm、Argo CD 和 Flux。用 `zeaburctl ui` 打开时，页面显示的是 `zeaburctl` 自己的版本和更新方法。
-- `zeaburctl` 每 24 小时最多检查一次，由任意命令触发。检查与命令同时运行，不会拖慢命令。命令结束时还没查完，就直接放弃。有新版本时，`zeaburctl` 会在 stderr 输出一行。上次检查的时间保存在 `$XDG_CACHE_HOME/zeaburctl`。未设置 `XDG_CACHE_HOME` 时，macOS 保存在 `~/Library/Caches/zeaburctl`，其他系统保存在 `~/.cache/zeaburctl`。stderr 不是终端，或设置了 `CI` 时，不会检查。
+- 集群页始终显示 `Zeabur v<版本>`。不管多少人打开 Zeabur，Zeabur 服务器每小时最多查询 GitHub 一次。页面每次打开时读取它的结果，一直开着时每小时再读一次。服务器会保留上次的结果。访问不了 GitHub 时先沿用，一分钟后再试。GitHub 拒绝时，等 GitHub 重新计数后再试。浏览器不会访问 GitHub。“设置”›“关于”也会显示版本，点击“升级方法”会按 Zeabur 的安装方式列出步骤，分为 zeabur-installer、Helm、Argo CD 和 Flux。请参阅[升级 Zeabur](../get-started/upgrade.mdx)。用 `zeaburctl ui` 打开时，页面显示的是 `zeaburctl` 自己的版本和更新方法。
+- `zeaburctl` 每次运行命令都会检查。检查与命令同时进行，命令结束后 `zeaburctl` 最多再等一秒。有新版本时，会在 stderr 输出一行。它不在磁盘上保存任何东西。stderr 不是终端，或设置了 `CI` 时，不会检查。
+- 没有令牌时，GitHub 每小时只响应同一个 IP 地址 60 次，共用这个地址的人一起算。用完时，`zeaburctl` 会输出提示。把 GitHub 令牌设在 `GH_TOKEN` 或 `GITHUB_TOKEN`（与 `gh` 读取的变量相同），`zeaburctl` 就会带上它，改用你自己的额度。不授予任何权限的 fine-grained 令牌就够了。
 
-**会发送什么**。一个普通的 GitHub 请求，不带任何 ID、Cookie 或令牌。GitHub 会看到请求来自哪个 IP 地址。集群页的请求还会让 GitHub 从 `Origin` 请求头看到你的 Zeabur 地址。浏览器不会发送 referrer。`zeaburctl` 的 user agent 是 `zeaburctl/<版本>`。
+**会发送什么**。一个普通的 GitHub 请求，不带任何 ID 或 Cookie。除非你为 `zeaburctl` 设置了令牌，否则也不带令牌。GitHub 会看到请求来自哪个 IP 地址。Zeabur 服务器的 user agent 是 `zeabur`，`zeaburctl` 的是 `zeaburctl/<版本>`。
 
-**关闭**。以下任意一种都有效。
+**关闭**。以下任意一种都有效。关闭后，Zeabur 服务器完全不会访问 GitHub。
 
 - 用安装程序安装时，在确认页取消勾选，或在 `/etc/zeabur-installer/config.yaml` 中设置 `updateCheck: false`。运行 `apply` 时设置了 `DO_NOT_TRACK=1` 或 `NO_UPDATE_NOTIFIER` 也会关闭。
 - 用 Helm 安装时，设置 `updateCheck.enabled=false`。集群页就只显示版本。

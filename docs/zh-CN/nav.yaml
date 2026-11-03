@@ -5,6 +5,7 @@
     advanced-install: 使用配置文件和命令安装
     personal: 个人使用：在小型服务器上安装
     install: 将 Zeabur 安装到已有集群
+    upgrade: 升级 Zeabur
     first-project: 部署第一个服务
     how-it-works: Zeabur 如何管理服务
 - group: deploy

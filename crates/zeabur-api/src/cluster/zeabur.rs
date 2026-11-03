@@ -1,7 +1,6 @@
 //! Zeabur's own version and how it was installed, for the interface's update check.
 //!
-//! Zeabur makes no request to GitHub: the interface reads the releases from the person's browser
-//! (docs/reference/telemetry.mdx, "Update check").
+//! [`super::update`] compares it with the releases on GitHub.
 
 use axum::Json;
 use axum::extract::State;

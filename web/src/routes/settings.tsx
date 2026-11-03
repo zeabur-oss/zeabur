@@ -30,6 +30,7 @@ import { Select } from "@zeabur-oss/design-system/components/select"
 import { Switch } from "@zeabur-oss/design-system/components/switch"
 import { localeNames, locales, useI18n, useT } from "@/i18n"
 import { nameSourceOf } from "@/lib/cluster-name"
+import { UpgradeButton, useNewer } from "@/routes/cluster/zeabur-version"
 import { setTheme, useTheme, type ThemeChoice } from "@/theme"
 import { PageHeader } from "@zeabur-oss/design-system/components/page-header"
 import { PageColumn } from "@zeabur-oss/design-system/components/page-column"
@@ -108,6 +109,7 @@ export function SettingsPage() {
               )) ?? "—"}
             </span>
           </Row>
+          <ZeaburVersionRow />
           {capabilities.data ? (
             <>
               <Row label={t("settings.kubernetesVersion")}>
@@ -123,6 +125,35 @@ export function SettingsPage() {
         </Rows>
       </Panel>
     </PageColumn>
+  )
+}
+
+/** Zeabur's version, whether a newer one is out, and the way to upgrade to it. */
+function ZeaburVersionRow() {
+  const t = useT()
+  const { zeabur, newer, checked } = useNewer()
+  return (
+    <Row label={t("settings.zeabur")}>
+      <span className="flex flex-wrap items-center gap-2">
+        <span className="font-mono text-xs" translate="no">
+          {zeabur ? `v${zeabur.version}` : "—"}
+        </span>
+        {zeabur && newer ? (
+          <>
+            {newer.security.length > 0 ? (
+              <StatusPill health="fail">{t("update.securityBadge")}</StatusPill>
+            ) : (
+              <StatusPill health="progress">
+                {t("cluster.available", newer.latest.version)}
+              </StatusPill>
+            )}
+            <UpgradeButton zeabur={zeabur} newer={newer} size="xs" />
+          </>
+        ) : zeabur?.updateCheck && checked ? (
+          <span className="text-xs text-muted-foreground">{t("update.upToDate")}</span>
+        ) : null}
+      </span>
+    </Row>
   )
 }
 

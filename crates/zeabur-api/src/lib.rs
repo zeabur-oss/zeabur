@@ -138,6 +138,7 @@ pub mod plan_token;
 pub mod pods;
 pub mod projects;
 mod query;
+pub mod releases;
 pub mod resolve;
 pub mod resources;
 pub mod services;
@@ -220,6 +221,7 @@ macro_rules! handlers {
             identity::get,
             cluster::get,
             cluster::zeabur::get,
+            cluster::update::get,
             cluster::capabilities,
             cluster::backups::get,
             cluster::backups::plan,
@@ -657,6 +659,7 @@ fn build_with(
         store: Arc::new(cluster::object_store::Fetcher::new(images.reach(), &tls)),
         images,
         github,
+        releases: Arc::new(cluster::update::Releases::default()),
         terminals,
     };
     routes()

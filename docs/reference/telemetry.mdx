@@ -75,12 +75,13 @@ Zeabur and `zeaburctl` tell you when a newer version is out and how to upgrade. 
 
 **Where it runs.**
 
-- The cluster page always shows `Zeabur v<version>`. Each signed-in person's browser checks once a day and keeps the answer. The Zeabur server makes no request to GitHub. The upgrade steps match how Zeabur was installed, with zeabur-installer, Helm, Argo CD or Flux. Under `zeaburctl ui`, the page shows `zeaburctl`'s own version and how to update it.
-- `zeaburctl` checks at most once every 24 hours, when any command runs. The check runs beside the command and never slows it down. If it hasn't finished when the command ends, `zeaburctl` drops it. When a newer version is out, `zeaburctl` prints one line to stderr. It keeps the time of the last check in `$XDG_CACHE_HOME/zeaburctl`. Without `XDG_CACHE_HOME`, that's `~/Library/Caches/zeaburctl` on macOS and `~/.cache/zeaburctl` elsewhere. It doesn't check when stderr isn't a terminal or when `CI` is set.
+- The cluster page always shows `Zeabur v<version>`. The Zeabur server asks GitHub at most once an hour, however many people open Zeabur, and the page reads its answer each time it opens and every hour while it stays open. The server keeps the last answer: if GitHub can't be reached, that answer stays and the server tries again a minute later, or after GitHub's reset when GitHub refuses. Browsers make no request to GitHub. **Settings** › **About** shows the version too, and **How to upgrade** opens the steps for how Zeabur was installed, with zeabur-installer, Helm, Argo CD or Flux. See [Upgrade Zeabur](../get-started/upgrade.mdx). Under `zeaburctl ui`, the page shows `zeaburctl`'s own version and how to update it.
+- `zeaburctl` checks each time a command runs. The check runs beside the command. When the command ends, `zeaburctl` waits at most a second more for the answer. When a newer version is out, it prints one line to stderr. It keeps nothing on disk. It doesn't check when stderr isn't a terminal or when `CI` is set.
+- Without a token, GitHub answers 60 requests an hour from one IP address, shared by everyone behind it. When that's used up, `zeaburctl` says so instead. Set `GH_TOKEN` or `GITHUB_TOKEN` to a GitHub token, the same variables `gh` reads, and `zeaburctl` sends it so the requests count against your own limit. A fine-grained token with no permissions is enough.
 
-**What is sent.** A plain request to GitHub with no ID, cookie or token. GitHub sees the IP address it comes from. For the cluster page, GitHub also sees your Zeabur's address in the `Origin` header. The browser doesn't send the referrer. `zeaburctl` sends `zeaburctl/<version>` as its user agent.
+**What is sent.** A plain request to GitHub with no ID or cookie, and no token unless you set one for `zeaburctl`. GitHub sees the IP address it comes from. The Zeabur server sends `zeabur` as its user agent, and `zeaburctl` sends `zeaburctl/<version>`.
 
-**Turn it off.** Any one of these is enough.
+**Turn it off.** Any one of these is enough. Once it is off, the Zeabur server makes no request to GitHub.
 
 - In the installer, uncheck the box on the review page or set `updateCheck: false` in `/etc/zeabur-installer/config.yaml`. Running `apply` with `DO_NOT_TRACK=1` or `NO_UPDATE_NOTIFIER` set turns it off too.
 - With Helm, set `updateCheck.enabled=false`. The cluster page then only shows the version.
