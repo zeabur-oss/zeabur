@@ -127,9 +127,42 @@ const RKE2_STATIC_PODS_REQUEST_MIB: u64 =
 const RKE2_COREDNS_REQUEST_MIB: u64 = 144;
 /// K3s's `CoreDNS`. Calico asks for no memory.
 const K3S_COREDNS_REQUEST_MIB: u64 = 70;
-/// The memory requests of the catalog's default components with Zeabur and Identity, on one node,
-/// sized from what they used on K3s with 35 pods running.
-const DEFAULT_COMPONENTS_REQUEST_MIB: u64 = 1264;
+/// The memory requests of the catalog's default components on one node, sized from what they used
+/// on K3s with 35 pods running.
+const DEFAULT_COMPONENTS_REQUEST_MIB: u64 = 1200;
+/// Zeabur Identity's memory request (identity `crates/zeabur-identity-k8s/src/deployment.rs`).
+const IDENTITY_REQUEST_MIB: u64 = 32;
+/// Zeabur's chart, whose own and proxy requests count.
+const ZEABUR_VALUES: &str = include_str!("../../../deploy/chart/zeabur/values.yaml");
+
+/// The memory requests of Zeabur and its proxy in the chart's values, with Zeabur Identity's.
+fn products_request_mib() -> u64 {
+    let Ok(values) = serde_saphyr::from_str::<serde_json::Value>(ZEABUR_VALUES) else {
+        return IDENTITY_REQUEST_MIB;
+    };
+    let request = |path: &str| {
+        values
+            .pointer(path)
+            .and_then(serde_json::Value::as_str)
+            .and_then(mebibytes)
+            .unwrap_or(0)
+    };
+    request("/resources/requests/memory")
+        + request("/proxy/resources/requests/memory")
+        + IDENTITY_REQUEST_MIB
+}
+
+/// A memory quantity in `Mi` or `Gi`, in MiB.
+fn mebibytes(quantity: &str) -> Option<u64> {
+    if let Some(mib) = quantity.strip_suffix("Mi") {
+        return mib.parse().ok();
+    }
+    quantity
+        .strip_suffix("Gi")?
+        .parse::<u64>()
+        .ok()
+        .map(|gib| gib * 1024)
+}
 
 impl Distribution {
     /// Every distribution, in the order an interface lists them.
@@ -283,24 +316,25 @@ impl Distribution {
     ///
     /// The scheduler places a pod only where its memory request fits in what pods may use, so that
     /// must hold the requests of the distribution's own pods (RKE2's static pods and `CoreDNS`,
-    /// K3s's `CoreDNS`) and of the default components, on top of the reserves and the hard
-    /// eviction threshold, rounded up to a hundred. K3s comes to 3500, which a 4 GiB server passes
-    /// once its crash kernel reserve is off; RKE2 comes to 4300.
+    /// K3s's `CoreDNS`), of the default components and of Zeabur as its chart gives them, on top of
+    /// the reserves and the hard eviction threshold, rounded up to a hundred. K3s comes to 3500,
+    /// which a 4 GiB server passes once its crash kernel reserve is off; RKE2 comes to 4300.
     #[must_use]
-    pub const fn min_memory_mib(self) -> u64 {
+    pub fn min_memory_mib(self) -> u64 {
         self.min_memory_at_work_mib(0)
     }
 
     /// [`Self::min_memory_mib`] with a component that uses `work_mib` more while working, such as
     /// the builder in a build (`resources.workMemoryMiB` in the catalog).
     #[must_use]
-    pub const fn min_memory_at_work_mib(self, work_mib: u64) -> u64 {
+    pub fn min_memory_at_work_mib(self, work_mib: u64) -> u64 {
         let own_pods = match self {
             Self::K3s => K3S_COREDNS_REQUEST_MIB,
             Self::Rke2 => RKE2_STATIC_PODS_REQUEST_MIB + RKE2_COREDNS_REQUEST_MIB,
         };
         (own_pods
             + DEFAULT_COMPONENTS_REQUEST_MIB
+            + products_request_mib()
             + self.reserved_mib()
             + EVICTION_HARD_MIB
             + work_mib)
@@ -625,6 +659,14 @@ mod tests {
         // The builder's workMemoryMiB in the catalog.
         assert!(Distribution::K3s.min_memory_at_work_mib(500) > 3900);
         assert!(Distribution::Rke2.min_memory_mib() > 3900);
+    }
+
+    #[test]
+    fn the_chart_gives_zeabur_and_its_proxy_requests() {
+        assert_eq!(mebibytes("16Mi"), Some(16));
+        assert_eq!(mebibytes("1Gi"), Some(1024));
+        assert_eq!(mebibytes("500M"), None);
+        assert!(products_request_mib() > IDENTITY_REQUEST_MIB + 16);
     }
 
     #[test]
