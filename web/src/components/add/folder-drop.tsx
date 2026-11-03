@@ -66,7 +66,7 @@ export function useFolder() {
       setState(
         packed.files === 0
           ? { phase: "failed", message: t("upload.problem.empty") }
-          : { phase: "ready", packed, name, dockerfiles: dockerfilesOf(found) },
+          : { phase: "ready", packed, name, dockerfiles: dockerfilesOf(packed.paths ?? []) },
       )
     } catch (error) {
       setState(fail(error))
@@ -108,9 +108,9 @@ export function useFolder() {
   }
 }
 
-/** The paths of a folder's Dockerfiles. */
-const dockerfilesOf = (files: readonly SourceFile[]) =>
-  new Set(files.filter((f) => /(^|\/)[^/]*dockerfile[^/]*$/i.test(f.path)).map((f) => f.path))
+/** The Dockerfiles among the paths the archive keeps. */
+const dockerfilesOf = (paths: readonly string[]) =>
+  new Set(paths.filter((path) => /(^|\/)[^/]*dockerfile[^/]*$/i.test(path)))
 
 const withoutArchive = (name: string) => name.replace(/\.(zip|tar\.gz|tgz)$/i, "")
 

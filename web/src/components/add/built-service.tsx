@@ -152,6 +152,9 @@ export function useBuiltForm<F extends BuiltForm>(
     badBuildEnv: parsedBuildEnv.bad,
     typeName: (name: string) => typed("named", { name } as Partial<F>),
     chooseMethod: (method: BuildMethod) => typed("methoded", { method } as Partial<F>),
+    // Typing a path keeps Dockerfile even while the path does not match a file yet.
+    typeDockerfile: (dockerfile: string) =>
+      typed("methoded", { method: "dockerfile", dockerfile } as Partial<F>),
     found: dockerfileFound && !choices.methoded,
     typePort: (port: string) => typed("ported", { port } as Partial<F>),
     typeHost: (host: string) => typed("hosted", { host } as Partial<F>),
@@ -364,6 +367,7 @@ export function MoreSection({
           source={source}
           form={{ ...built.form, method: built.method }}
           set={built.set}
+          onDockerfile={built.typeDockerfile}
           security={built.security}
           onSecurity={built.chooseSecurity}
           env={built.env}
@@ -387,6 +391,7 @@ function MoreFields({
   source = "git",
   form,
   set,
+  onDockerfile,
   security,
   onSecurity,
   env,
@@ -402,6 +407,7 @@ function MoreFields({
   source?: "git" | "upload"
   form: BuildFields
   set: (patch: Partial<BuildFields>) => void
+  onDockerfile: (dockerfile: string) => void
   security: Profile
   onSecurity: (profile: Profile) => void
   env: string
@@ -448,7 +454,7 @@ function MoreFields({
               placeholder="Dockerfile"
               autoComplete="off"
               spellCheck={false}
-              onChange={(event) => set({ dockerfile: event.target.value })}
+              onChange={(event) => onDockerfile(event.target.value)}
             />
           </FormField>
         ) : null}

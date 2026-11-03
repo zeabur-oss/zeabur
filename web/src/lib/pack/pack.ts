@@ -14,6 +14,8 @@ export interface Packed {
   left: number
   /** The files together, unpacked. */
   bytes: number
+  /** The paths in the archive, when the files were packed here. */
+  paths?: readonly string[]
 }
 
 /** The folder is past a limit; the largest top-level entries, to leave out. */
@@ -76,5 +78,11 @@ export async function pack(files: readonly SourceFile[]): Promise<Packed> {
     })
   const blob = await gzip(tarParts(tarFiles))
   if (blob.size > MAX_PACKED) throw new TooLarge("packed", largestEntries(kept))
-  return { blob, files: kept.length, left: files.length - kept.length, bytes }
+  return {
+    blob,
+    files: kept.length,
+    left: files.length - kept.length,
+    bytes,
+    paths: kept.map((file) => file.path),
+  }
 }
