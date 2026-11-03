@@ -206,6 +206,12 @@ async function pins(version: Version): Promise<Record<string, string>> {
     );
   const ctl = (arch: string) =>
     listed(identityList, `zeabur-identityctl-${identity}-linux-${arch}.tar.gz`);
+  const resources = await download("identity", identity, "resources.json");
+  if ((await sha256(resources)) !== listed(identityList, "resources.json"))
+    throw new Failure("resources.json does not match SHA256SUMS");
+  const request = (await Bun.file(resources).json()).requestMemoryMiB;
+  if (!Number.isSafeInteger(request) || request <= 0)
+    throw new Failure(`resources.json gives ${request} as requestMemoryMiB`);
   return {
     ZEABUR_PIN_CATALOG_VERSION: catalog,
     ZEABUR_PIN_CATALOG_SHA256: listed(catalogList, "index.json"),
@@ -213,6 +219,7 @@ async function pins(version: Version): Promise<Record<string, string>> {
     ZEABUR_PIN_IDENTITY_IMAGE: image,
     ZEABUR_PIN_IDENTITYCTL_AMD64_SHA256: ctl("amd64"),
     ZEABUR_PIN_IDENTITYCTL_ARM64_SHA256: ctl("arm64"),
+    ZEABUR_PIN_IDENTITY_REQUEST_MEMORY_MIB: String(request),
   };
 }
 

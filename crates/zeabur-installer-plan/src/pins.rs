@@ -210,6 +210,8 @@ pub struct Identity {
     pub identityctl_amd64: &'static str,
     /// SHA-256 of `zeabur-identityctl-<version>-linux-arm64.tar.gz`.
     pub identityctl_arm64: &'static str,
+    /// The memory its pods request, from the release's `resources.json`.
+    pub request_memory_mib: u64,
 }
 
 /// The Zeabur release of this installer.
@@ -280,6 +282,19 @@ impl Zeabur {
     }
 }
 
+/// A whole number of MiB, at compile time.
+const fn mebibytes(digits: &str) -> u64 {
+    let mut rest = digits.as_bytes();
+    assert!(!rest.is_empty(), "an empty number of MiB");
+    let mut value: u64 = 0;
+    while let [digit, tail @ ..] = rest {
+        assert!(digit.is_ascii_digit(), "a number of MiB has only digits");
+        value = value * 10 + (*digit - b'0') as u64;
+        rest = tail;
+    }
+    value
+}
+
 /// The pinned releases, or `None` in a development build.
 pub const PRODUCTS: Option<Products> = match (
     option_env!("ZEABUR_PIN_CATALOG_VERSION"),
@@ -288,6 +303,7 @@ pub const PRODUCTS: Option<Products> = match (
     option_env!("ZEABUR_PIN_IDENTITY_IMAGE"),
     option_env!("ZEABUR_PIN_IDENTITYCTL_AMD64_SHA256"),
     option_env!("ZEABUR_PIN_IDENTITYCTL_ARM64_SHA256"),
+    option_env!("ZEABUR_PIN_IDENTITY_REQUEST_MEMORY_MIB"),
     option_env!("ZEABUR_PIN_ZEABUR_IMAGE"),
     option_env!("ZEABUR_PIN_ZEABUR_CHART_SHA256"),
 ) {
@@ -298,6 +314,7 @@ pub const PRODUCTS: Option<Products> = match (
         Some(identity_image),
         Some(identityctl_amd64),
         Some(identityctl_arm64),
+        Some(identity_request),
         Some(zeabur_image),
         Some(chart_sha256),
     ) => Some(Products {
@@ -310,6 +327,7 @@ pub const PRODUCTS: Option<Products> = match (
             image: identity_image,
             identityctl_amd64,
             identityctl_arm64,
+            request_memory_mib: mebibytes(identity_request),
         },
         zeabur: Zeabur {
             version: concat!("v", env!("CARGO_PKG_VERSION")),

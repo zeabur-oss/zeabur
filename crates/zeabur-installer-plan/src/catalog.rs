@@ -107,6 +107,19 @@ pub struct Resources {
     /// Memory it uses on top of its idle use while working, such as one build.
     #[serde(rename = "workMemoryMiB")]
     pub work_memory_mib: Option<u64>,
+    /// The memory request of the pod that does that work, from its chart's values.
+    #[serde(rename = "workRequestMemoryMiB")]
+    pub work_request_memory_mib: Option<u64>,
+}
+
+impl Resources {
+    /// What one piece of work needs on top of its idle use: what it uses, and no less than its
+    /// pod asks the scheduler for.
+    #[must_use]
+    pub fn work_mib(&self) -> Option<u64> {
+        let work = self.work_memory_mib?;
+        Some(work.max(self.work_request_memory_mib.unwrap_or(0)))
+    }
 }
 
 /// An in-cluster registry.
@@ -318,6 +331,9 @@ pub struct Measured {
     /// Working set at idle.
     #[serde(rename = "idleMemoryMiB")]
     pub idle_memory_mib: u64,
+    /// The memory its pods request, from the same run; absent in older measurements.
+    #[serde(rename = "requestMemoryMiB")]
+    pub request_memory_mib: Option<u64>,
 }
 
 impl Index {
@@ -409,5 +425,17 @@ impl Component {
             .rev()
             .find(|(key, _)| key.starts_with(&prefix))
             .map(|(_, m)| m.idle_memory_mib)
+    }
+
+    /// The memory its pods request for a profile and architecture, on the newest Kubernetes
+    /// measured with a request.
+    #[must_use]
+    pub fn request_memory_mib(&self, profile: &str, arch: &str) -> Option<u64> {
+        let prefix = format!("{profile}-{arch}-v");
+        self.measured
+            .iter()
+            .rev()
+            .filter(|(key, _)| key.starts_with(&prefix))
+            .find_map(|(_, m)| m.request_memory_mib)
     }
 }

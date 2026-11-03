@@ -24,7 +24,8 @@ notes and verifies the assets.
 The pins come from the releases of zeabur-oss/catalog and zeabur-oss/identity: the `SHA256SUMS`
 that the shared workflow signed for each, checked with cosign. The catalog files the build embeds
 must be the ones its `SHA256SUMS` lists; Zeabur Identity's image is the `index` line of its
-`digests.txt`.
+`digests.txt`, and its pods' memory request is `requestMemoryMiB` in its `resources.json`, which the
+installer counts toward the least memory of a team install.
 
 Every signature and attestation names the shared workflow,
 `https://github.com/zeabur-oss/.github/.github/workflows/release.yml@…`, not this repository's
