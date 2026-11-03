@@ -6,7 +6,7 @@ import type { Schemas } from "@/api/client"
 import * as zeabur from "@/api/zeabur"
 
 /** How often a page left open asks again. */
-export const CHECK_EVERY = 60 * 60_000
+const CHECK_EVERY = 60 * 60_000
 
 export type Release = Schemas.ZeaburRelease
 export type Newer = Schemas.ZeaburNewer
