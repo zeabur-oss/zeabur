@@ -2855,6 +2855,7 @@ dependencies = [
  "tar",
  "thiserror",
  "utoipa",
+ "zeabur-installer-plan",
  "zeabur-kube",
 ]
 

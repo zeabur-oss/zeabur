@@ -4,6 +4,7 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
+use zeabur_installer_plan::kube_version;
 use zeabur_kube::ClusterFacts;
 
 mod bundle {
@@ -42,8 +43,12 @@ pub struct Component {
     /// Whether the catalogue installs it by default, per profile (`single-node`, `multi-node`):
     /// `recommended` or `optional`.
     pub defaults: BTreeMap<String, String>,
-    /// The distributions it supports (`k3s`, …); empty means all.
+    /// The distributions it supports (`k3s`, …).
     pub distributions: Vec<String>,
+    /// The Kubernetes versions it supports, as a Helm chart's `kubeVersion` range.
+    #[serde(skip)]
+    #[schema(ignore)]
+    pub kube_version: String,
     /// How to recognise an existing installation.
     #[serde(skip)]
     #[schema(ignore)]
@@ -98,12 +103,32 @@ pub struct Detection {
     /// Helm chart names.
     #[serde(default)]
     pub helm_charts: Vec<String>,
-    /// k3s packaged add-ons (`HelmChart` objects in `kube-system`).
+    /// Add-ons a distribution packages.
     #[serde(default)]
-    pub k3s_addons: Vec<String>,
+    pub addons: Vec<Addon>,
     /// Workloads carrying all of these labels.
     #[serde(default)]
     pub workloads: Vec<WorkloadMatch>,
+}
+
+impl Detection {
+    /// The names of the k3s packaged add-ons (`HelmChart` objects in `kube-system`). RKE2 packages
+    /// the same charts as `rke2-<name>`.
+    pub fn k3s_addons(&self) -> impl Iterator<Item = &str> {
+        self.addons
+            .iter()
+            .filter(|a| a.distribution == "k3s")
+            .map(|a| a.name.as_str())
+    }
+}
+
+/// An add-on a distribution packages.
+#[derive(Debug, Clone, PartialEq, Eq, Default, Deserialize)]
+pub struct Addon {
+    /// The distribution (`k3s`). An entry of a distribution Zeabur does not know is ignored.
+    pub distribution: String,
+    /// The add-on's name.
+    pub name: String,
 }
 
 /// A workload kind and the labels that identify it.
@@ -121,8 +146,8 @@ pub struct WorkloadMatch {
 struct File {
     metadata: Metadata,
     defaults: BTreeMap<String, String>,
-    #[serde(default)]
     distributions: Vec<String>,
+    kube_version: String,
     detection: Detection,
     #[serde(default)]
     releases: Vec<Release>,
@@ -185,6 +210,7 @@ pub fn catalogue() -> Result<Vec<Component>, CatalogueError> {
                 },
                 defaults: file.defaults,
                 distributions: file.distributions,
+                kube_version: file.kube_version,
                 tested_version: tested_version(&file.releases, &file.detection),
                 detection: file.detection,
             })
@@ -252,8 +278,8 @@ fn suggestion(components: &[Component], facts: &ClusterFacts) -> Suggestion {
     let supported: Vec<&Component> = components
         .iter()
         .filter(|c| {
-            c.distributions.is_empty()
-                || distribution.is_some_and(|d| c.distributions.iter().any(|x| x == d))
+            distribution.is_some_and(|d| c.distributions.iter().any(|x| x == d))
+                && kube_version::admits(&c.kube_version, &facts.version).unwrap_or(false)
         })
         .collect();
     if supported.is_empty() {
@@ -364,7 +390,7 @@ fn evidence(detection: &Detection, facts: &ClusterFacts) -> Vec<String> {
             found.push(format!("Helm chart {chart}"));
         }
     }
-    for addon in &detection.k3s_addons {
+    for addon in detection.k3s_addons() {
         let key = format!("kube-system/{addon}");
         if facts.k3s_helm_charts.contains_key(&key) {
             found.push(format!("k3s add-on {addon}"));
@@ -427,7 +453,7 @@ mod tests {
                 + d.gateway_controllers.len()
                 + d.ingress_controllers.len()
                 + d.helm_charts.len()
-                + d.k3s_addons.len()
+                + d.addons.len()
                 + d.workloads.len();
             assert!(
                 rules > 0,

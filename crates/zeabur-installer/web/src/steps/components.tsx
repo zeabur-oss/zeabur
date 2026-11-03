@@ -175,6 +175,8 @@ export function leftOutReason(t: Translate, reason: string): string {
   if (untested) return t("components.untested", titleOf(untested[1]!))
   const memory = /^needs (\d+) MiB of memory$/.exec(reason)
   if (memory) return t("components.needsMemory", Number(memory[1]))
+  const kubernetes = /^needs Kubernetes (.+)$/.exec(reason)
+  if (kubernetes) return t("components.needsKubernetes", kubernetes[1]!)
   const only = /^runs on (.+) only$/.exec(reason)
   if (only) return t("components.runsOn", only[1]!)
   const profile = /^unsupported on (.+)$/.exec(reason)
@@ -329,9 +331,9 @@ function VeleroFields({ wizard }: { wizard: Wizard }) {
         help={t("velero.endpointHint")}
         kind="url"
         required
-        value={show(given["s3-url"])}
+        value={show(given["s3Url"])}
         placeholder="https://<account>.r2.cloudflarestorage.com"
-        onChange={(text) => setInput("s3-url", text)}
+        onChange={(text) => setInput("s3Url", text)}
       />
       <Setting
         label={t("velero.bucket")}

@@ -44,9 +44,8 @@ pub struct Template {
     pub license: String,
     /// The application's home page.
     pub homepage: String,
-    /// The components it needs: `<capability>/<component>`, or `<capability>` for any
-    /// component of it.
-    pub requires: Vec<String>,
+    /// The components it needs.
+    pub requires: Vec<Reference>,
     /// Its services, with what each one requests.
     pub services: Vec<TemplateService>,
     /// What a person gives or the browser generates.
@@ -250,12 +249,22 @@ impl RenderError {
     }
 }
 
+/// A capability or a component that something needs.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub enum Reference {
+    /// Any component of the capability (`databases`).
+    Capability(String),
+    /// The component `<capability>/<component>` (`databases/cloudnative-pg`).
+    Component(String),
+}
+
 /// The parts of `template.yaml` Zeabur reads.
 #[derive(Deserialize)]
 struct File {
     metadata: FileMetadata,
     #[serde(default)]
-    requires: Vec<String>,
+    requires: Vec<Reference>,
     #[serde(default)]
     services: Vec<FileService>,
     #[serde(default)]
@@ -314,14 +323,19 @@ struct FileInput {
     #[serde(default)]
     default: Option<String>,
     #[serde(default)]
-    generate: Option<String>,
-    #[serde(default)]
-    generate_bytes: Option<u8>,
-    #[serde(default)]
-    generate_encoding: Option<Encoding>,
+    generate: Option<FileGenerate>,
     #[serde(default)]
     secret: Option<SecretKey>,
     validation: FileValidation,
+}
+
+#[derive(Deserialize)]
+#[serde(tag = "type")]
+enum FileGenerate {
+    #[serde(rename = "random")]
+    Random { bytes: u8, encoding: Encoding },
+    #[serde(other)]
+    Unknown,
 }
 
 #[derive(Deserialize)]
@@ -329,7 +343,8 @@ struct FileValidation {
     pattern: String,
 }
 
-/// The templates this build carries, sorted by id.
+/// The templates this build carries and can deploy, sorted by id. A template with an input this
+/// build cannot generate is left out.
 ///
 /// # Errors
 ///
@@ -338,7 +353,10 @@ struct FileValidation {
 pub fn templates() -> Result<Vec<Template>, RenderError> {
     bundle::TEMPLATES
         .iter()
-        .map(|(id, file, manifests)| read(id, file, manifests))
+        .filter_map(|(id, file, manifests)| match read(id, file, manifests) {
+            Err(RenderError::UnknownTemplate(_)) => None,
+            read => Some(read),
+        })
         .collect()
 }
 
@@ -371,13 +389,14 @@ fn read(id: &str, file: &str, manifests: &str) -> Result<Template, RenderError> 
         .inputs
         .into_iter()
         .map(|input| {
-            let generate = match input.generate.as_deref() {
+            let generate = match input.generate {
                 None => None,
-                Some("random") => Some(Generated {
-                    bytes: input.generate_bytes.unwrap_or(32),
-                    encoding: input.generate_encoding.unwrap_or(Encoding::Base64url),
-                }),
-                Some(other) => return Err(broken(format!("unknown generator {other}"))),
+                Some(FileGenerate::Random { bytes, encoding }) => {
+                    Some(Generated { bytes, encoding })
+                }
+                Some(FileGenerate::Unknown) => {
+                    return Err(RenderError::UnknownTemplate(id.to_owned()));
+                }
             };
             Ok(TemplateInput {
                 name: input.name,
@@ -777,7 +796,7 @@ mod tests {
         };
         let input = |name: &str, secret: &str| {
             format!(
-                "  - {{name: {name}, description: d, generate: random, secret: {secret}, validation: {{pattern: x}}}}\n"
+                "  - {{name: {name}, description: d, generate: {{type: random, bytes: 32, encoding: base64url}}, secret: {secret}, validation: {{pattern: x}}}}\n"
             )
         };
         let secret = |name: &str, key: &str| format!("{{name: {name}, key: {key}}}");

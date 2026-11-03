@@ -13,7 +13,7 @@ use axum::Json;
 use axum::extract::{Path, State};
 use serde::Serialize;
 use utoipa::ToSchema;
-use zeabur_catalog::templates::{TemplateInput, TemplateService};
+use zeabur_catalog::templates::{Reference, TemplateInput, TemplateService};
 use zeabur_catalog::{Component, RenderError};
 use zeabur_core::problem::{Kind, MEDIA_TYPE as PROBLEM, Problem};
 use zeabur_kube::ServedResource;
@@ -191,16 +191,19 @@ fn view(
     }
 }
 
-/// `wanted` (`databases/cloudnative-pg`, or `databases`), and whether kube-apiserver serves the
-/// CustomResourceDefinitions its components are detected by.
+/// `wanted`, and whether kube-apiserver serves the CustomResourceDefinitions its components are
+/// detected by.
 fn requirement(
     catalogue: &[Component],
-    wanted: &str,
+    wanted: &Reference,
     served: Option<&[ServedResource]>,
 ) -> Requirement {
-    let (capability, component) = match wanted.split_once('/') {
-        Some((capability, component)) => (capability, Some(component)),
-        None => (wanted, None),
+    let (capability, component) = match wanted {
+        Reference::Component(id) => {
+            let (capability, component) = id.split_once('/').unwrap_or((id, ""));
+            (capability, Some(component))
+        }
+        Reference::Capability(capability) => (capability.as_str(), None),
     };
     let components: Vec<&Component> = catalogue
         .iter()
@@ -264,6 +267,7 @@ mod tests {
             summary: BTreeMap::new(),
             defaults: BTreeMap::new(),
             distributions: Vec::new(),
+            kube_version: String::new(),
             detection: Detection {
                 crds,
                 ..Detection::default()
@@ -308,10 +312,11 @@ mod tests {
             });
             let got: serde_json::Map<String, Value> = requires
                 .iter()
-                .map(|name| {
-                    let name = name.as_str().unwrap();
-                    let state = requirement(&catalogue, name, served.as_deref()).state;
-                    (name.to_owned(), json!(state))
+                .map(|wanted| {
+                    let wanted: Reference = serde_json::from_value(wanted.clone()).unwrap();
+                    let (Reference::Capability(name) | Reference::Component(name)) = &wanted;
+                    let state = requirement(&catalogue, &wanted, served.as_deref()).state;
+                    (name.clone(), json!(state))
                 })
                 .collect();
             assert_eq!(Value::Object(got), case["want"], "{}", path.display());
@@ -323,7 +328,12 @@ mod tests {
     fn names_the_component_a_template_requires() {
         let catalogue = zeabur_catalog::catalogue().unwrap();
         assert_eq!(
-            requirement(&catalogue, "databases/cloudnative-pg", None).name,
+            requirement(
+                &catalogue,
+                &Reference::Component("databases/cloudnative-pg".to_owned()),
+                None
+            )
+            .name,
             "CloudNativePG"
         );
     }

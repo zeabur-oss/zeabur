@@ -71,7 +71,9 @@ enable: [runtime-security, vulnerability-scanning, intrusion-prevention]
 
 `enable` accepts capabilities, such as `runtime-security`, or full component IDs, such as `volume-backup/velero`. The installer adds a component's dependencies with it. If `disable` excludes a component that another component needs, `plan` names both and stops. The `plan` output lists the final components, their installation order, and the reasons for exclusions. When the Catalog renames a component, an old ID in `enable` or `disable` stops `plan` with an error that names the new ID.
 
-The installer offers only components the Catalog has tested on your distribution. Each component lists them under `testedOn` in the Catalog's `index.json`. A recommended component that wasn't tested on your distribution is left out, and so is anything that needs it. If `enable` names an untested component, or a component you enabled needs one, `plan` installs it and warns that it wasn't tested there.
+The installer offers only components the Catalog has tested on your distribution and your server's platform, such as `linux/arm64`. Each component lists them under `testedOn` in the Catalog's `index.json`. A recommended component that wasn't tested on your distribution is left out, and so is anything that needs it. If `enable` names an untested component, or a component you enabled needs one, `plan` installs it and warns that it wasn't tested there.
+
+A component also lists the Kubernetes versions it runs on under `kubeVersion`. If your cluster's version isn't one of them, the installer leaves the component out, and `plan` warns when `enable` names it.
 
 The next `apply` removes any component you take off the list. If removing a component also deletes its data, add it to `allowDataLoss` first. See [Remove a component](./installer.mdx#remove-components).
 
@@ -79,12 +81,12 @@ The next `apply` removes any component you take off the list. If removing a comp
 inputs:
   volume-backup/velero:
     bucket: backups
-    s3-url: https://s3.example.com
+    s3Url: https://s3.example.com
 ```
 
 The Catalog defines each component's inputs and their types. If a required value is missing, `plan` names the field to add.
 
-The installer fills in `cluster-ip` for Zeabur Builder (zot's fixed address). A value in `inputs` overrides it.
+The installer fills in `clusterIp` for Zeabur Builder (zot's fixed address). A value in `inputs` overrides it.
 
 Velero's `region` input is the bucket's region. It defaults to `us-east-1`; Cloudflare R2 needs `auto`. The web interface asks for the access key ID and secret access key separately and writes the `credentials` file from them.
 

@@ -83,16 +83,8 @@ pub struct InstallText {
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Security {
-    /// It runs privileged.
-    #[serde(default)]
-    pub privileged: bool,
-    /// The Pod Security level its namespaces need when it is not `restricted`: `baseline`.
-    #[serde(
-        default,
-        rename = "podSecurity",
-        skip_serializing_if = "Option::is_none"
-    )]
-    pub level: Option<String>,
+    /// The Pod Security level its namespaces need: `restricted`, `baseline` or `privileged`.
+    pub pod_security: String,
 }
 
 /// A value the install needs from the person, or generates.
@@ -142,6 +134,10 @@ pub enum InstallError {
     /// No such component in the catalogue.
     #[error("Zeabur Catalog has no component {0}")]
     UnknownComponent(String),
+    /// The component needs something this build does not know: a release type, a Pod Security
+    /// level or a way to generate an input.
+    #[error("Zeabur Catalog, {0}: this build cannot install it ({1})")]
+    Unknown(String, String),
     /// No such profile.
     #[error("unknown profile {0}; use single-node or multi-node")]
     UnknownProfile(String),
@@ -154,28 +150,55 @@ pub enum InstallError {
 #[serde(rename_all = "camelCase")]
 struct File {
     #[serde(default)]
-    requires: Vec<String>,
+    requires: Vec<Reference>,
     #[serde(default)]
     inputs: Vec<Input>,
     releases: Vec<Release>,
     #[serde(default)]
     contributes: Vec<Contribution>,
-    #[serde(default)]
     security: Security,
     #[serde(default)]
     detection: Detection,
 }
 
+/// A capability (any provider) or a component.
+#[derive(Debug, Deserialize)]
+struct Reference {
+    #[serde(default)]
+    capability: Option<String>,
+    #[serde(default)]
+    component: Option<String>,
+}
+
 #[derive(Debug, Default, Deserialize)]
-#[serde(rename_all = "camelCase")]
 struct Detection {
     #[serde(default)]
-    k3s_addons: Vec<String>,
+    addons: Vec<Addon>,
+}
+
+#[derive(Debug, Deserialize)]
+struct Addon {
+    distribution: String,
+    name: String,
+}
+
+impl Detection {
+    fn k3s_addons(&self) -> impl Iterator<Item = &str> {
+        self.addons
+            .iter()
+            .filter(|a| a.distribution == "k3s")
+            .map(|a| a.name.as_str())
+    }
 }
 
 #[derive(Debug, Deserialize)]
 struct Contribution {
-    target: String,
+    target: Target,
+}
+
+#[derive(Debug, Deserialize)]
+struct Target {
+    component: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -190,26 +213,36 @@ struct Input {
     #[serde(default)]
     secret: Option<SecretRef>,
     #[serde(default)]
-    generate: Option<String>,
-    #[serde(default)]
-    generate_bytes: Option<u32>,
-    #[serde(default)]
-    generate_encoding: Option<String>,
+    generate: Option<Generate>,
     #[serde(default)]
     required: bool,
     #[serde(default)]
     default: Option<Value>,
 }
 
+/// How Zeabur makes an input's value.
+#[derive(Debug, Deserialize)]
+#[serde(tag = "type")]
+enum Generate {
+    #[serde(rename = "random")]
+    Random { bytes: u32, encoding: String },
+    #[serde(rename = "clusterIP")]
+    ClusterIp,
+    #[serde(other)]
+    Unknown,
+}
+
 impl Input {
-    /// The shell command that makes a value like the one Zeabur generates.
-    fn random(&self) -> String {
-        let n = self.generate_bytes.unwrap_or(64);
-        if self.generate_encoding.as_deref() == Some("base64url") {
-            format!("openssl rand -base64 {n} | tr '+/' '-_' | tr -d '='")
+    /// The shell command that makes a random value like the one Zeabur generates.
+    fn random(&self) -> Option<String> {
+        let Some(Generate::Random { bytes, encoding }) = &self.generate else {
+            return None;
+        };
+        Some(if encoding == "base64url" {
+            format!("openssl rand -base64 {bytes} | tr '+/' '-_' | tr -d '='")
         } else {
-            format!("openssl rand -hex {n}")
-        }
+            format!("openssl rand -hex {bytes}")
+        })
     }
 }
 
@@ -225,6 +258,8 @@ struct SecretRef {
 struct Release {
     name: String,
     namespace: String,
+    #[serde(rename = "type")]
+    kind: String,
     #[serde(default, rename = "releaseName")]
     helm_name: Option<String>,
     #[serde(default)]
@@ -293,8 +328,30 @@ impl Release {
         self.helm_name.as_deref().unwrap_or(&self.name)
     }
 
-    const fn is_chart(&self) -> bool {
-        self.chart.is_some()
+    fn is_chart(&self) -> bool {
+        self.kind == "helm"
+    }
+}
+
+impl File {
+    /// The first value of a release type, Pod Security level or input generator that this build
+    /// does not know.
+    fn unknown(&self) -> Option<String> {
+        if let Some(r) = self
+            .releases
+            .iter()
+            .find(|r| !["helm", "manifest", "inline"].contains(&r.kind.as_str()))
+        {
+            return Some(format!("release type {}", r.kind));
+        }
+        if !["restricted", "baseline", "privileged"].contains(&self.security.pod_security.as_str())
+        {
+            return Some(format!("Pod Security level {}", self.security.pod_security));
+        }
+        self.inputs
+            .iter()
+            .find(|i| matches!(i.generate, Some(Generate::Unknown)))
+            .map(|i| format!("how to generate {}", i.name))
     }
 }
 
@@ -317,12 +374,19 @@ pub fn guide(component: &str, profile: &str) -> Result<InstallGuide, InstallErro
         .ok_or_else(|| InstallError::UnknownComponent(component.to_owned()))?;
     let catalogue = |message: String| InstallError::Catalogue(component.to_owned(), message);
     let file: File = serde_saphyr::from_str(text).map_err(|e| catalogue(e.to_string()))?;
+    if let Some(unknown) = file.unknown() {
+        return Err(InstallError::Unknown(component.to_owned(), unknown));
+    }
     let rendered = Rendered::new(&file, profile).map_err(catalogue)?;
     Ok(InstallGuide {
         component: component.to_owned(),
         profile: profile.to_owned(),
         profiles: PROFILES.iter().map(|p| (*p).to_owned()).collect(),
-        requires: file.requires.clone(),
+        requires: file
+            .requires
+            .iter()
+            .filter_map(|r| r.capability.clone().or_else(|| r.component.clone()))
+            .collect(),
         security: file.security.clone(),
         inputs: file
             .inputs
@@ -331,11 +395,15 @@ pub fn guide(component: &str, profile: &str) -> Result<InstallGuide, InstallErro
                 name: i.name.clone(),
                 description: i.description.trim().to_owned(),
                 required: i.required,
-                generated: i.generate.is_some(),
+                generated: i.random().is_some(),
             })
             .collect(),
-        contributes_to: file.contributes.iter().map(|c| c.target.clone()).collect(),
-        replaces_k3s_packaged: file.detection.k3s_addons.clone(),
+        contributes_to: file
+            .contributes
+            .iter()
+            .map(|c| c.target.component.clone())
+            .collect(),
+        replaces_k3s_packaged: file.detection.k3s_addons().map(str::to_owned).collect(),
         formats: [
             InstallFormat::Helm,
             InstallFormat::K3s,
@@ -461,11 +529,10 @@ impl<'a> Rendered<'a> {
             let literals: Vec<String> = inputs
                 .iter()
                 .map(|(input, key)| {
-                    let value = if input.generate.is_some() {
-                        format!("\"$({})\"", input.random())
-                    } else {
-                        format!("'<{}>'", input.name)
-                    };
+                    let value = input.random().map_or_else(
+                        || format!("'<{}>'", input.name),
+                        |random| format!("\"$({random})\""),
+                    );
                     format!("--from-literal={key}={value}")
                 })
                 .collect();
@@ -598,11 +665,10 @@ impl<'a> Rendered<'a> {
             {
                 continue;
             }
-            let value = if input.generate.is_some() {
-                format!("\"$({})\"", input.random())
-            } else {
-                format!("'<{}>'", input.name)
-            };
+            let value = input.random().map_or_else(
+                || format!("'<{}>'", input.name),
+                |random| format!("\"$({random})\""),
+            );
             args.push(format!("--set {path}={value}"));
         }
         out.push_str(&args.join(&format!(" \\\n{indent}  ")));
@@ -651,7 +717,7 @@ impl<'a> Rendered<'a> {
     /// what that removes, at the head of every form; empty for any other component.
     fn k3s_packaged(&self) -> String {
         let mut out = String::new();
-        for addon in &self.file.detection.k3s_addons {
+        for addon in self.file.detection.k3s_addons() {
             push(
                 &mut out,
                 format!(
@@ -668,7 +734,7 @@ impl<'a> Rendered<'a> {
                     ),
                 );
             }
-            out.push_str(match addon.as_str() {
+            out.push_str(match addon {
                 "traefik" => {
                     "# That deletes the Traefik CRDs and any IngressRoute or Middleware objects;\n# Ingress traffic stops until this one runs.\n"
                 }
@@ -687,12 +753,10 @@ impl<'a> Rendered<'a> {
     /// The namespaces of its releases with the Pod Security level they need when it is not
     /// `restricted`; in release order.
     fn exempt_namespaces(&self) -> Vec<(&str, &'static str)> {
-        let level = if self.file.security.privileged {
-            "privileged"
-        } else if self.file.security.level.as_deref() == Some("baseline") {
-            "baseline"
-        } else {
-            return Vec::new();
+        let level = match self.file.security.pod_security.as_str() {
+            "privileged" => "privileged",
+            "baseline" => "baseline",
+            _ => return Vec::new(),
         };
         let mut namespaces: Vec<(&str, &'static str)> = Vec::new();
         for release in &self.file.releases {
@@ -719,11 +783,10 @@ impl<'a> Rendered<'a> {
                 ),
             );
             for (input, key) in &inputs {
-                let value = if input.generate.is_some() {
-                    format!("<random: {}>", input.random())
-                } else {
-                    format!("<{}>", input.name)
-                };
+                let value = input.random().map_or_else(
+                    || format!("<{}>", input.name),
+                    |random| format!("<random: {random}>"),
+                );
                 push(&mut out, format!("  {key}: \"{value}\"\n"));
             }
             out.push_str("---\n");
@@ -945,14 +1008,15 @@ impl<'a> Rendered<'a> {
 }
 
 fn placeholder(input: &Input) -> Value {
-    if input.generate.is_some() {
-        Value::String(format!("<random: {}>", input.random()))
-    } else {
-        input
-            .default
-            .clone()
-            .unwrap_or_else(|| Value::String(format!("<{}>", input.name)))
-    }
+    input.random().map_or_else(
+        || {
+            input
+                .default
+                .clone()
+                .unwrap_or_else(|| Value::String(format!("<{}>", input.name)))
+        },
+        |random| Value::String(format!("<random: {random}>")),
+    )
 }
 
 fn parse_values(text: Option<&str>) -> Result<Value, String> {
@@ -1180,14 +1244,14 @@ mod tests {
             .find(|(capability, id, _)| *capability == "databases" && *id == "cloudnative-pg")
             .unwrap();
         let mut file: File = serde_saphyr::from_str(text).unwrap();
-        file.security.privileged = true;
+        file.security.pod_security = "privileged".to_owned();
         let rendered = Rendered::new(&file, "single-node").unwrap();
         let k3s = rendered.k3s();
         let namespace = k3s.find("kind: Namespace").unwrap();
         assert!(namespace < k3s.find("kind: HelmChart").unwrap());
         for (capability, id, _) in bundle::FILES {
             let guide = guide(&format!("{capability}/{id}"), "multi-node").unwrap();
-            if !guide.security.privileged {
+            if guide.security.pod_security != "privileged" {
                 continue;
             }
             for text in &guide.formats {
@@ -1208,7 +1272,7 @@ mod tests {
     #[test]
     fn a_baseline_component_gets_a_baseline_namespace_in_every_form() {
         let guide = guide("volume-backup/k8up", "single-node").unwrap();
-        assert_eq!(guide.security.level.as_deref(), Some("baseline"));
+        assert_eq!(guide.security.pod_security, "baseline");
         for text in &guide.formats {
             let label = if text.format == InstallFormat::Helm {
                 "pod-security.kubernetes.io/enforce=baseline"

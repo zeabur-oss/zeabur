@@ -11,6 +11,7 @@ publish.workspace = true
 workspace = true
 
 [dependencies]
+zeabur-installer-plan.workspace = true
 zeabur-kube.workspace = true
 regex.workspace = true
 serde.workspace = true

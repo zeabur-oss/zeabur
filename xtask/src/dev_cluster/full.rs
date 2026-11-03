@@ -79,7 +79,7 @@ fn zot(dev: &DevCluster) -> Result<(), String> {
         dev,
         "builds/zeabur-builder",
         "zot",
-        &[&format!("cluster-ip={ZOT_IP}")],
+        &[&format!("clusterIp={ZOT_IP}")],
         Some("builder"),
     )?;
     dev.kubectl()

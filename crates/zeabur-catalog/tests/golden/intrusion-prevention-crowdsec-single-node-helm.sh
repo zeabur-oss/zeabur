@@ -43,7 +43,7 @@ lapi:
     # No data leaves the cluster unless the user opts in.
     - name: DISABLE_ONLINE_API
       value: "true"
-    # Registers the Traefik bouncer (input bouncer-key).
+    # Registers the Traefik bouncer (input bouncerKey).
     - name: BOUNCER_KEY_traefik
       valueFrom:
         secretKeyRef: {name: crowdsec-bouncer-key, key: key}

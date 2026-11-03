@@ -49,7 +49,7 @@ spec:
           customerKeyEncryptionSecret: velero-backup-key/key
           region: us-east-1
           s3ForcePathStyle: "true"
-          s3Url: <s3-url>
+          s3Url: <s3Url>
         default: true
         name: default
         provider: aws

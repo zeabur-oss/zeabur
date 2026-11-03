@@ -3,9 +3,10 @@
 //!
 //! A team install installs the catalog's recommended components for the profile and
 //! [`FEATURES`]; a personal install the ones recommended for [`PERSONAL_PROFILE`]. Only components
-//! whose `testedOn` names
-//! the distribution are installed by default: a default one that is not is left out, and one the
-//! configuration enables is installed with a warning. Names are capabilities or component ids,
+//! whose `testedOn` names the distribution with the node's platform are installed by default: a
+//! default one that is not is left out, and one the configuration enables is installed with a
+//! warning. A component whose `kubeVersion` leaves out the cluster's Kubernetes is left out, as
+//! one of another distribution is. Names are capabilities or component ids,
 //! so the catalog decides which component fills each one. The install order is the union of each
 //! chosen component's `installOrder`, taken in id order: every list already places a component
 //! after its dependencies, so the union does too, and the result never depends on the order of
@@ -16,6 +17,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use crate::PlanError;
 use crate::catalog::{Default, Index};
 use crate::config::{Config, PersonalConfig};
+use crate::pins::KUBESOLO;
 use crate::plan::{Warning, warning};
 
 /// The distribution of a personal install.
@@ -48,6 +50,11 @@ pub struct Selection {
 pub enum LeftOut {
     /// It runs only on these distributions.
     Distributions(Vec<String>),
+    /// Its `kubeVersion` leaves out the cluster's Kubernetes.
+    KubeVersion {
+        /// The range.
+        range: String,
+    },
     /// Its `defaults` is `unsupported` on the profile.
     Unsupported {
         /// The profile.
@@ -71,6 +78,7 @@ impl std::fmt::Display for LeftOut {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Distributions(only) => write!(f, "runs on {} only", only.join(", ")),
+            Self::KubeVersion { range } => write!(f, "needs Kubernetes {range}"),
             Self::Unsupported { profile } => write!(f, "unsupported on {profile}"),
             Self::Untested { distribution } => write!(f, "not tested on {distribution}"),
             Self::NeedsUntested {
@@ -101,34 +109,75 @@ pub enum Why {
     Dependency,
 }
 
-/// Chooses the components for a configuration.
+/// The cluster the components are chosen for.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Target {
+    /// `k3s`, `rke2` or `kubesolo`.
+    pub distribution: String,
+    /// The nodes' platform, `linux/<arch>`.
+    pub platform: String,
+    /// The server version (`v1.36.5+k3s1`).
+    pub kubernetes: String,
+}
+
+impl Target {
+    /// A team install of `config` on a Linux host of `arch`: the configured release of its
+    /// distribution, else the pinned one.
+    #[must_use]
+    pub fn team(config: &Config, arch: &str) -> Self {
+        let distribution = config.distribution;
+        Self {
+            distribution: distribution.id().to_owned(),
+            platform: format!("linux/{arch}"),
+            kubernetes: config
+                .version()
+                .unwrap_or_else(|| distribution.pinned_version())
+                .to_owned(),
+        }
+    }
+
+    /// A personal install on a Linux host of `arch`: the Kubernetes minor of the pinned `KubeSolo`.
+    #[must_use]
+    pub fn personal(arch: &str) -> Self {
+        Self {
+            distribution: PERSONAL_DISTRIBUTION.to_owned(),
+            platform: format!("linux/{arch}"),
+            kubernetes: format!("v{}.0", KUBESOLO.kubernetes),
+        }
+    }
+}
+
+/// Chooses the components for a configuration on `target`.
 ///
 /// # Errors
 ///
 /// When a name matches nothing or is an id that a component replaces, or a chosen component
 /// needs one that is disabled or left out.
-pub fn select(index: &Index, config: &Config) -> Result<Selection, PlanError> {
+pub fn select(index: &Index, config: &Config, target: &Target) -> Result<Selection, PlanError> {
     let profile = config.profile.as_str();
-    let distribution = config.distribution.id();
     choose(
         index,
         &Wanted {
-            base: team_base(index, profile, distribution, FEATURES)?,
+            base: team_base(index, profile, target, FEATURES)?,
             enable: &config.enable,
             disable: &config.disable,
             profile,
-            distribution,
+            target,
         },
     )
 }
 
 /// Chooses the components of a personal install: those the catalog recommends for
-/// [`PERSONAL_PROFILE`] and tested on [`PERSONAL_DISTRIBUTION`], then `enable` and `disable`.
+/// [`PERSONAL_PROFILE`] and tested on `target`, then `enable` and `disable`.
 ///
 /// # Errors
 ///
 /// As [`select`].
-pub fn select_personal(index: &Index, config: &PersonalConfig) -> Result<Selection, PlanError> {
+pub fn select_personal(
+    index: &Index,
+    config: &PersonalConfig,
+    target: &Target,
+) -> Result<Selection, PlanError> {
     choose(
         index,
         &Wanted {
@@ -137,13 +186,13 @@ pub fn select_personal(index: &Index, config: &PersonalConfig) -> Result<Selecti
                 .filter(|id| {
                     index
                         .component(id)
-                        .is_some_and(|c| c.is_tested_on(PERSONAL_DISTRIBUTION))
+                        .is_some_and(|c| c.is_tested_on(&target.distribution, &target.platform))
                 })
                 .collect(),
             enable: &config.enable,
             disable: &config.disable,
             profile: PERSONAL_PROFILE,
-            distribution: PERSONAL_DISTRIBUTION,
+            target,
         },
     )
 }
@@ -152,11 +201,11 @@ pub fn select_personal(index: &Index, config: &PersonalConfig) -> Result<Selecti
 fn team_base(
     index: &Index,
     profile: &str,
-    distribution: &str,
+    target: &Target,
     add: &[&str],
 ) -> Result<Vec<String>, PlanError> {
     let mut base = recommended(index, profile);
-    base.extend(resolve_all(index, profile, distribution, add)?);
+    base.extend(resolve_all(index, profile, target, add)?);
     Ok(base)
 }
 
@@ -165,7 +214,7 @@ struct Wanted<'a> {
     enable: &'a [String],
     disable: &'a [String],
     profile: &'a str,
-    distribution: &'a str,
+    target: &'a Target,
 }
 
 fn untested(id: &str, distribution: &str) -> Warning {
@@ -181,7 +230,8 @@ fn untested(id: &str, distribution: &str) -> Warning {
 
 fn choose(index: &Index, wanted: &Wanted<'_>) -> Result<Selection, PlanError> {
     let profile = wanted.profile;
-    let distribution = wanted.distribution;
+    let target = wanted.target;
+    let distribution = target.distribution.as_str();
     let mut chosen: BTreeMap<String, Why> = BTreeMap::new();
     for id in &wanted.base {
         chosen.insert(id.clone(), Why::Default);
@@ -190,7 +240,7 @@ fn choose(index: &Index, wanted: &Wanted<'_>) -> Result<Selection, PlanError> {
         check_replaced(index, name)?;
     }
     for name in wanted.enable {
-        chosen.insert(resolve(index, profile, distribution, name)?, Why::Enabled);
+        chosen.insert(resolve(index, profile, target, name)?, Why::Enabled);
     }
     let mut warnings = Vec::new();
     let mut disabled = BTreeSet::new();
@@ -210,7 +260,7 @@ fn choose(index: &Index, wanted: &Wanted<'_>) -> Result<Selection, PlanError> {
         }
     }
 
-    let mut left_out = leave_out_unusable(index, profile, distribution, &mut chosen, &mut warnings);
+    let mut left_out = leave_out_unusable(index, profile, target, &mut chosen, &mut warnings);
 
     let mut order: Vec<(String, Why)> = Vec::new();
     for (id, why) in &chosen {
@@ -227,7 +277,7 @@ fn choose(index: &Index, wanted: &Wanted<'_>) -> Result<Selection, PlanError> {
                 !disabled.contains(*dep)
                     && index
                         .component(dep)
-                        .is_some_and(|c| !c.is_tested_on(distribution))
+                        .is_some_and(|c| !c.is_tested_on(distribution, &target.platform))
             })
         {
             left_out.insert(
@@ -276,10 +326,12 @@ fn take_untested(
     left_out: &mut BTreeMap<String, LeftOut>,
     warnings: &mut Vec<Warning>,
 ) {
+    let target = wanted.target;
     let usable_untested = index.component(dep).is_some_and(|c| {
-        c.supports(wanted.distribution)
+        c.supports(&target.distribution)
+            && c.admits(&target.kubernetes)
             && c.default_for(wanted.profile) != Default::Unsupported
-            && !c.is_tested_on(wanted.distribution)
+            && !c.is_tested_on(&target.distribution, &target.platform)
     });
     if !usable_untested {
         return;
@@ -289,20 +341,21 @@ fn take_untested(
         .iter()
         .any(|w| w.code == "config.untested" && w.values.first().is_some_and(|v| v == dep))
     {
-        warnings.push(untested(dep, wanted.distribution));
+        warnings.push(untested(dep, &target.distribution));
     }
 }
 
-/// Takes out of `chosen` the components that cannot run on the distribution or profile, and the
-/// defaults that were not tested on the distribution, and returns them with the reason. An enabled
-/// component that was not tested stays, with a warning.
+/// Takes out of `chosen` the components that cannot run on the distribution, its Kubernetes or
+/// the profile, and the defaults that were not tested on the distribution and platform, and
+/// returns them with the reason. An enabled component that was not tested stays, with a warning.
 fn leave_out_unusable(
     index: &Index,
     profile: &str,
-    distribution: &str,
+    target: &Target,
     chosen: &mut BTreeMap<String, Why>,
     warnings: &mut Vec<Warning>,
 ) -> BTreeMap<String, LeftOut> {
+    let distribution = target.distribution.as_str();
     let mut left_out = BTreeMap::new();
     let mut unusable = Vec::new();
     for (id, why) in chosen.iter() {
@@ -323,6 +376,22 @@ fn leave_out_unusable(
                 id.clone(),
                 LeftOut::Distributions(component.distributions.clone()),
             );
+        } else if !component.admits(&target.kubernetes) {
+            let range = &component.kube_version;
+            let kubernetes = &target.kubernetes;
+            if enabled {
+                warnings.push(warning(
+                    "config.kubeVersion",
+                    &[id, range, kubernetes],
+                    format!("The configuration enables {id}, which needs Kubernetes {range}, and this cluster runs {kubernetes}, so it is not installed."),
+                ));
+            }
+            left_out.insert(
+                id.clone(),
+                LeftOut::KubeVersion {
+                    range: range.clone(),
+                },
+            );
         } else if component.default_for(profile) == Default::Unsupported {
             if enabled {
                 warnings.push(warning(
@@ -337,7 +406,7 @@ fn leave_out_unusable(
                     profile: profile.to_owned(),
                 },
             );
-        } else if !component.is_tested_on(distribution) {
+        } else if !component.is_tested_on(distribution, &target.platform) {
             if enabled {
                 warnings.push(untested(id, distribution));
                 continue;
@@ -385,33 +454,33 @@ fn recommended(index: &Index, profile: &str) -> Vec<String> {
 /// The components that [`REQUIRED`] names on a profile; names the catalog lacks are skipped.
 #[must_use]
 pub fn required(index: &Index, profile: &str) -> BTreeSet<String> {
+    let anywhere = Target {
+        distribution: String::new(),
+        platform: String::new(),
+        kubernetes: String::new(),
+    };
     REQUIRED
         .iter()
-        .filter_map(|name| resolve(index, profile, "", name).ok())
+        .filter_map(|name| resolve(index, profile, &anywhere, name).ok())
         .collect()
 }
 
 fn resolve_all(
     index: &Index,
     profile: &str,
-    distribution: &str,
+    target: &Target,
     names: &[&str],
 ) -> Result<Vec<String>, PlanError> {
     names
         .iter()
-        .map(|name| resolve(index, profile, distribution, name))
+        .map(|name| resolve(index, profile, target, name))
         .collect()
 }
 
 /// A component id, or the provider of a capability: its recommended component on the profile,
 /// else its first optional one (the catalog's own rule for a bare `requires`), taking one tested
-/// on the distribution first.
-fn resolve(
-    index: &Index,
-    profile: &str,
-    distribution: &str,
-    name: &str,
-) -> Result<String, PlanError> {
+/// on the distribution and platform first.
+fn resolve(index: &Index, profile: &str, target: &Target, name: &str) -> Result<String, PlanError> {
     if name.contains('/') {
         return index
             .component(name)
@@ -426,7 +495,7 @@ fn resolve(
         .collect();
     providers.sort_by_key(|c| {
         (
-            !c.is_tested_on(distribution),
+            !c.is_tested_on(&target.distribution, &target.platform),
             c.default_for(profile) != Default::Recommended,
         )
     });
@@ -472,12 +541,15 @@ mod tests {
                 component["capability"] = json!(id.split('/').next().unwrap());
                 component["metadata"] = json!({"name": id});
                 component["releases"] = json!([]);
-                component["security"] = json!({"summary": ""});
+                component["security"] = json!({"summary": "", "podSecurity": "restricted"});
+                if component.get("kubeVersion").is_none() {
+                    component["kubeVersion"] = json!(">=1.30.0-0");
+                }
                 component
             })
             .collect();
         let index = json!({
-            "indexVersion": 2,
+            "indexVersion": 3,
             "profiles": ["single-node", "multi-node"],
             "components": components,
         });
@@ -488,15 +560,19 @@ mod tests {
         let index = index_of(case);
         let config = &case["config"];
         let profile = config["profile"].as_str().unwrap();
-        let distribution = config["distribution"].as_str().unwrap();
+        let target = Target {
+            distribution: config["distribution"].as_str().unwrap().to_owned(),
+            platform: config["platform"].as_str().unwrap().to_owned(),
+            kubernetes: "v1.36.5".to_owned(),
+        };
         choose(
             &index,
             &Wanted {
-                base: team_base(&index, profile, distribution, &names(&config["add"]))?,
+                base: team_base(&index, profile, &target, &names(&config["add"]))?,
                 enable: &owned(&config["enable"]),
                 disable: &owned(&config["disable"]),
                 profile,
-                distribution,
+                target: &target,
             },
         )
     }
@@ -506,6 +582,7 @@ mod tests {
             LeftOut::Distributions(distributions) => {
                 json!({"reason": "distributions", "distributions": distributions})
             }
+            LeftOut::KubeVersion { range } => json!({"reason": "kube-version", "range": range}),
             LeftOut::Unsupported { profile } => {
                 json!({"reason": "unsupported", "profile": profile})
             }
@@ -594,6 +671,85 @@ mod tests {
             out.insert("warnings".to_owned(), json!(warnings));
         }
         sorted_warnings(Value::Object(out))
+    }
+
+    #[test]
+    fn a_component_outside_its_kube_version_is_left_out() {
+        let case: Value = serde_saphyr::from_str(
+            "components:
+  - {id: ingress/traefik, defaults: {single-node: recommended, multi-node: recommended},
+     distributions: [k3s], testedOn: [{distribution: k3s, platforms: [linux/amd64]}],
+     kubeVersion: '>=1.30.0-0'}
+  - {id: logs/victoria-logs, defaults: {single-node: recommended, multi-node: recommended},
+     distributions: [k3s], testedOn: [{distribution: k3s, platforms: [linux/amd64]}],
+     kubeVersion: '>=1.37.0-0'}
+  - {id: metrics/victoria-metrics, defaults: {single-node: optional, multi-node: optional},
+     distributions: [k3s], testedOn: [{distribution: k3s, platforms: [linux/amd64]}],
+     kubeVersion: '>=1.37.0-0'}
+",
+        )
+        .unwrap();
+        let index = index_of(&case);
+        let target = Target {
+            distribution: "k3s".to_owned(),
+            platform: "linux/amd64".to_owned(),
+            kubernetes: "v1.36.5+k3s1".to_owned(),
+        };
+        let selection = choose(
+            &index,
+            &Wanted {
+                base: team_base(&index, "single-node", &target, &[]).unwrap(),
+                enable: &["metrics/victoria-metrics".to_owned()],
+                disable: &[],
+                profile: "single-node",
+                target: &target,
+            },
+        )
+        .unwrap();
+        assert_eq!(
+            selection.components,
+            [("ingress/traefik".to_owned(), Why::Default)]
+        );
+        let needs = LeftOut::KubeVersion {
+            range: ">=1.37.0-0".to_owned(),
+        };
+        assert_eq!(selection.left_out["logs/victoria-logs"], needs);
+        assert_eq!(selection.left_out["metrics/victoria-metrics"], needs);
+        let codes: Vec<&str> = selection.warnings.iter().map(|w| w.code).collect();
+        assert_eq!(codes, ["config.kubeVersion"]);
+    }
+
+    #[test]
+    fn a_component_with_a_release_type_or_level_it_does_not_know_is_not_offered() {
+        let case: Value = serde_saphyr::from_str(
+            "components:
+  - {id: ingress/traefik, defaults: {single-node: recommended, multi-node: recommended},
+     distributions: [k3s], testedOn: [{distribution: k3s, platforms: [linux/amd64]}]}
+  - {id: logs/victoria-logs, defaults: {single-node: recommended, multi-node: recommended},
+     distributions: [k3s], testedOn: [{distribution: k3s, platforms: [linux/amd64]}]}
+",
+        )
+        .unwrap();
+        let mut json = case["components"].clone();
+        for component in json.as_array_mut().unwrap() {
+            let id = component["id"].as_str().unwrap().to_owned();
+            component["capability"] = json!(id.split('/').next().unwrap());
+            component["metadata"] = json!({"name": id});
+            component["kubeVersion"] = json!(">=1.30.0-0");
+            component["releases"] = json!([]);
+            component["security"] = json!({"summary": "", "podSecurity": "restricted"});
+        }
+        json[0]["releases"] = json!([{"name": "a", "namespace": "a", "type": "kustomize"}]);
+        json[1]["security"]["podSecurity"] = json!("hardened");
+        let index = Index::parse(
+            json!({"indexVersion": 3, "profiles": ["single-node"], "components": json})
+                .to_string()
+                .as_bytes(),
+        )
+        .unwrap();
+        for component in &index.components {
+            assert_eq!(component.default_for("single-node"), Default::Unsupported);
+        }
     }
 
     #[test]

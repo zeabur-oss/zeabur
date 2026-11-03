@@ -3,17 +3,18 @@
 //! The catalog is data, not an installer: it says which upstream components fill which capability,
 //! their charts and values per profile, the inputs to ask for and the order to install them in.
 //! Unknown fields are ignored, because the index only changes `indexVersion` on incompatible
-//! changes.
+//! changes, and a value it does not know is read as the catalog's `docs/reference/releases.mdx`
+//! says.
 
 use std::collections::{BTreeMap, BTreeSet};
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::PlanError;
+use crate::{PlanError, kube_version};
 
 /// The only `indexVersion` this installer understands.
-pub const INDEX_VERSION: u64 = 2;
+pub const INDEX_VERSION: u64 = 3;
 
 /// A parsed `index.json`.
 #[derive(Debug, Clone, Deserialize)]
@@ -43,14 +44,15 @@ pub struct Component {
     pub metadata: Metadata,
     /// `recommended`, `optional` or `unsupported`, per profile.
     pub defaults: BTreeMap<String, Default>,
-    /// Distributions it works on; empty means any.
-    #[serde(default)]
+    /// Distributions it works on. A distribution this installer does not know matches nothing.
     pub distributions: Vec<String>,
-    /// Distributions the catalog's CI installed it on and passed: `k3s`, `rke2`, `kubesolo`.
-    pub tested_on: Vec<String>,
-    /// Ids of components that this one replaces.
+    /// The Kubernetes versions it supports, as a Helm chart's `kubeVersion` (`>=1.34.0-0`).
+    pub kube_version: String,
+    /// Where the catalog's CI installed it and passed.
+    pub tested_on: Vec<TestedOn>,
+    /// Components that this one replaces.
     #[serde(default)]
-    pub replaces: Vec<String>,
+    pub replaces: Vec<ComponentRef>,
     /// Releases installed in this order.
     pub releases: Vec<Release>,
     /// Values asked for or generated before installing.
@@ -67,9 +69,9 @@ pub struct Component {
     /// The components to install first, then this one, per profile.
     #[serde(default)]
     pub install_order: BTreeMap<String, Vec<String>>,
-    /// Idle use measured by the catalog's CI, keyed `<profile>-<arch>-v<kubernetes>`.
+    /// What the catalog's CI measured in each environment where its test passed.
     #[serde(default)]
-    pub measured: BTreeMap<String, Measured>,
+    pub measured: Vec<Measured>,
     /// It keeps data of its own.
     #[serde(default)]
     pub persists_data: bool,
@@ -104,22 +106,71 @@ pub struct Provides {
 /// What a component needs beyond its measured idle use.
 #[derive(Debug, Clone, Default, Deserialize)]
 pub struct Resources {
-    /// Memory it uses on top of its idle use while working, such as one build.
-    #[serde(rename = "workMemoryMiB")]
-    pub work_memory_mib: Option<u64>,
-    /// The memory request of the pod that does that work, from its chart's values.
-    #[serde(rename = "workRequestMemoryMiB")]
-    pub work_request_memory_mib: Option<u64>,
+    /// Each kind of work it does, such as a build.
+    #[serde(default)]
+    pub work: Vec<Work>,
+}
+
+/// One kind of work a component does.
+#[derive(Debug, Clone, Deserialize)]
+pub struct Work {
+    /// Unique in the component.
+    pub name: String,
+    /// What each pod that does one unit of the work requests.
+    #[serde(default)]
+    pub requests: Amounts,
+    /// What the component uses on top of its idle use while it does one unit of the work.
+    #[serde(default, rename = "use")]
+    pub uses: Amounts,
+}
+
+/// Memory and CPU. The catalog leaves out an amount that is zero or not given.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize)]
+pub struct Amounts {
+    /// Memory in MiB.
+    #[serde(rename = "memoryMiB")]
+    pub memory_mib: Option<u64>,
+    /// CPU in millicores.
+    #[serde(rename = "cpuMillis")]
+    pub cpu_millis: Option<u64>,
+}
+
+impl Amounts {
+    /// The memory, 0 when the catalog leaves it out.
+    #[must_use]
+    pub fn memory(self) -> u64 {
+        self.memory_mib.unwrap_or(0)
+    }
 }
 
 impl Resources {
-    /// What one piece of work needs on top of its idle use: what it uses, and no less than its
-    /// pod asks the scheduler for.
+    /// What one unit of each kind of work needs on top of its idle use: what it uses, and no
+    /// less than its pod asks the scheduler for. `None` when it does no work of its own.
     #[must_use]
     pub fn work_mib(&self) -> Option<u64> {
-        let work = self.work_memory_mib?;
-        Some(work.max(self.work_request_memory_mib.unwrap_or(0)))
+        (!self.work.is_empty()).then(|| {
+            self.work
+                .iter()
+                .map(|w| w.uses.memory().max(w.requests.memory()))
+                .sum()
+        })
     }
+}
+
+/// A distribution and the node platforms where the catalog's CI passed on it.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+pub struct TestedOn {
+    /// `k3s`, `rke2` or `kubesolo`.
+    pub distribution: String,
+    /// `<os>/<architecture>`, such as `linux/amd64`.
+    pub platforms: Vec<String>,
+}
+
+/// A component by its id.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+pub struct ComponentRef {
+    /// `<capability>/<upstream>`.
+    pub component: String,
 }
 
 /// An in-cluster registry.
@@ -172,8 +223,24 @@ pub enum Default {
     Recommended,
     /// Installed when asked for.
     Optional,
-    /// Never installed on this profile.
+    /// Never installed on this profile, and what an unknown value means.
+    #[serde(other)]
     Unsupported,
+}
+
+/// How a release installs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ReleaseType {
+    /// A Helm chart: `chart`, `version`, `chartDigest`, `repo` for an HTTP repository.
+    Helm,
+    /// Files downloaded from `urls`.
+    Manifest,
+    /// The objects in `manifests`.
+    Inline,
+    /// A type this installer does not know: the component is not offered.
+    #[serde(other)]
+    Unknown,
 }
 
 /// One Helm chart, one set of manifests or one downloaded manifest file.
@@ -182,6 +249,9 @@ pub enum Default {
 pub struct Release {
     /// Unique within the component.
     pub name: String,
+    /// How it installs.
+    #[serde(rename = "type")]
+    pub kind: ReleaseType,
     /// The namespace it installs into.
     pub namespace: String,
     /// The Helm release name, when it differs from `name`.
@@ -234,14 +304,8 @@ pub struct Input {
     pub path: Option<String>,
     /// Or a Secret key it is stored in.
     pub secret: Option<SecretRef>,
-    /// `random`: `generate_bytes` random bytes in `generate_encoding`. `clusterIP`: a free
-    /// address in the Service CIDR, which the installer fills.
-    pub generate: Option<String>,
-    /// 64 when absent.
-    pub generate_bytes: Option<usize>,
-    /// Hexadecimal when absent.
-    #[serde(default)]
-    pub generate_encoding: Encoding,
+    /// How the installer makes the value when none is given.
+    pub generate: Option<Generate>,
     /// Installing fails without it.
     #[serde(default)]
     pub required: bool,
@@ -249,12 +313,31 @@ pub struct Input {
     pub default: Option<Value>,
 }
 
+/// How the installer makes an input's value.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(tag = "type")]
+pub enum Generate {
+    /// `bytes` random bytes in `encoding`.
+    #[serde(rename = "random")]
+    Random {
+        /// 12 to 64.
+        bytes: usize,
+        /// How they are written.
+        encoding: Encoding,
+    },
+    /// A free address in the Service CIDR.
+    #[serde(rename = "clusterIP")]
+    ClusterIp,
+    /// A type this installer does not know: the input is not filled in.
+    #[serde(other)]
+    Unknown,
+}
+
 /// How generated bytes are written.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Encoding {
     /// Two hexadecimal digits per byte.
-    #[default]
     Hex,
     /// URL-safe base64 without padding.
     Base64url,
@@ -274,12 +357,19 @@ pub struct SecretRef {
 /// Values one component adds to another's release.
 #[derive(Debug, Clone, Deserialize)]
 pub struct Contribution {
-    /// `<capability>/<upstream>`.
-    pub target: String,
-    /// The release in the target.
-    pub release: String,
+    /// The release that receives them.
+    pub target: Target,
     /// Values as YAML.
     pub values: String,
+}
+
+/// A release of another component.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+pub struct Target {
+    /// `<capability>/<upstream>`.
+    pub component: String,
+    /// The release in it.
+    pub release: String,
 }
 
 /// The security notes of a component.
@@ -288,15 +378,27 @@ pub struct Contribution {
 pub struct Security {
     /// One sentence.
     pub summary: String,
-    /// Runs privileged pods or host access.
-    #[serde(default)]
-    pub privileged: bool,
-    /// The Pod Security level its namespaces need when it cannot run under `restricted`.
-    #[serde(default, rename = "podSecurity")]
-    pub level: Option<String>,
+    /// The Pod Security level its namespaces need.
+    #[serde(rename = "podSecurity")]
+    pub level: PodSecurity,
     /// Hosts it calls.
     #[serde(default)]
     pub egress: Vec<String>,
+}
+
+/// A Pod Security Standards level.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum PodSecurity {
+    /// The default.
+    Restricted,
+    /// No seccomp profile or dropped capabilities.
+    Baseline,
+    /// Privileged pods or host access.
+    Privileged,
+    /// A level this installer does not know: the component is not offered.
+    #[serde(other)]
+    Unknown,
 }
 
 /// One health check: a single `kubectl wait` that applies nothing.
@@ -324,17 +426,40 @@ impl Health {
     }
 }
 
-/// Idle use measured in CI.
-#[derive(Debug, Clone, Copy, Deserialize)]
+/// What the catalog's CI measured in one environment where the component's test passed.
+#[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Measured {
-    /// Working set at idle.
-    #[serde(rename = "idleMemoryMiB")]
-    pub idle_memory_mib: u64,
-    /// The memory its pods request, from the same run; absent in older measurements.
-    #[serde(rename = "requestMemoryMiB")]
-    pub request_memory_mib: Option<u64>,
+    /// `kind`, `k3s`, `rke2` or `kubesolo`.
+    pub distribution: String,
+    /// The profile whose values the run installed; `single-node` on a host distribution.
+    pub profile: String,
+    /// The API server's platform.
+    pub platform: Platform,
+    /// The server's `gitVersion` without build metadata (`v1.36.4`).
+    pub kubernetes_version: String,
+    /// The working set at idle.
+    #[serde(default)]
+    pub idle: Amounts,
+    /// What its pods request.
+    #[serde(default)]
+    pub requests: Amounts,
+    /// The day it was measured, `YYYY-MM-DD`.
+    #[serde(rename = "measuredAt")]
+    pub date: String,
 }
+
+/// An operating system and architecture.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
+pub struct Platform {
+    /// `linux`.
+    pub os: String,
+    /// `amd64`, `arm64`.
+    pub architecture: String,
+}
+
+/// The distribution of the catalog's measurements on kind, which run every profile.
+pub const KIND: &str = "kind";
 
 impl Index {
     /// Parses an `index.json`.
@@ -355,7 +480,7 @@ impl Index {
     pub fn replacement_of(&self, old: &str) -> Option<&str> {
         self.components
             .iter()
-            .find(|c| c.replaces.iter().any(|id| id == old))
+            .find(|c| c.replaces.iter().any(|r| r.component == old))
             .map(|c| c.id.as_str())
     }
 
@@ -379,25 +504,39 @@ impl Index {
 }
 
 impl Component {
-    /// How it is offered on a profile.
+    /// How it is offered on a profile: `unsupported` everywhere when a release type or its Pod
+    /// Security level is one this installer does not know.
     #[must_use]
     pub fn default_for(&self, profile: &str) -> Default {
+        let known = self.security.level != PodSecurity::Unknown
+            && self.releases.iter().all(|r| r.kind != ReleaseType::Unknown);
         self.defaults
             .get(profile)
             .copied()
+            .filter(|_| known)
             .unwrap_or(Default::Unsupported)
     }
 
     /// Whether it runs on a distribution.
     #[must_use]
     pub fn supports(&self, distribution: &str) -> bool {
-        self.distributions.is_empty() || self.distributions.iter().any(|d| d == distribution)
+        self.distributions.iter().any(|d| d == distribution)
     }
 
-    /// Whether the catalog's CI passed with it on a distribution.
+    /// Whether it supports the Kubernetes of a server version (`v1.36.5+k3s1`). A range this
+    /// installer cannot read supports nothing.
     #[must_use]
-    pub fn is_tested_on(&self, distribution: &str) -> bool {
-        self.tested_on.iter().any(|d| d == distribution)
+    pub fn admits(&self, kubernetes: &str) -> bool {
+        kube_version::admits(&self.kube_version, kubernetes).unwrap_or(false)
+    }
+
+    /// Whether the catalog's CI passed with it on a distribution and node platform
+    /// (`linux/amd64`).
+    #[must_use]
+    pub fn is_tested_on(&self, distribution: &str, platform: &str) -> bool {
+        self.tested_on
+            .iter()
+            .any(|t| t.distribution == distribution && t.platforms.iter().any(|p| p == platform))
     }
 
     /// The input whose value the installer generates as a free Service address.
@@ -405,7 +544,7 @@ impl Component {
     pub fn cluster_ip_input(&self) -> Option<&Input> {
         self.inputs
             .iter()
-            .find(|i| i.generate.as_deref() == Some("clusterIP"))
+            .find(|i| i.generate == Some(Generate::ClusterIp))
     }
 
     /// The CRDs whose objects mean someone uses it: [`Detection::crds`] less its internal ones.
@@ -416,26 +555,56 @@ impl Component {
             .filter(|crd| !self.internal_crds.contains(crd))
     }
 
-    /// The idle memory measured for a profile and architecture, on the newest Kubernetes measured.
+    /// The newest measurement on `distribution` with `profile` on a Linux node of `arch`: on
+    /// [`KIND`] with either profile, or on a host distribution with `single-node`.
     #[must_use]
-    pub fn idle_memory_mib(&self, profile: &str, arch: &str) -> Option<u64> {
-        let prefix = format!("{profile}-{arch}-v");
+    pub fn measured(&self, distribution: &str, profile: &str, arch: &str) -> Option<&Measured> {
         self.measured
             .iter()
-            .rev()
-            .find(|(key, _)| key.starts_with(&prefix))
-            .map(|(_, m)| m.idle_memory_mib)
+            .filter(|m| {
+                m.distribution == distribution
+                    && m.profile == profile
+                    && m.platform.os == "linux"
+                    && m.platform.architecture == arch
+            })
+            .max_by_key(|m| (kube_version::release(&m.kubernetes_version), &m.date))
     }
 
-    /// The memory its pods request for a profile and architecture, on the newest Kubernetes
-    /// measured with a request.
+    /// The idle memory of [`Component::measured`].
     #[must_use]
-    pub fn request_memory_mib(&self, profile: &str, arch: &str) -> Option<u64> {
-        let prefix = format!("{profile}-{arch}-v");
-        self.measured
-            .iter()
-            .rev()
-            .filter(|(key, _)| key.starts_with(&prefix))
-            .find_map(|(_, m)| m.request_memory_mib)
+    pub fn idle_memory_mib(&self, distribution: &str, profile: &str, arch: &str) -> Option<u64> {
+        self.measured(distribution, profile, arch)
+            .map(|m| m.idle.memory())
     }
+
+    /// The memory its pods request in [`Component::measured`].
+    #[must_use]
+    pub fn request_memory_mib(&self, distribution: &str, profile: &str, arch: &str) -> Option<u64> {
+        self.measured(distribution, profile, arch)
+            .map(|m| m.requests.memory())
+    }
+}
+
+/// The catalog this build pins, tested on every distribution it supports. The release the build
+/// pins has no measurements yet.
+#[cfg(test)]
+pub(crate) fn pinned() -> Index {
+    let mut index = Index::parse(include_bytes!(concat!(
+        env!("ZEABUR_CATALOG_RELEASE"),
+        "/index.json"
+    )))
+    .unwrap();
+    for component in &mut index.components {
+        if component.tested_on.is_empty() {
+            component.tested_on = ["k3s", "rke2", "kubesolo"]
+                .into_iter()
+                .filter(|d| component.supports(d))
+                .map(|d| TestedOn {
+                    distribution: d.to_owned(),
+                    platforms: vec!["linux/amd64".to_owned(), "linux/arm64".to_owned()],
+                })
+                .collect();
+        }
+    }
+    index
 }

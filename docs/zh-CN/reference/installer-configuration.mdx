@@ -72,7 +72,9 @@ enable: [runtime-security, vulnerability-scanning, intrusion-prevention]
 
 `enable` 可以填写 capability（例如 `runtime-security`）或完整组件 ID（例如 `volume-backup/velero`），依赖的组件会一并添加。如果 `disable` 排除了其他组件依赖的组件，`plan` 会列出两者并停止。最终安装的组件、安装顺序和排除原因，见 `plan` 的输出。Catalog 给组件改名后，`enable` 或 `disable` 写旧 ID 时，`plan` 会停止，错误信息会写明新 ID。
 
-installer 只提供 Catalog 在你的 distribution 上测试过的组件。每个组件测试过哪些 distribution，列在 Catalog `index.json` 的 `testedOn` 中。推荐安装、但没在你的 distribution 上测试过的组件不会安装，依赖这个组件的其他组件也一样。如果 `enable` 填写了没测试过的组件，或你添加的组件依赖没测试过的组件，`plan` 照样安装，并警告它没在这里测试过。
+installer 只提供 Catalog 在你的 distribution 和服务器平台（例如 `linux/arm64`）上测试过的组件。每个组件在哪里测试过，列在 Catalog `index.json` 的 `testedOn` 中。推荐安装、但没在你的 distribution 上测试过的组件不会安装，依赖这个组件的其他组件也一样。如果 `enable` 填写了没测试过的组件，或你添加的组件依赖没测试过的组件，`plan` 照样安装，并警告它没在这里测试过。
+
+每个组件还在 `kubeVersion` 中列出能运行的 Kubernetes 版本。集群的版本不在其中时，installer 不会安装这个组件。如果 `enable` 填写了它，`plan` 会发出警告。
 
 从列表中去掉已安装的组件后，下次 `apply` 会将其移除。如果移除组件会一并删除数据，需要先将组件写入 `allowDataLoss`，见[移除组件](./installer.mdx#卸载组件)。
 
@@ -80,12 +82,12 @@ installer 只提供 Catalog 在你的 distribution 上测试过的组件。每�
 inputs:
   volume-backup/velero:
     bucket: backups
-    s3-url: https://s3.example.com
+    s3Url: https://s3.example.com
 ```
 
 Catalog 定义了每个组件有哪些 input 及其类型。缺少必填值时，`plan` 会指出需要补充的字段。
 
-installer 会自动填写 Zeabur Builder 的 `cluster-ip`（zot 的固定地址）。要修改，在 `inputs` 中填写值即可。
+installer 会自动填写 Zeabur Builder 的 `clusterIp`（zot 的固定地址）。要修改，在 `inputs` 中填写值即可。
 
 Velero 的 `region` input 是存储桶的区域，默认 `us-east-1`。Cloudflare R2 要填 `auto`。网页界面会分别询问访问密钥 ID 和私密访问密钥，再自己生成 `credentials` 文件。
 

@@ -5,6 +5,7 @@ pub mod cluster;
 pub mod config;
 pub mod join;
 pub mod k3s;
+pub mod kube_version;
 pub mod kubesolo;
 pub mod node_name;
 pub mod personal;

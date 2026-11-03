@@ -155,7 +155,7 @@ pub fn installation(
         tested: component.tested_version.clone(),
         upgrade: None,
     };
-    for addon in &component.detection.k3s_addons {
+    for addon in component.detection.k3s_addons() {
         let name = format!("rke2-{addon}");
         if let Some(url) = facts
             .rke2_packaged_charts
@@ -167,7 +167,7 @@ pub fn installation(
             return found;
         }
     }
-    for addon in &component.detection.k3s_addons {
+    for addon in component.detection.k3s_addons() {
         let key = format!("kube-system/{addon}");
         let Some(chart) = facts.k3s_helm_charts.get(&key) else {
             continue;

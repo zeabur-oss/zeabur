@@ -10,7 +10,7 @@ use std::collections::BTreeMap;
 
 use serde::Serialize;
 
-use crate::catalog::{Component, Index};
+use crate::catalog::{Component, Index, KIND};
 use crate::cluster::HostFile;
 use crate::config::PersonalConfig;
 use crate::pins::{HELM_CONTROLLER, KUBECTL, KUBESOLO};
@@ -20,7 +20,7 @@ use crate::plan::{
 };
 use crate::record::Changes;
 use crate::remove::Removal;
-use crate::select::{self, PERSONAL_DISTRIBUTION, PERSONAL_PROFILE};
+use crate::select::{self, PERSONAL_DISTRIBUTION, PERSONAL_PROFILE, Target};
 use crate::storage::Storage;
 use crate::{PlanError, kubesolo};
 
@@ -119,18 +119,18 @@ fn helm_controller() -> HelmControllerPlan {
     }
 }
 
-/// A component's idle memory on `KubeSolo`, else on a single node.
+/// A component's idle memory on `KubeSolo`, else on kind's single node.
 fn idle_memory_mib(component: &Component, arch: &str) -> Option<u64> {
     component
-        .idle_memory_mib(PERSONAL_DISTRIBUTION, arch)
-        .or_else(|| component.idle_memory_mib(PERSONAL_PROFILE, arch))
+        .idle_memory_mib(PERSONAL_DISTRIBUTION, PERSONAL_PROFILE, arch)
+        .or_else(|| component.idle_memory_mib(KIND, PERSONAL_PROFILE, arch))
 }
 
 /// The least host memory a personal install needs for a component that uses memory on top of its
 /// idle use while working: `KubeSolo`, the component idle and at work, and room for an app.
 #[must_use]
 pub fn min_memory_mib(component: &Component, arch: &str) -> Option<u64> {
-    let work = component.resources.work_memory_mib?;
+    let work = component.resources.work_mib()?;
     Some(KUBESOLO_IDLE_MIB + idle_memory_mib(component, arch).unwrap_or(0) + work + APP_ROOM_MIB)
 }
 
@@ -205,7 +205,7 @@ pub fn plan(
     let archive = KUBESOLO.archive(arch).ok_or_else(no_release)?;
     let kubectl = KUBECTL.binary(arch).ok_or_else(no_release)?;
     let mut warnings = warnings(index);
-    let mut selection = select::select_personal(index, config)?;
+    let mut selection = select::select_personal(index, config, &Target::personal(arch))?;
     warnings.extend(selection.warnings.clone());
     let mut left_out = select::reasons(&selection.left_out);
     leave_out_short_of_memory(
@@ -306,7 +306,6 @@ mod tests {
     use super::*;
     use crate::catalog::Default;
     use crate::plan::ReleasePlan;
-    const INDEX: &str = include_str!(concat!(env!("ZEABUR_CATALOG_RELEASE"), "/index.json"));
 
     fn facts(memory_mib: u64) -> Facts {
         Facts {
@@ -331,7 +330,7 @@ mod tests {
 
     #[test]
     fn a_stopped_kubesolo_last_applied_by_a_newer_installer_is_left_alone() {
-        let index = Index::parse(INDEX.as_bytes()).unwrap();
+        let index = crate::catalog::pinned();
         let stopped = Facts {
             installer: Some("99.0.0".to_owned()),
             ..facts(8192)
@@ -344,7 +343,7 @@ mod tests {
 
     #[test]
     fn kubesolo_is_told_the_node_name() {
-        let index = Index::parse(INDEX.as_bytes()).unwrap();
+        let index = crate::catalog::pinned();
         let name = |extra: &str, facts: &Facts| {
             let plan = plan(&index, &config(extra), facts).unwrap();
             let file = plan
@@ -365,7 +364,7 @@ mod tests {
 
     #[test]
     fn a_personal_install_has_ingress_and_certificates_and_no_panel() {
-        let index = Index::parse(INDEX.as_bytes()).unwrap();
+        let index = crate::catalog::pinned();
         let plan = plan(&index, &config(""), &facts(1500)).unwrap();
         let ids = ids(&plan);
         assert!(ids.contains(&"ingress/traefik"), "{ids:?}");
@@ -387,7 +386,7 @@ mod tests {
 
     #[test]
     fn a_registry_is_an_option_that_needs_the_memory() {
-        let index = Index::parse(INDEX.as_bytes()).unwrap();
+        let index = crate::catalog::pinned();
         let off = plan(&index, &config(""), &facts(4096)).unwrap();
         assert!(off.registry.is_none());
 
@@ -410,10 +409,12 @@ mod tests {
 
     #[test]
     fn a_component_not_tested_on_kubesolo_is_installed_when_asked_with_a_warning() {
-        let mut index = Index::parse(INDEX.as_bytes()).unwrap();
+        let mut index = crate::catalog::pinned();
         for component in &mut index.components {
             if component.id == "logs/victoria-logs" {
-                component.tested_on.retain(|d| d != PERSONAL_DISTRIBUTION);
+                component
+                    .tested_on
+                    .retain(|t| t.distribution != PERSONAL_DISTRIBUTION);
             }
         }
         let asked = plan(&index, &config("enable: [logs]\n"), &facts(4096)).unwrap();
@@ -426,13 +427,18 @@ mod tests {
 
     #[test]
     fn the_defaults_are_what_the_catalog_recommends_and_tested_on_kubesolo() {
-        let mut index = Index::parse(INDEX.as_bytes()).unwrap();
+        let mut index = crate::catalog::pinned();
         for component in &mut index.components {
             if component.id == "ingress/traefik" {
-                component.tested_on.retain(|d| d != PERSONAL_DISTRIBUTION);
+                component
+                    .tested_on
+                    .retain(|t| t.distribution != PERSONAL_DISTRIBUTION);
             }
             if component.id == "config-reload/reloader" {
-                component.tested_on.push(PERSONAL_DISTRIBUTION.to_owned());
+                component.tested_on.push(crate::catalog::TestedOn {
+                    distribution: PERSONAL_DISTRIBUTION.to_owned(),
+                    platforms: vec!["linux/amd64".to_owned(), "linux/arm64".to_owned()],
+                });
                 component
                     .defaults
                     .insert(PERSONAL_PROFILE.to_owned(), Default::Recommended);
@@ -445,14 +451,14 @@ mod tests {
 
     #[test]
     fn databases_can_be_added_to_a_personal_install() {
-        let index = Index::parse(INDEX.as_bytes()).unwrap();
+        let index = crate::catalog::pinned();
         let plan = plan(&index, &config("enable: [databases]\n"), &facts(4096)).unwrap();
         assert!(ids(&plan).contains(&"databases/cloudnative-pg"));
     }
 
     #[test]
     fn components_that_leave_out_kubesolo_are_left_out() {
-        let mut index = Index::parse(INDEX.as_bytes()).unwrap();
+        let mut index = crate::catalog::pinned();
         for component in &mut index.components {
             if component.id == "metrics/metrics-server" {
                 component.distributions = vec!["rke2".to_owned()];
@@ -465,7 +471,7 @@ mod tests {
 
     #[test]
     fn the_downloads_and_images_are_pinned() {
-        let index = Index::parse(INDEX.as_bytes()).unwrap();
+        let index = crate::catalog::pinned();
         let plan = plan(&index, &config(""), &facts(4096)).unwrap();
         for download in [
             &plan.kubesolo.download,
@@ -498,7 +504,7 @@ mod tests {
 
     #[test]
     fn a_host_under_one_and_a_half_gib_is_warned() {
-        let index = Index::parse(INDEX.as_bytes()).unwrap();
+        let index = crate::catalog::pinned();
         for (mib, low) in [(MIN_MEMORY_MIB, false), (MIN_MEMORY_MIB - 1, true)] {
             let plan = plan(&index, &config(""), &facts(mib)).unwrap();
             assert_eq!(
@@ -513,7 +519,7 @@ mod tests {
 
     #[test]
     fn the_config_file_names_the_node_address() {
-        let index = Index::parse(INDEX.as_bytes()).unwrap();
+        let index = crate::catalog::pinned();
         let plan = plan(
             &index,
             &config("host: {tlsSan: [solo.example.com]}\n"),

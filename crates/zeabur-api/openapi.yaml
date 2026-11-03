@@ -6866,7 +6866,7 @@ components:
           type: array
           items:
             type: string
-          description: The distributions it supports (`k3s`, …); empty means all.
+          description: The distributions it supports (`k3s`, …).
         homepage:
           type: string
           description: The project's home page.
@@ -9795,7 +9795,7 @@ components:
           minimum: 0
         environment:
           type: string
-          description: "Where it was measured: `<profile>-<architecture>-<Kubernetes version>`."
+          description: "Where it was measured: `<distribution>-<profile>-<architecture>-<Kubernetes version>`."
         measuredAt:
           type: string
           description: The day it was measured (`2026-10-25`).

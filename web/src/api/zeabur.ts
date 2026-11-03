@@ -1006,7 +1006,7 @@ export type Component = {
   defaults: ComponentDefaults
   /** Human-readable name. */
   displayName: string
-  /** The distributions it supports (`k3s`, …); empty means all. */
+  /** The distributions it supports (`k3s`, …). */
   distributions: string[]
   /** The project's home page. */
   homepage: string
@@ -5973,7 +5973,7 @@ export type IdleUse = {
    * @minimum 0
    */
   cpuMillicores: number
-  /** Where it was measured: `<profile>-<architecture>-<Kubernetes version>`. */
+  /** Where it was measured: `<distribution>-<profile>-<architecture>-<Kubernetes version>`. */
   environment: string
   /** The day it was measured (`2026-10-25`). */
   measuredAt: string
