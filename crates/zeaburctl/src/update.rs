@@ -75,27 +75,31 @@ impl Check {
     fn start_at(url: &str, dir: &Path, now: SystemTime) -> Option<Self> {
         let path = dir.join("update-check.json");
         let now = now.duration_since(UNIX_EPOCH).ok()?.as_secs();
-        let mut last = Cache::read(&path).unwrap_or_default();
-        let answer = if since(last.checked_at, now) >= EVERY.as_secs() {
-            // Claimed before asking, so commands that end first ask at most once an hour.
-            last.checked_at = now;
-            last.write(&path).ok()?;
+        let mut ask = false;
+        // Claimed before asking, so commands that end first ask at most once an hour.
+        let last = Cache::update(&path, |cache| {
+            ask = since(cache.checked_at, now) >= EVERY.as_secs();
+            if ask {
+                cache.checked_at = now;
+            }
+            ask
+        })
+        .ok()?;
+        let answer = ask.then(|| {
             let (send, receive) = mpsc::channel();
             let url = url.to_owned();
             let path = path.clone();
             std::thread::spawn(move || {
                 let Some(releases) = fetch(&url) else { return };
                 let known = known(&releases);
-                if let Some(mut cache) = Cache::read(&path) {
+                drop(Cache::update(&path, |cache| {
                     cache.releases.clone_from(&known);
-                    drop(cache.write(&path));
-                }
+                    true
+                }));
                 drop(send.send(known));
             });
-            Some(receive)
-        } else {
-            None
-        };
+            receive
+        });
         Some(Self {
             path,
             now,
@@ -117,16 +121,17 @@ impl Check {
         let fresh = self.answer.and_then(|answer| answer.try_recv().ok());
         let releases = fresh.as_deref().unwrap_or(&self.last.releases);
         let newer = newer(releases, RUNNING)?;
-        let mut cache = Cache::read(&self.path).unwrap_or(self.last);
-        if cache.notified.as_deref() == Some(newer.latest.as_str())
-            && since(cache.notified_at, self.now) < REMIND.as_secs()
-        {
-            return None;
-        }
-        cache.notified = Some(newer.latest.clone());
-        cache.notified_at = self.now;
-        drop(cache.write(&self.path));
-        Some(newer.notice(RUNNING))
+        let mut tell = false;
+        drop(Cache::update(&self.path, |cache| {
+            tell = cache.notified.as_deref() != Some(newer.latest.as_str())
+                || since(cache.notified_at, self.now) >= REMIND.as_secs();
+            if tell {
+                cache.notified = Some(newer.latest.clone());
+                cache.notified_at = self.now;
+            }
+            tell
+        }));
+        tell.then(|| newer.notice(RUNNING))
     }
 }
 
@@ -154,11 +159,23 @@ impl Cache {
         serde_json::from_slice(&std::fs::read(path).ok()?).ok()
     }
 
-    fn write(&self, path: &Path) -> Result<(), String> {
+    /// Reads the cache, lets `change` change it, and writes it back when `change` says so; the
+    /// cache as `change` left it. Commands running at once, and a command's own check, take
+    /// turns through a lock file, and a new file replaces the old whole, so neither undoes the
+    /// other's change nor reads half a file.
+    fn update(path: &Path, change: impl FnOnce(&mut Self) -> bool) -> Result<Self, String> {
         let dir = path.parent().ok_or("no directory")?;
         std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
-        let json = serde_json::to_vec(self).map_err(|e| e.to_string())?;
-        std::fs::write(path, json).map_err(|e| e.to_string())
+        let lock = std::fs::File::create(path.with_extension("lock")).map_err(|e| e.to_string())?;
+        lock.lock().map_err(|e| e.to_string())?;
+        let mut cache = Self::read(path).unwrap_or_default();
+        if change(&mut cache) {
+            let json = serde_json::to_vec(&cache).map_err(|e| e.to_string())?;
+            let new = path.with_extension(format!("json.{}", std::process::id()));
+            std::fs::write(&new, json).map_err(|e| e.to_string())?;
+            std::fs::rename(&new, path).map_err(|e| e.to_string())?;
+        }
+        Ok(cache)
     }
 }
 
@@ -618,7 +635,7 @@ mod tests {
             releases: known(&[release(tag, "")]),
             ..Cache::default()
         };
-        cache("v99.0.0").write(&path).unwrap();
+        put(&path, cache("v99.0.0"));
         let at = |hours: u64| {
             Check::start_at(
                 "http://127.0.0.1:9/",
@@ -630,10 +647,46 @@ mod tests {
         };
         assert!(at(0).is_some());
         assert_eq!(at(0), None);
-        let mut newer = Cache::read(&path).unwrap();
-        newer.releases = cache("v99.1.0").releases;
-        newer.write(&path).unwrap();
+        Cache::update(&path, |c| {
+            c.releases = cache("v99.1.0").releases;
+            true
+        })
+        .unwrap();
         assert!(at(0).is_some(), "a newer version is named at once");
         assert!(at(25).is_some());
+    }
+
+    fn put(path: &Path, cache: Cache) {
+        Cache::update(path, |c| {
+            *c = cache;
+            true
+        })
+        .unwrap();
+    }
+
+    #[test]
+    fn changes_made_at_once_are_all_kept() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("update-check.json");
+        let tags: Vec<String> = (0..16).map(|i| format!("v1.0.{i}")).collect();
+        std::thread::scope(|scope| {
+            for tag in &tags {
+                let path = &path;
+                scope.spawn(move || {
+                    Cache::update(path, |c| {
+                        c.releases.extend(known(&[release(tag, "")]));
+                        true
+                    })
+                    .unwrap();
+                });
+            }
+        });
+        let kept = Cache::read(&path).unwrap();
+        for tag in &tags {
+            assert!(
+                kept.releases.iter().any(|r| &r.tag == tag),
+                "{tag} was lost"
+            );
+        }
     }
 }

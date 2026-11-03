@@ -80,7 +80,7 @@ Zeabur and `zeaburctl` tell you when a newer version is out and how to upgrade. 
 
 **What is sent.** A plain request to GitHub with no ID, cookie or token. GitHub sees the IP address it comes from. The Zeabur server sends `zeabur` as its user agent, and `zeaburctl` sends `zeaburctl/<version>`.
 
-**Turn it off.** Any one of these is enough.
+**Turn it off.** Any one of these is enough. Once it is off, the Zeabur server makes no request to GitHub.
 
 - In the installer, uncheck the box on the review page or set `updateCheck: false` in `/etc/zeabur-installer/config.yaml`. Running `apply` with `DO_NOT_TRACK=1` or `NO_UPDATE_NOTIFIER` set turns it off too.
 - With Helm, set `updateCheck.enabled=false`. The cluster page then only shows the version.

@@ -81,7 +81,7 @@ kubectl -n zeabur logs deployment/zeabur | grep telemetry
 
 **会发送什么**。一个普通的 GitHub 请求，不带任何 ID、Cookie 或令牌。GitHub 会看到请求来自哪个 IP 地址。Zeabur 服务器的 user agent 是 `zeabur`，`zeaburctl` 的是 `zeaburctl/<版本>`。
 
-**关闭**。以下任意一种都有效。
+**关闭**。以下任意一种都有效。关闭后，Zeabur 服务器完全不会访问 GitHub。
 
 - 用安装程序安装时，在确认页取消勾选，或在 `/etc/zeabur-installer/config.yaml` 中设置 `updateCheck: false`。运行 `apply` 时设置了 `DO_NOT_TRACK=1` 或 `NO_UPDATE_NOTIFIER` 也会关闭。
 - 用 Helm 安装时，设置 `updateCheck.enabled=false`。集群页就只显示版本。
