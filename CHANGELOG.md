@@ -2,6 +2,126 @@
 
 All notable changes to Zeabur. Versions follow [Semantic Versioning](https://semver.org/); before 1.0.0, a minor or patch release may break the API. Each section comes from the change files in `.changeset/` (CONTRIBUTING.md, "Releases").
 
+## 0.1.2-beta.2 (2026-11-03)
+
+### Features
+
+#### Set a project's build memory and CPU
+
+A project's Settings has a Builds section for the memory and CPU one build may use, up to what the largest node has. An empty field uses Zeabur Builder's default. A build that ran out of memory now links to it.
+
+#### Suggest the port an image declares
+
+When Zeabur Builder built a service's image and the image declares ports with `EXPOSE`, the Networking tab of a service with no private address says which ports the image declares and offers **Add a private address on port …** for each TCP port its containers and Services do not use yet. The button plans the same Service as the form; nothing changes until the plan is applied. Builder reports the ports from the version that records them in a Build's `status.exposedPorts`.
+
+#### `zeabur-installer` installs only components the catalog tested on the server's distribution
+
+`plan` leaves out a default component that was not tested on K3s, RKE2 or KubeSolo, and installs one the configuration asks for with a warning. `doctor` and `apply` run the health checks the catalog ships with each component, and `doctor` prints the catalog's advice when one fails.
+
+#### A release tag may carry a SemVer pre-release part (`v0.1.2-beta.1`)
+
+Such a release is a GitHub pre-release, never the latest, and has its own section here.
+
+#### Add a private address from the Networking tab
+
+A Deployment, StatefulSet or DaemonSet with no Service gets an **Add a private address** form on its Networking tab. It plans a ClusterIP Service named like the service, selecting its pods by `matchLabels` and carrying every port its containers declare, with the port filled in from the readiness probe or a declared port. The `kubectl` command is under **Use kubectl instead**.
+
+#### Zeabur and `zeaburctl` tell people when a newer version is out
+
+The cluster page shows Zeabur's version. Once a day, the browser checks GitHub's releases. When a newer one is out, the page says so and shows how to upgrade for the way Zeabur was installed. It also says when the running version has known security problems. `zeaburctl` prints one line when a newer version is out, at most once a day. Turn the update check off with the installer's review page checkbox or `updateCheck: false`, the chart's `updateCheck.enabled=false`, `DO_NOT_TRACK=1` or `NO_UPDATE_NOTIFIER`. See [Update check](docs/reference/telemetry.mdx#update-check). `GET /api/v1/cluster/zeabur` returns Zeabur's version, whether the update check is on, and how Zeabur was installed.
+
+### Fixes
+
+- The image is pushed by digest with no `candidate-*` tags left in GHCR
+
+#### A failed build says why in a sentence
+
+The build card leads with what went wrong and what to do next, with the builder's output behind Details and its line breaks kept. The services table keeps CPU and Memory on one line.
+
+#### Git and folder services start with port 8080 and a public domain
+
+The add drawers name the service after the repository or folder (or `web` before one is chosen) and fill in the public domain from the start. With Railpack the port defaults to 8080, which Zeabur passes as `PORT`, so a website gets a URL without extra steps. With Dockerfile the service starts with no network until a port is filled in. A folder with a Dockerfile switches the build to Dockerfile.
+
+#### Components ask for the memory they were measured to use
+
+On a single node, each default component's memory request follows what it used on a 4 GB K3s server. VictoriaLogs asks for less memory, leaves out Kubernetes' own namespaces and keeps kube-apiserver's audit log.
+
+#### Zeabur ships with Zeabur Catalog v0.2.1-beta.0
+
+On a personal install with less than about 1.7 GiB of memory, VictoriaMetrics and VictoriaLogs are no longer installed. Templates show their summary in English, Traditional Chinese and Simplified Chinese.
+
+#### Upgrading an installation that has the VictoriaMetrics operator no longer stops on a field conflict over its CRDs
+
+`zeabur-installer apply` now applies only the `crds/` folders Helm would install, and leaves CRDs a chart makes from its templates to Helm.
+
+#### Dragonfly starts on any server and shows its logs
+
+Each size sets a CPU limit, the thread count and `maxmemory` together, so a store no longer exits on servers with more CPUs than its memory allows threads for. Small now needs 384 MiB. Dragonfly's pods are found by the labels its operator sets, so Logs, the terminal and crash diagnosis see them.
+
+#### Signing in from far away takes one redirect less
+
+A page opened without a session goes straight to Zeabur Identity instead of through `/auth/login` first. The API gzips JSON answers from a kilobyte up.
+
+#### Zeabur Identity v0.1.2-beta.1
+
+A release installs it in place of v0.1.1. It stores the sign-in pages' styles and scripts brotli-compressed, asks for 24Mi of memory instead of 32Mi, and its image is pushed by digest without `candidate-*` tags ([its release notes](https://github.com/zeabur-oss/identity/releases/tag/v0.1.2-beta.1)).
+
+#### A one-node install estimates each component's memory from the catalog's measurement on K3s or RKE2
+
+The review page used the figures measured on kind; the catalog also measures each component on K3s and RKE2, which can differ by tens of MiB.
+
+#### The installer's components page no longer says a component left out for memory is about building apps
+
+Any component a personal install leaves out because the server has too little memory now reads "Needs N MiB of memory, and this server has less".
+
+#### `zeabur-installer apply` moves the redirect URI of Zeabur's OAuth client
+
+It follows a changed `access.zeabur`, as it already did the home URL. It kept the first host's, so signing in to Zeabur at the new host failed with "This app's return address isn't registered".
+
+#### The installer asks about the experience program and the update check on an Options page
+
+They move out of the review page into an Options step between Components and Review. Review lists whether each is on and links back to change it.
+
+#### A K3s or RKE2 server that runs out of memory stops a pod, not the cluster
+
+`zeabur-installer` keeps memory for the OS and the distribution from pods with the kubelet's `system-reserved` and `kube-reserved`, and evicts pods when less than 400 MiB stays free for 30 seconds or less than 200 MiB at once. A build that runs out of memory fails alone instead of taking down K3s and every pod with it. On RKE2, etcd and kube-controller-manager ask for less memory, so the components still fit a 4 GiB server. The Options step shows how much memory is kept for the system. Running `zeabur-installer apply` again writes the new settings to an existing server and restarts K3s or RKE2; on a worker, run `zeabur-installer join` again.
+
+#### MySQL backups can be set up again
+
+Setting up backups for a MySQL database, or restoring one from a backup, no longer stops with "The cluster does not serve ServiceAccount (v1)".
+
+#### The installer chooses components from the configuration file alone
+
+`zeabur-installer plan` no longer reads the install record to choose components: a default the record lacks is installed, and an old component ID in `enable` or `disable` stops the plan and names the new ID. The record still shows what `apply` adds and removes; `container-registry/zot` shows as removed and `builds/zeabur-builder` as added.
+
+#### Zeabur Proxy's image is published with each release
+
+`ghcr.io/zeabur-oss/proxy` is signed and attested with each release, and the chart pins it by digest. 0.1.1 did not publish it, so an installation with VictoriaMetrics or VictoriaLogs left `zeabur-proxy` unable to pull its image.
+
+#### Release notes are the changelog section and a link to the documentation
+
+The digests of the image, each platform's image and the chart are in the signed `digests.txt` asset, as [Releases](docs/reference/releases.mdx) shows.
+
+#### A team install needs 3500 MiB on K3s and 4300 MiB on RKE2, and Zeabur Builder 500 MiB more
+
+The minimums now count what the scheduler counts: the memory requests of the distribution's own pods and the default components, on top of the memory kept for the system and the eviction threshold. Below them pods stayed Pending after the install. A 4 GiB server fits K3s once its crash kernel reserve is off, and the Server step greys RKE2 out on it.
+
+On K3s and RKE2 the installer adds the catalog's `workMemoryMiB` of Zeabur Builder, the memory of one build, to that minimum, and leaves the builder out on a server below it, as a personal install already does. So a 4 GiB server installs K3s without the builder.
+
+An install that already runs is upgraded on a server below the new minimum, with a warning that suggests turning off the crash kernel reserve, and keeps the components it has.
+
+#### Daily users are no longer counted again after Zeabur restarts
+
+`zeabur_active` carries `person`, a hash of the user name and the day under a key derived from the plan key, so someone who uses Zeabur before and after a restart is counted once that day. The user name can't be worked out from it, and the hash changes every day.
+
+#### Template summaries come from Zeabur Catalog
+
+The template list shows each template's summary from the catalogue in English, zh-TW and zh-CN. A template without one shows its description. `GET /api/v1/cluster/templates` returns them as `tagline` and `taglineLocales`.
+
+#### Zeabur asks for 24Mi of memory instead of 32Mi
+
+Zeabur used about 6Mi in a cluster with 35 pods, so the chart's request drops to 24Mi. The limit stays at 128Mi.
+
 ## 0.1.2-beta.1 (2026-11-03)
 
 ### Features
