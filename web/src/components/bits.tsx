@@ -225,3 +225,18 @@ export function ManagedTip({
     </Tooltip>
   )
 }
+
+/** A shell command to copy. */
+export function Command({ text }: { text: string }) {
+  return (
+    <div className="relative min-w-0 rounded-lg border bg-muted/30">
+      <CopyButton value={text} className="absolute top-2 right-2" />
+      <pre
+        className="py-3 pr-12 pl-3 font-mono text-xs leading-5 wrap-anywhere whitespace-pre-wrap"
+        translate="no"
+      >
+        {text}
+      </pre>
+    </div>
+  )
+}

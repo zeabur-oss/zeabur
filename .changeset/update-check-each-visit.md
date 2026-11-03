@@ -1,0 +1,11 @@
+---
+default: patch
+---
+
+# Zeabur checks for a newer version each time a page opens, and zeaburctl no longer misses it
+
+The cluster page used to ask GitHub once a day, and a failed request stopped the check for the rest of that day. Now each time a page opens, it shows the answer it kept and asks again in the background, and asks hourly while it stays open. If GitHub can't be reached, the last answer stays.
+
+`zeaburctl` dropped the answer when a command ended before GitHub replied, and then waited a day to ask again, so quick commands never showed a notice. It now keeps the answer for the next command, asks again at most once an hour, and names the same version at most once a day.
+
+**Settings** › **About** shows Zeabur's version, and **How to upgrade** there and in the cluster page's notice opens the steps for how Zeabur was installed, with the commands to copy. The new [Upgrade Zeabur](https://oss.zeabur.com/docs/zeabur/get-started/upgrade/) page covers zeabur-installer, Helm, Argo CD, Flux and `zeaburctl ui`.

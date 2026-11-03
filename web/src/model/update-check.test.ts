@@ -1,4 +1,5 @@
-import { describe, expect, setSystemTime, test } from "bun:test"
+import { describe, expect, test } from "bun:test"
+import { QueryClient, QueryObserver } from "@tanstack/react-query"
 
 import {
   CHECK_EVERY,
@@ -109,11 +110,11 @@ describe("a cluster that opts out of update checks", () => {
   })
 })
 
-describe("checking once a day", () => {
+describe("checking each time a page opens", () => {
   const answer = [github("v0.2.0", "### Security\n- x")]
   const ok = () => Promise.resolve(new Response(JSON.stringify(answer)))
 
-  test("asks GitHub without a referrer or credentials, then keeps the answer for a day", async () => {
+  test("asks GitHub without a referrer or credentials, and keeps the answer", async () => {
     const storage = memory()
     const calls: [string, RequestInit][] = []
     const fetcher = (url: string, init: RequestInit) => {
@@ -122,58 +123,99 @@ describe("checking once a day", () => {
     }
     const first = await releases(fetcher, storage, 1_000)
     expect(first.map((r: Release) => [r.version, r.security])).toEqual([["0.2.0", true]])
-    expect(calls).toHaveLength(1)
     expect(calls[0]![0]).toBe(RELEASES_URL)
     expect(calls[0]![1].referrerPolicy).toBe("no-referrer")
     expect(calls[0]![1].credentials).toBe("omit")
-
-    await releases(fetcher, storage, 1_000 + CHECK_EVERY - 1)
-    expect(calls).toHaveLength(1)
-    await releases(fetcher, storage, 1_000 + CHECK_EVERY)
-    expect(calls).toHaveLength(2)
+    expect(JSON.parse(storage.values.get("zeabur.updateCheck")!).releases).toEqual(first)
   })
 
-  test("a failed request keeps the last answer and does not ask again that day", async () => {
+  test("a failed or refused request leaves the last answer", async () => {
     const storage = memory()
     await releases(ok, storage, 0)
-    let asked = 0
-    const down = () => {
-      asked++
-      return Promise.reject(new TypeError("Failed to fetch"))
+    const kept = storage.values.get("zeabur.updateCheck")
+    const down = () => Promise.reject(new TypeError("Failed to fetch"))
+    const limited = () => Promise.resolve(new Response("{}", { status: 403 }))
+    for (const fetcher of [down, limited]) {
+      await expect(releases(fetcher, storage, 1)).rejects.toThrow()
+      expect(storage.values.get("zeabur.updateCheck")).toBe(kept)
     }
-    const kept = await releases(down, storage, CHECK_EVERY)
-    expect(kept.map((r) => r.version)).toEqual(["0.2.0"])
-    await releases(down, storage, CHECK_EVERY + 1)
-    expect(asked).toBe(1)
-  })
-
-  test("an unreadable cache is a fresh start", async () => {
-    const storage = memory({ "zeabur.updateCheck": "{not json" })
-    const list = await releases(ok, storage, 0)
-    expect(list.map((r) => r.version)).toEqual(["0.2.0"])
   })
 })
 
-describe("a page left open", () => {
-  test("polls daily, and each poll asks GitHub only once the day's cache has expired", async () => {
+describe("GitHub's hourly limit", () => {
+  test("once used up, no request until GitHub's reset, and the last answer stands", async () => {
     const storage = memory()
+    await releases(async () => new Response(JSON.stringify([github("v0.2.0")])), storage, 0)
+    const reset = 3_600
+    let requests = 0
+    const limited = async () => {
+      requests++
+      return new Response("{}", {
+        status: 403,
+        headers: { "x-ratelimit-remaining": "0", "x-ratelimit-reset": String(reset) },
+      })
+    }
+    await expect(releases(limited, storage, 1_000)).rejects.toThrow()
+    const kept = await releases(limited, storage, reset * 1000 - 1)
+    expect(kept.map((r) => r.version)).toEqual(["0.2.0"])
+    expect(requests).toBe(1)
+    await expect(releases(limited, storage, reset * 1000)).rejects.toThrow()
+    expect(requests).toBe(2)
+  })
+})
+
+describe("a page", () => {
+  const cachedAnswer = (tag: string) =>
+    JSON.stringify({ checkedAt: Date.now(), releases: publishedReleases([github(tag)]) })
+
+  function observe(
+    fetcher: (url: string, init: RequestInit) => Promise<Response>,
+    storage: ReturnType<typeof memory>,
+  ) {
+    const client = new QueryClient()
+    const observer = new QueryObserver(client, updateCheckQuery(fetcher, storage, true))
+    const seen: (string | undefined)[] = []
+    const stop = observer.subscribe((result) => seen.push(result.data?.[0]?.version))
+    return { observer, seen, stop, client }
+  }
+
+  test("shows the last answer at once and asks GitHub again in the background", async () => {
+    const storage = memory({ "zeabur.updateCheck": cachedAnswer("v0.2.0") })
     let requests = 0
     const fetcher = async () => {
       requests++
-      return { ok: true, json: async () => [github("v1.0.0")] } as Response
+      return new Response(JSON.stringify([github("v0.3.0")]))
     }
-    const options = updateCheckQuery(fetcher, storage, true)
-    expect(options.refetchInterval).toBe(CHECK_EVERY)
-    const poll = async () => await (options.queryFn as () => Promise<Release[]>)()
-    try {
-      await poll()
-      await poll()
-      expect(requests).toBe(1)
-      setSystemTime(new Date(Date.now() + CHECK_EVERY + 1))
-      await poll()
-      expect(requests).toBe(2)
-    } finally {
-      setSystemTime()
-    }
+    const { observer, seen, stop, client } = observe(fetcher, storage)
+    expect(observer.getCurrentResult().data?.[0]?.version).toBe("0.2.0")
+    await client.getQueryCache().find({ queryKey: ["update-check"] })?.promise
+    expect(seen.at(-1)).toBe("0.3.0")
+    expect(requests).toBe(1)
+    stop()
+  })
+
+  test("keeps showing the last answer when GitHub cannot be reached", async () => {
+    const storage = memory({ "zeabur.updateCheck": cachedAnswer("v0.2.0") })
+    const { observer, stop, client } = observe(
+      () => Promise.reject(new TypeError("Failed to fetch")),
+      storage,
+    )
+    await client
+      .getQueryCache()
+      .find({ queryKey: ["update-check"] })
+      ?.promise?.catch(() => {})
+    expect(observer.getCurrentResult().data?.[0]?.version).toBe("0.2.0")
+    stop()
+  })
+
+  test("an unreadable cache shows nothing until GitHub answers", () => {
+    const storage = memory({ "zeabur.updateCheck": "{not json" })
+    const { observer, stop } = observe(() => new Promise(() => {}), storage)
+    expect(observer.getCurrentResult().data).toBeUndefined()
+    stop()
+  })
+
+  test("left open, asks again every hour", () => {
+    expect(updateCheckQuery(fetch, memory(), true).refetchInterval).toBe(CHECK_EVERY)
   })
 })

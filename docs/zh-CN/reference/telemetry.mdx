@@ -76,8 +76,8 @@ kubectl -n zeabur logs deployment/zeabur | grep telemetry
 
 **在哪里运行。**
 
-- 集群页始终显示 `Zeabur v<版本>`。每位登录者的浏览器每天检查一次，结果保存在该浏览器里。Zeabur 服务器不会访问 GitHub。显示的升级方法取决于 Zeabur 的安装方式，分为 zeabur-installer、Helm、Argo CD 和 Flux。用 `zeaburctl ui` 打开时，页面显示的是 `zeaburctl` 自己的版本和更新方法。
-- `zeaburctl` 每 24 小时最多检查一次，由任意命令触发。检查与命令同时运行，不会拖慢命令。命令结束时还没查完，就直接放弃。有新版本时，`zeaburctl` 会在 stderr 输出一行。上次检查的时间保存在 `$XDG_CACHE_HOME/zeaburctl`。未设置 `XDG_CACHE_HOME` 时，macOS 保存在 `~/Library/Caches/zeaburctl`，其他系统保存在 `~/.cache/zeaburctl`。stderr 不是终端，或设置了 `CI` 时，不会检查。
+- 集群页始终显示 `Zeabur v<版本>`。登录者每次打开 Zeabur，浏览器会先显示上次保存的结果，同时在后台重新检查；页面一直开着时，每小时再查一次。访问不了 GitHub 时，沿用上次的结果。GitHub 每小时只响应同一个 IP 地址 60 次，共用这个地址的人一起算；用完后，浏览器会等到 GitHub 重新计数时再查。Zeabur 服务器不会访问 GitHub。“设置”›“关于”也会显示版本，点击“升级方法”会按 Zeabur 的安装方式列出步骤，分为 zeabur-installer、Helm、Argo CD 和 Flux。请参阅[升级 Zeabur](../get-started/upgrade.mdx)。用 `zeaburctl ui` 打开时，页面显示的是 `zeaburctl` 自己的版本和更新方法。
+- `zeaburctl` 每小时最多检查一次，由任意命令触发。检查与命令同时运行，不会拖慢命令。结果会保存下来，命令结束时还没查完，就由下一个命令显示。有新版本时，`zeaburctl` 会在 stderr 输出一行，同一个版本一天最多提醒一次。结果和上次检查的时间保存在 `$XDG_CACHE_HOME/zeaburctl`。未设置 `XDG_CACHE_HOME` 时，macOS 保存在 `~/Library/Caches/zeaburctl`，其他系统保存在 `~/.cache/zeaburctl`。stderr 不是终端，或设置了 `CI` 时，不会检查。
 
 **会发送什么**。一个普通的 GitHub 请求，不带任何 ID、Cookie 或令牌。GitHub 会看到请求来自哪个 IP 地址。集群页的请求还会让 GitHub 从 `Origin` 请求头看到你的 Zeabur 地址。浏览器不会发送 referrer。`zeaburctl` 的 user agent 是 `zeaburctl/<版本>`。
 

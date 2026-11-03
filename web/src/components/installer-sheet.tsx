@@ -3,7 +3,7 @@ import type { ReactNode } from "react"
 import XIcon from "~icons/ph/x"
 
 import { capabilitiesQuery } from "@/api/queries"
-import { CopyButton } from "@/components/bits"
+import { Command } from "@/components/bits"
 import { Button } from "@zeabur-oss/design-system/components/button"
 import {
   Dialog,
@@ -129,19 +129,5 @@ function Step({ text, children }: { text: string; children: ReactNode }) {
       <p className="text-pretty">{text}</p>
       {children}
     </section>
-  )
-}
-
-function Command({ text }: { text: string }) {
-  return (
-    <div className="relative min-w-0 rounded-lg border bg-muted/30">
-      <CopyButton value={text} className="absolute top-2 right-2" />
-      <pre
-        className="py-3 pr-12 pl-3 font-mono text-xs leading-5 wrap-anywhere whitespace-pre-wrap"
-        translate="no"
-      >
-        {text}
-      </pre>
-    </div>
   )
 }

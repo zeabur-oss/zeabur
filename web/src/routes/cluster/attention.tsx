@@ -5,21 +5,19 @@
 import { useQuery } from "@tanstack/react-query"
 import { Link } from "@tanstack/react-router"
 import type { ReactNode } from "react"
-import ArrowSquareOutIcon from "~icons/ph/arrow-square-out"
 import CaretRightIcon from "~icons/ph/caret-right"
 
 import { isStatus, isUnreachable, type Schemas } from "@/api/client"
 import { capabilitiesQuery, nodesQuery, upgradesQuery } from "@/api/queries"
 import { StatusDot } from "@/components/status"
 import { buttonVariants } from "@zeabur-oss/design-system/components/button"
-import { useI18n, useT, type Locale } from "@/i18n"
-import { docsUrl } from "@/lib/docs"
+import { useT } from "@/i18n"
 import { useQuantityFormat } from "@/lib/quantity"
 import { groupIssues, isProblem, nodeIssues, type IssueGroup } from "@/model/node-health"
 import { healthRank, type Health } from "@/model/service"
 import { useDate } from "@/routes/cluster/upgrade"
 import type { Newer } from "@/model/update-check"
-import { HOW, OutLink, useNewer } from "@/routes/cluster/zeabur-version"
+import { HOW, OutLink, UpgradeButton, useNewer } from "@/routes/cluster/zeabur-version"
 import {
   Collapsible,
   CollapsibleContent,
@@ -103,7 +101,7 @@ export function useIssueText() {
  * release the versions that fix the running one. */
 type Translate = ReturnType<typeof useT>
 
-function UpdateLinks({ newer, guide }: { newer: Newer; guide: string }) {
+function UpdateLinks({ zeabur, newer }: { zeabur: Schemas.ZeaburVersion; newer: Newer }) {
   const t = useT()
   return (
     <span className="flex flex-col items-end gap-2 sm:flex-row sm:items-center sm:gap-3">
@@ -116,31 +114,16 @@ function UpdateLinks({ newer, guide }: { newer: Newer; guide: string }) {
       ) : (
         <OutLink href={newer.latest.url}>{t("update.notes")}</OutLink>
       )}
-      <a
-        href={guide}
-        target="_blank"
-        rel="noreferrer"
-        className={buttonVariants({ variant: "outline", size: "sm" })}
-      >
-        {t("update.guide")}
-        <ArrowSquareOutIcon aria-hidden="true" />
-        <span className="sr-only">{t("common.newTab")}</span>
-      </a>
+      <UpgradeButton zeabur={zeabur} newer={newer} />
     </span>
   )
 }
 
-export function updateItem(
-  t: Translate,
-  locale: Locale,
-  zeabur: Schemas.ZeaburVersion,
-  newer: Newer,
-): ClusterItem {
+export function updateItem(t: Translate, zeabur: Schemas.ZeaburVersion, newer: Newer): ClusterItem {
   const by = zeabur.installedBy ?? undefined
   const local = by === "zeaburctl"
   const product = local ? "zeaburctl" : "Zeabur"
   const security = newer.security.length > 0
-  const guide = docsUrl(locale, local ? "reference/releases" : "get-started/upgrade")
   return {
     key: "zeabur-update",
     health: security ? "fail" : "warn",
@@ -153,7 +136,7 @@ export function updateItem(
         : undefined,
       by ? t(HOW[by]) : undefined,
     ]),
-    link: <UpdateLinks newer={newer} guide={guide} />,
+    link: <UpdateLinks zeabur={zeabur} newer={newer} />,
     nodes: [],
     problem: false,
     lift: security,
@@ -211,9 +194,8 @@ export function useAttention(): Attention {
   const upgrades = upgradesRead.data
   const nodes = nodesRead.data
   const capabilities = capabilitiesRead.data
-  const { locale } = useI18n()
   const { zeabur, newer } = useNewer()
-  const update = zeabur && newer ? updateItem(t, locale, zeabur, newer) : undefined
+  const update = zeabur && newer ? updateItem(t, zeabur, newer) : undefined
   const items: ClusterItem[] = []
   const minor = upgrades?.minor ?? ""
   const eol = upgrades?.release?.endOfLife

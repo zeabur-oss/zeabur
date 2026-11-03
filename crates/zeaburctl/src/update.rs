@@ -1,7 +1,7 @@
-//! The update check (docs/reference/telemetry.mdx, "Update check"): at most once a day, any
-//! command asks GitHub for Zeabur's releases on a thread of its own, and prints one line when a
-//! newer `zeaburctl` is out. The command never waits for it: an answer that has not come by the
-//! time the command ends is dropped.
+//! The update check (docs/reference/telemetry.mdx, "Update check"): any command prints one line
+//! when the releases it last read name a newer `zeaburctl`, at most once a day for each version,
+//! and at most once an hour asks GitHub again on a thread of its own. The command never waits
+//! for it: an answer that has not come by the time the command ends is left for the next one.
 
 use std::cmp::Ordering;
 use std::ffi::OsString;
@@ -23,8 +23,10 @@ use crate::output;
 const RELEASES: &str = "https://api.github.com/repos/zeabur-oss/zeabur/releases";
 /// Where to download and verify a release.
 const DOWNLOAD: &str = "https://oss.zeabur.com/docs/zeabur/reference/releases/";
-/// The least time between two checks.
-const EVERY: Duration = Duration::from_hours(24);
+/// The least time between two requests to GitHub.
+const EVERY: Duration = Duration::from_hours(1);
+/// The least time between two notices of the same version.
+const REMIND: Duration = Duration::from_hours(24);
 /// How long a check may take.
 const TIMEOUT: Duration = Duration::from_secs(5);
 /// The largest answer read.
@@ -52,11 +54,14 @@ fn wanted(env: &dyn Fn(&str) -> Option<OsString>, terminal: bool) -> bool {
 /// A check under way.
 #[derive(Debug)]
 pub(crate) struct Check {
-    answer: Receiver<Option<Newer>>,
+    path: PathBuf,
+    now: u64,
+    last: Cache,
+    answer: Option<Receiver<Vec<Known>>>,
 }
 
 impl Check {
-    /// Starts a check when one is wanted and the last was more than a day ago.
+    /// Starts a check when one is wanted.
     pub(crate) fn start() -> Option<Self> {
         if !wanted(
             &|name| std::env::var_os(name),
@@ -70,49 +75,78 @@ impl Check {
     fn start_at(url: &str, dir: &Path, now: SystemTime) -> Option<Self> {
         let path = dir.join("update-check.json");
         let now = now.duration_since(UNIX_EPOCH).ok()?.as_secs();
-        let last = Cache::read(&path);
-        if !last.as_ref().is_none_or(|c| c.due(now)) {
-            return None;
-        }
-        // Claimed before asking, so a command that ends first does not ask again on each run.
-        let claim = Cache {
-            checked_at: now,
-            latest: last.and_then(|c| c.latest),
+        let mut last = Cache::read(&path).unwrap_or_default();
+        let answer = if since(last.checked_at, now) >= EVERY.as_secs() {
+            // Claimed before asking, so commands that end first ask at most once an hour.
+            last.checked_at = now;
+            last.write(&path).ok()?;
+            let (send, receive) = mpsc::channel();
+            let url = url.to_owned();
+            let path = path.clone();
+            std::thread::spawn(move || {
+                let Some(releases) = fetch(&url) else { return };
+                let known = known(&releases);
+                if let Some(mut cache) = Cache::read(&path) {
+                    cache.releases.clone_from(&known);
+                    drop(cache.write(&path));
+                }
+                drop(send.send(known));
+            });
+            Some(receive)
+        } else {
+            None
         };
-        claim.write(&path).ok()?;
-        let (send, answer) = mpsc::channel();
-        let url = url.to_owned();
-        std::thread::spawn(move || {
-            let releases = fetch(&url);
-            if let Some(releases) = &releases {
-                let cache = Cache {
-                    checked_at: now,
-                    latest: latest(releases, false).map(|(version, _)| version.to_string()),
-                };
-                drop(cache.write(&path));
-            }
-            drop(send.send(releases.and_then(|r| newer(&r, RUNNING))));
-        });
-        Some(Self { answer })
+        Some(Self {
+            path,
+            now,
+            last,
+            answer,
+        })
     }
 
-    /// Prints the notice when the answer has come and names a newer version; never waits.
+    /// Prints the notice from the answer when it has come, else from the releases read last
+    /// time; never waits.
     pub(crate) fn finish(self) {
-        if let Ok(Some(newer)) = self.answer.try_recv() {
-            output::info(&newer.notice(RUNNING));
+        if let Some(notice) = self.notice() {
+            output::info(&notice);
         }
+    }
+
+    /// The notice to print now, recorded so the same version is not named again within a day.
+    fn notice(self) -> Option<String> {
+        let fresh = self.answer.and_then(|answer| answer.try_recv().ok());
+        let releases = fresh.as_deref().unwrap_or(&self.last.releases);
+        let newer = newer(releases, RUNNING)?;
+        let mut cache = Cache::read(&self.path).unwrap_or(self.last);
+        if cache.notified.as_deref() == Some(newer.latest.as_str())
+            && since(cache.notified_at, self.now) < REMIND.as_secs()
+        {
+            return None;
+        }
+        cache.notified = Some(newer.latest.clone());
+        cache.notified_at = self.now;
+        drop(cache.write(&self.path));
+        Some(newer.notice(RUNNING))
     }
 }
 
+/// Seconds from `then` to `now`, as if a long time had passed when the clock went back.
+const fn since(then: u64, now: u64) -> u64 {
+    if now < then { u64::MAX } else { now - then }
+}
+
 /// The last check, in the user's cache directory.
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
 struct Cache {
-    /// Seconds since the Unix epoch.
+    /// When GitHub was last asked, in seconds since the Unix epoch.
     checked_at: u64,
-    /// The newest release then, when there was one.
+    /// The releases of the last answer.
+    releases: Vec<Known>,
+    /// The version the last notice named, and when.
     #[serde(skip_serializing_if = "Option::is_none")]
-    latest: Option<String>,
+    notified: Option<String>,
+    notified_at: u64,
 }
 
 impl Cache {
@@ -125,11 +159,6 @@ impl Cache {
         std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
         let json = serde_json::to_vec(self).map_err(|e| e.to_string())?;
         std::fs::write(path, json).map_err(|e| e.to_string())
-    }
-
-    /// A day has passed, or the clock went back.
-    const fn due(&self, now: u64) -> bool {
-        now < self.checked_at || now - self.checked_at >= EVERY.as_secs()
     }
 }
 
@@ -189,19 +218,6 @@ struct Release {
 }
 
 impl Release {
-    /// Its version, for a published release that is not a pre-release.
-    fn normal(&self) -> Option<Version> {
-        self.version(false)
-    }
-
-    /// Its version, for a published release; a pre-release only when `pre` allows it.
-    fn version(&self, pre: bool) -> Option<Version> {
-        if self.draft || (self.prerelease && !pre) {
-            return None;
-        }
-        Version::parse(&self.tag_name)
-    }
-
     /// Its notes have a `### Security` section, the changelog's heading for fixed vulnerabilities.
     fn fixes_security(&self) -> bool {
         self.body
@@ -210,11 +226,34 @@ impl Release {
     }
 }
 
-fn latest(releases: &[Release], pre: bool) -> Option<(Version, &Release)> {
+/// A published release, as the cache keeps it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+struct Known {
+    tag: String,
+    prerelease: bool,
+    security: bool,
+}
+
+impl Known {
+    fn version(&self, pre: bool) -> Option<Version> {
+        if self.prerelease && !pre {
+            return None;
+        }
+        Version::parse(&self.tag)
+    }
+}
+
+/// The published releases in GitHub's answer.
+fn known(releases: &[Release]) -> Vec<Known> {
     releases
         .iter()
-        .filter_map(|r| Some((r.version(pre)?, r)))
-        .max_by(|a, b| a.0.cmp(&b.0))
+        .filter(|r| !r.draft)
+        .map(|r| Known {
+            tag: r.tag_name.clone(),
+            prerelease: r.prerelease,
+            security: r.fixes_security(),
+        })
+        .collect()
 }
 
 /// A newer release than the running one.
@@ -245,16 +284,18 @@ impl Newer {
 /// The newest normal release when it is newer than `running`, or the newest pre-release when
 /// `running` is one; `None` without one, or when `running` is not a version. Only normal
 /// releases mark the running version insecure.
-fn newer(releases: &[Release], running: &str) -> Option<Newer> {
+fn newer(releases: &[Known], running: &str) -> Option<Newer> {
     let running = Version::parse(running)?;
-    let (latest, _) = latest(releases, !running.pre.is_empty())?;
+    let latest = releases
+        .iter()
+        .filter_map(|r| r.version(!running.pre.is_empty()))
+        .max()?;
     if latest <= running {
         return None;
     }
     let security = releases
         .iter()
-        .filter(|r| r.normal().is_some_and(|v| v > running))
-        .any(Release::fixes_security);
+        .any(|r| r.security && r.version(false).is_some_and(|v| v > running));
     Some(Newer {
         latest: latest.to_string(),
         security,
@@ -395,12 +436,15 @@ mod tests {
             release("v0.1.2", ""),
             release("v0.2.0", ""),
         ];
-        let found = newer(&releases, "0.1.1").unwrap();
+        let found = newer(&known(&releases), "0.1.1").unwrap();
         assert_eq!(found.latest, "0.2.0");
         assert!(!found.security);
-        assert_eq!(newer(&releases, "0.2.0"), None);
-        assert_eq!(newer(&releases, "0.3.0"), None);
-        assert_eq!(newer(&[release("v0.1.1-beta.1", "")], "0.1.0"), None);
+        assert_eq!(newer(&known(&releases), "0.2.0"), None);
+        assert_eq!(newer(&known(&releases), "0.3.0"), None);
+        assert_eq!(
+            newer(&known(&[release("v0.1.1-beta.1", "")]), "0.1.0"),
+            None
+        );
         assert_eq!(newer(&[], "0.1.0"), None);
     }
 
@@ -410,17 +454,17 @@ mod tests {
             release("v0.2.0-rc.2", "### Security\n- In a pre-release"),
             release("v0.1.1", ""),
         ];
-        let found = newer(&releases, "0.2.0-rc.1").unwrap();
+        let found = newer(&known(&releases), "0.2.0-rc.1").unwrap();
         assert_eq!(found.latest, "0.2.0-rc.2");
         assert!(!found.security);
-        assert_eq!(newer(&releases, "0.1.1"), None);
+        assert_eq!(newer(&known(&releases), "0.1.1"), None);
         let out = [release("v0.2.0", ""), release("v0.2.0-rc.2", "")];
-        assert_eq!(newer(&out, "0.2.0-rc.1").unwrap().latest, "0.2.0");
+        assert_eq!(newer(&known(&out), "0.2.0-rc.1").unwrap().latest, "0.2.0");
     }
 
     #[test]
     fn a_pre_release_is_behind_its_normal_release() {
-        let found = newer(&[release("v0.1.1", "")], "0.1.1-beta.2").unwrap();
+        let found = newer(&known(&[release("v0.1.1", "")]), "0.1.1-beta.2").unwrap();
         assert_eq!(found.latest, "0.1.1");
     }
 
@@ -431,13 +475,13 @@ mod tests {
             release("v0.2.0", "## 0.2.0\n\n### Security\n\n- Fixed a hole"),
             release("v0.1.0", "### Security\n- Older"),
         ];
-        assert!(newer(&releases, "0.1.0").unwrap().security);
-        assert!(!newer(&releases, "0.2.0").unwrap().security);
+        assert!(newer(&known(&releases), "0.1.0").unwrap().security);
+        assert!(!newer(&known(&releases), "0.2.0").unwrap().security);
         let mentioned = [release(
             "v0.2.0",
             "Security fixes are listed below.\n#### Security",
         )];
-        assert!(!newer(&mentioned, "0.1.0").unwrap().security);
+        assert!(!newer(&known(&mentioned), "0.1.0").unwrap().security);
     }
 
     #[test]
@@ -514,24 +558,82 @@ mod tests {
     }
 
     #[test]
-    fn one_check_a_day_and_its_answer_is_kept() {
+    fn the_answer_is_kept_for_the_next_command_and_asked_again_after_an_hour() {
         let dir = tempfile::tempdir().unwrap();
         let url = github(RELEASES_JSON, Duration::ZERO);
         let now = SystemTime::now();
         let check = Check::start_at(&url, dir.path(), now).unwrap();
-        let answer = check.answer.recv_timeout(Duration::from_secs(10)).unwrap();
-        assert_eq!(
-            answer,
-            Some(Newer {
-                latest: "99.0.0".to_owned(),
-                security: true
-            })
-        );
+        let answer = check
+            .answer
+            .as_ref()
+            .unwrap()
+            .recv_timeout(Duration::from_secs(10))
+            .unwrap();
+        assert_eq!(answer[0].tag, "v99.0.0");
         let cache = Cache::read(&dir.path().join("update-check.json")).unwrap();
-        assert_eq!(cache.latest.as_deref(), Some("99.0.0"));
+        assert_eq!(cache.releases, answer);
 
-        let hour = Duration::from_hours(1);
-        assert!(Check::start_at(&url, dir.path(), now + 23 * hour).is_none());
-        assert!(Check::start_at(&url, dir.path(), now + 25 * hour).is_some());
+        let minute = Duration::from_secs(60);
+        let next = Check::start_at(&url, dir.path(), now + minute).unwrap();
+        assert!(next.answer.is_none());
+        assert!(
+            Check::start_at(&url, dir.path(), now + 61 * minute)
+                .unwrap()
+                .answer
+                .is_some()
+        );
+    }
+
+    #[test]
+    fn a_command_that_ends_first_leaves_the_answer_to_the_next() {
+        let dir = tempfile::tempdir().unwrap();
+        let url = github(RELEASES_JSON, Duration::from_millis(300));
+        let now = SystemTime::now();
+        assert_eq!(
+            Check::start_at(&url, dir.path(), now).unwrap().notice(),
+            None
+        );
+        let path = dir.path().join("update-check.json");
+        let started = Instant::now();
+        while Cache::read(&path).is_none_or(|c| c.releases.is_empty()) {
+            assert!(
+                started.elapsed() < Duration::from_secs(10),
+                "no answer was kept"
+            );
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        let later = Check::start_at(&url, dir.path(), now + Duration::from_secs(60)).unwrap();
+        let notice = later.notice().unwrap();
+        assert!(notice.contains("99.0.0"), "{notice}");
+    }
+
+    #[test]
+    fn the_same_version_is_named_once_a_day() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("update-check.json");
+        let now = SystemTime::now();
+        let checked = now.duration_since(UNIX_EPOCH).unwrap().as_secs();
+        let cache = |tag: &str| Cache {
+            checked_at: checked,
+            releases: known(&[release(tag, "")]),
+            ..Cache::default()
+        };
+        cache("v99.0.0").write(&path).unwrap();
+        let at = |hours: u64| {
+            Check::start_at(
+                "http://127.0.0.1:9/",
+                dir.path(),
+                now + Duration::from_hours(hours),
+            )
+            .unwrap()
+            .notice()
+        };
+        assert!(at(0).is_some());
+        assert_eq!(at(0), None);
+        let mut newer = Cache::read(&path).unwrap();
+        newer.releases = cache("v99.1.0").releases;
+        newer.write(&path).unwrap();
+        assert!(at(0).is_some(), "a newer version is named at once");
+        assert!(at(25).is_some());
     }
 }

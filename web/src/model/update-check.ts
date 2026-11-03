@@ -1,10 +1,12 @@
-/** The update check: once a day this browser reads Zeabur's releases from GitHub and compares
- * the newest normal one with the running version. Zeabur's server makes no request. */
+/** The update check: each time a page opens, this browser shows the releases it read last and
+ * asks GitHub again in the background, then compares the newest normal one with the running
+ * version. Zeabur's server makes no request. */
 
 import { queryOptions } from "@tanstack/react-query"
 
 export const RELEASES_URL = "https://api.github.com/repos/zeabur-oss/zeabur/releases"
-export const CHECK_EVERY = 24 * 60 * 60_000
+/** How often a page left open asks again. */
+export const CHECK_EVERY = 60 * 60_000
 const CHECK_TIMEOUT = 10_000
 const CACHE_KEY = "zeabur.updateCheck"
 
@@ -20,6 +22,8 @@ export interface Release {
 interface Cached {
   checkedAt: number
   releases: Release[]
+  /** GitHub refused for the rest of the hour: no request until then. */
+  limitedUntil?: number
 }
 
 export interface Newer {
@@ -115,10 +119,6 @@ export function newerFor(
   return zeabur?.updateCheck && checked ? findNewer(checked, zeabur.version) : undefined
 }
 
-function due(cached: Cached | undefined, now: number): boolean {
-  return !cached || now < cached.checkedAt || now - cached.checkedAt >= CHECK_EVERY
-}
-
 export interface Storage {
   load(key: string): string | null
   save(key: string, value: string): void
@@ -130,7 +130,11 @@ function readCache(storage: Storage): Cached | undefined {
     if (typeof value !== "object" || value === null) return undefined
     const cached = value as Partial<Cached>
     if (typeof cached.checkedAt !== "number" || !Array.isArray(cached.releases)) return undefined
-    return { checkedAt: cached.checkedAt, releases: cached.releases }
+    return {
+      checkedAt: cached.checkedAt,
+      releases: cached.releases,
+      limitedUntil: typeof cached.limitedUntil === "number" ? cached.limitedUntil : undefined,
+    }
   } catch {
     return undefined
   }
@@ -138,12 +142,12 @@ function readCache(storage: Storage): Cached | undefined {
 
 type Fetch = (url: string, init: RequestInit) => Promise<Response>
 
-/** The releases, from this browser's cache when it is less than a day old, else from GitHub. A
- * failed request keeps the last answer and waits a day too. */
+/** The releases from GitHub, kept in this browser for the next page. A failed request throws,
+ * so the last answer stands. People behind one address share GitHub's hourly limit, so once
+ * GitHub says it is used up, the last answer stands with no request until GitHub's reset. */
 export async function releases(fetcher: Fetch, storage: Storage, now: number): Promise<Release[]> {
   const cached = readCache(storage)
-  if (cached && !due(cached, now)) return cached.releases
-  let fresh = cached?.releases ?? []
+  if (cached?.limitedUntil !== undefined && now < cached.limitedUntil) return cached.releases
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), CHECK_TIMEOUT)
   try {
@@ -152,24 +156,36 @@ export async function releases(fetcher: Fetch, storage: Storage, now: number): P
       referrerPolicy: "no-referrer",
       signal: controller.signal,
     })
-    if (response.ok) fresh = publishedReleases(await response.json())
-  } catch {
-    // Offline or blocked: the last answer stands.
+    const reset = Number(response.headers.get("x-ratelimit-reset"))
+    if (response.headers.get("x-ratelimit-remaining") === "0" && reset > 0)
+      storage.save(
+        CACHE_KEY,
+        JSON.stringify({
+          checkedAt: cached?.checkedAt ?? 0,
+          releases: cached?.releases ?? [],
+          limitedUntil: reset * 1000,
+        } satisfies Cached),
+      )
+    if (!response.ok) throw new Error(`GitHub answered ${response.status}`)
+    const fresh = publishedReleases(await response.json())
+    storage.save(CACHE_KEY, JSON.stringify({ checkedAt: now, releases: fresh } satisfies Cached))
+    return fresh
   } finally {
     clearTimeout(timer)
   }
-  storage.save(CACHE_KEY, JSON.stringify({ checkedAt: now, releases: fresh } satisfies Cached))
-  return fresh
 }
 
-/** The releases as a query that asks again every day, so a page left open still reaches the
- * cache's expiry; `releases` itself decides whether that is a request. */
+/** The releases as a query: the ones this browser read last show at once, and each page that
+ * opens asks GitHub again in the background, as does a page left open, every hour. */
 export function updateCheckQuery(fetcher: Fetch, storage: Storage, enabled: boolean) {
   return queryOptions({
     queryKey: ["update-check"],
     queryFn: async () => await releases(fetcher, storage, Date.now()),
     enabled,
-    staleTime: Infinity,
+    initialData: () => readCache(storage)?.releases,
+    // Older than any staleTime, so the first page of a visit always asks again.
+    initialDataUpdatedAt: 0,
+    staleTime: CHECK_EVERY,
     refetchInterval: CHECK_EVERY,
     retry: false,
   })
