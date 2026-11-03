@@ -70,8 +70,8 @@ export const DEFAULT_BUILT_PORT = "8080"
 export const derivedMethod = (chosen: boolean, method: BuildMethod, dockerfileFound: boolean) =>
   chosen ? method : dockerfileFound ? "dockerfile" : "railpack"
 
-/** The port a service listens on before the person types one: Railpack's, or the Dockerfile's
- * `EXPOSE` (none: no network). */
+/** The port a service listens on before the person types one: Railpack's, and none for a
+ * Dockerfile (no network). */
 export const defaultPort = (method: BuildMethod) =>
   method === "railpack" ? DEFAULT_BUILT_PORT : ""
 
