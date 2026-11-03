@@ -36,6 +36,13 @@ pub const ANNOTATION_DESCRIPTION: &str = "zeabur.com/description";
 /// Annotation on a project's namespace: its icon, by name, one of Zeabur's built-in set.
 pub const ANNOTATION_ICON: &str = "zeabur.com/icon";
 
+/// Annotation on a project's namespace: the memory limit of one build, a Kubernetes quantity.
+/// Zeabur Builder reads it; without it, the controller's default applies.
+pub const ANNOTATION_BUILD_MEMORY: &str = "builder.zeabur.com/build-memory";
+
+/// Annotation on a project's namespace: the CPU limit of one build, a Kubernetes quantity.
+pub const ANNOTATION_BUILD_CPU: &str = "builder.zeabur.com/build-cpu";
+
 /// The RBAC verb on a namespace that lets a patch change more than the project's details.
 ///
 /// The chart's admission policy asks for it before a patch changes the labels, which adopting

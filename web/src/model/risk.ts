@@ -108,6 +108,7 @@ const fixedWeight: Partial<Record<Change["op"], OneWeight>> = {
   adopt: { risk: "low" },
   createProject: { risk: "low" },
   details: { risk: "low" },
+  buildLimits: { risk: "low" },
   rebuild: { risk: "low" },
   uploadToken: { risk: "low" },
   archiveDigest: { risk: "normal" },
@@ -328,6 +329,7 @@ const projectPlace: Partial<Record<Change["op"], (project: string) => string>> =
   unadopt: () => "/projects",
   deleteProject: () => "/projects",
   details: (project) => `/projects/${project}/settings`,
+  buildLimits: (project) => `/projects/${project}/settings`,
 }
 
 export function destinationOf(

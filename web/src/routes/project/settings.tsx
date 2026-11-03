@@ -20,6 +20,7 @@ import { Problem } from "@/components/problem"
 import { projectGlyphs } from "@/components/project-icon"
 import { useI18n, useT } from "@/i18n"
 import { formatAgo } from "@/lib/format"
+import { BuildLimits } from "@/routes/project/build-limits"
 import { NetworkSettings } from "@/routes/project/network-settings"
 import { projectCoverage } from "@/model/cluster-backups"
 import { DISPLAY_NAME_MAX, mayChange, projectIcons, type ProjectIconName } from "@/model/project"
@@ -114,19 +115,7 @@ export function ProjectSettings({ namespace }: { namespace: Schemas.ProjectNames
           )}
         </Card>
       </Group>
-      {namespace.adopted ? (
-        <>
-          <Suspense fallback={<LoadingRows label={t("common.loading")} rows={2} />}>
-            <SharedVariables project={namespace.name} />
-          </Suspense>
-          <NetworkSettings project={namespace.name} />
-          <ClusterBackups project={namespace.name} />
-          <Group label={t("notify.title")}>
-            <Notifications project={namespace.name} />
-          </Group>
-          <BatchActions project={namespace.name} />
-        </>
-      ) : null}
+      {namespace.adopted ? <AdoptedSettings namespace={namespace} /> : null}
       <DangerZone namespace={namespace} />
       {help ? (
         <AccessDialog
@@ -137,6 +126,28 @@ export function ProjectSettings({ namespace }: { namespace: Schemas.ProjectNames
           onClose={() => setHelp(false)}
         />
       ) : null}
+    </>
+  )
+}
+
+function AdoptedSettings({ namespace }: { namespace: Schemas.ProjectNamespace }) {
+  const t = useT()
+  return (
+    <>
+      <Suspense fallback={<LoadingRows label={t("common.loading")} rows={2} />}>
+        <SharedVariables project={namespace.name} />
+      </Suspense>
+      <BuildLimits
+        // A new form when the saved limits change, so it starts from them.
+        key={JSON.stringify([namespace.buildMemory, namespace.buildCpu])}
+        namespace={namespace}
+      />
+      <NetworkSettings project={namespace.name} />
+      <ClusterBackups project={namespace.name} />
+      <Group label={t("notify.title")}>
+        <Notifications project={namespace.name} />
+      </Group>
+      <BatchActions project={namespace.name} />
     </>
   )
 }

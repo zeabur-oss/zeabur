@@ -255,6 +255,61 @@ mod tests {
         );
     }
 
+    fn node(name: &str, memory: &str, cpu: &str) -> zeabur_kube::k8s_openapi::api::core::v1::Node {
+        serde_json::from_value(json!({
+            "metadata": {"name": name, "uid": format!("uid-{name}")},
+            "status": {"conditions": [{"type": "Ready", "status": "True"}],
+                       "allocatable": {"cpu": cpu, "memory": memory, "pods": "110"}}
+        }))
+        .unwrap()
+    }
+
+    /// Build limits are the Namespace's annotations: the plan holds them to the largest node,
+    /// and a person who may not patch the Namespace is refused at the apply like for any detail.
+    #[tokio::test]
+    async fn build_limits_stay_within_the_largest_node_and_need_the_right_to_patch_the_namespace() {
+        let cluster = cluster();
+        cluster.update(|s| {
+            s.namespaces = vec![namespace("shop", &json!({"zeabur.com/project": "true"}))];
+            s.nodes = vec![node("a", "4Gi", "2"), node("b", "16Gi", "8")];
+        });
+        let app = app(&cluster);
+        let (_, shown) = send(&app, "GET", "/api/v1/projects/shop/namespace", None).await;
+        assert_eq!(shown["maxBuildMemoryBytes"], 16_u64 << 30);
+        assert_eq!(shown["maxBuildCpuMillicores"], 8000);
+
+        let (status, problem) = plan_and_apply(
+            &app,
+            "shop",
+            json!([{"op": "buildLimits", "buildMemory": "32Gi"}]),
+        )
+        .await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{problem}");
+        let (status, problem) = plan_and_apply(
+            &app,
+            "shop",
+            json!([{"op": "buildLimits", "buildMemory": "8Gi", "buildCpu": "4"}]),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{problem}");
+        let (_, shown) = send(&app, "GET", "/api/v1/projects/shop/namespace", None).await;
+        assert_eq!(
+            (&shown["buildMemory"], &shown["buildCpu"]),
+            (&json!("8Gi"), &json!("4"))
+        );
+
+        cluster.update(|s| {
+            s.forbidden_writes.insert("Namespace/shop".to_owned());
+        });
+        let (status, problem) = plan_and_apply(
+            &app,
+            "shop",
+            json!([{"op": "buildLimits", "buildMemory": "2Gi", "buildCpu": "1"}]),
+        )
+        .await;
+        assert_eq!(status, StatusCode::FORBIDDEN, "{problem}");
+    }
+
     fn rule(verbs: &[&str], group: &str, resources: &[&str]) -> AccessRule {
         AccessRule {
             verbs: verbs.iter().map(|&v| v.to_owned()).collect(),

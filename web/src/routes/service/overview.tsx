@@ -42,7 +42,7 @@ import {
 import { SwapText } from "@zeabur-oss/design-system/components/swap-text"
 import { TermDetail } from "@zeabur-oss/design-system/components/term"
 import { Tooltip } from "@zeabur-oss/design-system/components/tooltip"
-import { useI18n, useSentence, useT } from "@/i18n"
+import { useI18n, useSentence, useT, type Translate } from "@/i18n"
 import { LoadingRows } from "@/components/page"
 import { Problem } from "@/components/problem"
 import { GateTip, useGate } from "@/components/gate"
@@ -52,7 +52,14 @@ import { serviceLink } from "@/lib/place"
 import { cn } from "@/lib/utils"
 import type { Schemas } from "@/api/client"
 import { alertsFor, folded } from "@/model/alerts"
-import { failureText, refusedCredentials, runsOf } from "@/model/builds"
+import {
+  failureText,
+  ranOutOfMemory,
+  refusedCredentials,
+  runsOf,
+  type Build,
+  type BuildRun,
+} from "@/model/builds"
 import { neighboursOf, type Edge } from "@/model/connections"
 import { edgeText } from "@/model/evidence"
 import { overviewOf, type Overview } from "@/model/overview"
@@ -377,12 +384,7 @@ function BuildLine({
   const run = build ? runsOf(builds.data?.runs ?? [], build)[0] : undefined
   const failed = statusOf(service).reason === "BuildFailed"
   const waiting = !failed && statusOf(service).word === "waitingUpload"
-  const refused = build ? refusedCredentials(build, run) : undefined
-  const why = failed
-    ? ((refused ? t(`builds.refused.${refused}`) : undefined) ?? failureText(build, run))
-    : waiting
-      ? t("builds.waitingUpload", service.name)
-      : t("overview.building")
+  const why = buildWhy(t, { service, build, run, failed, waiting })
   return (
     <p className="mt-1 flex max-w-prose flex-wrap items-baseline gap-x-2 gap-y-1 text-sm text-secondary">
       {why ? <span className="min-w-0 break-words">{why}</span> : null}
@@ -392,6 +394,23 @@ function BuildLine({
       <More onClick={() => onTab("builds")}>{t("overview.seeBuild")}</More>
     </p>
   )
+}
+
+function buildWhy(
+  t: Translate,
+  at: {
+    service: Service
+    build: Build | undefined
+    run: BuildRun | undefined
+    failed: boolean
+    waiting: boolean
+  },
+): string | null | undefined {
+  const { service, build, run, failed, waiting } = at
+  if (!failed) return waiting ? t("builds.waitingUpload", service.name) : t("overview.building")
+  if (ranOutOfMemory(build, run)) return t("builds.reason.OutOfMemory")
+  const refused = build ? refusedCredentials(build, run) : undefined
+  return (refused ? t(`builds.refused.${refused}`) : undefined) ?? failureText(build, run)
 }
 
 function More({ onClick, children }: { onClick: () => void; children: string }) {

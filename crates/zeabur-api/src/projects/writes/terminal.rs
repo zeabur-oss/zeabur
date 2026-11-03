@@ -123,6 +123,7 @@ pub(crate) async fn compute(
         | Change::Unadopt
         | Change::DeleteProject
         | Change::Details { .. }
+        | Change::BuildLimits { .. }
         | Change::ScheduleTask { .. }
         | Change::RunTask { .. }
         | Change::EditTask { .. } => Err(ApiError::from(Problem::new(

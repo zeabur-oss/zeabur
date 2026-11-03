@@ -13,6 +13,7 @@ type PageRight =
   | "changeGitHubApp"
   | "restoreBackups"
   | "createServices"
+  | "changeBuildLimits"
 export type Right = keyof ProjectRights | keyof ClusterRights | PageRight
 type Permission = Schemas.Permission
 
@@ -57,6 +58,7 @@ const rules: Record<Right, { role: NeededRole; rule: string }> = {
   testClusterNotifications: { role: "admin", rule: "create jobs.batch" },
   changeS3Destinations: { role: "admin", rule: "create secrets -n zeabur-s3-destinations" },
   changeGitHubApp: { role: "admin", rule: "create secrets -n builder-system" },
+  changeBuildLimits: { role: "admin", rule: "patch and zeabur-manage namespaces" },
 }
 
 export const neededRole = (right: Right): NeededRole => rules[right].role
@@ -112,6 +114,7 @@ const notProject: Record<Exclude<Right, keyof ProjectRights>, true> = {
   changeGitHubApp: true,
   restoreBackups: true,
   createServices: true,
+  changeBuildLimits: true,
 }
 
 const workloads = ["deployments", "statefulsets", "daemonsets"]

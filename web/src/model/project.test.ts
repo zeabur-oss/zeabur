@@ -6,6 +6,10 @@ import { projectGlyphs } from "@/components/project-icon"
 import type { Translate } from "@/i18n"
 import { en } from "@/i18n/en"
 import {
+  buildCeiling,
+  buildLimitProblem,
+  buildLimitsChange,
+  isBuildQuantity,
   projectMention,
   compareProjects,
   kubectlLabel,
@@ -201,5 +205,45 @@ describe("a project named in a sentence", () => {
     })
     expect(projectMention({ name: "blog" }, "blog")).toStrictEqual({ title: "blog" })
     expect(projectMention(undefined, "blog")).toStrictEqual({ title: "blog" })
+  })
+})
+
+describe("a project's build limits", () => {
+  test("a limit is a Kubernetes quantity above zero", () => {
+    for (const ok of ["2Gi", "512Mi", "1.5", "500m", "1e3", " 2G "])
+      expect(isBuildQuantity(ok)).toBe(true)
+    for (const bad of ["", "0", "0m", "-1", "2GB", "Gi", "two", "1 Gi", "1e"])
+      expect(isBuildQuantity(bad)).toBe(false)
+  })
+
+  test("a limit above the largest node is refused, one within it or unchecked is not", () => {
+    const node = { maxBuildMemoryBytes: 4 * 2 ** 30, maxBuildCpuMillicores: 2000 }
+    expect(buildLimitProblem("buildMemory", "8Gi", node)).toBe("tooLarge")
+    expect(buildLimitProblem("buildMemory", "4Gi", node)).toBeUndefined()
+    expect(buildLimitProblem("buildCpu", "2500m", node)).toBe("tooLarge")
+    expect(buildLimitProblem("buildCpu", "2", node)).toBeUndefined()
+    expect(buildLimitProblem("buildCpu", "lots", node)).toBe("invalid")
+    expect(buildLimitProblem("buildMemory", "", node)).toBeUndefined()
+    expect(buildLimitProblem("buildMemory", "64Gi", {})).toBeUndefined()
+    expect(buildCeiling(node)).toEqual({ buildMemory: "4Gi", buildCpu: "2" })
+  })
+
+  test("an empty field is left out, so its annotation is removed", () => {
+    expect(buildLimitsChange({ buildMemory: " 2Gi ", buildCpu: "" })).toEqual({
+      op: "buildLimits",
+      buildMemory: "2Gi",
+      buildCpu: undefined,
+    })
+  })
+
+  test("the plan names the build limits", () => {
+    const said = describePlan(
+      english,
+      { changes: [{ op: "buildLimits", buildMemory: "2Gi" }] },
+      empty,
+      () => undefined,
+    )
+    expect(said.lines.join(" ")).toMatch(/build memory and CPU/)
+    expect(said.action).toBe("Save build limits")
   })
 })

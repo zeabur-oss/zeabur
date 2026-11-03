@@ -3,6 +3,7 @@
 /// Conventions of third-party tools: Helm, Argo CD, Flux, operators, Gateway API.
 pub mod adapters;
 mod attribution;
+mod build_limits;
 mod container;
 mod details;
 mod diagnosis;
@@ -22,6 +23,7 @@ mod trace;
 mod workload;
 
 pub use attribution::{Attribution, NamespaceAttribution, Ownership, WorkloadRef};
+pub use build_limits::{ProjectBuildLimits, is_build_quantity};
 pub use container::{
     Container, ContainerPort, ContainerResources, EnvVar, ImportedEnv, Mount, MountCategory,
     PendingRestart, ProbeHandler, ProbeSummary, Probes, Quantities, ReadOnlyReason,

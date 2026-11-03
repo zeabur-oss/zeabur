@@ -1,5 +1,7 @@
 import type { Schemas } from "@/api/client"
+import { kubeAmount } from "@/lib/amount"
 import { roleYaml } from "@/model/rbac"
+import { bytesOf } from "@/model/volume-edit"
 import { countsHealth, healthRank } from "@/model/service"
 
 export type ProjectIconName = Schemas.ProjectIcon
@@ -68,8 +70,65 @@ export const namespaceOps = new Set<Schemas.Change["op"]>([
   "unadopt",
   "deleteProject",
   "details",
+  "buildLimits",
   "createProject",
 ])
+
+const QUANTITY = /^\+?(\d+\.?\d*|\.\d+)(n|u|m|k|M|G|T|P|E|Ki|Mi|Gi|Ti|Pi|Ei|[eE][+-]?\d+)?$/
+
+/** Whether Builder takes it as a build limit: a Kubernetes quantity above zero (zeabur-model
+ * `is_build_quantity`). */
+export function isBuildQuantity(value: string): boolean {
+  const text = value.trim()
+  return QUANTITY.test(text) && /[1-9]/.test(text.replace(/[eE][+-]?\d+$/, ""))
+}
+
+export type BuildLimit = "buildMemory" | "buildCpu"
+
+/** The largest node's room, as the namespace says it; the plan checks it again. */
+export function buildCeiling(
+  namespace: Pick<Schemas.ProjectNamespace, "maxBuildMemoryBytes" | "maxBuildCpuMillicores">,
+): { buildMemory?: string; buildCpu?: string } {
+  const { maxBuildMemoryBytes: memory, maxBuildCpuMillicores: cpu } = namespace
+  return {
+    buildMemory:
+      memory == null ? undefined : kubeAmount(Math.floor(memory / 2 ** 20) * 2 ** 20, "bytes"),
+    buildCpu: cpu == null ? undefined : kubeAmount(cpu / 1000, "cpu"),
+  }
+}
+
+/** What is wrong with a build limit as typed: not a quantity above zero, or more than the
+ * largest node has. */
+export function buildLimitProblem(
+  kind: BuildLimit,
+  value: string,
+  namespace: Pick<Schemas.ProjectNamespace, "maxBuildMemoryBytes" | "maxBuildCpuMillicores">,
+): "invalid" | "tooLarge" | undefined {
+  const text = value.trim()
+  if (text === "") return undefined
+  if (!isBuildQuantity(text)) return "invalid"
+  if (kind === "buildMemory") {
+    const bytes = bytesOf(text)
+    const max = namespace.maxBuildMemoryBytes
+    return bytes !== undefined && max != null && bytes > max ? "tooLarge" : undefined
+  }
+  const match = /^\+?(\d+(?:\.\d*)?|\.\d+)(m)?$/.exec(text)
+  const max = namespace.maxBuildCpuMillicores
+  if (!match || max == null) return undefined
+  return Number(match[1]) * (match[2] ? 1 : 1000) > max ? "tooLarge" : undefined
+}
+
+/** The plan change for the build limits a form holds; an empty field removes its annotation. */
+export function buildLimitsChange(values: {
+  buildMemory: string
+  buildCpu: string
+}): Extract<Schemas.Change, { op: "buildLimits" }> {
+  return {
+    op: "buildLimits",
+    buildMemory: values.buildMemory.trim() || undefined,
+    buildCpu: values.buildCpu.trim() || undefined,
+  }
+}
 
 /** zeabur-model `DISPLAY_NAME_MAX`. */
 export const DISPLAY_NAME_MAX = 64

@@ -345,9 +345,11 @@ fn dns() -> zeabur_api::resolve::Fixed {
 }
 
 /// Blog's docs, deployed from Git: its first image is still being built
-/// (`ZEABUR_DEMO_BUILD_FAILED=1`: the build failed).
+/// (`ZEABUR_DEMO_BUILD_FAILED=1`: the build failed; `ZEABUR_DEMO_BUILD_OOM=1`: it ran out of
+/// memory).
 fn docs_build() -> [DynamicObject; 2] {
-    let failed = std::env::var_os("ZEABUR_DEMO_BUILD_FAILED").is_some();
+    let oom = std::env::var_os("ZEABUR_DEMO_BUILD_OOM").is_some();
+    let failed = oom || std::env::var_os("ZEABUR_DEMO_BUILD_FAILED").is_some();
     let build = json!({
         "apiVersion": "builder.zeabur.com/v1alpha1", "kind": "Build",
         "metadata": {"name": "docs", "namespace": "blog"},
@@ -359,7 +361,9 @@ fn docs_build() -> [DynamicObject; 2] {
                 {"name": "docs-build-env", "key": "NPM_TOKEN"}}}],
             "notify": [{"type": "keel",
                 "url": "http://keel.keel.svc.cluster.local:9300/v1/webhooks/native"}]},
-        "status": if failed {
+        "status": if oom {
+            json!({})
+        } else if failed {
             json!({"conditions": [{"type": "Ready", "status": "False", "reason": "BuildFailed",
                 "message": "railpack: no start command found"}]})
         } else {
@@ -372,7 +376,10 @@ fn docs_build() -> [DynamicObject; 2] {
             "creationTimestamp": "2026-10-23T08:00:00Z"},
         "spec": {"buildRef": "docs", "revision": "3f9a1c2b7d4e5f60718293a4b5c6d7e8f9012345",
             "trigger": "poll"},
-        "status": if failed {
+        "status": if oom {
+            json!({"phase": "Failed", "reason": "OutOfMemory",
+                "message": "buildkitd was killed for its memory. Set the annotation builder.zeabur.com/build-memory on the namespace to raise the limit."})
+        } else if failed {
             json!({"phase": "Failed", "reason": "PlanFailed",
                 "message": "railpack: no start command found. Add a start script to package.json."})
         } else {

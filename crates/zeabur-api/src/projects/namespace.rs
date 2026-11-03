@@ -42,7 +42,7 @@ use utoipa::ToSchema;
 use zeabur_core::names::{LABEL_PROJECT, MANAGE_VERB, is_system_namespace};
 use zeabur_core::problem::{MEDIA_TYPE as PROBLEM, Problem};
 use zeabur_kube::{Access, AccessRules, ResourceRef};
-use zeabur_model::{Origin, PodSecurityLevel, ProjectDetails};
+use zeabur_model::{Origin, PodSecurityLevel, ProjectBuildLimits, ProjectDetails};
 
 use super::rights::ProjectRights;
 use crate::account::{AccountRole, role};
@@ -97,11 +97,22 @@ pub struct ProjectNamespace {
     /// The name, description and icon given to it.
     #[serde(flatten)]
     pub details: ProjectDetails,
+    /// The memory and CPU limits of one build, when the project sets them.
+    #[serde(flatten)]
+    pub build_limits: ProjectBuildLimits,
+    /// The most memory a build limit may ask for, the largest allocatable memory of a node, in
+    /// bytes; absent when the nodes could not be read.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_build_memory_bytes: Option<u64>,
+    /// The most CPU a build limit may ask for, the largest allocatable CPU of a node, in
+    /// millicores; absent when the nodes could not be read.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_build_cpu_millicores: Option<u64>,
     /// Whether the person may patch the Namespace: change its details.
     pub can_change: Permission,
     /// Whether the person may adopt it or let it go: patch it, and where the admission policy
-    /// guards its labels, also `zeabur-manage` it. Changing its Pod Security level needs the
-    /// same.
+    /// guards its labels, also `zeabur-manage` it. Changing its Pod Security level or its build
+    /// limits needs the same.
     pub can_adopt: Permission,
     /// The Pod Security level enforced in it, its `pod-security.kubernetes.io/enforce` label;
     /// absent when the label is not set, and the cluster's default applies, or names no level.
@@ -198,6 +209,7 @@ pub(crate) async fn get(
             ))
         })?;
     let deleting = deleting::read(cluster.as_ref(), &project, &namespace).await;
+    let capacity = super::writes::node_capacity(cluster.as_ref()).await;
     let metadata = namespace.metadata;
     let guarded = state.settings.identity.project_roles;
     let workload_patch = workload_patch(rules.as_ref().ok());
@@ -224,6 +236,9 @@ pub(crate) async fn get(
             .is_some_and(|labels| labels.contains_key(LABEL_PROJECT)),
         system: is_system_namespace(&project),
         details: ProjectDetails::from_annotations(metadata.annotations.as_ref()),
+        build_limits: ProjectBuildLimits::from_annotations(metadata.annotations.as_ref()),
+        max_build_memory_bytes: capacity.map(|c| c.memory_bytes),
+        max_build_cpu_millicores: capacity.map(|c| c.cpu_millicores),
         can_change,
         can_adopt,
         pod_security: metadata

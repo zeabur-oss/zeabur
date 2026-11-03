@@ -1,4 +1,5 @@
 import { useMutation, useQuery } from "@tanstack/react-query"
+import { Link, useParams } from "@tanstack/react-router"
 import { useState } from "react"
 import ArrowClockwiseIcon from "~icons/ph/arrow-clockwise"
 import ArrowSquareOutIcon from "~icons/ph/arrow-square-out"
@@ -468,13 +469,36 @@ function SummaryFacts({
   )
 }
 
+/** The build ran out of memory: raise the project's build memory, in its settings. */
+function OutOfMemory() {
+  const t = useT()
+  const { project } = useParams({ strict: false }) as { project: string }
+  return (
+    <p className="text-sm text-fail-strong">
+      {t("builds.reason.OutOfMemory")}{" "}
+      <Link
+        to="/projects/$project/settings"
+        params={{ project }}
+        hash="builds"
+        className="font-medium underline underline-offset-2"
+      >
+        {t("builds.oom.open")}
+      </Link>
+    </p>
+  )
+}
+
 /** Why a run failed in a sentence, with the builder's own message behind Details. */
 function FailedRun({ run }: { run: BuildRun }) {
   const t = useT()
   const [open, setOpen] = useState(false)
   return (
     <div className="mt-1 flex max-w-prose flex-col items-start gap-1">
-      <p className="text-sm text-fail-strong">{t(reasonKey(run.reason))}</p>
+      {run.reason === "OutOfMemory" ? (
+        <OutOfMemory />
+      ) : (
+        <p className="text-sm text-fail-strong">{t(reasonKey(run.reason))}</p>
+      )}
       {run.message ? (
         <Collapsible open={open} onOpenChange={setOpen} className="w-full">
           <CollapsibleTrigger render={<Button variant="ghost" size="xs" className="-ml-2" />}>

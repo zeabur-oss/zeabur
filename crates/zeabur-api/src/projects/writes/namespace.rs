@@ -2,8 +2,10 @@
 //! details.
 
 use zeabur_core::isolation::PLATFORM_LABEL;
-use zeabur_kube::{Cluster, ClusterError};
-use zeabur_plan::{Change, Input, Plan, PlanRequest};
+use zeabur_core::quantity::{bytes, millicores};
+use zeabur_kube::k8s_openapi::api::core::v1::Node;
+use zeabur_kube::{Cluster, ClusterError, ClusterExt as _};
+use zeabur_plan::{Change, Input, NodeCapacity, Plan, PlanRequest};
 
 use super::plan_problem;
 use crate::error::{ApiError, get_read, read_problem};
@@ -36,10 +38,20 @@ pub(super) async fn compute_namespace(
         ..zeabur_graph::Snapshot::default()
     };
     let platform_namespaces = creating && platform_namespaces(cluster).await;
+    let node_capacity = if request
+        .changes
+        .iter()
+        .any(|c| matches!(c, Change::BuildLimits { .. }))
+    {
+        node_capacity(cluster).await
+    } else {
+        None
+    };
     zeabur_plan::plan(
         Input {
             namespace: namespace.as_ref(),
             platform_namespaces,
+            node_capacity,
             ..Input::new(&snapshot, now)
         },
         request,
@@ -55,4 +67,21 @@ pub(crate) async fn platform_namespaces(cluster: &dyn Cluster) -> bool {
         .list_labelled(&resource, None, PLATFORM_LABEL, "true")
         .await
         .is_ok_and(|found| !found.is_empty())
+}
+
+/// The largest allocatable memory and CPU of a node; `None` when the nodes could not be listed
+/// or there are none.
+pub(crate) async fn node_capacity(cluster: &dyn Cluster) -> Option<NodeCapacity> {
+    let nodes = cluster.list::<Node>(None).await.ok()?;
+    let allocatable = |key: &str, parse: fn(&str) -> Option<u64>| {
+        nodes
+            .iter()
+            .filter_map(|n| n.status.as_ref()?.allocatable.as_ref()?.get(key))
+            .filter_map(|q| parse(&q.0))
+            .max()
+    };
+    Some(NodeCapacity {
+        memory_bytes: allocatable("memory", bytes)?,
+        cpu_millicores: allocatable("cpu", millicores)?,
+    })
 }

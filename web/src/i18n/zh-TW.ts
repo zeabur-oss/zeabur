@@ -720,8 +720,8 @@ export const zhTW: Messages = {
   "builds.reason.InfraError": "建置做到一半被中斷了。再建置一次。",
   "builds.reason.QuotaExceeded": "這個專案同時建置的數量已滿。其他建置結束後，這個會自動開始。",
   "builds.reason.BuildkitdStarting": "建置引擎正在啟動，稍後會自動開始建置。",
-  "builds.reason.OutOfMemory":
-    "建置用完了記憶體。請叢集的管理員給建置更多記憶體，或把建置的內容縮小。",
+  "builds.reason.OutOfMemory": "建置用完了記憶體。請調高這個專案的建置記憶體，或把建置的內容縮小。",
+  "builds.oom.open": "開啟建置設定",
   "builds.reason.Cancelled": "這次建置被較新的建置取代，或被人取消了。",
   "builds.reason.other": "建置失敗。展開詳細資料看原因。",
   "builds.step": "步驟",
@@ -1160,10 +1160,12 @@ export const zhTW: Messages = {
   "action.openDebugTerminal": "開啟除錯終端機",
   "action.openToolsTerminal": "開啟 kubectl 終端機",
   "action.saveDetails": "儲存詳細資料",
+  "action.saveBuildLimits": "儲存建置上限",
   "title.adopt": (ns) => `使用既有的 Namespace ${ns}`,
   "title.unadopt": (ns) => `${ns} 不再顯示為專案`,
   "title.deleteProject": (ns) => `刪除專案 ${ns}`,
   "title.details": (ns) => `${ns} 的詳細資料`,
+  "title.buildLimits": (ns) => `${ns} 的建置上限`,
   "title.pauseAll": (ns) => `暫停 ${ns} 的所有服務`,
   "title.restartAll": (ns) => `重新啟動 ${ns} 的所有服務`,
   "confirm.createProject":
@@ -1189,6 +1191,7 @@ export const zhTW: Messages = {
   "confirm.labelVolume": (claim) =>
     `在 ${claim} 加上標籤和註解，之後只由這個磁碟區自己的排程備份。不會重新啟動任何東西。`,
   "confirm.details": "把名稱、描述和圖示存到 Namespace 上。",
+  "confirm.buildLimits": "把建置記憶體和 CPU 存到 Namespace 上。之後開始的建置會套用。",
   "access.title": (ns) => `無法變更 ${ns}`,
   "access.you": "<你的使用者名稱>",
   "access.ask": (ns) => `向叢集管理員申請 Namespace ${ns} 的 patch 權限。`,
@@ -1227,6 +1230,18 @@ export const zhTW: Messages = {
   "projectSettings.namespaceHint": "這個專案就是這個 Namespace，名稱無法變更。",
   "projectSettings.shown": "顯示為專案",
   "projectSettings.shownNo": "否。改為顯示成專案時，Zeabur 只會加上專案標籤，其他都不會改變。",
+  "projectSettings.builds": "建置",
+  "projectSettings.buildMemory": "建置記憶體",
+  "projectSettings.buildMemoryHint":
+    "這個專案每次建置最多能用的記憶體，例如 2Gi。留空就用 Builder 預設值。",
+  "projectSettings.buildCpu": "建置 CPU",
+  "projectSettings.buildCpuHint":
+    "這個專案每次建置最多能用的 CPU，例如 2 或 500m。留空就用 Builder 預設值。",
+  "projectSettings.buildTooLarge": (max) => `超過最大節點能給的量（${max}）。`,
+  "projectSettings.buildMost": (max) => `最大的節點有 ${max}。`,
+  "projectSettings.buildInvalid": "請填大於 0 的數量，例如 2Gi、512Mi、2 或 500m。",
+  "projectSettings.buildNeedsAdmin": "改建置上限需要的權限比改專案名稱更高。",
+  "buildLimits.default": "Builder 預設值",
   "network.title": "網路",
   "network.isolation": "其他專案",
   "network.isolated": "連不到這個專案的服務。專案內的服務和 Zeabur 元件不受影響。",
@@ -1446,6 +1461,7 @@ export const zhTW: Messages = {
     `${host} 只有 HTTP。管理員指定 cert-manager 的簽發者後，新網域會使用 HTTPS`,
   "warn.httpOnlyElsewhere": (host: string, route: string) =>
     `${host} 只有 HTTP：${route} 的憑證不是 cert-manager 簽發的，請到產生憑證的地方加入 ${host}`,
+  "warn.nodeCapacityUnknown": "無法讀取節點：建置上限沒有和最大的節點比對",
   "warn.secretValuesUnknown": (name: string) => `無法讀取 ${name} 的值：差異只列出鍵名`,
   "warn.configNotRolledBack": (workload: string) =>
     `${workload} 讀取設定檔或機密變數：回滾不會改動這些內容`,

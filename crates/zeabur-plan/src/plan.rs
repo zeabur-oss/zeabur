@@ -207,6 +207,18 @@ pub struct Input<'a> {
     /// The registry Zeabur Builder pushes to and nodes pull from (`builds.registry`); `None`:
     /// services are not built in this cluster.
     pub build_registry: Option<&'a str>,
+    /// The largest allocatable memory and CPU of one node, which a build limit may not pass;
+    /// `None` when the nodes could not be read.
+    pub node_capacity: Option<NodeCapacity>,
+}
+
+/// The most one node can give a pod.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct NodeCapacity {
+    /// The largest allocatable memory of a node, in bytes.
+    pub memory_bytes: u64,
+    /// The largest allocatable CPU of a node, in millicores.
+    pub cpu_millicores: u64,
 }
 
 impl<'a> Input<'a> {
@@ -240,6 +252,7 @@ impl<'a> Input<'a> {
             certificates: &NO_CERTIFICATES,
             platform_namespaces: false,
             build_registry: None,
+            node_capacity: None,
         }
     }
 }
@@ -561,6 +574,10 @@ impl<'a> Planner<'a> {
                 description,
                 icon,
             } => self.details(display_name.as_deref(), description.as_deref(), *icon),
+            Change::BuildLimits {
+                build_memory,
+                build_cpu,
+            } => self.build_limits(build_memory.as_deref(), build_cpu.as_deref()),
             Change::ScheduleTask {
                 from,
                 container,

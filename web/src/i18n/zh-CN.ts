@@ -719,7 +719,8 @@ export const zhCN: Messages = {
   "builds.reason.InfraError": "构建做到一半被中断了。重新构建一次。",
   "builds.reason.QuotaExceeded": "这个项目同时构建的数量已满。其他构建结束后，这个会自动开始。",
   "builds.reason.BuildkitdStarting": "构建引擎正在启动，稍后会自动开始构建。",
-  "builds.reason.OutOfMemory": "构建用完了内存。请集群的管理员给构建更多内存，或把构建的内容缩小。",
+  "builds.reason.OutOfMemory": "构建用完了内存。请调高这个项目的构建内存，或把构建的内容缩小。",
+  "builds.oom.open": "打开构建设置",
   "builds.reason.Cancelled": "这次构建被较新的构建取代，或被人取消了。",
   "builds.reason.other": "构建失败。展开详细信息看原因。",
   "builds.step": "步骤",
@@ -1156,10 +1157,12 @@ export const zhCN: Messages = {
   "action.openDebugTerminal": "打开调试终端",
   "action.openToolsTerminal": "打开 kubectl 终端",
   "action.saveDetails": "保存详细信息",
+  "action.saveBuildLimits": "保存构建上限",
   "title.adopt": (ns) => `使用已有的 Namespace ${ns}`,
   "title.unadopt": (ns) => `${ns} 不再显示为项目`,
   "title.deleteProject": (ns) => `删除项目 ${ns}`,
   "title.details": (ns) => `${ns} 的详细信息`,
+  "title.buildLimits": (ns) => `${ns} 的构建上限`,
   "title.pauseAll": (ns) => `暂停 ${ns} 的所有服务`,
   "title.restartAll": (ns) => `重启 ${ns} 的所有服务`,
   "confirm.createProject":
@@ -1185,6 +1188,7 @@ export const zhCN: Messages = {
   "confirm.labelVolume": (claim) =>
     `给 ${claim} 加上标签和注解，之后只由这个卷自己的定时任务备份。不会重启任何东西。`,
   "confirm.details": "把名称、描述和图标保存到 Namespace 上。",
+  "confirm.buildLimits": "把构建内存和 CPU 保存到 Namespace 上。之后开始的构建会应用。",
   "access.title": (ns) => `无法更改 ${ns}`,
   "access.you": "<你的用户名>",
   "access.ask": (ns) => `向集群管理员申请 Namespace ${ns} 的 patch 权限。`,
@@ -1223,6 +1227,18 @@ export const zhCN: Messages = {
   "projectSettings.namespaceHint": "这个项目就是这个 Namespace，名称无法更改。",
   "projectSettings.shown": "显示为项目",
   "projectSettings.shownNo": "否。改为显示成项目时，Zeabur 只会加上项目标签，其他都不会改变。",
+  "projectSettings.builds": "构建",
+  "projectSettings.buildMemory": "构建内存",
+  "projectSettings.buildMemoryHint":
+    "这个项目每次构建最多能用的内存，例如 2Gi。留空就用 Builder 默认值。",
+  "projectSettings.buildCpu": "构建 CPU",
+  "projectSettings.buildCpuHint":
+    "这个项目每次构建最多能用的 CPU，例如 2 或 500m。留空就用 Builder 默认值。",
+  "projectSettings.buildTooLarge": (max) => `超过最大节点能给的量（${max}）。`,
+  "projectSettings.buildMost": (max) => `最大的节点有 ${max}。`,
+  "projectSettings.buildInvalid": "请填大于 0 的数量，例如 2Gi、512Mi、2 或 500m。",
+  "projectSettings.buildNeedsAdmin": "改构建上限需要的权限比改项目名称更高。",
+  "buildLimits.default": "Builder 默认值",
   "network.title": "网络",
   "network.isolation": "其他项目",
   "network.isolated": "连不到这个项目的服务。项目内的服务和 Zeabur 组件不受影响。",
@@ -1442,6 +1458,7 @@ export const zhCN: Messages = {
     `${host} 只有 HTTP。管理员指定 cert-manager 的签发者后，新域名会使用 HTTPS`,
   "warn.httpOnlyElsewhere": (host: string, route: string) =>
     `${host} 只有 HTTP：${route} 的证书不是由 cert-manager 签发的，请到生成证书的地方加入 ${host}`,
+  "warn.nodeCapacityUnknown": "无法读取节点：构建上限没有和最大的节点比对",
   "warn.secretValuesUnknown": (name: string) => `无法读取 ${name} 的值：差异只列出键名`,
   "warn.configNotRolledBack": (workload: string) =>
     `${workload} 读取配置文件或机密变量：回滚不会改动这些内容`,

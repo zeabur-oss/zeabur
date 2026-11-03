@@ -60,6 +60,14 @@ Zeabur 只会为 Namespace 添加 `zeabur.com/project: "true"` 标签，不会�
 
 点击**保存详细信息**，检查后应用。这三项保存在 Namespace 的 annotation 中。项目的开发者可以修改这三项，其他 label 和 annotation 只有管理员能修改。
 
+## 设置构建的内存和 CPU
+
+在项目**设置**的**构建**，可以设置这个项目每次构建最多能用的内存和 CPU，例如 `2Gi` 和 `2`。留空就用 Zeabur Builder 的默认值。填的数量不能超过集群里最大的节点能给的量。点**保存构建上限**并应用，之后开始的构建就会用新的值。
+
+构建因为内存不够而失败时，失败信息会链接到这一节。改构建上限要有那个 Namespace 的 `patch` 和 `zeabur-manage` 权限，所以开发者看得到，但不能保存。
+
+这两个值就是 Namespace 的 `builder.zeabur.com/build-memory` 和 `builder.zeabur.com/build-cpu` 注解。
+
 ## 隔离其他项目
 
 打开项目**设置**的**网络**，**其他项目**一行会说明当前状态：
