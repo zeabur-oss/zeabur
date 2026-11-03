@@ -1,38 +1,35 @@
-// Documentation screenshots (e2e/shots/), run by scripts/docs-shots.sh against a demo server:
-//   ZEABUR_SHOTS_URL       the demo's origin, http://127.0.0.1:<port>
-//   ZEABUR_SHOTS_MANIFEST  the manifest (docs/shots.yaml) as JSON
-//   ZEABUR_SHOTS_SERVER    the demo's app and environment (e2e/shots/manifest.ts): only its shots run
-//   ZEABUR_SHOTS_OUT       receives <locale>/<theme>/<id>.png
-//   ZEABUR_SHOTS_SCALE     the manifest's scale
+// Documentation screenshots (e2e/shots/), run by scripts/docs-shots.sh: one project for each set,
+// locale and theme (e2e/shots/sets.ts), such as docs/en/light. The demo servers are fixtures
+// (e2e/shots/fixtures.ts).
 import { defineConfig, devices } from "@playwright/test"
-import { locales, themes } from "./e2e/shots/manifest.ts"
-
-const url = process.env.ZEABUR_SHOTS_URL
-if (!url) throw new Error("ZEABUR_SHOTS_URL is not set")
+import { locales, sets, type Locale } from "./e2e/shots/sets.ts"
 
 export default defineConfig({
   testDir: "e2e/shots",
-  testMatch: "shots.ts",
   fullyParallel: true,
   forbidOnly: Boolean(process.env.CI),
   retries: 0,
   reporter: process.env.CI ? "list" : "line",
+  // A wait in a shot may take as long as the test.
+  expect: { timeout: 30_000 },
   use: {
     ...devices["Desktop Chrome"],
-    baseURL: url,
+    viewport: { width: 1440, height: 900 },
     // Full Chromium in its new headless mode, as in playwright.config.ts.
     channel: "chromium",
-    deviceScaleFactor: Number(process.env.ZEABUR_SHOTS_SCALE ?? 2),
     reducedMotion: "reduce",
     timezoneId: "UTC",
     trace: "retain-on-failure",
     // GPU rasterisation changes a few pixels from run to run.
     launchOptions: { args: ["--disable-gpu", "--force-color-profile=srgb"] },
   },
-  projects: Object.entries(locales).flatMap(([locale, tag]) =>
-    themes.map((theme) => ({
-      name: `${locale}/${theme}`,
-      use: { locale: tag, colorScheme: theme },
-    })),
+  projects: Object.entries(sets).flatMap(([name, set]) =>
+    set.locales.flatMap((locale: Locale) =>
+      set.themes.map((theme) => ({
+        name: `${name}/${locale}/${theme}`,
+        testMatch: `${name}.ts`,
+        use: { locale: locales[locale], colorScheme: theme, deviceScaleFactor: set.scale },
+      })),
+    ),
   ),
 })

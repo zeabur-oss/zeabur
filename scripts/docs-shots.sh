@@ -1,94 +1,56 @@
 #!/usr/bin/env bash
-# Takes the screenshots that a manifest declares (docs/internal/screenshots.md), from the demo
-# server (crates/zeabur-api/examples/demo.rs) or the installer's pages with captured responses, in
-# each locale and theme, as AVIF. Each docs/*shots.yaml is one image set. Run inside `nix develop`.
-#   scripts/docs-shots.sh [manifest] [out]
-# <out> defaults to the manifest's `out`, else target/docs-shots. Images in <out> that this run
-# does not take stay, unless the manifest sets `clean`.
+# Takes the screenshots of one image set (docs/internal/screenshots.md), the Playwright tests in
+# web/e2e/shots/<set>.ts, from the demo server (crates/zeabur-api/examples/demo.rs) or the
+# installer's pages with captured responses, in each locale and theme, as AVIF. Run inside
+# `nix develop`.
+#   scripts/docs-shots.sh [set] [out] [-- playwright arguments]
+# <set> defaults to docs. <out> defaults to the set's `out`, else target/docs-shots/<set>. Images
+# in <out> that this run does not take stay, unless the set sets `clean`.
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
-manifest="$(realpath "${1:-$root/docs/shots.yaml}")"
-port="${ZEABUR_SHOTS_PORT:-18300}"
+set=docs
+out=""
+if [[ $# -gt 0 && "$1" != -- ]]; then set="$1" && shift; fi
+if [[ $# -gt 0 && "$1" != -- ]]; then out="$1" && shift; fi
+if [[ "${1:-}" == -- ]]; then shift; fi
 # The demo server and the browser both take this as the time now, so dates are the same on every run.
 export ZEABUR_DEMO_NOW="${ZEABUR_DEMO_NOW:-2026-10-26T09:00:00Z}"
 work="$(mktemp -d)"
-server=""
-cleanup() {
-  if [[ -n "$server" ]]; then kill "$server" 2>/dev/null || true; fi
-  rm -rf "$work"
-}
-trap cleanup EXIT
+trap 'rm -rf "$work"' EXIT
 
-yq -o=json '.' "$manifest" >"$work/shots.json"
-settings="$(cd "$root/web" && bun e2e/shots/manifest.ts "$work/shots.json" "$manifest")"
+settings="$(cd "$root/web" && bun e2e/shots/sets.ts "$set")"
 kept="$(jq -r '.out // ""' <<<"$settings")"
 file="$(jq -r .file <<<"$settings")"
 budget=$(($(jq -r .budget <<<"$settings") * 1024))
-out="${2:-${kept:+$root/$kept}}"
-out="${out:-$root/target/docs-shots}"
+out="${out:-${kept:+$root/$kept}}"
+out="${out:-$root/target/docs-shots/$set}"
 mkdir -p "$out"
 out="$(realpath "$out")"
-servers="$(jq -r '.servers[]' <<<"$settings")"
 
-mkdir -p "$work/png" "$work/avif"
-if grep -q '"app":"zeabur"' <<<"$servers"; then
+if jq -e '.apps | index("zeabur")' <<<"$settings" >/dev/null; then
   "$root/scripts/build-ui.sh"
   ZEABUR_UI_DIST="$root/web/dist" cargo build --locked -p zeabur-api --example demo
-  demo="${CARGO_TARGET_DIR:-$root/target}/debug/examples/demo"
+  export ZEABUR_SHOTS_DEMO="${CARGO_TARGET_DIR:-$root/target}/debug/examples/demo"
 fi
-if grep -q '"app":"installer"' <<<"$servers"; then
+if jq -e '.apps | index("installer")' <<<"$settings" >/dev/null; then
   "$root/scripts/build-installer-ui.sh"
+  # Written once here, not by each preview server: they read them while the shots run.
+  (cd "$root/crates/zeabur-installer/web" &&
+    bun -e 'import { generated } from "./scripts/dev-api.ts"; import { writeFixtures } from "./scripts/fixtures.ts"; writeFixtures(generated)')
 fi
 
-# One demo server for each distinct app and environment. The installer's is Vite's preview
-# server with the captured responses of crates/zeabur-installer/web/scripts/dev-api.ts.
-while IFS= read -r line; do
-  [[ -n "$line" ]] || continue
-  app="$(jq -r .app <<<"$line")"
-  mapfile -t vars < <(jq -r '.env | to_entries[] | "\(.key)=\(.value)"' <<<"$line")
-  if [[ "$app" == installer ]]; then
-    (
-      cd "$root/crates/zeabur-installer/web"
-      exec env "${vars[@]}" bun node_modules/vite/bin/vite.js preview \
-        --host 127.0.0.1 --port "$port" --strictPort
-    ) >"$work/demo.log" 2>&1 &
-  else
-    env "${vars[@]}" ZEABUR_DEMO_ADDR="127.0.0.1:$port" "$demo" >"$work/demo.log" 2>&1 &
-  fi
-  server=$!
-  # The installer's server first builds and runs a cargo test to write its fixtures
-  # (scripts/fixtures.ts), so a cold run takes minutes.
-  listening=""
-  for _ in $(seq 1 6000); do
-    if (exec 3<>"/dev/tcp/127.0.0.1/$port") 2>/dev/null; then
-      listening=1
-      break
-    fi
-    kill -0 "$server" 2>/dev/null || break
-    sleep 0.1
-  done
-  if [[ -z "$listening" ]]; then
-    echo "error: the demo server did not start ($line):" >&2
-    cat "$work/demo.log" >&2
-    exit 1
-  fi
-  (
-    cd "$root/web"
-    ZEABUR_SHOTS_URL="http://127.0.0.1:$port" ZEABUR_SHOTS_MANIFEST="$work/shots.json" \
-      ZEABUR_SHOTS_SERVER="$line" ZEABUR_SHOTS_OUT="$work/png" \
-      ZEABUR_SHOTS_SCALE="$(jq -r .scale <<<"$settings")" \
-      bunx playwright test -c playwright.shots.config.ts --output="$root/target/docs-shots-results"
-  )
-  kill "$server"
-  wait "$server" 2>/dev/null || true
-  server=""
-done <<<"$servers"
+(
+  cd "$root/web"
+  ZEABUR_SHOTS_OUT="$work/png" bunx playwright test -c playwright.shots.config.ts \
+    --project "$set/*" --output="$root/target/docs-shots-results" "$@"
+)
 
 # Encode into $work/avif first, so a failed run leaves <out> as it was.
+mkdir -p "$work/avif"
 over=()
 while IFS= read -r png; do
-  IFS=/ read -r locale theme id <<<"${png#"$work/png/"}"
+  IFS=/ read -r locale theme id <<<"${png#"$work/png/$set/"}"
   id="${id%.png}"
   name="${file//\{locale\}/$locale}"
   # {docs} is the locale's docs folder: empty for English, "<locale>/" for a translation.
@@ -114,8 +76,9 @@ if ((${#over[@]} > 0)); then
   exit 1
 fi
 
-# `clean` empties each folder the run writes into, so images whose shot is gone go too.
-if [[ "$(jq -r .clean <<<"$settings")" == true ]]; then
+# `clean` empties each folder the run writes into, so images whose shot is gone go too. A run
+# limited by Playwright arguments takes only some of them, so it keeps the others.
+if [[ "$(jq -r .clean <<<"$settings")" == true && $# -eq 0 ]]; then
   (cd "$work/avif" && find . -name '*.avif' -exec dirname {} \; | sort -u) | while IFS= read -r dir; do
     rm -rf "${out:?}/$dir"
   done
