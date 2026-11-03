@@ -54,7 +54,9 @@ export function ComponentsStep({ wizard }: { wizard: Wizard }) {
       !all.some((o) => o.capability === c.capability && o.testedOn.includes(distribution)))
   const catalog = all.filter((c) => c.testedOn.includes(distribution) || asked(c))
   const hostMib = wizard.server.facts?.memoryMib ?? Infinity
-  const tooSmall = (c: CatalogComponent) => personal && hostMib < (c.personalMinMemoryMib ?? 0)
+  const minMemoryMib = (c: CatalogComponent) =>
+    (personal ? c.personalMinMemoryMib : c.teamMinMemoryMib?.[wizard.config.distribution]) ?? 0
+  const tooSmall = (c: CatalogComponent) => hostMib < minMemoryMib(c)
   const plan = planned && "plan" in planned ? planned.plan : null
   const fit = plan ? memoryFit(plan, catalog) : null
   const why = new Map(wizard.shown?.components.map((c) => [c.id, c.why]))
@@ -148,8 +150,11 @@ export function ComponentsStep({ wizard }: { wizard: Wizard }) {
                 mib={component.idleMemoryMib ?? measured.get(component.id) ?? null}
                 leftOut={plan?.leftOut[component.id]}
                 onToggle={(on) => toggle(component.id, on)}
-                supported={runsOn(component, distribution) && !tooSmall(component)}
-                tooSmall={tooSmall(component)}
+                // Memory gates ticking a component, never unticking one already chosen.
+                supported={
+                  runsOn(component, distribution) && (!tooSmall(component) || chosen(component.id))
+                }
+                needsMib={tooSmall(component) ? minMemoryMib(component) : null}
                 distribution={distribution}
                 wizard={wizard}
               />
@@ -185,7 +190,7 @@ function ComponentRow({
   leftOut,
   onToggle,
   supported,
-  tooSmall,
+  needsMib,
   distribution,
   wizard,
 }: {
@@ -196,7 +201,8 @@ function ComponentRow({
   leftOut: string | undefined
   onToggle: (on: boolean) => void
   supported: boolean
-  tooSmall: boolean
+  /** The memory it needs, when the server has less. */
+  needsMib: number | null
   distribution: string
   wizard: Wizard
 }) {
@@ -210,13 +216,14 @@ function ComponentRow({
   )
   const required = asked.filter((input) => input.required)
   const optional = asked.filter((input) => !input.required)
-  const unsupported = tooSmall
-    ? t("components.needsMemory", component.personalMinMemoryMib ?? 0)
-    : component.distributions.length
-      ? t("components.runsOn", t("common.list", component.distributions))
-      : leftOut
-        ? leftOutReason(t, leftOut)
-        : t("components.unsupported", titleOf(distribution))
+  const unsupported =
+    needsMib !== null
+      ? t("components.needsMemory", needsMib)
+      : component.distributions.length
+        ? t("components.runsOn", t("common.list", component.distributions))
+        : leftOut
+          ? leftOutReason(t, leftOut)
+          : t("components.unsupported", titleOf(distribution))
   return (
     <div className="px-5 py-2">
       <Collapsible className="flex flex-col">

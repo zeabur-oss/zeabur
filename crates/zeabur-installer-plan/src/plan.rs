@@ -405,6 +405,83 @@ pub struct Memory {
     pub unmeasured: usize,
     /// The host's memory.
     pub host_mib: u64,
+    /// What the kubelet keeps from pods on K3s and RKE2; none on `KubeSolo`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reserved_mib: Option<u64>,
+}
+
+/// The least memory a team install on `distribution` needs for a component that uses memory on
+/// top of its idle use while working.
+#[must_use]
+pub fn min_memory_mib(component: &Component, distribution: Distribution) -> Option<u64> {
+    let work = component.resources.work_memory_mib?;
+    Some(distribution.min_memory_at_work_mib(work))
+}
+
+/// The selection without the components one build or other work would not fit beside, and the
+/// reasons for all it leaves out. A component already installed stays.
+///
+/// # Errors
+///
+/// When a new install does not fit the server, or the selection fails.
+fn select_fitting(
+    index: &Index,
+    config: &Config,
+    facts: &Facts,
+) -> Result<(Selection, BTreeMap<String, String>), PlanError> {
+    let distribution = config.distribution;
+    // An install that is already running is upgraded with a warning instead.
+    if facts.record.is_none() && facts.memory_mib < distribution.min_memory_mib() {
+        return Err(PlanError::TeamMemory {
+            distribution,
+            min: distribution.min_memory_mib(),
+            have: facts.memory_mib,
+        });
+    }
+    let mut selection = select::select(index, config)?;
+    let mut left_out = select::reasons(&selection.left_out);
+    crate::personal::leave_out_short_of_memory(
+        index,
+        &mut selection,
+        &mut left_out,
+        facts.memory_mib,
+        |c| {
+            let installed = facts
+                .record
+                .as_ref()
+                .is_some_and(|r| r.components.contains(&c.id));
+            min_memory_mib(c, config.distribution).filter(|_| !installed)
+        },
+    );
+    Ok((selection, left_out))
+}
+
+/// When an upgrade keeps the server below what a team install with these components now needs.
+fn below_minimum(
+    index: &Index,
+    selection: &Selection,
+    distribution: Distribution,
+    host_mib: u64,
+) -> Option<Warning> {
+    let needs = selection
+        .components
+        .iter()
+        .filter_map(|(id, _)| index.component(id))
+        .filter_map(|c| min_memory_mib(c, distribution))
+        .fold(distribution.min_memory_mib(), u64::max);
+    let title = distribution.title();
+    (host_mib < needs).then(|| {
+        warning(
+            "memory.belowMinimum",
+            &[&host_mib.to_string(), &needs.to_string(), title],
+            format!(
+                "This server has {host_mib} MiB of memory, and a team install on {title} with these \
+                 components needs {needs} MiB, so some replicas may not start. If you don't need \
+                 the crash kernel (kdump), turn it off to give its memory back, or move to a \
+                 server with more memory."
+            ),
+        )
+    })
 }
 
 /// Computes the plan.
@@ -428,16 +505,9 @@ pub fn plan_with(
     products: Option<&pins::Products>,
 ) -> Result<Plan, PlanError> {
     let distribution = config.distribution;
-    if facts.memory_mib < distribution.min_memory_mib() {
-        return Err(PlanError::TeamMemory {
-            distribution,
-            min: distribution.min_memory_mib(),
-            have: facts.memory_mib,
-        });
-    }
     facts.check_installer()?;
     let node_name = node_name::choose(config.host.node_name.as_deref(), facts, &[])?;
-    let selection = select::select(index, config)?;
+    let (selection, left_out) = select_fitting(index, config, facts)?;
     let profile = config.profile.as_str();
     let chosen: BTreeSet<&str> = selection
         .components
@@ -445,6 +515,12 @@ pub fn plan_with(
         .map(|(id, _)| id.as_str())
         .collect();
     let mut warnings = selection.warnings.clone();
+    warnings.extend(below_minimum(
+        index,
+        &selection,
+        distribution,
+        facts.memory_mib,
+    ));
 
     let cluster = cluster_plan(distribution, config.version(), &facts.arch, &mut warnings)?;
     let kubernetes = distribution.kubernetes();
@@ -465,8 +541,19 @@ pub fn plan_with(
         inputs: &config.inputs,
         secret_files: &config.secret_files,
     };
-    let (components, mut namespaces) =
+    let (mut components, mut namespaces) =
         components(index, &selection, &choices, profile, &facts.arch)?;
+    // On one node the catalog's measurement on the distribution itself is closer than kind's.
+    if profile == "single-node" {
+        for plan in &mut components {
+            if let Some(mib) = index
+                .component(&plan.id)
+                .and_then(|c| c.idle_memory_mib(distribution.id(), &facts.arch))
+            {
+                plan.idle_memory_mib = Some(mib);
+            }
+        }
+    }
 
     if !chosen.contains(CERT_MANAGER) && config.zeabur {
         return Err(PlanError::NeedsDisabled {
@@ -510,7 +597,7 @@ pub fn plan_with(
         host_files,
         namespaces: namespaces.into_values().collect(),
         components,
-        left_out: select::reasons(&selection.left_out),
+        left_out,
         removals: Vec::new(),
         node_prep: storage::node_prep(chosen.iter().copied()),
         registry,
@@ -766,7 +853,10 @@ fn memory(
     host_mib: u64,
     warnings: &mut Vec<Warning>,
 ) -> Memory {
-    let memory = idle_memory(distribution.base_idle_mib(), components, host_mib);
+    let memory = Memory {
+        reserved_mib: Some(distribution.reserved_mib()),
+        ..idle_memory(distribution.base_idle_mib(), components, host_mib)
+    };
     let idle = memory.cluster_mib + memory.components_mib;
     if idle > host_mib * 4 / 5 {
         let title = distribution.title();
@@ -788,6 +878,7 @@ pub(crate) fn idle_memory(cluster_mib: u64, components: &[ComponentPlan], host_m
             .filter(|c| c.idle_memory_mib.is_none())
             .count(),
         host_mib,
+        reserved_mib: None,
     }
 }
 
@@ -2465,15 +2556,119 @@ mod tests {
     }
 
     #[test]
-    fn the_defaults_fit_a_4_gib_server_without_a_warning() {
+    fn the_defaults_fit_the_smallest_servers_without_a_warning() {
         let index = Index::parse(INDEX.as_bytes()).unwrap();
-        let mut host = facts();
-        host.memory_mib = 3379;
-        for extra in ["", "distribution: rke2\n"] {
+        for (extra, memory_mib) in [
+            ("", Distribution::K3s.min_memory_mib()),
+            ("distribution: rke2\n", Distribution::Rke2.min_memory_mib()),
+        ] {
+            let mut host = facts();
+            host.memory_mib = memory_mib;
             let plan = plan(&index, &config(extra), &host).unwrap();
             let idle = plan.memory.cluster_mib + plan.memory.components_mib;
             assert!(idle < host.memory_mib * 4 / 5, "{idle} MiB");
             assert!(plan.warnings.iter().all(|w| w.code != "memory.tight"));
+        }
+    }
+
+    #[test]
+    fn a_single_node_install_counts_what_the_catalog_measured_on_its_distribution() {
+        let index = Index::parse(INDEX.as_bytes()).unwrap();
+        let logs = index.component("logs/victoria-logs").unwrap();
+        for distribution in Distribution::ALL {
+            let config = config(&format!(
+                "distribution: {}\nenable: [logs/victoria-logs]\n",
+                distribution.id()
+            ));
+            let plan = plan(&index, &config, &facts()).unwrap();
+            let planned = plan
+                .components
+                .iter()
+                .find(|c| c.id == "logs/victoria-logs");
+            assert_eq!(
+                planned.and_then(|c| c.idle_memory_mib),
+                logs.idle_memory_mib(distribution.id(), "arm64"),
+                "{}",
+                distribution.id()
+            );
+        }
+    }
+
+    #[test]
+    fn rke2_is_refused_on_a_4_gib_server_and_k3s_is_not() {
+        let index = Index::parse(INDEX.as_bytes()).unwrap();
+        let mut host = facts();
+        host.memory_mib = 3793;
+        assert!(plan(&index, &config(""), &host).is_ok());
+        let Err(PlanError::TeamMemory {
+            distribution, have, ..
+        }) = plan(&index, &config("distribution: rke2\n"), &host)
+        else {
+            panic!("RKE2 on {} MiB", host.memory_mib);
+        };
+        assert_eq!((distribution, have), (Distribution::Rke2, 3793));
+        host.memory_mib = Distribution::Rke2.min_memory_mib();
+        assert!(plan(&index, &config("distribution: rke2\n"), &host).is_ok());
+    }
+
+    #[test]
+    fn the_builder_is_left_out_where_one_build_would_not_fit() {
+        let index = Index::parse(INDEX.as_bytes()).unwrap();
+        let builder = index.component("builds/zeabur-builder").unwrap();
+        for distribution in Distribution::ALL {
+            let config = config(&format!(
+                "distribution: {}\nenable: [builds/zeabur-builder]\n",
+                distribution.id()
+            ));
+            let needs = min_memory_mib(builder, distribution).unwrap();
+            assert!(needs > distribution.min_memory_mib());
+            let mut host = facts();
+            host.memory_mib = needs - 1;
+            let short = plan(&index, &config, &host).unwrap();
+            assert_eq!(
+                short.left_out["builds/zeabur-builder"],
+                format!("needs {needs} MiB of memory")
+            );
+            assert!(!ids(&short).contains(&"builds/zeabur-builder"));
+            host.memory_mib = needs;
+            let enough = plan(&index, &config, &host).unwrap();
+            assert!(ids(&enough).contains(&"builds/zeabur-builder"));
+        }
+    }
+
+    #[test]
+    fn the_kubelet_keeps_memory_from_pods_and_evicts_before_it_runs_out() {
+        let index = Index::parse(INDEX.as_bytes()).unwrap();
+        for (extra, path, kube_reserved) in [
+            (
+                "",
+                "/etc/rancher/k3s/config.yaml",
+                "kube-reserved=memory=1530Mi",
+            ),
+            (
+                "distribution: rke2\n",
+                "/etc/rancher/rke2/config.yaml",
+                "kube-reserved=memory=502Mi",
+            ),
+        ] {
+            let plan = plan(&index, &config(extra), &facts()).unwrap();
+            let file = plan.host_files.iter().find(|f| f.path == path).unwrap();
+            let value: Value = serde_saphyr::from_str(&file.content).unwrap();
+            let args = value["kubelet-arg"].as_array().unwrap();
+            for arg in [
+                "system-reserved=memory=350Mi",
+                kube_reserved,
+                "eviction-hard=memory.available<200Mi,nodefs.available<5%,imagefs.available<5%",
+                "eviction-soft=memory.available<400Mi",
+                "eviction-soft-grace-period=memory.available=30s",
+                "pod-max-pids=4096",
+            ] {
+                assert!(args.contains(&json!(arg)), "{path}: {arg}");
+            }
+            assert_eq!(
+                plan.memory.reserved_mib,
+                Some(plan.cluster.distribution.reserved_mib())
+            );
         }
     }
 
@@ -2528,6 +2723,29 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn an_upgrade_below_the_minimum_keeps_what_runs_and_warns() {
+        let index = Index::parse(INDEX.as_bytes()).unwrap();
+        let config = config("enable: [builds/zeabur-builder]\n");
+        let first = plan(&index, &config, &facts()).unwrap();
+        let mut small = facts();
+        small.memory_mib = 2882;
+        assert!(matches!(
+            plan(&index, &config, &small),
+            Err(PlanError::TeamMemory { .. })
+        ));
+
+        small.record = Some(recorded(&first, "0.1.1", |_| {}));
+        let upgrade = plan(&index, &config, &small).unwrap();
+        assert!(ids(&upgrade).contains(&"builds/zeabur-builder"));
+        let warning = upgrade
+            .warnings
+            .iter()
+            .find(|w| w.code == "memory.belowMinimum")
+            .unwrap();
+        assert!(warning.text.contains("kdump"), "{}", warning.text);
     }
 
     #[test]

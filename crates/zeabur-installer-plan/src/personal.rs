@@ -134,19 +134,20 @@ pub fn min_memory_mib(component: &Component, arch: &str) -> Option<u64> {
     Some(KUBESOLO_IDLE_MIB + idle_memory_mib(component, arch).unwrap_or(0) + work + APP_ROOM_MIB)
 }
 
-/// Takes out of the selection the components that need more memory than the host has, and adds
-/// them to `left_out`.
-fn leave_out_short_of_memory(
+/// Takes out of the selection the components that need more memory than the host has, by `min`,
+/// and adds them to `left_out`.
+pub(crate) fn leave_out_short_of_memory(
     index: &Index,
     selection: &mut select::Selection,
     left_out: &mut BTreeMap<String, String>,
-    facts: &Facts,
+    host_mib: u64,
+    min: impl Fn(&Component) -> Option<u64>,
 ) {
     let needs = |id: &str| {
         index
             .component(id)
-            .and_then(|c| min_memory_mib(c, &facts.arch))
-            .filter(|&mib| facts.memory_mib < mib)
+            .and_then(&min)
+            .filter(|&mib| host_mib < mib)
     };
     let (kept, dropped): (Vec<_>, Vec<_>) = std::mem::take(&mut selection.components)
         .into_iter()
@@ -207,7 +208,13 @@ pub fn plan(
     let mut selection = select::select_personal(index, config)?;
     warnings.extend(selection.warnings.clone());
     let mut left_out = select::reasons(&selection.left_out);
-    leave_out_short_of_memory(index, &mut selection, &mut left_out, facts);
+    leave_out_short_of_memory(
+        index,
+        &mut selection,
+        &mut left_out,
+        facts.memory_mib,
+        |c| min_memory_mib(c, arch),
+    );
     let choices = Choices {
         inputs: &config.inputs,
         secret_files: &config.secret_files,

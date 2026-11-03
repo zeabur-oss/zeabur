@@ -1,3 +1,4 @@
+import { distributionTitle } from "@/api"
 import type { Wizard } from "@/app"
 import { Panel } from "@/components/bits"
 import { useT } from "@/i18n"
@@ -9,6 +10,8 @@ export function SettingsStep({ wizard }: { wizard: Wizard }) {
   const t = useT()
   const { config } = wizard
   const personal = wizard.use === "personal"
+  const plan = wizard.planned && "plan" in wizard.planned ? wizard.planned.plan : null
+  const reserved = plan && plan.use !== "personal" ? plan.memory.reservedMib : undefined
   return (
     <StepPage
       title={t("settings.title")}
@@ -68,6 +71,17 @@ export function SettingsStep({ wizard }: { wizard: Wizard }) {
                 {t("review.updateCheck.link")}
               </a>
             </div>
+          </div>
+        </Panel>
+      ) : null}
+
+      {plan && plan.use !== "personal" && reserved ? (
+        <Panel title={t("settings.reserve")}>
+          <div className="flex min-w-0 flex-col gap-1">
+            <span className="text-sm font-medium text-main">
+              {t("settings.reserve.value", reserved, distributionTitle[plan.cluster.distribution])}
+            </span>
+            <span className="text-sm text-secondary">{t("settings.reserve.hint")}</span>
           </div>
         </Panel>
       ) : null}

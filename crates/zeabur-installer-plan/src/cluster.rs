@@ -108,8 +108,61 @@ const RKE2_LAYOUT: Layout = Layout {
 const OS_IDLE_MIB: u64 = 350;
 /// Zeabur and Identity at idle.
 const ZEABUR_IDLE_MIB: u64 = 60;
-/// Traefik and cert-manager, what `minimal` installs, and room to spare.
-const MINIMAL_AND_HEADROOM_MIB: u64 = 150 + 250;
+
+// What the RKE2 control plane's processes used at idle on a 4 GiB VM (`Distribution::idle_mib`).
+const RKE2_APISERVER_IDLE_MIB: u64 = 980;
+const RKE2_ETCD_IDLE_MIB: u64 = 97;
+const RKE2_CONTROLLER_MANAGER_IDLE_MIB: u64 = 92;
+const RKE2_CANAL_IDLE_MIB: u64 = 59;
+
+// RKE2 asks for 512Mi for etcd and 256Mi for kube-controller-manager, which idle near 100Mi;
+// less leaves more of what the reserves allow to pods.
+const RKE2_ETCD_REQUEST_MIB: u64 = 256;
+const RKE2_CONTROLLER_MANAGER_REQUEST_MIB: u64 = 128;
+/// The memory requests of RKE2's static pods: kube-apiserver 1024, etcd, kube-controller-manager,
+/// then kube-scheduler, kube-proxy and cloud-controller-manager at 128 each.
+const RKE2_STATIC_PODS_REQUEST_MIB: u64 =
+    1024 + RKE2_ETCD_REQUEST_MIB + RKE2_CONTROLLER_MANAGER_REQUEST_MIB + 3 * 128;
+/// rke2-coredns and its autoscaler.
+const RKE2_COREDNS_REQUEST_MIB: u64 = 144;
+/// K3s's `CoreDNS`. Calico asks for no memory.
+const K3S_COREDNS_REQUEST_MIB: u64 = 70;
+/// The memory requests of the catalog's default components on one node, sized from what they used
+/// on K3s with 35 pods running.
+const DEFAULT_COMPONENTS_REQUEST_MIB: u64 = 1200;
+/// Zeabur Identity's memory request (identity `crates/zeabur-identity-k8s/src/deployment.rs`).
+const IDENTITY_REQUEST_MIB: u64 = 32;
+/// Zeabur's chart, whose own and proxy requests count.
+const ZEABUR_VALUES: &str = include_str!("../../../deploy/chart/zeabur/values.yaml");
+
+/// The memory requests of Zeabur and its proxy in the chart's values, with Zeabur Identity's.
+fn products_request_mib() -> u64 {
+    let Ok(values) = serde_saphyr::from_str::<serde_json::Value>(ZEABUR_VALUES) else {
+        return IDENTITY_REQUEST_MIB;
+    };
+    let request = |path: &str| {
+        values
+            .pointer(path)
+            .and_then(serde_json::Value::as_str)
+            .and_then(mebibytes)
+            .unwrap_or(0)
+    };
+    request("/resources/requests/memory")
+        + request("/proxy/resources/requests/memory")
+        + IDENTITY_REQUEST_MIB
+}
+
+/// A memory quantity in `Mi` or `Gi`, in MiB.
+fn mebibytes(quantity: &str) -> Option<u64> {
+    if let Some(mib) = quantity.strip_suffix("Mi") {
+        return mib.parse().ok();
+    }
+    quantity
+        .strip_suffix("Gi")?
+        .parse::<u64>()
+        .ok()
+        .map(|gib| gib * 1024)
+}
 
 impl Distribution {
     /// Every distribution, in the order an interface lists them.
@@ -211,6 +264,47 @@ impl Distribution {
         }
     }
 
+    /// The memory the kubelet keeps from pods on a server for the distribution (`kube-reserved`).
+    /// K3s runs the control plane in its own process: all of [`Self::idle_mib`]. RKE2 runs it in
+    /// static pods, whose requests already count against what pods may use: what is left of
+    /// [`Self::idle_mib`] without kube-apiserver, etcd, kube-controller-manager and canal.
+    #[must_use]
+    pub const fn kube_reserved_mib(self) -> u64 {
+        match self {
+            Self::K3s => self.idle_mib(),
+            Self::Rke2 => {
+                self.idle_mib()
+                    - (RKE2_APISERVER_IDLE_MIB
+                        + RKE2_ETCD_IDLE_MIB
+                        + RKE2_CONTROLLER_MANAGER_IDLE_MIB
+                        + RKE2_CANAL_IDLE_MIB)
+            }
+        }
+    }
+
+    /// The memory pods cannot use on a server: the OS and [`Self::kube_reserved_mib`].
+    #[must_use]
+    pub const fn reserved_mib(self) -> u64 {
+        OS_IDLE_MIB + self.kube_reserved_mib()
+    }
+
+    /// The kubelet's arguments. With the reserves, the pods' cgroup ends short of the OS and the
+    /// distribution, so memory running out kills or evicts a pod, a build first, and not
+    /// `k3s-server`. A worker has no control plane and reserves only the OS.
+    pub(crate) fn kubelet_args(self, server: bool) -> String {
+        let kube_reserved = if server {
+            format!("  - kube-reserved=memory={}Mi\n", self.kube_reserved_mib())
+        } else {
+            String::new()
+        };
+        format!(
+            "{KUBELET_ARGS}  - system-reserved=memory={OS_IDLE_MIB}Mi\n{kube_reserved}  \
+             - eviction-hard=memory.available<{EVICTION_HARD_MIB}Mi,{DISK_EVICTION_HARD}\n  \
+             - eviction-soft=memory.available<{EVICTION_SOFT_MIB}Mi\n  \
+             - eviction-soft-grace-period=memory.available=30s\n"
+        )
+    }
+
     /// What a team host uses at idle before any catalog component: the OS, the distribution, and
     /// Zeabur with Identity.
     #[must_use]
@@ -218,12 +312,34 @@ impl Distribution {
         OS_IDLE_MIB + self.idle_mib() + ZEABUR_IDLE_MIB
     }
 
-    /// The least memory a team install needs: the idle base, Traefik and cert-manager, and
-    /// 250 MiB of headroom, rounded up to a hundred. A server with 4 GiB passes with either,
-    /// also when a crash kernel reserve takes 512 MiB of it.
+    /// The least memory a team install needs.
+    ///
+    /// The scheduler places a pod only where its memory request fits in what pods may use, so that
+    /// must hold the requests of the distribution's own pods (RKE2's static pods and `CoreDNS`,
+    /// K3s's `CoreDNS`), of the default components and of Zeabur as its chart gives them, on top of
+    /// the reserves and the hard eviction threshold, rounded up to a hundred. K3s comes to 3500,
+    /// which a 4 GiB server passes once its crash kernel reserve is off; RKE2 comes to 4300.
     #[must_use]
-    pub const fn min_memory_mib(self) -> u64 {
-        (self.base_idle_mib() + MINIMAL_AND_HEADROOM_MIB).div_ceil(100) * 100
+    pub fn min_memory_mib(self) -> u64 {
+        self.min_memory_at_work_mib(0)
+    }
+
+    /// [`Self::min_memory_mib`] with a component that uses `work_mib` more while working, such as
+    /// the builder in a build (`resources.workMemoryMiB` in the catalog).
+    #[must_use]
+    pub fn min_memory_at_work_mib(self, work_mib: u64) -> u64 {
+        let own_pods = match self {
+            Self::K3s => K3S_COREDNS_REQUEST_MIB,
+            Self::Rke2 => RKE2_STATIC_PODS_REQUEST_MIB + RKE2_COREDNS_REQUEST_MIB,
+        };
+        (own_pods
+            + DEFAULT_COMPONENTS_REQUEST_MIB
+            + products_request_mib()
+            + self.reserved_mib()
+            + EVICTION_HARD_MIB
+            + work_mib)
+            .div_ceil(100)
+            * 100
     }
 
     /// The label `ServiceLB` puts on its pods.
@@ -493,14 +609,35 @@ rules:
   - level: Metadata
 "#;
 
-/// The kubelet settings both distributions get: a fork bomb in one pod cannot take the node's
-/// process table, an idle exec or log stream closes after five minutes, and the port serves only
-/// the cipher suites the CIS benchmark allows.
-pub(crate) const KUBELET_ARGS: &str = "kubelet-arg:\n  - pod-max-pids=4096\n  \
+/// The kubelet settings every node gets: a fork bomb in one pod cannot take the node's process
+/// table, an idle exec or log stream closes after five minutes, and the port serves only the cipher
+/// suites the CIS benchmark allows.
+const KUBELET_ARGS: &str = "kubelet-arg:\n  - pod-max-pids=4096\n  \
      - streaming-connection-idle-timeout=5m\n  - tls-cipher-suites=\
 TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,\
 TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,\
 TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305,TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305\n";
+
+/// Below this much available memory the kubelet evicts at once. Twice its default of 100Mi, so it
+/// evicts before the kernel has to kill.
+const EVICTION_HARD_MIB: u64 = 200;
+/// The disk thresholds K3s sets in its kubelet configuration, which RKE2 runs as its agent
+/// (<https://github.com/k3s-io/k3s/blob/3acf8db8f2096ae0ea34f4b4ce1048e6472b89be/pkg/daemons/agent/agent.go#L192-L195>).
+/// The flag replaces the whole map, and a threshold it leaves out is zero
+/// (<https://kubernetes.io/docs/concepts/scheduling-eviction/node-pressure-eviction/#hard-eviction-thresholds>).
+const DISK_EVICTION_HARD: &str = "nodefs.available<5%,imagefs.available<5%";
+/// Below this much for 30 seconds the kubelet evicts too, which catches memory that grows slowly
+/// before it reaches the hard threshold.
+const EVICTION_SOFT_MIB: u64 = 400;
+
+/// RKE2's `control-plane-resource-requests` for etcd and kube-controller-manager.
+pub(crate) fn control_plane_requests() -> String {
+    format!(
+        "control-plane-resource-requests:\n  \
+           - etcd-memory={RKE2_ETCD_REQUEST_MIB}Mi\n  \
+           - kube-controller-manager-memory={RKE2_CONTROLLER_MANAGER_REQUEST_MIB}Mi\n"
+    )
+}
 
 /// A YAML list under `key`, or nothing when it is empty.
 pub(crate) fn yaml_list(out: &mut String, key: &str, items: &[String]) {
@@ -521,11 +658,47 @@ mod tests {
     use super::*;
 
     #[test]
-    fn k3s_needs_less_memory_than_rke2_and_both_fit_4_gib_with_a_crash_kernel() {
-        assert!(Distribution::K3s.min_memory_mib() < Distribution::Rke2.min_memory_mib());
-        for d in Distribution::ALL {
-            assert!(d.min_memory_mib() <= 3379, "{d:?}");
+    fn k3s_fits_4_gib_without_a_crash_kernel_but_not_a_build_and_rke2_needs_more_than_4_gib() {
+        // What a 4 GiB server reports with its crash kernel reserve off.
+        assert!(Distribution::K3s.min_memory_mib() <= 3900);
+        // The builder's workMemoryMiB in the catalog.
+        assert!(Distribution::K3s.min_memory_at_work_mib(500) > 3900);
+        assert!(Distribution::Rke2.min_memory_mib() > 3900);
+    }
+
+    #[test]
+    fn the_memory_threshold_keeps_the_disk_thresholds_k3s_sets() {
+        for distribution in Distribution::ALL {
+            for server in [true, false] {
+                let args = distribution.kubelet_args(server);
+                let hard = args
+                    .lines()
+                    .find_map(|l| l.trim().strip_prefix("- eviction-hard="))
+                    .unwrap();
+                for threshold in [
+                    "memory.available<",
+                    "nodefs.available<5%",
+                    "imagefs.available<5%",
+                ] {
+                    assert!(hard.contains(threshold), "{distribution:?}: {hard}");
+                }
+            }
         }
+    }
+
+    #[test]
+    fn the_chart_gives_zeabur_and_its_proxy_requests() {
+        assert_eq!(mebibytes("16Mi"), Some(16));
+        assert_eq!(mebibytes("1Gi"), Some(1024));
+        assert_eq!(mebibytes("500M"), None);
+        assert!(products_request_mib() > IDENTITY_REQUEST_MIB + 16);
+    }
+
+    #[test]
+    // docs/*/get-started/personal.mdx
+    fn the_minimums_are_the_ones_the_docs_give() {
+        assert_eq!(Distribution::K3s.min_memory_mib(), 3500);
+        assert_eq!(Distribution::Rke2.min_memory_mib(), 4300);
     }
 
     #[test]

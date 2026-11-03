@@ -29,6 +29,8 @@ export interface CatalogComponent {
   default: "recommended" | "optional" | "unsupported"
   /** A personal install offers it only on a server with this much memory. */
   personalMinMemoryMib?: number | null
+  /** A team install offers it only on a server with this much memory, by distribution. */
+  teamMinMemoryMib?: Partial<Record<Distribution, number>>
   /** Zeabur needs it to run, so it is never suggested for leaving out. */
   required: boolean
   /** Where it runs; empty when everywhere. */
@@ -188,7 +190,14 @@ interface PlanBase {
   leftOut: Record<string, string>
   removals: Removal[]
   /** The distribution itself (K3s, RKE2 or KubeSolo), then the measured components. */
-  memory: { clusterMib: number; componentsMib: number; unmeasured: number; hostMib: number }
+  memory: {
+    clusterMib: number
+    componentsMib: number
+    unmeasured: number
+    hostMib: number
+    /** What the kubelet keeps from pods on K3s and RKE2. */
+    reservedMib?: number
+  }
   warnings: Warning[]
 }
 

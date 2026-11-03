@@ -278,6 +278,10 @@ export const zhCN: Messages = {
 
   "settings.title": "选项",
   "settings.description": "决定 Zeabur 在这台服务器上怎么运行。",
+  "settings.reserve": "系统内存",
+  "settings.reserve.value": (mib, distribution) =>
+    `为操作系统和 ${distribution} 保留 ${mib.toLocaleString("zh-CN")} MiB`,
+  "settings.reserve.hint": "应用和构建都用不到这部分。内存快不够时会先停掉构建，服务器就不会宕机。",
   "review.change": "更改",
   "review.title": "确认",
   "review.description": (path) =>
@@ -405,6 +409,8 @@ export const zhCN: Messages = {
     `空闲时 KubeSolo 和组件大约用掉 ${mib(idle)}，这台机器总共 ${mib(host)}。`,
   "warning.memory.tight": (idle, host, distribution) =>
     `空闲时，系统、${distribution} 和组件约使用 ${mib(idle)}，这台服务器共有 ${mib(host)}。`,
+  "warning.memory.belowMinimum": (host, needs, distribution) =>
+    `这台服务器有 ${mib(host)} 内存，用 ${distribution} 装这些组件需要 ${mib(needs)}，有些副本可能跑不起来。用不到崩溃转储（kdump）的话，可以关掉它把内存还给系统，或者换一台内存更大的服务器。`,
   "warning.cluster.unsupported": (distribution, version) =>
     `此安装程序不支持 ${distribution} ${version}：下载的文件只能用该版本自带的校验和验证。`,
   "warning.join.sameRegion": () =>

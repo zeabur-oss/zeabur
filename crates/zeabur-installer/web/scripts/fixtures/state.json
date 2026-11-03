@@ -265,7 +265,7 @@
   "rke2SuggestedMib": 7168,
   "teamMinMemoryMib": {
     "k3s": 2400,
-    "rke2": 2600
+    "rke2": 4200
   },
   "use": "team"
 }

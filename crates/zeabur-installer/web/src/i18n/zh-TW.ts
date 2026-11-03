@@ -278,6 +278,11 @@ export const zhTW: Messages = {
 
   "settings.title": "選項",
   "settings.description": "決定 Zeabur 在這台伺服器上怎麼運作。",
+  "settings.reserve": "系統記憶體",
+  "settings.reserve.value": (mib, distribution) =>
+    `保留 ${mib.toLocaleString("zh-TW")} MiB 給作業系統和 ${distribution}`,
+  "settings.reserve.hint":
+    "應用程式和建置都用不到這部分。記憶體快不夠時會先停掉建置，伺服器才不會當掉。",
   "review.change": "變更",
   "review.title": "確認",
   "review.description": (path) =>
@@ -405,6 +410,8 @@ export const zhTW: Messages = {
     `閒置時 KubeSolo 和元件大約用掉 ${mib(idle)}，這台機器總共 ${mib(host)}。`,
   "warning.memory.tight": (idle, host, distribution) =>
     `閒置時，系統、${distribution} 和元件約使用 ${mib(idle)}，這台伺服器共有 ${mib(host)}。`,
+  "warning.memory.belowMinimum": (host, needs, distribution) =>
+    `這台伺服器有 ${mib(host)} 記憶體，用 ${distribution} 裝這些元件要 ${mib(needs)}，有些副本可能跑不起來。用不到當機傾印（kdump）的話，可以關掉它把記憶體還給系統，或換一台記憶體更大的伺服器。`,
   "warning.cluster.unsupported": (distribution, version) =>
     `這個安裝程式不支援 ${distribution} ${version}：下載的檔案只能用該版本自己附的檢查碼驗證。`,
   "warning.join.sameRegion": () =>

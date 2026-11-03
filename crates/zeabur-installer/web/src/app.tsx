@@ -39,7 +39,7 @@ const personalSteps: readonly Step[] = steps.filter((s) => s !== "access")
 
 /** The memory below which a team install is refused, when the server does not say
  * (`Distribution::min_memory_mib`). */
-const teamMinMemoryMib: Record<Distribution, number> = { k3s: 2400, rke2: 2600 }
+const teamMinMemoryMib: Record<Distribution, number> = { k3s: 3500, rke2: 4300 }
 /** From this much memory RKE2 is suggested (`RKE2_SUGGESTED_MIB`). */
 const rke2SuggestedMib = 7 * 1024
 

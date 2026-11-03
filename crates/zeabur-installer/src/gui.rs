@@ -379,9 +379,17 @@ impl Server {
                 (d.id().to_owned(), json!(checks))
             })
             .collect();
+        // A running install is upgraded below the minimum with a warning, as the plan allows.
         let min_memory: serde_json::Map<String, Value> = Distribution::ALL
             .into_iter()
-            .map(|d| (d.id().to_owned(), json!(d.min_memory_mib())))
+            .map(|d| {
+                let min = if systemd::is_active(d.server_unit()) {
+                    0
+                } else {
+                    d.min_memory_mib()
+                };
+                (d.id().to_owned(), json!(min))
+            })
             .collect();
         let personal_checks = preflight::run(preflight::Options {
             cluster_running: systemd::is_active(kubesolo::UNIT),
@@ -679,6 +687,10 @@ fn catalog_json(index: &Index, profile: &str, arch: &str) -> Value {
                 "distributions": c.distributions,
                 "testedOn": c.tested_on,
                 "personalMinMemoryMib": personal::min_memory_mib(c, arch),
+                "teamMinMemoryMib": Distribution::ALL
+                    .into_iter()
+                    .filter_map(|d| Some((d.id(), plan::min_memory_mib(c, d)?)))
+                    .collect::<BTreeMap<_, _>>(),
                 "required": required.contains(&c.id),
                 "needs": c
                     .install_order
@@ -1048,6 +1060,11 @@ mod tests {
             state["config"]["profile"].as_str().unwrap(),
             state["facts"]["arch"].as_str().unwrap(),
         );
+        state["teamMinMemoryMib"] = super::Distribution::ALL
+            .into_iter()
+            .map(|d| (d.id().to_owned(), json!(d.min_memory_mib())))
+            .collect();
+        state["rke2SuggestedMib"] = json!(plan::RKE2_SUGGESTED_MIB);
         written.insert("state.json", state);
 
         let mut team = read("plan.json");

@@ -303,6 +303,11 @@ export const en = {
   // Review
   "settings.title": "Options",
   "settings.description": "How Zeabur runs on this server.",
+  "settings.reserve": "Memory for the system",
+  "settings.reserve.value": (mib: number, distribution: string) =>
+    `${mib.toLocaleString("en")} MiB kept for the OS and ${distribution}`,
+  "settings.reserve.hint":
+    "Apps and builds can't use it. When memory runs low, a build is stopped first, so the server keeps running.",
   "review.change": "Change",
   "review.title": "Review",
   "review.description": (path: string) =>
@@ -438,6 +443,8 @@ export const en = {
     `At idle, KubeSolo and the components use about ${mib(idle)} of this machine's ${mib(host)}.`,
   "warning.memory.tight": (idle: string, host: string, distribution: string) =>
     `At idle, the system, ${distribution} and the components use about ${mib(idle)} of this server's ${mib(host)}.`,
+  "warning.memory.belowMinimum": (host: string, needs: string, distribution: string) =>
+    `This server has ${mib(host)} of memory, and a team install on ${distribution} with these components needs ${mib(needs)}, so some replicas may not start. If you don't need the crash kernel (kdump), turn it off to give its memory back, or move to a server with more memory.`,
   "warning.cluster.unsupported": (distribution: string, version: string) =>
     `${distribution} ${version} is not supported by this installer: its downloads are checked only against the release's own checksums.`,
   "warning.join.sameRegion": () =>
