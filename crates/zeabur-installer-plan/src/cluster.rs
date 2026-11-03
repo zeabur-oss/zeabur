@@ -128,8 +128,8 @@ const RKE2_COREDNS_REQUEST_MIB: u64 = 144;
 /// K3s's `CoreDNS`. Calico asks for no memory.
 const K3S_COREDNS_REQUEST_MIB: u64 = 70;
 /// The memory requests of the catalog's default components with Zeabur and Identity, on one node,
-/// as K3s ran them on a VM.
-const DEFAULT_COMPONENTS_REQUEST_MIB: u64 = 995;
+/// sized from what they used on K3s with 35 pods running.
+const DEFAULT_COMPONENTS_REQUEST_MIB: u64 = 1264;
 
 impl Distribution {
     /// Every distribution, in the order an interface lists them.
@@ -284,8 +284,8 @@ impl Distribution {
     /// The scheduler places a pod only where its memory request fits in what pods may use, so that
     /// must hold the requests of the distribution's own pods (RKE2's static pods and `CoreDNS`,
     /// K3s's `CoreDNS`) and of the default components, on top of the reserves and the hard
-    /// eviction threshold, rounded up to a hundred. K3s comes to 3200, which a 4 GiB server passes
-    /// also when a crash kernel reserve takes 512 MiB of it; RKE2 comes to 4000.
+    /// eviction threshold, rounded up to a hundred. K3s comes to 3500, which a 4 GiB server passes
+    /// once its crash kernel reserve is off; RKE2 comes to 4300.
     #[must_use]
     pub const fn min_memory_mib(self) -> u64 {
         self.min_memory_at_work_mib(0)
@@ -619,18 +619,19 @@ mod tests {
     use super::*;
 
     #[test]
-    fn k3s_fits_4_gib_with_a_crash_kernel_but_not_a_build_and_rke2_needs_more_than_4_gib() {
-        assert!(Distribution::K3s.min_memory_mib() <= 3379);
+    fn k3s_fits_4_gib_without_a_crash_kernel_but_not_a_build_and_rke2_needs_more_than_4_gib() {
+        // What a 4 GiB server reports with its crash kernel reserve off.
+        assert!(Distribution::K3s.min_memory_mib() <= 3900);
         // The builder's workMemoryMiB in the catalog.
-        assert!(Distribution::K3s.min_memory_at_work_mib(500) > 3379);
-        assert!(Distribution::Rke2.min_memory_mib() > 3800);
+        assert!(Distribution::K3s.min_memory_at_work_mib(500) > 3900);
+        assert!(Distribution::Rke2.min_memory_mib() > 3900);
     }
 
     #[test]
     // docs/*/get-started/personal.mdx
     fn the_minimums_are_the_ones_the_docs_give() {
-        assert_eq!(Distribution::K3s.min_memory_mib(), 3200);
-        assert_eq!(Distribution::Rke2.min_memory_mib(), 4000);
+        assert_eq!(Distribution::K3s.min_memory_mib(), 3500);
+        assert_eq!(Distribution::Rke2.min_memory_mib(), 4300);
     }
 
     #[test]

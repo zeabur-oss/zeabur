@@ -2559,7 +2559,7 @@ mod tests {
     fn the_defaults_fit_the_smallest_servers_without_a_warning() {
         let index = Index::parse(INDEX.as_bytes()).unwrap();
         for (extra, memory_mib) in [
-            ("", 3379),
+            ("", Distribution::K3s.min_memory_mib()),
             ("distribution: rke2\n", Distribution::Rke2.min_memory_mib()),
         ] {
             let mut host = facts();
@@ -2607,7 +2607,7 @@ mod tests {
             panic!("RKE2 on {} MiB", host.memory_mib);
         };
         assert_eq!((distribution, have), (Distribution::Rke2, 3793));
-        host.memory_mib = 4200;
+        host.memory_mib = Distribution::Rke2.min_memory_mib();
         assert!(plan(&index, &config("distribution: rke2\n"), &host).is_ok());
     }
 
