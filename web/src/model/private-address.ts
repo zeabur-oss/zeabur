@@ -2,7 +2,7 @@
 // selecting its pods by its `matchLabels`, with every port its containers declare.
 import type { Schemas } from "@/api/client"
 import { toYaml } from "@/lib/yaml-out"
-import { builtContainers, type Build } from "@/model/builds"
+import { builtContainers, runsLatest, type Build } from "@/model/builds"
 import type { Service } from "@/model/service"
 
 /** The port in {@link exposeCommand} when the port is not known. */
@@ -50,7 +50,9 @@ export function likelyPort(service: Service): number | undefined {
 }
 
 /** The TCP ports the Builds of the service's images last built declare (`EXPOSE`) that the
- * service does not use yet: none of its containers declares them and no Service has them. */
+ * service does not use yet: none of its containers declares them and no Service has them. A
+ * container that runs an older image than the Build's newest gets none, since the newest
+ * image's ports may not be the ones it listens on. */
 export function imagePorts(
   service: Service,
   builds: readonly Build[],
@@ -62,7 +64,7 @@ export function imagePorts(
   ])
   const running = new Set(service.containers.filter((c) => !c.init).map((c) => c.name))
   const declared = builtContainers(service, builds)
-    .filter((b) => running.has(b.container))
+    .filter((b) => running.has(b.container) && runsLatest(b.image, b.build) === true)
     .flatMap((b) => b.build.exposedPorts ?? [])
     .flatMap((spec) => {
       const [port, protocol = "tcp"] = spec.split("/")

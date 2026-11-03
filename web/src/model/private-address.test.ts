@@ -186,7 +186,12 @@ describe("the kubectl command", () => {
 
 describe("the ports the image of a Build declares", () => {
   const built = (exposedPorts?: string[]): Build =>
-    ({ name: "web", repository: "zot.zot.svc:5000/shop/web", exposedPorts }) as unknown as Build
+    ({
+      name: "web",
+      repository: "zot.zot.svc:5000/shop/web",
+      latestImage: "zot.zot.svc:5000/shop/web:main-1-aaaaaaa",
+      exposedPorts,
+    }) as unknown as Build
   const running = (fields: object = {}) =>
     workload("Deployment", {
       containers: [container({ image: "zot.zot.svc:5000/shop/web:main-1-aaaaaaa", ...fields })],
@@ -209,6 +214,11 @@ describe("the ports the image of a Build declares", () => {
     expect(imagePorts(running(), [])).toStrictEqual([])
     const other = { ...built(["3000/tcp"]), repository: "zot.zot.svc:5000/shop/api" } as Build
     expect(imagePorts(running(), [other])).toStrictEqual([])
+  })
+
+  test("are none when the container runs an older image than the Build's newest", () => {
+    const older = running({ image: "zot.zot.svc:5000/shop/web:main-0-bbbbbbb" })
+    expect(imagePorts(older, [built(["8080/tcp"])])).toStrictEqual([])
   })
 
   test("ignore an init container's image", () => {
