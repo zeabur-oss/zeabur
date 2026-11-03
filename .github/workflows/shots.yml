@@ -1,9 +1,10 @@
 name: Screenshots
 
-# Takes docs/shots.yaml again after a change on main that can move a screen, and opens one pull
-# request with the images that changed (docs/internal/screenshots.md). The organization's GitHub
-# App (`ZEABUR_OSS_BOT_CLIENT_ID`, `ZEABUR_OSS_BOT_PRIVATE_KEY`) opens it, because a pull request
-# made with GITHUB_TOKEN does not start CI. GitHub signs the commit, as main requires.
+# Takes the docs screenshots (web/e2e/shots/docs.ts) again after a change on main that can move a
+# screen, and opens one pull request with the images that changed (docs/internal/screenshots.md).
+# The organization's GitHub App (`ZEABUR_OSS_BOT_CLIENT_ID`, `ZEABUR_OSS_BOT_PRIVATE_KEY`) opens
+# it, because a pull request made with GITHUB_TOKEN does not start CI. GitHub signs the commit, as
+# main requires.
 
 on:
   push:
@@ -13,7 +14,6 @@ on:
       - crates/**
       - Cargo.lock
       - flake.lock
-      - docs/shots.yaml
       - scripts/docs-shots.sh
       - scripts/build-ui.sh
   workflow_dispatch:
@@ -41,7 +41,7 @@ jobs:
       - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
         with:
           key: shots
-      - run: nix develop --command scripts/docs-shots.sh docs/shots.yaml
+      - run: nix develop --command scripts/docs-shots.sh docs
       - uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         id: app
         with:
@@ -71,6 +71,6 @@ jobs:
           commit-message: "docs: take the screenshots again"
           title: "docs: take the screenshots again"
           body: |
-            `.github/workflows/shots.yml` took `docs/shots.yaml` again on main at ${{ github.sha }}
+            `.github/workflows/shots.yml` took the docs screenshots again on main at ${{ github.sha }}
             and these images changed. Look at each one before merging: a screen that moved on
             purpose is fine, one that broke is a bug in the change that moved it.

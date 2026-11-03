@@ -30,10 +30,10 @@ nix develop -c cargo build --release --locked --no-default-features -p zeabur -p
 The installer's web interface (`crates/zeabur-installer/web`) is not in CI: run
 `nix develop -c bash -c 'cd crates/zeabur-installer/web && bun install && bun run fmt:check && bun run lint && bun run typecheck'`
 and `nix develop -c scripts/build-installer-ui.sh`.
-The screenshots are kept in git and not taken in CI: after changing a page that `docs/shots.yaml`
-covers, run `nix develop -c scripts/docs-shots.sh` on aarch64 Linux, as CI does, and commit
-`docs/images/shots` (`docs/internal/screenshots.md`). The README and cover images take the same
-script with their manifest, `docs/<set>-shots.yaml`.
+The screenshots are kept in git and not taken in CI: after changing a page that
+`web/e2e/shots/docs.ts` covers, run `nix develop -c scripts/docs-shots.sh` on aarch64 Linux, as CI
+does, and commit `docs/images/shots` (`docs/internal/screenshots.md`). The README and cover images
+take the same script with their set, `readme` or `cover`.
 Cluster tests: see `zeabur-cluster-tests`. Web interface: see `zeabur-ui`. Each CI job is
 `scripts/ci.sh <job>` (`--list` names them), the same on GitHub and on any Linux machine with
 Nix; `scripts/ci-local.sh [job…]` runs several and prints a result line per job (in

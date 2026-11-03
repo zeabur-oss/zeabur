@@ -4,9 +4,9 @@
 // catalog answer.
 // Installing is always simulated: the log replays fixtures/apply.log (INSTALLER_FAIL=1, or an
 // `installer_fail=1` cookie, stops it partway), so nothing changes on the server.
-// `vite preview` serves the built pages with the same API, for scripts/docs-shots.sh. There,
-// ZEABUR_DEMO_INSTALL gives the whole log at the first read: `done`, `running` (stops before
-// Zeabur) or `fail`. ZEABUR_DEMO_HOST changes the server: `small` (1.5 GiB, so only a personal
+// `vite preview` serves the built pages with the same API, for scripts/docs-shots.sh, which writes
+// the fixtures first. There, ZEABUR_DEMO_INSTALL gives the whole log at the first read: `done`,
+// `running` (stops before Zeabur) or `fail`. ZEABUR_DEMO_HOST changes the server: `small` (1.5 GiB, so only a personal
 // install fits and Zeabur Builder is out of reach), `medium` (a 4 GiB VPS)
 // or `docker` (Docker found, which stops a personal install).
 import { readFileSync } from "node:fs"
@@ -182,7 +182,6 @@ export const devApi: Plugin = {
     server.middlewares.use(middleware)
   },
   configurePreviewServer: (server) => {
-    if (!backend) writeFixtures(generated)
     server.middlewares.use(middleware)
   },
 }

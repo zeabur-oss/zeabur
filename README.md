@@ -35,7 +35,7 @@ configuring and operating the cluster, and leaving Zeabur, in English,
 </tr>
 </table>
 
-<sub>Screenshots of the built-in demo data (`cargo run -p zeabur-api --example demo`), taken by `scripts/docs-shots.sh docs/readme-shots.yaml`.</sub>
+<sub>Screenshots of the built-in demo data (`cargo run -p zeabur-api --example demo`), taken by `scripts/docs-shots.sh readme`.</sub>
 
 ## Get started
 
