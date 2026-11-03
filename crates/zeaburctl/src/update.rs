@@ -1,21 +1,25 @@
-//! The update check (docs/reference/telemetry.mdx, "Update check"): any command prints one line
-//! when the releases it last read name a newer `zeaburctl`, at most once a day for each version,
-//! and at most once an hour asks GitHub again on a thread of its own. The command never waits
-//! for it: an answer that has not come by the time the command ends is left for the next one.
+//! The update check (docs/reference/telemetry.mdx, "Update check"): each command asks GitHub for
+//! the releases on a thread of its own while it runs, and prints one line when they name a newer
+//! `zeaburctl`. At its end the command waits at most [`GRACE`] for the answer.
+//!
+//! Without a token GitHub answers 60 requests an hour from one address [gh-limit]. A token in
+//! `GH_TOKEN` or `GITHUB_TOKEN`, the variables `gh` reads, makes the requests count against its
+//! own limit, and the line says so when the limit of the address is used up.
+//!
+//! [gh-limit]: https://docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api#primary-rate-limit-for-unauthenticated-users
 
 use std::cmp::Ordering;
 use std::ffi::OsString;
 use std::io::IsTerminal as _;
-use std::path::{Path, PathBuf};
 use std::sync::mpsc::{self, Receiver};
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::Duration;
 
 use bytes::Bytes;
-use http::{Request, header};
+use http::{HeaderValue, Request, StatusCode, header};
 use http_body_util::{BodyExt as _, Empty, Limited};
 use hyper_util::client::legacy::Client;
 use hyper_util::rt::TokioExecutor;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
 use crate::output;
 
@@ -23,16 +27,17 @@ use crate::output;
 const RELEASES: &str = "https://api.github.com/repos/zeabur-oss/zeabur/releases";
 /// Where to download and verify a release.
 const DOWNLOAD: &str = "https://oss.zeabur.com/docs/zeabur/reference/releases/";
-/// The least time between two requests to GitHub.
-const EVERY: Duration = Duration::from_hours(1);
-/// The least time between two notices of the same version.
-const REMIND: Duration = Duration::from_hours(24);
 /// How long a check may take.
 const TIMEOUT: Duration = Duration::from_secs(5);
+/// How long a command that has ended waits for the answer.
+const GRACE: Duration = Duration::from_secs(1);
 /// The largest answer read.
 const MAX_BODY: usize = 8 * 1024 * 1024;
 /// The running version.
 const RUNNING: &str = env!("CARGO_PKG_VERSION");
+/// The line printed when GitHub's limit for the address is used up.
+const LIMITED: &str = "zeaburctl could not check for a newer version: GitHub's limit for this \
+                       address is used up. Set GH_TOKEN to a GitHub token to use your own limit.";
 
 /// Whether the environment allows update checks: not with `DO_NOT_TRACK` or
 /// `NO_UPDATE_NOTIFIER`. `zeaburctl ui` passes it on to the interface.
@@ -51,164 +56,98 @@ fn wanted(env: &dyn Fn(&str) -> Option<OsString>, terminal: bool) -> bool {
     terminal && env("CI").is_none() && allowed_in(env)
 }
 
+/// `GH_TOKEN`, else `GITHUB_TOKEN`; an empty one is none.
+fn token(env: &dyn Fn(&str) -> Option<OsString>) -> Option<String> {
+    ["GH_TOKEN", "GITHUB_TOKEN"].iter().find_map(|name| {
+        env(name)
+            .and_then(|v| v.into_string().ok())
+            .filter(|v| !v.is_empty())
+    })
+}
+
 /// A check under way.
 #[derive(Debug)]
 pub(crate) struct Check {
-    path: PathBuf,
-    now: u64,
-    last: Cache,
-    answer: Option<Receiver<Vec<Known>>>,
+    answer: Receiver<Answer>,
+}
+
+/// What GitHub answered.
+#[derive(Debug)]
+enum Answer {
+    Releases(Vec<Known>),
+    /// The address, or the token, has no requests left this hour.
+    Limited,
+    Failed,
 }
 
 impl Check {
     /// Starts a check when one is wanted.
     pub(crate) fn start() -> Option<Self> {
-        if !wanted(
-            &|name| std::env::var_os(name),
-            std::io::stderr().is_terminal(),
-        ) {
+        let env = |name: &str| std::env::var_os(name);
+        if !wanted(&env, std::io::stderr().is_terminal()) {
             return None;
         }
-        Self::start_at(RELEASES, &cache_dir()?.join("zeaburctl"), SystemTime::now())
+        Some(Self::start_at(RELEASES, token(&env)))
     }
 
-    fn start_at(url: &str, dir: &Path, now: SystemTime) -> Option<Self> {
-        let path = dir.join("update-check.json");
-        let now = now.duration_since(UNIX_EPOCH).ok()?.as_secs();
-        let mut ask = false;
-        // Claimed before asking, so commands that end first ask at most once an hour.
-        let last = Cache::update(&path, |cache| {
-            ask = since(cache.checked_at, now) >= EVERY.as_secs();
-            if ask {
-                cache.checked_at = now;
-            }
-            ask
-        })
-        .ok()?;
-        let answer = ask.then(|| {
-            let (send, receive) = mpsc::channel();
-            let url = url.to_owned();
-            let path = path.clone();
-            std::thread::spawn(move || {
-                let Some(releases) = fetch(&url) else { return };
-                let known = known(&releases);
-                drop(Cache::update(&path, |cache| {
-                    cache.releases.clone_from(&known);
-                    true
-                }));
-                drop(send.send(known));
-            });
-            receive
-        });
-        Some(Self {
-            path,
-            now,
-            last,
-            answer,
-        })
+    fn start_at(url: &str, token: Option<String>) -> Self {
+        let (send, receive) = mpsc::channel();
+        let url = url.to_owned();
+        std::thread::spawn(move || drop(send.send(fetch(&url, token.as_deref()))));
+        Self { answer: receive }
     }
 
-    /// Prints the notice from the answer when it has come, else from the releases read last
-    /// time; never waits.
+    /// Prints the notice once the answer comes, waiting at most [`GRACE`].
     pub(crate) fn finish(self) {
-        if let Some(notice) = self.notice() {
+        if let Some(notice) = self.notice(GRACE) {
             output::info(&notice);
         }
     }
 
-    /// The notice to print now, recorded so the same version is not named again within a day.
-    fn notice(self) -> Option<String> {
-        let fresh = self.answer.and_then(|answer| answer.try_recv().ok());
-        let releases = fresh.as_deref().unwrap_or(&self.last.releases);
-        let newer = newer(releases, RUNNING)?;
-        let mut tell = false;
-        drop(Cache::update(&self.path, |cache| {
-            tell = cache.notified.as_deref() != Some(newer.latest.as_str())
-                || since(cache.notified_at, self.now) >= REMIND.as_secs();
-            if tell {
-                cache.notified = Some(newer.latest.clone());
-                cache.notified_at = self.now;
-            }
-            tell
-        }));
-        tell.then(|| newer.notice(RUNNING))
-    }
-}
-
-/// Seconds from `then` to `now`, as if a long time had passed when the clock went back.
-const fn since(then: u64, now: u64) -> u64 {
-    if now < then { u64::MAX } else { now - then }
-}
-
-/// The last check, in the user's cache directory.
-#[derive(Debug, Default, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", default)]
-struct Cache {
-    /// When GitHub was last asked, in seconds since the Unix epoch.
-    checked_at: u64,
-    /// The releases of the last answer.
-    releases: Vec<Known>,
-    /// The version the last notice named, and when.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    notified: Option<String>,
-    notified_at: u64,
-}
-
-impl Cache {
-    fn read(path: &Path) -> Option<Self> {
-        serde_json::from_slice(&std::fs::read(path).ok()?).ok()
-    }
-
-    /// Reads the cache, lets `change` change it, and writes it back when `change` says so; the
-    /// cache as `change` left it. Commands running at once, and a command's own check, take
-    /// turns through a lock file, and a new file replaces the old whole, so neither undoes the
-    /// other's change nor reads half a file.
-    fn update(path: &Path, change: impl FnOnce(&mut Self) -> bool) -> Result<Self, String> {
-        let dir = path.parent().ok_or("no directory")?;
-        std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
-        let lock = std::fs::File::create(path.with_extension("lock")).map_err(|e| e.to_string())?;
-        lock.lock().map_err(|e| e.to_string())?;
-        let mut cache = Self::read(path).unwrap_or_default();
-        if change(&mut cache) {
-            let json = serde_json::to_vec(&cache).map_err(|e| e.to_string())?;
-            let new = path.with_extension(format!("json.{}", std::process::id()));
-            std::fs::write(&new, json).map_err(|e| e.to_string())?;
-            std::fs::rename(&new, path).map_err(|e| e.to_string())?;
+    fn notice(self, grace: Duration) -> Option<String> {
+        match self.answer.recv_timeout(grace).ok()? {
+            Answer::Releases(releases) => newer(&releases, RUNNING).map(|n| n.notice(RUNNING)),
+            Answer::Limited => Some(LIMITED.to_owned()),
+            Answer::Failed => None,
         }
-        Ok(cache)
     }
 }
 
-/// `$XDG_CACHE_HOME`, else `~/Library/Caches` on macOS and `~/.cache` elsewhere.
-fn cache_dir() -> Option<PathBuf> {
-    if let Some(dir) = std::env::var_os("XDG_CACHE_HOME").map(PathBuf::from)
-        && dir.is_absolute()
-    {
-        return Some(dir);
-    }
-    let home = PathBuf::from(std::env::var_os("HOME")?);
-    if cfg!(target_os = "macos") {
-        Some(home.join("Library/Caches"))
-    } else {
-        Some(home.join(".cache"))
-    }
-}
-
-fn fetch(url: &str) -> Option<Vec<Release>> {
-    let runtime = tokio::runtime::Builder::new_current_thread()
+fn fetch(url: &str, token: Option<&str>) -> Answer {
+    let Ok(runtime) = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
-        .ok()?;
+    else {
+        return Answer::Failed;
+    };
     runtime.block_on(async {
-        let client = Client::builder(TokioExecutor::new()).build(crate::server::connector().ok()?);
-        let request = Request::get(url)
-            .header(header::USER_AGENT, format!("zeaburctl/{RUNNING}"))
-            .header(header::ACCEPT, "application/vnd.github+json")
-            .body(Empty::<Bytes>::new())
-            .ok()?;
         let exchange = async {
-            let response = client.request(request).await.ok()?;
-            if !response.status().is_success() {
+            let client =
+                Client::builder(TokioExecutor::new()).build(crate::server::connector().ok()?);
+            let mut request = Request::get(url)
+                .header(header::USER_AGENT, format!("zeaburctl/{RUNNING}"))
+                .header(header::ACCEPT, "application/vnd.github+json");
+            if let Some(token) = token {
+                let mut value = HeaderValue::from_str(&format!("Bearer {token}")).ok()?;
+                value.set_sensitive(true);
+                request = request.header(header::AUTHORIZATION, value);
+            }
+            let response = client
+                .request(request.body(Empty::<Bytes>::new()).ok()?)
+                .await
+                .ok()?;
+            let used_up = response
+                .headers()
+                .get("x-ratelimit-remaining")
+                .is_some_and(|v| v == "0");
+            let status = response.status();
+            // GitHub refuses a used-up limit with 403 or 429 [gh-limit].
+            if used_up
+                && (status == StatusCode::FORBIDDEN || status == StatusCode::TOO_MANY_REQUESTS)
+            {
+                return Some(Answer::Limited);
+            }
+            if !status.is_success() {
                 return None;
             }
             let body = Limited::new(response.into_body(), MAX_BODY)
@@ -216,9 +155,14 @@ fn fetch(url: &str) -> Option<Vec<Release>> {
                 .await
                 .ok()?
                 .to_bytes();
-            serde_json::from_slice(&body).ok()
+            let releases: Vec<Release> = serde_json::from_slice(&body).ok()?;
+            Some(Answer::Releases(known(&releases)))
         };
-        tokio::time::timeout(TIMEOUT, exchange).await.ok()?
+        tokio::time::timeout(TIMEOUT, exchange)
+            .await
+            .ok()
+            .flatten()
+            .unwrap_or(Answer::Failed)
     })
 }
 
@@ -243,8 +187,8 @@ impl Release {
     }
 }
 
-/// A published release, as the cache keeps it.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+/// A published release.
+#[derive(Debug, Clone, PartialEq, Eq)]
 struct Known {
     tag: String,
     prerelease: bool,
@@ -540,153 +484,104 @@ mod tests {
         assert!(allowed_in(&env(&[("DO_NOT_TRACK", "")])));
     }
 
-    /// Answers each request with `body`, after `delay`.
-    fn github(body: &'static str, delay: Duration) -> String {
+    /// Answers each request with `status`, `headers` and `body` after `delay`, and sends on
+    /// each request it read.
+    fn github(
+        status: &'static str,
+        headers: &'static str,
+        body: &'static str,
+        delay: Duration,
+    ) -> (String, Receiver<String>) {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let address = listener.local_addr().unwrap();
+        let (seen, requests) = mpsc::channel();
         std::thread::spawn(move || {
             for stream in listener.incoming() {
                 let Ok(mut stream) = stream else { break };
+                let seen = seen.clone();
                 std::thread::spawn(move || {
                     let mut buffer = [0; 4096];
-                    drop(stream.read(&mut buffer));
+                    let read = stream.read(&mut buffer).unwrap_or(0);
+                    drop(seen.send(String::from_utf8_lossy(&buffer[..read]).into_owned()));
                     std::thread::sleep(delay);
                     drop(write!(
                         stream,
-                        "HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{body}",
+                        "HTTP/1.1 {status}\r\n{headers}content-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{body}",
                         body.len()
                     ));
                 });
             }
         });
-        format!("http://{address}/releases")
+        (format!("http://{address}/releases"), requests)
     }
 
     const RELEASES_JSON: &str = r####"[{"tag_name":"v99.0.0","draft":false,"prerelease":false,"body":"### Security\n- x"}]"####;
+    const WAIT: Duration = Duration::from_secs(10);
 
     #[test]
-    fn a_slow_answer_never_holds_the_command_up() {
-        let dir = tempfile::tempdir().unwrap();
-        let url = github(RELEASES_JSON, Duration::from_secs(30));
-        let check = Check::start_at(&url, dir.path(), SystemTime::now()).unwrap();
+    fn a_slow_answer_holds_the_command_up_no_longer_than_the_grace() {
+        let (url, _) = github("200 OK", "", RELEASES_JSON, Duration::from_secs(30));
         let started = Instant::now();
-        check.finish();
+        assert_eq!(
+            Check::start_at(&url, None).notice(Duration::from_millis(200)),
+            None
+        );
         assert!(started.elapsed() < Duration::from_secs(1));
     }
 
     #[test]
-    fn the_answer_is_kept_for_the_next_command_and_asked_again_after_an_hour() {
-        let dir = tempfile::tempdir().unwrap();
-        let url = github(RELEASES_JSON, Duration::ZERO);
-        let now = SystemTime::now();
-        let check = Check::start_at(&url, dir.path(), now).unwrap();
-        let answer = check
-            .answer
-            .as_ref()
-            .unwrap()
-            .recv_timeout(Duration::from_secs(10))
-            .unwrap();
-        assert_eq!(answer[0].tag, "v99.0.0");
-        let cache = Cache::read(&dir.path().join("update-check.json")).unwrap();
-        assert_eq!(cache.releases, answer);
-
-        let minute = Duration::from_secs(60);
-        let next = Check::start_at(&url, dir.path(), now + minute).unwrap();
-        assert!(next.answer.is_none());
-        assert!(
-            Check::start_at(&url, dir.path(), now + 61 * minute)
-                .unwrap()
-                .answer
-                .is_some()
-        );
-    }
-
-    #[test]
-    fn a_command_that_ends_first_leaves_the_answer_to_the_next() {
-        let dir = tempfile::tempdir().unwrap();
-        let url = github(RELEASES_JSON, Duration::from_millis(300));
-        let now = SystemTime::now();
-        assert_eq!(
-            Check::start_at(&url, dir.path(), now).unwrap().notice(),
-            None
-        );
-        let path = dir.path().join("update-check.json");
-        let started = Instant::now();
-        while Cache::read(&path).is_none_or(|c| c.releases.is_empty()) {
-            assert!(
-                started.elapsed() < Duration::from_secs(10),
-                "no answer was kept"
-            );
-            std::thread::sleep(Duration::from_millis(20));
+    fn every_command_asks_and_names_a_newer_release() {
+        let (url, requests) = github("200 OK", "", RELEASES_JSON, Duration::ZERO);
+        for _ in 0..2 {
+            let notice = Check::start_at(&url, None).notice(WAIT).unwrap();
+            assert!(notice.contains("99.0.0"), "{notice}");
+            assert!(requests.recv_timeout(WAIT).is_ok());
         }
-        let later = Check::start_at(&url, dir.path(), now + Duration::from_secs(60)).unwrap();
-        let notice = later.notice().unwrap();
-        assert!(notice.contains("99.0.0"), "{notice}");
     }
 
     #[test]
-    fn the_same_version_is_named_once_a_day() {
-        let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("update-check.json");
-        let now = SystemTime::now();
-        let checked = now.duration_since(UNIX_EPOCH).unwrap().as_secs();
-        let cache = |tag: &str| Cache {
-            checked_at: checked,
-            releases: known(&[release(tag, "")]),
-            ..Cache::default()
-        };
-        put(&path, cache("v99.0.0"));
-        let at = |hours: u64| {
-            Check::start_at(
-                "http://127.0.0.1:9/",
-                dir.path(),
-                now + Duration::from_hours(hours),
-            )
-            .unwrap()
-            .notice()
-        };
-        assert!(at(0).is_some());
-        assert_eq!(at(0), None);
-        Cache::update(&path, |c| {
-            c.releases = cache("v99.1.0").releases;
-            true
-        })
-        .unwrap();
-        assert!(at(0).is_some(), "a newer version is named at once");
-        assert!(at(25).is_some());
-    }
-
-    fn put(path: &Path, cache: Cache) {
-        Cache::update(path, |c| {
-            *c = cache;
-            true
-        })
-        .unwrap();
+    fn a_token_is_sent_to_github_as_a_bearer() {
+        let (url, requests) = github("200 OK", "", "[]", Duration::ZERO);
+        Check::start_at(&url, Some("t0ken".to_owned())).notice(WAIT);
+        let request = requests.recv_timeout(WAIT).unwrap().to_ascii_lowercase();
+        assert!(request.contains("authorization: bearer t0ken"), "{request}");
+        let (url, requests) = github("200 OK", "", "[]", Duration::ZERO);
+        Check::start_at(&url, None).notice(WAIT);
+        let request = requests.recv_timeout(WAIT).unwrap().to_ascii_lowercase();
+        assert!(!request.contains("authorization"), "{request}");
     }
 
     #[test]
-    fn changes_made_at_once_are_all_kept() {
-        let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("update-check.json");
-        let tags: Vec<String> = (0..16).map(|i| format!("v1.0.{i}")).collect();
-        std::thread::scope(|scope| {
-            for tag in &tags {
-                let path = &path;
-                scope.spawn(move || {
-                    Cache::update(path, |c| {
-                        c.releases.extend(known(&[release(tag, "")]));
-                        true
-                    })
-                    .unwrap();
-                });
+    fn a_used_up_limit_says_to_set_a_token_and_other_failures_say_nothing() {
+        let used_up = "x-ratelimit-remaining: 0\r\n";
+        for status in ["403 Forbidden", "429 Too Many Requests"] {
+            let (url, _) = github(status, used_up, "{}", Duration::ZERO);
+            let notice = Check::start_at(&url, None).notice(WAIT).unwrap();
+            assert!(notice.contains("GH_TOKEN"), "{notice}");
+        }
+        let (url, _) = github("403 Forbidden", "", "{}", Duration::ZERO);
+        assert_eq!(Check::start_at(&url, None).notice(WAIT), None);
+        let (url, _) = github("500 Internal Server Error", "", "{}", Duration::ZERO);
+        assert_eq!(Check::start_at(&url, None).notice(WAIT), None);
+    }
+
+    #[test]
+    fn the_token_comes_from_gh_token_then_github_token() {
+        let env = |vars: &'static [(&'static str, &'static str)]| {
+            move |name: &str| {
+                vars.iter()
+                    .find(|(k, _)| *k == name)
+                    .map(|(_, v)| OsString::from(v))
             }
-        });
-        let kept = Cache::read(&path).unwrap();
-        for tag in &tags {
-            assert!(
-                kept.releases.iter().any(|r| &r.tag == tag),
-                "{tag} was lost"
-            );
-        }
+        };
+        assert_eq!(
+            token(&env(&[("GH_TOKEN", "a"), ("GITHUB_TOKEN", "b")])).as_deref(),
+            Some("a")
+        );
+        assert_eq!(
+            token(&env(&[("GH_TOKEN", ""), ("GITHUB_TOKEN", "b")])).as_deref(),
+            Some("b")
+        );
+        assert_eq!(token(&env(&[])), None);
     }
 }
