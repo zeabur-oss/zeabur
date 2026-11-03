@@ -1,7 +1,7 @@
 ---
 title: 升级 Zeabur
 description: 查看当前的 Zeabur 版本，按安装方式用 zeabur-installer、Helm、Argo CD、Flux 或 zeaburctl 升级，并在升级后确认新版本。
-source: "3faca7e45cf7"
+source: "82ee238dac12"
 ---
 
 先看你是怎么安装的，再按对应的小节升级。升级不会自动发生，Zeabur 只会告诉你有新版本。
@@ -37,6 +37,8 @@ source: "3faca7e45cf7"
    ```
 
 K3s、RKE2 或 KubeSolo 的版本或主机文件有变时，`apply` 会重启 `k3s`、`rke2-server` 或 `kubesolo`。Kubernetes API 约有 10 秒不响应，运行中的应用照常服务。
+
+每版 installer 固定一个 K3s、RKE2 或 KubeSolo 版本，由 `apply` 安装。Kubernetes 只能这样升级：用其他方式升级（例如 System Upgrade Controller 的 Plan），下次 `apply` 会装回 installer 固定的版本。
 
 服务器内存低于新版对团队使用的最低要求时，已在运行的安装仍会升级，`plan` 会显示警告，并保留现有的组件。
 

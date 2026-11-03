@@ -37,6 +37,8 @@ Team and personal installs work the same way.
 
 When the K3s, RKE2 or KubeSolo release or a host file changes, `apply` restarts `k3s`, `rke2-server` or `kubesolo`. The Kubernetes API stops answering for about 10 seconds. Running apps keep serving.
 
+Each installer pins one K3s, RKE2 or KubeSolo release, and `apply` installs it. Upgrade Kubernetes only this way: if something else upgrades it, such as a System Upgrade Controller Plan, the next `apply` puts the pinned release back.
+
 If the server has less memory than a team install now needs, an install that already runs is still upgraded. `plan` shows a warning, and the components it has stay.
 
 ## Upgrade with Helm
