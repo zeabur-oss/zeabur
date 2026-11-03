@@ -2,6 +2,6 @@
 default: patch
 ---
 
-# Zeabur ships with Zeabur Catalog v0.2.0
+# Zeabur ships with Zeabur Catalog v0.2.1-beta.0
 
 On a personal install with less than about 1.7 GiB of memory, VictoriaMetrics and VictoriaLogs are no longer installed. Templates show their summary in English, Traditional Chinese and Simplified Chinese.
