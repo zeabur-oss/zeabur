@@ -675,10 +675,24 @@ function warningsSaid(t: Translate, warnings: Schemas.PlanWarning[]): Said[] {
   })
 }
 
+type WorkloadsWarning = Extract<
+  Schemas.PlanWarning,
+  { code: "restartNeeded" | "reloaderRestarts" | "stillUsed" }
+>
+
+const workloadCodes = new Set<string>(["restartNeeded", "reloaderRestarts", "stillUsed"])
+
+function workloadsText(t: Translate, warning: WorkloadsWarning): Said {
+  const all = warning.workloads.map((w) => w.name)
+  const cut = bounded(t, all).rest.length > 0
+  return { text: warningSentence(t, warning), names: cut ? all : undefined }
+}
+
 function warningText(
   t: Translate,
   warning: Exclude<Schemas.PlanWarning, { code: "recreated" | "deletesProject" }>,
 ): Said {
+  if (workloadCodes.has(warning.code)) return workloadsText(t, warning as WorkloadsWarning)
   switch (warning.code) {
     case "deletesDependents":
       return namedText(
@@ -704,13 +718,8 @@ function warningText(
         warning.rights.map((r) => `${r.verb} ${r.group ? `${r.resource}.${r.group}` : r.resource}`),
         (list) => t("warn.rightsMissing", list),
       )
-    case "restartNeeded":
-    case "reloaderRestarts":
-    case "stillUsed": {
-      const all = warning.workloads.map((w) => w.name)
-      const cut = bounded(t, all).rest.length > 0
-      return { text: warningSentence(t, warning), names: cut ? all : undefined }
-    }
+    case "nodeCapacityUnknown":
+      return { text: t("warn.nodeCapacityUnknown"), health: "warn" }
     default:
       return { text: warningSentence(t, warning), health: healthOf(warning) }
   }
@@ -767,6 +776,7 @@ function warningSentence(
         | "claimDataMayBeLost"
         | "recreated"
         | "deletesProject"
+        | "nodeCapacityUnknown"
     }
   >,
 ): string {

@@ -392,6 +392,18 @@ pub enum Change {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         icon: Option<ProjectIcon>,
     },
+    /// Set the project's build limits, the Namespace's `builder.zeabur.com/build-memory` and
+    /// `…/build-cpu` annotations: each one left out (or blank) is removed, so the cluster's
+    /// default applies. A value is a Kubernetes quantity above zero.
+    #[serde(rename_all = "camelCase")]
+    BuildLimits {
+        /// The memory limit of one build, such as `2Gi`.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        build_memory: Option<String>,
+        /// The CPU limit of one build, such as `2` or `500m`.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        build_cpu: Option<String>,
+    },
     /// Make a scheduled task from a service: a CronJob that runs a command in a copy of one of
     /// its containers (see the `tasks` module).
     #[serde(rename_all = "camelCase")]
@@ -495,7 +507,11 @@ impl Change {
     pub const fn is_namespace_change(&self) -> bool {
         matches!(
             self,
-            Self::CreateProject { .. } | Self::Adopt | Self::Unadopt | Self::Details { .. }
+            Self::CreateProject { .. }
+                | Self::Adopt
+                | Self::Unadopt
+                | Self::Details { .. }
+                | Self::BuildLimits { .. }
         )
     }
 }
@@ -1174,6 +1190,8 @@ pub enum Warning {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         route: Option<String>,
     },
+    /// The nodes could not be read, so a build limit was not checked against the largest node.
+    NodeCapacityUnknown,
     /// The Secret's values could not be read, so its diff shows only which keys change.
     #[serde(rename_all = "camelCase")]
     SecretValuesUnknown {

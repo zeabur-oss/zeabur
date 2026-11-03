@@ -59,6 +59,14 @@ Go to **Basic information** in the project's **Settings**:
 
 Click **Save details**, review the changes, and apply them. These three values are stored in the namespace's annotations. Project developers can change them, but only administrators can change other labels and annotations.
 
+## Set the memory and CPU of builds
+
+In the project's **Settings**, **Builds** sets the most memory and CPU one build of the project may use, for example `2Gi` and `2`. Leave a field empty to use Zeabur Builder's default. The values can't exceed what the largest node in the cluster has to give. Select **Save build limits** and apply the change. Builds that start afterwards use the new values.
+
+If a build fails because it ran out of memory, its failure message links to this section. Changing the limits needs `patch` and `zeabur-manage` permission on the namespace, so a developer sees them but can't save.
+
+The values are the namespace annotations `builder.zeabur.com/build-memory` and `builder.zeabur.com/build-cpu`.
+
 ## Isolate the project from other projects
 
 Go to **Networking** in the project's **Settings**. The **Other projects** row shows the current state:

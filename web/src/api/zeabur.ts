@@ -1976,6 +1976,19 @@ export type Change =
       op: "details"
     }
   | {
+      /**
+       * The CPU limit of one build, such as `2` or `500m`.
+       * @nullable
+       */
+      buildCpu?: string | null
+      /**
+       * The memory limit of one build, such as `2Gi`.
+       * @nullable
+       */
+      buildMemory?: string | null
+      op: "buildLimits"
+    }
+  | {
       /** The command, run by `/bin/sh -c`. */
       command: string
       /** What happens when a run is due while the last one still runs. */
@@ -3045,6 +3058,9 @@ export type PlanWarning =
        * @nullable
        */
       route?: string | null
+    }
+  | {
+      code: "nodeCapacityUnknown"
     }
   | {
       code: "secretValuesUnknown"
@@ -7971,6 +7987,23 @@ export type ProjectBackups = {
 }
 
 /**
+ * A project's build limits, as its namespace's annotations give them. Each is absent when its
+ * annotation is missing, blank or not a quantity (Builder ignores such a value).
+ */
+export type ProjectBuildLimits = {
+  /**
+   * The CPU limit of one build, such as `2` or `500m`.
+   * @nullable
+   */
+  buildCpu?: string | null
+  /**
+   * The memory limit of one build, such as `2Gi`.
+   * @nullable
+   */
+  buildMemory?: string | null
+}
+
+/**
  * A `BuildRun`.
  */
 export type ZeaburBuilderRun = {
@@ -8533,42 +8566,57 @@ export type WorkloadPatch = {
 /**
  * A project's Namespace.
  */
-export type ProjectNamespace = ProjectDetails & {
-  /** It carries Zeabur's project label. */
-  adopted: boolean
-  /**
-   * What you may change in the project. A project Viewer may change nothing, nor read the
-   * pods' logs.
-   */
-  can: ProjectRights
-  /**
-   * Whether the person may adopt it or let it go: patch it, and where the admission policy
-   * guards its labels, also `zeabur-manage` it. Changing its Pod Security level needs the
-   * same.
-   */
-  canAdopt: Permission
-  /** Whether the person may patch the Namespace: change its details. */
-  canChange: Permission
-  deleting?: ProjectDeleting | null
-  /**
-   * The chart's admission policy is installed: patching the Namespace without `zeabur-manage`
-   * changes only its details.
-   */
-  labelsGuarded: boolean
-  /** Its name. */
-  name: string
-  /** The Namespace. */
-  origin: Origin
-  podSecurity?: PodSecurityLevel | null
-  role?: AccountRole | null
-  /** Kubernetes keeps it for itself (`kube-` prefix); it cannot be adopted. */
-  system: boolean
-  /**
-   * Which Deployments, StatefulSets and DaemonSets the person may patch (change their
-   * variables).
-   */
-  workloadPatch: WorkloadPatch[]
-}
+export type ProjectNamespace = ProjectDetails &
+  ProjectBuildLimits & {
+    /** It carries Zeabur's project label. */
+    adopted: boolean
+    /**
+     * What you may change in the project. A project Viewer may change nothing, nor read the
+     * pods' logs.
+     */
+    can: ProjectRights
+    /**
+     * Whether the person may adopt it or let it go: patch it, and where the admission policy
+     * guards its labels, also `zeabur-manage` it. Changing its Pod Security level or its build
+     * limits needs the same.
+     */
+    canAdopt: Permission
+    /** Whether the person may patch the Namespace: change its details. */
+    canChange: Permission
+    deleting?: ProjectDeleting | null
+    /**
+     * The chart's admission policy is installed: patching the Namespace without `zeabur-manage`
+     * changes only its details.
+     */
+    labelsGuarded: boolean
+    /**
+     * The most CPU a build limit may ask for, the largest allocatable CPU of a node, in
+     * millicores; absent when the nodes could not be read.
+     * @minimum 0
+     * @nullable
+     */
+    maxBuildCpuMillicores?: number | null
+    /**
+     * The most memory a build limit may ask for, the largest allocatable memory of a node, in
+     * bytes; absent when the nodes could not be read.
+     * @minimum 0
+     * @nullable
+     */
+    maxBuildMemoryBytes?: number | null
+    /** Its name. */
+    name: string
+    /** The Namespace. */
+    origin: Origin
+    podSecurity?: PodSecurityLevel | null
+    role?: AccountRole | null
+    /** Kubernetes keeps it for itself (`kube-` prefix); it cannot be adopted. */
+    system: boolean
+    /**
+     * Which Deployments, StatefulSets and DaemonSets the person may patch (change their
+     * variables).
+     */
+    workloadPatch: WorkloadPatch[]
+  }
 
 /**
  * The access key services use, from an `S3Credentials` of the store.

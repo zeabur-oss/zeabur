@@ -183,6 +183,14 @@ export function failureText(build: Build | undefined, run: BuildRun | undefined)
   )
 }
 
+/** Whether the build failed for lack of memory, which a higher build memory fixes. */
+export function ranOutOfMemory(build: Build | undefined, run: BuildRun | undefined): boolean {
+  const problem = build ? buildProblem(build, run) : undefined
+  return (
+    problem?.reason === "OutOfMemory" || (run?.phase === "Failed" && run.reason === "OutOfMemory")
+  )
+}
+
 const REASON_KEYS = {
   PlanFailed: "builds.reason.PlanFailed",
   SourceFailed: "builds.reason.SourceFailed",

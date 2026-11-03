@@ -9,7 +9,8 @@ mod tests {
     use zeabur_model::{ProjectIcon, Tool, WorkloadKind, WorkloadRef};
     use zeabur_plan::json::apply_patch;
     use zeabur_plan::{
-        Change, Conventions, ErrorKind, Input, Plan, PlanError, PlanRequest, Write, plan, plan_with,
+        Change, Conventions, ErrorKind, Input, NodeCapacity, Plan, PlanError, PlanRequest, Warning,
+        Write, plan, plan_with,
     };
 
     const LABEL: &str = "zeabur.com/project";
@@ -284,6 +285,99 @@ mod tests {
             after["metadata"]["annotations"]["zeabur.com/display-name"],
             "Shop"
         );
+    }
+
+    fn limits(memory: Option<&str>, cpu: Option<&str>) -> Change {
+        Change::BuildLimits {
+            build_memory: memory.map(str::to_owned),
+            build_cpu: cpu.map(str::to_owned),
+        }
+    }
+
+    #[test]
+    fn build_limits_are_the_two_builder_annotations_and_nothing_else() {
+        let stored = namespace(
+            "shop",
+            &json!({LABEL: "true"}),
+            Some(json!({"zeabur.com/display-name": "Shop", "owner": "web-team"})),
+        );
+        let plan = planned(Some(&stored), vec![limits(Some(" 2Gi "), Some("500m"))]).unwrap();
+        let (after, _) = applied(&plan, &stored);
+        let mut expected = stored.clone();
+        expected["metadata"]["annotations"]["builder.zeabur.com/build-memory"] = json!("2Gi");
+        expected["metadata"]["annotations"]["builder.zeabur.com/build-cpu"] = json!("500m");
+        assert_eq!(after, expected);
+
+        let with_limits = after;
+        let plan = planned(Some(&with_limits), vec![limits(Some("4Gi"), None)]).unwrap();
+        let (changed, operations) = applied(&plan, &with_limits);
+        assert_eq!(
+            changed["metadata"]["annotations"]["builder.zeabur.com/build-memory"],
+            "4Gi"
+        );
+        assert_eq!(changed["metadata"]["annotations"]["owner"], "web-team");
+        assert!(changed["metadata"]["annotations"]["builder.zeabur.com/build-cpu"].is_null());
+        assert!(operations.contains(&json!({
+            "op": "test", "path": "/metadata/annotations/builder.zeabur.com~1build-memory",
+            "value": "2Gi"
+        })));
+
+        let plan = planned(Some(&with_limits), vec![limits(None, None)]).unwrap();
+        let (cleared, _) = applied(&plan, &with_limits);
+        assert_eq!(
+            cleared["metadata"]["annotations"],
+            stored["metadata"]["annotations"]
+        );
+    }
+
+    #[test]
+    fn build_limits_that_are_not_quantities_unchanged_or_of_no_project_are_refused() {
+        for bad in ["lots", "2GB", "0", "-1Gi", "1 Gi"] {
+            let error = planned(Some(&shop(true)), vec![limits(Some(bad), None)]).unwrap_err();
+            assert_eq!(error.code, "build_memory_invalid", "{bad}");
+            let error = planned(Some(&shop(true)), vec![limits(None, Some(bad))]).unwrap_err();
+            assert_eq!(error.code, "build_cpu_invalid", "{bad}");
+        }
+        let error = planned(Some(&shop(true)), vec![limits(Some("  "), None)]).unwrap_err();
+        assert_eq!(error.code, "unchanged");
+        let error = planned(Some(&shop(false)), vec![limits(Some("2Gi"), None)]).unwrap_err();
+        assert_eq!(error.code, "not_adopted");
+    }
+
+    fn planned_on(
+        capacity: Option<NodeCapacity>,
+        namespace: &Value,
+        changes: Vec<Change>,
+    ) -> Result<Plan, PlanError> {
+        let snapshot = Snapshot::default();
+        plan(
+            Input {
+                namespace: Some(namespace),
+                node_capacity: capacity,
+                ..Input::new(&snapshot, "2026-10-15T00:00:00Z")
+            },
+            &PlanRequest { changes },
+        )
+    }
+
+    #[test]
+    fn build_limits_above_the_largest_node_are_refused_and_unread_nodes_warn() {
+        let capacity = Some(NodeCapacity {
+            memory_bytes: 4 << 30,
+            cpu_millicores: 2000,
+        });
+        let stored = shop(true);
+        let error = planned_on(capacity, &stored, vec![limits(Some("8Gi"), None)]).unwrap_err();
+        assert_eq!(error.code, "build_memory_too_large");
+        let error = planned_on(capacity, &stored, vec![limits(None, Some("2500m"))]).unwrap_err();
+        assert_eq!(error.code, "build_cpu_too_large");
+        let plan = planned_on(capacity, &stored, vec![limits(Some("4Gi"), Some("2"))]).unwrap();
+        assert_eq!(plan.warnings, Vec::<Warning>::new());
+
+        let plan = planned_on(None, &stored, vec![limits(Some("8Gi"), None)]).unwrap();
+        assert_eq!(plan.warnings, vec![Warning::NodeCapacityUnknown]);
+        let plan = planned_on(None, &stored, vec![limits(None, None)]);
+        assert_eq!(plan.unwrap_err().code, "unchanged");
     }
 
     #[test]

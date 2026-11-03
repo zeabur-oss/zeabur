@@ -770,7 +770,8 @@ export const en = {
     "This project is already building as much as it may. This build starts when another one finishes.",
   "builds.reason.BuildkitdStarting": "The build engine is starting. This build begins shortly.",
   "builds.reason.OutOfMemory":
-    "The build ran out of memory. Ask whoever runs the cluster to give builds more memory, or make the build smaller.",
+    "The build ran out of memory. Raise this project's build memory, or make the build smaller.",
+  "builds.oom.open": "Open build settings",
   "builds.reason.Cancelled": "A newer build replaced this one, or someone cancelled it.",
   "builds.reason.other": "The build failed. Open the details to see why.",
   "builds.step": "Step",
@@ -1241,10 +1242,12 @@ export const en = {
   "action.openDebugTerminal": "Open debug terminal",
   "action.openToolsTerminal": "Open kubectl terminal",
   "action.saveDetails": "Save details",
+  "action.saveBuildLimits": "Save build limits",
   "title.adopt": (ns: string) => `Use the existing namespace ${ns}`,
   "title.unadopt": (ns: string) => `Stop showing ${ns} as a project`,
   "title.deleteProject": (ns: string) => `Delete project ${ns}`,
   "title.details": (ns: string) => `${ns} details`,
+  "title.buildLimits": (ns: string) => `${ns} build limits`,
   "title.pauseAll": (ns: string) => `Pause every service in ${ns}`,
   "title.restartAll": (ns: string) => `Restart every service in ${ns}`,
   "confirm.createProject":
@@ -1271,6 +1274,8 @@ export const en = {
   "confirm.labelVolume": (claim: string) =>
     `Adds a label and an annotation to ${claim} so that only its own schedule backs it up. Nothing restarts.`,
   "confirm.details": "Saves the name, description, and icon on the namespace.",
+  "confirm.buildLimits":
+    "Saves the build memory and CPU on the namespace. Builds that start after this use them.",
   "access.title": (ns: string) => `You can't change ${ns}`,
   "access.you": "<your user name>",
   "access.ask": (ns: string) =>
@@ -1314,6 +1319,20 @@ export const en = {
   "projectSettings.shown": "Shown as a project",
   "projectSettings.shownNo":
     "No. Showing it as a project only adds Zeabur's project label; nothing else changes.",
+  "projectSettings.builds": "Builds",
+  "projectSettings.buildMemory": "Build memory",
+  "projectSettings.buildMemoryHint":
+    "The most memory one build of this project may use, like 2Gi. Leave it empty to use Builder's default.",
+  "projectSettings.buildCpu": "Build CPU",
+  "projectSettings.buildCpuHint":
+    "The most CPU one build of this project may use, like 2 or 500m. Leave it empty to use Builder's default.",
+  "projectSettings.buildTooLarge": (max: string) =>
+    `More than the largest node has to give (${max}).`,
+  "projectSettings.buildMost": (max: string) => ` The largest node has ${max}.`,
+  "projectSettings.buildInvalid": "Write an amount above zero, like 2Gi, 512Mi, 2 or 500m.",
+  "projectSettings.buildNeedsAdmin":
+    "Changing the build limits needs more rights than changing the name.",
+  "buildLimits.default": "Builder's default",
   "network.title": "Network",
   "network.isolation": "Other projects",
   "network.isolated":
@@ -1555,6 +1574,8 @@ export const en = {
     `${host} is HTTP only. An administrator can name a cert-manager issuer to make new domains HTTPS`,
   "warn.httpOnlyElsewhere": (host: string, route: string) =>
     `${host} is HTTP only: ${route}'s certificates don't come from cert-manager, so add ${host} where they're made`,
+  "warn.nodeCapacityUnknown":
+    "Unable to read the nodes: the build limits were not checked against the largest node",
   "warn.secretValuesUnknown": (name: string) =>
     `Unable to read ${name}'s values: the diff shows keys only`,
   "warn.configNotRolledBack": (workload: string) =>

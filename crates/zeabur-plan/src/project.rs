@@ -19,6 +19,8 @@
 //!   every object, and is only no longer shown as a project.
 //! - **Details** are three annotations (display name, description, icon), set, replaced or removed
 //!   one by one.
+//! - **Build limits** are two annotations (build memory, build CPU) that Zeabur Builder reads,
+//!   handled the same way; a value is a Kubernetes quantity above zero.
 //!
 //! Like every change to an existing object, each is one JSON Patch pinned to the Namespace's
 //! `resourceVersion` (a Namespace has no `metadata.generation`), with every value it replaces or
@@ -37,10 +39,16 @@ use k8s_openapi::api::core::v1::ServiceAccount;
 use k8s_openapi::api::networking::v1::NetworkPolicy;
 use serde_json::{Value, json};
 use zeabur_model::kernel::isolation::{PROJECT_POLICY, project_policy};
-use zeabur_model::kernel::names::{Conventions, NODE_SHELL_NAMESPACE, is_system_namespace};
-use zeabur_model::{DESCRIPTION_MAX, DISPLAY_NAME_MAX, PodSecurityLevel, ProjectIcon};
+use zeabur_model::kernel::names::{
+    ANNOTATION_BUILD_CPU, ANNOTATION_BUILD_MEMORY, Conventions, NODE_SHELL_NAMESPACE,
+    is_system_namespace,
+};
+use zeabur_model::kernel::quantity;
+use zeabur_model::{
+    DESCRIPTION_MAX, DISPLAY_NAME_MAX, PodSecurityLevel, ProjectIcon, is_build_quantity,
+};
 
-use crate::change::Target;
+use crate::change::{Target, Warning};
 use crate::checks::is_dns_label;
 use crate::fields::Step;
 use crate::json::{add, pointer, remove, replace, test};
@@ -287,15 +295,103 @@ impl Planner<'_> {
             "description",
             "description",
         )?;
-        let mut changed = false;
-        for (key, value) in [
-            (conventions.display_name_annotation.as_ref(), display_name),
-            (conventions.description_annotation.as_ref(), description),
-            (
-                conventions.icon_annotation.as_ref(),
-                icon.map(ProjectIcon::as_str),
-            ),
+        self.set_annotations(
+            index,
+            &name,
+            [
+                (conventions.display_name_annotation.as_ref(), display_name),
+                (conventions.description_annotation.as_ref(), description),
+                (
+                    conventions.icon_annotation.as_ref(),
+                    icon.map(ProjectIcon::as_str),
+                ),
+            ],
+            "already has these details.",
+        )
+    }
+
+    pub(crate) fn build_limits(
+        &mut self,
+        memory: Option<&str>,
+        cpu: Option<&str>,
+    ) -> Result<(), PlanError> {
+        let (index, name) = self.namespace_object()?;
+        if !self.adopted(index) {
+            return Err(error(
+                ErrorKind::Conflict,
+                "not_adopted",
+                format!("{name} is not a project; adopt it first."),
+            ));
+        }
+        let memory = wanted(memory);
+        let cpu = wanted(cpu);
+        for (value, code, what) in [
+            (memory, "build_memory", "build memory"),
+            (cpu, "build_cpu", "build CPU"),
         ] {
+            if value.is_some_and(|v| !is_build_quantity(v)) {
+                return Err(error(
+                    ErrorKind::BadRequest,
+                    &format!("{code}_invalid"),
+                    format!(
+                        "The {what} is not an amount above zero; write it like 2Gi, 512Mi, 2 or 500m."
+                    ),
+                ));
+            }
+        }
+        let capacity = self.input.node_capacity;
+        if memory.is_some() || cpu.is_some() {
+            match capacity {
+                Some(capacity) => {
+                    let over = |value: Option<&str>, limit: u64, bound: fn(&str) -> Option<u64>| {
+                        value.and_then(bound).is_some_and(|n| n > limit)
+                    };
+                    if over(memory, capacity.memory_bytes, quantity::bytes) {
+                        return Err(error(
+                            ErrorKind::Invalid,
+                            "build_memory_too_large",
+                            format!(
+                                "The build memory is more than the largest node has to give ({}).",
+                                bytes_text(capacity.memory_bytes)
+                            ),
+                        ));
+                    }
+                    if over(cpu, capacity.cpu_millicores, quantity::millicores) {
+                        return Err(error(
+                            ErrorKind::Invalid,
+                            "build_cpu_too_large",
+                            format!(
+                                "The build CPU is more than the largest node has to give ({}).",
+                                cpu_text(capacity.cpu_millicores)
+                            ),
+                        ));
+                    }
+                }
+                None => self.warnings.push(Warning::NodeCapacityUnknown),
+            }
+        }
+        self.set_annotations(
+            index,
+            &name,
+            [
+                (ANNOTATION_BUILD_MEMORY, memory),
+                (ANNOTATION_BUILD_CPU, cpu),
+            ],
+            "already has these build limits.",
+        )
+    }
+
+    /// Sets each annotation to its value, or removes it when there is none; those already so
+    /// are left alone, and nothing to change is `unchanged`.
+    fn set_annotations<const N: usize>(
+        &mut self,
+        index: usize,
+        name: &str,
+        wanted: [(&str, Option<&str>); N],
+        unchanged: &str,
+    ) -> Result<(), PlanError> {
+        let mut changed = false;
+        for (key, value) in wanted {
             let current = self.current(index);
             let path = pointer(&["metadata", "annotations", key]);
             let before = current.pointer(&path).cloned();
@@ -324,10 +420,19 @@ impl Planner<'_> {
             Err(error(
                 ErrorKind::BadRequest,
                 "unchanged",
-                format!("{name} already has these details."),
+                format!("{name} {unchanged}"),
             ))
         }
     }
+}
+
+fn bytes_text(bytes: u64) -> String {
+    const MI: u64 = 1 << 20;
+    format!("{}Mi", bytes / MI)
+}
+
+fn cpu_text(millicores: u64) -> String {
+    format!("{millicores}m")
 }
 
 /// A detail as asked: trimmed, and absent when blank.

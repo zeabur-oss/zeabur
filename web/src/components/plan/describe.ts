@@ -107,6 +107,7 @@ const plainSentence: Partial<Record<Change["op"], PlainKey>> = {
   unadopt: "confirm.unadopt",
   deleteProject: "confirm.deleteProject",
   details: "confirm.details",
+  buildLimits: "confirm.buildLimits",
   clusterTools: "confirm.clusterTools",
 }
 
@@ -859,6 +860,7 @@ const plainAction: Partial<Record<Change["op"], PlainKey>> = {
   unadopt: "action.unadopt",
   deleteProject: "action.deleteProject",
   details: "action.saveDetails",
+  buildLimits: "action.saveBuildLimits",
   debugContainer: "action.openDebugTerminal",
   clusterTools: "action.openToolsTerminal",
 }

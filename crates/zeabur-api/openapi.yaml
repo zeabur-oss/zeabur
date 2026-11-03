@@ -6185,6 +6185,28 @@ components:
             - details
       - type: object
         description: |-
+          Set the project's build limits, the Namespace's `builder.zeabur.com/build-memory` and
+          `…/build-cpu` annotations: each one left out (or blank) is removed, so the cluster's
+          default applies. A value is a Kubernetes quantity above zero.
+        required:
+        - op
+        properties:
+          buildCpu:
+            type:
+            - string
+            - "null"
+            description: The CPU limit of one build, such as `2` or `500m`.
+          buildMemory:
+            type:
+            - string
+            - "null"
+            description: The memory limit of one build, such as `2Gi`.
+          op:
+            type: string
+            enum:
+            - buildLimits
+      - type: object
+        description: |-
           Make a scheduled task from a service: a CronJob that runs a command in a copy of one of
           its containers (see the `tasks` module).
         required:
@@ -12463,6 +12485,17 @@ components:
             - "null"
             description: The Ingress whose certificates come from elsewhere, for `certificatesElsewhere`.
       - type: object
+        description: >-
+          The nodes could not be read, so a build limit was not checked against the
+          largest node.
+        required:
+        - code
+        properties:
+          code:
+            type: string
+            enum:
+            - nodeCapacityUnknown
+      - type: object
         description: The Secret's values could not be read, so its diff shows only which keys change.
         required:
         - name
@@ -13735,6 +13768,22 @@ components:
           items:
             $ref: "#/components/schemas/BackupTarget"
           description: Claims and databases no active schedule covers.
+    ProjectBuildLimits:
+      type: object
+      description: |-
+        A project's build limits, as its namespace's annotations give them. Each is absent when its
+        annotation is missing, blank or not a quantity (Builder ignores such a value).
+      properties:
+        buildCpu:
+          type:
+          - string
+          - "null"
+          description: The CPU limit of one build, such as `2` or `500m`.
+        buildMemory:
+          type:
+          - string
+          - "null"
+          description: The memory limit of one build, such as `2Gi`.
     ProjectBuildRun:
       allOf:
       - $ref: "#/components/schemas/ZeaburBuilderRun"
@@ -14073,6 +14122,8 @@ components:
       allOf:
       - $ref: "#/components/schemas/ProjectDetails"
         description: The name, description and icon given to it.
+      - $ref: "#/components/schemas/ProjectBuildLimits"
+        description: The memory and CPU limits of one build, when the project sets them.
       - type: object
         required:
         - origin
@@ -14097,8 +14148,8 @@ components:
             $ref: "#/components/schemas/Permission"
             description: |-
               Whether the person may adopt it or let it go: patch it, and where the admission policy
-              guards its labels, also `zeabur-manage` it. Changing its Pod Security level needs the
-              same.
+              guards its labels, also `zeabur-manage` it. Changing its Pod Security level or its build
+              limits needs the same.
           canChange:
             $ref: "#/components/schemas/Permission"
             description: "Whether the person may patch the Namespace: change its details."
@@ -14112,6 +14163,24 @@ components:
             description: |-
               The chart's admission policy is installed: patching the Namespace without `zeabur-manage`
               changes only its details.
+          maxBuildCpuMillicores:
+            type:
+            - integer
+            - "null"
+            format: int64
+            description: |-
+              The most CPU a build limit may ask for, the largest allocatable CPU of a node, in
+              millicores; absent when the nodes could not be read.
+            minimum: 0
+          maxBuildMemoryBytes:
+            type:
+            - integer
+            - "null"
+            format: int64
+            description: |-
+              The most memory a build limit may ask for, the largest allocatable memory of a node, in
+              bytes; absent when the nodes could not be read.
+            minimum: 0
           name:
             type: string
             description: Its name.

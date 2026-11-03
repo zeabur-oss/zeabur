@@ -60,6 +60,14 @@ Zeabur 只替 Namespace 加上 `zeabur.com/project: "true"` 標籤，裡面的�
 
 按**儲存詳細資料**，檢查後套用。這三項存在 Namespace 的 annotation 上。專案的開發者可以改這三項，其他 label 和 annotation 只有管理員能改。
 
+## 設定建置的記憶體和 CPU
+
+在專案**設定**的**建置**，可以設定這個專案每次建置最多能用的記憶體和 CPU，例如 `2Gi` 和 `2`。留空就用 Zeabur Builder 的預設值。填的數量不能超過叢集裡最大的節點能給的量。按**儲存建置上限**並套用，之後開始的建置就會用新的值。
+
+建置因為記憶體不夠而失敗時，失敗訊息會連到這一節。改建置上限要有那個 Namespace 的 `patch` 和 `zeabur-manage` 權限，所以開發者看得到，但不能儲存。
+
+這兩個值就是 Namespace 的 `builder.zeabur.com/build-memory` 和 `builder.zeabur.com/build-cpu` 註解。
+
 ## 隔離其他專案
 
 到專案**設定**的**網路**，**其他專案**一列說明目前的狀態：

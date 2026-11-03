@@ -47,6 +47,7 @@ use deletions::{
 };
 use edits::edited_objects;
 use namespace::compute_namespace;
+pub(super) use namespace::node_capacity;
 use refusals::refused;
 use releases::releases_to_roll_back;
 use secrets::secret_values;
@@ -225,6 +226,7 @@ async fn compute(
             issuers: &issuers,
             certificates: &certificates,
             platform_namespaces: false,
+            node_capacity: None,
             build_registry,
         },
         request,

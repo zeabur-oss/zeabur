@@ -6,6 +6,7 @@ import {
   builtContainers,
   durationOf,
   failureText,
+  ranOutOfMemory,
   reasonKey,
   refusedCredentials,
   repositoryOf,
@@ -197,5 +198,16 @@ describe("reasonKey", () => {
   test("a reason Zeabur does not know shares one sentence", () => {
     expect(reasonKey("SomethingNew")).toBe("builds.reason.other")
     expect(reasonKey(undefined)).toBe("builds.reason.other")
+  })
+})
+
+describe("a build that ran out of memory", () => {
+  const failed = (reason: string): BuildRun =>
+    ({ name: "r", build: "web", phase: "Failed", reason }) as BuildRun
+
+  test("is told from other failures by the run's reason", () => {
+    expect(ranOutOfMemory(build(), failed("OutOfMemory"))).toBe(true)
+    expect(ranOutOfMemory(build(), failed("BuildFailed"))).toBe(false)
+    expect(ranOutOfMemory(build(), undefined)).toBe(false)
   })
 })
