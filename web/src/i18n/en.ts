@@ -1048,6 +1048,9 @@ export const en = {
   "net.addPrivate": "Add a private address",
   "net.privatePort": "Port",
   "net.privatePortHint": "The port your app listens on.",
+  "net.imageDeclares": (n: number, ports: string) =>
+    `The image declares ${n === 1 ? "port" : "ports"} ${ports}.`,
+  "net.addImagePort": (port: number) => `Add a private address on port ${port}`,
   "net.privateWillBe": (address: string) => `Other services will reach it at ${address}.`,
   "net.privateAlso": (ports: string) =>
     `It also gets the other ports its containers declare: ${ports}.`,

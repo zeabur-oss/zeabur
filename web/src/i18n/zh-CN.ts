@@ -970,6 +970,8 @@ export const zhCN: Messages = {
   "net.addPrivate": "添加私有地址",
   "net.privatePort": "端口",
   "net.privatePortHint": "应用监听的端口。",
+  "net.imageDeclares": (_n, ports) => `镜像声明了端口 ${ports}。`,
+  "net.addImagePort": (port) => `用端口 ${port} 添加私有地址`,
   "net.privateWillBe": (address) => `其他服务会用 ${address} 连到它。`,
   "net.privateAlso": (ports) => `容器声明的其他端口也会一起加上：${ports}。`,
   "net.alsoDomain": "同时添加公开域名",

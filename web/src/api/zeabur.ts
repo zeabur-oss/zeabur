@@ -8128,6 +8128,12 @@ export type ZeaburBuilderBuild = {
   /** The build variables, by name. A literal value is left out. */
   env: ZeaburBuilderEnv[]
   /**
+   * The ports that image declares, `3000/tcp` each (`status.exposedPorts`); none when it
+   * declares none.
+   * @nullable
+   */
+  exposedPorts?: string[] | null
+  /**
    * The branch or tag it follows; `HEAD` (or none) follows the repository's default branch.
    * @nullable
    */

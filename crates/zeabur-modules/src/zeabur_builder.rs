@@ -84,6 +84,9 @@ pub struct ZeaburBuilderBuild {
     pub suspended: bool,
     /// The newest successful image, `repository:tag@sha256:…`.
     pub latest_image: Option<String>,
+    /// The ports that image declares, `3000/tcp` each (`status.exposedPorts`); none when it
+    /// declares none.
+    pub exposed_ports: Option<Vec<String>>,
     /// The commit it was built from.
     pub latest_revision: Option<String>,
     /// The commit the ref points at.
@@ -239,6 +242,17 @@ fn condition<'a>(object: &'a DynamicObject, kind: &str) -> Option<&'a serde_json
         .find(|c| c["type"] == kind)
 }
 
+fn strings(object: &DynamicObject, pointer: &str) -> Option<Vec<String>> {
+    let found: Vec<String> = object
+        .data
+        .pointer(pointer)?
+        .as_array()?
+        .iter()
+        .filter_map(|v| v.as_str().map(str::to_owned))
+        .collect();
+    (!found.is_empty()).then_some(found)
+}
+
 fn field(value: Option<&serde_json::Value>, key: &str) -> Option<String> {
     value
         .and_then(|v| v[key].as_str())
@@ -279,6 +293,7 @@ pub fn builds(objects: &[DynamicObject], now: Option<Timestamp>) -> Vec<ZeaburBu
                     .and_then(serde_json::Value::as_bool)
                     .unwrap_or(false),
                 latest_image,
+                exposed_ports: strings(b, "/status/exposedPorts"),
                 latest_revision: text(b, "/status/latestRevision"),
                 remote_revision: text(b, "/status/remoteRevision"),
                 ready: field(ready, "status"),
@@ -505,12 +520,17 @@ mod tests {
                 "notify": [{"type": "keel", "url": "http://keel:9300/v1/webhooks/native"},
                            {"type": "generic", "url": "https://example.com/hook"}]},
             "status": {"latestImage": "zot:5000/demo/web:main-1-abc@sha256:00",
+                "exposedPorts": ["3000/tcp", "53/udp"],
                 "conditions": [{"type": "Ready", "status": "True", "reason": "Succeeded",
                     "lastTransitionTime": "2026-10-23T08:00:00Z"}]}
         }));
         let found = builds(&[build], None);
         assert_eq!(found[0].repository.as_deref(), Some("zot:5000/demo/web"));
         assert_eq!(found[0].ready.as_deref(), Some("True"));
+        assert_eq!(
+            found[0].exposed_ports.as_deref(),
+            Some(&["3000/tcp".to_owned(), "53/udp".to_owned()][..])
+        );
         assert_eq!(
             found[0].keel_webhooks,
             ["http://keel:9300/v1/webhooks/native"]

@@ -21,6 +21,7 @@ import SlidersHorizontalIcon from "~icons/ph/sliders-horizontal"
 import TrashIcon from "~icons/ph/trash"
 
 import {
+  buildsQuery,
   clusterIssuersQuery,
   clusterQuery,
   creatableQuery,
@@ -79,6 +80,7 @@ import {
   declaredPorts,
   exposeCommand,
   exposureOf,
+  imagePorts,
   isPort,
   likelyPort,
   PORT_PLACEHOLDER,
@@ -730,6 +732,63 @@ type PrivateAddressProps = {
   onDomain: () => void
 }
 
+function privateAsk(
+  t: ReturnType<typeof useT>,
+  service: Service,
+  selector: Record<string, string>,
+  port: number,
+): PlanAsk {
+  return {
+    title: t("title.addPrivate", service.name),
+    service: { kind: service.kind, name: service.name },
+    changes: [
+      {
+        op: "create",
+        object: privateService(service, selector, port) as unknown as Record<string, never>,
+      },
+    ],
+    notes: [t("net.privateWillBe", privateAddress(service, port))],
+  }
+}
+
+function ImagePortOffer({
+  project,
+  service,
+  managed,
+  gate,
+  onPick,
+}: {
+  project: string
+  service: Service
+  managed?: string
+  gate: Gate
+  onPick: (port: number) => void
+}) {
+  const t = useT()
+  const builds = useQuery(buildsQuery(project)).data?.builds
+  const ports = imagePorts(service, builds ?? [])
+  if (ports.length === 0) return null
+  return (
+    <div className="mt-3 flex w-full flex-wrap items-center gap-x-3 gap-y-1.5">
+      <span className="type-meta text-muted-foreground">
+        {t("net.imageDeclares", ports.length, t("common.list", ports.map(String)))}
+      </span>
+      {ports.map((p) => (
+        <Managed key={p} tool={managed} gate={gate}>
+          <Button
+            variant="outline"
+            size="xs"
+            disabled={managed !== undefined}
+            onClick={() => onPick(p)}
+          >
+            {t("net.addImagePort", p)}
+          </Button>
+        </Managed>
+      ))}
+    </div>
+  )
+}
+
 function PrivateAddressFields({
   project,
   service,
@@ -752,27 +811,21 @@ function PrivateAddressFields({
     .filter((p) => p.port !== number || p.protocol)
     .map((p) => (p.protocol ? `${p.port}/${p.protocol}` : String(p.port)))
   const command = exposeCommand(service, selector, valid ? number : undefined)
+  const review = (chosen: number) => planner.plan(privateAsk(t, service, selector, chosen))
   return (
     <>
+      <ImagePortOffer
+        project={project}
+        service={service}
+        managed={managed}
+        gate={gate}
+        onPick={review}
+      />
       <form
         className="mt-3 flex w-full flex-col gap-3"
         onSubmit={(event) => {
           event.preventDefault()
-          if (!valid) return
-          planner.plan({
-            title: t("title.addPrivate", service.name),
-            service: { kind: service.kind, name: service.name },
-            changes: [
-              {
-                op: "create",
-                object: privateService(service, selector, number) as unknown as Record<
-                  string,
-                  never
-                >,
-              },
-            ],
-            notes: [t("net.privateWillBe", privateAddress(service, number))],
-          })
+          if (valid) review(number)
         }}
       >
         <div className="flex flex-wrap items-end gap-2">
