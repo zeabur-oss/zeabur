@@ -14,6 +14,9 @@ import {
   buildOptionsChanges,
   buildOptionsOf,
   buildProfile,
+  defaultPort,
+  derivedMethod,
+  dockerfileAt,
   createGitService,
   deployKeyHost,
   deployKeyPage,
@@ -35,6 +38,7 @@ const form = (patch: Partial<GitService>): GitService => ({
   url: "https://github.com/acme/site",
   name: "site",
   port: "3000",
+  publicUrl: false,
   ...patch,
 })
 
@@ -259,6 +263,17 @@ describe("the objects", () => {
     })
   })
 
+  test("a new Git service listens on 8080 with a public URL, and a cleared port stays a background service", () => {
+    const fresh = { ...newGitService(), url: "https://github.com/acme/site", name: "site" }
+    const objects = gitObjects({ ...fresh, host: "site.example.com" }, "shop", "zot:5000", {})
+    expect(find(objects, "Service").spec.ports[0].port).toBe(8080)
+    expect(find(objects, "Secret").stringData).toEqual({ PORT: "8080" })
+    expect(find(objects, "Ingress").spec.rules[0].host).toBe("site.example.com")
+
+    const background = gitObjects({ ...fresh, port: "", publicUrl: false }, "shop", "zot:5000", {})
+    expect(background.some((o) => ["Service", "Ingress"].includes((o as Object).kind))).toBe(false)
+  })
+
   test("a public domain adds an Ingress", () => {
     const objects = gitObjects(
       form({ publicUrl: true, host: "site.example.com" }),
@@ -413,5 +428,30 @@ describe("the Builds tab", () => {
     expect(buildProblem(failed, run("Failed"))).toEqual(problem)
     expect(buildProblem(failed, run("Building"))).toBeUndefined()
     expect(buildProblem(build({}), undefined)).toBeUndefined()
+  })
+})
+
+describe("the Dockerfile's path", () => {
+  test("is found at the Dockerfile's path inside the directory", () => {
+    expect(dockerfileAt("", "")).toBe("Dockerfile")
+    expect(dockerfileAt("./apps/web/", "docker/Dockerfile.prod")).toBe(
+      "apps/web/docker/Dockerfile.prod",
+    )
+  })
+})
+
+describe("the port of a method", () => {
+  test("Railpack starts at 8080; a Dockerfile starts with no network", () => {
+    expect(defaultPort("railpack")).toBe("8080")
+    expect(defaultPort("dockerfile")).toBe("")
+  })
+})
+
+describe("the method of a folder", () => {
+  test("is Dockerfile when the folder has one, until the person chooses", () => {
+    expect(derivedMethod(false, "railpack", true)).toBe("dockerfile")
+    expect(derivedMethod(false, "railpack", false)).toBe("railpack")
+    expect(derivedMethod(true, "railpack", true)).toBe("railpack")
+    expect(derivedMethod(true, "dockerfile", false)).toBe("dockerfile")
   })
 })

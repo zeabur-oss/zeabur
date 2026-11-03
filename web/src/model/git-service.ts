@@ -62,6 +62,23 @@ export interface GitService extends Pick<
   installationId?: number
 }
 
+/** What Railpack's apps listen on once Zeabur sets `PORT`; the form starts with it. */
+export const DEFAULT_BUILT_PORT = "8080"
+
+/** The method the form builds with: the person's once they choose, else Dockerfile when the
+ * folder has one at the path. */
+export const derivedMethod = (chosen: boolean, method: BuildMethod, dockerfileFound: boolean) =>
+  chosen ? method : dockerfileFound ? "dockerfile" : "railpack"
+
+/** The port a service listens on before the person types one: Railpack's, and none for a
+ * Dockerfile (no network). */
+export const defaultPort = (method: BuildMethod) =>
+  method === "railpack" ? DEFAULT_BUILT_PORT : ""
+
+/** Where the Dockerfile is in the repository or folder: `dockerfile` is relative to `directory`. */
+export const dockerfileAt = (directory: string, dockerfile: string) =>
+  [cleanPath(directory), cleanPath(dockerfile) || "Dockerfile"].filter(Boolean).join("/")
+
 export const newGitService = (): GitService => ({
   url: "",
   branch: "",
@@ -73,8 +90,8 @@ export const newGitService = (): GitService => ({
   username: "",
   token: "",
   name: "",
-  port: "",
-  publicUrl: false,
+  port: DEFAULT_BUILT_PORT,
+  publicUrl: true,
   host: "",
   variables: [],
   size: "small",

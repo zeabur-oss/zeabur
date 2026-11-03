@@ -14,11 +14,20 @@ import { useT } from "@/i18n"
 import {
   buildMethods,
   buildProfile,
+  defaultPort,
+  derivedMethod,
+  dockerfileAt,
   type BuildMethod,
   type BuiltService,
   type GitService,
 } from "@/model/git-service"
-import { imageOptions, parseEnv, rightsOf, suggestedHost } from "@/model/image-service"
+import {
+  hostPlaceholder,
+  imageOptions,
+  parseEnv,
+  rightsOf,
+  suggestedHost,
+} from "@/model/image-service"
 import type { Profile } from "@/model/pod-security"
 import type { FieldProblem } from "@/model/image-service"
 import {
@@ -42,6 +51,8 @@ export type Shown = (problem: unknown, text: () => string) => string[]
 
 interface Choices {
   named: boolean
+  methoded: boolean
+  ported: boolean
   hosted: boolean
   securitySet: boolean
 }
@@ -53,6 +64,7 @@ function resolveBuilt<F extends BuiltForm>(
   context: {
     project: string
     suggested: string
+    dockerfileFound: boolean
     options: ReturnType<typeof imageOptions>
     suffix: string | undefined
     env: ReturnType<typeof parseEnv>
@@ -60,24 +72,27 @@ function resolveBuilt<F extends BuiltForm>(
   },
 ) {
   const name = choices.named ? form.name : context.suggested
-  const port = context.options.port ? form.port.trim() : ""
+  const method = derivedMethod(choices.methoded, form.method, context.dockerfileFound)
+  const portText = choices.ported ? form.port : defaultPort(method)
+  const port = context.options.port ? portText.trim() : ""
   const publicUrl = context.options.publicUrl && port !== "" && form.publicUrl
   const host = choices.hosted ? form.host : suggestedHost(name, context.project, context.suffix)
-  const security = choices.securitySet ? form.security : buildProfile(form.method)
+  const security = choices.securitySet ? form.security : buildProfile(method)
   const resolved: F = {
     ...form,
+    method,
     name,
     port,
     publicUrl,
     host,
     variables: context.env.variables,
-    dockerfile: form.method === "dockerfile" ? form.dockerfile : "",
+    dockerfile: method === "dockerfile" ? form.dockerfile : "",
     buildVariables: context.buildEnv.variables.flatMap((v) =>
       "value" in v ? [{ name: v.name, value: v.value }] : [],
     ),
     security,
   }
-  return { name, port, publicUrl, host, security, resolved }
+  return { name, method, port, portText, publicUrl, host, security, resolved }
 }
 
 /** `suggested` gives the name until the person types one, from the form and the names taken. */
@@ -85,6 +100,8 @@ export function useBuiltForm<F extends BuiltForm>(
   project: string,
   initial: () => F,
   suggested: (form: F, taken: string[]) => string,
+  /** Whether the repository or folder has a file at a path, when the form can tell. */
+  hasFile: (path: string) => boolean = () => false,
 ) {
   const cluster = useQuery(clusterQuery).data
   const domains = cluster?.domains ?? {}
@@ -95,6 +112,8 @@ export function useBuiltForm<F extends BuiltForm>(
   const [buildEnv, setBuildEnv] = useState("")
   const [choices, setChoices] = useState<Choices>({
     named: false,
+    methoded: false,
+    ported: false,
     hosted: false,
     securitySet: false,
   })
@@ -104,11 +123,13 @@ export function useBuiltForm<F extends BuiltForm>(
     setChoices((c) => ({ ...c, [choice]: true }))
     set(patch)
   }
+  const dockerfileFound = hasFile(dockerfileAt(form.directory, form.dockerfile))
   const parsedEnv = parseEnv(env)
   const parsedBuildEnv = parseEnv(buildEnv)
   const derived = resolveBuilt(form, choices, {
     project,
     suggested: suggested(form, taken),
+    dockerfileFound,
     options,
     suffix: domains.suffixes?.[0],
     env: parsedEnv,
@@ -130,6 +151,12 @@ export function useBuiltForm<F extends BuiltForm>(
     badEnv: parsedEnv.bad,
     badBuildEnv: parsedBuildEnv.bad,
     typeName: (name: string) => typed("named", { name } as Partial<F>),
+    chooseMethod: (method: BuildMethod) => typed("methoded", { method } as Partial<F>),
+    // Typing a path keeps Dockerfile even while the path does not match a file yet.
+    typeDockerfile: (dockerfile: string) =>
+      typed("methoded", { method: "dockerfile", dockerfile } as Partial<F>),
+    found: dockerfileFound && !choices.methoded,
+    typePort: (port: string) => typed("ported", { port } as Partial<F>),
     typeHost: (host: string) => typed("hosted", { host } as Partial<F>),
     chooseSecurity: (security: F["security"]) => typed("securitySet", { security } as Partial<F>),
     tried,
@@ -183,16 +210,22 @@ export function MethodField({
   source: "git" | "upload"
 }) {
   const t = useT()
-  const method = built.form.method
+  const method = built.method
   return (
     <FormField
       label={t("add.field.method")}
-      hint={t(source === "upload" ? `upload.methodHint.${method}` : `add.methodHint.${method}`)}
+      hint={t(
+        source === "upload"
+          ? built.found
+            ? "upload.methodHint.found"
+            : `upload.methodHint.${method}`
+          : `add.methodHint.${method}`,
+      )}
     >
       <Select
         size="sm"
-        value={built.form.method}
-        onValueChange={(method) => built.set({ method: method as BuildMethod })}
+        value={built.method}
+        onValueChange={(method) => built.chooseMethod(method as BuildMethod)}
         items={buildMethods.map((m) => ({ value: m, label: t(`add.method.${m}`) }))}
       />
     </FormField>
@@ -247,6 +280,7 @@ export function Toggle({
 
 /** "Public URL": the switch and, when on, the host; nothing for a service with no port. */
 export function PublicUrlFields({
+  project,
   port,
   canPublish,
   on,
@@ -256,6 +290,7 @@ export function PublicUrlFields({
   domains,
   error,
 }: {
+  project: string
   port: string
   canPublish: boolean
   on: boolean
@@ -289,7 +324,7 @@ export function PublicUrlFields({
             size="sm"
             mono
             value={host}
-            placeholder={domains.suffixes?.length ? undefined : "web.example.com"}
+            placeholder={hostPlaceholder(project, domains.suffixes?.[0])}
             autoComplete="off"
             spellCheck={false}
             onChange={(event) => onHost(event.target.value.trim())}
@@ -330,8 +365,9 @@ export function MoreSection({
         <MoreFields
           project={built.project}
           source={source}
-          form={built.form}
+          form={{ ...built.form, method: built.method }}
           set={built.set}
+          onDockerfile={built.typeDockerfile}
           security={built.security}
           onSecurity={built.chooseSecurity}
           env={built.env}
@@ -355,6 +391,7 @@ function MoreFields({
   source = "git",
   form,
   set,
+  onDockerfile,
   security,
   onSecurity,
   env,
@@ -370,6 +407,7 @@ function MoreFields({
   source?: "git" | "upload"
   form: BuildFields
   set: (patch: Partial<BuildFields>) => void
+  onDockerfile: (dockerfile: string) => void
   security: Profile
   onSecurity: (profile: Profile) => void
   env: string
@@ -416,7 +454,7 @@ function MoreFields({
               placeholder="Dockerfile"
               autoComplete="off"
               spellCheck={false}
-              onChange={(event) => set({ dockerfile: event.target.value })}
+              onChange={(event) => onDockerfile(event.target.value)}
             />
           </FormField>
         ) : null}
@@ -468,9 +506,9 @@ export function BuiltPort({ built, problems }: { built: BuiltFormState; problems
   if (!built.options.port) return null
   return (
     <PortField
-      value={built.form.port}
-      onChange={(port) => built.set({ port })}
-      hint={t("add.gitPortHint")}
+      value={built.portText}
+      onChange={built.typePort}
+      hint={t(built.method === "railpack" ? "add.railpackPortHint" : "add.dockerfilePortHint")}
       error={built.shown(problems.port, () => t("add.problem.port.invalid"))}
     />
   )
@@ -481,6 +519,7 @@ export function BuiltPublicUrl({ built, problems }: { built: BuiltFormState; pro
   const t = useT()
   return (
     <PublicUrlFields
+      project={built.project}
       port={built.port}
       canPublish={built.options.publicUrl}
       on={built.form.publicUrl}

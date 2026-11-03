@@ -2499,7 +2499,9 @@ export const zhTW: Messages = {
   "add.methodHint.railpack":
     "自動判斷語言，不需要 Dockerfile。儲存庫裡有 Dockerfile 時，請改選 Dockerfile。",
   "add.methodHint.dockerfile": "用根目錄裡的 Dockerfile 建置。其他檔案可在「更多設定」指定。",
-  "add.gitPortHint": "應用程式監聽的連接埠，也會放進 PORT。留空表示不接受連線，例如背景服務。",
+  "add.dockerfilePortHint": "應用程式監聽的連接埠。留空表示不接受連線，例如背景服務。",
+  "add.railpackPortHint":
+    "Railpack 建置的應用程式會監聽 PORT，Zeabur 會把它設成這個連接埠。留空表示不接受連線，例如背景服務。",
   "add.access": "儲存庫存取",
   "add.access.public": "公開儲存庫",
   "add.access.deployKey": "部署金鑰",
@@ -2586,6 +2588,7 @@ export const zhTW: Messages = {
   "upload.problem.archiveBomb": "壓縮檔解壓縮後超過 1 GiB。",
   "upload.moreSummary": "要建置的資料夾、環境變數、建置變數、規格和安全性。",
   "upload.directoryHint": "要建置上傳內容裡的哪個資料夾。留空：整份上傳內容。",
+  "upload.methodHint.found": "資料夾裡有 Dockerfile。",
   "upload.methodHint.railpack":
     "自動判斷語言，不需要 Dockerfile。資料夾裡有 Dockerfile 時，請改選 Dockerfile。",
   "upload.methodHint.dockerfile":

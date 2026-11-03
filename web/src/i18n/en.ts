@@ -2730,8 +2730,9 @@ export const en = {
     "Detects the language and builds without a Dockerfile. Pick Dockerfile if the repository has one.",
   "add.methodHint.dockerfile":
     "Builds the Dockerfile in the root directory. Name another file under More settings.",
-  "add.gitPortHint":
-    "The port the app listens on, also passed as PORT. Leave empty for a background service.",
+  "add.dockerfilePortHint": "The port the app listens on. Leave empty for a background service.",
+  "add.railpackPortHint":
+    "Railpack apps listen on PORT, which Zeabur sets to this port. Leave empty for a background service.",
   "add.access": "Repository access",
   "add.access.public": "Public repository",
   "add.access.deployKey": "Deploy key",
@@ -2828,6 +2829,7 @@ export const en = {
   "upload.problem.archiveBomb": "The archive holds more than 1 GiB once unpacked.",
   "upload.moreSummary": "Folder to build, variables, build variables, size and security.",
   "upload.directoryHint": "The folder to build inside the upload. Empty: the whole upload.",
+  "upload.methodHint.found": "Found a Dockerfile in the folder.",
   "upload.methodHint.railpack":
     "Detects the language and builds without a Dockerfile. Pick Dockerfile if the folder has one.",
   "upload.methodHint.dockerfile":

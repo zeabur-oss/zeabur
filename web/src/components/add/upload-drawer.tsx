@@ -15,7 +15,7 @@ import { PlanDrawer, ReviewFooter, ReviewForm } from "@/components/plan/plan-dra
 import { usePlanStep } from "@/components/plan/planner"
 import { useT } from "@/i18n"
 import { serviceLink } from "@/lib/place"
-import { nameFromImage } from "@/model/image-service"
+import { builtName } from "@/model/image-service"
 import {
   createUploadService,
   newUploadService,
@@ -32,8 +32,11 @@ export function UploadDrawer({ project, onClose }: { project: string; onClose: (
   const folder = useFolder()
   const [request] = useState(newRequest)
   const ready = folder.state.phase === "ready" ? folder.state : undefined
-  const built = useBuiltForm<UploadService>(project, newUploadService, (_, taken) =>
-    ready?.name ? nameFromImage(ready.name.toLowerCase(), taken) : "",
+  const built = useBuiltForm<UploadService>(
+    project,
+    newUploadService,
+    (_, taken) => builtName(ready?.name.toLowerCase() ?? "", taken),
+    (path) => ready?.dockerfiles.has(path) ?? false,
   )
   const { name } = built
   const problems = uploadProblems(built.resolved, {

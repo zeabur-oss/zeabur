@@ -23,7 +23,7 @@ import { Spinner } from "@zeabur-oss/design-system/components/spinner"
 type FolderState =
   | { phase: "empty" }
   | { phase: "reading" }
-  | { phase: "ready"; packed: Packed; name: string }
+  | { phase: "ready"; packed: Packed; name: string; dockerfiles: Set<string> }
   | { phase: "failed"; message: string }
 
 const ARCHIVE_PROBLEMS = {
@@ -66,7 +66,7 @@ export function useFolder() {
       setState(
         packed.files === 0
           ? { phase: "failed", message: t("upload.problem.empty") }
-          : { phase: "ready", packed, name },
+          : { phase: "ready", packed, name, dockerfiles: dockerfilesOf(packed.paths ?? []) },
       )
     } catch (error) {
       setState(fail(error))
@@ -82,7 +82,7 @@ export function useFolder() {
       setState(
         packed.files === 0
           ? { phase: "failed", message: t("upload.problem.empty") }
-          : { phase: "ready", packed, name },
+          : { phase: "ready", packed, name, dockerfiles: new Set() },
       )
     } catch (error) {
       setState(fail(error))
@@ -107,6 +107,10 @@ export function useFolder() {
     clear: () => setState({ phase: "empty" }),
   }
 }
+
+/** The Dockerfiles among the paths the archive keeps. */
+const dockerfilesOf = (paths: readonly string[]) =>
+  new Set(paths.filter((path) => /(^|\/)[^/]*dockerfile[^/]*$/i.test(path)))
 
 const withoutArchive = (name: string) => name.replace(/\.(zip|tar\.gz|tgz)$/i, "")
 

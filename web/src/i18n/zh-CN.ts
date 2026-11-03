@@ -2494,7 +2494,9 @@ export const zhCN: Messages = {
   "add.methodHint.railpack":
     "自动识别语言，不需要 Dockerfile。仓库里有 Dockerfile 时，请改选 Dockerfile。",
   "add.methodHint.dockerfile": "用根目录里的 Dockerfile 构建。其他文件可在“更多设置”指定。",
-  "add.gitPortHint": "应用监听的端口，也会放进 PORT。留空表示不接受连接，例如后台服务。",
+  "add.dockerfilePortHint": "应用程序监听的端口。留空表示不接受连接，例如后台服务。",
+  "add.railpackPortHint":
+    "Railpack 构建的应用会监听 PORT，Zeabur 会把它设成这个端口。留空表示不接受连接，例如后台服务。",
   "add.access": "仓库访问",
   "add.access.public": "公开仓库",
   "add.access.deployKey": "部署密钥",
@@ -2581,6 +2583,7 @@ export const zhCN: Messages = {
   "upload.problem.archiveBomb": "压缩包解压后超过 1 GiB。",
   "upload.moreSummary": "要构建的文件夹、环境变量、构建变量、规格和安全性。",
   "upload.directoryHint": "要构建上传内容里的哪个文件夹。留空：整份上传内容。",
+  "upload.methodHint.found": "文件夹里有 Dockerfile。",
   "upload.methodHint.railpack":
     "自动识别语言，不需要 Dockerfile。文件夹里有 Dockerfile 时，请改选 Dockerfile。",
   "upload.methodHint.dockerfile": "用文件夹最上层的 Dockerfile 构建。其他文件可在“更多设置”指定。",

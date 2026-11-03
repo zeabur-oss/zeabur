@@ -71,6 +71,15 @@ describe("pack", () => {
     expect(packed.left).toBe(5)
   })
 
+  test("lists the paths it keeps, so an ignored Dockerfile is not offered", async () => {
+    const packed = await pack([
+      file("Dockerfile", "FROM scratch"),
+      file(".dockerignore", "Dockerfile\n"),
+      file("index.js"),
+    ])
+    expect(packed.paths).toEqual([".dockerignore", "index.js"])
+  })
+
   test("a path longer than a tar header holds survives", async () => {
     const path = `${"deep/".repeat(30)}file-with-a-long-name.txt`
     const found = await entries((await pack([file(path, "x")])).blob)

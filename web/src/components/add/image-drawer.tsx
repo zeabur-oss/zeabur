@@ -242,6 +242,7 @@ export function ImageDrawer({ project, onClose }: { project: string; onClose: ()
           ) : null}
         </div>
         <PublicUrlFields
+          project={project}
           port={port}
           canPublish={options.publicUrl}
           on={form.publicUrl}
