@@ -6,8 +6,9 @@ use std::path::Path;
 
 use sha2::{Digest as _, Sha256};
 
-use super::{DevCluster, cluster};
+use super::{DevCluster, cluster, identity_release};
 use crate::checkout::{self, Pin};
+use crate::output;
 
 pub(crate) const BUSYBOX: &str = "busybox:1.37";
 const IDENTITY_DEV: &str = "docker.io/library/zeabur-identity:dev";
@@ -35,49 +36,36 @@ pub(crate) struct Built {
     pub(crate) import: Vec<String>,
 }
 
-/// Builds Zeabur Identity (and links its `zeabur-identityctl`) and, unless `zeabur_image` is
-/// given, Zeabur and Zeabur Proxy from this checkout.
+/// Zeabur Identity and its `zeabur-identityctl`, and, unless `zeabur_image` is given, Zeabur and
+/// Zeabur Proxy built from this checkout. Zeabur Identity is built from `identity_src`, else it is
+/// the published release that `ZEABUR_IDENTITY_PINNED` names.
 pub(crate) fn build(
     dev: &DevCluster,
     identity_src: Option<&Path>,
     zeabur_image: Option<&str>,
 ) -> Result<Built, String> {
-    let identity_src = if let Some(src) = identity_src {
-        src.to_path_buf()
+    let mut import = Vec::new();
+    let identity = if let Some(src) = identity_src {
+        output::say(&format!(
+            "Zeabur Identity: building ZEABUR_IDENTITY_SRC {}",
+            src.display()
+        ));
+        let identity = build_identity(dev, src)?;
+        import.push(identity.clone());
+        identity
     } else {
-        let dir = dev.state.join("identity");
-        pinned_checkout(
-            dev,
-            &dir,
-            "ZEABUR_IDENTITY_PINNED",
-            "ZEABUR_IDENTITY_GIT",
-            "https://github.com/zeabur-oss/identity.git",
-        )?;
-        dir
+        let tag = match read_pin(dev, "ZEABUR_IDENTITY_PINNED")? {
+            Pin::Tag(tag) => tag,
+            Pin::Commit(commit) => return Err(no_release(&commit)),
+        };
+        let release = identity_release::fetch(dev, &tag)?.ok_or_else(|| no_release(&tag))?;
+        output::say(&format!(
+            "Zeabur Identity: release {tag}, {}",
+            release.image
+        ));
+        link_identityctl(dev, &release.identityctl)?;
+        release.image
     };
-    let identity_src = fs::canonicalize(&identity_src)
-        .map_err(|e| format!("Zeabur Identity's source {}: {e}", identity_src.display()))?;
-    dev.cmd("nix")
-        .arg("develop")
-        .arg(&identity_src)
-        .args(["--command", "bash", "-c"])
-        .arg(format!(
-            "./scripts/build-image.sh {IDENTITY_DEV} && cargo build --release --locked -p zeabur-identityctl"
-        ))
-        .current_dir(&identity_src)
-        .run()
-        .map_err(|e| format!("building Zeabur Identity: {e}"))?;
-    let link = dev.identityctl();
-    if fs::symlink_metadata(&link).is_ok() {
-        fs::remove_file(&link).map_err(|e| format!("removing {}: {e}", link.display()))?;
-    }
-    symlink(
-        identity_src.join("target/release/zeabur-identityctl"),
-        &link,
-    )
-    .map_err(|e| format!("linking {}: {e}", link.display()))?;
-    let identity = content_tag(dev, IDENTITY_DEV)?;
-    let mut import = vec![identity.clone()];
 
     let (zeabur, proxy) = match zeabur_image {
         None => {
@@ -109,6 +97,53 @@ pub(crate) fn build(
     })
 }
 
+fn no_release(pin: &str) -> String {
+    format!(
+        "ZEABUR_IDENTITY_PINNED is {pin}, which has no Zeabur Identity release: \
+         pin a release tag, or set ZEABUR_IDENTITY_SRC to a checkout to build"
+    )
+}
+
+/// Builds Zeabur Identity's image and `zeabur-identityctl` from `src`; returns the image.
+fn build_identity(dev: &DevCluster, src: &Path) -> Result<String, String> {
+    let src = fs::canonicalize(src)
+        .map_err(|e| format!("Zeabur Identity's source {}: {e}", src.display()))?;
+    dev.cmd("nix")
+        .arg("develop")
+        .arg(&src)
+        .args(["--command", "bash", "-c"])
+        .arg(format!(
+            "./scripts/build-image.sh {IDENTITY_DEV} && cargo build --release --locked -p zeabur-identityctl"
+        ))
+        .current_dir(&src)
+        .run()
+        .map_err(|e| format!("building Zeabur Identity: {e}"))?;
+    link_identityctl(dev, &src.join("target/release/zeabur-identityctl"))?;
+    content_tag(dev, IDENTITY_DEV)
+}
+
+fn link_identityctl(dev: &DevCluster, to: &Path) -> Result<(), String> {
+    let link = dev.identityctl();
+    if fs::symlink_metadata(&link).is_ok() {
+        fs::remove_file(&link).map_err(|e| format!("removing {}: {e}", link.display()))?;
+    }
+    symlink(to, &link).map_err(|e| format!("linking {}: {e}", link.display()))
+}
+
+fn read_pin(dev: &DevCluster, pin_file: &str) -> Result<Pin, String> {
+    let path = dev.root.join(pin_file);
+    let pin = fs::read_to_string(&path).map_err(|e| format!("reading {}: {e}", path.display()))?;
+    Pin::parse(&pin)
+}
+
+/// `$url_env`, or `url` when it is unset or empty.
+fn pin_url(url_env: &str, url: &str) -> String {
+    std::env::var(url_env)
+        .ok()
+        .filter(|url| !url.is_empty())
+        .unwrap_or_else(|| url.to_owned())
+}
+
 /// A checkout of the pin in file `pin_file` of this repository, from `$url_env` or `url`, kept
 /// between runs for its build cache.
 pub(crate) fn pinned_checkout(
@@ -118,13 +153,7 @@ pub(crate) fn pinned_checkout(
     url_env: &str,
     url: &str,
 ) -> Result<(), String> {
-    let path = dev.root.join(pin_file);
-    let pin = fs::read_to_string(&path).map_err(|e| format!("reading {}: {e}", path.display()))?;
-    let url = std::env::var(url_env)
-        .ok()
-        .filter(|url| !url.is_empty())
-        .unwrap_or_else(|| url.to_owned());
-    checkout::checkout(dir, &Pin::parse(&pin)?, &url)
+    checkout::checkout(dir, &read_pin(dev, pin_file)?, &pin_url(url_env, url))
 }
 
 /// Tags `image` by its content, so that a changed image gets a new tag and the cluster a new

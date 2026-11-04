@@ -46,8 +46,9 @@ ssh host 'cd zeabur && scripts/ci-local.sh'                # every job, a result
   `target/ci-local/<job>.result`, logs next to them, a failed job's copy kept under `work/`. Its
   header documents the settings.
 - It refuses to start with less than 25 GB free (`CI_LOCAL_MIN_FREE_GB`).
-- The cluster jobs fetch Zeabur Identity at `ZEABUR_IDENTITY_PINNED` from `ZEABUR_IDENTITY_GIT`
-  (default GitHub); point it at a mirror, or set `ZEABUR_IDENTITY_SRC` to a checkout synced along.
+- The cluster jobs download the Zeabur Identity release `ZEABUR_IDENTITY_PINNED` names from
+  GitHub, and the node pulls its image from ghcr.io. Set `ZEABUR_IDENTITY_SRC` to a checkout synced
+  along to build it instead.
 
 ## Fixing
 

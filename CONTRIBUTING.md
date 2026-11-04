@@ -230,8 +230,8 @@ nix run .#dev-cluster -- down     # deletes the cluster, its volume and its imag
 ```
 
 `up` builds Zeabur and Zeabur Proxy from the checkout (cargo profile `ci`, which compiles faster
-than `release`) and Zeabur Identity from the commit or tag in `ZEABUR_IDENTITY_PINNED` (no image
-of it is published yet), then prints the setup link that enrols the first admin's passkey. Your browser accepts the site once it trusts the printed CA
+than `release`) and installs the Zeabur Identity release that `ZEABUR_IDENTITY_PINNED` names, then
+prints the setup link that enrols the first admin's passkey. Your browser accepts the site once it trusts the printed CA
 (`target/dev-cluster/tls/ca.crt`). On a VM, forward port 443 from your machine
 (`sudo ssh -L 443:127.0.0.1:443 <vm>`); `*.localhost` resolves to your own machine. Run `up` again
 after a change: it rebuilds and redeploys what changed. Options:
