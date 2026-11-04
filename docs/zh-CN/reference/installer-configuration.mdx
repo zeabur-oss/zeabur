@@ -87,6 +87,8 @@ inputs:
 
 Catalog 定义了每个组件有哪些 input 及其类型。缺少必填值时，`plan` 会指出需要补充的字段。
 
+Catalog 给 input 改名时（例如 `s3-url` 改成 `s3Url`），installer 第一次读到配置文件就会直接改掉文件里的键名，并为每个改名打印一行。只有键名会变，注释、顺序和文件权限都保持原样。如果没办法安全地改，或者文件写不进去，installer 不会动文件，这次运行照新名称处理，并请你自己改键名。
+
 installer 会自动填写 Zeabur Builder 的 `clusterIp`（zot 的固定地址）。要修改，在 `inputs` 中填写值即可。
 
 Velero 的 `region` input 是存储桶的区域，默认 `us-east-1`。Cloudflare R2 要填 `auto`。网页界面会分别询问访问密钥 ID 和私密访问密钥，再自己生成 `credentials` 文件。

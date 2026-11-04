@@ -260,7 +260,8 @@ pub struct Sources {
     pub zeabur_chart: Option<String>,
 }
 
-/// Component inputs that Zeabur Catalog renamed: component id, old name, new name.
+/// Component inputs that Zeabur Catalog renamed: component id, old name, new name. The installer
+/// writes the new names into the file it reads; this table is removed in v0.2.0 (#223).
 pub const RENAMED_INPUTS: &[(&str, &str, &str)] = &[
     ("builds/zeabur-builder", "cluster-ip", "clusterIp"),
     ("intrusion-prevention/crowdsec", "bouncer-key", "bouncerKey"),
@@ -299,25 +300,6 @@ fn rename_inputs<V>(inputs: &mut BTreeMap<String, BTreeMap<String, V>>) {
             values.entry((*new).to_owned()).or_insert(value);
         }
     }
-}
-
-/// The old input names a configuration file uses, each as `<component>: input <old> is now
-/// <new>`.
-#[must_use]
-pub fn renamed_inputs(yaml: &str) -> Vec<String> {
-    let Ok(value) = serde_saphyr::from_str::<Value>(yaml) else {
-        return Vec::new();
-    };
-    RENAMED_INPUTS
-        .iter()
-        .filter(|(component, old, _)| {
-            ["inputs", "secretFiles"]
-                .iter()
-                .filter_map(|key| value.get(key)?.get(component))
-                .any(|values| values.get(old).is_some())
-        })
-        .map(|(component, old, new)| format!("{component}: input {old} is now {new}"))
-        .collect()
 }
 
 /// A configuration file: a new cluster, or a node joining one.
@@ -905,13 +887,6 @@ mod tests {
             config.secret_files["intrusion-prevention/crowdsec"]["bouncerKey"],
             "/etc/key"
         );
-        assert_eq!(
-            renamed_inputs(&yaml),
-            [
-                "intrusion-prevention/crowdsec: input bouncer-key is now bouncerKey",
-                "volume-backup/velero: input s3-url is now s3Url"
-            ]
-        );
         let personal = PersonalConfig::parse(
             "use: personal\ninputs:\n  builds/zeabur-builder: {cluster-ip: 10.43.0.9}\n",
         )
@@ -920,7 +895,6 @@ mod tests {
             personal.inputs["builds/zeabur-builder"]["clusterIp"],
             "10.43.0.9"
         );
-        assert_eq!(renamed_inputs(MINIMAL), Vec::<String>::new());
     }
 
     #[test]

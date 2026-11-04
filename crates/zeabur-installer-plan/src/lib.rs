@@ -13,6 +13,7 @@ pub mod pins;
 pub mod plan;
 pub mod record;
 pub mod remove;
+pub mod rename_inputs;
 pub mod rke2;
 pub mod select;
 pub mod storage;

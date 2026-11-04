@@ -4,9 +4,10 @@ use std::fs;
 use std::os::unix::fs::PermissionsExt as _;
 use std::path::Path;
 
-use zeabur_installer_host::{download, facts};
+use zeabur_installer_host::{download, facts, files};
 use zeabur_installer_plan::catalog::Index;
-use zeabur_installer_plan::config::{self, Config, Document, JoinConfig, PersonalConfig};
+use zeabur_installer_plan::config::{Config, Document, JoinConfig, PersonalConfig};
+use zeabur_installer_plan::rename_inputs::rename_input_keys;
 use zeabur_installer_plan::{PlanError, pins};
 
 use crate::{InstallError, out};
@@ -16,12 +17,6 @@ use crate::{InstallError, out};
 pub(crate) fn document(path: &Path) -> Result<Document, InstallError> {
     let text = read(path)?;
     let document = Document::parse(&text)?;
-    for renamed in config::renamed_inputs(&text) {
-        out::err(&format!(
-            "{}: {renamed}; this run uses the new name, rename it in the file",
-            path.display()
-        ));
-    }
     if let Document::Join(JoinConfig { join, .. }) = &document
         && join.token.is_some()
     {
@@ -37,7 +32,54 @@ pub(crate) fn document(path: &Path) -> Result<Document, InstallError> {
             )));
         }
     }
+    rename_inputs(path, &text);
     Ok(document)
+}
+
+/// Writes the catalog's new input names into the file, or says which keys to rename when that
+/// cannot be done safely. The run uses the new names either way.
+fn rename_inputs(path: &Path, text: &str) {
+    let rewrite = rename_input_keys(text);
+    let shown = path.display();
+    let mut left = rewrite.left;
+    if let Some(new_text) = &rewrite.text {
+        match write_renamed(path, new_text) {
+            Ok(()) => {
+                for r in &rewrite.done {
+                    out::err(&format!(
+                        "{shown}: renamed input {} to {} ({})",
+                        r.old, r.new, r.component
+                    ));
+                }
+            }
+            Err(e) => {
+                out::err(&format!(
+                    "{shown}: could not write the new input names: {e}"
+                ));
+                left.extend(rewrite.done);
+            }
+        }
+    }
+    for r in left {
+        out::err(&format!(
+            "{shown}: {r}; this run uses the new name, rename it in the file"
+        ));
+    }
+}
+
+fn write_renamed(path: &Path, text: &str) -> Result<(), String> {
+    let target = fs::canonicalize(path).map_err(|e| e.to_string())?;
+    let mode = fs::metadata(&target)
+        .map_err(|e| e.to_string())?
+        .permissions()
+        .mode()
+        & 0o7777;
+    if mode & 0o222 == 0 {
+        return Err("the file is read-only".to_owned());
+    }
+    files::write(&target, mode, text.as_bytes())
+        .map(|_| ())
+        .map_err(|e| e.to_string())
 }
 
 /// The join configuration at `path`, if that is what it holds.
@@ -119,4 +161,129 @@ pub(crate) fn catalog(source: Option<&str>, state_dir: &str) -> Result<Index, In
         (None, None) => return Err(PlanError::Unpublished(vec!["catalog"]).into()),
     };
     Ok(Index::parse(&bytes)?)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::fs;
+    use std::os::unix::fs::PermissionsExt as _;
+    use std::path::Path;
+
+    use super::document;
+
+    const BASE: &str = "# my server\naccess: {mode: domain, identity: login.example.com, zeabur: zeabur.example.com}\n";
+
+    fn write(dir: &Path, text: &str, mode: u32) -> std::path::PathBuf {
+        let path = dir.join("zeabur.yaml");
+        fs::write(&path, text).unwrap();
+        fs::set_permissions(&path, fs::Permissions::from_mode(mode)).unwrap();
+        path
+    }
+
+    #[test]
+    fn block_style_is_renamed_and_comments_stay() {
+        let dir = tempfile::tempdir().unwrap();
+        let text = format!(
+            "{BASE}inputs:\n  # backups\n  volume-backup/velero:\n    bucket: b # where\n    s3-url: https://s3.example.com # s3-url\n    note: s3-url\n"
+        );
+        let path = write(dir.path(), &text, 0o600);
+        document(&path).unwrap();
+        let after = fs::read_to_string(&path).unwrap();
+        assert_eq!(after, text.replace("    s3-url: https", "    s3Url: https"));
+        assert_eq!(
+            fs::metadata(&path).unwrap().permissions().mode() & 0o777,
+            0o600
+        );
+    }
+
+    #[test]
+    fn flow_style_is_renamed_in_both_sections_and_comments_stay() {
+        let dir = tempfile::tempdir().unwrap();
+        let text = format!(
+            "{BASE}inputs:\n  volume-backup/velero: {{s3-url: x, bucket: b}} # keep\nsecretFiles:\n  intrusion-prevention/crowdsec: {{\"bouncer-key\": /etc/key}}\n"
+        );
+        let path = write(dir.path(), &text, 0o640);
+        document(&path).unwrap();
+        let after = fs::read_to_string(&path).unwrap();
+        assert_eq!(
+            after,
+            text.replace("{s3-url:", "{s3Url:")
+                .replace("\"bouncer-key\"", "\"bouncerKey\"")
+        );
+        assert_eq!(
+            fs::metadata(&path).unwrap().permissions().mode() & 0o777,
+            0o640
+        );
+    }
+
+    #[test]
+    fn a_second_read_finds_nothing_to_rename() {
+        let dir = tempfile::tempdir().unwrap();
+        let text = format!("{BASE}inputs:\n  volume-backup/velero:\n    s3-url: x\n");
+        let path = write(dir.path(), &text, 0o600);
+        document(&path).unwrap();
+        let first = fs::read_to_string(&path).unwrap();
+        let again = zeabur_installer_plan::rename_inputs::rename_input_keys(&first);
+        assert!(again.done.is_empty() && again.left.is_empty() && again.text.is_none());
+        document(&path).unwrap();
+        assert_eq!(fs::read_to_string(&path).unwrap(), first);
+    }
+
+    #[test]
+    fn a_value_equal_to_an_old_name_is_not_changed() {
+        let dir = tempfile::tempdir().unwrap();
+        let text = format!(
+            "{BASE}inputs:\n  volume-backup/velero:\n    bucket: s3-url\n    s3-url: s3-url\n"
+        );
+        let path = write(dir.path(), &text, 0o600);
+        document(&path).unwrap();
+        assert_eq!(
+            fs::read_to_string(&path).unwrap(),
+            text.replace("    s3-url: s3-url", "    s3Url: s3-url")
+        );
+    }
+
+    #[test]
+    fn the_same_name_in_another_component_is_not_changed() {
+        let dir = tempfile::tempdir().unwrap();
+        let text = format!(
+            "{BASE}inputs:\n  other/thing:\n    s3-url: a\n  volume-backup/velero:\n    s3-url: b\n"
+        );
+        let path = write(dir.path(), &text, 0o600);
+        document(&path).unwrap();
+        assert_eq!(
+            fs::read_to_string(&path).unwrap(),
+            text.replace("    s3-url: b", "    s3Url: b")
+        );
+    }
+
+    #[test]
+    fn an_unsafe_case_leaves_the_file_untouched() {
+        let dir = tempfile::tempdir().unwrap();
+        for body in [
+            "inputs:\n  volume-backup/velero:\n    s3-url: a\n    s3Url: b\n",
+            "inputs:\n  volume-backup/velero: {s3-url: a, s3Url: b}\n",
+            "inputs:\n  volume-backup/velero: {s3-url: a,\n    bucket: b}\n",
+            "inputs: {volume-backup/velero: {s3-url: a}}\n",
+            "inputs:\n  other/x: &v {s3-url: a}\n  volume-backup/velero: *v\n",
+        ] {
+            let text = format!("{BASE}{body}");
+            let path = write(dir.path(), &text, 0o600);
+            document(&path).unwrap();
+            assert_eq!(fs::read_to_string(&path).unwrap(), text, "{body}");
+        }
+    }
+
+    #[test]
+    fn a_read_only_file_is_not_written_and_the_run_goes_on() {
+        let dir = tempfile::tempdir().unwrap();
+        let text = format!("{BASE}inputs:\n  volume-backup/velero:\n    s3-url: x\n");
+        let path = write(dir.path(), &text, 0o400);
+        let doc = document(&path).unwrap();
+        assert_eq!(fs::read_to_string(&path).unwrap(), text);
+        let zeabur_installer_plan::config::Document::Install(config) = doc else {
+            panic!("not an install configuration");
+        };
+        assert_eq!(config.inputs["volume-backup/velero"]["s3Url"], "x");
+    }
 }
