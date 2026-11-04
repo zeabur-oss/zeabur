@@ -52,13 +52,6 @@ pub(crate) struct Args {
     /// environment variable, `true` or `false`.
     #[arg(long, env = "ZEABUR_MEMBER_ROLES")]
     pub(crate) member_roles: bool,
-    /// Minutes a session may go unused before it ends. Zeabur Identity's idle limit for the
-    /// account, when shorter, applies instead.
-    #[arg(long, env = "ZEABUR_SESSION_IDLE_MINUTES", default_value_t = 60)]
-    pub(crate) session_idle_minutes: u32,
-    /// Hours a session lasts at most, used or not.
-    #[arg(long, env = "ZEABUR_SESSION_MAX_HOURS", default_value_t = 12)]
-    pub(crate) session_max_hours: u32,
     /// The metrics store history is read from, until someone chooses another in the settings: a
     /// Service port serving the Prometheus HTTP API, as `namespace/name:port`. Empty: where
     /// Zeabur Catalog installs VictoriaMetrics.
@@ -163,7 +156,6 @@ pub(crate) struct Config {
 
 impl Args {
     /// Checks every value and reads the files.
-    #[expect(clippy::too_many_lines, reason = "one step per flag")]
     pub(crate) fn check(&self) -> Result<Config, String> {
         let public_url =
             BaseUrl::parse_root(&self.public_url).map_err(|e| format!("--public-url: {e}"))?;
@@ -253,11 +245,6 @@ impl Args {
                     .map_err(|e| format!("--proxy-url, --proxy-ca-file: {e}"))?,
             ),
         };
-        if self.session_idle_minutes == 0 || self.session_max_hours == 0 {
-            return Err(
-                "--session-idle-minutes and --session-max-hours must be at least 1".to_owned(),
-            );
-        }
         Ok(Config {
             public_url,
             issuer,
@@ -265,11 +252,7 @@ impl Args {
             client_id: self.client_id.clone(),
             client_secret: SecretString::from(secret),
             plan_key,
-            limits: Limits {
-                idle: i64::from(self.session_idle_minutes) * 60,
-                absolute: i64::from(self.session_max_hours) * 3600,
-                ..Limits::default()
-            },
+            limits: Limits::default(),
             settings,
             proxy,
         })
@@ -537,8 +520,6 @@ mod tests {
         assert!(error.starts_with("--plan-key-file:"), "{error}");
         let error = args(&files, &["--plan-key-file", "/nonexistent/key"]).unwrap_err();
         assert!(error.contains("cannot read"), "{error}");
-        let error = args(&files, &["--session-idle-minutes", "0"]).unwrap_err();
-        assert!(error.contains("at least 1"), "{error}");
         let error = args(&files, &["--metrics-service", "prometheus:9090"]).unwrap_err();
         assert!(error.starts_with("--metrics-service:"), "{error}");
         let error = args(&files, &["--namespace", "Default"]).unwrap_err();
