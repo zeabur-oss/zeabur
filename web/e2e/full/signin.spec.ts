@@ -1,23 +1,23 @@
 import { expect, test } from "../fixtures.ts"
 import { authenticator, enrol, signInAtZeaburIdentity } from "./identity.ts"
 
-// Zeabur in a cluster with Zeabur Identity, the first admin account signs in. scripts/e2e-l2-browser.sh sets:
+// Zeabur in a cluster with Zeabur Identity, the first admin account signs in. scripts/e2e-browser.sh sets:
 //
-//   ZEABUR_L2_URL          Zeabur's public URL (https://zeabur.localhost)
-//   ZEABUR_L2_SETUP_LINK   the one-time link `zeabur-identityctl setup-link` printed for user `admin`
-//   ZEABUR_L2_NAMESPACE    a project with a running Deployment whose image has a shell
-//   ZEABUR_L2_SERVICE      that Deployment (default talker)
+//   ZEABUR_E2E_URL          Zeabur's public URL (https://zeabur.localhost)
+//   ZEABUR_E2E_SETUP_LINK   the one-time link `zeabur-identityctl setup-link` printed for user `admin`
+//   ZEABUR_E2E_NAMESPACE    a project with a running Deployment whose image has a shell
+//   ZEABUR_E2E_SERVICE      that Deployment (default talker)
 const env = (name: string, fallback = "") => process.env[name] ?? fallback
-const setupLink = env("ZEABUR_L2_SETUP_LINK")
-const namespace = env("ZEABUR_L2_NAMESPACE")
-const service = env("ZEABUR_L2_SERVICE", "talker")
+const setupLink = env("ZEABUR_E2E_SETUP_LINK")
+const namespace = env("ZEABUR_E2E_NAMESPACE")
+const service = env("ZEABUR_E2E_SERVICE", "talker")
 const servicePage = `/projects/${encodeURIComponent(namespace)}/services/Deployment/${service}`
-const zeabur = env("ZEABUR_L2_URL")
+const zeabur = env("ZEABUR_E2E_URL")
 const identity = setupLink ? new URL(setupLink).origin : ""
 
 test.beforeAll(() => {
-  if (!setupLink) throw new Error("ZEABUR_L2_SETUP_LINK is not set")
-  if (!namespace) throw new Error("ZEABUR_L2_NAMESPACE is not set")
+  if (!setupLink) throw new Error("ZEABUR_E2E_SETUP_LINK is not set")
+  if (!namespace) throw new Error("ZEABUR_E2E_NAMESPACE is not set")
 })
 
 test("a first admin enrols a passkey, signs in and acts with full rights", async ({ page }) => {

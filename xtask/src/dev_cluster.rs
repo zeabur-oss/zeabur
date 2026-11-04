@@ -271,7 +271,7 @@ pub(crate) fn up(options: &Up) -> Result<(), String> {
         &[],
         catalog::stop_at_from_env().as_deref(),
     )?;
-    // Before Zeabur, so that e2e-l2's removal check counts them as the cluster's own.
+    // Before Zeabur, so that e2e's removal check counts them as the cluster's own.
     if options.profile == Profile::Full {
         full::install(&dev, options.builder_src.as_deref())?;
     }

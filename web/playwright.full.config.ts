@@ -1,8 +1,8 @@
-// End-to-end tests of Zeabur in a cluster with Zeabur Identity (e2e/l2/), run by
-// scripts/e2e-l2-browser.sh:
+// End-to-end tests of Zeabur in a cluster with Zeabur Identity (e2e/full/), run by
+// scripts/e2e-browser.sh:
 //
-//   ZEABUR_L2_URL   Zeabur's public URL, https://zeabur.localhost
-//   ZEABUR_L2_SPKI  base64 SHA-256 of each served certificate's public key (SubjectPublicKeyInfo),
+//   ZEABUR_E2E_URL   Zeabur's public URL, https://zeabur.localhost
+//   ZEABUR_E2E_SPKI  base64 SHA-256 of each served certificate's public key (SubjectPublicKeyInfo),
 //                   separated by commas
 //
 // Both host names end in `.localhost` and reach the cluster's ingress on this machine's port 443
@@ -13,13 +13,13 @@
 // which Playwright always passes.
 import { defineConfig, devices } from "@playwright/test"
 
-const url = process.env.ZEABUR_L2_URL
-if (!url) throw new Error("ZEABUR_L2_URL is not set")
-const spki = process.env.ZEABUR_L2_SPKI
-if (!spki) throw new Error("ZEABUR_L2_SPKI is not set")
+const url = process.env.ZEABUR_E2E_URL
+if (!url) throw new Error("ZEABUR_E2E_URL is not set")
+const spki = process.env.ZEABUR_E2E_SPKI
+if (!spki) throw new Error("ZEABUR_E2E_SPKI is not set")
 
 export default defineConfig({
-  testDir: "e2e/l2",
+  testDir: "e2e/full",
   fullyParallel: false,
   workers: 1,
   forbidOnly: Boolean(process.env.CI),

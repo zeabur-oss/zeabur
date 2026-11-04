@@ -24,7 +24,7 @@ cd "$root"
 # runner and its dev shell but much less to run. Each one can still run alone.
 lint_jobs=(format clippy docs cargo-deny unsafe-report levels chart)
 check_jobs=(lint test fuzz ui no-ui wording)
-cluster_jobs=(kubernetes kubernetes-l2)
+cluster_jobs=(cluster e2e)
 
 if [[ "${1:-}" == --list ]]; then
   printf '%s\n' "${check_jobs[@]}" "${cluster_jobs[@]}"
@@ -52,8 +52,8 @@ keep() { # $1 = file
   cp "$1" "$CI_ARTIFACTS/"
 }
 
-# The image's size and Zeabur's memory after kubernetes-l2, in the run's summary when there is one.
-l2_report() {
+# The image's size and Zeabur's memory after the e2e job, in the run's summary when there is one.
+e2e_report() {
   local measurements="target/dev-cluster/measurements.json"
   keep "$measurements"
   [[ -n "${GITHUB_STEP_SUMMARY:-}" ]] || return 0
@@ -182,7 +182,7 @@ case "$job" in
     ;;
   # Integration tests (JSON Patch writes, dry run, identity, revocation), `zeaburctl doctor`, and
   # browser tests in local mode with the embedded interface.
-  kubernetes)
+  cluster)
     if [[ -z "${ZEABUR_CI_KEEP:-}" ]]; then
       trap './scripts/dev-cluster.sh down' EXIT
     fi
@@ -198,10 +198,10 @@ case "$job" in
     ;;
   # Zeabur in a cluster with Zeabur Identity, from their images and Zeabur's chart, through a browser:
   # passkey sign-in, terminal, rights, memory, removal.
-  kubernetes-l2)
+  e2e)
     status=0
-    ZEABUR_L2_KEEP="${ZEABUR_CI_KEEP:-}" ./scripts/e2e-l2.sh || status=$?
-    l2_report
+    ZEABUR_E2E_KEEP="${ZEABUR_CI_KEEP:-}" ./scripts/e2e.sh || status=$?
+    e2e_report
     exit "$status"
     ;;
 esac

@@ -37,7 +37,7 @@ for t in "${targets[@]}"; do
 done
 # In the order of the list, which puts the cluster jobs last.
 mapfile -t targets < <(printf '%s\n' "${all[@]}" | grep -xF -f <(printf '%s\n' "${targets[@]}"))
-is_cluster() { [[ "$1" == kubernetes || "$1" == kubernetes-l2 ]]; }
+is_cluster() { [[ "$1" == cluster || "$1" == e2e ]]; }
 
 dirs=("$out")
 for t in "${targets[@]}"; do

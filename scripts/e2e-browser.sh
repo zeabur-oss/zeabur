@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# The browser part of scripts/e2e-l2.sh, on the cluster `scripts/dev-cluster.sh up` made: makes the
-# e2e users again from scratch, then runs web/e2e/l2 with Playwright. Arguments go to Playwright:
-#   scripts/e2e-l2-browser.sh e2e/l2/roles.spec.ts
+# The browser part of scripts/e2e.sh, on the cluster `scripts/dev-cluster.sh up` made: makes the
+# e2e users again from scratch, then runs web/e2e/full with Playwright. Arguments go to Playwright:
+#   scripts/e2e-browser.sh e2e/full/roles.spec.ts
 #
 # Every e2e user is deleted with the RBAC bindings Zeabur made for them (label zeabur.com/member)
 # and made again the way the product makes users, so each has what that way gives today:
@@ -54,9 +54,9 @@ db_admin_link=$("$zeabur_identityctl" invite --username e2e-db-admin --admin)
 image_admin_link=$("$zeabur_identityctl" invite --username e2e-image-admin --admin)
 usage_admin_link=$("$zeabur_identityctl" invite --username e2e-usage-admin --admin)
 terminal_admin_link=$("$zeabur_identityctl" invite --username e2e-terminal-admin --admin)
-# Deploy from Git, when Zeabur Builder runs here (e2e/l2/git.spec.ts skips otherwise), and from a
-# private repository when E2E_PRIVATE_GIT_REPO names one (e2e/l2/git-private.spec.ts), and from an
-# uploaded folder (e2e/l2/upload.spec.ts).
+# Deploy from Git, when Zeabur Builder runs here (e2e/full/git.spec.ts skips otherwise), and from a
+# private repository when E2E_PRIVATE_GIT_REPO names one (e2e/full/git-private.spec.ts), and from an
+# uploaded folder (e2e/full/upload.spec.ts).
 git_admin_link="" git_private_admin_link="" upload_admin_link=""
 if has_crd builds.builder.zeabur.com; then
   git_admin_link=$("$zeabur_identityctl" invite --username e2e-git-admin --admin)
@@ -71,7 +71,7 @@ kubectl apply -f "$root/web/e2e/manifests/talker.yaml" -f "$root/web/e2e/manifes
 wait_for "$first" kubectl -n "$first" rollout status deployment/talker --timeout=180s
 wait_for "$second" kubectl -n "$second" rollout status deployment/talker --timeout=180s
 
-# --- Databases, when an operator and the test S3 run here (e2e/l2/databases.spec.ts skips otherwise)
+# --- Databases, when an operator and the test S3 run here (e2e/full/databases.spec.ts skips otherwise)
 s3_endpoint="" mongodb=""
 if has_crd clusters.postgresql.cnpg.io; then
   if kubectl -n s3-test get deployment seaweedfs >/dev/null 2>&1; then
@@ -84,7 +84,7 @@ if has_crd clusters.postgresql.cnpg.io; then
 fi
 
 # --- The browser ----------------------------------------------------------------------------------
-# Chromium accepts the served certificates by their keys (ZEABUR_L2_SPKI): cert-manager, on the
+# Chromium accepts the served certificates by their keys (ZEABUR_E2E_SPKI): cert-manager, on the
 # full profile, issues its own. The test's own requests (page.request) go through Node, which
 # takes the cluster's CA from NODE_EXTRA_CA_CERTS.
 spki=$(for host in identity.localhost "$zeabur_host"; do
@@ -94,14 +94,14 @@ done | paste -sd,)
 rm -rf "$out/results"
 cd "$root/web"
 NODE_EXTRA_CA_CERTS="$tls/ca.crt" \
-  ZEABUR_L2_URL="https://$zeabur_host" ZEABUR_L2_SPKI="$spki" \
-  ZEABUR_L2_SETUP_LINK="$setup_link" ZEABUR_L2_ADMIN_LINK="$admin_link" \
-  ZEABUR_L2_MEMBER_LINK="$member_link" ZEABUR_L2_DB_ADMIN_LINK="$db_admin_link" \
-  ZEABUR_L2_IMAGE_ADMIN_LINK="$image_admin_link" ZEABUR_L2_USAGE_ADMIN_LINK="$usage_admin_link" \
-  ZEABUR_L2_TERMINAL_ADMIN_LINK="$terminal_admin_link" \
-  ZEABUR_L2_GIT_ADMIN_LINK="$git_admin_link" ZEABUR_L2_GIT_PRIVATE_ADMIN_LINK="$git_private_admin_link" \
-  ZEABUR_L2_UPLOAD_ADMIN_LINK="$upload_admin_link" \
-  ZEABUR_L2_S3_ENDPOINT="$s3_endpoint" ZEABUR_L2_MONGODB="$mongodb" \
-  ZEABUR_L2_DB_KEEP="${ZEABUR_L2_DB_KEEP:-}" \
-  ZEABUR_L2_NAMESPACE="$first" ZEABUR_L2_SECOND_NAMESPACE="$second" ZEABUR_L2_SERVICE=talker \
-  bunx playwright test -c playwright.l2.config.ts --reporter=line --output="$out/results" "$@"
+  ZEABUR_E2E_URL="https://$zeabur_host" ZEABUR_E2E_SPKI="$spki" \
+  ZEABUR_E2E_SETUP_LINK="$setup_link" ZEABUR_E2E_ADMIN_LINK="$admin_link" \
+  ZEABUR_E2E_MEMBER_LINK="$member_link" ZEABUR_E2E_DB_ADMIN_LINK="$db_admin_link" \
+  ZEABUR_E2E_IMAGE_ADMIN_LINK="$image_admin_link" ZEABUR_E2E_USAGE_ADMIN_LINK="$usage_admin_link" \
+  ZEABUR_E2E_TERMINAL_ADMIN_LINK="$terminal_admin_link" \
+  ZEABUR_E2E_GIT_ADMIN_LINK="$git_admin_link" ZEABUR_E2E_GIT_PRIVATE_ADMIN_LINK="$git_private_admin_link" \
+  ZEABUR_E2E_UPLOAD_ADMIN_LINK="$upload_admin_link" \
+  ZEABUR_E2E_S3_ENDPOINT="$s3_endpoint" ZEABUR_E2E_MONGODB="$mongodb" \
+  ZEABUR_E2E_DB_KEEP="${ZEABUR_E2E_DB_KEEP:-}" \
+  ZEABUR_E2E_NAMESPACE="$first" ZEABUR_E2E_SECOND_NAMESPACE="$second" ZEABUR_E2E_SERVICE=talker \
+  bunx playwright test -c playwright.full.config.ts --reporter=line --output="$out/results" "$@"

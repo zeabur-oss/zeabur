@@ -5,15 +5,15 @@ import { invite, member, planAndApply, signInAdmin } from "./members.ts"
 
 // kubectl terminals: every tools pod runs in zeabur-terminals, where members have no rights. A
 // Developer opens their project's terminal and cannot see, list, delete or open an admin's tools
-// pod; the admin's terminal for the same project works. scripts/e2e-l2-browser.sh sets, besides
-// ZEABUR_L2_URL:
+// pod; the admin's terminal for the same project works. scripts/e2e-browser.sh sets, besides
+// ZEABUR_E2E_URL:
 //
-//   ZEABUR_L2_TERMINAL_ADMIN_LINK  an invitation for the admin account `e2e-terminal-admin`
-//   ZEABUR_L2_NAMESPACE            the Developer's project
+//   ZEABUR_E2E_TERMINAL_ADMIN_LINK  an invitation for the admin account `e2e-terminal-admin`
+//   ZEABUR_E2E_NAMESPACE            the Developer's project
 const env = (name: string) => process.env[name] ?? ""
-const adminLink = env("ZEABUR_L2_TERMINAL_ADMIN_LINK")
-const project = env("ZEABUR_L2_NAMESPACE")
-const zeabur = env("ZEABUR_L2_URL")
+const adminLink = env("ZEABUR_E2E_TERMINAL_ADMIN_LINK")
+const project = env("ZEABUR_E2E_NAMESPACE")
+const zeabur = env("ZEABUR_E2E_URL")
 const tools = `/api/v1/projects/${encodeURIComponent(project)}/tools`
 
 type Tools = { namespace: string; pods: { name: string; ready: boolean }[] }
@@ -72,8 +72,8 @@ async function terminal(page: Page, name: string, input: string) {
 }
 
 test.beforeAll(() => {
-  if (!adminLink) throw new Error("ZEABUR_L2_TERMINAL_ADMIN_LINK is not set")
-  if (!project) throw new Error("ZEABUR_L2_NAMESPACE is not set")
+  if (!adminLink) throw new Error("ZEABUR_E2E_TERMINAL_ADMIN_LINK is not set")
+  if (!project) throw new Error("ZEABUR_E2E_NAMESPACE is not set")
 })
 
 test("a Developer's kubectl terminal is theirs alone, and an admin's works beside it", async ({

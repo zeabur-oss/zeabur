@@ -3,23 +3,23 @@ import { invite, member, signInAdmin } from "./members.ts"
 
 // The cluster page's resource usage: an admin sees the test project and its services; a Viewer
 // of one project may not list every pod, so the section says it needs more rights.
-// scripts/e2e-l2-browser.sh sets, besides ZEABUR_L2_URL:
+// scripts/e2e-browser.sh sets, besides ZEABUR_E2E_URL:
 //
-//   ZEABUR_L2_USAGE_ADMIN_LINK   an invitation for `e2e-usage-admin`, an admin account
+//   ZEABUR_E2E_USAGE_ADMIN_LINK   an invitation for `e2e-usage-admin`, an admin account
 //                                (`invite --admin`)
-//   ZEABUR_L2_NAMESPACE          a project with a running Deployment
-//   ZEABUR_L2_SERVICE            that Deployment (default talker)
+//   ZEABUR_E2E_NAMESPACE          a project with a running Deployment
+//   ZEABUR_E2E_SERVICE            that Deployment (default talker)
 //
 // It deletes the user e2e-usage-viewer before each run, so Zeabur makes it anew.
 const env = (name: string, fallback = "") => process.env[name] ?? fallback
-const adminLink = env("ZEABUR_L2_USAGE_ADMIN_LINK")
-const project = env("ZEABUR_L2_NAMESPACE")
-const service = env("ZEABUR_L2_SERVICE", "talker")
-const zeabur = env("ZEABUR_L2_URL")
+const adminLink = env("ZEABUR_E2E_USAGE_ADMIN_LINK")
+const project = env("ZEABUR_E2E_NAMESPACE")
+const service = env("ZEABUR_E2E_SERVICE", "talker")
+const zeabur = env("ZEABUR_E2E_URL")
 
 test.beforeAll(() => {
-  if (!adminLink) throw new Error("ZEABUR_L2_USAGE_ADMIN_LINK is not set")
-  if (!project) throw new Error("ZEABUR_L2_NAMESPACE is not set")
+  if (!adminLink) throw new Error("ZEABUR_E2E_USAGE_ADMIN_LINK is not set")
+  if (!project) throw new Error("ZEABUR_E2E_NAMESPACE is not set")
 })
 
 test("an admin sees what the test project uses; a Viewer is told it needs more rights", async ({

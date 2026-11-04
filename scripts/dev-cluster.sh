@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # A k3d cluster with Zeabur Identity and Zeabur at https://zeabur.localhost, for development and
-# for the in-cluster tests (e2e-l2, the kubernetes CI jobs, the release smoke). Runs on Linux with
+# for the in-cluster tests (e2e, the kubernetes CI jobs, the release smoke). Runs on Linux with
 # Docker and Nix; it uses this machine's port 443 and enters `nix develop` by itself. The work is
 # `cargo xtask dev-cluster` (xtask/src/dev_cluster.rs); without arguments it prints its options.
 #

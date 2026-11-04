@@ -7,20 +7,20 @@ import { invite, member, signInAdmin, toast } from "./members.ts"
 // Deploy from Git: a Developer deploys a small public repository with its Dockerfile from its
 // default branch; the service is building until Zeabur Builder pushes the first image, then Keel
 // moves it there and it runs. A branch that does not exist fails the service at once.
-// scripts/e2e-l2-browser.sh sets, besides ZEABUR_L2_URL and ZEABUR_L2_NAMESPACE:
+// scripts/e2e-browser.sh sets, besides ZEABUR_E2E_URL and ZEABUR_E2E_NAMESPACE:
 //
-//   ZEABUR_L2_GIT_ADMIN_LINK  an invitation for `e2e-git-admin`, an admin account (`invite --admin`);
+//   ZEABUR_E2E_GIT_ADMIN_LINK  an invitation for `e2e-git-admin`, an admin account (`invite --admin`);
 //                             set only when Zeabur Builder, a registry and Keel run here
-//   ZEABUR_L2_GIT_REPOSITORY  the repository, by default traefik/whoami (Dockerfile, port 80)
-//   ZEABUR_L2_GIT_BUILDER     how to build it, Dockerfile (default) or Railpack
-//   ZEABUR_L2_GIT_PORT        the port it listens on, by default 80
+//   ZEABUR_E2E_GIT_REPOSITORY  the repository, by default traefik/whoami (Dockerfile, port 80)
+//   ZEABUR_E2E_GIT_BUILDER     how to build it, Dockerfile (default) or Railpack
+//   ZEABUR_E2E_GIT_PORT        the port it listens on, by default 80
 const env = (name: string, fallback = "") => process.env[name] ?? fallback
-const adminLink = env("ZEABUR_L2_GIT_ADMIN_LINK")
-const project = env("ZEABUR_L2_NAMESPACE")
-const zeabur = env("ZEABUR_L2_URL")
-const repository = env("ZEABUR_L2_GIT_REPOSITORY", "https://github.com/traefik/whoami")
-const builder = env("ZEABUR_L2_GIT_BUILDER", "Dockerfile")
-const port = env("ZEABUR_L2_GIT_PORT", "80")
+const adminLink = env("ZEABUR_E2E_GIT_ADMIN_LINK")
+const project = env("ZEABUR_E2E_NAMESPACE")
+const zeabur = env("ZEABUR_E2E_URL")
+const repository = env("ZEABUR_E2E_GIT_REPOSITORY", "https://github.com/traefik/whoami")
+const builder = env("ZEABUR_E2E_GIT_BUILDER", "Dockerfile")
+const port = env("ZEABUR_E2E_GIT_PORT", "80")
 
 test.skip(!adminLink, "Zeabur Builder, a registry and Keel are not in this cluster")
 test.use({ actionTimeout: 30_000 })

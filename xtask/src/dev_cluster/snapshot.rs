@@ -1,5 +1,5 @@
 //! Every cluster-scoped object by kind and name, and every namespace's labels and annotations:
-//! what e2e-l2 compares before Zeabur's installation and after its removal.
+//! what e2e compares before Zeabur's installation and after its removal.
 
 use std::collections::BTreeMap;
 

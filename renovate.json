@@ -84,7 +84,7 @@
     },
     {
       "customType": "regex",
-      "description": "Zeabur Identity release tag that e2e-l2 builds and a release installs.",
+      "description": "Zeabur Identity release tag that e2e builds and a release installs.",
       "managerFilePatterns": [
         "/^ZEABUR_IDENTITY_PINNED$/"
       ],

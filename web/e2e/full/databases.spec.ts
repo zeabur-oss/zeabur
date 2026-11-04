@@ -5,26 +5,26 @@ import { invite, member, planAndApply, signInAdmin, toast } from "./members.ts"
 
 // Databases by role: a Developer creates a database, backs it up to S3 and backs it up now; a
 // Viewer of the same project sees it but cannot back it up or read its password.
-// scripts/e2e-l2-browser.sh sets, besides ZEABUR_L2_URL and ZEABUR_L2_NAMESPACE:
+// scripts/e2e-browser.sh sets, besides ZEABUR_E2E_URL and ZEABUR_E2E_NAMESPACE:
 //
-//   ZEABUR_L2_DB_ADMIN_LINK   an invitation for `e2e-db-admin`, an admin account (`invite --admin`;
+//   ZEABUR_E2E_DB_ADMIN_LINK   an invitation for `e2e-db-admin`, an admin account (`invite --admin`;
 //                             links work once, so not the roles test's)
-//   ZEABUR_L2_S3_ENDPOINT     an S3 endpoint the cluster reaches, with the bucket `backups` and
+//   ZEABUR_E2E_S3_ENDPOINT     an S3 endpoint the cluster reaches, with the bucket `backups` and
 //                             the keys below; set only when CloudNativePG runs in the cluster
-//   ZEABUR_L2_MONGODB         1 when the Percona Operator for MongoDB runs in the cluster too
-//   ZEABUR_L2_DB_KEEP         1 keeps the databases afterwards, to look at them
-//   ZEABUR_L2_SERVICE         the Deployment each database is connected to
+//   ZEABUR_E2E_MONGODB         1 when the Percona Operator for MongoDB runs in the cluster too
+//   ZEABUR_E2E_DB_KEEP         1 keeps the databases afterwards, to look at them
+//   ZEABUR_E2E_SERVICE         the Deployment each database is connected to
 const env = (name: string, fallback = "") => process.env[name] ?? fallback
-const keep = env("ZEABUR_L2_DB_KEEP") === "1"
-const adminLink = env("ZEABUR_L2_DB_ADMIN_LINK")
-const project = env("ZEABUR_L2_NAMESPACE")
-const s3 = env("ZEABUR_L2_S3_ENDPOINT")
-const mongodb = env("ZEABUR_L2_MONGODB") === "1"
-const zeabur = env("ZEABUR_L2_URL")
-const service = env("ZEABUR_L2_SERVICE", "talker")
+const keep = env("ZEABUR_E2E_DB_KEEP") === "1"
+const adminLink = env("ZEABUR_E2E_DB_ADMIN_LINK")
+const project = env("ZEABUR_E2E_NAMESPACE")
+const s3 = env("ZEABUR_E2E_S3_ENDPOINT")
+const mongodb = env("ZEABUR_E2E_MONGODB") === "1"
+const zeabur = env("ZEABUR_E2E_URL")
+const service = env("ZEABUR_E2E_SERVICE", "talker")
 const keys = {
-  access: env("ZEABUR_L2_S3_ACCESS_KEY", "testkey"),
-  secret: env("ZEABUR_L2_S3_SECRET_KEY", "testsecret123"),
+  access: env("ZEABUR_E2E_S3_ACCESS_KEY", "testkey"),
+  secret: env("ZEABUR_E2E_S3_SECRET_KEY", "testsecret123"),
 }
 
 test.skip(!s3, "CloudNativePG and a test S3 are not in this cluster")

@@ -1,5 +1,5 @@
-# A throwaway S3 store for the database backup test (e2e/l2/databases.spec.ts), applied by
-# scripts/e2e-l2-browser.sh when CloudNativePG runs in the cluster. Data lives in an emptyDir.
+# A throwaway S3 store for the database backup test (e2e/full/databases.spec.ts), applied by
+# scripts/e2e-browser.sh when CloudNativePG runs in the cluster. Data lives in an emptyDir.
 apiVersion: v1
 kind: Namespace
 metadata: { name: s3-test }
