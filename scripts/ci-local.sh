@@ -4,7 +4,7 @@
 # workstation you care about: the cluster jobs create k3d clusters, images and volumes.
 #
 #   scripts/ci-local.sh                 # every job
-#   scripts/ci-local.sh clippy ui       # some jobs (scripts/ci.sh --list)
+#   scripts/ci-local.sh lint ui         # some jobs (scripts/ci.sh --list)
 #
 # As on GitHub, each job starts from its own copy of this checkout (uncommitted changes included,
 # build output and node_modules left out), with a build directory of its own, so jobs neither see
