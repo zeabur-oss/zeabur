@@ -157,6 +157,8 @@ pub(crate) fn joint_tag(ids: &[String]) -> String {
         hash.update(id.as_bytes());
         hash.update(b"\n");
     }
+    // Each byte becomes two hex digits, high nibble first, so the tag is the first 12 digits that
+    // `sha256sum` prints for the same input.
     let digits: String = hash
         .finalize()
         .iter()
