@@ -2793,6 +2793,7 @@ dependencies = [
  "rustls",
  "rustls-platform-verifier",
  "secrecy",
+ "semver",
  "serde",
  "serde-saphyr 2.0.0",
  "serde_json",
@@ -2952,6 +2953,7 @@ dependencies = [
 name = "zeabur-installer-plan"
 version = "0.1.2-beta.2"
 dependencies = [
+ "semver",
  "serde",
  "serde-saphyr 2.0.0",
  "serde_json",

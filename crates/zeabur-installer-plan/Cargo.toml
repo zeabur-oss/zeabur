@@ -10,6 +10,7 @@ repository.workspace = true
 readme = "README.md"
 
 [dependencies]
+semver.workspace = true
 serde.workspace = true
 serde-saphyr.workspace = true
 serde_json.workspace = true
