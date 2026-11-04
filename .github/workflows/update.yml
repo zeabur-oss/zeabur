@@ -1,0 +1,17 @@
+name: Update
+
+# Moves every pin of zeabur-oss/.github to its main and copies the shared skills again from
+# zeabur-oss/skills, in one pull request: Monday 02:30 in Asia/Taipei, or by hand.
+on:
+  schedule:
+    - cron: "30 18 * * 0"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  update:
+    uses: zeabur-oss/.github/.github/workflows/update.yml@fc4d36e33c9bdd662320242cf83e80b7938f818c # main
+    secrets:
+      private-key: ${{ secrets.ZEABUR_OSS_BOT_PRIVATE_KEY }}
