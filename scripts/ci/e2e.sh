@@ -4,7 +4,6 @@
 # shellcheck source-path=SCRIPTDIR
 source "$(dirname "$0")/lib.sh"
 
-
 # The image's size and Zeabur's memory, in the run's summary when there is one.
 report() {
   local measurements="target/dev-cluster/measurements.json"

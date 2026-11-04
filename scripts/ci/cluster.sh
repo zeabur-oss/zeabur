@@ -7,7 +7,6 @@
 # shellcheck source-path=SCRIPTDIR
 source "$(dirname "$0")/lib.sh"
 
-
 # As k3d's cluster admin, with no Zeabur dashboard and no Zeabur Identity: nothing critical, the Identity
 # checks skipped; the exit code is
 # the most serious status in the JSON (crates/zeaburctl/README.md).
