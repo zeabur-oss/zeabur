@@ -3,8 +3,12 @@
     "catalog": {
       "inputs": {
         "flake-utils": "flake-utils",
-        "nixpkgs": "nixpkgs",
-        "oss": "oss"
+        "nixpkgs": [
+          "nixpkgs"
+        ],
+        "oss": [
+          "oss"
+        ]
       },
       "locked": {
         "lastModified": 1793794494,
@@ -62,28 +66,6 @@
     "nix-bun": {
       "inputs": {
         "nixpkgs": [
-          "catalog",
-          "oss",
-          "nixpkgs"
-        ]
-      },
-      "locked": {
-        "lastModified": 1793455789,
-        "narHash": "sha256-E9NBwcMeAn8r1QFGzsY6hmMpR/Jmjg17cgLys9H0/8U=",
-        "owner": "zeabur-oss",
-        "repo": "nix-bun",
-        "rev": "8cc67ab1d93ab5c5ccd8a04c1dcaad205e93e180",
-        "type": "github"
-      },
-      "original": {
-        "owner": "zeabur-oss",
-        "repo": "nix-bun",
-        "type": "github"
-      }
-    },
-    "nix-bun_2": {
-      "inputs": {
-        "nixpkgs": [
           "oss",
           "nixpkgs"
         ]
@@ -104,22 +86,6 @@
     },
     "nixpkgs": {
       "locked": {
-        "lastModified": 1793582901,
-        "narHash": "sha256-WDValiY9se78X2Wh7aWWaq/c7HN29U555+OKbHEzYrw=",
-        "owner": "NixOS",
-        "repo": "nixpkgs",
-        "rev": "5c9de89ec55bff981cb8da1a4ee92b10f1438ffc",
-        "type": "github"
-      },
-      "original": {
-        "owner": "NixOS",
-        "ref": "nixpkgs-unstable",
-        "repo": "nixpkgs",
-        "type": "github"
-      }
-    },
-    "nixpkgs_2": {
-      "locked": {
         "lastModified": 1793345420,
         "narHash": "sha256-e/yiZ31gXRROBDcnOtT3YwDQ73NVG9Cepccbt86LIn8=",
         "owner": "NixOS",
@@ -138,7 +104,6 @@
       "inputs": {
         "nix-bun": "nix-bun",
         "nixpkgs": [
-          "catalog",
           "nixpkgs"
         ]
       },
@@ -176,32 +141,11 @@
         "type": "github"
       }
     },
-    "oss_2": {
-      "inputs": {
-        "nix-bun": "nix-bun_2",
-        "nixpkgs": [
-          "nixpkgs"
-        ]
-      },
-      "locked": {
-        "lastModified": 1793633888,
-        "narHash": "sha256-sU+MYwhvoOk1qX1itJ/y/6qPRBkxUe2OMmTZOiaRwYs=",
-        "owner": "zeabur-oss",
-        "repo": ".github",
-        "rev": "6ab106525ce16169ab0ecfebe4b0248e096797fa",
-        "type": "github"
-      },
-      "original": {
-        "owner": "zeabur-oss",
-        "repo": ".github",
-        "type": "github"
-      }
-    },
     "root": {
       "inputs": {
         "catalog": "catalog",
-        "nixpkgs": "nixpkgs_2",
-        "oss": "oss_2",
+        "nixpkgs": "nixpkgs",
+        "oss": "oss",
         "oss-skills": "oss-skills",
         "rust-overlay": "rust-overlay",
         "zhtw-mcp": "zhtw-mcp"
