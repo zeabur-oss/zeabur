@@ -13,7 +13,8 @@ mod tests {
     use zeabur_kube::memory::{MemoryCluster, State};
     use zeabur_kube::{Identity, NamespaceObjects, ServedResource, WriteBody};
 
-    use crate::common::{app_with, send};
+    use crate::common::send;
+    use crate::support::TestApi;
 
     fn cluster() -> MemoryCluster {
         let namespace: Namespace = serde_json::from_value(json!({"metadata": {"name": "shop",
@@ -86,7 +87,7 @@ mod tests {
     async fn a_template_is_planned_and_applied_as_its_objects_in_the_project() {
         let cluster = cluster();
         serve_cloudnative_pg(&cluster);
-        let app = app_with(&cluster, settings());
+        let app = TestApi::new(&cluster).with_settings(settings()).router();
         let (status, planned) = send(
             &app,
             "POST",
@@ -160,7 +161,7 @@ mod tests {
     async fn deploying_a_template_again_names_every_object_that_exists() {
         let cluster = cluster();
         serve_cloudnative_pg(&cluster);
-        let app = app_with(&cluster, settings());
+        let app = TestApi::new(&cluster).with_settings(settings()).router();
         let (_, planned) = send(
             &app,
             "POST",
@@ -198,7 +199,7 @@ mod tests {
     #[tokio::test]
     async fn a_missing_component_is_reported_and_its_objects_are_not_planned() {
         let cluster = cluster();
-        let app = app_with(&cluster, settings());
+        let app = TestApi::new(&cluster).with_settings(settings()).router();
         let (status, list) = send(&app, "GET", "/api/v1/cluster/templates", None).await;
         assert_eq!(status, StatusCode::OK, "{list}");
         let cnpg = requirement(&list, "miniflux", "cloudnative-pg");
@@ -233,7 +234,7 @@ mod tests {
     async fn a_template_input_that_fails_its_pattern_points_at_the_input() {
         let cluster = cluster();
         serve_cloudnative_pg(&cluster);
-        let app = app_with(&cluster, settings());
+        let app = TestApi::new(&cluster).with_settings(settings()).router();
         let request = json!({"changes": [{"op": "template", "template": "wordpress",
             "domain": "blog.example.com", "inputs": {"adminEmail": "nope"}}]});
         let (status, problem) =

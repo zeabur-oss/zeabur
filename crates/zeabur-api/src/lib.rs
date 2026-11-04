@@ -394,251 +394,85 @@ fn openapi_router() -> OpenApiRouter<AppState> {
     handlers!(describe)
 }
 
+/// What [`router_with`] builds the API with.
+///
+/// [`Options::default`] is what [`router`] uses: the system clock and resolver, a plan key made at
+/// start, no Zeabur Proxy and no terminal namespace, with registries read at any address.
+pub struct Options {
+    /// Zeabur's settings (see [`settings`]).
+    pub settings: Settings,
+    /// The time now.
+    pub clock: fn() -> zeabur_kube::k8s_openapi::jiff::Timestamp,
+    /// The key plan tokens are sealed with; a key read from a file outlives a restart.
+    pub plan_key: Option<Arc<PlanKey>>,
+    /// How long a terminal may idle before the server closes it.
+    pub terminal_idle: std::time::Duration,
+    /// How domains are looked up for a route's trace.
+    pub resolver: Arc<dyn resolve::Resolve>,
+    /// Where the issuer lets people manage how they sign in.
+    pub sign_in: Arc<dyn account::SignInPage>,
+    /// Zeabur Proxy, for log and usage history, when it is installed.
+    pub zeabur_proxy: Option<Arc<dyn services::proxy::ZeaburProxy>>,
+    /// Reads images' configurations; `None` connects to registries at `reach`, trusting
+    /// `settings.trusted_ca`.
+    pub images: Option<Arc<images::Inspector>>,
+    /// What a template uses when idle.
+    pub template_idle: fn(&str) -> Option<zeabur_catalog::IdleUse>,
+    /// Which addresses registries, buckets and GitHub may be reached at.
+    pub reach: images::https::Reach,
+    /// Zeabur's own service account in the terminal namespace (see [`tools`]).
+    pub terminals: Option<Arc<dyn zeabur_kube::Cluster>>,
+}
+
+impl Default for Options {
+    fn default() -> Self {
+        Self {
+            settings: Settings::default(),
+            clock: zeabur_kube::k8s_openapi::jiff::Timestamp::now,
+            plan_key: PlanKey::random().ok().map(Arc::new),
+            terminal_idle: pods::exec::IDLE,
+            resolver: Arc::new(resolve::System),
+            sign_in: Arc::new(account::Fixed(None)),
+            zeabur_proxy: None,
+            images: None,
+            template_idle: zeabur_catalog::template_idle,
+            reach: images::https::Reach::Any,
+            terminals: None,
+        }
+    }
+}
+
+impl std::fmt::Debug for Options {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Options").finish_non_exhaustive()
+    }
+}
+
 /// The API, for `access`; mount it next to the web interface.
 ///
 /// Every answer carries `Cache-Control: no-store` (see the `cache` module).
 pub fn router(access: Arc<dyn ClusterAccess>) -> Router {
-    router_at(access, zeabur_kube::k8s_openapi::jiff::Timestamp::now)
+    router_with(access, Options::default())
 }
 
-/// [`router`] for the in-cluster server, with its `settings`.
-///
-/// Plan tokens are sealed with `plan_key` instead of a key made at start, so that they outlive a
-/// restart, `sign_in` finds the issuer's page where people manage how they sign in, and
-/// `zeabur_proxy` reaches Zeabur Proxy for log and usage history, when it is installed.
-pub fn router_with_key(
-    access: Arc<dyn ClusterAccess>,
-    plan_key: PlanKey,
-    settings: Settings,
-    sign_in: Arc<dyn account::SignInPage>,
-    zeabur_proxy: Option<Arc<dyn services::proxy::ZeaburProxy>>,
-) -> Router {
-    let terminals = tools::connect(&settings.terminal);
-    build_with(
-        access,
-        zeabur_kube::k8s_openapi::jiff::Timestamp::now,
-        Some(Arc::new(plan_key)),
-        pods::exec::IDLE,
+/// [`router`] with `options`.
+pub fn router_with(access: Arc<dyn ClusterAccess>, options: Options) -> Router {
+    let Options {
         settings,
-        Arc::new(resolve::System),
-        sign_in,
-        zeabur_proxy,
-        |tls| inspector(images::https::Reach::Public, tls),
-        zeabur_catalog::template_idle,
-        images::https::Reach::Public,
-        terminals,
-    )
-}
-
-/// [`router`], reading images' configurations with `images`; for tests.
-pub fn router_with_images(access: Arc<dyn ClusterAccess>, images: images::Inspector) -> Router {
-    build_with(
-        access,
-        zeabur_kube::k8s_openapi::jiff::Timestamp::now,
-        PlanKey::random().ok().map(Arc::new),
-        pods::exec::IDLE,
-        Settings::default(),
-        Arc::new(resolve::System),
-        Arc::new(account::Fixed(None)),
-        None,
-        |_| Arc::new(images),
-        zeabur_catalog::template_idle,
-        images::https::Reach::Any,
-        None,
-    )
-}
-
-fn inspector(reach: images::https::Reach, tls: &images::https::Tls) -> Arc<images::Inspector> {
-    Arc::new(images::Inspector::connected(reach, tls))
-}
-
-/// [`router_at`], reaching Zeabur Proxy through `zeabur_proxy`; for tests.
-pub fn router_with_zeabur_proxy(
-    access: Arc<dyn ClusterAccess>,
-    clock: fn() -> zeabur_kube::k8s_openapi::jiff::Timestamp,
-    zeabur_proxy: Arc<dyn services::proxy::ZeaburProxy>,
-) -> Router {
-    build_with(
-        access,
-        clock,
-        PlanKey::random().ok().map(Arc::new),
-        pods::exec::IDLE,
-        Settings::default(),
-        Arc::new(resolve::System),
-        Arc::new(account::Fixed(None)),
-        Some(zeabur_proxy),
-        |tls| inspector(images::https::Reach::Any, tls),
-        zeabur_catalog::template_idle,
-        images::https::Reach::Any,
-        None,
-    )
-}
-
-/// [`router`] with `settings` other than the defaults.
-pub fn router_with_settings(access: Arc<dyn ClusterAccess>, settings: Settings) -> Router {
-    build(
-        access,
-        zeabur_kube::k8s_openapi::jiff::Timestamp::now,
-        PlanKey::random().ok().map(Arc::new),
-        pods::exec::IDLE,
-        settings,
-    )
-}
-
-/// [`router_with_settings`], with `terminals` as Zeabur's own service account in the terminal
-/// namespace (see [`tools`]); for tests.
-pub fn router_with_terminals(
-    access: Arc<dyn ClusterAccess>,
-    settings: Settings,
-    terminals: Arc<dyn zeabur_kube::Cluster>,
-) -> Router {
-    build_with(
-        access,
-        zeabur_kube::k8s_openapi::jiff::Timestamp::now,
-        PlanKey::random().ok().map(Arc::new),
-        pods::exec::IDLE,
-        settings,
-        Arc::new(resolve::System),
-        Arc::new(account::Fixed(None)),
-        None,
-        |tls| inspector(images::https::Reach::Any, tls),
-        zeabur_catalog::template_idle,
-        images::https::Reach::Any,
-        Some(terminals),
-    )
-}
-
-/// [`router`], reading the time from `clock` instead of the system clock; for tests.
-pub fn router_at(
-    access: Arc<dyn ClusterAccess>,
-    clock: fn() -> zeabur_kube::k8s_openapi::jiff::Timestamp,
-) -> Router {
-    build(
-        access,
-        clock,
-        PlanKey::random().ok().map(Arc::new),
-        pods::exec::IDLE,
-        Settings::default(),
-    )
-}
-
-/// [`router_at`], closing a terminal after `terminal_idle` without a byte instead of after
-/// [`pods::exec::IDLE`]; for tests.
-pub fn router_with_terminal_idle(
-    access: Arc<dyn ClusterAccess>,
-    clock: fn() -> zeabur_kube::k8s_openapi::jiff::Timestamp,
-    terminal_idle: std::time::Duration,
-) -> Router {
-    build(
-        access,
-        clock,
-        PlanKey::random().ok().map(Arc::new),
-        terminal_idle,
-        Settings::default(),
-    )
-}
-
-/// [`router`], looking domains up with `resolver` instead of the system's resolver; for tests.
-pub fn router_with_resolver(
-    access: Arc<dyn ClusterAccess>,
-    resolver: Arc<dyn resolve::Resolve>,
-) -> Router {
-    router_with_settings_and_resolver(access, Settings::default(), resolver)
-}
-
-/// [`router_with_settings`], looking domains up with `resolver`; for tests.
-pub fn router_with_settings_and_resolver(
-    access: Arc<dyn ClusterAccess>,
-    settings: Settings,
-    resolver: Arc<dyn resolve::Resolve>,
-) -> Router {
-    build_with(
-        access,
-        zeabur_kube::k8s_openapi::jiff::Timestamp::now,
-        PlanKey::random().ok().map(Arc::new),
-        pods::exec::IDLE,
-        settings,
-        resolver,
-        Arc::new(account::Fixed(None)),
-        None,
-        |tls| inspector(images::https::Reach::Any, tls),
-        zeabur_catalog::template_idle,
-        images::https::Reach::Any,
-        None,
-    )
-}
-
-/// [`router_with_settings_and_resolver`], reading images' configurations with `images` and
-/// templates' idle use from `template_idle`; for the demo, whose `clock` may be fixed.
-pub fn router_for_demo(
-    access: Arc<dyn ClusterAccess>,
-    clock: fn() -> zeabur_kube::k8s_openapi::jiff::Timestamp,
-    settings: Settings,
-    resolver: Arc<dyn resolve::Resolve>,
-    images: Arc<images::Inspector>,
-    template_idle: fn(&str) -> Option<zeabur_catalog::IdleUse>,
-    terminals: Option<Arc<dyn zeabur_kube::Cluster>>,
-) -> Router {
-    build_with(
-        access,
-        clock,
-        PlanKey::random().ok().map(Arc::new),
-        pods::exec::IDLE,
-        settings,
-        resolver,
-        Arc::new(account::Fixed(None)),
-        None,
-        |_| images,
-        template_idle,
-        images::https::Reach::Any,
-        terminals,
-    )
-}
-
-fn build(
-    access: Arc<dyn ClusterAccess>,
-    clock: fn() -> zeabur_kube::k8s_openapi::jiff::Timestamp,
-    plan_key: Option<Arc<PlanKey>>,
-    terminal_idle: std::time::Duration,
-    settings: Settings,
-) -> Router {
-    build_with(
-        access,
         clock,
         plan_key,
         terminal_idle,
-        settings,
-        Arc::new(resolve::System),
-        Arc::new(account::Fixed(None)),
-        None,
-        |tls| inspector(images::https::Reach::Any, tls),
-        zeabur_catalog::template_idle,
-        images::https::Reach::Any,
-        None,
-    )
-}
-
-#[expect(
-    clippy::too_many_arguments,
-    reason = "every router above passes all of AppState's parts"
-)]
-fn build_with(
-    access: Arc<dyn ClusterAccess>,
-    clock: fn() -> zeabur_kube::k8s_openapi::jiff::Timestamp,
-    plan_key: Option<Arc<PlanKey>>,
-    terminal_idle: std::time::Duration,
-    settings: Settings,
-    resolver: Arc<dyn resolve::Resolve>,
-    sign_in: Arc<dyn account::SignInPage>,
-    zeabur_proxy: Option<Arc<dyn services::proxy::ZeaburProxy>>,
-    images: impl FnOnce(&images::https::Tls) -> Arc<images::Inspector>,
-    template_idle: fn(&str) -> Option<zeabur_catalog::IdleUse>,
-    reach: images::https::Reach,
-    terminals: Option<Arc<dyn zeabur_kube::Cluster>>,
-) -> Router {
+        resolver,
+        sign_in,
+        zeabur_proxy,
+        images,
+        template_idle,
+        reach,
+        terminals,
+    } = options;
     let catalogue = Arc::new(zeabur_catalog::catalogue().unwrap_or_default());
     let tls = images::https::tls(settings.trusted_ca.as_deref());
-    let images = images(&tls);
+    let images = images.unwrap_or_else(|| Arc::new(images::Inspector::connected(reach, &tls)));
     let github = tls
         .as_ref()
         .ok()

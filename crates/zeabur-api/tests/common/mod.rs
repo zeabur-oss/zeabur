@@ -9,18 +9,12 @@ use axum::http::{Request, StatusCode};
 use http_body_util::BodyExt as _;
 use serde_json::{Value, json};
 use tower::ServiceExt as _;
-use zeabur_api::Settings;
 use zeabur_api::access::SingleCluster;
 use zeabur_kube::Cluster;
 
 /// The API over `cluster`, with the default settings.
 pub(crate) fn app<C: Cluster + Clone + 'static>(cluster: &C) -> Router {
     zeabur_api::router(Arc::new(SingleCluster(Arc::new(cluster.clone()))))
-}
-
-/// The API over `cluster`, with `settings`.
-pub(crate) fn app_with<C: Cluster + Clone + 'static>(cluster: &C, settings: Settings) -> Router {
-    zeabur_api::router_with_settings(Arc::new(SingleCluster(Arc::new(cluster.clone()))), settings)
 }
 
 /// Sends one request, with `body` as JSON; the status and the answer as JSON (`null` when it is

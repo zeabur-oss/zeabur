@@ -38,6 +38,8 @@ mod rollout;
 mod s3_destinations;
 mod source_upload;
 mod storage;
+#[cfg(test)]
+mod support;
 mod templates;
 mod terminal;
 mod timeline;

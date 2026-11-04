@@ -127,7 +127,16 @@ pub(crate) fn app(
     let access = Arc::new(SessionAccess {
         origin: auth.public.origin(),
     });
-    let api = zeabur_api::router_with_key(access, plan_key, settings, sign_in, zeabur_proxy)
+    let options = zeabur_api::Options {
+        terminals: zeabur_api::tools::connect(&settings.terminal),
+        settings,
+        plan_key: Some(Arc::new(plan_key)),
+        sign_in,
+        zeabur_proxy,
+        reach: zeabur_api::images::https::Reach::Public,
+        ..zeabur_api::Options::default()
+    };
+    let api = zeabur_api::router_with(access, options)
         .layer(axum::middleware::from_fn_with_state(
             Arc::clone(auth),
             session,

@@ -15,7 +15,8 @@ mod tests {
     use zeabur_kube::memory::{MemoryCluster, State};
     use zeabur_kube::{AccessRule, AccessRules, Identity, WriteBody};
 
-    use crate::common::{app, app_with, plan_and_apply, send};
+    use crate::common::{app, plan_and_apply, send};
+    use crate::support::TestApi;
 
     fn namespace(name: &str, labels: &Value) -> Namespace {
         serde_json::from_value(json!({"apiVersion": "v1", "kind": "Namespace",
@@ -203,7 +204,15 @@ mod tests {
                 .insert("shop".to_owned(), Some(developer_rules()));
         });
         let uri = "/api/v1/projects/shop/namespace";
-        let (status, guarded) = send(&app_with(&cluster, with_roles(true)), "GET", uri, None).await;
+        let (status, guarded) = send(
+            &TestApi::new(&cluster)
+                .with_settings(with_roles(true))
+                .router(),
+            "GET",
+            uri,
+            None,
+        )
+        .await;
         assert_eq!(status, StatusCode::OK, "{guarded}");
         assert_eq!(
             (
@@ -219,7 +228,15 @@ mod tests {
             guarded["workloadPatch"][0],
             json!({"kind": "Deployment", "all": "denied", "names": []})
         );
-        let (_, open) = send(&app_with(&cluster, with_roles(false)), "GET", uri, None).await;
+        let (_, open) = send(
+            &TestApi::new(&cluster)
+                .with_settings(with_roles(false))
+                .router(),
+            "GET",
+            uri,
+            None,
+        )
+        .await;
         assert_eq!(
             (
                 &open["canChange"],
@@ -234,7 +251,15 @@ mod tests {
             manager.rules[0].verbs.push("zeabur-manage".to_owned());
             s.access_rules.insert("shop".to_owned(), Some(manager));
         });
-        let (_, manager) = send(&app_with(&cluster, with_roles(true)), "GET", uri, None).await;
+        let (_, manager) = send(
+            &TestApi::new(&cluster)
+                .with_settings(with_roles(true))
+                .router(),
+            "GET",
+            uri,
+            None,
+        )
+        .await;
         assert_eq!(manager["canAdopt"], "allowed");
 
         // A rule limited to names allows patching only those.
@@ -248,7 +273,15 @@ mod tests {
             });
             s.access_rules.insert("shop".to_owned(), Some(named));
         });
-        let (_, named) = send(&app_with(&cluster, with_roles(true)), "GET", uri, None).await;
+        let (_, named) = send(
+            &TestApi::new(&cluster)
+                .with_settings(with_roles(true))
+                .router(),
+            "GET",
+            uri,
+            None,
+        )
+        .await;
         assert_eq!(
             named["workloadPatch"][0],
             json!({"kind": "Deployment", "all": "denied", "names": ["web"]})
@@ -453,7 +486,9 @@ mod tests {
                 ),
             );
         });
-        let app = app_with(&cluster, with_roles(true));
+        let app = TestApi::new(&cluster)
+            .with_settings(with_roles(true))
+            .router();
         let (status, problem) = plan_and_apply(&app, "shop", json!([{"op": "adopt"}])).await;
         assert_eq!(status, StatusCode::FORBIDDEN, "{problem}");
         assert_eq!(problem["kind"], "policy-denied");

@@ -8,26 +8,21 @@
 mod tests {
     use std::collections::BTreeMap;
     use std::net::SocketAddr;
-    use std::sync::Arc;
     use std::time::Duration;
 
     use axum::Router;
     use axum::http::StatusCode;
-    use axum::http::request::Parts;
     use futures_util::{SinkExt as _, StreamExt as _};
-    use secrecy::SecretString;
     use serde_json::{Value, json};
     use tokio_tungstenite::tungstenite::Message;
     use tokio_tungstenite::tungstenite::client::IntoClientRequest as _;
     use zeabur_api::Settings;
-    use zeabur_api::access::{ClusterAccess, Handoff, SingleCluster};
-    use zeabur_core::problem::Problem;
     use zeabur_kube::k8s_openapi::api::core::v1::{Namespace, Pod};
-    use zeabur_kube::k8s_openapi::jiff::{SignedDuration, Timestamp};
     use zeabur_kube::memory::{MemoryCluster, State};
-    use zeabur_kube::{Cluster, Identity, NamespaceObjects, WriteBody};
+    use zeabur_kube::{Identity, NamespaceObjects, WriteBody};
 
     use crate::common::send;
+    use crate::support::TestApi;
 
     const TOKEN: &str = "eyJhbGciOi.secret-token-of-alice.sig";
     const WAIT: Duration = Duration::from_secs(5);
@@ -97,25 +92,6 @@ mod tests {
         })
     }
 
-    /// The in-cluster server's view of one person: their token, expiring in ten minutes, handed
-    /// to a tools pod.
-    struct Signed {
-        cluster: Arc<dyn Cluster>,
-    }
-
-    impl ClusterAccess for Signed {
-        fn for_request(&self, _parts: &Parts) -> Result<Arc<dyn Cluster>, Box<Problem>> {
-            Ok(Arc::clone(&self.cluster))
-        }
-
-        fn handoff(&self, _parts: &Parts) -> Option<Handoff> {
-            Some(Handoff {
-                token: zeabur_kube::UserToken::new(SecretString::from(TOKEN)).unwrap(),
-                expires_at: Timestamp::now() + SignedDuration::from_mins(10),
-            })
-        }
-    }
-
     fn settings() -> Settings {
         let mut settings = Settings::default();
         settings.terminal.tools_grace = Duration::ZERO;
@@ -123,20 +99,15 @@ mod tests {
     }
 
     fn local(cluster: &MemoryCluster) -> Router {
-        zeabur_api::router_with_settings(
-            Arc::new(SingleCluster(Arc::new(cluster.clone()))),
-            settings(),
-        )
+        TestApi::new(cluster).with_settings(settings()).router()
     }
 
     fn signed(cluster: &MemoryCluster, zeabur: &MemoryCluster) -> Router {
-        zeabur_api::router_with_terminals(
-            Arc::new(Signed {
-                cluster: Arc::new(cluster.clone()),
-            }),
-            settings(),
-            Arc::new(zeabur.clone()),
-        )
+        TestApi::new(cluster)
+            .signed_in(TOKEN)
+            .with_settings(settings())
+            .with_terminals(zeabur)
+            .router()
     }
 
     async fn plan(app: &Router, change: Value) -> (StatusCode, Value) {

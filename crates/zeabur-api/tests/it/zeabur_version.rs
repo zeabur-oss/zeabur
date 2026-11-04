@@ -12,7 +12,8 @@ mod tests {
     use zeabur_kube::memory::{MemoryCluster, State};
     use zeabur_kube::{NamespaceObjects, ServedResource};
 
-    use crate::common::{app_with, send};
+    use crate::common::send;
+    use crate::support::TestApi;
 
     fn in_cluster() -> Settings {
         Settings {
@@ -80,7 +81,7 @@ mod tests {
 
     async fn about(cluster: &MemoryCluster, settings: Settings) -> Value {
         let (status, body) = send(
-            &app_with(cluster, settings),
+            &TestApi::new(cluster).with_settings(settings).router(),
             "GET",
             "/api/v1/cluster/zeabur",
             None,

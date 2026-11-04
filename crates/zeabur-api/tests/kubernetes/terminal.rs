@@ -18,8 +18,8 @@ use secrecy::SecretString;
 use serde_json::{Value, json};
 use tokio_tungstenite::tungstenite::Message;
 use tokio_tungstenite::tungstenite::client::IntoClientRequest as _;
-use zeabur_api::Settings;
 use zeabur_api::access::{ClusterAccess, Handoff};
+use zeabur_api::{Options, Settings};
 use zeabur_core::problem::{Denied, Problem};
 use zeabur_kube::Cluster;
 use zeabur_kube::k8s_openapi::api::core::v1::Pod;
@@ -52,12 +52,15 @@ impl ClusterAccess for Signed {
 fn app(sandbox: &Sandbox) -> Router {
     let mut settings = Settings::default();
     settings.terminal.tools_grace = Duration::ZERO;
-    zeabur_api::router_with_settings(
+    zeabur_api::router_with(
         Arc::new(Signed {
             cluster: Arc::new(sandbox.user().clone()),
             token: sandbox.token().to_owned(),
         }),
-        settings,
+        Options {
+            settings,
+            ..Options::default()
+        },
     )
 }
 
@@ -67,13 +70,16 @@ fn with_terminals(sandbox: &Sandbox, terminals: &Sandbox) -> Router {
     terminals
         .namespace()
         .clone_into(&mut settings.terminal.namespace);
-    zeabur_api::router_with_terminals(
+    zeabur_api::router_with(
         Arc::new(Signed {
             cluster: Arc::new(sandbox.user().clone()),
             token: sandbox.token().to_owned(),
         }),
-        settings,
-        Arc::new(terminals.user().clone()),
+        Options {
+            settings,
+            terminals: Some(Arc::new(terminals.user().clone())),
+            ..Options::default()
+        },
     )
 }
 

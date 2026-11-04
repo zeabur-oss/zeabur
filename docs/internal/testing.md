@@ -51,7 +51,7 @@ Removing or weakening one of these tests needs another test of the same promise 
 - **No shared state.** Each API test builds its own in-memory cluster. Each cluster test works in
   a namespace of its own with a random name and deletes it, and any cluster-scoped object, from a
   drop guard, so a failed run leaves nothing behind; tests assume they share the cluster [sig-e2e].
-- **No real clock where the answer depends on the date**: tests fix it (`zeabur_api::router_at`).
+- **No real clock where the answer depends on the date**: tests fix it (`zeabur_api::Options::clock`).
 - **A flaky test is broken.** It is fixed or removed, not retried until green [nondeterminism].
 
 ## Mutation testing

@@ -3305,16 +3305,17 @@ async fn main() -> std::io::Result<()> {
         ..zeabur_api::Settings::default()
     };
     let images = zeabur_api::images::Inspector::new(Arc::new(Registry::new()), Vec::new());
-    let app = zeabur_api::router_for_demo(
-        Arc::new(access),
-        clock,
+    let options = zeabur_api::Options {
         settings,
-        Arc::new(dns()),
-        Arc::new(images),
+        clock,
+        resolver: Arc::new(dns()),
+        images: Some(Arc::new(images)),
         template_idle,
         terminals,
-    )
-    .fallback_service(zeabur_ui::router_for(zeabur_ui::assets(), zeabur_ui::CSP));
+        ..zeabur_api::Options::default()
+    };
+    let app = zeabur_api::router_with(Arc::new(access), options)
+        .fallback_service(zeabur_ui::router_for(zeabur_ui::assets(), zeabur_ui::CSP));
     // Another port when 8080 is taken: ZEABUR_DEMO_ADDR=127.0.0.1:8090.
     let addr = std::env::var("ZEABUR_DEMO_ADDR").unwrap_or_else(|_| "127.0.0.1:8080".to_owned());
     let listener = tokio::net::TcpListener::bind(addr).await?;

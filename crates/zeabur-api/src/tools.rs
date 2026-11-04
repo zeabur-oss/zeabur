@@ -162,7 +162,8 @@ fn exec_in(namespace: &str) -> Denied {
 }
 
 /// Zeabur's own service account in the terminal namespace, from `settings.token_file`.
-pub(crate) fn connect(settings: &TerminalSettings) -> Option<Arc<dyn Cluster>> {
+#[must_use]
+pub fn connect(settings: &TerminalSettings) -> Option<Arc<dyn Cluster>> {
     let path = settings.token_file.as_deref()?;
     match zeabur_kube::ClusterEndpoint::in_cluster()
         .and_then(|endpoint| zeabur_kube::UserClient::with_token_file(&endpoint, path))

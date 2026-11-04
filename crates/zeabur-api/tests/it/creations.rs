@@ -17,7 +17,8 @@ mod tests {
     use zeabur_kube::memory::{MemoryCluster, State};
     use zeabur_kube::{Identity, NamespaceObjects, ServedResource, WriteBody};
 
-    use crate::common::{app, app_with, send};
+    use crate::common::{app, send};
+    use crate::support::TestApi;
 
     const DEPLOYMENT: &str = "apiVersion: apps/v1
 kind: Deployment
@@ -235,7 +236,7 @@ stringData:
             },
             ..Settings::default()
         };
-        let app = app_with(&cluster, settings);
+        let app = TestApi::new(&cluster).with_settings(settings).router();
         let request = json!({"changes": [{"op": "addDomain",
             "workload": {"kind": "Deployment", "name": "web"}, "hostname": "www.example.com"}]});
         let (status, planned) = plan(&app, &request).await;

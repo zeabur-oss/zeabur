@@ -10,7 +10,8 @@ mod tests {
     use zeabur_kube::memory::{MemoryCluster, State};
     use zeabur_kube::{DynamicObject, Identity, ServedResource, WriteBody};
 
-    use crate::common::{app_with, send};
+    use crate::common::send;
+    use crate::support::TestApi;
 
     const NS: &str = "zeabur-identity";
 
@@ -132,7 +133,13 @@ mod tests {
         uri: &str,
         body: Option<&Value>,
     ) -> (StatusCode, Value) {
-        send(&app_with(cluster, settings()), method, uri, body).await
+        send(
+            &TestApi::new(cluster).with_settings(settings()).router(),
+            method,
+            uri,
+            body,
+        )
+        .await
     }
 
     /// Plans `change` and applies the plan on one server: the answer of the step that stopped,
@@ -142,7 +149,7 @@ mod tests {
         settings: Settings,
         change: Value,
     ) -> (StatusCode, Value, Value) {
-        let app = app_with(cluster, settings);
+        let app = TestApi::new(cluster).with_settings(settings).router();
         let (status, plan) = send(&app, "POST", "/api/v1/members/plan", Some(&change)).await;
         if status != StatusCode::OK {
             return (status, plan, Value::Null);
@@ -698,7 +705,7 @@ mod tests {
     #[tokio::test]
     async fn a_plan_is_refused_once_the_member_changed_and_a_project_token_never_applies() {
         let cluster = signed_in("zeabur:ada");
-        let app = app_with(&cluster, settings());
+        let app = TestApi::new(&cluster).with_settings(settings()).router();
         let (status, plan) = send(
             &app,
             "POST",

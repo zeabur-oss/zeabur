@@ -26,7 +26,8 @@ mod tests {
     use zeabur_kube::memory::{MemoryCluster, State};
     use zeabur_kube::{Identity, NamespaceObjects, WriteBody};
 
-    use crate::common::{app_with, send};
+    use crate::common::send;
+    use crate::support::TestApi;
 
     const BASE: &str = "/api/v1/cluster/github-app";
     const CLIENT_ID: &str = "Iv23liexample";
@@ -204,7 +205,7 @@ mod tests {
             },
             ..Settings::default()
         };
-        let app = app_with(&cluster, settings);
+        let app = TestApi::new(&cluster).with_settings(settings).router();
         (cluster, app, fake)
     }
 

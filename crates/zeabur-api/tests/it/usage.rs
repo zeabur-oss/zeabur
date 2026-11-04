@@ -15,7 +15,8 @@ mod tests {
     use zeabur_kube::memory::{MemoryCluster, State};
     use zeabur_kube::{Identity, NamespaceObjects, ServedResource, WriteBody};
 
-    use crate::common::{app_with, send};
+    use crate::common::send;
+    use crate::support::TestApi;
 
     /// The store the settings name by default.
     const STORE: &str = "observability/vmsingle-vm-victoria-metrics-k8s-stack:8428";
@@ -48,7 +49,13 @@ mod tests {
         uri: &str,
         body: Option<&Value>,
     ) -> (StatusCode, Value) {
-        send(&app_with(cluster, settings), method, uri, body).await
+        send(
+            &TestApi::new(cluster).with_settings(settings).router(),
+            method,
+            uri,
+            body,
+        )
+        .await
     }
 
     async fn get(cluster: &MemoryCluster, uri: &str) -> Value {

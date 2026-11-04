@@ -9,17 +9,14 @@ mod tests {
 
     use axum::Router;
     use axum::http::StatusCode;
-    use axum::http::request::Parts;
-    use secrecy::{ExposeSecret as _, SecretString};
+    use secrecy::ExposeSecret as _;
     use serde_json::json;
-    use zeabur_api::access::{ClusterAccess, Handoff, SingleCluster};
     use zeabur_api::services::proxy::{ProxyAnswer, ZeaburProxy};
-    use zeabur_core::problem::Problem;
-    use zeabur_kube::Cluster;
-    use zeabur_kube::k8s_openapi::jiff::{SignedDuration, Timestamp};
+    use zeabur_kube::k8s_openapi::jiff::Timestamp;
     use zeabur_kube::memory::{MemoryCluster, State};
 
     use crate::common::send;
+    use crate::support::TestApi;
 
     const TOKEN: &str = "eyJhbGciOi.token-of-alice.sig";
     const NOW: i64 = 1_800_000_000;
@@ -48,32 +45,17 @@ mod tests {
         }
     }
 
-    struct Signed(Arc<dyn Cluster>);
-
-    impl ClusterAccess for Signed {
-        fn for_request(&self, _parts: &Parts) -> Result<Arc<dyn Cluster>, Box<Problem>> {
-            Ok(Arc::clone(&self.0))
-        }
-
-        fn handoff(&self, _parts: &Parts) -> Option<Handoff> {
-            Some(Handoff {
-                token: zeabur_kube::UserToken::new(SecretString::from(TOKEN)).unwrap(),
-                expires_at: now() + SignedDuration::from_mins(10),
-            })
-        }
-    }
-
     fn app(answer: Result<ProxyAnswer, String>) -> (Router, Arc<Fake>) {
         let fake = Arc::new(Fake {
             answer,
             asked: Mutex::new(Vec::new()),
         });
-        let cluster: Arc<dyn Cluster> = Arc::new(MemoryCluster::new(State::default()));
-        let proxy: Arc<dyn ZeaburProxy> = Arc::<Fake>::clone(&fake);
-        (
-            zeabur_api::router_with_zeabur_proxy(Arc::new(Signed(cluster)), now, proxy),
-            fake,
-        )
+        let app = TestApi::new(&MemoryCluster::new(State::default()))
+            .signed_in(TOKEN)
+            .with_clock(now)
+            .with_zeabur_proxy(Arc::<Fake>::clone(&fake))
+            .router();
+        (app, fake)
     }
 
     fn answer(status: u16, body: &str) -> ProxyAnswer {
@@ -173,17 +155,16 @@ mod tests {
 
     #[tokio::test]
     async fn without_a_proxy_or_a_token_to_pass_on_it_is_not_installed() {
-        let cluster: Arc<dyn Cluster> = Arc::new(MemoryCluster::new(State::default()));
+        let cluster = MemoryCluster::new(State::default());
         for app in [
-            zeabur_api::router(Arc::new(Signed(Arc::clone(&cluster)))),
-            zeabur_api::router_with_zeabur_proxy(
-                Arc::new(SingleCluster(Arc::clone(&cluster))),
-                now,
-                Arc::new(Fake {
+            TestApi::new(&cluster).signed_in(TOKEN).router(),
+            TestApi::new(&cluster)
+                .with_clock(now)
+                .with_zeabur_proxy(Arc::new(Fake {
                     answer: Ok(answer(200, "")),
                     asked: Mutex::new(Vec::new()),
-                }),
-            ),
+                }))
+                .router(),
         ] {
             let (status, body) = send(&app, "GET", PATH, None).await;
             assert_eq!(status, StatusCode::OK, "{body}");

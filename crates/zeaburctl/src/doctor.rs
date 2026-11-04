@@ -808,9 +808,12 @@ mod tests {
     }
 
     fn api(cluster: &MemoryCluster) -> InProcess {
-        InProcess::new(zeabur_api::router_at(
+        InProcess::new(zeabur_api::router_with(
             Arc::new(SingleCluster(Arc::new(cluster.clone()))),
-            today,
+            zeabur_api::Options {
+                clock: today,
+                ..zeabur_api::Options::default()
+            },
         ))
     }
 

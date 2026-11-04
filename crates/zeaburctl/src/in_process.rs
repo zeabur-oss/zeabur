@@ -50,9 +50,12 @@ impl InProcess {
 
     /// The API acting as the person `cluster` signs in as.
     pub(crate) fn with_client(cluster: UserClient, settings: zeabur_api::Settings) -> Self {
-        Self::new(zeabur_api::router_with_settings(
+        Self::new(zeabur_api::router_with(
             Arc::new(SingleCluster(Arc::new(cluster))),
-            settings,
+            zeabur_api::Options {
+                settings,
+                ..zeabur_api::Options::default()
+            },
         ))
     }
 

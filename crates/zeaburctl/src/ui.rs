@@ -85,8 +85,13 @@ async fn serve(args: &UiArgs) -> Result<(), String> {
 
 /// The API, acting as the person whose kubeconfig this is, and the web interface.
 fn app(cluster: UserClient, settings: zeabur_api::Settings) -> Router {
-    let router =
-        zeabur_api::router_with_settings(Arc::new(SingleCluster(Arc::new(cluster))), settings);
+    let router = zeabur_api::router_with(
+        Arc::new(SingleCluster(Arc::new(cluster))),
+        zeabur_api::Options {
+            settings,
+            ..zeabur_api::Options::default()
+        },
+    );
     #[cfg(feature = "ui")]
     let router =
         router.fallback_service(zeabur_ui::router_for(zeabur_ui::assets(), zeabur_ui::CSP));

@@ -18,12 +18,15 @@ mod tests {
     use tokio_tungstenite::tungstenite::protocol::frame::coding::CloseCode;
     use tokio_tungstenite::tungstenite::{Error as WsError, Message};
     use tokio_tungstenite::{MaybeTlsStream, WebSocketStream};
-    use zeabur_api::access::{ClusterAccess, SingleCluster};
+    use zeabur_api::Options;
+    use zeabur_api::access::ClusterAccess;
     use zeabur_core::problem::Problem;
     use zeabur_kube::k8s_openapi::api::core::v1::Pod;
     use zeabur_kube::k8s_openapi::jiff::Timestamp;
     use zeabur_kube::memory::{MemoryCluster, State};
     use zeabur_kube::{Cluster, NamespaceObjects, TerminalSize};
+
+    use crate::support::TestApi;
 
     type Socket = WebSocketStream<MaybeTlsStream<TcpStream>>;
 
@@ -70,7 +73,7 @@ mod tests {
     }
 
     fn app(cluster: &MemoryCluster) -> Router {
-        zeabur_api::router_at(Arc::new(SingleCluster(Arc::new(cluster.clone()))), now)
+        TestApi::new(cluster).with_clock(now).router()
     }
 
     async fn connect_from(
@@ -197,8 +200,10 @@ mod tests {
 
     #[tokio::test]
     async fn an_idle_terminal_is_closed() {
-        let access = Arc::new(SingleCluster(Arc::new(cluster())));
-        let router = zeabur_api::router_with_terminal_idle(access, now, Duration::from_millis(300));
+        let router = TestApi::new(&cluster())
+            .with_clock(now)
+            .with_terminal_idle(Duration::from_millis(300))
+            .router();
         let mut socket = connect(router, "").await;
         assert_eq!(frame(&mut socket).await["type"], "ready");
         assert_eq!(close_code(&mut socket).await.0, CloseCode::from(4001));
@@ -223,7 +228,11 @@ mod tests {
             cluster: Arc::new(cluster()),
             signed_out,
         });
-        let mut socket = connect(zeabur_api::router_at(access, now), "").await;
+        let options = Options {
+            clock: now,
+            ..Options::default()
+        };
+        let mut socket = connect(zeabur_api::router_with(access, options), "").await;
         assert_eq!(frame(&mut socket).await["type"], "ready");
         sign_out.send_replace(true);
         assert_eq!(close_code(&mut socket).await.0, CloseCode::from(4002));

@@ -10,17 +10,15 @@ mod tests {
 
     use axum::Router;
     use axum::http::StatusCode;
-    use axum::http::request::Parts;
-    use secrecy::{ExposeSecret as _, SecretString};
+    use secrecy::ExposeSecret as _;
     use serde_json::{Value, json};
-    use zeabur_api::access::{ClusterAccess, Handoff};
     use zeabur_api::services::proxy::{ProxyAnswer, ZeaburProxy};
-    use zeabur_core::problem::{KubernetesStatus, Problem};
-    use zeabur_kube::Cluster;
-    use zeabur_kube::k8s_openapi::jiff::{SignedDuration, Timestamp};
+    use zeabur_core::problem::KubernetesStatus;
+    use zeabur_kube::k8s_openapi::jiff::Timestamp;
     use zeabur_kube::memory::{MemoryCluster, State};
 
     use crate::common::send;
+    use crate::support::TestApi;
 
     const TOKEN: &str = "eyJhbGciOi.token-of-dana.sig";
     const NOW: i64 = 1_800_000_000;
@@ -48,21 +46,6 @@ mod tests {
                 .unwrap()
                 .push((token.secret().expose_secret().to_owned(), path_and_query));
             Box::pin(std::future::ready(Ok(answer)))
-        }
-    }
-
-    struct Signed(Arc<dyn Cluster>);
-
-    impl ClusterAccess for Signed {
-        fn for_request(&self, _parts: &Parts) -> Result<Arc<dyn Cluster>, Box<Problem>> {
-            Ok(Arc::clone(&self.0))
-        }
-
-        fn handoff(&self, _parts: &Parts) -> Option<Handoff> {
-            Some(Handoff {
-                token: zeabur_kube::UserToken::new(SecretString::from(TOKEN)).unwrap(),
-                expires_at: now() + SignedDuration::from_mins(10),
-            })
         }
     }
 
@@ -145,13 +128,12 @@ mod tests {
         memory.update(|s| {
             s.proxied.insert(STORE.to_owned(), store_refuses);
         });
-        let cluster: Arc<dyn Cluster> = Arc::new(memory.clone());
-        let proxy: Arc<dyn ZeaburProxy> = Arc::<Fake>::clone(&fake);
-        (
-            zeabur_api::router_with_zeabur_proxy(Arc::new(Signed(cluster)), now, proxy),
-            fake,
-            memory,
-        )
+        let app = TestApi::new(&memory)
+            .signed_in(TOKEN)
+            .with_clock(now)
+            .with_zeabur_proxy(Arc::<Fake>::clone(&fake))
+            .router();
+        (app, fake, memory)
     }
 
     fn history(project: &str) -> String {

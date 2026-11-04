@@ -6,7 +6,6 @@
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeMap;
-    use std::sync::Arc;
 
     use axum::Router;
     use axum::body::Body;
@@ -14,7 +13,6 @@ mod tests {
     use http_body_util::BodyExt as _;
     use serde_json::{Value, json};
     use tower::ServiceExt as _;
-    use zeabur_api::access::SingleCluster;
     use zeabur_core::problem::KubernetesStatus;
     use zeabur_kube::k8s_openapi::api::apps::v1::Deployment;
     use zeabur_kube::k8s_openapi::api::core::v1::{ConfigMap, Namespace, Node, Pod, Secret};
@@ -24,6 +22,7 @@ mod tests {
     use zeabur_kube::{Identity, NamespaceObjects, SecretSummary, ServedResource};
 
     use crate::common::app;
+    use crate::support::TestApi;
 
     const SECRET_VALUE: &str = "correct-horse-battery-staple";
 
@@ -1196,8 +1195,7 @@ mod tests {
     async fn upgrades_warn_of_end_of_life_from_the_bundled_table() {
         let cluster = with_nodes();
         let on = |clock: fn() -> Timestamp| {
-            let app =
-                zeabur_api::router_at(Arc::new(SingleCluster(Arc::new(cluster.clone()))), clock);
+            let app = TestApi::new(&cluster).with_clock(clock).router();
             async move {
                 let (status, _, body) = call(app, "GET", "/api/v1/cluster/upgrades").await;
                 assert_eq!(status, StatusCode::OK, "{body}");
