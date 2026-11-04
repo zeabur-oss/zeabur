@@ -39,6 +39,7 @@ serde_json.workspace = true
 # Reads the vendored error-pages template.
 serde-saphyr.workspace = true
 secrecy.workspace = true
+semver.workspace = true
 sha2.workspace = true
 tar.workspace = true
 thiserror.workspace = true

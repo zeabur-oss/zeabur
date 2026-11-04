@@ -4,10 +4,10 @@
 //! [`ask`] makes one request. The server keeps its answer for an hour (`cluster::update`), and
 //! `zeaburctl` asks on each command.
 
-use std::cmp::Ordering;
 use std::time::{Duration, SystemTime};
 
 use axum::http::{self, HeaderMap, HeaderValue, Request};
+use semver::Version;
 use serde::Deserialize;
 
 use crate::images::https::Https;
@@ -153,14 +153,14 @@ pub fn parse(body: &[u8]) -> Result<Vec<ZeaburRelease>, String> {
 /// normal releases that fix vulnerabilities come with it. `None` when `running` is not a version.
 #[must_use]
 pub fn newer(releases: &[ZeaburRelease], running: &str) -> Option<ZeaburNewer> {
-    let running = Version::parse(running)?;
+    let running = version(running)?;
     let mut newer: Vec<(Version, &ZeaburRelease)> = releases
         .iter()
         .filter(|r| !r.prerelease || !running.pre.is_empty())
-        .filter_map(|r| Some((Version::parse(&r.version)?, r)))
-        .filter(|(v, _)| *v > running)
+        .filter_map(|r| Some((version(&r.version)?, r)))
+        .filter(|(v, _)| v.cmp_precedence(&running).is_gt())
         .collect();
-    newer.sort_by(|a, b| b.0.cmp(&a.0));
+    newer.sort_by(|a, b| b.0.cmp_precedence(&a.0));
     let (_, latest) = newer.first()?;
     Some(ZeaburNewer {
         latest: (*latest).clone(),
@@ -172,70 +172,9 @@ pub fn newer(releases: &[ZeaburRelease], running: &str) -> Option<ZeaburNewer> {
     })
 }
 
-/// A Semantic Versioning 2.0.0 version. Build metadata is dropped, as it takes no part in
-/// precedence.
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct Version {
-    core: [u64; 3],
-    pre: Vec<String>,
-}
-
-impl Version {
-    /// `1.2.3`, `v1.2.3-beta.1` or `1.2.3+build`.
-    fn parse(tag: &str) -> Option<Self> {
-        let text = tag.strip_prefix('v').unwrap_or(tag);
-        let text = text.split_once('+').map_or(text, |(version, _)| version);
-        let (core, pre) = text
-            .split_once('-')
-            .map_or((text, None), |(core, pre)| (core, Some(pre)));
-        let mut parts = core.split('.').map(|p| p.parse::<u64>().ok());
-        let core = [parts.next()??, parts.next()??, parts.next()??];
-        if parts.next().is_some() {
-            return None;
-        }
-        let pre: Vec<String> =
-            pre.map_or_else(Vec::new, |pre| pre.split('.').map(str::to_owned).collect());
-        if pre.iter().any(String::is_empty) {
-            return None;
-        }
-        Some(Self { core, pre })
-    }
-}
-
-impl Ord for Version {
-    /// [SemVer 2.0.0, section 11]: a pre-release comes before its normal version. Identifiers
-    /// compare numerically when both are numbers, else as ASCII, and numbers come first.
-    ///
-    /// [SemVer 2.0.0, section 11]: https://semver.org/spec/v2.0.0.html#spec-item-11
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.core
-            .cmp(&other.core)
-            .then_with(|| match (self.pre.is_empty(), other.pre.is_empty()) {
-                (true, true) => Ordering::Equal,
-                (true, false) => Ordering::Greater,
-                (false, true) => Ordering::Less,
-                (false, false) => {
-                    for (a, b) in self.pre.iter().zip(&other.pre) {
-                        let order = match (a.parse::<u64>(), b.parse::<u64>()) {
-                            (Ok(a), Ok(b)) => a.cmp(&b),
-                            (Ok(_), Err(_)) => Ordering::Less,
-                            (Err(_), Ok(_)) => Ordering::Greater,
-                            (Err(_), Err(_)) => a.cmp(b),
-                        };
-                        if order != Ordering::Equal {
-                            return order;
-                        }
-                    }
-                    self.pre.len().cmp(&other.pre.len())
-                }
-            })
-    }
-}
-
-impl PartialOrd for Version {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
+/// `1.2.3`, `v1.2.3-beta.1` or `1.2.3+build`.
+fn version(tag: &str) -> Option<Version> {
+    Version::parse(tag.strip_prefix('v').unwrap_or(tag)).ok()
 }
 
 #[cfg(test)]
@@ -256,7 +195,7 @@ mod tests {
     }
 
     fn v(text: &str) -> Version {
-        Version::parse(text).unwrap()
+        version(text).unwrap()
     }
 
     #[test]
@@ -276,11 +215,16 @@ mod tests {
             "2.0.0",
         ];
         for pair in ordered.windows(2) {
-            assert!(v(pair[0]) < v(pair[1]), "{} < {}", pair[0], pair[1]);
+            assert!(
+                v(pair[0]).cmp_precedence(&v(pair[1])).is_lt(),
+                "{} < {}",
+                pair[0],
+                pair[1]
+            );
         }
-        assert_eq!(v("v1.2.3").cmp(&v("1.2.3+build.5")), Ordering::Equal);
+        assert!(v("v1.2.3").cmp_precedence(&v("1.2.3+build.5")).is_eq());
         for bad in ["1.2", "1.2.3.4", "x.1.2", "1.2.3-", "1.2.3-a..b", ""] {
-            assert!(Version::parse(bad).is_none(), "{bad}");
+            assert!(version(bad).is_none(), "{bad}");
         }
     }
 

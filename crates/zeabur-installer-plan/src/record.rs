@@ -280,46 +280,9 @@ pub fn builder_deletes_images(record: &Record, components: &[ComponentPlan]) -> 
 /// (<https://semver.org/#spec-item-11>); `None` when either is not one.
 #[must_use]
 pub fn precedence(a: &str, b: &str) -> Option<Ordering> {
-    let (a_core, a_pre) = parts(a)?;
-    let (b_core, b_pre) = parts(b)?;
-    Some(a_core.cmp(&b_core).then_with(|| {
-        match (a_pre.is_empty(), b_pre.is_empty()) {
-            (true, true) => Ordering::Equal,
-            (true, false) => Ordering::Greater,
-            (false, true) => Ordering::Less,
-            (false, false) => a_pre
-                .iter()
-                .zip(&b_pre)
-                .map(|(x, y)| identifier(x, y))
-                .find(|o| o.is_ne())
-                .unwrap_or_else(|| a_pre.len().cmp(&b_pre.len())),
-        }
-    }))
-}
-
-fn parts(version: &str) -> Option<([u64; 3], Vec<&str>)> {
-    let version = version.split_once('+').map_or(version, |(v, _)| v);
-    let (core, pre) = version.split_once('-').unwrap_or((version, ""));
-    let mut numbers = core.split('.').map(|n| n.parse::<u64>().ok());
-    let core = [numbers.next()??, numbers.next()??, numbers.next()??];
-    if numbers.next().is_some() {
-        return None;
-    }
-    let pre = if pre.is_empty() {
-        Vec::new()
-    } else {
-        pre.split('.').collect()
-    };
-    Some((core, pre))
-}
-
-fn identifier(a: &str, b: &str) -> Ordering {
-    match (a.parse::<u64>(), b.parse::<u64>()) {
-        (Ok(x), Ok(y)) => x.cmp(&y),
-        (Ok(_), Err(_)) => Ordering::Less,
-        (Err(_), Ok(_)) => Ordering::Greater,
-        (Err(_), Err(_)) => a.cmp(b),
-    }
+    let a = semver::Version::parse(a).ok()?;
+    let b = semver::Version::parse(b).ok()?;
+    Some(a.cmp_precedence(&b))
 }
 
 #[cfg(test)]
