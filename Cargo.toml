@@ -234,3 +234,10 @@ verbose_file_reads = "warn"
 codegen-units = 1
 lto = "thin"
 strip = true
+
+# The cluster CI jobs' images (scripts/build-image.sh): the release build without its slowest
+# steps. Releases use `release`.
+[profile.ci]
+inherits = "release"
+codegen-units = 16
+lto = false
