@@ -30,7 +30,7 @@ zot's fixed ClusterIP 10.43.0.50, checked against zot's CA.
 `--profile bare` is the cluster alone: run `binary(kubernetes)` and `e2e-ui.sh` there (the
 `cluster` job does), since Zeabur's ValidatingAdmissionPolicy `zeabur-project-namespace` stops
 their non-admin people from changing namespace labels. To run a whole
-job as CI does, use `scripts/ci-local.sh kubernetes` (see `zeabur-ci`).
+job as CI does, use `scripts/ci-local.sh cluster` (see `zeabur-ci`).
 
 ## Run
 ```sh

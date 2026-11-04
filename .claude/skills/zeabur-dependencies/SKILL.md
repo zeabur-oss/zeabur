@@ -10,7 +10,7 @@ zeabur-oss-dependencies`; `skills-lock.json` pins it). This skill adds what is Z
 
 ## Rust
 
-- The unsafe report is `./scripts/ci.sh unsafe-report`. Only normal and build dependencies of
+- The unsafe report is `node_modules/.bin/zeabur-oss-unsafe-report zeabur zeaburctl zeabur-proxy zeabur-installer`, run by `scripts/ci/lint.sh`. Only normal and build dependencies of
   `zeabur`, `zeaburctl`, `zeabur-proxy` and `zeabur-installer` count. kube's and axum's `ws`,
   for the terminal, brought in `tungstenite` when they moved from dev-dependencies to normal
   ones: that move needed the review.
