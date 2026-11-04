@@ -101,9 +101,7 @@ pub(crate) fn install(dev: &DevCluster, install: &Install<'_>) -> Result<(), Str
                 "--tail=50",
             ])
             .report();
-        dev.kubectl()
-            .args(["-n", "zeabur", "get", "pods,events"])
-            .report();
+        dev.diagnose("zeabur");
         return Err(e);
     }
     dev.write("profile", &format!("{}\n", install.profile.name()))?;

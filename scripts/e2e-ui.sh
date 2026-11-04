@@ -9,30 +9,19 @@ root="$(cd "$(dirname "$0")/.." && pwd)"
 namespace=zeabur-e2e
 out="$root/target/e2e-ui"
 mkdir -p "$out"
-
-# Runs one kubectl wait; when it times out, says which one and shows the namespace's pods and
-# events, since the cluster is gone by the time anyone reads the CI log.
-wait_for() {
-  if ! "$@" >/dev/null; then
-    echo "error: timed out: $*" >&2
-    kubectl -n "$namespace" get pods -o wide >&2 || true
-    kubectl -n "$namespace" get events --sort-by=.lastTimestamp >&2 || true
-    kubectl get nodes -o wide >&2 || true
-    exit 1
-  fi
-}
+source "$root/scripts/wait.sh"
 
 # The write tests start from the manifest as applied: what an earlier run added (a variable, a
 # volume, a policy) goes with the namespace.
-wait_for kubectl delete namespace "$namespace" "$namespace-adopt" "$namespace-files" \
+wait_for "$namespace" kubectl delete namespace "$namespace" "$namespace-adopt" "$namespace-files" \
   --ignore-not-found --wait --timeout=180s
 kubectl apply -f "$root/web/e2e/manifests/talker.yaml" \
   -f "$root/web/e2e/manifests/second-project.yaml" \
   -f "$root/web/e2e/manifests/files.yaml" >/dev/null
-wait_for kubectl -n "$namespace" rollout status deployment/talker --timeout=180s
-wait_for kubectl -n "$namespace" rollout status deployment/editor --timeout=180s
-wait_for kubectl -n "$namespace-files" rollout status deployment/keeper --timeout=180s
-wait_for kubectl -n "$namespace-files" rollout status deployment/distroless --timeout=180s
+wait_for "$namespace" kubectl -n "$namespace" rollout status deployment/talker --timeout=180s
+wait_for "$namespace" kubectl -n "$namespace" rollout status deployment/editor --timeout=180s
+wait_for "$namespace-files" kubectl -n "$namespace-files" rollout status deployment/keeper --timeout=180s
+wait_for "$namespace-files" kubectl -n "$namespace-files" rollout status deployment/distroless --timeout=180s
 pod=$(kubectl -n "$namespace" get pods -l app=talker -o jsonpath='{.items[0].metadata.name}')
 # The crashing Deployment must have crashed a few times before the Overview test looks for it.
 # Between restarts the kubelet reports the container as `waiting: CrashLoopBackOff`,
@@ -47,7 +36,7 @@ for _ in $(seq 1 90); do
 done
 if [[ "${restarts:-0}" -lt 2 ]]; then
   echo "error: deployment/crasher has not restarted twice (restarts: ${restarts:-0})" >&2
-  kubectl -n "$namespace" get pods -o wide >&2 || true
+  diagnose "$namespace"
   exit 1
 fi
 

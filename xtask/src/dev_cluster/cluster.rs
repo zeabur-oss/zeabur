@@ -74,7 +74,8 @@ pub(crate) fn traefik(dev: &DevCluster) -> Result<(), String> {
             .args(["-n", "kube-system", "get", "deployment/traefik"])
             .probe()
             .map(drop)
-    })?;
+    })
+    .inspect_err(|_| dev.diagnose("kube-system"))?;
     dev.rollout(
         "kube-system",
         "deployment/traefik",
@@ -113,7 +114,8 @@ pub(crate) fn resolve_hosts(dev: &DevCluster) -> Result<(), String> {
         &format!("{IDENTITY_HOST} to resolve in the cluster"),
         Duration::from_secs(120),
         || resolves(dev),
-    )?;
+    )
+    .inspect_err(|_| dev.diagnose("default"))?;
     dev.kubectl()
         .args(["delete", "pod", "dns-check", "--wait"])
         .quiet()

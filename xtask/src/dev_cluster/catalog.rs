@@ -51,6 +51,7 @@ pub(crate) fn install(
         .args(["-n", namespace, "wait", "deployment", "--all"])
         .args(["--for=condition=Available", "--timeout=300s"])
         .run()
+        .inspect_err(|_| dev.diagnose(namespace))
         .map_err(|e| format!("waiting for {component} in {namespace}: {e}"))
 }
 

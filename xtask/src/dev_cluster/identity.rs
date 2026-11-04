@@ -89,6 +89,7 @@ fn trust(dev: &DevCluster) -> Result<(), String> {
             }
         },
     )
+    .inspect_err(|_| dev.diagnose("kube-system"))
 }
 
 fn reloads(dev: &DevCluster) -> Result<f64, String> {
