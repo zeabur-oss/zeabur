@@ -7,6 +7,11 @@ on:
 permissions:
   contents: read
 
+# A title edit, a label and a push in a row leave only the last run.
+concurrency:
+  group: changeset-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 jobs:
   changeset:
     uses: zeabur-oss/.github/.github/workflows/changeset.yml@6ab106525ce16169ab0ecfebe4b0248e096797fa # main
