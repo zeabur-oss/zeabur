@@ -8,8 +8,8 @@
 #   scripts/ci.sh <job>      # run one job; it enters its Nix dev shell itself
 #   scripts/ci.sh --list     # the job names, without the dev shell
 #
-# A job leaves what is worth keeping (the unsafe report) in $CI_ARTIFACTS when it is set; the
-# workflow uploads it as the artifact ci-<job>.
+# A job leaves what is worth keeping (the unsafe report, the cluster's measurements) in
+# $CI_ARTIFACTS when it is set; the workflow uploads it as the artifact ci-<job>.
 #
 # The cluster jobs run on the development cluster (scripts/dev-cluster.sh, which also reads
 # ZEABUR_IDENTITY_SRC, K3S_IMAGE and ZEABUR_REGISTRY_MIRRORS; without ZEABUR_IDENTITY_SRC it fetches
@@ -50,6 +50,20 @@ keep() { # $1 = file
   [[ -n "${CI_ARTIFACTS:-}" && -f "$1" ]] || return 0
   mkdir -p "$CI_ARTIFACTS"
   cp "$1" "$CI_ARTIFACTS/"
+}
+
+# The image's size and Zeabur's memory after kubernetes-l2, in the run's summary when there is one.
+l2_report() {
+  local measurements="target/dev-cluster/measurements.json"
+  keep "$measurements"
+  [[ -n "${GITHUB_STEP_SUMMARY:-}" ]] || return 0
+  {
+    echo "### Zeabur in the cluster, \`ci\` build (${K3S_IMAGE:-the default k3s})"
+    echo "| Measure | Bytes |"
+    echo "|---|---|"
+    echo "| Image \`zeabur\` | $(docker image inspect --format '{{.Size}}' zeabur:dev 2>/dev/null || echo n/a) |"
+    echo "| Pod working set when idle | $(jq -r .pod_working_set_bytes "$measurements" 2>/dev/null || echo n/a) |"
+  } >>"$GITHUB_STEP_SUMMARY"
 }
 
 # As k3d's cluster admin, with no Zeabur dashboard and no Zeabur Identity: nothing critical, the Identity
@@ -185,6 +199,9 @@ case "$job" in
   # Zeabur in a cluster with Zeabur Identity, from their images and Zeabur's chart, through a browser:
   # passkey sign-in, terminal, rights, memory, removal.
   kubernetes-l2)
-    ZEABUR_L2_KEEP="${ZEABUR_CI_KEEP:-}" ./scripts/e2e-l2.sh
+    status=0
+    ZEABUR_L2_KEEP="${ZEABUR_CI_KEEP:-}" ./scripts/e2e-l2.sh || status=$?
+    l2_report
+    exit "$status"
     ;;
 esac

@@ -120,6 +120,7 @@ echo "domains: the system namespaces keep theirs"
 # --- Memory when idle -----------------------------------------------------------------------------
 # Of the `ci` build (scripts/build-image.sh); release-smoke.sh records the release build's.
 working_set=$(idle_working_set "$namespace")
+printf '{"pod_working_set_bytes": %s}\n' "$working_set" >"$state/measurements.json"
 if ((working_set > memory_budget)); then
   echo "error: idle working set $working_set bytes exceeds 30 MiB in every reading" >&2
   exit 1
