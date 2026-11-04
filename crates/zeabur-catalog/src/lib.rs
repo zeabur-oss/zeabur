@@ -246,7 +246,7 @@ pub enum Suggestion {
     Recommended,
     /// Available, but not installed by default (heavier or for specific needs).
     Optional,
-    /// No component supports this cluster's distribution.
+    /// No component runs here: on the cluster's distribution and Kubernetes, and on its profile.
     Unsupported,
 }
 
@@ -267,26 +267,39 @@ pub fn distribution(facts: &ClusterFacts) -> Option<&'static str> {
         Some("k3s")
     } else if facts.version.contains("+rke2") {
         Some("rke2")
+    } else if facts.version.contains("+kubesolo") {
+        Some("kubesolo")
     } else {
         None
     }
 }
 
+/// A component's `defaults` on a profile; a value Zeabur does not know counts as unsupported.
+fn default_on<'a>(component: &'a Component, profile: &str) -> &'a str {
+    match component.defaults.get(profile).map(String::as_str) {
+        Some(known @ ("recommended" | "optional")) => known,
+        _ => "unsupported",
+    }
+}
+
+/// The components of a capability that can run here: on the cluster's distribution, when the
+/// version names one the catalogue knows, on its Kubernetes, and not unsupported on its profile.
 fn suggestion(components: &[Component], facts: &ClusterFacts) -> Suggestion {
     let profile = profile(facts);
     let distribution = distribution(facts);
     let supported: Vec<&Component> = components
         .iter()
         .filter(|c| {
-            distribution.is_some_and(|d| c.distributions.iter().any(|x| x == d))
+            distribution.is_none_or(|d| c.distributions.iter().any(|x| x == d))
                 && kube_version::admits(&c.kube_version, &facts.version).unwrap_or(false)
+                && default_on(c, profile) != "unsupported"
         })
         .collect();
     if supported.is_empty() {
         Suggestion::Unsupported
     } else if supported
         .iter()
-        .any(|c| c.defaults.get(profile).is_some_and(|m| m == "recommended"))
+        .any(|c| default_on(c, profile) == "recommended")
     {
         Suggestion::Recommended
     } else {
@@ -521,22 +534,93 @@ mod tests {
         assert_eq!(backup.suggestion, Some(Suggestion::Optional));
     }
 
+    fn suggestion_of(facts: &ClusterFacts, capability: &str) -> Option<Suggestion> {
+        detect(&catalogue().unwrap(), facts)
+            .into_iter()
+            .find(|c| c.name == capability)
+            .and_then(|c| c.suggestion)
+    }
+
     #[test]
-    fn node_updates_are_unsupported_outside_k3s() {
+    fn node_updates_are_unsupported_on_kubesolo() {
         let mut facts = ClusterFacts {
+            version: "v1.35.7+kubesolo-v1.2.3".to_owned(),
+            nodes: Some(1),
+            ..ClusterFacts::default()
+        };
+        assert_eq!(distribution(&facts), Some("kubesolo"));
+        assert_eq!(
+            suggestion_of(&facts, "node-updates"),
+            Some(Suggestion::Unsupported)
+        );
+        assert_eq!(
+            suggestion_of(&facts, "certificates"),
+            Some(Suggestion::Recommended)
+        );
+        facts.version = "v1.36.5+k3s1".to_owned();
+        assert_ne!(
+            suggestion_of(&facts, "node-updates"),
+            Some(Suggestion::Unsupported)
+        );
+    }
+
+    #[test]
+    fn a_distribution_the_catalogue_does_not_name_is_not_held_against_a_component() {
+        let facts = ClusterFacts {
             version: "v1.36.2".to_owned(),
             nodes: Some(3),
             ..ClusterFacts::default()
         };
-        let find = |facts: &ClusterFacts| {
-            detect(&catalogue().unwrap(), facts)
-                .into_iter()
-                .find(|c| c.name == "node-updates")
-                .and_then(|c| c.suggestion)
+        assert_eq!(distribution(&facts), None);
+        for capability in ["certificates", "node-updates"] {
+            assert_ne!(
+                suggestion_of(&facts, capability),
+                Some(Suggestion::Unsupported),
+                "{capability}"
+            );
+        }
+    }
+
+    fn component(defaults: &str, kube_version: &str) -> Component {
+        Component {
+            id: "cert-manager".to_owned(),
+            capability: "certificates".to_owned(),
+            display_name: "cert-manager".to_owned(),
+            homepage: String::new(),
+            license: String::new(),
+            summary: BTreeMap::new(),
+            defaults: BTreeMap::from([("single-node".to_owned(), defaults.to_owned())]),
+            distributions: vec!["k3s".to_owned()],
+            kube_version: kube_version.to_owned(),
+            detection: Detection::default(),
+            tested_version: None,
+        }
+    }
+
+    #[test]
+    fn a_component_outside_its_kube_version_or_with_an_unknown_default_is_not_suggested() {
+        let facts = ClusterFacts {
+            version: "v1.36.5+k3s1".to_owned(),
+            nodes: Some(1),
+            ..ClusterFacts::default()
         };
-        assert_eq!(find(&facts), Some(Suggestion::Unsupported));
-        facts.version = "v1.36.5+k3s1".to_owned();
-        assert_ne!(find(&facts), Some(Suggestion::Unsupported));
+        let one = |c: Component| suggestion(&[c], &facts);
+        assert_eq!(
+            one(component("recommended", ">=1.34.0-0")),
+            Suggestion::Recommended
+        );
+        assert_eq!(
+            one(component("optional", ">=1.34.0-0")),
+            Suggestion::Optional
+        );
+        assert_eq!(
+            one(component("recommended", ">=1.37.0-0")),
+            Suggestion::Unsupported
+        );
+        assert_eq!(
+            one(component("required", ">=1.34.0-0")),
+            Suggestion::Unsupported
+        );
     }
 
     #[test]

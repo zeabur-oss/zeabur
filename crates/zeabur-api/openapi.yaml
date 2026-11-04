@@ -6478,7 +6478,7 @@ components:
           type:
           - string
           - "null"
-          description: "The distribution, when the version names one: `k3s` or `rke2`."
+          description: "The distribution, when the version names one: `k3s`, `rke2` or `kubesolo`."
         domains:
           $ref: "#/components/schemas/DomainSettings"
           description: How a new service's public URL is made.
@@ -17288,7 +17288,7 @@ components:
           type:
           - string
           - "null"
-          description: "`k3s` or `rke2`, when the version names one."
+          description: "`k3s`, `rke2` or `kubesolo`, when the version names one."
         extensions:
           $ref: "#/components/schemas/UpgradeExtensions"
           description: |-

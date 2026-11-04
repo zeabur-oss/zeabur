@@ -2273,7 +2273,7 @@ export type Cluster = {
   /** What you may change in the cluster itself. */
   can: ClusterRights
   /**
-   * The distribution, when the version names one: `k3s` or `rke2`.
+   * The distribution, when the version names one: `k3s`, `rke2` or `kubesolo`.
    * @nullable
    */
   distribution?: string | null
@@ -9771,7 +9771,7 @@ export type Upgrades = {
   /** When the bundled table was copied from the Kubernetes schedule (`YYYY-MM-DD`). */
   dataAsOf: string
   /**
-   * `k3s` or `rke2`, when the version names one.
+   * `k3s`, `rke2` or `kubesolo`, when the version names one.
    * @nullable
    */
   distribution?: string | null

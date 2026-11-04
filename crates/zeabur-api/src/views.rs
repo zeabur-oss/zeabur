@@ -70,7 +70,7 @@ pub struct Cluster {
     pub name_source: crate::settings::cluster_name::NameSource,
     /// kube-apiserver's version (`gitVersion`, such as `v1.36.5+k3s1`).
     pub kubernetes_version: String,
-    /// The distribution, when the version names one: `k3s` or `rke2`.
+    /// The distribution, when the version names one: `k3s`, `rke2` or `kubesolo`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub distribution: Option<String>,
     /// How a new service's public URL is made.
@@ -596,7 +596,7 @@ pub struct Upgrades {
     pub id: String,
     /// kube-apiserver's version.
     pub kubernetes_version: String,
-    /// `k3s` or `rke2`, when the version names one.
+    /// `k3s`, `rke2` or `kubesolo`, when the version names one.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub distribution: Option<String>,
     /// `1.34`.
