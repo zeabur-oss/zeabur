@@ -32,15 +32,15 @@ import {
   pushImage,
   readDigests,
   recorded,
+  scratch,
   sha256,
   sums,
   verifyChart,
   verifyImage,
 } from "@zeabur-oss/release";
 import { $ } from "bun";
-import { existsSync, rmSync } from "node:fs";
-import { cp, mkdir, mkdtemp, readdir, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { existsSync } from "node:fs";
+import { cp, mkdir, readdir, rm } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { parseVersion, pinTag, type Version } from "./versions";
 
@@ -83,25 +83,6 @@ function platform(os: string, arch: string) {
   const here = `${process.platform}-${{ x64: "amd64" }[process.arch as "x64"] ?? process.arch}`;
   if (here !== `${os}-${arch}`)
     fail(`this machine is ${here}, not ${os}-${arch}`);
-}
-
-// A directory of this run's own, removed when it ends, with an empty registry login. Helm reads
-// the same file as crane.
-async function scratch(): Promise<{
-  dir: string;
-  env: Record<string, string>;
-}> {
-  const dir = await mkdtemp(join(tmpdir(), "release-"));
-  process.on("exit", () => rmSync(dir, { recursive: true, force: true }));
-  const docker = join(dir, "docker");
-  await mkdir(docker);
-  return {
-    dir,
-    env: {
-      DOCKER_CONFIG: docker,
-      HELM_REGISTRY_CONFIG: join(docker, "config.json"),
-    },
-  };
 }
 
 // The digest a checksum list has for a file.
