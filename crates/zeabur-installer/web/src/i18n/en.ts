@@ -220,9 +220,9 @@ export const en = {
     "Runs with host access, so its namespace is exempt from the restricted Pod Security level.",
   "components.personalDescription":
     "Ingress and certificates come by default. Tick Zeabur Builder if you want to build apps from Git or a folder. What a component needs is added with it.",
-  "components.untested": (distribution: string) => `Not tested on ${distribution}`,
-  "components.needsUntested": (component: string, distribution: string) =>
-    `Needs ${component}, which was not tested on ${distribution}`,
+  "components.untested": "Untested",
+  "components.untestedHint": (distribution: string) =>
+    `Not tested on ${distribution} yet. You can still install it.`,
   "components.needsMemory": (mib: number) =>
     `Needs ${mib.toLocaleString("en")} MiB of memory, and this server has less`,
   "components.unsupported": (distribution: string) => `Not on ${distribution}`,
@@ -469,7 +469,7 @@ export const en = {
   "warning.builder.deletesImages": () =>
     "Zeabur Builder takes over zot and deletes images under <project>/<name> paths that no build made, including any you pushed there yourself. To keep every image, uncheck Zeabur Builder on the Components step.",
   "warning.config.untested": (id: string, distribution: string) =>
-    `${id} wasn't tested on ${distribution}. It's installed because the configuration file asks for it or for a component that needs it.`,
+    `${id} wasn't tested on ${distribution}. It's installed anyway.`,
   "warning.config.kubeVersion": (id: string, range: string, version: string) =>
     `${id} needs Kubernetes ${range}, and this cluster runs ${version}, so it isn't installed.`,
   "warning.config.runsOn": (id: string, only: string) =>

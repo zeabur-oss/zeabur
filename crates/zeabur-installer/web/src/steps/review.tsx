@@ -627,6 +627,7 @@ function ComponentTable({
                       {byId.get(c.id)?.privileged ? (
                         <Badge variant="warn">{t("components.privileged")}</Badge>
                       ) : null}
+                      {c.untested ? <Badge variant="warn">{t("components.untested")}</Badge> : null}
                     </span>
                     {note ? (
                       <span className="mt-1 block text-xs whitespace-normal text-secondary">

@@ -200,9 +200,8 @@ export const zhTW: Messages = {
     "以主機權限執行，所以這個元件的 Namespace 不套用 restricted Pod 安全等級。",
   "components.personalDescription":
     "預設會裝 Ingress 和憑證，要從 Git 或資料夾建置，再勾選 Zeabur Builder。元件需要的其他元件會一起加入。",
-  "components.untested": (distribution) => `還沒在 ${distribution} 上測試過`,
-  "components.needsUntested": (component, distribution) =>
-    `需要的 ${component} 還沒在 ${distribution} 上測試過`,
+  "components.untested": "未測試",
+  "components.untestedHint": (distribution) => `還沒在 ${distribution} 上測試過，一樣可以安裝。`,
   "components.needsMemory": (mib) => `至少要 ${mib.toLocaleString("zh-TW")} MiB 記憶體，這台不夠`,
   "components.unsupported": (distribution) => `不支援 ${distribution}`,
   "components.runsOn": (where) => `只能在 ${where} 上執行`,
@@ -436,7 +435,7 @@ export const zhTW: Messages = {
   "warning.builder.deletesImages": () =>
     "Zeabur Builder 會接手 zot，並刪除 <project>/<name> 路徑下不是建置產生的映像檔，包括你自己推上去的。要保留所有映像檔，請在「元件」步驟取消勾選 Zeabur Builder。",
   "warning.config.untested": (id, distribution) =>
-    `${id} 沒在 ${distribution} 上測試過。設定檔要求安裝它，或要求安裝需要它的元件，所以照樣安裝。`,
+    `${id} 沒在 ${distribution} 上測試過，照樣安裝。`,
   "warning.config.kubeVersion": (id, range, version) =>
     `${id} 需要 Kubernetes ${range}，這個叢集是 ${version}，所以不會安裝。`,
   "warning.config.runsOn": (id, only) => `${id} 只能在 ${only} 上執行，所以不會安裝。`,

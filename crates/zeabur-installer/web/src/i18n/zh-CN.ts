@@ -200,9 +200,8 @@ export const zhCN: Messages = {
     "以主机权限运行，所以这个组件的 Namespace 不适用 restricted Pod 安全级别。",
   "components.personalDescription":
     "默认会装 Ingress 和证书，要从 Git 或文件夹构建，再勾选 Zeabur Builder。组件依赖的其他组件会一并加入。",
-  "components.untested": (distribution) => `还没在 ${distribution} 上测试过`,
-  "components.needsUntested": (component, distribution) =>
-    `需要的 ${component} 还没在 ${distribution} 上测试过`,
+  "components.untested": "未测试",
+  "components.untestedHint": (distribution) => `还没在 ${distribution} 上测试过，一样可以安装。`,
   "components.needsMemory": (mib) => `至少要 ${mib.toLocaleString("zh-CN")} MiB 内存，这台不够`,
   "components.unsupported": (distribution) => `不支持 ${distribution}`,
   "components.runsOn": (where) => `仅能在 ${where} 上运行`,
@@ -435,7 +434,7 @@ export const zhCN: Messages = {
   "warning.builder.deletesImages": () =>
     "Zeabur Builder 会接管 zot，并删除 <project>/<name> 路径下不是构建产生的镜像，包括你自己推送上去的。要保留所有镜像，请在“组件”步骤取消勾选 Zeabur Builder。",
   "warning.config.untested": (id, distribution) =>
-    `${id} 没在 ${distribution} 上测试过。配置文件要求安装它，或要求安装依赖它的组件，所以照样安装。`,
+    `${id} 没在 ${distribution} 上测试过，照样安装。`,
   "warning.config.kubeVersion": (id, range, version) =>
     `${id} 需要 Kubernetes ${range}，这个集群是 ${version}，所以不会安装。`,
   "warning.config.runsOn": (id, only) => `${id} 只能在 ${only} 上运行，所以不会安装。`,

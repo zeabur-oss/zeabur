@@ -207,6 +207,15 @@ const fn rank(status: Status) -> u8 {
     }
 }
 
+/// The line for a component whose checks pass, marked when the catalog did not test it here.
+fn passed(id: &str, component: &Value) -> String {
+    if component.get("untested") == Some(&Value::Bool(true)) {
+        format!("{id} (untested)")
+    } else {
+        id.to_owned()
+    }
+}
+
 /// Each component's `HelmCharts` installed, its Deployments and `DaemonSets` available and the
 /// catalog's health checks in the install record met.
 pub(crate) fn components(kubectl: &Kubectl, plan: &Value) -> Vec<(Status, String)> {
@@ -295,7 +304,7 @@ pub(crate) fn components(kubectl: &Kubectl, plan: &Value) -> Vec<(Status, String
             kubectl.wait(args).is_ok()
         });
         if checks.is_some() && problems.is_empty() && failed.is_empty() {
-            results.push((Status::Pass, id.to_owned()));
+            results.push((Status::Pass, passed(id, component)));
         }
         if !problems.is_empty() {
             results.push((Status::Fail, format!("{id}: {}", problems.join("; "))));

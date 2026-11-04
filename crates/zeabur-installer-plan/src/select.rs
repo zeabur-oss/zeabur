@@ -2,11 +2,10 @@
 //! install record does not change the choice.
 //!
 //! A team install installs the catalog's recommended components for the profile and
-//! [`FEATURES`]; a personal install the ones recommended for [`PERSONAL_PROFILE`]. Only components
-//! whose `testedOn` names the distribution with the node's platform are installed by default: a
-//! default one that is not is left out, and one the configuration enables is installed with a
-//! warning. A component whose `kubeVersion` leaves out the cluster's Kubernetes is left out, as
-//! one of another distribution is. Names are capabilities or component ids,
+//! [`FEATURES`]; a personal install the ones recommended for [`PERSONAL_PROFILE`]. Components
+//! that `testedOn` does not name for the distribution and the node's platform are still installed,
+//! with a warning. A component whose `kubeVersion` leaves out the cluster's Kubernetes is left out,
+//! as one of another distribution is. Names are capabilities or component ids,
 //! so the catalog decides which component fills each one. The install order is the union of each
 //! chosen component's `installOrder`, taken in id order: every list already places a component
 //! after its dependencies, so the union does too, and the result never depends on the order of
@@ -60,18 +59,6 @@ pub enum LeftOut {
         /// The profile.
         profile: String,
     },
-    /// A default that was not tested on the distribution.
-    Untested {
-        /// The distribution.
-        distribution: String,
-    },
-    /// A default that needs a component not tested on the distribution.
-    NeedsUntested {
-        /// The component it needs.
-        dependency: String,
-        /// The distribution.
-        distribution: String,
-    },
 }
 
 impl std::fmt::Display for LeftOut {
@@ -80,11 +67,6 @@ impl std::fmt::Display for LeftOut {
             Self::Distributions(only) => write!(f, "runs on {} only", only.join(", ")),
             Self::KubeVersion { range } => write!(f, "needs Kubernetes {range}"),
             Self::Unsupported { profile } => write!(f, "unsupported on {profile}"),
-            Self::Untested { distribution } => write!(f, "not tested on {distribution}"),
-            Self::NeedsUntested {
-                dependency,
-                distribution,
-            } => write!(f, "needs {dependency}, not tested on {distribution}"),
         }
     }
 }
@@ -107,6 +89,18 @@ pub enum Why {
     Enabled,
     /// Another chosen component needs it.
     Dependency,
+}
+
+impl Why {
+    /// The name the plan shows.
+    #[must_use]
+    pub const fn name(self) -> &'static str {
+        match self {
+            Self::Default => "default",
+            Self::Enabled => "enabled",
+            Self::Dependency => "dependency",
+        }
+    }
 }
 
 /// The cluster the components are chosen for.
@@ -168,7 +162,7 @@ pub fn select(index: &Index, config: &Config, target: &Target) -> Result<Selecti
 }
 
 /// Chooses the components of a personal install: those the catalog recommends for
-/// [`PERSONAL_PROFILE`] and tested on `target`, then `enable` and `disable`.
+/// [`PERSONAL_PROFILE`], then `enable` and `disable`.
 ///
 /// # Errors
 ///
@@ -181,14 +175,7 @@ pub fn select_personal(
     choose(
         index,
         &Wanted {
-            base: recommended(index, PERSONAL_PROFILE)
-                .into_iter()
-                .filter(|id| {
-                    index
-                        .component(id)
-                        .is_some_and(|c| c.is_tested_on(&target.distribution, &target.platform))
-                })
-                .collect(),
+            base: recommended(index, PERSONAL_PROFILE),
             enable: &config.enable,
             disable: &config.disable,
             profile: PERSONAL_PROFILE,
@@ -221,10 +208,7 @@ fn untested(id: &str, distribution: &str) -> Warning {
     warning(
         "config.untested",
         &[id, distribution],
-        format!(
-            "{id} was not tested on {distribution}. It is installed because the configuration \
-             enables it or a component it enables needs it."
-        ),
+        format!("{id} was not tested on {distribution}. It is installed anyway."),
     )
 }
 
@@ -260,7 +244,7 @@ fn choose(index: &Index, wanted: &Wanted<'_>) -> Result<Selection, PlanError> {
         }
     }
 
-    let mut left_out = leave_out_unusable(index, profile, target, &mut chosen, &mut warnings);
+    let left_out = leave_out_unusable(index, profile, target, &mut chosen, &mut warnings);
 
     let mut order: Vec<(String, Why)> = Vec::new();
     for (id, why) in &chosen {
@@ -272,29 +256,15 @@ fn choose(index: &Index, wanted: &Wanted<'_>) -> Result<Selection, PlanError> {
             .get(profile)
             .cloned()
             .unwrap_or_else(|| vec![id.clone()]);
-        if *why == Why::Default
-            && let Some(dep) = chain.iter().find(|dep| {
-                !disabled.contains(*dep)
-                    && index
-                        .component(dep)
-                        .is_some_and(|c| !c.is_tested_on(distribution, &target.platform))
-            })
-        {
-            left_out.insert(
-                id.clone(),
-                LeftOut::NeedsUntested {
-                    dependency: dep.clone(),
-                    distribution: distribution.to_owned(),
-                },
-            );
-            continue;
-        }
         for dep in chain {
             if order.iter().any(|(seen, _)| *seen == dep) {
                 continue;
             }
-            if *why == Why::Enabled && !disabled.contains(&dep) {
-                take_untested(index, wanted, &dep, &mut left_out, &mut warnings);
+            if index
+                .component(&dep)
+                .is_some_and(|c| !c.is_tested_on(distribution, &target.platform))
+            {
+                warn_untested(&dep, distribution, &mut warnings);
             }
             if disabled.contains(&dep) || left_out.contains_key(&dep) {
                 return Err(PlanError::NeedsDisabled {
@@ -317,37 +287,18 @@ fn choose(index: &Index, wanted: &Wanted<'_>) -> Result<Selection, PlanError> {
     })
 }
 
-/// Puts back a dependency of an enabled component that was left out only because it was not tested
-/// on the distribution, with a warning.
-fn take_untested(
-    index: &Index,
-    wanted: &Wanted<'_>,
-    dep: &str,
-    left_out: &mut BTreeMap<String, LeftOut>,
-    warnings: &mut Vec<Warning>,
-) {
-    let target = wanted.target;
-    let usable_untested = index.component(dep).is_some_and(|c| {
-        c.supports(&target.distribution)
-            && c.admits(&target.kubernetes)
-            && c.default_for(wanted.profile) != Default::Unsupported
-            && !c.is_tested_on(&target.distribution, &target.platform)
-    });
-    if !usable_untested {
-        return;
-    }
-    left_out.remove(dep);
+/// Warns once that `id` was not tested on the distribution and platform.
+fn warn_untested(id: &str, distribution: &str, warnings: &mut Vec<Warning>) {
     if !warnings
         .iter()
-        .any(|w| w.code == "config.untested" && w.values.first().is_some_and(|v| v == dep))
+        .any(|w| w.code == "config.untested" && w.values.first().is_some_and(|v| v == id))
     {
-        warnings.push(untested(dep, &target.distribution));
+        warnings.push(untested(id, distribution));
     }
 }
 
 /// Takes out of `chosen` the components that cannot run on the distribution, its Kubernetes or
-/// the profile, and the defaults that were not tested on the distribution and platform, and
-/// returns them with the reason. An enabled component that was not tested stays, with a warning.
+/// the profile, and returns them with the reason.
 fn leave_out_unusable(
     index: &Index,
     profile: &str,
@@ -404,17 +355,6 @@ fn leave_out_unusable(
                 id.clone(),
                 LeftOut::Unsupported {
                     profile: profile.to_owned(),
-                },
-            );
-        } else if !component.is_tested_on(distribution, &target.platform) {
-            if enabled {
-                warnings.push(untested(id, distribution));
-                continue;
-            }
-            left_out.insert(
-                id.clone(),
-                LeftOut::Untested {
-                    distribution: distribution.to_owned(),
                 },
             );
         } else {
@@ -586,15 +526,6 @@ mod tests {
             LeftOut::Unsupported { profile } => {
                 json!({"reason": "unsupported", "profile": profile})
             }
-            LeftOut::Untested { distribution } => {
-                json!({"reason": "untested", "distribution": distribution})
-            }
-            LeftOut::NeedsUntested {
-                dependency,
-                distribution,
-            } => {
-                json!({"reason": "needs-untested", "dependency": dependency, "distribution": distribution})
-            }
         }
     }
 
@@ -647,14 +578,7 @@ mod tests {
             let components: Vec<Value> = selection
                 .components
                 .iter()
-                .map(|(id, why)| {
-                    let why = match why {
-                        Why::Default => "default",
-                        Why::Enabled => "enabled",
-                        Why::Dependency => "dependency",
-                    };
-                    json!({"id": id, "why": why})
-                })
+                .map(|(id, why)| json!({"id": id, "why": why.name()}))
                 .collect();
             out.insert("components".to_owned(), json!(components));
         }

@@ -408,7 +408,7 @@ mod tests {
     }
 
     #[test]
-    fn a_component_not_tested_on_kubesolo_is_installed_when_asked_with_a_warning() {
+    fn a_component_not_tested_on_kubesolo_is_installed_with_a_warning() {
         let mut index = crate::catalog::pinned();
         for component in &mut index.components {
             if component.id == "logs/victoria-logs" {
@@ -421,12 +421,10 @@ mod tests {
         assert!(ids(&asked).contains(&"logs/victoria-logs"));
         assert!(asked.warnings.iter().any(|w| w.code == "config.untested"
             && w.values == ["logs/victoria-logs", PERSONAL_DISTRIBUTION]));
-        let default = plan(&index, &config(""), &facts(4096)).unwrap();
-        assert!(!ids(&default).contains(&"logs/victoria-logs"));
     }
 
     #[test]
-    fn the_defaults_are_what_the_catalog_recommends_and_tested_on_kubesolo() {
+    fn the_defaults_are_what_the_catalog_recommends_tested_or_not() {
         let mut index = crate::catalog::pinned();
         for component in &mut index.components {
             if component.id == "ingress/traefik" {
@@ -435,17 +433,15 @@ mod tests {
                     .retain(|t| t.distribution != PERSONAL_DISTRIBUTION);
             }
             if component.id == "config-reload/reloader" {
-                component.tested_on.push(crate::catalog::TestedOn {
-                    distribution: PERSONAL_DISTRIBUTION.to_owned(),
-                    platforms: vec!["linux/amd64".to_owned(), "linux/arm64".to_owned()],
-                });
                 component
                     .defaults
                     .insert(PERSONAL_PROFILE.to_owned(), Default::Recommended);
             }
         }
-        let plan = plan(&index, &config("disable: [certificates]\n"), &facts(4096)).unwrap();
-        assert!(!ids(&plan).contains(&"ingress/traefik"));
+        let plan = plan(&index, &config(""), &facts(4096)).unwrap();
+        assert!(ids(&plan).contains(&"ingress/traefik"));
+        assert!(plan.warnings.iter().any(|w| w.code == "config.untested"
+            && w.values == ["ingress/traefik", PERSONAL_DISTRIBUTION]));
         assert!(ids(&plan).contains(&"config-reload/reloader"));
     }
 

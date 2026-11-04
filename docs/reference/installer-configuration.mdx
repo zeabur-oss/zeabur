@@ -71,7 +71,7 @@ enable: [runtime-security, vulnerability-scanning, intrusion-prevention]
 
 `enable` accepts capabilities, such as `runtime-security`, or full component IDs, such as `volume-backup/velero`. The installer adds a component's dependencies with it. If `disable` excludes a component that another component needs, `plan` names both and stops. The `plan` output lists the final components, their installation order, and the reasons for exclusions. When the Catalog renames a component, an old ID in `enable` or `disable` stops `plan` with an error that names the new ID.
 
-The installer offers only components the Catalog has tested on your distribution and your server's platform, such as `linux/arm64`. Each component lists them under `testedOn` in the Catalog's `index.json`. A recommended component that wasn't tested on your distribution is left out, and so is anything that needs it. If `enable` names an untested component, or a component you enabled needs one, `plan` installs it and warns that it wasn't tested there.
+Each component lists the distributions and platforms, such as `linux/arm64`, that the Catalog tested it on under `testedOn` in the Catalog's `index.json`. A component that wasn't tested on your distribution and your server's platform is still offered and installed. The installer marks it untested, and `plan` warns that it wasn't tested there.
 
 A component also lists the Kubernetes versions it runs on under `kubeVersion`. If your cluster's version isn't one of them, the installer leaves the component out, and `plan` warns when `enable` names it.
 
@@ -183,7 +183,7 @@ Only the fields in the table below can appear alongside it. `profile`, `access`,
 
 | Field | Default and purpose |
 |---|---|
-| `enable` | `[]`. A personal install gets the components the Catalog recommends for `single-node` and has tested on KubeSolo, such as ingress and certificates. You can add other components tested on KubeSolo, such as `builds` and `databases`. `builds` is Zeabur Builder with zot and needs at least 1800 MiB of memory. A component not tested on KubeSolo is installed with a warning |
+| `enable` | `[]`. A personal install gets the components the Catalog recommends for `single-node`, such as ingress and certificates. You can add other components, such as `builds` and `databases`. `builds` is Zeabur Builder with zot and needs at least 1800 MiB of memory. A component not tested on KubeSolo is installed with a warning |
 | `disable` | `[]`. Capabilities or full component IDs to exclude |
 | `allowDataLoss` | `[]`. Same as in the configuration for creating a cluster |
 | `inputs` | `{}`. Same as in the configuration for creating a cluster, grouped by component ID |

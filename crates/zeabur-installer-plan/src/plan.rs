@@ -269,6 +269,9 @@ pub struct ComponentPlan {
     pub health: Vec<Health>,
     /// Measured idle memory.
     pub idle_memory_mib: Option<u64>,
+    /// The catalog's `testedOn` does not name the distribution and the node's platform.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub untested: bool,
     /// The catalog's one-line security summary.
     pub security: String,
     /// The component's `NetworkPolicy` objects, labelled as the installer's, applied before its
@@ -1102,14 +1105,12 @@ pub(crate) fn components(
                     && c.contributes.iter().any(|x| x.target.component == *id)
             })
             .collect();
-        components.push(component_plan(
-            component,
-            *why,
-            &contributors,
-            choices,
-            profile,
-            arch,
-        )?);
+        let mut plan = component_plan(component, *why, &contributors, choices, profile, arch)?;
+        plan.untested = selection
+            .warnings
+            .iter()
+            .any(|w| w.code == "config.untested" && w.values.first() == Some(id));
+        components.push(plan);
         let privileged = privileged(component, choices);
         let baseline = baseline(component);
         for release in &component.releases {
@@ -1232,16 +1233,13 @@ fn component_plan(
     Ok(ComponentPlan {
         id: id.to_owned(),
         display_name: component.metadata.name.clone(),
-        why: match why {
-            Why::Default => "default",
-            Why::Enabled => "enabled",
-            Why::Dependency => "dependency",
-        },
+        why: why.name(),
         secrets,
         releases,
         contributed_by: contributors.iter().map(|c| c.id.clone()).collect(),
         health: component.health.clone(),
         idle_memory_mib: component.idle_memory_mib(KIND, profile, arch),
+        untested: false,
         security: component.security.summary.clone(),
         network_policies: network_policies(component)?,
     })
@@ -2303,14 +2301,19 @@ mod tests {
     }
 
     #[test]
-    fn a_default_component_not_tested_on_the_distribution_is_left_out() {
+    fn a_default_component_not_tested_on_the_distribution_is_installed_with_a_warning() {
         let mut index = crate::catalog::pinned();
         untested_on(&mut index, "image-updates/keel", "rke2");
         let rke2 = plan(&index, &config("distribution: rke2\n"), &facts()).unwrap();
-        assert!(!ids(&rke2).contains(&"image-updates/keel"));
-        assert_eq!(rke2.left_out["image-updates/keel"], "not tested on rke2");
+        assert!(ids(&rke2).contains(&"image-updates/keel"));
+        assert!(
+            rke2.warnings
+                .iter()
+                .any(|w| w.code == "config.untested" && w.values == ["image-updates/keel", "rke2"])
+        );
         let k3s = plan(&index, &config(""), &facts()).unwrap();
         assert!(ids(&k3s).contains(&"image-updates/keel"));
+        assert!(k3s.warnings.iter().all(|w| w.code != "config.untested"));
     }
 
     #[test]

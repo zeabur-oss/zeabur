@@ -145,6 +145,7 @@ export interface PlannedComponent {
   displayName: string
   why: "default" | "enabled" | "dependency"
   idleMemoryMib: number | null
+  untested?: boolean
   releases: Release[]
 }
 
