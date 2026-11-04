@@ -538,7 +538,7 @@ function NodeRow({
               usage: node.disk.capacityBytes - node.disk.availableBytes,
               thresholds: DISK,
             })
-          : null}
+          : <div aria-hidden className="hidden sm:block sm:w-36" />}
         <div className="flex flex-col gap-1 type-meta sm:w-16">
           <span className="text-muted-foreground">{t("pod.pods")}</span>
           <span>
