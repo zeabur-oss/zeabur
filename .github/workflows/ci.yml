@@ -1,9 +1,8 @@
 name: CI
 
-# The jobs of scripts/ci/jobs, each as `scripts/ci.sh <job>` through the shared workflow of
-# zeabur-oss/.github; the script enters the Nix dev shell itself, so a job runs the same locally.
-# Pull requests and pushes run the fast tier. The merge queue runs every job on the commit about to
-# land, and the nightly run keeps main's caches for the merge queue's jobs.
+# Each job runs scripts/ci/<job>.sh in the Nix dev shell, the same as locally. Pull requests and
+# pushes run lint, test and ui. The merge queue runs every job on the commit about to land, and the
+# nightly run keeps main's caches for the merge queue's jobs.
 on:
   push:
     branches: [main]
@@ -20,8 +19,132 @@ concurrency:
   group: ci-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  CARGO_TERM_COLOR: always
+
 jobs:
-  ci:
-    uses: zeabur-oss/.github/.github/workflows/ci.yml@5efa62e01e1b103d1431d780658eaa74bb417438 # main
+  lint:
+    runs-on: ubuntu-26.04-arm
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: zeabur-oss/.github/actions/ci-setup@fc4d36e33c9bdd662320242cf83e80b7938f818c # main
+        with:
+          rust-cache: true
+      - run: nix develop -c scripts/ci/lint.sh
+      - if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: unsafe-report
+          path: target/unsafe-report.md
+          if-no-files-found: ignore
+          retention-days: 14
+
+  test:
+    runs-on: ubuntu-26.04-arm
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: zeabur-oss/.github/actions/ci-setup@fc4d36e33c9bdd662320242cf83e80b7938f818c # main
+        with:
+          rust-cache: true
+      - run: nix develop -c scripts/ci/test.sh
+
+  ui:
+    runs-on: ubuntu-26.04-arm
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          # fallow audit compares HEAD with HEAD^.
+          fetch-depth: 2
+      - uses: zeabur-oss/.github/actions/ci-setup@fc4d36e33c9bdd662320242cf83e80b7938f818c # main
+        with:
+          rust-cache: true
+      - run: nix develop -c scripts/ci/ui.sh
+
+  # Four to six minutes each, set up included: only in the merge queue, with the cluster jobs.
+  fuzz:
+    if: github.event_name != 'pull_request' && !(github.event_name == 'push' && github.ref_type == 'branch')
+    runs-on: ubuntu-26.04-arm
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: zeabur-oss/.github/actions/ci-setup@fc4d36e33c9bdd662320242cf83e80b7938f818c # main
+        with:
+          rust-cache: true
+      - run: nix develop -c scripts/ci/fuzz.sh
+
+  no-ui:
+    if: github.event_name != 'pull_request' && !(github.event_name == 'push' && github.ref_type == 'branch')
+    runs-on: ubuntu-26.04-arm
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: zeabur-oss/.github/actions/ci-setup@fc4d36e33c9bdd662320242cf83e80b7938f818c # main
+        with:
+          rust-cache: true
+      - run: nix develop -c scripts/ci/no-ui.sh
+
+  wording:
+    if: github.event_name != 'pull_request' && !(github.event_name == 'push' && github.ref_type == 'branch')
+    runs-on: ubuntu-26.04-arm
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: zeabur-oss/.github/actions/ci-setup@fc4d36e33c9bdd662320242cf83e80b7938f818c # main
+        with:
+          rust-cache: true
+      - run: nix develop .#zh -c scripts/ci/wording.sh
+
+  cluster:
+    if: github.event_name != 'pull_request' && !(github.event_name == 'push' && github.ref_type == 'branch')
+    runs-on: ubuntu-26.04-arm
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: zeabur-oss/.github/actions/ci-setup@fc4d36e33c9bdd662320242cf83e80b7938f818c # main
+        with:
+          rust-cache: true
+      - run: nix develop -c scripts/ci/cluster.sh
+
+  e2e:
+    if: github.event_name != 'pull_request' && !(github.event_name == 'push' && github.ref_type == 'branch')
+    runs-on: ubuntu-26.04-arm
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: zeabur-oss/.github/actions/ci-setup@fc4d36e33c9bdd662320242cf83e80b7938f818c # main
+        with:
+          rust-cache: true
+      - run: nix develop -c scripts/ci/e2e.sh
+      - if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: e2e-measurements
+          path: target/dev-cluster/measurements.json
+          if-no-files-found: ignore
+          retention-days: 14
+
+  zizmor:
+    uses: zeabur-oss/.github/.github/workflows/zizmor.yml@fc4d36e33c9bdd662320242cf83e80b7938f818c # main
+
+  # The check rulesets require.
+  ok:
+    name: ci / ok
+    if: always()
+    needs: [lint, test, ui, fuzz, no-ui, wording, cluster, e2e, zizmor]
+    runs-on: ubuntu-slim
+    steps:
+      - if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: exit 1
+
   dco:
     uses: zeabur-oss/.github/.github/workflows/dco.yml@6ab106525ce16169ab0ecfebe4b0248e096797fa # main

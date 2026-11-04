@@ -6,13 +6,13 @@ description: Investigate a failed or flaky CI or release run of Zeabur (GitHub A
 # When CI fails
 
 Follow `zeabur-oss-ci` (install: `npx skills add zeabur-oss/skills --skill zeabur-oss-ci`;
-`skills-lock.json` pins it): how the shared workflows call `scripts/ci.sh`, reading the log,
+`skills-lock.json` pins it): how CI runs `scripts/ci/<job>.sh`, reading the log,
 finding the cause, reproducing, fixing, and its release recovery notes. This skill adds Zeabur's
 jobs and tools.
 
 ## Jobs
 
-`scripts/ci.sh --list`, the rows of `scripts/ci/jobs` (each is `scripts/ci/<job>.sh`): `lint`
+The jobs of `.github/workflows/ci.yml`, each `nix develop -c scripts/ci/<job>.sh`: `lint`
 (format, clippy, docs, cargo-deny, unsafe-report, levels, chart in a row), `test` and `ui` on every
 pull request; `fuzz`, `no-ui`, `wording`, `cluster` (cluster tests, `zeaburctl doctor`,
 browser tests in local mode) and `e2e` (Zeabur and Zeabur Identity in a cluster,
@@ -40,7 +40,7 @@ Linux), `sign` (macOS), `publish`, `attest`, `finish` (the installers),
 
 ```sh
 rsync -a --delete --exclude target --exclude node_modules --exclude web/dist ./ host:zeabur/
-ssh host 'cd zeabur && scripts/ci.sh cluster'           # one job
+ssh host 'cd zeabur && nix develop -c scripts/ci/cluster.sh'   # one job
 ssh host 'cd zeabur && scripts/ci-local.sh'                # every job, a result line each
 ```
 - `scripts/ci-local.sh [job…]` runs each job in its own copy of the checkout, three at a time

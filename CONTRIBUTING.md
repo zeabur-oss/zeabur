@@ -15,7 +15,7 @@ messages follow [Conventional Commits](https://www.conventionalcommits.org/).
 
 ## Before you open a pull request
 
-Run what CI runs (the jobs of `scripts/ci/jobs` that need no cluster), inside `nix develop`:
+Run what CI runs (the jobs in `.github/workflows/ci.yml` that need no cluster), inside `nix develop`:
 
 ```sh
 cargo fmt --all --check && nixfmt --check flake.nix && shellcheck scripts/*.sh scripts/ci/*.sh && actionlint
@@ -24,7 +24,7 @@ cargo lint                                   # clippy, all targets and features,
 RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --document-private-items --locked
 cargo nextest run --workspace --all-features --locked
 cargo deny --locked check
-./scripts/ci.sh unsafe-report
+node_modules/.bin/zeabur-oss-unsafe-report zeabur zeaburctl zeabur-proxy zeabur-installer
 ./scripts/check-levels.sh
 ./scripts/check-chart.sh                     # the Helm chart: lint, renderings, refused values
 ./scripts/build-without-ui.sh                # the API-only build, without bun
@@ -68,14 +68,12 @@ the interface's styles are checked in
 [zeabur-oss/design-system](https://github.com/zeabur-oss/design-system), which publishes
 `@zeabur-oss/design-system` to npm; Renovate moves its version.
 
-Every CI job is a call to `scripts/ci.sh <job>` (`scripts/ci.sh --list` names them), which enters
-its dev shell itself and runs `scripts/ci/<job>.sh`; the workflow only checks out, installs Nix and
-restores caches. So a job runs the same on any Linux machine with Nix, and Docker for the cluster
-jobs: `scripts/ci.sh clippy`. The jobs are the rows of `scripts/ci/jobs`. A pull request runs the
-`fast` tier: `lint` (format, clippy, docs, cargo-deny, unsafe-report, levels and chart in a row),
-`test` and `ui`. The merge queue, a tag, the nightly run and a manual run add `fuzz`, `no-ui`,
-`wording`, `cluster` and `e2e`; a change that only touches most of `docs/`, change files,
-`CHANGELOG.md` or `CONTRIBUTING.md` skips the code jobs.
+Each CI job in `.github/workflows/ci.yml` runs `nix develop -c scripts/ci/<job>.sh` (`.#zh` for
+`wording`); the workflow only checks out, installs Nix and restores caches. So a job runs the same
+on any Linux machine with Nix, and Docker for the cluster jobs: `nix develop -c scripts/ci/lint.sh`.
+A pull request runs `lint` (format, clippy, docs, cargo-deny, unsafe-report, levels and chart in a
+row), `test` and `ui`. The merge queue, a tag, the nightly run and a manual run add `fuzz`,
+`no-ui`, `wording`, `cluster` and `e2e`.
 `scripts/ci-local.sh [job…]` runs several (all by default), each in its own copy of the checkout,
 and prints one result line per job; use a disposable machine or VM for the cluster jobs.
 
@@ -204,8 +202,8 @@ the same delay.
 
 A dependency that reaches the shipped binaries and contains `unsafe` code or builds native code
 needs an entry in `supply-chain/unsafe-allowlist.toml` with a reason and the date a maintainer
-approved it. `zeabur-oss-unsafe-report` (from zeabur-oss/.github, run by `scripts/ci.sh
-unsafe-report`) scans the shipped dependency graph (normal and build dependencies of `zeabur`,
+approved it. `zeabur-oss-unsafe-report` (from zeabur-oss/.github, run by
+`scripts/ci/lint.sh`) scans the shipped dependency graph (normal and build dependencies of `zeabur`,
 `zeaburctl`, `zeabur-proxy` and `zeabur-installer` for the image target), lists every such crate and
 fails on one that is not approved; an entry marked `pending` is a proposal awaiting review. The
 count is a review signal, not an audit.
@@ -217,8 +215,8 @@ What to test, at which level, and what not to test: [docs/internal/testing.md](d
 - **Unit and integration tests** run anywhere: `cargo nextest run --workspace`. They include the
   language-neutral cases in [`fixtures/`](fixtures/README.md).
 - **Cluster tests** and **end-to-end tests** are `#[ignore]`d and require a disposable cluster
-  where you are cluster admin: the development cluster below, which the cluster jobs of
-  `scripts/ci.sh` use too.
+  where you are cluster admin: the development cluster below, which CI's `cluster` and `e2e`
+  jobs use too.
 
 ### Development cluster
 

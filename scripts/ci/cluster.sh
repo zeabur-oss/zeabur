@@ -4,8 +4,8 @@
 # (scripts/dev-cluster.sh, which also reads ZEABUR_IDENTITY_SRC, K3S_IMAGE and
 # ZEABUR_REGISTRY_MIRRORS; without ZEABUR_IDENTITY_SRC it installs the Zeabur Identity release that
 # ZEABUR_IDENTITY_PINNED names). The cluster is deleted at the end; ZEABUR_CI_KEEP=1 keeps it.
-# shellcheck source-path=SCRIPTDIR
-source "$(dirname "$0")/lib.sh"
+set -euo pipefail
+cd "$(dirname "$0")/../.."
 
 # As k3d's cluster admin, with no Zeabur dashboard and no Zeabur Identity: nothing critical, the Identity
 # checks skipped; the exit code is
@@ -51,7 +51,7 @@ if [[ -z "${ZEABUR_CI_KEEP:-}" ]]; then
 fi
 # Bare: the cluster tests' people are no admins, whom Zeabur's admission policy would stop.
 ./scripts/dev-cluster.sh up --profile bare
-export KUBECONFIG="$root/target/dev-cluster/kubeconfig"
+export KUBECONFIG="$PWD/target/dev-cluster/kubeconfig"
 cargo nextest run --locked --run-ignored only -E 'binary(kubernetes)'
 check_doctor
 if ! { ./scripts/build-ui.sh && ./scripts/e2e-ui.sh; }; then

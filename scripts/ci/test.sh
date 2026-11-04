@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# shellcheck source-path=SCRIPTDIR
-source "$(dirname "$0")/lib.sh"
+set -euo pipefail
+cd "$(dirname "$0")/../.."
 
 cargo nextest run --workspace --all-features --locked --no-tests=warn

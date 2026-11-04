@@ -23,7 +23,7 @@ adds what is Zeabur's own.
 
 ## Checks (what CI runs, beyond `zeabur-oss-rust`'s)
 ```sh
-nix develop -c ./scripts/ci.sh unsafe-report
+nix develop -c bash -c 'bun install --frozen-lockfile && node_modules/.bin/zeabur-oss-unsafe-report zeabur zeaburctl zeabur-proxy zeabur-installer'
 nix develop -c ./scripts/check-levels.sh
 nix develop -c cargo build --release --locked --no-default-features -p zeabur -p zeaburctl
 ```
@@ -35,8 +35,7 @@ The screenshots are kept in git and not taken in CI: after changing a page that
 does, and commit `docs/images/shots` (`docs/internal/screenshots.md`). The README and cover images
 take the same script with their set, `readme` or `cover`.
 Cluster tests: see `zeabur-cluster-tests`. Web interface: see `zeabur-ui`. Each CI job is
-`scripts/ci.sh <job>` (`--list` names them), the same on GitHub and on any Linux machine with
-Nix; `scripts/ci-local.sh [job…]` runs several and prints a result line per job (in
+`nix develop -c scripts/ci/<job>.sh`, the same on GitHub and on any Linux machine with Nix; `scripts/ci-local.sh [job…]` runs several and prints a result line per job (in
 `target/ci-local/*.result`), each in its own copy of the checkout but in the machine's own
 environment; on a VM, snapshot its clean state and restore it after every run (see
 `zeabur-cluster-tests`). When a check fails on GitHub, see `zeabur-ci`.

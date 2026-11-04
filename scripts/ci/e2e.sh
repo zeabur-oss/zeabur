@@ -1,20 +1,20 @@
 #!/usr/bin/env bash
 # Zeabur in a cluster with Zeabur Identity, from their images and Zeabur's chart, through a browser:
 # passkey sign-in, terminal, rights, memory, removal. ZEABUR_CI_KEEP=1 keeps the cluster.
-# shellcheck source-path=SCRIPTDIR
-source "$(dirname "$0")/lib.sh"
+set -euo pipefail
+cd "$(dirname "$0")/../.."
 
-# The image's size and Zeabur's memory, in the run's summary when there is one.
+# The image's size and Zeabur's memory, in the run's summary when there is one. The workflow
+# uploads the measurements file.
 report() {
   local measurements="target/dev-cluster/measurements.json"
-  keep "$measurements"
   {
     echo "### Zeabur in the cluster, \`ci\` build (${K3S_IMAGE:-the default k3s})"
     echo "| Measure | Bytes |"
     echo "|---|---|"
     echo "| Image \`zeabur\` | $(docker image inspect --format '{{.Size}}' zeabur:dev 2>/dev/null || echo n/a) |"
     echo "| Pod working set when idle | $(jq -r .pod_working_set_bytes "$measurements" 2>/dev/null || echo n/a) |"
-  } | summary
+  } | tee -a "${GITHUB_STEP_SUMMARY:-/dev/null}"
 }
 
 status=0

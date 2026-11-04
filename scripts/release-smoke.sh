@@ -98,7 +98,7 @@ if [[ "$image" != *@sha256:* ]]; then
 fi
 
 # zeaburctl against the same cluster as its admin: a JSON report and an exit code of 0 (all ok)
-# or 1 (warnings), as in scripts/ci.sh.
+# or 1 (warnings), as in scripts/ci/cluster.sh.
 code=0
 "$work/zeaburctl" doctor --output json >"$work/doctor.json" || code=$?
 [[ $code -eq 0 || $code -eq 1 ]] || { cat "$work/doctor.json" >&2; echo "zeaburctl doctor exited $code" >&2; exit 1; }
