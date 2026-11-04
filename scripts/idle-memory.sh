@@ -1,8 +1,8 @@
 # shellcheck shell=bash
-# Sourced by the scripts that measure Zeabur's memory on the development cluster (e2e-l2.sh,
+# Sourced by the scripts that measure Zeabur's memory on the development cluster (e2e.sh,
 # release-smoke.sh), with KUBECONFIG set.
 
-# Zeabur's budget when idle (deploy/chart/zeabur/values.yaml), which e2e-l2.sh checks.
+# Zeabur's budget when idle (deploy/chart/zeabur/values.yaml), which e2e.sh checks.
 memory_budget=$((30 * 1024 * 1024))
 
 # Prints the idle working set in bytes of Zeabur's pod in namespace $1, as the kubelet reports it
