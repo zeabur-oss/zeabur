@@ -18,8 +18,6 @@ Flags, or the environment variable after each:
 | `--client-id` | `ZEABUR_CLIENT_ID` | the `client_id` (default `zeabur`) |
 | `--client-secret-file` | `ZEABUR_CLIENT_SECRET_FILE` | a file with the client secret |
 | `--plan-key-file` | `ZEABUR_PLAN_KEY_FILE` | a file with the plan-token key: 32 bytes, or 64 hex digits |
-| `--session-idle-minutes` | `ZEABUR_SESSION_IDLE_MINUTES` | default 60; Zeabur Identity's idle limit for the account applies when shorter |
-| `--session-max-hours` | `ZEABUR_SESSION_MAX_HOURS` | default 12 |
 | `--listen` | `ZEABUR_LISTEN` | default `[::]:8080`: IPv6 and, on Linux, IPv4 as well ([dual-stack](https://kubernetes.io/docs/concepts/services-networking/dual-stack/)); `0.0.0.0:8080` on a node without IPv6 |
 | `--metrics-service` | `ZEABUR_METRICS_SERVICE` | the metrics store history, node disk and volume use are read from, `namespace/name:port` (default: where Zeabur's VictoriaMetrics recommendation installs it) |
 | `--namespace` | `ZEABUR_NAMESPACE` | the namespace Zeabur runs in, whose ConfigMap `zeabur-settings` keeps the settings people choose; unset, they cannot be changed |
