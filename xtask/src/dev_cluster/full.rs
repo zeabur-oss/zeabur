@@ -198,12 +198,8 @@ fn builder(dev: &DevCluster, builder_src: Option<&Path>) -> Result<(), String> {
     ] {
         helm = helm.arg("--set").arg(value);
     }
-    helm.args([
-        "--set-json",
-        r#"extraArgs=["--buildkitd-host-users=false"]"#,
-    ])
-    .quiet()
-    .map_err(|e| format!("installing Zeabur Builder: {e}"))?;
+    helm.quiet()
+        .map_err(|e| format!("installing Zeabur Builder: {e}"))?;
     dev.rollout(
         "builder-system",
         "deployment/zeabur-builder",
