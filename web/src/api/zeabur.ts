@@ -1006,7 +1006,7 @@ export type Component = {
   defaults: ComponentDefaults
   /** Human-readable name. */
   displayName: string
-  /** The distributions it supports (`k3s`, …); empty means all. */
+  /** The distributions it supports (`k3s`, …). */
   distributions: string[]
   /** The project's home page. */
   homepage: string
@@ -2273,7 +2273,7 @@ export type Cluster = {
   /** What you may change in the cluster itself. */
   can: ClusterRights
   /**
-   * The distribution, when the version names one: `k3s` or `rke2`.
+   * The distribution, when the version names one: `k3s`, `rke2` or `kubesolo`.
    * @nullable
    */
   distribution?: string | null
@@ -5973,7 +5973,7 @@ export type IdleUse = {
    * @minimum 0
    */
   cpuMillicores: number
-  /** Where it was measured: `<profile>-<architecture>-<Kubernetes version>`. */
+  /** Where it was measured: `<distribution>-<profile>-<architecture>-<Kubernetes version>`. */
   environment: string
   /** The day it was measured (`2026-10-25`). */
   measuredAt: string
@@ -9771,7 +9771,7 @@ export type Upgrades = {
   /** When the bundled table was copied from the Kubernetes schedule (`YYYY-MM-DD`). */
   dataAsOf: string
   /**
-   * `k3s` or `rke2`, when the version names one.
+   * `k3s`, `rke2` or `kubesolo`, when the version names one.
    * @nullable
    */
   distribution?: string | null

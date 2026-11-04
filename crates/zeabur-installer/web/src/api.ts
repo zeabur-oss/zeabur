@@ -33,10 +33,12 @@ export interface CatalogComponent {
   teamMinMemoryMib?: Partial<Record<Distribution, number>>
   /** Zeabur needs it to run, so it is never suggested for leaving out. */
   required: boolean
-  /** Where it runs; empty when everywhere. */
+  /** The distributions whose Kubernetes it runs on. */
   distributions: string[]
-  /** Where the catalog's CI installed it and passed; the installer offers it only there. */
+  /** The distributions where it runs here and was tested on this server's platform. One not listed is still offered and installed, marked untested. */
   testedOn: string[]
+  /** The distributions where it was tested on another platform only. */
+  testedOnOtherPlatforms?: string[]
   /** The components installed before it because it needs them. */
   needs?: string[]
   /** Measured idle memory on this server's architecture. */
@@ -60,9 +62,9 @@ export const titleOf = (distribution: string) =>
     ? "KubeSolo"
     : (distributionTitle[distribution as Distribution] ?? distribution)
 
-/** Whether a component runs on the distribution: an empty list means everywhere. */
+/** Whether a component runs on the distribution. */
 export const runsOn = (component: CatalogComponent, distribution: string) =>
-  component.distributions.length === 0 || component.distributions.includes(distribution)
+  component.distributions.includes(distribution)
 export type AccessMode = "domain" | "local"
 
 export interface Config {
@@ -145,6 +147,7 @@ export interface PlannedComponent {
   displayName: string
   why: "default" | "enabled" | "dependency"
   idleMemoryMib: number | null
+  untested?: boolean
   releases: Release[]
 }
 

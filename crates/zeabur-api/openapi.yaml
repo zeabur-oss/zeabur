@@ -6503,7 +6503,7 @@ components:
           type:
           - string
           - "null"
-          description: "The distribution, when the version names one: `k3s` or `rke2`."
+          description: "The distribution, when the version names one: `k3s`, `rke2` or `kubesolo`."
         domains:
           $ref: "#/components/schemas/DomainSettings"
           description: How a new service's public URL is made.
@@ -6891,7 +6891,7 @@ components:
           type: array
           items:
             type: string
-          description: The distributions it supports (`k3s`, …); empty means all.
+          description: The distributions it supports (`k3s`, …).
         homepage:
           type: string
           description: The project's home page.
@@ -9820,7 +9820,7 @@ components:
           minimum: 0
         environment:
           type: string
-          description: "Where it was measured: `<profile>-<architecture>-<Kubernetes version>`."
+          description: "Where it was measured: `<distribution>-<profile>-<architecture>-<Kubernetes version>`."
         measuredAt:
           type: string
           description: The day it was measured (`2026-10-25`).
@@ -17313,7 +17313,7 @@ components:
           type:
           - string
           - "null"
-          description: "`k3s` or `rke2`, when the version names one."
+          description: "`k3s`, `rke2` or `kubesolo`, when the version names one."
         extensions:
           $ref: "#/components/schemas/UpgradeExtensions"
           description: |-

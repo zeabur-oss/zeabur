@@ -72,7 +72,9 @@ enable: [runtime-security, vulnerability-scanning, intrusion-prevention]
 
 `enable` 可以寫 capability（例如 `runtime-security`）或完整元件 ID（例如 `volume-backup/velero`），相依的元件會一起加入。`disable` 排除了另一個元件需要的元件時，`plan` 會列出兩者並停下。最後裝哪些元件、順序和排除原因，看 `plan` 的輸出。Catalog 把元件改名後，`enable` 或 `disable` 寫舊 ID 時，`plan` 會停下，錯誤訊息會寫出新 ID。
 
-installer 只提供 Catalog 在你的 distribution 上測試過的元件。每個元件測試過哪些 distribution，列在 Catalog `index.json` 的 `testedOn`。建議安裝、但沒在你的 distribution 上測試過的元件不會安裝，需要這個元件的其他元件也一樣。`enable` 寫了沒測試過的元件，或你加入的元件需要沒測試過的元件時，`plan` 照樣安裝，並警告它沒在這裡測試過。
+每個元件在哪些 distribution 和平台（例如 `linux/arm64`）上測試過，列在 Catalog `index.json` 的 `testedOn`。沒在你的 distribution 和伺服器平台上測試過的元件一樣可以選、照樣安裝。installer 會把它標成「未測試」，`plan` 也會警告它沒在這裡測試過。
+
+每個元件也在 `kubeVersion` 列出能跑的 Kubernetes 版本。叢集的版本不在其中時，installer 不會安裝這個元件。`enable` 寫了它的話，`plan` 會發出警告。
 
 已經裝好的元件從清單拿掉後，下次 `apply` 會移除這個元件。移除會連資料一起刪掉的元件，要先寫進 `allowDataLoss`，見[移除元件](./installer.mdx#移除元件)。
 
@@ -80,12 +82,14 @@ installer 只提供 Catalog 在你的 distribution 上測試過的元件。每�
 inputs:
   volume-backup/velero:
     bucket: backups
-    s3-url: https://s3.example.com
+    s3Url: https://s3.example.com
 ```
 
 每個元件有哪些 input、型別是什麼，由 Catalog 定義。少了必填值時，`plan` 會指出要補哪個欄位。
 
-Zeabur Builder 的 `cluster-ip`（zot 的固定位址）由 installer 自己填。要修改時，在 `inputs` 寫上值即可。
+Catalog 替 input 改名時（例如 `s3-url` 改成 `s3Url`），`apply` 和 `gui` 會直接改掉檔案裡的鍵名，並為每個改名印一行。其他指令把舊名稱當新名稱讀，不會動檔案。只有鍵名會變，註解、順序、檔案權限和擁有者都維持原樣。如果沒辦法安全地改、保不住檔案的擁有者，或是檔案寫不進去，installer 不會動檔案，這次執行照新名稱處理，並請你自己改鍵名。
+
+Zeabur Builder 的 `clusterIp`（zot 的固定位址）由 installer 自己填。要修改時，在 `inputs` 寫上值即可。
 
 Velero 的 `region` input 是儲存貯體的區域，預設 `us-east-1`。Cloudflare R2 要寫 `auto`。網頁介面會分別詢問存取金鑰 ID 和私密存取金鑰，再自己組成 `credentials` 檔。
 
@@ -182,7 +186,7 @@ host:
 
 | 欄位 | 預設與用途 |
 |---|---|
-| `enable` | `[]`。個人安裝會裝 Catalog 建議 `single-node` 使用、也在 KubeSolo 上測試過的元件，例如 Ingress 和憑證。可以再加其他在 KubeSolo 上測試過的元件，例如 `builds` 和 `databases`。`builds` 是 Zeabur Builder，會連 zot 一起安裝，記憶體要 1800 MiB 以上。沒在 KubeSolo 上測試過的元件照樣安裝，並顯示警告 |
+| `enable` | `[]`。個人安裝會裝 Catalog 建議 `single-node` 使用的元件，例如 Ingress 和憑證。可以再加其他元件，例如 `builds` 和 `databases`。`builds` 是 Zeabur Builder，會連 zot 一起安裝，記憶體要 1800 MiB 以上。沒在 KubeSolo 上測試過的元件照樣安裝，並顯示警告 |
 | `disable` | `[]`。排除 capability 或完整元件 ID |
 | `allowDataLoss` | `[]`。和建立叢集的檔案一樣 |
 | `inputs` | `{}`。和建立叢集的檔案一樣，依元件 ID 分組 |

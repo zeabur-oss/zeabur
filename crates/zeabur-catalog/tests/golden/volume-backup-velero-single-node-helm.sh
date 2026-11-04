@@ -55,11 +55,11 @@ configuration:
         region: us-east-1
         s3ForcePathStyle: "true"
         # Velero writes Secrets into the backup as they are. The
-        # store encrypts them with the backup-key input (SSE-C).
+        # store encrypts them with the backupKey input (SSE-C).
         customerKeyEncryptionSecret: velero-backup-key/key
   # Kopia file-system backups work on any storage class, local-path included.
   uploaderType: kopia
-  # No node agent by default, so no volume copy. Backups opt in with file-backup.
+  # No node agent by default, so no volume copy. Backups opt in with fileBackup.
   defaultVolumesToFsBackup: false
 # CSI snapshots need per-driver setup; use file-system backups instead.
 snapshotsEnabled: false
@@ -79,7 +79,7 @@ configuration:
       customerKeyEncryptionSecret: velero-backup-key/key
       region: us-east-1
       s3ForcePathStyle: "true"
-      s3Url: <s3-url>
+      s3Url: <s3Url>
     default: true
     name: default
     provider: aws
@@ -91,4 +91,4 @@ helm upgrade --install velero velero \
   --values velero-values.yaml \
   --values velero-single-node.yaml \
   --values velero-inputs.yaml \
-  --set deployNodeAgent='<file-backup>'
+  --set deployNodeAgent='<fileBackup>'

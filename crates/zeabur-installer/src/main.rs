@@ -168,6 +168,10 @@ enum InstallError {
 
 fn main() -> ExitCode {
     let cli = Cli::parse();
+    // Only the commands that change the server write the catalog's new input names into the file.
+    if matches!(cli.command, Command::Apply | Command::Gui { .. }) {
+        load::rename_inputs(&cli.config);
+    }
     // A configuration that does not parse is reported by the command itself.
     if let Some(config) = load::personal(&cli.config) {
         return personal(&cli, &config);

@@ -46,13 +46,7 @@ export function ComponentsStep({ wizard }: { wizard: Wizard }) {
   const choices = wizard.active
   const personal = wizard.use === "personal"
   const distribution = personal ? personalDistribution : wizard.config.distribution
-  const all = wizard.server.catalog?.components ?? []
-  // An untested component stays listed while the configuration asks for it, so it can be removed.
-  const asked = (c: CatalogComponent) =>
-    choices.enable.includes(c.id) ||
-    (choices.enable.includes(c.capability) &&
-      !all.some((o) => o.capability === c.capability && o.testedOn.includes(distribution)))
-  const catalog = all.filter((c) => c.testedOn.includes(distribution) || asked(c))
+  const catalog = wizard.server.catalog?.components ?? []
   const hostMib = wizard.server.facts?.memoryMib ?? Infinity
   const minMemoryMib = (c: CatalogComponent) =>
     (personal ? c.personalMinMemoryMib : c.teamMinMemoryMib?.[wizard.config.distribution]) ?? 0
@@ -72,7 +66,7 @@ export function ComponentsStep({ wizard }: { wizard: Wizard }) {
     groups.set(component.capability, [...(groups.get(component.capability) ?? []), component])
   }
   const toggle = (id: string, on: boolean) => {
-    const capability = all.find((c) => c.id === id)?.capability
+    const capability = catalog.find((c) => c.id === id)?.capability
     const enable = choices.enable.filter((x) => x !== id && (on || x !== capability))
     const disable = choices.disable.filter((x) => x !== id)
     wizard.setChoices({
@@ -168,13 +162,10 @@ export function ComponentsStep({ wizard }: { wizard: Wizard }) {
 
 /** The plan's reason for leaving a component out, in the words the components page uses. */
 export function leftOutReason(t: Translate, reason: string): string {
-  const needsUntested = /^needs (.+), not tested on (.+)$/.exec(reason)
-  if (needsUntested)
-    return t("components.needsUntested", needsUntested[1]!, titleOf(needsUntested[2]!))
-  const untested = /^not tested on (.+)$/.exec(reason)
-  if (untested) return t("components.untested", titleOf(untested[1]!))
   const memory = /^needs (\d+) MiB of memory$/.exec(reason)
   if (memory) return t("components.needsMemory", Number(memory[1]))
+  const kubernetes = /^needs Kubernetes (.+)$/.exec(reason)
+  if (kubernetes) return t("components.needsKubernetes", kubernetes[1]!)
   const only = /^runs on (.+) only$/.exec(reason)
   if (only) return t("components.runsOn", only[1]!)
   const profile = /^unsupported on (.+)$/.exec(reason)
@@ -207,6 +198,7 @@ function ComponentRow({
   wizard: Wizard
 }) {
   const t = useT()
+  const arch = wizard.server.facts?.arch
   const id = useId()
   const disabled = !supported || needed
   const form = veleroForm(component)
@@ -240,6 +232,19 @@ function ComponentRow({
             </label>
             {!supported ? <Badge variant="secondary">{unsupported}</Badge> : null}
             {needed ? <Badge variant="secondary">{t("components.needed")}</Badge> : null}
+            {supported && !component.testedOn.includes(distribution) ? (
+              <Tooltip
+                content={
+                  component.testedOnOtherPlatforms?.includes(distribution) && arch
+                    ? t("components.untestedPlatformHint", titleOf(distribution), `linux/${arch}`)
+                    : t("components.untestedHint", titleOf(distribution))
+                }
+              >
+                <Badge variant="warn" render={<button type="button" />}>
+                  {t("components.untested")}
+                </Badge>
+              </Tooltip>
+            ) : null}
             {component.privileged ? (
               <Tooltip content={t("components.privilegedHint")}>
                 <Badge variant="warn" render={<button type="button" />}>
@@ -329,9 +334,9 @@ function VeleroFields({ wizard }: { wizard: Wizard }) {
         help={t("velero.endpointHint")}
         kind="url"
         required
-        value={show(given["s3-url"])}
+        value={show(given["s3Url"])}
         placeholder="https://<account>.r2.cloudflarestorage.com"
-        onChange={(text) => setInput("s3-url", text)}
+        onChange={(text) => setInput("s3Url", text)}
       />
       <Setting
         label={t("velero.bucket")}

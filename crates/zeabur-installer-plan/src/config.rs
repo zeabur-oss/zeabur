@@ -160,8 +160,10 @@ impl PersonalConfig {
     ///
     /// When the YAML does not match or `use` is not `personal`.
     pub fn parse(yaml: &str) -> Result<Self, PlanError> {
-        let config: Self =
+        let mut config: Self =
             serde_saphyr::from_str(yaml).map_err(|e| PlanError::Config(e.to_string()))?;
+        rename_inputs(&mut config.inputs);
+        rename_inputs(&mut config.secret_files);
         config.check()?;
         Ok(config)
     }
@@ -256,6 +258,48 @@ pub struct Sources {
     pub proxy_image: Option<String>,
     /// Zeabur's chart: a directory or a packaged `.tgz`.
     pub zeabur_chart: Option<String>,
+}
+
+/// Component inputs that Zeabur Catalog renamed: component id, old name, new name. The installer
+/// writes the new names into the file it reads; this table is removed in v0.2.0 (#223).
+pub const RENAMED_INPUTS: &[(&str, &str, &str)] = &[
+    ("builds/zeabur-builder", "cluster-ip", "clusterIp"),
+    ("intrusion-prevention/crowdsec", "bouncer-key", "bouncerKey"),
+    ("intrusion-prevention/crowdsec", "lapi-secret", "lapiSecret"),
+    (
+        "intrusion-prevention/crowdsec",
+        "registration-token",
+        "registrationToken",
+    ),
+    (
+        "remote-access/tailscale-operator",
+        "oauth-client-id",
+        "oauthClientId",
+    ),
+    (
+        "remote-access/tailscale-operator",
+        "oauth-client-secret",
+        "oauthClientSecret",
+    ),
+    ("volume-backup/velero", "s3-url", "s3Url"),
+    (
+        "volume-backup/velero",
+        "repository-password",
+        "repositoryPassword",
+    ),
+    ("volume-backup/velero", "backup-key", "backupKey"),
+    ("volume-backup/velero", "file-backup", "fileBackup"),
+];
+
+/// Gives each input with an old name its new name. A value under the new name wins.
+fn rename_inputs<V>(inputs: &mut BTreeMap<String, BTreeMap<String, V>>) {
+    for (component, old, new) in RENAMED_INPUTS {
+        if let Some(values) = inputs.get_mut(*component)
+            && let Some(value) = values.remove(*old)
+        {
+            values.entry((*new).to_owned()).or_insert(value);
+        }
+    }
 }
 
 /// A configuration file: a new cluster, or a node joining one.
@@ -524,12 +568,23 @@ pub fn server_address(url: &str, default_port: u16) -> Result<(String, u16), Pla
     Ok((host.to_owned(), port))
 }
 
-/// The release override of the other distribution is a mistake: it would be ignored.
+/// The release override of the other distribution is a mistake: it would be ignored. An override
+/// is a release tag, `v1.37.1+k3s1` or `v1.37.1+rke2r1`, whose Kubernetes version the catalog's
+/// `kubeVersion` ranges are read against.
 fn check_version(
     distribution: Distribution,
     rke2: Option<&String>,
     k3s: Option<&String>,
 ) -> Result<(), PlanError> {
+    for (name, version, build) in [("rke2Version", rke2, "rke2r"), ("k3sVersion", k3s, "k3s")] {
+        if let Some(version) = version
+            && !is_release_tag(version, build)
+        {
+            return Err(PlanError::Config(format!(
+                "{name}: {version} is not a release tag such as v1.37.1+{build}1"
+            )));
+        }
+    }
     match (distribution, rke2, k3s) {
         (Distribution::K3s, Some(_), _) => Err(PlanError::Config(
             "rke2Version applies to distribution: rke2; this one is k3s (set k3sVersion)"
@@ -541,6 +596,19 @@ fn check_version(
         )),
         _ => Ok(()),
     }
+}
+
+/// Whether `version` is `v<major>.<minor>.<patch>+<build><n>`, such as `v1.37.1+k3s1`.
+fn is_release_tag(version: &str, build: &str) -> bool {
+    let Some((release, metadata)) = version.strip_prefix('v').and_then(|v| v.split_once('+'))
+    else {
+        return false;
+    };
+    let numbers: Vec<&str> = release.split('.').collect();
+    let number = |n: &str| !n.is_empty() && n.bytes().all(|b| b.is_ascii_digit());
+    numbers.len() == 3
+        && numbers.iter().all(|n| number(n))
+        && metadata.strip_prefix(build).is_some_and(number)
 }
 
 /// A join token: `K10<64 hex>::<credentials>`, or bare credentials (no CA pinning).
@@ -675,8 +743,10 @@ impl Config {
     ///
     /// When the YAML does not match or a value is invalid.
     pub fn parse(yaml: &str) -> Result<Self, PlanError> {
-        let config: Self =
+        let mut config: Self =
             serde_saphyr::from_str(yaml).map_err(|e| PlanError::Config(e.to_string()))?;
+        rename_inputs(&mut config.inputs);
+        rename_inputs(&mut config.secret_files);
         config.check()?;
         Ok(config)
     }
@@ -828,6 +898,30 @@ mod tests {
     }
 
     #[test]
+    fn an_old_input_name_is_read_as_its_new_name() {
+        let yaml = format!(
+            "{MINIMAL}inputs:\n  volume-backup/velero: {{s3-url: https://s3.example.com, bucket: b}}\n\
+             secretFiles:\n  intrusion-prevention/crowdsec: {{bouncer-key: /etc/key}}\n"
+        );
+        let config = Config::parse(&yaml).unwrap();
+        let velero = &config.inputs["volume-backup/velero"];
+        assert_eq!(velero["s3Url"], "https://s3.example.com");
+        assert!(!velero.contains_key("s3-url"));
+        assert_eq!(
+            config.secret_files["intrusion-prevention/crowdsec"]["bouncerKey"],
+            "/etc/key"
+        );
+        let personal = PersonalConfig::parse(
+            "use: personal\ninputs:\n  builds/zeabur-builder: {cluster-ip: 10.43.0.9}\n",
+        )
+        .unwrap();
+        assert_eq!(
+            personal.inputs["builds/zeabur-builder"]["clusterIp"],
+            "10.43.0.9"
+        );
+    }
+
+    #[test]
     fn use_personal_makes_a_personal_configuration() {
         let Document::Personal(c) = Document::parse(
             "use: personal\nenable: [databases]\nhost: {tlsSan: [a.example.com]}\n",
@@ -915,6 +1009,22 @@ mod tests {
         assert!(
             Config::parse(&format!(
                 "{MINIMAL}distribution: rke2\nk3sVersion: v1.37.1+k3s1\n"
+            ))
+            .is_err()
+        );
+        for bad in [
+            "stable",
+            "1.37.1+k3s1",
+            "v1.37+k3s1",
+            "v1.37.1",
+            "v1.37.1+rke2r1",
+        ] {
+            let err = Config::parse(&format!("{MINIMAL}k3sVersion: {bad}\n")).unwrap_err();
+            assert!(err.to_string().contains("k3sVersion"), "{bad}: {err}");
+        }
+        assert!(
+            Config::parse(&format!(
+                "{MINIMAL}distribution: rke2\nrke2Version: v1.37.1+k3s1\n"
             ))
             .is_err()
         );

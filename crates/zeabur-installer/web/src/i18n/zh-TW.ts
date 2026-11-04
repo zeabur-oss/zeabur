@@ -200,12 +200,14 @@ export const zhTW: Messages = {
     "以主機權限執行，所以這個元件的 Namespace 不套用 restricted Pod 安全等級。",
   "components.personalDescription":
     "預設會裝 Ingress 和憑證，要從 Git 或資料夾建置，再勾選 Zeabur Builder。元件需要的其他元件會一起加入。",
-  "components.untested": (distribution) => `還沒在 ${distribution} 上測試過`,
-  "components.needsUntested": (component, distribution) =>
-    `需要的 ${component} 還沒在 ${distribution} 上測試過`,
+  "components.untested": "未測試",
+  "components.untestedHint": (distribution) => `還沒在 ${distribution} 上測試過，一樣可以安裝。`,
+  "components.untestedPlatformHint": (distribution, platform) =>
+    `在 ${distribution} 上測試過，但還沒在 ${platform} 上測試過，一樣可以安裝。`,
   "components.needsMemory": (mib) => `至少要 ${mib.toLocaleString("zh-TW")} MiB 記憶體，這台不夠`,
   "components.unsupported": (distribution) => `不支援 ${distribution}`,
   "components.runsOn": (where) => `只能在 ${where} 上執行`,
+  "components.needsKubernetes": (range) => `需要 Kubernetes ${range}`,
   "components.unsupportedOn": (profile) => `不支援 ${profile}`,
   "components.details": (name) => `關於 ${name}`,
   "components.customise": (n) => `自訂（${n}）`,
@@ -226,32 +228,32 @@ export const zhTW: Messages = {
   "velero.regionHint": "留白時使用 us-east-1。Cloudflare R2 請填 auto。",
   "velero.accessKey": "存取金鑰 ID",
   "velero.secretKey": "私密存取金鑰",
-  "input.volume-backup/velero.s3-url": "端點",
+  "input.volume-backup/velero.s3Url": "端點",
   "input.volume-backup/velero.bucket": "儲存貯體",
   "input.volume-backup/velero.credentials": "憑證檔",
   "inputHelp.volume-backup/velero.credentials":
     "AWS 格式的憑證檔：第一行 [default]，接著是 aws_access_key_id 和 aws_secret_access_key。",
-  "input.volume-backup/velero.repository-password": "磁碟區備份密碼",
-  "inputHelp.volume-backup/velero.repository-password": "Kopia 用它加密磁碟區檔案的備份。",
-  "input.volume-backup/velero.backup-key": "備份加密金鑰",
-  "inputHelp.volume-backup/velero.backup-key":
+  "input.volume-backup/velero.repositoryPassword": "磁碟區備份密碼",
+  "inputHelp.volume-backup/velero.repositoryPassword": "Kopia 用它加密磁碟區檔案的備份。",
+  "input.volume-backup/velero.backupKey": "備份加密金鑰",
+  "inputHelp.volume-backup/velero.backupKey":
     "S3 伺服器用這把金鑰加密每份備份（SSE-C），長度必須是 32 個字元。",
-  "input.volume-backup/velero.file-backup": "備份磁碟區裡的檔案",
-  "inputHelp.volume-backup/velero.file-backup":
+  "input.volume-backup/velero.fileBackup": "備份磁碟區裡的檔案",
+  "inputHelp.volume-backup/velero.fileBackup":
     "每個節點會多跑一個代理程式來複製磁碟區裡的檔案。代理程式以 root 執行，可以存取主機。",
-  "input.remote-access/tailscale-operator.oauth-client-id": "OAuth 用戶端 ID",
-  "inputHelp.remote-access/tailscale-operator.oauth-client-id":
+  "input.remote-access/tailscale-operator.oauthClientId": "OAuth 用戶端 ID",
+  "inputHelp.remote-access/tailscale-operator.oauthClientId":
     "到 Tailscale 管理主控台建立 OAuth 用戶端，給予 Devices Core、Auth Keys 和 Services 的寫入權限，標籤設為 tag:k8s-operator。Tailnet 政策裡要讓 tag:k8s-operator 擁有 tag:k8s。",
-  "input.remote-access/tailscale-operator.oauth-client-secret": "OAuth 用戶端密鑰",
-  "inputHelp.remote-access/tailscale-operator.oauth-client-secret": "同一個 OAuth 用戶端的密鑰。",
-  "input.intrusion-prevention/crowdsec.bouncer-key": "Bouncer 金鑰",
-  "inputHelp.intrusion-prevention/crowdsec.bouncer-key":
+  "input.remote-access/tailscale-operator.oauthClientSecret": "OAuth 用戶端密鑰",
+  "inputHelp.remote-access/tailscale-operator.oauthClientSecret": "同一個 OAuth 用戶端的密鑰。",
+  "input.intrusion-prevention/crowdsec.bouncerKey": "Bouncer 金鑰",
+  "inputHelp.intrusion-prevention/crowdsec.bouncerKey":
     "Traefik 的 bouncer 用它呼叫 CrowdSec 的本機 API。",
-  "input.intrusion-prevention/crowdsec.lapi-secret": "本機 API 密鑰",
-  "inputHelp.intrusion-prevention/crowdsec.lapi-secret":
+  "input.intrusion-prevention/crowdsec.lapiSecret": "本機 API 密鑰",
+  "inputHelp.intrusion-prevention/crowdsec.lapiSecret":
     "CrowdSec 的本機 API 用它簽署代理程式的工作階段。",
-  "input.intrusion-prevention/crowdsec.registration-token": "註冊權杖",
-  "inputHelp.intrusion-prevention/crowdsec.registration-token":
+  "input.intrusion-prevention/crowdsec.registrationToken": "註冊權杖",
+  "inputHelp.intrusion-prevention/crowdsec.registrationToken":
     "CrowdSec 的代理程式用它向本機 API 註冊。",
   "capability.certificates": "憑證",
   "capability.builds": "建置",
@@ -435,7 +437,11 @@ export const zhTW: Messages = {
   "warning.builder.deletesImages": () =>
     "Zeabur Builder 會接手 zot，並刪除 <project>/<name> 路徑下不是建置產生的映像檔，包括你自己推上去的。要保留所有映像檔，請在「元件」步驟取消勾選 Zeabur Builder。",
   "warning.config.untested": (id, distribution) =>
-    `${id} 沒在 ${distribution} 上測試過。設定檔要求安裝它，或要求安裝需要它的元件，所以照樣安裝。`,
+    `${id} 沒在 ${distribution} 上測試過，照樣安裝。`,
+  "warning.config.untestedPlatform": (id, distribution, platform) =>
+    `${id} 在 ${distribution} 上測試過，但沒在 ${platform} 上測試過，照樣安裝。`,
+  "warning.config.kubeVersion": (id, range, version) =>
+    `${id} 需要 Kubernetes ${range}，這個叢集是 ${version}，所以不會安裝。`,
   "warning.config.runsOn": (id, only) => `${id} 只能在 ${only} 上執行，所以不會安裝。`,
   "warning.config.unsupportedOn": (id, profile) => `${id} 不支援 ${profile}，所以不會安裝。`,
   "warning.remove.unknown": (id, charts) =>

@@ -220,13 +220,16 @@ export const en = {
     "Runs with host access, so its namespace is exempt from the restricted Pod Security level.",
   "components.personalDescription":
     "Ingress and certificates come by default. Tick Zeabur Builder if you want to build apps from Git or a folder. What a component needs is added with it.",
-  "components.untested": (distribution: string) => `Not tested on ${distribution}`,
-  "components.needsUntested": (component: string, distribution: string) =>
-    `Needs ${component}, which was not tested on ${distribution}`,
+  "components.untested": "Untested",
+  "components.untestedHint": (distribution: string) =>
+    `Not tested on ${distribution} yet. You can still install it.`,
+  "components.untestedPlatformHint": (distribution: string, platform: string) =>
+    `Tested on ${distribution}, but not on ${platform} yet. You can still install it.`,
   "components.needsMemory": (mib: number) =>
     `Needs ${mib.toLocaleString("en")} MiB of memory, and this server has less`,
   "components.unsupported": (distribution: string) => `Not on ${distribution}`,
   "components.runsOn": (where: string) => `Runs on ${where} only`,
+  "components.needsKubernetes": (range: string) => `Needs Kubernetes ${range}`,
   "components.unsupportedOn": (profile: string) => `Not supported on ${profile}`,
   "components.details": (name: string) => `About ${name}`,
   "components.customise": (n: number) => `Customize (${n})`,
@@ -248,34 +251,34 @@ export const en = {
   "velero.regionHint": "us-east-1 when left empty. Cloudflare R2 uses auto.",
   "velero.accessKey": "Access key ID",
   "velero.secretKey": "Secret access key",
-  "input.volume-backup/velero.s3-url": "Endpoint",
+  "input.volume-backup/velero.s3Url": "Endpoint",
   "input.volume-backup/velero.bucket": "Bucket",
   "input.volume-backup/velero.credentials": "Credentials file",
   "inputHelp.volume-backup/velero.credentials":
     "An AWS credentials file: [default], then aws_access_key_id and aws_secret_access_key lines.",
-  "input.volume-backup/velero.repository-password": "Volume copy password",
-  "inputHelp.volume-backup/velero.repository-password":
+  "input.volume-backup/velero.repositoryPassword": "Volume copy password",
+  "inputHelp.volume-backup/velero.repositoryPassword":
     "Kopia encrypts the copies of volume files with it.",
-  "input.volume-backup/velero.backup-key": "Backup encryption key",
-  "inputHelp.volume-backup/velero.backup-key":
+  "input.volume-backup/velero.backupKey": "Backup encryption key",
+  "inputHelp.volume-backup/velero.backupKey":
     "The S3 server encrypts every backup with this key (SSE-C). It must be 32 characters.",
-  "input.volume-backup/velero.file-backup": "Copy volume files",
-  "inputHelp.volume-backup/velero.file-backup":
+  "input.volume-backup/velero.fileBackup": "Copy volume files",
+  "inputHelp.volume-backup/velero.fileBackup":
     "Adds an agent on every node that copies the files in volumes. It runs as root with access to the host.",
-  "input.remote-access/tailscale-operator.oauth-client-id": "OAuth client ID",
-  "inputHelp.remote-access/tailscale-operator.oauth-client-id":
+  "input.remote-access/tailscale-operator.oauthClientId": "OAuth client ID",
+  "inputHelp.remote-access/tailscale-operator.oauthClientId":
     "Make an OAuth client in the Tailscale admin console with write access to Devices Core, Auth Keys and Services, and the tag tag:k8s-operator. In the tailnet policy, tag:k8s-operator must own tag:k8s.",
-  "input.remote-access/tailscale-operator.oauth-client-secret": "OAuth client secret",
-  "inputHelp.remote-access/tailscale-operator.oauth-client-secret":
+  "input.remote-access/tailscale-operator.oauthClientSecret": "OAuth client secret",
+  "inputHelp.remote-access/tailscale-operator.oauthClientSecret":
     "The secret of the same OAuth client.",
-  "input.intrusion-prevention/crowdsec.bouncer-key": "Bouncer key",
-  "inputHelp.intrusion-prevention/crowdsec.bouncer-key":
+  "input.intrusion-prevention/crowdsec.bouncerKey": "Bouncer key",
+  "inputHelp.intrusion-prevention/crowdsec.bouncerKey":
     "Traefik's bouncer calls CrowdSec's local API with it.",
-  "input.intrusion-prevention/crowdsec.lapi-secret": "Local API secret",
-  "inputHelp.intrusion-prevention/crowdsec.lapi-secret":
+  "input.intrusion-prevention/crowdsec.lapiSecret": "Local API secret",
+  "inputHelp.intrusion-prevention/crowdsec.lapiSecret":
     "CrowdSec's local API signs agent sessions with it.",
-  "input.intrusion-prevention/crowdsec.registration-token": "Registration token",
-  "inputHelp.intrusion-prevention/crowdsec.registration-token":
+  "input.intrusion-prevention/crowdsec.registrationToken": "Registration token",
+  "inputHelp.intrusion-prevention/crowdsec.registrationToken":
     "CrowdSec's agents register with the local API with it.",
   "capability.certificates": "Certificates",
   "capability.builds": "Builds",
@@ -468,7 +471,11 @@ export const en = {
   "warning.builder.deletesImages": () =>
     "Zeabur Builder takes over zot and deletes images under <project>/<name> paths that no build made, including any you pushed there yourself. To keep every image, uncheck Zeabur Builder on the Components step.",
   "warning.config.untested": (id: string, distribution: string) =>
-    `${id} wasn't tested on ${distribution}. It's installed because the configuration file asks for it or for a component that needs it.`,
+    `${id} wasn't tested on ${distribution}. It's installed anyway.`,
+  "warning.config.untestedPlatform": (id: string, distribution: string, platform: string) =>
+    `${id} was tested on ${distribution}, but not on ${platform}. It's installed anyway.`,
+  "warning.config.kubeVersion": (id: string, range: string, version: string) =>
+    `${id} needs Kubernetes ${range}, and this cluster runs ${version}, so it isn't installed.`,
   "warning.config.runsOn": (id: string, only: string) =>
     `${id} runs on ${only} only, so it isn't installed.`,
   "warning.config.unsupportedOn": (id: string, profile: string) =>

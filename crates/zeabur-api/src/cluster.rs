@@ -109,6 +109,8 @@ fn distribution(version: &str) -> Option<String> {
         Some("k3s".to_owned())
     } else if version.contains("+rke2") {
         Some("rke2".to_owned())
+    } else if version.contains("+kubesolo") {
+        Some("kubesolo".to_owned())
     } else {
         None
     }
@@ -771,5 +773,16 @@ mod tests {
         ]);
         assert_eq!(roles(Some(&labels)), ["control-plane", "etcd"]);
         assert_eq!(roles(None), Vec::<String>::new());
+    }
+
+    #[test]
+    fn the_version_names_the_distribution() {
+        assert_eq!(distribution("v1.36.5+k3s1").as_deref(), Some("k3s"));
+        assert_eq!(distribution("v1.36.5+rke2r1").as_deref(), Some("rke2"));
+        assert_eq!(
+            distribution("v1.35.7+kubesolo-v1.2.3").as_deref(),
+            Some("kubesolo")
+        );
+        assert_eq!(distribution("v1.36.2"), None);
     }
 }

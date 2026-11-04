@@ -24,9 +24,7 @@ const templates = resolve(process.env.ZEABUR_CATALOG ?? "", "templates")
 
 interface CatalogInput {
   name: string
-  generate?: string
-  generateBytes?: number
-  generateEncoding?: "base64url" | "hex"
+  generate?: { type: string; bytes?: number; encoding?: "base64url" | "hex" }
   validation?: { pattern?: string }
 }
 
@@ -117,13 +115,13 @@ const shownWords = (c: WordsCase) => {
 
 describe("app templates", () => {
   test("a generated value matches its input's pattern in every template", () => {
-    const generated = catalogInputs.filter(({ input }) => input.generate === "random")
+    const generated = catalogInputs.filter(({ input }) => input.generate?.type === "random")
     expect(generated.length).toBeGreaterThan(0)
     const refused = generated
       .filter(({ input }) => {
         const value = generate({
-          bytes: input.generateBytes ?? 32,
-          encoding: input.generateEncoding ?? "base64url",
+          bytes: input.generate!.bytes!,
+          encoding: input.generate!.encoding!,
         })
         return !new RegExp(input.validation?.pattern ?? "").test(value)
       })

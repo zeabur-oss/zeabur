@@ -29,9 +29,10 @@ use axum::response::Response;
 use axum::routing::get;
 use serde_json::{Value, json};
 use zeabur_installer_host::{facts, files, preflight, systemd};
-use zeabur_installer_plan::catalog::{Default, Index};
+use zeabur_installer_plan::catalog::{Default, Index, KIND, PodSecurity};
 use zeabur_installer_plan::cluster::Distribution;
 use zeabur_installer_plan::config::{Config, Document, PersonalConfig};
+use zeabur_installer_plan::select::Target;
 use zeabur_installer_plan::{kubesolo, node_name, personal, pins, plan, select};
 use zeabur_ui::Asset;
 
@@ -394,21 +395,15 @@ impl Server {
             .as_ref()
             .ok()
             .zip(team.as_ref())
-            .map_or_else(Vec::new, |(index, config)| team_selections(index, config));
+            .map_or_else(Vec::new, |(index, config)| {
+                team_selections(index, config, arch)
+            });
         let min_memory = loaded.as_ref().map_or_else(
             |_| json!({}),
             |index| team_min_memory(index, &selections, arch),
         );
         let (catalog, catalog_error) = match &loaded {
-            Ok(index) => (
-                catalog_json(
-                    index,
-                    team.as_ref().map_or("single-node", |c| c.profile.as_str()),
-                    arch,
-                    &selections,
-                ),
-                None,
-            ),
+            Ok(index) => (catalog_json(index, team.as_ref(), arch, &selections), None),
             Err(e) => (Value::Null, Some(e.to_string())),
         };
         let applying = self
@@ -671,7 +666,7 @@ fn team_min_memory(index: &Index, selections: &[(Distribution, Vec<String>)], ar
 }
 
 /// The components a team install of `config` selects on each distribution.
-fn team_selections(index: &Index, config: &Config) -> Vec<(Distribution, Vec<String>)> {
+fn team_selections(index: &Index, config: &Config, arch: &str) -> Vec<(Distribution, Vec<String>)> {
     Distribution::ALL
         .into_iter()
         .filter_map(|d| {
@@ -679,7 +674,7 @@ fn team_selections(index: &Index, config: &Config) -> Vec<(Distribution, Vec<Str
                 distribution: d,
                 ..config.clone()
             };
-            let selection = select::select(index, &config).ok()?;
+            let selection = select::select(index, &config, &Target::team(&config, arch)).ok()?;
             Some((
                 d,
                 selection.components.into_iter().map(|(id, _)| id).collect(),
@@ -688,17 +683,44 @@ fn team_selections(index: &Index, config: &Config) -> Vec<(Distribution, Vec<Str
         .collect()
 }
 
+/// Each distribution a component can run on here: the team distributions as `team` configures
+/// them, and `KubeSolo`.
+fn targets(team: Option<&Config>, arch: &str) -> Vec<Target> {
+    Distribution::ALL
+        .into_iter()
+        .map(|d| {
+            team.map_or_else(
+                || Target {
+                    distribution: d.id().to_owned(),
+                    platform: format!("linux/{arch}"),
+                    kubernetes: d.pinned_version().to_owned(),
+                },
+                |config| {
+                    let config = Config {
+                        distribution: d,
+                        ..config.clone()
+                    };
+                    Target::team(&config, arch)
+                },
+            )
+        })
+        .chain([Target::personal(arch)])
+        .collect()
+}
+
 fn strs(ids: &[String]) -> Vec<&str> {
     ids.iter().map(String::as_str).collect()
 }
 
-/// The catalog, as the components page shows it.
+/// The catalog, as the components page shows it for the team install `team`.
 fn catalog_json(
     index: &Index,
-    profile: &str,
+    team: Option<&Config>,
     arch: &str,
     selections: &[(Distribution, Vec<String>)],
 ) -> Value {
+    let profile = team.map_or("single-node", |c| c.profile.as_str());
+    let targets = targets(team, arch);
     let required = select::required(index, profile);
     let components: Vec<Value> = index
         .components
@@ -728,8 +750,25 @@ fn catalog_json(
                     Default::Optional => "optional",
                     Default::Unsupported => "unsupported",
                 },
-                "distributions": c.distributions,
-                "testedOn": c.tested_on,
+                "distributions": targets
+                    .iter()
+                    .filter(|t| c.supports(&t.distribution) && c.admits(&t.kubernetes))
+                    .map(|t| &t.distribution)
+                    .collect::<Vec<_>>(),
+                "testedOn": targets
+                    .iter()
+                    .filter(|t| c.is_tested_on(&t.distribution, &t.platform) && c.admits(&t.kubernetes))
+                    .map(|t| &t.distribution)
+                    .collect::<Vec<_>>(),
+                "testedOnOtherPlatforms": targets
+                    .iter()
+                    .filter(|t| {
+                        c.admits(&t.kubernetes)
+                            && !c.is_tested_on(&t.distribution, &t.platform)
+                            && c.tested_on.iter().any(|x| x.distribution == t.distribution)
+                    })
+                    .map(|t| &t.distribution)
+                    .collect::<Vec<_>>(),
                 "personalMinMemoryMib": personal::min_memory_mib(c, arch),
                 "teamMinMemoryMib": selections
                     .iter()
@@ -753,9 +792,9 @@ fn catalog_json(
                     .flatten()
                     .filter(|id| **id != c.id)
                     .collect::<Vec<_>>(),
-                "idleMemoryMib": c.idle_memory_mib(profile, arch),
+                "idleMemoryMib": c.idle_memory_mib(KIND, profile, arch),
                 "security": c.security.summary,
-                "privileged": c.security.privileged,
+                "privileged": c.security.level == PodSecurity::Privileged,
                 "inputs": inputs,
             })
         })
@@ -779,7 +818,7 @@ mod tests {
 
     use serde_json::{Value, json};
     use zeabur_installer_host::preflight::{Code, Topic};
-    use zeabur_installer_plan::catalog::Index;
+    use zeabur_installer_plan::catalog::{Index, TestedOn};
     use zeabur_installer_plan::config::{Config, PersonalConfig};
     use zeabur_installer_plan::plan::{self, Facts};
     use zeabur_installer_plan::{personal, pins};
@@ -1097,11 +1136,24 @@ mod tests {
     /// (web/scripts/fixtures.ts); without it they go to a temporary one.
     #[test]
     fn the_web_fixtures_follow_the_catalog() {
-        let index = Index::parse(include_bytes!(concat!(
+        let mut index = Index::parse(include_bytes!(concat!(
             env!("ZEABUR_CATALOG_RELEASE"),
             "/index.json"
         )))
         .unwrap();
+        // The pinned catalog release has no test results yet.
+        for component in &mut index.components {
+            if component.tested_on.is_empty() {
+                component.tested_on = component
+                    .distributions
+                    .iter()
+                    .map(|d| TestedOn {
+                        distribution: d.clone(),
+                        platforms: vec!["linux/amd64".to_owned(), "linux/arm64".to_owned()],
+                    })
+                    .collect();
+            }
+        }
         let seeds = Path::new(env!("CARGO_MANIFEST_DIR")).join("web/scripts/fixtures");
         let read = |name: &str| -> Value {
             serde_json::from_str(&fs::read_to_string(seeds.join(name)).unwrap()).unwrap()
@@ -1111,8 +1163,8 @@ mod tests {
         let mut state = read("state.json");
         let seeded: Config = serde_json::from_value(state["config"].clone()).unwrap();
         let arch = state["facts"]["arch"].as_str().unwrap().to_owned();
-        let selections = super::team_selections(&index, &seeded);
-        state["catalog"] = catalog_json(&index, &seeded.profile, &arch, &selections);
+        let selections = super::team_selections(&index, &seeded, &arch);
+        state["catalog"] = catalog_json(&index, Some(&seeded), &arch, &selections);
         state["teamMinMemoryMib"] = selections
             .iter()
             .map(|(d, ids)| {

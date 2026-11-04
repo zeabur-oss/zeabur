@@ -7,11 +7,11 @@
         "oss": "oss"
       },
       "locked": {
-        "lastModified": 1793710713,
-        "narHash": "sha256-HdpLyBDsVrYbMgv5pbLcS42v6tZ1Ycmh6zpxkI68VTE=",
+        "lastModified": 1793775542,
+        "narHash": "sha256-AEwBPZH6LsUJ31lEGkhZyIGsoLWSWfD6VVGocZVOyIU=",
         "owner": "zeabur-oss",
         "repo": "catalog",
-        "rev": "7fb1f2ef9516af6eb5d1ef3a6cdf972507301d70",
+        "rev": "f9466acdd616ebf46af9bfd26b9974414e91bf0b",
         "type": "github"
       },
       "original": {

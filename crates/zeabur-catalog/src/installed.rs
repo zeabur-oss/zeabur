@@ -7,7 +7,7 @@
 //! |---|---|---|
 //! | k3s packaged add-on (a `HelmChart` in `kube-system` whose chart is served from `/static/charts/`) | the chart file's name | no: "managed by k3s" |
 //! | k3s packaged manifest (metrics-server on k3s, with no Helm evidence) | not read | no: "managed by k3s" |
-//! | RKE2 packaged chart (a `HelmChart` named `rke2-<name>` with the `rke2.cattle.io/inject-cluster-config` annotation RKE2 puts on its own charts) | the `helm.cattle.io/chart-url` file name | no: "managed by RKE2" |
+//! | RKE2 packaged chart (a `HelmChart` the catalog names for `rke2`, such as `rke2-traefik`, with the `rke2.cattle.io/inject-cluster-config` annotation RKE2 puts on its own charts) | the `helm.cattle.io/chart-url` file name | no: "managed by RKE2" |
 //! | k3s `HelmChart` from a repository | `spec.version` | yes |
 //! | Helm (CLI or any tool that sets the label) | the workloads' `helm.sh/chart` label | yes |
 //! | anything else (plain manifests, operators) | not read | no |
@@ -155,19 +155,18 @@ pub fn installation(
         tested: component.tested_version.clone(),
         upgrade: None,
     };
-    for addon in &component.detection.k3s_addons {
-        let name = format!("rke2-{addon}");
+    for name in component.detection.addons_on("rke2") {
         if let Some(url) = facts
             .rke2_packaged_charts
             .get(&format!("kube-system/{name}"))
         {
             found.source = InstallSource::Rke2;
             found.managed_by = Some("RKE2".to_owned());
-            found.version = packaged_chart_version(url, &name);
+            found.version = packaged_chart_version(url, name);
             return found;
         }
     }
-    for addon in &component.detection.k3s_addons {
+    for addon in component.detection.addons_on("k3s") {
         let key = format!("kube-system/{addon}");
         let Some(chart) = facts.k3s_helm_charts.get(&key) else {
             continue;

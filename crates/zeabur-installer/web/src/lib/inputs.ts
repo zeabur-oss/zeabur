@@ -5,11 +5,11 @@ export type InputKind = "text" | "secret" | "multiline" | "url" | "boolean"
 
 /** Inputs whose kind the catalog does not tell, by `<component>:<input>`. */
 const kinds: Record<string, InputKind> = {
-  "volume-backup/velero:s3-url": "url",
+  "volume-backup/velero:s3Url": "url",
   "volume-backup/velero:credentials": "multiline",
-  "volume-backup/velero:file-backup": "boolean",
+  "volume-backup/velero:fileBackup": "boolean",
   // An ID, not a secret, though the catalog keeps it in a Secret.
-  "remote-access/tailscale-operator:oauth-client-id": "text",
+  "remote-access/tailscale-operator:oauthClientId": "text",
 }
 
 export function inputKind(component: string, input: Input): InputKind {
@@ -22,7 +22,7 @@ export function inputKind(component: string, input: Input): InputKind {
 export const velero = "volume-backup/velero"
 
 /** The catalog inputs the Velero form asks for in its own fields. */
-export const veleroInputs = ["s3-url", "bucket", "credentials"]
+export const veleroInputs = ["s3Url", "bucket", "credentials"]
 
 /** The secrets the page sends in place of `credentials`; gui.rs makes the file from them. */
 export const veleroKeys = ["access-key-id", "secret-access-key"] as const
