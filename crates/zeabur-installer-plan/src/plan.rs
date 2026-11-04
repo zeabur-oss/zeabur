@@ -410,12 +410,70 @@ pub struct Memory {
     pub reserved_mib: Option<u64>,
 }
 
-/// The least memory a team install on `distribution` needs for a component that uses memory on
-/// top of its idle use while working.
+/// What the components `ids` ask the scheduler for on `distribution`: the catalog's measurement on
+/// the distribution itself, or on `single-node` where it has none.
+fn requests_mib<'a>(
+    index: &Index,
+    ids: impl IntoIterator<Item = &'a str>,
+    distribution: Distribution,
+    arch: &str,
+) -> u64 {
+    ids.into_iter()
+        .filter_map(|id| index.component(id))
+        .filter_map(|c| {
+            c.request_memory_mib(distribution.id(), arch)
+                .or_else(|| c.request_memory_mib("single-node", arch))
+        })
+        .sum()
+}
+
+/// What Zeabur Identity's pods request, as its pinned release gives it; a development build names
+/// its own image and has no such figure.
+fn identity_request_mib(products: Option<&pins::Products>) -> u64 {
+    products.map_or(0, |p| p.identity.request_memory_mib)
+}
+
+/// The least memory a team install of `ids` on `distribution` needs: the components that do no
+/// work of their own, which are never left out for memory, and Zeabur Identity.
 #[must_use]
-pub fn min_memory_mib(component: &Component, distribution: Distribution) -> Option<u64> {
-    let work = component.resources.work_memory_mib?;
-    Some(distribution.min_memory_at_work_mib(work))
+pub fn team_min_memory_mib(
+    index: &Index,
+    ids: &[&str],
+    distribution: Distribution,
+    arch: &str,
+    products: Option<&pins::Products>,
+) -> u64 {
+    let idle = ids.iter().copied().filter(|id| {
+        index
+            .component(id)
+            .is_some_and(|c| c.resources.work_mib().is_none())
+    });
+    distribution.min_memory_mib(
+        requests_mib(index, idle, distribution, arch) + identity_request_mib(products),
+    )
+}
+
+/// The least memory a team install of `ids` on `distribution` needs for `component`, which uses
+/// memory on top of its idle use while working: every one of them installed, with one piece of
+/// its work running.
+#[must_use]
+pub fn min_memory_mib(
+    component: &Component,
+    index: &Index,
+    ids: &[&str],
+    distribution: Distribution,
+    arch: &str,
+    products: Option<&pins::Products>,
+) -> Option<u64> {
+    let work = component.resources.work_mib()?;
+    let installed = ids
+        .iter()
+        .copied()
+        .filter(|id| *id != component.id)
+        .chain([component.id.as_str()]);
+    Some(distribution.min_memory_mib(
+        requests_mib(index, installed, distribution, arch) + identity_request_mib(products) + work,
+    ))
 }
 
 /// The selection without the components one build or other work would not fit beside, and the
@@ -428,17 +486,26 @@ fn select_fitting(
     index: &Index,
     config: &Config,
     facts: &Facts,
+    products: Option<&pins::Products>,
 ) -> Result<(Selection, BTreeMap<String, String>), PlanError> {
     let distribution = config.distribution;
+    let arch = facts.arch.as_str();
+    let mut selection = select::select(index, config)?;
+    let ids: Vec<String> = selection
+        .components
+        .iter()
+        .map(|(id, _)| id.clone())
+        .collect();
+    let ids: Vec<&str> = ids.iter().map(String::as_str).collect();
+    let min = team_min_memory_mib(index, &ids, distribution, arch, products);
     // An install that is already running is upgraded with a warning instead.
-    if facts.record.is_none() && facts.memory_mib < distribution.min_memory_mib() {
+    if facts.record.is_none() && facts.memory_mib < min {
         return Err(PlanError::TeamMemory {
             distribution,
-            min: distribution.min_memory_mib(),
+            min,
             have: facts.memory_mib,
         });
     }
-    let mut selection = select::select(index, config)?;
     let mut left_out = select::reasons(&selection.left_out);
     crate::personal::leave_out_short_of_memory(
         index,
@@ -450,7 +517,7 @@ fn select_fitting(
                 .record
                 .as_ref()
                 .is_some_and(|r| r.components.contains(&c.id));
-            min_memory_mib(c, config.distribution).filter(|_| !installed)
+            min_memory_mib(c, index, &ids, distribution, arch, products).filter(|_| !installed)
         },
     );
     Ok((selection, left_out))
@@ -461,14 +528,24 @@ fn below_minimum(
     index: &Index,
     selection: &Selection,
     distribution: Distribution,
-    host_mib: u64,
+    facts: &Facts,
+    products: Option<&pins::Products>,
 ) -> Option<Warning> {
-    let needs = selection
+    let host_mib = facts.memory_mib;
+    let arch = facts.arch.as_str();
+    let ids: Vec<&str> = selection
         .components
         .iter()
-        .filter_map(|(id, _)| index.component(id))
-        .filter_map(|c| min_memory_mib(c, distribution))
-        .fold(distribution.min_memory_mib(), u64::max);
+        .map(|(id, _)| id.as_str())
+        .collect();
+    let needs = ids
+        .iter()
+        .filter_map(|id| index.component(id))
+        .filter_map(|c| min_memory_mib(c, index, &ids, distribution, arch, products))
+        .fold(
+            team_min_memory_mib(index, &ids, distribution, arch, products),
+            u64::max,
+        );
     let title = distribution.title();
     (host_mib < needs).then(|| {
         warning(
@@ -507,7 +584,7 @@ pub fn plan_with(
     let distribution = config.distribution;
     facts.check_installer()?;
     let node_name = node_name::choose(config.host.node_name.as_deref(), facts, &[])?;
-    let (selection, left_out) = select_fitting(index, config, facts)?;
+    let (selection, left_out) = select_fitting(index, config, facts, products)?;
     let profile = config.profile.as_str();
     let chosen: BTreeSet<&str> = selection
         .components
@@ -519,7 +596,8 @@ pub fn plan_with(
         index,
         &selection,
         distribution,
-        facts.memory_mib,
+        facts,
+        products,
     ));
 
     let cluster = cluster_plan(distribution, config.version(), &facts.arch, &mut warnings)?;
@@ -2478,6 +2556,7 @@ mod tests {
                 image: "ghcr.io/zeabur-oss/identity@sha256:bb",
                 identityctl_amd64: "cc",
                 identityctl_arm64: "dd",
+                request_memory_mib: 24,
             },
             zeabur: pins::Zeabur {
                 version: "v0.3.0",
@@ -2536,6 +2615,23 @@ mod tests {
         assert_eq!(keys, ["identityImage", "identityctl", "zeaburChart"]);
     }
 
+    /// The least memory a team install of `config` needs, as the plan checks it.
+    fn least_memory(index: &Index, config: &Config) -> u64 {
+        let selection = select::select(index, config).unwrap();
+        let ids: Vec<&str> = selection
+            .components
+            .iter()
+            .map(|(id, _)| id.as_str())
+            .collect();
+        team_min_memory_mib(
+            index,
+            &ids,
+            config.distribution,
+            "arm64",
+            pins::PRODUCTS.as_ref(),
+        )
+    }
+
     #[test]
     fn a_team_install_needs_the_least_memory() {
         let index = Index::parse(INDEX.as_bytes()).unwrap();
@@ -2544,7 +2640,7 @@ mod tests {
             (Distribution::Rke2, "distribution: rke2\n"),
         ] {
             let mut small = facts();
-            small.memory_mib = distribution.min_memory_mib();
+            small.memory_mib = least_memory(&index, &config(extra));
             assert!(plan(&index, &config(extra), &small).is_ok());
             small.memory_mib -= 1;
             let Err(error) = plan(&index, &config(extra), &small) else {
@@ -2552,22 +2648,6 @@ mod tests {
             };
             assert!(error.to_string().contains("use: personal"), "{error}");
             assert!(error.to_string().contains(distribution.title()), "{error}");
-        }
-    }
-
-    #[test]
-    fn the_defaults_fit_the_smallest_servers_without_a_warning() {
-        let index = Index::parse(INDEX.as_bytes()).unwrap();
-        for (extra, memory_mib) in [
-            ("", Distribution::K3s.min_memory_mib()),
-            ("distribution: rke2\n", Distribution::Rke2.min_memory_mib()),
-        ] {
-            let mut host = facts();
-            host.memory_mib = memory_mib;
-            let plan = plan(&index, &config(extra), &host).unwrap();
-            let idle = plan.memory.cluster_mib + plan.memory.components_mib;
-            assert!(idle < host.memory_mib * 4 / 5, "{idle} MiB");
-            assert!(plan.warnings.iter().all(|w| w.code != "memory.tight"));
         }
     }
 
@@ -2595,20 +2675,18 @@ mod tests {
     }
 
     #[test]
-    fn rke2_is_refused_on_a_4_gib_server_and_k3s_is_not() {
+    fn a_4_gib_server_takes_the_defaults_without_the_builder_or_a_warning() {
         let index = Index::parse(INDEX.as_bytes()).unwrap();
         let mut host = facts();
         host.memory_mib = 3793;
-        assert!(plan(&index, &config(""), &host).is_ok());
-        let Err(PlanError::TeamMemory {
-            distribution, have, ..
-        }) = plan(&index, &config("distribution: rke2\n"), &host)
-        else {
-            panic!("RKE2 on {} MiB", host.memory_mib);
-        };
-        assert_eq!((distribution, have), (Distribution::Rke2, 3793));
-        host.memory_mib = Distribution::Rke2.min_memory_mib();
-        assert!(plan(&index, &config("distribution: rke2\n"), &host).is_ok());
+        for extra in ["", "distribution: rke2\n"] {
+            let plan = plan(&index, &config(extra), &host).unwrap();
+            assert!(!ids(&plan).contains(&"builds/zeabur-builder"));
+            assert!(plan.left_out.contains_key("builds/zeabur-builder"));
+            let idle = plan.memory.cluster_mib + plan.memory.components_mib;
+            assert!(idle < host.memory_mib * 4 / 5, "{idle} MiB");
+            assert!(plan.warnings.iter().all(|w| w.code != "memory.tight"));
+        }
     }
 
     #[test]
@@ -2620,8 +2698,22 @@ mod tests {
                 "distribution: {}\nenable: [builds/zeabur-builder]\n",
                 distribution.id()
             ));
-            let needs = min_memory_mib(builder, distribution).unwrap();
-            assert!(needs > distribution.min_memory_mib());
+            let selection = select::select(&index, &config).unwrap();
+            let all: Vec<&str> = selection
+                .components
+                .iter()
+                .map(|(id, _)| id.as_str())
+                .collect();
+            let needs = min_memory_mib(
+                builder,
+                &index,
+                &all,
+                distribution,
+                "arm64",
+                pins::PRODUCTS.as_ref(),
+            )
+            .unwrap();
+            assert!(needs > least_memory(&index, &config));
             let mut host = facts();
             host.memory_mib = needs - 1;
             let short = plan(&index, &config, &host).unwrap();
@@ -2731,7 +2823,7 @@ mod tests {
         let config = config("enable: [builds/zeabur-builder]\n");
         let first = plan(&index, &config, &facts()).unwrap();
         let mut small = facts();
-        small.memory_mib = 2882;
+        small.memory_mib = least_memory(&index, &config) - 1;
         assert!(matches!(
             plan(&index, &config, &small),
             Err(PlanError::TeamMemory { .. })

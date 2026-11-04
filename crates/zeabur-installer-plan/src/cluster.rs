@@ -127,18 +127,13 @@ const RKE2_STATIC_PODS_REQUEST_MIB: u64 =
 const RKE2_COREDNS_REQUEST_MIB: u64 = 144;
 /// K3s's `CoreDNS`. Calico asks for no memory.
 const K3S_COREDNS_REQUEST_MIB: u64 = 70;
-/// The memory requests of the catalog's default components on one node, sized from what they used
-/// on K3s with 35 pods running.
-const DEFAULT_COMPONENTS_REQUEST_MIB: u64 = 1200;
-/// Zeabur Identity's memory request (identity `crates/zeabur-identity-k8s/src/deployment.rs`).
-const IDENTITY_REQUEST_MIB: u64 = 32;
 /// Zeabur's chart, whose own and proxy requests count.
 const ZEABUR_VALUES: &str = include_str!("../../../deploy/chart/zeabur/values.yaml");
 
-/// The memory requests of Zeabur and its proxy in the chart's values, with Zeabur Identity's.
-fn products_request_mib() -> u64 {
+/// The memory requests of Zeabur and its proxy in the chart's values.
+fn zeabur_request_mib() -> u64 {
     let Ok(values) = serde_saphyr::from_str::<serde_json::Value>(ZEABUR_VALUES) else {
-        return IDENTITY_REQUEST_MIB;
+        return 0;
     };
     let request = |path: &str| {
         values
@@ -147,9 +142,7 @@ fn products_request_mib() -> u64 {
             .and_then(mebibytes)
             .unwrap_or(0)
     };
-    request("/resources/requests/memory")
-        + request("/proxy/resources/requests/memory")
-        + IDENTITY_REQUEST_MIB
+    request("/resources/requests/memory") + request("/proxy/resources/requests/memory")
 }
 
 /// A memory quantity in `Mi` or `Gi`, in MiB.
@@ -312,32 +305,20 @@ impl Distribution {
         OS_IDLE_MIB + self.idle_mib() + ZEABUR_IDLE_MIB
     }
 
-    /// The least memory a team install needs.
+    /// The least memory a team install needs, with `requests_mib` what the components and
+    /// Zeabur Identity ask the scheduler for, and any work one of them does on top.
     ///
     /// The scheduler places a pod only where its memory request fits in what pods may use, so that
     /// must hold the requests of the distribution's own pods (RKE2's static pods and `CoreDNS`,
-    /// K3s's `CoreDNS`), of the default components and of Zeabur as its chart gives them, on top of
-    /// the reserves and the hard eviction threshold, rounded up to a hundred. K3s comes to 3500,
-    /// which a 4 GiB server passes once its crash kernel reserve is off; RKE2 comes to 4300.
+    /// K3s's `CoreDNS`), `requests_mib` and Zeabur's as its chart gives them, on top of the
+    /// reserves and the hard eviction threshold, rounded up to a hundred.
     #[must_use]
-    pub fn min_memory_mib(self) -> u64 {
-        self.min_memory_at_work_mib(0)
-    }
-
-    /// [`Self::min_memory_mib`] with a component that uses `work_mib` more while working, such as
-    /// the builder in a build (`resources.workMemoryMiB` in the catalog).
-    #[must_use]
-    pub fn min_memory_at_work_mib(self, work_mib: u64) -> u64 {
+    pub fn min_memory_mib(self, requests_mib: u64) -> u64 {
         let own_pods = match self {
             Self::K3s => K3S_COREDNS_REQUEST_MIB,
             Self::Rke2 => RKE2_STATIC_PODS_REQUEST_MIB + RKE2_COREDNS_REQUEST_MIB,
         };
-        (own_pods
-            + DEFAULT_COMPONENTS_REQUEST_MIB
-            + products_request_mib()
-            + self.reserved_mib()
-            + EVICTION_HARD_MIB
-            + work_mib)
+        (own_pods + requests_mib + zeabur_request_mib() + self.reserved_mib() + EVICTION_HARD_MIB)
             .div_ceil(100)
             * 100
     }
@@ -658,12 +639,15 @@ mod tests {
     use super::*;
 
     #[test]
-    fn k3s_fits_4_gib_without_a_crash_kernel_but_not_a_build_and_rke2_needs_more_than_4_gib() {
-        // What a 4 GiB server reports with its crash kernel reserve off.
-        assert!(Distribution::K3s.min_memory_mib() <= 3900);
-        // The builder's workMemoryMiB in the catalog.
-        assert!(Distribution::K3s.min_memory_at_work_mib(500) > 3900);
-        assert!(Distribution::Rke2.min_memory_mib() > 3900);
+    fn the_minimum_holds_the_requests_on_top_of_the_reserves() {
+        for distribution in Distribution::ALL {
+            let floor = distribution.reserved_mib() + EVICTION_HARD_MIB;
+            assert!(distribution.min_memory_mib(0) >= floor + zeabur_request_mib());
+            assert_eq!(
+                distribution.min_memory_mib(1000) - distribution.min_memory_mib(0),
+                1000
+            );
+        }
     }
 
     #[test]
@@ -691,14 +675,7 @@ mod tests {
         assert_eq!(mebibytes("16Mi"), Some(16));
         assert_eq!(mebibytes("1Gi"), Some(1024));
         assert_eq!(mebibytes("500M"), None);
-        assert!(products_request_mib() > IDENTITY_REQUEST_MIB + 16);
-    }
-
-    #[test]
-    // docs/*/get-started/personal.mdx
-    fn the_minimums_are_the_ones_the_docs_give() {
-        assert_eq!(Distribution::K3s.min_memory_mib(), 3500);
-        assert_eq!(Distribution::Rke2.min_memory_mib(), 4300);
+        assert!(zeabur_request_mib() > 0);
     }
 
     #[test]

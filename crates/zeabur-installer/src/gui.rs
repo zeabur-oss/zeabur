@@ -32,7 +32,7 @@ use zeabur_installer_host::{facts, files, preflight, systemd};
 use zeabur_installer_plan::catalog::{Default, Index};
 use zeabur_installer_plan::cluster::Distribution;
 use zeabur_installer_plan::config::{Config, Document, PersonalConfig};
-use zeabur_installer_plan::{kubesolo, node_name, personal, plan, select};
+use zeabur_installer_plan::{kubesolo, node_name, personal, pins, plan, select};
 use zeabur_ui::Asset;
 
 use crate::{InstallError, apply, load, out, render};
@@ -379,18 +379,6 @@ impl Server {
                 (d.id().to_owned(), json!(checks))
             })
             .collect();
-        // A running install is upgraded below the minimum with a warning, as the plan allows.
-        let min_memory: serde_json::Map<String, Value> = Distribution::ALL
-            .into_iter()
-            .map(|d| {
-                let min = if systemd::is_active(d.server_unit()) {
-                    0
-                } else {
-                    d.min_memory_mib()
-                };
-                (d.id().to_owned(), json!(min))
-            })
-            .collect();
         let personal_checks = preflight::run(preflight::Options {
             cluster_running: systemd::is_active(kubesolo::UNIT),
             require_encrypted_disk: personal.host.require_encrypted_disk,
@@ -400,12 +388,24 @@ impl Server {
             .as_ref()
             .and_then(|c| c.sources.catalog.clone())
             .or_else(|| personal.sources.catalog.clone());
-        let (catalog, catalog_error) = match load::catalog(source.as_deref(), apply::STATE_DIR) {
+        let arch = host.as_ref().map_or("", |f| f.arch.as_str());
+        let loaded = load::catalog(source.as_deref(), apply::STATE_DIR);
+        let selections = loaded
+            .as_ref()
+            .ok()
+            .zip(team.as_ref())
+            .map_or_else(Vec::new, |(index, config)| team_selections(index, config));
+        let min_memory = loaded.as_ref().map_or_else(
+            |_| json!({}),
+            |index| team_min_memory(index, &selections, arch),
+        );
+        let (catalog, catalog_error) = match &loaded {
             Ok(index) => (
                 catalog_json(
-                    &index,
+                    index,
                     team.as_ref().map_or("single-node", |c| c.profile.as_str()),
-                    host.as_ref().map_or("", |f| f.arch.as_str()),
+                    arch,
+                    &selections,
                 ),
                 None,
             ),
@@ -653,8 +653,52 @@ fn velero_credentials(values: &mut BTreeMap<String, String>) -> Result<(), Insta
     Ok(())
 }
 
+/// The least memory of a team install on each distribution. A running install is upgraded below
+/// it with a warning, as the plan allows, so its minimum is 0.
+fn team_min_memory(index: &Index, selections: &[(Distribution, Vec<String>)], arch: &str) -> Value {
+    let min: serde_json::Map<String, Value> = selections
+        .iter()
+        .map(|(d, ids)| {
+            let min = if systemd::is_active(d.server_unit()) {
+                0
+            } else {
+                plan::team_min_memory_mib(index, &strs(ids), *d, arch, pins::PRODUCTS.as_ref())
+            };
+            (d.id().to_owned(), json!(min))
+        })
+        .collect();
+    Value::Object(min)
+}
+
+/// The components a team install of `config` selects on each distribution.
+fn team_selections(index: &Index, config: &Config) -> Vec<(Distribution, Vec<String>)> {
+    Distribution::ALL
+        .into_iter()
+        .filter_map(|d| {
+            let config = Config {
+                distribution: d,
+                ..config.clone()
+            };
+            let selection = select::select(index, &config).ok()?;
+            Some((
+                d,
+                selection.components.into_iter().map(|(id, _)| id).collect(),
+            ))
+        })
+        .collect()
+}
+
+fn strs(ids: &[String]) -> Vec<&str> {
+    ids.iter().map(String::as_str).collect()
+}
+
 /// The catalog, as the components page shows it.
-fn catalog_json(index: &Index, profile: &str, arch: &str) -> Value {
+fn catalog_json(
+    index: &Index,
+    profile: &str,
+    arch: &str,
+    selections: &[(Distribution, Vec<String>)],
+) -> Value {
     let required = select::required(index, profile);
     let components: Vec<Value> = index
         .components
@@ -687,9 +731,19 @@ fn catalog_json(index: &Index, profile: &str, arch: &str) -> Value {
                 "distributions": c.distributions,
                 "testedOn": c.tested_on,
                 "personalMinMemoryMib": personal::min_memory_mib(c, arch),
-                "teamMinMemoryMib": Distribution::ALL
-                    .into_iter()
-                    .filter_map(|d| Some((d.id(), plan::min_memory_mib(c, d)?)))
+                "teamMinMemoryMib": selections
+                    .iter()
+                    .filter_map(|(d, ids)| {
+                        let min = plan::min_memory_mib(
+                            c,
+                            index,
+                            &strs(ids),
+                            *d,
+                            arch,
+                            pins::PRODUCTS.as_ref(),
+                        )?;
+                        Some((d.id(), min))
+                    })
                     .collect::<BTreeMap<_, _>>(),
                 "required": required.contains(&c.id),
                 "needs": c
@@ -1055,14 +1109,16 @@ mod tests {
         let mut written = BTreeMap::new();
 
         let mut state = read("state.json");
-        state["catalog"] = catalog_json(
-            &index,
-            state["config"]["profile"].as_str().unwrap(),
-            state["facts"]["arch"].as_str().unwrap(),
-        );
-        state["teamMinMemoryMib"] = super::Distribution::ALL
-            .into_iter()
-            .map(|d| (d.id().to_owned(), json!(d.min_memory_mib())))
+        let seeded: Config = serde_json::from_value(state["config"].clone()).unwrap();
+        let arch = state["facts"]["arch"].as_str().unwrap().to_owned();
+        let selections = super::team_selections(&index, &seeded);
+        state["catalog"] = catalog_json(&index, &seeded.profile, &arch, &selections);
+        state["teamMinMemoryMib"] = selections
+            .iter()
+            .map(|(d, ids)| {
+                let min = plan::team_min_memory_mib(&index, &super::strs(ids), *d, &arch, None);
+                (d.id().to_owned(), json!(min))
+            })
             .collect();
         state["rke2SuggestedMib"] = json!(plan::RKE2_SUGGESTED_MIB);
         written.insert("state.json", state);
@@ -1082,6 +1138,7 @@ mod tests {
                 image: image("zeabur-identity").leak(),
                 identityctl_amd64: fake,
                 identityctl_arm64: fake,
+                request_memory_mib: 24,
             },
             zeabur: pins::Zeabur {
                 version: "v0.0.1",

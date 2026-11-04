@@ -37,9 +37,6 @@ export type Step = (typeof steps)[number]
 /** A personal install has no Zeabur panel, so nothing to reach it by. */
 const personalSteps: readonly Step[] = steps.filter((s) => s !== "access")
 
-/** The memory below which a team install is refused, when the server does not say
- * (`Distribution::min_memory_mib`). */
-const teamMinMemoryMib: Record<Distribution, number> = { k3s: 3500, rke2: 4300 }
 /** From this much memory RKE2 is suggested (`RKE2_SUGGESTED_MIB`). */
 const rke2SuggestedMib = 7 * 1024
 
@@ -47,7 +44,7 @@ const memoryOf = (server: ServerState | null) => server?.facts?.memoryMib ?? Inf
 
 /** Whether a team install on the distribution fits the server's memory. */
 export const fits = (server: ServerState | null, distribution: Distribution) =>
-  memoryOf(server) >= (server?.teamMinMemoryMib?.[distribution] ?? teamMinMemoryMib[distribution])
+  memoryOf(server) >= (server?.teamMinMemoryMib?.[distribution] ?? 0)
 
 /** The distribution to suggest for the server's memory. */
 export const suggested = (server: ServerState | null): Distribution =>
