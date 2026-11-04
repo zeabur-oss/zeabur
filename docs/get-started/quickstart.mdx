@@ -24,6 +24,57 @@ The released installer pins the versions of K3s, RKE2, Zeabur Catalog, Zeabur Id
 
 ## Open the installer
 
+### One command
+
+Run this command on your own computer, so you don't have to sign in to the server and download the installer first. Replace `<user>@<server>` with the account and address you use to SSH into the server. The account must be able to run `sudo`, or you can use root:
+
+```sh
+ssh -t -L 8085:127.0.0.1:8085 <user>@<server> exec sh -c \''
+set -e
+
+# Look up the latest version, for example v0.2.0
+latest=$(curl -fsSLI -o /dev/null -w "%{url_effective}" https://github.com/zeabur-oss/zeabur/releases/latest)
+version=${latest##*/}
+
+# Pick the file for the server's architecture
+case $(uname -m) in
+  x86_64)  arch=amd64 ;;
+  aarch64) arch=arm64 ;;
+  *) echo "Unsupported architecture: $(uname -m)" >&2; exit 1 ;;
+esac
+file=zeabur-installer-$version-linux-$arch.tar.gz
+url=https://github.com/zeabur-oss/zeabur/releases/download/$version
+
+# Download to a temporary directory, check SHA-256, then extract
+cd "$(mktemp -d)"
+curl -fSLO --progress-bar "$url/$file"
+curl -fsSLO "$url/SHA256SUMS"
+sha256sum -c --ignore-missing SHA256SUMS
+tar -xzf "$file" zeabur-installer
+
+# Start the installer
+if [ "$(id -u)" = 0 ]; then
+  ./zeabur-installer gui
+else
+  sudo ./zeabur-installer gui
+fi
+'\'
+```
+
+The command opens an SSH tunnel, downloads the latest installer for the server's architecture, checks it against `SHA256SUMS`, and starts the installer. The server runs the whole script with `sh`, so it also works when the login shell is fish or another non-POSIX shell.
+
+Because the command already opens the SSH tunnel, open the link with the token in your computer's browser as soon as the terminal prints it. You don't need to run the `ssh -L` command printed below the link.
+
+If you use Ghostty, put `command` in front: `command ssh -t -L …`. Ghostty's SSH integration first installs its own terminfo on the server and can get stuck there, showing `Setting up xterm-ghostty terminfo`.
+
+Keep this terminal open during the installation. When it's done, press Ctrl-C to stop the installer. K3s/RKE2 and the services keep running.
+
+This command checks only the SHA-256 checksum. To also verify the signature and build provenance, see [Release files and verification](../reference/releases.mdx#download-and-verify-binaries).
+
+To install a specific version, replace the `version=` line with that version, for example `version=v0.2.0`.
+
+### Manual
+
 On the server, run:
 
 ```sh
