@@ -77,7 +77,7 @@ import {
 } from "@/model/service"
 import type { ServicePlace } from "@/routes/search"
 import { UploadAction, useServiceBuilds } from "@/routes/service/builds"
-import { TaskRunsCard } from "@/routes/service/tasks"
+import { TaskRunsCard } from "@/routes/service/task-runs"
 import { UsageGlance } from "@/routes/service/usage"
 
 type OnTab = (place: ServicePlace, pod?: string) => void
