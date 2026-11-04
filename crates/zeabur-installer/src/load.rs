@@ -6,15 +6,22 @@ use std::path::Path;
 
 use zeabur_installer_host::{download, facts};
 use zeabur_installer_plan::catalog::Index;
-use zeabur_installer_plan::config::{Config, Document, JoinConfig, PersonalConfig};
+use zeabur_installer_plan::config::{self, Config, Document, JoinConfig, PersonalConfig};
 use zeabur_installer_plan::{PlanError, pins};
 
-use crate::InstallError;
+use crate::{InstallError, out};
 
 /// Reads a configuration file of either kind. A join configuration holding its token must not be
 /// readable by others.
 pub(crate) fn document(path: &Path) -> Result<Document, InstallError> {
-    let document = Document::parse(&read(path)?)?;
+    let text = read(path)?;
+    let document = Document::parse(&text)?;
+    for renamed in config::renamed_inputs(&text) {
+        out::err(&format!(
+            "{}: {renamed}; this run uses the new name, rename it in the file",
+            path.display()
+        ));
+    }
     if let Document::Join(JoinConfig { join, .. }) = &document
         && join.token.is_some()
     {

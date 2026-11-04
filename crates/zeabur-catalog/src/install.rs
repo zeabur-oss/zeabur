@@ -24,10 +24,10 @@
 //! `APIService`, and the k3s form's `HelmChart kube-system/<name>` would overwrite k3s's own, which
 //! k3s re-applies on its next restart. So every form, on k3s, begins with how to disable the
 //! packaged one first (`disable` in `/etc/rancher/k3s/config.yaml` on every server, then a
-//! restart), and what that removes [k3s-packaged]. RKE2 names its copies `rke2-<name>` and
-//! chooses its ingress controller with `ingress-controller` in `/etc/rancher/rke2/config.yaml`
-//! [rke2-packaged] [rke2-ingress], so the comment gives that form too. The guide lists those
-//! add-ons.
+//! restart), and what that removes [k3s-packaged]. RKE2 packages its own copies, which the
+//! catalog names per distribution, and chooses its ingress controller with `ingress-controller`
+//! in `/etc/rancher/rke2/config.yaml` [rke2-packaged] [rke2-ingress], so the comment gives that
+//! form too. The guide lists the k3s add-ons.
 //!
 //! Releases that are manifests (by URL or inline) are applied with `kubectl apply
 //! --server-side` in the Helm form, and listed in the others for the person's own repository.
@@ -121,8 +121,8 @@ pub struct InstallGuide {
     /// are not in these texts.
     pub contributes_to: Vec<String>,
     /// K3s packaged components of the same kind (`traefik`, `metrics-server`) that must be
-    /// turned off on K3s, or their `rke2-` copies on RKE2, before installing this one; each text
-    /// begins by saying how.
+    /// turned off on K3s, or RKE2's copies on RKE2, before installing this one; each text begins
+    /// by saying how.
     pub replaces_k3s_packaged: Vec<String>,
     /// The texts, one per form.
     pub formats: Vec<InstallText>,
@@ -183,10 +183,10 @@ struct Addon {
 }
 
 impl Detection {
-    fn k3s_addons(&self) -> impl Iterator<Item = &str> {
+    fn addons_on(&self, distribution: &str) -> impl Iterator<Item = &str> {
         self.addons
             .iter()
-            .filter(|a| a.distribution == "k3s")
+            .filter(move |a| a.distribution == distribution)
             .map(|a| a.name.as_str())
     }
 }
@@ -403,7 +403,7 @@ pub fn guide(component: &str, profile: &str) -> Result<InstallGuide, InstallErro
             .iter()
             .map(|c| c.target.component.clone())
             .collect(),
-        replaces_k3s_packaged: file.detection.k3s_addons().map(str::to_owned).collect(),
+        replaces_k3s_packaged: file.detection.addons_on("k3s").map(str::to_owned).collect(),
         formats: [
             InstallFormat::Helm,
             InstallFormat::K3s,
@@ -716,31 +716,41 @@ impl<'a> Rendered<'a> {
     /// For each k3s packaged component this one replaces, a comment on disabling it first and
     /// what that removes, at the head of every form; empty for any other component.
     fn k3s_packaged(&self) -> String {
+        let detection = &self.file.detection;
         let mut out = String::new();
-        for addon in self.file.detection.k3s_addons() {
+        for addon in detection.addons_on("k3s") {
             push(
                 &mut out,
                 format!(
                     "# On K3s, first turn off the packaged {addon}: add it to `disable` in\n# /etc/rancher/k3s/config.yaml on every server, then restart k3s.\n"
                 ),
             );
-            if addon == "traefik" {
+        }
+        for addon in detection.addons_on("rke2") {
+            if addon == "rke2-traefik" {
                 out.push_str("# On RKE2, set `ingress-controller: none` in /etc/rancher/rke2/config.yaml on\n# every server, then restart rke2-server.\n");
             } else {
                 push(
                     &mut out,
                     format!(
-                        "# On RKE2, add rke2-{addon} to `disable` in /etc/rancher/rke2/config.yaml on\n# every server, then restart rke2-server.\n"
+                        "# On RKE2, add {addon} to `disable` in /etc/rancher/rke2/config.yaml on\n# every server, then restart rke2-server.\n"
                     ),
                 );
             }
-            out.push_str(match addon {
-                "traefik" => {
-                    "# That deletes the Traefik CRDs and any IngressRoute or Middleware objects;\n# Ingress traffic stops until this one runs.\n"
-                }
-                "metrics-server" => "# The metrics API is unavailable until this one runs.\n",
-                _ => "# Its workloads stop until this one runs.\n",
-            });
+        }
+        let names: Vec<&str> = detection.addons.iter().map(|a| a.name.as_str()).collect();
+        if names
+            .iter()
+            .any(|n| ["traefik", "rke2-traefik"].contains(n))
+        {
+            out.push_str("# That deletes the Traefik CRDs and any IngressRoute or Middleware objects;\n# Ingress traffic stops until this one runs.\n");
+        } else if names
+            .iter()
+            .any(|n| ["metrics-server", "rke2-metrics-server"].contains(n))
+        {
+            out.push_str("# The metrics API is unavailable until this one runs.\n");
+        } else if !out.is_empty() {
+            out.push_str("# Its workloads stop until this one runs.\n");
         }
         if !out.is_empty() {
             out.push_str("# https://docs.k3s.io/installation/packaged-components\n");

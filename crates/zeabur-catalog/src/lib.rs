@@ -112,12 +112,11 @@ pub struct Detection {
 }
 
 impl Detection {
-    /// The names of the k3s packaged add-ons (`HelmChart` objects in `kube-system`). RKE2 packages
-    /// the same charts as `rke2-<name>`.
-    pub fn k3s_addons(&self) -> impl Iterator<Item = &str> {
+    /// The names of the add-ons `distribution` packages: `HelmChart` objects in `kube-system`.
+    pub fn addons_on<'a>(&'a self, distribution: &'a str) -> impl Iterator<Item = &'a str> {
         self.addons
             .iter()
-            .filter(|a| a.distribution == "k3s")
+            .filter(move |a| a.distribution == distribution)
             .map(|a| a.name.as_str())
     }
 }
@@ -125,9 +124,10 @@ impl Detection {
 /// An add-on a distribution packages.
 #[derive(Debug, Clone, PartialEq, Eq, Default, Deserialize)]
 pub struct Addon {
-    /// The distribution (`k3s`). An entry of a distribution Zeabur does not know is ignored.
+    /// The distribution (`k3s`, `rke2`). An entry of a distribution Zeabur does not know is
+    /// ignored.
     pub distribution: String,
-    /// The add-on's name.
+    /// The name of its `HelmChart` in `kube-system`.
     pub name: String,
 }
 
@@ -390,16 +390,20 @@ fn evidence(detection: &Detection, facts: &ClusterFacts) -> Vec<String> {
             found.push(format!("Helm chart {chart}"));
         }
     }
-    for addon in detection.k3s_addons() {
-        let key = format!("kube-system/{addon}");
-        if facts.k3s_helm_charts.contains_key(&key) {
+    for addon in detection.addons_on("k3s") {
+        if facts
+            .k3s_helm_charts
+            .contains_key(&format!("kube-system/{addon}"))
+        {
             found.push(format!("k3s add-on {addon}"));
         }
+    }
+    for addon in detection.addons_on("rke2") {
         if facts
             .rke2_packaged_charts
-            .contains_key(&format!("kube-system/rke2-{addon}"))
+            .contains_key(&format!("kube-system/{addon}"))
         {
-            found.push(format!("RKE2 add-on rke2-{addon}"));
+            found.push(format!("RKE2 add-on {addon}"));
         }
     }
     for wanted in &detection.workloads {
