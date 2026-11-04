@@ -436,7 +436,9 @@ pub struct Measured {
     pub profile: String,
     /// The API server's platform.
     pub platform: Platform,
-    /// The server's `gitVersion` without build metadata (`v1.36.4`).
+    /// The server's `gitVersion` without build metadata (`v1.36.4`); empty when the catalog
+    /// leaves it out.
+    #[serde(default)]
     pub kubernetes_version: String,
     /// The working set at idle.
     #[serde(default)]

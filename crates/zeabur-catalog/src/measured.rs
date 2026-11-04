@@ -36,6 +36,8 @@ struct Environment {
     kubernetes_version: Option<String>,
     #[serde(default)]
     idle: Amounts,
+    /// `passed`; any other value, or none, is a run that did not pass.
+    #[serde(default)]
     result: String,
     measured_at: String,
 }
@@ -155,6 +157,18 @@ mod tests {
         let idle = idle_from(&text).unwrap();
         assert_eq!(idle.environment, "k3s-single-node-arm64-v1.36.4");
         assert_eq!(idle.memory_bytes, 13_002_342);
+    }
+
+    #[test]
+    fn a_run_without_a_result_did_not_pass_and_the_others_still_count() {
+        let text = format!(
+            r#"{{"environments": [{}, {}]}}"#,
+            run("kind", "amd64", 300.0, "passed", "2026-10-11"),
+            run("kind", "amd64", 900.0, "passed", "2026-10-12")
+                .replace(r#""result": "passed", "#, ""),
+        );
+        let idle = idle_from(&text).unwrap();
+        assert_eq!(idle.measured_at, "2026-10-11");
     }
 
     #[test]
