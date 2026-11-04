@@ -113,4 +113,3 @@ pub(crate) fn catalog(source: Option<&str>, state_dir: &str) -> Result<Index, In
     };
     Ok(Index::parse(&bytes)?)
 }
-
