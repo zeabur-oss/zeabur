@@ -533,12 +533,14 @@ function NodeRow({
           maximum: pick(node.limits, mem),
           thresholds: MEMORY,
         })}
-        {node.disk
-          ? gauge(t("cluster.disk"), node.disk.capacityBytes, memory, {
-              usage: node.disk.capacityBytes - node.disk.availableBytes,
-              thresholds: DISK,
-            })
-          : null}
+        {node.disk ? (
+          gauge(t("cluster.disk"), node.disk.capacityBytes, memory, {
+            usage: node.disk.capacityBytes - node.disk.availableBytes,
+            thresholds: DISK,
+          })
+        ) : (
+          <div aria-hidden className="hidden sm:block sm:w-36" />
+        )}
         <div className="flex flex-col gap-1 type-meta sm:w-16">
           <span className="text-muted-foreground">{t("pod.pods")}</span>
           <span>
