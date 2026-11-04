@@ -1,7 +1,7 @@
 {
   "private": true,
   "dependencies": {
-    "@zeabur-oss/release": "github:zeabur-oss/.github#3a323352707f845adb2d66f260a74c82ccae9e02"
+    "@zeabur-oss/release": "github:zeabur-oss/.github#506bf00d16d1ae61b1dc70b2115484cbd44ffd52"
   },
   "devDependencies": {
     "@types/bun": "^1.4.4"
