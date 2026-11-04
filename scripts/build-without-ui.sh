@@ -16,5 +16,5 @@ if command -v bun >/dev/null; then
   exit 1
 fi
 unset ZEABUR_UI_DIST
-cargo build --release --locked --no-default-features -p zeabur -p zeaburctl --manifest-path "$root/Cargo.toml"
+cargo build --profile ci --locked --no-default-features -p zeabur -p zeaburctl --manifest-path "$root/Cargo.toml"
 echo "built without the web interface and without bun"
