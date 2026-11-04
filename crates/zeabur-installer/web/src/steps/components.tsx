@@ -198,6 +198,7 @@ function ComponentRow({
   wizard: Wizard
 }) {
   const t = useT()
+  const arch = wizard.server.facts?.arch
   const id = useId()
   const disabled = !supported || needed
   const form = veleroForm(component)
@@ -232,7 +233,13 @@ function ComponentRow({
             {!supported ? <Badge variant="secondary">{unsupported}</Badge> : null}
             {needed ? <Badge variant="secondary">{t("components.needed")}</Badge> : null}
             {supported && !component.testedOn.includes(distribution) ? (
-              <Tooltip content={t("components.untestedHint", titleOf(distribution))}>
+              <Tooltip
+                content={
+                  component.testedOnOtherPlatforms?.includes(distribution) && arch
+                    ? t("components.untestedPlatformHint", titleOf(distribution), `linux/${arch}`)
+                    : t("components.untestedHint", titleOf(distribution))
+                }
+              >
                 <Badge variant="warn" render={<button type="button" />}>
                   {t("components.untested")}
                 </Badge>

@@ -760,6 +760,15 @@ fn catalog_json(
                     .filter(|t| c.is_tested_on(&t.distribution, &t.platform) && c.admits(&t.kubernetes))
                     .map(|t| &t.distribution)
                     .collect::<Vec<_>>(),
+                "testedOnOtherPlatforms": targets
+                    .iter()
+                    .filter(|t| {
+                        c.admits(&t.kubernetes)
+                            && !c.is_tested_on(&t.distribution, &t.platform)
+                            && c.tested_on.iter().any(|x| x.distribution == t.distribution)
+                    })
+                    .map(|t| &t.distribution)
+                    .collect::<Vec<_>>(),
                 "personalMinMemoryMib": personal::min_memory_mib(c, arch),
                 "teamMinMemoryMib": selections
                     .iter()

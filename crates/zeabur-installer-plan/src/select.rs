@@ -14,7 +14,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::PlanError;
-use crate::catalog::{Default, Index};
+use crate::catalog::{Component, Default, Index};
 use crate::config::{Config, PersonalConfig};
 use crate::pins::KUBESOLO;
 use crate::plan::{Warning, warning};
@@ -204,12 +204,37 @@ struct Wanted<'a> {
     target: &'a Target,
 }
 
-fn untested(id: &str, distribution: &str) -> Warning {
-    warning(
-        "config.untested",
-        &[id, distribution],
-        format!("{id} was not tested on {distribution}. It is installed anyway."),
-    )
+/// The warning that `component` was not tested on the target: on its distribution at all, or
+/// on its distribution but not on its platform.
+fn untested(component: &Component, target: &Target) -> Warning {
+    let id = component.id.as_str();
+    let distribution = target.distribution.as_str();
+    let platform = target.platform.as_str();
+    if component
+        .tested_on
+        .iter()
+        .any(|t| t.distribution == distribution)
+    {
+        warning(
+            "config.untestedPlatform",
+            &[id, distribution, platform],
+            format!(
+                "{id} was tested on {distribution}, but not on {platform}. It is installed anyway."
+            ),
+        )
+    } else {
+        warning(
+            "config.untested",
+            &[id, distribution],
+            format!("{id} was not tested on {distribution}. It is installed anyway."),
+        )
+    }
+}
+
+/// Whether `warning` says that a component, its first value, was not tested where it is installed.
+#[must_use]
+pub fn is_untested(warning: &Warning) -> bool {
+    matches!(warning.code, "config.untested" | "config.untestedPlatform")
 }
 
 fn choose(index: &Index, wanted: &Wanted<'_>) -> Result<Selection, PlanError> {
@@ -260,11 +285,11 @@ fn choose(index: &Index, wanted: &Wanted<'_>) -> Result<Selection, PlanError> {
             if order.iter().any(|(seen, _)| *seen == dep) {
                 continue;
             }
-            if index
+            if let Some(c) = index
                 .component(&dep)
-                .is_some_and(|c| !c.is_tested_on(distribution, &target.platform))
+                .filter(|c| !c.is_tested_on(distribution, &target.platform))
             {
-                warn_untested(&dep, distribution, &mut warnings);
+                warn_untested(c, target, &mut warnings);
             }
             if disabled.contains(&dep) || left_out.contains_key(&dep) {
                 return Err(PlanError::NeedsDisabled {
@@ -287,13 +312,13 @@ fn choose(index: &Index, wanted: &Wanted<'_>) -> Result<Selection, PlanError> {
     })
 }
 
-/// Warns once that `id` was not tested on the distribution and platform.
-fn warn_untested(id: &str, distribution: &str, warnings: &mut Vec<Warning>) {
+/// Warns once that `component` was not tested on the distribution and platform.
+fn warn_untested(component: &Component, target: &Target, warnings: &mut Vec<Warning>) {
     if !warnings
         .iter()
-        .any(|w| w.code == "config.untested" && w.values.first().is_some_and(|v| v == id))
+        .any(|w| is_untested(w) && w.values.first() == Some(&component.id))
     {
-        warnings.push(untested(id, distribution));
+        warnings.push(untested(component, target));
     }
 }
 
@@ -531,7 +556,8 @@ mod tests {
 
     fn case_warning(warning: &Warning) -> Value {
         match (warning.code, warning.values.as_slice()) {
-            ("config.untested", [component, distribution]) => {
+            ("config.untested", [component, distribution])
+            | ("config.untestedPlatform", [component, distribution, _]) => {
                 json!({"kind": "untested", "component": component, "distribution": distribution})
             }
             ("config.runsOn" | "config.unsupportedOn", [component, _]) => {
@@ -641,6 +667,58 @@ mod tests {
         assert_eq!(selection.left_out["metrics/victoria-metrics"], needs);
         let codes: Vec<&str> = selection.warnings.iter().map(|w| w.code).collect();
         assert_eq!(codes, ["config.kubeVersion"]);
+    }
+
+    #[test]
+    fn the_warning_names_the_platform_when_only_the_platform_was_not_tested() {
+        let case: Value = serde_saphyr::from_str(
+            "components:
+  - {id: ingress/traefik, defaults: {single-node: recommended, multi-node: recommended},
+     distributions: [k3s, rke2], testedOn: [{distribution: k3s, platforms: [linux/amd64]}]}
+",
+        )
+        .unwrap();
+        let index = index_of(&case);
+        let warnings = |distribution: &str| {
+            let target = Target {
+                distribution: distribution.to_owned(),
+                platform: "linux/arm64".to_owned(),
+                kubernetes: "v1.36.5".to_owned(),
+            };
+            choose(
+                &index,
+                &Wanted {
+                    base: team_base(&index, "single-node", &target, &[]).unwrap(),
+                    enable: &[],
+                    disable: &[],
+                    profile: "single-node",
+                    target: &target,
+                },
+            )
+            .unwrap()
+            .warnings
+            .into_iter()
+            .map(|w| (w.code, w.values))
+            .collect::<Vec<_>>()
+        };
+        assert_eq!(
+            warnings("k3s"),
+            [(
+                "config.untestedPlatform",
+                vec![
+                    "ingress/traefik".to_owned(),
+                    "k3s".to_owned(),
+                    "linux/arm64".to_owned()
+                ]
+            )]
+        );
+        assert_eq!(
+            warnings("rke2"),
+            [(
+                "config.untested",
+                vec!["ingress/traefik".to_owned(), "rke2".to_owned()]
+            )]
+        );
     }
 
     #[test]

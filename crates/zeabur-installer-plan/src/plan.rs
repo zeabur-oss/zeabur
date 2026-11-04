@@ -1109,7 +1109,7 @@ pub(crate) fn components(
         plan.untested = selection
             .warnings
             .iter()
-            .any(|w| w.code == "config.untested" && w.values.first() == Some(id));
+            .any(|w| select::is_untested(w) && w.values.first() == Some(id));
         components.push(plan);
         let privileged = privileged(component, choices);
         let baseline = baseline(component);

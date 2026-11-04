@@ -223,6 +223,8 @@ export const en = {
   "components.untested": "Untested",
   "components.untestedHint": (distribution: string) =>
     `Not tested on ${distribution} yet. You can still install it.`,
+  "components.untestedPlatformHint": (distribution: string, platform: string) =>
+    `Tested on ${distribution}, but not on ${platform} yet. You can still install it.`,
   "components.needsMemory": (mib: number) =>
     `Needs ${mib.toLocaleString("en")} MiB of memory, and this server has less`,
   "components.unsupported": (distribution: string) => `Not on ${distribution}`,
@@ -470,6 +472,8 @@ export const en = {
     "Zeabur Builder takes over zot and deletes images under <project>/<name> paths that no build made, including any you pushed there yourself. To keep every image, uncheck Zeabur Builder on the Components step.",
   "warning.config.untested": (id: string, distribution: string) =>
     `${id} wasn't tested on ${distribution}. It's installed anyway.`,
+  "warning.config.untestedPlatform": (id: string, distribution: string, platform: string) =>
+    `${id} was tested on ${distribution}, but not on ${platform}. It's installed anyway.`,
   "warning.config.kubeVersion": (id: string, range: string, version: string) =>
     `${id} needs Kubernetes ${range}, and this cluster runs ${version}, so it isn't installed.`,
   "warning.config.runsOn": (id: string, only: string) =>

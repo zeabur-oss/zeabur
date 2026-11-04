@@ -35,8 +35,10 @@ export interface CatalogComponent {
   required: boolean
   /** The distributions whose Kubernetes it runs on. */
   distributions: string[]
-  /** Where it runs here and was tested on this server's platform. The installer offers it only there. */
+  /** The distributions where it runs here and was tested on this server's platform. One not listed is still offered and installed, marked untested. */
   testedOn: string[]
+  /** The distributions where it was tested on another platform only. */
+  testedOnOtherPlatforms?: string[]
   /** The components installed before it because it needs them. */
   needs?: string[]
   /** Measured idle memory on this server's architecture. */
