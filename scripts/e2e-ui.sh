@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Browser tests of the web interface in local mode: the release `zeaburctl ui`, with the
+# Browser tests of the web interface in local mode: the dev build of `zeaburctl ui`, with the
 # interface embedded, against the current kubeconfig context (a disposable cluster), driven by
 # Playwright. Run inside `nix develop` on Linux after scripts/build-ui.sh.
 #   scripts/e2e-ui.sh
@@ -40,8 +40,8 @@ if [[ "${restarts:-0}" -lt 2 ]]; then
   exit 1
 fi
 
-ZEABUR_UI_DIST="$root/web/dist" cargo build --release --locked -p zeaburctl
-"$root/target/release/zeaburctl" ui --no-browser >"$out/zeaburctl.log" 2>&1 &
+ZEABUR_UI_DIST="$root/web/dist" cargo build --locked -p zeaburctl
+"$root/target/debug/zeaburctl" ui --no-browser >"$out/zeaburctl.log" 2>&1 &
 server=$!
 trap 'kill "$server" 2>/dev/null || true' EXIT
 url=""
