@@ -73,10 +73,6 @@ The record isn't configuration, and you don't edit it. `apply` writes it, and th
 
 If a newer installer wrote the record, `plan` and `apply` stop and name the version to use. To go back to an older installer, restore a snapshot taken before the upgrade.
 
-When the Catalog renames a component, an old ID in `enable` or `disable` stops `plan` and `apply` with an error that names the new ID. `container-registry/zot` is now `builds/zeabur-builder`.
-
-On a server that has `container-registry/zot`, `plan` lists it as removed and `builds/zeabur-builder` as added. The disk with zot's images stays. Zeabur Builder deletes images under `<project>/<name>` paths that no build made, so images you pushed to zot yourself can disappear. To keep every image, add `builds/zeabur-builder` to `disable`. `apply` then leaves zot running and warns that the Catalog no longer lists it.
-
 ## `gui`
 
 Run on the server:

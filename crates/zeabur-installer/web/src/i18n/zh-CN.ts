@@ -433,8 +433,6 @@ export const zhCN: Messages = {
     "默认 local-path 存储类创建的卷只在创建卷的节点上：使用这种卷的 Pod 只能在那个节点运行，节点没了，数据也跟着没了。",
   "warning.join.token.unpinned": () =>
     "这个令牌没有 CA 哈希（K10<hash>::…），所以这台 VM 会信任在那个地址响应的任何服务器。请原样使用 node add 打印的令牌。",
-  "warning.builder.deletesImages": () =>
-    "Zeabur Builder 会接管 zot，并删除 <project>/<name> 路径下不是构建产生的镜像，包括你自己推送上去的。要保留所有镜像，请在“组件”步骤取消勾选 Zeabur Builder。",
   "warning.config.untested": (id, distribution) =>
     `${id} 没在 ${distribution} 上测试过，照样安装。`,
   "warning.config.untestedPlatform": (id, distribution, platform) =>

@@ -663,12 +663,6 @@ pub fn plan_with(
         .record
         .as_ref()
         .map(|r| Changes::new(r, index, &components, &cluster.version));
-    warnings.extend(
-        facts
-            .record
-            .as_ref()
-            .and_then(|r| crate::record::builder_deletes_images(r, &components)),
-    );
 
     Ok(Plan {
         storage: storage_plan(&components, profile, &mut warnings),
@@ -2802,8 +2796,7 @@ mod tests {
         );
     }
 
-    /// The record an `apply` of `plan` writes, from an installer at `installer`, with the
-    /// components and chart versions an older catalog had.
+    /// The record an `apply` of `plan` writes, from an installer at `installer`, edited by `edit`.
     fn recorded(plan: &Plan, installer: &str, edit: impl FnOnce(&mut Value)) -> Record {
         let mut summary = json!(plan);
         edit(&mut summary);
@@ -2822,11 +2815,11 @@ mod tests {
         .unwrap()
     }
 
+    /// Traefik's chart version in an older catalog.
     fn older_catalog(summary: &mut Value) {
-        let components = summary["components"].as_array_mut().unwrap();
-        components.retain(|c| c["id"] != "builds/zeabur-builder");
-        components.push(json!({"id": "container-registry/zot", "releases": []}));
-        for c in components
+        for c in summary["components"]
+            .as_array_mut()
+            .unwrap()
             .iter_mut()
             .filter(|c| c["id"] == "ingress/traefik")
         {
@@ -2862,7 +2855,7 @@ mod tests {
     }
 
     #[test]
-    fn an_old_id_in_the_record_is_removed_and_the_new_default_added() {
+    fn an_upgrade_reports_the_chart_versions_and_release_it_changes() {
         let index = crate::catalog::pinned();
         let first = plan(&index, &config(""), &facts()).unwrap();
         assert_eq!(first.changes, None);
@@ -2870,11 +2863,8 @@ mod tests {
         let mut upgrade = facts();
         upgrade.record = Some(recorded(&first, "0.0.1", older_catalog));
         let plan = plan(&index, &config(""), &upgrade).unwrap();
-        assert!(ids(&plan).contains(&"builds/zeabur-builder"));
-        assert!(!ids(&plan).contains(&"container-registry/zot"));
         let changes = plan.changes.unwrap();
-        assert_eq!(changes.added, ["builds/zeabur-builder"]);
-        assert_eq!(changes.removed, ["container-registry/zot"]);
+        assert!(changes.added.is_empty() && changes.removed.is_empty());
         let traefik = changes
             .charts
             .iter()
@@ -2886,42 +2876,6 @@ mod tests {
             Some("v1.0.0+k3s1")
         );
         assert!(changes.restart);
-    }
-
-    #[test]
-    fn installing_builder_on_a_zot_server_warns_that_it_deletes_images() {
-        let index = crate::catalog::pinned();
-        let first = plan(&index, &config(""), &facts()).unwrap();
-        let deletes = |p: &Plan| p.warnings.iter().any(|w| w.code == "builder.deletesImages");
-        assert!(!deletes(&first));
-
-        let mut upgrade = facts();
-        upgrade.record = Some(recorded(&first, "0.0.1", older_catalog));
-        assert!(deletes(&plan(&index, &config(""), &upgrade).unwrap()));
-        let kept = plan(
-            &index,
-            &config("disable: [builds/zeabur-builder]\n"),
-            &upgrade,
-        )
-        .unwrap();
-        assert!(!deletes(&kept));
-    }
-
-    #[test]
-    fn with_builder_disabled_the_old_zot_is_kept() {
-        let index = crate::catalog::pinned();
-        let first = plan(&index, &config(""), &facts()).unwrap();
-        let mut upgrade = facts();
-        upgrade.record = Some(recorded(&first, "0.0.1", older_catalog));
-        let plan = plan(
-            &index,
-            &config("disable: [builds/zeabur-builder]\n"),
-            &upgrade,
-        )
-        .unwrap();
-        let changes = plan.changes.unwrap();
-        assert_eq!(changes.removed, Vec::<String>::new());
-        assert_eq!(changes.kept, ["container-registry/zot"]);
     }
 
     #[test]
@@ -3029,23 +2983,5 @@ mod tests {
                 .to_string()
                 .contains("zeabur-installer 999.0.0 or newer")
         );
-    }
-
-    #[test]
-    fn an_old_id_in_enable_or_disable_stops_the_plan_and_names_the_new_id() {
-        let index = crate::catalog::pinned();
-        for field in ["enable", "disable"] {
-            let error = plan(
-                &index,
-                &config(&format!("{field}: [container-registry/zot]\n")),
-                &facts(),
-            )
-            .unwrap_err();
-            assert!(matches!(error, PlanError::Renamed { .. }), "{error}");
-            assert!(
-                error.to_string().contains("`builds/zeabur-builder`"),
-                "{error}"
-            );
-        }
     }
 }

@@ -9,7 +9,7 @@ use serde_json::Value;
 
 use crate::PlanError;
 use crate::catalog::Index;
-use crate::plan::{ComponentPlan, ReleasePlan, Warning, warning};
+use crate::plan::{ComponentPlan, ReleasePlan};
 
 /// This installer's version.
 pub const INSTALLER_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -130,8 +130,7 @@ pub struct Changes {
     pub installer: String,
     /// Components it installs that the record does not have.
     pub added: Vec<String>,
-    /// Recorded components it no longer plans and uninstalls, and old ids whose new component it
-    /// installs.
+    /// Recorded components it no longer plans and uninstalls.
     pub removed: Vec<String>,
     /// Recorded components it no longer plans that have no chart to uninstall; what they
     /// installed keeps running.
@@ -219,12 +218,7 @@ impl Changes {
             .iter()
             .filter(|id| !planned.contains(id.as_str()))
             .cloned()
-            .partition(|id| {
-                record.helm.contains(id) && index.component(id).is_some()
-                    || index
-                        .replacement_of(id)
-                        .is_some_and(|new| planned.contains(new))
-            });
+            .partition(|id| record.helm.contains(id) && index.component(id).is_some());
         let version = record
             .version
             .as_ref()
@@ -254,26 +248,6 @@ impl Changes {
         self.restart = self.version.is_some() || !paths.is_empty();
         self.host_files = paths;
     }
-}
-
-/// Warns that Zeabur Builder deletes images when `apply` installs it on a server that has zot.
-#[must_use]
-pub fn builder_deletes_images(record: &Record, components: &[ComponentPlan]) -> Option<Warning> {
-    const ZOT: &str = "container-registry/zot";
-    const BUILDER: &str = "builds/zeabur-builder";
-    (record.components.contains(ZOT)
-        && !record.components.contains(BUILDER)
-        && components.iter().any(|c| c.id == BUILDER))
-    .then(|| {
-        warning(
-            "builder.deletesImages",
-            &[],
-            "Zeabur Builder takes over zot and deletes images under <project>/<name> paths that \
-             no build made, including any you pushed there yourself. To keep every image: \
-             disable: [builds/zeabur-builder]"
-                .to_owned(),
-        )
-    })
 }
 
 /// The precedence of two versions as Semantic Versioning 2.0.0 orders them

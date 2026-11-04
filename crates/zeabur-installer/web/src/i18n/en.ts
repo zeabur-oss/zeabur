@@ -468,8 +468,6 @@ export const en = {
     "Volumes on the default local-path storage class stay on the node that created them: a pod using one runs only on that node, and the data goes with the node.",
   "warning.join.token.unpinned": () =>
     "The token has no CA hash (K10<hash>::…), so this VM trusts whichever server answers at that address. Use the token exactly as node add printed it.",
-  "warning.builder.deletesImages": () =>
-    "Zeabur Builder takes over zot and deletes images under <project>/<name> paths that no build made, including any you pushed there yourself. To keep every image, uncheck Zeabur Builder on the Components step.",
   "warning.config.untested": (id: string, distribution: string) =>
     `${id} wasn't tested on ${distribution}. It's installed anyway.`,
   "warning.config.untestedPlatform": (id: string, distribution: string, platform: string) =>
