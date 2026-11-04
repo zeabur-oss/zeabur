@@ -16,6 +16,7 @@ set -euo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
 out="$root/target/dev-cluster"
+source "$root/scripts/wait.sh"
 tls="$out/tls"
 zeabur_identityctl="$out/identityctl"
 zeabur_host=zeabur.localhost
@@ -67,8 +68,8 @@ fi
 
 # --- The projects ---------------------------------------------------------------------------------
 kubectl apply -f "$root/web/e2e/manifests/talker.yaml" -f "$root/web/e2e/manifests/second-project.yaml" >/dev/null
-kubectl -n "$first" rollout status deployment/talker --timeout=180s
-kubectl -n "$second" rollout status deployment/talker --timeout=180s
+wait_for "$first" kubectl -n "$first" rollout status deployment/talker --timeout=180s
+wait_for "$second" kubectl -n "$second" rollout status deployment/talker --timeout=180s
 
 # --- Databases, when an operator and the test S3 run here (e2e/l2/databases.spec.ts skips otherwise)
 s3_endpoint="" mongodb=""

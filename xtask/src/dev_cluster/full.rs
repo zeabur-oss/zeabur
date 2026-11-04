@@ -69,6 +69,7 @@ fn test_s3(dev: &DevCluster) -> Result<(), String> {
             Err(said.trim().to_owned())
         }
     })
+    .inspect_err(|_| dev.diagnose("s3-test"))
 }
 
 /// zot from Zeabur Builder's component, with the fixed ClusterIP the node's mirror points at.
@@ -91,7 +92,11 @@ fn zot(dev: &DevCluster) -> Result<(), String> {
             "--for=condition=Ready",
         ])
         .arg("--timeout=120s")
-        .quiet()?;
+        .quiet()
+        .inspect_err(|_| {
+            dev.diagnose("zot");
+            dev.diagnose("cert-manager");
+        })?;
     dev.rollout("zot", "statefulset/zot", Duration::from_secs(180))?;
     let ca = dev
         .kubectl()

@@ -17,6 +17,7 @@ root="$(cd "$(dirname "$0")/.." && pwd)"
 if [[ -z "${ZEABUR_CA_BUNDLE:-}" ]]; then
   exec nix develop "$root" --command "$0" "$@"
 fi
+source "$root/scripts/wait.sh"
 state="$root/target/dev-cluster"
 namespace=zeabur             # Zeabur's release
 project=zeabur-e2e           # the project the browser opens (web/e2e/manifests/talker.yaml)
@@ -150,18 +151,18 @@ fi
 # --- Removal leaves the cluster as it was -----------------------------------------------------------
 [[ -z "${ZEABUR_L2_KEEP:-}" ]] || exit 0
 # As `zeabur-installer uninstall` removes Zeabur, and the values only this cluster sets.
-kubectl -n kube-system delete helmchart.helm.cattle.io zeabur --wait --timeout=180s
+wait_for kube-system kubectl -n kube-system delete helmchart.helm.cattle.io zeabur --wait --timeout=180s
 kubectl -n kube-system delete helmchartconfig.helm.cattle.io zeabur --wait
-kubectl delete namespace "$namespace" --wait --timeout=180s
-kubectl wait --for=delete namespace/zeabur-terminals --timeout=180s
+wait_for "$namespace" kubectl delete namespace "$namespace" --wait --timeout=180s
+wait_for zeabur-terminals kubectl wait --for=delete namespace/zeabur-terminals --timeout=180s
 kubectl delete rolebindings,clusterrolebindings -A -l app.kubernetes.io/managed-by=zeabur,zeabur.com/member --wait
 # The chart keeps the S3 destinations' namespace on purpose; the project's name is the person's.
-kubectl delete namespace zeabur-s3-destinations --wait --timeout=180s
+wait_for zeabur-s3-destinations kubectl delete namespace zeabur-s3-destinations --wait --timeout=180s
 kubectl annotate namespace "$project" zeabur.com/display-name-
 # Zeabur Builder keeps a buildkitd, with its cache volume, for every namespace that built something.
 # The project stays, so its builds' daemon goes here (full profile only).
 if kubectl get namespace builder-system >/dev/null 2>&1; then
-  kubectl -n builder-system delete statefulset "buildkitd-$project" --ignore-not-found --wait --timeout=180s
+  wait_for builder-system kubectl -n builder-system delete statefulset "buildkitd-$project" --ignore-not-found --wait --timeout=180s
 fi
 # A volume's PersistentVolume goes after its claim, when the provisioner has cleaned the disk.
 for _ in $(seq 36); do
