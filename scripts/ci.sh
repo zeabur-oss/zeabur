@@ -58,7 +58,7 @@ l2_report() {
   keep "$measurements"
   [[ -n "${GITHUB_STEP_SUMMARY:-}" ]] || return 0
   {
-    echo "### Zeabur in the cluster (${K3S_IMAGE:-the default k3s})"
+    echo "### Zeabur in the cluster, \`ci\` build (${K3S_IMAGE:-the default k3s})"
     echo "| Measure | Bytes |"
     echo "|---|---|"
     echo "| Image \`zeabur\` | $(docker image inspect --format '{{.Size}}' zeabur:dev 2>/dev/null || echo n/a) |"

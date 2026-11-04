@@ -24,6 +24,7 @@ case "$(uname -s):$(uname -m)" in
 esac
 work="$(mktemp -d)"
 root="$(cd "$(dirname "$0")/.." && pwd)"
+source "$root/scripts/idle-memory.sh"
 state="$root/target/dev-cluster"
 
 cleanup() {
@@ -78,6 +79,23 @@ echo "zeabur runs $running"
 health="$(curl --fail --silent --show-error --max-time 10 --cacert "$state/tls/ca.crt" \
   --resolve zeabur.localhost:443:127.0.0.1 https://zeabur.localhost/api/healthz)"
 [[ "$health" == ok ]] || { echo "/api/healthz answered '$health'" >&2; exit 1; }
+
+# A local candidate is the release build: its image's size and its idle pod's working set, in the
+# run's summary when there is one. The CI jobs build with another profile (scripts/build-image.sh).
+if [[ "$image" != *@sha256:* ]]; then
+  size="$(docker image inspect --format '{{.Size}}' "$image")"
+  echo "image $image: $size bytes"
+  working_set="$(idle_working_set zeabur)"
+  if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
+    {
+      echo "### Zeabur's release build (linux/$arch)"
+      echo "| Measure | Bytes |"
+      echo "|---|---|"
+      echo "| Image \`$image\` | $size |"
+      echo "| Pod working set when idle | $working_set |"
+    } >>"$GITHUB_STEP_SUMMARY"
+  fi
+fi
 
 # zeaburctl against the same cluster as its admin: a JSON report and an exit code of 0 (all ok)
 # or 1 (warnings), as in scripts/ci.sh.
