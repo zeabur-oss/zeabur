@@ -267,12 +267,6 @@ pub fn plan(
         .record
         .as_ref()
         .map(|r| Changes::new(r, index, &components, KUBESOLO.version));
-    warnings.extend(
-        facts
-            .record
-            .as_ref()
-            .and_then(|r| crate::record::builder_deletes_images(r, &components)),
-    );
     Ok(PersonalPlan {
         use_: "personal",
         facts: facts.clone(),

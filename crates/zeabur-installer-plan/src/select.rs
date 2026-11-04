@@ -145,8 +145,7 @@ impl Target {
 ///
 /// # Errors
 ///
-/// When a name matches nothing or is an id that a component replaces, or a chosen component
-/// needs one that is disabled or left out.
+/// When a name matches nothing, or a chosen component needs one that is disabled or left out.
 pub fn select(index: &Index, config: &Config, target: &Target) -> Result<Selection, PlanError> {
     let profile = config.profile.as_str();
     choose(
@@ -244,9 +243,6 @@ fn choose(index: &Index, wanted: &Wanted<'_>) -> Result<Selection, PlanError> {
     let mut chosen: BTreeMap<String, Why> = BTreeMap::new();
     for id in &wanted.base {
         chosen.insert(id.clone(), Why::Default);
-    }
-    for name in wanted.enable.iter().chain(wanted.disable) {
-        check_replaced(index, name)?;
     }
     for name in wanted.enable {
         chosen.insert(resolve(index, profile, target, name)?, Why::Enabled);
@@ -395,16 +391,6 @@ fn leave_out_unusable(
 
 fn known(index: &Index, name: &str) -> bool {
     index.components.iter().any(|c| matches(index, &c.id, name))
-}
-
-/// Stops when a component replaces `name`.
-fn check_replaced(index: &Index, name: &str) -> Result<(), PlanError> {
-    index.replacement_of(name).map_or(Ok(()), |new| {
-        Err(PlanError::Renamed {
-            old: name.to_owned(),
-            new: new.to_owned(),
-        })
-    })
 }
 
 fn recommended(index: &Index, profile: &str) -> Vec<String> {
@@ -585,9 +571,6 @@ mod tests {
             Err(error) => {
                 let error = match error {
                     PlanError::Unknown(name) => json!({"kind": "unknown", "name": name}),
-                    PlanError::Renamed { old, new } => {
-                        json!({"kind": "replaced", "old": old, "new": new})
-                    }
                     PlanError::NeedsDisabled {
                         component,
                         dependency,

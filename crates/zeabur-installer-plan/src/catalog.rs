@@ -50,9 +50,6 @@ pub struct Component {
     pub kube_version: String,
     /// Where the catalog's CI installed it and passed.
     pub tested_on: Vec<TestedOn>,
-    /// Components that this one replaces.
-    #[serde(default)]
-    pub replaces: Vec<ComponentRef>,
     /// Releases installed in this order.
     pub releases: Vec<Release>,
     /// Values asked for or generated before installing.
@@ -475,15 +472,6 @@ impl Index {
             return Err(PlanError::IndexVersion(index.index_version));
         }
         Ok(index)
-    }
-
-    /// The id of the component that replaces `old`.
-    #[must_use]
-    pub fn replacement_of(&self, old: &str) -> Option<&str> {
-        self.components
-            .iter()
-            .find(|c| c.replaces.iter().any(|r| r.component == old))
-            .map(|c| c.id.as_str())
     }
 
     /// The component with this id.

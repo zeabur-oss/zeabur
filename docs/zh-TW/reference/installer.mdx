@@ -74,10 +74,6 @@ sudo zeabur-installer doctor
 
 紀錄是較新版的 installer 寫的時候，`plan` 和 `apply` 會停下，並寫出要改用哪一版。要退回舊版 installer，請還原升級前的快照。
 
-Catalog 把元件改名後，`enable` 或 `disable` 寫舊 ID 時，`plan` 和 `apply` 會停下，錯誤訊息會寫出新 ID。`container-registry/zot` 現在叫 `builds/zeabur-builder`。
-
-裝過 `container-registry/zot` 的伺服器，`plan` 會把它列在移除，把 `builds/zeabur-builder` 列在新增。存放 zot 映像檔的磁碟會留著。不過 Zeabur Builder 會刪除 `<project>/<name>` 路徑下不是建置產生的映像檔，你自己推上 zot 的映像檔可能會消失。要保留所有映像檔，把 `builds/zeabur-builder` 加進 `disable`。這樣 `apply` 會讓 zot 繼續執行，並警告這版 Catalog 已經沒有這個元件。
-
 ## `gui`
 
 在伺服器執行：

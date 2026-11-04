@@ -434,8 +434,6 @@ export const zhTW: Messages = {
     "預設 local-path 儲存類別建立的磁碟區只在建立磁碟區的節點上：使用這種磁碟區的 Pod 只能在那個節點執行，節點不在了，資料也跟著不在。",
   "warning.join.token.unpinned": () =>
     "這個權杖沒有 CA 雜湊（K10<hash>::…），所以這台 VM 會信任在那個位址回應的任何伺服器。請照 node add 印出的權杖原樣使用。",
-  "warning.builder.deletesImages": () =>
-    "Zeabur Builder 會接手 zot，並刪除 <project>/<name> 路徑下不是建置產生的映像檔，包括你自己推上去的。要保留所有映像檔，請在「元件」步驟取消勾選 Zeabur Builder。",
   "warning.config.untested": (id, distribution) =>
     `${id} 沒在 ${distribution} 上測試過，照樣安裝。`,
   "warning.config.untestedPlatform": (id, distribution, platform) =>
