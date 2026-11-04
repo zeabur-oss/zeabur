@@ -1833,6 +1833,9 @@ mod tests {
         for component in &mut index.components {
             if component.id == "node-updates/system-upgrade-controller" {
                 component.distributions = vec!["rke2".to_owned()];
+                for default in component.defaults.values_mut() {
+                    *default = crate::catalog::Default::Recommended;
+                }
             }
         }
         let plan = plan(&index, &config(""), &facts()).unwrap();
@@ -2941,7 +2944,8 @@ mod tests {
     #[test]
     fn a_left_out_component_without_a_chart_is_kept_not_removed() {
         let index = crate::catalog::pinned();
-        let first = plan(&index, &config(""), &facts()).unwrap();
+        let enabled = config("enable: [node-updates/system-upgrade-controller]\n");
+        let first = plan(&index, &enabled, &facts()).unwrap();
         let mut upgrade = facts();
         upgrade.record = Some(recorded(&first, "0.0.1", |_| {}));
         let plan = plan(
