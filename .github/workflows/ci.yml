@@ -104,10 +104,12 @@ jobs:
         with:
           path: ~/.cache/zhtw-mcp-store
           key: zhtw-mcp-${{ runner.arch }}-${{ hashFiles('flake.lock') }}
-      - run: scripts/ci/zhtw-mcp-store.sh import
+      # Root trusts the unsigned local store.
+      - if: steps.zhtw-mcp.outputs.cache-hit == 'true'
+        run: sudo "$(command -v nix)" copy --no-check-sigs --from "file://$HOME/.cache/zhtw-mcp-store" --all
       - run: nix develop .#zh -c scripts/ci/wording.sh
       - if: github.ref == 'refs/heads/main' && steps.zhtw-mcp.outputs.cache-hit != 'true'
-        run: scripts/ci/zhtw-mcp-store.sh export
+        run: nix copy --to "file://$HOME/.cache/zhtw-mcp-store" "$(nix build .#zhtw-mcp --no-link --print-out-paths)"
       - if: github.ref == 'refs/heads/main' && steps.zhtw-mcp.outputs.cache-hit != 'true'
         uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
