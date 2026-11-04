@@ -6,6 +6,7 @@ pub(crate) mod certificates;
 mod cluster;
 mod full;
 mod identity;
+mod identity_release;
 mod images;
 mod registries;
 mod snapshot;
@@ -59,8 +60,8 @@ pub(crate) struct Up {
     /// What to install besides the cluster.
     #[arg(long, value_enum, default_value_t)]
     pub(crate) profile: Profile,
-    /// Build Zeabur Identity from this working tree, as it is, instead of
-    /// `ZEABUR_IDENTITY_PINNED` fetched from `ZEABUR_IDENTITY_GIT`.
+    /// Build Zeabur Identity from this working tree, as it is, instead of the release that
+    /// `ZEABUR_IDENTITY_PINNED` names.
     #[arg(long, value_name = "DIR", env = "ZEABUR_IDENTITY_SRC")]
     pub(crate) identity_src: Option<PathBuf>,
     /// Build Zeabur Builder from this working tree, as it is (full profile), instead of
@@ -341,6 +342,7 @@ pub(crate) fn down() -> Result<(), String> {
         "registries.yaml",
         "install.yaml",
         "identityctl",
+        "identity-release",
     ] {
         let path = dev.state.join(name);
         let removed = match fs::symlink_metadata(&path) {

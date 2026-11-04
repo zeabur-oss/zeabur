@@ -19,8 +19,9 @@ nix run .#dev-cluster -- down
 ```
 `scripts/dev-cluster.sh` (`cargo xtask dev-cluster`, `xtask/src/dev_cluster.rs`) is the one
 cluster setup: the `kubernetes` and `kubernetes-l2` jobs,
-`e2e-l2.sh` and `release-smoke.sh` all use it. It installs Zeabur Identity (built from
-`ZEABUR_IDENTITY_PINNED`, fetched from `ZEABUR_IDENTITY_GIT`, or from `--identity-src`) and Zeabur
+`e2e-l2.sh` and `release-smoke.sh` all use it. It installs Zeabur Identity (the signed
+release `ZEABUR_IDENTITY_PINNED` names; built from `--identity-src`, or at the pin from
+`ZEABUR_IDENTITY_GIT` when that is set or the pin has no release) and Zeabur
 from `zeabur-installer manifests` (the installer's own HelmChart and values; a `HelmChartConfig`
 adds Zeabur Proxy), and imports busybox for the exec test. `--profile full` adds cert-manager,
 CloudNativePG with Barman Cloud, Percona MongoDB, Keel and zot (each with the Helm commands Zeabur
