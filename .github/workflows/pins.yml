@@ -16,6 +16,6 @@ permissions:
 
 jobs:
   pins:
-    uses: zeabur-oss/.github/.github/workflows/pins.yml@6ab106525ce16169ab0ecfebe4b0248e096797fa # main
+    uses: zeabur-oss/.github/.github/workflows/pins.yml@07053982f99078683ff95ebb5003d5223420aa2e # main
     secrets:
       private-key: ${{ secrets.ZEABUR_OSS_BOT_PRIVATE_KEY }}
