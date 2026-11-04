@@ -88,9 +88,7 @@ impl Record {
         Some(Self {
             installer: text("installer").unwrap_or_default().to_owned(),
             components,
-            version: text("version")
-                .or_else(|| text("kubesolo"))
-                .map(str::to_owned),
+            version: text("version").map(str::to_owned),
             charts,
             values,
             helm,

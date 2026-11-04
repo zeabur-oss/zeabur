@@ -391,7 +391,7 @@ fn record(kubectl: &Kubectl, plan: &PersonalPlan) -> Result<(), InstallError> {
         "data": {
             "installer": env!("CARGO_PKG_VERSION"),
             "use": "personal",
-            "kubesolo": plan.kubesolo.version,
+            "version": plan.kubesolo.version,
             "components": components.join(","),
             "plan": summary,
         },
