@@ -24,13 +24,11 @@ clap.workspace = true
 hex.workspace = true
 serde-saphyr = { workspace = true, features = ["serialize"] }
 serde_json.workspace = true
+tempfile.workspace = true
 thiserror.workspace = true
 
 [build-dependencies]
 zeabur-embed.workspace = true
-
-[dev-dependencies]
-tempfile.workspace = true
 
 [lints]
 workspace = true
