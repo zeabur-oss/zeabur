@@ -86,8 +86,6 @@ inputs:
 
 The Catalog defines each component's inputs and their types. If a required value is missing, `plan` names the field to add.
 
-When the Catalog renames an input, such as `s3-url` to `s3Url`, `apply` and `gui` rename the key in your file and print one line for each rename. Other commands read the old name as the new one and leave the file alone. Only the key changes. Comments and the order of the file stay as they are, and so do the file's mode and owner. If the installer can't place a rename safely, can't keep the file's owner or can't write the file, it leaves the file as it is, uses the new name for that run, and asks you to rename the key yourself.
-
 The installer fills in `clusterIp` for Zeabur Builder (zot's fixed address). A value in `inputs` overrides it.
 
 Velero's `region` input is the bucket's region. It defaults to `us-east-1`; Cloudflare R2 needs `auto`. The web interface asks for the access key ID and secret access key separately and writes the `credentials` file from them.
