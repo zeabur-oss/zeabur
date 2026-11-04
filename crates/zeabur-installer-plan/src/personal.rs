@@ -257,6 +257,7 @@ pub fn plan(
         node_ip: facts.node_ips.first().cloned(),
         tls_san: config.host.tls_san.clone(),
     });
+    host_files.extend(facts.apparmor_profile());
     host_files.extend(registry.as_ref().and_then(|r| {
         Some(kubesolo::registry_hosts_file(
             &r.host,
@@ -311,6 +312,7 @@ mod tests {
             node_ips: vec!["10.0.0.5".to_owned()],
             record: None,
             installer: None,
+            apparmor_restricts_unconfined: false,
         }
     }
 
@@ -523,5 +525,26 @@ mod tests {
             .unwrap();
         assert!(file.content.contains("10.0.0.5"));
         assert!(file.content.contains("solo.example.com"));
+    }
+
+    #[test]
+    fn kubesolo_on_a_host_that_restricts_unconfined_gets_containerds_apparmor_profile() {
+        let index = crate::catalog::pinned();
+        let plain = plan(&index, &config(""), &facts(8192)).unwrap();
+        assert!(
+            !plain
+                .host_files
+                .contains(&crate::cluster::apparmor_profile())
+        );
+        let restricted = Facts {
+            apparmor_restricts_unconfined: true,
+            ..facts(8192)
+        };
+        let stacked = plan(&index, &config(""), &restricted).unwrap();
+        assert!(
+            stacked
+                .host_files
+                .contains(&crate::cluster::apparmor_profile())
+        );
     }
 }

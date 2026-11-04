@@ -140,7 +140,7 @@ This checks KubeSolo, each component with the Catalog's health checks for it, an
 
 ```sh
 sudo systemctl disable --now kubesolo
-sudo rm -f /etc/systemd/system/kubesolo.service /usr/local/bin/kubesolo /usr/local/libexec/zeabur-kubesolo-webhook
+sudo rm -f /etc/systemd/system/kubesolo.service /usr/local/bin/kubesolo /usr/local/libexec/zeabur-kubesolo-webhook /etc/apparmor.d/cri-containerd.apparmor.d
 sudo systemctl daemon-reload
 sudo reboot
 ```

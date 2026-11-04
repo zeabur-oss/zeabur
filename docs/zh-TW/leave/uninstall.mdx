@@ -195,7 +195,7 @@ sudo zeabur-installer uninstall
 sudo zeabur-installer uninstall --purge
 ```
 
-K3s 或 RKE2 的腳本會移除 Kubernetes 和資料，所有依賴 Kubernetes 的工作負載都會停止。下一個 `uninstall` 列出 installer 殘留檔案，`--purge` 清除下載快取、本機 CA 副本、設定，以及 installer 寫給 Longhorn 的 module／multipath 設定檔。Longhorn 主機套件會保留。
+K3s 或 RKE2 的腳本會移除 Kubernetes 和資料，所有依賴 Kubernetes 的工作負載都會停止。下一個 `uninstall` 列出 installer 殘留檔案，`--purge` 清除下載快取、本機 CA 副本、設定、installer 寫給 Longhorn 的 module／multipath 設定檔，以及寫給 containerd 的 AppArmor 設定檔。Longhorn 主機套件會保留。
 
 `/var/lib/zeabur/storage` 的 local-path 資料與 `/var/lib/longhorn` 的 replica 資料都不由 `--purge` 刪除。只保留原始資料目錄不夠，還要有對應的 PV／PVC 與儲存系統資訊，才能重新接回服務。確認已有可還原的備份後，再決定這些目錄如何處理。
 

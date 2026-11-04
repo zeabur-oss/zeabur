@@ -194,7 +194,7 @@ sudo zeabur-installer uninstall
 sudo zeabur-installer uninstall --purge
 ```
 
-The K3s or RKE2 script removes Kubernetes and its data. All workloads that depend on it stop. The next `uninstall` command lists leftover installer files. `--purge` clears the download cache, local CA copy, configuration, and module and multipath config files that the installer wrote for Longhorn. Longhorn host packages stay installed.
+The K3s or RKE2 script removes Kubernetes and its data. All workloads that depend on it stop. The next `uninstall` command lists leftover installer files. `--purge` clears the download cache, local CA copy, configuration, the module and multipath config files that the installer wrote for Longhorn, and the AppArmor profile it wrote for containerd. Longhorn host packages stay installed.
 
 `--purge` doesn't delete local-path data in `/var/lib/zeabur/storage` or replica data in `/var/lib/longhorn`. Reattaching the original data directories to services also requires the corresponding PVs, disks, and storage system information. Confirm that you have backups you can restore before deciding what to do with these directories.
 

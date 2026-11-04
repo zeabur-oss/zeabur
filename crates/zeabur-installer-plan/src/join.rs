@@ -374,6 +374,7 @@ pub fn plan(config: &JoinConfig, facts: &JoinFacts) -> Result<JoinPlan, PlanErro
     host_files.push(distribution.join_file(&join.server));
     host_files.push(distribution.node_name_file(&node_name));
     host_files.extend(distribution.node_ip_file(&facts.facts.node_ips));
+    host_files.extend(facts.facts.apparmor_profile());
     if let Some(registry) = &join.registry {
         host_files
             .push(distribution.registries_file(&registry.host, &registry.cluster_ip.to_string()));
@@ -457,6 +458,7 @@ mod tests {
                 node_ips: vec!["10.0.0.6".to_owned(), "fd00::6".to_owned()],
                 record: None,
                 installer: None,
+                apparmor_restricts_unconfined: false,
             },
             rtt_us: rtt_us.to_vec(),
             ports: vec![(9345, true), (6443, true), (10250, false)],
@@ -643,5 +645,20 @@ mod tests {
                 .any(|f| f.ends_with("50-zeabur-identity.yaml"))
         );
         assert!(p.ports.iter().any(|port| port.number == 2380));
+    }
+
+    #[test]
+    fn servers_and_workers_on_a_host_that_restricts_unconfined_get_containerds_apparmor_profile() {
+        let mut restricted = facts(&[500; 5]);
+        restricted.facts.apparmor_restricts_unconfined = true;
+        for extra in ["", "  role: server\n  serverConfig: {}\n"] {
+            let plain = plan(&config(extra), &facts(&[500; 5])).unwrap();
+            assert!(!plain.host_files.contains(&cluster::apparmor_profile()));
+            let p = plan(&config(extra), &restricted).unwrap();
+            assert!(
+                p.host_files.contains(&cluster::apparmor_profile()),
+                "{extra}"
+            );
+        }
     }
 }

@@ -323,6 +323,7 @@ fn manifests(cli: &Cli, cluster_name: &str) -> Result<(), InstallError> {
         node_ips: Vec::new(),
         record: None,
         installer: None,
+        apparmor_restricts_unconfined: false,
     };
     let (identity, zeabur) = plan::products_only(&config, &facts)?.ok_or_else(|| {
         InstallError::Message(format!("{} says `zeabur: false`", cli.config.display()))

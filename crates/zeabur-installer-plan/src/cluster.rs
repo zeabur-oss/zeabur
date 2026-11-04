@@ -104,6 +104,25 @@ const RKE2_LAYOUT: Layout = Layout {
     uninstall_agent: "/usr/local/bin/rke2-uninstall.sh",
 };
 
+/// containerd's AppArmor profile for containers, under the name containerd gives it.
+pub const APPARMOR_PROFILE: &str = "/etc/apparmor.d/cri-containerd.apparmor.d";
+
+/// containerd's default profile, which also lets a container's processes signal and trace each
+/// other under the stacked label `cri-containerd.apparmor.d//&unconfined`.
+///
+/// Ubuntu's kernels from 7.0.0-41 on give containers that label when
+/// `kernel.apparmor_restrict_unprivileged_unconfined` is 1, as on Ubuntu 26.04. containerd loads
+/// its own profile only when none of that name is loaded, and `apparmor.service` loads this one at
+/// boot.
+#[must_use]
+pub fn apparmor_profile() -> HostFile {
+    HostFile {
+        path: APPARMOR_PROFILE.to_owned(),
+        mode: 0o644,
+        content: include_str!("cri-containerd.apparmor.d").to_owned(),
+    }
+}
+
 /// The OS at idle, which every team install has.
 const OS_IDLE_MIB: u64 = 350;
 /// Zeabur and Identity at idle.
@@ -720,6 +739,28 @@ mod tests {
         for d in Distribution::ALL {
             assert!(has(d, d.join_port()));
             assert!(!d.node_ports(false).iter().any(|(p, _)| *p == 6443));
+        }
+    }
+
+    #[test]
+    fn containerds_profile_keeps_its_name_and_lets_stacked_containers_signal_each_other() {
+        let profile = apparmor_profile();
+        let name = profile.path.rsplit('/').next().unwrap();
+        assert!(
+            profile
+                .content
+                .contains(&format!("\nprofile {name} flags="))
+        );
+        for rule in [
+            "signal (send,receive)",
+            "ptrace (trace,tracedby,read,readby)",
+        ] {
+            assert!(
+                profile
+                    .content
+                    .contains(&format!("  {rule} peer={name}//&unconfined,\n")),
+                "{rule}"
+            );
         }
     }
 }

@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 
 use zeabur_installer_host::facts;
 use zeabur_installer_host::kubectl::Kubectl;
-use zeabur_installer_plan::cluster::{Distribution, EMPTY_AUTHN};
+use zeabur_installer_plan::cluster::{APPARMOR_PROFILE, Distribution, EMPTY_AUTHN};
 use zeabur_installer_plan::plan::{IDENTITY_NAMESPACE, ZEABUR_NAMESPACE};
 use zeabur_installer_plan::storage::{MODULES_FILE, MULTIPATH_FILE};
 
@@ -135,13 +135,15 @@ pub(crate) fn script(distribution: Distribution) -> &'static str {
 
 /// What the installer keeps on the machine after the cluster's uninstall script: its download cache
 /// and local CA, the configuration (with a join token on a joined node), a token file it names, and
-/// the files it wrote for Longhorn. Packages it installed for Longhorn stay.
+/// the files it wrote for Longhorn and containerd's AppArmor profile. Packages it installed for
+/// Longhorn stay.
 pub(crate) fn leftovers(config: &Path, token_file: Option<&str>) -> Vec<PathBuf> {
     let mut paths = vec![
         PathBuf::from(STATE_DIR),
         config.to_owned(),
         PathBuf::from(MODULES_FILE),
         PathBuf::from(MULTIPATH_FILE),
+        PathBuf::from(APPARMOR_PROFILE),
     ];
     paths.extend(token_file.map(PathBuf::from));
     paths.retain(|p| p.exists());
