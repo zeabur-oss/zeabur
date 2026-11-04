@@ -1,7 +1,7 @@
 ---
 title: 用設定檔和指令安裝
 description: 把安裝選擇寫成 YAML，用 plan 檢查、apply 安裝，適合重複安裝和版本控制。
-source: "818ee6533682"
+source: "da9aa058e2dc"
 ---
 
 把安裝選擇寫進 `/etc/zeabur-installer/config.yaml`，用 `plan` 查看安裝步驟，再用 `apply` 安裝。這個方式適合把設定放進版本控制、在多台機器重複同樣的安裝，或透過自動化工具安裝。
@@ -140,6 +140,31 @@ sudo zeabur-installer doctor
 | `domain` 模式的憑證還沒核發 | 檢查兩個網域的 DNS，以及 TCP 80 連接埠能否從外部連到。修正後重新執行 `apply` |
 | `local` 模式下，瀏覽器顯示憑證不受信任 | 把 `/var/lib/rancher/zeabur-installer/local-ca.crt` 匯入瀏覽器或系統的信任清單 |
 | 第一位管理員的註冊連結過期 | 在伺服器執行 `sudo zeabur-installer setup-link`，產生新的連結 |
+
+## 用 AI Agents 安裝
+
+Claude Code、Codex 這類 AI Agents 也能照上面的流程幫你安裝。請先讓 AI Agent 能用 SSH 連到伺服器，帳號要能執行 `sudo`，並用金鑰登入，不要把密碼交給 AI Agent。
+
+把下面這段貼給 AI Agent，並將 `<user>@<server>` 換成你的伺服器：
+
+```text
+請幫我在 <user>@<server> 這台伺服器安裝 Zeabur，用 SSH 連線，需要 root 的指令用 sudo。
+
+1. 依 https://oss.zeabur.com/zh-TW/docs/zeabur/reference/releases 的「下載與驗證執行檔」，下載 https://github.com/zeabur-oss/zeabur/releases 上最新發行版的 zeabur-installer，並依伺服器的 `uname -m` 選擇 linux-amd64 或 linux-arm64。驗證 SHA256SUMS 的簽章、檔案的 SHA-256 和建置來源，三項都通過才解壓縮。任何一項沒通過就停下來告訴我，不要為了讓驗證通過而修改驗證參數。
+2. 問我 Zeabur 和登入（Identity）要用的兩個網域。如果這是測試機，改用 local 模式，網域用 zeabur.<位址>.sslip.io 和 login.<位址>.sslip.io。依 https://oss.zeabur.com/zh-TW/docs/zeabur/get-started/advanced-install 寫好 /etc/zeabur-installer/config.yaml。
+3. 執行 sudo zeabur-installer plan，把變更、警告和沒通過的檢查整理給我看，等我確認可以再繼續。
+4. 我同意後執行 sudo zeabur-installer apply。中途失敗時，先修好原因，再用同一份設定重新執行。
+5. 安裝完成後執行 sudo zeabur-installer doctor，回報結果。
+6. 把第一位管理員的註冊連結原樣交給我，不要自己開啟，也不要自己註冊通行密鑰。
+
+其他細節見 https://oss.zeabur.com/llms.txt。
+```
+
+想自己在安裝介面上操作，可以請 AI Agent 改用[快速開始的一行指令](quickstart.mdx#用一行指令)，把含權杖的連結交給你，由你自己開啟。
+
+<Callout type="warn">
+第一位管理員的註冊連結會建立管理員帳號，誰先開啟就由誰掌控整個叢集。只讓 AI Agent 把連結交給你，不要讓它自己開啟。
+</Callout>
 
 ## 指令參考與加入節點
 

@@ -1,7 +1,7 @@
 ---
 title: 在一台伺服器安裝 Zeabur
 description: 用 Zeabur Installer 的網頁介面檢查伺服器、選元件並安裝，最後註冊第一位管理員的通行密鑰。
-source: "9ea55850b95a"
+source: "ff741d35fbc2"
 ---
 
 用 Zeabur Installer 的網頁介面完成五個步驟，就能開啟 Zeabur 並註冊第一位管理員的通行密鑰。按下「安裝」之前，installer 不會改動伺服器。
@@ -24,6 +24,57 @@ source: "9ea55850b95a"
 發行版的 installer 釘選 K3s、RKE2、Zeabur Catalog、Zeabur Identity 與 Zeabur 的版本。安裝所需的下載檔案會放在 `/var/lib/rancher/zeabur-installer/downloads`，並核對 SHA-256。
 
 ## 開啟安裝介面
+
+### 用一行指令
+
+在自己的電腦上執行下面這行指令，這樣就不必先登入伺服器下載 installer。把 `<user>@<server>` 換成你 SSH 登入伺服器時用的帳號和位址。這個帳號要能執行 `sudo`，也可以直接使用 root：
+
+```sh
+ssh -t -L 8085:127.0.0.1:8085 <user>@<server> exec sh -c \''
+set -e
+
+# 查最新版本，例如 v0.2.0
+latest=$(curl -fsSLI -o /dev/null -w "%{url_effective}" https://github.com/zeabur-oss/zeabur/releases/latest)
+version=${latest##*/}
+
+# 依伺服器架構選檔案
+case $(uname -m) in
+  x86_64)  arch=amd64 ;;
+  aarch64) arch=arm64 ;;
+  *) echo "不支援這個架構：$(uname -m)" >&2; exit 1 ;;
+esac
+file=zeabur-installer-$version-linux-$arch.tar.gz
+url=https://github.com/zeabur-oss/zeabur/releases/download/$version
+
+# 下載到暫存目錄，核對 SHA-256 後解壓縮
+cd "$(mktemp -d)"
+curl -fSLO --progress-bar "$url/$file"
+curl -fsSLO "$url/SHA256SUMS"
+sha256sum -c --ignore-missing SHA256SUMS
+tar -xzf "$file" zeabur-installer
+
+# 啟動安裝介面
+if [ "$(id -u)" = 0 ]; then
+  ./zeabur-installer gui
+else
+  sudo ./zeabur-installer gui
+fi
+'\'
+```
+
+指令會先建立 SSH tunnel，接著在伺服器上下載符合架構的最新版 installer，核對 `SHA256SUMS` 後啟動安裝介面。整段指令由伺服器上的 `sh` 執行，所以登入 shell 是 fish 之類的也能用。
+
+上面的指令已經開啟 SSH tunnel，因此終端機印出含權杖的連結後，直接用自己電腦的瀏覽器開啟就好，不用再執行連結下方那行 `ssh -L` 指令。
+
+如果你使用 Ghostty，請在指令前面加上 `command`，寫成 `command ssh -t -L …`。Ghostty 的 SSH 整合會先在伺服器安裝它自己的 terminfo，可能就卡在這一步，畫面停在 `Setting up xterm-ghostty terminfo`。
+
+安裝期間這個終端機要一直開著，安裝完成後按 Ctrl-C 關閉 installer，K3s/RKE2 和服務會繼續執行。
+
+這行指令只核對 SHA-256，要一併驗證簽章和建置來源，請見[發行檔與驗證](../reference/releases.mdx#下載與驗證執行檔)。
+
+要安裝指定版本，把 `version=` 那一行換成指定的版本，例如 `version=v0.2.0`。
+
+### 手動開啟
 
 在伺服器執行：
 

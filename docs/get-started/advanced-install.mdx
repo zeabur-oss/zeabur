@@ -140,6 +140,31 @@ This checks K3s or RKE2, components, the default storage class, Zeabur Identity,
 | The browser doesn't trust the certificate in `local` mode | Import `/var/lib/rancher/zeabur-installer/local-ca.crt` into your browser's or system's trust store |
 | The registration link for the first admin account has expired | Run `sudo zeabur-installer setup-link` on the server to generate a new link |
 
+## Install with AI Agents
+
+AI Agents such as Claude Code or Codex can follow the steps above to install for you. First let the AI Agent reach the server over SSH with an account that can run `sudo`, and sign in with a key. Don't give the AI Agent a password.
+
+Paste the following to the AI Agent and replace `<user>@<server>` with your server:
+
+```text
+Install Zeabur on the server <user>@<server>. Connect over SSH and use sudo for commands that need root.
+
+1. Following "Download and verify binaries" at https://oss.zeabur.com/docs/zeabur/reference/releases, download zeabur-installer from the latest release at https://github.com/zeabur-oss/zeabur/releases, choosing linux-amd64 or linux-arm64 from the server's `uname -m`. Verify the signature of SHA256SUMS, the file's SHA-256 and the build provenance, and extract only when all three pass. If any of them fails, stop and tell me. Don't change the verification options to make it pass.
+2. Ask me for the two domains for Zeabur and sign-in (Identity). If this is a test machine, use local mode with zeabur.<address>.sslip.io and login.<address>.sslip.io. Write /etc/zeabur-installer/config.yaml following https://oss.zeabur.com/docs/zeabur/get-started/advanced-install.
+3. Run sudo zeabur-installer plan, summarize the changes, warnings and failed checks for me, and wait for my go-ahead.
+4. Once I agree, run sudo zeabur-installer apply. If it fails partway, fix the cause, then run it again with the same config.
+5. When the installation finishes, run sudo zeabur-installer doctor and report the result.
+6. Give me the registration link for the first administrator exactly as printed. Don't open it and don't register a passkey yourself.
+
+For other details, see https://oss.zeabur.com/llms.txt.
+```
+
+To click through the web interface yourself, ask the AI Agent to use the [one command from the quickstart](quickstart.mdx#one-command) instead and hand you the link with the token to open.
+
+<Callout type="warn">
+The registration link for the first administrator creates an admin account, and whoever opens it first controls the whole cluster. Have the AI Agent give you the link, and don't let it open the link itself.
+</Callout>
+
 ## Command reference and adding nodes
 
 For commands such as `gui`, `doctor`, `node add`, and `uninstall`, along with all options, see [Installer commands](../reference/installer.mdx).
