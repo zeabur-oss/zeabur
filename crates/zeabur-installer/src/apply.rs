@@ -13,7 +13,7 @@ use zeabur_installer_host::nodeprep::{self, Stage};
 use zeabur_installer_host::preflight::{self, Status};
 use zeabur_installer_host::{archive, chart, cmd, download, facts, files, systemd};
 use zeabur_installer_plan::catalog::{Encoding, Index};
-use zeabur_installer_plan::cluster::{AUTHN_CONFIGMAP, Distribution, HostFile};
+use zeabur_installer_plan::cluster::{APPARMOR_PROFILE, AUTHN_CONFIGMAP, Distribution, HostFile};
 use zeabur_installer_plan::config::{AccessMode, Config};
 use zeabur_installer_plan::k3s;
 use zeabur_installer_plan::plan::{
@@ -483,6 +483,7 @@ pub(crate) fn install_cluster(install: &ClusterInstall<'_>) -> Result<Option<u64
         &["--quiet", &format!("--load={}", layout.sysctl_file)],
         None,
     )?;
+    load_apparmor_profile(install.files())?;
     match distribution {
         Distribution::Rke2 if install.server && !cmd::succeeds("id", &["etcd"]) => {
             let (program, args) = ETCD_USER
@@ -521,6 +522,16 @@ pub(crate) fn install_cluster(install: &ClusterInstall<'_>) -> Result<Option<u64
     } else {
         Ok(None)
     }
+}
+
+/// Loads the AppArmor profile among `files`, so containerd finds it loaded and keeps it.
+pub(crate) fn load_apparmor_profile<'a>(
+    mut files: impl Iterator<Item = &'a HostFile>,
+) -> Result<(), InstallError> {
+    if files.any(|f| f.path == APPARMOR_PROFILE) {
+        cmd::run("apparmor_parser", &["--replace", APPARMOR_PROFILE], None)?;
+    }
+    Ok(())
 }
 
 /// Downloads the release into `dir` and its image archives into the image directory, and checks

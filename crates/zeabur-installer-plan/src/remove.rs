@@ -353,6 +353,7 @@ mod tests {
             node_ips: Vec::new(),
             record: None,
             installer: None,
+            apparmor_restricts_unconfined: false,
         };
         plan(&index(), &config, &facts).unwrap().components
     }

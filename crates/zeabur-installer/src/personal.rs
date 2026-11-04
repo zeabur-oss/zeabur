@@ -12,6 +12,7 @@ use zeabur_installer_host::kubectl::{self, Kubectl};
 use zeabur_installer_host::preflight::{self, Node, Status};
 use zeabur_installer_host::{archive, cmd, download, facts, files, systemd};
 use zeabur_installer_plan::catalog::Index;
+use zeabur_installer_plan::cluster::APPARMOR_PROFILE;
 use zeabur_installer_plan::config::PersonalConfig;
 use zeabur_installer_plan::kubesolo::{
     ADMIN_KUBECONFIG, BINARY, DATA_DIR, KUBECTL, PERSONAL_KUBECONFIG, STATE_DIR, UNIT,
@@ -315,6 +316,7 @@ fn install_kubesolo(plan: &PersonalPlan) -> Result<(), InstallError> {
     for file in &plan.host_files {
         changed |= files::write(Path::new(&file.path), file.mode, file.content.as_bytes())?;
     }
+    crate::apply::load_apparmor_profile(plan.host_files.iter())?;
     if binary_outdated(Path::new(BINARY), &plan.kubesolo.version) {
         let download = &plan.kubesolo.download;
         let dir = PathBuf::from(STATE_DIR)
@@ -559,7 +561,7 @@ pub(crate) fn uninstall_text() -> String {
          the installer; manage them with kubectl (kubectl get helmcharts -n kube-system).\n\n\
          To remove everything, apps and volumes included:\n\n  \
          sudo systemctl disable --now {UNIT}\n  \
-         sudo rm -f /etc/systemd/system/{UNIT}.service {BINARY} {WEBHOOK_SCRIPT}\n  \
+         sudo rm -f /etc/systemd/system/{UNIT}.service {BINARY} {WEBHOOK_SCRIPT} {APPARMOR_PROFILE}\n  \
          sudo systemctl daemon-reload\n  \
          sudo reboot    # the containers and their mounts outlive the service\n  \
          sudo rm -rf {DATA_DIR} /etc/kubesolo {STATE_DIR} /etc/zeabur-installer\n"

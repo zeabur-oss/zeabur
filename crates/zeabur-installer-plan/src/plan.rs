@@ -76,9 +76,20 @@ pub struct Facts {
     /// The version of the installer that last applied, as kept on the host.
     #[serde(skip)]
     pub installer: Option<String>,
+    /// `kernel.apparmor_restrict_unprivileged_unconfined` is 1; see
+    /// [`cluster::apparmor_profile`].
+    #[serde(skip)]
+    pub apparmor_restricts_unconfined: bool,
 }
 
 impl Facts {
+    /// The AppArmor profile containerd must find loaded on this host, if it needs one.
+    #[must_use]
+    pub fn apparmor_profile(&self) -> Option<HostFile> {
+        self.apparmor_restricts_unconfined
+            .then(cluster::apparmor_profile)
+    }
+
     /// The name this host has as a node: [`Self::node_name`], else the host name in lower case,
     /// as K3s, RKE2 and `KubeSolo` name a node they are not told the name of.
     #[must_use]
@@ -1372,6 +1383,7 @@ fn server_files(
     });
     files.push(distribution.node_name_file(node_name));
     files.extend(distribution.node_ip_file(&facts.node_ips));
+    files.extend(facts.apparmor_profile());
     files.extend(
         registry
             .and_then(|r| Some(distribution.registries_file(&r.host, r.cluster_ip.as_deref()?))),
@@ -1777,6 +1789,7 @@ mod tests {
             node_ips: vec!["10.0.0.5".to_owned()],
             record: None,
             installer: None,
+            apparmor_restricts_unconfined: false,
         }
     }
 
@@ -2983,5 +2996,24 @@ mod tests {
                 .to_string()
                 .contains("zeabur-installer 999.0.0 or newer")
         );
+    }
+
+    #[test]
+    fn only_a_host_that_restricts_unconfined_gets_containerds_apparmor_profile() {
+        let index = crate::catalog::pinned();
+        let restricted = Facts {
+            apparmor_restricts_unconfined: true,
+            ..facts()
+        };
+        for extra in ["", "distribution: rke2\n"] {
+            let plain = plan(&index, &config(extra), &facts()).unwrap();
+            assert!(
+                !plain
+                    .host_file_paths
+                    .contains(&cluster::APPARMOR_PROFILE.to_owned())
+            );
+            let stacked = plan(&index, &config(extra), &restricted).unwrap();
+            assert!(stacked.host_files.contains(&cluster::apparmor_profile()));
+        }
     }
 }

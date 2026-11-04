@@ -11,6 +11,8 @@ use zeabur_installer_plan::plan::Facts;
 
 use crate::HostError;
 
+const RESTRICT_UNCONFINED: &str = "/proc/sys/kernel/apparmor_restrict_unprivileged_unconfined";
+
 /// Reads the architecture, host name and memory.
 ///
 /// # Errors
@@ -33,6 +35,8 @@ pub fn read() -> Result<Facts, HostError> {
         node_ips,
         record: None,
         installer: None,
+        apparmor_restricts_unconfined: fs::read_to_string(RESTRICT_UNCONFINED)
+            .is_ok_and(|v| v.trim() == "1"),
     })
 }
 

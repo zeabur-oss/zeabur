@@ -131,6 +131,7 @@ mod tests {
             node_ips: vec!["10.211.55.189".to_owned(), "fd00::5".to_owned()],
             record: None,
             installer: None,
+            apparmor_restricts_unconfined: false,
         }
     }
 
