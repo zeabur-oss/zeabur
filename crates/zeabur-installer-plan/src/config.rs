@@ -160,10 +160,8 @@ impl PersonalConfig {
     ///
     /// When the YAML does not match or `use` is not `personal`.
     pub fn parse(yaml: &str) -> Result<Self, PlanError> {
-        let mut config: Self =
+        let config: Self =
             serde_saphyr::from_str(yaml).map_err(|e| PlanError::Config(e.to_string()))?;
-        rename_inputs(&mut config.inputs);
-        rename_inputs(&mut config.secret_files);
         config.check()?;
         Ok(config)
     }
@@ -258,48 +256,6 @@ pub struct Sources {
     pub proxy_image: Option<String>,
     /// Zeabur's chart: a directory or a packaged `.tgz`.
     pub zeabur_chart: Option<String>,
-}
-
-/// Component inputs that Zeabur Catalog renamed: component id, old name, new name. The installer
-/// writes the new names into the file it reads; this table is removed in v0.2.0 (#223).
-pub const RENAMED_INPUTS: &[(&str, &str, &str)] = &[
-    ("builds/zeabur-builder", "cluster-ip", "clusterIp"),
-    ("intrusion-prevention/crowdsec", "bouncer-key", "bouncerKey"),
-    ("intrusion-prevention/crowdsec", "lapi-secret", "lapiSecret"),
-    (
-        "intrusion-prevention/crowdsec",
-        "registration-token",
-        "registrationToken",
-    ),
-    (
-        "remote-access/tailscale-operator",
-        "oauth-client-id",
-        "oauthClientId",
-    ),
-    (
-        "remote-access/tailscale-operator",
-        "oauth-client-secret",
-        "oauthClientSecret",
-    ),
-    ("volume-backup/velero", "s3-url", "s3Url"),
-    (
-        "volume-backup/velero",
-        "repository-password",
-        "repositoryPassword",
-    ),
-    ("volume-backup/velero", "backup-key", "backupKey"),
-    ("volume-backup/velero", "file-backup", "fileBackup"),
-];
-
-/// Gives each input with an old name its new name. A value under the new name wins.
-fn rename_inputs<V>(inputs: &mut BTreeMap<String, BTreeMap<String, V>>) {
-    for (component, old, new) in RENAMED_INPUTS {
-        if let Some(values) = inputs.get_mut(*component)
-            && let Some(value) = values.remove(*old)
-        {
-            values.entry((*new).to_owned()).or_insert(value);
-        }
-    }
 }
 
 /// A configuration file: a new cluster, or a node joining one.
@@ -743,10 +699,8 @@ impl Config {
     ///
     /// When the YAML does not match or a value is invalid.
     pub fn parse(yaml: &str) -> Result<Self, PlanError> {
-        let mut config: Self =
+        let config: Self =
             serde_saphyr::from_str(yaml).map_err(|e| PlanError::Config(e.to_string()))?;
-        rename_inputs(&mut config.inputs);
-        rename_inputs(&mut config.secret_files);
         config.check()?;
         Ok(config)
     }
@@ -895,30 +849,6 @@ mod tests {
         assert!(PersonalConfig::parse("use: personal\nhost: {nodeName: -solo}\n").is_err());
         assert!(join("host: {nodeName: Worker.1}\n").is_err());
         assert!(join("host: {nodeName: worker-1}\n").is_ok());
-    }
-
-    #[test]
-    fn an_old_input_name_is_read_as_its_new_name() {
-        let yaml = format!(
-            "{MINIMAL}inputs:\n  volume-backup/velero: {{s3-url: https://s3.example.com, bucket: b}}\n\
-             secretFiles:\n  intrusion-prevention/crowdsec: {{bouncer-key: /etc/key}}\n"
-        );
-        let config = Config::parse(&yaml).unwrap();
-        let velero = &config.inputs["volume-backup/velero"];
-        assert_eq!(velero["s3Url"], "https://s3.example.com");
-        assert!(!velero.contains_key("s3-url"));
-        assert_eq!(
-            config.secret_files["intrusion-prevention/crowdsec"]["bouncerKey"],
-            "/etc/key"
-        );
-        let personal = PersonalConfig::parse(
-            "use: personal\ninputs:\n  builds/zeabur-builder: {cluster-ip: 10.43.0.9}\n",
-        )
-        .unwrap();
-        assert_eq!(
-            personal.inputs["builds/zeabur-builder"]["clusterIp"],
-            "10.43.0.9"
-        );
     }
 
     #[test]
