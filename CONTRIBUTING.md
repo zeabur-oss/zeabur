@@ -255,16 +255,16 @@ export KUBECONFIG=$PWD/target/dev-cluster/kubeconfig
 cargo nextest run --locked --run-ignored only -E 'binary(kubernetes)'
 ./scripts/build-ui.sh && ./scripts/e2e-ui.sh     # zeaburctl ui in local mode (Playwright)
 # on `up` or `up --profile full`
-./scripts/e2e-l2-browser.sh                      # Zeabur in the cluster (Playwright)
+./scripts/e2e-browser.sh                      # Zeabur in the cluster (Playwright)
 ```
 
 Each cluster test works in a namespace of its own with a person in it, from
 `zeabur-test-support`'s `sandbox`, and deletes it when it ends. A release `zeaburctl` embeds the
 interface: `./scripts/build-ui.sh && ZEABUR_UI_DIST=$PWD/web/dist cargo build --release -p zeaburctl`.
 
-`scripts/e2e-l2.sh` (the `kubernetes-l2` job) is `up`, the browser tests, then checks from outside
+`scripts/e2e.sh` (the `e2e` job) is `up`, the browser tests, then checks from outside
 (Zeabur's service accounts have no extra rights beyond pods in `zeabur-terminals`, the idle pod's memory, removing Zeabur leaves the
-cluster as it was) and `down`. It takes `up`'s options; `ZEABUR_L2_KEEP=1` keeps the cluster and
+cluster as it was) and `down`. It takes `up`'s options; `ZEABUR_E2E_KEEP=1` keeps the cluster and
 skips the removal check. On a cluster of `--profile full`, a browser test that would skip for want
 of a component fails instead.
 

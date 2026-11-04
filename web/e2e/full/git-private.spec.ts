@@ -20,15 +20,15 @@ import { invite, member, signInAdmin, toast } from "./members.ts"
 //                          the account `gh` is signed in with; otherwise the test prints the key
 //                          and waits for someone to add it, then to remove it
 //
-// scripts/e2e-l2-browser.sh passes E2E_PRIVATE_GIT_* through and sets
-// ZEABUR_L2_GIT_PRIVATE_ADMIN_LINK when Zeabur Builder runs in the cluster.
+// scripts/e2e-browser.sh passes E2E_PRIVATE_GIT_* through and sets
+// ZEABUR_E2E_GIT_PRIVATE_ADMIN_LINK when Zeabur Builder runs in the cluster.
 const env = (name: string, fallback = "") => process.env[name] ?? fallback
 const repository = env("E2E_PRIVATE_GIT_REPO")
 const text = env("E2E_PRIVATE_GIT_TEXT", "Built by Zeabur from a private repository.")
 const useGh = env("E2E_GH_DEPLOY_KEY") === "1"
-const adminLink = env("ZEABUR_L2_GIT_PRIVATE_ADMIN_LINK")
-const project = env("ZEABUR_L2_NAMESPACE")
-const zeabur = env("ZEABUR_L2_URL")
+const adminLink = env("ZEABUR_E2E_GIT_PRIVATE_ADMIN_LINK")
+const project = env("ZEABUR_E2E_NAMESPACE")
+const zeabur = env("ZEABUR_E2E_URL")
 
 test.skip(!repository, "E2E_PRIVATE_GIT_REPO is not set")
 test.skip(!adminLink, "Zeabur Builder, a registry and Keel are not in this cluster")

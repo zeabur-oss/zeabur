@@ -4,17 +4,17 @@ import { expect, test } from "../fixtures.ts"
 import { authenticator, enrol, signInAtZeaburIdentity } from "./identity.ts"
 
 // A member manages their passkeys on Zeabur Identity's account page, reached from Zeabur's.
-// scripts/e2e-l2-browser.sh sets, besides ZEABUR_L2_URL:
+// scripts/e2e-browser.sh sets, besides ZEABUR_E2E_URL:
 //
-//   ZEABUR_L2_MEMBER_LINK   an invitation `zeabur-identityctl invite` printed for `e2e-member`,
+//   ZEABUR_E2E_MEMBER_LINK   an invitation `zeabur-identityctl invite` printed for `e2e-member`,
 //                           in no group
 const env = (name: string, fallback = "") => process.env[name] ?? fallback
-const memberLink = env("ZEABUR_L2_MEMBER_LINK")
-const zeabur = env("ZEABUR_L2_URL")
+const memberLink = env("ZEABUR_E2E_MEMBER_LINK")
+const zeabur = env("ZEABUR_E2E_URL")
 const identity = memberLink ? new URL(memberLink).origin : ""
 
 test.beforeAll(() => {
-  if (!memberLink) throw new Error("ZEABUR_L2_MEMBER_LINK is not set")
+  if (!memberLink) throw new Error("ZEABUR_E2E_MEMBER_LINK is not set")
 })
 
 const passkeys = (page: Page) => page.getByRole("region", { name: "Passkeys" })

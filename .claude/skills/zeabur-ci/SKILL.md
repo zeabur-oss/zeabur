@@ -13,9 +13,9 @@ jobs and tools.
 ## Jobs
 
 `scripts/ci.sh --list`: the checks (format, clippy, docs, test, cargo-deny, unsafe-report,
-levels, fuzz, ui, no-ui, chart, wording), `kubernetes` (cluster tests, `zeaburctl doctor`,
-browser tests in local mode) and `kubernetes-l2` (Zeabur and Zeabur Identity in a cluster,
-`scripts/e2e-l2.sh`), both on `scripts/dev-cluster.sh`. What each cluster job runs is in
+levels, fuzz, ui, no-ui, chart, wording), `cluster` (cluster tests, `zeaburctl doctor`,
+browser tests in local mode) and `e2e` (Zeabur and Zeabur Identity in a cluster,
+`scripts/e2e.sh`), both on `scripts/dev-cluster.sh`. What each cluster job runs is in
 `zeabur-cluster-tests`.
 
 `.github/workflows/release.yml` runs on a `vX.Y.Z` or `vX.Y.Z-<pre-release>` tag: zeabur-oss/.github's
@@ -38,7 +38,7 @@ Linux), `sign` (macOS), `publish`, `attest`, `finish` (the installers),
 
 ```sh
 rsync -a --delete --exclude target --exclude node_modules --exclude web/dist ./ host:zeabur/
-ssh host 'cd zeabur && scripts/ci.sh kubernetes'           # one job
+ssh host 'cd zeabur && scripts/ci.sh cluster'           # one job
 ssh host 'cd zeabur && scripts/ci-local.sh'                # every job, a result line each
 ```
 - `scripts/ci-local.sh [job…]` runs each job in its own copy of the checkout, three at a time

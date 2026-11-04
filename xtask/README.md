@@ -12,7 +12,7 @@ Nothing ships it. Git, Docker, k3d, kubectl, Helm, openssl, curl, tar, cosign an
 cargo xtask dev-cluster up [--profile bare|default|full] [--identity-src <dir>]
                            [--builder-src <dir>] [--zeabur-image <image>] [--zeabur-chart <chart>]
 cargo xtask dev-cluster down
-cargo xtask dev-cluster snapshot   # cluster-scoped objects and namespace metadata, for e2e-l2
+cargo xtask dev-cluster snapshot   # cluster-scoped objects and namespace metadata, for e2e
 
 # Zeabur Proxy's canary (scripts/e2e-proxy.sh) on the cluster KUBECONFIG points at: no person
 # reads another namespace's log lines or series. Removes what it made, however it ends, unless

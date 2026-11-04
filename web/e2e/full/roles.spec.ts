@@ -4,21 +4,21 @@ import { expect, test } from "../fixtures.ts"
 import { invite, member, planAndApply, signInAdmin } from "./members.ts"
 
 // Roles per project: an admin invites a Developer of one project and a Viewer of another, and
-// each sees what their role allows. scripts/e2e-l2-browser.sh sets, besides ZEABUR_L2_URL:
+// each sees what their role allows. scripts/e2e-browser.sh sets, besides ZEABUR_E2E_URL:
 //
-//   ZEABUR_L2_ADMIN_LINK         an invitation `zeabur-identityctl invite --admin` printed for the
+//   ZEABUR_E2E_ADMIN_LINK         an invitation `zeabur-identityctl invite --admin` printed for the
 //                                admin account `e2e-admin`
-//   ZEABUR_L2_NAMESPACE          the Developer's project, with a running Deployment
-//   ZEABUR_L2_SECOND_NAMESPACE   the Viewer's project, with a running Deployment of the same name
-//   ZEABUR_L2_SERVICE            that Deployment (default talker)
+//   ZEABUR_E2E_NAMESPACE          the Developer's project, with a running Deployment
+//   ZEABUR_E2E_SECOND_NAMESPACE   the Viewer's project, with a running Deployment of the same name
+//   ZEABUR_E2E_SERVICE            that Deployment (default talker)
 //
 // It deletes the users e2e-developer and e2e-viewer before each run, so Zeabur makes them anew.
 const env = (name: string, fallback = "") => process.env[name] ?? fallback
-const adminLink = env("ZEABUR_L2_ADMIN_LINK")
-const first = env("ZEABUR_L2_NAMESPACE")
-const second = env("ZEABUR_L2_SECOND_NAMESPACE")
-const service = env("ZEABUR_L2_SERVICE", "talker")
-const zeabur = env("ZEABUR_L2_URL")
+const adminLink = env("ZEABUR_E2E_ADMIN_LINK")
+const first = env("ZEABUR_E2E_NAMESPACE")
+const second = env("ZEABUR_E2E_SECOND_NAMESPACE")
+const service = env("ZEABUR_E2E_SERVICE", "talker")
+const zeabur = env("ZEABUR_E2E_URL")
 const servicePage = (project: string) =>
   `/projects/${encodeURIComponent(project)}/services/Deployment/${service}`
 
@@ -31,9 +31,9 @@ const shownName = async (page: Page, project: string) => {
 }
 
 test.beforeAll(() => {
-  if (!adminLink) throw new Error("ZEABUR_L2_ADMIN_LINK is not set")
-  if (!first) throw new Error("ZEABUR_L2_NAMESPACE is not set")
-  if (!second) throw new Error("ZEABUR_L2_SECOND_NAMESPACE is not set")
+  if (!adminLink) throw new Error("ZEABUR_E2E_ADMIN_LINK is not set")
+  if (!first) throw new Error("ZEABUR_E2E_NAMESPACE is not set")
+  if (!second) throw new Error("ZEABUR_E2E_SECOND_NAMESPACE is not set")
 })
 
 test("an admin invites a Developer and a Viewer, who each get what their role allows", async ({

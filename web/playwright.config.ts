@@ -12,8 +12,8 @@ if (!launch) throw new Error("ZEABUR_E2E_URL is not set")
 
 export default defineConfig({
   testDir: "e2e",
-  // Run by playwright.l2.config.ts.
-  testIgnore: "**/e2e/l2/**",
+  // Run by playwright.full.config.ts.
+  testIgnore: "**/e2e/full/**",
   fullyParallel: false,
   workers: 1,
   forbidOnly: Boolean(process.env.CI),

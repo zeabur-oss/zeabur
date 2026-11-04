@@ -9,12 +9,12 @@ import { invite, member, signInAdmin, toast } from "./members.ts"
 // Upload a folder: a Developer picks a small folder with a Dockerfile, applies the plan, and the
 // folder goes up through Zeabur to the registry as an OCI artifact; Zeabur Builder builds it,
 // Keel moves the service to the image and it runs. What `.gitignore` leaves out is not built.
-// scripts/e2e-l2-browser.sh sets ZEABUR_L2_UPLOAD_ADMIN_LINK (an admin account's invitation)
+// scripts/e2e-browser.sh sets ZEABUR_E2E_UPLOAD_ADMIN_LINK (an admin account's invitation)
 // only when Zeabur Builder, a registry and Keel run here.
 const env = (name: string, fallback = "") => process.env[name] ?? fallback
-const adminLink = env("ZEABUR_L2_UPLOAD_ADMIN_LINK")
-const project = env("ZEABUR_L2_NAMESPACE")
-const zeabur = env("ZEABUR_L2_URL")
+const adminLink = env("ZEABUR_E2E_UPLOAD_ADMIN_LINK")
+const project = env("ZEABUR_E2E_NAMESPACE")
+const zeabur = env("ZEABUR_E2E_URL")
 
 test.skip(!adminLink, "Zeabur Builder, a registry and Keel are not in this cluster")
 test.use({ actionTimeout: 30_000 })

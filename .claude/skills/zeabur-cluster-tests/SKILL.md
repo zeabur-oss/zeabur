@@ -18,8 +18,8 @@ export KUBECONFIG=$PWD/target/dev-cluster/kubeconfig   # never your normal conte
 nix run .#dev-cluster -- down
 ```
 `scripts/dev-cluster.sh` (`cargo xtask dev-cluster`, `xtask/src/dev_cluster.rs`) is the one
-cluster setup: the `kubernetes` and `kubernetes-l2` jobs,
-`e2e-l2.sh` and `release-smoke.sh` all use it. It installs Zeabur Identity (the signed
+cluster setup: the `cluster` and `e2e` jobs,
+`e2e.sh` and `release-smoke.sh` all use it. It installs Zeabur Identity (the signed
 release `ZEABUR_IDENTITY_PINNED` names, or built from `--identity-src`) and Zeabur
 from `zeabur-installer manifests` (the installer's own HelmChart and values; a `HelmChartConfig`
 adds Zeabur Proxy), and imports busybox for the exec test. `--profile full` adds cert-manager,
@@ -28,7 +28,7 @@ Catalog gives), the test S3, and Zeabur Builder's chart from `ZEABUR_BUILDER_PIN
 anonymously to zot. The node pulls `zot.zot.svc:5000` as zeabur-installer sets it up: a mirror to
 zot's fixed ClusterIP 10.43.0.50, checked against zot's CA.
 `--profile bare` is the cluster alone: run `binary(kubernetes)` and `e2e-ui.sh` there (the
-`kubernetes` job does), since Zeabur's ValidatingAdmissionPolicy `zeabur-project-namespace` stops
+`cluster` job does), since Zeabur's ValidatingAdmissionPolicy `zeabur-project-namespace` stops
 their non-admin people from changing namespace labels. To run a whole
 job as CI does, use `scripts/ci-local.sh kubernetes` (see `zeabur-ci`).
 
@@ -36,21 +36,21 @@ job as CI does, use `scripts/ci-local.sh kubernetes` (see `zeabur-ci`).
 ```sh
 cargo nextest run --locked --run-ignored only -E 'binary(kubernetes)'   # every crate's tests/kubernetes.rs
 ./scripts/build-ui.sh && ./scripts/e2e-ui.sh                             # browser tests, local mode
-./scripts/e2e-l2-browser.sh           # web/e2e/l2, Zeabur in the cluster
-./scripts/e2e-l2.sh                   # up, web/e2e/l2, rights, memory, removal, down
+./scripts/e2e-browser.sh           # web/e2e/full, Zeabur in the cluster
+./scripts/e2e.sh                   # up, web/e2e/full, rights, memory, removal, down
 ```
 - `e2e-ui.sh` recreates the namespace `zeabur-e2e` from `web/e2e/manifests/talker.yaml` (a
   healthy service, a ConfigMap reader, and `crasher`, which exits 1 at once), waits until
   `crasher` has restarted twice, starts the release `zeaburctl ui`, and runs `web/e2e` with
   Playwright. Failures land in `target/e2e-ui/results/<test>/` (`error-context.md`, a trace).
-- `e2e-l2.sh [up options]` brings the cluster up, runs `web/e2e/l2`, checks from outside, and
-  deletes the cluster (`ZEABUR_L2_KEEP=1` keeps it and skips the removal check). Its header lists
+- `e2e.sh [up options]` brings the cluster up, runs `web/e2e/full`, checks from outside, and
+  deletes the cluster (`ZEABUR_E2E_KEEP=1` keeps it and skips the removal check). Its header lists
   every step.
-- `e2e-l2-browser.sh [playwright args]` runs only `web/e2e/l2` on the cluster. It deletes the e2e
+- `e2e-browser.sh [playwright args]` runs only `web/e2e/full` on the cluster. It deletes the e2e
   users and their `zeabur.com/member` bindings and makes them again first, so every user comes
   from today's code; never reuse a user from an earlier run. On the full profile a spec that
   would skip for a missing component fails instead.
-- `e2e/l2/git-private.spec.ts` deploys a private GitHub repository with a deploy key and runs
+- `e2e/full/git-private.spec.ts` deploys a private GitHub repository with a deploy key and runs
   only with `E2E_PRIVATE_GIT_REPO` set (e.g. `git@github.com:zeabur-oss/oss-private-git-demo.git`).
   With `E2E_GH_DEPLOY_KEY=1` it adds the key read-only and removes it with `gh repo deploy-key`
   (gh signed in with admin on that repository); otherwise it prints `E2E_DEPLOY_KEY_ADD …` and

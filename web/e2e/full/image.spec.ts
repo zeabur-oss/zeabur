@@ -7,16 +7,16 @@ import { invite, member, planAndApply, signInAdmin, toast } from "./members.ts"
 // project Zeabur creates (Pod Security baseline), a root image runs as Compatible and an image
 // with a numeric user is Strict, both chosen for the Developer. The admin then deletes that project,
 // so removing Zeabur leaves the cluster as it was.
-// scripts/e2e-l2-browser.sh sets, besides ZEABUR_L2_URL and ZEABUR_L2_NAMESPACE:
+// scripts/e2e-browser.sh sets, besides ZEABUR_E2E_URL and ZEABUR_E2E_NAMESPACE:
 //
-//   ZEABUR_L2_IMAGE_ADMIN_LINK  an invitation for `e2e-image-admin`, an admin account
+//   ZEABUR_E2E_IMAGE_ADMIN_LINK  an invitation for `e2e-image-admin`, an admin account
 //                               (`invite --admin`)
-//   ZEABUR_L2_IMAGE             the image, by default traefik/whoami:v1.10.3 (port 80)
+//   ZEABUR_E2E_IMAGE             the image, by default traefik/whoami:v1.10.3 (port 80)
 const env = (name: string, fallback = "") => process.env[name] ?? fallback
-const adminLink = env("ZEABUR_L2_IMAGE_ADMIN_LINK")
-const project = env("ZEABUR_L2_NAMESPACE")
-const zeabur = env("ZEABUR_L2_URL")
-const image = env("ZEABUR_L2_IMAGE", "traefik/whoami:v1.10.3")
+const adminLink = env("ZEABUR_E2E_IMAGE_ADMIN_LINK")
+const project = env("ZEABUR_E2E_NAMESPACE")
+const zeabur = env("ZEABUR_E2E_URL")
+const image = env("ZEABUR_E2E_IMAGE", "traefik/whoami:v1.10.3")
 
 test.skip(!adminLink, "no invitation for e2e-image-admin")
 test.use({ actionTimeout: 30_000 })

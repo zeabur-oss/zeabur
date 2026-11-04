@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Zeabur in a cluster, end to end, on the development cluster (scripts/dev-cluster.sh: Zeabur
 # Identity and Zeabur from zeabur-installer's objects, behind Traefik over HTTPS): a browser
-# (web/e2e/l2) enrols a passkey, signs in, confirms a terminal with the passkey again, runs a
+# (web/e2e/full) enrols a passkey, signs in, confirms a terminal with the passkey again, runs a
 # command, then reads and changes with admin rights; an admin invites a Developer and a Viewer,
 # who each see what their role allows. Then, from the outside: Zeabur's service account can do
 # nothing a fresh one cannot, the idle pod stays within its memory budget, and removing Zeabur
@@ -9,8 +9,8 @@
 #
 # Run on Linux with Docker and Nix; it uses this machine's port 443. Arguments go to
 # `dev-cluster.sh up` (`--profile full`, `--identity-src <dir>`). The cluster is deleted at the
-# end; ZEABUR_L2_KEEP=1 keeps it, with Zeabur, and skips the removal check.
-#   scripts/e2e-l2.sh
+# end; ZEABUR_E2E_KEEP=1 keeps it, with Zeabur, and skips the removal check.
+#   scripts/e2e.sh
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
@@ -35,7 +35,7 @@ finish() {
       [[ -f "$context" ]] && cat "$context" >&2
     done
   fi
-  [[ -n "${ZEABUR_L2_KEEP:-}" ]] || "$root/scripts/dev-cluster.sh" down
+  [[ -n "${ZEABUR_E2E_KEEP:-}" ]] || "$root/scripts/dev-cluster.sh" down
   exit "$status"
 }
 trap finish EXIT
@@ -43,8 +43,8 @@ trap finish EXIT
 "$root/scripts/dev-cluster.sh" up "$@"
 
 # --- The browser ----------------------------------------------------------------------------------
-# The e2e users, made from scratch, and web/e2e/l2.
-"$root/scripts/e2e-l2-browser.sh"
+# The e2e users, made from scratch, and web/e2e/full.
+"$root/scripts/e2e-browser.sh"
 # The restart the browser confirmed reached the cluster.
 restarted=$(kubectl -n "$project" get deployment/talker \
   -o jsonpath='{.spec.template.metadata.annotations.kubectl\.kubernetes\.io/restartedAt}')
@@ -127,7 +127,7 @@ if ((working_set > memory_budget)); then
 fi
 
 # --- Removal leaves the cluster as it was -----------------------------------------------------------
-[[ -z "${ZEABUR_L2_KEEP:-}" ]] || exit 0
+[[ -z "${ZEABUR_E2E_KEEP:-}" ]] || exit 0
 # As `zeabur-installer uninstall` removes Zeabur, and the values only this cluster sets.
 wait_for kube-system kubectl -n kube-system delete helmchart.helm.cattle.io zeabur --wait --timeout=180s
 kubectl -n kube-system delete helmchartconfig.helm.cattle.io zeabur --wait

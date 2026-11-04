@@ -211,7 +211,7 @@ httpRoute:
   # The Gateway listeners to attach to, for example [{name: public, namespace: gateway}].
   parentRefs: []
 
-# The budget is 30 MiB working set when idle (scripts/e2e-l2.sh checks it); it idles near 6Mi with
+# The budget is 30 MiB working set when idle (scripts/e2e.sh checks it); it idles near 6Mi with
 # 35 pods in the cluster. The limit leaves room for open terminals and large projects.
 resources:
   requests:
