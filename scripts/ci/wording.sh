@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # The interface's zh-TW wording (.zhtw-mcp.toml); runs in the zh dev shell, where zhtw-mcp builds
-# from source; CI keeps that build between runs.
+# from source.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 
