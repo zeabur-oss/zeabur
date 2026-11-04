@@ -2,7 +2,7 @@
 
 use std::fs;
 use std::io::Write as _;
-use std::os::unix::fs::{MetadataExt as _, PermissionsExt as _};
+use std::os::unix::fs::{MetadataExt as _, OpenOptionsExt as _, PermissionsExt as _};
 use std::path::Path;
 
 use zeabur_installer_host::{download, facts};
@@ -84,16 +84,45 @@ fn write_renamed(path: &Path, text: &str) -> Result<(), String> {
         return Err("the file is read-only".to_owned());
     }
     let dir = target.parent().unwrap_or_else(|| Path::new("/"));
-    let mut temp = tempfile::NamedTempFile::new_in(dir).map_err(|e| e.to_string())?;
-    std::os::unix::fs::fchown(temp.as_file(), Some(meta.uid()), Some(meta.gid()))
-        .map_err(|e| format!("its owner cannot be kept: {e}"))?;
-    temp.as_file()
-        .set_permissions(fs::Permissions::from_mode(mode))
-        .map_err(|e| e.to_string())?;
-    temp.write_all(text.as_bytes()).map_err(|e| e.to_string())?;
-    temp.as_file().sync_all().map_err(|e| e.to_string())?;
-    temp.persist(&target).map_err(|e| e.error.to_string())?;
+    let (temp, mut file) = new_file_in(dir).map_err(|e| e.to_string())?;
+    let written = (|| {
+        std::os::unix::fs::fchown(&file, Some(meta.uid()), Some(meta.gid()))
+            .map_err(|e| format!("its owner cannot be kept: {e}"))?;
+        file.set_permissions(fs::Permissions::from_mode(mode))
+            .map_err(|e| e.to_string())?;
+        file.write_all(text.as_bytes()).map_err(|e| e.to_string())?;
+        file.sync_all().map_err(|e| e.to_string())?;
+        fs::rename(&temp, &target).map_err(|e| e.to_string())
+    })();
+    if let Err(e) = written {
+        return Err(match fs::remove_file(&temp) {
+            Ok(()) => e,
+            Err(left) => format!("{e}; {} is left behind: {left}", temp.display()),
+        });
+    }
     Ok(())
+}
+
+/// A new file in `dir` with a random name, which no one else can have made or linked first.
+fn new_file_in(dir: &Path) -> std::io::Result<(std::path::PathBuf, fs::File)> {
+    use std::hash::{BuildHasher as _, RandomState};
+    loop {
+        let name = format!(
+            ".zeabur-installer-{:016x}",
+            RandomState::new().hash_one(0_u8)
+        );
+        let path = dir.join(name);
+        match fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .mode(0o600)
+            .open(&path)
+        {
+            Ok(file) => return Ok((path, file)),
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {}
+            Err(e) => return Err(e),
+        }
+    }
 }
 
 /// The join configuration at `path`, if that is what it holds.
