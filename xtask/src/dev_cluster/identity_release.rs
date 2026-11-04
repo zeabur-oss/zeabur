@@ -24,11 +24,16 @@ pub(crate) struct Release {
 }
 
 /// The release `tag` of Zeabur Identity, downloaded to `target/dev-cluster/identity-release` and
-/// checked; `None` if `tag` has no published release or none for this machine.
+/// checked; `None` if `tag` has no published release. The node pulls the image's platform from
+/// its index, and identityctl is the archive of the node's architecture: k3d runs the node in the
+/// Docker that this machine uses.
 pub(crate) fn fetch(dev: &DevCluster, tag: &str) -> Result<Option<Release>, String> {
-    let Some(arch) = linux_arch(std::env::consts::OS, std::env::consts::ARCH) else {
-        return Ok(None);
-    };
+    let docker_arch = dev
+        .cmd("docker")
+        .args(["info", "--format", "{{.Architecture}}"])
+        .read()?;
+    let arch = archive_arch(docker_arch.trim())
+        .ok_or_else(|| format!("Zeabur Identity has no release for {}", docker_arch.trim()))?;
     let dir = dev.state.join("identity-release");
     if dir.exists() {
         fs::remove_dir_all(&dir).map_err(|e| format!("removing {}: {e}", dir.display()))?;
@@ -155,18 +160,18 @@ fn index_image(digests: &str) -> Result<String, String> {
     }
 }
 
-/// The architecture in the name of a release's Linux archive; releases have no other system.
-fn linux_arch(os: &str, arch: &str) -> Option<&'static str> {
-    match (os, arch) {
-        ("linux", "x86_64") => Some("amd64"),
-        ("linux", "aarch64") => Some("arm64"),
+/// The architecture in the name of a release's archive, from the one Docker reports.
+fn archive_arch(docker: &str) -> Option<&'static str> {
+    match docker {
+        "x86_64" | "amd64" => Some("amd64"),
+        "aarch64" | "arm64" => Some("arm64"),
         _ => None,
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{index_image, linux_arch, listed};
+    use super::{archive_arch, index_image, listed};
 
     const SUMS: &str = "\
 6ad5244e7aede0e1a48cffabdee2ebb8b4296d345e69a499417be9132276491c  digests.txt
@@ -220,10 +225,9 @@ index  ghcr.io/zeabur-oss/identity@sha256:4b691461c6f333ee3771b740298135fa4e3364
     }
 
     #[test]
-    fn only_linux_on_amd64_and_arm64_has_an_archive() {
-        assert_eq!(linux_arch("linux", "x86_64"), Some("amd64"));
-        assert_eq!(linux_arch("linux", "aarch64"), Some("arm64"));
-        assert_eq!(linux_arch("macos", "aarch64"), None);
-        assert_eq!(linux_arch("linux", "riscv64"), None);
+    fn only_amd64_and_arm64_have_an_archive() {
+        assert_eq!(archive_arch("x86_64"), Some("amd64"));
+        assert_eq!(archive_arch("aarch64"), Some("arm64"));
+        assert_eq!(archive_arch("riscv64"), None);
     }
 }

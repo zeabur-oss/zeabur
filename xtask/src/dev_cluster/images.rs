@@ -38,7 +38,7 @@ pub(crate) struct Built {
 
 /// Zeabur Identity and its `zeabur-identityctl`, and, unless `zeabur_image` is given, Zeabur and
 /// Zeabur Proxy built from this checkout. Zeabur Identity is built from `identity_src`, else it is
-/// the published release that `ZEABUR_IDENTITY_PINNED` names, else it is built at that pin.
+/// the published release that `ZEABUR_IDENTITY_PINNED` names.
 pub(crate) fn build(
     dev: &DevCluster,
     identity_src: Option<&Path>,
@@ -54,39 +54,17 @@ pub(crate) fn build(
         import.push(identity.clone());
         identity
     } else {
-        let pin = read_pin(dev, "ZEABUR_IDENTITY_PINNED")?;
-        let git = std::env::var("ZEABUR_IDENTITY_GIT")
-            .ok()
-            .filter(|url| !url.is_empty());
-        let release = match (&pin, &git) {
-            (Pin::Tag(tag), None) => identity_release::fetch(dev, tag)?,
-            _ => None,
+        let tag = match read_pin(dev, "ZEABUR_IDENTITY_PINNED")? {
+            Pin::Tag(tag) => tag,
+            Pin::Commit(commit) => return Err(no_release(&commit)),
         };
-        if let Some(release) = release {
-            output::say(&format!(
-                "Zeabur Identity: release {pin}, {}, not built",
-                release.image
-            ));
-            link_identityctl(dev, &release.identityctl)?;
+        let release = identity_release::fetch(dev, &tag)?.ok_or_else(|| no_release(&tag))?;
+        output::say(&format!(
+            "Zeabur Identity: release {tag}, {}",
             release.image
-        } else {
-            let why = match (&pin, &git) {
-                (_, Some(_)) => "from ZEABUR_IDENTITY_GIT",
-                (Pin::Commit(_), None) => "a commit, not a release",
-                (Pin::Tag(_), None) => "no published release for this machine",
-            };
-            output::say(&format!("Zeabur Identity: building {pin} ({why})"));
-            let dir = dev.state.join("identity");
-            checkout::checkout(
-                &dir,
-                &pin,
-                git.as_deref()
-                    .unwrap_or("https://github.com/zeabur-oss/identity.git"),
-            )?;
-            let identity = build_identity(dev, &dir)?;
-            import.push(identity.clone());
-            identity
-        }
+        ));
+        link_identityctl(dev, &release.identityctl)?;
+        release.image
     };
 
     let (zeabur, proxy) = match zeabur_image {
@@ -117,6 +95,13 @@ pub(crate) fn build(
         proxy,
         import,
     })
+}
+
+fn no_release(pin: &str) -> String {
+    format!(
+        "ZEABUR_IDENTITY_PINNED is {pin}, which has no Zeabur Identity release: \
+         pin a release tag, or set ZEABUR_IDENTITY_SRC to a checkout to build"
+    )
 }
 
 /// Builds Zeabur Identity's image and `zeabur-identityctl` from `src`; returns the image.

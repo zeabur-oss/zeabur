@@ -12,8 +12,8 @@
 # $CI_ARTIFACTS when it is set; the workflow uploads it as the artifact ci-<job>.
 #
 # The cluster jobs run on the development cluster (scripts/dev-cluster.sh, which also reads
-# ZEABUR_IDENTITY_SRC, K3S_IMAGE and ZEABUR_REGISTRY_MIRRORS; without ZEABUR_IDENTITY_SRC it fetches
-# Zeabur Identity at ZEABUR_IDENTITY_PINNED itself) and delete it when they end; set
+# ZEABUR_IDENTITY_SRC, K3S_IMAGE and ZEABUR_REGISTRY_MIRRORS; without ZEABUR_IDENTITY_SRC it
+# installs the Zeabur Identity release that ZEABUR_IDENTITY_PINNED names) and delete it when they end; set
 # ZEABUR_CI_KEEP=1 to keep it for a look afterwards.
 set -euo pipefail
 

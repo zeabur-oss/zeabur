@@ -13,8 +13,7 @@ use std::process::ExitCode;
 use clap::{Parser, Subcommand};
 
 const AFTER_HELP: &str = "\
-Without --identity-src, Zeabur Identity is the signed release that ZEABUR_IDENTITY_PINNED names;
-a pin with no release, or ZEABUR_IDENTITY_GIT, has it built at that pin from that Git URL.
+Without --identity-src, Zeabur Identity is the signed release that ZEABUR_IDENTITY_PINNED names.
 ZEABUR_BUILDER_PINNED and ZEABUR_BUILDER_GIT give the commit Zeabur Builder is built from.
 ZEABUR_REGISTRY_MIRRORS (`docker.io=http://mirror:5001,ghcr.io=...`) makes the node pull through
 those mirrors; K3S_IMAGE picks the k3s release; CATALOG_STOP_AT leaves out the catalog's releases

@@ -19,8 +19,9 @@
 #
 # A full disk fails jobs with no error of their own (a log cut off mid-line, a k3s node that
 # stops scheduling pods), so the run refuses to start with less than CI_LOCAL_MIN_FREE_GB
-# (default 25) free; each running job's build directory takes several GB. The cluster jobs fetch
-# Zeabur Identity themselves (scripts/dev-cluster.sh), or build ZEABUR_IDENTITY_SRC when it is set.
+# (default 25) free; each running job's build directory takes several GB. The cluster jobs install
+# the Zeabur Identity release that ZEABUR_IDENTITY_PINNED names (scripts/dev-cluster.sh), or build
+# ZEABUR_IDENTITY_SRC when it is set.
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
