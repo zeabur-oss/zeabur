@@ -22,6 +22,7 @@ mod tests {
     use zeabur_kube::{Identity, NamespaceObjects, ServedResource};
 
     use crate::common::{app, plan_and_apply};
+    use crate::support::TestApi;
 
     const TOKEN: &str = "registry-token-1";
 
@@ -319,13 +320,9 @@ mod tests {
             upload_address: Some(format!("http://{forwarded}")),
             ..zeabur_api::Settings::default()
         };
-        let app = zeabur_api::router_with_settings(
-            Arc::new(zeabur_api::access::SingleCluster(Arc::new(cluster(
-                "zot.zot.svc:5000",
-                "u1",
-            )))),
-            settings,
-        );
+        let app = TestApi::new(&cluster("zot.zot.svc:5000", "u1"))
+            .with_settings(settings)
+            .router();
         let (status, answer) = post(&app, UPLOAD, vec![1; 10]).await;
         assert_eq!(status, StatusCode::OK, "{answer}");
         assert!(heard(&registry).iter().any(|a| a.contains(TOKEN)));

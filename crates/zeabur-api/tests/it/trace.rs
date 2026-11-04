@@ -4,13 +4,10 @@
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeMap;
-    use std::sync::Arc;
 
     use axum::Router;
     use axum::http::StatusCode;
     use serde_json::{Value, json};
-    use zeabur_api::access::SingleCluster;
-    use zeabur_api::resolve::Fixed;
     use zeabur_kube::k8s_openapi::api::apps::v1::Deployment;
     use zeabur_kube::k8s_openapi::api::core::v1::{Namespace, Pod, Secret, Service};
     use zeabur_kube::k8s_openapi::api::networking::v1::Ingress;
@@ -18,6 +15,7 @@ mod tests {
     use zeabur_kube::{DynamicObject, NamespaceObjects, SecretSummary, ServedResource};
 
     use crate::common::send;
+    use crate::support::TestApi;
 
     const TRACE: &str = "/api/v1/projects/shop/services/deployment/web/trace";
 
@@ -103,10 +101,7 @@ mod tests {
             .iter()
             .map(|(name, address)| ((*name).to_owned(), vec![(*address).to_owned()]))
             .collect();
-        zeabur_api::router_with_resolver(
-            Arc::new(SingleCluster(Arc::new(cluster.clone()))),
-            Arc::new(Fixed(answers)),
-        )
+        TestApi::new(cluster).with_dns(answers).router()
     }
 
     fn hops(route: &Value) -> Vec<(String, String)> {

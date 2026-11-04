@@ -8,7 +8,8 @@ mod tests {
     use zeabur_kube::memory::{MemoryCluster, State};
     use zeabur_kube::{Identity, WriteBody};
 
-    use crate::common::{app_with, send};
+    use crate::common::send;
+    use crate::support::TestApi;
 
     fn cluster() -> MemoryCluster {
         MemoryCluster::new(State {
@@ -40,7 +41,13 @@ mod tests {
         uri: &str,
         body: Option<&Value>,
     ) -> Value {
-        let (status, body) = send(&app_with(cluster, settings), method, uri, body).await;
+        let (status, body) = send(
+            &TestApi::new(cluster).with_settings(settings).router(),
+            method,
+            uri,
+            body,
+        )
+        .await;
         assert_eq!(status, StatusCode::OK, "{method} {uri}: {body}");
         body
     }
@@ -104,7 +111,9 @@ mod tests {
         let cluster = cluster();
         for name in ["", "   ", "a\nb", &"x".repeat(64)] {
             let (status, problem) = send(
-                &app_with(&cluster, in_cluster(None)),
+                &TestApi::new(&cluster)
+                    .with_settings(in_cluster(None))
+                    .router(),
                 "PUT",
                 "/api/v1/settings/cluster-name",
                 Some(&json!({"name": name})),
@@ -113,7 +122,9 @@ mod tests {
             assert_eq!(status, StatusCode::BAD_REQUEST, "{name:?}: {problem}");
         }
         let (status, _) = send(
-            &app_with(&cluster, Settings::default()),
+            &TestApi::new(&cluster)
+                .with_settings(Settings::default())
+                .router(),
             "PUT",
             "/api/v1/settings/cluster-name",
             Some(&json!({"name": "dev"})),

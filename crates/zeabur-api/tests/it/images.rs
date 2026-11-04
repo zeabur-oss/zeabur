@@ -12,12 +12,12 @@ mod tests {
     use secrecy::ExposeSecret as _;
     use serde_json::json;
     use sha2::{Digest as _, Sha256};
-    use zeabur_api::access::SingleCluster;
     use zeabur_api::images::Inspector;
     use zeabur_api::images::registry::{Answer, Get, Transport};
     use zeabur_kube::memory::{MemoryCluster, State};
 
     use crate::common::send;
+    use crate::support::TestApi;
 
     /// `me:pw`, as Basic credentials.
     const BASIC: &str = "Basic bWU6cHc=";
@@ -121,18 +121,17 @@ mod tests {
         })
     }
 
-    fn app(cluster: MemoryCluster, registry: &Arc<Private>) -> axum::Router {
+    fn app(cluster: &MemoryCluster, registry: &Arc<Private>) -> axum::Router {
         let transport: Arc<dyn Transport> = Arc::<Private>::clone(registry);
-        zeabur_api::router_with_images(
-            Arc::new(SingleCluster(Arc::new(cluster))),
-            Inspector::new(transport, Vec::new()),
-        )
+        TestApi::new(cluster)
+            .with_images(Inspector::new(transport, Vec::new()))
+            .router()
     }
 
     #[tokio::test]
     async fn a_private_image_is_read_with_the_projects_pull_secret() {
         let registry = Arc::new(Private::new());
-        let app = app(cluster(false), &registry);
+        let app = app(&cluster(false), &registry);
         let (status, body) = send(
             &app,
             "POST",
@@ -160,7 +159,7 @@ mod tests {
     #[tokio::test]
     async fn a_secret_the_person_may_not_read_lends_nothing() {
         let registry = Arc::new(Private::new());
-        let app = app(cluster(true), &registry);
+        let app = app(&cluster(true), &registry);
         let (status, body) = send(
             &app,
             "POST",
@@ -177,7 +176,7 @@ mod tests {
     #[tokio::test]
     async fn typed_credentials_go_only_to_the_registry_they_name() {
         let registry = Arc::new(Private::new());
-        let app = app(cluster(false), &registry);
+        let app = app(&cluster(false), &registry);
         let (status, body) = send(
             &app,
             "POST",
@@ -209,7 +208,7 @@ mod tests {
 
     #[tokio::test]
     async fn what_is_not_an_image_reference_is_a_bad_request() {
-        let app = app(cluster(false), &Arc::new(Private::new()));
+        let app = app(&cluster(false), &Arc::new(Private::new()));
         let (status, body) =
             send(&app, "POST", PATH, Some(&json!({"image": "Not An Image"}))).await;
         assert_eq!(status, StatusCode::BAD_REQUEST, "{body}");

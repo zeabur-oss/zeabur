@@ -4,19 +4,16 @@
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeMap;
-    use std::sync::Arc;
 
     use axum::http::StatusCode;
     use serde_json::{Value, json};
     use zeabur_api::Settings;
-    use zeabur_api::access::SingleCluster;
-    use zeabur_api::account::Fixed;
-    use zeabur_api::plan_token::PlanKey;
     use zeabur_kube::k8s_openapi::api::core::v1::Namespace;
     use zeabur_kube::memory::{MemoryCluster, State};
     use zeabur_kube::{AccessRule, AccessRules, Identity};
 
-    use crate::common::{app, app_with, send};
+    use crate::common::{app, send};
+    use crate::support::TestApi;
 
     fn namespace(name: &str, adopted: bool) -> Namespace {
         let labels = if adopted {
@@ -128,13 +125,10 @@ mod tests {
     async fn the_page_for_sign_in_methods_is_the_configured_one_else_the_issuers() {
         let cluster = cluster(BTreeMap::new(), false);
         let found = |url: Option<&str>, settings: Settings| {
-            zeabur_api::router_with_key(
-                Arc::new(SingleCluster(Arc::new(cluster.clone()))),
-                PlanKey::from_bytes([7; 32]),
-                settings,
-                Arc::new(Fixed(url.map(str::to_owned))),
-                None,
-            )
+            TestApi::new(&cluster)
+                .with_settings(settings)
+                .with_sign_in(url)
+                .router()
         };
         let configured = Settings {
             account_url: Some("https://id.example.com/me".to_owned()),
@@ -151,7 +145,7 @@ mod tests {
             ),
             (found(None, Settings::default()), Value::Null),
             (
-                app_with(&cluster, configured),
+                TestApi::new(&cluster).with_settings(configured).router(),
                 json!("https://id.example.com/me"),
             ),
         ] {

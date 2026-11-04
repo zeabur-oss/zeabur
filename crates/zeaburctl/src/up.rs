@@ -689,9 +689,12 @@ mod tests {
             },
             ..zeabur_api::Settings::default()
         };
-        zeabur_api::router_with_settings(
+        zeabur_api::router_with(
             Arc::new(SingleCluster(Arc::new(cluster.clone()))),
-            settings,
+            zeabur_api::Options {
+                settings,
+                ..zeabur_api::Options::default()
+            },
         )
     }
 

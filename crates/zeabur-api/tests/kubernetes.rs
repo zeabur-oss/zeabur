@@ -39,7 +39,7 @@ mod tests {
     use zeabur_kube::k8s_openapi::api::rbac::v1::{Role, RoleBinding};
     use zeabur_test_support::sandbox::{PERSON, Sandbox, create};
 
-    use crate::common::{app, app_with, plan_and_apply, planned_and_applied, send};
+    use crate::common::{app, plan_and_apply, planned_and_applied, send};
 
     const SECRET_VALUE: &str = "s3cr3t-value-that-must-not-leak";
 
@@ -1400,7 +1400,15 @@ mod tests {
             namespace: None,
             ..zeabur_api::Settings::default()
         };
-        let app = app_with(&person, settings);
+        let app = zeabur_api::router_with(
+            std::sync::Arc::new(zeabur_api::access::SingleCluster(std::sync::Arc::new(
+                person,
+            ))),
+            zeabur_api::Options {
+                settings,
+                ..zeabur_api::Options::default()
+            },
+        );
 
         // metrics-server leaves a pod out until it has two scrapes of it.
         let usage = until(&app, &format!("/api/v1/projects/{ns}/usage"), 120, |u| {

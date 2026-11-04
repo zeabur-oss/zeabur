@@ -17,7 +17,8 @@ mod tests {
     use zeabur_kube::memory::{MemoryCluster, State};
     use zeabur_kube::{Identity, NamespaceObjects, ServedResource, WriteBody};
 
-    use crate::common::{app, app_with, send};
+    use crate::common::{app, send};
+    use crate::support::TestApi;
 
     const IMAGE: &str = "zot.zot.svc:5000/shop/site:pending";
 
@@ -270,7 +271,7 @@ mod tests {
             ..Settings::default()
         };
         let (status, answer) = send(
-            &app_with(&cluster, settings),
+            &TestApi::new(&cluster).with_settings(settings).router(),
             "GET",
             "/api/v1/cluster",
             None,

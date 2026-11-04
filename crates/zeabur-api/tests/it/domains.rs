@@ -4,20 +4,18 @@
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeMap;
-    use std::sync::Arc;
 
     use axum::Router;
     use axum::http::StatusCode;
     use serde_json::{Value, json};
     use zeabur_api::Settings;
-    use zeabur_api::access::SingleCluster;
-    use zeabur_api::resolve::Fixed;
     use zeabur_api::settings::DomainSettings;
     use zeabur_kube::k8s_openapi::api::networking::v1::Ingress;
     use zeabur_kube::memory::{MemoryCluster, State};
     use zeabur_kube::{Identity, NamespaceObjects};
 
     use crate::common::send;
+    use crate::support::TestApi;
 
     fn cluster() -> MemoryCluster {
         let ingress: Ingress = serde_json::from_value(json!({
@@ -66,11 +64,10 @@ mod tests {
                 vec!["198.51.100.9".to_owned()],
             ),
         ]);
-        zeabur_api::router_with_settings_and_resolver(
-            Arc::new(SingleCluster(Arc::new(cluster.clone()))),
-            settings,
-            Arc::new(Fixed(answers)),
-        )
+        TestApi::new(cluster)
+            .with_settings(settings)
+            .with_dns(answers)
+            .router()
     }
 
     async fn call(cluster: &MemoryCluster, method: &str, uri: &str, body: Option<&Value>) -> Value {

@@ -5,13 +5,11 @@
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeMap;
-    use std::sync::Arc;
     use std::sync::atomic::{AtomicI64, Ordering};
 
     use axum::Router;
     use axum::http::StatusCode;
     use serde_json::{Value, json};
-    use zeabur_api::access::SingleCluster;
     use zeabur_api::plan_token::LIFETIME_SECONDS;
     use zeabur_kube::k8s_openapi::api::apps::v1::Deployment;
     use zeabur_kube::k8s_openapi::api::core::v1::Namespace;
@@ -20,6 +18,7 @@ mod tests {
     use zeabur_kube::{Identity, NamespaceObjects, WriteBody};
 
     use crate::common::{app, send};
+    use crate::support::TestApi;
 
     fn deployment(name: &str, labels: &Value) -> Deployment {
         serde_json::from_value(json!({
@@ -341,7 +340,7 @@ mod tests {
             Timestamp::from_second(NOW.load(Ordering::SeqCst)).unwrap()
         }
         let cluster = cluster();
-        let app = zeabur_api::router_at(Arc::new(SingleCluster(Arc::new(cluster.clone()))), clock);
+        let app = TestApi::new(&cluster).with_clock(clock).router();
         let planned = plan(&app, &set_env("web")).await;
         assert_eq!(planned["expiresAt"], "2026-10-15T00:10:00Z");
         let token = json!({"token": planned["token"]});
@@ -523,13 +522,9 @@ mod tests {
     /// One key for every router, as on a server that reads it from a file, so a plan made
     /// through one applies through another.
     fn keyed(cluster: &MemoryCluster) -> Router {
-        zeabur_api::router_with_key(
-            Arc::new(SingleCluster(Arc::new(cluster.clone()))),
-            zeabur_api::plan_token::PlanKey::from_bytes([7; 32]),
-            zeabur_api::Settings::default(),
-            Arc::new(zeabur_api::account::Fixed(None)),
-            None,
-        )
+        TestApi::new(cluster)
+            .with_plan_key(zeabur_api::plan_token::PlanKey::from_bytes([7; 32]))
+            .router()
     }
 
     /// When the cluster refuses a write, the answer is `forbidden` with kube-apiserver's answer
