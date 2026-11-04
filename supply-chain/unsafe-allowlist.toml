@@ -711,19 +711,6 @@ kind = "unsafe"
 reason = "ureq's text decoding"
 approved = "2026-10-28"
 
-# --- Parser stack growth (pest 2.9.4 uses stacker to avoid stack overflow on deep input).
-[[crate]]
-name = "psm"
-kind = "unsafe"
-reason = "Stack pointer switching under stacker"
-approved = "2026-10-28"
-
-[[crate]]
-name = "stacker"
-kind = "unsafe"
-reason = "Grows the stack for recursive parsing in pest"
-approved = "2026-10-28"
-
 # --- Web interface: decoding the embedded brotli files for clients without brotli (zeabur-ui).
 # The `unsafe` lines sit behind the crates' `unsafe` and `ffi-api` features, which are off; the default build is `forbid(unsafe_code)`.
 
