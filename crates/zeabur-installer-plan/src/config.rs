@@ -568,12 +568,23 @@ pub fn server_address(url: &str, default_port: u16) -> Result<(String, u16), Pla
     Ok((host.to_owned(), port))
 }
 
-/// The release override of the other distribution is a mistake: it would be ignored.
+/// The release override of the other distribution is a mistake: it would be ignored. An override
+/// is a release tag, `v1.37.1+k3s1` or `v1.37.1+rke2r1`, whose Kubernetes version the catalog's
+/// `kubeVersion` ranges are read against.
 fn check_version(
     distribution: Distribution,
     rke2: Option<&String>,
     k3s: Option<&String>,
 ) -> Result<(), PlanError> {
+    for (name, version, build) in [("rke2Version", rke2, "rke2r"), ("k3sVersion", k3s, "k3s")] {
+        if let Some(version) = version
+            && !is_release_tag(version, build)
+        {
+            return Err(PlanError::Config(format!(
+                "{name}: {version} is not a release tag such as v1.37.1+{build}1"
+            )));
+        }
+    }
     match (distribution, rke2, k3s) {
         (Distribution::K3s, Some(_), _) => Err(PlanError::Config(
             "rke2Version applies to distribution: rke2; this one is k3s (set k3sVersion)"
@@ -585,6 +596,19 @@ fn check_version(
         )),
         _ => Ok(()),
     }
+}
+
+/// Whether `version` is `v<major>.<minor>.<patch>+<build><n>`, such as `v1.37.1+k3s1`.
+fn is_release_tag(version: &str, build: &str) -> bool {
+    let Some((release, metadata)) = version.strip_prefix('v').and_then(|v| v.split_once('+'))
+    else {
+        return false;
+    };
+    let numbers: Vec<&str> = release.split('.').collect();
+    let number = |n: &str| !n.is_empty() && n.bytes().all(|b| b.is_ascii_digit());
+    numbers.len() == 3
+        && numbers.iter().all(|n| number(n))
+        && metadata.strip_prefix(build).is_some_and(number)
 }
 
 /// A join token: `K10<64 hex>::<credentials>`, or bare credentials (no CA pinning).
@@ -985,6 +1009,22 @@ mod tests {
         assert!(
             Config::parse(&format!(
                 "{MINIMAL}distribution: rke2\nk3sVersion: v1.37.1+k3s1\n"
+            ))
+            .is_err()
+        );
+        for bad in [
+            "stable",
+            "1.37.1+k3s1",
+            "v1.37+k3s1",
+            "v1.37.1",
+            "v1.37.1+rke2r1",
+        ] {
+            let err = Config::parse(&format!("{MINIMAL}k3sVersion: {bad}\n")).unwrap_err();
+            assert!(err.to_string().contains("k3sVersion"), "{bad}: {err}");
+        }
+        assert!(
+            Config::parse(&format!(
+                "{MINIMAL}distribution: rke2\nrke2Version: v1.37.1+k3s1\n"
             ))
             .is_err()
         );
