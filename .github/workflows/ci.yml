@@ -1,27 +1,27 @@
 name: CI
 
-# Every job of `scripts/ci.sh --list`, each as `scripts/ci.sh <job>`, through the shared CI workflow
-# of zeabur-oss/.github: it only checks out, installs Nix and restores caches. A job runs the same
-# on any Linux machine with Nix (scripts/ci-local.sh).
+# The jobs of scripts/ci/jobs, each as `scripts/ci.sh <job>` through the shared workflow of
+# zeabur-oss/.github; the script enters the Nix dev shell itself, so a job runs the same locally.
+# Pull requests and pushes run the fast tier. The merge queue runs every job on the commit about to
+# land, and the nightly run keeps main's caches for the merge queue's jobs.
 on:
   push:
     branches: [main]
   pull_request:
   merge_group:
+  schedule:
+    - cron: "0 17 * * *"
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   ci:
-    uses: zeabur-oss/.github/.github/workflows/ci.yml@6ab106525ce16169ab0ecfebe4b0248e096797fa # main
-    with:
-      rust-cache: true
-      # `fallow audit` in the ui job compares HEAD with HEAD^.
-      fetch-depth: 2
+    uses: zeabur-oss/.github/.github/workflows/ci.yml@5efa62e01e1b103d1431d780658eaa74bb417438 # main
   dco:
     uses: zeabur-oss/.github/.github/workflows/dco.yml@6ab106525ce16169ab0ecfebe4b0248e096797fa # main

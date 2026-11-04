@@ -30,13 +30,15 @@ parallel="${CI_LOCAL_PARALLEL:-3}"
 min_free_gb="${CI_LOCAL_MIN_FREE_GB:-25}"
 mkdir -p "$out"
 
-mapfile -t all < <("$root/scripts/ci.sh" --list)
+# Every job by default, except the members of a group (they run inside it), in the order of
+# scripts/ci/jobs, which puts the cluster jobs last. A member can still be named.
+mapfile -t known < <("$root/scripts/ci.sh" --list)
+mapfile -t all < <(awk '!/^[[:space:]]*(#|$)/ && $1 != "*" && !/[[:space:]]in=/ { print $1 }' "$root/scripts/ci/jobs")
 if (($# > 0)); then targets=("$@"); else targets=("${all[@]}"); fi
 for t in "${targets[@]}"; do
-  printf '%s\n' "${all[@]}" | grep -qx -- "$t" || { echo "error: no job named $t" >&2; exit 1; }
+  printf '%s\n' "${known[@]}" | grep -qx -- "$t" || { echo "error: no job named $t" >&2; exit 1; }
 done
-# In the order of the list, which puts the cluster jobs last.
-mapfile -t targets < <(printf '%s\n' "${all[@]}" | grep -xF -f <(printf '%s\n' "${targets[@]}"))
+mapfile -t targets < <(printf '%s\n' "${known[@]}" | grep -xF -f <(printf '%s\n' "${targets[@]}"))
 is_cluster() { [[ "$1" == cluster || "$1" == e2e ]]; }
 
 dirs=("$out")

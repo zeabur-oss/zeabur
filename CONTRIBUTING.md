@@ -15,10 +15,10 @@ messages follow [Conventional Commits](https://www.conventionalcommits.org/).
 
 ## Before you open a pull request
 
-Run what CI runs (the jobs of `scripts/ci.sh` that need no cluster), inside `nix develop`:
+Run what CI runs (the jobs of `scripts/ci/jobs` that need no cluster), inside `nix develop`:
 
 ```sh
-cargo fmt --all --check && nixfmt --check flake.nix && shellcheck scripts/*.sh && actionlint
+cargo fmt --all --check && nixfmt --check flake.nix && shellcheck scripts/*.sh scripts/ci/*.sh && actionlint
 bun install --frozen-lockfile && bun fmt --check scripts/*.ts && bun check scripts/ && bun test scripts/
 cargo lint                                   # clippy, all targets and features, -D warnings
 RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --document-private-items --locked
@@ -69,8 +69,13 @@ the interface's styles are checked in
 `@zeabur-oss/design-system` to npm; Renovate moves its version.
 
 Every CI job is a call to `scripts/ci.sh <job>` (`scripts/ci.sh --list` names them), which enters
-its dev shell itself; the workflow only checks out, installs Nix and restores caches. So a job runs
-the same on any Linux machine with Nix, and Docker for the cluster jobs: `scripts/ci.sh clippy`.
+its dev shell itself and runs `scripts/ci/<job>.sh`; the workflow only checks out, installs Nix and
+restores caches. So a job runs the same on any Linux machine with Nix, and Docker for the cluster
+jobs: `scripts/ci.sh clippy`. The jobs are the rows of `scripts/ci/jobs`. A pull request runs the
+`fast` tier: `lint` (format, clippy, docs, cargo-deny, unsafe-report, levels and chart in a row),
+`test` and `ui`. The merge queue, a tag, the nightly run and a manual run add `fuzz`, `no-ui`,
+`wording`, `cluster` and `e2e`; a change that only touches most of `docs/`, change files,
+`CHANGELOG.md` or `CONTRIBUTING.md` skips the code jobs.
 `scripts/ci-local.sh [job…]` runs several (all by default), each in its own copy of the checkout,
 and prints one result line per job; use a disposable machine or VM for the cluster jobs.
 

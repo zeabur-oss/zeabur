@@ -1,207 +1,104 @@
 #!/usr/bin/env bash
-# One CI job, as .github/workflows/ci.yml runs it (through zeabur-oss/.github's shared CI workflow,
-# one job each) and as anyone runs it locally: the workflow only checks out, installs Nix and
-# restores caches, then calls this script. Everything a job checks is here, so a job behaves the
-# same on GitHub and on any Linux machine with Nix (and Docker for the cluster jobs); there is no
-# runner image to emulate.
+# One CI job, as zeabur-oss/.github's shared CI workflow runs it and as anyone runs it locally. The
+# jobs are the rows of scripts/ci/jobs; each one is scripts/ci/<job>.sh, run in its Nix dev shell.
+# This file is the same in every zeabur-oss repository.
 #
-#   scripts/ci.sh <job>      # run one job; it enters its Nix dev shell itself
-#   scripts/ci.sh --list     # the job names, without the dev shell
+#   scripts/ci.sh <job>             # run one job; it enters its dev shell itself
+#   scripts/ci.sh --list            # every job name
+#   scripts/ci.sh --matrix <tier> [changed-files]
+#                                   # the shared workflow's matrix: `fast` or `all`, without Nix
 #
-# A job leaves what is worth keeping (the unsafe report, the cluster's measurements) in
-# $CI_ARTIFACTS when it is set; the workflow uploads it as the artifact ci-<job>.
-#
-# The cluster jobs run on the development cluster (scripts/dev-cluster.sh, which also reads
-# ZEABUR_IDENTITY_SRC, K3S_IMAGE and ZEABUR_REGISTRY_MIRRORS; without ZEABUR_IDENTITY_SRC it
-# installs the Zeabur Identity release that ZEABUR_IDENTITY_PINNED names) and delete it when they end; set
-# ZEABUR_CI_KEEP=1 to keep it for a look afterwards.
+# A job may leave files in $CI_ARTIFACTS; the workflow uploads them as the artifact `ci-<job>`.
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$root"
+table=scripts/ci/jobs
 
-# CI runs the short checks one after another in the lint job: each needs about a minute to set up a
-# runner and its dev shell but much less to run. Each one can still run alone.
-lint_jobs=(format clippy docs cargo-deny unsafe-report levels chart)
-check_jobs=(lint test fuzz ui no-ui wording)
-cluster_jobs=(cluster e2e)
-
-if [[ "${1:-}" == --list ]]; then
-  printf '%s\n' "${check_jobs[@]}" "${cluster_jobs[@]}"
-  exit 0
-fi
-job="${1:?usage: scripts/ci.sh <job> | --list}"
-printf '%s\n' "${lint_jobs[@]}" "${check_jobs[@]}" "${cluster_jobs[@]}" | grep -qx -- "$job" ||
-  { echo "error: no job named $job (scripts/ci.sh --list)" >&2; exit 1; }
-
-# Each job runs in its dev shell: wording in `.#zh` (zhtw-mcp builds from source), the rest in the
-# default one. The marker tells a re-run inside the shell apart from a call outside it.
-shell=default
-[[ "$job" == wording ]] && shell=zh
-if [[ "${ZEABUR_CI_SHELL:-}" != "$shell" ]]; then
-  export ZEABUR_CI_SHELL="$shell"
-  exec nix develop "$root#$shell" --command "$0" "$@"
-fi
-
-export RUSTDOCFLAGS="-D warnings"
-
-# Copies a file into $CI_ARTIFACTS, which the workflow uploads; nothing without it or the file.
-keep() { # $1 = file
-  [[ -n "${CI_ARTIFACTS:-}" && -f "$1" ]] || return 0
-  mkdir -p "$CI_ARTIFACTS"
-  cp "$1" "$CI_ARTIFACTS/"
+# Each row as `job key=value...`, with the `*` row's values first.
+rows() {
+  awk '
+    /^[[:space:]]*(#|$)/ { next }
+    $1 == "*" { $1 = ""; defaults = $0; next }
+    { job = $1; $1 = ""; print job defaults $0 }
+  ' "$table"
 }
 
-# The image's size and Zeabur's memory after the e2e job, in the run's summary when there is one.
-e2e_report() {
-  local measurements="target/dev-cluster/measurements.json"
-  keep "$measurements"
-  [[ -n "${GITHUB_STEP_SUMMARY:-}" ]] || return 0
-  {
-    echo "### Zeabur in the cluster, \`ci\` build (${K3S_IMAGE:-the default k3s})"
-    echo "| Measure | Bytes |"
-    echo "|---|---|"
-    echo "| Image \`zeabur\` | $(docker image inspect --format '{{.Size}}' zeabur:dev 2>/dev/null || echo n/a) |"
-    echo "| Pod working set when idle | $(jq -r .pod_working_set_bytes "$measurements" 2>/dev/null || echo n/a) |"
-  } >>"$GITHUB_STEP_SUMMARY"
+# The value of key $2 in job $1's row, or $3.
+attr() {
+  rows | awk -v job="$1" -v key="$2" -v fallback="${3:-}" '
+    $1 == job { for (i = 2; i <= NF; i++) if (index($i, key "=") == 1) value = substr($i, length(key) + 2); found = 1 }
+    END { if (!found) exit 1; print (value == "" ? fallback : value) }
+  '
 }
 
-# As k3d's cluster admin, with no Zeabur dashboard and no Zeabur Identity: nothing critical, the Identity
-# checks skipped; the exit code is
-# the most serious status in the JSON (crates/zeaburctl/README.md).
-check_doctor() {
-  cargo build --locked -p zeaburctl --no-default-features
-  local code=0 expected
-  ./target/debug/zeaburctl doctor --output json >target/doctor.json || code=$?
-  cat target/doctor.json
-  [[ $code -eq 0 || $code -eq 1 ]] || { echo "unexpected exit code $code"; return 1; }
-  jq -e '
-    def status(name): .checks[] | select(.name == name) | .status;
-    (.checks | map(.name)) == ["cluster-version", "components", "cluster-gaps",
-      "zeabur-identity-installed", "zeabur-identity-client", "zeabur-identity-user", "zeabur-identity-issuer-trust"]
-    and all(.checks[]; (.status | IN("ok", "warning", "critical", "skipped", "error"))
-      and (.findings | type == "array") and (.fix == null or (.fix | type == "string")))
-    and (status("components") | IN("ok", "warning"))
-    and status("zeabur-identity-installed") == "skipped"
-    and status("zeabur-identity-client") == "skipped"
-    and status("zeabur-identity-user") == "skipped"
-  ' target/doctor.json
-  expected=$(jq '.checks | map(.status)
-    | if any(. == "critical") then 2 elif any(. == "warning") then 1
-      elif any(. == "error") then 3 else 0 end' target/doctor.json)
-  [[ $code -eq $expected ]] || { echo "exit code $code, expected $expected"; return 1; }
-}
-
-# A failed browser test's files stay on the machine (or need a download on GitHub): print what
-# explains it into the log, each test's page snapshot and the pods it looked at.
-browser_failure_context() {
-  local context
-  for context in target/e2e-ui/results/*/error-context.md; do
-    [[ -f "$context" ]] || continue
-    echo "::group::$context"
-    cat "$context"
-    echo "::endgroup::"
-  done
-  kubectl get pods,events -A -o wide || true
-}
-
-case "$job" in
-  # Every short check runs, also after one fails, and the job fails if any did.
-  lint)
-    failed=()
-    for check in "${lint_jobs[@]}"; do
-      echo "::group::$check"
-      "$0" "$check" || failed+=("$check")
-      echo "::endgroup::"
-    done
-    [[ ${#failed[@]} -eq 0 ]] || { echo "::error::failed: ${failed[*]}"; exit 1; }
+case "${1:-}" in
+  --list)
+    rows | awk '{ print $1 }'
+    exit 0
     ;;
-  format)
-    cargo fmt --all --check
-    nixfmt --check flake.nix
-    shellcheck scripts/*.sh
-    actionlint
-    (cd web; bun ci; bun run fmt:check)
-    (cd crates/zeabur-installer/web; bun ci; bun run fmt:check)
-    bun install --frozen-lockfile
-    bun fmt --check scripts/*.ts
-    bun check scripts/
-    bun test scripts/
-    ;;
-  clippy) cargo lint ;;
-  docs) cargo doc --workspace --no-deps --document-private-items --locked ;;
-  test) cargo nextest run --workspace --all-features --locked --no-tests=warn ;;
-  cargo-deny) cargo deny --locked check ;;
-  unsafe-report)
-    bun install --frozen-lockfile
-    status=0
-    node_modules/.bin/zeabur-oss-unsafe-report zeabur zeaburctl zeabur-proxy zeabur-installer || status=$?
-    keep target/unsafe-report.md
-    exit "$status"
-    ;;
-  levels) ./scripts/check-levels.sh ;;
-  # Zeabur Proxy's request parser for a minute (crates/zeabur-proxy/fuzz). Without a sanitizer the
-  # stable toolchain builds it; the target's own assertions are what it checks.
-  fuzz)
-    cd crates/zeabur-proxy/fuzz
-    cargo fuzz run parse --sanitizer none -- -max_total_time=60
-    ;;
-  # The web interface: banned styles, lint, unused code and layer boundaries, new findings in the changed
-  # files, build, unit tests, generated API types up to date, the installer's interface built and linted, no use of a
-  # deprecated declaration in either, size budget, and a release build that embeds it. The health
-  # and duplication report after it does not fail the job.
-  ui)
-    ./scripts/check-ui-styles.sh
-    ./scripts/build-ui.sh
-    (
-      cd web
-      bun run lint
-      bun run fallow dead-code --baseline fallow-baseline.json
-      # On a pull request, HEAD is GitHub's merge commit and HEAD^ is the base branch.
-      bun run fallow audit --base "${FALLOW_AUDIT_BASE:-HEAD^}"
-      bun run test
-      bun run gen:api
-    )
-    git diff --exit-code -- web/src/api/zeabur.ts
-    ./scripts/build-installer-ui.sh
-    (cd crates/zeabur-installer/web; bun run lint)
-    (cd web; bun scripts/check-deprecated.ts . ../crates/zeabur-installer/web)
-    ./scripts/ui-budget.sh
-    ZEABUR_UI_DIST="$root/web/dist" cargo build --release --locked -p zeabur -p zeaburctl
-    ZEABUR_UI_DIST="$root/web/dist" cargo nextest run --release --locked -p zeabur-ui --features interface
-    (cd web; bun run fallow health --report-only --top 10; bun run fallow dupes --summary)
-    ;;
-  # The API-only build needs no JavaScript toolchain: bun is taken off PATH.
-  no-ui) ./scripts/build-without-ui.sh ;;
-  # The Helm chart: lint, what every rendering promises, and the values it refuses.
-  chart) ./scripts/check-chart.sh ;;
-  # The interface's zh-TW wording (.zhtw-mcp.toml).
-  wording)
-    (cd web; bun ci)
-    ./scripts/check-zh-tw.sh
-    ;;
-  # Integration tests (JSON Patch writes, dry run, identity, revocation), `zeaburctl doctor`, and
-  # browser tests in local mode with the embedded interface.
-  cluster)
-    if [[ -z "${ZEABUR_CI_KEEP:-}" ]]; then
-      trap './scripts/dev-cluster.sh down' EXIT
-    fi
-    # Bare: the cluster tests' people are no admins, whom Zeabur's admission policy would stop.
-    ./scripts/dev-cluster.sh up --profile bare
-    export KUBECONFIG="$root/target/dev-cluster/kubeconfig"
-    cargo nextest run --locked --run-ignored only -E 'binary(kubernetes)'
-    check_doctor
-    if ! { ./scripts/build-ui.sh && ./scripts/e2e-ui.sh; }; then
-      browser_failure_context
-      exit 1
-    fi
-    ;;
-  # Zeabur in a cluster with Zeabur Identity, from their images and Zeabur's chart, through a browser:
-  # passkey sign-in, terminal, rights, memory, removal.
-  e2e)
-    status=0
-    ZEABUR_E2E_KEEP="${ZEABUR_CI_KEEP:-}" ./scripts/e2e.sh || status=$?
-    e2e_report
-    exit "$status"
+  # A job inside a group runs only in its group. With a list of changed files, a job is left out
+  # when every file matches one of its skip-if-only patterns (bash patterns, `*` also matches `/`).
+  # Keys other than tier, in, shell and skip-if-only go to the workflow as they are.
+  --matrix)
+    tier="${2:?usage: scripts/ci.sh --matrix fast|all [changed-files]}"
+    changed=()
+    [[ -z "${3:-}" ]] || mapfile -t changed <"$3"
+    out=()
+    while read -r job fields; do
+      t=fast inside=0 skip="" json=""
+      for field in $fields; do
+        key="${field%%=*}" value="${field#*=}"
+        case "$key" in
+          tier) t="$value" ;;
+          in) inside=1 ;;
+          shell) ;;
+          skip-if-only) skip="$value" ;;
+          *) json+=",\"$key\":\"$value\"" ;;
+        esac
+      done
+      [[ $inside == 0 ]] || continue
+      [[ $tier != fast || $t == fast ]] || continue
+      if [[ -n "$skip" && ${#changed[@]} -gt 0 ]]; then
+        IFS=, read -ra patterns <<<"$skip"
+        needed=0
+        for path in "${changed[@]}"; do
+          hit=0
+          for pattern in "${patterns[@]}"; do
+            # shellcheck disable=SC2053 # the pattern is meant to match as a pattern
+            [[ "$path" == $pattern ]] && { hit=1; break; }
+          done
+          [[ $hit == 1 ]] || { needed=1; break; }
+        done
+        [[ $needed == 1 ]] || continue
+      fi
+      out+=("{\"job\":\"$job\"$json}")
+    done < <(rows)
+    (IFS=,; echo "[${out[*]}]")
+    exit 0
     ;;
 esac
+
+job="${1:?usage: scripts/ci.sh <job> | --list | --matrix fast|all [changed-files]}"
+attr "$job" tier >/dev/null || { echo "error: no job named $job (scripts/ci.sh --list)" >&2; exit 1; }
+
+# A group runs every member, also after one fails, and fails if any did.
+members=$(rows | awk -v group="$job" '{ for (i = 2; i <= NF; i++) if ($i == "in=" group) print $1 }')
+if [[ -n "$members" ]]; then
+  failed=()
+  for member in $members; do
+    echo "::group::$member"
+    "$0" "$member" || failed+=("$member")
+    echo "::endgroup::"
+  done
+  [[ ${#failed[@]} -eq 0 ]] || { echo "::error::failed: ${failed[*]}"; exit 1; }
+  exit 0
+fi
+
+# The marker tells a run inside the job's dev shell apart from a call outside it.
+shell=$(attr "$job" shell default)
+if [[ "${CI_SHELL:-}" != "$shell" ]]; then
+  export CI_SHELL="$shell"
+  exec nix develop "$root#$shell" --command "$0" "$@"
+fi
+exec "$root/scripts/ci/$job.sh"

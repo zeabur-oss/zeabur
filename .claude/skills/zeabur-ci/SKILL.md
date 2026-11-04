@@ -12,10 +12,12 @@ jobs and tools.
 
 ## Jobs
 
-`scripts/ci.sh --list`: the checks (format, clippy, docs, test, cargo-deny, unsafe-report,
-levels, fuzz, ui, no-ui, chart, wording), `cluster` (cluster tests, `zeaburctl doctor`,
+`scripts/ci.sh --list`, the rows of `scripts/ci/jobs` (each is `scripts/ci/<job>.sh`): `lint`
+(format, clippy, docs, cargo-deny, unsafe-report, levels, chart in a row), `test` and `ui` on every
+pull request; `fuzz`, `no-ui`, `wording`, `cluster` (cluster tests, `zeaburctl doctor`,
 browser tests in local mode) and `e2e` (Zeabur and Zeabur Identity in a cluster,
-`scripts/e2e.sh`), both on `scripts/dev-cluster.sh`. What each cluster job runs is in
+`scripts/e2e.sh`) only in the merge queue, on a tag, nightly and by hand; the cluster jobs run on
+`scripts/dev-cluster.sh`. What each cluster job runs is in
 `zeabur-cluster-tests`.
 
 `.github/workflows/release.yml` runs on a `vX.Y.Z` or `vX.Y.Z-<pre-release>` tag: zeabur-oss/.github's
