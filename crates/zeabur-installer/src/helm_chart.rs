@@ -86,15 +86,13 @@ pub(crate) fn install(kubectl: &Kubectl, name: &str, object: &Value) -> Result<(
     )))
 }
 
-/// What `apply` says when Helm failed to upgrade a release. Helm keeps the reason in the failed
-/// revision's Secret.
+/// What `apply` says when Helm failed to upgrade a release.
 fn failed_upgrade(name: &str, namespace: &str, revision: u64) -> String {
     format!(
         "Helm failed to upgrade the {name} chart (release {name} in namespace {namespace}, \
          revision {revision}). apply set the chart's `failurePolicy` to `abort`, so \
          helm-controller stops retrying the upgrade.\n\
-         Helm records why in the failed revision: Secret sh.helm.release.v1.{name}.v{revision} \
-         in namespace {namespace}, which `helm history` also shows.\n\
+         See why with `helm history {name} -n {namespace}`.\n\
          Fix the cause, then run apply again. apply sets `failurePolicy` back to `retry` and \
          upgrades over the failed release."
     )
@@ -312,10 +310,7 @@ esac
             "{error}"
         );
         assert!(error.contains("`failurePolicy` to `abort`"), "{error}");
-        assert!(
-            error.contains("Secret sh.helm.release.v1.zot.v2 in namespace zot"),
-            "{error}"
-        );
+        assert!(error.contains("helm history zot -n zot"), "{error}");
         assert!(error.contains("run apply again"), "{error}");
         let patched = fs::read_to_string(dir.path().join("patched")).unwrap();
         assert!(patched.starts_with("patch helmchart zot "), "{patched}");
