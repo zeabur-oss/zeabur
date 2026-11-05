@@ -174,7 +174,7 @@ zeabur-installer uninstall --purge
 
 `/var/lib/zeabur/storage` 底下的磁碟區會留在 VM 上。確認不再需要這些資料後，再手動刪除。
 
-如果叢集用 Longhorn，它會替已刪除的節點留著一筆節點資料，`zeabur-installer doctor` 會列出它。節點上還有副本時，Longhorn 不讓你刪。請等每個磁碟區在其他節點都有健康的副本之後，再執行：
+如果叢集使用 Longhorn，Longhorn 會替已刪除的節點留著節點資料，`zeabur-installer doctor` 會列出這個節點。節點上還有副本時，Longhorn 不會讓你刪除。請先確認每個磁碟區在其他節點都有健康的副本，再執行：
 
 ```sh
 kubectl -n longhorn-system patch nodes.longhorn.io <node> --type=merge -p '{"spec":{"allowScheduling":false}}'

@@ -174,7 +174,7 @@ zeabur-installer uninstall --purge
 
 `/var/lib/zeabur/storage` 下的卷会保留在 VM 上。确认不再需要这些数据后，再手动删除。
 
-如果集群使用 Longhorn，它会为已删除的节点保留一条节点数据，`zeabur-installer doctor` 会列出它。节点上还有副本时，Longhorn 不允许删除。请等每个卷在其他节点上都有健康的副本之后，再运行：
+如果集群使用 Longhorn，Longhorn 会为已删除的节点保留节点数据，`zeabur-installer doctor` 会列出这个节点。节点上还有副本时，Longhorn 不允许删除这个节点。请先确认每个卷在其他节点上都有健康的副本，再运行：
 
 ```sh
 kubectl -n longhorn-system patch nodes.longhorn.io <node> --type=merge -p '{"spec":{"allowScheduling":false}}'

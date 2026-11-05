@@ -365,13 +365,15 @@ fn failed_checks(
     } else {
         None
     };
-    let removed = list.as_ref().map_or_else(Vec::new, removed_longhorn_nodes);
-    if !removed.is_empty() {
-        results.push((Status::Warn, removed_longhorn_nodes_advice(&removed)));
+    let not_ready = list.as_ref().map(not_ready_longhorn_nodes);
+    if let Some(not_ready) = &not_ready
+        && !not_ready.gone.is_empty()
+    {
+        results.push((Status::Warn, removed_longhorn_nodes_advice(&not_ready.gone)));
     }
-    failed_health(checks, |check, timeout| match &list {
-        Some(list) if check.name == "nodes-ready" && !removed.is_empty() => {
-            not_ready_longhorn_nodes(list).is_empty()
+    failed_health(checks, |check, timeout| match &not_ready {
+        Some(not_ready) if check.name == "nodes-ready" && !not_ready.gone.is_empty() => {
+            not_ready.other.is_empty()
         }
         _ => wait_health(check, timeout, |args| kubectl.wait(args)).is_ok(),
     })
@@ -457,36 +459,18 @@ fn longhorn_nodes(kubectl: &Kubectl) -> Vec<(Status, String)> {
     }
 }
 
-/// The Longhorn Node objects whose Kubernetes node is gone.
-fn removed_longhorn_nodes(list: &Value) -> Vec<String> {
-    let mut found = Vec::new();
-    for node in list
-        .get("items")
-        .and_then(Value::as_array)
-        .into_iter()
-        .flatten()
-    {
-        for condition in node
-            .pointer("/status/conditions")
-            .and_then(Value::as_array)
-            .into_iter()
-            .flatten()
-        {
-            if condition.get("type").and_then(Value::as_str) == Some("Ready")
-                && condition.get("reason").and_then(Value::as_str) == Some("KubernetesNodeGone")
-                && let Some(name) = node.pointer("/metadata/name").and_then(Value::as_str)
-            {
-                found.push(name.to_owned());
-            }
-        }
-    }
-    found
+/// Longhorn's Node objects that are not ready, sorted by why.
+#[derive(Default)]
+struct NotReadyNodes {
+    /// The Kubernetes node is gone (reason `KubernetesNodeGone`).
+    gone: Vec<String>,
+    /// Any other reason.
+    other: Vec<String>,
 }
 
-/// The Longhorn Node objects that are not ready for a reason other than a removed Kubernetes node.
-fn not_ready_longhorn_nodes(list: &Value) -> Vec<String> {
-    let gone = removed_longhorn_nodes(list);
-    let mut found = Vec::new();
+/// Reads each Longhorn node's Ready condition once.
+fn not_ready_longhorn_nodes(list: &Value) -> NotReadyNodes {
+    let mut found = NotReadyNodes::default();
     for node in list
         .get("items")
         .and_then(Value::as_array)
@@ -497,6 +481,7 @@ fn not_ready_longhorn_nodes(list: &Value) -> Vec<String> {
             continue;
         };
         let mut ready = false;
+        let mut gone = false;
         for condition in node
             .pointer("/status/conditions")
             .and_then(Value::as_array)
@@ -505,10 +490,14 @@ fn not_ready_longhorn_nodes(list: &Value) -> Vec<String> {
         {
             if condition.get("type").and_then(Value::as_str) == Some("Ready") {
                 ready = condition.get("status").and_then(Value::as_str) == Some("True");
+                gone =
+                    condition.get("reason").and_then(Value::as_str) == Some("KubernetesNodeGone");
             }
         }
-        if !ready && !gone.iter().any(|g| g == name) {
-            found.push(name.to_owned());
+        if gone {
+            found.gone.push(name.to_owned());
+        } else if !ready {
+            found.other.push(name.to_owned());
         }
     }
     found
@@ -516,10 +505,8 @@ fn not_ready_longhorn_nodes(list: &Value) -> Vec<String> {
 
 fn removed_longhorn_nodes_advice(names: &[String]) -> String {
     format!(
-        "Longhorn still lists {}, which Kubernetes no longer has. Once every volume has a \
-         healthy replica on another node, remove its Longhorn node (the steps are under \
-         \"Remove a node\" in the node guide): kubectl -n longhorn-system delete \
-         nodes.longhorn.io {}",
+        "Longhorn still lists nodes that Kubernetes has removed: {}. Delete them with: kubectl -n \
+         longhorn-system delete nodes.longhorn.io {}",
         names.join(", "),
         names.join(" ")
     )
@@ -814,7 +801,7 @@ mod tests {
     }
 
     #[test]
-    fn a_longhorn_node_that_kubernetes_removed_is_named_with_the_removal_steps() {
+    fn a_longhorn_node_that_kubernetes_removed_is_told_apart_from_one_not_ready() {
         let node = |name: &str, status: &str, reason: &str| {
             json!({"metadata": {"name": name}, "status": {"conditions": [
                 {"type": "Ready", "status": status, "reason": reason},
@@ -825,10 +812,11 @@ mod tests {
             node("vps-2", "False", "KubernetesNodeGone"),
             node("vps-3", "False", "KubernetesNodeNotReady"),
         ]});
-        assert_eq!(removed_longhorn_nodes(&list), ["vps-2"]);
-        let advice = removed_longhorn_nodes_advice(&["vps-2".to_owned()]);
-        assert!(advice.contains("no longer has"), "{advice}");
-        assert_eq!(not_ready_longhorn_nodes(&list), ["vps-3"]);
+        let not_ready = not_ready_longhorn_nodes(&list);
+        assert_eq!(not_ready.gone, ["vps-2"]);
+        assert_eq!(not_ready.other, ["vps-3"]);
+        let advice = removed_longhorn_nodes_advice(&not_ready.gone);
+        assert!(advice.contains("nodes.longhorn.io vps-2"), "{advice}");
     }
 
     #[test]
