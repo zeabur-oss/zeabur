@@ -143,7 +143,7 @@ sudo zeabur-installer node add --role server --address 10.0.0.5
 sudo zeabur-installer node sync
 ```
 
-`node sync` 讓 installer 建立的基準網路政策放行目前每個節點的流量，也就是每個節點 Pod 網段的第一個位址。新加入的 server 會自己同步。worker 加入後，一定要在 server 執行一次 `node sync`，執行之前，網路政策會擋掉新節點的流量。`node add` 的輸出也會提醒這一步。網路和儲存的前提見[加入節點](../cluster/nodes.mdx)。
+`node sync` 讓 installer 建立的基準網路政策放行目前每個節點的流量。節點連到其他節點上副本的流量，從它的 VXLAN 位址送出：K3s 上是 Calico 分配給節點的位址，RKE2 上是節點副本網段的第一個位址。已就緒的節點還沒拿到 VXLAN 位址時，`node sync` 最多等兩分鐘。`node sync` 會先略過還沒就緒的節點，等它就緒後，`doctor` 會提醒你再執行一次 `node sync`。新加入的 server 會自己同步。worker 加入後，一定要在 server 執行一次 `node sync`，執行之前，網路政策會擋掉新節點的流量。`node add` 的輸出也會提醒這一步。網路和儲存的前提見[加入節點](../cluster/nodes.mdx)。
 
 ## 移除元件
 

@@ -142,7 +142,7 @@ After the new host applies the join configuration, run this on an existing serve
 sudo zeabur-installer node sync
 ```
 
-`node sync` updates the installer's baseline network policies to allow traffic from every current node: the first address in each node's replica network range. A joining server runs the sync itself. After a worker joins, you must run `node sync` once on a server. Until then, the network policies block traffic from the new node. `node add` also prints a reminder for this step. For network and storage requirements, see [Add nodes](../cluster/nodes.mdx).
+`node sync` updates the installer's baseline network policies to allow traffic from every current node. A node's traffic to replicas on other nodes leaves from its VXLAN address. On K3s that's the address Calico gives the node, and on RKE2 it's the first address in the node's replica network range. If a Ready node has no VXLAN address yet, `node sync` waits up to two minutes. `node sync` leaves out a node that isn't Ready, and once that node is Ready, `doctor` asks you to run `node sync` again. A joining server runs the sync itself. After a worker joins, you must run `node sync` once on a server. Until then, the network policies block traffic from the new node. `node add` also prints a reminder for this step. For network and storage requirements, see [Add nodes](../cluster/nodes.mdx).
 
 ## Remove components
 

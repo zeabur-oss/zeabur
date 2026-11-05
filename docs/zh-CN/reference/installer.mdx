@@ -143,7 +143,7 @@ sudo zeabur-installer node add --role server --address 10.0.0.5
 sudo zeabur-installer node sync
 ```
 
-`node sync` 会更新 installer 创建的基准网络策略，放行当前各节点的流量，也就是每个节点 Pod 网段的第一个地址。新加入的 server 会自行同步。worker 加入后，必须在 server 上运行一次 `node sync`，否则网络策略会阻止新节点的流量。`node add` 的输出也会提醒这一步。网络和存储的前提条件见[添加节点](../cluster/nodes.mdx)。
+`node sync` 会更新 installer 创建的基准网络策略，放行当前各节点的流量。节点访问其他节点上副本的流量，从它的 VXLAN 地址发出：K3s 上是 Calico 分配给节点的地址，RKE2 上是节点副本网段的第一个地址。已就绪的节点还没拿到 VXLAN 地址时，`node sync` 最多等两分钟。`node sync` 会先跳过尚未就绪的节点，等它就绪后，`doctor` 会提醒你再运行一次 `node sync`。新加入的 server 会自行同步。worker 加入后，必须在 server 上运行一次 `node sync`，否则网络策略会阻止新节点的流量。`node add` 的输出也会提醒这一步。网络和存储的前提条件见[添加节点](../cluster/nodes.mdx)。
 
 ## 卸载组件
 
