@@ -40,7 +40,7 @@ Open Claude Code or Codex on your computer, paste the message below, and replace
 Install Zeabur on the server <user>@<server>. Connect over SSH and use sudo for commands that need root.
 
 1. Following "Download and verify binaries" at https://oss.zeabur.com/docs/zeabur/reference/releases, download zeabur-installer from the latest release at https://github.com/zeabur-oss/zeabur/releases, choosing linux-amd64 or linux-arm64 from the server's `uname -m`. Verify the signature of SHA256SUMS, the file's SHA-256 and the build provenance, and extract only when all three pass. If any of them fails, stop and tell me. Don't change the verification options to make it pass.
-2. Ask me for the two domains for Zeabur and sign-in (Identity). If I don't have any, use zeabur.<public address>.sslip.io and login.<public address>.sslip.io. If the server has only a private address, use local mode. Write /etc/zeabur-installer/config.yaml following https://oss.zeabur.com/docs/zeabur/get-started/advanced-install.
+2. Ask me for the two domains for Zeabur and sign-in (Identity). If I don't have any, use zeabur.<public address>.sslip.io and login.<public address>.sslip.io. If the server has only a private address, use local mode. Write /etc/zeabur-installer/config.yaml following https://oss.zeabur.com/docs/zeabur/install/config-file.
 3. Run sudo zeabur-installer plan, summarize the changes, warnings and failed checks for me in plain words, and wait for my go-ahead.
 4. Once I agree, run sudo zeabur-installer apply. If it fails partway, fix the cause, then run it again with the same config.
 5. When the installation finishes, run sudo zeabur-installer doctor and report the result.

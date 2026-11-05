@@ -6,7 +6,7 @@ source: "1032006f1802"
 
 将域名、组件选择和主机配置写入 YAML，运行 `zeabur-installer --config config.yaml plan`，先查看安装内容。文件默认位于 `/etc/zeabur-installer/config.yaml`。字段使用 camelCase；字段拼写错误或存在多余字段时，installer 会直接停止。
 
-网页界面的选择也会保存到这份文件。通过网页界面安装，见[在一台服务器上安装 Zeabur](../get-started/quickstart.mdx)；通过命令安装，见[用配置文件和命令安装](../get-started/advanced-install.mdx)；各命令的选项，见 [Installer 命令](./installer.mdx)。
+网页界面的选择也会保存到这份文件。通过网页界面安装，见[在一台服务器上安装 Zeabur](../get-started/quickstart.mdx)；通过命令安装，见[用配置文件和命令安装](../install/config-file.mdx)；各命令的选项，见 [Installer 命令](./installer.mdx)。
 
 ## 创建集群的文件
 
@@ -171,7 +171,7 @@ sources:
 
 ## 个人使用的文件
 
-顶层填写 `use: personal` 时，installer 改为安装 KubeSolo 和组件，不安装 Zeabur 面板和 Zeabur Identity。操作方法和限制见[个人使用：在小型机器上安装](../get-started/personal.mdx)。
+顶层填写 `use: personal` 时，installer 改为安装 KubeSolo 和组件，不安装 Zeabur 面板和 Zeabur Identity。操作方法和限制见[个人使用：在小型机器上安装](../install/personal.mdx)。
 
 ```yaml title="/etc/zeabur-installer/config.yaml"
 use: personal

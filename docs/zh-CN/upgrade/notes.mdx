@@ -1,10 +1,10 @@
 ---
 title: 升级须知
 description: 每一版不兼容的变更，以及升级前要先做的事。一次跨好几版时，依次看过中间每一节。
-source: "83fbd53c7555"
+source: "f62aa884d01c"
 ---
 
-这一页列出每一版不兼容的变更，以及升级前要先做的事。升级的步骤本身见[升级 Zeabur](upgrade.mdx)。
+这一页列出每一版不兼容的变更，以及升级前要先做的事。升级的步骤本身见[升级 Zeabur](steps.mdx)。
 
 一次跨好几版升级时，从你当前的版本开始，依次看过到目标版本为止的每一节。新的版本写在最上面。
 
@@ -64,7 +64,7 @@ zot 存的镜像会一起删掉。之后 `apply` 会安装 Zeabur Builder 和它
 
 #### 3. 升级服务器
 
-下载 v0.2 的 installer，运行 `plan`，确认后再 `apply`，步骤见[升级 Zeabur](upgrade.mdx#用-zeabur-installer-升级)。
+下载 v0.2 的 installer，运行 `plan`，确认后再 `apply`，步骤见[升级 Zeabur](steps.mdx#用-zeabur-installer-升级)。
 
 `plan` 会列出这次新增的组件。System Upgrade Controller 不再是默认组件，`apply` 不会移除，只是不再更新，`plan` 会写成 `not removed, no longer updated`。installer 本来就固定了 K3s 和 RKE2 的版本，不需要 System Upgrade Controller。要保留，在 `enable` 加上 `node-updates/system-upgrade-controller`。不要的话，`apply` 完再删掉：
 

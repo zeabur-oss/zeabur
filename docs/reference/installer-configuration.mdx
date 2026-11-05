@@ -5,7 +5,7 @@ description: YAML fields, defaults, and secret file formats for creating a clust
 
 Put domains, component choices, and host settings in YAML, then run `zeabur-installer --config config.yaml plan` to preview the installation. The default file path is `/etc/zeabur-installer/config.yaml`. Field names are camelCase. The installer stops on misspelled or unknown fields.
 
-The web interface saves its choices to this same file. For installation through the web interface, see [Install Zeabur on a server](../get-started/quickstart.mdx). For command-line installation, see [Install with a configuration file and commands](../get-started/advanced-install.mdx). For command options, see [Installer commands](./installer.mdx).
+The web interface saves its choices to this same file. For installation through the web interface, see [Install Zeabur on a server](../get-started/quickstart.mdx). For command-line installation, see [Install with a configuration file and commands](../install/config-file.mdx). For command options, see [Installer commands](./installer.mdx).
 
 ## Configuration for creating a cluster
 
@@ -170,7 +170,7 @@ An archive removed from `imageArchives` is also removed from the K3s or RKE2 imp
 
 ## Configuration for personal use
 
-With `use: personal` at the top level, the installer installs KubeSolo and components, without the Zeabur dashboard or Zeabur Identity. For instructions and limitations, see [Personal use: Install on a small machine](../get-started/personal.mdx).
+With `use: personal` at the top level, the installer installs KubeSolo and components, without the Zeabur dashboard or Zeabur Identity. For instructions and limitations, see [Personal use: Install on a small machine](../install/personal.mdx).
 
 ```yaml title="/etc/zeabur-installer/config.yaml"
 use: personal

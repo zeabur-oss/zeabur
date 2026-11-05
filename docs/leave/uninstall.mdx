@@ -207,4 +207,4 @@ To remove only a node that joined the cluster, follow [Remove a node](../cluster
 - A service URL stops working after removal: Compare the Ingress or HTTPRoute, ingress controller, Gateway, certificates, and backend replicas. Check that you haven't deleted shared dependencies.
 - Members can't make changes, but services work: The chart's member roles and bindings have been removed. Grant permissions again through replacement RBAC.
 
-To reinstall the management interface, use the [single-machine installer process](../get-started/quickstart.mdx) or the [existing cluster process](../get-started/install.mdx). Don't delete and recreate existing projects.
+To reinstall the management interface, use the [single-machine installer process](../get-started/quickstart.mdx) or the [existing cluster process](../install/existing-cluster.mdx). Don't delete and recreate existing projects.
