@@ -415,7 +415,7 @@ impl Health {
     /// The arguments of the `kubectl wait`, with `timeout` in place of the check's own.
     #[must_use]
     pub fn args<'a>(&'a self, timeout: &'a str) -> Vec<&'a str> {
-        let mut args = Vec::new();
+        let mut args = Vec::with_capacity(self.wait.len() + 1);
         for arg in &self.wait {
             args.push(arg.as_str());
         }
@@ -428,7 +428,8 @@ impl Health {
     /// `kubectl wait --all` or `-l` fails at once while nothing matches yet.
     #[must_use]
     pub fn create_args<'a>(&'a self, timeout: &'a str) -> Vec<&'a str> {
-        let mut args = vec!["--for=create"];
+        let mut args = Vec::with_capacity(self.wait.len() + 1);
+        args.push("--for=create");
         for arg in &self.wait {
             if !arg.starts_with("--for=") {
                 args.push(arg);
