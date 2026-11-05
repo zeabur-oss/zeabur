@@ -18,7 +18,7 @@ use crate::plan::{
     Choices, ComponentPlan, Download, Facts, Memory, Namespace, RegistryPlan, Warning, components,
     idle_memory, registry, warning,
 };
-use crate::record::Changes;
+use crate::record::{Changes, Planned};
 use crate::remove::Removal;
 use crate::select::{self, PERSONAL_DISTRIBUTION, PERSONAL_PROFILE, Target};
 use crate::storage::Storage;
@@ -264,10 +264,15 @@ pub fn plan(
             r.cluster_ip.as_deref()?,
         ))
     }));
-    let changes = facts
-        .record
-        .as_ref()
-        .map(|r| Changes::new(r, index, &components, KUBESOLO.version));
+    let changes = facts.record.as_ref().map(|r| {
+        let planned = Planned {
+            components: &components,
+            version: KUBESOLO.version,
+            identity: None,
+            zeabur: None,
+        };
+        Changes::new(r, index, planned)
+    });
     Ok(PersonalPlan {
         use_: "personal",
         facts: facts.clone(),

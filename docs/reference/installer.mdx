@@ -58,6 +58,8 @@ When installation finishes, the installer prints the Zeabur and Zeabur Identity 
 When the cluster has the install record `kube-system/zeabur-installer`, `plan` starts with `Changes since the last apply`. This part names the installer version that wrote the record and lists what `apply` changes. A personal install shows it too. It lists:
 
 - The new K3s, RKE2, or KubeSolo release
+- A new Zeabur Identity or Zeabur URL, when `access` changes
+- The Zeabur and Zeabur Identity releases it installs. After an upgrade from an installer that didn't record them, it shows only the new release
 - Host files whose content changes
 - Components added or removed
 - Charts that move to a new version

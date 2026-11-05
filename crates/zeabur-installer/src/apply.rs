@@ -1688,6 +1688,7 @@ mod tests {
         let zeabur = ZeaburPlan {
             url: "https://zeabur.example.com".to_owned(),
             chart: Source::Local(chart.to_string_lossy().into_owned()),
+            version: None,
             values: json!({"updateCheck": {"enabled": true}, "replicas": 1}),
         };
         for on in [true, false] {
