@@ -86,6 +86,7 @@ pub(crate) fn run() -> ExitCode {
                         .filter(|c| c.status != Status::Pass)
                         .map(|c| (c.status, c.detail)),
                 );
+                results.extend(longhorn_nodes(&kubectl));
             }
             if plan.get("zeabur").is_some_and(|z| !z.is_null()) {
                 results.push(deployment(&kubectl, IDENTITY_NAMESPACE, "zeabur-identity"));
@@ -384,6 +385,74 @@ fn unavailable(list: &Value) -> Vec<String> {
     found
 }
 
+/// The nodes whose Longhorn checks of iSCSI, NFS or kernel modules fail, as Longhorn's Node
+/// objects report them.
+fn longhorn_nodes(kubectl: &Kubectl) -> Vec<(Status, String)> {
+    let list = kubectl
+        .run(
+            &[
+                "get",
+                "nodes.longhorn.io",
+                "-n",
+                "longhorn-system",
+                "--output=json",
+            ],
+            None,
+        )
+        .map_err(|e| e.to_string())
+        .and_then(|out| serde_json::from_str::<Value>(&out).map_err(|e| e.to_string()));
+    match list {
+        Ok(list) => unprepared_nodes(&list)
+            .into_iter()
+            .map(|n| (Status::Fail, n))
+            .collect(),
+        Err(e) => vec![(Status::Warn, format!("reading Longhorn's nodes: {e}"))],
+    }
+}
+
+/// Longhorn's node conditions that a node's preparation makes true.
+const LONGHORN_PREP_CONDITIONS: [&str; 3] = [
+    "RequiredPackages",
+    "KernelModulesLoaded",
+    "NFSClientInstalled",
+];
+
+/// The Longhorn Node objects in a list with a preparation condition that is not true, as text.
+fn unprepared_nodes(list: &Value) -> Vec<String> {
+    let mut found = Vec::new();
+    for node in list
+        .get("items")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+    {
+        let name = node
+            .pointer("/metadata/name")
+            .and_then(Value::as_str)
+            .unwrap_or_default();
+        let failing: Vec<&str> = node
+            .pointer("/status/conditions")
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+            .filter(|c| {
+                c.get("type")
+                    .and_then(Value::as_str)
+                    .is_some_and(|t| LONGHORN_PREP_CONDITIONS.contains(&t))
+                    && c.get("status").and_then(Value::as_str) == Some("False")
+            })
+            .map(|c| c.get("message").and_then(Value::as_str).unwrap_or_default())
+            .collect();
+        if !failing.is_empty() {
+            found.push(format!(
+                "node {name} is not prepared for Longhorn ({}): run zeabur-installer apply on it",
+                failing.join("; ")
+            ));
+        }
+    }
+    found
+}
+
 /// Whether the cluster's default storage class is the one the plan chose, and the only one.
 pub(crate) fn default_class(kubectl: &Kubectl, plan: &Value) -> (Status, String) {
     let Some(planned) = plan
@@ -536,6 +605,34 @@ mod tests {
             [
                 "deployment/moco-controller has 0 of 2 Pods available",
                 "daemonset/agent has 2 of 3 Pods available"
+            ]
+        );
+    }
+
+    #[test]
+    fn a_longhorn_node_without_its_packages_is_named_with_longhorns_message() {
+        let node = |name: &str, conditions: Value| json!({"metadata": {"name": name}, "status": {"conditions": conditions}});
+        let list = json!({"items": [
+            node("vps-1", json!([
+                {"type": "Ready", "status": "True"},
+                {"type": "RequiredPackages", "status": "True"},
+                {"type": "NFSClientInstalled", "status": "True"},
+            ])),
+            node("vps-2", json!([
+                {"type": "Ready", "status": "True"},
+                {"type": "RequiredPackages", "status": "False",
+                 "message": "Missing packages: [nfs-common open-iscsi]"},
+                {"type": "KernelModulesLoaded", "status": "False",
+                 "message": "Kernel modules [iscsi_tcp] are not loaded"},
+            ])),
+            node("vps-3", json!([{"type": "Ready", "status": "False"}])),
+        ]});
+        assert_eq!(
+            unprepared_nodes(&list),
+            [
+                "node vps-2 is not prepared for Longhorn (Missing packages: [nfs-common \
+                 open-iscsi]; Kernel modules [iscsi_tcp] are not loaded): run zeabur-installer \
+                 apply on it"
             ]
         );
     }

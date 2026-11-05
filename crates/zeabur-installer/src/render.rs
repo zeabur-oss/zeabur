@@ -508,6 +508,7 @@ mod tests {
                 (2380, false),
             ],
             token_pinned: true,
+            longhorn_runs_here: false,
         };
         join::plan(&config, &facts).unwrap()
     }
