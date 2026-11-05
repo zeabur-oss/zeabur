@@ -15,7 +15,7 @@ use zeabur_installer_plan::join::{self, JoinFacts, JoinPlan, Latency, RTT_SAMPLE
 use zeabur_installer_plan::storage;
 
 use crate::apply::{self, ClusterInstall};
-use crate::{InstallError, node, out, render};
+use crate::{InstallError, load, node, out, render};
 
 /// The join token, from the configuration or its file, checked against the role.
 fn token(config: &JoinConfig) -> Result<String, InstallError> {
@@ -82,6 +82,7 @@ fn longhorn_runs_on(kubectl: &Kubectl, name: &str) -> Result<bool, InstallError>
 }
 
 fn make_plan(config: &JoinConfig) -> Result<(JoinPlan, String), InstallError> {
+    load::image_archives(&config.sources.image_archives)?;
     let token = token(config)?;
     let facts = read_facts(config, &token)?;
     Ok((join::plan(config, &facts)?, token))

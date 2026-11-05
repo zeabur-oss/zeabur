@@ -176,6 +176,7 @@ fn install_components(kubectl: &Kubectl, plan: &Plan) -> Result<(), InstallError
 
 /// The plan, with the install record and the removals read from the cluster when it runs.
 pub(crate) fn make_plan(index: &Index, config: &Config) -> Result<Plan, InstallError> {
+    load::sources(&config.sources)?;
     let kubectl = Kubectl::admin(config.distribution);
     let running = systemd::is_active(config.distribution.server_unit());
     let mut facts = facts::read()?;

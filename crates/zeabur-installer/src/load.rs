@@ -6,7 +6,7 @@ use std::path::Path;
 
 use zeabur_installer_host::{download, facts};
 use zeabur_installer_plan::catalog::Index;
-use zeabur_installer_plan::config::{Config, Document, JoinConfig, PersonalConfig};
+use zeabur_installer_plan::config::{Config, Document, JoinConfig, PersonalConfig, Sources};
 use zeabur_installer_plan::{PlanError, pins};
 
 use crate::InstallError;
@@ -15,7 +15,6 @@ use crate::InstallError;
 /// readable by others.
 pub(crate) fn document(path: &Path) -> Result<Document, InstallError> {
     let document = Document::parse(&read(path)?)?;
-    sources(&document)?;
     if let Document::Join(JoinConfig { join, .. }) = &document
         && join.token.is_some()
     {
@@ -56,48 +55,34 @@ pub(crate) fn personal(path: &Path) -> Option<PersonalConfig> {
     }
 }
 
-/// Checks that each `sources` path is there: a file, or for `zeaburChart` a directory too.
-fn sources(document: &Document) -> Result<(), InstallError> {
-    let mut files: Vec<(String, &str)> = Vec::new();
-    let mut chart = None;
-    let archives = match document {
-        Document::Install(config) => {
-            let s = &config.sources;
-            for (key, path) in [("catalog", &s.catalog), ("identityctl", &s.identityctl)] {
-                if let Some(path) = path {
-                    files.push((key.to_owned(), path));
-                }
-            }
-            chart = s.zeabur_chart.as_deref();
-            &s.image_archives
-        }
-        Document::Join(config) => &config.sources.image_archives,
-        Document::Personal(config) => {
-            if let Some(path) = &config.sources.catalog {
-                files.push(("catalog".to_owned(), path));
-            }
-            return check_files(&files);
-        }
-    };
-    for (i, path) in archives.iter().enumerate() {
-        files.push((format!("imageArchives[{i}]"), path));
+/// Checks the paths `plan` and `apply` take from `sources`, so a wrong one stops `plan` before
+/// the host changes: each is a file, and `zeaburChart` a file or a directory.
+pub(crate) fn sources(sources: &Sources) -> Result<(), InstallError> {
+    if let Some(path) = &sources.identityctl {
+        file("identityctl", path)?;
     }
-    if let Some(path) = chart {
+    if let Some(path) = &sources.zeabur_chart {
         fs::metadata(path)
             .map_err(|e| InstallError::Message(format!("sources.zeaburChart: {path}: {e}")))?;
     }
-    check_files(&files)
+    image_archives(&sources.image_archives)
 }
 
-fn check_files(files: &[(String, &str)]) -> Result<(), InstallError> {
-    for (key, path) in files {
-        let meta = fs::metadata(path)
-            .map_err(|e| InstallError::Message(format!("sources.{key}: {path}: {e}")))?;
-        if !meta.is_file() {
-            return Err(InstallError::Message(format!(
-                "sources.{key}: {path} is not a file"
-            )));
-        }
+/// Checks that each of `sources.imageArchives` is a file.
+pub(crate) fn image_archives(paths: &[String]) -> Result<(), InstallError> {
+    for (i, path) in paths.iter().enumerate() {
+        file(&format!("imageArchives[{i}]"), path)?;
+    }
+    Ok(())
+}
+
+fn file(key: &str, path: &str) -> Result<(), InstallError> {
+    let meta = fs::metadata(path)
+        .map_err(|e| InstallError::Message(format!("sources.{key}: {path}: {e}")))?;
+    if !meta.is_file() {
+        return Err(InstallError::Message(format!(
+            "sources.{key}: {path} is not a file"
+        )));
     }
     Ok(())
 }
@@ -146,9 +131,8 @@ pub(crate) fn config(path: &Path) -> Result<Config, InstallError> {
 /// and kept in `state_dir`.
 pub(crate) fn catalog(source: Option<&str>, state_dir: &str) -> Result<Index, InstallError> {
     let bytes = match (source, pins::PRODUCTS) {
-        (Some(path), _) => {
-            fs::read(path).map_err(|e| InstallError::Message(format!("{path}: {e}")))?
-        }
+        (Some(path), _) => fs::read(path)
+            .map_err(|e| InstallError::Message(format!("sources.catalog: {path}: {e}")))?,
         (None, Some(products)) => {
             let index = products.catalog.index();
             let dest = Path::new(state_dir).join("index.json");
@@ -165,13 +149,8 @@ pub(crate) fn catalog(source: Option<&str>, state_dir: &str) -> Result<Index, In
 mod tests {
     use super::*;
 
-    fn plan_error(dir: &Path, sources: &str) -> String {
-        let path = dir.join("config.yaml");
-        let yaml = format!(
-            "access:\n  mode: local\n  identity: identity.example.com\n  zeabur: zeabur.example.com\nsources:\n{sources}"
-        );
-        fs::write(&path, yaml).unwrap();
-        match document(&path) {
+    fn error(result: Result<impl Sized, InstallError>) -> String {
+        match result {
             Ok(_) => String::new(),
             Err(e) => e.to_string(),
         }
@@ -185,40 +164,54 @@ mod tests {
         let file = file.display().to_string();
         let folder = dir.path().display().to_string();
         let missing = dir.path().join("missing").display().to_string();
-        for key in ["catalog", "identityctl", "imageArchives"] {
-            let value = |path: &str| {
-                if key == "imageArchives" {
-                    format!("  {key}: [{path}]\n")
-                } else {
-                    format!("  {key}: {path}\n")
-                }
-            };
-            let shown = if key == "imageArchives" {
-                "imageArchives[0]"
-            } else {
-                key
-            };
-            let error = plan_error(dir.path(), &value(&missing));
+        let at = |key: &str, path: &str| {
+            let mut sources = Sources::default();
+            match key {
+                "identityctl" => sources.identityctl = Some(path.to_owned()),
+                "zeaburChart" => sources.zeabur_chart = Some(path.to_owned()),
+                _ => sources.image_archives = vec![path.to_owned()],
+            }
+            sources
+        };
+
+        for key in ["identityctl", "imageArchives[0]"] {
+            let missing_error = error(sources(&at(key, &missing)));
             assert!(
-                error.starts_with(&format!("sources.{shown}: {missing}:")),
-                "{error}"
+                missing_error.starts_with(&format!("sources.{key}: {missing}:")),
+                "{missing_error}"
             );
-            let error = plan_error(dir.path(), &value(&folder));
-            assert_eq!(error, format!("sources.{shown}: {folder} is not a file"));
-            assert_eq!(plan_error(dir.path(), &value(&file)), "");
+            assert_eq!(
+                error(sources(&at(key, &folder))),
+                format!("sources.{key}: {folder} is not a file")
+            );
+            assert_eq!(error(sources(&at(key, &file))), "");
         }
-        let error = plan_error(dir.path(), &format!("  zeaburChart: {missing}\n"));
+
+        let chart_error = error(sources(&at("zeaburChart", &missing)));
         assert!(
-            error.starts_with(&format!("sources.zeaburChart: {missing}:")),
-            "{error}"
+            chart_error.starts_with(&format!("sources.zeaburChart: {missing}:")),
+            "{chart_error}"
         );
-        assert_eq!(
-            plan_error(dir.path(), &format!("  zeaburChart: {folder}\n")),
-            ""
+        assert_eq!(error(sources(&at("zeaburChart", &folder))), "");
+        assert_eq!(error(sources(&at("zeaburChart", &file))), "");
+
+        let catalog_error = error(catalog(Some(&missing), &folder));
+        assert!(
+            catalog_error.starts_with(&format!("sources.catalog: {missing}:")),
+            "{catalog_error}"
         );
-        assert_eq!(
-            plan_error(dir.path(), &format!("  zeaburChart: {file}\n")),
-            ""
-        );
+    }
+
+    #[test]
+    fn a_missing_source_still_tells_what_kind_of_node_this_is() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("config.yaml");
+        fs::write(
+            &path,
+            "join:\n  server: https://10.0.0.5:6443\n  tokenFile: /root/token\n\
+             sources: {imageArchives: [/gone.tar]}\n",
+        )
+        .unwrap();
+        assert!(join(&path).is_some());
     }
 }
