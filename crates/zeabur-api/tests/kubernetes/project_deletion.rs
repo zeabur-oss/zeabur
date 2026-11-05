@@ -5,16 +5,20 @@
 //!
 //! Where CloudNativePG is not installed (the bare profile), a stand-in for its `Cluster` CRD is
 //! made and deleted with the sandbox.
+//!
+//! A project held by a finalizer no controller removes is force deleted by a person whose rights
+//! come from a ClusterRole, since the namespace controller deletes the Roles inside the project.
 
 use std::time::Duration;
 
 use axum::http::StatusCode;
-use kube::api::{Api, DynamicObject, Patch, PatchParams, PostParams};
+use kube::api::{Api, DeleteParams, DynamicObject, Patch, PatchParams, PostParams};
 use kube::core::GroupVersionKind;
 use kube::discovery::ApiResource;
 use serde_json::json;
-use zeabur_kube::k8s_openapi::api::core::v1::Namespace;
-use zeabur_test_support::sandbox::Sandbox;
+use zeabur_kube::k8s_openapi::api::core::v1::{ConfigMap, Namespace};
+use zeabur_kube::k8s_openapi::api::rbac::v1::{ClusterRole, ClusterRoleBinding};
+use zeabur_test_support::sandbox::{PERSON, Sandbox, create};
 
 use crate::common::{app, plan_and_apply};
 
@@ -130,11 +134,15 @@ async fn a_project_with_a_database_goes_away() {
         .filter_map(|a| a["target"]["kind"].as_str())
         .collect();
     assert_eq!(kinds, ["Cluster", "Namespace"], "{applied}");
+    gone(&namespaces, &ns).await;
+}
 
+/// Waits until `namespace` is gone, for at most [`WAIT`].
+async fn gone(namespaces: &Api<Namespace>, namespace: &str) {
     let deadline = tokio::time::Instant::now() + WAIT;
     loop {
-        match namespaces.get_opt(&ns).await.unwrap() {
-            None => break,
+        match namespaces.get_opt(namespace).await.unwrap() {
+            None => return,
             Some(left) => assert!(
                 tokio::time::Instant::now() < deadline,
                 "the namespace is still there: {:?}",
@@ -143,4 +151,73 @@ async fn a_project_with_a_database_goes_away() {
         }
         tokio::time::sleep(Duration::from_secs(1)).await;
     }
+}
+
+#[tokio::test]
+#[ignore = "needs a disposable cluster"]
+async fn a_project_held_by_a_finalizer_without_a_controller_is_force_deleted() {
+    let person = Sandbox::new(
+        "zeabur-force-person",
+        json!([{"apiGroups": [""], "resources": ["configmaps"], "verbs": ["get"]}]),
+    )
+    .await;
+    let project = Sandbox::new(
+        "zeabur-force",
+        json!([{"apiGroups": [""], "resources": ["configmaps"], "verbs": ["get"]}]),
+    )
+    .await;
+    let (ns, admin) = (project.namespace().to_owned(), project.admin().clone());
+    let role = person.namespace().to_owned();
+    person.delete_cluster_role(&role);
+    create(
+        &Api::<ClusterRole>::all(admin.clone()),
+        json!({"metadata": {"name": role}, "rules": [
+            {"apiGroups": ["", "apps", "batch", "networking.k8s.io", "events.k8s.io"],
+             "resources": ["*"], "verbs": ["get", "list"]},
+            {"apiGroups": [""], "resources": ["configmaps"], "verbs": ["patch"]}
+        ]}),
+    )
+    .await;
+    create(
+        &Api::<ClusterRoleBinding>::all(admin.clone()),
+        json!({"metadata": {"name": role},
+               "roleRef": {"apiGroup": "rbac.authorization.k8s.io", "kind": "ClusterRole", "name": role},
+               "subjects": [{"kind": "ServiceAccount", "name": PERSON, "namespace": role}]}),
+    )
+    .await;
+    let namespaces = Api::<Namespace>::all(admin.clone());
+    namespaces
+        .patch(
+            &ns,
+            &PatchParams::default(),
+            &Patch::Merge(json!({"metadata": {"labels": {"zeabur.com/project": "true"}}})),
+        )
+        .await
+        .unwrap();
+    create(
+        &Api::<ConfigMap>::namespaced(admin.clone(), &ns),
+        json!({"metadata": {"name": "held", "finalizers": ["example.com/no-controller"]}}),
+    )
+    .await;
+    let _deleting = namespaces.delete(&ns, &DeleteParams::background()).await;
+
+    // The namespace controller names the finalizer in a condition once it has deleted the rest.
+    let app = app(person.user());
+    let deadline = tokio::time::Instant::now() + WAIT;
+    let (status, applied) = loop {
+        let (status, body) = plan_and_apply(&app, &ns, json!([{"op": "forceDeleteProject"}])).await;
+        if status == StatusCode::OK || tokio::time::Instant::now() >= deadline {
+            break (status, body);
+        }
+        tokio::time::sleep(Duration::from_secs(1)).await;
+    };
+    assert_eq!(status, StatusCode::OK, "{applied}");
+    let written: Vec<(&str, &str)> = applied["applied"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter_map(|a| Some((a["target"]["kind"].as_str()?, a["target"]["name"].as_str()?)))
+        .collect();
+    assert_eq!(written, [("ConfigMap", "held")], "{applied}");
+    gone(&namespaces, &ns).await;
 }

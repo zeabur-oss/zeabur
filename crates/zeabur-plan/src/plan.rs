@@ -323,7 +323,7 @@ pub fn plan_with(
              changes to the objects in it.",
         ));
     }
-    if request.changes.len() > 1 && request.changes.iter().any(Change::is_project_deletion) {
+    if request.changes.len() > 1 && request.changes.iter().any(Change::deletes_project) {
         return Err(error(
             ErrorKind::BadRequest,
             "delete_project_alone",
@@ -486,6 +486,7 @@ impl<'a> Planner<'a> {
             Change::Adopt => self.adopt(),
             Change::Unadopt => self.unadopt(),
             Change::DeleteProject => self.delete_project(),
+            Change::ForceDeleteProject => self.force_delete_project(),
             Change::Details {
                 display_name,
                 description,

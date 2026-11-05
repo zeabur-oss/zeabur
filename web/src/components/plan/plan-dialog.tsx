@@ -655,6 +655,15 @@ function names(t: Translate, workloads: Schemas.WorkloadRef[]): string {
 function warningsSaid(t: Translate, warnings: Schemas.PlanWarning[]): Said[] {
   return warnings.flatMap((w): Said[] => {
     if (sentenced.has(w.code) || w.code === "deletesProject") return []
+    if (w.code === "removesFinalizers")
+      return [
+        namedText(
+          t,
+          w.objects.map((o) => `${kindName(t, o.kind)} ${o.name} (${o.finalizers.join(", ")})`),
+          (list) => t("warn.removesFinalizers", list),
+        ),
+        { text: t("warn.cleanupSkipped"), health: "fail" },
+      ]
     if (w.code === "recreated")
       return [
         namedText(
@@ -682,7 +691,10 @@ function workloadsText(t: Translate, warning: WorkloadsWarning): Said {
 
 function warningText(
   t: Translate,
-  warning: Exclude<Schemas.PlanWarning, { code: "recreated" | "deletesProject" }>,
+  warning: Exclude<
+    Schemas.PlanWarning,
+    { code: "recreated" | "deletesProject" | "removesFinalizers" }
+  >,
 ): Said {
   if (workloadCodes.has(warning.code)) return workloadsText(t, warning as WorkloadsWarning)
   switch (warning.code) {
@@ -768,6 +780,7 @@ function warningSentence(
         | "claimDataMayBeLost"
         | "recreated"
         | "deletesProject"
+        | "removesFinalizers"
         | "nodeCapacityUnknown"
     }
   >,

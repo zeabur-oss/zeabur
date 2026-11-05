@@ -1,6 +1,7 @@
 //! Deleting a project: the database objects go first, then the Namespace, each pinned to the
 //! object as read; the plan says what goes and what happens to each volume's data; Zeabur's own
-//! and the system's namespaces are refused.
+//! and the system's namespaces are refused. A force deletion removes the finalizers only of the
+//! objects the namespace controller waits on, and never writes the Namespace.
 
 #[cfg(test)]
 mod tests {
@@ -10,7 +11,7 @@ mod tests {
     use zeabur_graph::Snapshot;
     use zeabur_model::{Tool, WorkloadKind, WorkloadRef};
     use zeabur_plan::{
-        Change, DatabaseObject, DeletionInput, ObjectName, Plan, PlanError, PlanRequest,
+        Change, DeletionInput, HeldBy, ObjectName, Plan, PlanError, PlanRequest, ProjectObject,
         ResourceRef, VolumeDeletion, Warning, Write, plan,
     };
 
@@ -32,8 +33,8 @@ mod tests {
         }
     }
 
-    fn database(name: &str) -> DatabaseObject {
-        DatabaseObject {
+    fn database(name: &str) -> ProjectObject {
+        ProjectObject {
             resource: cnpg(),
             object: json!({"apiVersion": "postgresql.cnpg.io/v1", "kind": "Cluster",
                 "metadata": {"name": name, "uid": format!("{name}-uid"), "resourceVersion": "40",
@@ -77,6 +78,7 @@ mod tests {
             default_class: Some("local-path".to_owned()),
             tools_namespace: "zeabur-terminals".to_owned(),
             tools_pods: vec!["zeabur-tools-alice-1".to_owned()],
+            ..DeletionInput::default()
         }
     }
 
@@ -287,5 +289,116 @@ mod tests {
         )
         .unwrap_err();
         assert_eq!(error.code, "delete_project_alone");
+    }
+
+    fn terminating() -> Value {
+        let mut ns = shop();
+        ns["metadata"]["deletionTimestamp"] = json!("2026-10-26T00:00:00Z");
+        ns
+    }
+
+    fn held(name: &str, namespace: &str, deleted: bool, finalizers: &[&str]) -> ProjectObject {
+        let mut object = json!({"apiVersion": "postgresql.cnpg.io/v1", "kind": "Cluster",
+            "metadata": {"name": name, "namespace": namespace, "uid": format!("{name}-uid"),
+                "resourceVersion": "40", "generation": 2, "finalizers": finalizers}});
+        if deleted {
+            object["metadata"]["deletionTimestamp"] = json!("2026-10-26T00:00:00Z");
+        }
+        ProjectObject {
+            resource: cnpg(),
+            object,
+        }
+    }
+
+    fn forced(namespace: &Value, held: Vec<ProjectObject>) -> Result<Plan, PlanError> {
+        let input = DeletionInput {
+            zeabur_namespaces: vec!["zeabur".to_owned()],
+            finalizers: vec!["cnpg.io/cleanup".to_owned()],
+            held,
+            ..DeletionInput::default()
+        };
+        plan(
+            zeabur_plan::Input {
+                namespace: Some(namespace),
+                deletion: Some(&input),
+                ..zeabur_plan::Input::new(&Snapshot::default(), "2026-10-26T00:00:00Z")
+            },
+            &PlanRequest {
+                changes: vec![Change::ForceDeleteProject],
+            },
+        )
+    }
+
+    #[test]
+    fn a_force_deletion_empties_the_finalizers_of_the_objects_the_controller_waits_on() {
+        let plan = forced(
+            &terminating(),
+            vec![
+                held("db", "shop", true, &["cnpg.io/cleanup"]),
+                held("not-deleted", "shop", false, &["cnpg.io/cleanup"]),
+                held("elsewhere", "other", true, &["cnpg.io/cleanup"]),
+                held("unnamed", "shop", true, &["example.com/other"]),
+            ],
+        )
+        .unwrap();
+        let writes: Vec<(&str, &Write)> = plan
+            .objects
+            .iter()
+            .map(|o| (o.target.name.as_str(), &o.write))
+            .collect();
+        assert_eq!(
+            writes,
+            [(
+                "db",
+                &Write::Patch {
+                    operations: vec![
+                        json!({"op": "test", "path": "/metadata/generation", "value": 2}),
+                        json!({"op": "test", "path": "/metadata/finalizers",
+                            "value": ["cnpg.io/cleanup"]}),
+                        json!({"op": "replace", "path": "/metadata/finalizers", "value": []}),
+                    ]
+                }
+            )]
+        );
+        assert_eq!(
+            plan.warnings,
+            [Warning::RemovesFinalizers {
+                objects: vec![HeldBy {
+                    kind: "Cluster".to_owned(),
+                    name: "db".to_owned(),
+                    finalizers: vec!["cnpg.io/cleanup".to_owned()],
+                }]
+            }]
+        );
+    }
+
+    #[test]
+    fn a_force_deletion_is_refused_where_a_deletion_is_and_where_nothing_is_held() {
+        let mut zeabur = namespace("zeabur", &json!({"zeabur.com/project": "true"}));
+        zeabur["metadata"]["deletionTimestamp"] = json!("2026-10-26T00:00:00Z");
+        let cases = [
+            (
+                "not being deleted",
+                shop(),
+                vec![held("db", "shop", true, &["cnpg.io/cleanup"])],
+                "not_deleting",
+            ),
+            (
+                "Zeabur's own",
+                zeabur,
+                vec![held("db", "zeabur", true, &["cnpg.io/cleanup"])],
+                "zeabur_namespace",
+            ),
+            (
+                "nothing held",
+                terminating(),
+                vec![held("db", "shop", false, &["cnpg.io/cleanup"])],
+                "nothing_held",
+            ),
+        ];
+        for (case, ns, objects, code) in cases {
+            let error = forced(&ns, objects).unwrap_err();
+            assert_eq!(error.code, code, "{case}");
+        }
     }
 }

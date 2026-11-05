@@ -465,6 +465,7 @@ pub(crate) async fn open(
             | Change::Adopt
             | Change::Unadopt
             | Change::DeleteProject
+            | Change::ForceDeleteProject
             | Change::CreateProject { .. }
             | Change::Details { .. }
             | Change::BuildLimits { .. }

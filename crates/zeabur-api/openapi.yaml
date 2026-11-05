@@ -6178,6 +6178,18 @@ components:
             - deleteProject
       - type: object
         description: |-
+          Finish deleting a project whose Namespace a finalizer holds: remove the finalizers of the
+          objects the namespace controller waits on, never the Namespace's own (see the
+          `project_deletion` module). Planned on its own.
+        required:
+        - op
+        properties:
+          op:
+            type: string
+            enum:
+            - forceDeleteProject
+      - type: object
+        description: |-
           Create the project's Namespace, with the project label and, when given, its display
           name. Refused when a namespace of that name exists (adopt it instead), and for a name
           Kubernetes keeps for itself (`kube-` prefix). Planned on its own.
@@ -9696,6 +9708,27 @@ components:
       - progress
       - ok
       - idle
+    HeldBy:
+      type: object
+      description: >-
+        An object whose finalizers a force deletion removes
+        ([`Warning::RemovesFinalizers`]).
+      required:
+      - kind
+      - name
+      - finalizers
+      properties:
+        finalizers:
+          type: array
+          items:
+            type: string
+          description: The finalizers removed.
+        kind:
+          type: string
+          description: The kind.
+        name:
+          type: string
+          description: The name.
     HeldDomain:
       type: object
       description: A hostname that another project serves.
@@ -13063,6 +13096,24 @@ components:
         description: |-
           The plan deletes the project's Namespace and everything in it: what goes, and what
           happens to the data of each volume.
+      - type: object
+        description: |-
+          The plan removes these objects' finalizers, so their controllers do not finish their
+          cleanup: what they made outside the cluster, such as a backup in object storage or a
+          cloud disk, may stay.
+        required:
+        - objects
+        - code
+        properties:
+          code:
+            type: string
+            enum:
+            - removesFinalizers
+          objects:
+            type: array
+            items:
+              $ref: "#/components/schemas/HeldBy"
+            description: The objects, with the finalizers removed.
       - type: object
         description: |-
           Helm, Argo CD or Flux manages these objects of the deleted project: if the tool still

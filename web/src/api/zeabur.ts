@@ -1964,6 +1964,9 @@ export type Change =
       op: "deleteProject"
     }
   | {
+      op: "forceDeleteProject"
+    }
+  | {
       /**
        * The name to show instead of the namespace's.
        * @nullable
@@ -3009,6 +3012,18 @@ export type ProjectDeletion = {
 }
 
 /**
+ * An object whose finalizers a force deletion removes ([`Warning::RemovesFinalizers`]).
+ */
+export type HeldBy = {
+  /** The finalizers removed. */
+  finalizers: string[]
+  /** The kind. */
+  kind: string
+  /** The name. */
+  name: string
+}
+
+/**
  * Something a person should know before applying.
  */
 export type PlanWarning =
@@ -3265,6 +3280,11 @@ export type PlanWarning =
   | (ProjectDeletion & {
       code: "deletesProject"
     })
+  | {
+      code: "removesFinalizers"
+      /** The objects, with the finalizers removed. */
+      objects: HeldBy[]
+    }
   | {
       code: "recreated"
       /** The objects. */
