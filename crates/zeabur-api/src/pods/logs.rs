@@ -8,16 +8,17 @@
 use std::convert::Infallible;
 
 use axum::Json;
-use axum::extract::{Path, RawQuery};
+use axum::extract::{Path, RawQuery, State};
 use axum::response::sse::{Event as SseEvent, KeepAlive, Sse};
 use futures_util::{Stream, StreamExt as _};
 use utoipa::IntoParams;
 use zeabur_core::problem::{Kind, MEDIA_TYPE as PROBLEM, Problem};
 use zeabur_kube::{ClusterError, LogOptions, unavailable_log};
 use zeabur_model::Origin;
+use zeabur_telemetry::Feature;
 
 use crate::error::{ApiError, get_read, read_problem};
-use crate::handlers::Person;
+use crate::handlers::{AppState, Person};
 use crate::views::LogSnapshot;
 
 /// Which part of a container's log to read.
@@ -138,6 +139,7 @@ pub(crate) async fn logs(
               (status = 403, body = Problem, content_type = PROBLEM),
               (status = 404, description = "The pod does not exist, or the log asked for cannot be read (`log-unavailable`)", body = Problem, content_type = PROBLEM)))]
 pub(crate) async fn follow_logs(
+    State(state): State<AppState>,
     Person(cluster): Person,
     Path((project, pod)): Path<(String, String)>,
     RawQuery(query): RawQuery,
@@ -148,6 +150,7 @@ pub(crate) async fn follow_logs(
         .follow_pod_logs(&project, &pod, &query.options())
         .await
         .map_err(|e| log_problem(e, &what, &project, &pod))?;
+    (state.used)(Feature::LogsViewed);
     let events = lines.scan(false, move |failed, line| {
         if *failed {
             return std::future::ready(None);
