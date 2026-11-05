@@ -1607,7 +1607,7 @@ mod tests {
             .map(|(tag, _)| format!("          image: {tag}\n"))
             .collect();
         let manifest = format!(
-            "{}            # - name: CALICO_IPV4POOL_CIDR\n            #   value: \"192.168.0.0/16\"\n",
+            "{}            # - name: CALICO_IPV4POOL_CIDR\n            #   value: \"192.168.0.0/16\"\n            - name: CALICO_IPV4POOL_VXLAN\n              value: \"CrossSubnet\"\n",
             images.concat()
         );
         fs::write(&source, &manifest).unwrap();
