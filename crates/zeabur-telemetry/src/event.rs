@@ -246,6 +246,8 @@ pub enum Feature {
     TerminalOpened,
     /// Someone was invited.
     MemberInvited,
+    /// Services were created from a Docker Compose file.
+    Compose,
 }
 
 impl Feature {
@@ -257,6 +259,7 @@ impl Feature {
             Self::LogsViewed => "logs_viewed",
             Self::TerminalOpened => "terminal_opened",
             Self::MemberInvited => "member_invited",
+            Self::Compose => "compose",
         }
     }
 }
@@ -274,7 +277,7 @@ impl Serialize for Feature {
             }
             Self::DatabaseCreated(kind) => map.serialize_entry("kind", kind)?,
             Self::DomainAdded(kind) => map.serialize_entry("kind", kind)?,
-            Self::LogsViewed | Self::TerminalOpened | Self::MemberInvited => {}
+            Self::LogsViewed | Self::TerminalOpened | Self::MemberInvited | Self::Compose => {}
         }
         map.end()
     }

@@ -19,8 +19,8 @@ import { namespaceOps } from "@/model/project"
 /** Toasts with an action stay long enough to reach it. */
 const WITH_ACTION_MS = 10_000
 
-async function apply(project: string, token: string) {
-  return await zeabur.applyProject(project, { token })
+async function apply(project: string, token: string, via?: Schemas.Via) {
+  return await zeabur.applyProject(project, { token, via })
 }
 
 async function planAndApply(project: string, changes: Schemas.Change[]) {
@@ -55,7 +55,7 @@ export async function carryOut(confirmed: Confirmed): Promise<void> {
   const { project, token, ask, t, locale, view, navigate } = confirmed
   const id = toast.loading(t("plan.applying"), { description: ask.title })
   try {
-    const { applied } = await apply(project, token)
+    const { applied } = await apply(project, token, ask.via)
     const undo = confirmed.undo?.(applied)
     markCreated(ask.changes)
     void queryClient.invalidateQueries({ queryKey: ["project", project] })
