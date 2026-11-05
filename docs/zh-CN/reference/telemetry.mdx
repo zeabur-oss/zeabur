@@ -1,28 +1,33 @@
 ---
 title: 体验计划
 description: 加入体验计划后，Zeabur 和安装程序会发送什么、绝不发送什么；Zeabur 和 zeaburctl 如何检查新版本；以及如何分别关闭。
-source: "119a598e43c4"
+source: "a2c96ad0cebf"
 ---
 
-体验计划会发送版本和每天的使用人数，让我们知道有多少人在用、该先修哪里。用安装程序安装时默认加入，可以在确认页取消勾选；用 Helm 安装时默认不加入，需要自己开启。
+体验计划会发送版本、每天的使用人数和用过哪些功能，让我们知道有多少人在用、该先修哪里。用安装程序安装时默认加入，可以在确认页取消勾选；用 Helm 安装时默认不加入，需要自己开启。
 
 ## 会发送什么
 
-每个人每天（UTC）第一次使用 Zeabur 时，Zeabur 会发送一条事件；安装程序在安装开始、完成或失败时各发送一条。每条事件只带随机的安装代码和下表的属性，没有别的。安装代码由安装程序生成一次，或由你用 `uuidgen` 生成，不含任何机器的信息。数据保留 13 个月。
+每个人每天（UTC）第一次使用 Zeabur 时，Zeabur 会发送一条事件；每项功能每天（UTC）第一次用到同一组值时，Zeabur 也会发送一条；安装程序在安装开始、完成或失败时各发送一条。每条事件只带随机的安装代码和下表的属性，没有别的。安装代码由安装程序生成一次，或由你用 `uuidgen` 生成，不含任何机器的信息。数据保留 13 个月。
 
 | 事件 | 由谁发送 | 时机 |
 |---|---|---|
 | `zeabur_active` | Zeabur | 每个人每天（UTC）第一次使用 Zeabur 网页界面时 |
+| `feature_used` | Zeabur | 服务、数据库或域名创建成功之后；每项功能和对应的值，每天（UTC）只发送一次 |
 | `install_started` | 安装程序 | `apply` 开始 |
 | `install_finished` | 安装程序 | `apply` 顺利结束 |
 | `install_failed` | 安装程序 | `apply` 中途停止 |
 
 | 属性 | 事件 | 值 |
 |---|---|---|
-| `zeabur_version` | `zeabur_active` | Zeabur 的版本，例如 `0.1.1` |
-| `day` | `zeabur_active` | UTC 日期，例如 `2026-10-30` |
+| `zeabur_version` | `zeabur_active`、`feature_used` | Zeabur 的版本，例如 `0.1.1` |
+| `day` | `zeabur_active`、`feature_used` | UTC 日期，例如 `2026-10-30` |
 | `person` | `zeabur_active` | 32 位十六进制数字，只在同一个安装、同一天里区分不同的人 |
 | `mode` | `zeabur_active` | `in-cluster` |
+| `feature` | `feature_used` | `service_created`、`database_created` 或 `domain_added` |
+| `source` | `service_created` 的 `feature_used` | 服务怎么创建：`git`、`upload`、`image` 或 `template` |
+| `template` | `source` 为 `template` 的 `feature_used` | 模板在 Zeabur Catalog 里的 ID，例如 `wordpress`；Catalog 里没有的 ID 不会发送 |
+| `kind` | `database_created` 或 `domain_added` 的 `feature_used` | 数据库或对象存储：`postgresql`、`mongodb`、`mysql`、`mariadb`、`dragonfly` 或 `object-storage`。域名：名称属于 Zeabur 提供给新服务的其中一个域名后缀时是 `generated`，其他是 `custom` |
 | `installer_version` | 安装程序的事件 | 安装程序的版本 |
 | `profile` | 安装程序的事件 | `single-node`、`multi-node` 或 `personal` |
 | `distribution` | 安装程序的事件 | `k3s`、`rke2` 或 `kube-solo` |
@@ -32,6 +37,8 @@ source: "119a598e43c4"
 | `$geoip_disable` | 全部 | 固定为 `true`：不查询所在位置 |
 
 事件不会说明是谁。`person` 是用密钥算出的用户名加日期的哈希值。密钥从 Zeabur 的 plan key 派生，保存在集群的 Secret 里，从不发送，所以我们无法从哈希值反推用户名。同一个人一整天的 `person` 都一样，Zeabur 重启也不变；第二天就换成另一个，所以不同天无法关联起来。
+
+`feature_used` 没有 `person`，只表示今天用过某项功能，不说是谁、用了几次。浏览器不会发送任何东西，由 Zeabur 的服务器在创建成功之后发送。
 
 事件通过 HTTPS 发送到 PostHog（经由 `oss-nori.zeabur.com`），只尝试一次，超时很短。发送失败时不会重试，也不影响 Zeabur 或安装。PostHog 不保存 IP 地址。
 

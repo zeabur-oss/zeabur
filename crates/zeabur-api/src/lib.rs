@@ -145,6 +145,7 @@ pub mod services;
 pub mod settings;
 pub mod timeline;
 pub mod tools;
+pub mod used;
 pub mod views;
 
 use std::sync::Arc;
@@ -422,6 +423,8 @@ pub struct Options {
     pub reach: images::https::Reach,
     /// Zeabur's own service account in the terminal namespace (see [`tools`]).
     pub terminals: Option<Arc<dyn zeabur_kube::Cluster>>,
+    /// Receives each feature a successful write used, for the experience program.
+    pub used: used::Used,
 }
 
 impl Default for Options {
@@ -438,6 +441,7 @@ impl Default for Options {
             template_idle: zeabur_catalog::template_idle,
             reach: images::https::Reach::Any,
             terminals: None,
+            used: Arc::new(|_| {}),
         }
     }
 }
@@ -469,6 +473,7 @@ pub fn router_with(access: Arc<dyn ClusterAccess>, options: Options) -> Router {
         template_idle,
         reach,
         terminals,
+        used,
     } = options;
     let catalogue = Arc::new(zeabur_catalog::catalogue().unwrap_or_default());
     let tls = images::https::tls(settings.trusted_ca.as_deref());
@@ -495,6 +500,7 @@ pub fn router_with(access: Arc<dyn ClusterAccess>, options: Options) -> Router {
         github,
         releases: Arc::new(cluster::update::Releases::default()),
         terminals,
+        used,
     };
     routes()
         .route("/api/{*rest}", axum::routing::any(handlers::not_found))

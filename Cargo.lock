@@ -2824,6 +2824,7 @@ dependencies = [
  "zeabur-model",
  "zeabur-modules",
  "zeabur-plan",
+ "zeabur-telemetry",
  "zeabur-test-support",
  "zeabur-ui",
 ]

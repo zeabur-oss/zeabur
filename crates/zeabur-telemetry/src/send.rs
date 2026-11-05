@@ -162,7 +162,8 @@ mod tests {
 
     use super::*;
     use crate::event::{
-        Day, Distribution, ErrorCode, Failure, Install, Mode, Profile, Step, ZeaburActive,
+        DatabaseKind, Day, Distribution, DomainKind, ErrorCode, Failure, Feature, FeatureUsed,
+        Install, Mode, Profile, Source, Step, ZeaburActive,
     };
 
     /// A receiver on a free port that records each request body.
@@ -230,6 +231,14 @@ mod tests {
         }
     }
 
+    fn used(feature: Feature) -> FeatureUsed {
+        FeatureUsed {
+            zeabur_version: "0.1.0",
+            day: Day::from_unix(1_800_000_000),
+            feature,
+        }
+    }
+
     fn events() -> Vec<Event> {
         vec![
             Event::ZeaburActive(ZeaburActive {
@@ -238,6 +247,10 @@ mod tests {
                 person: "0123456789abcdef0123456789abcdef".to_owned(),
                 mode: Mode::InCluster,
             }),
+            Event::FeatureUsed(used(Feature::ServiceCreated(Source::Template("wordpress")))),
+            Event::FeatureUsed(used(Feature::ServiceCreated(Source::Git))),
+            Event::FeatureUsed(used(Feature::DatabaseCreated(DatabaseKind::ObjectStorage))),
+            Event::FeatureUsed(used(Feature::DomainAdded(DomainKind::Custom))),
             Event::InstallStarted(install()),
             Event::InstallFinished(install()),
             Event::InstallFailed(Failure {
@@ -329,6 +342,10 @@ mod tests {
             "day",
             "person",
             "mode",
+            "feature",
+            "source",
+            "template",
+            "kind",
             "installer_version",
             "profile",
             "distribution",
@@ -349,6 +366,30 @@ mod tests {
             assert_eq!(properties["$geoip_disable"], true);
             assert_eq!(body["batch"].as_array().unwrap().len(), 1);
         }
+    }
+
+    #[test]
+    fn a_feature_carries_only_its_own_enum_values() {
+        let body = |feature| {
+            let body: Value =
+                serde_json::from_str(&Event::FeatureUsed(used(feature)).body("k", &id())).unwrap();
+            body["batch"][0]["properties"].clone()
+        };
+        let template = body(Feature::ServiceCreated(Source::Template("wordpress")));
+        assert_eq!(template["feature"], "service_created");
+        assert_eq!(template["source"], "template");
+        assert_eq!(template["template"], "wordpress");
+        let git = body(Feature::ServiceCreated(Source::Git));
+        assert_eq!(git["source"], "git");
+        assert!(git.get("template").is_none());
+        assert_eq!(
+            body(Feature::DatabaseCreated(DatabaseKind::ObjectStorage))["kind"],
+            "object-storage"
+        );
+        assert_eq!(
+            body(Feature::DomainAdded(DomainKind::Generated))["kind"],
+            "generated"
+        );
     }
 
     #[test]

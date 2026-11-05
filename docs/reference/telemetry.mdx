@@ -3,25 +3,30 @@ title: Experience program
 description: What Zeabur and its installer send when you join the experience program, what they never send, how Zeabur and zeaburctl check for a newer version, and how to turn each off.
 ---
 
-The experience program sends the version and how many people use Zeabur each day, so we know how many installations are in use and what to fix first. The installer joins by default, and you can uncheck the box on its review page. With Helm, Zeabur stays out until you turn it on.
+The experience program sends the version, how many people use Zeabur each day and which features they use, so we know how many installations are in use and what to fix first. The installer joins by default, and you can uncheck the box on its review page. With Helm, Zeabur stays out until you turn it on.
 
 ## What is sent
 
-Zeabur sends one event the first time each person uses it in a UTC day, and the installer sends one event when an install starts, finishes or fails. Each event carries a random installation ID, the properties below and nothing else. The installer makes the ID once, or you make it with `uuidgen`; nothing about your machine goes into it. The data is kept for 13 months.
+Zeabur sends one event the first time each person uses it in a UTC day and one the first time each feature below is used with the same values in a UTC day, and the installer sends one event when an install starts, finishes or fails. Each event carries a random installation ID, the properties below and nothing else. The installer makes the ID once, or you make it with `uuidgen`; nothing about your machine goes into it. The data is kept for 13 months.
 
 | Event | Sent by | When |
 |---|---|---|
 | `zeabur_active` | Zeabur | The first time each person uses Zeabur's web interface in a UTC day |
+| `feature_used` | Zeabur | After a call that creates a service, a database or a domain succeeds; once for each feature and its values per UTC day |
 | `install_started` | Installer | `apply` begins |
 | `install_finished` | Installer | `apply` succeeds |
 | `install_failed` | Installer | `apply` stops |
 
 | Property | Events | Values |
 |---|---|---|
-| `zeabur_version` | `zeabur_active` | Zeabur's version, such as `0.1.1` |
-| `day` | `zeabur_active` | The UTC date, such as `2026-10-30` |
+| `zeabur_version` | `zeabur_active`, `feature_used` | Zeabur's version, such as `0.1.1` |
+| `day` | `zeabur_active`, `feature_used` | The UTC date, such as `2026-10-30` |
 | `person` | `zeabur_active` | 32 hexadecimal digits that tell people apart within one installation and one day |
 | `mode` | `zeabur_active` | `in-cluster` |
+| `feature` | `feature_used` | `service_created`, `database_created` or `domain_added` |
+| `source` | `feature_used` with `service_created` | How the service was made: `git`, `upload`, `image` or `template` |
+| `template` | `feature_used` with `source` `template` | The template's ID in Zeabur Catalog, such as `wordpress`; an ID the catalog doesn't carry isn't sent |
+| `kind` | `feature_used` with `database_created` or `domain_added` | The database or object storage: `postgresql`, `mongodb`, `mysql`, `mariadb`, `dragonfly` or `object-storage`. The domain: `generated` for a name under one of the domain suffixes Zeabur offers new services, `custom` for any other |
 | `installer_version` | the installer's events | The installer's version |
 | `profile` | the installer's events | `single-node`, `multi-node` or `personal` |
 | `distribution` | the installer's events | `k3s`, `rke2` or `kube-solo` |
@@ -31,6 +36,8 @@ Zeabur sends one event the first time each person uses it in a UTC day, and the 
 | `$geoip_disable` | all | Always `true`: no location is looked up |
 
 The event doesn't say who the person is. `person` is a keyed hash of the user name and the day. The key is derived from Zeabur's plan key, which stays in the cluster's Secret and is never sent, so we can't work out the user name from it. The same person gets the same `person` all day, even after Zeabur restarts, and a different one the next day, so their days can't be linked.
+
+`feature_used` has no `person`. It says that something was used today, not by whom or how often. Nothing is sent from your browser: Zeabur's server sends it after the call succeeds.
 
 Events go to PostHog through `oss-nori.zeabur.com` over HTTPS, one try with a short timeout. A failed request isn't retried and doesn't affect Zeabur or the install. PostHog doesn't keep IP addresses.
 
