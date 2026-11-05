@@ -13,7 +13,7 @@ import { ServiceStatus, StatusDot } from "@/components/status"
 import { Button, buttonVariants } from "@zeabur-oss/design-system/components/button"
 import type { usePresence } from "@zeabur-oss/design-system/components/presence"
 import { useT } from "@/i18n"
-import { podLogsLink, serviceLink } from "@/lib/place"
+import { podLogsLink, podObjectLink, serviceLink } from "@/lib/place"
 import { cn } from "@/lib/utils"
 import { neighboursOf, type Edge } from "@/model/connections"
 import { edgeText } from "@/model/evidence"
@@ -154,6 +154,12 @@ export function QuickLook({
                     {t("tab.logs")}
                   </Link>
                 ) : null}
+                <Link
+                  {...podObjectLink(project, pod.name)}
+                  className="shrink-0 rounded px-1.5 py-0.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                >
+                  {t("pod.yaml")}
+                </Link>
               </li>
             ))}
           </ul>

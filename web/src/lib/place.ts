@@ -2,6 +2,7 @@
 // every page uses to reach a project entry or a place on a service.
 import { useMatches, type RegisteredRouter, type RouteIds } from "@tanstack/react-router"
 
+import { objectKey } from "@/lib/objects"
 import { servicePlace, type ServicePlace } from "@/routes/search"
 
 export type ProjectEntry = "overview" | "objects" | "settings"
@@ -101,6 +102,13 @@ export const podLogsLink = (
   service: { kind: string; name: string },
   pod: string,
 ) => serviceLink(project, service, { tab: "logs", pod })
+
+/** The pod's YAML on the Objects page. */
+export const podObjectLink = (project: string, pod: string) => ({
+  to: "/projects/$project/objects" as const,
+  params: { project },
+  search: { object: objectKey({ group: "", version: "v1", resource: "pods", name: pod }) },
+})
 
 export const podEventsLink = (
   project: string,
