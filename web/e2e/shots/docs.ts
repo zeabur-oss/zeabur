@@ -80,7 +80,7 @@ test.describe(() => {
     })
   })
 
-  // Personal install (docs/zh-TW/get-started/personal.mdx). ZEABUR_DEMO_HOST: small has 1.5 GiB, docker has Docker.
+  // Personal install (docs/zh-TW/install/personal.mdx). ZEABUR_DEMO_HOST: small has 1.5 GiB, docker has Docker.
   test("installer-personal-choose", async ({ page, shot }) => {
     await page.goto("/", { waitUntil: "networkidle" })
     await page.locator('[data-slot="radio-option"]').first().click()

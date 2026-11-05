@@ -79,7 +79,7 @@ not `sort -V`.
    on a new k3s cluster on Linux amd64 and arm64, whose node pulled the published image, and run
    `zeaburctl` on macOS arm64.
 6. Check the draft: the notes, the asset list, the digests. Optionally install it on a cluster of
-   your own as [Install on an existing cluster](../get-started/install.mdx) describes.
+   your own as [Install on an existing cluster](../install/existing-cluster.mdx) describes.
 7. Publish it: on the release page, **Edit → Publish release**, or
    `gh release edit v0.1.1 --repo zeabur-oss/zeabur --draft=false`. Then download it once without signing in and repeat
    the checks above against the public release.

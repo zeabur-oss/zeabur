@@ -49,6 +49,9 @@ pub struct JoinFacts {
     pub ports: Vec<(u16, bool)>,
     /// The token carries the cluster CA's hash, so the node checks whom it joins.
     pub token_pinned: bool,
+    /// Longhorn's manager runs on this node, which has joined already: the cluster installed
+    /// Longhorn after it joined, so its configuration may not say `longhorn: true`.
+    pub longhorn_runs_here: bool,
 }
 
 /// One port and what was found.
@@ -308,7 +311,7 @@ fn standing_warnings(
             "join.storage.longhorn",
             &[],
             "The cluster runs Longhorn: apply installs an iSCSI initiator and an NFS client here, \
-             starts iscsid and loads iscsi_tcp. Longhorn then keeps replicas under \
+             starts iscsid and loads iscsi_tcp and dm_crypt. Longhorn then keeps replicas under \
              /var/lib/longhorn on this node's disk. Volumes on local-path still stay on the node \
              that created them."
                 .to_owned(),
@@ -398,11 +401,12 @@ pub fn plan(config: &JoinConfig, facts: &JoinFacts) -> Result<JoinPlan, PlanErro
     }
 
     let ports = ports(distribution, join.role, &facts.ports, &host, &mut warnings);
+    let longhorn = join.longhorn || facts.longhorn_runs_here;
     warnings.extend(standing_warnings(
         distribution,
         join.role,
         facts.token_pinned,
-        join.longhorn,
+        longhorn,
     ));
 
     Ok(JoinPlan {
@@ -414,7 +418,7 @@ pub fn plan(config: &JoinConfig, facts: &JoinFacts) -> Result<JoinPlan, PlanErro
         cluster,
         host_file_paths: host_files.iter().map(|f| f.path.clone()).collect(),
         host_files,
-        node_prep: join.longhorn.then_some(storage::LONGHORN_PREP),
+        node_prep: longhorn.then_some(storage::LONGHORN_PREP),
         rtt,
         ports,
         local_ports: distribution
@@ -463,6 +467,7 @@ mod tests {
             rtt_us: rtt_us.to_vec(),
             ports: vec![(9345, true), (6443, true), (10250, false)],
             token_pinned: true,
+            longhorn_runs_here: false,
         }
     }
 
@@ -596,6 +601,18 @@ mod tests {
         assert!(!codes(&p).contains(&"join.storage.local"));
         let p = plan(&config(""), &facts(&[500; 5])).unwrap();
         assert_eq!(p.node_prep, None);
+    }
+
+    #[test]
+    fn a_node_that_joined_before_longhorn_is_prepared_for_it() {
+        let facts = JoinFacts {
+            longhorn_runs_here: true,
+            ..facts(&[500; 5])
+        };
+        let p = plan(&config(""), &facts).unwrap();
+        assert_eq!(p.node_prep, Some(storage::LONGHORN_PREP));
+        assert!(codes(&p).contains(&"join.storage.longhorn"));
+        assert!(!codes(&p).contains(&"join.storage.local"));
     }
 
     #[test]

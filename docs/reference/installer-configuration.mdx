@@ -5,7 +5,7 @@ description: YAML fields, defaults, and secret file formats for creating a clust
 
 Put domains, component choices, and host settings in YAML, then run `zeabur-installer --config config.yaml plan` to preview the installation. The default file path is `/etc/zeabur-installer/config.yaml`. Field names are camelCase. The installer stops on misspelled or unknown fields.
 
-The web interface saves its choices to this same file. For installation through the web interface, see [Install Zeabur on a server](../get-started/quickstart.mdx). For command-line installation, see [Install with a configuration file and commands](../get-started/advanced-install.mdx). For command options, see [Installer commands](./installer.mdx).
+The web interface saves its choices to this same file. For installation through the web interface, see [Install Zeabur on a server](../get-started/quickstart.mdx). For command-line installation, see [Install with a configuration file and commands](../install/config-file.mdx). For command options, see [Installer commands](./installer.mdx).
 
 ## Configuration for creating a cluster
 
@@ -114,7 +114,7 @@ The installer always creates `local-path`, which stores data on the node at `/va
 - When Longhorn becomes the default, the installer changes its previously default `local-path` to a non-default class.
 - If the cluster already has another default class, the installer keeps it. If this installation would make Longhorn the default, `apply` stops. Remove the default annotation from the existing class, then run it again.
 
-When Longhorn is selected, `apply` installs the iSCSI initiator and NFS client on this host, loads `iscsi_tcp`, and starts `iscsid`. Every node running Longhorn needs these. See [Add nodes](../cluster/nodes.mdx).
+When Longhorn is selected, `apply` installs the iSCSI initiator and NFS client on this host, loads `iscsi_tcp` and `dm_crypt`, and starts `iscsid`. Every node running Longhorn needs these. See [Add nodes](../cluster/nodes.mdx).
 
 ### `distribution` and versions
 
@@ -170,7 +170,7 @@ An archive removed from `imageArchives` is also removed from the K3s or RKE2 imp
 
 ## Configuration for personal use
 
-With `use: personal` at the top level, the installer installs KubeSolo and components, without the Zeabur dashboard or Zeabur Identity. For instructions and limitations, see [Personal use: Install on a small machine](../get-started/personal.mdx).
+With `use: personal` at the top level, the installer installs KubeSolo and components, without the Zeabur dashboard or Zeabur Identity. For instructions and limitations, see [Personal use: Install on a small machine](../install/personal.mdx).
 
 ```yaml title="/etc/zeabur-installer/config.yaml"
 use: personal

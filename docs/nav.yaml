@@ -3,7 +3,13 @@
 # translations' nav.yaml refers to it, and it is part of each page's URL.
 - group: get-started
   label: Get started
-  pages: [quickstart, ai-agent, advanced-install, personal, install, upgrade, upgrade-notes, first-project, how-it-works]
+  pages: [quickstart, ai-agent, first-project, how-it-works]
+- group: install
+  label: More ways to install
+  pages: [config-file, personal, existing-cluster]
+- group: upgrade
+  label: Upgrade
+  pages: [steps, notes]
 - group: deploy
   label: Deploy
   pages: [git, upload, image, compose, templates, databases, object-storage, cron-jobs]

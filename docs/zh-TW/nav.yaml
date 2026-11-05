@@ -3,12 +3,19 @@
   pages:
     quickstart: 在一台伺服器安裝 Zeabur
     ai-agent: 請 AI Agent 幫你安裝
-    advanced-install: 用設定檔和指令安裝
-    personal: 自己用：在小機器上安裝
-    install: 把 Zeabur 裝進既有叢集
-    upgrade: 升級 Zeabur
     first-project: 部署第一個服務
     how-it-works: Zeabur 如何管理服務
+- group: install
+  label: 其他安裝方式
+  pages:
+    config-file: 用設定檔和指令安裝
+    personal: 自己用：在小機器上安裝
+    existing-cluster: 把 Zeabur 裝進既有叢集
+- group: upgrade
+  label: 升級
+  pages:
+    steps: 升級 Zeabur
+    notes: 升級須知
 - group: deploy
   label: 部署服務
   pages:

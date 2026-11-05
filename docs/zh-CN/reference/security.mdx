@@ -6,7 +6,7 @@ source: "6a1b767cfd46"
 
 把同事设为**开发者**之前，先检查项目里有哪些 Secret 和 ServiceAccount：开发者都能访问。打开**节点终端**就等于获得整台主机的 root 权限。Zeabur 沿用 Kubernetes 的身份和准入规则，下面按功能说明各类访问的范围。
 
-角色对照见[权限](./permissions.mdx)，安装配置见[在已有集群中安装](../get-started/install.mdx)和 [installer 配置](./installer-configuration.mdx)。
+角色对照见[权限](./permissions.mdx)，安装配置见[在已有集群中安装](../install/existing-cluster.mdx)和 [installer 配置](./installer-configuration.mdx)。
 
 ## 登录与凭证
 
@@ -388,7 +388,7 @@ K3s 改用 Calico 替代 flannel，由 Calico 执行 NetworkPolicy。
 
 ### 个人使用的安装
 
-个人使用的安装运行在 KubeSolo 上，没有上述保护。获得 `/etc/zeabur-installer/kubeconfig.yaml` 的人可以控制整个集群。KubeSolo 不执行网络策略，Zeabur 为项目创建的网络策略不会生效，项目之间也就没有隔离。KubeSolo 将数据保存在 SQLite 中，installer 不会另外加密 Secret，也不应用 CIS profile。这种安装只适合个人使用，见[个人使用：在小型机器上安装](../get-started/personal.mdx)。
+个人使用的安装运行在 KubeSolo 上，没有上述保护。获得 `/etc/zeabur-installer/kubeconfig.yaml` 的人可以控制整个集群。KubeSolo 不执行网络策略，Zeabur 为项目创建的网络策略不会生效，项目之间也就没有隔离。KubeSolo 将数据保存在 SQLite 中，installer 不会另外加密 Secret，也不应用 CIS profile。这种安装只适合个人使用，见[个人使用：在小型机器上安装](../install/personal.mdx)。
 
 helm-controller 按上游配置运行，ServiceAccount 拥有整个集群的权限，安装组件的 Job 也使用同一身份。
 

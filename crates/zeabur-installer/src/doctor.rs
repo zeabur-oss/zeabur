@@ -86,6 +86,7 @@ pub(crate) fn run() -> ExitCode {
                         .filter(|c| c.status != Status::Pass)
                         .map(|c| (c.status, c.detail)),
                 );
+                results.extend(longhorn_nodes(&kubectl));
             }
             if plan.get("zeabur").is_some_and(|z| !z.is_null()) {
                 results.push(deployment(&kubectl, IDENTITY_NAMESPACE, "zeabur-identity"));
@@ -300,8 +301,8 @@ pub(crate) fn components(kubectl: &Kubectl, plan: &Value) -> Vec<(Status, String
                 ),
             ));
         }
-        let failed = failed_health(checks.as_deref().unwrap_or_default(), |args| {
-            kubectl.wait(args).is_ok()
+        let failed = failed_health(checks.as_deref().unwrap_or_default(), |check, timeout| {
+            wait_health(check, timeout, |args| kubectl.wait(args)).is_ok()
         });
         if checks.is_some() && problems.is_empty() && failed.is_empty() {
             results.push((Status::Pass, passed(id, component)));
@@ -319,13 +320,13 @@ pub(crate) fn components(kubectl: &Kubectl, plan: &Value) -> Vec<(Status, String
 }
 
 /// The catalog's health checks that fail, each with its advice and the wait that failed.
-fn failed_health(checks: &[Health], wait: impl Fn(&[&str]) -> bool) -> Vec<String> {
+fn failed_health(checks: &[Health], wait: impl Fn(&Health, &str) -> bool) -> Vec<String> {
     checks
         .iter()
         .filter_map(|check| {
             let timeout = format!("--timeout={}", check.timeout);
             let args = check.args(&timeout);
-            (!wait(&args)).then(|| {
+            (!wait(check, &timeout)).then(|| {
                 format!(
                     "{}: {} To check again: kubectl wait {}",
                     check.name,
@@ -335,6 +336,16 @@ fn failed_health(checks: &[Health], wait: impl Fn(&[&str]) -> bool) -> Vec<Strin
             })
         })
         .collect()
+}
+
+/// Runs a health check: waits for its objects to exist, then for its condition.
+pub(crate) fn wait_health<E>(
+    check: &Health,
+    timeout: &str,
+    mut wait: impl FnMut(&[&str]) -> Result<(), E>,
+) -> Result<(), E> {
+    wait(&check.create_args(timeout))?;
+    wait(&check.args(timeout))
 }
 
 /// The Deployments and `DaemonSets` in a list that have fewer Pods available than they want, or
@@ -370,6 +381,74 @@ fn unavailable(list: &Value) -> Vec<String> {
             found.push(format!(
                 "{}/{name} has {have} of {want} Pods available",
                 kind.to_ascii_lowercase()
+            ));
+        }
+    }
+    found
+}
+
+/// The nodes whose Longhorn checks of iSCSI, NFS or kernel modules fail, as Longhorn's Node
+/// objects report them.
+fn longhorn_nodes(kubectl: &Kubectl) -> Vec<(Status, String)> {
+    let list = kubectl
+        .run(
+            &[
+                "get",
+                "nodes.longhorn.io",
+                "-n",
+                "longhorn-system",
+                "--output=json",
+            ],
+            None,
+        )
+        .map_err(|e| e.to_string())
+        .and_then(|out| serde_json::from_str::<Value>(&out).map_err(|e| e.to_string()));
+    match list {
+        Ok(list) => unprepared_nodes(&list)
+            .into_iter()
+            .map(|n| (Status::Fail, n))
+            .collect(),
+        Err(e) => vec![(Status::Warn, format!("reading Longhorn's nodes: {e}"))],
+    }
+}
+
+/// Longhorn's node conditions that a node's preparation makes true.
+const LONGHORN_PREP_CONDITIONS: [&str; 3] = [
+    "RequiredPackages",
+    "KernelModulesLoaded",
+    "NFSClientInstalled",
+];
+
+/// The Longhorn Node objects in a list with a preparation condition that is not true, as text.
+fn unprepared_nodes(list: &Value) -> Vec<String> {
+    let mut found = Vec::new();
+    for node in list
+        .get("items")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+    {
+        let name = node
+            .pointer("/metadata/name")
+            .and_then(Value::as_str)
+            .unwrap_or_default();
+        let failing: Vec<&str> = node
+            .pointer("/status/conditions")
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+            .filter(|c| {
+                c.get("type")
+                    .and_then(Value::as_str)
+                    .is_some_and(|t| LONGHORN_PREP_CONDITIONS.contains(&t))
+                    && c.get("status").and_then(Value::as_str) == Some("False")
+            })
+            .map(|c| c.get("message").and_then(Value::as_str).unwrap_or_default())
+            .collect();
+        if !failing.is_empty() {
+            found.push(format!(
+                "node {name} is not prepared for Longhorn ({}): run zeabur-installer apply on it",
+                failing.join("; ")
             ));
         }
     }
@@ -534,6 +613,90 @@ mod tests {
     }
 
     #[test]
+    fn a_longhorn_node_without_its_packages_is_named_with_longhorns_message() {
+        let node = |name: &str, conditions: Value| json!({"metadata": {"name": name}, "status": {"conditions": conditions}});
+        let list = json!({"items": [
+            node("vps-1", json!([
+                {"type": "Ready", "status": "True"},
+                {"type": "RequiredPackages", "status": "True"},
+                {"type": "NFSClientInstalled", "status": "True"},
+            ])),
+            node("vps-2", json!([
+                {"type": "Ready", "status": "True"},
+                {"type": "RequiredPackages", "status": "False",
+                 "message": "Missing packages: [nfs-common open-iscsi]"},
+                {"type": "KernelModulesLoaded", "status": "False",
+                 "message": "Kernel modules [iscsi_tcp] are not loaded"},
+            ])),
+            node("vps-3", json!([{"type": "Ready", "status": "False"}])),
+        ]});
+        assert_eq!(
+            unprepared_nodes(&list),
+            [
+                "node vps-2 is not prepared for Longhorn (Missing packages: [nfs-common \
+                 open-iscsi]; Kernel modules [iscsi_tcp] are not loaded): run zeabur-installer \
+                 apply on it"
+            ]
+        );
+    }
+
+    #[test]
+    fn a_health_check_waits_for_its_objects_to_exist_before_its_condition() {
+        let check = Health {
+            name: "nodes-ready".to_owned(),
+            wait: [
+                "--for=condition=Ready",
+                "nodes.longhorn.io",
+                "--all",
+                "-n",
+                "longhorn-system",
+            ]
+            .map(str::to_owned)
+            .to_vec(),
+            timeout: "60s".to_owned(),
+            advice: String::new(),
+        };
+        let mut calls: Vec<Vec<String>> = Vec::new();
+        let result = wait_health(&check, "--timeout=60s", |args| {
+            calls.push(args.iter().map(|&a| a.to_owned()).collect());
+            Ok::<(), ()>(())
+        });
+        assert_eq!(result, Ok(()));
+        assert_eq!(
+            calls,
+            [
+                [
+                    "--for=create",
+                    "nodes.longhorn.io",
+                    "--all",
+                    "-n",
+                    "longhorn-system",
+                    "--timeout=60s"
+                ],
+                [
+                    "--for=condition=Ready",
+                    "nodes.longhorn.io",
+                    "--all",
+                    "-n",
+                    "longhorn-system",
+                    "--timeout=60s"
+                ],
+            ]
+        );
+
+        let mut conditions = false;
+        let result = wait_health(&check, "--timeout=60s", |args| {
+            conditions |= args[0] != "--for=create";
+            Err(())
+        });
+        assert_eq!(result, Err(()));
+        assert!(
+            !conditions,
+            "the condition is not waited for when no object appeared"
+        );
+    }
+
+    #[test]
     fn a_failing_health_check_gives_the_catalogs_advice_and_its_wait() {
         let check = |name: &str, target: &str| Health {
             name: name.to_owned(),
@@ -547,8 +710,8 @@ mod tests {
             check("manager", "deployment/manager"),
             check("nodes-ready", "nodes.longhorn.io"),
         ];
-        assert_eq!(failed_health(&checks, |_| true), Vec::<String>::new());
-        let failed = failed_health(&checks, |args| !args.contains(&"nodes.longhorn.io"));
+        assert_eq!(failed_health(&checks, |_, _| true), Vec::<String>::new());
+        let failed = failed_health(&checks, |check, _| check.name != "nodes-ready");
         assert_eq!(
             failed,
             [
