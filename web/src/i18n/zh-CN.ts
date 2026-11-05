@@ -789,7 +789,6 @@ export const zhCN: Messages = {
   "pod.notReady": "未就绪",
   "pod.readyCount": (ready, total) => `${ready}/${total} 就绪`,
   "pod.restarts": (n) => `重启 ${n} 次`,
-  "pod.object": "对象 (YAML)",
   "pod.yaml": "YAML",
   "pod.logsOf": (pod) => `${pod} 的日志`,
   "resources.title": "资源",
