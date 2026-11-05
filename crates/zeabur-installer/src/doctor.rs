@@ -2,7 +2,7 @@
 //! `zeaburctl doctor` uses them: 0 OK, 1 warning, 2 critical, 3 when the checks cannot run.
 
 use std::process::ExitCode;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use serde_json::Value;
 use zeabur_installer_host::kubectl::Kubectl;
@@ -300,8 +300,8 @@ pub(crate) fn components(kubectl: &Kubectl, plan: &Value) -> Vec<(Status, String
                 ),
             ));
         }
-        let failed = failed_health(checks.as_deref().unwrap_or_default(), |args| {
-            kubectl.wait(args).is_ok()
+        let failed = failed_health(checks.as_deref().unwrap_or_default(), |check, timeout| {
+            wait_health(check, timeout, |args| kubectl.wait(args)).is_ok()
         });
         if checks.is_some() && problems.is_empty() && failed.is_empty() {
             results.push((Status::Pass, passed(id, component)));
@@ -319,13 +319,14 @@ pub(crate) fn components(kubectl: &Kubectl, plan: &Value) -> Vec<(Status, String
 }
 
 /// The catalog's health checks that fail, each with its advice and the wait that failed.
-fn failed_health(checks: &[Health], wait: impl Fn(&[&str]) -> bool) -> Vec<String> {
+fn failed_health(checks: &[Health], wait: impl Fn(&Health, Duration) -> bool) -> Vec<String> {
     checks
         .iter()
         .filter_map(|check| {
             let timeout = format!("--timeout={}", check.timeout);
             let args = check.args(&timeout);
-            (!wait(&args)).then(|| {
+            let within = check.timeout().unwrap_or(Duration::from_secs(60));
+            (!wait(check, within)).then(|| {
                 format!(
                     "{}: {} To check again: kubectl wait {}",
                     check.name,
@@ -335,6 +336,24 @@ fn failed_health(checks: &[Health], wait: impl Fn(&[&str]) -> bool) -> Vec<Strin
             })
         })
         .collect()
+}
+
+/// Runs a health check within `timeout`: waits for its objects to exist, then for its condition.
+pub(crate) fn wait_health<E>(
+    check: &Health,
+    timeout: Duration,
+    mut wait: impl FnMut(&[&str]) -> Result<(), E>,
+) -> Result<(), E> {
+    let deadline = Instant::now() + timeout;
+    wait(&check.create_args(&kubectl_timeout(timeout)))?;
+    let left = deadline
+        .saturating_duration_since(Instant::now())
+        .max(Duration::from_secs(1));
+    wait(&check.args(&kubectl_timeout(left)))
+}
+
+fn kubectl_timeout(d: Duration) -> String {
+    format!("--timeout={}ms", d.as_millis())
 }
 
 /// The Deployments and `DaemonSets` in a list that have fewer Pods available than they want, as
@@ -531,6 +550,58 @@ mod tests {
     }
 
     #[test]
+    fn a_health_check_waits_for_its_objects_to_exist_before_its_condition() {
+        let check = Health {
+            name: "nodes-ready".to_owned(),
+            wait: [
+                "--for=condition=Ready",
+                "nodes.longhorn.io",
+                "--all",
+                "-n",
+                "longhorn-system",
+            ]
+            .map(str::to_owned)
+            .to_vec(),
+            timeout: "60s".to_owned(),
+            advice: String::new(),
+        };
+        let mut calls: Vec<Vec<String>> = Vec::new();
+        let result = wait_health(&check, Duration::from_secs(60), |args| {
+            calls.push(args.iter().map(|&a| a.to_owned()).collect());
+            Ok::<(), ()>(())
+        });
+        assert_eq!(result, Ok(()));
+        let [create, ready] = calls.as_slice() else {
+            panic!("{calls:?}");
+        };
+        assert_eq!(create[0], "--for=create");
+        assert!(!create.iter().any(|a| a.starts_with("--for=condition")));
+        assert_eq!(create.last().map(String::as_str), Some("--timeout=60000ms"));
+        assert_eq!(ready[0], "--for=condition=Ready");
+        let left: u64 = ready
+            .last()
+            .and_then(|t| {
+                t.strip_prefix("--timeout=")?
+                    .strip_suffix("ms")?
+                    .parse()
+                    .ok()
+            })
+            .unwrap_or(u64::MAX);
+        assert!(left <= 60_000, "{ready:?}");
+
+        let mut conditions = false;
+        let result = wait_health(&check, Duration::from_secs(60), |args| {
+            conditions |= args[0] != "--for=create";
+            Err(())
+        });
+        assert_eq!(result, Err(()));
+        assert!(
+            !conditions,
+            "the condition is not waited for when no object appeared"
+        );
+    }
+
+    #[test]
     fn a_failing_health_check_gives_the_catalogs_advice_and_its_wait() {
         let check = |name: &str, target: &str| Health {
             name: name.to_owned(),
@@ -544,8 +615,8 @@ mod tests {
             check("manager", "deployment/manager"),
             check("nodes-ready", "nodes.longhorn.io"),
         ];
-        assert_eq!(failed_health(&checks, |_| true), Vec::<String>::new());
-        let failed = failed_health(&checks, |args| !args.contains(&"nodes.longhorn.io"));
+        assert_eq!(failed_health(&checks, |_, _| true), Vec::<String>::new());
+        let failed = failed_health(&checks, |check, _| check.name != "nodes-ready");
         assert_eq!(
             failed,
             [
