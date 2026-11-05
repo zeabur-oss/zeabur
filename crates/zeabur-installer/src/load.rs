@@ -15,6 +15,7 @@ use crate::InstallError;
 /// readable by others.
 pub(crate) fn document(path: &Path) -> Result<Document, InstallError> {
     let document = Document::parse(&read(path)?)?;
+    sources(&document)?;
     if let Document::Join(JoinConfig { join, .. }) = &document
         && join.token.is_some()
     {
@@ -53,6 +54,52 @@ pub(crate) fn personal(path: &Path) -> Option<PersonalConfig> {
         Ok(Document::Personal(config)) => Some(config),
         Ok(Document::Install(_) | Document::Join(_)) | Err(_) => None,
     }
+}
+
+/// Checks that each `sources` path is there: a file, or for `zeaburChart` a directory too.
+fn sources(document: &Document) -> Result<(), InstallError> {
+    let mut files: Vec<(String, &str)> = Vec::new();
+    let mut chart = None;
+    let archives = match document {
+        Document::Install(config) => {
+            let s = &config.sources;
+            for (key, path) in [("catalog", &s.catalog), ("identityctl", &s.identityctl)] {
+                if let Some(path) = path {
+                    files.push((key.to_owned(), path));
+                }
+            }
+            chart = s.zeabur_chart.as_deref();
+            &s.image_archives
+        }
+        Document::Join(config) => &config.sources.image_archives,
+        Document::Personal(config) => {
+            if let Some(path) = &config.sources.catalog {
+                files.push(("catalog".to_owned(), path));
+            }
+            return check_files(&files);
+        }
+    };
+    for (i, path) in archives.iter().enumerate() {
+        files.push((format!("imageArchives[{i}]"), path));
+    }
+    if let Some(path) = chart {
+        fs::metadata(path)
+            .map_err(|e| InstallError::Message(format!("sources.zeaburChart: {path}: {e}")))?;
+    }
+    check_files(&files)
+}
+
+fn check_files(files: &[(String, &str)]) -> Result<(), InstallError> {
+    for (key, path) in files {
+        let meta = fs::metadata(path)
+            .map_err(|e| InstallError::Message(format!("sources.{key}: {path}: {e}")))?;
+        if !meta.is_file() {
+            return Err(InstallError::Message(format!(
+                "sources.{key}: {path} is not a file"
+            )));
+        }
+    }
+    Ok(())
 }
 
 fn read(path: &Path) -> Result<String, InstallError> {
@@ -112,4 +159,66 @@ pub(crate) fn catalog(source: Option<&str>, state_dir: &str) -> Result<Index, In
         (None, None) => return Err(PlanError::Unpublished(vec!["catalog"]).into()),
     };
     Ok(Index::parse(&bytes)?)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn plan_error(dir: &Path, sources: &str) -> String {
+        let path = dir.join("config.yaml");
+        let yaml = format!(
+            "access:\n  mode: local\n  identity: identity.example.com\n  zeabur: zeabur.example.com\nsources:\n{sources}"
+        );
+        fs::write(&path, yaml).unwrap();
+        match document(&path) {
+            Ok(_) => String::new(),
+            Err(e) => e.to_string(),
+        }
+    }
+
+    #[test]
+    fn a_missing_or_wrong_kind_of_source_names_its_key() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("file");
+        fs::write(&file, "").unwrap();
+        let file = file.display().to_string();
+        let folder = dir.path().display().to_string();
+        let missing = dir.path().join("missing").display().to_string();
+        for key in ["catalog", "identityctl", "imageArchives"] {
+            let value = |path: &str| {
+                if key == "imageArchives" {
+                    format!("  {key}: [{path}]\n")
+                } else {
+                    format!("  {key}: {path}\n")
+                }
+            };
+            let shown = if key == "imageArchives" {
+                "imageArchives[0]"
+            } else {
+                key
+            };
+            let error = plan_error(dir.path(), &value(&missing));
+            assert!(
+                error.starts_with(&format!("sources.{shown}: {missing}:")),
+                "{error}"
+            );
+            let error = plan_error(dir.path(), &value(&folder));
+            assert_eq!(error, format!("sources.{shown}: {folder} is not a file"));
+            assert_eq!(plan_error(dir.path(), &value(&file)), "");
+        }
+        let error = plan_error(dir.path(), &format!("  zeaburChart: {missing}\n"));
+        assert!(
+            error.starts_with(&format!("sources.zeaburChart: {missing}:")),
+            "{error}"
+        );
+        assert_eq!(
+            plan_error(dir.path(), &format!("  zeaburChart: {folder}\n")),
+            ""
+        );
+        assert_eq!(
+            plan_error(dir.path(), &format!("  zeaburChart: {file}\n")),
+            ""
+        );
+    }
 }
