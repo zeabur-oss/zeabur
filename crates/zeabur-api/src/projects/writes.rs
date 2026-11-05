@@ -256,6 +256,19 @@ async fn compute_any(
 ) -> Result<Plan, ApiError> {
     if request.changes.iter().any(Change::is_terminal_change) {
         terminal::compute(planner, cluster, project, request, now).await
+    } else if request
+        .changes
+        .iter()
+        .any(|c| matches!(c, Change::ForceDeleteProject))
+    {
+        project_deletion::compute_force(
+            cluster,
+            project,
+            request,
+            now,
+            project_deletion::zeabur_namespaces(settings),
+        )
+        .await
     } else if request.changes.iter().any(Change::is_project_deletion) {
         project_deletion::compute(
             planner,

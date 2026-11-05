@@ -369,6 +369,10 @@ pub enum Change {
     /// Delete the project: its database objects, then its Namespace and everything in it, as
     /// `kubectl delete namespace` does (see the `project_deletion` module). Planned on its own.
     DeleteProject,
+    /// Finish deleting a project whose Namespace a finalizer holds: remove the finalizers of the
+    /// objects the namespace controller waits on, never the Namespace's own (see the
+    /// `project_deletion` module). Planned on its own.
+    ForceDeleteProject,
     /// Create the project's Namespace, with the project label and, when given, its display
     /// name. Refused when a namespace of that name exists (adopt it instead), and for a name
     /// Kubernetes keeps for itself (`kube-` prefix). Planned on its own.
@@ -499,6 +503,12 @@ impl Change {
     #[must_use]
     pub const fn is_project_deletion(&self) -> bool {
         matches!(self, Self::DeleteProject)
+    }
+
+    /// Whether the change deletes the project or finishes its deletion, alone.
+    #[must_use]
+    pub const fn deletes_project(&self) -> bool {
+        matches!(self, Self::DeleteProject | Self::ForceDeleteProject)
     }
 
     /// Whether the change writes the project's Namespace (creating it, adopting it, letting it
@@ -1443,6 +1453,14 @@ pub enum Warning {
     /// The plan deletes the project's Namespace and everything in it: what goes, and what
     /// happens to the data of each volume.
     DeletesProject(crate::project_deletion::ProjectDeletion),
+    /// The plan removes these objects' finalizers, so their controllers do not finish their
+    /// cleanup: what they made outside the cluster, such as a backup in object storage or a
+    /// cloud disk, may stay.
+    #[serde(rename_all = "camelCase")]
+    RemovesFinalizers {
+        /// The objects, with the finalizers removed.
+        objects: Vec<crate::project_deletion::HeldBy>,
+    },
     /// Helm, Argo CD or Flux manages these objects of the deleted project: if the tool still
     /// deploys them, it creates them again after the deletion.
     #[serde(rename_all = "camelCase")]

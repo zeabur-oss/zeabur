@@ -36,6 +36,7 @@ mod deleting;
 
 use axum::Json;
 use axum::extract::{Path, State};
+pub(crate) use deleting::held_objects;
 pub use deleting::{HeldObject, ProjectDeleting, RemainingContent, RemainingFinalizer};
 use serde::Serialize;
 use utoipa::ToSchema;
