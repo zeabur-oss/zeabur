@@ -798,6 +798,9 @@ pub(crate) async fn apply(
             false,
         ));
     }
+    if link.is_some() {
+        (state.used)(zeabur_telemetry::Feature::MemberInvited);
+    }
     Ok(Json(MemberApplied { link }))
 }
 

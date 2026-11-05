@@ -805,6 +805,7 @@ async fn run(
                 container: TOOLS_CONTAINER.to_owned(),
             };
             if exec::send_frame(&mut socket, &ready).await {
+                (terminal.used)(zeabur_telemetry::Feature::TerminalOpened);
                 exec::relay(socket, session, terminal.idle, terminal.signed_out.clone()).await;
             }
             if let (Some(closing), Some(zeabur)) =
