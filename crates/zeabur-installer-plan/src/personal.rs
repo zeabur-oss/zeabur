@@ -267,7 +267,7 @@ pub fn plan(
     let changes = facts
         .record
         .as_ref()
-        .map(|r| Changes::new(r, index, &components, KUBESOLO.version));
+        .map(|r| Changes::new(r, index, &components, KUBESOLO.version, None, None));
     Ok(PersonalPlan {
         use_: "personal",
         facts: facts.clone(),

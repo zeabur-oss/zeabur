@@ -148,6 +148,12 @@ pub(crate) fn changes(changes: Option<&Changes>, unit: &str) -> String {
     if let Some(v) = &c.version {
         push(&mut s, &format!("  {unit:<48} {} -> {}", v.from, v.to));
     }
+    for url in &c.urls {
+        push(
+            &mut s,
+            &format!("  {:<48} {} -> {}", url.name, url.from, url.to),
+        );
+    }
     for path in &c.host_files {
         push(&mut s, &format!("  {path:<48} changes"));
     }
@@ -561,6 +567,7 @@ mod tests {
                 values: false,
             }],
             version: None,
+            urls: Vec::new(),
             host_files: Vec::new(),
             restart: false,
         };

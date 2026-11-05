@@ -670,10 +670,16 @@ pub fn plan_with(
     let host_files = server_files(config, &chosen, facts, &node_name, registry.as_ref());
 
     let memory = memory(distribution, &components, facts.memory_mib, &mut warnings);
-    let changes = facts
-        .record
-        .as_ref()
-        .map(|r| Changes::new(r, index, &components, &cluster.version));
+    let changes = facts.record.as_ref().map(|r| {
+        Changes::new(
+            r,
+            index,
+            &components,
+            &cluster.version,
+            identity.as_ref().map(|i| i.issuer.as_str()),
+            zeabur.as_ref().map(|z| z.url.as_str()),
+        )
+    });
 
     Ok(Plan {
         storage: storage_plan(&components, profile, &mut warnings),
@@ -2889,6 +2895,32 @@ mod tests {
             Some("v1.0.0+k3s1")
         );
         assert!(changes.restart);
+    }
+
+    #[test]
+    fn a_changed_access_domain_is_a_change() {
+        let index = crate::catalog::pinned();
+        let first = plan(&index, &config(""), &facts()).unwrap();
+        let issuer = first.identity.as_ref().unwrap().issuer.clone();
+
+        let mut same = facts();
+        same.record = Some(recorded(&first, "0.0.1", |_| {}));
+        let unchanged = plan(&index, &config(""), &same).unwrap();
+        assert_eq!(unchanged.changes.unwrap().urls, []);
+
+        let mut moved = facts();
+        moved.record = Some(recorded(&first, "0.0.1", |summary| {
+            summary["identity"]["issuer"] = json!("https://old-identity.example.com");
+        }));
+        let changes = plan(&index, &config(""), &moved).unwrap().changes.unwrap();
+        assert_eq!(
+            changes.urls,
+            [record::UrlChange {
+                name: "Zeabur Identity".to_owned(),
+                from: "https://old-identity.example.com".to_owned(),
+                to: issuer,
+            }]
+        );
     }
 
     #[test]

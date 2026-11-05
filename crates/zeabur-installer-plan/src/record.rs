@@ -33,6 +33,10 @@ pub struct Record {
     pub values: BTreeMap<(String, String), String>,
     /// The components with a `HelmChart` release, which `apply` uninstalls when they leave.
     pub helm: BTreeSet<String>,
+    /// Zeabur Identity's issuer, `https://<identity>`.
+    pub identity: Option<String>,
+    /// Zeabur's URL.
+    pub zeabur: Option<String>,
 }
 
 impl Record {
@@ -92,6 +96,14 @@ impl Record {
             charts,
             values,
             helm,
+            identity: plan
+                .pointer("/identity/issuer")
+                .and_then(Value::as_str)
+                .map(str::to_owned),
+            zeabur: plan
+                .pointer("/zeabur/url")
+                .and_then(Value::as_str)
+                .map(str::to_owned),
         })
     }
 
@@ -137,6 +149,8 @@ pub struct Changes {
     pub charts: Vec<ChartChange>,
     /// The K3s, RKE2 or `KubeSolo` release, when it changes.
     pub version: Option<VersionChange>,
+    /// Zeabur Identity's or Zeabur's URL, when the access domains change.
+    pub urls: Vec<UrlChange>,
     /// Host files whose content changes; `apply` fills it.
     pub host_files: Vec<String>,
     /// `apply` restarts K3s, RKE2 or `KubeSolo`.
@@ -159,6 +173,17 @@ pub struct ChartChange {
     pub values: bool,
 }
 
+/// A URL that changes: certificates are issued again and sign-in moves to the new one.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct UrlChange {
+    /// What the URL is for, as `plan` names it.
+    pub name: String,
+    /// The recorded URL.
+    pub from: String,
+    /// The planned URL.
+    pub to: String,
+}
+
 /// A release that changes.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct VersionChange {
@@ -169,7 +194,8 @@ pub struct VersionChange {
 }
 
 impl Changes {
-    /// The changes of a plan with `components` and the `version` release.
+    /// The changes of a plan with `components`, the `version` release and the `identity` issuer
+    /// and `zeabur` URL.
     ///
     /// A left-out component counts as removed only when `apply` uninstalls it: it has a chart and
     /// `index` still knows it, as [`crate::remove::removals`] requires.
@@ -179,6 +205,8 @@ impl Changes {
         index: &Index,
         components: &[ComponentPlan],
         version: &str,
+        identity: Option<&str>,
+        zeabur: Option<&str>,
     ) -> Self {
         let planned: BTreeSet<&str> = components.iter().map(|c| c.id.as_str()).collect();
         let mut charts = Vec::new();
@@ -225,8 +253,25 @@ impl Changes {
                 from: from.clone(),
                 to: version.to_owned(),
             });
+        let mut urls = Vec::new();
+        let pairs = [
+            ("Zeabur Identity", record.identity.as_deref(), identity),
+            ("Zeabur", record.zeabur.as_deref(), zeabur),
+        ];
+        for (name, from, to) in pairs {
+            if let (Some(from), Some(to)) = (from, to)
+                && from != to
+            {
+                urls.push(UrlChange {
+                    name: name.to_owned(),
+                    from: from.to_owned(),
+                    to: to.to_owned(),
+                });
+            }
+        }
         Self {
             installer: record.installer.clone(),
+            urls,
             added: components
                 .iter()
                 .filter(|c| !record.components.contains(&c.id))
@@ -293,6 +338,8 @@ mod tests {
             charts: BTreeMap::new(),
             values: BTreeMap::new(),
             helm: BTreeSet::new(),
+            identity: None,
+            zeabur: None,
         };
         let error = record.check_installer().unwrap_err().to_string();
         assert!(
