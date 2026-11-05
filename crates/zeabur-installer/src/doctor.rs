@@ -279,9 +279,8 @@ pub(crate) fn components(kubectl: &Kubectl, plan: &Value) -> Vec<(Status, String
             ) {
                 Ok(out) => {
                     let list = serde_json::from_str::<Value>(&out).unwrap_or_default();
-                    let idle_ok = scale_targets(kubectl, ns);
                     problems.extend(
-                        unavailable(&list, &idle_ok)
+                        unavailable(&list)
                             .into_iter()
                             .map(|w| format!("{ns}: {w} (kubectl get pods -n {ns})")),
                     );
@@ -338,44 +337,9 @@ fn failed_health(checks: &[Health], wait: impl Fn(&[&str]) -> bool) -> Vec<Strin
         .collect()
 }
 
-/// The workloads that KEDA `ScaledObject`s in `namespace` scale, which may sit at 0 Pods. A
-/// cluster without KEDA has none.
-fn scale_targets(kubectl: &Kubectl, namespace: &str) -> Vec<String> {
-    let args = [
-        "get",
-        "scaledobjects.keda.sh",
-        "--namespace",
-        namespace,
-        "--output=json",
-    ];
-    let Ok(out) = kubectl.run(&args, None) else {
-        return Vec::new();
-    };
-    targets_of(&serde_json::from_str::<Value>(&out).unwrap_or_default())
-}
-
-/// The names in `spec.scaleTargetRef` of a `ScaledObject` list.
-fn targets_of(list: &Value) -> Vec<String> {
-    let mut names = Vec::new();
-    for item in list
-        .get("items")
-        .and_then(Value::as_array)
-        .into_iter()
-        .flatten()
-    {
-        if let Some(name) = item
-            .pointer("/spec/scaleTargetRef/name")
-            .and_then(Value::as_str)
-        {
-            names.push(name.to_owned());
-        }
-    }
-    names
-}
-
 /// The Deployments and `DaemonSets` in a list that have fewer Pods available than they want, or
-/// a Deployment scaled to 0 that is not in `idle_ok`, as text.
-fn unavailable(list: &Value, idle_ok: &[String]) -> Vec<String> {
+/// a Deployment scaled to 0, as text.
+fn unavailable(list: &Value) -> Vec<String> {
     let mut found = Vec::new();
     for item in list
         .get("items")
@@ -401,9 +365,7 @@ fn unavailable(list: &Value, idle_ok: &[String]) -> Vec<String> {
             )
         };
         if kind != "DaemonSet" && want == 0 {
-            if !idle_ok.iter().any(|n| n == name) {
-                found.push(format!("deployment/{name} is scaled to 0"));
-            }
+            found.push(format!("deployment/{name} is scaled to 0"));
         } else if have < want {
             found.push(format!(
                 "{}/{name} has {have} of {want} Pods available",
@@ -562,29 +524,12 @@ mod tests {
              "status": {"desiredNumberScheduled": 3, "numberAvailable": 2}},
         ]});
         assert_eq!(
-            unavailable(&list, &[]),
+            unavailable(&list),
             [
                 "deployment/moco-controller has 0 of 2 Pods available",
                 "deployment/off is scaled to 0",
                 "daemonset/agent has 2 of 3 Pods available"
             ]
-        );
-    }
-
-    #[test]
-    fn a_deployment_a_scaled_object_scales_may_sit_at_zero() {
-        let deployments = json!({"items": [
-            {"kind": "Deployment", "metadata": {"name": "cert-manager"},
-             "spec": {"replicas": 0}, "status": {}},
-            {"kind": "Deployment", "metadata": {"name": "worker"},
-             "spec": {"replicas": 0}, "status": {}},
-        ]});
-        let scaled = json!({"items": [
-            {"spec": {"scaleTargetRef": {"name": "worker"}}},
-        ]});
-        assert_eq!(
-            unavailable(&deployments, &targets_of(&scaled)),
-            ["deployment/cert-manager is scaled to 0"]
         );
     }
 
