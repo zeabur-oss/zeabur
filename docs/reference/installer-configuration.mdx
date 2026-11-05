@@ -144,7 +144,7 @@ A node keeps the name it was installed with. Running `apply` again reuses it, an
 
 Release builds of the installer don't need `sources`. They pin versions of Zeabur Catalog, Zeabur Identity, and Zeabur, download them to `/var/lib/rancher/zeabur-installer/downloads`, and check them against SHA-256 hashes compiled into the installer.
 
-Use `sources` to install your own builds, usually for development and testing. Specify only the fields you want to override; the rest keep their pinned versions. A development build of the installer that you compile yourself doesn't pin any versions, so you must specify `catalog`, `identityImage`, `identityctl`, `zeaburImage`, and `zeaburChart`. `plan` lists any that are missing. Replace the paths with the files you've prepared:
+Use `sources` to install your own builds, usually for development and testing. Specify only the fields you want to override; the rest keep their pinned versions. A development build of the installer that you compile yourself doesn't pin any versions, so you must specify `catalog`, `identityImage`, `identityctl`, `zeaburImage`, and `zeaburChart`. `plan` lists any that are missing, and stops when a path doesn't exist or is a directory where a file belongs. Only `zeaburChart` can be a directory. Replace the paths with the files you've prepared:
 
 ```yaml
 sources:
