@@ -118,6 +118,35 @@ mod tests {
         );
     }
 
+    async fn applied_via(app: &Router, changes: &Value, via: Option<&str>) {
+        let planned = plan(app, changes).await;
+        let (status, body) = send(
+            app,
+            "POST",
+            "/api/v1/projects/shop/apply",
+            Some(&json!({"token": planned["token"], "via": via})),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+    }
+
+    #[tokio::test]
+    async fn a_compose_import_is_sent_after_its_apply_and_a_plain_apply_is_not() {
+        let changes = json!([deployment()]);
+        let (app, seen) = api(&cluster());
+        let planned = plan(&app, &changes).await;
+        assert_eq!(taken(&seen), Vec::<Feature>::new());
+        assert_eq!(apply(&app, &planned).await, StatusCode::OK);
+        assert_eq!(taken(&seen), [Feature::ServiceCreated(Source::Image)]);
+
+        let (app, seen) = api(&cluster());
+        applied_via(&app, &changes, Some("compose")).await;
+        assert_eq!(
+            taken(&seen),
+            [Feature::ServiceCreated(Source::Image), Feature::Compose]
+        );
+    }
+
     #[tokio::test]
     async fn nothing_is_sent_when_the_apply_fails() {
         let cluster = cluster();

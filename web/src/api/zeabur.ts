@@ -387,11 +387,21 @@ export type AppliedObject = {
 }
 
 /**
+ * The form that made a plan.
+ */
+export type Via = (typeof Via)[keyof typeof Via]
+
+export const Via = {
+  compose: "compose",
+} as const
+
+/**
  * The token of a plan to apply.
  */
 export type ApplyRequest = {
   /** The token `plan` returned. */
   token: string
+  via?: Via | null
 }
 
 /**
