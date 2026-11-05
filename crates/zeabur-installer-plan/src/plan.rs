@@ -1498,19 +1498,17 @@ const CALICO_TUNNEL_ANNOTATIONS: [&str; 2] = [
 ///
 /// A node's traffic to pods on other nodes leaves from its VXLAN interface. Calico (K3s) names
 /// that interface's address in an annotation; Canal (RKE2) gives it the first address of the
-/// node's pod range. A node's traffic to its own pods passes without a rule, so a cluster of one
-/// node has none. Sorted and without repeats.
+/// node's pod range. A node's traffic to its own pods passes without a rule. Sorted and without
+/// repeats.
 #[must_use]
 pub fn node_sources(nodes: &Value) -> Vec<String> {
     let mut found = BTreeSet::new();
-    let items = nodes
+    for node in nodes
         .get("items")
         .and_then(Value::as_array)
-        .map_or(&[][..], Vec::as_slice);
-    if items.len() < 2 {
-        return Vec::new();
-    }
-    for node in items {
+        .into_iter()
+        .flatten()
+    {
         let calico: Vec<String> = CALICO_TUNNEL_ANNOTATIONS
             .iter()
             .filter_map(|key| {
@@ -2809,17 +2807,6 @@ mod tests {
             node_sources(&nodes),
             ["10.42.1.0", "10.42.8.64", "fd00:42:1::"]
         );
-    }
-
-    #[test]
-    fn a_single_node_has_no_other_node_to_let_in() {
-        let nodes = json!({"items": [{
-            "metadata": {"annotations": {
-                "projectcalico.org/IPv4VXLANTunnelAddr": "10.42.8.64",
-            }},
-            "spec": {"podCIDRs": ["10.42.0.0/24"]},
-        }]});
-        assert_eq!(node_sources(&nodes), Vec::<String>::new());
     }
 
     /// The record an `apply` of `plan` writes, from an installer at `installer`, edited by `edit`.
