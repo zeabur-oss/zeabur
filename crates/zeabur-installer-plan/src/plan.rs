@@ -16,7 +16,7 @@ use crate::catalog::{
 use crate::cluster::{self, Distribution, HostFile};
 use crate::config::{AccessMode, Config};
 use crate::pins::{self, CALICO, K3S, K3s, RKE2};
-use crate::record::{Changes, Record};
+use crate::record::{Changes, Planned, Record};
 use crate::remove::Removal;
 use crate::select::{self, Selection, Target, Why};
 use crate::storage::{self, NodePrep, Storage};
@@ -671,14 +671,13 @@ pub fn plan_with(
 
     let memory = memory(distribution, &components, facts.memory_mib, &mut warnings);
     let changes = facts.record.as_ref().map(|r| {
-        Changes::new(
-            r,
-            index,
-            &components,
-            &cluster.version,
-            identity.as_ref().map(|i| i.issuer.as_str()),
-            zeabur.as_ref().map(|z| z.url.as_str()),
-        )
+        let planned = Planned {
+            components: &components,
+            version: &cluster.version,
+            identity: identity.as_ref().map(|i| i.issuer.as_str()),
+            zeabur: zeabur.as_ref().map(|z| z.url.as_str()),
+        };
+        Changes::new(r, index, planned)
     });
 
     Ok(Plan {

@@ -184,6 +184,19 @@ pub struct UrlChange {
     pub to: String,
 }
 
+/// What a plan installs, to compare with the record.
+#[derive(Debug, Clone, Copy)]
+pub struct Planned<'a> {
+    /// The components.
+    pub components: &'a [ComponentPlan],
+    /// The K3s, RKE2 or `KubeSolo` release.
+    pub version: &'a str,
+    /// Zeabur Identity's issuer; `None` when the plan has no Zeabur Identity.
+    pub identity: Option<&'a str>,
+    /// Zeabur's URL; `None` when the plan has no Zeabur.
+    pub zeabur: Option<&'a str>,
+}
+
 /// A release that changes.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct VersionChange {
@@ -194,94 +207,48 @@ pub struct VersionChange {
 }
 
 impl Changes {
-    /// The changes of a plan with `components`, the `version` release and the `identity` issuer
-    /// and `zeabur` URL.
+    /// The changes `planned` makes against `record`.
     ///
     /// A left-out component counts as removed only when `apply` uninstalls it: it has a chart and
     /// `index` still knows it, as [`crate::remove::removals`] requires.
     #[must_use]
-    pub fn new(
-        record: &Record,
-        index: &Index,
-        components: &[ComponentPlan],
-        version: &str,
-        identity: Option<&str>,
-        zeabur: Option<&str>,
-    ) -> Self {
-        let planned: BTreeSet<&str> = components.iter().map(|c| c.id.as_str()).collect();
-        let mut charts = Vec::new();
-        for component in components {
-            for release in &component.releases {
-                let ReleasePlan::HelmChart { name, object, .. } = release else {
-                    continue;
-                };
-                let key = (component.id.clone(), name.clone());
-                let Some(from) = record.charts.get(&key) else {
-                    continue;
-                };
-                let Some(to) = object.pointer("/spec/version").and_then(Value::as_str) else {
-                    continue;
-                };
-                let values_changed = record.values.get(&key).is_some_and(|recorded| {
-                    object
-                        .pointer("/spec/valuesContent")
-                        .and_then(Value::as_str)
-                        .is_some_and(|planned| planned != recorded)
-                });
-                if from != to || values_changed {
-                    charts.push(ChartChange {
-                        component: component.id.clone(),
-                        release: name.clone(),
-                        from: from.clone(),
-                        to: to.to_owned(),
-                        values: values_changed,
-                    });
-                }
+    pub fn new(record: &Record, index: &Index, planned: Planned<'_>) -> Self {
+        let ids: BTreeSet<&str> = planned.components.iter().map(|c| c.id.as_str()).collect();
+        let mut added = Vec::new();
+        for component in planned.components {
+            if !record.components.contains(&component.id) {
+                added.push(component.id.clone());
             }
         }
-        let (removed, kept) = record
-            .components
-            .iter()
-            .filter(|id| !planned.contains(id.as_str()))
-            .cloned()
-            .partition(|id| record.helm.contains(id) && index.component(id).is_some());
+        let mut removed = Vec::new();
+        let mut kept = Vec::new();
+        for id in &record.components {
+            if ids.contains(id.as_str()) {
+                continue;
+            }
+            if record.helm.contains(id) && index.component(id).is_some() {
+                removed.push(id.clone());
+            } else {
+                kept.push(id.clone());
+            }
+        }
         let version = record
             .version
             .as_ref()
-            .filter(|from| *from != version)
+            .filter(|from| *from != planned.version)
             .map(|from| VersionChange {
                 from: from.clone(),
-                to: version.to_owned(),
+                to: planned.version.to_owned(),
             });
-        let mut urls = Vec::new();
-        let pairs = [
-            ("Zeabur Identity", record.identity.as_deref(), identity),
-            ("Zeabur", record.zeabur.as_deref(), zeabur),
-        ];
-        for (name, from, to) in pairs {
-            if let (Some(from), Some(to)) = (from, to)
-                && from != to
-            {
-                urls.push(UrlChange {
-                    name: name.to_owned(),
-                    from: from.to_owned(),
-                    to: to.to_owned(),
-                });
-            }
-        }
         Self {
             installer: record.installer.clone(),
-            urls,
-            added: components
-                .iter()
-                .filter(|c| !record.components.contains(&c.id))
-                .map(|c| c.id.clone())
-                .collect(),
+            added,
             removed,
             kept,
-            charts,
+            charts: chart_changes(record, planned.components),
             restart: version.is_some(),
             version,
+            urls: url_changes(record, planned),
             host_files: Vec::new(),
         }
     }
@@ -291,6 +258,67 @@ impl Changes {
         self.restart = self.version.is_some() || !paths.is_empty();
         self.host_files = paths;
     }
+}
+
+/// The planned charts whose version or values differ from the recorded ones.
+fn chart_changes(record: &Record, components: &[ComponentPlan]) -> Vec<ChartChange> {
+    let mut charts = Vec::new();
+    for component in components {
+        for release in &component.releases {
+            let ReleasePlan::HelmChart { name, object, .. } = release else {
+                continue;
+            };
+            let key = (component.id.clone(), name.clone());
+            let Some(from) = record.charts.get(&key) else {
+                continue;
+            };
+            let Some(to) = object.pointer("/spec/version").and_then(Value::as_str) else {
+                continue;
+            };
+            let values_changed = record.values.get(&key).is_some_and(|recorded| {
+                object
+                    .pointer("/spec/valuesContent")
+                    .and_then(Value::as_str)
+                    .is_some_and(|planned| planned != recorded)
+            });
+            if from != to || values_changed {
+                charts.push(ChartChange {
+                    component: component.id.clone(),
+                    release: name.clone(),
+                    from: from.clone(),
+                    to: to.to_owned(),
+                    values: values_changed,
+                });
+            }
+        }
+    }
+    charts
+}
+
+/// Zeabur Identity's and Zeabur's URLs, when both the record and the plan have one and they
+/// differ.
+fn url_changes(record: &Record, planned: Planned<'_>) -> Vec<UrlChange> {
+    let pairs = [
+        (
+            "Zeabur Identity",
+            record.identity.as_deref(),
+            planned.identity,
+        ),
+        ("Zeabur", record.zeabur.as_deref(), planned.zeabur),
+    ];
+    let mut urls = Vec::new();
+    for (name, from, to) in pairs {
+        if let (Some(from), Some(to)) = (from, to)
+            && from != to
+        {
+            urls.push(UrlChange {
+                name: name.to_owned(),
+                from: from.to_owned(),
+                to: to.to_owned(),
+            });
+        }
+    }
+    urls
 }
 
 /// The precedence of two versions as Semantic Versioning 2.0.0 orders them
