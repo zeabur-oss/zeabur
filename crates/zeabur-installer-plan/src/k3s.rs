@@ -217,9 +217,10 @@ const VXLAN_CROSS_SUBNET: &str =
 
 /// Calico's VXLAN manifest with K3s's pod network and the images pinned by digest.
 ///
-/// Pod traffic between nodes always goes through VXLAN. With the manifest's `CrossSubnet`, nodes
-/// in one subnet send it unencapsulated with pod addresses, which networks that check addresses
-/// drop, such as Parallels' shared network or AWS with its source/destination check on.
+/// Traffic between nodes always goes through VXLAN. With the manifest's `CrossSubnet`, a node
+/// reaches a pod on another node in its subnet from its own address instead of its tunnel
+/// address, and the baseline NetworkPolicy only lets tunnel addresses in, so webhook calls and
+/// probes from the API server and kubelet time out.
 ///
 /// IP forwarding in pods stays off, as with RKE2's Canal; `ServiceLB`'s pods turn it on with their
 /// own sysctl.
