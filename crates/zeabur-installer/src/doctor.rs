@@ -208,6 +208,9 @@ const fn rank(status: Status) -> u8 {
     }
 }
 
+/// The component that keeps a Node object for every node it has met.
+const LONGHORN: &str = "replicated-storage/longhorn";
+
 /// The line for a component whose checks pass. It names only what was checked: its workloads are
 /// reported under their namespace, so they may still be unavailable.
 fn passed(id: &str, component: &Value, checks: &[Health]) -> String {
@@ -273,8 +276,18 @@ pub(crate) fn components(kubectl: &Kubectl, plan: &Value) -> Vec<(Status, String
                 ),
             ));
         }
+        let removed = if id == LONGHORN {
+            longhorn_node_list(kubectl)
+                .map_or_else(|_| Vec::new(), |list| removed_longhorn_nodes(&list))
+        } else {
+            Vec::new()
+        };
+        if !removed.is_empty() {
+            results.push((Status::Warn, removed_longhorn_nodes_advice(&removed)));
+        }
         let failed = failed_health(checks.as_deref().unwrap_or_default(), |check, timeout| {
-            wait_health(check, timeout, |args| kubectl.wait(args)).is_ok()
+            (check.name == "nodes-ready" && !removed.is_empty())
+                || wait_health(check, timeout, |args| kubectl.wait(args)).is_ok()
         });
         if checks.is_some() && problems.is_empty() && failed.is_empty() {
             results.push((
@@ -417,7 +430,54 @@ fn unavailable(list: &Value) -> Vec<String> {
 /// The nodes whose Longhorn checks of iSCSI, NFS or kernel modules fail, as Longhorn's Node
 /// objects report them.
 fn longhorn_nodes(kubectl: &Kubectl) -> Vec<(Status, String)> {
-    let list = kubectl
+    match longhorn_node_list(kubectl) {
+        Ok(list) => unprepared_nodes(&list)
+            .into_iter()
+            .map(|n| (Status::Fail, n))
+            .collect(),
+        Err(e) => vec![(Status::Warn, format!("reading Longhorn's nodes: {e}"))],
+    }
+}
+
+/// The Longhorn Node objects whose Kubernetes node is gone.
+fn removed_longhorn_nodes(list: &Value) -> Vec<String> {
+    let mut found = Vec::new();
+    for node in list
+        .get("items")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+    {
+        for condition in node
+            .pointer("/status/conditions")
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+        {
+            if condition.get("type").and_then(Value::as_str) == Some("Ready")
+                && condition.get("reason").and_then(Value::as_str) == Some("KubernetesNodeGone")
+                && let Some(name) = node.pointer("/metadata/name").and_then(Value::as_str)
+            {
+                found.push(name.to_owned());
+            }
+        }
+    }
+    found
+}
+
+fn removed_longhorn_nodes_advice(names: &[String]) -> String {
+    format!(
+        "Longhorn still lists {}, which Kubernetes no longer has. Once every volume has a \
+         healthy replica on another node, remove its Longhorn node (the steps are under \
+         \"Remove a node\" in the node guide): kubectl -n longhorn-system delete \
+         nodes.longhorn.io {}",
+        names.join(", "),
+        names.join(" ")
+    )
+}
+
+fn longhorn_node_list(kubectl: &Kubectl) -> Result<Value, String> {
+    let out = kubectl
         .run(
             &[
                 "get",
@@ -428,15 +488,8 @@ fn longhorn_nodes(kubectl: &Kubectl) -> Vec<(Status, String)> {
             ],
             None,
         )
-        .map_err(|e| e.to_string())
-        .and_then(|out| serde_json::from_str::<Value>(&out).map_err(|e| e.to_string()));
-    match list {
-        Ok(list) => unprepared_nodes(&list)
-            .into_iter()
-            .map(|n| (Status::Fail, n))
-            .collect(),
-        Err(e) => vec![(Status::Warn, format!("reading Longhorn's nodes: {e}"))],
-    }
+        .map_err(|e| e.to_string())?;
+    serde_json::from_str(&out).map_err(|e| e.to_string())
 }
 
 /// Longhorn's node conditions that a node's preparation makes true.
@@ -709,6 +762,24 @@ mod tests {
                  app=longhorn-manager --field-selector spec.nodeName=vps-2"
             ]
         );
+    }
+
+    #[test]
+    fn a_longhorn_node_that_kubernetes_removed_is_named_with_the_removal_steps() {
+        let node = |name: &str, status: &str, reason: &str| {
+            json!({"metadata": {"name": name}, "status": {"conditions": [
+                {"type": "Ready", "status": status, "reason": reason},
+            ]}})
+        };
+        let list = json!({"items": [
+            node("vps-1", "True", ""),
+            node("vps-2", "False", "KubernetesNodeGone"),
+            node("vps-3", "False", "KubernetesNodeNotReady"),
+        ]});
+        assert_eq!(removed_longhorn_nodes(&list), ["vps-2"]);
+        let advice = removed_longhorn_nodes_advice(&["vps-2".to_owned()]);
+        assert!(advice.contains("no longer has"), "{advice}");
+        assert!(!advice.contains("longhorn: true"), "{advice}");
     }
 
     #[test]
