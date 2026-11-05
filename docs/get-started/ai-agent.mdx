@@ -1,0 +1,76 @@
+---
+title: Install with an AI Agent
+description: No command-line experience needed. Paste one message into Claude Code or Codex, and it installs Zeabur on your server over SSH and hands you the registration link.
+---
+
+You can install Zeabur without knowing Linux commands. Paste the message below into an AI Agent such as Claude Code or Codex. It connects to your server, downloads and verifies the installer, writes the config, installs Zeabur, and gives you the registration link for the first administrator.
+
+You make only two decisions along the way: which two domains to use, and whether to go ahead after reviewing the install plan.
+
+## Before you start
+
+- A server that meets the [quickstart requirements](quickstart.mdx#prepare-the-server). A Linux server from a cloud provider with at least 4 GiB of memory works.
+- An AI Agent on your own computer, such as Claude Code or Codex.
+- Two domains, such as `zeabur.example.com` and `login.example.com`, with DNS records pointing at the server. If you don't have a domain yet, the AI Agent uses sslip.io names instead.
+
+## 1. Let your computer sign in to the server with a key
+
+The AI Agent reaches the server through SSH on your computer. Set up key sign-in first so you never have to give the AI Agent a password.
+
+- Many cloud providers let you paste an SSH public key when you create the server. If you don't know where your public key is, ask the AI Agent to create a key on your computer, then paste the public key into the provider's console.
+- If the server already exists and only accepts a password, run this in a terminal on your computer and type the password once yourself:
+
+```sh
+ssh-copy-id <user>@<server>
+```
+
+Replace `<user>@<server>` with the account and address your provider gave you, for example `root@203.0.113.10`.
+
+Then run this to check. If it finishes without asking for a password, you're ready:
+
+```sh
+ssh <user>@<server> sudo true
+```
+
+## 2. Paste this into the AI Agent
+
+Open Claude Code or Codex on your computer, paste the message below, and replace `<user>@<server>` with your server:
+
+```text
+Install Zeabur on the server <user>@<server>. Connect over SSH and use sudo for commands that need root.
+
+1. Following "Download and verify binaries" at https://oss.zeabur.com/docs/zeabur/reference/releases, download zeabur-installer from the latest release at https://github.com/zeabur-oss/zeabur/releases, choosing linux-amd64 or linux-arm64 from the server's `uname -m`. Verify the signature of SHA256SUMS, the file's SHA-256 and the build provenance, and extract only when all three pass. If any of them fails, stop and tell me. Don't change the verification options to make it pass.
+2. Ask me for the two domains for Zeabur and sign-in (Identity). If I don't have any, use zeabur.<public address>.sslip.io and login.<public address>.sslip.io. If the server has only a private address, use local mode. Write /etc/zeabur-installer/config.yaml following https://oss.zeabur.com/docs/zeabur/get-started/advanced-install.
+3. Run sudo zeabur-installer plan, summarize the changes, warnings and failed checks for me in plain words, and wait for my go-ahead.
+4. Once I agree, run sudo zeabur-installer apply. If it fails partway, fix the cause, then run it again with the same config.
+5. When the installation finishes, run sudo zeabur-installer doctor and report the result.
+6. Give me the registration link for the first administrator exactly as printed. Don't open it and don't register a passkey yourself.
+
+For other details, see https://oss.zeabur.com/llms.txt.
+```
+
+## 3. Answer its two questions
+
+**Which two domains**: reply with the two domains you prepared. If you have none, say so and it uses sslip.io names.
+
+**Is the install plan OK**: it lists the changes, warnings and failed checks.
+
+- If a check failed, ask it to explain why and fix it, then show the plan again.
+- Warnings alone are fine to continue with, for example an unencrypted disk.
+- If everything looks right, reply "go ahead". The installation takes about 10 to 20 minutes.
+
+## 4. Open the registration link yourself
+
+When the installation finishes, the AI Agent gives you the registration link for the first administrator. Open it in your own browser, register a passkey, then sign in to Zeabur. See [Register the first administrator](quickstart.mdx#register-the-first-administrator) for the steps.
+
+<Callout type="warn">
+The registration link for the first administrator creates an admin account, and whoever opens it first controls the whole cluster. Have the AI Agent give you the link, and don't let it open the link itself.
+</Callout>
+
+In local mode, import the server's certificate authority into your browser or system and trust it before you register a passkey. You can ask the AI Agent to copy `/var/lib/rancher/zeabur-installer/local-ca.crt` to your computer.
+
+Next, [deploy your first service](first-project.mdx).
+
+## Click through the installer yourself
+
+Ask the AI Agent to use the [one command from the quickstart](quickstart.mdx#one-command) instead and hand you the link with the token. You open it and go through the five steps yourself.
