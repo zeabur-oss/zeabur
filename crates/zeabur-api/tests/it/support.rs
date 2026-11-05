@@ -87,6 +87,12 @@ impl TestApi {
         self
     }
 
+    /// `used` receives each feature a successful write used.
+    pub(crate) fn with_used(mut self, used: zeabur_api::used::Used) -> Self {
+        self.options.used = used;
+        self
+    }
+
     pub(crate) fn router(self) -> Router {
         let access: Arc<dyn ClusterAccess> = match self.token {
             Some(token) => Arc::new(Signed {

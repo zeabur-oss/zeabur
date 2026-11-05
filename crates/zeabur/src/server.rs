@@ -133,6 +133,11 @@ pub(crate) fn app(
         plan_key: Some(Arc::new(plan_key)),
         sign_in,
         zeabur_proxy,
+        used: {
+            let telemetry = Arc::clone(&auth.telemetry);
+            let clock = Arc::clone(&auth.clock);
+            Arc::new(move |feature| telemetry.used(feature, clock()))
+        },
         reach: zeabur_api::images::https::Reach::Public,
         ..zeabur_api::Options::default()
     };

@@ -18,6 +18,7 @@ mod domains;
 mod durability;
 mod evidence;
 mod exec;
+mod feature_used;
 mod files;
 mod github_app;
 mod images;
