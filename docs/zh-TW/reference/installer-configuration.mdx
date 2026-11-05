@@ -6,7 +6,7 @@ source: "1032006f1802"
 
 把網域、元件選擇和主機設定寫進 YAML，執行 `zeabur-installer --config config.yaml plan` 先看安裝內容。檔案預設放在 `/etc/zeabur-installer/config.yaml`。欄位用 camelCase，拼錯或多出欄位時，installer 會直接停下。
 
-網頁介面的選擇也存成這份檔案。用網頁介面安裝見[在一台伺服器安裝 Zeabur](../get-started/quickstart.mdx)，用指令安裝見[用設定檔和指令安裝](../get-started/advanced-install.mdx)，各指令的選項見 [Installer 指令](./installer.mdx)。
+網頁介面的選擇也存成這份檔案。用網頁介面安裝見[在一台伺服器安裝 Zeabur](../get-started/quickstart.mdx)，用指令安裝見[用設定檔和指令安裝](../install/config-file.mdx)，各指令的選項見 [Installer 指令](./installer.mdx)。
 
 ## 建立叢集的檔案
 
@@ -115,7 +115,7 @@ installer 一定會建立 `local-path`，資料放在節點的 `/var/lib/zeabur/
 - Longhorn 成為預設時，installer 原本設為預設的 `local-path` 會改成一般類別。
 - 叢集已有別的預設類別時，installer 保留原本的預設類別。如果這次要把 Longhorn 設為預設，`apply` 會停下，先拿掉原本類別的預設註解再執行一次。
 
-選了 Longhorn 時，`apply` 會在這台主機安裝 iSCSI initiator 和 NFS client、載入 `iscsi_tcp`、啟動 `iscsid`。每個執行 Longhorn 的節點都要有這些，見[加入節點](../cluster/nodes.mdx)。
+選了 Longhorn 時，`apply` 會在這台主機安裝 iSCSI initiator 和 NFS client、載入 `iscsi_tcp` 和 `dm_crypt`、啟動 `iscsid`。每個執行 Longhorn 的節點都要有這些，見[加入節點](../cluster/nodes.mdx)。
 
 ### `distribution` 與版本
 
@@ -171,7 +171,7 @@ sources:
 
 ## 自己用的檔案
 
-頂層寫 `use: personal` 時，installer 改裝 KubeSolo 和元件，不裝 Zeabur 面板和 Zeabur Identity。做法和限制見[自己用：在小機器上安裝](../get-started/personal.mdx)。
+頂層寫 `use: personal` 時，installer 改裝 KubeSolo 和元件，不裝 Zeabur 面板和 Zeabur Identity。做法和限制見[自己用：在小機器上安裝](../install/personal.mdx)。
 
 ```yaml title="/etc/zeabur-installer/config.yaml"
 use: personal

@@ -6,7 +6,7 @@ source: "9c36b7d3c51e"
 
 先用 `plan` 看設定會建立什麼，再以 root 執行 `apply`。安裝中斷時，修正原因後用同一份設定再執行一次 `apply`，每個步驟會先看現況，只補上缺少或不同的部分。
 
-用網頁介面安裝見[在一台伺服器安裝 Zeabur](../get-started/quickstart.mdx)，用設定檔和指令安裝見[用設定檔和指令安裝](../get-started/advanced-install.mdx)，YAML 欄位見 [Installer 設定](./installer-configuration.mdx)。已有 Kubernetes 叢集時，走[把 Zeabur 裝進既有叢集](../get-started/install.mdx)。
+用網頁介面安裝見[在一台伺服器安裝 Zeabur](../get-started/quickstart.mdx)，用設定檔和指令安裝見[用設定檔和指令安裝](../install/config-file.mdx)，YAML 欄位見 [Installer 設定](./installer-configuration.mdx)。已有 Kubernetes 叢集時，走[把 Zeabur 裝進既有叢集](../install/existing-cluster.mdx)。
 
 ## 共用參數
 
@@ -190,7 +190,7 @@ K3s 或 RKE2 移除後，`uninstall --purge` 清掉 installer 的下載快取、
 
 ### 自己用的安裝
 
-設定檔是 `use: personal` 時，`uninstall` 不刪東西，只印出移除 KubeSolo 的指令，見[自己用：在小機器上安裝](../get-started/personal.mdx#移除)。`node add` 和 `node sync` 不能用，因為 KubeSolo 只有一個節點。
+設定檔是 `use: personal` 時，`uninstall` 不刪東西，只印出移除 KubeSolo 的指令，見[自己用：在小機器上安裝](../install/personal.mdx#移除)。`node add` 和 `node sync` 不能用，因為 KubeSolo 只有一個節點。
 
 ## 安裝中斷時
 
