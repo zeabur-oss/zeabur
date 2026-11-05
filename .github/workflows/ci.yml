@@ -32,6 +32,7 @@ jobs:
       - uses: zeabur-oss/.github/actions/ci-setup@64a6547509a1911f03c4b1e62965ef9f2b4c39b6 # main
         with:
           rust-cache: true
+      - uses: ./.github/actions/catalog-release
       - run: nix develop -c scripts/ci/lint.sh
       - if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -50,6 +51,7 @@ jobs:
       - uses: zeabur-oss/.github/actions/ci-setup@64a6547509a1911f03c4b1e62965ef9f2b4c39b6 # main
         with:
           rust-cache: true
+      - uses: ./.github/actions/catalog-release
       - run: nix develop -c scripts/ci/test.sh
 
   ui:
@@ -63,6 +65,7 @@ jobs:
       - uses: zeabur-oss/.github/actions/ci-setup@64a6547509a1911f03c4b1e62965ef9f2b4c39b6 # main
         with:
           rust-cache: true
+      - uses: ./.github/actions/catalog-release
       - run: nix develop -c scripts/ci/ui.sh
 
   # Four to six minutes each, set up included: only in the merge queue, with the cluster jobs.
@@ -76,6 +79,7 @@ jobs:
       - uses: zeabur-oss/.github/actions/ci-setup@64a6547509a1911f03c4b1e62965ef9f2b4c39b6 # main
         with:
           rust-cache: true
+      - uses: ./.github/actions/catalog-release
       - run: nix develop -c scripts/ci/fuzz.sh
 
   no-ui:
@@ -88,6 +92,7 @@ jobs:
       - uses: zeabur-oss/.github/actions/ci-setup@64a6547509a1911f03c4b1e62965ef9f2b4c39b6 # main
         with:
           rust-cache: true
+      - uses: ./.github/actions/catalog-release
       - run: nix develop -c scripts/ci/no-ui.sh
 
   wording:
@@ -126,6 +131,7 @@ jobs:
       - uses: zeabur-oss/.github/actions/ci-setup@64a6547509a1911f03c4b1e62965ef9f2b4c39b6 # main
         with:
           rust-cache: true
+      - uses: ./.github/actions/catalog-release
       - run: nix develop -c scripts/ci/cluster.sh
 
   e2e:
@@ -138,6 +144,7 @@ jobs:
       - uses: zeabur-oss/.github/actions/ci-setup@64a6547509a1911f03c4b1e62965ef9f2b4c39b6 # main
         with:
           rust-cache: true
+      - uses: ./.github/actions/catalog-release
       - run: nix develop -c scripts/ci/e2e.sh
       - if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
