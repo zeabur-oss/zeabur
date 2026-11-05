@@ -5,7 +5,7 @@ description: Permissions and data boundaries for sign-in, secrets, applying chan
 
 Before assigning a coworker the **Developer** role, check which secrets and ServiceAccounts are in the project: developers can access all of them. Opening a **Node terminal** gives full root access to the host. Zeabur follows Kubernetes identity and admission rules.
 
-For role details, see [Permissions](./permissions.mdx). For installation settings, see [Install on an existing cluster](../get-started/install.mdx) and [Installer configuration](./installer-configuration.mdx).
+For role details, see [Permissions](./permissions.mdx). For installation settings, see [Install on an existing cluster](../install/existing-cluster.mdx) and [Installer configuration](./installer-configuration.mdx).
 
 ## Sign-in and credentials
 
@@ -388,7 +388,7 @@ The installer checks host disk encryption separately. With `host.requireEncrypte
 
 ### Personal installations
 
-Personal installations run on KubeSolo without the protections above. Anyone who obtains `/etc/zeabur-installer/kubeconfig.yaml` can control the entire cluster. KubeSolo doesn't enforce connection rules, so the rules Zeabur creates for projects have no effect, and projects aren't isolated from each other. KubeSolo stores data in SQLite. The installer doesn't add secret encryption or apply a CIS profile. This setup is only suitable for one person. See [Personal use: Install on a small machine](../get-started/personal.mdx).
+Personal installations run on KubeSolo without the protections above. Anyone who obtains `/etc/zeabur-installer/kubeconfig.yaml` can control the entire cluster. KubeSolo doesn't enforce connection rules, so the rules Zeabur creates for projects have no effect, and projects aren't isolated from each other. KubeSolo stores data in SQLite. The installer doesn't add secret encryption or apply a CIS profile. This setup is only suitable for one person. See [Personal use: Install on a small machine](../install/personal.mdx).
 
 helm-controller runs with its upstream configuration. Its ServiceAccount has cluster-wide permissions, and component installation Jobs use the same identity.
 

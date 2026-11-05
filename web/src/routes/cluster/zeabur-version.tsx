@@ -157,7 +157,7 @@ function UpgradeDialog({
             ))}
             <span className="flex flex-wrap gap-x-4 gap-y-2">
               <OutLink href={newer.latest.url}>{t("update.notesOf", newer.latest.version)}</OutLink>
-              <OutLink href={docsUrl(locale, local ? "reference/releases" : "get-started/upgrade")}>
+              <OutLink href={docsUrl(locale, local ? "reference/releases" : "upgrade/steps")}>
                 {t("update.guideFull")}
               </OutLink>
             </span>

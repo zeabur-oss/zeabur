@@ -415,11 +415,28 @@ impl Health {
     /// The arguments of the `kubectl wait`, with `timeout` in place of the check's own.
     #[must_use]
     pub fn args<'a>(&'a self, timeout: &'a str) -> Vec<&'a str> {
-        self.wait
-            .iter()
-            .map(String::as_str)
-            .chain(std::iter::once(timeout))
-            .collect()
+        let mut args = Vec::with_capacity(self.wait.len() + 1);
+        for arg in &self.wait {
+            args.push(arg.as_str());
+        }
+        args.push(timeout);
+        args
+    }
+
+    /// The arguments of a `kubectl wait` until the check's objects exist, with `timeout`.
+    ///
+    /// `kubectl wait --all` or `-l` fails at once while nothing matches yet.
+    #[must_use]
+    pub fn create_args<'a>(&'a self, timeout: &'a str) -> Vec<&'a str> {
+        let mut args = Vec::with_capacity(self.wait.len() + 1);
+        args.push("--for=create");
+        for arg in &self.wait {
+            if !arg.starts_with("--for=") {
+                args.push(arg);
+            }
+        }
+        args.push(timeout);
+        args
     }
 }
 

@@ -1,7 +1,7 @@
 ---
 title: 體驗計畫
 description: 加入體驗計畫後，Zeabur 和 installer 會傳送什麼、絕不傳送什麼；Zeabur 和 zeaburctl 怎麼檢查新版；以及怎麼分別關閉。
-source: "0239d29c3a48"
+source: "119a598e43c4"
 ---
 
 體驗計畫會傳送版本和每天的使用人數，讓我們知道有多少人在用、該先修哪裡。用 installer 安裝時預設加入，可以在確認頁取消勾選；用 Helm 安裝時預設不加入，要自己開啟。
@@ -76,7 +76,7 @@ kubectl -n zeabur logs deployment/zeabur | grep telemetry
 
 **在哪裡執行。**
 
-- 叢集頁一律顯示 `Zeabur v<版本>`。不管多少人打開 Zeabur，Zeabur 伺服器每小時最多問 GitHub 一次。頁面每次打開時讀它的結果，一直開著時每小時再讀一次。伺服器會留著上次的結果。連不到 GitHub 時先沿用，一分鐘後再試。GitHub 拒絕時，等 GitHub 重新計算後再試。瀏覽器不會連到 GitHub。「設定」›「關於」也會顯示版本，按「升級方式」會依 Zeabur 的安裝方式列出步驟，分為 zeabur-installer、Helm、Argo CD 和 Flux。請參閱[升級 Zeabur](../get-started/upgrade.mdx)。用 `zeaburctl ui` 開啟時，頁面顯示的是 `zeaburctl` 本身的版本和更新方式。
+- 叢集頁一律顯示 `Zeabur v<版本>`。不管多少人打開 Zeabur，Zeabur 伺服器每小時最多問 GitHub 一次。頁面每次打開時讀它的結果，一直開著時每小時再讀一次。伺服器會留著上次的結果。連不到 GitHub 時先沿用，一分鐘後再試。GitHub 拒絕時，等 GitHub 重新計算後再試。瀏覽器不會連到 GitHub。「設定」›「關於」也會顯示版本，按「升級方式」會依 Zeabur 的安裝方式列出步驟，分為 zeabur-installer、Helm、Argo CD 和 Flux。請參閱[升級 Zeabur](../upgrade/steps.mdx)。用 `zeaburctl ui` 開啟時，頁面顯示的是 `zeaburctl` 本身的版本和更新方式。
 - `zeaburctl` 每次執行指令都會檢查。檢查和指令同時進行，指令結束後 `zeaburctl` 最多再等一秒。有新版時，會在 stderr 印出一行。它不在磁碟上存任何東西。stderr 不是終端機，或設定了 `CI` 時，不會檢查。
 - 沒有權杖時，GitHub 每小時只回應同一個 IP 位址 60 次，共用這個位址的人一起算。用完時，`zeaburctl` 會印出提示。把 GitHub 權杖設在 `GH_TOKEN` 或 `GITHUB_TOKEN`（和 `gh` 讀的變數相同），`zeaburctl` 就會帶上它，改用你自己的額度。不給任何權限的 fine-grained 權杖就夠了。
 

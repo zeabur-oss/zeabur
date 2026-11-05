@@ -2,6 +2,6 @@
 default: patch
 ---
 
-# Doctor names the component that owns a broken workload
+# Doctor reports a broken workload once
 
-When several components share a namespace, `zeabur-installer doctor` blames an unavailable Deployment or DaemonSet on the component whose Helm release made it, including the ones an operator creates from that release's objects, instead of on every component in the namespace.
+`zeabur-installer doctor` lists an unavailable Deployment or DaemonSet once, under its namespace. Before, it was repeated under every component that installs into that namespace, such as the four in `observability`.

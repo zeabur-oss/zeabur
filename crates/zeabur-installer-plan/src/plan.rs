@@ -1712,7 +1712,7 @@ pub fn is_public(address: &str) -> bool {
     }
 }
 
-/// The chart values of docs/get-started/install.mdx, with the Secrets the installer creates.
+/// The chart values of docs/install/existing-cluster.mdx, with the Secrets the installer creates.
 /// The chart's `image` values for a reference: repository with a tag or a digest.
 fn image_values(image: &str) -> Value {
     let (repository, digest) = image
