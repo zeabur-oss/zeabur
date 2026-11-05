@@ -1,5 +1,5 @@
 //! Preparing a node for a component that needs host packages, kernel modules and services:
-//! Longhorn's iSCSI initiator, NFS client, `iscsid` and `iscsi_tcp`.
+//! Longhorn's iSCSI initiator, NFS client, `iscsid`, `iscsi_tcp` and `dm_crypt`.
 //!
 //! Each step looks first and changes only what is missing, so running it again changes nothing.
 

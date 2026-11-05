@@ -5,7 +5,8 @@
 //! profile say whether its class `longhorn` is the default (multi-node) or local-path stays it
 //! (single-node). Longhorn attaches volumes over iSCSI from the node itself, so every node needs
 //! an initiator, `iscsid` and the `iscsi_tcp` module before Longhorn's pods start there;
-//! `ReadWriteMany` volumes and NFS backups also need an NFS client.
+//! `ReadWriteMany` volumes and NFS backups also need an NFS client. Longhorn's node check also
+//! wants `dm_crypt`, which its encrypted volumes use.
 
 use serde::Serialize;
 use serde_json::Value;
@@ -18,7 +19,7 @@ pub const LONGHORN_CLASS: &str = "longhorn";
 pub const LOCAL_PATH_CLASS: &str = "local-path";
 /// The annotation that makes a storage class the default.
 pub const DEFAULT_CLASS_ANNOTATION: &str = "storageclass.kubernetes.io/is-default-class";
-/// Loads `iscsi_tcp` at boot, before `iscsid` starts.
+/// Loads `iscsi_tcp` and `dm_crypt` at boot, before `iscsid` starts.
 pub const MODULES_FILE: &str = "/etc/modules-load.d/zeabur-longhorn.conf";
 /// Keeps multipathd off Longhorn's disks.
 pub const MULTIPATH_FILE: &str = "/etc/multipath/conf.d/zeabur-longhorn.conf";
@@ -95,7 +96,7 @@ pub const LONGHORN_PREP: NodePrep = NodePrep {
             suse: "nfs-client",
         },
     ],
-    modules: &["iscsi_tcp"],
+    modules: &["iscsi_tcp", "dm_crypt"],
     services: &["iscsid"],
 };
 
@@ -144,7 +145,8 @@ mod tests {
         assert_eq!(node_prep(["ingress/traefik"].into_iter()), None);
         let prep = node_prep(["ingress/traefik", LONGHORN].into_iter()).unwrap();
         assert_eq!(prep.services, ["iscsid"]);
-        assert_eq!(prep.modules, ["iscsi_tcp"]);
+        // Longhorn's KernelModulesLoaded condition is False without dm_crypt.
+        assert_eq!(prep.modules, ["iscsi_tcp", "dm_crypt"]);
         assert_eq!(prep.packages[0].debian, "open-iscsi");
     }
 
