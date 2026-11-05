@@ -2,7 +2,7 @@
 //! `zeaburctl doctor` uses them: 0 OK, 1 warning, 2 critical, 3 when the checks cannot run.
 
 use std::process::ExitCode;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use serde_json::Value;
 use zeabur_installer_host::kubectl::Kubectl;
@@ -319,14 +319,13 @@ pub(crate) fn components(kubectl: &Kubectl, plan: &Value) -> Vec<(Status, String
 }
 
 /// The catalog's health checks that fail, each with its advice and the wait that failed.
-fn failed_health(checks: &[Health], wait: impl Fn(&Health, Duration) -> bool) -> Vec<String> {
+fn failed_health(checks: &[Health], wait: impl Fn(&Health, &str) -> bool) -> Vec<String> {
     checks
         .iter()
         .filter_map(|check| {
             let timeout = format!("--timeout={}", check.timeout);
             let args = check.args(&timeout);
-            let within = check.timeout().unwrap_or(Duration::from_secs(60));
-            (!wait(check, within)).then(|| {
+            (!wait(check, &timeout)).then(|| {
                 format!(
                     "{}: {} To check again: kubectl wait {}",
                     check.name,
@@ -338,22 +337,14 @@ fn failed_health(checks: &[Health], wait: impl Fn(&Health, Duration) -> bool) ->
         .collect()
 }
 
-/// Runs a health check within `timeout`: waits for its objects to exist, then for its condition.
+/// Runs a health check: waits for its objects to exist, then for its condition.
 pub(crate) fn wait_health<E>(
     check: &Health,
-    timeout: Duration,
+    timeout: &str,
     mut wait: impl FnMut(&[&str]) -> Result<(), E>,
 ) -> Result<(), E> {
-    let deadline = Instant::now() + timeout;
-    wait(&check.create_args(&kubectl_timeout(timeout)))?;
-    let left = deadline
-        .saturating_duration_since(Instant::now())
-        .max(Duration::from_secs(1));
-    wait(&check.args(&kubectl_timeout(left)))
-}
-
-fn kubectl_timeout(d: Duration) -> String {
-    format!("--timeout={}ms", d.as_millis())
+    wait(&check.create_args(timeout))?;
+    wait(&check.args(timeout))
 }
 
 /// The Deployments and `DaemonSets` in a list that have fewer Pods available than they want, as
@@ -566,31 +557,35 @@ mod tests {
             advice: String::new(),
         };
         let mut calls: Vec<Vec<String>> = Vec::new();
-        let result = wait_health(&check, Duration::from_secs(60), |args| {
+        let result = wait_health(&check, "--timeout=60s", |args| {
             calls.push(args.iter().map(|&a| a.to_owned()).collect());
             Ok::<(), ()>(())
         });
         assert_eq!(result, Ok(()));
-        let [create, ready] = calls.as_slice() else {
-            panic!("{calls:?}");
-        };
-        assert_eq!(create[0], "--for=create");
-        assert!(!create.iter().any(|a| a.starts_with("--for=condition")));
-        assert_eq!(create.last().map(String::as_str), Some("--timeout=60000ms"));
-        assert_eq!(ready[0], "--for=condition=Ready");
-        let left: u64 = ready
-            .last()
-            .and_then(|t| {
-                t.strip_prefix("--timeout=")?
-                    .strip_suffix("ms")?
-                    .parse()
-                    .ok()
-            })
-            .unwrap_or(u64::MAX);
-        assert!(left <= 60_000, "{ready:?}");
+        assert_eq!(
+            calls,
+            [
+                [
+                    "--for=create",
+                    "nodes.longhorn.io",
+                    "--all",
+                    "-n",
+                    "longhorn-system",
+                    "--timeout=60s"
+                ],
+                [
+                    "--for=condition=Ready",
+                    "nodes.longhorn.io",
+                    "--all",
+                    "-n",
+                    "longhorn-system",
+                    "--timeout=60s"
+                ],
+            ]
+        );
 
         let mut conditions = false;
-        let result = wait_health(&check, Duration::from_secs(60), |args| {
+        let result = wait_health(&check, "--timeout=60s", |args| {
             conditions |= args[0] != "--for=create";
             Err(())
         });

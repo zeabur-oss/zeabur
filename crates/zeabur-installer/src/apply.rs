@@ -157,7 +157,7 @@ fn install_components(kubectl: &Kubectl, plan: &Plan) -> Result<(), InstallError
         }
         releases(kubectl, component)?;
         for check in &component.health {
-            doctor::wait_health(check, Duration::from_secs(300), |args| kubectl.wait(args))?;
+            doctor::wait_health(check, "--timeout=5m", |args| kubectl.wait(args))?;
         }
         if let Some(registry) = plan
             .registry

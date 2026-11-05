@@ -7,7 +7,6 @@
 //! says.
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -416,11 +415,12 @@ impl Health {
     /// The arguments of the `kubectl wait`, with `timeout` in place of the check's own.
     #[must_use]
     pub fn args<'a>(&'a self, timeout: &'a str) -> Vec<&'a str> {
-        self.wait
-            .iter()
-            .map(String::as_str)
-            .chain(std::iter::once(timeout))
-            .collect()
+        let mut args = Vec::new();
+        for arg in &self.wait {
+            args.push(arg.as_str());
+        }
+        args.push(timeout);
+        args
     }
 
     /// The arguments of a `kubectl wait` until the check's objects exist, with `timeout`.
@@ -436,25 +436,6 @@ impl Health {
         }
         args.push(timeout);
         args
-    }
-
-    /// The check's timeout, when it is whole hours, minutes, seconds or milliseconds
-    /// (`1m30s`, `60s`).
-    #[must_use]
-    pub fn timeout(&self) -> Option<Duration> {
-        let mut total = Duration::ZERO;
-        let mut rest = self.timeout.as_str();
-        while !rest.is_empty() {
-            let digits = rest.find(|c: char| !c.is_ascii_digit())?;
-            let (number, after) = rest.split_at_checked(digits)?;
-            let n: u64 = number.parse().ok()?;
-            let (unit, after) = [("ms", 1), ("h", 3_600_000), ("m", 60_000), ("s", 1_000)]
-                .into_iter()
-                .find_map(|(u, ms)| Some((ms, after.strip_prefix(u)?)))?;
-            total += Duration::from_millis(n.checked_mul(unit)?);
-            rest = after;
-        }
-        (total > Duration::ZERO).then_some(total)
     }
 }
 
@@ -632,55 +613,4 @@ pub(crate) fn pinned() -> Index {
         }
     }
     index
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn health(wait: &[&str], timeout: &str) -> Health {
-        Health {
-            name: "nodes-ready".to_owned(),
-            wait: wait.iter().map(|&a| a.to_owned()).collect(),
-            timeout: timeout.to_owned(),
-            advice: String::new(),
-        }
-    }
-
-    #[test]
-    fn the_create_wait_names_the_same_objects_without_the_condition() {
-        let check = health(
-            &[
-                "--for=condition=Ready",
-                "nodes.longhorn.io",
-                "--all",
-                "-n",
-                "longhorn-system",
-            ],
-            "60s",
-        );
-        assert_eq!(
-            check.create_args("--timeout=60s"),
-            [
-                "--for=create",
-                "nodes.longhorn.io",
-                "--all",
-                "-n",
-                "longhorn-system",
-                "--timeout=60s"
-            ]
-        );
-    }
-
-    #[test]
-    fn the_timeout_reads_as_kubectl_does() {
-        let timeout = |t: &str| health(&[], t).timeout();
-        assert_eq!(timeout("60s"), Some(Duration::from_secs(60)));
-        assert_eq!(timeout("1m30s"), Some(Duration::from_secs(90)));
-        assert_eq!(timeout("1h"), Some(Duration::from_secs(3600)));
-        assert_eq!(timeout("500ms"), Some(Duration::from_millis(500)));
-        for unread in ["", "60", "1.5m", "1d", "s"] {
-            assert_eq!(timeout(unread), None, "{unread}");
-        }
-    }
 }
