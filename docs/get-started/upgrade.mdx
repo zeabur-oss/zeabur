@@ -57,7 +57,7 @@ Upgrade Zeabur on the server <user>@<server>. Connect over SSH and use sudo for 
 4. Read https://oss.zeabur.com/docs/zeabur/get-started/upgrade-notes/. For every section between the current and target versions, change the configuration file as "Installed with zeabur-installer" says, and show me what you changed. Before any step that deletes components or data, tell me and wait for my approval.
 5. Run sudo zeabur-installer plan with the new version. Summarize the components added and removed, what changes version, the warnings and any failed checks, and wait for me to confirm.
 6. Once I approve, run sudo zeabur-installer apply. If it fails partway, fix the cause, then run it again with the same configuration.
-7. If the upgrade notes say worker nodes must join again, ask me how to reach each worker node over SSH, then do it.
+7. If the upgrade notes say other nodes must join again, ask me how to reach each of them over SSH, then do it.
 8. Run sudo zeabur-installer doctor and report the result. Exit code 1 means warnings only.
 ```
 

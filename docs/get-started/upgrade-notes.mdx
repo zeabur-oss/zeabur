@@ -9,7 +9,7 @@ If you're skipping versions, start at the version you run now and read every sec
 
 ## v0.1 → v0.2
 
-On a server installed with zeabur-installer, change the configuration file and remove the zot that v0.1 installed, then run `plan` and `apply`. If you have worker nodes, have each one join again after the server is upgraded.
+On a server installed with zeabur-installer, change the configuration file and remove the zot that v0.1 installed, then run `plan` and `apply`. If other nodes joined later, worker nodes or RKE2 servers, have each one join again after the server is upgraded.
 
 If you installed with Helm, Argo CD or Flux, the chart values have no breaking changes. You only need to act if you added flags that v0.2 removed to the Deployment yourself. See below.
 
@@ -78,15 +78,15 @@ The zot you removed in step 2 also shows as `not removed, no longer updated` in 
 
 v0.2 reserves memory for the system so pods can't use it all and take the whole server down. So `apply` restarts K3s or RKE2. The Kubernetes API stops answering for about 10 seconds. Running apps keep serving.
 
-#### 4. Have worker nodes join again
+#### 4. Have the other nodes join again
 
-If you have no worker nodes, skip this step.
+Nodes that joined later have a `join` section in their configuration file: worker nodes, and on RKE2, servers added after the first. If no node has one, skip this step.
 
-In a worker's configuration file, v0.1's `join.zot` is `join.registry` in v0.2, and zot's address has changed, so join again with a new configuration:
+In their configuration files, v0.1's `join.zot` is `join.registry` in v0.2, and zot's address has changed, so join again with a new configuration:
 
-1. On the upgraded server, run `sudo zeabur-installer node add`.
-2. On each worker node, put the v0.2 installer in place, back up `/etc/zeabur-installer/config.yaml`, then paste what `node add` printed as root. It writes the new configuration file, then runs `plan` and `apply`.
-3. Once every worker node is `Ready`, run `sudo zeabur-installer node sync` on the server, then revoke the token as the last line of the `node add` output says. Until you run `node sync`, the network policies block the rejoined nodes.
+1. On the upgraded server, run `sudo zeabur-installer node add`. For RKE2 servers that joined later, add `--role server` so they keep their server role.
+2. On each of those nodes, put the v0.2 installer in place, back up `/etc/zeabur-installer/config.yaml`, then paste what `node add` printed as root. It writes the new configuration file, then runs `plan` and `apply`.
+3. Once every node is `Ready`, if any worker nodes joined, run `sudo zeabur-installer node sync` on the server, then revoke the token as the last line of the `node add` output says. Until you run `node sync`, the network policies block the rejoined nodes.
 
 For `node add`'s options and how to revoke its token, see [Manage nodes](../cluster/nodes.mdx).
 

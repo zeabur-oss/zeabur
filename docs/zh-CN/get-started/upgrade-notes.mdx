@@ -1,7 +1,7 @@
 ---
 title: 升级须知
 description: 每一版不兼容的变更，以及升级前要先做的事。一次跨好几版时，依次看过中间每一节。
-source: "6efdd23dd52d"
+source: "83fbd53c7555"
 ---
 
 这一页列出每一版不兼容的变更，以及升级前要先做的事。升级的步骤本身见[升级 Zeabur](upgrade.mdx)。
@@ -10,7 +10,7 @@ source: "6efdd23dd52d"
 
 ## v0.1 → v0.2
 
-用 zeabur-installer 安装的服务器，要先改配置文件、移除 v0.1 装的 zot，再运行 `plan` 和 `apply`。有工作节点时，服务器升级完要让每个工作节点重新加入。
+用 zeabur-installer 安装的服务器，要先改配置文件、移除 v0.1 装的 zot，再运行 `plan` 和 `apply`。有后来加入的节点时，例如工作节点或 RKE2 的其他服务器，服务器升级完要让每个节点重新加入。
 
 用 Helm、Argo CD 或 Flux 安装的，chart 的值没有不兼容的变更。只有自己在 Deployment 加过 v0.2 去掉的参数时，要先删掉，见下面的说明。
 
@@ -79,15 +79,15 @@ kubectl delete clusterrole system-upgrade-controller system-upgrade-controller-d
 
 v0.2 会给系统预留内存，避免 Pod 用光内存拖垮整台服务器，所以 `apply` 会重启 K3s 或 RKE2。Kubernetes API 约有 10 秒不响应，运行中的应用照常服务。
 
-#### 4. 让工作节点重新加入
+#### 4. 让其他节点重新加入
 
-没有工作节点的话，可以跳过这一步。
+后来加入的节点，配置文件里都有 `join`，包括工作节点，以及 RKE2 在第一台之后加入的服务器。没有这种节点的话，可以跳过这一步。
 
-工作节点的配置文件里，v0.1 的 `join.zot` 在 v0.2 改成了 `join.registry`，zot 的地址也换了，所以要用新的配置重新加入：
+这些节点的配置文件里，v0.1 的 `join.zot` 在 v0.2 改成了 `join.registry`，zot 的地址也换了，所以要用新的配置重新加入：
 
-1. 在升级好的服务器运行 `sudo zeabur-installer node add`。
-2. 在每个工作节点换上 v0.2 的 installer，备份 `/etc/zeabur-installer/config.yaml`，再用 root 粘贴 `node add` 输出的内容。它会写入新的配置文件，再运行 `plan` 和 `apply`。
-3. 工作节点都 `Ready` 后，在服务器运行 `sudo zeabur-installer node sync`，再按 `node add` 输出的最后一行撤销令牌。没有运行 `node sync` 的话，网络策略会拦住重新加入的节点。
+1. 在升级好的服务器运行 `sudo zeabur-installer node add`。RKE2 后来加入的服务器要加上 `--role server`，才会保留服务器的角色。
+2. 在每个节点换上 v0.2 的 installer，备份 `/etc/zeabur-installer/config.yaml`，再用 root 粘贴 `node add` 输出的内容。它会写入新的配置文件，再运行 `plan` 和 `apply`。
+3. 节点都 `Ready` 后，有工作节点重新加入的话，在服务器运行 `sudo zeabur-installer node sync`，再按 `node add` 输出的最后一行撤销令牌。没有运行 `node sync` 的话，网络策略会拦住重新加入的节点。
 
 `node add` 的选项和令牌怎么撤销，见[管理节点](../cluster/nodes.mdx)。
 

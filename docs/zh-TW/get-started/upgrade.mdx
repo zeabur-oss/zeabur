@@ -1,7 +1,7 @@
 ---
 title: 升級 Zeabur
 description: 查看目前的 Zeabur 版本，依安裝方式用 zeabur-installer、Helm、Argo CD、Flux 或 zeaburctl 升級，並在升級後確認新版本。
-source: "228d3e4db777"
+source: "4c2e9bff5f6a"
 ---
 
 先看你是怎麼安裝的，再照該段升級。升級不會自動發生，Zeabur 只會告訴你有新版本。
@@ -58,7 +58,7 @@ K3s、RKE2 或 KubeSolo 的版本或主機檔案有變時，`apply` 會重新啟
 4. 讀 https://oss.zeabur.com/zh-TW/docs/zeabur/get-started/upgrade-notes/，從目前版本到目標版本之間的每一節，照「用 zeabur-installer 安裝」的步驟修改設定檔，把改了哪些地方給我看。要刪除元件或資料的步驟，先告訴我，等我同意再做。
 5. 用新版執行 sudo zeabur-installer plan，把新增和移除的元件、要換版的部分、警告和沒通過的檢查整理給我看，等我確認再繼續。
 6. 我同意後執行 sudo zeabur-installer apply。中途失敗時，先修好原因，再用同一份設定重新執行。
-7. 升級須知要求工作節點重新加入時，問我每個工作節點怎麼用 SSH 連線，再照著做。
+7. 升級須知要求其他節點重新加入時，問我每個節點怎麼用 SSH 連線，再照著做。
 8. 執行 sudo zeabur-installer doctor，回報結果。結束碼 1 表示只有警告。
 ```
 
