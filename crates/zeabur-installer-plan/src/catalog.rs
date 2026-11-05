@@ -423,22 +423,19 @@ impl Health {
             .collect()
     }
 
-    /// The arguments of a `kubectl wait --for=create` of the same objects, with `timeout`.
+    /// The arguments of a `kubectl wait` until the check's objects exist, with `timeout`.
     ///
-    /// `kubectl wait --all` (or `-l`) fails at once with "no matching resources found" while
-    /// none exist yet, as with the objects a controller creates after install. `--for=create`
-    /// waits for at least one (kubectl 1.33 for `--all` and `-l`).
+    /// `kubectl wait --all` or `-l` fails at once while nothing matches yet.
     #[must_use]
     pub fn create_args<'a>(&'a self, timeout: &'a str) -> Vec<&'a str> {
-        std::iter::once("--for=create")
-            .chain(
-                self.wait
-                    .iter()
-                    .map(String::as_str)
-                    .filter(|a| !a.starts_with("--for=")),
-            )
-            .chain(std::iter::once(timeout))
-            .collect()
+        let mut args = vec!["--for=create"];
+        for arg in &self.wait {
+            if !arg.starts_with("--for=") {
+                args.push(arg);
+            }
+        }
+        args.push(timeout);
+        args
     }
 
     /// The check's timeout, when it is whole hours, minutes, seconds or milliseconds
