@@ -169,6 +169,14 @@ Next, sign in to the removed VM and run these as `root`, with the uninstall scri
 zeabur-installer uninstall --purge
 ```
 
+If the cluster uses Longhorn, it still lists the removed node, and `doctor` reports `replicated-storage/longhorn` as critical. Once every volume has a healthy replica on another node, stop scheduling on the node, delete its replicas and then the Longhorn node:
+
+```sh
+kubectl -n longhorn-system patch nodes.longhorn.io <node> --type=merge -p '{"spec":{"allowScheduling":false}}'
+kubectl -n longhorn-system delete replicas.longhorn.io $(kubectl -n longhorn-system get replicas.longhorn.io -o jsonpath='{range .items[?(@.spec.nodeID=="<node>")]}{.metadata.name}{" "}{end}')
+kubectl -n longhorn-system delete nodes.longhorn.io <node>
+```
+
 **After deleting the Kubernetes node, you must also complete the uninstall on the VM.** Until you do, the VM rejoins the cluster whenever `k3s-agent` or RKE2 restarts.
 
 Volumes under `/var/lib/zeabur/storage` remain on the VM. Delete them manually only after confirming you no longer need the data.
