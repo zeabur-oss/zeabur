@@ -1,0 +1,45 @@
+name: Profile switch
+
+# zeabur-installer on the runner's host, switching one K3s install from single-node to multi-node
+# and back with data in it (scripts/ci/profile-switch.sh), weekly on one runner.
+
+on:
+  schedule:
+    - cron: "0 4 * * 0"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  profile-switch:
+    runs-on: ubuntu-26.04-arm
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: zeabur-oss/.github/actions/ci-setup@64a6547509a1911f03c4b1e62965ef9f2b4c39b6 # main
+        with:
+          rust-cache: true
+      # K3s runs on this host, which Docker's netfilter rules would break: stopping Docker leaves
+      # the FORWARD policy DROP, so pods reach nothing outside the node. Remove the rules as
+      # uninstalling Docker would; the security table holds the runner's own rules and stays.
+      - name: Remove Docker
+        run: |
+          sudo systemctl stop docker.socket docker.service
+          for ipt in iptables ip6tables; do
+            for table in filter nat; do
+              sudo "$ipt" -t "$table" -F
+              sudo "$ipt" -t "$table" -X
+            done
+            sudo "$ipt" -P FORWARD ACCEPT
+          done
+      - run: nix develop -c scripts/ci/profile-switch.sh
