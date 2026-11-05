@@ -197,6 +197,7 @@ sudo zeabur-installer uninstall zeabur
 - 主机检查失败：根据输出释放端口或修复磁盘，再重新运行 `plan`、`apply`。
 - Kubernetes 未启动：K3s 查看 `sudo journalctl -u k3s`，worker 查看 `k3s-agent`；RKE2 查看 `sudo journalctl -u rke2-server`，worker 查看 `rke2-agent`。
 - 组件卡在 Helm 安装阶段：`doctor` 会指出 `kube-system` 中的 `helm-install-<name>` Job，查看这个 Job 的日志。
+- Chart 上次升级失败：helm-controller 不会重试，`plan` 会说明。如果升级改到 StatefulSet 中 Kubernetes 无法更新的字段，例如更换 `profile` 后的磁盘大小，`apply` 会删除这个 StatefulSet（Pod 和磁盘保留）再升级一次，磁盘大小不变。如果是其他原因，`plan` 会打印让 helm-controller 重试的 `kubectl` 命令。
 - 新节点已就绪，但部分系统服务无法连接：先在 server 上运行 `node sync`，再查看 `doctor` 的网络策略检查。
 
 要撤销安装，按照[卸载流程](../leave/uninstall.mdx)选择只卸载 Zeabur，或清理整台测试机。删除应用的 Namespace 不会卸载 Zeabur，只会删除应用。

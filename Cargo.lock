@@ -2924,6 +2924,7 @@ dependencies = [
  "axum",
  "base64 0.23.1",
  "clap",
+ "flate2",
  "form_urlencoded",
  "hex",
  "serde-saphyr 2.0.0",

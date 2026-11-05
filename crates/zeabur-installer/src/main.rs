@@ -9,6 +9,7 @@ mod load;
 mod node;
 mod out;
 mod personal;
+mod recreate;
 mod remove;
 mod render;
 mod telemetry;

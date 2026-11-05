@@ -443,6 +443,12 @@ export const zhCN: Messages = {
   "warning.config.unsupportedOn": (id, profile) => `${id} 不支持 ${profile}，所以不会安装。`,
   "warning.remove.unknown": (id, charts) =>
     `${id} 已经安装，但不在这版目录里，apply 会原样保留。要移除时，运行 kubectl -n kube-system delete helmchart ${charts}`,
+  "warning.statefulset.mayRecreate": (release, sets) =>
+    `${release} 的新设置如果改到 StatefulSet ${sets} 的 volumeClaimTemplates、selector、serviceName 或 podManagementPolicy，Kubernetes 无法直接更新，apply 会删除这个 StatefulSet，再由 Helm 重新创建。它的 Pod 和磁盘都会保留，磁盘大小也不变。`,
+  "warning.statefulset.recreate": (release, fields, sets) =>
+    `${release} 上次升级失败，因为它改到 StatefulSet ${sets} 的 ${fields}，Kubernetes 无法更新这些字段。apply 会删除这个 StatefulSet 再升级一次。它的 Pod 和磁盘都会保留，磁盘大小也不变。`,
+  "warning.release.failed": (release, why, command) =>
+    `${release} 上次升级失败（${why}）。helm-controller 不会重试失败的版本，所以 apply 会停在这里。排除原因后，运行 ${command} 再 apply 一次。`,
   "warning.join.server.unreachable": (server) =>
     `连不上 ${server}。请检查地址，以及这台 VM 能否连到 TCP 9345。`,
 

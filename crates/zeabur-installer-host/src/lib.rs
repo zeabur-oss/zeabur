@@ -6,6 +6,7 @@ pub mod cmd;
 pub mod download;
 pub mod facts;
 pub mod files;
+pub mod helm;
 pub mod kubectl;
 pub mod network;
 pub mod nodeprep;

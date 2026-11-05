@@ -15,6 +15,7 @@ pub mod record;
 pub mod remove;
 pub mod rke2;
 pub mod select;
+pub mod statefulset;
 pub mod storage;
 pub mod values;
 

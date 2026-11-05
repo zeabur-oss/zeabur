@@ -1,0 +1,168 @@
+//! Helm releases as Helm's Secret driver stores them: one Secret per revision, labelled
+//! `owner=helm`, `name`, `status` and `version`, whose `release` key holds the release as
+//! base64 of gzipped JSON.
+
+use std::io::Read as _;
+
+use base64::Engine as _;
+use base64::engine::general_purpose::STANDARD;
+use flate2::read::GzDecoder;
+use serde_json::Value;
+use zeabur_installer_plan::statefulset::{Revision, revision_secret};
+
+use crate::HostError;
+use crate::kubectl::Kubectl;
+
+/// A revision as Helm stored it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Release {
+    /// Helm's status.
+    pub status: String,
+    /// Helm's description, which names the error of a failed revision.
+    pub description: String,
+    /// The objects it rendered, as YAML documents.
+    pub manifest: String,
+}
+
+/// The release's revisions; empty when Helm has not installed it.
+///
+/// # Errors
+///
+/// When `kubectl` fails.
+pub fn history(kubectl: &Kubectl, namespace: &str, name: &str) -> Result<Vec<Revision>, HostError> {
+    let selector = format!("--selector=owner=helm,name={name}");
+    let out = kubectl.run(
+        &[
+            "get",
+            "secrets",
+            "--namespace",
+            namespace,
+            &selector,
+            "--output=jsonpath={range .items[*]}{.metadata.labels.version} {.metadata.labels.status}{\"\\n\"}{end}",
+        ],
+        None,
+    )?;
+    Ok(out
+        .lines()
+        .filter_map(|line| {
+            let (version, status) = line.split_once(' ')?;
+            Some(Revision {
+                version: version.parse().ok()?,
+                status: status.to_owned(),
+            })
+        })
+        .collect())
+}
+
+/// The namespace and name of each release with a failed revision, oldest ones included.
+///
+/// # Errors
+///
+/// When `kubectl` fails.
+pub fn with_failed_revisions(kubectl: &Kubectl) -> Result<Vec<(String, String)>, HostError> {
+    let out = kubectl.run(
+        &[
+            "get",
+            "secrets",
+            "--all-namespaces",
+            "--selector=owner=helm,status=failed",
+            "--output=jsonpath={range .items[*]}{.metadata.namespace} {.metadata.labels.name}{\"\\n\"}{end}",
+        ],
+        None,
+    )?;
+    let mut releases: Vec<(String, String)> = out
+        .lines()
+        .filter_map(|line| {
+            let (namespace, name) = line.split_once(' ')?;
+            Some((namespace.to_owned(), name.to_owned()))
+        })
+        .collect();
+    releases.sort();
+    releases.dedup();
+    Ok(releases)
+}
+
+/// One revision; `None` when its Secret is gone.
+///
+/// # Errors
+///
+/// When `kubectl` fails or the Secret does not hold a release.
+pub fn release(
+    kubectl: &Kubectl,
+    namespace: &str,
+    name: &str,
+    version: u64,
+) -> Result<Option<Release>, HostError> {
+    let secret_name = revision_secret(name, version);
+    let Some(secret) = kubectl.get("secret", &secret_name, Some(namespace))? else {
+        return Ok(None);
+    };
+    let data = secret
+        .pointer("/data/release")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+    decode(data).map(Some).map_err(|reason| HostError::Parse {
+        what: format!("Secret {namespace}/{secret_name}"),
+        reason,
+    })
+}
+
+/// The release from the `release` key of its Secret, as `kubectl` prints it.
+fn decode(data: &str) -> Result<Release, String> {
+    let helm = STANDARD.decode(data).map_err(|e| e.to_string())?;
+    let gzipped = STANDARD.decode(&helm).map_err(|e| e.to_string())?;
+    let mut json = Vec::new();
+    GzDecoder::new(gzipped.as_slice())
+        .read_to_end(&mut json)
+        .map_err(|e| e.to_string())?;
+    let release: Value = serde_json::from_slice(&json).map_err(|e| e.to_string())?;
+    let text = |pointer: &str| {
+        release
+            .pointer(pointer)
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+            .to_owned()
+    };
+    Ok(Release {
+        status: text("/info/status"),
+        description: text("/info/description"),
+        manifest: text("/manifest"),
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use std::io::Write as _;
+
+    use flate2::Compression;
+    use flate2::write::GzEncoder;
+    use serde_json::json;
+
+    use super::*;
+
+    #[test]
+    fn a_release_reads_back_from_its_secret() {
+        let release = json!({
+            "name": "zot",
+            "version": 3,
+            "info": {"status": "failed", "description": "Upgrade \"zot\" failed"},
+            "manifest": "kind: StatefulSet\n",
+        });
+        let mut gzip = GzEncoder::new(Vec::new(), Compression::default());
+        gzip.write_all(release.to_string().as_bytes()).unwrap();
+        let helm = STANDARD.encode(gzip.finish().unwrap());
+        assert_eq!(
+            decode(&STANDARD.encode(helm)).unwrap(),
+            Release {
+                status: "failed".to_owned(),
+                description: "Upgrade \"zot\" failed".to_owned(),
+                manifest: "kind: StatefulSet\n".to_owned(),
+            }
+        );
+    }
+
+    #[test]
+    fn a_secret_that_is_not_a_release_is_an_error() {
+        assert!(decode(&STANDARD.encode("not base64 of gzip")).is_err());
+    }
+}

@@ -27,7 +27,7 @@ use zeabur_installer_plan::storage::{self, NodePrep, Storage};
 use zeabur_telemetry::{InstallationId, Step};
 
 use crate::telemetry::{self, Reporter};
-use crate::{InstallError, load, out, remove, render};
+use crate::{InstallError, load, out, recreate, remove, render};
 
 /// Downloads and the local CA's copy.
 pub(crate) const STATE_DIR: &str = "/var/lib/rancher/zeabur-installer";
@@ -210,6 +210,10 @@ pub(crate) fn make_plan(index: &Index, config: &Config) -> Result<Plan, InstallE
         &config.allow_data_loss,
         &mut plan.warnings,
     )?;
+    if running {
+        let more = recreate::warnings(&kubectl, &plan)?;
+        plan.warnings.extend(more);
+    }
     Ok(plan)
 }
 
@@ -939,9 +943,24 @@ fn checked_chart(object: &Value, digest: &str) -> Result<(Value, Vec<u8>), Insta
 /// Applies a `HelmChart` and waits for helm-controller's `helm upgrade --install` job, so running
 /// again is safe. helm-controller replaces the job within seconds when the chart changed and keeps
 /// the finished one when it did not; which of the two happened is only known by watching.
+///
+/// A release whose upgrade fails on a StatefulSet field Kubernetes won't update is got through
+/// once ([`recreate::unstick`]), before the apply when an earlier run left it failed.
 fn helm_chart(kubectl: &Kubectl, name: &str, object: &Value) -> Result<(), InstallError> {
     const SETTLE: Duration = Duration::from_secs(5);
+    const RELEASE_CHECK: Duration = Duration::from_secs(15);
     let job_name = format!("helm-install-{name}");
+    let namespace = object
+        .pointer("/spec/targetNamespace")
+        .and_then(Value::as_str)
+        .unwrap_or("default");
+    let mut unstuck = match recreate::stuck(kubectl, name, namespace)? {
+        Some(stuck) => {
+            recreate::unstick(kubectl, name, namespace, &stuck)?;
+            true
+        }
+        None => false,
+    };
     let old_uid = kubectl
         .get("job", &job_name, Some("kube-system"))?
         .and_then(|j| j.pointer("/metadata/uid").cloned());
@@ -949,10 +968,35 @@ fn helm_chart(kubectl: &Kubectl, name: &str, object: &Value) -> Result<(), Insta
     let applied = Instant::now();
 
     let mut outcome = None;
+    let mut stopped = None;
+    let mut checked = Instant::now();
     kubectl::poll(
         Duration::from_mins(15),
         &format!("the {name} chart to install"),
         || {
+            if checked.elapsed() >= RELEASE_CHECK {
+                checked = Instant::now();
+                match recreate::stuck(kubectl, name, namespace) {
+                    Ok(Some(stuck)) => {
+                        let again = if unstuck {
+                            Err(recreate::failed_again(name, namespace, &stuck))
+                        } else {
+                            recreate::unstick(kubectl, name, namespace, &stuck)
+                        };
+                        unstuck = true;
+                        if let Err(error) = again {
+                            stopped = Some(error);
+                            return true;
+                        }
+                        return false;
+                    }
+                    Ok(None) => {}
+                    Err(error) => {
+                        stopped = Some(error);
+                        return true;
+                    }
+                }
+            }
             let Ok(job) = kubectl.get("job", &job_name, Some("kube-system")) else {
                 return false;
             };
@@ -986,6 +1030,9 @@ fn helm_chart(kubectl: &Kubectl, name: &str, object: &Value) -> Result<(), Insta
             outcome.is_some()
         },
     )?;
+    if let Some(error) = stopped {
+        return Err(error);
+    }
     if outcome == Some(false) {
         let job = format!("job/{job_name}");
         let logs = kubectl
