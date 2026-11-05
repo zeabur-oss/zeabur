@@ -59,6 +59,8 @@ sudo zeabur-installer doctor
 叢集裡有安裝紀錄 `kube-system/zeabur-installer` 時，`plan` 會先印出 `Changes since the last apply`，寫出上次安裝用的 installer 版本，再列出這次 `apply` 會改變的地方。個人安裝也會顯示。列出的項目有：
 
 - K3s、RKE2 或 KubeSolo 的新版本
+- 改了 `access` 時，Zeabur Identity 或 Zeabur 的新網址
+- 要裝的 Zeabur 和 Zeabur Identity 版本。舊版 installer 沒記下版本，從它升級時只列新版本
 - 內容會改變的主機檔案
 - 新增和移除的元件
 - 換版本的 chart

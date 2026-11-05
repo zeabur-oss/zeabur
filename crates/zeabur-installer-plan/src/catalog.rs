@@ -411,14 +411,19 @@ pub struct Health {
     pub advice: String,
 }
 
+/// Leaves out the pods the kubelet left behind after evicting or finishing them: they never
+/// become Ready.
+const LIVE_PODS: &str = "--field-selector=status.phase!=Succeeded,status.phase!=Failed";
+
 impl Health {
     /// The arguments of the `kubectl wait`, with `timeout` in place of the check's own.
     #[must_use]
     pub fn args<'a>(&'a self, timeout: &'a str) -> Vec<&'a str> {
-        let mut args = Vec::with_capacity(self.wait.len() + 1);
+        let mut args = Vec::with_capacity(self.wait.len() + 2);
         for arg in &self.wait {
             args.push(arg.as_str());
         }
+        self.live_pods(&mut args);
         args.push(timeout);
         args
     }
@@ -428,15 +433,25 @@ impl Health {
     /// `kubectl wait --all` or `-l` fails at once while nothing matches yet.
     #[must_use]
     pub fn create_args<'a>(&'a self, timeout: &'a str) -> Vec<&'a str> {
-        let mut args = Vec::with_capacity(self.wait.len() + 1);
+        let mut args = Vec::with_capacity(self.wait.len() + 2);
         args.push("--for=create");
         for arg in &self.wait {
             if !arg.starts_with("--for=") {
                 args.push(arg);
             }
         }
+        self.live_pods(&mut args);
         args.push(timeout);
         args
+    }
+
+    fn live_pods(&self, args: &mut Vec<&str>) {
+        for arg in &self.wait {
+            if arg == "pod" || arg == "pods" {
+                args.push(LIVE_PODS);
+                return;
+            }
+        }
     }
 }
 

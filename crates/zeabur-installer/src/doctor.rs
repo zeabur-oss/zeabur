@@ -820,6 +820,47 @@ mod tests {
     }
 
     #[test]
+    fn a_pod_health_check_leaves_out_pods_that_have_ended() {
+        let check = Health {
+            name: "ready".to_owned(),
+            wait: ["--for=condition=Ready", "pod", "-l", "app=web", "-n", "web"]
+                .map(str::to_owned)
+                .to_vec(),
+            timeout: "60s".to_owned(),
+            advice: String::new(),
+        };
+        let mut calls: Vec<Vec<String>> = Vec::new();
+        let result = wait_health(&check, "--timeout=60s", |args| {
+            calls.push(args.iter().map(|&a| a.to_owned()).collect());
+            Ok::<(), ()>(())
+        });
+        assert_eq!(result, Ok(()));
+        for call in calls {
+            assert!(
+                call.contains(
+                    &"--field-selector=status.phase!=Succeeded,status.phase!=Failed".to_owned()
+                ),
+                "{call:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_check_on_other_objects_has_no_pod_field_selector() {
+        let check = Health {
+            name: "ready".to_owned(),
+            wait: ["--for=condition=Available", "deployment/web", "-n", "web"]
+                .map(str::to_owned)
+                .to_vec(),
+            timeout: "60s".to_owned(),
+            advice: String::new(),
+        };
+        for arg in check.args("--timeout=60s") {
+            assert!(!arg.starts_with("--field-selector"), "{arg}");
+        }
+    }
+
+    #[test]
     fn a_health_check_waits_for_its_objects_to_exist_before_its_condition() {
         let check = Health {
             name: "nodes-ready".to_owned(),

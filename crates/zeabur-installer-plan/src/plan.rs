@@ -14,9 +14,9 @@ use crate::catalog::{
     Component, Encoding, Generate, Health, Index, Input, KIND, PodSecurity, ReleaseType, SecretRef,
 };
 use crate::cluster::{self, Distribution, HostFile};
-use crate::config::{AccessMode, Config};
+use crate::config::{AccessMode, Config, Sources};
 use crate::pins::{self, CALICO, K3S, K3s, RKE2};
-use crate::record::{Changes, Record};
+use crate::record::{Changes, Planned, Record};
 use crate::remove::Removal;
 use crate::select::{self, Selection, Target, Why};
 use crate::storage::{self, NodePrep, Storage};
@@ -389,6 +389,8 @@ pub struct IdentityPlan {
     pub host: String,
     /// Image reference.
     pub image: String,
+    /// The pinned release; `None` when `sources.identityImage` replaces it.
+    pub version: Option<String>,
     /// The `zeabur-identityctl` binary, or its release archive.
     pub identityctl: Source,
     /// The Ingress exposing it.
@@ -405,6 +407,8 @@ pub struct ZeaburPlan {
     pub url: String,
     /// The chart: a local directory or `.tgz`, or the released `.tgz`.
     pub chart: Source,
+    /// The pinned release; `None` when `sources.zeaburImage` or `sources.zeaburChart` replaces it.
+    pub version: Option<String>,
     /// Helm values, except the generated Secrets' names, which are fixed.
     pub values: Value,
 }
@@ -670,10 +674,15 @@ pub fn plan_with(
     let host_files = server_files(config, &chosen, facts, &node_name, registry.as_ref());
 
     let memory = memory(distribution, &components, facts.memory_mib, &mut warnings);
-    let changes = facts
-        .record
-        .as_ref()
-        .map(|r| Changes::new(r, index, &components, &cluster.version));
+    let changes = facts.record.as_ref().map(|r| {
+        let planned = Planned {
+            components: &components,
+            version: &cluster.version,
+            identity: identity.as_ref(),
+            zeabur: zeabur.as_ref(),
+        };
+        Changes::new(r, index, planned)
+    });
 
     Ok(Plan {
         storage: storage_plan(&components, profile, &mut warnings),
@@ -800,6 +809,7 @@ fn products(
         );
     }
     let sources = &config.sources;
+    let (identity_version, zeabur_version) = pinned_versions(sources, pins);
     let image = sources
         .identity_image
         .clone()
@@ -835,6 +845,7 @@ fn products(
         issuer: config.issuer(),
         host: config.access.identity.clone(),
         image,
+        version: identity_version,
         identityctl,
         ingress: ingress(
             IDENTITY_NAMESPACE,
@@ -844,6 +855,29 @@ fn products(
         ),
         invitations: config.access.invitations,
     };
+    product_warnings(config, chosen, warnings);
+    let suffixes = suffixes(config, facts);
+    warn_no_suffixes(config, facts, &suffixes, warnings);
+    let mut values = zeabur_values(config, facts, tls_issuer, &zeabur_image, &suffixes);
+    chosen_values(
+        chosen,
+        registry,
+        sources.proxy_image.as_deref(),
+        &mut values,
+    );
+    Ok((
+        Some(identity),
+        Some(ZeaburPlan {
+            url: config.zeabur_url(),
+            chart,
+            version: zeabur_version,
+            values,
+        }),
+    ))
+}
+
+/// What Zeabur misses without metrics, and what local access needs from DNS.
+fn product_warnings(config: &Config, chosen: &BTreeSet<&str>, warnings: &mut Vec<Warning>) {
     // The chart reads usage history from the catalog's VictoriaMetrics by default.
     if !chosen.contains(VICTORIA_METRICS) {
         warnings.push(warning(
@@ -864,23 +898,23 @@ fn products(
             ),
         ));
     }
-    let suffixes = suffixes(config, facts);
-    warn_no_suffixes(config, facts, &suffixes, warnings);
-    let mut values = zeabur_values(config, facts, tls_issuer, &zeabur_image, &suffixes);
-    chosen_values(
-        chosen,
-        registry,
-        sources.proxy_image.as_deref(),
-        &mut values,
-    );
-    Ok((
-        Some(identity),
-        Some(ZeaburPlan {
-            url: config.zeabur_url(),
-            chart,
-            values,
-        }),
-    ))
+}
+
+/// The pinned Zeabur Identity and Zeabur releases, each `None` when `sources` replaces it.
+fn pinned_versions(
+    sources: &Sources,
+    pins: Option<&pins::Products>,
+) -> (Option<String>, Option<String>) {
+    let Some(pins) = pins else {
+        return (None, None);
+    };
+    let identity = sources
+        .identity_image
+        .is_none()
+        .then(|| pins.identity.version.to_owned());
+    let zeabur = (sources.zeabur_image.is_none() && sources.zeabur_chart.is_none())
+        .then(|| pins.zeabur.version.to_owned());
+    (identity, zeabur)
 }
 
 /// The chart values that follow from the chosen components.
@@ -2889,6 +2923,92 @@ mod tests {
             Some("v1.0.0+k3s1")
         );
         assert!(changes.restart);
+    }
+
+    #[test]
+    fn a_changed_access_domain_is_a_change() {
+        let index = crate::catalog::pinned();
+        let first = plan(&index, &config(""), &facts()).unwrap();
+        let issuer = first.identity.as_ref().unwrap().issuer.clone();
+
+        let mut same = facts();
+        same.record = Some(recorded(&first, "0.0.1", |_| {}));
+        let unchanged = plan(&index, &config(""), &same).unwrap();
+        assert_eq!(unchanged.changes.unwrap().urls, []);
+
+        let mut moved = facts();
+        moved.record = Some(recorded(&first, "0.0.1", |summary| {
+            summary["identity"]["issuer"] = json!("https://old-identity.example.com");
+        }));
+        let changes = plan(&index, &config(""), &moved).unwrap().changes.unwrap();
+        assert_eq!(
+            changes.urls,
+            [record::UrlChange {
+                name: "Zeabur Identity".to_owned(),
+                from: "https://old-identity.example.com".to_owned(),
+                to: issuer,
+            }]
+        );
+    }
+
+    #[test]
+    fn an_upgrade_names_the_zeabur_and_identity_releases_it_installs() {
+        let index = crate::catalog::pinned();
+        let pinned = pins::Products {
+            catalog: pins::Catalog {
+                version: "v0.1.0",
+                index_sha256: "aa",
+            },
+            identity: pins::Identity {
+                version: "v0.2.0",
+                image: "ghcr.io/zeabur-oss/identity@sha256:bb",
+                identityctl_amd64: "cc",
+                identityctl_arm64: "dd",
+                request_memory_mib: 24,
+            },
+            zeabur: pins::Zeabur {
+                version: "v0.3.0",
+                image: "ghcr.io/zeabur-oss/zeabur@sha256:ee",
+                chart_sha256: "ff",
+            },
+        };
+        let config = Config::parse(
+            "access: {mode: domain, identity: login.example.com, zeabur: zeabur.example.com}",
+        )
+        .unwrap();
+        let plan = |facts: &Facts| plan_with(&index, &config, facts, Some(&pinned)).unwrap();
+        let first = plan(&facts());
+        let change = |name: &str, from: Option<&str>, to: &str| record::ProductChange {
+            name: name.to_owned(),
+            from: from.map(str::to_owned),
+            to: to.to_owned(),
+        };
+
+        let mut same = facts();
+        same.record = Some(recorded(&first, "0.0.1", |_| {}));
+        assert_eq!(plan(&same).changes.unwrap().products, []);
+
+        let mut older = facts();
+        older.record = Some(recorded(&first, "0.0.1", |summary| {
+            summary["zeabur"]["version"] = json!("v0.2.9");
+        }));
+        assert_eq!(
+            plan(&older).changes.unwrap().products,
+            [change("Zeabur", Some("v0.2.9"), "v0.3.0")]
+        );
+
+        let mut unrecorded = facts();
+        unrecorded.record = Some(recorded(&first, "0.0.1", |summary| {
+            summary["identity"]["version"] = Value::Null;
+            summary["zeabur"]["version"] = Value::Null;
+        }));
+        assert_eq!(
+            plan(&unrecorded).changes.unwrap().products,
+            [
+                change("Zeabur Identity", None, "v0.2.0"),
+                change("Zeabur", None, "v0.3.0"),
+            ]
+        );
     }
 
     #[test]
