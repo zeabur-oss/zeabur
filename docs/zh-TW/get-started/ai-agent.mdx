@@ -1,7 +1,7 @@
 ---
 title: 請 AI Agent 幫你安裝
 description: 不熟指令也能裝。把一段話貼給 Claude Code 或 Codex，它會透過 SSH 在伺服器上安裝 Zeabur，最後把註冊連結交給你。
-source: "0f54ed65ba96"
+source: "1a07748d4136"
 ---
 
 不熟 Linux 指令也能安裝 Zeabur。把下面那段話貼給 Claude Code、Codex 這類 AI Agent，它會連到你的伺服器，下載並驗證 installer、寫好設定、完成安裝，最後把第一位管理員的註冊連結交給你。
@@ -41,7 +41,7 @@ ssh <user>@<server> sudo true
 請幫我在 <user>@<server> 這台伺服器安裝 Zeabur，用 SSH 連線，需要 root 的指令用 sudo。
 
 1. 依 https://oss.zeabur.com/zh-TW/docs/zeabur/reference/releases 的「下載與驗證執行檔」，下載 https://github.com/zeabur-oss/zeabur/releases 上最新發行版的 zeabur-installer，並依伺服器的 `uname -m` 選擇 linux-amd64 或 linux-arm64。驗證 SHA256SUMS 的簽章、檔案的 SHA-256 和建置來源，三項都通過才解壓縮。任何一項沒通過就停下來告訴我，不要為了讓驗證通過而修改驗證參數。
-2. 問我 Zeabur 和登入（Identity）要用的兩個網域。我沒有網域時，用 zeabur.<公開位址>.sslip.io 和 login.<公開位址>.sslip.io；伺服器只有私有位址時，改用 local 模式。依 https://oss.zeabur.com/zh-TW/docs/zeabur/get-started/advanced-install 寫好 /etc/zeabur-installer/config.yaml。
+2. 問我 Zeabur 和登入（Identity）要用的兩個網域。我沒有網域時，用 zeabur.<公開位址>.sslip.io 和 login.<公開位址>.sslip.io；伺服器只有私有位址時，改用 local 模式。依 https://oss.zeabur.com/zh-TW/docs/zeabur/install/config-file 寫好 /etc/zeabur-installer/config.yaml。
 3. 執行 sudo zeabur-installer plan，用白話把變更、警告和沒通過的檢查整理給我看，等我確認可以再繼續。
 4. 我同意後執行 sudo zeabur-installer apply。中途失敗時，先修好原因，再用同一份設定重新執行。
 5. 安裝完成後執行 sudo zeabur-installer doctor，回報結果。

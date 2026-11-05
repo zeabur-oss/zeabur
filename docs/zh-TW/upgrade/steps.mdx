@@ -1,7 +1,7 @@
 ---
 title: 升級 Zeabur
 description: 查看目前的 Zeabur 版本，依安裝方式用 zeabur-installer、Helm、Argo CD、Flux 或 zeaburctl 升級，並在升級後確認新版本。
-source: "4c2e9bff5f6a"
+source: "ddbc87dcb4ed"
 ---
 
 先看你是怎麼安裝的，再照該段升級。升級不會自動發生，Zeabur 只會告訴你有新版本。
@@ -15,7 +15,7 @@ source: "4c2e9bff5f6a"
 ## 升級前
 
 - 到 [GitHub Releases](https://github.com/zeabur-oss/zeabur/releases) 讀要升級的版本的發行說明。
-- 讀[升級須知](upgrade-notes.mdx)，跨過幾版就讀那幾節，先把每一版要做的事做完。
+- 讀[升級須知](notes.mdx)，跨過幾版就讀那幾節，先把每一版要做的事做完。
 - 先替伺服器或叢集留一份快照。要退回舊版時，只能還原升級前的快照，見[退回舊版](#退回舊版)。
 - 專案的資料另外用 Velero 備份，見[備份叢集並從備份還原](../cluster/backups.mdx)。
 
@@ -55,7 +55,7 @@ K3s、RKE2 或 KubeSolo 的版本或主機檔案有變時，`apply` 會重新啟
 1. 執行 zeabur-installer --version 查目前的版本。目標版本是 https://github.com/zeabur-oss/zeabur/releases 上最新的發行版，除非我另外指定。把兩個版本告訴我。
 2. 把 /etc/zeabur-installer/config.yaml 複製一份備份。
 3. 依 https://oss.zeabur.com/zh-TW/docs/zeabur/reference/releases/ 的「下載與驗證執行檔」，下載目標版本的 zeabur-installer，依伺服器的 `uname -m` 選擇 linux-amd64 或 linux-arm64。驗證 SHA256SUMS 的簽章、檔案的 SHA-256 和建置來源，三項都通過才解壓縮。任何一項沒通過就停下來告訴我，不要為了讓驗證通過而修改驗證參數。伺服器上沒有 gh 或 cosign 的話，在這台電腦驗證，再把壓縮檔傳到伺服器。解壓縮後，把舊的 zeabur-installer 改名留著，換上新版。
-4. 讀 https://oss.zeabur.com/zh-TW/docs/zeabur/get-started/upgrade-notes/，從目前版本到目標版本之間的每一節，照「用 zeabur-installer 安裝」的步驟修改設定檔，把改了哪些地方給我看。要刪除元件或資料的步驟，先告訴我，等我同意再做。
+4. 讀 https://oss.zeabur.com/zh-TW/docs/zeabur/upgrade/notes/，從目前版本到目標版本之間的每一節，照「用 zeabur-installer 安裝」的步驟修改設定檔，把改了哪些地方給我看。要刪除元件或資料的步驟，先告訴我，等我同意再做。
 5. 用新版執行 sudo zeabur-installer plan，把新增和移除的元件、要換版的部分、警告和沒通過的檢查整理給我看，等我確認再繼續。
 6. 我同意後執行 sudo zeabur-installer apply。中途失敗時，先修好原因，再用同一份設定重新執行。
 7. 升級須知要求其他節點重新加入時，問我每個節點怎麼用 SSH 連線，再照著做。
@@ -77,7 +77,7 @@ kubectl -n zeabur rollout status deployment/zeabur
 
 ## 用 Argo CD 升級
 
-把 Argo CD Application 裡的 chart 版本改成新版，再同步。Argo CD 不連叢集就產生 manifest，所以要事先建立固定的簽章金鑰並設定 `planKey.existingSecret`，做法見[用 GitOps 管理 chart](install.mdx#用-gitops-管理-chart)。
+把 Argo CD Application 裡的 chart 版本改成新版，再同步。Argo CD 不連叢集就產生 manifest，所以要事先建立固定的簽章金鑰並設定 `planKey.existingSecret`，做法見[用 GitOps 管理 chart](../install/existing-cluster.mdx#用-gitops-管理-chart)。
 
 ## 用 Flux 升級
 

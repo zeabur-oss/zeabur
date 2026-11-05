@@ -6,7 +6,7 @@ source: "9c36b7d3c51e"
 
 先用 `plan` 查看配置会创建什么，再以 root 运行 `apply`。如果安装中断，排除原因后，用同一份配置重新运行 `apply`。每个步骤都会先检查当前状态，只补上缺少或不同的部分。
 
-通过网页界面安装，见[在一台服务器上安装 Zeabur](../get-started/quickstart.mdx)；使用配置文件和命令安装，见[使用配置文件和命令安装](../get-started/advanced-install.mdx)；YAML 字段见 [Installer 配置](./installer-configuration.mdx)。如果已有 Kubernetes 集群，见[将 Zeabur 安装到已有集群](../get-started/install.mdx)。
+通过网页界面安装，见[在一台服务器上安装 Zeabur](../get-started/quickstart.mdx)；使用配置文件和命令安装，见[使用配置文件和命令安装](../install/config-file.mdx)；YAML 字段见 [Installer 配置](./installer-configuration.mdx)。如果已有 Kubernetes 集群，见[将 Zeabur 安装到已有集群](../install/existing-cluster.mdx)。
 
 ## 通用参数
 
@@ -190,7 +190,7 @@ sudo zeabur-installer uninstall zeabur
 
 ### 个人使用的安装
 
-如果配置文件中设置了 `use: personal`，`uninstall` 不会删除任何内容，只会输出卸载 KubeSolo 的命令，见[个人使用：在小型服务器上安装](../get-started/personal.mdx#移除)。`node add` 和 `node sync` 不可用，因为 KubeSolo 只有一个节点。
+如果配置文件中设置了 `use: personal`，`uninstall` 不会删除任何内容，只会输出卸载 KubeSolo 的命令，见[个人使用：在小型服务器上安装](../install/personal.mdx#移除)。`node add` 和 `node sync` 不可用，因为 KubeSolo 只有一个节点。
 
 ## 安装中断时
 

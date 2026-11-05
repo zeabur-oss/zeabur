@@ -6,7 +6,7 @@ source: "1032006f1802"
 
 把網域、元件選擇和主機設定寫進 YAML，執行 `zeabur-installer --config config.yaml plan` 先看安裝內容。檔案預設放在 `/etc/zeabur-installer/config.yaml`。欄位用 camelCase，拼錯或多出欄位時，installer 會直接停下。
 
-網頁介面的選擇也存成這份檔案。用網頁介面安裝見[在一台伺服器安裝 Zeabur](../get-started/quickstart.mdx)，用指令安裝見[用設定檔和指令安裝](../get-started/advanced-install.mdx)，各指令的選項見 [Installer 指令](./installer.mdx)。
+網頁介面的選擇也存成這份檔案。用網頁介面安裝見[在一台伺服器安裝 Zeabur](../get-started/quickstart.mdx)，用指令安裝見[用設定檔和指令安裝](../install/config-file.mdx)，各指令的選項見 [Installer 指令](./installer.mdx)。
 
 ## 建立叢集的檔案
 
@@ -171,7 +171,7 @@ sources:
 
 ## 自己用的檔案
 
-頂層寫 `use: personal` 時，installer 改裝 KubeSolo 和元件，不裝 Zeabur 面板和 Zeabur Identity。做法和限制見[自己用：在小機器上安裝](../get-started/personal.mdx)。
+頂層寫 `use: personal` 時，installer 改裝 KubeSolo 和元件，不裝 Zeabur 面板和 Zeabur Identity。做法和限制見[自己用：在小機器上安裝](../install/personal.mdx)。
 
 ```yaml title="/etc/zeabur-installer/config.yaml"
 use: personal

@@ -208,4 +208,4 @@ K3s 或 RKE2 的脚本会移除 Kubernetes 和数据，所有依赖 Kubernetes �
 - 服务网址在移除后失效：对比 Ingress／HTTPRoute、ingress controller、Gateway、证书和后端副本，确认没有一起删除共同依赖的组件。
 - 成员无法操作，但服务正常：chart 的成员角色和 binding 已移除，按替代 RBAC 重新授权。
 
-需要重新安装管理界面时，使用[单机 installer 流程](../get-started/quickstart.mdx)或[已有集群流程](../get-started/install.mdx)，不要删除现有项目后再重新创建。
+需要重新安装管理界面时，使用[单机 installer 流程](../get-started/quickstart.mdx)或[已有集群流程](../install/existing-cluster.mdx)，不要删除现有项目后再重新创建。

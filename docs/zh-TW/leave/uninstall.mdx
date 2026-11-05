@@ -208,4 +208,4 @@ K3s 或 RKE2 的腳本會移除 Kubernetes 和資料，所有依賴 Kubernetes �
 - 服務網址在移除後失效：比對 Ingress／HTTPRoute、ingress controller、Gateway、憑證與後端 Pod，確認沒有把共同依賴一起刪除。
 - 成員無法操作但服務正常：chart 的成員角色和 binding 已經移除，依替代 RBAC 重新授權。
 
-需要重新安裝管理介面時，使用[單機 installer 流程](../get-started/quickstart.mdx)或[既有叢集流程](../get-started/install.mdx)，不要刪除既有專案再建立。
+需要重新安裝管理介面時，使用[單機 installer 流程](../get-started/quickstart.mdx)或[既有叢集流程](../install/existing-cluster.mdx)，不要刪除既有專案再建立。

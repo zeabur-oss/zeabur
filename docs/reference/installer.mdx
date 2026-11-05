@@ -5,7 +5,7 @@ description: Reference for zeabur-installer planning, installation, health check
 
 Run `plan` first to see what the configuration will create, then run `apply` as root. If installation stops, fix the cause and run `apply` again with the same configuration. Each step checks what's already there and changes only what's missing or different.
 
-To install with the web interface, see [Install Zeabur on a server](../get-started/quickstart.mdx). To use a configuration file and commands, see [Install with a configuration file and commands](../get-started/advanced-install.mdx). For YAML fields, see [Installer configuration](./installer-configuration.mdx). If you already have a Kubernetes cluster, follow [Install Zeabur in an existing cluster](../get-started/install.mdx).
+To install with the web interface, see [Install Zeabur on a server](../get-started/quickstart.mdx). To use a configuration file and commands, see [Install with a configuration file and commands](../install/config-file.mdx). For YAML fields, see [Installer configuration](./installer-configuration.mdx). If you already have a Kubernetes cluster, follow [Install Zeabur in an existing cluster](../install/existing-cluster.mdx).
 
 ## Common options
 
@@ -189,7 +189,7 @@ After K3s or RKE2 is removed, `uninstall --purge` deletes the installer's downlo
 
 ### A personal install
 
-With `use: personal` in the configuration, `uninstall` deletes nothing and only prints the commands to remove KubeSolo. See [Personal use: Install on a small machine](../get-started/personal.mdx#uninstall). `node add` and `node sync` aren't available because KubeSolo has only one node.
+With `use: personal` in the configuration, `uninstall` deletes nothing and only prints the commands to remove KubeSolo. See [Personal use: Install on a small machine](../install/personal.mdx#uninstall). `node add` and `node sync` aren't available because KubeSolo has only one node.
 
 ## If installation stops
 

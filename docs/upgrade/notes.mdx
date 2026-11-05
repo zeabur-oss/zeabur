@@ -3,7 +3,7 @@ title: Upgrade notes
 description: Each version's breaking changes and what to do before you upgrade. When you skip versions, read every section in between, in order.
 ---
 
-This page lists each version's breaking changes and what to do before you upgrade. For the upgrade steps themselves, see [Upgrade Zeabur](upgrade.mdx).
+This page lists each version's breaking changes and what to do before you upgrade. For the upgrade steps themselves, see [Upgrade Zeabur](steps.mdx).
 
 If you're skipping versions, start at the version you run now and read every section up to the version you're moving to. The newest version is at the top.
 
@@ -63,7 +63,7 @@ This also deletes the images zot stored. The next `apply` installs Zeabur Builde
 
 #### 3. Upgrade the server
 
-Download the v0.2 installer, run `plan`, review it, then run `apply`. See [Upgrade Zeabur](upgrade.mdx#upgrade-with-zeabur-installer) for the steps.
+Download the v0.2 installer, run `plan`, review it, then run `apply`. See [Upgrade Zeabur](steps.mdx#upgrade-with-zeabur-installer) for the steps.
 
 `plan` lists the components this upgrade adds. System Upgrade Controller is no longer a default component. `apply` doesn't remove it but stops updating it, and `plan` shows it as `not removed, no longer updated`. The installer already pins the K3s and RKE2 release, so you don't need it. To keep it, add `node-updates/system-upgrade-controller` to `enable`. Otherwise, delete it after `apply`:
 

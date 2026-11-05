@@ -5,13 +5,13 @@ description: Define installation options in YAML, review them with plan, and ins
 
 Define installation options in `/etc/zeabur-installer/config.yaml`, review the plan with `plan`, and install with `apply`. Use this approach to keep the configuration in version control, repeat the same installation on multiple machines, or install through automation.
 
-The [web interface](quickstart.mdx) and commands read and write the same config file and install the same components. You can also download the config file from the web interface's “Review” step, then install from the command line.
+The [web interface](../get-started/quickstart.mdx) and commands read and write the same config file and install the same components. You can also download the config file from the web interface's “Review” step, then install from the command line.
 
 ![The “Review” step shows an installation summary, with a “Download” button under “Details” to save the config file](../images/shots/installer-review.avif)
 
 ## Prepare the server and installer
 
-Prepare a host that meets the [server requirements in the quickstart](quickstart.mdx#prepare-the-server), and download the installer for its architecture.
+Prepare a host that meets the [server requirements in the quickstart](../get-started/quickstart.mdx#prepare-the-server), and download the installer for its architecture.
 
 ## Create the config file
 
@@ -24,7 +24,7 @@ access:
   zeabur: zeabur.example.com
 ```
 
-Replace both domains with the ones you want to use. For DNS and port requirements in public domain mode, see [connection options in the quickstart](quickstart.mdx#2-choose-how-to-connect).
+Replace both domains with the ones you want to use. For DNS and port requirements in public domain mode, see [connection options in the quickstart](../get-started/quickstart.mdx#2-choose-how-to-connect).
 
 If you omit `enable` and `disable`, the installer installs the [default components](../reference/installer-configuration.mdx#component-selection). If you omit `profile`, it uses `single-node`. If you omit `distribution`, it installs K3s. For a server with 8 GiB of memory or more, or to run the control plane on three servers later, add `distribution: rke2`.
 
@@ -142,7 +142,7 @@ This checks K3s or RKE2, components, the default storage class, Zeabur Identity,
 
 ## Install with AI Agents
 
-To have an AI Agent such as Claude Code or Codex follow this page for you, see [Install with an AI Agent](ai-agent.mdx).
+To have an AI Agent such as Claude Code or Codex follow this page for you, see [Install with an AI Agent](../get-started/ai-agent.mdx).
 
 ## Command reference and adding nodes
 

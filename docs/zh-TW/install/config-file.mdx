@@ -1,18 +1,18 @@
 ---
 title: 用設定檔和指令安裝
 description: 把安裝選擇寫成 YAML，用 plan 檢查、apply 安裝，適合重複安裝和版本控制。
-source: "eae4c480583d"
+source: "7d8cb74fbdac"
 ---
 
 把安裝選擇寫進 `/etc/zeabur-installer/config.yaml`，用 `plan` 查看安裝步驟，再用 `apply` 安裝。這個方式適合把設定放進版本控制、在多台機器重複同樣的安裝，或透過自動化工具安裝。
 
-[網頁介面](quickstart.mdx)和指令讀寫同一份設定檔，安裝的內容相同。你也可以在網頁介面的「確認」步驟下載設定檔，再用指令安裝。
+[網頁介面](../get-started/quickstart.mdx)和指令讀寫同一份設定檔，安裝的內容相同。你也可以在網頁介面的「確認」步驟下載設定檔，再用指令安裝。
 
 ![「確認」顯示安裝摘要，「詳細資料」有「下載」按鈕可存下設定檔](../images/shots/installer-review.avif)
 
 ## 準備伺服器與 installer
 
-依照[快速開始的伺服器條件](quickstart.mdx#先準備伺服器)準備主機，並下載符合架構的 installer。
+依照[快速開始的伺服器條件](../get-started/quickstart.mdx#先準備伺服器)準備主機，並下載符合架構的 installer。
 
 ## 建立設定檔
 
@@ -25,7 +25,7 @@ access:
   zeabur: zeabur.example.com
 ```
 
-把兩個網域換成你要使用的網域。公開網域模式的 DNS 和連接埠需求，見[快速開始的連線方式](quickstart.mdx#2-選擇連線方式)。
+把兩個網域換成你要使用的網域。公開網域模式的 DNS 和連接埠需求，見[快速開始的連線方式](../get-started/quickstart.mdx#2-選擇連線方式)。
 
 未填 `enable` 和 `disable` 時安裝[預設元件](../reference/installer-configuration.mdx#元件選擇)，未填 `profile` 時使用 `single-node`，未填 `distribution` 時安裝 K3s。伺服器有 8 GiB 以上記憶體，或之後想用三台伺服器執行控制平面，就加上 `distribution: rke2`。
 
@@ -143,7 +143,7 @@ sudo zeabur-installer doctor
 
 ## 用 AI Agents 安裝
 
-要請 Claude Code、Codex 這類 AI Agent 照這一頁的流程幫你安裝，見[請 AI Agent 幫你安裝](ai-agent.mdx)。
+要請 Claude Code、Codex 這類 AI Agent 照這一頁的流程幫你安裝，見[請 AI Agent 幫你安裝](../get-started/ai-agent.mdx)。
 
 ## 指令參考與加入節點
 
