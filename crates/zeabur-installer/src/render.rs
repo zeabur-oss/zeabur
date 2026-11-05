@@ -427,6 +427,23 @@ fn ports(s: &mut String, plan: &JoinPlan) {
             ),
         );
     }
+    if plan.unit_running {
+        let numbers: Vec<String> = plan
+            .local_ports
+            .iter()
+            .map(|p| p.number.to_string())
+            .collect();
+        push(
+            s,
+            &format!(
+                "Ports on this VM: {} belong to the running {}",
+                numbers.join(", "),
+                plan.unit
+            ),
+        );
+        push(s, "");
+        return;
+    }
     push(
         s,
         "Ports on this VM, free before the node starts (apply checks them)",
@@ -509,8 +526,24 @@ mod tests {
             ],
             token_pinned: true,
             longhorn_runs_here: false,
+            unit_running: false,
         };
         join::plan(&config, &facts).unwrap()
+    }
+
+    #[test]
+    fn a_node_that_joined_already_holds_its_own_ports() {
+        let mut p = plan(
+            include_str!("../../../docs/reference/installer-examples/join.yaml"),
+            &[640, 610, 700, 900, 650],
+        );
+        p.unit_running = true;
+        let text = join_plan(&p);
+        assert!(
+            text.contains("Ports on this VM: 80, 443, 10250 belong to the running k3s-agent"),
+            "{text}"
+        );
+        assert!(!text.contains("free before the node starts"), "{text}");
     }
 
     #[test]
