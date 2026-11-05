@@ -55,7 +55,7 @@ pub struct AppState {
     /// [`crate::tools`]); `None` where there is none (local mode).
     pub terminals: Option<Arc<dyn Cluster>>,
     /// Receives each feature a successful write used (see [`crate::used`]).
-    pub used: crate::used::Used,
+    pub used: Option<crate::used::Used>,
 }
 
 impl std::fmt::Debug for AppState {
