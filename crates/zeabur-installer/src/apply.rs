@@ -3,7 +3,7 @@
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use base64::Engine as _;
 use base64::engine::general_purpose::{STANDARD, URL_SAFE_NO_PAD};
@@ -27,7 +27,7 @@ use zeabur_installer_plan::storage::{self, NodePrep, Storage};
 use zeabur_telemetry::{InstallationId, Step};
 
 use crate::telemetry::{self, Reporter};
-use crate::{InstallError, doctor, load, out, remove, render};
+use crate::{InstallError, doctor, helm_chart, load, out, remove, render};
 
 /// Downloads and the local CA's copy.
 pub(crate) const STATE_DIR: &str = "/var/lib/rancher/zeabur-installer";
@@ -860,9 +860,9 @@ pub(crate) fn releases(kubectl: &Kubectl, component: &ComponentPlan) -> Result<(
                     if !crds.is_empty() {
                         kubectl.apply(&crds)?;
                     }
-                    helm_chart(kubectl, name, &object)?;
+                    helm_chart::install(kubectl, name, &object)?;
                 }
-                None => helm_chart(kubectl, name, object)?,
+                None => helm_chart::install(kubectl, name, object)?,
             },
             ReleasePlan::Manifests {
                 namespace, yaml, ..
@@ -934,85 +934,6 @@ fn checked_chart(object: &Value, digest: &str) -> Result<(Value, Vec<u8>), Insta
         spec.insert("chartContent".to_owned(), json!(STANDARD.encode(&chart)));
     }
     Ok((object, chart))
-}
-
-/// Applies a `HelmChart` and waits for helm-controller's `helm upgrade --install` job, so running
-/// again is safe. helm-controller replaces the job within seconds when the chart changed and keeps
-/// the finished one when it did not; which of the two happened is only known by watching.
-fn helm_chart(kubectl: &Kubectl, name: &str, object: &Value) -> Result<(), InstallError> {
-    const SETTLE: Duration = Duration::from_secs(5);
-    let job_name = format!("helm-install-{name}");
-    let old_uid = kubectl
-        .get("job", &job_name, Some("kube-system"))?
-        .and_then(|j| j.pointer("/metadata/uid").cloned());
-    kubectl.apply_object(object)?;
-    let applied = Instant::now();
-
-    let mut outcome = None;
-    kubectl::poll(
-        Duration::from_mins(15),
-        &format!("the {name} chart to install"),
-        || {
-            let Ok(job) = kubectl.get("job", &job_name, Some("kube-system")) else {
-                return false;
-            };
-            let settled = applied.elapsed() >= SETTLE;
-            let Some(job) = job else {
-                // helm-controller deletes finished jobs on its own schedule.
-                if settled && old_uid.is_some() {
-                    outcome = Some(true);
-                }
-                return outcome.is_some();
-            };
-            if job.pointer("/metadata/uid") == old_uid.as_ref() && !settled {
-                return false;
-            }
-            if job
-                .pointer("/status/succeeded")
-                .and_then(Value::as_u64)
-                .unwrap_or(0)
-                > 0
-            {
-                outcome = Some(true);
-            } else if job
-                .pointer("/status/failed")
-                .and_then(Value::as_u64)
-                .unwrap_or(0)
-                > 0
-                && conditions(&job).any(|(kind, status)| kind == "Failed" && status == "True")
-            {
-                outcome = Some(false);
-            }
-            outcome.is_some()
-        },
-    )?;
-    if outcome == Some(false) {
-        let job = format!("job/{job_name}");
-        let logs = kubectl
-            .run(
-                &["logs", "--namespace=kube-system", &job, "--tail=30"],
-                None,
-            )
-            .unwrap_or_default();
-        return Err(InstallError::Message(format!(
-            "the {name} chart failed to install:\n{logs}"
-        )));
-    }
-    Ok(())
-}
-
-fn conditions(object: &Value) -> impl Iterator<Item = (&str, &str)> {
-    object
-        .pointer("/status/conditions")
-        .and_then(Value::as_array)
-        .into_iter()
-        .flatten()
-        .map(|c| {
-            (
-                c.get("type").and_then(Value::as_str).unwrap_or_default(),
-                c.get("status").and_then(Value::as_str).unwrap_or_default(),
-            )
-        })
 }
 
 fn cert_manager_namespace(plan: &Plan) -> Result<String, InstallError> {
@@ -1287,7 +1208,7 @@ fn zeabur(
         }))?;
     }
 
-    helm_chart(
+    helm_chart::install(
         kubectl,
         "zeabur",
         &zeabur_helm_chart(zeabur, telemetry, update_check(config))?,
@@ -1353,7 +1274,8 @@ pub(crate) fn zeabur_helm_chart(
             "targetNamespace": ZEABUR_NAMESPACE,
             "createNamespace": false,
             "valuesContent": values.to_string(),
-            "failurePolicy": "abort",
+            "failurePolicy": plan::FAILURE_POLICY,
+            "backOffLimit": plan::BACK_OFF_LIMIT,
             "timeout": "10m0s",
         },
     }))
