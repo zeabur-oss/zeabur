@@ -20,7 +20,7 @@ use crate::record::{Changes, Record};
 use crate::remove::Removal;
 use crate::select::{self, Selection, Target, Why};
 use crate::storage::{self, NodePrep, Storage};
-use crate::{PlanError, node_name, values};
+use crate::{PlanError, helm, node_name, values};
 
 /// The label and field manager on everything the installer creates.
 pub const MANAGER: &str = "zeabur-installer";
@@ -1189,6 +1189,7 @@ fn component_plan(
                     "createNamespace": false,
                     "valuesContent": values::canonical(&vals),
                     "failurePolicy": "abort",
+                    "backOffLimit": helm::BACK_OFF_LIMIT,
                     "timeout": "10m0s",
                 });
                 if let (Some(repo), Some(map)) = (&release.repo, spec.as_object_mut()) {

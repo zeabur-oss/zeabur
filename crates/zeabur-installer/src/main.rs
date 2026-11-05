@@ -3,6 +3,7 @@
 
 mod apply;
 mod doctor;
+mod failure;
 mod gui;
 mod join;
 mod load;

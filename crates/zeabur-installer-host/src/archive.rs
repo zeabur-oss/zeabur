@@ -74,6 +74,36 @@ pub fn chart_crds(archive: &[u8], values: &Value) -> Result<Vec<u8>, HostError> 
         .into_bytes())
 }
 
+/// The `version` in a packaged chart's own `Chart.yaml`.
+///
+/// # Errors
+///
+/// When the archive or its `Chart.yaml` cannot be read.
+pub fn chart_version(archive: &[u8]) -> Result<String, HostError> {
+    #[derive(Deserialize)]
+    struct Version {
+        #[serde(default)]
+        version: String,
+    }
+    let io = |e: std::io::Error| parse_error("chart archive", &e);
+    let mut tar = tar::Archive::new(GzDecoder::new(archive));
+    for entry in tar.entries().map_err(io)? {
+        let mut entry = entry.map_err(io)?;
+        let path = entry.path().map_err(io)?.to_string_lossy().into_owned();
+        let Some((_, rel)) = path.split_once('/') else {
+            continue;
+        };
+        if rel != "Chart.yaml" {
+            continue;
+        }
+        let mut text = String::new();
+        entry.read_to_string(&mut text).map_err(io)?;
+        let parsed: Version = serde_saphyr::from_str(&text).map_err(|e| parse_error(&path, &e))?;
+        return Ok(parsed.version);
+    }
+    Err(parse_error("chart archive", &"no Chart.yaml"))
+}
+
 struct Chart {
     name: String,
     dependencies: Option<Vec<Dependency>>,
@@ -468,6 +498,16 @@ mod tests {
             names.push(entry.path().unwrap().display().to_string());
         }
         assert!(names.contains(&"zeabur/Chart.yaml".to_owned()), "{names:?}");
+    }
+
+    #[test]
+    fn a_charts_version_is_read_from_its_own_chart_yaml() {
+        let dir = chart(&[
+            ("Chart.yaml", "name: zot\nversion: 0.1.60\n"),
+            ("charts/sub/Chart.yaml", "name: sub\nversion: 9.9.9\n"),
+        ]);
+        let archive = pack_chart(dir.path(), "zot").unwrap();
+        assert_eq!(chart_version(&archive).unwrap(), "0.1.60");
     }
 
     fn chart(files: &[(&str, &str)]) -> tempfile::TempDir {

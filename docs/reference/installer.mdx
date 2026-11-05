@@ -196,6 +196,7 @@ With `use: personal` in the configuration, `uninstall` deletes nothing and only 
 - Host check failed: free the ports or fix the disk as directed in the output, then run `plan` and `apply` again.
 - Kubernetes didn't start: on K3s, check `sudo journalctl -u k3s`, or `k3s-agent` on a worker. On RKE2, check `sudo journalctl -u rke2-server`, or `rke2-agent` on a worker.
 - A component is stuck installing through Helm: `doctor` points to the `helm-install-<name>` Job in `kube-system`. Check its logs.
+- A chart upgrade that fails: a failed upgrade is tried once more, unless Kubernetes refused the chart's objects. If it fails again, `apply` rolls the chart back to its last deployed revision and sets the `HelmChart` back to that revision's chart and values, so the previous version keeps running and helm-controller doesn't try the failed upgrade again. It then stops with Helm's reason, the `HelmChart` conditions and the end of the `helm-install-<name>` Job's log. A release that an interrupted Job left pending is marked failed and upgraded again by the next `helm-install-<name>` Job.
 - A new node is ready but can't reach some system services: run `node sync` on a server first, then check `doctor`'s network policy results.
 
 To undo an installation, follow the [removal steps](../leave/uninstall.mdx) to remove only Zeabur or clean up the entire test machine. Deleting an application's namespace doesn't remove Zeabur; it only deletes the application.
