@@ -200,3 +200,12 @@ When you close the terminal, Zeabur removes the terminal replica. A terminal rep
 - `drain` is stuck: It's waiting for PodDisruptionBudget to allow eviction or has stopped at a replica that isn't managed by a controller. Run `kubectl get pdb -A` to see which budget is blocking eviction, resolve it, and run the command again.
 - A replica is `Pending` on the new node: It uses a `local-path` volume on the old node and must wait for that node to return.
 - A terminal replica **Can't start**: Check its events. A failed image download is a common cause.
+- VictoriaMetrics keeps restarting (`OOMKilled`) after you switch to `multi-node`: `multi-node` gives its volume 20Gi instead of 5Gi, and a `local-path` volume can't grow, so the VictoriaMetrics operator stops updating it and it keeps the smaller memory limit of `single-node`. Move it to a new volume. This drops the metrics history it had:
+
+  ```bash
+  # K3s
+  sudo k3s kubectl -n observability scale deployment/vmsingle-vm-victoria-metrics-k8s-stack --replicas=0
+  sudo k3s kubectl -n observability delete pvc vmsingle-vm-victoria-metrics-k8s-stack
+  ```
+
+  The operator creates a 20Gi volume on the default storage class and starts VictoriaMetrics again within about two minutes.

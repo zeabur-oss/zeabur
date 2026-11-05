@@ -201,3 +201,12 @@ sudo zeabur-installer node sync
 - `drain` 一直没有进展：`drain` 在等待 PodDisruptionBudget 放行，或停在不属于任何控制器的副本上。用 `kubectl get pdb -A` 查看哪个预算阻止了驱逐，处理后再运行一次。
 - 副本在新节点上处于 `Pending` 状态：副本使用的是旧节点的 `local-path` 卷，需要等待旧节点恢复运行。
 - 终端副本**无法启动**：查看该副本的事件，常见原因是镜像下载失败。
+- 改成 `multi-node` 后 VictoriaMetrics 一直重启（`OOMKilled`）：`multi-node` 把它的存储卷从 5Gi 改成 20Gi，但 `local-path` 存储卷不能扩容，VictoriaMetrics operator 就停止更新，它也一直使用 `single-node` 较小的内存上限。把它换到新的存储卷，原有的指标记录会清空：
+
+  ```bash
+  # K3s
+  sudo k3s kubectl -n observability scale deployment/vmsingle-vm-victoria-metrics-k8s-stack --replicas=0
+  sudo k3s kubectl -n observability delete pvc vmsingle-vm-victoria-metrics-k8s-stack
+  ```
+
+  operator 会在默认存储类上创建一个 20Gi 的存储卷，大约两分钟内重新启动 VictoriaMetrics。
