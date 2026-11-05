@@ -148,6 +148,13 @@ pub(crate) fn changes(changes: Option<&Changes>, unit: &str) -> String {
     if let Some(v) = &c.version {
         push(&mut s, &format!("  {unit:<48} {} -> {}", v.from, v.to));
     }
+    for product in &c.products {
+        let mut release = product.to.clone();
+        if let Some(from) = &product.from {
+            release = format!("{from} -> {release}");
+        }
+        push(&mut s, &format!("  {:<48} {release}", product.name));
+    }
     for url in &c.urls {
         push(
             &mut s,
@@ -568,6 +575,7 @@ mod tests {
             }],
             version: None,
             urls: Vec::new(),
+            products: Vec::new(),
             host_files: Vec::new(),
             restart: false,
         };

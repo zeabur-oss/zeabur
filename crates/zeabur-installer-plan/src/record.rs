@@ -9,7 +9,7 @@ use serde_json::Value;
 
 use crate::PlanError;
 use crate::catalog::Index;
-use crate::plan::{ComponentPlan, ReleasePlan};
+use crate::plan::{ComponentPlan, IdentityPlan, ReleasePlan, ZeaburPlan};
 
 /// This installer's version.
 pub const INSTALLER_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -37,6 +37,10 @@ pub struct Record {
     pub identity: Option<String>,
     /// Zeabur's URL.
     pub zeabur: Option<String>,
+    /// Zeabur Identity's release; `None` from an older installer or a development source.
+    pub identity_version: Option<String>,
+    /// Zeabur's release; `None` from an older installer or a development source.
+    pub zeabur_version: Option<String>,
 }
 
 impl Record {
@@ -104,6 +108,14 @@ impl Record {
                 .pointer("/zeabur/url")
                 .and_then(Value::as_str)
                 .map(str::to_owned),
+            identity_version: plan
+                .pointer("/identity/version")
+                .and_then(Value::as_str)
+                .map(str::to_owned),
+            zeabur_version: plan
+                .pointer("/zeabur/version")
+                .and_then(Value::as_str)
+                .map(str::to_owned),
         })
     }
 
@@ -151,6 +163,8 @@ pub struct Changes {
     pub version: Option<VersionChange>,
     /// Zeabur Identity's or Zeabur's URL, when the access domains change.
     pub urls: Vec<UrlChange>,
+    /// Zeabur Identity's or Zeabur's release, when it changes.
+    pub products: Vec<ProductChange>,
     /// Host files whose content changes; `apply` fills it.
     pub host_files: Vec<String>,
     /// `apply` restarts K3s, RKE2 or `KubeSolo`.
@@ -184,6 +198,17 @@ pub struct UrlChange {
     pub to: String,
 }
 
+/// Zeabur Identity's or Zeabur's release that `apply` installs.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct ProductChange {
+    /// `Zeabur Identity` or `Zeabur`.
+    pub name: String,
+    /// The recorded release; `None` when an older installer wrote the record.
+    pub from: Option<String>,
+    /// The planned release.
+    pub to: String,
+}
+
 /// What a plan installs, to compare with the record.
 #[derive(Debug, Clone, Copy)]
 pub struct Planned<'a> {
@@ -191,10 +216,10 @@ pub struct Planned<'a> {
     pub components: &'a [ComponentPlan],
     /// The K3s, RKE2 or `KubeSolo` release.
     pub version: &'a str,
-    /// Zeabur Identity's issuer; `None` when the plan has no Zeabur Identity.
-    pub identity: Option<&'a str>,
-    /// Zeabur's URL; `None` when the plan has no Zeabur.
-    pub zeabur: Option<&'a str>,
+    /// Zeabur Identity; `None` when the plan has none.
+    pub identity: Option<&'a IdentityPlan>,
+    /// Zeabur; `None` when the plan has none.
+    pub zeabur: Option<&'a ZeaburPlan>,
 }
 
 /// A release that changes.
@@ -249,6 +274,7 @@ impl Changes {
             restart: version.is_some(),
             version,
             urls: url_changes(record, planned),
+            products: product_changes(record, planned),
             host_files: Vec::new(),
         }
     }
@@ -302,9 +328,13 @@ fn url_changes(record: &Record, planned: Planned<'_>) -> Vec<UrlChange> {
         (
             "Zeabur Identity",
             record.identity.as_deref(),
-            planned.identity,
+            planned.identity.map(|i| i.issuer.as_str()),
         ),
-        ("Zeabur", record.zeabur.as_deref(), planned.zeabur),
+        (
+            "Zeabur",
+            record.zeabur.as_deref(),
+            planned.zeabur.map(|z| z.url.as_str()),
+        ),
     ];
     let mut urls = Vec::new();
     for (name, from, to) in pairs {
@@ -319,6 +349,37 @@ fn url_changes(record: &Record, planned: Planned<'_>) -> Vec<UrlChange> {
         }
     }
     urls
+}
+
+/// Zeabur Identity's and Zeabur's releases, when the plan pins one the record doesn't have.
+fn product_changes(record: &Record, planned: Planned<'_>) -> Vec<ProductChange> {
+    let pairs = [
+        (
+            "Zeabur Identity",
+            record.identity_version.as_ref(),
+            planned.identity.and_then(|i| i.version.as_ref()),
+        ),
+        (
+            "Zeabur",
+            record.zeabur_version.as_ref(),
+            planned.zeabur.and_then(|z| z.version.as_ref()),
+        ),
+    ];
+    let mut products = Vec::new();
+    for (name, from, to) in pairs {
+        let Some(to) = to else {
+            continue;
+        };
+        if from == Some(to) {
+            continue;
+        }
+        products.push(ProductChange {
+            name: name.to_owned(),
+            from: from.cloned(),
+            to: to.clone(),
+        });
+    }
+    products
 }
 
 /// The precedence of two versions as Semantic Versioning 2.0.0 orders them
@@ -368,6 +429,8 @@ mod tests {
             helm: BTreeSet::new(),
             identity: None,
             zeabur: None,
+            identity_version: None,
+            zeabur_version: None,
         };
         let error = record.check_installer().unwrap_err().to_string();
         assert!(
