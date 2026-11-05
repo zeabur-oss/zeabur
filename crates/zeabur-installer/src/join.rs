@@ -162,7 +162,7 @@ pub(crate) fn apply(config: &JoinConfig) -> Result<(), InstallError> {
         let admin = Kubectl::admin(distribution);
         admin.wait_ready(Duration::from_mins(5))?;
         sync_authn(&admin, distribution)?;
-        node::report_sync(&admin)?;
+        node::report_sync(&admin, distribution)?;
     }
 
     out::step("Done");

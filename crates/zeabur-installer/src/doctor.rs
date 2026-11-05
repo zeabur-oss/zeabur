@@ -30,8 +30,8 @@ pub(crate) fn cannot_run() -> Option<ExitCode> {
 }
 
 /// Whether the network policies let in the traffic of every node.
-fn policies(kubectl: &Kubectl) -> (Status, String) {
-    match crate::node::policies_behind(kubectl) {
+fn policies(kubectl: &Kubectl, distribution: Distribution) -> (Status, String) {
+    match crate::node::policies_behind(kubectl, distribution) {
         Ok(missing) if missing.is_empty() => (
             Status::Pass,
             "the network policies let every node's traffic in".to_owned(),
@@ -113,7 +113,7 @@ pub(crate) fn run() -> ExitCode {
     if let Ok(host) = facts::read() {
         results.push(crate::join::node_addresses(&kubectl, &host.own_node_name()));
     }
-    results.push(policies(&kubectl));
+    results.push(policies(&kubectl, distribution));
     let encryption = match preflight::disk_encryption("/var/lib/rancher") {
         Encryption::Encrypted => (Status::Pass, "/var/lib/rancher is encrypted"),
         Encryption::Plain => (

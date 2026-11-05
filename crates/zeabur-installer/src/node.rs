@@ -403,13 +403,17 @@ fn ca_hash(
 }
 
 pub(crate) fn sync(_config_path: &Path) -> Result<(), InstallError> {
-    report_sync(&Kubectl::admin(server_distribution()?))
+    let distribution = server_distribution()?;
+    report_sync(&Kubectl::admin(distribution), distribution)
 }
 
 /// Runs [`sync_policies`] under its own step and says how many policies changed.
-pub(crate) fn report_sync(kubectl: &Kubectl) -> Result<(), InstallError> {
+pub(crate) fn report_sync(
+    kubectl: &Kubectl,
+    distribution: Distribution,
+) -> Result<(), InstallError> {
     out::step("Network policies");
-    let changed = sync_policies(kubectl)?;
+    let changed = sync_policies(kubectl, distribution)?;
     out::line(&format!(
         "{changed} network {} updated for the current nodes",
         if changed == 1 { "policy" } else { "policies" }
@@ -419,8 +423,9 @@ pub(crate) fn report_sync(kubectl: &Kubectl) -> Result<(), InstallError> {
 
 /// Rewrites every baseline policy the installer made with the addresses of the current nodes.
 /// Returns how many changed.
-fn sync_policies(kubectl: &Kubectl) -> Result<usize, InstallError> {
-    let sources = crate::apply::node_addresses(kubectl)?;
+fn sync_policies(kubectl: &Kubectl, distribution: Distribution) -> Result<usize, InstallError> {
+    let wait = crate::apply::NODE_ADDRESS_WAIT;
+    let sources = crate::apply::node_addresses(kubectl, distribution, wait)?;
     let mut changed = 0;
     for policy in baseline_policies(kubectl)? {
         let have = plan::policy_sources(&policy);
@@ -463,9 +468,13 @@ pub(crate) fn baseline_policies(kubectl: &Kubectl) -> Result<Vec<Value>, Install
         .collect())
 }
 
-/// Nodes whose traffic the baseline policies do not let in yet.
-pub(crate) fn policies_behind(kubectl: &Kubectl) -> Result<Vec<String>, InstallError> {
-    let sources = crate::apply::node_addresses(kubectl)?;
+/// Nodes whose traffic the baseline policies do not let in yet. Does not wait for a node's
+/// VXLAN address.
+pub(crate) fn policies_behind(
+    kubectl: &Kubectl,
+    distribution: Distribution,
+) -> Result<Vec<String>, InstallError> {
+    let sources = crate::apply::node_addresses(kubectl, distribution, Duration::ZERO)?;
     let mut missing = Vec::new();
     for policy in baseline_policies(kubectl)? {
         let have = plan::policy_sources(&policy);
