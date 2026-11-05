@@ -1,7 +1,7 @@
 ---
 title: 升級須知
 description: 每一版不相容的變更，以及升級前要先做的事。一次跨好幾版時，依序看過中間每一節。
-source: "dc840e1ee646"
+source: "6efdd23dd52d"
 ---
 
 這一頁列出每一版不相容的變更，以及升級前要先做的事。升級的步驟本身見[升級 Zeabur](upgrade.mdx)。
@@ -81,7 +81,7 @@ v0.2 會替系統保留記憶體，避免 Pod 用光記憶體拖垮整台伺服�
 
 #### 4. 讓工作節點重新加入
 
-只有一台伺服器的話，可以跳過這一步。
+沒有工作節點的話，可以跳過這一步。
 
 工作節點的設定檔裡，v0.1 的 `join.zot` 在 v0.2 改成 `join.registry`，zot 的位址也換了，所以要用新的設定重新加入：
 
@@ -95,5 +95,5 @@ v0.2 會替系統保留記憶體，避免 Pod 用光記憶體拖垮整台伺服�
 
 Zeabur 和 Zeabur Proxy 拿掉了調整工作階段長度和 proxy 限制的參數，數值維持原樣：閒置 1 小時或總共 12 小時後要重新登入。proxy 逾時 30 秒、請求上限 16 MiB。chart 從來沒有設定這些參數。你自己在 Deployment 的 `args` 或 `env` 加過的話，先刪掉再升級：
 
-- `zeabur`：`--session-idle-minutes`、`--session-max-hours`，以及 `ZEABUR_SESSION_*` 環境變數。
-- `zeabur-proxy`：`--timeout`、`--max-bytes`、`--review-cache`、`--max-inflight`、`--max-inflight-per-person`，以及 `ZEABUR_PROXY_*` 環境變數。
+- `zeabur`：`--session-idle-minutes`、`--session-max-hours`，或環境變數 `ZEABUR_SESSION_IDLE_MINUTES`、`ZEABUR_SESSION_MAX_HOURS`。
+- `zeabur-proxy`：`--timeout`、`--max-bytes`、`--review-cache`、`--max-inflight`、`--max-inflight-per-person`，或環境變數 `ZEABUR_PROXY_TIMEOUT`、`ZEABUR_PROXY_MAX_BYTES`、`ZEABUR_PROXY_REVIEW_CACHE`、`ZEABUR_PROXY_MAX_INFLIGHT`、`ZEABUR_PROXY_MAX_INFLIGHT_PER_PERSON`。其他 `ZEABUR_PROXY_*` 環境變數照常使用，例如 TLS 憑證和私鑰。

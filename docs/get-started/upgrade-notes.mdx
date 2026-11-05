@@ -80,7 +80,7 @@ v0.2 reserves memory for the system so pods can't use it all and take the whole 
 
 #### 4. Have worker nodes join again
 
-If you have only one server, skip this step.
+If you have no worker nodes, skip this step.
 
 In a worker's configuration file, v0.1's `join.zot` is `join.registry` in v0.2, and zot's address has changed, so join again with a new configuration:
 
@@ -94,5 +94,5 @@ For `node add`'s options and how to revoke its token, see [Manage nodes](../clus
 
 Zeabur and Zeabur Proxy dropped the flags that set session length and proxy limits. The values stay the same: people sign in again after 1 hour idle or 12 hours in total. The proxy times out after 30 seconds and caps requests at 16 MiB. The chart never set these flags. If you added them to the Deployment's `args` or `env` yourself, delete them before you upgrade:
 
-- `zeabur`: `--session-idle-minutes`, `--session-max-hours`, and the `ZEABUR_SESSION_*` environment variables.
-- `zeabur-proxy`: `--timeout`, `--max-bytes`, `--review-cache`, `--max-inflight`, `--max-inflight-per-person`, and the `ZEABUR_PROXY_*` environment variables.
+- `zeabur`: `--session-idle-minutes`, `--session-max-hours`, or the `ZEABUR_SESSION_IDLE_MINUTES` and `ZEABUR_SESSION_MAX_HOURS` environment variables.
+- `zeabur-proxy`: `--timeout`, `--max-bytes`, `--review-cache`, `--max-inflight`, `--max-inflight-per-person`, or the `ZEABUR_PROXY_TIMEOUT`, `ZEABUR_PROXY_MAX_BYTES`, `ZEABUR_PROXY_REVIEW_CACHE`, `ZEABUR_PROXY_MAX_INFLIGHT` and `ZEABUR_PROXY_MAX_INFLIGHT_PER_PERSON` environment variables. Other `ZEABUR_PROXY_*` variables, such as the TLS certificate and key, still work.
