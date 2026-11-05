@@ -198,6 +198,11 @@ sudo zeabur-installer node sync
 
 - 加入时无法连接服务器：确认新 VM 能访问 `node add` 输出的服务器地址。K3s 需要 TCP 6443，RKE2 需要 TCP 9345 和 6443，上表中的其他端口也要开放。
 - 新节点已就绪，但不同节点上的服务无法互相连接：检查 UDP 4789（K3s）或 8472（RKE2），以及网络策略是否已放行新节点。
+- K3s 的 UDP 4789 已开放，`apply` 仍然卡在 webhook，或节点访问不了其他节点上的服务：旧版 zeabur-installer 安装的集群，节点访问同一子网中其他节点的 Pod 时使用节点自己的地址，会被基础网络策略拦截。在服务器上运行下面的命令，改为始终使用 VXLAN，几秒内生效：
+
+  ```bash
+  sudo k3s kubectl patch ippools.crd.projectcalico.org default-ipv4-ippool --type merge -p '{"spec":{"vxlanMode":"Always"}}'
+  ```
 - `drain` 一直没有进展：`drain` 在等待 PodDisruptionBudget 放行，或停在不属于任何控制器的副本上。用 `kubectl get pdb -A` 查看哪个预算阻止了驱逐，处理后再运行一次。
 - 副本在新节点上处于 `Pending` 状态：副本使用的是旧节点的 `local-path` 卷，需要等待旧节点恢复运行。
 - 终端副本**无法启动**：查看该副本的事件，常见原因是镜像下载失败。

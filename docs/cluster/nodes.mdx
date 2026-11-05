@@ -197,6 +197,11 @@ When you close the terminal, Zeabur removes the terminal replica. A terminal rep
 
 - Can't reach the server when joining: Check that the new VM can reach the server address printed by `node add` on TCP 6443 (K3s) or TCP 9345 and 6443 (RKE2), along with the other ports in the table above.
 - The new node is ready, but services on different nodes can't reach each other: Check UDP 4789 (K3s) or 8472 (RKE2) and whether network policies allow traffic from the new node.
+- On K3s, UDP 4789 is open and `apply` still fails on a webhook, or a node can't reach a service on another node: a cluster installed by an earlier zeabur-installer sends a node's traffic to pods on other nodes in the same subnet from the node's own address, which the baseline network policy blocks. Run this on the server to always use VXLAN; it takes effect within seconds:
+
+  ```bash
+  sudo k3s kubectl patch ippools.crd.projectcalico.org default-ipv4-ippool --type merge -p '{"spec":{"vxlanMode":"Always"}}'
+  ```
 - `drain` is stuck: It's waiting for PodDisruptionBudget to allow eviction or has stopped at a replica that isn't managed by a controller. Run `kubectl get pdb -A` to see which budget is blocking eviction, resolve it, and run the command again.
 - A replica is `Pending` on the new node: It uses a `local-path` volume on the old node and must wait for that node to return.
 - A terminal replica **Can't start**: Check its events. A failed image download is a common cause.

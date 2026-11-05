@@ -198,6 +198,11 @@ sudo zeabur-installer node sync
 
 - 加入時連不到伺服器：確認新 VM 連得到 `node add` 印出的伺服器位址。K3s 要通 TCP 6443，RKE2 要通 TCP 9345 和 6443，上面表格的其他連接埠也要開。
 - 新節點已就緒，但不同節點上的服務連不到彼此：檢查 UDP 4789（K3s）或 8472（RKE2），以及網路政策是否已放行新節點。
+- K3s 的 UDP 4789 已開，`apply` 還是卡在 webhook，或節點連不到其他節點上的服務：舊版 zeabur-installer 裝的叢集，節點連同一個子網路裡其他節點的 Pod 時用的是節點自己的位址，會被基本網路政策擋掉。在伺服器上執行下面的指令，改成一律走 VXLAN，幾秒內就會生效：
+
+  ```bash
+  sudo k3s kubectl patch ippools.crd.projectcalico.org default-ipv4-ippool --type merge -p '{"spec":{"vxlanMode":"Always"}}'
+  ```
 - `drain` 一直停著：`drain` 在等 PodDisruptionBudget 放行，或停在不屬於任何控制器的副本上。用 `kubectl get pdb -A` 看哪個預算擋住了，處理後再執行一次。
 - 副本在新節點 `Pending`：副本用的是舊節點的 `local-path` 磁碟區，要等舊節點回來。
 - 終端機副本**無法啟動**：看該副本的事件，常見原因是映像檔下載失敗。

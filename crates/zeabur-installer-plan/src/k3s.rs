@@ -212,7 +212,15 @@ fn policy(name: &str, namespace: &str, pods: &Value, ingress: &Value) -> Value {
     })
 }
 
+const VXLAN_CROSS_SUBNET: &str =
+    "            - name: CALICO_IPV4POOL_VXLAN\n              value: \"CrossSubnet\"\n";
+
 /// Calico's VXLAN manifest with K3s's pod network and the images pinned by digest.
+///
+/// Traffic between nodes always goes through VXLAN. With the manifest's `CrossSubnet`, a node
+/// reaches a pod on another node in its subnet from its own address instead of its tunnel
+/// address, and the baseline NetworkPolicy only lets tunnel addresses in, so webhook calls and
+/// probes from the API server and kubelet time out.
 ///
 /// IP forwarding in pods stays off, as with RKE2's Canal; `ServiceLB`'s pods turn it on with their
 /// own sysctl.
@@ -222,11 +230,17 @@ fn policy(name: &str, namespace: &str, pods: &Value, ingress: &Value) -> Value {
 /// When the manifest does not have the expected text, which a checked download always has.
 pub fn calico_manifest(manifest: &str) -> Result<String, PlanError> {
     let mut out = manifest.to_owned();
-    let edits = [(
-        "            # - name: CALICO_IPV4POOL_CIDR\n            #   value: \"192.168.0.0/16\"\n"
-            .to_owned(),
-        format!("            - name: CALICO_IPV4POOL_CIDR\n              value: \"{POD_CIDR}\"\n"),
-    )];
+    let edits = [
+        (
+            "            # - name: CALICO_IPV4POOL_CIDR\n            #   value: \"192.168.0.0/16\"\n"
+                .to_owned(),
+            format!("            - name: CALICO_IPV4POOL_CIDR\n              value: \"{POD_CIDR}\"\n"),
+        ),
+        (
+            VXLAN_CROSS_SUBNET.to_owned(),
+            VXLAN_CROSS_SUBNET.replace("CrossSubnet", "Always"),
+        ),
+    ];
     for (from, to) in edits
         .into_iter()
         .chain(CALICO.images.iter().map(|(tag, digest)| {
@@ -402,11 +416,13 @@ mod tests {
             .map(|(tag, _)| format!("          image: {tag}\n"))
             .collect();
         let manifest = format!(
-            "{}            # - name: CALICO_IPV4POOL_CIDR\n            #   value: \"192.168.0.0/16\"\n",
+            "{}            # - name: CALICO_IPV4POOL_CIDR\n            #   value: \"192.168.0.0/16\"\n{VXLAN_CROSS_SUBNET}",
             images.concat()
         );
         let out = calico_manifest(&manifest).unwrap();
         assert!(out.contains("value: \"10.42.0.0/16\""));
+        assert!(out.contains("- name: CALICO_IPV4POOL_VXLAN\n              value: \"Always\"\n"));
+        assert!(!out.contains("CrossSubnet"));
         assert!(!out.contains("allow_ip_forwarding"));
         for (tag, digest) in CALICO.images {
             assert!(out.contains(&format!("image: {tag}@{digest}\n")));
