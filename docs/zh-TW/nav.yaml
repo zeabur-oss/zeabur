@@ -2,6 +2,7 @@
   label: 開始使用
   pages:
     quickstart: 在一台伺服器安裝 Zeabur
+    ai-agent: 請 AI Agent 幫你安裝
     advanced-install: 用設定檔和指令安裝
     personal: 自己用：在小機器上安裝
     install: 把 Zeabur 裝進既有叢集

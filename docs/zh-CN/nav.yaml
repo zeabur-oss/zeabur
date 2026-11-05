@@ -2,6 +2,7 @@
   label: 开始使用
   pages:
     quickstart: 在一台服务器上安装 Zeabur
+    ai-agent: 让 AI Agent 帮你安装
     advanced-install: 使用配置文件和命令安装
     personal: 个人使用：在小型服务器上安装
     install: 将 Zeabur 安装到已有集群
