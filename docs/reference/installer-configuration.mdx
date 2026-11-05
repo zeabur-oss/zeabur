@@ -114,7 +114,7 @@ The installer always creates `local-path`, which stores data on the node at `/va
 - When Longhorn becomes the default, the installer changes its previously default `local-path` to a non-default class.
 - If the cluster already has another default class, the installer keeps it. If this installation would make Longhorn the default, `apply` stops. Remove the default annotation from the existing class, then run it again.
 
-When Longhorn is selected, `apply` installs the iSCSI initiator and NFS client on this host, loads `iscsi_tcp`, and starts `iscsid`. Every node running Longhorn needs these. See [Add nodes](../cluster/nodes.mdx).
+When Longhorn is selected, `apply` installs the iSCSI initiator and NFS client on this host, loads `iscsi_tcp` and `dm_crypt`, and starts `iscsid`. Every node running Longhorn needs these. See [Add nodes](../cluster/nodes.mdx).
 
 ### `distribution` and versions
 

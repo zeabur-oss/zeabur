@@ -115,7 +115,7 @@ installer 一定会创建 `local-path`，数据存放在节点的 `/var/lib/zeab
 - Longhorn 成为默认存储类时，installer 原先设为默认的 `local-path` 会改为普通存储类。
 - 集群已有其他默认存储类时，installer 会保留原来的默认存储类。如果本次要将 Longhorn 设为默认，`apply` 会停止，需要先删除原存储类的默认注解，再重新运行。
 
-选择 Longhorn 后，`apply` 会在这台主机上安装 iSCSI initiator 和 NFS client、加载 `iscsi_tcp`、启动 `iscsid`。每个运行 Longhorn 的节点都需要这些，见[加入节点](../cluster/nodes.mdx)。
+选择 Longhorn 后，`apply` 会在这台主机上安装 iSCSI initiator 和 NFS client、加载 `iscsi_tcp` 和 `dm_crypt`、启动 `iscsid`。每个运行 Longhorn 的节点都需要这些，见[加入节点](../cluster/nodes.mdx)。
 
 ### `distribution` 与版本
 
