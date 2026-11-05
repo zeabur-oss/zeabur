@@ -213,6 +213,31 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn without_the_program_an_apply_reads_nothing_extra() {
+        let reads = |used: Option<zeabur_api::used::Used>| async move {
+            let cluster = cluster();
+            let settings = Settings {
+                namespace: Some("zeabur".to_owned()),
+                ..settings()
+            };
+            let mut api = TestApi::new(&cluster).with_settings(settings);
+            if let Some(used) = used {
+                api = api.with_used(used);
+            }
+            let app = api.router();
+            let add = json!([{"op": "addDomain",
+                "workload": {"kind": "Deployment", "name": "web"},
+                "hostname": "web.apps.example.com"}]);
+            let planned = plan(&app, &add).await;
+            let before = cluster.inspect(|s| s.object_reads).unwrap();
+            assert_eq!(apply(&app, &planned).await, StatusCode::OK);
+            cluster.inspect(|s| s.object_reads).unwrap() - before
+        };
+        let used: zeabur_api::used::Used = Arc::new(|_| {});
+        assert!(reads(Some(used)).await > reads(None).await);
+    }
+
+    #[tokio::test]
     async fn a_write_that_creates_no_service_sends_nothing() {
         let (app, seen) = api(&cluster());
         let planned = plan(

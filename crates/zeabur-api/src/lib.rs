@@ -423,8 +423,9 @@ pub struct Options {
     pub reach: images::https::Reach,
     /// Zeabur's own service account in the terminal namespace (see [`tools`]).
     pub terminals: Option<Arc<dyn zeabur_kube::Cluster>>,
-    /// Receives each feature a successful write used, for the experience program.
-    pub used: used::Used,
+    /// Receives each feature a successful write used, for the experience program; `None` when
+    /// the program is off, so nothing is classified.
+    pub used: Option<used::Used>,
 }
 
 impl Default for Options {
@@ -441,7 +442,7 @@ impl Default for Options {
             template_idle: zeabur_catalog::template_idle,
             reach: images::https::Reach::Any,
             terminals: None,
-            used: Arc::new(|_| {}),
+            used: None,
         }
     }
 }

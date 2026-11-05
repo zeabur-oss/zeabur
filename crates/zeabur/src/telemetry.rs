@@ -100,6 +100,11 @@ impl Telemetry {
         Self { on }
     }
 
+    /// Whether anything is sent.
+    pub(crate) const fn is_on(&self) -> bool {
+        self.on.is_some()
+    }
+
     #[cfg(test)]
     pub(crate) const fn off() -> Self {
         Self { on: None }

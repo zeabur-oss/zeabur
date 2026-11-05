@@ -89,7 +89,7 @@ impl TestApi {
 
     /// `used` receives each feature a successful write used.
     pub(crate) fn with_used(mut self, used: zeabur_api::used::Used) -> Self {
-        self.options.used = used;
+        self.options.used = Some(used);
         self
     }
 
