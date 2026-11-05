@@ -6,11 +6,13 @@ use std::time::Duration;
 
 use serde_json::Value;
 use zeabur_installer_host::kubectl::{self, Kubectl};
+use zeabur_installer_host::nodeprep::{self, Stage};
 use zeabur_installer_host::preflight::{self, Encryption, Status};
 use zeabur_installer_host::{facts, files, network, systemd};
 use zeabur_installer_plan::cluster::{AUTHN_CONFIGMAP, Distribution};
 use zeabur_installer_plan::config::{self, JoinConfig, Role};
 use zeabur_installer_plan::join::{self, JoinFacts, JoinPlan, Latency, RTT_SAMPLES};
+use zeabur_installer_plan::storage;
 
 use crate::apply::{self, ClusterInstall};
 use crate::{InstallError, node, out, render};
@@ -48,12 +50,35 @@ fn read_facts(config: &JoinConfig, token: &str) -> Result<JoinFacts, InstallErro
             (p, open)
         })
         .collect();
+    let facts = facts::read()?;
+    let longhorn_runs_here =
+        longhorn_runs_on(&own_kubectl(distribution), &facts.own_node_name()).unwrap_or(false);
     Ok(JoinFacts {
-        facts: facts::read()?,
+        facts,
         rtt_us,
         ports,
         token_pinned: config::token_pins_ca(token),
+        longhorn_runs_here,
     })
+}
+
+/// Whether a Longhorn manager Pod is bound to node `name`. The kubelet's credentials may list the
+/// Pods of their own node, so this works on an agent; before the node joins it is an error.
+fn longhorn_runs_on(kubectl: &Kubectl, name: &str) -> Result<bool, InstallError> {
+    let field = format!("--field-selector=spec.nodeName={name}");
+    let pods = kubectl.run(
+        &[
+            "get",
+            "pods",
+            "--all-namespaces",
+            &field,
+            "--selector=app=longhorn-manager",
+            "--output=name",
+            "--request-timeout=10s",
+        ],
+        None,
+    )?;
+    Ok(!pods.trim().is_empty())
 }
 
 fn make_plan(config: &JoinConfig) -> Result<(JoinPlan, String), InstallError> {
@@ -245,6 +270,14 @@ pub(crate) fn doctor(config: &JoinConfig) -> ExitCode {
 
     results.push(node_addresses(&own, &name));
     results.push(distance(config));
+    if config.join.longhorn || longhorn_runs_on(&own, &name).unwrap_or(false) {
+        results.extend(
+            nodeprep::check(&storage::LONGHORN_PREP, Stage::After)
+                .into_iter()
+                .filter(|c| c.status != Status::Pass)
+                .map(|c| (c.status, c.detail)),
+        );
+    }
 
     if config.join.role == Role::Server {
         let admin = Kubectl::admin(distribution);
