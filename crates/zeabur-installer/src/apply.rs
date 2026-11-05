@@ -942,9 +942,10 @@ fn checked_chart(object: &Value, digest: &str) -> Result<(Value, Vec<u8>), Insta
 /// the one before the apply, or that one when the `HelmChart` did not change and nothing needs to
 /// run again. Which install Job ran it, and when helm-controller replaced it, does not matter.
 ///
-/// Before it, a release left failed is rolled back ([`failure::prepare`]). A failed upgrade is
-/// tried once more unless its error repeats by nature; then `apply` rolls back and stops with the
-/// cause ([`failure::give_up`]).
+/// A release whose last upgrade failed for good with the same chart and values is not upgraded
+/// again ([`failure::repeats`]); any other one left failed is rolled back first
+/// ([`failure::prepare`]). A failed upgrade is tried once more unless its error repeats by
+/// nature; then `apply` rolls back and stops with the cause ([`failure::give_up`]).
 fn helm_chart(kubectl: &Kubectl, name: &str, object: &Value) -> Result<(), InstallError> {
     let chart_namespace = object
         .pointer("/metadata/namespace")
@@ -955,6 +956,15 @@ fn helm_chart(kubectl: &Kubectl, name: &str, object: &Value) -> Result<(), Insta
         namespace: release_namespace(object),
     };
     let previous = kubectl.get("helmchart", name, Some(chart_namespace))?;
+    if let Some(reason) = failure::repeats(kubectl, release, object)? {
+        return Err(failure::give_up(
+            kubectl,
+            release,
+            previous.as_ref(),
+            object,
+            &reason,
+        ));
+    }
     let mut rerun = failure::prepare(kubectl, release)?;
     let mut since = newest_revision(kubectl, release)?;
     let job_name = format!("helm-install-{name}");
@@ -967,10 +977,10 @@ fn helm_chart(kubectl: &Kubectl, name: &str, object: &Value) -> Result<(), Insta
     let applied = kubectl.get("helmchart", name, Some(chart_namespace))?;
     let spec = |chart: Option<&Value>| chart.and_then(|c| c.get("spec")).cloned();
     let changed = spec(previous.as_ref()) != spec(applied.as_ref());
-    if rerun && !changed && !failure::installing(kubectl, release)? {
-        failure::restart_install(kubectl, release)?;
-    }
     let expected = rerun || changed;
+    if expected {
+        failure::start_install(kubectl, release)?;
+    }
 
     let mut failed = None;
     let mut retried = false;

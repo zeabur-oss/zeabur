@@ -71,6 +71,49 @@ pub(crate) fn prepare(kubectl: &Kubectl, release: Release<'_>) -> Result<bool, I
     Ok(true)
 }
 
+/// Helm's reason when the newest revision failed with an error that repeats by nature and ran
+/// the chart version and values `chart` holds, so upgrading to `chart` would fail the same way.
+pub(crate) fn repeats(
+    kubectl: &Kubectl,
+    release: Release<'_>,
+    chart: &Value,
+) -> Result<Option<String>, InstallError> {
+    let history = helm::history(kubectl, release.namespace, release.name)?;
+    let Some(top) = newest(&history) else {
+        return Ok(None);
+    };
+    if top.status != "failed" {
+        return Ok(None);
+    }
+    let Some(revision) = helm::release(kubectl, release.namespace, release.name, top.version)?
+    else {
+        return Ok(None);
+    };
+    if !is_deterministic(&revision.description) {
+        return Ok(None);
+    }
+    if chart_version(chart).as_deref() != Some(revision.chart_version.as_str()) {
+        return Ok(None);
+    }
+    let config = if revision.config.is_null() {
+        json!({})
+    } else {
+        revision.config.clone()
+    };
+    if values_of(chart) != Some(config) {
+        return Ok(None);
+    }
+    Ok(Some(revision.description))
+}
+
+/// The values a `HelmChart` holds in `valuesContent`, `{}` when none.
+fn values_of(chart: &Value) -> Option<Value> {
+    let Some(text) = chart.pointer("/spec/valuesContent").and_then(Value::as_str) else {
+        return Some(json!({}));
+    };
+    serde_json::from_str(text).ok()
+}
+
 /// What the release's history and install Job say about an upgrade `apply` waits for.
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) enum Verdict {
@@ -207,11 +250,12 @@ enum Restored {
     Untouched,
 }
 
-/// Gives up on an upgrade: rolls the release back when its newest revision failed, and puts
-/// back a `HelmChart` with the chart and values of the revision the release now runs, so
-/// helm-controller has no failing upgrade to try again. `previous` is the `HelmChart` from before
-/// the apply and `applied` the one it applied; the chart comes from whichever holds the
-/// revision's version. Returns the error that says why, for `apply` to stop with.
+/// Gives up on an upgrade: puts back a `HelmChart` with the chart and values of the last good
+/// revision, then rolls the release back to it when its newest revision failed. In that order,
+/// helm-controller has no failing upgrade to run on the rolled-back release. `previous` is the
+/// `HelmChart` from before the apply and `applied` the one it applied; the chart comes from
+/// whichever holds the revision's version. Returns the error that says why, for `apply` to stop
+/// with.
 pub(crate) fn give_up(
     kubectl: &Kubectl,
     release: Release<'_>,
@@ -223,6 +267,11 @@ pub(crate) fn give_up(
         return stop(kubectl, release, reason, &Restored::Untouched, None);
     };
     let history = helm::history(kubectl, release.namespace, release.name).unwrap_or_default();
+    let Some(good) = last_good(&history) else {
+        let left = Restored::Left("the release has no deployed revision".to_owned());
+        return stop(kubectl, release, reason, &left, None);
+    };
+    let restored = restore(kubectl, release, &[previous, applied], good);
     let mut kept = None;
     if newest(&history).is_some_and(|r| r.status == "failed") {
         match rollback(kubectl, release) {
@@ -230,11 +279,6 @@ pub(crate) fn give_up(
             Err(error) => out::err(&format!("    rollback failed: {error}")),
         }
     }
-    let Some(version) = kept.or_else(|| last_good(&history)) else {
-        let left = Restored::Left("the release has no deployed revision".to_owned());
-        return stop(kubectl, release, reason, &left, kept);
-    };
-    let restored = restore(kubectl, release, &[previous, applied], version);
     stop(kubectl, release, reason, &restored, kept)
 }
 
@@ -401,9 +445,17 @@ pub(crate) fn installing(kubectl: &Kubectl, release: Release<'_>) -> Result<bool
     Ok(!pods.trim().is_empty())
 }
 
+/// Before waiting for an upgrade: restarts the install Job unless it runs now. helm-controller
+/// starts no Job for a change outside its config hash, or for a release its Job gave up on.
+pub(crate) fn start_install(kubectl: &Kubectl, release: Release<'_>) -> Result<(), InstallError> {
+    if installing(kubectl, release)? {
+        return Ok(());
+    }
+    restart_install(kubectl, release)
+}
+
 /// Deletes the install Job, so helm-controller creates it again from the `HelmChart` and runs it
-/// now, with a fresh back-off. Only for a `HelmChart` helm-controller has no change to act on,
-/// since it replaces the Job of a changed one itself.
+/// now, with a fresh back-off.
 pub(crate) fn restart_install(kubectl: &Kubectl, release: Release<'_>) -> Result<(), InstallError> {
     kubectl.run(
         &[
@@ -720,8 +772,8 @@ mod tests {
     }
 
     /// A `kubectl` for a release `zot` with the history in `history`: revision 1 ran chart 0.1.60
-    /// with 20Gi, revision 2 failed, helm Jobs succeed, no install Pod runs, and each applied
-    /// object is kept in `applied`.
+    /// with 20Gi, revision 2 failed, helm Jobs succeed, an install Pod runs when `pods` says so,
+    /// each applied object is kept in `applied` and each delete in `deleted`.
     const FAKE: &str = r#"#!/bin/sh
 dir=$(dirname "${1#--kubeconfig=}")
 shift
@@ -731,7 +783,9 @@ case "$*" in
 "get secret sh.helm.release.v1.zot.v2 "*) cat "$dir/failed.json" ;;
 "get job helm-install-zot "*) echo '{"metadata":{"uid":"i"},"spec":{"template":{"spec":{"containers":[{"name":"helm"}]}}}}' ;;
 "get job zeabur-helm-zot "*) echo '{"status":{"succeeded":1}}' ;;
+"get pods "*) cat "$dir/pods" 2>/dev/null || true ;;
 apply*) cat >> "$dir/applied"; echo >> "$dir/applied" ;;
+delete*) echo "$*" >> "$dir/deleted" ;;
 esac
 "#;
 
@@ -813,6 +867,76 @@ esac
         let text = error.to_string();
         assert!(text.contains("rolled back to revision 1"), "{text}");
         assert!(!text.contains("still holds"), "{text}");
+    }
+
+    #[test]
+    fn giving_up_puts_the_chart_back_before_rolling_back() {
+        let dir = tempfile::tempdir().unwrap();
+        let kubectl = fake(dir.path(), "1 deployed\n2 failed\n");
+        let previous = helm_chart("0.1.60", "50Gi");
+        give_up(&kubectl, ZOT, Some(&previous), &previous, "spec: Forbidden");
+
+        let text = fs::read_to_string(dir.path().join("applied")).unwrap();
+        let mut kinds = Vec::new();
+        for line in text.lines() {
+            let object: Value = serde_json::from_str(line).unwrap();
+            kinds.push(object["kind"].as_str().unwrap().to_owned());
+        }
+        assert_eq!(kinds, ["HelmChart", "Job"]);
+    }
+
+    fn fail_with(dir: &Path, description: &str, version: &str, storage: &str) {
+        let failed = json!({
+            "info": {"status": "failed", "description": description},
+            "chart": {"metadata": {"name": "zot", "version": version}},
+            "config": {"pvc": {"storage": storage}},
+        });
+        fs::write(dir.join("failed.json"), secret(&failed).to_string()).unwrap();
+    }
+
+    #[test]
+    fn a_refused_upgrade_with_the_same_chart_and_values_repeats() {
+        let dir = tempfile::tempdir().unwrap();
+        let kubectl = fake(dir.path(), "1 deployed\n2 failed\n");
+        let refused = "StatefulSet.apps \"zot\" is invalid: spec: Forbidden";
+        fail_with(dir.path(), refused, "0.1.60", "50Gi");
+
+        let same = helm_chart("0.1.60", "50Gi");
+        let reason = repeats(&kubectl, ZOT, &same).unwrap();
+        assert_eq!(reason.as_deref(), Some(refused));
+        let other_values = helm_chart("0.1.60", "20Gi");
+        assert_eq!(repeats(&kubectl, ZOT, &other_values).unwrap(), None);
+        let other_chart = helm_chart("0.1.61", "50Gi");
+        assert_eq!(repeats(&kubectl, ZOT, &other_chart).unwrap(), None);
+    }
+
+    #[test]
+    fn an_upgrade_that_may_pass_or_a_deployed_release_does_not_repeat() {
+        let dir = tempfile::tempdir().unwrap();
+        let kubectl = fake(dir.path(), "1 deployed\n2 failed\n");
+        fail_with(dir.path(), "context deadline exceeded", "0.1.60", "50Gi");
+        let same = helm_chart("0.1.60", "50Gi");
+        assert_eq!(repeats(&kubectl, ZOT, &same).unwrap(), None);
+
+        let kubectl = fake(dir.path(), "1 deployed\n");
+        assert_eq!(repeats(&kubectl, ZOT, &same).unwrap(), None);
+    }
+
+    #[test]
+    fn the_install_job_starts_again_unless_it_runs() {
+        let dir = tempfile::tempdir().unwrap();
+        let kubectl = fake(dir.path(), "1 deployed\n");
+        start_install(&kubectl, ZOT).unwrap();
+        let deleted = fs::read_to_string(dir.path().join("deleted")).unwrap();
+        assert!(
+            deleted.starts_with("delete job helm-install-zot "),
+            "{deleted}"
+        );
+
+        fs::remove_file(dir.path().join("deleted")).unwrap();
+        fs::write(dir.path().join("pods"), "2026-11-05T13:59:47Z").unwrap();
+        start_install(&kubectl, ZOT).unwrap();
+        assert!(!dir.path().join("deleted").exists());
     }
 
     #[test]
