@@ -440,6 +440,23 @@ fn ports(s: &mut String, plan: &JoinPlan) {
             ),
         );
     }
+    if plan.unit_running {
+        let numbers: Vec<String> = plan
+            .local_ports
+            .iter()
+            .map(|p| p.number.to_string())
+            .collect();
+        push(
+            s,
+            &format!(
+                "Ports on this VM: {} belong to the running {}",
+                numbers.join(", "),
+                plan.unit
+            ),
+        );
+        push(s, "");
+        return;
+    }
     push(
         s,
         "Ports on this VM, free before the node starts (apply checks them)",
@@ -496,11 +513,18 @@ mod tests {
 
     use super::*;
 
-    fn plan(yaml: &str, rtt_us: &[u64]) -> JoinPlan {
-        let Document::Join(config) = Document::parse(yaml).unwrap() else {
-            panic!("not a join");
-        };
-        let facts = JoinFacts {
+    /// The example worker configuration from the docs.
+    const WORKER: &str = include_str!("../../../docs/reference/installer-examples/join.yaml");
+
+    /// Five TCP connect times to the server's join port, in microseconds, as `plan` measures them.
+    /// Under 1 ms: the same region.
+    const SAME_REGION_US: [u64; 5] = [640, 610, 700, 900, 650];
+    /// About 24 ms: another region.
+    const OTHER_REGION_US: [u64; 5] = [24_000, 23_500, 25_100, 24_200, 23_900];
+
+    /// A fresh VM that reached the server in `rtt_us`; none means the server did not answer.
+    fn facts(rtt_us: &[u64]) -> JoinFacts {
+        JoinFacts {
             facts: Facts {
                 arch: "amd64".to_owned(),
                 hostname: "vps-2".to_owned(),
@@ -522,16 +546,20 @@ mod tests {
             ],
             token_pinned: true,
             longhorn_runs_here: false,
+            unit_running: false,
+        }
+    }
+
+    fn plan(yaml: &str, facts: &JoinFacts) -> JoinPlan {
+        let Document::Join(config) = Document::parse(yaml).unwrap() else {
+            panic!("not a join");
         };
-        join::plan(&config, &facts).unwrap()
+        join::plan(&config, facts).unwrap()
     }
 
     #[test]
     fn a_worker_near_the_server() {
-        let p = plan(
-            include_str!("../../../docs/reference/installer-examples/join.yaml"),
-            &[640, 610, 700, 900, 650],
-        );
+        let p = plan(WORKER, &facts(&SAME_REGION_US));
         let text = join_plan(&p).replace(&p.cluster.version, "<version>");
         assert_eq!(text, include_str!("../fixtures/join-worker.txt"));
     }
@@ -541,7 +569,7 @@ mod tests {
         let p = plan(
             "distribution: rke2\njoin:\n  server: https://10.0.0.5:9345\n  role: server\n  \
              tokenFile: /root/token\n  serverConfig: {disable: [rke2-metrics-server], identity: true}\n",
-            &[24_000, 23_500, 25_100, 24_200, 23_900],
+            &facts(&OTHER_REGION_US),
         );
         let text = join_plan(&p).replace(&p.cluster.version, "<version>");
         assert_eq!(text, include_str!("../fixtures/join-server.txt"));
@@ -549,13 +577,21 @@ mod tests {
 
     #[test]
     fn an_unreachable_server_is_an_error() {
-        let p = plan(
-            include_str!("../../../docs/reference/installer-examples/join.yaml"),
-            &[],
-        );
-        let text = join_plan(&p);
+        let text = join_plan(&plan(WORKER, &facts(&[])));
         assert!(text.contains("Distance         the server did not answer"));
         assert!(text.contains("error: Cannot connect to https://10.0.0.5:6443."));
+    }
+
+    #[test]
+    fn a_node_that_joined_already_holds_its_own_ports() {
+        let mut joined = facts(&SAME_REGION_US);
+        joined.unit_running = true;
+        let text = join_plan(&plan(WORKER, &joined));
+        assert!(
+            text.contains("Ports on this VM: 80, 443, 10250 belong to the running k3s-agent"),
+            "{text}"
+        );
+        assert!(!text.contains("free before the node starts"), "{text}");
     }
 
     #[test]

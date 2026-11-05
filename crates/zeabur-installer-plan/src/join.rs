@@ -52,6 +52,9 @@ pub struct JoinFacts {
     /// Longhorn's manager runs on this node, which has joined already: the cluster installed
     /// Longhorn after it joined, so its configuration may not say `longhorn: true`.
     pub longhorn_runs_here: bool,
+    /// The node's unit (`k3s-agent`, `rke2-server`, …) is running: the node joined already and
+    /// holds its own ports.
+    pub unit_running: bool,
 }
 
 /// One port and what was found.
@@ -155,6 +158,8 @@ pub struct JoinPlan {
     pub ports: Vec<Port>,
     /// Ports on this VM that `apply` checks are free before the node starts.
     pub local_ports: Vec<Port>,
+    /// The node's unit is running, so its ports are in use by it and `apply` doesn't check them.
+    pub unit_running: bool,
     /// Things to read before applying.
     pub warnings: Vec<Warning>,
     /// Things `apply` refuses to go on with.
@@ -431,6 +436,7 @@ pub fn plan(config: &JoinConfig, facts: &JoinFacts) -> Result<JoinPlan, PlanErro
                 open: None,
             })
             .collect(),
+        unit_running: facts.unit_running,
         warnings,
         blockers,
     })
@@ -468,6 +474,7 @@ mod tests {
             ports: vec![(9345, true), (6443, true), (10250, false)],
             token_pinned: true,
             longhorn_runs_here: false,
+            unit_running: false,
         }
     }
 
@@ -607,6 +614,7 @@ mod tests {
     fn a_node_that_joined_before_longhorn_is_prepared_for_it() {
         let facts = JoinFacts {
             longhorn_runs_here: true,
+            unit_running: true,
             ..facts(&[500; 5])
         };
         let p = plan(&config(""), &facts).unwrap();

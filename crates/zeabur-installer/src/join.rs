@@ -53,12 +53,17 @@ fn read_facts(config: &JoinConfig, token: &str) -> Result<JoinFacts, InstallErro
     let facts = facts::read()?;
     let longhorn_runs_here =
         longhorn_runs_on(&own_kubectl(distribution), &facts.own_node_name()).unwrap_or(false);
+    let unit = match config.join.role {
+        Role::Worker => distribution.agent_unit(),
+        Role::Server => distribution.server_unit(),
+    };
     Ok(JoinFacts {
         facts,
         rtt_us,
         ports,
         token_pinned: config::token_pins_ca(token),
         longhorn_runs_here,
+        unit_running: systemd::is_active(unit),
     })
 }
 
