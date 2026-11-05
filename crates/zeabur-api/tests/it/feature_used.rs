@@ -151,7 +151,7 @@ mod tests {
             assert_eq!(apply(&app, &planned).await, StatusCode::OK);
             cluster.inspect(|s| s.object_reads).unwrap() - before
         };
-        let used: zeabur_api::used::Used = Arc::new(|_| {});
+        let used: zeabur_api::used::Used = std::sync::Arc::new(|_| {});
         assert!(reads(Some(used)).await > reads(None).await);
     }
 }
