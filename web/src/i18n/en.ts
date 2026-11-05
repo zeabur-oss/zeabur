@@ -846,7 +846,6 @@ export const en = {
   "pod.notReady": "Not ready",
   "pod.readyCount": (ready: number, total: number) => `${ready}/${total} ready`,
   "pod.restarts": (n: number) => plural(n, "restart", "restarts"),
-  "pod.object": "Object (YAML)",
   "pod.yaml": "YAML",
   "pod.logsOf": (pod: string) => `Logs of ${pod}`,
   "resources.title": "Resources",

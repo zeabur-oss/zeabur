@@ -8,6 +8,7 @@ import {
   roleOf,
   serviceOfPod,
   type Network,
+  type Pod,
   type Service,
 } from "@/model/service"
 
@@ -112,10 +113,10 @@ describe("the Secrets a service's variables read", () => {
 
 describe("the service of a pod", () => {
   test("is the one that lists the pod, so a delete names the controller that replaces it", () => {
-    const pod = (name: string) => ({ name })
+    const pods = (...names: string[]) => names.map((name) => ({ name }) as Pod)
     const services = [
-      service("web", { pods: [pod("web-7d9-abc")] as unknown as Service["pods"] }),
-      service("db", { kind: "StatefulSet", pods: [pod("db-0")] as unknown as Service["pods"] }),
+      service("web", { pods: pods("web-7d9-abc") }),
+      service("db", { kind: "StatefulSet", pods: pods("db-0") }),
     ]
     expect(serviceOfPod(services, "db-0")?.name).toBe("db")
     expect(serviceOfPod(services, "web-7d9-abc")?.kind).toBe("Deployment")

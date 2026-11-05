@@ -790,7 +790,6 @@ export const zhTW: Messages = {
   "pod.notReady": "未就緒",
   "pod.readyCount": (ready, total) => `${ready}/${total} 就緒`,
   "pod.restarts": (n) => `重新啟動 ${n} 次`,
-  "pod.object": "物件 (YAML)",
   "pod.yaml": "YAML",
   "pod.logsOf": (pod) => `${pod} 的日誌`,
   "resources.title": "資源",

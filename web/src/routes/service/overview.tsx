@@ -48,7 +48,7 @@ import { Problem } from "@/components/problem"
 import { GateTip, useGate } from "@/components/gate"
 import { usePlanner } from "@/components/plan/planner"
 import { formatAgo, formatTime } from "@/lib/format"
-import { serviceLink } from "@/lib/place"
+import { podObjectLink, serviceLink } from "@/lib/place"
 import { cn } from "@/lib/utils"
 import type { Schemas } from "@/api/client"
 import { alertsFor, folded } from "@/model/alerts"
@@ -606,6 +606,13 @@ function Replicas({
                         {t("tab.logs")}
                       </button>
                     ) : null}
+                    <Link
+                      {...podObjectLink(project, pod.name)}
+                      className="shrink-0 rounded px-1 text-muted-foreground outline-none hover:bg-muted hover:text-foreground"
+                      aria-label={t("yaml.label", pod.name)}
+                    >
+                      {t("pod.yaml")}
+                    </Link>
                   </span>
                   <span className="flex flex-wrap gap-x-2 pl-3.5 type-meta text-muted-foreground">
                     <span className={health === "ok" ? undefined : "text-foreground"}>
