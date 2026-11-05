@@ -447,7 +447,10 @@ fn unprepared_nodes(list: &Value) -> Vec<String> {
             .collect();
         if !failing.is_empty() {
             found.push(format!(
-                "node {name} is not prepared for Longhorn ({}): run zeabur-installer apply on it",
+                "node {name} is not prepared for Longhorn ({}): run zeabur-installer apply on it, \
+                 then restart its Longhorn manager, which only checks the node again when it \
+                 starts: kubectl -n longhorn-system delete pod -l app=longhorn-manager \
+                 --field-selector spec.nodeName={name}",
                 failing.join("; ")
             ));
         }
@@ -635,7 +638,9 @@ mod tests {
             [
                 "node vps-2 is not prepared for Longhorn (Missing packages: [nfs-common \
                  open-iscsi]; Kernel modules [iscsi_tcp] are not loaded): run zeabur-installer \
-                 apply on it"
+                 apply on it, then restart its Longhorn manager, which only checks the node \
+                 again when it starts: kubectl -n longhorn-system delete pod -l \
+                 app=longhorn-manager --field-selector spec.nodeName=vps-2"
             ]
         );
     }
