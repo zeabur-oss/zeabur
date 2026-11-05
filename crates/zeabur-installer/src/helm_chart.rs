@@ -92,7 +92,8 @@ fn failed_upgrade(name: &str, namespace: &str, revision: u64) -> String {
         "Helm failed to upgrade the {name} chart (release {name} in namespace {namespace}, \
          revision {revision}). apply set the chart's `failurePolicy` to `abort`, so \
          helm-controller stops retrying the upgrade.\n\
-         See why with `helm history {name} -n {namespace}`.\n\
+         See why with `helm history {name} -n {namespace}`, from a machine that has helm and \
+         can reach the cluster.\n\
          Fix the cause, then run apply again. apply sets `failurePolicy` back to `retry` and \
          upgrades over the failed release."
     )
