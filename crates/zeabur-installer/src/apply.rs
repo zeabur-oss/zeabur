@@ -27,7 +27,7 @@ use zeabur_installer_plan::storage::{self, NodePrep, Storage};
 use zeabur_telemetry::{InstallationId, Step};
 
 use crate::telemetry::{self, Reporter};
-use crate::{InstallError, load, out, remove, render};
+use crate::{InstallError, doctor, load, out, remove, render};
 
 /// Downloads and the local CA's copy.
 pub(crate) const STATE_DIR: &str = "/var/lib/rancher/zeabur-installer";
@@ -157,7 +157,7 @@ fn install_components(kubectl: &Kubectl, plan: &Plan) -> Result<(), InstallError
         }
         releases(kubectl, component)?;
         for check in &component.health {
-            kubectl.wait(&check.args("--timeout=5m"))?;
+            doctor::wait_health(check, "--timeout=5m", |args| kubectl.wait(args))?;
         }
         if let Some(registry) = plan
             .registry

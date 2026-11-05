@@ -311,7 +311,7 @@ fn standing_warnings(
             "join.storage.longhorn",
             &[],
             "The cluster runs Longhorn: apply installs an iSCSI initiator and an NFS client here, \
-             starts iscsid and loads iscsi_tcp. Longhorn then keeps replicas under \
+             starts iscsid and loads iscsi_tcp and dm_crypt. Longhorn then keeps replicas under \
              /var/lib/longhorn on this node's disk. Volumes on local-path still stay on the node \
              that created them."
                 .to_owned(),
