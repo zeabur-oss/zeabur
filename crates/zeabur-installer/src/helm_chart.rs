@@ -93,9 +93,8 @@ fn failed_upgrade(name: &str, namespace: &str, revision: u64) -> String {
         "Helm failed to upgrade the {name} chart (release {name} in namespace {namespace}, \
          revision {revision}). apply set the chart's `failurePolicy` to `abort`, so \
          helm-controller stops retrying the upgrade.\n\
-         See why the upgrade failed:\n  sudo kubectl -n {namespace} get secret \
-         sh.helm.release.v1.{name}.v{revision} -o jsonpath='{{.data.release}}' | base64 -d | \
-         base64 -d | gunzip | grep -o '\"description\":[^}}]*\"status\":\"failed\"'\n\
+         Helm records why in the failed revision: Secret sh.helm.release.v1.{name}.v{revision} \
+         in namespace {namespace}, which `helm history` also shows.\n\
          Fix the cause, then run apply again. apply sets `failurePolicy` back to `retry` and \
          upgrades over the failed release."
     )
@@ -314,7 +313,7 @@ esac
         );
         assert!(error.contains("`failurePolicy` to `abort`"), "{error}");
         assert!(
-            error.contains("kubectl -n zot get secret sh.helm.release.v1.zot.v2 "),
+            error.contains("Secret sh.helm.release.v1.zot.v2 in namespace zot"),
             "{error}"
         );
         assert!(error.contains("run apply again"), "{error}");
