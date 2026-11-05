@@ -276,19 +276,12 @@ pub(crate) fn components(kubectl: &Kubectl, plan: &Value) -> Vec<(Status, String
                 ),
             ));
         }
-        let removed = if id == LONGHORN {
-            longhorn_node_list(kubectl)
-                .map_or_else(|_| Vec::new(), |list| removed_longhorn_nodes(&list))
-        } else {
-            Vec::new()
-        };
-        if !removed.is_empty() {
-            results.push((Status::Warn, removed_longhorn_nodes_advice(&removed)));
-        }
-        let failed = failed_health(checks.as_deref().unwrap_or_default(), |check, timeout| {
-            (check.name == "nodes-ready" && !removed.is_empty())
-                || wait_health(check, timeout, |args| kubectl.wait(args)).is_ok()
-        });
+        let failed = failed_checks(
+            kubectl,
+            id,
+            checks.as_deref().unwrap_or_default(),
+            &mut results,
+        );
         if checks.is_some() && problems.is_empty() && failed.is_empty() {
             results.push((
                 Status::Pass,
@@ -357,6 +350,31 @@ fn namespaces(plan: &Value) -> Vec<&str> {
         }
     }
     found
+}
+
+/// The catalog's health checks of a component that fail. A Longhorn node whose Kubernetes node is
+/// gone is a warning of its own, and the `nodes-ready` check then covers the other nodes only.
+fn failed_checks(
+    kubectl: &Kubectl,
+    id: &str,
+    checks: &[Health],
+    results: &mut Vec<(Status, String)>,
+) -> Vec<String> {
+    let list = if id == LONGHORN {
+        longhorn_node_list(kubectl).ok()
+    } else {
+        None
+    };
+    let removed = list.as_ref().map_or_else(Vec::new, removed_longhorn_nodes);
+    if !removed.is_empty() {
+        results.push((Status::Warn, removed_longhorn_nodes_advice(&removed)));
+    }
+    failed_health(checks, |check, timeout| match &list {
+        Some(list) if check.name == "nodes-ready" && !removed.is_empty() => {
+            not_ready_longhorn_nodes(list).is_empty()
+        }
+        _ => wait_health(check, timeout, |args| kubectl.wait(args)).is_ok(),
+    })
 }
 
 /// The catalog's health checks that fail, each with its advice and the wait that failed.
@@ -460,6 +478,37 @@ fn removed_longhorn_nodes(list: &Value) -> Vec<String> {
             {
                 found.push(name.to_owned());
             }
+        }
+    }
+    found
+}
+
+/// The Longhorn Node objects that are not ready for a reason other than a removed Kubernetes node.
+fn not_ready_longhorn_nodes(list: &Value) -> Vec<String> {
+    let gone = removed_longhorn_nodes(list);
+    let mut found = Vec::new();
+    for node in list
+        .get("items")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+    {
+        let Some(name) = node.pointer("/metadata/name").and_then(Value::as_str) else {
+            continue;
+        };
+        let mut ready = false;
+        for condition in node
+            .pointer("/status/conditions")
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+        {
+            if condition.get("type").and_then(Value::as_str) == Some("Ready") {
+                ready = condition.get("status").and_then(Value::as_str) == Some("True");
+            }
+        }
+        if !ready && !gone.iter().any(|g| g == name) {
+            found.push(name.to_owned());
         }
     }
     found
@@ -779,7 +828,7 @@ mod tests {
         assert_eq!(removed_longhorn_nodes(&list), ["vps-2"]);
         let advice = removed_longhorn_nodes_advice(&["vps-2".to_owned()]);
         assert!(advice.contains("no longer has"), "{advice}");
-        assert!(!advice.contains("longhorn: true"), "{advice}");
+        assert_eq!(not_ready_longhorn_nodes(&list), ["vps-3"]);
     }
 
     #[test]
