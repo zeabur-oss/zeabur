@@ -78,6 +78,9 @@ pub(crate) fn run() -> ExitCode {
                 .and_then(|p| serde_json::from_str::<Value>(p).ok())
                 .unwrap_or_default();
             results.extend(components(&kubectl, &plan));
+            if crate::crowdsec::planned(&plan) {
+                results.extend(crate::crowdsec::check(&kubectl));
+            }
             results.push(default_class(&kubectl, &plan));
             if plan.get("nodePrep").is_some_and(|p| !p.is_null()) {
                 results.extend(

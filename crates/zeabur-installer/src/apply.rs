@@ -27,7 +27,7 @@ use zeabur_installer_plan::storage::{self, NodePrep, Storage};
 use zeabur_telemetry::{InstallationId, Step};
 
 use crate::telemetry::{self, Reporter};
-use crate::{InstallError, load, out, remove, render};
+use crate::{InstallError, crowdsec, load, out, remove, render};
 
 /// Downloads and the local CA's copy.
 pub(crate) const STATE_DIR: &str = "/var/lib/rancher/zeabur-installer";
@@ -108,6 +108,9 @@ fn install(config: &Config, reporter: &Reporter) -> Result<(), InstallError> {
 
     reporter.at(Step::Components);
     install_components(&kubectl, &plan)?;
+    if plan.components.iter().any(|c| c.id == crowdsec::COMPONENT) {
+        crowdsec::repair(&kubectl);
+    }
 
     let mut report = Vec::new();
     let mut link_issued = !first_install(&kubectl)?;

@@ -2,6 +2,7 @@
 //! server, or `KubeSolo` and the components for one person.
 
 mod apply;
+mod crowdsec;
 mod doctor;
 mod gui;
 mod join;
