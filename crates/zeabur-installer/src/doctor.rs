@@ -348,8 +348,8 @@ pub(crate) fn wait_health<E>(
     wait(&check.args(timeout))
 }
 
-/// The Deployments and `DaemonSets` in a list that have fewer Pods available than they want, as
-/// text.
+/// The Deployments and `DaemonSets` in a list that have fewer Pods available than they want, or
+/// a Deployment scaled to 0, as text.
 fn unavailable(list: &Value) -> Vec<String> {
     let mut found = Vec::new();
     for item in list
@@ -375,7 +375,9 @@ fn unavailable(list: &Value) -> Vec<String> {
                 count("/status/availableReplicas").unwrap_or(0),
             )
         };
-        if have < want {
+        if kind != "DaemonSet" && want == 0 {
+            found.push(format!("deployment/{name} is scaled to 0"));
+        } else if have < want {
             found.push(format!(
                 "{}/{name} has {have} of {want} Pods available",
                 kind.to_ascii_lowercase()
@@ -604,6 +606,7 @@ mod tests {
             unavailable(&list),
             [
                 "deployment/moco-controller has 0 of 2 Pods available",
+                "deployment/off is scaled to 0",
                 "daemonset/agent has 2 of 3 Pods available"
             ]
         );
