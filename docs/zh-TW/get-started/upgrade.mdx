@@ -1,7 +1,7 @@
 ---
 title: 升級 Zeabur
 description: 查看目前的 Zeabur 版本，依安裝方式用 zeabur-installer、Helm、Argo CD、Flux 或 zeaburctl 升級，並在升級後確認新版本。
-source: "82ee238dac12"
+source: "228d3e4db777"
 ---
 
 先看你是怎麼安裝的，再照該段升級。升級不會自動發生，Zeabur 只會告訴你有新版本。
@@ -15,6 +15,7 @@ source: "82ee238dac12"
 ## 升級前
 
 - 到 [GitHub Releases](https://github.com/zeabur-oss/zeabur/releases) 讀要升級的版本的發行說明。
+- 讀[升級須知](upgrade-notes.mdx)，跨過幾版就讀那幾節，先把每一版要做的事做完。
 - 先替伺服器或叢集留一份快照。要退回舊版時，只能還原升級前的快照，見[退回舊版](#退回舊版)。
 - 專案的資料另外用 Velero 備份，見[備份叢集並從備份還原](../cluster/backups.mdx)。
 
@@ -22,7 +23,7 @@ source: "82ee238dac12"
 
 團隊使用和個人使用的做法相同。
 
-1. 到[發行檔與驗證](../reference/releases.mdx)下載新版的 `zeabur-installer-v<版本>-linux-<架構>.tar.gz`，驗證後解開。
+1. 到[發行檔與驗證](../reference/releases.mdx)下載新版的 `zeabur-installer-v<版本>-linux-<架構>.tar.gz`，驗證後解開，用它取代伺服器上原本的 `zeabur-installer`，例如 `/usr/local/bin/zeabur-installer`。伺服器上沒有 `gh` 或 `cosign` 的話，可以在自己的電腦下載和驗證，再把壓縮檔傳到伺服器。
 2. 用同一份設定檔預覽變更：
 
    ```sh
@@ -41,6 +42,25 @@ K3s、RKE2 或 KubeSolo 的版本或主機檔案有變時，`apply` 會重新啟
 每版 installer 固定一個 K3s、RKE2 或 KubeSolo 版本，由 `apply` 安裝。Kubernetes 只能這樣升級：用其他方式升級（例如 System Upgrade Controller 的 Plan），下次 `apply` 會裝回 installer 固定的版本。
 
 伺服器記憶體低於新版對團隊使用的最低需求時，已在執行的安裝仍會升級，`plan` 會顯示警告，並保留現有的元件。
+
+### 用 AI Agents 升級
+
+也可以請 Claude Code、Codex 這類 AI Agents 照上面的步驟幫你升級。請先替伺服器留一份快照，再讓 AI Agent 能用 SSH 連到伺服器，帳號要能執行 `sudo`，並用金鑰登入。
+
+把下面這段貼給 AI Agent，並將 `<user>@<server>` 換成你的伺服器：
+
+```text
+請幫我升級 <user>@<server> 這台伺服器上的 Zeabur，用 SSH 連線，需要 root 的指令用 sudo。
+
+1. 執行 zeabur-installer --version 查目前的版本。目標版本是 https://github.com/zeabur-oss/zeabur/releases 上最新的發行版，除非我另外指定。把兩個版本告訴我。
+2. 把 /etc/zeabur-installer/config.yaml 複製一份備份。
+3. 依 https://oss.zeabur.com/zh-TW/docs/zeabur/reference/releases/ 的「下載與驗證執行檔」，下載目標版本的 zeabur-installer，依伺服器的 `uname -m` 選擇 linux-amd64 或 linux-arm64。驗證 SHA256SUMS 的簽章、檔案的 SHA-256 和建置來源，三項都通過才解壓縮。任何一項沒通過就停下來告訴我，不要為了讓驗證通過而修改驗證參數。伺服器上沒有 gh 或 cosign 的話，在這台電腦驗證，再把壓縮檔傳到伺服器。解壓縮後，把舊的 zeabur-installer 改名留著，換上新版。
+4. 讀 https://oss.zeabur.com/zh-TW/docs/zeabur/get-started/upgrade-notes/，從目前版本到目標版本之間的每一節，照「用 zeabur-installer 安裝」的步驟修改設定檔，把改了哪些地方給我看。要刪除元件或資料的步驟，先告訴我，等我同意再做。
+5. 用新版執行 sudo zeabur-installer plan，把新增和移除的元件、要換版的部分、警告和沒通過的檢查整理給我看，等我確認再繼續。
+6. 我同意後執行 sudo zeabur-installer apply。中途失敗時，先修好原因，再用同一份設定重新執行。
+7. 升級須知要求工作節點重新加入時，問我每個工作節點怎麼用 SSH 連線，再照著做。
+8. 執行 sudo zeabur-installer doctor，回報結果。結束碼 1 表示只有警告。
+```
 
 ## 用 Helm 升級
 

@@ -1,0 +1,99 @@
+---
+title: 升级须知
+description: 每一版不兼容的变更，以及升级前要先做的事。一次跨好几版时，依次看过中间每一节。
+source: "dc840e1ee646"
+---
+
+这一页列出每一版不兼容的变更，以及升级前要先做的事。升级的步骤本身见[升级 Zeabur](upgrade.mdx)。
+
+一次跨好几版升级时，从你当前的版本开始，依次看过到目标版本为止的每一节。新的版本写在最上面。
+
+## v0.1 → v0.2
+
+用 zeabur-installer 安装的服务器，要先改配置文件、移除 v0.1 装的 zot，再运行 `plan` 和 `apply`。有工作节点时，服务器升级完要让每个工作节点重新加入。
+
+用 Helm、Argo CD 或 Flux 安装的，chart 的值没有不兼容的变更。只有自己在 Deployment 加过 v0.2 去掉的参数时，要先删掉，见下面的说明。
+
+### 用 zeabur-installer 安装
+
+下面的 `kubectl` 在服务器上运行。K3s 用 `sudo k3s kubectl`，RKE2 用 `sudo /var/lib/rancher/rke2/bin/kubectl --kubeconfig /etc/rancher/rke2/rke2.yaml`。
+
+#### 1. 修改配置文件
+
+编辑服务器的 `/etc/zeabur-installer/config.yaml`，改掉下面三种旧写法。
+
+v0.2 没有 `preset`。默认会装组件目录建议的组件，再加上 Zeabur Builder、Keel 和 CloudNativePG。按你原来的 `preset` 调整：
+
+| 原来 | 改成 |
+| --- | --- |
+| `standard`，或没写 | 删掉 `preset` 这一行就行 |
+| `secure` | 删掉 `preset`，加上 `enable: [runtime-security, vulnerability-scanning, intrusion-prevention]` |
+| `minimal` | 删掉 `preset`，运行 `plan` 看会新增哪些组件，把不要的加进 `disable` |
+
+Zeabur Builder 是新加的默认组件，用来从 Git 构建。用不到的话，在 `disable` 加上 `builds`。
+
+`inputs` 和 `secretFiles` 里的输入名称改成 camelCase，新版不会读旧名称。必填的输入用旧名称时，`plan` 会提示缺少这一项。选填的会被当成没写，改用默认值。用到下面这些组件时，把旧名称改成新的：
+
+| 组件 | 旧名称 | 新名称 |
+| --- | --- | --- |
+| `builds/zeabur-builder` | `cluster-ip` | `clusterIp` |
+| `intrusion-prevention/crowdsec` | `bouncer-key`、`lapi-secret`、`registration-token` | `bouncerKey`、`lapiSecret`、`registrationToken` |
+| `remote-access/tailscale-operator` | `oauth-client-id`、`oauth-client-secret` | `oauthClientId`、`oauthClientSecret` |
+| `volume-backup/velero` | `s3-url`、`repository-password`、`backup-key`、`file-backup` | `s3Url`、`repositoryPassword`、`backupKey`、`fileBackup` |
+
+`enable` 或 `disable` 里有 `container-registry/zot` 时，把它删掉。zot 现在是 Zeabur Builder 的一部分。
+
+#### 2. 移除 v0.1 装的 zot
+
+v0.1 的默认组件里有独立的 zot。v0.2 不会把它换成 Zeabur Builder 的 zot，所以要先自己移除。先确认这台服务器有没有：
+
+```sh
+kubectl -n kube-system get helmchart zot \
+  -o jsonpath='{.metadata.annotations.installer\.zeabur\.com/component}'
+```
+
+输出 `container-registry/zot` 才需要移除。输出 `builds/zeabur-builder`，或找不到 `zot`，就跳到下一步。
+
+```sh
+kubectl -n kube-system delete helmchart zot
+kubectl -n zot get pods      # 等到没有任何 Pod
+kubectl delete namespace zot
+```
+
+zot 存的镜像会一起删掉。之后 `apply` 会安装 Zeabur Builder 和它自己的 zot，构建时会重新推送镜像。
+
+#### 3. 升级服务器
+
+下载 v0.2 的 installer，运行 `plan`，确认后再 `apply`，步骤见[升级 Zeabur](upgrade.mdx#用-zeabur-installer-升级)。
+
+`plan` 会列出这次新增的组件。System Upgrade Controller 不再是默认组件，`apply` 不会移除，只是不再更新，`plan` 会写成 `not removed, no longer updated`。installer 本来就固定了 K3s 和 RKE2 的版本，不需要 System Upgrade Controller。要保留，在 `enable` 加上 `node-updates/system-upgrade-controller`。不要的话，`apply` 完再删掉：
+
+```sh
+kubectl delete namespace system-upgrade
+kubectl delete crd plans.upgrade.cattle.io
+kubectl delete clusterrolebinding system-upgrade system-upgrade-drainer
+kubectl delete clusterrole system-upgrade-controller system-upgrade-controller-drainer
+```
+
+第 2 步移除的 zot 也会在 `plan` 显示 `not removed, no longer updated`。这是因为安装记录里还有它，`apply` 之后就不会再出现。
+
+v0.2 会给系统预留内存，避免 Pod 用光内存拖垮整台服务器，所以 `apply` 会重启 K3s 或 RKE2。Kubernetes API 约有 10 秒不响应，运行中的应用照常服务。
+
+#### 4. 让工作节点重新加入
+
+只有一台服务器的话，可以跳过这一步。
+
+工作节点的配置文件里，v0.1 的 `join.zot` 在 v0.2 改成了 `join.registry`，zot 的地址也换了，所以要用新的配置重新加入：
+
+1. 在升级好的服务器运行 `sudo zeabur-installer node add`。
+2. 在每个工作节点换上 v0.2 的 installer，备份 `/etc/zeabur-installer/config.yaml`，再用 root 粘贴 `node add` 输出的内容。它会写入新的配置文件，再运行 `plan` 和 `apply`。
+3. 工作节点都 `Ready` 后，在服务器运行 `sudo zeabur-installer node sync`，再按 `node add` 输出的最后一行撤销令牌。没有运行 `node sync` 的话，网络策略会拦住重新加入的节点。
+
+`node add` 的选项和令牌怎么撤销，见[管理节点](../cluster/nodes.mdx)。
+
+### 用 Helm、Argo CD 或 Flux 安装
+
+Zeabur 和 Zeabur Proxy 去掉了调整会话时长和 proxy 限制的参数，数值保持不变：空闲 1 小时或总共 12 小时后要重新登录。proxy 超时 30 秒、请求上限 16 MiB。chart 从来没有设置这些参数。你自己在 Deployment 的 `args` 或 `env` 加过的话，先删掉再升级：
+
+- `zeabur`：`--session-idle-minutes`、`--session-max-hours`，以及 `ZEABUR_SESSION_*` 环境变量。
+- `zeabur-proxy`：`--timeout`、`--max-bytes`、`--review-cache`、`--max-inflight`、`--max-inflight-per-person`，以及 `ZEABUR_PROXY_*` 环境变量。

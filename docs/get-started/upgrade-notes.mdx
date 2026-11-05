@@ -1,0 +1,98 @@
+---
+title: Upgrade notes
+description: Each version's breaking changes and what to do before you upgrade. When you skip versions, read every section in between, in order.
+---
+
+This page lists each version's breaking changes and what to do before you upgrade. For the upgrade steps themselves, see [Upgrade Zeabur](upgrade.mdx).
+
+If you're skipping versions, start at the version you run now and read every section up to the version you're moving to. The newest version is at the top.
+
+## v0.1 → v0.2
+
+On a server installed with zeabur-installer, change the configuration file and remove the zot that v0.1 installed, then run `plan` and `apply`. If you have worker nodes, have each one join again after the server is upgraded.
+
+If you installed with Helm, Argo CD or Flux, the chart values have no breaking changes. You only need to act if you added flags that v0.2 removed to the Deployment yourself. See below.
+
+### Installed with zeabur-installer
+
+Run the `kubectl` commands below on the server. On K3s, use `sudo k3s kubectl`. On RKE2, use `sudo /var/lib/rancher/rke2/bin/kubectl --kubeconfig /etc/rancher/rke2/rke2.yaml`.
+
+#### 1. Change the configuration file
+
+Edit `/etc/zeabur-installer/config.yaml` on the server and replace the three old forms below.
+
+v0.2 has no `preset`. By default it installs the components the catalog recommends, plus Zeabur Builder, Keel and CloudNativePG. Adjust it based on your old `preset`:
+
+| Before | After |
+| --- | --- |
+| `standard`, or not set | Delete the `preset` line |
+| `secure` | Delete `preset` and add `enable: [runtime-security, vulnerability-scanning, intrusion-prevention]` |
+| `minimal` | Delete `preset`, run `plan` to see which components it adds, and add the ones you don't want to `disable` |
+
+Zeabur Builder is a new default component that builds from Git. If you don't need it, add `builds` to `disable`.
+
+Input names in `inputs` and `secretFiles` are now camelCase, and the new version doesn't read the old names. If a required input uses its old name, `plan` reports it as missing. An optional one is treated as unset and takes its default. If you use any of these components, rename the old inputs:
+
+| Component | Old name | New name |
+| --- | --- | --- |
+| `builds/zeabur-builder` | `cluster-ip` | `clusterIp` |
+| `intrusion-prevention/crowdsec` | `bouncer-key`, `lapi-secret`, `registration-token` | `bouncerKey`, `lapiSecret`, `registrationToken` |
+| `remote-access/tailscale-operator` | `oauth-client-id`, `oauth-client-secret` | `oauthClientId`, `oauthClientSecret` |
+| `volume-backup/velero` | `s3-url`, `repository-password`, `backup-key`, `file-backup` | `s3Url`, `repositoryPassword`, `backupKey`, `fileBackup` |
+
+If `enable` or `disable` lists `container-registry/zot`, delete it. zot is now part of Zeabur Builder.
+
+#### 2. Remove the zot that v0.1 installed
+
+v0.1's default components included a standalone zot. v0.2 doesn't replace it with Zeabur Builder's zot, so remove it yourself first. Check whether this server has it:
+
+```sh
+kubectl -n kube-system get helmchart zot \
+  -o jsonpath='{.metadata.annotations.installer\.zeabur\.com/component}'
+```
+
+Only remove it if this prints `container-registry/zot`. If it prints `builds/zeabur-builder`, or there's no `zot`, go to the next step.
+
+```sh
+kubectl -n kube-system delete helmchart zot
+kubectl -n zot get pods      # wait until no pods are left
+kubectl delete namespace zot
+```
+
+This also deletes the images zot stored. The next `apply` installs Zeabur Builder with its own zot, and builds push their images again.
+
+#### 3. Upgrade the server
+
+Download the v0.2 installer, run `plan`, review it, then run `apply`. See [Upgrade Zeabur](upgrade.mdx#upgrade-with-zeabur-installer) for the steps.
+
+`plan` lists the components this upgrade adds. System Upgrade Controller is no longer a default component. `apply` doesn't remove it but stops updating it, and `plan` shows it as `not removed, no longer updated`. The installer already pins the K3s and RKE2 release, so you don't need it. To keep it, add `node-updates/system-upgrade-controller` to `enable`. Otherwise, delete it after `apply`:
+
+```sh
+kubectl delete namespace system-upgrade
+kubectl delete crd plans.upgrade.cattle.io
+kubectl delete clusterrolebinding system-upgrade system-upgrade-drainer
+kubectl delete clusterrole system-upgrade-controller system-upgrade-controller-drainer
+```
+
+The zot you removed in step 2 also shows as `not removed, no longer updated` in `plan`. That's because the install record still lists it. It no longer shows after `apply`.
+
+v0.2 reserves memory for the system so pods can't use it all and take the whole server down. So `apply` restarts K3s or RKE2. The Kubernetes API stops answering for about 10 seconds. Running apps keep serving.
+
+#### 4. Have worker nodes join again
+
+If you have only one server, skip this step.
+
+In a worker's configuration file, v0.1's `join.zot` is `join.registry` in v0.2, and zot's address has changed, so join again with a new configuration:
+
+1. On the upgraded server, run `sudo zeabur-installer node add`.
+2. On each worker node, put the v0.2 installer in place, back up `/etc/zeabur-installer/config.yaml`, then paste what `node add` printed as root. It writes the new configuration file, then runs `plan` and `apply`.
+3. Once every worker node is `Ready`, run `sudo zeabur-installer node sync` on the server, then revoke the token as the last line of the `node add` output says. Until you run `node sync`, the network policies block the rejoined nodes.
+
+For `node add`'s options and how to revoke its token, see [Manage nodes](../cluster/nodes.mdx).
+
+### Installed with Helm, Argo CD or Flux
+
+Zeabur and Zeabur Proxy dropped the flags that set session length and proxy limits. The values stay the same: people sign in again after 1 hour idle or 12 hours in total. The proxy times out after 30 seconds and caps requests at 16 MiB. The chart never set these flags. If you added them to the Deployment's `args` or `env` yourself, delete them before you upgrade:
+
+- `zeabur`: `--session-idle-minutes`, `--session-max-hours`, and the `ZEABUR_SESSION_*` environment variables.
+- `zeabur-proxy`: `--timeout`, `--max-bytes`, `--review-cache`, `--max-inflight`, `--max-inflight-per-person`, and the `ZEABUR_PROXY_*` environment variables.

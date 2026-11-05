@@ -14,6 +14,7 @@ Under `zeaburctl ui`, the page shows `zeaburctl`'s own version. For the details 
 ## Before you upgrade
 
 - Read the release notes for the version you're moving to on [GitHub Releases](https://github.com/zeabur-oss/zeabur/releases).
+- Read the [upgrade notes](upgrade-notes.mdx). Read one section for each version you skip, and finish what each one asks before you upgrade.
 - Take a snapshot of the server or cluster. To go back to an older version, you can only restore a snapshot taken before the upgrade. See [Go back](#go-back).
 - Back up project data separately with Velero. See [Back up a cluster and restore from a backup](../cluster/backups.mdx).
 
@@ -21,7 +22,7 @@ Under `zeaburctl ui`, the page shows `zeaburctl`'s own version. For the details 
 
 Team and personal installs work the same way.
 
-1. Download the new `zeabur-installer-v<version>-linux-<arch>.tar.gz` from [Release files and verification](../reference/releases.mdx), verify it, and extract it.
+1. Download the new `zeabur-installer-v<version>-linux-<arch>.tar.gz` from [Release files and verification](../reference/releases.mdx), verify it, extract it, and replace the server's old `zeabur-installer` with it, such as `/usr/local/bin/zeabur-installer`. If the server has no `gh` or `cosign`, download and verify it on your own computer, then copy the archive to the server.
 2. Preview the changes with the same configuration file:
 
    ```sh
@@ -40,6 +41,25 @@ When the K3s, RKE2 or KubeSolo release or a host file changes, `apply` restarts 
 Each installer pins one K3s, RKE2 or KubeSolo release, and `apply` installs it. Upgrade Kubernetes only this way: if something else upgrades it, such as a System Upgrade Controller Plan, the next `apply` puts the pinned release back.
 
 If the server has less memory than a team install now needs, an install that already runs is still upgraded. `plan` shows a warning, and the components it has stay.
+
+### Upgrade with AI Agents
+
+You can also have an AI Agent such as Claude Code or Codex follow the steps above for you. Take a snapshot of the server first. Then let the AI Agent reach the server over SSH with a key, as an account that can run `sudo`.
+
+Paste the text below to the AI Agent and replace `<user>@<server>` with your server:
+
+```text
+Upgrade Zeabur on the server <user>@<server>. Connect over SSH and use sudo for commands that need root.
+
+1. Run zeabur-installer --version to find the current version. The target version is the latest release on https://github.com/zeabur-oss/zeabur/releases unless I name another one. Tell me both versions.
+2. Make a backup copy of /etc/zeabur-installer/config.yaml.
+3. Follow "Download and verify binaries" on https://oss.zeabur.com/docs/zeabur/reference/releases/ to download the target version's zeabur-installer, picking linux-amd64 or linux-arm64 from the server's `uname -m`. Verify the signature on SHA256SUMS, the file's SHA-256 and its build provenance, and extract it only when all three pass. If any of them fails, stop and tell me, and don't change the verification parameters to make it pass. If the server has no gh or cosign, verify on this computer, then copy the archive to the server. After extracting, rename the old zeabur-installer to keep it, and put the new one in its place.
+4. Read https://oss.zeabur.com/docs/zeabur/get-started/upgrade-notes/. For every section between the current and target versions, change the configuration file as "Installed with zeabur-installer" says, and show me what you changed. Before any step that deletes components or data, tell me and wait for my approval.
+5. Run sudo zeabur-installer plan with the new version. Summarize the components added and removed, what changes version, the warnings and any failed checks, and wait for me to confirm.
+6. Once I approve, run sudo zeabur-installer apply. If it fails partway, fix the cause, then run it again with the same configuration.
+7. If the upgrade notes say worker nodes must join again, ask me how to reach each worker node over SSH, then do it.
+8. Run sudo zeabur-installer doctor and report the result. Exit code 1 means warnings only.
+```
 
 ## Upgrade with Helm
 
