@@ -220,33 +220,31 @@ fn passed(id: &str, component: &Value) -> String {
 /// catalog's health checks in the install record met.
 pub(crate) fn components(kubectl: &Kubectl, plan: &Value) -> Vec<(Status, String)> {
     let mut results = Vec::new();
-    for component in plan
+    let all: &[Value] = plan
         .get("components")
         .and_then(Value::as_array)
-        .into_iter()
-        .flatten()
-    {
+        .map_or(&[], Vec::as_slice);
+    for component in all {
         let id = component
             .get("id")
             .and_then(Value::as_str)
             .unwrap_or_default();
         let mut problems = Vec::new();
         let mut namespaces: Vec<&str> = Vec::new();
+        let mut release_names: Vec<&str> = Vec::new();
         for release in component
             .get("releases")
             .and_then(Value::as_array)
             .into_iter()
             .flatten()
         {
-            let namespace = release
-                .get("namespace")
-                .or_else(|| release.pointer("/object/spec/targetNamespace"))
-                .and_then(Value::as_str);
-            if let Some(ns) = namespace
-                && ns != "kube-system"
+            if let Some(ns) = release_namespace(release)
                 && !namespaces.contains(&ns)
             {
                 namespaces.push(ns);
+            }
+            if let Some(name) = release.get("name").and_then(Value::as_str) {
+                release_names.push(name);
             }
             if release.get("kind").and_then(Value::as_str) != Some("helmChart") {
                 continue;
@@ -267,26 +265,8 @@ pub(crate) fn components(kubectl: &Kubectl, plan: &Value) -> Vec<(Status, String
             }
         }
         for ns in namespaces {
-            match kubectl.run(
-                &[
-                    "get",
-                    "deployments,daemonsets",
-                    "--namespace",
-                    ns,
-                    "--output=json",
-                ],
-                None,
-            ) {
-                Ok(out) => {
-                    let list = serde_json::from_str::<Value>(&out).unwrap_or_default();
-                    problems.extend(
-                        unavailable(&list)
-                            .into_iter()
-                            .map(|w| format!("{ns}: {w} (kubectl get pods -n {ns})")),
-                    );
-                }
-                Err(e) => problems.push(format!("reading workloads in {ns}: {e}")),
-            }
+            let sole = !shares_namespace(all, component, ns);
+            problems.extend(workload_problems(kubectl, ns, &release_names, sole));
         }
         let checks = component
             .get("health")
@@ -316,6 +296,133 @@ pub(crate) fn components(kubectl: &Kubectl, plan: &Value) -> Vec<(Status, String
         );
     }
     results
+}
+
+/// The unavailable workloads in `namespace` that belong to the component with `releases`.
+fn workload_problems(
+    kubectl: &Kubectl,
+    namespace: &str,
+    releases: &[&str],
+    sole: bool,
+) -> Vec<String> {
+    let args = [
+        "get",
+        "deployments,daemonsets",
+        "--namespace",
+        namespace,
+        "--output=json",
+    ];
+    let out = match kubectl.run(&args, None) {
+        Ok(out) => out,
+        Err(e) => return vec![format!("reading workloads in {namespace}: {e}")],
+    };
+    let list = serde_json::from_str::<Value>(&out).unwrap_or_default();
+    let mine = owned_by(&list, releases, sole, &|owner| {
+        let kind = owner.get("kind").and_then(Value::as_str)?;
+        let name = owner.get("name").and_then(Value::as_str)?;
+        let group = owner
+            .get("apiVersion")
+            .and_then(Value::as_str)
+            .and_then(|v| v.split_once('/'))
+            .map_or("", |(group, _)| group);
+        let resource = format!("{kind}.{group}");
+        kubectl.get(&resource, name, Some(namespace)).ok().flatten()
+    });
+    let mut problems = Vec::new();
+    for workload in unavailable(&mine) {
+        problems.push(format!(
+            "{namespace}: {workload} (kubectl get pods -n {namespace})"
+        ));
+    }
+    problems
+}
+
+/// The namespace a release installs into, unless it is `kube-system`, which no component owns.
+fn release_namespace(release: &Value) -> Option<&str> {
+    release
+        .get("namespace")
+        .or_else(|| release.pointer("/object/spec/targetNamespace"))
+        .and_then(Value::as_str)
+        .filter(|ns| *ns != "kube-system")
+}
+
+/// Whether a component other than `component` has a release in `namespace`.
+fn shares_namespace(components: &[Value], component: &Value, namespace: &str) -> bool {
+    for other in components {
+        if other.get("id") == component.get("id") {
+            continue;
+        }
+        for release in other
+            .get("releases")
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+        {
+            if release_namespace(release) == Some(namespace) {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+/// How many owners up a workload's Helm release is looked for.
+const OWNER_DEPTH: usize = 4;
+
+/// The Helm release names that an object or its owners carry, in annotations and labels.
+/// `owner` reads an owner reference's object.
+fn release_candidates(workload: &Value, owner: &dyn Fn(&Value) -> Option<Value>) -> Vec<String> {
+    let mut names = Vec::new();
+    let mut current = workload.clone();
+    for _ in 0..OWNER_DEPTH {
+        for path in [
+            "/metadata/annotations/meta.helm.sh~1release-name",
+            "/metadata/labels/app.kubernetes.io~1instance",
+        ] {
+            if let Some(name) = current.pointer(path).and_then(Value::as_str) {
+                names.push(name.to_owned());
+            }
+        }
+        let Some(reference) = current.pointer("/metadata/ownerReferences/0") else {
+            break;
+        };
+        let Some(next) = owner(reference) else {
+            break;
+        };
+        current = next;
+    }
+    names
+}
+
+/// The workloads in a list that belong to one of the component's `releases`, as a list. A
+/// workload belongs to the release that made it, directly or through an operator's object that
+/// the release made. When no release is found on it, it belongs to the component only if no
+/// other component uses its namespace (`sole`).
+fn owned_by(
+    list: &Value,
+    releases: &[&str],
+    sole: bool,
+    owner: &dyn Fn(&Value) -> Option<Value>,
+) -> Value {
+    let mut items = Vec::new();
+    for item in list
+        .get("items")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+    {
+        let candidates = release_candidates(item, owner);
+        let mut mine = sole;
+        for name in &candidates {
+            if releases.contains(&name.as_str()) {
+                mine = true;
+            }
+        }
+        if mine {
+            items.push(item.clone());
+        }
+    }
+    serde_json::json!({ "items": items })
 }
 
 /// The catalog's health checks that fail, each with its advice and the wait that failed.
@@ -527,6 +634,53 @@ mod tests {
                 "deployment/moco-controller has 0 of 2 Pods available",
                 "daemonset/agent has 2 of 3 Pods available"
             ]
+        );
+    }
+
+    #[test]
+    fn a_workload_is_blamed_on_the_release_that_made_it_and_no_other_in_its_namespace() {
+        let list = json!({"items": [
+            {"kind": "Deployment",
+             "metadata": {"name": "vmsingle-vm", "ownerReferences": [
+                 {"kind": "VMSingle", "name": "vm", "apiVersion": "operator.victoriametrics.com/v1beta1"}]},
+             "spec": {"replicas": 1}, "status": {}},
+            {"kind": "Deployment",
+             "metadata": {"name": "blackbox",
+                          "annotations": {"meta.helm.sh/release-name": "blackbox"}},
+             "spec": {"replicas": 1}, "status": {}},
+        ]});
+        let owner = |reference: &Value| {
+            assert_eq!(reference["kind"], "VMSingle");
+            Some(json!({"metadata": {"name": "vm",
+                "annotations": {"meta.helm.sh/release-name": "victoria-metrics"}}}))
+        };
+        let problems =
+            |releases: &[&str], sole| unavailable(&owned_by(&list, releases, sole, &owner));
+        assert_eq!(
+            problems(&["victoria-metrics"], false),
+            ["deployment/vmsingle-vm has 0 of 1 Pods available"]
+        );
+        assert_eq!(
+            problems(&["blackbox"], false),
+            ["deployment/blackbox has 0 of 1 Pods available"]
+        );
+        assert_eq!(problems(&["operator"], false), Vec::<String>::new());
+    }
+
+    #[test]
+    fn a_workload_with_no_release_on_it_is_blamed_on_the_only_component_in_its_namespace() {
+        let list = json!({"items": [
+            {"kind": "Deployment", "metadata": {"name": "plain"},
+             "spec": {"replicas": 1}, "status": {}},
+        ]});
+        let none = |_: &Value| None;
+        assert_eq!(
+            unavailable(&owned_by(&list, &["a"], true, &none)),
+            ["deployment/plain has 0 of 1 Pods available"]
+        );
+        assert_eq!(
+            unavailable(&owned_by(&list, &["a"], false, &none)),
+            Vec::<String>::new()
         );
     }
 
