@@ -208,17 +208,22 @@ const fn rank(status: Status) -> u8 {
     }
 }
 
-/// The line for a component whose checks pass, marked when the catalog did not test it here.
-fn passed(id: &str, component: &Value) -> String {
-    if component.get("untested") == Some(&Value::Bool(true)) {
-        format!("{id} (untested)")
-    } else {
-        id.to_owned()
+/// The line for a component whose checks pass. It names only what was checked: its workloads are
+/// reported under their namespace, so they may still be unavailable.
+fn passed(id: &str, component: &Value, checks: &[Health]) -> String {
+    let mut line = format!("{id}: charts installed");
+    if !checks.is_empty() {
+        line.push_str(", health checks pass");
     }
+    if component.get("untested") == Some(&Value::Bool(true)) {
+        line.push_str(" (untested)");
+    }
+    line
 }
 
-/// Each component's `HelmCharts` installed, its Deployments and `DaemonSets` available and the
-/// catalog's health checks in the install record met.
+/// Each component's `HelmCharts` installed and the catalog's health checks in the install record
+/// met, then the Deployments and `DaemonSets` of every component namespace available. Components
+/// share namespaces, so a workload is reported once under its namespace, not under a component.
 pub(crate) fn components(kubectl: &Kubectl, plan: &Value) -> Vec<(Status, String)> {
     let mut results = Vec::new();
     for component in plan
@@ -232,23 +237,12 @@ pub(crate) fn components(kubectl: &Kubectl, plan: &Value) -> Vec<(Status, String
             .and_then(Value::as_str)
             .unwrap_or_default();
         let mut problems = Vec::new();
-        let mut namespaces: Vec<&str> = Vec::new();
         for release in component
             .get("releases")
             .and_then(Value::as_array)
             .into_iter()
             .flatten()
         {
-            let namespace = release
-                .get("namespace")
-                .or_else(|| release.pointer("/object/spec/targetNamespace"))
-                .and_then(Value::as_str);
-            if let Some(ns) = namespace
-                && ns != "kube-system"
-                && !namespaces.contains(&ns)
-            {
-                namespaces.push(ns);
-            }
             if release.get("kind").and_then(Value::as_str) != Some("helmChart") {
                 continue;
             }
@@ -267,28 +261,6 @@ pub(crate) fn components(kubectl: &Kubectl, plan: &Value) -> Vec<(Status, String
                 problems.push(format!("chart {name} is not installed (kubectl logs -n kube-system job/helm-install-{name})"));
             }
         }
-        for ns in namespaces {
-            match kubectl.run(
-                &[
-                    "get",
-                    "deployments,daemonsets",
-                    "--namespace",
-                    ns,
-                    "--output=json",
-                ],
-                None,
-            ) {
-                Ok(out) => {
-                    let list = serde_json::from_str::<Value>(&out).unwrap_or_default();
-                    problems.extend(
-                        unavailable(&list)
-                            .into_iter()
-                            .map(|w| format!("{ns}: {w} (kubectl get pods -n {ns})")),
-                    );
-                }
-                Err(e) => problems.push(format!("reading workloads in {ns}: {e}")),
-            }
-        }
         let checks = component
             .get("health")
             .and_then(|h| serde_json::from_value::<Vec<Health>>(h.clone()).ok());
@@ -305,7 +277,10 @@ pub(crate) fn components(kubectl: &Kubectl, plan: &Value) -> Vec<(Status, String
             wait_health(check, timeout, |args| kubectl.wait(args)).is_ok()
         });
         if checks.is_some() && problems.is_empty() && failed.is_empty() {
-            results.push((Status::Pass, passed(id, component)));
+            results.push((
+                Status::Pass,
+                passed(id, component, checks.as_deref().unwrap_or_default()),
+            ));
         }
         if !problems.is_empty() {
             results.push((Status::Fail, format!("{id}: {}", problems.join("; "))));
@@ -316,7 +291,59 @@ pub(crate) fn components(kubectl: &Kubectl, plan: &Value) -> Vec<(Status, String
                 .map(|failure| (Status::Fail, format!("{id}: {failure}"))),
         );
     }
+    for ns in namespaces(plan) {
+        let args = [
+            "get",
+            "deployments,daemonsets",
+            "--namespace",
+            ns,
+            "--output=json",
+        ];
+        match kubectl.run(&args, None) {
+            Ok(out) => {
+                let list = serde_json::from_str::<Value>(&out).unwrap_or_default();
+                for workload in unavailable(&list) {
+                    results.push((
+                        Status::Fail,
+                        format!("{ns}: {workload} (kubectl get pods -n {ns})"),
+                    ));
+                }
+            }
+            Err(e) => results.push((Status::Fail, format!("reading workloads in {ns}: {e}"))),
+        }
+    }
     results
+}
+
+/// The namespaces the components' releases install into, each once. `kube-system` is left out:
+/// K3s runs its own workloads there.
+fn namespaces(plan: &Value) -> Vec<&str> {
+    let mut found = Vec::new();
+    for component in plan
+        .get("components")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+    {
+        for release in component
+            .get("releases")
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+        {
+            let namespace = release
+                .get("namespace")
+                .or_else(|| release.pointer("/object/spec/targetNamespace"))
+                .and_then(Value::as_str);
+            if let Some(ns) = namespace
+                && ns != "kube-system"
+                && !found.contains(&ns)
+            {
+                found.push(ns);
+            }
+        }
+    }
+    found
 }
 
 /// The catalog's health checks that fail, each with its advice and the wait that failed.
@@ -613,6 +640,45 @@ mod tests {
                 "daemonset/agent has 2 of 3 Pods available"
             ]
         );
+    }
+
+    #[test]
+    fn a_passing_component_names_only_what_was_checked() {
+        let check = Health {
+            name: "nodes-ready".to_owned(),
+            wait: Vec::new(),
+            timeout: "60s".to_owned(),
+            advice: String::new(),
+        };
+        assert_eq!(
+            passed("metrics/victoria-metrics", &json!({}), &[]),
+            "metrics/victoria-metrics: charts installed"
+        );
+        assert_eq!(
+            passed(
+                "replicated-storage/longhorn",
+                &json!({"untested": true}),
+                &[check]
+            ),
+            "replicated-storage/longhorn: charts installed, health checks pass (untested)"
+        );
+    }
+
+    #[test]
+    fn a_namespace_shared_by_components_has_its_workloads_read_once() {
+        let plan = json!({"components": [
+            {"id": "metrics/victoria-metrics", "releases": [
+                {"kind": "helmChart", "name": "vm", "namespace": "observability"},
+            ]},
+            {"id": "logs/victoria-logs", "releases": [
+                {"kind": "helmChart", "name": "vl", "namespace": "observability"},
+                {"kind": "manifest", "object": {"spec": {"targetNamespace": "logs-extra"}}},
+            ]},
+            {"id": "ingress/traefik", "releases": [
+                {"kind": "helmChart", "name": "traefik", "namespace": "kube-system"},
+            ]},
+        ]});
+        assert_eq!(namespaces(&plan), ["observability", "logs-extra"]);
     }
 
     #[test]
