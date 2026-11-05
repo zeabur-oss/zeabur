@@ -20,7 +20,6 @@ pub(crate) fn busybox(dev: &DevCluster) -> Result<(), String> {
     dev.cmd("docker").args(["pull", "-q", BUSYBOX]).quiet()?;
     dev.cmd("docker")
         .args(["build", "-q", "-t", BUSYBOX, "-"])
-        .env("DOCKER_BUILDKIT", "0")
         .input(format!("FROM {BUSYBOX}\nLABEL com.zeabur.test=busybox\n"))
         .quiet()
 }
