@@ -3,7 +3,9 @@
 //!
 //! Charts use `failurePolicy: retry`, so the install Job upgrades over a failed release. In that
 //! path its script exits 0 even when the upgrade fails, so the Job's own status says nothing:
-//! the `status` label of the release's newest revision Secret does.
+//! the `status` label of the release's newest revision Secret does. helm-controller then starts
+//! the Job again and again, so a failed upgrade switches the chart to `abort` until the next
+//! apply writes it back.
 
 use std::time::Duration;
 
@@ -29,7 +31,7 @@ pub(crate) enum Verdict {
 
 /// Applies a `HelmChart` and waits until Helm deploys a revision newer than the one before the
 /// apply. A chart that did not change and is deployed needs no new revision. A newer failed
-/// revision stops `apply` with the end of the install Job's log.
+/// revision stops `apply` and says how to read why it failed.
 pub(crate) fn install(kubectl: &Kubectl, name: &str, object: &Value) -> Result<(), InstallError> {
     let chart_namespace = object
         .pointer("/metadata/namespace")
@@ -46,7 +48,7 @@ pub(crate) fn install(kubectl: &Kubectl, name: &str, object: &Value) -> Result<(
     }
     restart_finished_job(kubectl, name)?;
 
-    let mut failed = false;
+    let mut failed = None;
     kubectl::poll(
         Duration::from_mins(15),
         &format!("the {name} chart to install"),
@@ -58,27 +60,45 @@ pub(crate) fn install(kubectl: &Kubectl, name: &str, object: &Value) -> Result<(
                 Verdict::Waiting => false,
                 Verdict::Deployed => true,
                 Verdict::Failed => {
-                    failed = true;
+                    failed = now.map(|r| r.version);
                     true
                 }
             }
         },
     )?;
-    if !failed {
+    let Some(revision) = failed else {
         return Ok(());
-    }
-    let job = format!("job/helm-install-{name}");
-    let logs = kubectl
-        .run(
-            &["logs", "--namespace=kube-system", &job, "--tail=30"],
-            None,
-        )
-        .unwrap_or_default();
-    Err(InstallError::Message(format!(
-        "the {name} chart did not upgrade; once the cause is fixed, the next apply upgrades it \
-         again over the failed release\nkubectl logs --namespace=kube-system {job}:\n{}",
-        logs.trim_end()
+    };
+    kubectl.run(
+        &[
+            "patch",
+            "helmchart",
+            name,
+            "--namespace",
+            chart_namespace,
+            "--type=merge",
+            "--patch={\"spec\":{\"failurePolicy\":\"abort\"}}",
+        ],
+        None,
+    )?;
+    Err(InstallError::Message(failed_upgrade(
+        name, namespace, revision,
     )))
+}
+
+/// What `apply` says when Helm failed to upgrade a release. Helm keeps the reason in the failed
+/// revision's Secret.
+fn failed_upgrade(name: &str, namespace: &str, revision: u64) -> String {
+    format!(
+        "Helm failed to upgrade the {name} chart (release {name} in namespace {namespace}, \
+         revision {revision}). apply set the chart's `failurePolicy` to `abort`, so \
+         helm-controller stops retrying the upgrade.\n\
+         See why the upgrade failed:\n  sudo kubectl -n {namespace} get secret \
+         sh.helm.release.v1.{name}.v{revision} -o jsonpath='{{.data.release}}' | base64 -d | \
+         base64 -d | gunzip | grep -o '\"description\":[^}}]*\"status\":\"failed\"'\n\
+         Fix the cause, then run apply again. apply sets `failurePolicy` back to `retry` and \
+         upgrades over the failed release."
+    )
 }
 
 /// Whether Helm has to write a new revision: the `HelmChart` changed, or the release is not
@@ -255,7 +275,7 @@ case "$*" in
 "get secrets "*) if [ -f "$dir/applied" ]; then cat "$dir/after"; else cat "$dir/before"; fi ;;
 "get helmchart "*) if [ -f "$dir/applied" ]; then cat "$dir/applied"; else cat "$dir/previous" 2>/dev/null || true; fi ;;
 "get job "*) cat "$dir/job" 2>/dev/null || true ;;
-"logs "*) echo 'Error: UPGRADE FAILED: StatefulSet.apps "zot" is invalid: spec: Forbidden' ;;
+"patch "*) echo "$*" >> "$dir/patched" ;;
 "delete "*) echo "$*" >> "$dir/deleted" ;;
 *apply*) cat > "$dir/applied" ;;
 esac
@@ -282,15 +302,25 @@ esac
     const COMPLETE: &str = r#"{"status":{"conditions":[{"type":"Complete","status":"True"}]}}"#;
 
     #[test]
-    fn a_failed_upgrade_stops_apply_with_its_cause() {
+    fn a_failed_upgrade_switches_the_chart_to_abort_and_says_how_to_read_why() {
         let dir = tempfile::tempdir().unwrap();
         let kubectl = fake(dir.path(), "1 deployed\n", "1 deployed\n2 failed\n");
         let error = install(&kubectl, "zot", &zot("50Gi"))
             .unwrap_err()
             .to_string();
-        assert!(error.contains("the zot chart did not upgrade"), "{error}");
-        assert!(error.contains("next apply upgrades it again"), "{error}");
-        assert!(error.contains("UPGRADE FAILED"), "{error}");
+        assert!(
+            error.contains("release zot in namespace zot, revision 2"),
+            "{error}"
+        );
+        assert!(error.contains("`failurePolicy` to `abort`"), "{error}");
+        assert!(
+            error.contains("kubectl -n zot get secret sh.helm.release.v1.zot.v2 "),
+            "{error}"
+        );
+        assert!(error.contains("run apply again"), "{error}");
+        let patched = fs::read_to_string(dir.path().join("patched")).unwrap();
+        assert!(patched.starts_with("patch helmchart zot "), "{patched}");
+        assert!(patched.contains(r#""failurePolicy":"abort""#), "{patched}");
     }
 
     #[test]
