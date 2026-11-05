@@ -145,7 +145,7 @@ installer 一定会创建 `local-path`，数据存放在节点的 `/var/lib/zeab
 
 正式发行的 installer 不需要 `sources`，installer 已经固定了 Zeabur Catalog、Zeabur Identity 和 Zeabur 的版本，下载到 `/var/lib/rancher/zeabur-installer/downloads`，并使用编译进 installer 的 SHA-256 校验。
 
-`sources` 用于改装自行构建的版本，通常用于开发测试。只填写需要替换的字段，其他字段继续使用固定的版本。自行编译的开发版 installer 没有固定任何版本，因此必须填写 `catalog`、`identityImage`、`identityctl`、`zeaburImage` 和 `zeaburChart`，`plan` 会列出缺少的字段。将路径替换为实际准备好的文件：
+`sources` 用于改装自行构建的版本，通常用于开发测试。只填写需要替换的字段，其他字段继续使用固定的版本。自行编译的开发版 installer 没有固定任何版本，因此必须填写 `catalog`、`identityImage`、`identityctl`、`zeaburImage` 和 `zeaburChart`，`plan` 会列出缺少的字段。路径不存在，或该放文件的地方放了文件夹，`plan` 也会停下来；只有 `zeaburChart` 可以是文件夹。将路径替换为实际准备好的文件：
 
 ```yaml
 sources:

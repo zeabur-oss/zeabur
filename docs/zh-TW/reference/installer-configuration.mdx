@@ -145,7 +145,7 @@ installer 一定會建立 `local-path`，資料放在節點的 `/var/lib/zeabur/
 
 發行版的 installer 不需要 `sources`，installer 已經釘選了 Zeabur Catalog、Zeabur Identity 和 Zeabur 的版本，下載到 `/var/lib/rancher/zeabur-installer/downloads`，並用編譯進 installer 的 SHA-256 核對。
 
-`sources` 用來改裝自己建置的版本，通常是開發測試。只寫要換的欄位，其他照用釘選的版本。自己編譯的開發版 installer 沒有釘選任何版本，所以 `catalog`、`identityImage`、`identityctl`、`zeaburImage`、`zeaburChart` 都要寫，少了哪個 `plan` 會列出來。路徑換成實際準備好的檔案：
+`sources` 用來改裝自己建置的版本，通常是開發測試。只寫要換的欄位，其他照用釘選的版本。自己編譯的開發版 installer 沒有釘選任何版本，所以 `catalog`、`identityImage`、`identityctl`、`zeaburImage`、`zeaburChart` 都要寫，少了哪個 `plan` 會列出來。路徑不存在，或該放檔案的地方放了資料夾，`plan` 也會停下來；只有 `zeaburChart` 可以是資料夾。路徑換成實際準備好的檔案：
 
 ```yaml
 sources:
