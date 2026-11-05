@@ -792,10 +792,10 @@ fn system_hosts_documents() -> Result<Vec<(Option<String>, &'static str)>, Insta
         .collect()
 }
 
-/// How long `apply` and `node sync` wait for every node's VXLAN address.
+/// How long `apply` and `node sync` wait for every Ready node's VXLAN address.
 pub(crate) const NODE_ADDRESS_WAIT: Duration = Duration::from_mins(2);
 
-/// Where traffic from the nodes comes from ([`plan::node_sources`]), once every node has its
+/// Where traffic from the nodes comes from ([`plan::node_sources`]), once every Ready node has its
 /// VXLAN address. Asks again every few seconds for up to `wait`.
 pub(crate) fn node_addresses(
     kubectl: &Kubectl,

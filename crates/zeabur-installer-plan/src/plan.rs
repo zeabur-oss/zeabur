@@ -1494,7 +1494,7 @@ const CALICO_TUNNEL_ANNOTATIONS: [&str; 2] = [
     "projectcalico.org/IPv6VXLANTunnelAddr",
 ];
 
-/// A node whose VXLAN address is not known yet, by name. Calico writes its annotation a few
+/// A Ready node whose VXLAN address is not known yet, by name. Calico writes its annotation a few
 /// seconds after the node turns Ready.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NodeWaiting(pub String);
@@ -1503,16 +1503,20 @@ pub struct NodeWaiting(pub String);
 ///
 /// A node's traffic to pods on other nodes leaves from its VXLAN interface. On K3s, Calico names
 /// that interface's address in an annotation; on RKE2, Canal gives it the first address of the
-/// node's pod range. A node without its address yet is [`NodeWaiting`]. A node's traffic to its
-/// own pods passes without a rule. Sorted and without repeats.
+/// node's pod range. A node that is not Ready carries no pod traffic and is left out; a Ready node
+/// without its address yet is [`NodeWaiting`]. A node's traffic to its own pods passes without a
+/// rule. Sorted and without repeats.
 ///
 /// # Errors
 ///
-/// [`NodeWaiting`] for the first node whose address is not known yet.
+/// [`NodeWaiting`] for the first Ready node whose address is not known yet.
 pub fn node_sources(distribution: Distribution, nodes: &Value) -> Result<Vec<String>, NodeWaiting> {
     let mut found = BTreeSet::new();
     let items = nodes.get("items").and_then(Value::as_array);
     for node in items.into_iter().flatten() {
+        if !is_ready(node) {
+            continue;
+        }
         let addresses = match distribution {
             Distribution::K3s => calico_vxlan_addresses(node),
             Distribution::Rke2 => canal_vxlan_addresses(node),
@@ -1524,6 +1528,17 @@ pub fn node_sources(distribution: Distribution, nodes: &Value) -> Result<Vec<Str
         found.extend(addresses);
     }
     Ok(found.into_iter().collect())
+}
+
+/// Whether the node's `Ready` condition is `True`.
+fn is_ready(node: &Value) -> bool {
+    let conditions = node.pointer("/status/conditions").and_then(Value::as_array);
+    for condition in conditions.into_iter().flatten() {
+        if condition.get("type").and_then(Value::as_str) == Some("Ready") {
+            return condition.get("status").and_then(Value::as_str) == Some("True");
+        }
+    }
+    false
 }
 
 fn calico_vxlan_addresses(node: &Value) -> Vec<String> {
@@ -2394,10 +2409,9 @@ mod tests {
     fn canal_nodes_are_the_first_address_of_their_pod_range() {
         let nodes = json!({"items": [
             {"spec": {"podCIDRs": ["10.42.0.0/24"]},
-             "status": {"addresses": [{"type": "InternalIP", "address": "10.0.0.5"},
-                                      {"type": "Hostname", "address": "vps-1"}]}},
+             "status": {"conditions": [{"type": "Ready", "status": "True"}]}},
             {"spec": {"podCIDRs": ["10.42.1.0/24", "fd00:42:0:1::/64"]},
-             "status": {"addresses": [{"type": "InternalIP", "address": "10.0.0.6"}]}},
+             "status": {"conditions": [{"type": "Ready", "status": "True"}]}},
         ]});
         assert_eq!(
             node_sources(Distribution::Rke2, &nodes).unwrap(),
@@ -2813,10 +2827,32 @@ mod tests {
         let nodes = json!({"items": [{
             "metadata": {"name": "vps-1", "annotations": {}},
             "spec": {"podCIDRs": ["10.42.0.0/24"]},
+            "status": {"conditions": [{"type": "Ready", "status": "True"}]},
         }]});
         assert_eq!(
             node_sources(Distribution::K3s, &nodes),
             Err(NodeWaiting("vps-1".to_owned()))
+        );
+    }
+
+    #[test]
+    fn a_node_that_is_not_ready_is_skipped_not_waited_for() {
+        let nodes = json!({"items": [
+            {
+                "metadata": {"name": "vps-1", "annotations": {
+                    "projectcalico.org/IPv4VXLANTunnelAddr": "10.42.8.64",
+                }},
+                "status": {"conditions": [{"type": "Ready", "status": "True"}]},
+            },
+            {
+                "metadata": {"name": "vps-2", "annotations": {}},
+                "spec": {"podCIDRs": ["10.42.1.0/24"]},
+                "status": {"conditions": [{"type": "Ready", "status": "Unknown"}]},
+            },
+        ]});
+        assert_eq!(
+            node_sources(Distribution::K3s, &nodes).unwrap(),
+            ["10.42.8.64"]
         );
     }
 
@@ -2828,6 +2864,7 @@ mod tests {
                     "projectcalico.org/IPv4VXLANTunnelAddr": "10.42.8.64",
                 }},
                 "spec": {"podCIDRs": ["10.42.0.0/24"]},
+                "status": {"conditions": [{"type": "Ready", "status": "True"}]},
             },
             {
                 "metadata": {"annotations": {
@@ -2835,6 +2872,7 @@ mod tests {
                     "projectcalico.org/IPv6VXLANTunnelAddr": "fd00:42::1",
                 }},
                 "spec": {"podCIDRs": ["10.42.1.0/24"]},
+                "status": {"conditions": [{"type": "Ready", "status": "True"}]},
             },
         ]});
         assert_eq!(
