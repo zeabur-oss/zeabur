@@ -208,13 +208,17 @@ const fn rank(status: Status) -> u8 {
     }
 }
 
-/// The line for a component whose checks pass, marked when the catalog did not test it here.
-fn passed(id: &str, component: &Value) -> String {
-    if component.get("untested") == Some(&Value::Bool(true)) {
-        format!("{id} (untested)")
-    } else {
-        id.to_owned()
+/// The line for a component whose checks pass. It names only what was checked: its workloads are
+/// reported under their namespace, so they may still be unavailable.
+fn passed(id: &str, component: &Value, checks: &[Health]) -> String {
+    let mut line = format!("{id}: charts installed");
+    if !checks.is_empty() {
+        line.push_str(", health checks pass");
     }
+    if component.get("untested") == Some(&Value::Bool(true)) {
+        line.push_str(" (untested)");
+    }
+    line
 }
 
 /// Each component's `HelmCharts` installed and the catalog's health checks in the install record
@@ -273,7 +277,10 @@ pub(crate) fn components(kubectl: &Kubectl, plan: &Value) -> Vec<(Status, String
             wait_health(check, timeout, |args| kubectl.wait(args)).is_ok()
         });
         if checks.is_some() && problems.is_empty() && failed.is_empty() {
-            results.push((Status::Pass, passed(id, component)));
+            results.push((
+                Status::Pass,
+                passed(id, component, checks.as_deref().unwrap_or_default()),
+            ));
         }
         if !problems.is_empty() {
             results.push((Status::Fail, format!("{id}: {}", problems.join("; "))));
@@ -626,6 +633,28 @@ mod tests {
                 "deployment/moco-controller has 0 of 2 Pods available",
                 "daemonset/agent has 2 of 3 Pods available"
             ]
+        );
+    }
+
+    #[test]
+    fn a_passing_component_names_only_what_was_checked() {
+        let check = Health {
+            name: "nodes-ready".to_owned(),
+            wait: Vec::new(),
+            timeout: "60s".to_owned(),
+            advice: String::new(),
+        };
+        assert_eq!(
+            passed("metrics/victoria-metrics", &json!({}), &[]),
+            "metrics/victoria-metrics: charts installed"
+        );
+        assert_eq!(
+            passed(
+                "replicated-storage/longhorn",
+                &json!({"untested": true}),
+                &[check]
+            ),
+            "replicated-storage/longhorn: charts installed, health checks pass (untested)"
         );
     }
 
