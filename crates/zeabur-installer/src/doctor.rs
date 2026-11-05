@@ -505,8 +505,9 @@ fn not_ready_longhorn_nodes(list: &Value) -> NotReadyNodes {
 
 fn removed_longhorn_nodes_advice(names: &[String]) -> String {
     format!(
-        "Longhorn still lists nodes that Kubernetes has removed: {}. Delete them with: kubectl -n \
-         longhorn-system delete nodes.longhorn.io {}",
+        "Longhorn still lists nodes that Kubernetes has removed: {}. Deleting them fails while \
+         they still hold replicas, so follow Add and maintain nodes → Remove a node first, then \
+         run: kubectl -n longhorn-system delete nodes.longhorn.io {}",
         names.join(", "),
         names.join(" ")
     )
