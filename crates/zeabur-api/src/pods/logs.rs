@@ -150,7 +150,9 @@ pub(crate) async fn follow_logs(
         .follow_pod_logs(&project, &pod, &query.options())
         .await
         .map_err(|e| log_problem(e, &what, &project, &pod))?;
-    (state.used)(Feature::LogsViewed);
+    if let Some(used) = &state.used {
+        used(Feature::LogsViewed);
+    }
     let events = lines.scan(false, move |failed, line| {
         if *failed {
             return std::future::ready(None);
