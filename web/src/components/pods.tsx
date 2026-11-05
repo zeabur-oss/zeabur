@@ -3,7 +3,7 @@ import { Link } from "@tanstack/react-router"
 import { useLogsReadable } from "@/api/logs-access"
 import { Tooltip } from "@zeabur-oss/design-system/components/tooltip"
 import { useT } from "@/i18n"
-import { podLogsLink } from "@/lib/place"
+import { podLogsLink, podObjectLink } from "@/lib/place"
 import { cn } from "@/lib/utils"
 import { podHealth, podReason, type Pod, type Service } from "@/model/service"
 
@@ -45,7 +45,7 @@ export function PodCells({
   max = 10,
 }: {
   service: Service
-  /** Given, each square links to the pod's logs. */
+  /** Given, each square links to the pod's logs, and its tooltip to the logs and the pod's YAML. */
   project?: string
   max?: number
 }) {
@@ -71,7 +71,17 @@ export function PodCells({
           return (
             <li key={pod.name} className="flex">
               {project && logs ? (
-                <Tooltip content={label(pod)}>
+                <Tooltip
+                  content={
+                    <span className="flex flex-col gap-1">
+                      {label(pod)}
+                      <span className="flex gap-3 font-medium">
+                        <Link {...podLogsLink(project, service, pod.name)}>{t("tab.logs")}</Link>
+                        <Link {...podObjectLink(project, pod.name)}>{t("pod.object")}</Link>
+                      </span>
+                    </span>
+                  }
+                >
                   <Link
                     {...podLogsLink(project, service, pod.name)}
                     aria-label={t("pod.logsOf", pod.name)}

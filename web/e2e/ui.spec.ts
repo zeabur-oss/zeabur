@@ -276,6 +276,21 @@ test("the services list filters, sorts, and leads from a pod to its logs", async
   await expect(logsPod(page)).toHaveAccessibleName(`Replica ${pod}`)
 })
 
+test("a replica's tooltip in the services list opens the pod's YAML with Delete", async ({
+  page,
+}) => {
+  await page.goto(`${project}?view=list`)
+  await page.getByRole("link", { name: `Logs of ${pod}` }).hover()
+  const yaml = page.getByRole("link", { name: "Object (YAML)" })
+  await yaml.hover()
+  await yaml.click()
+  await expect(page).toHaveURL(new RegExp(`object=core%2Fv1%2Fpods%2F${pod}`))
+  const sheet = page.getByRole("dialog")
+  await sheet.getByRole("button", { name: "YAML" }).click()
+  await expect(sheet.getByRole("button", { name: "Delete" })).toBeEnabled()
+  await expect(sheet).toContainText(`${healthy} creates a new one`)
+})
+
 test("the service page has eight tabs and an actions menu, and Logs follows a pod", async ({
   page,
 }) => {
