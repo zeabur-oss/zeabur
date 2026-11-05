@@ -28,6 +28,8 @@ pub struct Index {
     /// Kubernetes versions the catalog was tested on.
     #[serde(default)]
     pub kubernetes: Vec<String>,
+    /// The release that built the index; `None` for an index built without one, as in CI.
+    pub catalog: Option<CatalogRelease>,
     /// Every component.
     pub components: Vec<Component>,
 }
@@ -91,6 +93,45 @@ pub struct Component {
     /// `NetworkPolicy` manifests that let its clients in, for installers that isolate
     /// namespaces.
     pub network_policies: Option<String>,
+    /// Objects an upgrade must delete and create again, because the API server refuses to
+    /// update them in place.
+    #[serde(default)]
+    pub recreates: Recreates,
+}
+
+/// The catalog release that built an index.
+#[derive(Debug, Clone, Deserialize)]
+pub struct CatalogRelease {
+    /// Such as `0.3.0`.
+    pub version: String,
+}
+
+/// The objects a component's upgrade recreates.
+#[derive(Debug, Clone, Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Recreates {
+    /// When the install switches between `single-node` and `multi-node`.
+    #[serde(default)]
+    pub profile_switch: Vec<Recreate>,
+    /// When upgrading from the catalog version of the key to the next one.
+    #[serde(default)]
+    pub from_version: BTreeMap<String, Vec<Recreate>>,
+}
+
+/// One object an upgrade recreates.
+#[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
+pub struct Recreate {
+    /// The catalog release that installs it.
+    pub release: String,
+    /// Its namespace.
+    pub namespace: String,
+    /// Such as `StatefulSet`.
+    pub kind: String,
+    /// Its name.
+    pub name: String,
+    /// The field paths the API server refuses to update, such as `spec`.
+    #[serde(default)]
+    pub fields: Vec<String>,
 }
 
 /// What a component serves.

@@ -33,6 +33,10 @@ pub struct Record {
     pub values: BTreeMap<(String, String), String>,
     /// The components with a `HelmChart` release, which `apply` uninstalls when they leave.
     pub helm: BTreeSet<String>,
+    /// `single-node` or `multi-node`; `None` from an installer that did not keep it.
+    pub profile: Option<String>,
+    /// The catalog version it installed, when its index had one.
+    pub catalog: Option<String>,
 }
 
 impl Record {
@@ -92,6 +96,14 @@ impl Record {
             charts,
             values,
             helm,
+            profile: plan
+                .get("profile")
+                .and_then(Value::as_str)
+                .map(str::to_owned),
+            catalog: plan
+                .get("catalogVersion")
+                .and_then(Value::as_str)
+                .map(str::to_owned),
         })
     }
 
@@ -293,6 +305,8 @@ mod tests {
             charts: BTreeMap::new(),
             values: BTreeMap::new(),
             helm: BTreeSet::new(),
+            profile: None,
+            catalog: None,
         };
         let error = record.check_installer().unwrap_err().to_string();
         assert!(

@@ -8,7 +8,7 @@ use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD;
 use flate2::read::GzDecoder;
 use serde_json::Value;
-use zeabur_installer_plan::statefulset::{Revision, revision_secret};
+use zeabur_installer_plan::helm::{Revision, revision_secret};
 
 use crate::HostError;
 use crate::kubectl::Kubectl;
@@ -20,8 +20,6 @@ pub struct Release {
     pub status: String,
     /// Helm's description, which names the error of a failed revision.
     pub description: String,
-    /// The objects it rendered, as YAML documents.
-    pub manifest: String,
 }
 
 /// The release's revisions; empty when Helm has not installed it.
@@ -52,34 +50,6 @@ pub fn history(kubectl: &Kubectl, namespace: &str, name: &str) -> Result<Vec<Rev
             })
         })
         .collect())
-}
-
-/// The namespace and name of each release with a failed revision, oldest ones included.
-///
-/// # Errors
-///
-/// When `kubectl` fails.
-pub fn with_failed_revisions(kubectl: &Kubectl) -> Result<Vec<(String, String)>, HostError> {
-    let out = kubectl.run(
-        &[
-            "get",
-            "secrets",
-            "--all-namespaces",
-            "--selector=owner=helm,status=failed",
-            "--output=jsonpath={range .items[*]}{.metadata.namespace} {.metadata.labels.name}{\"\\n\"}{end}",
-        ],
-        None,
-    )?;
-    let mut releases: Vec<(String, String)> = out
-        .lines()
-        .filter_map(|line| {
-            let (namespace, name) = line.split_once(' ')?;
-            Some((namespace.to_owned(), name.to_owned()))
-        })
-        .collect();
-    releases.sort();
-    releases.dedup();
-    Ok(releases)
 }
 
 /// One revision; `None` when its Secret is gone.
@@ -126,7 +96,6 @@ fn decode(data: &str) -> Result<Release, String> {
     Ok(Release {
         status: text("/info/status"),
         description: text("/info/description"),
-        manifest: text("/manifest"),
     })
 }
 
@@ -146,7 +115,6 @@ mod tests {
             "name": "zot",
             "version": 3,
             "info": {"status": "failed", "description": "Upgrade \"zot\" failed"},
-            "manifest": "kind: StatefulSet\n",
         });
         let mut gzip = GzEncoder::new(Vec::new(), Compression::default());
         gzip.write_all(release.to_string().as_bytes()).unwrap();
@@ -156,7 +124,6 @@ mod tests {
             Release {
                 status: "failed".to_owned(),
                 description: "Upgrade \"zot\" failed".to_owned(),
-                manifest: "kind: StatefulSet\n".to_owned(),
             }
         );
     }

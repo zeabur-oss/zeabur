@@ -11,8 +11,8 @@ use serde_json::{Map, Value, json};
 use zeabur_installer_host::kubectl::{self, Kubectl};
 use zeabur_installer_host::nodeprep::{self, Stage};
 use zeabur_installer_host::preflight::{self, Status};
-use zeabur_installer_host::{archive, chart, cmd, download, facts, files, systemd};
-use zeabur_installer_plan::catalog::{Encoding, Index};
+use zeabur_installer_host::{archive, chart, cmd, download, facts, files, helm, systemd};
+use zeabur_installer_plan::catalog::{Encoding, Index, Recreate};
 use zeabur_installer_plan::cluster::{APPARMOR_PROFILE, AUTHN_CONFIGMAP, Distribution, HostFile};
 use zeabur_installer_plan::config::{AccessMode, Config};
 use zeabur_installer_plan::k3s;
@@ -210,10 +210,6 @@ pub(crate) fn make_plan(index: &Index, config: &Config) -> Result<Plan, InstallE
         &config.allow_data_loss,
         &mut plan.warnings,
     )?;
-    if running {
-        let more = recreate::warnings(&kubectl, &plan)?;
-        plan.warnings.extend(more);
-    }
     Ok(plan)
 }
 
@@ -849,6 +845,7 @@ pub(crate) fn releases(kubectl: &Kubectl, component: &ComponentPlan) -> Result<(
                 name,
                 object,
                 digest,
+                recreates,
             } => match digest {
                 Some(digest) => {
                     let (object, archive) = checked_chart(object, digest)?;
@@ -864,9 +861,9 @@ pub(crate) fn releases(kubectl: &Kubectl, component: &ComponentPlan) -> Result<(
                     if !crds.is_empty() {
                         kubectl.apply(&crds)?;
                     }
-                    helm_chart(kubectl, name, &object)?;
+                    helm_chart(kubectl, name, &object, recreates)?;
                 }
-                None => helm_chart(kubectl, name, object)?,
+                None => helm_chart(kubectl, name, object, recreates)?,
             },
             ReleasePlan::Manifests {
                 namespace, yaml, ..
@@ -944,9 +941,14 @@ fn checked_chart(object: &Value, digest: &str) -> Result<(Value, Vec<u8>), Insta
 /// again is safe. helm-controller replaces the job within seconds when the chart changed and keeps
 /// the finished one when it did not; which of the two happened is only known by watching.
 ///
-/// A release whose upgrade fails on a StatefulSet field Kubernetes won't update is got through
-/// once ([`recreate::unstick`]), before the apply when an earlier run left it failed.
-fn helm_chart(kubectl: &Kubectl, name: &str, object: &Value) -> Result<(), InstallError> {
+/// `recreates` are deleted first ([`recreate::delete`]). A failed upgrade stops the wait with
+/// Helm's reason, since `failurePolicy: abort` keeps helm-controller from trying again.
+fn helm_chart(
+    kubectl: &Kubectl,
+    name: &str,
+    object: &Value,
+    recreates: &[Recreate],
+) -> Result<(), InstallError> {
     const SETTLE: Duration = Duration::from_secs(5);
     const RELEASE_CHECK: Duration = Duration::from_secs(15);
     let job_name = format!("helm-install-{name}");
@@ -954,13 +956,12 @@ fn helm_chart(kubectl: &Kubectl, name: &str, object: &Value) -> Result<(), Insta
         .pointer("/spec/targetNamespace")
         .and_then(Value::as_str)
         .unwrap_or("default");
-    let mut unstuck = match recreate::stuck(kubectl, name, namespace)? {
-        Some(stuck) => {
-            recreate::unstick(kubectl, name, namespace, &stuck)?;
-            true
-        }
-        None => false,
-    };
+    if let Some(reason) = failed_upgrade(kubectl, name, namespace, None)? {
+        return Err(upgrade_failed(name, &reason));
+    }
+    let before = helm::history(kubectl, namespace, name)?;
+    let before = zeabur_installer_plan::helm::newest(&before).map(|r| r.version);
+    recreate::delete(kubectl, recreates)?;
     let old_uid = kubectl
         .get("job", &job_name, Some("kube-system"))?
         .and_then(|j| j.pointer("/metadata/uid").cloned());
@@ -968,7 +969,7 @@ fn helm_chart(kubectl: &Kubectl, name: &str, object: &Value) -> Result<(), Insta
     let applied = Instant::now();
 
     let mut outcome = None;
-    let mut stopped = None;
+    let mut failed = None;
     let mut checked = Instant::now();
     kubectl::poll(
         Duration::from_mins(15),
@@ -976,25 +977,9 @@ fn helm_chart(kubectl: &Kubectl, name: &str, object: &Value) -> Result<(), Insta
         || {
             if checked.elapsed() >= RELEASE_CHECK {
                 checked = Instant::now();
-                match recreate::stuck(kubectl, name, namespace) {
-                    Ok(Some(stuck)) => {
-                        let again = if unstuck {
-                            Err(recreate::failed_again(name, namespace, &stuck))
-                        } else {
-                            recreate::unstick(kubectl, name, namespace, &stuck)
-                        };
-                        unstuck = true;
-                        if let Err(error) = again {
-                            stopped = Some(error);
-                            return true;
-                        }
-                        return false;
-                    }
-                    Ok(None) => {}
-                    Err(error) => {
-                        stopped = Some(error);
-                        return true;
-                    }
+                if let Ok(Some(reason)) = failed_upgrade(kubectl, name, namespace, before) {
+                    failed = Some(reason);
+                    return true;
                 }
             }
             let Ok(job) = kubectl.get("job", &job_name, Some("kube-system")) else {
@@ -1030,8 +1015,8 @@ fn helm_chart(kubectl: &Kubectl, name: &str, object: &Value) -> Result<(), Insta
             outcome.is_some()
         },
     )?;
-    if let Some(error) = stopped {
-        return Err(error);
+    if let Some(reason) = failed {
+        return Err(upgrade_failed(name, &reason));
     }
     if outcome == Some(false) {
         let job = format!("job/{job_name}");
@@ -1046,6 +1031,31 @@ fn helm_chart(kubectl: &Kubectl, name: &str, object: &Value) -> Result<(), Insta
         )));
     }
     Ok(())
+}
+
+/// Helm's description of the release's newest revision when it failed and is newer than
+/// `after`.
+fn failed_upgrade(
+    kubectl: &Kubectl,
+    name: &str,
+    namespace: &str,
+    after: Option<u64>,
+) -> Result<Option<String>, InstallError> {
+    let history = helm::history(kubectl, namespace, name)?;
+    let Some(newest) = zeabur_installer_plan::helm::newest(&history) else {
+        return Ok(None);
+    };
+    if newest.status != "failed" || Some(newest.version) <= after {
+        return Ok(None);
+    }
+    let release = helm::release(kubectl, namespace, name, newest.version)?;
+    Ok(Some(release.map_or_default(|r| r.description)))
+}
+
+fn upgrade_failed(name: &str, reason: &str) -> InstallError {
+    InstallError::Message(format!(
+        "the last upgrade of the {name} chart failed: {reason}"
+    ))
 }
 
 fn conditions(object: &Value) -> impl Iterator<Item = (&str, &str)> {
@@ -1338,6 +1348,7 @@ fn zeabur(
         kubectl,
         "zeabur",
         &zeabur_helm_chart(zeabur, telemetry, update_check(config))?,
+        &[],
     )?;
     kubectl.wait(&[
         "--namespace",

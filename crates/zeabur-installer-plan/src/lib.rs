@@ -3,6 +3,7 @@
 pub mod catalog;
 pub mod cluster;
 pub mod config;
+pub mod helm;
 pub mod join;
 pub mod k3s;
 pub mod kube_version;
@@ -12,10 +13,10 @@ pub mod personal;
 pub mod pins;
 pub mod plan;
 pub mod record;
+pub mod recreate;
 pub mod remove;
 pub mod rke2;
 pub mod select;
-pub mod statefulset;
 pub mod storage;
 pub mod values;
 

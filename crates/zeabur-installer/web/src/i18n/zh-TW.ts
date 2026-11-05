@@ -444,12 +444,10 @@ export const zhTW: Messages = {
   "warning.config.unsupportedOn": (id, profile) => `${id} 不支援 ${profile}，所以不會安裝。`,
   "warning.remove.unknown": (id, charts) =>
     `${id} 已經安裝，但不在這版目錄裡，apply 會原樣保留。要移除時，執行 kubectl -n kube-system delete helmchart ${charts}`,
-  "warning.statefulset.mayRecreate": (release, sets) =>
-    `${release} 的新設定如果改到 StatefulSet ${sets} 的 volumeClaimTemplates、selector、serviceName 或 podManagementPolicy，Kubernetes 不能直接更新，apply 會刪掉這個 StatefulSet，再由 Helm 重新建立。它的 Pod 和磁碟都會留著，磁碟大小也不變。`,
-  "warning.statefulset.recreate": (release, fields, sets) =>
-    `${release} 上次升級失敗，因為它改到 StatefulSet ${sets} 的 ${fields}，Kubernetes 不能更新這些欄位。apply 會刪掉這個 StatefulSet 再升級一次。它的 Pod 和磁碟都會留著，磁碟大小也不變。`,
-  "warning.release.failed": (release, why, command) =>
-    `${release} 上次升級失敗（${why}）。helm-controller 不會重試失敗的版本，所以 apply 會停在這裡。排除原因後，執行 ${command} 再 apply 一次。`,
+  "warning.recreate": (release, kind, object) =>
+    kind === "StatefulSet"
+      ? `升級 ${release} 會重新建立 ${object}，它的 Pod 和磁碟都會留著，磁碟大小也不變。`
+      : `升級 ${release} 會重新建立 ${object}，它建立的東西都會留著。`,
   "warning.join.server.unreachable": (server) =>
     `連不到 ${server}。請檢查位址，以及這台 VM 能不能連到 TCP 9345。`,
 

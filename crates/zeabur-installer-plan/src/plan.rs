@@ -11,7 +11,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
 use crate::catalog::{
-    Component, Encoding, Generate, Health, Index, Input, KIND, PodSecurity, ReleaseType, SecretRef,
+    Component, Encoding, Generate, Health, Index, Input, KIND, PodSecurity, Recreate, ReleaseType,
+    SecretRef,
 };
 use crate::cluster::{self, Distribution, HostFile};
 use crate::config::{AccessMode, Config};
@@ -20,7 +21,7 @@ use crate::record::{Changes, Record};
 use crate::remove::Removal;
 use crate::select::{self, Selection, Target, Why};
 use crate::storage::{self, NodePrep, Storage};
-use crate::{PlanError, node_name, values};
+use crate::{PlanError, node_name, recreate, values};
 
 /// The label and field manager on everything the installer creates.
 pub const MANAGER: &str = "zeabur-installer";
@@ -120,6 +121,10 @@ impl Facts {
 pub struct Plan {
     /// Facts it was computed from.
     pub facts: Facts,
+    /// `single-node` or `multi-node`.
+    pub profile: String,
+    /// The catalog version of the index, when it has one.
+    pub catalog_version: Option<String>,
     /// The node's name in Kubernetes, written into the distribution's configuration.
     pub node_name: String,
     /// The Kubernetes release.
@@ -354,6 +359,10 @@ pub enum ReleasePlan {
         /// `sha256:<hex>` the chart must have; the installer then puts the checked chart in the
         /// object.
         digest: Option<String>,
+        /// Objects `apply` deletes with `--cascade=orphan` before the upgrade, so Helm creates
+        /// them again.
+        #[serde(skip_serializing_if = "Vec::is_empty")]
+        recreates: Vec<Recreate>,
     },
     /// Manifests applied with server-side apply.
     Manifests {
@@ -674,10 +683,17 @@ pub fn plan_with(
         .record
         .as_ref()
         .map(|r| Changes::new(r, index, &components, &cluster.version));
+    let catalog_version = index.catalog.as_ref().map(|c| c.version.clone());
+    if let (Some(record), Some(changes)) = (&facts.record, &changes) {
+        let upgrade = recreate::Upgrade::new(record, profile, catalog_version.as_deref());
+        plan_recreates(index, &mut components, changes, upgrade, &mut warnings);
+    }
 
     Ok(Plan {
         storage: storage_plan(&components, profile, &mut warnings),
         facts: facts.clone(),
+        profile: profile.to_owned(),
+        catalog_version,
         node_name,
         cluster,
         calico: (distribution == Distribution::K3s).then(|| CALICO.manifest().into()),
@@ -1198,6 +1214,7 @@ fn component_plan(
                     object: helm_chart(&name, id, &spec),
                     name,
                     digest: release.chart_digest.clone(),
+                    recreates: Vec::new(),
                 });
             }
             (ReleaseType::Inline, _, Some(yaml)) => {
@@ -1413,6 +1430,41 @@ pub(crate) fn registry(
         cluster_ip,
         ca: secret_ref(&registry.ca),
     })
+}
+
+/// Sets the objects each changing release recreates, from the catalog, and says so.
+fn plan_recreates(
+    index: &Index,
+    components: &mut [ComponentPlan],
+    changes: &Changes,
+    upgrade: recreate::Upgrade<'_>,
+    warnings: &mut Vec<Warning>,
+) {
+    for plan in components {
+        let Some(component) = index.component(&plan.id) else {
+            continue;
+        };
+        for release in &component.releases {
+            let release_name = release.release_name();
+            let change = changes
+                .charts
+                .iter()
+                .find(|c| c.component == plan.id && c.release == release_name);
+            let found = recreate::for_release(component, &release.name, change, upgrade);
+            for object in &found {
+                warnings.push(recreate::warning_for(release_name, object));
+            }
+            for planned in &mut plan.releases {
+                if let ReleasePlan::HelmChart {
+                    name, recreates, ..
+                } = planned
+                    && name == release_name
+                {
+                    recreates.clone_from(&found);
+                }
+            }
+        }
+    }
 }
 
 /// A `HelmChart` in `kube-system`, labelled as the installer's.
@@ -2889,6 +2941,56 @@ mod tests {
             Some("v1.0.0+k3s1")
         );
         assert!(changes.restart);
+    }
+
+    #[test]
+    fn a_profile_switch_recreates_what_the_catalog_lists() {
+        let mut index = crate::catalog::pinned();
+        let zot: Recreate = serde_json::from_value(json!({
+            "release": "zot", "namespace": "zot", "kind": "StatefulSet", "name": "zot",
+            "fields": ["spec"],
+        }))
+        .unwrap();
+        for component in &mut index.components {
+            if component.id == "builds/zeabur-builder" {
+                component.recreates.profile_switch = vec![zot.clone()];
+            }
+        }
+        let builder = "enable: [builds/zeabur-builder]\n";
+        let single = config(&format!("{builder}profile: single-node\n"));
+        let multi = config(&format!("{builder}profile: multi-node\n"));
+        let first = plan(&index, &single, &facts()).unwrap();
+        let mut upgrade = facts();
+        upgrade.record = Some(recorded(&first, "0.0.1", |_| {}));
+
+        let switched = plan(&index, &multi, &upgrade).unwrap();
+        let planned: Vec<&Vec<Recreate>> = switched
+            .components
+            .iter()
+            .flat_map(|c| &c.releases)
+            .filter_map(|r| match r {
+                ReleasePlan::HelmChart {
+                    name, recreates, ..
+                } if name == "zot" => Some(recreates),
+                ReleasePlan::HelmChart { .. }
+                | ReleasePlan::Manifests { .. }
+                | ReleasePlan::Urls { .. } => None,
+            })
+            .collect();
+        assert_eq!(planned, [&vec![zot]]);
+        let warning = switched
+            .warnings
+            .iter()
+            .find(|w| w.code == "recreate")
+            .unwrap();
+        assert!(
+            warning.text.contains("recreates StatefulSet zot/zot"),
+            "{}",
+            warning.text
+        );
+
+        let same = plan(&index, &single, &upgrade).unwrap();
+        assert!(same.warnings.iter().all(|w| w.code != "recreate"));
     }
 
     #[test]

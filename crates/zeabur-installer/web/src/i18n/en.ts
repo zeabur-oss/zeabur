@@ -480,12 +480,10 @@ export const en = {
     `${id} doesn't support ${profile}, so it isn't installed.`,
   "warning.remove.unknown": (id: string, charts: string) =>
     `${id} is installed but not in this catalog, so apply leaves it in place. To remove it, run kubectl -n kube-system delete helmchart ${charts}`,
-  "warning.statefulset.mayRecreate": (release: string, sets: string) =>
-    `If the new settings of ${release} change a field Kubernetes can't update on StatefulSet ${sets} (volumeClaimTemplates, selector, serviceName or podManagementPolicy), apply deletes the StatefulSet and Helm creates it again. Its Pods and disks stay, and the disks keep their size.`,
-  "warning.statefulset.recreate": (release: string, fields: string, sets: string) =>
-    `The last upgrade of ${release} failed because it changes ${fields} of StatefulSet ${sets}, which Kubernetes can't update. apply deletes the StatefulSet and upgrades again. Its Pods and disks stay, and the disks keep their size.`,
-  "warning.release.failed": (release: string, why: string, command: string) =>
-    `The last upgrade of ${release} failed (${why}). helm-controller doesn't retry a failed release, so apply stops there. Once the cause is fixed, run ${command} and apply again.`,
+  "warning.recreate": (release: string, kind: string, object: string) =>
+    kind === "StatefulSet"
+      ? `Upgrading ${release} recreates ${object}; its Pods and volumes stay, and the volumes keep their size.`
+      : `Upgrading ${release} recreates ${object}; what it created stays.`,
   "warning.join.server.unreachable": (server: string) =>
     `Cannot connect to ${server}. Check the address and that TCP 9345 is open from this VM.`,
 

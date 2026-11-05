@@ -30,7 +30,6 @@ thiserror.workspace = true
 zeabur-embed.workspace = true
 
 [dev-dependencies]
-flate2.workspace = true
 tempfile.workspace = true
 
 [lints]
