@@ -173,6 +173,14 @@ zeabur-installer uninstall --purge
 
 Volumes under `/var/lib/zeabur/storage` remain on the VM. Delete them manually only after confirming you no longer need the data.
 
+If the cluster runs Longhorn, it keeps a node entry for the deleted node, and `zeabur-installer doctor` lists it. Longhorn won't delete a node that still has replicas. Make sure every volume has a healthy replica on another node, then run:
+
+```sh
+kubectl -n longhorn-system patch nodes.longhorn.io <node> --type=merge -p '{"spec":{"allowScheduling":false}}'
+for r in $(kubectl -n longhorn-system get replicas.longhorn.io -o jsonpath='{range .items[?(@.spec.nodeID=="<node>")]}{.metadata.name}{"\n"}{end}'); do kubectl -n longhorn-system delete replicas.longhorn.io "$r" --wait=false; done
+kubectl -n longhorn-system delete nodes.longhorn.io <node>
+```
+
 Finally, return to the server where you run zeabur-installer and run:
 
 ```sh
