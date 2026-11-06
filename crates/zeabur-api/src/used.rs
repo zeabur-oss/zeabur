@@ -43,32 +43,32 @@ impl Found {
 
 fn read(changes: &[Change]) -> Found {
     let mut found = Found::default();
-    let mut workload = false;
-    let mut build = None;
+    let mut workloads = 0;
+    let mut builds = 0;
     for change in changes {
         if let Change::Template(template) = change {
             if let Some(id) = zeabur_catalog::template_id(&template.template) {
                 found.feature(Feature::ServiceCreated(Source::Template(id)));
             }
             found.hosts.extend(template.domain.clone());
-        } else if matches!(change, Change::CreateUploadService(_)) {
+        } else if let Change::CreateUploadService(upload) = change {
             found.feature(Feature::ServiceCreated(Source::Upload));
+            found.hosts.extend(upload.host.clone());
         } else if let Change::AddDomain(add) = change {
             found.hosts.push(add.hostname.clone());
         } else if let Some(Ok(object)) = created_object(change) {
-            created(&object, &mut found, &mut workload, &mut build);
+            created(&object, &mut found, &mut workloads, &mut builds);
         }
     }
-    if let Some(source) = build {
-        found.feature(Feature::ServiceCreated(source));
-    } else if workload {
+    // Each built service has one Build and one workload; a workload more is an image service.
+    if workloads > builds {
         found.feature(Feature::ServiceCreated(Source::Image));
     }
     found
 }
 
 /// What one created object shows: a database, a build, a workload, or host names.
-fn created(object: &Value, found: &mut Found, workload: &mut bool, build: &mut Option<Source>) {
+fn created(object: &Value, found: &mut Found, workloads: &mut usize, builds: &mut usize) {
     let api_version = text(object, "/apiVersion");
     let kind = text(object, "/kind");
     let group = api_version.split('/').next().unwrap_or_default();
@@ -78,13 +78,16 @@ fn created(object: &Value, found: &mut Found, workload: &mut bool, build: &mut O
         }
     }
     match (group, kind) {
-        ("apps", "Deployment" | "StatefulSet") => *workload = true,
+        ("apps", "Deployment" | "StatefulSet") => *workloads += 1,
         (zeabur_plan::builds::BUILDER_GROUP, "Build") => {
-            *build = Some(if object.pointer("/spec/source/archive").is_some() {
-                Source::Upload
-            } else {
-                Source::Git
-            });
+            *builds += 1;
+            found.feature(Feature::ServiceCreated(
+                if object.pointer("/spec/source/archive").is_some() {
+                    Source::Upload
+                } else {
+                    Source::Git
+                },
+            ));
         }
         ("networking.k8s.io", "Ingress") => {
             let rules = object.pointer("/spec/rules").and_then(Value::as_array);
@@ -202,6 +205,27 @@ mod tests {
             features(json!([build(), deployment()])),
             [Feature::ServiceCreated(Source::Git)]
         );
+    }
+
+    #[test]
+    fn a_git_service_and_an_image_service_are_both_found() {
+        assert_eq!(
+            features(json!([build(), deployment(), deployment()])),
+            [
+                Feature::ServiceCreated(Source::Git),
+                Feature::ServiceCreated(Source::Image)
+            ]
+        );
+    }
+
+    #[test]
+    fn an_upload_service_brings_its_hostname() {
+        let found = read(&changes(json!([
+            {"op": "createUploadService", "name": "site", "request": "r1",
+             "method": "railpack", "port": 8080, "host": "site.example.com"},
+        ])));
+        assert_eq!(found.features, [Feature::ServiceCreated(Source::Upload)]);
+        assert_eq!(found.hosts, ["site.example.com"]);
     }
 
     #[test]
