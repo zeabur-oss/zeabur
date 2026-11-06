@@ -61,6 +61,7 @@ pub(super) async fn compute(
     project: &str,
     request: &PlanRequest,
     now: &str,
+    read_at: Timestamp,
     zeabur_namespaces: Vec<String>,
 ) -> Result<Plan, ApiError> {
     let namespaces = ResourceRef::new("", "v1", "namespaces", "Namespace");
@@ -76,7 +77,7 @@ pub(super) async fn compute(
         .namespace_objects(project)
         .await
         .map_err(|e| read_problem(e, &format!("project {project}"), project_read(project)))?;
-    let (snapshot, _) = snapshot(objects, now.parse().unwrap_or(Timestamp::UNIX_EPOCH));
+    let (snapshot, _) = snapshot(objects, read_at);
     let mut unreadable = Vec::new();
     let databases = databases(cluster, project, &mut unreadable).await?;
     let (class_reclaim, default_class) = classes(cluster).await?;
