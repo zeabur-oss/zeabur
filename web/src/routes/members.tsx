@@ -19,6 +19,7 @@ import {
   useAccessLines,
   useProjectTitle,
 } from "@/components/members/access"
+import { ApiTokenList } from "@/components/members/api-tokens"
 import { LinkedList, PasskeyList } from "@/components/members/credentials"
 import { MemberPlan } from "@/components/members/member-plan"
 import {
@@ -127,6 +128,11 @@ export function MembersPage() {
           <MemberList items={members.data.items} projectRoles={projectRoles} onOpen={setOpen} />
           <RefusedSome unreadable={members.data.unreadable} />
           <Pending invitations={members.data.invitations} />
+          <ApiTokenList
+            tokens={members.data.apiTokens}
+            projectRoles={projectRoles}
+            manage={manage}
+          />
         </>
       )}
       {open?.kind === "invite" ? (

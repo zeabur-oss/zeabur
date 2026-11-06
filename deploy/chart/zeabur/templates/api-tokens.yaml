@@ -1,0 +1,10 @@
+# The API token namespace: one ServiceAccount per API token and nothing else. Only cluster
+# administrators have rights here, so only they make tokens or ask for one.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: zeabur-api-tokens
+  labels:
+    {{- include "zeabur.labels" . | nindent 4 }}
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: latest

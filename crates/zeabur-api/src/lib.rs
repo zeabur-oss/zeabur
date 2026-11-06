@@ -121,7 +121,6 @@
 pub mod access;
 pub mod account;
 pub mod alerts;
-pub mod api_tokens;
 mod cache;
 pub mod cluster;
 mod error;
@@ -339,9 +338,6 @@ macro_rules! handlers {
             members::handlers::revoke_invitation,
             members::handlers::setup_link,
             members::handlers::remove_passkey,
-            api_tokens::list,
-            api_tokens::plan,
-            api_tokens::apply,
         }
     };
 }

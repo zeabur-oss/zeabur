@@ -24,9 +24,9 @@ For steps to assign member roles, see [Members](../cluster/members.mdx). When yo
 | Deploy from Git and rebuild | No | Yes |
 | Open container terminals and add debug containers | No | Yes |
 | Edit a project's display name, description, and icon | No | Yes |
-| Create, renew, and delete the project's [API tokens](./api-tokens.mdx) | No | Yes |
 | Create or delete namespaces and add namespaces to or remove them from Zeabur | No | No |
 | Edit roles, member access, nodes, and cluster components | No | No |
+| Create and manage [API tokens](./api-tokens.mdx) | No | No |
 | Restore volumes from backups (K8up) | No | Yes |
 | Configure cluster backups and restore from cluster backups | No | No |
 
@@ -48,9 +48,7 @@ The chart sets `memberRoles.enabled` to `true` by default and creates:
 - `zeabur-member`: Reads nodes, namespaces, storage classes, and PersistentVolumes whose names are known. Every member can see the names and annotations of all namespaces, so don't put secrets in project descriptions.
 - `zeabur-project-viewer`, `zeabur-project-developer`: Project roles that aggregate rules using the `zeabur.com/aggregate-to-<role>` label.
 - `zeabur-project-viewer-rules`, `zeabur-project-developer-rules`, `zeabur-project-builds-read`, `zeabur-project-builds-write`: The actual verbs and resources for the two roles above. Viewers can view builds. Developers can also deploy from Git and rebuild.
-- `zeabur-project-api-tokens`: Lets developers create the ServiceAccounts and RoleBindings of [API tokens](./api-tokens.mdx) and request tokens for them.
 - The `zeabur-project-namespace` ValidatingAdmissionPolicy and its binding: Restricts which namespace fields developers can change. Requires Kubernetes 1.30 or later.
-- The `zeabur-api-token-accounts`, `zeabur-api-token-bindings`, `zeabur-api-token-requests`, and `zeabur-api-token-pods` ValidatingAdmissionPolicies and their bindings: Keep what developers write to API tokens, and keep tokens from lasting past their expiry. See [API tokens and RBAC](#api-tokens-and-rbac).
 
 The chart doesn't bind roles to anyone. When an admin invites or updates a member in Zeabur, Zeabur uses the admin's permissions to create:
 
@@ -83,20 +81,22 @@ This restriction doesn't apply to anyone with `zeabur-manage` permission on that
 Developers can read the project's secrets, create replicas, edit workloads, and run commands in containers. This gives them access to secrets mounted by workloads and lets them run with the permissions of any ServiceAccount in the project. Don't put admin credentials or ServiceAccounts with more permissions than the team should have in the project.
 </Callout>
 
-The Developer role can write only the ServiceAccounts and RoleBindings of API tokens, and has no `bind`, `escalate`, `impersonate`, `nodes/proxy`, or service/pod proxy permissions, so developers can't grant themselves more permissions.
+The Developer role can't write RBAC objects or ServiceAccounts and has no `bind`, `escalate`, `impersonate`, `nodes/proxy`, or service/pod proxy permissions, so developers can't grant themselves more permissions.
 
 Viewers can't read secrets or logs, but they can read config files and workload configurations. They can also see passwords written directly in those places.
 
 ## API tokens and RBAC
 
-Developers can create ServiceAccounts, RoleBindings, and tokens in their projects so they can make [API tokens](./api-tokens.mdx). Kubernetes lets a RoleBinding grant only a role its creator already has. The chart's policies narrow these permissions further:
+An [API token](./api-tokens.mdx) gets roles the same way a member does. Its subject is a ServiceAccount in the `zeabur-api-tokens` namespace instead of `zeabur:<username>`:
 
-- In a project, a person can create only ServiceAccounts named `zeabur-api-token-<name>` with the `zeabur.com/api-token: "true"` label and their own name as the creator. After it's created, only the expiry annotation can change.
-- A RoleBinding must carry the same label, bind `zeabur-project-developer` or `zeabur-project-viewer`, and have one subject: a `zeabur-api-token-` ServiceAccount in the same namespace, with the same name as the binding. It can't be changed after it's created.
-- An API token can't write ServiceAccounts or RoleBindings or request tokens in any namespace, so it can't create or renew tokens.
-- No pod in a project can run as a `zeabur-api-token-` ServiceAccount. Kubernetes renews a pod's token for as long as the pod runs, so such a pod would keep the token's role past its expiry.
+| Object | Scope and contents |
+|---|---|
+| `ClusterRoleBinding zeabur-api-token-<name>` | Binds `zeabur-member` to the ServiceAccount, or `cluster-admin` for an admin token |
+| `RoleBinding zeabur-api-token-<name>` in each project | Binds the project's developer or viewer role to the same ServiceAccount |
 
-The first two rules don't apply to anyone with the same permission on all namespaces, such as admins, or to other ServiceAccounts, which only an admin can grant these permissions. The last two apply to everyone.
+These bindings and the ServiceAccount have the labels `zeabur.com/api-token: <name>` and `app.kubernetes.io/managed-by: zeabur`.
+
+The chart creates the `zeabur-api-tokens` namespace and grants no role in it, so only admins can create ServiceAccounts there or request tokens for them. A pod can run only as a ServiceAccount in its own namespace, and members can't create pods in `zeabur-api-tokens`, so nobody else can run a pod as a token. Zeabur refuses to make `zeabur-api-tokens` a project or give anyone a role in it.
 
 ## Admin accounts and regular accounts
 

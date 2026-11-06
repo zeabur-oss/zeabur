@@ -1,23 +1,16 @@
-//! API tokens: a ServiceAccount in a project's namespace, named with [`PREFIX`] and labelled
-//! [`LABEL`], bound to a project role, and the tokens kube-apiserver issues for it.
+//! API tokens: a ServiceAccount in [`NAMESPACE`], labelled [`LABEL`] with its own name, and the
+//! tokens kube-apiserver issues for it. Its rights are bindings like a member's (see
+//! `zeabur_api::members::access`).
+//!
+//! Nothing else runs in [`NAMESPACE`] and only cluster administrators have rights there, so only
+//! they make tokens, request tokens or run a pod as one.
 //!
 //! A token is never stored. Each comes from a `TokenRequest` (`create` of `serviceaccounts/token`)
-//! [k8s-token-request] and expires; a `kubernetes.io/service-account-token` Secret would outlive
-//! the person who made it, since every Developer of the project can read it. Renewing asks for
-//! another token for the same ServiceAccount. kube-apiserver may cut the expiry asked for
-//! (`--service-account-max-token-expiration`), so the expiry it answered is recorded in
-//! [`EXPIRES_AT_ANNOTATION`], for the latest token only. Deleting the ServiceAccount revokes every
-//! token issued for it: kube-apiserver checks that the ServiceAccount still exists, with the same
-//! `uid`, on each request [k8s-sa-tokens].
-//!
-//! The prefix lets the chart's policies tell a token's requests apart by user name alone, and keep
-//! pods from running as a token's ServiceAccount: kubelet would renew such a pod's token for as
-//! long as the pod runs.
-//!
-//! The binding is a `RoleBinding` in the namespace with the ServiceAccount's name, or for
-//! [`Scope::Cluster`] a `ClusterRoleBinding` ([`cluster_binding_name`]) that gives the role in
-//! every namespace. Either has one subject, the ServiceAccount. It goes before the ServiceAccount
-//! when a token is deleted, so a failure half-way leaves fewer rights, never more.
+//! [k8s-token-request] and expires. Renewing asks for another token for the same ServiceAccount.
+//! kube-apiserver may cut the expiry asked for (`--service-account-max-token-expiration`), so the
+//! expiry it answered is recorded in [`EXPIRES_AT_ANNOTATION`], for the latest token only.
+//! Deleting the ServiceAccount revokes every token issued for it: kube-apiserver checks that the
+//! ServiceAccount still exists, with the same `uid`, on each request [k8s-sa-tokens].
 //!
 //! # References
 //!
@@ -29,17 +22,12 @@
 //! [k8s-sa-tokens]: https://kubernetes.io/docs/reference/access-authn-authz/service-accounts-admin/#bound-service-account-tokens
 
 use serde_json::{Value, json};
+pub use zeabur_model::kernel::names::API_TOKENS_NAMESPACE as NAMESPACE;
 
 use crate::json::{add, pointer, test};
 
-/// The start of every API token's ServiceAccount name; the rest is the token's name.
-pub const PREFIX: &str = "zeabur-api-token-";
-/// Label, `"true"`, on an API token's ServiceAccount and its binding.
+/// Label on an API token's ServiceAccount and its bindings, with the token's name.
 pub const LABEL: &str = "zeabur.com/api-token";
-/// Annotation on the ServiceAccount: the `ClusterRole` it is bound to.
-pub const ROLE_ANNOTATION: &str = "zeabur.com/api-token-role";
-/// Annotation on the ServiceAccount: `project` or `cluster`.
-pub const SCOPE_ANNOTATION: &str = "zeabur.com/api-token-scope";
 /// Annotation on the ServiceAccount: the Kubernetes user name of the person who made it.
 pub const CREATED_BY_ANNOTATION: &str = "zeabur.com/api-token-created-by";
 /// Annotation on the ServiceAccount: when its latest token expires, RFC 3339.
@@ -50,182 +38,20 @@ pub const MIN_SECONDS: i64 = 600;
 pub const MAX_SECONDS: i64 = 365 * 86_400;
 
 const MANAGED_BY: &str = "app.kubernetes.io/managed-by";
-const RBAC_GROUP: &str = "rbac.authorization.k8s.io";
-const RBAC_VERSION: &str = "rbac.authorization.k8s.io/v1";
 
-/// Where a token's role applies.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Scope {
-    /// The project's namespace (`RoleBinding`).
-    Project,
-    /// Every namespace (`ClusterRoleBinding`).
-    Cluster,
-}
-
-impl Scope {
-    const fn as_str(self) -> &'static str {
-        match self {
-            Self::Project => "project",
-            Self::Cluster => "cluster",
-        }
-    }
-}
-
-/// A new API token.
-#[derive(Debug, Clone, Copy)]
-pub struct NewToken<'a> {
-    /// The project's namespace, where the ServiceAccount lives.
-    pub namespace: &'a str,
-    /// The token's name, without [`PREFIX`].
-    pub name: &'a str,
-    /// The `ClusterRole` to bind.
-    pub role: &'a str,
-    /// Where the role applies.
-    pub scope: Scope,
-    /// The Kubernetes user name of the person who makes it.
-    pub created_by: &'a str,
-}
-
-/// An object a step writes, as the API addresses it.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Addressed {
-    /// `apiVersion`.
-    pub api_version: String,
-    /// The kind.
-    pub kind: String,
-    /// The resource (plural).
-    pub plural: String,
-    /// The namespace; empty for a cluster-scoped object.
-    pub namespace: String,
-    /// The name.
-    pub name: String,
-}
-
-impl Addressed {
-    /// The ServiceAccount of the token `name`.
-    #[must_use]
-    pub fn service_account(namespace: &str, name: &str) -> Self {
-        Self {
-            api_version: "v1".to_owned(),
-            kind: "ServiceAccount".to_owned(),
-            plural: "serviceaccounts".to_owned(),
-            namespace: namespace.to_owned(),
-            name: account_name(name),
-        }
-    }
-
-    /// The token's binding: a `RoleBinding`, or a `ClusterRoleBinding` for [`Scope::Cluster`].
-    #[must_use]
-    pub fn binding(namespace: &str, name: &str, scope: Scope) -> Self {
-        let (kind, plural, in_namespace, name) = match scope {
-            Scope::Project => ("RoleBinding", "rolebindings", namespace, account_name(name)),
-            Scope::Cluster => (
-                "ClusterRoleBinding",
-                "clusterrolebindings",
-                "",
-                cluster_binding_name(namespace, name),
-            ),
-        };
-        Self {
-            api_version: RBAC_VERSION.to_owned(),
-            kind: kind.to_owned(),
-            plural: plural.to_owned(),
-            namespace: in_namespace.to_owned(),
-            name,
-        }
-    }
-}
-
-/// One write of an API token's plan, in order.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Step {
-    /// A new object.
-    Create {
-        /// The object.
-        target: Addressed,
-        /// Its body.
-        body: Value,
-    },
-    /// A `TokenRequest` for the ServiceAccount.
-    Token {
-        /// The ServiceAccount.
-        target: Addressed,
-        /// The expiry asked for.
-        seconds: i64,
-    },
-    /// The expiry kube-apiserver answered, written to [`EXPIRES_AT_ANNOTATION`].
-    RecordExpiry {
-        /// The ServiceAccount.
-        target: Addressed,
-    },
-    /// A deletion that holds only while the object has this `uid`.
-    Delete {
-        /// The object.
-        target: Addressed,
-        /// Its `metadata.uid`.
-        uid: Option<String>,
-        /// The object as read.
-        before: Value,
-    },
-}
-
-/// The ServiceAccount, and the `RoleBinding`, of the token `name`.
+/// The ServiceAccount of the token `name`.
 #[must_use]
-pub fn account_name(name: &str) -> String {
-    format!("{PREFIX}{name}")
-}
-
-/// The `ClusterRoleBinding` of the token `name` in `namespace`. A colon cannot be in either name,
-/// so no two tokens share one.
-#[must_use]
-pub fn cluster_binding_name(namespace: &str, name: &str) -> String {
-    format!("zeabur-api-token:{namespace}:{name}")
-}
-
-fn labels() -> Value {
-    json!({MANAGED_BY: "zeabur", LABEL: "true"})
-}
-
-/// The token's ServiceAccount.
-#[must_use]
-pub fn service_account(token: &NewToken<'_>) -> Value {
+pub fn service_account(name: &str, created_by: &str) -> Value {
     json!({
         "apiVersion": "v1",
         "kind": "ServiceAccount",
         "metadata": {
-            "name": account_name(token.name),
-            "namespace": token.namespace,
-            "labels": labels(),
-            "annotations": {
-                ROLE_ANNOTATION: token.role,
-                SCOPE_ANNOTATION: token.scope.as_str(),
-                CREATED_BY_ANNOTATION: token.created_by,
-            },
+            "name": name,
+            "namespace": NAMESPACE,
+            "labels": {MANAGED_BY: "zeabur", LABEL: name},
+            "annotations": {CREATED_BY_ANNOTATION: created_by},
         },
         "automountServiceAccountToken": false,
-    })
-}
-
-/// The binding that gives the ServiceAccount its role.
-#[must_use]
-pub fn binding(token: &NewToken<'_>) -> Value {
-    let target = Addressed::binding(token.namespace, token.name, token.scope);
-    let mut metadata = json!({"name": target.name, "labels": labels()});
-    if token.scope == Scope::Project
-        && let Some(map) = metadata.as_object_mut()
-    {
-        map.insert("namespace".to_owned(), json!(token.namespace));
-    }
-    json!({
-        "apiVersion": RBAC_VERSION,
-        "kind": target.kind,
-        "metadata": metadata,
-        "roleRef": {"apiGroup": RBAC_GROUP, "kind": "ClusterRole", "name": token.role},
-        "subjects": [{
-            "kind": "ServiceAccount",
-            "name": account_name(token.name),
-            "namespace": token.namespace,
-        }],
     })
 }
 
@@ -239,12 +65,12 @@ pub fn token_request(seconds: i64) -> Value {
     })
 }
 
-/// The JSON Patch that records `expires_at` on a token's ServiceAccount; its `test` refuses a
-/// ServiceAccount that is no longer an API token.
+/// The JSON Patch that records `expires_at` on the ServiceAccount of the token `name`; its `test`
+/// refuses a ServiceAccount that is no longer that token.
 #[must_use]
-pub fn expiry_patch(expires_at: &str) -> Vec<Value> {
+pub fn expiry_patch(name: &str, expires_at: &str) -> Vec<Value> {
     vec![
-        test(&pointer(&["metadata", "labels", LABEL]), json!("true")),
+        test(&pointer(&["metadata", "labels", LABEL]), json!(name)),
         add(
             &pointer(&["metadata", "annotations", EXPIRES_AT_ANNOTATION]),
             json!(expires_at),
@@ -261,90 +87,25 @@ pub enum Refusal {
     Seconds,
 }
 
-/// The writes that make a token: the ServiceAccount, its binding, the first token and its expiry.
+/// Checks a new token's name.
 ///
 /// # Errors
 ///
-/// [`Refusal`] for a name that is not a DNS label or an expiry out of range.
-pub fn create(token: &NewToken<'_>, seconds: i64) -> Result<Vec<Step>, Refusal> {
-    if !crate::checks::is_dns_label(token.name) {
-        return Err(Refusal::Name);
+/// [`Refusal::Name`] for a name that is not a DNS label.
+pub fn check_name(name: &str) -> Result<(), Refusal> {
+    if crate::checks::is_dns_label(name) {
+        Ok(())
+    } else {
+        Err(Refusal::Name)
     }
-    check_seconds(seconds)?;
-    let account = Addressed::service_account(token.namespace, token.name);
-    Ok(vec![
-        Step::Create {
-            target: account.clone(),
-            body: service_account(token),
-        },
-        Step::Create {
-            target: Addressed::binding(token.namespace, token.name, token.scope),
-            body: binding(token),
-        },
-        Step::Token {
-            target: account.clone(),
-            seconds,
-        },
-        Step::RecordExpiry { target: account },
-    ])
 }
 
-/// The writes that issue another token for an existing one.
+/// Checks how long a token is asked to last.
 ///
 /// # Errors
 ///
 /// [`Refusal::Seconds`] for an expiry out of range.
-pub fn renew(namespace: &str, name: &str, seconds: i64) -> Result<Vec<Step>, Refusal> {
-    check_seconds(seconds)?;
-    let account = Addressed::service_account(namespace, name);
-    Ok(vec![
-        Step::Token {
-            target: account.clone(),
-            seconds,
-        },
-        Step::RecordExpiry { target: account },
-    ])
-}
-
-/// The writes that delete a token: its binding when there is one, then the ServiceAccount, which
-/// revokes every token issued for it.
-#[must_use]
-pub fn delete(account: &Value, binding: Option<&Value>) -> Vec<Step> {
-    let mut steps = Vec::new();
-    let mut deletion = |object: &Value| {
-        let text = |path: &str| {
-            object
-                .pointer(path)
-                .and_then(Value::as_str)
-                .unwrap_or_default()
-                .to_owned()
-        };
-        let api_version = text("/apiVersion");
-        let kind = text("/kind");
-        let plural = format!("{}s", kind.to_lowercase());
-        steps.push(Step::Delete {
-            target: Addressed {
-                api_version,
-                kind,
-                plural,
-                namespace: text("/metadata/namespace"),
-                name: text("/metadata/name"),
-            },
-            uid: object
-                .pointer("/metadata/uid")
-                .and_then(Value::as_str)
-                .map(str::to_owned),
-            before: object.clone(),
-        });
-    };
-    if let Some(binding) = binding {
-        deletion(binding);
-    }
-    deletion(account);
-    steps
-}
-
-fn check_seconds(seconds: i64) -> Result<(), Refusal> {
+pub fn check_seconds(seconds: i64) -> Result<(), Refusal> {
     if (MIN_SECONDS..=MAX_SECONDS).contains(&seconds) {
         Ok(())
     } else {
@@ -355,12 +116,8 @@ fn check_seconds(seconds: i64) -> Result<(), Refusal> {
 /// An API token, as its ServiceAccount records it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Token {
-    /// The token's name, without [`PREFIX`].
+    /// The token's name, which is the ServiceAccount's.
     pub name: String,
-    /// The `ClusterRole` it is bound to, as recorded when it was made.
-    pub role: Option<String>,
-    /// Where the role applies.
-    pub scope: Scope,
     /// Who made it.
     pub created_by: Option<String>,
     /// `metadata.creationTimestamp`.
@@ -369,11 +126,12 @@ pub struct Token {
     pub expires_at: Option<String>,
 }
 
-/// The token a ServiceAccount is, when it carries [`LABEL`] and its name starts with [`PREFIX`].
+/// The token a ServiceAccount is, when its [`LABEL`] names it.
 #[must_use]
 pub fn read(account: &Value) -> Option<Token> {
     let metadata = account.get("metadata")?;
-    if metadata.pointer(&pointer(&["labels", LABEL])) != Some(&json!("true")) {
+    let name = metadata.get("name")?.as_str()?;
+    if metadata.pointer(&pointer(&["labels", LABEL])) != Some(&json!(name)) {
         return None;
     }
     let annotation = |key: &str| {
@@ -382,19 +140,8 @@ pub fn read(account: &Value) -> Option<Token> {
             .and_then(Value::as_str)
             .map(str::to_owned)
     };
-    let scope = if annotation(SCOPE_ANNOTATION).as_deref() == Some("cluster") {
-        Scope::Cluster
-    } else {
-        Scope::Project
-    };
     Some(Token {
-        name: metadata
-            .get("name")?
-            .as_str()?
-            .strip_prefix(PREFIX)?
-            .to_owned(),
-        role: annotation(ROLE_ANNOTATION),
-        scope,
+        name: name.to_owned(),
         created_by: annotation(CREATED_BY_ANNOTATION),
         created_at: metadata
             .get("creationTimestamp")
@@ -408,145 +155,51 @@ pub fn read(account: &Value) -> Option<Token> {
 mod tests {
     use super::*;
 
-    fn token(scope: Scope) -> NewToken<'static> {
-        NewToken {
-            namespace: "shop",
-            name: "ci",
-            role: "zeabur-project-developer",
-            scope,
-            created_by: "zeabur:ada",
-        }
-    }
-
-    fn created(steps: &[Step]) -> Vec<&Value> {
-        let mut bodies = Vec::new();
-        for step in steps {
-            if let Step::Create { body, .. } = step {
-                bodies.push(body);
-            }
-        }
-        bodies
-    }
-
     #[test]
-    fn a_token_is_a_labelled_service_account_bound_to_its_role_in_the_project() {
-        let steps = create(&token(Scope::Project), 86_400).unwrap();
-        let bodies = created(&steps);
-        let account = bodies[0];
-        assert_eq!(account["kind"], "ServiceAccount");
-        assert_eq!(account["metadata"]["name"], "zeabur-api-token-ci");
-        assert_eq!(account["metadata"]["namespace"], "shop");
-        assert_eq!(account["metadata"]["labels"][LABEL], "true");
+    fn a_token_is_a_service_account_in_the_token_namespace_labelled_with_its_name() {
+        let account = service_account("ci", "zeabur:ada");
+        assert_eq!(account["metadata"]["name"], "ci");
+        assert_eq!(account["metadata"]["namespace"], NAMESPACE);
+        assert_eq!(account["metadata"]["labels"][LABEL], "ci");
         assert_eq!(
             account["metadata"]["annotations"][CREATED_BY_ANNOTATION],
             "zeabur:ada"
         );
         assert_eq!(account["automountServiceAccountToken"], false);
-        let binding = bodies[1];
-        assert_eq!(binding["kind"], "RoleBinding");
-        assert_eq!(binding["metadata"]["name"], "zeabur-api-token-ci");
-        assert_eq!(binding["metadata"]["namespace"], "shop");
-        assert_eq!(binding["metadata"]["labels"][LABEL], "true");
-        assert_eq!(binding["roleRef"]["name"], "zeabur-project-developer");
-        assert_eq!(
-            binding["subjects"],
-            json!([{"kind": "ServiceAccount", "name": "zeabur-api-token-ci", "namespace": "shop"}])
-        );
-        assert!(matches!(
-            &steps[2],
-            Step::Token { target, seconds: 86_400 } if target.name == "zeabur-api-token-ci" && target.namespace == "shop"
-        ));
-        assert!(matches!(&steps[3], Step::RecordExpiry { .. }));
-        let read_back = read(account).unwrap();
+        let read_back = read(&account).unwrap();
         assert_eq!(read_back.name, "ci");
-        assert_eq!(read_back.scope, Scope::Project);
-    }
-
-    #[test]
-    fn a_cluster_wide_token_gets_a_cluster_role_binding_no_other_token_can_share() {
-        let steps = create(&token(Scope::Cluster), 3_600).unwrap();
-        let binding = created(&steps)[1];
-        assert_eq!(binding["kind"], "ClusterRoleBinding");
-        assert_eq!(binding["metadata"].get("namespace"), None);
-        assert_eq!(binding["subjects"][0]["namespace"], "shop");
-        assert_eq!(binding["subjects"][0]["name"], "zeabur-api-token-ci");
-        assert_ne!(
-            cluster_binding_name("a-b", "c"),
-            cluster_binding_name("a", "b-c")
-        );
-        assert_eq!(
-            read(created(&steps)[0]).unwrap().scope,
-            Scope::Cluster,
-            "the scope is recorded on the ServiceAccount"
-        );
+        assert_eq!(read_back.created_by.as_deref(), Some("zeabur:ada"));
     }
 
     #[test]
     fn names_and_expiries_kube_apiserver_would_refuse_are_refused_first() {
-        let named = |name| NewToken {
-            name,
-            ..token(Scope::Project)
-        };
-        assert_eq!(create(&named("CI"), 3_600), Err(Refusal::Name));
-        assert_eq!(create(&named(""), 3_600), Err(Refusal::Name));
-        assert_eq!(create(&named("ci"), 599), Err(Refusal::Seconds));
-        assert_eq!(renew("shop", "ci", MAX_SECONDS + 1), Err(Refusal::Seconds));
-        assert!(renew("shop", "ci", MIN_SECONDS).is_ok());
+        assert_eq!(check_name("CI"), Err(Refusal::Name));
+        assert_eq!(check_name(""), Err(Refusal::Name));
+        assert_eq!(check_name("ci"), Ok(()));
+        assert_eq!(check_seconds(599), Err(Refusal::Seconds));
+        assert_eq!(check_seconds(MAX_SECONDS + 1), Err(Refusal::Seconds));
+        assert_eq!(check_seconds(MIN_SECONDS), Ok(()));
     }
 
     #[test]
-    fn removal_deletes_the_binding_before_the_service_account_and_pins_both() {
-        let account = json!({
-            "apiVersion": "v1", "kind": "ServiceAccount",
-            "metadata": {"name": "ci", "namespace": "shop", "uid": "sa-uid"},
-        });
-        let binding = json!({
-            "apiVersion": RBAC_VERSION, "kind": "ClusterRoleBinding",
-            "metadata": {"name": "zeabur-api-token:shop:ci", "uid": "crb-uid"},
-        });
-        let steps = delete(&account, Some(&binding));
-        let mut deleted = Vec::new();
-        for step in &steps {
-            if let Step::Delete { target, uid, .. } = step {
-                deleted.push((
-                    target.plural.as_str(),
-                    target.namespace.as_str(),
-                    uid.as_deref(),
-                ));
-            }
-        }
-        assert_eq!(
-            deleted,
-            [
-                ("clusterrolebindings", "", Some("crb-uid")),
-                ("serviceaccounts", "shop", Some("sa-uid")),
-            ]
-        );
-        let alone = delete(&account, None);
-        assert!(
-            matches!(&alone[..], [Step::Delete { target, .. }] if target.kind == "ServiceAccount")
-        );
-    }
-
-    #[test]
-    fn only_a_labelled_service_account_reads_as_a_token_with_its_latest_expiry() {
-        let mut account = service_account(&token(Scope::Project));
+    fn only_a_service_account_labelled_with_its_own_name_reads_as_a_token() {
+        let account = service_account("ci", "zeabur:ada");
         assert_eq!(read(&account).unwrap().expires_at, None);
         let mut patched = account.clone();
         patched["metadata"]["annotations"][EXPIRES_AT_ANNOTATION] = json!("2026-12-01T00:00:00Z");
-        let read_back = read(&patched).unwrap();
         assert_eq!(
-            read_back.expires_at.as_deref(),
+            read(&patched).unwrap().expires_at.as_deref(),
             Some("2026-12-01T00:00:00Z")
         );
-        assert_eq!(read_back.role.as_deref(), Some("zeabur-project-developer"));
-        let mut unprefixed = account.clone();
-        unprefixed["metadata"]["name"] = json!("ci");
-        assert_eq!(read(&unprefixed), None);
-        account["metadata"]["labels"] = json!({});
-        assert_eq!(read(&account), None);
-        let patch = expiry_patch("2026-12-01T00:00:00Z");
+        let mut other = account.clone();
+        other["metadata"]["labels"][LABEL] = json!("true");
+        assert_eq!(read(&other), None);
+        let mut unlabelled = account;
+        unlabelled["metadata"]["labels"] = json!({});
+        assert_eq!(read(&unlabelled), None);
+        let patch = expiry_patch("ci", "2026-12-01T00:00:00Z");
         assert_eq!(patch[0]["op"], "test");
+        assert_eq!(patch[0]["value"], "ci");
         assert_eq!(
             patch[1]["path"],
             "/metadata/annotations/zeabur.com~1api-token-expires-at"

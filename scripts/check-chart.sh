@@ -45,14 +45,14 @@ for values in "$chart"/ci/*-values.yaml; do
   # and metrics readers.
   expect "$name" "$out" '[select(.kind == "ClusterRoleBinding")] | length' 0
   expect "$name" "$out" '[select(.kind == "ClusterRole") | .metadata.name] | sort | join(",")' \
-    zeabur-gateway-routes-reader,zeabur-member,zeabur-project-api-tokens,zeabur-project-builds-read,zeabur-project-builds-write,zeabur-project-developer,zeabur-project-developer-rules,zeabur-project-viewer,zeabur-project-viewer-rules,zeabur-proxy-logs-reader,zeabur-proxy-metrics-reader
+    zeabur-gateway-routes-reader,zeabur-member,zeabur-project-builds-read,zeabur-project-builds-write,zeabur-project-developer,zeabur-project-developer-rules,zeabur-project-viewer,zeabur-project-viewer-rules,zeabur-proxy-logs-reader,zeabur-proxy-metrics-reader
   # A project role is exactly what its own label selects: nothing else of the chart's widens it.
   expect "$name" "$out" \
     '[select(.kind == "ClusterRole" and .aggregationRule) | .metadata.name + "=" + (.aggregationRule.clusterRoleSelectors[].matchLabels | keys | join("+")) + ((.rules // []) | length | tostring)] | join(",")' \
     "zeabur-project-developer=zeabur.com/aggregate-to-zeabur-project-developer0,zeabur-project-viewer=zeabur.com/aggregate-to-zeabur-project-viewer0"
   expect "$name" "$out" \
     "[select(.kind == \"ClusterRole\") | .metadata.name as \$n | .metadata.labels | keys | .[] | select(test(\"aggregate-to\")) | \$n + \">\" + sub(\".*aggregate-to-\"; \"\")] | join(\",\")" \
-    "zeabur-project-api-tokens>zeabur-project-developer,zeabur-project-builds-read>zeabur-project-developer,zeabur-project-builds-read>zeabur-project-viewer,zeabur-project-builds-write>zeabur-project-developer,zeabur-project-developer-rules>zeabur-project-developer,zeabur-project-viewer-rules>zeabur-project-viewer,zeabur-proxy-logs-reader>zeabur-project-developer,zeabur-proxy-logs-reader>view,zeabur-proxy-metrics-reader>zeabur-project-developer,zeabur-proxy-metrics-reader>zeabur-project-viewer,zeabur-proxy-metrics-reader>view,zeabur-gateway-routes-reader>view"
+    "zeabur-project-builds-read>zeabur-project-developer,zeabur-project-builds-read>zeabur-project-viewer,zeabur-project-builds-write>zeabur-project-developer,zeabur-project-developer-rules>zeabur-project-developer,zeabur-project-viewer-rules>zeabur-project-viewer,zeabur-proxy-logs-reader>zeabur-project-developer,zeabur-proxy-logs-reader>view,zeabur-proxy-metrics-reader>zeabur-project-developer,zeabur-proxy-metrics-reader>zeabur-project-viewer,zeabur-proxy-metrics-reader>view,zeabur-gateway-routes-reader>view"
   expect "$name" "$out" \
     'select(.kind == "ClusterRole" and .metadata.name == "zeabur-gateway-routes-reader") | .rules[] | [.apiGroups, .resources, .verbs] | map(join(",")) | join("|")' \
     'gateway.networking.k8s.io|httproutes|get,list,watch'
@@ -68,11 +68,8 @@ for values in "$chart"/ci/*-values.yaml; do
   roles='select(.kind == "ClusterRole") | .rules[]'
   # Every rule names its groups, resources and verbs.
   expect "$name" "$out" "[$roles | (.apiGroups + .resources + .verbs)[] | select(test(\"^[*]$\"))] | length" 0
-  # No kubelet, no widening of one's own rights, no namespace made or deleted. The one RBAC write is
-  # the Developer's RoleBinding for an API token, which the admission policy keeps to one.
-  expect "$name" "$out" \
-    "[select(.kind == \"ClusterRole\") | .metadata.name as \$n | .rules[] | select(.apiGroups[] == \"rbac.authorization.k8s.io\") | \$n + \":\" + (.resources | join(\",\")) + \"|\" + (.verbs | join(\",\"))] | join(\" \")" \
-    "zeabur-project-api-tokens:rolebindings|get,create,delete"
+  # No RBAC objects, no kubelet, no widening of one's own rights, no namespace made or deleted.
+  expect "$name" "$out" "[$roles | select(.apiGroups[] == \"rbac.authorization.k8s.io\")] | length" 0
   expect "$name" "$out" "[$roles | select(.resources[] == \"nodes/proxy\")] | length" 0
   expect "$name" "$out" "[$roles | .verbs[] | select(. == \"escalate\" or . == \"bind\" or . == \"impersonate\")] | length" 0
   # The one namespace write is the Developer's patch of their project's Namespace, which the
@@ -82,9 +79,9 @@ for values in "$chart"/ci/*-values.yaml; do
     "zeabur-project-developer-rules patch"
   vap='select(.kind == "ValidatingAdmissionPolicy")'
   expect "$name" "$out" "$vap | [.metadata.name, .spec.failurePolicy, (.spec.matchConstraints.resourceRules[] | .resources + .operations | join(\"/\"))] | join(\",\")" \
-    "zeabur-api-token-accounts,Fail,serviceaccounts/CREATE/UPDATE/DELETE,zeabur-api-token-bindings,Fail,rolebindings/CREATE/UPDATE/DELETE,zeabur-api-token-requests,Fail,serviceaccounts/token/CREATE,zeabur-api-token-pods,Fail,pods/CREATE,zeabur-project-namespace,Fail,namespaces/UPDATE"
+    "zeabur-project-namespace,Fail,namespaces/UPDATE"
   expect "$name" "$out" 'select(.kind == "ValidatingAdmissionPolicyBinding") | [.spec.policyName, (.spec.validationActions | join("/"))] | join(",")' \
-    "zeabur-api-token-accounts,Deny,zeabur-api-token-bindings,Deny,zeabur-api-token-requests,Deny,zeabur-api-token-pods,Deny,zeabur-project-namespace,Deny"
+    "zeabur-project-namespace,Deny"
   # Secret values and shells in containers belong to developers only.
   expect "$name" "$out" \
     '[select(.kind == "ClusterRole") | select(.rules | any_c(.resources | any_c(test("^(secrets|pods/(exec|attach|portforward|ephemeralcontainers))$")))) | .metadata.name] | join(",")' \
@@ -100,6 +97,9 @@ for values in "$chart"/ci/*-values.yaml; do
     'zeabur-terminals:|pods||create,get,list,delete zeabur-terminals:|pods/exec||create,get'
   expect "$name" "$out" \
     "select(.kind == \"Namespace\" and .metadata.name == \"$terminals\") | .metadata.labels[\"pod-security.kubernetes.io/enforce\"]" \
+    restricted
+  expect "$name" "$out" \
+    'select(.kind == "Namespace" and .metadata.name == "zeabur-api-tokens") | .metadata.labels["pod-security.kubernetes.io/enforce"]' \
     restricted
   expect "$name" "$out" '[select(.kind == "ServiceAccount") | .automountServiceAccountToken == false] | all' true
   expect "$name" "$out" '[select(.kind == "Deployment") | .spec.template.spec.automountServiceAccountToken == false] | all' true

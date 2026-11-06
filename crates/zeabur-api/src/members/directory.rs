@@ -415,6 +415,7 @@ impl Directory {
             setup_links,
             can_manage,
             project_roles: false,
+            api_tokens: Vec::new(),
             unreadable: self.unreadable.clone(),
         }
     }
@@ -640,6 +641,8 @@ pub struct InvitationView {
 pub struct MembersView {
     /// `members`.
     pub id: String,
+    /// API tokens, by name: machine accounts with the access of a member.
+    pub api_tokens: Vec<super::tokens::ApiTokenView>,
     /// Whether Zeabur Identity is installed; when not, everything else is empty.
     pub installed: bool,
     /// Members, by user name.

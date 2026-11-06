@@ -1,26 +1,25 @@
 ---
 title: API 權杖
-description: 讓腳本和 CI 用專案角色呼叫 Kubernetes API，權杖會到期。
-source: "6356ce4196a8"
+description: 讓腳本和 CI 用各專案的角色呼叫 Kubernetes API，權杖會到期。
+source: "fb93330bc615"
 ---
 
-腳本或 CI 不需要你登入，也能用 API 權杖操作專案。到專案的**設定** → **API 權杖**建立一個，給它**開發者**或**檢視者**角色，再複製權杖。權杖跟 kubectl 一樣直接呼叫 kube-apiserver，能做什麼由 Kubernetes RBAC 決定。每個權杖都會到期。
+腳本或 CI 不需要任何人登入，也能用 API 權杖操作叢集。管理員在**成員**頁建立權杖，像給成員權限一樣，替它在各專案設定角色。權杖跟 kubectl 一樣直接呼叫 kube-apiserver，能做什麼由 Kubernetes RBAC 決定。每個權杖都會到期。
 
 ## 開始前
 
-- 你能在這個專案建立 API 權杖。開發者可以，檢視者不行。權杖只能拿到你在這個專案也有的角色，見[權限](./permissions.mdx)。
+- 你是管理員。只有管理員能建立、更新、變更和刪除 API 權杖，見[權限](./permissions.mdx)。
 - 要用權杖的機器連得到 kube-apiserver 的 TCP 6443。
 
 ## 建立權杖
 
-1. 打開專案的**設定** → **API 權杖**，按**建立權杖**。
-2. 取個看得出用途的名稱，例如 `github-actions`。選角色和有效期間，按**檢查**。
-3. 確認變更後套用。
-4. 複製權杖。Zeabur 只會顯示這一次。視窗裡也有 kubeconfig 和叢集的 CA 憑證。
+1. 打開**成員**，在 **API 權杖**下按**建立權杖**。
+2. 取個看得出用途的名稱，例如 `github-actions`。
+3. 在需要的專案選**開發者**或**檢視者**，或設成**管理員權杖**，對整個叢集有完整權限。選好有效期間，按**檢查**。
+4. 確認變更後套用。
+5. 複製權杖。Zeabur 只會顯示這一次。視窗裡也有 kubeconfig 和叢集的 CA 憑證。
 
 清單會列出每個權杖的角色、誰建立的、什麼時候到期。叢集用 `--service-account-max-token-expiration` 限制權杖效期時，kube-apiserver 會把權杖的效期縮短，清單顯示的是實際到期時間。
-
-管理員還可以勾**每個 Namespace**，角色就會套用到叢集裡的每個 Namespace，不只這個專案。
 
 ## 連線
 
@@ -28,20 +27,20 @@ source: "6356ce4196a8"
 
 **位址**：kube-apiserver 在每個 server 節點的 TCP 6443 上，例如 `https://203.0.113.10:6443`。你平常用 kubectl 的 kubeconfig 裡，`server` 那一行就是這個位址。要用網域或其他位址連 API 時，把它加到 [`host.tlsSan`](./installer-configuration.mdx)，憑證才會涵蓋它。
 
-**CA 憑證**：建立或更新權杖後，視窗裡會顯示。也可以從專案的 `kube-root-ca.crt` 設定檔讀出來：
+**CA 憑證**：建立或更新權杖後，視窗裡會顯示。在專案有角色的權杖，也可以從專案的 `kube-root-ca.crt` 設定檔讀出來：
 
 ```sh
 kubectl -n shop get configmap kube-root-ca.crt -o jsonpath='{.data.ca\.crt}' > ca.crt
 ```
 
-**kubeconfig**：複製視窗裡的 kubeconfig，填上 `server` 後存檔，例如 `shop-ci.yaml`。CA 憑證已經在 `certificate-authority-data` 裡。
+**kubeconfig**：複製視窗裡的 kubeconfig，填上 `server` 後存檔，例如 `ci.yaml`。CA 憑證已經在 `certificate-authority-data` 裡。權杖只在一個專案有角色時，kubeconfig 會直接從那個專案開始；否則每個指令都要加 `-n <專案>`。
 
 ```sh
-export KUBECONFIG=$PWD/shop-ci.yaml
+export KUBECONFIG=$PWD/ci.yaml
 kubectl auth whoami
 ```
 
-`kubectl auth whoami` 會顯示 `system:serviceaccount:shop:zeabur-api-token-github-actions`，kube-apiserver 記錄這個權杖的請求時用的就是這個名稱。
+`kubectl auth whoami` 會顯示 `system:serviceaccount:zeabur-api-tokens:github-actions`，kube-apiserver 記錄這個權杖的請求時用的就是這個名稱。
 
 用 curl 時，先設好位址和權杖：
 
@@ -165,24 +164,26 @@ curl --cacert ca.crt -H "Authorization: Bearer $TOKEN" -X PATCH \
   "$APISERVER/apis/apps/v1/namespaces/shop/deployments/web/scale"
 ```
 
-## 更新和刪除
+## 更新、變更和刪除
 
-按權杖旁的**更新**，會拿到同一個名稱、同一個角色的新權杖。之前簽發的權杖到期前都還能用。
+在權杖旁邊選**更多** → **更新**，會拿到同一個名稱、同樣權限的新權杖。之前簽發的權杖到期前都還能用。
 
-要讓權杖馬上失效，在它旁邊選**更多** → **刪除**。為它簽發的每個權杖都會失效，請求會收到 `401 Unauthorized`。
+選**更多** → **變更權限**，可以讓權杖在其他專案有角色，或改成管理員權杖。變更會套用到為它簽發的每個權杖。
 
-建立權杖的人離開專案後，權杖到期或被刪除前都還能用。有人離開時，看清單裡每個權杖是誰建立的，把那個人建立的刪掉。
+要讓權杖馬上失效，選**更多** → **刪除**。為它簽發的每個權杖都會失效，請求會收到 `401 Unauthorized`。
+
+權杖不屬於建立它的人。建立者離開後，權杖在到期或管理員刪除之前都照樣能用。
 
 ## Zeabur 建立什麼
 
-Zeabur 用你自己的權限寫入這些物件：
+Zeabur 用管理員自己的權限寫入這些物件：
 
 | 物件 | 內容 |
 |---|---|
-| 專案裡的 `ServiceAccount zeabur-api-token-<名稱>` | 標籤 `zeabur.com/api-token: "true"` 和 `app.kubernetes.io/managed-by: zeabur`。annotation 記錄角色、建立者和最新權杖的到期時間 |
-| 專案裡的 `RoleBinding zeabur-api-token-<名稱>` | 把 `zeabur-project-developer` 或 `zeabur-project-viewer` 綁到這個 ServiceAccount |
-| `ClusterRoleBinding zeabur-api-token:<專案>:<名稱>` | 用在每個 Namespace 的權杖改用這個，不建立 RoleBinding |
+| `zeabur-api-tokens` Namespace 中的 `ServiceAccount <name>` | 標籤 `zeabur.com/api-token: <name>` 和 `app.kubernetes.io/managed-by: zeabur`。annotation 記錄誰建立的，以及最新權杖什麼時候到期 |
+| 各專案中的 `RoleBinding zeabur-api-token-<name>` | 綁定 `zeabur-project-developer` 或 `zeabur-project-viewer` 給該 ServiceAccount |
+| `ClusterRoleBinding zeabur-api-token-<name>` | 跟成員一樣綁定 `zeabur-member`；管理員權杖則綁定 `cluster-admin` |
 
-權杖本身由 ServiceAccount 的 TokenRequest 簽發，Zeabur 不會把它存進 Secret 或其他地方。刪除權杖會刪掉 binding 和 ServiceAccount。
+權杖本身來自對該 ServiceAccount 的 TokenRequest，Zeabur 不會存進 Secret 或其他地方。刪除權杖會刪掉它的 binding 和 ServiceAccount。
 
-chart 裡的准入政策讓這些物件只能用在 API 權杖，也不讓 Pod 用權杖的 ServiceAccount 執行，見 [API 權杖和 RBAC](./permissions.mdx#api-權杖和-rbac)。
+Chart 會建立 `zeabur-api-tokens` Namespace，裡面不跑其他東西。只有管理員在那裡有權限，所以其他人沒辦法申請權杖，也沒辦法讓 Pod 以權杖的身分執行。見[API 權杖與 RBAC](./permissions.mdx#api-權杖與-rbac)。

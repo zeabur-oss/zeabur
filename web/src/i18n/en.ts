@@ -1315,28 +1315,17 @@ export const en = {
   "projectMembers.all": "Open members",
   "apiTokens.title": "API tokens",
   "apiTokens.about":
-    "Scripts and CI use an API token to call the Kubernetes API with a role in this project. Every token expires.",
-  "apiTokens.none": "No API tokens yet",
-  "apiTokens.another": "Another API token",
-  "apiTokens.createHint": "You can give a token only a role you have here.",
+    "Scripts and CI use an API token to call the Kubernetes API, with roles in projects like a member's. Every token expires.",
+  "apiTokens.none": "No API tokens yet. Create one for a script or CI job.",
   "apiTokens.create": "Create token",
   "apiTokens.createTitle": "Create an API token",
-  "apiTokens.review": "Review",
   "apiTokens.name": "Name",
   "apiTokens.nameHint":
     "Say what uses it, such as github-actions. Use lower-case letters, digits and hyphens.",
   "apiTokens.nameProblem":
     "Use lower-case letters, digits and hyphens, up to 63 characters. Start and end with a letter or digit.",
-  "apiTokens.role": "Role",
-  "apiTokens.roleHint.developer":
-    "Deploys, changes and deletes services, and reads secrets and logs.",
-  "apiTokens.roleHint.viewer": "Reads services and their settings, without secrets or logs.",
-  "apiTokens.refusal.noTokenRights": "Your role here can't create API tokens.",
-  "apiTokens.refusal.notHeld": "You can give only a role you have here.",
-  "apiTokens.refusal.notAdmin": "Only admins can create a token for every namespace.",
-  "apiTokens.cluster": "Every namespace",
-  "apiTokens.clusterHint":
-    "The role applies in every namespace in the cluster, not just this project.",
+  "apiTokens.admin": "Admin token",
+  "apiTokens.adminHint": "Full rights to the whole cluster, like an admin.",
   "apiTokens.lifetime": "Lasts",
   "apiTokens.lifetimeHint": "The cluster may set a shorter limit. The list shows the real expiry.",
   "apiTokens.lasts": (seconds: number) =>
@@ -1348,23 +1337,22 @@ export const en = {
   "apiTokens.by": (user: string) => `Created by ${user}`,
   "apiTokens.expires": (time: string) => `Expires ${time}`,
   "apiTokens.expired": (time: string) => `Expired ${time}`,
-  "apiTokens.everywhere": (role: string) => `${role} in every namespace`,
-  "apiTokens.otherRole": "Another role",
   "apiTokens.renew": "Renew",
   "apiTokens.renewTitle": (name: string) => `Renew ${name}`,
   "apiTokens.renewAbout":
-    "You get a new token for the same name and role. Tokens issued before keep working until they expire.",
+    "You get a new token with the same name and access. Tokens issued before keep working until they expire.",
   "apiTokens.delete": "Delete",
   "apiTokens.deleteTitle": (name: string) => `Delete ${name}`,
+  "apiTokens.deleted": (name: string) => `Deleted ${name}`,
   "apiTokens.more": (name: string) => `More for ${name}`,
-  "apiTokens.plan.create": (name: string, role: string) =>
-    `Creates ${name} with the ${role} role in this project.`,
-  "apiTokens.plan.createEverywhere": (name: string, role: string) =>
-    `Creates ${name} with the ${role} role in every namespace.`,
+  "apiTokens.plan.admin": (name: string) => `${name} gets full rights to the whole cluster.`,
+  "apiTokens.plan.noRole": (name: string) => `${name} gets no role in any project yet.`,
+  "apiTokens.plan.adminWarning":
+    "Whoever holds an admin token can do anything in the cluster, so keep it as safe as an admin's passkey.",
   "apiTokens.plan.renew": (name: string) => `Issues a new token for ${name}.`,
   "apiTokens.plan.lasts": (lasts: string) =>
     `The token lasts ${lasts}, or less if the cluster sets a shorter limit.`,
-  "apiTokens.plan.delete": (name: string) => `Deletes ${name} and its role.`,
+  "apiTokens.plan.delete": (name: string) => `Deletes ${name} and its roles.`,
   "apiTokens.plan.revokes": "Every token issued for it stops working at once.",
   "apiTokens.shownTitle": (name: string) => `Token for ${name}`,
   "apiTokens.shown.lead": "Copy the token now. Zeabur shows it only once.",
@@ -3613,8 +3601,7 @@ export const en = {
   "remove.done": (name: string) => `Removed ${name}`,
   "sentence.account.lastPasskey": () => "This is your only passkey",
   "sentence.account.lastPasskey.fix": () => "Add another passkey first, then remove this one.",
-  "sentence.apiTokens.clusterAdmins": () => "Only admins can create a token for every namespace",
-  "sentence.apiTokens.taken": () => "That name is taken in this project",
+  "sentence.apiTokens.taken": () => "There is already an API token with that name",
   "sentence.members.resetSelf": () => "You can't reset your own account",
   "sentence.members.resetSelf.fix": () =>
     "Add a passkey from your account instead, or ask another admin.",

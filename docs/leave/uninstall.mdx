@@ -120,7 +120,7 @@ Check that database and backup operators are still running, then check backup re
 
 ## Member permissions and admission policies
 
-Uninstalling the chart removes `zeabur-member`, the aggregated ClusterRoles for projects, their rule sets, and the `zeabur-project-namespace` and `zeabur-api-token-*` ValidatingAdmissionPolicies and their bindings. `zeabur-installer uninstall zeabur` also deletes the member bindings created by Zeabur.
+Uninstalling the chart removes `zeabur-member`, the aggregated ClusterRoles for projects, their rule sets, and the `zeabur-project-namespace` ValidatingAdmissionPolicy and its binding. `zeabur-installer uninstall zeabur` also deletes the member bindings created by Zeabur.
 
 The `zeabur-system-hosts` policy and binding added by the installer stay in place, so the Zeabur Identity domain remains protected. Once the `zeabur` namespace is deleted, its binding no longer finds an Ingress and doesn't block any routes. If you no longer need it, follow [Zeabur and Zeabur Identity domains](../reference/security.mdx#domains-for-zeabur-and-zeabur-identity) to delete it or change it to `Warn`.
 
@@ -135,10 +135,10 @@ kubectl delete rolebindings,clusterrolebindings --all-namespaces \
 
 If you keep Identity, other clients or kubeconfigs may still sign in as `zeabur:<username>`. Before deleting these bindings, check that those clients no longer depend on them.
 
-[API tokens](../reference/api-tokens.mdx) stay in place either way. Their bindings point to the project roles the chart removed, so the tokens lose their permissions. Delete them with:
+Uninstalling the chart also deletes the `zeabur-api-tokens` namespace. Its ServiceAccounts go with it, so every [API token](../reference/api-tokens.mdx) stops working. The tokens' bindings stay in place. Delete them with:
 
 ```sh
-kubectl delete rolebindings,clusterrolebindings,serviceaccounts --all-namespaces \
+kubectl delete rolebindings,clusterrolebindings --all-namespaces \
   -l app.kubernetes.io/managed-by=zeabur,zeabur.com/api-token
 ```
 

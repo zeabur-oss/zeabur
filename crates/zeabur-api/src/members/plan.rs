@@ -9,6 +9,9 @@
 //! writes again from the cluster as it is, refuses when any of those moved, dry-runs every write,
 //! then writes. An invitation's link is made only then, so its token is never in a plan: the plan
 //! says that a link will be made and how long it will work.
+//!
+//! API tokens ([`super::tokens`]) are planned the same way: their ServiceAccount, the bindings a
+//! member would get, and a `TokenRequest` sent last, whose token is only in the answer to apply.
 
 use std::collections::BTreeMap;
 
@@ -20,11 +23,15 @@ use utoipa::ToSchema;
 use zeabur_core::problem::{Denied, Kind, MEDIA_TYPE as PROBLEM, Problem};
 use zeabur_kube::k8s_openapi::jiff::Timestamp;
 use zeabur_kube::{Cluster, ObjectTarget, Preconditions, ResourceRef, WriteBody, WriteRequest};
+use zeabur_plan::api_token;
 
 use super::USER_PREFIX;
-use super::access::{self, Binding, ProjectGrant, RBAC_GROUP, Step};
+use super::access::{
+    self, ADMIN_ROLE, BASELINE_ROLE, Binding, Holder, ProjectGrant, RBAC_GROUP, Step,
+};
 use super::directory::{AccountType, IdentityKind, Object, UserSpec, request, setup_links};
 use super::handlers::{directory, issuer_of, you};
+use super::tokens::{self, IssuedTokenView};
 use super::writes::{
     INVITE_SECONDS, SetupLinkView, admin_patch, bad, is_username, issue, new_user, refuse,
     user_object,
@@ -77,6 +84,47 @@ pub enum MemberChange {
     Remove {
         /// The member.
         username: String,
+    },
+    /// Make an API token: its ServiceAccount, the access a member would get, and its first token.
+    #[serde(rename_all = "camelCase")]
+    CreateToken {
+        /// Its name: lower-case letters, digits and `-`, at most 63 characters.
+        name: String,
+        /// Whether it gets `cluster-admin`, as an admin member does.
+        #[serde(default)]
+        admin: bool,
+        /// Its roles in projects, when it is not an admin token.
+        #[serde(default)]
+        projects: Vec<ProjectGrant>,
+        /// How long the token should last; kube-apiserver may cut it.
+        expiration_seconds: i64,
+    },
+    /// Change what an API token may do, as for a member.
+    #[serde(rename_all = "camelCase")]
+    TokenAccess {
+        /// The token.
+        name: String,
+        /// Whether it gets `cluster-admin`.
+        admin: bool,
+        /// Roles in projects; empty for an admin token.
+        #[serde(default)]
+        projects: Vec<ProjectGrant>,
+    },
+    /// Issue another token for an API token; the ones issued before keep working until they
+    /// expire.
+    #[serde(rename_all = "camelCase")]
+    RenewToken {
+        /// The token.
+        name: String,
+        /// How long the new token should last.
+        expiration_seconds: i64,
+    },
+    /// Delete an API token: its bindings, then its ServiceAccount, which revokes every token
+    /// issued for it.
+    #[serde(rename_all = "camelCase")]
+    DeleteToken {
+        /// The token.
+        name: String,
     },
 }
 
@@ -146,6 +194,9 @@ pub struct MemberApplied {
     /// For an invitation: the link, shown once.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub link: Option<SetupLinkView>,
+    /// For a new or renewed API token: the token, shown once.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub issued: Option<IssuedTokenView>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -179,6 +230,13 @@ enum Op {
     },
     /// The invitation, made last with a fresh token for the member as stored by then.
     Invite,
+    /// A `TokenRequest` for an API token, then its expiry recorded on the ServiceAccount.
+    IssueToken {
+        name: String,
+        seconds: i64,
+        /// The ServiceAccount as read or as it will be made, shown before the expiry is recorded.
+        account: Value,
+    },
 }
 
 /// The writes a change needs and what they were computed against.
@@ -240,24 +298,24 @@ impl Computed {
     }
 
     /// The baseline binding, created when it is not there yet.
-    fn baseline(&mut self, username: &str, held: Option<&Value>) {
+    fn baseline(&mut self, holder: &Holder, held: Option<&Value>) {
         if held.is_none() {
             self.create(
-                access::target("ClusterRoleBinding", "", &access::binding_name(username)),
-                access::baseline_binding(username),
+                access::target("ClusterRoleBinding", "", &holder.binding_name()),
+                access::baseline_binding(holder),
             );
         }
     }
 
     /// The project bindings that take `current` to `wanted`, deletions first.
-    fn bindings(&mut self, username: &str, current: &[Binding], wanted: &[ProjectGrant]) {
-        let name = access::binding_name(username);
-        for step in access::steps(username, current, wanted) {
+    fn bindings(&mut self, holder: &Holder, current: &[Binding], wanted: &[ProjectGrant]) {
+        let name = holder.binding_name();
+        for step in access::steps(holder, current, wanted) {
             match step {
                 Step::Delete(binding) => {
                     let before = binding
                         .role
-                        .map(|role| access::role_binding(&binding.project, username, role));
+                        .map(|role| access::role_binding(&binding.project, holder, role));
                     self.delete(
                         access::target("RoleBinding", &binding.project, &name),
                         binding.uid,
@@ -266,9 +324,34 @@ impl Computed {
                 }
                 Step::Create(grant) => self.create(
                     access::target("RoleBinding", &grant.project, &name),
-                    access::role_binding(&grant.project, username, grant.role),
+                    access::role_binding(&grant.project, holder, grant.role),
                 ),
             }
+        }
+    }
+
+    /// A token's access: its `ClusterRoleBinding` to `role` (replaced when it names another,
+    /// deleted when `role` is `None`) and its project bindings. The old `ClusterRoleBinding` goes
+    /// first and the new one last, so a failure half-way never leaves more than was asked.
+    fn token_access(
+        &mut self,
+        holder: &Holder,
+        held: Option<&Value>,
+        current: &[Binding],
+        projects: &[ProjectGrant],
+        role: Option<&str>,
+    ) {
+        let target = access::target("ClusterRoleBinding", "", &holder.binding_name());
+        let held_role = held
+            .and_then(|b| b.pointer("/roleRef/name"))
+            .and_then(Value::as_str);
+        let replaced = held_role != role;
+        if replaced && let Some(held) = held {
+            self.delete(target.clone(), uid_of(held), Some(held.clone()));
+        }
+        self.bindings(holder, current, projects);
+        if replaced && let Some(role) = role {
+            self.create(target, access::cluster_binding(holder, role));
         }
     }
 
@@ -305,15 +388,22 @@ impl Computed {
     }
 }
 
-/// The member's baseline `ClusterRoleBinding`, if Zeabur made one.
-async fn baseline_of(cluster: &dyn Cluster, username: &str) -> Result<Option<Value>, ApiError> {
+fn uid_of(object: &Value) -> Option<String> {
+    object
+        .pointer("/metadata/uid")
+        .and_then(Value::as_str)
+        .map(str::to_owned)
+}
+
+/// The holder's `ClusterRoleBinding`, if Zeabur made one.
+async fn baseline_of(cluster: &dyn Cluster, holder: &Holder) -> Result<Option<Value>, ApiError> {
     let resource = ResourceRef::new(
         RBAC_GROUP,
         "v1",
         "clusterrolebindings",
         "ClusterRoleBinding",
     );
-    let name = access::binding_name(username);
+    let name = holder.binding_name();
     match cluster.get_object(&resource, None, &name).await {
         Ok(found) => Ok(found.and_then(|o| serde_json::to_value(o).ok())),
         Err(error) if error.code() == Some(404) => Ok(None),
@@ -344,10 +434,12 @@ fn is_admin(user: &Object<UserSpec>) -> bool {
     user.spec.account_type == AccountType::Admin
 }
 
-/// Reads what `change` needs and works out its writes; writes nothing.
+/// Reads what `change` needs and works out its writes; writes nothing. `person` is who asks, as
+/// Kubernetes sees them.
 async fn compute(
     state: &AppState,
     cluster: &dyn Cluster,
+    person: &str,
     change: &MemberChange,
 ) -> Result<Computed, ApiError> {
     let identity = &state.settings.identity;
@@ -378,7 +470,158 @@ async fn compute(
             access_change(identity, cluster, username, *admin, &projects).await
         }
         MemberChange::Remove { username } => remove(identity, cluster, username).await,
+        MemberChange::CreateToken {
+            name,
+            admin,
+            projects,
+            expiration_seconds,
+        } => {
+            let projects = wanted_projects(*admin, projects, identity.project_roles)?;
+            create_token(
+                state,
+                cluster,
+                person,
+                name,
+                *admin,
+                &projects,
+                *expiration_seconds,
+            )
+            .await
+        }
+        MemberChange::TokenAccess {
+            name,
+            admin,
+            projects,
+        } => {
+            let projects = wanted_projects(*admin, projects, identity.project_roles)?;
+            let account = tokens::existing(cluster, name).await?;
+            let mut computed = Computed::default();
+            computed.versions.insert(
+                key(&account_target(name)),
+                uid_of(&account).unwrap_or_default(),
+            );
+            token_access(identity, cluster, &mut computed, name, *admin, &projects).await?;
+            Ok(computed)
+        }
+        MemberChange::RenewToken {
+            name,
+            expiration_seconds,
+        } => renew_token(cluster, name, *expiration_seconds).await,
+        MemberChange::DeleteToken { name } => delete_token(cluster, name).await,
     }
+}
+
+async fn create_token(
+    state: &AppState,
+    cluster: &dyn Cluster,
+    person: &str,
+    name: &str,
+    admin: bool,
+    projects: &[ProjectGrant],
+    seconds: i64,
+) -> Result<Computed, ApiError> {
+    api_token::check_name(name).map_err(tokens::refusal)?;
+    api_token::check_seconds(seconds).map_err(tokens::refusal)?;
+    if tokens::account(cluster, name).await?.is_some() {
+        let mut problem = Problem::new(
+            Kind::Conflict,
+            format!("There is already an API token {name}."),
+        );
+        problem.summary = zeabur_core::message::Message::new("apiTokens.taken");
+        return Err(ApiError::from(problem));
+    }
+    let account = api_token::service_account(name, person);
+    let mut computed = Computed::default();
+    computed.create(account_target(name), account.clone());
+    token_access(
+        &state.settings.identity,
+        cluster,
+        &mut computed,
+        name,
+        admin,
+        projects,
+    )
+    .await?;
+    computed.ops.push(Op::IssueToken {
+        name: name.to_owned(),
+        seconds,
+        account,
+    });
+    Ok(computed)
+}
+
+async fn renew_token(
+    cluster: &dyn Cluster,
+    name: &str,
+    seconds: i64,
+) -> Result<Computed, ApiError> {
+    api_token::check_seconds(seconds).map_err(tokens::refusal)?;
+    let account = tokens::existing(cluster, name).await?;
+    let mut computed = Computed::default();
+    let version = account
+        .pointer("/metadata/resourceVersion")
+        .and_then(Value::as_str)
+        .unwrap_or_default();
+    computed
+        .versions
+        .insert(key(&account_target(name)), version.to_owned());
+    computed.ops.push(Op::IssueToken {
+        name: name.to_owned(),
+        seconds,
+        account,
+    });
+    Ok(computed)
+}
+
+async fn delete_token(cluster: &dyn Cluster, name: &str) -> Result<Computed, ApiError> {
+    let account = tokens::existing(cluster, name).await?;
+    let holder = Holder::token(name);
+    let mut computed = Computed::default();
+    let current = access::bindings_for(cluster, &holder).await?;
+    computed.bindings(&holder, &current, &[]);
+    if let Some(held) = baseline_of(cluster, &holder).await? {
+        computed.delete(
+            access::target("ClusterRoleBinding", "", &holder.binding_name()),
+            uid_of(&held),
+            Some(held),
+        );
+    }
+    computed.delete(account_target(name), uid_of(&account), Some(account));
+    Ok(computed)
+}
+
+fn account_target(name: &str) -> ObjectTarget {
+    ObjectTarget {
+        api_version: "v1".to_owned(),
+        kind: "ServiceAccount".to_owned(),
+        plural: "serviceaccounts".to_owned(),
+        namespace: api_token::NAMESPACE.to_owned(),
+        name: name.to_owned(),
+    }
+}
+
+/// The token's bindings as wanted: `cluster-admin` for an admin token, else the baseline (when
+/// the chart's member roles are installed) and `projects`.
+async fn token_access(
+    identity: &IdentitySettings,
+    cluster: &dyn Cluster,
+    computed: &mut Computed,
+    name: &str,
+    admin: bool,
+    projects: &[ProjectGrant],
+) -> Result<(), ApiError> {
+    let holder = Holder::token(name);
+    let current = access::bindings_for(cluster, &holder).await?;
+    let held = baseline_of(cluster, &holder).await?;
+    let role = if admin {
+        Some(ADMIN_ROLE)
+    } else if identity.project_roles {
+        Some(BASELINE_ROLE)
+    } else {
+        None
+    };
+    computed.token_access(&holder, held.as_ref(), &current, projects, role);
+    Ok(())
 }
 
 async fn invite(
@@ -414,10 +657,11 @@ async fn invite(
             new_user(namespace, username, display_name, admin),
         );
         if identity.project_roles {
-            let current = access::bindings_for(cluster, username).await?;
-            let held = baseline_of(cluster, username).await?;
-            computed.baseline(username, held.as_ref());
-            computed.bindings(username, &current, projects);
+            let holder = Holder::member(username);
+            let current = access::bindings_for(cluster, &holder).await?;
+            let held = baseline_of(cluster, &holder).await?;
+            computed.baseline(&holder, held.as_ref());
+            computed.bindings(&holder, &current, projects);
         }
     }
     computed.ops.push(Op::Invite);
@@ -451,10 +695,11 @@ async fn access_change(
         computed.patch_admin(namespace, &user, &typed, false);
     }
     if identity.project_roles {
-        let current = access::bindings_for(cluster, username).await?;
-        let held = baseline_of(cluster, username).await?;
-        computed.baseline(username, held.as_ref());
-        computed.bindings(username, &current, projects);
+        let holder = Holder::member(username);
+        let current = access::bindings_for(cluster, &holder).await?;
+        let held = baseline_of(cluster, &holder).await?;
+        computed.baseline(&holder, held.as_ref());
+        computed.bindings(&holder, &current, projects);
     }
     if admin {
         computed.patch_admin(namespace, &user, &typed, true);
@@ -481,16 +726,13 @@ async fn remove(
         return Err(no_member(username));
     };
     let mut computed = Computed::default();
-    let current = access::bindings_for(cluster, username).await?;
-    computed.bindings(username, &current, &[]);
-    if let Some(held) = baseline_of(cluster, username).await? {
-        let uid = held
-            .pointer("/metadata/uid")
-            .and_then(Value::as_str)
-            .map(str::to_owned);
+    let holder = Holder::member(username);
+    let current = access::bindings_for(cluster, &holder).await?;
+    computed.bindings(&holder, &current, &[]);
+    if let Some(held) = baseline_of(cluster, &holder).await? {
         computed.delete(
-            access::target("ClusterRoleBinding", "", &access::binding_name(username)),
-            uid,
+            access::target("ClusterRoleBinding", "", &holder.binding_name()),
+            uid_of(&held),
             Some(held),
         );
     }
@@ -542,12 +784,12 @@ fn shown(target: &ObjectTarget, action: MemberWriteAction) -> MemberWrite {
     }
 }
 
-/// The writes as the plan shows them. The invitation's name and token hash are made at apply.
+/// The writes as the plan shows them. The invitation's name and token hash are made at apply, and
+/// a token's expiry is the one kube-apiserver answers then.
 fn writes_of(computed: &Computed, namespace: &str, username: &str, now: i64) -> Vec<MemberWrite> {
-    computed
-        .ops
-        .iter()
-        .map(|op| match op {
+    let mut writes = Vec::new();
+    for op in &computed.ops {
+        let write = match op {
             Op::Create { target, body } => MemberWrite {
                 after_yaml: yaml(body),
                 ..shown(target, MemberWriteAction::Create)
@@ -566,6 +808,34 @@ fn writes_of(computed: &Computed, namespace: &str, username: &str, now: i64) -> 
                 before_yaml: before.as_ref().and_then(yaml),
                 ..shown(target, MemberWriteAction::Delete)
             },
+            Op::IssueToken {
+                name,
+                seconds,
+                account,
+            } => {
+                let target = account_target(name);
+                writes.push(MemberWrite {
+                    api_version: "authentication.k8s.io/v1".to_owned(),
+                    kind: "TokenRequest".to_owned(),
+                    after_yaml: yaml(&api_token::token_request(*seconds)),
+                    ..shown(&target, MemberWriteAction::Create)
+                });
+                let mut after = account.clone();
+                if let Some(annotations) = after
+                    .pointer_mut("/metadata/annotations")
+                    .and_then(Value::as_object_mut)
+                {
+                    annotations.insert(
+                        api_token::EXPIRES_AT_ANNOTATION.to_owned(),
+                        json!("<as kube-apiserver answers>"),
+                    );
+                }
+                MemberWrite {
+                    before_yaml: yaml(account),
+                    after_yaml: yaml(&after),
+                    ..shown(&target, MemberWriteAction::Patch)
+                }
+            }
             Op::Invite => {
                 let target = super::writes::target(IdentityKind::Invitation, namespace, "inv-");
                 let body = json!({
@@ -583,8 +853,10 @@ fn writes_of(computed: &Computed, namespace: &str, username: &str, now: i64) -> 
                     ..shown(&target, MemberWriteAction::Create)
                 }
             }
-        })
-        .collect()
+        };
+        writes.push(write);
+    }
+    writes
 }
 
 fn username_of(change: &MemberChange) -> &str {
@@ -592,6 +864,10 @@ fn username_of(change: &MemberChange) -> &str {
         MemberChange::Invite { username, .. }
         | MemberChange::Access { username, .. }
         | MemberChange::Remove { username } => username.trim(),
+        MemberChange::CreateToken { name, .. }
+        | MemberChange::TokenAccess { name, .. }
+        | MemberChange::RenewToken { name, .. }
+        | MemberChange::DeleteToken { name } => name,
     }
 }
 
@@ -622,7 +898,7 @@ pub(crate) async fn plan(
         .whoami()
         .await
         .map_err(|e| ApiError::from(e.into_problem("your identity")))?;
-    let computed = compute(&state, cluster.as_ref(), &change).await?;
+    let computed = compute(&state, cluster.as_ref(), &identity.username, &change).await?;
     let namespace = state.settings.identity.namespace.as_str();
     let now = (state.clock)().as_second();
     let writes = writes_of(&computed, namespace, username_of(&change), now);
@@ -680,7 +956,7 @@ const fn op_target(op: &Op) -> Option<&ObjectTarget> {
         Op::Create { target, .. } | Op::Patch { target, .. } | Op::Delete { target, .. } => {
             Some(target)
         }
-        Op::Invite => None,
+        Op::Invite | Op::IssueToken { .. } => None,
     }
 }
 
@@ -700,7 +976,7 @@ async fn send(cluster: &dyn Cluster, op: &Op, dry_run: bool) -> Result<(), ApiEr
             }),
             "delete",
         ),
-        Op::Invite => return Ok(()),
+        Op::Invite | Op::IssueToken { .. } => return Ok(()),
     };
     let write = WriteRequest {
         target: target.clone(),
@@ -752,7 +1028,7 @@ pub(crate) async fn apply(
             "Someone else made this plan, or you made it with other group memberships.",
         )));
     }
-    let computed = compute(&state, cluster.as_ref(), &claims.change).await?;
+    let computed = compute(&state, cluster.as_ref(), &claims.person, &claims.change).await?;
     if computed.versions != claims.versions {
         return Err(ApiError::from(Problem::new(
             Kind::Conflict,
@@ -769,7 +1045,12 @@ pub(crate) async fn apply(
     }
     let namespace = state.settings.identity.namespace.as_str();
     let mut link = None;
+    let mut token = None;
     for op in &computed.ops {
+        if let Op::IssueToken { name, seconds, .. } = op {
+            token = Some(issue_token(cluster.as_ref(), name, *seconds).await?);
+            continue;
+        }
         if !matches!(op, Op::Invite) {
             send(cluster.as_ref(), op, false).await?;
             continue;
@@ -798,17 +1079,60 @@ pub(crate) async fn apply(
             false,
         ));
     }
-    Ok(Json(MemberApplied { link }))
+    Ok(Json(MemberApplied {
+        link,
+        issued: token,
+    }))
+}
+
+/// Requests a token for the API token `name` and records its expiry. The token is issued before
+/// the expiry is recorded, so a failed record does not hide it.
+async fn issue_token(
+    cluster: &dyn Cluster,
+    name: &str,
+    seconds: i64,
+) -> Result<IssuedTokenView, ApiError> {
+    let namespace = api_token::NAMESPACE;
+    let token = cluster
+        .request_token(namespace, name, seconds)
+        .await
+        .map_err(|e| {
+            read_problem(
+                e,
+                &format!("a token for ServiceAccount {name} in {namespace}"),
+                Denied {
+                    verb: "create".to_owned(),
+                    group: String::new(),
+                    resource: "serviceaccounts/token".to_owned(),
+                    name: Some(name.to_owned()),
+                    namespace: Some(namespace.to_owned()),
+                },
+            )
+        })?;
+    let record = WriteRequest {
+        target: account_target(name),
+        body: WriteBody::JsonPatch(json!(api_token::expiry_patch(name, &token.expires_at))),
+        dry_run: false,
+    };
+    let recorded = cluster.write(&record).await.is_ok();
+    Ok(IssuedTokenView {
+        ca: tokens::root_ca(cluster).await,
+        name: name.to_owned(),
+        namespace: namespace.to_owned(),
+        token: token.token,
+        expires_at: token.expires_at,
+        recorded,
+    })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::members::access::{BASELINE_ROLE, ProjectRole};
+    use crate::members::access::ProjectRole;
 
     fn binding(project: &str, role: ProjectRole) -> Binding {
         Binding {
-            username: "bob".to_owned(),
+            holder: Holder::member("bob"),
             project: project.to_owned(),
             role: Some(role),
             uid: Some(format!("uid-{project}")),
@@ -831,6 +1155,7 @@ mod tests {
                 Op::Patch { target, .. } => format!("patch {}", key(target)),
                 Op::Delete { target, .. } => format!("delete {}", key(target)),
                 Op::Invite => "invite".to_owned(),
+                Op::IssueToken { name, .. } => format!("token {name}"),
             })
             .collect()
     }
@@ -838,9 +1163,9 @@ mod tests {
     #[test]
     fn a_role_change_deletes_before_it_creates_and_pins_what_it_deletes() {
         let mut computed = Computed::default();
-        computed.baseline("bob", None);
+        computed.baseline(&Holder::member("bob"), None);
         computed.bindings(
-            "bob",
+            &Holder::member("bob"),
             &[
                 binding("shop", ProjectRole::Viewer),
                 binding("blog", ProjectRole::Developer),
@@ -884,7 +1209,7 @@ mod tests {
     #[test]
     fn a_held_baseline_is_not_created_again() {
         let mut computed = Computed::default();
-        computed.baseline("bob", Some(&json!({})));
+        computed.baseline(&Holder::member("bob"), Some(&json!({})));
         assert!(computed.ops.is_empty());
     }
 
