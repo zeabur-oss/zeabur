@@ -17,8 +17,7 @@
 
 use std::collections::BTreeMap;
 
-use axum::Json;
-use axum::extract::{Path, State};
+use axum::extract::State;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use utoipa::ToSchema;
@@ -26,6 +25,7 @@ use zeabur_core::problem::{Kind, MEDIA_TYPE as PROBLEM, Problem};
 use zeabur_plan::{Change, PlanRequest};
 
 use crate::error::{ApiError, get_read, read_problem};
+use crate::extract::{Json, Path};
 use crate::handlers::{AppState, Person};
 use crate::plan_token::{self as token, PlanKey, TokenError};
 

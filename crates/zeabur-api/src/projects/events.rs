@@ -7,8 +7,7 @@
 
 use std::cmp::Ordering;
 
-use axum::Json;
-use axum::extract::{Path, RawQuery};
+use axum::extract::RawQuery;
 use utoipa::IntoParams;
 use zeabur_core::problem::{Kind, MEDIA_TYPE as PROBLEM, Problem};
 use zeabur_kube::ClusterExt as _;
@@ -16,6 +15,7 @@ use zeabur_kube::k8s_openapi::api::events::v1::Event;
 use zeabur_model::{Origin, id};
 
 use crate::error::{ApiError, list_read, read_problem};
+use crate::extract::{Json, Path};
 use crate::handlers::Person;
 use crate::query::{EventQuery, LimitParams};
 use crate::views::{EventList, EventView};

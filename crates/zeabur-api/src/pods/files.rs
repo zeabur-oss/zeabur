@@ -32,9 +32,8 @@
 
 use std::sync::Arc;
 
-use axum::Json;
 use axum::body::Body;
-use axum::extract::{Path, RawQuery};
+use axum::extract::RawQuery;
 use axum::http::{HeaderMap, HeaderValue, StatusCode, header};
 use axum::response::{IntoResponse as _, Response};
 use futures_util::StreamExt as _;
@@ -48,6 +47,7 @@ use zeabur_kube::files::{self, EntryKind, Failure, FileError, FilePath, Target};
 use zeabur_plan::terminal::{self, ContainerState};
 
 use crate::error::{ApiError, read_problem};
+use crate::extract::{Json, Path};
 use crate::handlers::Person;
 use crate::pods::exec::pick_container;
 use crate::projects::writes::terminal::read_pod;

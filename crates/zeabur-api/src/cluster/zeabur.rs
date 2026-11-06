@@ -2,7 +2,6 @@
 //!
 //! [`super::update`] compares it with the releases on GitHub.
 
-use axum::Json;
 use axum::extract::State;
 use zeabur_core::problem::{MEDIA_TYPE as PROBLEM, Problem};
 use zeabur_kube::{Cluster, ClusterExt as _, ResourceRef};
@@ -12,6 +11,7 @@ use zeabur_model::adapters::provenance::{
 };
 
 use crate::error::ApiError;
+use crate::extract::Json;
 use crate::handlers::{AppState, Person};
 use crate::settings::Settings;
 use crate::views::{InstallMethod, ZeaburVersion};

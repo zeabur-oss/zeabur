@@ -19,7 +19,7 @@ use std::collections::BTreeMap;
 use std::io::Read as _;
 use std::time::Duration;
 
-use axum::extract::{Path, State};
+use axum::extract::State;
 use axum::http::{HeaderName, HeaderValue, header};
 use axum::response::Response;
 use serde_json::Value;
@@ -32,6 +32,7 @@ use zeabur_modules::velero::{self, cluster as v};
 use super::backups::{GROUP, chosen_location, not_installed, objects, target};
 use super::object_store::{authority, customer_key_headers, fetched};
 use crate::error::{ApiError, get_read, read_problem};
+use crate::extract::Path;
 use crate::handlers::{AppState, Person};
 
 /// How long Velero may take to sign the URL.

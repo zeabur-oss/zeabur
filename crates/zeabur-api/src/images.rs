@@ -18,8 +18,7 @@ use std::future::Future;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use axum::Json;
-use axum::extract::{Path, State};
+use axum::extract::State;
 use reference::{Reference, registry_name};
 use registry::{Credential, Inspected, Transport, Unreadable};
 use secrecy::zeroize::Zeroizing;
@@ -31,6 +30,7 @@ use zeabur_kube::ClusterExt as _;
 use zeabur_kube::k8s_openapi::api::core::v1::Node;
 
 use crate::error::ApiError;
+use crate::extract::{Json, Path};
 use crate::handlers::{AppState, Person};
 
 /// How long the whole read may take.

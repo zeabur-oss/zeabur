@@ -81,7 +81,7 @@ use std::time::Duration;
 
 use axum::body::Bytes;
 use axum::extract::ws::{CloseFrame, Message, WebSocket, WebSocketUpgrade};
-use axum::extract::{FromRef, FromRequestParts, Path, RawQuery};
+use axum::extract::{FromRef, FromRequestParts, RawQuery};
 use axum::http::request::Parts;
 use axum::http::{HeaderMap, header};
 use axum::response::Response;
@@ -96,6 +96,7 @@ use zeabur_kube::{
 };
 
 use crate::error::{ApiError, get_read, read_problem, review_refusal};
+use crate::extract::Path;
 use crate::handlers::AppState;
 
 /// How long a terminal may stay without a byte either way before the server closes it.

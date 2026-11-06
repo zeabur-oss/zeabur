@@ -10,14 +10,14 @@
     reason = "utoipa's `path` macro expands `params(DebugParams)` to a qualified path"
 )]
 
-use axum::Json;
-use axum::extract::{Path, RawQuery};
+use axum::extract::RawQuery;
 use serde::Serialize;
 use utoipa::{IntoParams, ToSchema};
 use zeabur_core::problem::{Kind, MEDIA_TYPE as PROBLEM, Problem};
 use zeabur_plan::terminal::{self, ContainerState, DebugContainer};
 
 use crate::error::ApiError;
+use crate::extract::{Json, Path};
 use crate::handlers::Person;
 use crate::projects::writes::plan_problem;
 use crate::projects::writes::terminal::read_pod;

@@ -38,8 +38,7 @@
 
 use std::collections::BTreeSet;
 
-use axum::Json;
-use axum::extract::{Path, RawQuery};
+use axum::extract::RawQuery;
 use futures_util::StreamExt as _;
 use serde::Serialize;
 use utoipa::ToSchema;
@@ -49,6 +48,7 @@ use zeabur_kube::{Access, AccessRules, ClusterError, ResourceRef, ServedResource
 use zeabur_model::{Origin, Provenance};
 
 use crate::error::{ApiError, get_read, read_problem};
+use crate::extract::{Json, Path};
 use crate::handlers::Person;
 use crate::views::UnreadableView;
 

@@ -36,6 +36,7 @@ rustls.workspace = true
 rustls-platform-verifier.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+serde_path_to_error.workspace = true
 # Reads the vendored error-pages template.
 serde-saphyr.workspace = true
 secrecy.workspace = true

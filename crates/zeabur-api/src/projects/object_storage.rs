@@ -9,8 +9,6 @@
 //! Stores and buckets are created and deleted through plans: the kinds are in
 //! `zeabur_plan::CREATABLE`.
 
-use axum::Json;
-use axum::extract::Path;
 use serde::Serialize;
 use utoipa::ToSchema;
 use zeabur_core::problem::{MEDIA_TYPE as PROBLEM, Problem};
@@ -20,6 +18,7 @@ use zeabur_kube::{Cluster, ClusterExt};
 use zeabur_modules::seaweedfs::{self, ObjectStorage};
 
 use crate::error::ApiError;
+use crate::extract::{Json, Path};
 use crate::handlers::Person;
 use crate::projects::backups::{ProviderState, read_all};
 use crate::views::UnreadableView;

@@ -35,7 +35,6 @@ use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
 
-use axum::Json;
 use axum::extract::State;
 use futures_util::StreamExt as _;
 use serde::Serialize;
@@ -46,6 +45,7 @@ use zeabur_kube::{Access, AccessRules, Cluster, ResourceRef};
 use zeabur_model::ProjectDetails;
 
 use crate::error::ApiError;
+use crate::extract::Json;
 use crate::handlers::{AppState, Person};
 
 /// How many projects are reviewed at the same time.

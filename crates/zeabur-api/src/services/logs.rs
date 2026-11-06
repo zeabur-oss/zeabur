@@ -10,8 +10,7 @@
 //! `view` have that right (the chart's `zeabur-proxy-logs-reader`), the same people who may read
 //! the pods' logs (`pods/log`); Viewers do not.
 
-use axum::Json;
-use axum::extract::{Path, RawQuery, State};
+use axum::extract::{RawQuery, State};
 use serde::Serialize;
 use utoipa::ToSchema;
 use zeabur_core::problem::{Kind, MEDIA_TYPE as PROBLEM, Problem};
@@ -19,6 +18,7 @@ use zeabur_kube::k8s_openapi::jiff::Timestamp;
 use zeabur_modules::prometheus_api::{PrometheusRange, pod_pattern};
 
 use crate::error::ApiError;
+use crate::extract::{Json, Path};
 use crate::handlers::{AppState, Credential};
 use crate::services::proxy::detail;
 

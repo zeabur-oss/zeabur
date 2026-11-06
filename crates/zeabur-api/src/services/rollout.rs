@@ -28,8 +28,6 @@
 //! [kubectl-rollout-status]: https://github.com/kubernetes/kubectl/blob/master/pkg/polymorphichelpers/rollout_status.go
 //! [k8s-deployment-failed]: https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#failed-deployment
 
-use axum::Json;
-use axum::extract::Path;
 use serde::Serialize;
 use serde_json::Value;
 use utoipa::ToSchema;
@@ -39,6 +37,7 @@ use zeabur_model::{Diagnosis, DiagnosisKind, Message, Origin, WorkloadKind, Work
 use zeabur_plan::{Change, PlanRequest, Release};
 
 use crate::error::ApiError;
+use crate::extract::{Json, Path};
 use crate::handlers::Person;
 use crate::projects::not_found;
 use crate::timeline::history;

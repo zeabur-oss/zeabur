@@ -23,8 +23,7 @@
 //! [k8s-authn-filter]: https://github.com/kubernetes/kubernetes/blob/master/staging/src/k8s.io/apiserver/pkg/endpoints/filters/authentication.go
 //! [k8s-bootstrap-policy]: https://github.com/kubernetes/kubernetes/blob/master/plugin/pkg/auth/authorizer/rbac/bootstrappolicy/policy.go
 
-use axum::Json;
-use axum::extract::{Path, RawQuery, State};
+use axum::extract::{RawQuery, State};
 use serde::Serialize;
 use serde_json::Value;
 use utoipa::ToSchema;
@@ -35,6 +34,7 @@ use zeabur_modules::prometheus_api::{
 };
 
 use crate::error::ApiError;
+use crate::extract::{Json, Path};
 use crate::handlers::{AppState, Credential, Person};
 use crate::services::proxy::{ZeaburProxy, detail};
 use crate::settings::{

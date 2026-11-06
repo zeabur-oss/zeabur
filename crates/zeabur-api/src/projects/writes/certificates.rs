@@ -3,8 +3,6 @@
 
 use std::collections::BTreeMap;
 
-use axum::Json;
-use axum::extract::Path;
 use rustls::client::verify_server_name;
 use rustls::crypto::aws_lc_rs::sign::any_supported_type;
 use rustls::pki_types::pem::PemObject as _;
@@ -25,6 +23,7 @@ use zeabur_plan::{
 };
 
 use crate::error::ApiError;
+use crate::extract::{Json, Path};
 use crate::handlers::Person;
 
 const CLUSTER_ISSUER: &str = "cert-manager.io/cluster-issuer";

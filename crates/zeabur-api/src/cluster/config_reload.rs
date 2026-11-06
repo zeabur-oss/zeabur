@@ -6,7 +6,6 @@
 //! person; a person who may not do that gets `unknown`, never a `403`: the setting is theirs to
 //! use on their own workloads whoever may see Reloader.
 
-use axum::Json;
 use serde::Serialize;
 use utoipa::ToSchema;
 use zeabur_core::problem::{MEDIA_TYPE as PROBLEM, Problem};
@@ -15,6 +14,7 @@ use zeabur_model::Origin;
 use zeabur_modules::reloader;
 
 use crate::error::ApiError;
+use crate::extract::Json;
 use crate::handlers::Person;
 
 /// Whether Reloader runs.

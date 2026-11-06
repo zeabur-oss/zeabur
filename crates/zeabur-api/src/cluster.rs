@@ -73,7 +73,6 @@ pub(crate) mod zeabur;
 
 use std::collections::BTreeMap;
 
-use axum::Json;
 use axum::extract::{RawQuery, State};
 use axum::http::HeaderMap;
 use capacity::Amount;
@@ -87,6 +86,7 @@ use zeabur_model::Origin;
 use zeabur_modules::Reading;
 
 use crate::error::{ApiError, list_read, list_read_of_key};
+use crate::extract::Json;
 use crate::handlers::{AppState, Person};
 use crate::projects::events::{EventKey, event_key, event_view, last_seen, newest_first};
 use crate::query::{EventQuery, LimitParams};

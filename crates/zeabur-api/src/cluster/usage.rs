@@ -15,7 +15,6 @@
 
 use std::collections::BTreeMap;
 
-use axum::Json;
 use serde::Serialize;
 use utoipa::ToSchema;
 use zeabur_core::names::{LABEL_PROJECT, is_system_namespace};
@@ -28,6 +27,7 @@ use zeabur_modules::Reading;
 use super::capacity::{self, Amount};
 use super::{WIDE_LIMIT, modules, optional, refused};
 use crate::error::{ApiError, list_read};
+use crate::extract::Json;
 use crate::handlers::Person;
 use crate::views::{MetricsState, PodScan, Resources, UnreadableView};
 

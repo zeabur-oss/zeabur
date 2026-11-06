@@ -15,7 +15,6 @@
 //!
 //! [sp800-63b]: https://pages.nist.gov/800-63-4/sp800-63b.html
 
-use axum::Json;
 use axum::extract::State;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -25,6 +24,7 @@ use zeabur_model::Origin;
 
 use super::store::{Stored, can_change_config_map, read_config_map, write_config_map_key};
 use crate::error::ApiError;
+use crate::extract::Json;
 use crate::handlers::{AppState, Person};
 use crate::members::handlers::you;
 use crate::members::has_device_bound_passkey;

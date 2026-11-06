@@ -6,8 +6,6 @@
 //! plan's dry run is what decides. The cluster-scoped kinds are named too, so a client can say
 //! why one is refused before planning.
 
-use axum::Json;
-use axum::extract::Path;
 use serde::Serialize;
 use utoipa::ToSchema;
 use zeabur_core::problem::{MEDIA_TYPE as PROBLEM, Problem};
@@ -15,6 +13,7 @@ use zeabur_kube::{AccessRules, ServedResource};
 
 use super::objects::{GENERATED, ObjectAccess};
 use crate::error::ApiError;
+use crate::extract::{Json, Path};
 use crate::handlers::Person;
 
 /// A kind that can be created in a project.

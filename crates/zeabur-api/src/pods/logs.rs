@@ -7,8 +7,7 @@
 
 use std::convert::Infallible;
 
-use axum::Json;
-use axum::extract::{Path, RawQuery};
+use axum::extract::RawQuery;
 use axum::response::sse::{Event as SseEvent, KeepAlive, Sse};
 use futures_util::{Stream, StreamExt as _};
 use utoipa::IntoParams;
@@ -17,6 +16,7 @@ use zeabur_kube::{ClusterError, LogOptions, unavailable_log};
 use zeabur_model::Origin;
 
 use crate::error::{ApiError, get_read, read_problem};
+use crate::extract::{Json, Path};
 use crate::handlers::Person;
 use crate::views::LogSnapshot;
 

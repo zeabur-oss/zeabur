@@ -9,8 +9,6 @@
 //! namespace is the permission. A refusal is `state: refused` with the rule in `unreadable`, an
 //! API that is not served is `state: not-installed`; neither is an error.
 
-use axum::Json;
-use axum::extract::Path;
 use serde::Serialize;
 use utoipa::ToSchema;
 use zeabur_core::problem::{MEDIA_TYPE as PROBLEM, Problem};
@@ -19,6 +17,7 @@ use zeabur_modules::Reading;
 use zeabur_modules::falco::{self, Alert};
 
 use crate::error::ApiError;
+use crate::extract::{Json, Path};
 use crate::handlers::Person;
 use crate::projects::backups::ProviderState;
 use crate::views::UnreadableView;

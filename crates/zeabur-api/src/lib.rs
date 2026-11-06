@@ -124,6 +124,7 @@ pub mod alerts;
 mod cache;
 pub mod cluster;
 mod error;
+pub mod extract;
 pub mod gaps;
 mod github;
 mod handlers;

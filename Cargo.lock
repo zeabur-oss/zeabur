@@ -2806,6 +2806,7 @@ dependencies = [
  "serde",
  "serde-saphyr 2.0.0",
  "serde_json",
+ "serde_path_to_error",
  "sha2",
  "tar",
  "thiserror",

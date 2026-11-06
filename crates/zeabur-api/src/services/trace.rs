@@ -7,8 +7,7 @@
 //! diagnosis, with a plan where Zeabur can write the fix: a Service whose `targetPort` names no
 //! port of the containers, when the containers declare exactly one, is pointed at it.
 
-use axum::Json;
-use axum::extract::{Path, State};
+use axum::extract::State;
 use serde::Serialize;
 use utoipa::ToSchema;
 use zeabur_core::problem::{MEDIA_TYPE as PROBLEM, Problem};
@@ -18,6 +17,7 @@ use zeabur_model::{Diagnosis, HopStatus, HopStep, RouteTrace, Service, WorkloadK
 use zeabur_plan::{Change, PlanRequest};
 
 use crate::error::ApiError;
+use crate::extract::{Json, Path};
 use crate::handlers::{AppState, Person};
 use crate::projects::{ProjectRead, not_found};
 use crate::views::UnreadableView;
