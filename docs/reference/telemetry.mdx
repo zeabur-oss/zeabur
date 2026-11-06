@@ -7,12 +7,12 @@ The experience program sends the version, how many people use Zeabur each day an
 
 ## What is sent
 
-Zeabur sends one event the first time each person uses it in a UTC day and one the first time each feature below is used with the same values in a UTC day, and the installer sends one event when an install starts, finishes or fails. Each event carries a random installation ID, the properties below and nothing else. The installer makes the ID once, or you make it with `uuidgen`; nothing about your machine goes into it. The data is kept for 13 months.
+Zeabur sends one event the first time each person uses it in a UTC day, and one the first time each feature below is used with the same values in a UTC day. The installer sends one event when an install starts, finishes or fails. Each event carries a random installation ID, the properties below and nothing else. The installer makes the ID once, or you make it with `uuidgen`; nothing about your machine goes into it. The data is kept for 13 months.
 
 | Event | Sent by | When |
 |---|---|---|
 | `zeabur_active` | Zeabur | The first time each person uses Zeabur's web interface in a UTC day |
-| `feature_used` | Zeabur | After a call that creates a service, a database or a domain succeeds; once for each feature and its values per UTC day |
+| `feature_used` | Zeabur | After a call succeeds that creates a service, a database or a domain; once per UTC day for each feature and set of values |
 | `install_started` | Installer | `apply` begins |
 | `install_finished` | Installer | `apply` succeeds |
 | `install_failed` | Installer | `apply` stops |
@@ -24,9 +24,9 @@ Zeabur sends one event the first time each person uses it in a UTC day and one t
 | `person` | `zeabur_active` | 32 hexadecimal digits that tell people apart within one installation and one day |
 | `mode` | `zeabur_active` | `in-cluster` |
 | `feature` | `feature_used` | `service_created`, `database_created` or `domain_added` |
-| `source` | `feature_used` with `service_created` | How the service was made: `git`, `upload`, `image` or `template` |
-| `template` | `feature_used` with `source` `template` | The template's ID in Zeabur Catalog, such as `wordpress`; an ID the catalog doesn't carry isn't sent |
-| `kind` | `feature_used` with `database_created` or `domain_added` | The database or object storage: `postgresql`, `mongodb`, `mysql`, `mariadb`, `dragonfly` or `object-storage`. The domain: `generated` for a name under one of the domain suffixes Zeabur offers new services, `custom` for any other |
+| `source` | `feature_used` with `service_created` | How the service was created: `git`, `upload`, `image` or `template` |
+| `template` | `feature_used` with `source` `template` | The template's ID in Zeabur Catalog, such as `wordpress`; an ID not in the catalog is left out |
+| `kind` | `feature_used` with `database_created` or `domain_added` | The database or object storage: `postgresql`, `mongodb`, `mysql`, `mariadb`, `dragonfly` or `object-storage`. The domain: `generated` when the name ends in a suffix Zeabur offers for new services, `custom` otherwise |
 | `installer_version` | the installer's events | The installer's version |
 | `profile` | the installer's events | `single-node`, `multi-node` or `personal` |
 | `distribution` | the installer's events | `k3s`, `rke2` or `kube-solo` |
