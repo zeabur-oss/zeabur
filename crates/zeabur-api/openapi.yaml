@@ -10973,6 +10973,7 @@ components:
       - invitations
       - setupLinks
       - canManage
+      - canManageTokens
       - projectRoles
       - unreadable
       properties:
@@ -10984,6 +10985,11 @@ components:
         canManage:
           $ref: "#/components/schemas/Permission"
           description: Whether the person may create invitations, as far as their rules tell.
+        canManageTokens:
+          $ref: "#/components/schemas/Permission"
+          description: |-
+            Whether the person may create API tokens: `create serviceaccounts` in the token
+            namespace.
         id:
           type: string
           description: "`members`."

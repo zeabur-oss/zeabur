@@ -416,6 +416,7 @@ impl Directory {
             can_manage,
             project_roles: false,
             api_tokens: Vec::new(),
+            can_manage_tokens: Permission::Unknown,
             unreadable: self.unreadable.clone(),
         }
     }
@@ -653,6 +654,9 @@ pub struct MembersView {
     pub setup_links: SetupLinks,
     /// Whether the person may create invitations, as far as their rules tell.
     pub can_manage: Permission,
+    /// Whether the person may create API tokens: `create serviceaccounts` in the token
+    /// namespace.
+    pub can_manage_tokens: Permission,
     /// Whether members can be given Developer or Viewer in chosen projects (the chart's member
     /// roles are installed).
     pub project_roles: bool,
