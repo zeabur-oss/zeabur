@@ -1,13 +1,17 @@
 name: Screenshots
 
-# Takes the docs screenshots (web/e2e/shots/docs.ts) again when run by hand, and opens one pull
-# request with the images that changed. A release takes them on its own (knope.toml,
-# docs/internal/screenshots.md).
-# The organization's GitHub App (`ZEABUR_OSS_BOT_CLIENT_ID`, `ZEABUR_OSS_BOT_PRIVATE_KEY`) opens
-# it, because a pull request made with GITHUB_TOKEN does not start CI. GitHub signs the commit, as
-# main requires.
+# Takes the docs screenshots (web/e2e/shots/docs.ts) again for each release: when zeabur-oss-bot
+# pushes release/next, the release pull request's branch, this runs next to its CI and commits the
+# images that changed onto release/next, so the release carries them. A release does not wait for
+# it (docs/internal/screenshots.md, docs/internal/releasing.md). It pushes as the organization's
+# GitHub App (`ZEABUR_OSS_BOT_CLIENT_ID`, `ZEABUR_OSS_BOT_PRIVATE_KEY`), because a push made with
+# GITHUB_TOKEN does not start CI again.
 
 on:
+  push:
+    branches: [release/next]
+    # Its own commit changes only docs; that needs no second run.
+    paths-ignore: [docs/**]
   workflow_dispatch:
 
 permissions:
@@ -19,6 +23,7 @@ concurrency:
 
 jobs:
   shots:
+    if: github.ref == 'refs/heads/release/next'
     runs-on: ubuntu-26.04-arm
     timeout-minutes: 60
     defaults:
@@ -40,29 +45,18 @@ jobs:
           client-id: ${{ vars.ZEABUR_OSS_BOT_CLIENT_ID }}
           private-key: ${{ secrets.ZEABUR_OSS_BOT_PRIVATE_KEY }}
           permission-contents: write
-          permission-pull-requests: write
-      # The commit's author must match its sign-off (the DCO check).
-      - id: bot
-        env:
+      # The commit's author must match its sign-off (the DCO check). A plain push fails when
+      # release/next moved meanwhile; the next run takes the screenshots again.
+      - env:
           GH_TOKEN: ${{ steps.app.outputs.token }}
           APP_SLUG: ${{ steps.app.outputs.app-slug }}
         run: |
+          git add docs
+          if git diff --cached --quiet; then
+            echo "No screenshot changed."
+            exit 0
+          fi
           id="$(gh api "/users/${APP_SLUG}[bot]" --jq .id)"
-          echo "identity=${APP_SLUG}[bot] <${id}+${APP_SLUG}[bot]@users.noreply.github.com>" >> "$GITHUB_OUTPUT"
-      # Also runs when nothing changed, so it closes an update/shots that main no longer needs.
-      - uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
-        with:
-          token: ${{ steps.app.outputs.token }}
-          author: ${{ steps.bot.outputs.identity }}
-          committer: ${{ steps.bot.outputs.identity }}
-          signoff: true
-          sign-commits: true
-          add-paths: docs
-          branch: update/shots
-          delete-branch: true
-          commit-message: "docs: take the screenshots again"
-          title: "docs: take the screenshots again"
-          body: |
-            `.github/workflows/shots.yml` took the docs screenshots again on ${{ github.ref_name }} at ${{ github.sha }}
-            and these images changed. Look at each one before merging: a screen that moved on
-            purpose is fine, one that broke is a bug in the change that moved it.
+          git -c user.name="${APP_SLUG}[bot]" -c user.email="${id}+${APP_SLUG}[bot]@users.noreply.github.com" \
+            commit --quiet --signoff -m "docs: take the screenshots again"
+          git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:refs/heads/release/next

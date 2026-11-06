@@ -51,8 +51,7 @@ not `sort -V`.
    the one the change files give (before 1.0, `minor` is a patch bump), or give `v<version>`;
    `prerelease: rc` makes `vX.Y.Z-rc.N`. knope turns the change files in `.changeset/` into the
    `## <version> (<date>)` section of `CHANGELOG.md` and sets `Cargo.toml`; `bump` sets the other
-   manifests, `scripts/docs-shots.sh docs` takes the docs screenshots with the new version, `check`
-   confirms the manifests, and zeabur-oss-bot opens `chore(release): v<version>` from
+   manifests, `check` confirms them, and zeabur-oss-bot opens `chore(release): v<version>` from
    `release/next`. That section becomes the release notes as it is, so keep each paragraph and
    list item on one line, and edit `CHANGELOG.md` on that branch if it should read differently.
    A change file for a fixed vulnerability says `default: security`, which knope lists under
@@ -71,17 +70,21 @@ not `sort -V`.
    runs the three builds with their smoke tests and publishes nothing; the pins are
    not checked and no pinned installer is built.
 3. Before the first release only, see [Settings the workflow needs](#settings-the-workflow-needs).
-4. Once **CI** has passed on the release pull request, merge it. zeabur-oss-bot tags the merge
+4. **Screenshots** starts on its own with the release pull request and commits the docs screenshots
+   that changed onto `release/next`, which runs **CI** again. Look at the images in the diff. The
+   release doesn't wait for it: if it fails or you merge first, the release goes out with the
+   screenshots on main.
+5. Once **CI** has passed on the release pull request, merge it. zeabur-oss-bot tags the merge
    commit `v<version>`, which starts the **Release** run.
-5. Watch the **Release** run. When it succeeds, the images and the chart are in the registry (their
+6. Watch the **Release** run. When it succeeds, the images and the chart are in the registry (their
    tags are public while the release is still a draft) and the draft release has every asset.
    The `verify` jobs have downloaded the draft's assets on fresh runners, checked every
    signature, checksum and attestation without a registry login, installed the published chart
    on a new k3s cluster on Linux amd64 and arm64, whose node pulled the published image, and run
    `zeaburctl` on macOS arm64.
-6. Check the draft: the notes, the asset list, the digests. Optionally install it on a cluster of
+7. Check the draft: the notes, the asset list, the digests. Optionally install it on a cluster of
    your own as [Install on an existing cluster](../install/existing-cluster.mdx) describes.
-7. Publish it: on the release page, **Edit → Publish release**, or
+8. Publish it: on the release page, **Edit → Publish release**, or
    `gh release edit v0.1.1 --repo zeabur-oss/zeabur --draft=false`. Then download it once without signing in and repeat
    the checks above against the public release.
 
