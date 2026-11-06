@@ -709,8 +709,9 @@ function runMeta(t: ReturnType<typeof useT>, run: BuildRun, now: number) {
   const trigger = run.trigger ? triggers[run.trigger as keyof typeof triggers] : undefined
   const parts = [
     trigger ? t(trigger) : undefined,
-    ms === undefined ? undefined : t("builds.took", Math.round(ms / 1000)),
-    run.reason && run.phase === "Failed" ? run.reason : undefined,
+    ms === undefined
+      ? undefined
+      : t(run.finished ? "builds.took" : "builds.runningFor", Math.round(ms / 1000)),
   ]
   return parts.filter(Boolean).join(t("common.sep")) || undefined
 }

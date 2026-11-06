@@ -703,11 +703,15 @@ export const zhTW: Messages = {
     `Keel 依 ${policy} 規則更新這個服務，這個規則是在 Zeabur 以外設定的。`,
   "builds.keelMissing": "自動部署需要叢集裡的 Keel 元件，目前還沒有安裝。",
   "builds.history": "紀錄",
-  "builds.trigger.webhook": "推送觸發",
-  "builds.trigger.poll": "新的提交",
+  "builds.trigger.webhook": "Git 推送後自動開始",
+  "builds.trigger.poll": "發現新的提交後開始",
   "builds.trigger.manual": "手動開始",
   "builds.took": (seconds) =>
     seconds < 60 ? `花了 ${seconds} 秒` : `花了 ${Math.floor(seconds / 60)} 分 ${seconds % 60} 秒`,
+  "builds.runningFor": (seconds) =>
+    seconds < 60
+      ? `已經跑了 ${seconds} 秒`
+      : `已經跑了 ${Math.floor(seconds / 60)} 分 ${seconds % 60} 秒`,
   "builds.logs": "日誌",
   "builds.details": "詳細資料",
   "builds.hideDetails": "收起詳細資料",

@@ -54,7 +54,7 @@ describe("readBuildLog", () => {
       copy.done(0.5),
     ])
     const [ci, last] = log.steps
-    expect(ci?.name).toBe("[2/3] RUN npm ci")
+    expect(ci?.name).toBe("RUN npm ci")
     expect(ci?.lines).toEqual([
       { text: "added 312 packages", stderr: false },
       { text: "npm warn deprecated glob@7", stderr: true },
@@ -72,9 +72,9 @@ describe("readBuildLog", () => {
       npm.error(12.4, "exit code: 1"),
       JSON.stringify({ event: "message", text: "error: failed to solve: exit code: 1" }),
     ])
-    expect(log.failed).toEqual({ name: "[2/3] RUN npm ci", seconds: 12.4, message: "exit code: 1" })
+    expect(log.failed).toEqual({ name: "RUN npm ci", seconds: 12.4, message: "exit code: 1" })
     expect(rows([npm.started(1), npm.error(1, "x")])).toEqual([
-      { kind: "own", name: "[2/3] RUN npm ci", state: "failed" },
+      { kind: "own", name: "RUN npm ci", state: "failed" },
     ])
     expect(log.other).toEqual(["error: failed to solve: exit code: 1"])
   })
@@ -84,6 +84,11 @@ describe("readBuildLog", () => {
     const log = readBuildLog([metadata.started(0), metadata.error(0.8, "not found")])
     expect(log.steps[0]).toMatchObject({ kind: "prepare", state: "failed", error: "not found" })
     expect(log.failed?.name).toBe("[internal] load metadata for docker.io/library/nod:22")
+  })
+
+  test("a step's name drops BuildKit's [n/m] counter and keeps the rest", () => {
+    expect(rows([vertex(9, "[12/14] RUN echo [1/2]").started(0)])[0]?.name).toBe("RUN echo [1/2]")
+    expect(rows([definition.started(0)])[0]?.kind).toBe("prepare")
   })
 
   test("a running step counts its time from its start", () => {
@@ -98,7 +103,7 @@ describe("readBuildLog", () => {
     const second = vertex(7, "[2/2] COPY --chown=1000 /app /app")
     expect(rows([install.started(0), install.done(3), second.started(4), second.done(1)])).toEqual([
       { kind: "own", name: "npm ci", state: "done" },
-      { kind: "own", name: "[2/2] COPY --chown=1000 /app /app", state: "done" },
+      { kind: "own", name: "COPY --chown=1000 /app /app", state: "done" },
     ])
   })
 
