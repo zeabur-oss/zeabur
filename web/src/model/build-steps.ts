@@ -62,6 +62,9 @@ function event(line: string): Event | undefined {
   }
 }
 
+/** BuildKit's `[2/5]` before a Dockerfile step. */
+const COUNTER = /^\[\d+\/\d+\]\s+/
+
 const EXPORT = /^(exporting|pushing|writing image|naming to|preparing build cache)/i
 const PREPARE = /^(\[internal\]|load metadata|resolve image config|importing cache)/i
 
@@ -99,7 +102,7 @@ function handle(vertices: Map<number, Step>, vertex: number, e: Event) {
     step = { key: String(vertex), kind: "own", name: "", state: "running", lines: [] }
     vertices.set(vertex, step)
   }
-  if (e.name) step.name = e.name
+  if (e.name) step.name = e.name.replace(COUNTER, "")
   handlers[e.event]?.(step, e)
 }
 

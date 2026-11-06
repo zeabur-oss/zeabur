@@ -702,11 +702,15 @@ export const zhCN: Messages = {
     `Keel 按 ${policy} 规则更新这个服务，这个规则是在 Zeabur 之外设置的。`,
   "builds.keelMissing": "自动部署需要集群里的 Keel 组件，目前还没有安装。",
   "builds.history": "记录",
-  "builds.trigger.webhook": "推送触发",
-  "builds.trigger.poll": "新的提交",
+  "builds.trigger.webhook": "Git 推送后自动开始",
+  "builds.trigger.poll": "发现新的提交后开始",
   "builds.trigger.manual": "手动开始",
   "builds.took": (seconds) =>
     seconds < 60 ? `用了 ${seconds} 秒` : `用了 ${Math.floor(seconds / 60)} 分 ${seconds % 60} 秒`,
+  "builds.runningFor": (seconds) =>
+    seconds < 60
+      ? `已经运行了 ${seconds} 秒`
+      : `已经运行了 ${Math.floor(seconds / 60)} 分 ${seconds % 60} 秒`,
   "builds.logs": "日志",
   "builds.details": "详细信息",
   "builds.hideDetails": "收起详细信息",

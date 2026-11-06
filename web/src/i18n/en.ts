@@ -749,11 +749,15 @@ export const en = {
     `Keel updates this service with its ${policy} policy, set outside Zeabur.`,
   "builds.keelMissing": "Auto-deploy needs the Keel component, which this cluster doesn't have.",
   "builds.history": "History",
-  "builds.trigger.webhook": "Pushed",
-  "builds.trigger.poll": "New commit",
+  "builds.trigger.webhook": "Started by a Git push",
+  "builds.trigger.poll": "Started for a new commit",
   "builds.trigger.manual": "Started by hand",
   "builds.took": (seconds: number) =>
     seconds < 60 ? `took ${seconds} s` : `took ${Math.floor(seconds / 60)} min ${seconds % 60} s`,
+  "builds.runningFor": (seconds: number) =>
+    seconds < 60
+      ? `running for ${seconds} s`
+      : `running for ${Math.floor(seconds / 60)} min ${seconds % 60} s`,
   "builds.logs": "Logs",
   "builds.details": "Details",
   "builds.hideDetails": "Hide details",
