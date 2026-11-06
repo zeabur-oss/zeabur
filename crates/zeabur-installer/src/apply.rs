@@ -59,7 +59,7 @@ fn install(config: &Config, reporter: &Reporter) -> Result<(), InstallError> {
         plan.node_prep.as_ref(),
     )?;
     reporter.at(Step::NodePrep);
-    prepare_node(plan.node_prep.as_ref())?;
+    let prepared = prepare_node(plan.node_prep.as_ref())?;
 
     let kubectl = Kubectl::admin(distribution);
     reporter.at(Step::Cluster);
@@ -87,6 +87,9 @@ fn install(config: &Config, reporter: &Reporter) -> Result<(), InstallError> {
             &format!("node {name} to be Ready"),
             || crate::join::node_ready(&kubectl, &name, started).unwrap_or(false),
         )?;
+    }
+    if prepared {
+        restart_longhorn_manager(&kubectl, &plan.node_name);
     }
     remove_components(&kubectl, &index, config, &mut plan, !running && !replanned)?;
 
@@ -319,17 +322,17 @@ pub(crate) fn show_checks(
 }
 
 /// Installs and starts what the planned components need on this node, before the cluster runs their
-/// pods here.
-pub(crate) fn prepare_node(prep: Option<&NodePrep>) -> Result<(), InstallError> {
+/// pods here. True when it changed something.
+pub(crate) fn prepare_node(prep: Option<&NodePrep>) -> Result<bool, InstallError> {
     let Some(prep) = prep else {
-        return Ok(());
+        return Ok(false);
     };
     out::step(&format!("Preparing the node for {}", prep.component));
     let changed = nodeprep::prepare(prep)?;
     if changed.is_empty() {
         out::err("    already prepared");
     }
-    for line in changed {
+    for line in &changed {
         out::err(&format!("    {line}"));
     }
     let broken: Vec<String> = nodeprep::check(prep, Stage::After)
@@ -338,13 +341,41 @@ pub(crate) fn prepare_node(prep: Option<&NodePrep>) -> Result<(), InstallError> 
         .map(|c| c.detail)
         .collect();
     if broken.is_empty() {
-        Ok(())
+        Ok(!changed.is_empty())
     } else {
         Err(InstallError::Message(format!(
             "the node is still not ready for {}: {}",
             prep.component,
             broken.join("; ")
         )))
+    }
+}
+
+/// Longhorn's manager checks a node only when it starts, so a node prepared while it already runs
+/// there stays "not prepared" until its Pod starts again.
+pub(crate) fn restart_longhorn_manager(kubectl: &Kubectl, node: &str) {
+    let field = format!("--field-selector=spec.nodeName={node}");
+    let deleted = kubectl.run(
+        &[
+            "delete",
+            "pods",
+            "--namespace=longhorn-system",
+            "--selector=app=longhorn-manager",
+            &field,
+            "--wait=false",
+        ],
+        None,
+    );
+    match deleted {
+        Ok(out) if out.trim().is_empty() => {}
+        Ok(_) => out::err(&format!(
+            "    restarted Longhorn's manager on {node}, so it checks the node again"
+        )),
+        Err(e) => out::err(&format!(
+            "    couldn't restart Longhorn's manager on {node} ({e}). Restart it from a server: \
+             kubectl -n longhorn-system delete pod -l app=longhorn-manager \
+             --field-selector spec.nodeName={node}"
+        )),
     }
 }
 
@@ -1025,8 +1056,21 @@ fn helm_chart(kubectl: &Kubectl, name: &str, object: &Value) -> Result<(), Insta
         },
     )?;
     if let Some(revision) = failed {
+        let image = kubectl
+            .get("job", &job_name, Some("kube-system"))
+            .ok()
+            .flatten()
+            .and_then(|j| {
+                j.pointer("/spec/template/spec/containers/0/image")
+                    .and_then(Value::as_str)
+                    .map(str::to_owned)
+            });
         return Err(InstallError::Message(failed_release(
-            name, namespace, revision,
+            name,
+            namespace,
+            revision,
+            &kubectl.command_line(),
+            image.as_deref(),
         )));
     }
     if outcome == Some(false) {
@@ -1080,14 +1124,34 @@ fn newest_line(out: &str) -> Option<(u64, String)> {
     newest
 }
 
-fn failed_release(name: &str, namespace: &str, revision: u64) -> String {
+/// What to do about a release whose newest revision failed. helm-controller's own image and
+/// ServiceAccount run Helm in the cluster, so the server needs no Helm of its own.
+fn failed_release(
+    name: &str,
+    namespace: &str,
+    revision: u64,
+    kubectl: &str,
+    image: Option<&str>,
+) -> String {
     let undo = if revision == 1 {
         "uninstall"
     } else {
         "rollback"
     };
+    let Some(image) = image else {
+        return format!(
+            "Helm failed to install or upgrade the {name} chart. To see why, run `helm history {name} -n {namespace}` on a machine that has Helm installed and can reach the cluster. Fix the cause and run apply, which updates the chart and stops here again. Then run `helm {undo} {name} -n {namespace}` and run apply once more."
+        );
+    };
+    let helm = |args: &str| {
+        format!(
+            "  sudo {kubectl} -n kube-system run helm-{name}-fix --rm -i --restart=Never \\\n    --image={image} --overrides='{{\"spec\":{{\"serviceAccountName\":\"helm-{name}\"}}}}' \\\n    --command -- helm {args} {name} -n {namespace}"
+        )
+    };
     format!(
-        "Helm failed to install or upgrade the {name} chart. To see why, run `helm history {name} -n {namespace}` on a machine that has Helm installed and can reach the cluster. Fix the cause and run apply, which updates the chart and stops here again. Then run `helm {undo} {name} -n {namespace}` and run apply once more."
+        "Helm failed to install or upgrade the {name} chart. To see why, run on this server:\n{}\nFix the cause and run apply, which updates the chart and stops here again. Then undo the release with this command and run apply once more:\n{}",
+        helm("history"),
+        helm(undo),
     )
 }
 
@@ -1674,13 +1738,29 @@ mod tests {
     }
 
     #[test]
-    fn a_failed_release_says_how_to_see_why_and_undo_it() {
-        let upgrade = failed_release("zot", "zot", 4);
-        assert!(upgrade.contains("helm history zot -n zot"), "{upgrade}");
-        assert!(upgrade.contains("helm rollback zot -n zot"), "{upgrade}");
+    fn a_failed_release_says_how_to_see_why_and_undo_it_without_helm_on_the_server() {
+        let kubectl =
+            "/var/lib/rancher/k3s/data/current/bin/kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml";
+        let image = "rancher/klipper-helm:v0.13.3-build20260727";
+        let upgrade = failed_release("zot", "zot", 4, kubectl, Some(image));
+        for part in [
+            "sudo /var/lib/rancher/k3s/data/current/bin/kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml -n kube-system run",
+            "--image=rancher/klipper-helm:v0.13.3-build20260727",
+            r#"--overrides='{"spec":{"serviceAccountName":"helm-zot"}}'"#,
+            "--command -- helm history zot -n zot",
+            "--command -- helm rollback zot -n zot",
+        ] {
+            assert!(upgrade.contains(part), "{part}\n{upgrade}");
+        }
         // A first install has nothing to roll back to.
-        let install = failed_release("zot", "zot", 1);
-        assert!(install.contains("helm uninstall zot -n zot"), "{install}");
+        let install = failed_release("zot", "zot", 1, kubectl, Some(image));
+        assert!(
+            install.contains("--command -- helm uninstall zot -n zot"),
+            "{install}"
+        );
+        // Without helm-controller's job there is no image to borrow.
+        let bare = failed_release("zot", "zot", 4, kubectl, None);
+        assert!(bare.contains("`helm rollback zot -n zot`"), "{bare}");
     }
 
     #[test]

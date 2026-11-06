@@ -40,6 +40,16 @@ impl Kubectl {
         }
     }
 
+    /// The same `kubectl` as a command line a person can run on this machine.
+    #[must_use]
+    pub fn command_line(&self) -> String {
+        format!(
+            "{} --kubeconfig {}",
+            self.binary.display(),
+            self.kubeconfig.display()
+        )
+    }
+
     /// Runs `kubectl` with the kubeconfig.
     ///
     /// # Errors

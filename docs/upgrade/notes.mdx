@@ -63,6 +63,13 @@ This also deletes the images zot stored. The next `apply` installs Zeabur Builde
 
 #### 3. Upgrade the server
 
+If `profile` is `multi-node`, run these first. v0.1 gave VictoriaMetrics a 20 GiB volume on `multi-node` and v0.2 asks for 5 GiB, but a volume can't shrink, so the VictoriaMetrics operator would stop updating vmsingle. The first command tells the operator to keep the volume's size, and the second makes it try vmsingle again:
+
+```sh
+kubectl -n observability annotate pvc vmsingle-vm-victoria-metrics-k8s-stack operator.victoriametrics.com/pvc-allow-volume-expansion=false
+kubectl -n observability rollout restart deployment victoria-metrics-operator
+```
+
 Download the v0.2 installer, run `plan`, review it, then run `apply`. See [Upgrade Zeabur](steps.mdx#upgrade-with-zeabur-installer) for the steps.
 
 `plan` lists the components this upgrade adds. System Upgrade Controller is no longer a default component. `apply` doesn't remove it but stops updating it, and `plan` shows it as `not removed, no longer updated`. The installer already pins the K3s and RKE2 release, so you don't need it. To keep it, add `node-updates/system-upgrade-controller` to `enable`. Otherwise, delete it after `apply`:

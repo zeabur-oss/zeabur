@@ -64,6 +64,13 @@ zot 存的镜像会一起删掉。之后 `apply` 会安装 Zeabur Builder 和它
 
 #### 3. 升级服务器
 
+`profile` 是 `multi-node` 的话，先运行下面两条命令。v0.1 在 `multi-node` 给 VictoriaMetrics 20 GiB 的卷，v0.2 设定的是 5 GiB，但卷不能缩小，VictoriaMetrics operator 会因此停止更新 vmsingle。第一条命令让 operator 保留卷现在的大小，第二条让它重新处理 vmsingle：
+
+```sh
+kubectl -n observability annotate pvc vmsingle-vm-victoria-metrics-k8s-stack operator.victoriametrics.com/pvc-allow-volume-expansion=false
+kubectl -n observability rollout restart deployment victoria-metrics-operator
+```
+
 下载 v0.2 的 installer，运行 `plan`，确认后再 `apply`，步骤见[升级 Zeabur](steps.mdx#用-zeabur-installer-升级)。
 
 `plan` 会列出这次新增的组件。System Upgrade Controller 不再是默认组件，`apply` 不会移除，只是不再更新，`plan` 会写成 `not removed, no longer updated`。installer 本来就固定了 K3s 和 RKE2 的版本，不需要 System Upgrade Controller。要保留，在 `enable` 加上 `node-updates/system-upgrade-controller`。不要的话，`apply` 完再删掉：

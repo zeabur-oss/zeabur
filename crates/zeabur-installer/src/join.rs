@@ -137,7 +137,7 @@ pub(crate) fn apply(config: &JoinConfig) -> Result<(), InstallError> {
         config.host.require_encrypted_disk,
         plan.node_prep.as_ref(),
     )?;
-    apply::prepare_node(plan.node_prep.as_ref())?;
+    let prepared = apply::prepare_node(plan.node_prep.as_ref())?;
 
     let distribution = plan.cluster.distribution;
     let layout = distribution.layout();
@@ -163,6 +163,9 @@ pub(crate) fn apply(config: &JoinConfig) -> Result<(), InstallError> {
         &format!("node {name} to be Ready"),
         || node_ready(&own, &name, started).unwrap_or(false),
     )?;
+    if prepared {
+        apply::restart_longhorn_manager(&own, &name);
+    }
 
     if plan.role == Role::Server {
         let admin = Kubectl::admin(distribution);
