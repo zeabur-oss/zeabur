@@ -310,7 +310,7 @@ pub(crate) async fn plan(
         zeabur: state.terminals.as_deref(),
     };
     let opened = deploy_keys::open(&state, &identity.username, &project, &request)?;
-    let opened = s3_destinations::open(cluster.as_ref(), opened).await?;
+    let opened = s3_destinations::open(cluster.as_ref(), &project, opened).await?;
     let opened = templates::open(
         &project,
         state.settings.domains.cluster_issuer.as_deref(),
@@ -437,7 +437,7 @@ pub(crate) async fn apply(
         zeabur: state.terminals.as_deref(),
     };
     let opened = deploy_keys::open(&state, &identity.username, &project, &claims.request)?;
-    let opened = s3_destinations::open(cluster.as_ref(), opened).await?;
+    let opened = s3_destinations::open(cluster.as_ref(), &project, opened).await?;
     let opened = templates::open(
         &project,
         state.settings.domains.cluster_issuer.as_deref(),
