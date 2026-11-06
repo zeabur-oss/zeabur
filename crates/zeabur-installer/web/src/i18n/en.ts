@@ -448,6 +448,13 @@ export const en = {
     `At idle, the system, ${distribution} and the components use about ${mib(idle)} of this server's ${mib(host)}.`,
   "warning.memory.belowMinimum": (host: string, needs: string, distribution: string) =>
     `This server has ${mib(host)} of memory, and a team install on ${distribution} with these components needs ${mib(needs)}, so some replicas may not start. If you don't need the crash kernel (kdump), turn it off to give its memory back, or move to a server with more memory.`,
+  "warning.memory.nodeFull": (
+    node: string,
+    requested: string,
+    allocatable: string,
+    distribution: string,
+  ) =>
+    `The Pods on node ${node} already request ${mib(requested)} of memory, but only ${mib(allocatable)} is left for Pods once the system and ${distribution} have their share. Pods that don't fit stay Pending. To make room, delete a service on ${node} or lower its replicas, move a service to another node, or add a node.`,
   "warning.cluster.unsupported": (distribution: string, version: string) =>
     `${distribution} ${version} is not supported by this installer: its downloads are checked only against the release's own checksums.`,
   "warning.join.sameRegion": () =>

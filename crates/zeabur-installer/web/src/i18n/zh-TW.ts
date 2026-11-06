@@ -414,6 +414,8 @@ export const zhTW: Messages = {
     `閒置時，系統、${distribution} 和元件約使用 ${mib(idle)}，這台伺服器共有 ${mib(host)}。`,
   "warning.memory.belowMinimum": (host, needs, distribution) =>
     `這台伺服器有 ${mib(host)} 記憶體，用 ${distribution} 裝這些元件要 ${mib(needs)}，有些副本可能跑不起來。用不到當機傾印（kdump）的話，可以關掉它把記憶體還給系統，或換一台記憶體更大的伺服器。`,
+  "warning.memory.nodeFull": (node, requested, allocatable, distribution) =>
+    `節點 ${node} 上的 Pod 已經要了 ${mib(requested)} 記憶體，但扣掉系統和 ${distribution} 自己用的，只剩 ${mib(allocatable)} 給 Pod。放不下的 Pod 會一直停在 Pending。要空出記憶體，可以刪除 ${node} 上的服務或減少副本、把服務移到其他節點，或加一個節點。`,
   "warning.cluster.unsupported": (distribution, version) =>
     `這個安裝程式不支援 ${distribution} ${version}：下載的檔案只能用該版本自己附的檢查碼驗證。`,
   "warning.join.sameRegion": () =>

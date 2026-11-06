@@ -300,6 +300,13 @@ impl Distribution {
         OS_IDLE_MIB + self.kube_reserved_mib()
     }
 
+    /// The memory a server's kubelet keeps from pods: [`Self::reserved_mib`] and the hard eviction
+    /// threshold.
+    #[must_use]
+    pub const fn kept_from_pods_mib(self) -> u64 {
+        self.reserved_mib() + EVICTION_HARD_MIB
+    }
+
     /// The kubelet's arguments. With the reserves, the pods' cgroup ends short of the OS and the
     /// distribution, so memory running out kills or evicts a pod, a build first, and not
     /// `k3s-server`. A worker has no control plane and reserves only the OS.

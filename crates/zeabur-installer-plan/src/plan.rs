@@ -2973,6 +2973,68 @@ mod tests {
         assert!(warning.text.contains("kdump"), "{}", warning.text);
     }
 
+    /// The server from #343: 8 GiB, 7736 MiB allocatable before v0.2's reservation.
+    fn server(plan: &Plan, requested_mib: u64) -> crate::fit::NodeMemory {
+        crate::fit::NodeMemory {
+            name: plan.node_name.clone(),
+            capacity_mib: 7936,
+            allocatable_mib: 7736,
+            requested_mib,
+        }
+    }
+
+    fn upgrade(index: &Index) -> Plan {
+        let first = plan(index, &config(""), &facts()).unwrap();
+        let mut upgrade = facts();
+        upgrade.record = Some(recorded(&first, "0.1.1", |_| {}));
+        plan(index, &config(""), &upgrade).unwrap()
+    }
+
+    #[test]
+    fn an_upgrade_warns_when_the_reservation_leaves_less_than_the_pods_request() {
+        let index = crate::catalog::pinned();
+        let upgrade = upgrade(&index);
+        let full = crate::fit::warnings(&upgrade, &[server(&upgrade, 5900)]);
+        let [warning] = full.as_slice() else {
+            panic!("{full:?}");
+        };
+        assert_eq!(warning.code, "memory.nodeFull");
+        assert_eq!(
+            warning.values,
+            [upgrade.node_name.as_str(), "5900", "5856", "K3s"]
+        );
+    }
+
+    #[test]
+    fn an_upgrade_does_not_warn_when_the_pods_fit_what_is_left() {
+        let index = crate::catalog::pinned();
+        let upgrade = upgrade(&index);
+        assert_eq!(
+            crate::fit::warnings(&upgrade, &[server(&upgrade, 5800)]),
+            []
+        );
+    }
+
+    #[test]
+    fn a_worker_is_held_to_its_live_allocatable_memory() {
+        let index = crate::catalog::pinned();
+        let upgrade = upgrade(&index);
+        let worker = crate::fit::NodeMemory {
+            name: "node-d5a2f6".to_owned(),
+            capacity_mib: 3900,
+            allocatable_mib: 3700,
+            requested_mib: 3600,
+        };
+        assert_eq!(crate::fit::warnings(&upgrade, &[worker]), []);
+    }
+
+    #[test]
+    fn a_first_install_has_no_memory_fit_check() {
+        let index = crate::catalog::pinned();
+        let first = plan(&index, &config(""), &facts()).unwrap();
+        assert_eq!(crate::fit::warnings(&first, &[server(&first, 7000)]), []);
+    }
+
     #[test]
     fn an_upgrade_reports_the_chart_versions_and_release_it_changes() {
         let index = crate::catalog::pinned();

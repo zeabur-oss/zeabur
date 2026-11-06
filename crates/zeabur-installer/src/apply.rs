@@ -15,6 +15,7 @@ use zeabur_installer_host::{archive, chart, cmd, download, facts, files, systemd
 use zeabur_installer_plan::catalog::{Encoding, Index};
 use zeabur_installer_plan::cluster::{APPARMOR_PROFILE, AUTHN_CONFIGMAP, Distribution, HostFile};
 use zeabur_installer_plan::config::{AccessMode, Config};
+use zeabur_installer_plan::fit::{self, NodeMemory};
 use zeabur_installer_plan::k3s;
 use zeabur_installer_plan::plan::{
     self, ClusterPlan, ComponentPlan, Download, IDENTITY_NAMESPACE, IdentityPlan, LOCAL_ISSUER,
@@ -205,6 +206,11 @@ pub(crate) fn make_plan(index: &Index, config: &Config) -> Result<Plan, InstallE
             }
             changes.set_host_files(pending);
         }
+        // The check is advice; a failed read skips it.
+        if running && let Some(nodes) = node_memory(&kubectl) {
+            let full = fit::warnings(&plan, &nodes);
+            plan.warnings.extend(full);
+        }
     }
     plan.removals = remove::plan(
         running.then_some(&kubectl),
@@ -215,6 +221,16 @@ pub(crate) fn make_plan(index: &Index, config: &Config) -> Result<Plan, InstallE
         &mut plan.warnings,
     )?;
     Ok(plan)
+}
+
+/// Each node's memory and what the Pods on it request; `None` when a read fails.
+fn node_memory(kubectl: &Kubectl) -> Option<Vec<NodeMemory>> {
+    let list = |args: &[&str]| -> Option<Value> {
+        serde_json::from_str(&kubectl.run(args, None).ok()?).ok()
+    };
+    let nodes = list(&["get", "nodes", "--output=json"])?;
+    let pods = list(&["get", "pods", "--all-namespaces", "--output=json"])?;
+    Some(fit::nodes(&nodes, &pods))
 }
 
 /// The install record, when there is one.
