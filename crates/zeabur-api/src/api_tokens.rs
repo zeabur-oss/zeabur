@@ -266,6 +266,71 @@ fn service_accounts() -> ResourceRef {
     ResourceRef::new("", "v1", "serviceaccounts", "ServiceAccount")
 }
 
+/// A deletion of one object of a token, as a member's plan writes it.
+pub(crate) struct Revoked {
+    pub(crate) target: ObjectTarget,
+    pub(crate) uid: Option<String>,
+    pub(crate) before: Value,
+}
+
+/// The tokens `created_by` made in `project` that go when their role there changes: every one,
+/// or with `viewer_stays` all but their Viewer tokens. A token acts for its maker, so it keeps no
+/// more than they do. Tokens for every namespace stay: only admins make them. Each token's binding
+/// goes before its ServiceAccount.
+pub(crate) async fn revoked(
+    cluster: &dyn Cluster,
+    project: &str,
+    created_by: &str,
+    viewer_stays: bool,
+) -> Result<Vec<Revoked>, ApiError> {
+    let accounts = cluster
+        .list_kind(&service_accounts(), Some(project))
+        .await
+        .map_err(|e| {
+            read_problem(
+                e,
+                &format!("the ServiceAccounts of {project}"),
+                right("list", "", "serviceaccounts", Some(project)),
+            )
+        })?;
+    let viewer = ProjectRole::Viewer.cluster_role();
+    let mut revoked = Vec::new();
+    for account in accounts {
+        let Ok(object) = serde_json::to_value(&account) else {
+            continue;
+        };
+        let Some(token) = api_token::read(&object) else {
+            continue;
+        };
+        if token.scope != Scope::Project || token.created_by.as_deref() != Some(created_by) {
+            continue;
+        }
+        if viewer_stays && token.role.as_deref() == Some(viewer) {
+            continue;
+        }
+        let binding = read_object(
+            cluster,
+            &Addressed::binding(project, &token.name, Scope::Project),
+        )
+        .await?;
+        for step in api_token::delete(&object, binding.as_ref()) {
+            if let Step::Delete {
+                target,
+                uid,
+                before,
+            } = step
+            {
+                revoked.push(Revoked {
+                    target: object_target(&target),
+                    uid,
+                    before,
+                });
+            }
+        }
+    }
+    Ok(revoked)
+}
+
 fn view(token: api_token::Token) -> ApiTokenView {
     ApiTokenView {
         role: token.role.as_deref().and_then(ProjectRole::of_cluster_role),

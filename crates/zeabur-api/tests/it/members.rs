@@ -679,6 +679,173 @@ mod tests {
         );
     }
 
+    /// An API token in `project`: its ServiceAccount and, for a project token, its RoleBinding.
+    fn api_token(
+        project: &str,
+        name: &str,
+        role: &str,
+        maker: &str,
+        scope: &str,
+    ) -> Vec<DynamicObject> {
+        let account = format!("zeabur-api-token-{name}");
+        let labels =
+            json!({"zeabur.com/api-token": "true", "app.kubernetes.io/managed-by": "zeabur"});
+        let mut objects = vec![serde_json::from_value(json!({
+            "apiVersion": "v1", "kind": "ServiceAccount",
+            "metadata": {"name": account, "namespace": project, "uid": format!("uid-sa-{project}-{name}"),
+                         "resourceVersion": "1", "labels": labels,
+                         "annotations": {"zeabur.com/api-token-role": format!("zeabur-project-{role}"),
+                                         "zeabur.com/api-token-scope": scope,
+                                         "zeabur.com/api-token-created-by": maker}},
+        }))
+        .unwrap()];
+        if scope == "project" {
+            objects.push(
+                serde_json::from_value(json!({
+                    "apiVersion": "rbac.authorization.k8s.io/v1", "kind": "RoleBinding",
+                    "metadata": {"name": account, "namespace": project,
+                                 "uid": format!("uid-rb-{project}-{name}"), "resourceVersion": "1",
+                                 "labels": labels},
+                    "roleRef": {"apiGroup": "rbac.authorization.k8s.io", "kind": "ClusterRole",
+                                "name": format!("zeabur-project-{role}")},
+                    "subjects": [{"kind": "ServiceAccount", "name": account, "namespace": project}],
+                }))
+                .unwrap(),
+            );
+        }
+        objects
+    }
+
+    /// `bob`'s and `ada`'s API tokens in `blog`, where bob is a Developer, and `shop`, where he is
+    /// a Viewer.
+    fn with_tokens(cluster: &MemoryCluster) {
+        cluster.update(|s| {
+            s.served.push(ServedResource::readable(
+                "",
+                "v1",
+                "serviceaccounts",
+                "ServiceAccount",
+                true,
+            ));
+            for objects in [
+                api_token("blog", "deploy", "developer", "zeabur:bob", "project"),
+                api_token("blog", "grafana", "viewer", "zeabur:bob", "project"),
+                api_token("blog", "release", "developer", "zeabur:ada", "project"),
+                api_token("blog", "everywhere", "developer", "zeabur:bob", "cluster"),
+                api_token("shop", "status", "viewer", "zeabur:bob", "project"),
+            ] {
+                s.dynamic.extend(objects);
+            }
+        });
+    }
+
+    /// The API tokens' ServiceAccounts and RoleBindings left, as `namespace/Kind/name`.
+    fn token_objects(cluster: &MemoryCluster) -> Vec<String> {
+        let mut found = Vec::new();
+        for o in cluster.inspect(|s| s.dynamic.clone()).unwrap() {
+            let name = o.metadata.name.clone().unwrap_or_default();
+            if !name.starts_with("zeabur-api-token-") {
+                continue;
+            }
+            let namespace = o.metadata.namespace.clone().unwrap_or_default();
+            let mut kind = String::new();
+            if let Some(types) = &o.types {
+                kind.clone_from(&types.kind);
+            }
+            found.push(format!("{namespace}/{kind}/{name}"));
+        }
+        found.sort();
+        found
+    }
+
+    #[tokio::test]
+    async fn removing_a_member_deletes_the_project_tokens_they_made() {
+        let cluster = signed_in("zeabur:ada");
+        with_tokens(&cluster);
+        let (status, applied, plan) =
+            change(&cluster, json!({"op": "remove", "username": "bob"})).await;
+        assert_eq!(status, StatusCode::OK, "{applied}");
+        assert_eq!(
+            token_objects(&cluster),
+            [
+                "blog/RoleBinding/zeabur-api-token-release",
+                "blog/ServiceAccount/zeabur-api-token-everywhere",
+                "blog/ServiceAccount/zeabur-api-token-release",
+            ]
+        );
+        let planned = planned(&plan);
+        for gone in [
+            "delete RoleBinding/zeabur-api-token-deploy",
+            "delete ServiceAccount/zeabur-api-token-deploy",
+            "delete RoleBinding/zeabur-api-token-grafana",
+            "delete ServiceAccount/zeabur-api-token-grafana",
+            "delete RoleBinding/zeabur-api-token-status",
+            "delete ServiceAccount/zeabur-api-token-status",
+        ] {
+            assert!(planned.contains(&gone.to_owned()), "{gone}: {planned:?}");
+        }
+        let binding = planned
+            .iter()
+            .position(|w| w == "delete RoleBinding/zeabur-api-token-deploy");
+        let account = planned
+            .iter()
+            .position(|w| w == "delete ServiceAccount/zeabur-api-token-deploy");
+        assert!(binding < account, "{planned:?}");
+    }
+
+    #[tokio::test]
+    async fn a_member_made_a_viewer_loses_their_developer_tokens_there_and_keeps_the_rest() {
+        let cluster = signed_in("zeabur:ada");
+        with_tokens(&cluster);
+        let (status, body, plan) = change(
+            &cluster,
+            json!({"op": "access", "username": "bob", "admin": false, "projects": [
+                {"project": "shop", "role": "viewer"},
+                {"project": "blog", "role": "viewer"}
+            ]}),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        assert_eq!(
+            token_objects(&cluster),
+            [
+                "blog/RoleBinding/zeabur-api-token-grafana",
+                "blog/RoleBinding/zeabur-api-token-release",
+                "blog/ServiceAccount/zeabur-api-token-everywhere",
+                "blog/ServiceAccount/zeabur-api-token-grafana",
+                "blog/ServiceAccount/zeabur-api-token-release",
+                "shop/RoleBinding/zeabur-api-token-status",
+                "shop/ServiceAccount/zeabur-api-token-status",
+            ]
+        );
+        assert_eq!(
+            planned(&plan)[..2],
+            [
+                "delete RoleBinding/zeabur-api-token-deploy",
+                "delete ServiceAccount/zeabur-api-token-deploy",
+            ]
+        );
+
+        let (status, body, _) = change(
+            &cluster,
+            json!({"op": "access", "username": "bob", "admin": false, "projects": [
+                {"project": "shop", "role": "viewer"}
+            ]}),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        assert_eq!(
+            token_objects(&cluster),
+            [
+                "blog/RoleBinding/zeabur-api-token-release",
+                "blog/ServiceAccount/zeabur-api-token-everywhere",
+                "blog/ServiceAccount/zeabur-api-token-release",
+                "shop/RoleBinding/zeabur-api-token-status",
+                "shop/ServiceAccount/zeabur-api-token-status",
+            ]
+        );
+    }
+
     #[tokio::test]
     async fn an_admin_loses_their_project_bindings_and_nobody_demotes_themselves() {
         let cluster = signed_in("zeabur:ada");
