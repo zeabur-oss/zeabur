@@ -249,6 +249,8 @@ pub(crate) struct Terminal {
     pub(crate) handoff: Option<crate::access::Handoff>,
     /// Turns `true` when the person signs out.
     pub(crate) signed_out: Option<tokio::sync::watch::Receiver<bool>>,
+    /// Receives [`Feature::TerminalOpened`](zeabur_telemetry::Feature) once a session is ready.
+    pub(crate) used: Option<crate::used::Used>,
 }
 
 impl<S> FromRequestParts<S> for Terminal
@@ -273,6 +275,7 @@ where
                     idle: state.terminal_idle,
                     handoff: state.access.handoff(parts),
                     signed_out: state.access.signed_out(parts),
+                    used: state.used.clone(),
                 })
         } else {
             Err(ApiError::from(Problem::new(
@@ -331,6 +334,9 @@ async fn run(
         }
     };
     if send_frame(&mut socket, &ServerFrame::Ready { container }).await {
+        if let Some(used) = &terminal.used {
+            used(zeabur_telemetry::Feature::TerminalOpened);
+        }
         relay(socket, session, terminal.idle, terminal.signed_out).await;
     }
 }

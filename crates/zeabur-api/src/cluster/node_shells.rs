@@ -969,6 +969,9 @@ async fn run(mut socket: WebSocket, terminal: Terminal, pod: String) {
                 container: shell::CONTAINER.to_owned(),
             };
             if exec::send_frame(&mut socket, &ready).await {
+                if let Some(used) = &terminal.used {
+                    used(zeabur_telemetry::Feature::TerminalOpened);
+                }
                 exec::relay(socket, session, terminal.idle, terminal.signed_out.clone()).await;
             }
             let ended = WriteRequest {

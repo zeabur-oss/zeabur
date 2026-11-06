@@ -4552,6 +4552,11 @@ components:
         token:
           type: string
           description: The token `plan` returned.
+        via:
+          oneOf:
+          - $ref: "#/components/schemas/Via"
+            description: The form that made the plan, when it is one the experience program tells apart.
+          - type: "null"
     ApplyResponse:
       type: object
       description: What an apply wrote.
@@ -17837,6 +17842,11 @@ components:
         zeabur:
           type: boolean
           description: It is the schedule Zeabur sets up ([`SCHEDULE`]).
+    Via:
+      type: string
+      description: The form that made a plan.
+      enum:
+      - compose
     VolumeDeletion:
       type: object
       description: A volume that goes with the project.

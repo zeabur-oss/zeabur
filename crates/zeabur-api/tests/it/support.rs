@@ -1,7 +1,7 @@
 //! [`TestApi`]: the API over an in-memory cluster, with what a test changes from the defaults.
 
 use std::collections::BTreeMap;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use axum::Router;
@@ -11,10 +11,30 @@ use zeabur_api::access::{ClusterAccess, Handoff, SingleCluster};
 use zeabur_api::images::Inspector;
 use zeabur_api::plan_token::PlanKey;
 use zeabur_api::services::proxy::ZeaburProxy;
+use zeabur_api::used::Used;
 use zeabur_api::{Options, Settings};
 use zeabur_core::problem::Problem;
 use zeabur_kube::Cluster;
 use zeabur_kube::k8s_openapi::jiff::{SignedDuration, Timestamp};
+use zeabur_telemetry::Feature;
+
+/// The features a test's API reported.
+pub(crate) type Seen = Arc<Mutex<Vec<Feature>>>;
+
+/// A `used` callback and what it was given.
+pub(crate) fn recorder() -> (Used, Seen) {
+    let seen = Seen::default();
+    let log = Arc::clone(&seen);
+    (
+        Arc::new(move |feature| log.lock().unwrap().push(feature)),
+        seen,
+    )
+}
+
+/// What `seen` holds now.
+pub(crate) fn taken(seen: &Seen) -> Vec<Feature> {
+    seen.lock().unwrap().clone()
+}
 
 /// The API over one cluster, as one person, with [`Options::default`] but for each `with_*`.
 pub(crate) struct TestApi {
@@ -88,7 +108,7 @@ impl TestApi {
     }
 
     /// `used` receives each feature a successful write used.
-    pub(crate) fn with_used(mut self, used: zeabur_api::used::Used) -> Self {
+    pub(crate) fn with_used(mut self, used: Used) -> Self {
         self.options.used = Some(used);
         self
     }
