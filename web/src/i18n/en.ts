@@ -573,7 +573,7 @@ export const en = {
   "deleting.held":
     "These objects wait for their finalizers. The controller that added each finalizer removes it after its cleanup.",
   "deleting.forceHint":
-    "A controller usually finishes on its own, so waiting longer is safer. Force delete only if it doesn't.",
+    "A controller usually finishes on its own, so waiting longer is safer. Force delete only when it can't finish.",
   "deleting.force": "Force delete",
   "deleting.commandsLabel": "Look with kubectl",
 
@@ -1578,9 +1578,9 @@ export const en = {
   "warn.rightsMissing": (rights: string) => `The cluster may refuse this: you lack ${rights}.`,
   "warn.recreated": (names: string, tool: string) =>
     `${tool} manages ${names}: it may create them again after the deletion`,
-  "warn.removesFinalizers": (names: string) => `Removes the finalizers of ${names}`,
+  "warn.removesFinalizers": (names: string) => `Removes the finalizers from ${names}`,
   "warn.cleanupSkipped":
-    "Their controllers can't clean up what they made outside the cluster, such as a backup in object storage or a cloud disk",
+    "These objects' controllers can't clean up what they made outside the cluster, such as a backup in object storage or a cloud disk",
   "warn.restartNeeded": (names: string) => `Takes effect after a restart: ${names}`,
   "warn.reloaderRestarts": (names: string) => `Reloader restarts ${names}`,
   "warn.reloaderMayRestart": (names: string) =>
