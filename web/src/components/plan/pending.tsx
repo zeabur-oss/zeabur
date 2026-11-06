@@ -2,29 +2,31 @@
 // answers at once, and the code's preload for when the page is idle.
 import { useEffect } from "react"
 
+import { Frame } from "@/components/members/frame"
 import { LoadingRows } from "@/components/page"
 import { useT } from "@/i18n"
 import { Button } from "@zeabur-oss/design-system/components/button"
-import { Dialog, DialogContent, DialogTitle } from "@zeabur-oss/design-system/components/dialog"
 
+/** The same frame as PlanDialog, with its action disabled, so nothing moves under the pointer. */
 export function PlanDialogPending({ title, onClose }: { title: string; onClose: () => void }) {
   const t = useT()
   return (
-    <Dialog open onOpenChange={(open) => (open ? undefined : onClose())}>
-      <DialogContent variant="compact" aria-describedby={undefined}>
-        <div className="border-b px-5 py-3">
-          <DialogTitle>{title}</DialogTitle>
-        </div>
-        <div className="px-5 py-4">
-          <LoadingRows label={t("plan.planning")} rows={1} />
-        </div>
-        <div className="flex items-center justify-end gap-2 border-t px-5 py-3">
+    <Frame
+      title={title}
+      onClose={onClose}
+      footer={
+        <>
           <Button variant="ghost" size="sm" onClick={onClose}>
             {t("plan.cancel")}
           </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
+          <Button size="sm" disabled>
+            {t("plan.apply")}
+          </Button>
+        </>
+      }
+    >
+      <LoadingRows label={t("plan.planning")} rows={1} />
+    </Frame>
   )
 }
 

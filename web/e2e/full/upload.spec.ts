@@ -40,6 +40,7 @@ test("a Developer uploads a folder and the service runs it", async ({ page, brow
     developerLink = await invite(page, "e2e-upload-developer", [{ project, role: "developer" }])
   })
   const developer = await member(browser, developerLink, "e2e-upload-developer", zeabur)
+  let made = false
   try {
     await test.step("the Developer chooses the folder and applies the plan", async () => {
       await developer.goto(`/projects/${encodeURIComponent(project)}`)
@@ -58,6 +59,7 @@ test("a Developer uploads a folder and the service runs it", async ({ page, brow
       await expect(plan).toContainText("Build")
       await plan.getByRole("button", { name: "Create", exact: true }).click()
       await expect(toast(developer, "Uploaded")).toBeVisible({ timeout: 120_000 })
+      made = true
     })
 
     await test.step("the first image arrives and the service runs", async () => {
@@ -85,7 +87,8 @@ test("a Developer uploads a folder and the service runs it", async ({ page, brow
       await expect(main).toContainText("Uploaded folder")
     })
   } finally {
-    await test.step(`the Developer deletes ${name} and its Build`, () =>
-      deleteService(developer, project, name))
+    if (made)
+      await test.step(`the Developer deletes ${name} and its Build`, () =>
+        deleteService(developer, project, name))
   }
 })
