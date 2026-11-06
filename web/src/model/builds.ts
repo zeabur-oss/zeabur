@@ -183,6 +183,16 @@ export function failureText(build: Build | undefined, run: BuildRun | undefined)
   )
 }
 
+/** What the summary says went wrong: the Build's own message, which `passing` marks as one that
+ * may clear by itself, or else the newest run when it failed. */
+export function failureOf(build: Build, latest: BuildRun | undefined) {
+  const problem = buildProblem(build, latest)
+  const failedRun = !problem && latest?.phase === "Failed" ? latest : undefined
+  const message =
+    problem?.message ?? (build.ready === "False" && !failedRun ? build.message : undefined)
+  return { message: message ?? undefined, passing: !!problem && !problem.lasting, failedRun }
+}
+
 /** Whether the build failed for lack of memory, which a higher build memory fixes. */
 export function ranOutOfMemory(build: Build | undefined, run: BuildRun | undefined): boolean {
   const problem = build ? buildProblem(build, run) : undefined

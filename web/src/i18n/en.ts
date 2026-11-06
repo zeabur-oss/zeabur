@@ -755,7 +755,6 @@ export const en = {
   "builds.took": (seconds: number) =>
     seconds < 60 ? `took ${seconds} s` : `took ${Math.floor(seconds / 60)} min ${seconds % 60} s`,
   "builds.logs": "Logs",
-  "builds.hideLogs": "Hide logs",
   "builds.details": "Details",
   "builds.hideDetails": "Hide details",
   "builds.reason.PlanFailed":
@@ -777,11 +776,28 @@ export const en = {
   "builds.oom.open": "Open build settings",
   "builds.reason.Cancelled": "A newer build replaced this one, or someone cancelled it.",
   "builds.reason.other": "The build failed. Open the details to see why.",
-  "builds.step": "Step",
   "builds.logsGone":
     "Logs are deleted with the build's replica, ten minutes after the build finishes.",
   "builds.noLogsYet": "This step has not started yet.",
   "builds.emptyLog": "Nothing logged.",
+  "builds.phase.fetch": "Get the source",
+  "builds.phase.plan": "Plan the build",
+  "builds.phase.build": "Build the image",
+  "builds.stepGroup.prepare": "Prepare",
+  "builds.stepGroup.export": "Push the image",
+  "builds.cached": "Cached",
+  "builds.otherOutput": "Other output",
+  "builds.duration": (seconds: number) => {
+    const s = Math.round(seconds)
+    if (seconds < 1) return "under 1 s"
+    return s < 60 ? `${s} s` : `${Math.floor(s / 60)} min ${s % 60} s`
+  },
+  "builds.stepFailed": (step: string) => `${step} failed`,
+  "builds.stepFailedAfter": (step: string, seconds: number) => {
+    const s = Math.max(1, Math.round(seconds))
+    return `${step} failed after ${s < 60 ? `${s} s` : `${Math.floor(s / 60)} min ${s % 60} s`}`
+  },
+  "builds.keepsRunning": (service: string) => `${service} keeps running the image from before.`,
   "overview.source": "Source",
   "overview.managedBy": "Managed by",
   "overview.replicas": (ready: number, desired: number) => `Replicas ${ready}/${desired}`,
