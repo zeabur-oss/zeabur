@@ -72,7 +72,24 @@ sudo zeabur-installer apply
 
 - `access.mode: domain` 时，Let's Encrypt 使用 HTTP-01 验证，TCP 80 必须向互联网开放。改用 DNS-01 签发证书后即可关闭，见[创建通配符域名的签发者](../configure/domains.mdx#创建通配符域名的签发者)。
 - 服务自身的公开域名仍照常对外，不受影响。
-- Kubernetes API 使用 TCP 6443，节点加入使用 9345。这两个端口不经过面板，需要单独限制来源，只允许管理员和节点访问。
+- RKE2 的节点加入使用 TCP 9345，与 Kubernetes API 一样不经过面板，只允许节点访问。
+
+## Kubernetes API
+
+Zeabur 让 kube-apiserver 保持直接可访问（TCP 6443）。每个请求都由 kube-apiserver 自己验证，接受 Zeabur Identity 令牌和 ServiceAccount 令牌，匿名访问已关闭。
+
+6443 只对需要使用 API 的对象开放：
+
+- 节点。
+- 管理员的地址。
+- 地址固定的 CI runner。
+
+尽量不要向互联网开放，改用下面的做法：
+
+- 通过私有网络或 VPN 连接。
+- 只为一件事（例如部署步骤）在集群里运行一个小服务，放在 HTTPS 后面，使用它自己的 ServiceAccount。调用方就不需要访问 API。
+
+K3s 的工作节点也是通过 6443 加入。向互联网关闭 6443 时，工作节点要通过私有网络加入，见[节点](../cluster/nodes.mdx)。
 
 ## Secret 与通用配置
 
