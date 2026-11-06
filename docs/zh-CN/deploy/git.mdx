@@ -79,7 +79,7 @@ description: 连接 Git 仓库、完成首次构建，并选择新镜像何时�
 部署密钥适用于任何支持 SSH 连接的 Git 主机。Zeabur 内置了 GitHub 和 GitLab 的主机密钥，其他主机需要先粘贴其主机密钥：
 
 1. 在你的电脑上运行表单列出的命令，例如 `ssh-keyscan -t ed25519,ecdsa -p 2222 git.example.com`。SSH 端口为 22 时不带 `-p`。
-2. 将输出粘贴到**主机密变量钥（known_hosts）**，点击**创建部署密钥**。Zeabur Builder 仅接受 Ed25519 和 ECDSA 密钥。
+2. 将输出粘贴到**主机密钥（known_hosts）**，点击**创建部署密钥**。Zeabur Builder 仅接受 Ed25519 和 ECDSA 密钥。
 3. 表单会列出每个主机密钥的指纹，例如 `SHA256:+DiY3wvvV6TuJJhbpZisF/zLDA0zPMSvHdkr4UvCOqU`。将其与 Git 主机管理员公布的指纹对照，或请管理员在主机上运行 `ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub`。确认指纹一致后，再将公钥添加到仓库。
 
 仓库地址使用 HTTPS 时，Zeabur 会改用 `git@主机:路径.git` 连接。如果 SSH 端口不是 22，或用户不是 `git`，直接填写 SSH 地址，例如 `ssh://git@git.example.com:2222/acme/site.git`。

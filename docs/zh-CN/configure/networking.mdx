@@ -149,7 +149,7 @@ kubectl -n demo delete service db-public-5432
 
 ### 连接规则
 
-Zeabur 创建的规则都带有 `app.kubernetes.io/managed-by: zeabur` 标签，名称为 `zeabur-<规则>-<服务>`，超过 63 个字符会截断。以下以项目 `api` 为例。
+Zeabur 创建的规则都带有 `app.kubernetes.io/managed-by: zeabur` 标签，名称为 `zeabur-<规则>-<服务>`，超过 63 个字符会截断。以下以服务 `api` 为例。
 
 **隔离这个服务**：
 
