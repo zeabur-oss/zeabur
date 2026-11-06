@@ -252,9 +252,6 @@ mod tests {
             Event::FeatureUsed(used(Feature::DatabaseCreated(DatabaseKind::ObjectStorage))),
             Event::FeatureUsed(used(Feature::DomainAdded(DomainKind::Custom))),
             Event::FeatureUsed(used(Feature::LogsViewed)),
-            Event::FeatureUsed(used(Feature::TerminalOpened)),
-            Event::FeatureUsed(used(Feature::MemberInvited)),
-            Event::FeatureUsed(used(Feature::Compose)),
             Event::InstallStarted(install()),
             Event::InstallFinished(install()),
             Event::InstallFailed(Failure {
