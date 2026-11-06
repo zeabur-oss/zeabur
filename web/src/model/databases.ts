@@ -801,6 +801,14 @@ interface Writing {
   /** What the objects say now, when they exist. */
   current?: BackupTarget
   keysExist: boolean
+  /** The kept keys Secret holds the region. Backups set up by v0.1.1 without a region have none. */
+  regionSaved: boolean
+}
+
+/** The keys Secret, by its `keys`, holds the region. */
+export const holdsRegion = (database: Database, keys: string[]) => {
+  const key = SECRET_KEYS[backupEngine(database)].region
+  return key !== undefined && keys.includes(key)
 }
 
 /** The region key and value the keys Secret gets, unless a kept Secret keeps its own. */
@@ -865,7 +873,7 @@ function editObject(database: Database, change: (spec: Manifest) => void): Chang
   ]
 }
 
-function postgresStore(database: Database, target: BackupTarget): Manifest {
+function postgresStore(database: Database, target: BackupTarget, region: boolean): Manifest {
   const names = backupNames(database.name)
   const key = (key: string) => ({ name: names.secret, key })
   return {
@@ -880,7 +888,7 @@ function postgresStore(database: Database, target: BackupTarget): Manifest {
         s3Credentials: {
           accessKeyId: key("ACCESS_KEY_ID"),
           secretAccessKey: key("ACCESS_SECRET_KEY"),
-          region: key("REGION"),
+          ...(region ? { region: key("REGION") } : {}),
         },
         wal: { compression: "gzip" },
         data: { compression: "gzip" },
@@ -916,14 +924,16 @@ function withPlugin(spec: Manifest, store?: string) {
 }
 
 function postgresBackups(w: Writing): Change[] {
-  const { database, target, current } = w
+  const { database, target, current, keysExist, regionSaved } = w
+  // The ObjectStore names REGION only when the Secret will hold it.
+  const region = regionSaved || Object.keys(regionEntry(database, target, keysExist)).length > 0
   return [
     ...keyWrites(w),
     ...write(
       database,
       "objectstores",
-      postgresStore(database, target),
-      current && postgresStore(database, current),
+      postgresStore(database, target, region),
+      current && postgresStore(database, current, regionSaved),
     ),
     ...editObject(database, (spec) => withPlugin(spec, backupNames(database.name).store)),
     ...write(
@@ -1069,17 +1079,19 @@ const BACKUPS: Record<BackupEngine, (w: Writing) => Change[]> = {
  * The writes that back a database up as `target` says: the keys as a Secret, where backups go,
  * the schedule, and the database edited to use them (`object` is the database as written,
  * `Database.object`). What Zeabur set up before is edited, only where it changes: backups that
- * are on, or were turned off. `keysExist` says the keys Secret is there.
+ * are on, or were turned off. `keysExist` says the keys Secret is there, `regionSaved` that it
+ * holds the region.
  */
 export function writeBackups(
   database: Database,
   target: BackupTarget,
   keysExist = false,
+  regionSaved = keysExist,
 ): Change[] {
   const current = ownBackups(database) ? currentTarget(database) : undefined
   return madeFor(
     database.name,
-    BACKUPS[backupEngine(database)]({ database, target, current, keysExist }),
+    BACKUPS[backupEngine(database)]({ database, target, current, keysExist, regionSaved }),
   )
 }
 
