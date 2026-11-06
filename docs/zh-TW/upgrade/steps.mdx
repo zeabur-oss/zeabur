@@ -41,6 +41,8 @@ K3s、RKE2 或 KubeSolo 的版本或主機檔案有變時，`apply` 會重新啟
 
 每版 installer 固定一個 K3s、RKE2 或 KubeSolo 版本，由 `apply` 安裝。Kubernetes 只能這樣升級：用其他方式升級（例如 System Upgrade Controller 的 Plan），下次 `apply` 會裝回 installer 固定的版本。
 
+叢集還有其他節點，而 `plan` 把 `replicated-storage/longhorn` 列為新增時，也要在每個節點換上新版 installer 並執行 `sudo zeabur-installer apply`。它會在該節點安裝 Longhorn 需要的套件和核心模組，再重新啟動該節點的 Longhorn manager，因為 manager 只在啟動時檢查節點。
+
 伺服器記憶體低於新版對團隊使用的最低需求時，已在執行的安裝仍會升級，`plan` 會顯示警告，並保留現有的元件。
 
 ### 用 AI Agents 升級

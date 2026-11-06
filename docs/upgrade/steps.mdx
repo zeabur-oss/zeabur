@@ -40,6 +40,8 @@ When the K3s, RKE2 or KubeSolo release or a host file changes, `apply` restarts 
 
 Each installer pins one K3s, RKE2 or KubeSolo release, and `apply` installs it. Upgrade Kubernetes only this way: if something else upgrades it, such as a System Upgrade Controller Plan, the next `apply` puts the pinned release back.
 
+If the cluster has other nodes and `plan` lists `replicated-storage/longhorn` as added, put the new installer on each of those nodes and run `sudo zeabur-installer apply` there too. It installs the packages and kernel modules Longhorn needs on that node and restarts the node's Longhorn manager, which only checks the node when it starts.
+
 If the server has less memory than a team install now needs, an install that already runs is still upgraded. `plan` shows a warning, and the components it has stay.
 
 ### Upgrade with AI Agents

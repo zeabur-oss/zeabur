@@ -64,6 +64,13 @@ zot 存的映像檔會一起刪掉。之後 `apply` 會安裝 Zeabur Builder 和
 
 #### 3. 升級伺服器
 
+`profile` 是 `multi-node` 的話，先執行下面兩個指令。v0.1 在 `multi-node` 給 VictoriaMetrics 20 GiB 的磁碟區，v0.2 設定的是 5 GiB，但磁碟區不能縮小，VictoriaMetrics operator 會因此停止更新 vmsingle。第一個指令讓 operator 保留磁碟區現在的大小，第二個讓它重新處理 vmsingle：
+
+```sh
+kubectl -n observability annotate pvc vmsingle-vm-victoria-metrics-k8s-stack operator.victoriametrics.com/pvc-allow-volume-expansion=false
+kubectl -n observability rollout restart deployment victoria-metrics-operator
+```
+
 下載 v0.2 的 installer，執行 `plan`，確認後再 `apply`，步驟見[升級 Zeabur](steps.mdx#用-zeabur-installer-升級)。
 
 `plan` 會列出這次新增的元件。System Upgrade Controller 不再是預設元件，`apply` 不會移除，只是不再更新，`plan` 會寫成 `not removed, no longer updated`。installer 本來就固定 K3s 和 RKE2 的版本，不需要 System Upgrade Controller。要留著，在 `enable` 加上 `node-updates/system-upgrade-controller`。不要的話，`apply` 完再刪掉：
