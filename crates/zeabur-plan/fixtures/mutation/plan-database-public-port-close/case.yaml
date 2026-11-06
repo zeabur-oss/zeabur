@@ -1,0 +1,8 @@
+description: "Closing a PostgreSQL database's public port deletes the LoadBalancer Service that opened it."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - op: databasePublicPort
+        database: orders
+        remove: true

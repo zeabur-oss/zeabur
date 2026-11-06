@@ -77,6 +77,7 @@ import {
 import { needed } from "@/model/installer"
 import type { Event, Health } from "@/model/service"
 import { useProjectEvents } from "@/routes/project/data"
+import { Outside } from "@/routes/database/outside"
 import { Restore, Restored } from "@/routes/database/restore"
 import { DatabaseSettings } from "@/routes/database/settings"
 import { databaseTabs, type DatabaseTab } from "@/routes/search"
@@ -552,28 +553,31 @@ function Connection({ project, database }: { project: string; database: Database
     </span>
   )
   return (
-    <Section id="db-connect" title={t("db.connect")}>
-      <ConnectServices project={project} database={database} />
-      <p className="type-meta text-muted-foreground">{t("db.inCluster")}</p>
-      <NoAppDatabase database={database} />
-      <CardRows>
-        <CardRow label={t("db.host")}>
-          {mono(c.host)}
-          <CopyText value={() => c.host} label={t("common.copy")} />
-        </CardRow>
-        <CardRow label={t("db.port")}>{mono(String(c.port))}</CardRow>
-        {c.database ? <CardRow label={t("db.database")}>{mono(c.database)}</CardRow> : null}
-        <UsernameRow connection={c}>
-          {username ? mono(username) : <InSecret secret={c.secret} />}
-        </UsernameRow>
-        <RevealRow label={t("db.password")} value={password} reveal={revealed} />
-        <CardRow label={t("db.uri")}>
-          {mono(uri)}
-          <CopyText value={() => uri} label={t("common.copy")} />
-        </CardRow>
-      </CardRows>
-      {secret?.problem ? <Problem problem={secret.problem} what={c.secret} /> : null}
-    </Section>
+    <>
+      <Section id="db-connect" title={t("db.connect")}>
+        <ConnectServices project={project} database={database} />
+        <p className="type-meta text-muted-foreground">{t("db.inCluster")}</p>
+        <NoAppDatabase database={database} />
+        <CardRows>
+          <CardRow label={t("db.host")}>
+            {mono(c.host)}
+            <CopyText value={() => c.host} label={t("common.copy")} />
+          </CardRow>
+          <CardRow label={t("db.port")}>{mono(String(c.port))}</CardRow>
+          {c.database ? <CardRow label={t("db.database")}>{mono(c.database)}</CardRow> : null}
+          <UsernameRow connection={c}>
+            {username ? mono(username) : <InSecret secret={c.secret} />}
+          </UsernameRow>
+          <RevealRow label={t("db.password")} value={password} reveal={revealed} />
+          <CardRow label={t("db.uri")}>
+            {mono(uri)}
+            <CopyText value={() => uri} label={t("common.copy")} />
+          </CardRow>
+        </CardRows>
+        {secret?.problem ? <Problem problem={secret.problem} what={c.secret} /> : null}
+      </Section>
+      <Outside project={project} database={database} credentials={{ username, password }} />
+    </>
   )
 }
 

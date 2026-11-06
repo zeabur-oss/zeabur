@@ -217,6 +217,7 @@ pub fn database(
             .map(|i| format!("storage-{name}-{i}"))
             .collect(),
         resources: server.data.pointer("/spec/resources").cloned(),
+        public_port: None,
         connection: Connection {
             host: format!("{service}.{namespace}.svc"),
             port: databases::int(server, "/spec/port")

@@ -1,0 +1,8 @@
+description: "Deleting a PostgreSQL database lists its public port's LoadBalancer Service among what goes with it: the Cluster owns it."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - op: delete
+        resource: {group: postgresql.cnpg.io, version: v1, resource: clusters}
+        name: orders

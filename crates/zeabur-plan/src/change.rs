@@ -99,6 +99,9 @@ pub enum Change {
     /// Open a port of a workload to the internet with a `LoadBalancer` Service, or close it (see
     /// the `public_port` module).
     PublicPort(PublicPortChange),
+    /// Open the port of a PostgreSQL database to the internet with a `LoadBalancer` Service, or
+    /// close it (see the `public_port` module).
+    DatabasePublicPort(DatabasePublicPortChange),
     /// Replace a workload's pods, as `kubectl rollout restart` does.
     #[serde(rename_all = "camelCase")]
     Restart {
@@ -700,6 +703,18 @@ pub struct PublicPortChange {
     pub service: String,
     /// The Service port. It is also the port on the internet.
     pub port: i32,
+    /// Close the port instead: delete the `LoadBalancer` Service that opened it.
+    #[serde(default)]
+    pub remove: bool,
+}
+
+/// A [`Change::DatabasePublicPort`].
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[serde(rename_all = "camelCase")]
+pub struct DatabasePublicPortChange {
+    /// The CloudNativePG `Cluster`.
+    pub database: String,
     /// Close the port instead: delete the `LoadBalancer` Service that opened it.
     #[serde(default)]
     pub remove: bool,
@@ -1409,6 +1424,15 @@ pub enum Warning {
         /// What kind of data store the workload is, when it is one.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         data_store: Option<zeabur_model::DataStore>,
+    },
+    /// Anyone on the internet can connect to the database: its password is all that protects
+    /// the data.
+    #[serde(rename_all = "camelCase")]
+    DatabasePublicPort {
+        /// The CloudNativePG `Cluster`.
+        database: String,
+        /// The port.
+        port: i32,
     },
     /// A NetworkPolicy isolates the workload's pods and admits nothing from the internet, so the
     /// new public port does not answer until a policy admits it (added by the API, which reads the

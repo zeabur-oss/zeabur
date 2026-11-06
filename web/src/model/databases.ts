@@ -1008,6 +1008,9 @@ const SCHEMES: Record<Engine, string> = {
   dragonfly: "redis",
 }
 
+/** The port CloudNativePG serves PostgreSQL on, which a public port opens. */
+export const POSTGRES_PORT = 5432
+
 /** The connection string, with a placeholder where the password goes. */
 export function connectionUri(database: Database, password = "PASSWORD") {
   const c = database.connection
@@ -1018,6 +1021,48 @@ export function connectionUri(database: Database, password = "PASSWORD") {
   const options = c.options ? `?${c.options}` : ""
   return `${scheme}://${user}:${encodeURIComponent(password)}@${c.host}:${c.port}/${c.database ?? ""}${options}`
 }
+
+/** The command that forwards a port on the person's computer to the database. */
+export const connectCommand = (project: string, database: Pick<Database, "name">) =>
+  `zeaburctl connect ${project}/${database.name}`
+
+const PRIVATE = [/^10\./, /^172\.(1[6-9]|2\d|3[01])\./, /^192\.168\./]
+
+/** Whether `address` is in an RFC 1918 private range. */
+const isPrivate = (address: string) => PRIVATE.some((range) => range.test(address))
+
+/** Where a public port answers: the first address the load balancer lists, the others, and
+ * whether every one is private, so none is the nodes' public address. */
+export function publicAddresses(port: Schemas.DatabasePublicPort) {
+  const first = port.addresses.at(0)
+  return {
+    first,
+    others: port.addresses.slice(1),
+    allPrivate: port.addresses.length > 0 && port.addresses.every(isPrivate),
+  }
+}
+
+/** The connection string through the public port at `address`, which asks for TLS. */
+export function publicUri(database: Database, address: string, password?: string) {
+  const port = database.publicPort?.port ?? database.connection.port
+  return connectionUri(
+    {
+      ...database,
+      connection: { ...database.connection, host: address, port, options: "sslmode=require" },
+    },
+    password,
+  )
+}
+
+/** Why the load balancer gives the public port no address yet: its newest
+ * `UnAvailableLoadBalancer` event, as ServiceLB reports it. */
+export const unavailableReason = (events: Event[], service: string) =>
+  events.find(
+    (e) =>
+      e.reason === "UnAvailableLoadBalancer" &&
+      e.regarding?.kind === "Service" &&
+      e.regarding.name === service,
+  )?.note
 
 /** Where the database's own object lives in the objects API: a custom resource of its operator. */
 export function databaseAddress(database: Database): ObjectAddress {

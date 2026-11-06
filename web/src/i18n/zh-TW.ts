@@ -2688,7 +2688,19 @@ export const zhTW: Messages = {
   "db.fact.created": "建立時間",
   "db.fact.operator": "Operator 回報",
   "db.connect": "連線",
-  "db.inCluster": "只能從叢集內部連線。",
+  "db.inCluster": "這些資訊只能在叢集內部使用。",
+  "db.outside.title": "從叢集外連線",
+  "db.outside.commandHint":
+    "在你的電腦上執行。它會經由叢集把本機的一個連接埠接到資料庫，並印出 127.0.0.1 的連線字串。按 Ctrl-C 才會停止。",
+  "db.outside.refused": (reason) => `叢集會拒絕你執行這個指令。${reason}。`,
+  "db.outside.docs": "安裝 zeaburctl",
+  "db.outside.public": "對外連接埠",
+  "db.outside.publicHint": (port) =>
+    `在節點的位址上開放連接埠 ${port}，其他電腦上的工具不用 zeaburctl 也能連線。`,
+  "db.outside.address": "位址",
+  "db.outside.others": "其他節點",
+  "db.outside.private": (port) =>
+    `這些是節點的內網位址。要從網際網路連線，請用節點的公開 IP 加上連接埠 ${port}，或在啟動 k3s 時加上 --node-external-ip，這裡就會顯示。`,
   "db.noDatabase":
     "這個叢集沒有應用程式資料庫。服務以 moco-writable 連線，這個使用者可以建立資料庫。",
   "db.noAuth": (engine) => `這個 ${engine} 沒有設定密碼，叢集裡的任何程式都能連線。`,
@@ -3296,6 +3308,10 @@ export const zhTW: Messages = {
     "副本的事件會說明原因，可能是某項政策不允許以這個使用者身分執行。",
   "sentence.problem.badRequest.fix.toolsLocally": () =>
     "在你自己的終端機執行 kubectl 和 helm，用的是和 Zeabur 同一份 kubeconfig。",
+  "sentence.problem.summary.publicPort.unknownDatabase": (p) =>
+    `找不到名為 ${p.name} 的 PostgreSQL 資料庫。`,
+  "sentence.problem.publicPort.fix.unknownDatabase": () =>
+    "重新整理頁面看看，這個資料庫可能已經刪除了。",
   "sentence.problem.summary.publicPort.alreadyPublic": (p) => `已經有名為 ${p.name} 的 Service。`,
   "sentence.problem.publicPort.fix.alreadyPublic": () =>
     "重新整理頁面看看，這個連接埠可能已經開放了。",

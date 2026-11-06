@@ -1,0 +1,28 @@
+{
+  "objects": [
+    {
+      "target": {"kind": "Service", "name": "orders-public-5432"},
+      "write": {
+        "type": "create",
+        "body": {
+          "apiVersion": "v1",
+          "kind": "Service",
+          "metadata": {
+            "name": "orders-public-5432",
+            "namespace": "demo",
+            "ownerReferences": [
+              {"apiVersion": "postgresql.cnpg.io/v1", "kind": "Cluster", "name": "orders", "uid": "c-orders"}
+            ]
+          },
+          "spec": {
+            "type": "LoadBalancer",
+            "selector": {"cnpg.io/cluster": "orders", "cnpg.io/instanceRole": "primary"},
+            "ports": [{"name": "postgres", "port": 5432, "targetPort": 5432, "protocol": "TCP"}]
+          }
+        }
+      }
+    }
+  ],
+  "impact": [],
+  "warnings": [{"code": "databasePublicPort", "database": "orders", "port": 5432}]
+}

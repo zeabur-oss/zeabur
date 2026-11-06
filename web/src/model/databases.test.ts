@@ -10,6 +10,7 @@ import {
   backupsSummary,
   canBackUpNow,
   commands,
+  connectCommand,
   connectionUri,
   createDatabase,
   databaseAddress,
@@ -24,6 +25,9 @@ import {
   newDatabase,
   newPassword,
   presetOf,
+  publicAddresses,
+  publicUri,
+  unavailableReason,
   dragonflyArgs,
   presetResources,
   reshapeDatabase,
@@ -343,6 +347,51 @@ describe("connecting", () => {
     expect(connectionUri(mongo, "p@ss")).toBe(
       "mongodb://USER:p%40ss@mongo-rs0.shop.svc:27017/admin?replicaSet=rs0",
     )
+  })
+
+  test("from outside the cluster: zeaburctl, and the public port with TLS asked for", () => {
+    expect(connectCommand("shop", postgres)).toBe("zeaburctl connect shop/pg")
+    const open = {
+      ...postgres,
+      publicPort: { service: "pg-public-5432", port: 5432, addresses: [] },
+    }
+    expect(publicUri(open, "203.0.113.7", "p@ss")).toBe(
+      "postgresql://app:p%40ss@203.0.113.7:5432/app?sslmode=require",
+    )
+  })
+
+  test.each([
+    ["no address yet", [], { first: undefined, others: [], allPrivate: false }],
+    [
+      "a public node first, a private one after",
+      ["203.0.113.7", "10.0.0.8"],
+      { first: "203.0.113.7", others: ["10.0.0.8"], allPrivate: false },
+    ],
+    [
+      "only private nodes",
+      ["10.0.0.8", "172.20.1.2", "192.168.1.5"],
+      { first: "10.0.0.8", others: ["172.20.1.2", "192.168.1.5"], allPrivate: true },
+    ],
+    [
+      "172.32 is not private",
+      ["172.32.0.1"],
+      { first: "172.32.0.1", others: [], allPrivate: false },
+    ],
+    ["a hostname", ["lb.example.net"], { first: "lb.example.net", others: [], allPrivate: false }],
+  ])("public addresses: %s", (_, addresses, expected) => {
+    expect(publicAddresses({ service: "pg-public-5432", port: 5432, addresses })).toEqual(expected)
+  })
+
+  test("the load balancer's reason for no address is the Service's own event", () => {
+    const event = (name: string, reason: string, note: string) =>
+      ({ reason, note, regarding: { kind: "Service", name } }) as never
+    const events = [
+      event("other-public-5432", "UnAvailableLoadBalancer", "not this one"),
+      event("pg-public-5432", "EnsuringLoadBalancer", "ensuring"),
+      event("pg-public-5432", "UnAvailableLoadBalancer", "There are no available nodes"),
+    ]
+    expect(unavailableReason(events, "pg-public-5432")).toBe("There are no available nodes")
+    expect(unavailableReason(events.slice(0, 2), "pg-public-5432")).toBeUndefined()
   })
 
   test("kubectl commands for the object and a shell in the primary", () => {

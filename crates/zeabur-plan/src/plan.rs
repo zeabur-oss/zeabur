@@ -490,6 +490,7 @@ impl<'a> Planner<'a> {
             }
             Change::EnvImport(import) => self.env_import(import),
             Change::PublicPort(public) => self.public_port(public),
+            Change::DatabasePublicPort(public) => self.database_public_port(public),
             Change::Create { .. } => self.create(change, index),
             Change::CreateUploadService(service) => self.create_upload_service(service, index),
             Change::Restart { workload } => self.restart_workload(workload),

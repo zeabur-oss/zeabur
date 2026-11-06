@@ -479,7 +479,11 @@ const sentenced = new Set<Schemas.PlanWarning["code"]>([
 
 /** A database open to the internet is worse than the other high risks. */
 function alertVariant(warnings: Schemas.PlanWarning[]): "destructive" | "warn" {
-  return warnings.some((w) => w.code === "publicPort" && w.dataStore) ? "destructive" : "warn"
+  return warnings.some(
+    (w) => (w.code === "publicPort" && w.dataStore) || w.code === "databasePublicPort",
+  )
+    ? "destructive"
+    : "warn"
 }
 
 function PlanBody({
@@ -734,6 +738,7 @@ function healthOf(warning: Schemas.PlanWarning): Said["health"] {
     case "publicPort":
       return warning.dataStore ? "fail" : "warn"
     case "publicPortBlocked":
+    case "databasePublicPort":
       return "fail"
     default:
       return undefined
@@ -901,6 +906,7 @@ function accessWarning(
         | "passwordOverHttp"
         | "publicPort"
         | "publicPortBlocked"
+        | "databasePublicPort"
         | "ownCertificate"
         | "issuerShared"
         | "routeDeleted"
@@ -921,6 +927,8 @@ function accessWarning(
         : t("warn.publicPort", warning.port)
     case "publicPortBlocked":
       return t("warn.publicPortBlocked", warning.port, t("common.list", warning.policies))
+    case "databasePublicPort":
+      return t("warn.publicDatabase", warning.database)
     default:
       return routeWarning(t, warning)
   }

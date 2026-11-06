@@ -37,6 +37,7 @@ const rules: Record<Right, { role: NeededRole; rule: string }> = {
   backUpVolumes: { role: "developer", rule: "create schedules.k8up.io" },
   restoreVolumes: { role: "developer", rule: "create restores.k8up.io" },
   openTerminal: { role: "developer", rule: "create pods/exec" },
+  portForward: { role: "developer", rule: "create pods/portforward" },
   readLogs: { role: "developer", rule: "get pods/log" },
   build: { role: "developer", rule: "patch builds.builder.zeabur.com" },
   deployFromGit: { role: "developer", rule: "create builds.builder.zeabur.com" },

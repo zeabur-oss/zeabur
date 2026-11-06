@@ -1,6 +1,6 @@
 //! A project's databases of MOCO, mariadb-operator and the Dragonfly Operator: their backup Jobs,
 //! Dragonfly's master, and exporting a dump: refused without `pods/exec`, a failed dump as a
-//! problem, and MOCO's password kept out of the command.
+//! problem, and MOCO's password kept out of the command. A PostgreSQL database's public port.
 
 #[cfg(test)]
 mod tests {
@@ -11,7 +11,7 @@ mod tests {
     use http_body_util::BodyExt as _;
     use serde_json::{Value, json};
     use tower::ServiceExt as _;
-    use zeabur_kube::k8s_openapi::api::core::v1::Pod;
+    use zeabur_kube::k8s_openapi::api::core::v1::{Pod, Service};
     use zeabur_kube::memory::{MemoryCluster, State};
     use zeabur_kube::{DynamicObject, NamespaceObjects, ServedResource};
 
@@ -219,5 +219,55 @@ mod tests {
             StatusCode::NOT_FOUND
         );
         assert_eq!(export(&app, "mysql/missing").await.0, StatusCode::NOT_FOUND);
+    }
+
+    #[tokio::test]
+    async fn a_postgresql_database_shows_the_addresses_of_its_public_port() {
+        let served = ["clusters", "scheduledbackups", "backups"]
+            .map(|resource| {
+                ServedResource::readable("postgresql.cnpg.io", "v1", resource, "", true)
+            })
+            .into_iter()
+            .collect();
+        let cluster = |name: &str| {
+            object(json!({
+                "apiVersion": "postgresql.cnpg.io/v1", "kind": "Cluster",
+                "metadata": {"name": name, "namespace": "shop"},
+                "spec": {"instances": 1}
+            }))
+        };
+        let service: Service = serde_json::from_value(json!({
+            "metadata": {"name": "orders-public-5432", "namespace": "shop"},
+            "spec": {"type": "LoadBalancer", "ports": [{"port": 5432}]},
+            "status": {"loadBalancer": {"ingress": [{"ip": "203.0.113.7"}, {"ip": "10.0.0.8"}]}}
+        }))
+        .unwrap();
+        let memory = MemoryCluster::new(State {
+            served,
+            dynamic: vec![cluster("orders"), cluster("reports")],
+            objects: BTreeMap::from([(
+                "shop".to_owned(),
+                NamespaceObjects {
+                    namespace: "shop".to_owned(),
+                    services: vec![service],
+                    ..NamespaceObjects::default()
+                },
+            )]),
+            ..State::default()
+        });
+        let (status, answer) = send(
+            &app(&memory),
+            "GET",
+            "/api/v1/projects/shop/databases",
+            None,
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{answer}");
+        assert_eq!(
+            named(&answer, "orders")["publicPort"],
+            json!({"service": "orders-public-5432", "port": 5432,
+                   "addresses": ["203.0.113.7", "10.0.0.8"]})
+        );
+        assert_eq!(named(&answer, "reports").get("publicPort"), None);
     }
 }

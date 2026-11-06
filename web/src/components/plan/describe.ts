@@ -13,6 +13,7 @@ import {
   type OutcomeGroup,
 } from "@/components/plan/groups"
 import { plainAmount } from "@/lib/quantity"
+import { POSTGRES_PORT } from "@/model/databases"
 import { editCount, partOf } from "@/model/draft"
 import { problemText } from "@/model/problem"
 import { limitSentence } from "@/model/ip-limits"
@@ -240,7 +241,7 @@ type ServiceChange =
   | Extract<
       Change,
       {
-        op: "envImport" | "publicPort" | "buildOptions" | "labelVolume"
+        op: "envImport" | "publicPort" | "databasePublicPort" | "buildOptions" | "labelVolume"
       }
     >
   | UploadChange
@@ -315,6 +316,10 @@ function serviceSentence(t: Translate, change: ServiceChange): string {
       return change.remove
         ? t("confirm.publicPortOff", change.port, change.workload.name)
         : t("confirm.publicPort", change.port, change.workload.name)
+    case "databasePublicPort":
+      return change.remove
+        ? t("confirm.publicPortOff", POSTGRES_PORT, change.database)
+        : t("confirm.publicPort", POSTGRES_PORT, change.database)
     case "buildOptions":
       return t("confirm.buildOptions", change.build)
     case "labelVolume":
@@ -955,6 +960,7 @@ function serviceAction(t: Translate, change: ServiceChange): string {
     case "envImport":
       return t("action.saveVariables")
     case "publicPort":
+    case "databasePublicPort":
       return change.remove ? t("action.closePort") : t("action.openPort")
     case "buildOptions":
       return t("action.saveBuildOptions")

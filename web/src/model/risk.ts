@@ -137,7 +137,7 @@ function weighOne(change: Change, podsOf: PodsOf): OneWeight {
 
 function weighAccess(change: AccessChange | ServiceChange): { risk: Risk; reason?: Reason } {
   if (change.op === "egressLimit" && change.enabled) return { risk: "high", reason: "isolates" }
-  return change.op === "publicPort" && !change.remove
+  return (change.op === "publicPort" || change.op === "databasePublicPort") && !change.remove
     ? { risk: "high", reason: "opensPort" }
     : { risk: "normal" }
 }
@@ -175,6 +175,7 @@ export type AccessChange = Extract<
       | "certificate"
       | "envImport"
       | "publicPort"
+      | "databasePublicPort"
   }
 >
 

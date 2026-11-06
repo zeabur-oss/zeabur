@@ -360,6 +360,7 @@ pub fn database(
         storage_class: text(cluster, "/spec/storage/storageClass"),
         claims: strings(cluster, "/status/instanceNames"),
         resources: cluster.data.pointer("/spec/resources").cloned(),
+        public_port: None,
         connection: Connection {
             host: format!("{service}.{namespace}.svc"),
             port: 5432,

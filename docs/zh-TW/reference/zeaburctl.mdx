@@ -16,16 +16,18 @@ zeaburctl ui
 zeaburctl ui --context production --no-browser
 zeaburctl doctor --context production --output json
 zeaburctl up ./site --project shop --service site
+zeaburctl connect shop/orders
 zeaburctl components export certificates/cert-manager
 ```
 
-`ui`、`doctor`、`up` 各自接受 `--context`。省略時使用 kubeconfig 的目前 context，指令不會改動 kubeconfig。
+`ui`、`doctor`、`up`、`connect` 各自接受 `--context`。省略時使用 kubeconfig 的目前 context，指令不會改動 kubeconfig。
 
 | 指令 | 成果 | 會變更什麼 |
 |---|---|---|
 | `ui` | 在本機瀏覽器開啟 Zeabur | 不在叢集安裝元件，在介面套用的變更直接寫入叢集 |
 | `doctor` | 檢查叢集版本、元件和 Zeabur Identity 設定 | 只讀取，不修改設定 |
 | `up` | 把資料夾上傳到從資料夾建立的服務，並開始建置 | 修改該服務的 Build，把資料夾推到 registry |
+| `connect` | 把本機連接埠轉發到資料庫，並印出連線字串 | 不改叢集裡的任何東西 |
 | `components export` | 印出安裝 Catalog 元件的 manifest 或 Helm 指令 | 不連叢集，什麼都不改 |
 
 ## `ui`
@@ -150,6 +152,21 @@ zeaburctl up [資料夾] [--project <專案>] [--service <服務>]
 | `--method railpack\|dockerfile` | 新服務的建置方式，預設是 `railpack` |
 | `--port <連接埠>` | 新服務接收連線的連接埠，同時設定 Service 和 `PORT` 環境變數。省略時不接受連線 |
 | `--yes` | 在終端機建立新服務前，跳過建立確認 |
+
+## `connect`
+
+```sh
+zeaburctl connect <project>/<database> [--port <port>] [--context <name>]
+```
+
+經由 kube-apiserver 把 `127.0.0.1` 上的一個連接埠轉發到資料庫，就像 `kubectl port-forward`，並印出對應的連線字串。每種引擎都能用。指令會一直執行，按 Ctrl-C 才停止。
+
+你要能 `list` 資料庫的資源，並在專案有 `create pods/portforward` 權限，開發者都有。讀不到資料庫的 Secret 時，連線字串會用 `PASSWORD` 代替密碼。MongoDB 的連線字串會直接連到單一成員，因為其他成員的位址只在叢集內有效。
+
+| 選項 | 預設與用途 |
+|---|---|
+| `--port` | 一個空著的連接埠。想每次都用同一個本機連接埠時再指定 |
+| `--context` | kubeconfig 的目前 context |
 
 ## `components export`
 

@@ -85,6 +85,7 @@ pub(crate) async fn compute(
         | Change::Redirect(_)
         | Change::EnvImport(_)
         | Change::PublicPort(_)
+        | Change::DatabasePublicPort(_)
         | Change::BasicAuth(_)
         | Change::ErrorPageHtml(_)
         | Change::PageServer(_)

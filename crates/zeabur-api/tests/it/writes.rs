@@ -732,6 +732,55 @@ mod tests {
         );
     }
 
+    /// Given a PostgreSQL database, when its port is opened, then the plan reads the `Cluster`
+    /// and makes it the owner of the new `LoadBalancer` Service.
+    #[tokio::test]
+    async fn a_database_public_port_is_owned_by_its_cluster() {
+        let cluster = cluster();
+        cluster.update(|s| {
+            s.served.push(zeabur_kube::ServedResource::readable(
+                "postgresql.cnpg.io",
+                "v1",
+                "clusters",
+                "Cluster",
+                true,
+            ));
+        });
+        let app = app(&cluster);
+        let objects = [
+            json!({"apiVersion": "postgresql.cnpg.io/v1", "kind": "Cluster",
+                "metadata": {"name": "orders"}, "spec": {"instances": 1}}),
+            json!({"apiVersion": "v1", "kind": "Service", "metadata": {"name": "orders-rw"},
+                "spec": {"selector": {"cnpg.io/cluster": "orders"}, "ports": [{"port": 5432}]}}),
+        ];
+        for object in objects {
+            let planned = plan(
+                &app,
+                &json!({"changes": [{"op": "create", "object": object}]}),
+            )
+            .await;
+            let (status, applied) = post(
+                app.clone(),
+                "/api/v1/projects/shop/apply",
+                &json!({"token": planned["token"]}),
+            )
+            .await;
+            assert_eq!(status, StatusCode::OK, "{applied}");
+        }
+        let planned = plan(
+            &app,
+            &json!({"changes": [{"op": "databasePublicPort", "database": "orders"}]}),
+        )
+        .await;
+        let owner = &planned["objects"][0]["write"]["body"]["metadata"]["ownerReferences"][0];
+        assert_eq!(owner["kind"], "Cluster", "{planned}");
+        assert_eq!(owner["name"], "orders");
+        assert!(
+            owner["uid"].as_str().is_some_and(|uid| !uid.is_empty()),
+            "{planned}"
+        );
+    }
+
     /// Given a port another service already opens, when the port is opened again, then the
     /// refusal says so in words a client puts in the reader's language, with what to do.
     #[tokio::test]
