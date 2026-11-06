@@ -3,7 +3,7 @@
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use base64::Engine as _;
 use base64::engine::general_purpose::{STANDARD, URL_SAFE_NO_PAD};
@@ -27,7 +27,7 @@ use zeabur_installer_plan::storage::{self, NodePrep, Storage};
 use zeabur_telemetry::{InstallationId, Step};
 
 use crate::telemetry::{self, Reporter};
-use crate::{InstallError, doctor, helm_chart, load, out, remove, render};
+use crate::{InstallError, doctor, load, out, remove, render};
 
 /// Downloads and the local CA's copy.
 pub(crate) const STATE_DIR: &str = "/var/lib/rancher/zeabur-installer";
@@ -884,9 +884,9 @@ pub(crate) fn releases(kubectl: &Kubectl, component: &ComponentPlan) -> Result<(
                     if !crds.is_empty() {
                         kubectl.apply(&crds)?;
                     }
-                    helm_chart::install(kubectl, name, &object)?;
+                    helm_chart(kubectl, name, &object)?;
                 }
-                None => helm_chart::install(kubectl, name, object)?,
+                None => helm_chart(kubectl, name, object)?,
             },
             ReleasePlan::Manifests {
                 namespace, yaml, ..
@@ -958,6 +958,151 @@ fn checked_chart(object: &Value, digest: &str) -> Result<(Value, Vec<u8>), Insta
         spec.insert("chartContent".to_owned(), json!(STANDARD.encode(&chart)));
     }
     Ok((object, chart))
+}
+
+/// Applies a `HelmChart` and waits for helm-controller's `helm upgrade --install` job, so running
+/// again is safe. helm-controller replaces the job within seconds when the chart changed and keeps
+/// the finished one when it did not; which of the two happened is only known by watching.
+///
+/// Every chart has `failurePolicy: abort`, so once the release's newest revision is `failed`, the
+/// job only waits for someone to roll it back. The wait stops there and says so.
+fn helm_chart(kubectl: &Kubectl, name: &str, object: &Value) -> Result<(), InstallError> {
+    const SETTLE: Duration = Duration::from_secs(5);
+    let job_name = format!("helm-install-{name}");
+    let namespace = object
+        .pointer("/spec/targetNamespace")
+        .and_then(Value::as_str)
+        .unwrap_or("kube-system");
+    let mut failed = None;
+    let old_uid = kubectl
+        .get("job", &job_name, Some("kube-system"))?
+        .and_then(|j| j.pointer("/metadata/uid").cloned());
+    kubectl.apply_object(object)?;
+    let applied = Instant::now();
+
+    let mut outcome = None;
+    kubectl::poll(
+        Duration::from_mins(15),
+        &format!("the {name} chart to install"),
+        || {
+            failed = newest_revision(kubectl, name, namespace)
+                .filter(|(_, status)| status == "failed")
+                .map(|(revision, _)| revision);
+            if failed.is_some() {
+                return true;
+            }
+            let Ok(job) = kubectl.get("job", &job_name, Some("kube-system")) else {
+                return false;
+            };
+            let settled = applied.elapsed() >= SETTLE;
+            let Some(job) = job else {
+                // helm-controller deletes finished jobs on its own schedule.
+                if settled && old_uid.is_some() {
+                    outcome = Some(true);
+                }
+                return outcome.is_some();
+            };
+            if job.pointer("/metadata/uid") == old_uid.as_ref() && !settled {
+                return false;
+            }
+            if job
+                .pointer("/status/succeeded")
+                .and_then(Value::as_u64)
+                .unwrap_or(0)
+                > 0
+            {
+                outcome = Some(true);
+            } else if job
+                .pointer("/status/failed")
+                .and_then(Value::as_u64)
+                .unwrap_or(0)
+                > 0
+                && conditions(&job).any(|(kind, status)| kind == "Failed" && status == "True")
+            {
+                outcome = Some(false);
+            }
+            outcome.is_some()
+        },
+    )?;
+    if let Some(revision) = failed {
+        return Err(InstallError::Message(failed_release(
+            name, namespace, revision,
+        )));
+    }
+    if outcome == Some(false) {
+        let job = format!("job/{job_name}");
+        let logs = kubectl
+            .run(
+                &["logs", "--namespace=kube-system", &job, "--tail=30"],
+                None,
+            )
+            .unwrap_or_default();
+        return Err(InstallError::Message(format!(
+            "the {name} chart failed to install:\n{logs}"
+        )));
+    }
+    Ok(())
+}
+
+/// The version and status of the release's newest revision, from the labels Helm puts on its
+/// revision Secrets. `None` before Helm installs it.
+fn newest_revision(kubectl: &Kubectl, name: &str, namespace: &str) -> Option<(u64, String)> {
+    let selector = format!("--selector=owner=helm,name={name}");
+    let out = kubectl
+        .run(
+            &[
+                "get",
+                "secrets",
+                "--namespace",
+                namespace,
+                &selector,
+                "--output=jsonpath={range .items[*]}{.metadata.labels.version} {.metadata.labels.status}{\"\\n\"}{end}",
+            ],
+            None,
+        )
+        .ok()?;
+    newest_line(&out)
+}
+
+fn newest_line(out: &str) -> Option<(u64, String)> {
+    let mut newest: Option<(u64, String)> = None;
+    for line in out.lines() {
+        let Some((version, status)) = line.split_once(' ') else {
+            continue;
+        };
+        let Ok(version) = version.parse() else {
+            continue;
+        };
+        if newest.as_ref().is_none_or(|(n, _)| version > *n) {
+            newest = Some((version, status.to_owned()));
+        }
+    }
+    newest
+}
+
+fn failed_release(name: &str, namespace: &str, revision: u64) -> String {
+    let undo = if revision == 1 {
+        "uninstall"
+    } else {
+        "rollback"
+    };
+    format!(
+        "Helm failed to install or upgrade the {name} chart. See why with `helm history {name} -n {namespace}`, from a machine that has helm and can reach the cluster. Fix the cause, run `helm {undo} {name} -n {namespace}`, then run apply again."
+    )
+}
+
+fn conditions(object: &Value) -> impl Iterator<Item = (&str, &str)> {
+    object
+        .pointer("/status/conditions")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .map(|c| {
+            (
+                c.get("type").and_then(Value::as_str).unwrap_or_default(),
+                c.get("status").and_then(Value::as_str).unwrap_or_default(),
+            )
+        })
 }
 
 fn cert_manager_namespace(plan: &Plan) -> Result<String, InstallError> {
@@ -1232,7 +1377,7 @@ fn zeabur(
         }))?;
     }
 
-    helm_chart::install(
+    helm_chart(
         kubectl,
         "zeabur",
         &zeabur_helm_chart(zeabur, telemetry, update_check(config))?,
@@ -1298,8 +1443,7 @@ pub(crate) fn zeabur_helm_chart(
             "targetNamespace": ZEABUR_NAMESPACE,
             "createNamespace": false,
             "valuesContent": values.to_string(),
-            "failurePolicy": plan::FAILURE_POLICY,
-            "backOffLimit": plan::BACK_OFF_LIMIT,
+            "failurePolicy": "abort",
             "timeout": "10m0s",
         },
     }))
@@ -1516,6 +1660,29 @@ fn record(kubectl: &Kubectl, plan: &Plan, link_issued: bool) -> Result<(), Insta
 
 #[cfg(test)]
 mod tests {
+    // A failed upgrade under `failurePolicy: abort` waits for a rollback, so apply decides by the
+    // newest revision, whatever older ones say (docs/reference/installer.mdx, troubleshooting).
+    #[test]
+    fn the_newest_revision_decides_whether_a_release_failed() {
+        let out = "9 superseded\n11 failed\n10 superseded\n";
+        assert_eq!(newest_line(out), Some((11, "failed".to_owned())));
+        assert_eq!(
+            newest_line("2 failed\n3 deployed\n"),
+            Some((3, "deployed".to_owned()))
+        );
+        assert_eq!(newest_line(""), None);
+    }
+
+    #[test]
+    fn a_failed_release_says_how_to_see_why_and_undo_it() {
+        let upgrade = failed_release("zot", "zot", 4);
+        assert!(upgrade.contains("helm history zot -n zot"), "{upgrade}");
+        assert!(upgrade.contains("helm rollback zot -n zot"), "{upgrade}");
+        // A first install has nothing to roll back to.
+        let install = failed_release("zot", "zot", 1);
+        assert!(install.contains("helm uninstall zot -n zot"), "{install}");
+    }
+
     #[test]
     fn a_new_or_changed_image_archive_is_a_change_but_a_copied_one_is_not() {
         let dir = tempfile::tempdir().unwrap();

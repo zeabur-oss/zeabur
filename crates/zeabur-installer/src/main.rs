@@ -4,7 +4,6 @@
 mod apply;
 mod doctor;
 mod gui;
-mod helm_chart;
 mod join;
 mod load;
 mod node;

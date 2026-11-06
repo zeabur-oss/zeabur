@@ -199,7 +199,7 @@ K3s 或 RKE2 移除後，`uninstall --purge` 清掉 installer 的下載快取、
 - 主機檢查失敗：依輸出釋出連接埠或修正磁碟，再執行一次 `plan`、`apply`。
 - Kubernetes 沒啟動：K3s 看 `sudo journalctl -u k3s`，worker 看 `k3s-agent`；RKE2 看 `sudo journalctl -u rke2-server`，worker 看 `rke2-agent`。
 - 元件卡在 Helm 安裝：`doctor` 會指出 `kube-system` 裡的 `helm-install-<name>` Job，看這個 Job 的日誌。
-- Chart 升級失敗：`apply` 會停在那個 chart，把它改成 `failurePolicy: abort`，讓 helm-controller 不再重試，並提示你用 `helm history` 查看失敗原因。安裝工具不會裝 helm，請在裝了 helm、連得到叢集的電腦上執行。照原因排除，例如改設定，或改回 Kubernetes 不能直接修改的欄位，再執行一次 `apply`。它會直接在失敗的版本上重新升級，不會回退，也不會解除安裝。
+- Chart 安裝或升級失敗：`apply` 會停在這個 chart，提示你用 `helm history` 查原因。安裝程式不會安裝 helm，請在有 helm、連得到叢集的電腦上執行。修好原因後執行 `helm rollback`（第一次安裝就失敗時改用 `helm uninstall`），再執行一次 `apply`。
 - 新節點就緒但部分系統服務連不到：先在 server 執行 `node sync`，再看 `doctor` 的網路政策檢查。
 
 要撤回安裝，依[移除流程](../leave/uninstall.mdx)選擇只移除 Zeabur，或整台測試機一起清掉。刪掉應用程式的 Namespace 不會移除 Zeabur，只會刪掉應用程式。

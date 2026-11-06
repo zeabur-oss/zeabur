@@ -24,11 +24,6 @@ use crate::{PlanError, node_name, values};
 
 /// The label and field manager on everything the installer creates.
 pub const MANAGER: &str = "zeabur-installer";
-/// helm-controller's failure policy for every chart: the install Job upgrades over a failed
-/// release, so fixing the cause and applying again is enough.
-pub const FAILURE_POLICY: &str = "retry";
-/// How often helm-controller's install Job runs again after a failure, instead of 1000.
-pub const BACK_OFF_LIMIT: u32 = 3;
 /// The label the baseline policies let traffic in from. `app.kubernetes.io/managed-by` cannot be
 /// it: a product that labels its own namespace, as Zeabur Identity does, takes that one over.
 pub const BASELINE_LABEL: &str = "zeabur.com/platform";
@@ -1227,8 +1222,7 @@ fn component_plan(
                     "targetNamespace": release.namespace,
                     "createNamespace": false,
                     "valuesContent": values::canonical(&vals),
-                    "failurePolicy": FAILURE_POLICY,
-                    "backOffLimit": BACK_OFF_LIMIT,
+                    "failurePolicy": "abort",
                     "timeout": "10m0s",
                 });
                 if let (Some(repo), Some(map)) = (&release.repo, spec.as_object_mut()) {
