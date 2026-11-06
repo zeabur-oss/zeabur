@@ -170,7 +170,7 @@ Click **Renew** next to a token to get a new token with the same name and role. 
 
 To stop a token at once, choose **More** → **Delete** next to it. Every token issued for it stops working, and requests get `401 Unauthorized`.
 
-A token keeps working after the person who created it leaves the project, until it expires or someone deletes it. When someone leaves, check who created each token in the list and delete theirs.
+A token can't keep more access than the person who created it. When an admin removes someone from a project, Zeabur deletes the tokens that person created in that project. When an admin changes someone from Developer to Viewer, Zeabur deletes that person's Developer tokens in that project and keeps their Viewer tokens. The plan lists each token it deletes. Tokens set to **Every namespace** aren't affected, because only admins can create them.
 
 ## What Zeabur creates
 
