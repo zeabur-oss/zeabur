@@ -447,6 +447,7 @@ pub(crate) async fn open(
             | Change::RemoveVolume { .. }
             | Change::SwapClaim { .. }
             | Change::Probe { .. }
+            | Change::Port { .. }
             | Change::ConfigReload { .. }
             | Change::Image { .. }
             | Change::Rebuild { .. }

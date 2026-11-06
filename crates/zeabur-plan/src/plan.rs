@@ -528,6 +528,12 @@ impl<'a> Planner<'a> {
                 probe,
                 set,
             } => self.probe(workload, container.as_deref(), *probe, set.as_ref()),
+            Change::Port {
+                workload,
+                container,
+                from,
+                to,
+            } => self.port(workload, container.as_deref(), *from, *to),
             Change::Image {
                 workload,
                 container,
@@ -780,7 +786,7 @@ impl<'a> Planner<'a> {
 
     // ── Environment ──────────────────────────────────────────────────────────────────────────
 
-    fn env(
+    pub(crate) fn env(
         &mut self,
         reference: &WorkloadRef,
         container: Option<&str>,

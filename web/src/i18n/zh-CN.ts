@@ -1548,6 +1548,8 @@ export const zhCN: Messages = {
   "confirm.alsoReads": (names, object) => `也会影响 ${names}（读取 ${object}）。`,
   "confirm.alsoAffects": (names) => `也会影响 ${names}。`,
   "confirm.addDomain": (host, service) => `${host} 会指向 ${service}。`,
+  "confirm.port": (service, from, to) =>
+    `${service} 从端口 ${from} 改用 ${to}：容器端口、健康检查和 PORT 都会跟着调整，私有地址也会把流量转发到 ${to}。`,
   "confirm.image": (service, tag) => `${service} 会改为运行 ${tag}。`,
   "confirm.rebuild": (build) => `Zeabur Builder 会用分支最新的提交重新构建 ${build}。`,
   "confirm.buildOptions": (build) => `从下一次构建起，Zeabur Builder 用这些选项构建 ${build}。`,
@@ -3359,6 +3361,16 @@ export const zhCN: Messages = {
   "fixer.clusterAdmin.lead": "这需要集群管理员处理：",
   "diagnosis.copy": "复制诊断",
   "diagnosis.copyFailed": "无法复制诊断，请重试。",
+  "wrongPort.cause": (port) => `应用没有监听端口 ${port}。`,
+  "wrongPort.why": (port) =>
+    `Zeabur 把 PORT 设为 ${port}，也会检查这个端口，但连接一直被拒绝，已经超过一分钟。`,
+  "wrongPort.fix":
+    "让应用读取 PORT，或改用实际监听的端口，日志通常会写出是哪一个。如果只监听 127.0.0.1，请改为监听 0.0.0.0。",
+  "wrongPort.declares": (port) => `镜像声明的端口是 ${port}。`,
+  "wrongPort.offer": (to, from) =>
+    `镜像声明的端口是 ${to}，但服务用的是 ${from}。如果应用监听的是 ${to}，就改用这个端口。`,
+  "wrongPort.use": (port) => `改用端口 ${port}`,
+  "wrongPort.plan": (service, port) => `${service} 改用端口 ${port}`,
   "diagnosis.lastSeen": "最后出现",
   "trace.title": "连接检查",
   "trace.reachable": "可访问",

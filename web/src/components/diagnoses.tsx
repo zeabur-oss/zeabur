@@ -20,6 +20,8 @@ import { originOf } from "@/model/origin"
 import { isTask, statusOf, type Service } from "@/model/service"
 import { troubleTone } from "@/model/severity"
 import { cn } from "@/lib/utils"
+import { sameDiagnosis, type WrongPort } from "@/model/wrong-port"
+import { withOffer, wrongPortWords } from "@/components/wrong-port"
 import type { ServicePlace } from "@/routes/search"
 
 export type Diagnosis = Schemas.Diagnosis
@@ -59,9 +61,12 @@ export interface DiagnosisAction {
   pod?: string
 }
 
-/** The step that fixes `d`; without `logs`, the events instead of the logs. */
-export function diagnosisAction(d: Diagnosis, logs = true): DiagnosisAction {
-  const action = actionOf(d)
+/** The step that fixes `d`, or its logs with `toLogs`; without `logs`, the events instead of the
+ * logs. */
+export function diagnosisAction(d: Diagnosis, logs = true, toLogs = false): DiagnosisAction {
+  const action: DiagnosisAction = toLogs
+    ? { tab: "logs", label: "diagnosis.action.logs", pod: d.pods[0] }
+    : actionOf(d)
   return action.tab === "logs" && !logs
     ? { tab: "events", label: "diagnosis.action.events", pod: action.pod }
     : action
@@ -162,19 +167,18 @@ export function Diagnoses({
   service,
   project,
   also,
+  wrongPort,
 }: {
   diagnoses?: Diagnosis[]
   service: Service
   project: string
   /** What the first cause also takes down, inside its own entry. */
   also?: ReactNode
+  /** The app doesn't listen on its port: said in place of its failing traffic check. */
+  wrongPort?: WrongPort
 }) {
   const t = useT()
-  const write = useSentence()
-  const logs = useLogsReadable(project)
   if (!diagnoses || diagnoses.length === 0) return null
-  const button = buttonVariants({ variant: "outline", size: "sm" })
-  const runs = !isTask(service.kind) && service.pods.some((p) => p.ready)
   const warn = troubleTone(statusOf(service).health) === "warn"
   return (
     <section
@@ -188,91 +192,143 @@ export function Diagnoses({
         {t("diagnosis.title")}
       </h2>
       <ul className="flex flex-col">
-        {diagnoses.map((d, i) => {
-          const action = diagnosisAction(d, logs)
-          const raw = rawRows(t, d, service)
-          const pod = action.pod ?? d.pods[0]
-          const { origin, fixer } = originOf(d)
-          const lead = fixLead(t, fixer)
-          const where = lead ? undefined : originSentence(t, origin)
-          const copy = (
-            <CopyText
-              primary={lead !== undefined}
-              value={async () => {
-                try {
-                  const bundle = await queryClient.query(
-                    evidenceQuery(project, service.kind, service.name),
-                  )
-                  return writeBundle(bundle.markdown, (sentence) => writeSentence(t, sentence))
-                } catch {
-                  return diagnosisText(t, write, d, service, project)
-                }
-              }}
-              label={t("diagnosis.copy")}
-            />
-          )
-          return (
-            <li
-              key={`${d.kind}/${d.container ?? ""}/${d.cause.key}`}
-              className={cn(
-                "flex gap-3 border-t px-4 py-3 text-sm first:border-t-0",
-                warn ? "border-warn/20" : "border-fail/20",
-              )}
-            >
-              <WarningCircleFillIcon
-                className={cn("mt-0.5 size-4 shrink-0", warn ? "text-warn" : "text-fail")}
-                aria-hidden="true"
-              />
-              <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-                <p className="font-medium">{write(d.cause)}</p>
-                {where ? <p className="text-secondary">{where}</p> : null}
-                {d.incident ? <IncidentCause project={project} id={d.incident} /> : null}
-                <Layers
-                  why={write(d.why)}
-                  also={i === 0 ? also : undefined}
-                  fix={write(d.fix)}
-                  fixLead={lead}
-                  action={
-                    <span className="flex flex-wrap items-center gap-1.5">
-                      {lead ? copy : null}
-                      <Link
-                        {...serviceLink(project, service, { tab: action.tab, pod: action.pod })}
-                        className={button}
-                      >
-                        {t(action.label)}
-                      </Link>
-                      {action.tab === "logs" || !logs ? null : (
-                        <Link
-                          {...serviceLink(project, service, { tab: "logs", pod })}
-                          className={button}
-                        >
-                          <FileTextIcon aria-hidden="true" data-icon="inline-start" />
-                          {t("tab.logs")}
-                        </Link>
-                      )}
-                      {runs ? (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => openShell(project, service, pod)}
-                        >
-                          <TerminalWindowIcon aria-hidden="true" data-icon="inline-start" />
-                          {t("tab.terminal")}
-                        </Button>
-                      ) : null}
-                      {lead ? null : copy}
-                    </span>
-                  }
-                  evidence={d.evidence}
-                  lastSeen={d.lastSeen}
-                >
-                  {raw.length > 0 ? <Raw rows={raw} /> : null}
-                </Layers>
-              </div>
-            </li>
-          )
-        })}
+        {diagnoses.map((d, i) => (
+          <DiagnosisItem
+            key={`${d.kind}/${d.container ?? ""}/${d.cause.key}`}
+            d={d}
+            service={service}
+            project={project}
+            warn={warn}
+            also={i === 0 ? also : undefined}
+            wrongPort={wrongPort && sameDiagnosis(d, wrongPort.diagnosis) ? wrongPort : undefined}
+          />
+        ))}
       </ul>
     </section>
+  )
+}
+
+function DiagnosisItem({
+  d,
+  service,
+  project,
+  warn,
+  also,
+  wrongPort,
+}: {
+  d: Diagnosis
+  service: Service
+  project: string
+  warn: boolean
+  also?: ReactNode
+  wrongPort?: WrongPort
+}) {
+  const t = useT()
+  const write = useSentence()
+  const words = wrongPort
+    ? wrongPortWords(t, wrongPort)
+    : { cause: write(d.cause), why: write(d.why), fix: write(d.fix) }
+  const raw = rawRows(t, d, service)
+  const { origin, fixer } = originOf(d)
+  const lead = fixLead(t, fixer)
+  const where = lead ? undefined : originSentence(t, origin)
+  const copy = (
+    <CopyText
+      primary={lead !== undefined}
+      value={async () => {
+        try {
+          const bundle = await queryClient.query(evidenceQuery(project, service.kind, service.name))
+          return writeBundle(bundle.markdown, (sentence) => writeSentence(t, sentence))
+        } catch {
+          return diagnosisText(t, write, d, service, project)
+        }
+      }}
+      label={t("diagnosis.copy")}
+    />
+  )
+  return (
+    <li
+      className={cn(
+        "flex gap-3 border-t px-4 py-3 text-sm first:border-t-0",
+        warn ? "border-warn/20" : "border-fail/20",
+      )}
+    >
+      <WarningCircleFillIcon
+        className={cn("mt-0.5 size-4 shrink-0", warn ? "text-warn" : "text-fail")}
+        aria-hidden="true"
+      />
+      <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+        <p className="font-medium">{words.cause}</p>
+        {where ? <p className="text-secondary">{where}</p> : null}
+        {d.incident ? <IncidentCause project={project} id={d.incident} /> : null}
+        <Layers
+          why={words.why}
+          also={withOffer(t, project, service, wrongPort?.offer, also)}
+          fix={words.fix}
+          fixLead={lead}
+          action={
+            <DiagnosisActions
+              d={d}
+              service={service}
+              project={project}
+              toLogs={wrongPort !== undefined}
+              copy={copy}
+              copyFirst={lead !== undefined}
+            />
+          }
+          evidence={d.evidence}
+          lastSeen={d.lastSeen}
+        >
+          {raw.length > 0 ? <Raw rows={raw} /> : null}
+        </Layers>
+      </div>
+    </li>
+  )
+}
+
+function DiagnosisActions({
+  d,
+  service,
+  project,
+  toLogs,
+  copy,
+  copyFirst,
+}: {
+  d: Diagnosis
+  service: Service
+  project: string
+  toLogs: boolean
+  copy: ReactNode
+  copyFirst: boolean
+}) {
+  const t = useT()
+  const logs = useLogsReadable(project)
+  const button = buttonVariants({ variant: "outline", size: "sm" })
+  const runs = !isTask(service.kind) && service.pods.some((p) => p.ready)
+  const action = diagnosisAction(d, logs, toLogs)
+  const pod = action.pod ?? d.pods[0]
+  return (
+    <span className="flex flex-wrap items-center gap-1.5">
+      {copyFirst ? copy : null}
+      <Link
+        {...serviceLink(project, service, { tab: action.tab, pod: action.pod })}
+        className={button}
+      >
+        {t(action.label)}
+      </Link>
+      {action.tab === "logs" || !logs ? null : (
+        <Link {...serviceLink(project, service, { tab: "logs", pod })} className={button}>
+          <FileTextIcon aria-hidden="true" data-icon="inline-start" />
+          {t("tab.logs")}
+        </Link>
+      )}
+      {runs ? (
+        <Button variant="outline" size="sm" onClick={() => openShell(project, service, pod)}>
+          <TerminalWindowIcon aria-hidden="true" data-icon="inline-start" />
+          {t("tab.terminal")}
+        </Button>
+      ) : null}
+      {copyFirst ? null : copy}
+    </span>
   )
 }
