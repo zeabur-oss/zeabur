@@ -1179,7 +1179,7 @@ export const zhCN: Messages = {
   "confirm.deleteProject":
     "删除这个项目的 Namespace 和其中的所有内容，和 kubectl delete namespace 一样，删除后无法恢复。",
   "confirm.forceDeleteProject":
-    "移除卡住项目删除的 finalizer，让 Kubernetes 把项目删完。移除后无法恢复。",
+    "移除卡住项目的 finalizer，让 Kubernetes 把项目删完。移除后无法恢复。",
   "confirm.debugContainer": (pod: string) =>
     `在副本 ${pod} 中加上带 shell 的调试容器，从里面能看到应用程序的进程。`,
   "confirm.debugStays":
@@ -1458,7 +1458,7 @@ export const zhCN: Messages = {
     `${names} 由 ${tool} 管理，删除后 ${tool} 可能会重新创建`,
   "warn.removesFinalizers": (names: string) => `移除 ${names} 的 finalizer`,
   "warn.cleanupSkipped":
-    "这些对象的控制器就没有机会清理自己在集群外创建的内容，例如对象存储中的备份或云磁盘",
+    "这些对象的控制器就没办法清理自己在集群外创建的东西，例如对象存储里的备份或云磁盘",
   "warn.restartNeeded": (names: string) => `重启后才会生效：${names}`,
   "warn.reloaderRestarts": (names: string) => `Reloader 会重启 ${names}`,
   "warn.reloaderMayRestart": (names: string) => `如果这个集群运行着 Reloader，会重启 ${names}`,

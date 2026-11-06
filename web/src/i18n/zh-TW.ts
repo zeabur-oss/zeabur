@@ -1182,7 +1182,7 @@ export const zhTW: Messages = {
   "confirm.deleteProject":
     "會刪除專案的 Namespace 和裡面所有東西，效果和 kubectl delete namespace 一樣。刪除後無法復原。",
   "confirm.forceDeleteProject":
-    "會移除卡住專案刪除的 finalizer，讓 Kubernetes 把專案刪完。移除後無法復原。",
+    "會移除卡住專案的 finalizer，讓 Kubernetes 把專案刪完。移除後無法復原。",
   "confirm.debugContainer": (pod: string) =>
     `在副本 ${pod} 加上附 shell 的除錯容器，從裡面看得到應用程式正在執行的程式。`,
   "confirm.debugStays":
@@ -1461,7 +1461,7 @@ export const zhTW: Messages = {
     `${names} 由 ${tool} 管理，刪除後 ${tool} 可能會重建`,
   "warn.removesFinalizers": (names: string) => `移除 ${names} 的 finalizer`,
   "warn.cleanupSkipped":
-    "這些物件的控制器就沒機會清理自己在叢集外建立的東西，例如物件儲存裡的備份或雲端磁碟",
+    "這些物件的控制器就沒辦法清理自己在叢集外建立的東西，例如物件儲存裡的備份或雲端磁碟",
   "warn.restartNeeded": (names: string) => `重新啟動後才會生效：${names}`,
   "warn.reloaderRestarts": (names: string) => `Reloader 會重新啟動 ${names}`,
   "warn.reloaderMayRestart": (names: string) => `若這個叢集有執行 Reloader，會重新啟動 ${names}`,

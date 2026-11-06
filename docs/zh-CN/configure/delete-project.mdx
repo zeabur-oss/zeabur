@@ -88,15 +88,15 @@ kubectl get clusters.postgresql.cnpg.io orders -n shop -o yaml
 
 ### 强制删除
 
-控制器已经不在，或一直清理不完时，在项目页上方点击**强制删除**。只要有对象在等待 finalizer，就会出现这个按钮。控制器通常会自己处理完，多等一会儿更稳妥；确实等不到，再强制删除。
+控制器已经被移除，或一直清理不完时，在项目页上方点击**强制删除**。只要有对象在等待 finalizer，就会出现这个按钮。控制器通常会自己处理完，多等一会儿更稳妥；确实等不到，再强制删除。
 
 检查页面会列出每个对象和要移除的 finalizer。强制删除会：
 
-- 对 Namespace 控制器报告还在等待的对象，把 `metadata.finalizers` 设为 `[]`，并且只改已经在删除中的对象。
-- 不改 Namespace 自己的 `spec.finalizers`。之后 Kubernetes 会删除剩下的内容，再删除 Namespace。
+- Namespace 报告还在等待的对象，`metadata.finalizers` 会设为 `[]`。只改已经在删除的对象。
+- 不改 Namespace 自己的 `spec.finalizers`。之后 Kubernetes 会删除剩下的东西，再删除 Namespace。
 - 以你的身份运行，所以你需要这些对象的 `patch` 权限。
 
-finalizer 移除后，控制器就没有机会清理自己在集群外创建的内容，例如对象存储中的备份或云磁盘，这些需要自行检查并删除。输入项目名称，再点击**强制删除项目**。
+finalizer 移除后，控制器就没办法清理自己在集群外创建的东西，例如对象存储里的备份或云磁盘，这些要自己检查并删除。输入项目名称，再点击**强制删除项目**。
 
 用 kubectl 时，对项目页列出的每个对象运行：
 
