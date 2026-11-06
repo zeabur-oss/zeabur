@@ -1,7 +1,7 @@
 ---
 title: 移除 Zeabur，保留服务
 description: 移除 Zeabur 管理界面，保留应用、数据和仍在使用的 Kubernetes 组件。
-source: "4ad7bec6c913"
+source: "85d2518a692e"
 ---
 
 只移除 Zeabur 的 chart 或运行 `zeabur-installer uninstall zeabur`，现有服务会留在 Kubernetes，继续由原生控制器和 operator 运行。保留 ingress、证书、存储和备份等依赖组件后，就能改用 kubectl、Helm 或原来的 GitOps 工具管理服务。
@@ -121,7 +121,7 @@ kubectl get storageclasses
 
 ## 成员权限和准入策略
 
-卸载 Chart 会移除 `zeabur-member`、项目的聚合 ClusterRole、其规则集，以及 `zeabur-project-namespace` ValidatingAdmissionPolicy 和 binding。`zeabur-installer uninstall zeabur` 还会删除 Zeabur 创建的成员 binding。
+卸载 Chart 会移除 `zeabur-member`、项目的聚合 ClusterRole、其规则集，以及 `zeabur-project-namespace` 和 `zeabur-api-token-*` ValidatingAdmissionPolicy 和 binding。`zeabur-installer uninstall zeabur` 还会删除 Zeabur 创建的成员 binding。
 
 installer 添加的 `zeabur-system-hosts` 策略和 binding 会保留，Zeabur Identity 的域名会继续受到保护。删除 `zeabur` Namespace 后，这个策略的 binding 找不到 Ingress，不再拦截任何路由。不再需要时，按 [Zeabur 和 Zeabur Identity 的域名](../reference/security.mdx#zeabur-和-zeabur-identity-的域名)删除或改为 `Warn`。
 
@@ -135,6 +135,13 @@ kubectl delete rolebindings,clusterrolebindings --all-namespaces \
 ```
 
 保留 Identity 时，其他 client 或 kubeconfig 仍可能以 `zeabur:<username>` 身份登录，删除前先确认它们不再依赖这些 binding。
+
+无论用哪种方式移除，[API 令牌](../reference/api-tokens.mdx)都会保留。它们的 binding 指向 chart 已移除的项目角色，因此令牌已经没有权限。用以下命令删除：
+
+```sh
+kubectl delete rolebindings,clusterrolebindings,serviceaccounts --all-namespaces \
+  -l app.kubernetes.io/managed-by=zeabur,zeabur.com/api-token
+```
 
 ## 清理临时工具和目的地信息
 

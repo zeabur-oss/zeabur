@@ -24,6 +24,7 @@ For steps to assign member roles, see [Members](../cluster/members.mdx). When yo
 | Deploy from Git and rebuild | No | Yes |
 | Open container terminals and add debug containers | No | Yes |
 | Edit a project's display name, description, and icon | No | Yes |
+| Create, renew, and delete the project's [API tokens](./api-tokens.mdx) | No | Yes |
 | Create or delete namespaces and add namespaces to or remove them from Zeabur | No | No |
 | Edit roles, member access, nodes, and cluster components | No | No |
 | Restore volumes from backups (K8up) | No | Yes |
@@ -47,7 +48,9 @@ The chart sets `memberRoles.enabled` to `true` by default and creates:
 - `zeabur-member`: Reads nodes, namespaces, storage classes, and PersistentVolumes whose names are known. Every member can see the names and annotations of all namespaces, so don't put secrets in project descriptions.
 - `zeabur-project-viewer`, `zeabur-project-developer`: Project roles that aggregate rules using the `zeabur.com/aggregate-to-<role>` label.
 - `zeabur-project-viewer-rules`, `zeabur-project-developer-rules`, `zeabur-project-builds-read`, `zeabur-project-builds-write`: The actual verbs and resources for the two roles above. Viewers can view builds. Developers can also deploy from Git and rebuild.
+- `zeabur-project-api-tokens`: Lets developers create the ServiceAccounts and RoleBindings of [API tokens](./api-tokens.mdx) and request tokens for them.
 - The `zeabur-project-namespace` ValidatingAdmissionPolicy and its binding: Restricts which namespace fields developers can change. Requires Kubernetes 1.30 or later.
+- The `zeabur-api-token-accounts`, `zeabur-api-token-bindings`, and `zeabur-api-token-requests` ValidatingAdmissionPolicies and their bindings: Keep what developers write to API tokens. See [API tokens and RBAC](#api-tokens-and-rbac).
 
 The chart doesn't bind roles to anyone. When an admin invites or updates a member in Zeabur, Zeabur uses the admin's permissions to create:
 
@@ -80,9 +83,19 @@ This restriction doesn't apply to anyone with `zeabur-manage` permission on that
 Developers can read the project's secrets, create replicas, edit workloads, and run commands in containers. This gives them access to secrets mounted by workloads and lets them run with the permissions of any ServiceAccount in the project. Don't put admin credentials or ServiceAccounts with more permissions than the team should have in the project.
 </Callout>
 
-The Developer role can't write RBAC objects or ServiceAccounts and has no `bind`, `escalate`, `impersonate`, `nodes/proxy`, or service/pod proxy permissions, so developers can't grant themselves more permissions.
+The Developer role can write only the ServiceAccounts and RoleBindings of API tokens, and has no `bind`, `escalate`, `impersonate`, `nodes/proxy`, or service/pod proxy permissions, so developers can't grant themselves more permissions.
 
 Viewers can't read secrets or logs, but they can read config files and workload configurations. They can also see passwords written directly in those places.
+
+## API tokens and RBAC
+
+Developers can create ServiceAccounts, RoleBindings, and tokens in their projects so they can make [API tokens](./api-tokens.mdx). Kubernetes lets a RoleBinding grant only a role its creator already has. The chart's three policies narrow these permissions further in project namespaces:
+
+- A ServiceAccount must carry the `zeabur.com/api-token: "true"` label and name its creator. After it's created, only the expiry annotation can change.
+- A RoleBinding must carry the same label, bind `zeabur-project-developer` or `zeabur-project-viewer`, and have one subject: a ServiceAccount in the same namespace, with the binding named `zeabur-api-token-<ServiceAccount>`. It can't be changed after it's created.
+- ServiceAccounts can't write these objects or request tokens, so a token can't create or renew tokens.
+
+These restrictions don't apply to anyone with the same permission on all namespaces, such as admins. Because of the last rule, a workload in a project can't create ServiceAccounts, RoleBindings, or tokens there unless an admin grants it that permission on all namespaces.
 
 ## Admin accounts and regular accounts
 
