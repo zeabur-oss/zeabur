@@ -761,7 +761,7 @@ pub(crate) mod tests {
         ] {
             assert!(policy.contains(&format!("'{name}'")), "{name}");
         }
-        assert!(policy.contains(&format!("'{}' + ", api_token::binding_name(""))));
+        assert!(policy.contains(&format!("'{}'", api_token::PREFIX)));
     }
 
     #[test]

@@ -40,7 +40,7 @@ export KUBECONFIG=$PWD/shop-ci.yaml
 kubectl auth whoami
 ```
 
-`kubectl auth whoami` shows `system:serviceaccount:shop:github-actions`. That's the name kube-apiserver logs for the token's requests.
+`kubectl auth whoami` shows `system:serviceaccount:shop:zeabur-api-token-github-actions`. That's the name kube-apiserver logs for the token's requests.
 
 For curl, set the address and token once:
 
@@ -178,10 +178,10 @@ Zeabur writes these objects with your own permissions:
 
 | Object | Contents |
 |---|---|
-| `ServiceAccount <name>` in the project | Labels `zeabur.com/api-token: "true"` and `app.kubernetes.io/managed-by: zeabur`. Annotations record the role, who created it, and when the latest token expires |
+| `ServiceAccount zeabur-api-token-<name>` in the project | Labels `zeabur.com/api-token: "true"` and `app.kubernetes.io/managed-by: zeabur`. Annotations record the role, who created it, and when the latest token expires |
 | `RoleBinding zeabur-api-token-<name>` in the project | Binds `zeabur-project-developer` or `zeabur-project-viewer` to the ServiceAccount |
 | `ClusterRoleBinding zeabur-api-token:<project>:<name>` | Instead of the RoleBinding, for a token in every namespace |
 
 The token itself comes from a TokenRequest for the ServiceAccount. Zeabur doesn't store it in a secret or anywhere else. Deleting the token deletes the binding and the ServiceAccount.
 
-Three admission policies in the chart keep these objects to API tokens. See [API tokens and RBAC](./permissions.mdx#api-tokens-and-rbac).
+Admission policies in the chart keep these objects to API tokens, and keep pods from running as a token's ServiceAccount. See [API tokens and RBAC](./permissions.mdx#api-tokens-and-rbac).

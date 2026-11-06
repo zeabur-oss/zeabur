@@ -1,7 +1,7 @@
 ---
 title: API 令牌
 description: 让脚本和 CI 以项目角色调用 Kubernetes API，令牌会到期。
-source: "51664d35a6ec"
+source: "6356ce4196a8"
 ---
 
 脚本或 CI 无需你登录，也能用 API 令牌操作项目。在项目的**设置** → **API 令牌**中创建一个，授予它**开发者**或**查看者**角色，然后复制令牌。令牌和 kubectl 一样直接调用 kube-apiserver，能做什么由 Kubernetes RBAC 决定。每个令牌都会到期。
@@ -41,7 +41,7 @@ export KUBECONFIG=$PWD/shop-ci.yaml
 kubectl auth whoami
 ```
 
-`kubectl auth whoami` 会显示 `system:serviceaccount:shop:github-actions`，kube-apiserver 记录这个令牌的请求时使用的就是这个名称。
+`kubectl auth whoami` 会显示 `system:serviceaccount:shop:zeabur-api-token-github-actions`，kube-apiserver 记录这个令牌的请求时使用的就是这个名称。
 
 使用 curl 时，先设置地址和令牌：
 
@@ -179,10 +179,10 @@ Zeabur 用你自己的权限写入以下对象：
 
 | 对象 | 内容 |
 |---|---|
-| 项目中的 `ServiceAccount <名称>` | 标签 `zeabur.com/api-token: "true"` 和 `app.kubernetes.io/managed-by: zeabur`。annotation 记录角色、创建者和最新令牌的到期时间 |
+| 项目中的 `ServiceAccount zeabur-api-token-<名称>` | 标签 `zeabur.com/api-token: "true"` 和 `app.kubernetes.io/managed-by: zeabur`。annotation 记录角色、创建者和最新令牌的到期时间 |
 | 项目中的 `RoleBinding zeabur-api-token-<名称>` | 将 `zeabur-project-developer` 或 `zeabur-project-viewer` 绑定到这个 ServiceAccount |
 | `ClusterRoleBinding zeabur-api-token:<项目>:<名称>` | 用于每个 Namespace 的令牌，代替 RoleBinding |
 
 令牌本身由 ServiceAccount 的 TokenRequest 签发，Zeabur 不会将它保存到 Secret 或其他地方。删除令牌会删除 binding 和 ServiceAccount。
 
-chart 中的三个准入策略确保这些对象只用于 API 令牌，见 [API 令牌和 RBAC](./permissions.mdx#api-令牌和-rbac)。
+chart 中的准入策略确保这些对象只用于 API 令牌，并禁止 Pod 以令牌的 ServiceAccount 运行，见 [API 令牌和 RBAC](./permissions.mdx#api-令牌和-rbac)。

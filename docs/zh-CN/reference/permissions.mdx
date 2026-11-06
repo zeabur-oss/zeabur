@@ -1,7 +1,7 @@
 ---
 title: 权限
 description: 对照成员角色、管理员账号和 Kubernetes RBAC，确认各项操作的访问范围和登录有效期。
-source: "13d222d908c7"
+source: "1c78e8872f86"
 ---
 
 能看到项目却读不到日志时，先确认自己在项目中的角色：**查看者**只能看状态和事件，**开发者**才能读取日志、读取 Secret 和部署。Zeabur 用你自己的身份调用 kube-apiserver，能否执行操作由 Kubernetes RBAC 决定。
@@ -51,7 +51,7 @@ Chart 的 `memberRoles.enabled` 默认为 `true`，会创建：
 - `zeabur-project-viewer-rules`、`zeabur-project-developer-rules`、`zeabur-project-builds-read`、`zeabur-project-builds-write`：上面两个角色实际使用的 verb 和 resource。查看者能查看构建，开发者还能从 Git 部署和重新构建。
 - `zeabur-project-api-tokens`：让开发者创建 [API 令牌](./api-tokens.mdx)所用的 ServiceAccount 和 RoleBinding，并为它们申请令牌。
 - `zeabur-project-namespace` ValidatingAdmissionPolicy 及其 binding：限制开发者可以修改 Namespace 的哪些字段，需要 Kubernetes 1.30 及以上版本。
-- `zeabur-api-token-accounts`、`zeabur-api-token-bindings`、`zeabur-api-token-requests` ValidatingAdmissionPolicy 及其 binding：让开发者只能写入 API 令牌所用的对象，见 [API 令牌和 RBAC](#api-令牌和-rbac)。
+- `zeabur-api-token-accounts`、`zeabur-api-token-bindings`、`zeabur-api-token-requests`、`zeabur-api-token-pods` ValidatingAdmissionPolicy 及其 binding：让开发者只能写入 API 令牌所用的对象，并确保令牌过期后无法继续使用，见 [API 令牌和 RBAC](#api-令牌和-rbac)。
 
 Chart 本身不绑定任何人。管理员在 Zeabur 中邀请成员或变更成员权限时，Zeabur 用管理员的权限创建：
 
@@ -90,13 +90,14 @@ zeabur.com/icon
 
 ## API 令牌和 RBAC
 
-为了创建 [API 令牌](./api-tokens.mdx)，开发者可以在自己的项目中创建 ServiceAccount、RoleBinding 和令牌。Kubernetes 本身只允许通过 RoleBinding 授予自己已有的角色，chart 的三个策略在项目 Namespace 中进一步缩小范围：
+为了创建 [API 令牌](./api-tokens.mdx)，开发者可以在自己的项目中创建 ServiceAccount、RoleBinding 和令牌。Kubernetes 本身只允许通过 RoleBinding 授予自己已有的角色，chart 的策略进一步缩小范围：
 
-- ServiceAccount 必须带有 `zeabur.com/api-token: "true"` 标签，并注明创建者。创建后只能修改到期时间的 annotation。
-- RoleBinding 必须带有同一个标签，只能绑定 `zeabur-project-developer` 或 `zeabur-project-viewer`，对象只能是同一个 Namespace 中的一个 ServiceAccount，名称为 `zeabur-api-token-<ServiceAccount>`。创建后不能修改。
-- ServiceAccount 不能写入这些对象，也不能申请令牌，因此不能用令牌创建或续期令牌。
+- 在项目中，用户只能创建名称为 `zeabur-api-token-<名称>`、带有 `zeabur.com/api-token: "true"` 标签、并注明自己是创建者的 ServiceAccount。创建后只能修改到期时间的 annotation。
+- RoleBinding 必须带有同一个标签，只能绑定 `zeabur-project-developer` 或 `zeabur-project-viewer`，对象只能是同一个 Namespace 中的一个 `zeabur-api-token-` ServiceAccount，名称与 binding 相同。创建后不能修改。
+- API 令牌在任何 Namespace 都不能写入 ServiceAccount 或 RoleBinding，也不能申请令牌，因此不能用令牌创建或续期令牌。
+- 项目中的 Pod 不能以 `zeabur-api-token-` ServiceAccount 运行。Pod 运行期间 Kubernetes 会一直续期它的令牌，这样的 Pod 会让令牌的角色在过期后仍然可用。
 
-在所有 Namespace 都拥有相同权限的人不受这些限制，例如管理员。由于最后一条，项目中的工作负载要在该项目创建 ServiceAccount、RoleBinding 或令牌，需要管理员授予它所有 Namespace 的相同权限。
+在所有 Namespace 都拥有相同权限的人不受前两条限制，例如管理员；其他 ServiceAccount 也不受限，因为只有管理员能授予它们这些权限。后两条对所有人都适用。
 
 ## 管理员账号和普通账号
 

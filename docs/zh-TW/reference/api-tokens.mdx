@@ -1,7 +1,7 @@
 ---
 title: API 權杖
 description: 讓腳本和 CI 用專案角色呼叫 Kubernetes API，權杖會到期。
-source: "51664d35a6ec"
+source: "6356ce4196a8"
 ---
 
 腳本或 CI 不需要你登入，也能用 API 權杖操作專案。到專案的**設定** → **API 權杖**建立一個，給它**開發者**或**檢視者**角色，再複製權杖。權杖跟 kubectl 一樣直接呼叫 kube-apiserver，能做什麼由 Kubernetes RBAC 決定。每個權杖都會到期。
@@ -41,7 +41,7 @@ export KUBECONFIG=$PWD/shop-ci.yaml
 kubectl auth whoami
 ```
 
-`kubectl auth whoami` 會顯示 `system:serviceaccount:shop:github-actions`，kube-apiserver 記錄這個權杖的請求時用的就是這個名稱。
+`kubectl auth whoami` 會顯示 `system:serviceaccount:shop:zeabur-api-token-github-actions`，kube-apiserver 記錄這個權杖的請求時用的就是這個名稱。
 
 用 curl 時，先設好位址和權杖：
 
@@ -179,10 +179,10 @@ Zeabur 用你自己的權限寫入這些物件：
 
 | 物件 | 內容 |
 |---|---|
-| 專案裡的 `ServiceAccount <名稱>` | 標籤 `zeabur.com/api-token: "true"` 和 `app.kubernetes.io/managed-by: zeabur`。annotation 記錄角色、建立者和最新權杖的到期時間 |
+| 專案裡的 `ServiceAccount zeabur-api-token-<名稱>` | 標籤 `zeabur.com/api-token: "true"` 和 `app.kubernetes.io/managed-by: zeabur`。annotation 記錄角色、建立者和最新權杖的到期時間 |
 | 專案裡的 `RoleBinding zeabur-api-token-<名稱>` | 把 `zeabur-project-developer` 或 `zeabur-project-viewer` 綁到這個 ServiceAccount |
 | `ClusterRoleBinding zeabur-api-token:<專案>:<名稱>` | 用在每個 Namespace 的權杖改用這個，不建立 RoleBinding |
 
 權杖本身由 ServiceAccount 的 TokenRequest 簽發，Zeabur 不會把它存進 Secret 或其他地方。刪除權杖會刪掉 binding 和 ServiceAccount。
 
-chart 裡的三個准入政策讓這些物件只能用在 API 權杖，見 [API 權杖和 RBAC](./permissions.mdx#api-權杖和-rbac)。
+chart 裡的准入政策讓這些物件只能用在 API 權杖，也不讓 Pod 用權杖的 ServiceAccount 執行，見 [API 權杖和 RBAC](./permissions.mdx#api-權杖和-rbac)。

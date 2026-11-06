@@ -261,12 +261,11 @@ zeabur-project-builds-write:
     resources: [builds]
     verbs: [create, patch, delete]
 
-# API tokens (crates/zeabur-plan/src/api_token.rs): a ServiceAccount labelled
-# `zeabur.com/api-token`, a RoleBinding of it to a project role, and its tokens. RBAC lets a
-# person bind only a role whose rights they hold, so a Viewer cannot make a Developer token.
-# The admission policy zeabur-api-tokens (templates/api-token-policy.yaml) keeps these writes to
-# labelled ServiceAccounts and to bindings of one of them to a project role, and refuses them to
-# the tokens themselves.
+# API tokens (crates/zeabur-plan/src/api_token.rs): a ServiceAccount `zeabur-api-token-<name>`
+# labelled `zeabur.com/api-token`, a RoleBinding of it to a project role, and its tokens. RBAC lets
+# a person bind only a role whose rights they hold, so a Viewer cannot make a Developer token.
+# The admission policies in templates/api-token-policy.yaml keep these writes to API tokens,
+# refuse them to the tokens themselves, and refuse pods that run as a token.
 # https://kubernetes.io/docs/reference/access-authn-authz/rbac/#restrictions-on-role-binding-creation-or-update
 zeabur-project-api-tokens:
   - apiGroups: [""]

@@ -1,7 +1,7 @@
 ---
 title: 權限
 description: 對照成員角色、管理員帳號與 Kubernetes RBAC，確認每項操作的存取範圍和登入能維持多久。
-source: "13d222d908c7"
+source: "1c78e8872f86"
 ---
 
 看得到專案卻讀不到日誌時，先確認自己在這個專案的角色：**檢視者**只能看狀態和事件，**開發者**才能讀日誌、讀 Secret 和部署。Zeabur 用你自己的身分呼叫 kube-apiserver，能不能做由 Kubernetes RBAC 決定。
@@ -51,7 +51,7 @@ Chart 的 `memberRoles.enabled` 預設是 `true`，會建立：
 - `zeabur-project-viewer-rules`、`zeabur-project-developer-rules`、`zeabur-project-builds-read`、`zeabur-project-builds-write`：上面兩個角色實際的 verb 和 resource。檢視者看得到建置，開發者還能從 Git 部署和重新建置。
 - `zeabur-project-api-tokens`：讓開發者建立 [API 權杖](./api-tokens.mdx)用的 ServiceAccount 和 RoleBinding，並為它們申請權杖。
 - `zeabur-project-namespace` ValidatingAdmissionPolicy 和對應的 binding：限制開發者能改 Namespace 的哪些欄位，需要 Kubernetes 1.30 以上。
-- `zeabur-api-token-accounts`、`zeabur-api-token-bindings`、`zeabur-api-token-requests` ValidatingAdmissionPolicy 和對應的 binding：讓開發者只能寫 API 權杖用的物件，見 [API 權杖和 RBAC](#api-權杖和-rbac)。
+- `zeabur-api-token-accounts`、`zeabur-api-token-bindings`、`zeabur-api-token-requests`、`zeabur-api-token-pods` ValidatingAdmissionPolicy 和對應的 binding：讓開發者只能寫 API 權杖用的物件，也讓權杖過了期限就不能再用，見 [API 權杖和 RBAC](#api-權杖和-rbac)。
 
 Chart 本身不綁定任何人。管理員在 Zeabur 邀請或變更成員時，Zeabur 用管理員的權限建立：
 
@@ -90,13 +90,14 @@ zeabur.com/icon
 
 ## API 權杖和 RBAC
 
-為了建立 [API 權杖](./api-tokens.mdx)，開發者可以在自己的專案建立 ServiceAccount、RoleBinding 和權杖。Kubernetes 本來就只讓人用 RoleBinding 給出自己有的角色，chart 的三個政策在專案 Namespace 裡再把範圍縮小：
+為了建立 [API 權杖](./api-tokens.mdx)，開發者可以在自己的專案建立 ServiceAccount、RoleBinding 和權杖。Kubernetes 本來就只讓人用 RoleBinding 給出自己有的角色，chart 的政策再把範圍縮小：
 
-- ServiceAccount 要有 `zeabur.com/api-token: "true"` 標籤，並寫明是誰建立的。建立後只有到期時間的 annotation 能改。
-- RoleBinding 要有同一個標籤，只能綁 `zeabur-project-developer` 或 `zeabur-project-viewer`，對象只能是同一個 Namespace 裡的一個 ServiceAccount，名稱是 `zeabur-api-token-<ServiceAccount>`。建立後不能修改。
-- ServiceAccount 不能寫這些物件，也不能申請權杖，所以不能用權杖建立或更新權杖。
+- 在專案裡，人只能建立名稱是 `zeabur-api-token-<名稱>`、有 `zeabur.com/api-token: "true"` 標籤、並寫明自己是建立者的 ServiceAccount。建立後只有到期時間的 annotation 能改。
+- RoleBinding 要有同一個標籤，只能綁 `zeabur-project-developer` 或 `zeabur-project-viewer`，對象只能是同一個 Namespace 裡的一個 `zeabur-api-token-` ServiceAccount，名稱和 binding 相同。建立後不能修改。
+- API 權杖在任何 Namespace 都不能寫 ServiceAccount 或 RoleBinding，也不能申請權杖，所以不能用權杖建立或更新權杖。
+- 專案裡的 Pod 不能用 `zeabur-api-token-` ServiceAccount 執行。Pod 執行期間 Kubernetes 會一直更新它的權杖，這樣的 Pod 會讓權杖的角色在過期後還能用。
 
-在所有 Namespace 都有同樣權限的人不受這些限制，例如管理員。因為最後一條，專案裡的工作負載要在那裡建立 ServiceAccount、RoleBinding 或權杖，得由管理員給它所有 Namespace 的同樣權限。
+在所有 Namespace 都有同樣權限的人不受前兩條限制，例如管理員；其他 ServiceAccount 也不受限，因為只有管理員能給它們這些權限。後兩條對所有人都適用。
 
 ## 管理員帳號和一般帳號
 

@@ -1236,7 +1236,7 @@ fn api_token(name: &str, role: &str, by: &str, days_left: i64) -> DynamicObject 
     from(json!({
         "apiVersion": "v1", "kind": "ServiceAccount",
         "metadata": {
-            "name": name, "namespace": "shop", "uid": format!("uid-sa-{name}"),
+            "name": api_token::account_name(name), "namespace": "shop", "uid": format!("uid-sa-{name}"),
             "resourceVersion": "1", "creationTimestamp": "2026-10-01T09:00:00Z",
             "labels": {(api_token::LABEL): "true", "app.kubernetes.io/managed-by": "zeabur"},
             "annotations": {
