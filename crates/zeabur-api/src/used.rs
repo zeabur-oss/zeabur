@@ -121,6 +121,24 @@ fn is_under(host: &str, suffix: &str) -> bool {
         .is_some_and(|front| front.ends_with('.'))
 }
 
+/// The kinds of domain `hosts` are, each once: under one of the offered `suffixes` is generated.
+fn domain_kinds(hosts: &[String], suffixes: &[String]) -> Vec<DomainKind> {
+    let mut kinds: Vec<DomainKind> = Vec::new();
+    for host in hosts {
+        let host = host.to_ascii_lowercase();
+        let mut kind = DomainKind::Custom;
+        for suffix in suffixes {
+            if is_under(&host, suffix) {
+                kind = DomainKind::Generated;
+            }
+        }
+        if !kinds.contains(&kind) {
+            kinds.push(kind);
+        }
+    }
+    kinds
+}
+
 /// Hands `used` each feature the applied `changes` used.
 pub(crate) async fn report(
     used: &Used,
@@ -136,19 +154,107 @@ pub(crate) async fn report(
         return;
     }
     let (suffixes, ..) = domains::effective(cluster, settings).await;
-    let mut kinds: Vec<DomainKind> = Vec::new();
-    for host in &found.hosts {
-        let generated = suffixes
-            .iter()
-            .any(|s| is_under(&host.to_ascii_lowercase(), s));
-        let kind = if generated {
-            DomainKind::Generated
-        } else {
-            DomainKind::Custom
-        };
-        if !kinds.contains(&kind) {
-            kinds.push(kind);
-            used(Feature::DomainAdded(kind));
-        }
+    for kind in domain_kinds(&found.hosts, &suffixes) {
+        used(Feature::DomainAdded(kind));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+
+    use super::*;
+
+    fn changes(value: Value) -> Vec<Change> {
+        serde_json::from_value(value).unwrap()
+    }
+
+    fn features(value: Value) -> Vec<Feature> {
+        read(&changes(value)).features
+    }
+
+    fn deployment() -> Value {
+        json!({"op": "create", "object": {"apiVersion": "apps/v1", "kind": "Deployment",
+            "metadata": {"name": "api"}}})
+    }
+
+    fn build() -> Value {
+        json!({"op": "create", "object": {"apiVersion": "builder.zeabur.com/v1alpha1",
+            "kind": "Build", "metadata": {"name": "site"},
+            "spec": {"source": {"git": {"url": "https://github.com/acme/site.git"}}}}})
+    }
+
+    fn strings(values: &[&str]) -> Vec<String> {
+        values.iter().map(|v| (*v).to_owned()).collect()
+    }
+
+    #[test]
+    fn an_image_service_is_found_once() {
+        assert_eq!(
+            features(json!([deployment(), deployment()])),
+            [Feature::ServiceCreated(Source::Image)]
+        );
+    }
+
+    #[test]
+    fn a_service_built_from_git_is_not_also_an_image_service() {
+        assert_eq!(
+            features(json!([build(), deployment()])),
+            [Feature::ServiceCreated(Source::Git)]
+        );
+    }
+
+    #[test]
+    fn a_template_is_found_by_its_catalog_id_with_its_domain() {
+        let found = read(&changes(json!([
+            {"op": "template", "template": "miniflux", "domain": "rss.example.com"},
+        ])));
+        assert_eq!(
+            found.features,
+            [Feature::ServiceCreated(Source::Template("miniflux"))]
+        );
+        assert_eq!(found.hosts, ["rss.example.com"]);
+    }
+
+    #[test]
+    fn a_database_is_found_by_its_kind() {
+        let created = json!([{"op": "create", "object": {
+            "apiVersion": "postgresql.cnpg.io/v1", "kind": "Cluster",
+            "metadata": {"name": "db"}}}]);
+        assert_eq!(
+            features(created),
+            [Feature::DatabaseCreated(DatabaseKind::Postgresql)]
+        );
+    }
+
+    #[test]
+    fn a_write_that_creates_no_service_finds_nothing() {
+        let scale = json!([{"op": "scale",
+            "workload": {"kind": "Deployment", "name": "web"}, "replicas": 2}]);
+        let found = read(&changes(scale));
+        assert_eq!(found.features, Vec::<Feature>::new());
+        assert_eq!(found.hosts, Vec::<String>::new());
+    }
+
+    #[test]
+    fn a_domain_under_an_offered_suffix_is_generated_and_any_other_is_custom() {
+        let suffixes = strings(&["apps.example.com"]);
+        assert_eq!(
+            domain_kinds(&strings(&["web-shop.apps.example.com"]), &suffixes),
+            [DomainKind::Generated]
+        );
+        assert_eq!(
+            domain_kinds(&strings(&["notapps.example.com"]), &suffixes),
+            [DomainKind::Custom]
+        );
+    }
+
+    #[test]
+    fn each_kind_of_domain_is_found_once() {
+        let hosts = strings(&["a.apps.example.com", "b.apps.example.com", "a.org", "b.org"]);
+        assert_eq!(
+            domain_kinds(&hosts, &strings(&["apps.example.com"])),
+            [DomainKind::Generated, DomainKind::Custom]
+        );
     }
 }

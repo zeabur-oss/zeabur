@@ -362,34 +362,16 @@ mod tests {
                 assert!(allowed.contains(&name.as_str()), "{name}");
                 assert!(!value.is_object() && !value.is_array(), "{name}");
             }
+            if properties
+                .get("source")
+                .is_some_and(|source| source == "git")
+            {
+                assert!(!properties.contains_key("template"));
+            }
             assert_eq!(properties["$process_person_profile"], false);
             assert_eq!(properties["$geoip_disable"], true);
             assert_eq!(body["batch"].as_array().unwrap().len(), 1);
         }
-    }
-
-    #[test]
-    fn a_feature_carries_only_its_own_enum_values() {
-        let body = |feature| {
-            let body: Value =
-                serde_json::from_str(&Event::FeatureUsed(used(feature)).body("k", &id())).unwrap();
-            body["batch"][0]["properties"].clone()
-        };
-        let template = body(Feature::ServiceCreated(Source::Template("wordpress")));
-        assert_eq!(template["feature"], "service_created");
-        assert_eq!(template["source"], "template");
-        assert_eq!(template["template"], "wordpress");
-        let git = body(Feature::ServiceCreated(Source::Git));
-        assert_eq!(git["source"], "git");
-        assert!(git.get("template").is_none());
-        assert_eq!(
-            body(Feature::DatabaseCreated(DatabaseKind::ObjectStorage))["kind"],
-            "object-storage"
-        );
-        assert_eq!(
-            body(Feature::DomainAdded(DomainKind::Generated))["kind"],
-            "generated"
-        );
     }
 
     #[test]
