@@ -15,14 +15,25 @@ describe("kubeconfig", () => {
   it("leaves the server for the person and carries the token, the CA and the namespace", () => {
     const yaml = kubeconfig(issued, "shop")
     expect(yaml).toContain('server: ""')
-    expect(yaml).toContain("token: eyJhbGciOi")
-    expect(yaml).toContain("namespace: shop")
+    expect(yaml).toContain('token: "eyJhbGciOi"')
+    expect(yaml).toContain('namespace: "shop"')
     const data = /certificate-authority-data: (\S+)/.exec(yaml)?.[1] ?? ""
     expect(atob(data)).toBe(issued.ca)
   })
 
   it("leaves the CA out when it could not be read", () => {
     expect(kubeconfig({ ...issued, ca: null })).not.toContain("certificate-authority-data")
+  })
+
+  it("keeps names that YAML would read as other values", () => {
+    const config = Bun.YAML.parse(kubeconfig({ ...issued, name: "null" }, "true")) as {
+      "current-context": unknown
+      contexts: { name: unknown; context: { user: unknown; namespace: unknown } }[]
+    }
+    expect(config["current-context"]).toBe("null")
+    expect(config.contexts[0]?.name).toBe("null")
+    expect(config.contexts[0]?.context.user).toBe("null")
+    expect(config.contexts[0]?.context.namespace).toBe("true")
   })
 
   it("starts in no namespace when none is given", () => {

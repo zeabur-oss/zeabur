@@ -22,8 +22,11 @@ export function startNamespace(projects: readonly Schemas.ProjectGrant[]): strin
 /** A kubeconfig for the token with `server` blank: Zeabur knows kube-apiserver only by its
  * in-cluster address, so the person fills in the one they reach it on. */
 export function kubeconfig(issued: Schemas.IssuedTokenView, namespace?: string): string {
+  // JSON strings are YAML strings, so a name such as `null` stays a name.
+  const q = JSON.stringify
+  const name = q(issued.name)
   const ca = issued.ca ? `\n      certificate-authority-data: ${btoa(issued.ca)}` : ""
-  const ns = namespace ? `\n      namespace: ${namespace}` : ""
+  const ns = namespace ? `\n      namespace: ${q(namespace)}` : ""
   return `apiVersion: v1
 kind: Config
 clusters:
@@ -31,14 +34,14 @@ clusters:
     cluster:
       server: ""${ca}
 users:
-  - name: ${issued.name}
+  - name: ${name}
     user:
-      token: ${issued.token}
+      token: ${q(issued.token)}
 contexts:
-  - name: ${issued.name}
+  - name: ${name}
     context:
       cluster: zeabur
-      user: ${issued.name}${ns}
-current-context: ${issued.name}
+      user: ${name}${ns}
+current-context: ${name}
 `
 }
