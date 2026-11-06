@@ -26,7 +26,7 @@ export interface WrongPort {
   offer?: PortOffer
 }
 
-export function portOffer(service: Service, builds: readonly Build[]): PortOffer | undefined {
+function portOffer(service: Service, builds: readonly Build[]): PortOffer | undefined {
   const from = likelyPort(service)
   if (from === undefined) return undefined
   for (const { container, ports } of imageDeclared(service, builds)) {

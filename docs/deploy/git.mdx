@@ -285,7 +285,7 @@ Zeabur Builder and Keel keep building and deploying after you remove Zeabur. The
 
 If a minute after the container starts nothing answers on the service's port, **Overview** says the app isn't listening on that port. Have the app read `PORT`, or change the service to the port the app listens on. An app that listens on `127.0.0.1` only can't be reached from outside its container; make it listen on `0.0.0.0`.
 
-When the image declares a port with `EXPOSE` and the service uses another one, **Overview** offers **Use port …**. It changes the container port, health checks, `PORT` and the port the service's private addresses send traffic to, and shows you the change before applying it. Railpack builds declare no port, so they only get the first message.
+When the image declares a port with `EXPOSE` and the service uses another one, that message also offers **Use port …**. It changes the container port, health checks, `PORT` and the port the service's private addresses send traffic to, and shows you the change before applying it. Railpack builds declare no port, so they only get the first message.
 
 ## Delete a service
 

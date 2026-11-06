@@ -3,7 +3,7 @@ import { describe, expect, test } from "bun:test"
 import type { Schemas } from "@/api/client"
 import type { Build } from "@/model/builds"
 import type { Service } from "@/model/service"
-import { portOffer, wrongPort } from "@/model/wrong-port"
+import { wrongPort } from "@/model/wrong-port"
 
 const IMAGE = "zot.zot.svc:5000/lab/checkout:main-1-5d41402"
 const NOW = Date.parse("2026-10-26T09:00:00Z")
@@ -83,22 +83,14 @@ describe("a built service that doesn't listen on its port", () => {
     })
   })
 
-  test("offers nothing when the image declares the service's port", () => {
+  test("offers nothing when the image declares the service's port or only UDP ports", () => {
     expect(wrongPort(checkout(), [build(["8080/tcp", "3000/tcp"])], NOW)?.offer).toBeUndefined()
+    expect(wrongPort(checkout(), [build(["53/udp"])], NOW)?.offer).toBeUndefined()
   })
 
   test("is still said, without an offer, when the image declares no port", () => {
     const wrong = wrongPort(checkout(), [build()], NOW)
     expect(wrong?.port).toBe(8080)
     expect(wrong?.offer).toBeUndefined()
-  })
-})
-
-describe("the image's port offered on its own", () => {
-  test("needs a TCP port the service doesn't use", () => {
-    const healthy = checkout({ diagnoses: [] })
-    expect(portOffer(healthy, [build(["3000/tcp"])])?.to).toBe(3000)
-    expect(portOffer(healthy, [build(["53/udp"])])).toBeUndefined()
-    expect(portOffer(healthy, [build(["8080/tcp"])])).toBeUndefined()
   })
 })

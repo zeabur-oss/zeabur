@@ -21,7 +21,7 @@ import { isTask, statusOf, type Service } from "@/model/service"
 import { troubleTone } from "@/model/severity"
 import { cn } from "@/lib/utils"
 import { sameDiagnosis, type WrongPort } from "@/model/wrong-port"
-import { withOffer, wrongPortWords } from "@/components/wrong-port"
+import { PortOfferButton, wrongPortWords } from "@/components/wrong-port"
 import type { ServicePlace } from "@/routes/search"
 
 export type Diagnosis = Schemas.Diagnosis
@@ -263,7 +263,7 @@ function DiagnosisItem({
         {d.incident ? <IncidentCause project={project} id={d.incident} /> : null}
         <Layers
           why={words.why}
-          also={withOffer(t, project, service, wrongPort?.offer, also)}
+          also={also}
           fix={words.fix}
           fixLead={lead}
           action={
@@ -271,7 +271,7 @@ function DiagnosisItem({
               d={d}
               service={service}
               project={project}
-              toLogs={wrongPort !== undefined}
+              wrongPort={wrongPort}
               copy={copy}
               copyFirst={lead !== undefined}
             />
@@ -290,45 +290,76 @@ function DiagnosisActions({
   d,
   service,
   project,
-  toLogs,
+  wrongPort,
   copy,
   copyFirst,
 }: {
   d: Diagnosis
   service: Service
   project: string
-  toLogs: boolean
+  wrongPort?: WrongPort
   copy: ReactNode
   copyFirst: boolean
 }) {
   const t = useT()
   const logs = useLogsReadable(project)
   const button = buttonVariants({ variant: "outline", size: "sm" })
-  const runs = !isTask(service.kind) && service.pods.some((p) => p.ready)
-  const action = diagnosisAction(d, logs, toLogs)
+  const action = diagnosisAction(d, logs, wrongPort !== undefined)
   const pod = action.pod ?? d.pods[0]
   return (
     <span className="flex flex-wrap items-center gap-1.5">
       {copyFirst ? copy : null}
+      {wrongPort?.offer ? (
+        <PortOfferButton project={project} service={service} offer={wrongPort.offer} />
+      ) : null}
       <Link
         {...serviceLink(project, service, { tab: action.tab, pod: action.pod })}
         className={button}
       >
+        {wrongPort ? <FileTextIcon aria-hidden="true" data-icon="inline-start" /> : null}
         {t(action.label)}
       </Link>
-      {action.tab === "logs" || !logs ? null : (
-        <Link {...serviceLink(project, service, { tab: "logs", pod })} className={button}>
+      <LogsAndTerminal
+        project={project}
+        service={service}
+        pod={pod}
+        logs={logs && action.tab !== "logs"}
+      />
+      {copyFirst ? null : copy}
+    </span>
+  )
+}
+
+function LogsAndTerminal({
+  project,
+  service,
+  pod,
+  logs,
+}: {
+  project: string
+  service: Service
+  pod?: string
+  logs: boolean
+}) {
+  const t = useT()
+  const runs = !isTask(service.kind) && service.pods.some((p) => p.ready)
+  return (
+    <>
+      {logs ? (
+        <Link
+          {...serviceLink(project, service, { tab: "logs", pod })}
+          className={buttonVariants({ variant: "outline", size: "sm" })}
+        >
           <FileTextIcon aria-hidden="true" data-icon="inline-start" />
           {t("tab.logs")}
         </Link>
-      )}
+      ) : null}
       {runs ? (
         <Button variant="outline" size="sm" onClick={() => openShell(project, service, pod)}>
           <TerminalWindowIcon aria-hidden="true" data-icon="inline-start" />
           {t("tab.terminal")}
         </Button>
       ) : null}
-      {copyFirst ? null : copy}
-    </span>
+    </>
   )
 }

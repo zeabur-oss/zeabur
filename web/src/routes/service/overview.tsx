@@ -14,7 +14,7 @@ import { projectAlertsQuery, rolloutQuery, traceQuery } from "@/api/queries"
 import { AlertList, RecentNote } from "@/components/alerts"
 import { Ago, CopyButton } from "@/components/bits"
 import { Diagnoses } from "@/components/diagnoses"
-import { PortOfferCard, useWrongPort } from "@/components/wrong-port"
+import { useWrongPort } from "@/components/wrong-port"
 import { EventList } from "@/components/events"
 import { replicaCounts } from "@/components/pods"
 import { RouteLine } from "@/components/route-trace"
@@ -114,7 +114,7 @@ export function OverviewTab({
     events,
   )
   const diagnosed = said.causes.length > 0
-  const { wrong, offer } = useWrongPort(project, service)
+  const wrong = useWrongPort(project, service)
   const browser = useBrowserChecks()
   const routes = trace.data?.routes ?? []
   const verdict = verdictOf({
@@ -147,7 +147,6 @@ export function OverviewTab({
           wrongPort={wrong}
         />
       ) : null}
-      <PortOfferCard project={project} service={service} offer={offer} />
       {service.kind === "CronJob" ? <TaskRunsCard project={project} service={service} /> : null}
       {said.rollout.as === "card" && rollout.data && !buildSays(service) ? (
         <Rollout project={project} service={service} data={rollout.data} />
