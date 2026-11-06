@@ -8,8 +8,8 @@ use ureq::tls::{RootCerts, TlsConfig};
 
 use crate::event::{Event, InstallationId};
 
-/// `PostHog`'s batch endpoint.
-pub const ENDPOINT: &str = "https://us.i.posthog.com/batch/";
+/// `PostHog`'s batch endpoint, through our own domain.
+pub const ENDPOINT: &str = "https://oss-nori.zeabur.com/batch/";
 /// The `PostHog` project key, `ZEABUR_TELEMETRY_KEY` at build time: only release builds have it
 /// (docs/internal/releasing.md). Empty: nothing is sent.
 pub const PROJECT_KEY: &str = match option_env!("ZEABUR_TELEMETRY_KEY") {

@@ -33,7 +33,7 @@ source: "119a598e43c4"
 
 事件不會說明是誰。`person` 是用金鑰算出的使用者名稱加日期的雜湊值。金鑰從 Zeabur 的 plan key 衍生，留在叢集的 Secret 裡，從不送出，所以我們無法從雜湊值反推使用者名稱。同一個人一整天的 `person` 都一樣，Zeabur 重新啟動也不變；隔天就換成另一個，所以不同天無法串在一起。
 
-事件用 HTTPS 送到 PostHog（`us.i.posthog.com`），只試一次，逾時很短。傳送失敗時不會重試，也不影響 Zeabur 或安裝。PostHog 不保存 IP 位址。
+事件用 HTTPS 送到 PostHog（經由 `oss-nori.zeabur.com`），只試一次，逾時很短。傳送失敗時不會重試，也不影響 Zeabur 或安裝。PostHog 不保存 IP 位址。
 
 ## 絕不傳送
 
