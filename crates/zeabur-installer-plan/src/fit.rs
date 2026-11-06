@@ -107,41 +107,46 @@ fn pod_request(pod: &Value) -> u128 {
     total + overhead
 }
 
-/// A Kubernetes memory quantity (`8128452Ki`, `512Mi`, `1.5Gi`, `500M`, `1048576`) in bytes.
+/// A Kubernetes memory quantity (`8128452Ki`, `512Mi`, `1.5Gi`, `500M`, `1e9`) in bytes, rounded
+/// up. The same grammar as `zeabur-model`'s `kernel::quantity`.
 fn quantity(text: &str) -> Option<u128> {
-    const SUFFIXES: [(&str, u128); 13] = [
-        ("Ki", 1 << 10),
-        ("Mi", 1 << 20),
-        ("Gi", 1 << 30),
-        ("Ti", 1 << 40),
-        ("Pi", 1 << 50),
-        ("Ei", 1 << 60),
-        ("k", 1_000),
-        ("M", 1_000_000),
-        ("G", 1_000_000_000),
-        ("T", 1_000_000_000_000),
-        ("P", 1_000_000_000_000_000),
-        ("E", 1_000_000_000_000_000_000),
-        ("", 1),
-    ];
-    if let Some(milli) = text.strip_suffix('m') {
-        return milli.parse::<u128>().ok().map(|m| m / 1000);
+    let text = text.trim();
+    let split = text
+        .find(|c: char| !(c.is_ascii_digit() || c == '.' || c == '+'))
+        .unwrap_or(text.len());
+    let (number, suffix) = text.split_at_checked(split)?;
+    let number = number.strip_prefix('+').unwrap_or(number);
+    let (whole, fraction) = number.split_once('.').unwrap_or((number, ""));
+    if whole.is_empty() && fraction.is_empty() {
+        return None;
     }
-    for (suffix, unit) in SUFFIXES {
-        let Some(number) = text.strip_suffix(suffix) else {
-            continue;
-        };
-        let (whole, fraction) = number.split_once('.').unwrap_or((number, ""));
-        let whole: u128 = whole.parse().ok()?;
-        let mut bytes = whole.checked_mul(unit)?;
-        if !fraction.is_empty() {
-            let digits: u128 = fraction.parse().ok()?;
-            let scale = 10_u128.checked_pow(u32::try_from(fraction.len()).ok()?)?;
-            bytes = bytes.checked_add(digits.checked_mul(unit)? / scale)?;
-        }
-        return Some(bytes);
+    let mantissa: u128 = format!("{whole}{fraction}").parse().ok()?;
+    let (multiplier, power): (u128, i32) = match suffix {
+        "" => (1, 0),
+        "n" => (1, -9),
+        "u" => (1, -6),
+        "m" => (1, -3),
+        "k" => (1, 3),
+        "M" => (1, 6),
+        "G" => (1, 9),
+        "T" => (1, 12),
+        "P" => (1, 15),
+        "E" => (1, 18),
+        "Ki" => (1 << 10, 0),
+        "Mi" => (1 << 20, 0),
+        "Gi" => (1 << 30, 0),
+        "Ti" => (1 << 40, 0),
+        "Pi" => (1 << 50, 0),
+        "Ei" => (1 << 60, 0),
+        other => (1, other.strip_prefix(['e', 'E'])?.parse().ok()?),
+    };
+    let value = mantissa.checked_mul(multiplier)?;
+    let shift = power.checked_sub(i32::try_from(fraction.len()).ok()?)?;
+    if shift >= 0 {
+        value.checked_mul(10_u128.checked_pow(u32::try_from(shift).ok()?)?)
+    } else {
+        Some(value.div_ceil(10_u128.checked_pow(u32::try_from(-shift).ok()?)?))
     }
-    None
 }
 
 const MIB: u128 = 1 << 20;
@@ -202,6 +207,18 @@ mod tests {
     use serde_json::json;
 
     use super::*;
+
+    #[test]
+    fn memory_quantities_parse_in_every_form_kubernetes_accepts() {
+        assert_eq!(quantity("8128452Ki"), Some(8_128_452 << 10));
+        assert_eq!(quantity("1.5Gi"), Some(3 << 29));
+        assert_eq!(quantity("500M"), Some(500_000_000));
+        assert_eq!(quantity("1e9"), Some(1_000_000_000));
+        assert_eq!(quantity("5E-1"), Some(1), "rounded up");
+        assert_eq!(quantity("1048576"), Some(1_048_576));
+        assert_eq!(quantity("12Kix"), None);
+        assert_eq!(quantity(""), None);
+    }
 
     #[test]
     fn requests_are_read_per_node() {
