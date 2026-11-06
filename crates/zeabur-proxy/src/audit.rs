@@ -145,28 +145,32 @@ impl Inflight {
     }
 
     pub(crate) async fn enter(self: &Arc<Self>, person: &str) -> Result<Slot, Reject> {
-        let own = {
+        let member = {
             let mut people = self.people.lock().unwrap_or_else(PoisonError::into_inner);
             let own = people
                 .entry(person.to_owned())
                 .or_insert_with(|| Arc::new(Semaphore::new(self.per_person)));
-            Arc::clone(own)
+            Member {
+                inflight: Arc::clone(self),
+                person: person.to_owned(),
+                own: Some(Arc::clone(own)),
+            }
         };
+        // From here, `member` forgets the person when this request ends, also when it is
+        // cancelled while it waits.
         let places = async {
-            let mine = Arc::clone(&own).acquire_owned().await.ok()?;
+            let own = Arc::clone(member.own.as_ref()?);
+            let mine = own.acquire_owned().await.ok()?;
             let total = Arc::clone(&self.total).acquire_owned().await.ok()?;
             Some((mine, total))
         };
         let Ok(Some((mine, total))) = tokio::time::timeout(self.wait, places).await else {
-            self.leave(person, own);
             return Err(Reject::Busy);
         };
         Ok(Slot {
-            inflight: Arc::clone(self),
-            person: person.to_owned(),
-            own: Some(own),
-            mine: Some(mine),
+            _mine: mine,
             _total: total,
+            _member: member,
         })
     }
 
@@ -183,24 +187,29 @@ impl Inflight {
     }
 }
 
-/// A place among the queries in flight, given back when dropped.
+/// One request of a person, from asking for a place to giving it back.
 #[derive(Debug)]
-pub(crate) struct Slot {
+struct Member {
     inflight: Arc<Inflight>,
     person: String,
     own: Option<Arc<Semaphore>>,
-    mine: Option<OwnedSemaphorePermit>,
-    _total: OwnedSemaphorePermit,
 }
 
-impl Drop for Slot {
+impl Drop for Member {
     fn drop(&mut self) {
-        // The permit holds a clone of the semaphore too, so it goes first.
-        drop(self.mine.take());
         if let Some(own) = self.own.take() {
             self.inflight.leave(&self.person, own);
         }
     }
+}
+
+/// A place among the queries in flight, given back when dropped. The fields drop in order, so
+/// the person's permit, which holds a clone of their semaphore, is gone before `_member` counts.
+#[derive(Debug)]
+pub(crate) struct Slot {
+    _mine: OwnedSemaphorePermit,
+    _total: OwnedSemaphorePermit,
+    _member: Member,
 }
 
 #[cfg(test)]
@@ -244,6 +253,22 @@ mod tests {
         assert!(inflight.people.lock().unwrap().contains_key("a"));
         drop(held);
         assert!(inflight.people.lock().unwrap().is_empty());
+    }
+
+    // A browser that closes the page cancels the request while it waits.
+    #[tokio::test]
+    async fn a_person_is_forgotten_when_their_waiting_query_is_cancelled() {
+        let inflight = Inflight::new(1, 2, Duration::from_secs(5));
+        let _other = inflight.enter("b").await.unwrap();
+        let waiting = tokio::spawn({
+            let inflight = Arc::clone(&inflight);
+            async move { inflight.enter("a").await.map(drop) }
+        });
+        tokio::time::sleep(Duration::from_millis(20)).await;
+        assert!(inflight.people.lock().unwrap().contains_key("a"));
+        waiting.abort();
+        assert!(waiting.await.unwrap_err().is_cancelled());
+        assert!(!inflight.people.lock().unwrap().contains_key("a"));
     }
 
     #[test]
