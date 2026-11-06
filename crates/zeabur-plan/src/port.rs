@@ -4,17 +4,22 @@
 //! - **The container** declares `to` where it declared `from`, or adds it when it declares neither.
 //!   A probe that names its port by name follows the entry.
 //! - **Its probes** on `from` (`httpGet`, `tcpSocket`, `grpc`) check `to`.
-//! - **`PORT`** is set to `to` in the container's `env`, which wins over a `PORT` it imports from a
-//!   ConfigMap or Secret [k8s-env].
+//! - **`PORT`** is set to `to` where the container gets it: its own `env` when it sets `PORT`
+//!   there, else the last Secret it imports (`envFrom`, no prefix) whose values hold `PORT`, as the
+//!   last import wins [k8s-env]. Otherwise it goes in the container's `env`, which wins over any
+//!   import. One `PORT` stays, so the variables show it once and editing it changes what the app
+//!   reads. The Secret is changed first, so the pods the new template starts read the new value.
 //! - **Each Service** that sends traffic to `from` on its pods (`targetPort`, or `port` without
 //!   one) sends it to `to`. The Service's own `port` stays, so its address and the routes to it do
 //!   not change.
 //!
 //! [k8s-env]: https://kubernetes.io/docs/tasks/inject-data-application/define-environment-variable-container/#using-environment-variables-inside-of-your-config
 
+use k8s_openapi::api::core::v1::Container;
 use serde_json::{Value, json};
 use zeabur_model::WorkloadRef;
 
+use crate::change::{DataEdit, DataKind, Warning};
 use crate::fields::Step;
 use crate::json::{add, replace, test};
 use crate::plan::{ErrorKind, PlanError, Planner, error, to_json};
@@ -45,8 +50,27 @@ impl Planner<'_> {
         }
         let found = self.editable_workload(reference)?;
         let target = Self::container(found, reference, container)?;
-        let (index, at, steps) = self.container_slot(found, &target)?;
         let name = target.name.clone();
+        let secret = self.port_secret(&target.spec);
+        if let Some(secret) = &secret {
+            let edit = DataEdit {
+                op: "set".to_owned(),
+                key: "PORT".to_owned(),
+                value: Some(to.to_string()),
+            };
+            self.data(DataKind::Secret, secret, &[edit])?;
+            // The template changes below, so its pods start again and read the new value.
+            for warning in &mut self.warnings {
+                if let Warning::RestartNeeded { workloads } = warning {
+                    workloads.retain(|w| w != reference);
+                }
+            }
+            self.warnings.retain(
+                |w| !matches!(w, Warning::RestartNeeded { workloads } if workloads.is_empty()),
+            );
+        }
+        let found = self.editable_workload(reference)?;
+        let (index, at, steps) = self.container_slot(found, &target)?;
         self.move_declared(index, &at, &steps, &name, from, to)?;
         for probe in PROBES {
             for handler in HANDLERS {
@@ -63,14 +87,37 @@ impl Planner<'_> {
                 )?;
             }
         }
-        let port = EnvEdit {
-            op: "set".to_owned(),
-            name: "PORT".to_owned(),
-            value: Some(to.to_string()),
-            value_from: None,
-        };
-        self.env(reference, Some(&name), &[port])?;
+        if secret.is_none() {
+            let port = EnvEdit {
+                op: "set".to_owned(),
+                name: "PORT".to_owned(),
+                value: Some(to.to_string()),
+                value_from: None,
+            };
+            self.env(reference, Some(&name), &[port])?;
+        }
         self.move_target_ports(reference, from, to)
+    }
+
+    /// The last Secret `container` imports whole that holds `PORT`, unless it sets `PORT` itself.
+    fn port_secret(&self, container: &Container) -> Option<String> {
+        let own = container.env.iter().flatten().any(|e| e.name == "PORT");
+        if own {
+            return None;
+        }
+        for from in container.env_from.iter().flatten().rev() {
+            if from.prefix.as_deref().is_some_and(|p| !p.is_empty()) {
+                continue;
+            }
+            let Some(secret) = from.secret_ref.as_ref() else {
+                continue;
+            };
+            let values = self.input.secret_values.get(&secret.name);
+            if values.is_some_and(|v| v.contains_key("PORT")) {
+                return Some(secret.name.clone());
+            }
+        }
+        None
     }
 
     fn move_declared(

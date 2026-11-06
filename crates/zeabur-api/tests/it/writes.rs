@@ -15,7 +15,7 @@ mod tests {
     use zeabur_kube::k8s_openapi::api::core::v1::Namespace;
     use zeabur_kube::k8s_openapi::jiff::Timestamp;
     use zeabur_kube::memory::{MemoryCluster, State};
-    use zeabur_kube::{Identity, NamespaceObjects, WriteBody};
+    use zeabur_kube::{Identity, NamespaceObjects, SecretSummary, WriteBody};
 
     use crate::common::{app, send};
     use crate::support::TestApi;
@@ -1051,5 +1051,49 @@ mod tests {
         assert_eq!(status, StatusCode::CONFLICT, "{problem}");
         assert_eq!(problem["managedBy"], "Helm", "{problem}");
         assert_eq!(problem["kind"], "managed");
+    }
+
+    #[tokio::test]
+    async fn a_port_change_sets_port_in_the_secret_the_container_imports_it_from() {
+        let cluster = cluster();
+        cluster.update(|s| {
+            let objects = s.objects.get_mut("shop").unwrap();
+            let mut web = serde_json::to_value(&objects.deployments[0]).unwrap();
+            web["spec"]["template"]["spec"]["containers"][0]["ports"] =
+                json!([{"containerPort": 8080}]);
+            web["spec"]["template"]["spec"]["containers"][0]["envFrom"] =
+                json!([{"secretRef": {"name": "web-env"}}]);
+            objects.deployments[0] = serde_json::from_value(web).unwrap();
+            objects.secrets.push(SecretSummary {
+                secret: serde_json::from_value(json!({"metadata": {"name": "web-env",
+                    "namespace": "shop", "resourceVersion": "5"}, "type": "Opaque"}))
+                .unwrap(),
+                key_count: 1,
+            });
+            s.secret_values.insert(
+                "shop/web-env".to_owned(),
+                BTreeMap::from([("PORT".to_owned(), b"8080".to_vec())]),
+            );
+        });
+        let planned = plan(
+            &app(&cluster),
+            &json!({"changes": [{"op": "port", "workload": {"kind": "Deployment", "name": "web"},
+                "from": 8080, "to": 3000}]}),
+        )
+        .await;
+        let objects = planned["objects"].as_array().unwrap();
+        let written = |kind: &str| {
+            objects
+                .iter()
+                .find(|o| o["target"]["kind"] == kind)
+                .unwrap()
+        };
+        assert_eq!(written("Secret")["target"]["name"], "web-env");
+        let container =
+            &written("Deployment")["after"]["spec"]["template"]["spec"]["containers"][0];
+        assert_eq!(
+            container["env"],
+            json!([{"name": "MODE", "value": "production"}])
+        );
     }
 }
