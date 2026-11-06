@@ -10,7 +10,7 @@ import { DocsLink } from "@/components/docs-link"
 import { FormField } from "@/components/form-field"
 import { GatedMenuItem, GateTip } from "@/components/gate"
 import {
-  AccessFields,
+  ProjectPicker,
   ReviewFrame,
   useAccessLines,
   useRoleLine,
@@ -21,6 +21,7 @@ import { MemberPlan } from "@/components/members/member-plan"
 import { YamlBlock } from "@/components/yaml"
 import { useI18n, useT } from "@/i18n"
 import { formatTime } from "@/lib/format"
+import { cn } from "@/lib/utils"
 import {
   DEFAULT_LIFETIME,
   expired,
@@ -69,14 +70,18 @@ export function ApiTokenList({
           <h2 id="api-tokens" className="type-heading">
             {t("apiTokens.title")}
           </h2>
-          <p className="type-meta text-muted-foreground">{t("apiTokens.about")}</p>
+          <p className="type-meta text-muted-foreground">
+            {t(projectRoles ? "apiTokens.about" : "apiTokens.noProjectRoles")}
+          </p>
         </div>
-        <GateTip gate={manage}>
-          <Button size="sm" variant="outline" onClick={() => setOpen({ step: "create" })}>
-            <KeyIcon aria-hidden="true" data-icon="inline-start" />
-            {t("apiTokens.create")}
-          </Button>
-        </GateTip>
+        {projectRoles ? (
+          <GateTip gate={manage}>
+            <Button size="sm" variant="outline" onClick={() => setOpen({ step: "create" })}>
+              <KeyIcon aria-hidden="true" data-icon="inline-start" />
+              {t("apiTokens.create")}
+            </Button>
+          </GateTip>
+        ) : null}
       </div>
       {tokens.length === 0 ? (
         <p className="text-sm text-muted-foreground">{t("apiTokens.none")}</p>
@@ -87,14 +92,13 @@ export function ApiTokenList({
               key={token.name}
               token={token}
               manage={manage}
+              projectRoles={projectRoles}
               onOpen={(step) => setOpen({ step, token })}
             />
           ))}
         </ul>
       )}
-      {open ? (
-        <Opened open={open} projectRoles={projectRoles} onOpen={setOpen} onClose={close} />
-      ) : null}
+      {open ? <Opened open={open} onOpen={setOpen} onClose={close} /> : null}
     </section>
   )
 }
@@ -106,22 +110,23 @@ function accessOf(token: Token): { role: Schemas.MemberRole; projects: Schemas.P
 function TokenRow({
   token,
   manage,
+  projectRoles,
   onOpen,
 }: {
   token: Token
   manage: Gate
+  projectRoles: boolean
   onOpen: (step: "access" | "renew" | "delete") => void
 }) {
   const t = useT()
   const { locale } = useI18n()
   const accessLines = useAccessLines()
-  const access = token.admin ? [t("apiTokens.admin")] : accessLines(accessOf(token))
+  const access = accessLines(accessOf(token))
+  const late = token.expiresAt ? expired(token.expiresAt, Date.now()) : false
   const when = token.expiresAt
-    ? t(
-        expired(token.expiresAt, Date.now()) ? "apiTokens.expired" : "apiTokens.expires",
-        formatTime(token.expiresAt, locale),
-      )
+    ? t(late ? "apiTokens.expired" : "apiTokens.expires", formatTime(token.expiresAt, locale))
     : ""
+  const whenTone = late ? "text-warn-strong" : "text-muted-foreground"
   const by = token.createdBy ? t("apiTokens.by", shortUser(token.createdBy)) : ""
   return (
     <li className="grid grid-cols-invitation-phone items-center gap-3 px-4 py-2.5 md:grid-cols-member md:gap-4">
@@ -140,7 +145,7 @@ function TokenRow({
           >
             {t("common.list", access)}
           </span>
-          <span className="truncate type-meta text-muted-foreground md:hidden">{when}</span>
+          <span className={cn("truncate type-meta md:hidden", whenTone)}>{when}</span>
         </span>
       </span>
       <span className="flex min-w-0 flex-col text-muted-foreground max-md:hidden">
@@ -150,7 +155,7 @@ function TokenRow({
           </span>
         ))}
       </span>
-      <span className="text-muted-foreground max-md:hidden md:col-span-2">{when}</span>
+      <span className={cn("max-md:hidden md:col-span-2", whenTone)}>{when}</span>
       <span className="flex justify-end">
         <Menu>
           <MenuTrigger
@@ -161,10 +166,12 @@ function TokenRow({
             <DotsThreeIcon aria-hidden="true" />
           </MenuTrigger>
           <MenuContent align="end">
-            <GatedMenuItem gate={manage} onClick={() => onOpen("access")}>
-              <UserGearIcon aria-hidden="true" />
-              {t("roles.change")}
-            </GatedMenuItem>
+            {projectRoles ? (
+              <GatedMenuItem gate={manage} onClick={() => onOpen("access")}>
+                <UserGearIcon aria-hidden="true" />
+                {t("roles.change")}
+              </GatedMenuItem>
+            ) : null}
             <GatedMenuItem gate={manage} onClick={() => onOpen("renew")}>
               <KeyIcon aria-hidden="true" />
               {t("apiTokens.renew")}
@@ -182,12 +189,10 @@ function TokenRow({
 /** The dialog that is open: a form, its plan, or the token just issued. */
 function Opened({
   open,
-  projectRoles,
   onOpen,
   onClose,
 }: {
   open: Open
-  projectRoles: boolean
   onOpen: (open: Open) => void
   onClose: () => void
 }) {
@@ -196,13 +201,12 @@ function Opened({
     case "create":
       return (
         <CreateDialog
-          projectRoles={projectRoles}
           onClose={onClose}
           onIssued={(issued, namespace) => onOpen({ step: "shown", issued, namespace })}
         />
       )
     case "access":
-      return <TokenAccess token={open.token} projectRoles={projectRoles} onClose={onClose} />
+      return <TokenAccess token={open.token} onClose={onClose} />
     case "renew":
       return (
         <RenewDialog
@@ -239,15 +243,32 @@ function shortUser(user: string): string {
 }
 
 /** What a token's access comes to, in the plan's words. */
-function useAccessSentence(): (name: string, admin: boolean, chosen: Chosen) => string {
+function useAccessSentence(): (name: string, chosen: Chosen) => string {
   const t = useT()
   const roleLine = useRoleLine()
-  return (name, admin, chosen) =>
-    admin
-      ? t("apiTokens.plan.admin", name)
-      : chosen.size === 0
-        ? t("apiTokens.plan.noRole", name)
-        : t("members.plan.gets", name, roleLine(grantsOf(chosen)))
+  return (name, chosen) =>
+    chosen.size === 0
+      ? t("apiTokens.plan.noRole", name)
+      : t("members.plan.gets", name, roleLine(grantsOf(chosen)))
+}
+
+function TokenProjects({
+  chosen,
+  onChosen,
+  held,
+}: {
+  chosen: Chosen
+  onChosen: (chosen: Chosen) => void
+  held?: string[]
+}) {
+  const t = useT()
+  return (
+    <fieldset className="flex min-w-0 flex-col gap-2">
+      <legend className="mb-1 text-sm font-medium">{t("apiTokens.projects")}</legend>
+      <p className="type-meta text-muted-foreground">{t("apiTokens.projectsHint")}</p>
+      <ProjectPicker chosen={chosen} onChosen={onChosen} held={held ?? []} />
+    </fieldset>
+  )
 }
 
 function Lifetime({ value, onChange }: { value: number; onChange: (seconds: number) => void }) {
@@ -270,23 +291,19 @@ function Lifetime({ value, onChange }: { value: number; onChange: (seconds: numb
 
 interface Wanted {
   name: string
-  admin: boolean
   chosen: Chosen
   seconds: number
 }
 
 function CreateDialog({
-  projectRoles,
   onClose,
   onIssued,
 }: {
-  projectRoles: boolean
   onClose: () => void
   onIssued: (issued: Issued, namespace?: string) => void
 }) {
   const t = useT()
   const [name, setName] = useState("")
-  const [admin, setAdmin] = useState(false)
   const [chosen, setChosen] = useState<Chosen>(new Map())
   const [seconds, setSeconds] = useState(DEFAULT_LIFETIME)
   const [tried, setTried] = useState(false)
@@ -295,8 +312,7 @@ function CreateDialog({
   if (reviewing)
     return (
       <CreatePlan
-        wanted={{ name, admin, chosen, seconds }}
-        projectRoles={projectRoles}
+        wanted={{ name, chosen, seconds }}
         onBack={() => setReviewing(false)}
         onClose={onClose}
         onIssued={onIssued}
@@ -325,44 +341,31 @@ function CreateDialog({
           onChange={(event) => setName(event.target.value.trim())}
         />
       </FormField>
-      <AccessFields
-        projectRoles={projectRoles}
-        admin={admin}
-        onAdmin={setAdmin}
-        chosen={chosen}
-        onChosen={setChosen}
-        adminCopy={{ label: t("apiTokens.admin"), hint: t("apiTokens.adminHint") }}
-      />
+      <TokenProjects chosen={chosen} onChosen={setChosen} />
       <Lifetime value={seconds} onChange={setSeconds} />
     </ReviewFrame>
   )
 }
 
 function CreatePlan({
-  wanted: { name, admin, chosen, seconds },
-  projectRoles,
+  wanted: { name, chosen, seconds },
   onBack,
   onClose,
   onIssued,
 }: {
   wanted: Wanted
-  projectRoles: boolean
   onBack: () => void
   onClose: () => void
   onIssued: (issued: Issued, namespace?: string) => void
 }) {
   const t = useT()
   const sentence = useAccessSentence()
-  const projects = admin || !projectRoles ? [] : grantsOf(chosen)
+  const projects = grantsOf(chosen)
   return (
     <MemberPlan
       title={t("apiTokens.createTitle")}
-      change={{ op: "createToken", name, admin, projects, expirationSeconds: seconds }}
-      consequence={admin ? t("apiTokens.plan.adminWarning") : undefined}
-      lines={[
-        sentence(name, admin, chosen),
-        t("apiTokens.plan.lasts", t("apiTokens.lasts", seconds)),
-      ]}
+      change={{ op: "createToken", name, projects, expirationSeconds: seconds }}
+      lines={[sentence(name, chosen), t("apiTokens.plan.lasts", t("apiTokens.lasts", seconds))]}
       action={t("apiTokens.create")}
       onBack={onBack}
       onClose={onClose}
@@ -373,18 +376,9 @@ function CreatePlan({
   )
 }
 
-function TokenAccess({
-  token,
-  projectRoles,
-  onClose,
-}: {
-  token: Token
-  projectRoles: boolean
-  onClose: () => void
-}) {
+function TokenAccess({ token, onClose }: { token: Token; onClose: () => void }) {
   const t = useT()
   const sentence = useAccessSentence()
-  const [admin, setAdmin] = useState(token.admin)
   const [chosen, setChosen] = useState<Chosen>(() => chosenOf(token))
   const [reviewing, setReviewing] = useState(false)
   if (reviewing)
@@ -394,11 +388,9 @@ function TokenAccess({
         change={{
           op: "tokenAccess",
           name: token.name,
-          admin,
-          projects: admin || !projectRoles ? [] : grantsOf(chosen),
+          projects: grantsOf(chosen),
         }}
-        consequence={admin && !token.admin ? t("apiTokens.plan.adminWarning") : undefined}
-        lines={[sentence(token.name, admin, chosen)]}
+        lines={[sentence(token.name, chosen)]}
         action={t("roles.save")}
         onBack={() => setReviewing(false)}
         onClose={onClose}
@@ -414,13 +406,9 @@ function TokenAccess({
       onClose={onClose}
       onReview={() => setReviewing(true)}
     >
-      <AccessFields
-        projectRoles={projectRoles}
-        admin={admin}
-        onAdmin={setAdmin}
+      <TokenProjects
         chosen={chosen}
         onChosen={setChosen}
-        adminCopy={{ label: t("apiTokens.admin"), hint: t("apiTokens.adminHint") }}
         held={token.projects.map((p) => p.project)}
       />
     </ReviewFrame>

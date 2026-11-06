@@ -1,8 +1,8 @@
 //! API tokens: machine accounts managed like members. Each is a ServiceAccount in
 //! [`api_token::NAMESPACE`] ([`zeabur_plan::api_token`]) with the bindings of [`super::access`]
-//! for [`Holder::Token`]: Developer or Viewer in chosen projects and the baseline, or
-//! `cluster-admin` for an admin token. Admins make, renew, change and delete them through member
-//! plans ([`super::plan`]); nobody else has rights in the namespace.
+//! for [`Holder::Token`]: Developer or Viewer in chosen projects and the baseline. Admins make,
+//! renew, change and delete them through member plans ([`super::plan`]); nobody else has rights in
+//! the namespace.
 //!
 //! The token is in the answer to apply only, once, and never in a plan, a log or a stored object.
 //! The answer carries kube-apiserver's CA from the `kube-root-ca.crt` ConfigMap of the namespace
@@ -18,7 +18,7 @@ use zeabur_core::problem::{Denied, Kind, Problem};
 use zeabur_kube::{Cluster, ClusterError, ResourceRef};
 use zeabur_plan::api_token::{self, NAMESPACE, Refusal};
 
-use super::access::{ADMIN_ROLE, Binding, Holder, ProjectGrant, RBAC_GROUP, grants_of};
+use super::access::{Binding, Holder, ProjectGrant, grants_of};
 use crate::error::{ApiError, read_problem};
 
 const ROOT_CA: &str = "kube-root-ca.crt";
@@ -29,9 +29,7 @@ const ROOT_CA: &str = "kube-root-ca.crt";
 pub struct ApiTokenView {
     /// Its name, which is its ServiceAccount's.
     pub name: String,
-    /// Whether it is bound to `cluster-admin`, as an admin member is.
-    pub admin: bool,
-    /// Its roles in projects; empty for an admin token.
+    /// Its roles in projects.
     pub projects: Vec<ProjectGrant>,
     /// The Kubernetes user name of whoever made it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -77,22 +75,12 @@ pub(crate) fn service_accounts() -> ResourceRef {
     ResourceRef::new("", "v1", "serviceaccounts", "ServiceAccount")
 }
 
-fn cluster_role_bindings() -> ResourceRef {
-    ResourceRef::new(
-        RBAC_GROUP,
-        "v1",
-        "clusterrolebindings",
-        "ClusterRoleBinding",
-    )
-}
-
 /// The refusal key of the token read, as `unreadable` names it.
 pub(crate) fn key() -> String {
     "serviceaccounts".to_owned()
 }
 
-/// Every API token, by name, with its access from `bindings` and the `ClusterRoleBinding`s. An
-/// absent namespace has none.
+/// Every API token, by name, with its access from `bindings`. An absent namespace has none.
 pub(crate) async fn list(
     cluster: &dyn Cluster,
     bindings: &[Binding],
@@ -105,19 +93,6 @@ pub(crate) async fn list(
         Err(error) if error.code() == Some(404) => Vec::new(),
         Err(error) => return Err(error),
     };
-    let cluster_bindings = cluster
-        .list_objects(&cluster_role_bindings(), None)
-        .await?
-        .unwrap_or_default();
-    let mut admins = Vec::new();
-    for binding in cluster_bindings {
-        let Ok(object) = serde_json::to_value(&binding) else {
-            continue;
-        };
-        if let Some(name) = admin_token(&object) {
-            admins.push(name);
-        }
-    }
     let mut items = Vec::new();
     for account in accounts {
         let Ok(object) = serde_json::to_value(&account) else {
@@ -126,14 +101,8 @@ pub(crate) async fn list(
         let Some(token) = api_token::read(&object) else {
             continue;
         };
-        let admin = admins.contains(&token.name);
-        let projects = if admin {
-            Vec::new()
-        } else {
-            grants_of(bindings, &Holder::token(&token.name))
-        };
+        let projects = grants_of(bindings, &Holder::token(&token.name));
         items.push(ApiTokenView {
-            admin,
             projects,
             name: token.name,
             created_by: token.created_by,
@@ -143,22 +112,6 @@ pub(crate) async fn list(
     }
     items.sort_by(|a, b| a.name.cmp(&b.name));
     Ok(items)
-}
-
-/// The token a `ClusterRoleBinding` makes an admin: one Zeabur named and labelled for it, bound
-/// to `cluster-admin`.
-fn admin_token(binding: &Value) -> Option<String> {
-    let name = binding
-        .pointer(&format!(
-            "/metadata/labels/{}",
-            api_token::LABEL.replace('/', "~1")
-        ))?
-        .as_str()?;
-    let holder = Holder::token(name);
-    let named = binding.pointer("/metadata/name").and_then(Value::as_str)
-        == Some(holder.binding_name().as_str());
-    let role = binding.pointer("/roleRef/name").and_then(Value::as_str);
-    (named && role == Some(ADMIN_ROLE)).then(|| name.to_owned())
 }
 
 fn no_token(name: &str) -> ApiError {

@@ -16,8 +16,7 @@
 //!
 //! An API token gets the same bindings as a member ([`Holder::Token`]), named
 //! `zeabur-api-token-<name>`, labelled [`TOKEN_LABEL`], for its ServiceAccount in
-//! [`API_TOKENS_NAMESPACE`]. A token has no `User` to mark it an admin, so an admin token's
-//! `ClusterRoleBinding` names `cluster-admin` ([`ADMIN_ROLE`]) instead of the baseline.
+//! [`API_TOKENS_NAMESPACE`]. A token is never an admin: admins sign in with passkeys only.
 //!
 //! [k8s-roleref]: https://kubernetes.io/docs/reference/access-authn-authz/rbac/#clusterrolebinding-example
 //! [k8s-escalation]: https://kubernetes.io/docs/reference/access-authn-authz/rbac/#restrictions-on-role-binding-creation-or-update
@@ -39,8 +38,6 @@ pub const MEMBER_LABEL: &str = "zeabur.com/member";
 pub const TOKEN_LABEL: &str = zeabur_plan::api_token::LABEL;
 /// The `ClusterRole` every member gets.
 pub const BASELINE_ROLE: &str = "zeabur-member";
-/// The `ClusterRole` of an admin token, as admin members get through their group.
-pub const ADMIN_ROLE: &str = "cluster-admin";
 pub(crate) const RBAC_GROUP: &str = "rbac.authorization.k8s.io";
 const RBAC_VERSION: &str = "rbac.authorization.k8s.io/v1";
 const MANAGED_BY: &str = "app.kubernetes.io/managed-by";
@@ -145,23 +142,16 @@ pub fn role_binding(project: &str, holder: &Holder, role: ProjectRole) -> Value 
     })
 }
 
-/// The `ClusterRoleBinding` that gives `holder` the `ClusterRole` `role`: [`BASELINE_ROLE`], or
-/// [`ADMIN_ROLE`] for an admin token.
+/// The `ClusterRoleBinding` that gives `holder` the baseline.
 #[must_use]
-pub fn cluster_binding(holder: &Holder, role: &str) -> Value {
+pub fn baseline_binding(holder: &Holder) -> Value {
     json!({
         "apiVersion": RBAC_VERSION,
         "kind": "ClusterRoleBinding",
         "metadata": {"name": holder.binding_name(), "labels": holder.labels()},
-        "roleRef": {"apiGroup": RBAC_GROUP, "kind": "ClusterRole", "name": role},
+        "roleRef": {"apiGroup": RBAC_GROUP, "kind": "ClusterRole", "name": BASELINE_ROLE},
         "subjects": holder.subjects(),
     })
-}
-
-/// The `ClusterRoleBinding` that gives `holder` the baseline.
-#[must_use]
-pub fn baseline_binding(holder: &Holder) -> Value {
-    cluster_binding(holder, BASELINE_ROLE)
 }
 
 /// A project binding Zeabur made, as read.
@@ -399,10 +389,7 @@ pub(crate) mod tests {
             object["subjects"],
             json!([{"kind": "ServiceAccount", "name": "ci", "namespace": API_TOKENS_NAMESPACE}])
         );
-        assert_eq!(
-            cluster_binding(&token, ADMIN_ROLE)["roleRef"]["name"],
-            "cluster-admin"
-        );
+        assert_eq!(baseline_binding(&token)["roleRef"]["name"], BASELINE_ROLE);
         let read = bindings_of(vec![serde_json::from_value(object).unwrap()]);
         assert_eq!(read[0].holder, token);
         assert_eq!(read[0].role, Some(ProjectRole::Developer));

@@ -26,9 +26,7 @@ use zeabur_kube::{Cluster, ObjectTarget, Preconditions, ResourceRef, WriteBody, 
 use zeabur_plan::api_token;
 
 use super::USER_PREFIX;
-use super::access::{
-    self, ADMIN_ROLE, BASELINE_ROLE, Binding, Holder, ProjectGrant, RBAC_GROUP, Step,
-};
+use super::access::{self, Binding, Holder, ProjectGrant, RBAC_GROUP, Step};
 use super::directory::{AccountType, IdentityKind, Object, UserSpec, request, setup_links};
 use super::handlers::{directory, issuer_of, you};
 use super::tokens::{self, IssuedTokenView};
@@ -90,10 +88,7 @@ pub enum MemberChange {
     CreateToken {
         /// Its name: lower-case letters, digits and `-`, at most 63 characters.
         name: String,
-        /// Whether it gets `cluster-admin`, as an admin member does.
-        #[serde(default)]
-        admin: bool,
-        /// Its roles in projects, when it is not an admin token.
+        /// Its roles in projects.
         #[serde(default)]
         projects: Vec<ProjectGrant>,
         /// How long the token should last; kube-apiserver may cut it.
@@ -104,9 +99,7 @@ pub enum MemberChange {
     TokenAccess {
         /// The token.
         name: String,
-        /// Whether it gets `cluster-admin`.
-        admin: bool,
-        /// Roles in projects; empty for an admin token.
+        /// Its roles in projects.
         #[serde(default)]
         projects: Vec<ProjectGrant>,
     },
@@ -333,28 +326,6 @@ impl Computed {
     /// A token's access: its `ClusterRoleBinding` to `role` (replaced when it names another,
     /// deleted when `role` is `None`) and its project bindings. The old `ClusterRoleBinding` goes
     /// first and the new one last, so a failure half-way never leaves more than was asked.
-    fn token_access(
-        &mut self,
-        holder: &Holder,
-        held: Option<&Value>,
-        current: &[Binding],
-        projects: &[ProjectGrant],
-        role: Option<&str>,
-    ) {
-        let target = access::target("ClusterRoleBinding", "", &holder.binding_name());
-        let held_role = held
-            .and_then(|b| b.pointer("/roleRef/name"))
-            .and_then(Value::as_str);
-        let replaced = held_role != role;
-        if replaced && let Some(held) = held {
-            self.delete(target.clone(), uid_of(held), Some(held.clone()));
-        }
-        self.bindings(holder, current, projects);
-        if replaced && let Some(role) = role {
-            self.create(target, access::cluster_binding(holder, role));
-        }
-    }
-
     fn patch_admin(
         &mut self,
         namespace: &str,
@@ -472,35 +443,21 @@ async fn compute(
         MemberChange::Remove { username } => remove(identity, cluster, username).await,
         MemberChange::CreateToken {
             name,
-            admin,
             projects,
             expiration_seconds,
         } => {
-            let projects = wanted_projects(*admin, projects, identity.project_roles)?;
-            create_token(
-                state,
-                cluster,
-                person,
-                name,
-                *admin,
-                &projects,
-                *expiration_seconds,
-            )
-            .await
+            let projects = token_projects(identity, projects)?;
+            create_token(cluster, person, name, &projects, *expiration_seconds).await
         }
-        MemberChange::TokenAccess {
-            name,
-            admin,
-            projects,
-        } => {
-            let projects = wanted_projects(*admin, projects, identity.project_roles)?;
+        MemberChange::TokenAccess { name, projects } => {
+            let projects = token_projects(identity, projects)?;
             let account = tokens::existing(cluster, name).await?;
             let mut computed = Computed::default();
             computed.versions.insert(
                 key(&account_target(name)),
                 uid_of(&account).unwrap_or_default(),
             );
-            token_access(identity, cluster, &mut computed, name, *admin, &projects).await?;
+            token_access(cluster, &mut computed, name, &projects).await?;
             Ok(computed)
         }
         MemberChange::RenewToken {
@@ -512,11 +469,9 @@ async fn compute(
 }
 
 async fn create_token(
-    state: &AppState,
     cluster: &dyn Cluster,
     person: &str,
     name: &str,
-    admin: bool,
     projects: &[ProjectGrant],
     seconds: i64,
 ) -> Result<Computed, ApiError> {
@@ -533,15 +488,7 @@ async fn create_token(
     let account = api_token::service_account(name, person);
     let mut computed = Computed::default();
     computed.create(account_target(name), account.clone());
-    token_access(
-        &state.settings.identity,
-        cluster,
-        &mut computed,
-        name,
-        admin,
-        projects,
-    )
-    .await?;
+    token_access(cluster, &mut computed, name, projects).await?;
     computed.ops.push(Op::IssueToken {
         name: name.to_owned(),
         seconds,
@@ -600,27 +547,33 @@ fn account_target(name: &str) -> ObjectTarget {
     }
 }
 
-/// The token's bindings as wanted: `cluster-admin` for an admin token, else the baseline (when
-/// the chart's member roles are installed) and `projects`.
-async fn token_access(
+/// A token's roles in projects. A token has no other rights, so it needs the chart's member roles.
+fn token_projects(
     identity: &IdentitySettings,
+    projects: &[ProjectGrant],
+) -> Result<Vec<ProjectGrant>, ApiError> {
+    if !identity.project_roles {
+        return Err(refuse(
+            "Zeabur was installed without the member roles, so an API token could get no role.",
+            "Install the chart with memberRoles.enabled=true.",
+            "apiTokens.noProjectRoles",
+        ));
+    }
+    wanted_projects(false, projects, true)
+}
+
+/// The token's bindings as wanted: the baseline and a role in each of `projects`.
+async fn token_access(
     cluster: &dyn Cluster,
     computed: &mut Computed,
     name: &str,
-    admin: bool,
     projects: &[ProjectGrant],
 ) -> Result<(), ApiError> {
     let holder = Holder::token(name);
     let current = access::bindings_for(cluster, &holder).await?;
     let held = baseline_of(cluster, &holder).await?;
-    let role = if admin {
-        Some(ADMIN_ROLE)
-    } else if identity.project_roles {
-        Some(BASELINE_ROLE)
-    } else {
-        None
-    };
-    computed.token_access(&holder, held.as_ref(), &current, projects, role);
+    computed.bindings(&holder, &current, projects);
+    computed.baseline(&holder, held.as_ref());
     Ok(())
 }
 
@@ -1281,6 +1234,5 @@ mod tests {
                 projects: vec![grant("shop", ProjectRole::Viewer)],
             }
         );
-        assert_eq!(BASELINE_ROLE, "zeabur-member");
     }
 }

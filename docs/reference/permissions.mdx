@@ -91,7 +91,7 @@ An [API token](./api-tokens.mdx) gets roles the same way a member does. Its subj
 
 | Object | Scope and contents |
 |---|---|
-| `ClusterRoleBinding zeabur-api-token-<name>` | Binds `zeabur-member` to the ServiceAccount, or `cluster-admin` for an admin token |
+| `ClusterRoleBinding zeabur-api-token-<name>` | Binds `zeabur-member` to the ServiceAccount |
 | `RoleBinding zeabur-api-token-<name>` in each project | Binds the project's developer or viewer role to the same ServiceAccount |
 
 These bindings and the ServiceAccount have the labels `zeabur.com/api-token: <name>` and `app.kubernetes.io/managed-by: zeabur`.

@@ -38,6 +38,8 @@
 //! second shop channel was rejected by Alertmanager. `ZEABUR_DEMO_ALERTING=none` leaves it
 //! uninstalled.
 //!
+//! `ZEABUR_DEMO_IDENTITY=none` leaves Zeabur Identity uninstalled; the API tokens stay.
+//!
 //! `storageclasses.storage.k8s.io` and `persistentvolumes` in `ZEABUR_DEMO_FORBID` refuse
 //! reading the storage classes (local-path, the default, and Longhorn) and the volumes behind
 //! claims.
@@ -233,11 +235,9 @@ fn people() -> Vec<DynamicObject> {
 
 /// What Bob and Carol may do: Bob develops `shop` and views `blog`, Carol views five projects.
 /// The API token `github-actions` develops `shop`, `grafana` views `shop` and `blog`, and
-/// `backup-bot` is an admin token.
+/// `backup-bot` develops `billing`.
 fn member_roles() -> Vec<DynamicObject> {
-    use zeabur_api::members::access::{
-        ADMIN_ROLE, BASELINE_ROLE, Holder, ProjectRole, cluster_binding, role_binding,
-    };
+    use zeabur_api::members::access::{Holder, ProjectRole, baseline_binding, role_binding};
     let roles = [
         (Holder::member("bob"), "shop", ProjectRole::Developer),
         (Holder::member("bob"), "blog", ProjectRole::Viewer),
@@ -253,23 +253,28 @@ fn member_roles() -> Vec<DynamicObject> {
         ),
         (Holder::token("grafana"), "shop", ProjectRole::Viewer),
         (Holder::token("grafana"), "blog", ProjectRole::Viewer),
+        (
+            Holder::token("backup-bot"),
+            "billing",
+            ProjectRole::Developer,
+        ),
     ];
-    let cluster_roles = [
-        (Holder::member("alice"), BASELINE_ROLE),
-        (Holder::member("bob"), BASELINE_ROLE),
-        (Holder::member("carol"), BASELINE_ROLE),
-        (Holder::member("dan"), BASELINE_ROLE),
-        (Holder::token("github-actions"), BASELINE_ROLE),
-        (Holder::token("grafana"), BASELINE_ROLE),
-        (Holder::token("backup-bot"), ADMIN_ROLE),
+    let baselines = [
+        Holder::member("alice"),
+        Holder::member("bob"),
+        Holder::member("carol"),
+        Holder::member("dan"),
+        Holder::token("github-actions"),
+        Holder::token("grafana"),
+        Holder::token("backup-bot"),
     ];
     let mut objects = Vec::new();
     for (holder, project, role) in roles {
         objects.push(from(role_binding(project, &holder, role)));
     }
-    for (holder, role) in cluster_roles {
+    for holder in baselines {
         // The memory cluster keeps a cluster-scoped object in namespace "".
-        let mut binding = cluster_binding(&holder, role);
+        let mut binding = baseline_binding(&holder);
         if let Some(metadata) = binding.get_mut("metadata").and_then(Value::as_object_mut) {
             metadata.insert("namespace".to_owned(), "".into());
         }
@@ -857,6 +862,7 @@ fn state() -> State {
                 false,
             )
         }])
+        .filter(|r| identity_installed() || r.group != "identity.zeabur.com")
         .collect(),
         dynamic: [
             // The Gateway of the shop's HTTPRoute, which accepts routes from every namespace.
@@ -1483,6 +1489,10 @@ fn k8up() -> Vec<DynamicObject> {
                 "reason": "Succeeded", "lastTransitionTime": minutes_ago(88)}]}
         })),
     ]
+}
+
+fn identity_installed() -> bool {
+    std::env::var("ZEABUR_DEMO_IDENTITY").as_deref() != Ok("none")
 }
 
 /// Velero, unless `ZEABUR_DEMO_VELERO` is `none`; `location` has a location and nothing else.

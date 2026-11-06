@@ -14,7 +14,7 @@ An API token lets a script or CI job work with the cluster without anyone's sign
 
 1. Open **Members** and, under **API tokens**, click **Create token**.
 2. Name it after what uses it, such as `github-actions`.
-3. Pick **Developer** or **Viewer** in each project it needs, or make it an **Admin token** with full rights to the cluster. Pick how long it lasts, then click **Review**.
+3. Pick **Developer** or **Viewer** in each project it needs and how long it lasts, then click **Review**.
 4. Check the changes and apply them.
 5. Copy the token. Zeabur shows it only once. The dialog also shows a kubeconfig and the cluster's CA certificate.
 
@@ -47,6 +47,23 @@ For curl, set the address and token once:
 APISERVER=https://203.0.113.10:6443
 TOKEN='<token>'
 ```
+
+## What a token can do
+
+A token has only the roles you give it in projects, plus `zeabur-member`, which lets it read node and namespace names. A **Viewer** token can see the status of a project's services. A **Developer** token can also:
+
+- Change a service's image and replicas, and restart it.
+- Read and edit secrets, and set variables.
+- Read logs and run commands in a replica with `kubectl exec`.
+- Build again.
+
+A token can't:
+
+- Create or delete projects, or touch a project it has no role in.
+- Change nodes, cluster components, or cluster backups.
+- Read or change anything in `zeabur-api-tokens`, so it can't request more tokens.
+
+There's no admin token. Admin accounts sign in only with passkeys, and a token with full rights would get around that. For work across the cluster, such as creating projects, installing components, managing nodes, or cluster backups, use your own kubeconfig as an admin. See [Admin accounts and regular accounts](./permissions.mdx#admin-accounts-and-regular-accounts).
 
 ## Common tasks
 
@@ -167,7 +184,7 @@ curl --cacert ca.crt -H "Authorization: Bearer $TOKEN" -X PATCH \
 
 Choose **More** → **Renew** next to a token to get a new token with the same name and access. Tokens issued before keep working until they expire.
 
-Choose **More** → **Change access** to give the token roles in other projects or make it an admin token. The change applies to every token issued for it.
+Choose **More** → **Change access** to give the token roles in other projects. The change applies to every token issued for it.
 
 To stop a token at once, choose **More** → **Delete**. Every token issued for it stops working, and requests get `401 Unauthorized`.
 
@@ -181,7 +198,7 @@ Zeabur writes these objects with the admin's own permissions:
 |---|---|
 | `ServiceAccount <name>` in the `zeabur-api-tokens` namespace | Labels `zeabur.com/api-token: <name>` and `app.kubernetes.io/managed-by: zeabur`. Annotations record who created it and when the latest token expires |
 | `RoleBinding zeabur-api-token-<name>` in each project | Binds `zeabur-project-developer` or `zeabur-project-viewer` to the ServiceAccount |
-| `ClusterRoleBinding zeabur-api-token-<name>` | Binds `zeabur-member`, like a member's, or `cluster-admin` for an admin token |
+| `ClusterRoleBinding zeabur-api-token-<name>` | Binds `zeabur-member`, like a member's |
 
 The token itself comes from a TokenRequest for the ServiceAccount. Zeabur doesn't store it in a secret or anywhere else. Deleting the token deletes its bindings and the ServiceAccount.
 

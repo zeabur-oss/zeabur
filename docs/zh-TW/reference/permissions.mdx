@@ -1,7 +1,7 @@
 ---
 title: 權限
 description: 對照成員角色、管理員帳號與 Kubernetes RBAC，確認每項操作的存取範圍和登入能維持多久。
-source: "83a1e5c77b7e"
+source: "9b217064c94c"
 ---
 
 看得到專案卻讀不到日誌時，先確認自己在這個專案的角色：**檢視者**只能看狀態和事件，**開發者**才能讀日誌、讀 Secret 和部署。Zeabur 用你自己的身分呼叫 kube-apiserver，能不能做由 Kubernetes RBAC 決定。
@@ -92,7 +92,7 @@ zeabur.com/icon
 
 | 物件 | 範圍與內容 |
 |---|---|
-| `ClusterRoleBinding zeabur-api-token-<name>` | 綁定 `zeabur-member` 給該 ServiceAccount；管理員權杖則綁定 `cluster-admin` |
+| `ClusterRoleBinding zeabur-api-token-<name>` | 綁定 `zeabur-member` 給該 ServiceAccount |
 | 各專案中的 `RoleBinding zeabur-api-token-<name>` | 綁定該專案的 developer 或 viewer 角色給同一個 ServiceAccount |
 
 這些 binding 和 ServiceAccount 都帶有 `zeabur.com/api-token: <name>` 和 `app.kubernetes.io/managed-by: zeabur` 標籤。

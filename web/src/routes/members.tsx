@@ -111,21 +111,25 @@ export function MembersPage() {
         <Skeleton variant="card" className="h-50" />
       ) : members.isError ? (
         <Problem error={members.error} what={t("refused.see", t("members.everyone"))} />
-      ) : !members.data.installed ? (
-        <Empty variant="outline">
-          <EmptyHeader>
-            <EmptyMedia>
-              <Illustration kind="empty" />
-            </EmptyMedia>
-            <EmptyTitle>{t("members.notInstalled")}</EmptyTitle>
-            <EmptyDescription>{t("members.notInstalledBody")}</EmptyDescription>
-          </EmptyHeader>
-        </Empty>
       ) : (
         <>
-          <LinksUnavailable links={members.data.setupLinks} />
-          <ManageDenied hint={members.data.canManage} denied={t("members.denied")} />
-          <MemberList items={members.data.items} projectRoles={projectRoles} onOpen={setOpen} />
+          {members.data.installed ? (
+            <>
+              <LinksUnavailable links={members.data.setupLinks} />
+              <ManageDenied hint={members.data.canManage} denied={t("members.denied")} />
+              <MemberList items={members.data.items} projectRoles={projectRoles} onOpen={setOpen} />
+            </>
+          ) : (
+            <Empty variant="outline">
+              <EmptyHeader>
+                <EmptyMedia>
+                  <Illustration kind="empty" />
+                </EmptyMedia>
+                <EmptyTitle>{t("members.notInstalled")}</EmptyTitle>
+                <EmptyDescription>{t("members.notInstalledBody")}</EmptyDescription>
+              </EmptyHeader>
+            </Empty>
+          )}
           <RefusedSome unreadable={members.data.unreadable} />
           <Pending invitations={members.data.invitations} />
           <ApiTokenList
