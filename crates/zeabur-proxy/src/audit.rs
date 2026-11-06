@@ -171,14 +171,15 @@ impl Inflight {
     }
 
     /// Forgets `person` once nobody holds or waits for one of their places. Every holder and
-    /// waiter has a clone of `own`, taken under the lock, so the count is exact here.
+    /// waiter has a clone of `own`, taken and given back under the lock, so the count is exact
+    /// here.
     fn leave(&self, person: &str, own: Arc<Semaphore>) {
         let mut people = self.people.lock().unwrap_or_else(PoisonError::into_inner);
-        if Arc::strong_count(&own) == 2 {
+        let last = Arc::strong_count(&own) == 2;
+        drop(own);
+        if last {
             people.remove(person);
         }
-        drop(people);
-        drop(own);
     }
 }
 
@@ -243,5 +244,28 @@ mod tests {
         assert!(inflight.people.lock().unwrap().contains_key("a"));
         drop(held);
         assert!(inflight.people.lock().unwrap().is_empty());
+    }
+
+    #[test]
+    fn a_person_is_forgotten_when_their_last_queries_end_together() {
+        const AT_ONCE: usize = 8;
+        let runtime = tokio::runtime::Runtime::new().unwrap();
+        let inflight = Inflight::new(AT_ONCE, AT_ONCE, WAIT);
+        for _ in 0..500 {
+            let start = Arc::new(std::sync::Barrier::new(AT_ONCE));
+            let mut ends = Vec::new();
+            for _ in 0..AT_ONCE {
+                let slot = runtime.block_on(inflight.enter("a")).unwrap();
+                let start = Arc::clone(&start);
+                ends.push(std::thread::spawn(move || {
+                    start.wait();
+                    drop(slot);
+                }));
+            }
+            for end in ends {
+                end.join().unwrap();
+            }
+            assert!(inflight.people.lock().unwrap().is_empty());
+        }
     }
 }
