@@ -24,9 +24,9 @@ description: 對照成員角色、管理員帳號與 Kubernetes RBAC，確認每
 | 從 Git 部署、重新建置 | 無 | 可 |
 | 開啟容器終端機、加入除錯容器 | 無 | 可 |
 | 修改專案顯示名稱、描述與圖示 | 無 | 可 |
-| 建立、更新和刪除專案的 [API 權杖](./api-tokens.mdx) | 無 | 可 |
 | 建立／刪除 Namespace、把 Namespace 加入或移出 Zeabur | 無 | 無 |
 | 修改角色與成員存取權、節點、叢集元件 | 無 | 無 |
+| 建立與管理 [API 權杖](./api-tokens.mdx) | 無 | 無 |
 | 從磁碟區的備份還原（K8up） | 無 | 可 |
 | 設定叢集備份、從叢集備份還原 | 無 | 無 |
 
@@ -48,9 +48,7 @@ Chart 的 `memberRoles.enabled` 預設是 `true`，會建立：
 - `zeabur-member`：讀取節點、Namespace、StorageClass，以及知道名稱的 PersistentVolume。每位成員都看得到所有 Namespace 的名稱和 annotations，所以專案描述裡不要放機密。
 - `zeabur-project-viewer`、`zeabur-project-developer`：專案角色，用 `zeabur.com/aggregate-to-<role>` 標籤聚合規則。
 - `zeabur-project-viewer-rules`、`zeabur-project-developer-rules`、`zeabur-project-builds-read`、`zeabur-project-builds-write`：上面兩個角色實際的 verb 和 resource。檢視者看得到建置，開發者還能從 Git 部署和重新建置。
-- `zeabur-project-api-tokens`：讓開發者建立 [API 權杖](./api-tokens.mdx)用的 ServiceAccount 和 RoleBinding，並為它們申請權杖。
 - `zeabur-project-namespace` ValidatingAdmissionPolicy 和對應的 binding：限制開發者能改 Namespace 的哪些欄位，需要 Kubernetes 1.30 以上。
-- `zeabur-api-token-accounts`、`zeabur-api-token-bindings`、`zeabur-api-token-requests`、`zeabur-api-token-pods` ValidatingAdmissionPolicy 和對應的 binding：讓開發者只能寫 API 權杖用的物件，也讓權杖過了期限就不能再用，見 [API 權杖和 RBAC](#api-權杖和-rbac)。
 
 Chart 本身不綁定任何人。管理員在 Zeabur 邀請或變更成員時，Zeabur 用管理員的權限建立：
 
@@ -83,20 +81,22 @@ zeabur.com/icon
 開發者能讀專案的 Secret，也能建立 Pod、修改工作負載、在容器裡執行指令，因此拿得到工作負載掛載的機密，也能以專案裡任何 ServiceAccount 的權限執行。權限比團隊該有的更大的 ServiceAccount 或管理員認證資訊，不要放進專案。
 </Callout>
 
-開發者角色只能寫入 API 權杖用的 ServiceAccount 和 RoleBinding，也沒有 `bind`、`escalate`、`impersonate`、`nodes/proxy` 或 service／pod proxy 權限，所以不能自己擴大權限。
+開發者角色不能寫入 RBAC 物件和 ServiceAccount，也沒有 `bind`、`escalate`、`impersonate`、`nodes/proxy` 或 service／pod proxy 權限，所以不能自己擴大權限。
 
 檢視者讀不到 Secret 和日誌，但讀得到 ConfigMap 和工作負載的設定。直接寫在這些地方的密碼，檢視者也看得到。
 
-## API 權杖和 RBAC
+## API 權杖與 RBAC
 
-為了建立 [API 權杖](./api-tokens.mdx)，開發者可以在自己的專案建立 ServiceAccount、RoleBinding 和權杖。Kubernetes 本來就只讓人用 RoleBinding 給出自己有的角色，chart 的政策再把範圍縮小：
+[API 權杖](./api-tokens.mdx)拿到角色的方式跟成員一樣，只是綁定的對象是 `zeabur-api-tokens` Namespace 裡的 ServiceAccount，不是 `zeabur:<username>`：
 
-- 在專案裡，人只能建立名稱是 `zeabur-api-token-<名稱>`、有 `zeabur.com/api-token: "true"` 標籤、並寫明自己是建立者的 ServiceAccount。建立後只有到期時間的 annotation 能改。
-- RoleBinding 要有同一個標籤，只能綁 `zeabur-project-developer` 或 `zeabur-project-viewer`，對象只能是同一個 Namespace 裡的一個 `zeabur-api-token-` ServiceAccount，名稱和 binding 相同。建立後不能修改。
-- API 權杖在任何 Namespace 都不能寫 ServiceAccount 或 RoleBinding，也不能申請權杖，所以不能用權杖建立或更新權杖。
-- 專案裡的 Pod 不能用 `zeabur-api-token-` ServiceAccount 執行。Pod 執行期間 Kubernetes 會一直更新它的權杖，這樣的 Pod 會讓權杖的角色在過期後還能用。
+| 物件 | 範圍與內容 |
+|---|---|
+| `ClusterRoleBinding zeabur-api-token-<name>` | 綁定 `zeabur-member` 給該 ServiceAccount；管理員權杖則綁定 `cluster-admin` |
+| 各專案中的 `RoleBinding zeabur-api-token-<name>` | 綁定該專案的 developer 或 viewer 角色給同一個 ServiceAccount |
 
-在所有 Namespace 都有同樣權限的人不受前兩條限制，例如管理員；其他 ServiceAccount 也不受限，因為只有管理員能給它們這些權限。後兩條對所有人都適用。
+這些 binding 和 ServiceAccount 都帶有 `zeabur.com/api-token: <name>` 和 `app.kubernetes.io/managed-by: zeabur` 標籤。
+
+Chart 會建立 `zeabur-api-tokens` Namespace，但不在裡面給任何角色，所以只有管理員能在那裡建立 ServiceAccount 或幫它們申請權杖。Pod 只能以同一個 Namespace 的 ServiceAccount 執行，成員又不能在 `zeabur-api-tokens` 建立 Pod，所以其他人沒辦法讓 Pod 以權杖的身分執行。Zeabur 不會把 `zeabur-api-tokens` 當成專案，也不會讓任何人在裡面拿到角色。
 
 ## 管理員帳號和一般帳號
 

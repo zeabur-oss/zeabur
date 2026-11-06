@@ -1,25 +1,24 @@
 ---
 title: API tokens
-description: Let scripts and CI call the Kubernetes API with a project role, using a token that expires.
+description: Let scripts and CI call the Kubernetes API with roles in projects, using a token that expires.
 ---
 
-An API token lets a script or CI job work with a project without your sign-in. Create one in the project's **Settings** → **API tokens**, give it the **Developer** or **Viewer** role, and copy the token. It calls kube-apiserver directly, the same way kubectl does, and Kubernetes RBAC decides what it can do. Every token expires.
+An API token lets a script or CI job work with the cluster without anyone's sign-in. Admins create tokens on the **Members** page and give each one roles in projects, the same way they give a member access. A token calls kube-apiserver directly, the same way kubectl does, and Kubernetes RBAC decides what it can do. Every token expires.
 
 ## Before you begin
 
-- You can create API tokens in the project. Developers can, Viewers can't. You can give a token only a role you have in that project. See [Permissions](./permissions.mdx).
+- You're an admin. Only admins can create, renew, change, and delete API tokens. See [Permissions](./permissions.mdx).
 - The machine that uses the token can reach kube-apiserver on TCP 6443.
 
 ## Create a token
 
-1. Open the project's **Settings** → **API tokens** and click **Create token**.
-2. Name it after what uses it, such as `github-actions`. Pick a role and how long it lasts, then click **Review**.
-3. Check the changes and apply them.
-4. Copy the token. Zeabur shows it only once. The dialog also shows a kubeconfig and the cluster's CA certificate.
+1. Open **Members** and, under **API tokens**, click **Create token**.
+2. Name it after what uses it, such as `github-actions`.
+3. Pick **Developer** or **Viewer** in each project it needs, or make it an **Admin token** with full rights to the cluster. Pick how long it lasts, then click **Review**.
+4. Check the changes and apply them.
+5. Copy the token. Zeabur shows it only once. The dialog also shows a kubeconfig and the cluster's CA certificate.
 
-The list shows each token's role, who created it, and when it expires. If the cluster limits token lifetimes with `--service-account-max-token-expiration`, kube-apiserver cuts the token short, and the list shows the real expiry.
-
-Admins can also select **Every namespace**. The role then applies in every namespace in the cluster, not just this project.
+The list shows each token's roles, who created it, and when it expires. If the cluster limits token lifetimes with `--service-account-max-token-expiration`, kube-apiserver cuts the token short, and the list shows the real expiry.
 
 ## Connect
 
@@ -27,20 +26,20 @@ A request needs three things: the API address, the CA certificate, and the token
 
 **Address**: kube-apiserver listens on TCP 6443 on each server node, for example `https://203.0.113.10:6443`. The `server` line in the kubeconfig you use with kubectl has the same address. If you reach the API through a domain or another address, add it to [`host.tlsSan`](./installer-configuration.mdx) so the certificate covers it.
 
-**CA certificate**: The dialog shows it after you create or renew a token. You can also read it from the `kube-root-ca.crt` config file in the project:
+**CA certificate**: The dialog shows it after you create or renew a token. A token with a role in a project can also read it from the project's `kube-root-ca.crt` config file:
 
 ```sh
 kubectl -n shop get configmap kube-root-ca.crt -o jsonpath='{.data.ca\.crt}' > ca.crt
 ```
 
-**kubeconfig**: Copy the kubeconfig from the dialog, fill in `server`, and save it, for example as `shop-ci.yaml`. The CA certificate is already in `certificate-authority-data`.
+**kubeconfig**: Copy the kubeconfig from the dialog, fill in `server`, and save it, for example as `ci.yaml`. The CA certificate is already in `certificate-authority-data`. When the token has a role in only one project, the kubeconfig starts in that project. Otherwise, add `-n <project>` to each command.
 
 ```sh
-export KUBECONFIG=$PWD/shop-ci.yaml
+export KUBECONFIG=$PWD/ci.yaml
 kubectl auth whoami
 ```
 
-`kubectl auth whoami` shows `system:serviceaccount:shop:zeabur-api-token-github-actions`. That's the name kube-apiserver logs for the token's requests.
+`kubectl auth whoami` shows `system:serviceaccount:zeabur-api-tokens:github-actions`. That's the name kube-apiserver logs for the token's requests.
 
 For curl, set the address and token once:
 
@@ -164,24 +163,26 @@ curl --cacert ca.crt -H "Authorization: Bearer $TOKEN" -X PATCH \
   "$APISERVER/apis/apps/v1/namespaces/shop/deployments/web/scale"
 ```
 
-## Renew and delete
+## Renew, change, and delete
 
-Click **Renew** next to a token to get a new token with the same name and role. Tokens issued before keep working until they expire.
+Choose **More** → **Renew** next to a token to get a new token with the same name and access. Tokens issued before keep working until they expire.
 
-To stop a token at once, choose **More** → **Delete** next to it. Every token issued for it stops working, and requests get `401 Unauthorized`.
+Choose **More** → **Change access** to give the token roles in other projects or make it an admin token. The change applies to every token issued for it.
 
-A token keeps working after the person who created it leaves the project, until it expires or someone deletes it. When someone leaves, check who created each token in the list and delete theirs.
+To stop a token at once, choose **More** → **Delete**. Every token issued for it stops working, and requests get `401 Unauthorized`.
+
+A token doesn't belong to the person who created it. It keeps working after they leave, until it expires or an admin deletes it.
 
 ## What Zeabur creates
 
-Zeabur writes these objects with your own permissions:
+Zeabur writes these objects with the admin's own permissions:
 
 | Object | Contents |
 |---|---|
-| `ServiceAccount zeabur-api-token-<name>` in the project | Labels `zeabur.com/api-token: "true"` and `app.kubernetes.io/managed-by: zeabur`. Annotations record the role, who created it, and when the latest token expires |
-| `RoleBinding zeabur-api-token-<name>` in the project | Binds `zeabur-project-developer` or `zeabur-project-viewer` to the ServiceAccount |
-| `ClusterRoleBinding zeabur-api-token:<project>:<name>` | Instead of the RoleBinding, for a token in every namespace |
+| `ServiceAccount <name>` in the `zeabur-api-tokens` namespace | Labels `zeabur.com/api-token: <name>` and `app.kubernetes.io/managed-by: zeabur`. Annotations record who created it and when the latest token expires |
+| `RoleBinding zeabur-api-token-<name>` in each project | Binds `zeabur-project-developer` or `zeabur-project-viewer` to the ServiceAccount |
+| `ClusterRoleBinding zeabur-api-token-<name>` | Binds `zeabur-member`, like a member's, or `cluster-admin` for an admin token |
 
-The token itself comes from a TokenRequest for the ServiceAccount. Zeabur doesn't store it in a secret or anywhere else. Deleting the token deletes the binding and the ServiceAccount.
+The token itself comes from a TokenRequest for the ServiceAccount. Zeabur doesn't store it in a secret or anywhere else. Deleting the token deletes its bindings and the ServiceAccount.
 
-Admission policies in the chart keep these objects to API tokens, and keep pods from running as a token's ServiceAccount. See [API tokens and RBAC](./permissions.mdx#api-tokens-and-rbac).
+The chart creates the `zeabur-api-tokens` namespace, and nothing else runs there. Only admins have permissions in it, so nobody else can request a token or run a pod as one. See [API tokens and RBAC](./permissions.mdx#api-tokens-and-rbac).

@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query"
-import { useId, useState } from "react"
+import { useId, useState, type ReactNode } from "react"
 import { toast } from "sonner"
 
 import { projectsQuery } from "@/api/queries"
@@ -94,6 +94,7 @@ export function AccessFields({
   chosen,
   onChosen,
   held = [],
+  adminCopy,
 }: {
   projectRoles: boolean
   admin: boolean
@@ -101,9 +102,13 @@ export function AccessFields({
   chosen: Chosen
   onChosen: (chosen: Chosen) => void
   held?: string[]
+  /** The admin choice's label and hint, when it is not a member's. */
+  adminCopy?: { label: string; hint: string }
 }) {
   const t = useT()
   const adminId = useId()
+  const adminLabel = adminCopy?.label ?? t("invite.admin")
+  const adminHint = adminCopy?.hint ?? t("members.adminHint")
   if (!projectRoles)
     return (
       <div className="flex items-start gap-2.5">
@@ -114,8 +119,8 @@ export function AccessFields({
           className="mt-0.5"
         />
         <div className="flex flex-col gap-0.5">
-          <Label htmlFor={adminId}>{t("invite.admin")}</Label>
-          <span className="type-meta text-muted-foreground">{t("members.adminHint")}</span>
+          <Label htmlFor={adminId}>{adminLabel}</Label>
+          <span className="type-meta text-muted-foreground">{adminHint}</span>
         </div>
       </div>
     )
@@ -131,7 +136,7 @@ export function AccessFields({
           label={t("roles.projects")}
           description={t("roles.projectsHint")}
         />
-        <RadioOption value="admin" label={t("invite.admin")} description={t("members.adminHint")} />
+        <RadioOption value="admin" label={adminLabel} description={adminHint} />
       </RadioGroup>
       {admin ? null : <ProjectPicker chosen={chosen} onChosen={onChosen} held={held} />}
     </fieldset>
@@ -319,20 +324,10 @@ export function AccessDialog({
     )
   }
   return (
-    <Frame
+    <ReviewFrame
       title={t("roles.title", name)}
-      wide
       onClose={onClose}
-      footer={
-        <>
-          <Button variant="ghost" size="sm" onClick={onClose}>
-            {t("plan.cancel")}
-          </Button>
-          <Button size="sm" onClick={() => setReviewing(true)}>
-            {t("create.review")}
-          </Button>
-        </>
-      }
+      onReview={() => setReviewing(true)}
     >
       <AccessFields
         projectRoles={projectRoles}
@@ -342,6 +337,40 @@ export function AccessDialog({
         onChosen={setChosen}
         held={held}
       />
+    </ReviewFrame>
+  )
+}
+
+/** A form in a wide dialog, with Cancel and Review changes. */
+export function ReviewFrame({
+  title,
+  onClose,
+  onReview,
+  children,
+}: {
+  title: string
+  onClose: () => void
+  onReview: () => void
+  children: ReactNode
+}) {
+  const t = useT()
+  return (
+    <Frame
+      title={title}
+      wide
+      onClose={onClose}
+      footer={
+        <>
+          <Button variant="ghost" size="sm" onClick={onClose}>
+            {t("plan.cancel")}
+          </Button>
+          <Button size="sm" onClick={onReview}>
+            {t("create.review")}
+          </Button>
+        </>
+      }
+    >
+      {children}
     </Frame>
   )
 }

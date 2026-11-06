@@ -36,7 +36,7 @@ use serde_json::Value;
 use zeabur_graph::workloads;
 use zeabur_model::WorkloadRef;
 use zeabur_model::adapters::provenance::{Tool, detect_tool};
-use zeabur_model::kernel::names::{LABEL_BASELINE, NODE_SHELL_NAMESPACE, is_system_namespace};
+use zeabur_model::kernel::names::{LABEL_BASELINE, admin_only_namespace, is_system_namespace};
 
 use crate::change::{ObjectName, Target, Warning};
 use crate::checks::ResourceRef;
@@ -239,7 +239,8 @@ fn refuse_namespace(
             format!("{name} holds Kubernetes' own components; it cannot be deleted here."),
         ));
     }
-    if name == NODE_SHELL_NAMESPACE || deletion.zeabur_namespaces.iter().any(|n| n == name) {
+    if admin_only_namespace(name).is_some() || deletion.zeabur_namespaces.iter().any(|n| n == name)
+    {
         return Err(refusal(
             "zeabur_namespace",
             format!("Zeabur itself runs in {name}; it cannot be deleted here."),

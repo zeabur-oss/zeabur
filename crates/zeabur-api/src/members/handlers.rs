@@ -14,7 +14,7 @@ use super::writes::{
     RESET_SECONDS, SetupLinkRequest, SetupLinkView, clear, delete, issue, refuse, target,
     user_object,
 };
-use super::{USER_PREFIX, access};
+use super::{USER_PREFIX, access, tokens};
 use crate::error::{ApiError, read_problem};
 use crate::extract::{Json, Path};
 use crate::handlers::{AppState, Person};
@@ -87,9 +87,19 @@ pub(crate) async fn list(
     let Some(mut directory) = directory? else {
         return Ok(Json(MembersView::not_installed(links, can)));
     };
+    let mut api_tokens = Vec::new();
     match bindings {
         Ok(bindings) => {
-            directory.projects = Some(access::grants_by_member(&bindings.unwrap_or_default()));
+            let bindings = bindings.unwrap_or_default();
+            directory.projects = Some(access::grants_by_member(&bindings));
+            match tokens::list(cluster.as_ref(), &bindings).await {
+                Ok(found) => api_tokens = found,
+                Err(error) => {
+                    if let Ok(refused) = error.into_unreadable(&tokens::key()) {
+                        directory.unreadable.push(refused.into());
+                    }
+                }
+            }
         }
         Err(error) => {
             if let Ok(refused) = error.into_unreadable(&access::key()) {
@@ -99,6 +109,7 @@ pub(crate) async fn list(
     }
     let mut view = directory.view(namespace, Some(&you), (state.clock)(), links, can);
     view.project_roles = identity.project_roles;
+    view.api_tokens = api_tokens;
     Ok(Json(view))
 }
 
@@ -258,6 +269,7 @@ impl MembersView {
             setup_links,
             can_manage,
             project_roles: false,
+            api_tokens: Vec::new(),
             unreadable: Vec::new(),
         }
     }

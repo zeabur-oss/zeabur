@@ -232,29 +232,50 @@ fn people() -> Vec<DynamicObject> {
 }
 
 /// What Bob and Carol may do: Bob develops `shop` and views `blog`, Carol views five projects.
+/// The API token `github-actions` develops `shop`, `grafana` views `shop` and `blog`, and
+/// `backup-bot` is an admin token.
 fn member_roles() -> Vec<DynamicObject> {
-    use zeabur_api::members::access::{ProjectRole, baseline_binding, role_binding};
+    use zeabur_api::members::access::{
+        ADMIN_ROLE, BASELINE_ROLE, Holder, ProjectRole, cluster_binding, role_binding,
+    };
     let roles = [
-        ("bob", "shop", ProjectRole::Developer),
-        ("bob", "blog", ProjectRole::Viewer),
-        ("carol", "shop", ProjectRole::Viewer),
-        ("carol", "blog", ProjectRole::Viewer),
-        ("carol", "billing", ProjectRole::Viewer),
-        ("carol", "payments", ProjectRole::Viewer),
-        ("carol", "analytics", ProjectRole::Viewer),
+        (Holder::member("bob"), "shop", ProjectRole::Developer),
+        (Holder::member("bob"), "blog", ProjectRole::Viewer),
+        (Holder::member("carol"), "shop", ProjectRole::Viewer),
+        (Holder::member("carol"), "blog", ProjectRole::Viewer),
+        (Holder::member("carol"), "billing", ProjectRole::Viewer),
+        (Holder::member("carol"), "payments", ProjectRole::Viewer),
+        (Holder::member("carol"), "analytics", ProjectRole::Viewer),
+        (
+            Holder::token("github-actions"),
+            "shop",
+            ProjectRole::Developer,
+        ),
+        (Holder::token("grafana"), "shop", ProjectRole::Viewer),
+        (Holder::token("grafana"), "blog", ProjectRole::Viewer),
     ];
-    roles
-        .into_iter()
-        .map(|(user, project, role)| from(role_binding(project, user, role)))
-        .chain(["alice", "bob", "carol", "dan"].map(|user| {
-            // The memory cluster keeps a cluster-scoped object in namespace "".
-            let mut binding = baseline_binding(user);
-            if let Some(metadata) = binding.get_mut("metadata").and_then(Value::as_object_mut) {
-                metadata.insert("namespace".to_owned(), "".into());
-            }
-            from(binding)
-        }))
-        .collect()
+    let cluster_roles = [
+        (Holder::member("alice"), BASELINE_ROLE),
+        (Holder::member("bob"), BASELINE_ROLE),
+        (Holder::member("carol"), BASELINE_ROLE),
+        (Holder::member("dan"), BASELINE_ROLE),
+        (Holder::token("github-actions"), BASELINE_ROLE),
+        (Holder::token("grafana"), BASELINE_ROLE),
+        (Holder::token("backup-bot"), ADMIN_ROLE),
+    ];
+    let mut objects = Vec::new();
+    for (holder, project, role) in roles {
+        objects.push(from(role_binding(project, &holder, role)));
+    }
+    for (holder, role) in cluster_roles {
+        // The memory cluster keeps a cluster-scoped object in namespace "".
+        let mut binding = cluster_binding(&holder, role);
+        if let Some(metadata) = binding.get_mut("metadata").and_then(Value::as_object_mut) {
+            metadata.insert("namespace".to_owned(), "".into());
+        }
+        objects.push(from(binding));
+    }
+    objects
 }
 
 /// The address Traefik writes into every Ingress's status.
@@ -630,6 +651,7 @@ fn state() -> State {
             namespace("edge", true),
             namespace("default", false),
             namespace("kube-system", false),
+            namespace("zeabur-api-tokens", false),
         ],
         objects,
         events: data.events,
@@ -837,13 +859,6 @@ fn state() -> State {
         }])
         .collect(),
         dynamic: [
-            api_token("github-actions", "developer", "zeabur:alice", 20),
-            api_token("grafana", "viewer", "zeabur:bob", -2),
-            from(json!({
-                "apiVersion": "v1", "kind": "ConfigMap",
-                "metadata": {"name": "kube-root-ca.crt", "namespace": "shop", "resourceVersion": "1"},
-                "data": {"ca.crt": "-----BEGIN CERTIFICATE-----\nMIIBdzCCAR2gAwIBAgIBADAKBggqhkjOPQQDAjAjMSEwHwYDVQQDDBhrM3Mtc2Vy\ndmVyLWNhQDE3NjE0NjkyMDAwHhcNMjYxMDI2MDkwMDAwWhcNMzYxMDIzMDkwMDAw\n-----END CERTIFICATE-----\n"}
-            })),
             // The Gateway of the shop's HTTPRoute, which accepts routes from every namespace.
             from(json!({
                 "apiVersion": "gateway.networking.k8s.io/v1", "kind": "Gateway",
@@ -1142,6 +1157,7 @@ fn state() -> State {
         .chain([storefront_build()])
         .chain(people())
         .chain(member_roles())
+        .chain(api_tokens())
         .chain(velero())
         .chain(k8up())
         .chain(alerting())
@@ -1227,27 +1243,39 @@ fn state() -> State {
     }
 }
 
-/// An API token of the shop, made `days_left` days before it expires (negative: expired).
-fn api_token(name: &str, role: &str, by: &str, days_left: i64) -> DynamicObject {
+/// API tokens' ServiceAccounts, and the CA their kubeconfigs carry.
+fn api_tokens() -> Vec<DynamicObject> {
+    vec![
+        api_token("github-actions", "zeabur:alice", 20),
+        api_token("grafana", "zeabur:alice", -2),
+        api_token("backup-bot", "zeabur:alice", 300),
+        from(json!({
+            "apiVersion": "v1", "kind": "ConfigMap",
+            "metadata": {"name": "kube-root-ca.crt", "namespace": "zeabur-api-tokens", "resourceVersion": "1"},
+            "data": {"ca.crt": "-----BEGIN CERTIFICATE-----\nMIIBdzCCAR2gAwIBAgIBADAKBggqhkjOPQQDAjAjMSEwHwYDVQQDDBhrM3Mtc2Vy\ndmVyLWNhQDE3NjE0NjkyMDAwHhcNMjYxMDI2MDkwMDAwWhcNMzYxMDIzMDkwMDAw\n-----END CERTIFICATE-----\n"}
+        })),
+    ]
+}
+
+/// An API token's ServiceAccount, made `days_left` days before it expires (negative: expired).
+fn api_token(name: &str, by: &str, days_left: i64) -> DynamicObject {
     use zeabur_plan::api_token;
     let expires = Timestamp::from_second(clock().as_second() + days_left * 86_400)
         .expect("a time")
         .to_string();
-    from(json!({
-        "apiVersion": "v1", "kind": "ServiceAccount",
-        "metadata": {
-            "name": api_token::account_name(name), "namespace": "shop", "uid": format!("uid-sa-{name}"),
-            "resourceVersion": "1", "creationTimestamp": "2026-10-01T09:00:00Z",
-            "labels": {(api_token::LABEL): "true", "app.kubernetes.io/managed-by": "zeabur"},
-            "annotations": {
-                (api_token::ROLE_ANNOTATION): format!("zeabur-project-{role}"),
-                (api_token::SCOPE_ANNOTATION): "project",
-                (api_token::CREATED_BY_ANNOTATION): by,
-                (api_token::EXPIRES_AT_ANNOTATION): expires,
-            }
-        },
-        "automountServiceAccountToken": false
-    }))
+    let mut account = api_token::service_account(name, by);
+    if let Some(Value::Object(metadata)) = account.get_mut("metadata") {
+        metadata.insert("uid".to_owned(), json!(format!("uid-sa-{name}")));
+        metadata.insert("resourceVersion".to_owned(), json!("1"));
+        metadata.insert(
+            "creationTimestamp".to_owned(),
+            json!("2026-10-01T09:00:00Z"),
+        );
+        if let Some(Value::Object(annotations)) = metadata.get_mut("annotations") {
+            annotations.insert(api_token::EXPIRES_AT_ANNOTATION.to_owned(), json!(expires));
+        }
+    }
+    from(account)
 }
 
 /// What one of billing's API replicas wrote: requests, and a slow one now and then.

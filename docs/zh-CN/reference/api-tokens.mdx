@@ -1,49 +1,48 @@
 ---
 title: API 令牌
-description: 让脚本和 CI 以项目角色调用 Kubernetes API，令牌会到期。
-source: "6356ce4196a8"
+description: 让脚本和 CI 以各项目的角色调用 Kubernetes API，令牌会到期。
+source: "fb93330bc615"
 ---
 
-脚本或 CI 无需你登录，也能用 API 令牌操作项目。在项目的**设置** → **API 令牌**中创建一个，授予它**开发者**或**查看者**角色，然后复制令牌。令牌和 kubectl 一样直接调用 kube-apiserver，能做什么由 Kubernetes RBAC 决定。每个令牌都会到期。
+脚本或 CI 无需任何人登录，也能用 API 令牌操作集群。管理员在**成员**页创建令牌，像给成员授权一样，为它在各项目设置角色。令牌和 kubectl 一样直接调用 kube-apiserver，能做什么由 Kubernetes RBAC 决定。每个令牌都会到期。
 
 ## 开始前
 
-- 你能在这个项目中创建 API 令牌。开发者可以，查看者不行。令牌只能获得你在这个项目中也有的角色，见[权限](./permissions.mdx)。
+- 你是管理员。只有管理员能创建、续期、更改和删除 API 令牌，见[权限](./permissions.mdx)。
 - 使用令牌的机器能访问 kube-apiserver 的 TCP 6443。
 
 ## 创建令牌
 
-1. 打开项目的**设置** → **API 令牌**，点击**创建令牌**。
-2. 按用途命名，例如 `github-actions`。选择角色和有效期，点击**检查**。
-3. 确认变更后应用。
-4. 复制令牌。Zeabur 只显示这一次。对话框中还有 kubeconfig 和集群的 CA 证书。
+1. 打开**成员**，在 **API 令牌**下点击**创建令牌**。
+2. 起一个能看出用途的名称，比如 `github-actions`。
+3. 在需要的项目中选择**开发者**或**查看者**，或设为**管理员令牌**，对整个集群有完整权限。选好有效期，点击**检查**。
+4. 确认变更后应用。
+5. 复制令牌。Zeabur 只会显示这一次。窗口中还有 kubeconfig 和集群的 CA 证书。
 
-列表会显示每个令牌的角色、创建者和到期时间。集群通过 `--service-account-max-token-expiration` 限制令牌有效期时，kube-apiserver 会缩短令牌的有效期，列表显示的是实际到期时间。
-
-管理员还可以勾选**每个 Namespace**，角色会应用到集群中的每个 Namespace，而不只是这个项目。
+列表会显示每个令牌的角色、创建者和过期时间。集群用 `--service-account-max-token-expiration` 限制令牌有效期时，kube-apiserver 会缩短令牌的有效期，列表显示的是实际过期时间。
 
 ## 连接
 
 每个请求需要三样东西：API 地址、CA 证书和令牌。
 
-**地址**：kube-apiserver 监听每个 server 节点的 TCP 6443，例如 `https://203.0.113.10:6443`。你平时使用 kubectl 的 kubeconfig 中，`server` 一行就是这个地址。如果要通过域名或其他地址访问 API，把它添加到 [`host.tlsSan`](./installer-configuration.mdx)，证书才会包含它。
+**地址**：kube-apiserver 监听每个 server 节点的 TCP 6443，比如 `https://203.0.113.10:6443`。你平时用 kubectl 的 kubeconfig 中，`server` 那一行就是这个地址。要通过域名或其他地址访问 API 时，把它加到 [`host.tlsSan`](./installer-configuration.mdx)，证书才会覆盖它。
 
-**CA 证书**：创建或续期令牌后，对话框中会显示。也可以从项目的 `kube-root-ca.crt` 配置文件读取：
+**CA 证书**：创建或续期令牌后，窗口中会显示。在项目中有角色的令牌，也可以从项目的 `kube-root-ca.crt` 配置文件读取：
 
 ```sh
 kubectl -n shop get configmap kube-root-ca.crt -o jsonpath='{.data.ca\.crt}' > ca.crt
 ```
 
-**kubeconfig**：复制对话框中的 kubeconfig，填写 `server` 后保存，例如保存为 `shop-ci.yaml`。CA 证书已经写在 `certificate-authority-data` 中。
+**kubeconfig**：复制窗口中的 kubeconfig，填上 `server` 后保存，比如 `ci.yaml`。CA 证书已经在 `certificate-authority-data` 中。令牌只在一个项目中有角色时，kubeconfig 会直接从那个项目开始；否则每条命令都要加 `-n <项目>`。
 
 ```sh
-export KUBECONFIG=$PWD/shop-ci.yaml
+export KUBECONFIG=$PWD/ci.yaml
 kubectl auth whoami
 ```
 
-`kubectl auth whoami` 会显示 `system:serviceaccount:shop:zeabur-api-token-github-actions`，kube-apiserver 记录这个令牌的请求时使用的就是这个名称。
+`kubectl auth whoami` 会显示 `system:serviceaccount:zeabur-api-tokens:github-actions`，kube-apiserver 记录这个令牌的请求时用的就是这个名称。
 
-使用 curl 时，先设置地址和令牌：
+用 curl 时，先设好地址和令牌：
 
 ```sh
 APISERVER=https://203.0.113.10:6443
@@ -165,24 +164,26 @@ curl --cacert ca.crt -H "Authorization: Bearer $TOKEN" -X PATCH \
   "$APISERVER/apis/apps/v1/namespaces/shop/deployments/web/scale"
 ```
 
-## 续期和删除
+## 续期、更改和删除
 
-点击令牌旁的**续期**，会获得同一名称、同一角色的新令牌。之前签发的令牌在到期前仍然有效。
+在令牌旁边选择**更多** → **续期**，会拿到同一个名称、同样权限的新令牌。之前签发的令牌过期前都还能用。
 
-要立即停用令牌，在它旁边选择**更多** → **删除**。为它签发的每个令牌都会失效，请求会收到 `401 Unauthorized`。
+选择**更多** → **更改权限**，可以让令牌在其他项目中有角色，或改为管理员令牌。更改会应用到为它签发的每个令牌。
 
-创建令牌的人离开项目后，令牌在到期或被删除前仍然有效。有人离开时，查看列表中每个令牌的创建者，删除他创建的令牌。
+要让令牌立即失效，选择**更多** → **删除**。为它签发的每个令牌都会失效，请求会收到 `401 Unauthorized`。
+
+令牌不属于创建它的人。创建者离开后，令牌在过期或被管理员删除之前都照样能用。
 
 ## Zeabur 会创建什么
 
-Zeabur 用你自己的权限写入以下对象：
+Zeabur 用管理员自己的权限写入这些对象：
 
 | 对象 | 内容 |
 |---|---|
-| 项目中的 `ServiceAccount zeabur-api-token-<名称>` | 标签 `zeabur.com/api-token: "true"` 和 `app.kubernetes.io/managed-by: zeabur`。annotation 记录角色、创建者和最新令牌的到期时间 |
-| 项目中的 `RoleBinding zeabur-api-token-<名称>` | 将 `zeabur-project-developer` 或 `zeabur-project-viewer` 绑定到这个 ServiceAccount |
-| `ClusterRoleBinding zeabur-api-token:<项目>:<名称>` | 用于每个 Namespace 的令牌，代替 RoleBinding |
+| `zeabur-api-tokens` Namespace 中的 `ServiceAccount <name>` | 标签 `zeabur.com/api-token: <name>` 和 `app.kubernetes.io/managed-by: zeabur`。annotation 记录创建者，以及最新令牌的过期时间 |
+| 各项目中的 `RoleBinding zeabur-api-token-<name>` | 将 `zeabur-project-developer` 或 `zeabur-project-viewer` 绑定给该 ServiceAccount |
+| `ClusterRoleBinding zeabur-api-token-<name>` | 和成员一样绑定 `zeabur-member`；管理员令牌则绑定 `cluster-admin` |
 
-令牌本身由 ServiceAccount 的 TokenRequest 签发，Zeabur 不会将它保存到 Secret 或其他地方。删除令牌会删除 binding 和 ServiceAccount。
+令牌本身来自对该 ServiceAccount 的 TokenRequest，Zeabur 不会存进 Secret 或其他地方。删除令牌会删除它的 binding 和 ServiceAccount。
 
-chart 中的准入策略确保这些对象只用于 API 令牌，并禁止 Pod 以令牌的 ServiceAccount 运行，见 [API 令牌和 RBAC](./permissions.mdx#api-令牌和-rbac)。
+Chart 会创建 `zeabur-api-tokens` Namespace，其中不运行其他东西。只有管理员在那里有权限，所以其他人无法申请令牌，也无法让 Pod 以令牌的身份运行。见[API 令牌和 RBAC](./permissions.mdx#api-令牌和-rbac)。

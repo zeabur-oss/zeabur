@@ -1570,124 +1570,6 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/Problem"
-  "/api/v1/projects/{project}/api-tokens":
-    get:
-      tags:
-      - projects
-      summary: A project's API tokens and the roles a new one can be given. Read as the person.
-      operationId: listApiTokens
-      parameters:
-      - name: project
-        in: path
-        description: The project's namespace
-        required: true
-        schema:
-          type: string
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ApiTokens"
-        "403":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/Problem"
-  "/api/v1/projects/{project}/api-tokens/apply":
-    post:
-      tags:
-      - projects
-      summary: |-
-        Carries out an API token plan by its token: checks it, dry-runs every creation and deletion,
-        then writes, requests the token and records its expiry. The token is in the answer only.
-      operationId: applyApiTokenChange
-      parameters:
-      - name: project
-        in: path
-        description: The project's namespace
-        required: true
-        schema:
-          type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/ApiTokenApply"
-        required: true
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ApiTokenApplied"
-        "400":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/Problem"
-        "403":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/Problem"
-        "409":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/Problem"
-        "422":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/Problem"
-  "/api/v1/projects/{project}/api-tokens/plan":
-    post:
-      tags:
-      - projects
-      summary: |-
-        Works out what a change to a project's API tokens writes, and a token to apply it; writes
-        nothing and issues no token.
-      operationId: planApiTokenChange
-      parameters:
-      - name: project
-        in: path
-        description: The project's namespace
-        required: true
-        schema:
-          type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/ApiTokenChange"
-        required: true
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ApiTokenPlan"
-        "400":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/Problem"
-        "403":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/Problem"
-        "404":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/Problem"
-        "409":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/Problem"
   "/api/v1/projects/{project}/apply":
     post:
       tags:
@@ -4627,118 +4509,17 @@ components:
       - certificate
       - node-not-ready
       - runtime-security
-    ApiTokenApplied:
-      type: object
-      description: What an applied plan made.
-      properties:
-        issued:
-          oneOf:
-          - $ref: "#/components/schemas/IssuedTokenView"
-            description: "For a new or renewed token: the token, shown once."
-          - type: "null"
-    ApiTokenApply:
-      type: object
-      description: The token of an API token plan to apply.
-      required:
-      - token
-      properties:
-        token:
-          type: string
-          description: The token `plan` returned.
-    ApiTokenChange:
-      oneOf:
-      - type: object
-        description: "Make a token: its ServiceAccount, the binding to `role` and the first token."
-        required:
-        - name
-        - role
-        - expirationSeconds
-        - op
-        properties:
-          cluster:
-            type: boolean
-            description: |-
-              Whether the role applies in every namespace (`ClusterRoleBinding`), not only the
-              project's.
-          expirationSeconds:
-            type: integer
-            format: int64
-            description: How long the token should last; kube-apiserver may cut it.
-          name:
-            type: string
-            description: "The ServiceAccount's name: lower-case letters, digits and `-`, at most 63 characters."
-          op:
-            type: string
-            enum:
-            - create
-          role:
-            $ref: "#/components/schemas/ProjectRole"
-            description: The project role it gets.
-      - type: object
-        description: |-
-          Issue another token for the same ServiceAccount; the ones issued before keep working until
-          they expire.
-        required:
-        - name
-        - expirationSeconds
-        - op
-        properties:
-          expirationSeconds:
-            type: integer
-            format: int64
-            description: How long the new token should last.
-          name:
-            type: string
-            description: The token's name.
-          op:
-            type: string
-            enum:
-            - renew
-      - type: object
-        description: >-
-          Delete the binding and the ServiceAccount, which revokes every token issued for
-          it.
-        required:
-        - name
-        - op
-        properties:
-          name:
-            type: string
-            description: The token's name.
-          op:
-            type: string
-            enum:
-            - delete
-      description: A change to a project's API tokens.
-    ApiTokenPlan:
-      type: object
-      description: An API token plan and the token that applies it.
-      required:
-      - token
-      - expiresAt
-      - writes
-      properties:
-        expiresAt:
-          type: string
-          description: When the plan token stops working, RFC 3339.
-        token:
-          type: string
-          description: Send this to `apply` to carry out exactly this plan.
-        writes:
-          type: array
-          items:
-            $ref: "#/components/schemas/MemberWrite"
-          description: The writes, in order. The `TokenRequest` is a creation of kind `TokenRequest`.
     ApiTokenView:
       type: object
-      description: One API token of a project.
+      description: One API token.
       required:
       - name
-      - cluster
+      - admin
+      - projects
       properties:
-        cluster:
+        admin:
           type: boolean
-          description: Whether the role applies in every namespace.
+          description: Whether it is bound to `cluster-admin`, as an admin member is.
         createdAt:
           type:
           - string
@@ -4756,37 +4537,12 @@ components:
           description: When its latest token expires, RFC 3339, as kube-apiserver answered.
         name:
           type: string
-          description: The ServiceAccount's name.
-        role:
-          oneOf:
-          - $ref: "#/components/schemas/ProjectRole"
-            description: The role recorded when it was made; absent when it names another `ClusterRole`.
-          - type: "null"
-    ApiTokens:
-      type: object
-      description: A project's API tokens.
-      required:
-      - items
-      - choices
-      - canRenew
-      - canDelete
-      properties:
-        canDelete:
-          $ref: "#/components/schemas/Permission"
-          description: Whether the person may delete a token.
-        canRenew:
-          $ref: "#/components/schemas/Permission"
-          description: Whether the person may renew a token.
-        choices:
+          description: Its name, which is its ServiceAccount's.
+        projects:
           type: array
           items:
-            $ref: "#/components/schemas/RoleChoice"
-          description: The roles a new token can be given.
-        items:
-          type: array
-          items:
-            $ref: "#/components/schemas/ApiTokenView"
-          description: The tokens, by name.
+            $ref: "#/components/schemas/ProjectGrant"
+          description: Its roles in projects; empty for an admin token.
     Applied:
       type: object
       description: One object an apply wrote.
@@ -6671,13 +6427,6 @@ components:
             enum:
             - clusterTools
       description: One change a person asks for.
-    ChoiceRefusal:
-      type: string
-      description: Why a role cannot be given to a token.
-      enum:
-      - noTokenRights
-      - notHeld
-      - notAdmin
     Citation:
       type: object
       description: A public source a rule rests on.
@@ -10477,10 +10226,10 @@ components:
           description: When it expires, RFC 3339, as kube-apiserver answered.
         name:
           type: string
-          description: The ServiceAccount's name.
+          description: The token's name.
         namespace:
           type: string
-          description: Its namespace.
+          description: The namespace of its ServiceAccount.
         recorded:
           type: boolean
           description: Whether the expiry was recorded on the ServiceAccount for the token list.
@@ -10898,6 +10647,11 @@ components:
       type: object
       description: What an applied member plan made.
       properties:
+        issued:
+          oneOf:
+          - $ref: "#/components/schemas/IssuedTokenView"
+            description: "For a new or renewed API token: the token, shown once."
+          - type: "null"
         link:
           oneOf:
           - $ref: "#/components/schemas/SetupLinkView"
@@ -10981,6 +10735,89 @@ components:
           username:
             type: string
             description: The member.
+      - type: object
+        description: "Make an API token: its ServiceAccount, the access a member would get, and its first token."
+        required:
+        - name
+        - expirationSeconds
+        - op
+        properties:
+          admin:
+            type: boolean
+            description: Whether it gets `cluster-admin`, as an admin member does.
+          expirationSeconds:
+            type: integer
+            format: int64
+            description: How long the token should last; kube-apiserver may cut it.
+          name:
+            type: string
+            description: "Its name: lower-case letters, digits and `-`, at most 63 characters."
+          op:
+            type: string
+            enum:
+            - createToken
+          projects:
+            type: array
+            items:
+              $ref: "#/components/schemas/ProjectGrant"
+            description: Its roles in projects, when it is not an admin token.
+      - type: object
+        description: Change what an API token may do, as for a member.
+        required:
+        - name
+        - admin
+        - op
+        properties:
+          admin:
+            type: boolean
+            description: Whether it gets `cluster-admin`.
+          name:
+            type: string
+            description: The token.
+          op:
+            type: string
+            enum:
+            - tokenAccess
+          projects:
+            type: array
+            items:
+              $ref: "#/components/schemas/ProjectGrant"
+            description: Roles in projects; empty for an admin token.
+      - type: object
+        description: |-
+          Issue another token for an API token; the ones issued before keep working until they
+          expire.
+        required:
+        - name
+        - expirationSeconds
+        - op
+        properties:
+          expirationSeconds:
+            type: integer
+            format: int64
+            description: How long the new token should last.
+          name:
+            type: string
+            description: The token.
+          op:
+            type: string
+            enum:
+            - renewToken
+      - type: object
+        description: |-
+          Delete an API token: its bindings, then its ServiceAccount, which revokes every token
+          issued for it.
+        required:
+        - name
+        - op
+        properties:
+          name:
+            type: string
+            description: The token.
+          op:
+            type: string
+            enum:
+            - deleteToken
       description: A change to the members, as a person asks for it.
     MemberPlan:
       type: object
@@ -11141,6 +10978,7 @@ components:
       description: Everyone who can sign in, and the links waiting to be used.
       required:
       - id
+      - apiTokens
       - installed
       - items
       - invitations
@@ -11149,6 +10987,11 @@ components:
       - projectRoles
       - unreadable
       properties:
+        apiTokens:
+          type: array
+          items:
+            $ref: "#/components/schemas/ApiTokenView"
+          description: "API tokens, by name: machine accounts with the access of a member."
         canManage:
           $ref: "#/components/schemas/Permission"
           description: Whether the person may create invitations, as far as their rules tell.
@@ -14656,10 +14499,7 @@ components:
           description: "Add, change and remove domains: `create`, `patch` and `delete` on ingresses or HTTPRoutes."
         changeMembers:
           $ref: "#/components/schemas/Permission"
-          description: |-
-            Give people access to the project: `create` on rolebindings and `bind` on clusterroles. A
-            Developer creates rolebindings too, but the chart's admission policy keeps those to API
-            tokens.
+          description: "Give people access to the project: `create` on rolebindings."
         changeNetworkPolicies:
           $ref: "#/components/schemas/Permission"
           description: "Change network policies: `create` and `patch` on networkpolicies."
@@ -15424,28 +15264,6 @@ components:
         risk:
           type: string
           description: The risk.
-    RoleChoice:
-      type: object
-      description: A role a token can be given, and whether this person can give it.
-      required:
-      - role
-      - cluster
-      - permission
-      properties:
-        cluster:
-          type: boolean
-          description: In every namespace.
-        permission:
-          $ref: "#/components/schemas/Permission"
-          description: What `SelfSubjectAccessReview` answered for the rights it needs.
-        refusal:
-          oneOf:
-          - $ref: "#/components/schemas/ChoiceRefusal"
-            description: Why not, when denied.
-          - type: "null"
-        role:
-          $ref: "#/components/schemas/ProjectRole"
-          description: The role.
     Rollout:
       type: object
       description: One workload whose pods a plan changes.
