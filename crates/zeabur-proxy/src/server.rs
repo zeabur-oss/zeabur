@@ -66,7 +66,11 @@ impl<R: Reviewer> Proxy<R> {
         Arc::new(Self {
             reviewer,
             client: upstream::client(Duration::from_secs(5)),
-            inflight: Inflight::new(settings.max_inflight, settings.max_inflight_per_person),
+            inflight: Inflight::new(
+                settings.max_inflight,
+                settings.max_inflight_per_person,
+                INFLIGHT_WAIT,
+            ),
             settings,
         })
     }
@@ -153,7 +157,7 @@ impl<R: Reviewer> Proxy<R> {
         audit.user(grant.user());
         let authorized = Authorized::new::<B>(query, grant)?;
         let upstream = B::build(&authorized, &config.limits, Timestamp::now())?;
-        audit.hold(self.inflight.enter(authorized.grant().user())?);
+        audit.hold(self.inflight.enter(authorized.grant().user()).await?);
         match upstream::send(&self.client, &config.url, &upstream, config.timeout).await? {
             Answer::Data { content_type, body } => Ok(Served::Data {
                 content_type,
@@ -239,6 +243,8 @@ fn no_store(mut response: Response<ProxyBody>) -> Response<ProxyBody> {
     response
 }
 
+/// How long a query waits for a place among the queries in flight before it is refused.
+const INFLIGHT_WAIT: Duration = Duration::from_secs(10);
 /// How long a client has to send a request's headers.
 const HEADER_WAIT: Duration = Duration::from_secs(10);
 /// Connections served at once; more wait in the listener's backlog.

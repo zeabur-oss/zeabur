@@ -3,7 +3,7 @@
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, PoisonError};
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 
@@ -124,39 +124,61 @@ impl Audit {
 }
 
 /// Queries in flight: a few per person and a ceiling for the proxy, so one person's wide
-/// queries cannot hold the backend for everyone.
+/// queries cannot hold the backend for everyone. A query waits for a place up to `wait`, as one
+/// page asks for several series at once.
 #[derive(Debug)]
 pub(crate) struct Inflight {
     total: Arc<Semaphore>,
     per_person: usize,
-    people: Mutex<HashMap<String, usize>>,
+    wait: Duration,
+    people: Mutex<HashMap<String, Arc<Semaphore>>>,
 }
 
 impl Inflight {
-    pub(crate) fn new(total: usize, per_person: usize) -> Arc<Self> {
+    pub(crate) fn new(total: usize, per_person: usize, wait: Duration) -> Arc<Self> {
         Arc::new(Self {
             total: Arc::new(Semaphore::new(total)),
             per_person,
+            wait,
             people: Mutex::default(),
         })
     }
 
-    pub(crate) fn enter(self: &Arc<Self>, person: &str) -> Result<Slot, Reject> {
-        let permit = Arc::clone(&self.total)
-            .try_acquire_owned()
-            .map_err(|_full| Reject::Busy)?;
-        let mut people = self.people.lock().unwrap_or_else(PoisonError::into_inner);
-        let count = people.entry(person.to_owned()).or_default();
-        if *count >= self.per_person {
+    pub(crate) async fn enter(self: &Arc<Self>, person: &str) -> Result<Slot, Reject> {
+        let own = {
+            let mut people = self.people.lock().unwrap_or_else(PoisonError::into_inner);
+            let own = people
+                .entry(person.to_owned())
+                .or_insert_with(|| Arc::new(Semaphore::new(self.per_person)));
+            Arc::clone(own)
+        };
+        let places = async {
+            let mine = Arc::clone(&own).acquire_owned().await.ok()?;
+            let total = Arc::clone(&self.total).acquire_owned().await.ok()?;
+            Some((mine, total))
+        };
+        let Ok(Some((mine, total))) = tokio::time::timeout(self.wait, places).await else {
+            self.leave(person, own);
             return Err(Reject::Busy);
-        }
-        *count += 1;
-        drop(people);
+        };
         Ok(Slot {
             inflight: Arc::clone(self),
             person: person.to_owned(),
-            _permit: permit,
+            own: Some(own),
+            mine: Some(mine),
+            _total: total,
         })
+    }
+
+    /// Forgets `person` once nobody holds or waits for one of their places. Every holder and
+    /// waiter has a clone of `own`, taken under the lock, so the count is exact here.
+    fn leave(&self, person: &str, own: Arc<Semaphore>) {
+        let mut people = self.people.lock().unwrap_or_else(PoisonError::into_inner);
+        if Arc::strong_count(&own) == 2 {
+            people.remove(person);
+        }
+        drop(people);
+        drop(own);
     }
 }
 
@@ -165,21 +187,17 @@ impl Inflight {
 pub(crate) struct Slot {
     inflight: Arc<Inflight>,
     person: String,
-    _permit: OwnedSemaphorePermit,
+    own: Option<Arc<Semaphore>>,
+    mine: Option<OwnedSemaphorePermit>,
+    _total: OwnedSemaphorePermit,
 }
 
 impl Drop for Slot {
     fn drop(&mut self) {
-        let mut people = self
-            .inflight
-            .people
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner);
-        if let Some(count) = people.get_mut(&self.person) {
-            *count = count.saturating_sub(1);
-            if *count == 0 {
-                people.remove(&self.person);
-            }
+        // The permit holds a clone of the semaphore too, so it goes first.
+        drop(self.mine.take());
+        if let Some(own) = self.own.take() {
+            self.inflight.leave(&self.person, own);
         }
     }
 }
@@ -188,15 +206,42 @@ impl Drop for Slot {
 mod tests {
     use super::*;
 
-    #[test]
-    fn a_person_gets_a_few_places_and_the_proxy_a_ceiling() {
-        let inflight = Inflight::new(3, 2);
-        let a1 = inflight.enter("a").unwrap();
-        let _a2 = inflight.enter("a").unwrap();
-        assert_eq!(inflight.enter("a").err(), Some(Reject::Busy));
-        let _b1 = inflight.enter("b").unwrap();
-        assert_eq!(inflight.enter("c").err(), Some(Reject::Busy));
+    const WAIT: Duration = Duration::from_millis(50);
+
+    #[tokio::test]
+    async fn a_person_waits_for_a_place_and_the_proxy_has_a_ceiling() {
+        let inflight = Inflight::new(3, 2, WAIT);
+        let a1 = inflight.enter("a").await.unwrap();
+        let _a2 = inflight.enter("a").await.unwrap();
+        assert_eq!(inflight.enter("a").await.err(), Some(Reject::Busy));
+        let _b1 = inflight.enter("b").await.unwrap();
+        assert_eq!(inflight.enter("c").await.err(), Some(Reject::Busy));
         drop(a1);
-        assert!(inflight.enter("a").is_ok());
+        assert!(inflight.enter("a").await.is_ok());
+    }
+
+    // The usage history asks for CPU, memory and restarts at once (zeabur-api's
+    // `services::history::read`); the third waits for the first to end instead of failing.
+    #[tokio::test]
+    async fn a_third_query_gets_the_place_the_first_gives_back() {
+        let inflight = Inflight::new(16, 2, Duration::from_secs(5));
+        let first = inflight.enter("a").await.unwrap();
+        let _second = inflight.enter("a").await.unwrap();
+        let third = tokio::spawn({
+            let inflight = Arc::clone(&inflight);
+            async move { inflight.enter("a").await.map(drop) }
+        });
+        tokio::time::sleep(Duration::from_millis(20)).await;
+        drop(first);
+        assert_eq!(third.await.unwrap(), Ok(()));
+    }
+
+    #[tokio::test]
+    async fn a_person_is_forgotten_once_their_places_are_back() {
+        let inflight = Inflight::new(16, 2, WAIT);
+        let held = inflight.enter("a").await.unwrap();
+        assert!(inflight.people.lock().unwrap().contains_key("a"));
+        drop(held);
+        assert!(inflight.people.lock().unwrap().is_empty());
     }
 }
