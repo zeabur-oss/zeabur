@@ -367,6 +367,12 @@ pub(crate) fn prepare_node(prep: Option<&NodePrep>) -> Result<bool, InstallError
     }
 }
 
+/// Whether `kubectl delete --output=name` deleted a Pod. With none there, kubectl still prints
+/// "No resources found" on standard output.
+fn deleted_a_pod(names: &str) -> bool {
+    names.lines().any(|line| line.starts_with("pod/"))
+}
+
 /// Longhorn's manager checks a node only when it starts, so a node prepared while it already runs
 /// there stays "not prepared" until its Pod starts again.
 pub(crate) fn restart_longhorn_manager(kubectl: &Kubectl, node: &str) {
@@ -379,11 +385,12 @@ pub(crate) fn restart_longhorn_manager(kubectl: &Kubectl, node: &str) {
             "--selector=app=longhorn-manager",
             &field,
             "--wait=false",
+            "--output=name",
         ],
         None,
     );
     match deleted {
-        Ok(out) if out.trim().is_empty() => {}
+        Ok(names) if !deleted_a_pod(&names) => {}
         Ok(_) => out::err(&format!(
             "    restarted Longhorn's manager on {node}, so it checks the node again"
         )),
@@ -1740,6 +1747,15 @@ fn record(kubectl: &Kubectl, plan: &Plan, link_issued: bool) -> Result<(), Insta
 
 #[cfg(test)]
 mod tests {
+    // On a first install the server is prepared before Longhorn's chart, so no manager runs yet,
+    // and apply must not say it restarted one.
+    #[test]
+    fn only_a_deleted_pod_counts_as_a_restart() {
+        assert!(deleted_a_pod("pod/longhorn-manager-qggrw\n"));
+        assert!(!deleted_a_pod("No resources found\n"));
+        assert!(!deleted_a_pod(""));
+    }
+
     // A failed upgrade under `failurePolicy: abort` waits for a rollback, so apply decides by the
     // newest revision, whatever older ones say (docs/reference/installer.mdx, troubleshooting).
     #[test]
