@@ -1,7 +1,6 @@
 ---
 title: 權限
 description: 對照成員角色、管理員帳號與 Kubernetes RBAC，確認每項操作的存取範圍和登入能維持多久。
-source: "4d65535f6503"
 ---
 
 看得到專案卻讀不到日誌時，先確認自己在這個專案的角色：**檢視者**只能看狀態和事件，**開發者**才能讀日誌、讀 Secret 和部署。Zeabur 用你自己的身分呼叫 kube-apiserver，能不能做由 Kubernetes RBAC 決定。

@@ -1,7 +1,6 @@
 ---
 title: 發行檔與驗證
 description: 依作業系統選擇 Zeabur 發行檔，驗證 checksum、簽章與建置來源後再執行。
-source: "3896a0a6cfe9"
 ---
 
 在 [GitHub Releases](https://github.com/zeabur-oss/zeabur/releases) 選好版本，下載對應的 archive、`SHA256SUMS` 和簽章。驗證時把簽署者限定為 zeabur-oss 共用的 release workflow，且是為本 repository 該版本 tag 執行的那一次，通過了才解壓縮、執行。
