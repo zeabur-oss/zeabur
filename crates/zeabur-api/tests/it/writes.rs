@@ -781,6 +781,86 @@ mod tests {
         );
     }
 
+    /// Given a PostgreSQL database whose instance a policy isolates by a label of its pod, when
+    /// its port is opened, then the plan names that policy. Zeabur's own project policy admits
+    /// `kube-system`, where `ServiceLB` runs, so with it alone the port answers and nothing warns.
+    #[tokio::test]
+    async fn a_database_public_port_behind_an_isolating_policy_is_warned_about() {
+        let warnings = |policy: Value| async move {
+            let cluster = cluster();
+            cluster.update(|s| {
+                s.served.push(zeabur_kube::ServedResource::readable(
+                    "postgresql.cnpg.io",
+                    "v1",
+                    "clusters",
+                    "Cluster",
+                    true,
+                ));
+                s.served.push(zeabur_kube::ServedResource::readable(
+                    "networking.k8s.io",
+                    "v1",
+                    "networkpolicies",
+                    "NetworkPolicy",
+                    true,
+                ));
+                let instance = serde_json::from_value(json!({"metadata": {"name": "orders-1",
+                    "labels": {"cnpg.io/cluster": "orders", "cnpg.io/podRole": "instance"}}}))
+                .unwrap();
+                s.objects
+                    .entry("shop".to_owned())
+                    .or_default()
+                    .pods
+                    .push(instance);
+            });
+            let app = app(&cluster);
+            let objects = [
+                json!({"apiVersion": "postgresql.cnpg.io/v1", "kind": "Cluster",
+                    "metadata": {"name": "orders"}, "spec": {"instances": 1}}),
+                json!({"apiVersion": "v1", "kind": "Service", "metadata": {"name": "orders-rw"},
+                    "spec": {"selector": {"cnpg.io/cluster": "orders"}, "ports": [{"port": 5432}]}}),
+                policy,
+            ];
+            for object in objects {
+                let planned = plan(
+                    &app,
+                    &json!({"changes": [{"op": "create", "object": object}]}),
+                )
+                .await;
+                let (status, applied) = post(
+                    app.clone(),
+                    "/api/v1/projects/shop/apply",
+                    &json!({"token": planned["token"]}),
+                )
+                .await;
+                assert_eq!(status, StatusCode::OK, "{applied}");
+            }
+            plan(
+                &app,
+                &json!({"changes": [{"op": "databasePublicPort", "database": "orders"}]}),
+            )
+            .await["warnings"]
+                .clone()
+        };
+        let isolated = warnings(json!({"apiVersion": "networking.k8s.io/v1",
+            "kind": "NetworkPolicy", "metadata": {"name": "instances-isolate"},
+            "spec": {"podSelector": {"matchLabels": {"cnpg.io/podRole": "instance"}},
+                "ingress": [{"from": [{"podSelector": {}}]}]}}))
+        .await;
+        assert_eq!(
+            isolated,
+            json!([
+                {"code": "databasePublicPort", "database": "orders", "port": 5432},
+                {"code": "databasePublicPortBlocked", "database": "orders", "port": 5432,
+                    "policies": ["instances-isolate"]}
+            ]),
+        );
+        let own = warnings(zeabur_model::kernel::isolation::project_policy("shop")).await;
+        assert_eq!(
+            own,
+            json!([{"code": "databasePublicPort", "database": "orders", "port": 5432}]),
+        );
+    }
+
     /// Given a port another service already opens, when the port is opened again, then the
     /// refusal says so in words a client puts in the reader's language, with what to do.
     #[tokio::test]

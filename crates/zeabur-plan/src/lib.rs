@@ -53,7 +53,7 @@ pub use project::{DEFAULT_ACCOUNT, project_namespace};
 pub use project_deletion::{
     DatabaseDeletion, DatabaseObject, DeletionInput, ProjectDeletion, VolumeDeletion,
 };
-pub use public_port::{database_public_service_name, public_service_name};
+pub use public_port::{POSTGRES_PORT, database_public_service_name, public_service_name};
 pub use releases::{Release, ReleasePods};
 pub use rules::{EnvEdit, EnvValueFrom, FieldChange};
 pub use zeabur_model::TaskConcurrency;

@@ -174,27 +174,19 @@ pub(super) async fn network_policies_opened(
 }
 
 /// A warning for each port the request opens to the internet whose pods a NetworkPolicy keeps
-/// the internet from (`zeabur_modules::network_policy::blocks_internet`). The policies are read
-/// once, and only when the request opens a port; none when they could not be read.
+/// the internet from (`zeabur_modules::network_policy::blocks_internet`): a workload's, or a
+/// PostgreSQL database's instances. The policies are read once, and only when the request opens a
+/// port; none when they could not be read.
 pub(super) async fn public_ports_blocked(
     cluster: &dyn Cluster,
     snapshot: &zeabur_graph::Snapshot,
     request: &PlanRequest,
 ) -> Result<Vec<zeabur_plan::Warning>, ApiError> {
-    let opened: Vec<&zeabur_plan::PublicPortChange> = request
-        .changes
-        .iter()
-        .filter_map(|c| {
-            if let Change::PublicPort(public) = c
-                && !public.remove
-            {
-                Some(public)
-            } else {
-                None
-            }
-        })
-        .collect();
-    if opened.is_empty() {
+    let opens = request.changes.iter().any(|c| {
+        matches!(c, Change::PublicPort(public) if !public.remove)
+            || matches!(c, Change::DatabasePublicPort(public) if !public.remove)
+    });
+    if !opens {
         return Ok(Vec::new());
     }
     let project = zeabur_graph::project(snapshot);
@@ -204,20 +196,72 @@ pub(super) async fn public_ports_blocked(
     else {
         return Ok(Vec::new());
     };
-    Ok(opened
-        .into_iter()
-        .filter_map(|public| {
+    let mut out = Vec::new();
+    for change in &request.changes {
+        if let Change::PublicPort(public) = change
+            && !public.remove
+        {
             let id = zeabur_model::id::service(
                 &snapshot.namespace,
                 public.workload.kind,
                 &public.workload.name,
             );
-            let policies = zeabur_modules::network_policy::blocks_internet(facts.input(), &id)?;
-            Some(zeabur_plan::Warning::PublicPortBlocked {
-                workload: public.workload.clone(),
-                port: public.port,
+            if let Some(policies) =
+                zeabur_modules::network_policy::blocks_internet(facts.input(), &id)
+            {
+                out.push(zeabur_plan::Warning::PublicPortBlocked {
+                    workload: public.workload.clone(),
+                    port: public.port,
+                    policies,
+                });
+            }
+        } else if let Change::DatabasePublicPort(public) = change
+            && !public.remove
+            && let Some(policies) = database_blocked(snapshot, &facts, &public.database)
+        {
+            out.push(zeabur_plan::Warning::DatabasePublicPortBlocked {
+                database: public.database.clone(),
+                port: zeabur_plan::POSTGRES_PORT,
                 policies,
-            })
-        })
-        .collect())
+            });
+        }
+    }
+    Ok(out)
 }
+
+/// The policies that keep the internet from every instance of PostgreSQL database `database`,
+/// by the labels of its pods, or by `cnpg.io/cluster` alone before it has any.
+fn database_blocked(
+    snapshot: &zeabur_graph::Snapshot,
+    facts: &crate::projects::network_policy::Facts,
+    database: &str,
+) -> Option<Vec<String>> {
+    let mut instances: Vec<BTreeMap<String, String>> = Vec::new();
+    for pod in &snapshot.pods {
+        let Some(labels) = &pod.metadata.labels else {
+            continue;
+        };
+        if labels.get(CNPG_CLUSTER_LABEL).map(String::as_str) == Some(database) {
+            instances.push(labels.clone());
+        }
+    }
+    if instances.is_empty() {
+        instances.push(BTreeMap::from([(
+            CNPG_CLUSTER_LABEL.to_owned(),
+            database.to_owned(),
+        )]));
+    }
+    let mut blocked = Vec::new();
+    for labels in &instances {
+        let policies = zeabur_modules::network_policy::blocks_internet_to(facts.input(), labels)?;
+        for policy in policies {
+            if !blocked.contains(&policy) {
+                blocked.push(policy);
+            }
+        }
+    }
+    Some(blocked)
+}
+
+/// The label CloudNativePG puts on each instance's pod: the `Cluster`'s name.
+const CNPG_CLUSTER_LABEL: &str = "cnpg.io/cluster";

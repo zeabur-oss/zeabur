@@ -1446,6 +1446,17 @@ pub enum Warning {
         /// The policies that isolate its pods, by name.
         policies: Vec<String>,
     },
+    /// [`Warning::PublicPortBlocked`] for a database's public port: a NetworkPolicy isolates the
+    /// database's pods and admits nothing from the internet.
+    #[serde(rename_all = "camelCase")]
+    DatabasePublicPortBlocked {
+        /// The CloudNativePG `Cluster`.
+        database: String,
+        /// The port.
+        port: i32,
+        /// The policies that isolate its pods, by name.
+        policies: Vec<String>,
+    },
     /// The Ingress serves these hostnames over plain HTTP, so the password crosses the network
     /// readable on them.
     #[serde(rename_all = "camelCase")]

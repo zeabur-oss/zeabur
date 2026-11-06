@@ -56,7 +56,7 @@ pub fn public_service_name(service: &str, port: i32) -> String {
 }
 
 /// The port CloudNativePG serves PostgreSQL on.
-const POSTGRES_PORT: i32 = 5432;
+pub const POSTGRES_PORT: i32 = 5432;
 const CNPG_GROUP: &str = "postgresql.cnpg.io";
 
 /// The name of the `LoadBalancer` Service that opens PostgreSQL database `database`.

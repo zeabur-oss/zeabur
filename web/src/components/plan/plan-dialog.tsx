@@ -738,6 +738,7 @@ function healthOf(warning: Schemas.PlanWarning): Said["health"] {
     case "publicPort":
       return warning.dataStore ? "fail" : "warn"
     case "publicPortBlocked":
+    case "databasePublicPortBlocked":
     case "databasePublicPort":
       return "fail"
     default:
@@ -906,6 +907,7 @@ function accessWarning(
         | "passwordOverHttp"
         | "publicPort"
         | "publicPortBlocked"
+        | "databasePublicPortBlocked"
         | "databasePublicPort"
         | "ownCertificate"
         | "issuerShared"
@@ -926,6 +928,7 @@ function accessWarning(
         ? t("warn.publicDatabase", warning.workload.name)
         : t("warn.publicPort", warning.port)
     case "publicPortBlocked":
+    case "databasePublicPortBlocked":
       return t("warn.publicPortBlocked", warning.port, t("common.list", warning.policies))
     case "databasePublicPort":
       return t("warn.publicDatabase", warning.database)

@@ -3264,6 +3264,15 @@ export type PlanWarning =
       workload: WorkloadRef
     }
   | {
+      code: "databasePublicPortBlocked"
+      /** The CloudNativePG `Cluster`. */
+      database: string
+      /** The policies that isolate its pods, by name. */
+      policies: string[]
+      /** The port. */
+      port: number
+    }
+  | {
       code: "passwordOverHttp"
       /** Its hostnames without HTTPS. */
       hostnames: string[]

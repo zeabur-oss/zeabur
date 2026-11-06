@@ -763,6 +763,15 @@ pub fn opened_without(input: Input<'_>, name: &str) -> Opened {
 #[must_use]
 pub fn blocks_internet(input: Input<'_>, id: &str) -> Option<Vec<String>> {
     let workload = input.workloads.iter().find(|w| w.id == id)?;
+    blocks_internet_to(input, &workload.labels)
+}
+
+/// [`blocks_internet`] for pods with `labels` that are not a service's, such as a database's.
+#[must_use]
+pub fn blocks_internet_to(
+    input: Input<'_>,
+    labels: &BTreeMap<String, String>,
+) -> Option<Vec<String>> {
     let policies = policies(input.policies);
     let kube_system = Pod {
         namespace: "kube-system",
@@ -771,7 +780,7 @@ pub fn blocks_internet(input: Input<'_>, id: &str) -> Option<Vec<String>> {
     };
     let isolating: Vec<&NetworkPolicy> = policies
         .iter()
-        .filter(|p| types(p).0 && selects(p, &workload.labels))
+        .filter(|p| types(p).0 && selects(p, labels))
         .collect();
     if isolating.is_empty() {
         return None;

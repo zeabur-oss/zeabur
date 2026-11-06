@@ -13085,6 +13085,32 @@ components:
             description: The workload.
       - type: object
         description: |-
+          [`Warning::PublicPortBlocked`] for a database's public port: a NetworkPolicy isolates the
+          database's pods and admits nothing from the internet.
+        required:
+        - database
+        - port
+        - policies
+        - code
+        properties:
+          code:
+            type: string
+            enum:
+            - databasePublicPortBlocked
+          database:
+            type: string
+            description: The CloudNativePG `Cluster`.
+          policies:
+            type: array
+            items:
+              type: string
+            description: The policies that isolate its pods, by name.
+          port:
+            type: integer
+            format: int32
+            description: The port.
+      - type: object
+        description: |-
           The Ingress serves these hostnames over plain HTTP, so the password crosses the network
           readable on them.
         required:
