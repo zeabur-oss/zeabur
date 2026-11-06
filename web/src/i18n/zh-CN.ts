@@ -531,8 +531,9 @@ export const zhCN: Messages = {
   "deleting.since": (ago) => `${ago}开始删除。`,
   "deleting.count": (resource, count) => `${resource}（${count}）`,
   "deleting.left": (list) => `还剩：${list}。`,
-  "deleting.held":
-    "下面这些对象在等待 finalizer。控制器清理完，就会移除自己添加的 finalizer；Zeabur 不会替你移除。",
+  "deleting.held": "下面这些对象在等待 finalizer。控制器清理完，就会移除自己添加的 finalizer。",
+  "deleting.forceHint": "控制器通常会自己处理完，多等一会儿更稳妥。确实等不到，再强制删除。",
+  "deleting.force": "强制删除",
   "deleting.commandsLabel": "用 kubectl 查看",
 
   "attention.title": "需要处理",
@@ -1158,6 +1159,7 @@ export const zhCN: Messages = {
   "action.adopt": "使用这个 Namespace",
   "action.unadopt": "不再显示为项目",
   "action.deleteProject": "删除项目",
+  "action.forceDeleteProject": "强制删除项目",
   "action.openDebugTerminal": "打开调试终端",
   "action.openToolsTerminal": "打开 kubectl 终端",
   "action.saveDetails": "保存详细信息",
@@ -1165,6 +1167,7 @@ export const zhCN: Messages = {
   "title.adopt": (ns) => `使用已有的 Namespace ${ns}`,
   "title.unadopt": (ns) => `${ns} 不再显示为项目`,
   "title.deleteProject": (ns) => `删除项目 ${ns}`,
+  "title.forceDeleteProject": (ns) => `强制删除项目 ${ns}`,
   "title.details": (ns) => `${ns} 的详细信息`,
   "title.buildLimits": (ns) => `${ns} 的构建上限`,
   "title.pauseAll": (ns) => `暂停 ${ns} 的所有服务`,
@@ -1175,6 +1178,8 @@ export const zhCN: Messages = {
   "confirm.unadopt": "这个 Namespace 不再显示为项目，其中的对象都不会删除。",
   "confirm.deleteProject":
     "删除这个项目的 Namespace 和其中的所有内容，和 kubectl delete namespace 一样，删除后无法恢复。",
+  "confirm.forceDeleteProject":
+    "移除卡住项目的 finalizer，让 Kubernetes 把项目删完。移除后无法恢复。",
   "confirm.debugContainer": (pod: string) =>
     `在副本 ${pod} 中加上带 shell 的调试容器，从里面能看到应用程序的进程。`,
   "confirm.debugStays":
@@ -1451,6 +1456,9 @@ export const zhCN: Messages = {
   "warn.rightsMissing": (rights: string) => `集群可能会拒绝：你缺少 ${rights} 的权限。`,
   "warn.recreated": (names: string, tool: string) =>
     `${names} 由 ${tool} 管理，删除后 ${tool} 可能会重新创建`,
+  "warn.removesFinalizers": (names: string) => `移除 ${names} 的 finalizer`,
+  "warn.cleanupSkipped":
+    "这些对象的控制器就没办法清理自己在集群外创建的东西，例如对象存储里的备份或云磁盘",
   "warn.restartNeeded": (names: string) => `重启后才会生效：${names}`,
   "warn.reloaderRestarts": (names: string) => `Reloader 会重启 ${names}`,
   "warn.reloaderMayRestart": (names: string) => `如果这个集群运行着 Reloader，会重启 ${names}`,

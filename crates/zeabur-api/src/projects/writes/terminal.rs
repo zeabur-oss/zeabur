@@ -122,6 +122,7 @@ pub(crate) async fn compute(
         | Change::Adopt
         | Change::Unadopt
         | Change::DeleteProject
+        | Change::ForceDeleteProject
         | Change::Details { .. }
         | Change::BuildLimits { .. }
         | Change::ScheduleTask { .. }

@@ -571,7 +571,10 @@ export const en = {
   "deleting.count": (resource: string, count: number) => `${resource} (${count})`,
   "deleting.left": (list: string) => `Left: ${list}.`,
   "deleting.held":
-    "These objects wait for their finalizers. The controller that added each finalizer removes it after its cleanup; Zeabur doesn't remove finalizers.",
+    "These objects wait for their finalizers. The controller that added each finalizer removes it after its cleanup.",
+  "deleting.forceHint":
+    "A controller usually finishes on its own, so waiting longer is safer. Force delete only when it can't finish.",
+  "deleting.force": "Force delete",
   "deleting.commandsLabel": "Look with kubectl",
 
   // Overview
@@ -1246,6 +1249,7 @@ export const en = {
   "action.adopt": "Use this namespace",
   "action.unadopt": "Stop showing as a project",
   "action.deleteProject": "Delete project",
+  "action.forceDeleteProject": "Force delete project",
   "action.openDebugTerminal": "Open debug terminal",
   "action.openToolsTerminal": "Open kubectl terminal",
   "action.saveDetails": "Save details",
@@ -1253,6 +1257,7 @@ export const en = {
   "title.adopt": (ns: string) => `Use the existing namespace ${ns}`,
   "title.unadopt": (ns: string) => `Stop showing ${ns} as a project`,
   "title.deleteProject": (ns: string) => `Delete project ${ns}`,
+  "title.forceDeleteProject": (ns: string) => `Force delete project ${ns}`,
   "title.details": (ns: string) => `${ns} details`,
   "title.buildLimits": (ns: string) => `${ns} build limits`,
   "title.pauseAll": (ns: string) => `Pause every service in ${ns}`,
@@ -1263,6 +1268,8 @@ export const en = {
   "confirm.unadopt": "The namespace stops showing as a project. Nothing in it is deleted.",
   "confirm.deleteProject":
     "Deletes the project's namespace and everything in it, as kubectl delete namespace does. This can't be undone.",
+  "confirm.forceDeleteProject":
+    "Removes the finalizers that keep the project from being deleted, so Kubernetes can finish deleting it. This can't be undone.",
   "confirm.debugContainer": (pod: string) =>
     `Adds a debug container with a shell to replica ${pod}. It can see the app's processes.`,
   "confirm.debugStays":
@@ -1569,6 +1576,9 @@ export const en = {
   "warn.rightsMissing": (rights: string) => `The cluster may refuse this: you lack ${rights}.`,
   "warn.recreated": (names: string, tool: string) =>
     `${tool} manages ${names}: it may create them again after the deletion`,
+  "warn.removesFinalizers": (names: string) => `Removes the finalizers from ${names}`,
+  "warn.cleanupSkipped":
+    "These objects' controllers can't clean up what they made outside the cluster, such as a backup in object storage or a cloud disk",
   "warn.restartNeeded": (names: string) => `Takes effect after a restart: ${names}`,
   "warn.reloaderRestarts": (names: string) => `Reloader restarts ${names}`,
   "warn.reloaderMayRestart": (names: string) =>

@@ -16,7 +16,8 @@
 //   cannot shrink, a new or moved mount replaces the pods); a YAML edit (written as typed);
 //   removing a domain; a NetworkPolicy that isolates its pods (limits what they send, or lets
 //   nothing in); opening a port to the internet; deleting an object, which cannot be taken back
-//   and is confirmed by typing its name; deleting a project, confirmed by typing the project's.
+//   and is confirmed by typing its name; deleting a project or force deleting it, confirmed by
+//   typing the project's.
 // - normal: everything else (variables, values set, domains added or renamed, resources, health
 //   checks, other created objects, letting a namespace go).
 // - low as well: adopting a namespace and a project's details, which touch only the Namespace's
@@ -92,6 +93,7 @@ const fixedWeight: Partial<Record<Change["op"], OneWeight>> = {
   removeDomain: { risk: "high", reason: "removesDomain" },
   delete: { risk: "high", reason: "deletes" },
   deleteProject: { risk: "high", reason: "deletes" },
+  forceDeleteProject: { risk: "high", reason: "deletes" },
   image: { risk: "normal" },
   autoUpdate: { risk: "normal" },
   env: { risk: "normal" },
@@ -260,7 +262,11 @@ export function deletionOf(created: {
  * deletes `project`, else the first object it deletes; `undefined` when there is none. */
 export function typedName(changes: readonly Change[], project?: string): string | undefined {
   for (const change of changes) {
-    if (change.op === "deleteProject" && project !== undefined) return project
+    if (
+      (change.op === "deleteProject" || change.op === "forceDeleteProject") &&
+      project !== undefined
+    )
+      return project
     if (change.op === "delete") return change.name
   }
   return undefined
@@ -328,6 +334,7 @@ const projectPlace: Partial<Record<Change["op"], (project: string) => string>> =
   createProject: (project) => `/projects/${project}`,
   unadopt: () => "/projects",
   deleteProject: () => "/projects",
+  forceDeleteProject: () => "/projects",
   details: (project) => `/projects/${project}/settings`,
   buildLimits: (project) => `/projects/${project}/settings`,
 }
