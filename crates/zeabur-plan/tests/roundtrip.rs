@@ -403,7 +403,7 @@ mod tests {
             edited["spec"]["template"]["spec"]["containers"][0]["image"] = json!(format!("example/app:{tag}"));
             edited["metadata"]["labels"] = json!({"team": label});
             let yaml = serde_json::to_string(&edited).unwrap();
-            let plan = planned(&snapshot, vec![Change::Edit { resource: deployments(), name: "web".to_owned(), yaml }]);
+            let plan = planned(&snapshot, vec![Change::Edit { resource: deployments(), name: "web".to_owned(), yaml, spec_only: false }]);
             // The YAML the plan dialog shows is the objects as planned.
             let want = format!("image: example/app:{tag}");
             let written = |yaml: &Option<String>| {

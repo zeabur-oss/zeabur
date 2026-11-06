@@ -329,6 +329,7 @@ mod tests {
                 resource: w.resource(),
                 name: "app".to_owned(),
                 yaml: edited.to_string(),
+                spec_only: false,
             }
         };
         let containers = if w.kind == WorkloadKind::CronJob {
@@ -521,6 +522,7 @@ mod tests {
                         },
                         name: "credentials".to_owned(),
                         yaml: edited.to_string(),
+                        spec_only: false,
                     },
                     "secret",
                     vec![field("type")],
@@ -548,6 +550,7 @@ mod tests {
                         },
                         name: "settings".to_owned(),
                         yaml: edited.to_string(),
+                        spec_only: false,
                     },
                     "configmap",
                     vec![field("data"), field(&w.key)],

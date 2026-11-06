@@ -60,11 +60,11 @@ import {
   backupsSummary,
   backUpNowSummary,
   backupsNotes,
+  backsUp,
   currentTarget,
   ownBackups,
   regionInSecret,
   turnOffBackups,
-  turnOffNotes,
   turnOffSummary,
   writeBackups,
   daysOf,
@@ -113,6 +113,10 @@ import {
 import { TabsContent } from "@zeabur-oss/design-system/components/tabs"
 
 const route = getRouteApi("/projects/$project/databases/$engine/$name")
+
+/** Dragonfly has no Backups tab. */
+const tabsOf = (database: Database) =>
+  backsUp(database.engine) ? databaseTabs : databaseTabs.filter((value) => value !== "backups")
 
 const tabIcons: Record<DatabaseTab, Icon> = {
   overview: InfoIcon,
@@ -200,7 +204,7 @@ function Body({
   const { tab, shown, gates, unreadable, deleter, setTab, setPod, setMode } = useStorePage(
     project,
     search.tab,
-    databaseTabs,
+    tabsOf(database),
   )
   const events = eventsOf(useProjectEvents(project), database)
   const shell = (pod?: string) => openDatabaseShell(project, database, pod)
@@ -466,9 +470,11 @@ function Overview({
             <SummaryCardFact label={t("db.fact.size")}>
               {preset ? t(`db.size.${preset}`) : t("db.fact.custom")}
             </SummaryCardFact>
-            <SummaryCardFact label={t("db.backup.last")}>
-              <LastBackup database={database} />
-            </SummaryCardFact>
+            {backsUp(database.engine) ? (
+              <SummaryCardFact label={t("db.backup.last")}>
+                <LastBackup database={database} />
+              </SummaryCardFact>
+            ) : null}
           </SummaryCardFacts>
         </SummaryCardMain>
         {database.message && database.state !== "ready" ? (
@@ -496,7 +502,10 @@ function Cautions({ project, database }: { project: string; database: Database }
         <Alert variant="warn">
           <WarningIcon aria-hidden="true" />
           <AlertDescription>
-            {t("db.noRedundancy", Boolean(database.backups.store?.inUse))}
+            {t(
+              "db.noRedundancy",
+              !backsUp(database.engine) || Boolean(database.backups.store?.inUse),
+            )}
           </AlertDescription>
         </Alert>
       ) : null}
@@ -654,16 +663,13 @@ function Backups({
       ) : pluginMissing ? null : (
         <SetUp project={project} database={database} />
       )}
-      {database.engine === "dragonfly" ? null : <Runs database={database} />}
+      <Runs database={database} />
       <Section id="db-restore" title={t("db.restore.action")}>
         <Restore project={project} database={database} />
       </Section>
     </div>
   )
 }
-
-const targetNote: Partial<Record<Database["engine"], "db.backup.walNote" | "db.backup.snapshots">> =
-  { postgresql: "db.backup.walNote", dragonfly: "db.backup.snapshots" }
 
 /** How long the destination keeps backups, as each operator counts it. */
 function useRetention(database: Database) {
@@ -687,7 +693,6 @@ function Target({ project, database }: { project: string; database: Database }) 
       title: t("db.backup.planOff", database.name),
       changes: turnOffBackups(database),
       summary: turnOffSummary(t, database),
-      notes: turnOffNotes(t, database),
     })
   return (
     <Section
@@ -731,7 +736,7 @@ function TargetRows({
 }) {
   const t = useT()
   const retention = useRetention(database)
-  const note = targetNote[database.engine]
+  const note = database.engine === "postgresql" ? "db.backup.walNote" : undefined
   return (
     <>
       <CardRows>
@@ -873,7 +878,7 @@ function BackupForm({
       title: t(backupsOn(database) ? "db.backup.planEdit" : "db.backup.plan", database.name),
       changes: writeBackups(database, target, keysExist),
       summary: backupsSummary(t, database, target, keysExist),
-      notes: backupsNotes(t, database, target, keysExist),
+      notes: backupsNotes(t, database, target),
     })
   }
   const set = (patch: Partial<BackupTarget>) => setTarget((v) => ({ ...v, ...patch }))
@@ -923,8 +928,6 @@ function BackupForm({
 
 function FormNotes({ project, database }: { project: string; database: Database }) {
   const t = useT()
-  const startsEmpty =
-    database.engine === "dragonfly" && database.members === 1 && !backupsOn(database)
   return (
     <>
       {fixedFolder(database.engine) ? (
@@ -934,12 +937,6 @@ function FormNotes({ project, database }: { project: string; database: Database 
       ) : null}
       {keepsEverything(database.engine) ? (
         <p className="type-meta text-muted-foreground">{t("db.backup.keepsEverything")}</p>
-      ) : null}
-      {startsEmpty ? (
-        <Alert variant="warn">
-          <WarningIcon aria-hidden="true" />
-          <AlertDescription>{t("db.backup.startsEmpty")}</AlertDescription>
-        </Alert>
       ) : null}
     </>
   )

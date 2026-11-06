@@ -3166,11 +3166,7 @@ export const en = {
   "db.backup.keepsEverything":
     "Every backup is kept. Set a lifecycle rule on the bucket to delete old ones.",
   "db.backup.fixedFolder": (folder: string) => `MOCO writes to ${folder} in the bucket.`,
-  "db.backup.startsEmpty":
-    "With one instance, Dragonfly restarts from the bucket, which is empty: the data so far stays in the snapshot on its volume.",
   "db.backup.retentionHours": (hours: string) => `${hours} of backups`,
-  "db.backup.snapshots":
-    "Dragonfly writes a snapshot there on its schedule and when it stops. Zeabur cannot list them.",
   "db.backup.edit": "Edit",
   "db.backup.change": "Change backups",
   "db.backup.turnOff": "Turn off backups",
@@ -3183,26 +3179,19 @@ export const en = {
   "db.backup.saidNewKeys": (secret: string) => `Replace the access keys in secret ${secret}.`,
   "db.backup.saidCopyKeys": (secret: string, destination: string) =>
     `Replace the access keys in secret ${secret} with the keys of ${destination}.`,
-  "db.backup.keysOnRestart": (name: string) =>
-    `Dragonfly reads the keys when it starts, so ${name} uses the new ones after its next restart.`,
   "db.backup.moved": (where: string) =>
     `Earlier backups stay at ${where}. Restoring from them needs these old settings.`,
   "db.backup.movedPitr":
     "Restoring to a point in time from the new destination works after the next scheduled backup. This change doesn't start one.",
-  "db.backup.movedEmpty":
-    "With one instance, Dragonfly restarts from the new destination, which is empty. The data so far stays at the old one.",
   "db.backup.saidOff": (name: string, where: string) => `Stop backing up ${name} to ${where}.`,
   "db.backup.saidOffKept": (secret: string) =>
     `The keys stay in secret ${secret}, and backups already in the bucket stay there.`,
   "db.backup.saidOffRestart": (name: string) => `${name} restarts to stop backing up.`,
-  "db.backup.offStale":
-    "With one instance, Dragonfly restarts from the snapshot on its volume, saved before backups went to the bucket. Changes made since then are lost.",
   "db.restore.action": "New database from a backup point",
   "db.restore.title": (name: string) => `New database from a backup point of ${name}`,
   "db.restore.body":
     "Zeabur creates a new database with the same settings, starting from the backup. The original is not changed.",
   "db.restore.point": "Backup",
-  "db.restore.latest": "Newest snapshot",
   "db.restore.name": "New database name",
   "db.restore.none": "No finished backup or point in time to restore from yet.",
   "db.restore.fromBackup": "A finished backup",

@@ -11,7 +11,6 @@ import {
   backupsSummary,
   currentTarget,
   turnOffBackups,
-  turnOffNotes,
   turnOffSummary,
   canBackUpNow,
   commands,
@@ -21,6 +20,7 @@ import {
   DATABASE_LABEL,
   deleteDatabase,
   madeObjects,
+  MADE_KINDS,
   addPerThreadCaches,
   eventsOf,
   writeBackups,
@@ -504,6 +504,32 @@ describe("reshaping", () => {
       "pg-daily",
     ])
   })
+  test("deleting a MySQL database also removes the BackupPolicy and ServiceAccount turning off kept", () => {
+    const kind = (group: string, resource: string, items: { name: string }[]) =>
+      ({ group, version: "v1", resource, kind: resource, items }) as never
+    const mysql = {
+      ...postgres,
+      engine: "mysql",
+      resource: "mysqlclusters",
+      apiVersion: "moco.cybozu.com/v1beta2",
+      kind: "MySQLCluster",
+      name: "db",
+    } as Database
+    expect(MADE_KINDS).toContain("core/serviceaccounts")
+    const { gone } = madeObjects(
+      mysql,
+      [
+        kind("moco.cybozu.com", "backuppolicies", [{ name: "db-backups" }]),
+        kind("", "serviceaccounts", [{ name: "db-backup" }]),
+      ],
+      [mysql],
+    )
+    expect(
+      deleteDatabase(mysql, gone).map((c) =>
+        c.op === "delete" ? c.resource.resource + "/" + c.name : c.op,
+      ),
+    ).toEqual(["mysqlclusters/db", "backuppolicies/db-backups", "serviceaccounts/db-backup"])
+  })
 })
 
 const password = () => "pw"
@@ -695,27 +721,6 @@ describe("MySQL, MariaDB and Dragonfly", () => {
     ])
   })
 
-  test("Dragonfly snapshots to the bucket with the endpoint as its flags", () => {
-    const cache = as("dragonfly", "Dragonfly", "dragonflies", {
-      args: ["--s3_endpoint=old", "--maxmemory=1gb"],
-      env: [{ name: "AWS_REGION", value: "x" }],
-      snapshot: { cron: "0 * * * *", persistentVolumeClaimSpec: {} },
-    })
-    const [, edit] = writeBackups(cache, target)
-    const spec = edit?.op === "edit" ? JSON.parse(edit.yaml).spec : {}
-    expect(spec.args).toEqual([
-      "--maxmemory=1gb",
-      "--s3_endpoint=s3.test:8333",
-      "--s3_use_https=false",
-    ])
-    expect(spec.env.map((e: { name: string }) => e.name)).toEqual([
-      "AWS_ACCESS_KEY_ID",
-      "AWS_SECRET_ACCESS_KEY",
-      "AWS_REGION",
-    ])
-    expect(spec.snapshot).toMatchObject({ dir: "s3://backups/db", persistentVolumeClaimSpec: {} })
-  })
-
   test("reshaping MySQL changes mysqld's resources and the data claim template", () => {
     const mysql = as("mysql", "MySQLCluster", "mysqlclusters", {
       replicas: 1,
@@ -844,19 +849,47 @@ describe("changing backups", () => {
     expect(changed).not.toHaveProperty("db-backups-s3")
   })
 
-  test("PostgreSQL: new keys replace the Secret's and keep its region", () => {
+  test("PostgreSQL: new keys are set in the Secret, which keeps its region", () => {
     const changes = writeBackups(pg, { ...kept, accessKey: "new", secretKey: "s" }, true)
-    expect(edits(changes)["db-backups-s3"]).toEqual({
-      apiVersion: "v1",
-      kind: "Secret",
-      metadata: { name: "db-backups-s3", labels: { [DATABASE_LABEL]: "db" } },
-      type: "Opaque",
-      stringData: { ACCESS_KEY_ID: "new", ACCESS_SECRET_KEY: "s" },
-      data: { REGION: "(hidden)" },
-    })
+    expect(changes).toEqual([
+      {
+        op: "data",
+        kind: "Secret",
+        name: "db-backups-s3",
+        changes: [
+          { op: "set", key: "ACCESS_KEY_ID", value: "new" },
+          { op: "set", key: "ACCESS_SECRET_KEY", value: "s" },
+        ],
+      },
+    ])
     expect(
       backupsSummary(t, pg, { ...kept, accessKey: "new", secretKey: "s" }, true).lines,
     ).toContain("db.backup.saidNewKeys(db-backups-s3)")
+  })
+
+  test("an edit takes only the spec, so an operator's finalizer and annotation stay", () => {
+    const operated = {
+      ...pg,
+      object: {
+        metadata: {
+          name: "db",
+          namespace: "shop",
+          finalizers: ["cnpg.io/cluster"],
+          annotations: { "cnpg.io/operatorVersion": "1.27" },
+        },
+        spec: { plugins: [] },
+      },
+    } as unknown as Database
+    const changes = writeBackups(operated, { ...kept, frequency: "weekly" }, true)
+    const db = changes.find((c) => c.op === "edit" && c.name === "db")
+    expect(db).toMatchObject({ specOnly: true })
+    expect(db?.op === "edit" && JSON.parse(db.yaml).metadata).toMatchObject({
+      finalizers: ["cnpg.io/cluster"],
+      annotations: { "cnpg.io/operatorVersion": "1.27" },
+    })
+    for (const change of changes) if (change.op === "edit") expect(change.specOnly).toBe(true)
+    for (const change of turnOffBackups(pg))
+      if (change.op === "edit") expect(change.specOnly).toBe(true)
   })
 
   test("PostgreSQL: a typed region is set in the Secret that stays", () => {
@@ -874,7 +907,7 @@ describe("changing backups", () => {
     expect(
       edits(writeBackups(pg, moved, true))["db-backups"].spec.configuration.destinationPath,
     ).toBe("s3://other/db")
-    expect(backupsNotes(t, pg, moved, true)).toEqual([
+    expect(backupsNotes(t, pg, moved)).toEqual([
       "db.backup.moved(s3://backups/db (http://s3.test:8333))",
       "db.backup.movedPitr",
     ])
@@ -936,7 +969,7 @@ describe("changing backups", () => {
     })
   })
 
-  test("MySQL: an edit changes the BackupPolicy, and turning off deletes it and its account", () => {
+  test("MySQL: an edit changes the BackupPolicy, and turning off only unnames it", () => {
     const mysqlOn = on(
       "mysql",
       "mysqlclusters",
@@ -951,10 +984,26 @@ describe("changing backups", () => {
     expect(changed).not.toHaveProperty("db")
     const off = turnOffBackups(mysqlOn)
     expect(edits(off).db.spec).not.toHaveProperty("backupPolicyName")
-    expect(off.filter((c) => c.op === "delete").map((c) => c.name)).toEqual([
-      "db-backups",
-      "db-backup",
-    ])
+    expect(off.filter((c) => c.op !== "edit")).toEqual([])
+    expect(Object.keys(edits(off))).toEqual(["db"])
+  })
+
+  test("MySQL: setting up again reuses the kept BackupPolicy and updates it from the form", () => {
+    const mysqlOff = on(
+      "mysql",
+      "mysqlclusters",
+      {},
+      {
+        store: store("db-backups", { destination: "s3://backups/moco/shop/db", inUse: false }),
+        schedules: [schedule("db-backups", "0 3 * * *", true)],
+      },
+    )
+    expect(currentTarget(mysqlOff).frequency).toBe("daily")
+    const changes = writeBackups(mysqlOff, { ...kept, frequency: "weekly" }, true)
+    expect(changes.filter((c) => c.op === "create")).toEqual([])
+    const changed = edits(changes)
+    expect(changed["db-backups"].spec.schedule).toBe("0 3 * * 0")
+    expect(changed.db.spec.backupPolicyName).toBe("db-backups")
   })
 
   test("MariaDB: turning off pauses the scheduled Backup, and an edit resumes it", () => {
@@ -982,34 +1031,5 @@ describe("changing backups", () => {
     const resumed = edits(writeBackups(paused, { ...kept, keepDays: 3 }, true))["db-scheduled"].spec
     expect(resumed.schedule).toEqual({ cron: "0 3 * * *" })
     expect(resumed.maxRetention).toBe("72h")
-  })
-
-  const aws = (key: string) => {
-    const name =
-      key === "REGION"
-        ? "AWS_REGION"
-        : `AWS_${key === "ID" ? "ACCESS_KEY_ID" : "SECRET_ACCESS_KEY"}`
-    return { name, valueFrom: { secretKeyRef: { name: "db-backups-s3", key: name } } }
-  }
-
-  test("Dragonfly: turning off snapshots to its volume again and says what one instance loses", () => {
-    const cache = on(
-      "dragonfly",
-      "dragonflies",
-      {
-        args: ["--maxmemory=1gb", "--s3_endpoint=s3.test:8333", "--s3_use_https=false"],
-        env: [{ name: "TZ" }, ...["ID", "SECRET", "REGION"].map(aws)],
-        snapshot: { dir: "s3://backups/db", cron: "0 3 * * *", persistentVolumeClaimSpec: {} },
-      },
-      { store: store("db"), schedules: [schedule("db", "0 3 * * *")] },
-    )
-    const spec = edits(turnOffBackups(cache)).db.spec
-    expect(spec.args).toEqual(["--maxmemory=1gb"])
-    expect(spec.env).toEqual([{ name: "TZ" }])
-    expect(spec.snapshot).toEqual({ cron: "0 * * * *", persistentVolumeClaimSpec: {} })
-    expect(turnOffNotes(t, cache)).toEqual(["db.backup.offStale"])
-    expect(backupsNotes(t, cache, { ...kept, accessKey: "a", secretKey: "b" }, true)).toEqual([
-      "db.backup.keysOnRestart(db)",
-    ])
   })
 })

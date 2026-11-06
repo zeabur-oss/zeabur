@@ -1894,6 +1894,8 @@ export type Change =
       op: "edit"
       /** The object's resource. */
       resource: ResourceRef
+      /** Take only `spec` from the copy and keep the rest of the object, its metadata too. */
+      specOnly?: boolean
       /** The edited object, YAML (JSON is YAML too). */
       yaml: string
     }
