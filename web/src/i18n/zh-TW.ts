@@ -2960,10 +2960,7 @@ export const zhTW: Messages = {
   "db.backup.walNote": "PostgreSQL 也會持續把交易日誌（WAL）封存到那裡。",
   "db.backup.keepsEverything": "所有備份都會保留。要刪除舊備份，在儲存貯體設定生命週期規則。",
   "db.backup.fixedFolder": (folder) => `MOCO 會寫到儲存貯體裡的 ${folder}。`,
-  "db.backup.startsEmpty":
-    "只有一個執行個體時，Dragonfly 重新啟動會從還是空的儲存貯體載入，現有資料則保存在磁碟區快照裡。",
   "db.backup.retentionHours": (hours) => `${hours} 內的備份`,
-  "db.backup.snapshots": "Dragonfly 會依排程以及停止時寫入快照。Zeabur 無法列出這些快照。",
   "db.backup.edit": "編輯",
   "db.backup.change": "變更備份",
   "db.backup.turnOff": "關閉備份",
@@ -2975,24 +2972,17 @@ export const zhTW: Messages = {
   "db.backup.saidNewKeys": (secret) => `換掉機密變數 ${secret} 裡的存取金鑰。`,
   "db.backup.saidCopyKeys": (secret, destination) =>
     `機密變數 ${secret} 裡的存取金鑰，會換成 ${destination} 那組。`,
-  "db.backup.keysOnRestart": (name) =>
-    `Dragonfly 啟動時才會讀取金鑰，所以 ${name} 下次重新啟動後才會用新的金鑰。`,
   "db.backup.moved": (where) => `之前的備份會留在 ${where}。要從那些備份還原，需要用舊的設定。`,
   "db.backup.movedPitr":
     "要等下一次排程備份完成，才能從新目的地還原到某個時間點。這次變更不會馬上備份。",
-  "db.backup.movedEmpty":
-    "只有一個執行個體時，Dragonfly 重新啟動後會從新目的地載入，但那裡還是空的，現有資料留在舊目的地。",
   "db.backup.saidOff": (name, where) => `停止把 ${name} 備份到 ${where}。`,
   "db.backup.saidOffKept": (secret) =>
     `金鑰會留在機密變數 ${secret}，儲存貯體裡現有的備份也都還在。`,
   "db.backup.saidOffRestart": (name) => `${name} 會重新啟動，停止備份。`,
-  "db.backup.offStale":
-    "只有一個執行個體時，Dragonfly 重新啟動會載入磁碟區上的快照，那是開始備份到儲存貯體之前存的，之後的變更都會遺失。",
   "db.restore.action": "從備份點建立新資料庫",
   "db.restore.title": (name) => `從 ${name} 的備份點建立新資料庫`,
   "db.restore.body": "Zeabur 會用相同設定建立新的資料庫，資料來自備份。原本的資料庫不會變動。",
   "db.restore.point": "備份",
-  "db.restore.latest": "最新的快照",
   "db.restore.name": "新資料庫名稱",
   "db.restore.none": "還沒有可以還原的完成備份或時間點。",
   "db.restore.fromBackup": "完成的備份",

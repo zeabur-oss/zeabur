@@ -6080,6 +6080,11 @@ components:
           resource:
             $ref: "#/components/schemas/ResourceRef"
             description: The object's resource.
+          specOnly:
+            type: boolean
+            description: >-
+              Take only `spec` from the copy and keep the rest of the object, its metadata
+              too.
           yaml:
             type: string
             description: The edited object, YAML (JSON is YAML too).

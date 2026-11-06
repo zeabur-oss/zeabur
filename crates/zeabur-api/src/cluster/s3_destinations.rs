@@ -564,6 +564,7 @@ async fn copy_into(
         },
         name,
         yaml: edited.to_string(),
+        spec_only: false,
     })
 }
 

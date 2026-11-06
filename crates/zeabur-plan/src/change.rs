@@ -317,6 +317,9 @@ pub enum Change {
         name: String,
         /// The edited object, YAML (JSON is YAML too).
         yaml: String,
+        /// Take only `spec` from the copy and keep the rest of the object, its metadata too.
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        spec_only: bool,
     },
     /// Create one object in the project, of any namespaced kind the cluster serves (see the
     /// `create` module). Its namespace is the project's; an object of that name must not exist

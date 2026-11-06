@@ -938,6 +938,7 @@ impl<'a> Planner<'a> {
         resource: &ResourceRef,
         name: &str,
         yaml: &str,
+        spec_only: bool,
     ) -> Result<(), PlanError> {
         let edited: Value = serde_saphyr::from_str(yaml).map_err(|e| {
             error(
@@ -995,6 +996,18 @@ impl<'a> Planner<'a> {
                 "unknown_object",
                 format!("There is no {} named {name}.", resource.resource),
             ));
+        };
+        let edited = if spec_only {
+            let mut whole = object.clone();
+            if let Some(map) = whole.as_object_mut() {
+                match edited.get("spec") {
+                    Some(spec) => map.insert("spec".to_owned(), spec.clone()),
+                    None => map.remove("spec"),
+                };
+            }
+            whole
+        } else {
+            edited
         };
         let kind = object
             .get("kind")

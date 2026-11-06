@@ -52,6 +52,9 @@ pub const CLUSTERS: Read = Read {
     kind: "MySQLCluster",
 };
 
+/// The label of what Zeabur makes for a database, its name as the value.
+const DATABASE_LABEL: &str = "zeabur.com/database";
+
 /// `moco.cybozu.com/v1beta2` `BackupPolicy`, in the project's namespace.
 pub const BACKUP_POLICIES: Read = Read {
     group: "moco.cybozu.com",
@@ -154,12 +157,26 @@ fn backups_of(
     policies: &[DynamicObject],
     jobs: &[DynamicObject],
 ) -> Backups {
-    let Some(wanted) = text(cluster, "/spec/backupPolicyName") else {
+    // A policy Zeabur made stays when backups are turned off, and the cluster no longer names it.
+    let named = text(cluster, "/spec/backupPolicyName");
+    let made_for = |p: &DynamicObject| {
+        let labels = p.metadata.labels.as_ref();
+        labels
+            .and_then(|l| l.get(DATABASE_LABEL))
+            .is_some_and(|database| database == name)
+    };
+    let policy = policies.iter().find(|p| {
+        named.as_ref().map_or_else(
+            || made_for(p),
+            |wanted| p.metadata.name.as_ref() == Some(wanted),
+        )
+    });
+    let Some(wanted) = named
+        .clone()
+        .or_else(|| policy.and_then(|p| p.metadata.name.clone()))
+    else {
         return Backups::default();
     };
-    let policy = policies
-        .iter()
-        .find(|p| p.metadata.name.as_deref() == Some(&wanted));
     let config = |pointer: &str| policy.and_then(|p| text(p, &format!("/spec/jobConfig{pointer}")));
     let store = Store {
         name: wanted.clone(),
@@ -169,7 +186,7 @@ fn backups_of(
         secret: config("/envFrom/0/secretRef/name"),
         region: None,
         retention: None,
-        in_use: policy.is_some(),
+        in_use: named.is_some() && policy.is_some(),
     };
     let schedules = policy
         .and_then(|p| text(p, "/spec/schedule"))
@@ -177,7 +194,7 @@ fn backups_of(
             name: format!("{namespace}/{wanted}"),
             provider: MODULE.id.to_owned(),
             cron,
-            paused: false,
+            paused: named.is_none(),
             targets: vec![Target {
                 kind: TargetKind::Database,
                 name: name.to_owned(),
@@ -471,5 +488,27 @@ mod tests {
         assert_eq!(done.connection.database.as_deref(), Some("app"));
         assert_eq!(done.connection.secret, "mysql-app");
         assert_eq!(done.connection.password_key, "password");
+    }
+
+    #[test]
+    fn a_kept_policy_the_cluster_no_longer_names_is_paused() {
+        let policy = object(serde_json::json!({
+            "apiVersion": "moco.cybozu.com/v1beta2", "kind": "BackupPolicy",
+            "metadata": {"name": "mysql-backups", "namespace": "shop",
+                         "labels": {"zeabur.com/database": "mysql"}},
+            "spec": {"schedule": "0 3 * * *", "jobConfig": {
+                "envFrom": [{"secretRef": {"name": "mysql-backups-s3"}}],
+                "bucketConfig": {"bucketName": "b"}}}
+        }));
+        let mut off = cluster(&serde_json::json!({}));
+        if let Some(spec) = off.data.pointer_mut("/spec").and_then(Value::as_object_mut) {
+            spec.remove("backupPolicyName");
+        }
+        let backups = database("shop", &off, &[policy], &[]).backups;
+        let store = backups.store.unwrap();
+        assert_eq!(store.name, "mysql-backups");
+        assert_eq!(store.secret.as_deref(), Some("mysql-backups-s3"));
+        assert!(!store.in_use);
+        assert!(backups.schedules[0].paused);
     }
 }
