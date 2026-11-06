@@ -15,7 +15,7 @@ use zeabur_installer_plan::join::{self, JoinFacts, JoinPlan, Latency, RTT_SAMPLE
 use zeabur_installer_plan::storage;
 
 use crate::apply::{self, ClusterInstall};
-use crate::{InstallError, node, out, render};
+use crate::{InstallError, load, node, out, render};
 
 /// The join token, from the configuration or its file, checked against the role.
 fn token(config: &JoinConfig) -> Result<String, InstallError> {
@@ -53,12 +53,17 @@ fn read_facts(config: &JoinConfig, token: &str) -> Result<JoinFacts, InstallErro
     let facts = facts::read()?;
     let longhorn_runs_here =
         longhorn_runs_on(&own_kubectl(distribution), &facts.own_node_name()).unwrap_or(false);
+    let unit = match config.join.role {
+        Role::Worker => distribution.agent_unit(),
+        Role::Server => distribution.server_unit(),
+    };
     Ok(JoinFacts {
         facts,
         rtt_us,
         ports,
         token_pinned: config::token_pins_ca(token),
         longhorn_runs_here,
+        unit_running: systemd::is_active(unit),
     })
 }
 
@@ -82,6 +87,7 @@ fn longhorn_runs_on(kubectl: &Kubectl, name: &str) -> Result<bool, InstallError>
 }
 
 fn make_plan(config: &JoinConfig) -> Result<(JoinPlan, String), InstallError> {
+    load::image_archives(&config.sources.image_archives)?;
     let token = token(config)?;
     let facts = read_facts(config, &token)?;
     Ok((join::plan(config, &facts)?, token))
@@ -162,7 +168,7 @@ pub(crate) fn apply(config: &JoinConfig) -> Result<(), InstallError> {
         let admin = Kubectl::admin(distribution);
         admin.wait_ready(Duration::from_mins(5))?;
         sync_authn(&admin, distribution)?;
-        node::report_sync(&admin)?;
+        node::report_sync(&admin, distribution)?;
     }
 
     out::step("Done");
