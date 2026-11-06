@@ -1,0 +1,7 @@
+---
+default: patch
+---
+
+# A failed chart install or upgrade stops `apply` and says how to see why
+
+`apply` used to wait 15 minutes and then only report that the chart wasn't ready. It now stops as soon as Helm marks the release failed and tells you to run `helm history` on a machine that has Helm installed and can reach the cluster. The installer doesn't install Helm. Fix the cause and run `apply`, which updates the chart and stops there again. Then run `helm rollback` (or `helm uninstall` if the first install failed) and run `apply` once more. Rolling back first doesn't help: helm-controller upgrades again right away with the chart's old values.

@@ -963,9 +963,17 @@ fn checked_chart(object: &Value, digest: &str) -> Result<(Value, Vec<u8>), Insta
 /// Applies a `HelmChart` and waits for helm-controller's `helm upgrade --install` job, so running
 /// again is safe. helm-controller replaces the job within seconds when the chart changed and keeps
 /// the finished one when it did not; which of the two happened is only known by watching.
+///
+/// Every chart has `failurePolicy: abort`, so once the release's newest revision is `failed`, the
+/// job only waits for someone to roll it back. The wait stops there and says so.
 fn helm_chart(kubectl: &Kubectl, name: &str, object: &Value) -> Result<(), InstallError> {
     const SETTLE: Duration = Duration::from_secs(5);
     let job_name = format!("helm-install-{name}");
+    let namespace = object
+        .pointer("/spec/targetNamespace")
+        .and_then(Value::as_str)
+        .unwrap_or("kube-system");
+    let mut failed = None;
     let old_uid = kubectl
         .get("job", &job_name, Some("kube-system"))?
         .and_then(|j| j.pointer("/metadata/uid").cloned());
@@ -977,6 +985,12 @@ fn helm_chart(kubectl: &Kubectl, name: &str, object: &Value) -> Result<(), Insta
         Duration::from_mins(15),
         &format!("the {name} chart to install"),
         || {
+            failed = newest_revision(kubectl, name, namespace)
+                .filter(|(_, status)| status == "failed")
+                .map(|(revision, _)| revision);
+            if failed.is_some() {
+                return true;
+            }
             let Ok(job) = kubectl.get("job", &job_name, Some("kube-system")) else {
                 return false;
             };
@@ -1010,6 +1024,11 @@ fn helm_chart(kubectl: &Kubectl, name: &str, object: &Value) -> Result<(), Insta
             outcome.is_some()
         },
     )?;
+    if let Some(revision) = failed {
+        return Err(InstallError::Message(failed_release(
+            name, namespace, revision,
+        )));
+    }
     if outcome == Some(false) {
         let job = format!("job/{job_name}");
         let logs = kubectl
@@ -1023,6 +1042,53 @@ fn helm_chart(kubectl: &Kubectl, name: &str, object: &Value) -> Result<(), Insta
         )));
     }
     Ok(())
+}
+
+/// The version and status of the release's newest revision, from the labels Helm puts on its
+/// revision Secrets. `None` before Helm installs it.
+fn newest_revision(kubectl: &Kubectl, name: &str, namespace: &str) -> Option<(u64, String)> {
+    let selector = format!("--selector=owner=helm,name={name}");
+    let out = kubectl
+        .run(
+            &[
+                "get",
+                "secrets",
+                "--namespace",
+                namespace,
+                &selector,
+                "--output=jsonpath={range .items[*]}{.metadata.labels.version} {.metadata.labels.status}{\"\\n\"}{end}",
+            ],
+            None,
+        )
+        .ok()?;
+    newest_line(&out)
+}
+
+fn newest_line(out: &str) -> Option<(u64, String)> {
+    let mut newest: Option<(u64, String)> = None;
+    for line in out.lines() {
+        let Some((version, status)) = line.split_once(' ') else {
+            continue;
+        };
+        let Ok(version) = version.parse() else {
+            continue;
+        };
+        if newest.as_ref().is_none_or(|(n, _)| version > *n) {
+            newest = Some((version, status.to_owned()));
+        }
+    }
+    newest
+}
+
+fn failed_release(name: &str, namespace: &str, revision: u64) -> String {
+    let undo = if revision == 1 {
+        "uninstall"
+    } else {
+        "rollback"
+    };
+    format!(
+        "Helm failed to install or upgrade the {name} chart. To see why, run `helm history {name} -n {namespace}` on a machine that has Helm installed and can reach the cluster. Fix the cause and run apply, which updates the chart and stops here again. Then run `helm {undo} {name} -n {namespace}` and run apply once more."
+    )
 }
 
 fn conditions(object: &Value) -> impl Iterator<Item = (&str, &str)> {
@@ -1594,6 +1660,29 @@ fn record(kubectl: &Kubectl, plan: &Plan, link_issued: bool) -> Result<(), Insta
 
 #[cfg(test)]
 mod tests {
+    // A failed upgrade under `failurePolicy: abort` waits for a rollback, so apply decides by the
+    // newest revision, whatever older ones say (docs/reference/installer.mdx, troubleshooting).
+    #[test]
+    fn the_newest_revision_decides_whether_a_release_failed() {
+        let out = "9 superseded\n11 failed\n10 superseded\n";
+        assert_eq!(newest_line(out), Some((11, "failed".to_owned())));
+        assert_eq!(
+            newest_line("2 failed\n3 deployed\n"),
+            Some((3, "deployed".to_owned()))
+        );
+        assert_eq!(newest_line(""), None);
+    }
+
+    #[test]
+    fn a_failed_release_says_how_to_see_why_and_undo_it() {
+        let upgrade = failed_release("zot", "zot", 4);
+        assert!(upgrade.contains("helm history zot -n zot"), "{upgrade}");
+        assert!(upgrade.contains("helm rollback zot -n zot"), "{upgrade}");
+        // A first install has nothing to roll back to.
+        let install = failed_release("zot", "zot", 1);
+        assert!(install.contains("helm uninstall zot -n zot"), "{install}");
+    }
+
     #[test]
     fn a_new_or_changed_image_archive_is_a_change_but_a_copied_one_is_not() {
         let dir = tempfile::tempdir().unwrap();
