@@ -54,6 +54,7 @@ interface Choices {
   methoded: boolean
   ported: boolean
   hosted: boolean
+  published: boolean
   securitySet: boolean
 }
 
@@ -75,7 +76,9 @@ function resolveBuilt<F extends BuiltForm>(
   const method = derivedMethod(choices.methoded, form.method, context.dockerfileFound)
   const portText = choices.ported ? form.port : defaultPort(method)
   const port = context.options.port ? portText.trim() : ""
-  const publicUrl = context.options.publicUrl && port !== "" && form.publicUrl
+  // On by default only when the cluster has a domain suffix to fill the host from.
+  const publish = choices.published ? form.publicUrl : Boolean(context.suffix)
+  const publicUrl = context.options.publicUrl && port !== "" && publish
   const host = choices.hosted ? form.host : suggestedHost(name, context.project, context.suffix)
   const security = choices.securitySet ? form.security : buildProfile(method)
   const resolved: F = {
@@ -92,7 +95,7 @@ function resolveBuilt<F extends BuiltForm>(
     ),
     security,
   }
-  return { name, method, port, portText, publicUrl, host, security, resolved }
+  return { name, method, port, portText, publish, publicUrl, host, security, resolved }
 }
 
 /** `suggested` gives the name until the person types one, from the form and the names taken. */
@@ -115,6 +118,7 @@ export function useBuiltForm<F extends BuiltForm>(
     methoded: false,
     ported: false,
     hosted: false,
+    published: false,
     securitySet: false,
   })
   const [tried, setTried] = useState(false)
@@ -158,6 +162,7 @@ export function useBuiltForm<F extends BuiltForm>(
     found: dockerfileFound && !choices.methoded,
     typePort: (port: string) => typed("ported", { port } as Partial<F>),
     typeHost: (host: string) => typed("hosted", { host } as Partial<F>),
+    togglePublic: (publicUrl: boolean) => typed("published", { publicUrl } as Partial<F>),
     chooseSecurity: (security: F["security"]) => typed("securitySet", { security } as Partial<F>),
     tried,
     try: () => setTried(true),
@@ -522,8 +527,8 @@ export function BuiltPublicUrl({ built, problems }: { built: BuiltFormState; pro
       project={built.project}
       port={built.port}
       canPublish={built.options.publicUrl}
-      on={built.form.publicUrl}
-      onToggle={(publicUrl) => built.set({ publicUrl })}
+      on={built.publish}
+      onToggle={built.togglePublic}
       host={built.host}
       onHost={built.typeHost}
       domains={built.domains}
