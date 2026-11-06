@@ -1,13 +1,18 @@
 name: Screenshots
 
-# Takes the docs screenshots (web/e2e/shots/docs.ts) again, once per release: run it on
-# release/next, so the images show the version being released, and it opens one pull request
-# into main with the images that changed (docs/internal/screenshots.md, docs/internal/releasing.md).
+# Takes the docs screenshots (web/e2e/shots/docs.ts) again once per release, when the release pull
+# request's branch gets its release commit, so the images show the version being released. It opens
+# one pull request into that branch with the images that changed (docs/internal/screenshots.md,
+# docs/internal/releasing.md).
 # The organization's GitHub App (`ZEABUR_OSS_BOT_CLIENT_ID`, `ZEABUR_OSS_BOT_PRIVATE_KEY`) opens
 # it, because a pull request made with GITHUB_TOKEN does not start CI. GitHub signs the commit, as
 # main requires.
 
 on:
+  push:
+    branches: [release/next]
+    # Merging the screenshots into release/next changes only docs; that needs no second run.
+    paths-ignore: [docs/**]
   workflow_dispatch:
 
 permissions:
@@ -34,10 +39,6 @@ jobs:
         with:
           key: shots
       - run: nix develop --command scripts/docs-shots.sh docs
-      # The images go to main; the release commit on release/next does not touch them.
-      - run: |
-          git fetch --no-tags --depth=1 origin main
-          git checkout --quiet FETCH_HEAD
       - uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         id: app
         with:
@@ -62,7 +63,7 @@ jobs:
           signoff: true
           sign-commits: true
           add-paths: docs
-          base: main
+          base: ${{ github.ref_name }}
           branch: update/shots
           delete-branch: true
           commit-message: "docs: take the screenshots again"

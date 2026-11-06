@@ -11,9 +11,10 @@ from nixpkgs by `scripts/docs-shots.sh`. Each spec is one image set, with its se
 | `cover`  | `web/e2e/shots/cover.ts`  | The plate of the README cover          | design-system's `covers/zeabur`          |
 
 All of them are kept in git. Run the script after changing a page a shot covers, and commit the
-images. Once per release, `.github/workflows/shots.yml` takes the `docs` set again on `release/next`,
-so the images show the version being released, and opens a pull request into main,
-`update/shots`, with the images that changed ([Publish a release](releasing.md#publish-a-release)).
+images. When the release pull request's branch, `release/next`, gets its release commit,
+`.github/workflows/shots.yml` takes the `docs` set again, so the images show the version being
+released, and opens a pull request into `release/next`, `update/shots`, with the images that
+changed ([Publish a release](releasing.md#publish-a-release)).
 
 Each locale's screenshots sit in its docs folder: `docs/images/shots` for English,
 `docs/zh-TW/images/shots` for Traditional Chinese. A page shows them by a relative path, which

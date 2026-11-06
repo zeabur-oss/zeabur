@@ -66,9 +66,9 @@ not `sort -V`.
    the Identity tag only to newer release tags.
    The release reads the Identity release's `digests.txt`, which Identity publishes from v0.1.2
    on: release Identity before the next Zeabur release and move the pin to it.
-2. Run **Actions → Screenshots → Run workflow** on `release/next`. It takes the docs screenshots
-   with the new version and opens `docs: take the screenshots again` into main. Look at each image
-   and merge it; `release/next` picks it up on the next run of the release pull request.
+2. **Screenshots** starts on its own when `release/next` gets its release commit. It takes the docs
+   screenshots with the new version and opens `docs: take the screenshots again` into
+   `release/next`. Look at each image and merge it, so the tag carries them.
 3. Rehearse: **Actions → Release → Run workflow** on `release/next` with the version, `v<version>`. It
    runs the three builds with their smoke tests and publishes nothing; the pins are
    not checked and no pinned installer is built.
