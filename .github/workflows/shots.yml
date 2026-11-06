@@ -1,21 +1,13 @@
 name: Screenshots
 
-# Takes the docs screenshots (web/e2e/shots/docs.ts) again after a change on main that can move a
-# screen, and opens one pull request with the images that changed (docs/internal/screenshots.md).
+# Takes the docs screenshots (web/e2e/shots/docs.ts) again, once per release: run it on
+# release/next, so the images show the version being released, and it opens one pull request
+# into main with the images that changed (docs/internal/screenshots.md, docs/internal/releasing.md).
 # The organization's GitHub App (`ZEABUR_OSS_BOT_CLIENT_ID`, `ZEABUR_OSS_BOT_PRIVATE_KEY`) opens
 # it, because a pull request made with GITHUB_TOKEN does not start CI. GitHub signs the commit, as
 # main requires.
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - web/**
-      - crates/**
-      - Cargo.lock
-      - flake.lock
-      - scripts/docs-shots.sh
-      - scripts/build-ui.sh
   workflow_dispatch:
 
 permissions:
@@ -42,6 +34,10 @@ jobs:
         with:
           key: shots
       - run: nix develop --command scripts/docs-shots.sh docs
+      # The images go to main; the release commit on release/next does not touch them.
+      - run: |
+          git fetch --no-tags --depth=1 origin main
+          git checkout --quiet FETCH_HEAD
       - uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
         id: app
         with:
@@ -57,7 +53,7 @@ jobs:
         run: |
           id="$(gh api "/users/${APP_SLUG}[bot]" --jq .id)"
           echo "identity=${APP_SLUG}[bot] <${id}+${APP_SLUG}[bot]@users.noreply.github.com>" >> "$GITHUB_OUTPUT"
-      # Also runs when nothing changed, so it closes an update/shots that main no longer needs.
+      # Also runs when nothing changed, so it closes an update/shots that is no longer needed.
       - uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
         with:
           token: ${{ steps.app.outputs.token }}
@@ -66,11 +62,12 @@ jobs:
           signoff: true
           sign-commits: true
           add-paths: docs
+          base: main
           branch: update/shots
           delete-branch: true
           commit-message: "docs: take the screenshots again"
           title: "docs: take the screenshots again"
           body: |
-            `.github/workflows/shots.yml` took the docs screenshots again on main at ${{ github.sha }}
-            and these images changed. Look at each one before merging: a screen that moved on
+            `.github/workflows/shots.yml` took the docs screenshots again on ${{ github.ref_name }} at
+            ${{ github.sha }} and these images changed. Look at each one before merging: a screen that moved on
             purpose is fine, one that broke is a bug in the change that moved it.

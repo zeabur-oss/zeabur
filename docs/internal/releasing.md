@@ -66,21 +66,24 @@ not `sort -V`.
    the Identity tag only to newer release tags.
    The release reads the Identity release's `digests.txt`, which Identity publishes from v0.1.2
    on: release Identity before the next Zeabur release and move the pin to it.
-2. Rehearse: **Actions → Release → Run workflow** on `release/next` with the version, `v<version>`. It
+2. Run **Actions → Screenshots → Run workflow** on `release/next`. It takes the docs screenshots
+   with the new version and opens `docs: take the screenshots again` into main. Look at each image
+   and merge it; `release/next` picks it up on the next run of the release pull request.
+3. Rehearse: **Actions → Release → Run workflow** on `release/next` with the version, `v<version>`. It
    runs the three builds with their smoke tests and publishes nothing; the pins are
    not checked and no pinned installer is built.
-3. Before the first release only, see [Settings the workflow needs](#settings-the-workflow-needs).
-4. Once **CI** has passed on the release pull request, merge it. zeabur-oss-bot tags the merge
+4. Before the first release only, see [Settings the workflow needs](#settings-the-workflow-needs).
+5. Once **CI** has passed on the release pull request, merge it. zeabur-oss-bot tags the merge
    commit `v<version>`, which starts the **Release** run.
-5. Watch the **Release** run. When it succeeds, the images and the chart are in the registry (their
+6. Watch the **Release** run. When it succeeds, the images and the chart are in the registry (their
    tags are public while the release is still a draft) and the draft release has every asset.
    The `verify` jobs have downloaded the draft's assets on fresh runners, checked every
    signature, checksum and attestation without a registry login, installed the published chart
    on a new k3s cluster on Linux amd64 and arm64, whose node pulled the published image, and run
    `zeaburctl` on macOS arm64.
-6. Check the draft: the notes, the asset list, the digests. Optionally install it on a cluster of
+7. Check the draft: the notes, the asset list, the digests. Optionally install it on a cluster of
    your own as [Install on an existing cluster](../install/existing-cluster.mdx) describes.
-7. Publish it: on the release page, **Edit → Publish release**, or
+8. Publish it: on the release page, **Edit → Publish release**, or
    `gh release edit v0.1.1 --repo zeabur-oss/zeabur --draft=false`. Then download it once without signing in and repeat
    the checks above against the public release.
 
