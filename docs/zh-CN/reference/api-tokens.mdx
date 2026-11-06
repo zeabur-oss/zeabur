@@ -1,7 +1,7 @@
 ---
 title: API 令牌
 description: 让脚本和 CI 以各项目的角色调用 Kubernetes API，令牌会到期。
-source: "fb93330bc615"
+source: "5f7bb07ea1d9"
 ---
 
 脚本或 CI 无需任何人登录，也能用 API 令牌操作集群。管理员在**成员**页创建令牌，像给成员授权一样，为它在各项目设置角色。令牌和 kubectl 一样直接调用 kube-apiserver，能做什么由 Kubernetes RBAC 决定。每个令牌都会到期。
@@ -15,7 +15,7 @@ source: "fb93330bc615"
 
 1. 打开**成员**，在 **API 令牌**下点击**创建令牌**。
 2. 起一个能看出用途的名称，比如 `github-actions`。
-3. 在需要的项目中选择**开发者**或**查看者**，或设为**管理员令牌**，对整个集群有完整权限。选好有效期，点击**检查**。
+3. 在需要的项目中选择**开发者**或**查看者**，选好有效期，点击**检查**。
 4. 确认变更后应用。
 5. 复制令牌。Zeabur 只会显示这一次。窗口中还有 kubeconfig 和集群的 CA 证书。
 
@@ -48,6 +48,23 @@ kubectl auth whoami
 APISERVER=https://203.0.113.10:6443
 TOKEN='<令牌>'
 ```
+
+## 令牌能做什么
+
+令牌只有你在各项目授予它的角色，加上 `zeabur-member`，可以读取节点和 Namespace 的名称。**查看者**令牌能查看项目中各服务的状态。**开发者**令牌还能：
+
+- 更换服务的镜像、调整副本数，以及重启。
+- 读取和编辑机密变量，设置环境变量。
+- 读取日志，用 `kubectl exec` 在副本中执行命令。
+- 重新构建。
+
+令牌不能：
+
+- 创建或删除项目，也无法操作没有角色的项目。
+- 更改节点、集群组件或集群备份。
+- 读取或更改 `zeabur-api-tokens` 中的任何内容，因此无法再申请令牌。
+
+没有管理员令牌。管理员账号只能用通行密钥登录，拥有完整权限的令牌会绕过这一关。需要在整个集群上操作时，例如创建项目、安装组件、管理节点或集群备份，请以管理员身份使用你自己的 kubeconfig。详见[管理员账号和普通账号](./permissions.mdx#管理员账号和普通账号)。
 
 ## 常用操作
 
@@ -168,7 +185,7 @@ curl --cacert ca.crt -H "Authorization: Bearer $TOKEN" -X PATCH \
 
 在令牌旁边选择**更多** → **续期**，会拿到同一个名称、同样权限的新令牌。之前签发的令牌过期前都还能用。
 
-选择**更多** → **更改权限**，可以让令牌在其他项目中有角色，或改为管理员令牌。更改会应用到为它签发的每个令牌。
+选择**更多** → **更改权限**，可以让令牌在其他项目中有角色。更改会应用到为它签发的每个令牌。
 
 要让令牌立即失效，选择**更多** → **删除**。为它签发的每个令牌都会失效，请求会收到 `401 Unauthorized`。
 
@@ -182,7 +199,7 @@ Zeabur 用管理员自己的权限写入这些对象：
 |---|---|
 | `zeabur-api-tokens` Namespace 中的 `ServiceAccount <name>` | 标签 `zeabur.com/api-token: <name>` 和 `app.kubernetes.io/managed-by: zeabur`。annotation 记录创建者，以及最新令牌的过期时间 |
 | 各项目中的 `RoleBinding zeabur-api-token-<name>` | 将 `zeabur-project-developer` 或 `zeabur-project-viewer` 绑定给该 ServiceAccount |
-| `ClusterRoleBinding zeabur-api-token-<name>` | 和成员一样绑定 `zeabur-member`；管理员令牌则绑定 `cluster-admin` |
+| `ClusterRoleBinding zeabur-api-token-<name>` | 和成员一样绑定 `zeabur-member` |
 
 令牌本身来自对该 ServiceAccount 的 TokenRequest，Zeabur 不会存进 Secret 或其他地方。删除令牌会删除它的 binding 和 ServiceAccount。
 

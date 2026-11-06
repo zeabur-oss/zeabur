@@ -1230,8 +1230,11 @@ export const zhCN: Messages = {
   "apiTokens.name": "名称",
   "apiTokens.nameHint": "写明谁会用它，比如 github-actions。可用小写英文字母、数字和 -。",
   "apiTokens.nameProblem": "请用小写英文字母、数字和 -，最多 63 个字符，开头和结尾要是字母或数字。",
-  "apiTokens.admin": "管理员令牌",
-  "apiTokens.adminHint": "和管理员一样，对整个集群有完整权限。",
+  "apiTokens.projects": "项目",
+  "apiTokens.projectsHint":
+    "令牌只能在选定的项目里使用。需要在整个集群上操作时，请用管理员自己的 kubeconfig。",
+  "apiTokens.noProjectRoles":
+    "安装 Chart 时设置 memberRoles.enabled=true 才能创建令牌。没有成员角色，令牌就拿不到任何角色。",
   "apiTokens.lifetime": "有效期",
   "apiTokens.lifetimeHint": "集群可能限制得更短，列表会显示实际的过期时间。",
   "apiTokens.lasts": (seconds: number) =>
@@ -1250,10 +1253,7 @@ export const zhCN: Messages = {
   "apiTokens.deleteTitle": (name: string) => `删除 ${name}`,
   "apiTokens.deleted": (name: string) => `已删除 ${name}`,
   "apiTokens.more": (name: string) => `${name} 的更多操作`,
-  "apiTokens.plan.admin": (name: string) => `${name} 会对整个集群有完整权限。`,
   "apiTokens.plan.noRole": (name: string) => `${name} 目前在任何项目都没有角色。`,
-  "apiTokens.plan.adminWarning":
-    "拿到管理员令牌的人可以在集群里做任何事，请像管理员的通行密钥一样小心保管。",
   "apiTokens.plan.renew": (name: string) => `为 ${name} 签发一个新令牌。`,
   "apiTokens.plan.lasts": (lasts: string) => `令牌可以用 ${lasts}，集群限制更短的话就按集群的来。`,
   "apiTokens.plan.delete": (name: string) => `删除 ${name} 和它的角色。`,
@@ -3292,6 +3292,8 @@ export const zhCN: Messages = {
   "sentence.account.lastPasskey": () => "这是你唯一的通行密钥",
   "sentence.account.lastPasskey.fix": () => "请先添加另一把通行密钥，再移除这一把。",
   "sentence.apiTokens.taken": () => "已经有同名的 API 令牌",
+  "sentence.apiTokens.noProjectRoles": () => "安装 Zeabur 时没有启用成员角色",
+  "sentence.apiTokens.noProjectRoles.fix": () => "安装 Chart 时设置 memberRoles.enabled=true。",
   "sentence.members.resetSelf": () => "你不能重置自己的账号",
   "sentence.members.resetSelf.fix": () => "改从账号页添加通行密钥，或请其他管理员处理。",
   "sentence.members.removeSelf": () => "你不能移除自己",

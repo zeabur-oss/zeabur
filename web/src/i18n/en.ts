@@ -1325,8 +1325,11 @@ export const en = {
     "Say what uses it, such as github-actions. Use lower-case letters, digits and hyphens.",
   "apiTokens.nameProblem":
     "Use lower-case letters, digits and hyphens, up to 63 characters. Start and end with a letter or digit.",
-  "apiTokens.admin": "Admin token",
-  "apiTokens.adminHint": "Full rights to the whole cluster, like an admin.",
+  "apiTokens.projects": "Projects",
+  "apiTokens.projectsHint":
+    "A token works only in the projects you choose. For work across the cluster, use an admin's own kubeconfig.",
+  "apiTokens.noProjectRoles":
+    "To create a token, install the chart with memberRoles.enabled=true. Without the member roles, a token can't get a role.",
   "apiTokens.lifetime": "Lasts",
   "apiTokens.lifetimeHint": "The cluster may set a shorter limit. The list shows the real expiry.",
   "apiTokens.lasts": (seconds: number) =>
@@ -1346,10 +1349,7 @@ export const en = {
   "apiTokens.deleteTitle": (name: string) => `Delete ${name}`,
   "apiTokens.deleted": (name: string) => `Deleted ${name}`,
   "apiTokens.more": (name: string) => `More for ${name}`,
-  "apiTokens.plan.admin": (name: string) => `${name} gets full rights to the whole cluster.`,
   "apiTokens.plan.noRole": (name: string) => `${name} gets no role in any project yet.`,
-  "apiTokens.plan.adminWarning":
-    "Whoever holds an admin token can do anything in the cluster, so keep it as safe as an admin's passkey.",
   "apiTokens.plan.renew": (name: string) => `Issues a new token for ${name}.`,
   "apiTokens.plan.lasts": (lasts: string) =>
     `The token lasts ${lasts}, or less if the cluster sets a shorter limit.`,
@@ -3606,6 +3606,8 @@ export const en = {
   "sentence.account.lastPasskey": () => "This is your only passkey",
   "sentence.account.lastPasskey.fix": () => "Add another passkey first, then remove this one.",
   "sentence.apiTokens.taken": () => "There is already an API token with that name",
+  "sentence.apiTokens.noProjectRoles": () => "Zeabur was installed without the member roles",
+  "sentence.apiTokens.noProjectRoles.fix": () => "Install the chart with memberRoles.enabled=true.",
   "sentence.members.resetSelf": () => "You can't reset your own account",
   "sentence.members.resetSelf.fix": () =>
     "Add a passkey from your account instead, or ask another admin.",

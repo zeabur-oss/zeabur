@@ -91,7 +91,7 @@ zeabur.com/icon
 
 | 物件 | 範圍與內容 |
 |---|---|
-| `ClusterRoleBinding zeabur-api-token-<name>` | 綁定 `zeabur-member` 給該 ServiceAccount；管理員權杖則綁定 `cluster-admin` |
+| `ClusterRoleBinding zeabur-api-token-<name>` | 綁定 `zeabur-member` 給該 ServiceAccount |
 | 各專案中的 `RoleBinding zeabur-api-token-<name>` | 綁定該專案的 developer 或 viewer 角色給同一個 ServiceAccount |
 
 這些 binding 和 ServiceAccount 都帶有 `zeabur.com/api-token: <name>` 和 `app.kubernetes.io/managed-by: zeabur` 標籤。

@@ -1,7 +1,7 @@
 ---
 title: API 權杖
 description: 讓腳本和 CI 用各專案的角色呼叫 Kubernetes API，權杖會到期。
-source: "fb93330bc615"
+source: "5f7bb07ea1d9"
 ---
 
 腳本或 CI 不需要任何人登入，也能用 API 權杖操作叢集。管理員在**成員**頁建立權杖，像給成員權限一樣，替它在各專案設定角色。權杖跟 kubectl 一樣直接呼叫 kube-apiserver，能做什麼由 Kubernetes RBAC 決定。每個權杖都會到期。
@@ -15,7 +15,7 @@ source: "fb93330bc615"
 
 1. 打開**成員**，在 **API 權杖**下按**建立權杖**。
 2. 取個看得出用途的名稱，例如 `github-actions`。
-3. 在需要的專案選**開發者**或**檢視者**，或設成**管理員權杖**，對整個叢集有完整權限。選好有效期間，按**檢查**。
+3. 在需要的專案選**開發者**或**檢視者**，選好有效期間，按**檢查**。
 4. 確認變更後套用。
 5. 複製權杖。Zeabur 只會顯示這一次。視窗裡也有 kubeconfig 和叢集的 CA 憑證。
 
@@ -48,6 +48,23 @@ kubectl auth whoami
 APISERVER=https://203.0.113.10:6443
 TOKEN='<權杖>'
 ```
+
+## 權杖能做什麼
+
+權杖只有你在各專案給它的角色，加上 `zeabur-member`，可以讀節點和 Namespace 的名稱。**檢視者**權杖能看專案裡各服務的狀態。**開發者**權杖還能：
+
+- 換服務的映像檔、調整副本數，以及重新啟動。
+- 讀取和編輯機密變數，設定環境變數。
+- 讀日誌，用 `kubectl exec` 在副本裡執行指令。
+- 重新建置。
+
+權杖不能：
+
+- 建立或刪除專案，也碰不到沒有角色的專案。
+- 變更節點、叢集元件或叢集備份。
+- 讀取或變更 `zeabur-api-tokens` 裡的任何東西，所以沒辦法再申請權杖。
+
+沒有管理員權杖。管理員帳號只能用通行密鑰登入，有完整權限的權杖會繞過這道關卡。需要在整個叢集操作時，例如建立專案、安裝元件、管理節點或叢集備份，請以管理員身分用你自己的 kubeconfig。詳見[管理員帳號和一般帳號](./permissions.mdx#管理員帳號和一般帳號)。
 
 ## 常見操作
 
@@ -168,7 +185,7 @@ curl --cacert ca.crt -H "Authorization: Bearer $TOKEN" -X PATCH \
 
 在權杖旁邊選**更多** → **更新**，會拿到同一個名稱、同樣權限的新權杖。之前簽發的權杖到期前都還能用。
 
-選**更多** → **變更權限**，可以讓權杖在其他專案有角色，或改成管理員權杖。變更會套用到為它簽發的每個權杖。
+選**更多** → **變更權限**，可以讓權杖在其他專案有角色。變更會套用到為它簽發的每個權杖。
 
 要讓權杖馬上失效，選**更多** → **刪除**。為它簽發的每個權杖都會失效，請求會收到 `401 Unauthorized`。
 
@@ -182,7 +199,7 @@ Zeabur 用管理員自己的權限寫入這些物件：
 |---|---|
 | `zeabur-api-tokens` Namespace 中的 `ServiceAccount <name>` | 標籤 `zeabur.com/api-token: <name>` 和 `app.kubernetes.io/managed-by: zeabur`。annotation 記錄誰建立的，以及最新權杖什麼時候到期 |
 | 各專案中的 `RoleBinding zeabur-api-token-<name>` | 綁定 `zeabur-project-developer` 或 `zeabur-project-viewer` 給該 ServiceAccount |
-| `ClusterRoleBinding zeabur-api-token-<name>` | 跟成員一樣綁定 `zeabur-member`；管理員權杖則綁定 `cluster-admin` |
+| `ClusterRoleBinding zeabur-api-token-<name>` | 跟成員一樣綁定 `zeabur-member` |
 
 權杖本身來自對該 ServiceAccount 的 TokenRequest，Zeabur 不會存進 Secret 或其他地方。刪除權杖會刪掉它的 binding 和 ServiceAccount。
 

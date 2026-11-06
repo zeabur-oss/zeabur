@@ -84,33 +84,49 @@ pub(crate) async fn list(
         can_manage(cluster.as_ref(), namespace),
         access::read(cluster.as_ref()),
     );
-    let Some(mut directory) = directory? else {
-        return Ok(Json(MembersView::not_installed(links, can)));
-    };
-    let mut api_tokens = Vec::new();
+    let mut found = Access::default();
     match bindings {
         Ok(bindings) => {
             let bindings = bindings.unwrap_or_default();
-            directory.projects = Some(access::grants_by_member(&bindings));
+            found.projects = Some(access::grants_by_member(&bindings));
             match tokens::list(cluster.as_ref(), &bindings).await {
-                Ok(found) => api_tokens = found,
+                Ok(listed) => found.api_tokens = listed,
                 Err(error) => {
                     if let Ok(refused) = error.into_unreadable(&tokens::key()) {
-                        directory.unreadable.push(refused.into());
+                        found.unreadable.push(refused.into());
                     }
                 }
             }
         }
         Err(error) => {
             if let Ok(refused) = error.into_unreadable(&access::key()) {
-                directory.unreadable.push(refused.into());
+                found.unreadable.push(refused.into());
             }
         }
     }
+    // API tokens are plain ServiceAccounts: they work without Zeabur Identity.
+    let Some(mut directory) = directory? else {
+        let mut view = MembersView::not_installed(links, can);
+        view.project_roles = identity.project_roles;
+        view.api_tokens = found.api_tokens;
+        view.unreadable = found.unreadable;
+        return Ok(Json(view));
+    };
+    directory.projects = found.projects;
+    directory.unreadable.extend(found.unreadable);
     let mut view = directory.view(namespace, Some(&you), (state.clock)(), links, can);
     view.project_roles = identity.project_roles;
-    view.api_tokens = api_tokens;
+    view.api_tokens = found.api_tokens;
     Ok(Json(view))
+}
+
+/// Roles in projects and API tokens, read from the bindings whether Zeabur Identity is installed
+/// or not.
+#[derive(Default)]
+struct Access {
+    projects: Option<std::collections::BTreeMap<String, Vec<access::ProjectGrant>>>,
+    api_tokens: Vec<tokens::ApiTokenView>,
+    unreadable: Vec<crate::views::UnreadableView>,
 }
 
 /// Revokes a setup link that has not been used. One already used or expired is gone already.

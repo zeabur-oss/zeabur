@@ -4514,12 +4514,8 @@ components:
       description: One API token.
       required:
       - name
-      - admin
       - projects
       properties:
-        admin:
-          type: boolean
-          description: Whether it is bound to `cluster-admin`, as an admin member is.
         createdAt:
           type:
           - string
@@ -4542,7 +4538,7 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ProjectGrant"
-          description: Its roles in projects; empty for an admin token.
+          description: Its roles in projects.
     Applied:
       type: object
       description: One object an apply wrote.
@@ -10742,9 +10738,6 @@ components:
         - expirationSeconds
         - op
         properties:
-          admin:
-            type: boolean
-            description: Whether it gets `cluster-admin`, as an admin member does.
           expirationSeconds:
             type: integer
             format: int64
@@ -10760,17 +10753,13 @@ components:
             type: array
             items:
               $ref: "#/components/schemas/ProjectGrant"
-            description: Its roles in projects, when it is not an admin token.
+            description: Its roles in projects.
       - type: object
         description: Change what an API token may do, as for a member.
         required:
         - name
-        - admin
         - op
         properties:
-          admin:
-            type: boolean
-            description: Whether it gets `cluster-admin`.
           name:
             type: string
             description: The token.
@@ -10782,7 +10771,7 @@ components:
             type: array
             items:
               $ref: "#/components/schemas/ProjectGrant"
-            description: Roles in projects; empty for an admin token.
+            description: Its roles in projects.
       - type: object
         description: |-
           Issue another token for an API token; the ones issued before keep working until they

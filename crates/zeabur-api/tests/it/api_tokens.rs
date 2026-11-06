@@ -166,8 +166,8 @@ mod tests {
         out
     }
 
-    fn create(name: &str, admin: bool, projects: &Value, seconds: i64) -> Value {
-        json!({"op": "createToken", "name": name, "admin": admin, "projects": projects,
+    fn create(name: &str, projects: &Value, seconds: i64) -> Value {
+        json!({"op": "createToken", "name": name, "projects": projects,
                "expirationSeconds": seconds})
     }
 
@@ -176,8 +176,7 @@ mod tests {
         let cluster = signed_in("zeabur:ada");
         let projects = json!([{"project": "shop", "role": "developer"},
                               {"project": "blog", "role": "viewer"}]);
-        let (status, applied, plan) =
-            change(&cluster, create("ci", false, &projects, 86_400)).await;
+        let (status, applied, plan) = change(&cluster, create("ci", &projects, 86_400)).await;
         assert_eq!(status, StatusCode::OK, "{applied}");
         assert!(!plan.to_string().contains("memory-token"), "{plan}");
         let planned: Vec<&str> = plan["writes"]
@@ -226,7 +225,6 @@ mod tests {
 
         let listed = tokens(&cluster).await;
         let token = item(&listed, "ci").unwrap();
-        assert_eq!(token["admin"], false);
         assert_eq!(
             token["projects"],
             json!([{"project": "blog", "role": "viewer"},
@@ -239,40 +237,18 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn changing_a_tokens_access_replaces_its_bindings_and_an_admin_token_gets_cluster_admin()
-    {
+    async fn changing_a_tokens_access_replaces_its_project_bindings() {
         let cluster = signed_in("zeabur:ada");
         let (status, ..) = change(
             &cluster,
-            create(
-                "ci",
-                false,
-                &json!([{"project": "shop", "role": "viewer"}]),
-                3600,
-            ),
+            create("ci", &json!([{"project": "shop", "role": "viewer"}]), 3600),
         )
         .await;
         assert_eq!(status, StatusCode::OK);
 
         let (status, applied, _) = change(
             &cluster,
-            json!({"op": "tokenAccess", "name": "ci", "admin": true}),
-        )
-        .await;
-        assert_eq!(status, StatusCode::OK, "{applied}");
-        assert_eq!(
-            held(&cluster, "ci"),
-            [
-                "ClusterRoleBinding//zeabur-api-token-ci cluster-admin",
-                "ServiceAccount/zeabur-api-tokens/ci ",
-            ]
-        );
-        let listed = tokens(&cluster).await;
-        assert_eq!(item(&listed, "ci").unwrap()["admin"], true);
-
-        let (status, applied, _) = change(
-            &cluster,
-            json!({"op": "tokenAccess", "name": "ci", "admin": false,
+            json!({"op": "tokenAccess", "name": "ci",
                    "projects": [{"project": "blog", "role": "developer"}]}),
         )
         .await;
@@ -288,16 +264,49 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn a_token_cannot_be_made_without_the_member_roles() {
+        let cluster = signed_in("zeabur:ada");
+        let mut settings = settings();
+        settings.identity.project_roles = false;
+        let app = TestApi::new(&cluster).with_settings(settings).router();
+        let (status, body) = send(
+            &app,
+            "POST",
+            "/api/v1/members/plan",
+            Some(&create("ci", &json!([]), 3600)),
+        )
+        .await;
+        assert_eq!(status, StatusCode::CONFLICT, "{body}");
+        assert_eq!(body["summary"]["key"], "apiTokens.noProjectRoles", "{body}");
+        assert_eq!(writes(&cluster), Vec::<String>::new());
+    }
+
+    #[tokio::test]
+    async fn tokens_are_listed_without_zeabur_identity() {
+        let cluster = signed_in("zeabur:ada");
+        let (status, ..) = change(
+            &cluster,
+            create("ci", &json!([{"project": "shop", "role": "viewer"}]), 3600),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        cluster.update(|s| s.served.retain(|r| r.group != "identity.zeabur.com"));
+        let app = TestApi::new(&cluster).with_settings(settings()).router();
+        let (status, body) = send(&app, "GET", "/api/v1/members", None).await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        assert_eq!(body["installed"], false);
+        assert_eq!(
+            item(&body["apiTokens"], "ci").unwrap()["projects"],
+            json!([{"project": "shop", "role": "viewer"}])
+        );
+    }
+
+    #[tokio::test]
     async fn deleting_a_token_deletes_its_bindings_then_its_service_account() {
         let cluster = signed_in("zeabur:ada");
         let (status, ..) = change(
             &cluster,
-            create(
-                "ci",
-                false,
-                &json!([{"project": "shop", "role": "viewer"}]),
-                3600,
-            ),
+            create("ci", &json!([{"project": "shop", "role": "viewer"}]), 3600),
         )
         .await;
         assert_eq!(status, StatusCode::OK);
@@ -320,7 +329,7 @@ mod tests {
     #[tokio::test]
     async fn renewing_issues_another_token_for_the_same_account_and_records_its_expiry() {
         let cluster = signed_in("zeabur:ada");
-        let (status, ..) = change(&cluster, create("ci", true, &json!([]), 3600)).await;
+        let (status, ..) = change(&cluster, create("ci", &json!([]), 3600)).await;
         assert_eq!(status, StatusCode::OK);
         cluster.update(|s| s.now = NOW + 1800);
         let (status, applied, plan) = change(
@@ -346,7 +355,7 @@ mod tests {
             s.forbidden_namespaces.insert(TOKENS.to_owned());
         });
         for op in [
-            create("ci", false, &json!([]), 3600),
+            create("ci", &json!([]), 3600),
             json!({"op": "renewToken", "name": "ci", "expirationSeconds": 3600}),
             json!({"op": "deleteToken", "name": "ci"}),
         ] {
@@ -359,33 +368,17 @@ mod tests {
     #[tokio::test]
     async fn bad_names_lifetimes_and_projects_are_refused_before_any_write() {
         let cluster = signed_in("zeabur:ada");
-        let (status, ..) = change(&cluster, create("ci", false, &json!([]), 3600)).await;
+        let (status, ..) = change(&cluster, create("ci", &json!([]), 3600)).await;
         assert_eq!(status, StatusCode::OK);
         let before = writes(&cluster);
         let refused = [
-            (create("ci", false, &json!([]), 3600), StatusCode::CONFLICT),
-            (
-                create("CI", false, &json!([]), 3600),
-                StatusCode::BAD_REQUEST,
-            ),
-            (
-                create("ci2", false, &json!([]), 60),
-                StatusCode::BAD_REQUEST,
-            ),
+            (create("ci", &json!([]), 3600), StatusCode::CONFLICT),
+            (create("CI", &json!([]), 3600), StatusCode::BAD_REQUEST),
+            (create("ci2", &json!([]), 60), StatusCode::BAD_REQUEST),
             (
                 create(
                     "ci2",
-                    false,
                     &json!([{"project": TOKENS, "role": "developer"}]),
-                    3600,
-                ),
-                StatusCode::BAD_REQUEST,
-            ),
-            (
-                create(
-                    "ci2",
-                    true,
-                    &json!([{"project": "shop", "role": "viewer"}]),
                     3600,
                 ),
                 StatusCode::BAD_REQUEST,
@@ -410,11 +403,11 @@ mod tests {
             &app,
             "POST",
             "/api/v1/members/plan",
-            Some(&create("ci", false, &json!([]), 3600)),
+            Some(&create("ci", &json!([]), 3600)),
         )
         .await;
         assert_eq!(status, StatusCode::OK, "{plan}");
-        let (status, ..) = change(&cluster, create("ci", true, &json!([]), 3600)).await;
+        let (status, ..) = change(&cluster, create("ci", &json!([]), 3600)).await;
         assert_eq!(status, StatusCode::OK);
         let (status, body) = send(
             &app,

@@ -364,8 +364,6 @@ export type ProjectGrant = {
  * One API token.
  */
 export type ApiTokenView = {
-  /** Whether it is bound to `cluster-admin`, as an admin member is. */
-  admin: boolean
   /**
    * When it was made, RFC 3339.
    * @nullable
@@ -383,7 +381,7 @@ export type ApiTokenView = {
   expiresAt?: string | null
   /** Its name, which is its ServiceAccount's. */
   name: string
-  /** Its roles in projects; empty for an admin token. */
+  /** Its roles in projects. */
   projects: ProjectGrant[]
 }
 
@@ -6489,23 +6487,19 @@ export type MemberChange =
       username: string
     }
   | {
-      /** Whether it gets `cluster-admin`, as an admin member does. */
-      admin?: boolean
       /** How long the token should last; kube-apiserver may cut it. */
       expirationSeconds: number
       /** Its name: lower-case letters, digits and `-`, at most 63 characters. */
       name: string
       op: "createToken"
-      /** Its roles in projects, when it is not an admin token. */
+      /** Its roles in projects. */
       projects?: ProjectGrant[]
     }
   | {
-      /** Whether it gets `cluster-admin`. */
-      admin: boolean
       /** The token. */
       name: string
       op: "tokenAccess"
-      /** Roles in projects; empty for an admin token. */
+      /** Its roles in projects. */
       projects?: ProjectGrant[]
     }
   | {

@@ -1233,8 +1233,11 @@ export const zhTW: Messages = {
   "apiTokens.name": "名稱",
   "apiTokens.nameHint": "寫出誰會用它，例如 github-actions。可用小寫英文字母、數字和 -。",
   "apiTokens.nameProblem": "請用小寫英文字母、數字和 -，最多 63 個字元，開頭和結尾要是字母或數字。",
-  "apiTokens.admin": "管理員權杖",
-  "apiTokens.adminHint": "跟管理員一樣，對整個叢集有完整權限。",
+  "apiTokens.projects": "專案",
+  "apiTokens.projectsHint":
+    "權杖只能在選定的專案裡使用。需要在整個叢集操作時，請用管理員自己的 kubeconfig。",
+  "apiTokens.noProjectRoles":
+    "安裝 Chart 時設定 memberRoles.enabled=true 才能建立權杖。沒有成員角色，權杖就拿不到任何角色。",
   "apiTokens.lifetime": "有效期間",
   "apiTokens.lifetimeHint": "叢集可能限制得更短，清單會顯示實際的到期時間。",
   "apiTokens.lasts": (seconds: number) =>
@@ -1253,10 +1256,7 @@ export const zhTW: Messages = {
   "apiTokens.deleteTitle": (name: string) => `刪除 ${name}`,
   "apiTokens.deleted": (name: string) => `已刪除 ${name}`,
   "apiTokens.more": (name: string) => `${name} 的更多動作`,
-  "apiTokens.plan.admin": (name: string) => `${name} 會對整個叢集有完整權限。`,
   "apiTokens.plan.noRole": (name: string) => `${name} 目前在任何專案都沒有角色。`,
-  "apiTokens.plan.adminWarning":
-    "拿到管理員權杖的人可以在叢集裡做任何事，請像管理員的通行密鑰一樣小心保管。",
   "apiTokens.plan.renew": (name: string) => `幫 ${name} 簽發一個新權杖。`,
   "apiTokens.plan.lasts": (lasts: string) => `權杖可以用 ${lasts}，叢集限制更短的話就照叢集的。`,
   "apiTokens.plan.delete": (name: string) => `刪除 ${name} 和它的角色。`,
@@ -3299,6 +3299,8 @@ export const zhTW: Messages = {
   "sentence.account.lastPasskey": () => "這是你唯一的通行密鑰",
   "sentence.account.lastPasskey.fix": () => "請先新增另一把通行密鑰，再移除這一把。",
   "sentence.apiTokens.taken": () => "已經有同名的 API 權杖",
+  "sentence.apiTokens.noProjectRoles": () => "安裝 Zeabur 時沒有啟用成員角色",
+  "sentence.apiTokens.noProjectRoles.fix": () => "安裝 Chart 時設定 memberRoles.enabled=true。",
   "sentence.members.resetSelf": () => "你不能重設自己的帳號",
   "sentence.members.resetSelf.fix": () => "改從帳號頁新增通行密鑰，或請其他管理員處理。",
   "sentence.members.removeSelf": () => "你不能移除自己",
