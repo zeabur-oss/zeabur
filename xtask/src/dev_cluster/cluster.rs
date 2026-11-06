@@ -11,7 +11,7 @@ pub(crate) const NODE: &str = "k3d-zeabur-dev-server-0";
 pub(crate) const AUTHN_VOLUME: &str = "zeabur-dev-authn";
 /// Where the node reads Zeabur Identity's `AuthenticationConfiguration`.
 pub(crate) const AUTHN_DIR: &str = "/etc/rancher/k3s/zeabur-identity";
-const K3S_IMAGE: &str = "rancher/k3s:v1.36.5-k3s1";
+const K3S_IMAGE: &str = "rancher/k3s:v1.37.2-k3s1";
 /// kube-apiserver starts with no issuer.
 const NO_ISSUER: &str = "apiVersion: apiserver.config.k8s.io/v1
 kind: AuthenticationConfiguration
