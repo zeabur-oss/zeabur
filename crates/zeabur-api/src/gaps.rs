@@ -17,7 +17,7 @@
 //! service in the project document, see [`crate::projects`].
 
 use axum::Json;
-use axum::extract::Path;
+use axum::extract::{Path, State};
 use serde::Serialize;
 use utoipa::ToSchema;
 use zeabur_core::isolation::{PLATFORM_LABEL, PROJECT_POLICY};
@@ -32,7 +32,7 @@ use zeabur_model::{Citation, Gap, HttpRoute};
 use zeabur_modules::Finding;
 
 use crate::error::{ApiError, project_read, read_problem};
-use crate::handlers::Person;
+use crate::handlers::{AppState, Person};
 use crate::views::UnreadableView;
 
 /// What a project or the cluster is missing.
@@ -111,6 +111,7 @@ pub(crate) async fn ingress_class_facts(
     params(("project" = String, Path, description = "The project's namespace")),
     responses((status = 200, body = GapList), (status = 403, body = Problem, content_type = PROBLEM)))]
 pub(crate) async fn project(
+    State(state): State<AppState>,
     Person(cluster): Person,
     Path(project): Path<String>,
 ) -> Result<Json<GapList>, ApiError> {
@@ -121,7 +122,7 @@ pub(crate) async fn project(
         .map_err(|e| read_problem(e, &format!("project {project}"), project_read(&project)))?;
     let facts = facts?;
     let http_routes = objects.http_routes.clone();
-    let (snapshot, mut unreadable) = crate::projects::snapshot(objects);
+    let (snapshot, mut unreadable) = crate::projects::snapshot(objects, (state.clock)());
     // A refused list leaves `snapshot.services` empty; it says nothing about which exist.
     let services_readable = !unreadable.iter().any(|u| u.resource == "services");
     let projection = zeabur_graph::project(&snapshot);

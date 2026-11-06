@@ -59,7 +59,7 @@ pub mod writes;
 use std::sync::Arc;
 
 use axum::Json;
-use axum::extract::Path;
+use axum::extract::{Path, State};
 use futures_util::StreamExt as _;
 use zeabur_core::names::{LABEL_PROJECT, is_system_namespace};
 use zeabur_core::problem::{Kind, MEDIA_TYPE as PROBLEM, Problem};
@@ -70,7 +70,7 @@ use zeabur_kube::{Cluster, ClusterExt as _, NamespaceObjects};
 use zeabur_model::{Origin, ProjectDetails, ProjectHealth, id};
 
 use crate::error::{ApiError, list_read, project_read, read_problem};
-use crate::handlers::Person;
+use crate::handlers::{AppState, Person};
 use crate::views::{
     ProjectDocument, ProjectExtensions, ProjectList, ProjectSummary, ServiceSummary, UnreadableView,
 };
@@ -82,7 +82,11 @@ const HEALTH_CONCURRENCY: usize = 8;
 #[utoipa::path(get, path = "/api/v1/projects", tag = "projects",
     operation_id = "listProjects",
     responses((status = 200, body = ProjectList), (status = 403, body = Problem, content_type = PROBLEM)))]
-pub(crate) async fn list(Person(cluster): Person) -> Result<Json<ProjectList>, ApiError> {
+pub(crate) async fn list(
+    State(state): State<AppState>,
+    Person(cluster): Person,
+) -> Result<Json<ProjectList>, ApiError> {
+    let now = (state.clock)();
     let namespaces = cluster.namespaces().await.map_err(|e| {
         let mut problem = e.into_problem("the list of namespaces");
         if problem.kind == Kind::Forbidden {
@@ -131,7 +135,7 @@ pub(crate) async fn list(Person(cluster): Person) -> Result<Json<ProjectList>, A
     let healths: Vec<(usize, Option<Services>)> = futures_util::stream::iter(adopted)
         .map(|(i, name)| {
             let cluster = Arc::clone(&cluster);
-            async move { (i, health_of(cluster, name).await) }
+            async move { (i, health_of(cluster, name, now).await) }
         })
         .buffered(HEALTH_CONCURRENCY)
         .collect()
@@ -167,11 +171,11 @@ type Services = (ProjectHealth, Vec<ServiceSummary>);
 
 /// The service health counts of `project` and each service's health, from its workloads and
 /// pods; `None` when they cannot be read.
-async fn health_of(cluster: Arc<dyn Cluster>, project: String) -> Option<Services> {
+async fn health_of(cluster: Arc<dyn Cluster>, project: String, now: Timestamp) -> Option<Services> {
     let objects = cluster.namespace_workloads(&project).await.ok()?;
-    let (snapshot, _) = snapshot(objects);
+    let (snapshot, _) = snapshot(objects, now);
     let mut projection = zeabur_graph::project(&snapshot);
-    builds::built_images(cluster.as_ref(), &project, &mut projection.services).await;
+    builds::built_images(cluster.as_ref(), &project, &mut projection.services, now).await;
     let services: Vec<ServiceSummary> = projection.services.iter().map(service_summary).collect();
     let counts = ProjectHealth::count(services.iter().map(|s| s.health));
     Some((counts, services))
@@ -195,9 +199,12 @@ fn service_summary(service: &zeabur_model::Service) -> ServiceSummary {
     }
 }
 
-/// Builds the projection's input from what the cluster returned. Secrets arrive without values;
-/// only their key counts travel on.
-pub(crate) fn snapshot(objects: NamespaceObjects) -> (Snapshot, Vec<UnreadableView>) {
+/// Builds the projection's input from what the cluster returned, as of `now` (the server's
+/// clock). Secrets arrive without values; only their key counts travel on.
+pub(crate) fn snapshot(
+    objects: NamespaceObjects,
+    now: Timestamp,
+) -> (Snapshot, Vec<UnreadableView>) {
     let mut secret_key_counts = std::collections::BTreeMap::new();
     let secrets = objects
         .secrets
@@ -223,7 +230,7 @@ pub(crate) fn snapshot(objects: NamespaceObjects) -> (Snapshot, Vec<UnreadableVi
         secret_key_counts,
         persistent_volume_claims: objects.persistent_volume_claims,
         ingresses: objects.ingresses,
-        now: Some(Timestamp::now()),
+        now: Some(now),
     };
     let unreadable = objects
         .unreadable
@@ -236,8 +243,9 @@ pub(crate) fn snapshot(objects: NamespaceObjects) -> (Snapshot, Vec<UnreadableVi
 pub(crate) async fn document_of(
     cluster: &dyn Cluster,
     project: &str,
+    now: Timestamp,
 ) -> Result<ProjectDocument, ApiError> {
-    Ok(read(cluster, project).await?.document)
+    Ok(read(cluster, project, now).await?.document)
 }
 
 /// One read of a project: the document and what it was made from.
@@ -248,7 +256,11 @@ pub(crate) struct ProjectRead {
     pub(crate) events: Vec<zeabur_gaps::Event>,
 }
 
-pub(crate) async fn read(cluster: &dyn Cluster, project: &str) -> Result<ProjectRead, ApiError> {
+pub(crate) async fn read(
+    cluster: &dyn Cluster,
+    project: &str,
+    now: Timestamp,
+) -> Result<ProjectRead, ApiError> {
     let (objects, events) = futures_util::future::join(
         cluster.namespace_objects(project),
         cluster.list::<Event>(Some(project)),
@@ -257,7 +269,7 @@ pub(crate) async fn read(cluster: &dyn Cluster, project: &str) -> Result<Project
     let objects = objects
         .map_err(|e| read_problem(e, &format!("project {project}"), project_read(project)))?;
     let http_routes = objects.http_routes.clone();
-    let (snapshot, mut unreadable) = snapshot(objects);
+    let (snapshot, mut unreadable) = snapshot(objects, now);
     let mut projection = zeabur_graph::project(&snapshot);
     zeabur_graph::with_http_routes(&mut projection, &http_routes);
     // Diagnoses read the namespace's events too. Without them (refused, or the read failed) the
@@ -280,7 +292,7 @@ pub(crate) async fn read(cluster: &dyn Cluster, project: &str) -> Result<Project
     for service in &mut projection.services {
         service.diagnoses = namespace.diagnose(service);
     }
-    builds::built_images(cluster, project, &mut projection.services).await;
+    builds::built_images(cluster, project, &mut projection.services, now).await;
     let extensions = ProjectExtensions {
         network_policy: network_policy::extension(cluster, &snapshot, &projection, &mut unreadable)
             .await?,
@@ -304,10 +316,13 @@ pub(crate) async fn read(cluster: &dyn Cluster, project: &str) -> Result<Project
     params(("project" = String, Path, description = "The project's namespace")),
     responses((status = 200, body = ProjectDocument), (status = 403, body = Problem, content_type = PROBLEM)))]
 pub(crate) async fn get(
+    State(state): State<AppState>,
     Person(cluster): Person,
     Path(project): Path<String>,
 ) -> Result<Json<ProjectDocument>, ApiError> {
-    Ok(Json(document_of(cluster.as_ref(), &project).await?))
+    Ok(Json(
+        document_of(cluster.as_ref(), &project, (state.clock)()).await?,
+    ))
 }
 
 /// The `404` for a service or resource the project document does not have.

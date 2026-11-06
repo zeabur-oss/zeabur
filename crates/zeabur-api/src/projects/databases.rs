@@ -21,7 +21,7 @@
 //! are in `zeabur_plan::CREATABLE`, and the writes go with the person's credential.
 
 use axum::Json;
-use axum::extract::Path;
+use axum::extract::{Path, State};
 use serde::Serialize;
 use utoipa::ToSchema;
 use zeabur_core::problem::{MEDIA_TYPE as PROBLEM, Problem};
@@ -32,7 +32,7 @@ use zeabur_modules::databases::{self, Database, Engine};
 use zeabur_modules::{Module, cloudnative_pg, dragonfly, mariadb_operator, moco, percona_mongodb};
 
 use crate::error::ApiError;
-use crate::handlers::Person;
+use crate::handlers::{AppState, Person};
 use crate::projects::backups::{ProviderState, read_all};
 use crate::views::UnreadableView;
 
@@ -71,10 +71,13 @@ pub struct ProjectDatabases {
     params(("project" = String, Path, description = "The project's namespace")),
     responses((status = 200, body = ProjectDatabases), (status = 403, body = Problem, content_type = PROBLEM)))]
 pub(crate) async fn get(
+    State(state): State<AppState>,
     Person(cluster): Person,
     Path(project): Path<String>,
 ) -> Result<Json<ProjectDatabases>, ApiError> {
-    read(cluster.as_ref(), &project).await.map(Json)
+    read(cluster.as_ref(), &project, (state.clock)())
+        .await
+        .map(Json)
 }
 
 /// An operator whose backups are read with the database objects.
@@ -87,7 +90,11 @@ fn operator(engine: Engine, module: &Module, state: ProviderState) -> DatabaseOp
     }
 }
 
-async fn read(cluster: &dyn Cluster, project: &str) -> Result<ProjectDatabases, ApiError> {
+async fn read(
+    cluster: &dyn Cluster,
+    project: &str,
+    now: Timestamp,
+) -> Result<ProjectDatabases, ApiError> {
     let failed = |e: zeabur_kube::ClusterError| {
         ApiError::from(e.into_problem(&format!("databases of {project}")))
     };
@@ -174,7 +181,7 @@ async fn read(cluster: &dyn Cluster, project: &str) -> Result<ProjectDatabases, 
             Err(error) if error.code() == Some(403) => Vec::new(),
             Err(error) => return Err(failed(error)),
         };
-        add_members(project, &mut items, &pods);
+        add_members(project, &mut items, &pods, now);
     }
     items.sort_by(|a, b| (a.engine, &a.name).cmp(&(b.engine, &b.name)));
     Ok(ProjectDatabases {
@@ -185,8 +192,8 @@ async fn read(cluster: &dyn Cluster, project: &str) -> Result<ProjectDatabases, 
 }
 
 /// Gives each database its member pods, and Dragonfly its master.
-fn add_members(project: &str, items: &mut [Database], pods: &[Pod]) {
-    let now = Some(Timestamp::now());
+fn add_members(project: &str, items: &mut [Database], pods: &[Pod], now: Timestamp) {
+    let now = Some(now);
     let empty = std::collections::BTreeMap::new();
     for database in items {
         let members: Vec<&Pod> = pods

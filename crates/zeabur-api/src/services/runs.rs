@@ -4,7 +4,7 @@
 //! request. The CronJob's history limits keep it short; the newest 50 are sent.
 
 use axum::Json;
-use axum::extract::Path;
+use axum::extract::{Path, State};
 use serde::Serialize;
 use utoipa::ToSchema;
 use zeabur_core::problem::{MEDIA_TYPE as PROBLEM, Problem};
@@ -14,7 +14,7 @@ use zeabur_model::WorkloadKind;
 use zeabur_model::adapters::controller_of;
 
 use crate::error::ApiError;
-use crate::handlers::Person;
+use crate::handlers::{AppState, Person};
 use crate::projects::not_found;
 
 const LIMIT: usize = 50;
@@ -69,13 +69,14 @@ pub struct TaskRuns {
            ("name" = String, Path)),
     responses((status = 200, body = TaskRuns), (status = 404, body = Problem, content_type = PROBLEM)))]
 pub(crate) async fn runs(
+    State(state): State<AppState>,
     Person(cluster): Person,
     Path((project, kind, name)): Path<(String, String, String)>,
 ) -> Result<Json<TaskRuns>, ApiError> {
     if WorkloadKind::parse(&kind) != Some(WorkloadKind::CronJob) {
         return Err(not_found(&project, &kind, &name));
     }
-    let read = crate::projects::read(cluster.as_ref(), &project).await?;
+    let read = crate::projects::read(cluster.as_ref(), &project, (state.clock)()).await?;
     if !read
         .snapshot
         .cron_jobs

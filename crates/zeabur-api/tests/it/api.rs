@@ -1513,6 +1513,41 @@ mod tests {
         }
     }
 
+    /// Recent events count by the server's clock, not the machine's, so a fixed clock (tests,
+    /// the demo's screenshots) sees the same diagnoses on every run.
+    #[tokio::test]
+    async fn diagnoses_count_recent_events_by_the_servers_clock() {
+        let cluster = cluster();
+        let unhealthy: Event = serde_json::from_value(json!({
+            "metadata": {"name": "unhealthy", "namespace": "shop"},
+            "eventTime": "2026-10-14T08:05:00.000000Z",
+            "regarding": {"apiVersion": "v1", "kind": "Pod", "name": "web-1", "namespace": "shop",
+                "fieldPath": "spec.containers{web}"},
+            "type": "Warning", "reason": "Unhealthy",
+            "note": "Readiness probe failed: dial tcp 10.42.2.31:8080: connect: connection refused",
+            "reportingController": "kubelet", "reportingInstance": "vps-1", "action": "Unhealthy"
+        }))
+        .unwrap();
+        cluster.update(|s| s.events.get_mut("shop").unwrap().push(unhealthy));
+        let kinds = |clock: fn() -> Timestamp| {
+            let app = TestApi::new(&cluster).with_clock(clock).router();
+            async move {
+                let (status, _, body) = call(app, "GET", "/api/v1/projects/shop").await;
+                assert_eq!(status, StatusCode::OK, "{body}");
+                json(&body)["services"][0]["diagnoses"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|d| d["kind"].as_str().unwrap().to_owned())
+                    .collect::<Vec<_>>()
+            }
+        };
+        let soon = kinds(|| "2026-10-14T08:06:00Z".parse().unwrap()).await;
+        assert!(soon.contains(&"probeFailure".to_owned()), "{soon:?}");
+        let later = kinds(|| "2026-10-15T08:06:00Z".parse().unwrap()).await;
+        assert!(!later.contains(&"probeFailure".to_owned()), "{later:?}");
+    }
+
     #[tokio::test]
     async fn a_crash_looping_service_carries_its_diagnosis() {
         let document = get(&cluster(), "/api/v1/projects/shop").await;

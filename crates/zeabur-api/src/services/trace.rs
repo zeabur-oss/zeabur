@@ -86,7 +86,7 @@ pub(crate) async fn trace(
         return Err(not_found(&project, &kind, &name));
     };
     let cluster = cluster.as_ref();
-    let read = crate::projects::read(cluster, &project).await?;
+    let read = crate::projects::read(cluster, &project, (state.clock)()).await?;
     let service = read
         .document
         .project

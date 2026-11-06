@@ -11,12 +11,12 @@ pub mod runs;
 pub mod trace;
 
 use axum::Json;
-use axum::extract::Path;
+use axum::extract::{Path, State};
 use zeabur_core::problem::{MEDIA_TYPE as PROBLEM, Problem};
 use zeabur_model::WorkloadKind;
 
 use crate::error::ApiError;
-use crate::handlers::Person;
+use crate::handlers::{AppState, Person};
 use crate::projects::{document_of, not_found};
 use crate::views::ServiceDocument;
 
@@ -29,13 +29,14 @@ use crate::views::ServiceDocument;
            ("name" = String, Path)),
     responses((status = 200, body = ServiceDocument), (status = 404, body = Problem, content_type = PROBLEM)))]
 pub(crate) async fn service(
+    State(state): State<AppState>,
     Person(cluster): Person,
     Path((project, kind, name)): Path<(String, String, String)>,
 ) -> Result<Json<ServiceDocument>, ApiError> {
     let Some(workload_kind) = WorkloadKind::parse(&kind) else {
         return Err(not_found(&project, &kind, &name));
     };
-    let mut document = document_of(cluster.as_ref(), &project).await?;
+    let mut document = document_of(cluster.as_ref(), &project, (state.clock)()).await?;
     let position = document
         .project
         .services

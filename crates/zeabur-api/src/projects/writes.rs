@@ -163,7 +163,7 @@ async fn compute(
         .await
         .map_err(|e| read_problem(e, &format!("project {project}"), project_read(project)))?;
     let routes = objects.http_routes.clone();
-    let (snapshot, _) = snapshot(objects);
+    let (snapshot, _) = snapshot(objects, now.parse().unwrap_or(Timestamp::UNIX_EPOCH));
     let wants_gateways = request
         .changes
         .iter()
