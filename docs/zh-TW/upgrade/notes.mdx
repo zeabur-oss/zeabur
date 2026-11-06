@@ -77,7 +77,7 @@ kubectl delete clusterrole system-upgrade-controller system-upgrade-controller-d
 
 第 2 步移除的 zot 也會在 `plan` 顯示 `not removed, no longer updated`。這是因為安裝紀錄裡還有它，`apply` 之後就不會再出現。
 
-v0.2 會替系統保留記憶體，避免 Pod 用光記憶體拖垮整台伺服器，所以 `apply` 會重新啟動 K3s 或 RKE2。Kubernetes API 約有 10 秒不回應，執行中的應用程式照常服務。
+v0.2 會替系統保留記憶體，避免 Pod 用光記憶體拖垮整台伺服器，所以 `apply` 會重新啟動 K3s 或 RKE2。Kubernetes API 約有 10 秒不回應，執行中的應用程式照常服務。保留的記憶體是從 Pod 能要的記憶體裡扣的，原本就快滿的伺服器，這次升級新增或更新的元件可能放不下，會一直停在 `Pending`。節點放不下時，`plan` 會提出警告。請在 `apply` 前移除那個節點上的服務或減少副本、把服務移到其他節點，或加一個節點。
 
 #### 4. 讓其他節點重新加入
 

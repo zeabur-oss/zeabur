@@ -11,10 +11,11 @@ use serde_json::{Map, Value, json};
 use zeabur_installer_host::kubectl::{self, Kubectl};
 use zeabur_installer_host::nodeprep::{self, Stage};
 use zeabur_installer_host::preflight::{self, Status};
-use zeabur_installer_host::{archive, chart, cmd, download, facts, files, systemd};
+use zeabur_installer_host::{HostError, archive, chart, cmd, download, facts, files, systemd};
 use zeabur_installer_plan::catalog::{Encoding, Index};
 use zeabur_installer_plan::cluster::{APPARMOR_PROFILE, AUTHN_CONFIGMAP, Distribution, HostFile};
 use zeabur_installer_plan::config::{AccessMode, Config};
+use zeabur_installer_plan::fit::{self, NodeMemory};
 use zeabur_installer_plan::k3s;
 use zeabur_installer_plan::plan::{
     self, ClusterPlan, ComponentPlan, Download, IDENTITY_NAMESPACE, IdentityPlan, LOCAL_ISSUER,
@@ -202,6 +203,11 @@ pub(crate) fn make_plan(index: &Index, config: &Config) -> Result<Plan, InstallE
             }
             changes.set_host_files(pending);
         }
+        if running {
+            let nodes = node_memory(&kubectl)?;
+            let full = fit::warnings(index, &plan, &config.profile, &nodes);
+            plan.warnings.extend(full);
+        }
     }
     plan.removals = remove::plan(
         running.then_some(&kubectl),
@@ -212,6 +218,22 @@ pub(crate) fn make_plan(index: &Index, config: &Config) -> Result<Plan, InstallE
         &mut plan.warnings,
     )?;
     Ok(plan)
+}
+
+/// Each node's memory and what the Pods on it request.
+fn node_memory(kubectl: &Kubectl) -> Result<Vec<NodeMemory>, InstallError> {
+    let list = |args: &[&str]| -> Result<Value, InstallError> {
+        let out = kubectl.run(args, None)?;
+        serde_json::from_str(&out).map_err(|e| {
+            InstallError::from(HostError::Parse {
+                what: format!("kubectl {}", args.join(" ")),
+                reason: e.to_string(),
+            })
+        })
+    };
+    let nodes = list(&["get", "nodes", "--output=json"])?;
+    let pods = list(&["get", "pods", "--all-namespaces", "--output=json"])?;
+    Ok(fit::nodes(&nodes, &pods))
 }
 
 /// The install record, when there is one.

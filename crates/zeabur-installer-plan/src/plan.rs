@@ -2974,6 +2974,39 @@ mod tests {
     }
 
     #[test]
+    fn an_upgrade_warns_about_a_node_its_changed_components_do_not_fit() {
+        use crate::fit::{self, NodeMemory};
+
+        let index = crate::catalog::pinned();
+        let first = plan(&index, &config(""), &facts()).unwrap();
+        let node = |apps: u64| NodeMemory {
+            name: first.node_name.clone(),
+            capacity_mib: 7936,
+            allocatable_mib: 7736,
+            requests_mib: [("apps".to_owned(), apps)].into(),
+        };
+        assert_eq!(
+            fit::warnings(&index, &first, "single-node", &[node(5800)]),
+            []
+        );
+
+        let mut upgrade = facts();
+        upgrade.record = Some(recorded(&first, "0.0.1", older_catalog));
+        let plan = plan(&index, &config(""), &upgrade).unwrap();
+        assert_eq!(
+            fit::warnings(&index, &plan, "single-node", &[node(1000)]),
+            []
+        );
+        let full = fit::warnings(&index, &plan, "single-node", &[node(5800)]);
+        let [warning] = full.as_slice() else {
+            panic!("{full:?}");
+        };
+        assert_eq!(warning.code, "memory.nodeFull");
+        assert_eq!(warning.values[0], plan.node_name);
+        assert_eq!(warning.values[2], "5856");
+    }
+
+    #[test]
     fn an_upgrade_reports_the_chart_versions_and_release_it_changes() {
         let index = crate::catalog::pinned();
         let first = plan(&index, &config(""), &facts()).unwrap();

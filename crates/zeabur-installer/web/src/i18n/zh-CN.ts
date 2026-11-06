@@ -413,6 +413,8 @@ export const zhCN: Messages = {
     `空闲时，系统、${distribution} 和组件约使用 ${mib(idle)}，这台服务器共有 ${mib(host)}。`,
   "warning.memory.belowMinimum": (host, needs, distribution) =>
     `这台服务器有 ${mib(host)} 内存，用 ${distribution} 装这些组件需要 ${mib(needs)}，有些副本可能跑不起来。用不到崩溃转储（kdump）的话，可以关掉它把内存还给系统，或者换一台内存更大的服务器。`,
+  "warning.memory.nodeFull": (node, requested, allocatable, distribution) =>
+    `应用后，节点 ${node} 上的 Pod 一共要 ${mib(requested)} 左右的内存，但扣掉系统和 ${distribution} 自己用的，只剩 ${mib(allocatable)} 给 Pod。放不下的 Pod 会一直停在 Pending。要腾出内存，可以删除 ${node} 上的服务或减少副本、把服务移到其他节点，或者加一个节点。`,
   "warning.cluster.unsupported": (distribution, version) =>
     `此安装程序不支持 ${distribution} ${version}：下载的文件只能用该版本自带的校验和验证。`,
   "warning.join.sameRegion": () =>
