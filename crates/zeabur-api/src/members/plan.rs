@@ -3,9 +3,8 @@
 //! `projects::writes`).
 //!
 //! The plan lists every object the change writes, in the order it writes them: the `User`, the
-//! `ClusterRoleBinding` and `RoleBinding`s of [`super::access`], the member's API tokens in a
-//! project they leave or become a Viewer of, and their invitations, credentials and grants when
-//! they go. The token binds the person, the change, and the
+//! `ClusterRoleBinding` and `RoleBinding`s of [`super::access`], and the member's invitations,
+//! credentials and grants when they go. The token binds the person, the change, and the
 //! `resourceVersion` or `uid` of every object read (or that it was absent); apply computes the
 //! writes again from the cluster as it is, refuses when any of those moved, dry-runs every write,
 //! then writes. An invitation's link is made only then, so its token is never in a plan: the plan
@@ -22,14 +21,13 @@ use zeabur_kube::k8s_openapi::jiff::Timestamp;
 use zeabur_kube::{Cluster, ObjectTarget, Preconditions, ResourceRef, WriteBody, WriteRequest};
 
 use super::USER_PREFIX;
-use super::access::{self, Binding, ProjectGrant, ProjectRole, RBAC_GROUP, Step};
+use super::access::{self, Binding, ProjectGrant, RBAC_GROUP, Step};
 use super::directory::{AccountType, IdentityKind, Object, UserSpec, request, setup_links};
 use super::handlers::{directory, issuer_of, you};
 use super::writes::{
     INVITE_SECONDS, SetupLinkView, admin_patch, bad, is_username, issue, new_user, refuse,
     user_object,
 };
-use crate::api_tokens;
 use crate::error::{ApiError, read_problem};
 use crate::extract::Json;
 use crate::handlers::{AppState, Person};
@@ -251,39 +249,6 @@ impl Computed {
         }
     }
 
-    /// The member's API tokens in each project where they lose their role, or become a Viewer
-    /// (their Viewer tokens stay). They go before the member's bindings change.
-    async fn tokens(
-        &mut self,
-        cluster: &dyn Cluster,
-        username: &str,
-        current: &[Binding],
-        wanted: &[ProjectGrant],
-    ) -> Result<(), ApiError> {
-        let maker = format!("{USER_PREFIX}{username}");
-        for step in access::steps(username, current, wanted) {
-            let Step::Delete(binding) = step else {
-                continue;
-            };
-            let mut role = None;
-            for grant in wanted {
-                if grant.project == binding.project {
-                    role = Some(grant.role);
-                }
-            }
-            if role == Some(ProjectRole::Developer) {
-                continue;
-            }
-            let viewer_stays = role == Some(ProjectRole::Viewer);
-            for token in
-                api_tokens::revoked(cluster, &binding.project, &maker, viewer_stays).await?
-            {
-                self.delete(token.target, token.uid, Some(token.before));
-            }
-        }
-        Ok(())
-    }
-
     /// The project bindings that take `current` to `wanted`, deletions first.
     fn bindings(&mut self, username: &str, current: &[Binding], wanted: &[ProjectGrant]) {
         let name = access::binding_name(username);
@@ -487,9 +452,6 @@ async fn access_change(
     }
     if identity.project_roles {
         let current = access::bindings_for(cluster, username).await?;
-        computed
-            .tokens(cluster, username, &current, projects)
-            .await?;
         let held = baseline_of(cluster, username).await?;
         computed.baseline(username, held.as_ref());
         computed.bindings(username, &current, projects);
@@ -520,7 +482,6 @@ async fn remove(
     };
     let mut computed = Computed::default();
     let current = access::bindings_for(cluster, username).await?;
-    computed.tokens(cluster, username, &current, &[]).await?;
     computed.bindings(username, &current, &[]);
     if let Some(held) = baseline_of(cluster, username).await? {
         let uid = held
