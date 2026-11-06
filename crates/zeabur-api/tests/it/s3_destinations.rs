@@ -1,5 +1,6 @@
 //! S3 destinations: an administrator registers one through a plan and no answer shows its keys,
-//! a project plan copies the keys into a Secret of the project that names its source, a person
+//! a project plan copies the keys into a Secret of the project that names its source, or into
+//! one that exists, keeping its other keys, a person
 //! who may not read the keys is refused, a Velero location takes them too, and new keys reach
 //! every copy the person may change.
 
@@ -9,6 +10,7 @@ mod tests {
 
     use axum::Router;
     use axum::http::StatusCode;
+    use base64::Engine as _;
     use serde_json::{Value, json};
     use zeabur_kube::k8s_openapi::api::core::v1::Namespace;
     use zeabur_kube::memory::{MemoryCluster, State};
@@ -132,6 +134,41 @@ mod tests {
         let (status, backups) = send(&app, "GET", "/api/v1/projects/shop/backups", None).await;
         assert_eq!(status, StatusCode::OK, "{backups}");
         assert_eq!(backups["keysFrom"], json!({"db-backups-s3": "r2"}));
+    }
+
+    #[tokio::test]
+    async fn copying_into_a_secret_that_exists_replaces_its_keys_and_keeps_the_rest() {
+        let cluster = cluster();
+        let app = app(&cluster);
+        register(&app).await;
+        let typed = json!({"changes": [{"op": "create", "object": {"apiVersion": "v1",
+            "kind": "Secret", "metadata": {"name": "db-backups-s3"}, "type": "Opaque",
+            "stringData": {"ACCESS_KEY_ID": "old", "ACCESS_SECRET_KEY": "old-secret",
+                           "REGION": "eu-west-1"}}}]});
+        applied(&app, "/api/v1/projects/shop", &typed).await;
+        let mut request = copy("db-backups-s3");
+        request["changes"][0]["object"]["stringData"] = json!({});
+        let (planned, _) = applied(&app, "/api/v1/projects/shop", &request).await;
+        assert!(!planned.to_string().contains(SECRET_KEY), "{planned}");
+        let writes = cluster.inspect(|s| s.writes.clone()).unwrap();
+        let Some(WriteBody::JsonPatch(ops)) = writes.last().map(|w| &w.body) else {
+            panic!("no patch of the Secret: {writes:?}");
+        };
+        let set: BTreeMap<&str, &Value> = ops
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter(|op| op["op"] != "test")
+            .map(|op| (op["path"].as_str().unwrap(), &op["value"]))
+            .collect();
+        let encoded = |text: &str| json!(base64::engine::general_purpose::STANDARD.encode(text));
+        assert_eq!(set["/data/ACCESS_KEY_ID"], &encoded("AKIA1"));
+        assert_eq!(set["/data/ACCESS_SECRET_KEY"], &encoded(SECRET_KEY));
+        assert!(!set.contains_key("/data/REGION"), "{ops}");
+        assert_eq!(
+            set["/metadata/labels"],
+            &json!({"zeabur.com/s3-destination": "r2"})
+        );
     }
 
     #[tokio::test]

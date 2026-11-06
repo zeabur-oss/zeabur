@@ -2957,6 +2957,29 @@ export const zhCN: Messages = {
     "只有一个实例时，Dragonfly 重启会从仍为空的存储桶加载，目前的数据留在卷上的快照里。",
   "db.backup.retentionHours": (hours) => `${hours} 内的备份`,
   "db.backup.snapshots": "Dragonfly 会定时以及在停止时写入快照。Zeabur 无法列出这些快照。",
+  "db.backup.edit": "编辑",
+  "db.backup.change": "更改备份",
+  "db.backup.turnOff": "关闭备份",
+  "db.backup.planEdit": (name) => `更改 ${name} 的备份`,
+  "db.backup.planOff": (name) => `关闭 ${name} 的备份`,
+  "db.backup.keepKeys": (secret) => `两个都留空就沿用机密变量 ${secret} 里的密钥。`,
+  "db.backup.keepRegion": "留空就沿用和密钥存在一起的区域。",
+  "db.backup.offBody": "备份已关闭。存储桶里现有的备份都还在。",
+  "db.backup.saidNewKeys": (secret) => `替换机密变量 ${secret} 里的访问密钥。`,
+  "db.backup.saidCopyKeys": (secret, destination) =>
+    `机密变量 ${secret} 里的访问密钥，会换成 ${destination} 那组。`,
+  "db.backup.keysOnRestart": (name) =>
+    `Dragonfly 启动时才会读取密钥，所以 ${name} 下次重启后才会用新的密钥。`,
+  "db.backup.moved": (where) => `之前的备份会留在 ${where}。要从那些备份还原，需要用旧的设置。`,
+  "db.backup.movedPitr":
+    "要等下一次定时备份完成，才能从新目的地还原到某个时间点。这次更改不会马上备份。",
+  "db.backup.movedEmpty":
+    "只有一个实例时，Dragonfly 重启后会从新目的地加载，但那里还是空的，现有数据留在旧目的地。",
+  "db.backup.saidOff": (name, where) => `停止把 ${name} 备份到 ${where}。`,
+  "db.backup.saidOffKept": (secret) => `密钥会留在机密变量 ${secret}，存储桶里现有的备份也都还在。`,
+  "db.backup.saidOffRestart": (name) => `${name} 会重启，停止备份。`,
+  "db.backup.offStale":
+    "只有一个实例时，Dragonfly 重启会加载卷上的快照，那是开始备份到存储桶之前保存的，之后的更改都会丢失。",
   "db.restore.action": "从备份点创建新数据库",
   "db.restore.title": (name) => `从 ${name} 的备份点创建新数据库`,
   "db.restore.body": "Zeabur 会用相同设置创建新的数据库，数据来自备份。原来的数据库不会变动。",
