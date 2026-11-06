@@ -35,7 +35,7 @@ fn refusal(
     }
 }
 
-fn service_target(name: &str) -> Target {
+pub(crate) fn service_target(name: &str) -> Target {
     Target {
         api_version: "v1".to_owned(),
         kind: "Service".to_owned(),
@@ -228,7 +228,7 @@ impl<'a> Planner<'a> {
         Ok(())
     }
 
-    fn kube_service(&self, name: &str) -> Option<&'a KubeService> {
+    pub(crate) fn kube_service(&self, name: &str) -> Option<&'a KubeService> {
         self.input
             .snapshot
             .services

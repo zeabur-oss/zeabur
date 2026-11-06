@@ -3,8 +3,8 @@
 Turns a person's request into a plan: the writes, the fields they change, who owns those fields
 now, which workloads it affects, and what to know before applying. The requests ([`Change`]):
 set a variable, change a ConfigMap or Secret key, add, rename or remove a hostname, restart a
-workload or roll it back to an earlier release, scale it, set a probe or its resources, add or
-grow a volume and move a mount, replace an object with edited YAML, create an object of a kind the cluster serves, delete one, create a project's namespace, adopt a namespace or let it go, and set a project's details.
+workload or roll it back to an earlier release, scale it, set a probe or its resources, move the
+port it listens on, add or grow a volume and move a mount, replace an object with edited YAML, create an object of a kind the cluster serves, delete one, create a project's namespace, adopt a namespace or let it go, and set a project's details.
 A plan token binds the request, the resource versions it was computed against and the person,
 so an apply carries out exactly what was confirmed, or nothing; this crate defines the claims,
 `zeabur-api` seals them.

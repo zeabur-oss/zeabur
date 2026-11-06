@@ -102,6 +102,7 @@ pub(crate) async fn compute(
         | Change::RemoveVolume { .. }
         | Change::SwapClaim { .. }
         | Change::Probe { .. }
+        | Change::Port { .. }
         | Change::Image { .. }
         | Change::Rebuild { .. }
         | Change::UploadToken { .. }

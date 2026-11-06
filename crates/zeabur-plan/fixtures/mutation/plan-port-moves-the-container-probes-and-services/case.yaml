@@ -1,0 +1,3 @@
+description: "Moving a built service from 8080 to 3000 changes its declared port, its readiness probe, its PORT and the Services' target ports, and keeps the Services' own ports."
+operation: mutation.plan
+params: {"request": {"changes": [{"op": "port", "workload": {"kind": "Deployment", "name": "web"}, "from": 8080, "to": 3000}]}}

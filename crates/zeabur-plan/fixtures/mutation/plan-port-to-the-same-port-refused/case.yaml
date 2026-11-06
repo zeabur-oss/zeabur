@@ -1,0 +1,3 @@
+description: "Moving a port to itself is refused."
+operation: mutation.plan
+params: {"request": {"changes": [{"op": "port", "workload": {"kind": "Deployment", "name": "web"}, "from": 8080, "to": 8080}]}}
