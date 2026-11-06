@@ -7,6 +7,7 @@ import CaretDownIcon from "~icons/ph/caret-down"
 import type { Schemas } from "@/api/client"
 import { namespaceQuery, projectQuery } from "@/api/queries"
 import { AccessDialog, AdoptButton } from "@/components/adopt"
+import { ApiTokens } from "@/components/api-tokens"
 import { useBackups } from "@/components/backups"
 import { CopyButton } from "@/components/bits"
 import { FormField } from "@/components/form-field"
@@ -92,6 +93,7 @@ export function ProjectSettings({ namespace }: { namespace: Schemas.ProjectNames
         </Group>
       ) : null}
       <ProjectMembers namespace={namespace} />
+      <ApiTokens namespace={namespace} />
       <Group label={t("projectSettings.namespaceGroup")}>
         <Card variant="list">
           <CardRow

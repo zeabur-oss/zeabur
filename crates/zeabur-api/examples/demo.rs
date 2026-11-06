@@ -819,6 +819,7 @@ fn state() -> State {
                 "Gateway",
                 true,
             ),
+            ServedResource::readable("", "v1", "serviceaccounts", "ServiceAccount", true),
         ]
         .into_iter()
         .chain(velero_served())
@@ -836,6 +837,13 @@ fn state() -> State {
         }])
         .collect(),
         dynamic: [
+            api_token("github-actions", "developer", "zeabur:alice", 20),
+            api_token("grafana", "viewer", "zeabur:bob", -2),
+            from(json!({
+                "apiVersion": "v1", "kind": "ConfigMap",
+                "metadata": {"name": "kube-root-ca.crt", "namespace": "shop", "resourceVersion": "1"},
+                "data": {"ca.crt": "-----BEGIN CERTIFICATE-----\nMIIBdzCCAR2gAwIBAgIBADAKBggqhkjOPQQDAjAjMSEwHwYDVQQDDBhrM3Mtc2Vy\ndmVyLWNhQDE3NjE0NjkyMDAwHhcNMjYxMDI2MDkwMDAwWhcNMzYxMDIzMDkwMDAw\n-----END CERTIFICATE-----\n"}
+            })),
             // The Gateway of the shop's HTTPRoute, which accepts routes from every namespace.
             from(json!({
                 "apiVersion": "gateway.networking.k8s.io/v1", "kind": "Gateway",
@@ -1214,8 +1222,32 @@ fn state() -> State {
             ),
         ]),
         facts,
+        now: clock().as_second(),
         ..State::default()
     }
+}
+
+/// An API token of the shop, made `days_left` days before it expires (negative: expired).
+fn api_token(name: &str, role: &str, by: &str, days_left: i64) -> DynamicObject {
+    use zeabur_plan::api_token;
+    let expires = Timestamp::from_second(clock().as_second() + days_left * 86_400)
+        .expect("a time")
+        .to_string();
+    from(json!({
+        "apiVersion": "v1", "kind": "ServiceAccount",
+        "metadata": {
+            "name": name, "namespace": "shop", "uid": format!("uid-sa-{name}"),
+            "resourceVersion": "1", "creationTimestamp": "2026-10-01T09:00:00Z",
+            "labels": {(api_token::LABEL): "true", "app.kubernetes.io/managed-by": "zeabur"},
+            "annotations": {
+                (api_token::ROLE_ANNOTATION): format!("zeabur-project-{role}"),
+                (api_token::SCOPE_ANNOTATION): "project",
+                (api_token::CREATED_BY_ANNOTATION): by,
+                (api_token::EXPIRES_AT_ANNOTATION): expires,
+            }
+        },
+        "automountServiceAccountToken": false
+    }))
 }
 
 /// What one of billing's API replicas wrote: requests, and a slow one now and then.

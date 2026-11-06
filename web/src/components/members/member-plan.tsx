@@ -1,4 +1,5 @@
-import { useMutation, useQuery } from "@tanstack/react-query"
+import { useMutation, useQuery, type QueryKey, type UseQueryOptions } from "@tanstack/react-query"
+import type { ReactNode } from "react"
 import CaretLeftIcon from "~icons/ph/caret-left"
 
 import type { Schemas } from "@/api/client"
@@ -22,21 +23,14 @@ import { writeCounts, writtenName, type MemberWrite } from "@/model/members"
 import { projectMention } from "@/model/project"
 import { Button } from "@zeabur-oss/design-system/components/button"
 
-/** A change to the members as its plan: what it does in words first, the objects it writes behind
- * Technical details, and the button that applies exactly that. */
-export function MemberPlan({
-  title,
-  change,
-  consequence,
-  lines,
-  action,
-  destructive,
-  onBack,
-  onClose,
-  onApplied,
-}: {
+interface SealedPlan {
+  token: string
+  expiresAt: string
+  writes: MemberWrite[]
+}
+
+interface PlanCopy {
   title: string
-  change: MemberChange
   consequence?: string
   lines: string[]
   action: string
@@ -44,79 +38,181 @@ export function MemberPlan({
   /** Back to the form; Cancel when there is none. */
   onBack?: () => void
   onClose: () => void
-  onApplied: (applied: Schemas.MemberApplied) => void
+}
+
+/** A change to the members as its plan: what it does in words first, the objects it writes behind
+ * Technical details, and the button that applies exactly that. */
+export function MemberPlan({
+  change,
+  onApplied,
+  ...copy
+}: PlanCopy & { change: MemberChange; onApplied: (applied: Schemas.MemberApplied) => void }) {
+  return (
+    <WritesPlan
+      {...copy}
+      planQuery={memberPlanQuery(change)}
+      apply={applyMemberChange}
+      refresh={refreshMembers}
+      onApplied={onApplied}
+    />
+  )
+}
+
+/** A sealed plan of object writes, members' or API tokens': planned as a query, applied by its
+ * token. */
+export function WritesPlan<Applied, Plan extends SealedPlan, Key extends QueryKey>({
+  planQuery,
+  apply: applyToken,
+  refresh,
+  title,
+  consequence,
+  lines,
+  action,
+  destructive,
+  onBack,
+  onClose,
+  onApplied,
+}: PlanCopy & {
+  planQuery: UseQueryOptions<Plan, Error, Plan, Key>
+  apply: (token: string) => Promise<Applied>
+  refresh: () => void
+  onApplied: (applied: Applied) => void
 }) {
-  const t = useT()
   // Planning writes nothing, so it is a query.
-  const plan = useQuery(memberPlanQuery(change))
+  const plan = useQuery(planQuery)
   const apply = useMutation({
-    mutationFn: (token: string) => applyMemberChange(token),
+    mutationFn: (token: string) => applyToken(token),
     onSuccess: (applied) => {
-      refreshMembers()
+      refresh()
       onApplied(applied)
     },
-    onError: refreshMembers,
+    onError: refresh,
   })
-  const left = useSecondsLeft(plan.data?.expiresAt)
   const writes = plan.data?.writes ?? []
-  const nothing = plan.data !== undefined && writes.length === 0
-  const ready = plan.data && !plan.isFetching
   return (
     <Frame
       title={title}
       wide
       onClose={onClose}
       footer={
-        <SealedFooter
-          left={left}
-          ready={Boolean(ready)}
+        <PlanFooter
+          expiresAt={plan.data?.expiresAt}
+          ready={plan.data !== undefined && !plan.isFetching}
+          empty={writes.length === 0}
+          applying={apply.isPending}
+          destructive={destructive}
+          action={action}
           onReplan={() => void plan.refetch()}
-          back={
-            onBack ? (
-              <Button variant="outline" size="sm" onClick={onBack}>
-                <CaretLeftIcon aria-hidden="true" data-icon="inline-start" />
-                {t("plan.back")}
-              </Button>
-            ) : (
-              <Button variant="ghost" size="sm" onClick={onClose}>
-                {t("plan.cancel")}
-              </Button>
-            )
-          }
-        >
-          <Button
-            size="sm"
-            variant={destructive ? "destructive" : "default"}
-            disabled={!ready || nothing}
-            loading={apply.isPending}
-            onClick={() => plan.data && apply.mutate(plan.data.token)}
-          >
-            {action}
-          </Button>
-        </SealedFooter>
+          onApply={() => plan.data && apply.mutate(plan.data.token)}
+          back={<BackButton onBack={onBack} onClose={onClose} />}
+        />
       }
     >
-      {plan.isPending || plan.isFetching ? (
-        <LoadingRows label={t("plan.planning")} rows={3} />
-      ) : plan.isError ? (
-        <Problem error={plan.error} />
-      ) : (
-        <>
-          {consequence ? <Consequence>{consequence}</Consequence> : null}
-          {nothing ? (
-            <p>{t("members.plan.nothing")}</p>
-          ) : (
-            lines.map((line, i) => (
-              <p key={line} className={i > 0 || consequence ? "text-muted-foreground" : undefined}>
-                {line}
-              </p>
-            ))
-          )}
-          {writes.length > 0 ? <Writes writes={writes} /> : null}
-        </>
-      )}
+      <PlanBody
+        loading={plan.isPending || plan.isFetching}
+        error={plan.error}
+        consequence={consequence}
+        lines={lines}
+        writes={writes}
+      />
       {apply.isError ? <Problem error={apply.error} /> : null}
     </Frame>
+  )
+}
+
+function PlanBody({
+  loading,
+  error,
+  ...said
+}: {
+  loading: boolean
+  error: Error | null
+  consequence?: string
+  lines: string[]
+  writes: MemberWrite[]
+}) {
+  const t = useT()
+  if (loading) return <LoadingRows label={t("plan.planning")} rows={3} />
+  if (error) return <Problem error={error} />
+  return <Said {...said} />
+}
+
+function PlanFooter({
+  expiresAt,
+  ready,
+  empty,
+  applying,
+  destructive,
+  action,
+  onReplan,
+  onApply,
+  back,
+}: {
+  expiresAt: string | undefined
+  ready: boolean
+  empty: boolean
+  applying: boolean
+  destructive?: boolean
+  action: string
+  onReplan: () => void
+  onApply: () => void
+  back: ReactNode
+}) {
+  const left = useSecondsLeft(expiresAt)
+  return (
+    <SealedFooter left={left} ready={ready} onReplan={onReplan} back={back}>
+      <Button
+        size="sm"
+        variant={destructive ? "destructive" : "default"}
+        disabled={!ready || empty}
+        loading={applying}
+        onClick={onApply}
+      >
+        {action}
+      </Button>
+    </SealedFooter>
+  )
+}
+
+function BackButton({ onBack, onClose }: { onBack?: () => void; onClose: () => void }) {
+  const t = useT()
+  return onBack ? (
+    <Button variant="outline" size="sm" onClick={onBack}>
+      <CaretLeftIcon aria-hidden="true" data-icon="inline-start" />
+      {t("plan.back")}
+    </Button>
+  ) : (
+    <Button variant="ghost" size="sm" onClick={onClose}>
+      {t("plan.cancel")}
+    </Button>
+  )
+}
+
+/** The plan in words, then its writes; "Nothing changes" when it writes nothing. */
+function Said({
+  consequence,
+  lines,
+  writes,
+}: {
+  consequence?: string
+  lines: string[]
+  writes: MemberWrite[]
+}) {
+  const t = useT()
+  return (
+    <>
+      {consequence ? <Consequence>{consequence}</Consequence> : null}
+      {writes.length === 0 ? (
+        <p>{t("members.plan.nothing")}</p>
+      ) : (
+        lines.map((line, i) => (
+          <p key={line} className={i > 0 || consequence ? "text-muted-foreground" : undefined}>
+            {line}
+          </p>
+        ))
+      )}
+      {writes.length > 0 ? <Writes writes={writes} /> : null}
+    </>
   )
 }
 
