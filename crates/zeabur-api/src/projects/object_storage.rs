@@ -10,7 +10,7 @@
 //! `zeabur_plan::CREATABLE`.
 
 use axum::Json;
-use axum::extract::Path;
+use axum::extract::{Path, State};
 use serde::Serialize;
 use utoipa::ToSchema;
 use zeabur_core::problem::{MEDIA_TYPE as PROBLEM, Problem};
@@ -20,7 +20,7 @@ use zeabur_kube::{Cluster, ClusterExt};
 use zeabur_modules::seaweedfs::{self, ObjectStorage};
 
 use crate::error::ApiError;
-use crate::handlers::Person;
+use crate::handlers::{AppState, Person};
 use crate::projects::backups::{ProviderState, read_all};
 use crate::views::UnreadableView;
 
@@ -44,13 +44,20 @@ pub struct ProjectObjectStorage {
     params(("project" = String, Path, description = "The project's namespace")),
     responses((status = 200, body = ProjectObjectStorage), (status = 403, body = Problem, content_type = PROBLEM)))]
 pub(crate) async fn get(
+    State(state): State<AppState>,
     Person(cluster): Person,
     Path(project): Path<String>,
 ) -> Result<Json<ProjectObjectStorage>, ApiError> {
-    read(cluster.as_ref(), &project).await.map(Json)
+    read(cluster.as_ref(), &project, (state.clock)())
+        .await
+        .map(Json)
 }
 
-async fn read(cluster: &dyn Cluster, project: &str) -> Result<ProjectObjectStorage, ApiError> {
+async fn read(
+    cluster: &dyn Cluster,
+    project: &str,
+    now: Timestamp,
+) -> Result<ProjectObjectStorage, ApiError> {
     let failed = |e: zeabur_kube::ClusterError| {
         ApiError::from(e.into_problem(&format!("object storage of {project}")))
     };
@@ -94,7 +101,7 @@ async fn read(cluster: &dyn Cluster, project: &str) -> Result<ProjectObjectStora
             Err(error) if error.code() == Some(403) => Vec::new(),
             Err(error) => return Err(failed(error)),
         };
-        let now = Some(Timestamp::now());
+        let now = Some(now);
         let empty = std::collections::BTreeMap::new();
         for store in &mut items {
             let mut pods: Vec<_> = pods

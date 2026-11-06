@@ -684,6 +684,7 @@ fn about_the_cluster(event: &zeabur_kube::k8s_openapi::api::events::v1::Event) -
     responses((status = 200, body = ClusterEventList), (status = 400, body = Problem, content_type = PROBLEM),
               (status = 403, body = Problem, content_type = PROBLEM)))]
 pub(crate) async fn events(
+    State(state): State<AppState>,
     Person(cluster): Person,
     RawQuery(query): RawQuery,
 ) -> Result<Json<ClusterEventList>, ApiError> {
@@ -716,7 +717,7 @@ pub(crate) async fn events(
             list_read("events.k8s.io", "events", None),
         )
     })?;
-    let cutoff = since.map(|s| Timestamp::now().as_second().saturating_sub(s));
+    let cutoff = since.map(|s| (state.clock)().as_second().saturating_sub(s));
     let mut keyed: Vec<(EventKey, crate::views::EventView)> = read
         .events
         .iter()

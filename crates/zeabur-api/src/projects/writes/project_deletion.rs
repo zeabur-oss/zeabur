@@ -20,6 +20,7 @@ use serde_json::Value;
 use zeabur_core::problem::Denied;
 use zeabur_kube::k8s_openapi::api::core::v1::Pod;
 use zeabur_kube::k8s_openapi::api::storage::v1::StorageClass;
+use zeabur_kube::k8s_openapi::jiff::Timestamp;
 use zeabur_kube::{Cluster, ClusterError, ClusterExt as _, ResourceRef, WriteRequest};
 use zeabur_modules::{Reading, cloudnative_pg, dragonfly, mariadb_operator, moco, percona_mongodb};
 use zeabur_plan::terminal::{self as plans, ToolsScope};
@@ -60,6 +61,7 @@ pub(super) async fn compute(
     project: &str,
     request: &PlanRequest,
     now: &str,
+    read_at: Timestamp,
     zeabur_namespaces: Vec<String>,
 ) -> Result<Plan, ApiError> {
     let namespaces = ResourceRef::new("", "v1", "namespaces", "Namespace");
@@ -75,7 +77,7 @@ pub(super) async fn compute(
         .namespace_objects(project)
         .await
         .map_err(|e| read_problem(e, &format!("project {project}"), project_read(project)))?;
-    let (snapshot, _) = snapshot(objects);
+    let (snapshot, _) = snapshot(objects, read_at);
     let mut unreadable = Vec::new();
     let databases = databases(cluster, project, &mut unreadable).await?;
     let (class_reclaim, default_class) = classes(cluster).await?;
