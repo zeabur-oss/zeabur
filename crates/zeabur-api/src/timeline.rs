@@ -33,6 +33,7 @@
 
 use std::collections::BTreeMap;
 
+use axum::extract::State;
 use serde::Serialize;
 use serde_json::Value;
 use utoipa::ToSchema;
@@ -48,7 +49,7 @@ use zeabur_plan::{Change, PlanRequest, Release};
 
 use crate::error::ApiError;
 use crate::extract::{Json, Path};
-use crate::handlers::Person;
+use crate::handlers::{AppState, Person};
 use crate::incidents::allowed;
 use crate::projects::not_found;
 use crate::projects::writes::releases::History;
@@ -566,11 +567,12 @@ pub(crate) async fn history(
     params(("project" = String, Path, description = "The project's namespace")),
     responses((status = 200, body = Timeline), (status = 403, body = Problem, content_type = PROBLEM)))]
 pub(crate) async fn project(
+    State(state): State<AppState>,
     Person(cluster): Person,
     Path(project): Path<String>,
 ) -> Result<Json<Timeline>, ApiError> {
     let cluster = cluster.as_ref();
-    let read = crate::projects::read(cluster, &project).await?;
+    let read = crate::projects::read(cluster, &project, (state.clock)()).await?;
     let mut unreadable = read.document.unreadable.clone();
     let history = history(cluster, &project, &mut unreadable).await?;
     let sources = Sources {
@@ -600,6 +602,7 @@ pub(crate) async fn project(
            ("name" = String, Path)),
     responses((status = 200, body = Timeline), (status = 404, body = Problem, content_type = PROBLEM)))]
 pub(crate) async fn service(
+    State(state): State<AppState>,
     Person(cluster): Person,
     Path((project, kind, name)): Path<(String, String, String)>,
 ) -> Result<Json<Timeline>, ApiError> {
@@ -607,7 +610,7 @@ pub(crate) async fn service(
         return Err(not_found(&project, &kind, &name));
     };
     let cluster = cluster.as_ref();
-    let read = crate::projects::read(cluster, &project).await?;
+    let read = crate::projects::read(cluster, &project, (state.clock)()).await?;
     let workload = zeabur_graph::workloads(&read.snapshot)
         .into_iter()
         .find(|w| w.kind() == workload_kind && w.name() == name)

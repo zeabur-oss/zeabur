@@ -7,7 +7,7 @@
 //! makes the document fail. Whether the cluster's network plugin enforces the policies is not
 //! known; clients say it depends on the plugin.
 
-use axum::extract::RawQuery;
+use axum::extract::{RawQuery, State};
 use serde::Serialize;
 use utoipa::ToSchema;
 use zeabur_core::problem::{Kind, MEDIA_TYPE as PROBLEM, Problem};
@@ -19,7 +19,7 @@ use zeabur_modules::network_policy::{self, Preset, Reachability, Workload};
 
 use crate::error::{ApiError, project_read, read_problem};
 use crate::extract::{Json, Path};
-use crate::handlers::Person;
+use crate::handlers::{AppState, Person};
 use crate::views::UnreadableView;
 
 /// The project's services as reachability sees them: their ids and pod template labels.
@@ -191,6 +191,7 @@ pub struct PresetList {
     params(("project" = String, Path), PresetQuery),
     responses((status = 200, body = PresetList), (status = 404, body = Problem, content_type = PROBLEM)))]
 pub(crate) async fn presets(
+    State(state): State<AppState>,
     Person(cluster): Person,
     Path(project): Path<String>,
     RawQuery(query): RawQuery,
@@ -202,7 +203,7 @@ pub(crate) async fn presets(
         .namespace_objects(&project)
         .await
         .map_err(|e| read_problem(e, &format!("project {project}"), project_read(&project)))?;
-    let (snapshot, _) = crate::projects::snapshot(objects);
+    let (snapshot, _) = crate::projects::snapshot(objects, (state.clock)());
     let (kind, name) = wanted.split_once('/').unwrap_or_default();
     let target = WorkloadKind::parse(kind).map(|k| id::service(&project, k, name));
     let all = services(&snapshot);

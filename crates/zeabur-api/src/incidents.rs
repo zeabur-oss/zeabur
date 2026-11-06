@@ -11,6 +11,7 @@
 //! (`symptoms`) the incident explains, so a client shows those diagnoses as the incident's and
 //! not as the service's own.
 
+use axum::extract::State;
 use serde::Serialize;
 use utoipa::ToSchema;
 use zeabur_core::problem::{MEDIA_TYPE as PROBLEM, Problem};
@@ -24,7 +25,7 @@ use zeabur_model::Incident;
 use crate::cluster::WIDE_LIMIT;
 use crate::error::ApiError;
 use crate::extract::{Json, Path};
-use crate::handlers::Person;
+use crate::handlers::{AppState, Person};
 use crate::projects::ProjectRead;
 use crate::views::UnreadableView;
 
@@ -125,11 +126,12 @@ pub(crate) async fn of_project(
     params(("project" = String, Path, description = "The project's namespace")),
     responses((status = 200, body = IncidentList), (status = 403, body = Problem, content_type = PROBLEM)))]
 pub(crate) async fn project(
+    State(state): State<AppState>,
     Person(cluster): Person,
     Path(project): Path<String>,
 ) -> Result<Json<IncidentList>, ApiError> {
     let cluster = cluster.as_ref();
-    let read = crate::projects::read(cluster, &project).await?;
+    let read = crate::projects::read(cluster, &project, (state.clock)()).await?;
     let mut unreadable = read.document.unreadable.clone();
     let items = of_project(cluster, &read, &mut unreadable).await?;
     Ok(Json(IncidentList { items, unreadable }))
