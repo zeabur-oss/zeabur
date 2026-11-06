@@ -63,40 +63,48 @@ fn items(list: &Value) -> &[Value] {
         .map_or(&[], Vec::as_slice)
 }
 
-/// What the scheduler counts for a Pod: its containers together or its largest init container,
-/// whichever is more, plus its overhead.
+/// What the scheduler counts for a Pod, by the rules of `capacity.rs::pod_amounts` in
+/// zeabur-api: its containers and sidecars together, or the peak while init containers run,
+/// whichever is more; a Pod-level request instead when there is one; plus its overhead.
 fn pod_request(pod: &Value) -> u128 {
-    let request = |container: &Value| {
-        container
-            .pointer("/resources/requests/memory")
+    let memory = |at: Option<&Value>| {
+        at.and_then(|r| r.pointer("/requests/memory"))
             .and_then(Value::as_str)
             .and_then(quantity)
             .unwrap_or(0)
     };
-    let mut containers = 0;
-    for c in pod
-        .pointer("/spec/containers")
-        .and_then(Value::as_array)
-        .into_iter()
-        .flatten()
-    {
-        containers += request(c);
+    let list = |path: &str| {
+        pod.pointer(path)
+            .and_then(Value::as_array)
+            .map_or(&[][..], Vec::as_slice)
+    };
+    let mut regular = 0;
+    for c in list("/spec/containers") {
+        regular += memory(c.get("resources"));
     }
-    let mut init = 0;
-    for c in pod
-        .pointer("/spec/initContainers")
-        .and_then(Value::as_array)
-        .into_iter()
-        .flatten()
-    {
-        init = init.max(request(c));
+    let mut sidecars = 0;
+    let mut init_peak = 0;
+    for c in list("/spec/initContainers") {
+        let own = memory(c.get("resources"));
+        if c.get("restartPolicy").and_then(Value::as_str) == Some("Always") {
+            regular += own;
+            sidecars += own;
+            init_peak = init_peak.max(sidecars);
+        } else {
+            init_peak = init_peak.max(own + sidecars);
+        }
     }
+    let pod_level = pod
+        .pointer("/spec/resources/requests/memory")
+        .and_then(Value::as_str)
+        .and_then(quantity);
+    let total = pod_level.unwrap_or_else(|| regular.max(init_peak));
     let overhead = pod
         .pointer("/spec/overhead/memory")
         .and_then(Value::as_str)
         .and_then(quantity)
         .unwrap_or(0);
-    containers.max(init) + overhead
+    total + overhead
 }
 
 /// A Kubernetes memory quantity (`8128452Ki`, `512Mi`, `1.5Gi`, `500M`, `1048576`) in bytes.
@@ -240,6 +248,41 @@ mod tests {
                 // 2048 from the init container, then 954 (1000M rounded up) and 64.
                 requested_mib: 2048 + 954 + 64,
             }]
+        );
+    }
+
+    #[test]
+    fn sidecars_run_with_the_containers_and_a_pod_level_request_wins() {
+        let mib = |pod: Value| pod_request(&json!({"spec": pod})) >> 20;
+        // A native sidecar keeps running next to the app.
+        assert_eq!(
+            mib(json!({
+                "containers": [{"resources": {"requests": {"memory": "512Mi"}}}],
+                "initContainers": [
+                    {"restartPolicy": "Always", "resources": {"requests": {"memory": "512Mi"}}},
+                ],
+            })),
+            1024
+        );
+        // An ordinary init container after a sidecar runs alongside it.
+        assert_eq!(
+            mib(json!({
+                "containers": [{"resources": {"requests": {"memory": "128Mi"}}}],
+                "initContainers": [
+                    {"restartPolicy": "Always", "resources": {"requests": {"memory": "256Mi"}}},
+                    {"resources": {"requests": {"memory": "1Gi"}}},
+                ],
+            })),
+            1280
+        );
+        // A Pod-level request replaces the containers' total; overhead still adds.
+        assert_eq!(
+            mib(json!({
+                "resources": {"requests": {"memory": "1Gi"}},
+                "containers": [{}],
+                "overhead": {"memory": "64Mi"},
+            })),
+            1088
         );
     }
 }
