@@ -1,0 +1,177 @@
+{{- if .Values.memberRoles.enabled }}
+# A Developer may write ServiceAccounts and RoleBindings in their project for API tokens
+# (files/member-roles.yaml, zeabur-project-api-tokens), and RBAC cannot narrow that to some
+# objects. These policies keep such writes in project namespaces to API tokens:
+#
+# - a ServiceAccount carries the `zeabur.com/api-token` label, names its maker as they are, and
+#   only its recorded expiry changes;
+# - a RoleBinding carries the label and binds one ServiceAccount of the namespace, after which it
+#   is named, to zeabur-project-developer or zeabur-project-viewer;
+# - a ServiceAccount's token cannot make, change or renew API tokens, so a token cannot outlive its
+#   expiry by renewing itself.
+#
+# Each skips whoever may make the same write in every namespace, so admins, controllers (the
+# namespace controller deletes a namespace's objects) and Helm are not held to it.
+# https://kubernetes.io/docs/reference/access-authn-authz/validating-admission-policy/
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: zeabur-api-token-accounts
+  labels:
+    {{- include "zeabur.labels" . | nindent 4 }}
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    namespaceSelector:
+      matchExpressions:
+        - {key: zeabur.com/project, operator: Exists}
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE, DELETE]
+        resources: [serviceaccounts]
+  matchConditions:
+    - name: not-cluster-wide
+      expression: >-
+        !authorizer.group('').resource('serviceaccounts')
+        .check(request.operation == 'DELETE' ? 'delete' : request.operation == 'UPDATE' ? 'update' : 'create').allowed()
+  variables:
+    - name: account
+      expression: "request.operation == 'DELETE' ? oldObject : object"
+    - name: labels
+      expression: "has(variables.account.metadata.labels) ? variables.account.metadata.labels : {}"
+    - name: notes
+      expression: >-
+        has(variables.account.metadata.annotations) ? variables.account.metadata.annotations : {}
+  validations:
+    - expression: "!('system:serviceaccounts' in request.userInfo.groups)"
+      reason: Forbidden
+      message: An API token can't make, change or delete API tokens.
+    - expression: "variables.labels[?'zeabur.com/api-token'].orValue('') == 'true'"
+      reason: Forbidden
+      message: Only an admin can write a ServiceAccount that isn't an API token.
+    - expression: >-
+        request.operation != 'CREATE' ||
+        variables.notes[?'zeabur.com/api-token-created-by'].orValue('') == request.userInfo.username
+      reason: Forbidden
+      message: A new API token must name you as the person who made it.
+    - expression: >-
+        request.operation != 'UPDATE' || (
+        (has(oldObject.metadata.labels) ? oldObject.metadata.labels : {}) == variables.labels &&
+        (has(oldObject.metadata.annotations) ? oldObject.metadata.annotations : {}).all(k,
+          k == 'zeabur.com/api-token-expires-at' || (k in variables.notes &&
+          variables.notes[k] == oldObject.metadata.annotations[k])) &&
+        variables.notes.all(k, k == 'zeabur.com/api-token-expires-at' ||
+          (has(oldObject.metadata.annotations) && k in oldObject.metadata.annotations)) &&
+        (has(object.secrets) ? object.secrets : []) == (has(oldObject.secrets) ? oldObject.secrets : []) &&
+        (has(object.imagePullSecrets) ? object.imagePullSecrets : []) ==
+        (has(oldObject.imagePullSecrets) ? oldObject.imagePullSecrets : []) &&
+        has(object.automountServiceAccountToken) == has(oldObject.automountServiceAccountToken) &&
+        (!has(object.automountServiceAccountToken) ||
+        object.automountServiceAccountToken == oldObject.automountServiceAccountToken))
+      reason: Forbidden
+      message: Only an API token's expiry can change.
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: zeabur-api-token-accounts
+  labels:
+    {{- include "zeabur.labels" . | nindent 4 }}
+spec:
+  policyName: zeabur-api-token-accounts
+  validationActions: [Deny]
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: zeabur-api-token-bindings
+  labels:
+    {{- include "zeabur.labels" . | nindent 4 }}
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    namespaceSelector:
+      matchExpressions:
+        - {key: zeabur.com/project, operator: Exists}
+    resourceRules:
+      - apiGroups: [rbac.authorization.k8s.io]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE, DELETE]
+        resources: [rolebindings]
+  matchConditions:
+    - name: not-cluster-wide
+      expression: >-
+        !authorizer.group('rbac.authorization.k8s.io').resource('rolebindings')
+        .check(request.operation == 'DELETE' ? 'delete' : request.operation == 'UPDATE' ? 'update' : 'create').allowed()
+  variables:
+    - name: binding
+      expression: "request.operation == 'DELETE' ? oldObject : object"
+  validations:
+    - expression: "!('system:serviceaccounts' in request.userInfo.groups)"
+      reason: Forbidden
+      message: An API token can't make, change or delete API tokens.
+    - expression: >-
+        request.operation != 'UPDATE' &&
+        (has(variables.binding.metadata.labels) ? variables.binding.metadata.labels : {})
+        [?'zeabur.com/api-token'].orValue('') == 'true'
+      reason: Forbidden
+      message: Only an admin can write a RoleBinding that isn't an API token's.
+    - expression: >-
+        variables.binding.roleRef.kind == 'ClusterRole' &&
+        variables.binding.roleRef.name in ['zeabur-project-developer', 'zeabur-project-viewer'] &&
+        has(variables.binding.subjects) && size(variables.binding.subjects) == 1 &&
+        variables.binding.subjects[0].kind == 'ServiceAccount' &&
+        variables.binding.subjects[0].namespace == request.namespace &&
+        variables.binding.metadata.name == 'zeabur-api-token-' + variables.binding.subjects[0].name
+      reason: Forbidden
+      message: >-
+        An API token's RoleBinding gives one of the project's roles to one ServiceAccount of the
+        project, after which it is named.
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: zeabur-api-token-bindings
+  labels:
+    {{- include "zeabur.labels" . | nindent 4 }}
+spec:
+  policyName: zeabur-api-token-bindings
+  validationActions: [Deny]
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: zeabur-api-token-requests
+  labels:
+    {{- include "zeabur.labels" . | nindent 4 }}
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    namespaceSelector:
+      matchExpressions:
+        - {key: zeabur.com/project, operator: Exists}
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: [v1]
+        operations: [CREATE]
+        resources: [serviceaccounts/token]
+  matchConditions:
+    - name: not-cluster-wide
+      expression: >-
+        !authorizer.group('').resource('serviceaccounts').subresource('token').check('create').allowed()
+  validations:
+    - expression: "!('system:serviceaccounts' in request.userInfo.groups)"
+      reason: Forbidden
+      message: An API token can't issue tokens.
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: zeabur-api-token-requests
+  labels:
+    {{- include "zeabur.labels" . | nindent 4 }}
+spec:
+  policyName: zeabur-api-token-requests
+  validationActions: [Deny]
+{{- end }}

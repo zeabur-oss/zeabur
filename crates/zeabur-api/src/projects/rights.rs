@@ -56,7 +56,9 @@ pub struct ProjectRights {
     pub deploy_from_git: Permission,
     /// Change network policies: `create` and `patch` on networkpolicies.
     pub change_network_policies: Permission,
-    /// Give people access to the project: `create` on rolebindings.
+    /// Give people access to the project: `create` on rolebindings and `bind` on clusterroles. A
+    /// Developer creates rolebindings too, but the chart's admission policy keeps those to API
+    /// tokens.
     pub change_members: Permission,
 }
 
@@ -207,7 +209,10 @@ impl ProjectRights {
                 "networking.k8s.io",
                 "networkpolicies",
             ),
-            change_members: ask.can("create", "rbac.authorization.k8s.io", "rolebindings"),
+            change_members: all([
+                ask.can("create", "rbac.authorization.k8s.io", "rolebindings"),
+                ask.can("bind", "rbac.authorization.k8s.io", "clusterroles"),
+            ]),
         }
     }
 }

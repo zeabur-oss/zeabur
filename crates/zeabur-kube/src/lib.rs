@@ -50,9 +50,9 @@ pub use objects::{Access, AccessRule, AccessRules, ResourceRef, ServedResource};
 pub use port::{
     Answer, Cluster, ClusterError, ClusterEvents, ClusterExt, ClusterFacts, ClusterPod,
     ClusterPods, ContainerResources, ExecRequest, ExecSession, ExecStream, ExitStatus,
-    FIELD_MANAGER, GatewayRef, Identity, LogLines, LogOptions, NamespaceObjects, ObjectTarget,
-    Preconditions, RawList, Resize, SecretSummary, ServicePort, TerminalSize, Unreadable,
-    WriteBody, WriteRequest, Written,
+    FIELD_MANAGER, GatewayRef, Identity, IssuedToken, LogLines, LogOptions, NamespaceObjects,
+    ObjectTarget, Preconditions, RawList, Resize, SecretSummary, ServicePort, TerminalSize,
+    Unreadable, WriteBody, WriteRequest, Written,
 };
 use secrecy::{ExposeSecret as _, SecretString};
 
