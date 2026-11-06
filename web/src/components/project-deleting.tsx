@@ -48,27 +48,33 @@ export function ProjectDeleting({ project, className }: { project: string; class
     )
   const state = namespace.data?.deleting
   const holding = (state?.finalizers.length ?? 0) > 0
-  const forcible = (state?.held.length ?? 0) > 0
   return (
     <Alert variant={holding ? "warn" : "info"} role="status" className={className}>
       <TrashIcon aria-hidden="true" />
       <AlertTitle>{t("deleting.title")}</AlertTitle>
       <AlertDescription>
         <p>{state ? progressText(t, locale, state) : t("deleting.body")}</p>
-        {holding ? (
-          <p>
-            {t("deleting.held")}
-            {forcible ? `${t("common.gap")}${t("deleting.forceHint")}` : ""}
-          </p>
-        ) : null}
-        {holding ? (
-          <div className="mt-3 flex min-w-0 flex-col items-start gap-2">
-            {forcible ? <ForceDelete project={project} /> : null}
-            <HeldObjects project={project} held={state?.held ?? []} />
-          </div>
-        ) : null}
+        {state && holding ? <Held project={project} held={state.held} /> : null}
       </AlertDescription>
     </Alert>
+  )
+}
+
+/** Why the project is held, Force delete when Zeabur can lift it, and the kubectl commands. */
+function Held({ project, held }: { project: string; held: Schemas.HeldObject[] }) {
+  const t = useT()
+  const forcible = held.length > 0
+  return (
+    <>
+      <p>
+        {t("deleting.held")}
+        {forcible ? `${t("common.gap")}${t("deleting.forceHint")}` : ""}
+      </p>
+      <div className="mt-3 flex min-w-0 flex-col items-start gap-2">
+        {forcible ? <ForceDelete project={project} /> : null}
+        <HeldObjects project={project} held={held} />
+      </div>
+    </>
   )
 }
 
