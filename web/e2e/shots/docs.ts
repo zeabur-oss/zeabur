@@ -47,6 +47,12 @@ test.describe(() => {
     await expect(page.locator('[role="alert"]')).toBeVisible()
     await shot()
   })
+  test("installer-options", async ({ page, shot }) => {
+    await page.goto("/", { waitUntil: "networkidle" })
+    await toStep(page, "settings")
+    await expect(page.locator('main[data-step="settings"] [data-slot="checkbox"]').first()).toBeVisible()
+    await shot()
+  })
   test.describe(() => {
     test.use({ demo: { ZEABUR_DEMO_INSTALL: "running" } })
     // Stopped before Zeabur: the folded timeline then shows five items.
@@ -902,4 +908,60 @@ test("change-review", async ({ page, shot }) => {
   await page.locator('[role="dialog"] button:text-is("YAML")').click()
   await expect(page.locator('[role="dialog"] pre, [role="dialog"] code').first()).toBeVisible()
   await shot({ clip: '[role="dialog"]' })
+})
+
+// The blog post of 0.2.0 and the build, networking and update pages it shows.
+test("build-limits", async ({ page, shot }) => {
+  await page.goto("/projects/blog/settings", { waitUntil: "networkidle" })
+  await expect(page.locator("section#builds")).toBeVisible()
+  await shot({ clip: "section#builds" })
+})
+test.describe(() => {
+  test.use({ demo: { ZEABUR_DEMO_BUILD_OOM: "1" } })
+  test("build-out-of-memory", async ({ page, shot }) => {
+    await page.goto("/projects/blog/services/Deployment/docs?tab=builds", {
+      waitUntil: "networkidle",
+    })
+    await expect(page.locator('a[href$="/settings#builds"]')).toBeVisible()
+    await shot({ clip: "main" })
+  })
+})
+test("networking-port-hint", async ({ page, shot }) => {
+  await page.goto("/projects/lab/services/Deployment/storefront?tab=networking", {
+    waitUntil: "networkidle",
+  })
+  await expect(page.locator('[data-slot="empty"] button:has-text("3000")')).toBeVisible()
+  await shot({ clip: '[data-slot="empty"]' })
+})
+test("private-address-form", async ({ page, shot }) => {
+  await page.goto("/projects/lab/services/Deployment/storefront?tab=networking", {
+    waitUntil: "networkidle",
+  })
+  await page.locator('[data-slot="empty"] form input[inputmode="numeric"]').fill("3000")
+  await expect(page.locator('[data-slot="empty"] form button[type=submit]')).toBeEnabled()
+  await shot({ clip: '[data-slot="empty"]' })
+})
+test.describe(() => {
+  test.use({ demo: { ZEABUR_DEMO_UPDATE_CHECK: "1" } })
+  test("update-available", async ({ page, shot }) => {
+    // The demo reaches no GitHub, so the page is told what the update check would find.
+    await page.route("**/api/v1/cluster/zeabur/update", (route) =>
+      route.fulfill({
+        json: {
+          newer: {
+            latest: {
+              version: "0.2.0",
+              url: "https://github.com/zeabur-oss/zeabur/releases/tag/v0.2.0",
+              prerelease: false,
+              security: false,
+            },
+            security: [],
+          },
+        },
+      }),
+    )
+    await page.goto("/cluster", { waitUntil: "networkidle" })
+    await expect(page.locator("#cluster-attention-title")).toBeVisible()
+    await shot({ clip: "section:has(#cluster-attention-title)" })
+  })
 })

@@ -52,6 +52,9 @@
 //! at the start: it is installed on `acme` and `bob`, and `acme` is granted to `shop`.
 //! `ZEABUR_DEMO_GITHUB=uninstalled` makes the App at the start, installed nowhere.
 //!
+//! `ZEABUR_DEMO_UPDATE_CHECK=1` turns the update check on, so the interface asks for a newer
+//! version. The demo reaches no GitHub, so that answer comes from the caller.
+//!
 //! The Error pages template has a made-up idle use of 9 MiB, so turning on a domain's error pages
 //! says the cluster has room; `ZEABUR_DEMO_TEMPLATE_IDLE=large` makes it 24 GiB, to see it tight.
 //!
@@ -3302,6 +3305,7 @@ async fn main() -> std::io::Result<()> {
             web_url: url.clone(),
             api_url: url,
         }),
+        update_check: std::env::var_os("ZEABUR_DEMO_UPDATE_CHECK").is_some(),
         ..zeabur_api::Settings::default()
     };
     let images = zeabur_api::images::Inspector::new(Arc::new(Registry::new()), Vec::new());
