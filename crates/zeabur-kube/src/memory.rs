@@ -735,7 +735,10 @@ impl Cluster for MemoryCluster {
                     .container
                     .as_ref()
                     .and_then(|c| state.logs.get(&format!("{key}/{c}")));
-                return Ok(own.or_else(|| state.logs.get(&key)).cloned().unwrap_or_default());
+                return Ok(own
+                    .or_else(|| state.logs.get(&key))
+                    .cloned()
+                    .unwrap_or_default());
             }
             state.previous_logs.get(&key).cloned().ok_or_else(|| {
                 // The kubelet's refusal, as kube-apiserver passes it on.
