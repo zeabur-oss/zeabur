@@ -49,7 +49,7 @@ export const Note = ({ children }: { children: ReactNode }) => (
 
 export type Shown = (problem: unknown, text: () => string) => string[]
 
-interface Choices {
+export interface Choices {
   named: boolean
   methoded: boolean
   ported: boolean
@@ -59,7 +59,7 @@ interface Choices {
 }
 
 /** The form as the objects take it, with what the person has not typed filled in. */
-function resolveBuilt<F extends BuiltForm>(
+export function resolveBuilt<F extends BuiltForm>(
   form: F,
   choices: Choices,
   context: {
