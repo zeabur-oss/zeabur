@@ -21,7 +21,7 @@ stringData:
 ---
 # Keep these values out of Git (SOPS, Sealed Secrets or a secret manager).
 # csLapiSecret: The local API (LAPI) signs agent sessions with this shared secret.
-# registrationToken: Agents register with the local API using this token.
+# registrationToken: The chart's LAPI reads this token. Auto-registration is off, so nothing uses it.
 apiVersion: v1
 kind: Secret
 metadata:
@@ -30,6 +30,31 @@ metadata:
 stringData:
   csLapiSecret: "<random: openssl rand -hex 64>"
   registrationToken: "<random: openssl rand -hex 64>"
+---
+# ca (namespace crowdsec)
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata: {name: crowdsec-selfsigned, namespace: crowdsec}
+spec: {selfSigned: {}}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata: {name: crowdsec-ca, namespace: crowdsec}
+spec:
+  isCA: true
+  commonName: crowdsec-ca
+  secretName: crowdsec-ca
+  # Ten years, like the certificates it signs.
+  duration: 87600h
+  renewBefore: 720h
+  privateKey: {algorithm: ECDSA, size: 256}
+  issuerRef: {name: crowdsec-selfsigned, kind: Issuer}
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata: {name: crowdsec-ca, namespace: crowdsec}
+spec:
+  ca: {secretName: crowdsec-ca}
 ---
 apiVersion: helm.cattle.io/v1
 kind: HelmChart
@@ -56,6 +81,17 @@ spec:
         requests:
           cpu: 20m
           memory: 48Mi
+      wait_for_lapi:
+        image:
+          repository: crowdsecurity/crowdsec
+          tag: v1.8.1@sha256:0f2523fa61ef507f15d953045cface490cc880670c62f2755ced17524107f71a
+    config:
+      config.yaml.local: |
+        db_config:
+          flush:
+            agents_autodelete:
+              # Deletes the machine a restarted agent leaves behind.
+              cert: 7d
     container_runtime: containerd
     image:
       repository: crowdsecurity/crowdsec
@@ -71,7 +107,7 @@ spec:
             name: crowdsec-bouncer-key
       persistentVolume:
         config:
-          enabled: true
+          enabled: false
         data:
           enabled: true
       resources:
@@ -83,6 +119,17 @@ spec:
     secrets:
       externalSecret:
         name: crowdsec-lapi
+    tls:
+      certManager:
+        duration: 87600h
+        issuerRef:
+          kind: Issuer
+          name: crowdsec-ca
+        renewBefore: 720h
+        secretTemplate:
+          labels:
+            app.kubernetes.io/part-of: crowdsec
+      enabled: true
 ---
 # bouncer-middleware (namespace crowdsec)
 # Referenced from Traefik's entrypoints as crowdsec-bouncer@kubernetescrd.
@@ -97,8 +144,10 @@ spec:
       enabled: true
       # Local copy of decisions; requests never wait on LAPI.
       crowdsecMode: stream
-      crowdsecLapiScheme: http
+      crowdsecLapiScheme: https
       crowdsecLapiHost: crowdsec-service.crowdsec.svc.cluster.local:8080
+      # The CA from the ca release, which signs the LAPI certificate.
+      crowdsecLapiTlsCertificateAuthority: urn:k8s:secret:crowdsec-lapi-tls:ca.crt
       # Read from the Secret in the Middleware's namespace.
       crowdsecLapiKey: urn:k8s:secret:crowdsec-bouncer-key:key
       # Fail open: if LAPI is unreachable, keep serving traffic.
