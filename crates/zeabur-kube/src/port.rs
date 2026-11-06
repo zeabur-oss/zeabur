@@ -300,6 +300,20 @@ pub trait Cluster: Send + Sync {
     /// `resourceVersion`.
     fn write<'a>(&'a self, request: &'a WriteRequest) -> Answer<'a, Written>;
 
+    /// A token for ServiceAccount `name` in `namespace`, from a `TokenRequest` (`create` of
+    /// `serviceaccounts/token`) for the API server's own audience, valid for `seconds` or less
+    /// [k8s-token-request]. kube-apiserver may shorten it
+    /// (`--service-account-max-token-expiration`), so [`IssuedToken::expires_at`] is the expiry it
+    /// answered.
+    ///
+    /// [k8s-token-request]: https://kubernetes.io/docs/reference/kubernetes-api/authentication-resources/token-request-v1/
+    fn request_token<'a>(
+        &'a self,
+        namespace: &'a str,
+        name: &'a str,
+        seconds: i64,
+    ) -> Answer<'a, IssuedToken>;
+
     // ── Reads through the service proxy ──────────────────────────────────────────────────────
 
     /// `GET path_and_query` of `service` through kube-apiserver's service proxy
@@ -564,6 +578,23 @@ pub struct WriteRequest {
     ///
     /// [k8s-dry-run]: https://kubernetes.io/docs/reference/using-api/api-concepts/#dry-run
     pub dry_run: bool,
+}
+
+/// A token kube-apiserver issued ([`Cluster::request_token`]). Shown once; never logged.
+#[derive(Clone, PartialEq, Eq)]
+pub struct IssuedToken {
+    /// `status.token`.
+    pub token: String,
+    /// `status.expirationTimestamp`, RFC 3339.
+    pub expires_at: String,
+}
+
+impl std::fmt::Debug for IssuedToken {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("IssuedToken")
+            .field("expires_at", &self.expires_at)
+            .finish_non_exhaustive()
+    }
 }
 
 /// What a write left behind.

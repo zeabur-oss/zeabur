@@ -2,9 +2,9 @@
 # (crates/zeabur-api/src/members/access.rs, which also tests these rules). A project role gathers
 # the rule sets files/member-role-sets.yaml names for it.
 #
-# Every verb and resource is named: no `*`. Neither role has RBAC objects, namespace create or
-# delete, nodes/proxy, or the escalate, bind and impersonate verbs, so no member can widen their
-# own rights or reach a kubelet.
+# Every verb and resource is named: no `*`. Neither role has namespace create or delete,
+# nodes/proxy, or the escalate, bind and impersonate verbs, so no member can widen their own
+# rights or reach a kubelet. The one RBAC write is the Developer's RoleBinding for an API token.
 # https://kubernetes.io/docs/concepts/security/rbac-good-practices/#privilege-escalation-risks
 #
 # No role has `velero.io`. Velero writes a Restore's objects with its own service account
@@ -260,3 +260,21 @@ zeabur-project-builds-write:
   - apiGroups: [builder.zeabur.com]
     resources: [builds]
     verbs: [create, patch, delete]
+
+# API tokens (crates/zeabur-plan/src/api_token.rs): a ServiceAccount labelled
+# `zeabur.com/api-token`, a RoleBinding of it to a project role, and its tokens. RBAC lets a
+# person bind only a role whose rights they hold, so a Viewer cannot make a Developer token.
+# The admission policy zeabur-api-tokens (templates/api-token-policy.yaml) keeps these writes to
+# labelled ServiceAccounts and to bindings of one of them to a project role, and refuses them to
+# the tokens themselves.
+# https://kubernetes.io/docs/reference/access-authn-authz/rbac/#restrictions-on-role-binding-creation-or-update
+zeabur-project-api-tokens:
+  - apiGroups: [""]
+    resources: [serviceaccounts]
+    verbs: [create, patch, delete]
+  - apiGroups: [""]
+    resources: [serviceaccounts/token]
+    verbs: [create]
+  - apiGroups: [rbac.authorization.k8s.io]
+    resources: [rolebindings]
+    verbs: [get, create, delete]

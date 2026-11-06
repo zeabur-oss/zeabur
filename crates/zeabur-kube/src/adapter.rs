@@ -11,10 +11,10 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use futures_util::{AsyncBufReadExt as _, TryStreamExt as _};
 use k8s_openapi::api::apps::v1::{DaemonSet, Deployment, StatefulSet};
-use k8s_openapi::api::authentication::v1::SelfSubjectReview;
+use k8s_openapi::api::authentication::v1::{SelfSubjectReview, TokenRequest, TokenRequestSpec};
 use k8s_openapi::api::batch::v1::{CronJob, Job};
 use k8s_openapi::api::core::v1::{
-    ConfigMap, Namespace, Node, PersistentVolumeClaim, Pod, Secret, Service,
+    ConfigMap, Namespace, Node, PersistentVolumeClaim, Pod, Secret, Service, ServiceAccount,
 };
 use k8s_openapi::api::networking::v1::{Ingress, IngressClass};
 use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition;
@@ -29,8 +29,8 @@ use zeabur_core::problem::{Denied, FieldCause, KubernetesStatus, StatusDetails};
 use crate::objects::{self, AccessRules, ResourceRef, ServedResource};
 use crate::port::{
     Answer, Cluster, ClusterError, ClusterEvents, ClusterFacts, ClusterPods, ExecRequest,
-    ExecSession, ExecStream, ExitStatus, Identity, LogLines, LogOptions, NamespaceObjects,
-    SecretSummary, ServicePort, TerminalSize, Unreadable, WriteRequest, Written,
+    ExecSession, ExecStream, ExitStatus, Identity, IssuedToken, LogLines, LogOptions,
+    NamespaceObjects, SecretSummary, ServicePort, TerminalSize, Unreadable, WriteRequest, Written,
 };
 use crate::{UserClient, names, wide};
 
@@ -816,6 +816,35 @@ impl Cluster for UserClient {
 
     fn write<'a>(&'a self, request: &'a WriteRequest) -> Answer<'a, Written> {
         Box::pin(async move { crate::write::write(self.kube(), request).await })
+    }
+
+    fn request_token<'a>(
+        &'a self,
+        namespace: &'a str,
+        name: &'a str,
+        seconds: i64,
+    ) -> Answer<'a, IssuedToken> {
+        Box::pin(async move {
+            names::namespace(namespace)?;
+            names::name(name)?;
+            let request = TokenRequest {
+                spec: TokenRequestSpec {
+                    expiration_seconds: Some(seconds),
+                    ..TokenRequestSpec::default()
+                },
+                ..TokenRequest::default()
+            };
+            let answer = Api::<ServiceAccount>::namespaced(self.kube().clone(), namespace)
+                .create_token_request(name, &PostParams::default(), &request)
+                .await?;
+            let status = answer.status.ok_or_else(|| {
+                ClusterError::Decode("the TokenRequest came back without a status".to_owned())
+            })?;
+            Ok(IssuedToken {
+                token: status.token,
+                expires_at: status.expiration_timestamp.0.to_string(),
+            })
+        })
     }
 
     // ── Reads for releases, storage and YAML edits ───────────────────────────────────────────

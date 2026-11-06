@@ -341,6 +341,211 @@ export type AlertmanagerChannelSettings =
     }
 
 /**
+ * A token kube-apiserver issued, shown once.
+ */
+export type IssuedTokenView = {
+  /**
+   * kube-apiserver's CA bundle, PEM, from `kube-root-ca.crt`; absent when it could not be
+   * read.
+   * @nullable
+   */
+  ca?: string | null
+  /** When it expires, RFC 3339, as kube-apiserver answered. */
+  expiresAt: string
+  /** The ServiceAccount's name. */
+  name: string
+  /** Its namespace. */
+  namespace: string
+  /** Whether the expiry was recorded on the ServiceAccount for the token list. */
+  recorded: boolean
+  /** The bearer token. */
+  token: string
+}
+
+/**
+ * What an applied plan made.
+ */
+export type ApiTokenApplied = {
+  issued?: IssuedTokenView | null
+}
+
+/**
+ * The token of an API token plan to apply.
+ */
+export type ApiTokenApply = {
+  /** The token `plan` returned. */
+  token: string
+}
+
+/**
+ * What a member may do in one project.
+ */
+export type ProjectRole = (typeof ProjectRole)[keyof typeof ProjectRole]
+
+export const ProjectRole = {
+  developer: "developer",
+  viewer: "viewer",
+} as const
+
+/**
+ * A change to a project's API tokens.
+ */
+export type ApiTokenChange =
+  | {
+      /**
+       * Whether the role applies in every namespace (`ClusterRoleBinding`), not only the
+       * project's.
+       */
+      cluster?: boolean
+      /** How long the token should last; kube-apiserver may cut it. */
+      expirationSeconds: number
+      /** The ServiceAccount's name: lower-case letters, digits and `-`, at most 63 characters. */
+      name: string
+      op: "create"
+      /** The project role it gets. */
+      role: ProjectRole
+    }
+  | {
+      /** How long the new token should last. */
+      expirationSeconds: number
+      /** The token's name. */
+      name: string
+      op: "renew"
+    }
+  | {
+      /** The token's name. */
+      name: string
+      op: "delete"
+    }
+
+/**
+ * How a planned write changes its object.
+ */
+export type MemberWriteAction = (typeof MemberWriteAction)[keyof typeof MemberWriteAction]
+
+export const MemberWriteAction = {
+  create: "create",
+  patch: "patch",
+  delete: "delete",
+} as const
+
+/**
+ * One object a member plan writes.
+ */
+export type MemberWrite = {
+  /** The write. */
+  action: MemberWriteAction
+  /**
+   * The object as it will be, YAML; absent when it is deleted.
+   * @nullable
+   */
+  afterYaml?: string | null
+  /** `apiVersion`. */
+  apiVersion: string
+  /**
+   * The object as it is, YAML; absent when it is created or not shown.
+   * @nullable
+   */
+  beforeYaml?: string | null
+  /** The kind. */
+  kind: string
+  /** Its name; for the invitation, the prefix its random name starts with. */
+  name: string
+  /**
+   * Its namespace; absent for a cluster-scoped object.
+   * @nullable
+   */
+  namespace?: string | null
+}
+
+/**
+ * An API token plan and the token that applies it.
+ */
+export type ApiTokenPlan = {
+  /** When the plan token stops working, RFC 3339. */
+  expiresAt: string
+  /** Send this to `apply` to carry out exactly this plan. */
+  token: string
+  /** The writes, in order. The `TokenRequest` is a creation of kind `TokenRequest`. */
+  writes: MemberWrite[]
+}
+
+/**
+ * One API token of a project.
+ */
+export type ApiTokenView = {
+  /** Whether the role applies in every namespace. */
+  cluster: boolean
+  /**
+   * When it was made, RFC 3339.
+   * @nullable
+   */
+  createdAt?: string | null
+  /**
+   * The Kubernetes user name of whoever made it.
+   * @nullable
+   */
+  createdBy?: string | null
+  /**
+   * When its latest token expires, RFC 3339, as kube-apiserver answered.
+   * @nullable
+   */
+  expiresAt?: string | null
+  /** The ServiceAccount's name. */
+  name: string
+  role?: ProjectRole | null
+}
+
+/**
+ * Whether the person may change something, as far as their RBAC rules tell.
+ */
+export type Permission = (typeof Permission)[keyof typeof Permission]
+
+export const Permission = {
+  allowed: "allowed",
+  denied: "denied",
+  unknown: "unknown",
+} as const
+
+/**
+ * Why a role cannot be given to a token.
+ */
+export type ChoiceRefusal = (typeof ChoiceRefusal)[keyof typeof ChoiceRefusal]
+
+export const ChoiceRefusal = {
+  noTokenRights: "noTokenRights",
+  notHeld: "notHeld",
+  notAdmin: "notAdmin",
+} as const
+
+/**
+ * A role a token can be given, and whether this person can give it.
+ */
+export type RoleChoice = {
+  /** In every namespace. */
+  cluster: boolean
+  /** What `SelfSubjectAccessReview` answered for the rights it needs. */
+  permission: Permission
+  refusal?: ChoiceRefusal | null
+  /** The role. */
+  role: ProjectRole
+}
+
+/**
+ * A project's API tokens.
+ */
+export type ApiTokens = {
+  /** Whether the person may delete a token. */
+  canDelete: Permission
+  /** Whether the person may renew a token. */
+  canRenew: Permission
+  /** The roles a new token can be given. */
+  choices: RoleChoice[]
+  /** The tokens, by name. */
+  items: ApiTokenView[]
+}
+
+/**
  * The object a planned write addresses.
  */
 export type PlanTarget = {
@@ -2208,17 +2413,6 @@ export type ClientFrame = {
   rows: number
   type: "resize"
 }
-
-/**
- * Whether the person may change something, as far as their RBAC rules tell.
- */
-export type Permission = (typeof Permission)[keyof typeof Permission]
-
-export const Permission = {
-  allowed: "allowed",
-  denied: "denied",
-  unknown: "unknown",
-} as const
 
 /**
  * What the person may change in the cluster itself.
@@ -6382,16 +6576,6 @@ export type MemberApplyRequest = {
 }
 
 /**
- * What a member may do in one project.
- */
-export type ProjectRole = (typeof ProjectRole)[keyof typeof ProjectRole]
-
-export const ProjectRole = {
-  developer: "developer",
-  viewer: "viewer",
-} as const
-
-/**
  * A member's role in a project.
  */
 export type ProjectGrant = {
@@ -6433,46 +6617,6 @@ export type MemberChange =
       /** The member. */
       username: string
     }
-
-/**
- * How a planned write changes its object.
- */
-export type MemberWriteAction = (typeof MemberWriteAction)[keyof typeof MemberWriteAction]
-
-export const MemberWriteAction = {
-  create: "create",
-  patch: "patch",
-  delete: "delete",
-} as const
-
-/**
- * One object a member plan writes.
- */
-export type MemberWrite = {
-  /** The write. */
-  action: MemberWriteAction
-  /**
-   * The object as it will be, YAML; absent when it is deleted.
-   * @nullable
-   */
-  afterYaml?: string | null
-  /** `apiVersion`. */
-  apiVersion: string
-  /**
-   * The object as it is, YAML; absent when it is created or not shown.
-   * @nullable
-   */
-  beforeYaml?: string | null
-  /** The kind. */
-  kind: string
-  /** Its name; for the invitation, the prefix its random name starts with. */
-  name: string
-  /**
-   * Its namespace; absent for a cluster-scoped object.
-   * @nullable
-   */
-  namespace?: string | null
-}
 
 /**
  * A member plan and the token that applies it.
@@ -8520,7 +8664,11 @@ export type ProjectRights = {
   changeDatabases: Permission
   /** Add, change and remove domains: `create`, `patch` and `delete` on ingresses or HTTPRoutes. */
   changeDomains: Permission
-  /** Give people access to the project: `create` on rolebindings. */
+  /**
+   * Give people access to the project: `create` on rolebindings and `bind` on clusterroles. A
+   * Developer creates rolebindings too, but the chart's admission policy keeps those to API
+   * tokens.
+   */
   changeMembers: Permission
   /** Change network policies: `create` and `patch` on networkpolicies. */
   changeNetworkPolicies: Permission
@@ -11719,6 +11867,103 @@ export const getProjectAlerts = async (
   return zeaburFetch<RuntimeAlerts>(getGetProjectAlertsUrl(project), {
     ...options,
     method: "GET",
+  })
+}
+
+export const getListApiTokensUrl = (project: string) => {
+  return `/api/v1/projects/${encodeURIComponent(String(project))}/api-tokens`
+}
+
+/**
+ * @summary A project's API tokens and the roles a new one can be given. Read as the person.
+ */
+export const listApiTokens = async (
+  project: string,
+  options?: Parameters<typeof zeaburFetch>[1],
+): Promise<ApiTokens> => {
+  return zeaburFetch<ApiTokens>(getListApiTokensUrl(project), {
+    ...options,
+    method: "GET",
+  })
+}
+
+export const getApplyApiTokenChangeUrl = (project: string) => {
+  return `/api/v1/projects/${encodeURIComponent(String(project))}/api-tokens/apply`
+}
+
+/**
+ * @summary Carries out an API token plan by its token: checks it, dry-runs every creation and deletion,
+then writes, requests the token and records its expiry. The token is in the answer only.
+ */
+export const applyApiTokenChange = async (
+  project: string,
+  apiTokenApply: ApiTokenApply,
+  options?: Parameters<typeof zeaburFetch>[1],
+): Promise<ApiTokenApplied> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit["headers"]>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {}
+    if (h instanceof Headers) return Object.fromEntries(h.entries())
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      )
+    }
+    const headers: Record<string, string | readonly string[]> = {}
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value
+    }
+    return headers
+  }
+  return zeaburFetch<ApiTokenApplied>(getApplyApiTokenChangeUrl(project), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...getHeaders(options?.headers) },
+    body: JSON.stringify(apiTokenApply),
+  })
+}
+
+export const getPlanApiTokenChangeUrl = (project: string) => {
+  return `/api/v1/projects/${encodeURIComponent(String(project))}/api-tokens/plan`
+}
+
+/**
+ * @summary Works out what a change to a project's API tokens writes, and a token to apply it; writes
+nothing and issues no token.
+ */
+export const planApiTokenChange = async (
+  project: string,
+  apiTokenChange: ApiTokenChange,
+  options?: Parameters<typeof zeaburFetch>[1],
+): Promise<ApiTokenPlan> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit["headers"]>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {}
+    if (h instanceof Headers) return Object.fromEntries(h.entries())
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      )
+    }
+    const headers: Record<string, string | readonly string[]> = {}
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value
+    }
+    return headers
+  }
+  return zeaburFetch<ApiTokenPlan>(getPlanApiTokenChangeUrl(project), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...getHeaders(options?.headers) },
+    body: JSON.stringify(apiTokenChange),
   })
 }
 

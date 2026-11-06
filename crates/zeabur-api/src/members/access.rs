@@ -56,7 +56,7 @@ impl ProjectRole {
         }
     }
 
-    fn of_cluster_role(name: &str) -> Option<Self> {
+    pub(crate) fn of_cluster_role(name: &str) -> Option<Self> {
         [Self::Developer, Self::Viewer]
             .into_iter()
             .find(|role| role.cluster_role() == name)
@@ -659,7 +659,8 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn secrets_shells_and_patching_the_namespace_are_developers_and_nobody_gets_rbac_or_kubelets() {
+    fn secrets_shells_and_patching_the_namespace_are_developers_and_nobody_widens_rbac_or_reaches_kubelets()
+     {
         let roles = roles();
         let sensitive = [
             ("list", "secrets"),
@@ -684,17 +685,21 @@ pub(crate) mod tests {
             ] {
                 for resource in [
                     "roles.rbac.authorization.k8s.io",
-                    "rolebindings.rbac.authorization.k8s.io",
                     "clusterroles.rbac.authorization.k8s.io",
                     "clusterrolebindings.rbac.authorization.k8s.io",
                 ] {
                     assert!(!allows(role, verb, resource), "{name} {verb} {resource}");
                 }
             }
+            for verb in ["update", "patch", "bind", "escalate"] {
+                assert!(
+                    !allows(role, verb, "rolebindings.rbac.authorization.k8s.io"),
+                    "{name} {verb} rolebindings"
+                );
+            }
             assert!(!allows(role, "get", "nodes/proxy"), "{name}");
             assert!(!allows(role, "impersonate", "users"), "{name}");
             assert!(!allows(role, "impersonate", "serviceaccounts"), "{name}");
-            assert!(!allows(role, "create", "serviceaccounts/token"), "{name}");
             // The patch reaches only the project's own Namespace (RoleBinding), and the chart's
             // admission policy keeps it to the details without `zeabur-manage`.
             assert_eq!(allows(role, "patch", "namespaces"), developer, "{name}");
@@ -717,6 +722,46 @@ pub(crate) mod tests {
         assert!(allows(baseline, "get", "persistentvolumes"));
         assert!(!allows(baseline, "list", "persistentvolumes"));
         assert!(!allows(baseline, "list", "pods"));
+    }
+
+    #[test]
+    fn developers_make_api_tokens_and_viewers_do_not() {
+        let roles = roles();
+        let developer = &roles[ProjectRole::Developer.cluster_role()];
+        let viewer = &roles[ProjectRole::Viewer.cluster_role()];
+        let writes = [
+            ("create", "serviceaccounts"),
+            ("patch", "serviceaccounts"),
+            ("delete", "serviceaccounts"),
+            ("create", "serviceaccounts/token"),
+            ("create", "rolebindings.rbac.authorization.k8s.io"),
+            ("delete", "rolebindings.rbac.authorization.k8s.io"),
+        ];
+        for (verb, resource) in writes {
+            assert!(
+                allows(developer, verb, resource),
+                "developer {verb} {resource}"
+            );
+            assert!(!allows(viewer, verb, resource), "viewer {verb} {resource}");
+        }
+        assert!(allows(viewer, "list", "serviceaccounts"));
+    }
+
+    #[test]
+    fn the_api_token_policy_names_what_zeabur_writes() {
+        use zeabur_plan::api_token;
+        let policy =
+            include_str!("../../../../deploy/chart/zeabur/templates/api-token-policy.yaml");
+        for name in [
+            api_token::LABEL,
+            api_token::CREATED_BY_ANNOTATION,
+            api_token::EXPIRES_AT_ANNOTATION,
+            ProjectRole::Developer.cluster_role(),
+            ProjectRole::Viewer.cluster_role(),
+        ] {
+            assert!(policy.contains(&format!("'{name}'")), "{name}");
+        }
+        assert!(policy.contains(&format!("'{}' + ", api_token::binding_name(""))));
     }
 
     #[test]
