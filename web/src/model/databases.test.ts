@@ -892,6 +892,19 @@ describe("changing backups", () => {
       if (change.op === "edit") expect(change.specOnly).toBe(true)
   })
 
+  test("PostgreSQL: a v0.1.1 setup without a region keeps the ObjectStore off REGION", () => {
+    const changes = writeBackups(pg, { ...kept, keepDays: 30 }, true, false)
+    const store = edits(changes)["db-backups"].spec
+    expect(store.retentionPolicy).toBe("30d")
+    expect(store.configuration.s3Credentials).not.toHaveProperty("region")
+    expect(changes.filter((c) => c.op === "data")).toEqual([])
+    const typed = writeBackups(pg, { ...kept, region: "eu" }, true, false)
+    expect(edits(typed)["db-backups"].spec.configuration.s3Credentials.region).toEqual({
+      name: "db-backups-s3",
+      key: "REGION",
+    })
+  })
+
   test("PostgreSQL: a typed region is set in the Secret that stays", () => {
     const [region] = writeBackups(pg, { ...kept, region: "eu" }, true)
     expect(region).toEqual({

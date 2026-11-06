@@ -26,6 +26,7 @@ import { ConnectServices } from "@/components/connect"
 import { InstallAlert } from "@/components/lazy-installer-sheet"
 import { CopyText } from "@/components/copy-text"
 import { useBackups } from "@/components/backups"
+import { secretKeys } from "@/components/data-editor"
 import { DocsLink } from "@/components/docs-link"
 import { DatabaseState } from "@/components/databases"
 import {
@@ -67,6 +68,7 @@ import {
   turnOffBackups,
   turnOffSummary,
   writeBackups,
+  holdsRegion,
   daysOf,
   engineName,
   engineOperator,
@@ -865,18 +867,19 @@ function BackupForm({
   const planner = usePlanner(project, onCancel)
   const gate = useGate(project, "changeDatabases")
   const secret = backupNames(database.name).secret
-  const keysExist =
-    useQuery({
-      ...objectQuery(project, { group: "", version: "v1", resource: "secrets", name: secret }),
-      retry: false,
-    }).data !== undefined
+  const saved = useQuery({
+    ...objectQuery(project, { group: "", version: "v1", resource: "secrets", name: secret }),
+    retry: false,
+  }).data
+  const keysExist = saved !== undefined
+  const regionSaved = saved !== undefined && holdsRegion(database, secretKeys(saved.yaml))
   const problems = targetProblems(target, keysExist)
   const review = () => {
     setTried(true)
     if (problems.length > 0) return
     planner.plan({
       title: t(backupsOn(database) ? "db.backup.planEdit" : "db.backup.plan", database.name),
-      changes: writeBackups(database, target, keysExist),
+      changes: writeBackups(database, target, keysExist, regionSaved),
       summary: backupsSummary(t, database, target, keysExist),
       notes: backupsNotes(t, database, target),
     })
@@ -901,7 +904,7 @@ function BackupForm({
           folderHint={t("db.backup.pathHint")}
           keysHint={keysExist ? t("db.backup.keepKeys", secret) : undefined}
           regionHint={
-            keysExist && regionInSecret(database.engine) ? t("db.backup.keepRegion") : undefined
+            regionSaved && regionInSecret(database.engine) ? t("db.backup.keepRegion") : undefined
           }
         >
           <FrequencyField value={target.frequency} onChange={(frequency) => set({ frequency })} />
