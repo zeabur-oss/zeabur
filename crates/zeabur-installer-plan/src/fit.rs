@@ -346,7 +346,7 @@ pub fn warnings(index: &Index, plan: &Plan, profile: &str, nodes: &[NodeMemory])
             format!(
                 "After this apply, the Pods on node {node} ask for about {requested} MiB of \
                  memory, but only {allocatable} MiB is left for Pods once the system and {title} \
-                 have their share. Pods that don't fit stay Pending. To make room, remove a \
+                 have their share. Pods that don't fit stay Pending. To make room, delete a \
                  service on {node} or lower its replicas, move a service to another node, or add \
                  a node."
             ),

@@ -76,7 +76,7 @@ kubectl delete clusterrole system-upgrade-controller system-upgrade-controller-d
 
 The zot you removed in step 2 also shows as `not removed, no longer updated` in `plan`. That's because the install record still lists it. It no longer shows after `apply`.
 
-v0.2 reserves memory for the system so pods can't use it all and take the whole server down. So `apply` restarts K3s or RKE2. The Kubernetes API stops answering for about 10 seconds. Running apps keep serving. The reserved memory is taken from what pods can request, so on a server that was nearly full, a component this upgrade adds or changes may not fit and stays `Pending`. `plan` warns when a node's pods won't fit. Before `apply`, remove a service on that node or lower its replicas, move a service to another node, or add a node.
+v0.2 reserves memory for the system so pods can't use it all and take the whole server down. So `apply` restarts K3s or RKE2. The Kubernetes API stops answering for about 10 seconds. Running apps keep serving. The reserved memory is taken from what pods can request, so on a server that was nearly full, a component this upgrade adds or changes may not fit and stay `Pending`. `plan` warns when a node's pods won't fit. Before `apply`, delete a service on that node or lower its replicas, move a service to another node, or add a node.
 
 #### 4. Have the other nodes join again
 
