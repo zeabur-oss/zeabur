@@ -485,7 +485,10 @@ export function VariablesTab({
           key={`${container}/${env.name}`}
           className="grid grid-cols-1 items-center gap-x-4 gap-y-1 py-2 sm:grid-cols-variable-actions"
         >
-          <span className="font-mono text-xs font-medium text-tertiary line-through" translate="no">
+          <span
+            className="min-w-0 break-all font-mono text-xs font-medium text-tertiary line-through"
+            translate="no"
+          >
             {env.name}
           </span>
           <span className="type-meta text-fail-strong">{t("vars.state.removed")}</span>
@@ -502,7 +505,7 @@ export function VariablesTab({
         key={`${container}/${env.name}`}
         className="grid grid-cols-1 items-center gap-x-4 gap-y-1 py-2 sm:grid-cols-variable-actions"
       >
-        <span className="font-mono text-xs font-medium" translate="no">
+        <span className="min-w-0 break-all font-mono text-xs font-medium" translate="no">
           {env.name}
         </span>
         <span className="flex min-w-0 items-center gap-1">
@@ -583,7 +586,10 @@ export function VariablesTab({
     return (
       <Fragment key={key}>
         <li className="grid grid-cols-1 items-center gap-x-4 gap-y-1 py-2 sm:grid-cols-variable-actions">
-          <span className="font-mono text-xs font-medium text-muted-foreground" translate="no">
+          <span
+            className="min-w-0 break-all font-mono text-xs font-medium text-muted-foreground"
+            translate="no"
+          >
             {i.prefix ? `${i.prefix}*` : t("vars.allKeys")}
           </span>
           <span className="flex min-w-0 items-center gap-1">
@@ -618,7 +624,7 @@ export function VariablesTab({
             key={`${key}/${k}`}
             className="grid grid-cols-1 items-center gap-x-4 gap-y-1 py-2 sm:grid-cols-variable-actions"
           >
-            <span className="font-mono text-xs font-medium" translate="no">
+            <span className="min-w-0 break-all font-mono text-xs font-medium" translate="no">
               {`${i.prefix ?? ""}${k}`}
             </span>
             <span className="flex min-w-0 items-center gap-1">
@@ -948,7 +954,10 @@ export function VariablesTab({
                             entrance(createdKey.env(workload, env.name)),
                           )}
                         >
-                          <span className="font-mono text-xs font-medium" translate="no">
+                          <span
+                            className="min-w-0 break-all font-mono text-xs font-medium"
+                            translate="no"
+                          >
                             {env.name}
                           </span>
                           <span className="flex min-w-0 items-center gap-2">
