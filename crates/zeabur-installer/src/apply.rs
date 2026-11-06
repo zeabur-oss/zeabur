@@ -1087,7 +1087,7 @@ fn failed_release(name: &str, namespace: &str, revision: u64) -> String {
         "rollback"
     };
     format!(
-        "Helm failed to install or upgrade the {name} chart. To see why, run `helm history {name} -n {namespace}` on a machine that has Helm installed and can reach the cluster. Fix the cause, run `helm {undo} {name} -n {namespace}`, then run apply again."
+        "Helm failed to install or upgrade the {name} chart. To see why, run `helm history {name} -n {namespace}` on a machine that has Helm installed and can reach the cluster. Fix the cause and run apply, which updates the chart and stops here again. Then run `helm {undo} {name} -n {namespace}` and run apply once more."
     )
 }
 
