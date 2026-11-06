@@ -295,6 +295,7 @@ mod tests {
         let (status, body) = send(&app, "GET", "/api/v1/members", None).await;
         assert_eq!(status, StatusCode::OK, "{body}");
         assert_eq!(body["installed"], false);
+        assert_eq!(body["canManageTokens"], "allowed");
         assert_eq!(
             item(&body["apiTokens"], "ci").unwrap()["projects"],
             json!([{"project": "shop", "role": "viewer"}])
@@ -363,6 +364,10 @@ mod tests {
             assert_eq!(status, StatusCode::FORBIDDEN, "{body}");
         }
         assert_eq!(writes(&cluster), Vec::<String>::new());
+        let app = TestApi::new(&cluster).with_settings(settings()).router();
+        let (status, body) = send(&app, "GET", "/api/v1/members", None).await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        assert_eq!(body["canManageTokens"], "denied", "{body}");
     }
 
     #[tokio::test]

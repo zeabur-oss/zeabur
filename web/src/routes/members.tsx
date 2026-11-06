@@ -67,6 +67,7 @@ import { PageColumn } from "@zeabur-oss/design-system/components/page-column"
 import { PageHeader } from "@zeabur-oss/design-system/components/page-header"
 import { Skeleton } from "@zeabur-oss/design-system/components/skeleton"
 import { Tooltip } from "@zeabur-oss/design-system/components/tooltip"
+import type { Schemas } from "@/api/client"
 import type { Gate } from "@/model/rights"
 
 const open: Gate = { open: true }
@@ -112,32 +113,7 @@ export function MembersPage() {
       ) : members.isError ? (
         <Problem error={members.error} what={t("refused.see", t("members.everyone"))} />
       ) : (
-        <>
-          {members.data.installed ? (
-            <>
-              <LinksUnavailable links={members.data.setupLinks} />
-              <ManageDenied hint={members.data.canManage} denied={t("members.denied")} />
-              <MemberList items={members.data.items} projectRoles={projectRoles} onOpen={setOpen} />
-            </>
-          ) : (
-            <Empty variant="outline">
-              <EmptyHeader>
-                <EmptyMedia>
-                  <Illustration kind="empty" />
-                </EmptyMedia>
-                <EmptyTitle>{t("members.notInstalled")}</EmptyTitle>
-                <EmptyDescription>{t("members.notInstalledBody")}</EmptyDescription>
-              </EmptyHeader>
-            </Empty>
-          )}
-          <RefusedSome unreadable={members.data.unreadable} />
-          <Pending invitations={members.data.invitations} />
-          <ApiTokenList
-            tokens={members.data.apiTokens}
-            projectRoles={projectRoles}
-            manage={manage}
-          />
-        </>
+        <MembersBody data={members.data} onOpen={setOpen} />
       )}
       {open?.kind === "invite" ? (
         <InviteDialog members={data?.items ?? []} projectRoles={projectRoles} onClose={close} />
@@ -156,6 +132,45 @@ export function MembersPage() {
         <RemoveMember member={current(open.member)} onClose={close} />
       ) : null}
     </PageColumn>
+  )
+}
+
+function MembersBody({
+  data,
+  onOpen,
+}: {
+  data: Schemas.MembersView
+  onOpen: (open: Open) => void
+}) {
+  const t = useT()
+  const manageTokens = useHintGate("changeApiTokens", data.canManageTokens)
+  return (
+    <>
+      {data.installed ? (
+        <>
+          <LinksUnavailable links={data.setupLinks} />
+          <ManageDenied hint={data.canManage} denied={t("members.denied")} />
+          <MemberList items={data.items} projectRoles={data.projectRoles} onOpen={onOpen} />
+        </>
+      ) : (
+        <Empty variant="outline">
+          <EmptyHeader>
+            <EmptyMedia>
+              <Illustration kind="empty" />
+            </EmptyMedia>
+            <EmptyTitle>{t("members.notInstalled")}</EmptyTitle>
+            <EmptyDescription>{t("members.notInstalledBody")}</EmptyDescription>
+          </EmptyHeader>
+        </Empty>
+      )}
+      <RefusedSome unreadable={data.unreadable} />
+      <Pending invitations={data.invitations} />
+      <ApiTokenList
+        tokens={data.apiTokens}
+        projectRoles={data.projectRoles}
+        manage={manageTokens}
+      />
+    </>
   )
 }
 

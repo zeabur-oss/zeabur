@@ -6687,6 +6687,11 @@ export type MembersView = {
   apiTokens: ApiTokenView[]
   /** Whether the person may create invitations, as far as their rules tell. */
   canManage: Permission
+  /**
+   * Whether the person may create API tokens: `create serviceaccounts` in the token
+   * namespace.
+   */
+  canManageTokens: Permission
   /** `members`. */
   id: string
   /** Whether Zeabur Identity is installed; when not, everything else is empty. */

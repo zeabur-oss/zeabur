@@ -20,6 +20,7 @@ use zeabur_plan::api_token::{self, NAMESPACE, Refusal};
 
 use super::access::{Binding, Holder, ProjectGrant, grants_of};
 use crate::error::{ApiError, read_problem};
+use crate::projects::namespace::Permission;
 
 const ROOT_CA: &str = "kube-root-ca.crt";
 
@@ -73,6 +74,23 @@ impl std::fmt::Debug for IssuedTokenView {
 
 pub(crate) fn service_accounts() -> ResourceRef {
     ResourceRef::new("", "v1", "serviceaccounts", "ServiceAccount")
+}
+
+/// Whether the person may create API tokens, from a `SelfSubjectAccessReview` for `create
+/// serviceaccounts` in the token namespace; unknown when the review fails.
+pub(crate) async fn can_manage(cluster: &dyn Cluster) -> Permission {
+    let request = Denied {
+        verb: "create".to_owned(),
+        group: String::new(),
+        resource: "serviceaccounts".to_owned(),
+        name: None,
+        namespace: Some(NAMESPACE.to_owned()),
+    };
+    match cluster.review_access(&request).await {
+        Ok(true) => Permission::Allowed,
+        Ok(false) => Permission::Denied,
+        Err(_) => Permission::Unknown,
+    }
 }
 
 /// The refusal key of the token read, as `unreadable` names it.

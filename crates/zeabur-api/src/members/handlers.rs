@@ -77,11 +77,12 @@ pub(crate) async fn list(
 ) -> Result<Json<MembersView>, ApiError> {
     let identity = &state.settings.identity;
     let namespace = identity.namespace.as_str();
-    let (directory, you, links, can, bindings) = futures_util::join!(
+    let (directory, you, links, can, can_tokens, bindings) = futures_util::join!(
         Directory::load(cluster.as_ref(), namespace),
         you(cluster.as_ref()),
         setup_links(cluster.as_ref(), identity),
         can_manage(cluster.as_ref(), namespace),
+        tokens::can_manage(cluster.as_ref()),
         access::read(cluster.as_ref()),
     );
     let mut found = Access::default();
@@ -109,6 +110,7 @@ pub(crate) async fn list(
         let mut view = MembersView::not_installed(links, can);
         view.project_roles = identity.project_roles;
         view.api_tokens = found.api_tokens;
+        view.can_manage_tokens = can_tokens;
         view.unreadable = found.unreadable;
         return Ok(Json(view));
     };
@@ -117,6 +119,7 @@ pub(crate) async fn list(
     let mut view = directory.view(namespace, Some(&you), (state.clock)(), links, can);
     view.project_roles = identity.project_roles;
     view.api_tokens = found.api_tokens;
+    view.can_manage_tokens = can_tokens;
     Ok(Json(view))
 }
 
@@ -286,6 +289,7 @@ impl MembersView {
             can_manage,
             project_roles: false,
             api_tokens: Vec::new(),
+            can_manage_tokens: crate::projects::namespace::Permission::Unknown,
             unreadable: Vec::new(),
         }
     }
