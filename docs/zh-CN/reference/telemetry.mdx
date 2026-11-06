@@ -33,7 +33,7 @@ source: "119a598e43c4"
 
 事件不会说明是谁。`person` 是用密钥算出的用户名加日期的哈希值。密钥从 Zeabur 的 plan key 派生，保存在集群的 Secret 里，从不发送，所以我们无法从哈希值反推用户名。同一个人一整天的 `person` 都一样，Zeabur 重启也不变；第二天就换成另一个，所以不同天无法关联起来。
 
-事件通过 HTTPS 发送到 PostHog（`us.i.posthog.com`），只尝试一次，超时很短。发送失败时不会重试，也不影响 Zeabur 或安装。PostHog 不保存 IP 地址。
+事件通过 HTTPS 发送到 PostHog（经由 `oss-nori.zeabur.com`），只尝试一次，超时很短。发送失败时不会重试，也不影响 Zeabur 或安装。PostHog 不保存 IP 地址。
 
 ## 绝不发送
 

@@ -32,7 +32,7 @@ Zeabur sends one event the first time each person uses it in a UTC day, and the 
 
 The event doesn't say who the person is. `person` is a keyed hash of the user name and the day. The key is derived from Zeabur's plan key, which stays in the cluster's Secret and is never sent, so we can't work out the user name from it. The same person gets the same `person` all day, even after Zeabur restarts, and a different one the next day, so their days can't be linked.
 
-Events go to PostHog (`us.i.posthog.com`) over HTTPS, one try with a short timeout. A failed request isn't retried and doesn't affect Zeabur or the install. PostHog doesn't keep IP addresses.
+Events go to PostHog through `oss-nori.zeabur.com` over HTTPS, one try with a short timeout. A failed request isn't retried and doesn't affect Zeabur or the install. PostHog doesn't keep IP addresses.
 
 ## What is never sent
 
