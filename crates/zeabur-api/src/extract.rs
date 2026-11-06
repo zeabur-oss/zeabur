@@ -1,4 +1,5 @@
-//! axum's `Json` and `Path`, refusing as a [`Problem`] like every other answer.
+//! axum's `Json`, `Path` and `WebSocketUpgrade`, refusing as a [`Problem`] like every other
+//! answer.
 //!
 //! A refusal says where the request is wrong, not what serde expected there, which would list
 //! every variant of the type.
@@ -6,6 +7,7 @@
 use std::error::Error as _;
 
 use axum::extract::rejection::{JsonRejection, PathRejection};
+use axum::extract::ws::rejection::WebSocketUpgradeRejection;
 use axum::extract::{FromRequest, FromRequestParts, Request};
 use axum::http::StatusCode;
 use axum::http::request::Parts;
@@ -23,6 +25,10 @@ pub struct Json<T>(pub T);
 /// The path parameters.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Path<T>(pub T);
+
+/// A request to open a WebSocket; `.0` is axum's, to answer it.
+#[derive(Debug)]
+pub struct WebSocketUpgrade(pub axum::extract::ws::WebSocketUpgrade);
 
 fn bad_request(detail: String) -> ApiError {
     ApiError::from(Problem::new(Kind::BadRequest, detail))
@@ -111,6 +117,20 @@ where
     }
 }
 
+impl<S: Send + Sync> FromRequestParts<S> for WebSocketUpgrade {
+    type Rejection = ApiError;
+
+    async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, ApiError> {
+        match axum::extract::ws::WebSocketUpgrade::from_request_parts(parts, state).await {
+            Ok(upgrade) => Ok(Self(upgrade)),
+            Err(rejection) => Err(bad_request(format!(
+                "Open this address as a WebSocket: {}.",
+                WebSocketUpgradeRejection::body_text(&rejection)
+            ))),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use axum::body::Body;
@@ -173,6 +193,24 @@ mod tests {
         assert_eq!(problem.kind, Kind::BadRequest);
         assert!(
             problem.detail.contains("application/json"),
+            "{}",
+            problem.detail
+        );
+    }
+
+    #[tokio::test]
+    async fn a_plain_request_to_a_websocket_is_refused_as_a_problem() {
+        let request = Request::builder().uri("/").body(Body::empty()).unwrap();
+        let (mut parts, _) = request.into_parts();
+        let problem = *WebSocketUpgrade::from_request_parts(&mut parts, &())
+            .await
+            .unwrap_err()
+            .0;
+        assert_eq!(problem.kind, Kind::BadRequest);
+        assert!(
+            problem
+                .detail
+                .starts_with("Open this address as a WebSocket"),
             "{}",
             problem.detail
         );

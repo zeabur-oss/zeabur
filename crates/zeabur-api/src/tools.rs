@@ -55,8 +55,8 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
+use axum::extract::State;
 use axum::extract::ws::WebSocket;
-use axum::extract::{State, WebSocketUpgrade};
 use axum::http::StatusCode;
 use axum::response::Response;
 use secrecy::ExposeSecret as _;
@@ -72,7 +72,7 @@ use zeabur_plan::terminal::{self as plans, TOOLS_CONTAINER, TOOLS_PROJECT_ANNOTA
 
 use crate::access::Handoff;
 use crate::error::{ApiError, read_problem, review_refusal};
-use crate::extract::{Json, Path};
+use crate::extract::{Json, Path, WebSocketUpgrade};
 use crate::handlers::{AppState, Person};
 use crate::pods::exec::{self, ServerFrame, Terminal};
 use crate::projects::writes::terminal::{list_pods, local_mode, read_pod};
@@ -782,6 +782,7 @@ pub(crate) fn upgrade_in(
     upgrade: WebSocketUpgrade,
 ) -> Response {
     upgrade
+        .0
         .max_message_size(exec::MAX_MESSAGE)
         .on_upgrade(move |socket| run(socket, state, terminal, scope, name))
 }
