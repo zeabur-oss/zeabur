@@ -11,7 +11,7 @@ use serde_json::{Map, Value, json};
 use zeabur_installer_host::kubectl::{self, Kubectl};
 use zeabur_installer_host::nodeprep::{self, Stage};
 use zeabur_installer_host::preflight::{self, Status};
-use zeabur_installer_host::{HostError, archive, chart, cmd, download, facts, files, systemd};
+use zeabur_installer_host::{archive, chart, cmd, download, facts, files, systemd};
 use zeabur_installer_plan::catalog::{Encoding, Index};
 use zeabur_installer_plan::cluster::{APPARMOR_PROFILE, AUTHN_CONFIGMAP, Distribution, HostFile};
 use zeabur_installer_plan::config::{AccessMode, Config};
@@ -203,9 +203,9 @@ pub(crate) fn make_plan(index: &Index, config: &Config) -> Result<Plan, InstallE
             }
             changes.set_host_files(pending);
         }
-        if running {
-            let nodes = node_memory(&kubectl)?;
-            let full = fit::warnings(index, &plan, &config.profile, &nodes);
+        // The check is advice; a failed read skips it.
+        if running && let Some(nodes) = node_memory(&kubectl) {
+            let full = fit::warnings(&plan, &nodes);
             plan.warnings.extend(full);
         }
     }
@@ -220,20 +220,14 @@ pub(crate) fn make_plan(index: &Index, config: &Config) -> Result<Plan, InstallE
     Ok(plan)
 }
 
-/// Each node's memory and what the Pods on it request.
-fn node_memory(kubectl: &Kubectl) -> Result<Vec<NodeMemory>, InstallError> {
-    let list = |args: &[&str]| -> Result<Value, InstallError> {
-        let out = kubectl.run(args, None)?;
-        serde_json::from_str(&out).map_err(|e| {
-            InstallError::from(HostError::Parse {
-                what: format!("kubectl {}", args.join(" ")),
-                reason: e.to_string(),
-            })
-        })
+/// Each node's memory and what the Pods on it request; `None` when a read fails.
+fn node_memory(kubectl: &Kubectl) -> Option<Vec<NodeMemory>> {
+    let list = |args: &[&str]| -> Option<Value> {
+        serde_json::from_str(&kubectl.run(args, None).ok()?).ok()
     };
     let nodes = list(&["get", "nodes", "--output=json"])?;
     let pods = list(&["get", "pods", "--all-namespaces", "--output=json"])?;
-    Ok(fit::nodes(&nodes, &pods))
+    Some(fit::nodes(&nodes, &pods))
 }
 
 /// The install record, when there is one.

@@ -454,7 +454,7 @@ export const en = {
     allocatable: string,
     distribution: string,
   ) =>
-    `After this apply, the Pods on node ${node} ask for about ${mib(requested)} of memory, but only ${mib(allocatable)} is left for Pods once the system and ${distribution} have their share. Pods that don't fit stay Pending. To make room, delete a service on ${node} or lower its replicas, move a service to another node, or add a node.`,
+    `The Pods on node ${node} already request ${mib(requested)} of memory, but only ${mib(allocatable)} is left for Pods once the system and ${distribution} have their share. Pods that don't fit stay Pending. To make room, delete a service on ${node} or lower its replicas, move a service to another node, or add a node.`,
   "warning.cluster.unsupported": (distribution: string, version: string) =>
     `${distribution} ${version} is not supported by this installer: its downloads are checked only against the release's own checksums.`,
   "warning.join.sameRegion": () =>
