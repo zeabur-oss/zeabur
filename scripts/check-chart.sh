@@ -82,9 +82,9 @@ for values in "$chart"/ci/*-values.yaml; do
     "zeabur-project-developer-rules patch"
   vap='select(.kind == "ValidatingAdmissionPolicy")'
   expect "$name" "$out" "$vap | [.metadata.name, .spec.failurePolicy, (.spec.matchConstraints.resourceRules[] | .resources + .operations | join(\"/\"))] | join(\",\")" \
-    "zeabur-api-token-accounts,Fail,serviceaccounts/CREATE/UPDATE/DELETE,zeabur-api-token-bindings,Fail,rolebindings/CREATE/UPDATE/DELETE,zeabur-api-token-requests,Fail,serviceaccounts/token/CREATE,zeabur-project-namespace,Fail,namespaces/UPDATE"
+    "zeabur-api-token-accounts,Fail,serviceaccounts/CREATE/UPDATE/DELETE,zeabur-api-token-bindings,Fail,rolebindings/CREATE/UPDATE/DELETE,zeabur-api-token-requests,Fail,serviceaccounts/token/CREATE,zeabur-api-token-pods,Fail,pods/CREATE,zeabur-project-namespace,Fail,namespaces/UPDATE"
   expect "$name" "$out" 'select(.kind == "ValidatingAdmissionPolicyBinding") | [.spec.policyName, (.spec.validationActions | join("/"))] | join(",")' \
-    "zeabur-api-token-accounts,Deny,zeabur-api-token-bindings,Deny,zeabur-api-token-requests,Deny,zeabur-project-namespace,Deny"
+    "zeabur-api-token-accounts,Deny,zeabur-api-token-bindings,Deny,zeabur-api-token-requests,Deny,zeabur-api-token-pods,Deny,zeabur-project-namespace,Deny"
   # Secret values and shells in containers belong to developers only.
   expect "$name" "$out" \
     '[select(.kind == "ClusterRole") | select(.rules | any_c(.resources | any_c(test("^(secrets|pods/(exec|attach|portforward|ephemeralcontainers))$")))) | .metadata.name] | join(",")' \

@@ -50,7 +50,7 @@ The chart sets `memberRoles.enabled` to `true` by default and creates:
 - `zeabur-project-viewer-rules`, `zeabur-project-developer-rules`, `zeabur-project-builds-read`, `zeabur-project-builds-write`: The actual verbs and resources for the two roles above. Viewers can view builds. Developers can also deploy from Git and rebuild.
 - `zeabur-project-api-tokens`: Lets developers create the ServiceAccounts and RoleBindings of [API tokens](./api-tokens.mdx) and request tokens for them.
 - The `zeabur-project-namespace` ValidatingAdmissionPolicy and its binding: Restricts which namespace fields developers can change. Requires Kubernetes 1.30 or later.
-- The `zeabur-api-token-accounts`, `zeabur-api-token-bindings`, and `zeabur-api-token-requests` ValidatingAdmissionPolicies and their bindings: Keep what developers write to API tokens. See [API tokens and RBAC](#api-tokens-and-rbac).
+- The `zeabur-api-token-accounts`, `zeabur-api-token-bindings`, `zeabur-api-token-requests`, and `zeabur-api-token-pods` ValidatingAdmissionPolicies and their bindings: Keep what developers write to API tokens, and keep tokens from lasting past their expiry. See [API tokens and RBAC](#api-tokens-and-rbac).
 
 The chart doesn't bind roles to anyone. When an admin invites or updates a member in Zeabur, Zeabur uses the admin's permissions to create:
 
@@ -89,13 +89,14 @@ Viewers can't read secrets or logs, but they can read config files and workload 
 
 ## API tokens and RBAC
 
-Developers can create ServiceAccounts, RoleBindings, and tokens in their projects so they can make [API tokens](./api-tokens.mdx). Kubernetes lets a RoleBinding grant only a role its creator already has. The chart's three policies narrow these permissions further in project namespaces:
+Developers can create ServiceAccounts, RoleBindings, and tokens in their projects so they can make [API tokens](./api-tokens.mdx). Kubernetes lets a RoleBinding grant only a role its creator already has. The chart's policies narrow these permissions further:
 
-- A ServiceAccount must carry the `zeabur.com/api-token: "true"` label and name its creator. After it's created, only the expiry annotation can change.
-- A RoleBinding must carry the same label, bind `zeabur-project-developer` or `zeabur-project-viewer`, and have one subject: a ServiceAccount in the same namespace, with the binding named `zeabur-api-token-<ServiceAccount>`. It can't be changed after it's created.
-- ServiceAccounts can't write these objects or request tokens, so a token can't create or renew tokens.
+- In a project, a person can create only ServiceAccounts named `zeabur-api-token-<name>` with the `zeabur.com/api-token: "true"` label and their own name as the creator. After it's created, only the expiry annotation can change.
+- A RoleBinding must carry the same label, bind `zeabur-project-developer` or `zeabur-project-viewer`, and have one subject: a `zeabur-api-token-` ServiceAccount in the same namespace, with the same name as the binding. It can't be changed after it's created.
+- An API token can't write ServiceAccounts or RoleBindings or request tokens in any namespace, so it can't create or renew tokens.
+- No pod in a project can run as a `zeabur-api-token-` ServiceAccount. Kubernetes renews a pod's token for as long as the pod runs, so such a pod would keep the token's role past its expiry.
 
-These restrictions don't apply to anyone with the same permission on all namespaces, such as admins. Because of the last rule, a workload in a project can't create ServiceAccounts, RoleBindings, or tokens there unless an admin grants it that permission on all namespaces.
+The first two rules don't apply to anyone with the same permission on all namespaces, such as admins, or to other ServiceAccounts, which only an admin can grant these permissions. The last two apply to everyone.
 
 ## Admin accounts and regular accounts
 

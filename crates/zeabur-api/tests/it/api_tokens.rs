@@ -44,7 +44,13 @@ mod tests {
                 object(json!({
                     "apiVersion": "v1", "kind": "ServiceAccount",
                     "metadata": {"name": "default", "namespace": "shop", "uid": "uid-default",
-                                 "resourceVersion": "1"},
+                                 "resourceVersion": "1",
+                                 "labels": {"zeabur.com/api-token": "true"}},
+                })),
+                object(json!({
+                    "apiVersion": "v1", "kind": "ServiceAccount",
+                    "metadata": {"name": "zeabur-api-token-old", "namespace": "shop",
+                                 "uid": "uid-old", "resourceVersion": "1"},
                 })),
             ],
             now: NOW,
@@ -133,9 +139,9 @@ mod tests {
         assert_eq!(
             writes(&cluster),
             [
-                "create ServiceAccount/ci",
+                "create ServiceAccount/zeabur-api-token-ci",
                 "create RoleBinding/zeabur-api-token-ci",
-                "patch ServiceAccount/ci"
+                "patch ServiceAccount/zeabur-api-token-ci"
             ]
         );
         let issued = &applied["issued"];
@@ -157,6 +163,7 @@ mod tests {
         assert_eq!(token["expiresAt"], "2026-11-07T00:00:00Z");
         assert!(token.get("token").is_none(), "{token}");
         assert!(item(&listed, "default").is_none(), "{listed}");
+        assert!(item(&listed, "old").is_none(), "{listed}");
     }
 
     #[tokio::test]
@@ -189,7 +196,10 @@ mod tests {
         assert_eq!(plan["writes"][0]["kind"], "TokenRequest");
         assert_eq!(applied["issued"]["expiresAt"], "2026-11-06T02:30:00Z");
         let asked = cluster.inspect(|s| s.issued_tokens.clone()).unwrap();
-        assert_eq!(asked.last().unwrap(), &("shop/ci".to_owned(), 7200));
+        assert_eq!(
+            asked.last().unwrap(),
+            &("shop/zeabur-api-token-ci".to_owned(), 7200)
+        );
         let listed = list(&cluster).await;
         assert_eq!(
             item(&listed, "ci").unwrap()["expiresAt"],
@@ -210,7 +220,7 @@ mod tests {
             made[made.len() - 2..],
             [
                 "delete RoleBinding/zeabur-api-token-ci",
-                "delete ServiceAccount/ci"
+                "delete ServiceAccount/zeabur-api-token-ci"
             ]
         );
         assert!(item(&list(&cluster).await, "ci").is_none());
@@ -219,9 +229,12 @@ mod tests {
     #[tokio::test]
     async fn a_service_account_that_is_not_a_token_is_neither_renewed_nor_deleted() {
         let cluster = signed_in("zeabur:ada");
+        // `default` carries the label without the name; `zeabur-api-token-old` the name without it.
         for op in [
             json!({"op": "renew", "name": "default", "expirationSeconds": 3600}),
             json!({"op": "delete", "name": "default"}),
+            json!({"op": "renew", "name": "old", "expirationSeconds": 3600}),
+            json!({"op": "delete", "name": "old"}),
         ] {
             let (status, body, _) = change(&cluster, op).await;
             assert_eq!(status, StatusCode::NOT_FOUND, "{body}");
@@ -287,7 +300,7 @@ mod tests {
     #[tokio::test]
     async fn a_taken_name_and_a_too_short_token_are_refused_before_any_write() {
         let cluster = signed_in("zeabur:ada");
-        let (status, body, _) = change(&cluster, create("default", "viewer", false, 3600)).await;
+        let (status, body, _) = change(&cluster, create("old", "viewer", false, 3600)).await;
         assert_eq!(status, StatusCode::CONFLICT, "{body}");
         assert_eq!(body["summary"]["key"], "apiTokens.taken");
         let (status, body, _) = change(&cluster, create("ci", "viewer", false, 60)).await;
@@ -312,7 +325,7 @@ mod tests {
         cluster.update(|s| {
             s.dynamic.push(object(json!({
                 "apiVersion": "v1", "kind": "ServiceAccount",
-                "metadata": {"name": "ci", "namespace": "shop", "uid": "uid-ci",
+                "metadata": {"name": "zeabur-api-token-ci", "namespace": "shop", "uid": "uid-ci",
                              "resourceVersion": "1"},
             })));
         });
