@@ -11,7 +11,8 @@ use axum::extract::Path;
 use serde::Serialize;
 use utoipa::ToSchema;
 use zeabur_core::problem::{MEDIA_TYPE as PROBLEM, Problem};
-use zeabur_kube::k8s_openapi::api::core::v1::Pod;
+use zeabur_kube::k8s_openapi::api::core::v1::{ContainerStatus, Pod};
+use zeabur_kube::k8s_openapi::apimachinery::pkg::apis::meta::v1::Time;
 use zeabur_kube::k8s_openapi::jiff::Timestamp;
 use zeabur_kube::{Cluster, ClusterError, ClusterExt as _, ResourceRef};
 use zeabur_modules::Reading;
@@ -34,7 +35,21 @@ pub struct ProjectBuildRun {
     /// Its pod, while it is there.
     pub pod: Option<String>,
     /// The pod's containers, in the order they run (`fetch`, `plan`, `build`).
-    pub containers: Vec<String>,
+    pub phases: Vec<BuildPhase>,
+}
+
+/// One container of a run's pod: a phase of the build.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct BuildPhase {
+    /// The container: `fetch`, `plan` or `build`.
+    pub container: String,
+    /// `waiting`, `running`, `succeeded` or `failed`.
+    pub state: String,
+    /// When it started.
+    pub started: Option<String>,
+    /// When it finished.
+    pub finished: Option<String>,
 }
 
 /// A workload's Keel policy.
@@ -161,18 +176,10 @@ async fn read(cluster: &dyn Cluster, project: &str) -> Result<ProjectBuilds, Clu
                         .creation_timestamp
                         .cmp(&b.metadata.creation_timestamp)
                 });
-            let containers = pod.and_then(|p| p.spec.as_ref()).map_or_default(|spec| {
-                spec.init_containers
-                    .iter()
-                    .flatten()
-                    .chain(&spec.containers)
-                    .map(|c| c.name.clone())
-                    .collect()
-            });
             ProjectBuildRun {
                 run,
                 pod: pod.and_then(|p| p.metadata.name.clone()),
-                containers,
+                phases: pod.map_or_default(phases),
             }
         })
         .collect();
@@ -188,6 +195,54 @@ async fn read(cluster: &dyn Cluster, project: &str) -> Result<ProjectBuilds, Clu
         keel,
         unreadable,
     })
+}
+
+/// The pod's containers in the order they run, each with its state.
+fn phases(pod: &Pod) -> Vec<BuildPhase> {
+    let mut out = Vec::new();
+    let Some(spec) = pod.spec.as_ref() else {
+        return out;
+    };
+    let status = pod.status.as_ref();
+    let init = status.and_then(|s| s.init_container_statuses.as_deref());
+    let main = status.and_then(|s| s.container_statuses.as_deref());
+    for container in spec.init_containers.iter().flatten() {
+        out.push(phase(&container.name, init.unwrap_or_default()));
+    }
+    for container in &spec.containers {
+        out.push(phase(&container.name, main.unwrap_or_default()));
+    }
+    out
+}
+
+fn phase(container: &str, statuses: &[ContainerStatus]) -> BuildPhase {
+    let time = |t: Option<&Time>| t.map(|t| t.0.to_string());
+    let mut phase = BuildPhase {
+        container: container.to_owned(),
+        state: String::from("waiting"),
+        started: None,
+        finished: None,
+    };
+    let Some(state) = statuses
+        .iter()
+        .find(|s| s.name == container)
+        .and_then(|s| s.state.as_ref())
+    else {
+        return phase;
+    };
+    if let Some(running) = &state.running {
+        phase.state = String::from("running");
+        phase.started = time(running.started_at.as_ref());
+    } else if let Some(done) = &state.terminated {
+        phase.state = String::from(if done.exit_code == 0 {
+            "succeeded"
+        } else {
+            "failed"
+        });
+        phase.started = time(done.started_at.as_ref());
+        phase.finished = time(done.finished_at.as_ref());
+    }
+    phase
 }
 
 async fn keel_policies(

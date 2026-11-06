@@ -709,7 +709,6 @@ export const zhTW: Messages = {
   "builds.took": (seconds) =>
     seconds < 60 ? `花了 ${seconds} 秒` : `花了 ${Math.floor(seconds / 60)} 分 ${seconds % 60} 秒`,
   "builds.logs": "日誌",
-  "builds.hideLogs": "收起日誌",
   "builds.details": "詳細資料",
   "builds.hideDetails": "收起詳細資料",
   "builds.reason.PlanFailed":
@@ -727,10 +726,27 @@ export const zhTW: Messages = {
   "builds.oom.open": "開啟建置設定",
   "builds.reason.Cancelled": "這次建置被較新的建置取代，或被人取消了。",
   "builds.reason.other": "建置失敗。展開詳細資料看原因。",
-  "builds.step": "步驟",
   "builds.logsGone": "建置結束十分鐘後，副本和日誌會一起刪除。",
   "builds.noLogsYet": "這個步驟還沒開始。",
   "builds.emptyLog": "沒有輸出。",
+  "builds.phase.fetch": "取得程式碼",
+  "builds.phase.plan": "規劃建置",
+  "builds.phase.build": "建置映像檔",
+  "builds.stepGroup.prepare": "準備",
+  "builds.stepGroup.export": "推送映像檔",
+  "builds.cached": "沿用快取",
+  "builds.otherOutput": "其他輸出",
+  "builds.duration": (seconds) => {
+    const s = Math.round(seconds)
+    if (seconds < 1) return "不到 1 秒"
+    return s < 60 ? `${s} 秒` : `${Math.floor(s / 60)} 分 ${s % 60} 秒`
+  },
+  "builds.stepFailed": (step) => `${step}${latinEnd(step)}失敗了`,
+  "builds.stepFailedAfter": (step, seconds) => {
+    const s = Math.max(1, Math.round(seconds))
+    return `${step}${latinEnd(step)}執行了 ${s < 60 ? `${s} 秒` : `${Math.floor(s / 60)} 分 ${s % 60} 秒`}後失敗`
+  },
+  "builds.keepsRunning": (service) => `${service}${latinEnd(service)}會繼續跑之前的映像檔。`,
   "overview.source": "來源",
   "overview.managedBy": "管理工具",
   "overview.replicas": (ready, desired) => `副本 ${ready}/${desired}`,

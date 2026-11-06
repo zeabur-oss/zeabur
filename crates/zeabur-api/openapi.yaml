@@ -5112,6 +5112,29 @@ components:
           description: |-
             The build variables to set or remove, `spec.env`. A value from a Secret names only
             `secretName` and `key`.
+    BuildPhase:
+      type: object
+      description: "One container of a run's pod: a phase of the build."
+      required:
+      - container
+      - state
+      properties:
+        container:
+          type: string
+          description: "The container: `fetch`, `plan` or `build`."
+        finished:
+          type:
+          - string
+          - "null"
+          description: When it finished.
+        started:
+          type:
+          - string
+          - "null"
+          description: When it started.
+        state:
+          type: string
+          description: "`waiting`, `running`, `succeeded` or `failed`."
     BuildSettings:
       type: object
       description: |-
@@ -13815,12 +13838,12 @@ components:
         description: The run.
       - type: object
         required:
-        - containers
+        - phases
         properties:
-          containers:
+          phases:
             type: array
             items:
-              type: string
+              $ref: "#/components/schemas/BuildPhase"
             description: The pod's containers, in the order they run (`fetch`, `plan`, `build`).
           pod:
             type:
