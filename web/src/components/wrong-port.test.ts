@@ -19,17 +19,24 @@ const wrong: WrongPort = {
 
 describe("the card of an app that doesn't listen on its port", () => {
   test.each([
-    ["en", en, "port 8080", "0.0.0.0"],
-    ["zh-TW", zhTW, "連接埠 8080", "0.0.0.0"],
-    ["zh-CN", zhCN, "端口 8080", "0.0.0.0"],
-  ] as const)("names the port, PORT and the all-addresses bind in %s", (_, messages, port, all) => {
-    const words = wrongPortWords(translator(messages), wrong)
-    expect(words.cause).toContain(port)
-    expect(words.why).toContain("PORT")
-    expect(words.fix).toContain("PORT")
-    expect(words.fix).toContain("127.0.0.1")
-    expect(words.fix).toContain(all)
-  })
+    ["en", en, "port 8080", "port 3000"],
+    ["zh-TW", zhTW, "連接埠 8080", "連接埠是 3000"],
+    ["zh-CN", zhCN, "端口 8080", "端口是 3000"],
+  ] as const)(
+    "names the port, PORT, the bind and the image's port in %s",
+    (_, messages, port, image) => {
+      const t = translator(messages)
+      const words = wrongPortWords(t, wrong)
+      expect(words.cause).toContain(port)
+      expect(words.why).toContain("PORT")
+      for (const fix of [words.fix, wrongPortWords(t, { ...wrong, offer: undefined }).fix]) {
+        expect(fix).toContain("PORT")
+        expect(fix).toContain("127.0.0.1")
+        expect(fix).toContain("0.0.0.0")
+      }
+      expect(words.fix).toContain(image)
+    },
+  )
 })
 
 describe("the offer to use the image's port", () => {

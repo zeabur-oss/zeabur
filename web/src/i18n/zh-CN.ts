@@ -3367,12 +3367,11 @@ export const zhCN: Messages = {
   "diagnosis.copyFailed": "无法复制诊断，请重试。",
   "wrongPort.cause": (port) => `应用没有监听端口 ${port}。`,
   "wrongPort.why": (port) =>
-    `Zeabur 把 PORT 设为 ${port}，也会检查这个端口，但连接一直被拒绝，已经超过一分钟。`,
+    `Zeabur 把 PORT 设为 ${port}，也会检查这个端口。连接一直被拒绝，已经超过一分钟。`,
   "wrongPort.fix":
     "让应用读取 PORT，或改用实际监听的端口，日志通常会写出是哪一个。如果只监听 127.0.0.1，请改为监听 0.0.0.0。",
-  "wrongPort.declares": (port) => `镜像声明的端口是 ${port}。`,
-  "wrongPort.offer": (to, from) =>
-    `镜像声明的端口是 ${to}，但服务用的是 ${from}。如果应用监听的是 ${to}，就改用这个端口。`,
+  "wrongPort.fixOffer": (port) =>
+    `镜像声明的端口是 ${port}，可以改用它，或让应用读取 PORT。如果只监听 127.0.0.1，请改为监听 0.0.0.0。`,
   "wrongPort.use": (port) => `改用端口 ${port}`,
   "wrongPort.plan": (service, port) => `${service} 改用端口 ${port}`,
   "diagnosis.lastSeen": "最后出现",

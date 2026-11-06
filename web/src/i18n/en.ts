@@ -3701,12 +3701,11 @@ export const en = {
   "diagnosis.copyFailed": "Could not copy the diagnosis. Try again.",
   "wrongPort.cause": (port: number) => `The app isn't listening on port ${port}.`,
   "wrongPort.why": (port: number) =>
-    `Zeabur sets PORT to ${port} and checks that port; connections there have been refused for over a minute.`,
+    `Zeabur sets PORT to ${port} and checks that port. Connections to it have been refused for over a minute.`,
   "wrongPort.fix":
     "Have the app read PORT, or use the port it listens on; its logs usually say which. If it listens on 127.0.0.1 only, make it listen on 0.0.0.0.",
-  "wrongPort.declares": (port: number) => `The image declares port ${port}.`,
-  "wrongPort.offer": (to: number, from: number) =>
-    `The image declares port ${to}, but the service uses ${from}. If the app listens on ${to}, use that port.`,
+  "wrongPort.fixOffer": (port: number) =>
+    `The image declares port ${port}; use it, or have the app read PORT. If the app listens on 127.0.0.1 only, make it listen on 0.0.0.0.`,
   "wrongPort.use": (port: number) => `Use port ${port}`,
   "wrongPort.plan": (service: string, port: number) => `Use port ${port} for ${service}`,
   "diagnosis.lastSeen": "Last seen",

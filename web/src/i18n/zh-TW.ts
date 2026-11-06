@@ -3375,12 +3375,11 @@ export const zhTW: Messages = {
   "diagnosis.copyFailed": "無法複製診斷，請再試一次。",
   "wrongPort.cause": (port) => `應用程式沒有監聽連接埠 ${port}。`,
   "wrongPort.why": (port) =>
-    `Zeabur 把 PORT 設成 ${port}，也會檢查這個連接埠，但連線一直被拒絕，已經超過一分鐘。`,
+    `Zeabur 把 PORT 設成 ${port}，也會檢查這個連接埠。連線一直被拒絕，已經超過一分鐘。`,
   "wrongPort.fix":
     "讓應用程式讀取 PORT，或改用實際監聽的連接埠，日誌通常會寫出是哪一個。如果只監聽 127.0.0.1，請改成監聽 0.0.0.0。",
-  "wrongPort.declares": (port) => `映像檔宣告的連接埠是 ${port}。`,
-  "wrongPort.offer": (to, from) =>
-    `映像檔宣告的連接埠是 ${to}，但服務用的是 ${from}。如果應用程式監聽的是 ${to}，就改用這個連接埠。`,
+  "wrongPort.fixOffer": (port) =>
+    `映像檔宣告的連接埠是 ${port}，可以改用它，或讓應用程式讀取 PORT。如果只監聽 127.0.0.1，請改成監聽 0.0.0.0。`,
   "wrongPort.use": (port) => `改用連接埠 ${port}`,
   "wrongPort.plan": (service, port) => `${service} 改用連接埠 ${port}`,
   "diagnosis.lastSeen": "最後出現",
