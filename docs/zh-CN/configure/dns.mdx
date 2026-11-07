@@ -1,7 +1,6 @@
 ---
 title: 配置 DNS 记录
 description: 用一条通配符记录让所有生成的网址指向集群，并在 Cloudflare、Route 53 或注册商的 DNS 中添加记录。
-source: "320eed08f87d"
 ---
 
 应用域名是生成的网址共用的域名，只需为这个域名配置一次通配符记录，之后每个新服务的网址都会解析到集群。例如，应用域名是 `apps.example.com`，就添加一条 `*.apps.example.com` 的 A 记录，指向服务器的 IPv4 地址。如果服务器有 IPv6 地址，再添加一条 AAAA 记录。之后，`web-shop.apps.example.com` 这类新网址就不需要再添加记录。

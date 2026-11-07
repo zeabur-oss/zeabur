@@ -1,7 +1,6 @@
 ---
 title: 架构
 description: 了解 Zeabur 如何从 Kubernetes 对象呈现项目、以用户权限应用变更并沿用已有控制器。
-source: "faf843625478"
 ---
 
 Zeabur 显示的内容来自集群中的 Kubernetes 对象：用 kubectl 修改副本数后，Zeabur 下次读取时就会显示新的数值。服务、域名、卷和备份配置都保存在 Kubernetes 对象中。移除 Zeabur 后，原有控制器仍会管理这些对象。
