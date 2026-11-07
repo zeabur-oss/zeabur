@@ -228,27 +228,17 @@ fn no_store(mut response: Response<ProxyBody>) -> Response<ProxyBody> {
     response
 }
 
-/// How long a client has to send a request's headers.
-const HEADER_WAIT: Duration = Duration::from_secs(10);
-/// Connections served at once; more wait in the listener's backlog.
-const MAX_CONNECTIONS: usize = 256;
-
 /// Serves `listener` until the task is dropped, over TLS when `tls` is given.
-///
-/// # Errors
-///
-/// When accepting fails for a reason other than one connection.
+#[expect(
+    clippy::infinite_loop,
+    reason = "the caller stops it by dropping the task"
+)]
 pub async fn serve<R: Reviewer>(
     listener: TcpListener,
     tls: Option<TlsAcceptor>,
     proxy: Arc<Proxy<R>>,
-) -> io::Result<()> {
-    let connections = Arc::new(tokio::sync::Semaphore::new(MAX_CONNECTIONS));
+) {
     loop {
-        let permit = Arc::clone(&connections)
-            .acquire_owned()
-            .await
-            .map_err(io::Error::other)?;
         let (stream, _) = match listener.accept().await {
             Ok(accepted) => accepted,
             Err(error) => {
@@ -264,20 +254,17 @@ pub async fn serve<R: Reviewer>(
                 async move { Ok::<_, Infallible>(proxy.handle(request).await) }
             });
             let mut http = hyper::server::conn::http1::Builder::new();
-            http.timer(hyper_util::rt::TokioTimer::new())
-                .header_read_timeout(HEADER_WAIT)
-                .max_headers(64);
+            http.timer(hyper_util::rt::TokioTimer::new());
             let served = match tls {
-                Some(tls) => match tokio::time::timeout(HEADER_WAIT, tls.accept(stream)).await {
-                    Ok(Ok(stream)) => {
+                Some(tls) => match tls.accept(stream).await {
+                    Ok(stream) => {
                         http.serve_connection(hyper_util::rt::TokioIo::new(stream), service)
                             .await
                     }
-                    Ok(Err(error)) => {
+                    Err(error) => {
                         tracing::debug!(%error, "TLS handshake failed");
                         Ok(())
                     }
-                    Err(_) => Ok(()),
                 },
                 None => {
                     http.serve_connection(hyper_util::rt::TokioIo::new(stream), service)
@@ -287,7 +274,6 @@ pub async fn serve<R: Reviewer>(
             if let Err(error) = served {
                 tracing::debug!(%error, "connection ended");
             }
-            drop(permit);
         });
     }
 }

@@ -117,14 +117,10 @@ spec:
               value: {{ $proxy.logs.url | quote }}
             - name: ZEABUR_PROXY_LOGS_MAX_LIMIT
               value: {{ $proxy.logs.maxLimit | int | quote }}
-            - name: ZEABUR_PROXY_LOGS_MAX_HOURS
-              value: {{ $proxy.logs.maxHours | int | quote }}
             {{- end }}
             {{- if $proxy.metrics.enabled }}
             - name: ZEABUR_PROXY_METRICS_URL
               value: {{ printf "http://%s.%s.svc:%s" (first (splitList ":" $storeService)) $storeNamespace $storePort | quote }}
-            - name: ZEABUR_PROXY_METRICS_MAX_HOURS
-              value: {{ $proxy.metrics.maxHours | int | quote }}
             {{- end }}
           ports:
             - name: https

@@ -71,8 +71,6 @@ pub struct LogsLimits {
     pub max_limit: u32,
     /// The range when the query names no start.
     pub default_span: SignedDuration,
-    /// The longest range; an earlier start is moved up to it.
-    pub max_span: SignedDuration,
 }
 
 impl Default for LogsLimits {
@@ -81,7 +79,6 @@ impl Default for LogsLimits {
             default_limit: 100,
             max_limit: 1000,
             default_span: SignedDuration::from_hours(1),
-            max_span: SignedDuration::from_hours(24 * 7),
         }
     }
 }
@@ -149,7 +146,7 @@ impl Backend for Logs {
         })
     }
 
-    /// The range is cut to the longest span; the limit is lowered to the most allowed.
+    /// The limit is lowered to the most allowed.
     fn build(
         authorized: &Authorized<LogsQuery>,
         limits: &LogsLimits,
@@ -157,16 +154,12 @@ impl Backend for Logs {
     ) -> Result<Upstream, Reject> {
         let query = authorized.query();
         let end = query.end.unwrap_or(now).min(now);
-        let earliest = end
-            .checked_sub(limits.max_span)
-            .map_err(|_invalid| Reject::InvalidTime)?;
         let start = match query.start {
             Some(start) => start,
             None => end
                 .checked_sub(limits.default_span)
                 .map_err(|_invalid| Reject::InvalidTime)?,
-        }
-        .max(earliest);
+        };
         if start >= end {
             return Err(Reject::InvalidTime);
         }
@@ -380,8 +373,7 @@ mod tests {
             upstream.params(),
             [
                 ("query", "error | limit 5".to_owned()),
-                // Not more than a week before the end.
-                ("start", "2026-10-15T12:00:00Z".to_owned()),
+                ("start", "2020-01-01T00:00:00Z".to_owned()),
                 ("end", "2026-10-22T12:00:00Z".to_owned()),
                 (
                     "extra_stream_filters",
@@ -392,17 +384,17 @@ mod tests {
         );
         assert_eq!(
             upstream.path_and_query(),
-            "/select/logsql/query?query=error+%7C+limit+5&start=2026-10-15T12%3A00%3A00Z\
+            "/select/logsql/query?query=error+%7C+limit+5&start=2020-01-01T00%3A00%3A00Z\
              &end=2026-10-22T12%3A00%3A00Z\
              &extra_stream_filters=%7Bkubernetes.pod_namespace%3D%22shop%22%7D&limit=1000"
         );
     }
 
     #[test]
-    fn the_range_is_at_most_a_week_and_an_hour_by_default() {
+    fn a_given_start_is_kept_and_the_range_is_an_hour_by_default() {
         let query = parse("namespace=shop&start=1700000000&end=2026-10-02T00:00:00Z").unwrap();
         let upstream = build(query, "shop").unwrap();
-        assert_eq!(param(&upstream, "start"), ["2026-09-25T00:00:00Z"]);
+        assert_eq!(param(&upstream, "start"), ["2023-11-14T22:13:20Z"]);
         let defaults = build(parse("namespace=shop").unwrap(), "shop").unwrap();
         assert_eq!(param(&defaults, "start"), ["2026-10-22T11:00:00Z"]);
         assert_eq!(param(&defaults, "limit"), ["100"]);

@@ -108,8 +108,6 @@ impl Scoped for MetricsQuery {
 pub struct MetricsLimits {
     /// The range when the request names no start.
     pub default_span: SignedDuration,
-    /// The longest range; an earlier start is moved up to it.
-    pub max_span: SignedDuration,
     /// The most series, names or values; a larger limit is lowered to it.
     pub max_limit: u32,
 }
@@ -118,7 +116,6 @@ impl Default for MetricsLimits {
     fn default() -> Self {
         Self {
             default_span: SignedDuration::from_hours(1),
-            max_span: SignedDuration::from_hours(24 * 7),
             max_limit: 10_000,
         }
     }
@@ -263,8 +260,7 @@ impl Backend for Metrics {
             ));
         }
         let end = query.end.map_or(now, Timestamp::as_second).min(now);
-        let earliest = end.saturating_sub(limits.max_span.as_secs());
-        let mut start = query.start.map_or_else(
+        let start = query.start.map_or_else(
             || end.saturating_sub(limits.default_span.as_secs()),
             Timestamp::as_second,
         );
@@ -273,10 +269,6 @@ impl Backend for Metrics {
             .filter(|_| query.endpoint == Endpoint::QueryRange)
         {
             let step = i64::from(step);
-            if start < earliest {
-                let steps = (earliest - start).saturating_add(step - 1) / step;
-                start = start.saturating_add(steps.saturating_mul(step));
-            }
             if start > end {
                 return Err(Reject::InvalidTime);
             }
@@ -294,7 +286,6 @@ impl Backend for Metrics {
                 ],
             ));
         }
-        start = start.max(earliest);
         if start > end {
             return Err(Reject::InvalidTime);
         }
@@ -585,12 +576,14 @@ mod tests {
     }
 
     #[test]
-    fn times_stay_within_a_week_before_now_and_on_the_grid() {
-        let query = parse(RANGE, "namespace=shop&query=up&step=3600&start=1790800000").unwrap();
+    fn times_stay_before_now_and_a_range_has_bounded_points() {
+        let query = parse(
+            RANGE,
+            "namespace=shop&query=up&step=3600&start=1790800000&end=1900000000",
+        )
+        .unwrap();
         let upstream = build(query, "shop").unwrap();
-        let start: i64 = param(&upstream, "start")[0].parse().unwrap();
-        assert!(start >= NOW - 7 * 24 * 3600);
-        assert_eq!((start - 1_790_800_000) % 3600, 0);
+        assert_eq!(param(&upstream, "start"), ["1790800000"]);
         assert_eq!(param(&upstream, "end"), [NOW.to_string()]);
 
         let later = parse(
