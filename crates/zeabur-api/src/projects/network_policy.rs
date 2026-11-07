@@ -7,8 +7,7 @@
 //! makes the document fail. Whether the cluster's network plugin enforces the policies is not
 //! known; clients say it depends on the plugin.
 
-use axum::Json;
-use axum::extract::{Path, RawQuery};
+use axum::extract::RawQuery;
 use serde::Serialize;
 use utoipa::ToSchema;
 use zeabur_core::problem::{Kind, MEDIA_TYPE as PROBLEM, Problem};
@@ -19,6 +18,7 @@ use zeabur_modules::Reading;
 use zeabur_modules::network_policy::{self, Preset, Reachability, Workload};
 
 use crate::error::{ApiError, project_read, read_problem};
+use crate::extract::{Json, Path};
 use crate::handlers::Person;
 use crate::views::UnreadableView;
 

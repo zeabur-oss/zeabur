@@ -1,10 +1,11 @@
 //! Problems as HTTP responses.
 
-use axum::Json;
 use axum::http::{HeaderValue, StatusCode, header};
 use axum::response::{IntoResponse, Response};
 use zeabur_core::problem::{Denied, Kind, MEDIA_TYPE, Problem};
 use zeabur_kube::ClusterError;
+
+use crate::extract::Json;
 
 /// A [`Problem`] as an `application/problem+json` response.
 ///

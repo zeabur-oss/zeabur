@@ -124,6 +124,7 @@ pub mod alerts;
 mod cache;
 pub mod cluster;
 mod error;
+pub mod extract;
 pub mod gaps;
 mod github;
 mod handlers;
@@ -497,8 +498,11 @@ pub fn router_with(access: Arc<dyn ClusterAccess>, options: Options) -> Router {
         terminals,
     };
     routes()
+        .method_not_allowed_fallback(handlers::method_not_allowed)
+        .route("/api", axum::routing::any(handlers::not_found))
         .route("/api/{*rest}", axum::routing::any(handlers::not_found))
         .layer(axum::middleware::from_fn(cache::no_store))
+        .layer(handlers::catch_panic())
         .with_state(state)
 }
 

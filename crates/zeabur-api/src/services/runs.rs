@@ -3,8 +3,6 @@
 //! The Jobs come from the project read the document already makes, so the list costs no other
 //! request. The CronJob's history limits keep it short; the newest 50 are sent.
 
-use axum::Json;
-use axum::extract::Path;
 use serde::Serialize;
 use utoipa::ToSchema;
 use zeabur_core::problem::{MEDIA_TYPE as PROBLEM, Problem};
@@ -14,6 +12,7 @@ use zeabur_model::WorkloadKind;
 use zeabur_model::adapters::controller_of;
 
 use crate::error::ApiError;
+use crate::extract::{Json, Path};
 use crate::handlers::Person;
 use crate::projects::not_found;
 

@@ -11,8 +11,7 @@
 //!
 //! [ms-rbac]: https://github.com/kubernetes-sigs/metrics-server/blob/master/manifests/base/rbac.yaml
 
-use axum::Json;
-use axum::extract::{Path, State};
+use axum::extract::State;
 use serde::Serialize;
 use utoipa::ToSchema;
 use zeabur_core::problem::{Kind, MEDIA_TYPE as PROBLEM, Problem};
@@ -21,6 +20,7 @@ use zeabur_modules::Reading;
 
 use crate::cluster::{disks, modules};
 use crate::error::ApiError;
+use crate::extract::{Json, Path};
 use crate::handlers::{AppState, Person};
 use crate::views::{DiskState, MetricsState, UnreadableView};
 

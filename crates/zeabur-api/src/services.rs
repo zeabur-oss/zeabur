@@ -10,12 +10,11 @@ pub mod rollout;
 pub mod runs;
 pub mod trace;
 
-use axum::Json;
-use axum::extract::Path;
 use zeabur_core::problem::{MEDIA_TYPE as PROBLEM, Problem};
 use zeabur_model::WorkloadKind;
 
 use crate::error::ApiError;
+use crate::extract::{Json, Path};
 use crate::handlers::Person;
 use crate::projects::{document_of, not_found};
 use crate::views::ServiceDocument;

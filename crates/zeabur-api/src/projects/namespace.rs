@@ -34,8 +34,7 @@
 
 mod deleting;
 
-use axum::Json;
-use axum::extract::{Path, State};
+use axum::extract::State;
 pub use deleting::{HeldObject, ProjectDeleting, RemainingContent, RemainingFinalizer};
 use serde::Serialize;
 use utoipa::ToSchema;
@@ -47,6 +46,7 @@ use zeabur_model::{Origin, PodSecurityLevel, ProjectBuildLimits, ProjectDetails}
 use super::rights::ProjectRights;
 use crate::account::{AccountRole, role};
 use crate::error::{ApiError, get_read, read_problem};
+use crate::extract::{Json, Path};
 use crate::handlers::{AppState, Person};
 
 /// Whether the person may change something, as far as their RBAC rules tell.

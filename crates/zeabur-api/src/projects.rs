@@ -58,8 +58,6 @@ pub mod writes;
 
 use std::sync::Arc;
 
-use axum::Json;
-use axum::extract::Path;
 use futures_util::StreamExt as _;
 use zeabur_core::names::{LABEL_PROJECT, is_system_namespace};
 use zeabur_core::problem::{Kind, MEDIA_TYPE as PROBLEM, Problem};
@@ -70,6 +68,7 @@ use zeabur_kube::{Cluster, ClusterExt as _, NamespaceObjects};
 use zeabur_model::{Origin, ProjectDetails, ProjectHealth, id};
 
 use crate::error::{ApiError, list_read, project_read, read_problem};
+use crate::extract::{Json, Path};
 use crate::handlers::Person;
 use crate::views::{
     ProjectDocument, ProjectExtensions, ProjectList, ProjectSummary, ServiceSummary, UnreadableView,

@@ -12,11 +12,11 @@
 use std::future::Future;
 use std::time::{Duration, Instant};
 
-use axum::Json;
 use axum::extract::State;
 use zeabur_core::problem::{Kind, MEDIA_TYPE as PROBLEM, Problem};
 
 use crate::error::ApiError;
+use crate::extract::Json;
 use crate::handlers::{AppState, Person};
 use crate::releases::{self, Answer, RELEASES_URL};
 use crate::views::{ZeaburRelease, ZeaburUpdate};

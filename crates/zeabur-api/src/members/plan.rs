@@ -12,7 +12,6 @@
 
 use std::collections::BTreeMap;
 
-use axum::Json;
 use axum::extract::State;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -30,6 +29,7 @@ use super::writes::{
     user_object,
 };
 use crate::error::{ApiError, read_problem};
+use crate::extract::Json;
 use crate::handlers::{AppState, Person};
 use crate::plan_token::{self as token, LIFETIME_SECONDS, PlanKey, TokenError};
 use crate::projects::writes::token_problem;

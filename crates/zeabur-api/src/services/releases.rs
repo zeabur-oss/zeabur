@@ -1,8 +1,6 @@
 //! A service's releases: the pod templates its workload has run, for the Releases tab and
 //! rollbacks ([`zeabur_plan::releases`]).
 
-use axum::Json;
-use axum::extract::Path;
 use serde::Serialize;
 use utoipa::ToSchema;
 use zeabur_core::problem::{Kind, MEDIA_TYPE as PROBLEM, Problem};
@@ -10,6 +8,7 @@ use zeabur_model::WorkloadKind;
 use zeabur_plan::Release;
 
 use crate::error::{ApiError, project_read, read_problem};
+use crate::extract::{Json, Path};
 use crate::handlers::Person;
 use crate::projects::snapshot;
 use crate::projects::writes::releases::History;

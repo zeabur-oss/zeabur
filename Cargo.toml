@@ -130,6 +130,7 @@ semver = { version = "1", default-features = false }
 serde = { version = "1", features = ["derive"] }
 serde-saphyr = { version = "2", default-features = false, features = ["deserialize"] }
 serde_json = "1"
+serde_path_to_error = "0.1"
 # SHA-256 for derived names in the pure crates (zeabur-model), which hold no C library.
 sha2 = { version = "0.11", default-features = false }
 tar = { version = "0.4", default-features = false }
@@ -140,7 +141,11 @@ tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "signal
 tokio-tungstenite = { version = "0.30", default-features = false, features = ["connect"] }
 tower = { version = "0.5", default-features = false, features = ["util"] }
 # The request tracing of kube-rs's default client (zeabur-kube).
-tower-http = { version = "0.7", default-features = false, features = ["trace", "compression-gzip"] }
+tower-http = { version = "0.7", default-features = false, features = [
+    "catch-panic",
+    "compression-gzip",
+    "trace",
+] }
 tracing = "0.1"
 # OpenAPI from the code. Reviewed 2026-10-28 (zeabur-api README): no `yaml` feature (it pulls a
 # c2rust libyaml); the spec is written with serde-saphyr. Never enable `config`.

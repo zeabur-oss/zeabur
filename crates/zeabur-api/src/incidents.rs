@@ -11,8 +11,6 @@
 //! (`symptoms`) the incident explains, so a client shows those diagnoses as the incident's and
 //! not as the service's own.
 
-use axum::Json;
-use axum::extract::Path;
 use serde::Serialize;
 use utoipa::ToSchema;
 use zeabur_core::problem::{MEDIA_TYPE as PROBLEM, Problem};
@@ -25,6 +23,7 @@ use zeabur_model::Incident;
 
 use crate::cluster::WIDE_LIMIT;
 use crate::error::ApiError;
+use crate::extract::{Json, Path};
 use crate::handlers::Person;
 use crate::projects::ProjectRead;
 use crate::views::UnreadableView;

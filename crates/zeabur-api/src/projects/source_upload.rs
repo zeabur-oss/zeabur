@@ -7,9 +7,8 @@
 //! goes into no answer and no log. Naming the digest in the `Build` is a plan like any other
 //! write (`archiveDigest`).
 
-use axum::Json;
 use axum::body::Body;
-use axum::extract::{Path, RawQuery, State};
+use axum::extract::{RawQuery, State};
 use axum::http::{HeaderMap, header};
 use secrecy::SecretString;
 use serde::Serialize;
@@ -22,6 +21,7 @@ use zeabur_model::Origin;
 
 use super::oci_push::{MAX_LAYER, PushError, Target};
 use crate::error::{ApiError, get_read, read_problem};
+use crate::extract::{Json, Path};
 use crate::handlers::{AppState, Person};
 
 /// The folder as pushed.

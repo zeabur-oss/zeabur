@@ -80,8 +80,8 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use axum::body::Bytes;
-use axum::extract::ws::{CloseFrame, Message, WebSocket, WebSocketUpgrade};
-use axum::extract::{FromRef, FromRequestParts, Path, RawQuery};
+use axum::extract::ws::{CloseFrame, Message, WebSocket};
+use axum::extract::{FromRef, FromRequestParts, RawQuery};
 use axum::http::request::Parts;
 use axum::http::{HeaderMap, header};
 use axum::response::Response;
@@ -96,6 +96,7 @@ use zeabur_kube::{
 };
 
 use crate::error::{ApiError, get_read, read_problem, review_refusal};
+use crate::extract::{Path, WebSocketUpgrade};
 use crate::handlers::AppState;
 
 /// How long a terminal may stay without a byte either way before the server closes it.
@@ -308,6 +309,7 @@ pub(crate) async fn exec(
 ) -> Response {
     let query = ExecQuery::parse(query.as_deref());
     upgrade
+        .0
         .max_message_size(MAX_MESSAGE)
         .on_upgrade(move |socket| run(socket, terminal, project, pod, query))
 }

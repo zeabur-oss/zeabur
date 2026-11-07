@@ -11,8 +11,6 @@
 
 use std::collections::BTreeMap;
 
-use axum::Json;
-use axum::extract::Path;
 use serde::Serialize;
 use utoipa::ToSchema;
 use zeabur_core::problem::{MEDIA_TYPE as PROBLEM, Problem};
@@ -23,6 +21,7 @@ use zeabur_modules::{Module, Reading};
 
 use crate::cluster::s3_destinations;
 use crate::error::{ApiError, list_read, read_problem};
+use crate::extract::{Json, Path};
 use crate::handlers::Person;
 use crate::views::UnreadableView;
 

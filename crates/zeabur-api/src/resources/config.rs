@@ -2,8 +2,6 @@
 
 use std::collections::BTreeMap;
 
-use axum::Json;
-use axum::extract::Path;
 use axum::response::{IntoResponse, Response};
 use zeabur_core::problem::{MEDIA_TYPE as PROBLEM, Problem};
 use zeabur_kube::ClusterExt as _;
@@ -11,6 +9,7 @@ use zeabur_kube::k8s_openapi::api::core::v1::ConfigMap;
 use zeabur_model::{Origin, ResourceKind, id};
 
 use crate::error::{ApiError, get_read, list_read, read_problem};
+use crate::extract::{Json, Path};
 use crate::handlers::Person;
 use crate::views::{ConfigMapList, ConfigMapView, RevealedSecret, SecretValue};
 

@@ -317,7 +317,6 @@ pub(crate) use store::{
 };
 
 pub(crate) mod store {
-    use axum::Json;
     use axum::extract::State;
     use serde::{Deserialize, Serialize};
     use serde_json::{Value, json};
@@ -331,6 +330,7 @@ pub(crate) mod store {
 
     use super::{CONFIG_MAP, METRICS_STORE_KEY, Settings, parse_service_port};
     use crate::error::{ApiError, read_problem};
+    use crate::extract::Json;
     use crate::handlers::{AppState, Person};
     use crate::projects::namespace::Permission;
     use crate::views::UnreadableView;

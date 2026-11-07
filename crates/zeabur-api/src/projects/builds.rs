@@ -6,8 +6,6 @@
 //! ten minutes after it finishes). It also names the workloads that ask Keel to update them
 //! (`keel.sh/policy`), for the automatic-update switch.
 
-use axum::Json;
-use axum::extract::Path;
 use serde::Serialize;
 use utoipa::ToSchema;
 use zeabur_core::problem::{MEDIA_TYPE as PROBLEM, Problem};
@@ -20,6 +18,7 @@ use zeabur_modules::zeabur_builder::{
 };
 
 use crate::error::ApiError;
+use crate::extract::{Json, Path};
 use crate::handlers::Person;
 use crate::projects::backups::ProviderState;
 use crate::views::UnreadableView;

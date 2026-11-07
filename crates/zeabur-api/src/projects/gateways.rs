@@ -7,8 +7,6 @@
 
 use std::collections::BTreeMap;
 
-use axum::Json;
-use axum::extract::Path;
 use serde::Serialize;
 use utoipa::ToSchema;
 use zeabur_core::problem::{MEDIA_TYPE as PROBLEM, Problem};
@@ -16,6 +14,7 @@ use zeabur_kube::{Cluster, ResourceRef};
 use zeabur_plan::Attachable;
 
 use crate::error::ApiError;
+use crate::extract::{Json, Path};
 use crate::handlers::Person;
 
 /// A Gateway that accepts an `HTTPRoute` from the project.

@@ -463,6 +463,29 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn an_unknown_path_or_method_is_refused_as_a_problem() {
+        let cluster = cluster();
+        for (method, uri, status) in [
+            ("GET", "/api", StatusCode::NOT_FOUND),
+            ("GET", "/api/v1/nothing", StatusCode::NOT_FOUND),
+            ("DELETE", "/api/v1/session", StatusCode::METHOD_NOT_ALLOWED),
+        ] {
+            let (got, headers, body) = send(app(&cluster), method, uri, &[]).await;
+            if got == StatusCode::METHOD_NOT_ALLOWED {
+                assert_eq!(headers.get("allow").unwrap(), "GET,HEAD", "{method} {uri}");
+                assert_eq!(json(&body)["type"], "about:blank");
+            }
+            assert_eq!(got, status, "{method} {uri}: {body}");
+            assert_eq!(
+                headers.get("content-type").unwrap(),
+                "application/problem+json",
+                "{method} {uri}"
+            );
+            assert_ne!(json(&body)["detail"].as_str().unwrap(), "");
+        }
+    }
+
+    #[tokio::test]
     async fn the_project_document_says_who_may_reach_each_service() {
         let cluster = cluster();
         let open = get(&cluster, "/api/v1/projects/shop").await;
@@ -901,6 +924,7 @@ mod tests {
         )
         .await;
         assert_eq!(status, StatusCode::METHOD_NOT_ALLOWED, "{body}");
+        assert!(body.contains("does not accept GET"), "{body}");
 
         let (status, cache, body) = call(
             app(&cluster),

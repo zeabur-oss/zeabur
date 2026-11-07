@@ -13,8 +13,6 @@
 //! [local-path]: https://github.com/rancher/local-path-provisioner/blob/master/README.md
 //! [longhorn]: https://longhorn.io/docs/1.9.0/concepts/
 
-use axum::Json;
-use axum::extract::Path;
 use serde::Serialize;
 use serde_json::Value;
 use utoipa::ToSchema;
@@ -25,6 +23,7 @@ use zeabur_kube::{Cluster, ClusterExt, ResourceRef};
 use zeabur_model::Origin;
 
 use crate::error::ApiError;
+use crate::extract::{Json, Path};
 use crate::handlers::Person;
 use crate::views::UnreadableView;
 

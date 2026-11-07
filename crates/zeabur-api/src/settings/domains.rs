@@ -15,7 +15,6 @@
 
 use std::net::{Ipv4Addr, Ipv6Addr};
 
-use axum::Json;
 use axum::extract::State;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -28,6 +27,7 @@ use super::{
     CONFIG_MAP, DOMAIN_SUFFIXES_KEY, SettingSource, Settings, can_change, read_stored, write_key,
 };
 use crate::error::ApiError;
+use crate::extract::Json;
 use crate::handlers::{AppState, Person};
 use crate::projects::namespace::Permission;
 use crate::resolve::Resolved;

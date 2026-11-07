@@ -1,7 +1,6 @@
 //! `/api/v1/members`: everyone who can sign in, invitations, setup links and removals.
 
-use axum::Json;
-use axum::extract::{Path, State};
+use axum::extract::State;
 use axum::http::StatusCode;
 use zeabur_core::message::Message;
 use zeabur_core::problem::{Kind, MEDIA_TYPE as PROBLEM, Problem};
@@ -17,6 +16,7 @@ use super::writes::{
 };
 use super::{USER_PREFIX, access};
 use crate::error::{ApiError, read_problem};
+use crate::extract::{Json, Path};
 use crate::handlers::{AppState, Person};
 
 /// The problem when Zeabur Identity is not installed.

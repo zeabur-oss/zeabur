@@ -16,8 +16,6 @@
 //! Diagnoses (what is going wrong with a service right now) are not gaps: they ride on each
 //! service in the project document, see [`crate::projects`].
 
-use axum::Json;
-use axum::extract::Path;
 use serde::Serialize;
 use utoipa::ToSchema;
 use zeabur_core::isolation::{PLATFORM_LABEL, PROJECT_POLICY};
@@ -32,6 +30,7 @@ use zeabur_model::{Citation, Gap, HttpRoute};
 use zeabur_modules::Finding;
 
 use crate::error::{ApiError, project_read, read_problem};
+use crate::extract::{Json, Path};
 use crate::handlers::Person;
 use crate::views::UnreadableView;
 

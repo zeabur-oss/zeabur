@@ -9,8 +9,7 @@
 
 use std::collections::BTreeMap;
 
-use axum::Json;
-use axum::extract::{Path, State};
+use axum::extract::State;
 use serde::Serialize;
 use utoipa::ToSchema;
 use zeabur_catalog::templates::{Reference, TemplateInput, TemplateService};
@@ -20,6 +19,7 @@ use zeabur_kube::ServedResource;
 
 use crate::cluster::capacity::Amount;
 use crate::error::ApiError;
+use crate::extract::{Json, Path};
 use crate::handlers::{AppState, Person};
 
 /// A template of Zeabur Catalog.

@@ -19,8 +19,7 @@
 //! (`exposed`), and its apply is refused when one has appeared since. Everything else (the
 //! credential, the pod's lifetime) is the project tools pod's.
 
-use axum::Json;
-use axum::extract::{Path, State, WebSocketUpgrade};
+use axum::extract::State;
 use axum::http::StatusCode;
 use axum::response::Response;
 use serde::{Deserialize, Serialize};
@@ -38,6 +37,7 @@ use super::node_shells::{
 };
 use crate::access::Handoff;
 use crate::error::ApiError;
+use crate::extract::{Json, Path, WebSocketUpgrade};
 use crate::handlers::{AppState, Credential, Person};
 use crate::plan_token::{self as token, LIFETIME_SECONDS, TokenError};
 use crate::pods::exec::Terminal;

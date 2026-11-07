@@ -22,7 +22,6 @@
 //! [mysqldump]: https://dev.mysql.com/doc/refman/8.4/en/mysqldump.html
 
 use axum::body::Body;
-use axum::extract::Path;
 use axum::http::{HeaderValue, header};
 use axum::response::{IntoResponse as _, Response};
 use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
@@ -34,6 +33,7 @@ use zeabur_modules::databases::Database;
 use zeabur_modules::{mariadb_operator, moco, percona_mongodb};
 
 use crate::error::{ApiError, get_read, read_problem};
+use crate::extract::Path;
 use crate::handlers::Person;
 use crate::pods::exec::{exec_refusal, exec_right};
 

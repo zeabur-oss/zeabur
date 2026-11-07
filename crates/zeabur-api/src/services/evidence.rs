@@ -20,8 +20,7 @@
 //! Sentences are their keys with their values, as the API gives them (`diagnosis.crashLoop.cause.
 //! exitCode`, `exitCode=1`): the text reads the same whoever's language made it.
 
-use axum::Json;
-use axum::extract::{Path, State};
+use axum::extract::State;
 use serde::Serialize;
 use serde_json::Value;
 use utoipa::ToSchema;
@@ -31,6 +30,7 @@ use zeabur_kube::{Cluster, LogOptions};
 use zeabur_model::{Message, Origin, Service, WorkloadKind, id};
 
 use crate::error::ApiError;
+use crate::extract::{Json, Path};
 use crate::handlers::{AppState, Person};
 use crate::projects::{ProjectRead, not_found};
 use crate::services::trace::{ServiceTrace, of_service};

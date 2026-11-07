@@ -6,7 +6,6 @@
 
 use std::future::Future;
 
-use axum::Json;
 use axum::extract::{FromRef, FromRequestParts};
 use axum::http::request::Parts;
 use serde::Serialize;
@@ -14,6 +13,7 @@ use utoipa::ToSchema;
 use zeabur_core::problem::{MEDIA_TYPE as PROBLEM, Problem};
 
 use crate::error::ApiError;
+use crate::extract::Json;
 use crate::handlers::{AppState, Person};
 use crate::views::WhoAmI;
 
