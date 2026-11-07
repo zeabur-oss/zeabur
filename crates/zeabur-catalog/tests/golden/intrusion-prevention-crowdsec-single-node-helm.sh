@@ -49,7 +49,7 @@ cat > crowdsec-values.yaml <<'ZEABUR_VALUES'
 # Pinned by digest; a tag alone can move.
 image:
   repository: crowdsecurity/crowdsec
-  tag: v1.8.1@sha256:0f2523fa61ef507f15d953045cface490cc880670c62f2755ced17524107f71a
+  tag: v1.8.2@sha256:65b74942f7e7ed5c60fde4ac15fc4ba715904c398c8b16dd451f4907d90347d4
 # The runtime on k3s and mainstream distributions.
 container_runtime: containerd
 tls:
@@ -88,7 +88,7 @@ agent:
     image:
       # The agent's image has nc; the chart's busybox has no digest.
       repository: crowdsecurity/crowdsec
-      tag: v1.8.1@sha256:0f2523fa61ef507f15d953045cface490cc880670c62f2755ced17524107f71a
+      tag: v1.8.2@sha256:65b74942f7e7ed5c60fde4ac15fc4ba715904c398c8b16dd451f4907d90347d4
   acquisition:
     # Traefik's JSON access log.
     - namespace: traefik
