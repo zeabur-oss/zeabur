@@ -230,7 +230,7 @@ fn no_store(mut response: Response<ProxyBody>) -> Response<ProxyBody> {
 }
 
 /// Serves `listener`, over TLS when `tls` is given, until `stop` completes; then takes no new
-/// connection and returns once the open ones have answered.
+/// connection, drops unfinished TLS handshakes and returns once the open connections have answered.
 pub async fn serve<R: Reviewer>(
     listener: TcpListener,
     tls: Option<TlsAcceptor>,
@@ -238,6 +238,7 @@ pub async fn serve<R: Reviewer>(
     stop: impl Future<Output = ()>,
 ) {
     let graceful = GracefulShutdown::new();
+    let (stopping, stopped) = tokio::sync::watch::channel(false);
     let mut stop = std::pin::pin!(stop);
     loop {
         let stream = tokio::select! {
@@ -253,6 +254,7 @@ pub async fn serve<R: Reviewer>(
         let proxy = Arc::clone(&proxy);
         let tls = tls.clone();
         let watcher = graceful.watcher();
+        let mut stopped = stopped.clone();
         tokio::spawn(async move {
             let service = hyper::service::service_fn(move |request| {
                 let proxy = Arc::clone(&proxy);
@@ -261,7 +263,11 @@ pub async fn serve<R: Reviewer>(
             let mut http = hyper::server::conn::http1::Builder::new();
             http.timer(hyper_util::rt::TokioTimer::new());
             let served = if let Some(tls) = tls {
-                match tls.accept(stream).await {
+                let handshake = tokio::select! {
+                    handshake = tls.accept(stream) => handshake,
+                    _ = stopped.wait_for(|stopping| *stopping) => return,
+                };
+                match handshake {
                     Ok(stream) => {
                         let connection =
                             http.serve_connection(hyper_util::rt::TokioIo::new(stream), service);
@@ -282,6 +288,7 @@ pub async fn serve<R: Reviewer>(
             }
         });
     }
+    stopping.send_replace(true);
     graceful.shutdown().await;
 }
 
@@ -585,6 +592,34 @@ mod tests {
         tokio::time::timeout(Duration::from_secs(5), server)
             .await
             .unwrap()
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn an_unfinished_tls_handshake_does_not_hold_up_stopping() {
+        let config = rustls::ServerConfig::builder()
+            .with_no_client_auth()
+            .with_cert_resolver(Arc::new(rustls::server::ResolvesServerCertUsingSni::new()));
+        let tls = TlsAcceptor::from(Arc::new(config));
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let (stop, stopped) = tokio::sync::oneshot::channel::<()>();
+        let (url, _) = backend(200, "{}").await;
+        let server = tokio::spawn(serve(
+            listener,
+            Some(tls),
+            proxy(url, allowing(&["a"]), 1 << 20),
+            async {
+                stopped.await.unwrap();
+            },
+        ));
+
+        let _silent = tokio::net::TcpStream::connect(address).await.unwrap();
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        stop.send(()).unwrap();
+        tokio::time::timeout(Duration::from_secs(5), server)
+            .await
+            .expect("stopping waited for the handshake")
             .unwrap();
     }
 
