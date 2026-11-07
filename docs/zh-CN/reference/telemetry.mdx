@@ -1,6 +1,6 @@
 ---
 title: 体验计划
-description: 加入体验计划后，Zeabur 和安装程序会发送什么、绝不发送什么；Zeabur 和 zeaburctl 如何检查新版本；以及如何分别关闭。
+description: 加入体验计划后，Zeabur 和安装程序会发送什么、绝不发送什么；Zeabur 和 zeaburctl 如何检查新版本；Zeabur 如何获取更新的模板；以及如何分别关闭。
 source: "119a598e43c4"
 ---
 
@@ -88,3 +88,23 @@ kubectl -n zeabur logs deployment/zeabur | grep telemetry
 - 用 Helm 安装时，设置 `updateCheck.enabled=false`。集群页就只显示版本。
 - 在 Zeabur 的环境变量中设置 `DO_NOT_TRACK=1`。`zeaburctl` 则是在你自己的环境变量中设置。这也会关闭体验计划。
 - 为 `zeaburctl`（包括 `zeaburctl ui`）在你的环境变量中设置 `NO_UPDATE_NOTIFIER`，任意值都可以。这只关闭检查更新。
+
+## 模板更新
+
+不用升级 Zeabur，也能用上更新的模板。Zeabur 会获取 Zeabur Catalog 最新的一版，检查签名后，用其中的模板替换 Zeabur 内置的模板。组件，以及 Zeabur 如何在集群里找到它们，仍以内置的为准。已经用模板部署的服务不会变化。模板更新和体验计划、检查更新各自独立，默认开启。
+
+**获取什么**。从 `https://oss-catalog.zeabur.com/v1/` 获取 Zeabur Catalog 最新一版的文件：先取 `SHA256SUMS`，有变化时才再取 `SHA256SUMS.sigstore.json` 和 `bundle.tar.gz`（约 300 KB）。Zeabur 启动后第一次获取时，还会从 `https://tuf-repo-cdn.sigstore.dev` 读取 Sigstore 的信任根，用来检查签名。
+
+**检查什么**。签名要证明 `SHA256SUMS` 是 Zeabur Catalog 在 GitHub Actions 上的发布流程签的，`bundle.tar.gz` 也要与其中的校验和一致。然后逐个检查模板：要能读取，需要的组件要是这个 Zeabur 认识的，而且生成的对象要与 Catalog 记录的完全一致。没通过的模板不会出现，如果 Zeabur 内置了同一个模板，就继续用内置的。整体没通过检查时，什么都不会变。
+
+**什么时候运行**。有人打开模板列表时才会获取，每 6 小时最多一次，失败时 10 分钟后再试。获取的是 Zeabur 服务器，浏览器不会访问。模板只保存在内存中，重启后，在下次获取前先用内置的模板。`zeaburctl ui` 不会获取。
+
+**会发送什么**。普通的请求，不带任何 ID 或 Cookie。Zeabur 服务器的 user agent 是 `zeabur`。托管 `oss-catalog.zeabur.com` 的 GitHub Pages 和 Sigstore 会看到请求来自哪个 IP 地址。不会发送任何关于集群或使用者的数据，所以 `DO_NOT_TRACK` 不会关闭它。
+
+**使用镜像站**。集群无法访问互联网时，把某一版的四个文件原样放到集群能访问的 Web 服务器上，再填上它的地址：安装程序配置中的 `templateFetchUrl`、Helm 的 `templateFetch.url`，或 Zeabur 环境变量 `ZEABUR_TEMPLATE_FETCH_URL`。Zeabur 仍需要访问 `https://tuf-repo-cdn.sigstore.dev` 才能检查签名。
+
+**关闭**。以下任意一种都有效。关闭后，Zeabur 只提供内置的模板，也不会为模板发出任何请求。
+
+- 用安装程序安装时，在 `/etc/zeabur-installer/config.yaml` 中设置 `templateFetch: false`。
+- 用 Helm 安装时，设置 `templateFetch.enabled=false`。
+- 在 Zeabur 的环境变量中设置 `ZEABUR_TEMPLATE_FETCH=false`。

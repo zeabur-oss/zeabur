@@ -1,12 +1,12 @@
 //! The `template` and `pageServer` changes: a template of Zeabur Catalog, rendered for the project
-//! ([`zeabur_catalog::templates()`]) and opened into the `create` of each object.
+//! ([`zeabur_catalog::Catalog`]) and opened into the `create` of each object.
 //!
 //! A `pageServer` change is the `error-pages` template with the project's HTML in its ConfigMap of
 //! pages. Each object goes as one YAML document, as a person's own YAML does, so the plan checks
 //! its kind with discovery and sends every write as a dry run first.
 
 use serde_json::{Value, json};
-use zeabur_catalog::{RenderError, RenderOptions};
+use zeabur_catalog::{Catalog, RenderError, RenderOptions};
 use zeabur_core::problem::{Kind, Problem, ProblemAt};
 use zeabur_plan::{Change, ErrorPageHtml, PlanRequest, TemplateChange};
 
@@ -24,6 +24,7 @@ const PAGE_SERVER_TEMPLATE: &str = "error-pages";
 /// `ClusterIssuer` and Zeabur has none; `404` for a template this build does not carry; `500`
 /// when a template this build carries does not read.
 pub(crate) fn open(
+    catalog: &Catalog,
     namespace: &str,
     cluster_issuer: Option<&str>,
     request: PlanRequest,
@@ -38,14 +39,15 @@ pub(crate) fn open(
     let mut changes = Vec::with_capacity(request.changes.len());
     for (index, change) in request.changes.into_iter().enumerate() {
         let objects = if let Change::Template(template) = &change {
-            render(namespace, cluster_issuer, template).map_err(|e| problem(&e, index, template))?
+            render(catalog, namespace, cluster_issuer, template)
+                .map_err(|e| problem(&e, index, template))?
         } else if let Change::PageServer(pages) = &change {
             let template = TemplateChange {
                 template: PAGE_SERVER_TEMPLATE.to_owned(),
                 domain: None,
                 inputs: std::collections::BTreeMap::new(),
             };
-            let mut objects = render(namespace, cluster_issuer, &template)
+            let mut objects = render(catalog, namespace, cluster_issuer, &template)
                 .map_err(|e| problem(&e, index, &template))?;
             for object in &mut objects {
                 write_pages(object, pages);
@@ -72,11 +74,12 @@ pub(crate) fn open(
 }
 
 fn render(
+    catalog: &Catalog,
     namespace: &str,
     cluster_issuer: Option<&str>,
     template: &TemplateChange,
 ) -> Result<Vec<Value>, RenderError> {
-    zeabur_catalog::render(
+    catalog.render(
         &template.template,
         &RenderOptions {
             namespace,
@@ -183,7 +186,7 @@ mod tests {
                 ..ErrorPageHtml::default()
             })],
         };
-        let objects = created(&open("shop", None, request).unwrap());
+        let objects = created(&open(&Catalog::embedded(), "shop", None, request).unwrap());
         let named = |kind: &str, name: &str| {
             objects.iter().find(|o| {
                 o["kind"] == kind
@@ -217,7 +220,9 @@ mod tests {
                 inputs: [("adminEmail".to_owned(), "nope".to_owned())].into(),
             })],
         };
-        let problem = open("shop", Some("letsencrypt"), request).unwrap_err().0;
+        let problem = open(&Catalog::embedded(), "shop", Some("letsencrypt"), request)
+            .unwrap_err()
+            .0;
         assert_eq!(problem.kind, Kind::Invalid);
         assert_eq!(
             problem.at.and_then(|a| a.field).as_deref(),

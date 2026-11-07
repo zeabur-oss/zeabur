@@ -312,6 +312,7 @@ pub(crate) async fn plan(
     let opened = deploy_keys::open(&state, &identity.username, &project, &request)?;
     let opened = s3_destinations::open(cluster.as_ref(), opened).await?;
     let opened = templates::open(
+        &state.templates.current(),
         &project,
         state.settings.domains.cluster_issuer.as_deref(),
         opened,
@@ -439,6 +440,7 @@ pub(crate) async fn apply(
     let opened = deploy_keys::open(&state, &identity.username, &project, &claims.request)?;
     let opened = s3_destinations::open(cluster.as_ref(), opened).await?;
     let opened = templates::open(
+        &state.templates.current(),
         &project,
         state.settings.domains.cluster_issuer.as_deref(),
         opened,

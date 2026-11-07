@@ -13,10 +13,13 @@ workspace = true
 [dependencies]
 zeabur-installer-plan.workspace = true
 zeabur-kube.workspace = true
+# Reads a fetched catalogue's bundle.tar.gz (`Catalog::fetched`).
+flate2.workspace = true
 regex.workspace = true
 serde.workspace = true
 serde-saphyr = { workspace = true, features = ["serialize"] }
 serde_json.workspace = true
+tar.workspace = true
 thiserror.workspace = true
 utoipa.workspace = true
 

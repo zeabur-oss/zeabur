@@ -6,7 +6,9 @@
 //!
 //! [template-clients]: https://github.com/zeabur-oss/catalog/blob/main/docs/reference/template-clients.mdx
 
+use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet};
+use std::io::Read;
 use std::net::IpAddr;
 
 use regex::Regex;
@@ -343,38 +345,226 @@ struct FileValidation {
     pattern: String,
 }
 
-/// The templates this build carries and can deploy, sorted by id. A template with an input this
-/// build cannot generate is left out.
-///
-/// # Errors
-///
-/// When a template does not read. A test reads them all, so a build that passes CI cannot fail
-/// here.
-pub fn templates() -> Result<Vec<Template>, RenderError> {
-    bundle::TEMPLATES
-        .iter()
-        .filter_map(|(id, file, manifests)| match read(id, file, manifests) {
-            Err(RenderError::UnknownTemplate(_)) => None,
-            read => Some(read),
-        })
-        .collect()
+/// The templates Zeabur offers: the ones this build carries ([`Catalog::embedded`]), or those of
+/// a fetched catalogue that passed its checks ([`Catalog::fetched`]).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Catalog {
+    sources: BTreeMap<String, Source>,
 }
 
-/// The template `id`.
-///
-/// # Errors
-///
-/// When this build does not carry it, or it does not read.
-pub fn template(id: &str) -> Result<Template, RenderError> {
-    let (id, file, manifests) = find(id)?;
-    read(id, file, manifests)
+/// A template's `template.yaml` and `manifests.yaml`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct Source {
+    file: Cow<'static, str>,
+    manifests: Cow<'static, str>,
 }
 
-fn find(id: &str) -> Result<&'static (&'static str, &'static str, &'static str), RenderError> {
-    bundle::TEMPLATES
-        .iter()
-        .find(|(name, ..)| *name == id)
-        .ok_or_else(|| RenderError::UnknownTemplate(id.to_owned()))
+/// A template of a fetched catalogue that Zeabur does not offer, and why.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Dropped {
+    /// The template's id.
+    pub id: String,
+    /// Why it is not offered.
+    pub reason: String,
+}
+
+/// The most a fetched bundle unpacks to; Zeabur Catalog v0.4.0's unpacks to under 2 MiB.
+const UNPACKED_LIMIT: u64 = 64 * 1024 * 1024;
+
+impl Catalog {
+    /// The templates this build carries.
+    #[must_use]
+    pub fn embedded() -> Self {
+        let mut sources = BTreeMap::new();
+        for (id, file, manifests) in bundle::TEMPLATES {
+            let source = Source {
+                file: Cow::Borrowed(file),
+                manifests: Cow::Borrowed(manifests),
+            };
+            sources.insert((*id).to_owned(), source);
+        }
+        Self { sources }
+    }
+
+    /// The templates of a catalogue's `bundle.tar.gz`, checked one by one. A template is dropped
+    /// when it does not read, when it requires a component this build does not carry, or when it
+    /// does not render the objects the bundle's `crosscheck.json` recorded for it; the embedded
+    /// template of the same id, if there is one, is offered in its place.
+    ///
+    /// # Errors
+    ///
+    /// When `bundle` is not a gzipped tar archive with templates in it.
+    pub fn fetched(bundle: &[u8]) -> Result<(Self, Vec<Dropped>), String> {
+        let (parts, recorded) = unpack(bundle).map_err(|e| format!("the bundle: {e}"))?;
+        if parts.is_empty() {
+            return Err("the bundle has no templates".to_owned());
+        }
+        let embedded = Self::embedded();
+        let mut sources = BTreeMap::new();
+        let mut dropped = Vec::new();
+        for (id, (file, manifests)) in parts {
+            let checked = match (file, manifests) {
+                (Some(file), Some(manifests)) => {
+                    let source = Source {
+                        file: Cow::Owned(file),
+                        manifests: Cow::Owned(manifests),
+                    };
+                    check_fetched(&id, &source, recorded.get(&id)).map(|()| source)
+                }
+                _ => Err("it lacks template.yaml or manifests.yaml".to_owned()),
+            };
+            match checked {
+                Ok(source) => {
+                    sources.insert(id, source);
+                }
+                Err(reason) => {
+                    if let Some(source) = embedded.sources.get(&id) {
+                        sources.insert(id.clone(), source.clone());
+                    }
+                    dropped.push(Dropped { id, reason });
+                }
+            }
+        }
+        Ok((Self { sources }, dropped))
+    }
+
+    /// The templates Zeabur can deploy, sorted by id. A template with an input this build cannot
+    /// generate is left out.
+    ///
+    /// # Errors
+    ///
+    /// When a template does not read. A test reads every embedded one, and a fetched one is
+    /// checked before it is offered.
+    pub fn templates(&self) -> Result<Vec<Template>, RenderError> {
+        let mut templates = Vec::with_capacity(self.sources.len());
+        for (id, source) in &self.sources {
+            match read(id, &source.file, &source.manifests) {
+                Ok(template) => templates.push(template),
+                Err(RenderError::UnknownTemplate(_)) => {}
+                Err(error) => return Err(error),
+            }
+        }
+        Ok(templates)
+    }
+
+    /// The template `id`.
+    ///
+    /// # Errors
+    ///
+    /// When the catalogue does not have it, or it does not read.
+    pub fn template(&self, id: &str) -> Result<Template, RenderError> {
+        let source = self.find(id)?;
+        read(id, &source.file, &source.manifests)
+    }
+
+    /// The objects of the template `id` for `options`, in the order of its `manifests.yaml`.
+    ///
+    /// # Errors
+    ///
+    /// When the catalogue does not have the template, when `options` fail the catalogue's
+    /// checks, or when the template does not read.
+    pub fn render(&self, id: &str, options: &RenderOptions<'_>) -> Result<Vec<Value>, RenderError> {
+        let source = self.find(id)?;
+        render_file(id, &source.file, &source.manifests, options)
+    }
+
+    fn find(&self, id: &str) -> Result<&Source, RenderError> {
+        self.sources
+            .get(id)
+            .ok_or_else(|| RenderError::UnknownTemplate(id.to_owned()))
+    }
+}
+
+/// What `catalog crosscheck` records for a template: the options of its end-to-end render and the
+/// objects that the catalogue renders.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct Recorded {
+    namespace: String,
+    domain: String,
+    cluster_issuer: String,
+    inputs: BTreeMap<String, String>,
+    objects: Vec<Value>,
+}
+
+/// A template's `template.yaml` and `manifests.yaml`, by id, as an archive holds them.
+type Parts = BTreeMap<String, (Option<String>, Option<String>)>;
+
+fn unpack(bundle: &[u8]) -> std::io::Result<(Parts, BTreeMap<String, Recorded>)> {
+    let gzip = flate2::read::GzDecoder::new(bundle).take(UNPACKED_LIMIT);
+    let mut archive = tar::Archive::new(gzip);
+    let mut parts = Parts::new();
+    let mut recorded = BTreeMap::new();
+    for entry in archive.entries()? {
+        let mut entry = entry?;
+        let path = entry.path()?.into_owned();
+        let names: Vec<&str> = path.iter().filter_map(|part| part.to_str()).collect();
+        match names.as_slice() {
+            ["templates", id, "template.yaml"] => {
+                let text = read_text(&mut entry)?;
+                parts.entry((*id).to_owned()).or_default().0 = Some(text);
+            }
+            ["templates", id, "manifests.yaml"] => {
+                let text = read_text(&mut entry)?;
+                parts.entry((*id).to_owned()).or_default().1 = Some(text);
+            }
+            ["crosscheck.json"] => {
+                recorded = serde_json::from_str(&read_text(&mut entry)?)?;
+            }
+            _ => {}
+        }
+    }
+    Ok((parts, recorded))
+}
+
+fn read_text(entry: &mut impl Read) -> std::io::Result<String> {
+    let mut text = String::new();
+    entry.read_to_string(&mut text)?;
+    Ok(text)
+}
+
+fn check_fetched(id: &str, source: &Source, recorded: Option<&Recorded>) -> Result<(), String> {
+    let template = read(id, &source.file, &source.manifests).map_err(|e| e.to_string())?;
+    for wanted in &template.requires {
+        if !carries(wanted) {
+            let (Reference::Capability(name) | Reference::Component(name)) = wanted;
+            return Err(format!(
+                "it requires {name}, which this build of Zeabur does not carry"
+            ));
+        }
+    }
+    let recorded = recorded.ok_or_else(|| "the catalogue recorded no render of it".to_owned())?;
+    renders_as_recorded(id, source, recorded)
+}
+
+/// Whether this build carries a component `wanted` names.
+fn carries(wanted: &Reference) -> bool {
+    for (capability, id, _) in bundle::FILES {
+        let found = match wanted {
+            Reference::Capability(name) => name == capability,
+            Reference::Component(name) => name.split_once('/') == Some((capability, id)),
+        };
+        if found {
+            return true;
+        }
+    }
+    false
+}
+
+/// Renders the template with the options the catalogue recorded and compares the objects.
+fn renders_as_recorded(id: &str, source: &Source, recorded: &Recorded) -> Result<(), String> {
+    let options = RenderOptions {
+        namespace: &recorded.namespace,
+        domain: Some(&recorded.domain),
+        cluster_issuer: Some(&recorded.cluster_issuer),
+        inputs: &recorded.inputs,
+    };
+    let objects =
+        render_file(id, &source.file, &source.manifests, &options).map_err(|e| e.to_string())?;
+    if objects != recorded.objects {
+        return Err("it renders other objects than the catalogue recorded".to_owned());
+    }
+    Ok(())
 }
 
 #[expect(clippy::too_many_lines, reason = "one pass over the file's parts")]
@@ -496,17 +686,6 @@ fn read(id: &str, file: &str, manifests: &str) -> Result<Template, RenderError> 
         needs_domain: routes_domain,
         needs_cluster_issuer: routes_domain,
     })
-}
-
-/// The objects of the template `id` for `options`, in the order of its `manifests.yaml`.
-///
-/// # Errors
-///
-/// When this build does not carry the template, when `options` fail the catalogue's checks, or
-/// when the template does not read.
-pub fn render(id: &str, options: &RenderOptions<'_>) -> Result<Vec<Value>, RenderError> {
-    let (id, file, manifests) = find(id)?;
-    render_file(id, file, manifests, options)
 }
 
 fn render_file(
@@ -725,6 +904,18 @@ fn execute(nodes: &[Node], values: &Values<'_>, out: &mut String) -> Result<(), 
 mod tests {
     use super::*;
 
+    fn templates() -> Result<Vec<Template>, RenderError> {
+        Catalog::embedded().templates()
+    }
+
+    fn template(id: &str) -> Result<Template, RenderError> {
+        Catalog::embedded().template(id)
+    }
+
+    fn render(id: &str, options: &RenderOptions<'_>) -> Result<Vec<Value>, RenderError> {
+        Catalog::embedded().render(id, options)
+    }
+
     fn run(text: &str, inputs: &[(&str, &str)]) -> Result<String, String> {
         let values = Values {
             namespace: "shop",
@@ -831,18 +1022,6 @@ mod tests {
         assert_eq!(shown["default"], json!(input.default));
     }
 
-    /// What `catalog crosscheck` records for a template: the options of its end-to-end render
-    /// and the objects that the catalogue renders.
-    #[derive(Deserialize)]
-    #[serde(rename_all = "camelCase")]
-    struct Recorded {
-        namespace: String,
-        domain: String,
-        cluster_issuer: String,
-        inputs: BTreeMap<String, String>,
-        objects: Vec<Value>,
-    }
-
     fn recorded() -> BTreeMap<String, Recorded> {
         serde_json::from_str(include_str!(concat!(
             env!("OUT_DIR"),
@@ -854,22 +1033,14 @@ mod tests {
     #[test]
     fn renders_what_the_catalogue_renders() {
         let recorded = recorded();
-        for template in templates().unwrap() {
+        let catalog = Catalog::embedded();
+        for template in catalog.templates().unwrap() {
             let id = &template.id;
             let want = recorded
                 .get(id)
                 .unwrap_or_else(|| panic!("{id}: the catalogue recorded no render"));
-            let got = render(
-                id,
-                &RenderOptions {
-                    namespace: &want.namespace,
-                    domain: Some(&want.domain),
-                    cluster_issuer: Some(&want.cluster_issuer),
-                    inputs: &want.inputs,
-                },
-            )
-            .unwrap_or_else(|e| panic!("{id}: {e}"));
-            assert_eq!(got, want.objects, "{id}");
+            let source = catalog.find(id).unwrap();
+            assert_eq!(renders_as_recorded(id, source, want), Ok(()), "{id}");
         }
     }
 
@@ -1086,5 +1257,119 @@ mod tests {
         )
         .unwrap();
         assert!(objects.iter().any(|o| o["kind"] == "Deployment"));
+    }
+
+    /// A gzipped tar archive of `files`, as a catalogue release packs its bundle.
+    fn bundle(files: &[(String, String)]) -> Vec<u8> {
+        let gzip = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::default());
+        let mut archive = tar::Builder::new(gzip);
+        for (path, text) in files {
+            let mut header = tar::Header::new_gnu();
+            header.set_size(text.len().try_into().unwrap());
+            header.set_mode(0o644);
+            archive
+                .append_data(&mut header, path, text.as_bytes())
+                .unwrap();
+        }
+        archive.into_inner().unwrap().finish().unwrap()
+    }
+
+    fn template_files(id: &str, file: &str, manifests: &str) -> [(String, String); 2] {
+        [
+            (format!("templates/{id}/template.yaml"), file.to_owned()),
+            (
+                format!("templates/{id}/manifests.yaml"),
+                manifests.to_owned(),
+            ),
+        ]
+    }
+
+    #[test]
+    fn a_fetched_catalogue_replaces_the_templates_and_falls_back_one_template_at_a_time() {
+        let embedded = Catalog::embedded();
+        let mut recorded: serde_json::Map<String, Value> = serde_json::from_str(include_str!(
+            concat!(env!("OUT_DIR"), "/bundle/crosscheck.json")
+        ))
+        .unwrap();
+        let mut files = Vec::new();
+
+        // A newer miniflux, recorded as it renders: offered.
+        let miniflux = &embedded.sources["miniflux"];
+        let version = embedded.template("miniflux").unwrap().version;
+        let file =
+            miniflux
+                .file
+                .replacen(&format!("version: \"{version}\""), "version: \"9.9.9\"", 1);
+        let source = Source {
+            file: Cow::Owned(file.clone()),
+            manifests: miniflux.manifests.clone(),
+        };
+        let options: Recorded = serde_json::from_value(recorded["miniflux"].clone()).unwrap();
+        let objects = render_file(
+            "miniflux",
+            &source.file,
+            &source.manifests,
+            &RenderOptions {
+                namespace: &options.namespace,
+                domain: Some(&options.domain),
+                cluster_issuer: Some(&options.cluster_issuer),
+                inputs: &options.inputs,
+            },
+        )
+        .unwrap();
+        recorded["miniflux"]["objects"] = json!(objects);
+        files.extend(template_files("miniflux", &file, &miniflux.manifests));
+
+        // A newer error-pages whose objects differ from the record: the embedded one stays.
+        let pages = &embedded.sources["error-pages"];
+        let file = pages
+            .file
+            .replacen("version: ", "version: \"0.0.1\"\n  x: ", 1);
+        files.extend(template_files("error-pages", &file, &pages.manifests));
+
+        // A ghost that does not read: the embedded one stays.
+        files.extend(template_files(
+            "ghost",
+            "metadata: [",
+            &embedded.sources["ghost"].manifests,
+        ));
+
+        // A new template that requires a component this build does not carry: not offered.
+        let lonely = pages
+            .file
+            .replace("ingress/traefik", "ingress/not-in-zeabur");
+        files.extend(template_files("lonely", &lonely, &pages.manifests));
+        recorded.insert("lonely".to_owned(), recorded["error-pages"].clone());
+
+        files.push((
+            "crosscheck.json".to_owned(),
+            Value::Object(recorded).to_string(),
+        ));
+        let (fetched, dropped) = Catalog::fetched(&bundle(&files)).unwrap();
+
+        assert_eq!(fetched.template("miniflux").unwrap().version, "9.9.9");
+        for id in ["error-pages", "ghost"] {
+            assert_eq!(fetched.template(id), embedded.template(id), "{id}");
+        }
+        for id in ["lonely", "hermes-agent"] {
+            assert_eq!(
+                fetched.template(id).map_err(|e| e.code()),
+                Err("unknown_template"),
+                "{id}"
+            );
+        }
+        let dropped: BTreeSet<&str> = dropped.iter().map(|d| d.id.as_str()).collect();
+        assert_eq!(dropped, BTreeSet::from(["error-pages", "ghost", "lonely"]));
+        assert!(
+            fetched.templates().is_ok(),
+            "one bad template keeps the list"
+        );
+    }
+
+    #[test]
+    fn a_fetched_bundle_without_templates_is_refused() {
+        assert!(Catalog::fetched(b"not gzip").is_err());
+        let only_index = bundle(&[("index.json".to_owned(), "{}".to_owned())]);
+        assert!(Catalog::fetched(&only_index).is_err());
     }
 }

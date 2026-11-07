@@ -478,9 +478,17 @@ pub fn router_with(access: Arc<dyn ClusterAccess>, options: Options) -> Router {
         .as_ref()
         .ok()
         .map(|tls| images::https::Https::new(reach, tls));
+    let templates = match (&settings.template_fetch, &tls) {
+        (Some(url), Ok(tls)) => cluster::template_fetch::Templates::fetching(
+            url.clone(),
+            images::https::Https::new(reach, tls),
+        ),
+        _ => cluster::template_fetch::Templates::embedded(),
+    };
     let state = AppState {
         access,
         catalogue,
+        templates: Arc::new(templates),
         template_idle,
         plan_key,
         clock,

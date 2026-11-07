@@ -130,12 +130,20 @@ for values in "$chart"/ci/*-values.yaml; do
   # ZEABUR_MEMBER_ROLES is parsed as a bool: exactly true or false.
   expect "$name" "$out" "$container | .env[] | select(.name == \"ZEABUR_MEMBER_ROLES\") | .value | test(\"^(true|false)$\")" true
   expect "$name" "$out" "$container | .env[] | select(.name == \"ZEABUR_UPDATE_CHECK\") | .value | test(\"^(true|false)$\")" true
+  expect "$name" "$out" "$container | .env[] | select(.name == \"ZEABUR_TEMPLATE_FETCH\") | .value | test(\"^(true|false)$\")" true
 done
 
 # The update check is on unless turned off, and Zeabur knows its own Deployment's name.
 update_env='select(.kind == "Deployment" and .metadata.name == "zeabur") | .spec.template.spec.containers[0].env[] | select(.name == "ZEABUR_UPDATE_CHECK") | .value'
 expect minimal "$(render -f "$chart/ci/minimal-values.yaml")" "$update_env" true
 expect "updateCheck=false" "$(render -f "$chart/ci/minimal-values.yaml" --set updateCheck.enabled=false)" "$update_env" false
+
+# Template updates are on unless turned off, and go to the default address unless one is given.
+fetch_env='select(.kind == "Deployment" and .metadata.name == "zeabur") | .spec.template.spec.containers[0].env[] | select(.name == "ZEABUR_TEMPLATE_FETCH*") | .name + "=" + .value'
+expect minimal "$(render -f "$chart/ci/minimal-values.yaml")" "$fetch_env" ZEABUR_TEMPLATE_FETCH=true
+expect "templateFetch=false" "$(render -f "$chart/ci/minimal-values.yaml" --set templateFetch.enabled=false)" "$fetch_env" ZEABUR_TEMPLATE_FETCH=false
+expect "templateFetch.url" "$(render -f "$chart/ci/minimal-values.yaml" --set templateFetch.url=https://mirror.example.com/v1/)" \
+  "[$fetch_env] | join(\",\")" ZEABUR_TEMPLATE_FETCH=true,ZEABUR_TEMPLATE_FETCH_URL=https://mirror.example.com/v1/
 expect minimal "$(render -f "$chart/ci/minimal-values.yaml")" \
   'select(.kind == "Deployment" and .metadata.name == "zeabur") | .spec.template.spec.containers[0].env[] | select(.name == "ZEABUR_DEPLOYMENT") | .value' zeabur
 

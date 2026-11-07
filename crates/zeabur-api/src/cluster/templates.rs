@@ -1,4 +1,5 @@
-//! The templates of Zeabur Catalog this build carries ([`zeabur_catalog::templates()`]).
+//! The templates of Zeabur Catalog Zeabur offers ([`zeabur_catalog::Catalog`]): the ones this
+//! build carries, or newer ones it fetched ([`crate::cluster::template_fetch`]).
 //!
 //! For each one: what it asks for, what it requests, whether the components it needs are there,
 //! and what its pods use when idle ([`zeabur_catalog::measured`]).
@@ -120,7 +121,12 @@ pub(crate) async fn list(
     State(state): State<AppState>,
     Person(cluster): Person,
 ) -> Result<Json<TemplateList>, ApiError> {
-    let templates = zeabur_catalog::templates().map_err(|e| render_problem(&e))?;
+    state.templates.refresh_in_background();
+    let templates = state
+        .templates
+        .current()
+        .templates()
+        .map_err(|e| render_problem(&e))?;
     let served = cluster.served_resources().await.ok();
     let items = templates
         .into_iter()
@@ -139,7 +145,11 @@ pub(crate) async fn get(
     Person(cluster): Person,
     Path(template): Path<String>,
 ) -> Result<Json<TemplateView>, ApiError> {
-    let template = zeabur_catalog::template(&template).map_err(|e| render_problem(&e))?;
+    let template = state
+        .templates
+        .current()
+        .template(&template)
+        .map_err(|e| render_problem(&e))?;
     let served = cluster.served_resources().await.ok();
     Ok(Json(view(&state, template, served.as_deref())))
 }

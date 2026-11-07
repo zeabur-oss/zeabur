@@ -38,6 +38,8 @@ host:
 | `zeabur` | `true` | 安裝 Zeabur Identity 與 Zeabur。`false` 只安裝 K3s/RKE2 與選定元件 |
 | `telemetry` | `true` | 加入[體驗計畫](./telemetry.mdx)。`--no-telemetry` 和 `DO_NOT_TRACK=1` 可在該次執行時關閉 |
 | `updateCheck` | `true` | 有新版時在叢集頁提醒，做法見[檢查更新](./telemetry.mdx#檢查更新)。執行 `apply` 時設定了 `DO_NOT_TRACK=1` 或 `NO_UPDATE_NOTIFIER`，就會關閉 |
+| `templateFetch` | `true` | 取得 Zeabur Catalog 最新且有簽章的範本，做法見[範本更新](./telemetry.mdx#範本更新)。`DO_NOT_TRACK=1` 不會關閉它 |
+| `templateFetchUrl` | `https://oss-catalog.zeabur.com/v1/` | 改從這裡取得範本，例如鏡像站 |
 | `inputs` | `{}` | 依元件 ID 分組的一般輸入值 |
 | `secretFiles` | `{}` | 依元件 ID 分組的機密檔案路徑 |
 | `k3sVersion`、`rke2Version` | installer 釘選版本 | 覆寫 K3s 或 RKE2 的版本 |

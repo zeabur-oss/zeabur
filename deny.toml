@@ -9,7 +9,12 @@ all-features = true
 version = 2
 yanked = "deny"
 # Every ignore needs an id and the reason it is acceptable.
-ignore = []
+ignore = [
+  # rsa (Marvin attack, a timing side channel on RSA decryption) comes in through sigstore's
+  # `verify` feature, which pulls openidconnect. Zeabur only verifies a signature with sigstore and
+  # never decrypts or signs with an RSA private key; no fixed rsa release exists.
+  { id = "RUSTSEC-2023-0071", reason = "rsa is only in the graph through sigstore, which Zeabur uses to verify signatures, not to decrypt" },
+]
 
 [licenses]
 version = 2

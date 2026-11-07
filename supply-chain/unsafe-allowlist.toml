@@ -751,3 +751,451 @@ name = "compression-core"
 kind = "unsafe"
 reason = "gzip of API answers; the uninitialised-buffer type the codecs write into"
 approved = "2026-11-01"
+
+# --- Template updates: verifying the fetched catalogue's cosign keyless signature
+# (zeabur-api `cluster::template_fetch`). arc-swap holds the templates; the rest comes in through
+# sigstore 0.15 with `verify`, `sigstore-trust-root` and `rustls-tls` (its TUF client, reqwest and
+# the OpenID Connect and Fulcio types its `verify` feature pulls in).
+[[crate]]
+name = "aes"
+kind = "unsafe"
+reason = "Sigstore signature verification"
+approved = "pending"
+
+[[crate]]
+name = "anyhow"
+kind = "unsafe"
+reason = "Sigstore signature verification"
+approved = "pending"
+
+[[crate]]
+name = "arc-swap"
+kind = "unsafe"
+reason = "Holds the fetched templates"
+approved = "pending"
+
+[[crate]]
+name = "async-trait"
+kind = "unsafe"
+reason = "Sigstore signature verification"
+approved = "pending"
+
+[[crate]]
+name = "base16ct"
+kind = "unsafe"
+reason = "Sigstore signature verification"
+approved = "pending"
+
+[[crate]]
+name = "base64ct"
+kind = "unsafe"
+reason = "Sigstore signature verification"
+approved = "pending"
+
+[[crate]]
+name = "bstr"
+kind = "unsafe"
+reason = "Sigstore signature verification"
+approved = "pending"
+
+[[crate]]
+name = "chrono"
+kind = "unsafe"
+reason = "Sigstore signature verification"
+approved = "pending"
+
+[[crate]]
+name = "cipher"
+kind = "unsafe"
+reason = "Sigstore signature verification"
+approved = "pending"
+
+[[crate]]
+name = "cmov"
+kind = "unsafe"
+reason = "Sigstore signature verification"
+approved = "pending"
+
+[[crate]]
+name = "const-oid"
+kind = "unsafe"
+reason = "Sigstore signature verification"
+approved = "pending"
+
+[[crate]]
+name = "crypto-bigint"
+kind = "unsafe"
+reason = "Sigstore signature verification"
+approved = "pending"
+
+[[crate]]
+name = "ctutils"
+kind = "unsafe"
+reason = "Sigstore signature verification"
+approved = "pending"
+
+[[crate]]
+name = "curve25519-dalek"
+kind = "unsafe"
+reason = "Sigstore signature verification"
+approved = "pending"
+
+[[crate]]
+name = "curve25519-dalek-derive"
+kind = "unsafe"
+reason = "Sigstore signature verification"
+approved = "pending"
+
+[[crate]]
+name = "darling_core"
+kind = "unsafe"
+reason = "Sigstore signature verification"
+approved = "pending"
+
+[[crate]]
+name = "der"
+kind = "unsafe"
+reason = "Sigstore signature verification"
+approved = "pending"
+
+[[crate]]
+name = "dyn-clone"
+kind = "unsafe"
+reason = "Sigstore signature verification"
+approved = "pending"
+
+[[crate]]
+name = "elliptic-curve"
+kind = "unsafe"
+reason = "Sigstore signature verification"
+approved = "pending"
+
+[[crate]]
+name = "fixedbitset"
+kind = "unsafe"
+reason = "Sigstore signature verification"
+approved = "pending"
+
+[[crate]]
+name = "flagset"
+kind = "unsafe"
+reason = "Sigstore signature verification"
+approved = "pending"
+
+[[crate]]
+name = "foldhash"
+kind = "unsafe"
+reason = "Sigstore signature verification"
+approved = "pending"
+
+[[crate]]
+name = "futures-executor"
+kind = "unsafe"
+reason = "Sigstore signature verification"
+approved = "pending"
+
+[[crate]]
+name = "iana-time-zone"
+kind = "unsafe"
+reason = "Sigstore signature verification"
+approved = "pending"
+
+[[crate]]
+name = "icu_collections"
+kind = "unsafe"
+reason = "Sigstore signature verification"
+approved = "pending"
+
+[[crate]]
+name = "icu_locale_core"
+kind = "unsafe"
+reason = "Sigstore signature verification"
+approved = "pending"
+
+[[crate]]
+name = "icu_normalizer"
+kind = "unsafe"
+reason = "Sigstore signature verification"
+approved = "pending"
+
+[[crate]]
+name = "icu_provider"
+kind = "unsafe"
+reason = "Sigstore signature verification"
+approved = "pending"
+
+[[crate]]
+name = "idna"
+kind = "unsafe"
+reason = "Sigstore signature verification"
+approved = "pending"
+
+[[crate]]
+name = "itertools"
+kind = "unsafe"
+reason = "Sigstore signature verification"
+approved = "pending"
+
+[[crate]]
+name = "libm"
+kind = "unsafe"
+reason = "Sigstore signature verification"
+approved = "pending"
+
+[[crate]]
+name = "litemap"
+kind = "unsafe"
+reason = "Sigstore signature verification"
+approved = "pending"
+
+[[crate]]
+name = "num-bigint-dig"
+kind = "unsafe"
+reason = "Sigstore signature verification"
+approved = "pending"
+
+[[crate]]
+name = "pem-rfc7468"
+kind = "unsafe"
+reason = "Sigstore signature verification"
+approved = "pending"
+
+[[crate]]
+name = "petgraph"
+kind = "unsafe"
+reason = "Sigstore signature verification"
+approved = "pending"
+
+[[crate]]
+name = "pin-project"
+kind = "unsafe"
+reason = "Sigstore signature verification"
+approved = "pending"
+
+[[crate]]
+name = "pin-project-internal"
+kind = "unsafe"
+reason = "Sigstore signature verification"
+approved = "pending"
+
+[[crate]]
+name = "poly1305"
+kind = "unsafe"
+reason = "Sigstore signature verification"
+approved = "pending"
+
+[[crate]]
+name = "polyval"
+kind = "unsafe"
+reason = "Sigstore signature verification"
+approved = "pending"
+
+[[crate]]
+name = "potential_utf"
+kind = "unsafe"
+reason = "Sigstore signature verification"
+approved = "pending"
+
+[[crate]]
+name = "prettyplease"
+kind = "unsafe"
+reason = "Sigstore signature verification"
+approved = "pending"
+
+[[crate]]
+name = "prettyplease"
+kind = "native"
+reason = "Sigstore signature verification"
+approved = "pending"
+
+[[crate]]
+name = "prost"
+kind = "unsafe"
+reason = "Sigstore signature verification"
+approved = "pending"
+
+[[crate]]
+name = "prost-build"
+kind = "unsafe"
+reason = "Sigstore signature verification"
+approved = "pending"
+
+[[crate]]
+name = "rand_chacha"
+kind = "unsafe"
+reason = "Sigstore signature verification"
+approved = "pending"
+
+[[crate]]
+name = "rand_core"
+kind = "unsafe"
+reason = "Sigstore signature verification"
+approved = "pending"
+
+[[crate]]
+name = "reqwest"
+kind = "unsafe"
+reason = "Sigstore signature verification"
+approved = "pending"
+
+[[crate]]
+name = "ryu"
+kind = "unsafe"
+reason = "Sigstore signature verification"
+approved = "pending"
+
+[[crate]]
+name = "ryu-js"
+kind = "unsafe"
+reason = "Sigstore signature verification"
+approved = "pending"
+
+[[crate]]
+name = "same-file"
+kind = "unsafe"
+reason = "Sigstore signature verification"
+approved = "pending"
+
+[[crate]]
+name = "scrypt"
+kind = "unsafe"
+reason = "Sigstore signature verification"
+approved = "pending"
+
+[[crate]]
+name = "serde_json_canonicalizer"
+kind = "unsafe"
+reason = "Sigstore signature verification"
+approved = "pending"
+
+[[crate]]
+name = "serde_with"
+kind = "unsafe"
+reason = "Sigstore signature verification"
+approved = "pending"
+
+[[crate]]
+name = "snafu"
+kind = "unsafe"
+reason = "Sigstore signature verification"
+approved = "pending"
+
+[[crate]]
+name = "spin"
+kind = "unsafe"
+reason = "Sigstore signature verification"
+approved = "pending"
+
+[[crate]]
+name = "stable_deref_trait"
+kind = "unsafe"
+reason = "Sigstore signature verification"
+approved = "pending"
+
+[[crate]]
+name = "synstructure"
+kind = "unsafe"
+reason = "Sigstore signature verification"
+approved = "pending"
+
+[[crate]]
+name = "tempfile"
+kind = "unsafe"
+reason = "Sigstore signature verification"
+approved = "pending"
+
+[[crate]]
+name = "tinystr"
+kind = "unsafe"
+reason = "Sigstore signature verification"
+approved = "pending"
+
+[[crate]]
+name = "tough"
+kind = "unsafe"
+reason = "Sigstore signature verification"
+approved = "pending"
+
+[[crate]]
+name = "typed-path"
+kind = "unsafe"
+reason = "Sigstore signature verification"
+approved = "pending"
+
+[[crate]]
+name = "unicode-normalization"
+kind = "unsafe"
+reason = "Sigstore signature verification"
+approved = "pending"
+
+[[crate]]
+name = "universal-hash"
+kind = "unsafe"
+reason = "Sigstore signature verification"
+approved = "pending"
+
+[[crate]]
+name = "url"
+kind = "unsafe"
+reason = "Sigstore signature verification"
+approved = "pending"
+
+[[crate]]
+name = "utf8_iter"
+kind = "unsafe"
+reason = "Sigstore signature verification"
+approved = "pending"
+
+[[crate]]
+name = "utf_types"
+kind = "unsafe"
+reason = "Sigstore signature verification"
+approved = "pending"
+
+[[crate]]
+name = "webbrowser"
+kind = "unsafe"
+reason = "Sigstore signature verification"
+approved = "pending"
+
+[[crate]]
+name = "which"
+kind = "unsafe"
+reason = "Sigstore signature verification"
+approved = "pending"
+
+[[crate]]
+name = "writeable"
+kind = "unsafe"
+reason = "Sigstore signature verification"
+approved = "pending"
+
+[[crate]]
+name = "yoke"
+kind = "unsafe"
+reason = "Sigstore signature verification"
+approved = "pending"
+
+[[crate]]
+name = "yoke-derive"
+kind = "unsafe"
+reason = "Sigstore signature verification"
+approved = "pending"
+
+[[crate]]
+name = "zerotrie"
+kind = "unsafe"
+reason = "Sigstore signature verification"
+approved = "pending"
+
+[[crate]]
+name = "zerovec"
+kind = "unsafe"
+reason = "Sigstore signature verification"
+approved = "pending"
+
+[[crate]]
+name = "zerovec-derive"
+kind = "unsafe"
+reason = "Sigstore signature verification"
+approved = "pending"
