@@ -52,7 +52,7 @@ not `sort -V`.
    `prerelease: rc` makes `vX.Y.Z-rc.N`. knope turns the change files in `.changeset/` into the
    `## <version> (<date>)` section of `CHANGELOG.md` and sets `Cargo.toml`; `bump` sets the other
    manifests, `check` confirms them, and zeabur-oss-bot opens `chore(release): v<version>` from
-   `release/next-main`. That section becomes the release notes as it is, so keep each paragraph and
+   `release/next`. That section becomes the release notes as it is, so keep each paragraph and
    list item on one line, and edit `CHANGELOG.md` on that branch if it should read differently.
    A change file for a fixed vulnerability says `default: security`, which knope lists under
    `### Security` and releases as a patch. The update check in the interface and in `zeaburctl`
@@ -66,12 +66,12 @@ not `sort -V`.
    the Identity tag only to newer release tags.
    The release reads the Identity release's `digests.txt`, which Identity publishes from v0.1.2
    on: release Identity before the next Zeabur release and move the pin to it.
-2. Rehearse: **Actions → Release → Run workflow** on `release/next-main` with the version, `v<version>`. It
+2. Rehearse: **Actions → Release → Run workflow** on `release/next` with the version, `v<version>`. It
    runs the three builds with their smoke tests and publishes nothing; the pins are
    not checked and no pinned installer is built.
 3. Before the first release only, see [Settings the workflow needs](#settings-the-workflow-needs).
 4. **Screenshots** starts on its own with the release pull request and commits the docs screenshots
-   that changed onto `release/next-main`, which runs **CI** again. Look at the images in the diff. The
+   that changed onto `release/next`, which runs **CI** again. Look at the images in the diff. The
    release doesn't wait for it: if it fails or you merge first, the release goes out with the
    screenshots on main.
 5. Once **CI** has passed on the release pull request, merge it. zeabur-oss-bot tags the merge
@@ -104,9 +104,9 @@ which holds the release pull requests' branches.
    it, change file included, with the patch release's milestone. Only fixes and security fixes go
    there.
 3. Publish as above, but run **Release pull request** on `maint/v0.2`. Leave `version` empty: its
-   change files give `v0.2.1`. The bot opens the release pull request from
-   `release/next-maint/v0.2` and, once it is merged, tags it. On `maint/v0.2` it tags only
-   `v0.2.*`. Screenshots are taken again only for releases from `main`.
+   change files give `v0.2.1`. Everything else is the same: the release pull request comes from
+   `release/next`, so close or merge any other one first, and once it is merged the bot tags it.
+   On `maint/v0.2` it tags only `v0.2.*`.
 4. If 0.3.0 is already out, clear **Set as the latest release** when publishing the draft
    (`gh release edit v0.2.1 --draft=false --latest=false`), so GitHub's latest release stays
    0.3.0. The update check in the interface and in `zeaburctl` compares versions by SemVer and is

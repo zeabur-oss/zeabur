@@ -12,8 +12,8 @@ from nixpkgs by `scripts/docs-shots.sh`. Each spec is one image set, with its se
 
 All of them are kept in git. Run the script after changing a page a shot covers, and commit the
 images. For each release, `.github/workflows/shots.yml` takes the `docs` set again when
-zeabur-oss-bot pushes `release/next-main`, next to the release pull request's CI, and commits the
-images that changed onto `release/next-main`. Look at them in the release pull request's diff.
+zeabur-oss-bot pushes `release/next`, next to the release pull request's CI, and commits the images
+that changed onto `release/next`. Look at them in the release pull request's diff.
 
 Each locale's screenshots sit in its docs folder: `docs/images/shots` for English,
 `docs/zh-TW/images/shots` for Traditional Chinese. A page shows them by a relative path, which
