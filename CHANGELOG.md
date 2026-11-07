@@ -4,7 +4,7 @@ All notable changes to Zeabur. Versions follow [Semantic Versioning](https://sem
 
 ## 0.2.0 (2026-11-07)
 
-Read [what's new in Zeabur 0.2.0](https://oss.zeabur.com/zh-TW/blog/zeabur-0-2-0) (Traditional Chinese) for the highlights.
+Read [what's new in Zeabur 0.2.0](https://oss.zeabur.com/blog/zeabur-0-2-0) for the highlights.
 
 ### Breaking Changes
 
