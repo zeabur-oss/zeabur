@@ -85,7 +85,7 @@ pub(crate) async fn get(
     Person(cluster): Person,
     Path(project): Path<String>,
 ) -> Result<Json<ProjectUsage>, ApiError> {
-    let read = modules::read_in(
+    let read = modules::read_metrics(
         cluster.as_ref(),
         &zeabur_modules::metrics_server::POD_METRICS,
         Some(&project),

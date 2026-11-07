@@ -72,3 +72,5 @@ serde.workspace = true
 tower.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
+# Paused time, for deadlines.
+tokio = { workspace = true, features = ["test-util"] }

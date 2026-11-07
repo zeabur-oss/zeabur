@@ -69,6 +69,9 @@ pub struct State {
     ///
     /// [k8s-apf]: https://kubernetes.io/docs/concepts/cluster-administration/flow-control/
     pub busy: Option<u32>,
+    /// Resources (`nodes.metrics.k8s.io`) whose lists never answer, as an aggregated API whose
+    /// backend kube-apiserver cannot reach.
+    pub hanging: BTreeSet<String>,
     /// Namespaces whose objects are refused with `403 Forbidden`.
     pub forbidden_namespaces: BTreeSet<String>,
     /// How many times a Secret's values were read.
@@ -1040,6 +1043,10 @@ impl Cluster for MemoryCluster {
             // from a refusal.
             if !self.lock()?.serves(&resource.api_version()) {
                 return Ok(None);
+            }
+            let hangs = self.lock()?.hanging.contains(&resource.key());
+            if hangs {
+                std::future::pending::<()>().await;
             }
             let mut items = self
                 .readable(resource, namespace)?
