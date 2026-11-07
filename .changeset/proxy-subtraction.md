@@ -9,3 +9,5 @@ Zeabur Proxy refused a third query from one person, or a seventeenth in all, whi
 The proxy also no longer reads the namespace to cut history at its creation. The project's name is the boundary, so a new project with a deleted project's name shows its history until the storage's retention drops it. "Delete a project" says how to clear it first.
 
 Logs and usage queries are no longer cut to the last week: they reach as far back as the storage keeps. The chart's `proxy.logs.maxHours` and `proxy.metrics.maxHours` are gone. The proxy also drops its own connection cap and header wait, since only Zeabur can reach it.
+
+When it is stopped, as in a rolling update, the proxy takes no new connection and finishes the queries already under way instead of cutting them.

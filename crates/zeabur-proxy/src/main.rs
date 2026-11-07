@@ -152,10 +152,7 @@ async fn run(args: Args) -> Result<(), String> {
         .await
         .map_err(|e| format!("cannot listen on {}: {e}", args.listen))?;
     tracing::info!(address = %args.listen, "listening");
-    tokio::select! {
-        () = server::serve(listener, tls, proxy) => {}
-        () = stopped() => {}
-    }
+    server::serve(listener, tls, proxy, stopped()).await;
     Ok(())
 }
 
