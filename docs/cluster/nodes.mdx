@@ -18,7 +18,7 @@ Open these firewall ports between nodes:
 
 | Direction | K3s | RKE2 |
 | --- | --- | --- |
-| To servers | TCP 6443 | TCP 9345, 6443 |
+| To servers | TCP 6443 ([restrict the source](../reference/security.mdx#kubernetes-api)) | TCP 9345, 6443 |
 | Between all nodes | TCP 10250, UDP 4789 (Calico VXLAN) | TCP 10250, 9099, UDP 8472 (Canal VXLAN) |
 | Between servers | None | TCP 2379–2381 |
 
