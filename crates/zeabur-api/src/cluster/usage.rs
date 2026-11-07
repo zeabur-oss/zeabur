@@ -195,9 +195,10 @@ fn projects_of(list: Vec<Namespace>) -> BTreeMap<String, Option<String>> {
 pub(crate) async fn get(Person(cluster): Person) -> Result<Json<ClusterUsage>, ApiError> {
     let (pods, metrics, namespaces) = futures_util::join!(
         cluster.cluster_pods(WIDE_LIMIT),
-        modules::read(
+        modules::read_metrics(
             cluster.as_ref(),
-            &zeabur_modules::metrics_server::POD_METRICS
+            &zeabur_modules::metrics_server::POD_METRICS,
+            None
         ),
         cluster.namespaces()
     );

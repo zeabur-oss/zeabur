@@ -412,7 +412,7 @@ fn usage_by_node(usage: Vec<(String, String, String)>) -> BTreeMap<String, Resou
 async fn node_metrics(
     cluster: &dyn zeabur_kube::Cluster,
 ) -> Result<Reading<UnreadableView>, ClusterError> {
-    modules::read(cluster, &zeabur_modules::metrics_server::NODE_METRICS).await
+    modules::read_metrics(cluster, &zeabur_modules::metrics_server::NODE_METRICS, None).await
 }
 
 /// Each node's usage as `(node, cpu, memory)` quantities.

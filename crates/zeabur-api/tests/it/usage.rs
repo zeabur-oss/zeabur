@@ -6,6 +6,7 @@
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeMap;
+    use std::time::Duration;
 
     use axum::http::StatusCode;
     use serde_json::{Value, json};
@@ -117,6 +118,35 @@ mod tests {
         assert_eq!(usage["state"], "unreadable");
         assert_eq!(usage["unreadable"][0]["resource"], "pods.metrics.k8s.io");
         assert_eq!(usage["unreadable"][0]["kubernetes"]["code"], 403);
+    }
+
+    // zeabur-oss/zeabur#371: kube-apiserver waits about a minute on an aggregated API it cannot
+    // reach, and the pages waited with it.
+    #[tokio::test(start_paused = true)]
+    async fn a_metrics_api_that_does_not_answer_is_unavailable_after_a_few_seconds() {
+        let cluster = cluster();
+        cluster.update(|s| {
+            for (resource, kind) in [("nodes", "NodeMetrics"), ("pods", "PodMetrics")] {
+                s.served.push(ServedResource::readable(
+                    "metrics.k8s.io",
+                    "v1beta1",
+                    resource,
+                    kind,
+                    resource == "pods",
+                ));
+                s.hanging.insert(format!("{resource}.metrics.k8s.io"));
+            }
+        });
+        for (uri, field) in [
+            ("/api/v1/cluster/nodes", "metrics"),
+            ("/api/v1/cluster/usage", "metrics"),
+            ("/api/v1/projects/shop/usage", "state"),
+        ] {
+            let start = tokio::time::Instant::now();
+            let body = get(&cluster, uri).await;
+            assert_eq!(body[field], "unavailable", "{uri}: {body}");
+            assert!(start.elapsed() < Duration::from_secs(10), "{uri}");
+        }
     }
 
     fn pod(namespace: &str, name: &str, phase: &str, resources: &Value) -> Pod {

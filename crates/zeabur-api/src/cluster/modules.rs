@@ -4,7 +4,14 @@
 //! the person, cluster-wide, discovery first (see `zeabur_kube::objects`), and hands a module the
 //! objects, "not installed", or the refusal as an [`crate::views::UnreadableView`].
 
+use std::time::Duration;
+
 use zeabur_kube::{Cluster, ClusterError};
+
+/// How long a `metrics.k8s.io` read may take. metrics-server answers in milliseconds; when
+/// kube-apiserver cannot reach it, it answers only after about a minute, and the pages that show
+/// usage beside other reads would wait with it.
+const METRICS_DEADLINE: Duration = Duration::from_secs(5);
 
 /// Reads one resource a module needs, cluster-wide, as the person.
 ///
@@ -36,4 +43,25 @@ pub(crate) async fn read_in(
             error.into_unreadable(&resource.key())?.into(),
         )),
     }
+}
+
+/// Reads metrics-server's `read` like [`read_in`], or fails after [`METRICS_DEADLINE`].
+///
+/// # Errors
+///
+/// As [`read_in`], and when the read takes longer than the deadline.
+pub(crate) async fn read_metrics(
+    cluster: &dyn Cluster,
+    read: &zeabur_modules::Read,
+    namespace: Option<&str>,
+) -> Result<zeabur_modules::Reading<crate::views::UnreadableView>, ClusterError> {
+    tokio::time::timeout(METRICS_DEADLINE, read_in(cluster, read, namespace))
+        .await
+        .unwrap_or_else(|_| {
+            Err(ClusterError::Transport(format!(
+                "{} did not answer within {} seconds",
+                read.group,
+                METRICS_DEADLINE.as_secs()
+            )))
+        })
 }
