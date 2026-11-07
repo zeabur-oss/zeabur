@@ -1,6 +1,6 @@
 ---
 title: 體驗計畫
-description: 加入體驗計畫後，Zeabur 和 installer 會傳送什麼、絕不傳送什麼；Zeabur 和 zeaburctl 怎麼檢查新版；以及怎麼分別關閉。
+description: 加入體驗計畫後，Zeabur 和 installer 會傳送什麼、絕不傳送什麼；Zeabur 和 zeaburctl 怎麼檢查新版；Zeabur 怎麼取得較新的範本；以及怎麼分別關閉。
 source: "119a598e43c4"
 ---
 
@@ -88,3 +88,23 @@ kubectl -n zeabur logs deployment/zeabur | grep telemetry
 - 用 Helm 安裝時，設定 `updateCheck.enabled=false`。叢集頁就只顯示版本。
 - 在 Zeabur 的環境變數設定 `DO_NOT_TRACK=1`。`zeaburctl` 則是在你自己的環境變數設定。這也會關閉體驗計畫。
 - 為 `zeaburctl`（包括 `zeaburctl ui`）在你的環境變數設定 `NO_UPDATE_NOTIFIER`，任何值都可以。這只關閉檢查更新。
+
+## 範本更新
+
+不用升級 Zeabur，也能用到較新的範本。Zeabur 會取得 Zeabur Catalog 最新一版，檢查簽章後，用裡面的範本取代 Zeabur 內建的範本。元件，以及 Zeabur 怎麼在叢集裡找到它們，仍以內建的為準。已經用範本部署的服務不會變動。範本更新和體驗計畫、檢查更新各自獨立，預設開啟。
+
+**取得什麼**。從 `https://oss-catalog.zeabur.com/v1/` 取得 Zeabur Catalog 最新一版的檔案：先取 `SHA256SUMS`，有變動時才再取 `SHA256SUMS.sigstore.json` 和 `bundle.tar.gz`（約 300 KB）。Zeabur 啟動後第一次取得時，也會從 `https://tuf-repo-cdn.sigstore.dev` 讀取 Sigstore 的信任根，用來檢查簽章。
+
+**檢查什麼**。簽章要證明 `SHA256SUMS` 是 Zeabur Catalog 在 GitHub Actions 上的發行流程簽的，`bundle.tar.gz` 也要和裡面的校驗碼相符。接著逐一檢查每個範本：要能讀取、需要的元件要是這個 Zeabur 認得的，而且產生的物件要和 Catalog 記錄的完全一樣。沒通過的範本不會出現，如果 Zeabur 有內建同一個範本，就繼續用內建的。整份沒通過檢查時，什麼都不會變。
+
+**什麼時候執行**。有人打開範本清單時才會取得，每 6 小時最多一次，失敗時 10 分鐘後再試。取得的是 Zeabur 伺服器，瀏覽器不會連過去。範本只放在記憶體裡，重新啟動後，下次取得前先用內建的範本。`zeaburctl ui` 不會取得。
+
+**會傳送什麼**。普通的請求，不帶任何 ID 或 Cookie。Zeabur 伺服器的 user agent 是 `zeabur`。提供 `oss-catalog.zeabur.com` 的 GitHub Pages 和 Sigstore 會看到請求來自哪個 IP 位址。不會傳送任何關於叢集或使用者的資料，所以 `DO_NOT_TRACK` 不會關閉它。
+
+**使用鏡像站**。叢集連不到網際網路時，把某一版的四個檔案原封不動放到叢集連得到的網頁伺服器，再填上它的網址：installer 設定裡的 `templateFetchUrl`、Helm 的 `templateFetch.url`，或 Zeabur 環境變數 `ZEABUR_TEMPLATE_FETCH_URL`。Zeabur 仍需要連到 `https://tuf-repo-cdn.sigstore.dev` 才能檢查簽章。
+
+**關閉**。以下任何一種都有效。關閉後，Zeabur 只提供內建的範本，也不會為範本發出任何請求。
+
+- 用 installer 安裝時，在 `/etc/zeabur-installer/config.yaml` 設定 `templateFetch: false`。
+- 用 Helm 安裝時，設定 `templateFetch.enabled=false`。
+- 在 Zeabur 的環境變數設定 `ZEABUR_TEMPLATE_FETCH=false`。

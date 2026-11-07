@@ -1,6 +1,6 @@
 ---
 title: Experience program
-description: What Zeabur and its installer send when you join the experience program, what they never send, how Zeabur and zeaburctl check for a newer version, and how to turn each off.
+description: What Zeabur and its installer send when you join the experience program, what they never send, how Zeabur and zeaburctl check for a newer version, how Zeabur fetches newer templates, and how to turn each off.
 ---
 
 The experience program sends the version and how many people use Zeabur each day, so we know how many installations are in use and what to fix first. The installer joins by default, and you can uncheck the box on its review page. With Helm, Zeabur stays out until you turn it on.
@@ -87,3 +87,23 @@ Zeabur and `zeaburctl` tell you when a newer version is out and how to upgrade. 
 - With Helm, set `updateCheck.enabled=false`. The cluster page then only shows the version.
 - Set `DO_NOT_TRACK=1` in Zeabur's environment, or in yours for `zeaburctl`. It turns off the experience program too.
 - Set `NO_UPDATE_NOTIFIER` to any value in your environment for `zeaburctl`, including `zeaburctl ui`. It turns off only the update check.
+
+## Template updates
+
+Zeabur offers newer templates without an upgrade. It fetches the newest release of Zeabur Catalog, checks its signature and offers its templates in place of the ones it was built with. Components, and how Zeabur finds them in your cluster, stay as they were built. Services you already deployed from a template don't change. This is separate from the experience program and the update check, and on by default.
+
+**What is fetched.** From `https://oss-catalog.zeabur.com/v1/`, the files of Zeabur Catalog's newest release: `SHA256SUMS`, and only when it changed, `SHA256SUMS.sigstore.json` and `bundle.tar.gz` (about 300 KB). The first time after Zeabur starts, it also reads Sigstore's trust root from `https://tuf-repo-cdn.sigstore.dev`, to check the signature with.
+
+**What is checked.** The signature must show that Zeabur Catalog's release workflow on GitHub Actions signed `SHA256SUMS`, and `bundle.tar.gz` must match its checksum there. Then each template on its own: it must read, the components it needs must be ones this Zeabur knows, and it must make exactly the objects the catalog recorded for it. A template that fails isn't offered; the one Zeabur was built with stays, if there is one. When a check fails as a whole, nothing changes.
+
+**When it runs.** When someone opens the template list, at most once every 6 hours, or 10 minutes after a failure. The Zeabur server fetches; browsers don't. The templates are kept in memory only: after a restart, Zeabur offers the ones it was built with until the next fetch. `zeaburctl ui` doesn't fetch.
+
+**What is sent.** Plain requests with no ID or cookie. The Zeabur server sends `zeabur` as its user agent. GitHub Pages, which serves `oss-catalog.zeabur.com`, and Sigstore see the IP address they come from. Nothing about your cluster or its people is sent, so `DO_NOT_TRACK` doesn't turn this off.
+
+**Use a mirror.** For a cluster without internet access, copy a release's four files unchanged to a web server the cluster can reach, and give its address: `templateFetchUrl` in the installer's config, `templateFetch.url` with Helm or `ZEABUR_TEMPLATE_FETCH_URL` in Zeabur's environment. Zeabur still needs `https://tuf-repo-cdn.sigstore.dev` to check the signature.
+
+**Turn it off.** Any one of these is enough. Once it's off, Zeabur offers only the templates it was built with and makes no request for them.
+
+- In the installer, set `templateFetch: false` in `/etc/zeabur-installer/config.yaml`.
+- With Helm, set `templateFetch.enabled=false`.
+- Set `ZEABUR_TEMPLATE_FETCH=false` in Zeabur's environment.

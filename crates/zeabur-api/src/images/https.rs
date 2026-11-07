@@ -131,6 +131,16 @@ impl Https {
         request: Request<Full<Bytes>>,
         limit: usize,
     ) -> Result<(u16, http::HeaderMap, Vec<u8>), String> {
+        self.exchange_within(request, limit, DEADLINE).await
+    }
+
+    /// [`Self::exchange_with_headers`] within `deadline`, for a larger answer.
+    pub(crate) async fn exchange_within(
+        &self,
+        request: Request<Full<Bytes>>,
+        limit: usize,
+        deadline: Duration,
+    ) -> Result<(u16, http::HeaderMap, Vec<u8>), String> {
         refuse_named(self.reach, request.uri())?;
         let exchange = async {
             let response = self
@@ -148,7 +158,7 @@ impl Https {
                 .to_vec();
             Ok((status, headers, body))
         };
-        tokio::time::timeout(DEADLINE, exchange)
+        tokio::time::timeout(deadline, exchange)
             .await
             .map_err(|_elapsed| "the server did not answer in time".to_owned())?
     }

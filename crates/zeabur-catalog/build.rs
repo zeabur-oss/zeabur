@@ -2,9 +2,8 @@
 //! sets to the catalog's `release` output at the commit in flake.lock. The components
 //! (`components/<capability>/<id>.yaml`), the templates (`templates/<id>/template.yaml` and
 //! `manifests.yaml`) and the template measurements (`measurements/templates/<id>.json`) become
-//! sorted tables of `include_str!` entries, so the binary carries the catalogue it was built with
-//! and reads nothing at run time. `crosscheck.json`, the catalogue's own render of each template,
-//! is unpacked for the tests only.
+//! sorted tables of `include_str!` entries, so the binary carries the catalogue it was built with.
+//! `crosscheck.json`, the catalogue's own render of each template, is unpacked for the tests only.
 
 use std::fmt::Write as _;
 use std::fs::{self, File};

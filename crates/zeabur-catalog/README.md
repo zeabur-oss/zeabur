@@ -22,10 +22,14 @@ Level 3: may depend on `zeabur-core`, `zeabur-model` and `zeabur-kube` (for the 
   [Zeabur Catalog](https://github.com/zeabur-oss/catalog) (Apache-2.0) from
   `ZEABUR_CATALOG_RELEASE`: the dev shell builds the catalog's `release` output at the commit in
   `flake.lock`, byte for byte the bundle its release signs. `CATALOGUE_COMMIT` is that commit. The
-  binary carries the catalogue it was built with and fetches nothing at run time. Renovate moves
-  the pin.
+  binary carries the catalogue it was built with. Renovate moves the pin.
+- **Newer templates replace the embedded ones, one by one.** `Catalog::fetched` reads the
+  templates of a newer `bundle.tar.gz` (zeabur-api fetches it and checks its signature) and drops
+  each one that does not read, requires a component this build does not carry, or does not render
+  what the bundle's `crosscheck.json` recorded; the embedded template of the same id stays in its
+  place. Components and their detection always come from the embedded bundle.
 - **Templates are rendered here.** `build.rs` also embeds each `templates/<id>/` of the bundle,
-  and `templates::render` fills its `manifests.yaml` for a namespace, a domain, the cluster's
+  and `Catalog::render` fills its `manifests.yaml` for a namespace, a domain, the cluster's
   issuer and the inputs, as the catalogue's own Go renderer (`tools/internal/templates/render.go`)
   does: the same checks. A manifest allows field substitution only, and any other action is
   refused. A test renders every template with the values the catalogue recorded in
