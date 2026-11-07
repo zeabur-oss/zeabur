@@ -15,14 +15,12 @@ never reach it.
    `metrics`) in the group `proxy.zeabur.com` in that namespace. No: 403. kube-apiserver failing
    or slow: 503, never let through. Answers are reused for 10 s, keyed by a hash of the token, the
    namespace and the resource.
-5. The namespace is read with the person's token for its `creationTimestamp`; not readable: 403.
-6. The backend's request is rebuilt from the parsed query alone, with the namespace filter
-   (VictoriaLogs' `extra_stream_filters`, VictoriaMetrics' `extra_label=namespace=<namespace>`),
-   the time range cut to start no earlier than the namespace's creation, and the module's limits.
-   The original query string and headers are never sent on. A filter parameter in the request is
-   refused, not merged.
-7. The answer is streamed back within a time and a size, with only `Content-Type` of its headers.
-8. One audit line: user, namespace, backend, path, decision, duration and bytes; never the token,
+5. The backend's request is rebuilt from the parsed query alone, with the namespace filter
+   (VictoriaLogs' `extra_stream_filters`, VictoriaMetrics' `extra_label=namespace=<namespace>`)
+   and the module's limits. The original query string and headers are never sent on. A filter
+   parameter in the request is refused, not merged.
+6. The answer is streamed back within a time and a size, with only `Content-Type` of its headers.
+7. One audit line: user, namespace, backend, path, decision, duration and bytes; never the token,
    the query or the data.
 
 Types hold this order: a `Namespace` only comes from its validator, a `Grant` only from the
@@ -32,10 +30,10 @@ a query and a grant for the same namespace and resource make. The rules (`rules`
 
 The metrics module serves the Prometheus query, range query, series, label names and label values
 APIs, the ones VictoriaMetrics applies `extra_label` to. Export, federate, TSDB status, metadata
-and the vmalert APIs are refused. A range selector, subquery or `offset` reads samples before the
-range's start, so for metrics the cut at the namespace's creation is not a boundary: a namespace
-recreated under the same name may show the earlier one's usage. The namespace label is the
-boundary.
+and the vmalert APIs are refused.
+
+The namespace's name is the boundary, as in Kubernetes RBAC: a namespace recreated under the same
+name shows the earlier one's logs and usage until the backends' retention drops them.
 
 ## Deployment
 

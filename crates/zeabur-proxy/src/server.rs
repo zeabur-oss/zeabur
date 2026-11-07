@@ -14,7 +14,7 @@ use tokio::net::TcpListener;
 use tokio_rustls::TlsAcceptor;
 
 use crate::access::{Reviewer, Token};
-use crate::audit::{Audit, Inflight};
+use crate::audit::Audit;
 use crate::logs::{Logs, LogsLimits};
 use crate::metrics::{Metrics, MetricsLimits};
 use crate::reject::Reject;
@@ -44,10 +44,6 @@ pub struct Settings {
     pub logs: Option<BackendConfig<LogsLimits>>,
     /// VictoriaMetrics, when one is configured.
     pub metrics: Option<BackendConfig<MetricsLimits>>,
-    /// Queries in flight for the whole proxy.
-    pub max_inflight: usize,
-    /// Queries in flight for one person.
-    pub max_inflight_per_person: usize,
 }
 
 /// The proxy: settings, the access review and the backends' client.
@@ -56,7 +52,6 @@ pub struct Proxy<R> {
     reviewer: R,
     settings: Settings,
     client: Client,
-    inflight: Arc<Inflight>,
 }
 
 impl<R: Reviewer> Proxy<R> {
@@ -66,20 +61,11 @@ impl<R: Reviewer> Proxy<R> {
         Arc::new(Self {
             reviewer,
             client: upstream::client(Duration::from_secs(5)),
-            inflight: Inflight::new(
-                settings.max_inflight,
-                settings.max_inflight_per_person,
-                INFLIGHT_WAIT,
-            ),
             settings,
         })
     }
 
     /// Answers one request.
-    #[expect(
-        clippy::significant_drop_tightening,
-        reason = "the audit record is written by whichever branch ends the request"
-    )]
     pub async fn handle<B>(self: Arc<Self>, request: Request<B>) -> Response<ProxyBody> {
         let (method, uri, headers) = {
             let (parts, _) = request.into_parts();
@@ -157,7 +143,6 @@ impl<R: Reviewer> Proxy<R> {
         audit.user(grant.user());
         let authorized = Authorized::new::<B>(query, grant)?;
         let upstream = B::build(&authorized, &config.limits, Timestamp::now())?;
-        audit.hold(self.inflight.enter(authorized.grant().user()).await?);
         match upstream::send(&self.client, &config.url, &upstream, config.timeout).await? {
             Answer::Data { content_type, body } => Ok(Served::Data {
                 content_type,
@@ -243,8 +228,6 @@ fn no_store(mut response: Response<ProxyBody>) -> Response<ProxyBody> {
     response
 }
 
-/// How long a query waits for a place among the queries in flight before it is refused.
-const INFLIGHT_WAIT: Duration = Duration::from_secs(10);
 /// How long a client has to send a request's headers.
 const HEADER_WAIT: Duration = Duration::from_secs(10);
 /// Connections served at once; more wait in the listener's backlog.
@@ -314,7 +297,6 @@ mod tests {
     use std::sync::Mutex;
 
     use http_body_util::Empty;
-    use k8s_openapi::jiff::Timestamp;
 
     use super::*;
     use crate::access::Grant;
@@ -342,11 +324,7 @@ mod tests {
             } else if self.allowed.contains(&namespace.as_str())
                 && (resource == "logs" || resource == "metrics")
             {
-                Ok(Grant::for_tests(
-                    namespace.as_str(),
-                    resource,
-                    "2026-01-01T00:00:00Z".parse::<Timestamp>().unwrap(),
-                ))
+                Ok(Grant::for_tests(namespace.as_str(), resource))
             } else {
                 Err(Reject::Forbidden)
             };
@@ -413,8 +391,6 @@ mod tests {
                     timeout: Duration::from_secs(5),
                     max_bytes,
                 }),
-                max_inflight: 4,
-                max_inflight_per_person: 2,
             },
         )
     }
@@ -522,12 +498,6 @@ mod tests {
                 404,
                 "unknown_backend",
             ),
-            (
-                "/logs/select/logsql/query?namespace=a&end=2025-01-01T00:00:00Z",
-                Some("good"),
-                400,
-                "before_namespace",
-            ),
         ] {
             let response = Arc::clone(&proxy).handle(get(target, token)).await;
             assert_eq!(response.status().as_u16(), status, "{target}");
@@ -541,7 +511,7 @@ mod tests {
         assert!(seen.lock().unwrap().is_empty());
         assert_eq!(
             *proxy.reviewer.asked.lock().unwrap(),
-            ["b", "a"],
+            ["b"],
             "only well-formed requests are reviewed"
         );
     }

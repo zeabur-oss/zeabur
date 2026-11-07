@@ -45,16 +45,9 @@ pub enum Reject {
     /// `query` is too long or holds control characters.
     #[error("query is too long or holds control characters")]
     InvalidQuery,
-    /// The range ends before the namespace was created, so it could only show an earlier
-    /// namespace of the same name.
-    #[error("the range ends before the namespace was created")]
-    BeforeNamespace,
     /// The person may not read this resource in this namespace, or may not read the namespace.
     #[error("you may not read this in this namespace")]
     Forbidden,
-    /// The person has too many queries in flight, or the proxy has.
-    #[error("too many queries in flight")]
-    Busy,
     /// kube-apiserver could not answer the access review in time.
     #[error("kube-apiserver did not answer the access review")]
     Unavailable,
@@ -79,10 +72,8 @@ impl Reject {
             | Self::InvalidTime
             | Self::InvalidLimit
             | Self::InvalidStep
-            | Self::InvalidQuery
-            | Self::BeforeNamespace => StatusCode::BAD_REQUEST,
+            | Self::InvalidQuery => StatusCode::BAD_REQUEST,
             Self::Forbidden => StatusCode::FORBIDDEN,
-            Self::Busy => StatusCode::TOO_MANY_REQUESTS,
             Self::Unavailable => StatusCode::SERVICE_UNAVAILABLE,
             Self::Backend => StatusCode::BAD_GATEWAY,
         }
@@ -105,9 +96,7 @@ impl Reject {
             Self::InvalidLimit => "invalid_limit",
             Self::InvalidStep => "invalid_step",
             Self::InvalidQuery => "invalid_query",
-            Self::BeforeNamespace => "before_namespace",
             Self::Forbidden => "forbidden",
-            Self::Busy => "busy",
             Self::Unavailable => "unavailable",
             Self::Backend => "backend",
         }

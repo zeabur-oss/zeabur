@@ -91,6 +91,8 @@ If another team will use the name of a project you deleted, wait 70 minutes firs
 
 The registry token that Zeabur Builder uses to push images identifies the repository by the project name, not by the namespace UID. After a project is deleted and a project with the same name is created, a token issued for the old project can still push to the new project's repository until it expires. A build token lasts at most 70 minutes (the default build deadline of 60 minutes plus 10 minutes), and a token for uploading a source archive lasts 15 minutes. You don't need to wait if you're deleting and recreating your own project.
 
+Log and usage history are also kept by project name. In a new project with the same name, **Logs** and **Usage** show the deleted project's history until the log and usage storage drops it at the end of its retention period. To keep another team from seeing that history, ask a cluster administrator to delete it from that storage first.
+
 ## Restore a project from a backup
 
 In **Cluster** → **Backups**, select a backup from before the deletion in the **Backups** list, then click **Restore deleted project** (**New project from backup** while the original project still exists). See [Back up and restore a cluster](../cluster/backups.mdx#restore-from-a-backup) for the steps.

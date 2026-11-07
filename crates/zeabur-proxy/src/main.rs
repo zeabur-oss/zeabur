@@ -61,10 +61,6 @@ const REVIEW_CACHE: Duration = Duration::from_secs(10);
 const BACKEND_TIMEOUT: Duration = Duration::from_secs(30);
 /// The most bytes one answer may have.
 const MAX_BYTES: u64 = 16 << 20;
-/// Queries in flight for the whole proxy.
-const MAX_INFLIGHT: usize = 16;
-/// Queries in flight for one person.
-const MAX_INFLIGHT_PER_PERSON: usize = 2;
 
 /// Info and above, and nothing from kube-rs, which logs response bodies at `WARN`, `DEBUG` and
 /// `TRACE`. The proxy depends on no workspace crate, so this is a copy of `zeabur`'s filter.
@@ -166,15 +162,7 @@ async fn run(args: Args) -> Result<(), String> {
             return Err("give both the TLS certificate and key".to_owned());
         }
     };
-    let proxy = Proxy::new(
-        reviewer,
-        Settings {
-            logs,
-            metrics,
-            max_inflight: MAX_INFLIGHT,
-            max_inflight_per_person: MAX_INFLIGHT_PER_PERSON,
-        },
-    );
+    let proxy = Proxy::new(reviewer, Settings { logs, metrics });
     let listener = tokio::net::TcpListener::bind(args.listen)
         .await
         .map_err(|e| format!("cannot listen on {}: {e}", args.listen))?;

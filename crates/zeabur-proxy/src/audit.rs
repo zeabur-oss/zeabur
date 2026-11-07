@@ -1,11 +1,7 @@
 //! One line per request: who, which namespace, which backend and path, allowed or why not, how
 //! long and how many bytes. Never the token, the query or the data.
 
-use std::collections::HashMap;
-use std::sync::{Arc, Mutex, PoisonError};
-use std::time::{Duration, Instant};
-
-use tokio::sync::{OwnedSemaphorePermit, Semaphore};
+use std::time::Instant;
 
 use crate::reject::Reject;
 
@@ -40,7 +36,6 @@ pub(crate) struct Audit {
     backend: &'static str,
     user: String,
     namespace: String,
-    slot: Option<Slot>,
 }
 
 impl Audit {
@@ -51,7 +46,6 @@ impl Audit {
             backend: "",
             user: String::new(),
             namespace: String::new(),
-            slot: None,
         }
     }
 
@@ -65,11 +59,6 @@ impl Audit {
 
     pub(crate) fn user(&mut self, user: &str) {
         user.clone_into(&mut self.user);
-    }
-
-    /// Holds the person's place among the queries in flight until the answer ends.
-    pub(crate) fn hold(&mut self, slot: Slot) {
-        self.slot = Some(slot);
     }
 
     fn millis(&self) -> u64 {
@@ -120,177 +109,5 @@ impl Audit {
             duration_ms = self.millis(),
             bytes,
         );
-    }
-}
-
-/// Queries in flight: a few per person and a ceiling for the proxy, so one person's wide
-/// queries cannot hold the backend for everyone. A query waits for a place up to `wait`, as one
-/// page asks for several series at once.
-#[derive(Debug)]
-pub(crate) struct Inflight {
-    total: Arc<Semaphore>,
-    per_person: usize,
-    wait: Duration,
-    people: Mutex<HashMap<String, Arc<Semaphore>>>,
-}
-
-impl Inflight {
-    pub(crate) fn new(total: usize, per_person: usize, wait: Duration) -> Arc<Self> {
-        Arc::new(Self {
-            total: Arc::new(Semaphore::new(total)),
-            per_person,
-            wait,
-            people: Mutex::default(),
-        })
-    }
-
-    pub(crate) async fn enter(self: &Arc<Self>, person: &str) -> Result<Slot, Reject> {
-        let member = {
-            let mut people = self.people.lock().unwrap_or_else(PoisonError::into_inner);
-            let own = people
-                .entry(person.to_owned())
-                .or_insert_with(|| Arc::new(Semaphore::new(self.per_person)));
-            Member {
-                inflight: Arc::clone(self),
-                person: person.to_owned(),
-                own: Some(Arc::clone(own)),
-            }
-        };
-        // From here, `member` forgets the person when this request ends, also when it is
-        // cancelled while it waits.
-        let places = async {
-            let own = Arc::clone(member.own.as_ref()?);
-            let mine = own.acquire_owned().await.ok()?;
-            let total = Arc::clone(&self.total).acquire_owned().await.ok()?;
-            Some((mine, total))
-        };
-        let Ok(Some((mine, total))) = tokio::time::timeout(self.wait, places).await else {
-            return Err(Reject::Busy);
-        };
-        Ok(Slot {
-            _mine: mine,
-            _total: total,
-            _member: member,
-        })
-    }
-
-    /// Forgets `person` once nobody holds or waits for one of their places. Every holder and
-    /// waiter has a clone of `own`, taken and given back under the lock, so the count is exact
-    /// here.
-    fn leave(&self, person: &str, own: Arc<Semaphore>) {
-        let mut people = self.people.lock().unwrap_or_else(PoisonError::into_inner);
-        let last = Arc::strong_count(&own) == 2;
-        drop(own);
-        if last {
-            people.remove(person);
-        }
-    }
-}
-
-/// One request of a person, from asking for a place to giving it back.
-#[derive(Debug)]
-struct Member {
-    inflight: Arc<Inflight>,
-    person: String,
-    own: Option<Arc<Semaphore>>,
-}
-
-impl Drop for Member {
-    fn drop(&mut self) {
-        if let Some(own) = self.own.take() {
-            self.inflight.leave(&self.person, own);
-        }
-    }
-}
-
-/// A place among the queries in flight, given back when dropped. The fields drop in order, so
-/// the person's permit, which holds a clone of their semaphore, is gone before `_member` counts.
-#[derive(Debug)]
-pub(crate) struct Slot {
-    _mine: OwnedSemaphorePermit,
-    _total: OwnedSemaphorePermit,
-    _member: Member,
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    const WAIT: Duration = Duration::from_millis(50);
-
-    #[tokio::test]
-    async fn a_person_waits_for_a_place_and_the_proxy_has_a_ceiling() {
-        let inflight = Inflight::new(3, 2, WAIT);
-        let a1 = inflight.enter("a").await.unwrap();
-        let _a2 = inflight.enter("a").await.unwrap();
-        assert_eq!(inflight.enter("a").await.err(), Some(Reject::Busy));
-        let _b1 = inflight.enter("b").await.unwrap();
-        assert_eq!(inflight.enter("c").await.err(), Some(Reject::Busy));
-        drop(a1);
-        assert!(inflight.enter("a").await.is_ok());
-    }
-
-    // The usage history asks for CPU, memory and restarts at once (zeabur-api's
-    // `services::history::read`); the third waits for the first to end instead of failing.
-    #[tokio::test]
-    async fn a_third_query_gets_the_place_the_first_gives_back() {
-        let inflight = Inflight::new(16, 2, Duration::from_secs(5));
-        let first = inflight.enter("a").await.unwrap();
-        let _second = inflight.enter("a").await.unwrap();
-        let third = tokio::spawn({
-            let inflight = Arc::clone(&inflight);
-            async move { inflight.enter("a").await.map(drop) }
-        });
-        tokio::time::sleep(Duration::from_millis(20)).await;
-        drop(first);
-        assert_eq!(third.await.unwrap(), Ok(()));
-    }
-
-    #[tokio::test]
-    async fn a_person_is_forgotten_once_their_places_are_back() {
-        let inflight = Inflight::new(16, 2, WAIT);
-        let held = inflight.enter("a").await.unwrap();
-        assert!(inflight.people.lock().unwrap().contains_key("a"));
-        drop(held);
-        assert!(inflight.people.lock().unwrap().is_empty());
-    }
-
-    // A browser that closes the page cancels the request while it waits.
-    #[tokio::test]
-    async fn a_person_is_forgotten_when_their_waiting_query_is_cancelled() {
-        let inflight = Inflight::new(1, 2, Duration::from_secs(5));
-        let _other = inflight.enter("b").await.unwrap();
-        let waiting = tokio::spawn({
-            let inflight = Arc::clone(&inflight);
-            async move { inflight.enter("a").await.map(drop) }
-        });
-        tokio::time::sleep(Duration::from_millis(20)).await;
-        assert!(inflight.people.lock().unwrap().contains_key("a"));
-        waiting.abort();
-        assert!(waiting.await.unwrap_err().is_cancelled());
-        assert!(!inflight.people.lock().unwrap().contains_key("a"));
-    }
-
-    #[test]
-    fn a_person_is_forgotten_when_their_last_queries_end_together() {
-        const AT_ONCE: usize = 8;
-        let runtime = tokio::runtime::Runtime::new().unwrap();
-        let inflight = Inflight::new(AT_ONCE, AT_ONCE, WAIT);
-        for _ in 0..500 {
-            let start = Arc::new(std::sync::Barrier::new(AT_ONCE));
-            let mut ends = Vec::new();
-            for _ in 0..AT_ONCE {
-                let slot = runtime.block_on(inflight.enter("a")).unwrap();
-                let start = Arc::clone(&start);
-                ends.push(std::thread::spawn(move || {
-                    start.wait();
-                    drop(slot);
-                }));
-            }
-            for end in ends {
-                end.join().unwrap();
-            }
-            assert!(inflight.people.lock().unwrap().is_empty());
-        }
     }
 }

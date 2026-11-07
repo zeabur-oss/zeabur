@@ -17,8 +17,6 @@ use k8s_openapi::api::authentication::v1::SelfSubjectReview;
 use k8s_openapi::api::authorization::v1::{
     ResourceAttributes, SelfSubjectAccessReview, SelfSubjectAccessReviewSpec,
 };
-use k8s_openapi::api::core::v1::Namespace as KubeNamespace;
-use k8s_openapi::jiff::Timestamp;
 use kube::api::{Api, PostParams};
 use secrecy::{ExposeSecret as _, SecretString};
 use sha2::{Digest as _, Sha256};
@@ -56,14 +54,13 @@ impl fmt::Debug for Token {
     }
 }
 
-/// kube-apiserver's yes: this person may `get` this resource in this namespace, which was created
-/// at this time. Only [`KubeReviewer`] makes one, after asking.
+/// kube-apiserver's yes: this person may `get` this resource in this namespace. Only
+/// [`KubeReviewer`] makes one, after asking.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Grant {
     user: String,
     namespace: Namespace,
     resource: &'static str,
-    created: Timestamp,
 }
 
 impl Grant {
@@ -85,19 +82,12 @@ impl Grant {
         self.resource
     }
 
-    /// When the namespace was created.
-    #[must_use]
-    pub const fn created(&self) -> Timestamp {
-        self.created
-    }
-
     #[cfg(test)]
-    pub(crate) fn for_tests(namespace: &str, resource: &'static str, created: Timestamp) -> Self {
+    pub(crate) fn for_tests(namespace: &str, resource: &'static str) -> Self {
         Self {
             user: "tester".to_owned(),
             namespace: Namespace::parse(namespace).unwrap(),
             resource,
-            created,
         }
     }
 }
@@ -230,20 +220,10 @@ impl KubeReviewer {
             .ok()
             .and_then(|who| who.status?.user_info?.username)
             .unwrap_or_default();
-        let namespaces: Api<KubeNamespace> = Api::all(client);
-        let created = namespaces
-            .get(namespace.as_str())
-            .await
-            .map_err(read_error)?
-            .metadata
-            .creation_timestamp
-            .ok_or(Reject::Forbidden)?
-            .0;
         Ok(Grant {
             user,
             namespace: namespace.clone(),
             resource,
-            created,
         })
     }
 }
@@ -272,31 +252,6 @@ fn review_error(error: kube::Error) -> Reject {
         | kube::Error::TlsRequired
         | kube::Error::UpgradeConnection(_)
         | kube::Error::Auth(_) => Reject::Unavailable,
-    }
-}
-
-/// The namespace could not be read: one the person may not read, or that is gone, is refused.
-fn read_error(error: kube::Error) -> Reject {
-    match error {
-        kube::Error::Api(status) if matches!(status.code, 403 | 404) => Reject::Forbidden,
-        other @ (kube::Error::Api(_)
-        | kube::Error::HyperError(_)
-        | kube::Error::Service(_)
-        | kube::Error::ProxyProtocolUnsupported { .. }
-        | kube::Error::ProxyProtocolDisabled { .. }
-        | kube::Error::FromUtf8(_)
-        | kube::Error::LinesCodecMaxLineLengthExceeded
-        | kube::Error::ReadEvents(_)
-        | kube::Error::HttpError(_)
-        | kube::Error::SerdeError(_)
-        | kube::Error::BuildRequest(_)
-        | kube::Error::InferConfig(_)
-        | kube::Error::InferKubeconfig(_)
-        | kube::Error::Discovery(_)
-        | kube::Error::RustlsTls(_)
-        | kube::Error::TlsRequired
-        | kube::Error::UpgradeConnection(_)
-        | kube::Error::Auth(_)) => review_error(other),
     }
 }
 
@@ -367,8 +322,6 @@ impl Cache {
                 | Reject::InvalidLimit
                 | Reject::InvalidStep
                 | Reject::InvalidQuery
-                | Reject::BeforeNamespace
-                | Reject::Busy
                 | Reject::Unavailable
                 | Reject::Backend,
             ) => false,
@@ -397,7 +350,7 @@ mod tests {
         let token = Token::new("t");
         let a = Namespace::parse("a").unwrap();
         let b = Namespace::parse("b").unwrap();
-        let grant = Grant::for_tests("a", "logs", Timestamp::UNIX_EPOCH);
+        let grant = Grant::for_tests("a", "logs");
         cache.put(token.digest(&a, "logs"), &Ok(grant.clone()));
         cache.put(token.digest(&b, "logs"), &Err(Reject::Unavailable));
         assert_eq!(cache.get(&token.digest(&a, "logs")), Some(Ok(grant)));

@@ -149,24 +149,17 @@ impl Backend for Logs {
         })
     }
 
-    /// The range is cut to start no earlier than the namespace's creation, so a namespace
-    /// recreated under the same name never shows the earlier one's lines, and to the longest
-    /// span; the limit is lowered to the most allowed.
+    /// The range is cut to the longest span; the limit is lowered to the most allowed.
     fn build(
         authorized: &Authorized<LogsQuery>,
         limits: &LogsLimits,
         now: Timestamp,
     ) -> Result<Upstream, Reject> {
         let query = authorized.query();
-        let created = authorized.grant().created();
         let end = query.end.unwrap_or(now).min(now);
-        if end <= created {
-            return Err(Reject::BeforeNamespace);
-        }
         let earliest = end
             .checked_sub(limits.max_span)
-            .map_err(|_invalid| Reject::InvalidTime)?
-            .max(created);
+            .map_err(|_invalid| Reject::InvalidTime)?;
         let start = match query.start {
             Some(start) => start,
             None => end
@@ -238,12 +231,8 @@ mod tests {
         "2026-10-22T12:00:00Z".parse().unwrap()
     }
 
-    fn created() -> Timestamp {
-        "2026-10-01T00:00:00Z".parse().unwrap()
-    }
-
     fn grant(namespace: &str) -> Grant {
-        Grant::for_tests(namespace, Logs::RESOURCE, created())
+        Grant::for_tests(namespace, Logs::RESOURCE)
     }
 
     fn parse(query: &str) -> Result<LogsQuery, Reject> {
@@ -373,7 +362,7 @@ mod tests {
             Authorized::new::<Logs>(query.clone(), grant("b")).err(),
             Some(Reject::Forbidden)
         );
-        let metrics = Grant::for_tests("a", "metrics", created());
+        let metrics = Grant::for_tests("a", "metrics");
         assert_eq!(
             Authorized::new::<Logs>(query, metrics).err(),
             Some(Reject::Forbidden)
@@ -391,7 +380,7 @@ mod tests {
             upstream.params(),
             [
                 ("query", "error | limit 5".to_owned()),
-                // Not before the namespace was created, nor more than a week before the end.
+                // Not more than a week before the end.
                 ("start", "2026-10-15T12:00:00Z".to_owned()),
                 ("end", "2026-10-22T12:00:00Z".to_owned()),
                 (
@@ -410,12 +399,10 @@ mod tests {
     }
 
     #[test]
-    fn the_range_starts_when_the_namespace_was_created_and_never_ends_before() {
+    fn the_range_is_at_most_a_week_and_an_hour_by_default() {
         let query = parse("namespace=shop&start=1700000000&end=2026-10-02T00:00:00Z").unwrap();
         let upstream = build(query, "shop").unwrap();
-        assert_eq!(param(&upstream, "start"), ["2026-10-01T00:00:00Z"]);
-        let before = parse("namespace=shop&start=1700000000&end=2026-09-30T00:00:00Z").unwrap();
-        assert_eq!(build(before, "shop"), Err(Reject::BeforeNamespace));
+        assert_eq!(param(&upstream, "start"), ["2026-09-25T00:00:00Z"]);
         let defaults = build(parse("namespace=shop").unwrap(), "shop").unwrap();
         assert_eq!(param(&defaults, "start"), ["2026-10-22T11:00:00Z"]);
         assert_eq!(param(&defaults, "limit"), ["100"]);

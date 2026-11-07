@@ -19,9 +19,8 @@ use rustls::pki_types::pem::PemObject as _;
 use zeabur_api::services::proxy::{ProxyAnswer, ZeaburProxy};
 use zeabur_kube::UserToken;
 
-/// Longer than the proxy's own 10 s wait for a place and 30 s for its backend, so its answer
-/// arrives first.
-const DEADLINE: Duration = Duration::from_secs(45);
+/// Longer than the proxy's own 30 s for its backend, so its answer arrives first.
+const DEADLINE: Duration = Duration::from_secs(35);
 /// The proxy's own limit (16 MiB) and room for its problem.
 const MAX_BODY: usize = (16 << 20) + 4096;
 
