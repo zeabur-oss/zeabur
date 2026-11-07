@@ -30,12 +30,24 @@ const undeletableResources = new Set([
   "endpointslices",
 ])
 
+function Intro({ address, note }: { address: ObjectAddress; note?: string }) {
+  const t = useT()
+  return (
+    <p className="min-w-0 basis-full type-meta text-muted-foreground sm:basis-0 sm:flex-1">
+      {t("yaml.intro", address.name)}
+      {address.resource === "secrets" ? ` ${t("yaml.hidden")}` : ""}
+      {note ? ` ${note}` : ""}
+    </p>
+  )
+}
+
 export function YamlView({
   project,
   address,
   yaml,
   managedBy,
   kind,
+  note,
   onDeleted,
 }: {
   project: string
@@ -43,6 +55,8 @@ export function YamlView({
   yaml: string
   managedBy?: string | null
   kind?: string
+  /** Follows the intro. */
+  note?: string
   /** Offers Delete when given. */
   onDeleted?: () => void
 }) {
@@ -84,10 +98,7 @@ export function YamlView({
     return (
       <div className="flex flex-col gap-2">
         <div className="flex flex-wrap items-center gap-2">
-          <p className="min-w-0 basis-full type-meta text-muted-foreground sm:basis-0 sm:flex-1">
-            {t("yaml.intro", address.name)}
-            {address.resource === "secrets" ? ` ${t("yaml.hidden")}` : ""}
-          </p>
+          <Intro address={address} note={note} />
           <span className="flex shrink-0 gap-1.5 sm:ml-auto">
             {onDeleted ? (
               undeletable ? (
