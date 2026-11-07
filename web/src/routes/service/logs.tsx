@@ -352,8 +352,10 @@ function Snapshot({
   if (logs.isPending) return <Skeleton variant="card" className="min-h-80 w-full flex-1" />
   if (logs.isError) {
     const problem = toProblem(logs.error)
-    if (problem.status === 404) return <Gone project={project} pod={pod} />
-    if (!problem.unavailableLog) return <Problem problem={problem} />
+    if (!problem.unavailableLog) {
+      if (problem.status === 404) return <Gone project={project} pod={pod} />
+      return <Problem problem={problem} />
+    }
     // The kubelet had no log: a container state, not an error.
     const reason = problem.unavailableLog
     return (
@@ -490,7 +492,8 @@ function Gone({ project, pod }: { project: string; pod: string }) {
   const t = useT()
   const client = useQueryClient()
   useEffect(() => {
-    void client.invalidateQueries({ queryKey: projectQuery(project).queryKey })
+    // Exact: the pod's logs share the key's prefix, and refetching them would mount this again.
+    void client.invalidateQueries({ queryKey: projectQuery(project).queryKey, exact: true })
   }, [client, project, pod])
   return (
     <p
@@ -516,7 +519,8 @@ function Stream({
 }: { url: string; project: string; pod: string; onResume: () => void } & ViewProps) {
   const t = useT()
   const stream = useLogStream(url)
-  if (stream.problem?.status === 404) return <Gone project={project} pod={pod} />
+  if (stream.problem?.status === 404 && !stream.problem.unavailableLog)
+    return <Gone project={project} pod={pod} />
   return (
     <>
       {stream.problem ? <Problem problem={stream.problem} /> : null}

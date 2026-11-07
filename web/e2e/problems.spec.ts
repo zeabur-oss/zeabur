@@ -194,3 +194,32 @@ test("the project page shows its services while the suggestions are still being 
   release()
   await expect(waiting).toHaveCount(0)
 })
+
+test("a container that has not started says so, and its log is asked for once", async ({
+  page,
+}) => {
+  let asked = 0
+  await page.route(/\/api\/v1\/projects\/[^/]+\/pods\/[^/]+\/logs(\?.*)?$/, (route) => {
+    asked++
+    return route.fulfill({
+      status: 404,
+      contentType: "application/json",
+      body: JSON.stringify({
+        type: "/problems/log-unavailable",
+        title: "The log cannot be read",
+        status: 404,
+        detail: "No log yet: the container has not started.",
+        fix: "Wait for the container to start.",
+        kind: "log-unavailable",
+        unavailableLog: "not-started",
+      }),
+    })
+  })
+  await page.goto(`${servicePage}?tab=logs`)
+  const logs = page.getByRole("tabpanel", { name: "Logs" })
+  await expect(logs.getByText("No log yet: the container has not started.")).toBeVisible()
+  // Read as a gone replica, the answer refreshed the project and, with it, the log, over and over.
+  await page.waitForTimeout(3000)
+  await expect(logs.getByText(/no longer exists/)).toHaveCount(0)
+  expect(asked).toBe(1)
+})
