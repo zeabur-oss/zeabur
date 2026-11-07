@@ -98,8 +98,9 @@ Once `main` has changes for the next minor version, such as 0.3.0, fixes for the
 out from a maintenance branch, `maint/v0.2` for 0.2.x. Its name doesn't start with `release/`,
 which holds the release pull requests' branches.
 
-1. The first time, create `maint/v0.2` from the tag `v0.2.0`, and add `refs/heads/maint/*` to the
-   `main-security` ruleset so the branch takes changes only through pull requests with CI.
+1. The first time, create `maint/v0.2` from the tag `v0.2.0`. The ruleset `maintenance branches`
+   protects `maint/*` like `main`: changes only through pull requests with CI. It has no merge
+   queue, which GitHub doesn't allow on a pattern.
 2. Merge each fix into `main` first. Then open a pull request into `maint/v0.2` that cherry-picks
    it, change file included, with the patch release's milestone. Only fixes and security fixes go
    there.
