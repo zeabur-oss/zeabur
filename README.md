@@ -17,9 +17,6 @@ than you have, and keeps no state of its own: no database, no custom resources.
 configuring and operating the cluster, and leaving Zeabur, in English,
 [繁體中文](https://oss.zeabur.com/zh-TW/docs/zeabur/) and [简体中文](https://oss.zeabur.com/zh-CN/docs/zeabur/).
 
-> **Status: pre-alpha.** The API may still change, and it has been tried on few
-> clusters. Do not point it at a cluster you cannot afford to break.
-
 <table>
 <tr>
 <td width="50%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/readme-home-dark.avif"><img src="docs/images/readme-home-light.avif" alt="Home: what needs you across the cluster, grouped by where each problem comes from"></picture><br><b>What needs you</b>, across every project, grouped by where each problem comes from.</td>
