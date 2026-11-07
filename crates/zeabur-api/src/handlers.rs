@@ -1,10 +1,13 @@
 //! What every handler shares: the API's state and the person's connections.
 
+use std::any::Any;
 use std::future::Future;
 use std::sync::Arc;
 
 use axum::extract::{FromRef, FromRequestParts};
 use axum::http::request::Parts;
+use axum::response::{IntoResponse as _, Response};
+use tower_http::catch_panic::CatchPanicLayer;
 use zeabur_core::problem::{self, Kind, Problem};
 use zeabur_kube::Cluster;
 
@@ -107,9 +110,35 @@ pub(crate) async fn not_found() -> ApiError {
     ))
 }
 
+/// Answers a handler's panic as an `internal` problem. The panic's message goes to the log, not
+/// to the person: it can name Zeabur's internals.
+pub(crate) fn catch_panic() -> CatchPanicLayer<fn(Box<dyn Any + Send>) -> Response> {
+    CatchPanicLayer::custom(panicked)
+}
+
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "the signature CatchPanicLayer calls"
+)]
+fn panicked(payload: Box<dyn Any + Send>) -> Response {
+    let message = if let Some(text) = payload.downcast_ref::<&str>() {
+        text
+    } else if let Some(text) = payload.downcast_ref::<String>() {
+        text.as_str()
+    } else {
+        "(not text)"
+    };
+    tracing::error!(panic = message, "a request handler panicked");
+    ApiError::from(Problem::new(
+        Kind::Internal,
+        "Zeabur hit a bug while answering this request.",
+    ))
+    .into_response()
+}
+
 /// A known API path asked with a method it does not take: an `about:blank` problem, as HTTP's
 /// own `405` says all there is (RFC 9457, section 4.2.1). axum adds the `Allow` header.
-pub(crate) async fn method_not_allowed(method: axum::http::Method) -> axum::response::Response {
+pub(crate) async fn method_not_allowed(method: axum::http::Method) -> Response {
     let status = axum::http::StatusCode::METHOD_NOT_ALLOWED;
     let body = serde_json::json!({
         "type": "about:blank",
@@ -119,4 +148,35 @@ pub(crate) async fn method_not_allowed(method: axum::http::Method) -> axum::resp
     });
     let content_type = [(axum::http::header::CONTENT_TYPE, problem::MEDIA_TYPE)];
     axum::response::IntoResponse::into_response((status, content_type, body.to_string()))
+}
+
+#[cfg(test)]
+mod tests {
+    use axum::Router;
+    use axum::body::Body;
+    use axum::http::{Request, StatusCode, header};
+    use axum::routing::get;
+    use http_body_util::BodyExt as _;
+    use tower::ServiceExt as _;
+
+    use super::*;
+
+    #[tokio::test]
+    async fn a_panic_is_answered_as_a_problem_without_its_message() {
+        async fn boom() {
+            panic!("secret internals");
+        }
+        let app = Router::new().route("/", get(boom)).layer(catch_panic());
+        let request = Request::builder().uri("/").body(Body::empty()).unwrap();
+        let response = app.oneshot(request).await.unwrap();
+        assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
+        assert_eq!(
+            response.headers()[header::CONTENT_TYPE],
+            "application/problem+json"
+        );
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+        let body = String::from_utf8(body.to_vec()).unwrap();
+        assert!(body.contains("/problems/internal"), "{body}");
+        assert!(!body.contains("secret internals"), "{body}");
+    }
 }

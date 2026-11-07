@@ -502,6 +502,7 @@ pub fn router_with(access: Arc<dyn ClusterAccess>, options: Options) -> Router {
         .route("/api", axum::routing::any(handlers::not_found))
         .route("/api/{*rest}", axum::routing::any(handlers::not_found))
         .layer(axum::middleware::from_fn(cache::no_store))
+        .layer(handlers::catch_panic())
         .with_state(state)
 }
 
