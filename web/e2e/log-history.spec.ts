@@ -104,3 +104,37 @@ test("history in each state: not allowed, not answering, cut at the limit", asyn
   await page.getByRole("button", { name: "History", exact: true }).click()
   await expect(logs).toContainText("Latest 2 lines")
 })
+
+test("a container that has not started says so and stays, instead of reloading", async ({
+  page,
+}) => {
+  // The kubelet's refusal for a container still pulling its image, as Zeabur answers it.
+  const logPath = /\/api\/v1\/projects\/[^/]+\/pods\/[^/]+\/logs(\?.*)?$/
+  let reads = 0
+  await page.route(logPath, (route) => {
+    reads += 1
+    return route.fulfill({
+      status: 404,
+      contentType: "application/problem+json",
+      body: JSON.stringify({
+        type: "/problems/log-unavailable",
+        title: "The log is not available",
+        status: 404,
+        detail: `There is no log of pod ${pod} yet: the container has not started.`,
+        fix: "Wait for the container to start; the replica's events say what it is waiting for.",
+        fixKey: { key: "problem.logUnavailable.fix.notStarted" },
+        kind: "log-unavailable",
+        unavailableLog: "not-started",
+      }),
+    })
+  })
+  await page.goto(logsPage)
+  const logs = page.getByRole("tabpanel", { name: "Logs" })
+  await expect(logs).toContainText("No log yet: the container has not started.")
+  // The project is read again every few seconds; the log is not read again with it.
+  const projectPath = `/api/v1/projects/${encodeURIComponent(namespace)}`
+  await page.waitForResponse((response) => new URL(response.url()).pathname === projectPath)
+  await page.waitForResponse((response) => new URL(response.url()).pathname === projectPath)
+  await expect(logs).toContainText("No log yet: the container has not started.")
+  expect(reads).toBe(1)
+})

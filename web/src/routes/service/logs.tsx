@@ -352,10 +352,12 @@ function Snapshot({
   if (logs.isPending) return <Skeleton variant="card" className="min-h-80 w-full flex-1" />
   if (logs.isError) {
     const problem = toProblem(logs.error)
-    if (problem.status === 404) return <Gone project={project} pod={pod} />
-    if (!problem.unavailableLog) return <Problem problem={problem} />
-    // The kubelet had no log: a container state, not an error.
+    // The kubelet had no log: a container state, not an error. Its 404 is not a pod that went away.
     const reason = problem.unavailableLog
+    if (!reason) {
+      if (problem.status === 404) return <Gone project={project} pod={pod} />
+      return <Problem problem={problem} />
+    }
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-3 rounded-xl border border-dashed p-8 text-center text-sm">
         <p className="font-medium">{t(`logs.unavailable.${reason}`)}</p>
@@ -490,7 +492,8 @@ function Gone({ project, pod }: { project: string; pod: string }) {
   const t = useT()
   const client = useQueryClient()
   useEffect(() => {
-    void client.invalidateQueries({ queryKey: projectQuery(project).queryKey })
+    // Only the list: its logs are keyed under it, and reading them again would mount this again.
+    void client.invalidateQueries({ queryKey: projectQuery(project).queryKey, exact: true })
   }, [client, project, pod])
   return (
     <p
@@ -516,7 +519,8 @@ function Stream({
 }: { url: string; project: string; pod: string; onResume: () => void } & ViewProps) {
   const t = useT()
   const stream = useLogStream(url)
-  if (stream.problem?.status === 404) return <Gone project={project} pod={pod} />
+  if (stream.problem?.status === 404 && !stream.problem.unavailableLog)
+    return <Gone project={project} pod={pod} />
   return (
     <>
       {stream.problem ? <Problem problem={stream.problem} /> : null}
