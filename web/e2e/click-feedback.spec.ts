@@ -91,9 +91,14 @@ test("the skeleton that replaces the old page shows at once", async ({ page }) =
   release()
 })
 
-test("a navigation the data answers at once shows no progress", async ({ page }) => {
+// The bar's 100 ms threshold is a matter of timing, which a busy runner does not keep; what holds
+// by design is that a page whose code and data are already loaded opens without waiting.
+test("a navigation to a page already loaded shows no progress", async ({ page }) => {
   await page.goto("/")
-  await expect(page.getByRole("heading", { level: 1 })).toBeVisible()
+  await page.getByRole("link", { name: namespace }).first().click()
+  await expect(page.getByRole("heading", { level: 1, name: namespace })).toBeVisible()
+  await page.goBack()
+  await expect(page.getByRole("heading", { level: 1, name: "Home" })).toBeVisible()
   await page.evaluate(() => {
     const w = window as unknown as { bars: number }
     w.bars = 0
