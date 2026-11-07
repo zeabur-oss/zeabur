@@ -18,9 +18,8 @@
 // MariaDB is a mariadb-operator `MariaDB`; its backups are `Backup` objects, scheduled or not.
 // https://github.com/mariadb-operator/mariadb-operator/blob/main/docs/logical_backup.md
 //
-// Dragonfly is a Dragonfly Operator `Dragonfly`; it snapshots to a volume, or to a bucket when
-// `spec.snapshot.dir` is `s3://…`.
-// https://www.dragonflydb.io/docs/managing-dragonfly/backups
+// Dragonfly is a Dragonfly Operator `Dragonfly`; it snapshots to its volume. It loads the same
+// snapshots when it starts, so they are not a separate copy, and Zeabur offers no backups for it.
 import type { Schemas } from "@/api/client"
 import type { ObjectAddress } from "@/api/queries"
 import type { Translate } from "@/i18n"
@@ -239,6 +238,7 @@ export function addPerThreadCaches(database: Database): Change[] {
       resource: { group, version, resource },
       name: database.name,
       yaml: JSON.stringify(object),
+      specOnly: true,
     },
   ]
 }
@@ -300,13 +300,17 @@ export const DATABASE_LABEL = "zeabur.com/database"
 
 /** `changes`, with each object they create labelled as made for `database`. */
 export function madeFor(database: string, changes: Change[]): Change[] {
-  return changes.map((change) => {
-    if (change.op !== "create" && change.op !== "copyS3Keys") return change
-    const object = change.object as Manifest & { metadata?: Manifest }
-    const metadata = object.metadata ?? {}
-    const labels = { ...(metadata.labels as Manifest | undefined), [DATABASE_LABEL]: database }
-    return { ...change, object: { ...object, metadata: { ...metadata, labels } } as never }
-  })
+  return changes.map((change) =>
+    change.op === "create" || change.op === "copyS3Keys"
+      ? { ...change, object: labelled(database, change.object as Manifest) as never }
+      : change,
+  )
+}
+
+const labelled = (database: string, object: Manifest): Manifest => {
+  const metadata = (object.metadata as Manifest | undefined) ?? {}
+  const labels = { ...(metadata.labels as Manifest | undefined), [DATABASE_LABEL]: database }
+  return { ...object, metadata: { ...metadata, labels } }
 }
 
 const imageOf = (engine: Engine, label: string) =>
@@ -578,11 +582,12 @@ export const newBackupTarget = (): BackupTarget => ({
 
 export type TargetProblem = "endpoint" | "bucket" | "keys" | "keep"
 
-export function targetProblems(target: BackupTarget): TargetProblem[] {
+/** What is wrong with the form; with `keysExist`, keys left empty keep the Secret's. */
+export function targetProblems(target: BackupTarget, keysExist = false): TargetProblem[] {
   const problems: TargetProblem[] = []
   if (!/^https?:\/\/[^\s/]+/.test(target.endpoint.trim())) problems.push("endpoint")
   if (!/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/.test(target.bucket.trim())) problems.push("bucket")
-  if (needsKeys(target)) problems.push("keys")
+  if (needsKeys(target) && !keepsKeys(target, keysExist)) problems.push("keys")
   if (!Number.isInteger(target.keepDays) || target.keepDays < 1 || target.keepDays > 365)
     problems.push("keep")
   return problems
@@ -691,85 +696,265 @@ function mariaBackupPods(database: Database) {
   }
 }
 
-const awsKeys = (name: string, target: BackupTarget, region: string) =>
-  keysSecret(name, target, AWS_KEYS, { AWS_REGION: region || "us-east-1" })
+/** The engines Zeabur backs up to S3. */
+export type BackupEngine = Exclude<Engine, "dragonfly">
+
+export const backsUp = (engine: Engine): engine is BackupEngine => engine !== "dragonfly"
+
+/** The database's engine, for a database that `backsUp`. */
+export const backupEngine = (database: Database) => database.engine as BackupEngine
 
 /** Engines whose backups have no retention: the person sets a lifecycle rule on the bucket. */
-export const keepsEverything = (engine: Engine) => engine === "mysql" || engine === "dragonfly"
+export const keepsEverything = (engine: Engine) => engine === "mysql"
 
 /** MOCO writes to a fixed folder, `moco/<namespace>/<name>`. */
 export const fixedFolder = (engine: Engine) => engine === "mysql"
 
-/**
- * The writes that back a database up: the keys as a Secret, where backups go, the schedule, and
- * the database edited to use them (`object` is the database as written, `Database.object`).
- */
-export function enableBackups(database: Database, target: BackupTarget): Change[] {
+/** The keys of the backups' Secret, and the key of the region where the Secret holds it. */
+const SECRET_KEYS: Record<
+  BackupEngine,
+  { accessKeyId: string; secretAccessKey: string; region?: string }
+> = {
+  postgresql: {
+    accessKeyId: "ACCESS_KEY_ID",
+    secretAccessKey: "ACCESS_SECRET_KEY",
+    region: "REGION",
+  },
+  mongodb: AWS_KEYS,
+  mysql: { ...AWS_KEYS, region: "AWS_REGION" },
+  mariadb: { ...AWS_KEYS, region: "AWS_REGION" },
+}
+
+/** Engines whose region only the keys Secret holds, so the page cannot show it. */
+export const regionInSecret = (engine: Engine) => engine === "postgresql" || engine === "mysql"
+
+/** The name of the object Zeabur keeps the destination in, as `Store.name` says it. */
+const storeName = (database: Database) => {
   const names = backupNames(database.name)
-  const endpoint = target.endpoint.trim()
-  const bucket = target.bucket.trim()
+  const name: Record<BackupEngine, string> = {
+    postgresql: names.store,
+    mongodb: "backups",
+    mysql: names.store,
+    mariadb: names.schedule,
+  }
+  return name[backupEngine(database)]
+}
+
+/** The schedule Zeabur set up, by its name in `Schedule.name` after the namespace. */
+function ownSchedule(database: Database) {
+  const names = backupNames(database.name)
+  const name: Record<BackupEngine, string> = {
+    postgresql: names.schedule,
+    mongodb: `${database.name}/scheduled`,
+    mysql: names.store,
+    mariadb: names.schedule,
+  }
+  return database.backups.schedules.find((s) => s.name.endsWith(`/${name[backupEngine(database)]}`))
+}
+
+/** The database's backups are the ones Zeabur set up, so its form can change them. */
+export function ownBackups(database: Database) {
+  const store = database.backups.store
+  return store?.name === storeName(database) && store.secret === backupNames(database.name).secret
+}
+
+/** Whole days in a duration such as "7d" or "168h". */
+export function daysOf(duration: string) {
+  const days = /^(\d+)d$/.exec(duration)?.[1]
+  if (days) return Number(days)
+  const hours = Number(/^(\d+)h$/.exec(duration)?.[1] ?? Number.NaN)
+  return hours % 24 === 0 ? hours / 24 : undefined
+}
+
+/** The form as the database's backups are, with no keys: the keys Secret stays. */
+export function currentTarget(database: Database): BackupTarget {
+  const store = database.backups.store
+  const { bucket, folder } = splitDestination(store?.destination)
+  const cron = ownSchedule(database)?.cron ?? ""
+  const frequency: Frequency = cron.trim().split(/\s+/).at(-1) === "0" ? "weekly" : "daily"
+  const retention = store?.retention ?? ""
+  const days =
+    database.engine === "mongodb"
+      ? Number(retention) * (frequency === "weekly" ? 7 : 1)
+      : daysOf(retention)
+  return {
+    ...newBackupTarget(),
+    endpoint: store?.endpoint ?? "",
+    bucket,
+    path: fixedFolder(database.engine) ? "" : folder,
+    region: store?.region ?? "",
+    frequency,
+    keepDays: days || 7,
+  }
+}
+
+/** The keys Secret exists and the form names no other keys, so the Secret stays. */
+const keepsKeys = (target: BackupTarget, keysExist: boolean) =>
+  keysExist &&
+  target.destination === undefined &&
+  target.accessKey.trim() === "" &&
+  target.secretKey.trim() === ""
+
+interface Writing {
+  database: Database
+  target: BackupTarget
+  /** What the objects say now, when they exist. */
+  current?: BackupTarget
+  keysExist: boolean
+  /** The kept keys Secret holds the region. Backups set up by v0.1.1 without a region have none. */
+  regionSaved: boolean
+}
+
+/** The keys Secret, by its `keys`, holds the region. */
+export const holdsRegion = (database: Database, keys: string[]) => {
+  const key = SECRET_KEYS[backupEngine(database)].region
+  return key !== undefined && keys.includes(key)
+}
+
+/** The region key and value the keys Secret gets, unless a kept Secret keeps its own. */
+function regionEntry(database: Database, target: BackupTarget, keysExist: boolean) {
+  const key = SECRET_KEYS[backupEngine(database)].region
   const region = target.region.trim()
+  if (!key || (keysExist && regionInSecret(database.engine) && region === "")) return {}
+  return { [key]: region || "us-east-1" }
+}
+
+/** The Secret's writes: none when it stays, else typed keys, or the keys of a destination. Where
+ * the Secret holds the region, an empty region keeps the one it has. */
+function keyWrites({ database, target, keysExist }: Writing): Change[] {
+  const name = backupNames(database.name).secret
+  const { region: _, ...keys } = SECRET_KEYS[backupEngine(database)]
+  const more: Record<string, string> = regionEntry(database, target, keysExist)
+  if (!keysExist || target.destination !== undefined) return [keysSecret(name, target, keys, more)]
+  const typed = keepsKeys(target, keysExist)
+    ? {}
+    : {
+        [keys.accessKeyId]: target.accessKey.trim(),
+        [keys.secretAccessKey]: target.secretKey.trim(),
+      }
+  const set = { ...typed, ...(regionInSecret(database.engine) ? more : {}) }
+  const changes = Object.entries(set).map(([key, value]) => ({ op: "set", key, value }))
+  return changes.length > 0 ? [{ op: "data", kind: "Secret", name, changes }] : []
+}
+
+/** `after`, of the plural `resource`, created, or, when the object exists as `before`, edited
+ * if it differs. */
+function write(database: Database, resource: string, after: Manifest, before?: Manifest): Change[] {
+  const object = labelled(database.name, after)
+  if (!before) return [create(object)]
+  if (sorted(labelled(database.name, before)) === sorted(object)) return []
+  const [group = "", version = ""] = String(object.apiVersion).split("/")
+  const name = String((object.metadata as Manifest).name)
+  return [
+    {
+      op: "edit",
+      resource: { group, version, resource },
+      name,
+      yaml: JSON.stringify(object),
+      specOnly: true,
+    },
+  ]
+}
+
+/** The database's object edited by `change`, if that changes it. */
+function editObject(database: Database, change: (spec: Manifest) => void): Change[] {
   const object = structuredClone(database.object) as Manifest & { spec?: Manifest }
-  const spec = (object.spec ??= {})
+  change((object.spec ??= {}))
+  if (sorted(object) === sorted(database.object)) return []
   const { group, version, resource } = databaseAddress(database)
-  const edit = (): Change => ({
-    op: "edit",
-    resource: { group, version, resource },
-    name: database.name,
-    yaml: JSON.stringify(object),
-  })
-  switch (database.engine) {
-    case "postgresql": {
-      const keys = keysSecret(
-        names.secret,
-        target,
-        { accessKeyId: "ACCESS_KEY_ID", secretAccessKey: "ACCESS_SECRET_KEY" },
-        region ? { REGION: region } : {},
-      )
-      const store = create({
-        apiVersion: "barmancloud.cnpg.io/v1",
-        kind: "ObjectStore",
-        metadata: { name: names.store },
-        spec: {
-          retentionPolicy: `${target.keepDays}d`,
-          configuration: {
-            destinationPath: `s3://${bucket}/${folder(target, database.name)}`,
-            endpointURL: endpoint,
-            s3Credentials: {
-              accessKeyId: { name: names.secret, key: "ACCESS_KEY_ID" },
-              secretAccessKey: { name: names.secret, key: "ACCESS_SECRET_KEY" },
-              ...(region ? { region: { name: names.secret, key: "REGION" } } : {}),
-            },
-            wal: { compression: "gzip" },
-            data: { compression: "gzip" },
-          },
+  return [
+    {
+      op: "edit",
+      resource: { group, version, resource },
+      name: database.name,
+      yaml: JSON.stringify(object),
+      specOnly: true,
+    },
+  ]
+}
+
+function postgresStore(database: Database, target: BackupTarget, region: boolean): Manifest {
+  const names = backupNames(database.name)
+  const key = (key: string) => ({ name: names.secret, key })
+  return {
+    apiVersion: "barmancloud.cnpg.io/v1",
+    kind: "ObjectStore",
+    metadata: { name: names.store },
+    spec: {
+      retentionPolicy: `${target.keepDays}d`,
+      configuration: {
+        destinationPath: `s3://${target.bucket.trim()}/${folder(target, database.name)}`,
+        endpointURL: target.endpoint.trim(),
+        s3Credentials: {
+          accessKeyId: key("ACCESS_KEY_ID"),
+          secretAccessKey: key("ACCESS_SECRET_KEY"),
+          ...(region ? { region: key("REGION") } : {}),
         },
-      })
-      const plugins = ((spec.plugins as Manifest[] | undefined) ?? []).filter(
-        (p) => p.name !== PLUGIN,
-      )
-      spec.plugins = [
-        ...plugins,
-        { name: PLUGIN, isWALArchiver: true, parameters: { barmanObjectName: names.store } },
-      ]
-      const schedule = create({
-        apiVersion: "postgresql.cnpg.io/v1",
-        kind: "ScheduledBackup",
-        metadata: { name: names.schedule },
-        spec: {
-          schedule: cron(target.frequency, true),
-          backupOwnerReference: "self",
-          cluster: { name: database.name },
-          method: "plugin",
-          pluginConfiguration: { name: PLUGIN },
-        },
-      })
-      return madeFor(database.name, [keys, store, edit(), schedule])
-    }
-    case "mongodb": {
-      const keys = keysSecret(names.secret, target, AWS_KEYS)
+        wal: { compression: "gzip" },
+        data: { compression: "gzip" },
+      },
+    },
+  }
+}
+
+function postgresSchedule(database: Database, target: BackupTarget, suspend: boolean): Manifest {
+  return {
+    apiVersion: "postgresql.cnpg.io/v1",
+    kind: "ScheduledBackup",
+    metadata: { name: backupNames(database.name).schedule },
+    spec: {
+      schedule: cron(target.frequency, true),
+      backupOwnerReference: "self",
+      cluster: { name: database.name },
+      method: "plugin",
+      pluginConfiguration: { name: PLUGIN },
+      ...(suspend ? { suspend: true } : {}),
+    },
+  }
+}
+
+const paused = (database: Database) => ownSchedule(database)?.paused === true
+const scheduled = (database: Database) => ownSchedule(database) !== undefined
+
+function withPlugin(spec: Manifest, store?: string) {
+  const plugins = ((spec.plugins as Manifest[] | undefined) ?? []).filter((p) => p.name !== PLUGIN)
+  spec.plugins = store
+    ? [...plugins, { name: PLUGIN, isWALArchiver: true, parameters: { barmanObjectName: store } }]
+    : plugins
+}
+
+function postgresBackups(w: Writing): Change[] {
+  const { database, target, current, keysExist, regionSaved } = w
+  // The ObjectStore names REGION only when the Secret will hold it.
+  const region = regionSaved || Object.keys(regionEntry(database, target, keysExist)).length > 0
+  return [
+    ...keyWrites(w),
+    ...write(
+      database,
+      "objectstores",
+      postgresStore(database, target, region),
+      current && postgresStore(database, current, regionSaved),
+    ),
+    ...editObject(database, (spec) => withPlugin(spec, backupNames(database.name).store)),
+    ...write(
+      database,
+      "scheduledbackups",
+      postgresSchedule(database, target, false),
+      current && scheduled(database)
+        ? postgresSchedule(database, current, paused(database))
+        : undefined,
+    ),
+  ]
+}
+
+function mongoBackups(w: Writing): Change[] {
+  const { database, target } = w
+  const names = backupNames(database.name)
+  const runs = target.frequency === "weekly" ? Math.ceil(target.keepDays / 7) : target.keepDays
+  return [
+    ...keyWrites(w),
+    ...editObject(database, (spec) => {
       const backup = (spec.backup as Manifest | undefined) ?? {}
-      const runs = target.frequency === "weekly" ? Math.ceil(target.keepDays / 7) : target.keepDays
       spec.backup = {
         ...backup,
         enabled: true,
@@ -779,17 +964,17 @@ export function enableBackups(database: Database, target: BackupTarget): Change[
           backups: {
             type: "s3",
             s3: {
-              bucket,
+              bucket: target.bucket.trim(),
               prefix: folder(target, database.name),
-              endpointUrl: endpoint,
-              region: region || "us-east-1",
+              endpointUrl: target.endpoint.trim(),
+              region: target.region.trim() || "us-east-1",
               credentialsSecret: names.secret,
               forcePathStyle: true,
             },
           },
         },
         tasks: [
-          ...((backup.tasks as Manifest[] | undefined) ?? []).filter((t) => t.name !== "scheduled"),
+          ...otherTasks(backup),
           {
             name: "scheduled",
             enabled: true,
@@ -800,105 +985,232 @@ export function enableBackups(database: Database, target: BackupTarget): Change[
           },
         ],
       }
-      return madeFor(database.name, [keys, edit()])
-    }
-    case "mysql": {
-      const keys = awsKeys(names.secret, target, region)
-      const policy = create({
-        apiVersion: "moco.cybozu.com/v1beta2",
-        kind: "BackupPolicy",
-        metadata: { name: names.store },
-        spec: {
-          schedule: cron(target.frequency, false),
-          concurrencyPolicy: "Forbid",
-          jobConfig: mocoJobConfig(database, bucket, endpoint, names.secret, names.account),
-        },
-      })
-      spec.backupPolicyName = names.store
-      return madeFor(database.name, [jobAccount(names.account), keys, policy, edit()])
-    }
-    case "mariadb": {
-      const keys = awsKeys(names.secret, target, region)
-      const backup = create({
-        apiVersion: "k8s.mariadb.com/v1alpha1",
-        kind: "Backup",
-        metadata: { name: names.schedule },
-        spec: {
-          mariaDbRef: { name: database.name },
-          schedule: { cron: cron(target.frequency, false) },
-          maxRetention: `${target.keepDays * 24}h`,
-          compression: "gzip",
-          storage: mariaStorage(
-            bucket,
-            folder(target, database.name),
-            endpoint,
-            region,
-            names.secret,
-          ),
-          podMetadata: mariaBackupPods(database),
-          podSecurityContext: restrictedPod(999),
-          securityContext: restricted,
-        },
-      })
-      return madeFor(database.name, [keys, backup])
-    }
-    case "dragonfly": {
-      const keys = awsKeys(names.secret, target, region)
-      const https = !endpoint.startsWith("http://")
-      const host = endpoint.replace(/^https?:\/\//, "").replace(/\/+$/, "")
-      const own = (arg: string) =>
-        arg.startsWith("--s3_endpoint=") || arg.startsWith("--s3_use_https=")
-      spec.args = [
-        ...((spec.args as string[] | undefined) ?? []).filter((arg) => !own(arg)),
-        `--s3_endpoint=${host}`,
-        `--s3_use_https=${https}`,
-      ]
-      const key = (name: string) => ({
-        name,
-        valueFrom: { secretKeyRef: { name: names.secret, key: name } },
-      })
-      spec.env = [
-        ...((spec.env as Manifest[] | undefined) ?? []).filter(
-          (e) => !String(e.name).startsWith("AWS_"),
-        ),
-        key("AWS_ACCESS_KEY_ID"),
-        key("AWS_SECRET_ACCESS_KEY"),
-        key("AWS_REGION"),
-      ]
-      spec.snapshot = {
-        ...(spec.snapshot as Manifest | undefined),
-        dir: `s3://${bucket}/${folder(target, database.name)}`,
-        cron: cron(target.frequency, false),
-      }
-      return madeFor(database.name, [keys, edit()])
-    }
+    }),
+  ]
+}
+
+const otherTasks = (backup: Manifest) =>
+  ((backup.tasks as Manifest[] | undefined) ?? []).filter((t) => t.name !== "scheduled")
+
+function mysqlPolicy(database: Database, target: BackupTarget): Manifest {
+  const names = backupNames(database.name)
+  return {
+    apiVersion: "moco.cybozu.com/v1beta2",
+    kind: "BackupPolicy",
+    metadata: { name: names.store },
+    spec: {
+      schedule: cron(target.frequency, false),
+      concurrencyPolicy: "Forbid",
+      jobConfig: mocoJobConfig(
+        database,
+        target.bucket.trim(),
+        target.endpoint.trim(),
+        names.secret,
+        names.account,
+      ),
+    },
   }
 }
 
-/** Engines whose database restarts once its backups are turned on: a sidecar or new arguments. */
-const restartsForBackups = (engine: Engine) =>
-  engine === "postgresql" || engine === "mongodb" || engine === "dragonfly"
-
-/** What `enableBackups` does, in the form's words. */
-export function backupsSummary(t: Translate, database: Database, target: BackupTarget) {
+function mysqlBackups(w: Writing): Change[] {
+  const { database, target, current } = w
   const names = backupNames(database.name)
+  return [
+    ...(current ? [] : madeFor(database.name, [jobAccount(names.account)])),
+    ...keyWrites(w),
+    ...write(
+      database,
+      "backuppolicies",
+      mysqlPolicy(database, target),
+      current && mysqlPolicy(database, current),
+    ),
+    ...editObject(database, (spec) => {
+      spec.backupPolicyName = names.store
+    }),
+  ]
+}
+
+function mariaBackup(database: Database, target: BackupTarget, suspend: boolean): Manifest {
+  const names = backupNames(database.name)
+  return {
+    apiVersion: "k8s.mariadb.com/v1alpha1",
+    kind: "Backup",
+    metadata: { name: names.schedule },
+    spec: {
+      mariaDbRef: { name: database.name },
+      schedule: { cron: cron(target.frequency, false), ...(suspend ? { suspend: true } : {}) },
+      maxRetention: `${target.keepDays * 24}h`,
+      compression: "gzip",
+      storage: mariaStorage(
+        target.bucket.trim(),
+        folder(target, database.name),
+        target.endpoint.trim(),
+        target.region.trim(),
+        names.secret,
+      ),
+      podMetadata: mariaBackupPods(database),
+      podSecurityContext: restrictedPod(999),
+      securityContext: restricted,
+    },
+  }
+}
+
+function mariaBackups(w: Writing): Change[] {
+  const { database, target, current } = w
+  return [
+    ...keyWrites(w),
+    ...write(
+      database,
+      "backups",
+      mariaBackup(database, target, false),
+      current && mariaBackup(database, current, paused(database)),
+    ),
+  ]
+}
+
+const BACKUPS: Record<BackupEngine, (w: Writing) => Change[]> = {
+  postgresql: postgresBackups,
+  mongodb: mongoBackups,
+  mysql: mysqlBackups,
+  mariadb: mariaBackups,
+}
+
+/**
+ * The writes that back a database up as `target` says: the keys as a Secret, where backups go,
+ * the schedule, and the database edited to use them (`object` is the database as written,
+ * `Database.object`). What Zeabur set up before is edited, only where it changes: backups that
+ * are on, or were turned off. `keysExist` says the keys Secret is there, `regionSaved` that it
+ * holds the region.
+ */
+export function writeBackups(
+  database: Database,
+  target: BackupTarget,
+  keysExist = false,
+  regionSaved = keysExist,
+): Change[] {
+  const current = ownBackups(database) ? currentTarget(database) : undefined
+  return madeFor(
+    database.name,
+    BACKUPS[backupEngine(database)]({ database, target, current, keysExist, regionSaved }),
+  )
+}
+
+const TURN_OFF: Record<BackupEngine, (database: Database, current: BackupTarget) => Change[]> = {
+  postgresql: (database, current) => [
+    ...editObject(database, (spec) => withPlugin(spec)),
+    ...(scheduled(database)
+      ? write(
+          database,
+          "scheduledbackups",
+          postgresSchedule(database, current, true),
+          postgresSchedule(database, current, paused(database)),
+        )
+      : []),
+  ],
+  mongodb: (database) =>
+    editObject(database, (spec) => {
+      const backup = (spec.backup as Manifest | undefined) ?? {}
+      spec.backup = { ...backup, enabled: false, tasks: otherTasks(backup) }
+    }),
+  // MOCO deletes the backup CronJob once the cluster names no policy; the policy stays.
+  mysql: (database) =>
+    editObject(database, (spec) => {
+      delete spec.backupPolicyName
+    }),
+  mariadb: (database, current) =>
+    write(
+      database,
+      "backups",
+      mariaBackup(database, current, true),
+      mariaBackup(database, current, paused(database)),
+    ),
+}
+
+/** Turning backups off: no schedule, and the database no longer names where backups go. The keys
+ * Secret stays, so do the backups in the bucket, and what restoring from them reads where the
+ * operator lets it pause: CloudNativePG's and MariaDB's schedules pause, MongoDB's storage and
+ * MOCO's BackupPolicy stay. */
+export const turnOffBackups = (database: Database): Change[] =>
+  TURN_OFF[backupEngine(database)](database, currentTarget(database))
+
+/** Engines whose database restarts once its backups are turned on or off: a sidecar or new
+ * arguments. */
+const restartsForBackups = (engine: Engine) => engine === "postgresql" || engine === "mongodb"
+
+const where = (database: Database, target: BackupTarget) => {
   const namespace = database.origin.namespace ?? ""
   const path = fixedFolder(database.engine)
     ? `moco/${namespace}/${database.name}`
     : folder(target, database.name)
-  const where = `s3://${target.bucket.trim()}/${path} (${target.endpoint.trim()})`
+  return `s3://${target.bucket.trim()}/${path} (${target.endpoint.trim()})`
+}
+
+/** The destination changes: another bucket, folder, endpoint or region. */
+function moves(database: Database, target: BackupTarget, current: BackupTarget) {
+  const region = target.region.trim()
+  return (
+    target.bucket.trim() !== current.bucket ||
+    target.endpoint.trim() !== current.endpoint ||
+    (!fixedFolder(database.engine) &&
+      folder(target, database.name) !== folder(current, database.name)) ||
+    (region !== current.region && (region !== "" || !regionInSecret(database.engine)))
+  )
+}
+
+function keysLine(t: Translate, database: Database, target: BackupTarget, keysExist: boolean) {
+  const secret = backupNames(database.name).secret
+  if (target.destination !== undefined)
+    return [
+      t(keysExist ? "db.backup.saidCopyKeys" : "confirm.copyS3Keys", secret, target.destination),
+    ]
+  if (!keysExist) return [t("db.backup.saidKeys", secret)]
+  return keepsKeys(target, keysExist) ? [] : [t("db.backup.saidNewKeys", secret)]
+}
+
+/** What `writeBackups` does, in the form's words. */
+export function backupsSummary(
+  t: Translate,
+  database: Database,
+  target: BackupTarget,
+  keysExist = false,
+) {
+  const on = backupsOn(database)
+  const restarts = !on && restartsForBackups(database.engine)
   return {
     lines: [
-      t("db.backup.said", database.name, target.frequency === "weekly", where),
+      t("db.backup.said", database.name, target.frequency === "weekly", where(database, target)),
       keepsEverything(database.engine)
         ? t("db.backup.keepsEverything")
         : t("db.backup.saidKeep", target.keepDays),
-      target.destination === undefined
-        ? t("db.backup.saidKeys", names.secret)
-        : t("confirm.copyS3Keys", names.secret, target.destination),
-      ...(restartsForBackups(database.engine) ? [t("db.backup.saidRestart", database.name)] : []),
+      ...keysLine(t, database, target, keysExist),
+      ...(restarts ? [t("db.backup.saidRestart", database.name)] : []),
     ],
-    action: t("db.backup.setUp"),
+    action: t(on ? "db.backup.change" : "db.backup.setUp"),
+  }
+}
+
+/** What `writeBackups` costs that its lines do not say. */
+export function backupsNotes(t: Translate, database: Database, target: BackupTarget) {
+  const current = ownBackups(database) ? currentTarget(database) : undefined
+  if (!current || !moves(database, target, current)) return []
+  return [
+    t("db.backup.moved", where(database, current)),
+    ...(database.engine === "postgresql" ? [t("db.backup.movedPitr")] : []),
+  ]
+}
+
+/** What `turnOffBackups` does, in the form's words. */
+export function turnOffSummary(t: Translate, database: Database) {
+  const current = currentTarget(database)
+  return {
+    lines: [
+      t("db.backup.saidOff", database.name, where(database, current)),
+      t("db.backup.saidOffKept", backupNames(database.name).secret),
+      ...(restartsForBackups(database.engine)
+        ? [t("db.backup.saidOffRestart", database.name)]
+        : []),
+    ],
+    action: t("db.backup.turnOff"),
   }
 }
 
@@ -926,7 +1238,7 @@ export function backupName(database: string, now: Date) {
   return `${database}-${stamp}`
 }
 
-/** Engines that take a backup on demand: MOCO and Dragonfly only back up on their schedule. */
+/** Engines that take a backup on demand: MOCO only backs up on its schedule. */
 export const canBackUpNow = (engine: Engine) =>
   engine === "postgresql" || engine === "mongodb" || engine === "mariadb"
 
@@ -1237,6 +1549,7 @@ export function reshapeDatabase(database: Database, shape: DatabaseShape): Chang
       resource: { group, version, resource },
       name: database.name,
       yaml: JSON.stringify(object),
+      specOnly: true,
     },
   ]
 }
@@ -1254,6 +1567,7 @@ function withStorage(claim: Manifest, storage: string): Manifest {
  * setup Job, where backups go, their schedules, runs and restores. */
 export const MADE_KINDS = [
   "core/secrets",
+  "core/serviceaccounts",
   "batch/jobs",
   "barmancloud.cnpg.io/objectstores",
   "postgresql.cnpg.io/scheduledbackups",

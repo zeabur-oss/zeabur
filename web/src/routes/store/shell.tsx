@@ -137,12 +137,13 @@ export function useStorePage<Tab extends DatabaseTab | ObjectStorageTab>(
   const leave = useNavigate()
   const go = useNavigate()
   const logs = useLogsReadable(project)
+  const shown = all.filter((value) => value !== "logs" || logs)
   return {
     setTab: (next: Tab) => void go({ to: ".", search: tabSearch(next), hash: "" }),
     setPod: (pod?: string) => void go({ to: ".", search: podSearch(pod), replace: true }),
     setMode: (mode?: ServiceMode) => void go({ to: ".", search: modeSearch(mode), hash: "" }),
-    tab: asked === undefined || (asked === "logs" && !logs) ? ("overview" as Tab) : asked,
-    shown: all.filter((value) => value !== "logs" || logs),
+    tab: asked !== undefined && shown.includes(asked) ? asked : ("overview" as Tab),
+    shown,
     gates: useGates(project),
     unreadable: useQuery(projectQuery(project)).data?.unreadable ?? [],
     deleter: usePlanner(

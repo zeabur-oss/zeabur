@@ -745,6 +745,7 @@ fn state() -> State {
                 true,
             ),
             ServedResource::readable("batch", "v1", "jobs", "Job", true),
+            ServedResource::readable("", "v1", "serviceaccounts", "ServiceAccount", true),
             ServedResource::readable(
                 "postgresql.cnpg.io",
                 "v1",
@@ -1007,12 +1008,21 @@ fn state() -> State {
                         "gtidSet": "", "dumpSize": 1, "binlogSize": 1, "workDirUsage": 1, "warnings": []}}
             })),
             from(json!({
+                "apiVersion": "v1", "kind": "ServiceAccount",
+                "metadata": {"name": "mysql-backup", "namespace": "lab", "resourceVersion": "1"}
+            })),
+            from(json!({
                 "apiVersion": "moco.cybozu.com/v1beta2", "kind": "BackupPolicy",
-                "metadata": {"name": "mysql-backups", "namespace": "lab"},
-                "spec": {"schedule": "0 3 * * *", "jobConfig": {"serviceAccountName": "mysql-backup",
+                "metadata": {"name": "mysql-backups", "namespace": "lab", "resourceVersion": "1",
+                    "labels": {"zeabur.com/database": "mysql"}},
+                "spec": {"schedule": "0 3 * * *", "concurrencyPolicy": "Forbid",
+                    "jobConfig": {"serviceAccountName": "mysql-backup",
                     "bucketConfig": {"bucketName": "lab-backups", "endpointURL": "https://s3.example.com", "usePathStyle": true},
                     "envFrom": [{"secretRef": {"name": "mysql-backups-s3"}}],
-                    "workVolume": {"emptyDir": {}}}}
+                    "threads": 2, "cpu": "500m", "memory": "1Gi",
+                    "workVolume": {"ephemeral": {"volumeClaimTemplate": {"spec": {
+                        "accessModes": ["ReadWriteOnce"], "storageClassName": "local-path",
+                        "resources": {"requests": {"storage": "10Gi"}}}}}}}}
             })),
             from(json!({
                 "apiVersion": "batch/v1", "kind": "Job",

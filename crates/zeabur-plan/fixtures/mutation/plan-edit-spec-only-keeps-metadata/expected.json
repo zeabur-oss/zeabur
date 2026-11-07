@@ -1,0 +1,34 @@
+{
+  "objects": [
+    {
+      "changes": [
+        {
+          "after": "0 0 3 * * 0",
+          "before": "0 0 3 * * *",
+          "path": "spec.schedule"
+        }
+      ],
+      "write": {
+        "operations": [
+          {
+            "op": "test",
+            "path": "/metadata/resourceVersion",
+            "value": "12"
+          },
+          {
+            "op": "test",
+            "path": "/spec/schedule",
+            "value": "0 0 3 * * *"
+          },
+          {
+            "op": "replace",
+            "path": "/spec/schedule",
+            "value": "0 0 3 * * 0"
+          }
+        ],
+        "type": "patch"
+      }
+    }
+  ],
+  "warnings": []
+}

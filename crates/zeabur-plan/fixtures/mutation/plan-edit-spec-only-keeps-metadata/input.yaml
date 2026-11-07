@@ -1,0 +1,16 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: pg-scheduled
+  namespace: demo
+  resourceVersion: "12"
+  finalizers: [cnpg.io/scheduled-backup]
+  labels:
+    zeabur.com/database: pg
+    cnpg.io/cluster: pg
+  annotations:
+    cnpg.io/operatorVersion: "1.27.0"
+spec:
+  schedule: "0 0 3 * * *"
+  cluster:
+    name: pg

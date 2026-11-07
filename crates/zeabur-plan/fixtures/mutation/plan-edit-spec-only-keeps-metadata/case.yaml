@@ -1,0 +1,3 @@
+description: "A spec-only edit patches the spec alone; the finalizer, labels and annotations an operator added stay."
+operation: mutation.plan
+params: {"request": {"changes": [{"op": "edit", "resource": {"group": "postgresql.cnpg.io", "version": "v1", "resource": "scheduledbackups"}, "name": "pg-scheduled", "specOnly": true, "yaml": "{\"apiVersion\": \"postgresql.cnpg.io/v1\", \"kind\": \"ScheduledBackup\", \"metadata\": {\"name\": \"pg-scheduled\", \"labels\": {\"zeabur.com/database\": \"pg\"}}, \"spec\": {\"schedule\": \"0 0 3 * * 0\", \"cluster\": {\"name\": \"pg\"}}}"}]}}
