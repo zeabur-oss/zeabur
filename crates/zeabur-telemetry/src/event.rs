@@ -1,5 +1,6 @@
 //! The events and their properties.
 
+use serde::ser::SerializeMap as _;
 use serde::{Serialize, Serializer};
 use serde_json::{Map, Value, json};
 
@@ -177,6 +178,110 @@ pub struct ZeaburActive {
     pub mode: Mode,
 }
 
+/// How a service was made.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Source {
+    /// From a Git repository.
+    Git,
+    /// From an uploaded folder.
+    Upload,
+    /// From a container image.
+    Image,
+    /// From a template of Zeabur Catalog, by its ID. A `&'static str`, so only an ID the
+    /// embedded catalog carries can be named.
+    Template(&'static str),
+}
+
+impl Source {
+    const fn name(self) -> &'static str {
+        match self {
+            Self::Git => "git",
+            Self::Upload => "upload",
+            Self::Image => "image",
+            Self::Template(_) => "template",
+        }
+    }
+}
+
+/// The kind of a database or of object storage.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum DatabaseKind {
+    /// PostgreSQL.
+    Postgresql,
+    /// MongoDB.
+    Mongodb,
+    /// MySQL.
+    Mysql,
+    /// MariaDB.
+    Mariadb,
+    /// Dragonfly, which speaks the Redis protocol.
+    Dragonfly,
+    /// S3-compatible object storage.
+    ObjectStorage,
+}
+
+/// Where a domain's name comes from.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum DomainKind {
+    /// Under one of the suffixes Zeabur offers new services.
+    Generated,
+    /// Any other name.
+    Custom,
+}
+
+/// A feature someone used, with the one enum value that tells uses of it apart.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Feature {
+    /// A service was created.
+    ServiceCreated(Source),
+    /// A database or object storage was created.
+    DatabaseCreated(DatabaseKind),
+    /// A domain was added.
+    DomainAdded(DomainKind),
+}
+
+impl Feature {
+    const fn name(self) -> &'static str {
+        match self {
+            Self::ServiceCreated(_) => "service_created",
+            Self::DatabaseCreated(_) => "database_created",
+            Self::DomainAdded(_) => "domain_added",
+        }
+    }
+}
+
+impl Serialize for Feature {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let mut map = serializer.serialize_map(None)?;
+        map.serialize_entry("feature", self.name())?;
+        match self {
+            Self::ServiceCreated(source) => {
+                map.serialize_entry("source", source.name())?;
+                if let Source::Template(id) = source {
+                    map.serialize_entry("template", id)?;
+                }
+            }
+            Self::DatabaseCreated(kind) => map.serialize_entry("kind", kind)?,
+            Self::DomainAdded(kind) => map.serialize_entry("kind", kind)?,
+        }
+        map.end()
+    }
+}
+
+/// A feature was used, for the first time that day with these values.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct FeatureUsed {
+    /// The version of Zeabur.
+    pub zeabur_version: &'static str,
+    /// The UTC day.
+    pub day: Day,
+    /// What was used.
+    #[serde(flatten)]
+    pub feature: Feature,
+}
+
 /// What an install is, on every installer event.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct Install {
@@ -205,6 +310,8 @@ pub struct Failure {
 pub enum Event {
     /// Someone used Zeabur for the first time in a day.
     ZeaburActive(ZeaburActive),
+    /// A feature was used.
+    FeatureUsed(FeatureUsed),
     /// An install began.
     InstallStarted(Install),
     /// An install ended well.
@@ -219,6 +326,7 @@ impl Event {
     pub const fn name(&self) -> &'static str {
         match self {
             Self::ZeaburActive(_) => "zeabur_active",
+            Self::FeatureUsed(_) => "feature_used",
             Self::InstallStarted(_) => "install_started",
             Self::InstallFinished(_) => "install_finished",
             Self::InstallFailed(_) => "install_failed",
@@ -229,6 +337,7 @@ impl Event {
     fn properties(&self) -> Value {
         let value = match self {
             Self::ZeaburActive(active) => serde_json::to_value(active),
+            Self::FeatureUsed(used) => serde_json::to_value(used),
             Self::InstallStarted(install) | Self::InstallFinished(install) => {
                 serde_json::to_value(install)
             }

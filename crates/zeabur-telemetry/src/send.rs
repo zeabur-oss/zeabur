@@ -162,7 +162,8 @@ mod tests {
 
     use super::*;
     use crate::event::{
-        Day, Distribution, ErrorCode, Failure, Install, Mode, Profile, Step, ZeaburActive,
+        DatabaseKind, Day, Distribution, DomainKind, ErrorCode, Failure, Feature, FeatureUsed,
+        Install, Mode, Profile, Source, Step, ZeaburActive,
     };
 
     /// A receiver on a free port that records each request body.
@@ -230,6 +231,14 @@ mod tests {
         }
     }
 
+    fn used(feature: Feature) -> FeatureUsed {
+        FeatureUsed {
+            zeabur_version: "0.1.0",
+            day: Day::from_unix(1_800_000_000),
+            feature,
+        }
+    }
+
     fn events() -> Vec<Event> {
         vec![
             Event::ZeaburActive(ZeaburActive {
@@ -238,6 +247,10 @@ mod tests {
                 person: "0123456789abcdef0123456789abcdef".to_owned(),
                 mode: Mode::InCluster,
             }),
+            Event::FeatureUsed(used(Feature::ServiceCreated(Source::Template("wordpress")))),
+            Event::FeatureUsed(used(Feature::ServiceCreated(Source::Git))),
+            Event::FeatureUsed(used(Feature::DatabaseCreated(DatabaseKind::ObjectStorage))),
+            Event::FeatureUsed(used(Feature::DomainAdded(DomainKind::Custom))),
             Event::InstallStarted(install()),
             Event::InstallFinished(install()),
             Event::InstallFailed(Failure {
@@ -329,6 +342,10 @@ mod tests {
             "day",
             "person",
             "mode",
+            "feature",
+            "source",
+            "template",
+            "kind",
             "installer_version",
             "profile",
             "distribution",
@@ -344,6 +361,12 @@ mod tests {
             for (name, value) in properties {
                 assert!(allowed.contains(&name.as_str()), "{name}");
                 assert!(!value.is_object() && !value.is_array(), "{name}");
+            }
+            if properties
+                .get("source")
+                .is_some_and(|source| source == "git")
+            {
+                assert!(!properties.contains_key("template"));
             }
             assert_eq!(properties["$process_person_profile"], false);
             assert_eq!(properties["$geoip_disable"], true);
