@@ -162,3 +162,4 @@ bun scripts/release.ts verify v0.1.1 linux arm64 downloaded
 
 On Linux the last step installs the published chart on the development cluster, so it needs
 Docker and port 443.
+
