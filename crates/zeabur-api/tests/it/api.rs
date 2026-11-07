@@ -655,7 +655,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn builds_give_each_run_its_pod_or_say_the_builder_is_missing() {
+    async fn builds_give_each_run_its_pod_and_phases_or_say_the_builder_is_missing() {
         let cluster = cluster();
         let missing = get(&cluster, "/api/v1/projects/shop/builds").await;
         assert_eq!(missing["state"], "not-installed");
@@ -695,7 +695,15 @@ mod tests {
                         "metadata": {"name": "web-x1-abcde", "namespace": "shop",
                             "labels": {"builder.zeabur.com/buildrun": "web-x1"}},
                         "spec": {"initContainers": [{"name": "fetch"}],
-                            "containers": [{"name": "build"}]}
+                            "containers": [{"name": "build"}]},
+                        "status": {"initContainerStatuses": [{"name": "fetch", "image": "",
+                            "imageID": "", "ready": false, "restartCount": 0,
+                            "state": {"terminated": {"exitCode": 0,
+                                "startedAt": "2026-10-23T08:00:01Z",
+                                "finishedAt": "2026-10-23T08:00:03Z"}}}],
+                            "containerStatuses": [{"name": "build", "image": "", "imageID": "",
+                                "ready": true, "restartCount": 0,
+                                "state": {"running": {"startedAt": "2026-10-23T08:00:04Z"}}}]}
                     }))
                     .unwrap(),
                 );
@@ -706,7 +714,15 @@ mod tests {
         assert_eq!(builds["builds"][0]["repository"], "zot:5000/shop/web");
         assert_eq!(builds["runs"][0]["name"], "web-x1");
         assert_eq!(builds["runs"][0]["pod"], "web-x1-abcde");
-        assert_eq!(builds["runs"][0]["containers"], json!(["fetch", "build"]));
+        assert_eq!(
+            builds["runs"][0]["phases"],
+            json!([
+                {"container": "fetch", "state": "succeeded", "started": "2026-10-23T08:00:01Z",
+                    "finished": "2026-10-23T08:00:03Z"},
+                {"container": "build", "state": "running", "started": "2026-10-23T08:00:04Z",
+                    "finished": null}
+            ])
+        );
         assert_eq!(builds["keel"], json!([]));
     }
 

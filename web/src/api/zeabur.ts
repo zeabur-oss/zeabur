@@ -968,6 +968,26 @@ export type BuildOptionsChange = {
 }
 
 /**
+ * One container of a run's pod: a phase of the build.
+ */
+export type BuildPhase = {
+  /** The container: `fetch`, `plan` or `build`. */
+  container: string
+  /**
+   * When it finished.
+   * @nullable
+   */
+  finished?: string | null
+  /**
+   * When it started.
+   * @nullable
+   */
+  started?: string | null
+  /** `waiting`, `running`, `succeeded` or `failed`. */
+  state: string
+}
+
+/**
  * Where a service deployed from Git keeps its images, as an administrator installed Zeabur (the
  * chart's `builds`).
  */
@@ -8070,7 +8090,7 @@ export type ZeaburBuilderRun = {
  */
 export type ProjectBuildRun = ZeaburBuilderRun & {
   /** The pod's containers, in the order they run (`fetch`, `plan`, `build`). */
-  containers: string[]
+  phases: BuildPhase[]
   /**
    * Its pod, while it is there.
    * @nullable

@@ -50,7 +50,8 @@ pub struct State {
     pub objects: BTreeMap<String, NamespaceObjects>,
     /// Events per namespace.
     pub events: BTreeMap<String, Vec<Event>>,
-    /// Logs per `namespace/pod`; a pod among `objects` without one has written nothing yet.
+    /// Logs per `namespace/pod`, or `namespace/pod/container` for one container; a pod among
+    /// `objects` without one has written nothing yet.
     pub logs: BTreeMap<String, String>,
     /// Logs of the run before the last restart, per `namespace/pod`; a pod with a log but none
     /// here has not restarted, and asking for its previous run is refused as the kubelet does.
@@ -727,7 +728,14 @@ impl Cluster for MemoryCluster {
                 return Err(not_found(&key));
             }
             if !options.previous {
-                return Ok(state.logs.get(&key).cloned().unwrap_or_default());
+                let own = options
+                    .container
+                    .as_ref()
+                    .and_then(|c| state.logs.get(&format!("{key}/{c}")));
+                return Ok(own
+                    .or_else(|| state.logs.get(&key))
+                    .cloned()
+                    .unwrap_or_default());
             }
             state.previous_logs.get(&key).cloned().ok_or_else(|| {
                 // The kubelet's refusal, as kube-apiserver passes it on.

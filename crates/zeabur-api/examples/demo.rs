@@ -70,6 +70,8 @@
 //! made-up token, so the kubectl terminal is offered: a project's, and the whole cluster's from the
 //! Cluster page's header.
 //!
+//! Builds, and the `ZEABUR_DEMO_BUILD_*` variables that change them, are in `demo/builds.rs`.
+//!
 //! Node maintenance: `vps-3` holds Zeabur itself, a bare pod (`lab/debug-toolbox`) and `shop`'s
 //! `db-0` on a local-path volume pinned to it, so the node list counts what a drain would move and
 //! what it would leave.
@@ -105,6 +107,9 @@ use zeabur_kube::{
     Cluster, ClusterFacts, DynamicObject, Identity, NamespaceObjects, SecretSummary, ServedResource,
 };
 use zeabur_modules::alertmanager as am;
+
+#[path = "demo/builds.rs"]
+mod builds;
 
 fn from<T: serde::de::DeserializeOwned>(value: Value) -> T {
     serde_json::from_value(value).expect("valid example object")
@@ -342,71 +347,6 @@ fn dns() -> zeabur_api::resolve::Fixed {
         ]
         .map(|(name, address)| (name.to_owned(), vec![address.to_owned()])),
     ))
-}
-
-/// Blog's docs, deployed from Git: its first image is still being built
-/// (`ZEABUR_DEMO_BUILD_FAILED=1`: the build failed; `ZEABUR_DEMO_BUILD_OOM=1`: it ran out of
-/// memory).
-fn docs_build() -> [DynamicObject; 2] {
-    let oom = std::env::var_os("ZEABUR_DEMO_BUILD_OOM").is_some();
-    let failed = oom || std::env::var_os("ZEABUR_DEMO_BUILD_FAILED").is_some();
-    let build = json!({
-        "apiVersion": "builder.zeabur.com/v1alpha1", "kind": "Build",
-        "metadata": {"name": "docs", "namespace": "blog"},
-        "spec": {"builderRef": "railpack",
-            "source": {"git": {"url": "https://github.com/example/docs.git", "ref": "main",
-                "contextDir": "site"}},
-            "output": {"image": "zot.zot.svc:5000/blog/docs"},
-            "env": [{"name": "NPM_TOKEN", "valueFrom": {"secretKeyRef":
-                {"name": "docs-build-env", "key": "NPM_TOKEN"}}}],
-            "notify": [{"type": "keel",
-                "url": "http://keel.keel.svc.cluster.local:9300/v1/webhooks/native"}]},
-        "status": if oom {
-            json!({})
-        } else if failed {
-            json!({"conditions": [{"type": "Ready", "status": "False", "reason": "BuildFailed",
-                "message": "railpack: no start command found"}]})
-        } else {
-            json!({})
-        }
-    });
-    let run = json!({
-        "apiVersion": "builder.zeabur.com/v1alpha1", "kind": "BuildRun",
-        "metadata": {"name": "docs-x7k2p", "namespace": "blog",
-            "creationTimestamp": "2026-10-23T08:00:00Z"},
-        "spec": {"buildRef": "docs", "revision": "3f9a1c2b7d4e5f60718293a4b5c6d7e8f9012345",
-            "trigger": "poll"},
-        "status": if oom {
-            json!({"phase": "Failed", "reason": "OutOfMemory",
-                "message": "buildkitd was killed for its memory. Set the annotation builder.zeabur.com/build-memory on the namespace to raise the limit."})
-        } else if failed {
-            json!({"phase": "Failed", "reason": "PlanFailed",
-                "message": "railpack: no start command found. Add a start script to package.json."})
-        } else {
-            json!({"phase": "Building", "startTime": "2026-10-23T08:00:05Z"})
-        }
-    });
-    [
-        serde_json::from_value(build).expect("a Build"),
-        serde_json::from_value(run).expect("a BuildRun"),
-    ]
-}
-
-/// Lab's storefront, built from its Dockerfile, whose image declares a port the service has no
-/// address for yet.
-fn storefront_build() -> DynamicObject {
-    serde_json::from_value(json!({
-        "apiVersion": "builder.zeabur.com/v1alpha1", "kind": "Build",
-        "metadata": {"name": "storefront", "namespace": "lab"},
-        "spec": {"builderRef": "dockerfile",
-            "source": {"git": {"url": "https://github.com/example/storefront.git", "ref": "main"}},
-            "output": {"image": "zot.zot.svc:5000/lab/storefront"}},
-        "status": {"latestImage": "zot.zot.svc:5000/lab/storefront:main-12-c81e4a0",
-            "exposedPorts": ["3000/tcp"],
-            "conditions": [{"type": "SourceReady", "status": "True", "reason": "Git"},
-                {"type": "Ready", "status": "True", "reason": "Succeeded"}]}
-    }))
-    .expect("a Build")
 }
 
 /// One namespace's hand-written objects in `demo-data/<namespace>.yaml`: a manifest each, split
@@ -1130,8 +1070,7 @@ fn state() -> State {
         ]
         .into_iter()
         .chain(live)
-        .chain(docs_build())
-        .chain([storefront_build()])
+        .chain(builds::objects())
         .chain(people())
         .chain(member_roles())
         .chain(velero())
@@ -2831,6 +2770,10 @@ fn finish_builds(s: &mut State, now: Timestamp) {
             .and_then(|t| t.parse::<Timestamp>().ok());
         let building =
             run.data.pointer("/status/phase").and_then(Value::as_str) == Some("Building");
+        if building && builds::docs_running() && run.metadata.name.as_deref() == Some("docs-x7k2p")
+        {
+            continue;
+        }
         let late = started.is_some_and(|t| now.duration_since(t) >= SignedDuration::from_secs(8));
         if building && late {
             let digest = run
@@ -3229,6 +3172,7 @@ async fn main() -> std::io::Result<()> {
     }
     cluster.update(|s| {
         maintenance(s);
+        builds::pods(s);
         storage(s);
         s3_destinations(s);
         // A debug container's patch tests the pod's uid.

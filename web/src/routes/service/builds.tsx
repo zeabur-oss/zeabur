@@ -3,6 +3,7 @@ import { Link, useParams } from "@tanstack/react-router"
 import { useState } from "react"
 import ArrowClockwiseIcon from "~icons/ph/arrow-clockwise"
 import ArrowSquareOutIcon from "~icons/ph/arrow-square-out"
+import CaretRightIcon from "~icons/ph/caret-right"
 import CubeIcon from "~icons/ph/cube"
 import FolderSimpleIcon from "~icons/ph/folder-simple"
 import GitBranchIcon from "~icons/ph/git-branch"
@@ -12,8 +13,8 @@ import UploadSimpleIcon from "~icons/ph/upload-simple"
 import { toProblem } from "@/api/client"
 import { cn } from "@/lib/utils"
 import * as zeabur from "@/api/zeabur"
-import { buildsQuery, capabilitiesQuery, logsQuery } from "@/api/queries"
-import { Ago, CopyButton, Segmented } from "@/components/bits"
+import { buildsQuery, capabilitiesQuery } from "@/api/queries"
+import { Ago, CopyButton } from "@/components/bits"
 import { InstallAlert } from "@/components/lazy-installer-sheet"
 import { LoadingRows } from "@/components/page"
 import { GateTip, useHereGate } from "@/components/gate"
@@ -31,7 +32,6 @@ import {
 } from "@zeabur-oss/design-system/components/collapsible"
 import { Empty, EmptyDescription, EmptyHeader } from "@zeabur-oss/design-system/components/empty"
 import { SectionHeader } from "@zeabur-oss/design-system/components/section-header"
-import { Skeleton } from "@zeabur-oss/design-system/components/skeleton"
 import {
   SummaryCard,
   SummaryCardActions,
@@ -53,6 +53,7 @@ import {
   building,
   builtContainers,
   durationOf,
+  failureOf,
   KEEL_WEBHOOK,
   keelPolicy,
   reasonKey,
@@ -69,6 +70,7 @@ import {
 import { deployKeyPage, parseRepository } from "@/model/git-service"
 import { needed } from "@/model/installer"
 import { imageTag, isTask, type Service } from "@/model/service"
+import { RunSteps, useFailedStep } from "@/routes/service/build-steps"
 
 /** The service's builds, when a Zeabur Builder `Build` makes one of its images. */
 export function useServiceBuilds(project: string, service: Service) {
@@ -215,7 +217,7 @@ function phaseWord(t: ReturnType<typeof useT>, run?: BuildRun) {
 const tones = { ok: "ok", fail: "fail", progress: "progress", neutral: "idle" } as const
 
 /** What to do when the Git host refuses the Build's credentials; for a deploy key, the key to add
- * again, read from its Secret only when asked. */
+ * again. */
 function Refused({
   project,
   build,
@@ -226,32 +228,40 @@ function Refused({
   kind: "deployKey" | "token"
 }) {
   const t = useT()
+  return (
+    <div className="mt-1 flex max-w-prose flex-col gap-2">
+      <p className="text-sm text-fail-strong">{t(`builds.refused.${kind}`)}</p>
+      {kind === "deployKey" ? <DeployKey project={project} build={build} /> : null}
+    </div>
+  )
+}
+
+/** The deploy key to add again, read from its Secret only when asked, and the page to add it on. */
+function DeployKey({ project, build }: { project: string; build: Build }) {
+  const t = useT()
   const show = useMutation({
     mutationFn: async () => await zeabur.revealDeployKey(project, build.credentials ?? ""),
   })
   const repo = parseRepository(build.gitUrl ?? "")
   const keyPage = repo ? deployKeyPage(repo) : undefined
   return (
-    <div className="mt-1 flex max-w-prose flex-col gap-2">
-      <p className="text-sm text-fail-strong">{t(`builds.refused.${kind}`)}</p>
-      {kind === "deployKey" ? (
-        show.data ? (
-          <FormField label={t("add.deployKeyPublic")}>
-            <CopyInput value={show.data.publicKey} copyLabel={t("common.copy")} />
-          </FormField>
-        ) : (
-          <Button
-            variant="outline"
-            size="sm"
-            className="self-start"
-            disabled={show.isPending}
-            onClick={() => show.mutate()}
-          >
-            {t("builds.showKey")}
-          </Button>
-        )
-      ) : null}
-      {kind === "deployKey" && keyPage && repo ? (
+    <>
+      {show.data ? (
+        <FormField label={t("add.deployKeyPublic")}>
+          <CopyInput value={show.data.publicKey} copyLabel={t("common.copy")} />
+        </FormField>
+      ) : (
+        <Button
+          variant="outline"
+          size="sm"
+          className="self-start"
+          disabled={show.isPending}
+          onClick={() => show.mutate()}
+        >
+          {t("builds.showKey")}
+        </Button>
+      )}
+      {keyPage && repo ? (
         <a
           href={keyPage}
           target="_blank"
@@ -267,7 +277,7 @@ function Refused({
           <AlertDescription>{toProblem(show.error).detail}</AlertDescription>
         </Alert>
       ) : null}
-    </div>
+    </>
   )
 }
 
@@ -297,9 +307,6 @@ function Summary({
   const since = latest?.started ?? latest?.created
   const problem = buildProblem(build, latest)
   const branch = branchOf(build)
-  const failedRun = !problem && latest?.phase === "Failed" ? latest : undefined
-  const failure =
-    problem?.message ?? (build.ready === "False" && !failedRun ? build.message : undefined)
   const refused = refusedCredentials(build, latest)
   const waiting = build.awaitingUpload && !build.latestImage
   return (
@@ -318,7 +325,13 @@ function Summary({
             ? t("builds.waitingUpload", service.name)
             : currentWords(t, service, build, current)}
         </p>
-        <Failure problem={problem} failure={failure} failedRun={failedRun} refused={!!refused} />
+        <Failure
+          project={project}
+          build={build}
+          latest={latest}
+          refused={!!refused}
+          kept={build.latestImage ? service.name : undefined}
+        />
         {refused ? <Refused project={project} build={build} kind={refused} /> : null}
         <UploadProgress project={project} build={build.name} />
         {build.suspended ? (
@@ -400,32 +413,34 @@ function summaryTone(problem: ReturnType<typeof buildProblem>, latest?: BuildRun
 }
 
 function Failure({
-  problem,
-  failure,
-  failedRun,
+  project,
+  build,
+  latest,
   refused,
+  kept,
 }: {
-  problem: ReturnType<typeof buildProblem>
-  failure?: string | null
-  failedRun?: BuildRun
+  project: string
+  build: Build
+  latest?: BuildRun
   refused: boolean
+  /** The service that keeps running its image. */
+  kept?: string
 }) {
-  if (failure) {
-    const quiet = (problem && !problem.lasting) || refused
+  const { message, passing, failedRun } = failureOf(build, latest)
+  if (message)
     return (
       <p
         className={cn(
           "mt-1 max-w-prose text-sm break-words",
-          quiet ? "text-secondary" : "text-fail-strong",
+          passing || refused ? "text-secondary" : "text-fail-strong",
         )}
         lang="en"
         translate="no"
       >
-        {failure}
+        {message}
       </p>
     )
-  }
-  return failedRun ? <FailedRun run={failedRun} /> : null
+  return failedRun ? <FailedRun project={project} run={failedRun} kept={kept} /> : null
 }
 
 function SummaryFacts({
@@ -488,34 +503,64 @@ function OutOfMemory() {
   )
 }
 
-/** Why a run failed in a sentence, with the builder's own message behind Details. */
-function FailedRun({ run }: { run: BuildRun }) {
+/** Why a run failed: the step it stopped at with its error, else a sentence with the builder's own
+ * message behind Details; and that the image from before keeps running. */
+function FailedRun({ project, run, kept }: { project: string; run: BuildRun; kept?: string }) {
   const t = useT()
-  const [open, setOpen] = useState(false)
+  const step = useFailedStep(project, run)
   return (
     <div className="mt-1 flex max-w-prose flex-col items-start gap-1">
-      {run.reason === "OutOfMemory" ? (
+      {step ? (
+        <FailedStep step={step} />
+      ) : run.reason === "OutOfMemory" ? (
         <OutOfMemory />
       ) : (
         <p className="text-sm text-fail-strong">{t(reasonKey(run.reason))}</p>
       )}
-      {run.message ? (
-        <Collapsible open={open} onOpenChange={setOpen} className="w-full">
-          <CollapsibleTrigger render={<Button variant="ghost" size="xs" className="-ml-2" />}>
-            {t(open ? "builds.hideDetails" : "builds.details")}
-          </CollapsibleTrigger>
-          <CollapsibleContent>
-            <pre
-              className="mt-1 max-h-96 overflow-auto rounded-lg border border-main bg-muted p-3 font-mono text-xs leading-5 break-words whitespace-pre-wrap text-main"
-              lang="en"
-              translate="no"
-            >
-              {run.message}
-            </pre>
-          </CollapsibleContent>
-        </Collapsible>
-      ) : null}
+      {kept ? <p className="text-sm text-secondary">{t("builds.keepsRunning", kept)}</p> : null}
+      {!step && run.message ? <RunDetails message={run.message} /> : null}
     </div>
+  )
+}
+
+function FailedStep({ step }: { step: { name: string; seconds?: number; message: string } }) {
+  const t = useT()
+  return (
+    <>
+      <p className="text-sm font-medium text-fail-strong">
+        {step.seconds === undefined
+          ? t("builds.stepFailed", step.name)
+          : t("builds.stepFailedAfter", step.name, step.seconds)}
+      </p>
+      {step.message ? <RunMessage message={step.message} /> : null}
+    </>
+  )
+}
+
+function RunMessage({ message }: { message: string }) {
+  return (
+    <pre
+      className="mt-1 max-h-96 w-full overflow-auto rounded-lg border border-main bg-muted p-3 font-mono text-xs leading-5 break-words whitespace-pre-wrap text-main"
+      lang="en"
+      translate="no"
+    >
+      {message}
+    </pre>
+  )
+}
+
+function RunDetails({ message }: { message: string }) {
+  const t = useT()
+  const [open, setOpen] = useState(false)
+  return (
+    <Collapsible open={open} onOpenChange={setOpen} className="w-full">
+      <CollapsibleTrigger render={<Button variant="ghost" size="xs" className="-ml-2" />}>
+        {t(open ? "builds.hideDetails" : "builds.details")}
+      </CollapsibleTrigger>
+      <CollapsibleContent>
+        <RunMessage message={message} />
+      </CollapsibleContent>
+    </Collapsible>
   )
 }
 
@@ -658,6 +703,19 @@ const triggers = {
   manual: "builds.trigger.manual",
 } as const
 
+/** What started a run, how long it took and why it failed, in a line. */
+function runMeta(t: ReturnType<typeof useT>, run: BuildRun, now: number) {
+  const ms = durationOf(run, now)
+  const trigger = run.trigger ? triggers[run.trigger as keyof typeof triggers] : undefined
+  const parts = [
+    trigger ? t(trigger) : undefined,
+    ms === undefined
+      ? undefined
+      : t(run.finished ? "builds.took" : "builds.runningFor", Math.round(ms / 1000)),
+  ]
+  return parts.filter(Boolean).join(t("common.sep")) || undefined
+}
+
 function History({ project, runs }: { project: string; runs: BuildRun[] }) {
   const t = useT()
   const [now] = useState(() => Date.now())
@@ -666,9 +724,7 @@ function History({ project, runs }: { project: string; runs: BuildRun[] }) {
     <section aria-labelledby="builds-history" className="flex flex-col gap-4">
       <SectionHeader id="builds-history" title={t("builds.history")} />
       <Timeline aria-labelledby="builds-history">
-        {runs.map((run) => {
-          const ms = durationOf(run, now)
-          const trigger = run.trigger ? triggers[run.trigger as keyof typeof triggers] : undefined
+        {runs.map((run, i) => {
           return (
             <TimelineItem
               key={run.name}
@@ -684,17 +740,9 @@ function History({ project, runs }: { project: string; runs: BuildRun[] }) {
                   ) : null}
                 </span>
               }
-              meta={
-                [
-                  trigger ? t(trigger) : undefined,
-                  ms === undefined ? undefined : t("builds.took", Math.round(ms / 1000)),
-                  run.reason && run.phase === "Failed" ? run.reason : undefined,
-                ]
-                  .filter(Boolean)
-                  .join(t("common.sep")) || undefined
-              }
+              meta={runMeta(t, run, now)}
             >
-              <RunLogs project={project} run={run} />
+              <RunLogs project={project} run={run} newest={i === 0} />
             </TimelineItem>
           )
         })}
@@ -703,80 +751,34 @@ function History({ project, runs }: { project: string; runs: BuildRun[] }) {
   )
 }
 
-function RunLogs({ project, run }: { project: string; run: BuildRun }) {
+/** The run's phases and steps; the newest opens by itself while it runs or after it failed. */
+function RunLogs({ project, run, newest }: { project: string; run: BuildRun; newest: boolean }) {
   const t = useT()
-  const [open, setOpen] = useState(false)
+  const tone = runTone(run)
   return (
-    <Collapsible open={open} onOpenChange={setOpen}>
-      <CollapsibleTrigger render={<Button variant="ghost" size="xs" className="-ml-2" />}>
-        {t(open ? "builds.hideLogs" : "builds.logs")}
+    <Collapsible defaultOpen={newest && (tone === "progress" || tone === "fail")}>
+      <CollapsibleTrigger variant="disclosure">
+        <CaretRightIcon aria-hidden="true" />
+        {t("builds.logs")}
       </CollapsibleTrigger>
       <CollapsibleContent>
-        {open ? (
-          run.pod ? (
-            <PodLogs project={project} pod={run.pod} containers={run.containers} />
-          ) : (
-            <p className="mt-2 text-sm text-secondary">
-              {run.message ? (
-                <span
-                  className="mb-2 block font-mono text-xs break-words whitespace-pre-wrap"
-                  lang="en"
-                  translate="no"
-                >
-                  {run.message}
-                </span>
-              ) : null}
-              {t("builds.logsGone")}
-            </p>
-          )
-        ) : null}
+        {run.pod ? (
+          <RunSteps project={project} pod={run.pod} phases={run.phases} />
+        ) : (
+          <p className="mt-2 text-sm text-secondary">
+            {run.message ? (
+              <span
+                className="mb-2 block font-mono text-xs break-words whitespace-pre-wrap"
+                lang="en"
+                translate="no"
+              >
+                {run.message}
+              </span>
+            ) : null}
+            {t("builds.logsGone")}
+          </p>
+        )}
       </CollapsibleContent>
     </Collapsible>
-  )
-}
-
-function PodLogs({
-  project,
-  pod,
-  containers,
-}: {
-  project: string
-  pod: string
-  containers: string[]
-}) {
-  const t = useT()
-  const [container, setContainer] = useState(
-    containers.includes("build") ? "build" : (containers.at(-1) ?? ""),
-  )
-  const logs = useQuery(
-    logsQuery(project, pod, { container, tailLines: 2000, previous: false, timestamps: false }),
-  )
-  return (
-    <div className="mt-2 flex min-w-0 flex-col gap-2">
-      {containers.length > 1 ? (
-        <Segmented
-          label={t("builds.step")}
-          value={container}
-          options={containers.map((c) => ({ value: c, label: c }))}
-          onChange={setContainer}
-        />
-      ) : null}
-      {logs.isPending ? (
-        <Skeleton variant="card" className="h-40 w-full" />
-      ) : logs.isError ? (
-        toProblem(logs.error).unavailableLog ? (
-          <p className="text-sm text-secondary">{t("builds.noLogsYet")}</p>
-        ) : (
-          <Problem error={logs.error} />
-        )
-      ) : (
-        <pre
-          className="max-h-96 overflow-auto rounded-lg border border-main bg-muted p-3 font-mono text-xs leading-5 text-main"
-          translate="no"
-        >
-          {logs.data.lines.join("\n") || t("builds.emptyLog")}
-        </pre>
-      )}
-    </div>
   )
 }
