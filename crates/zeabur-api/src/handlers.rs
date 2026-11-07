@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use axum::extract::{FromRef, FromRequestParts};
 use axum::http::request::Parts;
-use zeabur_core::problem::{Kind, Problem};
+use zeabur_core::problem::{self, Kind, Problem};
 use zeabur_kube::Cluster;
 
 use crate::access::ClusterAccess;
@@ -107,10 +107,16 @@ pub(crate) async fn not_found() -> ApiError {
     ))
 }
 
-/// A known API path asked with a method it does not take.
-pub(crate) async fn method_not_allowed(method: axum::http::Method) -> ApiError {
-    ApiError::from(Problem::new(
-        Kind::BadRequest,
-        format!("This API endpoint does not take {method} requests."),
-    ))
+/// A known API path asked with a method it does not take: an `about:blank` problem, as HTTP's
+/// own `405` says all there is (RFC 9457, section 4.2.1). axum adds the `Allow` header.
+pub(crate) async fn method_not_allowed(method: axum::http::Method) -> axum::response::Response {
+    let status = axum::http::StatusCode::METHOD_NOT_ALLOWED;
+    let body = serde_json::json!({
+        "type": "about:blank",
+        "title": status.canonical_reason(),
+        "status": status.as_u16(),
+        "detail": format!("This API endpoint does not accept {method} requests."),
+    });
+    let content_type = [(axum::http::header::CONTENT_TYPE, problem::MEDIA_TYPE)];
+    axum::response::IntoResponse::into_response((status, content_type, body.to_string()))
 }

@@ -468,9 +468,13 @@ mod tests {
         for (method, uri, status) in [
             ("GET", "/api", StatusCode::NOT_FOUND),
             ("GET", "/api/v1/nothing", StatusCode::NOT_FOUND),
-            ("DELETE", "/api/v1/session", StatusCode::BAD_REQUEST),
+            ("DELETE", "/api/v1/session", StatusCode::METHOD_NOT_ALLOWED),
         ] {
             let (got, headers, body) = send(app(&cluster), method, uri, &[]).await;
+            if got == StatusCode::METHOD_NOT_ALLOWED {
+                assert_eq!(headers.get("allow").unwrap(), "GET,HEAD", "{method} {uri}");
+                assert_eq!(json(&body)["type"], "about:blank");
+            }
             assert_eq!(got, status, "{method} {uri}: {body}");
             assert_eq!(
                 headers.get("content-type").unwrap(),
@@ -919,8 +923,8 @@ mod tests {
             "/api/v1/projects/shop/secrets/db/reveal",
         )
         .await;
-        assert_eq!(status, StatusCode::BAD_REQUEST, "{body}");
-        assert!(body.contains("does not take GET"), "{body}");
+        assert_eq!(status, StatusCode::METHOD_NOT_ALLOWED, "{body}");
+        assert!(body.contains("does not accept GET"), "{body}");
 
         let (status, cache, body) = call(
             app(&cluster),
