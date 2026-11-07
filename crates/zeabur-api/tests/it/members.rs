@@ -5,7 +5,7 @@ mod tests {
     use axum::http::StatusCode;
     use serde_json::{Value, json};
     use zeabur_api::Settings;
-    use zeabur_api::members::access::{ProjectRole, baseline_binding, role_binding};
+    use zeabur_api::members::access::{Holder, ProjectRole, baseline_binding, role_binding};
     use zeabur_api::settings::IdentitySettings;
     use zeabur_kube::memory::{MemoryCluster, State};
     use zeabur_kube::{DynamicObject, Identity, ServedResource, WriteBody};
@@ -108,9 +108,17 @@ mod tests {
                            "authTime": 1_790_000_000, "expiresAt": 4_000_000_000_i64}),
                     json!({"identity.zeabur.com/user": "bob"}),
                 ),
-                rbac(role_binding("shop", "bob", ProjectRole::Viewer)),
-                rbac(role_binding("blog", "bob", ProjectRole::Developer)),
-                rbac(baseline_binding("bob")),
+                rbac(role_binding(
+                    "shop",
+                    &Holder::member("bob"),
+                    ProjectRole::Viewer,
+                )),
+                rbac(role_binding(
+                    "blog",
+                    &Holder::member("bob"),
+                    ProjectRole::Developer,
+                )),
+                rbac(baseline_binding(&Holder::member("bob"))),
             ],
             ..State::default()
         })

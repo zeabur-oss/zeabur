@@ -32,9 +32,9 @@ use crate::objects::{
 };
 use crate::port::{
     Answer, Cluster, ClusterError, ClusterEvents, ClusterFacts, ClusterPods, ExecRequest,
-    ExecSession, ExecStream, ExitStatus, Identity, LogLines, LogOptions, NamespaceObjects,
-    ObjectTarget, Preconditions, SecretSummary, ServicePort, TerminalSize, Unreadable, WriteBody,
-    WriteRequest, Written,
+    ExecSession, ExecStream, ExitStatus, Identity, IssuedToken, LogLines, LogOptions,
+    NamespaceObjects, ObjectTarget, Preconditions, SecretSummary, ServicePort, TerminalSize,
+    Unreadable, WriteBody, WriteRequest, Written,
 };
 
 /// What the in-memory cluster holds.
@@ -144,6 +144,13 @@ pub struct State {
     /// pods/exec`); the calls themselves are not refused, as on a cluster that checks fewer
     /// verbs.
     pub refused_rights: BTreeSet<String>,
+    /// The cluster's clock, Unix seconds, from which an issued token's expiry is counted.
+    pub now: i64,
+    /// The longest a token kube-apiserver issues may last, in seconds
+    /// (`--service-account-max-token-expiration`); `None`: as long as asked.
+    pub max_token_seconds: Option<i64>,
+    /// Every token issued, as `namespace/name` of its ServiceAccount and the seconds asked for.
+    pub issued_tokens: Vec<(String, i64)>,
 }
 
 /// A command [`Cluster::run`] ran.
@@ -1308,6 +1315,59 @@ impl Cluster for MemoryCluster {
             drop(state);
             Ok(Written {
                 resource_version: Some(next),
+            })
+        })
+    }
+
+    /// Issues a token as kube-apiserver does: refused with `403` when `create
+    /// serviceaccounts/token` is among [`State::refused_rights`], `404` when the ServiceAccount
+    /// is not held, `422` under ten minutes; its expiry counts from [`State::now`], cut to
+    /// [`State::max_token_seconds`].
+    fn request_token<'a>(
+        &'a self,
+        namespace: &'a str,
+        name: &'a str,
+        seconds: i64,
+    ) -> Answer<'a, IssuedToken> {
+        Box::pin(async move {
+            let mut state = self.allowed(Some(namespace))?;
+            if state
+                .refused_rights
+                .contains("create serviceaccounts/token")
+            {
+                return Err(forbidden("serviceaccounts/token"));
+            }
+            let target = ObjectTarget {
+                api_version: "v1".to_owned(),
+                kind: "ServiceAccount".to_owned(),
+                plural: "serviceaccounts".to_owned(),
+                namespace: namespace.to_owned(),
+                name: name.to_owned(),
+            };
+            if state.stored(&target)?.is_none() {
+                return Err(not_found(&format!("serviceaccounts \"{name}\"")));
+            }
+            if seconds < 600 {
+                return Err(ClusterError::Status(KubernetesStatus::new(
+                    422,
+                    "Invalid",
+                    "spec.expirationSeconds: may not specify a duration less than 10 minutes",
+                )));
+            }
+            let lasts = state
+                .max_token_seconds
+                .map_or(seconds, |max| seconds.min(max));
+            let expires_at =
+                k8s_openapi::jiff::Timestamp::from_second(state.now.saturating_add(lasts))
+                    .map_err(|e| ClusterError::Decode(e.to_string()))?;
+            state
+                .issued_tokens
+                .push((format!("{namespace}/{name}"), seconds));
+            let token = format!("memory-token-{}", state.issued_tokens.len());
+            drop(state);
+            Ok(IssuedToken {
+                token,
+                expires_at: expires_at.to_string(),
             })
         })
     }

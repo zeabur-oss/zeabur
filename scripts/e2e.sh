@@ -88,6 +88,85 @@ for right in "create secrets" "create rolebindings" "patch pods"; do
 done
 echo "service account zeabur: pods in zeabur-terminals only"
 
+# --- An API token with Developer in the project (docs/reference/api-tokens.mdx) ----------------------
+# Made as the Members page makes one (crates/zeabur-api/src/members/), then used on its own: the
+# automation the docs show works, and nothing outside its project does.
+token_name=e2e-ci
+kubectl apply -f - >/dev/null <<YAML
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: $token_name
+  namespace: zeabur-api-tokens
+  labels: {app.kubernetes.io/managed-by: zeabur, zeabur.com/api-token: $token_name}
+automountServiceAccountToken: false
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: zeabur-api-token-$token_name
+  namespace: $project
+  labels: {app.kubernetes.io/managed-by: zeabur, zeabur.com/api-token: $token_name}
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: ClusterRole, name: zeabur-project-developer}
+subjects: [{kind: ServiceAccount, name: $token_name, namespace: zeabur-api-tokens}]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: zeabur-api-token-$token_name
+  labels: {app.kubernetes.io/managed-by: zeabur, zeabur.com/api-token: $token_name}
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: ClusterRole, name: zeabur-member}
+subjects: [{kind: ServiceAccount, name: $token_name, namespace: zeabur-api-tokens}]
+YAML
+token=$(kubectl -n zeabur-api-tokens create token "$token_name" --duration=1h)
+# Its own kubeconfig: kube-apiserver's address and CA, and the token, without the admin's certificate.
+token_config="$state/api-token.kubeconfig"
+kubectl config view --raw --minify -o json | jq --arg token "$token" --arg ns "$project" '{
+  apiVersion: "v1", kind: "Config", clusters: .clusters,
+  users: [{name: "token", user: {token: $token}}],
+  contexts: [{name: "token", context: {cluster: .clusters[0].name, user: "token", namespace: $ns}}],
+  "current-context": "token"}' >"$token_config"
+kt() { KUBECONFIG="$token_config" kubectl "$@"; }
+[[ "$(kt auth whoami -o jsonpath='{.status.userInfo.username}')" == "system:serviceaccount:zeabur-api-tokens:$token_name" ]] ||
+  { echo "error: the API token is not its ServiceAccount" >&2; exit 1; }
+kt create deployment token-probe --image=busybox:1.37 --replicas=0 >/dev/null
+kt set image deployment/token-probe busybox=busybox:1.36 >/dev/null
+kt create secret generic token-probe --from-literal=LOG_LEVEL=info >/dev/null
+kt patch secret token-probe --type=merge -p '{"stringData": {"LOG_LEVEL": "debug"}}' >/dev/null
+kt set env deployment/token-probe --from=secret/token-probe >/dev/null
+kt logs deployment/talker --tail=1 >/dev/null
+kt exec deployment/talker -- true
+kt rollout restart deployment/talker >/dev/null
+wait_for "$project" kubectl -n "$project" rollout status deployment/talker --timeout=180s
+if kubectl get crd builds.builder.zeabur.com >/dev/null 2>&1; then
+  [[ "$(kt auth can-i patch builds.builder.zeabur.com)" == yes ]] ||
+    { echo "error: the API token may not build again" >&2; exit 1; }
+  for build in $(kubectl -n "$project" get builds.builder.zeabur.com -o name); do
+    kt annotate "$build" --overwrite builder.zeabur.com/rebuild="$(date -u +%Y-%m-%dT%H:%M:%SZ)" >/dev/null
+  done
+fi
+refused_token=(
+  "create namespace token-probe"
+  "-n zeabur-e2e-second get deployments"
+  "label nodes --all zeabur.com/token-probe=1"
+  "-n zeabur-api-tokens get serviceaccounts"
+  "-n zeabur-api-tokens create token $token_name"
+  "-n zeabur-api-tokens run token-probe --image=busybox:1.37"
+)
+for case in "${refused_token[@]}"; do
+  # shellcheck disable=SC2086 # each case is words
+  if out=$(kt $case 2>&1); then
+    echo "error: the API token may: $case" >&2
+    exit 1
+  fi
+  [[ "$out" == *Forbidden* || "$out" == *forbidden* ]] || { echo "error: unexpected refusal of $case: $out" >&2; exit 1; }
+done
+kubectl -n "$project" delete deployment/token-probe secret/token-probe --wait >/dev/null
+kubectl delete rolebindings,clusterrolebindings -A -l "zeabur.com/api-token=$token_name" --wait >/dev/null
+kubectl -n zeabur-api-tokens delete serviceaccount "$token_name" --wait >/dev/null
+rm -f "$token_config"
+echo "API token: Developer work in its project, refused elsewhere"
+
 # --- Domains of the system namespaces (crates/zeabur-installer/manifests/system-hosts.yaml) -------
 # A project cannot take Zeabur's or Zeabur Identity's domain, or every domain; it can use its own.
 admit() { # $1 = kind, $2 = spec as JSON
@@ -133,6 +212,7 @@ wait_for kube-system kubectl -n kube-system delete helmchart.helm.cattle.io zeab
 kubectl -n kube-system delete helmchartconfig.helm.cattle.io zeabur --wait
 wait_for "$namespace" kubectl delete namespace "$namespace" --wait --timeout=180s
 wait_for zeabur-terminals kubectl wait --for=delete namespace/zeabur-terminals --timeout=180s
+wait_for zeabur-api-tokens kubectl wait --for=delete namespace/zeabur-api-tokens --timeout=180s
 kubectl delete rolebindings,clusterrolebindings -A -l app.kubernetes.io/managed-by=zeabur,zeabur.com/member --wait
 # The chart keeps the S3 destinations' namespace on purpose; the project's name is the person's.
 wait_for zeabur-s3-destinations kubectl delete namespace zeabur-s3-destinations --wait --timeout=180s

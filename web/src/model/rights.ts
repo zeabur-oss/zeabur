@@ -14,6 +14,7 @@ type PageRight =
   | "restoreBackups"
   | "createServices"
   | "changeBuildLimits"
+  | "changeApiTokens"
 export type Right = keyof ProjectRights | keyof ClusterRights | PageRight
 type Permission = Schemas.Permission
 
@@ -42,6 +43,7 @@ const rules: Record<Right, { role: NeededRole; rule: string }> = {
   deployFromGit: { role: "developer", rule: "create builds.builder.zeabur.com" },
   changeNetworkPolicies: { role: "developer", rule: "patch networkpolicies.networking.k8s.io" },
   changeMembers: { role: "admin", rule: "create rolebindings.rbac.authorization.k8s.io" },
+  changeApiTokens: { role: "admin", rule: "create serviceaccounts -n zeabur-api-tokens" },
   changeNodes: { role: "admin", rule: "patch nodes" },
   changeBackups: { role: "admin", rule: "create schedules.velero.io" },
   restoreBackups: { role: "admin", rule: "create restores.velero.io" },
@@ -115,6 +117,7 @@ const notProject: Record<Exclude<Right, keyof ProjectRights>, true> = {
   restoreBackups: true,
   createServices: true,
   changeBuildLimits: true,
+  changeApiTokens: true,
 }
 
 const workloads = ["deployments", "statefulsets", "daemonsets"]

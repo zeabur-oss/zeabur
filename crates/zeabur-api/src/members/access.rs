@@ -14,6 +14,10 @@
 //! rights it grants or `bind` on the role [k8s-escalation]: in practice an admin with admin
 //! rights in use.
 //!
+//! An API token gets the same bindings as a member ([`Holder::Token`]), named
+//! `zeabur-api-token-<name>`, labelled [`TOKEN_LABEL`], for its ServiceAccount in
+//! [`API_TOKENS_NAMESPACE`]. A token is never an admin: admins sign in with passkeys only.
+//!
 //! [k8s-roleref]: https://kubernetes.io/docs/reference/access-authn-authz/rbac/#clusterrolebinding-example
 //! [k8s-escalation]: https://kubernetes.io/docs/reference/access-authn-authz/rbac/#restrictions-on-role-binding-creation-or-update
 
@@ -22,6 +26,7 @@ use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use utoipa::ToSchema;
+use zeabur_core::names::{API_TOKENS_NAMESPACE, admin_only_namespace};
 use zeabur_kube::{Cluster, ClusterError, DynamicObject, ObjectTarget, ResourceRef};
 
 use super::USER_PREFIX;
@@ -29,6 +34,8 @@ use crate::error::{ApiError, list_read, read_problem};
 
 /// Label naming the member a binding is for.
 pub const MEMBER_LABEL: &str = "zeabur.com/member";
+/// Label naming the API token a binding is for.
+pub const TOKEN_LABEL: &str = zeabur_plan::api_token::LABEL;
 /// The `ClusterRole` every member gets.
 pub const BASELINE_ROLE: &str = "zeabur-member";
 pub(crate) const RBAC_GROUP: &str = "rbac.authorization.k8s.io";
@@ -73,48 +80,84 @@ pub struct ProjectGrant {
     pub role: ProjectRole,
 }
 
-/// The name of every binding Zeabur makes for `username`.
+/// Who Zeabur binds roles to.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Holder {
+    /// A member, by user name: the user `zeabur:<username>`.
+    Member(String),
+    /// An API token, by name: its ServiceAccount in [`API_TOKENS_NAMESPACE`].
+    Token(String),
+}
+
+impl Holder {
+    /// A member.
+    #[must_use]
+    pub fn member(username: &str) -> Self {
+        Self::Member(username.to_owned())
+    }
+
+    /// An API token.
+    #[must_use]
+    pub fn token(name: &str) -> Self {
+        Self::Token(name.to_owned())
+    }
+
+    /// The name of every binding Zeabur makes for this holder.
+    #[must_use]
+    pub fn binding_name(&self) -> String {
+        match self {
+            Self::Member(username) => format!("zeabur-member-{username}"),
+            Self::Token(name) => format!("zeabur-api-token-{name}"),
+        }
+    }
+
+    fn labels(&self) -> Value {
+        match self {
+            Self::Member(username) => json!({MANAGED_BY: "zeabur", MEMBER_LABEL: username}),
+            Self::Token(name) => json!({MANAGED_BY: "zeabur", TOKEN_LABEL: name}),
+        }
+    }
+
+    fn subjects(&self) -> Value {
+        match self {
+            Self::Member(username) => json!([{
+                "apiGroup": RBAC_GROUP, "kind": "User", "name": format!("{USER_PREFIX}{username}"),
+            }]),
+            Self::Token(name) => json!([{
+                "kind": "ServiceAccount", "name": name, "namespace": API_TOKENS_NAMESPACE,
+            }]),
+        }
+    }
+}
+
+/// The `RoleBinding` that gives `holder` `role` in `project`.
 #[must_use]
-pub fn binding_name(username: &str) -> String {
-    format!("zeabur-member-{username}")
-}
-
-fn labels(username: &str) -> Value {
-    json!({MANAGED_BY: "zeabur", MEMBER_LABEL: username})
-}
-
-fn subjects(username: &str) -> Value {
-    json!([{"apiGroup": RBAC_GROUP, "kind": "User", "name": format!("{USER_PREFIX}{username}")}])
-}
-
-/// The `RoleBinding` that gives `username` `role` in `project`.
-#[must_use]
-pub fn role_binding(project: &str, username: &str, role: ProjectRole) -> Value {
+pub fn role_binding(project: &str, holder: &Holder, role: ProjectRole) -> Value {
     json!({
         "apiVersion": RBAC_VERSION,
         "kind": "RoleBinding",
-        "metadata": {"name": binding_name(username), "namespace": project, "labels": labels(username)},
+        "metadata": {"name": holder.binding_name(), "namespace": project, "labels": holder.labels()},
         "roleRef": {"apiGroup": RBAC_GROUP, "kind": "ClusterRole", "name": role.cluster_role()},
-        "subjects": subjects(username),
+        "subjects": holder.subjects(),
     })
 }
 
-/// The `ClusterRoleBinding` that gives `username` the baseline.
+/// The `ClusterRoleBinding` that gives `holder` the baseline.
 #[must_use]
-pub fn baseline_binding(username: &str) -> Value {
+pub fn baseline_binding(holder: &Holder) -> Value {
     json!({
         "apiVersion": RBAC_VERSION,
         "kind": "ClusterRoleBinding",
-        "metadata": {"name": binding_name(username), "labels": labels(username)},
+        "metadata": {"name": holder.binding_name(), "labels": holder.labels()},
         "roleRef": {"apiGroup": RBAC_GROUP, "kind": "ClusterRole", "name": BASELINE_ROLE},
-        "subjects": subjects(username),
+        "subjects": holder.subjects(),
     })
 }
 
 /// A project binding Zeabur made, as read.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Binding {
-    pub(crate) username: String,
+    pub(crate) holder: Holder,
     pub(crate) project: String,
     /// `None`: it names another role (edited by hand), so it is replaced like a changed one.
     pub(crate) role: Option<ProjectRole>,
@@ -131,8 +174,13 @@ pub(crate) fn bindings_of(objects: Vec<DynamicObject>) -> Vec<Binding> {
     let mut bindings: Vec<Binding> = objects
         .into_iter()
         .filter_map(|object| {
-            let username = object.metadata.labels.as_ref()?.get(MEMBER_LABEL)?.clone();
-            if object.metadata.name.as_deref() != Some(binding_name(&username).as_str()) {
+            let labels = object.metadata.labels.as_ref()?;
+            let holder = if let Some(username) = labels.get(MEMBER_LABEL) {
+                Holder::member(username)
+            } else {
+                Holder::token(labels.get(TOKEN_LABEL)?)
+            };
+            if object.metadata.name.as_deref() != Some(holder.binding_name().as_str()) {
                 return None;
             }
             let role = object
@@ -145,12 +193,12 @@ pub(crate) fn bindings_of(objects: Vec<DynamicObject>) -> Vec<Binding> {
             Some(Binding {
                 project: object.metadata.namespace?,
                 uid: object.metadata.uid,
-                username,
+                holder,
                 role,
             })
         })
         .collect();
-    bindings.sort_by(|a, b| (&a.username, &a.project).cmp(&(&b.username, &b.project)));
+    bindings.sort_by(|a, b| (&a.holder, &a.project).cmp(&(&b.holder, &b.project)));
     bindings
 }
 
@@ -171,14 +219,30 @@ pub(crate) fn key() -> String {
 pub(crate) fn grants_by_member(bindings: &[Binding]) -> BTreeMap<String, Vec<ProjectGrant>> {
     let mut grants: BTreeMap<String, Vec<ProjectGrant>> = BTreeMap::new();
     for binding in bindings {
-        if let Some(role) = binding.role {
+        if let (Holder::Member(username), Some(role)) = (&binding.holder, binding.role) {
             grants
-                .entry(binding.username.clone())
+                .entry(username.clone())
                 .or_default()
                 .push(ProjectGrant {
                     project: binding.project.clone(),
                     role,
                 });
+        }
+    }
+    grants
+}
+
+/// `holder`'s projects, from `bindings`; a binding to another role is left out.
+pub(crate) fn grants_of(bindings: &[Binding], holder: &Holder) -> Vec<ProjectGrant> {
+    let mut grants = Vec::new();
+    for binding in bindings {
+        if let Some(role) = binding.role
+            && binding.holder == *holder
+        {
+            grants.push(ProjectGrant {
+                project: binding.project.clone(),
+                role,
+            });
         }
     }
     grants
@@ -191,10 +255,10 @@ pub(crate) enum Step {
     Create(ProjectGrant),
 }
 
-/// The writes that take `username`'s `current` bindings to `wanted`: deletions first, so a
-/// failure half-way leaves fewer rights, never more.
-pub(crate) fn steps(username: &str, current: &[Binding], wanted: &[ProjectGrant]) -> Vec<Step> {
-    let mine: Vec<&Binding> = current.iter().filter(|b| b.username == username).collect();
+/// The writes that take `holder`'s `current` bindings to `wanted`: deletions first, so a failure
+/// half-way leaves fewer rights, never more.
+pub(crate) fn steps(holder: &Holder, current: &[Binding], wanted: &[ProjectGrant]) -> Vec<Step> {
+    let mine: Vec<&Binding> = current.iter().filter(|b| b.holder == *holder).collect();
     let mut deletes = Vec::new();
     let mut creates = Vec::new();
     for binding in &mine {
@@ -224,9 +288,9 @@ pub(crate) fn check(projects: &[ProjectGrant]) -> Result<Vec<ProjectGrant>, Stri
         if !zeabur_plan::checks::is_dns_label(&grant.project) {
             return Err(format!("{:?} is not a project's name.", grant.project));
         }
-        if grant.project == zeabur_core::names::NODE_SHELL_NAMESPACE {
+        if let Some(holds) = admin_only_namespace(&grant.project) {
             return Err(format!(
-                "{} holds node shells, which only cluster administrators may use.",
+                "{} holds {holds}, which only cluster administrators may use.",
                 grant.project
             ));
         }
@@ -250,22 +314,26 @@ pub(crate) fn target(kind: &str, namespace: &str, name: &str) -> ObjectTarget {
     }
 }
 
-/// Reads `username`'s project bindings, or the problem that names the read refused.
+/// Reads `holder`'s project bindings, or the problem that names the read refused.
 pub(crate) async fn bindings_for(
     cluster: &dyn Cluster,
-    username: &str,
+    holder: &Holder,
 ) -> Result<Vec<Binding>, ApiError> {
     let bindings = read(cluster).await.map_err(|error| {
+        let whose = match holder {
+            Holder::Member(username) => username.clone(),
+            Holder::Token(name) => format!("API token {name}"),
+        };
         read_problem(
             error,
-            &format!("the RoleBindings of {username}"),
+            &format!("the RoleBindings of {whose}"),
             list_read(RBAC_GROUP, "rolebindings", None),
         )
     })?;
     Ok(bindings
         .unwrap_or_default()
         .into_iter()
-        .filter(|b| b.username == username)
+        .filter(|b| b.holder == *holder)
         .collect())
 }
 
@@ -281,7 +349,7 @@ pub(crate) mod tests {
 
     fn binding(username: &str, project: &str, role: Option<ProjectRole>) -> Binding {
         Binding {
-            username: username.to_owned(),
+            holder: Holder::member(username),
             project: project.to_owned(),
             role,
             uid: Some(format!("uid-{project}")),
@@ -297,17 +365,42 @@ pub(crate) mod tests {
 
     #[test]
     fn a_binding_names_the_user_as_kubernetes_sees_them_and_carries_the_member_label() {
-        let object = role_binding("shop", "ada", ProjectRole::Viewer);
+        let object = role_binding("shop", &Holder::member("ada"), ProjectRole::Viewer);
         assert_eq!(object["metadata"]["name"], "zeabur-member-ada");
         assert_eq!(object["metadata"]["namespace"], "shop");
         assert_eq!(object["metadata"]["labels"][MEMBER_LABEL], "ada");
         assert_eq!(object["roleRef"]["name"], "zeabur-project-viewer");
         assert_eq!(object["subjects"][0]["kind"], "User");
         assert_eq!(object["subjects"][0]["name"], "zeabur:ada");
-        let baseline = baseline_binding("ada");
+        let baseline = baseline_binding(&Holder::member("ada"));
         assert_eq!(baseline["kind"], "ClusterRoleBinding");
         assert_eq!(baseline["metadata"].get("namespace"), None);
         assert_eq!(baseline["roleRef"]["name"], BASELINE_ROLE);
+    }
+
+    #[test]
+    fn a_token_binding_names_its_service_account_in_the_token_namespace() {
+        let token = Holder::token("ci");
+        let object = role_binding("shop", &token, ProjectRole::Developer);
+        assert_eq!(object["metadata"]["name"], "zeabur-api-token-ci");
+        assert_eq!(object["metadata"]["labels"][TOKEN_LABEL], "ci");
+        assert_eq!(object["metadata"]["labels"].get(MEMBER_LABEL), None);
+        assert_eq!(
+            object["subjects"],
+            json!([{"kind": "ServiceAccount", "name": "ci", "namespace": API_TOKENS_NAMESPACE}])
+        );
+        assert_eq!(baseline_binding(&token)["roleRef"]["name"], BASELINE_ROLE);
+        let read = bindings_of(vec![serde_json::from_value(object).unwrap()]);
+        assert_eq!(read[0].holder, token);
+        assert_eq!(read[0].role, Some(ProjectRole::Developer));
+        assert!(
+            grants_by_member(&read).is_empty(),
+            "a token is not a member"
+        );
+        assert_eq!(
+            grants_of(&read, &token),
+            [grant("shop", ProjectRole::Developer)]
+        );
     }
 
     #[test]
@@ -328,9 +421,12 @@ pub(crate) mod tests {
         ]);
         assert_eq!(
             read.iter()
-                .map(|b| (b.username.as_str(), b.role))
+                .map(|b| (b.holder.clone(), b.role))
                 .collect::<Vec<_>>(),
-            [("ada", Some(ProjectRole::Developer)), ("bob", None)]
+            [
+                (Holder::member("ada"), Some(ProjectRole::Developer)),
+                (Holder::member("bob"), None)
+            ]
         );
         let grants = grants_by_member(&read);
         assert_eq!(grants["ada"], [grant("shop", ProjectRole::Developer)]);
@@ -351,7 +447,7 @@ pub(crate) mod tests {
             grant("shop", ProjectRole::Developer),
         ];
         assert_eq!(
-            steps("ada", &current, &wanted),
+            steps(&Holder::member("ada"), &current, &wanted),
             [
                 Step::Delete(binding("ada", "shop", Some(ProjectRole::Viewer))),
                 Step::Delete(binding("ada", "old", Some(ProjectRole::Viewer))),
@@ -360,20 +456,21 @@ pub(crate) mod tests {
             ]
         );
         assert_eq!(
-            steps("ada", &current, &[]),
+            steps(&Holder::member("ada"), &current, &[]),
             [
                 Step::Delete(binding("ada", "shop", Some(ProjectRole::Viewer))),
                 Step::Delete(binding("ada", "blog", Some(ProjectRole::Developer))),
                 Step::Delete(binding("ada", "old", Some(ProjectRole::Viewer))),
             ]
         );
-        assert_eq!(steps("cy", &current, &[]), []);
+        assert_eq!(steps(&Holder::member("cy"), &current, &[]), []);
     }
 
     #[test]
     fn projects_are_names_each_given_once() {
         assert!(check(&[grant("Shop", ProjectRole::Viewer)]).is_err());
         assert!(check(&[grant("zeabur-node-shell", ProjectRole::Viewer)]).is_err());
+        assert!(check(&[grant(API_TOKENS_NAMESPACE, ProjectRole::Viewer)]).is_err());
         assert!(
             check(&[
                 grant("shop", ProjectRole::Viewer),

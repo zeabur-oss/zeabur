@@ -341,6 +341,51 @@ export type AlertmanagerChannelSettings =
     }
 
 /**
+ * What a member may do in one project.
+ */
+export type ProjectRole = (typeof ProjectRole)[keyof typeof ProjectRole]
+
+export const ProjectRole = {
+  developer: "developer",
+  viewer: "viewer",
+} as const
+
+/**
+ * A member's role in a project.
+ */
+export type ProjectGrant = {
+  /** The project (its namespace). */
+  project: string
+  /** The role there. */
+  role: ProjectRole
+}
+
+/**
+ * One API token.
+ */
+export type ApiTokenView = {
+  /**
+   * When it was made, RFC 3339.
+   * @nullable
+   */
+  createdAt?: string | null
+  /**
+   * The Kubernetes user name of whoever made it.
+   * @nullable
+   */
+  createdBy?: string | null
+  /**
+   * When its latest token expires, RFC 3339, as kube-apiserver answered.
+   * @nullable
+   */
+  expiresAt?: string | null
+  /** Its name, which is its ServiceAccount's. */
+  name: string
+  /** Its roles in projects. */
+  projects: ProjectGrant[]
+}
+
+/**
  * The object a planned write addresses.
  */
 export type PlanTarget = {
@@ -6163,6 +6208,28 @@ export type InvitationView = {
 }
 
 /**
+ * A token kube-apiserver issued, shown once.
+ */
+export type IssuedTokenView = {
+  /**
+   * kube-apiserver's CA bundle, PEM, from `kube-root-ca.crt`; absent when it could not be
+   * read.
+   * @nullable
+   */
+  ca?: string | null
+  /** When it expires, RFC 3339, as kube-apiserver answered. */
+  expiresAt: string
+  /** The token's name. */
+  name: string
+  /** The namespace of its ServiceAccount. */
+  namespace: string
+  /** Whether the expiry was recorded on the ServiceAccount for the token list. */
+  recorded: boolean
+  /** The bearer token. */
+  token: string
+}
+
+/**
  * A workload's Keel policy.
  */
 export type KeelPolicy = {
@@ -6370,6 +6437,7 @@ export type SetupLinkView = {
  * What an applied member plan made.
  */
 export type MemberApplied = {
+  issued?: IssuedTokenView | null
   link?: SetupLinkView | null
 }
 
@@ -6379,26 +6447,6 @@ export type MemberApplied = {
 export type MemberApplyRequest = {
   /** The token `plan` returned. */
   token: string
-}
-
-/**
- * What a member may do in one project.
- */
-export type ProjectRole = (typeof ProjectRole)[keyof typeof ProjectRole]
-
-export const ProjectRole = {
-  developer: "developer",
-  viewer: "viewer",
-} as const
-
-/**
- * A member's role in a project.
- */
-export type ProjectGrant = {
-  /** The project (its namespace). */
-  project: string
-  /** The role there. */
-  role: ProjectRole
 }
 
 /**
@@ -6432,6 +6480,34 @@ export type MemberChange =
       op: "remove"
       /** The member. */
       username: string
+    }
+  | {
+      /** How long the token should last; kube-apiserver may cut it. */
+      expirationSeconds: number
+      /** Its name: lower-case letters, digits and `-`, at most 63 characters. */
+      name: string
+      op: "createToken"
+      /** Its roles in projects. */
+      projects?: ProjectGrant[]
+    }
+  | {
+      /** The token. */
+      name: string
+      op: "tokenAccess"
+      /** Its roles in projects. */
+      projects?: ProjectGrant[]
+    }
+  | {
+      /** How long the new token should last. */
+      expirationSeconds: number
+      /** The token. */
+      name: string
+      op: "renewToken"
+    }
+  | {
+      /** The token. */
+      name: string
+      op: "deleteToken"
     }
 
 /**
@@ -6607,8 +6683,15 @@ export type SetupLinks = {
  * Everyone who can sign in, and the links waiting to be used.
  */
 export type MembersView = {
+  /** API tokens, by name: machine accounts with the access of a member. */
+  apiTokens: ApiTokenView[]
   /** Whether the person may create invitations, as far as their rules tell. */
   canManage: Permission
+  /**
+   * Whether the person may create API tokens: `create serviceaccounts` in the token
+   * namespace.
+   */
+  canManageTokens: Permission
   /** `members`. */
   id: string
   /** Whether Zeabur Identity is installed; when not, everything else is empty. */

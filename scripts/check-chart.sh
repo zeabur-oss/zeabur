@@ -98,6 +98,9 @@ for values in "$chart"/ci/*-values.yaml; do
   expect "$name" "$out" \
     "select(.kind == \"Namespace\" and .metadata.name == \"$terminals\") | .metadata.labels[\"pod-security.kubernetes.io/enforce\"]" \
     restricted
+  expect "$name" "$out" \
+    'select(.kind == "Namespace" and .metadata.name == "zeabur-api-tokens") | .metadata.labels["pod-security.kubernetes.io/enforce"]' \
+    restricted
   expect "$name" "$out" '[select(.kind == "ServiceAccount") | .automountServiceAccountToken == false] | all' true
   expect "$name" "$out" '[select(.kind == "Deployment") | .spec.template.spec.automountServiceAccountToken == false] | all' true
   dep='select(.kind == "Deployment" and .metadata.name == "zeabur")'

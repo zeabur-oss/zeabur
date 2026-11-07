@@ -1313,6 +1313,56 @@ export const en = {
     "They start as Developer here. You can change it before you create the link.",
   "projectMembers.more": (n: number) => `${n} more ${n === 1 ? "person" : "people"}`,
   "projectMembers.all": "Open members",
+  "apiTokens.title": "API tokens",
+  "apiTokens.about":
+    "Scripts and CI use an API token to call the Kubernetes API, with roles in projects like a member's. Every token expires.",
+  "apiTokens.none": "No API tokens yet. Create one for a script or CI job.",
+  "apiTokens.create": "Create token",
+  "apiTokens.createTitle": "Create an API token",
+  "apiTokens.name": "Name",
+  "apiTokens.nameHint":
+    "Say what uses it, such as github-actions. Use lower-case letters, digits and hyphens.",
+  "apiTokens.nameProblem":
+    "Use lower-case letters, digits and hyphens, up to 63 characters. Start and end with a letter or digit.",
+  "apiTokens.projects": "Projects",
+  "apiTokens.projectsHint":
+    "A token works only in the projects you choose. For work across the cluster, use an admin's own kubeconfig.",
+  "apiTokens.noProjectRoles":
+    "To create a token, install the chart with memberRoles.enabled=true. Without the member roles, a token can't get a role.",
+  "apiTokens.lifetime": "Lasts",
+  "apiTokens.lifetimeHint": "The cluster may set a shorter limit. The list shows the real expiry.",
+  "apiTokens.lasts": (seconds: number) =>
+    seconds < 86_400
+      ? plural(seconds / 3600, "hour", "hours")
+      : seconds === 365 * 86_400
+        ? "1 year"
+        : plural(seconds / 86_400, "day", "days"),
+  "apiTokens.by": (user: string) => `Created by ${user}`,
+  "apiTokens.expires": (time: string) => `Expires ${time}`,
+  "apiTokens.expired": (time: string) => `Expired ${time}`,
+  "apiTokens.renew": "Renew",
+  "apiTokens.renewTitle": (name: string) => `Renew ${name}`,
+  "apiTokens.renewAbout":
+    "You get a new token with the same name and access. Tokens issued before keep working until they expire.",
+  "apiTokens.delete": "Delete",
+  "apiTokens.deleteTitle": (name: string) => `Delete ${name}`,
+  "apiTokens.deleted": (name: string) => `Deleted ${name}`,
+  "apiTokens.more": (name: string) => `More for ${name}`,
+  "apiTokens.plan.noRole": (name: string) => `${name} gets no role in any project yet.`,
+  "apiTokens.plan.renew": (name: string) => `Issues a new token for ${name}.`,
+  "apiTokens.plan.lasts": (lasts: string) =>
+    `The token lasts ${lasts}, or less if the cluster sets a shorter limit.`,
+  "apiTokens.plan.delete": (name: string) => `Deletes ${name} and its roles.`,
+  "apiTokens.plan.revokes": "Every token issued for it stops working at once.",
+  "apiTokens.shownTitle": (name: string) => `Token for ${name}`,
+  "apiTokens.shown.lead": "Copy the token now. Zeabur shows it only once.",
+  "apiTokens.shown.copy": "Copy token",
+  "apiTokens.shown.notRecorded": "Zeabur couldn't save the expiry, so the list won't show it.",
+  "apiTokens.shown.kubeconfig": "kubeconfig",
+  "apiTokens.shown.kubeconfigHint":
+    "Fill in server with the address you reach the Kubernetes API on, such as https://203.0.113.10:6443.",
+  "apiTokens.shown.ca": "CA certificate",
+  "apiTokens.docs": "Use the token with kubectl or curl",
   "projectSettings.basic": "Basic information",
   "projectSettings.iconHint": "Shown beside the project's name.",
   "projectSettings.changeIcon": "Change icon",
@@ -3551,6 +3601,9 @@ export const en = {
   "remove.done": (name: string) => `Removed ${name}`,
   "sentence.account.lastPasskey": () => "This is your only passkey",
   "sentence.account.lastPasskey.fix": () => "Add another passkey first, then remove this one.",
+  "sentence.apiTokens.taken": () => "There is already an API token with that name",
+  "sentence.apiTokens.noProjectRoles": () => "Zeabur was installed without the member roles",
+  "sentence.apiTokens.noProjectRoles.fix": () => "Install the chart with memberRoles.enabled=true.",
   "sentence.members.resetSelf": () => "You can't reset your own account",
   "sentence.members.resetSelf.fix": () =>
     "Add a passkey from your account instead, or ask another admin.",
