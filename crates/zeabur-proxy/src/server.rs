@@ -537,6 +537,23 @@ mod tests {
         }
     }
 
+    // Usage history asks for CPU, memory and restarts at once; VictoriaMetrics queues what it
+    // cannot run yet, so the proxy refuses none of them.
+    #[tokio::test]
+    async fn one_persons_queries_at_once_all_reach_the_backend() {
+        let (url, seen) = backend(200, "{\"status\":\"success\"}").await;
+        let proxy = proxy(url, allowing(&["a"]), 1 << 20);
+        let mut answers = Vec::new();
+        for _ in 0..3 {
+            let target = "/metrics/api/v1/query?namespace=a&query=up";
+            answers.push(Arc::clone(&proxy).handle(get(target, Some("good"))).await);
+        }
+        for answer in &answers {
+            assert_eq!(answer.status(), StatusCode::OK);
+        }
+        assert_eq!(seen.lock().unwrap().len(), 3);
+    }
+
     #[tokio::test]
     async fn metrics_of_another_namespace_never_reach_the_person() {
         let (url, seen) = backend(200, "secret").await;
