@@ -17,13 +17,11 @@ vulnerability in Zeabur Identity itself belongs to
 
 | Version | Supported |
 | --- | --- |
-| latest 0.0.x | yes |
-| older releases | no |
+| latest stable release | yes |
+| older releases and prereleases | no |
 
-Zeabur is pre-alpha, for evaluation on clusters you can afford to break. Only the latest 0.0.x
-release receives security fixes, in a new release; fixes are not backported, and there is no
-guaranteed response or patch timeline. Releases before 1.0.0 may change the API and the chart's
-values without a migration path.
+Only the latest stable release receives security fixes, in a new release; fixes are not
+backported.
 
 ## What the installer trusts
 
