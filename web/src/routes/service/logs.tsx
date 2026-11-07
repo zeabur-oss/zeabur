@@ -1,4 +1,4 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { useQuery } from "@tanstack/react-query"
 import { useVirtualizer } from "@tanstack/react-virtual"
 import { useEffect, useRef, useState, type ReactNode } from "react"
 import ArrowClockwiseIcon from "~icons/ph/arrow-clockwise"
@@ -16,7 +16,7 @@ import TerminalWindowIcon from "~icons/ph/terminal-window"
 import TextAlignLeftIcon from "~icons/ph/text-align-left"
 
 import { toProblem, type Schemas } from "@/api/client"
-import { followUrl, logHistoryQuery, logsQuery, projectQuery, type LogOptions } from "@/api/queries"
+import { followUrl, logHistoryQuery, logsQuery, type LogOptions } from "@/api/queries"
 import { Ago, Histogram } from "@/components/bits"
 import { Problem } from "@/components/problem"
 import { Refused } from "@/components/refused"
@@ -314,7 +314,6 @@ export function LogsTab({
         <Followed
           key={followUrl(project, pod.name, options)}
           url={followUrl(project, pod.name, options)}
-          project={project}
           pod={pod.name}
           {...viewProps}
         />
@@ -352,10 +351,12 @@ function Snapshot({
   if (logs.isPending) return <Skeleton variant="card" className="min-h-80 w-full flex-1" />
   if (logs.isError) {
     const problem = toProblem(logs.error)
-    if (problem.status === 404) return <Gone project={project} pod={pod} />
-    if (!problem.unavailableLog) return <Problem problem={problem} />
-    // The kubelet had no log: a container state, not an error.
+    // The kubelet had no log: a container state, not an error. Its 404 is not a pod that went away.
     const reason = problem.unavailableLog
+    if (!reason) {
+      if (problem.status === 404) return <Gone pod={pod} />
+      return <Problem problem={problem} />
+    }
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-3 rounded-xl border border-dashed p-8 text-center text-sm">
         <p className="font-medium">{t(`logs.unavailable.${reason}`)}</p>
@@ -485,13 +486,9 @@ function History({
   )
 }
 
-/** The replica went away between the list and its log; the list is read again, which picks another. */
-function Gone({ project, pod }: { project: string; pod: string }) {
+/** The replica went away between the list and its log; the list's next poll picks another. */
+function Gone({ pod }: { pod: string }) {
   const t = useT()
-  const client = useQueryClient()
-  useEffect(() => {
-    void client.invalidateQueries({ queryKey: projectQuery(project).queryKey })
-  }, [client, project, pod])
   return (
     <p
       role="status"
@@ -502,21 +499,20 @@ function Gone({ project, pod }: { project: string; pod: string }) {
   )
 }
 
-function Followed(props: { url: string; project: string; pod: string } & ViewProps) {
+function Followed(props: { url: string; pod: string } & ViewProps) {
   const [attempt, setAttempt] = useState(0)
   return <Stream key={attempt} {...props} onResume={() => setAttempt((n) => n + 1)} />
 }
 
 function Stream({
   url,
-  project,
   pod,
   onResume,
   ...props
-}: { url: string; project: string; pod: string; onResume: () => void } & ViewProps) {
+}: { url: string; pod: string; onResume: () => void } & ViewProps) {
   const t = useT()
   const stream = useLogStream(url)
-  if (stream.problem?.status === 404) return <Gone project={project} pod={pod} />
+  if (stream.problem?.status === 404 && !stream.problem.unavailableLog) return <Gone pod={pod} />
   return (
     <>
       {stream.problem ? <Problem problem={stream.problem} /> : null}
