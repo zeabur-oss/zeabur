@@ -5,7 +5,7 @@ name: CI
 # nightly run keeps main's caches for the merge queue's jobs.
 on:
   push:
-    branches: [main, "release/*"]
+    branches: [main, "maint/*"]
   pull_request:
   merge_group:
   schedule:

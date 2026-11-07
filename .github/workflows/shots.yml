@@ -1,15 +1,15 @@
 name: Screenshots
 
-# Takes the docs screenshots (web/e2e/shots/docs.ts) again for each release: when zeabur-oss-bot
-# pushes release-pr/<branch>, the release pull request's branch, this runs next to its CI and
-# commits the images that changed onto it, so the release carries them. A release does not wait for
-# it (docs/internal/screenshots.md, docs/internal/releasing.md). It pushes as the organization's
-# GitHub App (`ZEABUR_OSS_BOT_CLIENT_ID`, `ZEABUR_OSS_BOT_PRIVATE_KEY`), because a push made with
-# GITHUB_TOKEN does not start CI again.
+# Takes the docs screenshots (web/e2e/shots/docs.ts) again for each release from main: when
+# zeabur-oss-bot pushes release/next-main, the release pull request's branch, this runs next to its
+# CI and commits the images that changed onto release/next-main, so the release carries them. A
+# release does not wait for it (docs/internal/screenshots.md, docs/internal/releasing.md). It
+# pushes as the organization's GitHub App (`ZEABUR_OSS_BOT_CLIENT_ID`, `ZEABUR_OSS_BOT_PRIVATE_KEY`),
+# because a push made with GITHUB_TOKEN does not start CI again.
 
 on:
   push:
-    branches: ["release-pr/**"]
+    branches: [release/next-main]
     # Its own commit changes only docs; that needs no second run.
     paths-ignore: [docs/**]
   workflow_dispatch:
@@ -18,12 +18,12 @@ permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}
   cancel-in-progress: true
 
 jobs:
   shots:
-    if: startsWith(github.ref, 'refs/heads/release-pr/')
+    if: github.ref == 'refs/heads/release/next-main'
     runs-on: ubuntu-26.04-arm
     timeout-minutes: 60
     defaults:
@@ -43,11 +43,10 @@ jobs:
           private-key: ${{ secrets.ZEABUR_OSS_BOT_PRIVATE_KEY }}
           permission-contents: write
       # The commit's author must match its sign-off (the DCO check). A plain push fails when
-      # the branch moved meanwhile; the next run takes the screenshots again.
+      # release/next-main moved meanwhile; the next run takes the screenshots again.
       - env:
           GH_TOKEN: ${{ steps.app.outputs.token }}
           APP_SLUG: ${{ steps.app.outputs.app-slug }}
-          BRANCH: ${{ github.ref_name }}
         run: |
           git add docs
           if git diff --cached --quiet; then
@@ -57,4 +56,4 @@ jobs:
           id="$(gh api "/users/${APP_SLUG}[bot]" --jq .id)"
           git -c user.name="${APP_SLUG}[bot]" -c user.email="${id}+${APP_SLUG}[bot]@users.noreply.github.com" \
             commit --quiet --signoff -m "docs: take the screenshots again"
-          git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "HEAD:refs/heads/$BRANCH"
+          git push "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" HEAD:refs/heads/release/next-main

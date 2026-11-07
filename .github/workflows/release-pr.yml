@@ -10,7 +10,7 @@ on:
         description: "Pre-release label (rc, beta) for vX.Y.Z-<label>.N; empty for a normal release"
         default: ""
   push:
-    branches: [main, "release/*"]
+    branches: [main, "maint/*"]
 
 permissions:
   contents: read
