@@ -15,16 +15,18 @@ zeaburctl ui
 zeaburctl ui --context production --no-browser
 zeaburctl doctor --context production --output json
 zeaburctl up ./site --project shop --service site
+zeaburctl connect shop/orders
 zeaburctl components export certificates/cert-manager
 ```
 
-`ui`, `doctor`, and `up` each accept `--context`. If omitted, they use the current context in kubeconfig. The commands don't modify kubeconfig.
+`ui`, `doctor`, `up`, and `connect` each accept `--context`. If omitted, they use the current context in kubeconfig. The commands don't modify kubeconfig.
 
 | Command | Result | What it changes |
 |---|---|---|
 | `ui` | Opens Zeabur in a local browser | Installs no components in the cluster. Changes applied in the interface go directly to the cluster |
 | `doctor` | Checks the cluster version, components, and Zeabur Identity settings | Reads only; doesn't change settings |
 | `up` | Uploads a folder to a service created from a folder and starts a build | Updates the service's Build and pushes the folder to the registry |
+| `connect` | Forwards a local port to a database and prints a connection string | Changes nothing in the cluster |
 | `components export` | Prints manifests or Helm commands to install Catalog components | Doesn't connect to the cluster or change anything |
 
 ## `ui`
@@ -149,6 +151,21 @@ These are the same change plans the web interface uses. Running the command conf
 | `--method railpack\|dockerfile` | The build method for a new service. Defaults to `railpack` |
 | `--port <port>` | The port where a new service accepts connections. Configures both the Kubernetes Service and the `PORT` environment variable. If omitted, the service doesn't accept connections |
 | `--yes` | Skips confirmation before creating a new service in a terminal |
+
+## `connect`
+
+```sh
+zeaburctl connect <project>/<database> [--port <port>] [--context <name>]
+```
+
+Forwards a port on `127.0.0.1` to a database through kube-apiserver, like `kubectl port-forward`, and prints a connection string for it. It works for every engine. The command keeps running until you press Ctrl-C.
+
+You need `list` on the database's resources and `create pods/portforward` in the project; Developers have both. If you can't read the database's secret, the connection string has `PASSWORD` in place of the password. For MongoDB the string connects to one member directly, since the other members' addresses only work inside the cluster.
+
+| Option | Default and purpose |
+|---|---|
+| `--port` | A free port. Set it to keep the same local port between runs |
+| `--context` | The current kubeconfig context |
 
 ## `components export`
 

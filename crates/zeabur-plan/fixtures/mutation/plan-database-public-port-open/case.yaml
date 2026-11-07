@@ -1,0 +1,7 @@
+description: "Opening a PostgreSQL database's port makes a LoadBalancer Service with the selector and port of its read-write Service, owned by the Cluster, and warns that only the password protects it."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - op: databasePublicPort
+        database: orders

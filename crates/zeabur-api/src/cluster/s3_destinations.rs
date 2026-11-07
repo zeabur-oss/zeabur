@@ -438,6 +438,7 @@ pub(crate) async fn open(
             | Change::Certificate(_)
             | Change::EnvImport(_)
             | Change::PublicPort(_)
+            | Change::DatabasePublicPort(_)
             | Change::Restart { .. }
             | Change::Rollback { .. }
             | Change::ExpandVolume { .. }

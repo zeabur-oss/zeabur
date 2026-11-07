@@ -98,6 +98,20 @@ pub struct Connection {
     pub options: Option<String>,
 }
 
+/// A port of the database open to the internet: a `LoadBalancer` Service.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+#[schema(as = DatabasePublicPort)]
+pub struct PublicPort {
+    /// The Service.
+    pub service: String,
+    /// The port on each address.
+    pub port: u16,
+    /// The addresses in the Service's `status.loadBalancer.ingress`, an IP or a hostname each,
+    /// in the load balancer's order; empty while it has none.
+    pub addresses: Vec<String>,
+}
+
 /// A database user for applications, and the Secret key holding its password.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
@@ -244,6 +258,9 @@ pub struct Database {
     pub resources: Option<serde_json::Value>,
     /// Where and as whom to connect.
     pub connection: Connection,
+    /// Its port open to the internet, when it has one.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub public_port: Option<PublicPort>,
     /// The user a service connects as; absent when the database has none (a MongoDB without
     /// `spec.users`).
     #[serde(skip_serializing_if = "Option::is_none")]

@@ -34,11 +34,11 @@ mod upload_service;
 pub use certificates::{CheckedCertificate, IssuerRead, own_secret_name};
 pub use change::{
     AddDomainChange, BasicAuthUser, BuildOptionsChange, CertificateChange, CertificateSource,
-    Change, ConnectionRef, CopyS3KeysChange, DataEdit, DataKind, EgressLimitChange,
-    EnvImportChange, ErrorPageHtml, FieldOwners, GatewayParent, HttpOnlyReason, IpAllowChange,
-    KeptReason, LabelVolumeChange, NameValue, ObjectName, Plan, PlanRequest, PlannedObject,
-    ProbeKind, PublicPortChange, RouteKind, RouteRef, ServiceSize, Target, TemplateChange,
-    UploadMethod, UploadServiceChange, Warning, Write,
+    Change, ConnectionRef, CopyS3KeysChange, DataEdit, DataKind, DatabasePublicPortChange,
+    EgressLimitChange, EnvImportChange, ErrorPageHtml, FieldOwners, GatewayParent, HttpOnlyReason,
+    IpAllowChange, KeptReason, LabelVolumeChange, NameValue, ObjectName, Plan, PlanRequest,
+    PlannedObject, ProbeKind, PublicPortChange, RouteKind, RouteRef, ServiceSize, Target,
+    TemplateChange, UploadMethod, UploadServiceChange, Warning, Write,
 };
 pub use checks::{AccessMode, ProbeHandler, ProbeRequest, ResourceRef, VolumeRequest};
 pub use create::{ServedKind, created_object, resolve};
@@ -53,7 +53,7 @@ pub use project::{DEFAULT_ACCOUNT, project_namespace};
 pub use project_deletion::{
     DatabaseDeletion, DatabaseObject, DeletionInput, ProjectDeletion, VolumeDeletion,
 };
-pub use public_port::public_service_name;
+pub use public_port::{POSTGRES_PORT, database_public_service_name, public_service_name};
 pub use releases::{Release, ReleasePods};
 pub use rules::{EnvEdit, EnvValueFrom, FieldChange};
 pub use zeabur_model::TaskConcurrency;

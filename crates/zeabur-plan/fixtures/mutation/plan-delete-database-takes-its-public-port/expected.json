@@ -1,0 +1,12 @@
+{
+  "warnings": [
+    {
+      "code": "deletesDependents",
+      "target": {"kind": "Cluster", "name": "orders"},
+      "dependents": [
+        {"kind": "Service", "name": "orders-public-5432"},
+        {"kind": "Service", "name": "orders-rw"}
+      ]
+    }
+  ]
+}

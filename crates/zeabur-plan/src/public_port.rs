@@ -1,5 +1,5 @@
-//! A port of a workload open to the internet, without a domain: a `LoadBalancer` Service
-//! [k8s-lb].
+//! A port of a workload or a PostgreSQL database open to the internet, without a domain: a
+//! `LoadBalancer` Service [k8s-lb].
 //!
 //! - **One Service per port**, named `<service>-public-<port>`, with the selector and the port of
 //!   the workload's Service. On k3s and RKE2, `ServiceLB` gives it the nodes' addresses and listens
@@ -7,17 +7,22 @@
 //!   address. When the port is already in use on the nodes, the Service waits without an address.
 //! - **It goes with the service.** It has the label `app.kubernetes.io/name`, so deleting the
 //!   service with what it made deletes it too.
+//! - **A PostgreSQL database** (a CloudNativePG `Cluster`) gets `<database>-public-5432`, a copy of
+//!   its read-write Service. CloudNativePG serves TLS, so only PostgreSQL is offered. The `Cluster`
+//!   owns the Service (`ownerReferences`), so the garbage collector deletes it with the database
+//!   [k8s-gc].
 //! - **Closing** deletes the Service, and only one this module would have made: a `LoadBalancer`
 //!   Service with that name.
 //!
 //! [k8s-lb]: https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer
 //! [k3s-servicelb]: https://docs.k3s.io/networking/networking-services#service-load-balancer
+//! [k8s-gc]: https://kubernetes.io/docs/concepts/architecture/garbage-collection/
 
 use k8s_openapi::api::core::v1::{Service as KubeService, ServicePort};
 use serde_json::{Value, json};
 use zeabur_model::Message;
 
-use crate::change::{PublicPortChange, Target, Warning};
+use crate::change::{DatabasePublicPortChange, PublicPortChange, Target, Warning};
 use crate::owned::SERVICE_LABEL;
 use crate::plan::{ErrorKind, PlanError, Planner, Words, Working, error, to_json};
 
@@ -48,6 +53,16 @@ fn service_target(name: &str) -> Target {
 #[must_use]
 pub fn public_service_name(service: &str, port: i32) -> String {
     format!("{service}-public-{port}")
+}
+
+/// The port CloudNativePG serves PostgreSQL on.
+pub const POSTGRES_PORT: i32 = 5432;
+const CNPG_GROUP: &str = "postgresql.cnpg.io";
+
+/// The name of the `LoadBalancer` Service that opens PostgreSQL database `database`.
+#[must_use]
+pub fn database_public_service_name(database: &str) -> String {
+    public_service_name(database, POSTGRES_PORT)
 }
 
 fn is_load_balancer(object: &KubeService) -> bool {
@@ -84,11 +99,90 @@ impl<'a> Planner<'a> {
         let found = self.workload(reference)?;
         Self::refuse_managed(found.meta(), reference.kind.as_str(), &reference.name)?;
         let name = public_service_name(&change.service, change.port);
-        let existing = self.kube_service(&name);
         if change.remove {
-            return self.close_public_port(change, &name, existing);
+            return self.close_public_port(&change.service, change.port, &name);
         }
-        if existing.is_some() {
+        self.open_public_port(
+            &change.service,
+            change.port,
+            &name,
+            json!({"labels": {SERVICE_LABEL: reference.name}}),
+        )?;
+        self.impact.insert(reference.clone());
+        let data_store = self
+            .project
+            .services
+            .iter()
+            .find(|s| s.workload.kind == reference.kind && s.workload.name == reference.name)
+            .and_then(|s| s.data_store);
+        self.warnings.push(Warning::PublicPort {
+            workload: reference.clone(),
+            port: change.port,
+            data_store,
+        });
+        Ok(())
+    }
+
+    pub(crate) fn database_public_port(
+        &mut self,
+        change: &DatabasePublicPortChange,
+    ) -> Result<(), PlanError> {
+        let name = database_public_service_name(&change.database);
+        if change.remove {
+            return self.close_public_port(&change.database, POSTGRES_PORT, &name);
+        }
+        let cluster = self
+            .input
+            .objects
+            .iter()
+            .find(|f| {
+                f.resource.group == CNPG_GROUP
+                    && f.resource.resource == "clusters"
+                    && f.name == change.database
+            })
+            .map(|f| &f.object)
+            .ok_or_else(|| {
+                refusal(
+                    ErrorKind::NotFound,
+                    "unknown_database",
+                    format!("There is no PostgreSQL database {}.", change.database),
+                    Message::new("problem.summary.publicPort.unknownDatabase")
+                        .with("name", change.database.clone()),
+                    Message::new("problem.publicPort.fix.unknownDatabase"),
+                )
+            })?;
+        let text = |pointer: &str| cluster.pointer(pointer).and_then(Value::as_str);
+        let service = text("/status/writeService")
+            .map_or_else(|| format!("{}-rw", change.database), str::to_owned);
+        let owner = json!({
+            "apiVersion": text("/apiVersion").unwrap_or("postgresql.cnpg.io/v1"),
+            "kind": "Cluster",
+            "name": change.database,
+            "uid": text("/metadata/uid").unwrap_or_default(),
+        });
+        self.open_public_port(
+            &service,
+            POSTGRES_PORT,
+            &name,
+            json!({"ownerReferences": [owner]}),
+        )?;
+        self.warnings.push(Warning::DatabasePublicPort {
+            database: change.database.clone(),
+            port: POSTGRES_PORT,
+        });
+        Ok(())
+    }
+
+    /// Plans a `LoadBalancer` Service `name` with the selector and port `port` of Service
+    /// `service`, and with `metadata` added to its own.
+    fn open_public_port(
+        &mut self,
+        service: &str,
+        port: i32,
+        name: &str,
+        metadata: Value,
+    ) -> Result<(), PlanError> {
+        if self.kube_service(name).is_some() {
             return Err(refusal(
                 ErrorKind::Conflict,
                 "already_public",
@@ -110,64 +204,49 @@ impl<'a> Planner<'a> {
             refusal(
                 ErrorKind::NotFound,
                 "unknown_port",
-                format!("Service {} has no port {}.", change.service, change.port),
+                format!("Service {service} has no port {port}."),
                 Message::new("problem.summary.publicPort.unknownPort")
-                    .with("port", change.port.to_string()),
+                    .with("port", port.to_string()),
                 Message::new("problem.publicPort.fix.unknownPort"),
             )
         };
-        let source = self.kube_service(&change.service).ok_or_else(unknown)?;
+        let source = self.kube_service(service).ok_or_else(unknown)?;
         let spec = source.spec.as_ref().ok_or_else(unknown)?;
-        let port = spec
+        let entry = spec
             .ports
             .iter()
             .flatten()
-            .find(|p| p.port == change.port)
+            .find(|p| p.port == port)
             .ok_or_else(unknown)?;
         let Some(selector) = spec.selector.as_ref().filter(|s| !s.is_empty()) else {
             return Err(refusal(
                 ErrorKind::Invalid,
                 "no_selector",
-                format!(
-                    "Service {} selects no pods, so a copy of it would reach nothing.",
-                    change.service
-                ),
-                Message::new("problem.summary.publicPort.noSelector")
-                    .with("service", change.service.clone()),
+                format!("Service {service} selects no pods, so a copy of it would reach nothing."),
+                Message::new("problem.summary.publicPort.noSelector").with("service", service),
                 Message::new("problem.publicPort.fix.noSelector"),
             ));
         };
-        self.refuse_taken(port)?;
-        let entry = port_entry(port);
-        let body = json!({
+        self.refuse_taken(entry)?;
+        let mut body = json!({
             "apiVersion": "v1",
             "kind": "Service",
-            "metadata": {
-                "name": name,
-                "namespace": self.input.snapshot.namespace,
-                "labels": {SERVICE_LABEL: reference.name},
-            },
-            "spec": {"type": "LoadBalancer", "selector": selector, "ports": [entry]},
+            "metadata": {"name": name, "namespace": self.input.snapshot.namespace},
+            "spec": {"type": "LoadBalancer", "selector": selector, "ports": [port_entry(entry)]},
         });
+        if let (Some(target), Value::Object(extra)) = (
+            body.get_mut("metadata").and_then(Value::as_object_mut),
+            metadata,
+        ) {
+            target.extend(extra);
+        }
         self.objects.push(Working {
-            target: service_target(&name),
+            target: service_target(name),
             original: None,
             current: body,
             operations: Vec::new(),
             owners: Vec::new(),
             deleted: false,
-        });
-        self.impact.insert(reference.clone());
-        let data_store = self
-            .project
-            .services
-            .iter()
-            .find(|s| s.workload.kind == reference.kind && s.workload.name == reference.name)
-            .and_then(|s| s.data_store);
-        self.warnings.push(Warning::PublicPort {
-            workload: reference.clone(),
-            port: change.port,
-            data_store,
         });
         Ok(())
     }
@@ -197,22 +276,13 @@ impl<'a> Planner<'a> {
         ))
     }
 
-    fn close_public_port(
-        &mut self,
-        change: &PublicPortChange,
-        name: &str,
-        existing: Option<&KubeService>,
-    ) -> Result<(), PlanError> {
-        let Some(object) = existing.filter(|o| is_load_balancer(o)) else {
+    fn close_public_port(&mut self, what: &str, port: i32, name: &str) -> Result<(), PlanError> {
+        let Some(object) = self.kube_service(name).filter(|o| is_load_balancer(o)) else {
             return Err(refusal(
                 ErrorKind::NotFound,
                 "not_public",
-                format!(
-                    "Port {} of {} is not open to the internet.",
-                    change.port, change.service
-                ),
-                Message::new("problem.summary.publicPort.notPublic")
-                    .with("port", change.port.to_string()),
+                format!("Port {port} of {what} is not open to the internet."),
+                Message::new("problem.summary.publicPort.notPublic").with("port", port.to_string()),
                 Message::new("problem.publicPort.fix.notPublic"),
             ));
         };

@@ -270,6 +270,7 @@ pub fn database(
             .map(|i| format!("mysql-data-moco-{name}-{i}"))
             .collect(),
         resources: server.and_then(|c| c.get("resources")).cloned(),
+        public_port: None,
         connection: Connection {
             host: format!("moco-{name}-primary.{namespace}.svc"),
             port: 3306,

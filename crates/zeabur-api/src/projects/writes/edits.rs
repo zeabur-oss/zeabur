@@ -1,5 +1,6 @@
 //! What a plan reads before it edits an object as YAML, or deletes it: the object itself. The
-//! same for the Zeabur Builder `Build` it builds again, changes the options of, or tells of Keel.
+//! same for the Zeabur Builder `Build` it builds again, changes the options of, or tells of Keel,
+//! and for the PostgreSQL database whose port it opens.
 
 use zeabur_kube::{Cluster, ClusterError, ClusterExt as _};
 use zeabur_plan::{Change, Fetched, PlanRequest};
@@ -19,6 +20,11 @@ pub(super) async fn edited_objects(
 ) -> Result<Vec<Fetched>, ApiError> {
     let mut out: Vec<Fetched> = Vec::new();
     let builds = zeabur_plan::builds::builds();
+    let clusters = zeabur_plan::checks::ResourceRef {
+        group: "postgresql.cnpg.io".to_owned(),
+        version: "v1".to_owned(),
+        resource: "clusters".to_owned(),
+    };
     for change in &request.changes {
         let (resource, name) =
             if let Change::Rebuild { build }
@@ -32,6 +38,10 @@ pub(super) async fn edited_objects(
             } = change
             {
                 (&builds, build)
+            } else if let Change::DatabasePublicPort(public) = change
+                && !public.remove
+            {
+                (&clusters, &public.database)
             } else if let Change::Edit { resource, name, .. } = change
                 && zeabur_plan::checks::resource_allowed(resource).allowed
             {

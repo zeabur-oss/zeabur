@@ -17,16 +17,21 @@
 //! Each database carries its members' pods, which its logs, events and terminal are read from; a
 //! refused pod read leaves them empty.
 //!
+//! A PostgreSQL database carries its public port: the `LoadBalancer` Service
+//! `<database>-public-5432` that `zeabur_plan`'s `public_port` module makes, with the addresses its
+//! load balancer reports. The project's Services are read once, and only when it has a PostgreSQL
+//! database; a refused read leaves the port out.
+//!
 //! Databases are created, changed and backed up through plans like any other change: the kinds
 //! are in `zeabur_plan::CREATABLE`, and the writes go with the person's credential.
 
 use serde::Serialize;
 use utoipa::ToSchema;
 use zeabur_core::problem::{MEDIA_TYPE as PROBLEM, Problem};
-use zeabur_kube::k8s_openapi::api::core::v1::Pod;
+use zeabur_kube::k8s_openapi::api::core::v1::{Pod, Service};
 use zeabur_kube::k8s_openapi::jiff::Timestamp;
 use zeabur_kube::{Cluster, ClusterExt, DynamicObject};
-use zeabur_modules::databases::{self, Database, Engine};
+use zeabur_modules::databases::{self, Database, Engine, PublicPort};
 use zeabur_modules::{Module, cloudnative_pg, dragonfly, mariadb_operator, moco, percona_mongodb};
 
 use crate::error::ApiError;
@@ -175,6 +180,13 @@ async fn read(cluster: &dyn Cluster, project: &str) -> Result<ProjectDatabases, 
         };
         add_members(project, &mut items, &pods);
     }
+    if items.iter().any(|d| d.engine == Engine::Postgresql) {
+        match cluster.list::<Service>(Some(project)).await {
+            Ok(services) => add_public_ports(&mut items, &services),
+            Err(error) if error.code() == Some(403) => {}
+            Err(error) => return Err(failed(error)),
+        }
+    }
     items.sort_by(|a, b| (a.engine, &a.name).cmp(&(b.engine, &b.name)));
     Ok(ProjectDatabases {
         operators,
@@ -210,6 +222,24 @@ fn add_members(project: &str, items: &mut [Database], pods: &[Pod]) {
             .map(|p| zeabur_graph::pod_summary(project, p, now))
             .collect();
         database.pods.sort_by(|a, b| a.name.cmp(&b.name));
+    }
+}
+
+/// Gives each PostgreSQL database its `LoadBalancer` Service, when it has one.
+fn add_public_ports(items: &mut [Database], services: &[Service]) {
+    for database in items.iter_mut().filter(|d| d.engine == Engine::Postgresql) {
+        let name = zeabur_plan::database_public_service_name(&database.name);
+        let Some(found) = services.iter().find(|s| {
+            s.metadata.name.as_deref() == Some(name.as_str())
+                && s.spec.as_ref().and_then(|spec| spec.type_.as_deref()) == Some("LoadBalancer")
+        }) else {
+            continue;
+        };
+        database.public_port = Some(PublicPort {
+            service: name,
+            port: database.connection.port,
+            addresses: zeabur_graph::endpoint(found).external_addresses,
+        });
     }
 }
 

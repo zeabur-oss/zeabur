@@ -5577,6 +5577,22 @@ components:
         description: |-
           Open a port of a workload to the internet with a `LoadBalancer` Service, or close it (see
           the `public_port` module).
+      - allOf:
+        - $ref: "#/components/schemas/DatabasePublicPortChange"
+          description: |-
+            Open the port of a PostgreSQL database to the internet with a `LoadBalancer` Service, or
+            close it (see the `public_port` module).
+        - type: object
+          required:
+          - op
+          properties:
+            op:
+              type: string
+              enum:
+              - databasePublicPort
+        description: |-
+          Open the port of a PostgreSQL database to the internet with a `LoadBalancer` Service, or
+          close it (see the `public_port` module).
       - type: object
         description: Replace a workload's pods, as `kubectl rollout restart` does.
         required:
@@ -7708,6 +7724,11 @@ components:
         provider:
           type: string
           description: The provider (module id).
+        publicPort:
+          oneOf:
+          - $ref: "#/components/schemas/DatabasePublicPort"
+            description: Its port open to the internet, when it has one.
+          - type: "null"
         ready:
           type: integer
           format: int64
@@ -7930,6 +7951,41 @@ components:
         state:
           $ref: "#/components/schemas/ProviderState"
           description: Whether its objects could be read.
+    DatabasePublicPort:
+      type: object
+      description: "A port of the database open to the internet: a `LoadBalancer` Service."
+      required:
+      - service
+      - port
+      - addresses
+      properties:
+        addresses:
+          type: array
+          items:
+            type: string
+          description: |-
+            The addresses in the Service's `status.loadBalancer.ingress`, an IP or a hostname each,
+            in the load balancer's order; empty while it has none.
+        port:
+          type: integer
+          format: int32
+          description: The port on each address.
+          minimum: 0
+        service:
+          type: string
+          description: The Service.
+    DatabasePublicPortChange:
+      type: object
+      description: A [`Change::DatabasePublicPort`].
+      required:
+      - database
+      properties:
+        database:
+          type: string
+          description: The CloudNativePG `Cluster`.
+        remove:
+          type: boolean
+          description: "Close the port instead: delete the `LoadBalancer` Service that opened it."
     DatabaseRecoveryWindow:
       type: object
       description: The times a new database can recover to.
@@ -12982,6 +13038,26 @@ components:
             description: The workload.
       - type: object
         description: |-
+          Anyone on the internet can connect to the database: its password is all that protects
+          the data.
+        required:
+        - database
+        - port
+        - code
+        properties:
+          code:
+            type: string
+            enum:
+            - databasePublicPort
+          database:
+            type: string
+            description: The CloudNativePG `Cluster`.
+          port:
+            type: integer
+            format: int32
+            description: The port.
+      - type: object
+        description: |-
           A NetworkPolicy isolates the workload's pods and admits nothing from the internet, so the
           new public port does not answer until a policy admits it (added by the API, which reads the
           project's policies).
@@ -13007,6 +13083,32 @@ components:
           workload:
             $ref: "#/components/schemas/WorkloadRef"
             description: The workload.
+      - type: object
+        description: |-
+          [`Warning::PublicPortBlocked`] for a database's public port: a NetworkPolicy isolates the
+          database's pods and admits nothing from the internet.
+        required:
+        - database
+        - port
+        - policies
+        - code
+        properties:
+          code:
+            type: string
+            enum:
+            - databasePublicPortBlocked
+          database:
+            type: string
+            description: The CloudNativePG `Cluster`.
+          policies:
+            type: array
+            items:
+              type: string
+            description: The policies that isolate its pods, by name.
+          port:
+            type: integer
+            format: int32
+            description: The port.
       - type: object
         description: |-
           The Ingress serves these hostnames over plain HTTP, so the password crosses the network
@@ -14298,6 +14400,7 @@ components:
       - backUpVolumes
       - restoreVolumes
       - openTerminal
+      - portForward
       - readLogs
       - build
       - deployFromGit
@@ -14354,6 +14457,11 @@ components:
         openTerminal:
           $ref: "#/components/schemas/Permission"
           description: "Open a terminal in a container: `create` on `pods/exec`."
+        portForward:
+          $ref: "#/components/schemas/Permission"
+          description: |-
+            Forward a port from the person's computer to a pod, as `zeaburctl connect` does: `create`
+            on `pods/portforward`.
         readLogs:
           $ref: "#/components/schemas/Permission"
           description: "Read the pods' logs: `get` on `pods/log`."

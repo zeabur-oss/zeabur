@@ -2682,7 +2682,19 @@ export const zhCN: Messages = {
   "db.fact.created": "创建时间",
   "db.fact.operator": "Operator 报告",
   "db.connect": "连接",
-  "db.inCluster": "只能从集群内部连接。",
+  "db.inCluster": "这些信息只能在集群内部使用。",
+  "db.outside.title": "从集群外连接",
+  "db.outside.commandHint":
+    "在你的电脑上运行。它会通过集群把本机的一个端口接到数据库，并打印 127.0.0.1 的连接字符串。按 Ctrl-C 才会停止。",
+  "db.outside.refused": (reason) => `集群会拒绝你运行这条命令。${reason}。`,
+  "db.outside.docs": "安装 zeaburctl",
+  "db.outside.public": "对外端口",
+  "db.outside.publicHint": (port) =>
+    `在节点的地址上开放端口 ${port}，其他电脑上的工具不用 zeaburctl 也能连接。`,
+  "db.outside.address": "地址",
+  "db.outside.others": "其他节点",
+  "db.outside.private": (port) =>
+    `这些是节点的内网地址。要从互联网连接，请用节点的公网 IP 加上端口 ${port}，或在启动 k3s 时加上 --node-external-ip，这里就会显示。`,
   "db.noDatabase": "这个集群没有应用数据库。服务以 moco-writable 连接，这个用户可以创建数据库。",
   "db.noAuth": (engine) => `这个 ${engine} 没有设置密码，集群里的任何程序都能连接。`,
   "db.export": "导出",
@@ -3289,6 +3301,10 @@ export const zhCN: Messages = {
     "副本的事件会说明原因，可能是某项策略不允许以这个用户身份运行。",
   "sentence.problem.badRequest.fix.toolsLocally": () =>
     "在你自己的终端里运行 kubectl 和 helm，使用的是和 Zeabur 同一份 kubeconfig。",
+  "sentence.problem.summary.publicPort.unknownDatabase": (p) =>
+    `找不到名为 ${p.name} 的 PostgreSQL 数据库。`,
+  "sentence.problem.publicPort.fix.unknownDatabase": () =>
+    "刷新页面看看，这个数据库可能已经删除了。",
   "sentence.problem.summary.publicPort.alreadyPublic": (p) => `已经有名为 ${p.name} 的 Service。`,
   "sentence.problem.publicPort.fix.alreadyPublic": () => "刷新页面看看，这个端口可能已经开放了。",
   "sentence.problem.summary.publicPort.nameTooLong": (p) =>

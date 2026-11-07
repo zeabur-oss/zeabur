@@ -1359,6 +1359,16 @@ export type PublicPortChange = {
 }
 
 /**
+ * A [`Change::DatabasePublicPort`].
+ */
+export type DatabasePublicPortChange = {
+  /** The CloudNativePG `Cluster`. */
+  database: string
+  /** Close the port instead: delete the `LoadBalancer` Service that opened it. */
+  remove?: boolean
+}
+
+/**
  * Annotations to set.
  */
 export type LabelVolumeChangeAnnotations = { [key: string]: string }
@@ -1708,6 +1718,9 @@ export type Change =
     })
   | (PublicPortChange & {
       op: "publicPort"
+    })
+  | (DatabasePublicPortChange & {
+      op: "databasePublicPort"
     })
   | {
       op: "restart"
@@ -3235,6 +3248,13 @@ export type PlanWarning =
       workload: WorkloadRef
     }
   | {
+      code: "databasePublicPort"
+      /** The CloudNativePG `Cluster`. */
+      database: string
+      /** The port. */
+      port: number
+    }
+  | {
       code: "publicPortBlocked"
       /** The policies that isolate its pods, by name. */
       policies: string[]
@@ -3242,6 +3262,15 @@ export type PlanWarning =
       port: number
       /** The workload. */
       workload: WorkloadRef
+    }
+  | {
+      code: "databasePublicPortBlocked"
+      /** The CloudNativePG `Cluster`. */
+      database: string
+      /** The policies that isolate its pods, by name. */
+      policies: string[]
+      /** The port. */
+      port: number
     }
   | {
       code: "passwordOverHttp"
@@ -4498,6 +4527,24 @@ export type PodSummary = {
 }
 
 /**
+ * A port of the database open to the internet: a `LoadBalancer` Service.
+ */
+export type DatabasePublicPort = {
+  /**
+   * The addresses in the Service's `status.loadBalancer.ingress`, an IP or a hostname each,
+   * in the load balancer's order; empty while it has none.
+   */
+  addresses: string[]
+  /**
+   * The port on each address.
+   * @minimum 0
+   */
+  port: number
+  /** The Service. */
+  service: string
+}
+
+/**
  * The backup a database was made from, as Zeabur noted it on the object when it planned the
  * restore.
  */
@@ -4587,6 +4634,7 @@ export type Database = {
   primary?: string | null
   /** The provider (module id). */
   provider: string
+  publicPort?: DatabasePublicPort | null
   /** Members ready. */
   ready: number
   /** The object's plural resource name. */
@@ -8543,6 +8591,11 @@ export type ProjectRights = {
   deployFromGit: Permission
   /** Open a terminal in a container: `create` on `pods/exec`. */
   openTerminal: Permission
+  /**
+   * Forward a port from the person's computer to a pod, as `zeaburctl connect` does: `create`
+   * on `pods/portforward`.
+   */
+  portForward: Permission
   /** Read the pods' logs: `get` on `pods/log`. */
   readLogs: Permission
   /** Read Secret values: `get` on secrets. */

@@ -839,6 +839,28 @@ status:
       - ip: 203.0.113.10
 ---
 apiVersion: v1
+kind: Service
+metadata:
+  name: orders-public-5432
+  namespace: shop
+spec:
+  ports:
+    - name: postgres
+      nodePort: 31432
+      port: 5432
+      protocol: TCP
+      targetPort: 5432
+  selector:
+    cnpg.io/cluster: orders
+    cnpg.io/instanceRole: primary
+  type: LoadBalancer
+status:
+  loadBalancer:
+    ingress:
+      - ip: 203.0.113.20
+      - ip: 203.0.113.21
+---
+apiVersion: v1
 kind: ConfigMap
 data:
   502.html: <!doctype html><title>Shop</title><h1>Shop is not responding</h1>

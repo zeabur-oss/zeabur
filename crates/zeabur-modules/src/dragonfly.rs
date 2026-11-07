@@ -168,6 +168,7 @@ pub fn database(namespace: &str, store: &DynamicObject) -> Database {
             Vec::new()
         },
         resources: store.data.pointer("/spec/resources").cloned(),
+        public_port: None,
         connection: Connection {
             host: format!("{name}.{namespace}.svc"),
             port: 6379,

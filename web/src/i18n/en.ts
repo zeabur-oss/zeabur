@@ -2932,7 +2932,20 @@ export const en = {
   "db.fact.created": "Created",
   "db.fact.operator": "Operator says",
   "db.connect": "Connect",
-  "db.inCluster": "Reachable from inside the cluster.",
+  "db.inCluster": "These work only inside the cluster.",
+  "db.outside.title": "Connect from outside the cluster",
+  "db.outside.commandHint":
+    "Run it on your computer. It connects a local port to the database through the cluster and prints a connection string on 127.0.0.1. It keeps running until you press Ctrl-C.",
+  "db.outside.refused": (reason: string) =>
+    `The cluster will refuse this command for you. ${reason}.`,
+  "db.outside.docs": "Install zeaburctl",
+  "db.outside.public": "Public port",
+  "db.outside.publicHint": (port: number) =>
+    `Opens port ${port} on the nodes' addresses, so tools on other machines can connect without zeaburctl.`,
+  "db.outside.address": "Address",
+  "db.outside.others": "Other nodes",
+  "db.outside.private": (port: number) =>
+    `These are the nodes' private addresses. From the internet, use a node's public IP with port ${port}, or start k3s with --node-external-ip so this page shows it.`,
   "db.noDatabase":
     "This cluster has no app database. Services connect as moco-writable, which can create one.",
   "db.noAuth": (engine: string) =>
@@ -3606,6 +3619,10 @@ export const en = {
     "Read the replica's events for the reason; a policy may forbid the user it runs as.",
   "sentence.problem.badRequest.fix.toolsLocally": () =>
     "Run kubectl and helm in your own terminal; they use the same kubeconfig as Zeabur.",
+  "sentence.problem.summary.publicPort.unknownDatabase": (p: P) =>
+    `There is no PostgreSQL database named ${p.name}.`,
+  "sentence.problem.publicPort.fix.unknownDatabase": () =>
+    "Reload the page: the database may have been deleted.",
   "sentence.problem.summary.publicPort.alreadyPublic": (p: P) =>
     `A Service named ${p.name} already exists.`,
   "sentence.problem.publicPort.fix.alreadyPublic": () =>

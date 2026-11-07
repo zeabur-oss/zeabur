@@ -1,0 +1,24 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: orders
+  namespace: demo
+  uid: c-orders
+  resourceVersion: "30"
+spec:
+  instances: 1
+status:
+  writeService: orders-rw
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: orders-rw
+  namespace: demo
+  ownerReferences:
+    - {apiVersion: postgresql.cnpg.io/v1, kind: Cluster, name: orders, uid: c-orders, controller: true}
+spec:
+  type: ClusterIP
+  selector: {cnpg.io/cluster: orders, cnpg.io/instanceRole: primary}
+  ports:
+    - {name: postgres, port: 5432, targetPort: 5432, protocol: TCP}

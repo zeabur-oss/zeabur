@@ -282,6 +282,7 @@ pub fn database(namespace: &str, cluster: &DynamicObject, backups: &[DynamicObje
             .map(str::to_owned),
         claims,
         resources: replset.and_then(|r| r.get("resources")).cloned(),
+        public_port: None,
         connection: Connection {
             host: format!("{name}-{rs}.{namespace}.svc"),
             port: 27017,

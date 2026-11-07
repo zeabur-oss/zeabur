@@ -157,6 +157,25 @@ Exports run in the database container using your `pods/exec` permission. MySQL a
 
 Use the corresponding database tools to work with downloaded dumps. **Restore to a new database** uses S3 backup records and has no field for uploading a dump.
 
+## Connect from outside the cluster
+
+**Connect** on the database page lists addresses that work only inside the cluster. To reach the database from your own computer, for example with `psql` or a desktop client, use one of these:
+
+- **zeaburctl**, for every engine. Copy the command under **Connect from outside the cluster** and run it on your computer:
+
+  ```sh
+  zeaburctl connect shop/orders
+  ```
+
+  It forwards a local port to the database through kube-apiserver and prints a connection string on `127.0.0.1`. Nothing in the cluster changes, and the connection stops when you press Ctrl-C. You need `create pods/portforward` in the project, which Developers have. See [`connect`](../reference/zeaburctl.mdx#connect) for the options.
+- **Public port**, for PostgreSQL only. Turn on **Public port** and apply the plan. Zeabur adds a LoadBalancer Service for port 5432, so the database answers on the nodes' addresses. Anyone on the internet can then try to connect, and the database password is all that protects the data. Use zeaburctl when you can.
+
+When the load balancer gives the Service an address, the page shows it with a connection string that asks for TLS (`sslmode=require`). Other addresses in the list belong to other nodes and work too. Until an address comes, the page says it is waiting and shows the load balancer's reason when there is one, such as no node having port 5432 free.
+
+If every address is private (10.x, 172.16–31.x, or 192.168.x), the cluster doesn't know the nodes' public addresses. Connect to a node's public IP on port 5432, or start k3s with `--node-external-ip` so the page shows it.
+
+To close the port, turn **Public port** off. Deleting the database also removes the Service.
+
 ## Verify the result
 
 The database is ready to use when its page shows **Ready** and **Connections** lists a host and port. After setting up backups, you have a restorable backup only when the first record in **Backups** shows success.
