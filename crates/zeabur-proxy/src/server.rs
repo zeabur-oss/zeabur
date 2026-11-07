@@ -9,12 +9,13 @@ use bytes::Bytes;
 use http::{HeaderMap, HeaderValue, Method, Request, Response, StatusCode, Uri, header};
 use http_body_util::combinators::BoxBody;
 use http_body_util::{BodyExt as _, Full};
+use hyper_util::server::graceful::GracefulShutdown;
 use k8s_openapi::jiff::Timestamp;
 use tokio::net::TcpListener;
 use tokio_rustls::TlsAcceptor;
 
 use crate::access::{Reviewer, Token};
-use crate::audit::{Audit, Inflight};
+use crate::audit::Audit;
 use crate::logs::{Logs, LogsLimits};
 use crate::metrics::{Metrics, MetricsLimits};
 use crate::reject::Reject;
@@ -44,10 +45,6 @@ pub struct Settings {
     pub logs: Option<BackendConfig<LogsLimits>>,
     /// VictoriaMetrics, when one is configured.
     pub metrics: Option<BackendConfig<MetricsLimits>>,
-    /// Queries in flight for the whole proxy.
-    pub max_inflight: usize,
-    /// Queries in flight for one person.
-    pub max_inflight_per_person: usize,
 }
 
 /// The proxy: settings, the access review and the backends' client.
@@ -56,7 +53,6 @@ pub struct Proxy<R> {
     reviewer: R,
     settings: Settings,
     client: Client,
-    inflight: Arc<Inflight>,
 }
 
 impl<R: Reviewer> Proxy<R> {
@@ -66,16 +62,11 @@ impl<R: Reviewer> Proxy<R> {
         Arc::new(Self {
             reviewer,
             client: upstream::client(Duration::from_secs(5)),
-            inflight: Inflight::new(settings.max_inflight, settings.max_inflight_per_person),
             settings,
         })
     }
 
     /// Answers one request.
-    #[expect(
-        clippy::significant_drop_tightening,
-        reason = "the audit record is written by whichever branch ends the request"
-    )]
     pub async fn handle<B>(self: Arc<Self>, request: Request<B>) -> Response<ProxyBody> {
         let (method, uri, headers) = {
             let (parts, _) = request.into_parts();
@@ -153,7 +144,6 @@ impl<R: Reviewer> Proxy<R> {
         audit.user(grant.user());
         let authorized = Authorized::new::<B>(query, grant)?;
         let upstream = B::build(&authorized, &config.limits, Timestamp::now())?;
-        audit.hold(self.inflight.enter(authorized.grant().user())?);
         match upstream::send(&self.client, &config.url, &upstream, config.timeout).await? {
             Answer::Data { content_type, body } => Ok(Served::Data {
                 content_type,
@@ -239,68 +229,67 @@ fn no_store(mut response: Response<ProxyBody>) -> Response<ProxyBody> {
     response
 }
 
-/// How long a client has to send a request's headers.
-const HEADER_WAIT: Duration = Duration::from_secs(10);
-/// Connections served at once; more wait in the listener's backlog.
-const MAX_CONNECTIONS: usize = 256;
-
-/// Serves `listener` until the task is dropped, over TLS when `tls` is given.
-///
-/// # Errors
-///
-/// When accepting fails for a reason other than one connection.
+/// Serves `listener`, over TLS when `tls` is given, until `stop` completes; then takes no new
+/// connection, drops unfinished TLS handshakes and returns once the open connections have answered.
 pub async fn serve<R: Reviewer>(
     listener: TcpListener,
     tls: Option<TlsAcceptor>,
     proxy: Arc<Proxy<R>>,
-) -> io::Result<()> {
-    let connections = Arc::new(tokio::sync::Semaphore::new(MAX_CONNECTIONS));
+    stop: impl Future<Output = ()>,
+) {
+    let graceful = GracefulShutdown::new();
+    let (stopping, stopped) = tokio::sync::watch::channel(false);
+    let mut stop = std::pin::pin!(stop);
     loop {
-        let permit = Arc::clone(&connections)
-            .acquire_owned()
-            .await
-            .map_err(io::Error::other)?;
-        let (stream, _) = match listener.accept().await {
-            Ok(accepted) => accepted,
-            Err(error) => {
-                tracing::warn!(%error, "accept failed");
-                continue;
-            }
+        let stream = tokio::select! {
+            accepted = listener.accept() => match accepted {
+                Ok((stream, _)) => stream,
+                Err(error) => {
+                    tracing::warn!(%error, "accept failed");
+                    continue;
+                }
+            },
+            () = &mut stop => break,
         };
         let proxy = Arc::clone(&proxy);
         let tls = tls.clone();
+        let watcher = graceful.watcher();
+        let mut stopped = stopped.clone();
         tokio::spawn(async move {
             let service = hyper::service::service_fn(move |request| {
                 let proxy = Arc::clone(&proxy);
                 async move { Ok::<_, Infallible>(proxy.handle(request).await) }
             });
             let mut http = hyper::server::conn::http1::Builder::new();
-            http.timer(hyper_util::rt::TokioTimer::new())
-                .header_read_timeout(HEADER_WAIT)
-                .max_headers(64);
-            let served = match tls {
-                Some(tls) => match tokio::time::timeout(HEADER_WAIT, tls.accept(stream)).await {
-                    Ok(Ok(stream)) => {
-                        http.serve_connection(hyper_util::rt::TokioIo::new(stream), service)
-                            .await
+            http.timer(hyper_util::rt::TokioTimer::new());
+            let served = if let Some(tls) = tls {
+                let handshake = tokio::select! {
+                    handshake = tls.accept(stream) => handshake,
+                    _ = stopped.wait_for(|stopping| *stopping) => return,
+                };
+                match handshake {
+                    Ok(stream) => {
+                        let connection =
+                            http.serve_connection(hyper_util::rt::TokioIo::new(stream), service);
+                        watcher.watch(connection).await
                     }
-                    Ok(Err(error)) => {
+                    Err(error) => {
                         tracing::debug!(%error, "TLS handshake failed");
                         Ok(())
                     }
-                    Err(_) => Ok(()),
-                },
-                None => {
-                    http.serve_connection(hyper_util::rt::TokioIo::new(stream), service)
-                        .await
                 }
+            } else {
+                let connection =
+                    http.serve_connection(hyper_util::rt::TokioIo::new(stream), service);
+                watcher.watch(connection).await
             };
             if let Err(error) = served {
                 tracing::debug!(%error, "connection ended");
             }
-            drop(permit);
         });
     }
+    stopping.send_replace(true);
+    graceful.shutdown().await;
 }
 
 #[cfg(test)]
@@ -308,7 +297,8 @@ mod tests {
     use std::sync::Mutex;
 
     use http_body_util::Empty;
-    use k8s_openapi::jiff::Timestamp;
+    use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
+    use tokio::sync::Notify;
 
     use super::*;
     use crate::access::Grant;
@@ -336,11 +326,7 @@ mod tests {
             } else if self.allowed.contains(&namespace.as_str())
                 && (resource == "logs" || resource == "metrics")
             {
-                Ok(Grant::for_tests(
-                    namespace.as_str(),
-                    resource,
-                    "2026-01-01T00:00:00Z".parse::<Timestamp>().unwrap(),
-                ))
+                Ok(Grant::for_tests(namespace.as_str(), resource))
             } else {
                 Err(Reject::Forbidden)
             };
@@ -407,8 +393,6 @@ mod tests {
                     timeout: Duration::from_secs(5),
                     max_bytes,
                 }),
-                max_inflight: 4,
-                max_inflight_per_person: 2,
             },
         )
     }
@@ -516,12 +500,6 @@ mod tests {
                 404,
                 "unknown_backend",
             ),
-            (
-                "/logs/select/logsql/query?namespace=a&end=2025-01-01T00:00:00Z",
-                Some("good"),
-                400,
-                "before_namespace",
-            ),
         ] {
             let response = Arc::clone(&proxy).handle(get(target, token)).await;
             assert_eq!(response.status().as_u16(), status, "{target}");
@@ -535,7 +513,7 @@ mod tests {
         assert!(seen.lock().unwrap().is_empty());
         assert_eq!(
             *proxy.reviewer.asked.lock().unwrap(),
-            ["b", "a"],
+            ["b"],
             "only well-formed requests are reviewed"
         );
     }
@@ -559,6 +537,107 @@ mod tests {
         for name in ["authorization", "cookie", "accountid", "projectid"] {
             assert!(sent.get(name).is_none(), "{name}");
         }
+    }
+
+    #[tokio::test]
+    async fn a_query_under_way_when_the_proxy_stops_still_gets_its_answer() {
+        let backend = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let url: Uri = format!("http://{}", backend.local_addr().unwrap())
+            .parse()
+            .unwrap();
+        let (arrived, release) = (Arc::new(Notify::new()), Arc::new(Notify::new()));
+        let (arrived_at_backend, released) = (Arc::clone(&arrived), Arc::clone(&release));
+        tokio::spawn(async move {
+            let (stream, _) = backend.accept().await.unwrap();
+            let service = hyper::service::service_fn(move |_request: Request<_>| {
+                let (arrived, release) = (Arc::clone(&arrived_at_backend), Arc::clone(&released));
+                async move {
+                    arrived.notify_one();
+                    release.notified().await;
+                    Ok::<_, Infallible>(Response::new(Full::new(Bytes::from_static(b"late"))))
+                }
+            });
+            let io = hyper_util::rt::TokioIo::new(stream);
+            hyper::server::conn::http1::Builder::new()
+                .serve_connection(io, service)
+                .await
+                .unwrap();
+        });
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let (stop, stopped) = tokio::sync::oneshot::channel::<()>();
+        let proxy = proxy(url, allowing(&["a"]), 1 << 20);
+        let mut server = tokio::spawn(serve(listener, None, proxy, async {
+            stopped.await.unwrap();
+        }));
+
+        let mut client = tokio::net::TcpStream::connect(address).await.unwrap();
+        client
+            .write_all(
+                b"GET /metrics/api/v1/query?namespace=a&query=up HTTP/1.1\r\n\
+                  host: proxy\r\nauthorization: Bearer good\r\n\r\n",
+            )
+            .await
+            .unwrap();
+        arrived.notified().await;
+        stop.send(()).unwrap();
+        let waiting = tokio::time::timeout(Duration::from_millis(200), &mut server).await;
+        assert!(waiting.is_err(), "the proxy stopped before answering");
+        release.notify_one();
+        let mut answer = String::new();
+        client.read_to_string(&mut answer).await.unwrap();
+        assert!(answer.starts_with("HTTP/1.1 200"), "{answer}");
+        assert!(answer.contains("connection: close"), "{answer}");
+        assert!(answer.ends_with("\r\nlate\r\n0\r\n\r\n"), "{answer}");
+        tokio::time::timeout(Duration::from_secs(5), server)
+            .await
+            .unwrap()
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn an_unfinished_tls_handshake_does_not_hold_up_stopping() {
+        let config = rustls::ServerConfig::builder()
+            .with_no_client_auth()
+            .with_cert_resolver(Arc::new(rustls::server::ResolvesServerCertUsingSni::new()));
+        let tls = TlsAcceptor::from(Arc::new(config));
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let (stop, stopped) = tokio::sync::oneshot::channel::<()>();
+        let (url, _) = backend(200, "{}").await;
+        let server = tokio::spawn(serve(
+            listener,
+            Some(tls),
+            proxy(url, allowing(&["a"]), 1 << 20),
+            async {
+                stopped.await.unwrap();
+            },
+        ));
+
+        let _silent = tokio::net::TcpStream::connect(address).await.unwrap();
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        stop.send(()).unwrap();
+        tokio::time::timeout(Duration::from_secs(5), server)
+            .await
+            .expect("stopping waited for the handshake")
+            .unwrap();
+    }
+
+    // Usage history asks for CPU, memory and restarts at once; VictoriaMetrics queues what it
+    // cannot run yet, so the proxy refuses none of them.
+    #[tokio::test]
+    async fn one_persons_queries_at_once_all_reach_the_backend() {
+        let (url, seen) = backend(200, "{\"status\":\"success\"}").await;
+        let proxy = proxy(url, allowing(&["a"]), 1 << 20);
+        let mut answers = Vec::new();
+        for _ in 0..3 {
+            let target = "/metrics/api/v1/query?namespace=a&query=up";
+            answers.push(Arc::clone(&proxy).handle(get(target, Some("good"))).await);
+        }
+        for answer in &answers {
+            assert_eq!(answer.status(), StatusCode::OK);
+        }
+        assert_eq!(seen.lock().unwrap().len(), 3);
     }
 
     #[tokio::test]

@@ -256,8 +256,7 @@
               "additionalProperties": { "type": "string" }
             },
             "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
-            "maxLimit": { "type": "integer", "minimum": 1, "maximum": 100000 },
-            "maxHours": { "type": "integer", "minimum": 1, "maximum": 8784 }
+            "maxLimit": { "type": "integer", "minimum": 1, "maximum": 100000 }
           }
         },
         "metrics": {
@@ -270,8 +269,7 @@
               "type": "object",
               "minProperties": 1,
               "additionalProperties": { "type": "string" }
-            },
-            "maxHours": { "type": "integer", "minimum": 1, "maximum": 8784 }
+            }
           }
         },
         "tls": {

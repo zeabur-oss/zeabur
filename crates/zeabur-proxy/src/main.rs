@@ -11,7 +11,6 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use clap::Parser;
-use k8s_openapi::jiff::SignedDuration;
 use tracing_subscriber::filter::{LevelFilter, Targets};
 use tracing_subscriber::layer::SubscriberExt as _;
 use tracing_subscriber::util::SubscriberInitExt as _;
@@ -40,17 +39,11 @@ struct Args {
     /// The most log lines one query returns.
     #[arg(long, env = "ZEABUR_PROXY_LOGS_MAX_LIMIT", default_value_t = 1000)]
     logs_max_limit: u32,
-    /// The longest range one log query covers, in hours.
-    #[arg(long, env = "ZEABUR_PROXY_LOGS_MAX_HOURS", default_value_t = 24 * 7)]
-    logs_max_hours: i64,
     /// VictoriaMetrics' (or another Prometheus API's with `extra_label`) base URL, such as
     /// `http://vmsingle-vm-victoria-metrics-k8s-stack.observability.svc:8428`. Unset: `/metrics/`
     /// is not served.
     #[arg(long, env = "ZEABUR_PROXY_METRICS_URL")]
     metrics_url: Option<http::Uri>,
-    /// The longest range one metrics query covers, in hours.
-    #[arg(long, env = "ZEABUR_PROXY_METRICS_MAX_HOURS", default_value_t = 24 * 7)]
-    metrics_max_hours: i64,
 }
 
 /// How long kube-apiserver may take to answer an access review.
@@ -61,10 +54,6 @@ const REVIEW_CACHE: Duration = Duration::from_secs(10);
 const BACKEND_TIMEOUT: Duration = Duration::from_secs(30);
 /// The most bytes one answer may have.
 const MAX_BYTES: u64 = 16 << 20;
-/// Queries in flight for the whole proxy.
-const MAX_INFLIGHT: usize = 16;
-/// Queries in flight for one person.
-const MAX_INFLIGHT_PER_PERSON: usize = 2;
 
 /// Info and above, and nothing from kube-rs, which logs response bodies at `WARN`, `DEBUG` and
 /// `TRACE`. The proxy depends on no workspace crate, so this is a copy of `zeabur`'s filter.
@@ -142,18 +131,10 @@ async fn run(args: Args) -> Result<(), String> {
         args.logs_url,
         LogsLimits {
             max_limit: args.logs_max_limit,
-            max_span: SignedDuration::from_hours(args.logs_max_hours),
             ..LogsLimits::default()
         },
     )?;
-    let metrics = backend(
-        "metrics",
-        args.metrics_url,
-        MetricsLimits {
-            max_span: SignedDuration::from_hours(args.metrics_max_hours),
-            ..MetricsLimits::default()
-        },
-    )?;
+    let metrics = backend("metrics", args.metrics_url, MetricsLimits::default())?;
     let tls = match (args.tls_cert, args.tls_key) {
         (Some(cert), Some(key)) => Some(tokio_rustls::TlsAcceptor::from(Arc::new(
             zeabur_proxy::tls::Reloading::new(cert, key)?.config(),
@@ -166,23 +147,13 @@ async fn run(args: Args) -> Result<(), String> {
             return Err("give both the TLS certificate and key".to_owned());
         }
     };
-    let proxy = Proxy::new(
-        reviewer,
-        Settings {
-            logs,
-            metrics,
-            max_inflight: MAX_INFLIGHT,
-            max_inflight_per_person: MAX_INFLIGHT_PER_PERSON,
-        },
-    );
+    let proxy = Proxy::new(reviewer, Settings { logs, metrics });
     let listener = tokio::net::TcpListener::bind(args.listen)
         .await
         .map_err(|e| format!("cannot listen on {}: {e}", args.listen))?;
     tracing::info!(address = %args.listen, "listening");
-    tokio::select! {
-        served = server::serve(listener, tls, proxy) => served.map_err(|e| e.to_string()),
-        () = stopped() => Ok(()),
-    }
+    server::serve(listener, tls, proxy, stopped()).await;
+    Ok(())
 }
 
 fn backend<L>(

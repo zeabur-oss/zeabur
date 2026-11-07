@@ -12,10 +12,8 @@
 //! Only the Prometheus query, range query, series, label names and label values APIs are served.
 //! Others, such as `export`, `federate`, `status/tsdb`, `metadata` or the vmalert ones, are not.
 //!
-//! The range is cut to start no earlier than the namespace's creation, as for logs. A range
-//! selector, a subquery or `offset` still reads samples before the start, so a namespace
-//! recreated under the same name may show the earlier one's usage near its creation. The
-//! namespace label, not the time, is what keeps other namespaces out.
+//! The namespace label is what keeps other namespaces out. A namespace recreated under the same
+//! name is the same namespace here, and shows the earlier one's usage while it is kept.
 
 use http::Method;
 use k8s_openapi::jiff::{SignedDuration, Timestamp};
@@ -110,8 +108,6 @@ impl Scoped for MetricsQuery {
 pub struct MetricsLimits {
     /// The range when the request names no start.
     pub default_span: SignedDuration,
-    /// The longest range; an earlier start is moved up to it.
-    pub max_span: SignedDuration,
     /// The most series, names or values; a larger limit is lowered to it.
     pub max_limit: u32,
 }
@@ -120,7 +116,6 @@ impl Default for MetricsLimits {
     fn default() -> Self {
         Self {
             default_span: SignedDuration::from_hours(1),
-            max_span: SignedDuration::from_hours(24 * 7),
             max_limit: 10_000,
         }
     }
@@ -242,7 +237,7 @@ impl Backend for Metrics {
         })
     }
 
-    /// Times are cut to the namespace's creation and to now, a range to the longest span (a
+    /// Times are cut to now, a range to the longest span (a
     /// range query's start moves by whole steps, so its points stay on the asked grid), and a
     /// limit to the most allowed.
     fn build(
@@ -251,7 +246,6 @@ impl Backend for Metrics {
         now: Timestamp,
     ) -> Result<Upstream, Reject> {
         let query = authorized.query();
-        let created = ceil(authorized.grant().created());
         let now = now.as_second();
         let filter = (
             "extra_label",
@@ -260,20 +254,13 @@ impl Backend for Metrics {
         let text = || query.query.clone().ok_or(Reject::InvalidQuery);
         if query.endpoint == Endpoint::Query {
             let at = query.time.map_or(now, Timestamp::as_second).min(now);
-            if at <= created {
-                return Err(Reject::BeforeNamespace);
-            }
             return Ok(Upstream::new(
                 QUERY_PATH,
                 vec![("query", text()?), ("time", at.to_string()), filter],
             ));
         }
         let end = query.end.map_or(now, Timestamp::as_second).min(now);
-        if end <= created {
-            return Err(Reject::BeforeNamespace);
-        }
-        let earliest = end.saturating_sub(limits.max_span.as_secs()).max(created);
-        let mut start = query.start.map_or_else(
+        let start = query.start.map_or_else(
             || end.saturating_sub(limits.default_span.as_secs()),
             Timestamp::as_second,
         );
@@ -282,10 +269,6 @@ impl Backend for Metrics {
             .filter(|_| query.endpoint == Endpoint::QueryRange)
         {
             let step = i64::from(step);
-            if start < earliest {
-                let steps = (earliest - start).saturating_add(step - 1) / step;
-                start = start.saturating_add(steps.saturating_mul(step));
-            }
             if start > end {
                 return Err(Reject::InvalidTime);
             }
@@ -303,7 +286,6 @@ impl Backend for Metrics {
                 ],
             ));
         }
-        start = start.max(earliest);
         if start > end {
             return Err(Reject::InvalidTime);
         }
@@ -332,16 +314,6 @@ impl Backend for Metrics {
     }
 }
 
-/// Whole seconds, rounded up.
-fn ceil(at: Timestamp) -> i64 {
-    let seconds = at.as_second();
-    if at.subsec_nanosecond() > 0 {
-        seconds.saturating_add(1)
-    } else {
-        seconds
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use proptest::prelude::*;
@@ -352,19 +324,13 @@ mod tests {
     const RANGE: &str = "/metrics/api/v1/query_range";
     /// 2026-10-22T12:00:00Z.
     const NOW: i64 = 1_792_670_400;
-    /// 2026-10-01T00:00:00Z.
-    const CREATED: i64 = 1_790_812_800;
 
     fn now() -> Timestamp {
         Timestamp::from_second(NOW).unwrap()
     }
 
     fn grant(namespace: &str) -> Grant {
-        Grant::for_tests(
-            namespace,
-            Metrics::RESOURCE,
-            Timestamp::from_second(CREATED).unwrap(),
-        )
+        Grant::for_tests(namespace, Metrics::RESOURCE)
     }
 
     fn parse(path: &str, query: &str) -> Result<MetricsQuery, Reject> {
@@ -561,7 +527,7 @@ mod tests {
             Authorized::new::<Metrics>(query.clone(), grant("b")).err(),
             Some(Reject::Forbidden)
         );
-        let logs = Grant::for_tests("a", "logs", Timestamp::from_second(CREATED).unwrap());
+        let logs = Grant::for_tests("a", "logs");
         assert_eq!(
             Authorized::new::<Metrics>(query, logs).err(),
             Some(Reject::Forbidden)
@@ -610,18 +576,16 @@ mod tests {
     }
 
     #[test]
-    fn times_start_when_the_namespace_was_created_and_stay_on_the_grid() {
-        let query = parse(RANGE, "namespace=shop&query=up&step=3600&start=1790800000").unwrap();
+    fn times_stay_before_now_and_a_range_has_bounded_points() {
+        let query = parse(
+            RANGE,
+            "namespace=shop&query=up&step=3600&start=1790800000&end=1900000000",
+        )
+        .unwrap();
         let upstream = build(query, "shop").unwrap();
-        let start: i64 = param(&upstream, "start")[0].parse().unwrap();
-        assert!(start >= CREATED);
-        assert_eq!((start - 1_790_800_000) % 3600, 0);
+        assert_eq!(param(&upstream, "start"), ["1790800000"]);
         assert_eq!(param(&upstream, "end"), [NOW.to_string()]);
 
-        let before = parse(RANGE, "namespace=shop&query=up&step=60&end=1790000000").unwrap();
-        assert_eq!(build(before, "shop"), Err(Reject::BeforeNamespace));
-        let instant = parse("/metrics/api/v1/query", "namespace=shop&query=up&time=1").unwrap();
-        assert_eq!(build(instant, "shop"), Err(Reject::BeforeNamespace));
         let later = parse(
             "/metrics/api/v1/query",
             "namespace=shop&query=up&time=1900000000",
