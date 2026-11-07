@@ -1551,6 +1551,8 @@ export const zhTW: Messages = {
   "confirm.alsoReads": (names, object) => `也會影響 ${names}（讀取 ${object}）。`,
   "confirm.alsoAffects": (names) => `也會影響 ${names}。`,
   "confirm.addDomain": (host, service) => `${host} 會連到 ${service}。`,
+  "confirm.port": (service, from, to) =>
+    `${service} 從連接埠 ${from} 改用 ${to}：容器連接埠、健康檢查和 PORT 都會跟著調整，私有位址也會把流量轉送到 ${to}。`,
   "confirm.image": (service, tag) => `${service} 會改為執行 ${tag}。`,
   "confirm.rebuild": (build) => `Zeabur Builder 會用分支最新的提交重新建置 ${build}。`,
   "confirm.buildOptions": (build) => `從下一次建置起，Zeabur Builder 用這些選項建置 ${build}。`,
@@ -3367,6 +3369,15 @@ export const zhTW: Messages = {
   "fixer.clusterAdmin.lead": "這需要叢集管理員處理：",
   "diagnosis.copy": "複製診斷",
   "diagnosis.copyFailed": "無法複製診斷，請再試一次。",
+  "wrongPort.cause": (port) => `應用程式沒有監聽連接埠 ${port}。`,
+  "wrongPort.why": (port) =>
+    `Zeabur 把 PORT 設成 ${port}，也會檢查這個連接埠。連線一直被拒絕，已經超過一分鐘。`,
+  "wrongPort.fix":
+    "讓應用程式讀取 PORT，或改用實際監聽的連接埠，日誌通常會寫出是哪一個。如果只監聽 127.0.0.1，請改成監聽 0.0.0.0。",
+  "wrongPort.fixOffer": (port) =>
+    `映像檔宣告的連接埠是 ${port}，可以改用它，或讓應用程式讀取 PORT。如果只監聽 127.0.0.1，請改成監聽 0.0.0.0。`,
+  "wrongPort.use": (port) => `改用連接埠 ${port}`,
+  "wrongPort.plan": (service, port) => `${service} 改用連接埠 ${port}`,
   "diagnosis.lastSeen": "最後出現",
   "trace.title": "連線檢查",
   "trace.reachable": "可連線",

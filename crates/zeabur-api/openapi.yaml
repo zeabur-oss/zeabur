@@ -5775,6 +5775,36 @@ components:
             description: The workload.
       - type: object
         description: |-
+          Move the port a container listens on: its declared port, its probes, its `PORT` and the
+          Services that send traffic to it (see the `port` module).
+        required:
+        - workload
+        - from
+        - to
+        - op
+        properties:
+          container:
+            type:
+            - string
+            - "null"
+            description: The container; may be left out when the workload has only one.
+          from:
+            type: integer
+            format: int32
+            description: The port it is set to listen on now.
+          op:
+            type: string
+            enum:
+            - port
+          to:
+            type: integer
+            format: int32
+            description: The port it listens on.
+          workload:
+            $ref: "#/components/schemas/WorkloadRef"
+            description: The workload.
+      - type: object
+        description: |-
           Have Stakater Reloader replace a workload's pods when a ConfigMap or Secret it reads
           changes, or stop it: the workload's `reloader.stakater.com/auto` annotation (see the
           `reload` module).

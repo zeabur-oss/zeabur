@@ -1,0 +1,385 @@
+{
+  "impact": [
+    {
+      "kind": "Deployment",
+      "name": "web"
+    }
+  ],
+  "objects": [
+    {
+      "after": {
+        "apiVersion": "v1",
+        "data": {
+          "NODE_ENV": "(hidden)",
+          "PORT": "(hidden)"
+        },
+        "kind": "Secret",
+        "metadata": {
+          "name": "web-env",
+          "namespace": "demo"
+        },
+        "type": "Opaque"
+      },
+      "afterYaml": "apiVersion: v1\nkind: Secret\nmetadata:\n  name: web-env\n  namespace: demo\ndata:\n  NODE_ENV: (hidden)\n  PORT: (hidden)\ntype: Opaque\n",
+      "before": {
+        "apiVersion": "v1",
+        "data": {
+          "NODE_ENV": "(hidden)",
+          "PORT": "(hidden)"
+        },
+        "kind": "Secret",
+        "metadata": {
+          "name": "web-env",
+          "namespace": "demo"
+        },
+        "type": "Opaque"
+      },
+      "beforeYaml": "apiVersion: v1\nkind: Secret\nmetadata:\n  name: web-env\n  namespace: demo\ndata:\n  NODE_ENV: (hidden)\n  PORT: (hidden)\ntype: Opaque\n",
+      "changes": [
+        {
+          "after": "(hidden)",
+          "before": "(hidden)",
+          "path": "data.PORT"
+        }
+      ],
+      "owners": [],
+      "resourceVersion": "5",
+      "target": {
+        "apiVersion": "v1",
+        "kind": "Secret",
+        "name": "web-env",
+        "plural": "secrets"
+      },
+      "write": {
+        "operations": [
+          {
+            "op": "test",
+            "path": "/metadata/resourceVersion",
+            "value": "5"
+          },
+          {
+            "op": "add",
+            "path": "/data/PORT",
+            "value": "MzAwMA=="
+          }
+        ],
+        "type": "patch"
+      }
+    },
+    {
+      "after": {
+        "apiVersion": "apps/v1",
+        "kind": "Deployment",
+        "metadata": {
+          "name": "web",
+          "namespace": "demo"
+        },
+        "spec": {
+          "replicas": 1,
+          "selector": {
+            "matchLabels": {
+              "app.kubernetes.io/name": "web"
+            }
+          },
+          "template": {
+            "metadata": {
+              "labels": {
+                "app.kubernetes.io/name": "web"
+              }
+            },
+            "spec": {
+              "containers": [
+                {
+                  "envFrom": [
+                    {
+                      "secretRef": {
+                        "name": "db-credentials"
+                      }
+                    },
+                    {
+                      "secretRef": {
+                        "name": "web-env"
+                      }
+                    }
+                  ],
+                  "image": "registry.local/demo/web:1",
+                  "name": "web",
+                  "ports": [
+                    {
+                      "containerPort": 3000
+                    }
+                  ],
+                  "readinessProbe": {
+                    "tcpSocket": {
+                      "port": 3000
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "afterYaml": "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: web\n  namespace: demo\nspec:\n  replicas: 1\n  selector:\n    matchLabels:\n      app.kubernetes.io/name: web\n  template:\n    metadata:\n      labels:\n        app.kubernetes.io/name: web\n    spec:\n      containers:\n      - envFrom:\n        - secretRef:\n            name: db-credentials\n        - secretRef:\n            name: web-env\n        image: registry.local/demo/web:1\n        name: web\n        ports:\n        - containerPort: 3000\n        readinessProbe:\n          tcpSocket:\n            port: 3000\n",
+      "before": {
+        "apiVersion": "apps/v1",
+        "kind": "Deployment",
+        "metadata": {
+          "name": "web",
+          "namespace": "demo"
+        },
+        "spec": {
+          "replicas": 1,
+          "selector": {
+            "matchLabels": {
+              "app.kubernetes.io/name": "web"
+            }
+          },
+          "template": {
+            "metadata": {
+              "labels": {
+                "app.kubernetes.io/name": "web"
+              }
+            },
+            "spec": {
+              "containers": [
+                {
+                  "envFrom": [
+                    {
+                      "secretRef": {
+                        "name": "db-credentials"
+                      }
+                    },
+                    {
+                      "secretRef": {
+                        "name": "web-env"
+                      }
+                    }
+                  ],
+                  "image": "registry.local/demo/web:1",
+                  "name": "web",
+                  "ports": [
+                    {
+                      "containerPort": 8080
+                    }
+                  ],
+                  "readinessProbe": {
+                    "tcpSocket": {
+                      "port": 8080
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "beforeYaml": "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: web\n  namespace: demo\nspec:\n  replicas: 1\n  selector:\n    matchLabels:\n      app.kubernetes.io/name: web\n  template:\n    metadata:\n      labels:\n        app.kubernetes.io/name: web\n    spec:\n      containers:\n      - envFrom:\n        - secretRef:\n            name: db-credentials\n        - secretRef:\n            name: web-env\n        image: registry.local/demo/web:1\n        name: web\n        ports:\n        - containerPort: 8080\n        readinessProbe:\n          tcpSocket:\n            port: 8080\n",
+      "changes": [
+        {
+          "after": "3000",
+          "path": "spec.template.spec.containers[name=web].ports[containerPort=3000].containerPort"
+        },
+        {
+          "before": "8080",
+          "path": "spec.template.spec.containers[name=web].ports[containerPort=8080].containerPort"
+        },
+        {
+          "after": "3000",
+          "before": "8080",
+          "path": "spec.template.spec.containers[name=web].readinessProbe.tcpSocket.port"
+        }
+      ],
+      "owners": [],
+      "resourceVersion": "41",
+      "target": {
+        "apiVersion": "apps/v1",
+        "kind": "Deployment",
+        "name": "web",
+        "plural": "deployments"
+      },
+      "write": {
+        "operations": [
+          {
+            "op": "test",
+            "path": "/metadata/resourceVersion",
+            "value": "41"
+          },
+          {
+            "op": "test",
+            "path": "/spec/template/spec/containers/0/ports/0/containerPort",
+            "value": 8080
+          },
+          {
+            "op": "replace",
+            "path": "/spec/template/spec/containers/0/ports/0/containerPort",
+            "value": 3000
+          },
+          {
+            "op": "test",
+            "path": "/spec/template/spec/containers/0/readinessProbe/tcpSocket/port",
+            "value": 8080
+          },
+          {
+            "op": "replace",
+            "path": "/spec/template/spec/containers/0/readinessProbe/tcpSocket/port",
+            "value": 3000
+          }
+        ],
+        "type": "patch"
+      }
+    },
+    {
+      "after": {
+        "apiVersion": "v1",
+        "kind": "Service",
+        "metadata": {
+          "name": "web",
+          "namespace": "demo"
+        },
+        "spec": {
+          "ports": [
+            {
+              "name": "http",
+              "port": 8080,
+              "targetPort": 3000
+            }
+          ],
+          "selector": {
+            "app.kubernetes.io/name": "web"
+          }
+        }
+      },
+      "afterYaml": "apiVersion: v1\nkind: Service\nmetadata:\n  name: web\n  namespace: demo\nspec:\n  ports:\n  - name: http\n    port: 8080\n    targetPort: 3000\n  selector:\n    app.kubernetes.io/name: web\n",
+      "before": {
+        "apiVersion": "v1",
+        "kind": "Service",
+        "metadata": {
+          "name": "web",
+          "namespace": "demo"
+        },
+        "spec": {
+          "ports": [
+            {
+              "name": "http",
+              "port": 8080,
+              "targetPort": 8080
+            }
+          ],
+          "selector": {
+            "app.kubernetes.io/name": "web"
+          }
+        }
+      },
+      "beforeYaml": "apiVersion: v1\nkind: Service\nmetadata:\n  name: web\n  namespace: demo\nspec:\n  ports:\n  - name: http\n    port: 8080\n    targetPort: 8080\n  selector:\n    app.kubernetes.io/name: web\n",
+      "changes": [
+        {
+          "after": "3000",
+          "before": "8080",
+          "path": "spec.ports[name=http].targetPort"
+        }
+      ],
+      "owners": [],
+      "resourceVersion": "7",
+      "target": {
+        "apiVersion": "v1",
+        "kind": "Service",
+        "name": "web",
+        "plural": "services"
+      },
+      "write": {
+        "operations": [
+          {
+            "op": "test",
+            "path": "/metadata/resourceVersion",
+            "value": "7"
+          },
+          {
+            "op": "test",
+            "path": "/spec/ports/0/targetPort",
+            "value": 8080
+          },
+          {
+            "op": "replace",
+            "path": "/spec/ports/0/targetPort",
+            "value": 3000
+          }
+        ],
+        "type": "patch"
+      }
+    },
+    {
+      "after": {
+        "apiVersion": "v1",
+        "kind": "Service",
+        "metadata": {
+          "name": "web-public-8080",
+          "namespace": "demo"
+        },
+        "spec": {
+          "ports": [
+            {
+              "port": 8080,
+              "targetPort": 3000
+            }
+          ],
+          "selector": {
+            "app.kubernetes.io/name": "web"
+          },
+          "type": "LoadBalancer"
+        }
+      },
+      "afterYaml": "apiVersion: v1\nkind: Service\nmetadata:\n  name: web-public-8080\n  namespace: demo\nspec:\n  ports:\n  - port: 8080\n    targetPort: 3000\n  selector:\n    app.kubernetes.io/name: web\n  type: LoadBalancer\n",
+      "before": {
+        "apiVersion": "v1",
+        "kind": "Service",
+        "metadata": {
+          "name": "web-public-8080",
+          "namespace": "demo"
+        },
+        "spec": {
+          "ports": [
+            {
+              "port": 8080
+            }
+          ],
+          "selector": {
+            "app.kubernetes.io/name": "web"
+          },
+          "type": "LoadBalancer"
+        }
+      },
+      "beforeYaml": "apiVersion: v1\nkind: Service\nmetadata:\n  name: web-public-8080\n  namespace: demo\nspec:\n  ports:\n  - port: 8080\n  selector:\n    app.kubernetes.io/name: web\n  type: LoadBalancer\n",
+      "changes": [
+        {
+          "after": "3000",
+          "path": "spec.ports[0].targetPort"
+        }
+      ],
+      "owners": [],
+      "resourceVersion": "9",
+      "target": {
+        "apiVersion": "v1",
+        "kind": "Service",
+        "name": "web-public-8080",
+        "plural": "services"
+      },
+      "write": {
+        "operations": [
+          {
+            "op": "test",
+            "path": "/metadata/resourceVersion",
+            "value": "9"
+          },
+          {
+            "op": "add",
+            "path": "/spec/ports/0/targetPort",
+            "value": 3000
+          }
+        ],
+        "type": "patch"
+      }
+    }
+  ],
+  "warnings": []
+}

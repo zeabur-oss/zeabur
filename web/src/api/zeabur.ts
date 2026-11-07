@@ -1800,6 +1800,20 @@ export type Change =
       workload: WorkloadRef
     }
   | {
+      /**
+       * The container; may be left out when the workload has only one.
+       * @nullable
+       */
+      container?: string | null
+      /** The port it is set to listen on now. */
+      from: number
+      op: "port"
+      /** The port it listens on. */
+      to: number
+      /** The workload. */
+      workload: WorkloadRef
+    }
+  | {
       /** On or off. */
       enabled: boolean
       op: "configReload"
