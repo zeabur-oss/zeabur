@@ -463,6 +463,25 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn an_unknown_path_or_method_is_refused_as_a_problem() {
+        let cluster = cluster();
+        for (method, uri, status) in [
+            ("GET", "/api", StatusCode::NOT_FOUND),
+            ("GET", "/api/v1/nothing", StatusCode::NOT_FOUND),
+            ("DELETE", "/api/v1/session", StatusCode::BAD_REQUEST),
+        ] {
+            let (got, headers, body) = send(app(&cluster), method, uri, &[]).await;
+            assert_eq!(got, status, "{method} {uri}: {body}");
+            assert_eq!(
+                headers.get("content-type").unwrap(),
+                "application/problem+json",
+                "{method} {uri}"
+            );
+            assert_ne!(json(&body)["detail"].as_str().unwrap(), "");
+        }
+    }
+
+    #[tokio::test]
     async fn the_project_document_says_who_may_reach_each_service() {
         let cluster = cluster();
         let open = get(&cluster, "/api/v1/projects/shop").await;
@@ -900,7 +919,8 @@ mod tests {
             "/api/v1/projects/shop/secrets/db/reveal",
         )
         .await;
-        assert_eq!(status, StatusCode::METHOD_NOT_ALLOWED, "{body}");
+        assert_eq!(status, StatusCode::BAD_REQUEST, "{body}");
+        assert!(body.contains("does not take GET"), "{body}");
 
         let (status, cache, body) = call(
             app(&cluster),

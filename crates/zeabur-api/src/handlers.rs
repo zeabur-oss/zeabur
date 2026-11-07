@@ -106,3 +106,11 @@ pub(crate) async fn not_found() -> ApiError {
         "There is no such API endpoint.",
     ))
 }
+
+/// A known API path asked with a method it does not take.
+pub(crate) async fn method_not_allowed(method: axum::http::Method) -> ApiError {
+    ApiError::from(Problem::new(
+        Kind::BadRequest,
+        format!("This API endpoint does not take {method} requests."),
+    ))
+}

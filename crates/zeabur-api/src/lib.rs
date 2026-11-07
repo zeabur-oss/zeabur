@@ -498,6 +498,8 @@ pub fn router_with(access: Arc<dyn ClusterAccess>, options: Options) -> Router {
         terminals,
     };
     routes()
+        .method_not_allowed_fallback(handlers::method_not_allowed)
+        .route("/api", axum::routing::any(handlers::not_found))
         .route("/api/{*rest}", axum::routing::any(handlers::not_found))
         .layer(axum::middleware::from_fn(cache::no_store))
         .with_state(state)
