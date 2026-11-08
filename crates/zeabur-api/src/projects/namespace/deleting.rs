@@ -17,9 +17,6 @@ use serde_json::Value;
 use utoipa::ToSchema;
 use zeabur_kube::{Cluster, DynamicObject, ResourceRef};
 
-/// Objects held back from more than this many kinds are not listed one by one.
-const KINDS_LISTED: usize = 10;
-
 /// A project whose Namespace is being deleted.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
@@ -110,22 +107,15 @@ pub(super) async fn read(
     })
 }
 
-/// The finalizers the namespace controller says hold `namespace`'s content back, and the objects
-/// with finalizers among that content, read as the person.
+/// The objects with finalizers among what the namespace controller says is left of `namespace`,
+/// read as the person.
 pub(crate) async fn held_objects(
     cluster: &dyn Cluster,
     project: &str,
     namespace: &DynamicObject,
-) -> (Vec<String>, Vec<(ResourceRef, DynamicObject)>) {
-    let finalizers: Vec<String> = finalizers(&condition(namespace, "NamespaceFinalizersRemaining"))
-        .into_iter()
-        .map(|f| f.finalizer)
-        .collect();
-    if finalizers.is_empty() {
-        return (finalizers, Vec::new());
-    }
+) -> Vec<(ResourceRef, DynamicObject)> {
     let remaining = remaining(&condition(namespace, "NamespaceContentRemaining"));
-    (finalizers, held(cluster, project, &remaining).await)
+    held(cluster, project, &remaining).await
 }
 
 /// The message of `namespace`'s condition `kind` when it is `True`; empty otherwise.
@@ -201,7 +191,7 @@ async fn held(
         return Vec::new();
     };
     let mut out = Vec::new();
-    for left in remaining.iter().take(KINDS_LISTED) {
+    for left in remaining {
         let Some(found) = served
             .iter()
             .find(|s| s.group == left.group && s.resource == left.resource && s.namespaced)

@@ -162,7 +162,7 @@ pub(super) async fn compute_force(
             format!("There is no namespace named {project}."),
         )));
     };
-    let (finalizers, objects) = held_objects(cluster, project, &found).await;
+    let objects = held_objects(cluster, project, &found).await;
     let mut held = Vec::new();
     let mut wanted = Vec::new();
     for (resource, object) in objects {
@@ -194,7 +194,6 @@ pub(super) async fn compute_force(
         .map_err(|e| ApiError::from(ClusterError::Decode(e.to_string()).into_problem(&what)))?;
     let deletion = DeletionInput {
         zeabur_namespaces,
-        finalizers,
         held,
         ..DeletionInput::default()
     };

@@ -27,16 +27,12 @@
 //! [`Change::ForceDeleteProject`] is for a project whose Namespace stays `Terminating` because a
 //! finalizer is never removed, for example when its controller is gone. Each of its writes is a
 //! JSON Patch that sets `metadata.finalizers` to `[]` on one object, after a `test` of the
-//! finalizers as read. It writes only an object that:
-//!
-//! - is in the project's namespace and already has a `deletionTimestamp`;
-//! - carries a finalizer the namespace controller names in its `NamespaceFinalizersRemaining`
-//!   condition ([`DeletionInput::finalizers`]).
-//!
-//! It never writes the Namespace, so its own `spec.finalizers` stay. The namespace controller
-//! then removes what is left and the Namespace. [`Warning::RemovesFinalizers`] names each object
-//! and its finalizers. Refused: the same namespaces as a deletion, a namespace that is not being
-//! deleted, and one with no such object.
+//! finalizers as read. It writes only an object of [`DeletionInput::held`] that is in the
+//! project's namespace and already has a `deletionTimestamp`. It never writes the Namespace, so
+//! its own `spec.finalizers` stay. The namespace controller then removes what is left and the
+//! Namespace. [`Warning::RemovesFinalizers`] names each object and its finalizers. Refused: the
+//! same namespaces as a deletion, a namespace that is not being deleted, and one with no such
+//! object.
 //!
 //! [`Change::ForceDeleteProject`]: crate::Change::ForceDeleteProject
 //!
@@ -83,8 +79,6 @@ pub struct DeletionInput {
     pub tools_namespace: String,
     /// The person's tools pods for the project, by name.
     pub tools_pods: Vec<String>,
-    /// For a force deletion: the finalizers the namespace controller says hold content back.
-    pub finalizers: Vec<String>,
     /// For a force deletion: the objects with finalizers among the content the namespace
     /// controller says is left.
     pub held: Vec<ProjectObject>,
@@ -260,8 +254,7 @@ impl<'a> Planner<'a> {
             }
             let in_namespace = text(object, "/metadata/namespace") == name;
             let being_deleted = object.pointer("/metadata/deletionTimestamp").is_some();
-            let named = finalizers.iter().any(|f| deletion.finalizers.contains(f));
-            if !(in_namespace && being_deleted && named) {
+            if finalizers.is_empty() || !in_namespace || !being_deleted {
                 continue;
             }
             let target = Target {
@@ -288,10 +281,7 @@ impl<'a> Planner<'a> {
             return Err(error(
                 ErrorKind::Conflict,
                 "nothing_held",
-                format!(
-                    "No object you can read in {name} waits on a finalizer the namespace \
-                     controller names."
-                ),
+                format!("No object you can read in {name} is being deleted and has finalizers."),
             ));
         }
         self.warnings

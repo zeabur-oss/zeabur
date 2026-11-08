@@ -1,7 +1,7 @@
 //! Deleting a project: the database objects go first, then the Namespace, each pinned to the
 //! object as read; the plan says what goes and what happens to each volume's data; Zeabur's own
 //! and the system's namespaces are refused. A force deletion removes the finalizers only of the
-//! objects the namespace controller waits on, and never writes the Namespace.
+//! project's objects already being deleted, and never writes the Namespace.
 
 #[cfg(test)]
 mod tests {
@@ -313,7 +313,6 @@ mod tests {
     fn forced(namespace: &Value, held: Vec<ProjectObject>) -> Result<Plan, PlanError> {
         let input = DeletionInput {
             zeabur_namespaces: vec!["zeabur".to_owned()],
-            finalizers: vec!["cnpg.io/cleanup".to_owned()],
             held,
             ..DeletionInput::default()
         };
@@ -330,14 +329,14 @@ mod tests {
     }
 
     #[test]
-    fn a_force_deletion_empties_the_finalizers_of_the_objects_the_controller_waits_on() {
+    fn a_force_deletion_empties_the_finalizers_only_of_objects_being_deleted_in_the_project() {
         let plan = forced(
             &terminating(),
             vec![
                 held("db", "shop", true, &["cnpg.io/cleanup"]),
                 held("not-deleted", "shop", false, &["cnpg.io/cleanup"]),
                 held("elsewhere", "other", true, &["cnpg.io/cleanup"]),
-                held("unnamed", "shop", true, &["example.com/other"]),
+                held("released", "shop", true, &[]),
             ],
         )
         .unwrap();
