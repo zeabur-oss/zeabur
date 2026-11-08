@@ -48,9 +48,16 @@ pub fn fetch(
     dest: &Path,
     sha256: Option<&str>,
 ) -> Result<String, HostError> {
+    let recorded = if sha256.is_none() {
+        bundle::recorded(url)
+    } else {
+        None
+    };
+    let sha256 = sha256.or(recorded.as_deref());
     if let Some(expected) = sha256 {
         if dest.exists() && sha256_file(dest)? == expected {
             bundle::save_file(expected, dest)?;
+            bundle::note(url, expected, file_size(dest), true);
             return Ok(expected.to_owned());
         }
         if let Some(source) = bundle::find(expected) {
@@ -95,10 +102,13 @@ pub fn fetch(
         });
     }
     fs::rename(&partial, dest).map_err(HostError::io(dest))?;
-    if sha256.is_some() {
-        bundle::save_file(&actual, dest)?;
-    }
+    bundle::save_file(&actual, dest)?;
+    bundle::note(url, &actual, file_size(dest), sha256.is_some());
     Ok(actual)
+}
+
+fn file_size(path: &Path) -> u64 {
+    fs::metadata(path).map_or(0, |m| m.len())
 }
 
 /// Copies the bundle's file to `dest`, once its content has the digest its name says.
@@ -125,6 +135,13 @@ fn from_bundle(source: &Path, expected: &str, dest: &Path) -> Result<String, Hos
 ///
 /// When the download fails or the digest differs.
 pub fn fetch_text(agent: &Agent, url: &str, sha256: Option<&str>) -> Result<String, HostError> {
+    let recorded = if sha256.is_none() {
+        bundle::recorded(url)
+    } else {
+        None
+    };
+    let pinned = sha256.is_some();
+    let sha256 = sha256.or(recorded.as_deref());
     if let Some(expected) = sha256
         && let Some(bytes) = bundle::read(expected)
     {
@@ -147,6 +164,11 @@ pub fn fetch_text(agent: &Agent, url: &str, sha256: Option<&str>) -> Result<Stri
         .map_err(|e| fail(e.to_string()))?;
     if let Some(expected) = sha256 {
         check(url, expected, text.as_bytes())?;
+        bundle::note(url, expected, text.len() as u64, pinned);
+    } else {
+        let digest = hex::encode(Sha256::digest(text.as_bytes()));
+        bundle::save(&digest, text.as_bytes())?;
+        bundle::note(url, &digest, text.len() as u64, false);
     }
     Ok(text)
 }

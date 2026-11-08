@@ -15,14 +15,14 @@ mod tests {
 
     fn keep(blobs: &std::path::Path, bytes: &[u8]) -> String {
         let digest = digest(bytes);
-        fs::write(blobs.join(format!("sha256-{digest}")), bytes).expect("write the blob");
+        fs::write(blobs.join(&digest), bytes).expect("write the blob");
         digest
     }
 
     #[test]
     fn downloads_come_from_the_bundle_and_are_checked() {
         let dir = tempfile::tempdir().expect("temporary directory");
-        let blobs = dir.path().join("bundle/blobs");
+        let blobs = dir.path().join("bundle/blobs/sha256");
         fs::create_dir_all(&blobs).expect("blobs directory");
 
         let file = b"a pinned release file";
@@ -32,8 +32,24 @@ mod tests {
         let archive = b"a chart archive";
         let archive_digest = keep(&blobs, archive);
         let altered = digest(b"what the name promises");
-        fs::write(blobs.join(format!("sha256-{altered}")), b"something else")
-            .expect("write the altered blob");
+        fs::write(blobs.join(&altered), b"something else").expect("write the altered blob");
+
+        let recorded = b"a file the installer pins nothing for";
+        let recorded_digest = keep(&blobs, recorded);
+        let recorded_url = "http://127.0.0.1:9/recorded";
+        let index = serde_json::json!({"schemaVersion": 2, "manifests": [
+            {"annotations": {
+                "com.zeabur.bundle.source-url": recorded_url,
+                "com.zeabur.bundle.sha256": recorded_digest,
+                "com.zeabur.bundle.pinned": "false",
+            }},
+            {"annotations": {
+                "com.zeabur.bundle.source-url": "http://127.0.0.1:9/pinned",
+                "com.zeabur.bundle.sha256": digest(b"x"),
+                "com.zeabur.bundle.pinned": "true",
+            }},
+        ]});
+        fs::write(dir.path().join("bundle/index.json"), index.to_string()).expect("index");
 
         bundle::open(&dir.path().join("bundle"));
         // Nothing listens here, so any download that is attempted fails.
@@ -58,6 +74,29 @@ mod tests {
         )
         .expect("chart from the bundle");
         assert_eq!(got, archive);
+
+        let other = dir.path().join("out/recorded");
+        download::fetch(&agent, recorded_url, &other, None).expect("a recorded file");
+        assert_eq!(fs::read(&other).expect("copied file"), recorded);
+        // A digest the installer has built in wins over the recorded one.
+        let builtin = digest(b"the built-in digest");
+        let error = download::fetch(
+            &agent,
+            recorded_url,
+            &dir.path().join("out/r2"),
+            Some(&builtin),
+        )
+        .expect_err("the recorded file is not what the built-in digest names");
+        assert!(matches!(error, HostError::Download { .. }), "{error}");
+        // A file noted as pinned is not a recorded one.
+        let error = download::fetch(
+            &agent,
+            "http://127.0.0.1:9/pinned",
+            &dir.path().join("out/p"),
+            None,
+        )
+        .expect_err("no digest to use");
+        assert!(matches!(error, HostError::Download { .. }), "{error}");
 
         let refused = download::fetch(&agent, url, &dir.path().join("out/altered"), Some(&altered))
             .expect_err("a changed file is refused");

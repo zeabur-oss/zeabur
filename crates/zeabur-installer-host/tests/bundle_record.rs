@@ -41,14 +41,20 @@ mod tests {
 
         let dest = dir.path().join("downloads/file");
         download::fetch(&agent, &url, &dest, Some(&digest)).expect("download");
-        let kept = dir.path().join(format!("bundle/blobs/sha256-{digest}"));
+        let kept = dir.path().join(format!("bundle/blobs/sha256/{digest}"));
         assert_eq!(fs::read(&kept).expect("kept file"), body);
 
-        // A download with no digest to check it against is not kept.
+        // A download with no digest to check it against is kept under the digest it has, and
+        // listed as not pinned.
+        let free: &'static [u8] = b"a file nothing pins";
+        let free_url = serve(free);
+        let free_digest = hex::encode(Sha256::digest(free));
         let other = dir.path().join("downloads/other");
-        download::fetch(&agent, &url, &other, None).expect("download without a digest");
-        let blobs = dir.path().join("bundle/blobs");
-        assert_eq!(fs::read_dir(blobs).expect("blobs").count(), 1);
+        download::fetch(&agent, &free_url, &other, None).expect("download without a digest");
+        let blob = dir
+            .path()
+            .join(format!("bundle/blobs/sha256/{free_digest}"));
+        assert_eq!(fs::read(blob).expect("kept"), free);
 
         // A file already on the host is kept too, so a second run still fills the bundle.
         fs::remove_file(&kept).expect("remove the kept file");
@@ -63,5 +69,29 @@ mod tests {
 
         let text = download::fetch_text(&agent, &url, Some(&digest)).expect("text");
         assert_eq!(text.as_bytes(), body);
+
+        bundle::finish().expect("write the index");
+        let root = dir.path().join("bundle");
+        assert!(root.join("oci-layout").is_file());
+        let index: serde_json::Value =
+            serde_json::from_slice(&fs::read(root.join("index.json")).expect("index"))
+                .expect("json");
+        let mut pinned = Vec::new();
+        for item in index["manifests"].as_array().expect("manifests") {
+            let notes = &item["annotations"];
+            pinned.push((
+                notes["com.zeabur.bundle.source-url"]
+                    .as_str()
+                    .expect("url")
+                    .to_owned(),
+                notes["com.zeabur.bundle.pinned"]
+                    .as_str()
+                    .expect("pinned")
+                    .to_owned(),
+            ));
+        }
+        assert!(pinned.contains(&(url, "true".to_owned())));
+        assert!(pinned.contains(&(free_url.clone(), "false".to_owned())));
+        assert_eq!(bundle::recorded_urls(), vec![free_url]);
     }
 }

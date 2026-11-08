@@ -60,7 +60,8 @@ enum Command {
     /// Keep every file `apply` downloads and checks against a digest in a directory, to carry to a
     /// host that cannot reach the sources. Run it on a host that can, as root, with the
     /// configuration the other host will use; set `bundle: <path>` there. A file with no digest to
-    /// check, such as a K3s release set with `k3sVersion`, is not kept.
+    /// check, such as a K3s release set with `k3sVersion`, is kept with the SHA-256 it has now and
+    /// listed as not checked against a source.
     Bundle {
         /// The directory to fill.
         dir: PathBuf,

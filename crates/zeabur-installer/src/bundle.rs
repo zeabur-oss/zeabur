@@ -34,12 +34,8 @@ pub(crate) fn run(config_path: &Path, dir: &Path) -> Result<(), InstallError> {
         files.push(d);
     }
     for d in files {
-        let Some(sha256) = d.sha256.as_deref() else {
-            left_out.push(d.url.clone());
-            continue;
-        };
         out::err(&format!("    {}", d.url));
-        download::fetch(&agent, &d.url, &work.join(&d.file), Some(sha256))?;
+        download::fetch(&agent, &d.url, &work.join(&d.file), d.sha256.as_deref())?;
     }
 
     for component in &plan.components {
@@ -58,12 +54,8 @@ pub(crate) fn run(config_path: &Path, dir: &Path) -> Result<(), InstallError> {
                 },
                 ReleasePlan::Urls { urls, digests, .. } => {
                     for (i, url) in urls.iter().enumerate() {
-                        let Some(digest) = digests.get(i) else {
-                            left_out.push(url.clone());
-                            continue;
-                        };
                         out::err(&format!("    {url}"));
-                        download::fetch_text(&agent, url, Some(digest))?;
+                        download::fetch_text(&agent, url, digests.get(i).map(String::as_str))?;
                     }
                 }
                 ReleasePlan::Manifests { .. } => {}
@@ -71,11 +63,17 @@ pub(crate) fn run(config_path: &Path, dir: &Path) -> Result<(), InstallError> {
         }
     }
 
+    bundle::finish()?;
     fs::remove_dir_all(&work)
         .map_err(|e| InstallError::Message(format!("{}: {e}", work.display())))?;
     for item in &left_out {
         out::err(&format!(
             "not kept, it has no digest to check it against: {item}"
+        ));
+    }
+    for url in bundle::recorded_urls() {
+        out::err(&format!(
+            "kept with the SHA-256 it has now, not checked against a source: {url}"
         ));
     }
     out::line(&format!(
