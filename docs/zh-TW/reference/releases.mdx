@@ -72,13 +72,13 @@ tar -xzf "$binary-v$version-$platform.tar.gz" "$binary"
 
 checksum 不符時，重新下載那個檔案。簽署者、issuer 或 attestation 不符時，不要執行檔案，先核對 release、檔名、workflow 身分、repository 和 tag，也不要為了通過而放寬驗證參數。
 
-用 macOS 瀏覽器下載的檔案會帶 quarantine 標記。驗證通過後，對解出的檔案執行：
+macOS 版本以 Developer ID 簽署，並經過 Apple 公證，所以用瀏覽器下載、帶有 quarantine 標記的檔案，macOS 也會讓它執行。要確認的話，執行：
 
 ```sh
-xattr -d com.apple.quarantine zeaburctl
+spctl --assess -vvv --type open --context context:primary-signature zeaburctl
 ```
 
-用 `gh release download` 下載就不會有這個標記。macOS 版本有 Sigstore 簽章，但沒有經過 Apple notarization。
+輸出應該有 `source=Notarized Developer ID`。
 
 ## 驗證映像檔與 chart
 

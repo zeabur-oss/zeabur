@@ -72,13 +72,13 @@ tar -xzf "$binary-v$version-$platform.tar.gz" "$binary"
 
 校验和不匹配时，重新下载该文件。签名者、issuer 或 attestation 不匹配时，不要运行文件，先核对 release、文件名、workflow 身份、仓库和 tag，也不要放宽验证参数来让验证通过。
 
-通过 macOS 浏览器下载的文件会带有 quarantine 标记。验证通过后，对解压出的文件运行：
+macOS 版本使用 Developer ID 签名，并经过 Apple 公证，所以通过浏览器下载、带有 quarantine 标记的文件，macOS 也会允许它运行。要确认的话，运行：
 
 ```sh
-xattr -d com.apple.quarantine zeaburctl
+spctl --assess -vvv --type open --context context:primary-signature zeaburctl
 ```
 
-用 `gh release download` 下载的文件不会带有这个标记。macOS 版本有 Sigstore 签名，但未经过 Apple 公证。
+输出应该包含 `source=Notarized Developer ID`。
 
 ## 验证镜像与 chart
 

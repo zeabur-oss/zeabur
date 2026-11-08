@@ -71,13 +71,13 @@ tar -xzf "$binary-v$version-$platform.tar.gz" "$binary"
 
 If a checksum doesn't match, download that file again. If the signer, issuer, or attestation doesn't match, don't run the file. Check the release, filename, workflow identity, repository, and tag first. Don't relax the verification parameters to make it pass.
 
-Files downloaded in a browser on macOS carry a quarantine flag. After verification passes, run this command on the extracted file:
+The macOS build is signed with a Developer ID and notarized by Apple, so macOS opens it even when a browser added a quarantine flag. To check:
 
 ```sh
-xattr -d com.apple.quarantine zeaburctl
+spctl --assess -vvv --type open --context context:primary-signature zeaburctl
 ```
 
-`gh release download` doesn't add this flag. The macOS build has a Sigstore signature, but Apple hasn't notarized it.
+The output should say `source=Notarized Developer ID`.
 
 ## Verify the image and chart
 
