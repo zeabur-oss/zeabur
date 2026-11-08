@@ -88,6 +88,21 @@ not `sort -V`.
    `gh release edit v0.1.1 --repo zeabur-oss/zeabur --draft=false`. Then download it once without signing in and repeat
    the checks above against the public release.
 
+## Milestones
+
+Each repository has one open version milestone, the release that comes next (`v0.2.1`), and `Later`
+for work that is not committed to a release. New work that is committed goes in the version
+milestone, and so does every pull request that closes such an issue. If the release turns out to be
+a minor one, rename the milestone; its issues stay.
+
+After publishing a release:
+
+1. Close its milestone, and move what is still open in it to the next one.
+2. Open the milestone of the release after it: the next patch version, unless the plan says
+   otherwise.
+
+A release is ready when its milestone has no open issue.
+
 The tag must match the manifests that `check` reads, `CHANGELOG.md` must have its section, and
 the commit must be on `main`; otherwise the run stops before building.
 
