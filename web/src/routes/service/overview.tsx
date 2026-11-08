@@ -108,7 +108,11 @@ export function OverviewTab({
   })
   const trace = useQuery(traceQuery(project, service.kind, service.name))
   const said = overviewOf(
-    { diagnoses: service.diagnoses, stopped: service.replicas?.desired === 0 },
+    {
+      diagnoses: service.diagnoses,
+      stopped: service.replicas?.desired === 0,
+      waitingForImage: ["building", "waitingUpload"].includes(statusOf(service).word),
+    },
     task ? undefined : rollout.data,
     trace.data?.routes ?? [],
     events,

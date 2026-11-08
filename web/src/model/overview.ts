@@ -78,6 +78,8 @@ export function overviewOf(
     diagnoses?: Diagnosis[] | null
     /** Scaled to zero: no replica is meant to run. */
     stopped: boolean
+    /** Waiting for its first image: the build has not pushed it yet, so no pull can work. */
+    waitingForImage?: boolean
   },
   rollout: Rollout | undefined,
   routes: Route[],
@@ -103,7 +105,12 @@ export function overviewOf(
     waiting,
     alsoDown,
     rollout: rolloutShown(rollout, causes),
-    warnings: events.filter((e) => isWarning(e) && !explainedBy(e, diagnoses)),
+    warnings: events.filter(
+      (e) =>
+        isWarning(e) &&
+        !explainedBy(e, diagnoses) &&
+        !(service.waitingForImage && explains.imagePull.includes(e.reason)),
+    ),
   }
 }
 

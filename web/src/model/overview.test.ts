@@ -120,6 +120,30 @@ describe("a service's overview", () => {
   })
 })
 
+describe("the warnings of a service waiting for its first image", () => {
+  const pulls = [
+    event("e1", "Failed", "web-1"),
+    event("e2", "BackOff", "web-1"),
+    event("e3", "ErrImagePull", "web-1"),
+  ]
+  const other = event("e4", "FailedScheduling", "web-1")
+  const warnings = (waitingForImage: boolean) =>
+    overviewOf(
+      { diagnoses: [], stopped: false, waitingForImage },
+      undefined,
+      [],
+      [...pulls, other],
+    ).warnings
+
+  test("leaves out the image pulls that cannot work before the build ends", () => {
+    expect(warnings(true)).toStrictEqual([other])
+  })
+
+  test("lists them once the service no longer waits for its first image", () => {
+    expect(warnings(false)).toStrictEqual([...pulls, other])
+  })
+})
+
 describe("a rollout on the overview", () => {
   const shown = (r: Rollout | undefined, diagnoses: Diagnosis[] = []) =>
     overviewOf({ diagnoses, stopped: false }, r, [], []).rollout
