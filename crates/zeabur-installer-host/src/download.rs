@@ -270,7 +270,6 @@ fn file_name(path: &Path) -> String {
 
 #[cfg(test)]
 mod tests {
-    use std::io::Read as _;
     use std::net::TcpListener;
     use std::sync::Arc;
     use std::sync::atomic::{AtomicUsize, Ordering};
@@ -290,7 +289,11 @@ mod tests {
                 let mut request = [0_u8; 4096];
                 drop(stream.read(&mut request));
                 let n = count.fetch_add(1, Ordering::SeqCst);
-                let status = statuses.get(n).or(statuses.last()).copied().unwrap_or(500);
+                let status = statuses
+                    .get(n)
+                    .or_else(|| statuses.last())
+                    .copied()
+                    .unwrap_or(500);
                 let body = if status == 200 { body } else { "" };
                 let reply = format!(
                     "HTTP/1.1 {status} X\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
