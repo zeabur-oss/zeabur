@@ -19,7 +19,7 @@ source: "cdb7a13a9dd3"
 
 | 方向 | K3s | RKE2 |
 | --- | --- | --- |
-| 連到伺服器 | TCP 6443 | TCP 9345、6443 |
+| 連到伺服器 | TCP 6443（[限制來源](../reference/security.mdx#kubernetes-api)） | TCP 9345、6443 |
 | 所有節點之間 | TCP 10250，UDP 4789（Calico VXLAN） | TCP 10250、9099，UDP 8472（Canal VXLAN） |
 | 伺服器之間 | 不用 | TCP 2379–2381 |
 
