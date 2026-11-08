@@ -209,6 +209,22 @@ describe("restoring into a new database", () => {
     })
   })
 
+  test("a MongoDB copy runs the backup agent when the original has backups off", () => {
+    const mongo = base({
+      engine: "mongodb",
+      apiVersion: "psmdb.percona.com/v1",
+      kind: "PerconaServerMongoDB",
+      backups: { schedules: [], runs: [], ready: true, store: { name: "backups", inUse: true } },
+      object: {
+        metadata: {},
+        spec: { backup: { enabled: false, storages: { backups: { s3: {} } }, tasks: [] } },
+      } as unknown as Database["object"],
+    })
+    const [cluster] = bodies(restoreChanges(mongo, point, "copy", "demo"))
+    expect(cluster?.spec.backup.enabled).toBe(true)
+    expect(cluster?.spec.backup.tasks).toEqual([])
+  })
+
   test("a copy of a MongoDB 8 keeps rseq in glibc", () => {
     const mongo = base({
       engine: "mongodb",

@@ -159,10 +159,12 @@ function backupS3(backup: Manifest, store?: Store) {
 }
 
 // A logical dump holds the system users, so the copy's users Secret has the original's values.
+// Percona runs a restore through the backup agent, so the copy has backups on even when the
+// original has them off, without scheduled tasks.
 function restoreMongodb({ source, point, name, spec, store, object, copied }: Restoring): Change[] {
   const backup = (spec.backup as Manifest | undefined) ?? {}
   const s3 = backupS3(backup, store)
-  spec.backup = { ...backup, tasks: [] }
+  spec.backup = { ...backup, enabled: true, tasks: [] }
   const users = copied ? `${name}-secrets` : keptSecret(source)?.name
   spec.secrets = { ...(spec.secrets as Manifest | undefined), users }
   perThreadCaches(spec, source.version)
