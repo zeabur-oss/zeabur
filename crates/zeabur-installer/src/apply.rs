@@ -989,7 +989,10 @@ pub(crate) fn releases(kubectl: &Kubectl, component: &ComponentPlan) -> Result<(
 /// helm-controller installs instead of fetching `chart` itself [helm-controller], and the archive.
 ///
 /// [helm-controller]: https://docs.rke2.io/helm#helmchart-field-definitions
-fn checked_chart(object: &Value, digest: &str) -> Result<(Value, Vec<u8>), InstallError> {
+pub(crate) fn checked_chart(
+    object: &Value,
+    digest: &str,
+) -> Result<(Value, Vec<u8>), InstallError> {
     let field = |key: &str| {
         object
             .pointer(&format!("/spec/{key}"))

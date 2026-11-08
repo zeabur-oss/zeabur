@@ -15,6 +15,14 @@ use crate::InstallError;
 /// readable by others.
 pub(crate) fn document(path: &Path) -> Result<Document, InstallError> {
     let document = Document::parse(&read(path)?)?;
+    let bundle = match &document {
+        Document::Install(config) => config.bundle.as_deref(),
+        Document::Join(config) => config.bundle.as_deref(),
+        Document::Personal(_) => None,
+    };
+    if let Some(dir) = bundle {
+        zeabur_installer_host::bundle::open(Path::new(dir));
+    }
     if let Document::Join(JoinConfig { join, .. }) = &document
         && join.token.is_some()
     {

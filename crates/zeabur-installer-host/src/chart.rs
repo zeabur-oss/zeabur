@@ -7,8 +7,8 @@ use serde::Deserialize;
 use ureq::Agent;
 use ureq::http::Response;
 
-use crate::HostError;
 use crate::download::check;
+use crate::{HostError, bundle};
 
 /// The largest chart or repository index read.
 const MAX: u64 = 64 << 20;
@@ -33,6 +33,10 @@ pub fn fetch(
 ) -> Result<Vec<u8>, HostError> {
     if let Some(reference) = chart.strip_prefix("oci://") {
         return oci(agent, reference, digest);
+    }
+    if let Some(archive) = bundle::read(digest) {
+        check(chart, digest, &archive)?;
+        return Ok(archive);
     }
     let repo = repo.ok_or_else(|| HostError::Parse {
         what: chart.to_owned(),
@@ -109,7 +113,10 @@ fn oci(agent: &Agent, reference: &str, digest: &str) -> Result<Vec<u8>, HostErro
     })?;
     let manifest_url = format!("https://{host}/v2/{path}/manifests/{digest}");
     let mut token = None;
-    let manifest = registry(agent, &manifest_url, Some(OCI_MANIFEST), &mut token)?;
+    let manifest = match bundle::read(digest) {
+        Some(manifest) => manifest,
+        None => registry(agent, &manifest_url, Some(OCI_MANIFEST), &mut token)?,
+    };
     check(reference, digest, &manifest)?;
     let manifest: Manifest = serde_json::from_slice(&manifest).map_err(|e| HostError::Parse {
         what: manifest_url.clone(),
@@ -124,7 +131,10 @@ fn oci(agent: &Agent, reference: &str, digest: &str) -> Result<Vec<u8>, HostErro
             reason: "no chart layer".to_owned(),
         })?;
     let blob_url = format!("https://{host}/v2/{path}/blobs/{}", layer.digest);
-    let archive = registry(agent, &blob_url, None, &mut token)?;
+    let archive = match bundle::read(&layer.digest) {
+        Some(archive) => archive,
+        None => registry(agent, &blob_url, None, &mut token)?,
+    };
     check(reference, &layer.digest, &archive)?;
     Ok(archive)
 }

@@ -42,6 +42,8 @@ host:
 | `secretFiles` | `{}` | 依元件 ID 分組的機密檔案路徑 |
 | `k3sVersion`、`rke2Version` | installer 釘選版本 | 覆寫 K3s 或 RKE2 的版本 |
 | `host` | 空 | API 憑證的額外名稱和磁碟加密要求 |
+| `bundle` | 空 | [`bundle`](./installer.mdx#bundle) 做出來的目錄，給連不到下載來源的主機用，見[離線主機與 registry 鏡像](#離線主機與-registry-鏡像) |
+| `registryMirrors` | `{}` | 容器執行環境拉映像檔時，先試的鏡像，依 registry 主機分組，同一節 |
 | `sources` | 空 | 選填，用自己準備的 Catalog、映像檔和 chart 取代釘選的版本 |
 
 `zeabur: false` 只決定這次安裝什麼，不會移除已裝好的 Zeabur。要移除，用 [`uninstall`](./installer.mdx#uninstall)。
@@ -169,6 +171,21 @@ sources:
 
 從 `imageArchives` 拿掉的檔案，下次 `apply` 時也會從 K3s 或 RKE2 的匯入目錄移除。這份清單放的是已經在主機上的封存檔，和私有 registry 的存取設定無關。
 
+### 離線主機與 registry 鏡像
+
+`bundle` 填 [`bundle`](./installer.mdx#bundle) 做出來的目錄。`plan` 和 `apply` 會先用目錄裡的檔案，SHA-256 和 Catalog 或 installer 釘選的相符才採用，目錄裡沒有的照常下載。
+
+`registryMirrors` 依 registry 主機列出容器執行環境拉那個 registry 的映像檔時要先試的位址。installer 把它們寫進 K3s 或 RKE2 的 `registries.yaml`，和 Zeabur Builder 的 registry 放在一起。
+
+```yaml title="/etc/zeabur-installer/config.yaml"
+bundle: /srv/zeabur-bundle
+registryMirrors:
+  docker.io: [https://docker-mirror.example.com]
+  ghcr.io: [https://ghcr-mirror.example.com]
+```
+
+每個鍵是 `docker.io` 這樣的 registry 主機，每個位址要以 `https://` 或 `http://` 開頭。加入叢集的主機在 `join` 的設定檔裡也能放這兩個欄位。
+
 ## 自己用的檔案
 
 頂層寫 `use: personal` 時，installer 改裝 KubeSolo 和元件，不裝 Zeabur 面板和 Zeabur Identity。做法和限制見[自己用：在小機器上安裝](../install/personal.mdx)。
@@ -198,7 +215,7 @@ host:
 
 ## 加入既有叢集的檔案
 
-頂層有 `join` 時，installer 把這台機器當成要加入的新節點，只安裝 K3s 或 RKE2。同一份檔案只能再放 `distribution`、對應的版本欄位（`k3sVersion` 或 `rke2Version`）、`host` 和 `sources.imageArchives`，不能放 `profile`、`access` 這些建立叢集的欄位。
+頂層有 `join` 時，installer 把這台機器當成要加入的新節點，只安裝 K3s 或 RKE2。同一份檔案只能再放 `distribution`、對應的版本欄位（`k3sVersion` 或 `rke2Version`）、`host`、`bundle`、`registryMirrors` 和 `sources.imageArchives`，不能放 `profile`、`access` 這些建立叢集的欄位。
 
 在既有 server 執行 `zeabur-installer node add` 取得完整 YAML，存到新主機。權杖和 server 設定都在裡面，不用自己拼。
 

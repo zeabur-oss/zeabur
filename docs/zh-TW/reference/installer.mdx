@@ -76,6 +76,18 @@ sudo zeabur-installer doctor
 
 紀錄是較新版的 installer 寫的時候，`plan` 和 `apply` 會停下，並寫出要改用哪一版。要退回舊版 installer，請還原升級前的快照。
 
+## `bundle`
+
+`bundle` 把 `apply` 會下載的檔案收進一個目錄，給連不到 GitHub、Helm 儲存庫或容器 registry 的主機用。在連得上的主機用 root 執行，設定檔用另一台主機要用的那份：
+
+```sh
+sudo zeabur-installer bundle /srv/zeabur-bundle
+```
+
+把目錄複製到另一台主機，在它的設定檔寫 `bundle: /srv/zeabur-bundle`。之後 `plan` 和 `apply` 會先用目錄裡的檔案，SHA-256 相符才採用，目錄裡沒有的照常下載，檔案被改過就拒絕。
+
+目錄只收有 digest 可以核對的檔案：K3s 或 RKE2 的發行檔、Catalog、chart，以及元件下載的 manifests。用 `k3sVersion` 或 `rke2Version` 指定的版本沒有 digest，`bundle` 會列出沒收的項目。元件啟動時拉的容器映像檔不在裡面，請用 [`registryMirrors`](./installer-configuration.mdx#離線主機與-registry-鏡像) 指到鏡像，或用 `sources.imageArchives` 匯入。
+
 ## `gui`
 
 在伺服器執行：

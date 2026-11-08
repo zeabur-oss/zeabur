@@ -1418,10 +1418,8 @@ fn server_files(
     files.push(distribution.node_name_file(node_name));
     files.extend(distribution.node_ip_file(&facts.node_ips));
     files.extend(facts.apparmor_profile());
-    files.extend(
-        registry
-            .and_then(|r| Some(distribution.registries_file(&r.host, r.cluster_ip.as_deref()?))),
-    );
+    let in_cluster = registry.and_then(|r| Some((r.host.as_str(), r.cluster_ip.as_deref()?)));
+    files.extend(distribution.registries_file(in_cluster, &config.registry_mirrors));
     files
 }
 
@@ -2215,10 +2213,11 @@ mod tests {
             .iter()
             .find(|f| f.path == k3s.layout().registries_file)
             .unwrap();
-        assert_eq!(
-            registries,
-            &k3s.registries_file(&registry.host, cluster::REGISTRY_CLUSTER_IP)
+        let expected = k3s.registries_file(
+            Some((&registry.host, cluster::REGISTRY_CLUSTER_IP)),
+            &BTreeMap::new(),
         );
+        assert_eq!(Some(registries), expected.as_ref());
         assert!(registries.content.contains(&registry.host));
 
         let input = index

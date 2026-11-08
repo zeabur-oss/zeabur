@@ -383,9 +383,13 @@ pub fn plan(config: &JoinConfig, facts: &JoinFacts) -> Result<JoinPlan, PlanErro
     host_files.push(distribution.node_name_file(&node_name));
     host_files.extend(distribution.node_ip_file(&facts.facts.node_ips));
     host_files.extend(facts.facts.apparmor_profile());
+    let cluster_ip = join.registry.as_ref().map(|r| r.cluster_ip.to_string());
+    let in_cluster = match (&join.registry, &cluster_ip) {
+        (Some(registry), Some(ip)) => Some((registry.host.as_str(), ip.as_str())),
+        _ => None,
+    };
+    host_files.extend(distribution.registries_file(in_cluster, &config.registry_mirrors));
     if let Some(registry) = &join.registry {
-        host_files
-            .push(distribution.registries_file(&registry.host, &registry.cluster_ip.to_string()));
         host_files.push(distribution.registry_ca_file(&registry.ca));
     }
 
@@ -507,7 +511,12 @@ mod tests {
         ));
         let p = plan(&c, &facts(&[500; 5])).unwrap();
         let rke2 = Distribution::Rke2;
-        let registries = rke2.registries_file("zot.zot.svc:5000", "10.43.0.50");
+        let registries = rke2
+            .registries_file(
+                Some(("zot.zot.svc:5000", "10.43.0.50")),
+                &std::collections::BTreeMap::new(),
+            )
+            .unwrap();
         assert!(registries.content.contains("https://10.43.0.50:5000"));
         assert!(p.host_files.contains(&registries));
         assert!(p.host_files.contains(&rke2.registry_ca_file(ca)));

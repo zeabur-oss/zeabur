@@ -9,7 +9,7 @@ use sha2::{Digest as _, Sha256};
 use ureq::Agent;
 use ureq::tls::{RootCerts, TlsConfig};
 
-use crate::HostError;
+use crate::{HostError, bundle};
 
 /// The largest file [`fetch`] downloads.
 const MAX_FILE: u64 = 4 << 30;
@@ -33,9 +33,11 @@ pub fn agent() -> Agent {
         .into()
 }
 
-/// Downloads `url` to `dest` unless a file with the expected digest is already there. Returns the
-/// digest. With no expected digest the file is always downloaded; check it with [`sha256_file`]
-/// against a list.
+/// Downloads `url` to `dest` unless a file with the expected digest is already there or the
+/// bundle holds it. Returns the digest.
+///
+/// With no expected digest the file is always downloaded; check it with [`sha256_file`] against a
+/// list.
 ///
 /// # Errors
 ///
@@ -46,11 +48,14 @@ pub fn fetch(
     dest: &Path,
     sha256: Option<&str>,
 ) -> Result<String, HostError> {
-    if let Some(expected) = sha256
-        && dest.exists()
-        && sha256_file(dest)? == expected
-    {
-        return Ok(expected.to_owned());
+    if let Some(expected) = sha256 {
+        if dest.exists() && sha256_file(dest)? == expected {
+            bundle::save_file(expected, dest)?;
+            return Ok(expected.to_owned());
+        }
+        if let Some(source) = bundle::find(expected) {
+            return from_bundle(&source, expected, dest);
+        }
     }
     let fail = |reason: String| HostError::Download {
         url: url.to_owned(),
@@ -90,6 +95,26 @@ pub fn fetch(
         });
     }
     fs::rename(&partial, dest).map_err(HostError::io(dest))?;
+    if sha256.is_some() {
+        bundle::save_file(&actual, dest)?;
+    }
+    Ok(actual)
+}
+
+/// Copies the bundle's file to `dest`, once its content has the digest its name says.
+fn from_bundle(source: &Path, expected: &str, dest: &Path) -> Result<String, HostError> {
+    let actual = sha256_file(source)?;
+    if actual != expected {
+        return Err(HostError::Parse {
+            what: source.display().to_string(),
+            reason: format!("its SHA-256 is {actual}, not the {expected} its name says"),
+        });
+    }
+    let dir = dest.parent().unwrap_or_else(|| Path::new("."));
+    fs::create_dir_all(dir).map_err(HostError::io(dir))?;
+    let partial = dest.with_extension("partial");
+    fs::copy(source, &partial).map_err(HostError::io(&partial))?;
+    fs::rename(&partial, dest).map_err(HostError::io(dest))?;
     Ok(actual)
 }
 
@@ -100,6 +125,15 @@ pub fn fetch(
 ///
 /// When the download fails or the digest differs.
 pub fn fetch_text(agent: &Agent, url: &str, sha256: Option<&str>) -> Result<String, HostError> {
+    if let Some(expected) = sha256
+        && let Some(bytes) = bundle::read(expected)
+    {
+        check(url, expected, &bytes)?;
+        return String::from_utf8(bytes).map_err(|e| HostError::Parse {
+            what: url.to_owned(),
+            reason: e.to_string(),
+        });
+    }
     let fail = |reason: String| HostError::Download {
         url: url.to_owned(),
         reason,
@@ -126,7 +160,7 @@ pub fn check(what: &str, expected: &str, bytes: &[u8]) -> Result<(), HostError> 
     let expected = expected.strip_prefix("sha256:").unwrap_or(expected);
     let actual = hex::encode(Sha256::digest(bytes));
     if actual == expected {
-        return Ok(());
+        return bundle::save(&actual, bytes);
     }
     Err(HostError::Digest {
         file: what.to_owned(),

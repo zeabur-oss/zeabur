@@ -6,6 +6,8 @@
 //! with etcd, and three servers keep it up when one fails. K3s gets Calico from the installer;
 //! RKE2 brings Canal, Calico's policy engine on flannel.
 
+use std::collections::BTreeMap;
+
 use serde::{Deserialize, Serialize};
 
 use crate::pins::{K3S, RKE2};
@@ -460,23 +462,53 @@ impl Distribution {
         }
     }
 
-    /// The node's container runtime cannot resolve the in-cluster registry's host, so its images
-    /// come from the registry's fixed `ClusterIP`, which kube-proxy routes on every node and the
-    /// registry's certificate names.
+    /// What the node's container runtime reads to pull images.
+    ///
+    /// `registry` is the in-cluster registry's host and fixed `ClusterIP`. The runtime cannot
+    /// resolve that host, so its images come from the `ClusterIP`, which kube-proxy routes on every
+    /// node and the registry's certificate names. `mirrors` are the endpoints to try before the
+    /// registry a name belongs to, by registry host. `None` when there is neither.
     #[must_use]
-    pub fn registries_file(self, host: &str, cluster_ip: &str) -> HostFile {
+    pub fn registries_file(
+        self,
+        registry: Option<(&str, &str)>,
+        mirrors: &BTreeMap<String, Vec<String>>,
+    ) -> Option<HostFile> {
+        if registry.is_none() && mirrors.is_empty() {
+            return None;
+        }
         let layout = self.layout();
-        let port = host.rsplit_once(':').map_or("443", |(_, p)| p);
-        HostFile {
+        let mut lines = vec![
+            "# Written by zeabur-installer; `zeabur-installer doctor` compares it.".to_owned(),
+            "mirrors:".to_owned(),
+        ];
+        if let Some((host, cluster_ip)) = registry {
+            let port = host.rsplit_once(':').map_or("443", |(_, p)| p);
+            lines.push(format!("  {host}:"));
+            lines.push(format!("    endpoint: [\"https://{cluster_ip}:{port}\"]"));
+        }
+        for (host, endpoints) in mirrors {
+            let mut list = Vec::new();
+            for endpoint in endpoints {
+                list.push(serde_json::json!(endpoint).to_string());
+            }
+            lines.push(format!("  {}:", serde_json::json!(host)));
+            lines.push(format!("    endpoint: [{}]", list.join(", ")));
+        }
+        if let Some((host, cluster_ip)) = registry {
+            let port = host.rsplit_once(':').map_or("443", |(_, p)| p);
+            lines.push("configs:".to_owned());
+            lines.push(format!("  \"{cluster_ip}:{port}\":"));
+            lines.push("    tls:".to_owned());
+            lines.push(format!("      ca_file: {}", layout.registry_ca_file));
+        }
+        lines.push(String::new());
+        let content = lines.join("\n");
+        Some(HostFile {
             path: layout.registries_file.to_owned(),
             mode: 0o600,
-            content: format!(
-                "# Written by zeabur-installer; `zeabur-installer doctor` compares it.\n\
-                 mirrors:\n  {host}:\n    endpoint: [\"https://{cluster_ip}:{port}\"]\n\
-                 configs:\n  \"{cluster_ip}:{port}\":\n    tls:\n      ca_file: {}\n",
-                layout.registry_ca_file
-            ),
-        }
+            content,
+        })
     }
 
     /// The registry's CA on a joining node, copied from the server by `node add`.
@@ -769,5 +801,73 @@ mod tests {
                 "{rule}"
             );
         }
+    }
+
+    fn mirrors(pairs: &[(&str, &[&str])]) -> BTreeMap<String, Vec<String>> {
+        let mut map = BTreeMap::new();
+        for (host, endpoints) in pairs {
+            let list = endpoints.iter().map(|e| (*e).to_owned()).collect();
+            map.insert((*host).to_owned(), list);
+        }
+        map
+    }
+
+    #[test]
+    fn registries_file_is_only_written_when_something_goes_in_it() {
+        assert_eq!(
+            Distribution::K3s.registries_file(None, &BTreeMap::new()),
+            None
+        );
+    }
+
+    #[test]
+    fn mirrors_alone_make_a_registries_file_for_each_distribution() {
+        let mirrors = mirrors(&[
+            (
+                "docker.io",
+                &["https://a.example.com", "https://b.example.com"],
+            ),
+            ("ghcr.io", &["http://10.0.0.9:5000"]),
+        ]);
+        for distribution in Distribution::ALL {
+            let file = distribution.registries_file(None, &mirrors).unwrap();
+            assert_eq!(file.path, distribution.layout().registries_file);
+            let parsed: serde_json::Value = serde_saphyr::from_str(&file.content).unwrap();
+            assert_eq!(
+                parsed["mirrors"]["docker.io"]["endpoint"],
+                serde_json::json!(["https://a.example.com", "https://b.example.com"])
+            );
+            assert_eq!(
+                parsed["mirrors"]["ghcr.io"]["endpoint"],
+                serde_json::json!(["http://10.0.0.9:5000"])
+            );
+            assert!(parsed.get("configs").is_none());
+        }
+    }
+
+    #[test]
+    fn mirrors_sit_beside_the_in_cluster_registry() {
+        let mirrors = mirrors(&[("docker.io", &["https://a.example.com"])]);
+        let file = Distribution::K3s
+            .registries_file(Some(("zot.zot.svc:5000", "10.43.0.50")), &mirrors)
+            .unwrap();
+        let parsed: serde_json::Value = serde_saphyr::from_str(&file.content).unwrap();
+        assert_eq!(
+            parsed["mirrors"]["zot.zot.svc:5000"]["endpoint"],
+            serde_json::json!(["https://10.43.0.50:5000"])
+        );
+        assert_eq!(
+            parsed["mirrors"]["docker.io"]["endpoint"],
+            serde_json::json!(["https://a.example.com"])
+        );
+        assert!(parsed["configs"]["10.43.0.50:5000"]["tls"]["ca_file"].is_string());
+    }
+
+    #[test]
+    fn a_wildcard_mirror_host_stays_a_key() {
+        let mirrors = mirrors(&[("*", &["https://a.example.com"])]);
+        let file = Distribution::K3s.registries_file(None, &mirrors).unwrap();
+        let parsed: serde_json::Value = serde_saphyr::from_str(&file.content).unwrap();
+        assert!(parsed["mirrors"]["*"]["endpoint"].is_array());
     }
 }

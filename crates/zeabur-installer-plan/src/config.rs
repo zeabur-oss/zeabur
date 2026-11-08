@@ -65,6 +65,13 @@ pub struct Config {
     /// Host settings.
     #[serde(default)]
     pub host: Host,
+    /// A directory made by `zeabur-installer bundle`. A download it holds is used after its digest
+    /// is checked; the rest is downloaded as usual.
+    pub bundle: Option<String>,
+    /// Registries whose images the container runtime pulls from a mirror first, by registry host
+    /// (`docker.io`, `ghcr.io`), each with the mirror's endpoints in order.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub registry_mirrors: BTreeMap<String, Vec<String>>,
     /// Releases to install instead of the pinned ones, for development builds.
     #[serde(default)]
     pub sources: Sources,
@@ -305,6 +312,11 @@ pub struct JoinConfig {
     /// Host settings. `tlsSan` applies to servers only.
     #[serde(default)]
     pub host: Host,
+    /// A directory made by `zeabur-installer bundle`, as in the install configuration.
+    pub bundle: Option<String>,
+    /// Registry mirrors, as in the install configuration.
+    #[serde(default)]
+    pub registry_mirrors: BTreeMap<String, Vec<String>>,
     /// Image archives the node imports on start.
     #[serde(default)]
     pub sources: JoinSources,
@@ -438,6 +450,7 @@ impl JoinConfig {
             return Err(PlanError::SecondServer);
         }
         server_address(&join.server, self.distribution.join_port())?;
+        check_mirrors(&self.registry_mirrors)?;
         if let Some(registry) = &join.registry
             && !registry
                 .ca
@@ -567,6 +580,31 @@ fn is_release_tag(version: &str, build: &str) -> bool {
         && metadata.strip_prefix(build).is_some_and(number)
 }
 
+/// Checks `registryMirrors`: a registry host (or `*`) with at least one `http://` or `https://`
+/// endpoint each.
+fn check_mirrors(mirrors: &BTreeMap<String, Vec<String>>) -> Result<(), PlanError> {
+    for (host, endpoints) in mirrors {
+        if host.is_empty() || host.contains("://") || host.contains('/') {
+            return Err(PlanError::Config(format!(
+                "registryMirrors: `{host}` is not a registry host such as docker.io"
+            )));
+        }
+        if endpoints.is_empty() {
+            return Err(PlanError::Config(format!(
+                "registryMirrors.{host}: name at least one endpoint"
+            )));
+        }
+        for endpoint in endpoints {
+            if !endpoint.starts_with("https://") && !endpoint.starts_with("http://") {
+                return Err(PlanError::Config(format!(
+                    "registryMirrors.{host}: `{endpoint}` does not start with https:// or http://"
+                )));
+            }
+        }
+    }
+    Ok(())
+}
+
 /// A join token: `K10<64 hex>::<credentials>`, or bare credentials (no CA pinning).
 ///
 /// # Errors
@@ -689,6 +727,8 @@ impl Config {
             rke2_version: None,
             k3s_version: None,
             host: Host::default(),
+            bundle: None,
+            registry_mirrors: BTreeMap::new(),
             sources: Sources::default(),
         })
     }
@@ -722,6 +762,7 @@ impl Config {
             self.rke2_version.as_ref(),
             self.k3s_version.as_ref(),
         )?;
+        check_mirrors(&self.registry_mirrors)?;
         if !matches!(self.profile.as_str(), "single-node" | "multi-node") {
             return Err(PlanError::Config(format!(
                 "profile `{}` is not single-node or multi-node",
@@ -996,5 +1037,25 @@ mod tests {
             check_token(&format!("K10{HASH}::server:x"), Role::Server).unwrap(),
             TokenKind::Server
         );
+    }
+
+    #[test]
+    fn registry_mirrors_name_a_host_and_an_http_endpoint() {
+        let yaml = |mirrors: &str| {
+            format!(
+                "access:\n  mode: domain\n  identity: login.example.com\n  zeabur: zeabur.example.com\n\
+                 registryMirrors:\n{mirrors}"
+            )
+        };
+        let ok = Config::parse(&yaml("  docker.io: [\"https://a.example.com\"]\n")).unwrap();
+        assert_eq!(ok.registry_mirrors["docker.io"], ["https://a.example.com"]);
+        for bad in [
+            "  docker.io: []\n",
+            "  docker.io: [\"a.example.com\"]\n",
+            "  \"https://docker.io\": [\"https://a.example.com\"]\n",
+            "  \"docker.io/library\": [\"https://a.example.com\"]\n",
+        ] {
+            assert!(Config::parse(&yaml(bad)).is_err(), "{bad}");
+        }
     }
 }

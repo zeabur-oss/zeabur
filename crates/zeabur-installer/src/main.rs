@@ -2,6 +2,7 @@
 //! server, or `KubeSolo` and the components for one person.
 
 mod apply;
+mod bundle;
 mod doctor;
 mod gui;
 mod join;
@@ -56,6 +57,14 @@ enum Command {
     },
     /// Install, or bring an existing install in line with the configuration. Safe to run again.
     Apply,
+    /// Keep every file `apply` downloads and checks against a digest in a directory, to carry to a
+    /// host that cannot reach the sources. Run it on a host that can, as root, with the
+    /// configuration the other host will use; set `bundle: <path>` there. A file with no digest to
+    /// check, such as a K3s release set with `k3sVersion`, is not kept.
+    Bundle {
+        /// The directory to fill.
+        dir: PathBuf,
+    },
     /// Print Zeabur's namespace, Zeabur Identity's Ingress and Zeabur's `HelmChart` as `apply`
     /// makes them, as a JSON `List`, for a K3s/RKE2 cluster that has its other parts from another
     /// source (`scripts/dev-cluster.sh`). Reads no host and no catalog.
@@ -181,7 +190,8 @@ fn main() -> ExitCode {
             join::uninstall(&config, &cli.config, *purge)
         }
         (
-            Command::Gui { .. }
+            Command::Bundle { .. }
+            | Command::Gui { .. }
             | Command::Node { .. }
             | Command::Manifests { .. }
             | Command::SetupLink { .. },
@@ -192,6 +202,7 @@ fn main() -> ExitCode {
         ))),
         (Command::Plan { json }, None) => show_plan(&cli, *json),
         (Command::Apply, None) => apply::run(&cli.config, cli.no_telemetry),
+        (Command::Bundle { dir }, None) => bundle::run(&cli.config, dir),
         (Command::Manifests { cluster_name }, None) => manifests(&cli, cluster_name),
         (
             Command::SetupLink {
@@ -269,12 +280,13 @@ fn personal(cli: &Cli, config: &zeabur_installer_plan::config::PersonalConfig) -
             out::line(&personal::uninstall_text());
             Ok(())
         }
-        Command::Node { .. } | Command::Manifests { .. } | Command::SetupLink { .. } => {
-            Err(InstallError::Message(format!(
-                "{} is a personal install: one node and no Zeabur panel",
-                cli.config.display()
-            )))
-        }
+        Command::Bundle { .. }
+        | Command::Node { .. }
+        | Command::Manifests { .. }
+        | Command::SetupLink { .. } => Err(InstallError::Message(format!(
+            "{} is a personal install: one node and no Zeabur panel",
+            cli.config.display()
+        ))),
     })
 }
 

@@ -75,6 +75,18 @@ The record isn't configuration, and you don't edit it. `apply` writes it, and th
 
 If a newer installer wrote the record, `plan` and `apply` stop and name the version to use. To go back to an older installer, restore a snapshot taken before the upgrade.
 
+## `bundle`
+
+`bundle` keeps what `apply` downloads in a directory, for a host that can't reach GitHub, the Helm repositories or the container registries. Run it as root on a host that can, with the configuration the other host will use:
+
+```sh
+sudo zeabur-installer bundle /srv/zeabur-bundle
+```
+
+Copy the directory to the other host and set `bundle: /srv/zeabur-bundle` in its configuration. `plan` and `apply` then use a file from the directory once its SHA-256 matches, download what the directory lacks, and refuse a file that has been changed.
+
+The directory holds the files that have a digest to check them against: the K3s or RKE2 release, the Catalog, the charts and the manifests that components download. A release you set with `k3sVersion` or `rke2Version` has none, so `bundle` lists it as not kept. It doesn't hold the container images that components pull when they start. For those, point [`registryMirrors`](./installer-configuration.mdx#offline-hosts-and-registry-mirrors) at a mirror, or import them with `sources.imageArchives`.
+
 ## `gui`
 
 Run on the server:

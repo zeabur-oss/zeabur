@@ -41,6 +41,8 @@ host:
 | `secretFiles` | `{}` | Secret file paths grouped by component ID |
 | `k3sVersion`, `rke2Version` | Versions pinned by the installer | Override the K3s or RKE2 version |
 | `host` | Empty | Extra names for the API certificate and disk encryption requirements |
+| `bundle` | Empty | A directory made by [`bundle`](./installer.mdx#bundle), for a host that can't reach the download sources. See [Offline hosts and registry mirrors](#offline-hosts-and-registry-mirrors) |
+| `registryMirrors` | `{}` | Mirrors the container runtime tries for a registry's images, by registry host. Same section |
 | `sources` | Empty | Optional overrides for the pinned Catalog, images, and chart using your own versions |
 
 `zeabur: false` only determines what this installation installs. It doesn't remove an existing Zeabur installation. To remove it, use [`uninstall`](./installer.mdx#uninstall).
@@ -168,6 +170,21 @@ sources:
 
 An archive removed from `imageArchives` is also removed from the K3s or RKE2 import directory on the next `apply`. This list contains archives already on the host. It has nothing to do with private registry access settings.
 
+### Offline hosts and registry mirrors
+
+`bundle` names a directory made by [`bundle`](./installer.mdx#bundle). `plan` and `apply` take a download from it once its SHA-256 matches the one the Catalog or the installer pins, and download whatever the directory lacks.
+
+`registryMirrors` lists, by registry host, the endpoints the container runtime tries for that registry's images. The installer writes them to the `registries.yaml` of K3s or RKE2, beside the entry for Zeabur Builder's registry.
+
+```yaml title="/etc/zeabur-installer/config.yaml"
+bundle: /srv/zeabur-bundle
+registryMirrors:
+  docker.io: [https://docker-mirror.example.com]
+  ghcr.io: [https://ghcr-mirror.example.com]
+```
+
+Each key is a registry host such as `docker.io`, and each endpoint starts with `https://` or `http://`. A host that joins a cluster takes the same two fields in its `join` configuration.
+
 ## Configuration for personal use
 
 With `use: personal` at the top level, the installer installs KubeSolo and components, without the Zeabur dashboard or Zeabur Identity. For instructions and limitations, see [Personal use: Install on a small machine](../install/personal.mdx).
@@ -197,7 +214,7 @@ Components use KubeSolo's built-in `local-path` storage class, which stores data
 
 ## Configuration for joining an existing cluster
 
-A top-level `join` tells the installer to treat this machine as a new node joining an existing cluster and install only K3s or RKE2. Only `distribution`, the version field of that distribution (`k3sVersion` or `rke2Version`), `host`, and `sources.imageArchives` can appear alongside it. Fields for creating a cluster, such as `profile` and `access`, aren't accepted.
+A top-level `join` tells the installer to treat this machine as a new node joining an existing cluster and install only K3s or RKE2. Only `distribution`, the version field of that distribution (`k3sVersion` or `rke2Version`), `host`, `bundle`, `registryMirrors`, and `sources.imageArchives` can appear alongside it. Fields for creating a cluster, such as `profile` and `access`, aren't accepted.
 
 Run `zeabur-installer node add` on an existing server to get the complete YAML, then save it on the new host. It includes the token and server settings, so you don't need to assemble them yourself.
 
