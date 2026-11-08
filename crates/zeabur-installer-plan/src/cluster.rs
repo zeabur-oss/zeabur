@@ -167,6 +167,15 @@ fn zeabur_request_mib() -> u64 {
 }
 
 /// A memory quantity in `Mi` or `Gi`, in MiB.
+/// The endpoints as a YAML flow list of JSON strings.
+fn quoted(endpoints: &[String]) -> String {
+    let mut list = Vec::new();
+    for endpoint in endpoints {
+        list.push(serde_json::json!(endpoint).to_string());
+    }
+    list.join(", ")
+}
+
 fn mebibytes(quantity: &str) -> Option<u64> {
     if let Some(mib) = quantity.strip_suffix("Mi") {
         return mib.parse().ok();
@@ -484,16 +493,19 @@ impl Distribution {
         ];
         if let Some((host, cluster_ip)) = registry {
             let port = host.rsplit_once(':').map_or("443", |(_, p)| p);
+            let mut endpoints = vec![format!("https://{cluster_ip}:{port}")];
+            if let Some(extra) = mirrors.get(host) {
+                endpoints.extend(extra.iter().cloned());
+            }
             lines.push(format!("  {host}:"));
-            lines.push(format!("    endpoint: [\"https://{cluster_ip}:{port}\"]"));
+            lines.push(format!("    endpoint: [{}]", quoted(&endpoints)));
         }
         for (host, endpoints) in mirrors {
-            let mut list = Vec::new();
-            for endpoint in endpoints {
-                list.push(serde_json::json!(endpoint).to_string());
+            if registry.is_some_and(|(registry_host, _)| registry_host == host) {
+                continue;
             }
             lines.push(format!("  {}:", serde_json::json!(host)));
-            lines.push(format!("    endpoint: [{}]", list.join(", ")));
+            lines.push(format!("    endpoint: [{}]", quoted(endpoints)));
         }
         if let Some((host, cluster_ip)) = registry {
             let port = host.rsplit_once(':').map_or("443", |(_, p)| p);
@@ -860,6 +872,19 @@ mod tests {
             serde_json::json!(["https://a.example.com"])
         );
         assert!(parsed["configs"]["10.43.0.50:5000"]["tls"]["ca_file"].is_string());
+    }
+
+    #[test]
+    fn a_mirror_of_the_in_cluster_registry_host_joins_its_endpoints() {
+        let mirrors = mirrors(&[("zot.zot.svc:5000", &["https://a.example.com"])]);
+        let file = Distribution::K3s
+            .registries_file(Some(("zot.zot.svc:5000", "10.43.0.50")), &mirrors)
+            .unwrap();
+        let parsed: serde_json::Value = serde_saphyr::from_str(&file.content).unwrap();
+        assert_eq!(
+            parsed["mirrors"]["zot.zot.svc:5000"]["endpoint"],
+            serde_json::json!(["https://10.43.0.50:5000", "https://a.example.com"])
+        );
     }
 
     #[test]
