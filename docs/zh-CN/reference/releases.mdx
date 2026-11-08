@@ -75,10 +75,26 @@ tar -xzf "$binary-v$version-$platform.tar.gz" "$binary"
 macOS 版本使用 Developer ID 签名，并经过 Apple 公证，所以通过浏览器下载、带有 quarantine 标记的文件，macOS 也会允许它运行。要确认的话，运行：
 
 ```sh
-spctl --assess -vvv --type open --context context:primary-signature zeaburctl
+spctl --assess -vvv --type open --context context:primary-signature ./zeaburctl
 ```
 
-输出应该包含 `source=Notarized Developer ID`。
+输出必须是下面两种之一，不是的话请不要打开这个文件。
+
+v0.2.0 起使用 Zeabur 的证书签名：
+
+```text
+./zeaburctl: accepted
+source=Notarized Developer ID
+origin=Developer ID Application: ZEABUR PTE. LTD. (6T873K59LQ)
+```
+
+v0.2.0 之前使用 Yi-Jyun Pan 的账号签名：
+
+```text
+./zeaburctl: accepted
+source=Notarized Developer ID
+origin=Developer ID Application: Yi-Jyun Pan (SG37523V73)
+```
 
 ## 验证镜像与 chart
 

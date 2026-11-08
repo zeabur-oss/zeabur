@@ -74,10 +74,26 @@ If a checksum doesn't match, download that file again. If the signer, issuer, or
 The macOS build is signed with a Developer ID and notarized by Apple, so macOS opens it even when a browser added a quarantine flag. To check:
 
 ```sh
-spctl --assess -vvv --type open --context context:primary-signature zeaburctl
+spctl --assess -vvv --type open --context context:primary-signature ./zeaburctl
 ```
 
-The output should say `source=Notarized Developer ID`.
+The output must be one of these two. If it isn't, don't open the file.
+
+From v0.2.0 on, signed with Zeabur's certificate:
+
+```text
+./zeaburctl: accepted
+source=Notarized Developer ID
+origin=Developer ID Application: ZEABUR PTE. LTD. (6T873K59LQ)
+```
+
+Before v0.2.0, signed with Yi-Jyun Pan's account:
+
+```text
+./zeaburctl: accepted
+source=Notarized Developer ID
+origin=Developer ID Application: Yi-Jyun Pan (SG37523V73)
+```
 
 ## Verify the image and chart
 
