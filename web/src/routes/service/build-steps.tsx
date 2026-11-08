@@ -175,7 +175,7 @@ function BuildPhase({
       <div className="flex min-w-0 items-center gap-2 py-1 pl-4.5 text-sm">{head}</div>
       <ol className="ml-5 flex min-w-0 flex-col border-l border-main pl-3">
         {log.steps.map((step) => (
-          <li key={step.key} className="min-w-0" data-testid="build-step" data-step={step.key}>
+          <li key={step.key} className="min-w-0" data-testid="build-step">
             <StepRow step={step} live={live} now={now} />
           </li>
         ))}
