@@ -184,6 +184,8 @@ registryMirrors:
   ghcr.io: [https://ghcr-mirror.example.com]
 ```
 
+bundle 不含容器映像檔，安裝前請先準備好 registry 鏡像。鏡像裡要已經有元件會拉的映像檔，涵蓋它們用到的每個 registry，例如 `docker.io`、`ghcr.io`、`quay.io`。主機連不到原本的 registry、鏡像又沒有某個映像檔時，用到它的 Pod 會一直停在 `ImagePullBackOff`。用 CNCF distribution registry 做的 pull-through 快取，一個實例只能鏡像一個上游 registry，所以每個上游各跑一個。
+
 每個鍵是 `docker.io` 這樣的 registry 主機，每個位址要以 `https://` 或 `http://` 開頭。加入叢集的主機在 `join` 的設定檔裡也能放這兩個欄位。
 
 ## 自己用的檔案

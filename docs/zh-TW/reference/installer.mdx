@@ -86,7 +86,7 @@ sudo zeabur-installer bundle /srv/zeabur-bundle
 
 把目錄複製到另一台主機，在它的設定檔寫 `bundle: /srv/zeabur-bundle`。之後 `plan` 和 `apply` 會先用目錄裡的檔案，SHA-256 相符才採用，目錄裡沒有的照常下載，檔案被改過就拒絕。
 
-目錄只收有 digest 可以核對的檔案：K3s 或 RKE2 的發行檔、Catalog、chart，以及元件下載的 manifests。用 `k3sVersion` 或 `rke2Version` 指定的版本沒有 digest，`bundle` 還是會下載，並記下當下的 SHA-256，列為「未對照來源」。另一台主機用這份紀錄核對，只能確認檔案和建包時一樣，不能證明它來自官方。installer 內建的 digest 永遠優先於紀錄。目錄是 [OCI image layout](https://github.com/opencontainers/image-spec/blob/main/image-layout.md)，`oras`、`crane`、`skopeo` 等工具都讀得懂。元件啟動時拉的容器映像檔不在裡面，請用 [`registryMirrors`](./installer-configuration.mdx#離線主機與-registry-鏡像) 指到鏡像，或用 `sources.imageArchives` 匯入。
+目錄只收有 digest 可以核對的檔案：K3s 或 RKE2 的發行檔、Catalog、chart，以及元件下載的 manifests。用 `k3sVersion` 或 `rke2Version` 指定的版本沒有 digest，`bundle` 還是會下載，並記下當下的 SHA-256，列為「未對照來源」。另一台主機用這份紀錄核對，只能確認檔案和建包時一樣，不能證明它來自官方。installer 內建的 digest 永遠優先於紀錄。目錄是 [OCI image layout](https://github.com/opencontainers/image-spec/blob/main/image-layout.md)，`oras`、`crane`、`skopeo` 等工具都讀得懂。元件啟動時拉的容器映像檔不在裡面，請在安裝前先在你的網路裡準備好 registry 鏡像，再用 [`registryMirrors`](./installer-configuration.mdx#離線主機與-registry-鏡像) 指過去。
 
 ## `gui`
 
