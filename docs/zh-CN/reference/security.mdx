@@ -1,7 +1,6 @@
 ---
 title: 安全性
 description: 了解登录、机密、应用变更、终端和 installer 的权限及数据边界。
-source: "6a1b767cfd46"
 ---
 
 把同事设为**开发者**之前，先检查项目里有哪些 Secret 和 ServiceAccount：开发者都能访问。打开**节点终端**就等于获得整台主机的 root 权限。Zeabur 沿用 Kubernetes 的身份和准入规则，下面按功能说明各类访问的范围。

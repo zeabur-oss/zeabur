@@ -1,7 +1,6 @@
 ---
 title: 服务之间的连接与对外端口
 description: 通过私有地址连接同一集群内的服务，将数据库等非 HTTP 服务的端口开放到互联网，并用连接规则限制谁能连接。
-source: "b047c089d5d1"
 ---
 
 服务的**网络**标签页管理三件事：**私有网络**列出集群内其他服务连接这个服务的地址，**对外端口**让集群外的客户端不经过域名直接连接，**连接规则**决定哪些服务能连进来、这个服务能连到哪里。公开域名和 HTTPS 见[添加公开域名与 HTTPS](./domains.mdx)。
@@ -150,7 +149,7 @@ kubectl -n demo delete service db-public-5432
 
 ### 连接规则
 
-Zeabur 创建的规则都带有 `app.kubernetes.io/managed-by: zeabur` 标签，名称为 `zeabur-<规则>-<服务>`，超过 63 个字符会截断。以下以项目 `api` 为例。
+Zeabur 创建的规则都带有 `app.kubernetes.io/managed-by: zeabur` 标签，名称为 `zeabur-<规则>-<服务>`，超过 63 个字符会截断。以下以服务 `api` 为例。
 
 **隔离这个服务**：
 
