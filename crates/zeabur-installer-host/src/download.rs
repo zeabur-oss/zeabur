@@ -3,16 +3,31 @@
 use std::fs::{self, File};
 use std::io::{self, BufRead as _, Read as _, Write as _};
 use std::path::Path;
+use std::thread;
 use std::time::Duration;
 
 use sha2::{Digest as _, Sha256};
-use ureq::Agent;
+use ureq::http::Response;
 use ureq::tls::{RootCerts, TlsConfig};
+use ureq::{Agent, Body};
 
 use crate::HostError;
 
 /// The largest file [`fetch`] downloads.
 const MAX_FILE: u64 = 4 << 30;
+
+/// How often a failed request is tried again.
+const RETRIES: u32 = 3;
+
+/// The wait before the first retry; each further one doubles it.
+const BACKOFF: Duration = if cfg!(test) {
+    Duration::from_millis(1)
+} else {
+    Duration::from_secs(1)
+};
+
+/// The longest wait a `Retry-After` header can ask for.
+const MAX_WAIT: Duration = Duration::from_secs(30);
 
 /// An HTTPS client trusting the system's CA store.
 #[must_use]
@@ -59,7 +74,7 @@ pub fn fetch(
     let dir = dest.parent().unwrap_or_else(|| Path::new("."));
     fs::create_dir_all(dir).map_err(HostError::io(dir))?;
     let partial = dest.with_extension("partial");
-    let response = agent.get(url).call().map_err(|e| fail(e.to_string()))?;
+    let response = get_ok(agent, url).map_err(fail)?;
     let mut reader = response
         .into_body()
         .into_with_config()
@@ -104,7 +119,7 @@ pub fn fetch_text(agent: &Agent, url: &str, sha256: Option<&str>) -> Result<Stri
         url: url.to_owned(),
         reason,
     };
-    let response = agent.get(url).call().map_err(|e| fail(e.to_string()))?;
+    let response = get_ok(agent, url).map_err(fail)?;
     let text = response
         .into_body()
         .with_config()
@@ -115,6 +130,68 @@ pub fn fetch_text(agent: &Agent, url: &str, sha256: Option<&str>) -> Result<Stri
         check(url, expected, text.as_bytes())?;
     }
     Ok(text)
+}
+
+/// A GET that succeeds, or the reason it did not.
+fn get_ok(agent: &Agent, url: &str) -> Result<Response<Body>, String> {
+    let response = get_retrying(agent, url, &[], &[]).map_err(|e| e.to_string())?;
+    if response.status().is_success() {
+        Ok(response)
+    } else {
+        Err(format!("HTTP {}", response.status()))
+    }
+}
+
+/// A GET that is tried again after a 5xx, a 429, a connection error or a timeout, up to three
+/// times with a doubling wait. Any other status is returned as it is for the caller to judge.
+pub(crate) fn get_retrying(
+    agent: &Agent,
+    url: &str,
+    headers: &[(&str, &str)],
+    query: &[(&str, &str)],
+) -> Result<Response<Body>, ureq::Error> {
+    let mut wait = BACKOFF;
+    let mut attempt = 0;
+    loop {
+        let mut request = agent.get(url).config().http_status_as_error(false).build();
+        for (key, value) in headers {
+            request = request.header(*key, *value);
+        }
+        for (key, value) in query {
+            request = request.query(*key, *value);
+        }
+        let asked = match request.call() {
+            Ok(response) => {
+                let status = response.status().as_u16();
+                if status < 500 && status != 429 {
+                    return Ok(response);
+                }
+                if attempt == RETRIES {
+                    return Ok(response);
+                }
+                response
+                    .headers()
+                    .get("retry-after")
+                    .and_then(|v| v.to_str().ok())
+                    .and_then(|v| v.trim().parse::<u64>().ok())
+                    .map(Duration::from_secs)
+            }
+            Err(e) => {
+                let transient = matches!(
+                    e,
+                    ureq::Error::Io(_) | ureq::Error::ConnectionFailed | ureq::Error::Timeout(_)
+                );
+                if !transient || attempt == RETRIES {
+                    return Err(e);
+                }
+                None
+            }
+        };
+        attempt += 1;
+        let pause = asked.map_or(wait, |a| a.min(MAX_WAIT));
+        thread::sleep(pause);
+        wait *= 2;
+    }
 }
 
 /// Checks `bytes` against `expected`, `sha256:<hex>` or bare hex.
@@ -193,7 +270,84 @@ fn file_name(path: &Path) -> String {
 
 #[cfg(test)]
 mod tests {
+    use std::io::Read as _;
+    use std::net::TcpListener;
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
     use super::*;
+
+    /// Serves one status per request, the last one for all later requests. Returns the URL and
+    /// the number of requests seen.
+    fn serve(statuses: &'static [u16], body: &'static str) -> (String, Arc<AtomicUsize>) {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let url = format!("http://{}/file", listener.local_addr().unwrap());
+        let seen = Arc::new(AtomicUsize::new(0));
+        let count = Arc::clone(&seen);
+        thread::spawn(move || {
+            for stream in listener.incoming() {
+                let Ok(mut stream) = stream else { return };
+                let mut request = [0_u8; 4096];
+                drop(stream.read(&mut request));
+                let n = count.fetch_add(1, Ordering::SeqCst);
+                let status = statuses.get(n).or(statuses.last()).copied().unwrap_or(500);
+                let body = if status == 200 { body } else { "" };
+                let reply = format!(
+                    "HTTP/1.1 {status} X\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                    body.len()
+                );
+                drop(stream.write_all(reply.as_bytes()));
+            }
+        });
+        (url, seen)
+    }
+
+    const ABC: &str = "abc";
+    const ABC_SHA: &str = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad";
+
+    #[test]
+    fn retries_server_errors_until_success() {
+        let (url, seen) = serve(&[503, 503, 200], ABC);
+        let dir = tempfile::tempdir().unwrap();
+        let dest = dir.path().join("f");
+        let digest = fetch(&agent(), &url, &dest, Some(ABC_SHA)).unwrap();
+        assert_eq!(digest, ABC_SHA);
+        assert_eq!(fs::read_to_string(&dest).unwrap(), ABC);
+        assert_eq!(seen.load(Ordering::SeqCst), 3);
+    }
+
+    #[test]
+    fn text_is_retried_too() {
+        let (url, _) = serve(&[429, 504, 200], ABC);
+        assert_eq!(fetch_text(&agent(), &url, None).unwrap(), ABC);
+    }
+
+    #[test]
+    fn client_errors_fail_at_once() {
+        let (url, seen) = serve(&[404], "");
+        let dir = tempfile::tempdir().unwrap();
+        let err = fetch(&agent(), &url, &dir.path().join("f"), None).unwrap_err();
+        assert!(err.to_string().contains("404"), "{err}");
+        assert_eq!(seen.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn gives_up_after_the_limit() {
+        let (url, seen) = serve(&[503], "");
+        let err = fetch_text(&agent(), &url, None).unwrap_err();
+        assert!(err.to_string().contains("503"), "{err}");
+        assert_eq!(seen.load(Ordering::SeqCst), 4);
+    }
+
+    #[test]
+    fn digest_mismatch_is_not_retried() {
+        let (url, seen) = serve(&[200], ABC);
+        let dir = tempfile::tempdir().unwrap();
+        let wrong = "0".repeat(64);
+        let err = fetch(&agent(), &url, &dir.path().join("f"), Some(&wrong)).unwrap_err();
+        assert!(matches!(err, HostError::Digest { .. }), "{err}");
+        assert_eq!(seen.load(Ordering::SeqCst), 1);
+    }
 
     #[test]
     fn checksum_lists() {
