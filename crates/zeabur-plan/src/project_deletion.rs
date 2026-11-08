@@ -50,10 +50,11 @@ use zeabur_model::WorkloadRef;
 use zeabur_model::adapters::provenance::{Tool, detect_tool};
 use zeabur_model::kernel::names::{LABEL_BASELINE, NODE_SHELL_NAMESPACE, is_system_namespace};
 
+use crate::access::meta_of;
 use crate::change::{ObjectName, Target, Warning};
 use crate::checks::ResourceRef;
 use crate::json::{replace, test};
-use crate::plan::{ErrorKind, PlanError, Planner, Working, array, error};
+use crate::plan::{ErrorKind, PlanError, Planner, Working, error};
 
 /// An object of the project, as read.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -246,22 +247,17 @@ impl<'a> Planner<'a> {
         let mut removed = Vec::new();
         for held in &deletion.held {
             let object = &held.object;
-            let mut finalizers = Vec::new();
-            for finalizer in array(object, "/metadata/finalizers") {
-                if let Some(finalizer) = finalizer.as_str() {
-                    finalizers.push(finalizer.to_owned());
-                }
-            }
-            let in_namespace = text(object, "/metadata/namespace") == name;
-            let being_deleted = object.pointer("/metadata/deletionTimestamp").is_some();
-            if finalizers.is_empty() || !in_namespace || !being_deleted {
+            let meta = meta_of(object);
+            let finalizers = meta.finalizers.unwrap_or_default();
+            let in_project = meta.namespace.as_deref() == Some(name.as_str());
+            if finalizers.is_empty() || !in_project || meta.deletion_timestamp.is_none() {
                 continue;
             }
             let target = Target {
                 api_version: held.resource.api_version(),
                 kind: text(object, "/kind"),
                 plural: held.resource.resource.clone(),
-                name: text(object, "/metadata/name"),
+                name: meta.name.unwrap_or_default(),
             };
             removed.push(HeldBy {
                 kind: target.kind.clone(),
