@@ -582,10 +582,11 @@ fn is_release_tag(version: &str, build: &str) -> bool {
 
 /// Checks `registryMirrors`: a registry host (or `*`) with at least one `http://` or `https://`
 /// endpoint each.
-fn check_mirrors<'a>(
-    mirrors: impl IntoIterator<Item = (&'a String, &'a Vec<String>)>,
+fn check_mirrors<H: AsRef<str>, E: AsRef<[String]>>(
+    mirrors: impl IntoIterator<Item = (H, E)>,
 ) -> Result<(), PlanError> {
     for (host, endpoints) in mirrors {
+        let (host, endpoints) = (host.as_ref(), endpoints.as_ref());
         if host.is_empty() || host.contains("://") || host.contains('/') {
             return Err(PlanError::Config(format!(
                 "registryMirrors: `{host}` is not a registry host such as docker.io"
