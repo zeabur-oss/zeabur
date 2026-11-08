@@ -1,4 +1,4 @@
-//! Database operators: which workloads they run, and their own controller Deployments.
+//! Database and backup operators: which workloads they run, and their own controller Deployments.
 
 use std::collections::BTreeMap;
 
@@ -188,6 +188,94 @@ pub fn database_cluster(meta: &ObjectMeta) -> Option<DatabaseCluster<'_>> {
                     .data_label
                     .is_some_and(|key| label(meta.labels.as_ref(), key).is_some()),
             })
+    })
+}
+
+/// A controller owner reference of a backup operator's run: the Job (or CronJob) does a backup,
+/// restore, prune or check for something else.
+struct BackupOwner {
+    group: &'static str,
+    kind: &'static str,
+    /// The engine, when the operator backs up only databases of one engine.
+    engine: Option<Engine>,
+}
+
+/// K8up sets itself as the controller of each Job it runs for an `Archive`, `Backup`, `Check`,
+/// `Prune` or `Restore` (`MutateBatchJob` in
+/// <https://github.com/k8up-io/k8up/blob/master/operator/job/job.go>). mariadb-operator sets its
+/// `Backup` as the controller of the Job or CronJob it runs (`BuildBackupJob` and
+/// `BuildBackupCronJob` in
+/// <https://github.com/mariadb-operator/mariadb-operator/blob/v26.10.1/pkg/builder/batch_builder.go>).
+const BACKUP_OWNERS: [BackupOwner; 6] = [
+    BackupOwner {
+        group: "k8up.io",
+        kind: "Archive",
+        engine: None,
+    },
+    BackupOwner {
+        group: "k8up.io",
+        kind: "Backup",
+        engine: None,
+    },
+    BackupOwner {
+        group: "k8up.io",
+        kind: "Check",
+        engine: None,
+    },
+    BackupOwner {
+        group: "k8up.io",
+        kind: "Prune",
+        engine: None,
+    },
+    BackupOwner {
+        group: "k8up.io",
+        kind: "Restore",
+        engine: None,
+    },
+    BackupOwner {
+        group: "k8s.mariadb.com",
+        kind: "Backup",
+        engine: Some(Engine::MariaDb),
+    },
+];
+
+/// The backup operator's resource that runs this Job or CronJob.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BackupRun<'a> {
+    /// The resource's kind, such as `Backup`.
+    pub kind: &'static str,
+    /// The resource's name.
+    pub name: &'a str,
+    /// The engine, when the operator backs up only databases of one engine.
+    pub engine: Option<Engine>,
+}
+
+/// The backup run this object is, from its controller owner reference.
+#[must_use]
+pub fn backup_run(meta: &ObjectMeta) -> Option<BackupRun<'_>> {
+    crate::adapters::controller_of(meta).and_then(|owner| {
+        let group = api_group(&owner.api_version);
+        BACKUP_OWNERS
+            .iter()
+            .find(|rule| rule.group == group && rule.kind == owner.kind)
+            .map(|rule| BackupRun {
+                kind: rule.kind,
+                name: &owner.name,
+                engine: rule.engine,
+            })
+    })
+}
+
+/// The custom resource that controls this object, when its operator is not a known one: its kind
+/// and name.
+///
+/// Built-in groups have no dot (`apps`, `batch`) or end in `.k8s.io`.
+#[must_use]
+pub fn custom_controller(meta: &ObjectMeta) -> Option<(&str, &str)> {
+    crate::adapters::controller_of(meta).and_then(|owner| {
+        let group = api_group(&owner.api_version);
+        let custom = group.contains('.') && !group.ends_with(".k8s.io");
+        custom.then_some((owner.kind.as_str(), owner.name.as_str()))
     })
 }
 

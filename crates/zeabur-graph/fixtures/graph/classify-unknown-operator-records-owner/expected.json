@@ -1,0 +1,10 @@
+{
+  "group": "default",
+  "displayName": null,
+  "managedBy": {
+    "kind": "Memcached",
+    "name": "cache",
+    "engine": null,
+    "role": "workload"
+  }
+}

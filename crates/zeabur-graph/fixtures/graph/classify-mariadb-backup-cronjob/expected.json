@@ -1,0 +1,9 @@
+{
+  "group": "default",
+  "managedBy": {
+    "kind": "Backup",
+    "name": "mariadb-scheduled",
+    "engine": "MariaDB",
+    "role": "backup"
+  }
+}

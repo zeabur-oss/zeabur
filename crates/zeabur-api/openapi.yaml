@@ -6458,6 +6458,11 @@ components:
           - $ref: "#/components/schemas/ManagedBy"
             description: The operator-managed resource the workload belongs to.
           - type: "null"
+        partOf:
+          oneOf:
+          - $ref: "#/components/schemas/WorkloadRef"
+            description: "The workload a backup run belongs to: the one that mounts the volume it backs up."
+          - type: "null"
     ClientFrame:
       oneOf:
       - type: object
@@ -10554,6 +10559,9 @@ components:
         name:
           type: string
           description: The resource's name.
+        role:
+          $ref: "#/components/schemas/PartRole"
+          description: What the workload does for the resource.
     ManagerTool:
       type: string
       description: The tool behind a field manager, by its name.
@@ -12174,6 +12182,13 @@ components:
       - user
       - database
       - mention
+    PartRole:
+      type: string
+      description: What an operator-made workload does for the resource that owns it.
+      enum:
+      - workload
+      - job
+      - backup
     PasskeyView:
       type: object
       description: "A passkey: a way to sign in that lives on a device or in a password manager."
@@ -16535,6 +16550,7 @@ components:
       - unknown
       - building
       - waitingUpload
+      - backupFailed
     StorageClassView:
       type: object
       description: A `StorageClass`.

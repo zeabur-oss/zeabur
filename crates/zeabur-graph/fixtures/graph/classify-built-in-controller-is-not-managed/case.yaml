@@ -1,0 +1,2 @@
+description: A workload whose controller is a built-in kind records no managing resource.
+operation: graph.classify

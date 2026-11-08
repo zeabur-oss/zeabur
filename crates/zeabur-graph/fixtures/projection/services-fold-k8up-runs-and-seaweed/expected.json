@@ -1,0 +1,255 @@
+[
+  {
+    "kind": "Deployment",
+    "name": "files-s3",
+    "group": "databases",
+    "managedBy": {
+      "kind": "Seaweed",
+      "name": "files",
+      "engine": "SeaweedFS",
+      "role": "workload"
+    },
+    "partOf": null,
+    "status": {
+      "health": "ok",
+      "word": "ready"
+    }
+  },
+  {
+    "kind": "Deployment",
+    "name": "n8n",
+    "managedBy": null,
+    "status": {
+      "health": "warn",
+      "word": "backupFailed"
+    }
+  },
+  {
+    "kind": "Deployment",
+    "name": "nginx-unprivileged",
+    "managedBy": null,
+    "status": {
+      "health": "ok",
+      "word": "ready"
+    }
+  },
+  {
+    "kind": "Deployment",
+    "name": "task-runner",
+    "managedBy": null,
+    "status": {
+      "health": "ok",
+      "word": "ready"
+    }
+  },
+  {
+    "kind": "Job",
+    "name": "backup-n8n-data-backup-backup-4hq7d-0",
+    "managedBy": {
+      "kind": "Backup",
+      "name": "n8n-data-backup-backup-4hq7d",
+      "engine": null,
+      "role": "backup"
+    },
+    "partOf": {
+      "kind": "Deployment",
+      "name": "n8n"
+    },
+    "status": {
+      "health": "idle",
+      "word": "completed"
+    }
+  },
+  {
+    "kind": "Job",
+    "name": "backup-n8n-data-backup-backup-9ktz2-0",
+    "managedBy": {
+      "kind": "Backup",
+      "name": "n8n-data-backup-backup-9ktz2",
+      "engine": null,
+      "role": "backup"
+    },
+    "partOf": {
+      "kind": "Deployment",
+      "name": "n8n"
+    },
+    "status": {
+      "health": "fail",
+      "word": "failed"
+    }
+  },
+  {
+    "kind": "Job",
+    "name": "backup-n8n-data-backup-backup-c2mxv-0",
+    "managedBy": {
+      "kind": "Backup",
+      "name": "n8n-data-backup-backup-c2mxv",
+      "engine": null,
+      "role": "backup"
+    },
+    "partOf": {
+      "kind": "Deployment",
+      "name": "n8n"
+    },
+    "status": {
+      "health": "fail",
+      "word": "failed"
+    }
+  },
+  {
+    "kind": "Job",
+    "name": "backup-n8n-data-backup-backup-r8wpl-0",
+    "managedBy": {
+      "kind": "Backup",
+      "name": "n8n-data-backup-backup-r8wpl",
+      "engine": null,
+      "role": "backup"
+    },
+    "partOf": {
+      "kind": "Deployment",
+      "name": "n8n"
+    },
+    "status": {
+      "health": "fail",
+      "word": "failed"
+    }
+  },
+  {
+    "kind": "Job",
+    "name": "backup-n8n-data-manual-0",
+    "managedBy": {
+      "kind": "Backup",
+      "name": "n8n-data-manual",
+      "engine": null,
+      "role": "backup"
+    },
+    "partOf": {
+      "kind": "Deployment",
+      "name": "n8n"
+    },
+    "status": {
+      "health": "idle",
+      "word": "completed"
+    }
+  },
+  {
+    "kind": "Job",
+    "name": "prune-n8n-data-backup-prune-2fb6n",
+    "managedBy": {
+      "kind": "Prune",
+      "name": "n8n-data-backup-prune-2fb6n",
+      "engine": null,
+      "role": "backup"
+    },
+    "partOf": null,
+    "status": {
+      "health": "idle",
+      "word": "completed"
+    }
+  },
+  {
+    "kind": "Job",
+    "name": "prune-n8n-data-backup-prune-6vjsx",
+    "managedBy": {
+      "kind": "Prune",
+      "name": "n8n-data-backup-prune-6vjsx",
+      "engine": null,
+      "role": "backup"
+    },
+    "partOf": null,
+    "status": {
+      "health": "fail",
+      "word": "failed"
+    }
+  },
+  {
+    "kind": "Job",
+    "name": "prune-n8n-data-backup-prune-hn4qe",
+    "managedBy": {
+      "kind": "Prune",
+      "name": "n8n-data-backup-prune-hn4qe",
+      "engine": null,
+      "role": "backup"
+    },
+    "partOf": null,
+    "status": {
+      "health": "fail",
+      "word": "failed"
+    }
+  },
+  {
+    "kind": "Job",
+    "name": "prune-n8n-data-backup-prune-m7ccr",
+    "managedBy": {
+      "kind": "Prune",
+      "name": "n8n-data-backup-prune-m7ccr",
+      "engine": null,
+      "role": "backup"
+    },
+    "partOf": null,
+    "status": {
+      "health": "fail",
+      "word": "failed"
+    }
+  },
+  {
+    "kind": "Job",
+    "name": "prune-n8n-data-backup-prune-x5t9k",
+    "managedBy": {
+      "kind": "Prune",
+      "name": "n8n-data-backup-prune-x5t9k",
+      "engine": null,
+      "role": "backup"
+    },
+    "partOf": null,
+    "status": {
+      "health": "fail",
+      "word": "failed"
+    }
+  },
+  {
+    "kind": "StatefulSet",
+    "name": "files-filer",
+    "group": "databases",
+    "managedBy": {
+      "kind": "Seaweed",
+      "name": "files",
+      "engine": "SeaweedFS",
+      "role": "workload"
+    },
+    "status": {
+      "health": "ok",
+      "word": "ready"
+    }
+  },
+  {
+    "kind": "StatefulSet",
+    "name": "files-master",
+    "group": "databases",
+    "managedBy": {
+      "kind": "Seaweed",
+      "name": "files",
+      "engine": "SeaweedFS",
+      "role": "workload"
+    },
+    "status": {
+      "health": "ok",
+      "word": "ready"
+    }
+  },
+  {
+    "kind": "StatefulSet",
+    "name": "files-volume",
+    "group": "databases",
+    "managedBy": {
+      "kind": "Seaweed",
+      "name": "files",
+      "engine": "SeaweedFS",
+      "role": "workload"
+    },
+    "status": {
+      "health": "ok",
+      "word": "ready"
+    }
+  }
+]

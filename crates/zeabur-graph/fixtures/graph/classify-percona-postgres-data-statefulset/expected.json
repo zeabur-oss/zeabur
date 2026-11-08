@@ -4,6 +4,7 @@
   "managedBy": {
     "kind": "PerconaPGCluster",
     "name": "postgres",
-    "engine": "PostgreSQL"
+    "engine": "PostgreSQL",
+    "role": "workload"
   }
 }

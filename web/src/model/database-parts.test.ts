@@ -5,6 +5,7 @@ import {
   databaseNodes,
   engineVersion,
   foldDatabases,
+  looseRuns,
   storageRows,
   versionLabel,
 } from "@/model/database-parts"
@@ -90,6 +91,46 @@ describe("a database's own workloads", () => {
   test("leave a project without any as it is", () => {
     const plain = { ...project, services: [api], connections: [] }
     expect(foldDatabases(plain)).toBe(plain)
+  })
+})
+
+describe("a backup operator's runs", () => {
+  const n8n = service("n8n")
+  const k8up = (kind: string, name: string, partOf?: string) =>
+    service(name, {
+      kind: "Job",
+      managedBy: { kind, name, role: "backup" },
+      partOf: partOf ? { kind: "Deployment", name: partOf } : undefined,
+    } as Partial<Service>)
+  const backup = k8up("Backup", "backup-n8n-data-backup-backup-r8wpl-0", "n8n")
+  const prune = k8up("Prune", "prune-n8n-data-backup-prune-x5t9k")
+  const files = service("files-s3", {
+    managedBy: { kind: "Seaweed", name: "files", engine: "SeaweedFS", role: "workload" },
+  } as Partial<Service>)
+  const operated = service("cache", {
+    managedBy: { kind: "Memcached", name: "cache", role: "workload" },
+  } as Partial<Service>)
+  const namespace = {
+    services: [backup, files, n8n, operated, prune, service("task-runner")],
+    connections: [],
+    resources: [],
+  } as unknown as Project
+
+  test("are not services, and neither is an object store's part", () => {
+    expect(foldDatabases(namespace).services.map((s) => s.name)).toStrictEqual([
+      "n8n",
+      "cache",
+      "task-runner",
+    ])
+  })
+
+  test("that belong to no service are listed apart", () => {
+    expect(looseRuns(namespace).map((s) => s.name)).toStrictEqual([prune.name])
+  })
+
+  test("do not show as users of the volume they back up", () => {
+    const rows = storageRows([claim("n8n-data", [n8n, backup])], [])
+    expect(rows[0]?.claims[0]?.services.map((s) => s.name)).toStrictEqual(["n8n"])
   })
 })
 

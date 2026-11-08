@@ -5,6 +5,7 @@ import ArrowRightIcon from "~icons/ph/arrow-right"
 import CaretDownIcon from "~icons/ph/caret-down"
 import CaretRightIcon from "~icons/ph/caret-right"
 import CubeIcon from "~icons/ph/cube"
+import GearSixIcon from "~icons/ph/gear-six"
 import GitBranchIcon from "~icons/ph/git-branch"
 import GlobeIcon from "~icons/ph/globe"
 import WarningCircleFillIcon from "~icons/ph/warning-circle-fill"
@@ -503,14 +504,7 @@ function Summary({
               <CopyButton value={service.image} />
             </SummaryCardFact>
           ) : null}
-          {service.provenance.tool ? (
-            <SummaryCardFact label={t("overview.managedBy")}>
-              <GitBranchIcon aria-hidden="true" />
-              <Tooltip content={t("common.managedByDetail", service.provenance.tool)}>
-                <span className="cursor-help truncate">{service.provenance.tool}</span>
-              </Tooltip>
-            </SummaryCardFact>
-          ) : null}
+          <ManagedFact service={service} />
         </SummaryCardFacts>
       </SummaryCardMain>
       {isTask(service.kind) ? null : (
@@ -521,6 +515,33 @@ function Summary({
         />
       )}
     </SummaryCard>
+  )
+}
+
+/** Who puts back changes made here: a deployment tool, else the operator of a custom resource. */
+function ManagedFact({ service }: { service: Service }) {
+  const t = useT()
+  const tool = service.provenance.tool
+  if (tool)
+    return (
+      <SummaryCardFact label={t("overview.managedBy")}>
+        <GitBranchIcon aria-hidden="true" />
+        <Tooltip content={t("common.managedByDetail", tool)}>
+          <span className="cursor-help truncate">{tool}</span>
+        </Tooltip>
+      </SummaryCardFact>
+    )
+  const owner = service.managedBy
+  if (!owner) return null
+  return (
+    <SummaryCardFact label={t("overview.managedBy")}>
+      <GearSixIcon aria-hidden="true" />
+      <Tooltip content={t("overview.operatorDetail", owner.kind)}>
+        <span className="cursor-help truncate" translate="no">
+          {owner.kind}/{owner.name}
+        </span>
+      </Tooltip>
+    </SummaryCardFact>
   )
 }
 

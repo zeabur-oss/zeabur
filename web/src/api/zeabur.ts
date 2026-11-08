@@ -2162,6 +2162,17 @@ export type ClaimStorage = {
 }
 
 /**
+ * What an operator-made workload does for the resource that owns it.
+ */
+export type PartRole = (typeof PartRole)[keyof typeof PartRole]
+
+export const PartRole = {
+  workload: "workload",
+  job: "job",
+  backup: "backup",
+} as const
+
+/**
  * The custom resource whose operator controls a workload. Direct edits to the workload are
  * reverted by that operator; the resource is what to change.
  */
@@ -2175,6 +2186,8 @@ export type ManagedBy = {
   kind: string
   /** The resource's name. */
   name: string
+  /** What the workload does for the resource. */
+  role?: PartRole
 }
 
 /**
@@ -2190,6 +2203,7 @@ export type Classification = {
   /** The group the workload is listed in. */
   group: string
   managedBy?: ManagedBy | null
+  partOf?: WorkloadRef | null
 }
 
 /**
@@ -7878,6 +7892,7 @@ export const StatusWord = {
   unknown: "unknown",
   building: "building",
   waitingUpload: "waitingUpload",
+  backupFailed: "backupFailed",
 } as const
 
 /**

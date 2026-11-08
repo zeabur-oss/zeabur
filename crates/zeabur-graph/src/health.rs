@@ -17,12 +17,17 @@
 //! 3. A `Running` workload is idle when it is a CronJob or scaled to zero, fails when no replica is
 //!    ready, warns when fewer replicas are ready than wanted, and is ok otherwise.
 //!
+//! 4. A service that is not already worse warns when the newest backup run of a volume it mounts
+//!    failed ([`backup_warnings`]).
+//!
 //! A pod fails by rule 1, is idle once it succeeded, ok when ready, and warns otherwise.
+
+use std::collections::BTreeMap;
 
 use k8s_openapi::jiff::{SignedDuration, Timestamp};
 use zeabur_model::{
-    ContainerStatusSummary, Health, Phase, PodSummary, ServiceStatus, StatusWord, WorkloadKind,
-    WorkloadSummary,
+    ContainerStatusSummary, Health, Phase, PodSummary, Service, ServiceStatus, StatusWord,
+    WorkloadKind, WorkloadRef, WorkloadSummary,
 };
 
 /// Waiting and termination reasons that mean a container keeps failing, as the kubelet reports
@@ -177,6 +182,46 @@ pub fn status(
     }
 }
 
+/// Marks each service whose newest backup run failed: its health warns with the word
+/// `BackupFailed`, unless it is already worse. The newest run is the one created last among the
+/// services whose classification is `part_of` it; a run still under way hides the runs before.
+pub(crate) fn backup_warnings(services: &mut [Service]) {
+    let mut newest: BTreeMap<WorkloadRef, (Option<String>, Phase)> = BTreeMap::new();
+    for service in services.iter() {
+        let Some(root) = &service.workload.classification.part_of else {
+            continue;
+        };
+        let created = service.workload.created.clone();
+        let newer = newest
+            .get(root)
+            .is_none_or(|(seen, _)| created.as_deref() > seen.as_deref());
+        if newer {
+            newest.insert(root.clone(), (created, service.workload.phase));
+        }
+    }
+    for service in services.iter_mut() {
+        let me = WorkloadRef {
+            kind: service.workload.kind,
+            name: service.workload.name.clone(),
+        };
+        let failed = newest
+            .get(&me)
+            .is_some_and(|(_, phase)| *phase == Phase::Failed);
+        if failed
+            && matches!(
+                service.status.health,
+                Health::Ok | Health::Idle | Health::Progress
+            )
+        {
+            service.status = ServiceStatus {
+                health: Health::Warn,
+                word: StatusWord::BackupFailed,
+                reason: None,
+            };
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use zeabur_model::{
@@ -204,6 +249,7 @@ mod tests {
                     group: "default".to_owned(),
                     display_name: None,
                     managed_by: None,
+                    part_of: None,
                 },
                 phase,
                 replicas: replicas.map(|(ready, desired)| Replicas { ready, desired }),

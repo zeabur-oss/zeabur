@@ -1,0 +1,649 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: files-s3
+  namespace: n8n
+  generation: 1
+  ownerReferences:
+  - apiVersion: seaweed.seaweedfs.com/v1
+    kind: Seaweed
+    name: files
+    uid: 5e1c9a2b-7d3f-4b8e-a6c0-1f2e3d4c5b6a
+    controller: true
+    blockOwnerDeletion: true
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: files-s3
+  template:
+    metadata:
+      labels:
+        app: files-s3
+    spec:
+      containers:
+      - name: files-s3
+        image: files-s3:latest
+status:
+  observedGeneration: 1
+  replicas: 1
+  readyReplicas: 1
+  updatedReplicas: 1
+  availableReplicas: 1
+  conditions:
+  - type: Progressing
+    status: 'True'
+    reason: NewReplicaSetAvailable
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: n8n
+  namespace: n8n
+  generation: 1
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: n8n
+  template:
+    metadata:
+      labels:
+        app: n8n
+    spec:
+      containers:
+      - name: n8n
+        image: n8n:latest
+        volumeMounts:
+        - name: data
+          mountPath: /data
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: n8n-data
+status:
+  observedGeneration: 1
+  replicas: 1
+  readyReplicas: 1
+  updatedReplicas: 1
+  availableReplicas: 1
+  conditions:
+  - type: Progressing
+    status: 'True'
+    reason: NewReplicaSetAvailable
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-unprivileged
+  namespace: n8n
+  generation: 1
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx-unprivileged
+  template:
+    metadata:
+      labels:
+        app: nginx-unprivileged
+    spec:
+      containers:
+      - name: nginx-unprivileged
+        image: nginx-unprivileged:latest
+status:
+  observedGeneration: 1
+  replicas: 1
+  readyReplicas: 1
+  updatedReplicas: 1
+  availableReplicas: 1
+  conditions:
+  - type: Progressing
+    status: 'True'
+    reason: NewReplicaSetAvailable
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: task-runner
+  namespace: n8n
+  generation: 1
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: task-runner
+  template:
+    metadata:
+      labels:
+        app: task-runner
+    spec:
+      containers:
+      - name: task-runner
+        image: task-runner:latest
+status:
+  observedGeneration: 1
+  replicas: 1
+  readyReplicas: 1
+  updatedReplicas: 1
+  availableReplicas: 1
+  conditions:
+  - type: Progressing
+    status: 'True'
+    reason: NewReplicaSetAvailable
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: files-filer
+  namespace: n8n
+  ownerReferences:
+  - apiVersion: seaweed.seaweedfs.com/v1
+    kind: Seaweed
+    name: files
+    uid: 5e1c9a2b-7d3f-4b8e-a6c0-1f2e3d4c5b6a
+    controller: true
+    blockOwnerDeletion: true
+spec:
+  replicas: 1
+  serviceName: files-filer
+  selector:
+    matchLabels:
+      app: files-filer
+  template:
+    metadata:
+      labels:
+        app: files-filer
+    spec:
+      containers:
+      - name: seaweed
+        image: chrislusf/seaweedfs:3.80
+        volumeMounts:
+        - name: files-filer
+          mountPath: /data
+  volumeClaimTemplates:
+  - metadata:
+      name: files-filer
+    spec:
+      accessModes:
+      - ReadWriteOnce
+      resources:
+        requests:
+          storage: 1Gi
+status:
+  replicas: 1
+  readyReplicas: 1
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: files-master
+  namespace: n8n
+  ownerReferences:
+  - apiVersion: seaweed.seaweedfs.com/v1
+    kind: Seaweed
+    name: files
+    uid: 5e1c9a2b-7d3f-4b8e-a6c0-1f2e3d4c5b6a
+    controller: true
+    blockOwnerDeletion: true
+spec:
+  replicas: 1
+  serviceName: files-master
+  selector:
+    matchLabels:
+      app: files-master
+  template:
+    metadata:
+      labels:
+        app: files-master
+    spec:
+      containers:
+      - name: seaweed
+        image: chrislusf/seaweedfs:3.80
+        volumeMounts:
+        - name: files-master
+          mountPath: /data
+  volumeClaimTemplates:
+  - metadata:
+      name: files-master
+    spec:
+      accessModes:
+      - ReadWriteOnce
+      resources:
+        requests:
+          storage: 1Gi
+status:
+  replicas: 1
+  readyReplicas: 1
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: files-volume
+  namespace: n8n
+  ownerReferences:
+  - apiVersion: seaweed.seaweedfs.com/v1
+    kind: Seaweed
+    name: files
+    uid: 5e1c9a2b-7d3f-4b8e-a6c0-1f2e3d4c5b6a
+    controller: true
+    blockOwnerDeletion: true
+spec:
+  replicas: 1
+  serviceName: files-volume
+  selector:
+    matchLabels:
+      app: files-volume
+  template:
+    metadata:
+      labels:
+        app: files-volume
+    spec:
+      containers:
+      - name: seaweed
+        image: chrislusf/seaweedfs:3.80
+        volumeMounts:
+        - name: mount0
+          mountPath: /data
+  volumeClaimTemplates:
+  - metadata:
+      name: mount0
+    spec:
+      accessModes:
+      - ReadWriteOnce
+      resources:
+        requests:
+          storage: 1Gi
+status:
+  replicas: 1
+  readyReplicas: 1
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: n8n-data
+  namespace: n8n
+  annotations:
+    k8up.io/backup: 'true'
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+status:
+  phase: Bound
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: files-filer-files-filer-0
+  namespace: n8n
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+status:
+  phase: Bound
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: files-master-files-master-0
+  namespace: n8n
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+status:
+  phase: Bound
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mount0-files-volume-0
+  namespace: n8n
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+status:
+  phase: Bound
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: backup-n8n-data-manual-0
+  namespace: n8n
+  creationTimestamp: '2026-11-01T10:00:00Z'
+  labels:
+    k8upjob: 'true'
+  ownerReferences:
+  - apiVersion: k8up.io/v1
+    kind: Backup
+    name: n8n-data-manual
+    uid: 00000000-0000-4000-8000-709875431979
+    controller: true
+    blockOwnerDeletion: true
+spec:
+  backoffLimit: 6
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+      - name: backup
+        image: ghcr.io/k8up-io/k8up:v2
+        volumeMounts:
+        - name: n8n-data
+          mountPath: /data/n8n-data
+      volumes:
+      - name: n8n-data
+        persistentVolumeClaim:
+          claimName: n8n-data
+status:
+  conditions:
+  - type: Complete
+    status: 'True'
+  succeeded: 1
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: backup-n8n-data-backup-backup-4hq7d-0
+  namespace: n8n
+  creationTimestamp: '2026-11-02T03:00:00Z'
+  labels:
+    k8upjob: 'true'
+  ownerReferences:
+  - apiVersion: k8up.io/v1
+    kind: Backup
+    name: n8n-data-backup-backup-4hq7d
+    uid: 00000000-0000-4000-8000-389486517868
+    controller: true
+    blockOwnerDeletion: true
+spec:
+  backoffLimit: 6
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+      - name: backup
+        image: ghcr.io/k8up-io/k8up:v2
+        volumeMounts:
+        - name: n8n-data
+          mountPath: /data/n8n-data
+      volumes:
+      - name: n8n-data
+        persistentVolumeClaim:
+          claimName: n8n-data
+status:
+  conditions:
+  - type: Complete
+    status: 'True'
+  succeeded: 1
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: backup-n8n-data-backup-backup-9ktz2-0
+  namespace: n8n
+  creationTimestamp: '2026-11-03T03:00:00Z'
+  labels:
+    k8upjob: 'true'
+  ownerReferences:
+  - apiVersion: k8up.io/v1
+    kind: Backup
+    name: n8n-data-backup-backup-9ktz2
+    uid: 00000000-0000-4000-8000-248977900825
+    controller: true
+    blockOwnerDeletion: true
+spec:
+  backoffLimit: 6
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+      - name: backup
+        image: ghcr.io/k8up-io/k8up:v2
+        volumeMounts:
+        - name: n8n-data
+          mountPath: /data/n8n-data
+      volumes:
+      - name: n8n-data
+        persistentVolumeClaim:
+          claimName: n8n-data
+status:
+  conditions:
+  - type: Failed
+    status: 'True'
+    reason: BackoffLimitExceeded
+  failed: 1
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: backup-n8n-data-backup-backup-c2mxv-0
+  namespace: n8n
+  creationTimestamp: '2026-11-04T03:00:00Z'
+  labels:
+    k8upjob: 'true'
+  ownerReferences:
+  - apiVersion: k8up.io/v1
+    kind: Backup
+    name: n8n-data-backup-backup-c2mxv
+    uid: 00000000-0000-4000-8000-130786114202
+    controller: true
+    blockOwnerDeletion: true
+spec:
+  backoffLimit: 6
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+      - name: backup
+        image: ghcr.io/k8up-io/k8up:v2
+        volumeMounts:
+        - name: n8n-data
+          mountPath: /data/n8n-data
+      volumes:
+      - name: n8n-data
+        persistentVolumeClaim:
+          claimName: n8n-data
+status:
+  conditions:
+  - type: Failed
+    status: 'True'
+    reason: BackoffLimitExceeded
+  failed: 1
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: backup-n8n-data-backup-backup-r8wpl-0
+  namespace: n8n
+  creationTimestamp: '2026-11-05T03:00:00Z'
+  labels:
+    k8upjob: 'true'
+  ownerReferences:
+  - apiVersion: k8up.io/v1
+    kind: Backup
+    name: n8n-data-backup-backup-r8wpl
+    uid: 00000000-0000-4000-8000-847563076622
+    controller: true
+    blockOwnerDeletion: true
+spec:
+  backoffLimit: 6
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+      - name: backup
+        image: ghcr.io/k8up-io/k8up:v2
+        volumeMounts:
+        - name: n8n-data
+          mountPath: /data/n8n-data
+      volumes:
+      - name: n8n-data
+        persistentVolumeClaim:
+          claimName: n8n-data
+status:
+  conditions:
+  - type: Failed
+    status: 'True'
+    reason: BackoffLimitExceeded
+  failed: 1
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: prune-n8n-data-backup-prune-2fb6n
+  namespace: n8n
+  creationTimestamp: '2026-11-01T04:00:00Z'
+  labels:
+    k8upjob: 'true'
+  ownerReferences:
+  - apiVersion: k8up.io/v1
+    kind: Prune
+    name: n8n-data-backup-prune-2fb6n
+    uid: 00000000-0000-4000-8000-161211428748
+    controller: true
+    blockOwnerDeletion: true
+spec:
+  backoffLimit: 6
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+      - name: prune
+        image: ghcr.io/k8up-io/k8up:v2
+status:
+  conditions:
+  - type: Complete
+    status: 'True'
+  succeeded: 1
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: prune-n8n-data-backup-prune-6vjsx
+  namespace: n8n
+  creationTimestamp: '2026-11-02T04:00:00Z'
+  labels:
+    k8upjob: 'true'
+  ownerReferences:
+  - apiVersion: k8up.io/v1
+    kind: Prune
+    name: n8n-data-backup-prune-6vjsx
+    uid: 00000000-0000-4000-8000-405597908421
+    controller: true
+    blockOwnerDeletion: true
+spec:
+  backoffLimit: 6
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+      - name: prune
+        image: ghcr.io/k8up-io/k8up:v2
+status:
+  conditions:
+  - type: Failed
+    status: 'True'
+    reason: BackoffLimitExceeded
+  failed: 1
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: prune-n8n-data-backup-prune-hn4qe
+  namespace: n8n
+  creationTimestamp: '2026-11-03T04:00:00Z'
+  labels:
+    k8upjob: 'true'
+  ownerReferences:
+  - apiVersion: k8up.io/v1
+    kind: Prune
+    name: n8n-data-backup-prune-hn4qe
+    uid: 00000000-0000-4000-8000-705873647991
+    controller: true
+    blockOwnerDeletion: true
+spec:
+  backoffLimit: 6
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+      - name: prune
+        image: ghcr.io/k8up-io/k8up:v2
+status:
+  conditions:
+  - type: Failed
+    status: 'True'
+    reason: BackoffLimitExceeded
+  failed: 1
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: prune-n8n-data-backup-prune-m7ccr
+  namespace: n8n
+  creationTimestamp: '2026-11-04T04:00:00Z'
+  labels:
+    k8upjob: 'true'
+  ownerReferences:
+  - apiVersion: k8up.io/v1
+    kind: Prune
+    name: n8n-data-backup-prune-m7ccr
+    uid: 00000000-0000-4000-8000-613411068101
+    controller: true
+    blockOwnerDeletion: true
+spec:
+  backoffLimit: 6
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+      - name: prune
+        image: ghcr.io/k8up-io/k8up:v2
+status:
+  conditions:
+  - type: Failed
+    status: 'True'
+    reason: BackoffLimitExceeded
+  failed: 1
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: prune-n8n-data-backup-prune-x5t9k
+  namespace: n8n
+  creationTimestamp: '2026-11-05T04:00:00Z'
+  labels:
+    k8upjob: 'true'
+  ownerReferences:
+  - apiVersion: k8up.io/v1
+    kind: Prune
+    name: n8n-data-backup-prune-x5t9k
+    uid: 00000000-0000-4000-8000-671200968986
+    controller: true
+    blockOwnerDeletion: true
+spec:
+  backoffLimit: 6
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+      - name: prune
+        image: ghcr.io/k8up-io/k8up:v2
+status:
+  conditions:
+  - type: Failed
+    status: 'True'
+    reason: BackoffLimitExceeded
+  failed: 1

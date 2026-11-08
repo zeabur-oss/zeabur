@@ -1,0 +1,21 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: mariadb-scheduled
+  namespace: demo
+  ownerReferences:
+    - apiVersion: k8s.mariadb.com/v1alpha1
+      kind: Backup
+      name: mariadb-scheduled
+      uid: 2d0f4b6a-3c1e-4a8b-9f5d-7e2a1b3c4d55
+      controller: true
+spec:
+  schedule: "0 3 * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: mariadb
+              image: mariadb:11.4

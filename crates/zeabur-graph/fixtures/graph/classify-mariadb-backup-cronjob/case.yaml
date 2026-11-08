@@ -1,0 +1,2 @@
+description: The CronJob of a scheduled mariadb-operator Backup is a backup run for a MariaDB database.
+operation: graph.classify

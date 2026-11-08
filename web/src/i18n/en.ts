@@ -48,6 +48,8 @@ export const en = {
   "shell.switchProject": "Switch project",
   "column.label": "Services",
   "column.other": "Other objects",
+  "column.system": "System",
+  "column.systemHint": "Backup upkeep runs that belong to no service, such as pruning old backups.",
   "column.advanced": "Advanced",
 
   // Common
@@ -172,6 +174,7 @@ export const en = {
   "status.failed": "Failed",
   "status.building": "Building",
   "status.waitingUpload": "Waiting for upload",
+  "status.backupFailed": "Last backup failed",
   "status.scaledToZero": "Scaled to 0",
   "status.completed": "Completed",
   "status.unknown": "Unknown",
@@ -784,6 +787,8 @@ export const en = {
   "builds.emptyLog": "Nothing logged.",
   "overview.source": "Source",
   "overview.managedBy": "Managed by",
+  "overview.operatorDetail": (kind: string) =>
+    `An operator runs this service for its ${kind} and puts back changes made here. Change the ${kind} instead.`,
   "overview.replicas": (ready: number, desired: number) => `Replicas ${ready}/${desired}`,
   "overview.replicaSettings": "Replica settings",
   "overview.noneReady": "No replica is ready",

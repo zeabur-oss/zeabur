@@ -1,0 +1,2 @@
+description: A Deployment a custom resource of an unknown operator controls stays a service in its group and records that resource.
+operation: graph.classify

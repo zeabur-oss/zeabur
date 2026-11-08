@@ -98,6 +98,7 @@ mod tests {
                 to_value(port_protocol(port)).unwrap()
             }
             "projection.connections" => to_value(project(&snapshot).connections).unwrap(),
+            "projection.services" => to_value(project(&snapshot).services).unwrap(),
             "projection.pods" => to_value(pods_of(&snapshot, workload(&snapshot))).unwrap(),
             "projection.containerResources" => {
                 let name = param(fixture, "container");

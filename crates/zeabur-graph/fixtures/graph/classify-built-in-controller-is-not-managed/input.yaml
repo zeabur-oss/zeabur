@@ -1,0 +1,11 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: migrate
+  namespace: demo
+  ownerReferences:
+    - apiVersion: apps/v1
+      kind: Deployment
+      name: api
+      uid: 1b3d5f7a-9c2e-4b6d-8f0a-3c5e7a9b1d24
+      controller: true

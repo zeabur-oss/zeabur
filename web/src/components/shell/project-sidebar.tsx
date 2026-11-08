@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query"
 import { Link, type LinkProps } from "@tanstack/react-router"
-import { useMemo } from "react"
+import { useMemo, type ReactNode } from "react"
 import ArrowLeftIcon from "~icons/ph/arrow-left"
 import CubeIcon from "~icons/ph/cube"
 import DatabaseIcon from "~icons/ph/database"
@@ -33,7 +33,7 @@ import {
 } from "@/lib/place"
 import { useProjectSummary } from "@/lib/project-name"
 import { remembered } from "@/lib/stores"
-import { foldDatabases } from "@/model/database-parts"
+import { foldDatabases, looseRuns } from "@/model/database-parts"
 import { stateHealth } from "@/model/databases"
 import { projectTitle } from "@/model/project"
 import {
@@ -180,7 +180,7 @@ function ProjectNav({ project }: { project: string }) {
         <SidebarGroup>{pages.map(pageRow)}</SidebarGroup>
         <SidebarSection title={t("column.label")} action={<AddMenu project={project} compact />}>
           {data ? (
-            <Services project={project} data={data} />
+            <Services project={project} data={data} loose={looseRuns(view.data)} />
           ) : view.isPending ? (
             <div className="flex flex-col gap-1.5">
               {Array.from({ length: 4 }, (_, i) => (
@@ -217,12 +217,10 @@ function ProjectNav({ project }: { project: string }) {
   )
 }
 
-function Services({ project, data }: { project: string; data: Project }) {
+function Services({ project, data, loose }: { project: string; data: Project; loose: Service[] }) {
   const t = useT()
   const place = usePlace()
   const groups = groupServices(data.services)
-  if (groups.length === 0)
-    return <p className="px-2 py-1 text-xs text-tertiary">{t("project.noServices")}</p>
   const row = (service: Service, child: boolean) => (
     <ServiceRow
       key={serviceId(service)}
@@ -232,52 +230,107 @@ function Services({ project, data }: { project: string; data: Project }) {
       current={!place.entry && place.service === serviceId(service)}
     />
   )
-  if (groups.length === 1) return <>{groups[0]?.services.map((s) => row(s, false))}</>
+  const system =
+    loose.length > 0 ? (
+      <ServiceMenu
+        services={loose}
+        label={
+          <Tooltip content={t("column.systemHint")}>
+            <span>{t("column.system")}</span>
+          </Tooltip>
+        }
+        icon={<GearSixIcon aria-hidden="true" />}
+        open="active"
+        row={row}
+      />
+    ) : null
+  if (groups.length === 0)
+    return (
+      <>
+        <p className="px-2 py-1 text-xs text-tertiary">{t("project.noServices")}</p>
+        {system}
+      </>
+    )
+  if (groups.length === 1)
+    return (
+      <>
+        {groups[0]?.services.map((s) => row(s, false))}
+        {system}
+      </>
+    )
   const many = data.services.length > OPEN_ALL
   return (
     <>
-      {groups.map((group) => {
-        const trouble = group.services.filter((s) => needsAttention(statusOf(s)))
-        const failing = trouble.filter((s) => statusOf(s).health === "fail").length
-        const active = group.services.some((s) => !place.entry && place.service === serviceId(s))
-        const label = group.role ? (
-          <Tooltip content={roleKube[group.role]}>
-            <span>{t(`role.${group.role}`)}</span>
-          </Tooltip>
-        ) : (
-          <span translate="no">{group.name}</span>
-        )
-        return (
-          <SidebarMenu
-            key={group.key}
-            icon={
-              group.role ? <RoleIcon role={group.role} /> : <FolderSimpleIcon aria-hidden="true" />
-            }
-            label={label}
-            badge={
-              <span className="flex shrink-0 items-center gap-1.5 type-nano text-tertiary">
-                {group.services.length}
-                {trouble.length > 0 ? (
-                  <span className="flex items-center gap-1">
-                    <StatusDot health={failing > 0 ? "fail" : "warn"} />
-                    {trouble.length}
-                    <span className="sr-only">
-                      {failing > 0
-                        ? t("overview.failingCount", failing)
-                        : t("overview.degradedCount", trouble.length)}
-                    </span>
-                  </span>
-                ) : null}
-              </span>
-            }
-            active={active}
-            defaultOpen={!many || trouble.length > 0 || active}
-          >
-            {group.services.map((s) => row(s, true))}
-          </SidebarMenu>
-        )
-      })}
+      {groups.map((group) => (
+        <ServiceMenu
+          key={group.key}
+          services={group.services}
+          label={
+            group.role ? (
+              <Tooltip content={roleKube[group.role]}>
+                <span>{t(`role.${group.role}`)}</span>
+              </Tooltip>
+            ) : (
+              <span translate="no">{group.name}</span>
+            )
+          }
+          icon={
+            group.role ? <RoleIcon role={group.role} /> : <FolderSimpleIcon aria-hidden="true" />
+          }
+          open={many ? "trouble" : "always"}
+          row={row}
+        />
+      ))}
+      {system}
     </>
+  )
+}
+
+/** A folding group of services. It starts open always, when one of them needs attention or is
+ * shown, or only when one is shown. */
+function ServiceMenu({
+  services,
+  label,
+  icon,
+  open,
+  row,
+}: {
+  services: Service[]
+  label: ReactNode
+  icon: ReactNode
+  open: "always" | "trouble" | "active"
+  row: (service: Service, child: boolean) => ReactNode
+}) {
+  const t = useT()
+  const place = usePlace()
+  const trouble = services.filter((s) => needsAttention(statusOf(s)))
+  const failing = trouble.filter((s) => statusOf(s).health === "fail").length
+  const active = services.some((s) => !place.entry && place.service === serviceId(s))
+  return (
+    <SidebarMenu
+      icon={icon}
+      label={label}
+      badge={
+        <span className="flex shrink-0 items-center gap-1.5 type-nano text-tertiary">
+          {services.length}
+          {trouble.length > 0 ? (
+            <span className="flex items-center gap-1">
+              <StatusDot health={failing > 0 ? "fail" : "warn"} />
+              {trouble.length}
+              <span className="sr-only">
+                {failing > 0
+                  ? t("overview.failingCount", failing)
+                  : t("overview.degradedCount", trouble.length)}
+              </span>
+            </span>
+          ) : null}
+        </span>
+      }
+      active={active}
+      defaultOpen={active || open === "always" || (open === "trouble" && trouble.length > 0)}
+    >
+      {services.map((s) => row(s, true))}
+    </SidebarMenu>
   )
 }
 

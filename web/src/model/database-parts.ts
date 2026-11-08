@@ -1,7 +1,9 @@
 // A database's operator runs workloads and volumes of its own: CloudNativePG's instance pods and
 // their claims, Percona's `<name>-rs0` StatefulSet and `mongod-data-…` claims. The server marks a
 // workload a database's operator controls with `managedBy` (its controller owner reference); the
-// project's pages show those as the database, not as services.
+// project's pages show those as the database, not as services. A backup operator's runs (K8up,
+// mariadb-operator) are not services either: the server marks them with the role `backup`, and
+// the workload they back up (`partOf`) shows whether the newest one failed.
 import type { Edge } from "@/model/connections"
 import { connected } from "@/model/connect"
 import { engineName, stateHealth, type Database } from "@/model/databases"
@@ -11,11 +13,24 @@ import { bytesOf } from "@/model/volume-edit"
 /** Whether a database's operator runs this workload for the database. */
 const isDatabasePart = (service: Pick<Service, "managedBy">) => Boolean(service.managedBy?.engine)
 
+/** Whether a backup operator runs this Job or CronJob. */
+const isBackupRun = (service: Pick<Service, "managedBy">) => service.managedBy?.role === "backup"
+
+const isFolded = (service: Pick<Service, "managedBy">) =>
+  isDatabasePart(service) || isBackupRun(service)
+
+/**
+ * The backup runs that belong to no service nor database, such as K8up's prune runs, which
+ * mount no volume. The sidebar lists them apart, under System.
+ */
+export const looseRuns = (project: Project | undefined): Service[] =>
+  project?.services.filter((s) => isBackupRun(s) && !s.partOf && !s.managedBy?.engine) ?? []
+
 const key = (ref: { kind: string; name: string }) => `${ref.kind}/${ref.name}`
 
-/** The project without its databases' own workloads, nor the connections to them. */
+/** The project without its databases' own workloads and backup runs, nor the connections to them. */
 export function foldDatabases(project: Project): Project {
-  const parts = new Set(project.services.filter(isDatabasePart).map(key))
+  const parts = new Set(project.services.filter(isFolded).map(key))
   if (parts.size === 0) return project
   return {
     ...project,
@@ -151,7 +166,7 @@ export function storageRows(claims: Claim[], databases: Database[]): StorageRow[
     const database =
       databases.find((d) => d.claims.includes(claim.name)) ??
       (part ? databaseOfPart(part, databases) : undefined)
-    const services = claim.services.filter((s) => !isDatabasePart(s))
+    const services = claim.services.filter((s) => !isFolded(s))
     const own = { ...claim, services, orphan: claim.orphan && !database }
     const bytes = claim.sizeBytes ?? (database?.storage ? bytesOf(database.storage) : undefined)
     if (!database || services.length > 0) {

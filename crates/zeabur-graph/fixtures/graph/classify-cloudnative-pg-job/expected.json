@@ -4,6 +4,7 @@
   "managedBy": {
     "kind": "Cluster",
     "name": "pg",
-    "engine": "PostgreSQL"
+    "engine": "PostgreSQL",
+    "role": "job"
   }
 }

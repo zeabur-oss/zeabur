@@ -1,0 +1,13 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: backup-n8n-data-backup-backup-8xk2p-0
+  namespace: demo
+  labels:
+    k8upjob: "true"
+  ownerReferences:
+    - apiVersion: k8up.io/v1
+      kind: Backup
+      name: n8n-data-backup-backup-8xk2p
+      uid: 6f1d2c1e-2b8a-4f0e-9d3a-1c5e7b9a0d21
+      controller: true

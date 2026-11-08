@@ -54,6 +54,8 @@ export const zhCN: Messages = {
   "shell.switchProject": "切换项目",
   "column.label": "服务",
   "column.other": "其他对象",
+  "column.system": "系统",
+  "column.systemHint": "不属于任何服务的备份维护任务，例如清理旧备份。",
   "column.advanced": "高级",
 
   "theme.system": "跟随系统",
@@ -175,6 +177,7 @@ export const zhCN: Messages = {
   "status.failed": "失败",
   "status.building": "构建中",
   "status.waitingUpload": "等待上传",
+  "status.backupFailed": "上次备份失败",
   "status.scaledToZero": "副本数为 0",
   "status.completed": "已完成",
   "status.unknown": "未知",
@@ -732,6 +735,8 @@ export const zhCN: Messages = {
   "builds.emptyLog": "没有输出。",
   "overview.source": "来源",
   "overview.managedBy": "管理工具",
+  "overview.operatorDetail": (kind) =>
+    `这个服务由 ${kind} 的 operator 运行，在这里做的修改会被改回去，请改 ${kind}。`,
   "overview.replicas": (ready, desired) => `副本 ${ready}/${desired}`,
   "overview.replicaSettings": "副本设置",
   "overview.noneReady": "没有就绪的副本",

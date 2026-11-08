@@ -55,7 +55,7 @@ Comparison rules:
 
 | Operation | Input | Params | Result |
 |---|---|---|---|
-| `graph.classify` | one workload | — | `{group, displayName: string \| null, managedBy: {kind, name, engine} \| null}`; database and operator workloads go to the groups `databases` and `operators` unless they carry an explicit group |
+| `graph.classify` | one workload | — | `{group, displayName: string \| null, managedBy: {kind, name, engine, role} \| null, partOf: null}`; database and operator workloads go to the groups `databases` and `operators` unless they carry an explicit group; `role` is `workload`, `job` (a database's Job or CronJob, or one an unknown custom resource controls) or `backup` (a run of a known backup operator) |
 | `graph.resolveGroup` | — | `labels` (a string map; `{}` for none) | the group name, a string; `default` when nothing names one |
 | `graph.attribution` | objects of one namespace | `namespace` | `{configMaps, secrets, persistentVolumeClaims, services}`, each a map name → `{ownership, owners}` (all four present, `{}` when empty), and `workloads: [{kind, name}]` sorted by kind then name |
 | `graph.deploymentPhase` | one Deployment | — | one of `Running`, `Progressing`, `Degraded`, `Paused`, `Suspended`, `Completed`, `Failed`, `Unknown` |
@@ -66,6 +66,7 @@ Comparison rules:
 | `projection.mounts` | a workload and its PVCs (for a StatefulSet, the PVCs created from its claim templates) | `container` | `[Mount]`, `category` one of `persistent`, `config`, `ephemeral` |
 | `projection.provenance` | one object | — | `{tool: "Helm" \| "Argo CD" \| "Flux" \| null, managedBy, warnBeforeEdit}`; `managedBy` is the `app.kubernetes.io/managed-by` label verbatim |
 | `projection.connections` | objects of one namespace | `namespace` | `[{from: {kind, name}, to: {kind, name}, inferred, evidence}]` sorted by `from` then `to`; `evidence` sorted, each `{basis: "sharedObject", object: {kind, name}}` (a non-data-store service and a data store read the same Secret or ConfigMap) or `{basis: "envValue", container, variable, service}` (a literal value names a Service of the namespace by short name or `<name>.<namespace>[.svc[.cluster.local]]`); `inferred` is true when every piece of evidence is `envValue` |
+| `projection.services` | objects of one namespace | `namespace` | `[Service]` sorted by kind then name; `partOf` is the workload a backup run belongs to (the one that mounts the claim it backs up); a service whose newest backup run failed has `status` `{health: "warn", word: "backupFailed"}` unless it is already worse |
 | `projection.pods` | one workload and its pods | — | `[PodSummary]` sorted by name; `reason` is the first waiting reason, else why a not-ready container last stopped; absent for a running, ready pod |
 | `projection.containerResources` | one workload | `container` | `{requests: {cpu?, memory?}, limits: {cpu?, memory?}}` as written, an empty side left out; `null` when neither is set |
 | `projection.selectorAndPorts` | one workload | — | `{selector: {matchLabels, expressions?} \| null, ports: {<container>: [{name?, port, protocol?}]}}`; `expressions` is true when the selector also has `matchExpressions`; `protocol` is left out for `TCP`; `selector` is `null` for a Job or CronJob |

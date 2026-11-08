@@ -1,0 +1,11 @@
+{
+  "group": "default",
+  "displayName": null,
+  "managedBy": {
+    "kind": "Backup",
+    "name": "n8n-data-backup-backup-8xk2p",
+    "engine": null,
+    "role": "backup"
+  },
+  "partOf": null
+}

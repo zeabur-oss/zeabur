@@ -52,6 +52,8 @@ pub enum StatusWord {
     Building,
     /// Its image comes from an uploaded folder or archive that nobody has uploaded yet.
     WaitingUpload,
+    /// It runs, but the newest backup of a volume it mounts failed.
+    BackupFailed,
 }
 
 /// A service's health, the word for it, and why when a pod keeps failing.

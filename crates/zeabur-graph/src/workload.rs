@@ -11,9 +11,11 @@ use zeabur_model::adapters::Conventions;
 use zeabur_model::adapters::group::{
     DATABASES_GROUP, OPERATORS_GROUP, explicit_group_with, resolve_group_with,
 };
-use zeabur_model::adapters::operators::{database_cluster, is_operator};
+use zeabur_model::adapters::operators::{
+    backup_run, custom_controller, database_cluster, is_operator,
+};
 use zeabur_model::{
-    Classification, ManagedBy, Origin, Phase, Replicas, TaskConcurrency, TaskSchedule,
+    Classification, ManagedBy, Origin, PartRole, Phase, Replicas, TaskConcurrency, TaskSchedule,
     WorkloadKind, WorkloadRef, WorkloadSummary,
 };
 
@@ -253,8 +255,10 @@ pub(crate) fn find_container<'a>(workload: Workload<'a>, name: &str) -> Option<C
 ///
 /// A workload a database operator controls belongs to that database: it records the managing
 /// resource, is shown under the cluster's name when it holds the data, and goes to the
-/// `databases` group. An operator's own Deployment goes to `operators`. The explicit group
-/// label wins over both; otherwise the labels decide
+/// `databases` group. A Job or CronJob a backup operator controls records that operator's
+/// resource with the role `backup`. A workload any other custom resource controls records that
+/// resource too, and is listed as before. An operator's own Deployment goes to `operators`. The
+/// explicit group label wins over all of these; otherwise the labels decide
 /// ([`resolve_group`](zeabur_model::adapters::group::resolve_group)).
 #[must_use]
 pub fn classify(workload: Workload<'_>) -> Classification {
@@ -267,6 +271,7 @@ pub fn classify_with(workload: Workload<'_>, conventions: &Conventions) -> Class
     let meta = workload.meta();
     let labels = meta.labels.as_ref();
     let explicit = explicit_group_with(labels, conventions);
+    let task = matches!(workload, Workload::Job(_) | Workload::CronJob(_));
     if let Some(cluster) = database_cluster(meta) {
         return Classification {
             group: explicit.unwrap_or(DATABASES_GROUP).to_owned(),
@@ -275,9 +280,33 @@ pub fn classify_with(workload: Workload<'_>, conventions: &Conventions) -> Class
                 kind: cluster.kind.to_owned(),
                 name: cluster.name.to_owned(),
                 engine: Some(cluster.engine.as_str().to_owned()),
+                role: if task {
+                    PartRole::Job
+                } else {
+                    PartRole::Workload
+                },
             }),
+            part_of: None,
         };
     }
+    let managed_by = match backup_run(meta) {
+        Some(run) if task => Some(ManagedBy {
+            kind: run.kind.to_owned(),
+            name: run.name.to_owned(),
+            engine: run.engine.map(|engine| engine.as_str().to_owned()),
+            role: PartRole::Backup,
+        }),
+        _ => custom_controller(meta).map(|(kind, name)| ManagedBy {
+            kind: kind.to_owned(),
+            name: name.to_owned(),
+            engine: None,
+            role: if task {
+                PartRole::Job
+            } else {
+                PartRole::Workload
+            },
+        }),
+    };
     let operator = explicit.is_none()
         && matches!(workload, Workload::Deployment(_))
         && is_operator(
@@ -295,8 +324,43 @@ pub fn classify_with(workload: Workload<'_>, conventions: &Conventions) -> Class
         }
         .to_owned(),
         display_name: None,
-        managed_by: None,
+        managed_by,
+        part_of: None,
     }
+}
+
+/// The workload a backup run of `workload` belongs to: the first other workload, by kind then
+/// name, that mounts a claim the run mounts. K8up mounts each claim it backs up in the Job's pod
+/// (`newVolumeMounts` in
+/// <https://github.com/k8up-io/k8up/blob/master/operator/backupcontroller/executor.go>). A
+/// prune or check run mounts none, and so belongs to no workload.
+#[must_use]
+pub(crate) fn backed_up_by(snapshot: &Snapshot, workload: Workload<'_>) -> Option<WorkloadRef> {
+    let claims = claims_of(workload);
+    if claims.is_empty() {
+        return None;
+    }
+    for other in workloads(snapshot) {
+        if backup_run(other.meta()).is_some() {
+            continue;
+        }
+        if claims_of(other).iter().any(|claim| claims.contains(claim)) {
+            return Some(other.reference());
+        }
+    }
+    None
+}
+
+/// The claims a workload's pod template mounts as volumes.
+fn claims_of(workload: Workload<'_>) -> Vec<&str> {
+    let mut out = Vec::new();
+    let volumes = workload.pod_spec().and_then(|spec| spec.volumes.as_ref());
+    for volume in volumes.into_iter().flatten() {
+        if let Some(claim) = &volume.persistent_volume_claim {
+            out.push(claim.claim_name.as_str());
+        }
+    }
+    out
 }
 
 /// The phase of a Deployment, from its rollout conditions rather than replica counts alone, so a
@@ -477,6 +541,13 @@ pub fn summarise_with(
     workload: Workload<'_>,
     conventions: &Conventions,
 ) -> WorkloadSummary {
+    let mut classification = classify_with(workload, conventions);
+    if let Some(by) = &classification.managed_by
+        && by.role == PartRole::Backup
+        && by.engine.is_none()
+    {
+        classification.part_of = backed_up_by(snapshot, workload);
+    }
     WorkloadSummary {
         kind: workload.kind(),
         name: workload.name().to_owned(),
@@ -485,7 +556,7 @@ pub fn summarise_with(
             .namespace
             .clone()
             .unwrap_or_else(|| snapshot.namespace.clone()),
-        classification: classify_with(workload, conventions),
+        classification,
         phase: phase(workload),
         replicas: replicas(workload),
         image: workload

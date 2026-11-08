@@ -58,10 +58,11 @@ pub fn project_with(snapshot: &Snapshot, conventions: &Conventions) -> Project {
     let all = workloads(snapshot);
     let attribution = attribution_of(snapshot, &all, &relations_of(snapshot, &all));
     let index = Index::new(snapshot, &attribution);
-    let services: Vec<Service> = all
+    let mut services: Vec<Service> = all
         .into_iter()
         .map(|workload| service(snapshot, &attribution, &index, workload, conventions))
         .collect();
+    crate::health::backup_warnings(&mut services);
     let owned = |owners: Option<&Attribution>| owners.is_some_and(|a| !a.owners.is_empty());
     let endpoints = snapshot
         .services

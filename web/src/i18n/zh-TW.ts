@@ -54,6 +54,8 @@ export const zhTW: Messages = {
   "shell.switchProject": "切換專案",
   "column.label": "服務",
   "column.other": "其他物件",
+  "column.system": "系統",
+  "column.systemHint": "不屬於任何服務的備份維護工作，例如清掉舊備份。",
   "column.advanced": "進階",
 
   "theme.system": "跟隨系統",
@@ -174,6 +176,7 @@ export const zhTW: Messages = {
   "status.failed": "失敗",
   "status.building": "建置中",
   "status.waitingUpload": "等待上傳",
+  "status.backupFailed": "上次備份失敗",
   "status.scaledToZero": "副本數為 0",
   "status.completed": "已完成",
   "status.unknown": "未知",
@@ -733,6 +736,8 @@ export const zhTW: Messages = {
   "builds.emptyLog": "沒有輸出。",
   "overview.source": "來源",
   "overview.managedBy": "管理工具",
+  "overview.operatorDetail": (kind) =>
+    `這個服務由 ${kind} 的 operator 執行，在這裡做的變更會被改回去，請改 ${kind}。`,
   "overview.replicas": (ready, desired) => `副本 ${ready}/${desired}`,
   "overview.replicaSettings": "副本設定",
   "overview.noneReady": "沒有就緒的副本",

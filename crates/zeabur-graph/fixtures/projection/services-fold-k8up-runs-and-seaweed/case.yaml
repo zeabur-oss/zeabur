@@ -1,0 +1,8 @@
+description: >-
+  A namespace read from a live cluster: three services, a SeaweedFS object store, and the Jobs of a
+  K8up schedule and a manual backup. Each backup run belongs to the Deployment that mounts the
+  claim it backs up, and that Deployment warns because its newest backup failed. Prune runs mount
+  no claim and belong to no workload. The Seaweed parts belong to the object store.
+operation: projection.services
+params:
+  namespace: n8n

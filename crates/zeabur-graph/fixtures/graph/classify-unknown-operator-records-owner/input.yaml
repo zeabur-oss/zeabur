@@ -1,0 +1,23 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cache
+  namespace: demo
+  ownerReferences:
+    - apiVersion: cache.example.com/v1
+      kind: Memcached
+      name: cache
+      uid: 9a7b5c3d-1e2f-4a6b-8c0d-2e4f6a8b0c13
+      controller: true
+spec:
+  selector:
+    matchLabels:
+      app: cache
+  template:
+    metadata:
+      labels:
+        app: cache
+    spec:
+      containers:
+        - name: memcached
+          image: memcached:1.6

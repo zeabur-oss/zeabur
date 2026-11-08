@@ -218,6 +218,23 @@ pub struct ManagedBy {
     /// The database engine, such as `PostgreSQL`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub engine: Option<String>,
+    /// What the workload does for the resource.
+    #[serde(default)]
+    pub role: PartRole,
+}
+
+/// What an operator-made workload does for the resource that owns it.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[serde(rename_all = "camelCase")]
+pub enum PartRole {
+    /// It runs the resource: a StatefulSet, Deployment or DaemonSet.
+    #[default]
+    Workload,
+    /// A Job or CronJob that sets the resource up or keeps it.
+    Job,
+    /// A Job or CronJob of a backup operator: a backup, restore, prune or check run.
+    Backup,
 }
 
 /// Where a workload is listed and under which name.
@@ -234,6 +251,9 @@ pub struct Classification {
     /// The operator-managed resource the workload belongs to.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub managed_by: Option<ManagedBy>,
+    /// The workload a backup run belongs to: the one that mounts the volume it backs up.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub part_of: Option<crate::WorkloadRef>,
 }
 
 /// Ready and desired replicas (per node for a DaemonSet, completions for a Job).
