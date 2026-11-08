@@ -502,8 +502,7 @@ impl Distribution {
             lines.push("    tls:".to_owned());
             lines.push(format!("      ca_file: {}", layout.registry_ca_file));
         }
-        lines.push(String::new());
-        let content = lines.join("\n");
+        let content = lines.join("\n") + "\n";
         Some(HostFile {
             path: layout.registries_file.to_owned(),
             mode: 0o600,

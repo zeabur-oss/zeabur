@@ -582,7 +582,9 @@ fn is_release_tag(version: &str, build: &str) -> bool {
 
 /// Checks `registryMirrors`: a registry host (or `*`) with at least one `http://` or `https://`
 /// endpoint each.
-fn check_mirrors(mirrors: &BTreeMap<String, Vec<String>>) -> Result<(), PlanError> {
+fn check_mirrors<'a>(
+    mirrors: impl IntoIterator<Item = (&'a String, &'a Vec<String>)>,
+) -> Result<(), PlanError> {
     for (host, endpoints) in mirrors {
         if host.is_empty() || host.contains("://") || host.contains('/') {
             return Err(PlanError::Config(format!(
