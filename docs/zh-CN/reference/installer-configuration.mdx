@@ -184,7 +184,7 @@ registryMirrors:
   ghcr.io: [https://ghcr-mirror.example.com]
 ```
 
-bundle 不含容器镜像，安装前请先准备好 registry 镜像站。镜像站里要已经有组件会拉取的镜像，覆盖它们用到的每个 registry，例如 `docker.io`、`ghcr.io`、`quay.io`。主机连不到原来的 registry、镜像站又没有某个镜像时，用到它的 Pod 会一直停在 `ImagePullBackOff`。用 CNCF distribution registry 做的 pull-through 缓存，一个实例只能镜像一个上游 registry，所以每个上游各跑一个。
+bundle 不含容器镜像，安装前请先准备好 registry 镜像站。镜像站里要已经有组件会拉取的镜像，覆盖它们用到的每个 registry，例如 `docker.io`、`ghcr.io`、`quay.io`。主机连不到原来的 registry、镜像站又没有某个镜像时，用到它的 Pod 会一直停在 `ImagePullBackOff`。用 CNCF distribution registry 做的 pull-through 缓存，一个实例只能镜像一个上游 registry，所以每个上游各跑一个。它在第一次有人要某个镜像时才去上游拉取，适合能连上镜像站、但连不上 GitHub 或各个 registry 的主机。完全没有对外连接的网络，要改用事先填好镜像的 registry，例如在能上网的机器上用 `skopeo` 把镜像复制进去。
 
 每个键是 `docker.io` 这样的 registry 主机，每个地址要以 `https://` 或 `http://` 开头。加入集群的主机在 `join` 配置里也可以填这两个字段。
 

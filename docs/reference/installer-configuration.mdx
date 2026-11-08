@@ -183,7 +183,7 @@ registryMirrors:
   ghcr.io: [https://ghcr-mirror.example.com]
 ```
 
-The bundle doesn't hold container images, so prepare a registry mirror before you install. It must already have the images that components pull, from each registry they use, such as `docker.io`, `ghcr.io` and `quay.io`. A Pod whose image the mirror lacks stays in `ImagePullBackOff` on a host that can't reach the original registry. A pull-through cache made with the CNCF distribution registry mirrors one upstream registry per instance, so run one for each.
+The bundle doesn't hold container images, so prepare a registry mirror before you install. It must already have the images that components pull, from each registry they use, such as `docker.io`, `ghcr.io` and `quay.io`. A Pod whose image the mirror lacks stays in `ImagePullBackOff` on a host that can't reach the original registry. A pull-through cache made with the CNCF distribution registry mirrors one upstream registry per instance, so run one for each. It fetches an image from the upstream the first time someone asks for it, so it suits a host that reaches the mirror but not GitHub or the registries. A network with no way out needs a registry you fill beforehand, by copying the images in from a connected machine with a tool such as `skopeo`.
 
 Each key is a registry host such as `docker.io`, and each endpoint starts with `https://` or `http://`. A host that joins a cluster takes the same two fields in its `join` configuration.
 
