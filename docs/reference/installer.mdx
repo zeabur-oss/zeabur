@@ -77,15 +77,15 @@ If a newer installer wrote the record, `plan` and `apply` stop and name the vers
 
 ## `bundle`
 
-`bundle` keeps what `apply` downloads in a directory, for a host that can't reach GitHub, the Helm repositories or the container registries. Run it as root on a host that can, with the configuration the other host will use:
+`bundle` keeps what `apply` downloads in a directory, for a host that can't reach GitHub or the Helm repositories. Run it as root on a host that can, with the configuration the other host will use:
 
 ```sh
 sudo zeabur-installer bundle /srv/zeabur-bundle
 ```
 
-Copy the directory to the other host and set `bundle: /srv/zeabur-bundle` in its configuration. `plan` and `apply` then use a file from the directory once its SHA-256 matches, download what the directory lacks, and refuse a file that has been changed.
+Copy the directory to the other host and set `bundle: /srv/zeabur-bundle` in its configuration. `plan` and `apply` then use a file from the directory when its SHA-256 matches the digest the Catalog or the installer pins (or the SHA-256 recorded for a file with none), download what the directory lacks, and refuse a file that has been changed.
 
-The directory holds the files that have a digest to check them against: the K3s or RKE2 release, the Catalog, the charts and the manifests that components download. A release you set with `k3sVersion` or `rke2Version` has none. `bundle` downloads it anyway and records the SHA-256 it has now, and lists it as not checked against a source. The other host then checks the file against that record, which proves only that it is the file that was there when the bundle was made. A digest the installer has built in always wins over a recorded one. The directory is an [OCI image layout](https://github.com/opencontainers/image-spec/blob/main/image-layout.md), so tools such as `oras`, `crane` and `skopeo` can read it. It doesn't hold the container images that components pull when they start. Set up a registry mirror in your network before you install, and point [`registryMirrors`](./installer-configuration.mdx#offline-hosts-and-registry-mirrors) at it.
+The directory holds the K3s or RKE2 release, the Catalog, the charts and the manifests that components download. For a release you set with `k3sVersion` or `rke2Version`, the installer has no digest. `bundle` downloads it anyway and records the SHA-256 it has now, and lists it as not checked against a source. The other host then checks the file against that record, which proves only that it is the file that was there when the bundle was made. A digest the installer has built in always wins over a recorded one. The directory is an [OCI image layout](https://github.com/opencontainers/image-spec/blob/main/image-layout.md). It doesn't hold the container images that components pull when they start. Set up a registry mirror in your network before you install, and point [`registryMirrors`](./installer-configuration.mdx#offline-hosts-and-registry-mirrors) at it.
 
 ## `gui`
 

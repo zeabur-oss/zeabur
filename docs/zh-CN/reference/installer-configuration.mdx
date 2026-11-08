@@ -42,8 +42,8 @@ host:
 | `secretFiles` | `{}` | 按组件 ID 分组的机密文件路径 |
 | `k3sVersion`、`rke2Version` | installer 固定的版本 | 覆盖 K3s 或 RKE2 的版本 |
 | `host` | 空 | API 证书的附加名称和磁盘加密要求 |
-| `bundle` | 空 | [`bundle`](./installer.mdx#bundle) 生成的目录，供连不上下载来源的主机使用，见[离线主机与 registry 镜像](#离线主机与-registry-镜像) |
-| `registryMirrors` | `{}` | 容器运行时拉取镜像时先尝试的镜像站，按 registry 主机分组，同一节 |
+| `bundle` | 空 | [`bundle`](./installer.mdx#bundle) 生成的目录，供连不上下载来源的主机使用，见[离线主机与 registry 镜像站](#离线主机与-registry-镜像站) |
+| `registryMirrors` | `{}` | 容器运行时拉取镜像时先尝试的地址，按 registry 主机分组。见[离线主机与 registry 镜像站](#离线主机与-registry-镜像站) |
 | `sources` | 空 | 选填，用自行准备的 Catalog、镜像和 chart 替换固定的版本 |
 
 `zeabur: false` 只决定本次安装什么，不会移除已安装的 Zeabur。要移除，使用 [`uninstall`](./installer.mdx#uninstall)。
@@ -171,11 +171,11 @@ sources:
 
 从 `imageArchives` 中去掉的文件，下次 `apply` 时也会从 K3s 或 RKE2 的导入目录中移除。这份列表填写的是主机上已有的归档文件，与私有 registry 的访问配置无关。
 
-### 离线主机与 registry 镜像
+### 离线主机与 registry 镜像站
 
-`bundle` 填 [`bundle`](./installer.mdx#bundle) 生成的目录。`plan` 和 `apply` 会先使用目录里的文件，SHA-256 与 Catalog 或 installer 固定的值一致才采用，目录里没有的照常下载。
+`bundle` 填 [`bundle`](./installer.mdx#bundle) 生成的目录。`plan` 和 `apply` 会先使用目录里的文件，SHA-256 与 Catalog 或 installer 固定的 digest 一致（没有 digest 的文件，则与 `bundle` 记下的 SHA-256 一致）才采用，目录里没有的照常下载。
 
-`registryMirrors` 按 registry 主机列出容器运行时拉取该 registry 的镜像时先尝试的地址。installer 把它们写入 K3s 或 RKE2 的 `registries.yaml`，与 Zeabur Builder 的 registry 放在一起。
+`registryMirrors` 按 registry 主机列出容器运行时拉取该 registry 的镜像时先尝试的地址。installer 把它们写入 K3s 或 RKE2 的 `registries.yaml`，安装了 Zeabur Builder 时，这份文件里也会列出 Builder 的 registry。
 
 ```yaml title="/etc/zeabur-installer/config.yaml"
 bundle: /srv/zeabur-bundle
@@ -184,7 +184,7 @@ registryMirrors:
   ghcr.io: [https://ghcr-mirror.example.com]
 ```
 
-bundle 不含容器镜像，安装前请先准备好 registry 镜像站。镜像站里要已经有组件会拉取的镜像，覆盖它们用到的每个 registry，例如 `docker.io`、`ghcr.io`、`quay.io`。主机连不到原来的 registry、镜像站又没有某个镜像时，用到它的 Pod 会一直停在 `ImagePullBackOff`。用 CNCF distribution registry 做的 pull-through 缓存，一个实例只能镜像一个上游 registry，所以每个上游各跑一个。它在第一次有人要某个镜像时才去上游拉取，适合能连上镜像站、但连不上 GitHub 或各个 registry 的主机。完全没有对外连接的网络，要改用事先填好镜像的 registry，例如在能上网的机器上用 `skopeo` 把镜像复制进去。
+bundle 不含容器镜像，安装前请先准备好 registry 镜像站。镜像站里要已经有组件会拉取的镜像，覆盖它们用到的每个 registry，例如 `docker.io`、`ghcr.io`、`quay.io`。主机连不到原来的 registry、镜像站又没有某个镜像时，用到它的 Pod 会一直停在 `ImagePullBackOff`。用 CNCF distribution registry 做的 pull-through 缓存，一个实例只能镜像一个上游 registry，因此每个上游 registry 都要一个独立的缓存实例。它在第一次有人要某个镜像时才去上游拉取，适合能连上镜像站、但连不上 GitHub 或各个 registry 的主机。完全没有对外连接的网络，要改用事先填好镜像的 registry，例如在能上网的机器上用 `skopeo` 把镜像复制进去。
 
 每个键是 `docker.io` 这样的 registry 主机，每个地址要以 `https://` 或 `http://` 开头。加入集群的主机在 `join` 配置里也可以填这两个字段。
 

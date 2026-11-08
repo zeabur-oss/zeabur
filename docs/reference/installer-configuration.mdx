@@ -42,7 +42,7 @@ host:
 | `k3sVersion`, `rke2Version` | Versions pinned by the installer | Override the K3s or RKE2 version |
 | `host` | Empty | Extra names for the API certificate and disk encryption requirements |
 | `bundle` | Empty | A directory made by [`bundle`](./installer.mdx#bundle), for a host that can't reach the download sources. See [Offline hosts and registry mirrors](#offline-hosts-and-registry-mirrors) |
-| `registryMirrors` | `{}` | Mirrors the container runtime tries for a registry's images, by registry host. Same section |
+| `registryMirrors` | `{}` | Endpoints the container runtime tries first for a registry's images, by registry host. See [Offline hosts and registry mirrors](#offline-hosts-and-registry-mirrors) |
 | `sources` | Empty | Optional overrides for the pinned Catalog, images, and chart using your own versions |
 
 `zeabur: false` only determines what this installation installs. It doesn't remove an existing Zeabur installation. To remove it, use [`uninstall`](./installer.mdx#uninstall).
@@ -172,9 +172,9 @@ An archive removed from `imageArchives` is also removed from the K3s or RKE2 imp
 
 ### Offline hosts and registry mirrors
 
-`bundle` names a directory made by [`bundle`](./installer.mdx#bundle). `plan` and `apply` take a download from it once its SHA-256 matches the one the Catalog or the installer pins, and download whatever the directory lacks.
+`bundle` names a directory made by [`bundle`](./installer.mdx#bundle). `plan` and `apply` use a file from it when its SHA-256 matches the digest the Catalog or the installer pins (or the one recorded for a file with none), and download whatever the directory lacks.
 
-`registryMirrors` lists, by registry host, the endpoints the container runtime tries for that registry's images. The installer writes them to the `registries.yaml` of K3s or RKE2, beside the entry for Zeabur Builder's registry.
+`registryMirrors` lists, by registry host, the endpoints the container runtime tries for that registry's images. The installer writes them to the `registries.yaml` of K3s or RKE2. When Zeabur Builder is installed, that file also lists Builder's registry.
 
 ```yaml title="/etc/zeabur-installer/config.yaml"
 bundle: /srv/zeabur-bundle
