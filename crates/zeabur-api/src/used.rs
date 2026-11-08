@@ -12,6 +12,7 @@ use zeabur_modules::{
 use zeabur_plan::{Change, created_object};
 use zeabur_telemetry::{DatabaseKind, DomainKind, Feature, Source};
 
+use crate::projects::templates::PAGE_SERVER_TEMPLATE;
 use crate::settings::{Settings, domains};
 
 /// What receives a feature after the call that used it succeeded; it decides whether to send.
@@ -51,6 +52,10 @@ fn read(changes: &[Change]) -> Found {
                 found.feature(Feature::ServiceCreated(Source::Template(id)));
             }
             found.hosts.extend(template.domain.clone());
+        } else if let Change::PageServer(_) = change {
+            if let Some(id) = zeabur_catalog::template_id(PAGE_SERVER_TEMPLATE) {
+                found.feature(Feature::ServiceCreated(Source::Template(id)));
+            }
         } else if let Change::CreateUploadService(upload) = change {
             found.feature(Feature::ServiceCreated(Source::Upload));
             found.hosts.extend(upload.host.clone());
@@ -238,6 +243,14 @@ mod tests {
             [Feature::ServiceCreated(Source::Template("miniflux"))]
         );
         assert_eq!(found.hosts, ["rss.example.com"]);
+    }
+
+    #[test]
+    fn a_page_server_is_found_as_its_template() {
+        assert_eq!(
+            features(json!([{"op": "pageServer", "maintenance": "<p>Back soon</p>"}])),
+            [Feature::ServiceCreated(Source::Template("error-pages"))]
+        );
     }
 
     #[test]
