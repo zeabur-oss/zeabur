@@ -30,6 +30,25 @@ pub fn controller_of(
         .find(|owner| owner.controller == Some(true))
 }
 
+/// Whether `claim` is named `<template>-<set>-<ordinal>`, the name a StatefulSet gives the claims
+/// of its `volumeClaimTemplates` [k8s-sts-storage].
+///
+/// The rest after the prefix must be the ordinal alone, or a set named `db` would claim the PVCs
+/// of one named `db-replica`.
+///
+/// [k8s-sts-storage]: https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/#stable-storage
+#[must_use]
+pub fn created_by_claim_template(claim: &str, template: &str, set: &str) -> bool {
+    claim
+        .strip_prefix(template)
+        .and_then(|rest| rest.strip_prefix('-'))
+        .and_then(|rest| rest.strip_prefix(set))
+        .and_then(|rest| rest.strip_prefix('-'))
+        .is_some_and(|ordinal| {
+            !ordinal.is_empty() && ordinal.bytes().all(|byte| byte.is_ascii_digit())
+        })
+}
+
 /// The value of label `key`, when it is present and not empty.
 ///
 /// An empty label value says nothing, so every convention here treats it as absent.

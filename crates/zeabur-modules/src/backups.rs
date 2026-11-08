@@ -10,11 +10,15 @@
 //! Outcomes are reported as each provider states them; Zeabur does not test that a backup can be
 //! restored.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
+use k8s_openapi::api::apps::v1::StatefulSet;
+use k8s_openapi::api::core::v1::PersistentVolumeClaim;
+use k8s_openapi::apimachinery::pkg::apis::meta::v1::OwnerReference;
 use serde::Serialize;
 use serde_json::Value;
 use utoipa::ToSchema;
+use zeabur_model::adapters::{controller_of, created_by_claim_template};
 use zeabur_model::{Citation, Fix, FixKind, Gap, Message, Origin, Severity};
 
 /// What a backup covers.
@@ -224,23 +228,79 @@ pub const VOLUME_WITHOUT_BACKUP: &str = "volume-without-backup";
 /// The id of the rule for databases no schedule covers.
 pub const DATABASE_WITHOUT_BACKUP: &str = "database-without-backup";
 
+/// The claims an operator manages, which get no volume backup advice.
+///
+/// These are a claim whose controller is an operator's object (CloudNativePG's `Cluster` owns its
+/// claims), and a claim of the `volumeClaimTemplates` of a StatefulSet that an operator's object
+/// controls (Percona, MOCO, mariadb-operator and Dragonfly run StatefulSets). A StatefulSet's claim
+/// does not name the StatefulSet's owner, so it is found by its name `<template>-<set>-<ordinal>`.
+///
+/// A Pod or a StatefulSet as the controller is Kubernetes' own, not an operator's.
+#[must_use]
+pub fn operated_claims(
+    claims: &[PersistentVolumeClaim],
+    stateful_sets: &[StatefulSet],
+) -> BTreeSet<String> {
+    let mut operated = BTreeSet::new();
+    for claim in claims {
+        if let Some(name) = &claim.metadata.name
+            && controller_of(&claim.metadata).is_some_and(|owner| !kubernetes_owner(owner))
+        {
+            operated.insert(name.clone());
+        }
+    }
+    for set in stateful_sets {
+        if controller_of(&set.metadata).is_none_or(kubernetes_owner) {
+            continue;
+        }
+        let set_name = set.metadata.name.as_deref().unwrap_or_default();
+        let templates = set
+            .spec
+            .iter()
+            .flat_map(|spec| spec.volume_claim_templates.iter().flatten());
+        for template in templates {
+            let template_name = template.metadata.name.as_deref().unwrap_or_default();
+            for claim in claims {
+                if let Some(name) = &claim.metadata.name
+                    && created_by_claim_template(name, template_name, set_name)
+                {
+                    operated.insert(name.clone());
+                }
+            }
+        }
+    }
+    operated
+}
+
+fn kubernetes_owner(owner: &OwnerReference) -> bool {
+    (owner.api_version == "v1" && owner.kind == "Pod")
+        || (owner.api_version == "apps/v1" && owner.kind == "StatefulSet")
+}
+
 /// The rules `volume-without-backup` and `database-without-backup`: claims and databases no
 /// active schedule covers ([`unscheduled`]).
 ///
 /// A database is a warning: it is the data a project cannot rebuild, and its operator backs it
 /// up natively (CloudNativePG's `ScheduledBackup` [cnpg-backup]). A claim is advice: many hold
-/// caches or data that can be rebuilt. Each fix names a form that asks for the bucket and ends in
-/// a plan: the database's backups (`backups.scheduledBackup`); for a claim, its volume's K8up
-/// backups when K8up is installed (`backups.k8upSchedule`) [k8up-schedule], else the cluster's
-/// Velero schedule when Velero is (`backups.veleroSchedule`) [velero-fs], else installing K8up.
+/// caches or data that can be rebuilt. A claim in `operated` ([`operated_claims`]) has none: its
+/// operator knows how to back up its data, and a copy of each claim alone can be inconsistent. Each
+/// fix names a form that asks for the bucket and ends in a plan: the database's backups
+/// (`backups.scheduledBackup`); for a claim, its volume's K8up backups when K8up is installed
+/// (`backups.k8upSchedule`) [k8up-schedule], else the cluster's Velero schedule when Velero is
+/// (`backups.veleroSchedule`) [velero-fs], else installing K8up.
 ///
 /// [cnpg-backup]: https://cloudnative-pg.io/documentation/current/backup/
 /// [k8up-schedule]: https://docs.k8up.io/k8up/references/schedule-specification.html
 /// [velero-fs]: https://velero.io/docs/main/file-system-backup/
 #[must_use]
-pub fn gaps(coverage: &[Coverage], installed: Installed) -> Vec<crate::Finding> {
+pub fn gaps(
+    coverage: &[Coverage],
+    installed: Installed,
+    operated: &BTreeSet<String>,
+) -> Vec<crate::Finding> {
     unscheduled(coverage)
         .into_iter()
+        .filter(|c| !(c.target.kind == TargetKind::Volume && operated.contains(&c.target.name)))
         .map(|c| {
             let name = c.target.name.as_str();
             if c.target.kind == TargetKind::Database {

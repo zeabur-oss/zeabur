@@ -259,6 +259,10 @@ async fn module_findings(
                 k8up: installed("k8up"),
                 velero: installed("velero"),
             },
+            &zeabur_modules::backups::operated_claims(
+                &snapshot.persistent_volume_claims,
+                &snapshot.stateful_sets,
+            ),
         ));
         unreadable.extend(backups.unreadable);
     }

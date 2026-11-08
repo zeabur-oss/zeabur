@@ -1,0 +1,5 @@
+description: A claim an operator controls gets no volume advice, directly (CloudNativePG's Cluster owns its claims) or through the StatefulSet whose volumeClaimTemplates made it; the database keeps its own warning. A standalone claim, and the claims of a StatefulSet nobody controls (one of them owned by the StatefulSet itself), keep the advice, also when that StatefulSet's name starts with an operated one's.
+operation: modules.backupGaps
+params:
+  namespace: "shop"
+  installed: {k8up: true, velero: false}

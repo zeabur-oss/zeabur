@@ -82,7 +82,16 @@ mod tests {
             k8up: installed["k8up"].as_bool().unwrap_or(false),
             velero: installed["velero"].as_bool().unwrap_or(false),
         };
-        to_value(backups::gaps(&covered(fixture), installed)).unwrap()
+        let claims: Vec<_> = fixture
+            .objects("PersistentVolumeClaim")
+            .map(|c| from_value(c.clone()).unwrap())
+            .collect();
+        let sets: Vec<_> = fixture
+            .objects("StatefulSet")
+            .map(|s| from_value(s.clone()).unwrap())
+            .collect();
+        let operated = backups::operated_claims(&claims, &sets);
+        to_value(backups::gaps(&covered(fixture), installed, &operated)).unwrap()
     }
 
     fn covered(fixture: &Fixture) -> Vec<backups::Coverage> {

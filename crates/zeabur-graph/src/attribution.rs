@@ -6,8 +6,8 @@ use k8s_openapi::api::apps::v1::StatefulSet;
 use k8s_openapi::api::core::v1::{PodTemplateSpec, Secret, Service as KubeService, Volume};
 use k8s_openapi::api::networking::v1::Ingress;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
-use zeabur_model::adapters::error_pages;
 use zeabur_model::adapters::provenance::is_helm_release_secret;
+use zeabur_model::adapters::{created_by_claim_template, error_pages};
 use zeabur_model::{
     Attribution, NamespaceAttribution, ObjectRef, Origin, Ownership, Relation, RelationKind,
     WorkloadRef,
@@ -348,21 +348,6 @@ fn claim_template_relations(
             }
         }
     }
-}
-
-/// Whether `claim` is named `<template>-<set>-<ordinal>`.
-///
-/// The rest after the prefix must be the ordinal alone, or a set named `db` would claim the PVCs
-/// of one named `db-replica`.
-pub(crate) fn created_by_claim_template(claim: &str, template: &str, set: &str) -> bool {
-    claim
-        .strip_prefix(template)
-        .and_then(|rest| rest.strip_prefix('-'))
-        .and_then(|rest| rest.strip_prefix(set))
-        .and_then(|rest| rest.strip_prefix('-'))
-        .is_some_and(|ordinal| {
-            !ordinal.is_empty() && ordinal.bytes().all(|byte| byte.is_ascii_digit())
-        })
 }
 
 /// The workloads whose pod labels a Service's selector matches. A Service without a selector

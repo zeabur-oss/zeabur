@@ -1,0 +1,26 @@
+[
+  {
+    "gap": {
+      "rule": "volume-without-backup",
+      "subject": { "kind": "PersistentVolumeClaim", "name": "storage-db-replica-0" }
+    }
+  },
+  {
+    "gap": {
+      "rule": "volume-without-backup",
+      "subject": { "kind": "PersistentVolumeClaim", "name": "storage-db-replica-1" }
+    }
+  },
+  {
+    "gap": {
+      "rule": "volume-without-backup",
+      "subject": { "kind": "PersistentVolumeClaim", "name": "uploads" }
+    }
+  },
+  {
+    "gap": {
+      "rule": "database-without-backup",
+      "subject": { "kind": "Cluster", "name": "pg" }
+    }
+  }
+]
