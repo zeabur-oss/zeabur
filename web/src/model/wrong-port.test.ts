@@ -31,7 +31,7 @@ const refused = (output = "dial tcp 10.42.2.31:8080: connect: connection refused
     evidence: [],
   }) as unknown as Schemas.Diagnosis
 
-const checkout = ({ started = 300, diagnoses = [refused()] } = {}) =>
+const checkout = ({ started = 300, ready = false, diagnoses = [refused()] } = {}) =>
   ({
     kind: "Deployment",
     name: "checkout",
@@ -47,7 +47,7 @@ const checkout = ({ started = 300, diagnoses = [refused()] } = {}) =>
     pods: [
       {
         name: "checkout-1",
-        containerStatuses: [{ name: "checkout", ready: false, startedAt: ago(started) }],
+        containerStatuses: [{ name: "checkout", ready, startedAt: ago(started) }],
       },
     ],
     diagnoses,
@@ -92,5 +92,30 @@ describe("a built service that doesn't listen on its port", () => {
     const wrong = wrongPort(checkout(), [build()], NOW)
     expect(wrong?.port).toBe(8080)
     expect(wrong?.offer).toBeUndefined()
+  })
+
+  test("is not said once the container is ready again", () => {
+    expect(wrongPort(checkout({ ready: true }), [build(["3000/tcp"])], NOW)).toBeUndefined()
+  })
+
+  test("offers only the port of the container whose check failed", () => {
+    const service = checkout()
+    const sidecar = { name: "sidecar", image: "zot.zot.svc:5000/lab/sidecar:main-1-5d41402" }
+    const withSidecar = {
+      ...service,
+      containers: [sidecar, ...service.containers],
+    } as unknown as Service
+    const sidecarBuild = {
+      name: "sidecar",
+      repository: "zot.zot.svc:5000/lab/sidecar",
+      latestImage: sidecar.image,
+      exposedPorts: ["9000/tcp"],
+    } as Build
+    expect(wrongPort(withSidecar, [sidecarBuild, build(["3000/tcp"])], NOW)?.offer).toStrictEqual({
+      container: "checkout",
+      from: 8080,
+      to: 3000,
+    })
+    expect(wrongPort(withSidecar, [sidecarBuild, build()], NOW)?.offer).toBeUndefined()
   })
 })

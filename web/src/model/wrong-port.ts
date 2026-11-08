@@ -26,14 +26,17 @@ export interface WrongPort {
   offer?: PortOffer
 }
 
-function portOffer(service: Service, builds: readonly Build[]): PortOffer | undefined {
+function portOffer(
+  service: Service,
+  builds: readonly Build[],
+  container: string | undefined,
+): PortOffer | undefined {
   const from = likelyPort(service)
-  if (from === undefined) return undefined
-  for (const { container, ports } of imageDeclared(service, builds)) {
-    const to = ports[0]
-    if (to !== undefined && !ports.includes(from)) return { container, from, to }
-  }
-  return undefined
+  if (from === undefined || container === undefined) return undefined
+  const declared = imageDeclared(service, builds).find((d) => d.container === container)
+  const to = declared?.ports[0]
+  if (to === undefined || declared?.ports.includes(from)) return undefined
+  return { container, from, to }
 }
 
 /** A failing traffic check whose connection to `port` was refused. */
@@ -44,13 +47,14 @@ function refusedOn(d: Diagnosis, port: number): boolean {
   return output.includes("connection refused") && output.includes(`:${port}:`)
 }
 
-/** Whether the container had longer than {@link BIND_WINDOW_MS} to listen in one of the
- * replicas the diagnosis names. */
-function hadTimeToListen(service: Service, d: Diagnosis, now: number): boolean {
+/** Whether the container is still not ready in one of the replicas the diagnosis names, after
+ * longer than {@link BIND_WINDOW_MS} to listen. */
+function stillNotListening(service: Service, d: Diagnosis, now: number): boolean {
   for (const pod of service.pods) {
     if (!d.pods.includes(pod.name)) continue
     const status = pod.containerStatuses?.find((c) => c.name === d.container)
-    const started = status?.startedAt ? Date.parse(status.startedAt) : Number.NaN
+    if (status?.ready !== false) continue
+    const started = status.startedAt ? Date.parse(status.startedAt) : Number.NaN
     if (now - started > BIND_WINDOW_MS) return true
   }
   return false
@@ -65,8 +69,8 @@ export function wrongPort(
   const port = likelyPort(service)
   if (port === undefined) return undefined
   for (const diagnosis of service.diagnoses ?? []) {
-    if (refusedOn(diagnosis, port) && hadTimeToListen(service, diagnosis, now))
-      return { diagnosis, port, offer: portOffer(service, builds) }
+    if (refusedOn(diagnosis, port) && stillNotListening(service, diagnosis, now))
+      return { diagnosis, port, offer: portOffer(service, builds, diagnosis.container) }
   }
   return undefined
 }

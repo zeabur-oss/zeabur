@@ -45,9 +45,13 @@ mod tests {
             secrets: vec![from_value(web_env()).unwrap()],
             ..Snapshot::default()
         };
+        planned_in(&snapshot, values, change)
+    }
+
+    fn planned_in(snapshot: &Snapshot, values: &Values, change: Change) -> Plan {
         let input = Input {
             secret_values: values,
-            ..Input::new(&snapshot, "2026-11-06T00:00:00Z")
+            ..Input::new(snapshot, "2026-11-06T00:00:00Z")
         };
         plan(
             input,
@@ -148,5 +152,75 @@ mod tests {
             port_seen(&deployment, &written_values(&edited, &stored)),
             "4000"
         );
+    }
+
+    fn container(deployment: &Value) -> &Value {
+        &deployment["spec"]["template"]["spec"]["containers"][0]
+    }
+
+    #[test]
+    fn a_port_change_sets_port_in_a_config_map_imported_after_the_secret() {
+        let mut deployment = web();
+        deployment["spec"]["template"]["spec"]["containers"][0]["envFrom"] = json!([
+            {"secretRef": {"name": "web-env"}},
+            {"configMapRef": {"name": "web-config"}}
+        ]);
+        let config: Value = json!({"apiVersion": "v1", "kind": "ConfigMap",
+            "metadata": {"name": "web-config", "namespace": "shop", "resourceVersion": "6"},
+            "data": {"PORT": "8080"}});
+        let snapshot = Snapshot {
+            namespace: "shop".to_owned(),
+            deployments: vec![from_value(deployment).unwrap()],
+            secrets: vec![from_value(web_env()).unwrap()],
+            config_maps: vec![from_value(config).unwrap()],
+            ..Snapshot::default()
+        };
+        let moved = planned_in(&snapshot, &values("8080"), move_port());
+        let config = after(&moved, "ConfigMap").unwrap();
+        assert_eq!(config["data"]["PORT"], "3000");
+        assert!(after(&moved, "Secret").is_none());
+    }
+
+    #[test]
+    fn a_port_change_moves_what_names_the_old_port_when_the_new_one_is_declared() {
+        let mut deployment = web();
+        let spec = &mut deployment["spec"]["template"]["spec"]["containers"][0];
+        spec["ports"] = json!([
+            {"name": "http", "containerPort": 8080},
+            {"name": "metrics", "containerPort": 3000}
+        ]);
+        spec["readinessProbe"] = json!({"httpGet": {"path": "/", "port": "http"}});
+        let service: Value = json!({"apiVersion": "v1", "kind": "Service",
+            "metadata": {"name": "web", "namespace": "shop", "resourceVersion": "7"},
+            "spec": {"selector": {"app": "web"},
+                "ports": [{"port": 80, "targetPort": "http"}]}});
+        let snapshot = Snapshot {
+            namespace: "shop".to_owned(),
+            deployments: vec![from_value(deployment).unwrap()],
+            secrets: vec![from_value(web_env()).unwrap()],
+            services: vec![from_value(service).unwrap()],
+            ..Snapshot::default()
+        };
+        let moved = planned_in(&snapshot, &values("8080"), move_port());
+        let deployment = after(&moved, "Deployment").unwrap();
+        let spec = container(&deployment);
+        assert_eq!(spec["readinessProbe"]["httpGet"]["port"], 3000);
+        assert_eq!(
+            spec["ports"],
+            json!([{"name": "metrics", "containerPort": 3000}])
+        );
+        let service = after(&moved, "Service").unwrap();
+        assert_eq!(service["spec"]["ports"][0]["targetPort"], 3000);
+    }
+
+    #[test]
+    fn a_port_change_restarts_the_pods_when_only_the_imported_port_changes() {
+        let mut deployment = web();
+        deployment["spec"]["template"]["spec"]["containers"][0]["ports"] =
+            json!([{"containerPort": 3000}]);
+        let moved = planned(&deployment, &values("8080"), move_port());
+        let deployment = after(&moved, "Deployment").unwrap();
+        let annotations = &deployment["spec"]["template"]["metadata"]["annotations"];
+        assert!(annotations[zeabur_plan::RESTARTED_AT].is_string());
     }
 }
