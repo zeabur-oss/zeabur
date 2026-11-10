@@ -1,8 +1,8 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use serde::Deserialize;
 use serde::de::DeserializeOwned;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 /// Loads every case of an area from the calling crate's own `fixtures/` directory, sorted by
@@ -230,19 +230,60 @@ impl<'de> Deserialize<'de> for NoParams {
 
 /// A parameter of a type that ignores unknown fields (a wire type).
 ///
-/// Reading it fails when the fixture holds a field the type drops.
+/// Reading it fails when the fixture holds a field the type drops, unless its value could be the
+/// default the type leaves out.
 #[derive(Debug, Clone, Default)]
 pub struct Strict<T>(pub T);
 
-impl<'de, T: DeserializeOwned> Deserialize<'de> for Strict<T> {
+impl<'de, T: DeserializeOwned + Serialize> Deserialize<'de> for Strict<T> {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        use serde::de::Error;
+        let given = Value::deserialize(deserializer)?;
         let mut ignored = Vec::new();
-        let value =
-            serde_ignored::deserialize(deserializer, |path| ignored.push(path.to_string()))?;
+        let value: T = serde_ignored::deserialize(&given, |path| ignored.push(path.to_string()))
+            .map_err(D::Error::custom)?;
         if let Some(path) = ignored.first() {
-            return Err(serde::de::Error::custom(format!("unknown field at {path}")));
+            return Err(D::Error::custom(format!("unknown field at {path}")));
+        }
+        // serde_ignored does not see inside an internally tagged enum, which buffers its
+        // fields; a field the type does not write back is found by comparing.
+        let kept = serde_json::to_value(&value).map_err(D::Error::custom)?;
+        if let Some(path) = dropped("$", &given, &kept) {
+            return Err(D::Error::custom(format!("unknown field at {path}")));
         }
         Ok(Self(value))
+    }
+}
+
+/// The first place where `given` has a field that `kept` lacks. A value that could be the
+/// default a type leaves out when it writes (`null`, `false`, `0`, `""`, `[]`, `{}`) is not
+/// reported, as it changes nothing.
+fn dropped(path: &str, given: &Value, kept: &Value) -> Option<String> {
+    match (given, kept) {
+        (Value::Object(given), Value::Object(kept)) => given.iter().find_map(|(key, value)| {
+            let at = format!("{path}.{key}");
+            match kept.get(key) {
+                Some(kept) => dropped(&at, value, kept),
+                None => (!is_default_like(value)).then_some(at),
+            }
+        }),
+        (Value::Array(given), Value::Array(kept)) => given
+            .iter()
+            .zip(kept)
+            .enumerate()
+            .find_map(|(index, (g, k))| dropped(&format!("{path}[{index}]"), g, k)),
+        _ => None,
+    }
+}
+
+fn is_default_like(value: &Value) -> bool {
+    match value {
+        Value::Null => true,
+        Value::Bool(flag) => !flag,
+        Value::Number(number) => number.as_f64() == Some(0.0),
+        Value::String(text) => text.is_empty(),
+        Value::Array(items) => items.is_empty(),
+        Value::Object(fields) => fields.is_empty(),
     }
 }
 
@@ -375,11 +416,21 @@ mod tests {
         }
     }
 
-    #[derive(Deserialize)]
+    #[derive(Deserialize, serde::Serialize)]
     struct Leaf {
         name: String,
         #[serde(default)]
         tags: Vec<String>,
+    }
+
+    #[derive(Deserialize, serde::Serialize)]
+    #[serde(tag = "op", rename_all = "camelCase")]
+    enum Tagged {
+        Delete {
+            name: String,
+            #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+            owned: bool,
+        },
     }
 
     struct Add;
@@ -439,6 +490,16 @@ mod tests {
         assert!(nested(json!({"name": "a", "tags": []})).is_ok());
         let error = nested(json!({"name": "a", "colour": "red"})).unwrap_err();
         assert!(error.contains("0.colour"), "{error}");
+    }
+
+    #[test]
+    fn an_internally_tagged_variant_refuses_an_unknown_field_too() {
+        let tagged = |change: Value| {
+            serde_json::from_value::<Strict<Vec<Tagged>>>(json!([change])).map(|c| c.0.len())
+        };
+        assert!(tagged(json!({"op": "delete", "name": "a"})).is_ok());
+        assert!(tagged(json!({"op": "delete", "name": "a", "owned": false})).is_ok());
+        assert!(tagged(json!({"op": "delete", "name": "a", "owend": true})).is_err());
     }
 
     #[test]
