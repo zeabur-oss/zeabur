@@ -229,7 +229,8 @@ impl<'de> Deserialize<'de> for NoParams {
 }
 
 /// A parameter of a type that ignores unknown fields (a wire type): reading it fails when the
-/// fixture holds a field the type drops.
+/// fixture holds a field the type drops. A field set to `null` that the type does not write back
+/// counts as dropped, so leave such a field out.
 #[derive(Debug, Clone, Default)]
 pub struct Strict<T>(pub T);
 
@@ -253,7 +254,7 @@ fn dropped(path: &str, given: &Value, kept: &Value) -> Option<String> {
             let at = format!("{path}.{key}");
             match kept.get(key) {
                 Some(kept) => dropped(&at, value, kept),
-                None => (!value.is_null()).then_some(at),
+                None => Some(at),
             }
         }),
         (Value::Array(given), Value::Array(kept)) => given
@@ -451,6 +452,7 @@ mod tests {
         let nested =
             |leaf: Value| run_op::<Add>(&case("test.add", json!({"left": 1, "nested": [leaf]})));
         assert!(nested(json!({"name": "a"})).is_ok());
+        assert!(nested(json!({"name": "a", "colour": null})).is_err());
         let error = nested(json!({"name": "a", "colour": "red"})).unwrap_err();
         assert!(error.contains("$[0].colour"), "{error}");
     }
