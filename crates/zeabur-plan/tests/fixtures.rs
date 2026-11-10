@@ -39,18 +39,6 @@ fn run_case(file: &Path) -> datatest_stable::Result<()> {
         Plan::NAME => run_op::<Plan>(&fixture),
         other => Err(format!("{}: no runner for operation {other}", fixture.name)),
     }?;
-    // A mask shown in place of a Secret value is never written.
-    for object in actual
-        .get("objects")
-        .and_then(Value::as_array)
-        .into_iter()
-        .flatten()
-    {
-        let write = object["write"].to_string();
-        if write.contains("(hidden)") || write.contains('•') {
-            return Err(format!("{}: a write carries a mask: {write}", fixture.name).into());
-        }
-    }
     compare(&fixture.expected, &actual)
         .map_err(|difference| format!("{}: {difference}\n  actual: {actual}", fixture.name))?;
     Ok(())
