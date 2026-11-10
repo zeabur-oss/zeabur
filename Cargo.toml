@@ -122,6 +122,8 @@ kube = { version = "4.2", default-features = false, features = ["client", "rustl
 proptest = { version = "1", default-features = false, features = ["std"] }
 # One test per fixture case directory (zeabur-test-support).
 datatest-stable = "0.3"
+# Names the fields a typed fixture parameter would drop (zeabur-test-support).
+serde_ignored = "0.1"
 # The input patterns of Zeabur Catalog templates (RE2 syntax), checked before a template renders.
 regex = { version = "1.13", default-features = false, features = ["std", "unicode-perl"] }
 # Process settings that keep a person's tokens out of core dumps (zeabur-core's `secret`).

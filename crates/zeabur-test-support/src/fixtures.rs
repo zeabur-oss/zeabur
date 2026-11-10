@@ -1,8 +1,8 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use serde::Deserialize;
 use serde::de::DeserializeOwned;
-use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 /// Loads every case of an area from the calling crate's own `fixtures/` directory, sorted by
@@ -230,40 +230,19 @@ impl<'de> Deserialize<'de> for NoParams {
 
 /// A parameter of a type that ignores unknown fields (a wire type).
 ///
-/// Reading it fails when the fixture holds a field the type drops. A field set to `null` that the
-/// type does not write back counts as dropped, so leave such a field out.
+/// Reading it fails when the fixture holds a field the type drops.
 #[derive(Debug, Clone, Default)]
 pub struct Strict<T>(pub T);
 
-impl<'de, T: DeserializeOwned + Serialize> Deserialize<'de> for Strict<T> {
+impl<'de, T: DeserializeOwned> Deserialize<'de> for Strict<T> {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        use serde::de::Error;
-        let given = Value::deserialize(deserializer)?;
-        let value: T = serde_json::from_value(given.clone()).map_err(D::Error::custom)?;
-        let kept = serde_json::to_value(&value).map_err(D::Error::custom)?;
-        if let Some(path) = dropped("$", &given, &kept) {
-            return Err(D::Error::custom(format!("unknown field at {path}")));
+        let mut ignored = Vec::new();
+        let value =
+            serde_ignored::deserialize(deserializer, |path| ignored.push(path.to_string()))?;
+        if let Some(path) = ignored.first() {
+            return Err(serde::de::Error::custom(format!("unknown field at {path}")));
         }
         Ok(Self(value))
-    }
-}
-
-/// The first place where `given` has a value that `kept` lacks.
-fn dropped(path: &str, given: &Value, kept: &Value) -> Option<String> {
-    match (given, kept) {
-        (Value::Object(given), Value::Object(kept)) => given.iter().find_map(|(key, value)| {
-            let at = format!("{path}.{key}");
-            match kept.get(key) {
-                Some(kept) => dropped(&at, value, kept),
-                None => Some(at),
-            }
-        }),
-        (Value::Array(given), Value::Array(kept)) => given
-            .iter()
-            .zip(kept)
-            .enumerate()
-            .find_map(|(index, (g, k))| dropped(&format!("{path}[{index}]"), g, k)),
-        _ => None,
     }
 }
 
@@ -391,13 +370,16 @@ mod tests {
 
     impl Pair {
         fn weight(&self) -> usize {
-            self.left as usize + self.nested.as_ref().map_or(0, |n| n.0.len())
+            let leaves = self.nested.iter().flat_map(|n| &n.0);
+            self.left as usize + leaves.map(|l| l.name.len() + l.tags.len()).sum::<usize>()
         }
     }
 
-    #[derive(Deserialize, serde::Serialize)]
+    #[derive(Deserialize)]
     struct Leaf {
         name: String,
+        #[serde(default)]
+        tags: Vec<String>,
     }
 
     struct Add;
@@ -454,8 +436,9 @@ mod tests {
             |leaf: Value| run_op::<Add>(&case("test.add", json!({"left": 1, "nested": [leaf]})));
         assert!(nested(json!({"name": "a"})).is_ok());
         assert!(nested(json!({"name": "a", "colour": null})).is_err());
+        assert!(nested(json!({"name": "a", "tags": []})).is_ok());
         let error = nested(json!({"name": "a", "colour": "red"})).unwrap_err();
-        assert!(error.contains("$[0].colour"), "{error}");
+        assert!(error.contains("0.colour"), "{error}");
     }
 
     #[test]
