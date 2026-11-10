@@ -99,21 +99,21 @@ mod tests {
     }
 
     fn refused(changes: &Value) {
-        let error = planned(changes).unwrap_err();
-        assert_eq!(error.code, "masked_value", "{changes}: {error:?}");
+        let code = planned(changes).err().map(|error| error.code);
+        assert_eq!(code.as_deref(), Some("masked_value"));
     }
 
     /// The patch or body the plan writes for its only object, as text.
     fn written(changes: &Value) -> String {
         let plan = planned(changes).unwrap();
         let [object] = plan.objects.as_slice() else {
-            panic!("one object: {plan:?}");
+            panic!("expected one object");
         };
         match &object.write {
             Write::Create { body } => body.to_string(),
             Write::Patch { operations } => Value::from(operations.clone()).to_string(),
-            other @ (Write::Delete { .. } | Write::EphemeralContainers { .. }) => {
-                panic!("{other:?}")
+            Write::Delete { .. } | Write::EphemeralContainers { .. } => {
+                panic!("expected a creation or a patch")
             }
         }
     }
@@ -180,20 +180,20 @@ mod tests {
         let write = written(&edit_secret(
             &json!({"password": "(hidden)", "token": "••••", "user": encode("alice")}),
         ));
-        assert!(write.contains(&encode("alice")), "{write}");
-        assert!(!write.contains("/data/password"), "{write}");
-        assert!(!write.contains("/data/token"), "{write}");
+        assert!(write.contains(&encode("alice")));
+        assert!(!write.contains("/data/password"));
+        assert!(!write.contains("/data/token"));
     }
 
     #[test]
     fn a_value_that_only_contains_a_bullet_is_written() {
         for value in ["p•ss", "• first", "a • b", "(hidden) for now"] {
             let secret = written(&set_key("Secret", "credentials", value));
-            assert!(secret.contains(&encode(value)), "{value}: {secret}");
+            assert!(secret.contains(&encode(value)), "{value}");
             let config = written(&set_key("ConfigMap", "settings", value));
-            assert!(config.contains(value), "{value}: {config}");
+            assert!(config.contains(value), "{value}");
         }
         let created = written(&create_secret("data", &encode("p•ss")));
-        assert!(created.contains(&encode("p•ss")), "{created}");
+        assert!(created.contains(&encode("p•ss")));
     }
 }
