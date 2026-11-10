@@ -1,351 +1,510 @@
-//! Runs the cases of the `mutation` fixture area that plans and their writes rest on.
+//! Runs the cases of the `mutation` fixture area that plans and their writes rest on, one test
+//! per case.
 
-#[cfg(test)]
-mod tests {
-    use std::collections::BTreeMap;
+use std::collections::BTreeMap;
+use std::path::Path;
 
-    use k8s_openapi::api::apps::v1::ReplicaSet;
-    use serde_json::{Value, from_value, json, to_value};
-    use zeabur_graph::Snapshot;
-    use zeabur_model::WorkloadRef;
-    use zeabur_plan::checks::{
-        ProbeRequest, ResourceRef, VolumeRequest, owned_by_stateful_set, probe_config,
-        reconcile_identity, resource_allowed, validate_storage,
-    };
-    use zeabur_plan::rules::{EnvEdit, diff, route_name, validate_env, validate_hostname};
-    use zeabur_plan::{
-        Attachable, CheckedCertificate, Fetched, Input, IssuerRead, PlanRequest, Release,
-        ServedKind, StorageClassInfo, plan,
-    };
-    use zeabur_test_support::fixtures::{Fixture, compare};
-    use zeabur_test_support::load;
+use k8s_openapi::api::apps::v1::ReplicaSet;
+use serde::{Deserialize, Deserializer};
+use serde_json::{Value, from_value, json, to_value};
+use zeabur_graph::Snapshot;
+use zeabur_model::WorkloadRef;
+use zeabur_plan::checks::{
+    ProbeRequest, ResourceRef, VolumeRequest, owned_by_stateful_set, probe_config,
+    reconcile_identity, resource_allowed, validate_storage,
+};
+use zeabur_plan::rules::{EnvEdit, diff, route_name, validate_env, validate_hostname};
+use zeabur_plan::{
+    Attachable, CheckedCertificate, Fetched, Input, IssuerRead, PlanRequest, Release, ServedKind,
+    StorageClassInfo, plan,
+};
+use zeabur_test_support::fixtures::{FixtureOp, NoParams, Strict, compare, load_case_file, run_op};
 
-    /// The resource (plural) of a kind, for the fixtures' objects.
-    fn plural(kind: &str) -> String {
-        let lower = kind.to_ascii_lowercase();
-        if lower.ends_with('y') {
-            format!("{}ies", lower.trim_end_matches('y'))
-        } else if lower.ends_with('s') {
-            format!("{lower}es")
-        } else {
-            format!("{lower}s")
+datatest_stable::harness! {
+    { test = run_case, root = "fixtures/mutation", pattern = r"^[^/]+/case\.yaml$" },
+}
+
+fn run_case(file: &Path) -> datatest_stable::Result<()> {
+    let fixture = load_case_file(file)?;
+    let actual = match fixture.case.operation.as_str() {
+        ValidateEnv::NAME => run_op::<ValidateEnv>(&fixture),
+        ValidateHostname::NAME => run_op::<ValidateHostname>(&fixture),
+        RouteName::NAME => run_op::<RouteName>(&fixture),
+        Diff::NAME => run_op::<Diff>(&fixture),
+        ValidateStorage::NAME => run_op::<ValidateStorage>(&fixture),
+        ProbeConfig::NAME => run_op::<ProbeConfig>(&fixture),
+        ResourceAllowed::NAME => run_op::<ResourceAllowed>(&fixture),
+        ReconcileIdentity::NAME => run_op::<ReconcileIdentity>(&fixture),
+        OwnedByStatefulSet::NAME => run_op::<OwnedByStatefulSet>(&fixture),
+        Plan::NAME => run_op::<Plan>(&fixture),
+        other => Err(format!("{}: no runner for operation {other}", fixture.name)),
+    }?;
+    // A mask shown in place of a Secret value is never written.
+    for object in actual
+        .get("objects")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+    {
+        let write = object["write"].to_string();
+        if write.contains("(hidden)") || write.contains('•') {
+            return Err(format!("{}: a write carries a mask: {write}", fixture.name).into());
         }
     }
+    compare(&fixture.expected, &actual)
+        .map_err(|difference| format!("{}: {difference}\n  actual: {actual}", fixture.name))?;
+    Ok(())
+}
 
-    /// The mount paths of the first container of the fixture's first object.
-    fn mount_paths(object: &Value) -> Vec<String> {
-        object
-            .pointer("/spec/template/spec/containers/0/volumeMounts")
+fn outcome<T: serde::Serialize, E: std::fmt::Display>(
+    result: Result<T, E>,
+) -> Result<Value, String> {
+    match result {
+        Ok(value) => to_value(value).map_err(|e| e.to_string()),
+        Err(error) => Ok(json!({"error": error.to_string()})),
+    }
+}
+
+fn ok<E: std::fmt::Display>(result: Result<(), E>) -> Value {
+    match result {
+        Ok(()) => json!({"ok": true}),
+        Err(error) => json!({"error": error.to_string()}),
+    }
+}
+
+struct ValidateEnv;
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ValidateEnvParams {
+    changes: Strict<Vec<EnvEdit>>,
+}
+
+impl FixtureOp for ValidateEnv {
+    const NAME: &'static str = "mutation.validateEnv";
+    type Params = ValidateEnvParams;
+
+    fn run(_: &[Value], params: Self::Params) -> Result<Value, String> {
+        // An unknown op still parses, so its refusal comes from the rule.
+        Ok(ok(validate_env(&params.changes.0)))
+    }
+}
+
+struct ValidateHostname;
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct HostnameParams {
+    hostname: String,
+}
+
+impl FixtureOp for ValidateHostname {
+    const NAME: &'static str = "mutation.validateHostname";
+    type Params = HostnameParams;
+
+    fn run(_: &[Value], params: Self::Params) -> Result<Value, String> {
+        Ok(ok(validate_hostname(&params.hostname)))
+    }
+}
+
+struct RouteName;
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct RouteNameParams {
+    workload: String,
+    hostname: String,
+}
+
+impl FixtureOp for RouteName {
+    const NAME: &'static str = "mutation.routeName";
+    type Params = RouteNameParams;
+
+    fn run(_: &[Value], params: Self::Params) -> Result<Value, String> {
+        Ok(json!(route_name(&params.workload, &params.hostname)))
+    }
+}
+
+struct Diff;
+
+impl FixtureOp for Diff {
+    const NAME: &'static str = "mutation.diff";
+    type Params = NoParams;
+
+    fn run(input: &[Value], _: Self::Params) -> Result<Value, String> {
+        let changes = match input {
+            [after] => diff(None, after),
+            [before, after] => diff(Some(before), after),
+            _ => return Err("one or two objects".to_owned()),
+        };
+        to_value(changes).map_err(|e| e.to_string())
+    }
+}
+
+struct ValidateStorage;
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ValidateStorageParams {
+    request: Strict<VolumeRequest>,
+}
+
+impl FixtureOp for ValidateStorage {
+    const NAME: &'static str = "mutation.validateStorage";
+    type Params = ValidateStorageParams;
+
+    fn run(input: &[Value], params: Self::Params) -> Result<Value, String> {
+        let paths: Vec<&str> = input
+            .first()
+            .and_then(|object| object.pointer("/spec/template/spec/containers/0/volumeMounts"))
             .and_then(Value::as_array)
             .into_iter()
             .flatten()
-            .filter_map(|m| m["mountPath"].as_str().map(str::to_owned))
-            .collect()
+            .filter_map(|mount| mount["mountPath"].as_str())
+            .collect();
+        Ok(ok(validate_storage(&params.request.0, &paths)))
     }
+}
 
-    fn snapshot(fixture: &Fixture) -> (Snapshot, Vec<Value>) {
+struct ProbeConfig;
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ProbeConfigParams {
+    container: String,
+    probe: Strict<ProbeRequest>,
+}
+
+impl FixtureOp for ProbeConfig {
+    const NAME: &'static str = "mutation.probeConfig";
+    type Params = ProbeConfigParams;
+
+    fn run(input: &[Value], params: Self::Params) -> Result<Value, String> {
+        let containers = input
+            .first()
+            .and_then(|object| object.pointer("/spec/template/spec/containers"))
+            .and_then(Value::as_array)
+            .ok_or("the workload has no containers")?;
+        let ports: Vec<i32> = containers
+            .iter()
+            .filter(|c| c["name"] == params.container.as_str())
+            .flat_map(|c| c["ports"].as_array().into_iter().flatten())
+            .filter_map(|p| p["containerPort"].as_i64())
+            .filter_map(|p| i32::try_from(p).ok())
+            .collect();
+        outcome(probe_config(&params.probe.0, &ports))
+    }
+}
+
+struct ResourceAllowed;
+
+impl FixtureOp for ResourceAllowed {
+    const NAME: &'static str = "mutation.resourceAllowed";
+    type Params = Strict<ResourceRef>;
+
+    fn run(_: &[Value], params: Self::Params) -> Result<Value, String> {
+        to_value(resource_allowed(&params.0)).map_err(|e| e.to_string())
+    }
+}
+
+struct ReconcileIdentity;
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ReconcileIdentityParams {
+    resource: Strict<ResourceRef>,
+    kind: String,
+    namespace: String,
+    name: String,
+    body: Value,
+}
+
+impl FixtureOp for ReconcileIdentity {
+    const NAME: &'static str = "mutation.reconcileIdentity";
+    type Params = ReconcileIdentityParams;
+
+    fn run(_: &[Value], params: Self::Params) -> Result<Value, String> {
+        Ok(ok(reconcile_identity(
+            &params.resource.0,
+            &params.kind,
+            &params.namespace,
+            &params.name,
+            &params.body,
+        )))
+    }
+}
+
+struct OwnedByStatefulSet;
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+struct OwnedByStatefulSetParams {
+    claim: String,
+    stateful_set: String,
+}
+
+impl FixtureOp for OwnedByStatefulSet {
+    const NAME: &'static str = "mutation.ownedByStatefulSet";
+    type Params = OwnedByStatefulSetParams;
+
+    fn run(_: &[Value], params: Self::Params) -> Result<Value, String> {
+        Ok(json!(owned_by_stateful_set(
+            &params.claim,
+            &params.stateful_set
+        )))
+    }
+}
+
+/// A list that may be absent, or `null` for "could not be read".
+#[derive(Default)]
+enum Listed<T> {
+    #[default]
+    Absent,
+    Unreadable,
+    Items(T),
+}
+
+impl<'de, T: Deserialize<'de>> Deserialize<'de> for Listed<T> {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        Ok(Option::<T>::deserialize(deserializer)?.map_or(Self::Unreadable, Self::Items))
+    }
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+struct StorageClassParam {
+    name: String,
+    #[serde(default)]
+    allow_volume_expansion: bool,
+    #[serde(default)]
+    default: bool,
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct KindParam {
+    group: String,
+    kind: String,
+    plural: String,
+    namespaced: bool,
+}
+
+/// What a `ClusterIssuer` read gave.
+#[derive(Deserialize)]
+#[serde(rename_all = "lowercase")]
+enum IssuerParam {
+    Dns01,
+    Http01,
+    Missing,
+    Unreadable,
+}
+
+impl From<IssuerParam> for IssuerRead {
+    fn from(read: IssuerParam) -> Self {
+        match read {
+            IssuerParam::Dns01 => Self::Found { wildcards: true },
+            IssuerParam::Http01 => Self::Found { wildcards: false },
+            IssuerParam::Missing => Self::Missing,
+            IssuerParam::Unreadable => Self::Unreadable,
+        }
+    }
+}
+
+impl From<KindParam> for ServedKind {
+    fn from(kind: KindParam) -> Self {
+        Self {
+            group: kind.group,
+            kind: kind.kind,
+            plural: kind.plural,
+            namespaced: kind.namespaced,
+        }
+    }
+}
+
+impl From<StorageClassParam> for StorageClassInfo {
+    fn from(class: StorageClassParam) -> Self {
+        Self {
+            name: class.name,
+            allow_expansion: class.allow_volume_expansion,
+            default: class.default,
+        }
+    }
+}
+
+fn demo() -> String {
+    "demo".to_owned()
+}
+
+fn now() -> String {
+    "2026-10-15T00:00:00Z".to_owned()
+}
+
+struct Plan;
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields, rename_all = "camelCase")]
+struct PlanParams {
+    request: Strict<PlanRequest>,
+    #[serde(default = "demo")]
+    namespace: String,
+    #[serde(default = "now")]
+    now: String,
+    #[serde(default)]
+    reloader: Option<bool>,
+    /// The Gateway objects of every namespace.
+    #[serde(default)]
+    gateways: Listed<Vec<Value>>,
+    #[serde(default)]
+    namespace_labels: BTreeMap<String, String>,
+    #[serde(default)]
+    releases: Strict<Vec<(WorkloadRef, Vec<Release>)>>,
+    #[serde(default)]
+    storage_classes: Listed<Vec<StorageClassParam>>,
+    #[serde(default)]
+    secret_values: BTreeMap<String, BTreeMap<String, String>>,
+    #[serde(default)]
+    reclaim_policies: BTreeMap<String, String>,
+    #[serde(default)]
+    kinds: Vec<KindParam>,
+    #[serde(default)]
+    cluster_issuer: Option<String>,
+    #[serde(default)]
+    issuers: BTreeMap<String, IssuerParam>,
+    #[serde(default)]
+    certificates: BTreeMap<String, String>,
+    #[serde(default)]
+    build_registry: Option<String>,
+}
+
+/// The resource (plural) of a kind, for the fixtures' objects.
+fn plural(kind: &str) -> String {
+    let lower = kind.to_ascii_lowercase();
+    if lower.ends_with('y') {
+        format!("{}ies", lower.trim_end_matches('y'))
+    } else if lower.ends_with('s') {
+        format!("{lower}es")
+    } else {
+        format!("{lower}s")
+    }
+}
+
+/// Every object of the input, as read for a YAML edit or a deletion.
+fn fetched(input: &[Value]) -> Vec<Fetched> {
+    input
+        .iter()
+        .filter_map(|object| {
+            let api_version = object["apiVersion"].as_str()?;
+            let (group, version) = api_version.split_once('/').unwrap_or(("", api_version));
+            Some(Fetched {
+                resource: ResourceRef {
+                    group: group.to_owned(),
+                    version: version.to_owned(),
+                    resource: plural(object["kind"].as_str()?),
+                },
+                name: object.pointer("/metadata/name")?.as_str()?.to_owned(),
+                object: object.clone(),
+            })
+        })
+        .collect()
+}
+
+impl FixtureOp for Plan {
+    const NAME: &'static str = "mutation.plan";
+    type Params = PlanParams;
+
+    fn run(input: &[Value], params: Self::Params) -> Result<Value, String> {
         let mut snapshot = Snapshot {
-            namespace: fixture.case.params["namespace"]
-                .as_str()
-                .unwrap_or("demo")
-                .to_owned(),
+            namespace: params.namespace.clone(),
             ..Snapshot::default()
         };
         let mut routes = Vec::new();
-        for object in &fixture.input {
+        for object in input {
             // Other kinds are read only for YAML edits (`Fetched`).
-            if !snapshot.insert(object.clone()).unwrap() && object["kind"] == "HTTPRoute" {
+            let inserted = snapshot.insert(object.clone()).map_err(|e| e.to_string())?;
+            if !inserted && object["kind"] == "HTTPRoute" {
                 routes.push(object.clone());
             }
         }
-        (snapshot, routes)
-    }
-
-    fn outcome<T: serde::Serialize, E: std::fmt::Display>(result: Result<T, E>) -> Value {
-        match result {
-            Ok(value) => to_value(value).unwrap(),
-            Err(error) => json!({"error": error.to_string()}),
-        }
-    }
-
-    fn ok<E: std::fmt::Display>(result: Result<(), E>) -> Value {
-        match result {
-            Ok(()) => json!({"ok": true}),
-            Err(error) => json!({"error": error.to_string()}),
-        }
-    }
-
-    /// `params.kinds`: the kinds discovery names.
-    fn served_kinds(params: &Value) -> Vec<ServedKind> {
-        params
-            .get("kinds")
-            .and_then(Value::as_array)
-            .map_or_else(Vec::new, |list| {
-                list.iter()
-                    .map(|k| ServedKind {
-                        group: k["group"].as_str().unwrap().to_owned(),
-                        kind: k["kind"].as_str().unwrap().to_owned(),
-                        plural: k["plural"].as_str().unwrap().to_owned(),
-                        namespaced: k["namespaced"].as_bool().unwrap(),
-                    })
-                    .collect()
-            })
-    }
-
-    /// `params.issuers`: each `ClusterIssuer` read, `dns01`, `http01`, `missing` or
-    /// `unreadable`.
-    fn issuers(params: &Value) -> BTreeMap<String, IssuerRead> {
-        params
-            .get("issuers")
-            .and_then(Value::as_object)
-            .into_iter()
-            .flatten()
-            .map(|(name, read)| {
-                let read = match read.as_str().unwrap() {
-                    "dns01" => IssuerRead::Found { wildcards: true },
-                    "http01" => IssuerRead::Found { wildcards: false },
-                    "missing" => IssuerRead::Missing,
-                    _ => IssuerRead::Unreadable,
-                };
-                (name.clone(), read)
-            })
-            .collect()
-    }
-
-    /// `params.certificates`: each own certificate's hostname and expiry, as checked.
-    fn certificates(params: &Value) -> BTreeMap<String, CheckedCertificate> {
-        params
-            .get("certificates")
-            .and_then(Value::as_object)
-            .into_iter()
-            .flatten()
-            .map(|(host, not_after)| {
-                (
-                    host.clone(),
-                    CheckedCertificate {
-                        not_after: not_after.as_str().unwrap().to_owned(),
-                        certificate: format!("CERT {host}"),
-                        key: format!("KEY {host}"),
-                    },
-                )
-            })
-            .collect()
-    }
-
-    /// Every object of the fixture, as read for a YAML edit or a deletion.
-    fn fetched(fixture: &Fixture) -> Vec<Fetched> {
-        fixture
-            .input
-            .iter()
-            .filter_map(|object| {
-                let api_version = object["apiVersion"].as_str()?;
-                let (group, version) = api_version.split_once('/').unwrap_or(("", api_version));
-                Some(Fetched {
-                    resource: ResourceRef {
-                        group: group.to_owned(),
-                        version: version.to_owned(),
-                        resource: plural(object["kind"].as_str()?),
-                    },
-                    name: object.pointer("/metadata/name")?.as_str()?.to_owned(),
-                    object: object.clone(),
-                })
-            })
-            .collect()
-    }
-
-    /// `mutation.plan`: the request planned against the fixture's objects.
-    fn run_plan(fixture: &Fixture) -> Value {
-        let params = &fixture.case.params;
-        let (snapshot, routes) = snapshot(fixture);
-        let request: PlanRequest = from_value(params["request"].clone()).unwrap();
         // Gateway objects, of which the plan sees those that accept a route from the namespace
-        // (labelled `namespaceLabels`); `null` when they cannot be listed.
-        let gateways: Option<Vec<Attachable>> = match params.get("gateways") {
-            Some(Value::Null) => None,
-            Some(list) => {
-                let labels: BTreeMap<String, String> =
-                    from_value(params.get("namespaceLabels").cloned().unwrap_or_default())
-                        .unwrap_or_default();
-                Some(zeabur_plan::attachable(
-                    list.as_array().unwrap(),
-                    &snapshot.namespace,
-                    &labels,
-                ))
-            }
-            None => Some(Vec::new()),
+        // (labelled `namespaceLabels`); none when they cannot be listed.
+        let gateways: Option<Vec<Attachable>> = match &params.gateways {
+            Listed::Unreadable => None,
+            Listed::Items(list) => Some(zeabur_plan::attachable(
+                list,
+                &snapshot.namespace,
+                &params.namespace_labels,
+            )),
+            Listed::Absent => Some(Vec::new()),
         };
         let secret_values: BTreeMap<String, BTreeMap<String, Vec<u8>>> = params
-            .get("secretValues")
-            .and_then(Value::as_object)
-            .into_iter()
-            .flatten()
+            .secret_values
+            .iter()
             .map(|(name, keys)| {
                 let keys = keys
-                    .as_object()
-                    .unwrap()
                     .iter()
-                    .map(|(k, v)| (k.clone(), v.as_str().unwrap().as_bytes().to_vec()))
+                    .map(|(key, value)| (key.clone(), value.as_bytes().to_vec()))
                     .collect();
                 (name.clone(), keys)
             })
             .collect();
-        let releases: BTreeMap<WorkloadRef, Vec<Release>> =
-            params.get("releases").map_or_else(BTreeMap::new, |list| {
-                let entries: Vec<(WorkloadRef, Vec<Release>)> = from_value(list.clone()).unwrap();
-                entries.into_iter().collect()
-            });
-        let storage_classes: Option<Vec<StorageClassInfo>> = match params.get("storageClasses") {
-            Some(Value::Null) => None,
-            Some(list) => Some(
-                list.as_array()
-                    .unwrap()
-                    .iter()
-                    .map(|c| StorageClassInfo {
-                        name: c["name"].as_str().unwrap().to_owned(),
-                        allow_expansion: c["allowVolumeExpansion"].as_bool().unwrap_or(false),
-                        default: c["default"].as_bool().unwrap_or(false),
-                    })
-                    .collect(),
-            ),
-            None => Some(Vec::new()),
+        let releases: BTreeMap<WorkloadRef, Vec<Release>> = params.releases.0.into_iter().collect();
+        let storage_classes: Option<Vec<StorageClassInfo>> = match params.storage_classes {
+            Listed::Unreadable => None,
+            Listed::Items(list) => Some(list.into_iter().map(Into::into).collect()),
+            Listed::Absent => Some(Vec::new()),
         };
-        let objects = fetched(fixture);
-        let replica_sets: Vec<ReplicaSet> = fixture
-            .input
+        let objects = fetched(input);
+        let replica_sets: Vec<ReplicaSet> = input
             .iter()
             .filter(|o| o["kind"] == "ReplicaSet")
-            .map(|o| from_value(o.clone()).unwrap())
+            .map(|o| from_value(o.clone()).map_err(|e| e.to_string()))
+            .collect::<Result<_, _>>()?;
+        let kinds: Vec<ServedKind> = params.kinds.into_iter().map(Into::into).collect();
+        let issuers: BTreeMap<String, IssuerRead> = params
+            .issuers
+            .into_iter()
+            .map(|(name, read)| (name, read.into()))
             .collect();
-        let reclaim_policies: BTreeMap<String, String> = params
-            .get("reclaimPolicies")
-            .map_or_else(BTreeMap::new, |p| from_value(p.clone()).unwrap());
-        let kinds = served_kinds(params);
-        let issuers = issuers(params);
-        let certificates = certificates(params);
-        let input = Input {
-            snapshot: &snapshot,
-            http_routes: &routes,
-            gateways: gateways.as_deref(),
-            secret_values: &secret_values,
-            now: params["now"].as_str().unwrap_or("2026-10-15T00:00:00Z"),
-            releases: &releases,
-            storage_classes: storage_classes.as_deref(),
-            objects: &objects,
-            replica_sets: &replica_sets,
-            reclaim_policies: &reclaim_policies,
-            namespace: None,
-            reloader: params.get("reloader").and_then(Value::as_bool),
-            kinds: &kinds,
-            deletion: None,
-            cluster_issuer: params.get("clusterIssuer").and_then(Value::as_str),
-            issuers: &issuers,
-            certificates: &certificates,
-            platform_namespaces: false,
-            build_registry: params.get("buildRegistry").and_then(Value::as_str),
-            node_capacity: None,
-        };
-        match plan(input, &request) {
-            Ok(plan) => to_value(plan).unwrap(),
-            Err(error) => json!({"error": error.code}),
-        }
-    }
-
-    fn run(fixture: &Fixture) -> Value {
-        let params = &fixture.case.params;
-        let first = fixture.input.first();
-        match fixture.case.operation.as_str() {
-            "mutation.validateEnv" => {
-                // An unknown op still parses, so its refusal comes from the rule.
-                let changes: Vec<EnvEdit> = from_value(params["changes"].clone()).unwrap();
-                ok(validate_env(&changes))
-            }
-            "mutation.validateHostname" => {
-                ok(validate_hostname(params["hostname"].as_str().unwrap()))
-            }
-            "mutation.routeName" => json!(route_name(
-                params["workload"].as_str().unwrap(),
-                params["hostname"].as_str().unwrap()
-            )),
-            "mutation.diff" => match fixture.input.as_slice() {
-                [after] => to_value(diff(None, after)).unwrap(),
-                [before, after] => to_value(diff(Some(before), after)).unwrap(),
-                _ => panic!("{}: one or two objects", fixture.name),
+        let certificates: BTreeMap<String, CheckedCertificate> = params
+            .certificates
+            .into_iter()
+            .map(|(host, not_after)| {
+                let checked = CheckedCertificate {
+                    not_after,
+                    certificate: format!("CERT {host}"),
+                    key: format!("KEY {host}"),
+                };
+                (host, checked)
+            })
+            .collect();
+        let planned = plan(
+            Input {
+                snapshot: &snapshot,
+                http_routes: &routes,
+                gateways: gateways.as_deref(),
+                secret_values: &secret_values,
+                now: &params.now,
+                releases: &releases,
+                storage_classes: storage_classes.as_deref(),
+                objects: &objects,
+                replica_sets: &replica_sets,
+                reclaim_policies: &params.reclaim_policies,
+                namespace: None,
+                reloader: params.reloader,
+                kinds: &kinds,
+                deletion: None,
+                cluster_issuer: params.cluster_issuer.as_deref(),
+                issuers: &issuers,
+                certificates: &certificates,
+                platform_namespaces: false,
+                build_registry: params.build_registry.as_deref(),
+                node_capacity: None,
             },
-            "mutation.validateStorage" => {
-                let request: VolumeRequest = from_value(params["request"].clone()).unwrap();
-                let paths = first.map_or_else(Vec::new, mount_paths);
-                let paths: Vec<&str> = paths.iter().map(String::as_str).collect();
-                ok(validate_storage(&request, &paths))
-            }
-            "mutation.probeConfig" => {
-                let request: ProbeRequest = from_value(params["probe"].clone()).unwrap();
-                let container = params["container"].as_str().unwrap();
-                let ports: Vec<i32> = first
-                    .unwrap()
-                    .pointer("/spec/template/spec/containers")
-                    .and_then(Value::as_array)
-                    .unwrap()
-                    .iter()
-                    .filter(|c| c["name"] == container)
-                    .flat_map(|c| c["ports"].as_array().cloned().unwrap_or_default())
-                    .filter_map(|p| p["containerPort"].as_i64())
-                    .map(|p| i32::try_from(p).unwrap())
-                    .collect();
-                outcome(probe_config(&request, &ports))
-            }
-            "mutation.resourceAllowed" => {
-                let resource: ResourceRef = from_value(params.clone()).unwrap();
-                to_value(resource_allowed(&resource)).unwrap()
-            }
-            "mutation.reconcileIdentity" => {
-                let resource: ResourceRef = from_value(params["resource"].clone()).unwrap();
-                ok(reconcile_identity(
-                    &resource,
-                    params["kind"].as_str().unwrap(),
-                    params["namespace"].as_str().unwrap(),
-                    params["name"].as_str().unwrap(),
-                    &params["body"],
-                ))
-            }
-            "mutation.ownedByStatefulSet" => json!(owned_by_stateful_set(
-                params["claim"].as_str().unwrap(),
-                params["statefulSet"].as_str().unwrap()
-            )),
-            "mutation.plan" => run_plan(fixture),
-            other => panic!("{}: no runner for operation {other}", fixture.name),
-        }
-    }
-
-    #[test]
-    fn mutation_fixtures_pass() {
-        let mut failures = Vec::new();
-        let mut total = 0;
-        for fixture in load!("mutation").unwrap() {
-            total += 1;
-            let actual = run(&fixture);
-            // A mask shown in place of a Secret value is never written.
-            for object in actual["objects"].as_array().into_iter().flatten() {
-                let write = object["write"].to_string();
-                assert!(
-                    !write.contains("(hidden)") && !write.contains('•'),
-                    "{}: a write carries a mask: {write}",
-                    fixture.name
-                );
-            }
-            match compare(&fixture.expected, &actual) {
-                Ok(()) => println!("pass {}", fixture.name),
-                Err(difference) => {
-                    println!("FAIL {}: {difference}\n  actual: {actual}", fixture.name);
-                    failures.push(format!("{}: {difference}", fixture.name));
-                }
-            }
-        }
-        assert!(total > 0, "no fixtures found");
-        assert!(
-            failures.is_empty(),
-            "{} of {total} failed:\n{}",
-            failures.len(),
-            failures.join("\n")
+            &params.request.0,
         );
+        match planned {
+            Ok(planned) => to_value(planned).map_err(|e| e.to_string()),
+            Err(error) => Ok(json!({"error": error.code})),
+        }
     }
 }
