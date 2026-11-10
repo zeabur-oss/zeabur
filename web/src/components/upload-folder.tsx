@@ -18,7 +18,7 @@ export function UploadProgress({ project, build }: { project: string; build: str
   if (!state || state.phase === "done") return null
   if (state.phase === "failed")
     return (
-      <Alert variant="destructive" className="mt-2 max-w-prose">
+      <Alert variant="destructive" role="alert" className="mt-2 max-w-prose">
         <AlertDescription>
           <span className="block font-medium">{t(`upload.failed.${state.stage}`)}</span>
           <span className="block" lang="en" translate="no">

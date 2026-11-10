@@ -316,7 +316,7 @@ export function NewDatabaseDrawer({
         />
         <Licence engine={form.engine} />
         {form.members === 1 ? (
-          <Alert variant="warn">
+          <Alert variant="warn" role="note">
             <WarningIcon aria-hidden="true" />
             <AlertDescription>{t("db.noRedundancy", false)}</AlertDescription>
           </Alert>
