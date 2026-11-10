@@ -228,9 +228,10 @@ impl<'de> Deserialize<'de> for NoParams {
     }
 }
 
-/// A parameter of a type that ignores unknown fields (a wire type): reading it fails when the
-/// fixture holds a field the type drops. A field set to `null` that the type does not write back
-/// counts as dropped, so leave such a field out.
+/// A parameter of a type that ignores unknown fields (a wire type).
+///
+/// Reading it fails when the fixture holds a field the type drops. A field set to `null` that the
+/// type does not write back counts as dropped, so leave such a field out.
 #[derive(Debug, Clone, Default)]
 pub struct Strict<T>(pub T);
 
