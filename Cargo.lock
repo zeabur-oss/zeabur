@@ -3048,7 +3048,9 @@ dependencies = [
 name = "zeabur-gaps"
 version = "0.2.0"
 dependencies = [
+ "datatest-stable",
  "k8s-openapi",
+ "serde",
  "serde-saphyr 2.0.0",
  "serde_json",
  "zeabur-graph",
@@ -3163,6 +3165,7 @@ dependencies = [
 name = "zeabur-modules"
 version = "0.2.0"
 dependencies = [
+ "datatest-stable",
  "k8s-openapi",
  "serde",
  "serde-saphyr 2.0.0",
