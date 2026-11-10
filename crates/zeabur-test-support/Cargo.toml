@@ -36,6 +36,7 @@ rcgen = { workspace = true, optional = true }
 rustls = { workspace = true, optional = true }
 serde.workspace = true
 serde-saphyr.workspace = true
+serde_ignored.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
 time = { workspace = true, optional = true }
