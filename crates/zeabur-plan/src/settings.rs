@@ -51,12 +51,13 @@ use crate::checks::{
 use crate::edit::{edit_operations, editable};
 use crate::fields::Step;
 use crate::json::{add, pointer, remove, replace, test};
+use crate::masks::is_mask;
 use crate::plan::{
     ErrorKind, PlanError, Planner, Working, error, pod_spec_steps, to_json, workload_json,
     workload_target,
 };
 use crate::project::{set_key, shown, steps};
-use crate::rules::{REDACTED, Refusal};
+use crate::rules::Refusal;
 
 /// A container of a workload: its name, position and spec.
 pub(crate) struct Found {
@@ -71,12 +72,6 @@ pub(crate) struct Found {
 )]
 fn bad(refusal: Refusal, detail: &str) -> PlanError {
     error(ErrorKind::BadRequest, &refusal.0, detail)
-}
-
-/// Whether a Secret value in an edited copy is a mask a person was shown: the YAML view's
-/// [`REDACTED`] or a run of `•`.
-fn is_mask(value: &str) -> bool {
-    value == REDACTED || (!value.is_empty() && value.chars().all(|c| c == '\u{2022}'))
 }
 
 #[expect(

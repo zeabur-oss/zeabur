@@ -1790,6 +1790,7 @@ impl<'a> Planner<'a> {
                 operations.extend(working.operations);
                 Write::Patch { operations }
             };
+            crate::masks::refuse_masks(&working.target, &write)?;
             let change = self
                 .created
                 .iter()
