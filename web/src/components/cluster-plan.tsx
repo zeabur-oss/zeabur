@@ -271,7 +271,7 @@ export function Exposed({
 }) {
   const t = useT()
   return (
-    <Alert variant="destructive">
+    <Alert variant="destructive" role="alert">
       <WarningCircleIcon aria-hidden="true" />
       <AlertTitle>{t("nodeShell.exposedTitle")}</AlertTitle>
       <AlertDescription>
