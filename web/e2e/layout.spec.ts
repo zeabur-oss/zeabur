@@ -160,7 +160,8 @@ test.describe("in a project with many services", () => {
       expect(await mainOverflows(page)).toBe(false)
 
       const main = page.locator("main")
-      await main.hover()
+      // Not over the table, which scrolls inside its own frame first.
+      await main.getByRole("heading", { level: 1 }).hover()
       await page.mouse.wheel(0, 2000)
       await expect.poll(() => main.evaluate((m) => m.scrollTop)).toBeGreaterThan(0)
       expect(await page.evaluate(() => window.scrollY)).toBe(0)
