@@ -192,6 +192,31 @@ mod tests {
         }
     }
 
+    /// A Secret's key changes are one merge patch of those keys: the Secret's values are not
+    /// read, and the plan shows none.
+    #[tokio::test]
+    async fn a_secret_key_edit_is_a_merge_patch_that_reads_no_value() {
+        let cluster = cluster();
+        let (planned, writes) = plan_and_apply(
+            &cluster,
+            json!([{"op": "data", "kind": "Secret", "name": "web-secret", "changes": [
+                {"op": "set", "key": "password", "value": "hunter3"},
+                {"op": "remove", "key": "user"}]}]),
+        )
+        .await;
+        assert_eq!(
+            writes,
+            [WriteBody::MergePatch(
+                json!({"data": {"password": "aHVudGVyMw==", "user": null}})
+            )]
+        );
+        assert_eq!(cluster.inspect(|s| s.secret_reads).unwrap(), 0);
+        let shown = planned.to_string();
+        for value in ["aHVudGVyMw==", "hunter"] {
+            assert!(!shown.contains(value), "the plan shows a Secret value");
+        }
+    }
+
     /// A plan the planner refuses because the object cannot take the change answers `422` with a
     /// problem document (RFC 9457); the web client tells its refusals apart by that status.
     #[tokio::test]

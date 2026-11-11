@@ -1,4 +1,4 @@
-description: "A key change of a Secret whose values were not read is refused, so no other key is lost."
+description: "A Secret key change shows which key changes but never a value, and is written as a merge patch of that key alone, in base64, without reading the Secret's values."
 operation: mutation.plan
 params:
   request:

@@ -314,6 +314,16 @@ impl Plan {
                         }
                     }
                 }
+                Write::MergePatch { body } => {
+                    // A removal (`null`) stays as it is: it carries no value.
+                    if let Some(data) = body.get_mut("data").and_then(Value::as_object_mut) {
+                        for value in data.values_mut() {
+                            if !value.is_null() {
+                                *value = json!(HIDDEN);
+                            }
+                        }
+                    }
+                }
                 Write::Delete { .. } | Write::EphemeralContainers { .. } => {}
             }
         }

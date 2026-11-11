@@ -13173,6 +13173,21 @@ components:
             - patch
       - type: object
         description: |-
+          An RFC 7386 JSON Merge Patch that sets or removes keys of a Secret's `data` without
+          reading the Secret: it tests nothing, so the last write to a key wins.
+        required:
+        - body
+        - type
+        properties:
+          body:
+            type: object
+            description: "The patch, `{\"data\": {key: base64 or null}}`."
+          type:
+            type: string
+            enum:
+            - mergePatch
+      - type: object
+        description: |-
           A `DELETE` with background propagation, refused (`409`) unless the object still has this
           `uid` and `resourceVersion`.
         required:

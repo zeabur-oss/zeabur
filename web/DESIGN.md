@@ -370,9 +370,9 @@ as the cluster gives it to the person, `data` in base64; a plan's diff shows `(h
 `last-applied-configuration` copy stays hidden. The key editor reads the same YAML: one row per
 key, the value masked until its eye is pressed (no second request), a copy button for the decoded
 value, and a binary value as its size with a download, never in a text box. It sends only the keys
-changed; typing then clearing a masked value is no change. The plan compares a Secret edit, from
-the key editor or the YAML, with the Secret as read, as for any other object; a person who may not
-`get` the Secret cannot change it.
+changed; typing then clearing a masked value is no change. Those keys go as one merge patch that
+reads nothing, so `patch` on the Secret is enough and the last write to a key wins. The plan
+compares a YAML edit with the Secret as read, as for any other object, so it needs `get`.
 
 ## Navigation and state
 

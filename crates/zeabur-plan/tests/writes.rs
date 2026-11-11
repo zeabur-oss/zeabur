@@ -9,8 +9,10 @@
 //!   6902 implementation is in the dependency tree, so the patch is applied with Zeabur's; what the
 //!   property adds is that the whole write (its precondition, and the operations of several changes
 //!   to one object in order) holds on the stored object, not on the planner's working copy.
-//!   kube-apiserver's own answer is checked by the cluster tests. The Secret's values are readable
-//!   here: a plan without them cannot show the keys it does not touch.
+//!   kube-apiserver's own answer is checked by the cluster tests. A key edit of a Secret is a
+//!   merge patch [rfc7386] instead: it sets the keys it names and leaves the others as stored,
+//!   whose values the plan does not read. The Secret's values are readable here for its YAML
+//!   edit: a plan without them cannot show the keys it does not touch.
 //!
 //! The cases are generated: the workload's kind, its container, variables, port and mount, the
 //! routes' hostnames and the keys of a ConfigMap and a Secret. A restart is left out of the
@@ -20,6 +22,7 @@
 //! [quickcheck]: https://www.cs.tufts.edu/comp/150FP/archive/john-hughes/quick.pdf
 //! [k8s-ssa-fields]: https://kubernetes.io/docs/reference/using-api/server-side-apply/#field-management
 //! [rfc6902]: https://www.rfc-editor.org/rfc/rfc6902
+//! [rfc7386]: https://www.rfc-editor.org/rfc/rfc7386
 
 #[cfg(test)]
 mod tests {
@@ -592,8 +595,8 @@ mod tests {
         }]);
     }
 
-    /// What the API reads of `objects`: the snapshot, the `HTTPRoute` objects and the values of
-    /// the Secret.
+    /// What the API reads of `objects`: the snapshot, which has the Secret without its keys, the
+    /// `HTTPRoute` objects and the values of the Secret.
     fn read(
         world: &World,
         objects: &BTreeMap<&'static str, Value>,
@@ -690,6 +693,20 @@ mod tests {
         )
     }
 
+    /// `stored` after the merge patch `body` of a Secret's keys, as the plan shows it: the keys
+    /// it does not name are left out, as the plan did not read them.
+    fn merged(stored: &Value, body: &Value) -> Value {
+        let mut written = stored.clone();
+        let mut data = serde_json::Map::new();
+        for (key, value) in body["data"].as_object().into_iter().flatten() {
+            if !value.is_null() {
+                data.insert(key.clone(), value.clone());
+            }
+        }
+        written["data"] = Value::Object(data);
+        written
+    }
+
     fn manager() -> impl Strategy<Value = &'static str> {
         let reapplying = REAPPLYING.iter().map(|(manager, _)| *manager);
         prop::sample::select(reapplying.chain(OTHERS).collect::<Vec<_>>())
@@ -752,6 +769,10 @@ mod tests {
             if picks.contains(&11) {
                 picks.remove(&12);
             }
+            // A Secret's key edit and its YAML edit are planned apart.
+            if picks.contains(&16) {
+                picks.remove(&8);
+            }
             // Changes that need another workload kind are planned on that kind alone.
             for which in picks {
                 let (adjusted, change, _, _) = case(&world, which);
@@ -769,14 +790,15 @@ mod tests {
             let objects = world.objects();
             let plan = planned(&world, &objects, changes).map_err(|e| TestCaseError::fail(format!("{}: {}", e.code, e.detail)))?;
             for object in &plan.objects {
-                let Write::Patch { operations } = &object.write else {
-                    return Err(TestCaseError::fail(format!("{} was created", object.target.name)));
-                };
                 let stored = objects
                     .values()
                     .find(|o| o["kind"] == object.target.kind.as_str() && o["metadata"]["name"] == object.target.name.as_str())
                     .unwrap();
-                let written = apply_patch(stored, operations).map_err(|e| TestCaseError::fail(e.to_string()))?;
+                let written = match &object.write {
+                    Write::Patch { operations } => apply_patch(stored, operations).map_err(|e| TestCaseError::fail(e.to_string()))?,
+                    Write::MergePatch { body } => merged(stored, body),
+                    _ => return Err(TestCaseError::fail(format!("{} was created", object.target.name))),
+                };
                 prop_assert_eq!(&written, &object.raw_after, "{}", object.target.kind);
             }
         }

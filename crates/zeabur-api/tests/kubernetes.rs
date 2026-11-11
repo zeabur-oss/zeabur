@@ -3,9 +3,9 @@
 //! version and the API server's readiness readable by anyone signed in, backup providers not
 //! installed, the first request after their RoleBinding is deleted answered with `403`, and
 //! writes through plan and apply (Helm's fields kept, one winner of 64 concurrent applies, a write
-//! outside the role refused before anything is written, a Secret the person cannot read refused
-//! with its keys kept, and the object stored being the one the plan showed), and usage and history
-//! read as a person with `view` (and, for history, `services/proxy`).
+//! outside the role refused before anything is written, one key of a Secret the person cannot
+//! read changed with its other keys kept, and the object stored being the one the plan showed),
+//! and usage and history read as a person with `view` (and, for history, `services/proxy`).
 //!
 //! Needs a disposable cluster where the current kubeconfig context is cluster admin
 //! (CONTRIBUTING.md, "Tests"); the admin connection only prepares the namespace and the person.
@@ -605,9 +605,9 @@ mod tests {
             yaml.contains("password: aHVudGVyMg=="),
             "the YAML has the value"
         );
-        let (status, body) = plan_and_apply(&app, &ns, json!([{"op": "edit",
+        let plan = planned_and_applied(&app, &ns, json!([{"op": "edit",
             "resource": {"group": "", "version": "v1", "resource": "secrets"}, "name": "web", "yaml": yaml}])).await;
-        assert_eq!(status, StatusCode::OK, "{body}");
+        assert_eq!(plan["objects"][0]["write"]["type"], json!("patch"), "a YAML edit is compared with the Secret as read");
         let secret = api("", "v1", "Secret").get("web").await.unwrap();
         assert_eq!(
             secret.data.pointer("/data/password"),
@@ -707,10 +707,11 @@ mod tests {
         Api::namespaced_with(admin.clone(), ns, &resource)
     }
 
-    /// A Secret whose values the person cannot read cannot be changed through Zeabur, by key or
-    /// as YAML: the plan compares the edit with the Secret as read, and is refused with the
-    /// denied `get`, so no key is lost. Losing them was a bug once. A ConfigMap's keys can be
-    /// edited with `list` and `patch`, and its other keys stay.
+    /// A person who may `list` and `patch` a Secret but not `get` it can set and remove one key,
+    /// and the other keys stay: a key change is a merge patch of that key, which reads nothing.
+    /// Losing the other keys was a bug once. The plan shows no value. A YAML edit of that Secret
+    /// is refused with the denied `get`, as it is compared with the Secret as read. A ConfigMap's
+    /// keys can be edited with `list` and `patch` as well, and its other keys stay.
     ///
     /// Kubernetes has no right to see a Secret's keys without its values: `list` and `watch`
     /// return the values as `get` does [k8s-rbac-secrets]. Zeabur reads values only with `get`
@@ -732,7 +733,7 @@ mod tests {
         create(
             &secrets,
             json!({"apiVersion": "v1", "kind": "Secret", "metadata": {"name": "db", "namespace": ns},
-                   "stringData": {"password": "hunter2", "user": "admin"}}),
+                   "stringData": {"password": "hunter2", "user": "admin", "token": "t0k"}}),
         )
         .await;
         let config_maps = objects(&admin, &ns, "", "ConfigMap");
@@ -743,24 +744,36 @@ mod tests {
         )
         .await;
 
-        let key_edit = |kind: &str, name: &str| {
-            json!({"changes": [{"op": "data", "kind": kind, "name": name,
-                "changes": [{"op": "set", "key": "MODE", "value": "new"}]}]})
-        };
+        let plan = planned_and_applied(
+            &app,
+            &ns,
+            json!([{"op": "data", "kind": "Secret", "name": "db",
+                "changes": [{"op": "set", "key": "password", "value": "hunter3"}]}]),
+        )
+        .await;
+        for value in ["hunter3", "aHVudGVyMw==", "hunter2", "aHVudGVyMg=="] {
+            assert!(!plan.to_string().contains(value), "{value} in {plan}");
+        }
+        planned_and_applied(
+            &app,
+            &ns,
+            json!([{"op": "data", "kind": "Secret", "name": "db",
+                "changes": [{"op": "remove", "key": "token"}]}]),
+        )
+        .await;
+        let secret = secrets.get("db").await.unwrap();
+        assert_eq!(
+            secret.data["data"],
+            json!({"password": "aHVudGVyMw==", "user": "YWRtaW4="})
+        );
+
         let yaml_edit = json!({"changes": [{"op": "edit",
             "resource": {"group": "", "version": "v1", "resource": "secrets"}, "name": "db",
             "yaml": "apiVersion: v1\nkind: Secret\nmetadata: {name: db, labels: {tier: data}}\n\
                      type: Opaque\ndata:\n  password: bmV3\n"}]});
-        for request in [key_edit("Secret", "db"), yaml_edit] {
-            let (status, body) = post(&app, &format!("/api/v1/projects/{ns}/plan"), &request).await;
-            assert_eq!(status, StatusCode::FORBIDDEN, "{body}");
-            assert_eq!(body["denied"]["verb"], json!("get"), "{body}");
-        }
-        let secret = secrets.get("db").await.unwrap();
-        assert_eq!(
-            secret.data["data"],
-            json!({"password": "aHVudGVyMg==", "user": "YWRtaW4="})
-        );
+        let (status, body) = post(&app, &format!("/api/v1/projects/{ns}/plan"), &yaml_edit).await;
+        assert_eq!(status, StatusCode::FORBIDDEN, "{body}");
+        assert_eq!(body["denied"]["verb"], json!("get"), "{body}");
         let (status, body) = call(
             &app,
             "GET",
@@ -773,7 +786,8 @@ mod tests {
         let (status, body) = plan_and_apply(
             &app,
             &ns,
-            key_edit("ConfigMap", "settings")["changes"].clone(),
+            json!([{"op": "data", "kind": "ConfigMap", "name": "settings",
+                "changes": [{"op": "set", "key": "MODE", "value": "new"}]}]),
         )
         .await;
         assert_eq!(status, StatusCode::OK, "{body}");

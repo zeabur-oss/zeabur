@@ -1046,6 +1046,14 @@ pub enum Write {
         #[cfg_attr(feature = "openapi", schema(value_type = Vec<Object>))]
         operations: Vec<Value>,
     },
+    /// An RFC 7386 JSON Merge Patch that sets or removes keys of a Secret's `data` without
+    /// reading the Secret: it tests nothing, so the last write to a key wins.
+    #[serde(rename_all = "camelCase")]
+    MergePatch {
+        /// The patch, `{"data": {key: base64 or null}}`.
+        #[cfg_attr(feature = "openapi", schema(value_type = Object))]
+        body: Value,
+    },
     /// A `DELETE` with background propagation, refused (`409`) unless the object still has this
     /// `uid` and `resourceVersion`.
     #[serde(rename_all = "camelCase")]

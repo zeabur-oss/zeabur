@@ -7360,6 +7360,11 @@ export type PlannedWrite =
       type: "patch"
     }
   | {
+      /** The patch, `{"data": {key: base64 or null}}`. */
+      body: { [key: string]: unknown }
+      type: "mergePatch"
+    }
+  | {
       /** The object's `metadata.resourceVersion`. */
       resourceVersion: string
       type: "delete"

@@ -167,7 +167,8 @@ pub struct Input<'a> {
     /// The Gateways with listeners that accept an `HTTPRoute` from the project's namespace;
     /// `None` when they could not be read.
     pub gateways: Option<&'a [Attachable]>,
-    /// The values of the Secrets the request edits, by name, where the person could read them.
+    /// The values of the Secrets the request edits as YAML, by name, where the person could read
+    /// them.
     pub secret_values: &'a BTreeMap<String, BTreeMap<String, Vec<u8>>>,
     /// The time the plan is made, RFC 3339; the restart annotation's value.
     pub now: &'a str,
@@ -366,6 +367,9 @@ pub(crate) struct Planner<'a> {
     pub(crate) created: Vec<(Target, usize)>,
     /// The objects the request's `create` changes give, read before any change is planned.
     pub(crate) requested: Vec<Value>,
+    /// The `data` keys key edits set (base64) or remove (`null`) in a Secret, by object index:
+    /// written as a merge patch.
+    pub(crate) merges: BTreeMap<usize, serde_json::Map<String, Value>>,
 }
 
 /// The plan for `request` against `input`.
@@ -442,6 +446,7 @@ pub fn plan_with(
             .filter_map(crate::create::created_object)
             .filter_map(Result::ok)
             .collect(),
+        merges: BTreeMap::new(),
     };
     for index in crate::create::order(&request.changes) {
         let Some(change) = request.changes.get(index) else {
@@ -906,8 +911,10 @@ impl<'a> Planner<'a> {
         Ok(())
     }
 
-    /// Plans `edits` to the keys of ConfigMap or Secret `name`: the object as read with the keys
-    /// changed, compared as a YAML edit is. A Secret's set value is plain text.
+    /// Plans `edits` to the keys of ConfigMap or Secret `name`. A ConfigMap is the object as read
+    /// with the keys changed, compared as a YAML edit is. A Secret's keys go as a merge patch,
+    /// which needs no read of its values: the last write to a key wins. A Secret's set value is
+    /// plain text.
     #[expect(clippy::too_many_lines, reason = "one change kind, read top to bottom")]
     pub(crate) fn data(
         &mut self,
@@ -948,7 +955,18 @@ impl<'a> Planner<'a> {
         Self::refuse_managed(&meta, kind_name, name)?;
         let mut json_object = json_object?;
         if kind == DataKind::Secret {
-            self.with_secret_values(name, &mut json_object)?;
+            // The keys of a Secret are not read; a key to remove is shown as there before.
+            for edit in edits {
+                if edit.op == "remove"
+                    && let Some(object) = json_object.as_object_mut()
+                    && let Some(data) = object
+                        .entry("data")
+                        .or_insert_with(|| Value::Object(serde_json::Map::new()))
+                        .as_object_mut()
+                {
+                    data.entry(edit.key.clone()).or_insert_with(|| json!(""));
+                }
+            }
         }
         let target = Target {
             api_version: "v1".to_owned(),
@@ -959,6 +977,7 @@ impl<'a> Planner<'a> {
         let index = self.working(target, json_object);
         let current = self.current(index);
         let mut edited = current.clone();
+        let mut merge = serde_json::Map::new();
         for edit in edits {
             if edit.key.is_empty()
                 || !edit
@@ -999,8 +1018,10 @@ impl<'a> Planner<'a> {
                         DataKind::Secret => base64::engine::general_purpose::STANDARD.encode(value),
                     };
                     data.insert(edit.key.clone(), json!(stored));
+                    merge.insert(edit.key.clone(), json!(stored));
                 }
                 "remove" => {
+                    merge.insert(edit.key.clone(), Value::Null);
                     if data.remove(&edit.key).is_none() {
                         return Err(error(
                             ErrorKind::NotFound,
@@ -1020,7 +1041,15 @@ impl<'a> Planner<'a> {
         }
         for operation in edit_operations(&current, &edited) {
             self.claim(index, &operation.field, &operation.shown)?;
-            self.patch(index, operation.operations)?;
+            if kind == DataKind::ConfigMap {
+                self.patch(index, operation.operations)?;
+            }
+        }
+        if kind == DataKind::Secret {
+            if let Some(working) = self.objects.get_mut(index) {
+                working.current = edited;
+            }
+            self.merges.entry(index).or_default().extend(merge);
         }
         self.readers(kind, name);
         Ok(())
@@ -1765,7 +1794,18 @@ impl<'a> Planner<'a> {
             self.restart(&reference)?;
         }
         let mut objects = Vec::new();
-        for working in self.objects {
+        for (index, working) in self.objects.into_iter().enumerate() {
+            let merge = self.merges.remove(&index);
+            if merge.is_some() && (working.deleted || !working.operations.is_empty()) {
+                return Err(error(
+                    ErrorKind::BadRequest,
+                    "secret_changed_twice",
+                    format!(
+                        "Secret {} has key changes and another change; plan them apart.",
+                        working.target.name
+                    ),
+                ));
+            }
             let resource_version = working
                 .original
                 .as_ref()
@@ -1776,7 +1816,11 @@ impl<'a> Planner<'a> {
                 objects.push(crate::delete::deletion(working)?);
                 continue;
             }
-            let write = if working.original.is_none() {
+            let write = if let Some(data) = merge {
+                Write::MergePatch {
+                    body: json!({ "data": data }),
+                }
+            } else if working.original.is_none() {
                 Write::Create {
                     body: working.current.clone(),
                 }
@@ -1983,7 +2027,7 @@ pub fn versions(plan: &Plan) -> BTreeMap<String, String> {
                     (op.get("path")?.as_str()? == "/metadata/uid")
                         .then(|| format!("/metadata/uid={value}"))
                 }),
-                Write::Create { .. } => None,
+                Write::Create { .. } | Write::MergePatch { .. } => None,
             };
             pin.map(|pin| (format!("{}/{}", o.target.kind, o.target.name), pin))
         })
