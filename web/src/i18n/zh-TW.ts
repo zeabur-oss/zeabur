@@ -1715,7 +1715,8 @@ export const zhTW: Messages = {
   "title.renameDomain": (from: string, to: string) => `${from} → ${to}`,
   "title.removeDomain": (host: string) => `移除 ${host}`,
   "yaml.edit": "編輯",
-  "yaml.editSecret": "data 底下的值都用 base64 編碼。想直接輸入文字，就寫在 stringData 底下。",
+  "yaml.editSecret":
+    "data 底下的值都用 base64 編碼，不接受 stringData。想直接輸入文字，請從服務的變數編輯這個機密變數。",
   "yaml.notEditable": "這類物件由 Kubernetes 自行管理，要修改請編輯擁有它的物件。",
   "title.editYaml": (name: string) => `編輯 ${name}`,
   "title.delete": (kind: string, name: string) => `刪除 ${kind} ${name}`,

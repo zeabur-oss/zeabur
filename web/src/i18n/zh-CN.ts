@@ -1712,7 +1712,8 @@ export const zhCN: Messages = {
   "title.renameDomain": (from: string, to: string) => `${from} → ${to}`,
   "title.removeDomain": (host: string) => `移除 ${host}`,
   "yaml.edit": "编辑",
-  "yaml.editSecret": "data 下的值都用 base64 编码。想直接输入文字，就写在 stringData 下。",
+  "yaml.editSecret":
+    "data 下的值都用 base64 编码，不接受 stringData。想直接输入文字，请从服务的变量编辑这个机密变量。",
   "yaml.notEditable": "这类对象由 Kubernetes 自行管理，要修改请编辑拥有它的对象。",
   "title.editYaml": (name: string) => `编辑 ${name}`,
   "title.delete": (kind: string, name: string) => `删除 ${kind} ${name}`,
