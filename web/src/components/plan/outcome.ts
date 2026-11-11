@@ -8,7 +8,7 @@ import { toast } from "sonner"
 
 import { toProblem, type Schemas } from "@/api/client"
 import * as zeabur from "@/api/zeabur"
-import { queryClient } from "@/api/queries"
+import { refreshProject, refreshProjects } from "@/api/queries"
 import { failureOf } from "@/components/plan/describe"
 import { markCreated } from "@/lib/created"
 import type { PlanAsk } from "@/components/plan/planner"
@@ -58,10 +58,9 @@ export async function carryOut(confirmed: Confirmed): Promise<void> {
     const { applied } = await apply(project, token)
     const undo = confirmed.undo?.(applied)
     markCreated(ask.changes)
-    void queryClient.invalidateQueries({ queryKey: ["project", project] })
+    void refreshProject(project)
     // Adopting, letting go and the details change how the project list names it.
-    if (ask.changes.some((c) => namespaceOps.has(c.op)))
-      void queryClient.invalidateQueries({ queryKey: ["projects"] })
+    if (ask.changes.some((c) => namespaceOps.has(c.op))) void refreshProjects()
     confirmed.onApplied?.()
     if (ask.quiet) {
       toast.dismiss(id)
@@ -84,13 +83,13 @@ export async function carryOut(confirmed: Confirmed): Promise<void> {
     const problem = toProblem(error)
     if (problem.applied?.length && confirmed.onPartial) {
       toast.dismiss(id)
-      void queryClient.invalidateQueries({ queryKey: ["project", project] })
+      void refreshProject(project)
       confirmed.onPartial(problem)
       return
     }
     if (replansOn(problem)) {
       toast.dismiss(id)
-      void queryClient.invalidateQueries({ queryKey: ["project", project] })
+      void refreshProject(project)
       confirmed.reopen(ask, confirmed.reviewed ?? { objects: [] })
       return
     }
@@ -108,7 +107,7 @@ async function takeBack(
   const id = toast.loading(t("plan.applying"), { description: title })
   try {
     await planAndApply(project, undo)
-    void queryClient.invalidateQueries({ queryKey: ["project", project] })
+    void refreshProject(project)
     toast.success(t("toast.undone"), { id, description: title })
   } catch (error) {
     fail(id, t, locale, error)

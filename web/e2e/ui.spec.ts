@@ -918,11 +918,15 @@ test("a component is installed from the server, not from the panel", async ({ pa
   await expect(sheet.getByRole("button", { name: /install/i })).toHaveCount(0)
 })
 
+// `<namespace>/<name>` of a Deployment whose container has no shell.
 const noShell = env("ZEABUR_E2E_NO_SHELL")
 
 test("a service without a shell opens a debug terminal through a plan", async ({ page }) => {
   test.skip(!noShell, "ZEABUR_E2E_NO_SHELL is not set")
-  await page.goto(`${project}/services/Deployment/${noShell}?tab=logs`)
+  const [noShellNamespace, noShellName] = noShell.split("/")
+  await page.goto(
+    `/projects/${encodeURIComponent(noShellNamespace)}/services/Deployment/${noShellName}?tab=logs`,
+  )
   await page
     .getByRole("tabpanel", { name: "Logs" })
     .getByRole("button", { name: "Terminal", exact: true })

@@ -9,7 +9,7 @@ import XIcon from "~icons/ph/x"
 
 import { type Schemas } from "@/api/client"
 import * as zeabur from "@/api/zeabur"
-import { clusterQuery, domainsQuery, queryClient } from "@/api/queries"
+import { clusterQuery, domainsQuery, refresh, setQueryData } from "@/api/queries"
 import { CheckAgain, Records } from "@/components/domain-setup"
 import { GateTip, useHintGate } from "@/components/gate"
 import { Problem } from "@/components/problem"
@@ -46,8 +46,8 @@ export function DomainsSection() {
   const save = useMutation({
     mutationFn: async (suffixes: string[] | null) => await zeabur.setDomains({ suffixes }),
     onSuccess: (next) => {
-      queryClient.setQueryData(domainsQuery.queryKey, next)
-      void queryClient.invalidateQueries({ queryKey: clusterQuery.queryKey, exact: true })
+      setQueryData(domainsQuery, next)
+      void refresh(clusterQuery, true)
       setEditing(false)
       toast.success(t("domains.saved"))
     },

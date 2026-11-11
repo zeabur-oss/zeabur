@@ -94,7 +94,7 @@ aws s3 cp $endpoint --recursive --exclude '*' --include "\${latest%-summary.dfs}
 type Spec = Manifest
 type Store = NonNullable<Database["backups"]["store"]>
 
-const create = (body: Manifest): Change => ({ op: "create", object: body as Record<string, never> })
+const create = (body: Manifest): Change => ({ op: "create", object: { ...body } })
 
 /** What one engine adds to the copy: it edits `spec` in place and returns the writes. */
 interface Restoring {

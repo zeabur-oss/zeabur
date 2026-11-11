@@ -10,9 +10,9 @@ import { isStatus, type Schemas } from "@/api/client"
 import {
   applyClusterBackups,
   clusterBackupsQuery,
-  planClusterBackups,
+  clusterBackupsPlanQuery,
   projectsQuery,
-  queryClient,
+  refresh as refreshQuery,
 } from "@/api/queries"
 import { Ago } from "@/components/bits"
 import { FormField } from "@/components/form-field"
@@ -97,7 +97,7 @@ export const backupsRole: Role = {
 }
 
 const refresh = () => {
-  void queryClient.invalidateQueries({ queryKey: clusterBackupsQuery.queryKey })
+  void refreshQuery(clusterBackupsQuery)
 }
 
 export function BackupsPage() {
@@ -846,13 +846,7 @@ function PlanDialog({
   onClose: () => void
 }) {
   const t = useT()
-  const plan = useQuery({
-    queryKey: ["cluster-backups-plan", request],
-    queryFn: ({ signal }) => planClusterBackups(request, signal),
-    retry: false,
-    staleTime: Infinity,
-    gcTime: 0,
-  })
+  const plan = useQuery(clusterBackupsPlanQuery(request))
   const apply = useMutation({
     mutationFn: (token: string) => applyClusterBackups(token),
     onSuccess: () => {

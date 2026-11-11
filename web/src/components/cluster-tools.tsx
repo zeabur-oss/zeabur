@@ -4,7 +4,7 @@ import { useMutation, useQuery } from "@tanstack/react-query"
 
 import {
   applyClusterTools,
-  planClusterTools,
+  clusterToolsPlanQuery,
   refreshClusterTools,
   type ClusterToolsPlan,
 } from "@/api/cluster-tools"
@@ -21,13 +21,7 @@ export function ClusterToolsDialog({
 }) {
   const t = useT()
   // Planning writes nothing, so it is a query.
-  const plan = useQuery({
-    queryKey: ["cluster-tools-plan"],
-    queryFn: ({ signal }) => planClusterTools(signal),
-    retry: false,
-    staleTime: Infinity,
-    gcTime: 0,
-  })
+  const plan = useQuery(clusterToolsPlanQuery)
   const apply = useMutation({
     mutationFn: (token: string) => applyClusterTools(token),
     onSuccess: (applied) => {

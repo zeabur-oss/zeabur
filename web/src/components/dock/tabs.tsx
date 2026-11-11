@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react"
 import { isStatus } from "@/api/client"
 import * as zeabur from "@/api/zeabur"
 import { clusterToolsQuery, deleteClusterTools } from "@/api/cluster-tools"
-import { databasesQuery, debugQuery, projectQuery, queryClient, toolsQuery } from "@/api/queries"
+import { databasesQuery, debugQuery, projectQuery, refresh, toolsQuery } from "@/api/queries"
 import { ClusterToolsDialog } from "@/components/cluster-tools"
 import { Session } from "@/components/dock/session"
 import { LoadingRows } from "@/components/page"
@@ -385,7 +385,7 @@ export function ToolsPods({
         if (!isStatus(error, 404)) throw error
       }
     },
-    onSettled: () => queryClient.invalidateQueries({ queryKey: toolsOf(project).queryKey }),
+    onSettled: () => refresh(toolsOf(project)),
   })
   return (
     <section className="flex flex-col gap-2">

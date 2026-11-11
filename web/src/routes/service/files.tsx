@@ -1,4 +1,4 @@
-import { queryOptions, useQuery, useQueryClient } from "@tanstack/react-query"
+import { useQuery } from "@tanstack/react-query"
 import { lazy, Suspense, useDeferredValue, useRef, useState, type ReactNode } from "react"
 import ArrowUpIcon from "~icons/ph/arrow-up"
 import CaretRightIcon from "~icons/ph/caret-right"
@@ -28,6 +28,7 @@ import {
   type Schemas,
 } from "@/api/client"
 import * as zeabur from "@/api/zeabur"
+import { filesQuery, listQuery, previewQuery, refreshFiles, type Place } from "@/api/files"
 import { debugQuery, whoamiQuery } from "@/api/queries"
 import { REQUEST_HEADERS } from "@/auth/session"
 import { Ago, Hint } from "@/components/bits"
@@ -67,14 +68,6 @@ type Mount = Schemas.FileMount
 type Entry = Schemas.FileEntry
 type Kind = Schemas.FileMountKind
 
-/** Where the calls go: the pod, its container, and the debug container that reads for it. */
-interface Place {
-  project: string
-  pod: string
-  container: string
-  via?: string
-}
-
 const base = (p: Place) =>
   `/api/v1/projects/${encodeURIComponent(p.project)}/pods/${encodeURIComponent(p.pod)}/files`
 
@@ -86,41 +79,6 @@ const query = (p: Place, extra: Record<string, string | undefined>) => {
 }
 
 const contentUrl = (p: Place, path: string) => `${base(p)}/content?${query(p, { path })}`
-
-const filesKey = (project: string, pod: string) => ["project", project, "files", pod]
-
-const filesQuery = (project: string, pod: string, container: string) =>
-  queryOptions({
-    queryKey: [...filesKey(project, pod), container],
-    queryFn: async ({ signal }) => await zeabur.getFiles(project, pod, { container }, { signal }),
-    staleTime: 0,
-  })
-
-const listQuery = (p: Place, path: string, filter: string) =>
-  queryOptions({
-    queryKey: [...filesKey(p.project, p.pod), p.container, p.via, "list", path, filter],
-    queryFn: async ({ signal }) =>
-      await zeabur.listFiles(
-        p.project,
-        p.pod,
-        { container: p.container, via: p.via, path, filter: filter || undefined },
-        { signal },
-      ),
-    staleTime: 5_000,
-  })
-
-const previewQuery = (p: Place, path: string) =>
-  queryOptions({
-    queryKey: [...filesKey(p.project, p.pod), p.container, p.via, "preview", path],
-    queryFn: async ({ signal }) =>
-      await zeabur.previewFile(
-        p.project,
-        p.pod,
-        { container: p.container, via: p.via, path },
-        { signal },
-      ),
-    staleTime: 0,
-  })
 
 const join = (folder: string, name: string) => (folder === "/" ? `/${name}` : `${folder}/${name}`)
 const parentOf = (path: string) => path.slice(0, path.lastIndexOf("/")) || "/"
@@ -1022,11 +980,6 @@ function Preview({ place, path, onClose }: { place: Place; path: string; onClose
   )
 }
 
-function useRefresh(place: Place) {
-  const client = useQueryClient()
-  return () => client.invalidateQueries({ queryKey: filesKey(place.project, place.pod) })
-}
-
 /** A confirmation: what happens, the warning that goes with the mount, and the button that does it. */
 function Confirm({
   title,
@@ -1084,7 +1037,7 @@ function Confirm({
 
 /** Runs a write once; keeps its problem for the dialog to show. */
 function useWrite(place: Place, onDone: () => void) {
-  const refresh = useRefresh(place)
+  const refresh = () => refreshFiles(place.project, place.pod)
   const [busy, setBusy] = useState(false)
   const [problem, setProblem] = useState<ProblemBody>()
   const run = async (write: () => Promise<unknown>) => {
@@ -1342,7 +1295,7 @@ function UploadDialog({
 }) {
   const t = useT()
   const size = useSize()
-  const refresh = useRefresh(place)
+  const refresh = () => refreshFiles(place.project, place.pod)
   const listed = useQuery(listQuery(place, folder, "")).data?.items ?? []
   const existing = new Set(listed.map((e) => e.name))
   const replacing = chosen.filter((f) => existing.has(f.name))
