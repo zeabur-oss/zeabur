@@ -1,6 +1,8 @@
-//! An in-memory [`Cluster`] for tests: fixed objects, and the person's rights as RBAC rules
-//! ([`Grants`]) that a test can change at any time, as a cluster administrator does. Reviews,
-//! writes, dry runs and commands in a pod are all decided from those rules.
+//! An in-memory [`Cluster`] for tests.
+//!
+//! It holds fixed objects and the person's rights as RBAC rules ([`Grants`]) that a test can
+//! change at any time, as a cluster administrator does. Reviews, writes, dry runs and commands in
+//! a pod are all decided from those rules.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::{Arc, Mutex, MutexGuard};
