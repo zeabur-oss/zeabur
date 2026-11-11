@@ -43,7 +43,7 @@ use zeabur_modules::velero::{self, cluster as v};
 
 use crate::cluster::restore_copy::{self, routes};
 use crate::cluster::{backup_download, s3_destinations};
-use crate::error::{ApiError, get_read, list_read, read_problem};
+use crate::error::{ApiError, get_read, list_read, read_problem, write_refused};
 use crate::extract::Json;
 use crate::handlers::{AppState, Person};
 use crate::plan_token::{self as token, LIFETIME_SECONDS, TokenError};
@@ -485,8 +485,8 @@ pub(crate) async fn get(Person(cluster): Person) -> Result<Json<ClusterBackups>,
     let keys_from = keys_from(cluster, &namespace, &locations).await;
     let mut schedules: Vec<v::ScheduleView> = schedules.iter().map(v::schedule).collect();
     schedules.sort_by(|a, b| (!a.zeabur, &a.name).cmp(&(!b.zeabur, &b.name)));
-    let can_change = may_create(cluster, "schedules", &namespace).await;
-    let can_restore = may_create(cluster, "restores", &namespace).await;
+    let can_change = may_create(cluster, GROUP, "schedules", &namespace).await;
+    let can_restore = may_create(cluster, GROUP, "restores", &namespace).await;
     Ok(Json(ClusterBackups {
         state: ProviderState::Installed,
         namespace,
@@ -502,9 +502,14 @@ pub(crate) async fn get(Person(cluster): Person) -> Result<Json<ClusterBackups>,
     }))
 }
 
-async fn may_create(cluster: &dyn Cluster, resource: &str, namespace: &str) -> Permission {
+async fn may_create(
+    cluster: &dyn Cluster,
+    group: &str,
+    resource: &str,
+    namespace: &str,
+) -> Permission {
     match cluster
-        .review_access(&right("create", resource, namespace, None))
+        .review_access(&Denied::new("create", group, resource).in_namespace(namespace))
         .await
     {
         Ok(true) => Permission::Allowed,
@@ -532,27 +537,6 @@ async fn keys_from(
 
 fn secrets() -> ResourceRef {
     ResourceRef::new("", "v1", "secrets", "Secret")
-}
-
-pub(crate) fn right(verb: &str, resource: &str, namespace: &str, name: Option<&str>) -> Denied {
-    let group = if resource == "secrets" { "" } else { GROUP };
-    right_in(group, verb, resource, namespace, name)
-}
-
-fn right_in(
-    group: &str,
-    verb: &str,
-    resource: &str,
-    namespace: &str,
-    name: Option<&str>,
-) -> Denied {
-    Denied {
-        verb: verb.to_owned(),
-        group: group.to_owned(),
-        resource: resource.to_owned(),
-        name: name.map(str::to_owned),
-        namespace: (!namespace.is_empty()).then(|| namespace.to_owned()),
-    }
 }
 
 /// One write of a plan.
@@ -1522,16 +1506,7 @@ async fn send(cluster: &dyn Cluster, write: &Planned, dry_run: bool) -> Result<(
             read_problem(
                 error,
                 &format!("{} {} in {}", target.kind, target.name, target.namespace),
-                right_in(
-                    target
-                        .api_version
-                        .split_once('/')
-                        .map_or("", |(group, _)| group),
-                    verb,
-                    &target.plural,
-                    &target.namespace,
-                    (write.action != BackupWriteAction::Create).then_some(target.name.as_str()),
-                ),
+                write_refused(target, verb),
             )
         })
 }

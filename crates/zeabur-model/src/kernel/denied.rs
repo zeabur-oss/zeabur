@@ -26,3 +26,31 @@ pub struct Denied {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub namespace: Option<String>,
 }
+
+impl Denied {
+    /// A request for `verb` on `resource` in `group`, with no object and no namespace.
+    #[must_use]
+    pub fn new(verb: &str, group: &str, resource: &str) -> Self {
+        Self {
+            verb: verb.to_owned(),
+            group: group.to_owned(),
+            resource: resource.to_owned(),
+            name: None,
+            namespace: None,
+        }
+    }
+
+    /// The same request for the object `name`.
+    #[must_use]
+    pub fn named(mut self, name: &str) -> Self {
+        self.name = Some(name.to_owned());
+        self
+    }
+
+    /// The same request in `namespace`; an empty one is cluster scope.
+    #[must_use]
+    pub fn in_namespace(mut self, namespace: &str) -> Self {
+        self.namespace = (!namespace.is_empty()).then(|| namespace.to_owned());
+        self
+    }
+}

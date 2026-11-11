@@ -60,6 +60,21 @@ pub(crate) fn review_refusal(what: &str, denied: Denied) -> ApiError {
     ApiError::from(problem)
 }
 
+/// The write `verb` refused for `target`: its group comes from the target's `apiVersion`, and
+/// kube-apiserver sees no name on a `create`.
+pub(crate) fn write_refused(target: &zeabur_kube::ObjectTarget, verb: &str) -> Denied {
+    let group = target
+        .api_version
+        .split_once('/')
+        .map_or("", |(group, _)| group);
+    let refused = Denied::new(verb, group, &target.plural).in_namespace(&target.namespace);
+    if verb == "create" {
+        refused
+    } else {
+        refused.named(&target.name)
+    }
+}
+
 /// A `list` of `resource` in `group` (empty for the core group), in `namespace` or, when that is
 /// `None`, across the cluster.
 pub(crate) fn list_read(group: &str, resource: &str, namespace: Option<&str>) -> Denied {

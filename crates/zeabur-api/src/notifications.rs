@@ -37,7 +37,7 @@ use zeabur_modules::alertmanager::{
     self as am, AlertmanagerChannel, AlertmanagerChannelSettings, AlertmanagerEvent,
 };
 
-use crate::error::{ApiError, get_read, list_read, read_problem};
+use crate::error::{ApiError, get_read, list_read, read_problem, write_refused};
 use crate::extract::{Json, Path};
 use crate::handlers::{AppState, Person};
 use crate::plan_token::{self as token, LIFETIME_SECONDS, TokenError};
@@ -234,31 +234,8 @@ fn conflict(detail: String) -> ApiError {
     ApiError::from(Problem::new(Kind::Conflict, detail))
 }
 
-fn right(verb: &str, resource: &str, namespace: &str, name: Option<&str>) -> Denied {
-    let group = match resource {
-        "secrets" => "",
-        "jobs" => "batch",
-        _ => am::CONFIGS.group,
-    };
-    Denied {
-        verb: verb.to_owned(),
-        group: group.to_owned(),
-        resource: resource.to_owned(),
-        name: name.map(str::to_owned),
-        namespace: Some(namespace.to_owned()),
-    }
-}
-
-async fn permission(
-    cluster: &dyn Cluster,
-    verb: &str,
-    resource: &str,
-    namespace: &str,
-) -> Permission {
-    match cluster
-        .review_access(&right(verb, resource, namespace, None))
-        .await
-    {
+async fn permission(cluster: &dyn Cluster, wanted: Denied) -> Permission {
+    match cluster.review_access(&wanted).await {
         Ok(true) => Permission::Allowed,
         Ok(false) => Permission::Denied,
         Err(_) => Permission::Unknown,
@@ -323,10 +300,22 @@ async fn answer(
             .ok()
             .map(|rules| rules.is_some());
     }
-    let configs = permission(cluster, "create", am::CONFIGS.resource, namespace).await;
-    let secrets = permission(cluster, "create", "secrets", namespace).await;
+    let configs = permission(
+        cluster,
+        Denied::new("create", am::CONFIGS.group, am::CONFIGS.resource).in_namespace(namespace),
+    )
+    .await;
+    let secrets = permission(
+        cluster,
+        Denied::new("create", "", "secrets").in_namespace(namespace),
+    )
+    .await;
     out.can_change = configs.and(secrets);
-    out.can_test = permission(cluster, "create", "jobs", namespace).await;
+    out.can_test = permission(
+        cluster,
+        Denied::new("create", "batch", "jobs").in_namespace(namespace),
+    )
+    .await;
     out.unreadable = unreadable;
     Ok(out)
 }
@@ -838,13 +827,7 @@ async fn send(cluster: &dyn Cluster, write: &Planned, dry_run: bool) -> Result<(
             read_problem(
                 error,
                 &format!("{} {} in {}", target.kind, target.name, target.namespace),
-                right(
-                    verb,
-                    &target.plural,
-                    &target.namespace,
-                    (write.action != NotificationWriteAction::Create)
-                        .then_some(target.name.as_str()),
-                ),
+                write_refused(target, verb),
             )
         })
 }

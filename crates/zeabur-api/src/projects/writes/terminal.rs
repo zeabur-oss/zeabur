@@ -154,16 +154,6 @@ pub(crate) async fn read_pod(
         .map_err(|e| ApiError::from(Problem::new(Kind::Internal, e.to_string())))
 }
 
-fn right(verb: &str, resource: &str, namespace: &str, name: Option<&str>) -> Denied {
-    Denied {
-        verb: verb.to_owned(),
-        group: String::new(),
-        resource: resource.to_owned(),
-        name: name.map(str::to_owned),
-        namespace: Some(namespace.to_owned()),
-    }
-}
-
 /// The rights of `wanted` the person lacks; none when all are granted or kube-apiserver would not
 /// say.
 pub(super) async fn denied(cluster: &dyn Cluster, wanted: Vec<Denied>) -> Vec<Denied> {
@@ -196,14 +186,17 @@ async fn debug_container(
             .map_err(plan_problem)?;
     let mut wanted = Vec::new();
     if !plan.objects.is_empty() {
-        wanted.push(right(
-            "patch",
-            "pods/ephemeralcontainers",
-            project,
-            Some(pod),
-        ));
+        wanted.push(
+            Denied::new("patch", "", "pods/ephemeralcontainers")
+                .in_namespace(project)
+                .named(pod),
+        );
     }
-    wanted.push(right("get", "pods/exec", project, Some(pod)));
+    wanted.push(
+        Denied::new("get", "", "pods/exec")
+            .in_namespace(project)
+            .named(pod),
+    );
     plan.warnings.extend(rights_missing(cluster, wanted).await);
     Ok(plan)
 }

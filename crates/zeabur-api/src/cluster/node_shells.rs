@@ -262,16 +262,6 @@ pub(crate) fn yaml(object: &Value) -> Option<String> {
     zeabur_graph::manifest::to_yaml(&zeabur_graph::manifest::clean(object)).ok()
 }
 
-fn right(verb: &str, group: &str, resource: &str, namespace: Option<&str>) -> Denied {
-    Denied {
-        verb: verb.to_owned(),
-        group: group.to_owned(),
-        resource: resource.to_owned(),
-        name: None,
-        namespace: namespace.map(str::to_owned),
-    }
-}
-
 /// Refused unless kube-apiserver says the person may do everything everywhere; `why` ends the
 /// refusal's sentence.
 pub(crate) async fn require_admin(
@@ -282,7 +272,7 @@ pub(crate) async fn require_admin(
     if crate::account::cluster_admin(cluster).await {
         return Ok(());
     }
-    let mut refusal = review_refusal(what, right("*", "*", "*", None));
+    let mut refusal = review_refusal(what, Denied::new("*", "*", "*"));
     format!("Only cluster administrators can use {what}: {why}").clone_into(&mut refusal.0.detail);
     Err(refusal)
 }
@@ -826,10 +816,9 @@ async fn apply_remove(cluster: &dyn Cluster, claims: Claims) -> Result<NodeShell
     if text(&found, "/metadata/uid") != claims.uid {
         return Err(moved(&format!("Pod {}", claims.pod)));
     }
-    let refused = Denied {
-        name: Some(claims.pod.clone()),
-        ..right("delete", "", "pods", Some(NAMESPACE))
-    };
+    let refused = Denied::new("delete", "", "pods")
+        .in_namespace(NAMESPACE)
+        .named(&claims.pod);
     for dry_run in [true, false] {
         send(
             cluster,
@@ -895,7 +884,7 @@ async fn apply_open(
         } else {
             "patch"
         };
-        let refused = right(verb, "", "namespaces", None);
+        let refused = Denied::new(verb, "", "namespaces");
         send(
             cluster,
             namespace_target(),
@@ -911,17 +900,12 @@ async fn apply_open(
         (
             pod_target(&pod),
             WriteBody::Create(shell::pod_body(&request)),
-            right("create", "", "pods", Some(NAMESPACE)),
+            Denied::new("create", "", "pods").in_namespace(NAMESPACE),
         ),
         (
             event_target(&pod),
             WriteBody::Create(shell::event_body(&request, &now.to_string())),
-            right(
-                "create",
-                "events.k8s.io",
-                "events",
-                Some(shell::EVENT_NAMESPACE),
-            ),
+            Denied::new("create", "events.k8s.io", "events").in_namespace(shell::EVENT_NAMESPACE),
         ),
     ];
     for (target, body, refused) in &writes {

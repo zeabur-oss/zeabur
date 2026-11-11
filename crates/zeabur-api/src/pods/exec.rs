@@ -387,13 +387,9 @@ pub(crate) fn outside_node_shells(namespace: &str) -> Result<(), ApiError> {
 
 /// `create` on `pods/exec`, which a terminal takes.
 pub(crate) fn exec_right(namespace: &str, pod: &str) -> Denied {
-    Denied {
-        verb: "create".to_owned(),
-        group: String::new(),
-        resource: "pods/exec".to_owned(),
-        name: Some(pod.to_owned()),
-        namespace: Some(namespace.to_owned()),
-    }
+    Denied::new("create", "", "pods/exec")
+        .in_namespace(namespace)
+        .named(pod)
 }
 
 /// R8: the one right a terminal needs, which an administrator can grant in this project alone;

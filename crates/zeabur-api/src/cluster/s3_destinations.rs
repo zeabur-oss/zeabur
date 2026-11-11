@@ -45,7 +45,7 @@ use zeabur_model::Origin;
 use zeabur_modules::velero::cluster as v;
 use zeabur_plan::{Change, CopyS3KeysChange, PlanRequest};
 
-use crate::error::{ApiError, get_read, list_read, read_problem};
+use crate::error::{ApiError, get_read, list_read, read_problem, write_refused};
 use crate::extract::Json;
 use crate::handlers::{AppState, Person};
 use crate::plan_token::{self as token, LIFETIME_SECONDS, TokenError};
@@ -243,18 +243,11 @@ fn invalid(detail: &str) -> ApiError {
     ApiError::from(Problem::new(Kind::Invalid, detail))
 }
 
-fn right(verb: &str, plural: &str, name: Option<&str>) -> Denied {
-    Denied {
-        verb: verb.to_owned(),
-        group: String::new(),
-        resource: plural.to_owned(),
-        name: name.map(str::to_owned),
-        namespace: Some(NAMESPACE.to_owned()),
-    }
-}
-
 async fn permission(cluster: &dyn Cluster, verb: &str, plural: &str) -> Permission {
-    match cluster.review_access(&right(verb, plural, None)).await {
+    match cluster
+        .review_access(&Denied::new(verb, "", plural).in_namespace(NAMESPACE))
+        .await
+    {
         Ok(true) => Permission::Allowed,
         Ok(false) => Permission::Denied,
         Err(_) => Permission::Unknown,
@@ -1016,12 +1009,7 @@ async fn send(cluster: &dyn Cluster, write: &Planned, dry_run: bool) -> Result<(
         S3DestinationWriteAction::Delete => "delete",
     };
     let target = &write.target;
-    let mut denied = right(
-        verb,
-        &target.plural,
-        (write.action != S3DestinationWriteAction::Create).then_some(target.name.as_str()),
-    );
-    denied.namespace = (!target.namespace.is_empty()).then(|| target.namespace.clone());
+    let denied = write_refused(target, verb);
     cluster.write(&request).await.map(|_| ()).map_err(|error| {
         read_problem(
             error,

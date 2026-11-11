@@ -203,7 +203,7 @@ pub(crate) async fn fetch(
             read_problem(
                 e,
                 &format!("DownloadRequest {name} in {namespace}"),
-                super::backups::right("create", "downloadrequests", namespace, None),
+                crate::error::write_refused(&request, "create"),
             )
         })?;
     let url = signed_url(cluster, &request, namespace, &name).await?;

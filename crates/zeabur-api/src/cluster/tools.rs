@@ -123,20 +123,10 @@ impl Computed {
                     name: self.pod.clone(),
                 },
                 body.clone(),
-                right(&self.namespace),
+                Denied::new("create", "", "pods").in_namespace(&self.namespace),
             ));
         }
         writes
-    }
-}
-
-fn right(namespace: &str) -> Denied {
-    Denied {
-        verb: "create".to_owned(),
-        group: String::new(),
-        resource: "pods".to_owned(),
-        name: None,
-        namespace: Some(namespace.to_owned()),
     }
 }
 
