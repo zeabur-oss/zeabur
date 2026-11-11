@@ -46,7 +46,9 @@ const refused: ProjectStorage = {
   classes: [],
   unreadable: [
     {
-      resource: "storageclasses.storage.k8s.io",
+      verb: "list",
+      group: "storage.k8s.io",
+      resource: "storageclasses",
       kubernetes: { code: 403, reason: "Forbidden", message: "forbidden" },
     },
   ],
