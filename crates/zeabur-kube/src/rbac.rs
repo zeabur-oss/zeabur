@@ -84,6 +84,33 @@ impl Attributes {
         self
     }
 
+    /// The verb.
+    #[must_use]
+    pub fn verb(&self) -> &str {
+        &self.verb
+    }
+
+    /// The API group.
+    #[must_use]
+    pub fn group(&self) -> &str {
+        &self.group
+    }
+
+    /// The resource, with its subresource (`pods/log`).
+    #[must_use]
+    pub fn resource(&self) -> String {
+        self.subresource.as_ref().map_or_else(
+            || self.resource.clone(),
+            |sub| format!("{}/{sub}", self.resource),
+        )
+    }
+
+    /// The object's name, when the request carries one.
+    #[must_use]
+    pub fn name(&self) -> Option<&str> {
+        self.name.as_deref()
+    }
+
     pub(crate) const fn is_well_formed(&self) -> bool {
         self.well_formed
     }

@@ -181,7 +181,7 @@ mod tests {
     async fn a_person_who_may_not_patch_nodes_is_refused() {
         let cluster = cluster();
         cluster.update(|s| {
-            s.forbidden_writes.insert("Node/vps-3".to_owned());
+            s.refuse_writes("Node/vps-3");
         });
         let app = app(&cluster);
         let planned = plan(&app, "cordon").await;

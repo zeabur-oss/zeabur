@@ -9,7 +9,7 @@ mod tests {
     use serde_json::{Value, json};
     use zeabur_api::Settings;
     use zeabur_kube::k8s_openapi::api::core::v1::Namespace;
-    use zeabur_kube::memory::{MemoryCluster, State};
+    use zeabur_kube::memory::{Grants, MemoryCluster, State};
     use zeabur_kube::{AccessRule, AccessRules, Identity};
 
     use crate::common::{app, send};
@@ -39,7 +39,7 @@ mod tests {
         }
     }
 
-    fn cluster(access_rules: BTreeMap<String, Option<AccessRules>>, admin: bool) -> MemoryCluster {
+    fn cluster(access_rules: &BTreeMap<String, Option<AccessRules>>, admin: bool) -> MemoryCluster {
         MemoryCluster::new(State {
             identity: Identity {
                 username: "zeabur:ada".to_owned(),
@@ -55,8 +55,23 @@ mod tests {
                 namespace("kube-system", true),
                 namespace("billing", true),
             ],
-            access_rules,
-            cluster_wide_denied: !admin,
+            grants: Grants {
+                cluster: if admin {
+                    AccessRules::everything()
+                } else {
+                    AccessRules::default()
+                },
+                in_namespace: access_rules
+                    .iter()
+                    .filter_map(|(namespace, rules)| Some((namespace.clone(), rules.clone()?)))
+                    .collect(),
+                failing_reviews: access_rules
+                    .iter()
+                    .filter(|(_, rules)| rules.is_none())
+                    .map(|(namespace, _)| namespace.clone())
+                    .collect(),
+                ..Grants::default()
+            },
             ..State::default()
         })
     }
@@ -70,7 +85,7 @@ mod tests {
     #[tokio::test]
     async fn you_are_who_the_cluster_says_with_a_role_per_adopted_project() {
         let cluster = cluster(
-            BTreeMap::from([
+            &BTreeMap::from([
                 (
                     "web".to_owned(),
                     Some(rules(&["get", "list"], &["pods", "pods/log"])),
@@ -100,7 +115,7 @@ mod tests {
 
     #[tokio::test]
     async fn a_cluster_administrator_is_admin_everywhere() {
-        let cluster = cluster(BTreeMap::from([("web".to_owned(), None)]), true);
+        let cluster = cluster(&BTreeMap::from([("web".to_owned(), None)]), true);
         let body = account(&cluster).await;
         assert_eq!(body["clusterAdmin"], true);
         let roles: Vec<_> = body["projects"]
@@ -114,8 +129,8 @@ mod tests {
 
     #[tokio::test]
     async fn someone_who_may_read_nothing_still_learns_who_they_are() {
-        let cluster = cluster(BTreeMap::new(), false);
-        cluster.update(|s| s.forbid_everything = true);
+        let cluster = cluster(&BTreeMap::new(), false);
+        cluster.update(State::refuse_everything);
         let body = account(&cluster).await;
         assert_eq!(body["username"], "zeabur:ada");
         assert!(body.get("projects").is_none(), "{body}");
@@ -123,7 +138,7 @@ mod tests {
 
     #[tokio::test]
     async fn the_page_for_sign_in_methods_is_the_configured_one_else_the_issuers() {
-        let cluster = cluster(BTreeMap::new(), false);
+        let cluster = cluster(&BTreeMap::new(), false);
         let found = |url: Option<&str>, settings: Settings| {
             TestApi::new(&cluster)
                 .with_settings(settings)

@@ -179,7 +179,7 @@ mod tests {
     #[tokio::test]
     async fn someone_who_is_not_a_cluster_administrator_is_refused_plainly() {
         let cluster = cluster();
-        cluster.update(|s| s.cluster_wide_denied = true);
+        cluster.update(State::refuse_cluster_wide);
         let app = app(&cluster);
         let (status, refused) = plan(&app, &json!({"op": "open", "node": "vps-1"})).await;
         assert_eq!(status, StatusCode::FORBIDDEN, "{refused}");
@@ -443,7 +443,7 @@ mod tests {
 
         cluster.update(|s| {
             s.identity.username = PERSON.to_owned();
-            s.refused_rights.insert("create pods/exec".to_owned());
+            s.refuse_right("create", "pods/exec");
         });
         let mut socket = connect(address, &path).await;
         let error = frame(&mut socket).await;
@@ -452,8 +452,8 @@ mod tests {
         assert_eq!(error["problem"]["denied"]["resource"], "pods/exec");
 
         cluster.update(|s| {
-            s.refused_rights.clear();
-            s.cluster_wide_denied = true;
+            s.grants.revoked.clear();
+            s.refuse_cluster_wide();
         });
         let mut socket = connect(address, &path).await;
         let error = frame(&mut socket).await;
@@ -461,7 +461,7 @@ mod tests {
         assert_eq!(error["problem"]["denied"]["resource"], "*");
         assert!(pod_of(&cluster, &pod).is_some());
 
-        cluster.update(|s| s.cluster_wide_denied = false);
+        cluster.update(|s| s.grants.cluster = zeabur_kube::AccessRules::everything());
         let mut socket = connect(
             address,
             &format!("/api/v1/projects/{NAMESPACE}/pods/{pod}/exec?container=shell"),

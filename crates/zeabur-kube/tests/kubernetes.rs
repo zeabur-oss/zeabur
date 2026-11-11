@@ -644,6 +644,17 @@ mod tests {
 
     #[tokio::test]
     #[ignore = "needs a disposable cluster"]
+    async fn contract_the_rules_decide_reviews_writes_and_dry_runs_alike() {
+        let sandbox = Sandbox::new("zeabur-contract", rules()).await;
+        contract::the_rules_decide_reviews_writes_and_dry_runs_alike(
+            sandbox.user(),
+            sandbox.namespace(),
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    #[ignore = "needs a disposable cluster"]
     async fn contract_a_deletion_keeps_to_its_preconditions() {
         let sandbox = Sandbox::new("zeabur-contract", rules()).await;
         contract::a_deletion_keeps_to_its_preconditions(sandbox.user(), sandbox.namespace()).await;

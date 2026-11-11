@@ -423,7 +423,7 @@ mod tests {
     async fn a_refused_exec_names_the_right() {
         let cluster = cluster();
         cluster.update(|s| {
-            s.exec_refused.insert("shop/web-1".to_owned());
+            s.refuse_exec("shop", "web-1");
         });
         let (status, problem) = list(&app(&cluster), "/data").await;
         assert_eq!(status, StatusCode::FORBIDDEN);

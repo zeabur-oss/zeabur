@@ -1014,7 +1014,7 @@ mod tests {
 
         cluster.update(|s| {
             s.forbidden_in_namespaces.clear();
-            s.forbidden_namespaces.insert("zeabur".to_owned());
+            s.refuse_namespace("zeabur");
         });
         assert_eq!(
             status(&report(&cluster).await, "zeabur-identity-installed"),

@@ -190,7 +190,7 @@ mod tests {
     async fn an_export_without_exec_is_refused_with_the_right_it_needs() {
         let cluster = cluster();
         cluster.update(|s| {
-            s.exec_refused.insert("shop/maria-0".to_owned());
+            s.refuse_exec("shop", "maria-0");
         });
         let (status, body, _) = export(&app(&cluster), "mariadb/maria").await;
         assert_eq!(status, StatusCode::FORBIDDEN);

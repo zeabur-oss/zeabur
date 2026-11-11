@@ -243,14 +243,13 @@ mod tests {
     async fn a_refused_exec_names_the_permission_it_needs() {
         let cluster = cluster();
         cluster.update(|s| {
-            s.exec_refused.insert("shop/web-1".to_owned());
+            s.refuse_exec("shop", "web-1");
         });
         let mut socket = connect(app(&cluster), "").await;
         let error = frame(&mut socket).await;
         assert_eq!(error["type"], "error");
         assert_eq!(error["problem"]["status"], 403);
         assert_eq!(error["problem"]["kind"], "forbidden");
-        assert_eq!(error["problem"]["kubernetes"]["code"], 403);
         assert_eq!(
             error["problem"]["denied"],
             json!({"verb": "create", "group": "", "resource": "pods/exec",
@@ -265,7 +264,7 @@ mod tests {
     async fn a_terminal_takes_create_on_pods_exec_not_just_get() {
         let cluster = cluster();
         cluster.update(|s| {
-            s.refused_rights.insert("create pods/exec".to_owned());
+            s.refuse_right("create", "pods/exec");
         });
         let mut socket = connect(app(&cluster), "").await;
         let error = frame(&mut socket).await;

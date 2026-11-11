@@ -3224,7 +3224,11 @@ async fn main() -> std::io::Result<()> {
                     })
                 })
                 .collect();
-            s.exec_refused.extend(pods);
+            for pod in pods {
+                if let Some((namespace, pod)) = pod.split_once('/') {
+                    s.refuse_exec(namespace, pod);
+                }
+            }
         });
     }
     cluster.update(|s| {
@@ -3253,7 +3257,7 @@ async fn main() -> std::io::Result<()> {
     if std::env::var("ZEABUR_DEMO_FORBID")
         .is_ok_and(|list| list.split(',').any(|r| r == "namespaces"))
     {
-        cluster.update(|s| s.cluster_wide_denied = true);
+        cluster.update(State::refuse_cluster_wide);
     }
     if std::env::var_os("ZEABUR_DEMO_RKE2").is_some() {
         cluster.update(rke2);

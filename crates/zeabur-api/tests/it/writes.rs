@@ -500,7 +500,7 @@ mod tests {
         let app = app(&cluster);
         let planned = plan(&app, &set_env("web")).await;
         cluster.update(|s| {
-            s.forbidden_writes.insert("Deployment/web".to_owned());
+            s.refuse_writes("Deployment/web");
         });
         let (status, problem) = post(
             app.clone(),
@@ -533,7 +533,7 @@ mod tests {
     async fn a_refused_write_names_the_refused_request() {
         let cluster = cluster();
         cluster.update(|s| {
-            s.forbidden_writes.insert("Deployment/web".to_owned());
+            s.refuse_writes("Deployment/web");
         });
         let app = keyed(&cluster);
         let planned = plan(&app, &set_env("web")).await;
@@ -881,7 +881,7 @@ mod tests {
         let app = app(&cluster);
         let planned = plan(&app, &delete(&deployments(), "web", None)).await;
         cluster.update(|s| {
-            s.forbidden_writes.insert("Deployment/web".to_owned());
+            s.refuse_writes("Deployment/web");
         });
         let (status, problem) = post(
             app.clone(),

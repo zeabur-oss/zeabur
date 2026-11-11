@@ -267,7 +267,7 @@ stringData:
     async fn a_create_the_rights_refuse_is_refused_at_the_plan() {
         let cluster = cluster();
         cluster.update(|s| {
-            s.forbidden_writes.insert("Service/api".to_owned());
+            s.refuse_writes("Service/api");
         });
         let app = app(&cluster);
         let (status, problem) = plan(&app, &creates(&[DEPLOYMENT, SERVICE])).await;

@@ -7,6 +7,7 @@ mod contract;
 #[cfg(test)]
 mod tests {
     use zeabur_kube::memory::{MemoryCluster, State};
+    use zeabur_kube::{AccessRule, AccessRules};
 
     use super::contract;
 
@@ -14,6 +15,39 @@ mod tests {
 
     fn cluster() -> MemoryCluster {
         MemoryCluster::new(State::default())
+    }
+
+    /// The person of the contract: ConfigMaps in full, Deployments to get, create and patch, in
+    /// the namespace only.
+    fn bound() -> MemoryCluster {
+        let rule = |group: &str, resource: &str, verbs: &[&str]| AccessRule {
+            verbs: verbs.iter().map(|&v| v.to_owned()).collect(),
+            groups: vec![group.to_owned()],
+            resources: vec![resource.to_owned()],
+            names: Vec::new(),
+        };
+        let mut state = State::default();
+        state.refuse_cluster_wide();
+        state.bind(
+            NAMESPACE,
+            AccessRules {
+                rules: vec![
+                    rule(
+                        "",
+                        "configmaps",
+                        &["get", "list", "create", "patch", "delete"],
+                    ),
+                    rule("apps", "deployments", &["get", "create", "patch"]),
+                ],
+                incomplete: false,
+            },
+        );
+        MemoryCluster::new(state)
+    }
+
+    #[tokio::test]
+    async fn the_rules_decide_reviews_writes_and_dry_runs_alike() {
+        contract::the_rules_decide_reviews_writes_and_dry_runs_alike(&bound(), NAMESPACE).await;
     }
 
     #[tokio::test]

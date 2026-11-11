@@ -895,7 +895,7 @@ mod tests {
         }
 
         cluster.update(|s| {
-            s.forbidden_namespaces.insert("shop".to_owned());
+            s.refuse_namespace("shop");
         });
         let (status, ..) = call(app(&cluster), "GET", "/api/v1/projects/shop/objects").await;
         assert_eq!(status, StatusCode::FORBIDDEN);
@@ -947,7 +947,7 @@ mod tests {
         assert_eq!(status, StatusCode::OK);
 
         cluster.update(|s| {
-            s.forbidden_namespaces.insert("shop".to_owned());
+            s.refuse_namespace("shop");
         });
         let (status, _, body) = call(app(&cluster), "GET", "/api/v1/projects/shop").await;
         assert_eq!(status, StatusCode::FORBIDDEN);
@@ -970,7 +970,7 @@ mod tests {
     #[tokio::test]
     async fn without_namespace_listing_the_person_is_told_how_to_go_on() {
         let cluster = cluster();
-        cluster.update(|s| s.forbid_everything = true);
+        cluster.update(State::refuse_everything);
         let (status, _, body) = call(app(&cluster), "GET", "/api/v1/projects").await;
         assert_eq!(status, StatusCode::FORBIDDEN);
         let problem = json(&body);

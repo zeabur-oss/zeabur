@@ -153,7 +153,7 @@ mod tests {
     async fn a_refused_patch_names_the_right_to_ask_for() {
         let cluster = cluster();
         cluster.update(|s| {
-            s.forbidden_writes.insert("Namespace/shop".to_owned());
+            s.refuse_writes("Namespace/shop");
         });
         let app = app(&cluster);
         let (status, namespace) = send(&app, "GET", "/api/v1/projects/shop/namespace", None).await;
@@ -200,8 +200,7 @@ mod tests {
     async fn adopting_needs_the_manage_verb_only_where_the_policy_guards_the_labels() {
         let cluster = cluster();
         cluster.update(|s| {
-            s.access_rules
-                .insert("shop".to_owned(), Some(developer_rules()));
+            s.bind("shop", developer_rules());
         });
         let uri = "/api/v1/projects/shop/namespace";
         let (status, guarded) = send(
@@ -249,7 +248,7 @@ mod tests {
         cluster.update(|s| {
             let mut manager = developer_rules();
             manager.rules[0].verbs.push("zeabur-manage".to_owned());
-            s.access_rules.insert("shop".to_owned(), Some(manager));
+            s.bind("shop", manager);
         });
         let (_, manager) = send(
             &TestApi::new(&cluster)
@@ -271,7 +270,7 @@ mod tests {
                 resources: vec!["deployments".to_owned()],
                 names: vec!["web".to_owned()],
             });
-            s.access_rules.insert("shop".to_owned(), Some(named));
+            s.bind("shop", named);
         });
         let (_, named) = send(
             &TestApi::new(&cluster)
@@ -332,7 +331,7 @@ mod tests {
         );
 
         cluster.update(|s| {
-            s.forbidden_writes.insert("Namespace/shop".to_owned());
+            s.refuse_writes("Namespace/shop");
         });
         let (status, problem) = plan_and_apply(
             &app,
@@ -376,8 +375,7 @@ mod tests {
         let app = app(&cluster);
 
         cluster.update(|s| {
-            s.access_rules
-                .insert("shop".to_owned(), Some(viewer_rules()));
+            s.bind("shop", viewer_rules());
         });
         let (status, viewer) = send(&app, "GET", uri, None).await;
         assert_eq!(status, StatusCode::OK, "{viewer}");
@@ -398,7 +396,7 @@ mod tests {
                 ),
                 rule(&["create", "update", "patch", "delete"], "", &["services"]),
             ]);
-            s.access_rules.insert("shop".to_owned(), Some(developer));
+            s.bind("shop", developer);
         });
         let (_, developer) = send(&app, "GET", uri, None).await;
         assert_eq!(developer["role"], "developer");
@@ -423,14 +421,14 @@ mod tests {
         cluster.update(|s| {
             let mut incomplete = viewer_rules();
             incomplete.incomplete = true;
-            s.access_rules.insert("shop".to_owned(), Some(incomplete));
+            s.bind("shop", incomplete);
         });
         let (_, incomplete) = send(&app, "GET", uri, None).await;
         assert_eq!(incomplete["can"]["deploy"], "unknown");
         assert_eq!(incomplete["role"], "viewer");
 
         cluster.update(|s| {
-            s.access_rules.insert("shop".to_owned(), None);
+            s.fail_review("shop");
         });
         let (status, failed) = send(&app, "GET", uri, None).await;
         assert_eq!(status, StatusCode::OK, "{failed}");
@@ -452,9 +450,8 @@ mod tests {
             json!({"changeNodes": "allowed", "changeBackups": "allowed"})
         );
         cluster.update(|s| {
-            s.access_rules
-                .insert("kube-system".to_owned(), Some(AccessRules::everything()));
-            s.cluster_wide_denied = true;
+            s.bind("kube-system", AccessRules::everything());
+            s.refuse_cluster_wide();
         });
         let (_, bound_in_kube_system) = send(&app, "GET", "/api/v1/cluster", None).await;
         assert_eq!(
@@ -588,7 +585,7 @@ mod tests {
     #[tokio::test]
     async fn without_the_right_to_create_namespaces_the_list_says_so_and_the_apply_is_refused() {
         let cluster = cluster();
-        cluster.update(|s| s.cluster_wide_denied = true);
+        cluster.update(State::refuse_cluster_wide);
         let app = app(&cluster);
         let (_, list) = send(&app, "GET", "/api/v1/projects", None).await;
         assert_eq!(list["canCreate"], "denied", "{list}");

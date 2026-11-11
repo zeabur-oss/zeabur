@@ -144,7 +144,7 @@ mod tests {
             "zeaburctl"
         );
         cluster.update(|s| {
-            s.forbidden_namespaces.insert("zeabur".to_owned());
+            s.refuse_namespace("zeabur");
         });
         assert_eq!(
             about(&cluster, in_cluster()).await["installedBy"],

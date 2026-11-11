@@ -14,7 +14,7 @@ mod tests {
     use zeabur_kube::k8s_openapi::api::apps::v1::{DaemonSet, Deployment};
     use zeabur_kube::k8s_openapi::api::core::v1::Namespace;
     use zeabur_kube::k8s_openapi::api::networking::v1::Ingress;
-    use zeabur_kube::memory::{MemoryCluster, State};
+    use zeabur_kube::memory::{Grants, MemoryCluster, State};
     use zeabur_kube::{DynamicObject, NamespaceObjects, ServedResource};
 
     use crate::common::{app, send};
@@ -313,7 +313,7 @@ mod tests {
     async fn a_write_rbac_refuses_names_the_right_it_needs() {
         let cluster = velero(vec![location(), schedule()]);
         cluster.update(|s| {
-            s.forbidden_writes.insert("Schedule/zeabur".to_owned());
+            s.refuse_writes("Schedule/zeabur");
         });
         let app = app(&cluster);
         let (_, planned) = plan(&app, &json!({"op": "pause", "paused": true})).await;
@@ -381,7 +381,7 @@ mod tests {
         let cluster = MemoryCluster::new(State {
             served: served(),
             dynamic: vec![location(), schedule()],
-            refused_rights: ["create restores".to_owned()].into(),
+            grants: Grants::refusing_right("create", "restores"),
             ..State::default()
         });
         let (status, found) = send(&app(&cluster), "GET", "/api/v1/cluster/backups", None).await;

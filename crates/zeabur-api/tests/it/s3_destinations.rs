@@ -140,7 +140,7 @@ mod tests {
         let app = app(&cluster);
         register(&app).await;
         cluster.update(|s| {
-            s.forbidden_namespaces.insert(NAMESPACE.to_owned());
+            s.refuse_namespace(NAMESPACE);
         });
         let (status, problem) = send(
             &app,
@@ -230,7 +230,7 @@ mod tests {
         let app = app(&cluster);
         copied_twice(&app).await;
         cluster.update(|s| {
-            s.forbidden_namespaces.insert("velero".to_owned());
+            s.refuse_namespace("velero");
         });
         let (status, planned) = send(&app, "POST", &format!("{BASE}/plan"), Some(&rotate())).await;
         assert_eq!(status, StatusCode::OK, "{planned}");

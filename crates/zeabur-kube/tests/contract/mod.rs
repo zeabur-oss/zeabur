@@ -424,3 +424,67 @@ pub(crate) async fn a_deletion_keeps_to_its_preconditions(cluster: &impl Cluster
     let again = status(cluster.write(&delete(&uid, &version, false)).await);
     assert_eq!(again.0, 404, "{again:?}");
 }
+
+/// The person's rules decide a review, a write and a dry run alike: what the rules allow is
+/// allowed in all three, and what they do not is refused in all three, cluster-wide as well as in
+/// the namespace.
+pub(crate) async fn the_rules_decide_reviews_writes_and_dry_runs_alike(
+    cluster: &impl Cluster,
+    namespace: &str,
+) {
+    use zeabur_core::problem::Denied;
+
+    let review = |verb: &str, group: &str, resource: &str, ns: Option<&str>| Denied {
+        verb: verb.to_owned(),
+        group: group.to_owned(),
+        resource: resource.to_owned(),
+        name: None,
+        namespace: ns.map(str::to_owned),
+    };
+
+    let allowed = config_map(namespace, "decided");
+    assert!(
+        cluster
+            .review_access(&review("create", "", "configmaps", Some(namespace)))
+            .await
+            .expect("review")
+    );
+    let body = json!({"apiVersion": "v1", "kind": "ConfigMap",
+        "metadata": {"name": allowed.name}, "data": {"a": "1"}});
+    cluster
+        .write(&write(&allowed, WriteBody::Create(body.clone()), true))
+        .await
+        .expect("a dry run of what the rules allow");
+    cluster
+        .write(&write(&allowed, WriteBody::Create(body), false))
+        .await
+        .expect("a write of what the rules allow");
+
+    // The rules give no `delete` on Deployments.
+    let refused = deployment(namespace, "web");
+    assert!(
+        !cluster
+            .review_access(&review("delete", "apps", "deployments", Some(namespace)))
+            .await
+            .expect("review")
+    );
+    for dry_run in [true, false] {
+        let error = cluster
+            .write(&write(
+                &refused,
+                WriteBody::Delete(Preconditions::default()),
+                dry_run,
+            ))
+            .await
+            .expect_err("a delete the rules do not allow");
+        assert_eq!(error.code(), Some(403), "dry run: {dry_run}");
+    }
+
+    // The rules bind the person in the namespace, not in the cluster.
+    assert!(
+        !cluster
+            .review_access(&review("patch", "", "nodes", None))
+            .await
+            .expect("review")
+    );
+}

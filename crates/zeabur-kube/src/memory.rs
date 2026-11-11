@@ -1,5 +1,6 @@
-//! An in-memory [`Cluster`] for tests: fixed objects, and refusals that can be switched on at
-//! any time, as when a cluster administrator removes a person's rights.
+//! An in-memory [`Cluster`] for tests: fixed objects, and the person's rights as RBAC rules
+//! ([`Grants`]) that a test can change at any time, as a cluster administrator does. Reviews,
+//! writes, dry runs and commands in a pod are all decided from those rules.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::{Arc, Mutex, MutexGuard};
@@ -24,18 +25,19 @@ use zeabur_core::json_patch::apply_patch;
 use zeabur_core::problem::{Denied, KubernetesStatus};
 
 mod files;
+mod grants;
 
 pub use files::{MemoryFiles, MemoryNode};
+pub use grants::{Grants, Revocation};
 
-use crate::objects::{
-    AccessRule, AccessRules, ResourceRef, ServedResource, hide_metadata, hide_secret_values,
-};
+use crate::objects::{AccessRules, ResourceRef, ServedResource, hide_metadata, hide_secret_values};
 use crate::port::{
     Answer, Cluster, ClusterError, ClusterEvents, ClusterFacts, ClusterPods, ExecRequest,
     ExecSession, ExecStream, ExitStatus, Identity, LogLines, LogOptions, NamespaceObjects,
     ObjectTarget, Preconditions, SecretSummary, ServicePort, TerminalSize, Unreadable, WriteBody,
     WriteRequest, Written,
 };
+use crate::rbac::Attributes;
 
 /// What the in-memory cluster holds.
 #[derive(Debug, Default)]
@@ -62,8 +64,6 @@ pub struct State {
     /// The body of `/readyz?verbose`; empty answers three passing checks. Refused with `403`
     /// when `forbidden_resources` holds `/readyz`.
     pub readyz: String,
-    /// When set, every call is refused with `403 Forbidden`.
-    pub forbid_everything: bool,
     /// When set, every call is refused with `429 Too Many Requests` and a `Retry-After` of this
     /// many seconds, as API Priority and Fairness answers under load [k8s-apf].
     ///
@@ -72,8 +72,6 @@ pub struct State {
     /// Resources (`nodes.metrics.k8s.io`) whose lists never answer, as an aggregated API whose
     /// backend kube-apiserver cannot reach.
     pub hanging: BTreeSet<String>,
-    /// Namespaces whose objects are refused with `403 Forbidden`.
-    pub forbidden_namespaces: BTreeSet<String>,
     /// How many times a Secret's values were read.
     pub secret_reads: usize,
     /// Nodes.
@@ -95,8 +93,6 @@ pub struct State {
     pub writes: Vec<WriteRequest>,
     /// How many dry-run writes were made.
     pub dry_runs: usize,
-    /// Objects whose writes are refused with `403 Forbidden`, as `kind/name`.
-    pub forbidden_writes: BTreeSet<String>,
     /// Objects whose writes, dry runs included, admission refuses after the person's rights
     /// allowed them, as `kind/name`, with kube-apiserver's answer: a quota's `403` or a
     /// webhook's `400` or `403`.
@@ -114,8 +110,6 @@ pub struct State {
     pub storage_classes: Option<Vec<StorageClass>>,
     /// How many `metadata.uid` values creations were given.
     pub uids: u64,
-    /// Pods, as `namespace/pod`, in which running a command is refused with `403 Forbidden`.
-    pub exec_refused: BTreeSet<String>,
     /// Pods, as `namespace/pod`, whose image has no shell, as a distroless image; their ephemeral
     /// containers have one.
     pub without_shell: BTreeSet<String>,
@@ -137,16 +131,9 @@ pub struct State {
     /// Every path and query asked of a Service through the proxy, as
     /// `namespace/name:port/path?query`, in order.
     pub proxy_requests: Vec<String>,
-    /// What a `SelfSubjectRulesReview` answers in a namespace, instead of rules that follow the
-    /// refusals above; `None`: the review fails with `500`.
-    pub access_rules: BTreeMap<String, Option<AccessRules>>,
-    /// Every cluster-wide `SelfSubjectAccessReview` (one without a namespace) answers no, and
-    /// creating a Namespace is refused.
-    pub cluster_wide_denied: bool,
-    /// Rights every `SelfSubjectAccessReview` answers no to, as `verb resource` (`create
-    /// pods/exec`); the calls themselves are not refused, as on a cluster that checks fewer
-    /// verbs.
-    pub refused_rights: BTreeSet<String>,
+    /// What the person may do. Reviews, writes, dry runs and commands in a pod are all decided by
+    /// these rules.
+    pub grants: Grants,
 }
 
 /// A command [`Cluster::run`] ran.
@@ -248,6 +235,78 @@ fn in_namespace<T: Serialize>(
 }
 
 impl State {
+    /// The person may do nothing: every call is refused with `403 Forbidden`.
+    pub fn refuse_everything(&mut self) {
+        self.grants = Grants::nothing();
+    }
+
+    /// The person has no rights in `namespace`: its objects are refused with `403 Forbidden`.
+    pub fn refuse_namespace(&mut self, namespace: &str) {
+        self.grants
+            .in_namespace
+            .insert(namespace.to_owned(), AccessRules::default());
+    }
+
+    /// The person has no rights outside a namespace: cluster-wide reviews answer no, and so does
+    /// creating a Namespace.
+    pub fn refuse_cluster_wide(&mut self) {
+        self.grants.cluster = AccessRules::default();
+    }
+
+    /// The person's role was written without `verb` on `resource` (`pods/exec`).
+    pub fn refuse_right(&mut self, verb: &str, resource: &str) {
+        self.grants.revoked.push(Revocation {
+            verbs: vec![verb.to_owned()],
+            resource: Some(resource.to_owned()),
+            ..Revocation::default()
+        });
+    }
+
+    /// Running a command in the pod `namespace/pod` is refused.
+    pub fn refuse_exec(&mut self, namespace: &str, pod: &str) {
+        self.grants.revoked.push(Revocation {
+            verbs: vec!["create".to_owned()],
+            resource: Some("pods/exec".to_owned()),
+            namespace: Some(namespace.to_owned()),
+            name: Some(pod.to_owned()),
+            ..Revocation::default()
+        });
+    }
+
+    /// Writes to the object `what` (`kind/name`) are refused with `403 Forbidden`.
+    pub fn refuse_writes(&mut self, what: &str) {
+        let (kind, name) = what.split_once('/').unwrap_or((what, ""));
+        let resource = builtin_resources()
+            .into_iter()
+            .chain(self.served.iter().cloned())
+            .find(|r| r.kind == kind)
+            .map_or_else(|| format!("{}s", kind.to_lowercase()), |r| r.resource);
+        self.grants.revoked.push(Revocation {
+            verbs: ["create", "update", "patch", "delete"]
+                .map(str::to_owned)
+                .to_vec(),
+            resource: Some(resource),
+            name: (!name.is_empty()).then(|| name.to_owned()),
+            subresources: true,
+            ..Revocation::default()
+        });
+    }
+
+    /// The person's rights in `namespace` are exactly `rules`, as a `RoleBinding` there gives them.
+    pub fn bind(&mut self, namespace: &str, rules: AccessRules) {
+        self.grants.in_namespace.insert(namespace.to_owned(), rules);
+    }
+
+    /// The rules review of `namespace` fails with `500`.
+    pub fn fail_review(&mut self, namespace: &str) {
+        self.grants.failing_reviews.push(namespace.to_owned());
+    }
+
+    /// Whether the person may make `request` in `namespace` (cluster-wide when `None`).
+    fn permits(&self, request: &Attributes, namespace: Option<&str>) -> bool {
+        self.grants.allows(request, namespace)
+    }
+
     /// What admission answers a write of `what` (`kind/name`), dry run or not.
     fn refusal(&self, what: &str, dry_run: bool) -> Option<KubernetesStatus> {
         self.admission_refusals
@@ -613,9 +672,7 @@ impl MemoryCluster {
                 ..KubernetesStatus::new(429, "TooManyRequests", "too many requests")
             }));
         }
-        if state.forbid_everything
-            || namespace.is_some_and(|n| state.forbidden_namespaces.contains(n))
-        {
+        if !state.grants.reaches(namespace) {
             return Err(forbidden(namespace.unwrap_or("the cluster")));
         }
         Ok(state)
@@ -774,7 +831,7 @@ impl Cluster for MemoryCluster {
             let key = format!("{namespace}/{pod}");
             let has_shell = {
                 let state = self.allowed(Some(namespace))?;
-                if state.exec_refused.contains(&key) {
+                if !state.permits(&exec_attributes(pod), Some(namespace)) {
                     return Err(forbidden(&format!("pods/exec {key}")));
                 }
                 let found = state.objects.get(namespace).and_then(|objects| {
@@ -851,7 +908,7 @@ impl Cluster for MemoryCluster {
         Box::pin(async move {
             let key = format!("{namespace}/{pod}");
             let mut state = self.allowed(Some(namespace))?;
-            if state.exec_refused.contains(&key) {
+            if !state.permits(&exec_attributes(pod), Some(namespace)) {
                 return Err(forbidden(&format!("pods/exec {key}")));
             }
             let exists = state.objects.get(namespace).is_some_and(|objects| {
@@ -895,7 +952,7 @@ impl Cluster for MemoryCluster {
             let key = format!("{namespace}/{pod}");
             let found = {
                 let mut state = self.allowed(Some(namespace))?;
-                if state.exec_refused.contains(&key) {
+                if !state.permits(&exec_attributes(pod), Some(namespace)) {
                     return Err(forbidden(&format!("pods/exec {key}")));
                 }
                 let found = state.objects.get(namespace).and_then(|objects| {
@@ -1087,40 +1144,26 @@ impl Cluster for MemoryCluster {
 
     fn access_rules<'a>(&'a self, namespace: &'a str) -> Answer<'a, AccessRules> {
         Box::pin(async move {
-            // The review itself is open to everyone; what it says follows this cluster's refusals.
-            // A Namespace whose writes are refused leaves the person reading everything in it.
-            let (refused, read_only) = {
-                let state = self.lock()?;
-                if let Some(rules) = state.access_rules.get(namespace) {
-                    return rules.clone().ok_or_else(|| {
-                        ClusterError::Status(KubernetesStatus::new(
-                            500,
-                            "InternalError",
-                            "the review failed",
-                        ))
-                    });
-                }
-                (
-                    state.forbid_everything || state.forbidden_namespaces.contains(namespace),
-                    state
-                        .forbidden_writes
-                        .contains(&format!("Namespace/{namespace}")),
+            // The review itself is open to everyone; what it says follows the person's rules. A
+            // Namespace whose writes are refused leaves the person reading everything in it.
+            let state = self.lock()?;
+            if state.grants.failing_reviews.iter().any(|n| n == namespace) {
+                return Err(ClusterError::Status(KubernetesStatus::new(
+                    500,
+                    "InternalError",
+                    "the review failed",
+                )));
+            }
+            let read_only = ["patch", "delete"].iter().any(|verb| {
+                state.grants.revokes(
+                    &Attributes::new(verb, "", "namespaces").named(namespace),
+                    Some(namespace),
                 )
-            };
-            Ok(if refused {
-                AccessRules::default()
-            } else if read_only {
-                AccessRules {
-                    rules: vec![AccessRule {
-                        verbs: vec!["get".to_owned(), "list".to_owned(), "watch".to_owned()],
-                        groups: vec!["*".to_owned()],
-                        resources: vec!["*".to_owned()],
-                        names: Vec::new(),
-                    }],
-                    incomplete: false,
-                }
+            });
+            Ok(if read_only {
+                Grants::read_only()
             } else {
-                AccessRules::everything()
+                state.grants.rules_in(Some(namespace)).clone()
             })
         })
     }
@@ -1232,18 +1275,18 @@ impl Cluster for MemoryCluster {
         Box::pin(async move {
             let target = &request.target;
             // kube-apiserver authorises a request for `namespaces/{name}` in namespace `name`
-            // (`RequestInfoFactory`, k8s.io/apiserver/pkg/endpoints/request/requestinfo.go).
-            let namespace = if target.kind == "Namespace" {
-                &target.name
+            // (`RequestInfoFactory`, k8s.io/apiserver/pkg/endpoints/request/requestinfo.go); a
+            // creation names nothing yet, so it is authorised cluster-wide.
+            let namespace = if creates_namespace(request) {
+                None
+            } else if target.kind == "Namespace" {
+                Some(target.name.as_str())
             } else {
-                &target.namespace
+                Some(target.namespace.as_str())
             };
-            let mut state = self.allowed(Some(namespace))?;
-            if state.cluster_wide_denied && creates_namespace(request) {
-                return Err(forbidden("namespaces"));
-            }
+            let mut state = self.allowed(namespace)?;
             let what = format!("{}/{}", target.kind, target.name);
-            if state.forbidden_writes.contains(&what) {
+            if !state.permits(&write_attributes(request), namespace) {
                 return Err(forbidden(&what));
             }
             if let Some(refusal) = state.refusal(&what, request.dry_run) {
@@ -1321,28 +1364,23 @@ impl Cluster for MemoryCluster {
 
     // ── Reads for releases, storage and YAML edits ───────────────────────────────────────────
 
-    /// Allowed unless every call is refused, the namespace is, the request is cluster-wide and
-    /// [`State::cluster_wide_denied`], it is among [`State::refused_rights`], or it names an
-    /// object whose writes are refused ([`State::forbidden_writes`]); admission refusals are
-    /// allowed, as on a cluster.
+    /// Allowed when the person's rules allow the request. Admission refusals are allowed, as on a
+    /// cluster.
     fn review_access<'a>(&'a self, request: &'a Denied) -> Answer<'a, bool> {
         Box::pin(async move {
             let state = self.lock()?;
-            let namespace = request.namespace.as_deref();
-            let refused_object = request.name.as_ref().is_some_and(|name| {
-                state.forbidden_writes.iter().any(|key| {
-                    key.rsplit_once('/')
-                        .is_some_and(|(_, refused)| refused == name)
-                })
-            });
-            let refused_right = state
-                .refused_rights
-                .contains(&format!("{} {}", request.verb, request.resource));
-            Ok(!(state.forbid_everything
-                || refused_right
-                || (namespace.is_none() && state.cluster_wide_denied)
-                || namespace.is_some_and(|n| state.forbidden_namespaces.contains(n))
-                || refused_object))
+            // kube-apiserver authorises `namespaces/{name}` in namespace `name`.
+            let namespace = if request.group.is_empty() && request.resource == "namespaces" {
+                request.namespace.as_deref().or(request.name.as_deref())
+            } else {
+                request.namespace.as_deref()
+            };
+            let attributes = Attributes::new(&request.verb, &request.group, &request.resource);
+            let attributes = match &request.name {
+                Some(name) => attributes.named(name),
+                None => attributes,
+            };
+            Ok(state.permits(&attributes, namespace))
         })
     }
 
@@ -1461,6 +1499,27 @@ where
 
 /// Puts `object` in `items` in place of the object called `name`, or after the others.
 /// A `POST` of a Namespace, which kube-apiserver authorises cluster-wide.
+fn exec_attributes(pod: &str) -> Attributes {
+    Attributes::new("create", "", "pods/exec").named(pod)
+}
+
+fn write_attributes(request: &WriteRequest) -> Attributes {
+    let target = &request.target;
+    let group = target
+        .api_version
+        .split_once('/')
+        .map_or("", |(group, _)| group);
+    let (verb, resource) = match &request.body {
+        WriteBody::Create(_) => ("create", target.plural.clone()),
+        WriteBody::Delete(_) => ("delete", target.plural.clone()),
+        WriteBody::JsonPatch(_) => ("patch", target.plural.clone()),
+        WriteBody::EphemeralContainers(_) => {
+            ("patch", format!("{}/ephemeralcontainers", target.plural))
+        }
+    };
+    Attributes::new(verb, group, &resource).named(&target.name)
+}
+
 fn creates_namespace(request: &WriteRequest) -> bool {
     request.target.kind == "Namespace" && matches!(request.body, WriteBody::Create(_))
 }
@@ -1766,7 +1825,7 @@ mod tests {
     #[tokio::test]
     async fn an_api_that_is_not_served_is_not_installed_even_when_everything_is_refused() {
         let cluster = cluster();
-        cluster.update(|s| s.forbid_everything = true);
+        cluster.update(State::refuse_everything);
         let plans = ResourceRef::new("upgrade.cattle.io", "v1", "plans", "Plan");
         assert_eq!(cluster.list_objects(&plans, None).await, Ok(None));
         let secrets = ResourceRef::new("", "v1", "secrets", "Secret");

@@ -415,7 +415,7 @@ mod tests {
     async fn someone_who_may_not_write_builder_system_cannot_start_the_flow() {
         let (cluster, app, _fake) = setup().await;
         cluster.update(|s| {
-            s.forbidden_namespaces.insert("builder-system".to_owned());
+            s.refuse_namespace("builder-system");
         });
         let request = json!({"name": "Zeabur shop", "redirectUrl":
             "https://zeabur.example.com/settings/github-app"});
@@ -430,7 +430,7 @@ mod tests {
         let (cluster, app, fake) = setup().await;
         made(&app, &fake).await;
         cluster.update(|s| {
-            s.forbidden_namespaces.insert("builder-system".to_owned());
+            s.refuse_namespace("builder-system");
         });
         let (status, found) = send(&app, "GET", BASE, None).await;
         assert_eq!(status, StatusCode::OK, "{found}");

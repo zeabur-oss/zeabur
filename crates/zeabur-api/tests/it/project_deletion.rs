@@ -5,7 +5,6 @@
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeSet;
 
     use axum::http::StatusCode;
     use serde_json::{Value, json};
@@ -169,7 +168,7 @@ mod tests {
     #[tokio::test]
     async fn without_the_right_to_delete_the_namespace_the_plan_says_so_and_the_apply_is_refused() {
         let cluster = cluster(namespace("shop", &json!({})));
-        cluster.update(|s| s.forbidden_writes = BTreeSet::from(["Namespace/shop".to_owned()]));
+        cluster.update(|s| s.refuse_writes("Namespace/shop"));
         let app = app(&cluster);
         let (status, plan) = send(
             &app,

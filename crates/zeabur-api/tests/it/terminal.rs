@@ -18,7 +18,7 @@ mod tests {
     use tokio_tungstenite::tungstenite::client::IntoClientRequest as _;
     use zeabur_api::Settings;
     use zeabur_kube::k8s_openapi::api::core::v1::{Namespace, Pod};
-    use zeabur_kube::memory::{MemoryCluster, State};
+    use zeabur_kube::memory::{Grants, MemoryCluster, State};
     use zeabur_kube::{Identity, NamespaceObjects, WriteBody};
 
     use crate::common::send;
@@ -67,7 +67,7 @@ mod tests {
                     ..NamespaceObjects::default()
                 },
             )]),
-            forbidden_namespaces: [TERMINALS.to_owned()].into(),
+            grants: Grants::refusing_namespace(TERMINALS),
             ..State::default()
         })
     }
@@ -87,7 +87,7 @@ mod tests {
                     ..NamespaceObjects::default()
                 },
             )]),
-            forbidden_namespaces: ["shop".to_owned()].into(),
+            grants: Grants::refusing_namespace("shop"),
             ..State::default()
         })
     }
@@ -280,7 +280,7 @@ mod tests {
     async fn a_refused_debug_container_names_the_right_it_needs() {
         let cluster = cluster();
         cluster.update(|state| {
-            state.forbidden_writes.insert("Pod/api-1".to_owned());
+            state.refuse_writes("Pod/api-1");
         });
         let app = local(&cluster);
         let (_, planned) = plan(&app, debug()).await;
@@ -437,7 +437,7 @@ mod tests {
     async fn without_the_right_to_run_commands_in_the_project_there_is_no_tools_pod() {
         let cluster = cluster();
         cluster.update(|s| {
-            s.refused_rights.insert("create pods/exec".to_owned());
+            s.refuse_right("create", "pods/exec");
         });
         let zeabur = zeabur();
         let app = signed(&cluster, &zeabur);
@@ -471,9 +471,7 @@ mod tests {
                 serde_json::from_value(json!("2026-10-21T00:10:00Z")).ok();
             pods.push(going);
             pods.push(tools_pod("zeabur-tools-kept", alice, "shop", "Failed"));
-            state
-                .forbidden_writes
-                .insert("Pod/zeabur-tools-kept".to_owned());
+            state.refuse_writes("Pod/zeabur-tools-kept");
         });
         let app = signed(&cluster, &zeabur);
         let (_, listed) = send(&app, "GET", "/api/v1/projects/shop/tools", None).await;

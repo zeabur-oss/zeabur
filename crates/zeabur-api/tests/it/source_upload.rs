@@ -279,7 +279,7 @@ mod tests {
         let (address, registry) = serve_registry().await;
         let cluster = cluster(&address, "u1");
         cluster.update(|s| {
-            s.forbidden_namespaces.insert("shop".to_owned());
+            s.refuse_namespace("shop");
         });
         let (status, _) = post(&app(&cluster), UPLOAD, vec![1; 10]).await;
         assert_eq!(status, StatusCode::FORBIDDEN);

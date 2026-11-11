@@ -179,7 +179,7 @@ mod tests {
     #[tokio::test]
     async fn someone_who_is_not_a_cluster_administrator_is_refused() {
         let cluster = cluster();
-        cluster.update(|s| s.cluster_wide_denied = true);
+        cluster.update(State::refuse_cluster_wide);
         let zeabur = zeabur();
         let app = signed(&cluster, &zeabur);
         let (status, refused) = plan(&app).await;

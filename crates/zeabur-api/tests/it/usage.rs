@@ -582,8 +582,7 @@ mod tests {
 
         // Who may change it is the cluster's decision.
         cluster.update(|s| {
-            s.forbidden_writes
-                .insert("ConfigMap/zeabur-settings".to_owned());
+            s.refuse_writes("ConfigMap/zeabur-settings");
         });
         let (status, problem) = call(
             &cluster,

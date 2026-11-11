@@ -14,7 +14,7 @@ mod tests {
     use sha2::{Digest as _, Sha256};
     use zeabur_api::images::Inspector;
     use zeabur_api::images::registry::{Answer, Get, Transport};
-    use zeabur_kube::memory::{MemoryCluster, State};
+    use zeabur_kube::memory::{Grants, MemoryCluster, State};
 
     use crate::common::send;
     use crate::support::TestApi;
@@ -112,10 +112,10 @@ mod tests {
                     "labels": {"kubernetes.io/arch": "arm64"}}}))
                 .unwrap(),
             ],
-            forbidden_namespaces: if forbidden {
-                ["shop".to_owned()].into()
+            grants: if forbidden {
+                Grants::refusing_namespace("shop")
             } else {
-                std::collections::BTreeSet::new()
+                Grants::default()
             },
             ..State::default()
         })

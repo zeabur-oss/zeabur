@@ -68,7 +68,7 @@ fn cluster(user: &str) -> MemoryCluster {
     });
     if !admin {
         cluster.update(|s| {
-            s.forbidden_writes.insert("Deployment/web".to_owned());
+            s.refuse_writes("Deployment/web");
             s.forbidden_resources.insert("nodes".to_owned());
         });
     }
