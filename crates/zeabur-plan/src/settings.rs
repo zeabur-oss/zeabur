@@ -946,6 +946,15 @@ impl<'a> Planner<'a> {
                 format!("Unable to read the YAML: {e}"),
             )
         })?;
+        // kube-apiserver folds `stringData` into `data` and never stores it, so it has no
+        // counterpart in the object as read to compare with, nor an owner to check.
+        if edited.get("stringData").is_some() {
+            return Err(error(
+                ErrorKind::Invalid,
+                "string_data",
+                "stringData is not stored; put the value under data, in base64.",
+            ));
+        }
         let allowed = resource_allowed(resource);
         if let Some(reason) = allowed.reason {
             return Err(error(

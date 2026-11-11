@@ -169,8 +169,7 @@ mod tests {
     async fn a_secret_yaml_edit_shows_no_value_in_the_plan() {
         let cluster = cluster();
         let yaml = "apiVersion: v1\nkind: Secret\nmetadata: {name: web-secret}\ntype: Opaque\n\
-                    data:\n  password: aHVudGVyMw==\n  user: YWRtaW4=\n\
-                    stringData:\n  token: plain-typed-value\n";
+                    data:\n  password: aHVudGVyMw==\n  user: YWRtaW4=\n";
         let (planned, writes) = plan_and_apply(
             &cluster,
             json!([{"op": "edit", "resource": {"group": "", "version": "v1", "resource": "secrets"},

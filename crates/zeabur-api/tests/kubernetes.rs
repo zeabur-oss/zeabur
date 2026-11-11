@@ -597,10 +597,10 @@ mod tests {
         .await;
         assert_eq!(status, StatusCode::OK);
         let shown: Value = serde_json::from_str(&body).unwrap();
-        let yaml = format!(
-            "{}stringData:\n  token: abc\n",
-            shown["yaml"].as_str().unwrap()
-        );
+        let yaml = shown["yaml"]
+            .as_str()
+            .unwrap()
+            .replace("data:\n", "data:\n  token: YWJj\n");
         assert!(
             yaml.contains("password: aHVudGVyMg=="),
             "the YAML has the value"
