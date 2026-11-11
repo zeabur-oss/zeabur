@@ -22,7 +22,7 @@
 //! RoleBinding [ssrr]. So its answer is exact only for namespaced requests. For a cluster-scoped
 //! request (nodes, a CustomResourceDefinition) ask a `SelfSubjectAccessReview` with no
 //! namespace instead. An incomplete review, one that could not be made, and a malformed request
-//! never turn into [`Access::Allowed`].
+//! never turn into [`Access::Allowed`](crate::Access::Allowed).
 //!
 //! # References
 //!
