@@ -616,6 +616,21 @@ mod tests {
 
     #[tokio::test]
     #[ignore = "needs a disposable cluster"]
+    async fn contract_a_secret_read_generically_keeps_its_keys_but_not_its_values() {
+        let mut with_secrets = rules();
+        with_secrets.as_array_mut().unwrap().push(json!({
+            "apiGroups": [""], "resources": ["secrets"], "verbs": ["get", "list", "create"]
+        }));
+        let sandbox = Sandbox::new("zeabur-contract", with_secrets).await;
+        contract::a_secret_read_generically_keeps_its_keys_but_not_its_values(
+            sandbox.user(),
+            sandbox.namespace(),
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    #[ignore = "needs a disposable cluster"]
     async fn contract_a_dry_run_validates_strictly_and_stores_nothing() {
         let sandbox = Sandbox::new("zeabur-contract", rules()).await;
         contract::a_dry_run_validates_strictly_and_stores_nothing(

@@ -89,6 +89,12 @@ Removing or weakening one of these tests needs another test of the same promise 
 - **No real clock where the answer depends on the date**: tests fix it (`zeabur_api::Options::clock`).
 - **A flaky test is broken.** It is fixed or removed, not retried until green [nondeterminism].
 
+## Cost runs
+
+What a read costs is measured by hand, never asserted. The `zeabur-overview-cost` skill says how
+to measure the project overview read; a change that claims to save work measures before and after
+and puts both in the pull request.
+
 [swe-unit]: https://abseil.io/resources/swe-book/html/ch12.html
 [swe-doubles]: https://abseil.io/resources/swe-book/html/ch13.html
 [pyramid]: https://martinfowler.com/articles/practical-test-pyramid.html

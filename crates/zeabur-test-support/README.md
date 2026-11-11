@@ -12,6 +12,12 @@ Helpers shared by Zeabur's tests. Only ever a dev-dependency: nothing here reach
 - `tls` (feature `tls`): two CAs and a leaf for `localhost` and `127.0.0.1` that the first signed,
   made once per test run and valid for a day, and a loopback HTTPS server that presents the leaf,
   to test which certificates a client trusts.
+- `allocations` (feature `allocations`): bytes and allocations a body makes on the calling thread,
+  for the manual cost run (`crates/zeabur-kube/tests/overview_cost.rs`). Linking it replaces the
+  test binary's allocator.
+- `allocations` (feature `allocations`): bytes and allocations a body makes on the calling thread,
+  for the manual cost run (`crates/zeabur-kube/tests/overview_cost.rs`). Linking it replaces the
+  test binary's allocator.
 
 Its own test checks every crate's `fixtures/` against `fixtures/README.md`; the cases are loaded
 with `fixtures`.
