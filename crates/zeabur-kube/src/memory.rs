@@ -1584,10 +1584,7 @@ fn merge(target: &mut Value, patch: &Value) {
         if value.is_null() {
             object.remove(name);
         } else {
-            merge(
-                object.entry(name.clone()).or_insert(Value::Null),
-                value,
-            );
+            merge(object.entry(name.clone()).or_insert(Value::Null), value);
         }
     }
 }

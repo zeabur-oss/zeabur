@@ -607,7 +607,11 @@ mod tests {
         );
         let plan = planned_and_applied(&app, &ns, json!([{"op": "edit",
             "resource": {"group": "", "version": "v1", "resource": "secrets"}, "name": "web", "yaml": yaml}])).await;
-        assert_eq!(plan["objects"][0]["write"]["type"], json!("patch"), "a YAML edit is compared with the Secret as read");
+        assert_eq!(
+            plan["objects"][0]["write"]["type"],
+            json!("patch"),
+            "a YAML edit is compared with the Secret as read"
+        );
         let secret = api("", "v1", "Secret").get("web").await.unwrap();
         assert_eq!(
             secret.data.pointer("/data/password"),

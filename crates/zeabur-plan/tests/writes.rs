@@ -9,10 +9,10 @@
 //!   6902 implementation is in the dependency tree, so the patch is applied with Zeabur's; what the
 //!   property adds is that the whole write (its precondition, and the operations of several changes
 //!   to one object in order) holds on the stored object, not on the planner's working copy.
-//!   kube-apiserver's own answer is checked by the cluster tests. A key edit of a Secret is a
-//!   merge patch [rfc7386] instead: it sets the keys it names and leaves the others as stored,
-//!   whose values the plan does not read. The Secret's values are readable here for its YAML
-//!   edit: a plan without them cannot show the keys it does not touch.
+//!   kube-apiserver's own answer is checked by the cluster tests. A key edit of a Secret is a merge
+//!   patch [rfc7386] instead: it sets the keys it names and leaves the others as stored, whose
+//!   values the plan does not read. The Secret's values are readable here for its YAML edit: a plan
+//!   without them cannot show the keys it does not touch.
 //!
 //! The cases are generated: the workload's kind, its container, variables, port and mount, the
 //! routes' hostnames and the keys of a ConfigMap and a Secret. A restart is left out of the
@@ -797,7 +797,9 @@ mod tests {
                 let written = match &object.write {
                     Write::Patch { operations } => apply_patch(stored, operations).map_err(|e| TestCaseError::fail(e.to_string()))?,
                     Write::MergePatch { body } => merged(stored, body),
-                    _ => return Err(TestCaseError::fail(format!("{} was created", object.target.name))),
+                    Write::Create { .. } | Write::Delete { .. } | Write::EphemeralContainers { .. } => {
+                        return Err(TestCaseError::fail(format!("{} was created", object.target.name)));
+                    }
                 };
                 prop_assert_eq!(&written, &object.raw_after, "{}", object.target.kind);
             }
