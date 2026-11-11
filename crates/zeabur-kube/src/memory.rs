@@ -1162,11 +1162,13 @@ impl Cluster for MemoryCluster {
                     Some(namespace),
                 )
             });
-            Ok(if read_only {
-                Grants::read_only()
-            } else {
-                state.grants.rules_in(Some(namespace)).clone()
-            })
+            Ok(
+                if read_only && !state.grants.in_namespace.contains_key(namespace) {
+                    Grants::read_only()
+                } else {
+                    state.grants.rules_in(Some(namespace)).clone()
+                },
+            )
         })
     }
 

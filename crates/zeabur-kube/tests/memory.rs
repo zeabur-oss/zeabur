@@ -78,6 +78,18 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn bound_rules_are_not_widened_by_a_namespace_whose_writes_are_refused() {
+        let mut state = State::default();
+        state.bind(NAMESPACE, AccessRules::default());
+        state.refuse_writes("Namespace/shop");
+        let rules = MemoryCluster::new(state)
+            .access_rules(NAMESPACE)
+            .await
+            .expect("review");
+        assert!(rules.rules.is_empty());
+    }
+
+    #[tokio::test]
     async fn a_patch_whose_tests_hold_is_stored_as_computed() {
         contract::a_patch_whose_tests_hold_is_stored_as_computed(&cluster(), NAMESPACE).await;
     }
